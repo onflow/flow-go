@@ -1,0 +1,466 @@
+/*
+ * Copyright 2007 Project RELIC
+ * 
+ * This file is part of RELIC. RELIC is legal property of its developers,
+ * whose names are not listed here. Please refer to the COPYRIGHT file.
+ *
+ * RELIC is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * RELIC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+ * @file
+ *
+ * Project configuration.
+ *
+ * @version $Id: relic_conf.h.in 45 2009-07-04 23:45:48Z dfaranha $
+ * @ingroup relic
+ */
+
+#ifndef RELIC_CONF_H
+#define RELIC_CONF_H
+
+/** Project version. */
+#define VERSION "@VERSION@"
+
+/** Debugging support. */
+#cmakedefine DEBUG
+/** Profiling support. */
+#cmakedefine PROFL
+/** Error handling support. */
+#cmakedefine CHECK
+/** Verbose error messages. */
+#cmakedefine VERBS
+/** Trace support. */
+#cmakedefine TRACE
+/** Multithreading. */
+#cmakedefine MULTI
+/** Build documentation. */
+#cmakedefine DOCUM
+/** Build only the selected algorithms. */
+#cmakedefine STRIP
+/** Build with printing disabled. */
+#cmakedefine QUIET
+/** Build shared library. */
+#cmakedefine SHLIB
+/** Build static library. */
+#cmakedefine STLIB
+/** Build with multithreading support. */
+#cmakedefine MULTI
+
+/** Number of times each test is ran. */
+#define TESTS    @TESTS@
+/** Number of times each benchmark is ran. */
+#define BENCH    @BENCH@
+
+/** Number of available cores. */
+#define CORES    @CORES@
+
+/** Atmel AVR ATMega128 8-bit architecture. */
+#define AVR		 1
+/** MSP430 16-bit architecture. */
+#define MSP      2
+/** ARM 32-bit architecture. */
+#define ARM      3
+/** Intel x86-compatible 32-bit architecture. */
+#define X86		 4
+/** AMD64-compatible 64-bit architecture. */
+#define x86_64	 5 
+/** Architecture. */
+#define ARCH	 @ARCH@
+
+/** Size of word in this architecture. */
+#define WORD     @WORD@
+
+/** Byte boundary to align digit vectors. */
+#define ALIGN    @ALIGN@
+
+/** Build multiple precision integer module. */
+#cmakedefine WITH_BN
+/** Build prime field module. */
+#cmakedefine WITH_FP
+/** Build binary field module. */
+#cmakedefine WITH_FB
+/** Build prime elliptic curve module. */
+#cmakedefine WITH_EP
+/** Build binary elliptic curve module. */
+#cmakedefine WITH_EB
+/** Build pairings over prime curves module. */
+#cmakedefine WITH_PP
+/** Build pairings over binary curves module. */
+#cmakedefine WITH_PB
+/** Build hash functions. */
+#cmakedefine WITH_HF
+/** Build cryptographic protocols. */
+#cmakedefine WITH_CP
+/** Build etat module. */
+#cmakedefine WITH_ETAT
+
+/** Easy C-only backend. */
+#define EASY	 1
+/** GMP backend. */
+#define GMP		 2
+/** x86-64 optimized backend. */
+#define X86_64	 3
+/** Arithmetic backend. */
+#define ARITH    @ARITH@
+
+/** Required precision in bits. */
+#define BN_PRECI @BN_PRECI@
+/** A multiple precision integer can store w words. */
+#define SINGLE	 0
+/** A multiple precision integer can store the result of an addition. */
+#define CARRY	 1
+/** A multiple precision integer can store the result of a multiplication. */
+#define DOUBLE	 2
+/** Effective size of a multiple precision integer. */
+#define BN_MAGNI @BN_MAGNI@
+
+/** Multiple precision arithmetic method */
+#define BN_METHD "@BN_METHD@"
+
+/** Schoolbook multiplication. */
+#define BASIC    1
+/** Comba multiplication. */
+#define COMBA    2
+/** Number of Karatsuba steps. */
+#define BN_MUK   @BN_MUK@
+/** Chosen multiple precision multiplication method. */
+#define BN_MUL   @BN_MUL@
+
+/** Schoolbook squaring. */
+#define BASIC    1
+/** Comba squaring. */
+#define COMBA    2
+/** Number of Karatsuba steps. */
+#define BN_SQK	 @BN_SQK@
+/** Chosen multiple precision multiplication method. */
+#define BN_SQR   @BN_SQR@
+
+/** Division modular reduction. */
+#define BASIC    1
+/** Barrett modular reduction. */
+#define BARRT    2
+/** Montgomery modular reduction. */
+#define MONTY    3
+/** Diminished radix modular reduction. */
+#define RADIX    4
+/** Chosen multiple precision modular reduction method. */
+#define BN_MOD   @BN_MOD@
+
+/** Binary modular exponentiation. */
+#define BASIC    1
+/** Constant-time Montgomery ladder modular exponentiation. */
+#define CONST    2
+/** Sliding window modular exponentiation. */
+#define SLIDE    3
+/** Chosen multiple precision modular exponentiation method. */
+#define BN_MXP   @BN_MXP@
+
+/** Basic Euclidean GCD Algorithm. */ 
+#define BASIC    1
+/* Lehmer's fast GCD Algorithm. */
+#define LEHME    2
+/* Stein's binary GCD Algorithm. */
+#define STEIN    3
+/** Chosen multiple precision greatest common divisor method. */
+#define BN_GCD   @BN_GCD@
+
+/** Basic prime generation. */
+#define BASIC    1
+/** Safe prime generation. */
+#define SAFEP    2
+/** Strong prime generation. */
+#define STRON    3
+/** Chosen prime generation algorithm. */
+#define BN_GEN   @BN_GEN@
+
+/** Prime field size in bits. */
+#define FP_PRIME @FP_PRIME@
+
+/** Prime field arithmetic method */
+#define FP_METHD "@FP_METHD@"
+
+/** Schoolbook multiplication. */
+#define BASIC    1
+/** Comba multiplication. */
+#define COMBA    2
+/** Number of Karatsuba steps. */
+#define FP_MUK   @FP_MUK@
+/** Chosen prime field multiplication method. */
+#define FP_MUL   @FP_MUL@
+
+/** Schoolbook squaring. */
+#define BASIC    1
+/** Comba squaring. */
+#define COMBA    2
+/** Number of Karatsuba steps. */
+#define FP_SQK   @FP_SQK@
+/** Chosen prime field multiplication method. */
+#define FP_SQR   @FP_SQR@
+
+/** Chosen prime field reduction method. */
+#define FP_RDC   @FP_RDC@
+
+/** Irreducible polynomial size in bits. */
+#define FB_POLYN @FB_POLYN@
+
+/** Binary field arithmetic method */
+#define FB_METHD "@FB_METHD@"
+
+/** Shift-and-add multiplication. */
+#define BASIC    1
+/** Integrated modular multiplication. */
+#define INTEG	 2
+/** Left-to-right Comb multiplication. */
+#define LCOMB	 3
+/** Right-to-left Comb multiplication. */
+#define RCOMB	 4
+/** Lopez-Dahab multiplication. */
+#define LODAH	 5
+/** Number of Karatsuba steps. */
+#define FB_MUK   @FB_MUK@
+/** Chosen binary field multiplication method. */
+#define FB_MUL   @FB_MUL@
+
+/** Basic squaring. */
+#define BASIC    1
+/** Integrated modular squaring. */
+#define INTEG	 2
+/** Table-based squaring. */
+#define TABLE    3
+/** Chosen binary field squaring method. */
+#define FB_SQR   @FB_SQR@
+
+/** Shift-and-add modular reduction. */
+#define BASIC    1
+/** Fast reduction modulo a trinomial or pentanomial. */
+#define QUICK	 2
+/** Chosen binary field modular reduction method. */
+#define FB_RDC   @FB_RDC@
+
+/** Square root by repeated squaring. */
+#define BASIC    1
+/** Fast square root extraction. */
+#define QUICK	 2
+/** Chosen binary field modular reduction method. */
+#define FB_SRT   @FB_SRT@
+
+/** Binary inversion. */
+#define BASIC    1
+/** Extended Euclidean algorithm. */
+#define EXGCD    2
+/** Almost inverse algorithm. */
+#define ALMOS    3
+/** Chosen binary field inversion method. */
+#define FB_INV   @FB_INV@ 
+
+/** Support for ordinary curves. */
+#cmakedefine EP_ORDIN
+/** Support for supersingular curves. */
+#cmakedefine EP_SUPER
+/** Support for NIST standardized curves. */
+#cmakedefine EP_STAND
+/** Use mixed coordinates. */
+#cmakedefine EP_MIXED
+
+/** Prime elliptic curve arithmetic method. */
+#define EP_METHD "@EP_METHD@"
+
+/** Affine coordinates. */
+#define BASIC	 1
+/** López-Dahab Projective coordinates. */
+#define PROJC	 2
+/** Chosen binary elliptic curve coordinate method. */
+#define EP_ADD	 @EP_ADD@
+
+/** Binary point multiplication. */ 
+#define BASIC	 1
+/** Constant-time point multiplication. */
+#define CONST	 2
+/** 4-width (T)NAF. */ 
+#define WNAF4	 3
+/** 5-width (T)NAF. */
+#define WNAF5	 4
+/** Chosen binary elliptic curve point multiplication method. */
+#define EP_MUL	 @EP_MUL@
+
+/** Support for ordinary curves. */
+#cmakedefine EB_ORDIN
+/** Support for supersingular curves. */
+#cmakedefine EB_SUPER
+/** Support for Koblitz anomalous binary curves. */
+#cmakedefine EB_KBLTZ
+/** Support for NIST standardized curves. */
+#cmakedefine EB_STAND
+/** Use mixed coordinates. */
+#cmakedefine EB_MIXED
+/** Build precomputation table for generator. */
+#cmakedefine EB_PRECO
+/** Width of precomputation table for fixed point methods. */
+#define EB_DEPTH @EB_DEPTH@
+/** Width of window processing for unknown point methods. */
+#define EB_WIDTH @EB_WIDTH@
+
+/** Binary elliptic curve arithmetic method. */
+#define EB_METHD "@EB_METHD@"
+
+/** Affine coordinates. */
+#define BASIC	 1
+/** López-Dahab Projective coordinates. */
+#define PROJC	 2
+/** Chosen binary elliptic curve coordinate method. */
+#define EB_ADD	 @EB_ADD@
+
+/** Binary point multiplication. */ 
+#define BASIC	 1
+/** Constant-time point multiplication. */
+#define CONST	 2
+/** Sliding window. */ 
+#define SLIDE    3
+/** 4-width (T)NAF. */ 
+#define WTNAF	 4
+/** Chosen binary elliptic curve point multiplication method. */
+#define EB_MUL	 @EB_MUL@
+
+/** Binary point multiplication. */ 
+#define BASIC	 1
+/** Yao's windowing method. */
+#define YAOWI	 2
+/** NAF windowing method. */ 
+#define NAFWI	 3
+/** w-(T)NAF method. */
+#define WTNAF    4
+/** Single-table comb method. */
+#define COMBS	 5
+/** Double-table comb method. */
+#define COMBD    6
+/** Chosen binary elliptic curve point multiplication method. */
+#define EB_FIX	 @EB_FIX@
+
+/** Basic simultaneouns point multiplication. */
+#define BASIC    1
+/** Shamir's trick. */
+#define TRICK    2
+/** Interleaving of w-(T)NAFs. */
+#define INTER    3
+/** Joint sparse form. */
+#define JOINT    4
+/** Chosen binary elliptic curve simulteanous point multiplication method. */
+#define EB_SIM   @EB_SIM@ 
+
+/** Parallel implementation. */
+#cmakedefine PB_PARAL
+
+/** Bilinear pairing method. */
+#define PB_METHD "@PB_METHD@"
+
+/** Pairing computation with square roots. */ 
+#define ETATS	 1
+/** Pairing computation without square roots. */
+#define ETATN	 2
+/** Chosen binary elliptic curve point multiplication method. */
+#define PB_MAP	 @PB_MAP@
+
+/** Bilinear pairing method. */
+#define HF_METHD "@HF_METHD@"
+
+/** SHA-1 hash function. */
+#define SHONE    1
+/** SHA-224 hash function. */
+#define SH224    2
+/** SHA-256 hash function. */
+#define SH256    3
+/** SHA-384 hash function. */
+#define SH384    4
+/** SHA-512 hash function. */
+#define SH512    5
+/** Chosen hash function. */
+#define HF_MAP   @HF_MAP@
+
+/** RSA without padding. */
+#define EMPTY    1
+/** RSA PKCS#1 v1.5 padding. */
+#define PKCS1    2
+/** RSA PKCS#1 v2.1 padding. */
+#define PKCS2    3
+/** Chosen RSA padding method. */
+#define CP_RSAPD   @CP_RSAPD@
+
+/** Slow RSA decryption/signature. */
+#define BASIC    1
+/** Fast RSA decryption/signature with CRT. */
+#define QUICK    2
+/** Chosen RSA method. */
+#define CP_RSA     @CP_RSA@
+
+/** Standard ECDSA. */
+#define BASIC    1
+/** ECDSA with fast verification. */
+#define QUICK    2
+/** Chosen ECDSA method. */
+#define CP_ECDSA     @CP_ECDSA@
+
+/** Static memory allocation. */
+#define	STATIC   1
+/** Dynamic memory allocation. */
+#define DYNAMIC  2
+/** Stack memory allocation. */
+#define STACK    3
+/** Chosen memory allocation policy. */
+#define ALLOC    @ALLOC@
+
+/** FIPS 186-2 generator. */
+#define FIPS     1
+/** Chosen random generator. */
+#define RAND     @RAND@
+
+/** Standard C library generator. */
+#define LIBC     1
+/** Device node generator. */
+#define DEV      2
+/** Chosen random generator seeder. */
+#define SEED     @SEED@
+
+/** Undefined/No operating system. */
+#define NONE     1
+/** GNU/Linux operating system. */
+#define LINUX    2
+/** FreeBSD operating system. */
+#define FREEBSD  3
+/** Detected operation system. */
+#define OPSYS    @OPSYS@
+
+/** No timer. */
+#define NONE     1
+/** High-resolution timer. */
+#define HRES     2
+/** POSIX-compatible timer. */
+#define POSIX    3
+/** ANSI-compatible timer. */
+#define ANSI     4
+/** Cycle-counting timer. */
+#define CYCLE    5
+/** Chosen timer. */
+#define TIMER    @TIMER@
+
+#ifndef ASM
+
+/**
+ * Prints the project options selected at build time.
+ */
+void conf_print(void);
+
+#endif /* ASM */
+
+#endif /* !RELIC_CONF_H */

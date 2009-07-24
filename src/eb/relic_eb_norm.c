@@ -1,0 +1,138 @@
+/*
+ * Copyright 2007 Project RELIC
+ *
+ * This file is part of RELIC. RELIC is legal property of its developers,
+ * whose names are not listed here. Please refer to the COPYRIGHT file.
+ *
+ * RELIC is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * RELIC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+ * @file
+ *
+ * Implementation of the point normalization on binary elliptic curves.
+ *
+ * @version $Id$
+ * @ingroup eb
+ */
+
+#include "string.h"
+
+#include "relic_core.h"
+#include "relic_eb.h"
+#include "relic_error.h"
+
+/*============================================================================*/
+/* Private definitions                                                        */
+/*============================================================================*/
+
+#if EB_ADD == PROJC || defined(EB_MIXED)
+
+#if defined(EB_ORDIN) || defined(EB_KBLTZ)
+
+/**
+ * Normalizes a point represented in projective coordinates.
+ *
+ * @param r			- the result.
+ * @param p			- the point to normalize.
+ */
+void eb_norm_ordin(eb_t r, eb_t p) {
+	if (!p->norm) {
+		fb_t t0 = NULL;
+
+		TRY {
+			fb_new(t0);
+
+			fb_inv(t0, p->z);
+			fb_mul(r->x, p->x, t0);
+			fb_sqr(t0, t0);
+			fb_mul(r->y, p->y, t0);
+			fb_zero(r->z);
+			fb_set_bit(r->z, 0, 1);
+		} CATCH_ANY {
+			THROW(ERR_CAUGHT);
+		} FINALLY {
+			fb_free(t0);
+		}
+	}
+
+	r->norm = 1;
+}
+
+#endif /* EB_ORDIN || EB_KBLTZ */
+
+#if defined(EB_SUPER)
+
+/**
+ * Normalizes a point represented in projective coordinates.
+ *
+ * @param r			- the result.
+ * @param p			- the point to normalize.
+ */
+void eb_norm_super(eb_t r, eb_t p) {
+	if (!p->norm) {
+		fb_t t0 = NULL;
+		TRY {
+			fb_new(t0);
+
+			fb_inv(t0, p->z);
+			fb_mul(r->x, p->x, t0);
+			fb_mul(r->y, p->y, t0);
+			fb_zero(r->z);
+			fb_set_bit(r->z, 0, 1);
+
+		} CATCH_ANY {
+			THROW(ERR_CAUGHT);
+		}
+		FINALLY {
+			fb_free(t0);
+		}
+	}
+
+	r->norm = 1;
+}
+
+#endif /* EB_SUPER */
+
+#endif /* EB_ADD == PROJC || EB_MIXED */
+
+/*============================================================================*/
+/* Public definitions                                                         */
+/*============================================================================*/
+
+void eb_norm(eb_t r, eb_t p) {
+	if (eb_is_infty(p)) {
+		eb_set_infty(r);
+		return;
+	}
+
+	if (p->norm) {
+		/* If the point is represented in affine coordinates, we just copy it. */
+		eb_copy(r, p);
+	}
+#if EB_ADD == PROJC || !defined(STRIP)
+
+#if defined(EB_SUPER)
+	if (eb_curve_is_super()) {
+		eb_norm_super(r, p);
+		return;
+	}
+#endif /* EB_SUPER */
+
+#if defined(EB_ORDIN) || defined(EB_KBLTZ)
+	eb_norm_ordin(r, p);
+#endif /* EB_ORDIN || EB_KBLTZ */
+
+#endif /* EB_ADD == PROJC */
+}
