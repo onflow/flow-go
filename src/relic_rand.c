@@ -72,12 +72,11 @@ static unsigned char state[64];
 #include "relic_hf.h"
 
 void rand_init() {
-	int rand_fd;
-	int c, l;
 	unsigned char buf[STATE_SIZE];
 
 	memset(state, 0, sizeof(state));
 #if SEED == DEV
+	int rand_fd, c, l;
 	rand_fd = open(RAND_PATH, O_RDONLY);
 	if (rand_fd == -1) {
 		THROW(ERR_NO_FILE);

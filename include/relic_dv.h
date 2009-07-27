@@ -70,8 +70,7 @@ typedef dig_t *dv_t;
 #define dv_new(A)			dv_new_statc(&(A), DV_DIGS)
 #elif ALLOC == STACK
 #define dv_new(A)															\
-	A = (dig_t *)alloca(DV_DIGS * sizeof(dig_t) + ALIGN);					\
-	A = (dig_t *)((dig_t)A + (ALIGN - ((dig_t)A & 0x0F)));					\
+	A = (dig_t *)alloca(DV_DIGS * sizeof(dig_t) + ALIGN); ALIGNED(A);		\
 
 #endif
 

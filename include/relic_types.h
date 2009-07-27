@@ -106,9 +106,28 @@ typedef __uint128_t dbl_t;
  * Specification for aligned variables.
  */
 #ifdef ALIGN
-#define align 	__attribute__ ((aligned (ALIGN)))
+#define align 			__attribute__ ((aligned (ALIGN)))
 #else
-#define align 	/* empty*/
+#define align 			/* empty*/
+#endif
+
+/**
+ * Align digit vector pointer to specified byte-boundary.
+ *
+ * @param[in,out] A		- the pointer to align.
+ */
+#ifdef ALIGN
+#if ARCH == AVR || ARCH == MSP || ARCH == X86
+#define ALIGNED(A)															\
+	A = (dig_t *)((unsigned int)A + (ALIGN - ((unsigned int)A & 0x0F)));	\
+
+#elif ARCH  == X86_64
+#define ALIGNED(A)															\
+	A = (dig_t *)((unsigned long)A + (ALIGN - ((unsigned long)A & 0x0F)));	\
+
+#endif
+#else
+#define ALIGNED(...)	/* empty */
 #endif
 
 #endif /* !RELIC_TYPES_H */

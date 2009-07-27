@@ -275,7 +275,7 @@ void fb_read(fb_t a, const char *str, int len, int radix) {
 	while (str[j] && j < len) {
 		c = (char)((radix < 36) ? toupper(str[j]) : str[j]);
 		for (i = 0; i < 64; i++) {
-			if (c == util_conv(i)) {
+			if (c == util_conv_char(i)) {
 				break;
 			}
 		}
@@ -320,7 +320,7 @@ void fb_write(char *str, int len, fb_t a, int radix) {
 	while (!fb_is_zero(t)) {
 		d = t[0] % radix;
 		fb_rsh(t, t, l);
-		str[j] = util_conv(d);
+		str[j] = util_conv_char(d);
 		j++;
 	}
 

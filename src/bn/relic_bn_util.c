@@ -291,7 +291,7 @@ void bn_read_str(bn_t a, const char *str, int len, int radix) {
 	while (str[j] && j < len) {
 		c = (char)((radix < 36) ? toupper(str[j]) : str[j]);
 		for (i = 0; i < 64; i++) {
-			if (c == util_conv(i)) {
+			if (c == util_conv_char(i)) {
 				break;
 			}
 		}
@@ -343,7 +343,7 @@ void bn_write_str(char *str, int len, bn_t a, int radix) {
 		digits = 0;
 		while (!bn_is_zero(t)) {
 			bn_div_dig(t, &d, t, (dig_t)radix);
-			str[j] = util_conv(d);
+			str[j] = util_conv_char(d);
 			digits++;
 			j++;
 		}

@@ -183,7 +183,7 @@ void fb_poly_add(fb_t c, fb_t a);
 #define fb_new(A)			dv_new_statc((dv_t *)&(A), FB_DIGS)
 #elif ALLOC == STACK
 #define fb_new(A)															\
-	A = (dig_t *)alloca(FB_DIGS * sizeof(dig_t));							\
+	A = (dig_t *)alloca(FB_DIGS * sizeof(dig_t) + ALIGN); ALIGNED(A);		\
 
 #endif
 

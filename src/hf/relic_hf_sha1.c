@@ -27,11 +27,10 @@
  * @ingroup hf
  */
 
-#include <arpa/inet.h>
-
 #include "relic_conf.h"
 #include "relic_core.h"
 #include "relic_error.h"
+#include "relic_util.h"
 #include "sha.h"
 
 static SHA1Context ctx;
@@ -67,9 +66,9 @@ void hf_sha1_final(unsigned char *hash) {
 }
 
 void hf_sha1_state(unsigned char *state) {
-	*(unsigned int *)(state) = htonl(ctx.Intermediate_Hash[0]);
-	*(unsigned int *)(state + 4) = htonl(ctx.Intermediate_Hash[1]);
-	*(unsigned int *)(state + 8) = htonl(ctx.Intermediate_Hash[2]);
-	*(unsigned int *)(state + 12) = htonl(ctx.Intermediate_Hash[3]);
-	*(unsigned int *)(state + 16) = htonl(ctx.Intermediate_Hash[4]);
+	*(unsigned int *)(state) = util_conv_big(ctx.Intermediate_Hash[0]);
+	*(unsigned int *)(state + 4) = util_conv_big(ctx.Intermediate_Hash[1]);
+	*(unsigned int *)(state + 8) = util_conv_big(ctx.Intermediate_Hash[2]);
+	*(unsigned int *)(state + 12) = util_conv_big(ctx.Intermediate_Hash[3]);
+	*(unsigned int *)(state + 16) = util_conv_big(ctx.Intermediate_Hash[4]);
 }

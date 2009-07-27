@@ -30,14 +30,14 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "relic_bench.h"
+#include "relic_conf.h"
+#include "relic_util.h"
+
 #if OPSYS == LINUX || OPSYS == FREEBSD
 #include <time.h>
 #include <sys/time.h>
 #endif
-
-#include "relic_bench.h"
-#include "relic_conf.h"
-#include "relic_util.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
@@ -101,8 +101,8 @@ static long long total;
 /*============================================================================*/
 
 void bench_timing_reset(char *label) {
-	total = 0;
 #if TIMER != NONE
+	total = 0;
 	util_print("BENCH: %s %*s = ", label, (int)(25 - strlen(label)), " ");
 #else
 	(void)label;

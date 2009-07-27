@@ -46,6 +46,20 @@ static const char conv_table[] =
 /* Public definitions                                                         */
 /*============================================================================*/
 
-char util_conv(dig_t i) {
+uint32_t util_conv_big(uint32_t i) {
+#ifdef BIGED
+	return i;
+#else
+	uint32_t i1, i2, i3, i4;
+	i1 = i & 0xFF;
+	i2 = (i >> 8) & 0xFF;
+	i3 = (i >> 16) & 0xFF;
+	i4 = (i >> 24) & 0xFF;
+
+	return ((uint32_t)i1 << 24) | ((uint32_t)i2 << 16) | ((uint32_t)i3 << 8) | i4;
+#endif
+}
+
+char util_conv_char(dig_t i) {
 	return conv_table[i];
 }

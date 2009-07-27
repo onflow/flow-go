@@ -27,8 +27,6 @@
  * @ingroup hf
  */
 
-#include <arpa/inet.h>
-
 #include "relic_conf.h"
 #include "relic_core.h"
 #include "relic_error.h"
@@ -46,31 +44,4 @@ void hf_map_sh224(unsigned char *hash, unsigned char *msg, int len) {
 	if (SHA224Result(&ctx, hash) != shaSuccess) {
 		THROW(ERR_INVALID);
 	}
-}
-
-void hf_sha224_init(void) {
-	if (SHA224Reset(&ctx) != shaSuccess) {
-		THROW(ERR_INVALID);
-	}
-}
-
-void hf_sha224_update(unsigned char *msg, int len) {
-	if (SHA224Input(&ctx, msg, len) != shaSuccess) {
-		THROW(ERR_INVALID);
-	}
-}
-
-void hf_sha224_final(unsigned char *hash) {
-	if (SHA224Result(&ctx, hash) != shaSuccess) {
-		THROW(ERR_INVALID);
-	}
-}
-
-void hf_sha224_state(unsigned char *state) {
-	*(unsigned int *)(state) = htonl(ctx.Intermediate_Hash[0]);
-	*(unsigned int *)(state + 4) = htonl(ctx.Intermediate_Hash[1]);
-	*(unsigned int *)(state + 8) = htonl(ctx.Intermediate_Hash[2]);
-	*(unsigned int *)(state + 12) = htonl(ctx.Intermediate_Hash[3]);
-	*(unsigned int *)(state + 16) = htonl(ctx.Intermediate_Hash[4]);
-	*(unsigned int *)(state + 20) = htonl(ctx.Intermediate_Hash[5]);
 }

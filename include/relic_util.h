@@ -121,8 +121,13 @@
 #endif
 
 /**
+ * Convert digit to big-endian.
+ */
+uint32_t util_conv_big(uint32_t i);
+
+/**
  * Converts a small digit to a character.
  */
-char util_conv(dig_t i);
+char util_conv_char(dig_t i);
 
 #endif /* !RELIC_UTIL_H */

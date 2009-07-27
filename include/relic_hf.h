@@ -118,33 +118,6 @@ void hf_sha1_state(unsigned char *state);
 void hf_map_sh224(unsigned char *hash, unsigned char *msg, int len);
 
 /**
- * Initializes the hash function context.
- */
-void hf_sha224_init(void);
-
-/**
- * Updates the hash function context with more data.
- *
- * @param[in] msg				- the message to hash.
- * @param[in] len				- the message length in bytes.
- */
-void hf_sha224_update(unsigned char *msg, int len);
-
-/**
- * Finalizes the hash function computation.
- *
- * @param[out] hash				- the digest.
- */
-void hf_sha224_final(unsigned char *hash);
-
-/**
- * Returns the internal state of the hash function.
- *
- * @param[out] state			- the internal state.
- */
-void hf_sha224_state(unsigned char *state);
-
-/**
  * Computes the SHA-256 hash function.
  *
  * @param[out] hash				- the digest.
@@ -152,33 +125,6 @@ void hf_sha224_state(unsigned char *state);
  * @param[in] len				- the message length in bytes.
  */
 void hf_map_sh256(unsigned char *hash, unsigned char *msg, int len);
-
-/**
- * Initializes the hash function context.
- */
-void hf_sha256_init(void);
-
-/**
- * Updates the hash function context with more data.
- *
- * @param[in] msg				- the message to hash.
- * @param[in] len				- the message length in bytes.
- */
-void hf_sha256_update(unsigned char *msg, int len);
-
-/**
- * Finalizes the hash function computation.
- *
- * @param[out] hash				- the digest.
- */
-void hf_sha256_final(unsigned char *hash);
-
-/**
- * Returns the internal state of the hash function.
- *
- * @param[out] state			- the internal state.
- */
-void hf_sha256_state(unsigned char *state);
 
 /**
  * Computes the SHA-384 hash function.
@@ -190,33 +136,6 @@ void hf_sha256_state(unsigned char *state);
 void hf_map_sh384(unsigned char *hash, unsigned char *msg, int len);
 
 /**
- * Initializes the hash function context.
- */
-void hf_sha384_init(void);
-
-/**
- * Updates the hash function context with more data.
- *
- * @param[in] msg				- the message to hash.
- * @param[in] len				- the message length in bytes.
- */
-void hf_sha384_update(unsigned char *msg, int len);
-
-/**
- * Finalizes the hash function computation.
- *
- * @param[out] hash				- the digest.
- */
-void hf_sha384_final(unsigned char *hash);
-
-/**
- * Returns the internal state of the hash function.
- *
- * @param[out] state			- the internal state.
- */
-void hf_sha384_state(unsigned char *state);
-
-/**
  * Computes the SHA-512 hash function.
  *
  * @param[out] hash				- the digest.
@@ -224,32 +143,5 @@ void hf_sha384_state(unsigned char *state);
  * @param[in] len				- the message length in bytes.
  */
 void hf_map_sh512(unsigned char *hash, unsigned char *msg, int len);
-
-/**
- * Initializes the hash function context.
- */
-void hf_sha512_init(void);
-
-/**
- * Updates the hash function context with more data.
- *
- * @param[in] msg				- the message to hash.
- * @param[in] len				- the message length in bytes.
- */
-void hf_sha512_update(unsigned char *msg, int len);
-
-/**
- * Finalizes the hash function computation.
- *
- * @param[out] hash				- the digest.
- */
-void hf_sha512_final(unsigned char *hash);
-
-/**
- * Returns the internal state of the hash function.
- *
- * @param[out] state			- the internal state.
- */
-void hf_sha512_state(unsigned char *state);
 
 #endif /* !RELIC_HF_H */
