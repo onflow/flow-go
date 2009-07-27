@@ -1,0 +1,2 @@
+#!/bin/bash 
+CC=avr-gcc CXX=c++ LINK="-mmcu=atmega128 -Wl,-gc-sections" COMP="-O2 -ggdb -Wa,-mmcu=atmega128 -mmcu=atmega128 -ffunction-sections -fdata-sections" cmake -DARCH=AVR -DWORD=8 -DOPSYS=NONE -DSEED=LIBC -DSHLIB=OFF -DSTBIN=ON -DTIMER=NONE -DWITH="DV;BN;FB;EB;PB;CP;HF" -DBENCH=20 -DTESTS=20 -DCHECK=off -DVERBS=off -DSTRIP=on -DQUIET=on -DARITH=avr-asm -DFB_METHD="INTEG;INTEG;QUICK;BASIC;ALMOS" $1
