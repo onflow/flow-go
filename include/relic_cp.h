@@ -121,11 +121,11 @@ int cp_ecdsa_ver_basic(bn_t r, bn_t s, unsigned char *msg, int len, eb_t q);
 
 int cp_ecdsa_ver_quick(bn_t r, bn_t s, unsigned char *msg, int len, eb_t q);
 
-void cp_sokaka_gen(void);
+void cp_sokaka_gen(bn_t master);
 
 void cp_sokaka_gen_pub(eb_t p, char *id, int len);
 
-void cp_sokaka_gen_prv(eb_t s, char *id, int len);
+void cp_sokaka_gen_prv(eb_t s, char *id, int len, bn_t master);
 
 void cp_sokaka_key(fb4_t key, eb_t p, eb_t s);
 

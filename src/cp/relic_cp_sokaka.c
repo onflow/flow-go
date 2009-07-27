@@ -39,36 +39,27 @@
 #include "relic_bench.h"
 
 /*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * Master key.
- */
-static bn_st master;
-
-/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void cp_sokaka_gen(void) {
+void cp_sokaka_gen(bn_t master) {
 	bn_t n = NULL;
 
 	n = eb_curve_get_ord();
 
 	do {
-		bn_rand(&master, BN_POS, bn_bits(n));
-		bn_mod_basic(&master, &master, n);
-	} while (bn_is_zero(&master));
+		bn_rand(master, BN_POS, bn_bits(n));
+		bn_mod_basic(master, master, n);
+	} while (bn_is_zero(master));
 }
 
 void cp_sokaka_gen_pub(eb_t p, char *id, int len) {
 	eb_map(p, (unsigned char *)id, len);
 }
 
-void cp_sokaka_gen_prv(eb_t s, char *id, int len) {
+void cp_sokaka_gen_prv(eb_t s, char *id, int len, bn_t master) {
 	eb_map(s, (unsigned char *)id, len);
-	eb_mul(s, s, &master);
+	eb_mul(s, s, master);
 }
 
 void cp_sokaka_key(fb4_t key, eb_t p, eb_t s) {

@@ -212,10 +212,12 @@ int ecdsa(void) {
 int sokaka(void) {
 	err_t e;
 	int code = STS_ERR;
+	bn_t s;
 	eb_t p_a = NULL, p_b = NULL, s_a = NULL, s_b = NULL;
 	fb4_t key1, key2;
 
 	TRY {
+		bn_new(s);
 		eb_new(p_a);
 		eb_new(p_b);
 		eb_new(s_a);
@@ -223,13 +225,13 @@ int sokaka(void) {
 		fb4_new(key1);
 		fb4_new(key2);
 
-		cp_sokaka_gen();
+		cp_sokaka_gen(s);
 
 		TEST_BEGIN("sakai-ohgishi-kasahara authenticated key agreement is correct") {
 			cp_sokaka_gen_pub(p_a, "Alice", strlen("Alice"));
 			cp_sokaka_gen_pub(p_b, "Bob", strlen("Bob"));
-			cp_sokaka_gen_prv(s_a, "Alice", strlen("Alice"));
-			cp_sokaka_gen_prv(s_b, "Bob", strlen("Bob"));
+			cp_sokaka_gen_prv(s_a, "Alice", strlen("Alice"), s);
+			cp_sokaka_gen_prv(s_b, "Bob", strlen("Bob"), s);
 			cp_sokaka_key(key1, p_b, s_a);
 			cp_sokaka_key(key2, p_a, s_b);
 			TEST_ASSERT(fb4_cmp(key1, key2) == CMP_EQ, end);
