@@ -116,14 +116,14 @@ typedef __uint128_t dbl_t;
  *
  * @param[in,out] A		- the pointer to align.
  */
-#ifdef ALIGN
+#if ALIGN > 1
 #if ARCH == AVR || ARCH == MSP || ARCH == X86
 #define ALIGNED(A)															\
-	A = (dig_t *)((unsigned int)A + (ALIGN - ((unsigned int)A & 0x0F)));	\
+	A = (dig_t *)((unsigned int)A + (ALIGN - ((unsigned int)A % ALIGN)));	\
 
 #elif ARCH  == X86_64
 #define ALIGNED(A)															\
-	A = (dig_t *)((unsigned long)A + (ALIGN - ((unsigned long)A & 0x0F)));	\
+	A = (dig_t *)((unsigned long)A + (ALIGN - ((unsigned long)A % ALIGN)));	\
 
 #endif
 #else
