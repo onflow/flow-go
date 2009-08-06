@@ -45,21 +45,26 @@
 /**
  * Prime modulus.
  */
-static dig_t poly[FB_DIGS];
+static fb_st poly;
 
 #if FB_RDC == BASIC || !defined(STRIP)
 
 /**
+ * Type of a shifted polynomial (used to maintain aligment).
+ */
+typedef align dig_t shift_t[FB_DIGS + 1];
+
+/**
  * Precomputed table of the modulus shifted by different amounts.
  */
-static dig_t poly_shift[FB_DIGIT][2 * FB_DIGS];
+static shift_t poly_shift[FB_DIGIT];
 
 #else
 
 /**
  * Emulate the precomputation table with a single digit vector.
  */
-static dig_t poly_shift[FB_DIGS + 1];
+static dig_t poly_shift[FB_DIGIT][FB_DIGS + 1];
 
 #endif
 
