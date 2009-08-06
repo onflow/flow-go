@@ -57,16 +57,14 @@ void fb_rdc_basic(fb_t c, dv_t a) {
 		if (fb_test_bit(tmpa, i)) {
 			SPLIT(k, j, i - FB_BITS, FB_DIG_LOG);
 			rdc = fb_poly_get_rdc(k);
-			fb_addn_low(tmpa + j, tmpa + j, rdc);
-			tmpa[j + FB_DIGS] ^= rdc[FB_DIGS];
+			fb_addd_low(tmpa + j, tmpa + j, rdc, FB_DIGS + 1);
 		}
 	}
 	for (int i = fb_bits(a); i >= FB_BITS; i--) {
 		if (fb_test_bit(a, i)) {
 			SPLIT(k, j, i - FB_BITS, FB_DIG_LOG);
 			rdc = fb_poly_get_rdc(k);
-			fb_addn_low(a + j, a + j, rdc);
-			a[j + FB_DIGS] ^= rdc[FB_DIGS];
+			fb_addd_low(a + j, a + j, rdc, FB_DIGS + 1);
 		}
 	}
 
