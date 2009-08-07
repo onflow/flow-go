@@ -425,12 +425,10 @@
 /** Chosen random generator. */
 #define RAND     @RAND@
 
-/** Standard C library random generator. */
+/** Standard C library generator. */
 #define LIBC     1
-/** BSD random generator. */
-#define BSD      2
 /** Device node generator. */
-#define DEV      3
+#define DEV      2
 /** Chosen random generator seeder. */
 #define SEED     @SEED@
 

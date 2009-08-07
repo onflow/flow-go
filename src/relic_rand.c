@@ -93,15 +93,17 @@ void rand_init() {
 		close(rand_fd);
 	}
 #elif SEED == LIBC
-	srand(1);
-	for (int i = 0; i < STATE_SIZE; i++) {
-		buf[i] = (unsigned char)rand();
-	}
-#elif SEED == BSD
+#if OPSYS == FREEBSD
 	srandom(1);
 	for (int i = 0; i < STATE_SIZE; i++) {
 		buf[i] = (unsigned char)random();
 	}
+#else
+	srand(1);
+	for (int i = 0; i < STATE_SIZE; i++) {
+		buf[i] = (unsigned char)rand();
+	}
+#endif
 #endif
 	rand_seed(buf, STATE_SIZE);
 }
