@@ -96,7 +96,8 @@ message(STATUS "Available pseudo-random number generators (default = FIPS):")
 message("   RAND=FIPS      Use the FIPS 186-2 SHA1-based generator. (recommended)\n")
 
 message(STATUS "Available random number generator seeders (default = DEV):")
-message("   SEED=LIBC      Use the libc random() function. (not crypto safe!)")
+message("   SEED=LIBC      Use the libc srand()/rand() functions. (not crypto safe!)")
+message("   SEED=BSD       Use the libc random()/srandom() functions. (not crypto safe!)")
 message("   SEED=DEV       Use /dev/random. (recommended)\n")
 
 message(STATUS "Supported operating systems (default = LINUX):")
