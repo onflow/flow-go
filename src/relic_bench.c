@@ -29,13 +29,13 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "relic_bench.h"
 #include "relic_conf.h"
 #include "relic_util.h"
 
 #if OPSYS == LINUX || OPSYS == FREEBSD
-#include <time.h>
 #include <sys/time.h>
 #endif
 

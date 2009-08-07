@@ -599,7 +599,7 @@ void bn_mul_karat(bn_t c, bn_t a, bn_t b);
  * @param[in] A				- the multiple precision integer to square.
  */
 #if BN_SQK > 0
-#define bn_sqr(C, A, B)	bn_sqr_karat(C, A, B)
+#define bn_sqr(C, A)	bn_sqr_karat(C, A)
 #elif BN_SQR == BASIC
 #define bn_sqr(C, A)	bn_sqr_basic(C, A)
 #elif BN_SQR == COMBA
