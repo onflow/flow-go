@@ -1,16 +1,16 @@
 message(STATUS "Cryptographic protocols configuration (CP module):\n")
 
-message("   *** Options for the binary elliptic curve module (default = PKCS1):")
-message("       CP_RSAPD=EMPTY    RSA without any padding.")
-message("       CP_RSAPD=PKCS1    RSA with PKCS#1 v1.5 padding.\n")
+message("   ** Options for the binary elliptic curve module (default = PKCS1):")
+message("      CP_RSAPD=EMPTY    RSA without any padding.")
+message("      CP_RSAPD=PKCS1    RSA with PKCS#1 v1.5 padding.\n")
 
-message("   *** Available cryptographic protocols methods (default = QUICK;BASIC):")
-message("       CP_METHD=BASIC    Slow RSA decryption/signature.")
-message("       CP_METHD=QUICK    Fast RSA decryption/signature using CRT.\n")
-message("       CP_METHD=BASIC    Standard ECDSA.")
-message("       CP_METHD=QUICK    ECDSA with fast verification.\n")
+message("   ** Available cryptographic protocols methods (default = QUICK;BASIC):")
+message("      CP_METHD=BASIC    Slow RSA decryption/signature.")
+message("      CP_METHD=QUICK    Fast RSA decryption/signature using CRT.\n")
+message("      CP_METHD=BASIC    Standard ECDSA.")
+message("      CP_METHD=QUICK    ECDSA with fast verification.\n")
 
-message("       Note: these methods must be given in order. Ex: CP_METHD=\"QUICK;QUICK\"\n")
+message("      Note: these methods must be given in order. Ex: CP_METHD=\"QUICK;QUICK\"\n")
 
 if (NOT CP_RSAPD)
 	set(CP_RSAPD "PKCS1")

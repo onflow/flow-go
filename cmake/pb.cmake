@@ -1,13 +1,13 @@
 message(STATUS "Bilinear pairings arithmetic configuration (PB module):\n")
 
-message("   *** Options for the bilinear pairing module (default = on):")
-message("       PB_PARAL=[off|on] Parallel implementation.\n")
+message("   ** Options for the bilinear pairing module (default = on):")
+message("      PB_PARAL=[off|on] Parallel implementation.\n")
 
 option(PB_PARAL "Parallel implementation." off)
 
-message("   *** Available bilinear pairing methods (default = ETATS):")
-message("       PB_METHD=ETATS    Eta-t pairing with square roots.")
-message("       PB_METHD=ETATN    Eta-t pairing without square roots.\n")
+message("   ** Available bilinear pairing methods (default = ETATS):")
+message("      PB_METHD=ETATS    Eta-t pairing with square roots.")
+message("      PB_METHD=ETATN    Eta-t pairing without square roots.\n")
 
 # Choose the arithmetic methods.
 if (NOT PB_METHD)
