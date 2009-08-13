@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -388,18 +388,7 @@ void fb_mul_basic(fb_t c, fb_t a, fb_t b) {
 #if FB_MUL == INTEG || !defined(STRIP)
 
 void fb_mul_integ(fb_t c, fb_t a, fb_t b) {
-	dv_t t = NULL;
-
-	TRY {
-		dv_new(t);
-
-		fb_mulm_low(c, t, a, b);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		dv_free(t);
-	}
+	fb_mulm_low(c, a, b);
 }
 
 #endif

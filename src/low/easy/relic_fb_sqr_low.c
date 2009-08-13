@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -28,6 +28,7 @@
  */
 
 #include "relic_fb.h"
+#include "relic_dv.h"
 #include "relic_fb_low.h"
 #include "relic_util.h"
 
@@ -153,7 +154,9 @@ void fb_sqrl_low(dig_t *c, dig_t *a) {
 #endif
 }
 
-void fb_sqrm_low(dig_t *c, dig_t *t, dig_t *a) {
+void fb_sqrm_low(dig_t *c, dig_t *a) {
+	dig_t align t[2 * FB_DIGS];
+
 	fb_sqrl_low(t, a);
 	fb_rdcn_low(c, t);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -124,7 +124,6 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 	dig_t *t = NULL, *u = NULL, *v = NULL, *g1 = NULL, *g2 = NULL, carry;
 
 	TRY {
-
 		dv_new(_u);
 		dv_new(_v);
 		dv_new(_g1);

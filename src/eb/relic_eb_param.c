@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -268,6 +268,11 @@ void copy_from_rom(char *dest, const char *src) {
 	PREPARE(str, CURVE##_R);												\
 	bn_read_str(r, str, strlen(str), 16);									\
 
+/**
+ * Current configured elliptic curve parameters.
+ */
+static int param_id;
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -298,77 +303,69 @@ void eb_param_set(int param) {
 				ASSIGN(NIST_B163, NIST_163);
 				ordin = 1;
 				break;
-#endif
-#if defined(EB_KBLTZ) && FB_POLYN == 163
+#elif defined(EB_KBLTZ) && FB_POLYN == 163
 			case NIST_K163:
 				ASSIGN(NIST_K163, NIST_163);
 				kbltz = 1;
 				break;
-#endif
-#if defined(EB_ORDIN) && FB_POLYN == 233
+#elif defined(EB_ORDIN) && FB_POLYN == 233
 			case NIST_B233:
 				ASSIGN(NIST_B233, NIST_233);
 				ordin = 1;
 				break;
-#endif
-#if defined(EB_KBLTZ) && FB_POLYN == 233
+#elif defined(EB_KBLTZ) && FB_POLYN == 233
 			case NIST_K233:
 				ASSIGN(NIST_K233, NIST_233);
 				kbltz = 1;
 				break;
-#endif
-#if defined(EB_ORDIN) && FB_POLYN == 283
+#elif defined(EB_ORDIN) && FB_POLYN == 283
 			case NIST_B283:
 				ASSIGN(NIST_B283, NIST_283);
 				ordin = 1;
 				break;
-#endif
-#if defined(EB_KBLTZ) && FB_POLYN == 283
+#elif defined(EB_KBLTZ) && FB_POLYN == 283
 			case NIST_K283:
 				ASSIGN(NIST_K283, NIST_283);
 				kbltz = 1;
 				break;
-#endif
-#if defined(EB_ORDIN) && FB_POLYN == 409
+#elif defined(EB_ORDIN) && FB_POLYN == 409
 			case NIST_B409:
 				ASSIGN(NIST_B409, NIST_409);
 				ordin = 1;
 				break;
-#endif
-#if defined(EB_KBLTZ) && FB_POLYN == 409
+#elif defined(EB_KBLTZ) && FB_POLYN == 409
 			case NIST_K409:
 				ASSIGN(NIST_K409, NIST_409);
 				kbltz = 1;
 				break;
-#endif
-#if defined(EB_ORDIN) && FB_POLYN == 571
+#elif defined(EB_ORDIN) && FB_POLYN == 571
 			case NIST_B571:
 				ASSIGN(NIST_B571, NIST_571);
 				ordin = 1;
 				break;
-#endif
-#if defined(EB_KBLTZ) && FB_POLYN == 571
+#elif defined(EB_KBLTZ) && FB_POLYN == 571
 			case NIST_K571:
 				ASSIGN(NIST_K571, NIST_571);
 				kbltz = 1;
 				break;
-#endif
-#if defined(EB_SUPER) && FB_POLYN == 271
+#elif defined(EB_SUPER) && FB_POLYN == 271
 			case ETAT_S271:
-				ASSIGNS(ETAT_S271, FAST_271);
+				ASSIGNS(ETAT_S271, PENTA_271);
 				super = 1;
 				break;
-#endif
-#if defined(EB_SUPER) && FB_POLYN == 1223
+#elif defined(EB_SUPER) && FB_POLYN == 1223
 			case ETAT_S1223:
 				ASSIGNS(ETAT_S1223, FAST_1223);
 				super = 1;
 				break;
 #endif
 			default:
+				(void)str;
 				THROW(ERR_INVALID);
 				break;
 		}
+
+		param_id = param;
 
 		fb_zero(g->z);
 		fb_set_bit(g->z, 0, 1);
@@ -409,3 +406,104 @@ void eb_param_set(int param) {
 }
 
 #endif /* EB_STAND */
+
+void eb_param_set_any() {
+	int r0, r1, r2;
+
+	r0 = eb_param_set_any_super();
+	r1 = eb_param_set_any_ordin();
+	r2 = eb_param_set_any_kbltz();
+
+	if (r0 == STS_ERR && r1 == STS_ERR && r2 == STS_ERR) {
+		THROW(ERR_NO_CURVE);
+	}
+}
+
+int eb_param_set_any_ordin() {
+	int r = STS_OK;
+#if FB_POLYN == 163
+	eb_param_set(NIST_B163);
+#elif FB_POLYN == 233
+	eb_param_set(NIST_B233);
+#elif FB_POLYN == 283
+	eb_param_set(NIST_B283);
+#elif FB_POLYN == 409
+	eb_param_set(NIST_B409);
+#elif FB_POLYN == 571
+	eb_param_set(NIST_B571);
+#else
+	r = STS_ERR;
+#endif
+	return r;
+}
+
+int eb_param_set_any_kbltz() {
+	int r = STS_OK;
+#if FB_POLYN == 163
+	eb_param_set(NIST_K163);
+#elif FB_POLYN == 233
+	eb_param_set(NIST_K233);
+#elif FB_POLYN == 283
+	eb_param_set(NIST_K283);
+#elif FB_POLYN == 409
+	eb_param_set(NIST_K409);
+#elif FB_POLYN == 571
+	eb_param_set(NIST_K571);
+#else
+	r = STS_ERR;
+#endif
+	return r;
+}
+
+int eb_param_set_any_super() {
+	int r = STS_OK;
+#if FB_POLYN == 271
+	eb_param_set(ETAT_S271);
+#elif FB_POLYN == 1223
+	eb_param_set(ETAT_S1223);
+#else
+	r = STS_ERR;
+#endif
+	return r;
+}
+
+void eb_param_print() {
+	switch (param_id) {
+	case NIST_B163:
+		util_print_label("Curve NIST-B163:", 0);
+		break;
+	case NIST_K163:
+		util_print_label("Curve NIST-K163:", 0);
+		break;
+	case NIST_B233:
+		util_print_label("Curve NIST-B233:", 0);
+		break;
+	case NIST_K233:
+		util_print_label("Curve NIST-K233:", 0);
+		break;
+	case NIST_B283:
+		util_print_label("Curve NIST-B283:", 0);
+		break;
+	case NIST_K283:
+		util_print_label("Curve NIST-K283:", 0);
+		break;
+	case NIST_B409:
+		util_print_label("Curve NIST-B409:", 0);
+		break;
+	case NIST_K409:
+		util_print_label("Curve NIST-K409:", 0);
+		break;
+	case NIST_B571:
+		util_print_label("Curve NIST-B571:", 0);
+		break;
+	case NIST_K571:
+		util_print_label("Curve NIST-K571:", 0);
+		break;
+	case ETAT_S271:
+		util_print_label("Curve ETAT-S271:", 0);
+		break;
+	case ETAT_S1223:
+		util_print_label("Curve ETAT-S1223:", 0);
+		break;
+	}
+}

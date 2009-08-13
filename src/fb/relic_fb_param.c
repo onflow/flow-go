@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -59,15 +59,51 @@ void fb_param_set(int param) {
 		case NIST_571:
 			fb_poly_set_penta(10, 5, 2);
 			break;
-		case FAST_271:
-			//fb_poly_set_trino(201);
+		case TRINO_271:
+			fb_poly_set_trino(201);
+			break;
+		case PENTA_271:
 			fb_poly_set_penta(207, 175, 111);
 			break;
-		case FAST_1223:
+		case TRINO_1223:
 			fb_poly_set_trino(255);
 			break;
 		default:
 			THROW(ERR_INVALID);
 			break;
+	}
+}
+
+void fb_param_set_any(void) {
+#if FB_POLYN == 163
+	fb_param_set(NIST_163);
+#elif FB_POLYN == 233
+	fb_param_set(NIST_233);
+#elif FB_POLYN == 283
+	fb_param_set(NIST_283);
+#elif FB_POLYN == 409
+	fb_param_set(NIST_409);
+#elif FB_POLYN == 571
+	fb_param_set(NIST_571);
+#elif FB_POLYN == 271
+	fb_param_set(TRINO_271);
+#elif FB_POLYN == 1223
+	fb_param_set(FAST_1223);
+#else
+	THROW(ERR_NO_FIELD);
+#endif
+}
+
+void fb_param_print(void) {
+	int fa, fb, fc;
+
+	fb_poly_get_rdc(&fa, &fb, &fc);
+
+	if (fb == -1) {
+		util_print_label("Irreducible trinomial:", 0);
+		util_print("   z^%d + z^%d + 1\n", FB_BITS, fa);
+	} else {
+		util_print_label("Irreducible pentanomial:", 0);
+		util_print("   z^%d + z^%d + z^%d + z^%d + 1\n", FB_BITS, fa, fb, fc);
 	}
 }

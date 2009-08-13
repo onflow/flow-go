@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -70,9 +70,7 @@ void fb_sqr_table(fb_t c, fb_t a) {
 	TRY {
 		/* We need a temporary variable so that c can be a or b. */
 		dv_new(t);
-
 		fb_sqrl_low(t, a);
-
 		fb_rdc(c, t);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -87,24 +85,7 @@ void fb_sqr_table(fb_t c, fb_t a) {
 #if FB_SQR == INTEG || !defined(STRIP)
 
 void fb_sqr_integ(fb_t c, fb_t a) {
-	dv_t t = NULL;
-
-	TRY {
-		dv_new(t);
-
-#if FB_RDC == BASIC
-		fb_sqrt_low(t, a);
-		fb_rdc_basic(c, t);
-#else
-		fb_sqrm_low(c, t, a);
-#endif
-
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		dv_free(t);
-	}
+	fb_sqrm_low(c, a);
 }
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -174,9 +174,9 @@ static void fb_rdcp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 void fb_rdcn_low(dig_t *c, dig_t *a) {
 	int fa, fb, fc;
 
-	fb_poly_get_quick(&fa, &fb, &fc);
+	fb_poly_get_rdc(&fa, &fb, &fc);
 
-	if (fb == 0) {
+	if (fb == -1) {
 		fb_rdct_low(c, a, fa);
 	} else {
 		fb_rdcp_low(c, a, fa, fb, fc);

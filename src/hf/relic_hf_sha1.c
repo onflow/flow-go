@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -33,7 +33,15 @@
 #include "relic_util.h"
 #include "sha.h"
 
+/*============================================================================*/
+/* Private definitions                                                        */
+/*============================================================================*/
+
 static SHA1Context ctx;
+
+/*============================================================================*/
+/* Public definitions                                                         */
+/*============================================================================*/
 
 void hf_map_shone(unsigned char *hash, unsigned char *msg, int len) {
 	if (SHA1Reset(&ctx) != shaSuccess) {
@@ -47,25 +55,25 @@ void hf_map_shone(unsigned char *hash, unsigned char *msg, int len) {
 	}
 }
 
-void hf_sha1_init(void) {
+void hf_map_shone_init(void) {
 	if (SHA1Reset(&ctx) != shaSuccess) {
 		THROW(ERR_INVALID);
 	}
 }
 
-void hf_sha1_update(unsigned char *msg, int len) {
+void hf_map_shone_update(unsigned char *msg, int len) {
 	if (SHA1Input(&ctx, msg, len) != shaSuccess) {
 		THROW(ERR_INVALID);
 	}
 }
 
-void hf_sha1_final(unsigned char *hash) {
+void hf_map_shone_final(unsigned char *hash) {
 	if (SHA1Result(&ctx, hash) != shaSuccess) {
 		THROW(ERR_INVALID);
 	}
 }
 
-void hf_sha1_state(unsigned char *state) {
+void hf_map_shone_state(unsigned char *state) {
 	*(unsigned int *)(state) = util_conv_big(ctx.Intermediate_Hash[0]);
 	*(unsigned int *)(state + 4) = util_conv_big(ctx.Intermediate_Hash[1]);
 	*(unsigned int *)(state + 8) = util_conv_big(ctx.Intermediate_Hash[2]);

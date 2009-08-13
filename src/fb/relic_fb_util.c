@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -166,9 +166,18 @@ int fb_bits(fb_t a) {
 }
 
 int fb_bits_dig(dig_t a) {
+	if (a == 0) {
+		return 0;
+	} else {
+		return FB_DIGIT - __builtin_clzl(a);
+	}
+}
+
+int fb_bits_dig2(dig_t a) {
 	static const unsigned char table[16] = {
 		0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4
 	};
+	int offset;
 
 #if WORD == 8
 	if (a >> 4 == 0) {
@@ -177,27 +186,64 @@ int fb_bits_dig(dig_t a) {
 		return table[a >> 4] + 4;
 	}
 	return 0;
-#else
-	int i;
-	dig_t b;
-
-	if (a == 0)
-		return 0;
-
-	i = FB_DIGIT - 8;
-	while (1) {
-		b = (a >> i) & 0xFF;
-		if (b != 0) {
-			if (b >> 4 == 0) {
-				return table[b & 0x0F] + i;
+#elif WORD == 16
+	if (a >= ((dig_t)1 << 8)) {
+		offset = 8;
+	} else {
+		offset = 0;
+	}
+#elif WORD == 32
+	if (a >= ((dig_t)1 << 16)) {
+		if (a >= ((dig_t)1 << 24)) {
+			offset = 24;
+		} else {
+			offset = 16;
+		}
+	} else {
+		if (a >= ((dig_t)1 << 8)) {
+			offset = 8;
+		} else {
+			offset = 0;
+		}
+	}
+#elif WORD == 64
+	if (a >= ((dig_t)1 << 32)) {
+		if (a >= ((dig_t)1 << 48)) {
+			if (a >= ((dig_t)1 << 56)) {
+				offset = 56;
 			} else {
-				return table[b >> 4] + 4 + i;
+				offset = 48;
+			}
+		} else {
+			if (a >= ((dig_t)1 << 40)) {
+				offset = 40;
+			} else {
+				offset = 32;
 			}
 		}
-		i -= 8;
+	} else {
+		if (a >= ((dig_t)1 << 16)) {
+			if (a >= ((dig_t)1 << 24)) {
+				offset = 24;
+			} else {
+				offset = 16;
+			}
+		} else {
+			if (a >= ((dig_t)1 << 8)) {
+				offset = 8;
+			} else {
+				offset = 0;
+			}
+		}
+	}
+#endif
+	a = a >> offset;
+	if (a >> 4 == 0) {
+		return table[a & 0xF] + offset;
+	} else {
+		return table[a >> 4] + 4 + offset;
 	}
 	return 0;
-#endif
 }
 
 void fb_rand(fb_t a) {

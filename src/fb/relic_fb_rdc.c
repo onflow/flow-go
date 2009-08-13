@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -48,27 +48,46 @@
 
 void fb_rdc_basic(fb_t c, dv_t a) {
 	int j, k;
-	dig_t *tmpa, *rdc;
+	dig_t *tmpa;
+	dv_t r = NULL;
 
-	tmpa = a + FB_DIGS;
+	TRY {
+		dv_new(r);
 
-	/* First reduce the high part. */
-	for (int i = fb_bits(tmpa); i >= 0; i--) {
-		if (fb_test_bit(tmpa, i)) {
-			SPLIT(k, j, i - FB_BITS, FB_DIG_LOG);
-			rdc = fb_poly_get_rdc(k);
-			fb_addd_low(tmpa + j, tmpa + j, rdc, FB_DIGS + 1);
+		tmpa = a + FB_DIGS;
+
+		/* First reduce the high part. */
+		for (int i = fb_bits(tmpa); i >= 0; i--) {
+			if (fb_test_bit(tmpa, i)) {
+				SPLIT(k, j, i - FB_BITS, FB_DIG_LOG);
+				if (k == 0) {
+					fb_addd_low(tmpa + j, tmpa + j, fb_poly_get(), FB_DIGS);
+				} else {
+					r[FB_DIGS] = fb_lshb_low(r, fb_poly_get(), k);
+					fb_addd_low(tmpa + j, tmpa + j, r, FB_DIGS + 1);
+				}
+			}
 		}
-	}
-	for (int i = fb_bits(a); i >= FB_BITS; i--) {
-		if (fb_test_bit(a, i)) {
-			SPLIT(k, j, i - FB_BITS, FB_DIG_LOG);
-			rdc = fb_poly_get_rdc(k);
-			fb_addd_low(a + j, a + j, rdc, FB_DIGS + 1);
+		for (int i = fb_bits(a); i >= FB_BITS; i--) {
+			if (fb_test_bit(a, i)) {
+				SPLIT(k, j, i - FB_BITS, FB_DIG_LOG);
+				if (k == 0) {
+					fb_addd_low(a + j, a + j, fb_poly_get(), FB_DIGS);
+				} else {
+					r[FB_DIGS] = fb_lshb_low(r, fb_poly_get(), k);
+					fb_addd_low(a + j, a + j, r, FB_DIGS + 1);
+				}
+			}
 		}
-	}
 
-	fb_copy(c, a);
+		fb_copy(c, a);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fb_free(r);
+	}
 }
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -126,7 +126,9 @@ void fb_muln_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-void fb_mulm_low(dig_t *c, dig_t *t, dig_t *a, dig_t *b) {
+void fb_mulm_low(dig_t *c, dig_t *a, dig_t *b) {
+	dig_t align t[2 * FB_DIGS];
+
 	fb_muln_low(t, a, b);
 	fb_rdc(c, t);
 }

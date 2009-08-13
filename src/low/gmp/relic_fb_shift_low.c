@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -40,7 +40,8 @@ dig_t fb_lsh1_low(dig_t *c, dig_t *a) {
 }
 
 dig_t fb_lshb_low(dig_t *c, dig_t *a, int bits) {
-	return mpn_lshift(c, a, FB_DIGS, bits);}
+	return mpn_lshift(c, a, FB_DIGS, bits);
+}
 
 void fb_lshd_low(dig_t *c, dig_t *a, int digits) {
 	dig_t *top, *bot;

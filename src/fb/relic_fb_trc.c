@@ -21,61 +21,57 @@
 /**
  * @file
  *
- * Implementation of the multiple precision comparison functions.
+ * Implementation of binary field trace function.
  *
- * @version $Id: relic_bn_cmp.c 10 2009-04-16 02:20:12Z dfaranha $
- * @ingroup bn
+ * @version $Id$
+ * @ingroup fb
  */
 
 #include "relic_core.h"
-#include "relic_bn.h"
-#include "relic_bn_low.h"
+#include "relic_fb.h"
+#include "relic_fb_low.h"
+#include "relic_error.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int bn_cmp_abs(bn_t a, bn_t b) {
-	int result;
+void fb_trc_basic(fb_t c, fb_t a) {
+	fb_t t0 = NULL;
 
-	if (a->used > b->used) {
-		return CMP_GT;
+	TRY {
+		fb_new(t0);
+
+		fb_copy(t0, a);
+		fb_copy(c, a);
+		for (int i = 1; i < FB_BITS; i++) {
+			fb_sqr(t0, t0);
+			fb_add(c, c, t0);
+		}
 	}
-
-	if (a->used < b->used) {
-		return CMP_LT;
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-
-	result = bn_cmpn_low(a->dp, b->dp, a->used);
-
-	return result;
+	FINALLY {
+		fb_free(t0);
+	}
 }
 
-int bn_cmp_dig(bn_t a, dig_t b) {
-	int result;
+void fb_trc_quick(fb_t c, fb_t a) {
+	int ta, tb, tc;
+	dig_t r;
 
-	if (a->sign == BN_NEG) {
-		return CMP_LT;
-	}
+	fb_poly_get_trc(&ta, &tb, &tc);
 
-	if (a->used > 1) {
-		return CMP_GT;
+	r = fb_get_bit(a, ta);
+	if (tb != -1) {
+		r ^= fb_get_bit(a, tb);
 	}
-
-	result = bn_cmp1_low(a->dp[0], b);
-
-	return result;
-}
-
-int bn_cmp(bn_t a, bn_t b) {
-	if (a->sign == BN_POS && b->sign == BN_NEG) {
-		return CMP_GT;
+	if (tc != -1) {
+		r ^= fb_get_bit(a, tc);
 	}
-	if (a->sign == BN_NEG && b->sign == BN_POS) {
-		return CMP_LT;
+	c[0] = r;
+	for (int i = 1; i < FB_DIGS; i++) {
+		c[i] = 0;
 	}
-	if (a->sign == BN_NEG) {
-		return bn_cmp_abs(b, a);
-	}
-	return bn_cmp_abs(a, b);
 }
