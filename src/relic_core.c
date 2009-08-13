@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -61,6 +61,8 @@ int core_init(void) {
 		core_ctx->reason[ERR_NO_READ] = MSG_NO_READ;
 		core_ctx->reason[ERR_INVALID] = MSG_INVALID;
 		core_ctx->reason[ERR_NO_BUFFER] = MSG_NO_BUFFER;
+		core_ctx->reason[ERR_NO_FIELD] = MSG_NO_FIELD;
+		core_ctx->reason[ERR_NO_CURVE] = MSG_NO_CURVE;
 	}
 	core_ctx->code = STS_OK;
 	core_ctx->last = NULL;

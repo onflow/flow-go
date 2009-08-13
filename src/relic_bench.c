@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -46,7 +46,7 @@
 /**
  * Timer type.
  */
-#if TIMER == HRES
+#if TIMER == HPROC || TIMER == HREAL
 typedef struct timespec bench_t;
 #elif TIMER == ANSI
 typedef clock_t bench_t;
@@ -56,22 +56,17 @@ typedef struct timeval bench_t;
 typedef unsigned long long bench_t;
 
 #if ARCH == X86
+#include <intrin.h>
 static inline bench_t cycles(void) {
 	unsigned long long int x;
-	asm volatile (""
-		".byte 0x0f, 0x31\n\t"
-		:"=A" (x)
-	);
+	asm volatile (".byte 0x0f, 0x31\n\t":"=A" (x));
 	return x;
 }
 #elif ARCH == X86_64
 static inline bench_t cycles(void) {
 	unsigned int hi, lo;
-	asm volatile(
-		"rdtsc\n\t"
-		: "=a" (lo), "=d"(hi)
-	);
-	return ((bench_t)lo) | (((bench_t)hi) << 32);
+	asm volatile ("rdtsc\n\t":"=a" (lo), "=d"(hi));
+	return ((bench_t) lo) | (((bench_t) hi) << 32);
 }
 #endif
 
@@ -94,13 +89,76 @@ static bench_t after;
  */
 static long long total;
 
+/**
+ * Benchmarking overhead to be measured and subtracted from benchmarks.
+ */
+static long long overhead;
+
 #endif
+
+static void empty(int *a) {
+	(*a)++;
+}
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bench_timing_reset(char *label) {
+void bench_overhead(void) {
+	int a[BENCH + 1];
+	int *tmpa;
+
+	do {
+		overhead = 0;
+		for (int l = 0; l < BENCH; l++) {
+			total = 0;
+			/* Measure the cost of (n^2 + over). */
+			bench_before();
+			for (int i = 0; i < BENCH; i++) {
+				tmpa = a;
+				for (int j = 0; j < BENCH; j++) {
+					empty(tmpa++);
+				}
+			}
+			bench_after();
+			/* Add the cost of (n^2 + over). */
+			overhead += total;
+		}
+		/* Overhead stores the cost of n*(n^2 + over). */
+		for (int l = 0; l < BENCH; l++) {
+			total = 0;
+			/* Measure the cost of (n^3 + over). */
+			bench_before();
+			for (int i = 0; i < BENCH; i++) {
+				for (int k = 0; k < BENCH; k++) {
+					tmpa = a;
+					for (int j = 0; j < BENCH; j++) {
+						empty(tmpa++);
+					}
+				}
+			}
+			bench_after();
+			/* Subtract the cost of n^2. */
+			overhead -= total / BENCH;
+		}
+		/* Now overhead stores n*over, so take the average to obtain the overhead
+		 * to execute BENCH operations inside a benchmark. */
+		overhead /= BENCH;
+		/* Divide to obtain the overhead of one operation pair. */
+		overhead /= BENCH;
+		/* We assume that our overhead estimate is too optimistic (due to cache
+		 * effects, per example). */
+		overhead /= 2;
+	} while (overhead < 0);
+
+#if TIMER == CYCLE
+	util_print("%lld cycles\n", overhead);
+#elif TIMER != NONE
+	util_print("%lld nanosec\n", overhead);
+#endif
+}
+
+void bench_reset(char *label) {
 #if TIMER != NONE
 	total = 0;
 	util_print("BENCH: %s %*s = ", label, (int)(25 - strlen(label)), " ");
@@ -109,8 +167,10 @@ void bench_timing_reset(char *label) {
 #endif
 }
 
-void bench_timing_before() {
-#if TIMER == HRES
+void bench_before() {
+#if TIMER == HPROC
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &before);
+#elif TIMER == HREAL
 	clock_gettime(CLOCK_REALTIME, &before);
 #elif TIMER == ANSI
 	before = clock();
@@ -121,9 +181,13 @@ void bench_timing_before() {
 #endif
 }
 
-void bench_timing_after() {
-	unsigned long long result;
-#if TIMER == HRES
+void bench_after() {
+	long long result;
+#if TIMER == HPROC
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &after);
+	result = ((long)after.tv_sec - (long)before.tv_sec) * 1000000000;
+	result += (after.tv_nsec - before.tv_nsec);
+#elif TIMER == HREAL
 	clock_gettime(CLOCK_REALTIME, &after);
 	result = ((long)after.tv_sec - (long)before.tv_sec) * 1000000000;
 	result += (after.tv_nsec - before.tv_nsec);
@@ -146,12 +210,18 @@ void bench_timing_after() {
 #endif
 }
 
-void bench_timing_compute(int benches) {
+void bench_compute(int benches) {
+	total = total / benches - overhead;
 #if TIMER == CYCLE
-	util_print("%llu cycles\n", total / (benches));
+	util_print("%lld cycles", total);
 #elif TIMER != NONE
-	util_print("%llu nanosec\n", total / (benches));
+	util_print("%lld nanosec", total);
 #else
 	(void)benches;
 #endif
+	if (total < 0) {
+		util_print(" (bad overhead estimation)\n");
+	} else {
+		util_print("\n");
+	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -136,9 +136,9 @@ void rand_bytes(unsigned char *buf, int size) {
     j = 0;
     while (j < size) {
         /* x = G(t, XKEY) */
-        hf_sha1_init();
-        hf_sha1_update(state, 64);
-        hf_sha1_state(hash);
+        hf_map_shone_init();
+        hf_map_shone_update(state, 64);
+        hf_map_shone_state(hash);
         /* XKEY = (XKEY + x + 1) mod 2^b */
         carry = 1;
         for (i = 19; i >= 0; i--) {

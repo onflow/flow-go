@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -74,7 +74,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void test_print_fail(void) {
+void test_fail(void) {
 	util_print("[");
 	util_print("%c[%d;%dm", CMD_SET, CMD_ATTR, FAIL_COLOR);
 	util_print("%s", FAIL_STRING);
@@ -82,7 +82,7 @@ void test_print_fail(void) {
 	util_print("]\n");
 }
 
-void test_print_pass(void) {
+void test_pass(void) {
 	util_print("[");
 	util_print("%c[%d;%dm", CMD_SET, CMD_ATTR, PASS_COLOR);
 	util_print("%s", PASS_STRING);

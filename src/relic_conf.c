@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -33,6 +33,7 @@
 #include "relic_bn.h"
 #include "relic_fb.h"
 #include "relic_core.h"
+#include "relic_bench.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -40,39 +41,47 @@
 
 void conf_print(void) {
 #ifndef QUIET
-	util_print("--- RELIC %s configuration:\n\n", VERSION);
+	util_print("-- RELIC %s configuration:\n\n", VERSION);
 #if ALLOC == STATIC
-	util_print("--- Allocation mode: STATIC\n\n");
+	util_print("** Allocation mode: STATIC\n\n");
 #elif ALLOC == DYNAMIC
-	util_print("--- Allocation mode: DYNAMIC\n\n");
+	util_print("** Allocation mode: DYNAMIC\n\n");
 #elif ALLOC == STACK
-	util_print("--- Allocation mode: STACK\n\n");
+	util_print("** Allocation mode: STACK\n\n");
 #endif
 
 #if ARITH == EASY
-	util_print("--- Arithmetic backend: EASY\n\n");
+	util_print("** Arithmetic backend: EASY\n\n");
 #elif ARITH == X86_64
-	util_print("--- Arithmetic backend: x86_64\n\n");
+	util_print("** Arithmetic backend: X86_64\n\n");
 #elif ARITH == GMP
-	util_print("--- Arithmetic backend: GMP\n\n");
+	util_print("** Arithmetic backend: GMP\n\n");
+#endif
+
+#if BENCH > 1
+	util_print("** Benchmarking options:\n");
+	util_print("   Number of times: %d\n", BENCH * BENCH);
+	util_print("   Estimated overhead: ");
+	bench_overhead();
+	util_print("\n");
 #endif
 
 #ifdef WITH_BN
-	util_print("--- Multiple precision module options:\n");
-	util_print("    Precision: %d bits, %d words\n", BN_BITS, BN_DIGS);
-	util_print("    Arithmetic method: %s\n\n", BN_METHD);
+	util_print("** Multiple precision module options:\n");
+	util_print("   Precision: %d bits, %d words\n", BN_BITS, BN_DIGS);
+	util_print("   Arithmetic method: %s\n\n", BN_METHD);
 #endif
 
 #ifdef WITH_FP
-	util_print("--- Prime field module options:\n");
-	util_print("    Prime size: %d bits, %d words\n", FP_BITS, FP_DIGS);
-	util_print("    Arithmetic method: %s\n\n", FP_METHD);
+	util_print("** Prime field module options:\n");
+	util_print("   Prime size: %d bits, %d words\n", FP_BITS, FP_DIGS);
+	util_print("   Arithmetic method: %s\n\n", FP_METHD);
 #endif
 
 #ifdef WITH_FB
-	util_print("--- Binary field module options:\n");
-	util_print("    Polynomial size: %d bits, %d words\n", FB_BITS, FB_DIGS);
-	util_print("    Arithmetic method: %s\n\n", FB_METHD);
+	util_print("** Binary field module options:\n");
+	util_print("   Polynomial size: %d bits, %d words\n", FB_BITS, FB_DIGS);
+	util_print("   Arithmetic method: %s\n", FB_METHD);
 #endif
 
 #endif
