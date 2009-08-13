@@ -3,11 +3,11 @@ cmake_minimum_required(VERSION 2.6)
 
 set(PROJECT_VERSION_MAJOR "0")
 set(PROJECT_VERSION_MINOR "1")
-set(PROJECT_VERSION_PATCH "0")
+set(PROJECT_VERSION_PATCH "1")
 set(PROJECT_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
 set(VERSION ${PROJECT_VERSION})
 
-set(INCLUDE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(INCLUDE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include/low)
 include_directories(${INCLUDE})
 
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
@@ -106,7 +106,8 @@ message("   OPSYS=FREEBSD  FreeBSD operating system.\n")
 
 message(STATUS "Supported timers (default = HIGH):")
 message("   TIMER=NONE     No timer.")
-message("   TIMER=HIGH     GNU/Linux high-resolution timer.")
+message("   TIMER=HPROC    GNU/Linux per-process high-resolution timer.")
+message("   TIMER=HREAL    GNU/Linux realtime high-resolution timer.")
 message("   TIMER=ANSI     ANSI-compatible timer.")
 message("   TIMER=POSIX    POSIX-compatible timer.")
 message("   TIMER=CYCLE    Cycle-counting timer. (architecture-dependant)\n")
@@ -287,7 +288,7 @@ endif(OPSYS STREQUAL LINUX)
 set(OPSYS ${OPSYS} CACHE STRING "Operating system")
 
 if (NOT TIMER)
-	set(TIMER "HRES")
+	set(TIMER "HPROC")
 endif(NOT TIMER)
 set(TIMER ${TIMER} CACHE STRING "Timer")
 
