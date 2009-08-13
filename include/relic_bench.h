@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -43,11 +43,11 @@
  * @param[in] LABEL			- the label for this benchmark.
  */
 #define BENCH_ONCE(LABEL, FUNCTION)											\
-	bench_timing_reset(LABEL);												\
-	bench_timing_before();													\
+	bench_reset(LABEL);														\
+	bench_before();															\
 	FUNCTION;																\
-	bench_timing_after();													\
-	bench_timing_compute(1);												\
+	bench_after();															\
+	bench_compute(1);														\
 
 /**
  * Runs a new benchmark.
@@ -55,7 +55,7 @@
  * @param[in] LABEL			- the label for this benchmark.
  */
 #define BENCH_BEGIN(LABEL)													\
-	bench_timing_reset(LABEL);												\
+	bench_reset(LABEL);														\
 	for (int i = 0; i < BENCH; i++)	{										\
 
 /**
@@ -63,7 +63,7 @@
  */
 #define BENCH_END															\
 	}																		\
-	bench_timing_compute(BENCH * BENCH);									\
+	bench_compute(BENCH * BENCH);											\
 
 /**
  * Measures the time of one execution and adds it to the benchmark total.
@@ -72,34 +72,39 @@
  */
 #define BENCH_ADD(FUNCTION)													\
 	FUNCTION;																\
-	bench_timing_before();													\
+	bench_before();															\
 	for (int j = 0; j < BENCH; j++) {										\
 		FUNCTION;															\
 	}																		\
-	bench_timing_after();													\
+	bench_after();															\
+
+/**
+ * Measures and prints benchmarking overhead.
+ */
+void bench_overhead(void);
 
 /**
  * Resets the benchmark data.
  *
  * @param[in] label			- the benchmark label.
  */
-void bench_timing_reset(char *label);
+void bench_reset(char *label);
 
 /**
  * Measures the time before a benchmark is executed.
  */
-void bench_timing_before(void);
+void bench_before(void);
 
 /**
  * Measures the time after a benchmark was started and adds it to the total.
  */
-void bench_timing_after(void);
+void bench_after(void);
 
 /**
  * Prints the mean elapsed time between the start and the end of a benchmark.
  *
  * @param benches			- the number of executed benchmarks.
  */
-void bench_timing_compute(int benches);
+void bench_compute(int benches);
 
 #endif /* !RELIC_BENCH_H */

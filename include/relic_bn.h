@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -38,6 +38,10 @@
 
 #include "relic_conf.h"
 #include "relic_types.h"
+
+/*============================================================================*/
+/* Constant definitions                                                       */
+/*============================================================================*/
 
 /**
  * Precision in bits of a multiple precision integer.
@@ -91,6 +95,10 @@
  */
 #define BN_NEG			1
 
+/*============================================================================*/
+/* Type definitions                                                           */
+/*============================================================================*/
+
 /**
  * Represents a multiple precision integer.
  *
@@ -118,6 +126,10 @@ typedef struct {
  * Pointer to a multiple precision integer structure.
  */
 typedef bn_st *bn_t;
+
+/*============================================================================*/
+/* Function prototypes                                                        */
+/*============================================================================*/
 
 /**
  * Calls a function to allocate and initialize a multiple precision integer.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -119,6 +119,16 @@
 #else
 #define util_print(...)			/* empty */
 #endif
+
+/**
+ * Prints a standard label.
+ */
+#define util_print_label(L, I)												\
+	if (!I) {																\
+		util_print("\n-- %s\n", L);											\
+	} else {																\
+		util_print("\n** %s\n\n", L);										\
+	}																		\
 
 /**
  * Convert digit to big-endian.

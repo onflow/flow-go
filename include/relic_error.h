@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -57,8 +57,12 @@ enum errors {
 	ERR_INVALID = 5,
 	/** Occurs when a buffer capacity is insufficient. */
 	ERR_NO_BUFFER = 6,
+	/** Occurs when there is not a supported field in the security level. */
+	ERR_NO_FIELD = 7,
+	/** Occurs when there is not a supported curve in the security level. */
+	ERR_NO_CURVE = 8,
 	/** Constant to indicate the number of errors. */
-	ERR_LAST = 7
+	ERR_LAST = 9
 };
 
 /** Constant to indicate the number of possible errors. */
@@ -78,6 +82,10 @@ enum errors {
 #define MSG_INVALID			"invalid value passed as input"
 /** Error message respective to ERR_NO_BUFFER. */
 #define MSG_NO_BUFFER		"insufficient buffer capacity"
+/** Error message respective to ERR_NO_FIELD. */
+#define MSG_NO_FIELD		"no finite field supported at this security level"
+/** Error message respective to ERR_NO_CURVE. */
+#define MSG_NO_CURVE		"no curve supported at this security level"
 
 /**
  * Type that represents an error.
@@ -111,7 +119,7 @@ typedef struct _state_t {
 #define ERR_TRY															\
 	{																	\
 		state_t *_last, _this; 											\
-		_last = core_ctx->last; 											\
+		_last = core_ctx->last; 										\
 		_this.flag = 1;													\
 		core_ctx->last = &_this; 										\
 		for (int _r = 0; ; _r = 1) 										\

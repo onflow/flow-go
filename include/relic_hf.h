@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -57,19 +57,29 @@
 #define hf_map(H, M, L)			hf_map_sh512(H, M, L)
 #endif
 
+#define HF_LEN_SHONE			20
+
+#define HF_LEN_SH224			28
+
+#define HF_LEN_SH256			32
+
+#define HF_LEN_SH384			48
+
+#define HF_LEN_SH512			64
+
 /**
  * Length in bytes of hash function output.
  */
 #if HF_MAP == SHONE
-#define HF_LEN					20
+#define HF_LEN					HF_LEN_SHONE
 #elif HF_MAP == SH224
-#define HF_LEN					28
+#define HF_LEN					HF_LEN_SH224
 #elif HF_MAP == SH256
-#define HF_LEN					32
+#define HF_LEN					HF_LEN_SH256
 #elif HF_MAP == SH384
-#define HF_LEN					48
+#define HF_LEN					HF_LEN_SH384
 #elif HF_MAP == SH512
-#define HF_LEN					64
+#define HF_LEN					HF_LEN_SH512
 #endif
 
 /**
@@ -84,7 +94,7 @@ void hf_map_shone(unsigned char *hash, unsigned char *msg, int len);
 /**
  * Initializes the hash function context.
  */
-void hf_sha1_init(void);
+void hf_map_shone_init(void);
 
 /**
  * Updates the hash function context with more data.
@@ -92,21 +102,21 @@ void hf_sha1_init(void);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void hf_sha1_update(unsigned char *msg, int len);
+void hf_map_shone_update(unsigned char *msg, int len);
 
 /**
  * Finalizes the hash function computation.
  *
  * @param[out] hash				- the digest.
  */
-void hf_sha1_final(unsigned char *hash);
+void hf_map_shone_final(unsigned char *hash);
 
 /**
  * Returns the internal state of the hash function.
  *
  * @param[out] state			- the internal state.
  */
-void hf_sha1_state(unsigned char *state);
+void hf_map_shone_state(unsigned char *state);
 
 /**
  * Computes the SHA-224 hash function.

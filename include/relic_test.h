@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -65,25 +65,25 @@
  * @param[in] LABEL			- the label to jump if the condition is no satisfied.
  */
 #define TEST_ASSERT(C, LABEL)												\
-		if (!(C)) {															\
-			test_print_fail();												\
-			ERROR(LABEL);													\
-		}
+	if (!(C)) {																\
+		test_fail();														\
+		ERROR(LABEL);														\
+	}
 
 /**
  * Finalizes a test printing the test result.
  */
 #define TEST_END															\
-		test_print_pass()													\
+	test_pass()																\
 
 /**
  * Prints a string indicating that the test failed.
  */
-void test_print_fail(void);
+void test_fail(void);
 
 /**
  * Prints a string indicating that the test passed.
  */
-void test_print_pass(void);
+void test_pass(void);
 
 #endif /* !RELIC_TEST_H */

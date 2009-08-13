@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -266,6 +266,39 @@ void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t n);
  * @param[in] param			- the parameters identifier.
  */
 void eb_param_set(int param);
+
+/**
+ * Configures some set of curve parameters for the current security level.
+ */
+void eb_param_set_any(void);
+
+/**
+ * Configures some set of ordinary curve parameters for the current security
+ * level.
+ *
+ * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
+ */
+int eb_param_set_any_ordin(void);
+
+/**
+ * Configures some set of Koblitz curve parameters for the current security
+ * level.
+ * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
+ */
+int eb_param_set_any_kbltz(void);
+
+/**
+ * Configures some set of supersingular curve parameters for the current
+ * security level.
+ *
+ * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
+ */
+int eb_param_set_any_super(void);
+
+/**
+ * Prints the current configured binary elliptic curve.
+ */
+void eb_param_print(void);
 
 /**
  * Calls a function to allocate a point on a binary elliptic curve.

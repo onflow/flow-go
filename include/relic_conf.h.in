@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  * 
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -256,6 +256,13 @@
 /** Chosen binary field modular reduction method. */
 #define FB_SRT   @FB_SRT@
 
+/** Trace by repeated squaring. */
+#define BASIC    1
+/** Fast trace computation. */
+#define QUICK	 2
+/** Chosen trace computation method. */
+#define FB_TRC   @FB_TRC@
+
 /** Binary inversion. */
 #define BASIC    1
 /** Extended Euclidean algorithm. */
@@ -443,14 +450,16 @@
 
 /** No timer. */
 #define NONE     1
-/** High-resolution timer. */
-#define HRES     2
+/** Per-process high-resolution timer. */
+#define HPROC    2
+/** Per-process high-resolution timer. */
+#define HREAL    3
 /** POSIX-compatible timer. */
-#define POSIX    3
+#define POSIX    4
 /** ANSI-compatible timer. */
-#define ANSI     4
+#define ANSI     5
 /** Cycle-counting timer. */
-#define CYCLE    5
+#define CYCLE    6
 /** Chosen timer. */
 #define TIMER    @TIMER@
 

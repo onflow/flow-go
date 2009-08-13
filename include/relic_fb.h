@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -72,10 +72,12 @@ enum {
 	NIST_409 = 4,
 	/** NIST 521-bit fast reduction polynomial. */
 	NIST_571 = 5,
-	/** Mike Scott's 271-bit pairing-friendly polynomial. */
-	FAST_271 = 6,
-	/** Mike Scott's 1223-bit pairing-friendly polynomial. */
-	FAST_1223 = 7
+	/** Mike Scott's 271-bit pairing-friendly trinomial. */
+	TRINO_271 = 6,
+	/** Mike Scott's 271-bit pairing-friendly pentanomial. */
+	PENTA_271 = 7,
+	/** Mike Scott's 1223-bit pairing-friendly trinomial. */
+	TRINO_1223 = 8
 };
 
 /**
@@ -110,15 +112,6 @@ void fb_poly_clean(void);
 dig_t *fb_poly_get(void);
 
 /**
- * Returns a shifted version of the irreducible polynomial configured for the
- * binary field, that is, f(z) * z^shift.
- *
- * @param[in] shift			- the shift amount.
- * @return a shifted version of the irreducible polynomial.
- */
-dig_t *fb_poly_get_rdc(int shift);
-
-/**
  * Configures the irreducible polynomial of the binary field.
  *
  * @param[in] f				- the new irreducible polynomial.
@@ -145,14 +138,24 @@ void fb_poly_set_penta(int a, int b, int c);
 
 /**
  * Returns the non-zero coefficients of the configured trinomial or pentanomial.
- * If b is zero, the irreducible polynomial configured is a trinomial.
+ * If b is -1, the irreducible polynomial configured is a trinomial.
  * The other coefficients are FB_BITS and 0.
  *
  * @param[out] a			- the second coefficient.
  * @param[out] b			- the third coefficient.
  * @param[out] c			- the fourth coefficient.
  */
-void fb_poly_get_quick(int *a, int *b, int *c);
+void fb_poly_get_rdc(int *a, int *b, int *c);
+
+/**
+ * Returns the non-zero bits used to compute the trace function. The -1
+ * coefficient is the last coefficient.
+ *
+ * @param[out] a			- the first coefficient.
+ * @param[out] b			- the second coefficient.
+ * @param[out] c			- the third coefficient.
+ */
+void fb_poly_get_trc(int *a, int *b, int *c);
 
 /**
  * Assigns a standard irreducible polynomial as modulo of the binary field.
@@ -160,6 +163,16 @@ void fb_poly_get_quick(int *a, int *b, int *c);
  * @param[in] param			- the standardized polynomial identifier.
  */
 void fb_param_set(int param);
+
+/**
+ * Configures some finite field parameters for the current security level.
+ */
+void fb_param_set_any(void);
+
+/**
+ * Prints the currently configured irreducible polynomial.
+ */
+void fb_param_print(void);
 
 /**
  * Adds a binary field element and the irreducible polynomial. Computes
@@ -613,6 +626,36 @@ void fb_srt_basic(fb_t c, fb_t a);
  * @param[in] a				- the binary field element to take a square root.
  */
 void fb_srt_quick(fb_t c, fb_t a);
+
+/**
+ * Compute the trace of a binary field element.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the binary field element.
+ */
+#if FB_TRC == BASIC
+#define fb_trc(C, A)	fb_trc_basic(C, A)
+#elif FB_TRC == QUICK
+#define fb_trc(C, A)	fb_trc_quick(C, A)
+#endif
+
+/**
+ * Computes the trace of a binary field element using repeated squaring.
+ * Computes c = Tr(a).
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the binary field element.
+ */
+void fb_trc_basic(fb_t c, fb_t a);
+
+/**
+ * Computes the trace of a binary field element using a fast trace computation
+ * algorithm.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the binary field element.
+ */
+void fb_trc_quick(fb_t c, fb_t a);
 
 /**
  * Inverts a binary field element. Computes c = a^{-1}.
