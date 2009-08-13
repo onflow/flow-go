@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -59,6 +59,8 @@ int main(void) {
 	int code = STS_ERR;
 
 	core_init();
+
+	util_print_label("Tests for the ERR module:\n", 0);
 
 	fprintf(stderr, "Testing if not using try-catch is correct... ");
 	dummy();

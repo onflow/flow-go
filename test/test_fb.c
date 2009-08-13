@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -529,7 +529,7 @@ int square_root(void) {
 
 #if FB_SRT == QUICK || !defined(STRIP)
 		int fa, fb, fc;
-		fb_poly_get_quick(&fa, &fb, &fc);
+		fb_poly_get_rdc(&fa, &fb, &fc);
 
 		if ((fb == 0 && FB_BITS % 2 != 0 && fa % 2 != 0) ||
 				(fb != 0 && FB_BITS % 2 != 0 && fa % 2 != 0 && fb % 2 != 0 &&
@@ -722,12 +722,6 @@ int reduction(void) {
 			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 #endif
-
-		fb_free(a);
-		fb_free(b);
-		fb_free(c);
-		dv_free(t0);
-		dv_free(t1);
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -739,6 +733,56 @@ int reduction(void) {
 	fb_free(c);
 	dv_free(t0);
 	dv_free(t1);
+	return code;
+}
+
+int trace(void) {
+	int code = STS_ERR;
+	fb_t a = NULL, b = NULL, c = NULL;
+
+	TRY {
+		fb_new(a);
+		fb_new(b);
+		fb_new(c);
+
+		TEST_BEGIN("trace is linear") {
+			fb_rand(a);
+			fb_rand(b);
+			fb_add(c, a, b);
+			/* Test if Tr(c) = Tr(a) + Tr(b). */
+			fb_trc(c, c);
+			fb_trc(a, a);
+			fb_trc(b, b);
+			fb_add(a, a, b);
+			TEST_ASSERT(fb_cmp(c, a) == CMP_EQ, end);
+		} TEST_END;
+
+#if FB_TRC == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic trace is correct") {
+			fb_rand(a);
+			fb_trc(c, a);
+			fb_trc_basic(b, a);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FB_TRC == QUICK || !defined(STRIP)
+		TEST_BEGIN("fast trace is correct") {
+			fb_rand(a);
+			fb_trc(c, a);
+			fb_trc_quick(b, a);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fb_free(a);
+	fb_free(b);
+	fb_free(c);
 	return code;
 }
 
@@ -801,31 +845,12 @@ int digit(void) {
 int main(void) {
 	core_init();
 
-	TRY {
-#if FB_POLYN == 163
-		fb_param_set(NIST_163);
-#elif FB_POLYN == 233
-		fb_param_set(NIST_233);
-#elif FB_POLYN == 283
-		fb_param_set(NIST_283);
-#elif FB_POLYN == 409
-		fb_param_set(NIST_409);
-#elif FB_POLYN == 571
-		fb_param_set(NIST_571);
-#elif FB_POLYN == 271
-		fb_param_set(FAST_271);
-#elif FB_POLYN == 1223
-		fb_param_set(FAST_1223);
-#endif
-	} CATCH_ANY {
-		util_print("Configure FB_METH correctly!\n");
-		ERROR(end);
-	}
+	util_print_label("Tests for the FB module", 0);
 
-	util_print("Irreducible polynomial: ");
-	fb_print(fb_poly_get());
-	util_print("\n");
+	fb_param_set_any();
+	fb_param_print();
 
+	util_print_label("Utilities", 1);
 	if (memory() != STS_OK) {
 		core_clean();
 		return 1;
@@ -835,6 +860,7 @@ int main(void) {
 		core_clean();
 		return 1;
 	}
+	util_print_label("Arithmetic", 1);
 
 	if (addition() != STS_OK) {
 		core_clean();
@@ -876,12 +902,17 @@ int main(void) {
 		return 1;
 	}
 
+	if (trace() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
 	if (digit() != STS_OK) {
 		core_clean();
 		return 1;
 	}
 
 	core_clean();
-  end:
+
 	return 0;
 }

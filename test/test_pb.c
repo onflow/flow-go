@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -625,22 +625,19 @@ int pairing(void) {
 int main(void) {
 	core_init();
 
-#if FB_POLYN == 163
-		fb_param_set(NIST_163);
-#elif FB_POLYN == 233
-		fb_param_set(NIST_233);
-#elif FB_POLYN == 271
-		fb_param_set(FAST_271);
-#elif FB_POLYN == 1223
-		fb_param_set(FAST_1223);
-#endif
+	fb_param_set_any();
 
-	util_print("\nQuadratic extension arithmetic:\n");
+	util_print_label("Tests for the PB module", 0);
+
+	util_print_label("Quadratic extension:", 0);
+	util_print_label("Utilities:", 1);
 
 	if (memory2() != STS_OK) {
 		core_clean();
 		return 1;
 	}
+
+	util_print_label("Arithmetic:", 1);
 
 	if (addition2() != STS_OK) {
 		core_clean();
@@ -667,12 +664,15 @@ int main(void) {
 		return 1;
 	}
 
-	util_print("\nQuartic extension arithmetic:\n");
+	util_print_label("Quartic extension:", 0);
+	util_print_label("Utilities", 1)
 
 	if (memory4() != STS_OK) {
 		core_clean();
 		return 1;
 	}
+
+	util_print_label("Arithmetic:", 1);
 
 	if (addition4() != STS_OK) {
 		core_clean();
@@ -699,17 +699,15 @@ int main(void) {
 		return 1;
 	}
 
-#if FB_POLYN == 271
-	eb_param_set(ETAT_S271);
-#elif FB_POLYN == 1223
-	eb_param_set(ETAT_S1223);
-#endif
+	if (eb_param_set_any_super() == STS_ERR) {
+		THROW(ERR_NO_CURVE);
+	} else {
+		util_print_label("Bilinear pairing:\n", 0);
 
-	util_print("\nBilinear pairing:\n");
-
-	if (pairing() != STS_OK) {
-		core_clean();
-		return 1;
+		if (pairing() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 	}
 
 	core_clean();

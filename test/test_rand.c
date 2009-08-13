@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -44,7 +44,7 @@ unsigned char result[40] = {
 	0x13, 0x78, 0x8E, 0x20, 0xD7, 0x37, 0xA3, 0x27, 0x51, 0x16
 };
 
-int rand(void) {
+int gen(void) {
 	int code = STS_ERR;
 	unsigned char out[40];
 
@@ -65,7 +65,9 @@ int rand(void) {
 int main(void) {
 	core_init();
 
-	if (rand() != STS_OK) {
+	util_print_label("Tests for the RAND module:\n", 0);
+
+	if (gen() != STS_OK) {
 		core_clean();
 		return 1;
 	}

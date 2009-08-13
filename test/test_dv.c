@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -61,6 +61,8 @@ int memory(void) {
 
 int main(void) {
 	core_init();
+
+	util_print_label("Tests for the DV module:\n", 0);
 
 	if (memory() != STS_OK) {
 		core_clean();
