@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -61,6 +61,7 @@ void error(void) {
 int main(void) {
 	core_init();
 	conf_print();
+	util_print_label("Benchmarks for the ERR module:\n", 0);
 	error();
 	core_clean();
 }

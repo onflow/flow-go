@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -233,38 +233,27 @@ int main(void) {
 	core_init();
 	conf_print();
 
-	util_print("--- Protocols based on prime factorization:\n\n");
+	util_print_label("Benchmarks for the CP module:", 0);
+
+#if defined(WITH_BN)
+	util_print_label("Protocols based on prime factorization:\n", 0);
 	rsa();
-	util_print("\n--- Protocols based on elliptic curves:\n\n");
+#endif
+
 #if defined(WITH_EB)
-#if defined(EB_STAND) && defined(EB_KBLTZ) && FB_POLYN == 163
-	eb_param_set(NIST_K163);
-	util_print("\nCurve NIST-K163:\n");
-	ecdsa();
+	util_print_label("Protocols based on elliptic curves:\n", 0);
+#if defined(EB_STAND) && defined(EB_ORDIN)
+	if (eb_param_set_any_ordin() == STS_OK) {
+		eb_param_print();
+		ecdsa();
+	}
 #endif
 
-#if defined(EB_STAND) && defined(EB_ORDIN) && FB_POLYN == 163
-	eb_param_set(NIST_B163);
-	util_print("\nCurve NIST-B163:\n");
-	ecdsa();
-#endif
-
-#if defined(EB_STAND) && defined(EB_ORDIN) && FB_POLYN == 233
-	eb_param_set(NIST_B233);
-	util_print("\nCurve NIST-B233:\n");
-	ecdsa();
-#endif
-
-#if defined(EB_STAND) && defined(EB_KBLTZ) && FB_POLYN == 233
-	eb_param_set(NIST_K233);
-	util_print("Curve NIST-K233:\n");
-	ecdsa();
-#endif
-
-#if defined(EB_STAND) && defined(EB_SUPER) && FB_POLYN == 271
-	eb_param_set(ETAT_S271);
-	util_print("\nCurve ETAT-S271:\n");
-	ecdsa();
+#if defined(EB_STAND) && defined(EB_KBLTZ)
+	if (eb_param_set_any_kbltz() == STS_OK) {
+		eb_param_print();
+		ecdsa();
+	}
 #endif
 #endif
 

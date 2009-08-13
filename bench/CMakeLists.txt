@@ -9,7 +9,9 @@ macro(ADD_MODULE MODULE)
 	endif(STBIN)
 endmacro(ADD_MODULE)
 
-ADD_MODULE(error)
+if (CHECK)
+	ADD_MODULE(err)
+endif(CHECK)
 
 if (WITH_BN)
 	ADD_MODULE(bn)

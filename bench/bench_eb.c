@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -543,85 +543,43 @@ void arith(void) {
 }
 
 void bench(void) {
-	util_print("\n--- Memory-management:\n\n");
+	eb_param_print();
+	util_print_label("Utilities:", 1);
 	memory();
-	util_print("\n--- Utilities:\n\n");
 	util();
-	util_print("\n--- Arithmetic:\n\n");
+	util_print_label("Arithmetic:", 1);
 	arith();
 }
 
 int main(void) {
+	int r0, r1, r2;
+
 	core_init();
 	conf_print();
+	util_print_label("Benchmarks for the EB module:", 0);
 
-#if defined(EB_STAND) && defined(EB_ORDIN) && FB_POLYN == 163
-	eb_param_set(NIST_B163);
-	util_print("\nCurve NIST-B163:\n");
-	bench();
-#endif
-#if defined(EB_STAND) && defined(EB_KBLTZ) && FB_POLYN == 163
-	eb_param_set(NIST_K163);
-	util_print("Curve NIST-K163:\n");
-	bench();
+#if defined(EB_STAND) && defined(EB_ORDIN)
+	r0 = eb_param_set_any_ordin();
+	if (r0 == STS_OK) {
+		bench();
+	}
 #endif
 
-#if defined(EB_STAND) && defined(EB_ORDIN) && FB_POLYN == 233
-	eb_param_set(NIST_B233);
-	util_print("\nCurve NIST-B233:\n");
-	bench();
-#endif
-#if defined(EB_STAND) && defined(EB_KBLTZ) && FB_POLYN == 233
-	eb_param_set(NIST_K233);
-	util_print("Curve NIST-K233:\n");
-	bench();
+#if defined(EB_STAND) && defined(EB_KBLTZ)
+	r1 = eb_param_set_any_ordin();
+	if (r1 == STS_OK) {
+		bench();	}
 #endif
 
-#if defined(EB_STAND) && defined(EB_ORDIN) && FB_POLYN == 283
-	eb_param_set(NIST_B283);
-	util_print("\nCurve NIST-B283:\n");
-	bench();
-#endif
-#if defined(EB_STAND) && defined(EB_KBLTZ) && FB_POLYN == 283
-	eb_param_set(NIST_K283);
-	util_print("Curve NIST-K283:\n");
-	bench();
+#if defined(EB_SUPER)
+	r2 = eb_param_set_any_super();
+	if (r2 == STS_OK) {
+		bench();	}
 #endif
 
-#if defined(EB_STAND) && defined(EB_ORDIN) && FB_POLYN == 409
-	eb_param_set(NIST_B409);
-	util_print("\nCurve NIST-B409:\n");
-	bench();
-#endif
-#if defined(EB_STAND) && defined(EB_KBLTZ) && FB_POLYN == 409
-	eb_param_set(NIST_K409);
-	util_print("Curve NIST-K409:\n");
-	bench();
-#endif
-
-#if defined(EB_STAND) && defined(EB_ORDIN) && FB_POLYN == 571
-	eb_param_set(NIST_B571);
-	util_print("\nCurve NIST-B571:\n");
-	bench();
-#endif
-#if defined(EB_STAND) && defined(EB_KBLTZ) && FB_POLYN == 571
-	eb_param_set(NIST_K571);
-	util_print("Curve NIST-K571:\n");
-	bench();
-#endif
-
-#if defined(EB_SUPER) && FB_POLYN == 271
-	eb_param_set(ETAT_S271);
-	util_print("\nCurve ETAT-S271:\n");
-	bench();
-#endif
-
-#if defined(EB_SUPER) && FB_POLYN == 1223
-	eb_param_set(ETAT_S1223);
-	util_print("\nCurve ETAT-S1223:\n");
-	bench();
-#endif
-
+	if (r0 == STS_ERR && r1 == STS_ERR && r2 == STS_ERR) {
+		eb_param_set_any();
+	}
 	core_clean();
 	return 0;
 }

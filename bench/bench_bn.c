@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -664,30 +664,17 @@ void arith(void) {
 
 #if defined(WITH_EB) && defined(EB_STAND) && defined(EB_KBLTZ)
 
-#if FB_POLYN == 163
-	eb_param_set(NIST_K163);
-#endif
-#if FB_POLYN == 233
-	eb_param_set(NIST_K233);
-#endif
-#if FB_POLYN == 283
-	eb_param_set(NIST_K283);
-#endif
-#if FB_POLYN == 409
-	eb_param_set(NIST_K409);
-#endif
-#if FB_POLYN == 571
-	eb_param_set(NIST_K571);
-#endif
-
-	BENCH_BEGIN("bn_rec_tnaf") {
-		signed char tnaf[FB_BITS + 8];
-		int len;
-		bn_rand(a, BN_POS, BN_BITS);
-		BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, eb_curve_get_vm(),
-						eb_curve_get_s0(), eb_curve_get_s1(), 1, FB_BITS, 4));
+	if (eb_param_set_any_kbltz() == STS_OK) {
+		BENCH_BEGIN("bn_rec_tnaf") {
+			signed char tnaf[FB_BITS + 8];
+			int len;
+			bn_rand(a, BN_POS, BN_BITS);
+			BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, eb_curve_get_vm(),
+							eb_curve_get_s0(), eb_curve_get_s1(), 1, FB_BITS,
+							4));
+		}
+		BENCH_END;
 	}
-	BENCH_END;
 #endif
 
 	BENCH_BEGIN("bn_rec_jsf") {
@@ -887,14 +874,13 @@ void arith(void) {
 int main(void) {
 	core_init();
 	conf_print();
-
-	util_print("\n--- Memory-management:\n\n");
+	util_print_label("Benchmarks for the BN module:", 0);
+	util_print_label("Utilities:", 1);
 	memory1();
 	memory2();
 	memory3();
-	util_print("\n--- Utilities:\n\n");
 	util();
-	util_print("\n--- Arithmetic:\n\n");
+	util_print_label("Arithmetic:", 1);
 	arith();
 
 	core_clean();

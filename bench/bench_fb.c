@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -116,8 +116,11 @@ void util(void) {
 	}
 	BENCH_END;
 
+	d = 0;
 	BENCH_BEGIN("fb_bits_dig") {
-		fb_rand(a);
+		fb_zero(a);
+		d = (d + 1) % FB_DIGIT;
+		fb_set_bit(a, d, 1);
 		BENCH_ADD(fb_bits_dig(a[0]));
 	}
 	BENCH_END;
@@ -366,6 +369,28 @@ void arith(void) {
 	BENCH_END;
 #endif
 
+	BENCH_BEGIN("fb_trc") {
+		fb_rand(a);
+		BENCH_ADD(fb_trc(c, a));
+	}
+	BENCH_END;
+
+#if FB_SRT == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fb_trc_basic") {
+		fb_rand(a);
+		BENCH_ADD(fb_trc_basic(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if FB_SRT == QUICK || !defined(STRIP)
+	BENCH_BEGIN("fb_trc_quick") {
+		fb_rand(a);
+		BENCH_ADD(fb_trc_quick(c, a));
+	}
+	BENCH_END;
+#endif
+
 	BENCH_BEGIN("fb_inv") {
 		fb_rand(a);
 		fb_sqr(e, a);
@@ -407,31 +432,14 @@ void arith(void) {
 int main(void) {
 	core_init();
 	conf_print();
+	util_print_label("Benchmarks for the FB module:", 0);
 
-#if FB_POLYN == 163
-	fb_param_set(NIST_163);
-#elif FB_POLYN == 233
-	fb_param_set(NIST_233);
-#elif FB_POLYN == 283
-	fb_param_set(NIST_283);
-#elif FB_POLYN == 409
-	fb_param_set(NIST_409);
-#elif FB_POLYN == 571
-	fb_param_set(NIST_571);
-#elif FB_POLYN == 271
-	fb_param_set(FAST_271);
-#elif FB_POLYN == 1223
-	fb_param_set(FAST_1223);
-#endif
-
-	util_print("--- Irreducible polynomial:");
-	fb_print(fb_poly_get());
-
-	util_print("\n--- Memory-management:\n\n");
+	fb_param_set_any();
+	fb_param_print();
+	util_print_label("Utilities:\n", 0);
 	memory();
-	util_print("\n--- Utilities:\n\n");
 	util();
-	util_print("\n--- Arithmetic:\n\n");
+	util_print_label("Arithmetic:\n", 0);
 	arith();
 
 	core_clean();

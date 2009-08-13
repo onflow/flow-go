@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Project RELIC
+ * Copyright 2007-2009 RELIC Project
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file.
@@ -74,16 +74,15 @@ int main(void) {
 	core_init();
 	conf_print();
 
-#if defined(EB_SUPER) && FB_POLYN == 271
-	eb_param_set(ETAT_S271);
-	util_print("Curve ETAT-S271:\n");
-#elif defined(EB_SUPER) && FB_POLYN == 1223
-	eb_param_set(ETAT_S1223);
-	util_print("Curve ETAT-S1223:\n");
-#endif
+	util_print_label("Benchmarks for the PB module:", 0);
 
-	util_print("\n--- Arithmetic:\n\n");
-	arith();
+	if (eb_param_set_any_super() == STS_OK) {
+		eb_param_print();
+		util_print_label("Arithmetic:", 1);
+		arith();
+	} else {
+		THROW(ERR_NO_CURVE);
+	}
 
 	core_clean();
 	return 0;
