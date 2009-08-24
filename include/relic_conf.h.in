@@ -451,15 +451,17 @@
 /** No timer. */
 #define NONE     1
 /** Per-process high-resolution timer. */
-#define HPROC    2
+#define HREAL    2
 /** Per-process high-resolution timer. */
-#define HREAL    3
+#define HPROC    3
+/** Per-thread high-resolution timer. */
+#define HTHRD    4
 /** POSIX-compatible timer. */
-#define POSIX    4
+#define POSIX    5
 /** ANSI-compatible timer. */
-#define ANSI     5
+#define ANSI     6
 /** Cycle-counting timer. */
-#define CYCLE    6
+#define CYCLE    7
 /** Chosen timer. */
 #define TIMER    @TIMER@
 
