@@ -190,6 +190,17 @@ void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit);
 void fb_muln_low(dig_t *c, dig_t *a, dig_t *b);
 
 /**
+ * Multiplies two digit vectors of the same size but smaller than the standard
+ * precision.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first digit vector to multiply.
+ * @param[in] b				- the second digit vector to multiply.
+ * @param[in] size			- the size of the digit vectors.
+ */
+void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size);
+
+/**
  * Multiplies two digit vectors of the same size with embedded modular
  * reduction.
  *
