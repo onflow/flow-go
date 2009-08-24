@@ -59,22 +59,17 @@ void fb_mul_basic_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 		dv_new(s);
 		dv_zero(s, 2 * FB_DIGS);
 
-		for (i = 0; i < size; i++) {
-			s[i] = b[i];
-		}
+		dv_copy(s, b, size);
+		dv_zero(c, 2 * size);
 
 		if (a[0] & 1) {
-			for (i = 0; i < size; i++) {
-				c[i] = b[i];
-			}
+			dv_copy(c, b, size);
 		}
 		for (i = 1; i <= (FB_DIGIT * size) - 1; i++) {
-			/* We are already shifting a temporary value, so this is more efficient
-			 * than calling fb_lsh(). */
-			bn_lsh1_low(s, s, size + 1);
+			fb_lsh1_low(s, s);
 			fb_rdc(s, s);
 			if (fb_test_bit(a, i)) {
-				fb_addd_low(c, c, s, size + 1);
+				fb_add(c, c, s);
 			}
 		}
 	}
@@ -96,6 +91,8 @@ void fb_mul_basic_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
  */
 void fb_mul_lcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 	dig_t carry;
+
+	dv_zero(c, 2 * size);
 
 	for (int i = FB_DIGIT - 1; i >= 0; i--) {
 		for (int j = 0; j < size; j++) {
@@ -119,14 +116,14 @@ void fb_mul_lcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
  */
 void fb_mul_rcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 	dv_t _b = NULL;
-	dig_t carry;
 
 	TRY {
 		dv_new(_b);
-		dv_zero(_b, size + 1);
+		dv_zero(c, 2 * size);
 
 		for (int i = 0; i < size; i++)
 			_b[i] = b[i];
+		_b[size] = 0;
 
 		for (int i = 0; i < FB_DIGIT; i++) {
 			for (int j = 0; j < size; j++) {
@@ -135,8 +132,7 @@ void fb_mul_rcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 				}
 			}
 			if (i != FB_DIGIT - 1) {
-				carry = bn_lsh1_low(_b, _b, size);
-				_b[size] = (_b[size] << 1) | carry;
+				bn_lsh1_low(_b, _b, size + 1);
 			}
 		}
 	}
@@ -145,91 +141,6 @@ void fb_mul_rcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 	}
 	FINALLY {
 		dv_free(_b);
-	}
-}
-
-/**
- * Multiplies two binary field elements using lopez-dahab multiplication.
- *
- * @param c					- the result.
- * @param a					- the first binary field element.
- * @param b					- the second binary field element.
- * @param size				- the number of digits to multiply.
- */
-void fb_mul_lodah_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
-	dv_t table[16] = { NULL };
-	dig_t u, *tmpa, *tmpc, r0, r1, r2, r4, r8;
-	int i, j;
-
-	TRY {
-		for (i = 0; i < 16; i++) {
-			dv_new(table[i]);
-			dv_zero(table[i], size + 1);
-		}
-
-		u = 0;
-		for (i = 0; i < size; i++) {
-			r1 = r0 = b[i];
-			r2 = (r0 << 1) | (u >> (FB_DIGIT - 1));
-			r4 = (r0 << 2) | (u >> (FB_DIGIT - 2));
-			r8 = (r0 << 3) | (u >> (FB_DIGIT - 3));
-			table[0][i] = 0;
-			table[1][i] = r1;
-			table[2][i] = r2;
-			table[3][i] = r1 ^ r2;
-			table[4][i] = r4;
-			table[5][i] = r1 ^ r4;
-			table[6][i] = r2 ^ r4;
-			table[7][i] = r1 ^ r2 ^ r4;
-			table[8][i] = r8;
-			table[9][i] = r1 ^ r8;
-			table[10][i] = r2 ^ r8;
-			table[11][i] = r1 ^ r2 ^ r8;
-			table[12][i] = r4 ^ r8;
-			table[13][i] = r1 ^ r4 ^ r8;
-			table[14][i] = r2 ^ r4 ^ r8;
-			table[15][i] = r1 ^ r2 ^ r4 ^ r8;
-			u = r1;
-		}
-
-		if (u > 0) {
-			r1 = 0;
-			r2 = u >> (FB_DIGIT - 1);
-			r4 = u >> (FB_DIGIT - 2);
-			r8 = u >> (FB_DIGIT - 3);
-			table[0][size] = table[1][size] = 0;
-			table[2][size] = table[3][size] = r2;
-			table[4][size] = table[5][size] = r4;
-			table[6][size] = table[7][size] = r2 ^ r4;
-			table[8][size] = table[9][size] = r8;
-			table[10][size] = table[11][size] = r2 ^ r8;
-			table[12][size] = table[13][size] = r4 ^ r8;
-			table[14][size] = table[15][size] = r2 ^ r4 ^ r8;
-		}
-
-		for (i = FB_DIGIT - 4; i >= 4; i -= 4) {
-			tmpa = a;
-			tmpc = c;
-			for (j = 0; j < size; j++, tmpa++, tmpc++) {
-				u = (*tmpa >> i) & 0x0F;
-				fb_addd_low(tmpc, tmpc, table[u], size);
-				*(tmpc + size) ^= table[u][size];
-			}
-			bn_lshb_low(c, c, 2 * size, 4);
-		}
-		for (j = 0; j < size; j++, a++, c++) {
-			u = *a & 0x0F;
-			fb_addd_low(c, c, table[u], size);
-			*(c + size) ^= table[u][size];
-		}
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		for (i = 0; i < 16; i++) {
-			dv_free(table[i]);
-		}
 	}
 }
 
@@ -245,7 +156,8 @@ void fb_mul_lodah_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
  */
 void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
 	int i, h, h1;
-	dv_t a1 = NULL, b1 = NULL, a0b0 = NULL, a1b1 = NULL;
+	dv_t a1 = NULL, b1 = NULL, ab = NULL;
+	dig_t *a0b0, *a1b1;
 
 	/* Compute half the digits of a or b. */
 	h = size >> 1;
@@ -255,12 +167,9 @@ void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
 		/* Allocate the temp variables. */
 		dv_new(a1);
 		dv_new(b1);
-		dv_new(a0b0);
-		dv_new(a1b1);
-		dv_zero(a1, h1);
-		dv_zero(b1, h1);
-		dv_zero(a0b0, 2 * h);
-		dv_zero(a1b1, 2 * h1);
+		dv_new(ab);
+		a0b0 = ab;
+		a1b1 = ab + 2 * h;
 
 		/* a0b0 = a0 * b0 and a1b1 = a1 * b1 */
 		if (level <= 1) {
@@ -274,20 +183,16 @@ void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
 			fb_mul_rcomb_impl(a0b0, a, b, h);
 			fb_mul_rcomb_impl(a1b1, a + h, b + h, h1);
 #elif FB_MUL == INTEG || FB_MUL == LODAH
-			fb_mul_lodah_impl(a0b0, a, b, h);
-			fb_mul_lodah_impl(a1b1, a + h, b + h, h1);
+			fb_muld_low(a0b0, a, b, h);
+			fb_muld_low(a1b1, a + h, b + h, h1);
 #endif
 		} else {
 			fb_mul_karat_impl(a0b0, a, b, h, level - 1);
 			fb_mul_karat_impl(a1b1, a + h, b + h, h1, level - 1);
 		}
 
-		for (i = 0; i < 2 * h; i++) {
-			c[i] = a0b0[i];
-		}
-
-		for (i = 0; i < 2 * h1; i++) {
-			c[2 * h + i] = a1b1[i];
+		for (i = 0; i < 2 * size; i++) {
+			c[i] = ab[i];
 		}
 
 		/* c = c - (a0*b0 << h digits) */
@@ -301,13 +206,10 @@ void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
 
 		/* b1 = (b1 + b0) */
 		fb_addd_low(b1, b, b + h, h);
+
 		if (h1 > h) {
 			a1[h1 - 1] = a[h + h1 - 1];
 			b1[h1 - 1] = b[h + h1 - 1];
-		}
-
-		for (i = 0; i < 2 * h1; i++) {
-			a1b1[i] = 0;
 		}
 
 		if (level <= 1) {
@@ -319,7 +221,7 @@ void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
 #elif FB_MUL == RCOMB
 			fb_mul_rcomb_impl(a1b1, a1, b1, h1);
 #elif FB_MUL == INTEG || FB_MUL == LODAH
-			fb_mul_lodah_impl(a1b1, a1, b1, h1);
+			fb_muld_low(a1b1, a1, b1, h1);
 #endif
 		} else {
 			fb_mul_karat_impl(a1b1, a1, b1, h1, level - 1);
@@ -372,7 +274,7 @@ void fb_mul_basic(fb_t c, fb_t a, fb_t b) {
 			}
 		}
 
-		fb_copy(c, t);
+		fb_rdc(c, t);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
