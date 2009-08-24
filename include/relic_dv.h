@@ -83,6 +83,15 @@ typedef dig_t *dv_t;
 void dv_zero(dv_t a, int digits);
 
 /**
+ * Copies some digits from a digit vector to another digit vector.
+ *
+ * @param[out] c			- the destination.
+ * @param[in] a				- the source.
+ * @param[in] digits		- the number of digits to copy.
+ */
+void dv_copy(dv_t c, dv_t a, int digits);
+
+/**
  * Calls a function to clean and free a temporary double-precision digit vector.
  *
  * @param[out] A			- the temporary digit vector to clean and free.
