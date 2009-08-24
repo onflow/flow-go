@@ -46,7 +46,7 @@
 /**
  * Timer type.
  */
-#if TIMER == HPROC || TIMER == HREAL
+#if TIMER == HPROC || TIMER == HREAL || TIMER == HTHRD
 typedef struct timespec bench_t;
 #elif TIMER == ANSI
 typedef clock_t bench_t;
@@ -146,9 +146,9 @@ void bench_overhead(void) {
 		overhead /= BENCH;
 		/* Divide to obtain the overhead of one operation pair. */
 		overhead /= BENCH;
-		/* We assume that our overhead estimate is too optimistic (due to cache
-		 * effects, per example). */
-		overhead /= 2;
+		/* We assume that our overhead estimate is too high (due to cache
+		 * effects, per example). The ratio 2/3 was found experimentally. */
+		overhead = overhead / 2;
 	} while (overhead < 0);
 
 #if TIMER == CYCLE
@@ -168,10 +168,12 @@ void bench_reset(char *label) {
 }
 
 void bench_before() {
-#if TIMER == HPROC
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &before);
-#elif TIMER == HREAL
+#if TIMER == HREAL
 	clock_gettime(CLOCK_REALTIME, &before);
+#elif TIMER == HPROC
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &before);
+#elif TIMER == HTHRD
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &before);
 #elif TIMER == ANSI
 	before = clock();
 #elif TIMER == POSIX
@@ -183,12 +185,16 @@ void bench_before() {
 
 void bench_after() {
 	long long result;
-#if TIMER == HPROC
+#if TIMER == HREAL
+	clock_gettime(CLOCK_REALTIME, &after);
+	result = ((long)after.tv_sec - (long)before.tv_sec) * 1000000000;
+	result += (after.tv_nsec - before.tv_nsec);
+#elif TIMER == HPROC
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &after);
 	result = ((long)after.tv_sec - (long)before.tv_sec) * 1000000000;
 	result += (after.tv_nsec - before.tv_nsec);
-#elif TIMER == HREAL
-	clock_gettime(CLOCK_REALTIME, &after);
+#elif TIMER == HTHRD
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &after);
 	result = ((long)after.tv_sec - (long)before.tv_sec) * 1000000000;
 	result += (after.tv_nsec - before.tv_nsec);
 #elif TIMER == ANSI
