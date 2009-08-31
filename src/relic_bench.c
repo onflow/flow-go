@@ -29,7 +29,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 
 #include "relic_bench.h"
 #include "relic_conf.h"
@@ -37,6 +36,10 @@
 
 #if OPSYS == LINUX || OPSYS == FREEBSD
 #include <sys/time.h>
+#endif
+
+#if TIMER != NONE
+#include <time.h>
 #endif
 
 /*============================================================================*/
@@ -105,6 +108,7 @@ static void empty(int *a) {
 /*============================================================================*/
 
 void bench_overhead(void) {
+#if TIMER != NONE
 	int a[BENCH + 1];
 	int *tmpa;
 
@@ -155,6 +159,7 @@ void bench_overhead(void) {
 	util_print("%lld cycles\n", overhead);
 #elif TIMER != NONE
 	util_print("%lld nanosec\n", overhead);
+#endif
 #endif
 }
 
@@ -217,6 +222,7 @@ void bench_after() {
 }
 
 void bench_compute(int benches) {
+#if TIMER != NONE
 	total = total / benches - overhead;
 #if TIMER == CYCLE
 	util_print("%lld cycles", total);
@@ -230,4 +236,7 @@ void bench_compute(int benches) {
 	} else {
 		util_print("\n");
 	}
+#else
+	(void)benches;
+#endif
 }
