@@ -113,7 +113,6 @@ message("   TIMER=ANSI     ANSI-compatible timer.")
 message("   TIMER=POSIX    POSIX-compatible timer.")
 message("   TIMER=CYCLE    Cycle-counting timer. (architecture-dependant)\n")
 
-include(cmake/macros.cmake)
 include(cmake/bn.cmake)
 include(cmake/fb.cmake)
 include(cmake/eb.cmake)
