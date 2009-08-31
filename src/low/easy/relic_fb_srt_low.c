@@ -52,15 +52,14 @@ static void fb_srtt_low(dig_t *c, dig_t *a, int fa) {
 	dv_new(t);
 	dv_zero(t, 2 * FB_DIGS);
 
-	sh = 1 + (FB_BITS >> FB_DIG_LOG);
-	h = (sh + 1) / 2;
+	h = (FB_DIGS + 1) / 2;
 	rh = (h << FB_DIG_LOG) - 1 - (FB_BITS - 1) / 2;
 	lh = FB_DIGIT - rh;
 
 	SPLIT(la, sa, (fa + 1) >> 1, FB_DIG_LOG);
 	ra = FB_DIGIT - la;
 
-	for (i = 0; i < sh; i++) {
+	for (i = 0; i < FB_DIGS; i++) {
 		n = i >> 1;
 		d = a[i];
 
