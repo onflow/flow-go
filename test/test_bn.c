@@ -505,7 +505,7 @@ int multiplication(void) {
 		TEST_END;
 #endif
 
-#if BN_MUK > 0 || !defined(STRIP)
+#if BN_KARAT > 0 || !defined(STRIP)
 		TEST_BEGIN("karatsuba multiplication is correct") {
 			bn_rand(a, BN_POS, BN_BITS / 2);
 			bn_rand(b, BN_POS, BN_BITS / 2);
@@ -565,7 +565,7 @@ int squaring(void) {
 		} TEST_END;
 #endif
 
-#if BN_SQK > 0 || !defined(STRIP)
+#if BN_KARAT > 0 || !defined(STRIP)
 		TEST_BEGIN("karatsuba squaring is correct") {
 			bn_rand(a, BN_POS, BN_BITS / 2);
 			bn_sqr(b, a);

@@ -422,7 +422,7 @@ int multiplication(void) {
 		TEST_END;
 #endif
 
-#if FB_MUK > 0 || !defined(STRIP)
+#if FB_KARAT > 0 || !defined(STRIP)
 		TEST_BEGIN("karatsuba multiplication is correct") {
 			fb_rand(a);
 			fb_rand(b);

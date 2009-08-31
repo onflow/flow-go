@@ -454,7 +454,7 @@ int multiplication(void) {
 		} TEST_END;
 #endif
 
-#if EB_MUL == CONST || !defined(STRIP)
+#if defined(EB_ORDIN) && (EB_MUL == CONST || !defined(STRIP))
 		if (!eb_curve_is_super()) {
 			TEST_BEGIN("constant-time point multiplication is correct") {
 				bn_rand(k, BN_POS, bn_bits(n));
@@ -808,7 +808,7 @@ int main(void) {
 	}
 #endif
 
-#if defined(EB_SUPER)
+#if defined(EB_STAND) && defined(EB_SUPER)
 	r2 = eb_param_set_any_super();
 	if (r2 == STS_OK) {
 		if (test() != STS_OK) {
