@@ -474,7 +474,7 @@ void eb_mul_wtnaf(eb_t r, eb_t p, bn_t k) {
 	}
 #endif
 
-#if defined(EB_ORDIN)
+#if defined(EB_ORDIN) || defined(EB_SUPER)
 	eb_mul_naf_tab(r, p, k);
 #endif
 }

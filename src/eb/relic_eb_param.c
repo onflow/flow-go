@@ -170,12 +170,27 @@
  * GF(2^271).
  */
 /** @{ */
-#define ETAT_S271_A		"1"
-#define ETAT_S271_B		"0"
-#define ETAT_S271_C		"1"
-#define ETAT_S271_X		"10B175C041258C778D1DD76AEF912696E510A16F0C4E5357F2F6591B401498D66271"
-#define ETAT_S271_Y		"7C026D0DB856E16E70976A84C19620F8D8B92B65C2A7BAF3B9FD80DC7F385B9C26BF"
-#define ETAT_S271_R     "000011325723001f4da29db638fb520315b3b99dae4bc727e10745f086979f3d4fd5"
+#define ETAT_P271_A		"1"
+#define ETAT_P271_B		"0"
+#define ETAT_P271_C		"1"
+#define ETAT_P271_X		"10B175C041258C778D1DD76AEF912696E510A16F0C4E5357F2F6591B401498D66271"
+#define ETAT_P271_Y		"7C026D0DB856E16E70976A84C19620F8D8B92B65C2A7BAF3B9FD80DC7F385B9C26BF"
+#define ETAT_P271_R     "000011325723001f4da29db638fb520315b3b99dae4bc727e10745f086979f3d4fd5"
+/** @} */
+#endif
+
+#if defined(EB_SUPER) && FB_POLYN == 271
+/**
+ * Parameters for the MIRACL supersingular pairing-friendly elliptic curve over
+ * GF(2^271).
+ */
+/** @{ */
+#define ETAT_T271_A		"1"
+#define ETAT_T271_B		"0"
+#define ETAT_T271_C		"1"
+#define ETAT_T271_X		"33797D0E4348C31F6867373A566F85F720B6BDF204A9DB557CDE08CB249963C93D86"
+#define ETAT_T271_Y		"3B519E11ADDE45B02AD36ED5A55F3ECD8CD9517460CAC25B187224D6BB73D9C49B1C"
+#define ETAT_T271_R     "000011325723001f4da29db638fb520315b3b99dae4bc727e10745f086979f3d4fd5"
 /** @} */
 #endif
 
@@ -349,13 +364,17 @@ void eb_param_set(int param) {
 				kbltz = 1;
 				break;
 #elif defined(EB_SUPER) && FB_POLYN == 271
-			case ETAT_S271:
-				ASSIGNS(ETAT_S271, PENTA_271);
+			case ETAT_P271:
+				ASSIGNS(ETAT_P271, PENTA_271);
+				super = 1;
+				break;
+			case ETAT_T271:
+				ASSIGNS(ETAT_T271, TRINO_271);
 				super = 1;
 				break;
 #elif defined(EB_SUPER) && FB_POLYN == 1223
 			case ETAT_S1223:
-				ASSIGNS(ETAT_S1223, FAST_1223);
+				ASSIGNS(ETAT_S1223, TRINO_1223);
 				super = 1;
 				break;
 #endif
@@ -458,7 +477,11 @@ int eb_param_set_any_kbltz() {
 int eb_param_set_any_super() {
 	int r = STS_OK;
 #if FB_POLYN == 271
-	eb_param_set(ETAT_S271);
+#ifdef FB_TRINO
+	eb_param_set(ETAT_T271);
+#else
+	eb_param_set(ETAT_P271);
+#endif
 #elif FB_POLYN == 1223
 	eb_param_set(ETAT_S1223);
 #else
@@ -499,8 +522,8 @@ void eb_param_print() {
 	case NIST_K571:
 		util_print_label("Curve NIST-K571:", 0);
 		break;
-	case ETAT_S271:
-		util_print_label("Curve ETAT-S271:", 0);
+	case ETAT_P271:
+		util_print_label("Curve ETAT-P271:", 0);
 		break;
 	case ETAT_S1223:
 		util_print_label("Curve ETAT-S1223:", 0);
