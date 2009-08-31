@@ -37,7 +37,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if BN_SQK > 0 || !defined(STRIP)
+#if BN_KARAT > 0 || !defined(STRIP)
 
 /**
  * Computes the square of a multiple precision integer using recursive Karatsuba
@@ -203,10 +203,10 @@ void bn_sqr_comba(bn_t c, bn_t a) {
 
 #endif
 
-#if BN_SQK > 0 || !defined(STRIP)
+#if BN_KARAT > 0 || !defined(STRIP)
 
 void bn_sqr_karat(bn_t c, bn_t a) {
-	bn_sqr_karat_impl(c, a, BN_SQK);
+	bn_sqr_karat_impl(c, a, BN_KARAT);
 }
 
 #endif

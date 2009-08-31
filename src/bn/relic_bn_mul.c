@@ -37,7 +37,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if BN_MUK > 0 || !defined(STRIP)
+#if BN_KARAT > 0 || !defined(STRIP)
 
 /**
  * Multiplies two multiple precision integers using recursive Karatsuba
@@ -252,10 +252,10 @@ void bn_mul_comba(bn_t c, bn_t a, bn_t b) {
 
 #endif
 
-#if BN_MUK > 0 || !defined(STRIP)
+#if BN_KARAT > 0 || !defined(STRIP)
 
 void bn_mul_karat(bn_t c, bn_t a, bn_t b) {
-	bn_mul_karat_impl(c, a, b, BN_MUK);
+	bn_mul_karat_impl(c, a, b, BN_KARAT);
 }
 
 #endif
