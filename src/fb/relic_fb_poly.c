@@ -112,6 +112,8 @@ void fb_poly_set(fb_t f) {
 						break;
 				}
 				counter++;
+			} else {
+				break;
 			}
 		}
 	}

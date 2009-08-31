@@ -40,7 +40,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if FB_MUK > 0 || !defined(STRIP)
+#if FB_KARAT > 0 || !defined(STRIP)
 
 /**
  * Multiplies two binary field elements using shift-and-add multiplication.
@@ -390,7 +390,7 @@ void fb_mul_lodah(fb_t c, fb_t a, fb_t b) {
 
 #endif
 
-#if FB_MUK > 0 || !defined(STRIP)
+#if FB_KARAT > 0 || !defined(STRIP)
 
 void fb_mul_karat(fb_t c, fb_t a, fb_t b) {
 	dv_t t = NULL;
@@ -400,7 +400,7 @@ void fb_mul_karat(fb_t c, fb_t a, fb_t b) {
 		dv_new(t);
 		dv_zero(t, 2 * FB_DIGS);
 
-		fb_mul_karat_impl(t, a, b, FB_DIGS, FB_MUK);
+		fb_mul_karat_impl(t, a, b, FB_DIGS, FB_KARAT);
 
 		fb_rdc(c, t);
 	} CATCH_ANY {

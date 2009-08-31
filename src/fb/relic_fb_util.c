@@ -166,84 +166,24 @@ int fb_bits(fb_t a) {
 }
 
 int fb_bits_dig(dig_t a) {
-	if (a == 0) {
-		return 0;
-	} else {
-		return FB_DIGIT - __builtin_clzl(a);
-	}
-}
-
-int fb_bits_dig2(dig_t a) {
+#if WORD == 8
 	static const unsigned char table[16] = {
 		0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4
 	};
-	int offset;
 
-#if WORD == 8
 	if (a >> 4 == 0) {
 		return table[a & 0xF];
 	} else {
 		return table[a >> 4] + 4;
 	}
 	return 0;
-#elif WORD == 16
-	if (a >= ((dig_t)1 << 8)) {
-		offset = 8;
+#else
+	if (a == 0) {
+		return 0;
 	} else {
-		offset = 0;
-	}
-#elif WORD == 32
-	if (a >= ((dig_t)1 << 16)) {
-		if (a >= ((dig_t)1 << 24)) {
-			offset = 24;
-		} else {
-			offset = 16;
-		}
-	} else {
-		if (a >= ((dig_t)1 << 8)) {
-			offset = 8;
-		} else {
-			offset = 0;
-		}
-	}
-#elif WORD == 64
-	if (a >= ((dig_t)1 << 32)) {
-		if (a >= ((dig_t)1 << 48)) {
-			if (a >= ((dig_t)1 << 56)) {
-				offset = 56;
-			} else {
-				offset = 48;
-			}
-		} else {
-			if (a >= ((dig_t)1 << 40)) {
-				offset = 40;
-			} else {
-				offset = 32;
-			}
-		}
-	} else {
-		if (a >= ((dig_t)1 << 16)) {
-			if (a >= ((dig_t)1 << 24)) {
-				offset = 24;
-			} else {
-				offset = 16;
-			}
-		} else {
-			if (a >= ((dig_t)1 << 8)) {
-				offset = 8;
-			} else {
-				offset = 0;
-			}
-		}
+		return FB_DIGIT - __builtin_clzl(a);
 	}
 #endif
-	a = a >> offset;
-	if (a >> 4 == 0) {
-		return table[a & 0xF] + offset;
-	} else {
-		return table[a >> 4] + 4 + offset;
-	}
-	return 0;
 }
 
 void fb_rand(fb_t a) {
