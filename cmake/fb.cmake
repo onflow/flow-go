@@ -39,8 +39,8 @@ set(FB_POLYN ${FB_POLYN} CACHE INTEGER "Irreducible polynomial size in bits.")
 # Fix the number of Karatsuba instances
 if (NOT FB_KARAT)
 	set(FB_KARAT 0)
-endif(NOT FB_KRAT)
-set(FB_POLYN ${FB_POLYN} CACHE INTEGER "Number of Karatsuba levels.")
+endif(NOT FB_KARAT)
+set(FB_KARAT ${FB_KARAT} CACHE INTEGER "Number of Karatsuba levels.")
 
 option(FB_TRINO "Prefer trinomials over pentanomials" on)
 
