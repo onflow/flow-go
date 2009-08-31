@@ -10,13 +10,6 @@ message("      EB_PRECO=[off|on] Build precomputation table for generator.")
 message("      EB_DEPTH=w        Width w in [2,6] of precomputation table for fixed point methods.")
 message("      EB_WIDTH=w        Width w in [2,6] of window processing for unknown point methods.\n")
 
-option(EB_ORDIN "Support for ordinary curves" on)
-option(EB_SUPER "Support for supersingular curves" on)
-option(EB_KBLTZ "Special support for Koblitz curves" on)
-option(EB_STAND "Support for NIST standardized curves" on)
-option(EB_MIXED "Use mixed coordinates" on)
-option(EB_PRECO "Build precomputation table for generator" on)
-
 message("   ** Available binary elliptic curve methods (default = PROJC;WTNAF;WTNAF;INTER):")
 message("      EB_METHD=BASIC    Affine coordinates.")
 message("      EB_METHD=PROJC    Projective coordinates (López-Dahab for ordinary curves).\n")
@@ -48,6 +41,13 @@ if (NOT EB_WIDTH)
 endif(NOT EB_WIDTH)	
 set(EB_DEPTH "${EB_DEPTH}" CACHE STRING "Width of precomputation table for fixed point methods.")
 set(EB_WIDTH "${EB_WIDTH}" CACHE STRING "Width of window processing for unknown point methods.")
+
+option(EB_ORDIN "Support for ordinary curves" on)
+option(EB_SUPER "Support for supersingular curves" on)
+option(EB_KBLTZ "Special support for Koblitz curves" on)
+option(EB_STAND "Support for NIST standardized curves" on)
+option(EB_MIXED "Use mixed coordinates" on)
+option(EB_PRECO "Build precomputation table for generator" on)
 
 # Choose the arithmetic methods.
 if (NOT EB_METHD)

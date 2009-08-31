@@ -1,15 +1,16 @@
 message(STATUS "Binary field arithmetic configuration (FB module):\n")
 
-message("   ** Arithmetic precision of the binary field module (default = 233):")
-message("      FB_POLY=n        The irreducible polynomial size in bits.\n")
+message("   ** Options for the binary elliptic curve module (default = 283,0,on):")
+message("      FB_POLYN=n        The irreducible polynomial size in bits.")
+message("      FB_KARAT=n        The number of Karatsuba levels.") 
+message("      FB_TRINO=[off|on] Prefer trinomials over pentanomials.\n")
 
-message("   ** Available binary field arithmetic methods (default = LRLD4;TABLE;QUICK;BASIC;EXGCD):")
+message("   ** Available binary field arithmetic methods (default = LRLD4;TABLE;QUICK;BASIC;QUICK;EXGCD):")
 message("      FB_METHD=BASIC    Right-to-left shift-and-add multiplication.")
 message("      FB_METHD=INTEG    Integrated modular multiplication.")
 message("      FB_METHD=RCOMB    Right-to-left comb multiplication.")
 message("      FB_METHD=LCOMB    Left-to-right comb multiplication.")
 message("      FB_METHD=LODAH    López-Dahab multiplication with window of width 4.")
-message("      FB_METHD=KnMUL    Karatsuba for (n > 0) steps and MUL multiplication.\n")
 
 message("      FB_METHD=BASIC    Bit manipulation squaring.")
 message("      FB_METHD=INTEG    Integrated modular squaring.")
@@ -35,6 +36,14 @@ if (NOT FB_POLYN)
 endif(NOT FB_POLYN)
 set(FB_POLYN ${FB_POLYN} CACHE INTEGER "Irreducible polynomial size in bits.")
 
+# Fix the number of Karatsuba instances
+if (NOT FB_KARAT)
+	set(FB_KARAT 0)
+endif(NOT FB_KRAT)
+set(FB_POLYN ${FB_POLYN} CACHE INTEGER "Number of Karatsuba levels.")
+
+option(FB_TRINO "Prefer trinomials over pentanomials" on)
+
 # Choose the arithmetic methods.
 if (NOT FB_METHD)
 	set(FB_METHD "LODAH;TABLE;QUICK;BASIC;QUICK;EXGCD")
@@ -51,6 +60,3 @@ list(GET FB_METHD 3 FB_SRT)
 list(GET FB_METHD 4 FB_TRC)
 list(GET FB_METHD 5 FB_INV)
 set(FB_METHD ${FB_METHD} CACHE STRING "Binary field arithmetic method")
-
-# Get the number of Karatsuba steps.
-KARAT(${FB_MUL} FB_MUK FB_MUL)
