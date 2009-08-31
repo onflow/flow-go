@@ -323,7 +323,7 @@ void arith(void) {
 	BENCH_END;
 #endif
 
-#if EB_MUL == CONST || !defined(STRIP)
+#if defined(EB_ORDIN) && (EB_MUL == CONST || !defined(STRIP))
 	if (!eb_curve_is_super()) {
 		BENCH_BEGIN("eb_mul_const") {
 			bn_rand(k, BN_POS, bn_bits(n));

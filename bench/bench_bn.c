@@ -395,7 +395,7 @@ void arith(void) {
 	BENCH_END;
 #endif
 
-#if BN_MUL == KARAT || !defined(STRIP)
+#if BN_KARAT > 0 || !defined(STRIP)
 	BENCH_BEGIN("bn_mul_karat") {
 		bn_rand(a, BN_POS, BN_BITS);
 		bn_rand(b, BN_POS, BN_BITS);
@@ -426,7 +426,7 @@ void arith(void) {
 	BENCH_END;
 #endif
 
-#if BN_SQK > 0 || !defined(STRIP)
+#if BN_KARAT > 0 || !defined(STRIP)
 	BENCH_BEGIN("bn_sqr_karat") {
 		bn_rand(a, BN_POS, BN_BITS);
 		BENCH_ADD(bn_sqr_karat(c, a));

@@ -254,7 +254,7 @@ void arith(void) {
 	BENCH_END;
 #endif
 
-#if FB_MUL == LODAW || !defined(STRIP)
+#if FB_MUL == LODAH || !defined(STRIP)
 	BENCH_BEGIN("fb_mul_lodah") {
 		fb_rand(a);
 		fb_rand(b);
@@ -263,7 +263,7 @@ void arith(void) {
 	BENCH_END;
 #endif
 
-#if FB_MUK > 0 || !defined(STRIP)
+#if FB_KARAT > 0 || !defined(STRIP)
 	BENCH_BEGIN("fb_mul_karat") {
 		fb_rand(a);
 		fb_rand(b);
