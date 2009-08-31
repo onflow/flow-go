@@ -559,7 +559,7 @@ void bn_sub_dig(bn_t c, bn_t a, dig_t b);
  * @param[in] A				- the first multiple precision integer to multiply.
  * @param[in] B				- the second multiple precision integer to multiply.
  */
-#if BN_MUK > 0
+#if BN_KARAT > 0
 #define bn_mul(C, A, B)	bn_mul_karat(C, A, B)
 #elif BN_MUL == BASIC
 #define bn_mul(C, A, B)	bn_mul_basic(C, A, B)
@@ -610,7 +610,7 @@ void bn_mul_karat(bn_t c, bn_t a, bn_t b);
  * @param[out] C			- the result.
  * @param[in] A				- the multiple precision integer to square.
  */
-#if BN_SQK > 0
+#if BN_KARAT > 0
 #define bn_sqr(C, A)	bn_sqr_karat(C, A)
 #elif BN_SQR == BASIC
 #define bn_sqr(C, A)	bn_sqr_basic(C, A)

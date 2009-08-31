@@ -125,6 +125,8 @@
 #define DOUBLE	 2
 /** Effective size of a multiple precision integer. */
 #define BN_MAGNI @BN_MAGNI@
+/** Number of Karatsuba steps. */
+#define BN_KARAT @BN_KARAT@
 
 /** Multiple precision arithmetic method */
 #define BN_METHD "@BN_METHD@"
@@ -133,8 +135,6 @@
 #define BASIC    1
 /** Comba multiplication. */
 #define COMBA    2
-/** Number of Karatsuba steps. */
-#define BN_MUK   @BN_MUK@
 /** Chosen multiple precision multiplication method. */
 #define BN_MUL   @BN_MUL@
 
@@ -142,8 +142,6 @@
 #define BASIC    1
 /** Comba squaring. */
 #define COMBA    2
-/** Number of Karatsuba steps. */
-#define BN_SQK	 @BN_SQK@
 /** Chosen multiple precision multiplication method. */
 #define BN_SQR   @BN_SQR@
 
@@ -214,6 +212,10 @@
 
 /** Irreducible polynomial size in bits. */
 #define FB_POLYN @FB_POLYN@
+/** Number of Karatsuba steps. */
+#define FB_KARAT @FB_KARAT@
+/** Prefer trinomials over pentanomials. */
+#cmakedefine FB_TRINO
 
 /** Binary field arithmetic method */
 #define FB_METHD "@FB_METHD@"
@@ -228,8 +230,6 @@
 #define RCOMB	 4
 /** Lopez-Dahab multiplication. */
 #define LODAH	 5
-/** Number of Karatsuba steps. */
-#define FB_MUK   @FB_MUK@
 /** Chosen binary field multiplication method. */
 #define FB_MUL   @FB_MUL@
 

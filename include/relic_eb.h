@@ -64,9 +64,11 @@ enum {
 	/** NIST K-571 Koblitz curve. */
 	NIST_K571 = 10,
 	/** MIRACL low-security pairing-friendly curve. */
-	ETAT_S271 = 11,
+	ETAT_P271 = 11,
+	/** MIRACL low-security pairing-friendly curve. */
+	ETAT_T271 = 12,
 	/** MIRACL high-security pairing-friendly curve. */
-	ETAT_S1223 = 12,
+	ETAT_S1223 = 13,
 };
 
 /**

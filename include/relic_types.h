@@ -105,7 +105,7 @@ typedef __uint128_t dbl_t;
 /**
  * Specification for aligned variables.
  */
-#ifdef ALIGN
+#if ALIGN > 1
 #define align 			__attribute__ ((aligned (ALIGN)))
 #else
 #define align 			/* empty*/

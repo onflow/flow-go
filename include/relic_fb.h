@@ -424,7 +424,7 @@ void fb_sub_dig(fb_t c, fb_t a, dig_t b);
  * @param[in] A				- the first binary field element to multiply.
  * @param[in] B				- the second binary field element to multiply.
  */
-#if FB_MUK > 0
+#if FB_KARAT > 0
 #define fb_mul(C, A, B)	fb_mul_karat(C, A, B)
 #elif FB_MUL == BASIC
 #define fb_mul(C, A, B)	fb_mul_basic(C, A, B)
