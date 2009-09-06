@@ -37,7 +37,9 @@
 #ifndef RELIC_DV_H
 #define RELIC_DV_H
 
+#ifndef alloca
 #define alloca __builtin_alloca
+#endif
 
 #include "relic_conf.h"
 #include "relic_types.h"
