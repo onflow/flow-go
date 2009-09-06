@@ -25,7 +25,7 @@
  *
  * Implementation of the pseudo-random number generator.
  *
- * @version $Id: relic_rand.c 13 2009-04-16 02:24:55Z dfaranha $
+ * @version $Id$
  * @ingroup rand
  */
 

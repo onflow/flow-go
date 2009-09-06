@@ -25,7 +25,7 @@
  *
  * Implementation of error-handling routines.
  *
- * @version $Id: relic_error.c 49 2009-07-04 23:48:19Z dfaranha $
+ * @version $Id$
  * @ingroup relic
  */
 

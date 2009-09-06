@@ -25,7 +25,7 @@
  *
  * Implementation of the multiple precision multiplication functions.
  *
- * @version $Id: relic_bn_mul.c 10 2009-04-16 02:20:12Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

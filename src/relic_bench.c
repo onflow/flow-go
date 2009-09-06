@@ -25,7 +25,7 @@
  *
  * Implementation of useful benchmark routines.
  *
- * @version $Id: relic_bench.c 49 2009-07-04 23:48:19Z dfaranha $
+ * @version $Id$
  * @ingroup relic
  */
 

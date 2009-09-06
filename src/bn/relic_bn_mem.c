@@ -25,7 +25,7 @@
  *
  * Implementation of the multiple precision integer memory management routines.
  *
- * @version $Id: relic_bn_mem.c 22 2009-05-03 06:48:50Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

@@ -25,7 +25,7 @@
  *
  * Implementation of the multiple precision exponentiation functions.
  *
- * @version $Id: relic_bn_mxp.c 34 2009-06-03 18:07:55Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

@@ -25,7 +25,7 @@
  *
  * Implementation of useful configuration routines.
  *
- * @version $Id: relic_util.c 13 2009-04-16 02:24:55Z dfaranha $
+ * @version $Id$
  * @ingroup relic
  */
 

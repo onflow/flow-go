@@ -25,7 +25,7 @@
  *
  * Implementation of tracing routines.
  *
- * @version $Id: relic_trace.c 13 2009-04-16 02:24:55Z dfaranha $
+ * @version $Id$
  * @ingroup relic
  */
 

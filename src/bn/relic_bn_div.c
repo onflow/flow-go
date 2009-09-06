@@ -25,7 +25,7 @@
  *
  * Implementation of the multiple precision division functions.
  *
- * @version $Id: relic_bn_div.c 22 2009-05-03 06:48:50Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

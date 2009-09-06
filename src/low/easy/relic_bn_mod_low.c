@@ -26,7 +26,7 @@
  * Implementation of the low-level multiple precision integer modular reduction
  * functions.
  *
- * @version $Id: relic_bn_mod_low.c 13 2009-04-16 02:24:55Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

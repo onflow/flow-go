@@ -26,7 +26,7 @@
  * Implementation of the low-level multiple precision addition and subtraction
  * functions.
  *
- * @version $Id: relic_bn_add_low.c 3 2009-04-08 01:05:51Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

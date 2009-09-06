@@ -25,7 +25,7 @@
  *
  * Implementation of the low-level multiple precision comparison functions.
  *
- * @version $Id: relic_bn_cmp_low.c 13 2009-04-16 02:24:55Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

@@ -26,7 +26,7 @@
  * Implementation of the low-level prime field addition and subtraction
  * functions.
  *
- * @version $Id: relic_fp_add_low.c 13 2009-04-16 02:24:55Z dfaranha $
+ * @version $Id$
  * @ingroup fp
  */
 

@@ -25,7 +25,7 @@
  *
  * Implementation of the multiple precision addition and subtraction functions.
  *
- * @version $Id: relic_bn_add.c 10 2009-04-16 02:20:12Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

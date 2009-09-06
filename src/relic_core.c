@@ -25,7 +25,7 @@
  *
  * Implementation of the library basic functions.
  *
- * @version $Id: relic_core.c 49 2009-07-04 23:48:19Z dfaranha $
+ * @version $Id$
  * @ingroup relic
  */
 

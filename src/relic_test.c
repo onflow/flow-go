@@ -25,7 +25,7 @@
  *
  * Implementation of useful test routines.
  *
- * @version $Id: relic_test.c 13 2009-04-16 02:24:55Z dfaranha $
+ * @version $Id$
  * @ingroup relic
  */
 

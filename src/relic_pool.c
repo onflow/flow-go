@@ -26,7 +26,7 @@
  * Implementation of the memory-management routines for the finite field
  * arithmetic modules.
  *
- * @version $Id: relic_pool.c 13 2009-04-16 02:24:55Z dfaranha $
+ * @version $Id$
  * @ingroup relic
  */
 

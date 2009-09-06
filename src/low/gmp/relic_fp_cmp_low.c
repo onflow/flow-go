@@ -25,7 +25,7 @@
  *
  * Implementation of the low-level prime field comparison functions.
  *
- * @version $Id: relic_fp_cmp_low.c 13 2009-04-16 02:24:55Z dfaranha $
+ * @version $Id$
  * @ingroup fp
  */
 

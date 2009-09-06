@@ -28,7 +28,7 @@
  * Strong prime generation is baed on Gordon's Algorithm, taken from Handbook
  * of Applied Cryptography.
  *
- * @version $Id: relic_bn_prime.c 34 2009-06-03 18:07:55Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 
