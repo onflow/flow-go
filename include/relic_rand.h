@@ -29,7 +29,7 @@
  *
  * Interface of the pseudo-random number generator.
  *
- * @version $Id: relic_rand.h 3 2009-04-08 01:05:51Z dfaranha $
+ * @version $Id$
  * @ingroup rand
  */
 

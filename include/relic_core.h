@@ -29,7 +29,7 @@
  *
  * Interface of the library core functions.
  *
- * @version $Id: relic_core.h 45 2009-07-04 23:45:48Z dfaranha $
+ * @version $Id$
  * @ingroup relic
  */
 

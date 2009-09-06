@@ -29,7 +29,7 @@
  *
  * Interface of the multiple precision integer arithmetic module.
  *
- * @version $Id: relic_bn.h 38 2009-06-03 18:15:41Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

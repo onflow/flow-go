@@ -29,7 +29,7 @@
  *
  * Interface of misc utilitles.
  *
- * @version $Id: relic_util.h 38 2009-06-03 18:15:41Z dfaranha $
+ * @version $Id$
  * @ingroup util
  */
 

@@ -25,7 +25,7 @@
  *
  * Interface of the error-handling functions.
  *
- * @version $Id: relic_error.h 13 2009-04-16 02:24:55Z dfaranha $
+ * @version $Id$
  * @ingroup relic
  */
 

@@ -25,7 +25,7 @@
  *
  * Interface of the tracing functions.
  *
- * @version $Id: relic_trace.h 3 2009-04-08 01:05:51Z dfaranha $
+ * @version $Id$
  * @ingroup relic
  */
 

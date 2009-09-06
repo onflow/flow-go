@@ -29,7 +29,7 @@
  *
  * Useful routines for testing.
  *
- * @version $Id: relic_test.h 3 2009-04-08 01:05:51Z dfaranha $
+ * @version $Id$
  * @ingroup test
  */
 

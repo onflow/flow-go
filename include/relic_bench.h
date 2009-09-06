@@ -29,7 +29,7 @@
  *
  * Useful routines for benchmarking.
  *
- * @version $Id: relic_bench.h 38 2009-06-03 18:15:41Z dfaranha $
+ * @version $Id$
  * @ingroup bench
  */
 
