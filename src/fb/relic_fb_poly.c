@@ -64,33 +64,22 @@ static int pos_a, pos_b, pos_c;
  */
 static int trc_a, trc_b, trc_c;
 
-/*============================================================================*/
-/* Public definitions                                                         */
-/*============================================================================*/
+/**
+ * Find non-zero bits for fast trace computation.
+ *
+ * @throw ERR_NO_MEMORY if there is no available memory.
+ * @throw ERR_INVALID if the polynomial is invalid.
+ */
 
-void fb_poly_init(void) {
-	fb_zero(poly);
-	poly_a = poly_b = poly_c = -1;
-	trc_a = trc_b = trc_c = pos_a = pos_b = pos_c = -1;
-}
-
-void fb_poly_clean(void) {
-}
-
-dig_t *fb_poly_get(void) {
-	return poly;
-}
-
-void fb_poly_set(fb_t f) {
+void find_trace() {
 	fb_t t0, t1 = NULL;
-	int counter = 0;
+	int counter;
 
 	TRY {
 		fb_new(t0);
 		fb_new(t1);
 
-		fb_copy(poly, f);
-
+		counter = 0;
 		for (int i = 0; i < FB_BITS; i++) {
 			fb_zero(t0);
 			fb_set_bit(t0, i, 1);
@@ -112,10 +101,11 @@ void fb_poly_set(fb_t f) {
 					case 2:
 						trc_c = i;
 						break;
+					default:
+						THROW(ERR_INVALID);
+						break;
 				}
 				counter++;
-			} else {
-				break;
 			}
 		}
 	}
@@ -126,6 +116,30 @@ void fb_poly_set(fb_t f) {
 		fb_free(t0);
 		fb_free(t1);
 	}
+}
+
+/*============================================================================*/
+/* Public definitions                                                         */
+/*============================================================================*/
+
+void fb_poly_init(void) {
+	fb_zero(poly);
+	poly_a = poly_b = poly_c = -1;
+	trc_a = trc_b = trc_c = pos_a = pos_b = pos_c = -1;
+}
+
+void fb_poly_clean(void) {
+}
+
+dig_t *fb_poly_get(void) {
+	return poly;
+}
+
+void fb_poly_set(fb_t f) {
+	fb_copy(poly, f);
+
+	find_trace();
+	printf("%d %d %d\n", trc_a, trc_b, trc_c);
 }
 
 void fb_poly_add(fb_t c, fb_t a) {
