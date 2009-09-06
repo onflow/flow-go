@@ -60,7 +60,7 @@ int main(void) {
 
 	core_init();
 
-	util_print_label("Tests for the ERR module:\n", 0);
+	util_print_banner("Tests for the ERR module:\n", 0);
 
 	fprintf(stderr, "Testing if not using try-catch is correct... ");
 	dummy();

@@ -68,6 +68,7 @@ int rsa(void) {
 					end);
 			TEST_ASSERT(cp_rsa_dec(out, &out_len, out, out_len, &prv) == STS_OK,
 					end);
+			printf("%d\n", out_len);
 			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
 		} TEST_END;
 
@@ -263,9 +264,9 @@ int main(void) {
 	int r0, r1;
 	core_init();
 
-	util_print_label("Tests for the CP module", 0);
+	util_print_banner("Tests for the CP module", 0);
 
-	util_print_label("Protocols based on prime factorization:", 1);
+	util_print_banner("Protocols based on prime factorization:", 1);
 
 #if defined(WITH_BN)
 	if (rsa() != STS_OK) {
@@ -274,7 +275,7 @@ int main(void) {
 	}
 #endif
 
-	util_print_label("Protocols based on elliptic curves:", 1);
+	util_print_banner("Protocols based on elliptic curves:", 1);
 
 #if defined(WITH_EB)
 #if defined(EB_STAND) && defined(EB_ORDIN)

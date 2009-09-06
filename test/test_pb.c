@@ -627,17 +627,17 @@ int main(void) {
 
 	fb_param_set_any();
 
-	util_print_label("Tests for the PB module", 0);
+	util_print_banner("Tests for the PB module", 0);
 
-	util_print_label("Quadratic extension:", 0);
-	util_print_label("Utilities:", 1);
+	util_print_banner("Quadratic extension:", 0);
+	util_print_banner("Utilities:", 1);
 
 	if (memory2() != STS_OK) {
 		core_clean();
 		return 1;
 	}
 
-	util_print_label("Arithmetic:", 1);
+	util_print_banner("Arithmetic:", 1);
 
 	if (addition2() != STS_OK) {
 		core_clean();
@@ -664,15 +664,15 @@ int main(void) {
 		return 1;
 	}
 
-	util_print_label("Quartic extension:", 0);
-	util_print_label("Utilities", 1)
+	util_print_banner("Quartic extension:", 0);
+	util_print_banner("Utilities", 1)
 
 	if (memory4() != STS_OK) {
 		core_clean();
 		return 1;
 	}
 
-	util_print_label("Arithmetic:", 1);
+	util_print_banner("Arithmetic:", 1);
 
 	if (addition4() != STS_OK) {
 		core_clean();
@@ -702,7 +702,7 @@ int main(void) {
 	if (eb_param_set_any_super() == STS_ERR) {
 		THROW(ERR_NO_CURVE);
 	} else {
-		util_print_label("Bilinear pairing:\n", 0);
+		util_print_banner("Bilinear pairing:\n", 0);
 
 		if (pairing() != STS_OK) {
 			core_clean();

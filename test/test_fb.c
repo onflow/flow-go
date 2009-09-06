@@ -845,12 +845,12 @@ int digit(void) {
 int main(void) {
 	core_init();
 
-	util_print_label("Tests for the FB module", 0);
+	util_print_banner("Tests for the FB module", 0);
 
 	fb_param_set_any();
 	fb_param_print();
 
-	util_print_label("Utilities", 1);
+	util_print_banner("Utilities", 1);
 	if (memory() != STS_OK) {
 		core_clean();
 		return 1;
@@ -860,7 +860,7 @@ int main(void) {
 		core_clean();
 		return 1;
 	}
-	util_print_label("Arithmetic", 1);
+	util_print_banner("Arithmetic", 1);
 
 	if (addition() != STS_OK) {
 		core_clean();
