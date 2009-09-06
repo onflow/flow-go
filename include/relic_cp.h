@@ -36,8 +36,6 @@
 #ifndef RELIC_CP_H
 #define RELIC_CP_H
 
-#include <alloca.h>
-
 #include "relic_conf.h"
 #include "relic_types.h"
 #include "relic_bn.h"

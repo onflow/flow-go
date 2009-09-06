@@ -37,6 +37,7 @@
 #include "relic_types.h"
 #include "relic_bn.h"
 #include "relic_dv.h"
+#include "relic_fp.h"
 #include "relic_fb.h"
 #include "relic_eb.h"
 #include "relic_pb.h"

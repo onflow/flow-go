@@ -185,6 +185,8 @@
 
 /** Prime field size in bits. */
 #define FP_PRIME @FP_PRIME@
+/** Number of Karatsuba steps. */
+#define FP_KARAT @FP_KARAT@
 
 /** Prime field arithmetic method */
 #define FP_METHD "@FP_METHD@"
@@ -193,8 +195,6 @@
 #define BASIC    1
 /** Comba multiplication. */
 #define COMBA    2
-/** Number of Karatsuba steps. */
-#define FP_MUK   @FP_MUK@
 /** Chosen prime field multiplication method. */
 #define FP_MUL   @FP_MUL@
 
@@ -202,8 +202,6 @@
 #define BASIC    1
 /** Comba squaring. */
 #define COMBA    2
-/** Number of Karatsuba steps. */
-#define FP_SQK   @FP_SQK@
 /** Chosen prime field multiplication method. */
 #define FP_SQR   @FP_SQR@
 
@@ -445,6 +443,8 @@
 #define LINUX    2
 /** FreeBSD operating system. */
 #define FREEBSD  3
+/** Windows operating system. */
+#define WINDOWS  4
 /** Detected operation system. */
 #define OPSYS    @OPSYS@
 

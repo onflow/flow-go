@@ -32,6 +32,7 @@
 #ifndef RELIC_ERROR_H
 #define RELIC_ERROR_H
 
+#include <stdint.h>
 #include <setjmp.h>
 #include <stdlib.h>
 #include <stdio.h>

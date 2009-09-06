@@ -117,7 +117,6 @@ foreach(SRC ${ARITH_ASMS})
 endforeach(SRC)
 
 add_custom_target(arith_objs DEPENDS ${ARITH_OBJS})
-add_dependencies(arith_objs ${CMAKE_CURRENT_BINARY_DIR}/include/relic_conf.h)
 
 if (SHLIB)
 	add_library(relic SHARED ${RELIC_SRCS} ${ARITH_OBJS})

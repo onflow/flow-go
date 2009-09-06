@@ -33,6 +33,7 @@
 
 #include "relic_conf.h"
 #include "relic_bn.h"
+#include "relic_fp.h"
 #include "relic_fb.h"
 #include "relic_core.h"
 #include "relic_bench.h"

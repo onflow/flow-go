@@ -32,7 +32,7 @@
 #include "relic.h"
 #include "relic_test.h"
 
-#if ARCH == AVR
+#if ARCH == AVR || ARCH == MSP
 #define MSG_SIZE	112
 #define TEST_MAX	2
 #else
