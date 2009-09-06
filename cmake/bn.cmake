@@ -1,6 +1,6 @@
 message(STATUS "Multiple precision arithmetic configuration (BN module):\n")
 
-message("   ** Options for the multiple precision module (default = 1024,DOUBLE,0):")
+message("   ** Options for the multiple precision module (default = 256,DOUBLE,0):")
 message("      BN_PRECI=n        The base precision in bits. Let w be n in words.")
 message("      BN_MAGNI=DOUBLE   A multiple precision integer can store 2w words.")
 message("      BN_MAGNI=CARRY    A multiple precision integer can store w+1 words.")
@@ -36,7 +36,7 @@ message("      Note: these methods must be given in order. Ex: BN_METHD=\"K1BASI
 
 # Choose the arithmetic precision.
 if (NOT BN_PRECI)
-	set(BN_PRECI 1024)
+	set(BN_PRECI 256)
 endif(NOT BN_PRECI)
 set(BN_PRECI ${BN_PRECI} CACHE INTEGER "Arithmetic precision in bits")
 
