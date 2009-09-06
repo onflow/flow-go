@@ -25,7 +25,7 @@
  *
  * Benchmarks for the error-management routines.
  *
- * @version $Id: bench_error.c 13 2009-04-16 02:24:55Z dfaranha $
+ * @version $Id$
  * @ingroup bench
  */
 

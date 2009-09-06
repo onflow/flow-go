@@ -25,7 +25,7 @@
  *
  * Benchmarks for the multiple precision integer arithmetic functions.
  *
- * @version $Id: bench_bn.c 39 2009-06-03 18:15:56Z dfaranha $
+ * @version $Id$
  * @ingroup bench
  */
 
