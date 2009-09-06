@@ -1,18 +1,20 @@
 /*
- * Copyright 2007-2009 RELIC Project
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -38,10 +40,30 @@
 #include "relic_fb.h"
 #include "relic_types.h"
 
+/*============================================================================*/
+/* Type definitions                                                           */
+/*============================================================================*/
+
 /**
  * Represents a quadratic extension binary field element.
+ *
+ * This extension field is construct with the basis {1, s}, where s is a
+ * non-quadratic residue in the binary field.
  */
 typedef fb_t fb2_t[2];
+
+/**
+ * Represents a quartic extension binary field element.
+ *
+ * This extension field is constructed with the basis {1, s, t, st}, where s is
+ * a non-quadratic residue in the binary field and t is a non-quadratic residue
+ * in the quadratic extension field (s^2 = s + 1 and t^2 = t + 1).
+ */
+typedef fb_t fb4_t[4];
+
+/*============================================================================*/
+/* Macro definitions                                                          */
+/*============================================================================*/
 
 /**
  * Calls a function to allocate a quadratic extension binary field element.
@@ -142,41 +164,6 @@ typedef fb_t fb2_t[2];
  */
 #define fb2_sub(C, A, B)													\
 		fb_sub(C[0], A[0], B[0]); fb_sub(C[1], A[1], B[1]);					\
-
-/**
- * Multiples two quadratic extension field elements. Computes c = a * b.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the quadratic extension binary field element.
- * @param[in] B				- the quadratic extension binary field element.
- */
-void fb2_mul(fb2_t c, fb2_t a, fb2_t b);
-
-/**
- * Computes the square of a quadratic extension field element. Computes
- * c = a * a.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the binary field element to square.
- */
-void fb2_sqr(fb2_t c, fb2_t a);
-
-/**
- * Inverts a quadratic extension field element. Computes c = a^{-1}.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the quadratic extension field element to invert.
- */
-void fb2_inv(fb2_t c, fb2_t a);
-
-/**
- * Represents a quartic extension binary field element.
- *
- * This extension field is constructed with the basis {1, s, t, st}, where s is
- * a non-quadratic residue in the binary field and t is a non-quadratic residue
- * in the quadratic extension field (s^2 = s + 1 and t^2 = t + 1).
- */
-typedef fb_t fb4_t[4];
 
 /**
  * Calls a funtion to allocate a quartic extension binary field element.
@@ -285,6 +272,50 @@ typedef fb_t fb4_t[4];
 		fb_sub(C[2], A[2], B[2]); fb_sub(C[3], A[3], B[3]);					\
 
 /**
+ * Computes the etat pairing of two binary elliptic curve points. Computes
+ * e(P, Q).
+ *
+ * @param[out] R			- the result.
+ * @param[in] P				- the first elliptic curve point.
+ * @param[in] Q				- the second elliptic curve point.
+ */
+#if PB_MAP == ETATS
+#define pb_map(R, P, Q)		pb_map_etats(R, P, Q)
+#elif PB_MAP == ETATN
+#define pb_map(R, P, Q)		pb_map_etatn(R, P, Q)
+#endif
+
+/*============================================================================*/
+/* Function prototypes                                                        */
+/*============================================================================*/
+
+/**
+ * Multiples two quadratic extension field elements. Computes c = a * b.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the quadratic extension binary field element.
+ * @param[in] B				- the quadratic extension binary field element.
+ */
+void fb2_mul(fb2_t c, fb2_t a, fb2_t b);
+
+/**
+ * Computes the square of a quadratic extension field element. Computes
+ * c = a * a.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the binary field element to square.
+ */
+void fb2_sqr(fb2_t c, fb2_t a);
+
+/**
+ * Inverts a quadratic extension field element. Computes c = a^{-1}.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the quadratic extension field element to invert.
+ */
+void fb2_inv(fb2_t c, fb2_t a);
+
+/**
  * Multiples two quartic extension field elements. Computes c = a * b.
  *
  * @param[out] c			- the result.
@@ -327,20 +358,6 @@ void fb4_exp_2m(fb4_t c, fb4_t a);
  * @param[in] A				- the quartic extension field element to invert.
  */
 void fb4_inv(fb4_t c, fb4_t a);
-
-/**
- * Computes the etat pairing of two binary elliptic curve points. Computes
- * e(P, Q).
- *
- * @param[out] R			- the result.
- * @param[in] P				- the first elliptic curve point.
- * @param[in] Q				- the second elliptic curve point.
- */
-#if PB_MAP == ETATS
-#define pb_map(R, P, Q)		pb_map_etats(R, P, Q)
-#elif PB_MAP == ETATN
-#define pb_map(R, P, Q)		pb_map_etatn(R, P, Q)
-#endif
 
 /**
  * Computes the etat pairing of two binary elliptic curve points without using

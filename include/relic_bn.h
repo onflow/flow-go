@@ -1,18 +1,20 @@
 /*
- * Copyright 2007-2009 RELIC Project
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -128,7 +130,7 @@ typedef struct {
 typedef bn_st *bn_t;
 
 /*============================================================================*/
-/* Function prototypes                                                        */
+/* Macro definitions                                                          */
 /*============================================================================*/
 
 /**
@@ -218,6 +220,156 @@ typedef bn_st *bn_t;
 	A = NULL;
 
 #endif
+
+/**
+ * Multiples two multiple precision integers. Computes c = a * b.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the first multiple precision integer to multiply.
+ * @param[in] B				- the second multiple precision integer to multiply.
+ */
+#if BN_KARAT > 0
+#define bn_mul(C, A, B)	bn_mul_karat(C, A, B)
+#elif BN_MUL == BASIC
+#define bn_mul(C, A, B)	bn_mul_basic(C, A, B)
+#elif BN_MUL == COMBA
+#define bn_mul(C, A, B)	bn_mul_comba(C, A, B)
+#endif
+
+/**
+ * Computes the square of a multiple precision integer. Computes c = a * a.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the multiple precision integer to square.
+ */
+#if BN_KARAT > 0
+#define bn_sqr(C, A)	bn_sqr_karat(C, A)
+#elif BN_SQR == BASIC
+#define bn_sqr(C, A)	bn_sqr_basic(C, A)
+#elif BN_SQR == COMBA
+#define bn_sqr(C, A)	bn_sqr_comba(C, A)
+#endif
+
+/**
+ * Computes the auxiliar value derived from the modulus to be used during
+ * modular reduction.
+ *
+ * @param[out] U			- the result.
+ * @param[in] M				- the modulus.
+ */
+#if BN_MOD == BASIC
+#define bn_mod_setup(U, M)	(void)U, (void)M
+#elif BN_MOD == BARRT
+#define bn_mod_setup(U, M)	bn_mod_barrt_setup(U, M)
+#elif BN_MOD == MONTY
+#define bn_mod_setup(U, M)	bn_mod_monty_setup(U, M)
+#elif BN_MOD == RADIX
+#define bn_mod_setup(U, M)	bn_mod_radix_setup(U, M)
+#endif
+
+
+/**
+ * Reduces a multiple precision integer modulo a modulus. Computes c = a mod m.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the the multiple precision integer to reduce.
+ * @param[in] M				- the modulus.
+ * @param[in] U				- the auxiliar value derived from the modulus.
+ */
+#if BN_MOD == BASIC
+#define bn_mod(C, A, M, U)	bn_mod_basic(C, A, M)
+#elif BN_MOD == BARRT
+#define bn_mod(C, A, M, U)	bn_mod_barrt(C, A, M, U)
+#elif BN_MOD == MONTY
+#define bn_mod(C, A, M, U)	bn_mod_monty(C, A, M, U)
+#elif BN_MOD == RADIX
+#define bn_mod(C, A, M, U)	bn_mod_radix(C, A, M, U)
+#endif
+
+/**
+ * Reduces a multiple precision integer modulo a modulus using Montgomery
+ * reduction. Computes c = a * u^(-1) (mod m).
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the multiple precision integer to reduce.
+ * @param[in] M				- the modulus.
+ * @param[in] U				- the reciprocal of the modulus.
+ */
+#if BN_MUL == BASIC
+#define bn_mod_monty(C, A, M, U)	bn_mod_monty_basic(C, A, M, U)
+#elif BN_MUL == COMBA
+#define bn_mod_monty(C, A, M, U)	bn_mod_monty_comba(C, A, M, U)
+#endif
+
+/**
+ * Exponentiates a multiple precision integer modulo a modulus. Computes
+ * c = a^b mod m. If Montgomery reduction is used, a must be in Montgomery form.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the basis.
+ * @param[in] B				- the exponent.
+ * @param[in] M				- the modulus.
+ */
+#if BN_MXP == BASIC
+#define bn_mxp(C, A, B, M)	bn_mxp_basic(C, A, B, M)
+#elif BN_MXP == SLIDE
+#define bn_mxp(C, A, B, M)	bn_mxp_slide(C, A, B, M)
+#elif BN_MXP == CONST
+#define bn_mxp(C, A, B, M)	bn_mxp_const(C, A, B, M)
+#endif
+
+/**
+ * Computes the greatest common divisor of two multiple precision integers.
+ * Computes c = gcd(a, b).
+ *
+ * @param[out] C			- the result;
+ * @param[in] A				- the first multiple precision integer.
+ * @param[in] B				- the second multiple precision integer.
+ */
+#if BN_GCD == BASIC
+#define bn_gcd(C, A, B)		bn_gcd_basic(C, A, B)
+#elif BN_GCD == LEHME
+#define bn_gcd(C, A, B)		bn_gcd_lehme(C, A, B)
+#elif BN_GCD == STEIN
+#define bn_gcd(C, A, B)		bn_gcd_stein(C, A, B)
+#endif
+
+/**
+ * Computes the extended greatest common divisor of two multiple precision
+ * integers. This function can be used to compute multiplicative inverses.
+ * Computes c = gcd(a,b) and c = a * d + b * e.
+ *
+ * @param[out] C			- the result;
+ * @param[out] D			- the cofactor of the first operand, can be NULL.
+ * @param[out] E			- the cofactor of the second operand, can be NULL.
+ * @param[in] A				- the first multiple precision integer.
+ * @param[in] B				- the second multiple precision integer.
+ */
+#if BN_GCD == BASIC
+#define bn_gcd_ext(C, D, E, A, B)		bn_gcd_ext_basic(C, D, E, A, B)
+#elif BN_GCD == LEHME
+#define bn_gcd_ext(C, D, E, A, B)		bn_gcd_ext_lehme(C, D, E, A, B)
+#elif BN_GCD == STEIN
+#define bn_gcd_ext(C, D, E, A, B)		bn_gcd_ext_stein(C, D, E, A, B)
+#endif
+
+/**
+ * Generates a probable prime number.
+ *
+ * @param[out] A			- the result.
+ * @param[in] B				- the length of the number in bits.
+ */
+#if BN_GEN == BASIC
+#define bn_gen_prime(A, B)	bn_gen_prime_basic(A, B)
+#elif BN_GEN == SAFEP
+#define bn_gen_prime(A, B)	bn_gen_prime_safep(A, B)
+#elif BN_GEN == STRON
+#define bn_gen_prime(A, B)	bn_gen_prime_stron(A, B)
+#endif
+
+/*============================================================================*/
+/* Function prototypes                                                        */
+/*============================================================================*/
 
 /**
  * Initializes a previously allocated multiple precision integer.
@@ -553,22 +705,6 @@ void bn_sub(bn_t c, bn_t a, bn_t b);
 void bn_sub_dig(bn_t c, bn_t a, dig_t b);
 
 /**
- * Multiples two multiple precision integers. Computes c = a * b.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the first multiple precision integer to multiply.
- * @param[in] B				- the second multiple precision integer to multiply.
- */
-#if BN_KARAT > 0
-#define bn_mul(C, A, B)	bn_mul_karat(C, A, B)
-#elif BN_MUL == BASIC
-#define bn_mul(C, A, B)	bn_mul_basic(C, A, B)
-#elif BN_MUL == COMBA
-#define bn_mul(C, A, B)	bn_mul_comba(C, A, B)
-#endif
-
-
-/**
  * Multiplies a multiple precision integer by a digit. Computes c = a * b.
  *
  * @param[out] c			- the result.
@@ -603,20 +739,6 @@ void bn_mul_comba(bn_t c, bn_t a, bn_t b);
  * @param[in] b				- the second multiple precision integer to multiply.
  */
 void bn_mul_karat(bn_t c, bn_t a, bn_t b);
-
-/**
- * Computes the square of a multiple precision integer. Computes c = a * a.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the multiple precision integer to square.
- */
-#if BN_KARAT > 0
-#define bn_sqr(C, A)	bn_sqr_karat(C, A)
-#elif BN_SQR == BASIC
-#define bn_sqr(C, A)	bn_sqr_basic(C, A)
-#elif BN_SQR == COMBA
-#define bn_sqr(C, A)	bn_sqr_comba(C, A)
-#endif
 
 /**
  * Computes the square of a multiple precision integer using Schoolbook
@@ -734,42 +856,6 @@ void bn_mod_2b(bn_t c, bn_t a, int b);
 void bn_mod_dig(dig_t *c, bn_t a, dig_t b);
 
 /**
- * Computes the auxiliar value derived from the modulus to be used during
- * modular reduction.
- *
- * @param[out] U			- the result.
- * @param[in] M				- the modulus.
- */
-#if BN_MOD == BASIC
-#define bn_mod_setup(U, M)	(void)U, (void)M
-#elif BN_MOD == BARRT
-#define bn_mod_setup(U, M)	bn_mod_barrt_setup(U, M)
-#elif BN_MOD == MONTY
-#define bn_mod_setup(U, M)	bn_mod_monty_setup(U, M)
-#elif BN_MOD == RADIX
-#define bn_mod_setup(U, M)	bn_mod_radix_setup(U, M)
-#endif
-
-
-/**
- * Reduces a multiple precision integer modulo a modulus. Computes c = a mod m.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the the multiple precision integer to reduce.
- * @param[in] M				- the modulus.
- * @param[in] U				- the auxiliar value derived from the modulus.
- */
-#if BN_MOD == BASIC
-#define bn_mod(C, A, M, U)	bn_mod_basic(C, A, M)
-#elif BN_MOD == BARRT
-#define bn_mod(C, A, M, U)	bn_mod_barrt(C, A, M, U)
-#elif BN_MOD == MONTY
-#define bn_mod(C, A, M, U)	bn_mod_monty(C, A, M, U)
-#elif BN_MOD == RADIX
-#define bn_mod(C, A, M, U)	bn_mod_radix(C, A, M, U)
-#endif
-
-/**
  * Reduces a multiple precision integer modulo a modulus using straightforward
  * division.
  *
@@ -828,21 +914,6 @@ void bn_mod_monty_back(bn_t c, bn_t a, bn_t m);
 
 /**
  * Reduces a multiple precision integer modulo a modulus using Montgomery
- * reduction. Computes c = a * u^(-1) (mod m).
- *
- * @param[out] C			- the result.
- * @param[in] A				- the multiple precision integer to reduce.
- * @param[in] M				- the modulus.
- * @param[in] U				- the reciprocal of the modulus.
- */
-#if BN_MUL == BASIC
-#define bn_mod_monty(C, A, M, U)	bn_mod_monty_basic(C, A, M, U)
-#elif BN_MUL == COMBA
-#define bn_mod_monty(C, A, M, U)	bn_mod_monty_comba(C, A, M, U)
-#endif
-
-/**
- * Reduces a multiple precision integer modulo a modulus using Montgomery
  * reduction with Schoolbook multiplication.
  *
  * @param[out] c			- the result.
@@ -890,23 +961,6 @@ void bn_mod_radix_setup(bn_t u, bn_t m);
 void bn_mod_radix(bn_t c, bn_t a, bn_t m, bn_t u);
 
 /**
- * Exponentiates a multiple precision integer modulo a modulus. Computes
- * c = a^b mod m. If Montgomery reduction is used, a must be in Montgomery form.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the basis.
- * @param[in] B				- the exponent.
- * @param[in] M				- the modulus.
- */
-#if BN_MXP == BASIC
-#define bn_mxp(C, A, B, M)	bn_mxp_basic(C, A, B, M)
-#elif BN_MXP == SLIDE
-#define bn_mxp(C, A, B, M)	bn_mxp_slide(C, A, B, M)
-#elif BN_MXP == CONST
-#define bn_mxp(C, A, B, M)	bn_mxp_const(C, A, B, M)
-#endif
-
-/**
  * Exponentiates a multiple precision integer modulo a modulus using the Binary
  * method.
  *
@@ -938,22 +992,6 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m);
  * @param[in] m				- the modulus.
  */
 void bn_mxp_const(bn_t c, bn_t a, bn_t b, bn_t m);
-
-/**
- * Computes the greatest common divisor of two multiple precision integers.
- * Computes c = gcd(a, b).
- *
- * @param[out] C			- the result;
- * @param[in] A				- the first multiple precision integer.
- * @param[in] B				- the second multiple precision integer.
- */
-#if BN_GCD == BASIC
-#define bn_gcd(C, A, B)		bn_gcd_basic(C, A, B)
-#elif BN_GCD == LEHME
-#define bn_gcd(C, A, B)		bn_gcd_lehme(C, A, B)
-#elif BN_GCD == STEIN
-#define bn_gcd(C, A, B)		bn_gcd_stein(C, A, B)
-#endif
 
 /**
  * Computes the greatest common divisor of two multiple precision integers
@@ -994,25 +1032,6 @@ void bn_gcd_stein(bn_t c, bn_t a, bn_t b);
  * @param[in] b				- the digit.
  */
 void bn_gcd_dig(bn_t c, bn_t a, dig_t b);
-
-/**
- * Computes the extended greatest common divisor of two multiple precision
- * integers. This function can be used to compute multiplicative inverses.
- * Computes c = gcd(a,b) and c = a * d + b * e.
- *
- * @param[out] C			- the result;
- * @param[out] D			- the cofactor of the first operand, can be NULL.
- * @param[out] E			- the cofactor of the second operand, can be NULL.
- * @param[in] A				- the first multiple precision integer.
- * @param[in] B				- the second multiple precision integer.
- */
-#if BN_GCD == BASIC
-#define bn_gcd_ext(C, D, E, A, B)		bn_gcd_ext_basic(C, D, E, A, B)
-#elif BN_GCD == LEHME
-#define bn_gcd_ext(C, D, E, A, B)		bn_gcd_ext_lehme(C, D, E, A, B)
-#elif BN_GCD == STEIN
-#define bn_gcd_ext(C, D, E, A, B)		bn_gcd_ext_stein(C, D, E, A, B)
-#endif
 
 /**
  * Computes the extended greatest common divisor of two multiple precision
@@ -1086,20 +1105,6 @@ int bn_is_prime_basic(bn_t a);
  * @return 1 if a is prime, 0 otherwise.
  */
 int bn_is_prime_rabin(bn_t a);
-
-/**
- * Generates a probable prime number.
- *
- * @param[out] A			- the result.
- * @param[in] B				- the length of the number in bits.
- */
-#if BN_GEN == BASIC
-#define bn_gen_prime(A, B)	bn_gen_prime_basic(A, B)
-#elif BN_GEN == SAFEP
-#define bn_gen_prime(A, B)	bn_gen_prime_safep(A, B)
-#elif BN_GEN == STRON
-#define bn_gen_prime(A, B)	bn_gen_prime_stron(A, B)
-#endif
 
 /**
  * Generates a probable prime number.

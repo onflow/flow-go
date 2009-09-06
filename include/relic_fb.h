@@ -1,18 +1,20 @@
 /*
- * Copyright 2007-2009 RELIC Project
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -37,6 +39,10 @@
 #include "relic_dv.h"
 #include "relic_conf.h"
 #include "relic_types.h"
+
+/*============================================================================*/
+/* Constant definitions                                                       */
+/*============================================================================*/
 
 /**
  * Precision in bits of a binary field element.
@@ -80,6 +86,10 @@ enum {
 	TRINO_1223 = 8
 };
 
+/*============================================================================*/
+/* Type definitions                                                           */
+/*============================================================================*/
+
 /**
  * Represents a binary field element.
  *
@@ -93,6 +103,152 @@ typedef dig_t *fb_t;
  * Represents a binary field element with automatic memory allocation.
  */
 typedef align dig_t fb_st[FB_DIGS];
+
+/*============================================================================*/
+/* Macro definitions                                                          */
+/*============================================================================*/
+
+/**
+ * Calls a function to allocate a binary field element.
+ *
+ * @param[out] A			- the new binary field element.
+ * @throw ERR_NO_MEMORY		- if there is no available memory.
+ */
+#if ALLOC == DYNAMIC
+#define fb_new(A)			dv_new_dynam((dv_t *)&(A), FB_DIGS)
+#elif ALLOC == STATIC
+#define fb_new(A)			dv_new_statc((dv_t *)&(A), FB_DIGS)
+#elif ALLOC == STACK
+#define fb_new(A)															\
+	A = (dig_t *)alloca(FB_DIGS * sizeof(dig_t) + ALIGN); ALIGNED(A);		\
+
+#endif
+
+/**
+ * Calls a function to free a binary field element.
+ *
+ * @param[out] A			- the binary field element to clean and free.
+ */
+#if ALLOC == DYNAMIC
+#define fb_free(A)			dv_free_dynam((dv_t *)&(A))
+#elif ALLOC == STATIC
+#define fb_free(A)			dv_free_statc((dv_t *)&(A))
+#elif ALLOC == STACK
+#define fb_free(A)			A = NULL;
+#endif
+
+/**
+ * Allocates and initializes a new binary field element.
+ *
+ * @param[out] a			- the new binary field element.
+ * @throw ERR_NO_MEMORY		- if there is no available memory.
+ */
+#if ALLOC == DYNAMIC
+void fb_new_dynam(fb_t *a);
+#elif ALLOC == STATIC
+void fb_new_statc(fb_t *a);
+#endif
+
+/**
+ * Cleans and frees a binary field element.
+ *
+ * @param[out] a			- the prime field element to free.
+ */
+#if ALLOC == DYNAMIC
+void fb_free_dynam(fb_t *a);
+#elif ALLOC == STATIC
+void fb_free_statc(fb_t *a);
+#endif
+
+/**
+ * Multiples two binary field elements. Computes c = a * b.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the first binary field element to multiply.
+ * @param[in] B				- the second binary field element to multiply.
+ */
+#if FB_KARAT > 0
+#define fb_mul(C, A, B)	fb_mul_karat(C, A, B)
+#elif FB_MUL == BASIC
+#define fb_mul(C, A, B)	fb_mul_basic(C, A, B)
+#elif FB_MUL == INTEG
+#define fb_mul(C, A, B)	fb_mul_integ(C, A, B)
+#elif FB_MUL == LCOMB
+#define fb_mul(C, A, B)	fb_mul_lcomb(C, A, B)
+#elif FB_MUL == RCOMB
+#define fb_mul(C, A, B)	fb_mul_rcomb(C, A, B)
+#elif FB_MUL == LODAH
+#define fb_mul(C, A, B)	fb_mul_lodah(C, A, B)
+#endif
+
+/**
+ * Squares a binary field element. Computes c = a * a.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the binary field element to square.
+ */
+#if FB_SQR == BASIC
+#define fb_sqr(C, A)	fb_sqr_basic(C, A)
+#elif FB_SQR == TABLE
+#define fb_sqr(C, A)	fb_sqr_table(C, A)
+#elif FB_SQR == INTEG
+#define fb_sqr(C, A)	fb_sqr_integ(C, A)
+#endif
+
+/**
+ * Extracts the square root of a binary field element.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the binary field element.
+ */
+#if FB_SRT == BASIC
+#define fb_srt(C, A)	fb_srt_basic(C, A)
+#elif FB_SRT == QUICK
+#define fb_srt(C, A)	fb_srt_quick(C, A)
+#endif
+
+/**
+ * Reduces a multiplication result modulo a binary irreducible polynomial.
+ * Compute c = a mod f(z).
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the multiplication result to reduce.
+ */
+#if FB_RDC == BASIC
+#define fb_rdc(C, A)	fb_rdc_basic(C, A)
+#elif FB_RDC == QUICK
+#define fb_rdc(C, A)	fb_rdc_quick(C, A)
+#endif
+
+/**
+ * Compute the trace of a binary field element.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the binary field element.
+ */
+#if FB_TRC == BASIC
+#define fb_trc(C, A)	fb_trc_basic(C, A)
+#elif FB_TRC == QUICK
+#define fb_trc(C, A)	fb_trc_quick(C, A)
+#endif
+
+/**
+ * Inverts a binary field element. Computes c = a^{-1}.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the binary field element to invert.
+ */
+#if FB_INV == BASIC
+#define fb_inv(C, A)	fb_inv_basic(C, A)
+#elif FB_INV == EXGCD
+#define fb_inv(C, A)	fb_inv_exgcd(C, A)
+#elif FB_INV == ALMOS
+#define fb_inv(C, A)	fb_inv_almos(C, A)
+#endif
+
+/*============================================================================*/
+/* Function prototypes                                                        */
+/*============================================================================*/
 
 /**
  * Initializes the binary field arithmetic layer.
@@ -183,58 +339,6 @@ void fb_param_print(void);
  * @param[in] a				- the binary field element.
  */
 void fb_poly_add(fb_t c, fb_t a);
-
-/**
- * Calls a function to allocate a binary field element.
- *
- * @param[out] A			- the new binary field element.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
- */
-#if ALLOC == DYNAMIC
-#define fb_new(A)			dv_new_dynam((dv_t *)&(A), FB_DIGS)
-#elif ALLOC == STATIC
-#define fb_new(A)			dv_new_statc((dv_t *)&(A), FB_DIGS)
-#elif ALLOC == STACK
-#define fb_new(A)															\
-	A = (dig_t *)alloca(FB_DIGS * sizeof(dig_t) + ALIGN); ALIGNED(A);		\
-
-#endif
-
-/**
- * Calls a function to free a binary field element.
- *
- * @param[out] A			- the binary field element to clean and free.
- */
-#if ALLOC == DYNAMIC
-#define fb_free(A)			dv_free_dynam((dv_t *)&(A))
-#elif ALLOC == STATIC
-#define fb_free(A)			dv_free_statc((dv_t *)&(A))
-#elif ALLOC == STACK
-#define fb_free(A)			A = NULL;
-#endif
-
-/**
- * Allocates and initializes a new binary field element.
- *
- * @param[out] a			- the new binary field element.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
- */
-#if ALLOC == DYNAMIC
-void fb_new_dynam(fb_t *a);
-#elif ALLOC == STATIC
-void fb_new_statc(fb_t *a);
-#endif
-
-/**
- * Cleans and frees a binary field element.
- *
- * @param[out] a			- the prime field element to free.
- */
-#if ALLOC == DYNAMIC
-void fb_free_dynam(fb_t *a);
-#elif ALLOC == STATIC
-void fb_free_statc(fb_t *a);
-#endif
 
 /**
  * Copies the second argument to the first argument.
@@ -418,27 +522,6 @@ void fb_sub(fb_t c, fb_t a, fb_t b);
 void fb_sub_dig(fb_t c, fb_t a, dig_t b);
 
 /**
- * Multiples two binary field elements. Computes c = a * b.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the first binary field element to multiply.
- * @param[in] B				- the second binary field element to multiply.
- */
-#if FB_KARAT > 0
-#define fb_mul(C, A, B)	fb_mul_karat(C, A, B)
-#elif FB_MUL == BASIC
-#define fb_mul(C, A, B)	fb_mul_basic(C, A, B)
-#elif FB_MUL == INTEG
-#define fb_mul(C, A, B)	fb_mul_integ(C, A, B)
-#elif FB_MUL == LCOMB
-#define fb_mul(C, A, B)	fb_mul_lcomb(C, A, B)
-#elif FB_MUL == RCOMB
-#define fb_mul(C, A, B)	fb_mul_rcomb(C, A, B)
-#elif FB_MUL == LODAH
-#define fb_mul(C, A, B)	fb_mul_lodah(C, A, B)
-#endif
-
-/**
  * Multiples two binary field elements using Shift-and-add multiplication.
  *
  * @param[out] c			- the result.
@@ -503,20 +586,6 @@ void fb_mul_dig(fb_t c, fb_t a, dig_t b);
 void fb_mul_karat(fb_t c, fb_t a, fb_t b);
 
 /**
- * Squares a binary field element. Computes c = a * a.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the binary field element to square.
- */
-#if FB_SQR == BASIC
-#define fb_sqr(C, A)	fb_sqr_basic(C, A)
-#elif FB_SQR == TABLE
-#define fb_sqr(C, A)	fb_sqr_table(C, A)
-#elif FB_SQR == INTEG
-#define fb_sqr(C, A)	fb_sqr_integ(C, A)
-#endif
-
-/**
  * Squares a binary field element using bit-manipulation squaring.
  *
  * @param[out] c			- the result.
@@ -568,19 +637,6 @@ void fb_rsh(fb_t c, fb_t a, int bits);
 void fb_exp(fb_t c, fb_t a, fb_t b);
 
 /**
- * Reduces a multiplication result modulo a binary irreducible polynomial.
- * Compute c = a mod f(z).
- *
- * @param[out] C			- the result.
- * @param[in] A				- the multiplication result to reduce.
- */
-#if FB_RDC == BASIC
-#define fb_rdc(C, A)	fb_rdc_basic(C, A)
-#elif FB_RDC == QUICK
-#define fb_rdc(C, A)	fb_rdc_quick(C, A)
-#endif
-
-/**
  * Reduces a multiplication result modulo an irreducible polynomial using
  * shift-and-add modular reduction.
  *
@@ -596,18 +652,6 @@ void fb_rdc_basic(fb_t c, dv_t a);
  * @param[in] a				- the multiplication result to reduce.
  */
 void fb_rdc_quick(fb_t c, dv_t a);
-
-/**
- * Extracts the square root of a binary field element.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the binary field element.
- */
-#if FB_SRT == BASIC
-#define fb_srt(C, A)	fb_srt_basic(C, A)
-#elif FB_SRT == QUICK
-#define fb_srt(C, A)	fb_srt_quick(C, A)
-#endif
 
 /**
  * Extracts the square root of a binary field element using repeated squaring.
@@ -628,18 +672,6 @@ void fb_srt_basic(fb_t c, fb_t a);
 void fb_srt_quick(fb_t c, fb_t a);
 
 /**
- * Compute the trace of a binary field element.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the binary field element.
- */
-#if FB_TRC == BASIC
-#define fb_trc(C, A)	fb_trc_basic(C, A)
-#elif FB_TRC == QUICK
-#define fb_trc(C, A)	fb_trc_quick(C, A)
-#endif
-
-/**
  * Computes the trace of a binary field element using repeated squaring.
  * Computes c = Tr(a).
  *
@@ -656,20 +688,6 @@ void fb_trc_basic(fb_t c, fb_t a);
  * @param[in] a				- the binary field element.
  */
 void fb_trc_quick(fb_t c, fb_t a);
-
-/**
- * Inverts a binary field element. Computes c = a^{-1}.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the binary field element to invert.
- */
-#if FB_INV == BASIC
-#define fb_inv(C, A)	fb_inv_basic(C, A)
-#elif FB_INV == EXGCD
-#define fb_inv(C, A)	fb_inv_exgcd(C, A)
-#elif FB_INV == ALMOS
-#define fb_inv(C, A)	fb_inv_almos(C, A)
-#endif
 
 /**
  * Inverts a binary field element using the binary method.

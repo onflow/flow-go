@@ -1,18 +1,20 @@
 /*
- * * Copyright 2007-2009 RELIC Project
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -41,10 +43,14 @@
 #include "relic_types.h"
 #include "relic_util.h"
 
+/*============================================================================*/
+/* Constant definitions                                                       */
+/*============================================================================*/
+
 /**
  * Size in bits of the biggest digit vector.
  */
-#define TEMP MAX(BN_PRECI, FB_POLYN)
+#define DV_TEMP MAX(BN_PRECI, FB_POLYN)
 
 /**
  * Size in digits of a temporary vector.
@@ -52,12 +58,20 @@
  * A temporary vector has enough size to store a multiplication result in any
  * finite field.
  */
-#define DV_DIGS	(2 * (int)((TEMP)/(DIGIT) + (TEMP % DIGIT > 0)) + 2)
+#define DV_DIGS	(2 * (int)((DV_TEMP)/(DIGIT) + (DV_TEMP % DIGIT > 0)) + 2)
+
+/*============================================================================*/
+/* Type definitions                                                           */
+/*============================================================================*/
 
 /**
  * Represents a temporary double precision digit vector.
  */
 typedef dig_t *dv_t;
+
+/*============================================================================*/
+/* Macro definitions                                                          */
+/*============================================================================*/
 
 /**
  * Calls a function to allocate a temporary double precision digit vector.
@@ -75,6 +89,23 @@ typedef dig_t *dv_t;
 #endif
 
 /**
+ * Calls a function to clean and free a temporary double-precision digit vector.
+ *
+ * @param[out] A			- the temporary digit vector to clean and free.
+ */
+#if ALLOC == DYNAMIC
+#define dv_free(A)			dv_free_dynam(&(A))
+#elif ALLOC == STATIC
+#define dv_free(A)			dv_free_statc(&(A))
+#elif ALLOC == STACK
+#define dv_free(A)			(void)A
+#endif
+
+/*============================================================================*/
+/* Function prototypes                                                        */
+/*============================================================================*/
+
+/**
  * Assigns zero to a temporary double precision digit vector.
  *
  * @param[out] a			- the temporary digit vector to assign.
@@ -90,19 +121,6 @@ void dv_zero(dv_t a, int digits);
  * @param[in] digits		- the number of digits to copy.
  */
 void dv_copy(dv_t c, dv_t a, int digits);
-
-/**
- * Calls a function to clean and free a temporary double-precision digit vector.
- *
- * @param[out] A			- the temporary digit vector to clean and free.
- */
-#if ALLOC == DYNAMIC
-#define dv_free(A)		dv_free_dynam(&(A))
-#elif ALLOC == STATIC
-#define dv_free(A)		dv_free_statc(&(A))
-#elif ALLOC == STACK
-#define dv_free(A)		(void)A
-#endif
 
 /**
  * Allocates and initializes a temporary double precision digit vector.

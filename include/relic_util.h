@@ -1,18 +1,20 @@
 /*
- * Copyright 2007-2009 RELIC Project
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -35,6 +37,10 @@
 #define RELIC_UTIL_H
 
 #include "relic_types.h"
+
+/*============================================================================*/
+/* Macro definitions                                                          */
+/*============================================================================*/
 
 /**
  * Returns the minimum between two numbers.
@@ -122,13 +128,20 @@
 
 /**
  * Prints a standard label.
+ *
+ * @param[in] L					- the label of the banner.
+ * @param[in] I					- if the banner is inside an hierarchy.
  */
-#define util_print_label(L, I)												\
+#define util_print_banner(L, I)												\
 	if (!I) {																\
 		util_print("\n-- %s\n", L);											\
 	} else {																\
 		util_print("\n** %s\n\n", L);										\
 	}																		\
+
+/*============================================================================*/
+/* Function prototypes                                                        */
+/*============================================================================*/
 
 /**
  * Convert digit to big-endian.
