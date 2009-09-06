@@ -36,7 +36,7 @@ message("      Note: these methods must be given in order. Ex: BN_METHD=\"K1BASI
 
 # Choose the arithmetic precision.
 if (NOT BN_PRECI)
-	set(BN_PRECI 256)
+	set(BN_PRECI 1024)
 endif(NOT BN_PRECI)
 set(BN_PRECI ${BN_PRECI} CACHE INTEGER "Arithmetic precision in bits")
 
