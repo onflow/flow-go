@@ -1,18 +1,20 @@
 /*
- * Copyright 2007-2009 RELIC Project
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -276,6 +278,157 @@ void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 		/* F = F * G. */
 		fb4_mul_sparse(r, r, g);
 	}
+#else
+	/* F = 1, L = L * G. */
+	fb4_zero(r);
+	fb_set_bit(r[0], 0, 1);
+
+	fb4_t _f[CORES];
+	omp_set_num_threads(CORES);
+
+	for (int j = 0; j < CORES; j++) {
+		fb4_new(_f[j]);
+	}
+#pragma omp parallel firstprivate(alpha, beta, delta) shared(r, _f, p, q) default(none)
+	{
+		int i = omp_get_thread_num();
+		int from, to;
+		fb_t xp, yp, xq, yq, u, v;
+		fb4_t l, g;
+
+		fb_new(xp);
+		fb_new(yp);
+		fb_new(xq);
+		fb_new(yq);
+		fb_new(u);
+		fb_new(v);
+		fb4_new(g);
+		fb4_new(l);
+
+		fb_copy(xp, p->x);
+		fb_copy(yp, p->y);
+		fb_copy(xq, q->x);
+		fb_copy(yq, q->y);
+
+		/* y_P = y_P + delta^bar. */
+		fb_add_dig(yp, yp, 1 - delta);
+
+		fb4_zero(_f[i]);
+		fb_zero(g[2]);
+		fb_set_bit(g[2], 0, 1);
+		fb_zero(g[3]);
+
+		if (i == 0) {
+			/* u = x_P + alpha, v = x_q + alpha. */
+			fb_add_dig(u, xp, alpha);
+			fb_add_dig(v, xq, alpha);
+			/* g_0 = u * v + y_P + y_Q + beta. */
+			fb_mul(g[0], u, v);
+			fb_add(g[0], g[0], yp);
+			fb_add(g[0], g[0], yq);
+			fb_add_dig(g[0], g[0], beta);
+			/* g_1 = u + x_Q. */
+			fb_add(g[1], u, xq);
+			/* G = g_0 + g_1 * s + t. */
+			fb_zero(g[2]);
+			fb_set_bit(g[2], 0, 1);
+			fb_zero(g[3]);
+			/* l_0 = g_0 + v + x_P^2. */
+			fb_sqr(u, xp);
+			fb_add(l[0], g[0], v);
+			fb_add(l[0], l[0], u);
+			/* L = l_0 + (g_1 + 1) * s + t. */
+			fb_add_dig(l[1], g[1], 1);
+			fb_zero(l[2]);
+			fb_set_bit(l[2], 0, 1);
+			fb_zero(l[3]);
+
+			fb4_mul_sparse(_f[0], l, g);
+		} else {
+			fb_set_bit(_f[i][0], 0, 1);
+		}
+
+		int s2[] = {0, 308, (FB_BITS - 1) / 2};
+		int s4[] = {0, 157, 311, 462, (FB_BITS - 1) / 2};
+		int s8[] = {0, 81, 161, 240, 317, 392, 467, 540, (FB_BITS - 1) / 2};
+		int s16[] = {0, 56, 109, 159, 206, 251, 294, 372, 408, 442, 474, 505, 534, 561, 587, (FB_BITS - 1) / 2};
+		int s32[] = {0, 39, 77, 113, 146, 178, 208, 237, 264, 289, 313, 336, 358, 378, 397, 416, 433, 449, 465, 479, 493, 506, 519, 530, 541, 552, 562, 571, 580, 588, 596, 604};
+
+		switch(CORES) {
+		case 1:
+			from = 0;
+			to = (FB_BITS - 1) / 2;
+			break;
+		case 2:
+			from = s2[i];
+			to = s2[i+1];
+			break;
+		case 4:
+			from = s4[i];
+			to = s4[i+1];
+			break;
+		case 8:
+			from = s8[i];
+			to = s8[i+1];
+			break;
+		case 16:
+			from = s16[i];
+			to = s16[i+1];
+			break;
+		case 32:
+			from = s32[i];
+			to = s32[i+1];
+			break;
+		}
+
+		for (int j = 0; j < from; j++) {
+			/* Compute starting point. */
+			fb_srt(xp, xp);
+			fb_srt(yp, yp);
+			fb_sqr(xq, xq);
+			fb_sqr(yq, yq);
+		}
+
+		for (int j = from; j < to; j++) {
+			//printf("%d %d\n", i, j);
+			/* x_P = sqrt(x_P), y_P = sqr(y_P). */
+			fb_srt(xp, xp);
+			fb_srt(yp, yp);
+			/* x_Q = x_Q^2, y_Q = y_Q^2. */
+			fb_sqr(xq, xq);
+			fb_sqr(yq, yq);
+
+			/* u = x_P + alpha, v = x_q + alpha. */
+			fb_add_dig(u, xp, alpha);
+			fb_add_dig(v, xq, alpha);
+			/* g_0 = u * v + y_P + y_Q + beta. */
+			fb_mul(g[0], u, v);
+			fb_add(g[0], g[0], yp);
+			fb_add(g[0], g[0], yq);
+			fb_add_dig(g[0], g[0], beta);
+			/* g_1 = u + x_Q. */
+			fb_add(g[1], u, xq);
+			/* G = g_0 + g_1 * s + t. */
+
+			/* F = F * G. */
+			fb4_mul_sparse(_f[i], _f[i], g);
+		}
+#pragma omp barrier
+		for (int s = 1; s < CORES; s *= 2) {
+			if (i % (2 * s) == 0) {
+				fb4_mul(_f[i], _f[i], _f[i+s]);
+			}
+#pragma omp barrier
+		}
+	}
+
+	//fb4_copy(r, _f[0]);
+	//for (int j = 1; j < CORES; j++) {
+//		fb4_mul(r, r, _f[j]);
+//		fb4_free(_f[j]);
+//	}
+	fb4_copy(r, _f[0]);
+
 #endif
 }
 
@@ -388,6 +541,138 @@ void pb_map_etatn_impl(fb4_t r, eb_t p, eb_t q) {
 		/* G = g_0 + g_1 * s + t. */
 		/* F = F * G. */
 		fb4_mul_sparse(r, r, g);
+	}
+#else
+	/* F = 1, L = L * G. */
+	fb4_zero(r);
+	fb_set_bit(r[0], 0, 1);
+
+	fb4_t _f[CORES];
+	omp_set_num_threads(CORES);
+
+	for (int j = 0; j < CORES; j++) {
+		fb4_new(_f[j]);
+	}
+
+#pragma omp parallel firstprivate(alpha, b, beta, delta) shared(r, _f, p, q) default(none)
+	{
+		int i = omp_get_thread_num();
+		int from, to, chunk;
+		fb_t xp, yp, xq, yq, u, v;
+		fb4_t f, l, g;
+
+		chunk = (int)ceilf((FB_BITS - 1) / (2.0 * CORES));
+
+		from = i * chunk;
+		to = MIN((FB_BITS - 1) / 2, from + chunk);
+
+		fb_new(xp);
+		fb_new(yp);
+		fb_new(xq);
+		fb_new(yq);
+		fb_new(u);
+		fb_new(v);
+		fb4_new(f);
+		fb4_new(g);
+		fb4_new(l);
+
+		fb_copy(xp, p->x);
+		fb_copy(yp, p->y);
+		fb_copy(xq, q->x);
+		fb_copy(yq, q->y);
+
+		/* y_P = y_P + delta^bar. */
+		fb_add_dig(yp, yp, 1 - delta);
+
+		fb4_zero(_f[i]);
+		fb_zero(g[2]);
+		fb_set_bit(g[2], 0, 1);
+		fb_zero(g[3]);
+
+		/* x_P = x_P^2. */
+		fb_sqr(xp, xp);
+		/* y_P = y_P^2. */
+		fb_sqr(yp, yp);
+		/* y_P = y_P + b. */
+		fb_add_dig(yp, yp, b);
+		/* u = x_P + 1. */
+		fb_add_dig(u, xp, 1);
+
+		if (i == 0) {
+			/* g_1 = u + x_Q. */
+			fb_add(g[1], u, xq);
+			/* g_0 = x_P * x_Q + y_P + y_Q + g1. */
+			fb_mul(g[0], xp, xq);
+			fb_add(g[0], g[0], yp);
+			fb_add(g[0], g[0], yq);
+			fb_add(g[0], g[0], g[1]);
+			/* x_Q = x_Q + 1. */
+			fb_add_dig(xq, xq, 1);
+			/* l_0 = g_0 + x_Q + x_P^2. */
+			fb_sqr(v, xp);
+			fb_add(l[0], g[0], xq);
+			fb_add(l[0], l[0], v);
+			/* L = l_0 + (g_1 + 1) * s + t. */
+			fb_add_dig(l[1], g[1], 1);
+			fb_zero(l[2]);
+			fb_set_bit(l[2], 0, 1);
+			fb_zero(l[3]);
+
+			fb4_mul_sparse(_f[0], l, g);
+		} else {
+			/* x_Q = x_Q + 1. */
+			fb_add_dig(xq, xq, 1);
+
+			fb_set_bit(_f[i][0], 0, 1);
+		}
+
+		for (int j = 0; j < from; j++) {
+			/* Compute starting point. */
+			fb_sqr(xq, xq);
+			fb_sqr(xq, xq);
+			fb_sqr(yq, yq);
+			fb_sqr(yq, yq);
+			fb_add_dig(xq, xq, 1);
+			fb_add(yq, yq, xq);
+		}
+
+		for (int j = from; j < to; j++) {
+			/* F = F^2. */
+			fb4_sqr(_f[i], _f[i]);
+
+			/* x_Q = x_Q^4, y_Q = y_Q^4. */
+			fb_sqr(xq, xq);
+			fb_sqr(xq, xq);
+			fb_sqr(yq, yq);
+			fb_sqr(yq, yq);
+
+			/* x_Q = x_Q + 1, y_Q = y_Q + x_Q. */
+			fb_add_dig(xq, xq, 1);
+			fb_add(yq, yq, xq);
+			/* g_0 = u * x_Q + y_P + y_Q. */
+			fb_mul(g[0], u, xq);
+			fb_add(g[0], g[0], yp);
+			fb_add(g[0], g[0], yq);
+			/* g_1 = x_P + x_Q. */
+			fb_add(g[1], xp, xq);
+
+			/* F = F * G. */
+			fb4_mul_sparse(_f[i], _f[i], g);
+		}
+
+		to = (FB_BITS - 1) / 2 - to;
+
+		for (int j = 0; j < to; j++) {
+			fb4_sqr(_f[i], _f[i]);
+		}
+
+#pragma omp barrier
+	}
+
+	fb4_copy(r, _f[0]);
+	for (int j = 1; j < CORES; j++) {
+		fb4_mul(r, r, _f[j]);
+		fb4_free(_f[j]);
 	}
 #endif
 }
