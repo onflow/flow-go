@@ -54,13 +54,13 @@ void eb_neg_basic(eb_t r, eb_t p) {
 #if defined(EB_SUPER)
 	if (eb_curve_is_super()) {
 		switch (eb_curve_opt_c()) {
-			case EB_OPT_ZERO:
+			case OPT_ZERO:
 				fb_copy(r->y, p->y);
 				break;
-			case EB_OPT_ONE:
+			case OPT_ONE:
 				fb_add_dig(r->y, p->y, (dig_t)1);
 				break;
-			case EB_OPT_DIGIT:
+			case OPT_DIGIT:
 				fb_add_dig(r->y, p->y, eb_curve_get_c()[0]);
 				break;
 			default:

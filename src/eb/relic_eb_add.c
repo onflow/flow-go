@@ -85,12 +85,12 @@ static void eb_add_basic_ordin(eb_t r, eb_t p, eb_t q) {
 			fb_add(t2, t2, t1);
 
 			switch (eb_curve_opt_a()) {
-				case EB_OPT_ZERO:
+				case OPT_ZERO:
 					break;
-				case EB_OPT_ONE:
+				case OPT_ONE:
 					fb_add_dig(t2, t2, (dig_t)1);
 					break;
-				case EB_OPT_DIGIT:
+				case OPT_DIGIT:
 					fb_add_dig(t2, t2, eb_curve_get_a()[0]);
 					break;
 				default:
@@ -171,12 +171,12 @@ static void eb_add_basic_super(eb_t r, eb_t p, eb_t q) {
 			fb_add(r->y, t1, p->y);
 
 			switch (eb_curve_opt_c()) {
-				case EB_OPT_ZERO:
+				case OPT_ZERO:
 					break;
-				case EB_OPT_ONE:
+				case OPT_ONE:
 					fb_add_dig(r->y, r->y, (dig_t)1);
 					break;
-				case EB_OPT_DIGIT:
+				case OPT_DIGIT:
 					fb_add_dig(r->y, r->y, eb_curve_get_c()[0]);
 					break;
 				default:
@@ -353,12 +353,12 @@ void eb_add_projc_ordin(eb_t r, eb_t p, eb_t q) {
 
 				/* t1 = A + B^2 + a2 * C. */
 				switch (eb_curve_opt_a()) {
-					case EB_OPT_ZERO:
+					case OPT_ZERO:
 						break;
-					case EB_OPT_ONE:
+					case OPT_ONE:
 						fb_add(t1, t1, t2);
 						break;
-					case EB_OPT_DIGIT:
+					case OPT_DIGIT:
 						/* t5 = a2 * C. */
 						fb_mul_dig(t5, t2, eb_curve_get_a()[0]);
 						fb_add(t1, t1, t5);

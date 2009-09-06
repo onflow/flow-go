@@ -146,7 +146,7 @@ void compute_koblitz(void) {
 		bn_new(b);
 		bn_new(c);
 
-		if (curve_opt_a == EB_OPT_ZERO) {
+		if (curve_opt_a == OPT_ZERO) {
 			u = -1;
 		} else {
 			u = 1;
@@ -217,15 +217,15 @@ void compute_koblitz(void) {
  */
 static void detect_opt(int *opt, fb_t a) {
 	if (fb_is_zero(a)) {
-		*opt = EB_OPT_ZERO;
+		*opt = OPT_ZERO;
 	} else {
 		if (fb_cmp_dig(a, 1) == CMP_EQ) {
-			*opt = EB_OPT_ONE;
+			*opt = OPT_ONE;
 		} else {
 			if (fb_bits(a) <= FB_DIGIT) {
-				*opt = EB_OPT_DIGIT;
+				*opt = OPT_DIGIT;
 			} else {
-				*opt = EB_OPT_NONE;
+				*opt = OPT_NONE;
 			}
 		}
 	}

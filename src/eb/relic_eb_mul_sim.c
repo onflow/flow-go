@@ -53,7 +53,7 @@
 static void table_init_koblitz(eb_t *t, eb_t p) {
 	int u;
 
-	if (eb_curve_opt_a() == EB_OPT_ZERO) {
+	if (eb_curve_opt_a() == OPT_ZERO) {
 		u = -1;
 	} else {
 		u = 1;
@@ -191,7 +191,7 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 	eb_t *t = NULL;
 
 	/* Compute the w-TNAF representation of k. */
-	if (eb_curve_opt_a() == EB_OPT_ZERO) {
+	if (eb_curve_opt_a() == OPT_ZERO) {
 		u = -1;
 	} else {
 		u = 1;

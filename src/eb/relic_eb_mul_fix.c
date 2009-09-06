@@ -51,7 +51,7 @@
 static void eb_mul_pre_kbltz(eb_t *t, eb_t p) {
 	int u;
 
-	if (eb_curve_opt_a() == EB_OPT_ZERO) {
+	if (eb_curve_opt_a() == OPT_ZERO) {
 		u = -1;
 	} else {
 		u = 1;
@@ -185,7 +185,7 @@ static void eb_mul_fix_kbltz(eb_t r, eb_t *table, bn_t k) {
 	signed char tnaf[FB_BITS + 8], *t;
 
 	/* Compute the w-TNAF representation of k. */
-	if (eb_curve_opt_a() == EB_OPT_ZERO) {
+	if (eb_curve_opt_a() == OPT_ZERO) {
 		u = -1;
 	} else {
 		u = 1;
