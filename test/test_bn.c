@@ -23,7 +23,7 @@
  *
  * Tests for the multiple precision integer arithmetic module.
  *
- * @version $Id: test_bn.c 36 2009-06-03 18:15:10Z dfaranha $
+ * @version $Id$
  * @ingroup test
  */
 

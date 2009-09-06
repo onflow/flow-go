@@ -23,7 +23,7 @@
  *
  * Tests for the error-management routines.
  *
- * @version $Id: test_error.c 16 2009-04-16 02:26:21Z dfaranha $
+ * @version $Id$
  * @ingroup test
  */
 
