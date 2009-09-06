@@ -1,18 +1,20 @@
 /*
- * Copyright 2007-2009 RELIC Project
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -22,6 +24,9 @@
  * @file
  *
  * Implementation of the prime number generation and testing functions.
+ *
+ * Strong prime generation is baed on Gordon's Algorithm, taken from Handbook
+ * of Applied Cryptography.
  *
  * @version $Id: relic_bn_prime.c 34 2009-06-03 18:07:55Z dfaranha $
  * @ingroup bn
@@ -340,14 +345,10 @@ void bn_gen_prime_stron(bn_t a, int bits) {
 		bn_new(t);
 
 		do {
-			/*
-			 * Gordon's Algorithm, taken from Handbook of Applied
-			 * Cryptography.
-			 */
 			do {
 				/* Generate two large primes r and s. */
-				bn_rand(s, BN_POS, bits / 2 - BN_DIG_LOG / 2 - 2);
-				bn_rand(t, BN_POS, bits / 2 - BN_DIG_LOG - 2);
+				bn_rand(s, BN_POS, bits / 2 - BN_DIGIT / 2);
+				bn_rand(t, BN_POS, bits / 2 - BN_DIGIT / 2);
 			} while (!bn_is_prime(s) || !bn_is_prime(t));
 			found = 1;
 			bn_rand(a, BN_POS, bits / 2 - bn_bits(t) - 1);
