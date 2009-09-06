@@ -26,7 +26,7 @@
  * Interface of the low-level binary field arithmetic module.
  *
  * All functions assume a configured polynomial basis f(z) and that the
- * result operand has enough capacity to store the result of the computation.
+ * destination has enough capacity to store the result of the computation.
  *
  * @version $Id$
  * @ingroup fb

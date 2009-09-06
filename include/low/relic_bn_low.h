@@ -25,7 +25,7 @@
  *
  * Interface of the low-level multiple precision integer arithmetic module.
  *
- * All functions assume that the result argument has enough capacity to store
+ * All functions assume that the destination has enough capacity to store
  * the result of the computation.
  *
  * @version $Id: relic_bn_low.h 13 2009-04-16 02:24:55Z dfaranha $
