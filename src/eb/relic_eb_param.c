@@ -1,18 +1,20 @@
 /*
- * Copyright 2007-2009 RELIC Project
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -493,40 +495,40 @@ int eb_param_set_any_super() {
 void eb_param_print() {
 	switch (param_id) {
 	case NIST_B163:
-		util_print_label("Curve NIST-B163:", 0);
+		util_print_banner("Curve NIST-B163:", 0);
 		break;
 	case NIST_K163:
-		util_print_label("Curve NIST-K163:", 0);
+		util_print_banner("Curve NIST-K163:", 0);
 		break;
 	case NIST_B233:
-		util_print_label("Curve NIST-B233:", 0);
+		util_print_banner("Curve NIST-B233:", 0);
 		break;
 	case NIST_K233:
-		util_print_label("Curve NIST-K233:", 0);
+		util_print_banner("Curve NIST-K233:", 0);
 		break;
 	case NIST_B283:
-		util_print_label("Curve NIST-B283:", 0);
+		util_print_banner("Curve NIST-B283:", 0);
 		break;
 	case NIST_K283:
-		util_print_label("Curve NIST-K283:", 0);
+		util_print_banner("Curve NIST-K283:", 0);
 		break;
 	case NIST_B409:
-		util_print_label("Curve NIST-B409:", 0);
+		util_print_banner("Curve NIST-B409:", 0);
 		break;
 	case NIST_K409:
-		util_print_label("Curve NIST-K409:", 0);
+		util_print_banner("Curve NIST-K409:", 0);
 		break;
 	case NIST_B571:
-		util_print_label("Curve NIST-B571:", 0);
+		util_print_banner("Curve NIST-B571:", 0);
 		break;
 	case NIST_K571:
-		util_print_label("Curve NIST-K571:", 0);
+		util_print_banner("Curve NIST-K571:", 0);
 		break;
 	case ETAT_P271:
-		util_print_label("Curve ETAT-P271:", 0);
+		util_print_banner("Curve ETAT-P271:", 0);
 		break;
 	case ETAT_S1223:
-		util_print_label("Curve ETAT-S1223:", 0);
+		util_print_banner("Curve ETAT-S1223:", 0);
 		break;
 	}
 }
