@@ -232,7 +232,7 @@ endif(TEMP GREATER -1)
 
 # Choose the arithmetic backend.
 if (NOT ARITH)
-	set(ARITH "EASY")
+	set(ARITH "easy")
 endif(NOT ARITH)
 set(ARITH "${ARITH}" CACHE STRING "Arithmetic backend")
 
@@ -335,19 +335,21 @@ if (QUIET)
 	set(DOC_OPTIONS "${DOC_OPTIONS} QUIET=1")
 endif(QUIET)
 
-if (ARITH STREQUAL "GMP")
+if (ARITH STREQUAL "gmp")
 	include(cmake/gmp.cmake)
 	set(LFLAGS "${LFLAGS} -lgmp")
-endif(ARITH STREQUAL "GMP")
+endif(ARITH STREQUAL "gmp")
 
 add_definitions("-pipe -std=c99 -pedantic ${WFLAGS} ${DFLAGS} ${PFLAGS} ${CFLAGS}")
 
 message(STATUS "Compiler flags: -pipe -std=c99 -pedantic ${WFLAGS} ${DFLAGS} ${PFLAGS} ${CFLAGS}")
 message(STATUS "Linker flags: ${LFLAGS}\n")
 
+string(TOUPPER ${ARITH} ARITH)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/relic_conf.h.in
 	${CMAKE_CURRENT_BINARY_DIR}/include/relic_conf.h @ONLY)
 message(STATUS "Configured ${CMAKE_CURRENT_SOURCE_DIR}/include/relic_conf.h.in")	
+string(TOLOWER ${ARITH} ARITH)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
