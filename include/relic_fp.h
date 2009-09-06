@@ -38,6 +38,10 @@
 #include "relic_dv.h"
 #include "relic_types.h"
 
+/*============================================================================*/
+/* Constant definitions                                                       */
+/*============================================================================*/
+
 /**
  * Precision in bits of a prime field element.
  */
@@ -58,6 +62,10 @@
  */
 #define FP_DIGS	((int)((FP_BITS)/(FP_DIGIT) + (FP_BITS % FP_DIGIT > 0)))
 
+/*============================================================================*/
+/* Type definitions                                                           */
+/*============================================================================*/
+
 /**
  * Represents a prime field element.
  *
@@ -71,6 +79,120 @@ typedef dig_t *fp_t;
  * Represents a prime field element with automatic memory allocation.
  */
 typedef align dig_t fp_st[FP_DIGS];
+
+/*============================================================================*/
+/* Macro definitions                                                          */
+/*============================================================================*/
+
+/**
+ * Calls a function to allocate and initialize a prime field element.
+ *
+ * @param[out] A			- the new prime field element.
+ */
+#if ALLOC == DYNAMIC
+#define fp_new(A)			dv_new_dynam((dv_t *)&(A), FP_DIGS)
+#elif ALLOC == STATIC
+#define fp_new(A)			dv_new_statc((dv_t *)&(A), FP_DIGS)
+#elif ALLOC == STACK
+#define fp_new(A)															\
+	A = (dig_t *)alloca(FP_DIGS * sizeof(dig_t) + ALIGN); ALIGNED(A);		\
+
+#endif
+
+/**
+ * Calls a function to clean and free a prime field element.
+ *
+ * @param[out] A			- the prime field element to clean and free.
+ */
+#if ALLOC == DYNAMIC
+#define fp_free(A)			dv_free_dynam((dv_t *)&(A))
+#elif ALLOC == STATIC
+#define fp_free(A)			dv_free_statc((dv_t *)&(A))
+#elif ALLOC == STACK
+#define fp_free(A)			A = NULL;
+#endif
+
+/**
+ * Allocates and initializes a new prime field element.
+ *
+ * @param[out] a			- the new prime field element.
+ * @throw ERR_NO_MEMORY		- if there is no available memory.
+ */
+#if ALLOC == DYNAMIC
+void fp_new_dynam(fp_t *a);
+#elif ALLOC == STATIC
+void fp_new_statc(fp_t *a);
+#endif
+
+/**
+ * Cleans and frees a prime field element.
+ *
+ * @param[out] a			- the prime field element to clean and free.
+ */
+#if ALLOC == DYNAMIC
+void fp_free_dynam(fp_t *a);
+#elif ALLOC == STATIC
+void fp_free_statc(fp_t *a);
+#endif
+
+/**
+ * Multiples two prime field elements. Compute c = a * b.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the first prime field element.
+ * @param[in] B				- the second prime field element.
+ */
+#if FP_KARAT > 0
+#define fp_mul(C, A, B)	fp_mul_karat(C, A, B)
+#elif FP_KAR == BASIC
+#define fp_mul(C, A, B)	fp_mul_basic(C, A, B)
+#elif FP_MUL == COMBA
+#define fp_mul(C, A, B)	fp_mul_comba(C, A, B)
+#endif
+
+/**
+ * Squares a prime field element. Computes c = a * a.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the prime field element to square.
+ */
+#if FP_KARAT > 0
+#define fp_sqr(C, A)	fp_sqr_karat(C, A)
+#elif FP_SQR == BASIC
+#define fp_sqr(C, A)	fp_sqr_basic(C, A)
+#elif FP_SQR == COMBA
+#define fp_sqr(C, A)	fp_sqr_comba(C, A)
+#endif
+
+/**
+ * Reduces a multiplication result modulo a prime field order. Computes
+ * c = a mod m.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the multiplication result to reduce.
+ */
+#if FP_RDC == MONTY
+#define fp_rdc(C, A)		fp_rdc_monty(C, A)
+#elif FP_RDC == RADIX
+#define fp_rdc(C, A)		fp_rdc_radix(C, A)
+#endif
+
+/**
+ * Reduces a multiplication result modulo a prime field order using Montgomery
+ * modular reduction.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the multiplication result to reduce.
+ */
+#if FP_MUL == BASIC || FP_MUL == KBASIC
+#define fp_rdc_monty(C, A)	fp_rdc_monty_basic(C, A)
+#elif  FP_MUL == COMBA || FP_MUL == KCOMBA
+#define fp_rdc_monty(C, A)	fp_rdc_monty_comba(C, A)
+#endif
+
+/*============================================================================*/
+/* Function prototypes                                                        */
+/*============================================================================*/
 
 /**
  * Initializes the prime field arithmetic layer.
@@ -131,57 +253,6 @@ dig_t *fp_prime_get_mod8(void);
  * @param[in] p			- the new prime field order.
  */
 void fp_prime_set(bn_t p);
-
-/**
- * Calls a function to allocate and initialize a prime field element.
- *
- * @param[out] A			- the new prime field element.
- */
-#if ALLOC == DYNAMIC
-#define fp_new(A)			dv_new_dynam((dv_t *)&(A), FP_DIGS)
-#elif ALLOC == STATIC
-#define fp_new(A)			dv_new_statc((dv_t *)&(A), FP_DIGS)
-#elif ALLOC == STACK
-#define fp_new(A)															\
-	A = (dig_t *)alloca(FP_DIGS * sizeof(dig_t) + ALIGN); ALIGNED(A);		\
-
-#endif
-
-/**
- * Calls a function to clean and free a prime field element.
- *
- * @param[out] A			- the prime field element to clean and free.
- */
-#if ALLOC == DYNAMIC
-#define fp_free(A)			dv_free_dynam((dv_t *)&(A))
-#elif ALLOC == STATIC
-#define fp_free(A)			dv_free_statc((dv_t *)&(A))
-#elif ALLOC == STACK
-#define fp_free(A)			A = NULL;
-#endif
-
-/**
- * Allocates and initializes a new prime field element.
- *
- * @param[out] a			- the new prime field element.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
- */
-#if ALLOC == DYNAMIC
-void fp_new_dynam(fp_t *a);
-#elif ALLOC == STATIC
-void fp_new_statc(fp_t *a);
-#endif
-
-/**
- * Cleans and frees a prime field element.
- *
- * @param[out] a			- the prime field element to clean and free.
- */
-#if ALLOC == DYNAMIC
-void fp_free_dynam(fp_t *a);
-#elif ALLOC == STATIC
-void fp_free_statc(fp_t *a);
-#endif
 
 /**
  * Copies the second argument to the first argument.
@@ -374,21 +445,6 @@ void fp_sub(fp_t c, fp_t a, fp_t b);
 void fp_sub_dig(fp_t c, fp_t a, dig_t b);
 
 /**
- * Multiples two prime field elements. Compute c = a * b.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the first prime field element.
- * @param[in] B				- the second prime field element.
- */
-#if FP_KARAT > 0
-#define fp_mul(C, A, B)	fp_mul_karat(C, A, B)
-#elif FP_KAR == BASIC
-#define fp_mul(C, A, B)	fp_mul_basic(C, A, B)
-#elif FP_MUL == COMBA
-#define fp_mul(C, A, B)	fp_mul_comba(C, A, B)
-#endif
-
-/**
  * Multiples two prime field elements using Schoolbook multiplication.
  *
  * @param[out] c			- the result.
@@ -423,20 +479,6 @@ void fp_mul_karat(fp_t c, fp_t a, fp_t b);
  * @param[in] b				- the digit to multiply.
  */
 void fp_mul_dig(fp_t c, fp_t a, dig_t b);
-
-/**
- * Squares a prime field element. Computes c = a * a.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the prime field element to square.
- */
-#if FP_KARAT > 0
-#define fp_sqr(C, A)	fp_sqr_karat(C, A)
-#elif FP_SQR == BASIC
-#define fp_sqr(C, A)	fp_sqr_basic(C, A)
-#elif FP_SQR == COMBA
-#define fp_sqr(C, A)	fp_sqr_comba(C, A)
-#endif
 
 /**
  * Squares a prime field element using Schoolbook squaring.
@@ -504,32 +546,6 @@ void fp_rsh(fp_t c, fp_t a, int bits);
  * @param[in] a				- the prime field element to inver.
  */
 void fp_inv(fp_t c, fp_t a);
-
-/**
- * Reduces a multiplication result modulo a prime field order. Computes
- * c = a mod m.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the multiplication result to reduce.
- */
-#if FP_RDC == MONTY
-#define fp_rdc(C, A)		fp_rdc_monty(C, A)
-#elif FP_RDC == RADIX
-#define fp_rdc(C, A)		fp_rdc_radix(C, A)
-#endif
-
-/**
- * Reduces a multiplication result modulo a prime field order using Montgomery
- * modular reduction.
- *
- * @param[out] C			- the result.
- * @param[in] A				- the multiplication result to reduce.
- */
-#if FP_MUL == BASIC || FP_MUL == KBASIC
-#define fp_rdc_monty(C, A)	fp_rdc_monty_basic(C, A)
-#elif  FP_MUL == COMBA || FP_MUL == KCOMBA
-#define fp_rdc_monty(C, A)	fp_rdc_monty_comba(C, A)
-#endif
 
 /**
  * Reduces a multiplication result modulo the prime field order using Shoolbook
