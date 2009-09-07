@@ -32,11 +32,11 @@
 #include "relic.h"
 #include "relic_test.h"
 
-void dv_new_impl(dv_t *a) {
+static void dv_new_impl(dv_t *a) {
 	dv_new(*a);
 }
 
-int memory(void) {
+static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
 	dv_t a = NULL;

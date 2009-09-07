@@ -36,11 +36,8 @@
 #include "relic_conf.h"
 #include "relic_util.h"
 
-#if OPSYS == LINUX || OPSYS == FREEBSD
+#if OPSYS != NONE && TIMER != NONE
 #include <sys/time.h>
-#endif
-
-#if TIMER != NONE
 #include <time.h>
 #endif
 

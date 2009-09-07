@@ -32,11 +32,11 @@
 #include "relic.h"
 #include "relic_bench.h"
 
-void fp_new_impl(fp_t *a) {
+static void fp_new_impl(fp_t *a) {
 	fp_new(*a);
 }
 
-void memory(void) {
+static void memory(void) {
 	fp_t a[BENCH + 1] = { NULL };
 	fp_t *tmpa;
 
@@ -59,7 +59,7 @@ void memory(void) {
 	BENCH_END;
 }
 
-void util(void) {
+static void util(void) {
 	int d;
 	char str[1000];
 
@@ -155,7 +155,7 @@ void util(void) {
 	fp_free(b);
 }
 
-void arith(void) {
+static void arith(void) {
 	fp_t a = NULL, b = NULL, c = NULL;
 	dv_t d;
 	bn_t e = NULL;
@@ -219,7 +219,7 @@ void arith(void) {
 	BENCH_END;
 #endif
 
-#if FP_MUL == KARAT || !defined(STRIP)
+#if FP_KARAT > 0 || !defined(STRIP)
 	BENCH_BEGIN("fp_mul_karat") {
 		fp_rand(a);
 		fp_rand(b);

@@ -320,53 +320,62 @@ void eb_param_set(int param) {
 				ASSIGN(NIST_B163, NIST_163);
 				ordin = 1;
 				break;
-#elif defined(EB_KBLTZ) && FB_POLYN == 163
+#endif
+#if defined(EB_KBLTZ) && FB_POLYN == 163
 			case NIST_K163:
 				ASSIGN(NIST_K163, NIST_163);
 				kbltz = 1;
 				break;
-#elif defined(EB_ORDIN) && FB_POLYN == 233
+#endif
+#if defined(EB_ORDIN) && FB_POLYN == 233
 			case NIST_B233:
 				ASSIGN(NIST_B233, NIST_233);
 				ordin = 1;
 				break;
-#elif defined(EB_KBLTZ) && FB_POLYN == 233
+#endif
+#if defined(EB_KBLTZ) && FB_POLYN == 233
 			case NIST_K233:
 				ASSIGN(NIST_K233, NIST_233);
 				kbltz = 1;
 				break;
-#elif defined(EB_ORDIN) && FB_POLYN == 283
+#endif
+#if defined(EB_ORDIN) && FB_POLYN == 283
 			case NIST_B283:
 				ASSIGN(NIST_B283, NIST_283);
 				ordin = 1;
 				break;
-#elif defined(EB_KBLTZ) && FB_POLYN == 283
-#error eita
+#endif
+#if defined(EB_KBLTZ) && FB_POLYN == 283
 			case NIST_K283:
 				ASSIGN(NIST_K283, NIST_283);
 				kbltz = 1;
 				break;
-#elif defined(EB_ORDIN) && FB_POLYN == 409
+#endif
+#if defined(EB_ORDIN) && FB_POLYN == 409
 			case NIST_B409:
 				ASSIGN(NIST_B409, NIST_409);
 				ordin = 1;
 				break;
-#elif defined(EB_KBLTZ) && FB_POLYN == 409
+#endif
+#if defined(EB_KBLTZ) && FB_POLYN == 409
 			case NIST_K409:
 				ASSIGN(NIST_K409, NIST_409);
 				kbltz = 1;
 				break;
-#elif defined(EB_ORDIN) && FB_POLYN == 571
+#endif
+#if defined(EB_ORDIN) && FB_POLYN == 571
 			case NIST_B571:
 				ASSIGN(NIST_B571, NIST_571);
 				ordin = 1;
 				break;
-#elif defined(EB_KBLTZ) && FB_POLYN == 571
+#endif
+#if defined(EB_KBLTZ) && FB_POLYN == 571
 			case NIST_K571:
 				ASSIGN(NIST_K571, NIST_571);
 				kbltz = 1;
 				break;
-#elif defined(EB_SUPER) && FB_POLYN == 271
+#endif
+#if defined(EB_SUPER) && FB_POLYN == 271
 			case ETAT_P271:
 				ASSIGNS(ETAT_P271, PENTA_271);
 				super = 1;
@@ -375,7 +384,8 @@ void eb_param_set(int param) {
 				ASSIGNS(ETAT_T271, TRINO_271);
 				super = 1;
 				break;
-#elif defined(EB_SUPER) && FB_POLYN == 1223
+#endif
+#if defined(EB_SUPER) && FB_POLYN == 1223
 			case ETAT_S1223:
 				ASSIGNS(ETAT_S1223, TRINO_1223);
 				super = 1;

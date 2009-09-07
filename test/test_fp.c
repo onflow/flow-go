@@ -32,11 +32,11 @@
 #include "relic.h"
 #include "relic_test.h"
 
-void fp_new_impl(fp_t *a) {
+static void fp_new_impl(fp_t *a) {
 	fp_new(*a);
 }
 
-int memory(void) {
+static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
 	fp_t a = NULL;
@@ -59,7 +59,7 @@ int memory(void) {
 	return code;
 }
 
-int util(void) {
+static int util(void) {
 	int bits, code = STS_ERR;
 	char str[1000];
 	fp_t a = NULL, b = NULL, c = NULL;
@@ -189,7 +189,7 @@ int util(void) {
 	return code;
 }
 
-int addition(void) {
+static int addition(void) {
 	int code = STS_ERR;
 	fp_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL;
 
@@ -246,7 +246,7 @@ int addition(void) {
 	return code;
 }
 
-int subtraction(void) {
+static int subtraction(void) {
 	int code = STS_ERR;
 	fp_t a = NULL, b = NULL, c = NULL, d = NULL;
 
@@ -293,7 +293,7 @@ int subtraction(void) {
 	return code;
 }
 
-int multiplication(void) {
+static int multiplication(void) {
 	int code = STS_ERR;
 	fp_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL, f = NULL;
 
@@ -372,7 +372,7 @@ int multiplication(void) {
 		TEST_END;
 #endif
 
-#if FP_MUK > 0 || !defined(STRIP)
+#if FP_KARAT > 0 || !defined(STRIP)
 		TEST_BEGIN("karatsuba multiplication is correct") {
 			fp_rand(a);
 			fp_rand(b);
@@ -397,7 +397,7 @@ int multiplication(void) {
 	return code;
 }
 
-int squaring(void) {
+static int squaring(void) {
 	int code = STS_ERR;
 	fp_t a = NULL, b = NULL, c = NULL;
 
@@ -431,7 +431,7 @@ int squaring(void) {
 		} TEST_END;
 #endif
 
-#if FP_SQK > 0 || !defined(STRIP)
+#if FP_KARAT > 0 || !defined(STRIP)
 		TEST_BEGIN("karatsuba squaring is correct") {
 			fp_rand(a);
 			fp_sqr(b, a);
@@ -451,7 +451,7 @@ int squaring(void) {
 	return code;
 }
 
-int doubling_halving(void) {
+static int doubling_halving(void) {
 	int code = STS_ERR;
 	fp_t a = NULL, b = NULL, c = NULL;
 
@@ -489,7 +489,7 @@ int doubling_halving(void) {
 	return code;
 }
 
-int shifting(void) {
+static int shifting(void) {
 	int code = STS_ERR;
 	fp_t a = NULL, b = NULL, c = NULL;
 	dv_t d = NULL;
@@ -562,7 +562,7 @@ int shifting(void) {
 	return code;
 }
 
-int digit(void) {
+static int digit(void) {
 	int code = STS_ERR;
 	fp_t a = NULL, b = NULL, c = NULL, d = NULL;
 	dig_t g;
@@ -619,7 +619,7 @@ int digit(void) {
 	return code;
 }
 
-int inversion(void) {
+static int inversion(void) {
 	int code = STS_ERR;
 	fp_t a = NULL, b = NULL, c = NULL;
 

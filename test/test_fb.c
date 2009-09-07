@@ -32,10 +32,10 @@
 #include "relic.h"
 #include "relic_test.h"
 
-int memory(void) {
+static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
-	fb_t a;
+	fb_t a = NULL;
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
@@ -50,13 +50,14 @@ int memory(void) {
 				break;
 		}
 	}
+	(void)a;
 	code = STS_OK;
   end:
 	return code;
 }
 
-int util(void) {
-	int bits, code = STS_ERR;
+static int util(void) {
+	int bits, bits_dig, code = STS_ERR;
 	char str[1000];
 	fb_t a = NULL, b = NULL, c = NULL;
 
@@ -171,7 +172,8 @@ int util(void) {
 		TEST_BEGIN("bit assignment and bit counting of a digit are consistent") {
 			fb_zero(a);
 			fb_set_bit(a, bits, 1);
-			TEST_ASSERT(fb_bits(a) == fb_bits_dig(a[0]), end);
+			bits_dig = fb_bits_dig(a[0]);
+			TEST_ASSERT(fb_bits(a) == bits_dig, end);
 			bits++;
 			bits %= (FB_DIGIT);
 		}
@@ -204,7 +206,7 @@ int util(void) {
 	return code;
 }
 
-int addition(void) {
+static int addition(void) {
 	int code = STS_ERR;
 	fb_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL;
 
@@ -261,7 +263,7 @@ int addition(void) {
 	return code;
 }
 
-int subtraction(void) {
+static int subtraction(void) {
 	int code = STS_ERR;
 	fb_t a = NULL, b = NULL, c = NULL, d = NULL;
 
@@ -309,7 +311,7 @@ int subtraction(void) {
 	return code;
 }
 
-int multiplication(void) {
+static int multiplication(void) {
 	int code = STS_ERR;
 	fb_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL, f = NULL;
 
@@ -447,7 +449,7 @@ int multiplication(void) {
 	return code;
 }
 
-int squaring(void) {
+static int squaring(void) {
 	int code = STS_ERR;
 	fb_t a = NULL, b = NULL, c = NULL;
 
@@ -502,7 +504,7 @@ int squaring(void) {
 	return code;
 }
 
-int square_root(void) {
+static int square_root(void) {
 	int code = STS_ERR;
 	fb_t a = NULL, b = NULL, c = NULL;
 
@@ -555,7 +557,7 @@ int square_root(void) {
 	return code;
 }
 
-int inversion(void) {
+static int inversion(void) {
 	int code = STS_ERR;
 	fb_t a = NULL, b = NULL, c = NULL;
 
@@ -610,7 +612,7 @@ int inversion(void) {
 	return code;
 }
 
-int shifting(void) {
+static int shifting(void) {
 	int code = STS_ERR;
 	fb_t a = NULL, b = NULL, c = NULL;
 
@@ -680,7 +682,7 @@ int shifting(void) {
 	return code;
 }
 
-int reduction(void) {
+static int reduction(void) {
 	int code = STS_ERR;
 	fb_t a = NULL, b = NULL, c = NULL;
 	dv_t t0 = NULL, t1 = NULL;
@@ -736,7 +738,7 @@ int reduction(void) {
 	return code;
 }
 
-int trace(void) {
+static int trace(void) {
 	int code = STS_ERR;
 	fb_t a = NULL, b = NULL, c = NULL;
 
@@ -786,7 +788,7 @@ int trace(void) {
 	return code;
 }
 
-int digit(void) {
+static int digit(void) {
 	int code = STS_ERR;
 	fb_t a = NULL, b = NULL, c = NULL, d = NULL;
 	dig_t g;

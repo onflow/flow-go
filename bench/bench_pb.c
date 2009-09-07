@@ -34,7 +34,7 @@
 #include "relic.h"
 #include "relic_bench.h"
 
-void arith(void) {
+static void arith(void) {
 	eb_t p, q;
 	fb4_t r;
 

@@ -32,11 +32,12 @@
 #include "relic.h"
 #include "relic_test.h"
 
-void eb_new_impl(eb_t a) {
+static void eb_new_impl(eb_t a) {
 	eb_new(a);
+	(void)a;
 }
 
-int memory(void) {
+static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
 	eb_t a = NULL;
@@ -61,7 +62,7 @@ int memory(void) {
 	return code;
 }
 
-int util(void) {
+static int util(void) {
 	int code = STS_ERR;
 	eb_t a = NULL, b = NULL, c = NULL;
 
@@ -126,7 +127,7 @@ int util(void) {
 	return code;
 }
 
-int addition(void) {
+static int addition(void) {
 	int code = STS_ERR;
 
 	eb_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL;
@@ -246,7 +247,7 @@ int addition(void) {
 	return code;
 }
 
-int subtraction(void) {
+static int subtraction(void) {
 	int code = STS_ERR;
 	eb_t a = NULL, b = NULL, c = NULL, d = NULL;
 
@@ -355,7 +356,7 @@ int subtraction(void) {
 	return code;
 }
 
-int doubling(void) {
+static int doubling(void) {
 	int code = STS_ERR;
 	eb_t a = NULL, b = NULL, c = NULL;
 
@@ -418,7 +419,7 @@ int doubling(void) {
 	return code;
 }
 
-int multiplication(void) {
+static int multiplication(void) {
 	int code = STS_ERR;
 	eb_t p = NULL, q = NULL, r = NULL;
 	bn_t n = NULL, k = NULL;
@@ -491,7 +492,7 @@ int multiplication(void) {
 	return code;
 }
 
-int fixed(void) {
+static int fixed(void) {
 	int code = STS_ERR;
 	eb_t p = NULL, q = NULL, r = NULL;
 	eb_t t[FB_BITS] = { NULL };
@@ -641,7 +642,7 @@ int fixed(void) {
 	return code;
 }
 
-int simultaneous(void) {
+static int simultaneous(void) {
 	int code = STS_ERR;
 	eb_t p = NULL, q = NULL, r = NULL, s = NULL;
 	bn_t n = NULL, k = NULL, l = NULL;
@@ -739,7 +740,7 @@ int simultaneous(void) {
 	return code;
 }
 
-int test(void) {
+static int test(void) {
 	eb_param_print();
 
 	util_print_banner("Utilities:", 1);

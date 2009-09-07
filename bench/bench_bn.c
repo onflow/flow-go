@@ -32,15 +32,15 @@
 #include "relic.h"
 #include "relic_bench.h"
 
-void bn_new_impl(bn_t *a) {
+static void bn_new_impl(bn_t *a) {
 	bn_new(*a);
 }
 
-void bn_new_size_impl(bn_t *a) {
+static void bn_new_size_impl(bn_t *a) {
 	bn_new_size(*a, 2 * BN_DIGS);
 }
 
-void memory1(void) {
+static void memory1(void) {
 	bn_t a[BENCH + 1] = { NULL };
 	bn_t *tmpa;
 
@@ -88,7 +88,7 @@ void memory1(void) {
 	BENCH_END;
 }
 
-void memory2(void) {
+static void memory2(void) {
 	bn_t a[BENCH + 1] = { NULL };
 	bn_t *tmpa;
 
@@ -117,7 +117,7 @@ void memory2(void) {
 	BENCH_END;
 }
 
-void memory3(void) {
+static void memory3(void) {
 	bn_t a[BENCH + 1] = { NULL };
 	bn_t *tmpa;
 
@@ -140,7 +140,7 @@ void memory3(void) {
 	BENCH_END;
 }
 
-void util(void) {
+static void util(void) {
 	int d, len, sign;
 	dig_t digit;
 	char str[BN_DIGS * sizeof(dig_t) * 3 + 1];
@@ -324,7 +324,7 @@ void util(void) {
 	bn_free(b);
 }
 
-void arith(void) {
+static void arith(void) {
 	bn_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL;
 	dig_t f;
 
@@ -666,13 +666,15 @@ void arith(void) {
 
 #if defined(WITH_EB) && defined(EB_STAND) && defined(EB_KBLTZ)
 	if (eb_param_set_any_kbltz() == STS_OK) {
+		bn_t vm = NULL, s0 = NULL, s1 = NULL;
+		vm = eb_curve_get_vm();
+		s0 = eb_curve_get_s0();
+		s1 = eb_curve_get_s1();
 		BENCH_BEGIN("bn_rec_tnaf") {
 			signed char tnaf[FB_BITS + 8];
 			int len;
 			bn_rand(a, BN_POS, BN_BITS);
-			BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, eb_curve_get_vm(),
-							eb_curve_get_s0(), eb_curve_get_s1(), 1, FB_BITS,
-							4));
+			BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, vm, s0, s1, 1, FB_BITS, 4));
 		}
 		BENCH_END;
 	}
@@ -841,10 +843,6 @@ void arith(void) {
 		BENCH_ADD(bn_gcd_ext_dig(c, d, e, a, b->dp[0]));
 	}
 	BENCH_END;
-
-
-#undef BENCH
-#define BENCH 1
 
 	BENCH_ONCE("bn_gen_prime", bn_gen_prime(a, BN_BITS));
 

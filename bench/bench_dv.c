@@ -34,11 +34,11 @@
 #include "relic.h"
 #include "relic_bench.h"
 
-void dv_new_impl(dv_t *a) {
+static void dv_new_impl(dv_t *a) {
 	dv_new(*a);
 }
 
-void memory(void) {
+static void memory(void) {
 	dv_t a[BENCH + 1] = { NULL };
 	dv_t *tmpa;
 

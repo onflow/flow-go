@@ -34,7 +34,7 @@
 #include "relic.h"
 #include "relic_bench.h"
 
-void rsa(void) {
+static void rsa(void) {
 	rsa_pub_t pub;
 	rsa_prv_t prv;
 	unsigned char in[1000], new[1000];
@@ -185,7 +185,7 @@ void rsa(void) {
 
 #if defined(WITH_EB)
 
-void ecdsa(void) {
+static void ecdsa(void) {
 	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
 	bn_t r = NULL, s = NULL, d = NULL;
 	eb_t p = NULL;

@@ -54,11 +54,9 @@ void conf_print(void) {
 #endif
 
 #if ARITH == EASY
-	util_print("** Arithmetic backend: EASY\n\n");
-#elif ARITH == X86_64
-	util_print("** Arithmetic backend: X86_64\n\n");
+	util_print("** Arithmetic backend: easy\n\n");
 #elif ARITH == GMP
-	util_print("** Arithmetic backend: GMP\n\n");
+	util_print("** Arithmetic backend: gmp\n\n");
 #endif
 
 #if BENCH > 1

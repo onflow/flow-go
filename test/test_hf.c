@@ -71,7 +71,7 @@ unsigned char result1[3][20] = {
 			0xEB, 0x2B, 0xDB, 0xAD, 0x27, 0x31, 0x65, 0x34, 0x01, 0x6F},
 };
 
-int sha1(void) {
+static int sha1(void) {
 	int code = STS_ERR;
 	int i, j;
 	unsigned char message[MSG_SIZE], digest[20];
@@ -106,7 +106,7 @@ unsigned char result224[3][28] = {
 			0xB2, 0xEE, 0x4E, 0xE7, 0xAD, 0x67},
 };
 
-int sha224(void) {
+static int sha224(void) {
 	int code = STS_ERR;
 	int i, j;
 	unsigned char message[MSG_SIZE], digest[28];
@@ -141,7 +141,7 @@ unsigned char result256[3][32] = {
 			0x20, 0x0E, 0x04, 0x6D, 0x39, 0xCC, 0xC7, 0x11, 0x2C, 0xD0}
 };
 
-int sha256(void) {
+static int sha256(void) {
 	int code = STS_ERR;
 	int i, j;
 	unsigned char message[MSG_SIZE], digest[32];
@@ -190,8 +190,7 @@ unsigned char result384[4][48] = {
 			0xDD, 0xD8, 0x7F, 0x3D, 0x89, 0x85},
 };
 
-
-int sha384(void) {
+static int sha384(void) {
 	int code = STS_ERR;
 	int i, j;
 	unsigned char message[MSG_SIZE], digest[48];
@@ -238,7 +237,7 @@ unsigned char result512[4][64] = {
 			0xC0, 0x9B},
 };
 
-int sha512(void) {
+static int sha512(void) {
 	int code = STS_ERR;
 	int i, j;
 	unsigned char message[MSG_SIZE], digest[64];

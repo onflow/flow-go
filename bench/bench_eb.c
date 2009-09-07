@@ -34,11 +34,11 @@
 #include "relic.h"
 #include "relic_bench.h"
 
-void eb_new_impl(eb_t *a) {
+static void eb_new_impl(eb_t *a) {
 	eb_new(*a);
 }
 
-void memory(void) {
+static void memory(void) {
 	eb_t a[BENCH + 1] = { NULL };
 	eb_t *tmpa;
 
@@ -61,7 +61,7 @@ void memory(void) {
 	BENCH_END;
 }
 
-void util(void) {
+static void util(void) {
 	eb_t p = NULL, q = NULL;
 
 	eb_new(p);
@@ -99,7 +99,7 @@ void util(void) {
 	BENCH_END;
 }
 
-void arith(void) {
+static void arith(void) {
 	eb_t p = NULL, q = NULL, r = NULL, t[FB_BITS] = { NULL };
 	bn_t k = NULL, l = NULL, n = NULL;
 
@@ -544,7 +544,7 @@ void arith(void) {
 	}
 }
 
-void bench(void) {
+static void bench(void) {
 	eb_param_print();
 	util_print_banner("Utilities:", 1);
 	memory();

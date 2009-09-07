@@ -33,18 +33,18 @@
 #include "relic_error.h"
 #include "relic_test.h"
 
-void dummy(void);
-void dummy2(void);
+static void dummy(void);
+static void dummy2(void);
 
 int j;
 
-void dummy(void) {
+static void dummy(void) {
 	j++;
 	if (j < 6)
 		dummy2();
 }
 
-void dummy2(void) {
+static void dummy2(void) {
 	j++;
 	if (j < 5)
 		dummy();

@@ -32,7 +32,7 @@
 #include "relic.h"
 #include "relic_test.h"
 
-int memory2(void) {
+static int memory2(void) {
 	err_t e;
 	int code = STS_ERR;
 	fb2_t a;
@@ -50,12 +50,13 @@ int memory2(void) {
 				break;
 		}
 	}
+	(void)a;
 	code = STS_OK;
   end:
 	return code;
 }
 
-int addition2(void) {
+static int addition2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c, d, e;
 
@@ -113,7 +114,7 @@ int addition2(void) {
 	return code;
 }
 
-int subtraction2(void) {
+static int subtraction2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c, d;
 
@@ -161,7 +162,7 @@ int subtraction2(void) {
 	return code;
 }
 
-int multiplication2(void) {
+static int multiplication2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c, d, e, f;
 
@@ -232,7 +233,7 @@ int multiplication2(void) {
 	return code;
 }
 
-int squaring2(void) {
+static int squaring2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c;
 
@@ -260,7 +261,7 @@ int squaring2(void) {
 	return code;
 }
 
-int inversion2(void) {
+static int inversion2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c;
 
@@ -288,7 +289,7 @@ int inversion2(void) {
 	return code;
 }
 
-int memory4(void) {
+static int memory4(void) {
 	err_t e;
 	int code = STS_ERR;
 	fb4_t a;
@@ -306,12 +307,13 @@ int memory4(void) {
 				break;
 		}
 	}
+	(void)a;
 	code = STS_OK;
   end:
 	return code;
 }
 
-int addition4(void) {
+static int addition4(void) {
 	int code = STS_ERR;
 	fb4_t a, b, c, d, e;
 
@@ -369,7 +371,7 @@ int addition4(void) {
 	return code;
 }
 
-int subtraction4(void) {
+static int subtraction4(void) {
 	int code = STS_ERR;
 	fb4_t a, b, c, d;
 
@@ -417,7 +419,7 @@ int subtraction4(void) {
 	return code;
 }
 
-int multiplication4(void) {
+static int multiplication4(void) {
 	int code = STS_ERR;
 	fb4_t a, b, c, d, e, f;
 
@@ -502,7 +504,7 @@ int multiplication4(void) {
 	return code;
 }
 
-int squaring4(void) {
+static int squaring4(void) {
 	int code = STS_ERR;
 	fb4_t a, b, c;
 
@@ -530,7 +532,7 @@ int squaring4(void) {
 	return code;
 }
 
-int exponentiation4(void) {
+static int exponentiation4(void) {
 	int code = STS_ERR;
 	fb4_t a, b, c;
 
@@ -561,7 +563,7 @@ int exponentiation4(void) {
 	return code;
 }
 
-int pairing(void) {
+static int pairing(void) {
 	int code = STS_ERR;
 	fb4_t e1, e2;
 	eb_t p, q, r;
@@ -591,7 +593,7 @@ int pairing(void) {
 			TEST_ASSERT(fb4_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 
-#if PB_PAIR == ETATS || !defined(STRIP)
+#if PB_MAP == ETATS || !defined(STRIP)
 		TEST_BEGIN("etat pairing with square roots is correct") {
 			eb_rand(p);
 			eb_rand(q);
@@ -601,7 +603,7 @@ int pairing(void) {
 		} TEST_END;
 #endif
 
-#if PB_PAIR == ETATN || !defined(STRIP)
+#if PB_MAP == ETATN || !defined(STRIP)
 		TEST_BEGIN("etat pairing without square roots is correct") {
 			eb_rand(p);
 			eb_rand(q);

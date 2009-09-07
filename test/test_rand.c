@@ -44,7 +44,7 @@ unsigned char result[40] = {
 	0x13, 0x78, 0x8E, 0x20, 0xD7, 0x37, 0xA3, 0x27, 0x51, 0x16
 };
 
-int gen(void) {
+static int gen(void) {
 	int code = STS_ERR;
 	unsigned char out[40];
 
@@ -60,7 +60,6 @@ int gen(void) {
   end:
 	return code;
 }
-
 
 int main(void) {
 	core_init();

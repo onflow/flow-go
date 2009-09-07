@@ -35,11 +35,11 @@
 #include "relic_fb_low.h"
 #include "relic_bench.h"
 
-void fb_new_impl(fb_t *a) {
+static void fb_new_impl(fb_t *a) {
 	fb_new(*a);
 }
 
-void memory(void) {
+static void memory(void) {
 	fb_t a[BENCH + 1] = { NULL };
 	fb_t *tmpa;
 
@@ -62,7 +62,7 @@ void memory(void) {
 	BENCH_END;
 }
 
-void util(void) {
+static void util(void) {
 	int d;
 	char str[1000];
 
@@ -167,14 +167,13 @@ void util(void) {
 	fb_free(b);
 }
 
-void arith(void) {
-	fb_t a, b, c, d;
+static void arith(void) {
+	fb_t a, b, c;
 	dv_t e;
 
 	fb_new(a);
 	fb_new(b);
 	fb_new(c);
-	fb_new(d);
 	dv_new(e);
 	dv_zero(e, 2 * FB_DIGS);
 
@@ -427,7 +426,6 @@ void arith(void) {
 	fb_free(a);
 	fb_free(b);
 	fb_free(c);
-	fb_free(d);
 	dv_free(e);
 }
 

@@ -34,11 +34,11 @@
 #include "relic.h"
 #include "relic_bench.h"
 
-void dummy2(void) {
+static void dummy2(void) {
 
 }
 
-void dummy(void) {
+static void dummy(void) {
 	TRY {
 
 	}
@@ -48,7 +48,7 @@ void dummy(void) {
 	}
 }
 
-void error(void) {
+static void error(void) {
 	BENCH_BEGIN("empty function") {
 		BENCH_ADD(dummy2());
 	}

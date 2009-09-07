@@ -237,7 +237,7 @@ int SHA256Input(SHA256Context *context, const uint8_t *message_array,
 
   while (length-- && !context->Corrupted) {
     context->Message_Block[context->Message_Block_Index++] =
-            (*message_array & 0xFF);
+    		(unsigned char)(*message_array & 0xFF);
 
     if (!SHA224_256AddLength(context, 8) &&
       (context->Message_Block_Index == SHA256_Message_Block_Size))
