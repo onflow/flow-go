@@ -1064,7 +1064,7 @@ INCLUDE_FILE_PATTERNS  =
 # undefined via #undef or recursively expanded use the := operator 
 # instead of the = operator.
 
-PREDEFINED             = @DOC_OPTIONS@ ARCH=@ARCH@ ARITH=@ARITH@ BITS=@BITS@ SIZE=@SIZE@ BN_KAR=@BN_KAR@ BN_MUL=@BN_MUL@ BN_MOD=@BN_MOD@ BN_EXP=@BN_EXP@ PRIME=@PRIME@ FP_KAR=@FP_KAR@ FP_MUL=@FP_MUL@ FP_MOD=@FP_MOD@ FP_EXP=@FP_EXP@ ALLOC=@ALLOC@ RAND=@RAND@ OPSYS=@OPSYS@
+PREDEFINED             = @DOC_OPTIONS@
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then 
 # this tag can be used to specify a list of macro names that should be expanded. 
