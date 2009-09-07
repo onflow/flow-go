@@ -35,7 +35,7 @@
 #include "relic_conf.h"
 #include "relic_core.h"
 #include "relic_rand.h"
-#include "relic_hf.h"
+#include "relic_md.h"
 #include "relic_error.h"
 
 /*============================================================================*/
@@ -71,7 +71,7 @@ static unsigned char state[64];
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#include "relic_hf.h"
+#include "relic_md.h"
 
 void rand_init() {
 	unsigned char buf[STATE_SIZE];
@@ -138,9 +138,9 @@ void rand_bytes(unsigned char *buf, int size) {
     j = 0;
     while (j < size) {
         /* x = G(t, XKEY) */
-        hf_map_shone_init();
-        hf_map_shone_update(state, 64);
-        hf_map_shone_state(hash);
+        md_map_shone_init();
+        md_map_shone_update(state, 64);
+        md_map_shone_state(hash);
         /* XKEY = (XKEY + x + 1) mod 2^b */
         carry = 1;
         for (i = 19; i >= 0; i--) {

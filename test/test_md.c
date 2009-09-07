@@ -82,7 +82,7 @@ static int sha1(void) {
 			for (j = 0; j < count[i]; j++) {
 				strcat((char *)message, tests[i]);
 			}
-			hf_map_shone(digest, message, strlen((char *)message));
+			md_map_shone(digest, message, strlen((char *)message));
 			TEST_ASSERT(memcmp(digest, result1[i], 20) == 0, end);
 		}
 	}
@@ -117,7 +117,7 @@ static int sha224(void) {
 			for (j = 0; j < count[i]; j++) {
 				strcat((char *)message, tests[i]);
 			}
-			hf_map_sh224(digest, message, strlen((char *)message));
+			md_map_sh224(digest, message, strlen((char *)message));
 			TEST_ASSERT(memcmp(digest, result224[i], 28) == 0, end);
 		}
 	}
@@ -152,7 +152,7 @@ static int sha256(void) {
 			for (j = 0; j < count[i]; j++) {
 				strcat((char *)message, tests[i]);
 			}
-			hf_map_sh256(digest, message, strlen((char *)message));
+			md_map_sh256(digest, message, strlen((char *)message));
 			TEST_ASSERT(memcmp(digest, result256[i], 32) == 0, end);
 		}
 	}
@@ -201,7 +201,7 @@ static int sha384(void) {
 			for (j = 0; j < count2[i]; j++) {
 				strcat((char *)message, tests2[i]);
 			}
-			hf_map_sh384(digest, message, strlen((char *)message));
+			md_map_sh384(digest, message, strlen((char *)message));
 			TEST_ASSERT(memcmp(digest, result384[i], 48) == 0, end);
 		}
 	}
@@ -248,7 +248,7 @@ static int sha512(void) {
 			for (j = 0; j < count2[i]; j++) {
 				strcat((char *)message, tests2[i]);
 			}
-			hf_map_sh512(digest, message, strlen((char *)message));
+			md_map_sh512(digest, message, strlen((char *)message));
 			TEST_ASSERT(memcmp(digest, result512[i], 64) == 0, end);
 		}
 	}

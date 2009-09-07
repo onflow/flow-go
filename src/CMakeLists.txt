@@ -13,7 +13,7 @@ file(GLOB EP_SRCS ep/*.c)
 file(GLOB EB_SRCS eb/*.c)
 file(GLOB PP_SRCS pp/*.c ep2/*.c)
 file(GLOB PB_SRCS pb/*.c)
-file(GLOB HF_SRCS hf/*.c)
+file(GLOB MD_SRCS md/*.c)
 
 set(RELIC_SRCS ${CORE_SRCS})
 
@@ -83,9 +83,9 @@ if (WITH_CP)
 	endif(WITH_PB)
 endif(WITH_CP)
 
-if (WITH_HF)
-	list(APPEND RELIC_SRCS ${HF_SRCS})
-endif(WITH_HF)
+if (WITH_MD)
+	list(APPEND RELIC_SRCS ${MD_SRCS})
+endif(WITH_MD)
 
 foreach(SRC ${LOW_SRCS})
 	get_filename_component(SRC ${SRC} NAME_WE)
