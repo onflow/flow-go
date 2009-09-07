@@ -31,7 +31,7 @@
 
 #include "relic_core.h"
 #include "relic_eb.h"
-#include "relic_hf.h"
+#include "relic_md.h"
 #include "relic_error.h"
 #include "relic_conf.h"
 
@@ -96,15 +96,15 @@ void eb_rand(eb_t p) {
 
 void eb_map(eb_t p, unsigned char *msg, int len) {
 	bn_t n = NULL, k = NULL;
-	unsigned char digest[HF_LEN];
+	unsigned char digest[MD_LEN];
 
 	TRY {
 		bn_new(k);
 
 		n = eb_curve_get_ord();
 
-		hf_map(digest, msg, len);
-		bn_read_bin(k, digest, HF_LEN, BN_POS);
+		md_map(digest, msg, len);
+		bn_read_bin(k, digest, MD_LEN, BN_POS);
 		bn_mod_basic(k, k, n);
 
 		n = eb_curve_get_ord();

@@ -97,6 +97,11 @@ static char get_bits(bn_t a, int from, int to) {
  * @param[out] r0		- the result.
  * @param[out] r1		- the result.
  * @param[in] k			- the number to reduce.
+ * @param[in] vm		- the V_m curve parameter.
+ * @param[in] s0		- the S_0 curve parameter.
+ * @param[in] s1		- the S_1 curve parameter.
+ * @param[in] u			- the u curve parameter.
+ * @param[in] m			- the extension degree of the binary field.
  */
 static void wtnaf_mod(bn_t r0, bn_t r1, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 		int u, int m) {

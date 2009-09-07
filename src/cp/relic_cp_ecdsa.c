@@ -66,7 +66,7 @@ void cp_ecdsa_gen(bn_t d, eb_t q) {
 void cp_ecdsa_sign_basic(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 	bn_t n = NULL, k = NULL, x = NULL, e = NULL;
 	eb_t p = NULL;
-	unsigned char hash[HF_LEN];
+	unsigned char hash[MD_LEN];
 
 	TRY {
 		n = eb_curve_get_ord();
@@ -86,7 +86,7 @@ void cp_ecdsa_sign_basic(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 			bn_mod_basic(r, x, n);
 		} while (bn_is_zero(r));
 
-		hf_map(hash, msg, len);
+		md_map(hash, msg, len);
 
 		bn_read_bin(e, hash, 20, BN_POS);
 
@@ -126,7 +126,7 @@ int cp_ecdsa_ver_basic(bn_t r, bn_t s, unsigned char *msg, int len, eb_t q) {
 		bn_new(k);
 		eb_new(p);
 
-		hf_map(hash, msg, len);
+		md_map(hash, msg, len);
 
 		if (bn_sign(r) == BN_POS && bn_sign(s) == BN_POS &&
 				!bn_is_zero(r) && !bn_is_zero(s)) {
