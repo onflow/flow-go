@@ -298,7 +298,6 @@ if (DEBUG)
 	# If the user did not specify compile flags, we turn off all optimizations.
 	set(CFLAGS "-O0 -fno-omit-frame-pointer")
 	set(DFLAGS "-ggdb")
-	set(DOC_OPTIONS "${DOC_OPTIONS} DEBUG=1")
 else(DEBUG)
 	# If the user did not specify compile flags, we use sane defaults.
 	set(CFLAGS "${COMP}")
@@ -308,54 +307,19 @@ endif(DEBUG)
 if (MULTI)
 	set(CFLAGS "${CFLAGS} -fopenmp")
 	set(LFLAGS "${LFLAGS} -lgomp -lm")
-	set(DOC_OPTIONS "${DOC_OPTIONS} MULTI=1")
 endif(MULTI)
 
 if (PROFL)
 	set(PFLAGS "-pg -fno-omit-frame-pointer")
-	set(DOC_OPTIONS "${DOC_OPTIONS} PROFL=1")
 else(PROFL)
 	set(PFLAGS "")
 endif(PROFL)
 
-if (CHECK)
-	set(DOC_OPTIONS "${DOC_OPTIONS} CHECK=1")
-endif(CHECK)
-
-if (VERBS)
-	set(DOC_OPTIONS "${DOC_OPTIONS} VERBS=1")
-endif(VERBS)
-
 if (TRACE)
 	set(DFLAGS "${DFLAGS} -fPIC -finstrument-functions")
 	set(LFLAGS "${LFLAGS} -ldl")
-	set(DOC_OPTIONS "${DOC_OPTIONS} TRACE=1")
 endif(TRACE)
 
-if (STRIP)
-	set(DOC_OPTIONS "${DOC_OPTIONS} STRIP=1")
-endif(STRIP)
-
-if (QUIET)
-	set(DOC_OPTIONS "${DOC_OPTIONS} QUIET=1")
-endif(QUIET)
-
-if (BIGED)
-	set(DOC_OPTIONS "${DOC_OPTIONS} BIGED=1")
-endif(BIGED)
-
-if (SHLIB)
-	set(DOC_OPTIONS "${DOC_OPTIONS} STBIN=1")
-endif(SHLIB)	
-
-if (STLIB)
-	set(DOC_OPTIONS "${DOC_OPTIONS} STBIN=1")
-endif(STLIB)
-
-if (STBIN)
-	set(DOC_OPTIONS "${DOC_OPTIONS} STBIN=1")
-endif(STBIN)
-	
 if (ARITH STREQUAL "gmp")
 	include(cmake/gmp.cmake)
 endif(ARITH STREQUAL "gmp")

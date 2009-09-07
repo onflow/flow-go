@@ -43,8 +43,8 @@
  *
  * This function maps a random coset element to a fixed coset representative.
  *
- * @param r
- * @param delta
+ * @param[out] r					- the result.
+ * @param[in] a						- the random coset element.
  */
 static void etat_exp(fb4_t r, fb4_t a) {
 	fb2_t t0, t1, t2;
