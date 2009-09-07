@@ -47,7 +47,7 @@
 /**
  * Runs a new benchmark once.
  *
- * @param[in] LABEL			- the label for this benchmark.
+ * @param[in] P				- the property description.
  */
 #define TEST_ONCE(P)														\
 	util_print("Testing if %s... %*s", P, (int)(64 - strlen(P)), " ");		\
@@ -55,7 +55,7 @@
 /**
  * Tests a sequence of commands to see if they respect some property.
  *
- * @param[in] P				- the description of the property.
+ * @param[in] P				- the property description.
  */
 #define TEST_BEGIN(P)														\
 	util_print("Testing if %s... %*s", P, (int)(64 - strlen(P)), " ");		\

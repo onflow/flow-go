@@ -536,7 +536,7 @@ void bn_set_2b(bn_t a, int b);
  *
  * @param[out] a			- the multiple precision integer to assign.
  * @param[in] sign			- the sign to be assigned (BN_NEG or BN_POS).
- * @param[in] digits		- the number of bits.
+ * @param[in] bits			- the number of bits.
  */
 void bn_rand(bn_t a, int sign, int bits);
 

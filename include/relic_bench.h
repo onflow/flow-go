@@ -47,6 +47,7 @@
  * Runs a new benchmark once.
  *
  * @param[in] LABEL			- the label for this benchmark.
+ * @param[in] FUNCTION		- the function to benchmark.
  */
 #define BENCH_ONCE(LABEL, FUNCTION)											\
 	bench_reset(LABEL);														\

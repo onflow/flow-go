@@ -113,30 +113,7 @@ typedef align dig_t fp_st[FP_DIGS];
 #endif
 
 /**
- * Allocates and initializes a new prime field element.
- *
- * @param[out] a			- the new prime field element.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
- */
-#if ALLOC == DYNAMIC
-void fp_new_dynam(fp_t *a);
-#elif ALLOC == STATIC
-void fp_new_statc(fp_t *a);
-#endif
-
-/**
- * Cleans and frees a prime field element.
- *
- * @param[out] a			- the prime field element to clean and free.
- */
-#if ALLOC == DYNAMIC
-void fp_free_dynam(fp_t *a);
-#elif ALLOC == STATIC
-void fp_free_statc(fp_t *a);
-#endif
-
-/**
- * Multiples two prime field elements. Compute c = a * b.
+ * Multiples two prime field elements. Computes c = a * b.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the first prime field element.
@@ -253,6 +230,40 @@ dig_t *fp_prime_get_mod8(void);
  * @param[in] p			- the new prime field order.
  */
 void fp_prime_set(bn_t p);
+
+#if ALLOC == DYNAMIC
+/**
+ * Allocates and initializes a new prime field element with dynamic allocation.
+ *
+ * @param[out] a			- the new prime field element.
+ * @throw ERR_NO_MEMORY		- if there is no available memory.
+ */
+void fp_new_dynam(fp_t *a);
+#elif ALLOC == STATIC
+/**
+ * Allocates and initializes a new prime field element with static allocation.
+ *
+ * @param[out] a			- the new prime field element.
+ * @throw ERR_NO_MEMORY		- if there is no available memory.
+ */
+void fp_new_statc(fp_t *a);
+#endif
+
+#if ALLOC == DYNAMIC
+/**
+ * Cleans and frees a prime field element with dynamic allocation.
+ *
+ * @param[out] a			- the prime field element to clean and free.
+ */
+void fp_free_dynam(fp_t *a);
+#elif ALLOC == STATIC
+/**
+ * Cleans and frees a prime field element with static allocation.
+ *
+ * @param[out] a			- the prime field element to clean and free.
+ */
+void fp_free_statc(fp_t *a);
+#endif
 
 /**
  * Copies the second argument to the first argument.

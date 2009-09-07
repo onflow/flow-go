@@ -167,11 +167,11 @@ int cp_rsa_gen_quick(rsa_pub_t *pub, rsa_prv_t *prv, int bits);
 /**
  * Encrypts using the RSA cryptosystem.
  *
- * @param[out] O			- the output buffer.
- * @param[out] OL			- the number of bytes written in the output buffer.
- * @param[in] I				- the input buffer.
- * @param[in] IL			- the number of bytes to encrypt.
- * @param[in] P				- the public key.
+ * @param[out] out			- the output buffer.
+ * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in] in			- the input buffer.
+ * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] pub			- the public key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
@@ -221,10 +221,10 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 /**
  * Signs using the basic RSA signature algorithm.
  *
- * @param[out] out			- the output buffer.
- * @param[out] out_len		- the number of bytes written in the output buffer.
- * @param[in] in			- the input buffer.
- * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[out] sig			- the signature
+ * @param[out] sig_len		- the number of bytes written in the signature.
+ * @param[in] msg			- the message to sign.
+ * @param[in] msg_len		- the number of bytes to sign.
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
@@ -234,10 +234,10 @@ int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
 /**
  * Signs using the fast RSA signature algorithm with CRT optimization.
  *
- * @param[out] out			- the output buffer.
- * @param[out] out_len		- the number of bytes written in the output buffer.
- * @param[in] in			- the input buffer.
- * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[out] sig			- the signature
+ * @param[out] sig_len		- the number of bytes written in the signature.
+ * @param[in] msg			- the message to sign.
+ * @param[in] msg_len		- the number of bytes to sign.
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
@@ -247,11 +247,11 @@ int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
 /**
  * Verifies an RSA signature.
  *
- * @param[in]				- the signature to verify.
- * @param[in]				- the signature length in bytes.
- * @param[in]				- the signed message.
- * @param[in]				- the message length in bytes.
- * @param[in]				- the public key.
+ * @param[in] sig			- the signature to verify.
+ * @param[in] sig_len		- the signature length in bytes.
+ * @param[in] msg			- the signed message.
+ * @param[in] msg_len		- the message length in bytes.
+ * @param[in] pub			- the public key.
  * @return 1 if the signature is valid, 0 otherwise.
  */
 int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg, int msg_len,
@@ -327,7 +327,7 @@ void cp_sokaka_gen(bn_t master);
  *
  * @param[out] p				- the public key.
  * @param[in] id				- the identity.
- * @[aram[in] len				- the length of identity.
+ * @param[in] len				- the length of identity in bytes.
  */
 void cp_sokaka_gen_pub(eb_t p, char *id, int len);
 
@@ -336,7 +336,8 @@ void cp_sokaka_gen_pub(eb_t p, char *id, int len);
  *
  * @param[out] s				- the private key.
  * @param[in] id				- the identity.
- * @[aram[in] len				- the length of identity.
+ * @param[in] len				- the length of identity in bytes.
+ * @param[in] master			- the master key.
  */
 void cp_sokaka_gen_prv(eb_t s, char *id, int len, bn_t master);
 

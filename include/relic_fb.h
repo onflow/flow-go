@@ -138,29 +138,6 @@ typedef align dig_t fb_st[FB_DIGS];
 #endif
 
 /**
- * Allocates and initializes a new binary field element.
- *
- * @param[out] a			- the new binary field element.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
- */
-#if ALLOC == DYNAMIC
-void fb_new_dynam(fb_t *a);
-#elif ALLOC == STATIC
-void fb_new_statc(fb_t *a);
-#endif
-
-/**
- * Cleans and frees a binary field element.
- *
- * @param[out] a			- the prime field element to free.
- */
-#if ALLOC == DYNAMIC
-void fb_free_dynam(fb_t *a);
-#elif ALLOC == STATIC
-void fb_free_statc(fb_t *a);
-#endif
-
-/**
  * Multiples two binary field elements. Computes c = a * b.
  *
  * @param[out] C			- the result.
@@ -339,6 +316,41 @@ void fb_param_print(void);
  * @param[in] a				- the binary field element.
  */
 void fb_poly_add(fb_t c, fb_t a);
+
+#if ALLOC == DYNAMIC
+/**
+ * Allocates and initializes a new binary field element with dynamic allocation.
+ *
+ * @param[out] a			- the new binary field element.
+ * @throw ERR_NO_MEMORY		- if there is no available memory.
+ */
+void fb_new_dynam(fb_t *a);
+#elif ALLOC == STATIC
+/**
+ * Allocates and initializes a new binary field element with static allocation.
+ *
+ * @param[out] a			- the new binary field element.
+ * @throw ERR_NO_MEMORY		- if there is no available memory.
+ */
+void fb_new_statc(fb_t *a);
+#endif
+
+
+#if ALLOC == DYNAMIC
+/**
+ * Cleans and frees a binary field element with dynamic allocation.
+ *
+ * @param[out] a			- the prime field element to free.
+ */
+void fb_free_dynam(fb_t *a);
+#else /* ALLOC == STATIC */
+/**
+ * Cleans and frees a binary field element with static allocation.
+ *
+ * @param[out] a			- the prime field element to free.
+ */
+void fb_free_statc(fb_t *a);
+#endif
 
 /**
  * Copies the second argument to the first argument.

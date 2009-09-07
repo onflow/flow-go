@@ -194,8 +194,8 @@ typedef fb_t fb4_t[4];
 /**
  * Negates a quartic extension field element.
  *
- * @param[out] c			- the result.
- * @param[out] a			- the quartic extension field element to negate.
+ * @param[out] C			- the result.
+ * @param[out] A			- the quartic extension field element to negate.
  */
 #define fb4_neg(C, A)														\
 		fb_neg(C[0], A[0]); fb_neg(C[1], A[1]); 							\
@@ -204,7 +204,7 @@ typedef fb_t fb4_t[4];
 /**
  * Assigns zero to a quartic extension field element.
  *
- * @param[out] a			- the quartic extension field element to zero.
+ * @param[out] A			- the quartic extension field element to zero.
  */
 #define fb4_zero(A)															\
 		fb_zero(A[0]); fb_zero(A[1]); fb_zero(A[2]); fb_zero(A[3]);			\
@@ -212,7 +212,7 @@ typedef fb_t fb4_t[4];
 /**
  * Tests if a quartic extension field element is zero or not.
  *
- * @param[in] a				- the quartic extension field element to test.
+ * @param[in] A				- the quartic extension field element to test.
  * @return 1 if the argument is zero, 0 otherwise.
  */
 #define fb4_is_zero(A)														\
@@ -222,7 +222,7 @@ typedef fb_t fb4_t[4];
 /**
  * Assigns a random value to a quartic extension field element.
  *
- * @param[out] a			- the binary field element to assign.
+ * @param[out] A			- the binary field element to assign.
  */
 #define fb4_rand(A)															\
 		fb_rand(A[0]); fb_rand(A[1]); fb_rand(A[2]); fb_rand(A[3]);			\
@@ -230,7 +230,7 @@ typedef fb_t fb4_t[4];
 /**
  * Prints a quartic extension field element to standard output.
  *
- * @param[in] a				- the quartic extension field element to print.
+ * @param[in] A				- the quartic extension field element to print.
  */
 #define fb4_print(A)														\
 		fb_print(A[0]); fb_print(A[1]); fb_print(A[2]); fb_print(A[3]);		\
@@ -239,8 +239,8 @@ typedef fb_t fb4_t[4];
  * Returns the result of a comparison between two quartic extension field
  * elements.
  *
- * @param[in] a				- the first quartic extension field element.
- * @param[in] b				- the second quartic extension field element.
+ * @param[in] A				- the first quartic extension field element.
+ * @param[in] B				- the second quartic extension field element.
  * @return CMP_NE if a != b, CMP_EQ if a == b.
  */
 #define fb4_cmp(A, B)														\
@@ -251,9 +251,9 @@ typedef fb_t fb4_t[4];
 /**
  * Adds two quartic extension field elements. Computes c = a + b.
  *
- * @param[out] c			- the result.
- * @param[in] a				- the first binary field element to add.
- * @param[in] b				- the second binary field element to add.
+ * @param[out] C			- the result.
+ * @param[in] A				- the first binary field element to add.
+ * @param[in] B				- the second binary field element to add.
  */
 #define fb4_add(C, A, B)													\
 		fb_add(C[0], A[0], B[0]); fb_add(C[1], A[1], B[1]);					\
@@ -263,9 +263,9 @@ typedef fb_t fb4_t[4];
  * Subtracts a quartic extension field element from another. Computes
  * c = a - b.
  *
- * @param[out] c			- the result.
- * @param[in] a				- the first quartic extension field element.
- * @param[in] b				- the second quartic extension field element.
+ * @param[out] C			- the result.
+ * @param[in] A				- the first quartic extension field element.
+ * @param[in] B				- the second quartic extension field element.
  */
 #define fb4_sub(C, A, B)													\
 		fb_sub(C[0], A[0], B[0]); fb_sub(C[1], A[1], B[1]);					\
@@ -292,9 +292,9 @@ typedef fb_t fb4_t[4];
 /**
  * Multiples two quadratic extension field elements. Computes c = a * b.
  *
- * @param[out] C			- the result.
- * @param[in] A				- the quadratic extension binary field element.
- * @param[in] B				- the quadratic extension binary field element.
+ * @param[out] c			- the result.
+ * @param[in] a				- the quadratic extension binary field element.
+ * @param[in] b				- the quadratic extension binary field element.
  */
 void fb2_mul(fb2_t c, fb2_t a, fb2_t b);
 
@@ -302,16 +302,16 @@ void fb2_mul(fb2_t c, fb2_t a, fb2_t b);
  * Computes the square of a quadratic extension field element. Computes
  * c = a * a.
  *
- * @param[out] C			- the result.
- * @param[in] A				- the binary field element to square.
+ * @param[out] c			- the result.
+ * @param[in] a				- the binary field element to square.
  */
 void fb2_sqr(fb2_t c, fb2_t a);
 
 /**
  * Inverts a quadratic extension field element. Computes c = a^{-1}.
  *
- * @param[out] C			- the result.
- * @param[in] A				- the quadratic extension field element to invert.
+ * @param[out] c			- the result.
+ * @param[in] a				- the quadratic extension field element to invert.
  */
 void fb2_inv(fb2_t c, fb2_t a);
 
@@ -354,8 +354,8 @@ void fb4_exp_2m(fb4_t c, fb4_t a);
 /**
  * Inverts a quadratic extension field element. Computes c = a^{-1}.
  *
- * @param[out] C			- the result.
- * @param[in] A				- the quartic extension field element to invert.
+ * @param[out] c			- the result.
+ * @param[in] a				- the quartic extension field element to invert.
  */
 void fb4_inv(fb4_t c, fb4_t a);
 

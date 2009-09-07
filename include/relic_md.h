@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup hf Hash functions.
+ * @defgroup md Hash functions.
  */
 
 /**
@@ -30,11 +30,11 @@
  * Interface of the hash functions module.
  *
  * @version $Id$
- * @ingroup hf
+ * @ingroup md
  */
 
-#ifndef RELIC_HF_H
-#define RELIC_HF_H
+#ifndef RELIC_MD_H
+#define RELIC_MD_H
 
 #include "relic_conf.h"
 #include "relic_types.h"
@@ -45,30 +45,30 @@
 
 enum {
 	/** Hash length for SHA-1 function. */
-	HF_LEN_SHONE = 20,
+	MD_LEN_SHONE = 20,
 	/** Hash kength for SHA-224 function. */
-	HF_LEN_SH224 = 28,
+	MD_LEN_SH224 = 28,
 	/** Hash kength for SHA-256 function. */
-	HF_LEN_SH256 = 32,
+	MD_LEN_SH256 = 32,
 	/** Hash kength for SHA-384 function. */
-	HF_LEN_SH384 = 48,
+	MD_LEN_SH384 = 48,
 	/** Hash kength for SHA-512 function. */
-	HF_LEN_SH512 = 64
+	MD_LEN_SH512 = 64
 };
 
 /**
  * Length in bytes of default hash function output.
  */
-#if HF_MAP == SHONE
-#define HF_LEN					HF_LEN_SHONE
-#elif HF_MAP == SH224
-#define HF_LEN					HF_LEN_SH224
-#elif HF_MAP == SH256
-#define HF_LEN					HF_LEN_SH256
-#elif HF_MAP == SH384
-#define HF_LEN					HF_LEN_SH384
-#elif HF_MAP == SH512
-#define HF_LEN					HF_LEN_SH512
+#if MD_MAP == SHONE
+#define MD_LEN					MD_LEN_SHONE
+#elif MD_MAP == SH224
+#define MD_LEN					MD_LEN_SH224
+#elif MD_MAP == SH256
+#define MD_LEN					MD_LEN_SH256
+#elif MD_MAP == SH384
+#define MD_LEN					MD_LEN_SH384
+#elif MD_MAP == SH512
+#define MD_LEN					MD_LEN_SH512
 #endif
 
 /*============================================================================*/
@@ -83,16 +83,16 @@ enum {
  * @param[in] M					- the message to hash.
  * @param[in] L					- the message length in bytes.
  */
-#if HF_MAP == SHONE
-#define hf_map(H, M, L)			hf_map_shone(H, M, L)
-#elif HF_MAP == SH224
-#define hf_map(H, M, L)			hf_map_sh224(H, M, L)
-#elif HF_MAP == SH256
-#define hf_map(H, M, L)			hf_map_sh256(H, M, L)
-#elif HF_MAP == SH384
-#define hf_map(H, M, L)			hf_map_sh384(H, M, L)
-#elif HF_MAP == SH512
-#define hf_map(H, M, L)			hf_map_sh512(H, M, L)
+#if MD_MAP == SHONE
+#define md_map(H, M, L)			md_map_shone(H, M, L)
+#elif MD_MAP == SH224
+#define md_map(H, M, L)			md_map_sh224(H, M, L)
+#elif MD_MAP == SH256
+#define md_map(H, M, L)			md_map_sh256(H, M, L)
+#elif MD_MAP == SH384
+#define md_map(H, M, L)			md_map_sh384(H, M, L)
+#elif MD_MAP == SH512
+#define md_map(H, M, L)			md_map_sh512(H, M, L)
 #endif
 
 /*============================================================================*/
@@ -106,12 +106,12 @@ enum {
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void hf_map_shone(unsigned char *hash, unsigned char *msg, int len);
+void md_map_shone(unsigned char *hash, unsigned char *msg, int len);
 
 /**
  * Initializes the hash function context.
  */
-void hf_map_shone_init(void);
+void md_map_shone_init(void);
 
 /**
  * Updates the hash function context with more data.
@@ -119,21 +119,21 @@ void hf_map_shone_init(void);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void hf_map_shone_update(unsigned char *msg, int len);
+void md_map_shone_update(unsigned char *msg, int len);
 
 /**
  * Finalizes the hash function computation.
  *
  * @param[out] hash				- the digest.
  */
-void hf_map_shone_final(unsigned char *hash);
+void md_map_shone_final(unsigned char *hash);
 
 /**
  * Returns the internal state of the hash function.
  *
  * @param[out] state			- the internal state.
  */
-void hf_map_shone_state(unsigned char *state);
+void md_map_shone_state(unsigned char *state);
 
 /**
  * Computes the SHA-224 hash function.
@@ -142,7 +142,7 @@ void hf_map_shone_state(unsigned char *state);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void hf_map_sh224(unsigned char *hash, unsigned char *msg, int len);
+void md_map_sh224(unsigned char *hash, unsigned char *msg, int len);
 
 /**
  * Computes the SHA-256 hash function.
@@ -151,7 +151,7 @@ void hf_map_sh224(unsigned char *hash, unsigned char *msg, int len);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void hf_map_sh256(unsigned char *hash, unsigned char *msg, int len);
+void md_map_sh256(unsigned char *hash, unsigned char *msg, int len);
 
 /**
  * Computes the SHA-384 hash function.
@@ -160,7 +160,7 @@ void hf_map_sh256(unsigned char *hash, unsigned char *msg, int len);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void hf_map_sh384(unsigned char *hash, unsigned char *msg, int len);
+void md_map_sh384(unsigned char *hash, unsigned char *msg, int len);
 
 /**
  * Computes the SHA-512 hash function.
@@ -169,6 +169,6 @@ void hf_map_sh384(unsigned char *hash, unsigned char *msg, int len);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void hf_map_sh512(unsigned char *hash, unsigned char *msg, int len);
+void md_map_sh512(unsigned char *hash, unsigned char *msg, int len);
 
-#endif /* !RELIC_HF_H */
+#endif /* !RELIC_MD_H */

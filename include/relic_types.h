@@ -145,7 +145,7 @@ typedef __uint128_t dbl_t;
 
 #endif
 #else
-#define ALIGNED(...)	/* empty */
+#define ALIGNED(A)	/* empty */
 #endif
 
 #endif /* !RELIC_TYPES_H */

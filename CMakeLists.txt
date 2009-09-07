@@ -118,7 +118,7 @@ include(cmake/fp.cmake)
 include(cmake/fb.cmake)
 include(cmake/eb.cmake)
 include(cmake/pb.cmake)
-include(cmake/hf.cmake)
+include(cmake/md.cmake)
 include(cmake/cp.cmake) 
 
 # Number of tests and benchmarks
@@ -168,7 +168,7 @@ if (TEMP GREATER -1)
 	set(WITH_FB 1)
 	set(WITH_EB 1)
 	set(WITH_PB 1)
-	set(WITH_HF 1)
+	set(WITH_MD 1)
 	set(WITH_CP 1)
 endif(TEMP GREATER -1)
 
@@ -221,9 +221,9 @@ if (TEMP GREATER -1)
 endif(TEMP GREATER -1)
 
 # See if support for hash functions is required.
-LIST(FIND WITH "HF" TEMP)
+LIST(FIND WITH "MD" TEMP)
 if (TEMP GREATER -1)
-	set(WITH_HF 1)
+	set(WITH_MD 1)
 endif(TEMP GREATER -1)
 
 # See if support for crptographic protocols is required.
@@ -298,6 +298,7 @@ if (DEBUG)
 	# If the user did not specify compile flags, we turn off all optimizations.
 	set(CFLAGS "-O0 -fno-omit-frame-pointer")
 	set(DFLAGS "-ggdb")
+	set(DOC_OPTIONS "${DOC_OPTIONS} DEBUG=1")
 else(DEBUG)
 	# If the user did not specify compile flags, we use sane defaults.
 	set(CFLAGS "${COMP}")
@@ -307,10 +308,12 @@ endif(DEBUG)
 if (MULTI)
 	set(CFLAGS "${CFLAGS} -fopenmp")
 	set(LFLAGS "${LFLAGS} -lgomp -lm")
+	set(DOC_OPTIONS "${DOC_OPTIONS} MULTI=1")
 endif(MULTI)
 
 if (PROFL)
 	set(PFLAGS "-pg -fno-omit-frame-pointer")
+	set(DOC_OPTIONS "${DOC_OPTIONS} PROFL=1")
 else(PROFL)
 	set(PFLAGS "")
 endif(PROFL)
@@ -337,6 +340,22 @@ if (QUIET)
 	set(DOC_OPTIONS "${DOC_OPTIONS} QUIET=1")
 endif(QUIET)
 
+if (BIGED)
+	set(DOC_OPTIONS "${DOC_OPTIONS} BIGED=1")
+endif(BIGED)
+
+if (SHLIB)
+	set(DOC_OPTIONS "${DOC_OPTIONS} STBIN=1")
+endif(SHLIB)	
+
+if (STLIB)
+	set(DOC_OPTIONS "${DOC_OPTIONS} STBIN=1")
+endif(STLIB)
+
+if (STBIN)
+	set(DOC_OPTIONS "${DOC_OPTIONS} STBIN=1")
+endif(STBIN)
+	
 if (ARITH STREQUAL "gmp")
 	include(cmake/gmp.cmake)
 endif(ARITH STREQUAL "gmp")

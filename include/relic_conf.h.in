@@ -378,7 +378,7 @@
 #define PB_MAP	 @PB_MAP@
 
 /** Bilinear pairing method. */
-#define HF_METHD "@HF_METHD@"
+#define MD_METHD "@MD_METHD@"
 
 /** SHA-1 hash function. */
 #define SHONE    1
@@ -391,7 +391,7 @@
 /** SHA-512 hash function. */
 #define SH512    5
 /** Chosen hash function. */
-#define HF_MAP   @HF_MAP@
+#define MD_MAP   @MD_MAP@
 
 /** RSA without padding. */
 #define EMPTY    1
