@@ -156,18 +156,12 @@ static void fp_mul_karat_impl(dv_t c, fp_t a, fp_t b, int size, int level) {
 /*============================================================================*/
 
 void fp_mul_dig(fp_t c, fp_t a, dig_t b) {
-	dv_t t = NULL, t0 = NULL;
+	dv_t t = NULL;
 
 	TRY {
 		dv_new(t);
-		dv_new(t0);
-
-		fp_prime_conv_dig(t0, b);
-
-		fp_muln_low(t, a, t0);
-
-		fp_rdc(c, t);
-
+		fp_prime_conv_dig(t, b);
+		fp_mul(c, a, t);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}

@@ -35,7 +35,7 @@
 static void memory(void) {
 	fp_t a[BENCH] = { NULL };
 
-	BENCH_SMALL("fb_new", fp_new(a[i]));
+	BENCH_SMALL("fp_new", fp_new(a[i]));
 	for (int i = 0; i < BENCH; i++) {
 		fp_free(a[i]);
 	}
