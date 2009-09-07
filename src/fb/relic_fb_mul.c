@@ -241,8 +241,7 @@ static void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
 	FINALLY {
 		dv_free(a1);
 		dv_free(b1);
-		dv_free(a0b0);
-		dv_free(a1b1);
+		dv_free(ab);
 	}
 }
 

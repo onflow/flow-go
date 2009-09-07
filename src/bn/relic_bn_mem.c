@@ -54,12 +54,17 @@ void bn_init(bn_t a, int digits) {
 	}
 
 	if (a != NULL && a->dp == NULL) {
-		r = posix_memalign((void **)&(a->dp), ALIGN, digits * sizeof(dig_t));
-		if (r == ENOMEM) {
-			THROW(ERR_NO_MEMORY);
-		}
-		if (r == EINVAL) {
-			THROW(ERR_INVALID);
+		if (ALIGN == 1) {
+			a->dp = malloc(digits * sizeof(dig_t));
+		} else {
+			r = posix_memalign((void **)&(a->dp), ALIGN,
+					digits * sizeof(dig_t));
+			if (r == ENOMEM) {
+				THROW(ERR_NO_MEMORY);
+			}
+			if (r == EINVAL) {
+				THROW(ERR_INVALID);
+			}
 		}
 
 		if (a->dp == NULL) {

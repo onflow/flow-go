@@ -125,6 +125,10 @@ void fb_muln_low(dig_t *c, dig_t *a, dig_t *b) {
 		fb_addn_low(c, c, table[u]);
 		*(c + FB_DIGS) ^= table[u][FB_DIGS];
 	}
+
+	for (i = 0; i < 16; i++) {
+		dv_free(table[i]);
+	}
 }
 
 void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size) {

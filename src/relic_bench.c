@@ -149,7 +149,7 @@ void bench_overhead(void) {
 		/* Divide to obtain the overhead of one operation pair. */
 		overhead /= BENCH;
 		/* We assume that our overhead estimate is too high (due to cache
-		 * effects, per example). The ratio 2/3 was found experimentally. */
+		 * effects, per example). The ratio 1/2 was found experimentally. */
 		overhead = overhead / 2;
 	} while (overhead < 0);
 

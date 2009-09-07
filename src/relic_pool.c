@@ -98,7 +98,6 @@ dig_t *pool_get(void) {
 	} else {
 		next = i;
 	}
-
 	pool[r].elem[DV_DIGS] = r;
 	return (pool[r].elem);
 }

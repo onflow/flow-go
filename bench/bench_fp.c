@@ -32,31 +32,20 @@
 #include "relic.h"
 #include "relic_bench.h"
 
-static void fp_new_impl(fp_t *a) {
-	fp_new(*a);
-}
-
 static void memory(void) {
-	fp_t a[BENCH + 1] = { NULL };
-	fp_t *tmpa;
+	fp_t a[BENCH] = { NULL };
 
-	BENCH_BEGIN("fp_new") {
-		tmpa = a;
-		BENCH_ADD(fp_new_impl(tmpa++));
-		for (int j = 0; j <= BENCH; j++) {
-			fp_free(a[j]);
-		}
+	BENCH_SMALL("fb_new", fp_new(a[i]));
+	for (int i = 0; i < BENCH; i++) {
+		fp_free(a[i]);
 	}
-	BENCH_END;
 
-	BENCH_BEGIN("fp_free") {
-		for (int j = 0; j <= BENCH; j++) {
-			fp_new(a[j]);
-		}
-		tmpa = a;
-		BENCH_ADD(fp_free(*(tmpa++)));
+	for (int i = 0; i < BENCH; i++) {
+		fp_new(a[i]);
 	}
-	BENCH_END;
+	BENCH_SMALL("fp_free", fp_free(a[i]));
+
+	(void)a;
 }
 
 static void util(void) {
@@ -342,20 +331,18 @@ static void arith(void) {
 int main(void) {
 	core_init();
 	conf_print();
-	bn_t modulus;
+	util_print_banner("Benchmarks for the FP module:", 0);
+
+	bn_t modulus = NULL;
 
 	bn_new(modulus);
 	bn_gen_prime(modulus, FP_BITS);
 	fp_prime_set(modulus);
 
-	util_print("Prime field order: ");
-	fp_print(fp_prime_get());
-
-	util_print("\n--- Memory-management:\n\n");
+	util_print_banner("Utilities:\n", 0);
 	memory();
-	util_print("\n--- Utilities:\n\n");
 	util();
-	util_print("\n--- Arithmetic:\n\n");
+	util_print_banner("Arithmetic:\n", 0);
 	arith();
 
 	core_clean();

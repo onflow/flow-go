@@ -32,11 +32,6 @@
 #include "relic.h"
 #include "relic_test.h"
 
-static void eb_new_impl(eb_t a) {
-	eb_new(a);
-	(void)a;
-}
-
 static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
@@ -44,9 +39,7 @@ static int memory(void) {
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
-			/* We need another function call for the stack case, so that
-			 * the frame for this function does not provoke an overflow. */
-			eb_new_impl(a);
+			eb_new(a);
 			eb_free(a);
 		} TEST_END;
 	} CATCH(e) {
@@ -57,6 +50,7 @@ static int memory(void) {
 				break;
 		}
 	}
+	(void)a;
 	code = STS_OK;
   end:
 	return code;

@@ -34,31 +34,20 @@
 #include "relic.h"
 #include "relic_bench.h"
 
-static void eb_new_impl(eb_t *a) {
-	eb_new(*a);
-}
-
 static void memory(void) {
-	eb_t a[BENCH + 1] = { NULL };
-	eb_t *tmpa;
+	eb_t a[BENCH] = { NULL };
 
-	BENCH_BEGIN("eb_new") {
-		tmpa = a;
-		BENCH_ADD(eb_new_impl(tmpa++));
-		for (int j = 0; j <= BENCH; j++) {
-			eb_free(a[j]);
-		}
+	BENCH_SMALL("eb_new", eb_new(a[i]));
+	for (int i = 0; i < BENCH; i++) {
+		eb_free(a[i]);
 	}
-	BENCH_END;
 
-	BENCH_BEGIN("eb_free") {
-		for (int j = 0; j <= BENCH; j++) {
-			eb_new(a[j]);
-		}
-		tmpa = a;
-		BENCH_ADD(eb_free(*(tmpa++)));
+	for (int i = 0; i < BENCH; i++) {
+		eb_new(a[i]);
 	}
-	BENCH_END;
+	BENCH_SMALL("eb_free", eb_free(a[i]));
+
+	(void)a;
 }
 
 static void util(void) {

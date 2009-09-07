@@ -49,10 +49,10 @@ void fb_lshd_low(dig_t *c, dig_t *a, int digits) {
 	dig_t *top, *bot;
 	int i;
 
-	top = c + FB_DIGS + digits - 1;
-	bot = a + FB_DIGS - 1;
+	top = c + FB_DIGS - 1;
+	bot = a + FB_DIGS - 1 - digits;
 
-	for (i = 0; i < FB_DIGS; i++, top--, bot--) {
+	for (i = 0; i < FB_DIGS - digits; i++, top--, bot--) {
 		*top = *bot;
 	}
 	for (i = 0; i < digits; i++, c++) {

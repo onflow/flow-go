@@ -294,7 +294,7 @@ void bn_rec_win(unsigned char *win, int *len, bn_t k, int w) {
 
 void bn_rec_naf(signed char *naf, int *len, bn_t k, int w) {
 	int i, l;
-	bn_t t;
+	bn_t t = NULL;
 	dig_t t0, mask;
 	signed char u_i;
 

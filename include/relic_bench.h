@@ -57,6 +57,21 @@
 	bench_compute(1);														\
 
 /**
+ * Runs a new benchmark a small number of times.
+ *
+ * @param[in] LABEL			- the label for this benchmark.
+ * @param[in] FUNCTION		- the function to benchmark.
+ */
+#define BENCH_SMALL(LABEL, FUNCTION)										\
+	bench_reset(LABEL);														\
+	bench_before();															\
+	for (int i = 0; i < BENCH; i++)	{										\
+		FUNCTION;															\
+	}																		\
+	bench_after();															\
+	bench_compute(BENCH);													\
+
+/**
  * Runs a new benchmark.
  *
  * @param[in] LABEL			- the label for this benchmark.

@@ -32,34 +32,22 @@
 #include <stdio.h>
 
 #include "relic.h"
-#include "relic_fb_low.h"
 #include "relic_bench.h"
 
-static void fb_new_impl(fb_t *a) {
-	fb_new(*a);
-}
-
 static void memory(void) {
-	fb_t a[BENCH + 1] = { NULL };
-	fb_t *tmpa;
+	fb_t a[BENCH] = { NULL };
 
-	BENCH_BEGIN("fb_new") {
-		tmpa = a;
-		BENCH_ADD(fb_new_impl(tmpa++));
-		for (int j = 0; j <= BENCH; j++) {
-			fb_free(a[j]);
-		}
+	BENCH_SMALL("fb_new", fb_new(a[i]));
+	for (int i = 0; i < BENCH; i++) {
+		fb_free(a[i]);
 	}
-	BENCH_END;
 
-	BENCH_BEGIN("fb_free") {
-		for (int j = 0; j <= BENCH; j++) {
-			fb_new(a[j]);
-		}
-		tmpa = a;
-		BENCH_ADD(fb_free(*(tmpa++)));
+	for (int i = 0; i < BENCH; i++) {
+		fb_new(a[i]);
 	}
-	BENCH_END;
+	BENCH_SMALL("fb_free", fb_free(a[i]));
+
+	(void)a;
 }
 
 static void util(void) {

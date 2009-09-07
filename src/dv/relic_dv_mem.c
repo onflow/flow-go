@@ -51,12 +51,22 @@ void dv_new_dynam(dv_t *a, int digits) {
 		THROW(ERR_NO_PRECISION);
 	}
 
-	r = posix_memalign((void **)a, ALIGN, digits * sizeof(dig_t));
-	if (r == ENOMEM || r == EINVAL) {
-		THROW(ERR_NO_MEMORY);
+	if (ALIGN == 1) {
+		*a = malloc(digits * sizeof(dig_t));
+	} else {
+		r = posix_memalign((void **)&a, ALIGN,
+				digits * sizeof(dig_t));
+		if (r == ENOMEM) {
+			THROW(ERR_NO_MEMORY);
+		}
+		if (r == EINVAL) {
+			THROW(ERR_INVALID);
+		}
 	}
-	if (r == EINVAL) {
-		THROW(ERR_INVALID);
+
+	if (*a == NULL) {
+		free(*a);
+		THROW(ERR_NO_MEMORY);
 	}
 }
 
@@ -70,8 +80,6 @@ void dv_free_dynam(dv_t *a) {
 #elif ALLOC == STATIC
 
 void dv_new_statc(dv_t *a, int digits) {
-	dig_t *t;
-
 	if (digits > DV_DIGS) {
 		THROW(ERR_NO_PRECISION);
 	}
@@ -80,7 +88,6 @@ void dv_new_statc(dv_t *a, int digits) {
 	if ((*a) == NULL) {
 		THROW(ERR_NO_MEMORY);
 	}
-	t = (*a);
 }
 
 void dv_free_statc(dv_t *a) {

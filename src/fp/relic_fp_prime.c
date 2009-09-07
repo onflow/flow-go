@@ -161,7 +161,7 @@ void fp_prime_set(bn_t p) {
 }
 
 void fp_prime_conv(fp_t c, bn_t a) {
-	bn_t t;
+	bn_t t = NULL;
 	int i;
 
 	TRY {
@@ -194,7 +194,7 @@ void fp_prime_conv(fp_t c, bn_t a) {
 }
 
 void fp_prime_conv_dig(fp_t c, dig_t a) {
-	bn_t t;
+	bn_t t = NULL;
 	int i;
 
 	TRY {
@@ -232,7 +232,7 @@ void fp_prime_conv_dig(fp_t c, dig_t a) {
 }
 
 void fp_prime_back(bn_t c, fp_t a) {
-	bn_t t;
+	bn_t t = NULL;
 	int i;
 
 	TRY {

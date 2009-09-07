@@ -33,10 +33,6 @@
 #include "relic.h"
 #include "relic_test.h"
 
-static void bn_new_impl(bn_t *a) {
-	bn_new(*a);
-}
-
 static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
@@ -44,10 +40,12 @@ static int memory(void) {
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
-			bn_new_impl(&a);
+			bn_new(a);
 			bn_free(a);
-		} TEST_END;
-	} CATCH(e) {
+		}
+		TEST_END;
+	}
+	CATCH(e) {
 		switch (e) {
 			case ERR_NO_MEMORY:
 				util_print("FATAL ERROR!\n");
@@ -1171,8 +1169,7 @@ static int digit(void) {
 
 static int prime(void) {
 	int code = STS_ERR;
-
-	bn_t p;
+	bn_t p = NULL;
 
 	TRY {
 		bn_new(p);

@@ -32,10 +32,6 @@
 #include "relic.h"
 #include "relic_test.h"
 
-static void dv_new_impl(dv_t *a) {
-	dv_new(*a);
-}
-
 static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
@@ -43,7 +39,7 @@ static int memory(void) {
 
 	TRY {
 		TEST_BEGIN("temporary memory can be allocated") {
-			dv_new_impl(&a);
+			dv_new(a);
 			dv_free(a);
 		} TEST_END;
 	} CATCH(e) {

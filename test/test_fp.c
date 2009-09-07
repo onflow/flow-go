@@ -32,10 +32,6 @@
 #include "relic.h"
 #include "relic_test.h"
 
-static void fp_new_impl(fp_t *a) {
-	fp_new(*a);
-}
-
 static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
@@ -43,7 +39,7 @@ static int memory(void) {
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
-			fp_new_impl(&a);
+			fp_new(a);
 			fp_free(a);
 		} TEST_END;
 	} CATCH(e) {
@@ -54,6 +50,7 @@ static int memory(void) {
 				break;
 		}
 	}
+	(void)a;
 	code = STS_OK;
   end:
 	return code;

@@ -32,112 +32,62 @@
 #include "relic.h"
 #include "relic_bench.h"
 
-static void bn_new_impl(bn_t *a) {
-	bn_new(*a);
-}
+static void memory(void) {
+	bn_t a[BENCH] = { NULL };
 
-static void bn_new_size_impl(bn_t *a) {
-	bn_new_size(*a, 2 * BN_DIGS);
-}
-
-static void memory1(void) {
-	bn_t a[BENCH + 1] = { NULL };
-	bn_t *tmpa;
-
-	BENCH_BEGIN("bn_new") {
-		tmpa = a;
-		BENCH_ADD(bn_new_impl(tmpa++));
-		for (int j = 0; j <= BENCH; j++) {
-			bn_free(a[j]);
-		}
+	BENCH_SMALL("bn_new", bn_new(a[i]));
+	for (int i = 0; i < BENCH; i++) {
+		bn_free(a[i]);
 	}
-	BENCH_END;
 
-	BENCH_BEGIN("bn_new_size") {
-		tmpa = a;
-		BENCH_ADD(bn_new_size_impl(tmpa++));
-		for (int j = 0; j <= BENCH; j++) {
-			bn_free(a[j]);
-		}
+	BENCH_SMALL("bn_new_size", bn_new_size(a[i], 2 * BN_DIGS));
+	for (int i = 0; i < BENCH; i++) {
+		bn_free(a[i]);
 	}
-	BENCH_END;
 
-	BENCH_BEGIN("bn_init") {
-		for (int j = 0; j <= BENCH; j++) {
-			bn_new((a[j]));
-			bn_clean(a[j]);
-		}
-		tmpa = a;
-		BENCH_ADD(bn_init(*(tmpa++), BN_DIGS));
-		for (int j = 0; j <= BENCH; j++) {
-			bn_free(a[j]);
-		}
+	for (int i = 0; i < BENCH; i++) {
+		bn_new(a[i]);
+		bn_clean(a[i]);
 	}
-	BENCH_END;
-
-	BENCH_BEGIN("bn_clean") {
-		for (int j = 0; j <= BENCH; j++) {
-			bn_new(a[j]);
-		}
-		tmpa = a;
-		BENCH_ADD(bn_clean(*(tmpa++)));
-		for (int j = 0; j <= BENCH; j++) {
-			bn_free(a[j]);
-		}
+	BENCH_SMALL("bn_init", bn_init(a[i], BN_DIGS));
+	for (int i = 0; i < BENCH; i++) {
+		bn_free(a[i]);
 	}
-	BENCH_END;
-}
 
-static void memory2(void) {
-	bn_t a[BENCH + 1] = { NULL };
-	bn_t *tmpa;
-
-	BENCH_BEGIN("bn_grow") {
-		for (int j = 0; j <= BENCH; j++) {
-			bn_new(a[j]);
-		}
-		tmpa = a;
-		BENCH_ADD(bn_grow(*(tmpa++), 2 * BN_DIGS));
-		for (int j = 0; j <= BENCH; j++) {
-			bn_free(a[j]);
-		}
+	for (int i = 0; i < BENCH; i++) {
+		bn_new(a[i]);
 	}
-	BENCH_END;
-
-	BENCH_BEGIN("bn_trim") {
-		for (int j = 0; j <= BENCH; j++) {
-			bn_new(a[j]);
-		}
-		tmpa = a;
-		BENCH_ADD(bn_trim(*(tmpa++)));
-		for (int j = 0; j <= BENCH; j++) {
-			bn_free(a[j]);
-		}
+	BENCH_SMALL("bn_clean", bn_clean(a[i]));
+	for (int i = 0; i < BENCH; i++) {
+		bn_free(a[i]);
 	}
-	BENCH_END;
-}
 
-static void memory3(void) {
-	bn_t a[BENCH + 1] = { NULL };
-	bn_t *tmpa;
-
-	BENCH_BEGIN("bn_free") {
-		for (int j = 0; j <= BENCH; j++) {
-			bn_new(a[j]);
-		}
-		tmpa = a;
-		BENCH_ADD(bn_free(*(tmpa++)));
+	for (int i = 0; i < BENCH; i++) {
+		bn_new(a[i]);
 	}
-	BENCH_END;
-
-	BENCH_BEGIN("bn_free (size)") {
-		for (int j = 0; j <= BENCH; j++) {
-			bn_new_size(a[j], 2 * BN_DIGS);
-		}
-		tmpa = a;
-		BENCH_ADD(bn_free(*(tmpa++)));
+	BENCH_SMALL("bn_grow", bn_grow(a[i], 2 * BN_DIGS));
+	for (int i = 0; i < BENCH; i++) {
+		bn_free(a[i]);
 	}
-	BENCH_END;
+
+	for (int i = 0; i < BENCH; i++) {
+		bn_new(a[i]);
+		bn_grow(a[i], 2 * BN_DIGS);
+	}
+	BENCH_SMALL("bn_trim", bn_trim(a[i]));
+	for (int i = 0; i < BENCH; i++) {
+		bn_free(a[i]);
+	}
+
+	for (int i = 0; i < BENCH; i++) {
+		bn_new(a[i]);
+	}
+	BENCH_SMALL("bn_free", bn_free(a[i]));
+
+	for (int i = 0; i < BENCH; i++) {
+		bn_new_size(a[i], 2 * BN_DIGS);
+	}
+	BENCH_SMALL("bn_free (size)", bn_free(a[i]));
 }
 
 static void util(void) {
@@ -875,9 +825,7 @@ int main(void) {
 	conf_print();
 	util_print_banner("Benchmarks for the BN module:", 0);
 	util_print_banner("Utilities:", 1);
-	memory1();
-	memory2();
-	memory3();
+	memory();
 	util();
 	util_print_banner("Arithmetic:", 1);
 	arith();

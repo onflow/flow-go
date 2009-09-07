@@ -102,7 +102,7 @@
 /** Build pairings over binary curves module. */
 #cmakedefine WITH_PB
 /** Build hash functions. */
-#cmakedefine WITH_HF
+#cmakedefine WITH_MD
 /** Build cryptographic protocols. */
 #cmakedefine WITH_CP
 /** Build etat module. */
