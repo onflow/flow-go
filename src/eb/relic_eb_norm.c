@@ -49,7 +49,7 @@
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-void eb_norm_ordin(eb_t r, eb_t p) {
+static void eb_norm_ordin(eb_t r, eb_t p) {
 	if (!p->norm) {
 		fb_t t0 = NULL;
 
@@ -82,7 +82,7 @@ void eb_norm_ordin(eb_t r, eb_t p) {
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-void eb_norm_super(eb_t r, eb_t p) {
+static void eb_norm_super(eb_t r, eb_t p) {
 	if (!p->norm) {
 		fb_t t0 = NULL;
 		TRY {

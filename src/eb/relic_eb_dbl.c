@@ -207,7 +207,7 @@ static void eb_dbl_basic_super(eb_t r, eb_t p) {
  * @param r					- the result.
  * @param p					- the point to double.
  */
-void eb_dbl_projc_ordin(eb_t r, eb_t p) {
+static void eb_dbl_projc_ordin(eb_t r, eb_t p) {
 	fb_t t0 = NULL, t1 = NULL;
 
 	TRY {
@@ -285,7 +285,7 @@ void eb_dbl_projc_ordin(eb_t r, eb_t p) {
  * @param r					- the result.
  * @param p					- the point to double.
  */
-void eb_dbl_projc_super(eb_t r, eb_t p) {
+static void eb_dbl_projc_super(eb_t r, eb_t p) {
 	/* x3 = x1^4 */
 	fb_sqr(r->x, p->x);
 	fb_sqr(r->x, r->x);

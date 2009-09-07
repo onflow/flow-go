@@ -42,8 +42,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if FB_KARAT > 0 || !defined(STRIP)
-
+#if FB_KARAT > 0 && FB_MUL == BASIC
 /**
  * Multiplies two binary field elements using shift-and-add multiplication.
  *
@@ -52,7 +51,7 @@
  * @param b					- the second binary field element.
  * @param size				- the number of digits to multiply.
  */
-void fb_mul_basic_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
+static void fb_mul_basic_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 	int i;
 	dv_t s = NULL;
 
@@ -82,7 +81,9 @@ void fb_mul_basic_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 		dv_free(s);
 	}
 }
+#endif /* FB_KARAT > 0 && FB_MUL == BASIC */
 
+#if FB_KARAT > 0 && FB_MUL == LCOMB
 /**
  * Multiplies two binary field elements using left-to-right comb multiplication.
  *
@@ -91,9 +92,7 @@ void fb_mul_basic_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
  * @param b					- the second binary field element.
  * @param size				- the number of digits to multiply.
  */
-void fb_mul_lcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
-	dig_t carry;
-
+static void fb_mul_lcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 	dv_zero(c, 2 * size);
 
 	for (int i = FB_DIGIT - 1; i >= 0; i--) {
@@ -103,11 +102,13 @@ void fb_mul_lcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 			}
 		}
 		if (i != 0) {
-			carry = bn_lsh1_low(c, c, 2 * size);
+			bn_lsh1_low(c, c, 2 * size);
 		}
 	}
 }
+#endif /* FB_KARAT > 0 && FB_MUL == LCOMB */
 
+#if FB_KARAT > 0 && FB_MUL == RCOMB
 /**
  * Multiplies two binary field elements using right-to-left comb multiplication.
  *
@@ -116,7 +117,7 @@ void fb_mul_lcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
  * @param b					- the second binary field element.
  * @param size				- the number of digits to multiply.
  */
-void fb_mul_rcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
+static void fb_mul_rcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 	dv_t _b = NULL;
 
 	TRY {
@@ -145,7 +146,9 @@ void fb_mul_rcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 		dv_free(_b);
 	}
 }
+#endif /* FB_KARAT > 0 && FB_MUL == RCOMB */
 
+#if FB_KARAT > 0 || !defined(STRIP)
 /**
  * Multiplies two binary field elements using recursive Karatsuba
  * multiplication.
@@ -156,7 +159,7 @@ void fb_mul_rcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
  * @param[in] size			- the number of digits to multiply.
  * @param[in] level			- the number of Karatsuba steps to apply.
  */
-void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
+static void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
 	int i, h, h1;
 	dv_t a1 = NULL, b1 = NULL, ab = NULL;
 	dig_t *a0b0, *a1b1;
@@ -243,7 +246,7 @@ void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
 	}
 }
 
-#endif
+#endif /* FB_KARAT > 0 || !defined(STRIP) */
 
 /*============================================================================*/
 /* Public definitions                                                         */

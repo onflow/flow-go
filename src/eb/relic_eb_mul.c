@@ -177,9 +177,10 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
  * @param[in] k					- the integer.
  */
 static void eb_mul_tnaf_tab(eb_t r, eb_t p, bn_t k) {
-	int len, i, n, u;
-	signed char tnaf[FB_BITS + 8], *t;
+	int len, i, n;
+	signed char tnaf[FB_BITS + 8], *t, u;
 	eb_t table[1 << (EB_WIDTH - 2)] = { NULL };
+	bn_t vm = NULL, s0 = NULL, s1 = NULL;
 
 	if (eb_curve_opt_a() == OPT_ZERO) {
 		u = -1;
@@ -194,9 +195,11 @@ static void eb_mul_tnaf_tab(eb_t r, eb_t p, bn_t k) {
 	/* Compute the precomputation table. */
 	table_init_koblitz(table, p);
 
+	vm = eb_curve_get_vm();
+	s0 = eb_curve_get_s0();
+	s1 = eb_curve_get_s1();
 	/* Compute the w-TNAF representation of k. */
-	bn_rec_tnaf(tnaf, &len, k, eb_curve_get_vm(), eb_curve_get_s0(),
-			eb_curve_get_s1(), u, FB_BITS, EB_WIDTH);
+	bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_WIDTH);
 
 	t = tnaf + len - 1;
 	eb_set_infty(r);

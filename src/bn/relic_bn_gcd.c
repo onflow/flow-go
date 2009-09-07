@@ -174,7 +174,6 @@ void bn_gcd_lehme(bn_t c, bn_t a, bn_t b) {
 	bn_t t2 = NULL, t3 = NULL;
 	dig_t _x, _y, q, _q, t, _t;
 	sig_t _a, _b, _c, _d;
-	int swap;
 
 	if (bn_is_zero(a)) {
 		bn_abs(c, b);
@@ -202,11 +201,9 @@ void bn_gcd_lehme(bn_t c, bn_t a, bn_t b) {
 		if (bn_cmp(a, b) != CMP_LT) {
 			bn_abs(x, a);
 			bn_abs(y, b);
-			swap = 0;
 		} else {
 			bn_abs(x, b);
 			bn_abs(y, a);
-			swap = 1;
 		}
 		while (y->used > 1) {
 			bn_rsh(u, x, bn_bits(x) - BN_DIGIT);
@@ -656,7 +653,7 @@ void bn_gcd_stein(bn_t c, bn_t a, bn_t b) {
 
 void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 	bn_t x = NULL, y = NULL, u = NULL, v = NULL, *tmpe = NULL;
-	bn_t _a = NULL, _b = NULL, _c = NULL, _d = NULL, _e = NULL;
+	bn_t _a = NULL, _b = NULL, _e = NULL;
 	int shift, found;
 
 	if (d == NULL && e == NULL) {
@@ -782,8 +779,6 @@ void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 		bn_free(v);
 		bn_free(_a);
 		bn_free(_b);
-		bn_free(_c);
-		bn_free(_d);
 		bn_free(_e);
 	}
 }

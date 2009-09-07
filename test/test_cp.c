@@ -36,7 +36,7 @@
 #include "relic.h"
 #include "relic_test.h"
 
-int rsa(void) {
+static int rsa(void) {
 	err_t e;
 	int code = STS_ERR;
 	rsa_pub_t pub;
@@ -163,7 +163,7 @@ int rsa(void) {
 
 #if defined(WITH_EB)
 
-int ecdsa(void) {
+static int ecdsa(void) {
 	err_t e;
 	int code = STS_ERR;
 	bn_t d = NULL, r = NULL;
@@ -210,7 +210,7 @@ int ecdsa(void) {
 
 #if defined(WITH_PB)
 
-int sokaka(void) {
+static int sokaka(void) {
 	err_t e;
 	int code = STS_ERR;
 	bn_t s;
@@ -302,6 +302,13 @@ int main(void) {
 
 	if (r0 == STS_ERR && r1 == STS_ERR) {
 		THROW(ERR_NO_CURVE);
+	}
+#endif
+
+#if defined(WITH_PB)
+	if (sokaka() != STS_OK) {
+		core_clean();
+		return 1;
 	}
 #endif
 	core_clean();

@@ -57,12 +57,10 @@ void bn_dbl(bn_t c, bn_t a) {
 }
 
 void bn_hlv(bn_t c, bn_t a) {
-	dig_t carry;
-
 	bn_grow(c, a->used);
 
 	c->used = a->used;
-	carry = bn_rsh1_low(c->dp, a->dp, c->used);
+	bn_rsh1_low(c->dp, a->dp, c->used);
 
 	c->sign = a->sign;
 	bn_trim(c);
@@ -109,7 +107,6 @@ void bn_lsh(bn_t c, bn_t a, int bits) {
 
 void bn_rsh(bn_t c, bn_t a, int bits) {
 	int digits = 0;
-	dig_t carry;
 
 	if (bits <= 0) {
 		bn_copy(c, a);
@@ -126,9 +123,9 @@ void bn_rsh(bn_t c, bn_t a, int bits) {
 
 	if (bits > 0) {
 		if (digits == 0 && c != a) {
-			carry = bn_rshb_low(c->dp, a->dp + digits, a->used - digits, bits);
+			bn_rshb_low(c->dp, a->dp + digits, a->used - digits, bits);
 		} else {
-			carry = bn_rshb_low(c->dp, c->dp, c->used, bits);
+			bn_rshb_low(c->dp, c->dp, c->used, bits);
 		}
 	}
 	bn_trim(c);

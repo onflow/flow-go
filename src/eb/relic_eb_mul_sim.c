@@ -183,12 +183,14 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
  * @param[in] w					- the window size.
  */
 static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
-	int l0, l1, len, i, n0, n1, u, w;
+	int l0, l1, len, i, n0, n1, w;
+	signed char u;
 	signed char tnaf0[FB_BITS + 8], *t0;
 	signed char tnaf1[FB_BITS + 8], *t1;
 	eb_t table0[1 << (EB_WIDTH - 2)] = { NULL };
 	eb_t table1[1 << (EB_WIDTH - 2)] = { NULL };
 	eb_t *t = NULL;
+	bn_t vm = NULL, s0 = NULL, s1 = NULL;
 
 	/* Compute the w-TNAF representation of k. */
 	if (eb_curve_opt_a() == OPT_ZERO) {
@@ -225,11 +227,12 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 	} else {
 		w = EB_WIDTH;
 	}
-	bn_rec_tnaf(tnaf0, &l0, k, eb_curve_get_vm(), eb_curve_get_s0(),
-			eb_curve_get_s1(), u, FB_BITS, w);
+	vm = eb_curve_get_vm();
+	s0 = eb_curve_get_s0();
+	s1 = eb_curve_get_s1();
+	bn_rec_tnaf(tnaf0, &l0, k, vm, s0, s1, u, FB_BITS, w);
 
-	bn_rec_tnaf(tnaf1, &l1, l, eb_curve_get_vm(), eb_curve_get_s0(),
-			eb_curve_get_s1(), u, FB_BITS, EB_WIDTH);
+	bn_rec_tnaf(tnaf1, &l1, l, vm, s0, s1, u, FB_BITS, EB_WIDTH);
 
 	len = MAX(l0, l1);
 	t0 = tnaf0 + len - 1;
@@ -274,7 +277,7 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
  * @param[out] t				- the destination table.
  * @param[in] p					- the point to multiply.
  */
-void table_init_ordin(eb_t *t, eb_t p) {
+static void table_init_ordin(eb_t *t, eb_t p) {
 	int i;
 
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
@@ -492,9 +495,10 @@ void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 	eb_t t[5] = { NULL };
 	int u_i, len, offset;
 	signed char jsf[2 * (FB_BITS + 1)];
+	int i;
 
 	TRY {
-		for (int i = 0; i < 5; i++) {
+		for (i = 0; i < 5; i++) {
 			eb_new(t[i]);
 		}
 
@@ -508,8 +512,9 @@ void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 
 		eb_set_infty(r);
 
-		offset = MAX(bn_bits(k),bn_bits(l)) + 1;
-		for (int i = len - 1; i >= 0; i--) {
+		i = bn_bits(k);
+		offset = MAX(i, bn_bits(l)) + 1;
+		for (i = len - 1; i >= 0; i--) {
 			eb_dbl(r, r);
 			if (jsf[i] != 0 && jsf[i] == -jsf[i + offset]) {
 				u_i = jsf[i] * 2 + jsf[i + offset];
@@ -533,7 +538,7 @@ void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		for (int i = 0; i < 5; i++) {
+		for (i = 0; i < 5; i++) {
 			eb_free(t[i]);
 		}
 	}

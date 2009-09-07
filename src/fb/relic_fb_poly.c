@@ -70,8 +70,7 @@ static int trc_a, trc_b, trc_c;
  * @throw ERR_NO_MEMORY if there is no available memory.
  * @throw ERR_INVALID if the polynomial is invalid.
  */
-
-void find_trace() {
+static void find_trace() {
 	fb_t t0, t1 = NULL;
 	int counter;
 
@@ -137,9 +136,7 @@ dig_t *fb_poly_get(void) {
 
 void fb_poly_set(fb_t f) {
 	fb_copy(poly, f);
-
 	find_trace();
-	printf("%d %d %d\n", trc_a, trc_b, trc_c);
 }
 
 void fb_poly_add(fb_t c, fb_t a) {

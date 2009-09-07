@@ -665,7 +665,6 @@ void arith(void) {
 	BENCH_END;
 
 #if defined(WITH_EB) && defined(EB_STAND) && defined(EB_KBLTZ)
-
 	if (eb_param_set_any_kbltz() == STS_OK) {
 		BENCH_BEGIN("bn_rec_tnaf") {
 			signed char tnaf[FB_BITS + 8];

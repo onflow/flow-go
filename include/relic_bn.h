@@ -96,12 +96,12 @@
 /**
  * Positive sign of a multiple precision integer.
  */
-#define BN_POS			0
+#define BN_POS			(0)
 
 /**
  * Negative sign of a multiple precision integer.
  */
-#define BN_NEG			1
+#define BN_NEG			(1)
 
 /*============================================================================*/
 /* Type definitions                                                           */
@@ -120,7 +120,7 @@ typedef struct {
 	/** The number of digits actually used. */
 	int used;
 	/** The sign of this multiple precision integer. */
-	char sign;
+	int sign;
 #if ALLOC == DYNAMIC || ALLOC == STATIC
 	/** The sequence of contiguous digits that forms this integer. */
 	dig_t *dp;
@@ -1171,7 +1171,7 @@ void bn_rec_naf(signed char *naf, int *len, bn_t k, int w);
  * @param[in] w				- the window size in bits.
  */
 void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
-		int u, int m, int w);
+		signed char u, int m, int w);
 
 /**
  * Recodes a pair of integers in Joint Sparse Form.

@@ -181,8 +181,9 @@ static void eb_mul_pre_kbltz(eb_t *t, eb_t p) {
  * @param[in] w					- the window size.
  */
 static void eb_mul_fix_kbltz(eb_t r, eb_t *table, bn_t k) {
-	int len, i, n, u;
-	signed char tnaf[FB_BITS + 8], *t;
+	int len, i, n;
+	signed char u, tnaf[FB_BITS + 8], *t;
+	bn_t vm = NULL, s0 = NULL, s1 = NULL;
 
 	/* Compute the w-TNAF representation of k. */
 	if (eb_curve_opt_a() == OPT_ZERO) {
@@ -191,9 +192,11 @@ static void eb_mul_fix_kbltz(eb_t r, eb_t *table, bn_t k) {
 		u = 1;
 	}
 
+	vm = eb_curve_get_vm();
+	s0 = eb_curve_get_s0();
+	s1 = eb_curve_get_s1();
 	/* Compute the w-TNAF representation of k. */
-	bn_rec_tnaf(tnaf, &len, k, eb_curve_get_vm(), eb_curve_get_s0(),
-			eb_curve_get_s1(), u, FB_BITS, EB_DEPTH);
+	bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_DEPTH);
 
 	t = tnaf + len - 1;
 	eb_set_infty(r);
@@ -398,8 +401,8 @@ void eb_mul_fix_nafwi(eb_t r, eb_t *t, bn_t k) {
 			w = 0;
 			for (j = EB_DEPTH - 1; j >= 0; j--) {
 				if (i * EB_DEPTH + j < l) {
-					w = w << 1;
-					w += naf[i * EB_DEPTH + j];
+					w = (char)(w << 1);
+					w = (char)(w + naf[i * EB_DEPTH + j]);
 				}
 			}
 			naf[i] = w;

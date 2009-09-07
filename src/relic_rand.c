@@ -144,11 +144,11 @@ void rand_bytes(unsigned char *buf, int size) {
         /* XKEY = (XKEY + x + 1) mod 2^b */
         carry = 1;
         for (i = 19; i >= 0; i--) {
-    		r0 = state[i] + hash[i];
-    		c0 = (r0 < hash[i]);
-    		r1 = r0 + carry;
-    		c1 = (r1 < r0);
-    		carry = c0 | c1;
+    		r0 = (unsigned char)(state[i] + hash[i]);
+    		c0 = (unsigned char)(r0 < hash[i] ? 1 : 0);
+    		r1 = (unsigned char)(r0 + carry);
+    		c1 = (unsigned char)(r1 < r0 ? 1 : 0);
+    		carry = (unsigned char)(c0 | c1);
     		state[i] = r1;
         }
         for (i = 0; i < STATE_SIZE && j < size; i++) {

@@ -48,19 +48,16 @@ void fp_dbl(fp_t c, fp_t a) {
 
 	/* If there is an additional carry. */
 	if (carry || (fp_cmp(c, fp_prime_get()) != CMP_LT)) {
-		carry = fp_subn_low(c, c, fp_prime_get());
+		fp_subn_low(c, c, fp_prime_get());
 	}
 }
 
 void fp_hlv(fp_t c, fp_t a) {
-	dig_t carry;
-
-	carry = fp_rsh1_low(c, a);
+	fp_rsh1_low(c, a);
 }
 
 void fp_lsh(fp_t c, fp_t a, int bits) {
 	int digits;
-	dig_t carry;
 
 	SPLIT(bits, digits, bits, FP_DIG_LOG);
 
@@ -76,10 +73,10 @@ void fp_lsh(fp_t c, fp_t a, int bits) {
 		case 0:
 			break;
 		case 1:
-			carry = fp_lsh1_low(c, c);
+			fp_lsh1_low(c, c);
 			break;
 		default:
-			carry = fp_lshb_low(c, c, bits);
+			fp_lshb_low(c, c, bits);
 			break;
 	}
 
@@ -87,7 +84,6 @@ void fp_lsh(fp_t c, fp_t a, int bits) {
 
 void fp_rsh(fp_t c, fp_t a, int bits) {
 	int digits;
-	dig_t carry;
 
 	SPLIT(bits, digits, bits, FP_DIG_LOG);
 
@@ -103,10 +99,10 @@ void fp_rsh(fp_t c, fp_t a, int bits) {
 		case 0:
 			break;
 		case 1:
-			carry = fp_rsh1_low(c, c);
+			fp_rsh1_low(c, c);
 			break;
 		default:
-			carry = fp_rshb_low(c, c, bits);
+			fp_rshb_low(c, c, bits);
 			break;
 	}
 }

@@ -201,8 +201,8 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 			if (lu == 1 && u[lu - 1] == 1)
 				break;
 
-			j = ((lu - lv) << FB_DIG_LOG) + (fb_bits_dig(u[lu - 1]) -
-					fb_bits_dig(v[lv - 1]));
+			lt = fb_bits_dig(u[lu - 1]);
+			j = ((lu - lv) << FB_DIG_LOG) + lt - fb_bits_dig(v[lv - 1]);
 		}
 		fb_copy(c, g1);
 

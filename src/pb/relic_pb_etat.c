@@ -46,21 +46,22 @@
  * @param r
  * @param delta
  */
-void etat_exp(fb4_t r, fb4_t a) {
+static void etat_exp(fb4_t r, fb4_t a) {
 	fb2_t t0, t1, t2;
-	fb4_t v, w, v2m;
-	int delta;
+	fb4_t v, w;
+	int delta, mod;
 	dig_t b;
 
 	fb2_new(t0);
 	fb2_new(t1);
 	fb2_new(t2);
 	fb4_new(v);
-	fb4_new(v2m);
 	fb4_new(w);
 
+	mod = FB_BITS % 8;
 	b = eb_curve_get_b()[0];
-	switch (FB_BITS % 8) {
+
+	switch (mod) {
 		case 1:
 		case 7:
 			delta = b;
@@ -126,61 +127,11 @@ void etat_exp(fb4_t r, fb4_t a) {
 	fb4_free(w);
 }
 
-void fb4_mul_sparse(fb4_t c, fb4_t a, fb4_t b) {
-	fb_t t0, t1, t2, t3, t4, t5, t6;
-
-	fb_new(t0);
-	fb_new(t1);
-	fb_new(t2);
-	fb_new(t3);
-	fb_new(t4);
-	fb_new(t5);
-	fb_new(t6);
-
-	fb_add(t0, b[0], b[1]);
-	fb_add(t1, a[0], a[1]);
-	fb_add(t2, a[2], a[3]);
-
-	fb_mul(t2, t0, t2);
-	fb_mul(t0, t0, t1);
-
-	fb_mul(t3, a[0], b[0]);
-	fb_mul(t4, a[1], b[1]);
-	fb_mul(t5, a[2], b[0]);
-	fb_mul(t6, a[3], b[1]);
-
-	fb_copy(t1, a[3]);
-
-	fb_add(c[3], a[1], a[3]);
-	fb_add(c[3], c[3], t2);
-	fb_add(c[3], c[3], t5);
-
-	fb_copy(t2, a[2]);
-
-	fb_add(c[2], a[0], a[2]);
-	fb_add(c[2], c[2], t5);
-	fb_add(c[2], c[2], t6);
-
-	fb_add(c[0], t3, t4);
-	fb_add(c[0], c[0], t1);
-
-	fb_add(c[1], t2, t1);
-	fb_add(c[1], c[1], t3);
-	fb_add(c[1], c[1], t0);
-
-	fb_free(t0);
-	fb_free(t1);
-	fb_free(t2);
-	fb_free(t3);
-	fb_free(t4);
-	fb_free(t5);
-	fb_free(t6);
-}
-
 #if PB_MAP == ETATS || !defined(STRIP)
 
-void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
+static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 	dig_t alpha, beta, delta, b;
+	int mod;
 
 	if (FB_BITS % 4 == 3) {
 		alpha = 0;
@@ -189,7 +140,8 @@ void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 	}
 
 	b = eb_curve_get_b()[0];
-	switch (FB_BITS % 8) {
+	mod = FB_BITS % 8;
+	switch (mod) {
 		case 1:
 			beta = b;
 			delta = b;
@@ -422,11 +374,6 @@ void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 		}
 	}
 
-	//fb4_copy(r, _f[0]);
-	//for (int j = 1; j < CORES; j++) {
-//		fb4_mul(r, r, _f[j]);
-//		fb4_free(_f[j]);
-//	}
 	fb4_copy(r, _f[0]);
 
 #endif
@@ -436,38 +383,30 @@ void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 
 #if PB_MAP == ETATN || !defined(STRIP)
 
-void pb_map_etatn_impl(fb4_t r, eb_t p, eb_t q) {
-	dig_t alpha, beta, delta, b;
-
-	if (FB_BITS % 4 == 3) {
-		alpha = 0;
-	} else {
-		alpha = 1;
-	}
+static void pb_map_etatn_impl(fb4_t r, eb_t p, eb_t q) {
+	dig_t delta, b;
+	int mod;
 
 	b = eb_curve_get_b()[0];
-	switch (FB_BITS % 8) {
+	mod = FB_BITS % 8;
+	switch (mod) {
 		case 1:
-			beta = b;
 			delta = b;
 			break;
 		case 3:
-			beta = b;
 			delta = 1 - b;
 			break;
 		case 5:
-			beta = 1 - b;
 			delta = 1 - b;
 			break;
 		case 7:
-			beta = 1 - b;
 			delta = b;
 			break;
 	}
 
 #ifndef PB_PARAL
 	fb_t xp, yp, xq, yq, u, v;
-	fb4_t f, l, g;
+	fb4_t l, g;
 
 	fb_new(xp);
 	fb_new(yp);
@@ -475,7 +414,6 @@ void pb_map_etatn_impl(fb4_t r, eb_t p, eb_t q) {
 	fb_new(yq);
 	fb_new(u);
 	fb_new(v);
-	fb4_new(f);
 	fb4_new(g);
 	fb4_new(l);
 
@@ -554,7 +492,7 @@ void pb_map_etatn_impl(fb4_t r, eb_t p, eb_t q) {
 		fb4_new(_f[j]);
 	}
 
-#pragma omp parallel firstprivate(alpha, b, beta, delta) shared(r, _f, p, q) default(none)
+#pragma omp parallel firstprivate(b, delta) shared(r, _f, p, q) default(none)
 	{
 		int i = omp_get_thread_num();
 		int from, to, chunk;

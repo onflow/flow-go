@@ -49,7 +49,7 @@
  * @param[in] size			- the number of digits to square.
  * @param[in] level			- the number of Karatsuba steps to apply.
  */
-void fp_sqr_karat_impl(dv_t c, fp_t a, int size, int level) {
+static void fp_sqr_karat_impl(dv_t c, fp_t a, int size, int level) {
 	int i, h, h1;
 	dv_t t = NULL, b1 = NULL, a0a0 = NULL, a1a1 = NULL;
 	dig_t carry;
@@ -114,11 +114,11 @@ void fp_sqr_karat_impl(dv_t c, fp_t a, int size, int level) {
 
 		if (level <= 1) {
 			/* a1a1 = (a1 + a0)*(a1 + a0) */
-#if FP_SQR == BASIC || FP_SQR == KBASIC
+#if FP_SQR == BASIC
 			for (i = 0; i < h1 + 1; i++) {
 				bn_sqradd_low(a1a1 + (2 * i), t + i, h1 + 1 - i);
 			}
-#elif FP_SQR == COMBA || FP_SQR == KCOMBA
+#elif FP_SQR == COMBA
 			bn_sqrn_low(a1a1, t, h1 + 1);
 #endif
 		} else {

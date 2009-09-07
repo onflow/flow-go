@@ -52,7 +52,7 @@
 static void bn_sqr_karat_impl(bn_t c, bn_t a, int level) {
 	int h;
 	bn_t a0 = NULL, a1 = NULL, a0a0 = NULL, a1a1 = NULL, t = NULL;
-	dig_t *tmpa, *tmpb, *t0;
+	dig_t *tmpa, *t0;
 
 	/* Compute half the digits of a or b. */
 	h = a->used >> 1;
@@ -69,7 +69,6 @@ static void bn_sqr_karat_impl(bn_t c, bn_t a, int level) {
 		a1->used = a->used - h;
 
 		tmpa = a->dp;
-		tmpb = a->dp;
 
 		/* a = a1 || a0 */
 		t0 = a0->dp;

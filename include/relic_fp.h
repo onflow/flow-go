@@ -144,7 +144,7 @@ void fp_free_statc(fp_t *a);
  */
 #if FP_KARAT > 0
 #define fp_mul(C, A, B)	fp_mul_karat(C, A, B)
-#elif FP_KAR == BASIC
+#elif FP_MUL == BASIC
 #define fp_mul(C, A, B)	fp_mul_basic(C, A, B)
 #elif FP_MUL == COMBA
 #define fp_mul(C, A, B)	fp_mul_comba(C, A, B)
@@ -184,9 +184,9 @@ void fp_free_statc(fp_t *a);
  * @param[out] C			- the result.
  * @param[in] A				- the multiplication result to reduce.
  */
-#if FP_MUL == BASIC || FP_MUL == KBASIC
+#if FP_MUL == BASIC
 #define fp_rdc_monty(C, A)	fp_rdc_monty_basic(C, A)
-#elif  FP_MUL == COMBA || FP_MUL == KCOMBA
+#elif  FP_MUL == COMBA
 #define fp_rdc_monty(C, A)	fp_rdc_monty_comba(C, A)
 #endif
 

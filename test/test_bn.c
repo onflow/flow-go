@@ -33,11 +33,11 @@
 #include "relic.h"
 #include "relic_test.h"
 
-void bn_new_impl(bn_t *a) {
+static void bn_new_impl(bn_t *a) {
 	bn_new(*a);
 }
 
-int memory(void) {
+static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
 	bn_t a = NULL;
@@ -60,7 +60,7 @@ int memory(void) {
 	return code;
 }
 
-int util(void) {
+static int util(void) {
 	int code = STS_ERR;
 	int bits;
 	char str[BN_DIGS * sizeof(dig_t) * 3 + 1];
@@ -285,7 +285,7 @@ int util(void) {
 	return code;
 }
 
-int addition(void) {
+static int addition(void) {
 	int code = STS_ERR;
 	bn_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL;
 
@@ -344,8 +344,9 @@ int addition(void) {
 	return code;
 }
 
-int subtraction(void) {
+static int subtraction(void) {
 	int code = STS_ERR;
+	int s;
 	bn_t a = NULL, b = NULL, c = NULL, d = NULL;
 
 	TRY {
@@ -360,8 +361,10 @@ int subtraction(void) {
 			bn_sub(c, a, b);
 			bn_sub(d, b, a);
 			TEST_ASSERT(bn_cmp_abs(c, d) == CMP_EQ, end);
-			if (!bn_is_zero(c))
-				TEST_ASSERT(bn_sign(c) != bn_sign(d), end);
+			if (!bn_is_zero(c)) {
+				s = bn_sign(d);
+				TEST_ASSERT(bn_sign(c) != s, end);
+			}
 		}
 		TEST_END;
 
@@ -392,7 +395,7 @@ int subtraction(void) {
 	return code;
 }
 
-int multiplication(void) {
+static int multiplication(void) {
 	int code = STS_ERR;
 
 	bn_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL, f = NULL;
@@ -531,7 +534,7 @@ int multiplication(void) {
 	return code;
 }
 
-int squaring(void) {
+static int squaring(void) {
 	int code = STS_ERR;
 	bn_t a = NULL, b = NULL, c = NULL;
 
@@ -556,7 +559,7 @@ int squaring(void) {
 		} TEST_END;
 #endif
 
-#if BN_SQRL == COMBA || !defined(STRIP)
+#if BN_SQR == COMBA || !defined(STRIP)
 		TEST_BEGIN("comba squaring is correct") {
 			bn_rand(a, BN_POS, BN_BITS / 2);
 			bn_sqr(b, a);
@@ -586,7 +589,7 @@ int squaring(void) {
 	return code;
 }
 
-int doubling_halving(void) {
+static int doubling_halving(void) {
 	int code = STS_ERR;
 	bn_t a = NULL, b = NULL, c = NULL;
 
@@ -620,7 +623,7 @@ int doubling_halving(void) {
 	return code;
 }
 
-int shifting(void) {
+static int shifting(void) {
 	int code = STS_ERR;
 	bn_t a = NULL, b = NULL, c = NULL;
 
@@ -696,7 +699,7 @@ int shifting(void) {
 	return code;
 }
 
-int division(void) {
+static int division(void) {
 	int code = STS_ERR;
 	bn_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL;
 
@@ -764,7 +767,7 @@ int division(void) {
 	return code;
 }
 
-int reduction(void) {
+static int reduction(void) {
 	int code = STS_ERR;
 	bn_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL;
 
@@ -854,7 +857,7 @@ int reduction(void) {
 	return code;
 }
 
-int mxp(void) {
+static int mxp(void) {
 	int code = STS_ERR;
 	bn_t a = NULL, b = NULL, p = NULL;
 
@@ -942,7 +945,7 @@ int mxp(void) {
 	return code;
 }
 
-int gcd(void) {
+static int gcd(void) {
 	int code = STS_ERR;
 	bn_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL, f = NULL;
 
@@ -1062,7 +1065,7 @@ int gcd(void) {
 	return code;
 }
 
-int digit(void) {
+static int digit(void) {
 	int code = STS_ERR;
 	bn_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL, f = NULL;
 	dig_t g;
@@ -1166,7 +1169,7 @@ int digit(void) {
 #undef TESTS
 #define TESTS 1
 
-int prime(void) {
+static int prime(void) {
 	int code = STS_ERR;
 
 	bn_t p;

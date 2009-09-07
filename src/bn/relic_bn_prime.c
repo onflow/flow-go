@@ -336,7 +336,7 @@ void bn_gen_prime_safep(bn_t a, int bits) {
 
 void bn_gen_prime_stron(bn_t a, int bits) {
 	dig_t i, j;
-	int found;
+	int found, k;
 	bn_t r = NULL, s = NULL, t = NULL;
 
 	TRY {
@@ -372,7 +372,9 @@ void bn_gen_prime_stron(bn_t a, int bits) {
 			bn_dbl(t, t);
 			bn_sub_dig(t, t, 1);
 
-			bn_rand(a, BN_POS, bits - (bn_bits(r) + bn_bits(s)));
+			k = bits - bn_bits(r);
+			k -= bn_bits(s);
+			bn_rand(a, BN_POS, k);
 			j = a->dp[0];
 			do {
 				/* Find first prime a = t + 2 * j * r * s. */

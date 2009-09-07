@@ -215,9 +215,7 @@ static void eb_add_basic_super(eb_t r, eb_t p, eb_t q) {
  * @param p					- the first point to add.
  * @param q					- the second point to add.
  */
-#include "relic_bench.h"
-
-void eb_add_projc_ordin(eb_t r, eb_t p, eb_t q) {
+static void eb_add_projc_ordin(eb_t r, eb_t p, eb_t q) {
 	fb_t t0 = NULL, t1 = NULL, t2 = NULL, t3 = NULL;
 	fb_t t4 = NULL, t5 = NULL, t6 = NULL, t7 = NULL;
 
@@ -419,7 +417,7 @@ void eb_add_projc_ordin(eb_t r, eb_t p, eb_t q) {
  * @param q					- the second point to add.
  */
 #if defined(EB_SUPER)
-void eb_add_projc_super(eb_t r, eb_t p, eb_t q) {
+static void eb_add_projc_super(eb_t r, eb_t p, eb_t q) {
 	fb_t t0 = NULL, t1 = NULL, t2 = NULL, t3 = NULL, t4 = NULL, t5 = NULL;
 
 	TRY {

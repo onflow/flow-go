@@ -73,7 +73,7 @@ static void bn_div_impl(bn_t c, bn_t d, bn_t a, bn_t b) {
 		bn_abs(y, b);
 
 		/* Find the sign. */
-		sign = (a->sign == b->sign) ? BN_POS : BN_NEG;
+		sign = (a->sign == b->sign ? BN_POS : BN_NEG);
 
 		bn_divn_low(q->dp, r->dp, x->dp, a->used, y->dp, b->used);
 

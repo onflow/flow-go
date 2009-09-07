@@ -101,6 +101,57 @@ void fb4_mul(fb4_t c, fb4_t a, fb4_t b) {
 	fb_free(t9);
 }
 
+void fb4_mul_sparse(fb4_t c, fb4_t a, fb4_t b) {
+	fb_t t0, t1, t2, t3, t4, t5, t6;
+
+	fb_new(t0);
+	fb_new(t1);
+	fb_new(t2);
+	fb_new(t3);
+	fb_new(t4);
+	fb_new(t5);
+	fb_new(t6);
+
+	fb_add(t0, b[0], b[1]);
+	fb_add(t1, a[0], a[1]);
+	fb_add(t2, a[2], a[3]);
+
+	fb_mul(t2, t0, t2);
+	fb_mul(t0, t0, t1);
+
+	fb_mul(t3, a[0], b[0]);
+	fb_mul(t4, a[1], b[1]);
+	fb_mul(t5, a[2], b[0]);
+	fb_mul(t6, a[3], b[1]);
+
+	fb_copy(t1, a[3]);
+
+	fb_add(c[3], a[1], a[3]);
+	fb_add(c[3], c[3], t2);
+	fb_add(c[3], c[3], t5);
+
+	fb_copy(t2, a[2]);
+
+	fb_add(c[2], a[0], a[2]);
+	fb_add(c[2], c[2], t5);
+	fb_add(c[2], c[2], t6);
+
+	fb_add(c[0], t3, t4);
+	fb_add(c[0], c[0], t1);
+
+	fb_add(c[1], t2, t1);
+	fb_add(c[1], c[1], t3);
+	fb_add(c[1], c[1], t0);
+
+	fb_free(t0);
+	fb_free(t1);
+	fb_free(t2);
+	fb_free(t3);
+	fb_free(t4);
+	fb_free(t5);
+	fb_free(t6);
+}
+
 void fb4_sqr(fb4_t c, fb4_t a) {
 	fb_sqr(c[3], a[3]);
 	fb_sqr(c[2], a[2]);

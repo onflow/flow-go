@@ -47,7 +47,7 @@
  * @param[in] to			- the last bit position, inclusive.
  * @return the bits in the chosen positions.
  */
-char get_bits(bn_t a, int from, int to) {
+static char get_bits(bn_t a, int from, int to) {
 	int f, t;
 	dig_t mf, mt;
 
@@ -325,7 +325,7 @@ void bn_rec_naf(signed char *naf, int *len, bn_t k, int w) {
 					bn_get_dig(&t0, t);
 					u_i = t0 & mask;
 					if (u_i > l / 2) {
-						u_i = u_i - l;
+						u_i = (signed char)(u_i - l);
 					}
 					if (u_i < 0) {
 						bn_add_dig(t, t, -u_i);
@@ -352,7 +352,7 @@ void bn_rec_naf(signed char *naf, int *len, bn_t k, int w) {
 }
 
 void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
-		int u, int m, int w) {
+		signed char u, int m, int w) {
 	int i, l;
 	bn_t tmp = NULL, r0 = NULL, r1 = NULL;
 	signed char beta[16];
@@ -403,22 +403,22 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 
 	if (w >= 3) {
 		beta[1] = 1;
-		gama[1] = -u;
+		gama[1] = (signed char)-u;
 	}
 
 	if (w >= 4) {
 		beta[1] = -3;
 		beta[2] = -1;
 		beta[3] = 1;
-		gama[1] = gama[2] = gama[3] = u;
+		gama[1] = gama[2] = gama[3] = (signed char)u;
 	}
 
 	if (w == 5) {
 		beta[4] = -3;
 		beta[5] = -1;
 		beta[6] = beta[7] = 1;
-		gama[4] = gama[5] = gama[6] = 2 * u;
-		gama[7] = -3 * u;
+		gama[4] = gama[5] = gama[6] = (signed char)(2 * u);
+		gama[7] = (signed char)(-3 * u);
 	}
 
 	if (w == 6) {
@@ -429,10 +429,10 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 		beta[5] = beta[12] = -1;
 		beta[6] = beta[7] = beta[13] = 1;
 		gama[1] = gama[2] = 0;
-		gama[3] = gama[4] = gama[5] = gama[6] = 2 * u;
-		gama[7] = gama[8] = gama[9] = -3 * u;
-		gama[10] = 4 * u;
-		gama[11] = gama[12] = gama[13] = gama[14] = gama[15] = -u;
+		gama[3] = gama[4] = gama[5] = gama[6] = (signed char)(2 * u);
+		gama[7] = gama[8] = gama[9] = (signed char)(-3 * u);
+		gama[10] = (signed char)(4 * u);
+		gama[11] = gama[12] = gama[13] = gama[14] = gama[15] = (signed char)(-u);
 	}
 
 	mask = MASK(w);
@@ -468,27 +468,27 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 				/* u = r0 + r1 * (t_w = 6) mod_s 2^w. */
 				u_i = (t0 + t_w * t1) & mask;
 				if (u_i >= (l / 2)) {
-					u_i = u_i - l;
+					u_i = (signed char)(u_i - l);
 				}
 				*tnaf = u_i;
 				/* If u > 0, s = 1. */
 				if (u_i > 0) {
 					s = 1;
-					u_i = u_i >> 1;
+					u_i = (signed char)(u_i >> 1);
 				} else {
 					/* Else s = -1 and u = -u. */
 					s = -1;
-					u_i = -u_i >> 1;
+					u_i = (signed char)(-u_i >> 1);
 				}
 				/* r0 = r0 - s * beta_u. */
-				t = s * beta[(int)u_i];
+				t = (signed char)(s * beta[(int)u_i]);
 				if (t > 0) {
 					bn_sub_dig(r0, r0, t);
 				} else {
 					bn_add_dig(r0, r0, -t);
 				}
 				/* r1 = r1 - s * gama_u. */
-				t = s * gama[(int)u_i];
+				t = (signed char)(s * gama[(int)u_i]);
 				if (t > 0) {
 					bn_sub_dig(r1, r1, t);
 				} else {
@@ -523,7 +523,7 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 	bn_t n_0 = NULL, n_1 = NULL;
 	dig_t l_0, l_1;
 	signed char u_0, u_1, d_0, d_1;
-	int i, offset;
+	int i, j, offset;
 
 	TRY {
 		bn_new(n_0);
@@ -532,9 +532,12 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 		bn_copy(n_0, k);
 		bn_copy(n_1, l);
 
+		i = bn_bits(k);
+		j = bn_bits(l);
+		offset = MAX(i, j) + 1;
+
 		i = 0;
 		d_0 = d_1 = 0;
-		offset = MAX(bn_bits(k),bn_bits(l)) + 1;
 		while (!(bn_is_zero(n_0) && d_0 == 0) || !(bn_is_zero(n_1) && d_1 == 0)) {
 			bn_get_dig(&l_0, n_0);
 			bn_get_dig(&l_1, n_1);
@@ -547,7 +550,7 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 			} else {
 				u_0 = 2 - (l_0 & MASK(2));
 				if ((l_0 == 3 || l_0 == 5) && ((l_1 & MASK(2)) == 2)) {
-					u_0 = -u_0;
+					u_0 = (signed char)-u_0;
 				}
 			}
 			jsf[i] = u_0;
@@ -556,15 +559,17 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 			} else {
 				u_1 = 2 - (l_1 & MASK(2));
 				if ((l_1 == 3 || l_1 == 5) && ((l_0 & MASK(2)) == 2)) {
-					u_1 = -u_1;
+					u_1 = (signed char)-u_1;
 				}
 			}
 			jsf[i + offset] = u_1;
 
-			if (d_0 + d_0 == 1 + u_0)
-				d_0 = 1 - d_0;
-			if (d_1 + d_1 == 1 + u_1)
-				d_1 = 1 - d_1;
+			if (d_0 + d_0 == 1 + u_0) {
+				d_0 = (signed char)(1 - d_0);
+			}
+			if (d_1 + d_1 == 1 + u_1) {
+				d_1 = (signed char)(1 - d_1);
+			}
 
 			i++;
 			bn_hlv(n_0, n_0);

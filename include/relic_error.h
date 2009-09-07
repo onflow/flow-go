@@ -113,7 +113,7 @@ typedef struct _state_t {
 	/** Pointer to the program location where the error occurred. */
 	jmp_buf addr;
 	/** Flag to tell if there is a surrounding try-catch block. */
-	int flag;
+	int block;
 } state_t;
 
 /*============================================================================*/
@@ -135,7 +135,7 @@ typedef struct _state_t {
 	{																	\
 		state_t *_last, _this; 											\
 		_last = core_ctx->last; 										\
-		_this.flag = 1;													\
+		_this.block = 1;												\
 		core_ctx->last = &_this; 										\
 		for (int _r = 0; ; _r = 1) 										\
 			if (_r) { 													\
@@ -179,14 +179,14 @@ typedef struct _state_t {
  * If the error pointer is valid, the longjmp() function is called to return to
  * the program location where setjmp() was last called. An error message
  * respective to the error is then printed and the current error pointer is
- * updated to store the error thrown.
+ * updated to store the error.
  *
  * @param[in] E		- the exception being caught.
  */
 #define ERR_THROW(E)													\
 	{																	\
 		core_ctx->code = STS_ERR;										\
-		if (core_ctx->last != NULL && core_ctx->last->flag == 0) {		\
+		if (core_ctx->last != NULL && core_ctx->last->block == 0) {		\
 			exit(E);													\
 		}																\
 		if (core_ctx->last == NULL) {									\
@@ -194,17 +194,18 @@ typedef struct _state_t {
 			static err_t _err;											\
 			core_ctx->last = &_error;									\
 			_error.error = &_err;										\
-			_error.flag = 0;											\
+			_error.block = 0;											\
 			_err = E;													\
 			ERR_PRINT(E);												\
 		} else {														\
-			for (; ; longjmp(core_ctx->last->addr, 1))					\
+			for (; ; longjmp(core_ctx->last->addr, 1)) {				\
 				ERR_PRINT(E);											\
 				if (core_ctx->last->error) {							\
 					if (E != ERR_CAUGHT) {								\
 						*(core_ctx->last->error) = E;					\
 					}													\
 				}														\
+			}															\
 		}																\
 	}																	\
 

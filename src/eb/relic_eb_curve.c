@@ -137,7 +137,7 @@ static bn_st curve_s1;
  * Precomputes additional parameters for Koblitz curves used by the w-TNAF
  * multiplication algorithm.
  */
-void compute_koblitz(void) {
+static void compute_koblitz(void) {
 	int u, i;
 	bn_t a = NULL, b = NULL, c = NULL;
 

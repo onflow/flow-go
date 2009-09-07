@@ -41,7 +41,6 @@
 
 void fb_lsh(fb_t c, fb_t a, int bits) {
 	int digits;
-	dig_t carry;
 
 	SPLIT(bits, digits, bits, FB_DIG_LOG);
 
@@ -57,17 +56,16 @@ void fb_lsh(fb_t c, fb_t a, int bits) {
 		case 0:
 			break;
 		case 1:
-			carry = fb_lsh1_low(c, c);
+			fb_lsh1_low(c, c);
 			break;
 		default:
-			carry = fb_lshb_low(c, c, bits);
+			fb_lshb_low(c, c, bits);
 			break;
 	}
 }
 
 void fb_rsh(fb_t c, fb_t a, int bits) {
 	int digits;
-	dig_t carry;
 
 	SPLIT(bits, digits, bits, FB_DIG_LOG);
 
@@ -83,10 +81,10 @@ void fb_rsh(fb_t c, fb_t a, int bits) {
 		case 0:
 			break;
 		case 1:
-			carry = fb_rsh1_low(c, c);
+			fb_rsh1_low(c, c);
 			break;
 		default:
-			carry = fb_rshb_low(c, c, bits);
+			fb_rshb_low(c, c, bits);
 			break;
 	}
 }

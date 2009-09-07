@@ -341,6 +341,7 @@ void eb_param_set(int param) {
 				ordin = 1;
 				break;
 #elif defined(EB_KBLTZ) && FB_POLYN == 283
+#error eita
 			case NIST_K283:
 				ASSIGN(NIST_K283, NIST_283);
 				kbltz = 1;
