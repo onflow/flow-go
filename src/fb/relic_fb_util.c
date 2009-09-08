@@ -277,7 +277,9 @@ void fb_read(fb_t a, const char *str, int len, int radix) {
 
 	j = 0;
 	while (str[j] && j < len) {
-		c = (char)((radix < 36) ? toupper(str[j]) : str[j]);
+		c = str[j];
+		/* toupper replaced since it's broken in mspgcc */
+		c = (char)((radix < 36) ? ((c) - 0x20 * (((c) >= 'a') && ((c) <= 'z'))) : c);
 		for (i = 0; i < 64; i++) {
 			if (c == util_conv_char(i)) {
 				break;
