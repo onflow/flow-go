@@ -80,9 +80,9 @@ void md_map_shone_final(unsigned char *hash) {
 }
 
 void md_map_shone_state(unsigned char *state) {
-	*(unsigned int *)(state) = util_conv_big(ctx.Intermediate_Hash[0]);
-	*(unsigned int *)(state + 4) = util_conv_big(ctx.Intermediate_Hash[1]);
-	*(unsigned int *)(state + 8) = util_conv_big(ctx.Intermediate_Hash[2]);
-	*(unsigned int *)(state + 12) = util_conv_big(ctx.Intermediate_Hash[3]);
-	*(unsigned int *)(state + 16) = util_conv_big(ctx.Intermediate_Hash[4]);
+	*(uint32_t *)(state) = util_conv_big(ctx.Intermediate_Hash[0]);
+	*(uint32_t *)(state + 4) = util_conv_big(ctx.Intermediate_Hash[1]);
+	*(uint32_t *)(state + 8) = util_conv_big(ctx.Intermediate_Hash[2]);
+	*(uint32_t *)(state + 12) = util_conv_big(ctx.Intermediate_Hash[3]);
+	*(uint32_t *)(state + 16) = util_conv_big(ctx.Intermediate_Hash[4]);
 }
