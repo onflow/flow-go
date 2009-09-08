@@ -189,12 +189,30 @@ dig_t fp_mul1_low(dig_t *c, dig_t *a, dig_t digit);
 void fp_muln_low(dig_t *c, dig_t *a, dig_t *b);
 
 /**
+ * Multiplies two digit vectors of the same size with embedded modular
+ * reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first digit vector to multiply.
+ * @param[in] b				- the second digit vector to multiply.
+ */
+void fp_mulm_low(dig_t *c, dig_t *a, dig_t *b);
+
+/**
  * Squares a digit vector. Computes c = a * a.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to square.
  */
 void fp_sqrn_low(dig_t *c, dig_t *a);
+
+/**
+ * Squares a digit vector with embedded modular reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the digit vector to square.
+ */
+void fp_sqrm_low(dig_t *c, dig_t *a);
 
 /**
  * Reduces a digit vector modulo m. Computes c = a * u mod m.

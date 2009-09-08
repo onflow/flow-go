@@ -125,6 +125,8 @@ typedef align dig_t fp_st[FP_DIGS];
 #define fp_mul(C, A, B)	fp_mul_basic(C, A, B)
 #elif FP_MUL == COMBA
 #define fp_mul(C, A, B)	fp_mul_comba(C, A, B)
+#elif FP_MUL == INTEG
+#define fp_mul(C, A, B)	fp_mul_integ(C, A, B)
 #endif
 
 /**
@@ -139,6 +141,8 @@ typedef align dig_t fp_st[FP_DIGS];
 #define fp_sqr(C, A)	fp_sqr_basic(C, A)
 #elif FP_SQR == COMBA
 #define fp_sqr(C, A)	fp_sqr_comba(C, A)
+#elif FP_SQR == INTEG
+#define fp_sqr(C, A)	fp_sqr_integ(C, A)
 #endif
 
 /**
@@ -474,6 +478,16 @@ void fp_mul_basic(fp_t c, fp_t a, fp_t b);
 void fp_mul_comba(fp_t c, fp_t a, fp_t b);
 
 /**
+ * Multiples two prime field elements using multiplication integrated with
+ * modular reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first prime field element to multiply.
+ * @param[in] b				- the second prime field element to multiply.
+ */
+void fp_mul_integ(fp_t c, fp_t a, fp_t b);
+
+/**
  * Multiples two prime field elements using Karatsuba multiplication.
  *
  * @param[out] c			- the result.
@@ -506,6 +520,15 @@ void fp_sqr_basic(fp_t c, fp_t a);
  * @param[in] a				- the prime field element to square.
  */
 void fp_sqr_comba(fp_t c, fp_t a);
+
+/**
+ * Squares two prime field elements using squaring integrated with
+ * modular reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the binary field element to square.
+ */
+void fp_sqr_integ(fp_t c, fp_t a);
 
 /**
  * Squares a prime field element using Karatsuba squaring.

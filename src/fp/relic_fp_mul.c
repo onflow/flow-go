@@ -201,7 +201,7 @@ void fp_mul_comba(fp_t c, fp_t a, fp_t b) {
 		/* We need a temporary variable so that c can be a or b. */
 		dv_new(t);
 
-		bn_muln_low(t, a, b, FP_DIGS);
+		fp_muln_low(t, a, b);
 
 		fp_rdc(c, t);
 
@@ -212,6 +212,10 @@ void fp_mul_comba(fp_t c, fp_t a, fp_t b) {
 	FINALLY {
 		dv_free(t);
 	}
+}
+
+void fp_mul_integ(fp_t c, fp_t a, fp_t b) {
+	fp_mulm_low(c, a, b);
 }
 
 void fp_mul_karat(fp_t c, fp_t a, fp_t b) {

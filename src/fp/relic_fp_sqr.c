@@ -194,6 +194,14 @@ void fp_sqr_comba(fp_t c, fp_t a) {
 
 #endif
 
+#if FP_SQR == INTEG || !defined(STRIP)
+
+void fp_sqr_integ(fp_t c, fp_t a) {
+	fp_sqrm_low(c, a);
+}
+
+#endif
+
 #if FP_KARAT > 0 || !defined(STRIP)
 
 void fp_sqr_karat(fp_t c, fp_t a) {

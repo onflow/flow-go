@@ -134,14 +134,14 @@
 /** Schoolbook multiplication. */
 #define BASIC    1
 /** Comba multiplication. */
-#define COMBA    2
+#define COMBA    3
 /** Chosen multiple precision multiplication method. */
 #define BN_MUL   @BN_MUL@
 
 /** Schoolbook squaring. */
 #define BASIC    1
 /** Comba squaring. */
-#define COMBA    2
+#define COMBA    3
 /** Chosen multiple precision multiplication method. */
 #define BN_SQR   @BN_SQR@
 
@@ -193,15 +193,19 @@
 
 /** Schoolbook multiplication. */
 #define BASIC    1
+/** Integrated modular multiplication. */
+#define INTEG    2
 /** Comba multiplication. */
-#define COMBA    2
+#define COMBA    3
 /** Chosen prime field multiplication method. */
 #define FP_MUL   @FP_MUL@
 
 /** Schoolbook squaring. */
 #define BASIC    1
+/** Integrated modular squaring. */
+#define INTEG    2
 /** Comba squaring. */
-#define COMBA    2
+#define COMBA    3
 /** Chosen prime field multiplication method. */
 #define FP_SQR   @FP_SQR@
 
