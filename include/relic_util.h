@@ -109,6 +109,13 @@
 #define HIGH(D)				(D >> (DIGIT >> 1))
 
 /**
+ * Returns the given character in upper case.
+ *
+ * @param[in] C			- the character.
+ */
+#define TOUPPER(C)			((C) - 0x20 * (((C) >= 'a') && ((C) <= 'z')))
+
+/**
  * Renames the inline assembly macro to a prettier name.
  */
 #define asm			__asm__
