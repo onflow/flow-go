@@ -187,6 +187,8 @@
 #define FP_PRIME @FP_PRIME@
 /** Number of Karatsuba steps. */
 #define FP_KARAT @FP_KARAT@
+/** Prefer special form primes over random primes. */
+#cmakedefine FP_SFORM
 
 /** Prime field arithmetic method */
 #define FP_METHD "@FP_METHD@"
@@ -209,6 +211,12 @@
 /** Chosen prime field multiplication method. */
 #define FP_SQR   @FP_SQR@
 
+/** Division-based reduction. */
+#define BASIC    1
+/** Fast reduction modulo special form prime. */
+#define QUICK    2
+/** Montgomery modular reduction. */
+#define MONTY    3
 /** Chosen prime field reduction method. */
 #define FP_RDC   @FP_RDC@
 

@@ -41,26 +41,34 @@
 
 void fp_inv(fp_t c, fp_t a) {
 	fp_t t = NULL;
-	bn_t u = NULL, v = NULL, x1 = NULL, x2 = NULL;
+	bn_t _a = NULL, _p = NULL, u = NULL, v = NULL, x1 = NULL, x2 = NULL;
 	dig_t *p = NULL, carry;
-	int i, k;
+	int i, k, flag = 0;
 
 	TRY {
 		fp_new(t);
+		bn_new(_a);
+		bn_new(_p);
 		bn_new(u);
 		bn_new(v);
 		bn_new(x1);
 		bn_new(x2);
 
 		p = fp_prime_get();
-
 		fp_zero(t);
 
-		u->used = v->used = FP_DIGS;
-		for (i = 0; i < FP_DIGS; i++) {
-			u->dp[i] = a[i];
-			v->dp[i] = p[i];
-		}
+#if FP_RDC != MONTY
+		_a->used = FP_DIGS;
+		_p->used = FP_DIGS;
+		dv_copy(_a->dp, a, FP_DIGS);
+		dv_copy(_p->dp, p, FP_DIGS);
+		bn_mod_monty_conv(u, _a, _p);
+#else
+		u->used = FP_DIGS;
+		dv_copy(u->dp, a, FP_DIGS);
+#endif
+		v->used = FP_DIGS;
+		dv_copy(v->dp, p, FP_DIGS);
 
 		k = 0;
 		bn_set_dig(x1, 1);
@@ -105,6 +113,8 @@ void fp_inv(fp_t c, fp_t a) {
 		}
 
 		if (k < FP_DIGS * FP_DIGIT) {
+			flag = 1;
+			printf("dentro\n");
 			fp_mul(x1->dp, x1->dp, fp_prime_get_conv());
 			k = k + FP_DIGS * FP_DIGIT;
 		}
@@ -114,12 +124,31 @@ void fp_inv(fp_t c, fp_t a) {
 		t[0] = 1;
 		fp_lsh(t, t, 2 * FP_DIGS * FP_DIGIT - k);
 		fp_mul(c, x1->dp, t);
+
+#if FP_RDC != MONTY
+		/* If we do not use Montgomery reduction, the result of inversion is
+		 * a^{-1}R^3 mod p or a^{-1}R^4 mod p, depending on flag.
+		 * Hence we must reduce the result three times.
+		 */
+		_a->used = FP_DIGS;
+		dv_copy(_a->dp, c, FP_DIGS);
+		bn_mod_monty_back(_a, _a, _p);
+		bn_mod_monty_back(_a, _a, _p);
+		bn_mod_monty_back(_a, _a, _p);
+		if (flag) {
+			bn_mod_monty_back(_a, _a, _p);
+		}
+		fp_zero(c);
+		dv_copy(c, _a->dp, _a->used);
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
 		fp_free(t);
+		bn_free(_a);
+		bn_free(_p);
 		bn_free(u);
 		bn_free(v);
 		bn_free(x1);

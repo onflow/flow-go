@@ -170,6 +170,8 @@ void fp_mul_dig(fp_t c, fp_t a, dig_t b) {
 	}
 }
 
+#if FP_MUL == BASIC || !defined(STRIP)
+
 void fp_mul_basic(fp_t c, fp_t a, fp_t b) {
 	int i;
 	dv_t t = NULL;
@@ -194,6 +196,10 @@ void fp_mul_basic(fp_t c, fp_t a, fp_t b) {
 	}
 }
 
+#endif
+
+#if FP_MUL == COMBA || !defined(STRIP)
+
 void fp_mul_comba(fp_t c, fp_t a, fp_t b) {
 	dv_t t = NULL;
 
@@ -214,9 +220,17 @@ void fp_mul_comba(fp_t c, fp_t a, fp_t b) {
 	}
 }
 
+#endif
+
+#if FP_MUL == INTEG || !defined(STRIP)
+
 void fp_mul_integ(fp_t c, fp_t a, fp_t b) {
 	fp_mulm_low(c, a, b);
 }
+
+#endif
+
+#if FP_KARAT > 0 || !defined(STRIP)
 
 void fp_mul_karat(fp_t c, fp_t a, fp_t b) {
 	dv_t t = NULL;
@@ -236,3 +250,5 @@ void fp_mul_karat(fp_t c, fp_t a, fp_t b) {
 		dv_free(t);
 	}
 }
+
+#endif

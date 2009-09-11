@@ -215,6 +215,16 @@ void fp_sqrn_low(dig_t *c, dig_t *a);
 void fp_sqrm_low(dig_t *c, dig_t *a);
 
 /**
+ * Reduces a digit vector modulo m represented in special form.
+ * Computes c = a mod m.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the digit vector to reduce.
+ * @param[in] m				- the modulus.
+ */
+void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m);
+
+/**
  * Reduces a digit vector modulo m. Computes c = a * u mod m.
  *
  * @param[out] c			- the result.

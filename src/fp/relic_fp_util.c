@@ -151,12 +151,17 @@ void fp_print(fp_t a) {
 	TRY {
 		bn_new(t);
 
+#if FP_RDC == MONTY
 		if (a != fp_prime_get()) {
 			fp_prime_back(t, a);
 		} else {
 			t->used = FP_DIGS;
 			fp_copy(t->dp, fp_prime_get());
 		}
+#else
+		t->used = FP_DIGS;
+		fp_copy(t->dp, a);
+#endif
 
 		for (i = FP_DIGS - 1; i >= 0; i--) {
 			if (i >= t->used) {

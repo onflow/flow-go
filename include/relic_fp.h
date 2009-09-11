@@ -62,6 +62,26 @@
  */
 #define FP_DIGS	((int)((FP_BITS)/(FP_DIGIT) + (FP_BITS % FP_DIGIT > 0)))
 
+/*
+ * Finite field identifiers.
+ */
+enum {
+	/** NIST 192-bit fast reduction prime. */
+	NIST_192 = 1,
+	/** NIST 224-bit fast reduction polynomial. */
+	NIST_224 = 2,
+	/** NIST 256-bit fast reduction polynomial. */
+	NIST_256 = 3,
+	/** NIST 384-bit fast reduction polynomial. */
+	NIST_384 = 4,
+	/** NIST 521-bit fast reduction polynomial. */
+	NIST_521 = 5,
+	/** 256-bit prime provided in Nogami et al. for use with BN curves. */
+	BNN_256 = 6,
+	/** 256-bit prime provided in Nogami et al. for use with BN curves. */
+	BNP_256 = 7,
+};
+
 /*============================================================================*/
 /* Type definitions                                                           */
 /*============================================================================*/
@@ -120,13 +140,13 @@ typedef align dig_t fp_st[FP_DIGS];
  * @param[in] B				- the second prime field element.
  */
 #if FP_KARAT > 0
-#define fp_mul(C, A, B)	fp_mul_karat(C, A, B)
+#define fp_mul(C, A, B)		fp_mul_karat(C, A, B)
 #elif FP_MUL == BASIC
-#define fp_mul(C, A, B)	fp_mul_basic(C, A, B)
+#define fp_mul(C, A, B)		fp_mul_basic(C, A, B)
 #elif FP_MUL == COMBA
-#define fp_mul(C, A, B)	fp_mul_comba(C, A, B)
+#define fp_mul(C, A, B)		fp_mul_comba(C, A, B)
 #elif FP_MUL == INTEG
-#define fp_mul(C, A, B)	fp_mul_integ(C, A, B)
+#define fp_mul(C, A, B)		fp_mul_integ(C, A, B)
 #endif
 
 /**
@@ -136,13 +156,13 @@ typedef align dig_t fp_st[FP_DIGS];
  * @param[in] A				- the prime field element to square.
  */
 #if FP_KARAT > 0
-#define fp_sqr(C, A)	fp_sqr_karat(C, A)
+#define fp_sqr(C, A)		fp_sqr_karat(C, A)
 #elif FP_SQR == BASIC
-#define fp_sqr(C, A)	fp_sqr_basic(C, A)
+#define fp_sqr(C, A)		fp_sqr_basic(C, A)
 #elif FP_SQR == COMBA
-#define fp_sqr(C, A)	fp_sqr_comba(C, A)
+#define fp_sqr(C, A)		fp_sqr_comba(C, A)
 #elif FP_SQR == INTEG
-#define fp_sqr(C, A)	fp_sqr_integ(C, A)
+#define fp_sqr(C, A)		fp_sqr_integ(C, A)
 #endif
 
 /**
@@ -152,10 +172,12 @@ typedef align dig_t fp_st[FP_DIGS];
  * @param[out] C			- the result.
  * @param[in] A				- the multiplication result to reduce.
  */
-#if FP_RDC == MONTY
+#if FP_RDC == BASIC
+#define fp_rdc(C, A)		fp_rdc_basic(C, A)
+#elif FP_RDC == MONTY
 #define fp_rdc(C, A)		fp_rdc_monty(C, A)
-#elif FP_RDC == RADIX
-#define fp_rdc(C, A)		fp_rdc_radix(C, A)
+#elif FP_RDC == QUICK
+#define fp_rdc(C, A)		fp_rdc_quick(C, A)
 #endif
 
 /**
@@ -208,6 +230,14 @@ dig_t *fp_prime_get_rdc(void);
 dig_t *fp_prime_get_conv(void);
 
 /**
+ * Returns the prime stored in special form.
+ * @param[out] len		- the number of returned bits.
+ *
+ * @return the prime represented by it non-zero bits.
+ */
+int *fp_prime_get_sform(void);
+
+/**
  * Returns a non-quadratic residue in the prime field.
  *
  * @return the non-quadratic residue.
@@ -229,46 +259,33 @@ int fp_prime_get_cnr(void);
 dig_t *fp_prime_get_mod8(void);
 
 /**
- * Assigns the order of the prime field to p.
+ * Assigns the order of the prime field to a non-sparse prime p.
  *
  * @param[in] p			- the new prime field order.
  */
-void fp_prime_set(bn_t p);
+void fp_prime_set_dense(bn_t p);
 
-#if ALLOC == DYNAMIC
 /**
- * Allocates and initializes a new prime field element with dynamic allocation.
+ * Assigns the order of the prime field to a sparse prime p.
  *
- * @param[out] a			- the new prime field element.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
+ * @param[in] p			- the new prime field order.
  */
-void fp_new_dynam(fp_t *a);
-#elif ALLOC == STATIC
-/**
- * Allocates and initializes a new prime field element with static allocation.
- *
- * @param[out] a			- the new prime field element.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
- */
-void fp_new_statc(fp_t *a);
-#endif
+void fp_prime_set_sform(int *sform, int len);
 
-#if ALLOC == DYNAMIC
 /**
- * Cleans and frees a prime field element with dynamic allocation.
- *
- * @param[out] a			- the prime field element to clean and free.
+ * Assigns a prime modulus based on its identifier.
  */
-void fp_free_dynam(fp_t *a);
-#elif ALLOC == STATIC
-/**
- * Cleans and frees a prime field element with static allocation.
- *
- * @param[out] a			- the prime field element to clean and free.
- */
-void fp_free_statc(fp_t *a);
-#endif
+void fp_param_set(int param);
 
+/**
+ * Assigns any pre-defined parameter as the prime modulus.
+ */
+void fp_param_set_any(void);
+
+/**
+ * Prints the currently configured prime modulus.
+ */
+void fp_param_print(void);
 /**
  * Copies the second argument to the first argument.
  *
@@ -582,6 +599,15 @@ void fp_rsh(fp_t c, fp_t a, int bits);
 void fp_inv(fp_t c, fp_t a);
 
 /**
+ * Reduces a multiplication result modulo the prime field modulo using
+ * division-based reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the multiplication result to reduce.
+ */
+void fp_rdc_basic(fp_t c, dv_t a);
+
+/**
  * Reduces a multiplication result modulo the prime field order using Shoolbook
  * Montgomery reduction.
  *
@@ -598,6 +624,15 @@ void fp_rdc_monty_basic(fp_t c, dv_t a);
  * @param[in] a				- the multiplication result to reduce.
  */
 void fp_rdc_monty_comba(fp_t c, dv_t a);
+
+/**
+ * Reduces a multiplication result modulo the prime field modulo using
+ * fast reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the multiplication result to reduce.
+ */
+void fp_rdc_quick(fp_t c, dv_t a);
 
 /**
  * Imports a multiple precision integer as a prime field element, doing the

@@ -42,6 +42,38 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
+#if FP_RDC == BASIC || !defined(STRIP)
+
+void fp_rdc_basic(fp_t c, dv_t a) {
+	dv_t t0 = NULL, t1 = NULL, t2 = NULL, t3 = NULL;;
+
+	TRY {
+		dv_new(t0);
+		dv_new(t1);
+		dv_new(t2);
+		dv_new(t3);
+
+		dv_copy(t2, a, 2 * FP_DIGS);
+		dv_copy(t3, fp_prime_get(), FP_DIGS);
+		bn_divn_low(t0, t1, t2, 2 * FP_DIGS, t3, FP_DIGS);
+		dv_copy(c, t1, FP_DIGS);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		dv_free(t0);
+		dv_free(t1);
+		dv_free(t2);
+		dv_free(t3);
+	}
+}
+
+#endif
+
+#if FP_RDC == MONTY || !defined(STRIP)
+
+#if FP_MUL == BASIC || !defined(STRIP)
+
 void fp_rdc_monty_basic(fp_t c, dv_t a) {
 	int i;
 	dig_t r, carry, *tmp, u0;
@@ -63,6 +95,10 @@ void fp_rdc_monty_basic(fp_t c, dv_t a) {
 	}
 }
 
+#endif
+
+#if FP_MUL == COMBA || !defined(STRIP)
+
 void fp_rdc_monty_comba(fp_t c, dv_t a) {
 	dig_t carry, u0;
 
@@ -74,3 +110,15 @@ void fp_rdc_monty_comba(fp_t c, dv_t a) {
 		fp_subn_low(c, c, fp_prime_get());
 	}
 }
+
+#endif
+
+#endif
+
+#if FP_RDC == QUICK || !defined(STRIP)
+
+void fp_rdc_quick(fp_t c, dv_t a) {
+	fp_rdcs_low(c, a, fp_prime_get());
+}
+
+#endif

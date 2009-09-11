@@ -150,7 +150,7 @@ void bn_mod_barrt(bn_t c, bn_t a, bn_t m, bn_t u) {
 	}
 }
 
-#endif /** BN_MOD == BARRT || !defined(STRIP) */
+#endif /* BN_MOD == BARRT || !defined(STRIP) */
 
 #if BN_MOD == MONTY || !defined(STRIP)
 

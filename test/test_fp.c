@@ -330,6 +330,8 @@ static int multiplication(void) {
 			fp_mul(e, c, a);
 			fp_mul(f, c, b);
 			fp_add(e, e, f);
+			fp_print(d);
+			fp_print(e);
 			TEST_ASSERT(fp_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 
@@ -353,6 +355,17 @@ static int multiplication(void) {
 			fp_rand(b);
 			fp_mul(c, a, b);
 			fp_mul_basic(d, a, b);
+			TEST_ASSERT(fp_cmp(c, d) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
+#if FP_MUL == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated multiplication is correct") {
+			fp_rand(a);
+			fp_rand(b);
+			fp_mul(c, a, b);
+			fp_mul_integ(d, a, b);
 			TEST_ASSERT(fp_cmp(c, d) == CMP_EQ, end);
 		}
 		TEST_END;
@@ -415,6 +428,15 @@ static int squaring(void) {
 			fp_rand(a);
 			fp_sqr(b, a);
 			fp_sqr_basic(c, a);
+			TEST_ASSERT(fp_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FP_SQR == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated squaring is correct") {
+			fp_rand(a);
+			fp_sqr(b, a);
+			fp_sqr_integ(c, a);
 			TEST_ASSERT(fp_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -598,7 +620,7 @@ static int digit(void) {
 			for (int j = 1; j < FP_DIGS; j++)
 				b[j] = 0;
 			g = b[0];
-			fp_prime_conv_dig(b, g);
+			fp_set_dig(b, g);
 			fp_mul(c, a, b);
 			fp_mul_dig(d, a, g);
 			TEST_ASSERT(fp_cmp(c, d) == CMP_EQ, end);
@@ -629,7 +651,7 @@ static int inversion(void) {
 			fp_rand(a);
 			fp_inv(b, a);
 			fp_mul(c, a, b);
-			fp_prime_conv_dig(b, 1);
+			fp_set_dig(b, 1);
 			TEST_ASSERT(fp_cmp(c, b) == CMP_EQ, end);
 		} TEST_END;
 	}
@@ -646,17 +668,13 @@ static int inversion(void) {
 
 int main(void) {
 	core_init();
-	bn_t modulus;
 
-	bn_new(modulus);
-	bn_gen_prime(modulus, FP_BITS);
-	fp_prime_set(modulus);
-	bn_free(modulus);
+	util_print_banner("Tests for the FP module", 0);
 
-	util_print("Prime field order: ");
-	fp_print(fp_prime_get());
-	util_print("\n");
+	fp_param_set_any();
+	fp_param_print();
 
+	util_print_banner("Utilities", 1);
 	if (memory() != STS_OK) {
 		core_clean();
 		return 1;
@@ -667,6 +685,7 @@ int main(void) {
 		return 1;
 	}
 
+	util_print_banner("Arithmetic", 1);
 	if (addition() != STS_OK) {
 		core_clean();
 		return 1;
@@ -702,10 +721,10 @@ int main(void) {
 		return 1;
 	}
 
-	 /* if (reduction() != STS_OK) {
-	 * core_clean();
-	 * return 1;
-	 * } */
+	/*if (reduction() != STS_OK) {
+		 core_clean();
+		 return 1;
+	}*/
 
 	if (digit() != STS_OK) {
 		core_clean();

@@ -199,6 +199,15 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
+#if FP_MUL == INTEG || !defined(STRIP)
+	BENCH_BEGIN("fp_mul_integ") {
+		fp_rand(a);
+		fp_rand(b);
+		BENCH_ADD(fp_mul_integ(c, a, b));
+	}
+	BENCH_END;
+#endif
+
 #if FP_MUL == COMBA || !defined(STRIP)
 	BENCH_BEGIN("fp_mul_comba") {
 		fp_rand(a);
@@ -227,6 +236,14 @@ static void arith(void) {
 	BENCH_BEGIN("fp_sqr_basic") {
 		fp_rand(a);
 		BENCH_ADD(fp_sqr_basic(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if FP_SQR == INTEG || !defined(STRIP)
+	BENCH_BEGIN("fp_sqr_integ") {
+		fp_rand(a);
+		BENCH_ADD(fp_sqr_integ(c, a));
 	}
 	BENCH_END;
 #endif
@@ -333,11 +350,8 @@ int main(void) {
 	conf_print();
 	util_print_banner("Benchmarks for the FP module:", 0);
 
-	bn_t modulus = NULL;
-
-	bn_new(modulus);
-	bn_gen_prime(modulus, FP_BITS);
-	fp_prime_set(modulus);
+	fp_param_set_any();
+	fp_param_print();
 
 	util_print_banner("Utilities:\n", 0);
 	memory();

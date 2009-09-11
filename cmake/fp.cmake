@@ -3,21 +3,21 @@ message(STATUS "Prime field arithmetic configuration (FP module):\n")
 message("   ** Arithmetic precision of the prime field module (default = BITS):")
 message("      FP_PRIME=n        The prime modulus size in bits.\n")
 message("      FP_KARAT=n        The number of Karatsuba levels.")
+message("      FP_SFORM=[off|on] Prefer Pseudo-Mersenne primes over random primes.\n")
 
 message("   ** Available prime field arithmetic methods (default = COMBA;COMBA;MONTY):")
-message("      FP_METHD=BASIC    Schoolbook multiplication.")
+message("      FP_METHD=BASIC    Schoolbook multiplication.\n")
+message("      FP_METHD=INTEG    Integrated modular multiplication.")
 message("      FP_METHD=COMBA    Comba multiplication.")
-message("      FP_METHD=KnMUL    Karatsuba for (n > 0) steps and MUL multiplication.")
-message("      FP_METHD=INTEG    Integrated modular multiplication.\n")
 
 message("      FP_METHD=BASIC    Schoolbook squaring.")
-message("      FP_METHD=COMBA    Comba squaring.")
-message("      FP_METHD=KnSQR    Karatsuba for (n > 0) steps and SQR squaring.")
-message("      FP_METHD=INTEG    Integrated modular squaring.\n")
+message("      FP_METHD=INTEG    Integrated modular squaring.")
+message("      FP_METHD=COMBA    Comba squaring.\n")
 
-message("      FP_METHD=MONTY    Montgomery modular reduction.")
-message("      FP_METHD=RADIX    Diminished radix modular reduction.\n")
-message("      Note: these methods must be given in order. Ex: FP_METHD=\"K1BASIC;COMBA;MONTY\"\n")
+message("      FP_METHD=BASIC    Division-based reduction.")
+message("      FP_METHD=QUICK    Fast reduction modulo special form prime.")
+message("      FP_METHD=MONTY    Montgomery modular reduction.\n")
+message("      Note: these methods must be given in order. Ex: FP_METHD=\"BASIC;COMBA;MONTY\"\n")
 
 # Choose the prime field size.
 if (NOT FP_PRIME)
@@ -30,6 +30,8 @@ if (NOT FP_KARAT)
 	set(FP_KARAT 0)
 endif(NOT FP_KARAT)
 set(FP_KARAT ${FP_KARAT} CACHE INTEGER "Number of Karatsuba levels.")
+
+option(FP_SFORM "Prefer special form primes over random primes." on)
 
 # Choose the arithmetic methods.
 if (NOT FP_METHD)

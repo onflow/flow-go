@@ -57,26 +57,36 @@ static bn_st u;
  */
 static bn_st prime_mod8;
 
-#if FP_RDC == MONTY
-
 /**
  * Auxiliar value computed as R^2 mod m used to convert small integers
  * to Montgomery form.
  */
 static bn_st conv, one;
 
-#endif
-
 /**
  * Quadratic non-residue.
  */
-int prime_qnr;
+static int prime_qnr;
 
 /**
  * Cubic non-residue.
- *
  */
-int prime_cnr;
+static int prime_cnr;
+
+/**
+ * Maximum number of powers of 2 used to describe special form moduli.
+ */
+#define MAX_BITS		10
+
+/**
+ * Non-zero bits of special form prime.
+ */
+static int sform[MAX_BITS + 1] = { 0 };
+
+/**
+ * Number of bits of special form prime.
+ */
+static int sform_len = 0;
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -86,20 +96,16 @@ void fp_prime_init() {
 	bn_init(&prime, FP_DIGS);
 	bn_init(&u, FP_DIGS);
 	bn_init(&prime_mod8, FP_DIGS);
-#if FP_RDC == MONTY
 	bn_init(&conv, FP_DIGS);
 	bn_init(&one, FP_DIGS);
-#endif
 }
 
 void fp_prime_clean() {
 	bn_clean(&prime);
 	bn_clean(&u);
 	bn_clean(&prime_mod8);
-#if FP_RDC == MONTY
 	bn_clean(&conv);
 	bn_clean(&one);
-#endif
 }
 
 dig_t *fp_prime_get(void) {
@@ -108,6 +114,14 @@ dig_t *fp_prime_get(void) {
 
 dig_t *fp_prime_get_rdc(void) {
 	return u.dp;
+}
+
+int *fp_prime_get_sform(void) {
+	if (sform_len > 0 && sform_len < MAX_BITS ) {
+		return sform;
+	} else {
+		return NULL;
+	}
 }
 
 dig_t *fp_prime_get_conv(void) {
@@ -147,7 +161,6 @@ void fp_prime_set(bn_t p) {
 			prime_qnr = 0;
 			break;
 	}
-#if FP_RDC == MONTY
 	bn_mod_monty_setup(&u, &prime);
 	bn_set_dig(&conv, 1);
 	bn_lsh(&conv, &conv, 2 * prime.used * BN_DIGIT);
@@ -155,9 +168,62 @@ void fp_prime_set(bn_t p) {
 	bn_set_dig(&one, 1);
 	bn_lsh(&one, &one, prime.used * BN_DIGIT);
 	bn_mod_basic(&one, &one, &prime);
-#elif FP_RDC == RADIX
-	bn_mod_radix_setup(&u, &prime);
+}
+
+void fp_prime_set_dense(bn_t p) {
+	fp_prime_set(p);
+	sform_len = 0;
+	sform[0] = 0;
+#if FP_RDC == QUICK
+	THROW(ERR_INVALID);
 #endif
+}
+
+void fp_prime_set_sform(int *f, int len) {
+	bn_t p = NULL, t = NULL;
+
+	TRY {
+		bn_new(p);
+		bn_new(t);
+
+		if (len >= MAX_BITS) {
+			THROW(ERR_INVALID);
+		}
+
+		bn_set_2b(p, FP_BITS);
+		for (int i = len - 1; i > 0; i--) {
+			if (f[i] == FP_BITS) {
+				continue;
+			}
+
+			if (f[i] > 0) {
+				bn_set_2b(t, f[i]);
+				bn_add(p, p, t);
+			} else {
+				bn_set_2b(t, -f[i]);
+				bn_sub(p, p, t);
+			}
+		}
+		if (f[0] > 0) {
+			bn_add_dig(p, p, f[0]);
+		} else {
+			bn_sub_dig(p, p, -f[0]);
+		}
+
+		fp_prime_set(p);
+		for (int i = 0; i < len; i++) {
+			sform[i] = f[i];
+		}
+		sform[len] = 0;
+		sform_len = len;
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(p);
+		bn_free(t);
+	}
 }
 
 void fp_prime_conv(fp_t c, bn_t a) {
@@ -215,12 +281,9 @@ void fp_prime_conv_dig(fp_t c, dig_t a) {
 			THROW(ERR_NO_PRECISION);
 		}
 
-		if (bn_is_zero(t)) {
-			fp_zero(c);
-		} else {
-			for (i = 0; i < t->used; i++) {
-				c[i] = t->dp[i];
-			}
+		fp_zero(c);
+		for (i = 0; i < t->used; i++) {
+			c[i] = t->dp[i];
 		}
 	}
 	CATCH_ANY {

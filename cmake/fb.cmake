@@ -5,7 +5,7 @@ message("      FB_POLYN=n        The irreducible polynomial size in bits.")
 message("      FB_KARAT=n        The number of Karatsuba levels.") 
 message("      FB_TRINO=[off|on] Prefer trinomials over pentanomials.\n")
 
-message("   ** Available binary field arithmetic methods (default = LRLD4;TABLE;QUICK;BASIC;QUICK;EXGCD):")
+message("   ** Available binary field arithmetic methods (default = LODAH;TABLE;QUICK;BASIC;QUICK;EXGCD):")
 message("      FB_METHD=BASIC    Right-to-left shift-and-add multiplication.")
 message("      FB_METHD=INTEG    Integrated modular multiplication.")
 message("      FB_METHD=RCOMB    Right-to-left comb multiplication.")
@@ -42,7 +42,7 @@ if (NOT FB_KARAT)
 endif(NOT FB_KARAT)
 set(FB_KARAT ${FB_KARAT} CACHE INTEGER "Number of Karatsuba levels.")
 
-option(FB_TRINO "Prefer trinomials over pentanomials" on)
+option(FB_TRINO "Prefer trinomials over pentanomials." on)
 
 # Choose the arithmetic methods.
 if (NOT FB_METHD)
