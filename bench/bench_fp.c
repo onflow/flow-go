@@ -287,7 +287,8 @@ static void arith(void) {
 		BENCH_ADD(fp_inv(c, a));
 	}
 	BENCH_END;
-
+	
+#if FP_MUL != INTEG
 	BENCH_BEGIN("fp_rdc") {
 		fp_rand(a);
 		fp_lsh(d, a, FP_BITS);
@@ -301,6 +302,7 @@ static void arith(void) {
 		BENCH_ADD(fp_rdc_monty(c, d));
 	}
 	BENCH_END;
+#endif
 
 #if FP_MUL == BASIC || !defined(STRIP)
 	BENCH_BEGIN("fp_rdc_monty_basic") {

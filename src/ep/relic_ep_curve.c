@@ -124,7 +124,7 @@ void ep_curve_set_ordin(fp_t a, fp_t b) {
 	if (fp_is_zero(a)) {
 		curve_opt_a = EP_OPT_ZERO;
 	} else {
-		if (fp_cmp_dig(a, 1) == RLC_EQ) {
+		if (fp_cmp_dig(a, 1) == CMP_EQ) {
 			curve_opt_a = EP_OPT_ONE;
 		} else {
 			if (fp_bits(a) < FP_DIGIT) {

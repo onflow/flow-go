@@ -273,7 +273,7 @@ void ep_copy(ep_t r, ep_t p);
  *
  * @param[in] p				- the first prime elliptic curve point.
  * @param[in] q				- the second prime elliptic curve point.
- * @return RLC_EQ if p == q and RLC_NE if p != q.
+ * @return CMP_EQ if p == q and CMP_NE if p != q.
  */
 int ep_cmp(ep_t p, ep_t q);
 

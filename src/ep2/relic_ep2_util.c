@@ -54,19 +54,19 @@ void ep2_copy(ep2_t r, ep2_t p) {
 }
 
 int ep2_cmp(ep2_t p, ep2_t q) {
-	if (fp2_cmp(p->x, q->x) != RLC_EQ) {
-		return RLC_NE;
+	if (fp2_cmp(p->x, q->x) != CMP_EQ) {
+		return CMP_NE;
 	}
 
-	if (fp2_cmp(p->y, q->y) != RLC_EQ) {
-		return RLC_NE;
+	if (fp2_cmp(p->y, q->y) != CMP_EQ) {
+		return CMP_NE;
 	}
 
-	if (fp2_cmp(p->z, q->z) != RLC_EQ) {
-		return RLC_NE;
+	if (fp2_cmp(p->z, q->z) != CMP_EQ) {
+		return CMP_NE;
 	}
 
-	return RLC_EQ;
+	return CMP_EQ;
 }
 
 void ep2_rand(ep2_t p) {

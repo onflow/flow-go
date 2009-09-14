@@ -34,7 +34,7 @@
 #include "relic_bench.h"
 
 int main(void) {
-	rlc_init();
+	core_init();
 	ep2_t p;
 	ep_t q, t;
 	bn_t x;
@@ -79,7 +79,7 @@ int main(void) {
 		ep2_dbl(p, p);
 		ep2_norm(p, p);
 		pp_pair_rate(r2, p, q, x, f);
-		TEST_ASSERT(fp12_cmp(r1, r2) == RLC_EQ, end);
+		TEST_ASSERT(fp12_cmp(r1, r2) == CMP_EQ, end);
 	} TEST_END;
 
 	BENCH_BEGIN("rate_pair") {
@@ -98,7 +98,7 @@ int main(void) {
 	fp12_free(r2);
 	fp12_free(f);
 end:
-	rlc_clean();
+	core_clean();
 
 	return 0;
 }

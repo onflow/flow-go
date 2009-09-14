@@ -126,8 +126,8 @@ typedef fp_st fp2_st[2];
  * @return FP_LT if a < b, FP_EQ if a == b and FP_GT if a > b.
  */
 #define fp2_cmp(A, B)														\
-		((fp_cmp(A[0], B[0]) == RLC_EQ) && (fp_cmp(A[1], B[1]) == RLC_EQ)	\
-		? RLC_EQ : RLC_NE)													\
+		((fp_cmp(A[0], B[0]) == CMP_EQ) && (fp_cmp(A[1], B[1]) == CMP_EQ)	\
+		? CMP_EQ : CMP_NE)													\
 
 #define fp2_set_dig(A, B)													\
 		fp_set_dig(A[0], B); fp_zero(A[1]);									\

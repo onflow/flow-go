@@ -63,7 +63,7 @@ void ep_param_set(int param) {
 	switch (param) {
 		case RATE_P256:
 			bn_read_str(p, RATE_P256_P, strlen(RATE_P256_P), 16);
-			fp_prime_set(p);
+			fp_prime_set_dense(p);
 			fp_read(a, RATE_P256_A, strlen(RATE_P256_A), 16);
 			fp_read(b, RATE_P256_B, strlen(RATE_P256_B), 16);
 			bn_read_str(r, RATE_P256_R, strlen(RATE_P256_R), 16);

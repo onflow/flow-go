@@ -38,7 +38,7 @@ void ep_new_impl(ep_t a) {
 
 int memory(void) {
 	err_t e;
-	int code = RLC_ERR;
+	int code = STS_ERR;
 	ep_t a = NULL;
 
 	TRY {
@@ -51,18 +51,18 @@ int memory(void) {
 	} CATCH(e) {
 		switch (e) {
 			case ERR_NO_MEMORY:
-				rlc_print("FATAL ERROR!\n");
+				util_print("FATAL ERROR!\n");
 				ERROR(end);
 				break;
 		}
 	}
-	code = RLC_OK;
+	code = STS_OK;
   end:
 	return code;
 }
 
 int util(void) {
-	int code = RLC_ERR;
+	int code = STS_ERR;
 	ep_t a, b, c;
 
 	TRY {
@@ -73,20 +73,20 @@ int util(void) {
 		TEST_BEGIN("comparison is consistent") {
 			ep_rand(a);
 			ep_rand(b);
-			TEST_ASSERT(ep_cmp(a, b) != RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(a, b) != CMP_EQ, end);
 		}
 		TEST_END;
 
 		TEST_BEGIN("copy and comparison are consistent") {
 			ep_rand(a);
 			ep_rand(b);
-			if (ep_cmp(a, c) != RLC_EQ) {
+			if (ep_cmp(a, c) != CMP_EQ) {
 				ep_copy(c, a);
-				TEST_ASSERT(ep_cmp(c, a) == RLC_EQ, end);
+				TEST_ASSERT(ep_cmp(c, a) == CMP_EQ, end);
 			}
-			if (ep_cmp(b, c) != RLC_EQ) {
+			if (ep_cmp(b, c) != CMP_EQ) {
 				ep_copy(c, b);
-				TEST_ASSERT(ep_cmp(b, c) == RLC_EQ, end);
+				TEST_ASSERT(ep_cmp(b, c) == CMP_EQ, end);
 			}
 		}
 		TEST_END;
@@ -94,7 +94,7 @@ int util(void) {
 		TEST_BEGIN("negation and comparison are consistent") {
 			ep_rand(a);
 			ep_neg(b, a);
-			TEST_ASSERT(ep_cmp(a, b) != RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(a, b) != CMP_EQ, end);
 		}
 		TEST_END;
 
@@ -103,8 +103,8 @@ int util(void) {
 		{
 			ep_rand(a);
 			ep_set_infty(c);
-			TEST_ASSERT(ep_cmp(a, c) != RLC_EQ, end);
-			TEST_ASSERT(ep_cmp(c, a) != RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(a, c) != CMP_EQ, end);
+			TEST_ASSERT(ep_cmp(c, a) != CMP_EQ, end);
 		}
 		TEST_END;
 
@@ -115,10 +115,10 @@ int util(void) {
 		TEST_END;
 	}
 	CATCH_ANY {
-		rlc_print("FATAL ERROR!\n");
+		util_print("FATAL ERROR!\n");
 		ERROR(end);
 	}
-	code = RLC_OK;
+	code = STS_OK;
   end:
 	ep_free(a);
 	ep_free(b);
@@ -127,7 +127,7 @@ int util(void) {
 }
 
 int addition(void) {
-	int code = RLC_ERR;
+	int code = STS_ERR;
 
 	ep_t a, b, c, d, e;
 
@@ -142,7 +142,7 @@ int addition(void) {
 			ep_rand(b);
 			ep_add(d, a, b);
 			ep_add(e, b, a);
-			TEST_ASSERT(ep_cmp(d, e) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 
 		TEST_BEGIN("point addition is associative") {
@@ -153,18 +153,22 @@ int addition(void) {
 			ep_add(d, d, c);
 			ep_add(e, b, c);
 			ep_add(e, e, a);
+			puts("");
+			ep_print(d);
+			puts("");
+			ep_print(e);
 			ep_norm(d, d);
 			ep_norm(e, e);
-			TEST_ASSERT(ep_cmp(d, e) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 
 		TEST_BEGIN("point addition has identity") {
 			ep_rand(a);
 			ep_set_infty(d);
 			ep_add(e, a, d);
-			TEST_ASSERT(ep_cmp(e, a) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(e, a) == CMP_EQ, end);
 			ep_add(e, d, a);
-			TEST_ASSERT(ep_cmp(e, a) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(e, a) == CMP_EQ, end);
 		} TEST_END;
 
 		TEST_BEGIN("point addition has inverse") {
@@ -181,7 +185,7 @@ int addition(void) {
 			ep_add(d, a, b);
 			ep_norm(d, d);
 			ep_add_basic(e, a, b);
-			TEST_ASSERT(ep_cmp(e, d) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(e, d) == CMP_EQ, end);
 		} TEST_END;
 #endif
 
@@ -201,7 +205,7 @@ int addition(void) {
 			ep_norm(b, b);
 			ep_add(e, a, b);
 			ep_norm(e, e);
-			TEST_ASSERT(ep_cmp(e, d) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(e, d) == CMP_EQ, end);
 		} TEST_END;
 
 		TEST_BEGIN("point addition in mixed coordinates (z2 = 1) is correct") {
@@ -216,7 +220,7 @@ int addition(void) {
 			ep_norm(a, a);
 			ep_add(e, a, b);
 			ep_norm(e, e);
-			TEST_ASSERT(ep_cmp(e, d) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(e, d) == CMP_EQ, end);
 		} TEST_END;
 
 		TEST_BEGIN("point addition in mixed coordinates (z1,z2 = 1) is correct") {
@@ -229,7 +233,7 @@ int addition(void) {
 			ep_norm(d, d);
 			ep_add_projc(e, a, b);
 			ep_norm(e, e);
-			TEST_ASSERT(ep_cmp(e, d) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(e, d) == CMP_EQ, end);
 		} TEST_END;
 #endif
 #endif
@@ -237,7 +241,7 @@ int addition(void) {
 	CATCH_ANY {
 		ERROR(end);
 	}
-	code = RLC_OK;
+	code = STS_OK;
   end:
 	ep_free(a);
 	ep_free(b);
@@ -248,7 +252,7 @@ int addition(void) {
 }
 
 int subtraction(void) {
-	int code = RLC_ERR;
+	int code = STS_ERR;
 	ep_t a, b, c, d;
 
 	TRY {
@@ -265,7 +269,7 @@ int subtraction(void) {
 			ep_norm(c, c);
 			ep_norm(d, d);
 			ep_neg(d, d);
-			TEST_ASSERT(ep_cmp(c, d) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(c, d) == CMP_EQ, end);
 		}
 		TEST_END;
 
@@ -274,7 +278,7 @@ int subtraction(void) {
 			ep_set_infty(c);
 			ep_sub(d, a, c);
 			ep_norm(d, d);
-			TEST_ASSERT(ep_cmp(d, a) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(d, a) == CMP_EQ, end);
 		}
 		TEST_END;
 
@@ -289,7 +293,7 @@ int subtraction(void) {
 	CATCH_ANY {
 		ERROR(end);
 	}
-	code = RLC_OK;
+	code = STS_OK;
   end:
 	ep_free(a);
 	ep_free(b);
@@ -299,7 +303,7 @@ int subtraction(void) {
 }
 
 int doubling(void) {
-	int code = RLC_ERR;
+	int code = STS_ERR;
 	ep_t a, b, c;
 
 	TRY {
@@ -313,7 +317,7 @@ int doubling(void) {
 			ep_norm(b, b);
 			ep_dbl(c, a);
 			ep_norm(c, c);
-			TEST_ASSERT(ep_cmp(b, c) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 
 #if EP_ADD == BASIC || !defined(STRIP)
@@ -322,7 +326,7 @@ int doubling(void) {
 			ep_dbl(b, a);
 			ep_norm(b, b);
 			ep_dbl_basic(c, a);
-			TEST_ASSERT(ep_cmp(b, c) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 #endif
 
@@ -337,7 +341,7 @@ int doubling(void) {
 			ep_norm(a, a);
 			ep_dbl(c, a);
 			ep_norm(c, c);
-			TEST_ASSERT(ep_cmp(b, c) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 
 		TEST_BEGIN("point doubling in mixed coordinates (z1 = 1) is correct") {
@@ -346,7 +350,7 @@ int doubling(void) {
 			ep_norm(b, b);
 			ep_dbl(c, a);
 			ep_norm(c, c);
-			TEST_ASSERT(ep_cmp(b, c) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 #endif
 #endif
@@ -354,7 +358,7 @@ int doubling(void) {
 	CATCH_ANY {
 		ERROR(end);
 	}
-	code = RLC_OK;
+	code = STS_OK;
   end:
 	ep_free(a);
 	ep_free(b);
@@ -363,7 +367,7 @@ int doubling(void) {
 }
 
 int multiplication(void) {
-	int code = RLC_ERR;
+	int code = STS_ERR;
 
 	ep_t p;
 	ep_t q;
@@ -390,15 +394,15 @@ int multiplication(void) {
 			bn_mod_basic(k, k, n);
 			ep_mul(q, p, k);
 			ep_mul_basic(r, p, k);
-			TEST_ASSERT(ep_cmp(q, r) == RLC_EQ, end);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
 #endif
 	}
 	CATCH_ANY {
-		rlc_print("FATAL ERROR!\n");
+		util_print("FATAL ERROR!\n");
 		ERROR(end);
 	}
-	code = RLC_OK;
+	code = STS_OK;
   end:
 	ep_free(q);
 	ep_free(r);
@@ -407,51 +411,51 @@ int multiplication(void) {
 }
 
 int test(void) {
-	if (util() != RLC_OK) {
-		rlc_clean();
-		return RLC_ERR;
+	if (util() != STS_OK) {
+		core_clean();
+		return STS_ERR;
 	}
 
-	if (addition() != RLC_OK) {
-		rlc_clean();
-		return RLC_ERR;
+	if (addition() != STS_OK) {
+		core_clean();
+		return STS_ERR;
 	}
 
-	if (subtraction() != RLC_OK) {
-		rlc_clean();
-		return RLC_ERR;
+	if (subtraction() != STS_OK) {
+		core_clean();
+		return STS_ERR;
 	}
 
-	if (doubling() != RLC_OK) {
-		rlc_clean();
-		return RLC_ERR;
+	if (doubling() != STS_OK) {
+		core_clean();
+		return STS_ERR;
 	}
 
-	if (multiplication() != RLC_OK) {
-		rlc_clean();
-		return RLC_ERR;
+	if (multiplication() != STS_OK) {
+		core_clean();
+		return STS_ERR;
 	}
 
-	return RLC_OK;
+	return STS_OK;
 }
 
 int main(void) {
-	rlc_init();
+	core_init();
 
-	if (memory() != RLC_OK) {
-		rlc_clean();
+	if (memory() != STS_OK) {
+		core_clean();
 		return 1;
 	}
 #if defined(EP_STAND) && defined(EP_ORDIN) && FP_PRIME == 256
 	ep_param_set(RATE_P256);
-	rlc_print("Curve RATE-P256:\n");
+	util_print("Curve RATE-P256:\n");
 
-	if (test() != RLC_OK) {
-		rlc_clean();
+	if (test() != STS_OK) {
+		core_clean();
 		return 1;
 	}
 #endif
 
-	rlc_clean();
+	core_clean();
 	return 0;
 }

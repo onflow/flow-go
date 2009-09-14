@@ -118,8 +118,8 @@ typedef fp2_t fp6_t[3];
  * @return FP_LT if a < b, FP_EQ if a == b and FP_GT if a > b.
  */
 #define fp6_cmp(A, B)														\
-		((fp2_cmp(A[0], B[0]) == RLC_EQ) && (fp2_cmp(A[1], B[1]) == RLC_EQ)	\
-		&& (fp2_cmp(A[2], B[2]) == RLC_EQ) ? RLC_EQ : RLC_NE)				\
+		((fp2_cmp(A[0], B[0]) == CMP_EQ) && (fp2_cmp(A[1], B[1]) == CMP_EQ)	\
+		&& (fp2_cmp(A[2], B[2]) == CMP_EQ) ? CMP_EQ : CMP_NE)				\
 
 #define fp6_set_dig(A, B)													\
 		fp2_set_dig(A[0], B); fp2_zero(A[1]); fp2_zero(A[2]);				\

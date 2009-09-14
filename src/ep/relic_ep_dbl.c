@@ -199,7 +199,7 @@ static void ep_dbl_basic_super(ep_t r, ep_t p) {
 
 #endif /* EP_ADD == BASIC */
 
-#if EP_ADD == PROJC || !defined(STRIP)
+#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
 
 #if defined(EP_ORDIN) || defined(EP_KBLTZ)
 /**
@@ -341,7 +341,7 @@ void ep_dbl_basic(ep_t r, ep_t p) {
 
 #endif
 
-#if EP_ADD == PROJC || !defined(STRIP)
+#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
 
 void ep_dbl_projc(ep_t r, ep_t p) {
 	if (ep_is_infty(p)) {

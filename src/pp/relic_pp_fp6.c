@@ -83,9 +83,9 @@ void fp6_mul(fp6_t c, fp6_t a, fp6_t b) {
 	fp2_sub(c[1], t5, t2);
 	fp2_copy(c[2], t1);
 
-	fp_free(t0);
-	fp_free(t1);
-	fp_free(t2);
+	fp2_free(t0);
+	fp2_free(t1);
+	fp2_free(t2);
 }
 
 void fp6_mul_sparse1(fp6_t c, fp6_t a, fp6_t b) {
@@ -131,9 +131,9 @@ void fp6_mul_sparse1(fp6_t c, fp6_t a, fp6_t b) {
 	fp2_copy(c[1], t2);
 	fp2_copy(c[2], t1);
 
-	fp_free(t0);
-	fp_free(t1);
-	fp_free(t2);
+	fp2_free(t0);
+	fp2_free(t1);
+	fp2_free(t2);
 }
 
 void fp6_mul_sparse2(fp6_t c, fp6_t a, fp6_t b) {
@@ -181,9 +181,9 @@ void fp6_mul_sparse2(fp6_t c, fp6_t a, fp6_t b) {
 	fp2_copy(c[1], t5);
 	fp2_copy(c[2], t1);
 
-	fp_free(t0);
-	fp_free(t1);
-	fp_free(t2);
+	fp2_free(t0);
+	fp2_free(t1);
+	fp2_free(t2);
 }
 
 void fp6_mul_poly(fp6_t c, fp6_t a) {
@@ -228,11 +228,11 @@ void fp6_sqr(fp6_t c, fp6_t a) {
 	fp2_sub(c[0], t0, t1);
 	fp2_sub(c[1], t3, t2);
 
-	fp_free(t0);
-	fp_free(t1);
-	fp_free(t2);
-	fp_free(t3);
-	fp_free(t4);
+	fp2_free(t0);
+	fp2_free(t1);
+	fp2_free(t2);
+	fp2_free(t3);
+	fp2_free(t4);
 }
 
 void fp6_frob(fp6_t c, fp6_t a, fp6_t b) {
@@ -302,7 +302,7 @@ void fp6_inv(fp6_t c, fp6_t a) {
 
 	fp6_copy(c, t);
 
-	fp2_free(t);
+	fp6_free(t);
 	fp2_free(t0);
 	fp2_free(t1);
 }
