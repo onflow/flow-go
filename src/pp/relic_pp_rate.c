@@ -148,8 +148,9 @@ void rate_dbl(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
  * 
  * On G_2, this is the same as multiplying by p.   
  * 
- * @param[in] a				- a point Jacobian coordinates.
  * @param[out] c			- the result in Jacobian coordinates.
+ * @param[in] a				- a point Jacobian coordinates.
+ * @param[in] f				- constant used in Frobenius, Z^p.
  */
 static void ep2_frob(ep2_t c, ep2_t a, fp12_t f) {
 	fp12_t t;
