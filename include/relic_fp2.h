@@ -39,11 +39,14 @@
 
 /**
  * Represents a quadratic extension prime field element.
+ * 
+ * An element a is represented as a[0] + a[1] * X, where X^2 = -1 if p = 3 mod 8
+ * and X^2 = -2 if p = 5,7 mod 8.
  */
 typedef fp_t fp2_t[2];
 
 /**
- * Represents a prime field element with automatic memory allocation.
+ * Represents a quadratic extension field element with automatic memory allocation.
  */
 typedef fp_st fp2_st[2];
 
@@ -95,7 +98,7 @@ typedef fp_st fp2_st[2];
 /**
  * Tests if a quadratic extension field element is zero or not.
  *
- * @param[in] a				- the prime field element to compare.
+ * @param[in] a				- the quadratic extension field element to compare.
  * @return 1 if the argument is zero, 0 otherwise.
  */
 #define fp2_is_zero(A)														\
@@ -104,7 +107,7 @@ typedef fp_st fp2_st[2];
 /**
  * Assigns a random value to a quadratic extension field element.
  *
- * @param[out] a			- the prime field element to assign.
+ * @param[out] a			- the quadratic extension field element to assign.
  */
 #define fp2_rand(A)															\
 		fp_rand(A[0]); fp_rand(A[1]);										\
@@ -139,14 +142,14 @@ typedef fp_st fp2_st[2];
  * @param[out] str0			- 
  * @param[out] str1			- 
  * @param[in] len			- the buffer capacities.
- * @param[in] a				- the prime field element to write.
+ * @param[in] a				- the quadratic extension field element to write.
  * @param[in] radix			- the radix.
  * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
  * @throw ERR_INVALID		- if the radix is invalid.
  */
 #define fp2_write(STR0, STR1, LEN, A, RADIX)								\
-		fp_write(STR0, LEN, A[0], RADIX);										\
-		fp_write(STR1, LEN, A[1], RADIX);										\
+		fp_write(STR0, LEN, A[0], RADIX);									\
+		fp_write(STR1, LEN, A[1], RADIX);									\
 
 /**
  * Returns the result of a comparison between two quadratic extension field
@@ -174,7 +177,7 @@ typedef fp_st fp2_st[2];
 		fp_add(C[0], A[0], B[0]); fp_add(C[1], A[1], B[1]);					\
 
 /**
- * Subtracts a prime field element from another, that is, computes
+ * Subtracts a quadratic extension field element from another, that is, computes
  * c = a - b.
  *
  * @param[out] c			- the destination.
@@ -201,7 +204,7 @@ typedef fp_st fp2_st[2];
 		fp_sub_dig(C[0], A[0], B); fp_copy(C[1], A[1]);						\
 
 /**
- * Multiples two prime field elements, that is, compute c = a * b.
+ * Multiples two quadratic extension field elements, that is, compute c = a * b.
  *
  * @param[out] c			- the destination.
  * @param[in] a				- the quadratic extension prime field element.
@@ -210,22 +213,36 @@ typedef fp_st fp2_st[2];
 void fp2_mul(fp2_t c, fp2_t a, fp2_t b);
 
 /**
- * Computes the square of a prime field element, that is, computes
+ * Computes the square of a quadratic extension field element, that is, computes
  * c = a * a.
  *
  * @param[out] c			- the destination.
- * @param[in] a				- the prime field element to square.
+ * @param[in] a				- the quadratic extension field element to square.
  */
 void fp2_sqr(fp2_t c, fp2_t a);
 
 /**
+ * Inverts a quadratic extension field element. Computes c = a^(-1).
  *
- *
+ * @param[out] c			- the destination.
+ * @param[in] a				- the quadratic extension prime field element to invert.
  */
 void fp2_inv(fp2_t c, fp2_t a);
 
+/**
+ * Computes the conjugate of a quadratic extension field element.
+ * 
+ * @param[out] c			- the destination.
+ * @param[in] a				- the quadratic extension prime field element to conjugate.
+ */
 void fp2_conj(fp2_t c, fp2_t a);
 
+/**
+ * Multiplies a quadratic extension field element by X.
+ * 
+ * @param[out] c			- the destination.
+ * @param[in] a				- the quadratic extension prime field element.
+ */
 void fp2_mul_poly(fp2_t c, fp2_t a);
 
 #endif /* !RELIC_FP2_H */

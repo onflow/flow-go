@@ -269,7 +269,7 @@ void fp12_frob(fp12_t c, fp12_t a, fp12_t b);
  * A unitary element is one previously raised to the (p^6 - 1)th power.
  * 
  * @param[out] c			- the destination.
- * @param[in] a				- the unitary dodecic extension prime field element to conjugate.
+ * @param[in] a				- the dodecic extension prime field element to conjugate.
  */
 void fp12_conj(fp12_t c, fp12_t a);
 
