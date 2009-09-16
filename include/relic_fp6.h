@@ -110,6 +110,47 @@ typedef fp2_t fp6_t[3];
 		fp2_print(A[0]); fp2_print(A[1]); fp2_print(A[2]);					\
 
 /**
+ * Reads a sextic extension field element from strings in a given radix.
+ * The radix must be a power of 2 included in the interval [2, 64].
+ *
+ * @param[out] a			- the result.
+ * @param[in] str00			- 
+ * @param[in] str01			- 
+ * @param[in] str10			- 
+ * @param[in] str11			- 
+ * @param[in] str20			- 
+ * @param[in] str21			- 
+ * @param[in] len 			- the maximum length of the strings.
+ * @param[in] radix			- the radix.
+ * @throw ERR_INVALID		- if the radix is invalid.
+ */
+#define fp6_read(A, STR00, STR01, STR10, STR11, STR20, STR21, LEN, RADIX)	\
+		fp2_read(A[0], STR00, STR01, LEN, RADIX);							\
+		fp2_read(A[1], STR10, STR11, LEN, RADIX);							\
+		fp2_read(A[2], STR20, STR21, LEN, RADIX);							\
+
+/**
+ * Writes a sextic extension field element to strings in a given radix.
+ * The radix must be a power of 2 included in the interval [2, 64].
+ *
+ * @param[out] str00		- 
+ * @param[out] str01		- 
+ * @param[out] str10		- 
+ * @param[out] str11		- 
+ * @param[out] str20		- 
+ * @param[out] str21		- 
+ * @param[in] len			- the buffer capacities.
+ * @param[in] a				- the prime field element to write.
+ * @param[in] radix			- the radix.
+ * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
+ * @throw ERR_INVALID		- if the radix is invalid.
+ */
+#define fp6_write(STR00, STR01, STR10, STR11, STR20, STR21, LEN, A, RADIX)	\
+		fp2_write(STR00, STR01, LEN, A[0], RADIX);							\
+		fp2_write(STR10, STR11, LEN, A[1], RADIX);							\
+		fp2_write(STR20, STR21, LEN, A[2], RADIX);							\
+
+/**
  * Returns the result of a comparison between two sextic extension field
  * elements
  *
@@ -181,5 +222,13 @@ void fp6_sqr(fp6_t c, fp6_t a);
  *
  */
 void fp6_inv(fp6_t c, fp6_t a);
+
+void fp6_mul_sparse1(fp6_t c, fp6_t a, fp6_t b);
+
+void fp6_mul_sparse2(fp6_t c, fp6_t a, fp6_t b);
+
+void fp6_mul_poly(fp6_t c, fp6_t a);
+
+void fp6_frob(fp6_t c, fp6_t a, fp6_t b);
 
 #endif /* !RELIC_FP6_H */

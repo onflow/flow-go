@@ -90,11 +90,7 @@ void ep2_norm(ep2_t r, ep2_t p) {
 		ep2_copy(r, p);
 	}
 
-#if EP_ADD == PROJC || !defined(STRIP)
-
 #if defined(EP_ORDIN)
 	ep2_norm_ordin(r, p);
 #endif /* EP_ORDIN */
-
-#endif /* EP_ADD == PROJC */
 }

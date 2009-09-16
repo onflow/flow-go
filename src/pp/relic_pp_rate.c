@@ -590,3 +590,158 @@ void pp_pair_rate3(fp12_t r, ep2_t p, ep_t q, bn_t x, fp12_t f) {
 	ep2_free(_t);
 }
 
+void rate_miller(fp12_t res, ep2_t t, ep2_t q, bn_t r, ep_t p) {
+	fp12_t tmp;
+	unsigned int i;
+
+	fp12_new(tmp);
+
+	fp12_set_dig(res, 1);
+	ep2_copy(t, q);
+
+	for (i = bn_bits(r) - 1; i > 0; i--) {
+		rate_dbl(tmp, t, t, p);
+		fp12_sqr(res, res);
+		fp12_mul_sparse(res, res, tmp);
+
+		if (bn_test_bit(r, i - 1)) {
+			rate_add(tmp, t, q, p);
+			fp12_mul_sparse(res, res, tmp);
+		}
+	}
+}
+
+void rate_mult(fp12_t res, ep2_t t, ep2_t q, ep_t p, fp12_t f) {
+	ep2_t q1, r1q;
+	fp12_t tmp1;
+	fp12_t tmp2;
+	ep2_new(q1);
+	ep2_new(r1q);
+	fp12_new(tmp1);
+	fp12_new(tmp2);
+
+	ep2_copy(r1q, t);
+
+	rate_add(tmp1, r1q, q, p);
+	fp12_mul_sparse(tmp2, res, tmp1);
+	fp12_frob(tmp2, tmp2, f);
+	fp12_mul(res, res, tmp2);
+
+	//INVERSION
+	r1q->norm = 0;
+	ep2_norm(r1q, r1q);
+
+	ep2_frob(q1, r1q, f);
+
+	ep2_copy(r1q, t);
+
+	rate_add(tmp1, r1q, q1, p);
+	fp12_mul_sparse(res, res, tmp1);
+}
+
+void rate_final_expo(fp12_t m, bn_t x, fp12_t f) {
+	fp12_t v0;
+	fp12_t v1;
+	fp12_t v2;
+	fp12_t v3;
+	fp12_new(v0);
+	fp12_new(v1);
+	fp12_new(v2);
+	fp12_new(v3);
+
+	//First, m^(p^6 - 1)
+	//tmp = m^(-1)
+	//INVERSION
+	fp12_inv(v0, m);
+	//m' = m^(p^6)
+	fp12_conj(m, m);
+	//m' = m^(p^6 - 1)
+	fp12_mul(m, m, v0);
+
+	//Second, m^(p^2 + 1)
+	//t = m^(p^2)
+	fp12_frob(v0, m, f);
+	fp12_frob(v0, v0, f);
+	//m' = m^(p^2 + 1)
+	fp12_mul(m, m, v0);
+
+	//Third, m^((p^4 - p^2 + 1) / r)
+	//From here on we work with x' = -x, therefore if x is positive
+	//we need inversions
+	if (bn_sign(x) == BN_POS) {
+		//TODO: maybe these inversions are just conjugations, checl
+		//INVERSION
+		fp12_inv(v3, m);
+		fp12_exp_basic_uni(v0, v3, x);
+		//INVERSION
+		fp12_inv(v3, v0);
+		fp12_exp_basic_uni(v1, v3, x);
+		//INVERSION
+		fp12_inv(v3, v1);
+		fp12_exp_basic_uni(v2, v3, x);
+	} else {
+		fp12_exp_basic_uni(v0, m, x);
+		fp12_exp_basic_uni(v1, v0, x);
+		fp12_exp_basic_uni(v2, v1, x);
+	}
+
+	//TODO: make specific version for x positive to avoid above inversions
+	fp12_frob(v3, v2, f);
+	fp12_mul(v2, v2, v3);
+	fp12_sqr_uni(v2, v2);
+	fp12_frob(v3, v1, f);
+	fp12_conj(v3, v3);
+	fp12_mul(v3, v3, v0);
+	fp12_mul(v2, v2, v3);
+	fp12_frob(v0, v0, f);
+	fp12_conj(v3, v1);
+	fp12_mul(v2, v2, v3);
+	fp12_mul(v0, v0, v3);
+	fp12_frob(v1, v1, f);
+	fp12_frob(v1, v1, f);
+	fp12_mul(v0, v0, v2);
+	fp12_mul(v2, v2, v1);
+	fp12_sqr_uni(v0, v0);
+	fp12_mul(v0, v0, v2);
+	fp12_sqr_uni(v0, v0);
+	fp12_conj(v1, m);
+	fp12_mul(v2, v0, v1);
+	fp12_frob(v1, m, f);
+	fp12_frob(v1, v1, f);
+	fp12_frob(v3, v1, f);
+	fp12_mul(v1, v1, v3);
+	fp12_frob(v3, m, f);
+	fp12_mul(v1, v1, v3);
+	fp12_mul(v0, v0, v1);
+	fp12_sqr_uni(v2, v2);
+	fp12_mul(m, v2, v0);
+}
+
+void pp_pair_rate4(fp12_t res, ep2_t q, ep_t p, bn_t x, fp12_t f) {
+	ep2_t t;
+	bn_t a;
+
+	ep2_new(t);
+	bn_new(a);
+
+	bn_mul_dig(a, x, 6);
+	bn_add_dig(a, a, 2);
+	if (bn_sign(x) == BN_NEG) {
+		bn_neg(a, a);
+	}
+
+	//res = f_{r,Q}(P)
+	rate_miller(res, t, q, a, p);
+
+	if (bn_sign(x) == BN_NEG) {
+		//because f_{-r,Q}(P) = 1/f_{r,Q}(P)
+		//INVERSION
+		fp12_inv(res, res);
+		//We have rQ but we need -rQ
+		fp2_neg(t->y, t->y);
+	}
+
+	rate_mult(res, t, q, p, f);
+
+	rate_final_expo(res, x, f);
+}

@@ -62,25 +62,34 @@ void fp12_mul(fp12_t c, fp12_t a, fp12_t b) {
 }
 
 void fp12_mul_sparse(fp12_t c, fp12_t a, fp12_t b) {
-	fp6_t t0, t1, t2;
-
+	fp6_t v0, v1, t0;
+	fp6_new(v0);
+	fp6_new(v1);
 	fp6_new(t0);
-	fp6_new(t1);
-	fp6_new(t2);
-
-	fp6_mul_sparse1(t0, a[0], b[0]);
-	fp6_mul_sparse2(t1, a[1], b[1]);
-	fp6_add(t2, b[0], b[1]);
-	fp6_add(c[1], a[1], a[0]);
-	fp6_mul_sparse2(c[1], c[1], t2);
-	fp6_sub(c[1], c[1], t0);
-	fp6_sub(c[1], c[1], t1);
-	fp6_mul_poly(t1, t1);
-	fp6_add(c[0], t0, t1);
-
+	
+	/* c1 = (a0 + a1)(b0 + b1) */
+	fp6_add(v0, a[0], a[1]);
+	fp2_add(v1[0], b[0][0], b[1][0]);
+	fp2_copy(v1[1], b[1][1]);
+	fp6_mul_sparse2(t0, v0, v1); //5M
+	
+	/* v0 = a0b0 */
+	fp6_mul_sparse1(v0, a[0], b[0]); //3M
+	
+	/* v1 = a1b1 */
+	fp6_mul_sparse2(v1, a[1], b[1]); //5M
+	
+	/* c1 = c1 - v0 - v1 */
+	fp6_sub(c[1], t0, v0);
+	fp6_sub(c[1], c[1], v1);
+	
+	/* c0 = v0 + Bv1 */
+	fp6_mul_poly(v1, v1);
+	fp6_add(c[0], v0, v1);
+	
+	fp6_free(v0);
+	fp6_free(v1);
 	fp6_free(t0);
-	fp6_free(t1);
-	fp6_free(t2);
 }
 
 void fp12_sqr(fp12_t c, fp12_t a) {
@@ -89,15 +98,15 @@ void fp12_sqr(fp12_t c, fp12_t a) {
 	fp6_new(t0);
 	fp6_new(t1);
 
-    fp6_add(t0, a[0], a[1]);
-    fp6_mul_poly(t1, a[1]);
-    fp6_add(t1, a[0], t1);
-    fp6_mul(t0, t0, t1);
-    fp6_mul(c[1], a[0], a[1]);
-    fp6_sub(c[0], t0, c[1]);
-    fp6_mul_poly(t1, c[1]);
-    fp6_sub(c[0], c[0], t1);
-    fp6_add(c[1], c[1], c[1]);
+	fp6_add(t0, a[0], a[1]);
+	fp6_mul_poly(t1, a[1]);
+	fp6_add(t1, a[0], t1);
+	fp6_mul(t0, t0, t1);
+	fp6_mul(c[1], a[0], a[1]);
+	fp6_sub(c[0], t0, c[1]);
+	fp6_mul_poly(t1, c[1]);
+	fp6_sub(c[0], c[0], t1);
+	fp6_add(c[1], c[1], c[1]);
 
 	fp6_free(t0);
 	fp6_free(t1);
@@ -150,6 +159,7 @@ void fp12_frob(fp12_t c, fp12_t a, fp12_t b) {
 	fp6_zero(t1[1]);
 	fp12_mul(t1, t1, b);
 	fp12_add(c, t0, t1);
+	
 	fp12_free(t);
 	fp12_free(t0);
 	fp12_free(t1);
@@ -161,23 +171,23 @@ void fp12_conj(fp12_t c, fp12_t a) {
 }
 
 void fp12_inv(fp12_t c, fp12_t a) {
-	fp6_t t0, t1, t2;
-
+	fp6_t t0;
+	fp6_t t1;
 	fp6_new(t0);
 	fp6_new(t1);
-	fp6_new(t2);
+	
 	fp6_sqr(t0, a[0]);
 	fp6_sqr(t1, a[1]);
-	fp6_mul_poly(t2, t1);
-	fp6_sub(t0, t0, t2);
+	fp6_mul_poly(t1, t1);
+	fp6_sub(t0, t0, t1);
 	fp6_inv(t0, t0);
-	fp12_conj(c, a);
+	
+	fp6_mul(c[0], a[0], t0);
+	fp6_neg(c[1], a[1]);
 	fp6_mul(c[1], c[1], t0);
-	fp6_mul(c[0], c[0], t0);
-
+	
 	fp6_free(t0);
 	fp6_free(t1);
-	fp6_free(t2);
 }
 
 void fp12_exp(fp12_t c, fp12_t a, bn_t b) {

@@ -118,6 +118,37 @@ typedef fp_st fp2_st[2];
 		fp_print(A[0]); fp_print(A[1]);										\
 
 /**
+ * Reads a quadratic extension field element from strings in a given radix.
+ * The radix must be a power of 2 included in the interval [2, 64].
+ *
+ * @param[out] a			- the result.
+ * @param[in] str0			- 
+ * @param[in] str1			- 
+ * @param[in] len 			- the maximum length of the strings.
+ * @param[in] radix			- the radix.
+ * @throw ERR_INVALID		- if the radix is invalid.
+ */
+#define fp2_read(A, STR0, STR1, LEN, RADIX)									\
+		fp_read(A[0], STR0, LEN, RADIX);									\
+		fp_read(A[1], STR1, LEN, RADIX);									\
+
+/**
+ * Writes a quadratic extension field element to strings in a given radix.
+ * The radix must be a power of 2 included in the interval [2, 64].
+ *
+ * @param[out] str0			- 
+ * @param[out] str1			- 
+ * @param[in] len			- the buffer capacities.
+ * @param[in] a				- the prime field element to write.
+ * @param[in] radix			- the radix.
+ * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
+ * @throw ERR_INVALID		- if the radix is invalid.
+ */
+#define fp2_write(STR0, STR1, LEN, A, RADIX)								\
+		fp_write(STR0, LEN, A[0], RADIX);										\
+		fp_write(STR1, LEN, A[1], RADIX);										\
+
+/**
  * Returns the result of a comparison between two quadratic extension field
  * elements
  *
@@ -192,5 +223,9 @@ void fp2_sqr(fp2_t c, fp2_t a);
  *
  */
 void fp2_inv(fp2_t c, fp2_t a);
+
+void fp2_conj(fp2_t c, fp2_t a);
+
+void fp2_mul_poly(fp2_t c, fp2_t a);
 
 #endif /* !RELIC_FP2_H */

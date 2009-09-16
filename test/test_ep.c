@@ -153,10 +153,6 @@ int addition(void) {
 			ep_add(d, d, c);
 			ep_add(e, b, c);
 			ep_add(e, e, a);
-			puts("");
-			ep_print(d);
-			puts("");
-			ep_print(e);
 			ep_norm(d, d);
 			ep_norm(e, e);
 			TEST_ASSERT(ep_cmp(d, e) == CMP_EQ, end);

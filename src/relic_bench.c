@@ -38,7 +38,6 @@
 
 #if OPSYS != NONE && TIMER != NONE
 #include <sys/time.h>
-#include <time.h>
 #endif
 
 /*============================================================================*/
@@ -72,7 +71,9 @@ static inline bench_t cycles(void) {
 	return ((bench_t) lo) | (((bench_t) hi) << 32);
 }
 #endif
-
+#elif TIMER == MSPSIM
+#include "msp430util.h"
+typedef unsigned long long bench_t;
 #else
 typedef unsigned int bench_t;
 #endif
@@ -153,7 +154,7 @@ void bench_overhead(void) {
 		overhead = overhead / 2;
 	} while (overhead < 0);
 
-#if TIMER == CYCLE
+#if TIMER == CYCLE || TIMER == MSPSIM
 	util_print("%lld cycles\n", overhead);
 #elif TIMER != NONE
 	util_print("%lld nanosec\n", overhead);
@@ -183,6 +184,8 @@ void bench_before() {
 	gettimeofday(&before, NULL);
 #elif TIMER == CYCLE
 	before = cycles();
+#elif TIMER == MSPSIM
+	before = msp430_get_cycles();
 #endif
 }
 
@@ -210,6 +213,9 @@ void bench_after() {
 #elif TIMER == CYCLE
 	after = cycles();
 	result = (after - before);
+#elif TIMER == MSPSIM
+	after = msp430_get_cycles();
+	result = (after - before);
 #endif
 
 #if TIMER != NONE
@@ -222,8 +228,8 @@ void bench_after() {
 void bench_compute(int benches) {
 #if TIMER != NONE
 	total = total / benches - overhead;
-#if TIMER == CYCLE
-	util_print("%lld cycles", total);
+#if TIMER == CYCLE || TIMER == MSPSIM
+	util_print("%20lld cycles", total);
 #elif TIMER != NONE
 	util_print("%lld nanosec", total);
 #else

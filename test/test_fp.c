@@ -330,8 +330,6 @@ static int multiplication(void) {
 			fp_mul(e, c, a);
 			fp_mul(f, c, b);
 			fp_add(e, e, f);
-			fp_print(d);
-			fp_print(e);
 			TEST_ASSERT(fp_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 

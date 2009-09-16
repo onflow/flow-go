@@ -307,6 +307,8 @@ void ep2_add_basic(ep2_t r, ep2_t p, ep2_t q);
  */
 void ep2_add_basic_slope(ep2_t r, fp2_t s, ep2_t p, ep2_t q);
 
+void ep2_add_projc_slope(ep2_t r, fp2_t s, ep2_t p, ep2_t q);
+
 /**
  * Doubles a prime elliptic curve point.
  *
@@ -326,6 +328,8 @@ void ep2_add_basic_slope(ep2_t r, fp2_t s, ep2_t p, ep2_t q);
  * @param[in] p				- the point to double.
  */
 void ep2_dbl_basic(ep2_t r, ep2_t p);
+
+void ep2_dbl_projc(ep2_t r, ep2_t p);
 
 /**
  * Doubles a prime elliptic curve point returning the slope.
@@ -363,5 +367,9 @@ void ep2_mul_basic(ep2_t r, ep2_t p, bn_t k);
  * @param[in] p				- the point to convert.
  */
 void ep2_norm(ep2_t r, ep2_t p);
+
+void ep2_mul(ep2_t r, ep2_t p, bn_t k);
+
+void ep2_curve_set_twist(int twist);
 
 #endif /* !RELIC_EP2_H */

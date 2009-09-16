@@ -110,6 +110,57 @@ typedef fp6_t fp12_t[2];
 		fp6_print(A[0]); fp6_print(A[1]);									\
 
 /**
+ * Reads a quadratic extension field element from strings in a given radix.
+ * The radix must be a power of 2 included in the interval [2, 64].
+ *
+ * @param[out] a			- the result.
+ * @param[in] str000			- 
+ * @param[in] str001			- 
+ * @param[in] str010			- 
+ * @param[in] str011			- 
+ * @param[in] str020			- 
+ * @param[in] str021			- 
+ * @param[in] str100			- 
+ * @param[in] str101			- 
+ * @param[in] str110			- 
+ * @param[in] str111			- 
+ * @param[in] str120			- 
+ * @param[in] str121			- 
+ * @param[in] len 			- the maximum length of the strings.
+ * @param[in] radix			- the radix.
+ * @throw ERR_INVALID		- if the radix is invalid.
+ */
+#define fp12_read(A, STR000, STR001, STR010, STR011, STR020, STR021, STR100, STR101, STR110, STR111, STR120, STR121, LEN, RADIX)\
+		fp6_read(A[0], STR000, STR001, STR010, STR011, STR020, STR021, LEN, RADIX);\
+		fp6_read(A[1], STR100, STR101, STR110, STR111, STR120, STR121, LEN, RADIX);\
+
+/**
+ * Writes a quadratic extension field element to strings in a given radix.
+ * The radix must be a power of 2 included in the interval [2, 64].
+ *
+ * @param[out] str000		- 
+ * @param[out] str001		- 
+ * @param[out] str010		- 
+ * @param[out] str011		- 
+ * @param[out] str020		- 
+ * @param[out] str021		- 
+ * @param[out] str100		- 
+ * @param[out] str101		- 
+ * @param[out] str110		- 
+ * @param[out] str111		- 
+ * @param[out] str120		- 
+ * @param[out] str121		- 
+ * @param[in] len			- the buffer capacities.
+ * @param[in] a				- the prime field element to write.
+ * @param[in] radix			- the radix.
+ * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
+ * @throw ERR_INVALID		- if the radix is invalid.
+ */
+#define fp12_write(STR000, STR001, STR010, STR011, STR020, STR021, STR100, STR101, STR110, STR111, STR120, STR121, LEN, A, RADIX)\
+		fp6_write(STR000, STR001, STR010, STR011, STR020, STR021, LEN, A[0], RADIX);\
+		fp6_write(STR100, STR101, STR110, STR111, STR120, STR121, LEN, A[1], RADIX);\
+
+/**
  * Returns the result of a comparison between two quadratic extension field
  * elements
  *
@@ -174,5 +225,19 @@ void fp12_sqr(fp12_t c, fp12_t a);
  *
  */
 void fp12_inv(fp12_t c, fp12_t a);
+
+void fp12_mul_sparse(fp12_t c, fp12_t a, fp12_t b);
+
+void fp12_sqr_uni(fp12_t c, fp12_t a);
+
+void fp12_frob(fp12_t c, fp12_t a, fp12_t b);
+
+void fp12_conj(fp12_t c, fp12_t a);
+
+void fp12_exp(fp12_t c, fp12_t a, bn_t b);
+
+void fp12_exp_basic(fp12_t c, fp12_t a, bn_t b);
+
+void fp12_exp_basic_uni(fp12_t c, fp12_t a, bn_t b);
 
 #endif /* !RELIC_FP12_H */
