@@ -42,6 +42,15 @@
 #include "relic_ep2.h"
 #include "relic_types.h"
 
-void pp_pair_rate(fp12_t r, ep2_t p, ep_t q, bn_t x, fp12_t f);
+/**
+ * Compute the R-Ate pairing.
+ * 
+ * @param[out] r			- the result.
+ * @param[in] q				- the first point of the pairing, in G_2.
+ * @param[in] p				- the second point of the pairing, in G_1.
+ * @param[in] x				- the BN parameter used to generate the curve.
+ * @param[in] f				- constant used in Frobenius, Z^p.
+ */
+void pp_pair_rate(fp12_t res, ep2_t q, ep_t p, bn_t x, fp12_t f);
 
 #endif /* !RELIC_PP_H */
