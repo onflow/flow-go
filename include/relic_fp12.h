@@ -253,7 +253,8 @@ void fp12_mul_sparse(fp12_t c, fp12_t a, fp12_t b);
 void fp12_sqr_uni(fp12_t c, fp12_t a);
 
 /**
- * Computes the Frobenius endomorphism of a, that is, Frob(a) = a^p.
+ * Computes the Frobenius endomorphism of a unitary dodecic extension field element,
+ * that is, Frob(a) = a^p.
  * 
  * @param[out] c			- the destination.
  * @param[in] a				- a dodecic extension prime field element.

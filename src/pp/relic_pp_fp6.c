@@ -21,7 +21,7 @@
 /**
  * @file
  *
- * Implementation of the quadratic extension binary field arithmetic module.
+ * Implementation of the sextic extension binary field arithmetic module.
  *
  * @version $Id$
  * @ingroup fp6
@@ -94,13 +94,13 @@ void fp6_mul(fp6_t c, fp6_t a, fp6_t b) {
 	fp2_free(v0);
 }
 
-void fp6_mul_sparse1(fp6_t c, fp6_t a, fp6_t b) {
-	fp2_mul(c[0], a[0], b[0]);
-	fp2_mul(c[1], a[1], b[0]);
-	fp2_mul(c[2], a[2], b[0]);
+void fp6_mul_fp2(fp6_t c, fp6_t a, fp2_t b) {
+	fp2_mul(c[0], a[0], b);
+	fp2_mul(c[1], a[1], b);
+	fp2_mul(c[2], a[2], b);
 }
 
-void fp6_mul_sparse2(fp6_t c, fp6_t a, fp6_t b) {
+void fp6_mul_sparse(fp6_t c, fp6_t a, fp6_t b) {
 	fp2_t v0, v1, t0, t1, t2;
 	fp2_new(v0);
 	fp2_new(v1);

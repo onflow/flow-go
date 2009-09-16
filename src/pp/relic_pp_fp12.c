@@ -71,13 +71,13 @@ void fp12_mul_sparse(fp12_t c, fp12_t a, fp12_t b) {
 	fp6_add(v0, a[0], a[1]);
 	fp2_add(v1[0], b[0][0], b[1][0]);
 	fp2_copy(v1[1], b[1][1]);
-	fp6_mul_sparse2(t0, v0, v1);
+	fp6_mul_sparse(t0, v0, v1);
 	
 	/* v0 = a0b0 */
-	fp6_mul_sparse1(v0, a[0], b[0]);
+	fp6_mul_fp2(v0, a[0], b[0][0]);
 	
 	/* v1 = a1b1 */
-	fp6_mul_sparse2(v1, a[1], b[1]);
+	fp6_mul_sparse(v1, a[1], b[1]);
 	
 	/* c1 = c1 - v0 - v1 */
 	fp6_sub(c[1], t0, v0);

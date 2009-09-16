@@ -75,10 +75,10 @@ int main(void) {
 
 	TEST_BEGIN("rate pairing is bilinear") {
 		ep_dbl(t, q);
-		pp_pair_rate4(r1, p, t, x, f);
+		pp_pair_rate(r1, p, t, x, f);
 		ep2_dbl(p, p);
 		ep2_norm(p, p);
-		pp_pair_rate4(r2, p, q, x, f);
+		pp_pair_rate(r2, p, q, x, f);
 		TEST_ASSERT(fp12_cmp(r1, r2) == CMP_EQ, end);
 	} TEST_END;
 

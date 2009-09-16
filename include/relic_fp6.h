@@ -39,6 +39,10 @@
 
 /**
  * Represents a sextic extension prime field element.
+ * 
+ * An element a is represented as a[0] + a[1] * Y + a[1] * Y^2,
+ * where Y^3 = X if p = 5 mod 8, Y^3 = 1 + X if p = 3 mod 8 and
+ * Y^3 = 2 + X if p = 7 mod 8 and p = 2,3 mod 5.
  */
 typedef fp2_t fp6_t[3];
 
@@ -87,7 +91,7 @@ typedef fp2_t fp6_t[3];
 /**
  * Tests if a sextic extension field element is zero or not.
  *
- * @param[in] a				- the prime field element to compare.
+ * @param[in] a				- the sextic extension field element to compare.
  * @return 1 if the argument is zero, 0 otherwise.
  */
 #define fp6_is_zero(A)														\
@@ -96,7 +100,7 @@ typedef fp2_t fp6_t[3];
 /**
  * Assigns a random value to a sextic extension field element.
  *
- * @param[out] a			- the prime field element to assign.
+ * @param[out] a			- the sextic extension field element to assign.
  */
 #define fp6_rand(A)															\
 		fp2_rand(A[0]); fp2_rand(A[1]); fp2_rand(A[2]);						\
@@ -140,7 +144,7 @@ typedef fp2_t fp6_t[3];
  * @param[out] str20		- 
  * @param[out] str21		- 
  * @param[in] len			- the buffer capacities.
- * @param[in] a				- the prime field element to write.
+ * @param[in] a				- the sextic extension field element to write.
  * @param[in] radix			- the radix.
  * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
  * @throw ERR_INVALID		- if the radix is invalid.
@@ -188,7 +192,7 @@ typedef fp2_t fp6_t[3];
 		fp2_copy(C[2], A[2]);
 
 /**
- * Subtracts a prime field element from another, that is, computes
+ * Subtracts a sextic extension field element from another, that is, computes
  * c = a - b.
  *
  * @param[out] c			- the destination.
@@ -200,7 +204,7 @@ typedef fp2_t fp6_t[3];
 		fp2_sub(C[2], A[2], B[2]);											\
 
 /**
- * Multiples two prime field elements, that is, compute c = a * b.
+ * Multiples two sextic extension field elements, that is, compute c = a * b.
  *
  * @param[out] c			- the destination.
  * @param[in] a				- the sextic extension prime field element.
@@ -209,26 +213,58 @@ typedef fp2_t fp6_t[3];
 void fp6_mul(fp6_t c, fp6_t a, fp6_t b);
 
 /**
- * Computes the square of a prime field element, that is, computes
+ * Computes the square of a sextic extension field element, that is, computes
  * c = a * a.
  *
  * @param[out] c			- the destination.
- * @param[in] a				- the prime field element to square.
+ * @param[in] a				- the sextic extension field element to square.
  */
 void fp6_sqr(fp6_t c, fp6_t a);
 
 /**
- * Inverts a sextic.
+ * Inverts a sextic extension field element. Computes c = a^(-1).
  *
+ * @param[out] c			- the destination.
+ * @param[in] a				- the sextic extension prime field element to invert.
  */
 void fp6_inv(fp6_t c, fp6_t a);
 
-void fp6_mul_sparse1(fp6_t c, fp6_t a, fp6_t b);
+/**
+ * Multiples a sextic extension field element by a quadratic extension field element.
+ *
+ * @param[out] c			- the destination.
+ * @param[in] a				- the sextic extension prime field element.
+ * @param[in] b				- the quadratic extension prime field element.
+ */
+void fp6_mul_fp2(fp6_t c, fp6_t a, fp2_t b);
 
-void fp6_mul_sparse2(fp6_t c, fp6_t a, fp6_t b);
+/**
+ * Multiples a sextic extension field element by a sparse element.
+ * 
+ * The sparse element must have a[2] = 0.
+ *
+ * @param[out] c			- the destination.
+ * @param[in] a				- a sextic extension prime field element.
+ * @param[in] b				- a sparse sextic extension prime field element.
+ */
+void fp6_mul_sparse(fp6_t c, fp6_t a, fp6_t b);
 
+/**
+ * Multiplies a sextic extension field element by Y.
+ * 
+ * @param[out] c			- the destination.
+ * @param[in] a				- the sextic extension prime field element.
+ */
 void fp6_mul_poly(fp6_t c, fp6_t a);
 
+/**
+ * Computes the Frobenius endomorphism of a unitary sextic extension field element,
+ * that is, Frob(a) = a^p.
+ * 
+ * @param[out] c			- the destination.
+ * @param[in] a				- a sextic extension prime field element.
+ * @param[in] b				- constant used in Frobenius, (Z^p)^2 = Y^p. 
+ */
 void fp6_frob(fp6_t c, fp6_t a, fp6_t b);
 
 #endif /* !RELIC_FP6_H */
