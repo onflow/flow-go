@@ -474,8 +474,6 @@
 #define ANSI     6
 /** Cycle-counting timer. */
 #define CYCLE    7
-/** MSPSIM timer. */
-#define MSPSIM   8
 /** Chosen timer. */
 #define TIMER    @TIMER@
 

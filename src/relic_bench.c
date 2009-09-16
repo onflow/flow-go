@@ -36,10 +36,6 @@
 #include "relic_conf.h"
 #include "relic_util.h"
 
-#if OPSYS != NONE && TIMER != NONE
-#include <sys/time.h>
-#endif
-
 /*============================================================================*/
 /* Private definitions                                                        */
 /*============================================================================*/
@@ -47,18 +43,25 @@
 /**
  * Timer type.
  */
-#if TIMER == HPROC || TIMER == HREAL || TIMER == HTHRD
+#if TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
+
+#include <sys/time.h>
+#include <time.h>
 typedef struct timespec bench_t;
+
 #elif TIMER == ANSI
+
 #include <time.h>
 typedef clock_t bench_t;
-#elif TIMER == POSIX
-typedef struct timeval bench_t;
-#elif TIMER == CYCLE
-typedef unsigned long long bench_t;
 
+#elif TIMER == POSIX
+
+typedef struct timeval bench_t;
+
+#elif TIMER == CYCLE
+
+typedef unsigned long long bench_t;
 #if ARCH == X86
-#include <intrin.h>
 static inline bench_t cycles(void) {
 	unsigned long long int x;
 	asm volatile (".byte 0x0f, 0x31\n\t":"=A" (x));
@@ -70,12 +73,28 @@ static inline bench_t cycles(void) {
 	asm volatile ("rdtsc\n\t":"=a" (lo), "=d"(hi));
 	return ((bench_t) lo) | (((bench_t) hi) << 32);
 }
-#endif
-#elif TIMER == MSPSIM
+#elif ARCH == MSP
 #include "msp430util.h"
-typedef unsigned long long bench_t;
+#define cycles()		msp430_get_cycles()
+#endif
+
 #else
-typedef unsigned int bench_t;
+
+typedef unsigned long long bench_t;
+
+#endif
+
+/**
+ * Shared parameter for these timer.
+ */
+#if TIMER == HREAL
+#define CLOCK			CLOCK_REALTIME
+#elif TIMER == HPROC
+#define CLOCK			CLOCK_PROCESS_CPUTIME_ID
+#elif TIMER == HTHRD
+#define CLOCK			CLOCK_THREAD_CPUTIME_ID
+#else
+#define CLOCK			NULL
 #endif
 
 /**
@@ -98,6 +117,10 @@ static long long total;
  */
 static long long overhead;
 
+/**
+ * Dummy function for measuring benchmarking overhead.
+ * @param a				- the dummy parameter.
+ */
 static void empty(int *a) {
 	(*a)++;
 }
@@ -154,7 +177,7 @@ void bench_overhead(void) {
 		overhead = overhead / 2;
 	} while (overhead < 0);
 
-#if TIMER == CYCLE || TIMER == MSPSIM
+#if TIMER == CYCLE
 	util_print("%lld cycles\n", overhead);
 #elif TIMER != NONE
 	util_print("%lld nanosec\n", overhead);
@@ -172,35 +195,21 @@ void bench_reset(char *label) {
 }
 
 void bench_before() {
-#if TIMER == HREAL
-	clock_gettime(CLOCK_REALTIME, &before);
-#elif TIMER == HPROC
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &before);
-#elif TIMER == HTHRD
-	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &before);
+#if TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
+	clock_gettime(CLOCK, &before);
 #elif TIMER == ANSI
 	before = clock();
 #elif TIMER == POSIX
 	gettimeofday(&before, NULL);
 #elif TIMER == CYCLE
 	before = cycles();
-#elif TIMER == MSPSIM
-	before = msp430_get_cycles();
 #endif
 }
 
 void bench_after() {
 	long long result;
-#if TIMER == HREAL
-	clock_gettime(CLOCK_REALTIME, &after);
-	result = ((long)after.tv_sec - (long)before.tv_sec) * 1000000000;
-	result += (after.tv_nsec - before.tv_nsec);
-#elif TIMER == HPROC
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &after);
-	result = ((long)after.tv_sec - (long)before.tv_sec) * 1000000000;
-	result += (after.tv_nsec - before.tv_nsec);
-#elif TIMER == HTHRD
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &after);
+#if TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
+	clock_gettime(CLOCK, &after);
 	result = ((long)after.tv_sec - (long)before.tv_sec) * 1000000000;
 	result += (after.tv_nsec - before.tv_nsec);
 #elif TIMER == ANSI
@@ -212,9 +221,6 @@ void bench_after() {
 	result += (after.tv_usec - before.tv_usec) * 1000;
 #elif TIMER == CYCLE
 	after = cycles();
-	result = (after - before);
-#elif TIMER == MSPSIM
-	after = msp430_get_cycles();
 	result = (after - before);
 #endif
 
@@ -228,12 +234,10 @@ void bench_after() {
 void bench_compute(int benches) {
 #if TIMER != NONE
 	total = total / benches - overhead;
-#if TIMER == CYCLE || TIMER == MSPSIM
-	util_print("%20lld cycles", total);
-#elif TIMER != NONE
-	util_print("%lld nanosec", total);
+#if TIMER == CYCLE
+	util_print("%lld cycles", total);
 #else
-	(void)benches;
+	util_print("%lld nanosec", total);
 #endif
 	if (total < 0) {
 		util_print(" (bad overhead estimation)\n");
