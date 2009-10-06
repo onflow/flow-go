@@ -273,6 +273,13 @@
 /** Chosen trace computation method. */
 #define FB_TRC   @FB_TRC@
 
+/** Solve by half-trace computation. */
+#define BASIC    1
+/** Solve with precomputed half-traces. */
+#define QUICK	 2
+/** Chosen method to solve a quadratic equation. */
+#define FB_SLV   @FB_SLV@
+
 /** Binary inversion. */
 #define BASIC    1
 /** Extended Euclidean algorithm. */

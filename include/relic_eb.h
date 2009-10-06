@@ -141,11 +141,11 @@ typedef struct {
 	fb_t z;
 #elif ALLOC == DYNAMIC || ALLOC == STACK
 	/** The first coordinate. */
-	align fb_st x;
+	fb_st x;
 	/** The second coordinate. */
-	align fb_st y;
+	fb_st y;
 	/** The third coordinate (projective representation). */
-	align fb_st z;
+	fb_st z;
 #endif
 	/** Flag to indicate that this point is normalized. */
 	int norm;
@@ -159,6 +159,13 @@ typedef eb_st *eb_t;
 /*============================================================================*/
 /* Macro definitions                                                          */
 /*============================================================================*/
+
+/**
+ * Initializes a point on a binary elliptic curve with a null value.
+ *
+ * @param[out] A			- the point to initialize.
+ */
+#define eb_null(A)		A = NULL;
 
 /**
  * Calls a function to allocate a point on a binary elliptic curve.
@@ -211,9 +218,7 @@ typedef eb_st *eb_t;
 	}																		\
 
 #elif ALLOC == STACK
-#define eb_free(A)															\
-	A = NULL;																\
-
+#define eb_free(A)			A = NULL;
 #endif
 
 /**

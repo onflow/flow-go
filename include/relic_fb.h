@@ -92,10 +92,6 @@ enum {
 
 /**
  * Represents a binary field element.
- *
- * A field element is represented as a digit vector. These digits are organized
- * in little-endian format, that is, the least significant digits are
- * stored in the first positions of the vector.
  */
 typedef dig_t *fb_t;
 
@@ -107,6 +103,13 @@ typedef align dig_t fb_st[FB_DIGS];
 /*============================================================================*/
 /* Macro definitions                                                          */
 /*============================================================================*/
+
+/**
+ * Initializes a binary field element with a null value.
+ *
+ * @param[out] A			- the binary field element to initialize.
+ */
+#define fb_null(A)			A = NULL;
 
 /**
  * Calls a function to allocate a binary field element.
@@ -134,7 +137,7 @@ typedef align dig_t fb_st[FB_DIGS];
 #elif ALLOC == STATIC
 #define fb_free(A)			dv_free_statc((dv_t *)&(A))
 #elif ALLOC == STACK
-#define fb_free(A)			A = NULL;
+#define fb_free(A)			/* empty */
 #endif
 
 /**
@@ -173,7 +176,7 @@ typedef align dig_t fb_st[FB_DIGS];
 #endif
 
 /**
- * Extracts the square root of a binary field element.
+ * Extracts the square root of a binary field element. Computes c = a^(1/2).
  *
  * @param[out] C			- the result.
  * @param[in] A				- the binary field element.
@@ -186,7 +189,7 @@ typedef align dig_t fb_st[FB_DIGS];
 
 /**
  * Reduces a multiplication result modulo a binary irreducible polynomial.
- * Compute c = a mod f(z).
+ * Computes c = a mod f(z).
  *
  * @param[out] C			- the result.
  * @param[in] A				- the multiplication result to reduce.
@@ -198,7 +201,7 @@ typedef align dig_t fb_st[FB_DIGS];
 #endif
 
 /**
- * Compute the trace of a binary field element.
+ * Compute the trace of a binary field element. Computes c = Tr(a).
  *
  * @param[out] C			- the result.
  * @param[in] A				- the binary field element.
@@ -207,6 +210,19 @@ typedef align dig_t fb_st[FB_DIGS];
 #define fb_trc(C, A)	fb_trc_basic(C, A)
 #elif FB_TRC == QUICK
 #define fb_trc(C, A)	fb_trc_quick(C, A)
+#endif
+
+/**
+ * Solves a quadratic equation for c, Tr(a) = 0. Computes c such that
+ * c^2 + c = a.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the binary field element.
+ */
+#if FB_SLV == BASIC
+#define fb_slv(C, A)	fb_slv_basic(C, A)
+#elif FB_SLV == QUICK
+#define fb_slv(C, A)	fb_slv_quick(C, A)
 #endif
 
 /**
@@ -222,6 +238,8 @@ typedef align dig_t fb_st[FB_DIGS];
 #elif FB_INV == ALMOS
 #define fb_inv(C, A)	fb_inv_almos(C, A)
 #endif
+
+
 
 /*============================================================================*/
 /* Function prototypes                                                        */
@@ -289,6 +307,13 @@ void fb_poly_get_rdc(int *a, int *b, int *c);
  * @param[out] c			- the third coefficient.
  */
 void fb_poly_get_trc(int *a, int *b, int *c);
+
+/**
+ * Returns the half-trace of z^i, for odd i.
+ *
+ * @return the precomputed half-trace.
+ */
+dig_t *fb_poly_get_slv(int i);
 
 /**
  * Assigns a standard irreducible polynomial as modulo of the binary field.
@@ -726,11 +751,20 @@ void fb_inv_exgcd(fb_t c, fb_t a);
 void fb_inv_almos(fb_t c, fb_t a);
 
 /**
- * Solves a quadratic equation. Computes c such that c^2 + c = a.
+ * Solves a quadratic equation for a, Tr(a) = 0 by repeated squarings and
+ * additions.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to solve.
  */
-int fb_slv(fb_t c, fb_t a);
+void fb_slv_basic(fb_t c, fb_t a);
+
+/**
+ * Solves a quadratic equation for a, Tr(a) = 0 with precomputed half-traces.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the binary field element to solve.
+ */
+void fb_slv_quick(fb_t c, fb_t a);
 
 #endif /* !RELIC_FB_H */

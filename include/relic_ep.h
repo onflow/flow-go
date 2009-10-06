@@ -38,31 +38,18 @@
 #include "relic_bn.h"
 #include "relic_types.h"
 
+/*============================================================================*/
+/* Constant definitions                                                       */
+/*============================================================================*/
+
 /**
  * MIRACL's Barreto-Naehrig pairing-friendly prime elliptic curve
  */
 #define RATE_P256		0
 
-/**
- * Optimization identifier for the case a = 0.
- */
-#define EP_OPT_ZERO		0
-
-/**
- * Optimization identifier for the case a = 1.
- */
-#define EP_OPT_ONE		1
-
-/**
- * Optimization identifier for the case when a is small.
- */
-#define EP_OPT_DIGIT	2
-
-/**
- * Optimization identifier for the general case when a is big.
- *
- */
-#define EP_OPT_NONE		3
+/*============================================================================*/
+/* Type definitions                                                           */
+/*============================================================================*/
 
 /**
  * Represents an ellyptic curve point over a prime field.
@@ -91,6 +78,10 @@ typedef struct {
  * Pointer to an elliptic curve point.
  */
 typedef ep_st *ep_t;
+
+/*============================================================================*/
+/* Function prototypes                                                        */
+/*============================================================================*/
 
 /**
  * Initializes the prime elliptic curve arithmetic module.

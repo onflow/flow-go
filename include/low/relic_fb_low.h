@@ -245,6 +245,14 @@ void fb_sqrm_low(dig_t *c, dig_t *a);
 void fb_srtn_low(dig_t *c, dig_t *a);
 
 /**
+ * Solves a quadratic equation for c^2 + c = a.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the digit vector.
+ */
+void fb_slvn_low(dig_t *c, dig_t *a);
+
+/**
  * Reduces a digit vector modulo the configured irreducible polynomial.
  *
  * @param[out] c			- the result.

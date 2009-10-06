@@ -66,6 +66,12 @@ typedef fb_t fb4_t[4];
 /*============================================================================*/
 
 /**
+ * Initialized a quadratic extension binary field with a null value.
+ */
+#define fb2_null(A)															\
+		fb_null(A[0]); fb_null(A[1]);										\
+
+/**
  * Calls a function to allocate a quadratic extension binary field element.
  *
  * @param[out] A			- the new quadratic extension field element.
