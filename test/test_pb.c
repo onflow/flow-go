@@ -137,7 +137,6 @@ static int util2(void) {
 	return code;
 }
 
-
 static int addition2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c, d, e;
@@ -392,6 +391,87 @@ static int memory4(void) {
 	(void)a;
 	code = STS_OK;
   end:
+	return code;
+}
+
+static int util4(void) {
+	int code = STS_ERR;
+	fb4_t a, b, c;
+
+	fb4_null(a);
+	fb4_null(b);
+	fb4_null(c);
+
+	TRY {
+		fb4_new(a);
+		fb4_new(b);
+		fb4_new(c);
+
+		TEST_BEGIN("comparison is consistent") {
+			fb4_rand(a);
+			fb4_rand(b);
+			if (fb4_cmp(a, b) != CMP_EQ) {
+				TEST_ASSERT(fb4_cmp(b, a) == CMP_NE, end);
+			}
+		}
+		TEST_END;
+
+		TEST_BEGIN("copy and comparison are consistent") {
+			fb4_rand(a);
+			fb4_rand(b);
+			fb4_rand(c);
+			if (fb4_cmp(a, c) != CMP_EQ) {
+				fb4_copy(c, a);
+				TEST_ASSERT(fb4_cmp(c, a) == CMP_EQ, end);
+			}
+			if (fb4_cmp(b, c) != CMP_EQ) {
+				fb4_copy(c, b);
+				TEST_ASSERT(fb4_cmp(b, c) == CMP_EQ, end);
+			}
+		}
+		TEST_END;
+
+		TEST_BEGIN("negation is consistent") {
+			fb4_rand(a);
+			fb4_neg(b, a);
+			if (fb4_cmp(a, b) != CMP_EQ) {
+				TEST_ASSERT(fb4_cmp(b, a) == CMP_NE, end);
+			}
+			fb4_neg(b, b);
+			TEST_ASSERT(fb4_cmp(a, b) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to zero and comparison are consistent") {
+			fb4_rand(a);
+			fb4_zero(c);
+			TEST_ASSERT(fb4_cmp(a, c) == CMP_NE, end);
+			TEST_ASSERT(fb4_cmp(c, a) == CMP_NE, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to random and comparison are consistent") {
+			fb4_rand(a);
+			fb4_zero(c);
+			TEST_ASSERT(fb4_cmp(a, c) == CMP_NE, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to zero and zero test are consistent") {
+			fb4_zero(a);
+			TEST_ASSERT(fb4_is_zero(a), end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fb4_free(a);
+	fb4_free(b);
+	fb4_free(c);
 	return code;
 }
 
@@ -757,6 +837,11 @@ int main(void) {
 	util_print_banner("Utilities", 1)
 
 	if (memory4() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (util4() != STS_OK) {
 		core_clean();
 		return 1;
 	}
