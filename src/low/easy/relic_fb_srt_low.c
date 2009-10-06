@@ -190,7 +190,7 @@ void fb_srtn_low(dig_t *c, dig_t *a) {
 
 	fb_poly_get_rdc(&fa, &fb, &fc);
 
-	if (fb == 0) {
+	if (fb == -1) {
 		fb_srtt_low(c, a, fa);
 	} else {
 		fb_srtp_low(c, a, fa, fb, fc);
