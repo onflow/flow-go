@@ -158,6 +158,7 @@ static void util(void) {
 static void arith(void) {
 	fb_t a, b, c;
 	dv_t e;
+	int bits;
 
 	fb_new(a);
 	fb_new(b);
@@ -294,14 +295,17 @@ static void arith(void) {
 	BENCH_BEGIN("fb_lsh") {
 		fb_rand(a);
 		a[FB_DIGS - 1] = 0;
-		BENCH_ADD(fb_lsh(c, a, FB_DIGIT/2));
+		bits = a[0] & MASK(FB_DIG_LOG);
+		BENCH_ADD(fb_lsh(c, a, bits));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("fb_rsh") {
 		fb_rand(a);
 		a[FB_DIGS - 1] = 0;
-		BENCH_ADD(fb_rsh(c, a, FB_BITS/2));
+		bits = a[0] & MASK(FB_DIG_LOG);
+		BENCH_ADD(fb_rsh(c, a, bits));
+
 	}
 	BENCH_END;
 
@@ -364,7 +368,7 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-#if FB_SRT == BASIC || !defined(STRIP)
+#if FB_TRC == BASIC || !defined(STRIP)
 	BENCH_BEGIN("fb_trc_basic") {
 		fb_rand(a);
 		BENCH_ADD(fb_trc_basic(c, a));
@@ -372,10 +376,32 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
-#if FB_SRT == QUICK || !defined(STRIP)
+#if FB_TRC == QUICK || !defined(STRIP)
 	BENCH_BEGIN("fb_trc_quick") {
 		fb_rand(a);
 		BENCH_ADD(fb_trc_quick(c, a));
+	}
+	BENCH_END;
+#endif
+
+	BENCH_BEGIN("fb_slv") {
+		fb_rand(a);
+		BENCH_ADD(fb_slv(c, a));
+	}
+	BENCH_END;
+
+#if FB_SLV == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fb_slv_basic") {
+		fb_rand(a);
+		BENCH_ADD(fb_slv_basic(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if FB_SLV == QUICK || !defined(STRIP)
+	BENCH_BEGIN("fb_slv_quick") {
+		fb_rand(a);
+		BENCH_ADD(fb_slv_quick(c, a));
 	}
 	BENCH_END;
 #endif

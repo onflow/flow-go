@@ -35,7 +35,11 @@
 #include "relic_bench.h"
 
 static void memory(void) {
-	eb_t a[BENCH] = { NULL };
+	eb_t a[BENCH];
+
+	for (int i = 0; i < BENCH; i++) {
+		eb_null(a[i]);
+	}
 
 	BENCH_SMALL("eb_new", eb_new(a[i]));
 	for (int i = 0; i < BENCH; i++) {
@@ -51,7 +55,10 @@ static void memory(void) {
 }
 
 static void util(void) {
-	eb_t p = NULL, q = NULL;
+	eb_t p, q;
+
+	eb_null(p);
+	eb_null(q);
 
 	eb_new(p);
 	eb_new(q);
@@ -89,8 +96,15 @@ static void util(void) {
 }
 
 static void arith(void) {
-	eb_t p = NULL, q = NULL, r = NULL, t[FB_BITS] = { NULL };
+	eb_t p, q, r, t[FB_BITS];
 	bn_t k = NULL, l = NULL, n = NULL;
+
+	eb_null(p);
+	eb_null(q);
+	eb_null(r);
+	for (int i = 0; i < FB_BITS; i++) {
+		eb_null(t[i]);
+	}
 
 	eb_new(p);
 	eb_new(q);
