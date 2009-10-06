@@ -35,7 +35,9 @@
 static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
-	eb_t a = NULL;
+	eb_t a;
+
+	eb_null(a);
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
@@ -58,7 +60,11 @@ static int memory(void) {
 
 static int util(void) {
 	int code = STS_ERR;
-	eb_t a = NULL, b = NULL, c = NULL;
+	eb_t a, b, c;
+
+	eb_null(a);
+	eb_null(b);
+	eb_null(c);
 
 	TRY {
 		eb_new(a);
@@ -123,8 +129,13 @@ static int util(void) {
 
 static int addition(void) {
 	int code = STS_ERR;
+	eb_t a, b, c, d, e;
 
-	eb_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL;
+	eb_null(a);
+	eb_null(b);
+	eb_null(c);
+	eb_null(d);
+	eb_null(e);
 
 	TRY {
 		eb_new(a);
@@ -243,7 +254,12 @@ static int addition(void) {
 
 static int subtraction(void) {
 	int code = STS_ERR;
-	eb_t a = NULL, b = NULL, c = NULL, d = NULL;
+	eb_t a, b, c, d;
+
+	eb_null(a);
+	eb_null(b);
+	eb_null(c);
+	eb_null(d);
 
 	TRY {
 		eb_new(a);
@@ -352,7 +368,11 @@ static int subtraction(void) {
 
 static int doubling(void) {
 	int code = STS_ERR;
-	eb_t a = NULL, b = NULL, c = NULL;
+	eb_t a, b, c;
+
+	eb_null(a);
+	eb_null(b);
+	eb_null(c);
 
 	TRY {
 		eb_new(a);
@@ -415,8 +435,12 @@ static int doubling(void) {
 
 static int multiplication(void) {
 	int code = STS_ERR;
-	eb_t p = NULL, q = NULL, r = NULL;
+	eb_t p, q, r;
 	bn_t n = NULL, k = NULL;
+
+	eb_null(p);
+	eb_null(q);
+	eb_null(r);
 
 	TRY {
 		eb_new(q);
@@ -488,16 +512,24 @@ static int multiplication(void) {
 
 static int fixed(void) {
 	int code = STS_ERR;
-	eb_t p = NULL, q = NULL, r = NULL;
-	eb_t t[FB_BITS] = { NULL };
+	eb_t p, q, r;
+	eb_t t[FB_BITS];
 	bn_t n = NULL, k = NULL;
 
+	eb_null(p);
+	eb_null(q);
+	eb_null(r);
+
+	for (int i = 0; i < EB_TABLE; i++) {
+		eb_null(t[i]);
+	}
+
 	TRY {
-		p = eb_curve_get_gen();
 		eb_new(q);
 		eb_new(r);
 		bn_new(k);
 
+		p = eb_curve_get_gen();
 		n = eb_curve_get_ord();
 
 		for (int i = 0; i < EB_TABLE; i++) {
@@ -638,17 +670,23 @@ static int fixed(void) {
 
 static int simultaneous(void) {
 	int code = STS_ERR;
-	eb_t p = NULL, q = NULL, r = NULL, s = NULL;
+	eb_t p, q, r, s;
 	bn_t n = NULL, k = NULL, l = NULL;
 
+	eb_null(p);
+	eb_null(q);
+	eb_null(r);
+	eb_null(s);
+
 	TRY {
-		p = eb_curve_get_gen();
+
 		eb_new(q);
 		eb_new(r);
 		eb_new(s);
 		bn_new(k);
 		bn_new(l);
 
+		p = eb_curve_get_gen();
 		n = eb_curve_get_ord();
 
 		TEST_BEGIN("simultaneous point multiplication is correct") {

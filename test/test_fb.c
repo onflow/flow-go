@@ -35,7 +35,9 @@
 static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
-	fb_t a = NULL;
+	fb_t a;
+
+	fb_null(a);
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
@@ -59,7 +61,11 @@ static int memory(void) {
 static int util(void) {
 	int bits, bits_dig, code = STS_ERR;
 	char str[1000];
-	fb_t a = NULL, b = NULL, c = NULL;
+	fb_t a, b, c;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
 
 	TRY {
 		fb_new(a);
@@ -208,7 +214,13 @@ static int util(void) {
 
 static int addition(void) {
 	int code = STS_ERR;
-	fb_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL;
+	fb_t a, b, c, d, e;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
+	fb_null(d);
+	fb_null(e);
 
 	TRY {
 		fb_new(a);
@@ -265,7 +277,12 @@ static int addition(void) {
 
 static int subtraction(void) {
 	int code = STS_ERR;
-	fb_t a = NULL, b = NULL, c = NULL, d = NULL;
+	fb_t a, b, c, d;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
+	fb_null(d);
 
 	TRY {
 		fb_new(a);
@@ -313,7 +330,14 @@ static int subtraction(void) {
 
 static int multiplication(void) {
 	int code = STS_ERR;
-	fb_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL, f = NULL;
+	fb_t a, b, c, d, e, f;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
+	fb_null(d);
+	fb_null(e);
+	fb_null(f);
 
 	TRY {
 		fb_new(a);
@@ -451,7 +475,11 @@ static int multiplication(void) {
 
 static int squaring(void) {
 	int code = STS_ERR;
-	fb_t a = NULL, b = NULL, c = NULL;
+	fb_t a, b, c;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
 
 	TRY {
 		fb_new(a);
@@ -506,7 +534,11 @@ static int squaring(void) {
 
 static int square_root(void) {
 	int code = STS_ERR;
-	fb_t a = NULL, b = NULL, c = NULL;
+	fb_t a, b, c;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
 
 	TRY {
 		fb_new(a);
@@ -559,7 +591,11 @@ static int square_root(void) {
 
 static int inversion(void) {
 	int code = STS_ERR;
-	fb_t a = NULL, b = NULL, c = NULL;
+	fb_t a, b, c;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
 
 	TRY {
 		fb_new(a);
@@ -614,7 +650,11 @@ static int inversion(void) {
 
 static int shifting(void) {
 	int code = STS_ERR;
-	fb_t a = NULL, b = NULL, c = NULL;
+	fb_t a, b, c;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
 
 	TRY {
 		fb_new(a);
@@ -684,8 +724,12 @@ static int shifting(void) {
 
 static int reduction(void) {
 	int code = STS_ERR;
-	fb_t a = NULL, b = NULL, c = NULL;
+	fb_t a, b, c;
 	dv_t t0 = NULL, t1 = NULL;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
 
 	TRY {
 		fb_new(a);
@@ -740,7 +784,11 @@ static int reduction(void) {
 
 static int trace(void) {
 	int code = STS_ERR;
-	fb_t a = NULL, b = NULL, c = NULL;
+	fb_t a, b, c;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
 
 	TRY {
 		fb_new(a);
@@ -788,10 +836,72 @@ static int trace(void) {
 	return code;
 }
 
+static int solve(void) {
+	int code = STS_ERR;
+	fb_t a, b, c;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
+
+	TRY {
+		fb_new(a);
+		fb_new(b);
+		fb_new(c);
+
+		TEST_BEGIN("solving a quadratic equation is correct") {
+			fb_rand(a);
+			fb_rand(b);
+			/* Make Tr(a) = 0. */
+			fb_trc(c, a);
+			if (!fb_is_zero(c)) {
+				fb_add_dig(a, a, 1);
+			}
+			fb_slv(b, a);
+			/* Verify the solution. */
+			fb_sqr(c, b);
+			fb_add(c, c, b);
+			TEST_ASSERT(fb_cmp(c, a) == CMP_EQ, end);
+		} TEST_END;
+
+#if FB_SLV == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic solve is correct") {
+			fb_rand(a);
+			fb_slv(c, a);
+			fb_slv_basic(b, a);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FB_SLV == QUICK || !defined(STRIP)
+		TEST_BEGIN("fast solve is correct") {
+			fb_rand(a);
+			fb_slv(c, a);
+			fb_slv_quick(b, a);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fb_free(a);
+	fb_free(b);
+	fb_free(c);
+	return code;
+}
+
 static int digit(void) {
 	int code = STS_ERR;
-	fb_t a = NULL, b = NULL, c = NULL, d = NULL;
+	fb_t a, b, c, d;
 	dig_t g;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
+	fb_null(d);
 
 	TRY {
 		fb_new(a);
@@ -905,6 +1015,11 @@ int main(void) {
 	}
 
 	if (trace() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (solve() != STS_OK) {
 		core_clean();
 		return 1;
 	}

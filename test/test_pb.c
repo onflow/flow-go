@@ -56,6 +56,88 @@ static int memory2(void) {
 	return code;
 }
 
+static int util2(void) {
+	int code = STS_ERR;
+	fb2_t a, b, c;
+
+	fb2_null(a);
+	fb2_null(b);
+	fb2_null(c);
+
+	TRY {
+		fb2_new(a);
+		fb2_new(b);
+		fb2_new(c);
+
+		TEST_BEGIN("comparison is consistent") {
+			fb2_rand(a);
+			fb2_rand(b);
+			if (fb2_cmp(a, b) != CMP_EQ) {
+				TEST_ASSERT(fb2_cmp(b, a) == CMP_NE, end);
+			}
+		}
+		TEST_END;
+
+		TEST_BEGIN("copy and comparison are consistent") {
+			fb2_rand(a);
+			fb2_rand(b);
+			fb2_rand(c);
+			if (fb2_cmp(a, c) != CMP_EQ) {
+				fb2_copy(c, a);
+				TEST_ASSERT(fb2_cmp(c, a) == CMP_EQ, end);
+			}
+			if (fb2_cmp(b, c) != CMP_EQ) {
+				fb2_copy(c, b);
+				TEST_ASSERT(fb2_cmp(b, c) == CMP_EQ, end);
+			}
+		}
+		TEST_END;
+
+		TEST_BEGIN("negation is consistent") {
+			fb2_rand(a);
+			fb2_neg(b, a);
+			if (fb2_cmp(a, b) != CMP_EQ) {
+				TEST_ASSERT(fb2_cmp(b, a) == CMP_NE, end);
+			}
+			fb2_neg(b, b);
+			TEST_ASSERT(fb2_cmp(a, b) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to zero and comparison are consistent") {
+			fb2_rand(a);
+			fb2_zero(c);
+			TEST_ASSERT(fb2_cmp(a, c) == CMP_NE, end);
+			TEST_ASSERT(fb2_cmp(c, a) == CMP_NE, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to random and comparison are consistent") {
+			fb2_rand(a);
+			fb2_zero(c);
+			TEST_ASSERT(fb2_cmp(a, c) == CMP_NE, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to zero and zero test are consistent") {
+			fb2_zero(a);
+			TEST_ASSERT(fb2_is_zero(a), end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fb2_free(a);
+	fb2_free(b);
+	fb2_free(c);
+	return code;
+}
+
+
 static int addition2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c, d, e;
@@ -635,6 +717,11 @@ int main(void) {
 	util_print_banner("Utilities:", 1);
 
 	if (memory2() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (util2() != STS_OK) {
 		core_clean();
 		return 1;
 	}
