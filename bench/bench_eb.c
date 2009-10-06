@@ -37,9 +37,7 @@
 static void memory(void) {
 	eb_t a[BENCH];
 
-	for (int i = 0; i < BENCH; i++) {
-		eb_null(a[i]);
-	}
+	BENCH_SMALL("eb_null", eb_null(a[i]));
 
 	BENCH_SMALL("eb_new", eb_new(a[i]));
 	for (int i = 0; i < BENCH; i++) {
@@ -63,13 +61,13 @@ static void util(void) {
 	eb_new(p);
 	eb_new(q);
 
-	BENCH_BEGIN("eb_is_infinity") {
+	BENCH_BEGIN("eb_is_infty") {
 		eb_rand(p);
 		BENCH_ADD(eb_is_infty(p));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("eb_set_infinity") {
+	BENCH_BEGIN("eb_set_infty") {
 		eb_rand(p);
 		BENCH_ADD(eb_set_infty(p));
 	}

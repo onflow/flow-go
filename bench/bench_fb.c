@@ -35,7 +35,9 @@
 #include "relic_bench.h"
 
 static void memory(void) {
-	fb_t a[BENCH] = { NULL };
+	fb_t a[BENCH];
+
+	BENCH_SMALL("fb_null", fb_null(a[i]));
 
 	BENCH_SMALL("fb_new", fb_new(a[i]));
 	for (int i = 0; i < BENCH; i++) {
@@ -408,7 +410,6 @@ static void arith(void) {
 
 	BENCH_BEGIN("fb_inv") {
 		fb_rand(a);
-		fb_sqr(e, a);
 		BENCH_ADD(fb_inv(c, a));
 	}
 	BENCH_END;
