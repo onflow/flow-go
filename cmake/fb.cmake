@@ -5,7 +5,7 @@ message("      FB_POLYN=n        The irreducible polynomial size in bits.")
 message("      FB_KARAT=n        The number of Karatsuba levels.") 
 message("      FB_TRINO=[off|on] Prefer trinomials over pentanomials.\n")
 
-message("   ** Available binary field arithmetic methods (default = LODAH;TABLE;QUICK;BASIC;QUICK;EXGCD):")
+message("   ** Available binary field arithmetic methods (default = LODAH;TABLE;QUICK;BASIC;QUICK;EXGCD;QUICK):")
 message("      FB_METHD=BASIC    Right-to-left shift-and-add multiplication.")
 message("      FB_METHD=INTEG    Integrated modular multiplication.")
 message("      FB_METHD=RCOMB    Right-to-left comb multiplication.")
@@ -24,6 +24,9 @@ message("      FB_METHD=QUICK    Fast square root extraction.\n")
 
 message("      FB_METHD=BASIC    Trace computation by repeated squaring.")
 message("      FB_METHD=QUICK    Fast trace computation.\n")
+
+message("      FB_METHD=BASIC    Solve a quadratic equation by half-trace computation.")
+message("      FB_METHD=QUICK    Fast solving with precomputed half-traces.\n")
 
 message("      FB_METHD=BASIC    Shift-and-add inversion.")
 message("      FB_METHD=EXGCD    Inversion by the Extended Euclidean algorithm.")
@@ -46,17 +49,19 @@ option(FB_TRINO "Prefer trinomials over pentanomials." on)
 
 # Choose the arithmetic methods.
 if (NOT FB_METHD)
-	set(FB_METHD "LODAH;TABLE;QUICK;BASIC;QUICK;EXGCD")
+	set(FB_METHD "LODAH;TABLE;QUICK;BASIC;QUICK;QUICK;EXGCD")
 endif(NOT FB_METHD)
 list(LENGTH FB_METHD FB_LEN)
-if (FB_LEN LESS 6)
+if (FB_LEN LESS 7)
 	message(FATAL_ERROR "Incomplete FB_METHD specification: ${FB_METHD}")
-endif(FB_LEN LESS 6)
+endif(FB_LEN LESS 7)
 
 list(GET FB_METHD 0 FB_MUL)
 list(GET FB_METHD 1 FB_SQR)
 list(GET FB_METHD 2 FB_RDC)
 list(GET FB_METHD 3 FB_SRT)
 list(GET FB_METHD 4 FB_TRC)
-list(GET FB_METHD 5 FB_INV)
+list(GET FB_METHD 5 FB_SLV)
+list(GET FB_METHD 6 FB_INV)
+
 set(FB_METHD ${FB_METHD} CACHE STRING "Binary field arithmetic method")
