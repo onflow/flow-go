@@ -52,7 +52,11 @@
  * @param q					- the second point to add.
  */
 static void eb_add_basic_ordin(eb_t r, eb_t p, eb_t q) {
-	fb_t t0 = NULL, t1 = NULL, t2 = NULL;
+	fb_t t0, t1, t2;
+
+	fb_null(t0);
+	fb_null(t1);
+	fb_null(t2);
 
 	TRY {
 		fb_new(t0);
@@ -133,7 +137,11 @@ static void eb_add_basic_ordin(eb_t r, eb_t p, eb_t q) {
  * @param q					- the second point to add.
  */
 static void eb_add_basic_super(eb_t r, eb_t p, eb_t q) {
-	fb_t t0 = NULL, t1 = NULL, t2 = NULL;
+	fb_t t0, t1, t2;
+
+	fb_null(t0);
+	fb_null(t1);
+	fb_null(t2);
 
 	TRY {
 		fb_new(t0);
@@ -216,8 +224,16 @@ static void eb_add_basic_super(eb_t r, eb_t p, eb_t q) {
  * @param q					- the second point to add.
  */
 static void eb_add_projc_ordin(eb_t r, eb_t p, eb_t q) {
-	fb_t t0 = NULL, t1 = NULL, t2 = NULL, t3 = NULL;
-	fb_t t4 = NULL, t5 = NULL, t6 = NULL, t7 = NULL;
+	fb_t t0, t1, t2, t3, t4, t5, t6, t7;
+
+	fb_null(t0);
+	fb_null(t1);
+	fb_null(t2);
+	fb_null(t3);
+	fb_null(t4);
+	fb_null(t5);
+	fb_null(t6);
+	fb_null(t7);
 
 	TRY {
 		fb_new(t0);
@@ -418,7 +434,14 @@ static void eb_add_projc_ordin(eb_t r, eb_t p, eb_t q) {
  */
 #if defined(EB_SUPER)
 static void eb_add_projc_super(eb_t r, eb_t p, eb_t q) {
-	fb_t t0 = NULL, t1 = NULL, t2 = NULL, t3 = NULL, t4 = NULL, t5 = NULL;
+	fb_t t0, t1, t2, t3, t4, t5;
+
+	fb_null(t0);
+	fb_null(t1);
+	fb_null(t2);
+	fb_null(t3);
+	fb_null(t4);
+	fb_null(t5);
 
 	TRY {
 		fb_new(t0);
@@ -611,7 +634,9 @@ void eb_add_basic(eb_t r, eb_t p, eb_t q) {
 }
 
 void eb_sub_basic(eb_t r, eb_t p, eb_t q) {
-	eb_t t = NULL;
+	eb_t t;
+
+	eb_null(t);
 
 	if (p == q) {
 		eb_set_infty(r);
@@ -661,7 +686,9 @@ void eb_add_projc(eb_t r, eb_t p, eb_t q) {
 }
 
 void eb_sub_projc(eb_t r, eb_t p, eb_t q) {
-	eb_t t = NULL;
+	eb_t t;
+
+	eb_null(t);
 
 	if (p == q) {
 		eb_set_infty(r);

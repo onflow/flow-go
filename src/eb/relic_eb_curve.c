@@ -92,7 +92,7 @@ static eb_st table[EB_TABLE];
 /**
  * Array of pointers to the precomputation table.
  */
-static eb_t pointer[EB_TABLE];
+static eb_st *pointer[EB_TABLE];
 
 #endif
 
@@ -320,7 +320,7 @@ int eb_curve_is_super() {
 	return curve_is_super;
 }
 
-eb_t eb_curve_get_gen() {
+eb_st *eb_curve_get_gen() {
 	return &curve_g;
 }
 

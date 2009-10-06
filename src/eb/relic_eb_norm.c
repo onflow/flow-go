@@ -51,7 +51,9 @@
  */
 static void eb_norm_ordin(eb_t r, eb_t p) {
 	if (!p->norm) {
-		fb_t t0 = NULL;
+		fb_t t0;
+
+		fb_null(t0);
 
 		TRY {
 			fb_new(t0);
@@ -84,7 +86,10 @@ static void eb_norm_ordin(eb_t r, eb_t p) {
  */
 static void eb_norm_super(eb_t r, eb_t p) {
 	if (!p->norm) {
-		fb_t t0 = NULL;
+		fb_t t0;
+
+		fb_null(t0);
+
 		TRY {
 			fb_new(t0);
 

@@ -333,8 +333,10 @@ void eb_mul_pre_yaowi(eb_t *t, eb_t p) {
 
 void eb_mul_fix_yaowi(eb_t r, eb_t *t, bn_t k) {
 	int i, j, l;
-	eb_t a = NULL;
+	eb_t a;
 	unsigned char win[FB_BITS + 1];
+
+	eb_null(a);
 
 	TRY {
 		eb_new(a);
@@ -383,9 +385,11 @@ void eb_mul_pre_nafwi(eb_t *t, eb_t p) {
 
 void eb_mul_fix_nafwi(eb_t r, eb_t *t, bn_t k) {
 	int i, j, l, d, m;
-	eb_t a = NULL;
+	eb_t a;
 	signed char naf[FB_BITS + 1];
 	char w;
+
+	eb_null(a);
 
 	TRY {
 		eb_new(a);

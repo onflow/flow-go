@@ -179,7 +179,7 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
 static void eb_mul_tnaf_tab(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char tnaf[FB_BITS + 8], *t, u;
-	eb_t table[1 << (EB_WIDTH - 2)] = { NULL };
+	eb_t table[1 << (EB_WIDTH - 2)];
 	bn_t vm = NULL, s0 = NULL, s1 = NULL;
 
 	if (eb_curve_opt_a() == OPT_ZERO) {
@@ -188,38 +188,46 @@ static void eb_mul_tnaf_tab(eb_t r, eb_t p, bn_t k) {
 		u = 1;
 	}
 
-	/* Prepare the precomputation table. */
-	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_new(table[i]);
-	}
-	/* Compute the precomputation table. */
-	table_init_koblitz(table, p);
+	TRY {
 
-	vm = eb_curve_get_vm();
-	s0 = eb_curve_get_s0();
-	s1 = eb_curve_get_s1();
-	/* Compute the w-TNAF representation of k. */
-	bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_WIDTH);
-
-	t = tnaf + len - 1;
-	eb_set_infty(r);
-	for (i = len - 1; i >= 0; i--, t--) {
-		eb_frb(r, r);
-
-		n = *t;
-		if (n > 0) {
-			eb_add(r, r, table[n / 2]);
+		/* Prepare the precomputation table. */
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_new(table[i]);
 		}
-		if (n < 0) {
-			eb_sub(r, r, table[-n / 2]);
-		}
-	}
-	/* Convert r to affine coordinates. */
-	eb_norm(r, r);
+		/* Compute the precomputation table. */
+		table_init_koblitz(table, p);
 
-	/* Free the precomputation table. */
-	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_free(table[i]);
+		vm = eb_curve_get_vm();
+		s0 = eb_curve_get_s0();
+		s1 = eb_curve_get_s1();
+		/* Compute the w-TNAF representation of k. */
+		bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_WIDTH);
+
+		t = tnaf + len - 1;
+		eb_set_infty(r);
+		for (i = len - 1; i >= 0; i--, t--) {
+			eb_frb(r, r);
+
+			n = *t;
+			if (n > 0) {
+				eb_add(r, r, table[n / 2]);
+			}
+			if (n < 0) {
+				eb_sub(r, r, table[-n / 2]);
+			}
+		}
+		/* Convert r to affine coordinates. */
+		eb_norm(r, r);
+
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		/* Free the precomputation table. */
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_free(table[i]);
+		}
 	}
 }
 
@@ -258,38 +266,49 @@ static void table_init_ordin(eb_t *t, eb_t p) {
 static void eb_mul_naf_tab(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char naf[FB_BITS + 1], *t;
-	eb_t table[1 << (EB_WIDTH - 2)] = { NULL };
+	eb_t table[1 << (EB_WIDTH - 2)];
 
-	/* Prepare the precomputation table. */
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_new(table[i]);
+		eb_null(table[i]);
 	}
-	/* Compute the precomputation table. */
-	table_init_ordin(table, p);
 
-	/* Compute the w-TNAF representation of k. */
-	bn_rec_naf(naf, &len, k, EB_WIDTH);
-
-	t = naf + len - 1;
-
-	eb_set_infty(r);
-	for (i = len - 1; i >= 0; i--, t--) {
-		eb_dbl(r, r);
-
-		n = *t;
-		if (n > 0) {
-			eb_add(r, r, table[n / 2]);
+	TRY {
+		/* Prepare the precomputation table. */
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_new(table[i]);
 		}
-		if (n < 0) {
-			eb_sub(r, r, table[-n / 2]);
+		/* Compute the precomputation table. */
+		table_init_ordin(table, p);
+
+		/* Compute the w-TNAF representation of k. */
+		bn_rec_naf(naf, &len, k, EB_WIDTH);
+
+		t = naf + len - 1;
+
+		eb_set_infty(r);
+		for (i = len - 1; i >= 0; i--, t--) {
+			eb_dbl(r, r);
+
+			n = *t;
+			if (n > 0) {
+				eb_add(r, r, table[n / 2]);
+			}
+			if (n < 0) {
+				eb_sub(r, r, table[-n / 2]);
+			}
 		}
+		/* Convert r to affine coordinates. */
+		eb_norm(r, r);
+
 	}
-	/* Convert r to affine coordinates. */
-	eb_norm(r, r);
-
-	/* Free the precomputation table. */
-	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_free(table[i]);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		/* Free the precomputation table. */
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_free(table[i]);
+		}
 	}
 }
 
@@ -304,7 +323,9 @@ static void eb_mul_naf_tab(eb_t r, eb_t p, bn_t k) {
 
 void eb_mul_basic(eb_t r, eb_t p, bn_t k) {
 	int i, l;
-	eb_t t = NULL;
+	eb_t t;
+
+	eb_null(t);
 
 	TRY {
 		eb_new(t);
@@ -338,10 +359,18 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k) {
 #if EB_MUL == CONST || !defined(STRIP)
 
 void eb_mul_const(eb_t r, eb_t p, bn_t k) {
-	int i, t;
-	fb_t x1 = NULL, z1 = NULL, x2 = NULL, z2 = NULL;
-	fb_t r1 = NULL, r2 = NULL, r3 = NULL, r4 = NULL;
-	fb_t b;
+	int i, t, koblitz;
+	fb_t x1, z1, x2, z2, r1, r2, r3, r4, b;
+
+	fb_null(x1);
+	fb_null(z1);
+	fb_null(x2);
+	fb_null(z2);
+	fb_null(r1);
+	fb_null(r2);
+	fb_null(r3);
+	fb_null(r4);
+	fb_null(b);
 
 	TRY {
 		fb_new(x1);
@@ -359,9 +388,9 @@ void eb_mul_const(eb_t r, eb_t p, bn_t k) {
 		fb_sqr(z2, p->x);
 		fb_sqr(x2, z2);
 
-		b = eb_curve_get_b();
+		fb_copy(b, eb_curve_get_b());
 
-		int koblitz = eb_curve_is_kbltz();
+		koblitz = eb_curve_is_kbltz();
 
 		if (!koblitz) {
 			fb_add(x2, x2, b);

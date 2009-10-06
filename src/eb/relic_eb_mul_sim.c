@@ -187,8 +187,8 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 	signed char u;
 	signed char tnaf0[FB_BITS + 8], *t0;
 	signed char tnaf1[FB_BITS + 8], *t1;
-	eb_t table0[1 << (EB_WIDTH - 2)] = { NULL };
-	eb_t table1[1 << (EB_WIDTH - 2)] = { NULL };
+	eb_t table0[1 << (EB_WIDTH - 2)];
+	eb_t table1[1 << (EB_WIDTH - 2)];
 	eb_t *t = NULL;
 	bn_t vm = NULL, s0 = NULL, s1 = NULL;
 
@@ -197,6 +197,11 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 		u = -1;
 	} else {
 		u = 1;
+	}
+
+	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+		eb_null(table0[i]);
+		eb_null(table1[i]);
 	}
 
 	if (gen == 1) {
@@ -301,9 +306,14 @@ static void table_init_ordin(eb_t *t, eb_t p) {
 static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 	int len, l0, l1, i, n0, n1, w;
 	signed char naf0[FB_BITS + 1], naf1[FB_BITS + 1], *t0, *t1;
-	eb_t table0[1 << (EB_WIDTH - 2)] = { NULL };
-	eb_t table1[1 << (EB_WIDTH - 2)] = { NULL };
+	eb_t table0[1 << (EB_WIDTH - 2)];
+	eb_t table1[1 << (EB_WIDTH - 2)];
 	eb_t *t = NULL;
+
+	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+		eb_null(table0[i]);
+		eb_null(table1[i]);
+	}
 
 	if (gen) {
 #if defined(EB_PRECO)
@@ -381,7 +391,9 @@ static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 #if EB_SIM == BASIC || !defined(STRIP)
 
 void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
-	eb_t t = NULL;
+	eb_t t;
+
+	eb_null(t);
 
 	TRY {
 		eb_new(t);
@@ -403,11 +415,20 @@ void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 #if EB_SIM == TRICK || !defined(STRIP)
 
 void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
-	eb_t t0[1 << (EB_WIDTH / 2)] = { NULL };
-	eb_t t1[1 << (EB_WIDTH / 2)] = { NULL };
-	eb_t t[1 << EB_WIDTH] = { NULL };
+	eb_t t0[1 << (EB_WIDTH / 2)];
+	eb_t t1[1 << (EB_WIDTH / 2)];
+	eb_t t[1 << EB_WIDTH];
 	int d, l0, l1, w;
 	unsigned char w0[FB_BITS + 1], w1[FB_BITS + 1];
+
+	for (int i = 0; i < 1 << EB_WIDTH; i++) {
+		eb_null(t[i]);
+	}
+
+	for (int i = 0; i < 1 << (EB_WIDTH / 2); i++) {
+		eb_null(t0[i]);
+		eb_null(t1[i]);
+	}
 
 	w = EB_WIDTH / 2;
 
@@ -492,10 +513,16 @@ void eb_mul_sim_inter(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 #if EB_SIM == JOINT || !defined(STRIP)
 
 void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
-	eb_t t[5] = { NULL };
+	eb_t t[5];
 	int u_i, len, offset;
 	signed char jsf[2 * (FB_BITS + 1)];
 	int i;
+
+	eb_null(t[0]);
+	eb_null(t[1]);
+	eb_null(t[2]);
+	eb_null(t[3]);
+	eb_null(t[4]);
 
 	TRY {
 		for (i = 0; i < 5; i++) {

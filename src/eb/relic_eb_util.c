@@ -77,6 +77,8 @@ void eb_rand(eb_t p) {
 	bn_t n = NULL, k = NULL;
 	eb_t g;
 
+	eb_null(g);
+
 	TRY {
 		bn_new(k);
 

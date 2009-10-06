@@ -50,7 +50,11 @@
  * @param p					- the point to double.
  */
 static void eb_dbl_basic_ordin(eb_t r, eb_t p) {
-	fb_t t0 = NULL, t1 = NULL, t2 = NULL;
+	fb_t t0, t1, t2;
+
+	fb_null(t0);
+	fb_null(t1);
+	fb_null(t2);
 
 	TRY {
 		fb_new(t0);
@@ -118,7 +122,11 @@ static void eb_dbl_basic_ordin(eb_t r, eb_t p) {
  * @param p					- the point to double.
  */
 static void eb_dbl_basic_super(eb_t r, eb_t p) {
-	fb_t t0 = NULL, t1 = NULL, t2 = NULL;
+	fb_t t0, t1, t2;
+
+	fb_null(t0);
+	fb_null(t1);
+	fb_null(t2);
 
 	TRY {
 		fb_new(t0);
@@ -208,7 +216,10 @@ static void eb_dbl_basic_super(eb_t r, eb_t p) {
  * @param p					- the point to double.
  */
 static void eb_dbl_projc_ordin(eb_t r, eb_t p) {
-	fb_t t0 = NULL, t1 = NULL;
+	fb_t t0, t1;
+
+	fb_null(t0);
+	fb_null(t1);
 
 	TRY {
 		fb_new(t0);
