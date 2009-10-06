@@ -71,8 +71,11 @@ static int trc_a, trc_b, trc_c;
  * @throw ERR_INVALID if the polynomial is invalid.
  */
 static void find_trace() {
-	fb_t t0, t1 = NULL;
+	fb_t t0, t1;
 	int counter;
+
+	fb_null(t0);
+	fb_null(t1);
 
 	TRY {
 		fb_new(t0);
@@ -117,6 +120,53 @@ static void find_trace() {
 	}
 }
 
+#if FB_SLV == QUICK || !defined(STRIP)
+
+/**
+ * Size of the precomputed table of half-traces.
+ */
+#define HALF_SIZE		(FB_BITS / 2 + 1)
+
+/**
+ * Table of precomputed half-traces.
+ */
+fb_st half[HALF_SIZE];
+
+/**
+ * Precomputes half-traces for z^i with odd i.
+ *
+ * @throw ERR_NO_MEMORY if there is no available memory.
+ */
+static void find_solve() {
+	int i, j;
+	fb_t t0;
+
+	fb_null(t0);
+
+	TRY {
+		fb_new(t0);
+
+		for (i = FB_BITS - 2; i >= 1; i-=2) {
+			fb_zero(t0);
+			fb_set_bit(t0, i, 1);
+			fb_copy(half[i/2], t0);
+			for (j = 0; j < (FB_BITS - 1) / 2; j++) {
+				fb_sqr(half[i/2], half[i/2]);
+				fb_sqr(half[i/2], half[i/2]);;
+				fb_add(half[i/2], half[i/2], t0);
+			}
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fb_free(t0);
+	}
+}
+
+#endif
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -137,6 +187,7 @@ dig_t *fb_poly_get(void) {
 void fb_poly_set(fb_t f) {
 	fb_copy(poly, f);
 	find_trace();
+	find_solve();
 }
 
 void fb_poly_add(fb_t c, fb_t a) {
@@ -162,7 +213,9 @@ void fb_poly_add(fb_t c, fb_t a) {
 }
 
 void fb_poly_set_trino(int a) {
-	fb_t f = NULL;
+	fb_t f;
+
+	fb_null(f);
 
 	TRY {
 		poly_a = a;
@@ -193,7 +246,9 @@ void fb_poly_set_trino(int a) {
 }
 
 void fb_poly_set_penta(int a, int b, int c) {
-	fb_t f = NULL;
+	fb_t f;
+
+	fb_null(f);
 
 	TRY {
 		fb_new(f);
@@ -239,4 +294,12 @@ void fb_poly_get_rdc(int *a, int *b, int *c) {
 	*a = poly_a;
 	*b = poly_b;
 	*c = poly_c;
+}
+
+dig_t *fb_poly_get_slv(int i) {
+#if FB_SLV == QUICK || !defined(STRIP)
+	return half[i/2];
+#else
+	return NULL;
+#endif
 }

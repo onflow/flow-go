@@ -45,7 +45,12 @@
 
 void fb_inv_basic(fb_t c, fb_t a) {
 	int lu, lv;
-	fb_t u = NULL, v = NULL, g1 = NULL, g2 = NULL;
+	fb_t u, v, g1, g2;
+
+	fb_null(u);
+	fb_null(v);
+	fb_null(g1);
+	fb_null(g2);
 
 	TRY {
 		fb_new(u);
@@ -224,8 +229,13 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 
 void fb_inv_almos(fb_t c, fb_t a) {
 	int lu, lv, lt;
-	fb_t _b = NULL, _d = NULL, _u = NULL, _v = NULL;
+	fb_t _b, _d, _u, _v;
 	dig_t *t = NULL, *u = NULL, *v = NULL, *b = NULL, *d = NULL;
+
+	fb_null(_b);
+	fb_null(_d);
+	fb_null(_u);
+	fb_null(_v);
 
 	TRY {
 		fb_new(_b);

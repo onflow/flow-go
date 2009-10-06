@@ -57,3 +57,4 @@ void fb_sub(fb_t c, fb_t a, fb_t b) {
 void fb_sub_dig(fb_t c, fb_t a, dig_t b) {
 	fb_add1_low(c, a, b);
 }
+

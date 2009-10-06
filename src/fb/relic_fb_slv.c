@@ -41,13 +41,16 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int fb_slv(fb_t c, fb_t a) {
-	int i, result = 0;
-	fb_t t0 = NULL, t1 = NULL;
+#if FB_SLV == BASIC || !defined(STRIP)
+
+void fb_slv_basic(fb_t c, fb_t a) {
+	int i;
+	fb_t t0;
+
+	fb_null(t0);
 
 	TRY {
 		fb_new(t0);
-		fb_new(t1);
 
 		fb_copy(t0, a);
 		fb_copy(c, a);
@@ -57,22 +60,21 @@ int fb_slv(fb_t c, fb_t a) {
 			fb_sqr(c, c);
 			fb_add(c, c, t0);
 		}
-
-		fb_copy(t1, c);
-		fb_sqr(t1, t1);
-		fb_add(t1, t1, c);
-		if (fb_cmp(t0, t1) == CMP_EQ) {
-			result = 1;
-		} else {
-			result = 0;
-		}
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
 		fb_free(t0);
-		fb_free(t1);
 	}
-	return result;
 }
+
+#endif
+
+#if FB_SLV == QUICK || !defined(STRIP)
+
+void fb_slv_quick(fb_t c, fb_t a) {
+	fb_slvn_low(c, a);
+}
+
+#endif

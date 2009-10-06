@@ -184,23 +184,19 @@ int fb_bits_dig(dig_t a) {
 	int offset;
 
 	if (a >= ((dig_t)1 << 8)) {
-			offset = 8;
+		offset = 8;
 	} else {
-			offset = 0;
+		offset = 0;
 	}
 	a = a >> offset;
 	if (a >> 4 == 0) {
-			return table[a & 0xF] + offset;
+		return table[a & 0xF] + offset;
 	} else {
-			return table[a >> 4] + 4 + offset;
+		return table[a >> 4] + 4 + offset;
 	}
 	return 0;
 #else
-	if (a == 0) {
-		return 0;
-	} else {
-		return FB_DIGIT - __builtin_clzl(a);
-	}
+	return FB_DIGIT - __builtin_clzl(a);
 #endif
 }
 
@@ -230,8 +226,10 @@ void fb_print(fb_t a) {
 }
 
 void fb_size(int *size, fb_t a, int radix) {
-	int digits, l;
+	int digits = 0, l;
 	fb_t t;
+
+	fb_null(t);
 
 	*size = 0;
 
@@ -252,14 +250,22 @@ void fb_size(int *size, fb_t a, int radix) {
 		return;
 	}
 
-	fb_new(t);
-	fb_copy(t, a);
-	digits = 0;
-	while (fb_is_zero(t) == 0) {
-		fb_rsh(t, t, l);
-		digits++;
+	TRY {
+
+		fb_new(t);
+		fb_copy(t, a);
+		digits = 0;
+		while (fb_is_zero(t) == 0) {
+			fb_rsh(t, t, l);
+			digits++;
+		}
 	}
-	fb_free(t);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fb_free(t);
+	}
 
 	*size = digits + 1;
 }
@@ -299,6 +305,8 @@ void fb_write(char *str, int len, fb_t a, int radix) {
 	int d, l, i, j;
 	char c;
 
+	fb_null(t);
+
 	fb_size(&l, a, radix);
 	if (len < l) {
 		THROW(ERR_NO_BUFFER);
@@ -316,29 +324,35 @@ void fb_write(char *str, int len, fb_t a, int radix) {
 		return;
 	}
 
-	fb_new(t);
-	fb_copy(t, a);
+	TRY {
+		fb_new(t);
+		fb_copy(t, a);
 
-	j = 0;
-	while (!fb_is_zero(t)) {
-		d = t[0] % radix;
-		fb_rsh(t, t, l);
-		str[j] = util_conv_char(d);
-		j++;
+		j = 0;
+		while (!fb_is_zero(t)) {
+			d = t[0] % radix;
+			fb_rsh(t, t, l);
+			str[j] = util_conv_char(d);
+			j++;
+		}
+
+		/* Reverse the digits of the string. */
+		i = 0;
+		j = len - 2;
+		while (i < j) {
+			c = str[i];
+			str[i] = str[j];
+			str[j] = c;
+			++i;
+			--j;
+		}
+
+		str[len - 1] = '\0';
 	}
-
-	/* Reverse the digits of the string. */
-	i = 0;
-	j = len - 2;
-	while (i < j) {
-		c = str[i];
-		str[i] = str[j];
-		str[j] = c;
-		++i;
-		--j;
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-
-	str[len - 1] = '\0';
-
-	fb_free(t);
+	FINALLY {
+		fb_free(t);
+	}
 }
