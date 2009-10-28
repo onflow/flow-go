@@ -76,7 +76,6 @@ void err_full_msg(const char *function, const char *file, int line,
 		for (int i = 1; i < n - 2; i++) {
 			fprintf(stderr, "\t\t#%d %s\n", i - 1, symbols[i]);
 		}
-		fprintf(stderr, "\n");
 		free(symbols);
 	}
 }

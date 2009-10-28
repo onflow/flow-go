@@ -148,7 +148,6 @@ void fb_set_bit(fb_t a, int bit, int value) {
 
 int fb_bits(fb_t a) {
 	int i, j;
-	dig_t b;
 	dig_t t;
 
 	for (i = FB_DIGS - 1; i >= 0; i--) {
@@ -156,48 +155,13 @@ int fb_bits(fb_t a) {
 		if (t == 0) {
 			continue;
 		}
-		b = (dig_t)1 << (FB_DIGIT - 1);
-		j = FB_DIGIT - 1;
-		while (!(t & b)) {
-			j--;
-			b >>= 1;
+		j = util_bits_dig(t);
+		if (j == 0) {
+			continue;
 		}
-		return (i << FB_DIG_LOG) + j + 1;
+		return (i << FB_DIG_LOG) + j;
 	}
 	return 0;
-}
-
-int fb_bits_dig(dig_t a) {
-#if WORD == 8 || WORD == 16
-	static const unsigned char table[16] = {
-		0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4
-	};
-#endif
-#if WORD == 8
-	if (a >> 4 == 0) {
-		return table[a & 0xF];
-	} else {
-		return table[a >> 4] + 4;
-	}
-	return 0;
-#elif WORD == 16
-	int offset;
-
-	if (a >= ((dig_t)1 << 8)) {
-		offset = 8;
-	} else {
-		offset = 0;
-	}
-	a = a >> offset;
-	if (a >> 4 == 0) {
-		return table[a & 0xF] + offset;
-	} else {
-		return table[a >> 4] + 4 + offset;
-	}
-	return 0;
-#else
-	return FB_DIGIT - __builtin_clzl(a);
-#endif
 }
 
 void fb_rand(fb_t a) {

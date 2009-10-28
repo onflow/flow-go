@@ -119,6 +119,7 @@ static long long overhead;
 
 /**
  * Dummy function for measuring benchmarking overhead.
+ *
  * @param a				- the dummy parameter.
  */
 static void empty(int *a) {

@@ -114,7 +114,6 @@ int bn_is_even(bn_t a) {
 
 int bn_bits(bn_t a) {
 	int bits;
-	dig_t t;
 
 	if (a->used == 0) {
 		return 0;
@@ -123,13 +122,7 @@ int bn_bits(bn_t a) {
 	/* Bits in lower digits. */
 	bits = (a->used - 1) * BN_DIGIT;
 
-	/* Bits in last digit. */
-	t = a->dp[a->used - 1];
-	while (t > ((dig_t)0)) {
-		bits++;
-		t >>= ((dig_t)1);
-	}
-	return bits;
+	return bits + util_bits_dig(a->dp[a->used - 1]);
 }
 
 int bn_test_bit(bn_t a, int bit) {

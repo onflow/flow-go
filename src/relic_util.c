@@ -66,3 +66,36 @@ uint32_t util_conv_big(uint32_t i) {
 char util_conv_char(dig_t i) {
 	return conv_table[i];
 }
+
+int util_bits_dig(dig_t a) {
+#if WORD == 8 || WORD == 16
+	static const unsigned char table[16] = {
+		0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4
+	};
+#endif
+#if WORD == 8
+	if (a >> 4 == 0) {
+		return table[a & 0xF];
+	} else {
+		return table[a >> 4] + 4;
+	}
+	return 0;
+#elif WORD == 16
+	int offset;
+
+	if (a >= ((dig_t)1 << 8)) {
+		offset = 8;
+	} else {
+		offset = 0;
+	}
+	a = a >> offset;
+	if (a >> 4 == 0) {
+		return table[a & 0xF] + offset;
+	} else {
+		return table[a >> 4] + 4 + offset;
+	}
+	return 0;
+#else
+	return DIGIT - __builtin_clzl(a);
+#endif
+}

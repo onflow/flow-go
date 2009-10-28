@@ -49,7 +49,7 @@
 static void etat_exp(fb4_t r, fb4_t a) {
 	fb2_t t0, t1, t2;
 	fb4_t v, w;
-	int delta, mod;
+	int i = 0, delta, mod, to;
 	dig_t b;
 
 	fb2_new(t0);
@@ -115,7 +115,17 @@ static void etat_exp(fb4_t r, fb4_t a) {
 	/* v = v^(2m+1). */
 	fb4_exp_2m(r, v);
 	fb4_mul(v, r, v);
-	for (int i = 0; i < (FB_BITS + 1) / 2; i++) {
+
+	to = ((FB_BITS + 1) / 2) >> 2;
+	to = to << 2;
+	for (i = 0; i < to; i++) {
+		/* This is faster than calling fb4_sqr(w, w) (no field additions). */
+		fb_sqr(w[0], w[0]);
+		fb_sqr(w[1], w[1]);
+		fb_sqr(w[2], w[2]);
+		fb_sqr(w[3], w[3]);
+	}
+	for (; i < (FB_BITS + 1) / 2; i++) {
 		fb4_sqr(w, w);
 	}
 	fb4_mul(r, v, w);
@@ -299,40 +309,327 @@ static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 		} else {
 			fb_set_bit(_f[i][0], 0, 1);
 		}
+#ifdef CORE45NM
+		int s2[] = { 0, 308, (FB_BITS - 1) / 2 };
+		int s4[] = { 0, 156, 310, 462, (FB_BITS - 1) / 2 };
+		int s8[] = { 0, 80, 160, 238, 315, 391, 465, 539, (FB_BITS - 1) / 2 };
+		int s16[] =
+				{ 0, 43, 85, 127, 168, 208, 248, 287, 325, 363, 400, 437, 473,
+					508, 543, 577, (FB_BITS - 1) / 2 };
 
-		int s2[] = {0, 308, (FB_BITS - 1) / 2};
-		int s4[] = {0, 157, 311, 462, (FB_BITS - 1) / 2};
-		int s8[] = {0, 81, 161, 240, 317, 392, 467, 540, (FB_BITS - 1) / 2};
-		int s16[] = {0, 56, 109, 159, 206, 251, 294, 372, 408, 442, 474, 505, 534, 561, 587, (FB_BITS - 1) / 2};
-		int s32[] = {0, 39, 77, 113, 146, 178, 208, 237, 264, 289, 313, 336, 358, 378, 397, 416, 433, 449, 465, 479, 493, 506, 519, 530, 541, 552, 562, 571, 580, 588, 596, 604};
-
-		switch(CORES) {
-		case 1:
-			from = 0;
-			to = (FB_BITS - 1) / 2;
-			break;
-		case 2:
-			from = s2[i];
-			to = s2[i+1];
-			break;
-		case 4:
-			from = s4[i];
-			to = s4[i+1];
-			break;
-		case 8:
-			from = s8[i];
-			to = s8[i+1];
-			break;
-		case 16:
-			from = s16[i];
-			to = s16[i+1];
-			break;
-		case 32:
-			from = s32[i];
-			to = s32[i+1];
-			break;
+		switch (CORES) {
+			case 1:
+				from = 0;
+				to = (FB_BITS - 1) / 2;
+				break;
+			case 2:
+				from = s2[i];
+				to = s2[i + 1];
+				break;
+			case 4:
+				from = s4[i];
+				to = s4[i + 1];
+				break;
+			case 8:
+				from = s8[i];
+				to = s8[i + 1];
+				break;
+			case 16:
+				from = s16[i];
+				to = s16[i + 1];
+				break;
+			case 32:
+				if (i == 0) {
+					from = 0;
+					to = 24;
+				}
+				if (i == 1) {
+					from = 24;
+					to = 48;
+				}
+				if (i == 2) {
+					from = 48;
+					to = 71;
+				}
+				if (i == 3) {
+					from = 71;
+					to = 94;
+				}
+				if (i == 4) {
+					from = 94;
+					to = 117;
+				}
+				if (i == 5) {
+					from = 117;
+					to = 140;
+				}
+				if (i == 6) {
+					from = 140;
+					to = 162;
+				}
+				if (i == 7) {
+					from = 162;
+					to = 183;
+				}
+				if (i == 8) {
+					from = 183;
+					to = 205;
+				}
+				if (i == 9) {
+					from = 205;
+					to = 226;
+				}
+				if (i == 10) {
+					from = 226;
+					to = 246;
+				}
+				if (i == 11) {
+					from = 246;
+					to = 267;
+				}
+				if (i == 12) {
+					from = 267;
+					to = 287;
+				}
+				if (i == 13) {
+					from = 287;
+					to = 306;
+				}
+				if (i == 14) {
+					from = 306;
+					to = 326;
+				}
+				if (i == 15) {
+					from = 326;
+					to = 345;
+				}
+				if (i == 16) {
+					from = 345;
+					to = 363;
+				}
+				if (i == 17) {
+					from = 363;
+					to = 382;
+				}
+				if (i == 18) {
+					from = 382;
+					to = 400;
+				}
+				if (i == 19) {
+					from = 400;
+					to = 418;
+				}
+				if (i == 20) {
+					from = 418;
+					to = 435;
+				}
+				if (i == 21) {
+					from = 435;
+					to = 453;
+				}
+				if (i == 22) {
+					from = 453;
+					to = 470;
+				}
+				if (i == 23) {
+					from = 470;
+					to = 486;
+				}
+				if (i == 24) {
+					from = 486;
+					to = 503;
+				}
+				if (i == 25) {
+					from = 503;
+					to = 519;
+				}
+				if (i == 26) {
+					from = 519;
+					to = 535;
+				}
+				if (i == 27) {
+					from = 535;
+					to = 551;
+				}
+				if (i == 28) {
+					from = 551;
+					to = 566;
+				}
+				if (i == 29) {
+					from = 566;
+					to = 581;
+				}
+				if (i == 30) {
+					from = 581;
+					to = 596;
+				}
+				if (i == 31) {
+					from = 596;
+					to = (FB_BITS - 1) / 2;
+				}
+				break;
 		}
+#else
+		int s2[] = { 0, 309, (FB_BITS - 1) / 2 };
+		int s4[] = { 0, 158, 312, 463, (FB_BITS - 1) / 2 };
+		int s8[] = { 0, 82, 163, 242, 319, 395, 468, 540, (FB_BITS - 1) / 2 };
+		int s16[] =
+				{ 0, 45, 89, 132, 174, 215, 255, 294, 333, 370, 407, 443, 478,
+					513, 546, 579, (FB_BITS - 1) / 2 };
 
+		switch (CORES) {
+			case 1:
+				from = 0;
+				to = (FB_BITS - 1) / 2;
+				break;
+			case 2:
+				from = s2[i];
+				to = s2[i + 1];
+				break;
+			case 4:
+				from = s4[i];
+				to = s4[i + 1];
+				break;
+			case 8:
+				from = s8[i];
+				to = s8[i + 1];
+				break;
+			case 16:
+				from = s16[i];
+				to = s16[i + 1];
+				break;
+			case 32:
+				if (i == 0) {
+					from = 0;
+					to = 26;
+				}
+				if (i == 1) {
+					from = 26;
+					to = 52;
+				}
+				if (i == 2) {
+					from = 52;
+					to = 77;
+				}
+				if (i == 3) {
+					from = 77;
+					to = 102;
+				}
+				if (i == 4) {
+					from = 102;
+					to = 126;
+				}
+				if (i == 5) {
+					from = 126;
+					to = 150;
+				}
+				if (i == 6) {
+					from = 150;
+					to = 173;
+				}
+				if (i == 7) {
+					from = 173;
+					to = 196;
+				}
+				if (i == 8) {
+					from = 196;
+					to = 218;
+				}
+				if (i == 9) {
+					from = 218;
+					to = 240;
+				}
+				if (i == 10) {
+					from = 240;
+					to = 261;
+				}
+				if (i == 11) {
+					from = 261;
+					to = 282;
+				}
+				if (i == 12) {
+					from = 282;
+					to = 302;
+				}
+				if (i == 13) {
+					from = 302;
+					to = 322;
+				}
+				if (i == 14) {
+					from = 322;
+					to = 341;
+				}
+				if (i == 15) {
+					from = 341;
+					to = 360;
+				}
+				if (i == 16) {
+					from = 360;
+					to = 378;
+				}
+				if (i == 17) {
+					from = 378;
+					to = 397;
+				}
+				if (i == 18) {
+					from = 397;
+					to = 414;
+				}
+				if (i == 19) {
+					from = 414;
+					to = 431;
+				}
+				if (i == 20) {
+					from = 431;
+					to = 448;
+				}
+				if (i == 21) {
+					from = 448;
+					to = 465;
+				}
+				if (i == 22) {
+					from = 465;
+					to = 481;
+				}
+				if (i == 23) {
+					from = 481;
+					to = 497;
+				}
+				if (i == 24) {
+					from = 497;
+					to = 512;
+				}
+				if (i == 25) {
+					from = 512;
+					to = 527;
+				}
+				if (i == 26) {
+					from = 527;
+					to = 542;
+				}
+				if (i == 27) {
+					from = 542;
+					to = 556;
+				}
+				if (i == 28) {
+					from = 556;
+					to = 571;
+				}
+				if (i == 29) {
+					from = 571;
+					to = 584;
+				}
+				if (i == 30) {
+					from = 584;
+					to = 598;
+				}
+				if (i == 31) {
+					from = 598;
+					to = (FB_BITS - 1) / 2;
+				}
+				break;
+		}
+#endif
 		for (int j = 0; j < from; j++) {
 			/* Compute starting point. */
 			fb_srt(xp, xp);
@@ -342,7 +639,6 @@ static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 		}
 
 		for (int j = from; j < to; j++) {
-			//printf("%d %d\n", i, j);
 			/* x_P = sqrt(x_P), y_P = sqr(y_P). */
 			fb_srt(xp, xp);
 			fb_srt(yp, yp);
@@ -368,7 +664,7 @@ static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 #pragma omp barrier
 		for (int s = 1; s < CORES; s *= 2) {
 			if (i % (2 * s) == 0) {
-				fb4_mul(_f[i], _f[i], _f[i+s]);
+				fb4_mul(_f[i], _f[i], _f[i + s]);
 			}
 #pragma omp barrier
 		}

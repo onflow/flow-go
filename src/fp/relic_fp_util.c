@@ -113,7 +113,6 @@ void fp_set_bit(fp_t a, int bit, int value) {
 
 int fp_bits(fp_t a) {
 	int i, j;
-	dig_t b;
 	dig_t t;
 
 	for (i = FP_DIGS - 1; i >= 0; i--) {
@@ -121,13 +120,11 @@ int fp_bits(fp_t a) {
 		if (t == 0) {
 			continue;
 		}
-		b = (dig_t)1 << (FP_DIGIT - 1);
-		j = FP_DIGIT - 1;
-		while (!(t & b)) {
-			j--;
-			b >>= 1;
+		j = util_bits_dig(t);
+		if (j == 0) {
+			continue;
 		}
-		return (i << FP_DIG_LOG) + j + 1;
+		return (i << FP_DIG_LOG) + j;
 	}
 	return 0;
 }

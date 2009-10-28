@@ -161,12 +161,12 @@ static void ep_add_basic_super(ep_t r, ep_t p, ep_t q) {
 		fp_add(r->y, t1, p->y);
 
 		switch (ep_curve_opt_c()) {
-			case EP_OPT_ZERO:
+			case OPT_ZERO:
 				break;
-			case EP_OPT_ONE:
+			case OPT_ONE:
 				fp_add_dig(r->y, r->y, (dig_t)1);
 				break;
-			case EP_OPT_DIGIT:
+			case OPT_DIGIT:
 				fp_add_dig(r->y, r->y, ep_curve_get_c()[0]);
 				break;
 			default:
@@ -345,12 +345,12 @@ void ep_add_projc_ordin(ep_t r, ep_t p, ep_t q) {
 
 		/* t1 = A + B^2 + a2 * C. */
 		switch (ep_curve_opt_a()) {
-			case EP_OPT_ZERO:
+			case OPT_ZERO:
 				break;
-			case EP_OPT_ONE:
+			case OPT_ONE:
 				fp_add(t1, t1, t2);
 				break;
-			case EP_OPT_DIGIT:
+			case OPT_DIGIT:
 				/* t5 = a2 * C. */
 				fp_mul(t5, ep_curve_get_a(), t2);
 				fp_add(t1, t1, t5);

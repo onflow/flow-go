@@ -66,12 +66,12 @@ static void ep_dbl_basic_ordin(ep_t r, ep_t p) {
 		fp_add(t1, t1, t2);
 
 		switch (ep_curve_opt_a()) {
-			case EP_OPT_ZERO:
+			case OPT_ZERO:
 				break;
-			case EP_OPT_ONE:
+			case OPT_ONE:
 				fp_add_dig(t1, t1, (dig_t)1);
 				break;
-			case EP_OPT_DIGIT:
+			case OPT_DIGIT:
 				fp_add_dig(t1, t1, ep_curve_get_a()[0]);
 				break;
 			default:
@@ -132,12 +132,12 @@ static void ep_dbl_basic_super(ep_t r, ep_t p) {
 
 		/* t0 = (x1^2 + a)/c. */
 		switch (ep_curve_opt_a()) {
-			case EP_OPT_ZERO:
+			case OPT_ZERO:
 				break;
-			case EP_OPT_ONE:
+			case OPT_ONE:
 				fp_add_dig(t0, t0, (dig_t)1);
 				break;
-			case EP_OPT_DIGIT:
+			case OPT_DIGIT:
 				fp_add_dig(t0, t0, ep_curve_get_a()[0]);
 				break;
 			default:
@@ -146,10 +146,10 @@ static void ep_dbl_basic_super(ep_t r, ep_t p) {
 		}
 
 		switch (ep_curve_opt_c()) {
-			case EP_OPT_ZERO:
-			case EP_OPT_ONE:
+			case OPT_ZERO:
+			case OPT_ONE:
 				break;
-			case EP_OPT_DIGIT:
+			case OPT_DIGIT:
 			default:
 				fp_inv(t2, ep_curve_get_c());
 				fp_mul(t0, t0, t2);
@@ -166,12 +166,12 @@ static void ep_dbl_basic_super(ep_t r, ep_t p) {
 		fp_add(r->y, t1, p->y);
 
 		switch (ep_curve_opt_c()) {
-			case EP_OPT_ZERO:
+			case OPT_ZERO:
 				break;
-			case EP_OPT_ONE:
+			case OPT_ONE:
 				fp_add_dig(r->y, r->y, (dig_t)1);
 				break;
-			case EP_OPT_DIGIT:
+			case OPT_DIGIT:
 				fp_add_dig(r->y, r->y, ep_curve_get_c()[0]);
 				break;
 			default:
@@ -241,12 +241,12 @@ void ep_dbl_projc_ordin(ep_t r, ep_t p) {
 
 	/* C^2 + D + a2 * z3. */
 	switch (ep_curve_opt_a()) {
-		case EP_OPT_ZERO:
+		case OPT_ZERO:
 			break;
-		case EP_OPT_ONE:
+		case OPT_ONE:
 			fp_add(r->x, r->z, r->x);
 			break;
-		case EP_OPT_DIGIT:
+		case OPT_DIGIT:
 			fp_mul(r->y, r->z, ep_curve_get_a());
 			fp_add(r->x, r->y, r->x);
 			break;
