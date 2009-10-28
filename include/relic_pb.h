@@ -66,7 +66,7 @@ typedef fb_t fb4_t[4];
 /*============================================================================*/
 
 /**
- * Initialized a quadratic extension binary field with a null value.
+ * Initializes a quadratic extension binary field with a null value.
  */
 #define fb2_null(A)															\
 		fb_null(A[0]); fb_null(A[1]);										\
@@ -120,7 +120,7 @@ typedef fb_t fb4_t[4];
  * @return 1 if the argument is zero, 0 otherwise.
  */
 #define fb2_is_zero(A)														\
-		fb_is_zero(A[0]) && fb_is_zero(A[1])								\
+		(fb_is_zero(A[0]) && fb_is_zero(A[1]))								\
 
 /**
  * Assigns a random value to a quadratic extension field element.
@@ -170,6 +170,12 @@ typedef fb_t fb4_t[4];
  */
 #define fb2_sub(C, A, B)													\
 		fb_sub(C[0], A[0], B[0]); fb_sub(C[1], A[1], B[1]);					\
+
+/**
+ * Initializes a quadratic extension binary field with a null value.
+ */
+#define fb4_null(A)															\
+		fb_null(A[0]); fb_null(A[1]); fb_null(A[2]); fb_null(A[3]);			\
 
 /**
  * Calls a funtion to allocate a quartic extension binary field element.
@@ -222,8 +228,8 @@ typedef fb_t fb4_t[4];
  * @return 1 if the argument is zero, 0 otherwise.
  */
 #define fb4_is_zero(A)														\
-		fb_is_zero(A[0]) && fb_is_zero(A[1]) &&								\
-		fb_is_zero(A[2]) && fb_is_zero(A[3])								\
+		(fb_is_zero(A[0]) && fb_is_zero(A[1]) &&							\
+		fb_is_zero(A[2]) && fb_is_zero(A[3]))								\
 
 /**
  * Assigns a random value to a quartic extension field element.
@@ -356,14 +362,6 @@ void fb4_mul_sparse(fb4_t c, fb4_t a, fb4_t b);
  * @param[in] a				- the quartic extension element to exponentiate.
  */
 void fb4_exp_2m(fb4_t c, fb4_t a);
-
-/**
- * Inverts a quadratic extension field element. Computes c = a^{-1}.
- *
- * @param[out] c			- the result.
- * @param[in] a				- the quartic extension field element to invert.
- */
-void fb4_inv(fb4_t c, fb4_t a);
 
 /**
  * Computes the etat pairing of two binary elliptic curve points without using

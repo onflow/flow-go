@@ -136,6 +136,13 @@ typedef bn_st *bn_t;
 /*============================================================================*/
 
 /**
+ * Initializes a multiple precision integer with a null value.
+ *
+ * @param[out] A			- the multiple precision integer to initialize.
+ */
+#define bn_null(A)			A = NULL;
+
+/**
  * Calls a function to allocate and initialize a multiple precision integer.
  *
  * @param[in,out] A			- the multiple precision integer to initialize.

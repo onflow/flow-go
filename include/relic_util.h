@@ -70,6 +70,12 @@
  */
 #define SPLIT(B, D, V, L)	D = (V) >> (L); B = (V) - ((D) << (L));
 
+/**
+ * Computes the ceiling function of an integer division.
+ *
+ * @param[in] A			- the dividend.
+ * @param[in] B			- the divisor.
+ */
 #define CEIL(A, B)			(((A) - 1) / (B) + 1)
 
 /**
@@ -151,7 +157,7 @@
 /*============================================================================*/
 
 /**
- * Convert digit to big-endian.
+ * Convert a digit to big-endian.
  */
 uint32_t util_conv_big(uint32_t i);
 
@@ -159,5 +165,13 @@ uint32_t util_conv_big(uint32_t i);
  * Converts a small digit to a character.
  */
 char util_conv_char(dig_t i);
+
+/**
+ * Returns the highest bit set on a digit.
+ *
+ * @param[in] a				- the digit.
+ * @return the position of the highest bit set.
+ */
+int util_bits_dig(dig_t a);
 
 #endif /* !RELIC_UTIL_H */

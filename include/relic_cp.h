@@ -111,6 +111,21 @@ typedef struct _rsa_prv_t {
 #endif
 
 /**
+ * Signs a message using the RSA cryptosystem.
+ * @param[out] O			- the output buffer.
+ * @param[out] OL			- the number of bytes written in the output buffer.
+ * @param[in] I				- the input buffer.
+ * @param[in] IL			- the number of bytes to sign.
+ * @param[in] P				- the private key.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+#if CP_RSA == BASIC
+#define cp_rsa_sign(O, OL, I, IL, P)		cp_rsa_sign_basic(O, OL, I, IL, P)
+#elif CP_RSA == QUICK
+#define cp_rsa_sign(O, OL, I, IL, P)		cp_rsa_sign_quick(O, OL, I, IL, P)
+#endif
+
+/**
  * Signs using ECDSA.
  *
  * @param[out] R				- the first component of the signature.
@@ -202,21 +217,6 @@ int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
  */
 int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 		int in_len, rsa_prv_t *prv);
-
-/**
- * Signs a message using the RSA cryptosystem.
- * @param[out] O			- the output buffer.
- * @param[out] OL			- the number of bytes written in the output buffer.
- * @param[in] I				- the input buffer.
- * @param[in] IL			- the number of bytes to sign.
- * @param[in] P				- the private key.
- * @return STS_OK if no errors occurred, STS_ERR otherwise.
- */
-#if CP_RSA == BASIC
-#define cp_rsa_sign(O, OL, I, IL, P)		cp_rsa_sign_basic(O, OL, I, IL, P)
-#elif CP_RSA == QUICK
-#define cp_rsa_sign(O, OL, I, IL, P)		cp_rsa_sign_quick(O, OL, I, IL, P)
-#endif
 
 /**
  * Signs using the basic RSA signature algorithm.

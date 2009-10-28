@@ -444,14 +444,6 @@ void fb_set_bit(fb_t a, int bit, int value);
 int fb_bits(fb_t a);
 
 /**
- * Returns the highest bit set on a digit.
- *
- * @param[in] a				- the digit.
- * @return the position of the highest bit set.
- */
-int fb_bits_dig(dig_t a);
-
-/**
  * Assigns a random value to a binary field element.
  *
  * @param[out] a			- the binary field element to assign.
