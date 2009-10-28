@@ -543,6 +543,9 @@ void eb_param_print() {
 	case ETAT_P271:
 		util_print_banner("Curve ETAT-P271:", 0);
 		break;
+	case ETAT_T271:
+		util_print_banner("Curve ETAT-T271:", 0);
+		break;
 	case ETAT_S1223:
 		util_print_banner("Curve ETAT-S1223:", 0);
 		break;

@@ -243,10 +243,11 @@ int main(void) {
 #endif
 
 #if defined(WITH_EB)
-	util_print_banner("Protocols based on elliptic curves:\n", 0);
+	util_print_banner("Protocols based on elliptic curves:", 0);
 #if defined(EB_STAND) && defined(EB_ORDIN)
 	if (eb_param_set_any_ordin() == STS_OK) {
 		eb_param_print();
+		printf("\n");
 		ecdsa();
 	}
 #endif
@@ -254,6 +255,7 @@ int main(void) {
 #if defined(EB_STAND) && defined(EB_KBLTZ)
 	if (eb_param_set_any_kbltz() == STS_OK) {
 		eb_param_print();
+		printf("\n");
 		ecdsa();
 	}
 #endif

@@ -59,7 +59,7 @@ static int memory(void) {
 }
 
 static int util(void) {
-	int bits, bits_dig, code = STS_ERR;
+	int bits, code = STS_ERR;
 	char str[1000];
 	fb_t a, b, c;
 
@@ -171,17 +171,6 @@ static int util(void) {
 			fb_set_bit(a, bits, 1);
 			TEST_ASSERT(fb_bits(a) == bits + 1, end);
 			bits = (bits + 1) % FB_BITS;
-		}
-		TEST_END;
-
-		bits = 0;
-		TEST_BEGIN("bit assignment and bit counting of a digit are consistent") {
-			fb_zero(a);
-			fb_set_bit(a, bits, 1);
-			bits_dig = fb_bits_dig(a[0]);
-			TEST_ASSERT(fb_bits(a) == bits_dig, end);
-			bits++;
-			bits %= (FB_DIGIT);
 		}
 		TEST_END;
 

@@ -68,7 +68,6 @@ static int rsa(void) {
 					end);
 			TEST_ASSERT(cp_rsa_dec(out, &out_len, out, out_len, &prv) == STS_OK,
 					end);
-			printf("%d\n", out_len);
 			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
 		} TEST_END;
 
@@ -266,22 +265,22 @@ int main(void) {
 
 	util_print_banner("Tests for the CP module", 0);
 
-	util_print_banner("Protocols based on prime factorization:", 1);
-
 #if defined(WITH_BN)
+	util_print_banner("Protocols based on prime factorization:\n", 0);
+
 	if (rsa() != STS_OK) {
 		core_clean();
 		return 1;
 	}
 #endif
 
-	util_print_banner("Protocols based on elliptic curves:", 1);
-
 #if defined(WITH_EB)
+	util_print_banner("Protocols based on elliptic curves:", 0);
 #if defined(EB_STAND) && defined(EB_ORDIN)
 	r0 = eb_param_set_any_ordin();
 	if (r0 == STS_OK) {
 		eb_param_print();
+		printf("\n");
 		if (ecdsa() != STS_OK) {
 			core_clean();
 			return 1;
@@ -290,9 +289,10 @@ int main(void) {
 #endif
 
 #if defined(EB_STAND) && defined(EB_KBLTZ)
-	r1 = eb_param_set_any_ordin();
+	r1 = eb_param_set_any_kbltz();
 	if (r1 == STS_OK) {
 		eb_param_print();
+		printf("\n");
 		if (ecdsa() != STS_OK) {
 			core_clean();
 			return 1;
@@ -306,11 +306,22 @@ int main(void) {
 #endif
 
 #if defined(WITH_PB)
-	if (sokaka() != STS_OK) {
-		core_clean();
-		return 1;
+	util_print_banner("Protocols based on pairings:", 0);
+#if defined(EB_STAND) && defined(EB_SUPER)
+	r0 = eb_param_set_any_super();
+	if (r0 == STS_OK) {
+		eb_param_print();
+		printf("\n");
+		if (sokaka() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+	} else {
+		THROW(ERR_NO_CURVE);
 	}
 #endif
+#endif
+
 	core_clean();
 	return 0;
 }

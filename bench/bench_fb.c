@@ -108,15 +108,6 @@ static void util(void) {
 	}
 	BENCH_END;
 
-	d = 0;
-	BENCH_BEGIN("fb_bits_dig") {
-		fb_zero(a);
-		d = (d + 1) % FB_DIGIT;
-		fb_set_bit(a, d, 1);
-		BENCH_ADD(fb_bits_dig(a[0]));
-	}
-	BENCH_END;
-
 	BENCH_BEGIN("fb_rand") {
 		BENCH_ADD(fb_rand(a));
 	}
