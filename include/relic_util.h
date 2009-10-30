@@ -131,17 +131,16 @@
  */
 /** @{ */
 #define CAT(A, B)						_CAT(A, B)
-#define _CAT(A, B)						A ## _ ## B
+#define _CAT(A, B)						A ## B
 /** @} */
 
 /**
  * Selects a basic version of an algorithm if no additional argument was passed.
  */
 /** @{ */
-#define SEQ() 					impl, basic, error
-#define __ARGS(_1, _2, N,...)	N
+#define ARGS(...)				_ARGS(__VA_ARGS__, _impl, _basic, _error)
 #define _ARGS(...)				__ARGS(__VA_ARGS__)
-#define ARGS(...)				_ARGS(__VA_ARGS__, SEQ())
+#define __ARGS(_1, _2, N,...)	N
 /** @} */
 
 /**
