@@ -25,7 +25,7 @@
  *
  * Implementation of the prime number generation and testing functions.
  *
- * Strong prime generation is baed on Gordon's Algorithm, taken from Handbook
+ * Strong prime generation is based on Gordon's Algorithm, taken from Handbook
  * of Applied Cryptography.
  *
  * @version $Id$
@@ -130,7 +130,9 @@ static int bn_count(bn_t a) {
  */
 static void bn_exp(bn_t c, bn_t a, bn_t b, bn_t m) {
 	int i, l;
-	bn_t t = NULL;
+	bn_t t;
+
+	bn_null(t);
 
 	TRY {
 		bn_new(t);
@@ -197,11 +199,16 @@ int bn_is_prime_basic(bn_t a) {
 }
 
 int bn_is_prime_rabin(bn_t a) {
-	bn_t n1 = NULL, y = NULL, r = NULL, t = NULL;
+	bn_t t, n1, y, r;
 	int i, s, j, result, b, tests = 0;
 
 	tests = 0;
 	result = 1;
+
+	bn_null(t);
+	bn_null(n1);
+	bn_null(y);
+	bn_null(r);
 
 	TRY {
 		/*
@@ -294,6 +301,66 @@ int bn_is_prime_rabin(bn_t a) {
 	return result;
 }
 
+int bn_is_prime_solov(bn_t a) {
+	bn_t t0, t1, t2;
+	int i, result;
+
+	bn_null(t0);
+	bn_null(t1);
+	bn_null(t2);
+
+	result = 1;
+
+	TRY {
+		bn_new(t0);
+		bn_new(t1);
+		bn_new(t2);
+
+		for (i = 0; i < 100; i++) {
+			/* Generate t0, 2 <= t0, <= a - 2. */
+			do {
+				bn_rand(t0, BN_POS, bn_bits(a));
+				bn_mod_basic(t0, t0, a);
+			} while (bn_cmp_dig(t0, 2) == CMP_LT);
+			/* t2 = a - 1. */
+			bn_copy(t2, a);
+			bn_sub_dig(t2, t2, 1);
+			/* t1 = (a - 1)/2. */
+			bn_rsh(t1, t2, 1);
+			/* t1 = t0^(a - 1)/2 mod a. */
+			bn_exp(t1, t0, t1, a);
+			/* If t1 != 1 and t1 != n - 1 return 0 */
+			if (bn_cmp_dig(t1, 1) != CMP_EQ && bn_cmp(t1, t2) != CMP_EQ) {
+				result = 0;
+				break;
+			}
+
+			/* t2 = (t0|a). */
+			bn_smb_jac(t2, t0, a);
+			if (bn_sign(t2) == BN_NEG) {
+				bn_add(t2, t2, a);
+			}
+			/* If t1 != t2 (mod a) return 0. */
+			bn_mod_basic(t1, t1, a);
+			bn_mod_basic(t2, t2, a);
+			if (bn_cmp(t1, t2) != CMP_EQ) {
+				result = 0;
+				break;
+			}
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+		return 0;
+	}
+	FINALLY {
+		bn_free(t0);
+		bn_free(t1);
+		bn_free(t2);
+	}
+	return result;
+}
+
 #if BN_GEN == BASIC || !defined(STRIP)
 
 void bn_gen_prime_basic(bn_t a, int bits) {
@@ -337,7 +404,11 @@ void bn_gen_prime_safep(bn_t a, int bits) {
 void bn_gen_prime_stron(bn_t a, int bits) {
 	dig_t i, j;
 	int found, k;
-	bn_t r = NULL, s = NULL, t = NULL;
+	bn_t r, s, t;
+
+	bn_null(r);
+	bn_null(s);
+	bn_null(t);
 
 	TRY {
 		bn_new(r);

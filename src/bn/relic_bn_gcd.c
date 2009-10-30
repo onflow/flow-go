@@ -41,7 +41,10 @@
 #if BN_GCD == BASIC || !defined(STRIP)
 
 void bn_gcd_basic(bn_t c, bn_t a, bn_t b) {
-	bn_t u = NULL, v = NULL;
+	bn_t u, v;
+
+	bn_null(u);
+	bn_null(v);
 
 	if (bn_is_zero(a)) {
 		bn_abs(c, b);
@@ -75,7 +78,14 @@ void bn_gcd_basic(bn_t c, bn_t a, bn_t b) {
 }
 
 void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
-	bn_t u = NULL, v = NULL, x_1 = NULL, y_1 = NULL, q = NULL, r = NULL;
+	bn_t u, v, x_1, y_1, q, r;
+
+	bn_null(u);
+	bn_null(v);
+	bn_null(x_1);
+	bn_null(y_1);
+	bn_null(q);
+	bn_null(r);
 
 	if (d == NULL && e == NULL) {
 		bn_gcd_basic(c, a, b);
@@ -120,7 +130,7 @@ void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 			bn_zero(e);
 
 			while (!bn_is_zero(v)) {
-				bn_div_basic(q, r, u, v);
+				bn_div_rem(q, r, u, v);
 
 				bn_copy(u, v);
 				bn_copy(v, r);
@@ -139,7 +149,7 @@ void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 			bn_set_dig(d, 1);
 
 			while (!bn_is_zero(v)) {
-				bn_div_basic(q, r, u, v);
+				bn_div_rem(q, r, u, v);
 
 				bn_copy(u, v);
 				bn_copy(v, r);
@@ -170,10 +180,18 @@ void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 #if BN_GCD == LEHME || !defined(STRIP)
 
 void bn_gcd_lehme(bn_t c, bn_t a, bn_t b) {
-	bn_t x = NULL, y = NULL, u = NULL, v = NULL, t0 = NULL, t1 = NULL;
-	bn_t t2 = NULL, t3 = NULL;
+	bn_t x, y, u, v, t0, t1, t2, t3;
 	dig_t _x, _y, q, _q, t, _t;
-	sig_t _a, _b, _c, _d;
+	dsi_t _a, _b, _c, _d;
+
+	bn_null(x);
+	bn_null(y);
+	bn_null(u);
+	bn_null(v);
+	bn_null(t0);
+	bn_null(t1);
+	bn_null(t2);
+	bn_null(t3);
 
 	if (bn_is_zero(a)) {
 		bn_abs(c, b);
@@ -343,11 +361,20 @@ void bn_gcd_lehme(bn_t c, bn_t a, bn_t b) {
 }
 
 void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
-	bn_t x = NULL, y = NULL, u = NULL, v = NULL;
-	bn_t t0 = NULL, t1 = NULL, t2 = NULL, t3 = NULL, t4 = NULL;
+	bn_t x, y, u, v, t0, t1, t2, t3, t4;
 	dig_t _x, _y, q, _q, t, _t;
-	sig_t _a, _b, _c, _d;
+	dsi_t _a, _b, _c, _d;
 	int swap;
+
+	bn_null(x);
+	bn_null(y);
+	bn_null(u);
+	bn_null(v);
+	bn_null(t0);
+	bn_null(t1);
+	bn_null(t2);
+	bn_null(t3);
+	bn_null(t4);
 
 	if (d == NULL && e == NULL) {
 		bn_gcd_lehme(c, a, b);
@@ -436,7 +463,7 @@ void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 				}
 			}
 			if (_b == 0) {
-				bn_div_basic(t1, t0, x, y);
+				bn_div_rem(t1, t0, x, y);
 				bn_copy(x, y);
 				bn_copy(y, t0);
 				bn_mul(t1, t1, d);
@@ -562,14 +589,14 @@ void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 			bn_add(t4, t0, t1);
 			bn_mul(x, b, t4);
 			bn_sub(x, c, x);
-			bn_div_norem(d, x, a);
+			bn_div(d, x, a);
 		} else {
 			bn_mul(t0, t4, u);
 			bn_mul(t1, d, v);
 			bn_add(d, t0, t1);
 			bn_mul(x, a, d);
 			bn_sub(x, c, x);
-			bn_div_norem(t4, x, b);
+			bn_div(t4, x, b);
 		}
 		if (e != NULL) {
 			bn_copy(e, t4);
@@ -596,8 +623,12 @@ void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 #if BN_GCD == STEIN || !defined(STRIP)
 
 void bn_gcd_stein(bn_t c, bn_t a, bn_t b) {
-	bn_t u = NULL, v = NULL, t = NULL;
+	bn_t u, v, t;
 	int shift;
+
+	bn_null(u);
+	bn_null(v);
+	bn_null(t);
 
 	if (bn_is_zero(a)) {
 		bn_abs(c, b);
@@ -652,9 +683,17 @@ void bn_gcd_stein(bn_t c, bn_t a, bn_t b) {
 }
 
 void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
-	bn_t x = NULL, y = NULL, u = NULL, v = NULL, *tmpe = NULL;
-	bn_t _a = NULL, _b = NULL, _e = NULL;
+	bn_t x, y, u, v, _a, _b, _e, *tmpe;
 	int shift, found;
+
+	bn_null(x);
+	bn_null(y);
+	bn_null(u);
+	bn_null(v);
+	bn_null(_a);
+	bn_null(_b);
+	bn_null(_e);
+	tmpe = NULL;
 
 	if (d == NULL && e == NULL) {
 		bn_gcd_stein(c, a, b);
@@ -810,8 +849,15 @@ void bn_gcd_dig(bn_t c, bn_t a, dig_t b) {
 }
 
 void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b) {
-	bn_t u = NULL, v = NULL, x_1 = NULL, y_1 = NULL, q = NULL, r = NULL;
+	bn_t u, v, x1, y1, q, r;
 	dig_t _v, _q, _t, _u;
+
+	bn_null(u);
+	bn_null(v);
+	bn_null(x1);
+	bn_null(y1);
+	bn_null(q);
+	bn_null(r);
 
 	if (d == NULL && e == NULL) {
 		bn_gcd_dig(c, a, b);
@@ -843,16 +889,16 @@ void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b) {
 	TRY {
 		bn_new(u);
 		bn_new(v);
-		bn_new(x_1);
-		bn_new(y_1);
+		bn_new(x1);
+		bn_new(y1);
 		bn_new(q);
 		bn_new(r);
 
 		bn_abs(u, a);
 		bn_set_dig(v, b);
 
-		bn_zero(x_1);
-		bn_set_dig(y_1, 1);
+		bn_zero(x1);
+		bn_set_dig(y1, 1);
 		if (d != NULL) {
 			bn_set_dig(d, 1);
 		}
@@ -860,23 +906,23 @@ void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b) {
 			bn_zero(e);
 		}
 
-		bn_div_basic(q, r, u, v);
+		bn_div_rem(q, r, u, v);
 
 		bn_copy(u, v);
 		bn_copy(v, r);
 
 		if (d != NULL) {
-			bn_mul(c, q, x_1);
+			bn_mul(c, q, x1);
 			bn_sub(r, d, c);
-			bn_copy(d, x_1);
-			bn_copy(x_1, r);
+			bn_copy(d, x1);
+			bn_copy(x1, r);
 		}
 
 		if (e != NULL) {
-			bn_mul(c, q, y_1);
+			bn_mul(c, q, y1);
 			bn_sub(r, e, c);
-			bn_copy(e, y_1);
-			bn_copy(y_1, r);
+			bn_copy(e, y1);
+			bn_copy(y1, r);
 		}
 
 		_v = v->dp[0];
@@ -889,17 +935,17 @@ void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b) {
 			_v = _t;
 
 			if (d != NULL) {
-				bn_mul_dig(c, x_1, _q);
+				bn_mul_dig(c, x1, _q);
 				bn_sub(r, d, c);
-				bn_copy(d, x_1);
-				bn_copy(x_1, r);
+				bn_copy(d, x1);
+				bn_copy(x1, r);
 			}
 
 			if (e != NULL) {
-				bn_mul_dig(c, y_1, _q);
+				bn_mul_dig(c, y1, _q);
 				bn_sub(r, e, c);
-				bn_copy(e, y_1);
-				bn_copy(y_1, r);
+				bn_copy(e, y1);
+				bn_copy(y1, r);
 			}
 		}
 		bn_set_dig(c, _u);
@@ -910,8 +956,8 @@ void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b) {
 	FINALLY {
 		bn_free(u);
 		bn_free(v);
-		bn_free(x_1);
-		bn_free(y_1);
+		bn_free(x1);
+		bn_free(y1);
 		bn_free(q);
 		bn_free(r);
 	}

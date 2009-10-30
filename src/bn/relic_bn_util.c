@@ -69,7 +69,7 @@ void bn_neg(bn_t c, bn_t a) {
 	if (c->dp != a->dp) {
 		bn_copy(c, a);
 	}
-	if (c->used != 0) {
+	if (!bn_is_zero(c)) {
 		if (a->sign == BN_POS)
 			c->sign = BN_NEG;
 		else
@@ -85,7 +85,7 @@ void bn_zero(bn_t a) {
 	int i;
 	dig_t *tmp;
 
-	a->sign = 0;
+	a->sign = BN_POS;
 	a->used = 1;
 	tmp = a->dp;
 	for (i = 0; i < a->alloc; i++, tmp++)
@@ -220,7 +220,9 @@ void bn_print(bn_t a) {
 
 void bn_size_str(int *size, bn_t a, int radix) {
 	int digits;
-	bn_t t = NULL;
+	bn_t t;
+
+	bn_null(t);
 
 	*size = 0;
 
@@ -304,10 +306,12 @@ void bn_read_str(bn_t a, const char *str, int len, int radix) {
 }
 
 void bn_write_str(char *str, int len, bn_t a, int radix) {
-	bn_t t = NULL;
+	bn_t t;
 	dig_t d;
 	int digits, l, i, j;
 	char c;
+
+	bn_null(t);
 
 	bn_size_str(&l, a, radix);
 	if (len < l) {

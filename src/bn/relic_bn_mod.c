@@ -73,19 +73,22 @@ void bn_mod_dig(dig_t *c, bn_t a, dig_t b) {
 }
 
 void bn_mod_basic(bn_t c, bn_t a, bn_t m) {
-	bn_div_basic(NULL, c, a, m);
+	bn_div_rem(NULL, c, a, m);
 }
 
 #if BN_MOD == BARRT || !defined(STRIP)
 
 void bn_mod_barrt_setup(bn_t u, bn_t m) {
 	bn_set_2b(u, m->used * 2 * BN_DIGIT);
-	bn_div_norem(u, u, m);
+	bn_div(u, u, m);
 }
 
 void bn_mod_barrt(bn_t c, bn_t a, bn_t m, bn_t u) {
 	unsigned long mu;
-	bn_t q = NULL, t = NULL;
+	bn_t q, t;
+
+	bn_null(q);
+	bn_null(t);
 
 	if (bn_cmp(a, m) == CMP_LT) {
 		bn_copy(c, a);
@@ -178,19 +181,30 @@ void bn_mod_monty_setup(bn_t u, bn_t m) {
 }
 
 void bn_mod_monty_conv(bn_t c, bn_t a, bn_t m) {
-	bn_lsh(c, a, m->used * BN_DIGIT);
+	if (bn_sign(a) == BN_NEG) {
+		bn_add(c, m, a);
+	} else {
+		bn_copy(c, a);
+	}
+	bn_lsh(c, c, m->used * BN_DIGIT);
 	bn_mod_basic(c, c, m);
 }
 
 void bn_mod_monty_back(bn_t c, bn_t a, bn_t m) {
-	bn_t u = NULL;
+	bn_t u;
 
-	bn_new(u);
+	bn_null(u);
 
-	bn_mod_monty_setup(u, m);
-	bn_mod_monty(c, a, m, u);
+	TRY {
+		bn_new(u);
 
-	bn_free(u);
+		bn_mod_monty_setup(u, m);
+		bn_mod_monty(c, a, m, u);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		bn_free(u);
+	}
 }
 
 #if BN_MUL == BASIC || !defined(STRIP)
@@ -198,32 +212,39 @@ void bn_mod_monty_back(bn_t c, bn_t a, bn_t m) {
 void bn_mod_monty_basic(bn_t c, bn_t a, bn_t m, bn_t u) {
 	int digits, i;
 	dig_t r, carry, u0, *tmp;
-	bn_t t = NULL;
+	bn_t t;
 
+	bn_null(t);
 	digits = 2 * m->used + 1;
-	bn_new_size(t, digits);
-	bn_zero(t);
-	bn_copy(t, a);
-	t->used = digits;
+	TRY {
+		bn_new_size(t, digits);
+		bn_zero(t);
+		bn_copy(t, a);
+		t->used = digits;
 
-	u0 = u->dp[0];
-	tmp = t->dp;
+		u0 = u->dp[0];
+		tmp = t->dp;
 
-	for (i = 0; i < m->used; i++, tmp++) {
-		r = (dig_t)(*tmp * u0);
-		carry = bn_muladd_low(tmp, m->dp, r, m->used);
-		bn_add1_low(tmp + m->used, tmp + m->used, carry, m->used - i + 1);
+		for (i = 0; i < m->used; i++, tmp++) {
+			r = (dig_t)(*tmp * u0);
+			carry = bn_muladd_low(tmp, m->dp, r, m->used);
+			bn_add1_low(tmp + m->used, tmp + m->used, carry, m->used - i + 1);
+		}
+		bn_rsh(t, t, m->used * BN_DIGIT);
+		bn_trim(t);
+
+		if (bn_cmp_abs(t, m) != CMP_LT) {
+			bn_sub(t, t, m);
+		}
+
+		bn_copy(c, t);
 	}
-	bn_rsh(t, t, m->used * BN_DIGIT);
-	bn_trim(t);
-
-	if (bn_cmp_abs(t, m) != CMP_LT) {
-		bn_sub(t, t, m);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-
-	bn_copy(c, t);
-
-	bn_free(t);
+	FINALLY {
+		bn_free(t);
+	}
 }
 
 #endif /* BN_MUL == BASIC || !defined(STRIP) */
@@ -232,23 +253,31 @@ void bn_mod_monty_basic(bn_t c, bn_t a, bn_t m, bn_t u) {
 
 void bn_mod_monty_comba(bn_t c, bn_t a, bn_t m, bn_t u) {
 	int digits;
-	bn_t t = NULL;
+	bn_t t;
 
+	bn_null(t);
 	digits = 2 * m->used + 1;
-	bn_new_size(t, digits);
-	bn_zero(t);
 
-	bn_modn_low(t->dp, a->dp, a->used, m->dp, m->used, u->dp[0]);
-	t->used = m->used + 1;
+	TRY {
+		bn_new_size(t, digits);
+		bn_zero(t);
 
-	bn_trim(t);
-	if (bn_cmp_abs(t, m) != CMP_LT) {
-		bn_sub(t, t, m);
+		bn_modn_low(t->dp, a->dp, a->used, m->dp, m->used, u->dp[0]);
+		t->used = m->used + 1;
+
+		bn_trim(t);
+		if (bn_cmp_abs(t, m) != CMP_LT) {
+			bn_sub(t, t, m);
+		}
+
+		bn_copy(c, t);
 	}
-
-	bn_copy(c, t);
-
-	bn_free(t);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
+	}
 }
 
 #endif /* BN_MUL == COMBA || !defined(STRIP) */
@@ -258,8 +287,10 @@ void bn_mod_monty_comba(bn_t c, bn_t a, bn_t m, bn_t u) {
 #if BN_MOD == RADIX || !defined(STRIP)
 
 void bn_mod_radix_setup(bn_t u, bn_t m) {
-	bn_t t = NULL;
+	bn_t t;
 	int bits;
+
+	bn_null(t);
 
 	if (bn_mod_radix_check(m) != 1) {
 		THROW(ERR_INVALID);
@@ -267,14 +298,20 @@ void bn_mod_radix_setup(bn_t u, bn_t m) {
 
 	bits = bn_bits(m);
 
-	bn_new(t);
+	TRY {
+		bn_new(t);
 
-	bn_set_2b(t, bits);
-	bn_sub(t, t, m);
+		bn_set_2b(t, bits);
+		bn_sub(t, t, m);
 
-	bn_set_dig(u, t->dp[0]);
-
-	bn_free(t);
+		bn_set_dig(u, t->dp[0]);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
+	}
 }
 
 int bn_mod_radix_check(bn_t m) {
@@ -305,36 +342,46 @@ int bn_mod_radix_check(bn_t m) {
 }
 
 void bn_mod_radix(bn_t c, bn_t a, bn_t m, bn_t u) {
-	bn_t q = NULL, t = NULL;
+	bn_t q, t;
 	int bits, done;
 
-	bn_new(q);
-	bn_new(t);
+	bn_null(q);
+	bn_null(t);
 
-	bn_copy(t, a);
+	TRY {
+		bn_new(q);
+		bn_new(t);
 
-	bits = bn_bits(m);
+		bn_copy(t, a);
 
-	do {
-		done = 1;
+		bits = bn_bits(m);
 
-		bn_rsh(q, t, bits);
-		bn_mod_2b(t, t, bits);
+		do {
+			done = 1;
 
-		if (u->dp[0] != 1) {
-			bn_mul_dig(q, q, u->dp[0]);
-		}
-		bn_add(t, t, q);
+			bn_rsh(q, t, bits);
+			bn_mod_2b(t, t, bits);
 
-		if (bn_cmp_abs(t, m) != CMP_LT) {
-			bn_sub(t, t, m);
-			done = 0;
-		}
-	} while (done == 0);
+			if (u->dp[0] != 1) {
+				bn_mul_dig(q, q, u->dp[0]);
+			}
+			bn_add(t, t, q);
 
-	bn_copy(c, t);
-	bn_free(t);
-	bn_free(q);
+			if (bn_cmp_abs(t, m) != CMP_LT) {
+				bn_sub(t, t, m);
+				done = 0;
+			}
+		} while (done == 0);
+
+		bn_copy(c, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
+		bn_free(q);
+	}
 }
 
 #endif /* BN_MOD == RADIX || !defined(STRIP) */

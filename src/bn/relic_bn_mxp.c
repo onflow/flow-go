@@ -53,7 +53,10 @@
 
 void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m) {
 	int i, l;
-	bn_t t = NULL, u = NULL;
+	bn_t t, u;
+
+	bn_null(t);
+	bn_null(u);
 
 	TRY {
 		bn_new(t);
@@ -90,9 +93,15 @@ void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m) {
 #if BN_MXP == SLIDE || !defined(STRIP)
 
 void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
-	bn_t tab[TABLE_SIZE] = { NULL }, t = NULL, u = NULL;
+	bn_t tab[TABLE_SIZE], t, u;
 	dig_t buf;
 	int bitbuf, bitcpy, bitcnt, mode, digidx, i, j, w = 0;
+
+	bn_null(t);
+	bn_null(u);
+	for (i = 0; i < TABLE_SIZE; i++) {
+		bn_null(tab[i]);
+	}
 
 	TRY {
 
@@ -230,9 +239,13 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 #if BN_MXP == CONST || !defined(STRIP)
 
 void bn_mxp_const(bn_t c, bn_t a, bn_t b, bn_t m) {
-	bn_t tab[2] = { NULL, NULL }, u = NULL;
+	bn_t tab[2], u;
 	dig_t buf;
 	int bitcnt, digidx, j;
+
+	bn_null(tab[0]);
+	bn_null(tab[1]);
+	bn_null(u);
 
 	TRY {
 		bn_new(u);

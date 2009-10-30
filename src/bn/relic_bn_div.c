@@ -48,8 +48,13 @@
  * @param[in] b			- the the divisor.
  */
 static void bn_div_impl(bn_t c, bn_t d, bn_t a, bn_t b) {
-	bn_t q = NULL, x = NULL, y = NULL, r = NULL;
+	bn_t q, x, y, r;
 	int sign;
+
+	bn_null(q);
+	bn_null(x);
+	bn_null(y);
+	bn_null(r);
 
 	/* If a < b, we're done. */
 	if (bn_cmp_abs(a, b) == CMP_LT) {
@@ -107,14 +112,14 @@ static void bn_div_impl(bn_t c, bn_t d, bn_t a, bn_t b) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_div_norem(bn_t c, bn_t a, bn_t b) {
+void bn_div(bn_t c, bn_t a, bn_t b) {
 	if (bn_is_zero(b)) {
 		THROW(ERR_INVALID);
 	}
 	bn_div_impl(c, NULL, a, b);
 }
 
-void bn_div_basic(bn_t c, bn_t d, bn_t a, bn_t b) {
+void bn_div_rem(bn_t c, bn_t d, bn_t a, bn_t b) {
 	if (bn_is_zero(b)) {
 		THROW(ERR_INVALID);
 	}
@@ -122,8 +127,10 @@ void bn_div_basic(bn_t c, bn_t d, bn_t a, bn_t b) {
 }
 
 void bn_div_dig(bn_t c, dig_t *d, bn_t a, dig_t b) {
-	bn_t q = NULL;
+	bn_t q;
 	dig_t r;
+
+	bn_null(q);
 
 	if (b == 0) {
 		THROW(ERR_INVALID);

@@ -52,9 +52,17 @@
  */
 static void bn_mul_karat_impl(bn_t c, bn_t a, bn_t b, int level) {
 	int h;
-	bn_t a0 = NULL, a1 = NULL, b0 = NULL, b1 = NULL, a0b0 = NULL, a1b1 = NULL;
-	bn_t t = NULL;
+	bn_t a0, a1, b0, b1, a0b0, a1b1;
+	bn_t t;
 	dig_t *tmpa, *tmpb, *t0;
+
+	bn_null(a0);
+	bn_null(a1);
+	bn_null(b0);
+	bn_null(b1);
+	bn_null(a0b0);
+	bn_null(a1b1);
+	bn_null(t);
 
 	/* Compute half the digits of a or b. */
 	h = MIN(a->used, b->used) >> 1;
@@ -183,8 +191,10 @@ void bn_mul_dig(bn_t c, bn_t a, dig_t b) {
 
 void bn_mul_basic(bn_t c, bn_t a, bn_t b) {
 	int i;
-	bn_t t = NULL;
+	bn_t t;
 	dig_t carry;
+
+	bn_null(t);
 
 	TRY {
 		/* We need a temporary variable so that c can be a or b. */
