@@ -127,6 +127,24 @@
 #define asm			__asm__
 
 /**
+ * Concatenates two tokens.
+ */
+/** @{ */
+#define CAT(A, B)						_CAT(A, B)
+#define _CAT(A, B)						A ## _ ## B
+/** @} */
+
+/**
+ * Selects a basic version of an algorithm if no additional argument was passed.
+ */
+/** @{ */
+#define SEQ() 					impl, basic, error
+#define __ARGS(_1, _2, N,...)	N
+#define _ARGS(...)				__ARGS(__VA_ARGS__)
+#define ARGS(...)				_ARGS(__VA_ARGS__, SEQ())
+/** @} */
+
+/**
  * Formats and prints data following a printf-like syntax.
  *
  * @param[in] ...				- the list of arguments matching the format.

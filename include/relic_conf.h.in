@@ -105,8 +105,6 @@
 #cmakedefine WITH_MD
 /** Build cryptographic protocols. */
 #cmakedefine WITH_CP
-/** Build etat module. */
-#cmakedefine WITH_ETAT
 
 /** Easy C-only backend. */
 #define EASY	 1

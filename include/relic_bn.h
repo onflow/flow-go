@@ -36,12 +36,10 @@
 #ifndef RELIC_BN_H
 #define RELIC_BN_H
 
+#include "relic_dv.h"
 #include "relic_conf.h"
+#include "relic_util.h"
 #include "relic_types.h"
-
-#ifndef alloca
-#define alloca __builtin_alloca
-#endif
 
 /*============================================================================*/
 /* Constant definitions                                                       */
@@ -51,9 +49,9 @@
  * Precision in bits of a multiple precision integer.
  *
  * If the library is built with support for dynamic allocation, this constant
- * represents the size in bits of the memory block allocated each time
- * a multiple precision integer must grow. Otherwise, it represents the
- * the fixed precision.
+ * represents the size in bits of the memory block allocated each time a
+ * multiple precision integer must grow. Otherwise, it represents the fixed
+ * fixed precision.
  */
 #define BN_BITS 		((int)BN_PRECI)
 
@@ -72,20 +70,14 @@
  */
 #define BN_DIGS			((int)((BN_BITS)/(BN_DIGIT) + (BN_BITS % BN_DIGIT > 0)))
 
-#if BN_MAGNI == DOUBLE
 /**
  * Size in digits of a block sufficient to store a multiple precision integer.
  */
+#if BN_MAGNI == DOUBLE
 #define BN_SIZE			((int)(2 * BN_DIGS + 2))
 #elif BN_MAGNI == CARRY
-/**
- * Size in digits of a block sufficient to store a multiple precision integer.
- */
 #define BN_SIZE			((int)(BN_DIGS + 1))
 #elif BN_MAGNI == SINGLE
-/**
- * Size in digits of a block sufficient to store a multiple precision integer.
- */
 #define BN_SIZE			((int)BN_DIGS)
 #endif
 
@@ -276,9 +268,21 @@ typedef bn_st *bn_t;
 #define bn_mod_setup(U, M)	bn_mod_radix_setup(U, M)
 #endif
 
+/**
+ * Reduces a multiple precision integer modulo another integer. If the number
+ * of arguments is 3, then simple division is used. If the number of arguments
+ * is 4, then a modular reduction algorithm is used and the fourth argument
+ * is an auxiliar value derived from the modulus. Computes c = a mod m.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the multiple precision integer to reduce.
+ * @param[in] ...			- the modulus and an optional argument.
+ */
+#define bn_mod(C, A, ...)	CAT(bn_mod,ARGS(__VA_ARGS__))(C, A, __VA_ARGS__)
 
 /**
- * Reduces a multiple precision integer modulo a modulus. Computes c = a mod m.
+ * Reduces a multiple precision integer modulo another integer.
+ * Computes c = a mod m.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the the multiple precision integer to reduce.
@@ -286,13 +290,13 @@ typedef bn_st *bn_t;
  * @param[in] U				- the auxiliar value derived from the modulus.
  */
 #if BN_MOD == BASIC
-#define bn_mod(C, A, M, U)	bn_mod_basic(C, A, M)
+#define bn_mod_impl(C, A, M, U)	bn_mod_basic(C, A, M)
 #elif BN_MOD == BARRT
-#define bn_mod(C, A, M, U)	bn_mod_barrt(C, A, M, U)
+#define bn_mod_impl(C, A, M, U)	bn_mod_barrt(C, A, M, U)
 #elif BN_MOD == MONTY
-#define bn_mod(C, A, M, U)	bn_mod_monty(C, A, M, U)
+#define bn_mod_impl(C, A, M, U)	bn_mod_monty(C, A, M, U)
 #elif BN_MOD == RADIX
-#define bn_mod(C, A, M, U)	bn_mod_radix(C, A, M, U)
+#define bn_mod_impl(C, A, M, U)	bn_mod_radix(C, A, M, U)
 #endif
 
 /**
@@ -346,7 +350,7 @@ typedef bn_st *bn_t;
 /**
  * Computes the extended greatest common divisor of two multiple precision
  * integers. This function can be used to compute multiplicative inverses.
- * Computes c = gcd(a,b) and c = a * d + b * e.
+ * Computes c = gcd(a, b) and c = a * d + b * e.
  *
  * @param[out] C			- the result;
  * @param[out] D			- the cofactor of the first operand, can be NULL.
@@ -819,7 +823,7 @@ void bn_rsh(bn_t c, bn_t a, int bits);
  * @param[in] b				- the divisor.
  * @throw ERR_INVALID		- if the divisor is zero.
  */
-void bn_div_norem(bn_t c, bn_t a, bn_t b);
+void bn_div(bn_t c, bn_t a, bn_t b);
 
 /**
  * Divides a multiple precision integer by another multiple precision integer.
@@ -831,7 +835,7 @@ void bn_div_norem(bn_t c, bn_t a, bn_t b);
  * @param[in] b				- the divisor.
  * @throw ERR_INVALID		- if the divisor is zero.
  */
-void bn_div_basic(bn_t c, bn_t d, bn_t a, bn_t b);
+void bn_div_rem(bn_t c, bn_t d, bn_t a, bn_t b);
 
 /**
  * Divides a multiple precision integers by a digit. Computes c = floor(a / b)
@@ -1056,7 +1060,7 @@ void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b);
 
 /**
  * Computes the greatest common divisor of two multiple precision integers
- * using Lehme's algorithm.
+ * using Lehmer's algorithm.
  *
  * @param[out] c			- the result;
  * @param[out] d			- the cofactor of the first operand, can be NULL.
@@ -1091,7 +1095,35 @@ void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b);
 void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b);
 
 /**
- * Tests if a number is prime using all the tests available.
+ * Computes the last common multiple of two multiple precision integers.
+ * Computes c = lcm(a, b).
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first integer.
+ * @param[in] b				- the second integer.
+ */
+void bn_lcm(bn_t c, bn_t a, bn_t b);
+
+/**
+ * Computes the Legendre symbol c = (a|b), b prime.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first parameter.
+ * @param[in] b				- the second parameter.
+ */
+void bn_smb_leg(bn_t c, bn_t a, bn_t b);
+
+/**
+ * Computes the Jacobi symbol c = (a|b).
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first parameter.
+ * @param[in] b				- the second parameter.
+ */
+void bn_smb_jac(bn_t c, bn_t a, bn_t b);
+
+/**
+ * Tests if a number is a probable prime.
  *
  * @param[in] a				- the multiple precision integer to test.
  * @return 1 if a is prime, 0 otherwise.
@@ -1114,6 +1146,15 @@ int bn_is_prime_basic(bn_t a);
  * @return 1 if a is prime, 0 otherwise.
  */
 int bn_is_prime_rabin(bn_t a);
+
+/**
+ * Tests if a number is prime using the Solovay-Strassen test with probability
+ * 2^(-80) of error.
+ *
+ * @param[in] a				- the number to test.
+ * @return 1 if a is prime, 0 otherwise.
+ */
+int bn_is_prime_solov(bn_t a);
 
 /**
  * Generates a probable prime number.
@@ -1139,6 +1180,24 @@ void bn_gen_prime_safep(bn_t a, int bits);
  * @param[in] bits			- the length of the number in bits.
  */
 void bn_gen_prime_stron(bn_t a, int bits);
+
+/**
+ * Tries to factorize an integer using Pollard (p - 1) factoring algorithm.
+ *
+ * @param[out] c			- the resulting factor.
+ * @param[in] a				- the integer to fatorize.
+ * @return 1 if a factor is found and stored into c; 0 otherwise.
+ */
+int bn_factor(bn_t c, bn_t a);
+
+/**
+ * Tests if an integer divides other integer.
+ *
+ * @param[in] c				- the factor.
+ * @param[in] a				- the integer.
+ * @return 1 if the first integer is a factor; 0 otherwise.
+ */
+int bn_is_factor(bn_t c, bn_t a);
 
 /**
  * Recodes an integer in window form.

@@ -27,7 +27,7 @@
 /**
  * @file
  *
- * Interface of the cryptographics protocols module.
+ * Interface of cryptographic protocols.
  *
  * @version $Id$
  * @ingroup bn
@@ -47,21 +47,13 @@
 /*============================================================================*/
 
 /**
- * Represents an RSA public key.
+ * Represents an RSA private key.
  */
-typedef struct _rsa_pub_t {
+typedef struct _rsa_t {
 	/** The modulus n = pq. */
 	bn_t n;
 	/** The public exponent. */
 	bn_t e;
-} rsa_pub_t;
-
-/**
- * Represents an RSA private key.
- */
-typedef struct _rsa_prv_t {
-	/** The modulus n = pq. */
-	bn_t n;
 	/** The private exponent. */
 	bn_t d;
 	/** The first prime p. */
@@ -74,7 +66,23 @@ typedef struct _rsa_prv_t {
 	bn_t dq;
 	/** The inverse of q modulo p. */
 	bn_t qi;
-} rsa_prv_t;
+} rsa_t;
+
+/**
+ * Represents an RSA private key.
+ */
+typedef struct _rabin_t {
+	/** The modulus n = pq. */
+	bn_t n;
+	/** The first prime p. */
+	bn_t p;
+	/** The second prime q. */
+	bn_t q;
+	/** The cofactor of the first prime. */
+	bn_t dp;
+	/** The cofactor of the second prime. */
+	bn_t dq;
+} rabin_t;
 
 /*============================================================================*/
 /* Macro definitions                                                          */
@@ -167,7 +175,7 @@ typedef struct _rsa_prv_t {
  * @param[in] bits			- the key length in bits.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rsa_gen_basic(rsa_pub_t *pub, rsa_prv_t *prv, int bits);
+int cp_rsa_gen_basic(rsa_t pub, rsa_t prv, int bits);
 
 /**
  * Generates a new key RSA pair for fast operations with the CRT optimization.
@@ -177,7 +185,7 @@ int cp_rsa_gen_basic(rsa_pub_t *pub, rsa_prv_t *prv, int bits);
  * @param[in] bits			- the key length in bits.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rsa_gen_quick(rsa_pub_t *pub, rsa_prv_t *prv, int bits);
+int cp_rsa_gen_quick(rsa_t pub, rsa_t prv, int bits);
 
 /**
  * Encrypts using the RSA cryptosystem.
@@ -190,7 +198,7 @@ int cp_rsa_gen_quick(rsa_pub_t *pub, rsa_prv_t *prv, int bits);
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
-		rsa_pub_t *pub);
+		rsa_t pub);
 
 /**
  * Decrypts using the basic RSA decryption method.
@@ -203,7 +211,7 @@ int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, rsa_prv_t *prv);
+		int in_len, rsa_t prv);
 
 /**
  * Decrypts using the fast RSA decryption with CRT optimization.
@@ -216,7 +224,7 @@ int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, rsa_prv_t *prv);
+		int in_len, rsa_t prv);
 
 /**
  * Signs using the basic RSA signature algorithm.
@@ -229,7 +237,7 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
-		int msg_len, rsa_prv_t *prv);
+		int msg_len, rsa_t prv);
 
 /**
  * Signs using the fast RSA signature algorithm with CRT optimization.
@@ -242,7 +250,7 @@ int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
-		int msg_len, rsa_prv_t *prv);
+		int msg_len, rsa_t prv);
 
 /**
  * Verifies an RSA signature.
@@ -255,7 +263,43 @@ int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
  * @return 1 if the signature is valid, 0 otherwise.
  */
 int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg, int msg_len,
-		rsa_pub_t *pub);
+		rsa_t pub);
+
+/**
+ * Generates a new key pair for the Rabin cryptosystem.
+ *
+ * @param[out] pub			- the public key.
+ * @param[out] prv			- the private key,
+ * @param[in] bits			- the key length in bits.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_rabin_gen(rabin_t pub, rabin_t prv, int bits);
+
+/**
+ * Encrypts using the Rabin cryptosystem.
+ *
+ * @param[out] out			- the output buffer.
+ * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in] in			- the input buffer.
+ * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] pub			- the public key.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
+		rabin_t pub);
+
+/**
+ * Decrypts using the Rabin cryptosystem.
+ *
+ * @param[out] out			- the output buffer.
+ * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in] in			- the input buffer.
+ * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] prv			- the private key.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in, int in_len,
+		rabin_t prv);
 
 /**
  * Initializes the ECDSA protocol module.

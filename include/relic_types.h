@@ -88,13 +88,13 @@ typedef uint64_t dig_t;
  * Represents a signed digit.
  */
 #if WORD == 8
-typedef int8_t sig_t;
+typedef int8_t dsi_t;
 #elif WORD == 16
-typedef int16_t sig_t;
+typedef int16_t dsi_t;
 #elif WORD == 32
-typedef int32_t sig_t;
+typedef int32_t dsi_t;
 #elif WORD == 64
-typedef int64_t sig_t;
+typedef int64_t dsi_t;
 #endif
 
 /**
