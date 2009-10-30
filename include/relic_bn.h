@@ -272,7 +272,9 @@ typedef bn_st *bn_t;
  * Reduces a multiple precision integer modulo another integer. If the number
  * of arguments is 3, then simple division is used. If the number of arguments
  * is 4, then a modular reduction algorithm is used and the fourth argument
- * is an auxiliar value derived from the modulus. Computes c = a mod m.
+ * is an auxiliar value derived from the modulus. The variant with 4 arguments
+ * should be used when several modular reductions are computed with the same
+ * modulus. Computes c = a mod m.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the multiple precision integer to reduce.
@@ -281,8 +283,8 @@ typedef bn_st *bn_t;
 #define bn_mod(C, A, ...)	CAT(bn_mod,ARGS(__VA_ARGS__))(C, A, __VA_ARGS__)
 
 /**
- * Reduces a multiple precision integer modulo another integer.
- * Computes c = a mod m.
+ * Reduces a multiple precision integer modulo another integer. This macro
+ * should not be called.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the the multiple precision integer to reduce.
