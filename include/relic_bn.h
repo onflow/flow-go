@@ -658,7 +658,7 @@ void bn_write_raw(dig_t *raw, int *len, int *sign, bn_t a);
  *
  * @param[in] a				- the first multiple precision integer.
  * @param[in] b				- the second multiple precision integer.
- * @return BN_LT if a < b, BN_EQ if a == b and BN_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int bn_cmp_abs(bn_t a, bn_t b);
 
@@ -668,7 +668,7 @@ int bn_cmp_abs(bn_t a, bn_t b);
  *
  * @param[in] a				- the multiple precision integer.
  * @param[in] b				- the digit.
- * @return BN_LT if a < b, BN_EQ if a == b and BN_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int bn_cmp_dig(bn_t a, dig_t b);
 
@@ -678,7 +678,7 @@ int bn_cmp_dig(bn_t a, dig_t b);
  *
  * @param[in] a				- the first multiple precision integer.
  * @param[in] b				- the second multiple precision integer.
- * @return BN_LT if a < b, BN_EQ if a == b and BN_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int bn_cmp(bn_t a, bn_t b);
 
