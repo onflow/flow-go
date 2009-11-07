@@ -139,7 +139,11 @@ static bn_st curve_s1;
  */
 static void compute_koblitz(void) {
 	int u, i;
-	bn_t a = NULL, b = NULL, c = NULL;
+	bn_t a, b, c;
+
+	bn_null(a);
+	bn_null(b);
+	bn_null(c);
 
 	TRY {
 		bn_new(a);

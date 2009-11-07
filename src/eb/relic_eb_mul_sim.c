@@ -190,7 +190,11 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 	eb_t table0[1 << (EB_WIDTH - 2)];
 	eb_t table1[1 << (EB_WIDTH - 2)];
 	eb_t *t = NULL;
-	bn_t vm = NULL, s0 = NULL, s1 = NULL;
+	bn_t vm, s0, s1;
+
+	bn_null(vm);
+	bn_null(s0);
+	bn_null(s1);
 
 	/* Compute the w-TNAF representation of k. */
 	if (eb_curve_opt_a() == OPT_ZERO) {

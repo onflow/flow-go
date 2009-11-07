@@ -180,7 +180,11 @@ static void eb_mul_tnaf_tab(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char tnaf[FB_BITS + 8], *t, u;
 	eb_t table[1 << (EB_WIDTH - 2)];
-	bn_t vm = NULL, s0 = NULL, s1 = NULL;
+	bn_t vm, s0, s1;
+
+	bn_null(vm);
+	bn_null(s0);
+	bn_null(s1);
 
 	if (eb_curve_opt_a() == OPT_ZERO) {
 		u = -1;
@@ -388,7 +392,7 @@ void eb_mul_const(eb_t r, eb_t p, bn_t k) {
 		fb_sqr(z2, p->x);
 		fb_sqr(x2, z2);
 
-		fb_copy(b, eb_curve_get_b());
+		b = eb_curve_get_b();
 
 		koblitz = eb_curve_is_kbltz();
 

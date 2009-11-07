@@ -74,9 +74,11 @@ int eb_cmp(eb_t p, eb_t q) {
 }
 
 void eb_rand(eb_t p) {
-	bn_t n = NULL, k = NULL;
+	bn_t n, k;
 	eb_t g;
 
+	bn_null(n);
+	bn_null(k);
 	eb_null(g);
 
 	TRY {
@@ -86,7 +88,7 @@ void eb_rand(eb_t p) {
 		g = eb_curve_get_gen();
 
 		bn_rand(k, BN_POS, bn_bits(n));
-		bn_mod_basic(k, k, n);
+		bn_mod(k, k, n);
 
 		eb_mul(p, g, k);
 	} CATCH_ANY {
@@ -97,8 +99,11 @@ void eb_rand(eb_t p) {
 }
 
 void eb_map(eb_t p, unsigned char *msg, int len) {
-	bn_t n = NULL, k = NULL;
+	bn_t n, k;
 	unsigned char digest[MD_LEN];
+
+	bn_null(n);
+	bn_null(k);
 
 	TRY {
 		bn_new(k);
@@ -107,7 +112,7 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 
 		md_map(digest, msg, len);
 		bn_read_bin(k, digest, MD_LEN, BN_POS);
-		bn_mod_basic(k, k, n);
+		bn_mod(k, k, n);
 
 		n = eb_curve_get_ord();
 

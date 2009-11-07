@@ -305,12 +305,13 @@ void eb_param_set(int param) {
 #endif
 	fb_t a, b, c;
 	eb_t g;
-	bn_t r = NULL;
+	bn_t r;
 
 	fb_null(a);
 	fb_null(b);
 	fb_null(c);
 	eb_null(g);
+	bn_null(r);
 
 	TRY {
 		fb_new(a);
