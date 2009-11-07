@@ -95,7 +95,9 @@ int util_bits_dig(dig_t a) {
 		return table[a >> 4] + 4 + offset;
 	}
 	return 0;
-#else
+#elif WORD == 32
+	return DIGIT - __builtin_clz(a);
+#elif WORD == 64
 	return DIGIT - __builtin_clzl(a);
 #endif
 }
