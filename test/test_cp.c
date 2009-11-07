@@ -1,18 +1,20 @@
 /*
- * Copyright 2007-2009 RELIC Project
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -37,10 +39,8 @@
 #include "relic_test.h"
 
 static int rsa(void) {
-	err_t e;
 	int code = STS_ERR;
-	rsa_pub_t pub;
-	rsa_prv_t prv;
+	rsa_t pub, prv;
 	unsigned char in[10];
 	unsigned char out[BN_BITS / 8 + 1];
 	int in_len, out_len;
@@ -57,106 +57,161 @@ static int rsa(void) {
 		bn_new(prv.qi);
 		bn_new(prv.n);
 
-		result = cp_rsa_gen(&pub, &prv, BN_BITS);
+		result = cp_rsa_gen(pub, prv, BN_BITS);
 
 		TEST_BEGIN("rsa encryption/decryption is correct") {
 			TEST_ASSERT(result == STS_OK, end);
 			in_len = 10;
 			out_len = BN_BITS / 8 + 1;
 			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_enc(out, &out_len, in, in_len, &pub) == STS_OK,
+			TEST_ASSERT(cp_rsa_enc(out, &out_len, in, in_len, pub) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_dec(out, &out_len, out, out_len, &prv) == STS_OK,
+			TEST_ASSERT(cp_rsa_dec(out, &out_len, out, out_len, prv) == STS_OK,
 					end);
 			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
 		} TEST_END;
 
 #if CP_RSA == BASIC || !defined(STRIP)
-		result = cp_rsa_gen_basic(&pub, &prv, BN_BITS);
+		result = cp_rsa_gen_basic(pub, prv, BN_BITS);
 
 		TEST_BEGIN("basic rsa encryption/decryption is correct") {
 			TEST_ASSERT(result == STS_OK, end);
 			in_len = 10;
 			out_len = BN_BITS / 8 + 1;
 			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_enc(out, &out_len, in, in_len, &pub) == STS_OK,
+			TEST_ASSERT(cp_rsa_enc(out, &out_len, in, in_len, pub) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_dec_basic(out, &out_len, out, out_len, &prv) == STS_OK,
+			TEST_ASSERT(cp_rsa_dec_basic(out, &out_len, out, out_len, prv) == STS_OK,
 					end);
 			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
 		} TEST_END;
 #endif
 
 #if CP_RSA == QUICK || !defined(STRIP)
-		result = cp_rsa_gen_quick(&pub, &prv, BN_BITS);
+		result = cp_rsa_gen_quick(pub, prv, BN_BITS);
 
 		TEST_BEGIN("fast rsa encryption/decryption is correct") {
 			TEST_ASSERT(result == STS_OK, end);
 			in_len = 10;
 			out_len = BN_BITS / 8 + 1;
 			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_enc(out, &out_len, in, in_len, &pub) == STS_OK,
+			TEST_ASSERT(cp_rsa_enc(out, &out_len, in, in_len, pub) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_dec_quick(out, &out_len, out, out_len, &prv) == STS_OK,
+			TEST_ASSERT(cp_rsa_dec_quick(out, &out_len, out, out_len, prv) == STS_OK,
 					end);
 			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
 		} TEST_END;
 #endif
 
-		result = cp_rsa_gen(&pub, &prv, BN_BITS);
+		result = cp_rsa_gen(pub, prv, BN_BITS);
 
 		TEST_BEGIN("rsa signature/verification is correct") {
 			TEST_ASSERT(result == STS_OK, end);
 			in_len = 10;
 			out_len = BN_BITS / 8 + 1;
 			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_sign(out, &out_len, in, in_len, &prv) == STS_OK,
+			TEST_ASSERT(cp_rsa_sign(out, &out_len, in, in_len, prv) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, &pub) == 1,
+			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1,
 					end);
 		} TEST_END;
 
 #if CP_RSA == BASIC || !defined(STRIP)
-		result = cp_rsa_gen_basic(&pub, &prv, BN_BITS);
+		result = cp_rsa_gen_basic(pub, prv, BN_BITS);
 
 		TEST_BEGIN("basic rsa signature/verification is correct") {
 			TEST_ASSERT(result == STS_OK, end);
 			in_len = 10;
 			out_len = BN_BITS / 8 + 1;
 			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_sign_basic(out, &out_len, in, in_len, &prv) == STS_OK,
+			TEST_ASSERT(cp_rsa_sign_basic(out, &out_len, in, in_len, prv) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, &pub) == 1,
+			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1,
 					end);
 		} TEST_END;
 #endif
 
 #if CP_RSA == QUICK || !defined(STRIP)
-		result = cp_rsa_gen_quick(&pub, &prv, BN_BITS);
+		result = cp_rsa_gen_quick(pub, prv, BN_BITS);
 
 		TEST_BEGIN("fast rsa signature/verification is correct") {
 			TEST_ASSERT(result == STS_OK, end);
 			in_len = 10;
 			out_len = BN_BITS / 8 + 1;
 			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_sign_quick(out, &out_len, in, in_len, &prv) == STS_OK,
+			TEST_ASSERT(cp_rsa_sign_quick(out, &out_len, in, in_len, prv) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, &pub) == 1,
+			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1,
 					end);
 		} TEST_END;
 #endif
 
-	} CATCH(e) {
-		switch (e) {
-			case ERR_NO_MEMORY:
-				util_print("FATAL ERROR!\n");
-				ERROR(end);
-				break;
-		}
+	} CATCH_ANY {
+		ERROR(end);
 	}
 	code = STS_OK;
 
   end:
+	bn_free(pub.e);
+	bn_free(pub.n);
+	bn_free(prv.d);
+	bn_free(prv.dp);
+	bn_free(prv.dq);
+	bn_free(prv.p);
+	bn_free(prv.q);
+	bn_free(prv.qi);
+	bn_free(prv.n);
+	return code;
+}
+
+static int rabin(void) {
+	int code = STS_ERR;
+	rabin_t pub, prv;
+	unsigned char in[10];
+	unsigned char out[BN_BITS / 8 + 1];
+	int in_len, out_len;
+	int result;
+
+	bn_null(pub.n);
+	bn_null(prv.n);
+	bn_null(prv.p);
+	bn_null(prv.q);
+	bn_null(prv.dp);
+	bn_null(prv.dq);
+
+	TRY {
+		bn_new(pub.n);
+		bn_new(prv.n);
+		bn_new(prv.p);
+		bn_new(prv.q);
+		bn_new(prv.dp);
+		bn_new(prv.dq);
+
+		result = cp_rabin_gen(pub, prv, BN_BITS);
+
+		TEST_BEGIN("rabin encryption/decryption is correct") {
+			TEST_ASSERT(result == STS_OK, end);
+			in_len = 10;
+			out_len = BN_BITS / 8 + 1;
+			rand_bytes(in, in_len);
+			TEST_ASSERT(cp_rabin_enc(out, &out_len, in, in_len, pub) == STS_OK,
+					end);
+			TEST_ASSERT(cp_rabin_dec(out, &out_len, out, out_len, prv) == STS_OK,
+					end);
+			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
+		} TEST_END;
+	} CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+
+  end:
+	bn_free(pub.n);
+	bn_free(prv.n);
+	bn_free(prv.p);
+	bn_free(prv.q);
+	bn_free(prv.dp);
+	bn_free(prv.dq);
 	return code;
 }
 
@@ -165,9 +220,13 @@ static int rsa(void) {
 static int ecdsa(void) {
 	err_t e;
 	int code = STS_ERR;
-	bn_t d = NULL, r = NULL;
-	eb_t q = NULL;
+	bn_t d, r;
+	eb_t q;
 	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+
+	bn_null(d);
+	bn_null(r);
+	eb_null(q);
 
 	TRY {
 		bn_new(d);
@@ -188,13 +247,8 @@ static int ecdsa(void) {
 		} TEST_END;
 #endif
 
-	} CATCH(e) {
-		switch (e) {
-			case ERR_NO_MEMORY:
-				util_print("FATAL ERROR!\n");
-				ERROR(end);
-				break;
-		}
+	} CATCH_ANY {
+		ERROR(end);
 	}
 	code = STS_OK;
 
@@ -213,8 +267,13 @@ static int sokaka(void) {
 	err_t e;
 	int code = STS_ERR;
 	bn_t s;
-	eb_t p_a = NULL, p_b = NULL, s_a = NULL, s_b = NULL;
+	eb_t p_a, p_b, s_a, s_b;
 	fb4_t key1, key2;
+
+	eb_null(p_a);
+	eb_null(p_b);
+	eb_null(s_a);
+	eb_null(s_b);
 
 	TRY {
 		bn_new(s);
@@ -237,13 +296,8 @@ static int sokaka(void) {
 			TEST_ASSERT(fb4_cmp(key1, key2) == CMP_EQ, end);
 		} TEST_END;
 
-	} CATCH(e) {
-		switch (e) {
-			case ERR_NO_MEMORY:
-				util_print("FATAL ERROR!\n");
-				ERROR(end);
-				break;
-		}
+	} CATCH_ANY {
+		ERROR(end);
 	}
 	code = STS_OK;
 
@@ -269,6 +323,11 @@ int main(void) {
 	util_print_banner("Protocols based on prime factorization:\n", 0);
 
 	if (rsa() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (rabin() != STS_OK) {
 		core_clean();
 		return 1;
 	}

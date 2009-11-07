@@ -1,18 +1,20 @@
 /*
- * Copyright 2007 Project RELIC
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -31,11 +33,14 @@
 
 #include "relic.h"
 #include "relic_test.h"
+#include "relic_fp_low.h"
 
 static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
-	fp_t a = NULL;
+	fp_t a;
+
+	fp_null(a);
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
@@ -59,7 +64,11 @@ static int memory(void) {
 static int util(void) {
 	int bits, code = STS_ERR;
 	char str[1000];
-	fp_t a = NULL, b = NULL, c = NULL;
+	fp_t a, b, c;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
 
 	TRY {
 		fp_new(a);
@@ -164,16 +173,6 @@ static int util(void) {
 			TEST_ASSERT(fp_cmp(a, b) == CMP_EQ, end);
 		}
 		TEST_END;
-
-		/*TEST_BEGIN("getting the size of a prime field element is correct") {
-			fp_rand(a);
-			fp_size(&bits, a, 2);
-			bits--;
-			printf("%d %d\n", bits, fp_bits(a));
-			fp_print(a);
-			TEST_ASSERT(bits == fp_bits(a), end);
-		}
-		TEST_END;*/
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -188,7 +187,13 @@ static int util(void) {
 
 static int addition(void) {
 	int code = STS_ERR;
-	fp_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL;
+	fp_t a, b, c, d, e;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
+	fp_null(d);
+	fp_null(e);
 
 	TRY {
 		fp_new(a);
@@ -245,7 +250,12 @@ static int addition(void) {
 
 static int subtraction(void) {
 	int code = STS_ERR;
-	fp_t a = NULL, b = NULL, c = NULL, d = NULL;
+	fp_t a, b, c, d;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
+	fp_null(d);
 
 	TRY {
 		fp_new(a);
@@ -292,7 +302,14 @@ static int subtraction(void) {
 
 static int multiplication(void) {
 	int code = STS_ERR;
-	fp_t a = NULL, b = NULL, c = NULL, d = NULL, e = NULL, f = NULL;
+	fp_t a, b, c, d, e, f;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
+	fp_null(d);
+	fp_null(e);
+	fp_null(f);
 
 	TRY {
 		fp_new(a);
@@ -407,7 +424,11 @@ static int multiplication(void) {
 
 static int squaring(void) {
 	int code = STS_ERR;
-	fp_t a = NULL, b = NULL, c = NULL;
+	fp_t a, b, c;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
 
 	TRY {
 		fp_new(a);
@@ -470,7 +491,11 @@ static int squaring(void) {
 
 static int doubling_halving(void) {
 	int code = STS_ERR;
-	fp_t a = NULL, b = NULL, c = NULL;
+	fp_t a, b, c;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
 
 	TRY {
 		fp_new(a);
@@ -492,7 +517,8 @@ static int doubling_halving(void) {
 				fp_add_dig(c, c, 1);
 			}
 			TEST_ASSERT(fp_cmp(c, a) == CMP_EQ, end);
-		} TEST_END;
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -508,8 +534,13 @@ static int doubling_halving(void) {
 
 static int shifting(void) {
 	int code = STS_ERR;
-	fp_t a = NULL, b = NULL, c = NULL;
-	dv_t d = NULL;
+	fp_t a, b, c;
+	dv_t d;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
+	dv_null(d);
 
 	TRY {
 		fp_new(a);
@@ -579,10 +610,113 @@ static int shifting(void) {
 	return code;
 }
 
+static int reduction(void) {
+	int code = STS_ERR;
+	fp_t a, b, c;
+	dv_t t;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
+	dv_null(t);
+
+	TRY {
+		fp_new(a);
+		fp_new(b);
+		fp_new(c);
+		dv_new(t);
+		dv_zero(t, 2 * FB_DIGS);
+
+		TEST_BEGIN("modular reduction is correct") {
+			fp_rand(a);
+			/* Test if a * f(z) mod f(z) == 0. */
+			fp_mul(b, a, fp_prime_get());
+			TEST_ASSERT(fp_is_zero(b) == 1, end);
+		} TEST_END;
+
+#if FP_RDC == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic modular reduction is correct") {
+			fp_rand(a);
+			fp_muln_low(t, a, fp_prime_get());
+			fp_rdc_basic(b, t);
+			TEST_ASSERT(fp_is_zero(b), end);
+		} TEST_END;
+#endif
+
+#if FP_RDC == MONTY || !defined(STRIP)
+		TEST_BEGIN("montgomery modular reduction is correct") {
+			fp_rand(a);
+			fp_muln_low(t, a, fp_prime_get());
+			fp_rdc_monty(b, t);
+			TEST_ASSERT(fp_is_zero(b), end);
+		} TEST_END;
+#endif
+
+#if FP_RDC == QUICK || !defined(STRIP)
+		if (fp_prime_get_spars(NULL) != NULL) {
+			TEST_BEGIN("fast modular reduction is correct") {
+				fp_rand(a);
+				fp_muln_low(t, a, fp_prime_get());
+				fp_rdc_quick(b, t);
+				TEST_ASSERT(fp_is_zero(b), end);
+			}
+			TEST_END;
+		}
+#endif
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fb_free(a);
+	fb_free(b);
+	fb_free(c);
+	dv_free(t);
+	return code;
+}
+
+static int inversion(void) {
+	int code = STS_ERR;
+	fp_t a, b, c;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
+
+	TRY {
+		fp_new(a);
+		fp_new(b);
+		fp_new(c);
+
+		TEST_BEGIN("inversion is correct") {
+			fp_rand(a);
+			fp_inv(b, a);
+			fp_mul(c, a, b);
+			fp_set_dig(b, 1);
+			TEST_ASSERT(fp_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp_free(a);
+	fp_free(b);
+	fp_free(c);
+	return code;
+}
+
 static int digit(void) {
 	int code = STS_ERR;
-	fp_t a = NULL, b = NULL, c = NULL, d = NULL;
+	fp_t a, b, c, d;
 	dig_t g;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
+	fp_null(d);
 
 	TRY {
 		fp_new(a);
@@ -633,34 +767,6 @@ static int digit(void) {
 	fp_free(b);
 	fp_free(c);
 	fp_free(d);
-	return code;
-}
-
-static int inversion(void) {
-	int code = STS_ERR;
-	fp_t a = NULL, b = NULL, c = NULL;
-
-	TRY {
-		fp_new(a);
-		fp_new(b);
-		fp_new(c);
-
-		TEST_BEGIN("inversion is correct") {
-			fp_rand(a);
-			fp_inv(b, a);
-			fp_mul(c, a, b);
-			fp_set_dig(b, 1);
-			TEST_ASSERT(fp_cmp(c, b) == CMP_EQ, end);
-		} TEST_END;
-	}
-	CATCH_ANY {
-		ERROR(end);
-	}
-	code = STS_OK;
-  end:
-	fp_free(a);
-	fp_free(b);
-	fp_free(c);
 	return code;
 }
 
@@ -719,10 +825,10 @@ int main(void) {
 		return 1;
 	}
 
-	/*if (reduction() != STS_OK) {
-		 core_clean();
-		 return 1;
-	}*/
+	if (reduction() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	if (digit() != STS_OK) {
 		core_clean();
