@@ -54,14 +54,25 @@ void fp_param_set(int param) {
 		bn_new(p);
 
 		switch (param) {
+			case NIST_192:
+				/* p = 2^192 - 2^64 - 1. */
+				f[0] = -1;
+				f[1] = -64;
+				fp_prime_set_spars(f, 2);
+				break;
+			case NIST_224:
+				/* p = 2^224 - 2^96 + 1. */
+				f[0] = 1;
+				f[1] = -96;
+				fp_prime_set_spars(f, 2);
+				break;
 			case NIST_256:
 				/* p = 2^256 - 2^224 + 2^192 + 2^96 - 1. */
 				f[0] = -1;
 				f[1] = 96;
 				f[2] = 192;
 				f[3] = -224;
-				f[4] = 256;
-				fp_prime_set_sform(f, 5);
+				fp_prime_set_spars(f, 4);
 				break;
 			case BNN_256:
 				/* x = -4080000000000001. */
@@ -113,6 +124,19 @@ void fp_param_set(int param) {
 				bn_add(p, p, t1);
 				fp_prime_set_dense(p);
 				break;
+			case NIST_384:
+				/* p = 2^384 - 2^128 - 2^96 + 2^32 - 1. */
+				f[0] = -1;
+				f[1] = 32;
+				f[2] = -96;
+				f[3] = -128;
+				fp_prime_set_spars(f, 4);
+				break;
+			case NIST_521:
+				/* p = 2^521 - 1. */
+				f[0] = -1;
+				fp_prime_set_spars(f, 1);
+				break;
 			default:
 				THROW(ERR_NO_FIELD);
 				break;
@@ -129,19 +153,27 @@ void fp_param_set(int param) {
 }
 
 void fp_param_set_any(void) {
-#if FP_PRIME == 256
-#ifdef FP_SFORM
+#if FP_PRIME == 192
+	fp_param_set(NIST_192);
+#elif FP_PRIME == 224
+	fp_param_set(NIST_224);
+#elif FP_PRIME == 256
+#ifdef FP_PMERS
 	fp_param_set(NIST_256);
 #else
 	fp_param_set(BNN_256);
 #endif
+#elif FP_PRIME == 384
+	fp_param_set(NIST_384);
+#elif FP_PRIME == 521
+	fp_param_set(NIST_521);
 #else
 	bn_t modulus = NULL;
 
 	TRY {
 		bn_new(modulus);
 		bn_gen_prime(modulus, FP_BITS);
-		fp_prime_set(modulus);
+		fp_prime_set_dense(modulus);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {

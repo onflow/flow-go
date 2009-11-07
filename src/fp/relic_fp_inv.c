@@ -1,23 +1,24 @@
 /*
- * Copyright 2007 Project RELIC
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
  */
-
 /**
  * @file
  *
@@ -128,7 +129,7 @@ void fp_inv(fp_t c, fp_t a) {
 #if FP_RDC != MONTY
 		/* If we do not use Montgomery reduction, the result of inversion is
 		 * a^{-1}R^3 mod p or a^{-1}R^4 mod p, depending on flag.
-		 * Hence we must reduce the result three times.
+		 * Hence we must reduce the result three or four times.
 		 */
 		_a->used = FP_DIGS;
 		dv_copy(_a->dp, c, FP_DIGS);

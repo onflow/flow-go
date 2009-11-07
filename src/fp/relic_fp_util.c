@@ -1,18 +1,20 @@
 /*
- * Copyright 2007 Project RELIC
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -134,7 +136,15 @@ void fp_set_dig(fp_t c, dig_t a) {
 }
 
 void fp_rand(fp_t a) {
+	int bits, digits;
+
 	rand_bytes((unsigned char *)a, FP_DIGS * sizeof(dig_t));
+
+	SPLIT(bits, digits, FP_BITS, FP_DIG_LOG);
+	if (bits > 0) {
+		dig_t mask = ((dig_t)1 << (dig_t)bits) - 1;
+		a[FP_DIGS - 1] &= mask;
+	}
 
 	while (fp_cmp(a, fp_prime_get()) != CMP_LT) {
 		fp_subn_low(a, a, fp_prime_get());
@@ -171,21 +181,6 @@ void fp_print(fp_t a) {
 		}
 		util_print("\n");
 
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		bn_free(t);
-	}
-}
-
-void fp_size(int *size, fp_t a, int radix) {
-	bn_t t = NULL;
-
-	TRY {
-		bn_new(t);
-		fp_prime_back(t, a);
-		bn_size_str(size, t, radix);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}

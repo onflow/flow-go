@@ -1,23 +1,24 @@
 /*
- * Copyright 2007 Project RELIC
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
  */
-
 /**
  * @file
  *
@@ -81,12 +82,12 @@ static int prime_cnr;
 /**
  * Non-zero bits of special form prime.
  */
-static int sform[MAX_BITS + 1] = { 0 };
+static int spars[MAX_BITS + 1] = { 0 };
 
 /**
  * Number of bits of special form prime.
  */
-static int sform_len = 0;
+static int spars_len = 0;
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -116,10 +117,16 @@ dig_t *fp_prime_get_rdc(void) {
 	return u.dp;
 }
 
-int *fp_prime_get_sform(void) {
-	if (sform_len > 0 && sform_len < MAX_BITS ) {
-		return sform;
+int *fp_prime_get_spars(int *len) {
+	if (spars_len > 0 && spars_len < MAX_BITS ) {
+		if (len != NULL) {
+			*len = spars_len;
+		}
+		return spars;
 	} else {
+		if (len != NULL) {
+			*len = 0;
+		}
 		return NULL;
 	}
 }
@@ -164,22 +171,22 @@ void fp_prime_set(bn_t p) {
 	bn_mod_monty_setup(&u, &prime);
 	bn_set_dig(&conv, 1);
 	bn_lsh(&conv, &conv, 2 * prime.used * BN_DIGIT);
-	bn_mod_basic(&conv, &conv, &prime);
+	bn_mod(&conv, &conv, &prime);
 	bn_set_dig(&one, 1);
 	bn_lsh(&one, &one, prime.used * BN_DIGIT);
-	bn_mod_basic(&one, &one, &prime);
+	bn_mod(&one, &one, &prime);
 }
 
 void fp_prime_set_dense(bn_t p) {
 	fp_prime_set(p);
-	sform_len = 0;
-	sform[0] = 0;
+	spars_len = 0;
+	spars[0] = 0;
 #if FP_RDC == QUICK
 	THROW(ERR_INVALID);
 #endif
 }
 
-void fp_prime_set_sform(int *f, int len) {
+void fp_prime_set_spars(int *f, int len) {
 	bn_t p = NULL, t = NULL;
 
 	TRY {
@@ -212,10 +219,10 @@ void fp_prime_set_sform(int *f, int len) {
 
 		fp_prime_set(p);
 		for (int i = 0; i < len; i++) {
-			sform[i] = f[i];
+			spars[i] = f[i];
 		}
-		sform[len] = 0;
-		sform_len = len;
+		spars[len] = 0;
+		spars_len = len;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -248,6 +255,9 @@ void fp_prime_conv(fp_t c, bn_t a) {
 		} else {
 			for (i = 0; i < t->used; i++) {
 				c[i] = t->dp[i];
+			}
+			for (; i < FP_DIGS; i++) {
+				c[i] = 0;
 			}
 		}
 	}
@@ -284,6 +294,9 @@ void fp_prime_conv_dig(fp_t c, dig_t a) {
 		fp_zero(c);
 		for (i = 0; i < t->used; i++) {
 			c[i] = t->dp[i];
+		}
+		for (; i < FP_DIGS; i++) {
+			c[i] = 0;
 		}
 	}
 	CATCH_ANY {
