@@ -35,7 +35,7 @@ option(FP_SFORM "Prefer special form primes over random primes." on)
 
 # Choose the arithmetic methods.
 if (NOT FP_METHD)
-	set(FP_METHD "COMBA;COMBA;MONTY;SLIDE")
+	set(FP_METHD "COMBA;COMBA;MONTY")
 endif(NOT FP_METHD)
 list(LENGTH FP_METHD FP_LEN)
 if (FP_LEN LESS 3)
