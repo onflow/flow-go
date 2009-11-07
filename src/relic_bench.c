@@ -56,6 +56,7 @@ typedef clock_t bench_t;
 
 #elif TIMER == POSIX
 
+#include <sys/time.h>
 typedef struct timeval bench_t;
 
 #elif TIMER == CYCLE
