@@ -41,3 +41,10 @@
 void fp_sqrn_low(dig_t *c, dig_t *a) {
 	mpn_mul_n(c, a, a, FP_DIGS);
 }
+
+void fp_sqrm_low(dig_t *c, dig_t *a) {
+	dig_t align t[2 * FP_DIGS];
+
+	fp_sqrn_low(t, a);
+	fp_rdc(c, t);
+}

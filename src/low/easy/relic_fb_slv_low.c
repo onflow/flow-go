@@ -50,7 +50,7 @@ static void fb_slvt_low(dig_t *c, dig_t *a, int fa) {
 	fb_copy(t, a);
 
 	from = FB_BITS - fa;
-	from = (from % 2 == 0 ? from - 1 : from);
+	from = (from % 2 == 0 ? from - 1 : from - 2);
 	for (i = from; i > (FB_BITS - 1) / 2; i -= 2) {
 		if (fb_test_bit(t, i)) {
 			SPLIT(b, d, 2 * i - FB_BITS + fa, FB_DIG_LOG);
@@ -94,7 +94,7 @@ static void fb_slvp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 	fb_copy(t, a);
 
 	from = FB_BITS - fa;
-	from = (from % 2 == 0 ? from - 1 : from);
+	from = (from % 2 == 0 ? from - 1 : from - 2);
 	for (i = from; i > (FB_BITS - 1) / 2; i -= 2) {
 		if (fb_test_bit(t, i)) {
 			SPLIT(b, d, 2 * i - FB_BITS + fa, FB_DIG_LOG);

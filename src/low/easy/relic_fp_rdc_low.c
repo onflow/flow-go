@@ -75,40 +75,32 @@
 /*============================================================================*/
 
 void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
-	align dig_t q[2 * FP_DIGS], _q[2 * FP_DIGS], r[2 * FP_DIGS], t[2 * FP_DIGS];
+	align dig_t q[2 * FP_DIGS], _q[2 * FP_DIGS];
+	align dig_t _r[2 * FP_DIGS], r[2 * FP_DIGS], t[2 * FP_DIGS];
 	int *sform, len;
 	int first, i, j, b0, d0, b1, d1;
-	dig_t carry, carry2;
+	dig_t carry;
 
-	sform = fp_prime_get_sform();
-	len = 0;
-	for (int i = 0; sform[i] != 0; i++) {
-		len++;
-	}
+	sform = fp_prime_get_spars(&len);
 
 	SPLIT(b0, d0, FP_BITS, FP_DIG_LOG);
 	first = (d0) + (b0 == 0 ? 0 : 1);
 
-	/* q = floor(x/b^k) */
+	/* q = floor(a/b^k) */
 	dv_zero(q, 2 * FP_DIGS);
 	bn_rshd_low(q, a, 2 * FP_DIGS, d0);
 	bn_rshb_low(q, q, 2 * FP_DIGS, b0);
 
-	dv_zero(c, FP_DIGS);
-	dv_copy(c, a, first + 1);
-	c[first] &= MASK(b0);
-	dv_zero(r, 2 * FP_DIGS);
-	fp_copy(r, c);
+	/* r = a - qb^k. */
+	dv_copy(r, a, first);
+	if (b0 > 0) {
+		r[first - 1] &= MASK(b0);
+	}
 
-	printf("\na = ");
-	dv_print(a, 2 * FP_DIGS);
-
-	carry = i = 0;
+	carry = 0;
 	while (!fp_is_zero(q)) {
-		printf("q = ");
-		dv_print(q, 2 * FP_DIGS);
 		dv_zero(_q, 2 * FP_DIGS);
-		for (i = len - 2; i > 0; i--) {
+		for (i = len - 1; i > 0; i--) {
 			j = (sform[i] < 0 ? -sform[i] : sform[i]);
 			SPLIT(b1, d1, j, FP_DIG_LOG);
 			dv_zero(t, 2 * FP_DIGS);
@@ -119,40 +111,25 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 			} else {
 				bn_addn_low(_q, _q, t, 2 * FP_DIGS);
 			}
-			printf("_q = ");
-			dv_print(_q, 2 * FP_DIGS);
 		}
 		if (sform[0] > 0) {
-			bn_subn_low(_q, _q, q, FP_DIGS);
+			bn_subn_low(_q, _q, q, 2 * FP_DIGS);
 		} else {
-			bn_addn_low(_q, _q, q, FP_DIGS);
+			bn_addn_low(_q, _q, q, 2 * FP_DIGS);
 		}
-		printf("_q = ");
-		dv_print(_q, 2 * FP_DIGS);
 		bn_rshd_low(q, _q, 2 * FP_DIGS, d0);
 		bn_rshb_low(q, q, 2 * FP_DIGS, b0);
-		dv_copy(r, _q, first + 1);
-		r[first] &= MASK(b0);
-		i++;
-		if (i % 2 == 0) {
-			carry = fp_subn_low(c, c, r);
-		} else {
-			carry2 = fp_addn_low(c, c, r);
-		}
-		printf("q = ");
-		dv_print(q, FP_DIGS);
-	}
 
-	if (!carry) {
-		while (fp_cmpn_low(c, m) == CMP_GT) {
-			fp_subn_low(c, c, m);
+		dv_copy(_r, _q, first);
+		if (b0 > 0) {
+			_r[first - 1] &= MASK(b0);
 		}
-	} else {
-		while (carry) {
-			fp_addn_low(c, c, m);
-		}
+		fp_addn_low(r, r, _r);
 	}
-	dv_print(c, FP_DIGS);
+	while (fp_cmpn_low(r, m) != CMP_LT) {
+		fp_subn_low(r, r, m);
+	}
+	fp_copy(c, r);
 }
 
 dig_t fp_rdcn_low(dig_t *c, dig_t *a, dig_t *m, dig_t u) {

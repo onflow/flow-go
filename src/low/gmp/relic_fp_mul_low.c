@@ -43,3 +43,10 @@ dig_t fp_muladd_low(dig_t *c, dig_t *a, dig_t digit) {
 void fp_muln_low(dig_t *c, dig_t *a, dig_t *b) {
 	mpn_mul_n(c, a, b, FP_DIGS);
 }
+
+void fp_mulm_low(dig_t *c, dig_t *a, dig_t *b) {
+	dig_t align t[2 * FP_DIGS];
+
+	fp_muln_low(t, a, b);
+	fp_rdc(c, t);
+}
