@@ -1,18 +1,20 @@
 /*
- * Copyright 2007 Project RELIC
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -103,6 +105,13 @@ typedef align dig_t fp_st[FP_DIGS];
 /*============================================================================*/
 /* Macro definitions                                                          */
 /*============================================================================*/
+
+/**
+ * Initializes a binary field element with a null value.
+ *
+ * @param[out] A			- the binary field element to initialize.
+ */
+#define fp_null(A)			A = NULL;
 
 /**
  * Calls a function to allocate and initialize a prime field element.
@@ -230,12 +239,14 @@ dig_t *fp_prime_get_rdc(void);
 dig_t *fp_prime_get_conv(void);
 
 /**
- * Returns the prime stored in special form.
- * @param[out] len		- the number of returned bits.
+ * Returns the prime stored in special form. The most significant bit is
+ * FP_BITS.
+ *
+ * @param[out] len		- the number of returned bits, can be NULL.
  *
  * @return the prime represented by it non-zero bits.
  */
-int *fp_prime_get_sform(void);
+int *fp_prime_get_spars(int *len);
 
 /**
  * Returns a non-quadratic residue in the prime field.
@@ -266,11 +277,11 @@ dig_t *fp_prime_get_mod8(void);
 void fp_prime_set_dense(bn_t p);
 
 /**
- * Assigns the order of the prime field to a sparse prime p.
+ * Assigns the order of the prime field to a special form prime p.
  *
  * @param[in] p			- the new prime field order.
  */
-void fp_prime_set_sform(int *sform, int len);
+void fp_prime_set_spars(int *spars, int len);
 
 /**
  * Assigns a prime modulus based on its identifier.

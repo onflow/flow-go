@@ -138,9 +138,9 @@
  * Selects a basic version of an algorithm if no additional argument was passed.
  */
 /** @{ */
-#define ARGS(...)				_ARGS(__VA_ARGS__, _impl, _basic, _error)
-#define _ARGS(...)				__ARGS(__VA_ARGS__)
-#define __ARGS(_1, _2, N,...)	N
+#define OPT(...)				_OPT(__VA_ARGS__, _impl, _basic, _error)
+#define _OPT(...)				__OPT(__VA_ARGS__)
+#define __OPT(_1, _2, N,...)	N
 /** @} */
 
 /**

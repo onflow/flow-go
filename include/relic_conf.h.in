@@ -132,14 +132,14 @@
 /** Schoolbook multiplication. */
 #define BASIC    1
 /** Comba multiplication. */
-#define COMBA    3
+#define COMBA    2
 /** Chosen multiple precision multiplication method. */
 #define BN_MUL   @BN_MUL@
 
 /** Schoolbook squaring. */
 #define BASIC    1
 /** Comba squaring. */
-#define COMBA    3
+#define COMBA    2
 /** Chosen multiple precision multiplication method. */
 #define BN_SQR   @BN_SQR@
 
@@ -149,8 +149,8 @@
 #define BARRT    2
 /** Montgomery modular reduction. */
 #define MONTY    3
-/** Diminished radix modular reduction. */
-#define RADIX    4
+/** Pseudo-Mersenne modular reduction. */
+#define PMERS    4
 /** Chosen multiple precision modular reduction method. */
 #define BN_MOD   @BN_MOD@
 
@@ -165,9 +165,9 @@
 
 /** Basic Euclidean GCD Algorithm. */ 
 #define BASIC    1
-/* Lehmer's fast GCD Algorithm. */
+/** Lehmer's fast GCD Algorithm. */
 #define LEHME    2
-/* Stein's binary GCD Algorithm. */
+/** Stein's binary GCD Algorithm. */
 #define STEIN    3
 /** Chosen multiple precision greatest common divisor method. */
 #define BN_GCD   @BN_GCD@
@@ -185,27 +185,27 @@
 #define FP_PRIME @FP_PRIME@
 /** Number of Karatsuba steps. */
 #define FP_KARAT @FP_KARAT@
-/** Prefer special form primes over random primes. */
-#cmakedefine FP_SFORM
+/** Prefer Pseudo-Mersenne primes over random primes. */
+#cmakedefine FP_PMERS
 
 /** Prime field arithmetic method */
 #define FP_METHD "@FP_METHD@"
 
 /** Schoolbook multiplication. */
 #define BASIC    1
-/** Integrated modular multiplication. */
-#define INTEG    2
 /** Comba multiplication. */
-#define COMBA    3
+#define COMBA    2
+/** Integrated modular multiplication. */
+#define INTEG    3
 /** Chosen prime field multiplication method. */
 #define FP_MUL   @FP_MUL@
 
 /** Schoolbook squaring. */
 #define BASIC    1
-/** Integrated modular squaring. */
-#define INTEG    2
 /** Comba squaring. */
-#define COMBA    3
+#define COMBA    2
+/** Integrated modular squaring. */
+#define INTEG    3
 /** Chosen prime field multiplication method. */
 #define FP_SQR   @FP_SQR@
 
@@ -230,23 +230,23 @@
 
 /** Shift-and-add multiplication. */
 #define BASIC    1
-/** Integrated modular multiplication. */
-#define INTEG	 2
-/** Left-to-right Comb multiplication. */
-#define LCOMB	 3
-/** Right-to-left Comb multiplication. */
-#define RCOMB	 4
 /** Lopez-Dahab multiplication. */
-#define LODAH	 5
+#define LODAH	 2
+/** Integrated modular multiplication. */
+#define INTEG	 3
+/** Left-to-right Comb multiplication. */
+#define LCOMB	 4
+/** Right-to-left Comb multiplication. */
+#define RCOMB	 5
 /** Chosen binary field multiplication method. */
 #define FB_MUL   @FB_MUL@
 
 /** Basic squaring. */
 #define BASIC    1
-/** Integrated modular squaring. */
-#define INTEG	 2
 /** Table-based squaring. */
-#define TABLE    3
+#define TABLE    2
+/** Integrated modular squaring. */
+#define INTEG	 3
 /** Chosen binary field squaring method. */
 #define FB_SQR   @FB_SQR@
 

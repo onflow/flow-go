@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup bn Multiple precision arithmetic.
+ * @defgroup bn Multiple precision integer arithmetic.
  */
 
 /**
@@ -264,8 +264,8 @@ typedef bn_st *bn_t;
 #define bn_mod_setup(U, M)	bn_mod_barrt_setup(U, M)
 #elif BN_MOD == MONTY
 #define bn_mod_setup(U, M)	bn_mod_monty_setup(U, M)
-#elif BN_MOD == RADIX
-#define bn_mod_setup(U, M)	bn_mod_radix_setup(U, M)
+#elif BN_MOD == PMERS
+#define bn_mod_setup(U, M)	bn_mod_pmers_setup(U, M)
 #endif
 
 /**
@@ -280,7 +280,7 @@ typedef bn_st *bn_t;
  * @param[in] A				- the multiple precision integer to reduce.
  * @param[in] ...			- the modulus and an optional argument.
  */
-#define bn_mod(C, A, ...)	CAT(bn_mod,ARGS(__VA_ARGS__))(C, A, __VA_ARGS__)
+#define bn_mod(C, A, ...)	CAT(bn_mod, OPT(__VA_ARGS__))(C, A, __VA_ARGS__)
 
 /**
  * Reduces a multiple precision integer modulo another integer. This macro
@@ -297,8 +297,8 @@ typedef bn_st *bn_t;
 #define bn_mod_impl(C, A, M, U)	bn_mod_barrt(C, A, M, U)
 #elif BN_MOD == MONTY
 #define bn_mod_impl(C, A, M, U)	bn_mod_monty(C, A, M, U)
-#elif BN_MOD == RADIX
-#define bn_mod_impl(C, A, M, U)	bn_mod_radix(C, A, M, U)
+#elif BN_MOD == PMERS
+#define bn_mod_impl(C, A, M, U)	bn_mod_pmers(C, A, M, U)
 #endif
 
 /**
@@ -317,8 +317,9 @@ typedef bn_st *bn_t;
 #endif
 
 /**
- * Exponentiates a multiple precision integer modulo a modulus. Computes
- * c = a^b mod m. If Montgomery reduction is used, a must be in Montgomery form.
+ * Exponentiates a multiple precision integer modulo another multiple precision
+ * integer. Computes c = a^b mod m. If Montgomery reduction is used, the basis
+ * must not be in Montgomery form.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the basis.
@@ -440,7 +441,7 @@ void bn_copy(bn_t c, bn_t a);
 void bn_abs(bn_t c, bn_t a);
 
 /**
- * Negates a multiple precision integer.
+ * Inverts the sign of a multiple precision integer.
  *
  * @param[out] c			- the result.
  * @param[out] a			- the multiple precision integer to negate.
@@ -617,7 +618,6 @@ void bn_read_bin(bn_t a, unsigned char *bin, int len, int sign);
  * @param[in,out] len		- the buffer capacity/number of bytes written.
  * @param[out] sign			- the sign of the multiple precision integer.
  * @param[in] a				- the multiple integer to write.
- * @param[in] sign			- the sign.
  * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
  */
 void bn_write_bin(unsigned char *bin, int *len, int *sign, bn_t a);
@@ -840,6 +840,18 @@ void bn_div(bn_t c, bn_t a, bn_t b);
 void bn_div_rem(bn_t c, bn_t d, bn_t a, bn_t b);
 
 /**
+ * Divides a multiple precision integers by a digit without computing the
+ * remainder. Computes c = floor(a / b).
+ *
+ * @param[out] c			- the resulting quotient.
+ * @param[out] d			- the remainder.
+ * @param[in] a				- the dividend.
+ * @param[in] b				- the divisor.
+ * @throw ERR_INVALID		- if the divisor is zero.
+ */
+void bn_div_dig(bn_t c, bn_t a, dig_t b);
+
+/**
  * Divides a multiple precision integers by a digit. Computes c = floor(a / b)
  * and d = a mod b.
  *
@@ -849,7 +861,7 @@ void bn_div_rem(bn_t c, bn_t d, bn_t a, bn_t b);
  * @param[in] b				- the divisor.
  * @throw ERR_INVALID		- if the divisor is zero.
  */
-void bn_div_dig(bn_t c, dig_t *d, bn_t a, dig_t b);
+void bn_div_rem_dig(bn_t c, dig_t *d, bn_t a, dig_t b);
 
 /**
  * Reduces a multiple precision integer modulo a power of 2. Computes
@@ -950,30 +962,23 @@ void bn_mod_monty_basic(bn_t c, bn_t a, bn_t m, bn_t u);
 void bn_mod_monty_comba(bn_t c, bn_t a, bn_t m, bn_t u);
 
 /**
- * Checks if the modulus has the form 2^b - u.
- *
- * @param[in] m				- the modulus.
- */
-int bn_mod_radix_check(bn_t m);
-
-/**
  * Computes u if the modulus has the form 2^b - u.
  *
  * @param[out] u			- the result.
  * @param[in] m				- the modulus.
  */
-void bn_mod_radix_setup(bn_t u, bn_t m);
+void bn_mod_pmers_setup(bn_t u, bn_t m);
 
 /**
- * Reduces a multiple precision integer modulo a modulus using Diminished radix
+ * Reduces a multiple precision integer modulo a modulus using Pseudo-Mersenne
  * modular reduction.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the multiple precision integer to reduce.
  * @param[in] m				- the modulus.
- * @param[in] u				- the diminished radix of the modulus.
+ * @param[in] u				- the auxiliar value derived from the modulus.
  */
-void bn_mod_radix(bn_t c, bn_t a, bn_t m, bn_t u);
+void bn_mod_pmers(bn_t c, bn_t a, bn_t m, bn_t u);
 
 /**
  * Exponentiates a multiple precision integer modulo a modulus using the Binary

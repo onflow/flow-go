@@ -76,6 +76,13 @@ typedef dig_t *dv_t;
 /*============================================================================*/
 
 /**
+ * Initializes a digit vector with a null value.
+ *
+ * @param[out] A			- the digit vector to initialize.
+ */
+#define dv_null(A)			A = NULL;
+
+/**
  * Calls a function to allocate a temporary double precision digit vector.
  *
  * @param[out] A			- the double precision result.
