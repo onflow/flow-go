@@ -1,13 +1,13 @@
 message(STATUS "Multiple precision arithmetic configuration (BN module):\n")
 
-message("   ** Options for the multiple precision module (default = 256,DOUBLE,0):")
+message("   ** Options for the multiple precision module (default = 1024,DOUBLE,0):")
 message("      BN_PRECI=n        The base precision in bits. Let w be n in words.")
 message("      BN_MAGNI=DOUBLE   A multiple precision integer can store 2w words.")
 message("      BN_MAGNI=CARRY    A multiple precision integer can store w+1 words.")
 message("      BN_MAGNI=SINGLE   A multiple precision integer can store w words.")
 message("      BN_KARAT=n        The number of Karatsuba steps.\n")
 
-message("   ** Available multiple precision arithmetic methods (default = COMBA;COMBA;MONTY;SLIDE;STEIN;SAFEP):")
+message("   ** Available multiple precision arithmetic methods (default = COMBA;COMBA;MONTY;SLIDE;STEIN;BASIC):")
 message("      BN_METHD=BASIC    Schoolbook multiplication.")
 message("      BN_METHD=COMBA    Comba multiplication.")
 message("      BN_METHD=KnMUL    Karatsuba for (n > 0) steps and MUL multiplication.\n")
@@ -36,7 +36,7 @@ message("      Note: these methods must be given in order. Ex: BN_METHD=\"K1BASI
 
 # Choose the arithmetic precision.
 if (NOT BN_PRECI)
-	set(BN_PRECI 256)
+	set(BN_PRECI 1024)
 endif(NOT BN_PRECI)
 set(BN_PRECI ${BN_PRECI} CACHE INTEGER "Arithmetic precision in bits")
 
@@ -53,7 +53,7 @@ set(BN_MAGNI ${BN_MAGNI} CACHE STRING "Effective size in words")
 
 # Choose the arithmetic methods.
 if (NOT BN_METHD)
-	set(BN_METHD "COMBA;COMBA;MONTY;SLIDE;BASIC;SAFEP")
+	set(BN_METHD "COMBA;COMBA;MONTY;SLIDE;BASIC;BASIC")
 endif(NOT BN_METHD)
 list(LENGTH BN_METHD BN_LEN)
 if (BN_LEN LESS 6)
