@@ -35,7 +35,9 @@
 #include "relic_bench.h"
 
 static void memory(void) {
-	dv_t a[BENCH] = { NULL };
+	dv_t a[BENCH];
+
+	BENCH_SMALL("dv_null", dv_null(a[i]));
 
 	BENCH_SMALL("dv_new", dv_new(a[i]));
 	for (int i = 0; i < BENCH; i++) {

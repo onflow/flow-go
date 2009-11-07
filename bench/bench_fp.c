@@ -1,18 +1,20 @@
 /*
- * Copyright 2007 Project RELIC
+ * RELIC is an Efficient LIbrary for Cryptography
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
- * whose names are not listed here. Please refer to the COPYRIGHT file.
+ * whose names are not listed here. Please refer to the COPYRIGHT file
+ * for contact information.
  *
- * RELIC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * RELIC is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * RELIC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
@@ -33,7 +35,9 @@
 #include "relic_bench.h"
 
 static void memory(void) {
-	fp_t a[BENCH] = { NULL };
+	fp_t a[BENCH];
+
+	BENCH_SMALL("fp_null", fp_null(a[i]));
 
 	BENCH_SMALL("fp_new", fp_new(a[i]));
 	for (int i = 0; i < BENCH; i++) {
@@ -49,10 +53,12 @@ static void memory(void) {
 }
 
 static void util(void) {
-	int d;
 	char str[1000];
-
 	fp_t a, b;
+
+	fp_null(a);
+	fp_null(b);
+
 	fp_new(a);
 	fp_new(b);
 
@@ -109,12 +115,6 @@ static void util(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp_size") {
-		fp_rand(a);
-		BENCH_ADD(fp_size(&d, a, 16));
-	}
-	BENCH_END;
-
 	BENCH_BEGIN("fp_write") {
 		fp_rand(a);
 		BENCH_ADD(fp_write(str, sizeof(str), a, 16));
@@ -145,9 +145,15 @@ static void util(void) {
 }
 
 static void arith(void) {
-	fp_t a = NULL, b = NULL, c = NULL;
+	fp_t a, b, c;
 	dv_t d;
-	bn_t e = NULL;
+	bn_t e;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
+	dv_null(d);
+	bn_null(e);
 
 	fp_new(a);
 	fp_new(b);
@@ -271,14 +277,14 @@ static void arith(void) {
 	BENCH_BEGIN("fp_lsh") {
 		fp_rand(a);
 		a[FP_DIGS - 1] = 0;
-		BENCH_ADD(fp_lsh(c, a, FP_DIGIT/2));
+		BENCH_ADD(fp_lsh(c, a, FP_DIGIT / 2));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("fp_rsh") {
 		fp_rand(a);
 		a[FP_DIGS - 1] = 0;
-		BENCH_ADD(fp_rsh(c, a, FP_BITS/2));
+		BENCH_ADD(fp_rsh(c, a, FP_BITS / 2));
 	}
 	BENCH_END;
 
@@ -287,8 +293,7 @@ static void arith(void) {
 		BENCH_ADD(fp_inv(c, a));
 	}
 	BENCH_END;
-	
-#if FP_MUL != INTEG
+
 	BENCH_BEGIN("fp_rdc") {
 		fp_rand(a);
 		fp_lsh(d, a, FP_BITS);
@@ -296,13 +301,22 @@ static void arith(void) {
 	}
 	BENCH_END;
 
+#if FP_RDC == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fp_rdc_basic") {
+		fp_rand(a);
+		fp_lsh(d, a, FP_BITS);
+		BENCH_ADD(fp_rdc_basic(c, d));
+	}
+	BENCH_END;
+#endif
+
+#if FP_RDC == MONTY || !defined(STRIP)
 	BENCH_BEGIN("fp_rdc_monty") {
 		fp_rand(a);
 		fp_lsh(d, a, FP_BITS);
 		BENCH_ADD(fp_rdc_monty(c, d));
 	}
 	BENCH_END;
-#endif
 
 #if FP_MUL == BASIC || !defined(STRIP)
 	BENCH_BEGIN("fp_rdc_monty_basic") {
@@ -321,6 +335,18 @@ static void arith(void) {
 	}
 	BENCH_END;
 #endif
+#endif
+
+#if FP_RDC == QICK || !defined(STRIP)
+	if (fp_prime_get_spars(NULL) != NULL) {
+		BENCH_BEGIN("fp_rdc_quick") {
+			fp_rand(a);
+			fp_lsh(d, a, FP_BITS);
+			BENCH_ADD(fp_rdc_quick(c, d));
+		}
+		BENCH_END;
+	}
+#endif
 
 	BENCH_BEGIN("fp_prime_conv") {
 		bn_rand(e, BN_POS, FP_BITS);
@@ -328,13 +354,13 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp_order_conv_dig") {
+	BENCH_BEGIN("fp_prime_conv_dig") {
 		bn_rand(e, BN_POS, FP_BITS);
 		BENCH_ADD(fp_prime_conv_dig(a, e->dp[0]));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp_order_back") {
+	BENCH_BEGIN("fp_prime_back") {
 		fp_rand(c);
 		BENCH_ADD(fp_prime_back(e, c));
 	}
