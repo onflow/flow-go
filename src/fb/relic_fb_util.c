@@ -165,10 +165,10 @@ int fb_bits(fb_t a) {
 }
 
 void fb_rand(fb_t a) {
-	int bits;
+	int bits, digits;
 
 	rand_bytes((unsigned char *)a, FB_DIGS * sizeof(dig_t));
-	bits = FB_BITS - (FB_DIGS - 1) * FB_DIGIT;
+	SPLIT(bits, digits, FB_BITS, FB_DIG_LOG);
 	if (bits > 0) {
 		dig_t mask = ((dig_t)1 << (dig_t)bits) - 1;
 		a[FB_DIGS - 1] &= mask;
@@ -183,7 +183,8 @@ void fb_print(fb_t a) {
 
 	/* Suppress possible unused parameter warning. */
 	(void)a;
-	for (i = FB_DIGS - 1; i >= 0; i--) {
+	util_print("%lX ", (unsigned long int)a[FB_DIGS - 1]);
+	for (i = FB_DIGS - 2; i >= 0; i--) {
 		util_print("%.*lX ", (int)(2 * sizeof(dig_t)), (unsigned long int)a[i]);
 	}
 	printf("\n");
