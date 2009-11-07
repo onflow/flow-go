@@ -45,13 +45,15 @@
 /*============================================================================*/
 
 void cp_sokaka_gen(bn_t master) {
-	bn_t n = NULL;
+	bn_t n;
+
+	bn_null(n);
 
 	n = eb_curve_get_ord();
 
 	do {
 		bn_rand(master, BN_POS, bn_bits(n));
-		bn_mod_basic(master, master, n);
+		bn_mod(master, master, n);
 	} while (bn_is_zero(master));
 }
 

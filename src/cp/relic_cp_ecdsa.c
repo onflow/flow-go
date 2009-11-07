@@ -48,13 +48,15 @@ void cp_ecdsa_init() {
 }
 
 void cp_ecdsa_gen(bn_t d, eb_t q) {
-	bn_t n = NULL;
+	bn_t n;
+
+	bn_null(n);
 
 	n = eb_curve_get_ord();
 
 	do {
 		bn_rand(d, BN_POS, bn_bits(n));
-		bn_mod_basic(d, d, n);
+		bn_mod(d, d, n);
 	} while (bn_is_zero(d));
 
 	eb_mul_gen(q, d);
@@ -64,9 +66,15 @@ void cp_ecdsa_gen(bn_t d, eb_t q) {
 #if CP_ECDSA == BASIC || !defined(STRIP)
 
 void cp_ecdsa_sign_basic(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
-	bn_t n = NULL, k = NULL, x = NULL, e = NULL;
-	eb_t p = NULL;
+	bn_t n, k, x, e;
+	eb_t p;
 	unsigned char hash[MD_LEN];
+
+	bn_null(n);
+	bn_null(k);
+	bn_null(x);
+	bn_null(e);
+	eb_null(p);
 
 	TRY {
 		n = eb_curve_get_ord();
@@ -78,12 +86,12 @@ void cp_ecdsa_sign_basic(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 		do {
 			do {
 				bn_rand(k, BN_POS, bn_bits(n));
-				bn_mod_basic(k, k, n);
+				bn_mod(k, k, n);
 			} while (bn_is_zero(k));
 
 			eb_mul_gen(p, k);
 			bn_read_raw(x, p->x, FB_DIGS, BN_POS);
-			bn_mod_basic(r, x, n);
+			bn_mod(r, x, n);
 		} while (bn_is_zero(r));
 
 		md_map(hash, msg, len);
@@ -91,15 +99,15 @@ void cp_ecdsa_sign_basic(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 		bn_read_bin(e, hash, 20, BN_POS);
 
 		bn_mul(s, d, r);
-		bn_mod_basic(s, s, n);
+		bn_mod(s, s, n);
 		bn_add(s, s, e);
-		bn_mod_basic(s, s, n);
+		bn_mod(s, s, n);
 		bn_gcd_ext(x, NULL, k, n, k);
 		if (bn_sign(k) == BN_NEG) {
 			bn_add(k, k, n);
 		}
 		bn_mul(s, s, k);
-		bn_mod_basic(s, s, n);
+		bn_mod(s, s, n);
 
 	}
 	CATCH_ANY {
@@ -114,10 +122,16 @@ void cp_ecdsa_sign_basic(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 }
 
 int cp_ecdsa_ver_basic(bn_t r, bn_t s, unsigned char *msg, int len, eb_t q) {
-	bn_t n = NULL, k = NULL, e = NULL, v = NULL;
-	eb_t p = NULL;
+	bn_t n, k, e, v;
+	eb_t p;
 	unsigned char hash[20];
 	int result = 0;
+
+	bn_null(n);
+	bn_null(k);
+	bn_null(e);
+	bn_null(v);
+	eb_null(p);
 
 	TRY {
 		n = eb_curve_get_ord();
@@ -139,15 +153,15 @@ int cp_ecdsa_ver_basic(bn_t r, bn_t s, unsigned char *msg, int len, eb_t q) {
 				bn_read_bin(e, hash, 20, BN_POS);
 
 				bn_mul(e, e, k);
-				bn_mod_basic(e, e, n);
+				bn_mod(e, e, n);
 				bn_mul(v, r, k);
-				bn_mod_basic(v, v, n);
+				bn_mod(v, v, n);
 
 				eb_mul_sim_gen(p, e, q, v);
 
 				bn_read_raw(v, p->x, FB_DIGS, BN_POS);
 
-				bn_mod_basic(v, v, n);
+				bn_mod(v, v, n);
 
 				if (bn_cmp(v, r) == CMP_EQ) {
 					result = 1;

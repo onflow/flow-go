@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Implementation of the RSA protocol.
+ * Implementation of the RSA cryptosystem.
  *
  * @version $Id$
  * @ingroup cp
@@ -215,7 +215,7 @@ static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 
 #if CP_RSA == BASIC || !defined(STRIP)
 
-int cp_rsa_gen_basic(rsa_pub_t *pub, rsa_prv_t *prv, int bits) {
+int cp_rsa_gen_basic(rsa_t pub, rsa_t prv, int bits) {
 	bn_t t, r;
 	int result = STS_OK;
 
@@ -228,34 +228,34 @@ int cp_rsa_gen_basic(rsa_pub_t *pub, rsa_prv_t *prv, int bits) {
 
 		/* Generate different primes p and q. */
 		do {
-			bn_gen_prime(prv->p, bits / 2);
-			bn_gen_prime(prv->q, bits / 2);
-		} while (bn_cmp(prv->p, prv->q) == CMP_EQ);
+			bn_gen_prime(prv.p, bits / 2);
+			bn_gen_prime(prv.q, bits / 2);
+		} while (bn_cmp(prv.p, prv.q) == CMP_EQ);
 
 		/* Swap p and q so that p is smaller. */
-		if (bn_cmp(prv->p, prv->q) == CMP_LT) {
-			bn_copy(t, prv->p);
-			bn_copy(prv->p, prv->q);
-			bn_copy(prv->q, t);
+		if (bn_cmp(prv.p, prv.q) == CMP_LT) {
+			bn_copy(t, prv.p);
+			bn_copy(prv.p, prv.q);
+			bn_copy(prv.q, t);
 		}
 
-		bn_mul(pub->n, prv->p, prv->q);
-		bn_copy(prv->n, pub->n);
-		bn_sub_dig(prv->p, prv->p, 1);
-		bn_sub_dig(prv->q, prv->q, 1);
+		bn_mul(pub.n, prv.p, prv.q);
+		bn_copy(prv.n, pub.n);
+		bn_sub_dig(prv.p, prv.p, 1);
+		bn_sub_dig(prv.q, prv.q, 1);
 
-		bn_mul(t, prv->p, prv->q);
+		bn_mul(t, prv.p, prv.q);
 
-		bn_read_str(pub->e, RSA_EXP, strlen(RSA_EXP), 10);
+		bn_read_str(pub.e, RSA_EXP, strlen(RSA_EXP), 10);
 
-		bn_gcd_ext(r, prv->d, NULL, pub->e, t);
-		if (bn_sign(prv->d) == BN_NEG) {
-			bn_add(prv->d, prv->d, t);
+		bn_gcd_ext(r, prv.d, NULL, pub.e, t);
+		if (bn_sign(prv.d) == BN_NEG) {
+			bn_add(prv.d, prv.d, t);
 		}
 
 		if (bn_cmp_dig(r, 1) == CMP_EQ) {
-			bn_add_dig(prv->p, prv->p, 1);
-			bn_add_dig(prv->q, prv->q, 1);
+			bn_add_dig(prv.p, prv.p, 1);
+			bn_add_dig(prv.q, prv.q, 1);
 		}
 	}
 	CATCH_ANY {
@@ -273,7 +273,7 @@ int cp_rsa_gen_basic(rsa_pub_t *pub, rsa_prv_t *prv, int bits) {
 
 #if CP_RSA == QUICK || !defined(STRIP)
 
-int cp_rsa_gen_quick(rsa_pub_t *pub, rsa_prv_t *prv, int bits) {
+int cp_rsa_gen_quick(rsa_t pub, rsa_t prv, int bits) {
 	bn_t t, r;
 	int result = STS_OK;
 
@@ -286,47 +286,47 @@ int cp_rsa_gen_quick(rsa_pub_t *pub, rsa_prv_t *prv, int bits) {
 
 		/* Generate different primes p and q. */
 		do {
-			bn_gen_prime(prv->p, bits / 2);
-			bn_gen_prime(prv->q, bits / 2);
-		} while (bn_cmp(prv->p, prv->q) == CMP_EQ);
+			bn_gen_prime(prv.p, bits / 2);
+			bn_gen_prime(prv.q, bits / 2);
+		} while (bn_cmp(prv.p, prv.q) == CMP_EQ);
 
 		/* Swap p and q so that p is smaller. */
-		if (bn_cmp(prv->p, prv->q) == CMP_LT) {
-			bn_copy(t, prv->p);
-			bn_copy(prv->p, prv->q);
-			bn_copy(prv->q, t);
+		if (bn_cmp(prv.p, prv.q) == CMP_LT) {
+			bn_copy(t, prv.p);
+			bn_copy(prv.p, prv.q);
+			bn_copy(prv.q, t);
 		}
 
 		/* n = pq. */
-		bn_mul(pub->n, prv->p, prv->q);
-		bn_copy(prv->n, pub->n);
-		bn_sub_dig(prv->p, prv->p, 1);
-		bn_sub_dig(prv->q, prv->q, 1);
+		bn_mul(pub.n, prv.p, prv.q);
+		bn_copy(prv.n, pub.n);
+		bn_sub_dig(prv.p, prv.p, 1);
+		bn_sub_dig(prv.q, prv.q, 1);
 
 		/* phi(n) = (p - 1)(q - 1). */
-		bn_mul(t, prv->p, prv->q);
+		bn_mul(t, prv.p, prv.q);
 
-		bn_read_str(pub->e, RSA_EXP, strlen(RSA_EXP), 10);
+		bn_read_str(pub.e, RSA_EXP, strlen(RSA_EXP), 10);
 
 		/* d = e^(-1) mod phi(n). */
-		bn_gcd_ext(r, prv->d, NULL, pub->e, t);
-		if (bn_sign(prv->d) == BN_NEG) {
-			bn_add(prv->d, prv->d, t);
+		bn_gcd_ext(r, prv.d, NULL, pub.e, t);
+		if (bn_sign(prv.d) == BN_NEG) {
+			bn_add(prv.d, prv.d, t);
 		}
 
 		if (bn_cmp_dig(r, 1) == CMP_EQ) {
 			/* dP = d mod (p - 1). */
-			bn_mod_basic(prv->dp, prv->d, prv->p);
+			bn_mod(prv.dp, prv.d, prv.p);
 			/* dQ = d mod (q - 1). */
-			bn_mod_basic(prv->dq, prv->d, prv->q);
+			bn_mod(prv.dq, prv.d, prv.q);
 
-			bn_add_dig(prv->p, prv->p, 1);
-			bn_add_dig(prv->q, prv->q, 1);
+			bn_add_dig(prv.p, prv.p, 1);
+			bn_add_dig(prv.q, prv.q, 1);
 
 			/* qInv = q^(-1) mod p. */
-			bn_gcd_ext(r, prv->qi, NULL, prv->q, prv->p);
-			if (bn_sign(prv->qi) == BN_NEG) {
-				bn_add(prv->qi, prv->qi, prv->p);
+			bn_gcd_ext(r, prv.qi, NULL, prv.q, prv.p);
+			if (bn_sign(prv.qi) == BN_NEG) {
+				bn_add(prv.qi, prv.qi, prv.p);
 			}
 
 			result = STS_OK;
@@ -346,14 +346,14 @@ int cp_rsa_gen_quick(rsa_pub_t *pub, rsa_prv_t *prv, int bits) {
 #endif
 
 int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
-		rsa_pub_t *pub) {
+		rsa_t pub) {
 	bn_t m, eb;
 	int sign, size, pad_len, result = STS_OK;
 
 	bn_null(m);
 	bn_null(eb);
 
-	bn_size_bin(&size, pub->n);
+	bn_size_bin(&size, pub.n);
 
 	if (in_len > (size - RSA_PAD_LEN)) {
 		return STS_ERR;
@@ -376,13 +376,7 @@ int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
 			bn_read_bin(m, in, in_len, BN_POS);
 			bn_add(eb, eb, m);
 
-#if BN_MOD == MONTY
-			bn_mod_monty_conv(eb, eb, pub->n);
-			bn_mxp(eb, eb, pub->e, pub->n);
-			bn_mod_monty_back(eb, eb, pub->n);
-#else
-			bn_mxp(eb, eb, pub->e, pub->n);
-#endif
+			bn_mxp(eb, eb, pub.e, pub.n);
 
 			if (size <= *out_len) {
 				*out_len = size;
@@ -393,7 +387,7 @@ int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
 			}
 
 			if (sign == BN_NEG) {
-				return STS_ERR;
+				result = STS_ERR;
 			}
 		}
 	}
@@ -402,6 +396,7 @@ int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
 	}
 	FINALLY {
 		bn_free(m);
+		bn_free(eb);
 	}
 
 	return result;
@@ -410,11 +405,11 @@ int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
 #if CP_RSA == BASIC || !defined(STRIP)
 
 int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, rsa_prv_t *prv) {
+		int in_len, rsa_t prv) {
 	bn_t m, eb;
 	int sign, size, pad_len, result = STS_OK;
 
-	bn_size_bin(&size, prv->n);
+	bn_size_bin(&size, prv.n);
 
 	if (in_len < 0 || in_len != size || in_len < RSA_PAD_LEN) {
 		return STS_ERR;
@@ -428,13 +423,7 @@ int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
 		bn_new(eb);
 
 		bn_read_bin(eb, in, in_len, BN_POS);
-#if BN_MOD == MONTY
-		bn_mod_monty_conv(eb, eb, prv->n);
-		bn_mxp(eb, eb, prv->d, prv->n);
-		bn_mod_monty_back(eb, eb, prv->n);
-#else
-		bn_mxp(eb, eb, prv->d, prv->n);
-#endif
+		bn_mxp(eb, eb, prv.d, prv.n);
 
 #if CP_RSAPD == PKCS1
 		if (pad_pkcs1(eb, &pad_len, in_len, size, RSA_DEC) == STS_OK) {
@@ -456,7 +445,7 @@ int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
 			}
 
 			if (sign == BN_NEG) {
-				return STS_ERR;
+				result = STS_ERR;
 			}
 		}
 	}
@@ -476,14 +465,14 @@ int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
 #if CP_RSA == QUICK || !defined(STRIP)
 
 int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, rsa_prv_t *prv) {
+		int in_len, rsa_t prv) {
 	bn_t m, eb;
 	int sign, size, pad_len, result = STS_OK;
 
 	bn_null(m);
 	bn_null(eb);
 
-	bn_size_bin(&size, prv->n);
+	bn_size_bin(&size, prv.n);
 
 	if (in_len < 0 || in_len > size) {
 		return STS_ERR;
@@ -498,36 +487,24 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 		bn_copy(m, eb);
 
 		/* m1 = c^dP mod p. */
-#if BN_MOD == MONTY
-		bn_mod_monty_conv(eb, eb, prv->p);
-		bn_mxp(eb, eb, prv->dp, prv->p);
-		bn_mod_monty_back(eb, eb, prv->p);
-#else
-		bn_mxp(eb, eb, prv->dp, prv->p);
-#endif
+		bn_mxp(eb, eb, prv.dp, prv.p);
 
 		/* m2 = c^dQ mod q. */
-#if BN_MOD == MONTY
-		bn_mod_monty_conv(m, m, prv->q);
-		bn_mxp(m, m, prv->dq, prv->q);
-		bn_mod_monty_back(m, m, prv->q);
-#else
-		bn_mxp(m, m, prv->dq, prv->q);
-#endif
+		bn_mxp(m, m, prv.dq, prv.q);
 
 		/* m1 = m1 - m2 mod p. */
 		bn_sub(eb, eb, m);
 		while (bn_sign(eb) == BN_NEG) {
-			bn_add(eb, eb, prv->p);
+			bn_add(eb, eb, prv.p);
 		}
-		bn_mod_basic(eb, eb, prv->p);
+		bn_mod(eb, eb, prv.p);
 		/* m1 = qInv(m1 - m2) mod p. */
-		bn_mul(eb, eb, prv->qi);
-		bn_mod_basic(eb, eb, prv->p);
+		bn_mul(eb, eb, prv.qi);
+		bn_mod(eb, eb, prv.p);
 		/* m = m2 + m1 * q. */
-		bn_mul(eb, eb, prv->q);
+		bn_mul(eb, eb, prv.q);
 		bn_add(eb, eb, m);
-		bn_mod_basic(eb, eb, prv->n);
+		bn_mod(eb, eb, prv.n);
 
 #if CP_RSAPD == PKCS1
 		if (pad_pkcs1(eb, &pad_len, in_len, size, RSA_DEC) == STS_OK) {
@@ -549,7 +526,7 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 			}
 
 			if (sign == BN_NEG) {
-				return STS_ERR;
+				result = STS_ERR;
 			}
 		}
 	}
@@ -561,10 +538,6 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 		bn_free(eb);
 	}
 
-	if (sign == BN_NEG) {
-		return STS_ERR;
-	}
-
 	return result;
 }
 
@@ -573,14 +546,14 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 #if CP_RSA == BASIC || !defined(STRIP)
 
 int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
-		int msg_len, rsa_prv_t *prv) {
+		int msg_len, rsa_t prv) {
 	bn_t m, eb;
 	int sign, size, pad_len, result = STS_OK;
 	unsigned char hash[MD_LEN];
 
 	bn_null(m);
 	bn_null(eb);
-	bn_size_bin(&size, prv->n);
+	bn_size_bin(&size, prv.n);
 
 	if (MD_LEN > (size - RSA_PAD_LEN)) {
 		return STS_ERR;
@@ -605,15 +578,9 @@ int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
 			bn_read_bin(m, hash, MD_LEN, BN_POS);
 			bn_add(eb, eb, m);
 
-#if BN_MOD == MONTY
-			bn_mod_monty_conv(eb, eb, prv->n);
-			bn_mxp(eb, eb, prv->d, prv->n);
-			bn_mod_monty_back(eb, eb, prv->n);
-#else
-			bn_mxp(eb, eb, prv->d, prv->n);
-#endif
+			bn_mxp(eb, eb, prv.d, prv.n);
 
-			bn_size_bin(&size, prv->n);
+			bn_size_bin(&size, prv.n);
 
 			if (size <= *sig_len) {
 				*sig_len = size;
@@ -624,7 +591,7 @@ int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
 			}
 
 			if (sign == BN_NEG) {
-				return STS_ERR;
+				result = STS_ERR;
 			}
 		}
 	}
@@ -633,11 +600,9 @@ int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
 	}
 	FINALLY {
 		bn_free(m);
+		bn_free(eb);
 	}
 
-	if (sign == BN_NEG) {
-		return STS_ERR;
-	}
 	return result;
 }
 
@@ -646,16 +611,19 @@ int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
 #if CP_RSA == QUICK || !defined(STRIP)
 
 int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
-		int msg_len, rsa_prv_t *prv) {
-	bn_t m = NULL, eb = NULL;
+		int msg_len, rsa_t prv) {
+	bn_t m, eb;
 	int sign, pad_len, size, result = STS_OK;
 	unsigned char hash[MD_LEN];
 
-	bn_size_bin(&size, prv->n);
+	bn_size_bin(&size, prv.n);
 
 	if (MD_LEN > (size - RSA_PAD_LEN)) {
 		return STS_ERR;
 	}
+
+	bn_null(m);
+	bn_null(eb);
 
 	TRY {
 		bn_new(m);
@@ -679,38 +647,26 @@ int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
 			bn_copy(m, eb);
 
 			/* m1 = c^dP mod p. */
-#if BN_MOD == MONTY
-			bn_mod_monty_conv(eb, eb, prv->p);
-			bn_mxp(eb, eb, prv->dp, prv->p);
-			bn_mod_monty_back(eb, eb, prv->p);
-#else
-			bn_mxp(eb, eb, prv->dp, prv->p);
-#endif
+			bn_mxp(eb, eb, prv.dp, prv.p);
 
 			/* m2 = c^dQ mod q. */
-#if BN_MOD == MONTY
-			bn_mod_monty_conv(m, m, prv->q);
-			bn_mxp(m, m, prv->dq, prv->q);
-			bn_mod_monty_back(m, m, prv->q);
-#else
-			bn_mxp(m, m, prv->dq, prv->q);
-#endif
+			bn_mxp(m, m, prv.dq, prv.q);
 
 			/* m1 = m1 - m2 mod p. */
 			bn_sub(eb, eb, m);
 			while (bn_sign(eb) == BN_NEG) {
-				bn_add(eb, eb, prv->p);
+				bn_add(eb, eb, prv.p);
 			}
-			bn_mod_basic(eb, eb, prv->p);
+			bn_mod(eb, eb, prv.p);
 			/* m1 = qInv(m1 - m2) mod p. */
-			bn_mul(eb, eb, prv->qi);
-			bn_mod_basic(eb, eb, prv->p);
+			bn_mul(eb, eb, prv.qi);
+			bn_mod(eb, eb, prv.p);
 			/* m = m2 + m1 * q. */
-			bn_mul(eb, eb, prv->q);
+			bn_mul(eb, eb, prv.q);
 			bn_add(eb, eb, m);
-			bn_mod_basic(eb, eb, prv->n);
+			bn_mod(eb, eb, prv.n);
 
-			bn_size_bin(&size, prv->n);
+			bn_size_bin(&size, prv.n);
 
 			if (size <= *sig_len) {
 				*sig_len = size;
@@ -721,7 +677,7 @@ int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
 			}
 
 			if (sign == BN_NEG) {
-				return STS_ERR;
+				result = STS_ERR;
 			}
 		}
 	}
@@ -730,25 +686,26 @@ int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
 	}
 	FINALLY {
 		bn_free(m);
+		bn_free(eb);
 	}
 
-	if (sign == BN_NEG) {
-		return STS_ERR;
-	}
 	return result;
 }
 
 #endif
 
 int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg,
-		int msg_len, rsa_pub_t *pub) {
-	bn_t m = NULL, eb = NULL;
+		int msg_len, rsa_t pub) {
+	bn_t m, eb;
 	int sign, size, pad_len, result;
 	unsigned char hash1[MD_LEN], hash2[MD_LEN];
 
 	/* We suppose that the signature is invalid. */
 	result = 0;
-	bn_size_bin(&size, pub->n);
+	bn_size_bin(&size, pub.n);
+
+	bn_null(m);
+	bn_null(eb);
 
 	TRY {
 		bn_new(m);
@@ -756,13 +713,7 @@ int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg,
 
 		bn_read_bin(eb, sig, sig_len, BN_POS);
 
-#if BN_MOD == MONTY
-		bn_mod_monty_conv(eb, eb, pub->n);
-		bn_mxp(eb, eb, pub->e, pub->n);
-		bn_mod_monty_back(eb, eb, pub->n);
-#else
-		bn_mxp(eb, eb, pub->e, pub->n);
-#endif
+		bn_mxp(eb, eb, pub.e, pub.n);
 
 #if CP_RSAPD == PKCS1
 		if (pad_pkcs1(eb, &pad_len, MD_LEN, size, RSA_VER) == STS_OK) {
@@ -779,9 +730,6 @@ int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg,
 				if (memcmp(hash1, hash2, MD_LEN) == 0) {
 					/* Everything went ok, so signature status is changed. */
 					result = 1;
-				} else {
-					printf("%d %d\n", hash1[1], hash2[1]);
-					printf("aqui!\n");
 				}
 			}
 		}
