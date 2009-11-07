@@ -58,10 +58,15 @@ void fp_inv(fp_t c, fp_t a) {
 		p = fp_prime_get();
 		fp_zero(t);
 
+		/* u = a, v = p, x1 = 1, x2 = 0, k = 0. */
+		k = 0;
+		bn_set_dig(x1, 1);
+		bn_zero(x2);
+
 #if FP_RDC != MONTY
 		_a->used = FP_DIGS;
-		_p->used = FP_DIGS;
 		dv_copy(_a->dp, a, FP_DIGS);
+		_p->used = FP_DIGS;
 		dv_copy(_p->dp, p, FP_DIGS);
 		bn_mod_monty_conv(u, _a, _p);
 #else
@@ -71,34 +76,36 @@ void fp_inv(fp_t c, fp_t a) {
 		v->used = FP_DIGS;
 		dv_copy(v->dp, p, FP_DIGS);
 
-		k = 0;
-		bn_set_dig(x1, 1);
-		bn_zero(x2);
 		while (!bn_is_zero(v)) {
+			/* If v is even then v = v/2, x1 = 2 * x1. */
 			if (bn_is_even(v)) {
-				bn_rsh(v, v, 1);
-				bn_lsh(x1, x1, 1);
+				bn_hlv(v, v);
+				bn_dbl(x1, x1);
 			} else {
+				/* If u is even then u = u/2, x2 = 2 * x2. */
 				if (bn_is_even(u)) {
-					bn_rsh(u, u, 1);
-					bn_lsh(x2, x2, 1);
+					bn_hlv(u, u);
+					bn_dbl(x2, x2);
+					/* If v >= u,then v = (v - u)/2, x2 += x1, x1 = 2 * x1. */
 				} else {
 					if (bn_cmp(v, u) != CMP_LT) {
 						bn_sub(v, v, u);
-						bn_rsh(v, v, 1);
+						bn_hlv(v, v);
 						bn_add(x2, x2, x1);
-						bn_lsh(x1, x1, 1);
+						bn_dbl(x1, x1);
 					} else {
+						/* u = (u - v)/2, x1 += x2, x2 = 2 * x2. */
 						bn_sub(u, u, v);
-						bn_rsh(u, u, 1);
+						bn_hlv(u, u);
 						bn_add(x1, x1, x2);
-						bn_lsh(x2, x2, 1);
+						bn_dbl(x2, x2);
 					}
 				}
 			}
 			k++;
 		}
 
+		/* If x1 > p then x1 = x1 - p. */
 		for (i = x1->used; i < FP_DIGS; i++) {
 			x1->dp[i] = 0;
 		}
@@ -110,24 +117,27 @@ void fp_inv(fp_t c, fp_t a) {
 			bn_trim(x1);
 		}
 		if (fp_cmpn_low(x1->dp, fp_prime_get()) == CMP_GT) {
-			fp_sub(x1->dp, x1->dp, fp_prime_get());
+			fp_subn_low(x1->dp, x1->dp, fp_prime_get());
 		}
 
+		/* If k < Wt then x1 = x1 * R^2 * R^{-1} mod p. */
 		if (k < FP_DIGS * FP_DIGIT) {
 			flag = 1;
-			printf("dentro\n");
 			fp_mul(x1->dp, x1->dp, fp_prime_get_conv());
 			k = k + FP_DIGS * FP_DIGIT;
 		}
 
+		/* x1 = x1 * R^2 * R^{-1} mod p. */
 		fp_mul(x1->dp, x1->dp, fp_prime_get_conv());
 		fp_zero(t);
 		t[0] = 1;
 		fp_lsh(t, t, 2 * FP_DIGS * FP_DIGIT - k);
+		/* c = x1 * 2^{2Wt - k} * R^{-1} mod p. */
 		fp_mul(c, x1->dp, t);
 
 #if FP_RDC != MONTY
-		/* If we do not use Montgomery reduction, the result of inversion is
+		/*
+		 * If we do not use Montgomery reduction, the result of inversion is
 		 * a^{-1}R^3 mod p or a^{-1}R^4 mod p, depending on flag.
 		 * Hence we must reduce the result three or four times.
 		 */
@@ -136,6 +146,7 @@ void fp_inv(fp_t c, fp_t a) {
 		bn_mod_monty_back(_a, _a, _p);
 		bn_mod_monty_back(_a, _a, _p);
 		bn_mod_monty_back(_a, _a, _p);
+
 		if (flag) {
 			bn_mod_monty_back(_a, _a, _p);
 		}
