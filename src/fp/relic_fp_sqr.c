@@ -53,12 +53,17 @@
  */
 static void fp_sqr_karat_impl(dv_t c, fp_t a, int size, int level) {
 	int i, h, h1;
-	dv_t t = NULL, b1 = NULL, a0a0 = NULL, a1a1 = NULL;
+	dv_t t, b1, a0a0, a1a1;
 	dig_t carry;
 
 	/* Compute half the digits of a or b. */
 	h = size >> 1;
 	h1 = size - h;
+
+	dv_null(t);
+	dv_null(b1);
+	dv_null(a0a0);
+	dv_null(a1a1);
 
 	TRY {
 		/* Allocate the temp variables. */
@@ -153,7 +158,9 @@ static void fp_sqr_karat_impl(dv_t c, fp_t a, int size, int level) {
 
 void fp_sqr_basic(fp_t c, fp_t a) {
 	int i;
-	dv_t t = NULL;
+	dv_t t;
+
+	dv_null(t);
 
 	TRY {
 		dv_new(t);
@@ -178,7 +185,9 @@ void fp_sqr_basic(fp_t c, fp_t a) {
 #if FP_SQR == COMBA || !defined(STRIP)
 
 void fp_sqr_comba(fp_t c, fp_t a) {
-	dv_t t = NULL;
+	dv_t t;
+
+	dv_null(t);
 
 	TRY {
 		dv_new(t);
@@ -207,7 +216,9 @@ void fp_sqr_integ(fp_t c, fp_t a) {
 #if FP_KARAT > 0 || !defined(STRIP)
 
 void fp_sqr_karat(fp_t c, fp_t a) {
-	dv_t t = NULL;
+	dv_t t;
+
+	dv_null(t);
 
 	TRY {
 		dv_new(t);

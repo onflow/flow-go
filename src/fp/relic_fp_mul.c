@@ -52,12 +52,17 @@
  */
 static void fp_mul_karat_impl(dv_t c, fp_t a, fp_t b, int size, int level) {
 	int i, h, h1;
-	dv_t a1 = NULL, b1 = NULL, a0b0 = NULL, a1b1 = NULL;
+	dv_t a1, b1, a0b0, a1b1;
 	dig_t carry;
 
 	/* Compute half the digits of a or b. */
 	h = size >> 1;
 	h1 = size - h;
+
+	dv_null(a1);
+	dv_null(b1);
+	dv_null(a0b0);
+	dv_null(a1b1);
 
 	TRY {
 		/* Allocate the temp variables. */
@@ -157,7 +162,9 @@ static void fp_mul_karat_impl(dv_t c, fp_t a, fp_t b, int size, int level) {
 /*============================================================================*/
 
 void fp_mul_dig(fp_t c, fp_t a, dig_t b) {
-	dv_t t = NULL;
+	dv_t t;
+
+	dv_null(t);
 
 	TRY {
 		dv_new(t);
@@ -175,8 +182,10 @@ void fp_mul_dig(fp_t c, fp_t a, dig_t b) {
 
 void fp_mul_basic(fp_t c, fp_t a, fp_t b) {
 	int i;
-	dv_t t = NULL;
+	dv_t t;
 	dig_t carry;
+
+	dv_null(t);
 
 	TRY {
 		/* We need a temporary variable so that c can be a or b. */
@@ -202,7 +211,9 @@ void fp_mul_basic(fp_t c, fp_t a, fp_t b) {
 #if FP_MUL == COMBA || !defined(STRIP)
 
 void fp_mul_comba(fp_t c, fp_t a, fp_t b) {
-	dv_t t = NULL;
+	dv_t t;
+
+	dv_null(t);
 
 	TRY {
 		/* We need a temporary variable so that c can be a or b. */
@@ -234,7 +245,9 @@ void fp_mul_integ(fp_t c, fp_t a, fp_t b) {
 #if FP_KARAT > 0 || !defined(STRIP)
 
 void fp_mul_karat(fp_t c, fp_t a, fp_t b) {
-	dv_t t = NULL;
+	dv_t t;
+
+	dv_null(t);
 
 	TRY {
 		/* We need a temporary variable so that c can be a or b. */

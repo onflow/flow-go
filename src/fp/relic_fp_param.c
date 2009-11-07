@@ -168,7 +168,9 @@ void fp_param_set_any(void) {
 #elif FP_PRIME == 521
 	fp_param_set(NIST_521);
 #else
-	bn_t modulus = NULL;
+	bn_t modulus;
+
+	bn_null(modulus);
 
 	TRY {
 		bn_new(modulus);

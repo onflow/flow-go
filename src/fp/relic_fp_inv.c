@@ -41,10 +41,18 @@
 /*============================================================================*/
 
 void fp_inv(fp_t c, fp_t a) {
-	fp_t t = NULL;
-	bn_t _a = NULL, _p = NULL, u = NULL, v = NULL, x1 = NULL, x2 = NULL;
+	fp_t t;
+	bn_t _a, _p, u, v, x1, x2;
 	dig_t *p = NULL, carry;
 	int i, k, flag = 0;
+
+	fp_null(t);
+	bn_null(_a);
+	bn_null(_p);
+	bn_null(u);
+	bn_null(v);
+	bn_null(x1);
+	bn_null(x2);
 
 	TRY {
 		fp_new(t);

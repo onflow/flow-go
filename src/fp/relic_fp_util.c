@@ -153,7 +153,9 @@ void fp_rand(fp_t a) {
 
 void fp_print(fp_t a) {
 	int i;
-	bn_t t = NULL;
+	bn_t t;
+
+	bn_null(t);
 
 	TRY {
 		bn_new(t);
@@ -190,7 +192,9 @@ void fp_print(fp_t a) {
 }
 
 void fp_read(fp_t a, const char *str, int len, int radix) {
-	bn_t t = NULL;
+	bn_t t;
+
+	bn_null(t);
 
 	TRY {
 		bn_new(t);
@@ -214,7 +218,9 @@ void fp_read(fp_t a, const char *str, int len, int radix) {
 }
 
 void fp_write(char *str, int len, fp_t a, int radix) {
-	bn_t t = NULL;
+	bn_t t;
+
+	bn_null(t);
 
 	TRY {
 		bn_new(t);

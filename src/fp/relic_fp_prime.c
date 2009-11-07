@@ -187,7 +187,10 @@ void fp_prime_set_dense(bn_t p) {
 }
 
 void fp_prime_set_spars(int *f, int len) {
-	bn_t p = NULL, t = NULL;
+	bn_t p, t;
+
+	bn_null(p);
+	bn_null(t);
 
 	TRY {
 		bn_new(p);
@@ -234,8 +237,10 @@ void fp_prime_set_spars(int *f, int len) {
 }
 
 void fp_prime_conv(fp_t c, bn_t a) {
-	bn_t t = NULL;
+	bn_t t;
 	int i;
+
+	bn_null(t);
 
 	TRY {
 		bn_new(t);
@@ -270,8 +275,10 @@ void fp_prime_conv(fp_t c, bn_t a) {
 }
 
 void fp_prime_conv_dig(fp_t c, dig_t a) {
-	bn_t t = NULL;
+	bn_t t;
 	int i;
+
+	bn_null(t);
 
 	TRY {
 		bn_new(t);
@@ -308,8 +315,10 @@ void fp_prime_conv_dig(fp_t c, dig_t a) {
 }
 
 void fp_prime_back(bn_t c, fp_t a) {
-	bn_t t = NULL;
+	bn_t t;
 	int i;
+
+	bn_null(t);
 
 	TRY {
 		bn_new(t);

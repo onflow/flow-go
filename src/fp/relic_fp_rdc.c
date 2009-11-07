@@ -47,7 +47,12 @@
 #if FP_RDC == BASIC || !defined(STRIP)
 
 void fp_rdc_basic(fp_t c, dv_t a) {
-	dv_t t0 = NULL, t1 = NULL, t2 = NULL, t3 = NULL;;
+	dv_t t0, t1, t2, t3;
+
+	dv_null(t0);
+	dv_null(t1);
+	dv_null(t2);
+	dv_null(t3);
 
 	TRY {
 		dv_new(t0);
