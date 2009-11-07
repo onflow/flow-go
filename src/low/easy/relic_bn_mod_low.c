@@ -87,7 +87,9 @@ void bn_modn_low(dig_t *c, dig_t *a, int sa, dig_t *m, int sm, dig_t u) {
 		for (j = 0; j < i; j++, tmp++, tmpm--) {
 			COMBA_STEP(r2, r1, r0, *tmp, *tmpm);
 		}
-		COMBA_ADD(r2, r1, r0, *a);
+		if (i < sa) {
+			COMBA_ADD(r2, r1, r0, *a);
+		}
 		*tmpc = (dig_t)(r0 * u);
 		COMBA_STEP(r2, r1, r0, *tmpc, *m);
 		r0 = r1;
@@ -108,6 +110,7 @@ void bn_modn_low(dig_t *c, dig_t *a, int sa, dig_t *m, int sm, dig_t u) {
 		r1 = r2;
 		r2 = 0;
 	}
+
 	if (i < sa) {
 		COMBA_ADD(r2, r1, r0, *a);
 	}
