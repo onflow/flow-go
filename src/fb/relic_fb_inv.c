@@ -127,8 +127,13 @@ void fb_inv_basic(fb_t c, fb_t a) {
 
 void fb_inv_exgcd(fb_t c, fb_t a) {
 	int j, d, lu, lv, lt, l1, l2, bu, bv;
-	dv_t _u = NULL, _v = NULL, _g1 = NULL, _g2 = NULL;
+	dv_t _u, _v, _g1, _g2;
 	dig_t *t = NULL, *u = NULL, *v = NULL, *g1 = NULL, *g2 = NULL, carry;
+
+	dv_null(_u);
+	dv_null(_v);
+	dv_null(_g1);
+	dv_null(_g2);
 
 	TRY {
 		dv_new(_u);

@@ -53,7 +53,9 @@
  */
 static void fb_mul_basic_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 	int i;
-	dv_t s = NULL;
+	dv_t s;
+
+	dv_null(s);
 
 	TRY {
 		/* We need a temporary variable so that c can be a or b. */
@@ -118,7 +120,9 @@ static void fb_mul_lcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
  * @param size				- the number of digits to multiply.
  */
 static void fb_mul_rcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
-	dv_t _b = NULL;
+	dv_t _b;
+
+	dv_null(_b);
 
 	TRY {
 		dv_new(_b);
@@ -161,8 +165,12 @@ static void fb_mul_rcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
  */
 static void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
 	int i, h, h1;
-	dv_t a1 = NULL, b1 = NULL, ab = NULL;
+	dv_t a1, b1, ab;
 	dig_t *a0b0, *a1b1;
+
+	dv_null(a1);
+	dv_null(b1);
+	dv_null(ab);
 
 	/* Compute half the digits of a or b. */
 	h = size >> 1;
@@ -255,7 +263,10 @@ static void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
 
 void fb_mul_basic(fb_t c, fb_t a, fb_t b) {
 	int i;
-	dv_t s = NULL, t = NULL;
+	dv_t s, t;
+
+	dv_null(s);
+	dv_null(t);
 
 	TRY {
 		/* We need a temporary variable so that c can be a or b. */
@@ -302,8 +313,10 @@ void fb_mul_integ(fb_t c, fb_t a, fb_t b) {
 #if FB_MUL == LCOMB || !defined(STRIP)
 
 void fb_mul_lcomb(fb_t c, fb_t a, fb_t b) {
-	dv_t t = NULL;
+	dv_t t;
 	dig_t carry;
+
+	dv_null(t);
 
 	TRY {
 		dv_new(t);
@@ -337,8 +350,11 @@ void fb_mul_lcomb(fb_t c, fb_t a, fb_t b) {
 #if FB_MUL == RCOMB || !defined(STRIP)
 
 void fb_mul_rcomb(fb_t c, fb_t a, fb_t b) {
-	dv_t t = NULL, _b = NULL;
+	dv_t t, _b;
 	dig_t carry;
+
+	dv_null(t);
+	dv_null(_b);
 
 	TRY {
 		dv_new(t);
@@ -376,7 +392,9 @@ void fb_mul_rcomb(fb_t c, fb_t a, fb_t b) {
 #if FB_MUL == LODAH || !defined(STRIP)
 
 void fb_mul_lodah(fb_t c, fb_t a, fb_t b) {
-	dv_t t = NULL;
+	dv_t t;
+
+	dv_null(t);
 
 	TRY {
 		dv_new(t);
@@ -397,7 +415,9 @@ void fb_mul_lodah(fb_t c, fb_t a, fb_t b) {
 #if FB_KARAT > 0 || !defined(STRIP)
 
 void fb_mul_karat(fb_t c, fb_t a, fb_t b) {
-	dv_t t = NULL;
+	dv_t t;
+
+	dv_null(t);
 
 	TRY {
 		/* We need a temporary variable so that c can be a or b. */
@@ -418,7 +438,9 @@ void fb_mul_karat(fb_t c, fb_t a, fb_t b) {
 #endif
 
 void fb_mul_dig(fb_t c, fb_t a, dig_t b) {
-	dv_t t = NULL;
+	dv_t t;
+
+	dv_null(t);
 
 	TRY {
 		dv_new(t);

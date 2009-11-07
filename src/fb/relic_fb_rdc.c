@@ -51,7 +51,9 @@
 void fb_rdc_basic(fb_t c, dv_t a) {
 	int j, k;
 	dig_t *tmpa;
-	dv_t r = NULL;
+	dv_t r;
+
+	dv_null(r);
 
 	TRY {
 		dv_new(r);
