@@ -126,7 +126,46 @@ void bn_div_rem(bn_t c, bn_t d, bn_t a, bn_t b) {
 	bn_div_impl(c, d, a, b);
 }
 
-void bn_div_dig(bn_t c, dig_t *d, bn_t a, dig_t b) {
+void bn_div_dig(bn_t c, bn_t a, dig_t b) {
+	bn_t q;
+	dig_t r;
+
+	bn_null(q);
+
+	if (b == 0) {
+		THROW(ERR_INVALID);
+	}
+
+	if (b == 1 || bn_is_zero(a) == 1) {
+		if (c != NULL) {
+			bn_copy(c, a);
+		}
+		return;
+	}
+
+	TRY {
+		bn_new(q);
+		int size = a->used;
+		dig_t *ap = a->dp;
+
+		bn_div1_low(q->dp, &r, ap, size, b);
+
+		if (c != NULL) {
+			q->used = a->used;
+			q->sign = a->sign;
+			bn_trim(q);
+			bn_copy(c, q);
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(q);
+	}
+}
+
+void bn_div_rem_dig(bn_t c, dig_t *d, bn_t a, dig_t b) {
 	bn_t q;
 	dig_t r;
 
@@ -171,3 +210,4 @@ void bn_div_dig(bn_t c, dig_t *d, bn_t a, dig_t b) {
 		bn_free(q);
 	}
 }
+

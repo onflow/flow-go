@@ -53,31 +53,43 @@
 
 void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m) {
 	int i, l;
-	bn_t t, u;
+	bn_t t, u, r;
 
 	bn_null(t);
 	bn_null(u);
+	bn_null(r);
 
 	TRY {
 		bn_new(t);
 		bn_new(u);
+		bn_new(r);
+
+		bn_mod_setup(u, m);
 
 		l = bn_bits(b);
 
+#if BN_MOD == MONTY
+		bn_mod_monty_conv(t, a, m);
+#else
 		bn_copy(t, a);
-		bn_mod_setup(u, m);
+#endif
+
+		bn_copy(r, t);
 
 		for (i = l - 2; i >= 0; i--) {
-			bn_sqr(t, t);
-			bn_mod(t, t, m, u);
+			bn_sqr(r, r);
+			bn_mod(r, r, m, u);
 			if (bn_test_bit(b, i)) {
-				bn_mul(t, t, a);
-				bn_mod(t, t, m, u);
+				bn_mul(r, r, t);
+				bn_mod(r, r, m, u);
 			}
 		}
 
-		bn_copy(c, t);
-
+#if BN_MOD == MONTY
+		bn_mod_monty_back(c, r, m);
+#else
+		bn_copy(c, r);
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -85,6 +97,7 @@ void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m) {
 	FINALLY {
 		bn_free(t);
 		bn_free(u);
+		bn_free(r);
 	}
 }
 
@@ -93,12 +106,13 @@ void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m) {
 #if BN_MXP == SLIDE || !defined(STRIP)
 
 void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
-	bn_t tab[TABLE_SIZE], t, u;
+	bn_t tab[TABLE_SIZE], t, u, r;
 	dig_t buf;
 	int bitbuf, bitcpy, bitcnt, mode, digidx, i, j, w = 0;
 
 	bn_null(t);
 	bn_null(u);
+	bn_null(r);
 	for (i = 0; i < TABLE_SIZE; i++) {
 		bn_null(tab[i]);
 	}
@@ -128,17 +142,20 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 
 		bn_new(t);
 		bn_new(u);
+		bn_new(r);
 		bn_mod_setup(u, m);
 
 #if BN_MOD == MONTY
-		bn_set_2b(t, m->used * BN_DIGIT);
-		bn_mod_basic(t, t, m);
+		bn_set_dig(r, 1);
+		bn_mod_monty_conv(r, r, m);
+		bn_mod_monty_conv(t, a, m);
 #else /* BN_MOD == BARRT || BN_MOD == RADIX */
-		bn_set_dig(t, 1);
+		bn_set_dig(r, 1);
+		bn_copy(t, a);
 #endif
 
+		bn_copy(tab[0], t);
 		/* Compute the value at tab[0] by squaring a (w - 1) times. */
-		bn_copy(tab[0], a);
 		for (i = 0; i < (w - 1); i++) {
 			bn_sqr(tab[0], tab[0]);
 			bn_mod(tab[0], tab[0], m, u);
@@ -146,7 +163,7 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 
 		/* Create upper table. */
 		for (i = 1; i < (1 << (w - 1)); i++) {
-			bn_mul(tab[i], tab[i - 1], a);
+			bn_mul(tab[i], tab[i - 1], t);
 			bn_mod(tab[i], tab[i], m, u);
 		}
 
@@ -180,8 +197,8 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 
 			/* If the bit is zero and mode == 1 then we square. */
 			if (mode == 1 && j == 0) {
-				bn_sqr(t, t);
-				bn_mod(t, t, m, u);
+				bn_sqr(r, r);
+				bn_mod(r, r, m, u);
 				continue;
 			}
 
@@ -192,11 +209,11 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 			if (bitcpy == w) {
 				/* Window is filled so square as required and multiply. */
 				for (i = 0; i < w; i++) {
-					bn_sqr(t, t);
-					bn_mod(t, t, m, u);
+					bn_sqr(r, r);
+					bn_mod(r, r, m, u);
 				}
-				bn_mul(t, t, tab[bitbuf - (1 << (w - 1))]);
-				bn_mod(t, t, m, u);
+				bn_mul(r, r, tab[bitbuf - (1 << (w - 1))]);
+				bn_mod(r, r, m, u);
 				bitcpy = 0;
 				bitbuf = 0;
 				mode = 1;
@@ -207,20 +224,24 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 		if (mode == 2 && bitcpy > 0) {
 			/* Square then multiply if the bit is set. */
 			for (i = 0; i < bitcpy; i++) {
-				bn_sqr(t, t);
-				bn_mod(t, t, m, u);
+				bn_sqr(r, r);
+				bn_mod(r, r, m, u);
 
 				/* Get next bit of the window. */
 				bitbuf <<= 1;
 				if ((bitbuf & (1 << w)) != 0) {
-					bn_mul(t, t, a);
-					bn_mod(t, t, m, u);
+					bn_mul(r, r, t);
+					bn_mod(r, r, m, u);
 				}
 			}
 		}
 
-		bn_trim(t);
-		bn_copy(c, t);
+		bn_trim(r);
+#if BN_MOD == MONTY
+		bn_mod_monty_back(c, r, m);
+#else
+		bn_copy(c, r);
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -231,6 +252,7 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 		}
 		bn_free(u);
 		bn_free(t);
+		bn_free(r);
 	}
 }
 
@@ -255,12 +277,13 @@ void bn_mxp_const(bn_t c, bn_t a, bn_t b, bn_t m) {
 		bn_new(tab[1]);
 
 #if BN_MOD == MONTY
-		bn_set_2b(tab[0], m->used * BN_DIGIT);
-		bn_mod_basic(tab[0], tab[0], m);
+		bn_set_dig(tab[0], 1);
+		bn_mod_monty_conv(tab[0], tab[0], m);
+		bn_mod_monty_conv(tab[1], a, m);
 #else /* BN_MOD == BARRT || BN_MOD == RADIX */
 		bn_set_dig(tab[0], 1);
-#endif
 		bn_copy(tab[1], a);
+#endif
 
 		/* Set initial mode and bitcnt, */
 		bitcnt = 1;
@@ -289,7 +312,11 @@ void bn_mxp_const(bn_t c, bn_t a, bn_t b, bn_t m) {
 			bn_mod(tab[j], tab[j], m, u);
 		}
 
+#if BN_MOD == MONTY
+		bn_mod_monty_back(c, tab[0], m);
+#else
 		bn_copy(c, tab[0]);
+#endif
 
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);

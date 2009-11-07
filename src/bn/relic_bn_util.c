@@ -209,13 +209,14 @@ void bn_print(bn_t a) {
 	}
 	if (a->used == 0) {
 		util_print("0\n");
-		return;
+	} else {
+		util_print("%lX", (unsigned long int)a->dp[a->used - 1]);
+		for (i = a->used - 2; i >= 0; i--) {
+			util_print("%.*lX", (int)(2 * sizeof(dig_t)),
+					(unsigned long int)a->dp[i]);
+		}
+		util_print("\n");
 	}
-	for (i = a->used - 1; i >= 0; i--) {
-		util_print("%.*lX", (int)(2 * sizeof(dig_t)),
-				(unsigned long int)a->dp[i]);
-	}
-	util_print("\n");
 }
 
 void bn_size_str(int *size, bn_t a, int radix) {
@@ -255,7 +256,7 @@ void bn_size_str(int *size, bn_t a, int radix) {
 		t->sign = BN_POS;
 
 		while (!bn_is_zero(t)) {
-			bn_div_dig(t, NULL, t, (dig_t)radix);
+			bn_div_dig(t, t, (dig_t)radix);
 			digits++;
 		}
 		*size = digits + 1;
@@ -341,7 +342,7 @@ void bn_write_str(char *str, int len, bn_t a, int radix) {
 
 		digits = 0;
 		while (!bn_is_zero(t)) {
-			bn_div_dig(t, &d, t, (dig_t)radix);
+			bn_div_rem_dig(t, &d, t, (dig_t)radix);
 			str[j] = util_conv_char(d);
 			digits++;
 			j++;

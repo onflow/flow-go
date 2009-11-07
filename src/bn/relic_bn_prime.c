@@ -143,10 +143,10 @@ static void bn_exp(bn_t c, bn_t a, bn_t b, bn_t m) {
 
 		for (i = l - 2; i >= 0; i--) {
 			bn_sqr(t, t);
-			bn_mod_basic(t, t, m);
+			bn_mod(t, t, m);
 			if (bn_test_bit(b, i)) {
 				bn_mul(t, t, a);
-				bn_mod_basic(t, t, m);
+				bn_mod(t, t, m);
 			}
 		}
 
@@ -250,7 +250,7 @@ int bn_is_prime_rabin(bn_t a) {
 		for (i = 0; i < tests; i++) {
 			do {
 				bn_rand(t, BN_POS, bn_bits(a));
-				bn_mod_basic(t, t, a);
+				bn_mod(t, t, a);
 				bn_sub_dig(t, t, 1);
 			} while (bn_cmp_dig(t, 1) != CMP_GT);
 
@@ -270,7 +270,7 @@ int bn_is_prime_rabin(bn_t a) {
 				j = 1;
 				while ((j <= (s - 1)) && bn_cmp(y, n1) != CMP_EQ) {
 					bn_sqr(y, y);
-					bn_mod_basic(y, y, a);
+					bn_mod(y, y, a);
 
 					/* If y == 1 then composite. */
 					if (bn_cmp_dig(y, 1) == CMP_EQ) {
@@ -320,7 +320,7 @@ int bn_is_prime_solov(bn_t a) {
 			/* Generate t0, 2 <= t0, <= a - 2. */
 			do {
 				bn_rand(t0, BN_POS, bn_bits(a));
-				bn_mod_basic(t0, t0, a);
+				bn_mod(t0, t0, a);
 			} while (bn_cmp_dig(t0, 2) == CMP_LT);
 			/* t2 = a - 1. */
 			bn_copy(t2, a);
@@ -341,8 +341,8 @@ int bn_is_prime_solov(bn_t a) {
 				bn_add(t2, t2, a);
 			}
 			/* If t1 != t2 (mod a) return 0. */
-			bn_mod_basic(t1, t1, a);
-			bn_mod_basic(t2, t2, a);
+			bn_mod(t1, t1, a);
+			bn_mod(t2, t2, a);
 			if (bn_cmp(t1, t2) != CMP_EQ) {
 				result = 0;
 				break;

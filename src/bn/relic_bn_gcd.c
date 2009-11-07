@@ -64,7 +64,7 @@ void bn_gcd_basic(bn_t c, bn_t a, bn_t b) {
 		bn_abs(v, b);
 		while (!bn_is_zero(v)) {
 			bn_copy(c, v);
-			bn_mod_basic(v, u, v);
+			bn_mod(v, u, v);
 			bn_copy(u, c);
 		}
 	}
@@ -255,7 +255,7 @@ void bn_gcd_lehme(bn_t c, bn_t a, bn_t b) {
 				}
 			}
 			if (_b == 0) {
-				bn_mod_basic(t0, x, y);
+				bn_mod(t0, x, y);
 				bn_copy(x, y);
 				bn_copy(y, t0);
 			} else {
