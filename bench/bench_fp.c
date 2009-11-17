@@ -104,6 +104,18 @@ static void util(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fp_set_dig (1)") {
+		fp_rand(a);
+		BENCH_ADD(fp_set_dig(a, 1));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp_set_dig") {
+		fp_rand(a);
+		BENCH_ADD(fp_set_dig(a, a[0]));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fp_bits") {
 		fp_rand(a);
 		BENCH_ADD(fp_bits(a));
@@ -231,6 +243,13 @@ static void arith(void) {
 	}
 	BENCH_END;
 #endif
+
+	BENCH_BEGIN("fp_mul_dig") {
+		fp_rand(a);
+		fp_rand(b);
+		BENCH_ADD(fp_mul_dig(c, a, b[0]));
+	}
+	BENCH_END;
 
 	BENCH_BEGIN("fp_sqr") {
 		fp_rand(a);

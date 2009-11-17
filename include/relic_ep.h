@@ -455,7 +455,7 @@ void ep_param_set(int param);
 /**
  * Configures some set of curve parameters for the current security level.
  */
-void pb_param_set_any(void);
+void ep_param_set_any(void);
 
 /**
  * Configures some set of ordinary curve parameters for the current security
@@ -472,6 +472,11 @@ int ep_param_set_any_ordin(void);
  * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
  */
 int ep_param_set_any_pairf(void);
+
+/**
+ * Prints the current configured prime elliptic curve.
+ */
+void ep_param_print(void);
 
 /**
  * Initializes a previously allocated prime elliptic curve point.

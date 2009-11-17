@@ -569,7 +569,7 @@ int main(void) {
 #endif
 
 #if defined(EB_STAND) && defined(EB_KBLTZ)
-	r1 = eb_param_set_any_ordin();
+	r1 = eb_param_set_any_kbltz();
 	if (r1 == STS_OK) {
 		bench();	}
 #endif
