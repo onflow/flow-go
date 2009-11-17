@@ -46,6 +46,7 @@ void ep_set_infty(ep_t p) {
 	fp_zero(p->x);
 	fp_zero(p->y);
 	fp_zero(p->z);
+	p->norm = 1;
 }
 
 void ep_copy(ep_t r, ep_t p) {
@@ -93,5 +94,13 @@ void ep_rand(ep_t p) {
 void ep_print(ep_t p) {
 	fp_print(p->x);
 	fp_print(p->y);
-	fp_print(p->z);
+	if (!p->norm) {
+		for (int i = FP_DIGS - 1; i >= 0; i--) {
+			util_print("%.*lX ", (int)(2 * sizeof(dig_t)),
+					(unsigned long int)p->z[i]);
+		}
+		util_print("\n");
+	} else {
+		fp_print(p->z);
+	}
 }

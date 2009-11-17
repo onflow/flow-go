@@ -52,31 +52,34 @@ void ep_neg_basic(ep_t r, ep_t p) {
 		fp_copy(r->z, p->z);
 	}
 
-#if defined(EP_SUPER)
-	if (ep_curve_is_super()) {
-		switch (ep_curve_opt_c()) {
-			case EP_OPT_ZERO:
-				fb_copy(r->y, p->y);
-				break;
-			case EP_OPT_ONE:
-				fb_add_dig(r->y, p->y, (dig_t)1);
-				break;
-			case EP_OPT_DIGIT:
-				fb_add_dig(r->y, p->y, ep_curve_get_c()[0]);
-				break;
-			default:
-				fb_add(r->y, p->y, ep_curve_get_c());
-				break;
-		}
-
-		r->norm = 1;
-		return;
-	}
-#endif
-
 	fp_sub(r->y, fp_prime_get(), p->y);
 
 	r->norm = 1;
+}
+
+#endif
+
+#if EP_ADD == PROJC || !defined(STRIP)
+
+void ep_neg_projc(ep_t r, ep_t p) {
+	if (ep_is_infty(p)) {
+		ep_set_infty(r);
+		return;
+	}
+
+	if (p->norm) {
+		ep_neg_basic(r, p);
+		return;
+	}
+
+	if (r != p) {
+		fp_copy(r->x, p->x);
+		fp_copy(r->z, p->z);
+	}
+
+	fp_sub(r->y, fp_prime_get(), p->y);
+
+	r->norm = 0;
 }
 
 #endif

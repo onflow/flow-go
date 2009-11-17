@@ -71,6 +71,49 @@ static bn_st curve_r;
  */
 static int curve_is_super;
 
+/**
+ * Detects an optimization based on the curve coefficients.
+ *
+ * @param opt		- the resulting optimization.
+ * @param a			- the curve coefficient.
+ */
+static void detect_opt(int *opt, fp_t a) {
+	fp_t t;
+
+	fp_null(t);
+
+	TRY {
+		fp_new(t);
+		fp_prime_conv_dig(t, 3);
+		fp_neg(t, t);
+
+		if (fp_cmp(a, t) == CMP_EQ) {
+			*opt = OPT_MINUS3;
+		} else {
+			if (fp_is_zero(a)) {
+				*opt = OPT_ZERO;
+			} else {
+				fp_set_dig(a, 1);
+				if (fp_cmp(a, t) == CMP_EQ) {
+					*opt = OPT_ONE;
+				} else {
+					if (fp_bits(a) <= FP_DIGIT) {
+						*opt = OPT_DIGIT;
+					} else {
+						*opt = OPT_NONE;
+					}
+				}
+			}
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t);
+	}
+}
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -120,25 +163,21 @@ bn_t ep_curve_get_ord() {
 	return &curve_r;
 }
 
-void ep_curve_set_ordin(fp_t a, fp_t b) {
+#if defined(EP_ORDIN)
+
+void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
 	fp_copy(curve_a, a);
-
-	if (fp_is_zero(a)) {
-		curve_opt_a = OPT_ZERO;
-	} else {
-		if (fp_cmp_dig(a, 1) == CMP_EQ) {
-			curve_opt_a = OPT_ONE;
-		} else {
-			if (fp_bits(a) < FP_DIGIT) {
-				curve_opt_a = OPT_DIGIT;
-			} else {
-				curve_opt_a = OPT_NONE;
-			}
-		}
-	}
-
 	fp_copy(curve_b, b);
+
+	detect_opt(&curve_opt_a, curve_a);
+	//detect_opt(&curve_opt_b, curve_b);
+
+	ep_norm(g, g);
+	ep_copy(&curve_g, g);
+	bn_copy(&curve_r, r);
 }
+
+#endif
 
 void ep_curve_set_gen(ep_t g) {
 	ep_norm(g, g);

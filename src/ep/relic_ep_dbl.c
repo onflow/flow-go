@@ -41,7 +41,6 @@
 
 #if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
 
-#if defined(EP_ORDIN)
 /**
  * Doubles a point represented in affine coordinates on an ordinary prime
  * elliptic curve.
@@ -49,8 +48,12 @@
  * @param r					- the result.
  * @param p					- the point to double.
  */
-static void ep_dbl_basic_ordin(ep_t r, ep_t p) {
+static void ep_dbl_basic_impl(ep_t r, ep_t p) {
 	fp_t t0, t1, t2;
+
+	fp_null(t0);
+	fp_null(t1);
+	fp_null(t2);
 
 	TRY {
 		fp_new(t0);
@@ -111,82 +114,166 @@ static void ep_dbl_basic_ordin(ep_t r, ep_t p) {
 		fp_free(t2);
 	}
 }
-#endif /* EP_ORDIN */
 
-#if defined(EP_SUPER)
+#endif /* EP_ADD == BASIC */
+
+#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+
 /**
- * Doubles a point represented in affine coordinates on a supersingular prime
+ * Doubles a point represented in projective coordinates on an ordinary prime
  * elliptic curve.
  *
  * @param r					- the result.
  * @param p					- the point to double.
  */
-static void ep_dbl_basic_super(ep_t r, ep_t p) {
-	fp_t t0 = NULL, t1 = NULL, t2 = NULL;
+void ep_dbl_projc_impl(ep_t r, ep_t p) {
+	fp_t t0, t1, t2, t3, t4, t5;
+
+	fp_null(t1);
+	fp_null(t2);
+	fp_null(t3);
+	fp_null(t4);
+	fp_null(t5);
 
 	TRY {
+
 		fp_new(t0);
 		fp_new(t1);
 		fp_new(t2);
+		fp_new(t3);
+		fp_new(t4);
+		fp_new(t5);
 
-		/* t0 = x1^2. */
-		fp_sqr(t0, p->x);
+		if (!p->norm && ep_curve_opt_a() == OPT_MINUS3) {
+//			 delta = Z1^2
+//			      gamma = Y1^2
+//			      beta = X1*gamma
+//			      alpha = 3*(X1-delta)*(X1+delta)
+//			      X3 = alpha^2-8*beta
+//			      Z3 = (Y1+Z1)^2-gamma-delta
+//			      Y3 = alpha*(4*beta-X3)-8*gamma^2
 
-		/* t0 = (x1^2 + a)/c. */
-		switch (ep_curve_opt_a()) {
-			case OPT_ZERO:
-				break;
-			case OPT_ONE:
-				fp_add_dig(t0, t0, (dig_t)1);
-				break;
-			case OPT_DIGIT:
-				fp_add_dig(t0, t0, ep_curve_get_a()[0]);
-				break;
-			default:
-				fp_add(t0, t0, ep_curve_get_a());
-				break;
+			/* t0 = delta = z1^2. */
+			fp_sqr(t0, p->z);
+
+			/* t1 = gamma = y1^2. */
+			fp_sqr(t1, p->y);
+
+			/* t2 = beta = x1 * y1^2. */
+			fp_mul(t2, p->x, t1);
+
+			/* t3 = alpha = 3 * (x1 - z1^2) * (x1 + z1^2). */
+			fp_sub(t3, p->x, t0);
+			fp_add(t4, p->x, t0);
+			fp_mul(t4, t3, t4);
+			fp_dbl(t3, t4);
+			fp_add(t3, t3, t4);
+
+			/* x3 = alpha^2 - 8 * beta. */
+			fp_dbl(t2, t2);
+			fp_dbl(t2, t2);
+			fp_dbl(t5, t2);
+			fp_sqr(r->x, t3);
+			fp_sub(r->x, r->x, t5);
+
+			/* z3 = (y1 + z1)^2 - gamma - delta. */
+			fp_add(r->z, p->y, p->z);
+			fp_sqr(r->z, r->z);
+			fp_sub(r->z, r->z, t1);
+			fp_sub(r->z, r->z, t0);
+
+			/* y3 = alpha * (4 * beta - x3) - 8 * gamma^2. */
+			fp_sqr(t1, t1);
+			fp_dbl(t1, t1);
+			fp_dbl(t1, t1);
+			fp_dbl(t1, t1);
+			fp_sub(r->y, t2, r->x);
+			fp_mul(r->y, r->y, t3);
+			fp_sub(r->y, r->y, t1);
+		} else {
+			/* t0 = x1^2, t1 = y1^2, t2 = y1^4. */
+			fp_sqr(t0, p->x);
+			fp_sqr(t1, p->y);
+			fp_sqr(t2, t1);
+
+			if (!p->norm) {
+				/* t3 = z1^2. */
+				fp_sqr(t3, p->z);
+
+				if (ep_curve_get_a() == OPT_ZERO) {
+					/* z3 = 2 * y1 * z1. */
+					fp_mul(r->z, p->y, p->z);
+					fp_dbl(r->z, r->z);
+				} else {
+					/* z3 = (y1 + z1)^2 - y1^2 - z1^2. */
+					fp_add(r->z, p->y, p->z);
+					fp_sqr(r->z, r->z);
+					fp_sub(r->z, r->z, t1);
+					fp_sub(r->z, r->z, t3);
+				}
+			} else {
+				/* z3 = 2 * y1. */
+				fp_dbl(r->z, p->y);
+			}
+
+			/* t4 = S = 2*((x1 + y1^2)^2 - x1^2 - y1^4). */
+			fp_add(t4, p->x, t1);
+			fp_sqr(t4, t4);
+			fp_sub(t4, t4, t0);
+			fp_sub(t4, t4, t2);
+			fp_dbl(t4, t4);
+
+			/* t5 = M = 3 * x1^2 + a * z1^4. */
+			fp_dbl(t5, t0);
+			fp_add(t5, t5, t0);
+			if (!p->norm) {
+				fp_sqr(t3, t3);
+				switch (ep_curve_opt_a()) {
+					case OPT_ZERO:
+						break;
+					case OPT_ONE:
+						fp_add(t5, t5, ep_curve_get_a());
+						break;
+					case OPT_DIGIT:
+						fp_mul_dig(t1, t3, ep_curve_get_a()[0]);
+						fp_add(t5, t5, t1);
+						break;
+					default:
+						fp_mul(t1, ep_curve_get_a(), t3);
+						fp_add(t5, t5, t1);
+						break;
+				}
+			} else {
+				switch (ep_curve_opt_a()) {
+					case OPT_ZERO:
+						break;
+					case OPT_ONE:
+						fp_add_dig(t5, t5, (dig_t)1);
+						break;
+					case OPT_DIGIT:
+						fp_add_dig(t5, t5, ep_curve_get_a()[0]);
+						break;
+					default:
+						fp_add(t5, t5, ep_curve_get_a());
+						break;
+				}
+			}
+
+			/* x3 = T = M^2 - 2 * S. */
+			fp_sqr(r->x, t5);
+			fp_dbl(t1, t4);
+			fp_sub(r->x, r->x, t1);
+
+			/* y3 = M * (S - T) - 8 * y1^4. */
+			fp_dbl(t2, t2);
+			fp_dbl(t2, t2);
+			fp_dbl(t2, t2);
+			fp_sub(t4, t4, r->x);
+			fp_mul(t5, t5, t4);
+			fp_sub(r->y, t5, t2);
 		}
 
-		switch (ep_curve_opt_c()) {
-			case OPT_ZERO:
-			case OPT_ONE:
-				break;
-			case OPT_DIGIT:
-			default:
-				fp_inv(t2, ep_curve_get_c());
-				fp_mul(t0, t0, t2);
-				fp_add(t0, t0, ep_curve_get_a());
-				break;
-		}
-
-		/* t2 = ((x1^2 + a)/c)^2. */
-		fp_sqr(t2, t0);
-
-		/* y3 = ((x1^2 + a)/c) * (x1 + x3) + y1 + c. */
-		fp_add(t1, t2, p->x);
-		fp_mul(t1, t1, t0);
-		fp_add(r->y, t1, p->y);
-
-		switch (ep_curve_opt_c()) {
-			case OPT_ZERO:
-				break;
-			case OPT_ONE:
-				fp_add_dig(r->y, r->y, (dig_t)1);
-				break;
-			case OPT_DIGIT:
-				fp_add_dig(r->y, r->y, ep_curve_get_c()[0]);
-				break;
-			default:
-				fp_add(r->y, r->y, ep_curve_get_c());
-				break;
-		}
-
-		/* x3 = ((x1^2 + a)/c)^2. */
-		fp_copy(r->x, t2);
-		fp_copy(r->z, p->z);
-
-		r->norm = 1;
-
+		r->norm = 0;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -195,126 +282,11 @@ static void ep_dbl_basic_super(ep_t r, ep_t p) {
 		fp_free(t0);
 		fp_free(t1);
 		fp_free(t2);
+		fp_free(t3);
+		fp_free(t4);
+		fp_free(t5);
 	}
 }
-#endif /* EP_SUPER */
-
-#endif /* EP_ADD == BASIC */
-
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
-
-#if defined(EP_ORDIN) || defined(EP_KBLTZ)
-/**
- * Doubles a point represented in projective coordinates on an ordinary prime
- * elliptic curve.
- *
- * @param r					- the result.
- * @param p					- the point to double.
- */
-void ep_dbl_projc_ordin(ep_t r, ep_t p) {
-	fp_t t0 = NULL, t1 = NULL;
-
-	fp_new(t0);
-	fp_new(t1);
-
-	/* t0 = B = x1^2. */
-	fp_sqr(t0, p->x);
-	/* C = B + y1. */
-	fp_add(r->y, t0, p->y);
-
-	if (!p->norm) {
-		/* A = x1 * z1. */
-		fp_mul(t1, p->x, p->z);
-		/* z3 = A^2. */
-		fp_sqr(r->z, t1);
-	} else {
-		/* if z1 = 1, A = x1. */
-		fp_copy(t1, p->x);
-		/* if z1 = 1, z3 = x1^2. */
-		fp_copy(r->z, t0);
-	}
-
-	/* t1 = D = A * C. */
-	fp_mul(t1, t1, r->y);
-
-	/* C^2 + D. */
-	fp_sqr(r->y, r->y);
-	fp_add(r->x, t1, r->y);
-
-	/* C^2 + D + a2 * z3. */
-	switch (ep_curve_opt_a()) {
-		case OPT_ZERO:
-			break;
-		case OPT_ONE:
-			fp_add(r->x, r->z, r->x);
-			break;
-		case OPT_DIGIT:
-			fp_mul(r->y, r->z, ep_curve_get_a());
-			fp_add(r->x, r->y, r->x);
-			break;
-		default:
-			fp_mul(r->y, r->z, ep_curve_get_a());
-			fp_add(r->x, r->y, r->x);
-			break;
-	}
-
-	/* t1 = (D + z3). */
-	fp_add(t1, t1, r->z);
-	/* t0 = B^2. */
-	fp_sqr(t0, t0);
-	/* t0 = B^2 * z3. */
-	fp_mul(t0, t0, r->z);
-	/* y3 = (D + z3) * r3 + B^2 * z3. */
-	fp_mul(r->y, t1, r->x);
-	fp_add(r->y, r->y, t0);
-
-	r->norm = 0;
-
-	fp_free(t0);
-	fp_free(t1);
-}
-#endif /* EP_ORDIN || EP_KBLTZ */
-
-#if defined(EP_SUPER)
-/**
- * Doubles a point represented in projective coordinates on an supersingular
- * prime elliptic curve.
- *
- * @param r					- the result.
- * @param p					- the point to double.
- */
-void ep_dbl_projc_super(ep_t r, ep_t p) {
-	RLC_PROLOGUE;
-
-	/* x3 = x1^4 */
-	fp_sqr(r->x, p->x);
-	fp_sqr(r->x, r->x);
-	/* y3 = y1^4. */
-	fp_sqr(r->y, p->y);
-	fp_sqr(r->y, r->y);
-
-	if (!p->norm) {
-		/* z3 = z1^4. */
-		fp_sqr(r->z, p->z);
-		fp_sqr(r->z, p->z);
-		/* y3 = x1^4 + y1^4. */
-		fp_add(r->y, r->x, r->y);
-		/* x3 = x1^4 + z1^4. */
-		fp_add(r->x, r->x, r->z);
-	} else {
-		/* y3 = x1^4 + y1^4. */
-		fp_add(r->y, r->x, r->y);
-		/* x3 = x1^4 + 1. */
-		fp_add_dig(r->x, r->x, 1);
-		/* r is still in affine coordinates. */
-		fp_copy(r->z, p->z);
-	}
-
-	r->norm = p->norm;
-
-	RLC_EPILOGUE;
-}
-#endif /* EP_SUPER */
 
 #endif /* EP_ADD == PROJC */
 
@@ -329,16 +301,7 @@ void ep_dbl_basic(ep_t r, ep_t p) {
 		ep_set_infty(r);
 		return;
 	}
-#if defined(EP_SUPER)
-	if (ep_curve_is_super()) {
-		ep_dbl_basic_super(r, p);
-		return;
-	}
-#endif
-
-#if defined(EP_ORDIN)
-	ep_dbl_basic_ordin(r, p);
-#endif
+	ep_dbl_basic_impl(r, p);
 }
 
 #endif
@@ -355,16 +318,7 @@ void ep_dbl_projc(ep_t r, ep_t p) {
 		ep_set_infty(r);
 		return;
 	}
-#if defined(EP_SUPER)
-	if (ep_curve_is_super()) {
-		ep_dbl_projc_super(r, p);
-		return;
-	}
-#endif
-
-#if defined(EP_ORDIN)
-	ep_dbl_projc_ordin(r, p);
-#endif
+	ep_dbl_projc_impl(r, p);
 }
 
 #endif

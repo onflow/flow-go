@@ -49,20 +49,30 @@
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-void ep_norm_ordin(ep_t r, ep_t p) {
+void ep_norm_impl(ep_t r, ep_t p) {
 	if (!p->norm) {
-		fp_t t0;
+		fp_t t0, t1;
 
-		fp_new(t0);
+		fp_null(t0);
+		fp_null(t1);
 
-		fp_inv(t0, p->z);
-		fp_sqr(t0, t0);
-		fp_mul(r->x, p->x, t0);
-		fp_mul(t0, t0, p->z);
-		fp_mul(r->y, p->y, t0);
-		fp_set_bit(r->z, 0, 1);
+		TRY {
 
-		fp_free(t0);
+			fp_new(t0);
+			fp_new(t1);
+
+			fp_inv(t1, p->z);
+			fp_sqr(t0, t1);
+			fp_mul(r->x, p->x, t0);
+			fp_mul(t0, t0, t1);
+			fp_mul(r->y, p->y, t0);
+			fp_set_dig(r->z, 1);
+		} CATCH_ANY {
+			THROW(ERR_CAUGHT);
+		} FINALLY {
+			fp_free(t0);
+			fp_free(t1);
+		}
 	}
 
 	r->norm = 1;
@@ -85,13 +95,9 @@ void ep_norm(ep_t r, ep_t p) {
 	if (p->norm) {
 		/* If the point is represented in affine coordinates, we just copy it. */
 		ep_copy(r, p);
+		return;
 	}
-
 #if EP_ADD == PROJC || !defined(STRIP)
-
-#if defined(EP_ORDIN)
-	ep_norm_ordin(r, p);
-#endif /* EP_ORDIN */
-
+	ep_norm_impl(r, p);
 #endif /* EP_ADD == PROJC */
 }
