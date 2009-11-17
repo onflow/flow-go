@@ -773,9 +773,15 @@ static int simultaneous(void) {
 }
 
 int test(void) {
+	ep_param_print();
+
+	util_print_banner("Utilities:", 1);
+
 	if (util() != STS_OK) {
 		return STS_ERR;
 	}
+
+	util_print_banner("Arithmetic:", 1);
 
 	if (addition() != STS_OK) {
 		return STS_ERR;
