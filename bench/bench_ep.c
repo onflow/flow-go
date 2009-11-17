@@ -95,7 +95,7 @@ static void util(void) {
 
 static void arith(void) {
 	ep_t p, q, r, t[EP_TABLE_BASIC];
-	bn_t k = NULL, l = NULL, n = NULL;
+	bn_t k, l, n;
 
 	ep_null(p);
 	ep_null(q);

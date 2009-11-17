@@ -671,7 +671,7 @@ static int fixed(void) {
 static int simultaneous(void) {
 	int code = STS_ERR;
 	ep_t p, q, r, s;
-	bn_t n = NULL, k = NULL, l = NULL;
+	bn_t n, k, l;
 
 	ep_null(p);
 	ep_null(q);

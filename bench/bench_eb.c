@@ -94,13 +94,13 @@ static void util(void) {
 }
 
 static void arith(void) {
-	eb_t p, q, r, t[FB_BITS];
-	bn_t k = NULL, l = NULL, n = NULL;
+	eb_t p, q, r, t[EB_TABLE_BASIC];
+	bn_t k, l, n;
 
 	eb_null(p);
 	eb_null(q);
 	eb_null(r);
-	for (int i = 0; i < FB_BITS; i++) {
+	for (int i = 0; i < EB_TABLE_BASIC; i++) {
 		eb_null(t[i]);
 	}
 
@@ -355,7 +355,7 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-	for (int i = 0; i < FB_BITS; i++) {
+	for (int i = 0; i < EB_TABLE_BASIC; i++) {
 		eb_new(t[i]);
 	}
 
@@ -540,7 +540,7 @@ static void arith(void) {
 	bn_free(k);
 	bn_free(l);
 	bn_free(n);
-	for (int i = 0; i < FB_BITS; i++) {
+	for (int i = 0; i < EB_TABLE_BASIC; i++) {
 		eb_free(t[i]);
 	}
 }

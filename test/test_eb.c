@@ -519,7 +519,7 @@ static int multiplication(void) {
 static int fixed(void) {
 	int code = STS_ERR;
 	eb_t p, q, r;
-	eb_t t[FB_BITS];
+	eb_t t[EB_TABLE_BASIC];
 	bn_t n, k;
 
 	bn_null(n);
@@ -680,7 +680,7 @@ static int fixed(void) {
 static int simultaneous(void) {
 	int code = STS_ERR;
 	eb_t p, q, r, s;
-	bn_t n = NULL, k = NULL, l = NULL;
+	bn_t n, k, l;
 
 	eb_null(p);
 	eb_null(q);
