@@ -170,9 +170,9 @@ void fp_prime_set(bn_t p) {
 	}
 	bn_mod_monty_setup(&u, &prime);
 	bn_set_dig(&conv, 1);
+	bn_set_dig(&one, 1);
 	bn_lsh(&conv, &conv, 2 * prime.used * BN_DIGIT);
 	bn_mod(&conv, &conv, &prime);
-	bn_set_dig(&one, 1);
 	bn_lsh(&one, &one, prime.used * BN_DIGIT);
 	bn_mod(&one, &one, &prime);
 }
@@ -301,9 +301,6 @@ void fp_prime_conv_dig(fp_t c, dig_t a) {
 		fp_zero(c);
 		for (i = 0; i < t->used; i++) {
 			c[i] = t->dp[i];
-		}
-		for (; i < FP_DIGS; i++) {
-			c[i] = 0;
 		}
 	}
 	CATCH_ANY {

@@ -700,8 +700,6 @@ void eb_sub_projc(eb_t r, eb_t p, eb_t q) {
 
 		eb_neg_projc(t, q);
 		eb_add_projc(r, p, t);
-
-		r->norm = 0;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

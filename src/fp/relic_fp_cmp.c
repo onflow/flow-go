@@ -37,6 +37,25 @@
 /*============================================================================*/
 
 int fp_cmp_dig(fp_t a, dig_t b) {
+#if FP_RDC == MONTY
+	fp_t t;
+	int r;
+
+	fp_null(t);
+
+	TRY {
+		fp_new(t);
+
+		fp_prime_conv_dig(t, b);
+		r = fp_cmp(a, t);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp_free(t);
+	}
+
+	return r;
+#else
 	for (int i = 0; i < FP_DIGS; i++) {
 		if (a[i] > 0) {
 			return CMP_GT;
@@ -44,6 +63,7 @@ int fp_cmp_dig(fp_t a, dig_t b) {
 	}
 
 	return fp_cmp1_low(a[0], b);
+#endif
 }
 
 int fp_cmp(fp_t a, fp_t b) {
