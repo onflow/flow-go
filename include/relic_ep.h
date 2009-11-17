@@ -48,26 +48,28 @@
  * Binary elliptic curve identifiers.
  */
 enum {
+	/** SECG P-160 prime curve. */
+	SECG_P160 = 1,
 	/** NIST P-192 prime curve. */
-	NIST_P192 = 1,
+	NIST_P192 = 2,
 	/** NIST P-224 prime curve. */
-	NIST_P224 = 2,
+	NIST_P224 = 3,
 	/** NIST P-256 prime curve. */
-	NIST_P256 = 3,
+	NIST_P256 = 4,
 	/** NIST P-384 prime curve. */
-	NIST_P384 = 4,
+	NIST_P384 = 5,
 	/** NIST P-521 prime curve. */
-	NIST_P521 = 5,
+	NIST_P521 = 6,
 	/** Barreto-Naehrig curve with negative x (found by Nogami et al.). */
-	BNN_P256 = 6,
+	BNN_P256 = 7,
 	/** Barreto-Naehrig curve with positive x. */
-	BNP_P256 = 7,
+	BNP_P256 = 8,
 };
 
 /**
  * Size of a precomputation table using the binary method.
  */
-#define EP_TABLE_BASIC		(FP_BITS)
+#define EP_TABLE_BASIC		(FP_BITS + 1)
 
 /**
  * Size of a precomputation table using Yao's windowing method.

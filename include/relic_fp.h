@@ -68,20 +68,22 @@
  * Finite field identifiers.
  */
 enum {
+	/** SECG 160-bit fast reduction prime. */
+	SECG_160 = 1,
 	/** NIST 192-bit fast reduction prime. */
-	NIST_192 = 1,
+	NIST_192 = 2,
 	/** NIST 224-bit fast reduction polynomial. */
-	NIST_224 = 2,
+	NIST_224 = 3,
 	/** NIST 256-bit fast reduction polynomial. */
-	NIST_256 = 3,
+	NIST_256 = 4,
 	/** NIST 384-bit fast reduction polynomial. */
-	NIST_384 = 4,
+	NIST_384 = 5,
 	/** NIST 521-bit fast reduction polynomial. */
-	NIST_521 = 5,
+	NIST_521 = 6,
 	/** 256-bit prime provided in Nogami et al. for use with BN curves. */
-	BNN_256 = 6,
-	/** 256-bit prime provided in Nogami et al. for use with BN curves. */
-	BNP_256 = 7,
+	BNN_256 = 7,
+	/** 256-bit prime provided in Barreto et al. for use with BN curves. */
+	BNP_256 = 8,
 };
 
 /*============================================================================*/

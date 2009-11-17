@@ -552,12 +552,9 @@ static int fixed(void) {
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EB_TABLE; i++) {
-			eb_free(t[i]);
-		}
 
 #if EB_FIX == BASIC || !defined(STRIP)
-		for (int i = 0; i < EB_TABLE_BASIC; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_BASIC; i++) {
 			eb_new(t[i]);
 		}
 		TEST_BEGIN("binary fixed point multiplication is correct") {
@@ -569,13 +566,13 @@ static int fixed(void) {
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EB_TABLE_BASIC; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_BASIC; i++) {
 			eb_free(t[i]);
 		}
 #endif
 
 #if EB_FIX == YAOWI || !defined(STRIP)
-		for (int i = 0; i < EB_TABLE_YAOWI; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_YAOWI; i++) {
 			eb_new(t[i]);
 		}
 		TEST_BEGIN("yao windowing fixed point multiplication is correct") {
@@ -587,13 +584,13 @@ static int fixed(void) {
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EB_TABLE_YAOWI; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_YAOWI; i++) {
 			eb_free(t[i]);
 		}
 #endif
 
 #if EB_FIX == NAFWI || !defined(STRIP)
-		for (int i = 0; i < EB_TABLE_NAFWI; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_NAFWI; i++) {
 			eb_new(t[i]);
 		}
 		TEST_BEGIN("naf windowing fixed point multiplication is correct") {
@@ -605,13 +602,13 @@ static int fixed(void) {
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EB_TABLE_NAFWI; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_NAFWI; i++) {
 			eb_free(t[i]);
 		}
 #endif
 
 #if EB_FIX == COMBS || !defined(STRIP)
-		for (int i = 0; i < EB_TABLE_COMBS; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_COMBS; i++) {
 			eb_new(t[i]);
 		}
 		TEST_BEGIN("single-table comb fixed point multiplication is correct") {
@@ -623,13 +620,13 @@ static int fixed(void) {
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EB_TABLE_COMBS; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_COMBS; i++) {
 			eb_free(t[i]);
 		}
 #endif
 
 #if EB_FIX == COMBD || !defined(STRIP)
-		for (int i = 0; i < EB_TABLE_COMBD; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_COMBD; i++) {
 			eb_new(t[i]);
 		}
 		TEST_BEGIN("double-table comb fixed point multiplication is correct") {
@@ -641,13 +638,13 @@ static int fixed(void) {
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EB_TABLE_COMBD; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_COMBD; i++) {
 			eb_free(t[i]);
 		}
 #endif
 
 #if EB_FIX == WTNAF || !defined(STRIP)
-		for (int i = 0; i < EB_TABLE_WTNAF; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_WTNAF; i++) {
 			eb_new(t[i]);
 		}
 		TEST_BEGIN("w(t)naf fixed point multiplication is correct") {
@@ -659,10 +656,14 @@ static int fixed(void) {
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EB_TABLE_WTNAF; i++) {
+		for (int i = EB_TABLE; i < EB_TABLE_WTNAF; i++) {
 			eb_free(t[i]);
 		}
 #endif
+
+		for (int i = 0; i < EB_TABLE; i++) {
+			eb_free(t[i]);
+		}
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");

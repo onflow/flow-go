@@ -54,6 +54,12 @@ void fp_param_set(int param) {
 		bn_new(p);
 
 		switch (param) {
+			case SECG_160:
+				/* p = 2^160 - 2^31 + 1. */
+				f[0] = -1;
+				f[1] = -31;
+				fp_prime_set_spars(f, 2);
+				break;
 			case NIST_192:
 				/* p = 2^192 - 2^64 - 1. */
 				f[0] = -1;
@@ -153,7 +159,9 @@ void fp_param_set(int param) {
 }
 
 void fp_param_set_any(void) {
-#if FP_PRIME == 192
+#if FP_PRIME == 160
+	fp_param_set(SECG_160);
+#elif FP_PRIME == 192
 	fp_param_set(NIST_192);
 #elif FP_PRIME == 224
 	fp_param_set(NIST_224);

@@ -511,7 +511,7 @@ static int multiplication(void) {
 static int fixed(void) {
 	int code = STS_ERR;
 	ep_t p, q, r;
-	ep_t t[FB_BITS];
+	ep_t t[EP_TABLE_BASIC];
 	bn_t n, k;
 
 	bn_null(n);
