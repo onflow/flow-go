@@ -79,10 +79,20 @@ void conf_print(void) {
 	util_print("   Arithmetic method: %s\n\n", FP_METHD);
 #endif
 
+#ifdef WITH_EP
+	util_print("** Prime elliptic curve module options:\n");
+	util_print("   Arithmetic method: %s\n\n", EP_METHD);
+#endif
+
 #ifdef WITH_FB
 	util_print("** Binary field module options:\n");
 	util_print("   Polynomial size: %d bits, %d words\n", FB_BITS, FB_DIGS);
-	util_print("   Arithmetic method: %s\n", FB_METHD);
+	util_print("   Arithmetic method: %s\n\n", FB_METHD);
+#endif
+
+#ifdef WITH_EB
+	util_print("** Binary elliptic curve module options:\n");
+	util_print("   Arithmetic method: %s\n\n", EB_METHD);
 #endif
 
 #endif
