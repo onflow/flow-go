@@ -71,6 +71,20 @@ static bn_st curve_r;
  */
 static int curve_is_super;
 
+#ifdef EP_PRECO
+
+/**
+ * Precomputation table for generator multiplication.
+ */
+static ep_st table[EP_TABLE];
+
+/**
+ * Array of pointers to the precomputation table.
+ */
+static ep_st *pointer[EP_TABLE];
+
+#endif
+
 /**
  * Detects an optimization based on the curve coefficients.
  *
@@ -119,10 +133,20 @@ static void detect_opt(int *opt, fp_t a) {
 /*============================================================================*/
 
 void ep_curve_init(void) {
+#ifdef EP_PRECO
+	for (int i = 0; i < EP_TABLE; i++) {
+		pointer[i] = &(table[i]);
+	}
+#endif
 #if ALLOC == STATIC
 	fp_new(curve_g.x);
 	fp_new(curve_g.y);
 	fp_new(curve_g.z);
+	for (int i = 0; i < EP_TABLE; i++) {
+		fp_new(table[i].x);
+		fp_new(table[i].y);
+		fp_new(table[i].z);
+	}
 #endif
 	fp_zero(curve_g.x);
 	fp_zero(curve_g.y);
@@ -135,6 +159,11 @@ void ep_curve_clean(void) {
 	fp_free(curve_g.x);
 	fp_free(curve_g.y);
 	fp_free(curve_g.z);
+	for (int i = 0; i < EP_TABLE; i++) {
+		fp_free(table[i].x);
+		fp_free(table[i].y);
+		fp_free(table[i].z);
+	}
 #endif
 	bn_clean(&curve_r);
 }
@@ -163,6 +192,14 @@ bn_t ep_curve_get_ord() {
 	return &curve_r;
 }
 
+#if defined(EP_PRECO)
+
+ep_t *ep_curve_get_tab() {
+	return pointer;
+}
+
+#endif
+
 #if defined(EP_ORDIN)
 
 void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
@@ -170,20 +207,13 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
 	fp_copy(curve_b, b);
 
 	detect_opt(&curve_opt_a, curve_a);
-	//detect_opt(&curve_opt_b, curve_b);
 
 	ep_norm(g, g);
 	ep_copy(&curve_g, g);
 	bn_copy(&curve_r, r);
+#if defined(EP_PRECO)
+	ep_mul_pre(ep_curve_get_tab(), &curve_g);
+#endif
 }
 
 #endif
-
-void ep_curve_set_gen(ep_t g) {
-	ep_norm(g, g);
-	ep_copy(&curve_g, g);
-}
-
-void ep_curve_set_ord(bn_t r) {
-	bn_copy(&curve_r, r);
-}

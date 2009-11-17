@@ -51,7 +51,7 @@ dig_t bn_lshb_low(dig_t *c, dig_t *a, int size, int bits) {
 void bn_lshd_low(dig_t *c, dig_t *a, int size, int digits) {
 	dig_t *top, *bot;
 	int i;
-	
+
 	top = c + size + digits - 1;
 	bot = a + size - 1;
 

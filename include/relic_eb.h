@@ -218,7 +218,9 @@ typedef eb_st *eb_t;
 	}																		\
 
 #elif ALLOC == STACK
-#define eb_free(A)			A = NULL;
+#define eb_free(A)															\
+	A = NULL;																\
+
 #endif
 
 /**

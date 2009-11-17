@@ -10,13 +10,12 @@ message("      EB_PRECO=[off|on] Build precomputation table for generator.")
 message("      EB_DEPTH=w        Width w in [2,6] of precomputation table for fixed point methods.")
 message("      EB_WIDTH=w        Width w in [2,6] of window processing for unknown point methods.\n")
 
-message("   ** Available binary elliptic curve methods (default = PROJC;WTNAF;WTNAF;INTER):")
+message("   ** Available binary elliptic curve methods (default = PROJC;WTNAF;COMBS;INTER):")
 message("      EB_METHD=BASIC    Affine coordinates.")
 message("      EB_METHD=PROJC    Projective coordinates (López-Dahab for ordinary curves).\n")
 
 message("      EB_METHD=BASIC    Binary method.")
 message("      EB_METHD=CONST    Constant-time López-Dahab point multiplication.")
-message("      EB_METHD=SLIDE    Sliding window method.")
 message("      EB_METHD=WTNAF    Window (T)NAF method.\n")
 
 message("      EB_METHD=BASIC    Binary method for fixed point multiplication.")
@@ -31,7 +30,7 @@ message("      EB_METHD=TRICK    Shamir's trick for simultaneous multiplication.
 message("      EB_METHD=INTER    Interleaving of w-(T)NAFs.")
 message("      EB_METHD=JOINT    Joint sparse form.\n")
 
-message("      Note: these methods must be given in order. Ex: EB_METHD=\"BASIC;WTNAF;COMBS;TRICK\"\n")
+message("      Note: these methods must be given in order. Ex: EB_METHD=\"BASIC;WTNAF;COMBD;TRICK\"\n")
 
 if (NOT EB_DEPTH)
 	set(EB_DEPTH 4)

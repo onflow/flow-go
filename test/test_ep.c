@@ -38,16 +38,16 @@ void ep_new_impl(ep_t a) {
 	ep_new(a);
 }
 
-int memory(void) {
+static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
-	ep_t a = NULL;
+	ep_t a;
+
+	ep_null(a);
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
-			/* We need another function call for the stack case, so that
-			 * the frame for this function does not provoke an overflow. */
-			ep_new_impl(a);
+			ep_new(a);
 			ep_free(a);
 		} TEST_END;
 	} CATCH(e) {
@@ -58,6 +58,7 @@ int memory(void) {
 				break;
 		}
 	}
+	(void)a;
 	code = STS_OK;
   end:
 	return code;
@@ -66,6 +67,10 @@ int memory(void) {
 int util(void) {
 	int code = STS_ERR;
 	ep_t a, b, c;
+
+	ep_null(a);
+	ep_null(b);
+	ep_null(c);
 
 	TRY {
 		ep_new(a);
@@ -133,17 +138,26 @@ int addition(void) {
 
 	ep_t a, b, c, d, e;
 
+	ep_null(a);
+	ep_null(b);
+	ep_null(c);
+	ep_null(d);
+	ep_null(e);
+
 	TRY {
 		ep_new(a);
 		ep_new(b);
 		ep_new(c);
 		ep_new(d);
 		ep_new(e);
+
 		TEST_BEGIN("point addition is commutative") {
 			ep_rand(a);
 			ep_rand(b);
 			ep_add(d, a, b);
 			ep_add(e, b, a);
+			ep_norm(d, d);
+			ep_norm(e, e);
 			TEST_ASSERT(ep_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 
@@ -187,7 +201,6 @@ int addition(void) {
 		} TEST_END;
 #endif
 
-#if 0
 #if EP_ADD == PROJC || !defined(STRIP)
 		TEST_BEGIN("point addition in projective coordinates is correct") {
 			ep_rand(a);
@@ -234,7 +247,7 @@ int addition(void) {
 			TEST_ASSERT(ep_cmp(e, d) == CMP_EQ, end);
 		} TEST_END;
 #endif
-#endif
+
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -252,6 +265,11 @@ int addition(void) {
 int subtraction(void) {
 	int code = STS_ERR;
 	ep_t a, b, c, d;
+
+	ep_null(a);
+	ep_null(b);
+	ep_null(c);
+	ep_null(d);
 
 	TRY {
 		ep_new(a);
@@ -287,6 +305,64 @@ int subtraction(void) {
 			TEST_ASSERT(ep_is_infty(c), end);
 		}
 		TEST_END;
+
+#if EB_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("point subtraction in affine coordinates is correct") {
+			ep_rand(a);
+			ep_rand(b);
+			ep_sub(c, a, b);
+			ep_norm(c, c);
+			ep_sub_basic(d, a, b);
+			TEST_ASSERT(ep_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if EB_ADD == PROJC || !defined(STRIP)
+		TEST_BEGIN("point subtraction in projective coordinates is correct") {
+			ep_rand(a);
+			ep_rand(b);
+			ep_add_projc(a, a, b);
+			ep_rand(b);
+			ep_rand(c);
+			ep_add_projc(b, b, c);
+			/* a and b in projective coordinates. */
+			ep_sub_projc(c, a, b);
+			ep_norm(c, c);
+			ep_norm(a, a);
+			ep_norm(b, b);
+			ep_sub(d, a, b);
+			ep_norm(d, d);
+			TEST_ASSERT(ep_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("point subtraction in mixed coordinates (z2 = 1) is correct") {
+			ep_rand(a);
+			ep_rand(b);
+			ep_add_projc(a, a, b);
+			ep_rand(b);
+			/* a and b in projective coordinates. */
+			ep_sub_projc(c, a, b);
+			ep_norm(c, c);
+			/* a in affine coordinates. */
+			ep_norm(a, a);
+			ep_sub(d, a, b);
+			ep_norm(d, d);
+			TEST_ASSERT(ep_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("point subtraction in mixed coordinates (z1,z2 = 1) is correct") {
+			ep_rand(a);
+			ep_rand(b);
+			ep_norm(a, a);
+			ep_norm(b, b);
+			/* a and b in affine coordinates. */
+			ep_sub(c, a, b);
+			ep_norm(c, c);
+			ep_sub_projc(d, a, b);
+			ep_norm(d, d);
+			TEST_ASSERT(ep_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -303,6 +379,10 @@ int subtraction(void) {
 int doubling(void) {
 	int code = STS_ERR;
 	ep_t a, b, c;
+
+	ep_null(a);
+	ep_null(b);
+	ep_null(c);
 
 	TRY {
 		ep_new(a);
@@ -328,7 +408,6 @@ int doubling(void) {
 		} TEST_END;
 #endif
 
-#if 0
 #if EP_ADD == PROJC || !defined(STRIP)
 		TEST_BEGIN("point doubling in projective coordinates is correct") {
 			ep_rand(a);
@@ -351,7 +430,6 @@ int doubling(void) {
 			TEST_ASSERT(ep_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 #endif
-#endif
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -364,14 +442,16 @@ int doubling(void) {
 	return code;
 }
 
-int multiplication(void) {
+static int multiplication(void) {
 	int code = STS_ERR;
+	ep_t p, q, r;
+	bn_t n, k;
 
-	ep_t p;
-	ep_t q;
-	ep_t r;
-	bn_t n;
-	bn_t k;
+	bn_null(n);
+	bn_null(k);
+	ep_null(p);
+	ep_null(q);
+	ep_null(r);
 
 	TRY {
 		ep_new(q);
@@ -386,6 +466,14 @@ int multiplication(void) {
 			TEST_ASSERT(ep_is_infty(r) == 1, end);
 		} TEST_END;
 
+		TEST_BEGIN("generator multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(q, p, k);
+			ep_mul_gen(r, k);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+
 #if EP_MUL == BASIC || !defined(STRIP)
 		TEST_BEGIN("binary point multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
@@ -395,6 +483,282 @@ int multiplication(void) {
 			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
 #endif
+
+#if EP_MUL == WTNAF || !defined(STRIP)
+		TEST_BEGIN("w(t)naf point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(q, p, k);
+			ep_mul_wtnaf(r, p, k);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	ep_free(q);
+	ep_free(r);
+	bn_free(k);
+	return code;
+}
+
+static int fixed(void) {
+	int code = STS_ERR;
+	ep_t p, q, r;
+	ep_t t[FB_BITS];
+	bn_t n, k;
+
+	bn_null(n);
+	bn_null(k);
+	ep_null(p);
+	ep_null(q);
+	ep_null(r);
+
+	for (int i = 0; i < EP_TABLE; i++) {
+		ep_null(t[i]);
+	}
+
+	TRY {
+		ep_new(q);
+		ep_new(r);
+		bn_new(k);
+
+		p = ep_curve_get_gen();
+		n = ep_curve_get_ord();
+
+		for (int i = 0; i < EP_TABLE; i++) {
+			ep_new(t[i]);
+		}
+		TEST_BEGIN("fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(q, p, k);
+			ep_mul_pre(t, p);
+			ep_mul_fix(q, t, k);
+			ep_mul(r, p, k);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE; i++) {
+			ep_free(t[i]);
+		}
+
+#if EP_FIX == BASIC || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_BASIC; i++) {
+			ep_new(t[i]);
+		}
+		TEST_BEGIN("binary fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(q, p, k);
+			ep_mul_pre_basic(t, p);
+			ep_mul_fix_basic(q, t, k);
+			ep_mul(r, p, k);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_BASIC; i++) {
+			ep_free(t[i]);
+		}
+#endif
+
+#if EP_FIX == YAOWI || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_YAOWI; i++) {
+			ep_new(t[i]);
+		}
+		TEST_BEGIN("yao windowing fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(q, p, k);
+			ep_mul_pre_yaowi(t, p);
+			ep_mul_fix_yaowi(q, t, k);
+			ep_mul(r, p, k);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_YAOWI; i++) {
+			ep_free(t[i]);
+		}
+#endif
+
+#if EP_FIX == NAFWI || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_NAFWI; i++) {
+			ep_new(t[i]);
+		}
+		TEST_BEGIN("naf windowing fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(q, p, k);
+			ep_mul_pre_nafwi(t, p);
+			ep_mul_fix_nafwi(q, t, k);
+			ep_mul(r, p, k);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_NAFWI; i++) {
+			ep_free(t[i]);
+		}
+#endif
+
+#if EP_FIX == COMBS || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_COMBS; i++) {
+			ep_new(t[i]);
+		}
+		TEST_BEGIN("single-table comb fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(q, p, k);
+			ep_mul_pre_combs(t, p);
+			ep_mul_fix_combs(q, t, k);
+			ep_mul(r, p, k);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_COMBS; i++) {
+			ep_free(t[i]);
+		}
+#endif
+
+#if EP_FIX == COMBD || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_COMBD; i++) {
+			ep_new(t[i]);
+		}
+		TEST_BEGIN("double-table comb fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(q, p, k);
+			ep_mul_pre_combd(t, p);
+			ep_mul_fix_combd(q, t, k);
+			ep_mul(r, p, k);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_COMBD; i++) {
+			ep_free(t[i]);
+		}
+#endif
+
+#if EP_FIX == WTNAF || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+			ep_new(t[i]);
+		}
+		TEST_BEGIN("w(t)naf fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(q, p, k);
+			ep_mul_pre_wtnaf(t, p);
+			ep_mul_fix_wtnaf(q, t, k);
+			ep_mul(r, p, k);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+			ep_free(t[i]);
+		}
+#endif
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	ep_free(q);
+	ep_free(r);
+	bn_free(k);
+	return code;
+}
+
+static int simultaneous(void) {
+	int code = STS_ERR;
+	ep_t p, q, r, s;
+	bn_t n = NULL, k = NULL, l = NULL;
+
+	ep_null(p);
+	ep_null(q);
+	ep_null(r);
+	ep_null(s);
+
+	TRY {
+
+		ep_new(q);
+		ep_new(r);
+		ep_new(s);
+		bn_new(k);
+		bn_new(l);
+
+		p = ep_curve_get_gen();
+		n = ep_curve_get_ord();
+
+		TEST_BEGIN("simultaneous point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep_mul(q, p, k);
+			ep_mul(s, q, l);
+			ep_mul_sim(r, p, k, q, l);
+			ep_add(q, q, s);
+			ep_norm(q, q);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+
+#if EP_SIM == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic simultaneous point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep_mul_sim(r, p, k, q, l);
+			ep_mul_sim_basic(q, p, k, q, l);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if EP_SIM == TRICK || !defined(STRIP)
+		TEST_BEGIN("shamir's trick for simultaneous multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep_mul_sim(r, p, k, q, l);
+			ep_mul_sim_trick(q, p, k, q, l);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if EP_SIM == INTER || !defined(STRIP)
+		TEST_BEGIN("interleaving for simultaneous multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep_mul_sim(r, p, k, q, l);
+			ep_mul_sim_inter(q, p, k, q, l);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if EP_SIM == JOINT || !defined(STRIP)
+		TEST_BEGIN("jsf for simultaneous multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep_mul_sim(r, p, k, q, l);
+			ep_mul_sim_joint(q, p, k, q, l);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+		TEST_BEGIN("simultaneous multiplication with generator is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep_mul_sim_gen(r, k, q, l);
+			ep_mul_sim(q, ep_curve_get_gen(), k, q, l);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -410,27 +774,30 @@ int multiplication(void) {
 
 int test(void) {
 	if (util() != STS_OK) {
-		core_clean();
 		return STS_ERR;
 	}
 
 	if (addition() != STS_OK) {
-		core_clean();
 		return STS_ERR;
 	}
 
 	if (subtraction() != STS_OK) {
-		core_clean();
 		return STS_ERR;
 	}
 
 	if (doubling() != STS_OK) {
-		core_clean();
 		return STS_ERR;
 	}
 
 	if (multiplication() != STS_OK) {
-		core_clean();
+		return STS_ERR;
+	}
+
+	if (fixed() != STS_OK) {
+		return STS_ERR;
+	}
+
+	if (simultaneous() != STS_OK) {
 		return STS_ERR;
 	}
 
@@ -438,19 +805,20 @@ int test(void) {
 }
 
 int main(void) {
+	int r0;
 	core_init();
 
 	if (memory() != STS_OK) {
 		core_clean();
 		return 1;
 	}
-#if defined(EP_STAND) && defined(EP_ORDIN) && FP_PRIME == 256
-	ep_param_set(RATE_P256);
-	util_print("Curve RATE-P256:\n");
-
-	if (test() != STS_OK) {
-		core_clean();
-		return 1;
+#if defined(EB_STAND) && defined(EP_ORDIN)
+	r0 = ep_param_set_any_ordin();
+	if (r0 == STS_OK) {
+		if (test() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 	}
 #endif
 

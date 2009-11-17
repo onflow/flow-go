@@ -89,7 +89,9 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 	/* q = floor(a/b^k) */
 	dv_zero(q, 2 * FP_DIGS);
 	bn_rshd_low(q, a, 2 * FP_DIGS, d0);
-	bn_rshb_low(q, q, 2 * FP_DIGS, b0);
+	if (b0 > 0) {
+		bn_rshb_low(q, q, 2 * FP_DIGS, b0);
+	}
 
 	/* r = a - qb^k. */
 	dv_copy(r, a, first);
@@ -105,7 +107,9 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 			SPLIT(b1, d1, j, FP_DIG_LOG);
 			dv_zero(t, 2 * FP_DIGS);
 			bn_lshd_low(t, q, FP_DIGS, d1);
-			bn_lshb_low(t, t, 2 * FP_DIGS, b1);
+			if (b1 > 0) {
+				bn_lshb_low(t, t, 2 * FP_DIGS, b1);
+			}
 			if (sform[i] > 0) {
 				bn_subn_low(_q, _q, t, 2 * FP_DIGS);
 			} else {
@@ -118,13 +122,18 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 			bn_addn_low(_q, _q, q, 2 * FP_DIGS);
 		}
 		bn_rshd_low(q, _q, 2 * FP_DIGS, d0);
-		bn_rshb_low(q, q, 2 * FP_DIGS, b0);
+		if (b0 > 0) {
+			bn_rshb_low(q, q, 2 * FP_DIGS, b0);
+		}
 
 		dv_copy(_r, _q, first);
 		if (b0 > 0) {
 			_r[first - 1] &= MASK(b0);
 		}
-		fp_addn_low(r, r, _r);
+		carry = fp_addn_low(r, r, _r);
+		if (carry) {
+			fp_subn_low(r, r, m);
+		}
 	}
 	while (fp_cmpn_low(r, m) != CMP_LT) {
 		fp_subn_low(r, r, m);

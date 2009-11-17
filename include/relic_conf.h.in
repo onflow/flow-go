@@ -295,6 +295,12 @@
 #cmakedefine EP_STAND
 /** Use mixed coordinates. */
 #cmakedefine EP_MIXED
+/** Build precomputation table for generator. */
+#cmakedefine EP_PRECO
+/** Width of precomputation table for fixed point methods. */
+#define EP_DEPTH @EP_DEPTH@
+/** Width of window processing for unknown point methods. */
+#define EP_WIDTH @EP_WIDTH@
 
 /** Prime elliptic curve arithmetic method. */
 #define EP_METHD "@EP_METHD@"
@@ -306,16 +312,49 @@
 /** Chosen binary elliptic curve coordinate method. */
 #define EP_ADD	 @EP_ADD@
 
+/** Affine coordinates. */
+#define BASIC	 1
+/** López-Dahab Projective coordinates. */
+#define PROJC	 2
+/** Chosen binary elliptic curve coordinate method. */
+#define EB_ADD	 @EB_ADD@
+
 /** Binary point multiplication. */ 
 #define BASIC	 1
 /** Constant-time point multiplication. */
 #define CONST	 2
+/** Sliding window. */ 
+#define SLIDE    3
 /** 4-width (T)NAF. */ 
-#define WNAF4	 3
-/** 5-width (T)NAF. */
-#define WNAF5	 4
-/** Chosen binary elliptic curve point multiplication method. */
+#define WTNAF	 4
+/** Chosen prime elliptic curve point multiplication method. */
 #define EP_MUL	 @EP_MUL@
+
+/** Binary point multiplication. */ 
+#define BASIC	 1
+/** Yao's windowing method. */
+#define YAOWI	 2
+/** NAF windowing method. */ 
+#define NAFWI	 3
+/** w-(T)NAF method. */
+#define WTNAF    4
+/** Single-table comb method. */
+#define COMBS	 5
+/** Double-table comb method. */
+#define COMBD    6
+/** Chosen prime elliptic curve point multiplication method. */
+#define EP_FIX	 @EP_FIX@
+
+/** Basic simultaneouns point multiplication. */
+#define BASIC    1
+/** Shamir's trick. */
+#define TRICK    2
+/** Interleaving of w-(T)NAFs. */
+#define INTER    3
+/** Joint sparse form. */
+#define JOINT    4
+/** Chosen prime elliptic curve simulteanous point multiplication method. */
+#define EP_SIM   @EP_SIM@ 
 
 /** Support for ordinary curves. */
 #cmakedefine EB_ORDIN

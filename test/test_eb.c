@@ -151,6 +151,8 @@ static int addition(void) {
 			eb_rand(b);
 			eb_add(d, a, b);
 			eb_add(e, b, a);
+			eb_norm(d, d);
+			eb_norm(e, e);
 			TEST_ASSERT(eb_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 

@@ -31,7 +31,7 @@ if (NOT FP_KARAT)
 endif(NOT FP_KARAT)
 set(FP_KARAT ${FP_KARAT} CACHE INTEGER "Number of Karatsuba levels.")
 
-option(FP_SFORM "Prefer special form primes over random primes." on)
+option(FP_PMERS "Prefer special form primes over random primes." on)
 
 # Choose the arithmetic methods.
 if (NOT FP_METHD)
