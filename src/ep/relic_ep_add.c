@@ -50,7 +50,7 @@
  * @param q					- the second point to add.
  */
 static void ep_add_basic_impl(ep_t r, ep_t p, ep_t q) {
-	fp_t t0 = NULL, t1 = NULL, t2 = NULL;
+	fp_t t0, t1, t2;
 
 	fp_null(t0);
 	fp_null(t1);

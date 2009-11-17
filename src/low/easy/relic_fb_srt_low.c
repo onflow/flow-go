@@ -48,9 +48,10 @@ static const dig_t table_odds[16] = {
 
 static void fb_srtt_low(dig_t *c, dig_t *a, int fa) {
 	int i, j, n, h, sh, rh, lh, sa, la, ra;
-	dv_t t = NULL;
+	dv_t t;
 	dig_t d, d_e, d_o;
 
+	dv_null(t);
 	dv_new(t);
 	dv_zero(t, 2 * FB_DIGS);
 
@@ -107,9 +108,10 @@ static void fb_srtt_low(dig_t *c, dig_t *a, int fa) {
 
 static void fb_srtp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 	int i, j, n, h, sh, rh, lh, sa, la, ra, sb, lb, rb, sc, lc, rc;
-	dv_t t = NULL;
+	dv_t t;
 	dig_t d, d_e, d_o;
 
+	dv_null(t);
 	dv_new(t);
 	dv_zero(t, 2 * FB_DIGS);
 

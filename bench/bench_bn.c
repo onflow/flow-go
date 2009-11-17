@@ -840,7 +840,10 @@ static void arith(void) {
 
 #if defined(WITH_EB) && defined(EB_STAND) && defined(EB_KBLTZ)
 	if (eb_param_set_any_kbltz() == STS_OK) {
-		bn_t vm = NULL, s0 = NULL, s1 = NULL;
+		bn_t vm, s0, s1;
+		bn_null(vm);
+		bn_null(s0);
+		bn_null(s1);
 		vm = eb_curve_get_vm();
 		s0 = eb_curve_get_s0();
 		s1 = eb_curve_get_s1();

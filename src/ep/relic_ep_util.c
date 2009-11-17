@@ -73,7 +73,10 @@ int ep_cmp(ep_t p, ep_t q) {
 }
 
 void ep_rand(ep_t p) {
-	bn_t n = NULL, k = NULL;
+	bn_t n, k;
+
+	bn_null(k);
+	bn_null(n);
 
 	TRY {
 		bn_new(k);

@@ -41,8 +41,10 @@
 
 static void fb_slvt_low(dig_t *c, dig_t *a, int fa) {
 	int i, from, d, b;
-	fb_t s = NULL, t = NULL;
+	fb_t s, t;
 
+	fb_null(s);
+	fb_null(t);
 	fb_new(s);
 	fb_new(t);
 
@@ -85,8 +87,10 @@ static void fb_slvt_low(dig_t *c, dig_t *a, int fa) {
 
 static void fb_slvp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 	int i, from, d, b;
-	fb_t s = NULL, t = NULL;
+	fb_t s, t;
 
+	fb_null(s);
+	fb_null(t);
 	fb_new(s);
 	fb_new(t);
 

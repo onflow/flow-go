@@ -193,8 +193,13 @@ static void rabin(void) {
 
 static void ecdsa(void) {
 	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
-	bn_t r = NULL, s = NULL, d = NULL;
-	eb_t p = NULL;
+	bn_t r, s, d;
+	eb_t p;
+
+	bn_null(r);
+	bn_null(s);
+	bn_null(d);
+	eb_null(p);
 
 	bn_new(r);
 	bn_new(s);
