@@ -287,15 +287,16 @@ void ep_param_set(int param) {
 
 #endif /* EP_STAND */
 
-void ep_param_set_any() {
+int ep_param_set_any() {
 	int r0, r1;
 
 	r0 = ep_param_set_any_ordin();
 	r1 = ep_param_set_any_pairf();
 
 	if (r0 == STS_ERR && r1 == STS_ERR) {
-		THROW(ERR_NO_CURVE);
+		return STS_ERR;
 	}
+	return STS_OK;
 }
 
 int ep_param_set_any_ordin() {

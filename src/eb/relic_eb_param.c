@@ -452,7 +452,7 @@ void eb_param_set(int param) {
 
 #endif /* EB_STAND */
 
-void eb_param_set_any() {
+int eb_param_set_any() {
 	int r0, r1, r2;
 
 	r0 = eb_param_set_any_super();
@@ -460,8 +460,9 @@ void eb_param_set_any() {
 	r2 = eb_param_set_any_kbltz();
 
 	if (r0 == STS_ERR && r1 == STS_ERR && r2 == STS_ERR) {
-		THROW(ERR_NO_CURVE);
+		return STS_ERR;
 	}
+	return STS_OK;
 }
 
 int eb_param_set_any_ordin() {

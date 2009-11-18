@@ -223,14 +223,16 @@ static void bench(void) {
 }
 
 int main(void) {
-	int r0, r1, r2;
-
 	core_init();
 	conf_print();
-	util_print_banner("Benchmarks for the EB module:", 0);
+	util_print_banner("Benchmarks for the EC module:", 0);
 
-	ec_param_set_any();
-	bench();
+	if (ec_param_set_any() == STS_OK) {
+		bench();
+	} else {
+		THROW(ERR_NO_CURVE);
+	}
+
 	core_clean();
 	return 0;
 }

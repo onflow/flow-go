@@ -544,7 +544,7 @@ void eb_param_set(int param);
 /**
  * Configures some set of curve parameters for the current security level.
  */
-void eb_param_set_any(void);
+int eb_param_set_any(void);
 
 /**
  * Configures some set of ordinary curve parameters for the current security

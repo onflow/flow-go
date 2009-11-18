@@ -322,33 +322,14 @@ int main(void) {
 	}
 #endif
 
-#if defined(WITH_EB)
-	util_print_banner("Protocols based on elliptic curves:", 0);
-#if defined(EB_STAND) && defined(EB_ORDIN)
-	r0 = eb_param_set_any_ordin();
-	if (r0 == STS_OK) {
-		eb_param_print();
-		printf("\n");
+#if defined(WITH_EC)
+	util_print_banner("Protocols based on elliptic curves:\n", 0);
+	if (ec_param_set_any() == STS_OK) {
 		if (ecdsa() != STS_OK) {
 			core_clean();
 			return 1;
 		}
-	}
-#endif
-
-#if defined(EB_STAND) && defined(EB_KBLTZ)
-	r1 = eb_param_set_any_kbltz();
-	if (r1 == STS_OK) {
-		eb_param_print();
-		printf("\n");
-		if (ecdsa() != STS_OK) {
-			core_clean();
-			return 1;
-		}
-	}
-#endif
-
-	if (r0 == STS_ERR && r1 == STS_ERR) {
+	} else {
 		THROW(ERR_NO_CURVE);
 	}
 #endif
@@ -356,8 +337,7 @@ int main(void) {
 #if defined(WITH_PB)
 	util_print_banner("Protocols based on pairings:", 0);
 #if defined(EB_STAND) && defined(EB_SUPER)
-	r0 = eb_param_set_any_super();
-	if (r0 == STS_OK) {
+	if (eb_param_set_any_super() == STS_OK) {
 		eb_param_print();
 		printf("\n");
 		if (sokaka() != STS_OK) {

@@ -476,8 +476,14 @@ int main(void) {
 		return 1;
 	}
 
-	ec_param_set_any();
-	test();
+	if (ec_param_set_any() == STS_OK) {
+		if (test() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+	} else {
+		THROW(ERR_NO_CURVE);
+	}
 
 	core_clean();
 	return 0;
