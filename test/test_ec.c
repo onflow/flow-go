@@ -469,7 +469,6 @@ int test(void) {
 }
 
 int main(void) {
-	int r0;
 	core_init();
 
 	if (memory() != STS_OK) {

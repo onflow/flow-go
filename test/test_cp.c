@@ -218,7 +218,6 @@ static int rabin(void) {
 #if defined(WITH_EB)
 
 static int ecdsa(void) {
-	err_t e;
 	int code = STS_ERR;
 	bn_t d, r;
 	eb_t q;
@@ -255,7 +254,6 @@ static int ecdsa(void) {
 #if defined(WITH_PB)
 
 static int sokaka(void) {
-	err_t e;
 	int code = STS_ERR;
 	bn_t s;
 	eb_t p_a, p_b, s_a, s_b;
