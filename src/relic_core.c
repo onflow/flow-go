@@ -86,9 +86,6 @@ int core_init(void) {
 #ifdef WITH_EB
 		eb_curve_init();
 #endif
-#if defined(WITH_CP) && defined(WITH_PB)
-		cp_ecdsa_init();
-#endif
 	}
 	CATCH_ANY {
 		return STS_ERR;

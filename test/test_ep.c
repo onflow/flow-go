@@ -34,10 +34,6 @@
 #include "relic.h"
 #include "relic_test.h"
 
-void ep_new_impl(ep_t a) {
-	ep_new(a);
-}
-
 static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
@@ -306,7 +302,7 @@ int subtraction(void) {
 		}
 		TEST_END;
 
-#if EB_ADD == BASIC || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 		TEST_BEGIN("point subtraction in affine coordinates is correct") {
 			ep_rand(a);
 			ep_rand(b);
@@ -317,7 +313,7 @@ int subtraction(void) {
 		} TEST_END;
 #endif
 
-#if EB_ADD == PROJC || !defined(STRIP)
+#if EP_ADD == PROJC || !defined(STRIP)
 		TEST_BEGIN("point subtraction in projective coordinates is correct") {
 			ep_rand(a);
 			ep_rand(b);
@@ -818,7 +814,7 @@ int main(void) {
 		core_clean();
 		return 1;
 	}
-#if defined(EB_STAND) && defined(EP_ORDIN)
+#if defined(EP_STAND) && defined(EP_ORDIN)
 	r0 = ep_param_set_any_ordin();
 	if (r0 == STS_OK) {
 		if (test() != STS_OK) {

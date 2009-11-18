@@ -38,6 +38,10 @@ if (WITH_EB)
 	ADD_MODULE(eb)
 endif(WITH_EB)
 
+if (WITH_EC)
+	ADD_MODULE(ec)
+endif(WITH_EC)
+
 if (WITH_PP)
 	ADD_MODULE(pp)
 endif(WITH_PP)	

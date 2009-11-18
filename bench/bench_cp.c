@@ -42,6 +42,16 @@ static void rsa(void) {
 	unsigned char out[BN_BITS / 8 + 1];
 	int in_len, out_len, new_len;
 
+	bn_null(pub.e);
+	bn_null(pub.n);
+	bn_null(prv.d);
+	bn_null(prv.dp);
+	bn_null(prv.dq);
+	bn_null(prv.p);
+	bn_null(prv.q);
+	bn_null(prv.qi);
+	bn_null(prv.n);
+
 	bn_new(pub.e);
 	bn_new(pub.n);
 	bn_new(prv.d);
@@ -143,6 +153,16 @@ static void rsa(void) {
 		BENCH_ADD(cp_rsa_sign_quick(out, &out_len, in, in_len, prv));
 	} BENCH_END;
 #endif
+
+	bn_free(pub.e);
+	bn_free(pub.n);
+	bn_free(prv.d);
+	bn_free(prv.dp);
+	bn_free(prv.dq);
+	bn_free(prv.p);
+	bn_free(prv.q);
+	bn_free(prv.qi);
+	bn_free(prv.n);
 }
 
 static void rabin(void) {
@@ -185,6 +205,13 @@ static void rabin(void) {
 		cp_rabin_enc(out, &out_len, in, in_len, pub);
 		BENCH_ADD(cp_rabin_dec(new, &new_len, out, out_len, prv));
 	} BENCH_END;
+
+	bn_free(pub.n);
+	bn_free(prv.n);
+	bn_free(prv.p);
+	bn_free(prv.q);
+	bn_free(prv.dp);
+	bn_free(prv.dq);
 }
 
 #endif
@@ -221,23 +248,10 @@ static void ecdsa(void) {
 	}
 	BENCH_END;
 
-#if CP_ECDSA == BASIC || !defined(STRIP)
-	BENCH_BEGIN("cp_ecdsa_gen") {
-		BENCH_ADD(cp_ecdsa_gen(d, p));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("cp_ecdsa_sign_basic") {
-		BENCH_ADD(cp_ecdsa_sign_basic(r, s, msg, 5, d));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("cp_ecdsa_ver_basic") {
-		BENCH_ADD(cp_ecdsa_ver_basic(r, s, msg, 5, p));
-	}
-	BENCH_END;
-#endif
-
+	bn_free(r);
+	bn_free(s);
+	bn_free(d);
+	eb_free(p);
 }
 
 #endif

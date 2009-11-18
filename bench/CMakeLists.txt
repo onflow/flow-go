@@ -26,17 +26,21 @@ if (WITH_FP)
 	ADD_MODULE(fp)
 endif(WITH_FP)
 
-if (WITH_EP)
-	ADD_MODULE(ep)
-endif(WITH_EP)
-
 if (WITH_FB)
 	ADD_MODULE(fb)
 endif(WITH_FB)
 
+if (WITH_EP)
+	ADD_MODULE(ep)
+endif(WITH_EP)
+
 if (WITH_EB)
 	ADD_MODULE(eb)
 endif(WITH_EB)
+
+if (WITH_EC)
+	ADD_MODULE(ec)
+endif(WITH_EC)
 
 if (WITH_PB)
 	ADD_MODULE(pb)

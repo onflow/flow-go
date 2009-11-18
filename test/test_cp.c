@@ -238,15 +238,6 @@ static int ecdsa(void) {
 			cp_ecdsa_sign(r, d, msg, 5, d);
 			TEST_ASSERT(cp_ecdsa_ver(r, d, msg, 5, q) == 1, end);
 		} TEST_END;
-
-#if CP_ECDSA == BASIC || !defined(STRIP)
-		TEST_BEGIN("basic ecdsa is correct") {
-			cp_ecdsa_gen(d, q);
-			cp_ecdsa_sign_basic(r, d, msg, 5, d);
-			TEST_ASSERT(cp_ecdsa_ver_basic(r, d, msg, 5, q) == 1, end);
-		} TEST_END;
-#endif
-
 	} CATCH_ANY {
 		ERROR(end);
 	}

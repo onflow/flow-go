@@ -477,7 +477,6 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
-#if EP_SIM == INTER || !defined(STRIP)
 	BENCH_BEGIN("ep_mul_sim_gen") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
@@ -487,7 +486,6 @@ static void arith(void) {
 		BENCH_ADD(ep_mul_sim_gen(r, k, q, l));
 	}
 	BENCH_END;
-#endif
 
 	ep_free(p);
 	ep_free(q);

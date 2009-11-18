@@ -133,36 +133,6 @@ typedef struct _rabin_t {
 #define cp_rsa_sign(O, OL, I, IL, P)		cp_rsa_sign_quick(O, OL, I, IL, P)
 #endif
 
-/**
- * Signs using ECDSA.
- *
- * @param[out] R				- the first component of the signature.
- * @param[out] S				- the second component of the signature.
- * @param[in] M					- the message to sign.
- * @param[in] L					- the message length in bytes.
- * @param[in] D					- the private key.
- */
-#if CP_ECDSA == BASIC
-#define cp_ecdsa_sign(R, S, M, L, D)	cp_ecdsa_sign_basic(R, S, M, L, D)
-#elif CP_ECDSA == QUICK
-#define cp_ecdsa_sign(R, S, M, L, D)	cp_ecdsa_sign_quick(R, S, M, L, D)
-#endif
-
-/**
- * Verifies an ECDSA signature.
- *
- * @param[out] R				- the first component of the signature.
- * @param[out] S				- the second component of the signature.
- * @param[in] M					- the message to sign.
- * @param[in] L					- the message length in bytes.
- * @param[in] Q					- the public key.
- */
-#if CP_ECDSA == BASIC
-#define cp_ecdsa_ver(R, S, M, L, Q)		cp_ecdsa_ver_basic(R, S, M, L, Q)
-#elif
-#define cp_ecdsa_ver(R, S, M, L, Q)		cp_ecdsa_ver_quick(R, S, M, L, Q)
-#endif
-
 /*============================================================================*/
 /* Function prototypes                                                        */
 /*============================================================================*/
@@ -302,11 +272,6 @@ int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in, int in_len
 		rabin_t prv);
 
 /**
- * Initializes the ECDSA protocol module.
- */
-void cp_ecdsa_init(void);
-
-/**
  * Generates an ECDSA key pair.
  *
  * @param[out] d			- the private key.
@@ -323,18 +288,7 @@ void cp_ecdsa_gen(bn_t d, eb_t q);
  * @param[in] len				- the message length in bytes.
  * @param[in] d					- the private key.
  */
-void cp_ecdsa_sign_basic(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d);
-
-/**
- * Signs a message using ECDSA suitable for fast verification.
- *
- * @param[out] r				- the first component of the signature.
- * @param[out] s				- the second component of the signature.
- * @param[in] msg				- the message to sign.
- * @param[in] len				- the message length in bytes.
- * @param[in] d					- the private key.
- */
-void cp_ecdsa_sign_quick(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d);
+void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d);
 
 /**
  * Verifies a message signed with ECDSA using the basic method.
@@ -345,18 +299,7 @@ void cp_ecdsa_sign_quick(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d);
  * @param[in] len				- the message length in bytes.
  * @param[in] q					- the public key.
  */
-int cp_ecdsa_ver_basic(bn_t r, bn_t s, unsigned char *msg, int len, eb_t q);
-
-/**
- * Verifies a message signed with ECDSA using the fast method.
- *
- * @param[out] r				- the first component of the signature.
- * @param[out] s				- the second component of the signature.
- * @param[in] msg				- the message to sign.
- * @param[in] len				- the message length in bytes.
- * @param[in] q					- the public key.
- */
-int cp_ecdsa_ver_quick(bn_t r, bn_t s, unsigned char *msg, int len, eb_t q);
+int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, eb_t q);
 
 /**
  * Generates a master key for the SOK identity-based non-interactive

@@ -97,6 +97,8 @@
 #cmakedefine WITH_EP
 /** Build binary elliptic curve module. */
 #cmakedefine WITH_EB
+/** Build elliptic curve cryptography module. */
+#cmakedefine WITH_EC
 /** Build pairings over prime curves module. */
 #cmakedefine WITH_PP
 /** Build pairings over binary curves module. */
@@ -419,6 +421,19 @@
 #define JOINT    4
 /** Chosen binary elliptic curve simulteanous point multiplication method. */
 #define EB_SIM   @EB_SIM@ 
+
+/** Prefer Koblitz anomalous (binary or prime) curves. */
+#cmakedefine EC_KBLTZ
+
+/** Binary elliptic curve arithmetic method. */
+#define EC_METHD "@EC_METHD@"
+
+/** Prime curves. */
+#define PRIME	 1
+/** Binary curves. */
+#define BINAR	 2
+/** Chosen elliptic curve cryptography method. */
+#define EC_CUR	 @EC_CUR@
 
 /** Parallel implementation. */
 #cmakedefine PB_PARAL
