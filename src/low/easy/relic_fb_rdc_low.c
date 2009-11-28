@@ -34,7 +34,7 @@
 #include "relic_util.h"
 
 /*============================================================================*/
-/* Public definitions                                                         */
+/* Private definitions                                                        */
 /*============================================================================*/
 
 static void fb_rdct_low(dig_t *c, dig_t *a, int fa) {
@@ -173,6 +173,10 @@ static void fb_rdcp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 	fb_copy(c, a);
 }
 
+/*============================================================================*/
+/* Public definitions                                                         */
+/*============================================================================*/
+
 void fb_rdcn_low(dig_t *c, dig_t *a) {
 	int fa, fb, fc;
 
@@ -184,3 +188,100 @@ void fb_rdcn_low(dig_t *c, dig_t *a) {
 		fb_rdcp_low(c, a, fa, fb, fc);
 	}
 }
+
+void fb_rdc1_low(dig_t *c, dig_t *a) {
+	int fa, fb, fc;
+	int sh, lh, rh, sa, la, ra, sb, lb, rb, sc, lc, rc;
+	dig_t d;
+
+	fb_poly_get_rdc(&fa, &fb, &fc);
+
+	sh = lh = rh = sa = la = ra = sb = lb = rb = sc = lc = rc = 0;
+
+	SPLIT(rh, sh, FB_BITS, FB_DIG_LOG);
+	sh++;
+	lh = FB_DIGIT - rh;
+
+	SPLIT(ra, sa, FB_BITS - fa, FB_DIG_LOG);
+	sa++;
+	la = FB_DIGIT - ra;
+
+	if (fb != -1) {
+		SPLIT(rb, sb, FB_BITS - fb, FB_DIG_LOG);
+		sb++;
+		lb = FB_DIGIT - rb;
+
+		SPLIT(rc, sc, FB_BITS - fc, FB_DIG_LOG);
+		sc++;
+		lc = FB_DIGIT - rc;
+	}
+
+	d = a[FB_DIGS];
+	a[FB_DIGS] = 0;
+
+	if (rh == 0) {
+		a[FB_DIGS - sh + 1] ^= d;
+	} else {
+		a[FB_DIGS - sh + 1] ^= (d >> rh);
+		a[FB_DIGS - sh] ^= (d << lh);
+	}
+	if (ra == 0) {
+		a[FB_DIGS - sa + 1] ^= d;
+	} else {
+		a[FB_DIGS - sa + 1] ^= (d >> ra);
+		a[FB_DIGS - sa] ^= (d << la);
+	}
+
+	if (fb != -1) {
+		if (rb == 0) {
+			a[FB_DIGS - sb + 1] ^= d;
+		} else {
+			a[FB_DIGS - sb + 1] ^= (d >> rb);
+			a[FB_DIGS - sb] ^= (d << lb);
+		}
+		if (rc == 0) {
+			a[FB_DIGS - sc + 1] ^= d;
+		} else {
+			a[FB_DIGS - sc + 1] ^= (d >> rc);
+			a[FB_DIGS - sc] ^= (d << lc);
+		}
+	}
+
+	d = a[sh - 1] >> rh;
+
+	if (d != 0) {
+		a[0] ^= d;
+		d <<= rh;
+
+		if (ra == 0) {
+			a[sh - sa] ^= d;
+		} else {
+			a[sh - sa] ^= (d >> ra);
+			if (sh > sa) {
+				a[sh - sa - 1] ^= (d << la);
+			}
+		}
+		if (fb != -1) {
+			if (rb == 0) {
+				a[sh - sb] ^= d;
+			} else {
+				a[sh - sb] ^= (d >> rb);
+				if (sh > sb) {
+					a[sh - sb - 1] ^= (d << lb);
+				}
+			}
+			if (rc == 0) {
+				a[sh - sc] ^= d;
+			} else {
+				a[sh - sc] ^= (d >> rc);
+				if (sh > sc) {
+					a[sh - sc - 1] ^= (d << lc);
+				}
+			}
+		}
+		a[sh - 1] ^= d;
+	}
+
+	fb_copy(c, a);
+}
+

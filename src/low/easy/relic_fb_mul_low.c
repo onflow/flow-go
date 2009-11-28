@@ -41,18 +41,25 @@
 /*============================================================================*/
 
 void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
-	dig_t carry;
+	int j, k;
+	dig_t b1, b2;
 
-	fb_zero(c);
-	fb_zero(c + FB_DIGS);
-	for (int i = FB_DIGIT - 1; i >= 0; i--) {
+	c[FB_DIGS] = fb_lshb_low(c, a, util_bits_dig(digit) - 1);
+	for (int i = util_bits_dig(digit) - 2; i > 0; i--) {
 		if (digit & ((dig_t)1 << i)) {
-			fb_addn_low(c, c, a);
+			j = FB_DIGIT - i;
+			b1 = a[0];
+			c[0] ^= (b1 << i);
+			for (k = 1; k < FB_DIGS; k++) {
+				b2 = a[k];
+				c[k] ^= ((b2 << i) | (b1 >> j));
+				b1 = b2;
+			}
+			c[FB_DIGS] ^= (b1 >> j);
 		}
-		if (i != 0) {
-			carry = fb_lsh1_low(c, c);
-			c[FB_DIGS] = (c[FB_DIGS] << 1) | carry;
-		}
+	}
+	if (digit & (dig_t)1) {
+		fb_add(c, c, a);
 	}
 }
 
