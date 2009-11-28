@@ -47,22 +47,27 @@
 /**
  * Precision in bits of a binary field element.
  */
-#define FB_BITS 		((int)FB_POLYN)
+#define FB_BITS 	((int)FB_POLYN)
 
 /**
  * Size in bits of a digit.
  */
-#define FB_DIGIT		((int)DIGIT)
+#define FB_DIGIT	((int)DIGIT)
 
 /**
  * Logarithm of the digit size in base 2.
  */
-#define FB_DIG_LOG		((int)DIGIT_LOG)
+#define FB_DIG_LOG	((int)DIGIT_LOG)
 
 /**
  * Size in digits of a block sufficient to store a binary field element.
  */
-#define FB_DIGS	((int)((FB_BITS)/(FB_DIGIT) + (FB_BITS % FB_DIGIT > 0)))
+#define FB_DIGS		((int)((FB_BITS)/(FB_DIGIT) + (FB_BITS % FB_DIGIT > 0)))
+
+/**
+ * Size in bytes of a block sufficient to store a binary field element.
+ */
+#define FB_BYTES 	(FB_DIGS * sizeof(dig_t))
 
 /**
  * Finite field identifiers.
@@ -98,7 +103,7 @@ typedef dig_t *fb_t;
 /**
  * Represents a binary field element with automatic memory allocation.
  */
-typedef align dig_t fb_st[FB_DIGS];
+typedef align dig_t fb_st[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
 
 /*============================================================================*/
 /* Macro definitions                                                          */
@@ -123,7 +128,8 @@ typedef align dig_t fb_st[FB_DIGS];
 #define fb_new(A)			dv_new_statc((dv_t *)&(A), FB_DIGS)
 #elif ALLOC == STACK
 #define fb_new(A)															\
-	A = (dig_t *)alloca(FB_DIGS * sizeof(dig_t) + ALIGN); ALIGNED(A);		\
+	A = (dig_t *)alloca(FB_BYTES + PADDING(FB_BYTES));						\
+	A = (dig_t *)ALIGNED(A);												\
 
 #endif
 

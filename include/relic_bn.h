@@ -55,32 +55,37 @@
  * multiple precision integer must grow. Otherwise, it represents the fixed
  * fixed precision.
  */
-#define BN_BITS 		((int)BN_PRECI)
+#define BN_BITS 	((int)BN_PRECI)
 
 /**
  * Size in bits of a digit.
  */
-#define BN_DIGIT		((int)DIGIT)
+#define BN_DIGIT	((int)DIGIT)
 
 /**
  * Logarithm of the digit size in base 2.
  */
-#define BN_DIG_LOG		((int)DIGIT_LOG)
+#define BN_DIG_LOG	((int)DIGIT_LOG)
 
 /**
  * Size in digits of a block sufficient to store the required precision.
  */
-#define BN_DIGS			((int)((BN_BITS)/(BN_DIGIT) + (BN_BITS % BN_DIGIT > 0)))
+#define BN_DIGS		((int)((BN_BITS)/(BN_DIGIT) + (BN_BITS % BN_DIGIT > 0)))
+
+/**
+ * Size in bytes of a block sufficient to store the required precision.
+ */
+#define BN_BYTES	(BN_DIGS * sizeof(dig_t))
 
 /**
  * Size in digits of a block sufficient to store a multiple precision integer.
  */
 #if BN_MAGNI == DOUBLE
-#define BN_SIZE			((int)(2 * BN_DIGS + 2))
+#define BN_SIZE		((int)(2 * BN_DIGS + 2))
 #elif BN_MAGNI == CARRY
-#define BN_SIZE			((int)(BN_DIGS + 1))
+#define BN_SIZE		((int)(BN_DIGS + 1))
 #elif BN_MAGNI == SINGLE
-#define BN_SIZE			((int)BN_DIGS)
+#define BN_SIZE		((int)BN_DIGS)
 #endif
 
 /**

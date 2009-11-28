@@ -130,6 +130,15 @@ typedef __uint128_t dbl_t;
 #endif
 
 /**
+ * Size of padding to be added so that digit vectors are aligned.
+ */
+#if ALIGN > 1
+#define PADDING(A)		(ALIGN - ((A) % ALIGN))
+#else
+#define PADDING(A)		(0)
+#endif
+
+/**
  * Align digit vector pointer to specified byte-boundary.
  *
  * @param[in,out] A		- the pointer to align.
@@ -137,15 +146,15 @@ typedef __uint128_t dbl_t;
 #if ALIGN > 1
 #if ARCH == AVR || ARCH == MSP || ARCH == X86
 #define ALIGNED(A)															\
-	A = (dig_t *)((unsigned int)A + (ALIGN - ((unsigned int)A % ALIGN)));	\
+	((unsigned int)(A) + PADDING((unsigned int)(A)));						\
 
 #elif ARCH  == X86_64
 #define ALIGNED(A)															\
-	A = (dig_t *)((unsigned long)A + (ALIGN - ((unsigned long)A % ALIGN)));	\
+	((unsigned long)(A) + PADDING((unsigned long)(A)));						\
 
 #endif
 #else
-#define ALIGNED(A)	/* empty */
+#define ALIGNED(A)		(A)
 #endif
 
 #endif /* !RELIC_TYPES_H */

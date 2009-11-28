@@ -47,22 +47,27 @@
 /**
  * Precision in bits of a prime field element.
  */
-#define FP_BITS 		((int)FP_PRIME)
+#define FP_BITS 	((int)FP_PRIME)
 
 /**
  * Size in bits of a digit.
  */
-#define FP_DIGIT		((int)DIGIT)
+#define FP_DIGIT	((int)DIGIT)
 
 /**
  * Logarithm of the digit size in base 2.
  */
-#define FP_DIG_LOG		((int)DIGIT_LOG)
+#define FP_DIG_LOG	((int)DIGIT_LOG)
 
 /**
  * Size in digits of a block sufficient to store a prime field element.
  */
-#define FP_DIGS	((int)((FP_BITS)/(FP_DIGIT) + (FP_BITS % FP_DIGIT > 0)))
+#define FP_DIGS		((int)((FP_BITS)/(FP_DIGIT) + (FP_BITS % FP_DIGIT > 0)))
+
+/**
+ * Size in bytes of a block sufficient to store a binary field element.
+ */
+#define FP_BYTES 	(FP_DIGS * sizeof(dig_t))
 
 /*
  * Finite field identifiers.
@@ -102,7 +107,7 @@ typedef dig_t *fp_t;
 /**
  * Represents a prime field element with automatic memory allocation.
  */
-typedef align dig_t fp_st[FP_DIGS];
+typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 
 /*============================================================================*/
 /* Macro definitions                                                          */
@@ -126,7 +131,8 @@ typedef align dig_t fp_st[FP_DIGS];
 #define fp_new(A)			dv_new_statc((dv_t *)&(A), FP_DIGS)
 #elif ALLOC == STACK
 #define fp_new(A)															\
-	A = (dig_t *)alloca(FP_DIGS * sizeof(dig_t) + ALIGN); ALIGNED(A);		\
+	A = (dig_t *)alloca(FP_BYTES * PADDING(FP_BYTES));						\
+	A = (dig_t *)ALIGNED(A);												\
 
 #endif
 

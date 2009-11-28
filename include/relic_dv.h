@@ -60,7 +60,12 @@
  * A temporary vector has enough size to store a multiplication result in any
  * finite field.
  */
-#define DV_DIGS	(2 * (int)((DV_TEMP)/(DIGIT) + (DV_TEMP % DIGIT > 0)) + 2)
+#define DV_DIGS		(2 * (int)((DV_TEMP)/(DIGIT) + (DV_TEMP % DIGIT > 0)) + 2)
+
+/**
+ * Size in bytes of a temporary vector.
+ */
+#define DV_BYTES	(DV_DIGS * sizeof(dig_t))
 
 /*============================================================================*/
 /* Type definitions                                                           */
@@ -93,7 +98,8 @@ typedef dig_t *dv_t;
 #define dv_new(A)			dv_new_statc(&(A), DV_DIGS)
 #elif ALLOC == STACK
 #define dv_new(A)															\
-	A = (dig_t *)alloca(DV_DIGS * sizeof(dig_t) + ALIGN); ALIGNED(A);		\
+	A = (dig_t *)alloca(DV_BYTES + PADDING(DV_BYTES));						\
+	A = (dig_t *)ALIGNED(A);												\
 
 #endif
 
