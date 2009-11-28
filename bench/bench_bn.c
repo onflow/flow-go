@@ -469,7 +469,7 @@ static void arith(void) {
 	BENCH_END;
 
 	BENCH_BEGIN("bn_mod") {
-#if BN_MOD == RADIX
+#if BN_MOD == PMERS
 		bn_rand(a, BN_POS, 2 * BN_BITS - BN_DIGIT / 2);
 		bn_set_2b(b, BN_BITS);
 		bn_rand(c, BN_POS, BN_DIGIT);
@@ -588,7 +588,7 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
-#if BN_MOD == RADIX || !defined(STRIP)
+#if BN_MOD == PMERS || !defined(STRIP)
 	BENCH_BEGIN("bn_mod_pmers_setup") {
 		bn_rand(a, BN_POS, 2 * BN_BITS - BN_DIGIT / 2);
 		bn_set_2b(b, BN_BITS);
@@ -612,7 +612,7 @@ static void arith(void) {
 	BENCH_BEGIN("bn_mxp") {
 		bn_rand(a, BN_POS, 2 * BN_BITS - BN_DIGIT / 2);
 		bn_rand(b, BN_POS, BN_BITS);
-#if BN_MOD != RADIX
+#if BN_MOD != PMERS
 		if (bn_is_even(b)) {
 			bn_add_dig(b, b, 1);
 		}
@@ -628,7 +628,7 @@ static void arith(void) {
 
 #if BN_MXP == BASIC || !defined(STRIP)
 	BENCH_BEGIN("bn_mxp_basic") {
-#if BN_MOD != RADIX
+#if BN_MOD != PMERS
 		if (bn_is_even(b)) {
 			bn_add_dig(b, b, 1);
 		}
@@ -647,7 +647,7 @@ static void arith(void) {
 	BENCH_BEGIN("bn_mxp_slide") {
 		bn_rand(a, BN_POS, 2 * BN_BITS - BN_DIGIT / 2);
 		bn_rand(b, BN_POS, BN_BITS);
-#if BN_MOD != RADIX
+#if BN_MOD != PMERS
 		if (bn_is_even(b)) {
 			bn_add_dig(b, b, 1);
 		}
@@ -666,7 +666,7 @@ static void arith(void) {
 	BENCH_BEGIN("bn_mxp_const") {
 		bn_rand(a, BN_POS, 2 * BN_BITS - BN_DIGIT / 2);
 		bn_rand(b, BN_POS, BN_BITS);
-#if BN_MOD != RADIX
+#if BN_MOD != PMERS
 		if (bn_is_even(b)) {
 			bn_add_dig(b, b, 1);
 		}
@@ -823,7 +823,7 @@ static void arith(void) {
 	BENCH_END;
 
 	BENCH_BEGIN("bn_rec_win") {
-		unsigned char win[BN_BITS];
+		unsigned char win[BN_BITS + 1];
 		int len;
 		bn_rand(a, BN_POS, BN_BITS);
 		BENCH_ADD(bn_rec_win(win, &len, a, 4));
@@ -831,7 +831,7 @@ static void arith(void) {
 	BENCH_END;
 
 	BENCH_BEGIN("bn_rec_naf") {
-		signed char naf[BN_BITS];
+		signed char naf[BN_BITS + 1];
 		int len;
 		bn_rand(a, BN_POS, BN_BITS);
 		BENCH_ADD(bn_rec_naf(naf, &len, a, 4));
@@ -851,14 +851,19 @@ static void arith(void) {
 			signed char tnaf[FB_BITS + 8];
 			int len;
 			bn_rand(a, BN_POS, BN_BITS);
-			BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, vm, s0, s1, 1, FB_BITS, 4));
+			bn_mod(a, a, eb_curve_get_ord());
+			if (eb_curve_opt_a() == OPT_ZERO) {
+				BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, vm, s0, s1, -1, FB_BITS, 4));
+			} else {
+				BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, vm, s0, s1, 1, FB_BITS, 4));
+			}
 		}
 		BENCH_END;
 	}
 #endif
 
 	BENCH_BEGIN("bn_rec_jsf") {
-		signed char jsf[2 * BN_BITS];
+		signed char jsf[10 * BN_BITS];
 		int len;
 		bn_rand(a, BN_POS, BN_BITS);
 		bn_rand(b, BN_POS, BN_BITS);

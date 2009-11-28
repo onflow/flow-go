@@ -221,17 +221,17 @@ static void rabin(void) {
 static void ecdsa(void) {
 	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
 	bn_t r, s, d;
-	eb_t p;
+	ec_t p;
 
 	bn_null(r);
 	bn_null(s);
 	bn_null(d);
-	eb_null(p);
+	ec_null(p);
 
 	bn_new(r);
 	bn_new(s);
 	bn_new(d);
-	eb_new(p);
+	ec_new(p);
 
 	BENCH_BEGIN("cp_ecdsa_gen") {
 		BENCH_ADD(cp_ecdsa_gen(d, p));
@@ -251,7 +251,7 @@ static void ecdsa(void) {
 	bn_free(r);
 	bn_free(s);
 	bn_free(d);
-	eb_free(p);
+	ec_free(p);
 }
 
 #endif
@@ -268,7 +268,7 @@ int main(void) {
 	rabin();
 #endif
 
-#if defined(WITH_EB)
+#if defined(WITH_EC)
 	util_print_banner("Protocols based on elliptic curves:\n", 0);
 	if (ec_param_set_any() == STS_OK) {
 		ecdsa();
