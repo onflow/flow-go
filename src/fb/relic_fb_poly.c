@@ -167,6 +167,28 @@ static void find_solve() {
 
 #endif
 
+
+#if FB_SRT == QUICK || !defined(STRIP)
+
+/**
+ * Square root of z.
+ */
+static fb_st sqrt;
+
+/**
+ * Precomputes half-traces for z^i with odd i.
+ *
+ * @throw ERR_NO_MEMORY if there is no available memory.
+ */
+static void find_sqrt() {
+	fb_set_bit(sqrt, 1, 1);
+
+	for (int i = 1; i < FB_BITS; i++) {
+		fb_sqr(sqrt, sqrt);
+	}
+}
+
+#endif
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -184,10 +206,19 @@ dig_t *fb_poly_get(void) {
 	return poly;
 }
 
+dig_t *fb_poly_get_srt(void) {
+#if FB_SRT == QUICK || !defined(STRIP)
+	return sqrt;
+#else
+	return NULL
+#endif
+}
+
 void fb_poly_set(fb_t f) {
 	fb_copy(poly, f);
 	find_trace();
 	find_solve();
+	find_sqrt();
 }
 
 void fb_poly_add(fb_t c, fb_t a) {
@@ -230,12 +261,6 @@ void fb_poly_set_trino(int a) {
 		fb_set_bit(f, a, 1);
 		fb_set_bit(f, 0, 1);
 		fb_poly_set(f);
-
-#if FB_SRT == QUICK
-		if ((FB_BITS % 2 == 0) || (a % 2 == 0)) {
-			THROW(ERR_INVALID);
-		}
-#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -268,13 +293,6 @@ void fb_poly_set_penta(int a, int b, int c) {
 		fb_set_bit(f, c, 1);
 		fb_set_bit(f, 0, 1);
 		fb_poly_set(f);
-		fb_free(f);
-
-#if FB_SRT == QUICK
-		if ((FB_BITS % 2 == 0) || (a % 2 == 0) || (b % 2 == 0) || (c % 2 == 0)) {
-			THROW(ERR_INVALID);
-		}
-#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

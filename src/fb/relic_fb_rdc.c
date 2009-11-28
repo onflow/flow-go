@@ -64,7 +64,7 @@ void fb_rdc_basic(fb_t c, dv_t a) {
 		for (int i = fb_bits(tmpa); i >= 0; i--) {
 			if (fb_test_bit(tmpa, i)) {
 				SPLIT(k, j, i - FB_BITS, FB_DIG_LOG);
-				if (k == 0) {
+				if (k <= 0) {
 					fb_addd_low(tmpa + j, tmpa + j, fb_poly_get(), FB_DIGS);
 				} else {
 					r[FB_DIGS] = fb_lshb_low(r, fb_poly_get(), k);

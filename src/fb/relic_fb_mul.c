@@ -42,7 +42,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if FB_KARAT > 0 && FB_MUL == BASIC
+#if FB_MUL == BASIC
 /**
  * Multiplies two binary field elements using shift-and-add multiplication.
  *
@@ -83,9 +83,9 @@ static void fb_mul_basic_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 		dv_free(s);
 	}
 }
-#endif /* FB_KARAT > 0 && FB_MUL == BASIC */
+#endif /* FB_MUL == BASIC */
 
-#if FB_KARAT > 0 && FB_MUL == LCOMB
+#if FB_MUL == LCOMB
 /**
  * Multiplies two binary field elements using left-to-right comb multiplication.
  *
@@ -108,9 +108,9 @@ static void fb_mul_lcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 		}
 	}
 }
-#endif /* FB_KARAT > 0 && FB_MUL == LCOMB */
+#endif /* FB_MUL == LCOMB */
 
-#if FB_KARAT > 0 && FB_MUL == RCOMB
+#if FB_MUL == RCOMB
 /**
  * Multiplies two binary field elements using right-to-left comb multiplication.
  *
@@ -150,7 +150,7 @@ static void fb_mul_rcomb_impl(dig_t *c, dig_t *a, dig_t *b, int size) {
 		dv_free(_b);
 	}
 }
-#endif /* FB_KARAT > 0 && FB_MUL == RCOMB */
+#endif /* FB_MUL == RCOMB */
 
 #if FB_KARAT > 0 || !defined(STRIP)
 /**
