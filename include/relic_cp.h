@@ -39,7 +39,7 @@
 #include "relic_conf.h"
 #include "relic_types.h"
 #include "relic_bn.h"
-#include "relic_eb.h"
+#include "relic_ec.h"
 #include "relic_pb.h"
 
 /*============================================================================*/
@@ -277,7 +277,7 @@ int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in, int in_len
  * @param[out] d			- the private key.
  * @param[in] q				- the public key.
  */
-void cp_ecdsa_gen(bn_t d, eb_t q);
+void cp_ecdsa_gen(bn_t d, ec_t q);
 
 /**
  * Signs a message using ECDSA.
@@ -299,7 +299,7 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d);
  * @param[in] len				- the message length in bytes.
  * @param[in] q					- the public key.
  */
-int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, eb_t q);
+int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q);
 
 /**
  * Generates a master key for the SOK identity-based non-interactive

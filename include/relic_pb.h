@@ -337,13 +337,14 @@ void fb2_inv(fb2_t c, fb2_t a);
 void fb4_mul(fb4_t c, fb4_t a, fb4_t b);
 
 /**
- * Computes the square of a quartic extension field element. Computes
- * c = a * a.
+ * Multiplies two quartic extension field elements represented in a polynomial
+ * basis instead of a tower of extensions.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the quartic extension field element to square.
+ * @param[in] a				- the first quartic extension field element.
+ * @param[in] b				- the second quartic extension field element.
  */
-void fb4_sqr(fb4_t c, fb4_t a);
+void fb4_mul_quart(fb4_t c, fb4_t a, fb4_t b);
 
 /**
  * Multiplies two sparse quartic extension field elements.
@@ -352,7 +353,25 @@ void fb4_sqr(fb4_t c, fb4_t a);
  * @param[in] a				- the first quartic extension field element.
  * @param[in] b				- the second quartic extension field element.
  */
-void fb4_mul_sparse(fb4_t c, fb4_t a, fb4_t b);
+void fb4_mul_spxsp(fb4_t c, fb4_t a, fb4_t b);
+
+/**
+ * Multiplies two sparse quartic extension field elements.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first quartic extension field element.
+ * @param[in] b				- the second quartic extension field element.
+ */
+void fb4_mul_dexsp(fb4_t c, fb4_t a, fb4_t b);
+
+/**
+ * Computes the square of a quartic extension field element. Computes
+ * c = a * a.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quartic extension field element to square.
+ */
+void fb4_sqr(fb4_t c, fb4_t a);
 
 /**
  * Exponentiates a quartic extension field element to two times the degree of

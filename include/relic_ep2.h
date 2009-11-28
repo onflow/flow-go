@@ -342,7 +342,7 @@ void ep2_dbl_projc(ep2_t r, ep2_t p);
 #if EP_ADD == BASIC
 #define ep2_dbl_slope(R, S, E, P)	ep2_dbl_basic_slope(R, S, E, P);
 #elif EP_ADD == PROJC
-#define ep2_dbl_slope(R, S, P)	ep2_dbl_projc_slope(R, S, P);
+#define ep2_dbl_slope(R, S, E, P)	ep2_dbl_projc_slope(R, S, E, P);
 #endif
 
 /**

@@ -36,6 +36,8 @@
 #ifndef RELIC_BN_H
 #define RELIC_BN_H
 
+#include <string.h>
+
 #include "relic_dv.h"
 #include "relic_conf.h"
 #include "relic_util.h"
@@ -1141,25 +1143,25 @@ int bn_is_prime(bn_t a);
  * Tests if a number is prime using a series of trial divisions.
  *
  * @param[in] a				- the number to test.
- * @return 1 if a is prime, 0 otherwise.
+ * @return 1 if a is a probable prime, 0 otherwise.
  */
 int bn_is_prime_basic(bn_t a);
 
 /**
- * Tests if a number is prime using the Miller-Rabin test with probability
+ * Tests if a number a > 2 is prime using the Miller-Rabin test with probability
  * 2^(-80) of error.
  *
  * @param[in] a				- the number to test.
- * @return 1 if a is prime, 0 otherwise.
+ * @return 1 if a is a probable prime, 0 otherwise.
  */
 int bn_is_prime_rabin(bn_t a);
 
 /**
- * Tests if a number is prime using the Solovay-Strassen test with probability
- * 2^(-80) of error.
+ * Tests if a number a > 2 is prime using the Solovay-Strassen test with
+ * probability 2^(-80) of error.
  *
  * @param[in] a				- the number to test.
- * @return 1 if a is prime, 0 otherwise.
+ * @return 1 if a is a probable prime, 0 otherwise.
  */
 int bn_is_prime_solov(bn_t a);
 
@@ -1190,6 +1192,7 @@ void bn_gen_prime_stron(bn_t a, int bits);
 
 /**
  * Tries to factorize an integer using Pollard (p - 1) factoring algorithm.
+ * The maximum length of the returned factor is 16 bits.
  *
  * @param[out] c			- the resulting factor.
  * @param[in] a				- the integer to fatorize.

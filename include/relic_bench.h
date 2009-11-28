@@ -50,11 +50,13 @@
  * @param[in] FUNCTION		- the function to benchmark.
  */
 #define BENCH_ONCE(LABEL, FUNCTION)											\
-	bench_reset(LABEL);														\
+	bench_reset();															\
+	util_print("BENCH: %s %*s = ", LABEL, (int)(25 - strlen(LABEL)), " ");	\
 	bench_before();															\
 	FUNCTION;																\
 	bench_after();															\
 	bench_compute(1);														\
+	bench_print();															\
 
 /**
  * Runs a new benchmark a small number of times.
@@ -63,13 +65,15 @@
  * @param[in] FUNCTION		- the function to benchmark.
  */
 #define BENCH_SMALL(LABEL, FUNCTION)										\
-	bench_reset(LABEL);														\
+	bench_reset();															\
+	util_print("BENCH: %s %*s = ", LABEL, (int)(25 - strlen(LABEL)), " ");	\
 	bench_before();															\
 	for (int i = 0; i < BENCH; i++)	{										\
 		FUNCTION;															\
 	}																		\
 	bench_after();															\
 	bench_compute(BENCH);													\
+	bench_print();															\
 
 /**
  * Runs a new benchmark.
@@ -77,7 +81,8 @@
  * @param[in] LABEL			- the label for this benchmark.
  */
 #define BENCH_BEGIN(LABEL)													\
-	bench_reset(LABEL);														\
+	bench_reset();															\
+	util_print("BENCH: %s %*s = ", LABEL, (int)(25 - strlen(LABEL)), " ");	\
 	for (int i = 0; i < BENCH; i++)	{										\
 
 /**
@@ -86,6 +91,7 @@
 #define BENCH_END															\
 	}																		\
 	bench_compute(BENCH * BENCH);											\
+	bench_print()															\
 
 /**
  * Measures the time of one execution and adds it to the benchmark total.
@@ -114,7 +120,7 @@ void bench_overhead(void);
  *
  * @param[in] label			- the benchmark label.
  */
-void bench_reset(char *label);
+void bench_reset(void);
 
 /**
  * Measures the time before a benchmark is executed.
@@ -127,10 +133,24 @@ void bench_before(void);
 void bench_after(void);
 
 /**
- * Prints the mean elapsed time between the start and the end of a benchmark.
+ * Computes the mean elapsed time between the start and the end of a benchmark.
  *
  * @param benches			- the number of executed benchmarks.
  */
 void bench_compute(int benches);
+
+/**
+ * Prints the last benchmark.
+ */
+void bench_print(void);
+
+/**
+ * Returns the result of the last benchmark.
+ *
+ * @return the last benchmark.
+ */
+unsigned long long bench_get_total(void);
+
+
 
 #endif /* !RELIC_BENCH_H */

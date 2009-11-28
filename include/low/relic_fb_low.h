@@ -162,7 +162,7 @@ void fb_rshd_low(dig_t *c, dig_t *a, int digits);
 /**
  * Adds a left-shifted digit vector to another digit vector.
  * The shift amount must be shorter than the digit size.
- * Computes c = a + (b * z^bits).
+ * Computes c = c + (a * z^bits).
  *
  * @param[out] c			- the result.
  * @param[in] a				- the first digit vector to shift and add.
@@ -259,6 +259,16 @@ void fb_slvn_low(dig_t *c, dig_t *a);
  * @param[in] a				- the digit vector to reduce.
  */
 void fb_rdcn_low(dig_t *c, dig_t *a);
+
+/**
+ * Reduces the most significant bits of a digit vector modulo the configured
+ * irreducible polynomial. The maximum number of bits to be reduced is equal
+ * to the size of the digit.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the digit vector to reduce.
+ */
+void fb_rdc1_low(dig_t *c, dig_t *a);
 
 #endif /* !ASM */
 

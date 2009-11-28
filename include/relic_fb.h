@@ -263,6 +263,13 @@ void fb_poly_clean(void);
 dig_t *fb_poly_get(void);
 
 /**
+ * Returns the square root of z.
+ *
+ * @return the square root of z.
+ */
+dig_t *fb_poly_get_srt(void);
+
+/**
  * Configures the irreducible polynomial of the binary field.
  *
  * @param[in] f				- the new irreducible polynomial.
