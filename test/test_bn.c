@@ -1464,18 +1464,17 @@ static int prime(void) {
 		} TEST_END;
 #endif
 
+		bn_gen_prime(p, BN_BITS);
+
 		TEST_ONCE("basic prime testing is correct") {
-			bn_gen_prime(p, BN_BITS);
 			TEST_ASSERT(bn_is_prime_basic(p) == 1, end);
 		} TEST_END;
 
 		TEST_ONCE("miller-rabin prime testing is correct") {
-			bn_gen_prime(p, BN_BITS);
 			TEST_ASSERT(bn_is_prime_rabin(p) == 1, end);
 		} TEST_END;
 
 		TEST_ONCE("solovay-strassen prime testing is correct") {
-			bn_gen_prime(p, BN_BITS);
 			TEST_ASSERT(bn_is_prime_solov(p) == 1, end);
 		} TEST_END;
 	}
@@ -1489,25 +1488,24 @@ static int prime(void) {
 }
 
 static int factor(void) {
-	int bits, code = STS_ERR;
-	bn_t p, q;
+	int code = STS_ERR;
+	bn_t p, q, n;
 
 	bn_null(p);
 	bn_null(q);
+	bn_null(n);
 
 	TRY {
 		bn_new(p);
 		bn_new(q);
-
-		bits = (BN_BITS > 128 ? 128 : BN_BITS);
+		bn_new(n);
 
 		TEST_BEGIN("integer factorization is correct") {
-			bn_rand(p, BN_POS, BN_BITS);
-			if (bn_is_even(p)) {
-				bn_add_dig(p, p, 1);
-			}
-			if (bn_factor(q, p) == 1) {
-				TEST_ASSERT(bn_is_factor(q, p) == 1, end);
+			bn_gen_prime(p, 16);
+			bn_rand(n, BN_POS, BN_BITS - 16);
+			bn_mul(n, n, p);
+			if (bn_factor(q, n) == 1) {
+				TEST_ASSERT(bn_is_factor(q, n) == 1, end);
 			}
 		} TEST_END;
 

@@ -220,7 +220,7 @@ static int rabin(void) {
 static int ecdsa(void) {
 	int code = STS_ERR;
 	bn_t d, r;
-	eb_t q;
+	ec_t q;
 	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
 
 	bn_null(d);
@@ -230,7 +230,7 @@ static int ecdsa(void) {
 	TRY {
 		bn_new(d);
 		bn_new(r);
-		eb_new(q);
+		ec_new(q);
 
 		TEST_BEGIN("ecdsa is correct") {
 			cp_ecdsa_gen(d, q);
@@ -245,7 +245,7 @@ static int ecdsa(void) {
   end:
 	bn_free(d);
 	bn_free(r);
-	eb_free(q);
+	ec_free(q);
 	return code;
 }
 

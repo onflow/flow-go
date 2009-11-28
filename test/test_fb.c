@@ -553,20 +553,13 @@ static int square_root(void) {
 #endif
 
 #if FB_SRT == QUICK || !defined(STRIP)
-		int fa, fb, fc;
-		fb_poly_get_rdc(&fa, &fb, &fc);
-
-		if ((fb == 0 && FB_BITS % 2 != 0 && fa % 2 != 0) ||
-				(fb != 0 && FB_BITS % 2 != 0 && fa % 2 != 0 && fb % 2 != 0 &&
-						fc % 2 != 0)) {
-			TEST_BEGIN("fast square root extraction is correct") {
-				fb_rand(a);
-				fb_srt(b, a);
-				fb_srt_quick(c, a);
-				TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
-			}
-			TEST_END;
+		TEST_BEGIN("fast square root extraction is correct") {
+			fb_rand(a);
+			fb_srt(b, a);
+			fb_srt_quick(c, a);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
 		}
+		TEST_END;
 #endif
 	}
 	CATCH_ANY {

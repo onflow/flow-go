@@ -586,6 +586,7 @@ static int subtraction4(void) {
 static int multiplication4(void) {
 	int code = STS_ERR;
 	fb4_t a, b, c, d, e, f;
+	fb_t beta;
 
 	TRY {
 		fb4_new(a);
@@ -594,6 +595,7 @@ static int multiplication4(void) {
 		fb4_new(d);
 		fb4_new(e);
 		fb4_new(f);
+		fb_new(beta);
 
 		TEST_BEGIN("multiplication is commutative") {
 			fb4_rand(a);
@@ -626,19 +628,51 @@ static int multiplication4(void) {
 			TEST_ASSERT(fb4_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 
-		/*TEST_BEGIN("sparse multiplication is correct") {
+		TEST_BEGIN("quartic multiplication is correct") {
+			fb_zero(beta);
+			fb_set_bit(beta, 3, 1);
+			fb_set_bit(beta, 5, 1);
+			fb_set_bit(beta, 6, 1);
+			fb_set_bit(beta, 8, 1);
 			fb4_rand(a);
 			fb4_rand(b);
-			fb_copy(a[2], a[1]);
-			fb_copy(b[2], b[1]);
-			fb_add_dig(a[2], a[2], 1);
-			fb_add_dig(b[2], b[2], 1);
-			fb_zero(a[3]);
+			fb4_mul(c, a, b);
+			fb_mul(c[0], c[0], beta);
+			fb_mul(c[1], c[1], beta);
+			fb_mul(c[2], c[2], beta);
+			fb_mul(c[3], c[3], beta);
+			fb_mul(c[0], c[0], beta);
+			fb_mul(c[1], c[1], beta);
+			fb_mul(c[2], c[2], beta);
+			fb_mul(c[3], c[3], beta);
+			fb4_mul_quart(d, a, b);
+			TEST_ASSERT(fb4_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("dense x sparse multiplication is correct") {
+			fb4_rand(a);
+			fb4_rand(b);
+			fb_zero(b[2]);
+			fb_set_bit(b[2], 0, 1);
 			fb_zero(b[3]);
 			fb4_mul(c, a, b);
-			fb4_mul_sparse(d, a, b);
+			fb4_mul_dexsp(d, a, b);
 			TEST_ASSERT(fb4_cmp(c, d) == CMP_EQ, end);
-		} TEST_END;*/
+		} TEST_END;
+
+		TEST_BEGIN("sparse x sparse multiplication is correct") {
+			fb4_rand(a);
+			fb_zero(a[2]);
+			fb_set_bit(a[2], 0, 1);
+			fb_zero(a[3]);
+			fb4_rand(b);
+			fb_zero(b[2]);
+			fb_set_bit(b[2], 0, 1);
+			fb_zero(b[3]);
+			fb4_mul(c, a, b);
+			fb4_mul_spxsp(d, a, b);
+			TEST_ASSERT(fb4_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
 
 		TEST_BEGIN("multiplication has identity") {
 			fb4_zero(d);
@@ -665,6 +699,7 @@ static int multiplication4(void) {
 	fb4_free(d);
 	fb4_free(e);
 	fb4_free(f);
+	fb_free(beta);
 	return code;
 }
 

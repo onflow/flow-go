@@ -50,7 +50,7 @@ int main(void) {
 	fp12_new(r2);
 	fp12_new(f);
 
-	ep_param_set(RATE_P256);
+	ep_param_set(BNN_P256);
 	ep2_curve_set_twist(1);
 	char *xq = "1";
 	char *yq = "C7424FC261B627189A14E3433B4713E9C2413FCF89B8E2B178FB6322EFB2AB3";
