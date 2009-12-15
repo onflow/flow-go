@@ -216,7 +216,7 @@ static void rabin(void) {
 
 #endif
 
-#if defined(WITH_EB)
+#if defined(WITH_EC)
 
 static void ecdsa(void) {
 	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
