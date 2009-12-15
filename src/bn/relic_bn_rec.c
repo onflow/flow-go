@@ -84,7 +84,7 @@ static char get_bits(bn_t a, int from, int to) {
 /**
  * Constant 2^C.
  */
-#define MOD_2TC		256
+#define MOD_2TC		(1 << MOD_C)
 
 /**
  * Mask to calculate reduction modulo 2^C.
