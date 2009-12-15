@@ -455,12 +455,15 @@ void eb_param_set(int param) {
 int eb_param_set_any() {
 	int r0, r1, r2;
 
-	r0 = eb_param_set_any_super();
-	r1 = eb_param_set_any_ordin();
-	r2 = eb_param_set_any_kbltz();
-
-	if (r0 == STS_ERR && r1 == STS_ERR && r2 == STS_ERR) {
-		return STS_ERR;
+	r0 = eb_param_set_any_ordin();
+	if (r0 == STS_ERR) {
+		r1 = eb_param_set_any_ordin();
+		if (r1 == STS_ERR) {
+			r2 = eb_param_set_any_super();
+			if (r2 == STS_ERR) {
+				return STS_ERR;
+			}
+		}
 	}
 	return STS_OK;
 }
