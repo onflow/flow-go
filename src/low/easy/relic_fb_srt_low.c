@@ -169,7 +169,7 @@ static void fb_srtp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 static void fb_sqrt_low(dig_t *c, dig_t *a) {
 	int i, j, n, h, sh;
 	dig_t d, d_e, d_o;
-	align dig_t t[2 * FB_DIGS], u[FB_DIGS], t_e[FB_DIGS], t_o[FB_DIGS];
+	align dig_t t[2 * FB_DIGS], u[FB_DIGS + 1], t_e[FB_DIGS], t_o[FB_DIGS];
 
 	dv_zero(t, 2 * FB_DIGS);
 	dv_zero(u, FB_DIGS);
@@ -208,7 +208,7 @@ static void fb_sqrt_low(dig_t *c, dig_t *a) {
 	}
 	fb_muld_low(t + HALF, t_o, fb_poly_get_srt() + HALF, HALF);
 	fb_muld_low(u, t_o, fb_poly_get_srt(), HALF);
-	fb_addn_low(t, t, u);
+	fb_addd_low(t, t, u, FB_DIGS + 1);
 	fb_rdcn_low(c, t);
 	fb_addd_low(c, c, t_e, HALF);
 }
