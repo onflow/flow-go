@@ -447,7 +447,7 @@ void fb_mul_dig(fb_t c, fb_t a, dig_t b) {
 
 		fb_mul1_low(t, a, b);
 
-		fb_rdc(c, t);
+		fb_rdc1_low(c, t);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}

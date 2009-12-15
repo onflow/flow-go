@@ -130,7 +130,7 @@ static void find_trace() {
 /**
  * Table of precomputed half-traces.
  */
-fb_st half[HALF_SIZE];
+static fb_st half[HALF_SIZE];
 
 /**
  * Precomputes half-traces for z^i with odd i.

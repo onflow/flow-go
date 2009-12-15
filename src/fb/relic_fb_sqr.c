@@ -52,9 +52,7 @@ void fb_sqr_basic(fb_t c, fb_t a) {
 	TRY {
 		/* We need a temporary variable so that c can be a or b. */
 		dv_new(t);
-
 		fb_sqrn_low(t, a);
-
 		fb_rdc(c, t);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
