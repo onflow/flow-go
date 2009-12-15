@@ -179,20 +179,14 @@ void bench_overhead(void) {
 		overhead = overhead / 2;
 	} while (overhead < 0);
 
-#if TIMER == CYCLE
-	util_print("%lld cycles\n", overhead);
-#elif TIMER != NONE
-	util_print("%lld nanosec\n", overhead);
-#endif
+	total = overhead;
+	bench_print();
 #endif
 }
 
-void bench_reset(char *label) {
+void bench_reset() {
 #if TIMER != NONE
 	total = 0;
-	util_print("BENCH: %s %*s = ", label, (int)(25 - strlen(label)), " ");
-#else
-	(void)label;
 #endif
 }
 
@@ -236,6 +230,12 @@ void bench_after() {
 void bench_compute(int benches) {
 #if TIMER != NONE
 	total = total / benches - overhead;
+#else
+	(void)benches;
+#endif
+}
+
+void bench_print() {
 #if TIMER == CYCLE
 	util_print("%lld cycles", total);
 #else
@@ -246,7 +246,8 @@ void bench_compute(int benches) {
 	} else {
 		util_print("\n");
 	}
-#else
-	(void)benches;
-#endif
+}
+
+unsigned long long bench_get_total() {
+	return total;
 }
