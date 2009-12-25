@@ -39,12 +39,6 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp2_conj(fp2_t c, fp2_t a) {
-	/* conj(a0 + a1 * u) = a0 - a1 * u. */
-	fp_copy(c[0], a[0]);
-	fp_neg(c[1], a[1]);
-}
-
 void fp2_dbl(fp2_t c, fp2_t a) {
 	/* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
 	fp_dbl(c[0], a[0]);
@@ -88,7 +82,7 @@ void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 	}
 }
 
-void fp2_mul_qnr(fp2_t c, fp2_t a) {
+void fp2_mul_art(fp2_t c, fp2_t a) {
 	fp_t t0;
 
 	fp_null(t0);
@@ -112,29 +106,30 @@ void fp2_mul_qnr(fp2_t c, fp2_t a) {
 	}
 }
 
-void fp2_mul_poly(fp2_t c, fp2_t a) {
+void fp2_mul_nor(fp2_t c, fp2_t a) {
 	fp2_t t0;
 
 	fp2_null(t0);
+
 	TRY {
 		fp2_new(t0);
 
 		switch (fp_prime_get_mod8()[0]) {
 			case 5:
 				/* If p = 5 mod 8, x^2 - sqrt(sqrt(-2)) is irreducible. */
-				fp2_mul_qnr(c, a);
+				fp2_mul_art(c, a);
 				break;
 			case 3:
 				/* If p = 3 mod 8, x^2 - sqrt(1 + sqrt(-1)) is irreducible. */
 				fp2_copy(t0, a);
-				fp2_mul_qnr(t0, t0);
+				fp2_mul_art(t0, t0);
 				fp2_add(c, t0, a);
 				break;
 			case 7:
 				/* If p = 7 mod 8 and p = 2,3 mod 5, x^2 - sqrt(2 + sqrt(-1)) is
 				 * irreducible. */
 				fp2_copy(t0, a);
-				fp2_mul_qnr(a, a);
+				fp2_mul_art(a, a);
 				fp2_mul(c, a, t0);
 				fp2_mul(c, c, t0);
 				break;
@@ -229,4 +224,10 @@ void fp2_inv(fp2_t c, fp2_t a) {
 		fp_free(t0);
 		fp_free(t1);
 	}
+}
+
+void fp2_frb(fp2_t c, fp2_t a) {
+	/* (a0 + a1 * u)^p = a0 - a1 * u. */
+	fp_copy(c[0], a[0]);
+	fp_neg(c[1], a[1]);
 }

@@ -65,7 +65,7 @@ void fp12_mul(fp12_t c, fp12_t a, fp12_t b) {
 		fp6_mul(c[1], c[1], t2);
 		fp6_sub(c[1], c[1], t0);
 		fp6_sub(c[1], c[1], t1);
-		fp6_mul_cnr(t1, t1);
+		fp6_mul_art(t1, t1);
 		fp6_add(c[0], t0, t1);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -105,7 +105,7 @@ void fp12_mul_dexsp(fp12_t c, fp12_t a, fp12_t b) {
 		fp6_sub(c[1], c[1], v1);
 
 		/* c0 = v0 + v * v1 */
-		fp6_mul_cnr(v1, v1);
+		fp6_mul_art(v1, v1);
 		fp6_add(c[0], v0, v1);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -127,12 +127,12 @@ void fp12_sqr(fp12_t c, fp12_t a) {
 		fp6_new(t1);
 
 		fp6_add(t0, a[0], a[1]);
-		fp6_mul_cnr(t1, a[1]);
+		fp6_mul_art(t1, a[1]);
 		fp6_add(t1, a[0], t1);
 		fp6_mul(t0, t0, t1);
 		fp6_mul(c[1], a[0], a[1]);
 		fp6_sub(c[0], t0, c[1]);
-		fp6_mul_cnr(t1, c[1]);
+		fp6_mul_art(t1, c[1]);
 		fp6_sub(c[0], c[0], t1);
 		fp6_dbl(c[1], c[1]);
 	} CATCH_ANY {
@@ -160,7 +160,7 @@ void fp12_sqr_uni(fp12_t c, fp12_t a) {
 		fp6_add(t1, a[0], a[1]);
 		fp6_sqr(t1, t1);
 		fp6_sub(t1, t1, t0);
-		fp6_mul_cnr(c[0], t0);
+		fp6_mul_art(c[0], t0);
 		fp6_sub(c[1], t1, c[0]);
 		fp_set_dig(one, 1);
 		fp6_dbl(c[0], c[0]);
@@ -216,7 +216,7 @@ void fp12_inv(fp12_t c, fp12_t a) {
 
 		fp6_sqr(t0, a[0]);
 		fp6_sqr(t1, a[1]);
-		fp6_mul_cnr(t1, t1);
+		fp6_mul_art(t1, t1);
 		fp6_sub(t0, t0, t1);
 		fp6_inv(t0, t0);
 

@@ -159,9 +159,9 @@ static void ep2_frb(ep2_t c, ep2_t a, fp12_t f) {
 
 	fp12_sqr(t, f);
 
-	fp2_conj(c->x, a->x);
-	fp2_conj(c->y, a->y);
-	fp2_conj(c->z, a->z);
+	fp2_frb(c->x, a->x);
+	fp2_frb(c->y, a->y);
+	fp2_frb(c->z, a->z);
 	fp2_mul(c->x, c->x, t[0][1]);
 	fp2_mul(c->y, c->y, t[0][1]);
 	fp2_mul(c->y, c->y, f[1][0]);

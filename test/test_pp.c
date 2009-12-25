@@ -284,8 +284,8 @@ static int conjugate2(void) {
 
 		TEST_BEGIN("conjugate is correct") {
 			fp2_rand(a);
-			fp2_conj(b, a);
-			fp2_conj(b, b);
+			fp2_frb(b, a);
+			fp2_frb(b, b);
 			TEST_ASSERT(fp2_cmp(a, b) == CMP_EQ, end);
 		} TEST_END;
 	}
@@ -363,7 +363,7 @@ static int multiplication2(void) {
 			fp2_zero(b);
 			fp_set_dig(b[1], 1);
 			fp2_mul(c, a, b);
-			fp2_mul_qnr(d, a);
+			fp2_mul_art(d, a);
 			TEST_ASSERT(fp2_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 	}

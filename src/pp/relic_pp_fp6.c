@@ -81,7 +81,7 @@ void fp6_mul(fp6_t c, fp6_t a, fp6_t b) {
 		fp2_mul(t2, t0, t1);
 		fp2_sub(t2, t2, v1);
 		fp2_sub(t2, t2, v2);
-		fp2_mul_poly(t2, t2);
+		fp2_mul_nor(t2, t2);
 		fp2_add(t2, t2, v0);
 
 		/* c1 = (a0 + a1)(b0 + b1) - v0 - v1 + Bv2 */
@@ -90,7 +90,7 @@ void fp6_mul(fp6_t c, fp6_t a, fp6_t b) {
 		fp2_mul(c[1], t0, t1);
 		fp2_sub(c[1], c[1], v0);
 		fp2_sub(c[1], c[1], v1);
-		fp2_mul_poly(t0, v2);
+		fp2_mul_nor(t0, v2);
 		fp2_add(c[1], c[1], t0);
 
 		/* c2 = (a0 + a2)(b0 + b2) - v0 + v1 - v2 */
@@ -143,7 +143,7 @@ void fp6_mul_dexsp(fp6_t c, fp6_t a, fp6_t b) {
 		fp2_add(t0, a[1], a[2]);
 		fp2_mul(t2, t0, b[1]);
 		fp2_sub(t2, t2, v1);
-		fp2_mul_poly(t2, t2);
+		fp2_mul_nor(t2, t2);
 		fp2_add(t2, t2, v0);
 
 		/* c1 = (a0 + a1)(b0 + b1) - v0 - v1 + Bv2 */
@@ -178,7 +178,7 @@ void fp6_mul_dexqu(fp6_t c, fp6_t a, fp2_t b) {
 	fp2_mul(c[2], a[2], b);
 }
 
-void fp6_mul_cnr(fp6_t c, fp6_t a) {
+void fp6_mul_art(fp6_t c, fp6_t a) {
 	fp2_t t0;
 
 	fp2_null(t0);
@@ -188,7 +188,7 @@ void fp6_mul_cnr(fp6_t c, fp6_t a) {
 
 		/* (a0 + a1 * v + a2 * v^2) * v = a2 + a0 * v + a1 * v^2 */
 		fp2_copy(t0, a[0]);
-		fp2_mul_poly(c[0], a[2]);
+		fp2_mul_nor(c[0], a[2]);
 		fp2_copy(c[2], a[1]);
 		fp2_copy(c[1], t0);
 	} CATCH_ANY {
@@ -233,11 +233,11 @@ void fp6_sqr(fp6_t c, fp6_t a) {
 		fp2_sqr(t4, a[2]);
 
 		/* c0 = t0 + u * t3 */
-		fp2_mul_poly(c[0], t3);
+		fp2_mul_nor(c[0], t3);
 		fp2_add(c[0], c[0], t0);
 
 		/* c1 = t1 + u * t4 */
-		fp2_mul_poly(c[1], t4);
+		fp2_mul_nor(c[1], t4);
 		fp2_add(c[1], c[1], t1);
 
 		/* c2 = t1 + t2 + t3 - t0 - t4 */
@@ -269,9 +269,9 @@ void fp6_frb(fp6_t c, fp6_t a, fp6_t b) {
 		fp6_zero(t0);
 		fp6_zero(t1);
 
-		fp2_conj(c[0], a[0]);
-		fp2_conj(c[1], a[1]);
-		fp2_conj(c[2], a[2]);
+		fp2_frb(c[0], a[0]);
+		fp2_frb(c[1], a[1]);
+		fp2_frb(c[2], a[2]);
 
 		fp2_copy(t1[0], c[0]);
 		fp2_copy(t0[0], c[1]);
@@ -309,11 +309,11 @@ void fp6_inv(fp6_t c, fp6_t a) {
 
 		fp2_sqr(t0, a[0]);
 		fp2_mul(v0, a[1], a[2]);
-		fp2_mul_poly(v0, v0);
+		fp2_mul_nor(v0, v0);
 		fp2_sub(v0, t0, v0);
 
 		fp2_sqr(t0, a[2]);
-		fp2_mul_poly(t0, t0);
+		fp2_mul_nor(t0, t0);
 		fp2_mul(v1, a[0], a[1]);
 		fp2_sub(v1, t0, v1);
 
@@ -322,12 +322,12 @@ void fp6_inv(fp6_t c, fp6_t a) {
 		fp2_sub(v2, t0, v2);
 
 		fp2_mul(c[1], a[1], v2);
-		fp2_mul_poly(c[1], c[1]);
+		fp2_mul_nor(c[1], c[1]);
 
 		fp2_mul(c[0], a[0], v0);
 
 		fp2_mul(c[2], a[2], v1);
-		fp2_mul_poly(c[2], c[2]);
+		fp2_mul_nor(c[2], c[2]);
 
 		fp2_add(t0, c[0], c[1]);
 		fp2_add(t0, t0, c[2]);

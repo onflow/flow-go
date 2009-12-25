@@ -47,8 +47,8 @@
 /**
  * Represents a quadratic extension prime field element.
  *
- * This extension is constructed with the basis {1, u}, where u is a
- * quadratic non-residue in the prime field. If p = 3 mod 8, u^2 = -1; otherwise
+ * This extension is constructed with the basis {1, u}, where u is an
+ * adjoined square root in the prime field. If p = 3 mod 8, u^2 = -1; otherwise
  * u^2 = -2.
  */
 typedef fp_t fp2_t[2];
@@ -60,25 +60,26 @@ typedef fp_t fp2_t[2];
 typedef fp_st fp2_st[2];
 
 /**
- * Represents a sextic extension prime field element.
+ * Represents a sextic extension field element.
  *
- * This extension is constructed with the basis {1, v, v^2}, where v is a
- * cubic non-residue in the underlying quadratic extension.  If p = 3 mod 8,
+ * This extension is constructed with the basis {1, v, v^2}, where v is an
+ * adjoined cube root in the underlying quadratic extension.  If p = 3 mod 8,
  * v^3 = u + 1; if p = 5 mod 8, v^3 = u; if p = 7 mod 8 and p = 2,3 mod 5,
  * v^3 = u + 2.
  */
 typedef fp2_t fp6_t[3];
 
 /**
- * Represents a dodecic extension prime field element.
+ * Represents a dodecic extension field element.
  *
- * This extension is constructed with the basis {1, w}, where w^2 = v is a
- * quadratic non-residue in the underlying sextic extension.
+ * This extension is constructed with the basis {1, w}, where w^2 = v is an
+ * adjoined square root in the underlying sextic extension.
  */
 typedef fp6_t fp12_t[2];
 
 /**
- * Represents an elliptic curve point over a quadratic extension prime field.
+ * Represents an elliptic curve point over a quadratic extension over a prime
+ * field.
  */
 typedef struct {
 	/** The first coordinate. */
@@ -101,7 +102,7 @@ typedef ep2_st *ep2_t;
 /*============================================================================*/
 
 /**
- * Initializes a quadratic extension prime field with a null value.
+ * Initializes a quadratic extension field element with a null value.
  *
 * @param[out] A			- the quadratic extension element to initialize.
  */
@@ -109,7 +110,7 @@ typedef ep2_st *ep2_t;
 		fp_null(A[0]); fp_null(A[1]);										\
 
 /**
- * Allocate and initializes a quadratic extension prime field element.
+ * Allocate and initializes a quadratic extension field element.
  *
  * @param[out] A			- the new quadratic extension field element.
  */
@@ -202,14 +203,14 @@ typedef ep2_st *ep2_t;
  * C = A - B.
  *
  * @param[out] C			- the result.
- * @param[in] A				- the quadratic extension prime field element.
- * @param[in] B				- the quadratic extension prime field element.
+ * @param[in] A				- the quadratic extension field element.
+ * @param[in] B				- the quadratic extension field element.
  */
 #define fp2_sub(C, A, B)													\
 		fp_sub(C[0], A[0], B[0]); fp_sub(C[1], A[1], B[1]);					\
 
 /**
- * Initializes a sextic extension prime field with a null value.
+ * Initializes a sextic extension field with a null value.
  *
  * @param[out] A			- the sextic extension element to initialize.
  */
@@ -217,7 +218,7 @@ typedef ep2_st *ep2_t;
 		fp2_null(A[0]); fp2_null(A[1]); fp2_null(A[2]);						\
 
 /**
- * Allocate and initializes a sextic extension prime field element.
+ * Allocate and initializes a sextic extension field element.
  *
  * @param[out] A			- the new sextic extension field element.
  */
@@ -311,8 +312,8 @@ typedef ep2_st *ep2_t;
  * C = A - B.
  *
  * @param[out] C			- the result.
- * @param[in] A				- the sextic extension prime field element.
- * @param[in] B				- the sextic extension prime field element.
+ * @param[in] A				- the sextic extension field element.
+ * @param[in] B				- the sextic extension field element.
  */
 #define fp6_sub(C, A, B)													\
 		fp2_sub(C[0], A[0], B[0]); fp2_sub(C[1], A[1], B[1]);				\
@@ -320,7 +321,7 @@ typedef ep2_st *ep2_t;
 
 
 /**
- * Initializes a dodecic extension prime field with a null value.
+ * Initializes a dodecic extension field with a null value.
  *
  * @param[out] A			- the dodecic extension element to initialize.
  */
@@ -328,7 +329,7 @@ typedef ep2_st *ep2_t;
 		fp6_null(A[0]); fp6_null(A[1]);										\
 
 /**
- * Allocate and initializes a dodecic extension prime field element.
+ * Allocate and initializes a dodecic extension field element.
  *
  * @param[out] A			- the new dodecic extension field element.
  */
@@ -421,8 +422,8 @@ typedef ep2_st *ep2_t;
  * C = A - B.
  *
  * @param[out] C			- the result.
- * @param[in] A				- the first dodecic extension prime field element.
- * @param[in] B				- the second dodecic extension prime field element.
+ * @param[in] A				- the first dodecic extension field element.
+ * @param[in] B				- the second dodecic extension field element.
  */
 #define fp12_sub(C, A, B)													\
 		fp6_sub(C[0], A[0], B[0]); fp6_sub(C[1], A[1], B[1]);				\
@@ -559,32 +560,35 @@ typedef ep2_st *ep2_t;
 void fp2_dbl(fp2_t c, fp2_t a);
 
 /**
- * Computes the conjugate of a quadratic extension field element.
- *
- * @param[out] c			- the result.
- * @param[in] a				- the quadratic extension element to conjugate.
- */
-void fp2_conj(fp2_t c, fp2_t a);
-
-/**
  * Multiples two quadratic extension field elements, that is, compute c = a * b.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the quadratic extension prime field element.
- * @param[in] b				- the quadratic extension prime field element.
+ * @param[in] a				- the quadratic extension field element.
+ * @param[in] b				- the quadratic extension field element.
  */
 void fp2_mul(fp2_t c, fp2_t a, fp2_t b);
 
 /**
- * Multiplies a quadratic extension field element by the non-quadratic residue.
+ * Multiplies a quadratic extension field element by the adjoined square root.
+ * Computes c = a * u.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the quadratic extension prime field element.
+ * @param[in] a				- the quadratic extension field element to multiply.
  */
-void fp2_mul_qnr(fp2_t c, fp2_t a);
+void fp2_mul_art(fp2_t c, fp2_t a);
 
 /**
- * Computes the square of a quadratic extension field element, that is, computes
+ * Multiplies a quadratic extension field element by a quadratic/cubic
+ * non-residue. Computes c = a * v, where v is a non-square/non-cube in the
+ * quadratic extension.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quadratic extension field element to multiply.
+ */
+void fp2_mul_nor(fp2_t c, fp2_t a);
+
+/**
+ * Computes the square of a quadratic extension field element. Computes
  * c = a * a.
  *
  * @param[out] c			- the result.
@@ -596,9 +600,18 @@ void fp2_sqr(fp2_t c, fp2_t a);
  * Inverts a quadratic extension field element. Computes c = a^(-1).
  *
  * @param[out] c			- the result.
- * @param[in] a				- the quadratic extension prime field element to invert.
+ * @param[in] a				- the quadratic extension field element to invert.
  */
 void fp2_inv(fp2_t c, fp2_t a);
+
+/**
+ * Computes the Frobenius of a quadratic extension field element. This is the
+ * same as computing the conjugate of the extension field element.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quadratic extension element to conjugate.
+ */
+void fp2_frb(fp2_t c, fp2_t a);
 
 /**
  * Doubles a sextic extension field element. Computes c = 2 * a.
@@ -609,46 +622,45 @@ void fp2_inv(fp2_t c, fp2_t a);
 void fp6_dbl(fp6_t c, fp6_t a);
 
 /**
- * Multiples two sextic extension field elements, that is, compute c = a * b.
+ * Multiples two sextic extension field elements. Computes c = a * b.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the sextic extension prime field element.
- * @param[in] b				- the sextic extension prime field element.
+ * @param[in] a				- the sextic extension field element.
+ * @param[in] b				- the sextic extension field element.
  */
 void fp6_mul(fp6_t c, fp6_t a, fp6_t b);
 
 /**
- * Multiplies a sextic extension field element by the non-cubic residue.
+ * Multiplies a sextic extension field element by the adjoined cube root.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the sextic extension prime field element.
+ * @param[in] a				- the sextic extension field element to multiply.
  */
-void fp6_mul_cnr(fp6_t c, fp6_t a);
+void fp6_mul_art(fp6_t c, fp6_t a);
 
 /**
  * Multiples a sextic extension field element by a quadratic extension
  * field element.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the sextic extension prime field element.
- * @param[in] b				- the quadratic extension prime field element.
+ * @param[in] a				- the sextic extension field element.
+ * @param[in] b				- the quadratic extension field element.
  */
 void fp6_mul_dexqu(fp6_t c, fp6_t a, fp2_t b);
 
 /**
- * Multiples a sextic extension field element by a sparse element.
+ * Multiples a dense sextic extension field element by a sparse element.
  *
  * The sparse element must have a[2] = 0.
  *
  * @param[out] c			- the result.
- * @param[in] a				- a sextic extension prime field element.
- * @param[in] b				- a sparse sextic extension prime field element.
+ * @param[in] a				- a sextic extension field element.
+ * @param[in] b				- a sparse sextic extension field element.
  */
 void fp6_mul_dexsp(fp6_t c, fp6_t a, fp6_t b);
 
 /**
- * Computes the square of a sextic extension field element, that is, computes
- * c = a * a.
+ * Computes the square of a sextic extension field element. Computes c = a * a.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the sextic extension field element to square.
@@ -659,7 +671,7 @@ void fp6_sqr(fp6_t c, fp6_t a);
  * Inverts a sextic extension field element. Computes c = a^(-1).
  *
  * @param[out] c			- the result.
- * @param[in] a				- the sextic extension prime field element to invert.
+ * @param[in] a				- the sextic extension field element to invert.
  */
 void fp6_inv(fp6_t c, fp6_t a);
 
@@ -668,7 +680,7 @@ void fp6_inv(fp6_t c, fp6_t a);
  * field element. Computes c = a^p.
  *
  * @param[out] c			- the result.
- * @param[in] a				- a sextic extension prime field element.
+ * @param[in] a				- a sextic extension field element.
  * @param[in] b				- the constant v^p used for the computation.
  */
 void fp6_frb(fp6_t c, fp6_t a, fp6_t b);
@@ -685,32 +697,32 @@ void fp6_frb(fp6_t c, fp6_t a, fp6_t b);
 void fp12_conj(fp12_t c, fp12_t a);
 
 /**
- * Multiples two dodecic extension field elements, that is, compute c = a * b.
+ * Multiples two dodecic extension field elements. Compute c = a * b.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the first dodecic extension prime field element.
- * @param[in] b				- the second dodecic extension prime field element.
+ * @param[in] a				- the first dodecic extension field element.
+ * @param[in] b				- the second dodecic extension field element.
  */
 void fp12_mul(fp12_t c, fp12_t a, fp12_t b);
 
 /**
- * Multiples a dodecic extension field element by a sparse element.
+ * Multiples a dense dodecic extension field element by a sparse element.
  *
  * The sparse element must have only the a[0][0], a[1][0] and a[1][1] elements
- * not zero.
+ * not equal to zero.
  *
  * @param[out] c			- the result.
- * @param[in] a				- a dodecic extension prime field element.
- * @param[in] b				- a sparse dodecic extension prime field element.
+ * @param[in] a				- the dense dodecic extension field element.
+ * @param[in] b				- the sparse dodecic extension field element.
  */
 void fp12_mul_dexsp(fp12_t c, fp12_t a, fp12_t b);
 
 /**
- * Computes the square of a dodecic extension field element, that is, computes
+ * Computes the square of a dodecic extension field element. Computes
  * c = a * a.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the dodecic extension prime field element to square.
+ * @param[in] a				- the dodecic extension field element to square.
  */
 void fp12_sqr(fp12_t c, fp12_t a);
 
@@ -728,7 +740,7 @@ void fp12_sqr_uni(fp12_t c, fp12_t a);
  * Inverts a dodecic extension field element. Computes c = a^(-1).
  *
  * @param[out] c			- the result.
- * @param[in] a				- the dodecic extension prime field element to invert.
+ * @param[in] a				- the dodecic extension field element to invert.
  */
 void fp12_inv(fp12_t c, fp12_t a);
 
@@ -737,7 +749,7 @@ void fp12_inv(fp12_t c, fp12_t a);
  * Computes c = a^p.
  *
  * @param[out] c			- the result.
- * @param[in] a				- a dodecic extension prime field element.
+ * @param[in] a				- a dodecic extension field element.
  * @param[in] b				- the constant w^p used for the computation.
  */
 void fp12_frb(fp12_t c, fp12_t a, fp12_t b);
@@ -832,7 +844,7 @@ void ep2_curve_set_twist(int twist);
  * A unitary element is one previously raised to the (p^6 - 1)th power.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the unitary dodecic extension prime field element.
+ * @param[in] a				- the unitary dodecic extension field element.
  * @param[in] b				- the power.
  */
 void fp12_exp_uni(fp12_t c, fp12_t a, bn_t b);
