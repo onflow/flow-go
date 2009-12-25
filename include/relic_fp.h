@@ -131,7 +131,7 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #define fp_new(A)			dv_new_statc((dv_t *)&(A), FP_DIGS)
 #elif ALLOC == STACK
 #define fp_new(A)															\
-	A = (dig_t *)alloca(FP_BYTES * PADDING(FP_BYTES));						\
+	A = (dig_t *)alloca(FP_BYTES + PADDING(FP_BYTES));						\
 	A = (dig_t *)ALIGNED(A);												\
 
 #endif
@@ -247,6 +247,13 @@ dig_t *fp_prime_get_rdc(void);
 dig_t *fp_prime_get_conv(void);
 
 /**
+ * Returns the result of prime order mod 8.
+ *
+ * @return the result of prime order mod 8.
+ */
+dig_t *fp_prime_get_mod8(void);
+
+/**
  * Returns the prime stored in special form. The most significant bit is
  * FP_BITS.
  *
@@ -269,13 +276,6 @@ int fp_prime_get_qnr(void);
  * @return the non-cubic residue.
  */
 int fp_prime_get_cnr(void);
-
-/**
- * Returns the result of prime order mod 8.
- *
- * @return the result of prime order mod 8.
- */
-dig_t *fp_prime_get_mod8(void);
 
 /**
  * Assigns the order of the prime field to a non-sparse prime p.

@@ -41,8 +41,6 @@
 
 #if EP_ADD == PROJC || defined(EP_MIXED)
 
-#if defined(EP_ORDIN)
-
 /**
  * Normalizes a point represented in projective coordinates.
  *
@@ -77,8 +75,6 @@ void ep_norm_impl(ep_t r, ep_t p) {
 
 	r->norm = 1;
 }
-
-#endif /* EP_ORDIN || EP_KBLTZ */
 
 #endif /* EP_ADD == PROJC || EP_MIXED */
 

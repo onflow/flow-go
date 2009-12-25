@@ -247,10 +247,10 @@ static void arith4(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fb4_mul_quart") {
+	BENCH_BEGIN("fb4_mul_dexde") {
 		fb4_rand(a);
 		fb4_rand(b);
-		BENCH_ADD(fb4_mul_quart(c, a, b));
+		BENCH_ADD(fb4_mul_dexde(c, a, b));
 	}
 	BENCH_END;
 

@@ -511,11 +511,11 @@ static int doubling_halving(void) {
 
 		TEST_BEGIN("halving is consistent") {
 			fp_rand(a);
+			if (!fp_is_even(a)) {
+				a[0] &= MASK(FP_DIGIT - 1) << 1;
+			}
 			fp_hlv(b, a);
 			fp_dbl(c, b);
-			if (!fp_is_even(a)) {
-				fp_add_dig(c, c, 1);
-			}
 			TEST_ASSERT(fp_cmp(c, a) == CMP_EQ, end);
 		}
 		TEST_END;
@@ -730,6 +730,7 @@ static int digit(void) {
 			for (int j = 1; j < FP_DIGS; j++)
 				b[j] = 0;
 			g = b[0];
+			fp_set_dig(b, g);
 			fp_add(c, a, b);
 			fp_add_dig(d, a, g);
 			TEST_ASSERT(fp_cmp(c, d) == CMP_EQ, end);
@@ -741,6 +742,7 @@ static int digit(void) {
 			for (int j = 1; j < FP_DIGS; j++)
 				b[j] = 0;
 			g = b[0];
+			fp_set_dig(b, g);
 			fp_sub(c, a, b);
 			fp_sub_dig(d, a, g);
 			TEST_ASSERT(fp_cmp(c, d) == CMP_EQ, end);

@@ -52,12 +52,29 @@ void fp_add(fp_t c, fp_t a, fp_t b) {
 }
 
 void fp_add_dig(fp_t c, fp_t a, dig_t b) {
+#if FP_RDC == MONTY
+	fp_t t;
+
+	fp_null(t);
+
+	TRY {
+		fp_new(t);
+
+		fp_set_dig(t, b);
+		fp_add(c, a, t);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp_free(t);
+	}
+#else
 	dig_t carry;
 
 	carry = fp_add1_low(c, a, b);
 	if (carry || fp_cmp(c, fp_prime_get()) != CMP_LT) {
 		carry = fp_subn_low(c, c, fp_prime_get());
 	}
+#endif
 }
 
 void fp_sub(fp_t c, fp_t a, fp_t b) {
@@ -70,10 +87,27 @@ void fp_sub(fp_t c, fp_t a, fp_t b) {
 }
 
 void fp_sub_dig(fp_t c, fp_t a, dig_t b) {
+#if FP_RDC == MONTY
+	fp_t t;
+
+	fp_null(t);
+
+	TRY {
+		fp_new(t);
+
+		fp_set_dig(t, b);
+		fp_sub(c, a, t);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp_free(t);
+	}
+#else
 	dig_t carry;
 
 	carry = fp_sub1_low(c, a, b);
 	if (carry) {
 		fp_addn_low(c, c, fp_prime_get());
 	}
+#endif
 }

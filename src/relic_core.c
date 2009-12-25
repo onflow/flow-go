@@ -86,6 +86,9 @@ int core_init(void) {
 #ifdef WITH_EB
 		eb_curve_init();
 #endif
+#ifdef WITH_PP
+		pp_core_init();
+#endif
 	}
 	CATCH_ANY {
 		return STS_ERR;

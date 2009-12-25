@@ -11,7 +11,7 @@ file(GLOB FP_SRCS fp/*.c)
 file(GLOB FB_SRCS fb/*.c)
 file(GLOB EP_SRCS ep/*.c)
 file(GLOB EB_SRCS eb/*.c)
-file(GLOB PP_SRCS pp/*.c ep2/*.c)
+file(GLOB PP_SRCS pp/*.c)
 file(GLOB PB_SRCS pb/*.c)
 file(GLOB MD_SRCS md/*.c)
 

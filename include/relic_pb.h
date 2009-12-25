@@ -47,7 +47,7 @@
 /**
  * Represents a quadratic extension binary field element.
  *
- * This extension field is construct with the basis {1, s}, where s is a
+ * This extension field is constructed with the basis {1, s}, where s is a
  * non-quadratic residue in the binary field.
  */
 typedef fb_t fb2_t[2];
@@ -67,6 +67,8 @@ typedef fb_t fb4_t[4];
 
 /**
  * Initializes a quadratic extension binary field with a null value.
+ *
+ * @param[out] A			- the quadratic extension element to initialize.
  */
 #define fb2_null(A)															\
 		fb_null(A[0]); fb_null(A[1]);										\
@@ -173,6 +175,8 @@ typedef fb_t fb4_t[4];
 
 /**
  * Initializes a quadratic extension binary field with a null value.
+ *
+ * @param[out] A			- the quartic extension element to initialize.
  */
 #define fb4_null(A)															\
 		fb_null(A[0]); fb_null(A[1]); fb_null(A[2]); fb_null(A[3]);			\
@@ -344,16 +348,7 @@ void fb4_mul(fb4_t c, fb4_t a, fb4_t b);
  * @param[in] a				- the first quartic extension field element.
  * @param[in] b				- the second quartic extension field element.
  */
-void fb4_mul_quart(fb4_t c, fb4_t a, fb4_t b);
-
-/**
- * Multiplies two sparse quartic extension field elements.
- *
- * @param[out] c			- the result.
- * @param[in] a				- the first quartic extension field element.
- * @param[in] b				- the second quartic extension field element.
- */
-void fb4_mul_spxsp(fb4_t c, fb4_t a, fb4_t b);
+void fb4_mul_dexde(fb4_t c, fb4_t a, fb4_t b);
 
 /**
  * Multiplies two sparse quartic extension field elements.
@@ -363,6 +358,15 @@ void fb4_mul_spxsp(fb4_t c, fb4_t a, fb4_t b);
  * @param[in] b				- the second quartic extension field element.
  */
 void fb4_mul_dexsp(fb4_t c, fb4_t a, fb4_t b);
+
+/**
+ * Multiplies two sparse quartic extension field elements.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first quartic extension field element.
+ * @param[in] b				- the second quartic extension field element.
+ */
+void fb4_mul_spxsp(fb4_t c, fb4_t a, fb4_t b);
 
 /**
  * Computes the square of a quartic extension field element. Computes

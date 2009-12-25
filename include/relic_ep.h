@@ -130,11 +130,11 @@ typedef struct {
 	fp_t z;
 #elif ALLOC == DYNAMIC || ALLOC == STACK
 	/** The first coordinate. */
-	align fp_st x;
+	fp_st x;
 	/** The second coordinate. */
-	align fp_st y;
+	fp_st y;
 	/** The third coordinate (projective representation). */
-	align fp_st z;
+	fp_st z;
 #endif
 	/** Flag to indicate that this point is normalized. */
 	int norm;
@@ -625,7 +625,7 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k);
 
 /**
  * Multiplies a prime elliptic point by an integer using the constant-time
- * L?pez-Dahab point multiplication method.
+ * López-Dahab point multiplication method.
  *
  * @param[out] r			- the result.
  * @param[in] p				- the point to multiply.

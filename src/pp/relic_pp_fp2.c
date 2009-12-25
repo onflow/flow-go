@@ -23,145 +23,210 @@
 /**
  * @file
  *
- * Implementation of the quadratic extension binary field arithmetic module.
+ * Implementation of arithmetic in a quadratic extension over a prime field.
  *
  * @version $Id$
  * @ingroup fp2
  */
 
-#include <string.h>
-
 #include "relic_core.h"
 #include "relic_conf.h"
-#include "relic_fp2.h"
 #include "relic_fp.h"
+#include "relic_pp.h"
 #include "relic_util.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
+void fp2_conj(fp2_t c, fp2_t a) {
+	/* conj(a0 + a1 * u) = a0 - a1 * u. */
+	fp_copy(c[0], a[0]);
+	fp_neg(c[1], a[1]);
+}
+
+void fp2_dbl(fp2_t c, fp2_t a) {
+	/* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
+	fp_dbl(c[0], a[0]);
+	fp_dbl(c[1], a[1]);
+}
+
 void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 	fp_t t0, t1, t2;
 
-	fp_new(t0);
-	fp_new(t1);
-	fp_new(t2);
+	fp_null(t0);
+	fp_null(t1);
+	fp_null(t2);
 
-	fp_mul(t0, a[0], b[0]);
-	fp_mul(t1, a[1], b[1]);
-	fp_add(t2, a[0], a[1]);
-	fp_add(c[1], b[0], b[1]);
-	fp_mul(c[1], c[1], t2);
-	fp_sub(c[1], c[1], t0);
-	fp_sub(c[1], c[1], t1);
-	fp_sub(c[0], t0, t1);
+	TRY {
 
-	if (fp_prime_get_qnr() == -2) {
-		fp_sub(c[0], c[0], t1);
+		fp_new(t0);
+		fp_new(t1);
+		fp_new(t2);
+
+		/* Karatsuba algorithm. */
+		fp_mul(t0, a[0], b[0]);
+		fp_mul(t1, a[1], b[1]);
+		fp_add(t2, a[0], a[1]);
+		fp_add(c[1], b[0], b[1]);
+		fp_mul(c[1], c[1], t2);
+		fp_sub(c[1], c[1], t0);
+		fp_sub(c[1], c[1], t1);
+		fp_sub(c[0], t0, t1);
+
+		if (fp_prime_get_qnr() == -2) {
+			fp_sub(c[0], c[0], t1);
+		}
 	}
-
-	fp_free(t0);
-	fp_free(t1);
-	fp_free(t2);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t0);
+		fp_free(t1);
+		fp_free(t2);
+	}
 }
 
 void fp2_mul_qnr(fp2_t c, fp2_t a) {
 	fp_t t0;
 
-	fp_new(t0);
+	fp_null(t0);
 
-	fp_copy(t0, a[0]);
-	fp_neg(c[0], a[1]);
+	TRY {
+		fp_new(t0);
 
-	if (fp_prime_get_qnr() == -2) {
-		fp_dbl(c[0], c[0]);
+		/* (a0 + a1 * u) * u = a1 * u^2 + a0 * u. */
+		fp_copy(t0, a[0]);
+		fp_neg(c[0], a[1]);
+		if (fp_prime_get_qnr() == -2) {
+			fp_dbl(c[0], c[0]);
+		}
+		fp_copy(c[1], t0);
 	}
-	fp_copy(c[1], t0);
-
-	fp_free(t0);
-}
-
-void fp2_conj(fp2_t c, fp2_t a) {
-	fp_copy(c[0], a[0]);
-	fp_neg(c[1], a[1]);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t0);
+	}
 }
 
 void fp2_mul_poly(fp2_t c, fp2_t a) {
 	fp2_t t0;
 
-	fp2_new(t0);
+	fp2_null(t0);
+	TRY {
+		fp2_new(t0);
 
-	switch (fp_prime_get_mod8()[0]) {
-		case 5:
-			/* If p = 5 mod 8, x^2 - sqrt(sqrt(-2)) is irreducible. */
-			fp2_mul_qnr(c, a);
-			break;
-		case 3:
-			/* If p = 3 mod 8, x^2 - sqrt(1 + sqrt(-1)) is irreducible. */
-			fp2_copy(t0, a);
-			fp2_mul_qnr(t0, t0);
-			fp2_add(c, t0, a);
-			break;
-		case 7:
-			/* If p = 7 mod 8 and p = 2,3 mod 5, x^2 - sqrt(2 + sqrt(-1)) is
-			 * irreducible. */
-			fp2_copy(t0, a);
-			fp2_mul_qnr(a, a);
-			fp2_mul(c, a, t0);
-			fp2_mul(c, c, t0);
-			break;
+		switch (fp_prime_get_mod8()[0]) {
+			case 5:
+				/* If p = 5 mod 8, x^2 - sqrt(sqrt(-2)) is irreducible. */
+				fp2_mul_qnr(c, a);
+				break;
+			case 3:
+				/* If p = 3 mod 8, x^2 - sqrt(1 + sqrt(-1)) is irreducible. */
+				fp2_copy(t0, a);
+				fp2_mul_qnr(t0, t0);
+				fp2_add(c, t0, a);
+				break;
+			case 7:
+				/* If p = 7 mod 8 and p = 2,3 mod 5, x^2 - sqrt(2 + sqrt(-1)) is
+				 * irreducible. */
+				fp2_copy(t0, a);
+				fp2_mul_qnr(a, a);
+				fp2_mul(c, a, t0);
+				fp2_mul(c, c, t0);
+				break;
+		}
 	}
-
-	fp2_free(t0);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp2_free(t0);
+	}
 }
 
 void fp2_sqr(fp2_t c, fp2_t a) {
 	fp_t t0, t1;
 
-	fp_new(t0);
-	fp_new(t1);
+	fp_null(t0);
+	fp_null(t1);
 
-	fp_add(t0, a[0], a[1]);
+	TRY {
+		fp_new(t0);
+		fp_new(t1);
 
-	if (fp_prime_get_qnr() == -1) {
-		fp_sub(t1, a[0], a[1]);
-	} else {
-		if (fp_prime_get_qnr() == -2) {
-			fp_dbl(t1, a[1]);
-			fp_sub(t1, a[0], t1);
+		/* t0 = (a0 + a1). */
+		fp_add(t0, a[0], a[1]);
+
+		if (fp_prime_get_qnr() == -1) {
+			/* t1 = (a0 - a1). */
+			fp_sub(t1, a[0], a[1]);
+		} else {
+			/* t1 = (a0 - 2 * a1). */
+			if (fp_prime_get_qnr() == -2) {
+				fp_dbl(t1, a[1]);
+				fp_sub(t1, a[0], t1);
+			}
 		}
+
+		/* c_1 = a0 * a1. */
+		fp_mul(c[1], a[0], a[1]);
+
+		/* c_0 = a0^2 + b_0^2 * u^2. */
+		fp_mul(c[0], t0, t1);
+		if (fp_prime_get_qnr() == -2) {
+			fp_add(c[0], c[0], c[1]);
+		}
+
+		/* c_1 = 2 * a0 * a1. */
+		fp_dbl(c[1], c[1]);
+		/* c = c_0 + c_1 * u. */
 	}
-
-	fp_mul(c[1], a[0], a[1]);
-	fp_mul(c[0], t0, t1);
-
-	if (fp_prime_get_qnr() == -2) {
-		fp_add(c[0], c[0], c[1]);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-
-	fp_dbl(c[1], c[1]);
-
-	fp_free(t0);
-	fp_free(t1);
+	FINALLY {
+		fp_free(t0);
+		fp_free(t1);
+	}
 }
 
 void fp2_inv(fp2_t c, fp2_t a) {
 	fp_t t0, t1;
 
-	fp_new(t0);
-	fp_new(t1);
+	fp_null(t0);
+	fp_null(t1);
 
-	fp_sqr(t0, a[0]);
-	fp_sqr(t1, a[1]);
-	fp_add(t0, t0, t1);
+	TRY {
+		fp_new(t0);
+		fp_new(t1);
 
-	fp_inv(t1, t0);
+		/* t0 = a0^2, t1 = a1^2. */
+		fp_sqr(t0, a[0]);
+		fp_sqr(t1, a[1]);
 
-	fp_mul(c[0], a[0], t1);
-	fp_neg(t1, t1);
-	fp_mul(c[1], a[1], t1);
+		if (fp_prime_get_qnr() == -2) {
+			fp_dbl(t1, t1);
+		}
 
-	fp_free(t0);
-	fp_free(t1);
+		/* t1 = 1/(a0^2 + a1^2). */
+		fp_add(t0, t0, t1);
+		fp_inv(t1, t0);
+
+		/* c_0 = a0/(a0^2 + a1^2). */
+		fp_mul(c[0], a[0], t1);
+		/* c_1 = - a1/(a0^2 + a1^2). */
+		fp_mul(c[1], a[1], t1);
+		fp_neg(c[1], c[1]);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t0);
+		fp_free(t1);
+	}
 }

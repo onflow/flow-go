@@ -71,34 +71,31 @@ static void ep_add_basic_impl(ep_t r, ep_t p, ep_t q) {
 			if (fp_is_zero(t1)) {
 				/* If t1 is zero, q = p, should have doubled. */
 				ep_dbl_basic(r, p);
-				return;
 			} else {
 				/* If t1 is not zero and t0 is zero, q = -p and r = infinity. */
 				ep_set_infty(r);
-				return;
 			}
+		} else {
+			/* t2 = 1/(x2 - x1). */
+			fp_inv(t2, t0);
+			/* t2 = lambda = (y2 - y1)/(x2 - x1). */
+			fp_mul(t2, t1, t2);
+
+			/* x3 = lambda^2 - x2 - x1. */
+			fp_sqr(t1, t2);
+			fp_sub(t0, t1, p->x);
+			fp_sub(t0, t0, q->x);
+
+			/* y3 = lambda * (x1 - x3) - y1. */
+			fp_sub(t1, p->x, t0);
+			fp_mul(t1, t2, t1);
+			fp_sub(r->y, t1, p->y);
+
+			fp_copy(r->x, t0);
+			fp_copy(r->z, p->z);
+
+			r->norm = 1;
 		}
-
-		/* t2 = 1/(x2 - x1). */
-		fp_inv(t2, t0);
-		/* t2 = lambda = (y2 - y1)/(x2 - x1). */
-		fp_mul(t2, t1, t2);
-
-		/* x3 = lambda^2 - x2 - x1. */
-		fp_sqr(t1, t2);
-		fp_sub(t0, t1, p->x);
-		fp_sub(t0, t0, q->x);
-
-		/* y3 = lambda * (x1 - x3) - y1. */
-		fp_sub(t1, p->x, t0);
-		fp_mul(t1, t2, t1);
-		fp_sub(r->y, t1, p->y);
-
-		fp_copy(r->x, t0);
-		fp_copy(r->z, p->z);
-
-		r->norm = 1;
-
 		fp_free(t0);
 		fp_free(t1);
 		fp_free(t2);
@@ -333,13 +330,13 @@ void ep_sub_basic(ep_t r, ep_t p, ep_t q) {
 
 	ep_null(t);
 
+	if (p == q) {
+		ep_set_infty(r);
+		return;
+	}
+
 	TRY {
 		ep_new(t);
-
-		if (p == q) {
-			ep_set_infty(r);
-			return;
-		}
 
 		ep_neg_basic(t, q);
 		ep_add_basic(r, p, t);

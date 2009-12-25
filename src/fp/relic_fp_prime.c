@@ -135,16 +135,16 @@ dig_t *fp_prime_get_conv(void) {
 	return conv.dp;
 }
 
+dig_t *fp_prime_get_mod8() {
+	return prime_mod8.dp;
+}
+
 int fp_prime_get_qnr() {
 	return prime_qnr;
 }
 
 int fp_prime_get_cnr() {
 	return prime_cnr;
-}
-
-dig_t *fp_prime_get_mod8() {
-	return prime_mod8.dp;
 }
 
 void fp_prime_set(bn_t p) {

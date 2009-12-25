@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Implementation of the dodecic extension binary field arithmetic module.
+ * Implementation of the dodecic extension prime field arithmetic module.
  *
  * @version $Id$
  * @ingroup fp12
@@ -33,289 +33,226 @@
 
 #include "relic_core.h"
 #include "relic_conf.h"
-#include "relic_fp12.h"
-#include "relic_fp.h"
+#include "relic_pp.h"
 #include "relic_util.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
+void fp12_conj(fp12_t c, fp12_t a) {
+	fp6_copy(c[0], a[0]);
+	fp6_neg(c[1], a[1]);
+}
+
 void fp12_mul(fp12_t c, fp12_t a, fp12_t b) {
 	fp6_t t0, t1, t2;
 
-	fp6_new(t0);
-	fp6_new(t1);
-	fp6_new(t2);
+	fp6_null(t0);
+	fp6_null(t1);
+	fp6_null(t2);
 
-	fp6_mul(t0, a[0], b[0]);
-	fp6_mul(t1, a[1], b[1]);
-	fp6_add(t2, b[0], b[1]);
-	fp6_add(c[1], a[1], a[0]);
-	fp6_mul(c[1], c[1], t2);
-	fp6_sub(c[1], c[1], t0);
-	fp6_sub(c[1], c[1], t1);
-	fp6_mul_poly(t1, t1);
-	fp6_add(c[0], t0, t1);
+	TRY {
+		fp6_new(t0);
+		fp6_new(t1);
+		fp6_new(t2);
 
-	fp6_free(t0);
-	fp6_free(t1);
-	fp6_free(t2);
+		/* Karatsuba algorithm. */
+		fp6_mul(t0, a[0], b[0]);
+		fp6_mul(t1, a[1], b[1]);
+		fp6_add(t2, b[0], b[1]);
+		fp6_add(c[1], a[1], a[0]);
+		fp6_mul(c[1], c[1], t2);
+		fp6_sub(c[1], c[1], t0);
+		fp6_sub(c[1], c[1], t1);
+		fp6_mul_cnr(t1, t1);
+		fp6_add(c[0], t0, t1);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp6_free(t0);
+		fp6_free(t1);
+		fp6_free(t2);
+	}
 }
 
-void fp12_mul_sparse(fp12_t c, fp12_t a, fp12_t b) {
+void fp12_mul_dexsp(fp12_t c, fp12_t a, fp12_t b) {
 	fp6_t v0, v1, t0;
-	fp6_new(v0);
-	fp6_new(v1);
-	fp6_new(t0);
-	
-	/* c1 = (a0 + a1)(b0 + b1) */
-	fp6_add(v0, a[0], a[1]);
-	fp2_add(v1[0], b[0][0], b[1][0]);
-	fp2_copy(v1[1], b[1][1]);
-	fp6_mul_sparse(t0, v0, v1);
-	
-	/* v0 = a0b0 */
-	fp6_mul_fp2(v0, a[0], b[0][0]);
-	
-	/* v1 = a1b1 */
-	fp6_mul_sparse(v1, a[1], b[1]);
-	
-	/* c1 = c1 - v0 - v1 */
-	fp6_sub(c[1], t0, v0);
-	fp6_sub(c[1], c[1], v1);
-	
-	/* c0 = v0 + Bv1 */
-	fp6_mul_poly(v1, v1);
-	fp6_add(c[0], v0, v1);
-	
-	fp6_free(v0);
-	fp6_free(v1);
-	fp6_free(t0);
+
+	fp6_null(v0);
+	fp6_null(v1);
+	fp6_null(t0);
+
+	TRY {
+		fp6_new(v0);
+		fp6_new(v1);
+		fp6_new(t0);
+
+		/* c1 = (a0 + a1)(b0 + b1) */
+		fp6_add(v0, a[0], a[1]);
+		fp2_add(v1[0], b[0][0], b[1][0]);
+		fp2_copy(v1[1], b[1][1]);
+		fp6_mul_dexsp(t0, v0, v1);
+
+		/* v0 = a0b0 */
+		fp6_mul_dexqu(v0, a[0], b[0][0]);
+
+		/* v1 = a1b1 */
+		fp6_mul(v1, a[1], b[1]);
+
+		/* c1 = c1 - v0 - v1 */
+		fp6_sub(c[1], t0, v0);
+		fp6_sub(c[1], c[1], v1);
+
+		/* c0 = v0 + v * v1 */
+		fp6_mul_cnr(v1, v1);
+		fp6_add(c[0], v0, v1);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp6_free(v0);
+		fp6_free(v1);
+		fp6_free(t0);
+	}
 }
 
 void fp12_sqr(fp12_t c, fp12_t a) {
 	fp6_t t0, t1;
 
-	fp6_new(t0);
-	fp6_new(t1);
+	fp6_null(t0);
+	fp6_null(t1);
 
-	fp6_add(t0, a[0], a[1]);
-	fp6_mul_poly(t1, a[1]);
-	fp6_add(t1, a[0], t1);
-	fp6_mul(t0, t0, t1);
-	fp6_mul(c[1], a[0], a[1]);
-	fp6_sub(c[0], t0, c[1]);
-	fp6_mul_poly(t1, c[1]);
-	fp6_sub(c[0], c[0], t1);
-	fp6_add(c[1], c[1], c[1]);
+	TRY {
+		fp6_new(t0);
+		fp6_new(t1);
 
-	fp6_free(t0);
-	fp6_free(t1);
+		fp6_add(t0, a[0], a[1]);
+		fp6_mul_cnr(t1, a[1]);
+		fp6_add(t1, a[0], t1);
+		fp6_mul(t0, t0, t1);
+		fp6_mul(c[1], a[0], a[1]);
+		fp6_sub(c[0], t0, c[1]);
+		fp6_mul_cnr(t1, c[1]);
+		fp6_sub(c[0], c[0], t1);
+		fp6_dbl(c[1], c[1]);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp6_free(t0);
+		fp6_free(t1);
+	}
 }
 
 void fp12_sqr_uni(fp12_t c, fp12_t a) {
 	fp6_t t0, t1;
 	fp_t one;
 
-	fp6_new(t0);
-	fp6_new(t1);
-	fp_new(one);
+	fp6_null(t0);
+	fp6_null(t1);
 
-	fp6_sqr(t0, a[1]); //t = b * b
-	fp6_add(t1, a[0], a[1]); //b = b + a
-	fp6_sqr(t1, t1); //t1 = b * b
-	fp6_sub(t1, t1, t0); //b = b - t
-	fp6_mul_poly(c[0], t0); //a = tx(t)
-	fp6_sub(t1, t1, c[0]); //b = b - a
-	fp6_add(c[0], c[0], c[0]); //a = a + a
-	fp_set_dig(one, 1);
-	fp_add(c[0][0][0], c[0][0][0], one);
-	fp6_copy(c[1], t1);
-	fp_sub(c[1][0][0], c[1][0][0], one); // b = b -  1
+	TRY {
+		fp6_new(t0);
+		fp6_new(t1);
+		fp_new(one);
 
-	fp6_free(t0);
-	fp6_free(t1);
-	fp_free(one);
+		/* (a0 + a1 * w)^2 = (2b^2v + 1) + ((a + b)^2 - b^2 - b^2v - 1) * w. */
+		fp6_sqr(t0, a[1]);
+		fp6_add(t1, a[0], a[1]);
+		fp6_sqr(t1, t1);
+		fp6_sub(t1, t1, t0);
+		fp6_mul_cnr(c[0], t0);
+		fp6_sub(c[1], t1, c[0]);
+		fp_set_dig(one, 1);
+		fp6_dbl(c[0], c[0]);
+		fp_add_dig(c[0][0][0], c[0][0][0], 1);
+		fp_sub(c[1][0][0], c[1][0][0], one);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp6_free(t0);
+		fp6_free(t1);
+		fp_free(one);
+	}
 }
 
-void fp12_frob(fp12_t c, fp12_t a, fp12_t b) {
+void fp12_frb(fp12_t c, fp12_t a, fp12_t b) {
 	fp12_t t, t0, t1;
 
-	fp12_new(t);
-	fp12_new(t0);
-	fp12_new(t1);
+	fp12_null(t);
+	fp12_null(t0);
+	fp12_null(t1);
 
-	fp12_sqr(t, b);
-	fp6_frob(t0[0], a[0], t[0]);
-	fp6_frob(t1[0], a[1], t[0]);
-	fp6_zero(t0[1]);
-	fp6_zero(t1[1]);
-	fp12_mul(t1, t1, b);
-	fp12_add(c, t0, t1);
-	
-	fp12_free(t);
-	fp12_free(t0);
-	fp12_free(t1);
-}
+	TRY {
+		fp12_new(t);
+		fp12_new(t0);
+		fp12_new(t1);
 
-void fp12_conj(fp12_t c, fp12_t a) {
-	fp6_copy(c[0], a[0]);
-	fp6_neg(c[1], a[1]);
+		fp12_sqr(t, b);
+		fp6_frb(t0[0], a[0], t[0]);
+		fp6_frb(t1[0], a[1], t[0]);
+		fp6_zero(t0[1]);
+		fp6_zero(t1[1]);
+		fp12_mul(t1, t1, b);
+		fp12_add(c, t0, t1);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp12_free(t);
+		fp12_free(t0);
+		fp12_free(t1);
+	}
 }
 
 void fp12_inv(fp12_t c, fp12_t a) {
 	fp6_t t0;
 	fp6_t t1;
-	fp6_new(t0);
-	fp6_new(t1);
-	
-	fp6_sqr(t0, a[0]);
-	fp6_sqr(t1, a[1]);
-	fp6_mul_poly(t1, t1);
-	fp6_sub(t0, t0, t1);
-	fp6_inv(t0, t0);
-	
-	fp6_mul(c[0], a[0], t0);
-	fp6_neg(c[1], a[1]);
-	fp6_mul(c[1], c[1], t0);
-	
-	fp6_free(t0);
-	fp6_free(t1);
+
+	fp6_null(t0);
+	fp6_null(t1);
+
+	TRY {
+		fp6_new(t0);
+		fp6_new(t1);
+
+		fp6_sqr(t0, a[0]);
+		fp6_sqr(t1, a[1]);
+		fp6_mul_cnr(t1, t1);
+		fp6_sub(t0, t0, t1);
+		fp6_inv(t0, t0);
+
+		fp6_mul(c[0], a[0], t0);
+		fp6_neg(c[1], a[1]);
+		fp6_mul(c[1], c[1], t0);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp6_free(t0);
+		fp6_free(t1);
+	}
 }
 
-void fp12_exp(fp12_t c, fp12_t a, bn_t b) {
-	fp12_t tab[16], t, u;
-	dig_t buf;
-	int bitbuf, bitcpy, bitcnt, mode, digidx, i, j, w;
-
-	w = 4;
-
-	for (i = 0; i < 16; i++) {
-		fp12_new(tab[i]);
-	}
-
-	fp12_new(t);
-	fp12_new(u);
-	fp12_set_dig(t, 1);
-	fp12_copy(tab[1], a);
-
-	/* Compute the value at tab[1<<(w-1)] by squaring tab[1] (w-1) times. */
-	fp12_copy(tab[1 << (w - 1)], tab[1]);
-	for (i = 0; i < (w - 1); i++) {
-		fp12_sqr(tab[1 << (w - 1)], tab[1 << (w - 1)]);
-	}
-
-	/* Create upper table. */
-	for (i = (1 << (w - 1)) + 1; i < (1 << w); i++) {
-		fp12_mul(tab[i], tab[i - 1], tab[1]);
-	}
-
-	/* Set initial mode and bit count. */
-	mode = 0;
-	bitcnt = 1;
-	buf = 0;
-	digidx = b->used - 1;
-	bitcpy = 0;
-	bitbuf = 0;
-
-	for (;;) {
-		/* Grab next digit as required. */
-		if (--bitcnt == 0) {
-			/* If digidx == -1 we are out of digits so break. */
-			if (digidx == -1) {
-				break;
-			}
-			/* Read next digit and set bitcnt. */
-			buf = b->dp[digidx--];
-			bitcnt = (int)BN_DIGIT;
-		}
-
-		/* Grab the next most significant bit from the exponent. */
-		j = (buf >> (FP_DIGIT - 1)) & 0x01;
-		buf <<= (dig_t)1;
-
-		if (mode == 0 && j == 0) {
-			continue;
-		}
-
-		/* If the bit is zero and mode == 1 then we square. */
-		if (mode == 1 && j == 0) {
-			fp12_sqr(t, t);
-			continue;
-		}
-
-		/* Else we add it to the window. */
-		bitbuf |= (j << (w - ++bitcpy));
-		mode = 2;
-
-		if (bitcpy == w) {
-			/* Window is filled so square as required and multiply. */
-			for (i = 0; i < w; i++) {
-				fp12_sqr(t, t);
-			}
-			fp12_mul(t, t, tab[bitbuf]);
-			bitcpy = 0;
-			bitbuf = 0;
-			mode = 1;
-		}
-	}
-
-	/* If bits remain then square/multiply. */
-	if (mode == 2 && bitcpy > 0) {
-		/* Square then multiply if the bit is set. */
-		for (i = 0; i < bitcpy; i++) {
-			fp12_sqr(t, t);
-
-			/* Get next bit of the window. */
-			bitbuf <<= 1;
-			if ((bitbuf & (1 << w)) != 0) {
-				fp12_mul(t, t, tab[1]);
-			}
-		}
-	}
-
-	fp12_copy(c, t);
-	for (i = 0; i < 16; i++) {
-		fp12_free(tab[i]);
-	}
-	fp12_free(u);
-	fp12_free(t);
-}
-
-void fp12_exp_basic(fp12_t c, fp12_t a, bn_t b) {
+void fp12_exp_uni(fp12_t c, fp12_t a, bn_t b) {
 	fp12_t t;
 
-	fp12_new(t);
+	fp12_null(t);
 
-	fp12_copy(t, a);
+	TRY {
+		fp12_new(t);
 
-	for (int i = bn_bits(b) - 2; i >= 0; i--) {
-		fp12_sqr(t, t);
-		if (bn_test_bit(b, i)) {
-			fp12_mul(t, t, a);
+		fp12_copy(t, a);
+
+		for (int i = bn_bits(b) - 2; i >= 0; i--) {
+			fp12_sqr_uni(t, t);
+			if (bn_test_bit(b, i)) {
+				fp12_mul(t, t, a);
+			}
 		}
+		fp12_copy(c, t);
 	}
-	fp12_copy(c, t);
-
-	fp12_free(t);
-}
-
-void fp12_exp_basic_uni(fp12_t c, fp12_t a, bn_t b) {
-	fp12_t t;
-
-	fp12_new(t);
-
-	fp12_copy(t, a);
-
-	for (int i = bn_bits(b) - 2; i >= 0; i--) {
-		fp12_sqr_uni(t, t);
-		if (bn_test_bit(b, i)) {
-			fp12_mul(t, t, a);
-		}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-	fp12_copy(c, t);
-
-	fp12_free(t);
+	FINALLY {
+		fp12_free(t);
+	}
 }
-

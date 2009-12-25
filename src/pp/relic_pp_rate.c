@@ -30,10 +30,6 @@
  */
 
 #include "relic_core.h"
-#include "relic_fp.h"
-#include "relic_fp12.h"
-#include "relic_ep.h"
-#include "relic_ep2.h"
 #include "relic_pp.h"
 #include "relic_error.h"
 
@@ -42,12 +38,12 @@
 /*============================================================================*/
 
 /**
- * Add two prime elliptic curve points and evaluates the corresponing line
+ * Add two prime elliptic curve points and evaluates the corresponding line
  * function at another elliptic curve point.
  * 
  * @param[out] l			- the result of the evaluation.
- * @param[in,out] r				- the first point to add, in Affine coordinates.
- * The result of the addition, in Jacobian coordinates.
+ * @param[in,out] r			- the first point to add, in Affine coordinates.
+ * 							The result of the addition, in Jacobian coordinates.
  * @param[in] q				- the second point to add, in Jacobian coordinates.
  * @param[in] p				- the point where the line function will be
  * evaluated, in Affine coordinates. 
@@ -60,10 +56,11 @@ void rate_add(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	ep2_new(t);
 
 	ep2_copy(t, r);
-	ep2_add_slope(r, slope, r, q);
+	ep2_add_slp(r, slope, r, q);
 
-	if (ep2_is_infinity(r)) {
-		fp12_set_dig(l, 1);
+	if (ep2_is_infty(r)) {
+		fp12_zero(l);
+		fp_set_dig(l[0][0][0], 1);
 	} else {
 		fp6_t n, d;
 
@@ -94,7 +91,7 @@ void rate_add(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 }
 
 /**
- * Double a prime elliptic curve point and evaluates the corresponing line
+ * Double a prime elliptic curve point and evaluates the corresponding line
  * function at another elliptic curve point.
  * 
  * @param[out] l			- the result of the evaluation.
@@ -112,10 +109,11 @@ void rate_dbl(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	fp2_new(e);
 	ep2_new(t);
 	ep2_copy(t, r);
-	ep2_dbl_slope(r, s, e, r);
+	ep2_dbl_slp(r, s, e, r);
 
-	if (ep2_is_infinity(r)) {
-		fp12_set_dig(l, 1);
+	if (ep2_is_infty(r)) {
+		fp12_zero(l);
+		fp_set_dig(l[0][0][0], 1);
 	} else {
 		fp6_t n, d;
 
@@ -154,7 +152,7 @@ void rate_dbl(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
  * @param[in] a				- a point Jacobian coordinates.
  * @param[in] f				- constant used in Frobenius, Z^p.
  */
-static void ep2_frob(ep2_t c, ep2_t a, fp12_t f) {
+static void ep2_frb(ep2_t c, ep2_t a, fp12_t f) {
 	fp12_t t;
 
 	fp12_new(t);
@@ -186,17 +184,18 @@ void rate_miller(fp12_t res, ep2_t t, ep2_t q, bn_t r, ep_t p) {
 
 	fp12_new(tmp);
 
-	fp12_set_dig(res, 1);
+	fp12_zero(res);
+	fp_set_dig(res[0][0][0], 1);
 	ep2_copy(t, q);
 
 	for (i = bn_bits(r) - 1; i > 0; i--) {
 		rate_dbl(tmp, t, t, p);
 		fp12_sqr(res, res);
-		fp12_mul_sparse(res, res, tmp);
+		fp12_mul_dexsp(res, res, tmp);
 
 		if (bn_test_bit(r, i - 1)) {
 			rate_add(tmp, t, q, p);
-			fp12_mul_sparse(res, res, tmp);
+			fp12_mul_dexsp(res, res, tmp);
 		}
 	}
 }
@@ -205,7 +204,7 @@ void rate_miller(fp12_t res, ep2_t t, ep2_t q, bn_t r, ep_t p) {
  * Compute the additional multiplication required by the R-Ate pairing.
  * 
  * @param[in,out] res		- the field element output of the Miller loop.
- * The result of the additional multiplication.
+ * 							The result of the additional multiplication.
  * @param[in] t				- the elliptic point output of the Miller loop.
  * @param[in] q				- the first point of the pairing, in G_2. 
  * @param[in] p				- the second point of the pairing, in G_1.
@@ -223,20 +222,19 @@ void rate_mult(fp12_t res, ep2_t t, ep2_t q, ep_t p, fp12_t f) {
 	ep2_copy(r1q, t);
 
 	rate_add(tmp1, r1q, q, p);
-	fp12_mul_sparse(tmp2, res, tmp1);
-	fp12_frob(tmp2, tmp2, f);
+	fp12_mul_dexsp(tmp2, res, tmp1);
+	fp12_frb(tmp2, tmp2, f);
 	fp12_mul(res, res, tmp2);
 
-	//INVERSION
 	r1q->norm = 0;
 	ep2_norm(r1q, r1q);
 
-	ep2_frob(q1, r1q, f);
+	ep2_frb(q1, r1q, f);
 
 	ep2_copy(r1q, t);
 
 	rate_add(tmp1, r1q, q1, p);
-	fp12_mul_sparse(res, res, tmp1);
+	fp12_mul_dexsp(res, res, tmp1);
 }
 
 /**
@@ -247,7 +245,7 @@ void rate_mult(fp12_t res, ep2_t t, ep2_t q, ep_t p, fp12_t f) {
  * @param[in] x				- the BN parameter used to generate the curve.
  * @param[in] f				- constant used in Frobenius, Z^p.
  */
-void rate_final_expo(fp12_t m, bn_t x, fp12_t f) {
+void rate_exp(fp12_t m, bn_t x, fp12_t f) {
 	fp12_t v0;
 	fp12_t v1;
 	fp12_t v2;
@@ -268,8 +266,8 @@ void rate_final_expo(fp12_t m, bn_t x, fp12_t f) {
 
 	//Second, m^(p^2 + 1)
 	//t = m^(p^2)
-	fp12_frob(v0, m, f);
-	fp12_frob(v0, v0, f);
+	fp12_frb(v0, m, f);
+	fp12_frb(v0, v0, f);
 	//m' = m^(p^2 + 1)
 	fp12_mul(m, m, v0);
 
@@ -280,32 +278,32 @@ void rate_final_expo(fp12_t m, bn_t x, fp12_t f) {
 		//TODO: these inversions are probably just conjugations, test
 		//INVERSION
 		fp12_inv(v3, m);
-		fp12_exp_basic_uni(v0, v3, x);
+		fp12_exp_uni(v0, v3, x);
 		//INVERSION
 		fp12_inv(v3, v0);
-		fp12_exp_basic_uni(v1, v3, x);
+		fp12_exp_uni(v1, v3, x);
 		//INVERSION
 		fp12_inv(v3, v1);
-		fp12_exp_basic_uni(v2, v3, x);
+		fp12_exp_uni(v2, v3, x);
 	} else {
-		fp12_exp_basic_uni(v0, m, x);
-		fp12_exp_basic_uni(v1, v0, x);
-		fp12_exp_basic_uni(v2, v1, x);
+		fp12_exp_uni(v0, m, x);
+		fp12_exp_uni(v1, v0, x);
+		fp12_exp_uni(v2, v1, x);
 	}
 
-	fp12_frob(v3, v2, f);
+	fp12_frb(v3, v2, f);
 	fp12_mul(v2, v2, v3);
 	fp12_sqr_uni(v2, v2);
-	fp12_frob(v3, v1, f);
+	fp12_frb(v3, v1, f);
 	fp12_conj(v3, v3);
 	fp12_mul(v3, v3, v0);
 	fp12_mul(v2, v2, v3);
-	fp12_frob(v0, v0, f);
+	fp12_frb(v0, v0, f);
 	fp12_conj(v3, v1);
 	fp12_mul(v2, v2, v3);
 	fp12_mul(v0, v0, v3);
-	fp12_frob(v1, v1, f);
-	fp12_frob(v1, v1, f);
+	fp12_frb(v1, v1, f);
+	fp12_frb(v1, v1, f);
 	fp12_mul(v0, v0, v2);
 	fp12_mul(v2, v2, v1);
 	fp12_sqr_uni(v0, v0);
@@ -313,11 +311,11 @@ void rate_final_expo(fp12_t m, bn_t x, fp12_t f) {
 	fp12_sqr_uni(v0, v0);
 	fp12_conj(v1, m);
 	fp12_mul(v2, v0, v1);
-	fp12_frob(v1, m, f);
-	fp12_frob(v1, v1, f);
-	fp12_frob(v3, v1, f);
+	fp12_frb(v1, m, f);
+	fp12_frb(v1, v1, f);
+	fp12_frb(v3, v1, f);
 	fp12_mul(v1, v1, v3);
-	fp12_frob(v3, m, f);
+	fp12_frb(v3, m, f);
 	fp12_mul(v1, v1, v3);
 	fp12_mul(v0, v0, v1);
 	fp12_sqr_uni(v2, v2);
@@ -354,5 +352,5 @@ void pp_pair_rate(fp12_t res, ep2_t q, ep_t p, bn_t x, fp12_t f) {
 
 	rate_mult(res, t, q, p, f);
 
-	rate_final_expo(res, x, f);
+	rate_exp(res, x, f);
 }

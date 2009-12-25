@@ -46,12 +46,6 @@
 static fp_st curve_a;
 
 /**
- * Optimization identifier for the configured curve derived from the a
- * coefficient.
- */
-static int curve_opt_a;
-
-/**
  * The B coefficient of the elliptic curve.
  */
 static fp_st curve_b;
@@ -65,6 +59,12 @@ static ep_st curve_g;
  * The order of the group of points in the elliptic curve.
  */
 static bn_st curve_r;
+
+/**
+ * Optimization identifier for the configured curve derived from the a
+ * coefficient.
+ */
+static int curve_opt_a;
 
 /**
  * Flag that stores if the configured prime elliptic curve is supersingular.
@@ -148,9 +148,7 @@ void ep_curve_init(void) {
 		fp_new(table[i].z);
 	}
 #endif
-	fp_zero(curve_g.x);
-	fp_zero(curve_g.y);
-	fp_zero(curve_g.z);
+	ep_set_infty(&curve_g);
 	bn_init(&curve_r, FP_DIGS);
 }
 

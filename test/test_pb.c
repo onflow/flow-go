@@ -39,6 +39,8 @@ static int memory2(void) {
 	int code = STS_ERR;
 	fb2_t a;
 
+	fb2_null(a);
+
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
 			fb2_new(a);
@@ -143,6 +145,12 @@ static int addition2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c, d, e;
 
+	fb2_null(a);
+	fb2_null(b);
+	fb2_null(c);
+	fb2_null(d);
+	fb2_null(e);
+
 	TRY {
 		fb2_new(a);
 		fb2_new(b);
@@ -201,6 +209,11 @@ static int subtraction2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c, d;
 
+	fb2_null(a);
+	fb2_null(b);
+	fb2_null(c);
+	fb2_null(d);
+
 	TRY {
 		fb2_new(a);
 		fb2_new(b);
@@ -248,6 +261,13 @@ static int subtraction2(void) {
 static int multiplication2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c, d, e, f;
+
+	fb2_null(a);
+	fb2_null(b);
+	fb2_null(c);
+	fb2_null(d);
+	fb2_null(e);
+	fb2_null(f);
 
 	TRY {
 		fb2_new(a);
@@ -320,6 +340,10 @@ static int squaring2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c;
 
+	fb2_null(a);
+	fb2_null(b);
+	fb2_null(c);
+
 	TRY {
 		fb2_new(a);
 		fb2_new(b);
@@ -347,6 +371,10 @@ static int squaring2(void) {
 static int inversion2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c;
+
+	fb2_null(a);
+	fb2_null(b);
+	fb2_null(c);
 
 	TRY {
 		fb2_new(a);
@@ -376,6 +404,8 @@ static int memory4(void) {
 	err_t e;
 	int code = STS_ERR;
 	fb4_t a;
+
+	fb4_null(a);
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
@@ -481,6 +511,12 @@ static int addition4(void) {
 	int code = STS_ERR;
 	fb4_t a, b, c, d, e;
 
+	fb4_null(a);
+	fb4_null(b);
+	fb4_null(c);
+	fb4_null(d);
+	fb4_null(e);
+
 	TRY {
 		fb4_new(a);
 		fb4_new(b);
@@ -539,6 +575,11 @@ static int subtraction4(void) {
 	int code = STS_ERR;
 	fb4_t a, b, c, d;
 
+	fb4_null(a);
+	fb4_null(b);
+	fb4_null(c);
+	fb4_null(d);
+
 	TRY {
 		fb4_new(a);
 		fb4_new(b);
@@ -588,6 +629,13 @@ static int multiplication4(void) {
 	fb4_t a, b, c, d, e, f;
 	fb_t beta;
 
+	fb4_null(a);
+	fb4_null(b);
+	fb4_null(c);
+	fb4_null(d);
+	fb4_null(e);
+	fb4_null(f);
+
 	TRY {
 		fb4_new(a);
 		fb4_new(b);
@@ -628,7 +676,7 @@ static int multiplication4(void) {
 			TEST_ASSERT(fb4_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 
-		TEST_BEGIN("quartic multiplication is correct") {
+		TEST_BEGIN("dense x dense multiplication is correct") {
 			fb_zero(beta);
 			fb_set_bit(beta, 3, 1);
 			fb_set_bit(beta, 5, 1);
@@ -645,7 +693,7 @@ static int multiplication4(void) {
 			fb_mul(c[1], c[1], beta);
 			fb_mul(c[2], c[2], beta);
 			fb_mul(c[3], c[3], beta);
-			fb4_mul_quart(d, a, b);
+			fb4_mul_dexde(d, a, b);
 			TEST_ASSERT(fb4_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 
@@ -707,6 +755,10 @@ static int squaring4(void) {
 	int code = STS_ERR;
 	fb4_t a, b, c;
 
+	fb4_null(a);
+	fb4_null(b);
+	fb4_null(c);
+
 	TRY {
 		fb4_new(a);
 		fb4_new(b);
@@ -734,6 +786,10 @@ static int squaring4(void) {
 static int exponentiation4(void) {
 	int code = STS_ERR;
 	fb4_t a, b, c;
+
+	fb4_null(a);
+	fb4_null(b);
+	fb4_null(c);
 
 	TRY {
 		fb4_new(a);
@@ -767,6 +823,14 @@ static int pairing(void) {
 	fb4_t e1, e2;
 	eb_t p, q, r;
 	bn_t k, n;
+
+	fb4_null(e1);
+	fb4_null(e2);
+	eb_null(p);
+	eb_null(q);
+	eb_null(r);
+	bn_null(k);
+	bn_null(n);
 
 	TRY {
 		fb4_new(e1);

@@ -339,7 +339,7 @@ void fb4_mul(fb4_t c, fb4_t a, fb4_t b) {
 	}
 }
 
-void fb4_mul_quart(fb4_t c, fb4_t a, fb4_t b) {
+void fb4_mul_dexde(fb4_t c, fb4_t a, fb4_t b) {
 	fb4_t _a, _b;
 	fb_t t0, t1, t2, t3, t4, t5, t6, t7, t8, t9;
 	dv_t t;

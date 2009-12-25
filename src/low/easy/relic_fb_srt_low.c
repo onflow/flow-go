@@ -51,7 +51,7 @@ static const dig_t table_odds[16] = {
 static void fb_srtt_low(dig_t *c, dig_t *a, int fa) {
 	int i, j, n, h, sh, rh, lh, sa, la, ra;
 	dig_t d, d_e, d_o;
-	align dig_t t[DV_DIGS];
+	align dig_t t[2 * FB_DIGS];
 
 	dv_zero(t, 2 * FB_DIGS);
 
@@ -88,6 +88,19 @@ static void fb_srtt_low(dig_t *c, dig_t *a, int fa) {
 		}
 
 		t[n] ^= d_e;
+
+		if (rh == 0) {
+			t[h + n] = d_o;
+		} else {
+			t[h + n - 1] ^= (d_o << lh);
+			t[h + n] ^= (d_o >> rh);
+		}
+		if (la == 0) {
+			t[n + sa] ^= d_o;
+		} else {
+			t[n + sa] ^= (d_o << la);
+			t[n + sa + 1] ^= (d_o >> ra);
+		}
 	}
 	fb_copy(c, t);
 }
