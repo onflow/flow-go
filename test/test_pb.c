@@ -937,7 +937,7 @@ int main(void) {
 	util_print_banner("Quartic extension:", 0);
 	util_print_banner("Utilities", 1)
 
-	if (memory4() != STS_OK) {
+			if (memory4() != STS_OK) {
 		core_clean();
 		return 1;
 	}
@@ -976,13 +976,15 @@ int main(void) {
 
 	if (eb_param_set_any_super() == STS_ERR) {
 		THROW(ERR_NO_CURVE);
-	} else {
-		util_print_banner("Bilinear pairing:\n", 0);
+		core_clean();
+		return 1;
+	}
 
-		if (pairing() != STS_OK) {
-			core_clean();
-			return 1;
-		}
+	util_print_banner("Bilinear pairing:\n", 0);
+
+	if (pairing() != STS_OK) {
+		core_clean();
+		return 1;
 	}
 
 	core_clean();

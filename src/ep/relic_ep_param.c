@@ -196,7 +196,6 @@ static int param_id;
 
 void ep_param_set(int param) {
 	int ordin = 0;
-	int pairf = 0;
 #if ARCH == AVR
 	char str[2 * FB_DIGS + 1];
 #else
@@ -257,7 +256,7 @@ void ep_param_set(int param) {
 #if defined(EP_ORDIN) && FP_PRIME == 256
 			case BNN_P256:
 				ASSIGN(BNN_P256, BNN_256);
-				pairf = 1;
+				ordin = 1;
 				break;
 #endif
 			default:

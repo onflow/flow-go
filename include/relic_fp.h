@@ -305,23 +305,31 @@ void fp_param_set(int param);
 
 /**
  * Assigns any pre-defined parameter as the prime modulus.
+ *
+ * @return STS_OK if no errors occurred; STS_ERR otherwise.
  */
-void fp_param_set_any(void);
+int fp_param_set_any(void);
 
 /**
  * Assigns the order of the prime field to any non-sparse prime.
+ *
+ * @return STS_OK if no errors occurred; STS_ERR otherwise.
  */
-void fp_prime_set_any_dense(void);
+int fp_param_set_any_dense(void);
 
 /**
  * Assigns the order of the prime field to any sparse prime.
+ *
+ * @return STS_OK if no errors occurred; STS_ERR otherwise.
  */
-void fp_prime_set_any_spars(void);
+int fp_param_set_any_spars(void);
 
 /**
  * Assigns the order of the prime field to any towering-friendly prime.
+ *
+ * @return STS_OK if no errors occurred; STS_ERR otherwise.
  */
-void fp_prime_set_any_tower(void);
+int fp_param_set_any_tower(void);
 
 /**
  * Prints the currently configured prime modulus.

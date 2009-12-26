@@ -159,7 +159,7 @@ void fp_param_set(int param) {
 	}
 }
 
-void fp_param_set_any(void) {
+int fp_param_set_any(void) {
 #if FP_PRIME == 160
 	fp_param_set(SECG_160);
 #elif FP_PRIME == 192
@@ -177,27 +177,36 @@ void fp_param_set_any(void) {
 #elif FP_PRIME == 521
 	fp_param_set(NIST_521);
 #else
-	fp_param_set_any_dense();
+	return fp_param_set_any_dense();
 #endif
+	return STS_OK;
 }
 
-void fp_param_set_any_dense() {
+int fp_param_set_any_dense() {
 	bn_t modulus;
+	int result = STS_OK;
 
 	bn_null(modulus);
 
 	TRY {
 		bn_new(modulus);
 		bn_gen_prime(modulus, FP_BITS);
-		fp_prime_set_dense(modulus);
-	} CATCH_ANY {
+		if (!bn_is_prime(modulus)) {
+			result = STS_ERR;
+		} else {
+			fp_prime_set_dense(modulus);
+		}
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		bn_free(modulus);
 	}
+	return result;
 }
 
-void fp_param_set_any_spars(void) {
+int fp_param_set_any_spars(void) {
 #if FP_PRIME == 160
 	fp_param_set(SECG_160);
 #elif FP_PRIME == 192
@@ -211,17 +220,22 @@ void fp_param_set_any_spars(void) {
 #elif FP_PRIME == 521
 	fp_param_set(NIST_521);
 #else
-	THROW(ERR_INVALID);
+	return STS_ERR;
 #endif
+	return STS_OK;
 }
 
-void fp_param_set_any_tower() {
+int fp_param_set_any_tower() {
 #if FP_PRIME == 256
 	fp_param_set(BNN_256);
+#else
+	return STS_ERR;
 #endif
-	if (fp_prime_get_mod5() != 1 || fp_prime_get_mod8() == 1) {
-		THROW(ERR_INVALID);
+	if (fp_prime_get_mod5() == 1 || fp_prime_get_mod5() == 4 ||
+			fp_prime_get_mod8() == 1) {
+		return STS_ERR;
 	}
+	return STS_OK;
 }
 
 void fp_param_print(void) {

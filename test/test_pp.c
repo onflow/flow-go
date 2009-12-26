@@ -1293,10 +1293,10 @@ int addition(void) {
 		} TEST_END;
 
 		TEST_BEGIN("point addition has inverse") {
-//			ep2_rand(a);
-//			ep2_neg(d, a);
-//			ep2_add(e, a, d);
-//			TEST_ASSERT(ep2_is_infty(e), end);
+			//          ep2_rand(a);
+			//          ep2_neg(d, a);
+			//          ep2_add(e, a, d);
+			//          TEST_ASSERT(ep2_is_infty(e), end);
 		} TEST_END;
 
 #if EP_ADD == BASIC || !defined(STRIP)
@@ -1452,7 +1452,11 @@ int main(void) {
 	fp12_new(r2);
 	fp12_new(f);
 
-	fp_param_set_any_tower();
+	if (fp_param_set_any_tower() != STS_OK) {
+		THROW(ERR_NO_FIELD);
+		core_clean();
+		return 1;
+	}
 
 	util_print_banner("Tests for the PP module", 0);
 
@@ -1592,6 +1596,11 @@ int main(void) {
 		return 1;
 	}
 
+	if (ep_param_set_any_pairf() == STS_ERR) {
+		THROW(ERR_NO_CURVE);
+		core_clean();
+		return 1;
+	}
 	ep2_curve_set_twist(1);
 
 	util_print_banner("Quadratic twist:", 0);
@@ -1621,13 +1630,19 @@ int main(void) {
 
 	util_print_banner("Bilinear pairing:\n", 0);
 
-	char *xp0 = "1822AA754FAFAFF95FE37842D7D5DECE88305EC19B363F6681DF06BF405F02B4";
-	char *xp1 = "1AB4CC8A133A7AA970AADAE37C20D1C7191279CBA02830AFC64C19B50E8B1997";
-	char *yp0 = "16737CF6F9DEC5895A7E5A6D60316763FB6638A0A82F26888E909DA86F7F84BA";
-	char *yp1 = "5B6DB6FF5132FB917E505627E7CCC12E0CE9FCC4A59805B3B730EE0EC44E43C";
+	char *xp0 =
+			"1822AA754FAFAFF95FE37842D7D5DECE88305EC19B363F6681DF06BF405F02B4";
+	char *xp1 =
+			"1AB4CC8A133A7AA970AADAE37C20D1C7191279CBA02830AFC64C19B50E8B1997";
+	char *yp0 =
+			"16737CF6F9DEC5895A7E5A6D60316763FB6638A0A82F26888E909DA86F7F84BA";
+	char *yp1 =
+			"5B6DB6FF5132FB917E505627E7CCC12E0CE9FCC4A59805B3B730EE0EC44E43C";
 	char *sx = "-4080000000000001";
-	char *f0 = "1B377619212E7C8CB6499B50A846953F850974924D3F77C2E17DE6C06F2A6DE9";
-	char *f1 = "9EBEE691ED1837503EAB22F57B96AC8DC178B6DB2C08850C582193F90D5922A";
+	char *f0 =
+			"1B377619212E7C8CB6499B50A846953F850974924D3F77C2E17DE6C06F2A6DE9";
+	char *f1 =
+			"9EBEE691ED1837503EAB22F57B96AC8DC178B6DB2C08850C582193F90D5922A";
 
 	ep_copy(q, ep_curve_get_gen());
 	fp_read(p->x[0], xp0, strlen(xp0), 16);
@@ -1651,14 +1666,6 @@ int main(void) {
 		TEST_ASSERT(fp12_cmp(r1, r2) == CMP_EQ, end);
 	} TEST_END;
 
-//	BENCH_BEGIN("rate_pair") {
-//		BENCH_ADD(pp_pair_rate2(r1, p, q, x, f));
-//	} BENCH_END;
-//
-//	BENCH_BEGIN("rate_pair") {
-//		BENCH_ADD(pp_pair_rate(r1, p, q, x, f));
-//	} BENCH_END;
-
 	ep2_free(p);
 	ep_free(q);
 	ep_free(t);
@@ -1666,7 +1673,7 @@ int main(void) {
 	fp12_free(r1);
 	fp12_free(r2);
 	fp12_free(f);
-end:
+  end:
 	core_clean();
 
 	return 0;
