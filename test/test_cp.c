@@ -338,8 +338,6 @@ int main(void) {
 	util_print_banner("Protocols based on pairings:", 0);
 #if defined(EB_STAND) && defined(EB_SUPER)
 	if (eb_param_set_any_super() == STS_OK) {
-		eb_param_print();
-		printf("\n");
 		if (sokaka() != STS_OK) {
 			core_clean();
 			return 1;

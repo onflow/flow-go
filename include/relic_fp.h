@@ -247,11 +247,18 @@ dig_t *fp_prime_get_rdc(void);
 dig_t *fp_prime_get_conv(void);
 
 /**
+ * Returns the result of prime order mod 5.
+ *
+ * @return the result of prime order mod 5.
+ */
+dig_t fp_prime_get_mod5(void);
+
+/**
  * Returns the result of prime order mod 8.
  *
  * @return the result of prime order mod 8.
  */
-dig_t *fp_prime_get_mod8(void);
+dig_t fp_prime_get_mod8(void);
 
 /**
  * Returns the prime stored in special form. The most significant bit is
@@ -300,6 +307,21 @@ void fp_param_set(int param);
  * Assigns any pre-defined parameter as the prime modulus.
  */
 void fp_param_set_any(void);
+
+/**
+ * Assigns the order of the prime field to any non-sparse prime.
+ */
+void fp_prime_set_any_dense(void);
+
+/**
+ * Assigns the order of the prime field to any sparse prime.
+ */
+void fp_prime_set_any_spars(void);
+
+/**
+ * Assigns the order of the prime field to any towering-friendly prime.
+ */
+void fp_prime_set_any_tower(void);
 
 /**
  * Prints the currently configured prime modulus.

@@ -144,7 +144,8 @@ void fp_param_set(int param) {
 				fp_prime_set_spars(f, 1);
 				break;
 			default:
-				THROW(ERR_NO_FIELD);
+				bn_gen_prime(p, FP_BITS);
+				fp_prime_set_dense(p);
 				break;
 		}
 	}
@@ -176,6 +177,11 @@ void fp_param_set_any(void) {
 #elif FP_PRIME == 521
 	fp_param_set(NIST_521);
 #else
+	fp_param_set_any_dense();
+#endif
+}
+
+void fp_param_set_any_dense() {
 	bn_t modulus;
 
 	bn_null(modulus);
@@ -189,7 +195,33 @@ void fp_param_set_any(void) {
 	} FINALLY {
 		bn_free(modulus);
 	}
+}
+
+void fp_param_set_any_spars(void) {
+#if FP_PRIME == 160
+	fp_param_set(SECG_160);
+#elif FP_PRIME == 192
+	fp_param_set(NIST_192);
+#elif FP_PRIME == 224
+	fp_param_set(NIST_224);
+#elif FP_PRIME == 256
+	fp_param_set(NIST_256);
+#elif FP_PRIME == 384
+	fp_param_set(NIST_384);
+#elif FP_PRIME == 521
+	fp_param_set(NIST_521);
+#else
+	THROW(ERR_INVALID);
 #endif
+}
+
+void fp_param_set_any_tower() {
+#if FP_PRIME == 256
+	fp_param_set(BNN_256);
+#endif
+	if (fp_prime_get_mod5() != 1 || fp_prime_get_mod8() == 1) {
+		THROW(ERR_INVALID);
+	}
 }
 
 void fp_param_print(void) {

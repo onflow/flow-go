@@ -62,10 +62,10 @@ typedef fp_st fp2_st[2];
 /**
  * Represents a sextic extension field element.
  *
- * This extension is constructed with the basis {1, v, v^2}, where v is an
+ * This extension is constructed with the basis {1, v, v^2}, where v^3 = E is an
  * adjoined cube root in the underlying quadratic extension.  If p = 3 mod 8,
- * v^3 = u + 1; if p = 5 mod 8, v^3 = u; if p = 7 mod 8 and p = 2,3 mod 5,
- * v^3 = u + 2.
+ * E = u + 1; if p = 5 mod 8, E = u; if p = 7 mod 8 and p = 2,3 mod 5,
+ * E = u + 2.
  */
 typedef fp2_t fp6_t[3];
 
@@ -308,7 +308,7 @@ typedef ep2_st *ep2_t;
 		fp2_add(C[2], A[2], B[2]);											\
 
 /**
- * Subtracts a sextic extension field element from another, that is, computes
+ * Subtracts a sextic extension field element from another. Computes
  * C = A - B.
  *
  * @param[out] C			- the result.
@@ -579,8 +579,8 @@ void fp2_mul_art(fp2_t c, fp2_t a);
 
 /**
  * Multiplies a quadratic extension field element by a quadratic/cubic
- * non-residue. Computes c = a * v, where v is a non-square/non-cube in the
- * quadratic extension.
+ * non-residue. Computes c = a * E, where E is a non-square/non-cube in the
+ * this quadratic extension.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the quadratic extension field element to multiply.
@@ -676,25 +676,14 @@ void fp6_sqr(fp6_t c, fp6_t a);
 void fp6_inv(fp6_t c, fp6_t a);
 
 /**
- * Computes the Frobenius endomorphism of a unitary sextic extension
- * field element. Computes c = a^p.
+ * Computes the Frobenius endomorphism of a sextic extension field element.
+ * Computes c = a^p.
  *
  * @param[out] c			- the result.
  * @param[in] a				- a sextic extension field element.
  * @param[in] b				- the constant v^p used for the computation.
  */
 void fp6_frb(fp6_t c, fp6_t a, fp6_t b);
-
-/**
- * Computes the inverse of a dodecic unitary extension field element.
- *
- * For unitary elements, this is equivalent to computing the conjugate.
- * A unitary element is one previously raised to the (p^6 - 1)-th power.
- *
- * @param[out] c			- the result.
- * @param[in] a				- the dodecic extension field element to conjugate.
- */
-void fp12_conj(fp12_t c, fp12_t a);
 
 /**
  * Multiples two dodecic extension field elements. Compute c = a * b.
@@ -745,6 +734,17 @@ void fp12_sqr_uni(fp12_t c, fp12_t a);
 void fp12_inv(fp12_t c, fp12_t a);
 
 /**
+ * Computes the inverse of a dodecic unitary extension field element.
+ *
+ * For unitary elements, this is equivalent to computing the conjugate.
+ * A unitary element is one previously raised to the (p^6 - 1)-th power.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the dodecic extension field element to conjugate.
+ */
+void fp12_inv_uni(fp12_t c, fp12_t a);
+
+/**
  * Computes the Frobenius endomorphism of a dodecic extension element.
  * Computes c = a^p.
  *
@@ -753,6 +753,26 @@ void fp12_inv(fp12_t c, fp12_t a);
  * @param[in] b				- the constant w^p used for the computation.
  */
 void fp12_frb(fp12_t c, fp12_t a, fp12_t b);
+
+/**
+ * Computes a power of a dodecic extension field element.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fp12_exp(fp12_t c, fp12_t a, bn_t b);
+
+/**
+ * Computes a power of a unitary dodecic extension field element.
+ *
+ * A unitary element is one previously raised to the (p^6 - 1)-th power.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fp12_exp_uni(fp12_t c, fp12_t a, bn_t b);
 
 /**
  * Initializes the elliptic curve over quadratic extension.

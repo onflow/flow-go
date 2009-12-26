@@ -54,15 +54,20 @@ static bn_st prime;
 static bn_st u;
 
 /**
- * Prime modulus modulo 8.
- */
-static bn_st prime_mod8;
-
-/**
  * Auxiliar value computed as R^2 mod m used to convert small integers
  * to Montgomery form.
  */
 static bn_st conv, one;
+
+/**
+ * Prime modulus modulo 8.
+ */
+static dig_t prime_mod8;
+
+/**
+ * Prime modulus modulo 5.
+ */
+static dig_t prime_mod5;
 
 /**
  * Quadratic non-residue.
@@ -96,7 +101,6 @@ static int spars_len = 0;
 void fp_prime_init() {
 	bn_init(&prime, FP_DIGS);
 	bn_init(&u, FP_DIGS);
-	bn_init(&prime_mod8, FP_DIGS);
 	bn_init(&conv, FP_DIGS);
 	bn_init(&one, FP_DIGS);
 }
@@ -104,7 +108,6 @@ void fp_prime_init() {
 void fp_prime_clean() {
 	bn_clean(&prime);
 	bn_clean(&u);
-	bn_clean(&prime_mod8);
 	bn_clean(&conv);
 	bn_clean(&one);
 }
@@ -135,8 +138,12 @@ dig_t *fp_prime_get_conv(void) {
 	return conv.dp;
 }
 
-dig_t *fp_prime_get_mod8() {
-	return prime_mod8.dp;
+dig_t fp_prime_get_mod8() {
+	return prime_mod8;
+}
+
+dig_t fp_prime_get_mod5() {
+	return prime_mod5;
 }
 
 int fp_prime_get_qnr() {
@@ -154,9 +161,10 @@ void fp_prime_set(bn_t p) {
 
 	bn_copy(&prime, p);
 
-	bn_mod_2b(&prime_mod8, &prime, 3);
+	bn_mod_dig(&prime_mod5, &prime, 5);
+	bn_mod_dig(&prime_mod8, &prime, 8);
 
-	switch (prime_mod8.dp[0]) {
+	switch (prime_mod8) {
 		case 3:
 			prime_qnr = -1;
 			break;

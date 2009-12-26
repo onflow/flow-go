@@ -1452,7 +1452,7 @@ int main(void) {
 	fp12_new(r2);
 	fp12_new(f);
 
-	fp_param_set_any();
+	fp_param_set_any_tower();
 
 	util_print_banner("Tests for the PP module", 0);
 
@@ -1536,20 +1536,21 @@ int main(void) {
 		return 1;
 	}
 
-//	if (multiplication6() != STS_OK) {
-//		core_clean();
-//		return 1;
-//	}
-//
-//	if (squaring6() != STS_OK) {
-//		core_clean();
-//		return 1;
-//	}
 
-//	if (inversion6() != STS_OK) {
-//		core_clean();
-//	return 1;
-//	}
+	if (multiplication6() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (squaring6() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (inversion6() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	util_print_banner("Dodecic extension:", 0);
 	util_print_banner("Utilities:", 1);
@@ -1576,22 +1577,21 @@ int main(void) {
 		return 1;
 	}
 
-//	if (multiplication12() != STS_OK) {
-//		core_clean();
-//		return 1;
-//	}
-//
-//	if (squaring12() != STS_OK) {
-//		core_clean();
-//		return 1;
-//	}
-//
-//	if (inversion12() != STS_OK) {
-//		core_clean();
-//		return 1;
-//	}
+	if (multiplication12() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
-	ep_param_set(BNN_P256);
+	if (squaring12() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (inversion12() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
 	ep2_curve_set_twist(1);
 
 	util_print_banner("Quadratic twist:", 0);
