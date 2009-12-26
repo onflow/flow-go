@@ -1442,7 +1442,8 @@ int main(void) {
 	ep2_t p;
 	ep_t q, t;
 	bn_t x;
-	fp12_t r1, r2, f;
+	fp12_t r1, r2;
+	fp2_t f;
 
 	ep2_new(p);
 	ep_new(q);
@@ -1450,7 +1451,7 @@ int main(void) {
 	bn_new(x);
 	fp12_new(r1);
 	fp12_new(r2);
-	fp12_new(f);
+	fp2_new(f);
 
 	if (fp_param_set_any_tower() != STS_OK) {
 		THROW(ERR_NO_FIELD);
@@ -1651,9 +1652,8 @@ int main(void) {
 	fp_read(p->y[1], yp1, strlen(yp1), 16);
 	fp2_zero(p->z);
 	fp_set_dig(p->z[0], 1);
-	fp12_zero(f);
-	fp_read(f[1][0][0], f0, strlen(f0), 16);
-	fp_read(f[1][0][1], f1, strlen(f1), 16);
+	fp_read(f[0], f0, strlen(f0), 16);
+	fp_read(f[1], f1, strlen(f1), 16);
 	bn_read_str(x, sx, strlen(sx), 16);
 
 	TEST_BEGIN("rate pairing is bilinear") {
@@ -1672,8 +1672,8 @@ int main(void) {
 	bn_free(x);
 	fp12_free(r1);
 	fp12_free(r2);
-	fp12_free(f);
-  end:
+	fp2_free(f);
+end:
 	core_clean();
 
 	return 0;

@@ -211,7 +211,7 @@ dig_t *fb_poly_get_srt(void) {
 #if FB_SRT == QUICK || !defined(STRIP)
 	return sqrt;
 #else
-	return NULL
+	return NULL;
 #endif
 }
 

@@ -681,9 +681,9 @@ void fp6_inv(fp6_t c, fp6_t a);
  *
  * @param[out] c			- the result.
  * @param[in] a				- a sextic extension field element.
- * @param[in] b				- the constant v^p used for the computation.
+ * @param[in] b				- the constant v^{p-1} used for the computation.
  */
-void fp6_frb(fp6_t c, fp6_t a, fp6_t b);
+void fp6_frb(fp6_t c, fp6_t a, fp2_t b);
 
 /**
  * Multiples two dodecic extension field elements. Compute c = a * b.
@@ -750,9 +750,9 @@ void fp12_inv_uni(fp12_t c, fp12_t a);
  *
  * @param[out] c			- the result.
  * @param[in] a				- a dodecic extension field element.
- * @param[in] b				- the constant w^p used for the computation.
+ * @param[in] b				- the constant w^{p-1} used for the computation.
  */
-void fp12_frb(fp12_t c, fp12_t a, fp12_t b);
+void fp12_frb(fp12_t c, fp12_t a, fp2_t b);
 
 /**
  * Computes a power of a dodecic extension field element.
@@ -923,6 +923,8 @@ void ep2_print(ep2_t p);
  */
 void ep2_norm(ep2_t r, ep2_t p);
 
+void ep2_dbl_basic(ep2_t r, ep2_t p);
+
 /**
  * Initializes the pairing over prime fields module.
  */
@@ -941,8 +943,8 @@ void pp_core_clean(void);
  * @param[in] q				- the first elliptic curve point.
  * @param[in] p				- the second elliptic curve point.
  * @param[in] x				- the parameter used to generate the elliptic curve.
- * @param[in] f				- the constant w^p used in the Frobenius.
+ * @param[in] f				- the constant w^{p-1} used in the Frobenius.
  */
-void pp_pair_rate(fp12_t r, ep2_t q, ep_t p, bn_t x, fp12_t f);
+void pp_pair_rate(fp12_t r, ep2_t q, ep_t p, bn_t x, fp2_t f);
 
 #endif /* !RELIC_PP_H */

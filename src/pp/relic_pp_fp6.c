@@ -256,37 +256,25 @@ void fp6_sqr(fp6_t c, fp6_t a) {
 	}
 }
 
-void fp6_frb(fp6_t c, fp6_t a, fp6_t b) {
-	fp6_t t0, t1;
-
-	fp6_null(t0);
-	fp6_null(t1);
+void fp6_frb(fp6_t c, fp6_t a, fp2_t b) {
+	fp2_t t;
 
 	TRY {
-		fp6_new(t0);
-		fp6_new(t1);
+		fp2_new(t);
 
-		fp6_zero(t0);
-		fp6_zero(t1);
+		fp2_sqr(t, b);
 
 		fp2_frb(c[0], a[0]);
 		fp2_frb(c[1], a[1]);
 		fp2_frb(c[2], a[2]);
+		
+		fp2_mul(c[1], c[1], b);
+		fp2_mul(c[2], c[2], t);
 
-		fp2_copy(t1[0], c[0]);
-		fp2_copy(t0[0], c[1]);
-		fp6_mul(t0, t0, b);
-		fp6_add(t1, t1, t0);
-		fp6_zero(t0);
-		fp2_copy(t0[0], c[2]);
-		fp6_mul(t0, t0, b);
-		fp6_mul(t0, t0, b);
-		fp6_add(c, t1, t0);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
-		fp6_free(t0);
-		fp6_free(t1);
+		fp2_free(t);
 	}
 }
 

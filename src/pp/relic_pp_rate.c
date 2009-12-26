@@ -148,25 +148,24 @@ void rate_dbl(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
  * 
  * On G_2, this is the same as multiplying by p.   
  * 
- * @param[out] c			- the result in Jacobian coordinates.
- * @param[in] a				- a point Jacobian coordinates.
- * @param[in] f				- constant used in Frobenius, Z^p.
+ * @param[out] c			- the result in affine coordinates.
+ * @param[in] a				- a point in affine coordinates.
+ * @param[in] f				- constant used in Frobenius, w^{p-1}.
  */
-static void ep2_frb(ep2_t c, ep2_t a, fp12_t f) {
-	fp12_t t;
+static void ep2_frb(ep2_t c, ep2_t a, fp2_t f) {
+	fp2_t t;
 
-	fp12_new(t);
+	fp2_new(t);
 
-	fp12_sqr(t, f);
+	fp2_sqr(t, f);
 
 	fp2_frb(c->x, a->x);
 	fp2_frb(c->y, a->y);
-	fp2_frb(c->z, a->z);
-	fp2_mul(c->x, c->x, t[0][1]);
-	fp2_mul(c->y, c->y, t[0][1]);
-	fp2_mul(c->y, c->y, f[1][0]);
+	fp2_mul(c->x, c->x, t);
+	fp2_mul(c->y, c->y, t);
+	fp2_mul(c->y, c->y, f);
 
-	fp12_free(t);
+	fp2_free(t);
 }
 
 /**
@@ -208,9 +207,9 @@ void rate_miller(fp12_t res, ep2_t t, ep2_t q, bn_t r, ep_t p) {
  * @param[in] t				- the elliptic point output of the Miller loop.
  * @param[in] q				- the first point of the pairing, in G_2. 
  * @param[in] p				- the second point of the pairing, in G_1.
- * @param[in] f				- constant used in Frobenius, Z^p.
+ * @param[in] f				- constant used in Frobenius, w^{p-1}.
  */
-void rate_mult(fp12_t res, ep2_t t, ep2_t q, ep_t p, fp12_t f) {
+void rate_mult(fp12_t res, ep2_t t, ep2_t q, ep_t p, fp2_t f) {
 	ep2_t q1, r1q;
 	fp12_t tmp1;
 	fp12_t tmp2;
@@ -243,9 +242,9 @@ void rate_mult(fp12_t res, ep2_t t, ep2_t q, ep_t p, fp12_t f) {
  * @param[in,out] m			- the output of the additional pairing multiplication.
  * The result of the final exponentiation.
  * @param[in] x				- the BN parameter used to generate the curve.
- * @param[in] f				- constant used in Frobenius, Z^p.
+ * @param[in] f				- constant used in Frobenius, w^{p-1}.
  */
-void rate_exp(fp12_t m, bn_t x, fp12_t f) {
+void rate_exp(fp12_t m, bn_t x, fp2_t f) {
 	fp12_t v0;
 	fp12_t v1;
 	fp12_t v2;
@@ -326,7 +325,7 @@ void rate_exp(fp12_t m, bn_t x, fp12_t f) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void pp_pair_rate(fp12_t res, ep2_t q, ep_t p, bn_t x, fp12_t f) {
+void pp_pair_rate(fp12_t res, ep2_t q, ep_t p, bn_t x, fp2_t f) {
 	ep2_t t;
 	bn_t a;
 

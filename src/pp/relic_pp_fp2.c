@@ -114,7 +114,7 @@ void fp2_mul_nor(fp2_t c, fp2_t a) {
 	TRY {
 		fp2_new(t0);
 
-		switch (fp_prime_get_mod8()[0]) {
+		switch (fp_prime_get_mod8()) {
 			case 5:
 				/* If p = 5 mod 8, x^2 - sqrt(sqrt(-2)) is irreducible. */
 				fp2_mul_art(c, a);
