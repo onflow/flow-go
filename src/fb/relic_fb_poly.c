@@ -219,7 +219,9 @@ void fb_poly_set(fb_t f) {
 	fb_copy(poly, f);
 	find_trace();
 	find_solve();
+#if FB_SRT == QUICK || !defined(STRIP)
 	find_sqrt();
+#endif
 }
 
 void fb_poly_add(fb_t c, fb_t a) {
