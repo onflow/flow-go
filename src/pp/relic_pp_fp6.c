@@ -75,7 +75,7 @@ void fp6_mul(fp6_t c, fp6_t a, fp6_t b) {
 		/* v2 = a2b2 */
 		fp2_mul(v2, a[2], b[2]);
 
-		/* t2 (c0) = v0 + B((a1 + a2)(b1 + b2) - v1 - v2) */
+		/* t2 (c0) = v0 + E((a1 + a2)(b1 + b2) - v1 - v2) */
 		fp2_add(t0, a[1], a[2]);
 		fp2_add(t1, b[1], b[2]);
 		fp2_mul(t2, t0, t1);
@@ -84,7 +84,7 @@ void fp6_mul(fp6_t c, fp6_t a, fp6_t b) {
 		fp2_mul_nor(t2, t2);
 		fp2_add(t2, t2, v0);
 
-		/* c1 = (a0 + a1)(b0 + b1) - v0 - v1 + Bv2 */
+		/* c1 = (a0 + a1)(b0 + b1) - v0 - v1 + Ev2 */
 		fp2_add(t0, a[0], a[1]);
 		fp2_add(t1, b[0], b[1]);
 		fp2_mul(c[1], t0, t1);
@@ -139,14 +139,14 @@ void fp6_mul_dexsp(fp6_t c, fp6_t a, fp6_t b) {
 
 		/* v2 = a2b2 = 0 */
 
-		/* t2 (c0) = v0 + B((a1 + a2)(b1 + b2) - v1 - v2) */
+		/* t2 (c0) = v0 + E((a1 + a2)(b1 + b2) - v1 - v2) */
 		fp2_add(t0, a[1], a[2]);
 		fp2_mul(t2, t0, b[1]);
 		fp2_sub(t2, t2, v1);
 		fp2_mul_nor(t2, t2);
 		fp2_add(t2, t2, v0);
 
-		/* c1 = (a0 + a1)(b0 + b1) - v0 - v1 + Bv2 */
+		/* c1 = (a0 + a1)(b0 + b1) - v0 - v1 + Ev2 */
 		fp2_add(t0, a[0], a[1]);
 		fp2_add(t1, b[0], b[1]);
 		fp2_mul(c[1], t0, t1);
@@ -232,11 +232,11 @@ void fp6_sqr(fp6_t c, fp6_t a) {
 		/* t4 = a2^2 */
 		fp2_sqr(t4, a[2]);
 
-		/* c0 = t0 + u * t3 */
+		/* c0 = t0 + E * t3 */
 		fp2_mul_nor(c[0], t3);
 		fp2_add(c[0], c[0], t0);
 
-		/* c1 = t1 + u * t4 */
+		/* c1 = t1 + E * t4 */
 		fp2_mul_nor(c[1], t4);
 		fp2_add(c[1], c[1], t1);
 

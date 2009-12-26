@@ -36,8 +36,21 @@
 #include "relic_util.h"
 
 /*============================================================================*/
+/* Private definitions                                                        */
+/*============================================================================*/
+
+/**
+ * Constant used to compute the Frobenius map.
+ */
+fp2_st frb;
+
+/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
+
+fp2_t *fp2_get_frb() {
+
+}
 
 void fp2_dbl(fp2_t c, fp2_t a) {
 	/* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
@@ -129,10 +142,12 @@ void fp2_mul_nor(fp2_t c, fp2_t a) {
 				/* If p = 7 mod 8 and p = 2,3 mod 5, x^2 - sqrt(2 + sqrt(-1)) is
 				 * irreducible. */
 				fp2_copy(t0, a);
-				fp2_mul_art(a, a);
-				fp2_mul(c, a, t0);
-				fp2_mul(c, c, t0);
+				fp2_mul_art(t0, t0);
+				fp2_add(c, a, t0);
+				fp2_add(c, c, t0);
 				break;
+			default:
+				THROW(ERR_INVALID);
 		}
 	}
 	CATCH_ANY {
@@ -230,4 +245,30 @@ void fp2_frb(fp2_t c, fp2_t a) {
 	/* (a0 + a1 * u)^p = a0 - a1 * u. */
 	fp_copy(c[0], a[0]);
 	fp_neg(c[1], a[1]);
+}
+
+void fp2_exp(fp12_t c, fp12_t a, bn_t b) {
+	fp2_t t;
+
+	fp2_null(t);
+
+	TRY {
+		fp2_new(t);
+
+		fp2_copy(t, a);
+
+		for (int i = bn_bits(b) - 2; i >= 0; i--) {
+			fp2_sqr(t, t);
+			if (bn_test_bit(b, i)) {
+				fp2_mul(t, t, a);
+			}
+		}
+		fp2_copy(c, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp2_free(t);
+	}
 }

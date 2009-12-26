@@ -40,11 +40,6 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp12_conj(fp12_t c, fp12_t a) {
-	fp6_copy(c[0], a[0]);
-	fp6_neg(c[1], a[1]);
-}
-
 void fp12_mul(fp12_t c, fp12_t a, fp12_t b) {
 	fp6_t t0, t1, t2;
 
@@ -175,25 +170,6 @@ void fp12_sqr_uni(fp12_t c, fp12_t a) {
 	}
 }
 
-void fp12_frb(fp12_t c, fp12_t a, fp2_t b) {
-	fp2_t t;
-
-	fp2_null(t);
-
-	TRY {
-		fp2_new(t);
-
-		fp2_sqr(t, b);
-		fp6_frb(c[0], a[0], t);
-		fp6_frb(c[1], a[1], t);
-		fp6_mul_dexqu(c[1], c[1], b);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fp2_free(t);
-	}
-}
-
 void fp12_inv(fp12_t c, fp12_t a) {
 	fp6_t t0;
 	fp6_t t1;
@@ -219,6 +195,56 @@ void fp12_inv(fp12_t c, fp12_t a) {
 	} FINALLY {
 		fp6_free(t0);
 		fp6_free(t1);
+	}
+}
+
+void fp12_conj(fp12_t c, fp12_t a) {
+	fp6_copy(c[0], a[0]);
+	fp6_neg(c[1], a[1]);
+}
+
+void fp12_frb(fp12_t c, fp12_t a, fp2_t b) {
+	fp2_t t;
+
+	fp2_null(t);
+
+	TRY {
+		fp2_new(t);
+
+		fp2_sqr(t, b);
+		fp6_frb(c[0], a[0], t);
+		fp6_frb(c[1], a[1], t);
+		fp6_mul_dexqu(c[1], c[1], b);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp2_free(t);
+	}
+}
+
+void fp12_exp(fp12_t c, fp12_t a, bn_t b) {
+	fp12_t t;
+
+	fp12_null(t);
+
+	TRY {
+		fp12_new(t);
+
+		fp12_copy(t, a);
+
+		for (int i = bn_bits(b) - 2; i >= 0; i--) {
+			fp12_sqr(t, t);
+			if (bn_test_bit(b, i)) {
+				fp12_mul(t, t, a);
+			}
+		}
+		fp12_copy(c, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp12_free(t);
 	}
 }
 

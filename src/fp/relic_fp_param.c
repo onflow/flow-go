@@ -229,7 +229,7 @@ int fp_param_set_any_tower() {
 #if FP_PRIME == 256
 	fp_param_set(BNN_256);
 #else
-	return STS_ERR;
+	fp_param_set_any_dense();
 #endif
 	if (fp_prime_get_mod5() == 1 || fp_prime_get_mod5() == 4 ||
 			fp_prime_get_mod8() == 1) {
