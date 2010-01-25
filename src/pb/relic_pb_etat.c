@@ -237,7 +237,7 @@ static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 		fb_set_bit(l[2], 0, 1);
 		fb_zero(l[3]);
 		/* F = L * G. */
-		fb4_mul_spxsp(r, l, g);
+		fb4_mul_sxs(r, l, g);
 
 		for (int i = 0; i < ((FB_BITS - 1) / 2); i ++) {
 			/* x_P = sqrt(x_P), y_P = sqr(y_P). */
@@ -258,7 +258,7 @@ static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 			/* g_1 = u + x_Q. */
 			fb_add(g[1], u, xq);
 			/* G = g_0 + g_1 * s + t. */
-			fb4_mul_dexsp(r, r, g);
+			fb4_mul_dxs(r, r, g);
 		}
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -348,7 +348,7 @@ static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 					fb_set_bit(l[2], 0, 1);
 					fb_zero(l[3]);
 
-					fb4_mul_spxsp(_f[0], l, g);
+					fb4_mul_sxs(_f[0], l, g);
 				} else {
 					fb_set_bit(_f[i][0], 0, 1);
 				}
@@ -710,7 +710,7 @@ static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 					/* G = g_0 + g_1 * s + t. */
 
 					/* F = F * G. */
-					fb4_mul_dexsp(_f[i], _f[i], g);
+					fb4_mul_dxs(_f[i], _f[i], g);
 				}
 			} CATCH_ANY {
 				THROW(ERR_CAUGHT);
@@ -834,7 +834,7 @@ static void pb_map_etatn_impl(fb4_t r, eb_t p, eb_t q) {
 		fb_zero(l[3]);
 
 		/* F = L * G. */
-		fb4_mul_spxsp(r, l, g);
+		fb4_mul_sxs(r, l, g);
 
 		for (int i = 0; i < (FB_BITS - 1) / 2; i++) {
 			/* F = F^2. */
@@ -856,7 +856,7 @@ static void pb_map_etatn_impl(fb4_t r, eb_t p, eb_t q) {
 			fb_add(g[1], xp, xq);
 			/* G = g_0 + g_1 * s + t. */
 			/* F = F * G. */
-			fb4_mul_dexsp(r, r, g);
+			fb4_mul_dxs(r, r, g);
 		}
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -959,7 +959,7 @@ static void pb_map_etatn_impl(fb4_t r, eb_t p, eb_t q) {
 					fb_set_bit(l[2], 0, 1);
 					fb_zero(l[3]);
 
-					fb4_mul_spxsp(_f[0], l, g);
+					fb4_mul_sxs(_f[0], l, g);
 				} else {
 					/* x_Q = x_Q + 1. */
 					fb_add_dig(xq, xq, 1);
@@ -998,7 +998,7 @@ static void pb_map_etatn_impl(fb4_t r, eb_t p, eb_t q) {
 					fb_add(g[1], xp, xq);
 
 					/* F = F * G. */
-					fb4_mul_dexsp(_f[i], _f[i], g);
+					fb4_mul_dxs(_f[i], _f[i], g);
 				}
 
 				to = (FB_BITS - 1) / 2 - to;
