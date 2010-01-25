@@ -144,9 +144,9 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
-	fb_free(a);
-	fb_free(b);
-	fb_free(c);
+	fb2_free(a);
+	fb2_free(b);
+	fb2_free(c);
 }
 
 static void memory4(void) {
@@ -280,9 +280,9 @@ static void arith4(void) {
 	}
 	BENCH_END;
 
-	fb_free(a);
-	fb_free(b);
-	fb_free(c);
+	fb4_free(a);
+	fb4_free(b);
+	fb4_free(c);
 }
 
 static void arith(void) {

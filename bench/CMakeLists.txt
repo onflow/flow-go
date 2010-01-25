@@ -46,9 +46,9 @@ if (WITH_PB)
 	ADD_MODULE(pb)
 endif(WITH_PB)
 
-if (WITH_RATE)
+if (WITH_PP)
 	ADD_MODULE(pp)
-endif(WITH_RATE)
+endif(WITH_PP)
 
 if (WITH_CP)
 	ADD_MODULE(cp)

@@ -206,7 +206,7 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
  */
 #if FP_MUL == BASIC
 #define fp_rdc_monty(C, A)	fp_rdc_monty_basic(C, A)
-#elif  FP_MUL == COMBA
+#else
 #define fp_rdc_monty(C, A)	fp_rdc_monty_comba(C, A)
 #endif
 

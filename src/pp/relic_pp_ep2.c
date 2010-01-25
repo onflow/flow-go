@@ -481,6 +481,7 @@ void ep2_curve_set() {
 		param = ep_param_get();
 
 		switch (param) {
+#if FP_PRIME == 256
 			case BNN_P256:
 				fp_read(g->x[0], BNN_P256_X0, strlen(BNN_P256_X0), 16);
 				fp_read(g->x[1], BNN_P256_X1, strlen(BNN_P256_X1), 16);
@@ -488,6 +489,7 @@ void ep2_curve_set() {
 				fp_read(g->y[1], BNN_P256_Y1, strlen(BNN_P256_Y1), 16);
 				bn_read_str(r, BNN_P256_R, strlen(BNN_P256_R), 16);
 				break;
+#endif
 			default:
 				(void)str;
 				THROW(ERR_INVALID);

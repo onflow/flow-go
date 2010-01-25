@@ -377,7 +377,7 @@ typedef ep2_st *ep2_t;
  * @return 1 if the argument is zero, 0 otherwise.
  */
 #define fp12_is_zero(A)														\
-		fp6_is_zero(A[0]) || fp6_is_zero(A[1]) 								\
+		(fp6_is_zero(A[0]) && fp6_is_zero(A[1])) 							\
 
 /**
  * Assigns a random value to a dodecic extension field element.
@@ -576,6 +576,16 @@ typedef ep2_st *ep2_t;
 #elif EP_ADD == PROJC
 #define ep2_dbl_slp(R, S, E, P)	ep2_dbl_slp_projc(R, S, E, P);
 #endif
+
+/**
+ * Computes the etat pairing of two binary elliptic curve points. Computes
+ * e(P, Q).
+ *
+ * @param[out] R			- the result.
+ * @param[in] P				- the first elliptic curve point.
+ * @param[in] Q				- the second elliptic curve point.
+ */
+#define pp_map(R, P, Q)		pp_map_rate(R, P, Q)
 
 /*============================================================================*/
 /* Function prototypes                                                        */
