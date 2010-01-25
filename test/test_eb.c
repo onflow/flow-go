@@ -344,7 +344,9 @@ static int subtraction(void) {
 			TEST_ASSERT(eb_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 
-		TEST_BEGIN("point subtraction in mixed coordinates (z1,z2 = 1) is correct") {
+		TEST_BEGIN
+				("point subtraction in mixed coordinates (z1,z2 = 1) is correct")
+		{
 			eb_rand(a);
 			eb_rand(b);
 			eb_norm(a, a);
@@ -424,7 +426,73 @@ static int doubling(void) {
 			TEST_ASSERT(eb_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 #endif
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	eb_free(a);
+	eb_free(b);
+	eb_free(c);
+	return code;
+}
 
+static int frobenius(void) {
+	int code = STS_ERR;
+	eb_t a, b, c;
+
+	eb_null(a);
+	eb_null(b);
+	eb_null(c);
+
+	TRY {
+		eb_new(a);
+		eb_new(b);
+		eb_new(c);
+
+		if (eb_curve_is_kbltz()) {
+			TEST_BEGIN("frobenius map is correct") {
+				/* Test if (t^2 + 2)P = utP. */
+				eb_rand(a);
+				eb_frb(b, a);
+				eb_frb(b, b);
+				eb_dbl(c, a);
+				eb_add(b, b, c);
+				eb_norm(b, b);
+				eb_frb(c, a);
+				if (eb_curve_opt_a() == OPT_ZERO) {
+					eb_neg(c, c);
+				}
+				eb_norm(c, c);
+				TEST_ASSERT(eb_cmp(b, c) == CMP_EQ, end);
+			}
+			TEST_END;
+
+#if EB_ADD == BASIC || !defined(STRIP)
+			TEST_BEGIN("frobenius in affine coordinates is correct") {
+				eb_rand(a);
+				eb_frb(b, a);
+				eb_norm(b, b);
+				eb_frb_basic(c, a);
+				TEST_ASSERT(eb_cmp(b, c) == CMP_EQ, end);
+			} TEST_END;
+#endif
+
+#if EB_ADD == PROJC || !defined(STRIP)
+			TEST_BEGIN("frobenius in projective coordinates is correct") {
+				eb_rand(a);
+				eb_frb_projc(a, a);
+				/* a in projective coordinates. */
+				eb_frb_projc(b, a);
+				eb_norm(b, b);
+				eb_norm(a, a);
+				eb_frb(c, a);
+				eb_norm(c, c);
+				TEST_ASSERT(eb_cmp(b, c) == CMP_EQ, end);
+			} TEST_END;
+#endif
+		}
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -806,6 +874,10 @@ static int test(void) {
 	}
 
 	if (doubling() != STS_OK) {
+		return STS_ERR;
+	}
+
+	if (frobenius() != STS_OK) {
 		return STS_ERR;
 	}
 

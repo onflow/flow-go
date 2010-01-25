@@ -693,7 +693,7 @@ static int multiplication4(void) {
 			fb_mul(c[1], c[1], beta);
 			fb_mul(c[2], c[2], beta);
 			fb_mul(c[3], c[3], beta);
-			fb4_mul_dexde(d, a, b);
+			fb4_mul_dxd(d, a, b);
 			TEST_ASSERT(fb4_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 
@@ -704,7 +704,7 @@ static int multiplication4(void) {
 			fb_set_bit(b[2], 0, 1);
 			fb_zero(b[3]);
 			fb4_mul(c, a, b);
-			fb4_mul_dexsp(d, a, b);
+			fb4_mul_dxs(d, a, b);
 			TEST_ASSERT(fb4_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 
@@ -718,7 +718,7 @@ static int multiplication4(void) {
 			fb_set_bit(b[2], 0, 1);
 			fb_zero(b[3]);
 			fb4_mul(c, a, b);
-			fb4_mul_spxsp(d, a, b);
+			fb4_mul_sxs(d, a, b);
 			TEST_ASSERT(fb4_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 
@@ -884,6 +884,10 @@ static int pairing(void) {
   end:
 	fb4_free(e1);
 	fb4_free(e2);
+	eb_free(p);
+	eb_free(q);
+	eb_free(r);
+	bn_free(k);
 	return code;
 }
 

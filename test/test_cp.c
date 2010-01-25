@@ -303,7 +303,6 @@ static int sokaka(void) {
 #endif
 
 int main(void) {
-	int r0, r1;
 	core_init();
 
 	util_print_banner("Tests for the CP module", 0);

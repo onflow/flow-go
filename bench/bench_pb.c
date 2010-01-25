@@ -247,24 +247,24 @@ static void arith4(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fb4_mul_dexde") {
+	BENCH_BEGIN("fb4_mul_dxd") {
 		fb4_rand(a);
 		fb4_rand(b);
-		BENCH_ADD(fb4_mul_dexde(c, a, b));
+		BENCH_ADD(fb4_mul_dxd(c, a, b));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fb4_mul_dexsp") {
+	BENCH_BEGIN("fb4_mul_dxs") {
 		fb4_rand(a);
 		fb4_rand(b);
-		BENCH_ADD(fb4_mul_dexsp(c, a, b));
+		BENCH_ADD(fb4_mul_dxs(c, a, b));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fb4_mul_spxsp") {
+	BENCH_BEGIN("fb4_mul_sxs") {
 		fb4_rand(a);
 		fb4_rand(b);
-		BENCH_ADD(fb4_mul_spxsp(c, a, b));
+		BENCH_ADD(fb4_mul_sxs(c, a, b));
 	}
 	BENCH_END;
 

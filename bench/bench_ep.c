@@ -507,7 +507,7 @@ static void bench(void) {
 }
 
 int main(void) {
-	int r0, r1, r2;
+	int r0;
 
 	core_init();
 	conf_print();

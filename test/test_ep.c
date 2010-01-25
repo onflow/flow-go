@@ -609,6 +609,9 @@ static int fixed(void) {
 			ep_mul_pre_combs(t, p);
 			ep_mul_fix_combs(q, t, k);
 			ep_mul(r, p, k);
+			for (int i = 0; i < (1 << EP_DEPTH); i++) {
+				ep_print(t[i]);
+			}
 			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
 		for (int i = 0; i < EP_TABLE_COMBS; i++) {

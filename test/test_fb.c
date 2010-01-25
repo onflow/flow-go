@@ -62,8 +62,8 @@ static int memory(void) {
 
 static int util(void) {
 	int bits, code = STS_ERR;
-	char str[1000];
 	fb_t a, b, c;
+	char str[1000];
 
 	fb_null(a);
 	fb_null(b);
@@ -178,7 +178,9 @@ static int util(void) {
 
 		TEST_BEGIN("reading and writing a binary field element are consistent") {
 			fb_rand(a);
+			fb_print(a);
 			fb_write(str, sizeof(str), a, 16);
+			fb_print(a);
 			fb_read(b, str, sizeof(str), 16);
 			TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);
 		}
