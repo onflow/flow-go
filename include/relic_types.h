@@ -113,6 +113,7 @@ typedef uint64_t dbl_t;
 typedef __uint128_t dbl_t;
 #elif ARITH == EASY
 #error "Easy backend in 64-bit mode supported only in GCC compiler."
+#else
 #endif
 #endif
 
@@ -133,7 +134,7 @@ typedef __uint128_t dbl_t;
  * Size of padding to be added so that digit vectors are aligned.
  */
 #if ALIGN > 1
-#define PADDING(A)		(ALIGN - ((A) % ALIGN))
+#define PADDING(A)		((A) % ALIGN == 0 ? 0 : ALIGN - ((A) % ALIGN))
 #else
 #define PADDING(A)		(0)
 #endif

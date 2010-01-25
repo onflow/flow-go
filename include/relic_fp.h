@@ -285,6 +285,13 @@ int fp_prime_get_qnr(void);
 int fp_prime_get_cnr(void);
 
 /**
+ * Returns the prime field parameter identifier.
+ *
+ * @return the parameter identifier.
+ */
+int fp_param_get(void);
+
+/**
  * Assigns the order of the prime field to a non-sparse prime p.
  *
  * @param[in] p			- the new prime field order.

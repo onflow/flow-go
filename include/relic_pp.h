@@ -21,13 +21,13 @@
  */
 
 /**
- * @defgroup pp Pairings over prime elliptic curves.
+ * @defgroup pp Pairings over elliptic curves.
  */
 
 /**
  * @file
  *
- * Interface of the bilinear pairing over prime elliptic curves functions.
+ * Interface of the bilinear pairing over elliptic curves functions.
  *
  * @version $Id$
  * @ingroup pp
@@ -429,14 +429,14 @@ typedef ep2_st *ep2_t;
 		fp6_sub(C[0], A[0], B[0]); fp6_sub(C[1], A[1], B[1]);				\
 
 /**
- * Initializes a point on a prime elliptic curve with a null value.
+ * Initializes a point on a elliptic curve with a null value.
  *
  * @param[out] A			- the point to initialize.
  */
 #define ep2_null(A)		A = NULL;
 
 /**
- * Calls a function to allocate a point on a prime elliptic curve.
+ * Calls a function to allocate a point on a elliptic curve.
  *
  * @param[out] A			- the new point.
  * @throw ERR_NO_MEMORY		- if there is no available memory.
@@ -471,7 +471,7 @@ typedef ep2_st *ep2_t;
 #endif
 
 /**
- * Calls a function to clean and free a point on a prime elliptic curve.
+ * Calls a function to clean and free a point on a elliptic curve.
  *
  * @param[out] A			- the point to free.
  */
@@ -498,11 +498,24 @@ typedef ep2_st *ep2_t;
 #endif
 
 /**
- * Adds two prime elliptic curve points. Computes R = P + Q.
+ * Negates a point in an elliptic curve over a quadratic extension field.
  *
- * @param[out] R			- the result.
- * @param[in] P				- the first point to add.
- * @param[in] Q				- the second point to add.
+ * @param[out] R				- the result.
+ * @param[in] P					- the point to negate.
+ */
+#if EP_ADD == BASIC
+#define ep2_neg(R, P)			ep2_neg_basic(R, P)
+#elif EP_ADD == PROJC
+#define ep2_neg(R, P)			ep2_neg_projc(R, P)
+#endif
+
+/**
+ * Adds two points in an elliptic curve over a quadratic extension field.
+ * Computes R = P + Q.
+ *
+ * @param[out] R				- the result.
+ * @param[in] P					- the first point to add.
+ * @param[in] Q					- the second point to add.
  */
 #if EP_ADD == BASIC
 #define ep2_add(R, P, Q)		ep2_add_basic(R, P, Q);
@@ -511,11 +524,12 @@ typedef ep2_st *ep2_t;
 #endif
 
 /**
- * Adds two prime elliptic curve points returning the slope.
+ * Adds two points in an elliptic curve over a quadratic extension field and
+ * returns the computed slope. Computes R = P + Q and the slope S.
  *
- * @param[out] R			- the result.
- * @param[in] P				- the first point to add.
- * @param[in] Q				- the second point to add.
+ * @param[out] R				- the result.
+ * @param[in] P					- the first point to add.
+ * @param[in] Q					- the second point to add.
  */
 #if EP_ADD == BASIC
 #define ep2_add_slp(R, S, P, Q)	ep2_add_slp_basic(R, S, P, Q);
@@ -524,10 +538,25 @@ typedef ep2_st *ep2_t;
 #endif
 
 /**
- * Doubles a prime elliptic curve point. Computes R = 2 * P.
+ * Subtracts a point in an elliptic curve over a quadratic extension field from
+ * another point in this curve. Computes R = P - Q.
  *
  * @param[out] R			- the result.
- * @param[in] P				- the point to double.
+ * @param[in] P				- the first point.
+ * @param[in] Q				- the second point.
+ */
+#if EP_ADD == BASIC
+#define ep2_sub(R, P, Q)		ep2_sub_basic(R, P, Q)
+#elif EP_ADD == PROJC
+#define ep2_sub(R, P, Q)		ep2_sub_projc(R, P, Q)
+#endif
+
+/**
+ * Doubles a point in an elliptic curve over a quadratic extension field.
+ * Computes R = 2 * P.
+ *
+ * @param[out] R				- the result.
+ * @param[in] P					- the point to double.
  */
 #if EP_ADD == BASIC
 #define ep2_dbl(R, P)			ep2_dbl_basic(R, P);
@@ -536,10 +565,11 @@ typedef ep2_st *ep2_t;
 #endif
 
 /**
- * Doubles a prime elliptic curve point returning the slope.
+ * Doubles a point in an elliptic curve over a quadratic extension field and
+ * returns the computed slope. Computes R = 2 * P and the slope S.
  *
- * @param[out] R			- the result.
- * @param[in] P				- the point to double.
+ * @param[out] R				- the result.
+ * @param[in] P					- the point to double.
  */
 #if EP_ADD == BASIC
 #define ep2_dbl_slp(R, S, E, P)	ep2_dbl_slp_basic(R, S, E, P);
@@ -550,6 +580,40 @@ typedef ep2_st *ep2_t;
 /*============================================================================*/
 /* Function prototypes                                                        */
 /*============================================================================*/
+
+/**
+ * Initializes the pairing over elliptic curves.
+ */
+void pp_pair_init(void);
+
+/**
+ * Finalizes the pairing over elliptic curves.
+ */
+void pp_pair_clean(void);
+
+/**
+ * Initializes the constant needed to compute the Frobenius map.
+ */
+void fp2_const_init(void);
+
+/**
+ * Finalizes the constant needed to compute the Frobenius map.
+ */
+void fp2_const_clean(void);
+
+/**
+ * Computes the constant needed to compute the Frobenius map.
+ *
+ * @param[out] f			- the result.
+ */
+void fp2_const_calc(void);
+
+/**
+ * Returns the constant needed to compute the Frobenius map.
+ *
+ * @param[out] f			- the result.
+ */
+void fp2_const_get(fp2_t f);
 
 /**
  * Doubles a quadratic extension field element. Computes c = 2 * a.
@@ -580,7 +644,7 @@ void fp2_mul_art(fp2_t c, fp2_t a);
 /**
  * Multiplies a quadratic extension field element by a quadratic/cubic
  * non-residue. Computes c = a * E, where E is a non-square/non-cube in the
- * this quadratic extension.
+ * quadratic extension.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the quadratic extension field element to multiply.
@@ -603,6 +667,15 @@ void fp2_sqr(fp2_t c, fp2_t a);
  * @param[in] a				- the quadratic extension field element to invert.
  */
 void fp2_inv(fp2_t c, fp2_t a);
+
+/**
+ * Computes a power of a quadratic extension field element.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quadratic extension element to exponentiate.
+ * @param[in] b				- the exponent.
+ */
+void fp2_exp(fp2_t c, fp2_t a, bn_t b);
 
 /**
  * Computes the Frobenius of a quadratic extension field element. This is the
@@ -646,7 +719,7 @@ void fp6_mul_art(fp6_t c, fp6_t a);
  * @param[in] a				- the sextic extension field element.
  * @param[in] b				- the quadratic extension field element.
  */
-void fp6_mul_dexqu(fp6_t c, fp6_t a, fp2_t b);
+void fp6_mul_dxq(fp6_t c, fp6_t a, fp2_t b);
 
 /**
  * Multiples a dense sextic extension field element by a sparse element.
@@ -657,7 +730,7 @@ void fp6_mul_dexqu(fp6_t c, fp6_t a, fp2_t b);
  * @param[in] a				- a sextic extension field element.
  * @param[in] b				- a sparse sextic extension field element.
  */
-void fp6_mul_dexsp(fp6_t c, fp6_t a, fp6_t b);
+void fp6_mul_dxs(fp6_t c, fp6_t a, fp6_t b);
 
 /**
  * Computes the square of a sextic extension field element. Computes c = a * a.
@@ -676,6 +749,15 @@ void fp6_sqr(fp6_t c, fp6_t a);
 void fp6_inv(fp6_t c, fp6_t a);
 
 /**
+ * Computes a power of a sextic extension field element. Computes c = a^b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the sextic extension element to exponentiate.
+ * @param[in] b				- the exponent.
+ */
+void fp6_exp(fp6_t c, fp6_t a, bn_t b);
+
+/**
  * Computes the Frobenius endomorphism of a sextic extension field element.
  * Computes c = a^p.
  *
@@ -683,7 +765,7 @@ void fp6_inv(fp6_t c, fp6_t a);
  * @param[in] a				- a sextic extension field element.
  * @param[in] b				- the constant v^{p-1} used for the computation.
  */
-void fp6_frb(fp6_t c, fp6_t a, fp2_t b);
+void fp6_frb(fp6_t c, fp6_t a);
 
 /**
  * Multiples two dodecic extension field elements. Compute c = a * b.
@@ -704,7 +786,7 @@ void fp12_mul(fp12_t c, fp12_t a, fp12_t b);
  * @param[in] a				- the dense dodecic extension field element.
  * @param[in] b				- the sparse dodecic extension field element.
  */
-void fp12_mul_dexsp(fp12_t c, fp12_t a, fp12_t b);
+void fp12_mul_dxs(fp12_t c, fp12_t a, fp12_t b);
 
 /**
  * Computes the square of a dodecic extension field element. Computes
@@ -750,9 +832,8 @@ void fp12_inv_uni(fp12_t c, fp12_t a);
  *
  * @param[out] c			- the result.
  * @param[in] a				- a dodecic extension field element.
- * @param[in] b				- the constant w^{p-1} used for the computation.
  */
-void fp12_frb(fp12_t c, fp12_t a, fp2_t b);
+void fp12_frb(fp12_t c, fp12_t a);
 
 /**
  * Computes a power of a dodecic extension field element.
@@ -785,14 +866,14 @@ void ep2_curve_init(void);
 void ep2_curve_clean(void);
 
 /**
- * Returns the a coefficient of the currently configured prime elliptic curve.
+ * Returns the a coefficient of the currently configured elliptic curve.
  *
  * @return the a coefficient of the elliptic curve.
  */
 dig_t *ep2_curve_get_a(void);
 
 /**
- * Returns the b coefficient of the currently configured prime elliptic curve.
+ * Returns the b coefficient of the currently configured elliptic curve.
  *
  * @return the b coefficient of the elliptic curve.
  */
@@ -806,71 +887,41 @@ dig_t *ep2_curve_get_b(void);
 int ep2_curve_opt_a(void);
 
 /**
- * Tests if the configured prime elliptic curve is supersingular.
+ * Tests if the configured elliptic curve is a twist.
  *
- * @return 1 if the prime elliptic curve is supersingular, 0 otherwise.
+ * @return 1 if the elliptic curve is a twist, 0 otherwise.
  */
-int ep2_curve_is_super(void);
+int ep2_curve_is_twist(void);
 
 /**
- * Returns the generator of the group of points in the prime elliptic curve.
+ * Returns the generator of the group of points in the elliptic curve.
  *
  * @param[out] g			- the point to store the generator.
  */
 ep2_t ep2_curve_get_gen(void);
 
 /**
- * Returns the order of the group of points in the prime elliptic curve.
+ * Returns the order of the group of points in the elliptic curve.
  *
  * @param[out] r			- the multiple precision integer to store the order.
  */
 bn_t ep2_curve_get_ord(void);
 
 /**
- * Configures a new ordinary prime elliptic curve by its coefficients.
- *
- * @param[in] a			- the coefficient a of the curve.
- * @param[in] b			- the coefficient b of the curve.
+ * Configures a new elliptic curve by using the curve over the base prime field
+ * as a parameter.
  */
-void ep2_curve_set_ordin(fp2_t a, fp2_t b);
+void ep2_curve_set(void);
 
 /**
- * Configures a new generator for the group of points in the prime elliptic
- * curve.
+ * Notifies the module that the configured curve is a twist or not.
  *
- * @param[in] g			- the new generator.
+ * @param				- the flag indicating that the curve is a twist.
  */
-void ep2_curve_set_gen(ep2_t g);
-
-/**
- * Changes the order of the group of points.
- *
- * @param[in] r			- the new order.
- */
-void ep2_curve_set_ord(bn_t r);
-
-/**
- * Configures a new prime elliptic curve by its parameter identifier.
- *
- * @param				- the parameters identifier.
- */
-void ep2_param_set(int param);
-
 void ep2_curve_set_twist(int twist);
 
 /**
- * Computes a power of a unitary dodecic extension field element.
- *
- * A unitary element is one previously raised to the (p^6 - 1)th power.
- *
- * @param[out] c			- the result.
- * @param[in] a				- the unitary dodecic extension field element.
- * @param[in] b				- the power.
- */
-void fp12_exp_uni(fp12_t c, fp12_t a, bn_t b);
-
-/**
- * Tests if a point on a prime elliptic curve is at the infinity.
+ * Tests if a point on a elliptic curve is at the infinity.
  *
  * @param[in] p				- the point to test.
  * @return 1 if the point is at infinity, 0 otherise.
@@ -878,7 +929,7 @@ void fp12_exp_uni(fp12_t c, fp12_t a, bn_t b);
 int ep2_is_infty(ep2_t p);
 
 /**
- * Assigns a prime elliptic curve point to a point at the infinity.
+ * Assigns a elliptic curve point to a point at the infinity.
  *
  * @param[out] p			- the point to assign.
  */
@@ -888,32 +939,162 @@ void ep2_set_infty(ep2_t p);
  * Copies the second argument to the first argument.
  *
  * @param[out] q			- the result.
- * @param[in] p				- the prime elliptic curve point to copy.
+ * @param[in] p				- the elliptic curve point to copy.
  */
 void ep2_copy(ep2_t r, ep2_t p);
 
 /**
- * Compares two prime elliptic curve points.
+ * Compares two elliptic curve points.
  *
- * @param[in] p				- the first prime elliptic curve point.
- * @param[in] q				- the second prime elliptic curve point.
+ * @param[in] p				- the first elliptic curve point.
+ * @param[in] q				- the second elliptic curve point.
  * @return CMP_EQ if p == q and CMP_NE if p != q.
  */
 int ep2_cmp(ep2_t p, ep2_t q);
 
 /**
- * Assigns a random value to a prime elliptic curve point.
+ * Assigns a random value to a elliptic curve point.
  *
- * @param[out] p			- the prime elliptic curve point to assign.
+ * @param[out] p			- the elliptic curve point to assign.
  */
 void ep2_rand(ep2_t p);
 
 /**
- * Prints a prime elliptic curve point.
+ * Prints a elliptic curve point.
  *
- * @param[in] p				- the prime elliptic curve point to print.
+ * @param[in] p				- the elliptic curve point to print.
  */
 void ep2_print(ep2_t p);
+
+/**
+ * Negates a point represented in affine coordinates in an elliptic curve over
+ * a quadratic twist.
+ *
+ * @param[out] r			- the result.
+ * @param[out] p			- the point to negate.
+ */
+void ep2_neg_basic(ep2_t r, ep2_t p);
+
+/**
+ * Negates a point represented in projective coordinates in an elliptic curve over
+ * a quadratic twist.
+ *
+ * @param[out] r			- the result.
+ * @param[out] p			- the point to negate.
+ */
+void ep2_neg_projc(ep2_t r, ep2_t p);
+
+/**
+ * Adds to points represented in affine coordinates in an elliptic curve over a
+ * quadratic extension.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the first point to add.
+ * @param[in] q				- the second point to add.
+ */
+void ep2_add_basic(ep2_t r, ep2_t p, ep2_t q);
+
+/**
+ * Adds to points represented in affine coordinates in an elliptic curve over a
+ * quadratic extension and returns the computed slope.
+ *
+ * @param[out] r			- the result.
+ * @param[out] s			- the slope.
+ * @param[in] p				- the first point to add.
+ * @param[in] q				- the second point to add.
+ */
+void ep2_add_slp_basic(ep2_t r, fp2_t s, ep2_t p, ep2_t q);
+
+/**
+ * Subtracts a points represented in affine coordinates in an elliptic curve
+ * over a quadratic extension from another point.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the first point.
+ * @param[in] q				- the point to subtract.
+ */
+void ep2_sub_basic(ep2_t r, ep2_t p, ep2_t q);
+
+/**
+ * Adds two points represented in projective coordinates in an elliptic curve
+ * over a quadratic extension.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the first point to add.
+ * @param[in] q				- the second point to add.
+ */
+void ep2_add_projc(ep2_t r, ep2_t p, ep2_t q);
+
+/**
+ * Adds two points represented in projective coordinates in an elliptic curve
+ * over a quadratic extension and returns the computed slope.
+ *
+ * @param[out] r			- the result.
+ * @param[out] s			- the slope.
+ * @param[in] p				- the first point to add.
+ * @param[in] q				- the second point to add.
+ */
+void ep2_add_slp_projc(ep2_t r, fp2_t s, ep2_t p, ep2_t q);
+
+/**
+ * Subtracts a points represented in projective coordinates in an elliptic curve
+ * over a quadratic extension from another point.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the first point.
+ * @param[in] q				- the point to subtract.
+ */
+void ep2_sub_projc(ep2_t r, ep2_t p, ep2_t q);
+
+/**
+ * Doubles a points represented in affine coordinates in an elliptic curve over
+ * a quadratic extension.
+ *
+ * @param[out] r			- the result.
+ * @param[int] p			- the point to double.
+ */
+void ep2_dbl_basic(ep2_t r, ep2_t p);
+
+/**
+ * Doubles a points represented in affine coordinates in an elliptic curve over
+ * a quadratic extension and returns the computed slope.
+ *
+ * @param[out] r			- the result.
+ * @param[out] s			- the numerator of the slope.
+ * @param[out] e			- the denominator of the slope.
+ * @param[in] p				- the point to double.
+ */
+void ep2_dbl_slp_basic(ep2_t r, fp2_t s, fp2_t e, ep2_t p);
+
+/**
+ * Doubles a points represented in projective coordinates in an elliptic curve
+ * over a quadratic extension.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to double.
+ */
+void ep2_dbl_projc(ep2_t r, ep2_t p);
+
+/**
+ * Doubles a points represented in projective coordinates in an elliptic curve
+ * over a quadratic extension and returns the computed slope.
+ *
+ * @param[out] r			- the result.
+ * @param[out] s			- the numerator of the slope.
+ * @param[out] e			- the denominator of the slope.
+ * @param[in] p				- the point to double.
+ */
+void ep2_dbl_slp_projc(ep2_t r, fp2_t s, fp2_t e, ep2_t p);
+
+/**
+ * Multiplies a point in a elliptic curve over a quadratic extension by an
+ * integer scalar.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ * @param[in] k				- the scalar.
+ */
+void ep2_mul(ep2_t r, ep2_t p, bn_t k);
 
 /**
  * Converts a point to affine coordinates.
@@ -923,17 +1104,26 @@ void ep2_print(ep2_t p);
  */
 void ep2_norm(ep2_t r, ep2_t p);
 
-void ep2_dbl_basic(ep2_t r, ep2_t p);
+/**
+ * Computes the Frobenius map of a point represented in affine coordinates
+ * in an elliptic curve over a quadratic exension. Computes
+ * Frob(P = (x, y)) = (x^p, y^p). On a quadratic twist, this is the same as
+ * multiplying by the field characteristic.
+ *
+ * @param[out] r			- the result in affine coordinates.
+ * @param[in] p				- a point in affine coordinates.
+ */
+void ep2_frb(ep2_t r, ep2_t p);
 
 /**
- * Initializes the pairing over prime fields module.
+ * Initializes the pairing over prime fields.
  */
-void pp_core_init(void);
+void pp_pair_init(void);
 
 /**
- * Finalizes the pairing over prime fields module.
+ * Finalizes the pairing over prime fields.
  */
-void pp_core_clean(void);
+void pp_pair_clean(void);
 
 /**
  * Computes the R-ate pairing of two points in a parameterized elliptic curve.
@@ -942,9 +1132,7 @@ void pp_core_clean(void);
  * @param[out] r			- the result.
  * @param[in] q				- the first elliptic curve point.
  * @param[in] p				- the second elliptic curve point.
- * @param[in] x				- the parameter used to generate the elliptic curve.
- * @param[in] f				- the constant w^{p-1} used in the Frobenius.
  */
-void pp_pair_rate(fp12_t r, ep2_t q, ep_t p, bn_t x, fp2_t f);
+void pp_map_rate(fp12_t r, ep2_t q, ep_t p);
 
 #endif /* !RELIC_PP_H */

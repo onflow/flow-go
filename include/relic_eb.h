@@ -535,6 +535,14 @@ void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t n);
 void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t n);
 
 /**
+ * Returns the parameter identifier of the currently configured binary elliptic
+ * curve.
+ *
+ * @return the parameter identifier.
+ */
+int eb_param_get(void);
+
+/**
  * Configures a new binary elliptic curve by its parameter identifier.
  *
  * @param[in] param			- the parameters identifier.

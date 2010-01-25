@@ -428,6 +428,14 @@ ep_t *ep_curve_get_tab(void);
 bn_t ep_curve_get_ord(void);
 
 /**
+ * Returns the parameter identifier of the currently configured prime elliptic
+ * curve.
+ *
+ * @return the parameter identifier.
+ */
+int ep_param_get(void);
+
+/**
  * Configures a new ordinary prime elliptic curve by its coefficients.
  *
  * @param[in] a			- the coefficient a of the curve.
@@ -450,7 +458,7 @@ void ep_curve_set_pairf(fp_t a, fp_t b, ep_t g, bn_t r);
 /**
  * Configures a new prime elliptic curve by its parameter identifier.
  *
- * @param				- the parameters identifier.
+ * @param				- the parameter identifier.
  */
 void ep_param_set(int param);
 
