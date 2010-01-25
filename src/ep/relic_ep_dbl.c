@@ -145,14 +145,6 @@ void ep_dbl_projc_impl(ep_t r, ep_t p) {
 		fp_new(t5);
 
 		if (!p->norm && ep_curve_opt_a() == OPT_MINUS3) {
-//			 delta = Z1^2
-//			      gamma = Y1^2
-//			      beta = X1*gamma
-//			      alpha = 3*(X1-delta)*(X1+delta)
-//			      X3 = alpha^2-8*beta
-//			      Z3 = (Y1+Z1)^2-gamma-delta
-//			      Y3 = alpha*(4*beta-X3)-8*gamma^2
-
 			/* t0 = delta = z1^2. */
 			fp_sqr(t0, p->z);
 

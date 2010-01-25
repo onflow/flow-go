@@ -194,6 +194,10 @@ static int param_id;
 /* Public definitions                                                         */
 /*============================================================================*/
 
+int ep_param_get() {
+	return param_id;
+}
+
 void ep_param_set(int param) {
 	int ordin = 0;
 #if ARCH == AVR
