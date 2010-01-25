@@ -38,10 +38,12 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void pp_core_init(void) {
+void pp_pair_init(void) {
+	fp2_const_init();
 	ep2_curve_init();
 }
 
-void pp_core_clean(void) {
+void pp_pair_clean(void) {
+	fp2_const_clean();
 	ep2_curve_clean();
 }

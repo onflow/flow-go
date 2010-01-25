@@ -115,7 +115,7 @@ void fp6_mul(fp6_t c, fp6_t a, fp6_t b) {
 	}
 }
 
-void fp6_mul_dexsp(fp6_t c, fp6_t a, fp6_t b) {
+void fp6_mul_dxs(fp6_t c, fp6_t a, fp6_t b) {
 	fp2_t v0, v1, t0, t1, t2;
 
 	fp2_null(v0);
@@ -172,7 +172,7 @@ void fp6_mul_dexsp(fp6_t c, fp6_t a, fp6_t b) {
 	}
 }
 
-void fp6_mul_dexqu(fp6_t c, fp6_t a, fp2_t b) {
+void fp6_mul_dxq(fp6_t c, fp6_t a, fp2_t b) {
 	fp2_mul(c[0], a[0], b);
 	fp2_mul(c[1], a[1], b);
 	fp2_mul(c[2], a[2], b);
@@ -256,19 +256,47 @@ void fp6_sqr(fp6_t c, fp6_t a) {
 	}
 }
 
-void fp6_frb(fp6_t c, fp6_t a, fp2_t b) {
+void fp6_exp(fp6_t c, fp6_t a, bn_t b) {
+	fp6_t t;
+
+	fp6_null(t);
+
+	TRY {
+		fp6_new(t);
+
+		fp6_copy(t, a);
+
+		for (int i = bn_bits(b) - 2; i >= 0; i--) {
+			fp6_sqr(t, t);
+			if (bn_test_bit(b, i)) {
+				fp6_mul(t, t, a);
+			}
+		}
+		fp6_copy(c, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp6_free(t);
+	}
+}
+
+void fp6_frb(fp6_t c, fp6_t a) {
 	fp2_t t;
 
 	TRY {
 		fp2_new(t);
 
-		fp2_sqr(t, b);
+		fp2_const_get(t);
+		fp2_sqr(t, t);
 
 		fp2_frb(c[0], a[0]);
 		fp2_frb(c[1], a[1]);
 		fp2_frb(c[2], a[2]);
-		
-		fp2_mul(c[1], c[1], b);
+
+		fp2_mul(c[1], c[1], t);
+		fp2_sqr(t, t);
 		fp2_mul(c[2], c[2], t);
 
 	} CATCH_ANY {

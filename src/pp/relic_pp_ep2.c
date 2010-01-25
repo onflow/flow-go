@@ -38,21 +38,18 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
+#if defined(EP_ORDIN) && FP_PRIME == 256
 /**
- * The A coefficient of the elliptic curve.
+ * Parameters for a pairing-friendly prime curve over a quadratic extension.
  */
-static fp2_st curve_a;
-
-/**
- * Optimization identifier for the configured curve derived from the a
- * coefficient.
- */
-static int curve_opt_a;
-
-/**
- * The B coefficient of the elliptic curve.
- */
-static fp2_st curve_b;
+/** @{ */
+#define BNN_P256_X0		"1822AA754FAFAFF95FE37842D7D5DECE88305EC19B363F6681DF06BF405F02B4"
+#define BNN_P256_X1		"1AB4CC8A133A7AA970AADAE37C20D1C7191279CBA02830AFC64C19B50E8B1997"
+#define BNN_P256_Y0		"16737CF6F9DEC5895A7E5A6D60316763FB6638A0A82F26888E909DA86F7F84BA"
+#define BNN_P256_Y1		"05B6DB6FF5132FB917E505627E7CCC12E0CE9FCC4A59805B3B730EE0EC44E43C"
+#define BNN_P256_R		"5633FF249938445904D63EF07C4DCC56A3D53BC318AC022A68794AE6A80008F79BB4B3140000188AFC77D00000002B2EBA10000000002C68200000000000145L"
+/** @} */
+#endif
 
 /**
  * The generator of the elliptic curve.
@@ -205,8 +202,8 @@ static void ep2_dbl_basic_impl(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 					fp2_add(t1, t1, t2);
 					break;
 				default:
-					fp_copy(t2, ep_curve_get_a());
-					fp_zero(t2);
+					fp_copy(t2[0], ep_curve_get_a());
+					fp_zero(t2[1]);
 					fp2_mul_art(t2, t2);
 					fp2_mul_art(t2, t2);
 					fp2_add(t1, t1, t2);
@@ -304,6 +301,8 @@ static void ep2_add_projc_impl(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 		if (s != NULL) {
 			fp2_copy(s, t0);
 		}
+
+		r->norm = 0;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -450,10 +449,6 @@ void ep2_curve_clean(void) {
 	bn_clean(&curve_r);
 }
 
-int ep2_curve_opt_a() {
-	return curve_opt_a;
-}
-
 int ep2_curve_is_twist() {
 	return curve_is_twist;
 }
@@ -466,17 +461,53 @@ bn_t ep2_curve_get_ord() {
 	return &curve_r;
 }
 
-void ep2_curve_set_gen(ep2_t g) {
-	ep2_norm(g, g);
-	ep2_copy(&curve_g, g);
-}
-
-void ep2_curve_set_ord(bn_t r) {
-	bn_copy(&curve_r, r);
-}
-
 void ep2_curve_set_twist(int twist) {
 	curve_is_twist = twist;
+}
+
+void ep2_curve_set() {
+	int param;
+	char *str;
+	ep2_t g;
+	bn_t r;
+
+	ep2_null(g);
+	bn_null(r);
+
+	TRY {
+		ep2_new(g);
+		bn_new(r);
+
+		param = ep_param_get();
+
+		switch (param) {
+			case BNN_P256:
+				fp_read(g->x[0], BNN_P256_X0, strlen(BNN_P256_X0), 16);
+				fp_read(g->x[1], BNN_P256_X1, strlen(BNN_P256_X1), 16);
+				fp_read(g->y[0], BNN_P256_Y0, strlen(BNN_P256_Y0), 16);
+				fp_read(g->y[1], BNN_P256_Y1, strlen(BNN_P256_Y1), 16);
+				bn_read_str(r, BNN_P256_R, strlen(BNN_P256_R), 16);
+				break;
+			default:
+				(void)str;
+				THROW(ERR_INVALID);
+				break;
+		}
+
+		fp2_zero(g->z);
+		fp_set_dig(g->z[0], 1);
+		g->norm = 1;
+
+		ep2_copy(&curve_g, g);
+		bn_copy(&curve_r, r);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep2_free(g);
+		bn_free(r);
+	}
 }
 
 int ep2_is_infty(ep2_t p) {
@@ -520,10 +551,9 @@ void ep2_rand(ep2_t p) {
 	n = ep2_curve_get_ord();
 
 	bn_rand(k, BN_POS, bn_bits(n));
-	//bn_mod(k, k, n);
+	bn_mod(k, k, n);
 
-	//ep2_mul(p, ep2_curve_get_gen(), k);
-	ep2_copy(p, ep2_curve_get_gen());
+	ep2_mul(p, ep2_curve_get_gen(), k);
 
 	bn_free(k);
 }
@@ -535,6 +565,22 @@ void ep2_print(ep2_t p) {
 }
 
 #if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+
+void ep2_neg_basic(ep2_t r, ep2_t p) {
+	if (ep2_is_infty(p)) {
+		ep2_set_infty(r);
+		return;
+	}
+
+	if (r != p) {
+		fp2_copy(r->x, p->x);
+		fp2_copy(r->z, p->z);
+	}
+
+	fp2_neg(r->y, p->y);
+
+	r->norm = 1;
+}
 
 void ep2_add_basic(ep2_t r, ep2_t p, ep2_t q) {
 	if (ep2_is_infty(p)) {
@@ -564,41 +610,31 @@ void ep2_add_slp_basic(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 	ep2_add_basic_impl(r, s, p, q);
 }
 
-#endif
+void ep2_sub_basic(ep2_t r, ep2_t p, ep2_t q) {
+	ep2_t t;
 
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+	ep2_null(t);
 
-void ep2_add_projc(ep2_t r, ep2_t p, ep2_t q) {
-	if (ep2_is_infty(p)) {
-		ep2_copy(r, q);
+	if (p == q) {
+		ep2_set_infty(r);
 		return;
 	}
 
-	if (ep2_is_infty(q)) {
-		ep2_copy(r, p);
-		return;
-	}
+	TRY {
+		ep2_new(t);
 
-	ep2_add_basic_impl(r, NULL, p, q);
+		ep2_neg_basic(t, q);
+		ep2_add_basic(r, p, t);
+
+		r->norm = 1;
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep2_free(t);
+	}
 }
-
-void ep2_add_slp_projc(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
-	if (ep2_is_infty(p)) {
-		ep2_copy(r, q);
-		return;
-	}
-
-	if (ep2_is_infty(q)) {
-		ep2_copy(r, p);
-		return;
-	}
-
-	ep2_add_projc_impl(r, s, p, q);
-}
-
-#endif
-
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
 
 void ep2_dbl_basic(ep2_t r, ep2_t p) {
 	if (ep2_is_infty(p)) {
@@ -620,7 +656,84 @@ void ep2_dbl_slp_basic(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 
 #endif
 
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+
+void ep2_neg_projc(ep2_t r, ep2_t p) {
+	if (ep2_is_infty(p)) {
+		ep2_set_infty(r);
+		return;
+	}
+
+	if (p->norm) {
+		ep2_neg_basic(r, p);
+		return;
+	}
+
+	if (r != p) {
+		fp2_copy(r->x, p->x);
+		fp2_copy(r->z, p->z);
+	}
+
+	fp2_neg(r->y, p->y);
+
+	r->norm = 0;
+}
+
+void ep2_add_projc(ep2_t r, ep2_t p, ep2_t q) {
+	if (ep2_is_infty(p)) {
+		ep2_copy(r, q);
+		return;
+	}
+
+	if (ep2_is_infty(q)) {
+		ep2_copy(r, p);
+		return;
+	}
+
+	/*
+	 * TODO: Change this to ep2_add_proj_impl and sort the large code problem
+	 * with add_projc functions.
+	 */
+	ep2_add_basic_impl(r, NULL, p, q);
+}
+
+void ep2_add_slp_projc(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
+	if (ep2_is_infty(p)) {
+		ep2_copy(r, q);
+		return;
+	}
+
+	if (ep2_is_infty(q)) {
+		ep2_copy(r, p);
+		return;
+	}
+
+	ep2_add_projc_impl(r, s, p, q);
+}
+
+void ep2_sub_projc(ep2_t r, ep2_t p, ep2_t q) {
+	ep2_t t;
+
+	ep2_null(t);
+
+	if (p == q) {
+		ep2_set_infty(r);
+		return;
+	}
+
+	TRY {
+		ep2_new(t);
+
+		ep2_neg_projc(t, q);
+		ep2_add_projc(r, p, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep2_free(t);
+	}
+}
 
 void ep2_dbl_projc(ep2_t r, ep2_t p) {
 	if (ep2_is_infty(p)) {
@@ -681,4 +794,27 @@ void ep2_norm(ep2_t r, ep2_t p) {
 #if EP_ADD == PROJC || !defined(STRIP)
 	ep2_norm_impl(r, p);
 #endif
+}
+
+void ep2_frb(ep2_t r, ep2_t p) {
+	fp2_t t;
+
+	fp2_null(t);
+
+	TRY {
+		fp2_new(t);
+
+		fp2_const_get(t);
+
+		fp2_frb(r->x, p->x);
+		fp2_frb(r->y, p->y);
+		fp2_mul(r->y, r->y, t);
+		fp2_sqr(t, t);
+		fp2_mul(r->x, r->x, t);
+		fp2_mul(r->y, r->y, t);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp2_free(t);
+	}
 }

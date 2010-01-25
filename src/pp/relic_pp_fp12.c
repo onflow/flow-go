@@ -71,7 +71,7 @@ void fp12_mul(fp12_t c, fp12_t a, fp12_t b) {
 	}
 }
 
-void fp12_mul_dexsp(fp12_t c, fp12_t a, fp12_t b) {
+void fp12_mul_dxs(fp12_t c, fp12_t a, fp12_t b) {
 	fp6_t v0, v1, t0;
 
 	fp6_null(v0);
@@ -87,10 +87,10 @@ void fp12_mul_dexsp(fp12_t c, fp12_t a, fp12_t b) {
 		fp6_add(v0, a[0], a[1]);
 		fp2_add(v1[0], b[0][0], b[1][0]);
 		fp2_copy(v1[1], b[1][1]);
-		fp6_mul_dexsp(t0, v0, v1);
+		fp6_mul_dxs(t0, v0, v1);
 
 		/* v0 = a0b0 */
-		fp6_mul_dexqu(v0, a[0], b[0][0]);
+		fp6_mul_dxq(v0, a[0], b[0][0]);
 
 		/* v1 = a1b1 */
 		fp6_mul(v1, a[1], b[1]);
@@ -198,12 +198,13 @@ void fp12_inv(fp12_t c, fp12_t a) {
 	}
 }
 
-void fp12_conj(fp12_t c, fp12_t a) {
+void fp12_inv_uni(fp12_t c, fp12_t a) {
+	/* In this case, it's a simple conjugate. */
 	fp6_copy(c[0], a[0]);
 	fp6_neg(c[1], a[1]);
 }
 
-void fp12_frb(fp12_t c, fp12_t a, fp2_t b) {
+void fp12_frb(fp12_t c, fp12_t a) {
 	fp2_t t;
 
 	fp2_null(t);
@@ -211,10 +212,10 @@ void fp12_frb(fp12_t c, fp12_t a, fp2_t b) {
 	TRY {
 		fp2_new(t);
 
-		fp2_sqr(t, b);
-		fp6_frb(c[0], a[0], t);
-		fp6_frb(c[1], a[1], t);
-		fp6_mul_dexqu(c[1], c[1], b);
+		fp2_const_get(t);
+		fp6_frb(c[0], a[0]);
+		fp6_frb(c[1], a[1]);
+		fp6_mul_dxq(c[1], c[1], t);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {

@@ -40,16 +40,55 @@
 /*============================================================================*/
 
 /**
- * Constant used to compute the Frobenius map.
+ * Constant used to compute the Frobenius map in higher extensions.
  */
-fp2_st frb;
+fp2_st const_frb;
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-fp2_t *fp2_get_frb() {
+void fp2_const_init() {
+#if ALLOC == STATIC
+	fp2_new(const_frb);
+#endif
+}
 
+void fp2_const_clean() {
+#if ALLOC == STATIC
+	fp2_free(const_frb);
+#endif
+}
+
+void fp2_const_calc() {
+	bn_t e;
+	fp12_t t;
+
+	bn_null(e);
+	fp12_null(t);
+
+	TRY {
+		bn_new(e);
+		fp12_new(t);
+		fp12_zero(t);
+		fp_set_dig(t[1][0][0], 1);
+		e->used = FP_DIGS;
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		bn_sub_dig(e, e, 1);
+		fp12_exp(t, t, e);
+		fp_copy(const_frb[0], t[0][0][0]);
+		fp_copy(const_frb[1], t[0][0][1]);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		bn_free(e);
+		fp12_free(t);
+	}
+}
+
+void fp2_const_get(fp2_t f) {
+	fp_copy(f[0], const_frb[0]);
+	fp_copy(f[1], const_frb[1]);
 }
 
 void fp2_dbl(fp2_t c, fp2_t a) {
@@ -134,17 +173,15 @@ void fp2_mul_nor(fp2_t c, fp2_t a) {
 				break;
 			case 3:
 				/* If p = 3 mod 8, x^2 - sqrt(1 + sqrt(-1)) is irreducible. */
-				fp2_copy(t0, a);
-				fp2_mul_art(t0, t0);
+				fp2_mul_art(t0, a);
 				fp2_add(c, t0, a);
 				break;
 			case 7:
 				/* If p = 7 mod 8 and p = 2,3 mod 5, x^2 - sqrt(2 + sqrt(-1)) is
 				 * irreducible. */
-				fp2_copy(t0, a);
-				fp2_mul_art(t0, t0);
-				fp2_add(c, a, t0);
-				fp2_add(c, c, t0);
+				fp2_mul_art(t0, a);
+				fp2_add(t0, t0, a);
+				fp2_add(c, t0, a);
 				break;
 			default:
 				THROW(ERR_INVALID);
@@ -247,7 +284,7 @@ void fp2_frb(fp2_t c, fp2_t a) {
 	fp_neg(c[1], a[1]);
 }
 
-void fp2_exp(fp12_t c, fp12_t a, bn_t b) {
+void fp2_exp(fp2_t c, fp2_t a, bn_t b) {
 	fp2_t t;
 
 	fp2_null(t);
