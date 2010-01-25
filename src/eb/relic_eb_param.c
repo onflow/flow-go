@@ -301,6 +301,10 @@ static int param_id;
 /* Public definitions                                                         */
 /*============================================================================*/
 
+int eb_param_get() {
+	return param_id;
+}
+
 void eb_param_set(int param) {
 	int super = 0;
 	int ordin = 0;
