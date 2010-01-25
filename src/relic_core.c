@@ -42,6 +42,7 @@
 #include "relic_ep.h"
 #include "relic_eb.h"
 #include "relic_cp.h"
+#include "relic_pp.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -87,7 +88,7 @@ int core_init(void) {
 		eb_curve_init();
 #endif
 #ifdef WITH_PP
-		pp_core_init();
+		pp_pair_init();
 #endif
 	}
 	CATCH_ANY {
