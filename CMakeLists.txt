@@ -285,10 +285,8 @@ endif(NOT COMP)
 string(TOLOWER ${ARITH} LFLAGS)
 set(LFLAGS "-L${CMAKE_CURRENT_SOURCE_DIR}/src/low/${LFLAGS}/")
 set(TMP "$ENV{LINK}")
-if (TMP)
-	set(LINK ${TMP} CACHE STRING "User-chosen linker flags.")
-    set(LFLAGS "${LFLAGS} ${LINK}")
-endif(TMP)
+set(LINK ${TMP} CACHE STRING "User-chosen linker flags.")
+set(LFLAGS "${LFLAGS} ${LINK}")
 
 if (NOT OPSYS)
 	# Discover the operating system.
