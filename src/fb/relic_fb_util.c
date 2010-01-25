@@ -296,7 +296,7 @@ void fb_write(char *str, int len, fb_t a, int radix) {
 		j = 0;
 		while (!fb_is_zero(t)) {
 			d = t[0] % radix;
-			fb_rsh(t, t, l);
+			fb_rshb_low(t, t, l);
 			str[j] = util_conv_char(d);
 			j++;
 		}

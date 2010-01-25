@@ -173,7 +173,7 @@ static void find_solve() {
 /**
  * Square root of z.
  */
-static fb_st sqrt;
+static fb_st fb_sqrt;
 
 /**
  * Precomputes half-traces for z^i with odd i.
@@ -181,10 +181,10 @@ static fb_st sqrt;
  * @throw ERR_NO_MEMORY if there is no available memory.
  */
 static void find_sqrt() {
-	fb_set_bit(sqrt, 1, 1);
+	fb_set_bit(fb_sqrt, 1, 1);
 
 	for (int i = 1; i < FB_BITS; i++) {
-		fb_sqr(sqrt, sqrt);
+		fb_sqr(fb_sqrt, fb_sqrt);
 	}
 }
 
@@ -209,7 +209,7 @@ dig_t *fb_poly_get(void) {
 
 dig_t *fb_poly_get_srt(void) {
 #if FB_SRT == QUICK || !defined(STRIP)
-	return sqrt;
+	return fb_sqrt;
 #else
 	return NULL;
 #endif

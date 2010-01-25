@@ -40,8 +40,21 @@
 #include "relic_error.h"
 
 /*============================================================================*/
+/* Private definitions                                                        */
+/*============================================================================*/
+
+/**
+ * Current configured binary field identifier.
+ */
+static int param_id;
+
+/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
+
+int fb_param_get(void) {
+	return param_id;
+}
 
 void fb_param_set(int param) {
 	switch (param) {
@@ -73,6 +86,7 @@ void fb_param_set(int param) {
 			THROW(ERR_INVALID);
 			break;
 	}
+	param = param_id;
 }
 
 void fb_param_set_any(void) {
