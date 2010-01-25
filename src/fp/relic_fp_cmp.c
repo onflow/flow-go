@@ -39,7 +39,7 @@
 int fp_cmp_dig(fp_t a, dig_t b) {
 #if FP_RDC == MONTY
 	fp_t t;
-	int r;
+	int r = CMP_EQ;
 
 	fp_null(t);
 

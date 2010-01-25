@@ -38,6 +38,7 @@
 #include "relic_fp.h"
 #include "relic_fp_low.h"
 #include "relic_error.h"
+#include "relic_pp.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
@@ -183,6 +184,11 @@ void fp_prime_set(bn_t p) {
 	bn_mod(&conv, &conv, &prime);
 	bn_lsh(&one, &one, prime.used * BN_DIGIT);
 	bn_mod(&one, &one, &prime);
+
+#if defined(WITH_PP)
+	/* I don't have a better place for this. */
+	fp2_const_calc();
+#endif
 }
 
 void fp_prime_set_dense(bn_t p) {

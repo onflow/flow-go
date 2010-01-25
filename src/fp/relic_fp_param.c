@@ -41,12 +41,26 @@
 #include "relic_error.h"
 
 /*============================================================================*/
+/* Private definitions                                                        */
+/*============================================================================*/
+
+/**
+ * Current configured prime field identifier.
+ */
+static int param_id;
+
+/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
+
+int fp_param_get(void) {
+	return param_id;
+}
 
 void fp_param_set(int param) {
 	bn_t t0, t1, p;
 	int f[10] = { 0 };
+	int generated = 0;
 
 	TRY {
 		bn_new(t0);
@@ -54,24 +68,28 @@ void fp_param_set(int param) {
 		bn_new(p);
 
 		switch (param) {
+#if FP_PRIME == 160
 			case SECG_160:
 				/* p = 2^160 - 2^31 + 1. */
 				f[0] = -1;
 				f[1] = -31;
 				fp_prime_set_spars(f, 2);
 				break;
+#elif FP_PRIME == 192
 			case NIST_192:
 				/* p = 2^192 - 2^64 - 1. */
 				f[0] = -1;
 				f[1] = -64;
 				fp_prime_set_spars(f, 2);
 				break;
+#elif FP_PRIME == 224
 			case NIST_224:
 				/* p = 2^224 - 2^96 + 1. */
 				f[0] = 1;
 				f[1] = -96;
 				fp_prime_set_spars(f, 2);
 				break;
+#elif FP_PRIME == 256
 			case NIST_256:
 				/* p = 2^256 - 2^224 + 2^192 + 2^96 - 1. */
 				f[0] = -1;
@@ -130,6 +148,7 @@ void fp_param_set(int param) {
 				bn_add(p, p, t1);
 				fp_prime_set_dense(p);
 				break;
+#elif FP_PRIME == 284
 			case NIST_384:
 				/* p = 2^384 - 2^128 - 2^96 + 2^32 - 1. */
 				f[0] = -1;
@@ -138,15 +157,22 @@ void fp_param_set(int param) {
 				f[3] = -128;
 				fp_prime_set_spars(f, 4);
 				break;
+#elif FP_PRIME == 521
 			case NIST_521:
 				/* p = 2^521 - 1. */
 				f[0] = -1;
 				fp_prime_set_spars(f, 1);
 				break;
+#endif
 			default:
 				bn_gen_prime(p, FP_BITS);
 				fp_prime_set_dense(p);
+				generated = 1;
 				break;
+		}
+
+		if (!generated) {
+			param_id = param;
 		}
 	}
 	CATCH_ANY {
@@ -229,7 +255,10 @@ int fp_param_set_any_tower() {
 #if FP_PRIME == 256
 	fp_param_set(BNN_256);
 #else
-	fp_param_set_any_dense();
+	do {
+		fp_param_set_any_dense();
+	} while (fp_prime_get_mod5() == 1 || fp_prime_get_mod5() == 4 ||
+			fp_prime_get_mod8() == 1);
 #endif
 	if (fp_prime_get_mod5() == 1 || fp_prime_get_mod5() == 4 ||
 			fp_prime_get_mod8() == 1) {

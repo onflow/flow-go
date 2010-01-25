@@ -134,17 +134,19 @@ void fp_inv(fp_t c, fp_t a) {
 			fp_mul(x1->dp, x1->dp, fp_prime_get_conv());
 			k = k + FP_DIGS * FP_DIGIT;
 		}
-
 		/* x1 = x1 * R^2 * R^{-1} mod p. */
 		fp_mul(x1->dp, x1->dp, fp_prime_get_conv());
 		fp_zero(t);
 		t[0] = 1;
-		fp_lsh(t, t, 2 * FP_DIGS * FP_DIGIT - k);
-		/* c = x1 * 2^{2Wt - k} * R^{-1} mod p. */
-		fp_mul(c, x1->dp, t);
-
+		if (k > FP_DIGS * FP_DIGIT) {
+			fp_lsh(t, t, 2 * FP_DIGS * FP_DIGIT - k);
+			/* c = x1 * 2^{2Wt - k} * R^{-1} mod p. */
+			fp_mul(c, x1->dp, t);
+		} else {
+			fp_prime_conv_dig(c, 1);
+		}
 #if FP_RDC != MONTY
-		/*
+		/*is_one
 		 * If we do not use Montgomery reduction, the result of inversion is
 		 * a^{-1}R^3 mod p or a^{-1}R^4 mod p, depending on flag.
 		 * Hence we must reduce the result three or four times.
