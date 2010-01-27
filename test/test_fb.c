@@ -178,9 +178,7 @@ static int util(void) {
 
 		TEST_BEGIN("reading and writing a binary field element are consistent") {
 			fb_rand(a);
-			fb_print(a);
-			fb_write(str, sizeof(str), a, 16);
-			fb_print(a);
+			fb_write(str, sizeof(str), a, 16);;
 			fb_read(b, str, sizeof(str), 16);
 			TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);
 		}
@@ -952,7 +950,7 @@ int main(void) {
 		fb_param_print();
 	} CATCH_ANY {
 		core_clean();
-		return 1;
+		return 0;
 	}
 
 	util_print_banner("Utilities", 1);

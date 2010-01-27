@@ -981,7 +981,7 @@ int main(void) {
 	if (eb_param_set_any_super() == STS_ERR) {
 		THROW(ERR_NO_CURVE);
 		core_clean();
-		return 1;
+		return 0;
 	}
 
 	util_print_banner("Bilinear pairing:\n", 0);

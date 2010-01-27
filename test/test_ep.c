@@ -822,7 +822,7 @@ int main(void) {
 	if (r0 == STS_OK) {
 		if (test() != STS_OK) {
 			core_clean();
-			return 1;
+			return 0;
 		}
 	}
 #endif
