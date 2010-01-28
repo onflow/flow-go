@@ -303,6 +303,27 @@ void bn_rec_win(unsigned char *win, int *len, bn_t k, int w) {
 	*len = l;
 }
 
+void bn_rec_slw(unsigned char *win, int *len, bn_t k, int w) {
+	int i, j, s;
+
+	i = bn_bits(k) - 1;
+	j = 0;
+	while (i >= 0) {
+		if (!bn_test_bit(k, i)) {
+			i--;
+			win[j++] = 0;
+		} else {
+			s = MAX(i - w + 1, 0);
+			while (!bn_test_bit(k, s)) {
+				s++;
+			}
+			win[j++] = get_bits(k, s, i);
+			i = s - 1;
+		}
+	}
+	*len = j;
+}
+
 void bn_rec_naf(signed char *naf, int *len, bn_t k, int w) {
 	int i, l;
 	bn_t t;

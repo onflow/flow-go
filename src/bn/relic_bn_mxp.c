@@ -107,12 +107,13 @@ void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m) {
 
 void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 	bn_t tab[TABLE_SIZE], t, u, r;
-	dig_t buf;
-	int bitbuf, bitcpy, bitcnt, mode, digidx, i, j, w = 0;
+	int i, j, l, w = 1;
+	unsigned char win[BN_BITS];
 
 	bn_null(t);
 	bn_null(u);
 	bn_null(r);
+	/* Initialize table. */
 	for (i = 0; i < TABLE_SIZE; i++) {
 		bn_null(tab[i]);
 	}
@@ -123,20 +124,21 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 		i = bn_bits(b);
 		if (i <= 21) {
 			w = 2;
-		} else if (i <= 36) {
+		} else if (i <= 32) {
 			w = 3;
-		} else if (i <= 140) {
+		} else if (i <= 128) {
 			w = 4;
-		} else if (i <= 450) {
+		} else if (i <= 256) {
 			w = 5;
-		} else {
+		} else if (i <= 1024) {
 			w = 6;
+		} else if (i <= 2048) {
+			w = 7;
+		} else {
+			w = 8;
 		}
 
-		/* Initialize table. */
-		memset(tab, 0, sizeof(tab));
-
-		for (i = 0; i < (1 << (w - 1)); i++) {
+		for (i = 1; i < (1 << w); i += 2) {
 			bn_new(tab[i]);
 		}
 
@@ -154,88 +156,29 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 		bn_copy(t, a);
 #endif
 
-		bn_copy(tab[0], t);
-		/* Compute the value at tab[0] by squaring a (w - 1) times. */
-		for (i = 0; i < (w - 1); i++) {
-			bn_sqr(tab[0], tab[0]);
-			bn_mod(tab[0], tab[0], m, u);
+		bn_copy(tab[1], t);
+		bn_sqr(t, tab[1]);
+		bn_mod(t, t, m, u);
+		/* Create table. */
+		for (i = 1; i < 1 << (w - 1); i++) {
+			bn_mul(tab[2 * i + 1], tab[2 * i - 1], t);
+			bn_mod(tab[2 * i + 1], tab[2 * i + 1], m, u);
 		}
 
-		/* Create upper table. */
-		for (i = 1; i < (1 << (w - 1)); i++) {
-			bn_mul(tab[i], tab[i - 1], t);
-			bn_mod(tab[i], tab[i], m, u);
-		}
-
-		/* Set initial mode and bit count. */
-		mode = 0;
-		bitcnt = 1;
-		buf = 0;
-		digidx = b->used - 1;
-		bitcpy = 0;
-		bitbuf = 0;
-
-		for (;;) {
-			/* Grab next digit as required. */
-			if (--bitcnt == 0) {
-				/* If digidx == -1 we are out of digits so break. */
-				if (digidx == -1) {
-					break;
-				}
-				/* Read next digit and set bitcnt. */
-				buf = b->dp[digidx--];
-				bitcnt = (int)BN_DIGIT;
-			}
-
-			/* Grab the next most significant bit from the exponent. */
-			j = (buf >> (BN_DIGIT - 1)) & 0x01;
-			buf <<= (dig_t)1;
-
-			if (mode == 0 && j == 0) {
-				continue;
-			}
-
-			/* If the bit is zero and mode == 1 then we square. */
-			if (mode == 1 && j == 0) {
+		bn_rec_slw(win, &l, b, w);
+		for (i = 0; i < l; i++) {
+			if (win[i] == 0) {
 				bn_sqr(r, r);
 				bn_mod(r, r, m, u);
-				continue;
-			}
-
-			/* Else we add it to the window. */
-			bitbuf |= (j << (w - ++bitcpy));
-			mode = 2;
-
-			if (bitcpy == w) {
-				/* Window is filled so square as required and multiply. */
-				for (i = 0; i < w; i++) {
+			} else {
+				for (j = 0; j < util_bits_dig(win[i]); j++) {
 					bn_sqr(r, r);
 					bn_mod(r, r, m, u);
 				}
-				bn_mul(r, r, tab[bitbuf - (1 << (w - 1))]);
+				bn_mul(r, r, tab[win[i]]);
 				bn_mod(r, r, m, u);
-				bitcpy = 0;
-				bitbuf = 0;
-				mode = 1;
 			}
 		}
-
-		/* If bits remain then square/multiply. */
-		if (mode == 2 && bitcpy > 0) {
-			/* Square then multiply if the bit is set. */
-			for (i = 0; i < bitcpy; i++) {
-				bn_sqr(r, r);
-				bn_mod(r, r, m, u);
-
-				/* Get next bit of the window. */
-				bitbuf <<= 1;
-				if ((bitbuf & (1 << w)) != 0) {
-					bn_mul(r, r, t);
-					bn_mod(r, r, m, u);
-				}
-			}
-		}
-
 		bn_trim(r);
 #if BN_MOD == MONTY
 		bn_mod_monty_back(c, r, m);
@@ -247,7 +190,7 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		for (i = 0; i < (1 << (w - 1)); i++) {
+		for (i = 1; i < (1 << w); i++) {
 			bn_free(tab[i]);
 		}
 		bn_free(u);
@@ -255,6 +198,7 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 		bn_free(r);
 	}
 }
+
 
 #endif
 

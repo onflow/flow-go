@@ -1225,6 +1225,16 @@ int bn_is_factor(bn_t c, bn_t a);
 void bn_rec_win(unsigned char *win, int *len, bn_t k, int w);
 
 /**
+ * Recodes an integer in sliding window form.
+ *
+ * @param[out] win			- the recoded integer.
+ * @param[out] len			- the number of bytes written.
+ * @param[in] k				- the integer to recode.
+ * @param[in] w				- the window size in bits.
+ */
+void bn_rec_slw(unsigned char *win, int *len, bn_t k, int w);
+
+/**
  * Recodes an integer in width-w Non-Adjacent Form.
  *
  * @param[out] naf			- the recoded integer.
