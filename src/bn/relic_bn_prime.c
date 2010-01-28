@@ -302,8 +302,8 @@ int bn_is_prime_rabin(bn_t a) {
 		}
 	}
 	CATCH_ANY {
+		result = 0;
 		THROW(ERR_CAUGHT);
-		return 0;
 	}
 	FINALLY {
 		bn_free(r);
@@ -367,8 +367,8 @@ int bn_is_prime_solov(bn_t a) {
 		}
 	}
 	CATCH_ANY {
+		result = 0;
 		THROW(ERR_CAUGHT);
-		return 0;
 	}
 	FINALLY {
 		bn_free(t0);
@@ -400,14 +400,15 @@ void bn_gen_prime_safep(bn_t a, int bits) {
 		do {
 			bn_rand(a, BN_POS, bits);
 		} while (bn_bits(a) != bits);
+		/* Check if (a - 1)/2 is prime. */
+		bn_sub_dig(a, a, 1);
+		bn_rsh(a, a, 1);
 		if (bn_is_prime(a)) {
-			/* Check if (a - 1)/2 is prime. */
-			bn_sub_dig(a, a, 1);
-			bn_rsh(a, a, 1);
+			/* Restore a. */
+			bn_lsh(a, a, 1);
+			bn_add_dig(a, a, 1);
 			if (bn_is_prime(a)) {
-				/* Restore a. */
-				bn_lsh(a, a, 1);
-				bn_add_dig(a, a, 1);
+				/* Should be prime now. */
 				return;
 			}
 		}
@@ -447,9 +448,12 @@ void bn_gen_prime_stron(bn_t a, int bits) {
 				bn_mul_dig(r, t, i);
 				bn_add_dig(r, r, 1);
 				i++;
+				if (bn_bits(r) > bits / 2 - 1) {
+					found = 0;
+					break;
+				}
 			} while (!bn_is_prime(r));
-			if (bn_bits(r) != bits / 2 - 1) {
-				found = 0;
+			if (found == 0) {
 				continue;
 			}
 			/* Compute t = 2 * (s^(r-2) mod r) * s - 1. */
@@ -475,11 +479,11 @@ void bn_gen_prime_stron(bn_t a, int bits) {
 				bn_dbl(a, a);
 				bn_add(a, a, t);
 				j++;
+				if (bn_bits(a) > bits) {
+					found = 0;
+					break;
+				}
 			} while (!bn_is_prime(a));
-			if (bn_bits(a) != bits) {
-				found = 0;
-				continue;
-			}
 		} while (found == 0);
 	}
 	CATCH_ANY {
@@ -489,7 +493,6 @@ void bn_gen_prime_stron(bn_t a, int bits) {
 		bn_free(r);
 		bn_free(s);
 		bn_free(t);
-		return;
 	}
 }
 
