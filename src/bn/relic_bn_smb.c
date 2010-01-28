@@ -113,10 +113,10 @@ void bn_smb_jac(bn_t c, bn_t a, bn_t b) {
 					if (t == -1) {
 						bn_neg(c, c);
 					}
-					return;
+					break;
 				} else {
 					bn_zero(c);
-					return;
+					break;
 				}
 			}
 			/* Write t0 as 2^h * t0. */
