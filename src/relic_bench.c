@@ -187,6 +187,11 @@ void bench_overhead(void) {
 void bench_reset() {
 #if TIMER != NONE
 	total = 0;
+#else
+	(void)before;
+	(void)after;
+	(void)overhead;
+	(void)empty;
 #endif
 }
 

@@ -215,7 +215,7 @@ static int rabin(void) {
 	return code;
 }
 
-#if defined(WITH_EB)
+#if defined(WITH_EC)
 
 static int ecdsa(void) {
 	int code = STS_ERR;
