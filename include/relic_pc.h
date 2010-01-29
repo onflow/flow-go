@@ -94,9 +94,19 @@
 typedef CAT(G1_LOWER, t) g1_t;
 
 /**
+ * Represents a G_1 element with automatic allocation.
+ */
+typedef CAT(G1_LOWER, st) g1_st;
+
+/**
  * Represents a G_1 element.
  */
 typedef CAT(G2_LOWER, t) g2_t;
+
+/**
+ * Represents a G_2 element with automatic allocation.
+ */
+typedef CAT(G2_LOWER, st) g2_st;
 
 /**
  * Represents a G_1 element.
