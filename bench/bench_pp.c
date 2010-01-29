@@ -841,8 +841,6 @@ int main(void) {
 
 	if (ep_param_set_any_pairf() == STS_OK) {
 		ep_param_print();
-		ep2_curve_set();
-		ep2_curve_set_twist(1);
 		util_print_banner("Arithmetic:", 1);
 		memory();
 		util();

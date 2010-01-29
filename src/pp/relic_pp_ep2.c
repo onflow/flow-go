@@ -30,6 +30,7 @@
  */
 
 #include "relic_core.h"
+#include "relic_md.h"
 #include "relic_pp.h"
 #include "relic_error.h"
 #include "relic_conf.h"
@@ -465,11 +466,7 @@ bn_t ep2_curve_get_ord() {
 	}
 }
 
-void ep2_curve_set_twist(int twist) {
-	curve_is_twist = twist;
-}
-
-void ep2_curve_set() {
+void ep2_curve_set(int twist) {
 	int param;
 	char *str;
 	ep2_t g;
@@ -506,6 +503,8 @@ void ep2_curve_set() {
 
 		ep2_copy(&curve_g, g);
 		bn_copy(&curve_r, r);
+
+		curve_is_twist = twist;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -822,5 +821,35 @@ void ep2_frb(ep2_t r, ep2_t p) {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
 		fp2_free(t);
+	}
+}
+
+void ep2_mul_gen(ep2_t r, bn_t k) {
+	ep2_mul(r, ep2_curve_get_gen(), k);
+}
+
+void ep2_map(ep2_t p, unsigned char *msg, int len) {
+	bn_t n, k;
+	unsigned char digest[MD_LEN];
+
+	bn_null(n);
+	bn_null(k);
+
+	TRY {
+		bn_new(k);
+
+		n = ep2_curve_get_ord();
+
+		md_map(digest, msg, len);
+		bn_read_bin(k, digest, MD_LEN, BN_POS);
+		bn_mod(k, k, n);
+
+		n = ep2_curve_get_ord();
+
+		ep2_mul_gen(p, k);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		bn_free(k);
 	}
 }
