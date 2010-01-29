@@ -73,13 +73,6 @@ static int util(void) {
 		eb_new(b);
 		eb_new(c);
 
-		TEST_BEGIN("comparison is consistent") {
-			eb_rand(a);
-			eb_rand(b);
-			TEST_ASSERT(eb_cmp(a, b) != CMP_EQ, end);
-		}
-		TEST_END;
-
 		TEST_BEGIN("copy and comparison are consistent") {
 			eb_rand(a);
 			eb_rand(b);

@@ -1500,19 +1500,15 @@ static int factor(void) {
 		bn_new(q);
 		bn_new(n);
 
-		TEST_BEGIN("integer factorization is correct") {
+		TEST_ONCE("integer factorization is consistent") {
 			bn_gen_prime(p, 16);
 			bn_rand(n, BN_POS, BN_BITS - 16);
 			bn_mul(n, n, p);
 			if (bn_factor(q, n) == 1) {
 				TEST_ASSERT(bn_is_factor(q, n) == 1, end);
+			} else {
+				TEST_ASSERT(bn_is_factor(q, n) == 0, end);
 			}
-		} TEST_END;
-
-		bn_gen_prime(p, BN_BITS);
-
-		TEST_ONCE("integer factorization is consistent") {
-			TEST_ASSERT(bn_factor(q, p) == 0, end);
 		} TEST_END;
 	}
 	CATCH_ANY {

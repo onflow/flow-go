@@ -830,6 +830,14 @@ static void arith(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("bn_rec_slw") {
+		unsigned char win[BN_BITS + 1];
+		int len;
+		bn_rand(a, BN_POS, BN_BITS);
+		BENCH_ADD(bn_rec_slw(win, &len, a, 4));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("bn_rec_naf") {
 		signed char naf[BN_BITS + 1];
 		int len;

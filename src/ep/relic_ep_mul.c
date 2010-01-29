@@ -47,7 +47,7 @@
  * @param[out] t				- the destination table.
  * @param[in] p					- the point to multiply.
  */
-static void table_init(ep_t *t, ep_t p) {
+static void table_init(ep_t * t, ep_t p) {
 	int i;
 
 	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
@@ -129,26 +129,34 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 	int i, l;
 	ep_t t;
 
-	ep_new(t);
-	l = bn_bits(k);
+	ep_null(t);
 
-	if (bn_test_bit(k, l - 1)) {
-		ep_copy(t, p);
-	} else {
-		ep_set_infty(t);
-	}
+	TRY {
+		ep_new(t);
+		l = bn_bits(k);
 
-	for (i = l - 2; i >= 0; i--) {
-		ep_dbl(t, t);
-		if (bn_test_bit(k, i)) {
-			ep_add(t, t, p);
+		if (bn_test_bit(k, l - 1)) {
+			ep_copy(t, p);
+		} else {
+			ep_set_infty(t);
 		}
+
+		for (i = l - 2; i >= 0; i--) {
+			ep_dbl(t, t);
+			if (bn_test_bit(k, i)) {
+				ep_add(t, t, p);
+			}
+		}
+
+		ep_copy(r, t);
+		ep_norm(r, r);
 	}
-
-	ep_copy(r, t);
-	ep_norm(r, r);
-
-	ep_free(t);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep_free(t);
+	}
 }
 
 #endif

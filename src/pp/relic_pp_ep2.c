@@ -458,7 +458,11 @@ ep2_t ep2_curve_get_gen() {
 }
 
 bn_t ep2_curve_get_ord() {
-	return &curve_r;
+	if (curve_is_twist) {
+		return ep_curve_get_ord();
+	} else {
+		return &curve_r;
+	}
 }
 
 void ep2_curve_set_twist(int twist) {

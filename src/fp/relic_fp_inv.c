@@ -74,15 +74,19 @@ void fp_inv(fp_t c, fp_t a) {
 #if FP_RDC != MONTY
 		_a->used = FP_DIGS;
 		dv_copy(_a->dp, a, FP_DIGS);
+		bn_trim(_a);
 		_p->used = FP_DIGS;
 		dv_copy(_p->dp, p, FP_DIGS);
+		bn_trim(_p);
 		bn_mod_monty_conv(u, _a, _p);
 #else
 		u->used = FP_DIGS;
 		dv_copy(u->dp, a, FP_DIGS);
+		bn_trim(u);
 #endif
 		v->used = FP_DIGS;
 		dv_copy(v->dp, p, FP_DIGS);
+		bn_trim(v);
 
 		while (!bn_is_zero(v)) {
 			/* If v is even then v = v/2, x1 = 2 * x1. */
