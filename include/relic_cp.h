@@ -40,14 +40,14 @@
 #include "relic_types.h"
 #include "relic_bn.h"
 #include "relic_ec.h"
-#include "relic_pb.h"
+#include "relic_pc.h"
 
 /*============================================================================*/
 /* Type definitions.                                                          */
 /*============================================================================*/
 
 /**
- * Represents an RSA private key.
+ * Represents an RSA key pair.
  */
 typedef struct _rsa_t {
 	/** The modulus n = pq. */
@@ -69,7 +69,7 @@ typedef struct _rsa_t {
 } rsa_t;
 
 /**
- * Represents an RSA private key.
+ * Represents a Rabin key pair.
  */
 typedef struct _rabin_t {
 	/** The modulus n = pq. */
@@ -83,6 +83,16 @@ typedef struct _rabin_t {
 	/** The cofactor of the second prime. */
 	bn_t dq;
 } rabin_t;
+
+/**
+ * Represents a SOK key pair.
+ */
+typedef struct _sokaka {
+	/** The private key in G_1. */
+	g1_t s1;
+	/** The private key in G_2. */
+	g2_t s2;
+} sokaka_t;
 
 /*============================================================================*/
 /* Macro definitions                                                          */
@@ -310,31 +320,26 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q);
 void cp_sokaka_gen(bn_t master);
 
 /**
- * Generates a public key for the SOK protocol.
- *
- * @param[out] p				- the public key.
- * @param[in] id				- the identity.
- * @param[in] len				- the length of identity in bytes.
- */
-void cp_sokaka_gen_pub(eb_t p, char *id, int len);
-
-/**
  * Generates a private key for the SOK protocol.
  *
- * @param[out] s				- the private key.
+ * @param[out] k				- the private key.
  * @param[in] id				- the identity.
  * @param[in] len				- the length of identity in bytes.
  * @param[in] master			- the master key.
  */
-void cp_sokaka_gen_prv(eb_t s, char *id, int len, bn_t master);
+void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master);
 
 /**
  * Computes a shared key between two entities.
  *
  * @param[out] key				- the shared key.
- * @param[in] p					- the public key of the first entity.
- * @param[in] s					- the private key of the second entity.
+ * @param[int] key_len			- the intended shared key length in bytes.
+ * @param[in] id1				- the first identity.
+ * @param[in] len1				- the length of the first identity in bytes.
+ * @param[in] k					- the private key of the first identity.
+ * @param[in] id2				- the second identity.
+ * @param[in] len2				- the length of the second identity in bytes.
  */
-void cp_sokaka_key(fb4_t key, eb_t p, eb_t s);
+void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1, int len1, sokaka_t k, char *id2, int len2);
 
 #endif /* !RELIC_CP_H */

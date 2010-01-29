@@ -103,6 +103,8 @@
 #cmakedefine WITH_PP
 /** Build pairings over binary curves module. */
 #cmakedefine WITH_PB
+/** Build pairing-based cryptography module. */
+#cmakedefine WITH_PC
 /** Build hash functions. */
 #cmakedefine WITH_MD
 /** Build cryptographic protocols. */
@@ -447,6 +449,16 @@
 #define ETATN	 2
 /** Chosen binary elliptic curve point multiplication method. */
 #define PB_MAP	 @PB_MAP@
+
+/** Binary elliptic curve arithmetic method. */
+#define PC_METHD "@PC_METHD@"
+
+/** Prime curves. */
+#define PRIME	 1
+/** Binary curves. */
+#define BINAR	 2
+/** Chosen elliptic curve cryptography method. */
+#define PC_CUR	 @PC_CUR@
 
 /** Bilinear pairing method. */
 #define MD_METHD "@MD_METHD@"
