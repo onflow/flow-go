@@ -43,7 +43,7 @@
 /**
  * Size of precomputation table.
  */
-#define TABLE_SIZE			32
+#define TABLE_SIZE			256
 
 /*============================================================================*/
 /* Public definitions                                                         */

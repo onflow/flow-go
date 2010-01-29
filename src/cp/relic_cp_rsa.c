@@ -436,10 +436,10 @@ int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
 			size = size - pad_len;
 
 			if (size <= *out_len) {
-				*out_len = size;
 				memset(out, 0, size);
 				bn_size_bin(&size, eb);
 				bn_write_bin(out, &size, &sign, eb);
+				*out_len = size;
 			} else {
 				result = STS_ERR;
 			}
@@ -517,10 +517,10 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 			size = size - pad_len;
 
 			if (size <= *out_len) {
-				*out_len = size;
 				memset(out, 0, size);
 				bn_size_bin(&size, eb);
 				bn_write_bin(out, &size, &sign, eb);
+				*out_len = size;
 			} else {
 				result = STS_ERR;
 			}
@@ -618,6 +618,9 @@ int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
 
 	bn_size_bin(&size, prv.n);
 
+	if (MD_LEN == size) {
+		return STS_ERR;
+	}
 	if (MD_LEN > (size - RSA_PAD_LEN)) {
 		return STS_ERR;
 	}
