@@ -1755,6 +1755,14 @@ static int multiplication(void) {
 			ep2_mul(r, p, n);
 			TEST_ASSERT(ep2_is_infty(r) == 1, end);
 		} TEST_END;
+
+		TEST_BEGIN("generator multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep2_mul(q, p, k);
+			ep2_mul_gen(r, k);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -1983,8 +1991,6 @@ int main(void) {
 		core_clean();
 		return 0;
 	}
-	ep2_curve_set();
-	ep2_curve_set_twist(1);
 
 	util_print_banner("Quadratic twist:", 0);
 	util_print_banner("Utilities:", 1);
