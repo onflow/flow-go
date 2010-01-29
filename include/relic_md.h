@@ -171,4 +171,14 @@ void md_map_sh384(unsigned char *hash, unsigned char *msg, int len);
  */
 void md_map_sh512(unsigned char *hash, unsigned char *msg, int len);
 
+/**
+ * Derives a key from shared secret material.
+ *
+ * @param[out] key				- the resulting key.
+ * @param[in] key_len			- the intended key length in bytes.
+ * @param[in] in				- the shared secret.
+ * @param[in] in_len			- the length of the shared secret in bytes.
+ */
+void md_kdf(unsigned char *key, int key_len, unsigned char *in, int in_len);
+
 #endif /* !RELIC_MD_H */
