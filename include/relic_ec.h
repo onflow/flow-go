@@ -110,7 +110,7 @@ typedef CAT(EC_LOWER, t) ec_t;
 #define ec_free(A)					CAT(EC_LOWER, free)(A)
 
 /**
- * Returns the generator of the group of points in the binary elliptic curve.
+ * Returns the generator of the group of points in the elliptic curve.
  *
  * @return the generator.
  */
@@ -124,7 +124,7 @@ typedef CAT(EC_LOWER, t) ec_t;
 #define ec_curve_get_tab()			CAT(EC_LOWER, curve_get_tab)()
 
 /**
- * Returns the order of the group of points in the binary elliptic curve.
+ * Returns the order of the group of points in the elliptic curve.
  *
  * @return the order of the group.
  */
@@ -144,20 +144,20 @@ typedef CAT(EC_LOWER, t) ec_t;
 #endif
 
 /**
- * Prints the current configured binary elliptic curve.
+ * Prints the current configured elliptic curve.
  */
 #define ec_param_print()			CAT(EC_LOWER, param_print)()
 
 /**
- * Tests if a point on a binary elliptic curve is at the infinity.
+ * Tests if a point on a elliptic curve is at the infinity.
  *
  * @param[in] P				- the point to test.
- * @return 1 if the point is at infinity, 0 otherise.
+ * @return 1 if the point is at infinity, 0 otherwise.
  */
 #define ec_is_infty(P)				CAT(EC_LOWER, is_infty)(P)
 
 /**
- * Assigns a binary elliptic curve point to a point at the infinity.
+ * Assigns a elliptic curve point to a point at the infinity.
  *
  * @param[out] P			- the point to assign.
  */
@@ -167,30 +167,30 @@ typedef CAT(EC_LOWER, t) ec_t;
  * Copies the second argument to the first argument.
  *
  * @param[out] R			- the result.
- * @param[in] P				- the binary elliptic curve point to copy.
+ * @param[in] P				- the elliptic curve point to copy.
  */
 #define ec_copy(R, P)				CAT(EC_LOWER, copy)(R, P)
 
 /**
- * Compares two binary elliptic curve points.
+ * Compares two elliptic curve points.
  *
- * @param[in] P				- the first binary elliptic curve point.
- * @param[in] Q				- the second binary elliptic curve point.
+ * @param[in] P				- the first elliptic curve point.
+ * @param[in] Q				- the second elliptic curve point.
  * @return CMP_EQ if P == Q and CMP_NE if P != Q.
  */
 #define ec_cmp(P, Q)				CAT(EC_LOWER, cmp)(P, Q)
 
 /**
- * Assigns a random value to a binary elliptic curve point.
+ * Assigns a random value to a elliptic curve point.
  *
- * @param[out] P			- the binary elliptic curve point to assign.
+ * @param[out] P			- the elliptic curve point to assign.
  */
 #define ec_rand(P)					CAT(EC_LOWER, rand)(P)
 
 /**
- * Prints a binary elliptic curve point.
+ * Prints a elliptic curve point.
  *
- * @param[in] P				- the binary elliptic curve point to print.
+ * @param[in] P				- the elliptic curve point to print.
  */
 #define ec_print(P)					CAT(EC_LOWER, print)(P)
 
@@ -254,7 +254,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  */
 #define ec_mul_pre(T, P)			CAT(EC_LOWER, mul_pre)(T, P)
 /**
- * Multiplies a binary elliptic point using a precomputation table.
+ * Multiplies a elliptic point using a precomputation table.
  * Computes R = kP.
  *
  * @param[out] R			- the result.
@@ -295,7 +295,7 @@ typedef CAT(EC_LOWER, t) ec_t;
 #define ec_norm(R, P)				CAT(EC_LOWER, norm)(R, P)
 
 /**
- * Maps a byte array to a point in a binary elliptic curve.
+ * Maps a byte array to a point in an elliptic curve.
  *
  * @param[out] P			- the result.
  * @param[in] M				- the byte array to map.

@@ -920,15 +920,10 @@ bn_t ep2_curve_get_ord(void);
 /**
  * Configures a new elliptic curve by using the curve over the base prime field
  * as a parameter.
- */
-void ep2_curve_set(void);
-
-/**
- * Notifies the module that the configured curve is a twist or not.
  *
- * @param				- the flag indicating that the curve is a twist.
+ *  @param				- the flag indicating that the curve is a twist.
  */
-void ep2_curve_set_twist(int twist);
+void ep2_curve_set(int twist);
 
 /**
  * Tests if a point on a elliptic curve is at the infinity.
@@ -1107,12 +1102,29 @@ void ep2_dbl_slp_projc(ep2_t r, fp2_t s, fp2_t e, ep2_t p);
 void ep2_mul(ep2_t r, ep2_t p, bn_t k);
 
 /**
+ * Multiplies the generator of an elliptic curve over a qaudratic extension.
+ *
+ * @param[out] r			- the result.
+ * @param[in] k				- the integer.
+ */
+void ep2_mul_gen(ep2_t r, bn_t k);
+
+/**
  * Converts a point to affine coordinates.
  *
  * @param[out] r			- the result.
  * @param[in] p				- the point to convert.
  */
 void ep2_norm(ep2_t r, ep2_t p);
+
+/**
+ * Maps a byte array to a point in an elliptic curve over a quadratic extension.
+ *
+ * @param[out] p			- the result.
+ * @param[in] msg			- the byte array to map.
+ * @param[in] len			- the array length in bytes.
+ */
+void ep2_map(ep2_t p, unsigned char *msg, int len);
 
 /**
  * Computes the Frobenius map of a point represented in affine coordinates

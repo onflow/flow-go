@@ -81,8 +81,8 @@ static int rsa(void) {
 			rand_bytes(in, in_len);
 			TEST_ASSERT(cp_rsa_enc(out, &out_len, in, in_len, pub) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_dec_basic(out, &out_len, out, out_len, prv) == STS_OK,
-					end);
+			TEST_ASSERT(cp_rsa_dec_basic(out, &out_len, out, out_len,
+							prv) == STS_OK, end);
 			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
 		} TEST_END;
 #endif
@@ -97,8 +97,8 @@ static int rsa(void) {
 			rand_bytes(in, in_len);
 			TEST_ASSERT(cp_rsa_enc(out, &out_len, in, in_len, pub) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_dec_quick(out, &out_len, out, out_len, prv) == STS_OK,
-					end);
+			TEST_ASSERT(cp_rsa_dec_quick(out, &out_len, out, out_len,
+							prv) == STS_OK, end);
 			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
 		} TEST_END;
 #endif
@@ -112,8 +112,7 @@ static int rsa(void) {
 			rand_bytes(in, in_len);
 			TEST_ASSERT(cp_rsa_sign(out, &out_len, in, in_len, prv) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1,
-					end);
+			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1, end);
 		} TEST_END;
 
 #if CP_RSA == BASIC || !defined(STRIP)
@@ -124,10 +123,9 @@ static int rsa(void) {
 			in_len = 10;
 			out_len = BN_BITS / 8 + 1;
 			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_sign_basic(out, &out_len, in, in_len, prv) == STS_OK,
-					end);
-			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1,
-					end);
+			TEST_ASSERT(cp_rsa_sign_basic(out, &out_len, in, in_len,
+							prv) == STS_OK, end);
+			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1, end);
 		} TEST_END;
 #endif
 
@@ -139,10 +137,9 @@ static int rsa(void) {
 			in_len = 10;
 			out_len = BN_BITS / 8 + 1;
 			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_sign_quick(out, &out_len, in, in_len, prv) == STS_OK,
-					end);
-			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1,
-					end);
+			TEST_ASSERT(cp_rsa_sign_quick(out, &out_len, in, in_len,
+							prv) == STS_OK, end);
+			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1, end);
 		} TEST_END;
 #endif
 
@@ -196,8 +193,8 @@ static int rabin(void) {
 			rand_bytes(in, in_len);
 			TEST_ASSERT(cp_rabin_enc(out, &out_len, in, in_len, pub) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rabin_dec(out, &out_len, out, out_len, prv) == STS_OK,
-					end);
+			TEST_ASSERT(cp_rabin_dec(out, &out_len, out, out_len,
+							prv) == STS_OK, end);
 			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
 		} TEST_END;
 	} CATCH_ANY {
@@ -251,38 +248,36 @@ static int ecdsa(void) {
 
 #endif
 
-#if defined(WITH_PB)
+#if defined(WITH_PC)
 
 static int sokaka(void) {
 	int code = STS_ERR;
+	sokaka_t s_a, s_b;
 	bn_t s;
-	eb_t p_a, p_b, s_a, s_b;
-	fb4_t key1, key2;
+	unsigned char key1[MD_LEN], key2[MD_LEN];
 
-	eb_null(p_a);
-	eb_null(p_b);
-	eb_null(s_a);
-	eb_null(s_b);
+	g1_null(s_a.s1);
+	g2_null(s_a.s2);
+	g1_null(s_b.s1);
+	g2_null(s_b.s2);
 
 	TRY {
+		g1_new(s_a.s1);
+		g2_new(s_a.s2);
+		g1_new(s_b.s1);
+		g2_new(s_b.s2);
 		bn_new(s);
-		eb_new(p_a);
-		eb_new(p_b);
-		eb_new(s_a);
-		eb_new(s_b);
-		fb4_new(key1);
-		fb4_new(key2);
 
 		cp_sokaka_gen(s);
 
-		TEST_BEGIN("sakai-ohgishi-kasahara authenticated key agreement is correct") {
-			cp_sokaka_gen_pub(p_a, "Alice", strlen("Alice"));
-			cp_sokaka_gen_pub(p_b, "Bob", strlen("Bob"));
+		TEST_BEGIN
+				("sakai-ohgishi-kasahara authenticated key agreement is correct")
+		{
 			cp_sokaka_gen_prv(s_a, "Alice", strlen("Alice"), s);
 			cp_sokaka_gen_prv(s_b, "Bob", strlen("Bob"), s);
-			cp_sokaka_key(key1, p_b, s_a);
-			cp_sokaka_key(key2, p_a, s_b);
-			TEST_ASSERT(fb4_cmp(key1, key2) == CMP_EQ, end);
+			cp_sokaka_key(key1, MD_LEN, "Alice", 5, s_a, "Bob", 3);
+			cp_sokaka_key(key2, MD_LEN, "Bob", 3, s_b, "Alice", 5);
+			TEST_ASSERT(memcmp(key1, key2, MD_LEN) == 0, end);
 		} TEST_END;
 
 	} CATCH_ANY {
@@ -291,12 +286,10 @@ static int sokaka(void) {
 	code = STS_OK;
 
   end:
-	eb_free(p_a);
-	eb_free(p_b);
-	eb_free(s_a);
-	eb_free(s_b);
-	fb4_free(key1);
-	fb4_free(key2);
+	g1_free(s_a.s1);
+	g2_free(s_a.s2);
+	g1_free(s_b.s1);
+	g2_free(s_b.s2);
 	return code;
 }
 
@@ -333,10 +326,9 @@ int main(void) {
 	}
 #endif
 
-#if defined(WITH_PB)
-	util_print_banner("Protocols based on pairings:", 0);
-#if defined(EB_STAND) && defined(EB_SUPER)
-	if (eb_param_set_any_super() == STS_OK) {
+#if defined(WITH_PC)
+	util_print_banner("Protocols based on pairings:\n", 0);
+	if (pc_param_set_any() == STS_OK) {
 		if (sokaka() != STS_OK) {
 			core_clean();
 			return 1;
@@ -344,7 +336,6 @@ int main(void) {
 	} else {
 		THROW(ERR_NO_CURVE);
 	}
-#endif
 #endif
 
 	core_clean();
