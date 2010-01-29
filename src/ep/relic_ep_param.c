@@ -33,6 +33,7 @@
 
 #include "relic_core.h"
 #include "relic_ep.h"
+#include "relic_pp.h"
 #include "relic_error.h"
 #include "relic_conf.h"
 
@@ -326,6 +327,7 @@ int ep_param_set_any_pairf() {
 	int r = STS_OK;
 #if FP_PRIME == 256
 	ep_param_set(BNN_256);
+	ep2_curve_set(1);
 #else
 	r = STS_ERR;
 #endif
