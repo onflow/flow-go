@@ -62,27 +62,29 @@ void fp2_const_clean() {
 
 void fp2_const_calc() {
 	bn_t e;
-	fp12_t t;
+	fp2_t t;
 
 	bn_null(e);
-	fp12_null(t);
+	fp2_null(t);
 
 	TRY {
 		bn_new(e);
-		fp12_new(t);
-		fp12_zero(t);
-		fp_set_dig(t[1][0][0], 1);
+		fp2_new(t);
+		fp2_zero(t);
+		fp_set_dig(t[0], 1);
+		fp2_mul_nor(t, t);
 		e->used = FP_DIGS;
 		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
 		bn_sub_dig(e, e, 1);
-		fp12_exp(t, t, e);
-		fp_copy(const_frb[0], t[0][0][0]);
-		fp_copy(const_frb[1], t[0][0][1]);
+		bn_div_dig(e, e, 6);
+		fp2_exp(t, t, e);
+		fp_copy(const_frb[0], t[0]);
+		fp_copy(const_frb[1], t[1]);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
 		bn_free(e);
-		fp12_free(t);
+		fp2_free(t);
 	}
 }
 
