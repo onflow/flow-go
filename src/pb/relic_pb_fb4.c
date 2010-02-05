@@ -173,7 +173,7 @@ void fb_mul_420(dig_t *c, dig_t *a) {
 void fb_mul_41(dig_t *c, dig_t *a) {
 	int j, k;
 	dig_t b1, b2;
-	dv_t t, u;
+	dv_t t;
 
 	dv_null(t);
 
@@ -653,11 +653,10 @@ void fb4_mul_dxs(fb4_t c, fb4_t a, fb4_t b) {
 }
 
 void fb4_mul_sxs(fb4_t c, fb4_t a, fb4_t b) {
-	fb_t t0, t1, t2, t3, t4, t5;
+	fb_t t0, t1, t3, t4, t5;
 
 	fb_null(t0);
 	fb_null(t1);
-	fb_null(t2);
 	fb_null(t3);
 	fb_null(t4);
 	fb_null(t5);
@@ -665,7 +664,6 @@ void fb4_mul_sxs(fb4_t c, fb4_t a, fb4_t b) {
 	TRY {
 		fb_new(t0);
 		fb_new(t1);
-		fb_new(t2);
 		fb_new(t3);
 		fb_new(t4);
 		fb_new(t5);
@@ -688,7 +686,6 @@ void fb4_mul_sxs(fb4_t c, fb4_t a, fb4_t b) {
 	} FINALLY {
 		fb_free(t0);
 		fb_free(t1);
-		fb_free(t2);
 		fb_free(t3);
 		fb_free(t4);
 		fb_free(t5);

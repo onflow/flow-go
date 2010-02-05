@@ -535,18 +535,15 @@ static int doubling_halving(void) {
 static int shifting(void) {
 	int code = STS_ERR;
 	fp_t a, b, c;
-	dv_t d;
 
 	fp_null(a);
 	fp_null(b);
 	fp_null(c);
-	dv_null(d);
 
 	TRY {
 		fp_new(a);
 		fp_new(b);
 		fp_new(c);
-		dv_new(d);
 
 		TEST_BEGIN("shifting by 1 bit is consistent") {
 			fp_rand(a);
@@ -606,24 +603,21 @@ static int shifting(void) {
 	fp_free(a);
 	fp_free(b);
 	fp_free(c);
-	dv_free(d);
 	return code;
 }
 
 static int reduction(void) {
 	int code = STS_ERR;
-	fp_t a, b, c;
+	fp_t a, b;
 	dv_t t;
 
 	fp_null(a);
 	fp_null(b);
-	fp_null(c);
 	dv_null(t);
 
 	TRY {
 		fp_new(a);
 		fp_new(b);
-		fp_new(c);
 		dv_new(t);
 		dv_zero(t, 2 * FB_DIGS);
 
@@ -671,7 +665,6 @@ static int reduction(void) {
   end:
 	fb_free(a);
 	fb_free(b);
-	fb_free(c);
 	dv_free(t);
 	return code;
 }

@@ -53,15 +53,13 @@ static void memory2(void) {
 }
 
 static void util2(void) {
-	fp2_t a, b, c;
+	fp2_t a, b;
 
 	fp2_null(a);
 	fp2_null(b);
-	fp2_null(c);
 
 	fp2_new(a);
 	fp2_new(b);
-	fp2_new(c);
 
 	BENCH_BEGIN("fp2_copy") {
 		fp2_rand(a);
@@ -101,7 +99,6 @@ static void util2(void) {
 
 	fp2_free(a);
 	fp2_free(b);
-	fp2_free(c);
 }
 
 static void arith2(void) {
@@ -202,15 +199,13 @@ static void memory6(void) {
 }
 
 static void util6(void) {
-	fp6_t a, b, c;
+	fp6_t a, b;
 
 	fp6_null(a);
 	fp6_null(b);
-	fp6_null(c);
 
 	fp6_new(a);
 	fp6_new(b);
-	fp6_new(c);
 
 	BENCH_BEGIN("fp6_copy") {
 		fp6_rand(a);
@@ -250,7 +245,6 @@ static void util6(void) {
 
 	fp6_free(a);
 	fp6_free(b);
-	fp6_free(c);
 }
 
 static void arith6(void) {
@@ -359,15 +353,13 @@ static void memory12(void) {
 }
 
 static void util12(void) {
-	fp12_t a, b, c;
+	fp12_t a, b;
 
 	fp12_null(a);
 	fp12_null(b);
-	fp12_null(c);
 
 	fp12_new(a);
 	fp12_new(b);
-	fp12_new(c);
 
 	BENCH_BEGIN("fp12_copy") {
 		fp12_rand(a);
@@ -407,7 +399,6 @@ static void util12(void) {
 
 	fp12_free(a);
 	fp12_free(b);
-	fp12_free(c);
 }
 
 static void arith12(void) {

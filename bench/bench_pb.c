@@ -53,15 +53,13 @@ static void memory2(void) {
 }
 
 static void util2(void) {
-	fb2_t a, b, c;
+	fb2_t a, b;
 
 	fb2_null(a);
 	fb2_null(b);
-	fb2_null(c);
 
 	fb2_new(a);
 	fb2_new(b);
-	fb2_new(c);
 
 	BENCH_BEGIN("fb2_copy") {
 		fb2_rand(a);
@@ -101,7 +99,6 @@ static void util2(void) {
 
 	fb2_free(a);
 	fb2_free(b);
-	fb2_free(c);
 }
 
 static void arith2(void) {
@@ -168,15 +165,13 @@ static void memory4(void) {
 }
 
 static void util4(void) {
-	fb4_t a, b, c;
+	fb4_t a, b;
 
 	fb4_null(a);
 	fb4_null(b);
-	fb4_null(c);
 
 	fb4_new(a);
 	fb4_new(b);
-	fb4_new(c);
 
 	BENCH_BEGIN("fb4_copy") {
 		fb4_rand(a);
@@ -216,7 +211,6 @@ static void util4(void) {
 
 	fb4_free(a);
 	fb4_free(b);
-	fb4_free(c);
 }
 
 static void arith4(void) {

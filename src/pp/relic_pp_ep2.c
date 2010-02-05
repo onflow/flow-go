@@ -261,18 +261,16 @@ static void ep2_dbl_basic_impl(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
  * @param q					- the second point to add.
  */
 static void ep2_add_projc_impl(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
-	fp2_t t0, t1, t2, t3, t4;
+	fp2_t t0, t1, t3, t4;
 
 	fp2_null(t0);
 	fp2_null(t1);
-	fp2_null(t2);
 	fp2_null(t3);
 	fp2_null(t4);
 
 	TRY {
 		fp2_new(t0);
 		fp2_new(t1);
-		fp2_new(t2);
 		fp2_new(t3);
 		fp2_new(t4);
 
@@ -311,7 +309,6 @@ static void ep2_add_projc_impl(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 	FINALLY {
 		fp2_free(t0);
 		fp2_free(t1);
-		fp2_free(t2);
 		fp2_free(t3);
 		fp2_free(t4);
 	}
