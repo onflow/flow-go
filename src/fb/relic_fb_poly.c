@@ -217,7 +217,9 @@ dig_t *fb_poly_get_srt(void) {
 
 void fb_poly_set(fb_t f) {
 	fb_copy(poly, f);
+#if FB_TRC == QUICK || !defined(STRIP)
 	find_trace();
+#endif
 #if FB_SLV == QUICK || !defined(STRIP)
 	find_solve();
 #endif
