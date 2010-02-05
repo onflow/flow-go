@@ -444,6 +444,7 @@ static int frobenius(void) {
 		eb_new(b);
 		eb_new(c);
 
+#ifdef EB_KBLTZ
 		if (eb_curve_is_kbltz()) {
 			TEST_BEGIN("frobenius map is correct") {
 				/* Test if (t^2 + 2)P = utP. */
@@ -486,6 +487,7 @@ static int frobenius(void) {
 			} TEST_END;
 #endif
 		}
+#endif
 	}
 	CATCH_ANY {
 		ERROR(end);
