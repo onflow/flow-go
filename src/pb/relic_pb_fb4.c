@@ -179,7 +179,6 @@ void fb_mul_41(dig_t *c, dig_t *a) {
 
 	TRY {
 		dv_new(t);
-		dv_new(u);
 
 		t[FB_DIGS] = fb_lshb_low(t, a, 4);
 
