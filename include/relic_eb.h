@@ -124,6 +124,15 @@ enum {
 #define EB_TABLE			EB_TABLE_WTNAF
 #endif
 
+/**
+ * Maximum size of a precomputation table.
+ */
+#ifdef STRIP
+#define EB_TABLE_MAX EB_TABLE
+#else
+#define EB_TABLE_MAX EB_TABLE_BASIC
+#endif
+
 /*============================================================================*/
 /* Type definitions                                                           */
 /*============================================================================*/

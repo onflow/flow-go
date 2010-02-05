@@ -500,7 +500,7 @@ static int multiplication(void) {
 static int fixed(void) {
 	int code = STS_ERR;
 	ep_t p, q, r;
-	ep_t t[EP_TABLE_BASIC];
+	ep_t t[EP_TABLE_MAX];
 	bn_t n, k;
 
 	bn_null(n);
@@ -509,7 +509,7 @@ static int fixed(void) {
 	ep_null(q);
 	ep_null(r);
 
-	for (int i = 0; i < EP_TABLE; i++) {
+	for (int i = 0; i < EP_TABLE_MAX; i++) {
 		ep_null(t[i]);
 	}
 
