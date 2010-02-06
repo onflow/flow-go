@@ -461,7 +461,7 @@ typedef ep2_st *ep2_t;
 
 #elif ALLOC == STATIC
 #define ep2_new(A)															\
-	A = (ep2_st *)alloca(sizeof(ep2_st));									\
+	A = (ep2_t)alloca(sizeof(ep2_st));										\
 	if (A == NULL) {														\
 		THROW(ERR_NO_MEMORY);												\
 	}																		\

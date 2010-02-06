@@ -64,29 +64,29 @@ int cp_rabin_gen(rabin_t pub, rabin_t prv, int bits) {
 
 		/* Generate different primes p and q. */
 		do {
-			bn_gen_prime(prv.p, bits / 2);
-			bn_mod_2b(r, prv.p, 2);
+			bn_gen_prime(prv->p, bits / 2);
+			bn_mod_2b(r, prv->p, 2);
 		} while (bn_cmp_dig(r, 3) != CMP_EQ);
 
 		do {
-			bn_gen_prime(prv.q, bits / 2);
-			bn_mod_2b(r, prv.q, 2);
-		} while (bn_cmp(prv.p, prv.q) == CMP_EQ || bn_cmp_dig(r, 3) != CMP_EQ);
+			bn_gen_prime(prv->q, bits / 2);
+			bn_mod_2b(r, prv->q, 2);
+		} while (bn_cmp(prv->p, prv->q) == CMP_EQ || bn_cmp_dig(r, 3) != CMP_EQ);
 
 		/* Swap p and q so that p is smaller. */
-		if (bn_cmp(prv.p, prv.q) == CMP_LT) {
-			bn_copy(r, prv.p);
-			bn_copy(prv.p, prv.q);
-			bn_copy(prv.q, r);
+		if (bn_cmp(prv->p, prv->q) == CMP_LT) {
+			bn_copy(r, prv->p);
+			bn_copy(prv->p, prv->q);
+			bn_copy(prv->q, r);
 		}
 
-		bn_gcd_ext(r, prv.dp, prv.dq, prv.p, prv.q);
+		bn_gcd_ext(r, prv->dp, prv->dq, prv->p, prv->q);
 		if (bn_cmp_dig(r, 1) != CMP_EQ) {
 			result = STS_ERR;
 		}
 
-		bn_mul(prv.n, prv.p, prv.q);
-		bn_copy(pub.n, prv.n);
+		bn_mul(prv->n, prv->p, prv->q);
+		bn_copy(pub->n, prv->n);
 	}
 	CATCH_ANY {
 		result = STS_ERR;
@@ -106,7 +106,7 @@ int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len
 	bn_null(m);
 	bn_null(t);
 
-	bn_size_bin(&size, pub.n);
+	bn_size_bin(&size, pub->n);
 
 	if (in_len > (size - RABIN_PAD_LEN - 1)) {
 		return STS_ERR;
@@ -123,7 +123,7 @@ int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len
 		bn_add(m, m, t);
 
 		bn_sqr(m, m);
-		bn_mod(m, m, pub.n);
+		bn_mod(m, m, pub->n);
 
 		if (size <= *out_len) {
 			*out_len = size;
@@ -172,27 +172,27 @@ int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in,
 
 		bn_read_bin(m, in, in_len, BN_POS);
 
-		bn_add_dig(t, prv.p, 1);
+		bn_add_dig(t, prv->p, 1);
 		bn_rsh(t, t, 2);
-		bn_mxp(m0, m, t, prv.p);
+		bn_mxp(m0, m, t, prv->p);
 
-		bn_add_dig(t, prv.q, 1);
+		bn_add_dig(t, prv->q, 1);
 		bn_rsh(t, t, 2);
-		bn_mxp(m1, m, t, prv.q);
+		bn_mxp(m1, m, t, prv->q);
 
-		bn_mul(m, prv.dp, prv.p);
+		bn_mul(m, prv->dp, prv->p);
 		bn_mul(m, m, m1);
-		bn_mul(t, prv.dq, prv.q);
+		bn_mul(t, prv->dq, prv->q);
 		bn_mul(t, t, m0);
 		bn_add(m0, m, t);
-		bn_mod(m0, m0, prv.n);
+		bn_mod(m0, m0, prv->n);
 		if (bn_sign(m0) == BN_NEG) {
-			bn_add(m0, m0, prv.n);
+			bn_add(m0, m0, prv->n);
 		}
 		bn_sub(m1, m, t);
-		bn_mod(m1, m1, prv.n);
+		bn_mod(m1, m1, prv->n);
 		if (bn_sign(m1) == BN_NEG) {
-			bn_add(m1, m1, prv.n);
+			bn_add(m1, m1, prv->n);
 		}
 
 		bn_mod_2b(m, m0, 8 * RABIN_PAD_LEN);
@@ -201,7 +201,7 @@ int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in,
 		if (bn_cmp(t, m) == CMP_EQ) {
 			bn_rsh(m, m0, 8 * RABIN_PAD_LEN);
 		} else {
-			bn_sub(m0, prv.n, m0);
+			bn_sub(m0, prv->n, m0);
 			bn_mod_2b(m, m0, 8 * RABIN_PAD_LEN);
 			bn_rsh(t, m0, 8 * RABIN_PAD_LEN);
 			bn_mod_2b(t, t, 8 * RABIN_PAD_LEN);
@@ -214,7 +214,7 @@ int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in,
 				if (bn_cmp(t, m) == CMP_EQ) {
 					bn_rsh(m, m1, 8 * RABIN_PAD_LEN);
 				} else {
-					bn_sub(m1, prv.n, m1);
+					bn_sub(m1, prv->n, m1);
 					bn_mod_2b(m, m1, 8 * RABIN_PAD_LEN);
 					bn_rsh(t, m1, 8 * RABIN_PAD_LEN);
 					bn_mod_2b(t, t, 8 * RABIN_PAD_LEN);

@@ -199,7 +199,7 @@ typedef eb_st *eb_t;
 
 #elif ALLOC == STATIC
 #define eb_new(A)															\
-	A = (eb_st *)alloca(sizeof(eb_st));										\
+	A = (eb_t)alloca(sizeof(eb_st));										\
 	if (A == NULL) {														\
 		THROW(ERR_NO_MEMORY);												\
 	}																		\

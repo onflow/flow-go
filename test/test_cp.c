@@ -46,16 +46,12 @@ static int rsa(void) {
 	int in_len, out_len;
 	int result;
 
+	rsa_null(pub);
+	rsa_null(prv);
+
 	TRY {
-		bn_new(pub.e);
-		bn_new(pub.n);
-		bn_new(prv.d);
-		bn_new(prv.dp);
-		bn_new(prv.dq);
-		bn_new(prv.p);
-		bn_new(prv.q);
-		bn_new(prv.qi);
-		bn_new(prv.n);
+		rsa_new(pub);
+		rsa_new(prv);
 
 		result = cp_rsa_gen(pub, prv, BN_BITS);
 
@@ -68,7 +64,6 @@ static int rsa(void) {
 					end);
 			TEST_ASSERT(cp_rsa_dec(out, &out_len, out, out_len, prv) == STS_OK,
 					end);
-			printf("%d %d\n", in_len, out_len);
 			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
 		} TEST_END;
 
@@ -150,15 +145,8 @@ static int rsa(void) {
 	code = STS_OK;
 
   end:
-	bn_free(pub.e);
-	bn_free(pub.n);
-	bn_free(prv.d);
-	bn_free(prv.dp);
-	bn_free(prv.dq);
-	bn_free(prv.p);
-	bn_free(prv.q);
-	bn_free(prv.qi);
-	bn_free(prv.n);
+	rsa_free(pub);
+	rsa_free(prv);
 	return code;
 }
 
@@ -170,20 +158,12 @@ static int rabin(void) {
 	int in_len, out_len;
 	int result;
 
-	bn_null(pub.n);
-	bn_null(prv.n);
-	bn_null(prv.p);
-	bn_null(prv.q);
-	bn_null(prv.dp);
-	bn_null(prv.dq);
+	rabin_null(pub);
+	rabin_null(prv);
 
 	TRY {
-		bn_new(pub.n);
-		bn_new(prv.n);
-		bn_new(prv.p);
-		bn_new(prv.q);
-		bn_new(prv.dp);
-		bn_new(prv.dq);
+		rabin_new(pub);
+		rabin_new(prv);
 
 		result = cp_rabin_gen(pub, prv, BN_BITS);
 
@@ -204,12 +184,8 @@ static int rabin(void) {
 	code = STS_OK;
 
   end:
-	bn_free(pub.n);
-	bn_free(prv.n);
-	bn_free(prv.p);
-	bn_free(prv.q);
-	bn_free(prv.dp);
-	bn_free(prv.dq);
+	rabin_free(pub);
+	rabin_free(prv);
 	return code;
 }
 
@@ -257,16 +233,12 @@ static int sokaka(void) {
 	bn_t s;
 	unsigned char key1[MD_LEN], key2[MD_LEN];
 
-	g1_null(s_a.s1);
-	g2_null(s_a.s2);
-	g1_null(s_b.s1);
-	g2_null(s_b.s2);
+	sokaka_null(s_a);
+	sokaka_null(s_b);
 
 	TRY {
-		g1_new(s_a.s1);
-		g2_new(s_a.s2);
-		g1_new(s_b.s1);
-		g2_new(s_b.s2);
+		sokaka_new(s_a);
+		sokaka_new(s_b);
 		bn_new(s);
 
 		cp_sokaka_gen(s);
@@ -287,10 +259,8 @@ static int sokaka(void) {
 	code = STS_OK;
 
   end:
-	g1_free(s_a.s1);
-	g2_free(s_a.s2);
-	g1_free(s_b.s1);
-	g2_free(s_b.s2);
+	sokaka_free(s_a);
+	sokaka_free(s_b);
 	return code;
 }
 

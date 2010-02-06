@@ -383,7 +383,7 @@ void ep_mul_fix_combs(ep_t r, ep_t * t, bn_t k) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		bn_free(ord);
+		bn_free(n);
 	}
 }
 

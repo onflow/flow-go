@@ -66,7 +66,16 @@ typedef struct _rsa_t {
 	bn_t dq;
 	/** The inverse of q modulo p. */
 	bn_t qi;
-} rsa_t;
+} rsa_st;
+
+/**
+ * Pointer to an RSA key pair.
+ */
+#if ALLOC == AUTO
+typedef rsa_st rsa_t[1];
+#else
+typedef rsa_st *rsa_t;
+#endif
 
 /**
  * Represents a Rabin key pair.
@@ -82,7 +91,16 @@ typedef struct _rabin_t {
 	bn_t dp;
 	/** The cofactor of the second prime. */
 	bn_t dq;
-} rabin_t;
+} rabin_st;
+
+/**
+ * Pointer to a Rabin key pair.
+ */
+#if ALLOC == AUTO
+typedef rabin_st rabin_t[1];
+#else
+typedef rabin_st *rabin_t;
+#endif
 
 /**
  * Represents a SOK key pair.
@@ -92,11 +110,321 @@ typedef struct _sokaka {
 	g1_t s1;
 	/** The private key in G_2. */
 	g2_t s2;
-} sokaka_t;
+} sokaka_st;
+
+/**
+ * Pointer to SOK key pair.
+ */
+#if ALLOC == AUTO
+typedef sokaka_st sokaka_t[1];
+#else
+typedef sokaka_st *sokaka_t;
+#endif
 
 /*============================================================================*/
 /* Macro definitions                                                          */
 /*============================================================================*/
+
+/**
+ * Initializes an RSA key pair with a null value.
+ *
+ * @param[out] A			- the key pair to initialize.
+ */
+#if ALLOC == AUTO
+#define rsa_null(A)			/* empty */
+#else
+#define rsa_null(A)			A = NULL;
+#endif
+
+/**
+ * Calls a function to allocate and initialize an RSA key pair.
+ *
+ * @param[out] A			- the new key pair.
+ */
+#if ALLOC == DYNAMIC
+#define rsa_new(A)															\
+	A = (rsa_t)calloc(1, sizeof(rsa_st));									\
+	if (A == NULL) {														\
+		THROW(ERR_NO_MEMORY);												\
+	}																		\
+	bn_new((A)->e);															\
+	bn_new((A)->n);															\
+	bn_new((A)->d);															\
+	bn_new((A)->dp);														\
+	bn_new((A)->dq);														\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+	bn_new((A)->qi);														\
+
+#elif ALLOC == STATIC
+#define rsa_new(A)															\
+	A = (rsa_t)alloca(sizeof(rsa_st));										\
+	if (A == NULL) {														\
+		THROW(ERR_NO_MEMORY);												\
+	}																		\
+	bn_new((A)->e);															\
+	bn_new((A)->n);															\
+	bn_new((A)->d);															\
+	bn_new((A)->dp);														\
+	bn_new((A)->dq);														\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+	bn_new((A)->qi);														\
+
+#elif ALLOC == AUTO
+#define rsa_new(A)															\
+	bn_new((A)->e);															\
+	bn_new((A)->n);															\
+	bn_new((A)->d);															\
+	bn_new((A)->dp);														\
+	bn_new((A)->dq);														\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+	bn_new((A)->qi);														\
+
+#elif ALLOC == STACK
+#define rsa_new(A)															\
+	A = (rsa_t)alloca(sizeof(rsa_st));										\
+	bn_new((A)->e);															\
+	bn_new((A)->n);															\
+	bn_new((A)->d);															\
+	bn_new((A)->dp);														\
+	bn_new((A)->dq);														\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+	bn_new((A)->qi);														\
+
+#endif
+
+/**
+ * Calls a function to clean and free an RSA key pair.
+ *
+ * @param[out] A			- the key pair to clean and free.
+ */
+#if ALLOC == DYNAMIC
+#define rsa_free(A)															\
+	if (A != NULL) {														\
+		bn_free((A)->e);													\
+		bn_free((A)->n);													\
+		bn_free((A)->d);													\
+		bn_free((A)->dp);													\
+		bn_free((A)->dq);													\
+		bn_free((A)->p);													\
+		bn_free((A)->q);													\
+		bn_free((A)->qi);													\
+		free(A);															\
+		A = NULL;															\
+	}
+
+#elif ALLOC == STATIC
+#define rsa_free(A)															\
+	if (A != NULL) {														\
+		bn_free((A)->e);													\
+		bn_free((A)->n);													\
+		bn_free((A)->d);													\
+		bn_free((A)->dp);													\
+		bn_free((A)->dq);													\
+		bn_free((A)->p);													\
+		bn_free((A)->q);													\
+		bn_free((A)->qi);													\
+		A = NULL;															\
+	}																		\
+
+#elif ALLOC == AUTO
+#define rsa_free(A)			/* empty */
+
+#elif ALLOC == STACK
+#define rsa_free(A)															\
+	bn_free((A)->e);														\
+	bn_free((A)->n);														\
+	bn_free((A)->d);														\
+	bn_free((A)->dp);														\
+	bn_free((A)->dq);														\
+	bn_free((A)->p);														\
+	bn_free((A)->q);														\
+	bn_free((A)->qi);														\
+	A = NULL;																\
+
+#endif
+
+/**
+ * Initializes a Rabin key pair with a null value.
+ *
+ * @param[out] A			- the key pair to initialize.
+ */
+#if ALLOC == AUTO
+#define rabin_null(A)		/* empty */
+#else
+#define rabin_null(A)		A = NULL;
+#endif
+
+/**
+ * Calls a function to allocate and initialize a Rabin key pair.
+ *
+ * @param[out] A			- the new key pair.
+ */
+#if ALLOC == DYNAMIC
+#define rabin_new(A)														\
+	A = (rabin_t)calloc(1, sizeof(rabin_st));								\
+	if (A == NULL) {														\
+		THROW(ERR_NO_MEMORY);												\
+	}																		\
+	bn_new((A)->n);															\
+	bn_new((A)->dp);														\
+	bn_new((A)->dq);														\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+
+#elif ALLOC == STATIC
+#define rabin_new(A)														\
+	A = (rabin_t)alloca(sizeof(rabin_st));									\
+	if (A == NULL) {														\
+		THROW(ERR_NO_MEMORY);												\
+	}																		\
+	bn_new((A)->n);															\
+	bn_new((A)->dp);														\
+	bn_new((A)->dq);														\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+
+#elif ALLOC == AUTO
+#define rabin_new(A)														\
+	bn_new((A)->n);															\
+	bn_new((A)->dp);														\
+	bn_new((A)->dq);														\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+
+#elif ALLOC == STACK
+#define rabin_new(A)														\
+	A = (rabin_t)alloca(sizeof(rabin_st));									\
+	bn_new((A)->n);															\
+	bn_new((A)->dp);														\
+	bn_new((A)->dq);														\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+
+#endif
+
+/**
+ * Calls a function to clean and free a Rabin key pair.
+ *
+ * @param[out] A			- the key pair to clean and free.
+ */
+#if ALLOC == DYNAMIC
+#define rabin_free(A)														\
+	if (A != NULL) {														\
+		bn_free((A)->n);													\
+		bn_free((A)->dp);													\
+		bn_free((A)->dq);													\
+		bn_free((A)->p);													\
+		bn_free((A)->q);													\
+		free(A);															\
+		A = NULL;															\
+	}
+
+#elif ALLOC == STATIC
+#define rabin_free(A)														\
+	if (A != NULL) {														\
+		bn_free((A)->n);													\
+		bn_free((A)->dp);													\
+		bn_free((A)->dq);													\
+		bn_free((A)->p);													\
+		bn_free((A)->q);													\
+		A = NULL;															\
+	}																		\
+
+#elif ALLOC == AUTO
+#define rabin_free(A)			/* empty */
+
+#elif ALLOC == STACK
+#define rabin_free(A)														\
+	bn_free((A)->n);														\
+	bn_free((A)->dp);														\
+	bn_free((A)->dq);														\
+	bn_free((A)->p);														\
+	bn_free((A)->q);														\
+	A = NULL;																\
+
+#endif
+
+/**
+ * Initializes a SOKAKA key pair with a null value.
+ *
+ * @param[out] A			- the key pair to initialize.
+ */
+#if ALLOC == AUTO
+#define sokaka_null(A)		/* empty */
+#else
+#define sokaka_null(A)		A = NULL;
+#endif
+
+/**
+ * Calls a function to allocate and initialize a SOKAKA key pair.
+ *
+ * @param[out] A			- the new key pair.
+ */
+#if ALLOC == DYNAMIC
+#define sokaka_new(A)														\
+	A = (sokaka_t)calloc(1, sizeof(sokaka_st));								\
+	if (A == NULL) {														\
+		THROW(ERR_NO_MEMORY);												\
+	}																		\
+	g1_new((A)->s1);														\
+	g2_new((A)->s2);														\
+
+#elif ALLOC == STATIC
+#define sokaka_new(A)														\
+	A = (sokaka_t)alloca(sizeof(sokaka_st));								\
+	if (A == NULL) {														\
+		THROW(ERR_NO_MEMORY);												\
+	}																		\
+	g1_new((A)->s1);														\
+	g2_new((A)->s2);														\
+
+#elif ALLOC == AUTO
+#define sokaka_new(A)			/* empty */
+
+#elif ALLOC == STACK
+#define sokaka_new(A)														\
+	A = (sokaka_t)alloca(sizeof(sokaka_st));								\
+	g1_new((A)->s1);														\
+	g2_new((A)->s2);														\
+
+#endif
+
+/**
+ * Calls a function to clean and free a SOKAKA key pair.
+ *
+ * @param[out] A			- the key pair to clean and free.
+ */
+#if ALLOC == DYNAMIC
+#define sokaka_free(A)														\
+	if (A != NULL) {														\
+		g1_free((A)->s1);													\
+		g2_free((A)->s2);													\
+		free(A);															\
+		A = NULL;															\
+	}
+
+#elif ALLOC == STATIC
+#define sokaka_free(A)														\
+	if (A != NULL) {														\
+		g1_free((A)->s1);													\
+		g2_free((A)->s2);													\
+		A = NULL;															\
+	}																		\
+
+#elif ALLOC == AUTO
+#define sokaka_free(A)			/* empty */
+
+#elif ALLOC == STACK
+#define sokaka_free(A)														\
+	g1_free((A)->s1);														\
+	g2_free((A)->s2);														\
+	A = NULL;																\
+
+#endif
 
 /**
  * Generates a new RSA key pair.
