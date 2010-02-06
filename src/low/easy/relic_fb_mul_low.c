@@ -64,10 +64,13 @@ void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
 }
 
 void fb_muln_low(dig_t *c, dig_t *a, dig_t *b) {
-	dv_t table[16] = { NULL };
+	dv_t table[16];
 	dig_t r0, r1, r2, r4, r8, u, carry, *tmpa, *tmpc;
 	int i, j;
 
+	for (i = 0; i < 16; i++) {
+		dv_null(table[i]);
+	}
 	for (i = 0; i < 2 * FB_DIGS; i++) {
 		c[i] = 0;
 	}
@@ -139,9 +142,13 @@ void fb_muln_low(dig_t *c, dig_t *a, dig_t *b) {
 }
 
 void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size) {
-	dv_t table[16] = { NULL };
+	dv_t table[16];
 	dig_t u, *tmpa, *tmpc, r0, r1, r2, r4, r8;
 	int i, j;
+
+	for (i = 0; i < 16; i++) {
+		dv_null(table[i]);
+	}
 
 	dv_zero(c, 2 * size);
 

@@ -371,7 +371,8 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k) {
 
 void eb_mul_const(eb_t r, eb_t p, bn_t k) {
 	int i, t, koblitz;
-	fb_t x1, z1, x2, z2, r1, r2, r3, r4, b;
+	fb_t x1, z1, x2, z2, r1, r2, r3, r4;
+	dig_t *b;
 
 	fb_null(x1);
 	fb_null(z1);

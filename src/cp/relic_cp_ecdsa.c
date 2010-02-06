@@ -42,14 +42,24 @@ void cp_ecdsa_gen(bn_t d, ec_t q) {
 
 	bn_null(n);
 
-	n = ec_curve_get_ord();
+	TRY {
+		bn_new(n);
 
-	do {
-		bn_rand(d, BN_POS, bn_bits(n));
-		bn_mod(d, d, n);
-	} while (bn_is_zero(d));
+		ec_curve_get_ord(n);
 
-	ec_mul_gen(q, d);
+		do {
+			bn_rand(d, BN_POS, bn_bits(n));
+			bn_mod(d, d, n);
+		} while (bn_is_zero(d));
+
+		ec_mul_gen(q, d);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(n);
+	}
 }
 
 void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
@@ -64,12 +74,13 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 	ec_null(p);
 
 	TRY {
-		n = ec_curve_get_ord();
+		bn_new(n);
 		bn_new(k);
 		bn_new(x);
 		bn_new(e);
 		ec_new(p);
 
+		ec_curve_get_ord(n);
 		do {
 			do {
 				bn_rand(k, BN_POS, bn_bits(n));
@@ -101,6 +112,7 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+		bn_free(n);
 		bn_free(k);
 		bn_free(x);
 		bn_free(e);
@@ -121,12 +133,13 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
 	ec_null(p);
 
 	TRY {
-		n = ec_curve_get_ord();
+		bn_new(n);
 		bn_new(e);
 		bn_new(v);
 		bn_new(k);
 		ec_new(p);
 
+		ec_curve_get_ord(n);
 		md_map(hash, msg, len);
 
 		if (bn_sign(r) == BN_POS && bn_sign(s) == BN_POS &&
@@ -160,6 +173,7 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+		bn_free(n);
 		bn_free(e);
 		bn_free(v);
 		bn_free(k);

@@ -348,16 +348,28 @@ void eb_mul_fix_basic(eb_t r, eb_t *t, bn_t k) {
 
 void eb_mul_pre_yaowi(eb_t *t, eb_t p) {
 	int l;
+	bn_t n;
 
-	l = bn_bits(eb_curve_get_ord());
-	l = ((l % EB_DEPTH) == 0 ? (l / EB_DEPTH) : (l / EB_DEPTH) + 1);
+	bn_null(n);
 
-	eb_copy(t[0], p);
-	for (int i = 1; i < l; i++) {
-		eb_dbl_tab(t[i], t[i - 1]);
-		for (int j = 1; j < EB_DEPTH; j++) {
-			eb_dbl_tab(t[i], t[i]);
+	TRY {
+		bn_new(n);
+
+		eb_curve_get_ord(n);
+		l = bn_bits(n);
+		l = ((l % EB_DEPTH) == 0 ? (l / EB_DEPTH) : (l / EB_DEPTH) + 1);
+
+		eb_copy(t[0], p);
+		for (int i = 1; i < l; i++) {
+			eb_dbl_tab(t[i], t[i - 1]);
+			for (int j = 1; j < EB_DEPTH; j++) {
+				eb_dbl_tab(t[i], t[i]);
+			}
 		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		bn_free(n);
 	}
 }
 
@@ -619,41 +631,56 @@ void eb_mul_pre_combd(eb_t *t, eb_t p) {
 }
 
 void eb_mul_fix_combd(eb_t r, eb_t *t, bn_t k) {
-	int i, j, d, e, w0, w1, n, p0, p1;
+	int i, j, d, e, w0, w1, n0, p0, p1;
+	bn_t n;
 
-	d = bn_bits(eb_curve_get_ord());
-	d = ((d % EB_DEPTH) == 0 ? (d / EB_DEPTH) : (d / EB_DEPTH) + 1);
-	e = (d % 2 == 0 ? (d / 2) : (d / 2) + 1);
+	bn_null(n);
 
-	eb_set_infty(r);
-	n = bn_bits(k);
+	TRY {
+		bn_new(n);
 
-	p1 = (e - 1) + (EB_DEPTH - 1) * d;
-	for (i = e - 1; i >= 0; i--) {
-		eb_dbl(r, r);
+		eb_curve_get_ord(n);
 
-		w0 = 0;
-		p0 = p1;
-		for (j = EB_DEPTH - 1; j >= 0; j--, p0 -= d) {
-			w0 = w0 << 1;
-			if (p0 < n && bn_test_bit(k, p0)) {
-				w0 = w0 | 1;
+		d = bn_bits(n);
+		d = ((d % EB_DEPTH) == 0 ? (d / EB_DEPTH) : (d / EB_DEPTH) + 1);
+		e = (d % 2 == 0 ? (d / 2) : (d / 2) + 1);
+
+		eb_set_infty(r);
+		n0 = bn_bits(k);
+
+		p1 = (e - 1) + (EB_DEPTH - 1) * d;
+		for (i = e - 1; i >= 0; i--) {
+			eb_dbl(r, r);
+
+			w0 = 0;
+			p0 = p1;
+			for (j = EB_DEPTH - 1; j >= 0; j--, p0 -= d) {
+				w0 = w0 << 1;
+				if (p0 < n0 && bn_test_bit(k, p0)) {
+					w0 = w0 | 1;
+				}
 			}
-		}
 
-		w1 = 0;
-		p0 = p1-- + e;
-		for (j = EB_DEPTH - 1; j >= 0; j--, p0 -= d) {
-			w1 = w1 << 1;
-			if (i + e < d && p0 < n && bn_test_bit(k, p0)) {
-				w1 = w1 | 1;
+			w1 = 0;
+			p0 = p1-- + e;
+			for (j = EB_DEPTH - 1; j >= 0; j--, p0 -= d) {
+				w1 = w1 << 1;
+				if (i + e < d && p0 < n0 && bn_test_bit(k, p0)) {
+					w1 = w1 | 1;
+				}
 			}
-		}
 
-		eb_add(r, r, t[w0]);
-		eb_add(r, r, t[(1 << EB_DEPTH) + w1]);
+			eb_add(r, r, t[w0]);
+			eb_add(r, r, t[(1 << EB_DEPTH) + w1]);
+		}
+		eb_norm(r, r);
 	}
-	eb_norm(r, r);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(n);
+	}
 }
 
 #endif

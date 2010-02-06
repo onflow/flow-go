@@ -46,7 +46,7 @@
  * @param[out] t				- the destination table.
  * @param[in] p					- the point to multiply.
  */
-static void ep_mul_pre_ordin(ep_t *t, ep_t p) {
+static void ep_mul_pre_ordin(ep_t * t, ep_t p) {
 	int i;
 
 	for (i = 0; i < (1 << (EP_DEPTH - 2)); i++) {
@@ -74,7 +74,7 @@ static void ep_mul_pre_ordin(ep_t *t, ep_t p) {
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void ep_mul_fix_ordin(ep_t r, ep_t *table, bn_t k) {
+static void ep_mul_fix_ordin(ep_t r, ep_t * table, bn_t k) {
 	int len, i, n;
 	signed char naf[FP_BITS + 1], *t;
 
@@ -106,7 +106,7 @@ static void ep_mul_fix_ordin(ep_t r, ep_t *table, bn_t k) {
 
 #if EP_FIX == BASIC || !defined(STRIP)
 
-void ep_mul_pre_basic(ep_t *t, ep_t p) {
+void ep_mul_pre_basic(ep_t * t, ep_t p) {
 	bn_t n;
 
 	bn_null(n);
@@ -129,7 +129,7 @@ void ep_mul_pre_basic(ep_t *t, ep_t p) {
 	}
 }
 
-void ep_mul_fix_basic(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_fix_basic(ep_t r, ep_t * t, bn_t k) {
 	int i, l;
 
 	l = bn_bits(k);
@@ -150,16 +150,28 @@ void ep_mul_fix_basic(ep_t r, ep_t *t, bn_t k) {
 
 void ep_mul_pre_yaowi(ep_t *t, ep_t p) {
 	int l;
+	bn_t n;
 
-	l = bn_bits(ep_curve_get_ord());
-	l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
+	bn_null(n);
 
-	ep_copy(t[0], p);
-	for (int i = 1; i < l; i++) {
-		ep_dbl_tab(t[i], t[i - 1]);
-		for (int j = 1; j < EP_DEPTH; j++) {
-			ep_dbl_tab(t[i], t[i]);
+	TRY {
+		bn_new(n);
+
+		ep_curve_get_ord(n);
+		l = bn_bits(n);
+		l = ((l % EB_DEPTH) == 0 ? (l / EB_DEPTH) : (l / EB_DEPTH) + 1);
+
+		ep_copy(t[0], p);
+		for (int i = 1; i < l; i++) {
+			ep_dbl_tab(t[i], t[i - 1]);
+			for (int j = 1; j < EB_DEPTH; j++) {
+				ep_dbl_tab(t[i], t[i]);
+			}
 		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		bn_free(n);
 	}
 }
 
@@ -176,9 +188,9 @@ void ep_mul_fix_yaowi(ep_t r, ep_t *t, bn_t k) {
 		ep_set_infty(r);
 		ep_set_infty(a);
 
-		bn_rec_win(win, &l, k, EP_DEPTH);
+		bn_rec_win(win, &l, k, EB_DEPTH);
 
-		for (j = (1 << EP_DEPTH) - 1; j >= 1; j--) {
+		for (j = (1 << EB_DEPTH) - 1; j >= 1; j--) {
 			for (i = 0; i < l; i++) {
 				if (win[i] == j) {
 					ep_add(a, a, t[i]);
@@ -200,7 +212,7 @@ void ep_mul_fix_yaowi(ep_t r, ep_t *t, bn_t k) {
 
 #if EP_FIX == NAFWI || !defined(STRIP)
 
-void ep_mul_pre_nafwi(ep_t *t, ep_t p) {
+void ep_mul_pre_nafwi(ep_t * t, ep_t p) {
 	int l;
 	bn_t n;
 
@@ -210,7 +222,7 @@ void ep_mul_pre_nafwi(ep_t *t, ep_t p) {
 		bn_new(n);
 
 		ep_curve_get_ord(n);
-		l = bn_bits() + 1;
+		l = bn_bits(n) + 1;
 		l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
 
 		ep_copy(t[0], p);
@@ -229,7 +241,7 @@ void ep_mul_pre_nafwi(ep_t *t, ep_t p) {
 	}
 }
 
-void ep_mul_fix_nafwi(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_fix_nafwi(ep_t r, ep_t * t, bn_t k) {
 	int i, j, l, d, m;
 	ep_t a;
 	signed char naf[FP_BITS + 1];
@@ -289,7 +301,7 @@ void ep_mul_fix_nafwi(ep_t r, ep_t *t, bn_t k) {
 
 #if EP_FIX == COMBS || !defined(STRIP)
 
-void ep_mul_pre_combs(ep_t *t, ep_t p) {
+void ep_mul_pre_combs(ep_t * t, ep_t p) {
 	int i, j, l;
 	bn_t ord;
 
@@ -323,20 +335,20 @@ void ep_mul_pre_combs(ep_t *t, ep_t p) {
 	}
 }
 
-void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
-	int i, j, l, w, n, p0, p1;
-	bn_t ord;
+void ep_mul_fix_combs(ep_t r, ep_t * t, bn_t k) {
+	int i, j, l, w, n0, p0, p1;
+	bn_t n;
 
-	bn_null(ord);
+	bn_null(n);
 
 	TRY {
-		bn_new(ord);
+		bn_new(n);
 
-		ep_curve_get_ord(ord);
-		l = bn_bits(ord);
+		ep_curve_get_ord(n);
+		l = bn_bits(n);
 		l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
 
-		n = bn_bits(k);
+		n0 = bn_bits(k);
 
 		p0 = (EP_DEPTH) * l - 1;
 
@@ -344,7 +356,7 @@ void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
 		p1 = p0--;
 		for (j = EP_DEPTH - 1; j >= 0; j--, p1 -= l) {
 			w = w << 1;
-			if (p1 < n && bn_test_bit(k, p1)) {
+			if (p1 < n0 && bn_test_bit(k, p1)) {
 				w = w | 1;
 			}
 		}
@@ -357,7 +369,7 @@ void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
 			p1 = p0--;
 			for (j = EP_DEPTH - 1; j >= 0; j--, p1 -= l) {
 				w = w << 1;
-				if (p1 < n && bn_test_bit(k, p1)) {
+				if (p1 < n0 && bn_test_bit(k, p1)) {
 					w = w | 1;
 				}
 			}
@@ -379,7 +391,7 @@ void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
 
 #if EP_FIX == COMBD || !defined(STRIP)
 
-void ep_mul_pre_combd(ep_t *t, ep_t p) {
+void ep_mul_pre_combd(ep_t * t, ep_t p) {
 	int i, j, d, e;
 	bn_t n;
 
@@ -420,53 +432,67 @@ void ep_mul_pre_combd(ep_t *t, ep_t p) {
 	}
 }
 
-void ep_mul_fix_combd(ep_t r, ep_t *t, bn_t k) {
-	int i, j, d, e, w0, w1, n, p0, p1;
+void ep_mul_fix_combd(ep_t r, ep_t * t, bn_t k) {
+	int i, j, d, e, w0, w1, n0, p0, p1;
+	bn_t n;
 
-	d = bn_bits(ep_curve_get_ord());
-	d = ((d % EP_DEPTH) == 0 ? (d / EP_DEPTH) : (d / EP_DEPTH) + 1);
-	e = (d % 2 == 0 ? (d / 2) : (d / 2) + 1);
+	bn_null(n);
 
-	ep_set_infty(r);
-	n = bn_bits(k);
+	TRY {
+		bn_new(n);
 
-	p1 = (e - 1) + (EP_DEPTH - 1) * d;
-	for (i = e - 1; i >= 0; i--) {
-		ep_dbl(r, r);
+		ep_curve_get_ord(n);
+		d = bn_bits(n);
+		d = ((d % EP_DEPTH) == 0 ? (d / EP_DEPTH) : (d / EP_DEPTH) + 1);
+		e = (d % 2 == 0 ? (d / 2) : (d / 2) + 1);
 
-		w0 = 0;
-		p0 = p1;
-		for (j = EP_DEPTH - 1; j >= 0; j--, p0 -= d) {
-			w0 = w0 << 1;
-			if (p0 < n && bn_test_bit(k, p0)) {
-				w0 = w0 | 1;
+		ep_set_infty(r);
+		n0 = bn_bits(k);
+
+		p1 = (e - 1) + (EP_DEPTH - 1) * d;
+		for (i = e - 1; i >= 0; i--) {
+			ep_dbl(r, r);
+
+			w0 = 0;
+			p0 = p1;
+			for (j = EP_DEPTH - 1; j >= 0; j--, p0 -= d) {
+				w0 = w0 << 1;
+				if (p0 < n0 && bn_test_bit(k, p0)) {
+					w0 = w0 | 1;
+				}
 			}
-		}
 
-		w1 = 0;
-		p0 = p1-- + e;
-		for (j = EP_DEPTH - 1; j >= 0; j--, p0 -= d) {
-			w1 = w1 << 1;
-			if (i + e < d && p0 < n && bn_test_bit(k, p0)) {
-				w1 = w1 | 1;
+			w1 = 0;
+			p0 = p1-- + e;
+			for (j = EP_DEPTH - 1; j >= 0; j--, p0 -= d) {
+				w1 = w1 << 1;
+				if (i + e < d && p0 < n0 && bn_test_bit(k, p0)) {
+					w1 = w1 | 1;
+				}
 			}
-		}
 
-		ep_add(r, r, t[w0]);
-		ep_add(r, r, t[(1 << EP_DEPTH) + w1]);
+			ep_add(r, r, t[w0]);
+			ep_add(r, r, t[(1 << EP_DEPTH) + w1]);
+		}
+		ep_norm(r, r);
 	}
-	ep_norm(r, r);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(n);
+	}
 }
 
 #endif
 
 #if EP_FIX == WTNAF || !defined(STRIP)
 
-void ep_mul_pre_wtnaf(ep_t *t, ep_t p) {
+void ep_mul_pre_wtnaf(ep_t * t, ep_t p) {
 	ep_mul_pre_ordin(t, p);
 }
 
-void ep_mul_fix_wtnaf(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_fix_wtnaf(ep_t r, ep_t * t, bn_t k) {
 	ep_mul_fix_ordin(r, t, k);
 }
 #endif

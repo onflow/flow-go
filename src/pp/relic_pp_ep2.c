@@ -428,12 +428,18 @@ void ep2_curve_init(void) {
 	fp2_new(curve_gy);
 	fp2_new(curve_gz);
 #endif
+#if ALLOC == AUTO
+	fp2_copy(curve_g.x, curve_gx);
+	fp2_copy(curve_g.y, curve_gy);
+	fp2_copy(curve_g.z, curve_gz);
+#else
 	curve_g.x[0] = curve_gx[0];
 	curve_g.x[1] = curve_gx[1];
 	curve_g.y[0] = curve_gy[0];
 	curve_g.y[1] = curve_gy[1];
 	curve_g.z[0] = curve_gz[0];
 	curve_g.z[1] = curve_gz[1];
+#endif
 	ep2_set_infty(&curve_g);
 	bn_init(&curve_r, FP_DIGS);
 }
@@ -451,15 +457,15 @@ int ep2_curve_is_twist() {
 	return curve_is_twist;
 }
 
-ep2_t ep2_curve_get_gen() {
-	return &curve_g;
+void ep2_curve_get_gen(ep2_t g) {
+	ep2_copy(g, &curve_g);
 }
 
-bn_t ep2_curve_get_ord() {
+void ep2_curve_get_ord(bn_t n) {
 	if (curve_is_twist) {
-		return ep_curve_get_ord();
+		ep_curve_get_ord(n);
 	} else {
-		return &curve_r;
+		bn_copy(n, &curve_r);
 	}
 }
 
@@ -547,17 +553,33 @@ int ep2_cmp(ep2_t p, ep2_t q) {
 
 void ep2_rand(ep2_t p) {
 	bn_t n, k;
+	ep2_t gen;
 
-	bn_new(k);
+	bn_null(k);
+	bn_null(n);
+	ep2_null(gen);
 
-	n = ep2_curve_get_ord();
+	TRY {
+		bn_new(k);
+		bn_new(n);
+		ep2_new(gen);
 
-	bn_rand(k, BN_POS, bn_bits(n));
-	bn_mod(k, k, n);
+		ep2_curve_get_ord(n);
 
-	ep2_mul(p, ep2_curve_get_gen(), k);
+		bn_rand(k, BN_POS, bn_bits(n));
+		bn_mod(k, k, n);
 
-	bn_free(k);
+		ep2_curve_get_gen(gen);
+		ep2_mul(p, gen, k);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(k);
+		bn_free(n);
+		ep2_free(gen);
+	}
 }
 
 void ep2_print(ep2_t p) {
@@ -761,26 +783,33 @@ void ep2_mul(ep2_t r, ep2_t p, bn_t k) {
 	int i, l;
 	ep2_t t;
 
-	ep2_new(t);
-	l = bn_bits(k);
+	ep2_null(t);
+	TRY {
+		ep2_new(t);
+		l = bn_bits(k);
 
-	if (bn_test_bit(k, l - 1)) {
-		ep2_copy(t, p);
-	} else {
-		ep2_set_infty(t);
-	}
-
-	for (i = l - 2; i >= 0; i--) {
-		ep2_dbl(t, t);
-		if (bn_test_bit(k, i)) {
-			ep2_add(t, t, p);
+		if (bn_test_bit(k, l - 1)) {
+			ep2_copy(t, p);
+		} else {
+			ep2_set_infty(t);
 		}
+
+		for (i = l - 2; i >= 0; i--) {
+			ep2_dbl(t, t);
+			if (bn_test_bit(k, i)) {
+				ep2_add(t, t, p);
+			}
+		}
+
+		ep2_copy(r, t);
+		ep2_norm(r, r);
 	}
-
-	ep2_copy(r, t);
-	ep2_norm(r, r);
-
-	ep_free(t);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep2_free(t);
+	}
 }
 
 void ep2_norm(ep2_t r, ep2_t p) {
@@ -822,7 +851,21 @@ void ep2_frb(ep2_t r, ep2_t p) {
 }
 
 void ep2_mul_gen(ep2_t r, bn_t k) {
-	ep2_mul(r, ep2_curve_get_gen(), k);
+	ep2_t gen;
+
+	ep2_null(gen);
+
+	TRY {
+		ep2_new(gen);
+		ep2_curve_get_gen(gen);
+		ep2_mul(r, gen, k);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep2_free(gen);
+	}
 }
 
 void ep2_map(ep2_t p, unsigned char *msg, int len) {
@@ -833,20 +876,22 @@ void ep2_map(ep2_t p, unsigned char *msg, int len) {
 	bn_null(k);
 
 	TRY {
+		bn_new(n);
 		bn_new(k);
 
-		n = ep2_curve_get_ord();
+		ep2_curve_get_ord(n);
 
 		md_map(digest, msg, len);
 		bn_read_bin(k, digest, MD_LEN, BN_POS);
 		bn_mod(k, k, n);
 
-		n = ep2_curve_get_ord();
+		ep2_curve_get_ord(n);
 
 		ep2_mul_gen(p, k);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
+		bn_free(n);
 		bn_free(k);
 	}
 }

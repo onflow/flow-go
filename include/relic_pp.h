@@ -461,6 +461,9 @@ typedef ep2_st *ep2_t;
 	fp2_new((A)->y);														\
 	fp2_new((A)->z);														\
 
+#elif ALLOC == AUTO
+#define ep2_new(A)			/* empty */
+
 #elif ALLOC == STACK
 #define ep2_new(A)															\
 	A = (ep2_t)alloca(sizeof(ep2_st));										\
@@ -490,6 +493,9 @@ typedef ep2_st *ep2_t;
 		fp2_free((A)->z);													\
 		A = NULL;															\
 	}																		\
+
+#elif ALLOC == AUTO
+#define ep2_free(A)			/* empty */
 
 #elif ALLOC == STACK
 #define ep2_free(A)															\

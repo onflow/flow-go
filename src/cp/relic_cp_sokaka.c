@@ -49,24 +49,34 @@ void cp_sokaka_gen(bn_t master) {
 
 	bn_null(n);
 
-	n = g1_get_ord();
+	TRY {
+		bn_new(n);
 
-	do {
-		bn_rand(master, BN_POS, bn_bits(n));
-		bn_mod(master, master, n);
-	} while (bn_is_zero(master));
+		g1_get_ord(n);
+
+		do {
+			bn_rand(master, BN_POS, bn_bits(n));
+			bn_mod(master, master, n);
+		} while (bn_is_zero(master));
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(n);
+	}
 }
 
 void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master) {
-	if (pc_pair_is_type1()) {
-		g1_map(k.s1, (unsigned char *)id, len);
-		g1_mul(k.s1, k.s1, master);
-	} else {
-		g1_map(k.s1, (unsigned char *)id, len);
-		g1_mul(k.s1, k.s1, master);
-		g2_map(k.s2, (unsigned char *)id, len);
-		g2_mul(k.s2, k.s2, master);
-	}
+        if (pc_pair_is_type1()) {
+                g1_map(k.s1, (unsigned char *)id, len);
+                g1_mul(k.s1, k.s1, master);
+        } else {
+                g1_map(k.s1, (unsigned char *)id, len);
+                g1_mul(k.s1, k.s1, master);
+                g2_map(k.s2, (unsigned char *)id, len);
+                g2_mul(k.s2, k.s2, master);
+        }
 }
 
 void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
