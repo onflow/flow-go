@@ -662,7 +662,7 @@ static int fixed(void) {
 #endif
 
 #if EB_FIX == NAFWI || !defined(STRIP)
-		for (int i = EB_TABLE; i < EB_TABLE_NAFWI; i++) {
+		for (int i = 0; i < EB_TABLE_NAFWI; i++) {
 			eb_new(t[i]);
 		}
 		TEST_BEGIN("naf windowing fixed point multiplication is correct") {

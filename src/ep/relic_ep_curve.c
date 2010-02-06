@@ -186,8 +186,8 @@ void ep_curve_get_gen(ep_t g) {
 	ep_copy(g, &curve_g);
 }
 
-void ep_curve_get_ord(bn_t o) {
-	bn_copy(o, &curve_r);
+void ep_curve_get_ord(bn_t n) {
+	bn_copy(n, &curve_r);
 }
 
 #if defined(EP_PRECO)

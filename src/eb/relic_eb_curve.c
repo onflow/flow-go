@@ -328,8 +328,8 @@ void eb_curve_get_gen(eb_t g) {
 	eb_copy(g, &curve_g);
 }
 
-void eb_curve_get_ord(bn_t o) {
-	bn_copy(o, &curve_r);
+void eb_curve_get_ord(bn_t n) {
+	bn_copy(n, &curve_r);
 }
 
 #if defined(EB_PRECO)

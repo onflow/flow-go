@@ -455,6 +455,8 @@ void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 
 
 	TRY {
+		bn_new(n);
+
 		eb_curve_get_ord(n);
 		d = bn_bits(n);
 		d = ((d % w) == 0 ? (d / w) : (d / w) + 1);

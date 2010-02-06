@@ -295,10 +295,11 @@ int ep_param_set_any() {
 	int r0, r1;
 
 	r0 = ep_param_set_any_ordin();
-	r1 = ep_param_set_any_pairf();
-
-	if (r0 == STS_ERR && r1 == STS_ERR) {
-		return STS_ERR;
+	if (r0 == STS_ERR) {
+		r1 = ep_param_set_any_pairf();
+		if (r1 == STS_ERR) {
+			return STS_ERR;
+		}
 	}
 	return STS_OK;
 }

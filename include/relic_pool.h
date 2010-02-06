@@ -50,7 +50,7 @@
  * The size of the static pool of digit vectors.
  */
 #ifndef POOL_SIZE
-#define POOL_SIZE	(50 * MAX(TESTS, BENCH * BENCH))
+#define POOL_SIZE	(500 * MAX(TESTS, BENCH * BENCH))
 #endif
 
 #endif

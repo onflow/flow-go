@@ -199,7 +199,7 @@ static int ecdsa(void) {
 
 	bn_null(d);
 	bn_null(r);
-	eb_null(q);
+	ec_null(q);
 
 	TRY {
 		bn_new(d);
