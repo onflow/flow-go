@@ -512,12 +512,14 @@ static int multiplication(void) {
 	eb_null(r);
 
 	TRY {
+		eb_new(p);
 		eb_new(q);
 		eb_new(r);
+		bn_new(n);
 		bn_new(k);
 
-		p = eb_curve_get_gen();
-		n = eb_curve_get_ord();
+		eb_curve_get_gen(p);
+		eb_curve_get_ord(n);
 
 		TEST_BEGIN("generator has the right order") {
 			eb_mul(r, p, n);
@@ -573,8 +575,10 @@ static int multiplication(void) {
 	}
 	code = STS_OK;
   end:
+	eb_free(p);
 	eb_free(q);
 	eb_free(r);
+	bn_free(n);
 	bn_free(k);
 	return code;
 }
@@ -596,12 +600,14 @@ static int fixed(void) {
 	}
 
 	TRY {
+		eb_new(p);
 		eb_new(q);
 		eb_new(r);
+		bn_new(n);
 		bn_new(k);
 
-		p = eb_curve_get_gen();
-		n = eb_curve_get_ord();
+		eb_curve_get_gen(p);
+		eb_curve_get_ord(n);
 
 		for (int i = 0; i < EB_TABLE; i++) {
 			eb_new(t[i]);
@@ -733,8 +739,10 @@ static int fixed(void) {
 	}
 	code = STS_OK;
   end:
+	eb_free(p);
 	eb_free(q);
 	eb_free(r);
+	bn_free(n);
 	bn_free(k);
 	return code;
 }
@@ -751,14 +759,16 @@ static int simultaneous(void) {
 
 	TRY {
 
+		eb_new(p);
 		eb_new(q);
 		eb_new(r);
 		eb_new(s);
+		bn_new(n);
 		bn_new(k);
 		bn_new(l);
 
-		p = eb_curve_get_gen();
-		n = eb_curve_get_ord();
+		eb_curve_get_gen(p);
+		eb_curve_get_ord(n);
 
 		TEST_BEGIN("simultaneous point multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
@@ -827,7 +837,8 @@ static int simultaneous(void) {
 			bn_rand(l, BN_POS, bn_bits(n));
 			bn_mod(l, l, n);
 			eb_mul_sim_gen(r, k, q, l);
-			eb_mul_sim(q, eb_curve_get_gen(), k, q, l);
+			eb_curve_get_gen(s);
+			eb_mul_sim(q, s, k, q, l);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
 	}
@@ -837,8 +848,10 @@ static int simultaneous(void) {
 	}
 	code = STS_OK;
   end:
+	eb_free(p);
 	eb_free(q);
 	eb_free(r);
+	bn_free(n);
 	bn_free(k);
 	return code;
 }

@@ -683,7 +683,7 @@ void bn_gcd_stein(bn_t c, bn_t a, bn_t b) {
 }
 
 void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
-	bn_t x, y, u, v, _a, _b, _e, *tmpe;
+	bn_t x, y, u, v, _a, _b, _e;
 	int shift, found;
 
 	bn_null(x);
@@ -693,7 +693,6 @@ void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 	bn_null(_a);
 	bn_null(_b);
 	bn_null(_e);
-	tmpe = NULL;
 
 	if (d == NULL && e == NULL) {
 		bn_gcd_stein(c, a, b);
@@ -730,12 +729,7 @@ void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 		bn_new(v);
 		bn_new(_a);
 		bn_new(_b);
-		if (e == NULL) {
-			bn_new(_e);
-			tmpe = &_e;
-		} else {
-			tmpe = &e;
-		}
+		bn_new(_e);
 
 		bn_abs(x, a);
 		bn_abs(y, b);
@@ -756,7 +750,7 @@ void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 		bn_set_dig(_a, 1);
 		bn_zero(_b);
 		bn_zero(d);
-		bn_set_dig(*tmpe, 1);
+		bn_set_dig(_e, 1);
 
 		found = 0;
 		while (!found) {
@@ -779,33 +773,37 @@ void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 			while ((v->dp[0] & 0x01) == 0) {
 				bn_hlv(v, v);
 				/* If C = D = 0 (mod 2) then C = C/2, D = D/2. */
-				if ((d->dp[0] & 0x01) == 0 && ((*tmpe)->dp[0] & 0x01) == 0) {
+				if ((d->dp[0] & 0x01) == 0 && (_e->dp[0] & 0x01) == 0) {
 					bn_hlv(d, d);
-					bn_hlv(*tmpe, *tmpe);
+					bn_hlv(_e, _e);
 				} else {
 					/* Otherwise C = (C + y)/2, D = (D - x)/2. */
 					bn_add(d, d, y);
 					bn_hlv(d, d);
-					bn_sub(*tmpe, *tmpe, x);
-					bn_hlv(*tmpe, *tmpe);
+					bn_sub(_e, _e, x);
+					bn_hlv(_e, _e);
 				}
 			}
 			/* If u >= v then u = u - v, A = A - C, B = B - D. */
 			if (bn_cmp(u, v) != CMP_LT) {
 				bn_sub(u, u, v);
 				bn_sub(_a, _a, d);
-				bn_sub(_b, _b, *tmpe);
+				bn_sub(_b, _b, _e);
 			} else {
 				/* Otherwise, v = v - u, C = C - a, D = D - B. */
 				bn_sub(v, v, u);
 				bn_sub(d, d, _a);
-				bn_sub(*tmpe, *tmpe, _b);
+				bn_sub(_e, _e, _b);
 			}
 			/* If u = 0 then d = C, e = D and return (d, e, g * v). */
 			if (bn_is_zero(u)) {
 				bn_lsh(c, v, shift);
 				found = 1;
 			}
+		}
+
+		if (e != NULL) {
+			bn_copy(e, _e);
 		}
 	}
 	CATCH_ANY {

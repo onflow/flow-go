@@ -839,8 +839,9 @@ static int pairing(void) {
 		eb_new(q);
 		eb_new(r);
 		bn_new(k);
+		bn_new(n);
 
-		n = eb_curve_get_ord();
+		eb_curve_get_ord(n);
 
 		TEST_BEGIN("etat pairing is bilinear") {
 			eb_rand(p);
@@ -888,6 +889,7 @@ static int pairing(void) {
 	eb_free(q);
 	eb_free(r);
 	bn_free(k);
+	bn_free(n);
 	return code;
 }
 

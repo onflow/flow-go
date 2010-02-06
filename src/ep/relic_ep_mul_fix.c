@@ -109,11 +109,23 @@ static void ep_mul_fix_ordin(ep_t r, ep_t *table, bn_t k) {
 void ep_mul_pre_basic(ep_t *t, ep_t p) {
 	bn_t n;
 
-	n = ep_curve_get_ord();
+	bn_null(n);
 
-	ep_copy(t[0], p);
-	for (int i = 1; i < bn_bits(n); i++) {
-		ep_dbl_tab(t[i], t[i - 1]);
+	TRY {
+		bn_new(n);
+
+		ep_curve_get_ord(n);
+
+		ep_copy(t[0], p);
+		for (int i = 1; i < bn_bits(n); i++) {
+			ep_dbl_tab(t[i], t[i - 1]);
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(n);
 	}
 }
 
@@ -190,16 +202,30 @@ void ep_mul_fix_yaowi(ep_t r, ep_t *t, bn_t k) {
 
 void ep_mul_pre_nafwi(ep_t *t, ep_t p) {
 	int l;
+	bn_t n;
 
-	l = bn_bits(ep_curve_get_ord()) + 1;
-	l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
+	bn_null(n);
 
-	ep_copy(t[0], p);
-	for (int i = 1; i < l; i++) {
-		ep_dbl_tab(t[i], t[i - 1]);
-		for (int j = 1; j < EP_DEPTH; j++) {
-			ep_dbl_tab(t[i], t[i]);
+	TRY {
+		bn_new(n);
+
+		ep_curve_get_ord(n);
+		l = bn_bits() + 1;
+		l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
+
+		ep_copy(t[0], p);
+		for (int i = 1; i < l; i++) {
+			ep_dbl_tab(t[i], t[i - 1]);
+			for (int j = 1; j < EP_DEPTH; j++) {
+				ep_dbl_tab(t[i], t[i]);
+			}
 		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(n);
 	}
 }
 
@@ -265,46 +291,54 @@ void ep_mul_fix_nafwi(ep_t r, ep_t *t, bn_t k) {
 
 void ep_mul_pre_combs(ep_t *t, ep_t p) {
 	int i, j, l;
+	bn_t ord;
 
-	l = bn_bits(ep_curve_get_ord());
-	l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
+	bn_null(ord);
 
-	ep_set_infty(t[0]);
+	TRY {
+		bn_new(ord);
 
-	ep_copy(t[1], p);
-	for (j = 1; j < EP_DEPTH; j++) {
-		ep_dbl_tab(t[1 << j], t[1 << (j - 1)]);
-		for (i = 1; i < l; i++) {
-			ep_dbl_tab(t[1 << j], t[1 << j]);
+		ep_curve_get_ord(ord);
+		l = bn_bits(ord);
+		l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
+
+		ep_set_infty(t[0]);
+
+		ep_copy(t[1], p);
+		for (j = 1; j < EP_DEPTH; j++) {
+			ep_dbl_tab(t[1 << j], t[1 << (j - 1)]);
+			for (i = 1; i < l; i++) {
+				ep_dbl_tab(t[1 << j], t[1 << j]);
+			}
+			for (i = 1; i < (1 << j); i++) {
+				ep_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
+			}
 		}
-		for (i = 1; i < (1 << j); i++) {
-			ep_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
-		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(ord);
 	}
 }
 
 void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
 	int i, j, l, w, n, p0, p1;
+	bn_t ord;
 
-	l = bn_bits(ep_curve_get_ord());
-	l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
+	bn_null(ord);
 
-	n = bn_bits(k);
+	TRY {
+		bn_new(ord);
 
-	p0 = (EP_DEPTH) * l - 1;
+		ep_curve_get_ord(ord);
+		l = bn_bits(ord);
+		l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
 
-	w = 0;
-	p1 = p0--;
-	for (j = EP_DEPTH - 1; j >= 0; j--, p1 -= l) {
-		w = w << 1;
-		if (p1 < n && bn_test_bit(k, p1)) {
-			w = w | 1;
-		}
-	}
-	ep_copy(r, t[w]);
+		n = bn_bits(k);
 
-	for (i = l - 2; i >= 0; i--) {
-		ep_dbl(r, r);
+		p0 = (EP_DEPTH) * l - 1;
 
 		w = 0;
 		p1 = p0--;
@@ -314,11 +348,31 @@ void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
 				w = w | 1;
 			}
 		}
-		if (w > 0) {
-			ep_add(r, r, t[w]);
+		ep_copy(r, t[w]);
+
+		for (i = l - 2; i >= 0; i--) {
+			ep_dbl(r, r);
+
+			w = 0;
+			p1 = p0--;
+			for (j = EP_DEPTH - 1; j >= 0; j--, p1 -= l) {
+				w = w << 1;
+				if (p1 < n && bn_test_bit(k, p1)) {
+					w = w | 1;
+				}
+			}
+			if (w > 0) {
+				ep_add(r, r, t[w]);
+			}
 		}
+		ep_norm(r, r);
 	}
-	ep_norm(r, r);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(ord);
+	}
 }
 
 #endif
@@ -327,28 +381,42 @@ void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
 
 void ep_mul_pre_combd(ep_t *t, ep_t p) {
 	int i, j, d, e;
+	bn_t n;
 
-	d = bn_bits(ep_curve_get_ord());
-	d = ((d % EP_DEPTH) == 0 ? (d / EP_DEPTH) : (d / EP_DEPTH) + 1);
-	e = (d % 2 == 0 ? (d / 2) : (d / 2) + 1);
+	bn_null(n);
 
-	ep_set_infty(t[0]);
-	ep_copy(t[1], p);
-	for (j = 1; j < EP_DEPTH; j++) {
-		ep_dbl_tab(t[1 << j], t[1 << (j - 1)]);
-		for (i = 1; i < d; i++) {
-			ep_dbl_tab(t[1 << j], t[1 << j]);
+	TRY {
+		bn_new(n);
+
+		ep_curve_get_ord(n);
+		d = bn_bits(n);
+		d = ((d % EP_DEPTH) == 0 ? (d / EP_DEPTH) : (d / EP_DEPTH) + 1);
+		e = (d % 2 == 0 ? (d / 2) : (d / 2) + 1);
+
+		ep_set_infty(t[0]);
+		ep_copy(t[1], p);
+		for (j = 1; j < EP_DEPTH; j++) {
+			ep_dbl_tab(t[1 << j], t[1 << (j - 1)]);
+			for (i = 1; i < d; i++) {
+				ep_dbl_tab(t[1 << j], t[1 << j]);
+			}
+			for (i = 1; i < (1 << j); i++) {
+				ep_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
+			}
 		}
-		for (i = 1; i < (1 << j); i++) {
-			ep_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
+		ep_set_infty(t[1 << EP_DEPTH]);
+		for (j = 1; j < (1 << EP_DEPTH); j++) {
+			ep_dbl_tab(t[(1 << EP_DEPTH) + j], t[j]);
+			for (i = 1; i < e; i++) {
+				ep_dbl_tab(t[(1 << EP_DEPTH) + j], t[(1 << EP_DEPTH) + j]);
+			}
 		}
 	}
-	ep_set_infty(t[1 << EP_DEPTH]);
-	for (j = 1; j < (1 << EP_DEPTH); j++) {
-		ep_dbl_tab(t[(1 << EP_DEPTH) + j], t[j]);
-		for (i = 1; i < e; i++) {
-			ep_dbl_tab(t[(1 << EP_DEPTH) + j], t[(1 << EP_DEPTH) + j]);
-		}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(n);
 	}
 }
 

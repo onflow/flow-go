@@ -137,7 +137,7 @@ typedef struct {
 	fp_t y;
 	/** The third coordinate (projective representation). */
 	fp_t z;
-#elif ALLOC == DYNAMIC || ALLOC == STACK
+#elif ALLOC == DYNAMIC || ALLOC == STACK || ALLOC == AUTO
 	/** The first coordinate. */
 	fp_st x;
 	/** The second coordinate. */
@@ -152,7 +152,11 @@ typedef struct {
 /**
  * Pointer to an elliptic curve point.
  */
+#if ALLOC == AUTO
+typedef ep_st ep_t[1];
+#else
 typedef ep_st *ep_t;
+#endif
 
 /*============================================================================*/
 /* Macro definitions                                                          */
@@ -163,7 +167,11 @@ typedef ep_st *ep_t;
  *
  * @param[out] A			- the point to initialize.
  */
+#if ALLOC == AUTO
+#define ep_null(A)		/* empty */
+#else
 #define ep_null(A)		A = NULL;
+#endif
 
 /**
  * Calls a function to allocate a point on a prime elliptic curve.
@@ -187,6 +195,9 @@ typedef ep_st *ep_t;
 	fp_new((A)->x);															\
 	fp_new((A)->y);															\
 	fp_new((A)->z);															\
+
+#elif ALLOC == AUTO
+#define ep_new(A)			/* empty */
 
 #elif ALLOC == STACK
 #define ep_new(A)															\
@@ -214,6 +225,9 @@ typedef ep_st *ep_t;
 		fp_free((A)->z);													\
 		A = NULL;															\
 	}																		\
+
+#elif ALLOC == AUTO
+#define ep_free(A)			/* empty */
 
 #elif ALLOC == STACK
 #define ep_free(A)															\
@@ -418,9 +432,9 @@ int ep_curve_is_super(void);
 /**
  * Returns the generator of the group of points in the prime elliptic curve.
  *
- * @param[out] g			- the point to store the generator.
+ * @param[out] g			- the returned generator.
  */
-ep_t ep_curve_get_gen(void);
+void ep_curve_get_gen(ep_t g);
 
 /**
  * Returns the precomputation table for the generator.
@@ -432,9 +446,9 @@ ep_t *ep_curve_get_tab(void);
 /**
  * Returns the order of the group of points in the prime elliptic curve.
  *
- * @param[out] r			- the multiple precision integer to store the order.
+ * @param[out] r			- the returned order.
  */
-bn_t ep_curve_get_ord(void);
+void ep_curve_get_ord(bn_t n);
 
 /**
  * Returns the parameter identifier of the currently configured prime elliptic

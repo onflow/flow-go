@@ -723,6 +723,7 @@ int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg,
 #elif CP_RSAPD == PKCS2
 		if (pad_pkcs2(eb, &pad_len, MD_LEN, size, RSA_VER) == STS_OK) {
 #else
+		pad_len = 0;
 		if (1) {
 #endif
 			memset(hash1, 0, MD_LEN);

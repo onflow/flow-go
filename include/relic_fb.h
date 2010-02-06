@@ -98,7 +98,11 @@ enum {
 /**
  * Represents a binary field element.
  */
+#if ALLOC == AUTO
+typedef align dig_t fb_t[FB_DIGS];
+#else
 typedef dig_t *fb_t;
+#endif
 
 /**
  * Represents a binary field element with automatic memory allocation.
@@ -114,7 +118,11 @@ typedef align dig_t fb_st[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
  *
  * @param[out] A			- the binary field element to initialize.
  */
+#if ALLOC == AUTO
+#define fb_null(A)			/* empty */
+#else
 #define fb_null(A)			A = NULL;
+#endif
 
 /**
  * Calls a function to allocate a binary field element.
@@ -126,6 +134,8 @@ typedef align dig_t fb_st[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
 #define fb_new(A)			dv_new_dynam((dv_t *)&(A), FB_DIGS)
 #elif ALLOC == STATIC
 #define fb_new(A)			dv_new_statc((dv_t *)&(A), FB_DIGS)
+#elif ALLOC == AUTO
+#define fb_new(A)			/* empty */
 #elif ALLOC == STACK
 #define fb_new(A)															\
 	A = (dig_t *)alloca(FB_BYTES + PADDING(FB_BYTES));						\
@@ -142,8 +152,10 @@ typedef align dig_t fb_st[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
 #define fb_free(A)			dv_free_dynam((dv_t *)&(A))
 #elif ALLOC == STATIC
 #define fb_free(A)			dv_free_statc((dv_t *)&(A))
-#elif ALLOC == STACK
+#elif ALLOC == AUTO
 #define fb_free(A)			/* empty */
+#elif ALLOC == STACK
+#define fb_free(A)			A = NULL;
 #endif
 
 /**

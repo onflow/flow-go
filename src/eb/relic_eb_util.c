@@ -83,9 +83,11 @@ void eb_rand(eb_t p) {
 
 	TRY {
 		bn_new(k);
+		bn_new(n);
+		eb_new(g);
 
-		n = eb_curve_get_ord();
-		g = eb_curve_get_gen();
+		eb_curve_get_ord(n);
+		eb_curve_get_gen(g);
 
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
@@ -95,6 +97,8 @@ void eb_rand(eb_t p) {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
 		bn_free(k);
+		bn_free(n);
+		eb_free(g);
 	}
 }
 
@@ -107,20 +111,22 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 
 	TRY {
 		bn_new(k);
+		bn_new(n);
 
-		n = eb_curve_get_ord();
+		eb_curve_get_ord(n);
 
 		md_map(digest, msg, len);
 		bn_read_bin(k, digest, MD_LEN, BN_POS);
 		bn_mod(k, k, n);
 
-		n = eb_curve_get_ord();
+		eb_curve_get_ord(n);
 
 		eb_mul_gen(p, k);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
 		bn_free(k);
+		bn_free(n);
 	}
 }
 

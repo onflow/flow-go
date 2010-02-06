@@ -50,7 +50,7 @@
 /*============================================================================*/
 
 /**
- * Prefix for mappings of functions.
+ * Prefix for function mappings.
  */
 #if PC_CUR == PRIME
 #define G1_LOWER			ep2_
@@ -65,7 +65,7 @@
 #endif
 
 /**
- * Prefix for mappings of constant definitions.
+ * Prefix for constant mappings.
  */
 #if PC_CUR == PRIME
 #define EC_UPPER			EP_
@@ -186,30 +186,30 @@ typedef CAT(GT_LOWER, t) gt_t;
 /**
  * Returns the generator of the group G_1.
  *
- * @return the generator.
+ * @param[out] G			- the returned generator.
  */
-#define g1_get_gen()		CAT(G1_LOWER, curve_get_gen)()
+#define g1_get_gen(G)		CAT(G1_LOWER, curve_get_gen)(G)
 
 /**
  * Returns the generator of the group G_2.
  *
- * @return the generator.
+ * @param[out] G			- the returned generator.
  */
-#define g2_get_gen()		CAT(G2_LOWER, curve_get_gen)()
+#define g2_get_gen(G)		CAT(G2_LOWER, curve_get_gen)(G)
 
 /**
  * Returns the order of the group G_1.
  *
- * @return the order of the group.
+ * @param[out] N			0 the returned order.
  */
-#define g1_get_ord()		CAT(G1_LOWER, curve_get_ord)()
+#define g1_get_ord(N)		CAT(G1_LOWER, curve_get_ord)(N)
 
 /**
  * Returns the order of the group G_2.
  *
- * @return the order of the group.
+ * @param[out] N			0 the returned order.
  */
-#define g2_get_ord()		CAT(G2_LOWER, curve_get_ord)()
+#define g2_get_ord(N)		CAT(G2_LOWER, curve_get_ord)(N)
 
 /**
  * Configures some set of curve parameters for the current security level.

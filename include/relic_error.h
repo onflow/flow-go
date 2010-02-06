@@ -39,6 +39,7 @@
 
 #include "relic_core.h"
 #include "relic_conf.h"
+#include "relic_util.h"
 
 /*============================================================================*/
 /* Constant definitions                                                       */
@@ -266,7 +267,14 @@ typedef struct _state_t {
 /**
  * Stub for the THROW clause.
  */
+#ifdef QUIET
 #define THROW(E)			core_ctx->code = STS_ERR;
+#else
+#define THROW(E)															\
+	core_ctx->code = STS_ERR; 												\
+	util_print("FATAL ERROR in %s:%d\n", __FILE__, __LINE__);				\
+
+#endif
 #endif
 
 /**

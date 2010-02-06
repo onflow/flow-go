@@ -1,4 +1,4 @@
-project(RELIC)
+project(RELIC C)
 cmake_minimum_required(VERSION 2.6)
 
 set(PROJECT_VERSION_MAJOR "0")
@@ -93,6 +93,7 @@ message("   ARITH=EASY     Easy-to-understand implementation.")
 message("   ARITH=GMP      GNU Multiple Precision library.\n")
 
 message(STATUS "Available memory-allocation policies (default = STACK):")
+message("   ALLOC=AUTO     All memory is automatically allocated.")
 message("   ALLOC=STATIC   All memory is allocated statically once.")
 message("   ALLOC=DYNAMIC  All memory is allocated dynamically on demand.")
 message("   ALLOC=STACK    All memory is allocated from the stack.\n")

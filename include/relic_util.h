@@ -150,8 +150,7 @@
  */
 #ifndef QUIET
 #define util_print(...)														\
-	fprintf(stdout, __VA_ARGS__);											\
-	fflush(stdout)
+	printf(__VA_ARGS__)
 #else
 #define util_print(...)			/* empty */
 #endif

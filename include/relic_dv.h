@@ -52,7 +52,7 @@
 /**
  * Size in bits of the biggest digit vector.
  */
-#define DV_TEMP MAX(BN_PRECI, FB_POLYN)
+#define DV_TEMP 	MAX(BN_PRECI, FB_POLYN)
 
 /**
  * Size in digits of a temporary vector.
@@ -74,7 +74,11 @@
 /**
  * Represents a temporary double precision digit vector.
  */
+#if ALLOC == AUTO
+typedef align dig_t dv_t[DV_DIGS];
+#else
 typedef dig_t *dv_t;
+#endif
 
 /*============================================================================*/
 /* Macro definitions                                                          */
@@ -85,7 +89,11 @@ typedef dig_t *dv_t;
  *
  * @param[out] A			- the digit vector to initialize.
  */
+#if ALLOC == AUTO
+#define dv_null(A)			/* empty */
+#else
 #define dv_null(A)			A = NULL;
+#endif
 
 /**
  * Calls a function to allocate a temporary double precision digit vector.
@@ -96,6 +104,8 @@ typedef dig_t *dv_t;
 #define dv_new(A)			dv_new_dynam(&(A), DV_DIGS)
 #elif ALLOC == STATIC
 #define dv_new(A)			dv_new_statc(&(A), DV_DIGS)
+#elif ALLOC == AUTO
+#define dv_new(A)			/* empty */
 #elif ALLOC == STACK
 #define dv_new(A)															\
 	A = (dig_t *)alloca(DV_BYTES + PADDING(DV_BYTES));						\
@@ -112,8 +122,10 @@ typedef dig_t *dv_t;
 #define dv_free(A)			dv_free_dynam(&(A))
 #elif ALLOC == STATIC
 #define dv_free(A)			dv_free_statc(&(A))
+#elif ALLOC == AUTO
+#define dv_free(A)			/* empty */
 #elif ALLOC == STACK
-#define dv_free(A)			(void)A
+#define dv_free(A)			/* empty */
 #endif
 
 /*============================================================================*/

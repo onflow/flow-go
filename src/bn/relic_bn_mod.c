@@ -286,10 +286,7 @@ void bn_mod_monty_comba(bn_t c, bn_t a, bn_t m, bn_t u) {
 #if BN_MOD == PMERS || !defined(STRIP)
 
 void bn_mod_pmers_setup(bn_t u, bn_t m) {
-	bn_t t;
 	int bits;
-
-	bn_null(t);
 
 	bits = bn_bits(m);
 

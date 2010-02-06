@@ -499,12 +499,14 @@
 /** Chosen ECDSA method. */
 #define CP_ECDSA     @CP_ECDSA@
 
+/** Automatic memory allocation. */
+#define AUTO     1
 /** Static memory allocation. */
-#define	STATIC   1
+#define	STATIC   2
 /** Dynamic memory allocation. */
-#define DYNAMIC  2
+#define DYNAMIC  3
 /** Stack memory allocation. */
-#define STACK    3
+#define STACK    4
 /** Chosen memory allocation policy. */
 #define ALLOC    @ALLOC@
 

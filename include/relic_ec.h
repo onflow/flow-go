@@ -92,7 +92,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  *
  * @param[out] A			- the point to initialize.
  */
-#define ec_null(A)					CAT(EC_LOWER, null)(A)
+#define ec_null(A)			CAT(EC_LOWER, null)(A)
 
 /**
  * Calls a function to allocate a point on an elliptic curve.
@@ -100,53 +100,53 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[out] A			- the new point.
  * @throw ERR_NO_MEMORY		- if there is no available memory.
  */
-#define ec_new(A)					CAT(EC_LOWER, new)(A)
+#define ec_new(A)			CAT(EC_LOWER, new)(A)
 
 /**
  * Calls a function to clean and free a point on an elliptic curve.
  *
  * @param[out] A			- the point to clean and free.
  */
-#define ec_free(A)					CAT(EC_LOWER, free)(A)
+#define ec_free(A)			CAT(EC_LOWER, free)(A)
 
 /**
  * Returns the generator of the group of points in the elliptic curve.
  *
- * @return the generator.
+ * @param[out] G			- the returned generator.
  */
-#define ec_curve_get_gen()			CAT(EC_LOWER, curve_get_gen)()
+#define ec_curve_get_gen(G)	CAT(EC_LOWER, curve_get_gen)(G)
 
 /**
  * Returns the precomputation table for the generator.
  *
  * @return the table.
  */
-#define ec_curve_get_tab()			CAT(EC_LOWER, curve_get_tab)()
+#define ec_curve_get_tab()	CAT(EC_LOWER, curve_get_tab)()
 
 /**
  * Returns the order of the group of points in the elliptic curve.
  *
- * @return the order of the group.
+ * @param[out]	N			- the returned order.
  */
-#define ec_curve_get_ord()			CAT(EC_LOWER, curve_get_ord)()
+#define ec_curve_get_ord(N)	CAT(EC_LOWER, curve_get_ord)(N)
 
 /**
  * Configures some set of curve parameters for the current security level.
  */
 #if EC_CUR == PRIME
-#define ec_param_set_any()			ep_param_set_any()
+#define ec_param_set_any()	ep_param_set_any()
 #elif EC_CUR == BINAR
 #if defined(EC_KBLTZ)
-#define ec_param_set_any()			eb_param_set_any_kbltz()
+#define ec_param_set_any()	eb_param_set_any_kbltz()
 #else
-#define ec_param_set_any()			eb_param_set_any()
+#define ec_param_set_any()	eb_param_set_any()
 #endif
 #endif
 
 /**
  * Prints the current configured elliptic curve.
  */
-#define ec_param_print()			CAT(EC_LOWER, param_print)()
+#define ec_param_print()	CAT(EC_LOWER, param_print)()
 
 /**
  * Tests if a point on a elliptic curve is at the infinity.
@@ -154,14 +154,14 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[in] P				- the point to test.
  * @return 1 if the point is at infinity, 0 otherwise.
  */
-#define ec_is_infty(P)				CAT(EC_LOWER, is_infty)(P)
+#define ec_is_infty(P)		CAT(EC_LOWER, is_infty)(P)
 
 /**
  * Assigns a elliptic curve point to a point at the infinity.
  *
  * @param[out] P			- the point to assign.
  */
-#define ec_set_infty(P)				CAT(EC_LOWER, set_infty)(P)
+#define ec_set_infty(P)		CAT(EC_LOWER, set_infty)(P)
 
 /**
  * Copies the second argument to the first argument.
@@ -169,7 +169,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[out] R			- the result.
  * @param[in] P				- the elliptic curve point to copy.
  */
-#define ec_copy(R, P)				CAT(EC_LOWER, copy)(R, P)
+#define ec_copy(R, P)		CAT(EC_LOWER, copy)(R, P)
 
 /**
  * Compares two elliptic curve points.
@@ -178,21 +178,21 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[in] Q				- the second elliptic curve point.
  * @return CMP_EQ if P == Q and CMP_NE if P != Q.
  */
-#define ec_cmp(P, Q)				CAT(EC_LOWER, cmp)(P, Q)
+#define ec_cmp(P, Q)		CAT(EC_LOWER, cmp)(P, Q)
 
 /**
  * Assigns a random value to a elliptic curve point.
  *
  * @param[out] P			- the elliptic curve point to assign.
  */
-#define ec_rand(P)					CAT(EC_LOWER, rand)(P)
+#define ec_rand(P)			CAT(EC_LOWER, rand)(P)
 
 /**
  * Prints a elliptic curve point.
  *
  * @param[in] P				- the elliptic curve point to print.
  */
-#define ec_print(P)					CAT(EC_LOWER, print)(P)
+#define ec_print(P)			CAT(EC_LOWER, print)(P)
 
 /**
  * Negates an elliptic curve point. Computes R = -P.
@@ -200,7 +200,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[out] R			- the result.
  * @param[in] P				- the point to negate.
  */
-#define ec_neg(R, P)				CAT(EC_LOWER, neg)(R, P)
+#define ec_neg(R, P)		CAT(EC_LOWER, neg)(R, P)
 
 /**
  * Adds two elliptic curve points. Computes R = P + Q.
@@ -209,7 +209,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[in] P				- the first point to add.
  * @param[in] Q				- the second point to add.
  */
-#define ec_add(R, P, Q)				CAT(EC_LOWER, add)(R, P, Q)
+#define ec_add(R, P, Q)		CAT(EC_LOWER, add)(R, P, Q)
 
 /**
  * Subtracts an elliptic curve point from another. Computes R = P - Q.
@@ -218,7 +218,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[in] P				- the first point.
  * @param[in] Q				- the second point.
  */
-#define ec_sub(R, P, Q)				CAT(EC_LOWER, sub)(R, P, Q)
+#define ec_sub(R, P, Q)		CAT(EC_LOWER, sub)(R, P, Q)
 
 /**
  * Doubles an elliptic curve point. Computes R = 2P.
@@ -226,7 +226,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[out] R			- the result.
  * @param[in] P				- the point to double.
  */
-#define ec_dbl(R, P)				CAT(EC_LOWER, dbl)(R, P)
+#define ec_dbl(R, P)		CAT(EC_LOWER, dbl)(R, P)
 
 /**
  * Multiplies an elliptic curve point by an integer. Computes R = kP.
@@ -235,7 +235,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[in] P				- the point to multiply.
  * @param[in] K				- the integer.
  */
-#define ec_mul(R, P, K)				CAT(EC_LOWER, mul)(R, P, K)
+#define ec_mul(R, P, K)		CAT(EC_LOWER, mul)(R, P, K)
 
 /**
  * Multiplies the generator of a prime elliptic curve by an integer.
@@ -243,7 +243,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[out] R			- the result.
  * @param[in] K				- the integer.
  */
-#define ec_mul_gen(R, K)			CAT(EC_LOWER, mul_gen)(R, K)
+#define ec_mul_gen(R, K)	CAT(EC_LOWER, mul_gen)(R, K)
 
 /**
  * Builds a precomputation table for multiplying a fixed elliptic curve
@@ -252,7 +252,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[out] T			- the precomputation table.
  * @param[in] P				- the point to multiply.
  */
-#define ec_mul_pre(T, P)			CAT(EC_LOWER, mul_pre)(T, P)
+#define ec_mul_pre(T, P)	CAT(EC_LOWER, mul_pre)(T, P)
 /**
  * Multiplies a elliptic point using a precomputation table.
  * Computes R = kP.
@@ -261,7 +261,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[in] T				- the precomputation table.
  * @param[in] K				- the integer.
  */
-#define ec_mul_fix(R, T, K)			CAT(EC_LOWER, mul_fix)(R, T, K)
+#define ec_mul_fix(R, T, K)	CAT(EC_LOWER, mul_fix)(R, T, K)
 
 /**
  * Multiplies and adds two elliptic curve points simultaneously. Computes
@@ -292,7 +292,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[out] R			- the result.
  * @param[in] P				- the point to convert.
  */
-#define ec_norm(R, P)				CAT(EC_LOWER, norm)(R, P)
+#define ec_norm(R, P)		CAT(EC_LOWER, norm)(R, P)
 
 /**
  * Maps a byte array to a point in an elliptic curve.
@@ -301,6 +301,6 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[in] M				- the byte array to map.
  * @param[in] L				- the array length in bytes.
  */
-#define ec_map(P, M, L);			CAT(EC_LOWER, map)(P, M, L)
+#define ec_map(P, M, L);	CAT(EC_LOWER, map)(P, M, L)
 
 #endif /* !RELIC_EC_H */

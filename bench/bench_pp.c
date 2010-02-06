@@ -575,7 +575,7 @@ static void arith(void) {
 	fp2_new(s);
 	fp2_new(t);
 
-	n = ep2_curve_get_ord();
+	ep2_curve_get_ord(n);
 
 	BENCH_BEGIN("ep2_add") {
 		ep2_rand(p);

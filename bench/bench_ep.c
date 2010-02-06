@@ -111,7 +111,7 @@ static void arith(void) {
 	bn_new(n);
 	bn_new(l);
 
-	n = ep_curve_get_ord();
+	ep_curve_get_ord(n);
 
 	BENCH_BEGIN("ep_add") {
 		ep_rand(p);

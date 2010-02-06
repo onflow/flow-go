@@ -182,18 +182,22 @@ int ep_curve_is_super() {
 	return curve_is_super;
 }
 
-ep_t ep_curve_get_gen() {
-	return &curve_g;
+void ep_curve_get_gen(ep_t g) {
+	ep_copy(g, &curve_g);
 }
 
-bn_t ep_curve_get_ord() {
-	return &curve_r;
+void ep_curve_get_ord(bn_t o) {
+	bn_copy(o, &curve_r);
 }
 
 #if defined(EP_PRECO)
 
 ep_t *ep_curve_get_tab() {
+#if ALLOC == AUTO
+	return (ep_t*) *pointer;
+#else
 	return pointer;
+#endif
 }
 
 #endif

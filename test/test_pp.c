@@ -1744,12 +1744,14 @@ static int multiplication(void) {
 	ep2_null(r);
 
 	TRY {
+		ep2_new(p);
 		ep2_new(q);
 		ep2_new(r);
+		bn_new(n);
 		bn_new(k);
 
-		p = ep2_curve_get_gen();
-		n = ep2_curve_get_ord();
+		ep2_curve_get_gen(p);
+		ep2_curve_get_ord(n);
 
 		TEST_BEGIN("generator has the right order") {
 			ep2_mul(r, p, n);
@@ -1770,8 +1772,10 @@ static int multiplication(void) {
 	}
 	code = STS_OK;
   end:
+	ep2_free(p);
 	ep2_free(q);
 	ep2_free(r);
+	bn_free(n);
 	bn_free(k);
 	return code;
 }
@@ -1797,9 +1801,10 @@ static int pairing(void) {
 		ep2_new(p);
 		ep_new(q);
 		ep_new(r);
+		bn_new(n);
 		bn_new(k);
 
-		n = ep_curve_get_ord();
+		ep_curve_get_ord(n);
 
 		TEST_BEGIN("rate pairing is bilinear") {
 			ep2_rand(p);
@@ -1826,6 +1831,7 @@ static int pairing(void) {
 	ep2_free(p);
 	ep_free(q);
 	ep_free(r);
+	bn_free(n);
 	bn_free(k);
 	return code;
 }

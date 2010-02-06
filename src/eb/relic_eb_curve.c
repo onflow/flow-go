@@ -324,42 +324,43 @@ int eb_curve_is_super() {
 	return curve_is_super;
 }
 
-eb_st *eb_curve_get_gen() {
-	return &curve_g;
+void eb_curve_get_gen(eb_t g) {
+	eb_copy(g, &curve_g);
 }
 
-bn_t eb_curve_get_ord() {
-	return &curve_r;
+void eb_curve_get_ord(bn_t o) {
+	bn_copy(o, &curve_r);
 }
 
 #if defined(EB_PRECO)
 
 eb_t *eb_curve_get_tab() {
+#if ALLOC == STACK && defined(NO_ALLOCA)
+	return (eb_t *) *pointer;
+#else
 	return pointer;
+#endif
 }
 
 #endif
 
 #if defined(EB_KBLTZ) && (EB_MUL == WTNAF || EB_FIX == WTNAF || EB_SIM == INTER || !defined(STRIP))
-bn_t eb_curve_get_vm() {
+void eb_curve_get_vm(bn_t vm) {
 	if (curve_is_koblitz) {
-		return &curve_vm;
-	}
-	return NULL;
+		bn_copy(vm, &curve_vm);
+	} //TODO: else?
 }
 
-bn_t eb_curve_get_s0() {
+void eb_curve_get_s0(bn_t s0) {
 	if (curve_is_koblitz) {
-		return &curve_s0;
-	}
-	return NULL;
+		return bn_copy(s0, &curve_s0);
+	} //TODO: else?
 }
 
-bn_t eb_curve_get_s1() {
+void eb_curve_get_s1(bn_t s1) {
 	if (curve_is_koblitz) {
-		return &curve_s1;
-	}
-	return NULL;
+		bn_copy(s1, &curve_s1);
+	} //TODO: else?
 }
 #endif
 

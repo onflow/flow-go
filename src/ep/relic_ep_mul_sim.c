@@ -182,8 +182,11 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 	ep_t t0[1 << (EP_WIDTH / 2)];
 	ep_t t1[1 << (EP_WIDTH / 2)];
 	ep_t t[1 << EP_WIDTH];
+	bn_t n;
 	int d, l0, l1, w;
 	unsigned char w0[FP_BITS + 1], w1[FP_BITS + 1];
+
+	bn_null(n);
 
 	for (int i = 0; i < 1 << EP_WIDTH; i++) {
 		ep_null(t[i]);
@@ -196,10 +199,13 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 
 	w = EP_WIDTH / 2;
 
-	d = bn_bits(ep_curve_get_ord());
-	d = ((d % w) == 0 ? (d / w) : (d / w) + 1);
 
 	TRY {
+		bn_new(n);
+
+		ep_curve_get_ord(n);
+		d = bn_bits(n);
+		d = ((d % w) == 0 ? (d / w) : (d / w) + 1);
 		for (int i = 0; i < (1 << w); i++) {
 			ep_new(t0[i]);
 			ep_new(t1[i]);
@@ -246,6 +252,7 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+		bn_free(n);
 		for (int i = 0; i < (1 << w); i++) {
 			ep_free(t0[i]);
 			ep_free(t1[i]);
@@ -338,9 +345,24 @@ void ep_mul_sim_joint(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 #endif
 
 void ep_mul_sim_gen(ep_t r, bn_t k, ep_t q, bn_t l) {
+	ep_t gen;
+
+	ep_null(gen);
+
+	TRY {
+		ep_new(gen);
+
+		ep_curve_get_gen(gen);
 #if EP_FIX == WTNAF && defined(EP_PRECO)
-	ep_mul_sim_ordin(r, ep_curve_get_gen(), k, q, l, 1);
+		ep_mul_sim_ordin(r, gen, k, q, l, 1);
 #else
-	ep_mul_sim(r, ep_curve_get_gen(), k, q, l);
+		ep_mul_sim(r, gen, k, q, l);
 #endif
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep_free(gen);
+	}
 }

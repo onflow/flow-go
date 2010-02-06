@@ -848,25 +848,45 @@ static void arith(void) {
 
 #if defined(WITH_EB) && defined(EB_STAND) && defined(EB_KBLTZ)
 	if (eb_param_set_any_kbltz() == STS_OK) {
-		bn_t vm, s0, s1;
+		bn_t vm, s0, s1, n;
+
 		bn_null(vm);
 		bn_null(s0);
 		bn_null(s1);
-		vm = eb_curve_get_vm();
-		s0 = eb_curve_get_s0();
-		s1 = eb_curve_get_s1();
-		BENCH_BEGIN("bn_rec_tnaf") {
-			signed char tnaf[FB_BITS + 8];
-			int len;
-			bn_rand(a, BN_POS, BN_BITS);
-			bn_mod(a, a, eb_curve_get_ord());
-			if (eb_curve_opt_a() == OPT_ZERO) {
-				BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, vm, s0, s1, -1, FB_BITS, 4));
-			} else {
-				BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, vm, s0, s1, 1, FB_BITS, 4));
+		bn_null(n);
+
+		TRY {
+			bn_new(vm);
+			bn_new(s0);
+			bn_new(s1);
+			bn_new(n);
+
+			eb_curve_get_vm(vm);
+			eb_curve_get_s0(s0);
+			eb_curve_get_s1(s1);
+			BENCH_BEGIN("bn_rec_tnaf") {
+				signed char tnaf[FB_BITS + 8];
+				int len;
+				bn_rand(a, BN_POS, BN_BITS);
+				eb_curve_get_ord(n);
+				bn_mod(a, a, n);
+				if (eb_curve_opt_a() == OPT_ZERO) {
+					BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, vm, s0, s1, -1, FB_BITS, 4));
+				} else {
+					BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, vm, s0, s1, 1, FB_BITS, 4));
+				}
 			}
+			BENCH_END;
 		}
-		BENCH_END;
+		CATCH_ANY {
+			THROW(ERR_CAUGHT);
+		}
+		FINALLY {
+			bn_free(vm);
+			bn_free(s0);
+			bn_free(s1);
+			bn_free(n);
+		}
 	}
 #endif
 

@@ -906,16 +906,16 @@ int ep2_curve_is_twist(void);
 /**
  * Returns the generator of the group of points in the elliptic curve.
  *
- * @param[out] g			- the point to store the generator.
+ * @param[out] g			- the returned generator.
  */
-ep2_t ep2_curve_get_gen(void);
+void ep2_curve_get_gen(ep2_t g);
 
 /**
  * Returns the order of the group of points in the elliptic curve.
  *
- * @param[out] r			- the multiple precision integer to store the order.
+ * @param[out] n			- the returned order.
  */
-bn_t ep2_curve_get_ord(void);
+void ep2_curve_get_ord(bn_t n);
 
 /**
  * Configures a new elliptic curve by using the curve over the base prime field
@@ -1150,7 +1150,7 @@ void pp_pair_clean(void);
 /**
  * Computes the R-ate pairing of two points in a parameterized elliptic curve.
  * Computes e(Q, P).
- * 
+ *
  * @param[out] r			- the result.
  * @param[in] q				- the first elliptic curve point.
  * @param[in] p				- the second elliptic curve point.

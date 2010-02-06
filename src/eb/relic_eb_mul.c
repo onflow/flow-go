@@ -193,6 +193,9 @@ static void eb_mul_tnaf_tab(eb_t r, eb_t p, bn_t k) {
 	}
 
 	TRY {
+		bn_new(vm);
+		bn_new(s0);
+		bn_new(s1);
 
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
@@ -201,9 +204,9 @@ static void eb_mul_tnaf_tab(eb_t r, eb_t p, bn_t k) {
 		/* Compute the precomputation table. */
 		table_init_koblitz(table, p);
 
-		vm = eb_curve_get_vm();
-		s0 = eb_curve_get_s0();
-		s1 = eb_curve_get_s1();
+		eb_curve_get_vm(vm);
+		eb_curve_get_s0(s0);
+		eb_curve_get_s1(s1);
 		/* Compute the w-TNAF representation of k. */
 		bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_WIDTH);
 
@@ -228,6 +231,10 @@ static void eb_mul_tnaf_tab(eb_t r, eb_t p, bn_t k) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+		bn_free(vm);
+		bn_free(s0);
+		bn_free(s1);
+
 		/* Free the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
 			eb_free(table[i]);
@@ -523,6 +530,20 @@ void eb_mul_gen(eb_t r, bn_t k) {
 #ifdef EB_PRECO
 	eb_mul_fix(r, eb_curve_get_tab(), k);
 #else
-	eb_mul(r, eb_curve_get_gen(), k);
+	eb_t gen;
+
+	eb_null(gen);
+
+	TRY {
+		eb_new(gen);
+		eb_curve_get_gen(gen);
+		eb_mul(r, gen, k);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		eb_free(gen);
+	}
 #endif
 }
