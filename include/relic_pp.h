@@ -95,7 +95,11 @@ typedef struct {
 /**
  * Pointer to an elliptic curve point.
  */
+#if ALLOC == AUTO
+typedef ep2_st ep2_t[1];
+#else
 typedef ep2_st *ep2_t;
+#endif
 
 /*============================================================================*/
 /* Macro definitions                                                          */
@@ -433,7 +437,11 @@ typedef ep2_st *ep2_t;
  *
  * @param[out] A			- the point to initialize.
  */
-#define ep2_null(A)		A = NULL;
+#if ALLOC == AUTO
+#define ep2_null(A)			/* empty */
+#else
+#define ep2_null(A)			A = NULL
+#endif
 
 /**
  * Calls a function to allocate a point on a elliptic curve.

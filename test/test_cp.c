@@ -68,6 +68,7 @@ static int rsa(void) {
 					end);
 			TEST_ASSERT(cp_rsa_dec(out, &out_len, out, out_len, prv) == STS_OK,
 					end);
+			printf("%d %d\n", in_len, out_len);
 			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
 		} TEST_END;
 

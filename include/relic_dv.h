@@ -123,9 +123,9 @@ typedef dig_t *dv_t;
 #elif ALLOC == STATIC
 #define dv_free(A)			dv_free_statc(&(A))
 #elif ALLOC == AUTO
-#define dv_free(A)			/* empty */
+#define dv_free(A)			(void)A
 #elif ALLOC == STACK
-#define dv_free(A)			/* empty */
+#define dv_free(A)			(void)A
 #endif
 
 /*============================================================================*/

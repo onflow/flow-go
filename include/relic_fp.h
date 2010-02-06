@@ -105,7 +105,7 @@ enum {
 #if ALLOC == AUTO
 typedef align dig_t fp_t[FP_DIGS];
 #else
-typedef dig_t *fb_t;
+typedef dig_t *fp_t;
 #endif
 
 /**
