@@ -92,7 +92,7 @@ message(STATUS "Available arithmetic backends (default = EASY):")
 message("   ARITH=EASY     Easy-to-understand implementation.")
 message("   ARITH=GMP      GNU Multiple Precision library.\n")
 
-message(STATUS "Available memory-allocation policies (default = STACK):")
+message(STATUS "Available memory-allocation policies (default = AUTO):")
 message("   ALLOC=AUTO     All memory is automatically allocated.")
 message("   ALLOC=STATIC   All memory is allocated statically once.")
 message("   ALLOC=DYNAMIC  All memory is allocated dynamically on demand.")
@@ -267,7 +267,7 @@ set(ARITH "${ARITH}" CACHE STRING "Arithmetic backend")
 
 # Choose the memory-allocation policy.
 if (NOT ALLOC)
-	set(ALLOC "STACK")
+	set(ALLOC "AUTO")
 endif(NOT ALLOC)
 set(ALLOC ${ALLOC} CACHE STRING "Allocation policy")
 

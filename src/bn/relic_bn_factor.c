@@ -59,9 +59,9 @@ int bn_factor(bn_t c, bn_t a) {
 		bn_set_dig(t0, 2);
 
 #if WORD == 8
-		tests = 256;
+		tests = 255;
 #else
-		tests = 65536;
+		tests = 65535;
 #endif
 		for (i = 2; i < tests; i++) {
 			bn_set_dig(t1, i);

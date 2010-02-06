@@ -68,20 +68,9 @@
  * Prefix for constant mappings.
  */
 #if PC_CUR == PRIME
-#define EC_UPPER			EP_
 #define PC_UPPER			PP_
-#elif EC_CUR == BINAR
-#define EC_UPPER			EB_
+#elif PC_CUR == BINAR
 #define PC_UPPER			PB_
-#endif
-
-/**
- * Size of a precomputation table using the chosen algorithm.
- */
-#if EC_CUR == PRIME
-#define EC_TABLE			EP_TABLE
-#elif EC_CUR == BINAR
-#define EC_TABLE			EB_TABLE
 #endif
 
 /*============================================================================*/
