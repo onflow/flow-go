@@ -49,7 +49,7 @@ static const char conv_table[] =
 /**
  * Buffer to hold printed messages.
  */
-static char buffer[128 + 1];
+static char buffer[64 + 1];
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -120,7 +120,7 @@ void util_printf(char *format, ...) {
 #else
 	va_list list;
 	va_start(list, format);
-	vsnprintf(buffer, 128, format, list);
+	vsnprintf(buffer, 64, format, list);
 	printf("%s", buffer);
 	va_end(list);
 #endif

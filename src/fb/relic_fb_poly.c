@@ -59,6 +59,8 @@ static int poly_a, poly_b, poly_c;
  */
 static int pos_a, pos_b, pos_c;
 
+#if FB_TRC == QUICK || !defined(STRIP)
+
 /**
  * Powers of z with non-zero traces.
  */
@@ -76,6 +78,8 @@ static void find_trace() {
 
 	fb_null(t0);
 	fb_null(t1);
+
+	trc_a = trc_b = trc_c = -1;
 
 	TRY {
 		fb_new(t0);
@@ -119,6 +123,8 @@ static void find_trace() {
 		fb_free(t1);
 	}
 }
+
+#endif
 
 #if FB_SLV == QUICK || !defined(STRIP)
 
@@ -197,7 +203,7 @@ static void find_sqrt() {
 void fb_poly_init(void) {
 	fb_zero(poly);
 	poly_a = poly_b = poly_c = -1;
-	trc_a = trc_b = trc_c = pos_a = pos_b = pos_c = -1;
+	pos_a = pos_b = pos_c = -1;
 }
 
 void fb_poly_clean(void) {
@@ -310,9 +316,13 @@ void fb_poly_set_penta(int a, int b, int c) {
 }
 
 void fb_poly_get_trc(int *a, int *b, int *c) {
+#if FB_TRC == QUICK || !defined(STRIP)
 	*a = trc_a;
 	*b = trc_b;
 	*c = trc_c;
+#else
+	*a = *b = *c = -1;
+#endif
 }
 
 void fb_poly_get_rdc(int *a, int *b, int *c) {

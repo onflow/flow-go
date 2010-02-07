@@ -54,7 +54,7 @@
 /** Build with printing disabled. */
 #cmakedefine QUIET
 /** Build with colored output. */
-#cmakedefine QUIET
+#cmakedefine COLOR
 /** Build shared library. */
 #cmakedefine SHLIB
 /** Build static library. */

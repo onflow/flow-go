@@ -202,7 +202,7 @@ int ep_param_get() {
 void ep_param_set(int param) {
 	int ordin = 0;
 #if ARCH == AVR
-	char str[2 * FB_DIGS + 1];
+	char str[2 * FP_DIGS + 1];
 #else
 	char *str;
 #endif

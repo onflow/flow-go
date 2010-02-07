@@ -8,7 +8,7 @@ message("   ** Available cryptographic protocols methods (default = QUICK;BASIC)
 message("      CP_METHD=BASIC    Slow RSA decryption/signature.")
 message("      CP_METHD=QUICK    Fast RSA decryption/signature using CRT.\n")
 
-message("      Note: these methods must be given in order. Ex: CP_METHD=\"QUICK;QUICK\"\n")
+message("      Note: these methods must be given in order. Ex: CP_METHD=\"QUICK\"\n")
 
 if (NOT CP_RSAPD)
 	set(CP_RSAPD "PKCS1")
