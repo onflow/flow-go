@@ -77,17 +77,21 @@
 /*============================================================================*/
 
 void test_fail(void) {
-	util_print("[");
-	util_print("%c[%d;%dm", CMD_SET, CMD_ATTR, FAIL_COLOR);
+#ifdef COLOR
+	util_print("[%c[%d;%dm", CMD_SET, CMD_ATTR, FAIL_COLOR);
 	util_print("%s", FAIL_STRING);
-	util_print("%c[%dm", CMD_SET, CMD_RESET);
-	util_print("]\n");
+	util_print("%c[%dm]\n", CMD_SET, CMD_RESET);
+#else
+	util_print("[%s]\n", FAIL_STRING);
+#endif
 }
 
 void test_pass(void) {
-	util_print("[");
-	util_print("%c[%d;%dm", CMD_SET, CMD_ATTR, PASS_COLOR);
+#ifdef COLOR
+	util_print("[%c[%d;%dm", CMD_SET, CMD_ATTR, PASS_COLOR);
 	util_print("%s", PASS_STRING);
-	util_print("%c[%dm", CMD_SET, CMD_RESET);
-	util_print("]\n");
+	util_print("%c[%dm]\n", CMD_SET, CMD_RESET);
+#else
+	util_print("[%s]\n", PASS_STRING);
+#endif
 }

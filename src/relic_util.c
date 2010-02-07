@@ -30,6 +30,7 @@
  */
 
 #include <stdio.h>
+#include <stdarg.h>
 
 #include "relic_conf.h"
 #include "relic_util.h"
@@ -44,6 +45,11 @@
  */
 static const char conv_table[] =
 		"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
+
+/**
+ * Buffer to hold printed messages.
+ */
+static char buffer[128 + 1];
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -99,5 +105,24 @@ int util_bits_dig(dig_t a) {
 	return DIGIT - __builtin_clz(a);
 #elif WORD == 64
 	return DIGIT - __builtin_clzl(a);
+#endif
+}
+
+void util_printf(char *format, ...) {
+#ifndef QUIET
+#if ARCH == AVR
+	char *pointer = &buffer[1];
+	va_list list;
+	va_start(list, format);
+	vsnprintf(pointer, 128, format, list);
+	buffer[0] = (unsigned char)2;
+	va_end(list);
+#else
+	va_list list;
+	va_start(list, format);
+	vsnprintf(buffer, 128, format, list);
+	printf("%s", buffer);
+	va_end(list);
+#endif
 #endif
 }

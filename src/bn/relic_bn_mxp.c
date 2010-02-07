@@ -43,7 +43,7 @@
 /**
  * Size of precomputation table.
  */
-#define TABLE_SIZE			256
+#define TABLE_SIZE			64
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -130,12 +130,8 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 			w = 4;
 		} else if (i <= 256) {
 			w = 5;
-		} else if (i <= 1024) {
-			w = 6;
-		} else if (i <= 2048) {
-			w = 7;
 		} else {
-			w = 8;
+			w = 6;
 		}
 
 		for (i = 1; i < (1 << w); i += 2) {

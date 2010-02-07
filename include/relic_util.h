@@ -143,14 +143,8 @@
 #define __OPT(_1, _2, N,...)	N
 /** @} */
 
-/**
- * Formats and prints data following a printf-like syntax.
- *
- * @param[in] ...				- the list of arguments matching the format.
- */
 #ifndef QUIET
-#define util_print(...)														\
-	printf(__VA_ARGS__)
+#define util_print(...)			util_printf(__VA_ARGS__)
 #else
 #define util_print(...)			/* empty */
 #endif
@@ -189,5 +183,14 @@ char util_conv_char(dig_t i);
  * @return the position of the highest bit set.
  */
 int util_bits_dig(dig_t a);
+
+
+/**
+ * Formats and prints data following a printf-like syntax.
+ *
+ * @param[in] format			- the format.
+ * @param[in] ...				- the list of arguments matching the format.
+ */
+void util_printf(char *format, ...);
 
 #endif /* !RELIC_UTIL_H */
