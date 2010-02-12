@@ -41,6 +41,57 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
+void fp6_copy(fp6_t c, fp6_t a) {
+	fp2_copy(c[0], a[0]);
+	fp2_copy(c[1], a[1]);
+	fp2_copy(c[2], a[2]);
+}
+
+void fp6_neg(fp6_t c, fp6_t a) {
+	fp2_neg(c[0], a[0]);
+	fp2_neg(c[1], a[1]);
+	fp2_neg(c[2], a[2]);
+}
+
+void fp6_zero(fp6_t a) {
+	fp2_zero(a[0]);
+	fp2_zero(a[1]);
+	fp2_zero(a[2]);
+}
+
+int fp6_is_zero(fp6_t a) {
+	return fp2_is_zero(a[0]) && fp2_is_zero(a[1]) && fp2_is_zero(a[2]);
+}
+
+void fp6_rand(fp6_t a) {
+	fp2_rand(a[0]);
+	fp2_rand(a[1]);
+	fp2_rand(a[2]);
+}
+
+void fp6_print(fp6_t a) {
+	fp2_print(a[0]);
+	fp2_print(a[1]);
+	fp2_print(a[2]);
+}
+
+int fp6_cmp(fp6_t a, fp6_t b) {
+	return ((fp2_cmp(a[0], b[0]) == CMP_EQ) && (fp2_cmp(a[1], b[1]) == CMP_EQ)
+			&& (fp2_cmp(a[2], b[2]) == CMP_EQ) ? CMP_EQ : CMP_NE);
+}
+
+void fp6_add(fp6_t c, fp6_t a, fp6_t b) {
+	fp2_add(c[0], a[0], b[0]);
+	fp2_add(c[1], a[1], b[1]);
+	fp2_add(c[2], a[2], b[2]);
+}
+
+void fp6_sub(fp6_t c, fp6_t a, fp6_t b) {
+	fp2_sub(c[0], a[0], b[0]);
+	fp2_sub(c[1], a[1], b[1]);
+	fp2_sub(c[2], a[2], b[2]);
+}
+
 void fp6_dbl(fp6_t c, fp6_t a) {
 	/* 2 * (a0 + a1 * v + a2 * v^2) = 2 * a0 + 2 * a1 * v + 2 * a2 * v^2. */
 	fp2_dbl(c[0], a[0]);

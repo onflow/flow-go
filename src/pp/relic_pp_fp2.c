@@ -93,6 +93,50 @@ void fp2_const_get(fp2_t f) {
 	fp_copy(f[1], const_frb[1]);
 }
 
+void fp2_copy(fp2_t c, fp2_t a) {
+	fp_copy(c[0], a[0]);
+	fp_copy(c[1], a[1]);
+}
+
+void fp2_neg(fp2_t c, fp2_t a) {
+	fp_neg(c[0], a[0]);
+	fp_neg(c[1], a[1]);
+}
+
+void fp2_zero(fp2_t a) {
+	fp_zero(a[0]);
+	fp_zero(a[1]);
+}
+
+int fp2_is_zero(fp2_t a) {
+	return fp_is_zero(a[0]) && fp_is_zero(a[1]);
+}
+
+void fp2_rand(fp2_t a) {
+	fp_rand(a[0]);
+	fp_rand(a[1]);
+}
+
+void fp2_print(fp2_t a) {
+	fp_print(a[0]);
+	fp_print(a[1]);
+}
+
+int fp2_cmp(fp2_t a, fp2_t b) {
+	return (fp_cmp(a[0], b[0]) == CMP_EQ) && (fp_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ
+			: CMP_NE;
+}
+
+void fp2_add(fp2_t c, fp2_t a, fp2_t b) {
+	fp_add(c[0], a[0], b[0]);
+	fp_add(c[1], a[1], b[1]);
+}
+
+void fp2_sub(fp2_t c, fp2_t a, fp2_t b) {
+	fp_sub(c[0], a[0], b[0]);
+	fp_sub(c[1], a[1], b[1]);
+}
+
 void fp2_dbl(fp2_t c, fp2_t a) {
 	/* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
 	fp_dbl(c[0], a[0]);

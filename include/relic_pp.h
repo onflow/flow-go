@@ -135,8 +135,7 @@ typedef ep2_st *ep2_t;
  * @param[out] C			- the result.
  * @param[in] A				- the quadratic extension field element to copy.
  */
-#define fp2_copy(C, A)														\
-		fp_copy(C[0], A[0]); fp_copy(C[1], A[1]); 							\
+void fp2_copy(fp2_t c, fp2_t a);
 
 /**
  * Negates a quadratic extension field element.
@@ -144,16 +143,14 @@ typedef ep2_st *ep2_t;
  * @param[out] C			- the result.
  * @param[out] A			- the quadratic extension field element to negate.
  */
-#define fp2_neg(C, A)														\
-		fp_neg(C[0], A[0]); fp_neg(C[1], A[1]); 							\
+void fp2_neg(fp2_t c, fp2_t a);
 
 /**
  * Assigns zero to a quadratic extension field element.
  *
  * @param[out] A			- the quadratic extension field element to zero.
  */
-#define fp2_zero(A)															\
-		fp_zero(A[0]); fp_zero(A[1]); 										\
+void fp2_zero(fp2_t a);
 
 /**
  * Tests if a quadratic extension field element is zero or not.
@@ -161,24 +158,21 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the quadratic extension field element to compare.
  * @return 1 if the argument is zero, 0 otherwise.
  */
-#define fp2_is_zero(A)														\
-		(fp_is_zero(A[0]) && fp_is_zero(A[1])) 								\
+int fp2_is_zero(fp2_t a);
 
 /**
  * Assigns a random value to a quadratic extension field element.
  *
  * @param[out] A			- the quadratic extension field element to assign.
  */
-#define fp2_rand(A)															\
-		fp_rand(A[0]); fp_rand(A[1]);										\
+void fp2_rand(fp2_t a);
 
 /**
  * Prints a quadratic extension field element to standard output.
  *
  * @param[in] A				- the quadratic extension field element to print.
  */
-#define fp2_print(A)														\
-		fp_print(A[0]); fp_print(A[1]);										\
+void fp2_print(fp2_t a);
 
 /**
  * Returns the result of a comparison between two quadratic extension field
@@ -188,9 +182,7 @@ typedef ep2_st *ep2_t;
  * @param[in] B				- the second quadratic extension field element.
  * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
-#define fp2_cmp(A, B)														\
-		((fp_cmp(A[0], B[0]) == CMP_EQ) && (fp_cmp(A[1], B[1]) == CMP_EQ)	\
-		? CMP_EQ : CMP_NE)													\
+int fp2_cmp(fp2_t a, fp2_t b);
 
 /**
  * Adds two quadratic extension field elements. Computes C = A + B.
@@ -199,8 +191,7 @@ typedef ep2_st *ep2_t;
  * @param[in] a				- the first quadratic extension field element.
  * @param[in] b				- the second quadratic extension field element.
  */
-#define fp2_add(C, A, B)													\
-		fp_add(C[0], A[0], B[0]); fp_add(C[1], A[1], B[1]);					\
+void fp2_add(fp2_t c, fp2_t a, fp2_t b);
 
 /**
  * Subtracts a quadratic extension field element from another. Computes
@@ -210,8 +201,7 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the quadratic extension field element.
  * @param[in] B				- the quadratic extension field element.
  */
-#define fp2_sub(C, A, B)													\
-		fp_sub(C[0], A[0], B[0]); fp_sub(C[1], A[1], B[1]);					\
+void fp2_sub(fp2_t c, fp2_t a, fp2_t b);
 
 /**
  * Initializes a sextic extension field with a null value.
@@ -243,8 +233,7 @@ typedef ep2_st *ep2_t;
  * @param[out] C			- the result.
  * @param[in] A				- the sextic extension field element to copy.
  */
-#define fp6_copy(C, A)														\
-		fp2_copy(C[0], A[0]); fp2_copy(C[1], A[1]); fp2_copy(C[2], A[2]);	\
+void fp6_copy(fp6_t c, fp6_t a);
 
 /**
  * Negates a sextic extension field element.
@@ -252,16 +241,14 @@ typedef ep2_st *ep2_t;
  * @param[out] C			- the result.
  * @param[out] A			- the sextic extension field element to negate.
  */
-#define fp6_neg(C, A)														\
-		fp2_neg(C[0], A[0]); fp2_neg(C[1], A[1]); fp2_neg(C[2], A[2]); 		\
+void fp6_neg(fp6_t c, fp6_t a);
 
 /**
  * Assigns zero to a sextic extension field element.
  *
  * @param[out] A			- the sextic extension field element to zero.
  */
-#define fp6_zero(A)															\
-		fp2_zero(A[0]); fp2_zero(A[1]); fp2_zero(A[2]); 					\
+void fp6_zero(fp6_t a);
 
 /**
  * Tests if a sextic extension field element is zero or not.
@@ -269,24 +256,21 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the sextic extension field element to compare.
  * @return 1 if the argument is zero, 0 otherwise.
  */
-#define fp6_is_zero(A)														\
-		(fp2_is_zero(A[0]) && fp2_is_zero(A[1]) && fp2_is_zero(A[2]))		\
+int fp6_is_zero(fp6_t a);
 
 /**
  * Assigns a random value to a sextic extension field element.
  *
  * @param[out] A			- the sextic extension field element to assign.
  */
-#define fp6_rand(A)															\
-		fp2_rand(A[0]); fp2_rand(A[1]); fp2_rand(A[2]);						\
+void fp6_rand(fp6_t a);
 
 /**
  * Prints a sextic extension field element to standard output.
  *
  * @param[in] A				- the sextic extension field element to print.
  */
-#define fp6_print(A)														\
-		fp2_print(A[0]); fp2_print(A[1]); fp2_print(A[2]);					\
+void fp6_print(fp6_t a);
 
 /**
  * Returns the result of a comparison between two sextic extension field
@@ -296,9 +280,7 @@ typedef ep2_st *ep2_t;
  * @param[in] B				- the second sextic extension field element.
  * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
-#define fp6_cmp(A, B)														\
-		((fp2_cmp(A[0], B[0]) == CMP_EQ) && (fp2_cmp(A[1], B[1]) == CMP_EQ)	\
-		&& (fp2_cmp(A[2], B[2]) == CMP_EQ) ? CMP_EQ : CMP_NE)				\
+int fp6_cmp(fp6_t a, fp6_t b);
 
 /**
  * Adds two sextic extension field elements. Computes C = A + B.
@@ -307,9 +289,7 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the first sextic extension field element.
  * @param[in] B				- the second sextic extension field element.
  */
-#define fp6_add(C, A, B)													\
-		fp2_add(C[0], A[0], B[0]); fp2_add(C[1], A[1], B[1]);				\
-		fp2_add(C[2], A[2], B[2]);											\
+void fp6_add(fp6_t c, fp6_t a, fp6_t b);
 
 /**
  * Subtracts a sextic extension field element from another. Computes
@@ -319,10 +299,7 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the sextic extension field element.
  * @param[in] B				- the sextic extension field element.
  */
-#define fp6_sub(C, A, B)													\
-		fp2_sub(C[0], A[0], B[0]); fp2_sub(C[1], A[1], B[1]);				\
-		fp2_sub(C[2], A[2], B[2]);											\
-
+void fp6_sub(fp6_t c, fp6_t a, fp6_t b);
 
 /**
  * Initializes a dodecic extension field with a null value.
@@ -354,8 +331,7 @@ typedef ep2_st *ep2_t;
  * @param[out] C			- the result.
  * @param[in] A				- the dodecic extension field element to copy.
  */
-#define fp12_copy(C, A)														\
-		fp6_copy(C[0], A[0]); fp6_copy(C[1], A[1]); 						\
+void fp12_copy(fp12_t c, fp12_t a);
 
 /**
  * Negates a dodecic extension field element.
@@ -363,16 +339,14 @@ typedef ep2_st *ep2_t;
  * @param[out] C			- the result.
  * @param[out] A			- the dodecic extension field element to negate.
  */
-#define fp12_neg(C, A)														\
-		fp6_neg(C[0], A[0]); fp6_neg(C[1], A[1]); 							\
+void fp12_neg(fp12_t c, fp12_t a);
 
 /**
  * Assigns zero to a dodecic extension field element.
  *
  * @param[out] A			- the dodecic extension field element to zero.
  */
-#define fp12_zero(A)														\
-		fp6_zero(A[0]); fp6_zero(A[1]); 									\
+void fp12_zero(fp12_t a);
 
 /**
  * Tests if a dodecic extension field element is zero or not.
@@ -380,24 +354,21 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the dodecic extension field element to compare.
  * @return 1 if the argument is zero, 0 otherwise.
  */
-#define fp12_is_zero(A)														\
-		(fp6_is_zero(A[0]) && fp6_is_zero(A[1])) 							\
+int fp12_is_zero(fp12_t a);
 
 /**
  * Assigns a random value to a dodecic extension field element.
  *
  * @param[out] A			- the dodecic extension field element to assign.
  */
-#define fp12_rand(A)														\
-		fp6_rand(A[0]); fp6_rand(A[1]);										\
+void fp12_rand(fp12_t a);
 
 /**
  * Prints a dodecic extension field element to standard output.
  *
  * @param[in] A				- the dodecic extension field element to print.
  */
-#define fp12_print(A)														\
-		fp6_print(A[0]); fp6_print(A[1]);									\
+void fp12_print(fp12_t a);
 
 /**
  * Returns the result of a comparison between two dodecic extension field
@@ -407,9 +378,7 @@ typedef ep2_st *ep2_t;
  * @param[in] b				- the second dodecic extension field element.
  * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
-#define fp12_cmp(A, B)														\
-		((fp6_cmp(A[0], B[0]) == CMP_EQ) && (fp6_cmp(A[1], B[1]) == CMP_EQ)	\
-		? CMP_EQ : CMP_NE)													\
+int fp12_cmp(fp12_t a, fp12_t b);
 
 /**
  * Adds two dodecic extension field elements. Computes C = A + B.
@@ -418,8 +387,7 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the first dodecic extension field element.
  * @param[in] B				- the second dodecic extension field element.
  */
-#define fp12_add(C, A, B)													\
-		fp6_add(C[0], A[0], B[0]); fp6_add(C[1], A[1], B[1]);				\
+void fp12_add(fp12_t c, fp12_t a, fp12_t b);
 
 /**
  * Subtracts a dodecic extension field element from another. Computes
@@ -429,8 +397,7 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the first dodecic extension field element.
  * @param[in] B				- the second dodecic extension field element.
  */
-#define fp12_sub(C, A, B)													\
-		fp6_sub(C[0], A[0], B[0]); fp6_sub(C[1], A[1], B[1]);				\
+void fp12_sub(fp12_t c, fp12_t a, fp12_t b);
 
 /**
  * Initializes a point on a elliptic curve with a null value.

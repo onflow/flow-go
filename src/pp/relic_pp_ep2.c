@@ -353,7 +353,7 @@ static void ep2_dbl_projc_impl(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 			fp2_copy(s, t0);
 		}
 		if (e != NULL) {
-			fp2_copy(e, t3)
+			fp2_copy(e, t3);
 		}
 		fp2_sqr(t3, t3);
 		fp2_add(t3, t3, t3);
