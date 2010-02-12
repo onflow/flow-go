@@ -49,7 +49,9 @@ static const char conv_table[] =
 /**
  * Buffer to hold printed messages.
  */
+#if ARCH == AVR
 static char buffer[64 + 1];
+#endif
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -120,9 +122,11 @@ void util_printf(char *format, ...) {
 #else
 	va_list list;
 	va_start(list, format);
-	vsnprintf(buffer, 64, format, list);
-	printf("%s", buffer);
+	vprintf(format, list);
 	va_end(list);
+#if ARCH != MSP
+	fflush(stdout);
+#endif
 #endif
 #endif
 }
