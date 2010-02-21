@@ -93,10 +93,33 @@ void eb_neg_projc(eb_t r, eb_t p) {
 	}
 
 	if (p->norm) {
-		eb_neg_basic(r, p);
+		if (r != p) {
+			fb_copy(r->x, p->x);
+			fb_copy(r->z, p->z);
+		}
+#if defined(EB_SUPER)
+		if (eb_curve_is_super()) {
+			switch (eb_curve_opt_c()) {
+				case OPT_ZERO:
+					fb_copy(r->y, p->y);
+					break;
+				case OPT_ONE:
+					fb_add_dig(r->y, p->y, (dig_t)1);
+					break;
+				case OPT_DIGIT:
+					fb_add_dig(r->y, p->y, eb_curve_get_c()[0]);
+					break;
+				default:
+					fb_add(r->y, p->y, eb_curve_get_c());
+					break;
+			}
+
+			r->norm = 1;
+			return;
+		}
+#endif
 		return;
 	}
-
 #if defined(EB_SUPER)
 	if (eb_curve_is_super()) {
 		fb_add(r->y, p->y, p->z);
