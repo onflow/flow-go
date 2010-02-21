@@ -315,7 +315,7 @@ static void ep2_add_projc_impl(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 }
 
 /**
- * Doubles a point rep2resented in affine coordinates on an ordinary prime
+ * Doubles a point represented in affine coordinates on an ordinary prime
  * elliptic curve.
  *
  * @param r					- the result.
@@ -373,10 +373,6 @@ static void ep2_dbl_projc_impl(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 		fp2_free(t3);
 	}
 }
-
-#endif /* EP_ADD == BASIC */
-
-#if EP_ADD == PROJC || defined(EP_MIXED)
 
 /**
  * Normalizes a point represented in projective coordinates.
