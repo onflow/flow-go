@@ -51,6 +51,8 @@ void conf_print(void) {
 	util_print("** Allocation mode: DYNAMIC\n\n");
 #elif ALLOC == STACK
 	util_print("** Allocation mode: STACK\n\n");
+#elif ALLOC == AUTO
+	util_print("** Allocation mode: AUTO\n\n");
 #endif
 
 #if ARITH == EASY
