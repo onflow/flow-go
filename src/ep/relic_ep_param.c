@@ -328,7 +328,9 @@ int ep_param_set_any_pairf() {
 	int r = STS_OK;
 #if FP_PRIME == 256
 	ep_param_set(BNN_256);
+#ifdef WITH_PP
 	ep2_curve_set(1);
+#endif
 #else
 	r = STS_ERR;
 #endif
