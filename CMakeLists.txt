@@ -135,46 +135,30 @@ include(cmake/md.cmake)
 include(cmake/cp.cmake) 
 
 # Number of tests and benchmarks
-if (NOT DEFINED BENCH)
-	set(BENCH 100)
-endif(NOT DEFINED BENCH)
-set(BENCH "${BENCH}" CACHE STRING "Number of times each benchmark is ran.")
+set(BENCH 100 CACHE INTEGER "Number of times each benchmark is ran.")
+set(TESTS 100 CACHE INTEGER "Number of times each test is ran.")
 
-if (NOT DEFINED TESTS)
-	set(TESTS 100)
-endif(NOT DEFINED TESTS)
-set(TESTS "${TESTS}" CACHE STRING "Number of times each test is ran.")
+# Number of cores.
+set(CORES 1 CACHE INTEGER "Number of available processor cores.")
 
-if (NOT DEFINED CORES)
-	set(CORES 1)
-endif(NOT DEFINED CORES)
-set(CORES "${CORES}" CACHE STRING "Number of available processor cores.")
-
-# Default Architecture.
-if (NOT ARCH)
-	set(ARCH	"X86_64")
-endif(NOT ARCH)
-set(ARCH ${ARCH} CACHE STRING "Architecture")
-
-# Default word size.
-if (NOT WORD)
-	set(WORD 64)
-endif(NOT WORD)
-set(WORD ${WORD} CACHE INTEGER "Processor word size")
-
-if (NOT ALIGN)
-	set(ALIGN 1)
-endif(NOT ALIGN)	
-set(ALIGN ${ALIGN} CACHE INTEGER "Boundary to align digit vectors")
+# Architecture and memory layout.
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+	set(ARCH "X86_64" CACHE STRING "Architecture")
+	set(WORD 64 CACHE INTEGER "Processor word size")
+else(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+	if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86")
+		set(ARCH "X86" CACHE STRING "Architecture")
+		set(WORD 32 CACHE INTEGER "Processor word size")
+	endif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86")
+endif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+set(ARCH "X86_64" CACHE STRING "Architecture")
+set(WORD 64 CACHE INTEGER "Processor word size")
+set(ALIGN 1 CACHE INTEGER "Boundary to align digit vectors")
 
 # Default modules.
-if (NOT WITH)
-	set(WITH "ALL")
-endif(NOT WITH)
-set(WITH "${WITH}" CACHE STRING "Selected modules")
-
+set(WITH "ALL" CACHE STRING "Selected modules")
 LIST(FIND WITH "ALL" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_BN 1)
 	set(WITH_DV 1)
 	set(WITH_FP 1)
@@ -191,137 +175,119 @@ endif(TEMP GREATER -1)
 
 # See if multiple precision integer arithmetic is required.
 LIST(FIND WITH "BN" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_BN 1)
 endif(TEMP GREATER -1)
 
 # See if temporary vectors are required.
 LIST(FIND WITH "DV" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_DV 1)
 endif(TEMP GREATER -1)
 
 # See if prime field arithmetic is required.
 LIST(FIND WITH "FP" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_FP 1)
 endif(TEMP GREATER -1)
 
 # See if binary field arithmetic is required.
 LIST(FIND WITH "FB" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_FB 1)
 endif(TEMP GREATER -1)
 
 # See if prime elliptic curve support is required.
 LIST(FIND WITH "EP" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_EP 1)
 endif(TEMP GREATER -1)
 
 # See if binary elliptic curve support is required.
 LIST(FIND WITH "EB" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_EB 1)
 endif(TEMP GREATER -1)
 
 # See if elliptic curve cryptography support is required.
 LIST(FIND WITH "EC" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_EC 1)
 endif(TEMP GREATER -1)
 
 # See if support for pairings over prime curves is required.
 LIST(FIND WITH "PP" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_PP 1)
 endif(TEMP GREATER -1)
 
 # See if support for pairings over binary curves is required.
 LIST(FIND WITH "PB" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_PB 1)
 endif(TEMP GREATER -1)
 
 # See if elliptic curve cryptography support is required.
 LIST(FIND WITH "PC" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_PC 1)
 endif(TEMP GREATER -1)
 
 # See if support for hash functions is required.
 LIST(FIND WITH "MD" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_MD 1)
 endif(TEMP GREATER -1)
 
 # See if support for crptographic protocols is required.
 LIST(FIND WITH "CP" TEMP)
-if (TEMP GREATER -1)
+if(TEMP GREATER -1)
 	set(WITH_CP 1)
 endif(TEMP GREATER -1)
 
 # Choose the arithmetic backend.
-if (NOT ARITH)
-	set(ARITH "easy")
-endif(NOT ARITH)
-set(ARITH "${ARITH}" CACHE STRING "Arithmetic backend")
+set(ARITH "easy" CACHE STRING "Arithmetic backend")
 
 # Choose the memory-allocation policy.
-if (NOT ALLOC)
-	set(ALLOC "AUTO")
-endif(NOT ALLOC)
-set(ALLOC ${ALLOC} CACHE STRING "Allocation policy")
+set(ALLOC "AUTO" CACHE STRING "Allocation policy")
 
 # Choose the pseudo-random number generator.
-if (NOT RAND)
-	set(RAND "FIPS")
-endif(NOT RAND)
-set(RAND ${RAND} CACHE STRING "Pseudo-random number generator")
+set(RAND "FIPS" CACHE STRING "Pseudo-random number generator")
 
 # Choose the pseudo-random number generator.
-if (NOT SEED)
-	set(SEED "DEV")
-endif(NOT SEED)
-set(SEED ${SEED} CACHE STRING "Random number generator seeder")
+set(SEED "DEV" CACHE STRING "Random number generator seeder")
 
-set(TMP "$ENV{COMP}")
-if (TMP)
-	set(COMP ${TMP} CACHE STRING "User-chosen compiler flags.")
-endif(TMP)
+# Compiler flags.
+set(COMP "$ENV{COMP}" CACHE STRING "User-chosen compiler flags.")
+set(COMP "-O2 -funroll-loops -fomit-frame-pointer" CACHE STRING "User-chosen compiler flags.")
 
-if (NOT COMP)
-	set(COMP "-O2 -funroll-loops -fomit-frame-pointer" CACHE STRING "User-chosen compiler flags.")
-endif(NOT COMP)
-
+# Linker flags.
 string(TOLOWER ${ARITH} LFLAGS)
 set(LFLAGS "-L${CMAKE_CURRENT_SOURCE_DIR}/src/low/${LFLAGS}/")
-set(TMP "$ENV{LINK}")
-set(LINK ${TMP} CACHE STRING "User-chosen linker flags.")
+set(LINK "$ENV{LINK}" CACHE STRING "User-chosen linker flags.")
 set(LFLAGS "${LFLAGS} ${LINK}")
 
-if (NOT OPSYS)
-	# Discover the operating system.
-	if (CMAKE_SYSTEM_NAME STREQUAL Linux)
-		set(OPSYS "LINUX")
-	else(CMAKE_SYSTEM_NAME STREQUAL Linux)
-		if (CMAKE_SYSTEM_NAME STREQUAL FreeBSD)
-			set(OPSYS "FREEBSD")
-		endif (CMAKE_SYSTEM_NAME STREQUAL FreeBSD)
-	endif(CMAKE_SYSTEM_NAME STREQUAL Linux)
-endif(NOT OPSYS)
-if (OPSYS STREQUAL LINUX)
+if(STBIN)
+	set(LFLAGS "${LFLAGS} -static")
+endif(STBIN)
+
+# Discover the operating system.
+if(CMAKE_SYSTEM_NAME STREQUAL Linux)
+	set(OPSYS "LINUX")
+else(CMAKE_SYSTEM_NAME STREQUAL Linux)
+	if(CMAKE_SYSTEM_NAME STREQUAL FreeBSD)
+		set(OPSYS "FREEBSD")
+	endif(CMAKE_SYSTEM_NAME STREQUAL FreeBSD)
+endif(CMAKE_SYSTEM_NAME STREQUAL Linux)
+if(OPSYS STREQUAL LINUX)
 	add_definitions(-D_GNU_SOURCE)
 	set(LFLAGS "${LFLAGS} -lrt")
 endif(OPSYS STREQUAL LINUX)
 set(OPSYS ${OPSYS} CACHE STRING "Operating system")
 
-if (NOT TIMER)
-	set(TIMER "HPROC")
-endif(NOT TIMER)
-set(TIMER ${TIMER} CACHE STRING "Timer")
+set(TIMER "HPROC" CACHE STRING "Timer")
 
-if (DEBUG)
+if(DEBUG)
 	# If the user did not specify compile flags, we turn off all optimizations.
 	set(CFLAGS "-O0 -fno-omit-frame-pointer")
 	set(DFLAGS "-ggdb")
@@ -331,23 +297,23 @@ else(DEBUG)
 	set(DFLAGS "")
 endif(DEBUG)
 
-if (MULTI)
+if(MULTI)
 	set(CFLAGS "${CFLAGS} -fopenmp")
 	set(LFLAGS "${LFLAGS} -lgomp -lm")
 endif(MULTI)
 
-if (PROFL)
+if(PROFL)
 	set(PFLAGS "-pg -fno-omit-frame-pointer")
 else(PROFL)
 	set(PFLAGS "")
 endif(PROFL)
 
-if (TRACE)
+if(TRACE)
 	set(DFLAGS "${DFLAGS} -fPIC -finstrument-functions")
 	set(LFLAGS "${LFLAGS} -ldl")
 endif(TRACE)
 
-if (ARITH STREQUAL "gmp")
+if(ARITH STREQUAL "gmp")
 	include(cmake/gmp.cmake)
 endif(ARITH STREQUAL "gmp")
 
@@ -365,15 +331,15 @@ string(TOLOWER ${ARITH} ARITH)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-if (DOCUM)
+if(DOCUM)
 	include(cmake/doxygen.cmake)
 endif(DOCUM)
 
-if (TESTS GREATER 0)
+if(TESTS GREATER 0)
 	enable_testing()
 	add_subdirectory(test)
 endif(TESTS GREATER 0)
 
-if (BENCH GREATER 0)
+if(BENCH GREATER 0)
 	add_subdirectory(bench)
 endif(BENCH GREATER 0)
