@@ -75,7 +75,7 @@
  * Represents a temporary double precision digit vector.
  */
 #if ALLOC == AUTO
-typedef align dig_t dv_t[DV_DIGS];
+typedef align dig_t dv_t[DV_DIGS + PADDING(DV_BYTES)/sizeof(dig_t)];
 #else
 typedef dig_t *dv_t;
 #endif

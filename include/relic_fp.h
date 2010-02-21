@@ -103,7 +103,7 @@ enum {
  * stored in the first positions of the vector.
  */
 #if ALLOC == AUTO
-typedef align dig_t fp_t[FP_DIGS];
+typedef align dig_t fp_t[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #else
 typedef dig_t *fp_t;
 #endif

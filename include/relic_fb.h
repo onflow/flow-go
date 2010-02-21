@@ -99,7 +99,7 @@ enum {
  * Represents a binary field element.
  */
 #if ALLOC == AUTO
-typedef align dig_t fb_t[FB_DIGS];
+typedef align dig_t fb_t[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
 #else
 typedef dig_t *fb_t;
 #endif
