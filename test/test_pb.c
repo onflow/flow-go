@@ -941,9 +941,9 @@ int main(void) {
 	}
 
 	util_print_banner("Quartic extension:", 0);
-	util_print_banner("Utilities", 1)
+	util_print_banner("Utilities", 1);
 
-			if (memory4() != STS_OK) {
+	if (memory4() != STS_OK) {
 		core_clean();
 		return 1;
 	}
