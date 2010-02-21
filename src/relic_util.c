@@ -119,14 +119,17 @@ void util_printf(char *format, ...) {
 	vsnprintf(pointer, 128, format, list);
 	buffer[0] = (unsigned char)2;
 	va_end(list);
-#else
+#elif ARCH == MSP
 	va_list list;
 	va_start(list, format);
 	vprintf(format, list);
 	va_end(list);
-#if ARCH != MSP
+#else
+	va_list list;
+	va_start(list, format);
+	vprintf(format, list);
 	fflush(stdout);
-#endif
+	va_end(list);
 #endif
 #endif
 }
