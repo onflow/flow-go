@@ -114,6 +114,36 @@ static void eb_norm_super(eb_t r, eb_t p) {
 
 #endif /* EB_ADD == PROJC || EB_MIXED */
 
+/**
+ * Normalizes a point represented in lambda-coordinates.
+ *
+ * @param r			- the result.
+ * @param p			- the point to normalize.
+ */
+static void eb_norm_halve(eb_t r, eb_t p) {
+	if (p->norm == 2) {
+		fb_t t0;
+
+		fb_null(t0);
+
+		TRY {
+			fb_new(t0);
+
+			fb_sqr(t0, p->x);
+			fb_copy(r->x, p->x);
+			fb_mul(r->y, p->x, p->y);
+			fb_add(r->y, r->y, t0);
+		} CATCH_ANY {
+			THROW(ERR_CAUGHT);
+		}
+		FINALLY {
+			fb_free(t0);
+		}
+	}
+
+	r->norm = 1;
+}
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -124,10 +154,17 @@ void eb_norm(eb_t r, eb_t p) {
 		return;
 	}
 
-	if (p->norm) {
+	if (p->norm == 1) {
 		/* If the point is represented in affine coordinates, we just copy it. */
 		eb_copy(r, p);
+		return;
 	}
+
+	if (p->norm == 2) {
+		eb_norm_halve(r, p);
+		return;
+	}
+
 #if EB_ADD == PROJC || !defined(STRIP)
 
 #if defined(EB_SUPER)

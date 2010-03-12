@@ -527,6 +527,98 @@ void eb_mul_wtnaf(eb_t r, eb_t p, bn_t k) {
 
 #endif
 
+#if EB_MUL == HALVE || !defined(STRIP)
+
+void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
+	int len, i, j;
+	signed char naf[FB_BITS + 1], *tmp;
+	eb_t q, table[1 << (EB_WIDTH - 2)];
+	bn_t n, _k;
+
+	bn_null(_k);
+	bn_null(n);
+	eb_null(q);
+	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+		eb_null(table[i]);
+	}
+
+	TRY {
+		bn_new(n);
+		bn_new(_k);
+		fb_new(u);
+		fb_new(v);
+		fb_new(l);
+		fb_new(t);
+		eb_new(q);
+
+		/* Prepare the precomputation table. */
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_new(table[i]);
+			eb_set_infty(table[i]);
+		}
+
+		/* Convert k to alternate representation k' = (2^{t-1}k mod n). */
+		eb_curve_get_ord(n);
+		bn_lsh(_k, k, bn_bits(n) - 1);
+		bn_mod(_k, _k, n);
+
+		/* Compute the w-TNAF representation of k'. */
+		bn_rec_naf(naf, &len, _k, EB_WIDTH);
+
+		for (i = len; i <= bn_bits(n); i++) {
+			naf[i] = 0;
+		}
+		if (naf[bn_bits(n)] == 1) {
+			eb_dbl(table[0], p);
+		}
+		len = bn_bits(n);
+		tmp = naf + len - 1;
+
+		eb_copy(q, p);
+		for (i = len - 1; i >= 0; i--, tmp--) {
+			j = *tmp;
+			if (j > 0) {
+				eb_norm(q, q);
+				eb_add(table[j / 2], table[j / 2], q);
+			}
+			if (j < 0) {
+				eb_norm(q, q);
+				eb_sub(table[-j / 2], table[-j / 2], q);
+			}
+			eb_hlv(q, q);
+		}
+		/* Compute Q_i = Q_i + Q_{i+2} for i from 2^{w-1}-3 to 1. */
+		for (i = (1 << (EB_WIDTH - 1)) - 3; i >= 1; i -= 2) {
+			eb_add(table[i / 2], table[i / 2], table[(i + 2) / 2]);
+		}
+		/* Compute R = Q_1 + 2 * sum_{i != 1}Q_i. */
+		eb_copy(r, table[1]);
+		for (i = 2; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_add(r, r, table[i]);
+		}
+		eb_dbl(r, r);
+		eb_add(r, r, table[0]);
+		eb_norm(r, r);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		/* Free the precomputation table. */
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_free(table[i]);
+		}
+		bn_free(n);
+		bn_free(_k);
+		fb_free(u);
+		fb_free(v);
+		fb_free(l);
+		fb_free(t);
+	}
+}
+
+#endif
+
 void eb_mul_gen(eb_t r, bn_t k) {
 #ifdef EB_PRECO
 	eb_mul_fix(r, eb_curve_get_tab(), k);

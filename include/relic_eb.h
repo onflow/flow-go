@@ -324,6 +324,8 @@ typedef eb_st *eb_t;
 #define eb_mul(R, P, K)		eb_mul_slide(R, P, K)
 #elif EB_MUL == WTNAF
 #define eb_mul(R, P, K)		eb_mul_wtnaf(R, P, K)
+#elif EB_MUL == HALVE
+#define eb_mul(R, P, K)		eb_mul_halve(R, P, K)
 #endif
 
 /**
@@ -723,6 +725,14 @@ void eb_dbl_basic(eb_t r, eb_t p);
 void eb_dbl_projc(eb_t r, eb_t p);
 
 /**
+ * Halves a point represented in affine coordinates.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to halve.
+ */
+void eb_hlv(eb_t r, eb_t p);
+
+/**
  * Computes the Frobenius map of a binary elliptic curve point represented
  * by affine coordinates.
  *
@@ -760,17 +770,6 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k);
 void eb_mul_const(eb_t r, eb_t p, bn_t k);
 
 /**
- * Multiplies a binary elliptic point by an integer using the sliding window
- * method. If the binary curve is a Koblitz curve, the method by Lutz and
- * Hasan is used.
- *
- * @param[out] r			- the result.
- * @param[in] p				- the point to multiply.
- * @param[in] k				- the integer.
- */
-void eb_mul_slide(eb_t r, eb_t p, bn_t k);
-
-/**
  * Multiplies a binary elliptic point by an integer using the w-NAF method.
  * If the binary curve is a Koblitz curve, w-TNAF is used.
  *
@@ -779,6 +778,15 @@ void eb_mul_slide(eb_t r, eb_t p, bn_t k);
  * @param[in] k				- the integer.
  */
 void eb_mul_wtnaf(eb_t r, eb_t p, bn_t k);
+
+/**
+ * Multiplies a binary elliptic point by an integer using the halving method.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ * @param[in] k				- the integer.
+ */
+void eb_mul_halve(eb_t r, eb_t p, bn_t k);
 
 /**
  * Multiplies the generator of a binary elliptic curve by an integer.

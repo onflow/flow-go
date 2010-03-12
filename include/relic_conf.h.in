@@ -397,6 +397,8 @@
 #define SLIDE    3
 /** 4-width (T)NAF. */ 
 #define WTNAF	 4
+/** Halving. */
+#define HALVE    5
 /** Chosen binary elliptic curve point multiplication method. */
 #define EB_MUL	 @EB_MUL@
 

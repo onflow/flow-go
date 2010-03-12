@@ -250,6 +250,14 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
+	BENCH_BEGIN("eb_hlv") {
+		eb_rand(p);
+		eb_rand(q);
+		eb_add(p, p, q);
+		BENCH_ADD(eb_hlv(r, p));
+	}
+	BENCH_END;
+
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
 		BENCH_BEGIN("eb_frb") {
@@ -344,6 +352,16 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		eb_rand(p);
 		BENCH_ADD(eb_mul_wtnaf(q, p, k));
+	}
+	BENCH_END;
+#endif
+
+#if EB_MUL == HALVE || !defined(STRIP)
+	BENCH_BEGIN("eb_mul_halve") {
+		bn_rand(k, BN_POS, bn_bits(n));
+		bn_mod(k, k, n);
+		eb_rand(p);
+		BENCH_ADD(eb_mul_halve(q, p, k));
 	}
 	BENCH_END;
 #endif

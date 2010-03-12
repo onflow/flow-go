@@ -114,10 +114,13 @@ void eb_neg_projc(eb_t r, eb_t p) {
 					break;
 			}
 
+
 			r->norm = 1;
 			return;
 		}
 #endif
+		fb_add(r->y, p->x, p->y);
+		r->norm = 1;
 		return;
 	}
 #if defined(EB_SUPER)

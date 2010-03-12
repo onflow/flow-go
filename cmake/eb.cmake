@@ -16,7 +16,8 @@ message("      EB_METHD=PROJC    Projective coordinates (López-Dahab for ordinar
 
 message("      EB_METHD=BASIC    Binary method.")
 message("      EB_METHD=CONST    Constant-time López-Dahab point multiplication.")
-message("      EB_METHD=WTNAF    Window (T)NAF method.\n")
+message("      EB_METHD=WTNAF    Window (T)NAF method.")
+message("      EB_METHD=HALVE    Halving method.\n")
 
 message("      EB_METHD=BASIC    Binary method for fixed point multiplication.")
 message("      EB_METHD=YAOWI    Yao's windowing method for fixed point multiplication")

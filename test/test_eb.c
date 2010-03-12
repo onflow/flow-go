@@ -431,6 +431,46 @@ static int doubling(void) {
 	return code;
 }
 
+static int halving(void) {
+	int code = STS_ERR;
+	eb_t a, b, c;
+
+	eb_null(a);
+	eb_null(b);
+	eb_null(c);
+
+	TRY {
+		eb_new(a);
+		eb_new(b);
+		eb_new(c);
+
+		TEST_BEGIN("point halving is correct") {
+			eb_rand(a);
+			eb_hlv(b, a);
+			eb_norm(b, b);
+			eb_dbl(c, b);
+			eb_norm(c, c);
+			TEST_ASSERT(eb_cmp(a, c) == CMP_EQ, end);
+			eb_hlv(b, a);
+			eb_hlv(b, b);
+			eb_norm(b, b);
+			eb_dbl(c, b);
+			eb_dbl(c, c);
+			eb_norm(c, c);
+			TEST_ASSERT(eb_cmp(a, c) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	eb_free(a);
+	eb_free(b);
+	eb_free(c);
+	return code;
+}
+
 static int frobenius(void) {
 	int code = STS_ERR;
 	eb_t a, b, c;
@@ -563,6 +603,17 @@ static int multiplication(void) {
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
 			eb_mul_wtnaf(r, p, k);
+			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
+#if EB_MUL == HALVE || !defined(STRIP)
+		TEST_BEGIN("point multiplication by halving is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			eb_mul(q, p, k);
+			eb_mul_halve(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		}
 		TEST_END;
@@ -881,6 +932,10 @@ static int test(void) {
 	}
 
 	if (doubling() != STS_OK) {
+		return STS_ERR;
+	}
+
+	if (halving() != STS_OK) {
 		return STS_ERR;
 	}
 
