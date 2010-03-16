@@ -252,8 +252,6 @@ static void arith(void) {
 
 	BENCH_BEGIN("eb_hlv") {
 		eb_rand(p);
-		eb_rand(q);
-		eb_add(p, p, q);
 		BENCH_ADD(eb_hlv(r, p));
 	}
 	BENCH_END;
