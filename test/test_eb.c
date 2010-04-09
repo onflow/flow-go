@@ -444,21 +444,24 @@ static int halving(void) {
 		eb_new(b);
 		eb_new(c);
 
-		TEST_BEGIN("point halving is correct") {
-			eb_rand(a);
-			eb_hlv(b, a);
-			eb_norm(b, b);
-			eb_dbl(c, b);
-			eb_norm(c, c);
-			TEST_ASSERT(eb_cmp(a, c) == CMP_EQ, end);
-			eb_hlv(b, a);
-			eb_hlv(b, b);
-			eb_norm(b, b);
-			eb_dbl(c, b);
-			eb_dbl(c, c);
-			eb_norm(c, c);
-			TEST_ASSERT(eb_cmp(a, c) == CMP_EQ, end);
-		} TEST_END;
+		if (!eb_curve_is_kbltz()) {
+			TEST_BEGIN("point halving is correct") {
+				eb_rand(a);
+				eb_hlv(b, a);
+				eb_norm(b, b);
+				eb_dbl(c, b);
+				eb_norm(c, c);
+				TEST_ASSERT(eb_cmp(a, c) == CMP_EQ, end);
+				eb_hlv(b, a);
+				eb_hlv(b, b);
+				eb_norm(b, b);
+				eb_dbl(c, b);
+				eb_dbl(c, c);
+				eb_norm(c, c);
+				TEST_ASSERT(eb_cmp(a, c) == CMP_EQ, end);
+			}
+			TEST_END;
+		}
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -510,7 +513,8 @@ static int frobenius(void) {
 				eb_norm(b, b);
 				eb_frb_basic(c, a);
 				TEST_ASSERT(eb_cmp(b, c) == CMP_EQ, end);
-			} TEST_END;
+			}
+			TEST_END;
 #endif
 
 #if EB_ADD == PROJC || !defined(STRIP)
@@ -524,7 +528,8 @@ static int frobenius(void) {
 				eb_frb(c, a);
 				eb_norm(c, c);
 				TEST_ASSERT(eb_cmp(b, c) == CMP_EQ, end);
-			} TEST_END;
+			}
+			TEST_END;
 #endif
 		}
 #endif
@@ -608,17 +613,18 @@ static int multiplication(void) {
 		TEST_END;
 #endif
 
+		if (!eb_curve_is_kbltz()) {
 #if EB_MUL == HALVE || !defined(STRIP)
-		TEST_BEGIN("point multiplication by halving is correct") {
-			bn_rand(k, BN_POS, bn_bits(n));
-			bn_mod(k, k, n);
-			eb_mul(q, p, k);
-			eb_mul_halve(r, p, k);
-			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
-		}
-		TEST_END;
+			TEST_BEGIN("point multiplication by halving is correct") {
+				bn_rand(k, BN_POS, bn_bits(n));
+				bn_mod(k, k, n);
+				eb_mul(q, p, k);
+				eb_mul_halve(r, p, k);
+				TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
+			}
+			TEST_END;
 #endif
-
+		}
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
