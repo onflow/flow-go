@@ -44,6 +44,14 @@ void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
 	int j, k;
 	dig_t b1, b2;
 
+	if (digit == 0) {
+		dv_zero(c, FB_DIGS + 1);
+		return;
+	}
+	if (digit == 1) {
+		fb_copy(c, a);
+		return;
+	}
 	c[FB_DIGS] = fb_lshb_low(c, a, util_bits_dig(digit) - 1);
 	for (int i = util_bits_dig(digit) - 2; i > 0; i--) {
 		if (digit & ((dig_t)1 << i)) {
@@ -118,7 +126,7 @@ void fb_muln_low(dig_t *c, dig_t *a, dig_t *b) {
 		table[14][FB_DIGS] = table[15][FB_DIGS] = r2 ^ r4 ^ r8;
 	}
 
-	for (i = FB_DIGIT - 4; i >= 4; i -= 4) {
+	for (i = FB_DIGIT - 4; i > 0; i -= 4) {
 		tmpa = a;
 		tmpc = c;
 		for (j = 0; j < FB_DIGS; j++, tmpa++, tmpc++) {
@@ -196,7 +204,7 @@ void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size) {
 		table[14][size] = table[15][size] = r2 ^ r4 ^ r8;
 	}
 
-	for (i = FB_DIGIT - 4; i >= 4; i -= 4) {
+	for (i = FB_DIGIT - 4; i > 0; i -= 4) {
 		tmpa = a;
 		tmpc = c;
 		for (j = 0; j < size; j++, tmpa++, tmpc++) {

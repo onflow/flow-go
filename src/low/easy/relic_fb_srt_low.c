@@ -182,10 +182,10 @@ static void fb_srtp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 static void fb_sqrt_low(dig_t *c, dig_t *a) {
 	int i, j, n, h, sh;
 	dig_t d, d_e, d_o;
-	align dig_t t[2 * FB_DIGS], u[FB_DIGS + 1], t_e[FB_DIGS], t_o[FB_DIGS];
+	align dig_t t[2 * FB_DIGS], s[FB_DIGS + 1], t_e[FB_DIGS], t_o[FB_DIGS];
 
 	dv_zero(t, 2 * FB_DIGS);
-	dv_zero(u, FB_DIGS);
+	dv_zero(s, FB_DIGS + 1);
 	dv_zero(t_e + HALF, FB_DIGS - HALF);
 	dv_zero(t_o + HALF, FB_DIGS - HALF);
 
@@ -219,11 +219,11 @@ static void fb_sqrt_low(dig_t *c, dig_t *a) {
 		t_e[n] = d_e;
 		t_o[n] = d_o;
 	}
-	fb_muld_low(t + HALF, t_o, fb_poly_get_srt() + HALF, HALF);
-	fb_muld_low(u, t_o, fb_poly_get_srt(), HALF);
-	fb_addd_low(t, t, u, FB_DIGS + 1);
-	fb_rdcn_low(c, t);
-	fb_addd_low(c, c, t_e, HALF);
+    fb_muld_low(t + HALF, t_o, fb_poly_get_srz() + HALF, HALF);
+    fb_muld_low(s, t_o, fb_poly_get_srz(), HALF);
+    fb_addd_low(t, t, s, FB_DIGS + 1);
+    fb_rdcn_low(c, t);
+    fb_addd_low(c, c, t_e, HALF);
 }
 
 /*============================================================================*/
