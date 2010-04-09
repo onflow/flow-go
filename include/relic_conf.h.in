@@ -230,6 +230,8 @@
 #define FB_KARAT @FB_KARAT@
 /** Prefer trinomials over pentanomials. */
 #cmakedefine FB_TRINO
+/** Precompute multiplication table for sqrt(z). */
+#cmakedefine FB_PRECO
 
 /** Binary field arithmetic method */
 #define FB_METHD "@FB_METHD@"
@@ -284,12 +286,14 @@
 /** Chosen method to solve a quadratic equation. */
 #define FB_SLV   @FB_SLV@
 
-/** Binary inversion. */
+/** Inversion by Fermat's Little Theorem. */
 #define BASIC    1
+/** Binary inversion. */
+#define BINAR    2
 /** Extended Euclidean algorithm. */
-#define EXGCD    2
+#define EXGCD    3
 /** Almost inverse algorithm. */
-#define ALMOS    3
+#define ALMOS    4
 /** Chosen binary field inversion method. */
 #define FB_INV   @FB_INV@ 
 

@@ -44,6 +44,52 @@
 #if FB_INV == BASIC || !defined(STRIP)
 
 void fb_inv_basic(fb_t c, fb_t a) {
+	fb_t t, u, v;
+	int i, x;
+
+	fb_null(t);
+	fb_null(u);
+	fb_null(v);
+
+	TRY {
+		fb_new(t);
+		fb_new(u);
+		fb_new(v);
+
+		/* u = a^2, v = 1, x = (m - 1)/2. */
+		fb_sqr(u, a);
+		fb_set_dig(v, 1);
+		x = (FB_BITS - 1) >> 1;
+
+		while (x != 0) {
+			/* u = u * a^{2x}. */
+			fb_copy(t, u);
+			fb_exp_2b(t, t, x);
+			fb_mul(u, u, t);
+			if ((x & 0x01) == 0) {
+				x = x >> 1;
+			} else {
+				/* v = v * u, u = u^2, x = (x - 1)/2. */
+				fb_mul(v, v, u);
+				fb_sqr(u, u);
+				x = (x - 1) >> 1;
+			}
+		}
+		fb_copy(c, v);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb_free(t);
+		fb_free(u);
+		fb_free(v);
+	}
+}
+
+#endif
+
+#if FB_INV == BINAR || !defined(STRIP)
+
+void fb_inv_binar(fb_t c, fb_t a) {
 	int lu, lv;
 	fb_t u, v, g1, g2;
 
@@ -58,18 +104,22 @@ void fb_inv_basic(fb_t c, fb_t a) {
 		fb_new(g1);
 		fb_new(g2);
 
+		/* u = a, v = f, g1 = 1, g2 = 0. */
 		fb_copy(u, a);
 		fb_copy(v, fb_poly_get());
-		fb_zero(g1);
-		g1[0] = 1;
+		fb_set_dig(g1, 1);
 		fb_zero(g2);
 
 		lu = FB_DIGS;
 		lv = FB_DIGS;
 
+		/* While (u != 1 && v != 1. */
 		while (1) {
+			/* While z divides u do. */
 			while ((u[0] & 0x01) == 0) {
+				/* u = u/z. */
 				bn_rsh1_low(u, u, lu);
+				/* If z divides g1 then g1 = g1/z; else g1 = (g1 + f)/z. */
 				if ((g1[0] & 0x01) == 1) {
 					fb_poly_add(g1, g1);
 				}
@@ -81,8 +131,11 @@ void fb_inv_basic(fb_t c, fb_t a) {
 			if (lu == 1 && u[0] == 1)
 				break;
 
+			/* While z divides v do. */
 			while ((v[0] & 0x01) == 0) {
+				/* v = v/z. */
 				bn_rsh1_low(v, v, lv);
+				/* If z divides g2 then g2 = g2/z; else (g2 = g2 + f)/z. */
 				if ((g2[0] & 0x01) == 1) {
 					fb_poly_add(g2, g2);
 				}
@@ -94,21 +147,23 @@ void fb_inv_basic(fb_t c, fb_t a) {
 			if (lv == 1 && v[0] == 1)
 				break;
 
+			/* If deg(u) > deg(v) then u = u + v, g1 = g1 + g2. */
 			if (lu > lv || (lu == lv && u[lu - 1] > v[lv - 1])) {
 				fb_addd_low(u, u, v, lv);
 				fb_add(g1, g1, g2);
 			} else {
+				/* Else v = v + u, g2 = g2 + g1. */
 				fb_addd_low(v, v, u, lu);
 				fb_add(g2, g2, g1);
 			}
 		}
 
+		/* If u == 1 then return g1; else return g2. */
 		if (lu == 1 && u[0] == 1) {
 			fb_copy(c, g1);
 		} else {
 			fb_copy(c, g2);
 		}
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -148,6 +203,7 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 		g1 = _g1;
 		g2 = _g2;
 
+		/* u = a, v = f, g1 = 1, g2 = 0. */
 		fb_copy(u, a);
 		fb_copy(v, fb_poly_get());
 		g1[0] = 1;
@@ -159,7 +215,9 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 		bv = FB_BITS + 1;
 		j = bu - bv;
 
+		/* While (u != 1). */
 		while (1) {
+			/* If j < 0 then swap(u, v), swap(g1, g2), j = -j. */
 			if (j < 0) {
 				t = u;
 				u = v;
@@ -182,18 +240,18 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 
 			SPLIT(j, d, j, FB_DIG_LOG);
 
+			/* u = u + v * z^j. */
 			if (j > 0) {
 				carry = fb_lshadd_low(u + d, v, j, lv);
-				if (carry) {
-					u[d + lv] ^= carry;
-				}
+				u[d + lv] ^= carry;
 			} else {
 				fb_addd_low(u + d, u + d, v, lv);
 			}
 
+			/* g1 = g1 + g2 * z^j. */
 			if (j > 0) {
 				carry = fb_lshadd_low(g1 + d, g2, j, l2);
-				l1 = (l2 + d > l1 ? l2 + d : l1);
+				l1 = (l2 + d >= l1 ? l2 + d : l1);
 				if (carry) {
 					g1[d + l2] ^= carry;
 					l1 = (l2 + d >= l1 ? l1 + 1 : l1);
@@ -208,12 +266,14 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 			while (v[lv - 1] == 0)
 				lv--;
 
-			if (lu == 1 && u[lu - 1] == 1)
+			if (lu == 1 && u[0] == 1)
 				break;
 
-			lt = util_bits_dig(u[lu - 1]);
-			j = ((lu - lv) << FB_DIG_LOG) + lt - util_bits_dig(v[lv - 1]);
+			/* j = deg(u) - deg(v). */
+			lt = util_bits_dig(u[lu - 1]) - util_bits_dig(v[lv - 1]);
+			j = ((lu - lv) << FB_DIG_LOG) + lt;
 		}
+		/* Return g1. */
 		fb_copy(c, g1);
 
 	}
@@ -253,28 +313,33 @@ void fb_inv_almos(fb_t c, fb_t a) {
 		u = _u;
 		v = _v;
 
-		fb_zero(b);
+		/* b = 1, d = 0, u = a, v = f. */
+		fb_set_dig(b, 1);
 		fb_zero(d);
-		b[0] = 1;
 		fb_copy(u, a);
 		fb_copy(v, fb_poly_get());
 
 		lu = FB_DIGS;
 		lv = FB_DIGS;
 		while (1) {
+			/* While z divides u do. */
 			while ((u[0] & 0x01) == 0) {
+				/* u = u/z. */
 				bn_rsh1_low(u, u, lu);
+				/* If z divide v then b = b/z; else b = (b + f)/z. */
 				if ((b[0] & 0x01) == 1) {
 					fb_poly_add(b, b);
 				}
 				/* b often has FB_DIGS digits. */
 				fb_rsh1_low(b, b);
 			}
+			/* If u = 1, return b. */
 			while (u[lu - 1] == 0)
 				lu--;
 			if (lu == 1 && u[0] == 1) {
 				break;
 			}
+			/* If deg(u) < deg(v) then swap(u, v), swap(b, d). */
 			if ((lu < lv) || ((lu == lv) && (u[lu - 1] < v[lv - 1]))) {
 				t = u;
 				u = v;
@@ -289,10 +354,10 @@ void fb_inv_almos(fb_t c, fb_t a) {
 				b = d;
 				d = t;
 			}
+			/* u = u + v, b = b + d. */
 			fb_addd_low(u, u, v, lu);
 			fb_addn_low(b, b, d);
 		}
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
