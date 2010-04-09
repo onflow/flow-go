@@ -284,4 +284,3 @@ void fb_rdc1_low(dig_t *c, dig_t *a) {
 
 	fb_copy(c, a);
 }
-
