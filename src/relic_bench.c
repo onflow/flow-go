@@ -116,7 +116,7 @@ static long long total;
 /**
  * Benchmarking overhead to be measured and subtracted from benchmarks.
  */
-static long long overhead;
+static long long overhead = 0;
 
 /**
  * Dummy function for measuring benchmarking overhead.

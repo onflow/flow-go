@@ -184,7 +184,6 @@ char util_conv_char(dig_t i);
  */
 int util_bits_dig(dig_t a);
 
-
 /**
  * Formats and prints data following a printf-like syntax.
  *
