@@ -219,11 +219,33 @@ static void fb_sqrt_low(dig_t *c, dig_t *a) {
 		t_e[n] = d_e;
 		t_o[n] = d_o;
 	}
-    fb_muld_low(t + HALF, t_o, fb_poly_get_srz() + HALF, HALF);
-    fb_muld_low(s, t_o, fb_poly_get_srz(), HALF);
-    fb_addd_low(t, t, s, FB_DIGS + 1);
-    fb_rdcn_low(c, t);
-    fb_addd_low(c, c, t_e, HALF);
+	if (fb_poly_get_tab_srz(0) == NULL) {
+		fb_muld_low(t + HALF, t_o, fb_poly_get_srz() + HALF, HALF);
+		fb_muld_low(s, t_o, fb_poly_get_srz(), HALF);
+		fb_addd_low(t, t, s, FB_DIGS + 1);
+		fb_rdcn_low(c, t);
+		fb_addd_low(c, c, t_e, HALF);
+	} else {
+		dig_t u, carry, *tmpa, *tmpc;
+
+		for (i = FB_DIGIT - 8; i > 0; i -= 8) {
+			tmpa = t_o;
+			tmpc = t;
+			for (j = 0; j < HALF; j++, tmpa++, tmpc++) {
+				u = (*tmpa >> i) & 0xFF;
+				fb_addn_low(tmpc, tmpc, fb_poly_get_tab_srz(u));
+			}
+			carry = fb_lshb_low(t, t, 8);
+			fb_lshb_low(t + FB_DIGS, t + FB_DIGS, 8);
+			t[FB_DIGS] ^= carry;
+		}
+		for (j = 0; j < HALF; j++) {
+			u = t_o[j] & 0xFF;
+			fb_addn_low(t + j, t + j, fb_poly_get_tab_srz(u));
+		}
+		fb_rdcn_low(c, t);
+		fb_addd_low(c, c, t_e, HALF);
+	}
 }
 
 /*============================================================================*/
