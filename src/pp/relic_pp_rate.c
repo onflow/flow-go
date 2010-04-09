@@ -229,6 +229,7 @@ void rate_mult(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp12_new(tmp2);
 
 		ep2_copy(r1q, t);
+		ep2_set_infty(q1);
 
 		rate_add(tmp1, r1q, q, p);
 		fp12_mul_dxs(tmp2, res, tmp1);
