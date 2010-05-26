@@ -94,13 +94,13 @@ static void util(void) {
 }
 
 static void arith(void) {
-	eb_t p, q, r, t[EB_TABLE_BASIC];
+	eb_t p, q, r, t[EB_TABLE];
 	bn_t k, l, n;
 
 	eb_null(p);
 	eb_null(q);
 	eb_null(r);
-	for (int i = 0; i < EB_TABLE_BASIC; i++) {
+	for (int i = 0; i < EB_TABLE; i++) {
 		eb_null(t[i]);
 	}
 
@@ -373,7 +373,7 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-	for (int i = 0; i < EB_TABLE_BASIC; i++) {
+	for (int i = 0; i < EB_TABLE; i++) {
 		eb_new(t[i]);
 	}
 
