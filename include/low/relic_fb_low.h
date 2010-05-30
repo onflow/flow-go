@@ -270,6 +270,14 @@ void fb_rdcn_low(dig_t *c, dig_t *a);
  */
 void fb_rdc1_low(dig_t *c, dig_t *a);
 
+/**
+ * Inverts a digit vector modulo the configured irreducible polynomial.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the digit vector to reduce.
+ */
+void fb_invn_low(dig_t *c, dig_t *a);
+
 #endif /* !ASM */
 
 #endif /* !RELIC_FB_LOW_H */
