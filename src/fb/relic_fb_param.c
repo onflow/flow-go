@@ -58,17 +58,50 @@ int fb_param_get(void) {
 
 void fb_param_set(int param) {
 	switch (param) {
+		case TRINO_113:
+			fb_poly_set_trino(9);
+			break;
+		case TRINO_127:
+			fb_poly_set_trino(63);
+			break;
+		case SQRT_163:
+			fb_poly_set_penta(57, 49, 29);
+			break;
 		case NIST_163:
 			fb_poly_set_penta(7, 6, 3);
 			break;
+		case SQRT_233:
+			fb_poly_set_trino(159);
+			break;
 		case NIST_233:
 			fb_poly_set_trino(74);
+			break;
+		case SQRT_239:
+			fb_poly_set_trino(81);
+			break;
+		case SECG_239:
+			fb_poly_set_trino(158);
+			break;
+		case TRINO_257:
+			fb_poly_set_trino(41);
+			break;
+		case SQRT_251:
+			fb_poly_set_penta(89, 81, 3);
+			break;
+		case PENTA_251:
+			fb_poly_set_penta(7, 4, 2);
+			break;
+		case SQRT_283:
+			fb_poly_set_penta(97, 89, 87);
 			break;
 		case NIST_283:
 			fb_poly_set_penta(12, 7, 5);
 			break;
 		case NIST_409:
 			fb_poly_set_trino(87);
+			break;
+		case SQRT_571:
+			fb_poly_set_penta(193, 185, 5);
 			break;
 		case NIST_571:
 			fb_poly_set_penta(10, 5, 2);
@@ -90,16 +123,50 @@ void fb_param_set(int param) {
 }
 
 void fb_param_set_any(void) {
-#if FB_POLYN == 163
+#if FB_POLYN == 113
+	fb_param_set(TRINO_113);
+#elif FB_POLYN == 127
+	fb_param_set(TRINO_127);
+#elif FB_POLYN == 163
+#ifdef FB_SQRTF
+	fb_param_set(SQRT_163);
+#else
 	fb_param_set(NIST_163);
+#endif
 #elif FB_POLYN == 233
+#ifdef FB_SQRTF
+	fb_param_set(SQRT_233);
+#else
 	fb_param_set(NIST_233);
+#endif
+#elif FB_POLYN == 239
+#ifdef FB_SQRTF
+	fb_param_set(SQRT_239);
+#else
+	fb_param_set(SECG_239);
+#endif
+#elif FB_POLYN == 251
+#ifdef FB_SQRTF
+	fb_param_set(SQRT_251);
+#else
+	fb_param_set(PENTA_251);
+#endif
+#elif FB_POLYN == 257
+	fb_param_set(TRINO_257);
 #elif FB_POLYN == 283
+#ifdef FB_SQRTF
+	fb_param_set(SQRT_283);
+#else
 	fb_param_set(NIST_283);
+#endif
 #elif FB_POLYN == 409
 	fb_param_set(NIST_409);
 #elif FB_POLYN == 571
+#ifdef FB_SQRTF
+	fb_param_set(SQRT_571);
+#else
 	fb_param_set(NIST_571);
+#endif
 #elif FB_POLYN == 271
 #ifdef FB_TRINO
 	fb_param_set(TRINO_271);
@@ -118,7 +185,7 @@ void fb_param_print(void) {
 
 	fb_poly_get_rdc(&fa, &fb, &fc);
 
-	if (fb == -1) {
+	if (fb == 0) {
 		util_print_banner("Irreducible trinomial:", 0);
 		util_print("   z^%d + z^%d + 1\n", FB_BITS, fa);
 	} else {
