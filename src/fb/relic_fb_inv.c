@@ -372,3 +372,11 @@ void fb_inv_almos(fb_t c, fb_t a) {
 }
 
 #endif
+
+#if FB_INV == INTEG || !defined(STRIP)
+
+void fb_inv_integ(fb_t c, fb_t a) {
+	fb_invn_low(c, a);
+}
+#endif
+
