@@ -63,6 +63,7 @@ void eb_hlv(eb_t r, eb_t p) {
 		/* Solve l^2 + l = u + a. */
 		switch (eb_curve_opt_a()) {
 			case OPT_ZERO:
+				fb_copy(t, q->x);
 				break;
 			case OPT_ONE:
 				fb_add_dig(t, q->x, (dig_t)1);
