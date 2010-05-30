@@ -44,14 +44,7 @@
 /*============================================================================*/
 
 void fp_dbl(fp_t c, fp_t a) {
-	dig_t carry;
-
-	carry = fp_lsh1_low(c, a);
-
-	/* If there is an additional carry. */
-	if (carry || (fp_cmp(c, fp_prime_get()) != CMP_LT)) {
-		fp_subn_low(c, c, fp_prime_get());
-	}
+	fp_add(c, a, a);
 }
 
 void fp_hlv(fp_t c, fp_t a) {

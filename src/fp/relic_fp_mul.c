@@ -86,7 +86,7 @@ static void fp_mul_karat_impl(dv_t c, fp_t a, fp_t b, int size, int level) {
 				carry = bn_muladd_low(a1b1 + i, a + h, *(b + h + i), h1);
 				*(a1b1 + i + h1) = carry;
 			}
-#elif FP_MUL == COMBA
+#elif FP_MUL == COMBA || FP_MUL == INTEG
 			bn_muln_low(a0b0, a, b, h);
 			bn_muln_low(a1b1, a + h, b + h, h1);
 #endif
@@ -133,7 +133,7 @@ static void fp_mul_karat_impl(dv_t c, fp_t a, fp_t b, int size, int level) {
 				carry = bn_muladd_low(a1b1 + i, a1, *(b1 + i), h1 + 1);
 				*(a1b1 + i + h1 + 1) = carry;
 			}
-#elif FP_MUL == COMBA
+#elif FP_MUL == COMBA || FP_MUL == INTEG
 			bn_muln_low(a1b1, a1, b1, h1 + 1);
 #endif
 		} else {

@@ -83,12 +83,12 @@ static int prime_cnr;
 /**
  * Maximum number of powers of 2 used to describe special form moduli.
  */
-#define MAX_BITS		10
+#define MAX_EXPS		10
 
 /**
  * Non-zero bits of special form prime.
  */
-static int spars[MAX_BITS + 1] = { 0 };
+static int spars[MAX_EXPS + 1] = { 0 };
 
 /**
  * Number of bits of special form prime.
@@ -122,7 +122,7 @@ dig_t *fp_prime_get_rdc(void) {
 }
 
 int *fp_prime_get_spars(int *len) {
-	if (spars_len > 0 && spars_len < MAX_BITS ) {
+	if (spars_len > 0 && spars_len < MAX_EXPS ) {
 		if (len != NULL) {
 			*len = spars_len;
 		}
@@ -210,7 +210,7 @@ void fp_prime_set_spars(int *f, int len) {
 		bn_new(p);
 		bn_new(t);
 
-		if (len >= MAX_BITS) {
+		if (len >= MAX_EXPS) {
 			THROW(ERR_INVALID);
 		}
 
