@@ -43,20 +43,23 @@ void fb_add1_low(dig_t *c, dig_t *a, dig_t digit) {
 	(*c) = (*a) ^ digit;
 	c++;
 	a++;
-	for (i = 0; i < FB_DIGS - 1; i++, a++, c++)
+	for (i = 0; i < FB_DIGS - 1; i++, a++, c++) {
 		(*c) = (*a);
+	}
 }
 
 void fb_addn_low(dig_t *c, dig_t *a, dig_t *b) {
 	int i;
 
-	for (i = 0; i < FB_DIGS; i++, a++, b++, c++)
+	for (i = 0; i < FB_DIGS; i++, a++, b++, c++) {
 		(*c) = (*a) ^ (*b);
+	}
 }
 
 void fb_addd_low(dig_t *c, dig_t *a, dig_t *b, int size) {
 	int i;
 
-	for (i = 0; i < size; i++, a++, b++, c++)
+	for (i = 0; i < size; i++, a++, b++, c++) {
 		(*c) = (*a) ^ (*b);
+	}
 }

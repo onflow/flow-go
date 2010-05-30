@@ -150,22 +150,20 @@ static void fb_rdcp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 				a[sh - sa - 1] ^= (d << la);
 			}
 		}
-		if (fb > 0) {
-			if (rb == 0) {
-				a[sh - sb] ^= d;
-			} else {
-				a[sh - sb] ^= (d >> rb);
-				if (sh > sb) {
-					a[sh - sb - 1] ^= (d << lb);
-				}
+		if (rb == 0) {
+			a[sh - sb] ^= d;
+		} else {
+			a[sh - sb] ^= (d >> rb);
+			if (sh > sb) {
+				a[sh - sb - 1] ^= (d << lb);
 			}
-			if (rc == 0) {
-				a[sh - sc] ^= d;
-			} else {
-				a[sh - sc] ^= (d >> rc);
-				if (sh > sc) {
-					a[sh - sc - 1] ^= (d << lc);
-				}
+		}
+		if (rc == 0) {
+			a[sh - sc] ^= d;
+		} else {
+			a[sh - sc] ^= (d >> rc);
+			if (sh > sc) {
+				a[sh - sc - 1] ^= (d << lc);
 			}
 		}
 		a[sh - 1] ^= d;
@@ -182,7 +180,7 @@ void fb_rdcn_low(dig_t *c, dig_t *a) {
 
 	fb_poly_get_rdc(&fa, &fb, &fc);
 
-	if (fb == -1) {
+	if (fb == 0) {
 		fb_rdct_low(c, a, fa);
 	} else {
 		fb_rdcp_low(c, a, fa, fb, fc);
@@ -206,7 +204,7 @@ void fb_rdc1_low(dig_t *c, dig_t *a) {
 	sa++;
 	la = FB_DIGIT - ra;
 
-	if (fb != -1) {
+	if (fb != 0) {
 		SPLIT(rb, sb, FB_BITS - fb, FB_DIG_LOG);
 		sb++;
 		lb = FB_DIGIT - rb;
@@ -232,7 +230,7 @@ void fb_rdc1_low(dig_t *c, dig_t *a) {
 		a[FB_DIGS - sa] ^= (d << la);
 	}
 
-	if (fb != -1) {
+	if (fb != 0) {
 		if (rb == 0) {
 			a[FB_DIGS - sb + 1] ^= d;
 		} else {
@@ -261,7 +259,7 @@ void fb_rdc1_low(dig_t *c, dig_t *a) {
 				a[sh - sa - 1] ^= (d << la);
 			}
 		}
-		if (fb != -1) {
+		if (fb != 0) {
 			if (rb == 0) {
 				a[sh - sb] ^= d;
 			} else {

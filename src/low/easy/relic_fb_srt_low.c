@@ -257,7 +257,7 @@ void fb_srtn_low(dig_t *c, dig_t *a) {
 
 	fb_poly_get_rdc(&fa, &fb, &fc);
 
-	if (fb == -1) {
+	if (fb == 0) {
 		if (fa % 2 == 0) {
 			fb_sqrt_low(c, a);
 		} else {
