@@ -197,6 +197,10 @@ int bn_is_prime_basic(bn_t a) {
 
 	result = 1;
 
+	if (bn_cmp_dig(a, 1) == CMP_EQ) {
+		return 0;
+	}
+
 	/* Trial division. */
 	for (i = 0; i < BASIC_TESTS; i++) {
 		bn_mod_dig(&t, a, primes[i]);
@@ -219,6 +223,10 @@ int bn_is_prime_rabin(bn_t a) {
 	bn_null(n1);
 	bn_null(y);
 	bn_null(r);
+
+	if (bn_cmp_dig(a, 1) == CMP_EQ) {
+		return 0;
+	}
 
 	TRY {
 		/*
