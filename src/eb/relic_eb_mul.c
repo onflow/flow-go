@@ -367,9 +367,9 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k) {
 
 #if defined(EB_ORDIN) || defined(EB_KBLTZ)
 
-#if EB_MUL == CONST || !defined(STRIP)
+#if EB_MUL == LODAH || !defined(STRIP)
 
-void eb_mul_const(eb_t r, eb_t p, bn_t k) {
+void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
 	int i, t, koblitz;
 	fb_t x1, z1, x2, z2, r1, r2, r3, r4;
 	dig_t *b;
@@ -416,7 +416,7 @@ void eb_mul_const(eb_t r, eb_t p, bn_t k) {
 			fb_mul(r2, x2, z1);
 			fb_add(r3, r1, r2);
 			fb_mul(r4, r1, r2);
-			if (bn_get_bit(k, i) == 1) {
+			if (bn_test_bit(k, i) == 1) {
 				fb_sqr(z1, r3);
 				fb_mul(r1, z1, p->x);
 				fb_add(x1, r1, r4);
@@ -426,15 +426,28 @@ void eb_mul_const(eb_t r, eb_t p, bn_t k) {
 				if (!koblitz) {
 					fb_sqr(x2, r2);
 					fb_sqr(r1, r1);
-					fb_mul(r2, r1, b);
-					fb_add(x2, x2, r2);
+					switch (eb_curve_opt_b()) {
+						case OPT_ZERO:
+							break;
+						case OPT_ONE:
+							fb_add_dig(x2, x2, 1);
+							break;
+						case OPT_DIGIT:
+							fb_mul_dig(r2, r1, b[0]);
+							fb_add(x2, x2, r2);
+							break;
+						default:
+							fb_mul(r2, r1, b);
+							fb_add(x2, x2, r2);
+							break;
+					}
 				} else {
 					fb_add(r1, r1, r2);
 					fb_sqr(x2, r1);
 				}
 			} else {
 				fb_sqr(z2, r3);
-				fb_mul(r1, z2, p->x);
+				fb_mulm_low(r1, z2, p->x);
 				fb_add(x2, r1, r4);
 				fb_sqr(r1, z1);
 				fb_sqr(r2, x1);
@@ -442,8 +455,21 @@ void eb_mul_const(eb_t r, eb_t p, bn_t k) {
 				if (!koblitz) {
 					fb_sqr(x1, r2);
 					fb_sqr(r1, r1);
-					fb_mul(r2, r1, b);
-					fb_add(x1, x1, r2);
+					switch (eb_curve_opt_b()) {
+						case OPT_ZERO:
+							break;
+						case OPT_ONE:
+							fb_add_dig(x2, x2, 1);
+							break;
+						case OPT_DIGIT:
+							fb_mul_dig(r2, r1, b[0]);
+							fb_add(x1, x1, r2);
+							break;
+						default:
+							fb_mul(r2, r1, b);
+							fb_add(x1, x1, r2);
+							break;
+					}
 				} else {
 					fb_add(r1, r1, r2);
 					fb_sqr(x1, r1);
@@ -461,25 +487,36 @@ void eb_mul_const(eb_t r, eb_t p, bn_t k) {
 				fb_zero(r->z);
 				fb_set_bit(r->z, 0, 1);
 			} else {
+				/* r3 = z1 * z2. */
 				fb_mul(r3, z1, z2);
+				/* z1 = (x1 + x * z1). */
 				fb_mul(z1, z1, p->x);
 				fb_add(z1, z1, x1);
+				/* z2 = x * z2. */
 				fb_mul(z2, z2, p->x);
+				/* x1 = x1 * z2. */
 				fb_mul(x1, x1, z2);
+				/* z2 = (x2 + x * z2)(x1 + x * z1). */
 				fb_add(z2, z2, x2);
-
 				fb_mul(z2, z2, z1);
+
+				/* r4 = (x^2 + y) * z1 * z2 + (x2 + x * z2)(x1 + x * z1). */
 				fb_sqr(r4, p->x);
 				fb_add(r4, r4, p->y);
 				fb_mul(r4, r4, r3);
 				fb_add(r4, r4, z2);
 
+				/* r3 = (z1 * z2 * x)^{-1}. */
 				fb_mul(r3, r3, p->x);
 				fb_inv(r3, r3);
+				/* r4 = (x^2 + y) * z1 * z2 + (x2 + x * z2)(x1 + x * z1) * r3. */
 				fb_mul(r4, r4, r3);
+				/* x2 = x1 * x * z2 * (z1 * z2 * x)^{-1} = x1/z1. */
 				fb_mul(x2, x1, r3);
+				/* z2 = x + x1/z1. */
 				fb_add(z2, x2, p->x);
 
+				/* z2 = z2 * r4 + y. */
 				fb_mul(z2, z2, r4);
 				fb_add(z2, z2, p->y);
 
@@ -508,7 +545,7 @@ void eb_mul_const(eb_t r, eb_t p, bn_t k) {
 }
 
 #endif /* EB_ORDIN || EB_KBLTZ */
-#endif /* EB_MUL == CONST */
+#endif /* EB_MUL == LODAH */
 
 #if EB_MUL == WTNAF || !defined(STRIP)
 
@@ -531,7 +568,7 @@ void eb_mul_wtnaf(eb_t r, eb_t p, bn_t k) {
 
 void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 	int len, i, j;
-	signed char naf[FB_BITS + 1], *tmp;
+	signed char naf[FB_BITS + 1] = { 0 }, *tmp;
 	eb_t q, table[1 << (EB_WIDTH - 2)];
 	bn_t n, _k;
 
@@ -542,13 +579,13 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		eb_null(table[i]);
 	}
 
+	if (fb_is_zero(eb_curve_get_a())) {
+		THROW(ERR_INVALID);
+	}
+
 	TRY {
 		bn_new(n);
 		bn_new(_k);
-		fb_new(u);
-		fb_new(v);
-		fb_new(l);
-		fb_new(t);
 		eb_new(q);
 
 		/* Prepare the precomputation table. */
@@ -562,7 +599,7 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		bn_lsh(_k, k, bn_bits(n) - 1);
 		bn_mod(_k, _k, n);
 
-		/* Compute the w-TNAF representation of k'. */
+		/* Compute the w-NAF representation of k'. */
 		bn_rec_naf(naf, &len, _k, EB_WIDTH);
 
 		for (i = len; i <= bn_bits(n); i++) {
@@ -610,14 +647,118 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		}
 		bn_free(n);
 		bn_free(_k);
-		fb_free(u);
-		fb_free(v);
-		fb_free(l);
-		fb_free(t);
 	}
 }
 
 #endif
+
+#if defined(EB_ORDIN) || defined(EB_KBLTZ)
+
+#if EB_MUL == MSTAM || !defined(STRIP)
+
+void eb_mul_mstam(eb_t r, eb_t p, bn_t k) {
+	int i, swap;
+	fb_t r1, r2;
+	dig_t *b;
+	eb_t q, s, *t, *_q, *_s;
+
+	fb_null(x1);
+	fb_null(z1);
+	fb_null(x2);
+	fb_null(z2);
+	fb_null(r1);
+	fb_null(r2);
+	fb_null(r3);
+	fb_null(r4);
+	eb_null(q);
+	eb_null(s);
+
+	TRY {
+		fb_new(x1);
+		fb_new(z1);
+		fb_new(x2);
+		fb_new(z2);
+		fb_new(r1);
+		fb_new(r2);
+		fb_new(r3);
+		fb_new(r4);
+		eb_new(q);
+		eb_new(s);
+
+		b = eb_curve_get_b();
+
+		eb_copy(q, p);
+		fb_sqr(s->x, p->x);
+		fb_sqr(r1, p->z);
+		fb_mul(s->z, r1, s->x);
+		fb_add(s->x, s->x, r1);
+		fb_sqr(s->x, s->x);
+		fb_mul(s->x, b, s->x);
+
+		_q = &q;
+		_s = &s;
+
+		for (i = bn_bits(k) - 2; i >= 0; i--) {
+			swap = bn_get_bit(k, i);
+			if (swap) {
+				t = _s;
+				_s = _q;
+				_q = t;
+			}
+
+			fb_add(r1, (*_q)->x, (*_q)->z);
+			fb_add(r2, (*_s)->x, (*_s)->z);
+			fb_mul(r1, r1, r2);
+
+			fb_mul((*_s)->x, (*_q)->x, (*_s)->x);
+			fb_mul((*_s)->z, (*_q)->z, (*_s)->z);
+			fb_add((*_s)->x, (*_s)->x, (*_s)->z);
+			fb_add((*_s)->z, (*_s)->x, r1);
+
+			fb_sqr((*_s)->x, (*_s)->x);
+			fb_sqr((*_s)->z, (*_s)->z);
+			fb_mul((*_s)->z, (*_s)->z, p->x);
+
+			fb_sqr((*_q)->x, (*_q)->x);
+			fb_sqr(r1, (*_q)->z);
+			fb_mul((*_q)->z, r1, (*_q)->x);
+			fb_add((*_q)->x, (*_q)->x, r1);
+			fb_sqr((*_q)->x, (*_q)->x);
+			fb_mul((*_q)->x, (*_q)->x, b);
+
+			if (swap) {
+				t = _s;
+				_s = _q;
+				_q = t;
+			}
+		}
+
+		if (fb_is_zero((*_q)->z)) {
+			/* The point q is at infinity. */
+			eb_set_infty(r);
+		} else {
+			fb_inv(r->z, (*_q)->z);
+			fb_mul(r->x, (*_q)->x, (*_q)->z);
+			r->norm = 1;
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fb_free(x1);
+		fb_free(z1);
+		fb_free(x2);
+		fb_free(z2);
+		fb_free(r1);
+		fb_free(r2);
+		fb_free(r3);
+		fb_free(r4);
+	}
+}
+
+#endif /* EB_ORDIN || EB_KBLTZ */
+#endif /* EB_MUL == MSTAM */
 
 void eb_mul_gen(eb_t r, bn_t k) {
 #ifdef EB_PRECO
