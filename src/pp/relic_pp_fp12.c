@@ -37,6 +37,47 @@
 #include "relic_util.h"
 
 /*============================================================================*/
+/* Private definitions                                                        */
+/*============================================================================*/
+
+/**
+ * Squaring in the internal quadratic extension over fp2.
+ *
+ * @param c					- the first component of the result.
+ * @param d					- the second component of the result.
+ * @param a					- the first component of the input.
+ * @param b					- the second component of the input.
+ */
+static void fp4_sqr(fp2_t c, fp2_t d, fp2_t a, fp2_t b) {
+	fp2_t t0, t1;
+
+	fp2_null(t0);
+	fp2_null(t1);
+
+	TRY {
+		/* t0 = a^2. */
+		fp2_sqr(t0, a);
+		/* t1 = b^2. */
+		fp2_sqr(t1, b);
+
+		/* c = a^2  + b^2 * E. */
+		fp2_mul_nor(c, t1);
+		fp2_add(c, c, t0);
+
+		/* d = (a + b)^2 - a^2 - b^2 = 2 * a * b. */
+		fp2_add(d, a, b);
+		fp2_sqr(d, d);
+		fp2_sub(d, d, t0);
+		fp2_sub(d, d, t1);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp2_free(t0);
+		fp2_free(t1);
+	}
+}
+
+/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
@@ -70,8 +111,8 @@ void fp12_print(fp12_t a) {
 }
 
 int fp12_cmp(fp12_t a, fp12_t b) {
-	return ((fp6_cmp(a[0], b[0]) == CMP_EQ) && (fp6_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ
-			: CMP_NE);
+	return ((fp6_cmp(a[0], b[0]) == CMP_EQ) &&
+			(fp6_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ : CMP_NE);
 }
 
 void fp12_add(fp12_t c, fp12_t a, fp12_t b) {
@@ -182,36 +223,134 @@ void fp12_sqr(fp12_t c, fp12_t a) {
 	}
 }
 
+void fp12_sqr_uni2(fp12_t c, fp12_t a) {
+	fp2_t t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t;
+
+	fp2_add(t0, t0, t6);
+	fp2_add(t2, t2, t7);
+	fp2_add(t5, t5, t8);
+	fp2_add(t4, t4, t9);
+	fp2_add(t1, t1, t10);
+	fp2_add(t3, t3, t11);
+
+	fp2_sqr(t6, a[0][0]);
+	fp2_sqr(t7, a[1][1]);
+	fp2_mul_nor(t7, t7);
+	fp2_add(t6, t6, t7);
+	fp2_dbl(t, t6);
+	fp2_add(t6, t6, t);
+	fp2_dbl(t7, a[0][0]);
+	fp2_sub(t0, t6, t7);
+	
+	fp2_mul(t6, a[0][0], a[1][1]);
+	fp2_dbl(t6, t6);
+	fp2_dbl(t, t6);
+	fp2_add(t6, t6, t);
+	fp2_dbl(t7, a[1][1]);
+	fp2_add(t1, t6, t7);
+
+	fp2_sqr(t6, a[1][0]);
+	fp2_sqr(t7, a[0][2]);
+	fp2_mul_nor(t7, t7);
+	fp2_add(t6, t6, t7);
+	fp2_dbl(t, t6);
+	fp2_add(t6, t6, t);
+	fp2_dbl(t7, a[0][1]);
+	fp2_sub(t2, t6, t7);	
+
+	fp2_mul(t6, a[1][0], a[0][2]);
+	fp2_dbl(t6, t6);
+	fp2_dbl(t, t6);
+	fp2_add(t6, t6, t);
+	fp2_dbl(t7, a[1][2]);
+	fp2_add(t3, t6, t7);
+
+	fp2_mul(t6, a[0][1], a[1][2]);
+	fp2_dbl(t6, t6);
+	fp2_dbl(t, t6);
+	fp2_add(t6, t6, t);
+	fp2_mul_nor(t6, t6);
+	fp2_dbl(t7, a[1][0]);
+	fp2_add(t4, t6, t7);
+
+	fp2_sqr(t6, a[0][1]);
+	fp2_sqr(t7, a[1][2]);
+	fp2_mul_nor(t7, t7);
+	fp2_add(t6, t6, t7);
+	fp2_dbl(t, t6);
+	fp2_add(t6, t6, t);
+	fp2_dbl(t7, a[0][2]);
+	fp2_sub(t5, t6, t7);
+
+	fp2_copy(c[0][0], t0);
+	fp2_copy(c[0][1], t2);
+	fp2_copy(c[0][2], t5);
+	fp2_copy(c[1][0], t4);
+	fp2_copy(c[1][1], t1);
+	fp2_copy(c[1][2], t3);
+}
+
 void fp12_sqr_uni(fp12_t c, fp12_t a) {
-	fp6_t t0, t1;
-	fp_t one;
+	fp2_t t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t;
 
-	fp6_null(t0);
-	fp6_null(t1);
+	/* Define z = sqrt(E). */
 
-	TRY {
-		fp6_new(t0);
-		fp6_new(t1);
-		fp_new(one);
+	/* Now a is seen as (t0,t1) + (t2,t3) * w + (t4,t5) * w^2. */
 
-		/* (a0 + a1 * w)^2 = (2b^2v + 1) + ((a + b)^2 - b^2 - b^2v - 1) * w. */
-		fp6_sqr(t0, a[1]);
-		fp6_add(t1, a[0], a[1]);
-		fp6_sqr(t1, t1);
-		fp6_sub(t1, t1, t0);
-		fp6_mul_art(c[0], t0);
-		fp6_sub(c[1], t1, c[0]);
-		fp_set_dig(one, 1);
-		fp6_dbl(c[0], c[0]);
-		fp_add_dig(c[0][0][0], c[0][0][0], 1);
-		fp_sub(c[1][0][0], c[1][0][0], one);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fp6_free(t0);
-		fp6_free(t1);
-		fp_free(one);
-	}
+	/* (t0, t1) = (a00 + a11*z)^2. */
+	fp4_sqr(t0, t1, a[0][0], a[1][1]);
+	/* (t2, t3) = (a10 + a02*z)^2. */
+	fp4_sqr(t2, t3, a[1][0], a[0][2]);
+	/* (t4, t5) = (a01 + a12*z)^2. */
+	fp4_sqr(t4, t5, a[0][1], a[1][2]);
+
+	/* (t6, t9) = -2 * conj(a00, a11). */
+	fp2_dbl(t6, a[0][0]);
+	fp2_neg(t6, t6);
+	fp2_dbl(t9, a[1][1]);
+	/* (t7, t10) = -2 * conj(a01, a12). */
+	fp2_dbl(t7, a[0][1]);
+	fp2_neg(t7, t7);
+	fp2_dbl(t11, a[1][2]);
+	/* (t8, t11) = -2 * conj(a10, a02). */
+	fp2_dbl(t8, a[0][2]);
+	fp2_neg(t8, t8);
+	fp2_dbl(t10, a[1][0]);
+
+	/* (t4, t5) = E * (t4, t5). */
+	fp2_mul_nor(t, t5);
+	fp2_copy(t5, t4);
+	fp2_copy(t4, t);
+
+	/* (t0, t1) = 3 * (t0, t1). */
+	fp2_dbl(t, t0);
+	fp2_add(t0, t0, t);
+	fp2_dbl(t, t1);
+	fp2_add(t1, t1, t);
+	/* (t2, t3) = 3 * (t2, t3). */
+	fp2_dbl(t, t2);
+	fp2_add(t2, t2, t);
+	fp2_dbl(t, t3);
+	fp2_add(t3, t3, t);
+	/* (t4, t5) = 3 * (t4, t5). */
+	fp2_dbl(t, t4);
+	fp2_add(t4, t4, t);
+	fp2_dbl(t, t5);
+	fp2_add(t5, t5, t);
+
+	fp2_add(t0, t0, t6);
+	fp2_add(t1, t1, t9);
+	fp2_add(t2, t2, t7);
+	fp2_add(t3, t3, t11);
+	fp2_add(t4, t4, t10);
+	fp2_add(t5, t5, t8);
+
+	fp2_copy(c[0][0], t0);
+	fp2_copy(c[0][1], t2);
+	fp2_copy(c[0][2], t5);
+	fp2_copy(c[1][0], t4);
+	fp2_copy(c[1][1], t1);
+	fp2_copy(c[1][2], t3);
 }
 
 void fp12_inv(fp12_t c, fp12_t a) {
