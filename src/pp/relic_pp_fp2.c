@@ -32,6 +32,7 @@
 #include "relic_core.h"
 #include "relic_conf.h"
 #include "relic_fp.h"
+#include "relic_fp_low.h"
 #include "relic_pp.h"
 #include "relic_util.h"
 
@@ -144,39 +145,75 @@ void fp2_dbl(fp2_t c, fp2_t a) {
 }
 
 void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
-	fp_t t0, t1, t2;
+	dv_t t0, t1, t2;
+	fp_t t;
+	dig_t c0, c1;
 
-	fp_null(t0);
-	fp_null(t1);
-	fp_null(t2);
+	dv_null(t0);
+	dv_null(t1);
+	dv_null(t2);
+	fp_null(t);
 
 	TRY {
 
-		fp_new(t0);
-		fp_new(t1);
-		fp_new(t2);
+		dv_new(t0);
+		dv_new(t1);
+		dv_new(t2);
+		fp_new(t);
 
 		/* Karatsuba algorithm. */
-		fp_mul(t0, a[0], b[0]);
-		fp_mul(t1, a[1], b[1]);
-		fp_add(t2, a[0], a[1]);
-		fp_add(c[1], b[0], b[1]);
-		fp_mul(c[1], c[1], t2);
-		fp_sub(c[1], c[1], t0);
-		fp_sub(c[1], c[1], t1);
-		fp_sub(c[0], t0, t1);
 
+		/* t0 = a0 * b0, t1 = a1 * b1. */
+		fp_muln_low(t0, a[0], b[0]);
+		fp_muln_low(t1, a[1], b[1]);
+
+		/* t2 = (a0 * a1) + (b0 * b1). */
+		c0 = fp_addn_low(t2, t0, t1);
+		fp_addn_low(t2 + FP_DIGS, t0 + FP_DIGS, t1 + FP_DIGS);
+		c0 = fp_add1_low(t2 + FP_DIGS, t2 + FP_DIGS, c0);
+
+		/* t1 = u^2 * (a1 * b1). */
 		if (fp_prime_get_qnr() == -2) {
-			fp_sub(c[0], c[0], t1);
+			c0 = fp_lsh1_low(t1, t1);
+			fp_lsh1_low(t1 + FP_DIGS, t1 + FP_DIGS);
+			t1[FP_DIGS] ^= c0;
 		}
+		/* t0 = (a0 * a1) + u^2 * (a1 * b1). */
+		c0 = fp_subn_low(t0, t0, t1);
+		c1 = fp_subn_low(t0 + FP_DIGS, t0 + FP_DIGS, t1 + FP_DIGS);
+		fp_sub1_low(t0 + FP_DIGS, t0 + FP_DIGS, c0);
+		if (c1) {
+			fp_addn_low(t0 + FP_DIGS, t0 + FP_DIGS, fp_prime_get());
+		}
+
+		dv_zero(t1, 2 * FP_DIGS);
+
+		/* t1 = a0 + a1, c1 = b0 + b1. */
+		fp_add(t, a[0], a[1]);
+		fp_add(c[1], b[0], b[1]);
+		/* t1 = (a0 + a1) * (b0 + b1). */
+		fp_muln_low(t1, t, c[1]);
+
+		/* c0 = t0 mod p. */
+		fp_rdc(c[0], t0);
+
+		c0 = fp_subn_low(t1, t1, t2);
+		c1 = fp_subn_low(t1 + FP_DIGS, t1 + FP_DIGS, t2 + FP_DIGS);
+		fp_sub1_low(t1 + FP_DIGS, t1 + FP_DIGS, c0);
+		if (c1) {
+			fp_addn_low(t1 + FP_DIGS, t1 + FP_DIGS, fp_prime_get());
+		}
+
+		/* c1 = t1 mod p. */
+		fp_rdc(c[1], t1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp_free(t0);
-		fp_free(t1);
-		fp_free(t2);
+		dv_free(t0);
+		dv_free(t1);
+		dv_free(t2);
 	}
 }
 
