@@ -39,6 +39,7 @@
 #include "relic_dv.h"
 #include "relic_fp.h"
 #include "relic_fb.h"
+#include "relic_ft.h"
 #include "relic_ep.h"
 #include "relic_eb.h"
 #include "relic_ec.h"
