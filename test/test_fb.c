@@ -158,6 +158,13 @@ static int util(void) {
 		}
 		TEST_END;
 
+		TEST_BEGIN("reading and writing the first digit are consistent") {
+			fb_rand(a);
+			fb_rand(b);
+			fb_set_dig(b, a[0]);
+			TEST_ASSERT(a[0] == b[0], end);
+		} TEST_END;
+
 		bits = 0;
 		TEST_BEGIN("bit setting and testing are consistent") {
 			fb_zero(a);
@@ -184,7 +191,7 @@ static int util(void) {
 		}
 		TEST_END;
 
-		TEST_BEGIN("getting the size of binary field element is correct") {
+		TEST_BEGIN("getting the size of a binary field element is correct") {
 			fb_rand(a);
 			fb_size(&bits, a, 2);
 			bits--;
@@ -252,6 +259,13 @@ static int addition(void) {
 			fb_add(e, a, d);
 			TEST_ASSERT(fb_is_zero(e), end);
 		} TEST_END;
+
+		TEST_BEGIN("addition of the modulo f(z) is correct") {
+			fb_rand(a);
+			fb_poly_add(d, a);
+			fb_add(e, a, fb_poly_get());
+			TEST_ASSERT(fb_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -305,6 +319,21 @@ static int subtraction(void) {
 			TEST_ASSERT(fb_is_zero(c), end);
 		}
 		TEST_END;
+
+		TEST_BEGIN("subtraction of the modulo f(z) is correct") {
+			fb_rand(a);
+			fb_poly_sub(c, a);
+			fb_sub(d, a, fb_poly_get());
+			TEST_ASSERT(fb_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("subtraction is the same as addition") {
+			fb_rand(a);
+			fb_rand(b);
+			fb_add(c, a, b);
+			fb_sub(d, a, b);
+			TEST_ASSERT(fb_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -573,65 +602,6 @@ static int square_root(void) {
 	return code;
 }
 
-static int inversion(void) {
-	int code = STS_ERR;
-	fb_t a, b, c;
-
-	fb_null(a);
-	fb_null(b);
-	fb_null(c);
-
-	TRY {
-		fb_new(a);
-		fb_new(b);
-		fb_new(c);
-
-		TEST_BEGIN("inversion is correct") {
-			fb_rand(a);
-			fb_inv(b, a);
-			fb_mul(c, a, b);
-			TEST_ASSERT(fb_cmp_dig(c, 1) == CMP_EQ, end);
-		} TEST_END;
-
-#if FB_INV == BASIC || !defined(STRIP)
-		TEST_BEGIN("basic inversion is correct") {
-			fb_rand(a);
-			fb_inv(b, a);
-			fb_inv_basic(c, a);
-			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
-		} TEST_END;
-#endif
-
-#if FB_INV == EXGCD || !defined(STRIP)
-		TEST_BEGIN("euclidean inversion is correct") {
-			fb_rand(a);
-			fb_inv(b, a);
-			fb_inv_exgcd(c, a);
-			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
-		} TEST_END;
-#endif
-
-#if FB_INV == ALMOS || !defined(STRIP)
-		TEST_BEGIN("almost inverse is correct") {
-			fb_rand(a);
-			fb_inv(b, a);
-			fb_inv_almos(c, a);
-			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
-		} TEST_END;
-#endif
-
-	}
-	CATCH_ANY {
-		ERROR(end);
-	}
-	code = STS_OK;
-  end:
-	fb_free(a);
-	fb_free(b);
-	fb_free(c);
-	return code;
-}
-
 static int shifting(void) {
 	int code = STS_ERR;
 	fb_t a, b, c;
@@ -879,6 +849,83 @@ static int solve(void) {
 	return code;
 }
 
+static int inversion(void) {
+	int code = STS_ERR;
+	fb_t a, b, c;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
+
+	TRY {
+		fb_new(a);
+		fb_new(b);
+		fb_new(c);
+
+		TEST_BEGIN("inversion is correct") {
+			fb_rand(a);
+			fb_inv(b, a);
+			fb_mul(c, a, b);
+			TEST_ASSERT(fb_cmp_dig(c, 1) == CMP_EQ, end);
+		} TEST_END;
+
+#if FB_INV == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic inversion is correct") {
+			fb_rand(a);
+			fb_inv(b, a);
+			fb_inv_basic(c, a);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FB_INV == BINAR || !defined(STRIP)
+		TEST_BEGIN("binary inversion is correct") {
+			fb_rand(a);
+			fb_inv(b, a);
+			fb_inv_binar(c, a);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FB_INV == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated inversion is correct") {
+			fb_rand(a);
+			fb_inv(b, a);
+			fb_inv_integ(c, a);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FB_INV == EXGCD || !defined(STRIP)
+		TEST_BEGIN("euclidean inversion is correct") {
+			fb_rand(a);
+			fb_inv(b, a);
+			fb_inv_exgcd(c, a);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FB_INV == ALMOS || !defined(STRIP)
+		TEST_BEGIN("almost inverse is correct") {
+			fb_rand(a);
+			fb_inv(b, a);
+			fb_inv_almos(c, a);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fb_free(a);
+	fb_free(b);
+	fb_free(c);
+	return code;
+}
+
 static int digit(void) {
 	int code = STS_ERR;
 	fb_t a, b, c, d;
@@ -953,6 +1000,14 @@ int main(void) {
 		return 0;
 	}
 
+	int j = 0;
+	for (int i = 0; i < FB_BITS; i++) {
+		if (fb_test_bit(fb_poly_get_srz(), i)) {
+			j++;
+		}
+	}
+	printf("%d terms\n", j);
+
 	util_print_banner("Utilities", 1);
 	if (memory() != STS_OK) {
 		core_clean();
@@ -990,11 +1045,6 @@ int main(void) {
 		return 1;
 	}
 
-	if (inversion() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
 	if (shifting() != STS_OK) {
 		core_clean();
 		return 1;
@@ -1011,6 +1061,11 @@ int main(void) {
 	}
 
 	if (solve() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (inversion() != STS_OK) {
 		core_clean();
 		return 1;
 	}
