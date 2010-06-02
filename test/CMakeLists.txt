@@ -30,6 +30,10 @@ if (WITH_FB)
 	ADD_MODULE(fb)
 endif(WITH_FB)
 
+if (WITH_FT)
+	ADD_MODULE(ft)
+endif(WITH_FT)
+
 if (WITH_EP)
 	ADD_MODULE(ep)
 endif(WITH_EP)
