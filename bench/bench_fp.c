@@ -367,6 +367,38 @@ static void arith(void) {
 	}
 #endif
 
+	BENCH_BEGIN("fp_exp") {
+		fp_rand(a);
+		bn_rand(e, BN_POS, BN_BITS);
+		BENCH_ADD(fp_exp(c, a, e));
+	}
+	BENCH_END;
+
+#if FP_EXP == SLIDE || !defined(STRIP)
+	BENCH_BEGIN("fp_exp_slide") {
+		fp_rand(a);
+		bn_rand(e, BN_POS, BN_BITS);
+		BENCH_ADD(fp_exp_slide(c, a, e));
+	}
+	BENCH_END;
+#endif
+
+#if FP_EXP == MONTY || !defined(STRIP)
+	BENCH_BEGIN("fp_exp_monty") {
+		fp_rand(a);
+		bn_rand(e, BN_POS, BN_BITS);
+		BENCH_ADD(fp_exp_monty(c, a, e));
+	}
+	BENCH_END;
+#endif
+
+	BENCH_BEGIN("fp_srt") {
+		fp_rand(a);
+		fp_sqr(a, a);
+		BENCH_ADD(fp_srt(c, a));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fp_prime_conv") {
 		bn_rand(e, BN_POS, FP_BITS);
 		BENCH_ADD(fp_prime_conv(a, e));

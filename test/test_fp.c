@@ -619,7 +619,7 @@ static int reduction(void) {
 		fp_new(a);
 		fp_new(b);
 		dv_new(t);
-		dv_zero(t, 2 * FB_DIGS);
+		dv_zero(t, 2 * FP_DIGS);
 
 		TEST_BEGIN("modular reduction is correct") {
 			fp_rand(a);
@@ -688,6 +688,107 @@ static int inversion(void) {
 			fp_mul(c, a, b);
 			fp_set_dig(b, 1);
 			TEST_ASSERT(fp_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp_free(a);
+	fp_free(b);
+	fp_free(c);
+	return code;
+}
+
+static int exponentiation(void) {
+	int code = STS_ERR;
+	fp_t a, b, c;
+	bn_t d;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
+	bn_null(d);
+
+	TRY {
+		fp_new(a);
+		fp_new(b);
+		fp_new(c);
+		bn_new(d);
+
+		TEST_BEGIN("exponentiation is correct") {
+			fp_rand(a);
+			d->used = FP_DIGS;
+			dv_copy(d->dp, fp_prime_get(), FP_DIGS);
+			fp_exp_basic(c, a, d);
+			TEST_ASSERT(fp_cmp(a, c) == CMP_EQ, end);
+		}
+		TEST_END;
+
+#if FP_EXP == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic exponentiation is correct") {
+			fp_rand(a);
+			bn_rand(d, BN_POS, FP_BITS);
+			fp_exp(c, a, d);
+			fp_exp_basic(b, a, d);
+			TEST_ASSERT(fp_cmp(b, c) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
+#if FP_EXP == SLIDE || !defined(STRIP)
+		TEST_BEGIN("sliding window exponentiation is correct") {
+			fp_rand(a);
+			bn_rand(d, BN_POS, FP_BITS);
+			fp_exp(c, a, d);
+			fp_exp_slide(b, a, d);
+			TEST_ASSERT(fp_cmp(b, c) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
+#if FP_EXP == SLIDE || !defined(STRIP)
+		TEST_BEGIN("constant-time exponentiation is correct") {
+			fp_rand(a);
+			bn_rand(d, BN_POS, FP_BITS);
+			fp_exp(c, a, d);
+			fp_exp_monty(b, a, d);
+			TEST_ASSERT(fp_cmp(b, c) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	bn_free(a);
+	bn_free(b);
+	bn_free(p);
+	return code;
+}
+
+static int square_root(void) {
+	int code = STS_ERR;
+	fp_t a, b, c;
+
+	fp_null(a);
+	fp_null(b);
+	fp_null(c);
+
+	TRY {
+		fp_new(a);
+		fp_new(b);
+		fp_new(c);
+
+		TEST_BEGIN("square root extraction is correct") {
+			fp_rand(a);
+			fp_sqr(c, a);
+			fp_srt(b, c);
+			fp_neg(c, b);
+			TEST_ASSERT(fp_cmp(b, a) == CMP_EQ || fp_cmp(c, a) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
@@ -815,12 +916,22 @@ int main(void) {
 		return 1;
 	}
 
+	if (reduction() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
 	if (inversion() != STS_OK) {
 		core_clean();
 		return 1;
 	}
 
-	if (reduction() != STS_OK) {
+	if (exponentiation() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (square_root() != STS_OK) {
 		core_clean();
 		return 1;
 	}
