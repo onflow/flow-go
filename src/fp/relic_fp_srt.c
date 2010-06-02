@@ -63,8 +63,6 @@ void fp_srt(fp_t c, fp_t a) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp_free(t);
-		fp_free(u);
-		fp_free(r);
+		bn_free(e);
 	}
 }

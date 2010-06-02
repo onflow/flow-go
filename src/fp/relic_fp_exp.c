@@ -76,8 +76,6 @@ void fp_exp_basic(fp_t c, fp_t a, bn_t b) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp_free(t);
-		fp_free(u);
 		fp_free(r);
 	}
 }
@@ -92,8 +90,8 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 	unsigned char win[BN_BITS];
 
 	fp_null(t);
-	fp_null(u);
 	fp_null(r);
+
 	/* Initialize table. */
 	for (i = 0; i < TABLE_SIZE; i++) {
 		fp_null(tab[i]);
@@ -110,7 +108,6 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 		}
 
 		fp_new(t);
-		fp_new(u);
 		fp_new(r);
 
 		fp_set_dig(r, 1);
@@ -160,10 +157,8 @@ void fp_exp_monty(fp_t c, fp_t a, bn_t b) {
 
 	fp_null(tab[0]);
 	fp_null(tab[1]);
-	fp_null(u);
 
 	TRY {
-		fp_new(u);
 		fp_new(tab[0]);
 		fp_new(tab[1]);
 
@@ -203,7 +198,6 @@ void fp_exp_monty(fp_t c, fp_t a, bn_t b) {
 	FINALLY {
 		fp_free(tab[1]);
 		fp_free(tab[0]);
-		fp_free(u);
 	}
 }
 
