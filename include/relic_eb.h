@@ -57,24 +57,28 @@ enum {
 	NIST_B233 = 3,
 	/** NIST K-233 Koblitz curve. */
 	NIST_K233 = 4,
+	/** Curve over 2^{251} used in eBATs. */
+	EBATS_B251 = 5,
+	/** SECG K-239 binary curve. */
+	SECG_K239 = 6,
 	/** NIST B-283 binary curve. */
-	NIST_B283 = 5,
+	NIST_B283 = 7,
 	/** NIST K-283 Koblitz curve. */
-	NIST_K283 = 6,
+	NIST_K283 = 8,
 	/** NIST B-409 binary curve. */
-	NIST_B409 = 7,
+	NIST_B409 = 9,
 	/** NIST K-409 Koblitz curve. */
-	NIST_K409 = 8,
+	NIST_K409 = 10,
 	/** NIST B-571 binary curve. */
-	NIST_B571 = 9,
+	NIST_B571 = 11,
 	/** NIST K-571 Koblitz curve. */
-	NIST_K571 = 10,
+	NIST_K571 = 12,
 	/** MIRACL low-security pairing-friendly curve. */
-	ETAT_P271 = 11,
+	ETAT_P271 = 13,
 	/** MIRACL low-security pairing-friendly curve. */
-	ETAT_T271 = 12,
+	ETAT_T271 = 14,
 	/** MIRACL high-security pairing-friendly curve. */
-	ETAT_S1223 = 13,
+	ETAT_S1223 = 15,
 };
 
 /**
@@ -318,14 +322,16 @@ typedef eb_st *eb_t;
  */
 #if EB_MUL == BASIC
 #define eb_mul(R, P, K)		eb_mul_basic(R, P, K)
-#elif EB_MUL == CONST
-#define eb_mul(R, P, K)		eb_mul_const(R, P, K)
+#elif EB_MUL == LODAH
+#define eb_mul(R, P, K)		eb_mul_lodah(R, P, K)
 #elif EB_MUL == SLIDE
 #define eb_mul(R, P, K)		eb_mul_slide(R, P, K)
 #elif EB_MUL == WTNAF
 #define eb_mul(R, P, K)		eb_mul_wtnaf(R, P, K)
 #elif EB_MUL == HALVE
 #define eb_mul(R, P, K)		eb_mul_halve(R, P, K)
+#elif EB_MUL == MSTAM
+#define eb_mul(R, P, K)		eb_mul_mstam(R, P, K)
 #endif
 
 /**
@@ -761,13 +767,23 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k);
 
 /**
  * Multiplies a binary elliptic point by an integer using the constant-time
- * L?pez-Dahab point multiplication method.
+ * López-Dahab point multiplication method.
  *
  * @param[out] r			- the result.
  * @param[in] p				- the point to multiply.
  * @param[in] k				- the integer.
  */
-void eb_mul_const(eb_t r, eb_t p, bn_t k);
+void eb_mul_lodah(eb_t r, eb_t p, bn_t k);
+
+/**
+ * Multiplies a binary elliptic point by an integer using the constant-time
+ * Stam's point multiplication method.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ * @param[in] k				- the integer.
+ */
+void eb_mul_mstam(eb_t r, eb_t p, bn_t k);
 
 /**
  * Multiplies a binary elliptic point by an integer using the w-NAF method.
