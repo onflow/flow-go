@@ -50,17 +50,39 @@
 /*============================================================================*/
 
 /**
- * Size in bits of the biggest digit vector.
+ * Size in digits of a squaring result in a prime field.
  */
-#define DV_TEMP 	MAX(BN_PRECI, FB_POLYN)
+#ifdef WITH_FP
+#define DV_FP	(2 * ((int)((FP_PRIME)/(DIGIT) + (FP_PRIME % DIGIT > 0))))
+#else
+#define DV_FP	(0)
+#endif
+
+/**
+ * Size in digits of a squaring result in a binary field.
+ */
+#ifdef WITH_FB
+#define DV_FB	(2 * ((int)((FB_POLYN)/(DIGIT) + (FB_POLYN % DIGIT > 0))))
+#else
+#define DV_FB	(0)
+#endif
+
+/**
+ * Size in digits of a cubing result in a ternary field.
+ */
+#ifdef WITH_FT
+#define DV_FT	(6 * ((int)((FT_POLYN)/(DIGIT) + (FT_POLYN % DIGIT > 0))))
+#else
+#define DV_FT	(0)
+#endif
 
 /**
  * Size in digits of a temporary vector.
  *
- * A temporary vector has enough size to store a multiplication result in any
- * finite field.
+ * A temporary vector has enough size to store a multiplication/squaring/cubing
+ * result in any finite field.
  */
-#define DV_DIGS		(2 * (int)((DV_TEMP)/(DIGIT) + (DV_TEMP % DIGIT > 0)) + 2)
+#define DV_DIGS		MAX(MAX(DV_FB, DV_FP), DV_FT)
 
 /**
  * Size in bytes of a temporary vector.
