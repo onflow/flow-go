@@ -39,6 +39,7 @@
 #include "relic_error.h"
 #include "relic_fp.h"
 #include "relic_fb.h"
+#include "relic_ft.h"
 #include "relic_ep.h"
 #include "relic_eb.h"
 #include "relic_cp.h"
@@ -81,6 +82,9 @@ int core_init(void) {
 #ifdef WITH_FB
 		fb_poly_init();
 #endif
+#ifdef WITH_FT
+		ft_poly_init();
+#endif
 #ifdef WITH_EP
 		ep_curve_init();
 #endif
@@ -105,6 +109,9 @@ int core_clean(void) {
 #endif
 #ifdef WITH_FB
 	fb_poly_clean();
+#endif
+#ifdef WITH_FT
+	ft_poly_clean();
 #endif
 #ifdef WITH_EP
 	ep_curve_clean();
