@@ -198,9 +198,9 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 
 #endif
 
-#if BN_MXP == CONST || !defined(STRIP)
+#if BN_MXP == MONTY || !defined(STRIP)
 
-void bn_mxp_const(bn_t c, bn_t a, bn_t b, bn_t m) {
+void bn_mxp_monty(bn_t c, bn_t a, bn_t b, bn_t m) {
 	bn_t tab[2], u;
 	dig_t buf;
 	int bitcnt, digidx, j;

@@ -959,7 +959,7 @@ static int mxp(void) {
 			bn_rand(a, BN_POS, BN_BITS);
 			bn_mod(a, a, p);
 			bn_copy(b, a);
-			bn_mxp_const(b, b, p, p);
+			bn_mxp_monty(b, b, p, p);
 			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
 		}
 		TEST_END;

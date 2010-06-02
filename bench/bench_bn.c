@@ -663,7 +663,7 @@ static void arith(void) {
 #endif
 
 #if BN_MXP == CONST || !defined(STRIP)
-	BENCH_BEGIN("bn_mxp_const") {
+	BENCH_BEGIN("bn_mxp_monty") {
 		bn_rand(a, BN_POS, 2 * BN_BITS - BN_DIGIT / 2);
 		bn_rand(b, BN_POS, BN_BITS);
 #if BN_MOD != PMERS
@@ -676,7 +676,7 @@ static void arith(void) {
 		bn_sub(b, b, c);
 #endif
 		bn_mod(a, a, b);
-		BENCH_ADD(bn_mxp_const(c, a, b, b));
+		BENCH_ADD(bn_mxp_monty(c, a, b, b));
 	}
 	BENCH_END;
 #endif
