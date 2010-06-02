@@ -764,9 +764,10 @@ static int exponentiation(void) {
 	}
 	code = STS_OK;
   end:
-	bn_free(a);
-	bn_free(b);
-	bn_free(p);
+	fp_free(a);
+	fp_free(b);
+	fp_free(c);
+	bn_free(d);
 	return code;
 }
 
