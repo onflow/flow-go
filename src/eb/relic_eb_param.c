@@ -95,9 +95,35 @@
 /** @} */
 #endif
 
+#if defined(EB_ORDIN) && FB_POLYN == 251
+/**
+ * Parameters for the eBATS B-251 binary elliptic curve.
+ */
+/** @{ */
+#define EBATS_B251_A		"0"
+#define EBATS_B251_B		"2387"
+#define EBATS_B251_X		"5F0863C5C71AF797AB92AC136A5F5F32008E94A8D312E4D495732C1CDAB7F23"
+#define EBATS_B251_Y		"0A23CC8B8320AFB01D005524347EA162D5FF0EDEA7CB181B3D9FC014C892774"
+#define EBATS_B251_R		"1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF3E3AA131A2E1A8200BEF3B9ABB767E1"
+/** @} */
+#endif
+
+#if defined(EB_KBLTZ) && FB_POLYN == 239
+/**
+ * Parameters for the SECG K-239 binary elliptic curve.
+ */
+/** @{ */
+#define SECG_K239_A		"0"
+#define SECG_K239_B		"1"
+#define SECG_K239_X		"29A0B6A887A983E9730988A68727A8B2D126C44CC2CC7B2A6555193035DC"
+#define SECG_K239_Y		"76310804F12E549BDB011C103089E73510ACB275FC312A5DC6B76553F0CA"
+#define SECG_K239_R		"2000000000000000000000000000005A79FEC67CB6E91F1C1DA800E478A5"
+/** @} */
+#endif
+
 #if defined(EB_ORDIN) && FB_POLYN == 283
 /**
- * Parameters for the NIST B-233 binary elliptic curve.
+ * Parameters for the NIST B-283 binary elliptic curve.
  */
 /** @{ */
 #define NIST_B283_A		"1"
@@ -110,7 +136,7 @@
 
 #if defined(EB_KBLTZ) && FB_POLYN == 283
 /**
- * Parameters for the NIST B-233 binary elliptic curve.
+ * Parameters for the NIST K-283 binary elliptic curve.
  */
 /** @{ */
 #define NIST_K283_A		"0"
@@ -123,7 +149,7 @@
 
 #if defined(EB_ORDIN) && FB_POLYN == 409
 /**
- * Parameters for the NIST B-233 binary elliptic curve.
+ * Parameters for the NIST B-409 binary elliptic curve.
  */
 /** @{ */
 #define NIST_B409_A		"1"
@@ -136,7 +162,7 @@
 
 #if defined(EB_KBLTZ) && FB_POLYN == 409
 /**
- * Parameters for the NIST B-233 binary elliptic curve.
+ * Parameters for the NIST K-409 binary elliptic curve.
  */
 /** @{ */
 #define NIST_K409_A		"0"
@@ -149,7 +175,7 @@
 
 #if defined(EB_ORDIN) && FB_POLYN == 571
 /**
- * Parameters for the NIST B-233 binary elliptic curve.
+ * Parameters for the NIST B-571 binary elliptic curve.
  */
 /** @{ */
 #define NIST_B571_A		"1"
@@ -162,7 +188,7 @@
 
 #if defined(EB_ORDIN) && FB_POLYN == 571
 /**
- * Parameters for the NIST B-233 binary elliptic curve.
+ * Parameters for the NIST K-571 binary elliptic curve.
  */
 /** @{ */
 #define NIST_K571_A		"0"
@@ -356,6 +382,12 @@ void eb_param_set(int param) {
 				kbltz = 1;
 				break;
 #endif
+#if defined(EB_ORDIN) && FB_POLYN == 251
+			case EBATS_B251:
+				ASSIGN(EBATS_B251, PENTA_251);
+				ordin = 1;
+				break;
+#endif
 #if defined(EB_ORDIN) && FB_POLYN == 283
 			case NIST_B283:
 				ASSIGN(NIST_B283, NIST_283);
@@ -365,6 +397,12 @@ void eb_param_set(int param) {
 #if defined(EB_KBLTZ) && FB_POLYN == 283
 			case NIST_K283:
 				ASSIGN(NIST_K283, NIST_283);
+				kbltz = 1;
+				break;
+#endif
+#if defined(EB_KBLTZ) && FB_POLYN == 239
+			case SECG_K239:
+				ASSIGN(SECG_K239, SECG_239);
 				kbltz = 1;
 				break;
 #endif
@@ -478,6 +516,8 @@ int eb_param_set_any_ordin() {
 	eb_param_set(NIST_B163);
 #elif FB_POLYN == 233
 	eb_param_set(NIST_B233);
+#elif FB_POLYN == 251
+	eb_param_set(EBATS_B251);
 #elif FB_POLYN == 283
 	eb_param_set(NIST_B283);
 #elif FB_POLYN == 409
@@ -496,6 +536,8 @@ int eb_param_set_any_kbltz() {
 	eb_param_set(NIST_K163);
 #elif FB_POLYN == 233
 	eb_param_set(NIST_K233);
+#elif FB_POLYN == 239
+	eb_param_set(SECG_K239);
 #elif FB_POLYN == 283
 	eb_param_set(NIST_K283);
 #elif FB_POLYN == 409
@@ -537,6 +579,12 @@ void eb_param_print() {
 			break;
 		case NIST_K233:
 			util_print_banner("Curve NIST-K233:", 0);
+			break;
+		case SECG_K239:
+			util_print_banner("Curve SECG-K239:", 0);
+			break;
+		case EBATS_B251:
+			util_print_banner("Curve EBATS-B251:", 0);
 			break;
 		case NIST_B283:
 			util_print_banner("Curve NIST-B283:", 0);

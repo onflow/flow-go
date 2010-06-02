@@ -130,9 +130,9 @@ static void eb_norm_halve(eb_t r, eb_t p) {
 			fb_new(t0);
 
 			fb_sqr(t0, p->x);
-			fb_copy(r->x, p->x);
 			fb_mul(r->y, p->x, p->y);
 			fb_add(r->y, r->y, t0);
+			fb_copy(r->x, p->x);
 		} CATCH_ANY {
 			THROW(ERR_CAUGHT);
 		}
