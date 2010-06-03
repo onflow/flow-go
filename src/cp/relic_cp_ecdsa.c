@@ -100,7 +100,7 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 		bn_mod(s, s, n);
 		bn_add(s, s, e);
 		bn_mod(s, s, n);
-		bn_gcd_ext(x, NULL, k, n, k);
+		bn_gcd_ext(x, k, NULL, k, n);
 		if (bn_sign(k) == BN_NEG) {
 			bn_add(k, k, n);
 		}

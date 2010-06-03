@@ -87,16 +87,6 @@ void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 	bn_null(q);
 	bn_null(r);
 
-	if (d == NULL && e == NULL) {
-		bn_gcd_basic(c, a, b);
-		return;
-	}
-
-	if (d == NULL) {
-		bn_gcd_ext_basic(c, e, NULL, b, a);
-		return;
-	}
-
 	if (bn_is_zero(a)) {
 		bn_abs(c, b);
 		bn_zero(d);
@@ -375,16 +365,6 @@ void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 	bn_null(t2);
 	bn_null(t3);
 	bn_null(t4);
-
-	if (d == NULL && e == NULL) {
-		bn_gcd_lehme(c, a, b);
-		return;
-	}
-
-	if (d == NULL) {
-		bn_gcd_ext_lehme(c, e, NULL, b, a);
-		return;
-	}
 
 	if (bn_is_zero(a)) {
 		bn_abs(c, b);
@@ -693,16 +673,6 @@ void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 	bn_null(_a);
 	bn_null(_b);
 	bn_null(_e);
-
-	if (d == NULL && e == NULL) {
-		bn_gcd_stein(c, a, b);
-		return;
-	}
-
-	if (d == NULL) {
-		bn_gcd_ext_stein(c, e, NULL, b, a);
-		return;
-	}
 
 	if (bn_is_zero(a)) {
 		bn_abs(c, b);
