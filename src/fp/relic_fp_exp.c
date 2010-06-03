@@ -85,8 +85,8 @@ void fp_exp_basic(fp_t c, fp_t a, bn_t b) {
 #if FP_EXP == SLIDE || !defined(STRIP)
 
 void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
-	fp_t tab[TABLE_SIZE], t, r;
-	int i, j, l, w = 1;
+	fp_t tab[1 << FP_WIDTH], t, r;
+	int i, j, l;
 	unsigned char win[BN_BITS];
 
 	fp_null(t);
@@ -101,9 +101,8 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 
 		/* Find window size. */
 		i = bn_bits(b);
-		w = 4;
 
-		for (i = 1; i < (1 << w); i += 2) {
+		for (i = 1; i < (1 << FP_WIDTH); i += 2) {
 			fp_new(tab[i]);
 		}
 
@@ -116,11 +115,11 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 		fp_sqr(t, a);
 
 		/* Create table. */
-		for (i = 1; i < 1 << (w - 1); i++) {
+		for (i = 1; i < 1 << (FP_WIDTH - 1); i++) {
 			fp_mul(tab[2 * i + 1], tab[2 * i - 1], t);
 		}
 
-		bn_rec_slw(win, &l, b, w);
+		bn_rec_slw(win, &l, b, FP_WIDTH);
 		for (i = 0; i < l; i++) {
 			if (win[i] == 0) {
 				fp_sqr(r, r);
@@ -138,7 +137,7 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		for (i = 1; i < (1 << w); i++) {
+		for (i = 1; i < (1 << FP_WIDTH); i++) {
 			fp_free(tab[i]);
 		}
 		fp_free(t);
