@@ -88,15 +88,17 @@ void fb_copy(fb_t c, fb_t a) {
 void fb_neg(fb_t c, fb_t a) {
 	int i;
 
-	for (i = 0; i < FB_DIGS; i++, c++, a++)
+	for (i = 0; i < FB_DIGS; i++, c++, a++) {
 		*c = *a;
+	}
 }
 
 void fb_zero(fb_t a) {
 	int i;
 
-	for (i = 0; i < FB_DIGS; i++, a++)
+	for (i = 0; i < FB_DIGS; i++, a++) {
 		*a = 0;
+	}
 }
 
 int fb_is_zero(fb_t a) {
@@ -156,12 +158,14 @@ int fb_bits(fb_t a) {
 			continue;
 		}
 		j = util_bits_dig(t);
-		if (j == 0) {
-			continue;
-		}
 		return (i << FB_DIG_LOG) + j;
 	}
 	return 0;
+}
+
+void fb_set_dig(fb_t c, dig_t a) {
+	fb_zero(c);
+	c[0] = a;
 }
 
 void fb_rand(fb_t a) {
@@ -170,11 +174,8 @@ void fb_rand(fb_t a) {
 	rand_bytes((unsigned char *)a, FB_DIGS * sizeof(dig_t));
 	SPLIT(bits, digits, FB_BITS, FB_DIG_LOG);
 	if (bits > 0) {
-		dig_t mask = ((dig_t)1 << (dig_t)bits) - 1;
+		dig_t mask = MASK(bits);
 		a[FB_DIGS - 1] &= mask;
-	}
-	if (fb_cmp(a, fb_poly_get()) != CMP_LT) {
-		fb_addn_low(a, a, fb_poly_get());
 	}
 }
 
@@ -187,7 +188,7 @@ void fb_print(fb_t a) {
 	for (i = FB_DIGS - 2; i >= 0; i--) {
 		util_print("%.*lX ", (int)(2 * sizeof(dig_t)), (unsigned long int)a[i]);
 	}
-	printf("\n");
+	util_print("\n");
 }
 
 void fb_size(int *size, fb_t a, int radix) {
@@ -216,8 +217,8 @@ void fb_size(int *size, fb_t a, int radix) {
 	}
 
 	TRY {
-
 		fb_new(t);
+
 		fb_copy(t, a);
 		digits = 0;
 		while (fb_is_zero(t) == 0) {
@@ -238,6 +239,7 @@ void fb_size(int *size, fb_t a, int radix) {
 void fb_read(fb_t a, const char *str, int len, int radix) {
 	int i, j, l;
 	char c;
+	dig_t carry;
 
 	fb_zero(a);
 
@@ -256,7 +258,10 @@ void fb_read(fb_t a, const char *str, int len, int radix) {
 		}
 
 		if (i < radix) {
-			fb_lshb_low(a, a, l);
+			carry = fb_lshb_low(a, a, l);
+			if (carry != 0) {
+				THROW(ERR_NO_BUFFER);
+			}
 			fb_add_dig(a, a, (dig_t)i);
 		} else {
 			break;
@@ -273,7 +278,7 @@ void fb_write(char *str, int len, fb_t a, int radix) {
 	fb_null(t);
 
 	fb_size(&l, a, radix);
-	if (len < l) {
+	if (len <= l) {
 		THROW(ERR_NO_BUFFER);
 	}
 	len = l;
