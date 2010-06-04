@@ -222,6 +222,21 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #define fp_rdc_monty(C, A)	fp_rdc_monty_comba(C, A)
 #endif
 
+/**
+ * Exponentiates a prime field element. Computes c = a^b (mod p).
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the basis.
+ * @param[in] B				- the exponent.
+ */
+#if FP_EXP == BASIC
+#define fp_exp(C, A, B)		fp_exp_basic(C, A, B)
+#elif FP_EXP == SLIDE
+#define fp_exp(C, A, B)		fp_exp_slide(C, A, B)
+#elif FP_EXP == MONTY
+#define fp_exp(C, A, B)		fp_exp_monty(C, A, B)
+#endif
+
 /*============================================================================*/
 /* Function prototypes                                                        */
 /*============================================================================*/
@@ -316,6 +331,33 @@ void fp_prime_set_dense(bn_t p);
  * @param[in] p			- the new prime field order.
  */
 void fp_prime_set_spars(int *spars, int len);
+
+/**
+ * Imports a multiple precision integer as a prime field element, doing the
+ * necessary conversion.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the multiple precision integer to import.
+ */
+void fp_prime_conv(fp_t c, bn_t a);
+
+/**
+ * Imports a single digit as a prime field element, doing the necessary
+ * conversion.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the digit to import.
+ */
+void fp_prime_conv_dig(fp_t c, dig_t a);
+
+/**
+ * Exports a prime field element as a multiple precision integer, doing the
+ * necessary conversion.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the prime field element to export.
+ */
+void fp_prime_back(bn_t c, fp_t a);
 
 /**
  * Assigns a prime modulus based on its identifier.
@@ -659,14 +701,6 @@ void fp_lsh(fp_t c, fp_t a, int bits);
 void fp_rsh(fp_t c, fp_t a, int bits);
 
 /**
- * Inverts a prime field element. Computes c = a^(-1).
- *
- * @param[out] c			- the result.
- * @param[in] a				- the prime field element to inver.
- */
-void fp_inv(fp_t c, fp_t a);
-
-/**
  * Reduces a multiplication result modulo the prime field modulo using
  * division-based reduction.
  *
@@ -703,30 +737,49 @@ void fp_rdc_monty_comba(fp_t c, dv_t a);
 void fp_rdc_quick(fp_t c, dv_t a);
 
 /**
- * Imports a multiple precision integer as a prime field element, doing the
- * necessary conversion.
+ * Inverts a prime field element. Computes c = a^(-1).
  *
  * @param[out] c			- the result.
- * @param[in] a				- the multiple precision integer to import.
+ * @param[in] a				- the prime field element to inver.
  */
-void fp_prime_conv(fp_t c, bn_t a);
+void fp_inv(fp_t c, fp_t a);
 
 /**
- * Imports a single digit as a prime field element, doing the necessary
- * conversion.
+ * Exponentiates a prime field element using the binary
+ * method.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the digit to import.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
  */
-void fp_prime_conv_dig(fp_t c, dig_t a);
+void fp_exp_basic(fp_t c, fp_t a, bn_t b);
 
 /**
- * Exports a prime field element as a multiple precision integer, doing the
- * necessary conversion.
+ * Exponentiates a prime field element using the sliding window method.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the prime field element to export.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
  */
-void fp_prime_back(bn_t c, fp_t a);
+void fp_exp_slide(fp_t c, fp_t a, bn_t b);
+
+/**
+ * Exponentiates a prime field element using the constant-time Montgomery
+ * powering ladder method.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fp_exp_monty(fp_t c, fp_t a, bn_t b);
+
+/**
+ * Extracts the square root of prime field element. Computes c = sqrt(a). The
+ * other square root is the negation of c.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the prime field element.
+ */
+void fp_srt(fp_t c, fp_t a);
 
 #endif /* !RELIC_FP_H */
