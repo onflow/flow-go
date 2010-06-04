@@ -15,7 +15,7 @@ message("      EB_METHD=BASIC    Affine coordinates.")
 message("      EB_METHD=PROJC    Projective coordinates (López-Dahab for ordinary curves).\n")
 
 message("      EB_METHD=BASIC    Binary method.")
-message("      EB_METHD=CONST    Constant-time López-Dahab point multiplication.")
+message("      EB_METHD=LODAH    López-Dahab constant-time point multiplication.")
 message("      EB_METHD=WTNAF    Window (T)NAF method.")
 message("      EB_METHD=HALVE    Halving method.\n")
 
