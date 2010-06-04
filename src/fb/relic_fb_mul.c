@@ -263,23 +263,24 @@ static void fb_mul_karat_impl(dv_t c, fb_t a, fb_t b, int size, int level) {
 
 void fb_mul_basic(fb_t c, fb_t a, fb_t b) {
 	int i;
-	dv_t s, t;
+	dv_t s;
+	fb_t t;
 
 	dv_null(s);
-	dv_null(t);
+	fb_null(t);
 
 	TRY {
 		/* We need a temporary variable so that c can be a or b. */
-		dv_new(t);
+		fb_new(t);
 		dv_new(s);
-		dv_zero(t, 2 * FB_DIGS);
-		dv_zero(s, 2 * FB_DIGS);
+		fb_zero(t);
+		dv_zero(s + FB_DIGS, FB_DIGS);
 		fb_copy(s, b);
 
 		if (a[0] & 1) {
 			fb_copy(t, b);
 		}
-		for (i = 1; i <= FB_BITS - 1; i++) {
+		for (i = 1; i < FB_BITS; i++) {
 			/* We are already shifting a temporary value, so this is more efficient
 			 * than calling fb_lsh(). */
 			fb_lsh1_low(s, s);
@@ -289,14 +290,18 @@ void fb_mul_basic(fb_t c, fb_t a, fb_t b) {
 			}
 		}
 
-		fb_rdc(c, t);
+		if (fb_bits(t) > FB_BITS) {
+			fb_poly_add(c, t);
+		} else {
+			fb_copy(c, t);
+		}
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		dv_free(t);
-		dv_free(s);
+		fb_free(t);
+		fb_free(s);
 	}
 }
 
