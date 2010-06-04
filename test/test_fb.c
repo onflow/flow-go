@@ -1000,14 +1000,6 @@ int main(void) {
 		return 0;
 	}
 
-	int j = 0;
-	for (int i = 0; i < FB_BITS; i++) {
-		if (fb_test_bit(fb_poly_get_srz(), i)) {
-			j++;
-		}
-	}
-	printf("%d terms\n", j);
-
 	util_print_banner("Utilities", 1);
 	if (memory() != STS_OK) {
 		core_clean();
