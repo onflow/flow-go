@@ -102,6 +102,13 @@ static void util(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fb_set_dig") {
+		fb_rand(a);
+		fb_rand(b);
+		BENCH_ADD(fb_set_dig(a, b[0]));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fb_bits") {
 		fb_rand(a);
 		BENCH_ADD(fb_bits(a));
@@ -187,6 +194,18 @@ static void arith(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fb_poly_add") {
+		fb_rand(a);
+		BENCH_ADD(fb_poly_add(c, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb_poly_sub") {
+		fb_rand(a);
+		BENCH_ADD(fb_poly_sub(c, a));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fb_mul") {
 		fb_rand(a);
 		fb_rand(b);
@@ -197,7 +216,7 @@ static void arith(void) {
 	BENCH_BEGIN("fb_mul_dig") {
 		fb_rand(a);
 		fb_rand(b);
-		BENCH_ADD(fb_mul_dig(c, a, b[0]));
+		BENCH_ADD(fb_mul_dig(c, a, eb_curve_get_b()[0]));
 	}
 	BENCH_END;
 
@@ -409,6 +428,22 @@ static void arith(void) {
 	BENCH_BEGIN("fb_inv_basic") {
 		fb_rand(a);
 		BENCH_ADD(fb_inv_basic(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if FB_INV == BINAR || !defined(STRIP)
+	BENCH_BEGIN("fb_inv_binar") {
+		fb_rand(a);
+		BENCH_ADD(fb_inv_binar(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if FB_INV == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fb_inv_integ") {
+		fb_rand(a);
+		BENCH_ADD(fb_inv_integ(c, a));
 	}
 	BENCH_END;
 #endif

@@ -64,7 +64,9 @@ void fb_inv_basic(fb_t c, fb_t a) {
 		while (x != 0) {
 			/* u = u * a^{2x}. */
 			fb_copy(t, u);
-			fb_exp_2b(t, t, x);
+			for (i = 0; i < x; i++) {
+				fb_sqr(t, t);
+			}
 			fb_mul(u, u, t);
 			if ((x & 0x01) == 0) {
 				x = x >> 1;

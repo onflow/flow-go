@@ -152,7 +152,7 @@ static void find_solve() {
 	TRY {
 		fb_new(t0);
 
-		for (i = FB_BITS - 2; i >= 1; i-=2) {
+		for (i = FB_BITS - 2; i >= 1; i -=2 ) {
 			fb_zero(t0);
 			fb_set_bit(t0, i, 1);
 			fb_copy(half[i/2], t0);
@@ -179,49 +179,40 @@ static void find_solve() {
 /**
  * Square root of z.
  */
-static fb_st fb_sqrt;
+static fb_st fb_srz;
+
+#ifdef FB_PRECO
+/**
+ * Multiplication table for the z^(1/2).
+ */
+static fb_st fb_tab_srz[600];
+
+#endif
 
 /**
- * Precomputes half-traces for z^i with odd i.
- *
- * @throw ERR_NO_MEMORY if there is no available memory.
+ * Precomputes the square root of z.
  */
-static void find_sqrt() {
-	fb_set_bit(fb_sqrt, 1, 1);
+void find_srz() {
+	fb_set_bit(fb_srz, 1, 1);
 
 	for (int i = 1; i < FB_BITS; i++) {
-		fb_sqr(fb_sqrt, fb_sqrt);
+		fb_sqr(fb_srz, fb_srz);
 	}
+#ifdef FB_PRECO
+	for (int i = 0; i <= 255; i++) {
+		fb_mul_dig(fb_tab_srz[i], fb_srz, i);
+	}
+#endif
 }
 
 #endif
 
-/*============================================================================*/
-/* Public definitions                                                         */
-/*============================================================================*/
-
-void fb_poly_init(void) {
-	fb_zero(poly);
-	poly_a = poly_b = poly_c = -1;
-	pos_a = pos_b = pos_c = -1;
-}
-
-void fb_poly_clean(void) {
-}
-
-dig_t *fb_poly_get(void) {
-	return poly;
-}
-
-dig_t *fb_poly_get_srt(void) {
-#if FB_SRT == QUICK || !defined(STRIP)
-	return fb_sqrt;
-#else
-	return NULL;
-#endif
-}
-
-void fb_poly_set(fb_t f) {
+/**
+ * Configures the irreducible polynomial of the binary field.
+ *
+ * @param[in] f				- the new irreducible polynomial.
+ */
+static void fb_poly_set(fb_t f) {
 	fb_copy(poly, f);
 #if FB_TRC == QUICK || !defined(STRIP)
 	find_trace();
@@ -230,8 +221,25 @@ void fb_poly_set(fb_t f) {
 	find_solve();
 #endif
 #if FB_SRT == QUICK || !defined(STRIP)
-	find_sqrt();
+	find_srz();
 #endif
+}
+
+/*============================================================================*/
+/* Public definitions                                                         */
+/*============================================================================*/
+
+void fb_poly_init(void) {
+	fb_zero(poly);
+	poly_a = poly_b = poly_c = 0;
+	pos_a = pos_b = pos_c = -1;
+}
+
+void fb_poly_clean(void) {
+}
+
+dig_t *fb_poly_get(void) {
+	return poly;
 }
 
 void fb_poly_add(fb_t c, fb_t a) {
@@ -250,10 +258,22 @@ void fb_poly_add(fb_t c, fb_t a) {
 				c[pos_c] ^= poly[pos_c];
 			}
 		}
-		c[0] ^= 1;
+		if (pos_a != 0 && pos_b != 0 && pos_c != 0) {
+			c[0] ^= 1;
+		}
 	} else {
 		fb_add(c, a, poly);
 	}
+}
+
+void fb_poly_sub(fb_t c, fb_t a) {
+	return fb_poly_add(c, a);
+}
+
+void fb_poly_set_dense(fb_t f) {
+	fb_poly_set(f);
+	poly_a = poly_b = poly_c = 0;
+	pos_a = pos_b = pos_c = -1;
 }
 
 void fb_poly_set_trino(int a) {
@@ -263,7 +283,7 @@ void fb_poly_set_trino(int a) {
 
 	TRY {
 		poly_a = a;
-		poly_b = poly_c = -1;
+		poly_b = poly_c = 0;
 
 		pos_a = poly_a >> FB_DIG_LOG;
 		pos_b = pos_c = -1;
@@ -313,6 +333,28 @@ void fb_poly_set_penta(int a, int b, int c) {
 	FINALLY {
 		fb_free(f);
 	}
+}
+
+dig_t *fb_poly_get_srz(void) {
+#if FB_SRT == QUICK || !defined(STRIP)
+	return fb_srz;
+#else
+	return NULL;
+#endif
+}
+
+dig_t *fb_poly_tab_srz(int i) {
+#if FB_SRT == QUICK || !defined(STRIP)
+
+#ifdef FB_PRECO
+	return fb_tab_srz[i];
+#else
+	return NULL;
+#endif
+
+#else
+	return NULL;
+#endif
 }
 
 void fb_poly_get_trc(int *a, int *b, int *c) {

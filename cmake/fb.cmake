@@ -1,16 +1,18 @@
 message(STATUS "Binary field arithmetic configuration (FB module):\n")
 
-message("   ** Options for the binary elliptic curve module (default = 283,0,on):")
+message("   ** Options for the binary elliptic curve module (default = 283,0,on,on,on):")
 message("      FB_POLYN=n        The irreducible polynomial size in bits.")
 message("      FB_KARAT=n        The number of Karatsuba levels.") 
-message("      FB_TRINO=[off|on] Prefer trinomials over pentanomials.\n")
+message("      FB_TRINO=[off|on] Prefer trinomials.")
+message("      FB_SQRTF=[off|on] Prefer square-root friendly polynomials.")
+message("      FB_PRECO=[off|on] Precompute multiplication table for sqrt(z).\n")
 
-message("   ** Available binary field arithmetic methods (default = LODAH;TABLE;QUICK;BASIC;QUICK;EXGCD;QUICK):")
+message("   ** Available binary field arithmetic methods (default = LODAH;TABLE;QUICK;BASIC;QUICK;QUICK;EXGCD):")
 message("      FB_METHD=BASIC    Right-to-left shift-and-add multiplication.")
 message("      FB_METHD=INTEG    Integrated modular multiplication.")
 message("      FB_METHD=RCOMB    Right-to-left comb multiplication.")
 message("      FB_METHD=LCOMB    Left-to-right comb multiplication.")
-message("      FB_METHD=LODAH    López-Dahab multiplication with window of width 4.")
+message("      FB_METHD=LODAH    López-Dahab comb multiplication with window of width 4.\n")
 
 message("      FB_METHD=BASIC    Bit manipulation squaring.")
 message("      FB_METHD=INTEG    Integrated modular squaring.")
@@ -28,10 +30,12 @@ message("      FB_METHD=QUICK    Fast trace computation.\n")
 message("      FB_METHD=BASIC    Solve a quadratic equation by half-trace computation.")
 message("      FB_METHD=QUICK    Fast solving with precomputed half-traces.\n")
 
-message("      FB_METHD=BASIC    Shift-and-add inversion.")
+message("      FB_METHD=BASIC    Inversion by Fermat's Little Theorem.")
+message("      FB_METHD=BINAR    Binary Inversion algorithm.")
+message("      FB_METHD=INTEG    Integrated modular squaring.")
 message("      FB_METHD=EXGCD    Inversion by the Extended Euclidean algorithm.")
 message("      FB_METHD=ALMOS    Inversion by the Amost inverse algorithm.\n")
-message("      Note: these methods must be given in order. Ex: FB_METHD=\"INTEG;TABLE;QUICK;BASIC;ALMOS\"\n")
+message("      Note: these methods must be given in order. Ex: FB_METHD=\"INTEG;INTEG;QUICK;QUICK;QUICK;QUICK;ALMOS\"\n")
 
 # Choose the polynomial size.
 if (NOT FB_POLYN)
@@ -45,7 +49,9 @@ if (NOT FB_KARAT)
 endif(NOT FB_KARAT)
 set(FB_KARAT ${FB_KARAT} CACHE INTEGER "Number of Karatsuba levels.")
 
-option(FB_TRINO "Prefer trinomials over pentanomials." on)
+option(FB_TRINO "Prefer trinomials." on)
+option(FB_SQRTF "Prefer square-root friendly polynomials." off)
+option(FB_PRECO "Precompute multiplication table for sqrt(z)." on)
 
 # Choose the arithmetic methods.
 if (NOT FB_METHD)

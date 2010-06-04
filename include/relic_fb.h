@@ -73,22 +73,44 @@
  * Finite field identifiers.
  */
 enum {
+	/** Hankerson's trinomial for GLS curves. */
+	TRINO_113 = 1,
+	/** Hankerson's trinomial for GLS curves. */
+	TRINO_127 = 2,
 	/** NIST 163-bit fast reduction polynomial. */
-	NIST_163 = 1,
+	NIST_163 = 3,
+	/** Square-root friendly 163-bit polynomial. */
+	SQRT_163 = 4,
 	/** NIST 233-bit fast reduction polynomial. */
-	NIST_233 = 2,
-	/** NIST 283-bit fast reduction polynomial. */
-	NIST_283 = 3,
-	/** NIST 409-bit fast reduction polynomial. */
-	NIST_409 = 4,
-	/** NIST 521-bit fast reduction polynomial. */
-	NIST_571 = 5,
+	NIST_233 = 5,
+	/** Square-root friendly 163-bit polynomial. */
+	SQRT_233 = 6,
+	/** SECG 239-bit fast reduction polynomial. */
+	SECG_239 = 7,
+	/** Square-root friendly 239-bit polynomial. */
+	SQRT_239 = 8,
+	/** Square-root friendly 251-bit polynomial. */
+	SQRT_251 = 9,
+	/** eBATS curve_2_251 pentanomial. */
+	PENTA_251 = 10,
+	/** Hankerson's trinomial for GLS curves. */
+	TRINO_257 = 11,
 	/** Mike Scott's 271-bit pairing-friendly trinomial. */
-	TRINO_271 = 6,
+	TRINO_271 = 12,
 	/** Mike Scott's 271-bit pairing-friendly pentanomial. */
-	PENTA_271 = 7,
+	PENTA_271 = 13,
+	/** NIST 283-bit fast reduction polynomial. */
+	NIST_283 = 14,
+	/** Square-root friendly 283-bit polynomial. */
+	SQRT_283 = 15,
+	/** NIST 409-bit fast reduction polynomial. */
+	NIST_409 = 16,
+	/** NIST 571-bit fast reduction polynomial. */
+	NIST_571 = 17,
+	/** Square-root friendly 571-bit polynomial. */
+	SQRT_571 = 18,
 	/** Mike Scott's 1223-bit pairing-friendly trinomial. */
-	TRINO_1223 = 8
+	TRINO_1223 = 19
 };
 
 /*============================================================================*/
@@ -251,13 +273,15 @@ typedef align dig_t fb_st[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
  */
 #if FB_INV == BASIC
 #define fb_inv(C, A)	fb_inv_basic(C, A)
+#elif FB_INV == BINAR
+#define fb_inv(C, A)	fb_inv_binar(C, A)
+#elif FB_INV == INTEG
+#define fb_inv(C, A)	fb_inv_integ(C, A)
 #elif FB_INV == EXGCD
 #define fb_inv(C, A)	fb_inv_exgcd(C, A)
 #elif FB_INV == ALMOS
 #define fb_inv(C, A)	fb_inv_almos(C, A)
 #endif
-
-
 
 /*============================================================================*/
 /* Function prototypes                                                        */
@@ -281,18 +305,12 @@ void fb_poly_clean(void);
 dig_t *fb_poly_get(void);
 
 /**
- * Returns the square root of z.
- *
- * @return the square root of z.
- */
-dig_t *fb_poly_get_srt(void);
-
-/**
- * Configures the irreducible polynomial of the binary field.
+ * Configures the irreducible polynomial of the binary field as a dense
+ * polynomial.
  *
  * @param[in] f				- the new irreducible polynomial.
  */
-void fb_poly_set(fb_t f);
+void fb_poly_set_dense(fb_t f);
 
 /**
  * Configures a trinomial as the irreducible polynomial by its non-zero
@@ -311,6 +329,27 @@ void fb_poly_set_trino(int a);
  * @param[in] c				- the fourth coefficient.
  */
 void fb_poly_set_penta(int a, int b, int c);
+
+/**
+ * Returns the square root of z.
+ *
+ * @return the square root of z.
+ */
+dig_t *fb_poly_get_srz(void);
+
+/**
+ * Returns sqrt(z) * (i represented as a polynomial).
+ *
+ * @return the precomputed result.
+ */
+dig_t *fb_poly_tab_srz(int i);
+
+/**
+ * Returns the consecutive squaring (i as a polynomial * z^4j)^{2^k}.
+ *
+ * @return the precomputed result.
+ */
+dig_t *fb_poly_get_tab_sqr(int i, int j, int k);
 
 /**
  * Returns the non-zero coefficients of the configured trinomial or pentanomial.
@@ -336,6 +375,7 @@ void fb_poly_get_trc(int *a, int *b, int *c);
 /**
  * Returns the half-trace of z^i, for odd i.
  *
+ * @param[in] i				- the argument.
  * @return the precomputed half-trace.
  */
 dig_t *fb_poly_get_slv(int i);
@@ -361,11 +401,19 @@ void fb_param_print(void);
  * Adds a binary field element and the irreducible polynomial. Computes
  * c = a + f(z).
  *
- *
  * @param[out] c			- the destination.
  * @param[in] a				- the binary field element.
  */
 void fb_poly_add(fb_t c, fb_t a);
+
+/**
+ * Subtracts the irreducible polynomial from a binary field element. Computes
+ * c = a - f(z).
+ *
+ * @param[out] c			- the destination.
+ * @param[in] a				- the binary field element.
+ */
+void fb_poly_sub(fb_t c, fb_t a);
 
 #if ALLOC == DYNAMIC
 /**
@@ -385,19 +433,18 @@ void fb_new_dynam(fb_t *a);
 void fb_new_statc(fb_t *a);
 #endif
 
-
 #if ALLOC == DYNAMIC
 /**
  * Cleans and frees a binary field element with dynamic allocation.
  *
- * @param[out] a			- the prime field element to free.
+ * @param[out] a			- the binary field element to free.
  */
 void fb_free_dynam(fb_t *a);
 #else /* ALLOC == STATIC */
 /**
  * Cleans and frees a binary field element with static allocation.
  *
- * @param[out] a			- the prime field element to free.
+ * @param[out] a			- the binary field element to free.
  */
 void fb_free_statc(fb_t *a);
 #endif
@@ -434,7 +481,7 @@ void fb_zero(fb_t a);
 int fb_is_zero(fb_t a);
 
 /**
- * Tests the bit in the given position on a multiple precision integer.
+ * Tests if the bit in a given position is non-zero on a binary field element.
  *
  * @param[in] a				- the binary field element to test.
  * @param[in] bit			- the bit position.
@@ -461,6 +508,16 @@ int fb_get_bit(fb_t a, int bit);
 void fb_set_bit(fb_t a, int bit, int value);
 
 /**
+ * Assigns a small positive polynomial to a binary field element.
+ *
+ * The degree of the polynomial must be smaller than FB_DIGIT.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the small polynomial to assign.
+ */
+void fb_set_dig(fb_t c, dig_t a);
+
+/**
  * Returns the number of bits of a binary field element.
  *
  * @param[in] a				- the binary field element.
@@ -483,8 +540,8 @@ void fb_rand(fb_t a);
 void fb_print(fb_t a);
 
 /**
- * Returns the number of digits in radix necessary to store a multiple precision
- * integer. The radix must be a power of 2 included in the interval [2, 64].
+ * Returns the number of digits in radix necessary to store a binary field
+ * element. The radix must be a power of 2 included in the interval [2, 64].
  *
  * @param[out] size			- the result.
  * @param[in] a				- the binary field element.
@@ -501,6 +558,7 @@ void fb_size(int *size, fb_t a, int radix);
  * @param[in] str			- the string.
  * @param[in] len			- the size of the string.
  * @param[in] radix			- the radix.
+ * @throw ERR_NO_BUFFER		- if the string if too long.
  * @throw ERR_INVALID		- if the radix is invalid.
  */
 void fb_read(fb_t a, const char *str, int len, int radix);
@@ -513,7 +571,7 @@ void fb_read(fb_t a, const char *str, int len, int radix);
  * @param[in] len			- the buffer capacity.
  * @param[in] a				- the binary field element to write.
  * @param[in] radix			- the radix.
- * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  * @throw ERR_INVALID		- if the radix is invalid.
  */
 void fb_write(char *str, int len, fb_t a, int radix);
@@ -648,7 +706,7 @@ void fb_mul_karat(fb_t c, fb_t a, fb_t b);
 void fb_sqr_basic(fb_t c, fb_t a);
 
 /**
- * Squares a binary field element with integrated with modular reduction.
+ * Squares a binary field element with integrated modular reduction.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to square.
@@ -744,12 +802,28 @@ void fb_trc_basic(fb_t c, fb_t a);
 void fb_trc_quick(fb_t c, fb_t a);
 
 /**
- * Inverts a binary field element using the binary method.
+ * Inverts a binary field element using Fermat's Little Theorem.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to invert.
  */
 void fb_inv_basic(fb_t c, fb_t a);
+
+/**
+ * Inverts a binary field element using the binary method.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the binary field element to invert.
+ */
+void fb_inv_binar(fb_t c, fb_t a);
+
+/**
+ * Inverts a binary field element using a direct call to the lower layer.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the binary field element to invert.
+ */
+void fb_inv_integ(fb_t c, fb_t a);
 
 /**
  * Inverts a binary field element using the Extended Euclidean algorithm.
