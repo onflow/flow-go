@@ -279,6 +279,7 @@ static void arith(void) {
 	BENCH_BEGIN("ep_mul") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
+		ep_rand(p);
 		BENCH_ADD(ep_mul(q, p, k));
 	}
 	BENCH_END;
@@ -309,7 +310,7 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-	for (int i = 0; i < EP_TABLE_BASIC; i++) {
+	for (int i = 0; i < EP_TABLE; i++) {
 		ep_new(t[i]);
 	}
 
@@ -327,8 +328,15 @@ static void arith(void) {
 	}
 	BENCH_END;
 
+	for (int i = 0; i < EP_TABLE; i++) {
+		ep_free(t[i]);
+	}
+
 #if EP_FIX == BASIC || !defined(STRIP)
-		BENCH_BEGIN("ep_mul_pre_basic") {
+	for (int i = 0; i < EP_TABLE_BASIC; i++) {
+		ep_new(t[i]);
+	}
+	BENCH_BEGIN("ep_mul_pre_basic") {
 		BENCH_ADD(ep_mul_pre_basic(t, p));
 	}
 	BENCH_END;
@@ -341,9 +349,15 @@ static void arith(void) {
 		BENCH_ADD(ep_mul_fix_basic(q, t, k));
 	}
 	BENCH_END;
+	for (int i = 0; i < EP_TABLE_BASIC; i++) {
+		ep_free(t[i]);
+	}
 #endif
 
 #if EP_FIX == YAOWI || !defined(STRIP)
+	for (int i = 0; i < EP_TABLE_YAOWI; i++) {
+		ep_new(t[i]);
+	}
 	BENCH_BEGIN("ep_mul_pre_yaowi") {
 		BENCH_ADD(ep_mul_pre_yaowi(t, p));
 	}
@@ -356,9 +370,15 @@ static void arith(void) {
 		BENCH_ADD(ep_mul_fix_yaowi(q, t, k));
 	}
 	BENCH_END;
+	for (int i = 0; i < EP_TABLE_YAOWI; i++) {
+		ep_free(t[i]);
+	}
 #endif
 
 #if EP_FIX == NAFWI || !defined(STRIP)
+	for (int i = 0; i < EP_TABLE_NAFWI; i++) {
+		ep_new(t[i]);
+	}
 	BENCH_BEGIN("ep_mul_pre_nafwi") {
 		BENCH_ADD(ep_mul_pre_nafwi(t, p));
 	}
@@ -371,9 +391,15 @@ static void arith(void) {
 		BENCH_ADD(ep_mul_fix_nafwi(q, t, k));
 	}
 	BENCH_END;
+	for (int i = 0; i < EP_TABLE_NAFWI; i++) {
+		ep_free(t[i]);
+	}
 #endif
 
 #if EP_FIX == COMBS || !defined(STRIP)
+	for (int i = 0; i < EP_TABLE_COMBS; i++) {
+		ep_new(t[i]);
+	}
 	BENCH_BEGIN("ep_mul_pre_combs") {
 		BENCH_ADD(ep_mul_pre_combs(t, p));
 	}
@@ -387,9 +413,15 @@ static void arith(void) {
 		BENCH_ADD(ep_mul_fix_combs(q, t, k));
 	}
 	BENCH_END;
+	for (int i = 0; i < EP_TABLE_COMBS; i++) {
+		ep_free(t[i]);
+	}
 #endif
 
 #if EP_FIX == COMBD || !defined(STRIP)
+	for (int i = 0; i < EP_TABLE_COMBD; i++) {
+		ep_new(t[i]);
+	}
 	BENCH_BEGIN("ep_mul_pre_combd") {
 		BENCH_ADD(ep_mul_pre_combd(t, p));
 	}
@@ -402,9 +434,15 @@ static void arith(void) {
 		BENCH_ADD(ep_mul_fix_combd(q, t, k));
 	}
 	BENCH_END;
+	for (int i = 0; i < EP_TABLE_COMBD; i++) {
+		ep_free(t[i]);
+	}
 #endif
 
 #if EP_FIX == WTNAF || !defined(STRIP)
+	for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+		ep_new(t[i]);
+	}
 	BENCH_BEGIN("ep_mul_pre_wtnaf") {
 		BENCH_ADD(ep_mul_pre_wtnaf(t, p));
 	}
@@ -417,14 +455,17 @@ static void arith(void) {
 		BENCH_ADD(ep_mul_fix_wtnaf(q, t, k));
 	}
 	BENCH_END;
+	for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+		ep_free(t[i]);
+	}
 #endif
-
 	BENCH_BEGIN("ep_mul_sim") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		bn_rand(l, BN_POS, bn_bits(n));
 		bn_mod(l, l, n);
-		ep_mul(q, p, k);
+		ep_rand(p);
+		ep_rand(q);
 		BENCH_ADD(ep_mul_sim(r, p, k, q, l));
 	}
 	BENCH_END;
@@ -435,7 +476,8 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		bn_rand(l, BN_POS, bn_bits(n));
 		bn_mod(l, l, n);
-		ep_mul(q, p, k);
+		ep_rand(p);
+		ep_rand(q);
 		BENCH_ADD(ep_mul_sim_basic(r, p, k, q, l));
 	}
 	BENCH_END;
@@ -447,7 +489,8 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		bn_rand(l, BN_POS, bn_bits(n));
 		bn_mod(l, l, n);
-		ep_mul(q, p, k);
+		ep_rand(p);
+		ep_rand(q);
 		BENCH_ADD(ep_mul_sim_trick(r, p, k, q, l));
 	}
 	BENCH_END;
@@ -459,7 +502,8 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		bn_rand(l, BN_POS, bn_bits(n));
 		bn_mod(l, l, n);
-		ep_mul(q, p, k);
+		ep_rand(p);
+		ep_rand(q);
 		BENCH_ADD(ep_mul_sim_inter(r, p, k, q, l));
 	}
 	BENCH_END;
@@ -471,7 +515,8 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		bn_rand(l, BN_POS, bn_bits(n));
 		bn_mod(l, l, n);
-		ep_mul(q, p, k);
+		ep_rand(p);
+		ep_rand(q);
 		BENCH_ADD(ep_mul_sim_joint(r, p, k, q, l));
 	}
 	BENCH_END;
@@ -482,7 +527,7 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		bn_rand(l, BN_POS, bn_bits(n));
 		bn_mod(l, l, n);
-		ep_mul(q, p, k);
+		ep_rand(q);
 		BENCH_ADD(ep_mul_sim_gen(r, k, q, l));
 	}
 	BENCH_END;
