@@ -95,6 +95,8 @@
 #cmakedefine WITH_FP
 /** Build binary field module. */
 #cmakedefine WITH_FB
+/** Build ternary field module. */
+#cmakedefine WITH_FT
 /** Build prime elliptic curve module. */
 #cmakedefine WITH_EP
 /** Build binary elliptic curve module. */
@@ -162,10 +164,10 @@
 
 /** Binary modular exponentiation. */
 #define BASIC    1
-/** Constant-time Montgomery ladder modular exponentiation. */
-#define CONST    2
 /** Sliding window modular exponentiation. */
-#define SLIDE    3
+#define SLIDE    2
+/** Constant-time Montgomery powering ladder. */
+#define MONTY    3
 /** Chosen multiple precision modular exponentiation method. */
 #define BN_MXP   @BN_MXP@
 
@@ -193,6 +195,8 @@
 #define FP_KARAT @FP_KARAT@
 /** Prefer Pseudo-Mersenne primes over random primes. */
 #cmakedefine FP_PMERS
+/** Width of window processing for exponentiation methods. */
+#define FP_WIDTH @FP_WIDTH@
 
 /** Prime field arithmetic method */
 #define FP_METHD "@FP_METHD@"
@@ -224,12 +228,23 @@
 /** Chosen prime field reduction method. */
 #define FP_RDC   @FP_RDC@
 
+/** Binary modular exponentiation. */
+#define BASIC    1
+/** Sliding window modular exponentiation. */
+#define SLIDE    2
+/** Constant-time Montgomery powering ladder. */
+#define MONTY    3
+/** Chosen multiple precision modular exponentiation method. */
+#define FP_EXP   @FP_EXP@
+
 /** Irreducible polynomial size in bits. */
 #define FB_POLYN @FB_POLYN@
 /** Number of Karatsuba steps. */
 #define FB_KARAT @FB_KARAT@
 /** Prefer trinomials over pentanomials. */
 #cmakedefine FB_TRINO
+/** Prefer square-root friendly polynomials. */
+#cmakedefine FB_SQRTF
 /** Precompute multiplication table for sqrt(z). */
 #cmakedefine FB_PRECO
 
@@ -290,12 +305,58 @@
 #define BASIC    1
 /** Binary inversion. */
 #define BINAR    2
+/** Integrated modular multiplication. */
+#define INTEG    3
 /** Extended Euclidean algorithm. */
-#define EXGCD    3
+#define EXGCD    4
 /** Almost inverse algorithm. */
-#define ALMOS    4
+#define ALMOS    5
 /** Chosen binary field inversion method. */
 #define FB_INV   @FB_INV@ 
+
+/** Irreducible polynomial size in bits. */
+#define FT_POLYN @FT_POLYN@
+/** Number of Karatsuba steps. */
+#define FT_KARAT @FT_KARAT@
+/** Prefer trinomials over pentanomials. */
+#cmakedefine FT_TRINO
+/** Precompute multiplication table for cbrt(z). */
+#cmakedefine FT_PRECO
+
+/** Ternary field arithmetic method */
+#define FT_METHD "@FT_METHD@"
+
+/** Shift-and-add multiplication. */
+#define BASIC    1
+/** Lopez-Dahab multiplication. */
+#define LODAH	 2
+/** Integrated modular multiplication. */
+#define INTEG	 3
+/** Chosen ternary field multiplication method. */
+#define FT_MUL   @FT_MUL@
+
+/** Basic cubing. */
+#define BASIC    1
+/** Table-based cubing. */
+#define TABLE    2
+/** Integrated modular cubing. */
+#define INTEG	 3
+/** Chosen ternary field cubing method. */
+#define FT_CUB   @FT_CUB@
+
+/** Shift-and-add modular reduction. */
+#define BASIC    1
+/** Fast reduction modulo a trinomial or pentanomial. */
+#define QUICK	 2
+/** Chosen ternary field modular reduction method. */
+#define FT_RDC   @FT_RDC@
+
+/** Square root by repeated cubing. */
+#define BASIC    1
+/** Fast cube root extraction. */
+#define QUICK	 2
+/** Chosen binary field modular reduction method. */
+#define FT_CRT   @FT_CRT@
 
 /** Support for ordinary curves. */
 #cmakedefine EP_ORDIN
@@ -331,10 +392,10 @@
 
 /** Binary point multiplication. */ 
 #define BASIC	 1
-/** Constant-time point multiplication. */
-#define CONST	 2
 /** Sliding window. */ 
-#define SLIDE    3
+#define SLIDE    2
+/** Montgomery powering ladder. */
+#define MONTY	 3
 /** 4-width (T)NAF. */ 
 #define WTNAF	 4
 /** Chosen prime elliptic curve point multiplication method. */
@@ -395,14 +456,12 @@
 
 /** Binary point multiplication. */ 
 #define BASIC	 1
-/** Constant-time point multiplication. */
-#define CONST	 2
-/** Sliding window. */ 
-#define SLIDE    3
+/** López-Dahab point multiplication. */
+#define LODAH	 2
+/** Halving. */
+#define HALVE    3
 /** 4-width (T)NAF. */ 
 #define WTNAF	 4
-/** Halving. */
-#define HALVE    5
 /** Chosen binary elliptic curve point multiplication method. */
 #define EB_MUL	 @EB_MUL@
 
