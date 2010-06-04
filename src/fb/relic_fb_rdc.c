@@ -61,7 +61,7 @@ void fb_rdc_basic(fb_t c, dv_t a) {
 		tmpa = a + FB_DIGS;
 
 		/* First reduce the high part. */
-		for (int i = fb_bits(tmpa); i >= 0; i--) {
+		for (int i = fb_bits(tmpa) - 1; i >= 0; i--) {
 			if (fb_test_bit(tmpa, i)) {
 				SPLIT(k, j, i - FB_BITS, FB_DIG_LOG);
 				if (k <= 0) {
@@ -72,7 +72,7 @@ void fb_rdc_basic(fb_t c, dv_t a) {
 				}
 			}
 		}
-		for (int i = fb_bits(a); i >= FB_BITS; i--) {
+		for (int i = fb_bits(a) - 1; i >= FB_BITS; i--) {
 			if (fb_test_bit(a, i)) {
 				SPLIT(k, j, i - FB_BITS, FB_DIG_LOG);
 				if (k == 0) {
