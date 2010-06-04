@@ -324,14 +324,10 @@ typedef eb_st *eb_t;
 #define eb_mul(R, P, K)		eb_mul_basic(R, P, K)
 #elif EB_MUL == LODAH
 #define eb_mul(R, P, K)		eb_mul_lodah(R, P, K)
-#elif EB_MUL == SLIDE
-#define eb_mul(R, P, K)		eb_mul_slide(R, P, K)
-#elif EB_MUL == WTNAF
-#define eb_mul(R, P, K)		eb_mul_wtnaf(R, P, K)
 #elif EB_MUL == HALVE
 #define eb_mul(R, P, K)		eb_mul_halve(R, P, K)
-#elif EB_MUL == MSTAM
-#define eb_mul(R, P, K)		eb_mul_mstam(R, P, K)
+#elif EB_MUL == WTNAF
+#define eb_mul(R, P, K)		eb_mul_wtnaf(R, P, K)
 #endif
 
 /**
@@ -774,16 +770,6 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k);
  * @param[in] k				- the integer.
  */
 void eb_mul_lodah(eb_t r, eb_t p, bn_t k);
-
-/**
- * Multiplies a binary elliptic point by an integer using the constant-time
- * Stam's point multiplication method.
- *
- * @param[out] r			- the result.
- * @param[in] p				- the point to multiply.
- * @param[in] k				- the integer.
- */
-void eb_mul_mstam(eb_t r, eb_t p, bn_t k);
 
 /**
  * Multiplies a binary elliptic point by an integer using the w-NAF method.
