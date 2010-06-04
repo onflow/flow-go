@@ -370,7 +370,7 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k) {
 #if EB_MUL == LODAH || !defined(STRIP)
 
 void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
-	int i, t, koblitz;
+	int i, t;
 	fb_t x1, z1, x2, z2, r1, r2, r3, r4;
 	dig_t *b;
 
@@ -402,12 +402,18 @@ void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
 
 		b = eb_curve_get_b();
 
-		koblitz = eb_curve_is_kbltz();
-
-		if (!koblitz) {
-			fb_add(x2, x2, b);
-		} else {
-			fb_add_dig(x2, x2, (dig_t)1);
+		switch (eb_curve_opt_b()) {
+			case OPT_ZERO:
+				break;
+			case OPT_ONE:
+				fb_add_dig(x2, x2, (dig_t)1);
+				break;
+			case OPT_DIGIT:
+				fb_add_dig(x2, x2, b[0]);
+				break;
+			default:
+				fb_add(x2, x2, b);
+				break;
 		}
 
 		t = bn_bits(k);
@@ -423,56 +429,54 @@ void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
 				fb_sqr(r1, z2);
 				fb_sqr(r2, x2);
 				fb_mul(z2, r1, r2);
-				if (!koblitz) {
-					fb_sqr(x2, r2);
-					fb_sqr(r1, r1);
-					switch (eb_curve_opt_b()) {
-						case OPT_ZERO:
-							break;
-						case OPT_ONE:
-							fb_add_dig(x2, x2, 1);
-							break;
-						case OPT_DIGIT:
-							fb_mul_dig(r2, r1, b[0]);
-							fb_add(x2, x2, r2);
-							break;
-						default:
-							fb_mul(r2, r1, b);
-							fb_add(x2, x2, r2);
-							break;
-					}
-				} else {
-					fb_add(r1, r1, r2);
-					fb_sqr(x2, r1);
+				switch (eb_curve_opt_b()) {
+					case OPT_ZERO:
+						fb_sqr(x2, r2);
+						break;
+					case OPT_ONE:
+						fb_add(r1, r1, r2);
+						fb_sqr(x2, r1);
+						break;
+					case OPT_DIGIT:
+						fb_sqr(x2, r2);
+						fb_sqr(r1, r1);
+						fb_mul_dig(r2, r1, b[0]);
+						fb_add(x2, x2, r2);
+						break;
+					default:
+						fb_sqr(x2, r2);
+						fb_sqr(r1, r1);
+						fb_mul(r2, r1, b);
+						fb_add(x2, x2, r2);
+						break;
 				}
 			} else {
 				fb_sqr(z2, r3);
-				fb_mulm_low(r1, z2, p->x);
+				fb_mul(r1, z2, p->x);
 				fb_add(x2, r1, r4);
 				fb_sqr(r1, z1);
 				fb_sqr(r2, x1);
 				fb_mul(z1, r1, r2);
-				if (!koblitz) {
-					fb_sqr(x1, r2);
-					fb_sqr(r1, r1);
-					switch (eb_curve_opt_b()) {
-						case OPT_ZERO:
-							break;
-						case OPT_ONE:
-							fb_add_dig(x2, x2, 1);
-							break;
-						case OPT_DIGIT:
-							fb_mul_dig(r2, r1, b[0]);
-							fb_add(x1, x1, r2);
-							break;
-						default:
-							fb_mul(r2, r1, b);
-							fb_add(x1, x1, r2);
-							break;
-					}
-				} else {
-					fb_add(r1, r1, r2);
-					fb_sqr(x1, r1);
+				switch (eb_curve_opt_b()) {
+					case OPT_ZERO:
+						fb_sqr(x1, r2);
+						break;
+					case OPT_ONE:
+						fb_add(r1, r1, r2);
+						fb_sqr(x1, r1);
+						break;
+					case OPT_DIGIT:
+						fb_sqr(x1, r2);
+						fb_sqr(r1, r1);
+						fb_mul_dig(r2, r1, b[0]);
+						fb_add(x1, x1, r2);
+						break;
+					default:
+						fb_sqr(x1, r2);
+						fb_sqr(r1, r1);
+						fb_mul(r2, r1, b);
+						fb_add(x1, x1, r2);
+						break;
 				}
 			}
 		}
@@ -651,114 +655,6 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 }
 
 #endif
-
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
-
-#if EB_MUL == MSTAM || !defined(STRIP)
-
-void eb_mul_mstam(eb_t r, eb_t p, bn_t k) {
-	int i, swap;
-	fb_t r1, r2;
-	dig_t *b;
-	eb_t q, s, *t, *_q, *_s;
-
-	fb_null(x1);
-	fb_null(z1);
-	fb_null(x2);
-	fb_null(z2);
-	fb_null(r1);
-	fb_null(r2);
-	fb_null(r3);
-	fb_null(r4);
-	eb_null(q);
-	eb_null(s);
-
-	TRY {
-		fb_new(x1);
-		fb_new(z1);
-		fb_new(x2);
-		fb_new(z2);
-		fb_new(r1);
-		fb_new(r2);
-		fb_new(r3);
-		fb_new(r4);
-		eb_new(q);
-		eb_new(s);
-
-		b = eb_curve_get_b();
-
-		eb_copy(q, p);
-		fb_sqr(s->x, p->x);
-		fb_sqr(r1, p->z);
-		fb_mul(s->z, r1, s->x);
-		fb_add(s->x, s->x, r1);
-		fb_sqr(s->x, s->x);
-		fb_mul(s->x, b, s->x);
-
-		_q = &q;
-		_s = &s;
-
-		for (i = bn_bits(k) - 2; i >= 0; i--) {
-			swap = bn_get_bit(k, i);
-			if (swap) {
-				t = _s;
-				_s = _q;
-				_q = t;
-			}
-
-			fb_add(r1, (*_q)->x, (*_q)->z);
-			fb_add(r2, (*_s)->x, (*_s)->z);
-			fb_mul(r1, r1, r2);
-
-			fb_mul((*_s)->x, (*_q)->x, (*_s)->x);
-			fb_mul((*_s)->z, (*_q)->z, (*_s)->z);
-			fb_add((*_s)->x, (*_s)->x, (*_s)->z);
-			fb_add((*_s)->z, (*_s)->x, r1);
-
-			fb_sqr((*_s)->x, (*_s)->x);
-			fb_sqr((*_s)->z, (*_s)->z);
-			fb_mul((*_s)->z, (*_s)->z, p->x);
-
-			fb_sqr((*_q)->x, (*_q)->x);
-			fb_sqr(r1, (*_q)->z);
-			fb_mul((*_q)->z, r1, (*_q)->x);
-			fb_add((*_q)->x, (*_q)->x, r1);
-			fb_sqr((*_q)->x, (*_q)->x);
-			fb_mul((*_q)->x, (*_q)->x, b);
-
-			if (swap) {
-				t = _s;
-				_s = _q;
-				_q = t;
-			}
-		}
-
-		if (fb_is_zero((*_q)->z)) {
-			/* The point q is at infinity. */
-			eb_set_infty(r);
-		} else {
-			fb_inv(r->z, (*_q)->z);
-			fb_mul(r->x, (*_q)->x, (*_q)->z);
-			r->norm = 1;
-		}
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb_free(x1);
-		fb_free(z1);
-		fb_free(x2);
-		fb_free(z2);
-		fb_free(r1);
-		fb_free(r2);
-		fb_free(r3);
-		fb_free(r4);
-	}
-}
-
-#endif /* EB_ORDIN || EB_KBLTZ */
-#endif /* EB_MUL == MSTAM */
 
 void eb_mul_gen(eb_t r, bn_t k) {
 #ifdef EB_PRECO
