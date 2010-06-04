@@ -459,7 +459,7 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[out] R			- the result.
  * @param[in] P				- the element to square.
  */
-#define gt_dbl(R, P)		CAT(GT_LOWER, dbl)(R, P)
+#define gt_sqr(R, P)		CAT(GT_LOWER, sqr)(R, P)
 
 /**
  * Multiplies an element from G_1 by an integer. Computes R = kP.
