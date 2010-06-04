@@ -382,7 +382,7 @@ typedef bn_st *bn_t;
  * Computes c = gcd(a, b) and c = a * d + b * e.
  *
  * @param[out] C			- the result;
- * @param[out] D			- the cofactor of the first operand, can be NULL.
+ * @param[out] D			- the cofactor of the first operand, cannot be NULL.
  * @param[out] E			- the cofactor of the second operand, can be NULL.
  * @param[in] A				- the first multiple precision integer.
  * @param[in] B				- the second multiple precision integer.
@@ -614,7 +614,7 @@ void bn_read_str(bn_t a, const char *str, int len, int radix);
  * @param[in] len			- the buffer capacity.
  * @param[in] a				- the multiple integer to write.
  * @param[in] radix			- the radix.
- * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  * @throw ERR_INVALID		- if the radix is invalid.
  */
 void bn_write_str(char *str, int len, bn_t a, int radix);
@@ -644,7 +644,7 @@ void bn_read_bin(bn_t a, unsigned char *bin, int len, int sign);
  * @param[in,out] len		- the buffer capacity/number of bytes written.
  * @param[out] sign			- the sign of the multiple precision integer.
  * @param[in] a				- the multiple integer to write.
- * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
 void bn_write_bin(unsigned char *bin, int *len, int *sign, bn_t a);
 
@@ -674,7 +674,7 @@ void bn_read_raw(bn_t a, dig_t *raw, int len, int sign);
  * @param[out] sign			- the sign of the multiple precision integer.
  * @param[in] a				- the multiple integer to write.
  * @param[in] sign			- the sign.
- * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
 void bn_write_raw(dig_t *raw, int *len, int *sign, bn_t a);
 
@@ -1030,14 +1030,14 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m);
 
 /**
  * Exponentiates a multiple precision integer modulo a modulus using a
- * constant-time sliding window method.
+ * constant-time Montgomery powering ladder method.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the basis.
  * @param[in] b				- the exponent.
  * @param[in] m				- the modulus.
  */
-void bn_mxp_const(bn_t c, bn_t a, bn_t b, bn_t m);
+void bn_mxp_monty(bn_t c, bn_t a, bn_t b, bn_t m);
 
 /**
  * Computes the greatest common divisor of two multiple precision integers
