@@ -508,6 +508,13 @@ eb_t *eb_curve_get_tab(void);
 void eb_curve_get_ord(bn_t n);
 
 /**
+ * Returns the cofactor of the binary elliptic curve.
+ *
+ * @param[out] n			- the returned cofactor.
+ */
+void eb_curve_get_cof(bn_t h);
+
+/**
  * Returns the parameter Vm of a Koblitz curve.
  *
  * @param[out] vm			- the returned parameter.
@@ -536,8 +543,9 @@ void eb_curve_get_s1(bn_t s1);
  * @param[in] b				- the coefficient b of the curve.
  * @param[in] g				- the generator.
  * @param[in] n				- the order of the generator.
+ * @param[in] h				- the cofactor.
  */
-void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t n);
+void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t n, bn_t h);
 
 /**
  * Configures a new Koblitz binary elliptic curve by its coefficients and
@@ -546,8 +554,9 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t n);
  * @param[in] a				- the coefficient a of the curve.
  * @param[in] g				- the generator.
  * @param[in] n				- the order of the generator.
+ * @param[in] h				- the cofactor.
  */
-void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t n);
+void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t n, bn_t h);
 
 /**
  * Configures a new supersingular binary elliptic curve by its coefficients and
@@ -558,8 +567,9 @@ void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t n);
  * @param[in] c				- the coefficient c of the curve.
  * @param[in] g				- the generator.
  * @param[in] n				- the order of the generator.
+ * @param[in] h				- the cofactor.
  */
-void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t n);
+void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t n, bn_t h);
 
 /**
  * Returns the parameter identifier of the currently configured binary elliptic
@@ -799,6 +809,15 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k);
 void eb_mul_gen(eb_t r, bn_t k);
 
 /**
+ * Multiplies a binary elliptic point by a small integer.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ * @param[in] k				- the integer.
+ */
+void eb_mul_dig(eb_t r, eb_t p, dig_t k);
+
+/**
  * Builds a precomputation table for multiplying a fixed binary elliptic curve
  * using the binary method.
  *
@@ -987,5 +1006,21 @@ void eb_norm(eb_t r, eb_t p);
  * @param[in] len			- the array length in bytes.
  */
 void eb_map(eb_t p, unsigned char *msg, int len);
+
+/**
+ * Compress a point.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to compress.
+ */
+void eb_pck(eb_t r, eb_t p);
+
+/**
+ * Decompress a point.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to decompress.
+ */
+void eb_upk(eb_t r, eb_t p);
 
 #endif /* !RELIC_EB_H */

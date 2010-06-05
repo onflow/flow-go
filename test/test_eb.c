@@ -591,7 +591,7 @@ static int multiplication(void) {
 
 #if defined(EB_ORDIN) && (EB_MUL == LODAH || !defined(STRIP))
 		if (!eb_curve_is_super()) {
-			TEST_BEGIN("lópez-dahab point multiplication is correct") {
+			TEST_BEGIN("l?pez-dahab point multiplication is correct") {
 				bn_rand(k, BN_POS, bn_bits(n));
 				bn_mod(k, k, n);
 				eb_curve_get_ord(k);
@@ -628,6 +628,15 @@ static int multiplication(void) {
 			TEST_END;
 #endif
 		}
+
+		TEST_BEGIN("multiplication by digit is correct") {
+			bn_rand(k, BN_POS, BN_DIGIT);
+			eb_mul(q, p, k);
+			eb_mul_dig(r, p, k->dp[0]);
+			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
+		}
+		TEST_END;
+
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -917,6 +926,74 @@ static int simultaneous(void) {
 	return code;
 }
 
+static int compression(void) {
+	int code = STS_ERR;
+	eb_t a, b, c;
+
+	eb_null(a);
+	eb_null(b);
+	eb_null(c);
+
+	TRY {
+		eb_new(a);
+		eb_new(b);
+		eb_new(c);
+
+		TEST_BEGIN("point compression is correct") {
+			eb_rand(a);
+			eb_pck(b, a);
+			eb_upk(c, b);
+			TEST_ASSERT(eb_cmp(a, c) == CMP_EQ, end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	eb_free(a);
+	eb_free(b);
+	eb_free(c);
+	return code;
+}
+
+static int hashing(void) {
+	int code = STS_ERR;
+	eb_t a;
+	bn_t n;
+	unsigned char msg[5];
+
+	eb_null(a);
+	bn_null(n);
+
+	TRY {
+		eb_new(a);
+		bn_new(n);
+
+		eb_curve_get_ord(n);
+
+		TEST_BEGIN("point hashing is correct") {
+			rand_bytes(msg, sizeof(msg));
+			eb_map(a, msg, sizeof(strlen));
+			eb_mul(a, a, n);
+			TEST_ASSERT(eb_is_infty(a) == 1, end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	eb_free(a);
+	eb_free(b);
+	eb_free(c);
+	return code;
+}
+
 static int test(void) {
 	eb_param_print();
 
@@ -965,6 +1042,14 @@ static int test(void) {
 		return STS_ERR;
 	}
 
+	if (compression() != STS_OK) {
+		return STS_ERR;
+	}
+
+	if (hashing() != STS_OK) {
+		return STS_ERR;
+	}
+
 	return STS_OK;
 }
 
@@ -983,7 +1068,6 @@ int main(void) {
 		}
 	}
 #endif
-
 #if defined(EB_STAND) && defined(EB_KBLTZ)
 	r1 = eb_param_set_any_kbltz();
 	if (r1 == STS_OK) {

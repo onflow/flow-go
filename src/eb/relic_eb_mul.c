@@ -677,3 +677,34 @@ void eb_mul_gen(eb_t r, bn_t k) {
 	}
 #endif
 }
+
+void eb_mul_dig(eb_t r, eb_t p, dig_t k) {
+	int i, l;
+	eb_t t;
+
+	eb_null(t);
+
+	TRY {
+		eb_new(t);
+
+		l = util_bits_dig(k);
+
+		eb_copy(t, p);
+
+		for (i = l - 2; i >= 0; i--) {
+			eb_dbl(t, t);
+			if (k & ((dig_t)1 << i)) {
+				eb_add(t, t, p);
+			}
+		}
+
+		eb_copy(r, t);
+		eb_norm(r, r);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		eb_free(t);
+	}
+}

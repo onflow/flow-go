@@ -104,7 +104,7 @@ static bn_st curve_r;
 /**
  * The cofactor of the group order in the elliptic curve.
  */
-//static dig_t curve_h;
+static bn_st curve_h;
 
 /**
  * Flag that stores if the configured binary elliptic curve is a Koblitz
@@ -344,6 +344,10 @@ eb_t *eb_curve_get_tab() {
 
 #endif
 
+void eb_curve_get_cof(bn_t h) {
+	bn_copy(h, &curve_h);
+}
+
 #if defined(EB_KBLTZ) && (EB_MUL == WTNAF || EB_FIX == WTNAF || EB_SIM == INTER || !defined(STRIP))
 void eb_curve_get_vm(bn_t vm) {
 	if (curve_is_koblitz) {
@@ -372,7 +376,7 @@ void eb_curve_get_s1(bn_t s1) {
 
 #if defined(EB_ORDIN)
 
-void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r) {
+void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r, bn_t h) {
 	fb_copy(curve_a, a);
 	fb_copy(curve_b, b);
 
@@ -393,6 +397,7 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r) {
 	eb_norm(g, g);
 	eb_copy(&curve_g, g);
 	bn_copy(&curve_r, r);
+	bn_copy(&curve_h, h);
 #if defined(EB_PRECO)
 	eb_mul_pre(eb_curve_get_tab(), &curve_g);
 #endif
@@ -402,7 +407,7 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r) {
 
 #if defined(EB_KBLTZ)
 
-void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r) {
+void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r, bn_t h) {
 	curve_is_koblitz = 1;
 
 	fb_copy(curve_a, a);
@@ -419,6 +424,7 @@ void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r) {
 	eb_norm(g, g);
 	eb_copy(&curve_g, g);
 	bn_copy(&curve_r, r);
+	bn_copy(&curve_h, h);
 #if defined(EB_PRECO)
 	eb_mul_pre(eb_curve_get_tab(), &curve_g);
 #endif
@@ -428,7 +434,7 @@ void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r) {
 
 #if defined(EB_SUPER)
 
-void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t r) {
+void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t r, bn_t h) {
 	curve_is_super = 1;
 
 	fb_copy(curve_a, a);
@@ -442,6 +448,7 @@ void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t r) {
 	eb_norm(g, g);
 	eb_copy(&curve_g, g);
 	bn_copy(&curve_r, r);
+	bn_copy(&curve_h, h);
 #if defined(EB_PRECO)
 	eb_mul_pre(eb_curve_get_tab(), &curve_g);
 #endif

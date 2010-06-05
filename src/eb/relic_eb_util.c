@@ -31,7 +31,6 @@
 
 #include "relic_core.h"
 #include "relic_eb.h"
-#include "relic_md.h"
 #include "relic_error.h"
 #include "relic_conf.h"
 
@@ -99,34 +98,6 @@ void eb_rand(eb_t p) {
 		bn_free(k);
 		bn_free(n);
 		eb_free(g);
-	}
-}
-
-void eb_map(eb_t p, unsigned char *msg, int len) {
-	bn_t n, k;
-	unsigned char digest[MD_LEN];
-
-	bn_null(n);
-	bn_null(k);
-
-	TRY {
-		bn_new(k);
-		bn_new(n);
-
-		eb_curve_get_ord(n);
-
-		md_map(digest, msg, len);
-		bn_read_bin(k, digest, MD_LEN, BN_POS);
-		bn_mod(k, k, n);
-
-		eb_curve_get_ord(n);
-
-		eb_mul_gen(p, k);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		bn_free(k);
-		bn_free(n);
 	}
 }
 
