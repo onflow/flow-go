@@ -23,8 +23,7 @@
 /**
  * @file
  *
- * Implementation of the low-level binary field addition and subtraction
- * functions.
+ * Implementation of the low-level inversion functions.
  *
  * @version $Id$
  * @ingroup fb

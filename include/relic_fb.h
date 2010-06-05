@@ -275,8 +275,8 @@ typedef align dig_t fb_st[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
 #define fb_inv(C, A)	fb_inv_basic(C, A)
 #elif FB_INV == BINAR
 #define fb_inv(C, A)	fb_inv_binar(C, A)
-#elif FB_INV == INTEG
-#define fb_inv(C, A)	fb_inv_integ(C, A)
+#elif FB_INV == LOWER
+#define fb_inv(C, A)	fb_inv_lower(C, A)
 #elif FB_INV == EXGCD
 #define fb_inv(C, A)	fb_inv_exgcd(C, A)
 #elif FB_INV == ALMOS
@@ -823,7 +823,7 @@ void fb_inv_binar(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to invert.
  */
-void fb_inv_integ(fb_t c, fb_t a);
+void fb_inv_lower(fb_t c, fb_t a);
 
 /**
  * Inverts a binary field element using the Extended Euclidean algorithm.

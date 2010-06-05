@@ -40,7 +40,145 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_inv(fp_t c, fp_t a) {
+#if FP_INV == BASIC || !defined(STRIP)
+
+void fp_inv_basic(fp_t c, fp_t a) {
+	bn_t e;
+
+	bn_null(e);
+
+	TRY {
+		bn_new(e);
+
+		e->used = FP_DIGS;
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		bn_sub_dig(e, e, 2);
+
+		fp_exp(c, a, e);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(e);
+	}
+}
+
+#endif
+
+#if FP_INV == BINAR || !defined(STRIP)
+
+void fp_inv_binar(fp_t c, fp_t a) {
+	bn_t u, v, g1, g2, p;
+
+	bn_null(u);
+	bn_null(v);
+	bn_null(g1);
+	bn_null(g2);
+	bn_null(p);
+
+	TRY {
+		bn_new(u);
+		bn_new(v);
+		bn_new(g1);
+		bn_new(g2);
+		bn_new(p);
+
+		/* u = a, v = p, g1 = 1, g2 = 0. */
+#if FP_RDC == MONTY
+		fp_prime_back(u, a);
+#else
+		u->used = FP_DIGS;
+		dv_copy(u->dp, a, FP_DIGS);
+#endif
+		p->used = FP_DIGS;
+		dv_copy(p->dp, fp_prime_get(), FP_DIGS);
+		bn_copy(v, p);
+		bn_set_dig(g1, 1);
+		bn_zero(g2);
+
+		/* While (u != 1 && v != 1). */
+		while (1) {
+			/* While u is even do. */
+			while (!(u->dp[0] & 1)) {
+				/* u = u/2. */
+				fp_rsh1_low(u->dp, u->dp);
+				/* If g1 is even then g1 = g1/2; else g1 = (g1 + p)/2. */
+				if (g1->dp[0] & 1) {
+					bn_add(g1, g1, p);
+				}
+				bn_hlv(g1, g1);
+			}
+
+			while (u->dp[u->used - 1] == 0)
+				u->used--;
+			if (u->used == 1 && u->dp[0] == 1)
+				break;
+
+			/* While z divides v do. */
+			while (!(v->dp[0] & 1)) {
+				/* v = v/2. */
+				fp_rsh1_low(v->dp, v->dp);
+				/* If g2 is even then g2 = g2/2; else (g2 = g2 + p)/2. */
+				if (g2->dp[0] & 1) {
+					bn_add(g2, g2, p);
+				}
+				bn_hlv(g2, g2);
+			}
+
+			while (v->dp[v->used - 1] == 0)
+				v->used--;
+			if (v->used == 1 && v->dp[0] == 1)
+				break;
+
+			/* If u > v then u = u - v, g1 = g1 - g2. */
+			if (bn_cmp(u, v) == CMP_GT) {
+				fp_subn_low(u->dp, u->dp, v->dp);
+				bn_sub(g1, g1, g2);
+			} else {
+				fp_subn_low(v->dp, v->dp, u->dp);
+				bn_sub(g2, g2, g1);
+			}
+		}
+
+		/* If u == 1 then return g1; else return g2. */
+		if (bn_cmp_dig(u, 1) == CMP_EQ) {
+#if FP_RDC == MONTY
+			fp_prime_conv(c, g1);
+#else
+			if (bn_sign(g1) == BN_NEG) {
+				bn_add(g1, g1, p);
+			}
+			dv_copy(c, g1->dp, FP_DIGS);
+#endif
+		} else {
+#if FP_RDC == MONTY
+			fp_prime_conv(c, g2);
+#else
+			if (bn_sign(g2) == BN_NEG) {
+				bn_add(g2, g2, p);
+			}
+			dv_copy(c, g2->dp, FP_DIGS);
+#endif
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(u);
+		bn_free(v);
+		bn_free(g1);
+		bn_free(g2);
+		bn_free(p);
+	}
+}
+
+#endif
+
+#if FP_INV == MONTY || !defined(STRIP)
+
+void fp_inv_monty(fp_t c, fp_t a) {
 	fp_t t;
 	bn_t _a, _p, u, v, x1, x2;
 	dig_t *p = NULL, carry;
@@ -90,30 +228,32 @@ void fp_inv(fp_t c, fp_t a) {
 
 		while (!bn_is_zero(v)) {
 			/* If v is even then v = v/2, x1 = 2 * x1. */
-			if (bn_is_even(v)) {
-				bn_hlv(v, v);
+			if (!(v->dp[0] & 1)) {
+				fp_rsh1_low(v->dp, v->dp);
 				bn_dbl(x1, x1);
 			} else {
 				/* If u is even then u = u/2, x2 = 2 * x2. */
-				if (bn_is_even(u)) {
-					bn_hlv(u, u);
+				if (!(u->dp[0] & 1)) {
+					fp_rsh1_low(u->dp, u->dp);
 					bn_dbl(x2, x2);
 					/* If v >= u,then v = (v - u)/2, x2 += x1, x1 = 2 * x1. */
 				} else {
 					if (bn_cmp(v, u) != CMP_LT) {
-						bn_sub(v, v, u);
-						bn_hlv(v, v);
+						fp_subn_low(v->dp, v->dp, u->dp);
+						fp_rsh1_low(v->dp, v->dp);
 						bn_add(x2, x2, x1);
 						bn_dbl(x1, x1);
 					} else {
 						/* u = (u - v)/2, x1 += x2, x2 = 2 * x2. */
-						bn_sub(u, u, v);
-						bn_hlv(u, u);
+						fp_subn_low(u->dp, u->dp, v->dp);
+						fp_rsh1_low(u->dp, u->dp);
 						bn_add(x1, x1, x2);
 						bn_dbl(x2, x2);
 					}
 				}
 			}
+			bn_trim(u);
+			bn_trim(v);
 			k++;
 		}
 
@@ -150,7 +290,7 @@ void fp_inv(fp_t c, fp_t a) {
 			fp_prime_conv_dig(c, 1);
 		}
 #if FP_RDC != MONTY
-		/*is_one
+		/*
 		 * If we do not use Montgomery reduction, the result of inversion is
 		 * a^{-1}R^3 mod p or a^{-1}R^4 mod p, depending on flag.
 		 * Hence we must reduce the result three or four times.
@@ -181,3 +321,86 @@ void fp_inv(fp_t c, fp_t a) {
 		bn_free(x2);
 	}
 }
+
+#endif
+
+#if FP_INV == EXGCD || !defined(STRIP)
+
+void fp_inv_exgcd(fp_t c, fp_t a) {
+	bn_t u, v, g1, g2, p, q, r;
+
+	bn_null(u);
+	bn_null(v);
+	bn_null(g1);
+	bn_null(g2);
+	bn_null(p);
+	bn_null(q);
+	bn_null(v);
+
+	TRY {
+		bn_new(u);
+		bn_new(v);
+		bn_new(g1);
+		bn_new(g2);
+		bn_new(p);
+		bn_new(q);
+		bn_new(r);
+
+		/* u = a, v = p, g1 = 1, g2 = 0. */
+#if FP_RDC == MONTY
+		fp_prime_back(u, a);
+#else
+		u->used = FP_DIGS;
+		dv_copy(u->dp, a, FP_DIGS);
+#endif
+		p->used = FP_DIGS;
+		dv_copy(p->dp, fp_prime_get(), FP_DIGS);
+		bn_copy(v, p);
+		bn_set_dig(g1, 1);
+		bn_zero(g2);
+
+		/* While (u != 1. */
+		while (bn_cmp_dig(u, 1) != CMP_EQ) {
+			/* q = [v/u], r = v mod u. */
+			bn_div_rem(q, r, v, u);
+			/* v = u, u = r. */
+			bn_copy(v, u);
+			bn_copy(u, r);
+			/* r = g2 - q * g1. */
+			bn_mul(r, q, g1);
+			bn_sub(r, g2, r);
+			/* g2 = g1, g1 = r. */
+			bn_copy(g2, g1);
+			bn_copy(g1, r);
+		}
+
+#if FP_RDC == MONTY
+		fp_prime_conv(c, g1);
+#else
+		if (bn_sign(g1) == BN_NEG) {
+			bn_add(g1, g1, p);
+		}
+		dv_copy(c, g1->dp, FP_DIGS);
+#endif
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(u);
+		bn_free(v);
+		bn_free(g1);
+		bn_free(g2);
+		bn_free(p);
+		bn_free(q);
+	}
+}
+
+#endif
+
+#if FB_INV == LOWER || !defined(STRIP)
+
+void fp_inv_lower(fp_t c, fp_t a) {
+	fp_invn_low(c, a);
+}
+#endif

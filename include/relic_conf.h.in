@@ -228,6 +228,19 @@
 /** Chosen prime field reduction method. */
 #define FP_RDC   @FP_RDC@
 
+/** Inversion by Fermat's Little Theorem. */
+#define BASIC    1
+/** Binary inversion. */
+#define BINAR    2
+/** Integrated modular multiplication. */
+#define MONTY    3
+/** Extended Euclidean algorithm. */
+#define EXGCD    4
+/** Use implementation provided by the lower layer. */
+#define LOWER    5
+/** Chosen prime field inversion method. */ 
+#define FP_INV   @FP_INV@ 
+
 /** Binary modular exponentiation. */
 #define BASIC    1
 /** Sliding window modular exponentiation. */
@@ -305,12 +318,12 @@
 #define BASIC    1
 /** Binary inversion. */
 #define BINAR    2
-/** Integrated modular multiplication. */
-#define INTEG    3
+/** Almost inverse algorithm. */
+#define ALMOS    3
 /** Extended Euclidean algorithm. */
 #define EXGCD    4
-/** Almost inverse algorithm. */
-#define ALMOS    5
+/** Use implementation provided by the lower layer. */
+#define LOWER    5
 /** Chosen binary field inversion method. */
 #define FB_INV   @FB_INV@ 
 

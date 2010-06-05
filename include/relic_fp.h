@@ -223,6 +223,24 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #endif
 
 /**
+ * Inverts a prime field element. Computes c = a^{-1}.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the prime field element to invert.
+ */
+#if FP_INV == BASIC
+#define fp_inv(C, A)	fp_inv_basic(C, A)
+#elif FP_INV == BINAR
+#define fp_inv(C, A)	fp_inv_binar(C, A)
+#elif FP_INV == MONTY
+#define fp_inv(C, A)	fp_inv_monty(C, A)
+#elif FP_INV == EXGCD
+#define fp_inv(C, A)	fp_inv_exgcd(C, A)
+#elif FP_INV == LOWER
+#define fp_inv(C, A)	fp_inv_lower(C, A)
+#endif
+
+/**
  * Exponentiates a prime field element. Computes c = a^b (mod p).
  *
  * @param[out] C			- the result.
@@ -737,12 +755,44 @@ void fp_rdc_monty_comba(fp_t c, dv_t a);
 void fp_rdc_quick(fp_t c, dv_t a);
 
 /**
- * Inverts a prime field element. Computes c = a^(-1).
+ * Inverts a prime field element using Fermat's Little Theorem.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the prime field element to inver.
+ * @param[in] a				- the prime field element to invert.
  */
-void fp_inv(fp_t c, fp_t a);
+void fp_inv_basic(fp_t c, fp_t a);
+
+/**
+ * Inverts a prime field element using the binary method.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the prime field element to invert.
+ */
+void fp_inv_binar(fp_t c, fp_t a);
+
+/**
+ * Inverts a prime field element using Montgomery inversion.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the prime field element to invert.
+ */
+void fp_inv_monty(fp_t c, fp_t a);
+
+/**
+ * Inverts a prime field element using the Euclidean Extended Algorithm.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the prime field element to invert.
+ */
+void fp_inv_exgcd(fp_t c, fp_t a);
+
+/**
+ * Inverts a prime field element using a direct call to the lower layer.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the prime field element to invert.
+ */
+void fp_inv_lower(fp_t c, fp_t a);
 
 /**
  * Exponentiates a prime field element using the binary

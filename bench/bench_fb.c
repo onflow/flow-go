@@ -440,10 +440,10 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
-#if FB_INV == BASIC || !defined(STRIP)
-	BENCH_BEGIN("fb_inv_integ") {
+#if FB_INV == ALMOS || !defined(STRIP)
+	BENCH_BEGIN("fb_inv_almos") {
 		fb_rand(a);
-		BENCH_ADD(fb_inv_integ(c, a));
+		BENCH_ADD(fb_inv_almos(c, a));
 	}
 	BENCH_END;
 #endif
@@ -456,10 +456,10 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
-#if FB_INV == ALMOS || !defined(STRIP)
-	BENCH_BEGIN("fb_inv_almos") {
+#if FB_INV == LOWER || !defined(STRIP)
+	BENCH_BEGIN("fb_inv_lower") {
 		fb_rand(a);
-		BENCH_ADD(fb_inv_almos(c, a));
+		BENCH_ADD(fb_inv_lower(c, a));
 	}
 	BENCH_END;
 #endif

@@ -307,12 +307,6 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp_inv") {
-		fp_rand(a);
-		BENCH_ADD(fp_inv(c, a));
-	}
-	BENCH_END;
-
 	BENCH_BEGIN("fp_rdc") {
 		fp_rand(a);
 		fp_lsh(d, a, FP_BITS);
@@ -365,6 +359,52 @@ static void arith(void) {
 		}
 		BENCH_END;
 	}
+#endif
+
+	BENCH_BEGIN("fp_inv") {
+		fp_rand(a);
+		BENCH_ADD(fp_inv(c, a));
+	}
+	BENCH_END;
+
+#if FP_INV == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fp_inv_basic") {
+		fp_rand(a);
+		BENCH_ADD(fp_inv_basic(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if FP_INV == BINAR || !defined(STRIP)
+	BENCH_BEGIN("fp_inv_binar") {
+		fp_rand(a);
+		BENCH_ADD(fp_inv_binar(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if FP_INV == MONTY || !defined(STRIP)
+	BENCH_BEGIN("fp_inv_monty") {
+		fp_rand(a);
+		BENCH_ADD(fp_inv_monty(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if FP_INV == EXGCD || !defined(STRIP)
+	BENCH_BEGIN("fp_inv_exgcd") {
+		fp_rand(a);
+		BENCH_ADD(fp_inv_exgcd(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if FP_INV == LOWER || !defined(STRIP)
+	BENCH_BEGIN("fp_inv_lower") {
+		fp_rand(a);
+		BENCH_ADD(fp_inv_lower(c, a));
+	}
+	BENCH_END;
 #endif
 
 	BENCH_BEGIN("fp_exp") {

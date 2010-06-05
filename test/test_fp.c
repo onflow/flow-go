@@ -689,6 +689,51 @@ static int inversion(void) {
 			fp_set_dig(b, 1);
 			TEST_ASSERT(fp_cmp(c, b) == CMP_EQ, end);
 		} TEST_END;
+
+#if FP_INV == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic inversion is correct") {
+			fp_rand(a);
+			fp_inv(b, a);
+			fp_inv_basic(c, a);
+			TEST_ASSERT(fp_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FP_INV == BINAR || !defined(STRIP)
+		TEST_BEGIN("binary inversion is correct") {
+			fp_rand(a);
+			fp_inv(b, a);
+			fp_inv_binar(c, a);
+			TEST_ASSERT(fp_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FP_INV == MONTY || !defined(STRIP)
+		TEST_BEGIN("montgomery inversion is correct") {
+			fp_rand(a);
+			fp_inv(b, a);
+			fp_inv_monty(c, a);
+			TEST_ASSERT(fp_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FP_INV == EXGCD || !defined(STRIP)
+		TEST_BEGIN("euclidean inversion is correct") {
+			fp_rand(a);
+			fp_inv(b, a);
+			fp_inv_exgcd(c, a);
+			TEST_ASSERT(fp_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FP_INV == LOWER || !defined(STRIP)
+		TEST_BEGIN("lower inversion is correct") {
+			fp_rand(a);
+			fp_inv(b, a);
+			fp_inv_lower(c, a);
+			TEST_ASSERT(fp_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		ERROR(end);
