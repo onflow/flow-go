@@ -236,6 +236,14 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m);
  */
 dig_t fp_rdcn_low(dig_t *c, dig_t *a, dig_t *m, dig_t u);
 
+/**
+ * Inverts a digit vector modulo the configured prime.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the digit vector to invert.
+ */
+void fp_invn_low(dig_t *c, dig_t *a);
+
 #endif /* ASM */
 
 #endif /* !RELIC_FP_LOW_H */
