@@ -94,7 +94,7 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 
 		md_map(hash, msg, len);
 
-		bn_read_bin(e, hash, 20, BN_POS);
+		bn_read_bin(e, hash, MD_LEN, BN_POS);
 
 		bn_mul(s, d, r);
 		bn_mod(s, s, n);
@@ -123,7 +123,7 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
 	bn_t n, k, e, v;
 	ec_t p;
-	unsigned char hash[20];
+	unsigned char hash[MD_LEN];
 	int result = 0;
 
 	bn_null(n);
@@ -150,7 +150,7 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
 					bn_add(k, k, n);
 				}
 
-				bn_read_bin(e, hash, 20, BN_POS);
+				bn_read_bin(e, hash, MD_LEN, BN_POS);
 
 				bn_mul(e, e, k);
 				bn_mod(e, e, n);
