@@ -130,10 +130,7 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 		if (b0 > 0) {
 			_r[first - 1] &= MASK(b0);
 		}
-		carry = fp_addn_low(r, r, _r);
-		if (carry) {
-			fp_subn_low(r, r, m);
-		}
+		fp_addn_low(r, r, _r);
 	}
 	while (fp_cmpn_low(r, m) != CMP_LT) {
 		fp_subn_low(r, r, m);
@@ -141,11 +138,13 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 	fp_copy(c, r);
 }
 
-dig_t fp_rdcn_low(dig_t *c, dig_t *a, dig_t *m, dig_t u) {
+void fp_rdcn_low(dig_t *c, dig_t *a) {
 	int i, j;
-	dig_t r0, r1, r2;
-	dig_t *tmp, *tmpm, *tmpc;
+	dig_t r0, r1, r2, u;
+	dig_t *m, *tmp, *tmpm, *tmpc;
 
+	u = *(fp_prime_get_rdc());
+	m = fp_prime_get();
 	tmpc = c;
 
 	r0 = r1 = r2 = 0;
@@ -162,6 +161,7 @@ dig_t fp_rdcn_low(dig_t *c, dig_t *a, dig_t *m, dig_t u) {
 		r1 = r2;
 		r2 = 0;
 	}
+
 	for (i = FP_DIGS; i < 2 * FP_DIGS - 1; i++, a++) {
 		tmp = c + (i - FP_DIGS + 1);
 		tmpm = m + FP_DIGS - 1;
@@ -177,5 +177,7 @@ dig_t fp_rdcn_low(dig_t *c, dig_t *a, dig_t *m, dig_t u) {
 	COMBA_ADD(r2, r1, r0, *a);
 	c[FP_DIGS - 1] = r0;
 
-	return r1;
+	if (r1 || fp_cmp(c, fp_prime_get()) != CMP_LT) {
+		fp_subn_low(c, c, fp_prime_get());
+	}
 }

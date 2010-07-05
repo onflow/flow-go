@@ -90,7 +90,6 @@ void fp_sqrn_low(dig_t *c, dig_t *a) {
 		tmpb = a + i;
 
 		/* Compute the number of additions in this column. */
-		j = (i + 1);
 		for (j = 0; j < (i + 1) / 2; j++, tmpa++, tmpb--) {
 			COMBA_STEP(r2, r1, r0, *tmpa, *tmpb);
 		}
