@@ -191,6 +191,42 @@ static int rabin(void) {
 
 #if defined(WITH_EC)
 
+static int ecdh(void) {
+	int code = STS_ERR;
+	bn_t d_a, d_b;
+	ec_t q_a, q_b;
+	unsigned char key1[MD_LEN], key2[MD_LEN];
+
+	bn_null(d_a);
+	bn_null(d_b);
+	ec_null(q_a);
+	ec_null(q_b);
+
+	TRY {
+		bn_new(d_a);
+		bn_new(d_b);
+		ec_new(q_a);
+		ec_new(q_b);
+
+		TEST_BEGIN("ecdh is correct") {
+			cp_ecdh_gen(d_a, q_a);
+			cp_ecdh_gen(d_b, q_b);
+			cp_ecdh_key(key1, MD_LEN, d_b, q_a);
+			cp_ecdh_key(key2, MD_LEN, d_a, q_b);
+			TEST_ASSERT(memcmp(key1, key2, MD_LEN) == 0, end);
+		} TEST_END;
+	} CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+
+  end:
+	bn_free(d);
+	bn_free(r);
+	ec_free(q);
+	return code;
+}
+
 static int ecdsa(void) {
 	int code = STS_ERR;
 	bn_t d, r;
@@ -288,6 +324,10 @@ int main(void) {
 #if defined(WITH_EC)
 	util_print_banner("Protocols based on elliptic curves:\n", 0);
 	if (ec_param_set_any() == STS_OK) {
+		if (ecdh() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 		if (ecdsa() != STS_OK) {
 			core_clean();
 			return 1;

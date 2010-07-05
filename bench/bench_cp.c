@@ -185,6 +185,31 @@ static void rabin(void) {
 
 #if defined(WITH_EC)
 
+static void ecdh(void) {
+	bn_t d;
+	ec_t p;
+	unsigned char key[MD_LEN];
+
+	bn_null(d);
+	ec_null(p);
+
+	bn_new(d);
+	ec_new(p);
+
+	BENCH_BEGIN("cp_ecdh_gen") {
+		BENCH_ADD(cp_ecdh_gen(d, p));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("cp_ecdh_key") {
+		BENCH_ADD(cp_ecdh_key(key, MD_LEN, d, p));
+	}
+	BENCH_END;
+
+	bn_free(d);
+	ec_free(p);
+}
+
 static void ecdsa(void) {
 	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
 	bn_t r, s, d;
@@ -238,6 +263,7 @@ int main(void) {
 #if defined(WITH_EC)
 	util_print_banner("Protocols based on elliptic curves:\n", 0);
 	if (ec_param_set_any() == STS_OK) {
+		ecdh();
 		ecdsa();
 	} else {
 		THROW(ERR_NO_CURVE);
