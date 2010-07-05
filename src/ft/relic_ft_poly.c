@@ -67,12 +67,12 @@ static int pos_a, pos_b, pos_c;
 #define MAX_EXPS		10
 
 /**
- * Non-zero bits of special form prime.
+ * Non-zero bits of polynomial stored in sparse form.
  */
 static int crz[MAX_EXPS + 1] = { 0 };
 
 /**
- * Number of bits of special form prime.
+ * Number of bits of special form polynomial.
  */
 static int crz_len = 0;
 
@@ -82,12 +82,12 @@ static int crz_len = 0;
 static ft_st ft_crz;
 
 /**
- * Non-zero bits of special form prime.
+ * Non-zero bits of polynomial stored in sparse form.
  */
 static int srz[MAX_EXPS + 1] = { 0 };
 
 /**
- * Number of bits of special form prime.
+ * Number of bits of special form polynomial.
  */
 static int srz_len = 0;
 

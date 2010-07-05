@@ -45,8 +45,21 @@
 #if FB_CUB == BASIC || !defined(STRIP)
 
 void ft_cub_basic(ft_t c, ft_t a) {
-	ft_mul(c, a, a);
-	ft_mul(c, c, a);
+	dv_t t;
+
+	dv_null(t);
+
+	TRY {
+		/* We need a temporary variable so that c can be a or b. */
+		dv_new(t);
+		ft_cubn_low(t, a);
+		ft_rdc_cub(c, t);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		dv_free(t);
+	}
 }
 
 #endif
@@ -54,7 +67,7 @@ void ft_cub_basic(ft_t c, ft_t a) {
 #if FB_CUB == TABLE || !defined(STRIP)
 
 void ft_cub_table(ft_t c, ft_t a) {
-	dv_t t, t2;
+	dv_t t;
 
 	dv_null(t);
 
