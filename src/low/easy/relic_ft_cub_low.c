@@ -75,6 +75,30 @@ static const dig_t table_h[16] = {
 /* Public definitions                                                         */
 /*============================================================================*/
 
+void ft_cubn_low(dig_t *c, dig_t *a) {
+	int i, j, d, trit;
+
+	dv_zero(c, 3 * FT_DIGS);
+	for (i = 0; i < FT_TRITS; i++) {
+		j = ft_get_trit(a, i);
+		SPLIT(trit, d, 3 * i, FT_DIG_LOG);
+		switch (j % 3) {
+			case 0:
+				ft_set_bit(c + d, trit, 0);
+				ft_set_bit(c + 3 * FT_DIGS / 2 + d, trit, 0);
+				break;
+			case 1:
+				ft_set_bit(c + d, trit, 1);
+				ft_set_bit(c + 3 * FT_DIGS / 2 + d, trit, 0);
+				break;
+			case 2:
+				ft_set_bit(c + d, trit, 0);
+				ft_set_bit(c + 3 * FT_DIGS / 2 + d, trit, 1);
+				break;
+		}
+	}
+}
+
 void ft_cubl_low(dig_t *c, dig_t *a) {
 	dig_t d, *tmpt;
 

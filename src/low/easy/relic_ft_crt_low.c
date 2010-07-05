@@ -54,7 +54,6 @@
 static void ft_crtf_low(dig_t *c, dig_t *a, int *crz, int *srz, int clen,
 		int slen) {
 	int i, j, k, l;
-	dig_t d, d0, d1, d2;
 	align dig_t t[2 * FT_DIGS], r[2 * FT_DIGS], t0[FT_DIGS], t1[FT_DIGS],
 			t2[FT_DIGS];
 
