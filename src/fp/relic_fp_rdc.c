@@ -107,15 +107,7 @@ void fp_rdc_monty_basic(fp_t c, dv_t a) {
 #if FP_MUL == COMBA || !defined(STRIP)
 
 void fp_rdc_monty_comba(fp_t c, dv_t a) {
-	dig_t carry, u0;
-
-	u0 = *(fp_prime_get_rdc());
-
-	carry = fp_rdcn_low(c, a, fp_prime_get(), u0);
-
-	if (carry || fp_cmp(c, fp_prime_get()) != CMP_LT) {
-		fp_subn_low(c, c, fp_prime_get());
-	}
+	fp_rdcn_low(c, a);
 }
 
 #endif

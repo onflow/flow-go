@@ -42,13 +42,17 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_add(fp_t c, fp_t a, fp_t b) {
+void fp_add_basic(fp_t c, fp_t a, fp_t b) {
 	dig_t carry;
 
 	carry = fp_addn_low(c, a, b);
 	if (carry || (fp_cmp(c, fp_prime_get()) != CMP_LT)) {
 		carry = fp_subn_low(c, c, fp_prime_get());
 	}
+}
+
+void fp_add_integ(fp_t c, fp_t a, fp_t b) {
+	fp_addm_low(c, a, b);
 }
 
 void fp_add_dig(fp_t c, fp_t a, dig_t b) {
@@ -77,13 +81,17 @@ void fp_add_dig(fp_t c, fp_t a, dig_t b) {
 #endif
 }
 
-void fp_sub(fp_t c, fp_t a, fp_t b) {
+void fp_sub_basic(fp_t c, fp_t a, fp_t b) {
 	dig_t carry;
 
 	carry = fp_subn_low(c, a, b);
 	if (carry) {
 		fp_addn_low(c, c, fp_prime_get());
 	}
+}
+
+void fp_sub_integ(fp_t c, fp_t a, fp_t b) {
+	fp_subm_low(c, a, b);
 }
 
 void fp_sub_dig(fp_t c, fp_t a, dig_t b) {
