@@ -120,6 +120,7 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 				break;
 			}
 		}
+		/* Now, multiply by cofactor to get the correct group. */
 		eb_curve_get_cof(k);
 		if (bn_bits(k) < BN_DIGIT) {
 			eb_mul_dig(p, p, k->dp[0]);

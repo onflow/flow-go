@@ -35,6 +35,10 @@
 #include "relic_eb.h"
 #include "relic_error.h"
 
+/*============================================================================*/
+/* Private definitions                                                        */
+/*============================================================================*/
+
 #if EB_MUL == WTNAF || !defined(STRIP)
 
 #if defined(EB_KBLTZ)
@@ -176,7 +180,7 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void eb_mul_tnaf_tab(eb_t r, eb_t p, bn_t k) {
+static void eb_mul_tnaf_impl(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char tnaf[FB_BITS + 8], *t, u;
 	eb_t table[1 << (EB_WIDTH - 2)];
@@ -274,7 +278,7 @@ static void table_init_ordin(eb_t *t, eb_t p) {
 	eb_copy(t[0], p);
 }
 
-static void eb_mul_naf_tab(eb_t r, eb_t p, bn_t k) {
+static void eb_mul_naf_impl(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char naf[FB_BITS + 1], *t;
 	eb_t table[1 << (EB_WIDTH - 2)];
@@ -556,13 +560,13 @@ void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
 void eb_mul_wtnaf(eb_t r, eb_t p, bn_t k) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
-		eb_mul_tnaf_tab(r, p, k);
+		eb_mul_tnaf_impl(r, p, k);
 		return;
 	}
 #endif
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
-	eb_mul_naf_tab(r, p, k);
+	eb_mul_naf_impl(r, p, k);
 #endif
 }
 

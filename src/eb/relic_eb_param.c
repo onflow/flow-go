@@ -37,8 +37,6 @@
 #include "relic_error.h"
 #include "relic_conf.h"
 
-#if defined(EB_STAND)
-
 /*============================================================================*/
 /* Private definitions                                                        */
 /*============================================================================*/
@@ -511,8 +509,6 @@ void eb_param_set(int param) {
 		bn_free(r);
 	}
 }
-
-#endif /* EB_STAND */
 
 int eb_param_set_any() {
 	int r0, r1, r2;

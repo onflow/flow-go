@@ -380,6 +380,11 @@ void eb_mul_fix_yaowi(eb_t r, eb_t *t, bn_t k) {
 
 	eb_null(a);
 
+	if (bn_is_zero(k)) {
+		eb_set_infty(r);
+		return;
+	}
+
 	TRY {
 		eb_new(a);
 
