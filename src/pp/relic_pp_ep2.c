@@ -480,6 +480,9 @@ void ep2_curve_set(int twist) {
 
 		param = ep_param_get();
 
+		/* I don't have a better place for this. */
+		fp2_const_calc();
+
 		switch (param) {
 #if FP_PRIME == 256
 			case BNN_P256:
