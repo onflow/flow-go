@@ -243,28 +243,28 @@ void ft_muld_low(dig_t *c, dig_t *a, dig_t *b, int size);
 void ft_mulm_low(dig_t *c, dig_t *a, dig_t *b);
 
 /**
- * Squares a digit vector using bit manipulation.
+ * Cubes a digit vector using trit manipulation.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to square.
  */
-void ft_sqrn_low(dig_t *c, dig_t *a);
+void ft_cubn_low(dig_t *c, dig_t *a);
 
 /**
- * Squares a digit vector using a lookup table.
+ * Cubes a digit vector using a lookup table.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to square.
  */
-void ft_sqrl_low(dig_t *c, dig_t *a);
+void ft_cubl_low(dig_t *c, dig_t *a);
 
 /**
- * Squares a digit vector with embedded modular reduction.
+ * Cubes a digit vector with embedded modular reduction.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to square.
  */
-void ft_sqrm_low(dig_t *c, dig_t *a);
+void ft_cubm_low(dig_t *c, dig_t *a);
 
 /**
  * Extracts the square root of a digit vector.
@@ -272,7 +272,7 @@ void ft_sqrm_low(dig_t *c, dig_t *a);
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to extract the square root.
  */
-void ft_srtn_low(dig_t *c, dig_t *a);
+void ft_crtn_low(dig_t *c, dig_t *a);
 
 /**
  * Solves a quadratic equation for c^2 + c = a.
@@ -283,12 +283,22 @@ void ft_srtn_low(dig_t *c, dig_t *a);
 void ft_slvn_low(dig_t *c, dig_t *a);
 
 /**
- * Reduces a digit vector modulo the configured irreducible polynomial.
+ * Reduces a double-precision digit vector modulo the configured irreducible
+ * polynomial.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to reduce.
  */
-void ft_rdcn_low(dig_t *c, dig_t *a);
+void ft_rdcm_low(dig_t *c, dig_t *a);
+
+/**
+ * Reduces a triple-precision digit vector modulo the configured irreducible
+ * polynomial.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the digit vector to reduce.
+ */
+void ft_rdcc_low(dig_t *c, dig_t *a);
 
 /**
  * Reduces the most significant bits of a digit vector modulo the configured
