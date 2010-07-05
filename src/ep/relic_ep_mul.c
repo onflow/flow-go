@@ -68,7 +68,7 @@ static void table_init(ep_t * t, ep_t p) {
 	ep_copy(t[0], p);
 }
 
-static void ep_mul_naf_tab(ep_t r, ep_t p, bn_t k) {
+static void ep_mul_naf_impl(ep_t r, ep_t p, bn_t k) {
 	int len, i, n;
 	signed char naf[FP_BITS + 1], *t;
 	ep_t table[1 << (EP_WIDTH - 2)];
@@ -164,7 +164,7 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 #if EP_MUL == WTNAF || !defined(STRIP)
 
 void ep_mul_wtnaf(ep_t r, ep_t p, bn_t k) {
-	ep_mul_naf_tab(r, p, k);
+	ep_mul_naf_impl(r, p, k);
 }
 
 #endif
