@@ -57,7 +57,7 @@
 #define G2_LOWER			ep_
 #define GT_LOWER			fp12_
 #define PC_LOWER			pp_
-#elif PC_CUR == BINAR
+#elif PC_CUR == CHAR2
 #define G1_LOWER			eb_
 #define G2_LOWER			eb_
 #define GT_LOWER			fb4_
@@ -69,7 +69,7 @@
  */
 #if PC_CUR == PRIME
 #define PC_UPPER			PP_
-#elif PC_CUR == BINAR
+#elif PC_CUR == CHAR2
 #define PC_UPPER			PB_
 #endif
 
@@ -205,7 +205,7 @@ typedef CAT(GT_LOWER, t) gt_t;
  */
 #if PC_CUR == PRIME
 #define pc_param_set_any()	ep_param_set_any_pairf()
-#elif PC_CUR == BINAR
+#elif PC_CUR == CHAR2
 #define pc_param_set_any()	eb_param_set_any_super()
 #endif
 
@@ -217,7 +217,7 @@ typedef CAT(GT_LOWER, t) gt_t;
 #if PC_CUR == PRIME
 #define pc_pair_is_type1()	(0)
 #define pc_pair_is_type3()	(1)
-#elif PC_CUR == BINAR
+#elif PC_CUR == CHAR2
 #define pc_pair_is_type1()	(1)
 #define pc_pair_is_type3()	(0)
 #endif
