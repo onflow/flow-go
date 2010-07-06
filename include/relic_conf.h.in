@@ -103,6 +103,8 @@
 #cmakedefine WITH_EB
 /** Build elliptic curve cryptography module. */
 #cmakedefine WITH_EC
+/** Build hyperelliptic curve cryptography module. */
+#cmakedefine WITH_HB
 /** Build pairings over prime curves module. */
 #cmakedefine WITH_PP
 /** Build pairings over binary curves module. */
@@ -200,6 +202,13 @@
 
 /** Prime field arithmetic method */
 #define FP_METHD "@FP_METHD@"
+
+/** Schoolbook addition. */
+#define BASIC    1
+/** Integrated modular addtion. */
+#define INTEG    3
+/** Chosen prime field multiplication method. */
+#define FP_ADD   @FP_ADD@
 
 /** Schoolbook multiplication. */
 #define BASIC    1
@@ -375,8 +384,6 @@
 #cmakedefine EP_ORDIN
 /** Support for supersingular curves. */
 #cmakedefine EP_SUPER
-/** Support for NIST standardized curves. */
-#cmakedefine EP_STAND
 /** Use mixed coordinates. */
 #cmakedefine EP_MIXED
 /** Build precomputation table for generator. */
@@ -409,7 +416,7 @@
 #define SLIDE    2
 /** Montgomery powering ladder. */
 #define MONTY	 3
-/** 4-width (T)NAF. */ 
+/** Width-w (T)NAF. */ 
 #define WTNAF	 4
 /** Chosen prime elliptic curve point multiplication method. */
 #define EP_MUL	 @EP_MUL@
@@ -446,8 +453,6 @@
 #cmakedefine EB_SUPER
 /** Support for Koblitz anomalous binary curves. */
 #cmakedefine EB_KBLTZ
-/** Support for NIST standardized curves. */
-#cmakedefine EB_STAND
 /** Use mixed coordinates. */
 #cmakedefine EB_MIXED
 /** Build precomputation table for generator. */
@@ -473,7 +478,7 @@
 #define LODAH	 2
 /** Halving. */
 #define HALVE    3
-/** 4-width (T)NAF. */ 
+/** Width-w (T)NAF. */ 
 #define WTNAF	 4
 /** Chosen binary elliptic curve point multiplication method. */
 #define EB_MUL	 @EB_MUL@
@@ -511,11 +516,67 @@
 #define EC_METHD "@EC_METHD@"
 
 /** Prime curves. */
-#define PRIME	 1
+#define PRIME    1
 /** Binary curves. */
-#define BINAR	 2
+#define CHAR2    2
 /** Chosen elliptic curve cryptography method. */
 #define EC_CUR	 @EC_CUR@
+
+/** Support for supersingular curves. */
+#cmakedefine HB_SUPER
+/** Build precomputation table for generator. */
+#cmakedefine HB_PRECO
+/** Width of precomputation table for fixed point methods. */
+#define HB_DEPTH @HB_DEPTH@
+/** Width of window processing for unknown point methods. */
+#define HB_WIDTH @HB_WIDTH@
+
+/** Binary elliptic curve arithmetic method. */
+#define HB_METHD "@HB_METHD@"
+
+/** Affine coordinates. */
+#define BASIC	 1
+/** López-Dahab Projective coordinates. */
+#define PROJC	 2
+/** Chosen binary elliptic curve coordinate method. */
+#define HB_ADD	 @EB_ADD@
+
+/** Binary point multiplication. */ 
+#define BASIC	 1
+/** Width-w (T)NAF. */ 
+#define WTNAF	 4
+/** Octupling-based windowing. */
+#define OCTUP	 7
+/** Chosen binary hyperelliptic curve point multiplication method. */
+#define HB_MUL	 @HB_MUL@
+
+/** Binary point multiplication. */ 
+#define BASIC	 1
+/** Yao's windowing method. */
+#define YAOWI	 2
+/** NAF windowing method. */ 
+#define NAFWI	 3
+/** w-(T)NAF method. */
+#define WTNAF    4
+/** Single-table comb method. */
+#define COMBS	 5
+/** Double-table comb method. */
+#define COMBD    6
+/** Yao's windowing method. */
+#define OCTUP	 7
+/** Chosen binary hyperelliptic curve point multiplication method. */
+#define HB_FIX	 @HB_FIX@
+
+/** Basic simultaneouns point multiplication. */
+#define BASIC    1
+/** Shamir's trick. */
+#define TRICK    2
+/** Interleaving of w-(T)NAFs. */
+#define INTER    3
+/** Joint sparse form. */
+#define JOINT    4
+/** Chosen binary elliptic curve simulteanous point multiplication method. */
+#define HB_SIM   @HB_SIM@ 
 
 /** Parallel implementation. */
 #cmakedefine PB_PARAL
@@ -524,9 +585,9 @@
 #define PB_METHD "@PB_METHD@"
 
 /** Pairing computation with square roots. */ 
-#define ETATS	 1
+#define ETATS    1
 /** Pairing computation without square roots. */
-#define ETATN	 2
+#define ETATN    2
 /** Chosen binary elliptic curve point multiplication method. */
 #define PB_MAP	 @PB_MAP@
 
@@ -536,7 +597,7 @@
 /** Prime curves. */
 #define PRIME	 1
 /** Binary curves. */
-#define BINAR	 2
+#define CHAR2	 2
 /** Chosen elliptic curve cryptography method. */
 #define PC_CUR	 @PC_CUR@
 
