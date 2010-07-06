@@ -142,7 +142,7 @@ enum {
 /*============================================================================*/
 
 /**
- * Represents an ellyptic curve point over a binary field.
+ * Represents an elliptic curve point over a binary field.
  */
 typedef struct {
 #if ALLOC == STATIC
@@ -331,7 +331,7 @@ typedef eb_st *eb_t;
 #endif
 
 /**
- * Builds a precomputation table for multiplying a fixed binary elliptic curve
+ * Builds a precomputation table for multiplying a fixed binary elliptic point
  * point.
  *
  * @param[out] T			- the precomputation table.
@@ -818,7 +818,7 @@ void eb_mul_gen(eb_t r, bn_t k);
 void eb_mul_dig(eb_t r, eb_t p, dig_t k);
 
 /**
- * Builds a precomputation table for multiplying a fixed binary elliptic curve
+ * Builds a precomputation table for multiplying a fixed binary elliptic point
  * using the binary method.
  *
  * @param[out] t			- the precomputation table.
@@ -827,7 +827,7 @@ void eb_mul_dig(eb_t r, eb_t p, dig_t k);
 void eb_mul_pre_basic(eb_t *t, eb_t p);
 
 /**
- * Builds a precomputation table for multiplying a fixed binary elliptic curve
+ * Builds a precomputation table for multiplying a fixed binary elliptic point
  * using Yao's windowing method.
  *
  * @param[out] t			- the precomputation table.
@@ -836,7 +836,7 @@ void eb_mul_pre_basic(eb_t *t, eb_t p);
 void eb_mul_pre_yaowi(eb_t *t, eb_t p);
 
 /**
- * Builds a precomputation table for multiplying a fixed binary elliptic curve
+ * Builds a precomputation table for multiplying a fixed binary elliptic point
  * using the NAF windowing method.
  *
  * @param[out] t			- the precomputation table.
@@ -845,7 +845,7 @@ void eb_mul_pre_yaowi(eb_t *t, eb_t p);
 void eb_mul_pre_nafwi(eb_t *t, eb_t p);
 
 /**
- * Builds a precomputation table for multiplying a fixed binary elliptic curve
+ * Builds a precomputation table for multiplying a fixed binary elliptic point
  * using the single-table comb method.
  *
  * @param[out] t			- the precomputation table.
@@ -854,7 +854,7 @@ void eb_mul_pre_nafwi(eb_t *t, eb_t p);
 void eb_mul_pre_combs(eb_t *t, eb_t p);
 
 /**
- * Builds a precomputation table for multiplying a fixed binary elliptic curve
+ * Builds a precomputation table for multiplying a fixed binary elliptic point
  * using the double-table comb method.
  *
  * @param[out] t			- the precomputation table.
@@ -863,7 +863,7 @@ void eb_mul_pre_combs(eb_t *t, eb_t p);
 void eb_mul_pre_combd(eb_t *t, eb_t p);
 
 /**
- * Builds a precomputation table for multiplying a fixed binary elliptic curve
+ * Builds a precomputation table for multiplying a fixed binary elliptic point
  * using the w-(T)NAF method.
  *
  * @param[out] t			- the precomputation table.

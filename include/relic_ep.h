@@ -127,7 +127,7 @@ enum {
 /*============================================================================*/
 
 /**
- * Represents an ellyptic curve point over a prime field.
+ * Represents an elliptic curve point over a prime field.
  */
 typedef struct {
 #if ALLOC == STATIC
@@ -304,7 +304,7 @@ typedef ep_st *ep_t;
 #endif
 
 /**
- * Builds a precomputation table for multiplying a fixed prime elliptic curve
+ * Builds a precomputation table for multiplying a fixed prime elliptic point
  * point.
  *
  * @param[out] T			- the precomputation table.
@@ -692,7 +692,7 @@ void ep_mul_wtnaf(ep_t r, ep_t p, bn_t k);
 void ep_mul_gen(ep_t r, bn_t k);
 
 /**
- * Builds a precomputation table for multiplying a fixed prime elliptic curve
+ * Builds a precomputation table for multiplying a fixed prime elliptic point
  * using the binary method.
  *
  * @param[out] t			- the precomputation table.
@@ -701,7 +701,7 @@ void ep_mul_gen(ep_t r, bn_t k);
 void ep_mul_pre_basic(ep_t *t, ep_t p);
 
 /**
- * Builds a precomputation table for multiplying a fixed prime elliptic curve
+ * Builds a precomputation table for multiplying a fixed prime elliptic point
  * using Yao's windowing method.
  *
  * @param[out] t			- the precomputation table.
@@ -710,7 +710,7 @@ void ep_mul_pre_basic(ep_t *t, ep_t p);
 void ep_mul_pre_yaowi(ep_t *t, ep_t p);
 
 /**
- * Builds a precomputation table for multiplying a fixed prime elliptic curve
+ * Builds a precomputation table for multiplying a fixed prime elliptic point
  * using the NAF windowing method.
  *
  * @param[out] t			- the precomputation table.
@@ -719,7 +719,7 @@ void ep_mul_pre_yaowi(ep_t *t, ep_t p);
 void ep_mul_pre_nafwi(ep_t *t, ep_t p);
 
 /**
- * Builds a precomputation table for multiplying a fixed prime elliptic curve
+ * Builds a precomputation table for multiplying a fixed prime elliptic point
  * using the single-table comb method.
  *
  * @param[out] t			- the precomputation table.
@@ -728,7 +728,7 @@ void ep_mul_pre_nafwi(ep_t *t, ep_t p);
 void ep_mul_pre_combs(ep_t *t, ep_t p);
 
 /**
- * Builds a precomputation table for multiplying a fixed prime elliptic curve
+ * Builds a precomputation table for multiplying a fixed prime elliptic point
  * using the double-table comb method.
  *
  * @param[out] t			- the precomputation table.
@@ -737,7 +737,7 @@ void ep_mul_pre_combs(ep_t *t, ep_t p);
 void ep_mul_pre_combd(ep_t *t, ep_t p);
 
 /**
- * Builds a precomputation table for multiplying a fixed prime elliptic curve
+ * Builds a precomputation table for multiplying a fixed prime elliptic point
  * using the w-(T)NAF method.
  *
  * @param[out] t			- the precomputation table.
