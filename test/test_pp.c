@@ -302,8 +302,6 @@ static int multiplication2(void) {
 			fp2_mul(d, d, c);
 			fp2_mul(e, b, c);
 			fp2_mul(e, a, e);
-			fp2_print(d);
-			fp2_print(e);
 			TEST_ASSERT(fp2_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 
@@ -1818,8 +1816,8 @@ static int pairing(void) {
 int main(void) {
 	core_init();
 
-	if (fp_param_set_any_tower() != STS_OK) {
-		THROW(ERR_NO_FIELD);
+	if (ep_param_set_any_pairf() == STS_ERR) {
+		THROW(ERR_NO_CURVE);
 		core_clean();
 		return 0;
 	}
@@ -1969,12 +1967,6 @@ int main(void) {
 	if (exponentiation12() != STS_OK) {
 		core_clean();
 		return 1;
-	}
-
-	if (ep_param_set_any_pairf() == STS_ERR) {
-		THROW(ERR_NO_CURVE);
-		core_clean();
-		return 0;
 	}
 
 	util_print_banner("Quadratic twist:", 0);
