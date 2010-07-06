@@ -105,12 +105,14 @@ enum {
 	SQRT_283 = 15,
 	/** NIST 409-bit fast reduction polynomial. */
 	NIST_409 = 16,
+	/** Hankerson's trinomial for genus 2 curves. */
+	TRINO_439 = 17,
 	/** NIST 571-bit fast reduction polynomial. */
-	NIST_571 = 17,
+	NIST_571 = 18,
 	/** Square-root friendly 571-bit polynomial. */
-	SQRT_571 = 18,
+	SQRT_571 = 19,
 	/** Mike Scott's 1223-bit pairing-friendly trinomial. */
-	TRINO_1223 = 19
+	TRINO_1223 = 20
 };
 
 /*============================================================================*/
