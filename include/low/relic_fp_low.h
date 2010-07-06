@@ -62,6 +62,26 @@ dig_t fp_add1_low(dig_t *c, dig_t *a, dig_t digit);
 dig_t fp_addn_low(dig_t *c, dig_t *a, dig_t *b);
 
 /**
+ * Adds to digit vectors of the same size with integrated modular reduction.
+ * Computes c = a + b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first digit vector to add.
+ * @param[in] b				- the second digit vector to add.
+ */
+void fp_addm_low(dig_t *c, dig_t *a, dig_t *b);
+
+/**
+ * Adds to double-length digit vectors. Computes c = a + b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first digit vector to add.
+ * @param[in] b				- the second digit vector to add.
+ * @return the carry of the last digit addition.
+ */
+dig_t fp_addd_low(dig_t *c, dig_t *a, dig_t *b);
+
+/**
  * Subtracts a digit from a digit vector. Computes c = a - digit.
  *
  * @param[out] c			- the result.
@@ -80,6 +100,27 @@ dig_t fp_sub1_low(dig_t *c, dig_t *a, dig_t digit);
  * @return the carry of the last digit subtraction.
  */
 dig_t fp_subn_low(dig_t *c, dig_t *a, dig_t *b);
+
+/**
+ * Subtracts to digit vectors of the same size with integrated modular reduction.
+ * Computes c = a - b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first digit vector to add.
+ * @param[in] b				- the second digit vector to add.
+ */
+void fp_subm_low(dig_t *c, dig_t *a, dig_t *b);
+
+/**
+ * Subtracts a double-length digit vector from another digit vector.
+ * Computes c = a - b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first digit vector to add.
+ * @param[in] b				- the second digit vector to add.
+ * @return the carry of the last digit addition.
+ */
+dig_t fp_subd_low(dig_t *c, dig_t *a, dig_t *b);
 
 /**
  * Compares two digits.
@@ -231,10 +272,8 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m);
  *
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to reduce.
- * @param[in] m				- the modulus.
- * @param[in] u				- the value derived from the modulus.
  */
-dig_t fp_rdcn_low(dig_t *c, dig_t *a, dig_t *m, dig_t u);
+void fp_rdcn_low(dig_t *c, dig_t *a);
 
 /**
  * Inverts a digit vector modulo the configured prime.
