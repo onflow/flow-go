@@ -52,7 +52,7 @@
  */
 #if EC_CUR == PRIME
 #define EC_LOWER			ep_
-#elif EC_CUR == BINAR
+#elif EC_CUR == CHAR2
 #define EC_LOWER			eb_
 #endif
 
@@ -61,7 +61,7 @@
  */
 #if EC_CUR == PRIME
 #define EC_UPPER			EP_
-#elif EC_CUR == BINAR
+#elif EC_CUR == CHAR2
 #define EC_UPPER			EB_
 #endif
 
@@ -70,7 +70,7 @@
  */
 #if EC_CUR == PRIME
 #define EC_TABLE			EP_TABLE
-#elif EC_CUR == BINAR
+#elif EC_CUR == CHAR2
 #define EC_TABLE			EB_TABLE
 #endif
 
@@ -135,7 +135,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  */
 #if EC_CUR == PRIME
 #define ec_param_set_any()	ep_param_set_any()
-#elif EC_CUR == BINAR
+#elif EC_CUR == CHAR2
 #if defined(EC_KBLTZ)
 #define ec_param_set_any()	eb_param_set_any_kbltz()
 #else
