@@ -3,7 +3,6 @@ message(STATUS "Prime elliptic curve arithmetic configuration (EP module):\n")
 message("   ** Options for the binary elliptic curve module (default = all on):")
 message("      EP_ORDIN=[off|on] Support for ordinary curves.")
 message("      EP_SUPER=[off|on] Support for supersingular curves.")    
-message("      EP_STAND=[off|on] Support for standardized curves.")
 message("      EP_MIXED=[off|on] Use mixed coordinates.\n")
 message("      EB_PRECO=[off|on] Build precomputation table for generator.")
 message("      EB_DEPTH=w        Width w in [2,6] of precomputation table for fixed point methods.")
@@ -41,7 +40,6 @@ set(EP_WIDTH "${EP_WIDTH}" CACHE STRING "Width of window processing for unknown 
 
 option(EP_ORDIN "Support for ordinary curves" on)
 option(EP_SUPER "Support for supersingular curves" on)
-option(EP_STAND "Support for NIST standardized curves" on)
 option(EP_MIXED "Use mixed coordinates" on)
 option(EP_PRECO "Build precomputation table for generator" on)
 

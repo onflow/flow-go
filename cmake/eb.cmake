@@ -4,7 +4,6 @@ message("   ** Options for the binary elliptic curve module (default = on, w = 4
 message("      EB_ORDIN=[off|on] Support for ordinary curves.")
 message("      EB_SUPER=[off|on] Support for supersingular curves.")    
 message("      EB_KBLTZ=[off|on] Special support for Koblitz curves.")
-message("      EB_STAND=[off|on] Support for standardized curves.")
 message("      EB_MIXED=[off|on] Use mixed coordinates.")
 message("      EB_PRECO=[off|on] Build precomputation table for generator.")
 message("      EB_DEPTH=w        Width w in [2,6] of precomputation table for fixed point methods.")
@@ -45,7 +44,6 @@ set(EB_WIDTH "${EB_WIDTH}" CACHE STRING "Width of window processing for unknown 
 option(EB_ORDIN "Support for ordinary curves" on)
 option(EB_SUPER "Support for supersingular curves" on)
 option(EB_KBLTZ "Special support for Koblitz curves" on)
-option(EB_STAND "Support for NIST standardized curves" on)
 option(EB_MIXED "Use mixed coordinates" on)
 option(EB_PRECO "Build precomputation table for generator" on)
 
