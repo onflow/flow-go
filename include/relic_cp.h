@@ -610,6 +610,24 @@ int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in, int in_len
 		rabin_t prv);
 
 /**
+ * Generates an ECDH key pair.
+ *
+ * @param[out] d			- the private key.
+ * @param[in] q				- the public key.
+ */
+void cp_ecdh_gen(bn_t d, ec_t q);
+
+/**
+ * Derives a shared secret using ECDH.
+ *
+ * @param[out] key				- the shared key.
+ * @param[int] key_len			- the intended shared key length in bytes.
+ * @param[in] k					- the private key.
+ * @param[in] q					- the point received by the other party.
+ */
+void cp_ecdh_key(unsigned char *key, int key_len, bn_t d, ec_t q);
+
+/**
  * Generates an ECDSA key pair.
  *
  * @param[out] d			- the private key.
