@@ -162,6 +162,32 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #endif
 
 /**
+ * Adds two prime field elements. Computes c = a + b.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the first prime field element.
+ * @param[in] B				- the second prime field element.
+ */
+#if FP_ADD == BASIC
+#define fp_add(C, A, B)		fp_add_basic(C, A, B)
+#elif FP_ADD == INTEG
+#define fp_add(C, A, B)		fp_add_integ(C, A, B)
+#endif
+
+/**
+ * Subtracts a prime field element from another. Computes c = a - b.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the first prime field element.
+ * @param[in] B				- the second prime field element.
+ */
+#if FP_ADD == BASIC
+#define fp_sub(C, A, B)		fp_sub_basic(C, A, B)
+#elif FP_ADD == INTEG
+#define fp_sub(C, A, B)		fp_sub_integ(C, A, B)
+#endif
+
+/**
  * Multiples two prime field elements. Computes c = a * b.
  *
  * @param[out] C			- the result.
@@ -569,13 +595,23 @@ int fp_cmp_dig(fp_t a, dig_t b);
 int fp_cmp(fp_t a, fp_t b);
 
 /**
- * Adds two prime field elements. Computes c = a + b.
+ * Adds two prime field elements using basic addition. Computes c = a + b.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the first prime field element to add.
  * @param[in] b				- the second prime field element to add.
  */
-void fp_add(fp_t c, fp_t a, fp_t b);
+void fp_add_basic(fp_t c, fp_t a, fp_t b);
+
+/**
+ * Adds two prime field elements with integrated modular reduction. Computes
+ * c = a + b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first prime field element to add.
+ * @param[in] b				- the second prime field element to add.
+ */
+void fp_add_integ(fp_t c, fp_t a, fp_t b);
 
 /**
  * Adds a prime field element and a digit. Computes c = a + b.
@@ -587,13 +623,24 @@ void fp_add(fp_t c, fp_t a, fp_t b);
 void fp_add_dig(fp_t c, fp_t a, dig_t b);
 
 /**
- * Subtracts a prime field element from another. Computes c = a - b.
+ * Subtracts a prime field element from another using basic subtraction.
+ * Computes c = a - b.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element.
  * @param[in] b				- the prime field element to subtract.
  */
-void fp_sub(fp_t c, fp_t a, fp_t b);
+void fp_sub_basic(fp_t c, fp_t a, fp_t b);
+
+/**
+ * Subtracts a prime field element from another with integrated modular
+ * reduction. Computes c = a - b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the prime field element.
+ * @param[in] b				- the prime field element to subtract.
+ */
+void fp_sub_integ(fp_t c, fp_t a, fp_t b);
 
 /**
  * Subtracts a digit from a prime field element. Computes c = a - b.
