@@ -578,6 +578,18 @@
 /** Chosen binary elliptic curve simulteanous point multiplication method. */
 #define HB_SIM   @HB_SIM@ 
 
+/** Bilinear pairing method. */
+#define PP_METHD "@PP_METHD@"
+
+/** R-ate pairing. */ 
+#define R_ATE    1
+/** Optimal ate pairing. */
+#define O_ATE    2
+/** X-ate pairing. */
+#define X_ATE    3
+/** Chosen prime elliptic curve point pairing method. */
+#define PP_MAP   @PP_MAP@
+
 /** Parallel implementation. */
 #cmakedefine PB_PARAL
 
@@ -588,7 +600,7 @@
 #define ETATS    1
 /** Pairing computation without square roots. */
 #define ETATN    2
-/** Chosen binary elliptic curve point multiplication method. */
+/** Chosen binary elliptic curve point pairing method. */
 #define PB_MAP	 @PB_MAP@
 
 /** Binary elliptic curve arithmetic method. */

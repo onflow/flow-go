@@ -191,7 +191,9 @@ int fp2_cmp(fp2_t a, fp2_t b);
  * @param[in] a				- the first quadratic extension field element.
  * @param[in] b				- the second quadratic extension field element.
  */
-void fp2_add(fp2_t c, fp2_t a, fp2_t b);
+#define fp2_add(C, A, B)												\
+	fp_add(C[0], A[0], B[0]); fp_add(C[1], A[1], B[1]);					\
+//void fp2_add(fp2_t c, fp2_t a, fp2_t b);
 
 /**
  * Subtracts a quadratic extension field element from another. Computes
@@ -201,7 +203,10 @@ void fp2_add(fp2_t c, fp2_t a, fp2_t b);
  * @param[in] A				- the quadratic extension field element.
  * @param[in] B				- the quadratic extension field element.
  */
-void fp2_sub(fp2_t c, fp2_t a, fp2_t b);
+#define fp2_sub(C, A, B)												\
+	fp_sub(C[0], A[0], B[0]); fp_sub(C[1], A[1], B[1]);					\
+
+//void fp2_sub(fp2_t c, fp2_t a, fp2_t b);
 
 /**
  * Initializes a sextic extension field with a null value.
@@ -559,14 +564,19 @@ void fp12_sub(fp12_t c, fp12_t a, fp12_t b);
 #endif
 
 /**
- * Computes the etat pairing of two binary elliptic curve points. Computes
- * e(P, Q).
+ * Computes the pairing of two binary elliptic curve points. Computes e(P, Q).
  *
  * @param[out] R			- the result.
  * @param[in] P				- the first elliptic curve point.
  * @param[in] Q				- the second elliptic curve point.
  */
-#define pp_map(R, P, Q)		pp_map_rate(R, P, Q)
+#if PP_MAP == R_ATE
+#define pp_map(R, P, Q)		pp_map_r_ate(R, P, Q)
+#elif PP_MAP == O_ATE
+#define pp_map(R, P, Q)		pp_map_o_ate(R, P, Q)
+#elif PP_MAP == X_ATE
+#define pp_map(R, P, Q)		pp_map_x_ate(R, P, Q)
+#endif
 
 /*============================================================================*/
 /* Function prototypes                                                        */
@@ -1136,6 +1146,26 @@ void pp_pair_clean(void);
  * @param[in] q				- the first elliptic curve point.
  * @param[in] p				- the second elliptic curve point.
  */
-void pp_map_rate(fp12_t r, ep2_t q, ep_t p);
+void pp_map_r_ate(fp12_t r, ep2_t q, ep_t p);
+
+/**
+ * Computes the Optimal ate pairing of two points in a parameterized elliptic
+ * curve. Computes e(Q, P).
+ *
+ * @param[out] r			- the result.
+ * @param[in] q				- the first elliptic curve point.
+ * @param[in] p				- the second elliptic curve point.
+ */
+void pp_map_o_ate(fp12_t r, ep2_t q, ep_t p);
+
+/**
+ * Computes the X-ate pairing of two points in a parameterized elliptic curve.
+ * Computes e(Q, P).
+ *
+ * @param[out] r			- the result.
+ * @param[in] q				- the first elliptic curve point.
+ * @param[in] p				- the second elliptic curve point.
+ */
+void pp_map_x_ate(fp12_t r, ep2_t q, ep_t p);
 
 #endif /* !RELIC_PP_H */
