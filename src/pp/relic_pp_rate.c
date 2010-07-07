@@ -298,12 +298,13 @@ void rate_exp(fp12_t m, bn_t x) {
 		/* From here on we work with x' = -x, therefore if x is positive
 		 * we need inversions. */
 		if (bn_sign(x) == BN_POS) {
-			/* TODO: these inversions are probably just conjugations, test. */
-			fp12_inv(v3, m);
+			/* We are now on the cyclotomic subgroup, so inversion are
+			 * conjugations. */
+			fp12_inv_uni(v3, m);
 			fp12_exp_uni(v0, v3, x);
-			fp12_inv(v3, v0);
+			fp12_inv_uni(v3, v0);
 			fp12_exp_uni(v1, v3, x);
-			fp12_inv(v3, v1);
+			fp12_inv_uni(v3, v1);
 			fp12_exp_uni(v2, v3, x);
 		} else {
 			fp12_exp_uni(v0, m, x);

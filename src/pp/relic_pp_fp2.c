@@ -146,14 +146,12 @@ void fp2_dbl(fp2_t c, fp2_t a) {
 
 void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 	dv_t t0, t1, t2, t3;
-	fp_t t;
-	dig_t c0, c1, *p;
+	dig_t c0, *p;
 
 	dv_null(t0);
 	dv_null(t1);
 	dv_null(t2);
 	dv_null(t3);
-	fp_null(t);
 
 	TRY {
 
@@ -161,42 +159,44 @@ void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 		dv_new(t1);
 		dv_new(t2);
 		dv_new(t3);
-		fp_new(t);
 
 		p = fp_prime_get();
 
 		/* Karatsuba algorithm. */
 		/* t1 = a0 + a1, c1 = b0 + b1. */
-		fp_add(t, a[0], a[1]);
+		fp_add(t2, a[0], a[1]);
 		fp_add(t1, b[0], b[1]);
 		/* t1 = (a0 + a1) * (b0 + b1). */
-		fp_muln_low(t3, t, t1);
+		fp_muln_low(t3, t2, t1);
 
 		/* t0 = a0 * b0, t1 = a1 * b1. */
 		fp_muln_low(t0, a[0], b[0]);
 		fp_muln_low(t1, a[1], b[1]);
 
 		/* t2 = (a0 * a1) + (b0 * b1). */
-		fp_addd_low(t2, t0, t1);
-
-		/* t1 = u^2 * (a1 * b1). */
-		if (fp_prime_get_qnr() == -2) {
-			c0 = fp_lsh1_low(t1, t1);
-			fp_lsh1_low(t1 + FP_DIGS, t1 + FP_DIGS);
-			t1[FP_DIGS] ^= c0;
+		c0 = fp_addd_low(t2, t0, t1);
+		if (c0) {
+			fp_subn_low(t2 + FP_DIGS, t2 + FP_DIGS, p);
 		}
 
 		/* t0 = (a0 * a1) + u^2 * (a1 * b1). */
-		c1 = fp_subd_low(t0, t0, t1);
-		if (c1) {
+		c0 = fp_subd_low(t0, t0, t1);
+		if (c0) {
 			fp_addn_low(t0 + FP_DIGS, t0 + FP_DIGS, p);
+		}
+		/* t1 = u^2 * (a1 * b1). */
+		if (fp_prime_get_qnr() == -2) {
+			c0 = fp_subd_low(t0, t0, t1);
+			if (c0) {
+				fp_addn_low(t0 + FP_DIGS, t0 + FP_DIGS, p);
+			}
 		}
 
 		/* c0 = t0 mod p. */
 		fp_rdc(c[0], t0);
 
-		c1 = fp_subd_low(t3, t3, t2);
-		if (c1) {
+		c0 = fp_subd_low(t3, t3, t2);
+		if (c0) {
 			fp_addn_low(t3 + FP_DIGS, t3 + FP_DIGS, p);
 		}
 
