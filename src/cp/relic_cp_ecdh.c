@@ -25,7 +25,7 @@
  *
  * Implementation of the ECDSA protocol.
  *
- * @version $Id: relic_cp_ecdsa.c 363 2010-06-03 22:47:26Z dfaranha $
+ * @version $Id$
  * @ingroup cp
  */
 
