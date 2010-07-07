@@ -458,7 +458,7 @@ static void arith12(void) {
 
 	BENCH_BEGIN("fp12_inv_uni") {
 		fp12_rand(a);
-		BENCH_ADD(fp12_inv(c, a));
+		BENCH_ADD(fp12_inv_uni(c, a));
 	}
 	BENCH_END;
 
@@ -474,7 +474,7 @@ static void arith12(void) {
 		fp12_rand(a);
 		d->used = FP_DIGS;
 		dv_copy(d->dp, fp_prime_get(), FP_DIGS);
-		BENCH_ADD(fp12_exp(c, a, d));
+		BENCH_ADD(fp12_exp_uni(c, a, d));
 	}
 	BENCH_END;
 
@@ -785,6 +785,33 @@ static void arith(void) {
 		BENCH_ADD(pp_map(e, p, _q));
 	}
 	BENCH_END;
+
+#if PP_MAP == R_ATE || !defined(STRIP)
+	BENCH_BEGIN("pp_map_r_ate") {
+		ep2_rand(p);
+		ep_rand(_q);
+		BENCH_ADD(pp_map_r_ate(e, p, _q));
+	}
+	BENCH_END;
+#endif
+
+#if PP_MAP == O_ATE || !defined(STRIP)
+	BENCH_BEGIN("pp_map_o_ate") {
+		ep2_rand(p);
+		ep_rand(_q);
+		BENCH_ADD(pp_map_o_ate(e, p, _q));
+	}
+	BENCH_END;
+#endif
+
+#if PP_MAP == X_ATE || !defined(STRIP)
+	BENCH_BEGIN("pp_map_x_ate") {
+		ep2_rand(p);
+		ep_rand(_q);
+		BENCH_ADD(pp_map_x_ate(e, p, _q));
+	}
+	BENCH_END;
+#endif
 
 	ep2_free(p);
 	ep2_free(q);

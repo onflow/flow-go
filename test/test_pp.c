@@ -1783,7 +1783,7 @@ static int pairing(void) {
 
 		ep_curve_get_ord(n);
 
-		TEST_BEGIN("rate pairing is bilinear") {
+		TEST_BEGIN("pairing is bilinear") {
 			ep2_rand(p);
 			ep_rand(q);
 			bn_rand(k, BN_POS, bn_bits(n));
@@ -1791,11 +1791,59 @@ static int pairing(void) {
 			ep_mul(r, q, k);
 			fp12_zero(e1);
 			fp12_zero(e2);
-			pp_map_rate(e1, p, r);
+			pp_map(e1, p, r);
 			ep2_mul(p, p, k);
-			pp_map_rate(e2, p, q);
+			pp_map(e2, p, q);
 			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
+
+#if PP_MAP == R_ATE || !defined(STRIP)
+		TEST_BEGIN("r-ate pairing is bilinear") {
+			ep2_rand(p);
+			ep_rand(q);
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(r, q, k);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_map_r_ate(e1, p, r);
+			ep2_mul(p, p, k);
+			pp_map_r_ate(e2, p, q);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_MAP == O_ATE || !defined(STRIP)
+		TEST_BEGIN("o-ate pairing is bilinear") {
+			ep2_rand(p);
+			ep_rand(q);
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(r, q, k);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_map_o_ate(e1, p, r);
+			ep2_mul(p, p, k);
+			pp_map_o_ate(e2, p, q);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_MAP == X_ATE || !defined(STRIP)
+		TEST_BEGIN("x-ate pairing is bilinear") {
+			ep2_rand(p);
+			ep_rand(q);
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(r, q, k);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_map_x_ate(e1, p, r);
+			ep2_mul(p, p, k);
+			pp_map_x_ate(e2, p, q);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -1821,6 +1869,7 @@ int main(void) {
 		core_clean();
 		return 0;
 	}
+	fp2_const_calc();
 
 	util_print_banner("Tests for the PP module", 0);
 
