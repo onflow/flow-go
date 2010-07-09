@@ -34,6 +34,7 @@
 
 #include "relic_fp.h"
 #include "relic_fp_low.h"
+#include "relic_core.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -47,10 +48,37 @@ dig_t fp_addn_low(dig_t *c, dig_t *a, dig_t *b) {
 	return mpn_add_n(c, a, b, FP_DIGS);
 }
 
+void fp_addm_low(dig_t *c, dig_t *a, dig_t *b) {
+	dig_t carry;
+
+	carry = mpn_add_n(c, a, b, FP_DIGS);
+
+	if (carry || (fp_cmpn_low(c, fp_prime_get()) != CMP_LT)) {
+		carry = fp_subn_low(c, c, fp_prime_get());
+	}
+}
+
+dig_t fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
+	return mpn_add_n(c, a, b, 2 * FP_DIGS);
+}
+
 dig_t fp_sub1_low(dig_t *c, dig_t *a, dig_t digit) {
 	return mpn_sub_1(c, a, FP_DIGS, digit);
 }
 
 dig_t fp_subn_low(dig_t *c, dig_t *a, dig_t *b) {
 	return mpn_sub_n(c, a, b, FP_DIGS);
+}
+
+void fp_subm_low(dig_t *c, dig_t *a, dig_t *b) {
+	dig_t carry;
+
+	carry = mpn_sub_n(c, a, b, FP_DIGS);
+	if (carry) {
+		fp_addn_low(c, c, fp_prime_get());
+	}
+}
+
+dig_t fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
+	return mpn_sub_n(c, a, b, 2 * FP_DIGS);
 }

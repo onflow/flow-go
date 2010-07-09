@@ -107,9 +107,12 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 	fp_copy(c, r);
 }
 
-dig_t fp_rdcn_low(dig_t *c, dig_t *a, dig_t *m, dig_t u) {
+void fp_rdcn_low(dig_t *c, dig_t *a) {
 	int i;
-	dig_t r, carry, *tmp;
+	dig_t r, carry, *tmp, u, *m;
+
+	u = *(fp_prime_get_rdc());
+	m = fp_prime_get();
 
 	tmp = a;
 
@@ -118,8 +121,10 @@ dig_t fp_rdcn_low(dig_t *c, dig_t *a, dig_t *m, dig_t u) {
 		carry = mpn_addmul_1(tmp, m, FP_DIGS, r);
 		carry = mpn_add_1(tmp + FP_DIGS, tmp + FP_DIGS, FP_DIGS - i, carry);
 	}
-	for (i = 0; i < FP_DIGS; i++, c++, tmp++) {
-		*c = *tmp;
+	for (i = 0; i < FP_DIGS; i++, tmp++) {
+		c[i] = *tmp;
 	}
-	return carry;
+	if (carry || fp_cmp(c, m) != CMP_LT) {
+		fp_subn_low(c, c, m);
+	}
 }
