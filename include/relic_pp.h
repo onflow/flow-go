@@ -191,9 +191,7 @@ int fp2_cmp(fp2_t a, fp2_t b);
  * @param[in] a				- the first quadratic extension field element.
  * @param[in] b				- the second quadratic extension field element.
  */
-#define fp2_add(C, A, B)												\
-	fp_add(C[0], A[0], B[0]); fp_add(C[1], A[1], B[1]);					\
-//void fp2_add(fp2_t c, fp2_t a, fp2_t b);
+void fp2_add(fp2_t c, fp2_t a, fp2_t b);
 
 /**
  * Subtracts a quadratic extension field element from another. Computes
@@ -203,10 +201,7 @@ int fp2_cmp(fp2_t a, fp2_t b);
  * @param[in] A				- the quadratic extension field element.
  * @param[in] B				- the quadratic extension field element.
  */
-#define fp2_sub(C, A, B)												\
-	fp_sub(C[0], A[0], B[0]); fp_sub(C[1], A[1], B[1]);					\
-
-//void fp2_sub(fp2_t c, fp2_t a, fp2_t b);
+void fp2_sub(fp2_t c, fp2_t a, fp2_t b);
 
 /**
  * Initializes a sextic extension field with a null value.

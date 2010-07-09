@@ -128,15 +128,15 @@ int fp2_cmp(fp2_t a, fp2_t b) {
 			: CMP_NE;
 }
 
-//void fp2_add(fp2_t c, fp2_t a, fp2_t b) {
-//	fp_add(c[0], a[0], b[0]);
-//	fp_add(c[1], a[1], b[1]);
-//}
-//
-//void fp2_sub(fp2_t c, fp2_t a, fp2_t b) {
-//	fp_sub(c[0], a[0], b[0]);
-//	fp_sub(c[1], a[1], b[1]);
-//}
+void fp2_add(fp2_t c, fp2_t a, fp2_t b) {
+	fp_add(c[0], a[0], b[0]);
+	fp_add(c[1], a[1], b[1]);
+}
+
+void fp2_sub(fp2_t c, fp2_t a, fp2_t b) {
+	fp_sub(c[0], a[0], b[0]);
+	fp_sub(c[1], a[1], b[1]);
+}
 
 void fp2_dbl(fp2_t c, fp2_t a) {
 	/* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
