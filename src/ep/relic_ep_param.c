@@ -119,16 +119,16 @@
 /** @} */
 #endif
 
-#if defined(EP_ORDIN) && FP_PRIME == 256
+#if defined(EP_ORDIN) && FP_PRIME == 254
 /**
  * Parameters for a pairing-friendly prime curve.
  */
 /** @{ */
-#define BNN_P256_A		"0"
-#define BNN_P256_B		"16"
-#define BNN_P256_X		"1"
-#define BNN_P256_Y		"C7424FC261B627189A14E3433B4713E9C2413FCF89B8E2B178FB6322EFB2AB3"
-#define BNN_P256_R		"2523648240000001BA344D8000000007FF9F800000000010A10000000000000D"
+#define BN_P254_A		"0"
+#define BN_P254_B		"16"
+#define BN_P254_X		"1"
+#define BN_P254_Y		"C7424FC261B627189A14E3433B4713E9C2413FCF89B8E2B178FB6322EFB2AB3"
+#define BN_P254_R		"2523648240000001BA344D8000000007FF9F800000000010A10000000000000D"
 /** @} */
 #endif
 
@@ -256,9 +256,9 @@ void ep_param_set(int param) {
 				ordin = 1;
 				break;
 #endif
-#if defined(EP_ORDIN) && FP_PRIME == 256
-			case BNN_P256:
-				ASSIGN(BNN_P256, BNN_256);
+#if defined(EP_ORDIN) && FP_PRIME == 254
+			case BN_P254:
+				ASSIGN(BN_P254, BN_254);
 				ordin = 1;
 				break;
 #endif
@@ -322,13 +322,15 @@ int ep_param_set_any_ordin() {
 
 int ep_param_set_any_pairf() {
 	int r = STS_OK;
-#if FP_PRIME == 256
-	ep_param_set(BNN_256);
-#ifdef WITH_PP
-	ep2_curve_set(1);
-#endif
+#if FP_PRIME == 254
+	ep_param_set(BN_P254);
+#elif FP_PRIME == 256
+	ep_param_set(BN_P256);
 #else
 	r = STS_ERR;
+#endif
+#ifdef WITH_PP
+	ep2_curve_set(1);
 #endif
 	return r;
 }
@@ -353,10 +355,10 @@ void ep_param_print() {
 		case NIST_P521:
 			util_print_banner("Curve NIST-P521:", 0);
 			break;
-		case BNN_P256:
+		case BN_P254:
 			util_print_banner("Curve BNN-P256:", 0);
 			break;
-		case BNP_P256:
+		case BN_P256:
 			util_print_banner("Curve BNP-P256:", 0);
 			break;
 	}

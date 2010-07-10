@@ -164,8 +164,8 @@ void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 
 		/* Karatsuba algorithm. */
 		/* t1 = a0 + a1, c1 = b0 + b1. */
-		fp_add(t2, a[0], a[1]);
-		fp_add(t1, b[0], b[1]);
+		fp_addn_low(t2, a[0], a[1]);
+		fp_addn_low(t1, b[0], b[1]);
 		/* t1 = (a0 + a1) * (b0 + b1). */
 		fp_muln_low(t3, t2, t1);
 

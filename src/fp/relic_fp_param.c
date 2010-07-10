@@ -89,16 +89,8 @@ void fp_param_set(int param) {
 				f[1] = -96;
 				fp_prime_set_spars(f, 2);
 				break;
-#elif FP_PRIME == 256
-			case NIST_256:
-				/* p = 2^256 - 2^224 + 2^192 + 2^96 - 1. */
-				f[0] = -1;
-				f[1] = 96;
-				f[2] = 192;
-				f[3] = -224;
-				fp_prime_set_spars(f, 4);
-				break;
-			case BNN_256:
+#elif FP_PRIME == 254
+			case BN_254:
 				/* x = -4080000000000001. */
 				bn_set_2b(t0, 62);
 				bn_set_2b(t1, 55);
@@ -122,7 +114,16 @@ void fp_param_set(int param) {
 				bn_add(p, p, t1);
 				fp_prime_set_dense(p);
 				break;
-			case BNP_256:
+#elif FP_PRIME == 256
+			case NIST_256:
+				/* p = 2^256 - 2^224 + 2^192 + 2^96 - 1. */
+				f[0] = -1;
+				f[1] = 96;
+				f[2] = 192;
+				f[3] = -224;
+				fp_prime_set_spars(f, 4);
+				break;
+			case BN_256:
 				/* x = 6000000000001F2D. */
 				bn_set_2b(t0, 62);
 				bn_set_2b(t1, 61);
@@ -196,7 +197,7 @@ int fp_param_set_any(void) {
 #ifdef FP_PMERS
 	fp_param_set(NIST_256);
 #else
-	fp_param_set(BNN_256);
+	fp_param_set(BN_254);
 #endif
 #elif FP_PRIME == 384
 	fp_param_set(NIST_384);
@@ -253,7 +254,7 @@ int fp_param_set_any_spars(void) {
 
 int fp_param_set_any_tower() {
 #if FP_PRIME == 256
-	fp_param_set(BNN_256);
+	fp_param_set(BN_254);
 #else
 	do {
 		fp_param_set_any_dense();

@@ -500,6 +500,16 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
+void pp_map_init(void) {
+	fp2_const_init();
+	ep2_curve_init();
+}
+
+void pp_map_clean(void) {
+	fp2_const_clean();
+	ep2_curve_clean();
+}
+
 #if PP_MAP == R_ATE || !defined(STRIP)
 
 void pp_map_r_ate(fp12_t r, ep2_t q, ep_t p) {
@@ -516,7 +526,7 @@ void pp_map_r_ate(fp12_t r, ep2_t q, ep_t p) {
 		bn_new(x);
 
 		switch (fp_param_get()) {
-			case BNN_256:
+			case BN_254:
 				/* x = -4080000000000001. */
 				bn_set_2b(x, 62);
 				bn_set_2b(a, 55);
@@ -524,7 +534,7 @@ void pp_map_r_ate(fp12_t r, ep2_t q, ep_t p) {
 				bn_add_dig(x, x, 1);
 				bn_neg(x, x);
 				break;
-			case BNP_256:
+			case BN_256:
 				/* x = 6000000000001F2D. */
 				bn_set_2b(x, 62);
 				bn_set_2b(a, 61);
@@ -582,7 +592,7 @@ void pp_map_o_ate(fp12_t r, ep2_t q, ep_t p) {
 		bn_new(x);
 
 		switch (fp_param_get()) {
-			case BNN_256:
+			case BN_254:
 				/* x = -4080000000000001. */
 				bn_set_2b(x, 62);
 				bn_set_2b(a, 55);
@@ -590,7 +600,7 @@ void pp_map_o_ate(fp12_t r, ep2_t q, ep_t p) {
 				bn_add_dig(x, x, 1);
 				bn_neg(x, x);
 				break;
-			case BNP_256:
+			case BN_256:
 				/* x = 6000000000001F2D. */
 				bn_set_2b(x, 62);
 				bn_set_2b(a, 61);
@@ -650,7 +660,7 @@ void pp_map_x_ate(fp12_t r, ep2_t q, ep_t p) {
 		bn_new(x);
 
 		switch (fp_param_get()) {
-			case BNN_256:
+			case BN_254:
 				/* x = -4080000000000001. */
 				bn_set_2b(x, 62);
 				bn_set_2b(a, 55);
@@ -658,7 +668,7 @@ void pp_map_x_ate(fp12_t r, ep2_t q, ep_t p) {
 				bn_add_dig(x, x, 1);
 				bn_neg(x, x);
 				break;
-			case BNP_256:
+			case BN_256:
 				/* x = 6000000000001F2D. */
 				bn_set_2b(x, 62);
 				bn_set_2b(a, 61);
