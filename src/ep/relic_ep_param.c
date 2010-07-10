@@ -127,10 +127,24 @@
 #define BN_P254_A		"0"
 #define BN_P254_B		"16"
 #define BN_P254_X		"1"
-#define BN_P254_Y		"C7424FC261B627189A14E3433B4713E9C2413FCF89B8E2B178FB6322EFB2AB3"
+#define BN_P254_Y		"0C7424FC261B627189A14E3433B4713E9C2413FCF89B8E2B178FB6322EFB2AB3"
 #define BN_P254_R		"2523648240000001BA344D8000000007FF9F800000000010A10000000000000D"
 /** @} */
 #endif
+
+#if defined(EP_ORDIN) && FP_PRIME == 256
+/**
+ * Parameters for a pairing-friendly prime curve.
+ */
+/** @{ */
+#define BN_P256_A		"0"
+#define BN_P256_B		"3"
+#define BN_P256_X		"1"
+#define BN_P256_Y		"2"
+#define BN_P256_R		"B64000000000ECBF9E00000073543403580018F82536ABEC4206F9942A5D7249"
+/** @} */
+#endif
+
 
 #if ARCH == AVR
 
@@ -259,6 +273,12 @@ void ep_param_set(int param) {
 #if defined(EP_ORDIN) && FP_PRIME == 254
 			case BN_P254:
 				ASSIGN(BN_P254, BN_254);
+				ordin = 1;
+				break;
+#endif
+#if defined(EP_ORDIN) && FP_PRIME == 256
+			case BN_P256:
+				ASSIGN(BN_P256, BN_256);
 				ordin = 1;
 				break;
 #endif

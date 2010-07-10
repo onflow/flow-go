@@ -128,15 +128,15 @@ int fp2_cmp(fp2_t a, fp2_t b) {
 			: CMP_NE;
 }
 
-void fp2_add(fp2_t c, fp2_t a, fp2_t b) {
-	fp_add(c[0], a[0], b[0]);
-	fp_add(c[1], a[1], b[1]);
-}
-
-void fp2_sub(fp2_t c, fp2_t a, fp2_t b) {
-	fp_sub(c[0], a[0], b[0]);
-	fp_sub(c[1], a[1], b[1]);
-}
+//void fp2_add(fp2_t c, fp2_t a, fp2_t b) {
+//	fp_add(c[0], a[0], b[0]);
+//	fp_add(c[1], a[1], b[1]);
+//}
+//
+//void fp2_sub(fp2_t c, fp2_t a, fp2_t b) {
+//	fp_sub(c[0], a[0], b[0]);
+//	fp_sub(c[1], a[1], b[1]);
+//}
 
 void fp2_dbl(fp2_t c, fp2_t a) {
 	/* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
@@ -163,9 +163,15 @@ void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 		p = fp_prime_get();
 
 		/* Karatsuba algorithm. */
+#if (FP_PRIME % WORD) == (WORD - 2)
 		/* t1 = a0 + a1, c1 = b0 + b1. */
 		fp_addn_low(t2, a[0], a[1]);
 		fp_addn_low(t1, b[0], b[1]);
+#else
+		/* t1 = a0 + a1, c1 = b0 + b1. */
+		fp_add(t2, a[0], a[1]);
+		fp_add(t1, b[0], b[1]);
+#endif
 		/* t1 = (a0 + a1) * (b0 + b1). */
 		fp_muln_low(t3, t2, t1);
 

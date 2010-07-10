@@ -52,6 +52,19 @@
 /** @} */
 #endif
 
+#if defined(EP_ORDIN) && FP_PRIME == 256
+/**
+ * Parameters for a pairing-friendly prime curve over a quadratic extension.
+ */
+/** @{ */
+#define BN_P256_X0		"4E9CC6BC6CD0B6F4A64189D362F3441A33F7ECEFA1BCBC8EE1962261F6799383"
+#define BN_P256_X1		"8E0B49853E5DD8850F228D0D3338470DE76515A084014A4D159590F362D7F387"
+#define BN_P256_Y0		"0939AC72CF41569A0E045143558A396B14559F5D0898E687D9CAC72191B4DFA8"
+#define BN_P256_Y1		"3A112DC12DBD31123F36CBEDAADE233BE4CAD713F15D5B679BB11FAFCD49728A"
+#define BN_P256_R		"81BF100000015116D47700017F273ECD1BDCF8DD36E6667F24A696812D2D81949EC008633775474AF120D8C7DC360CCCFC88442B29C2FFED277D1C2EC8F24A1D"
+/** @} */
+#endif
+
 /**
  * The generator of the elliptic curve.
  */
@@ -491,6 +504,14 @@ void ep2_curve_set(int twist) {
 				fp_read(g->y[0], BN_P254_Y0, strlen(BN_P254_Y0), 16);
 				fp_read(g->y[1], BN_P254_Y1, strlen(BN_P254_Y1), 16);
 				bn_read_str(r, BN_P254_R, strlen(BN_P254_R), 16);
+				break;
+#elif FP_PRIME == 256
+			case BN_P256:
+				fp_read(g->x[0], BN_P256_X0, strlen(BN_P256_X0), 16);
+				fp_read(g->x[1], BN_P256_X1, strlen(BN_P256_X1), 16);
+				fp_read(g->y[0], BN_P256_Y0, strlen(BN_P256_Y0), 16);
+				fp_read(g->y[1], BN_P256_Y1, strlen(BN_P256_Y1), 16);
+				bn_read_str(r, BN_P256_R, strlen(BN_P256_R), 16);
 				break;
 #endif
 			default:
