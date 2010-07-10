@@ -61,9 +61,9 @@ enum {
 	/** NIST P-521 prime curve. */
 	NIST_P521 = 6,
 	/** Barreto-Naehrig curve with negative x (found by Nogami et al.). */
-	BNN_P256 = 7,
+	BN_P254 = 7,
 	/** Barreto-Naehrig curve with positive x. */
-	BNP_P256 = 8,
+	BN_P256 = 8,
 };
 
 /**

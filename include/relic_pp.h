@@ -580,12 +580,12 @@ void fp12_sub(fp12_t c, fp12_t a, fp12_t b);
 /**
  * Initializes the pairing over elliptic curves.
  */
-void pp_pair_init(void);
+void pp_map_init(void);
 
 /**
  * Finalizes the pairing over elliptic curves.
  */
-void pp_pair_clean(void);
+void pp_map_clean(void);
 
 /**
  * Initializes the constant needed to compute the Frobenius map.
@@ -1126,12 +1126,12 @@ void ep2_frb(ep2_t r, ep2_t p);
 /**
  * Initializes the pairing over prime fields.
  */
-void pp_pair_init(void);
+void pp_map_init(void);
 
 /**
  * Finalizes the pairing over prime fields.
  */
-void pp_pair_clean(void);
+void pp_map_clean(void);
 
 /**
  * Computes the R-ate pairing of two points in a parameterized elliptic curve.
