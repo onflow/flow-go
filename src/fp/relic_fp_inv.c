@@ -133,21 +133,23 @@ void fp_inv_binar(fp_t c, fp_t a) {
 
 			/* If u > v then u = u - v, g1 = g1 - g2. */
 			if (bn_cmp(u, v) == CMP_GT) {
-				fp_subn_low(u->dp, u->dp, v->dp);
+				bn_sub(u, u, v);
 				bn_sub(g1, g1, g2);
 			} else {
-				fp_subn_low(v->dp, v->dp, u->dp);
+				bn_sub(v, v, u);
 				bn_sub(g2, g2, g1);
 			}
 		}
-
 		/* If u == 1 then return g1; else return g2. */
 		if (bn_cmp_dig(u, 1) == CMP_EQ) {
 #if FP_RDC == MONTY
 			fp_prime_conv(c, g1);
 #else
-			if (bn_sign(g1) == BN_NEG) {
+			while (bn_sign(g1) == BN_NEG) {
 				bn_add(g1, g1, p);
+			}
+			while (bn_cmp(g1, p) != CMP_LT) {
+				bn_sub(g1, g1, p);
 			}
 			dv_copy(c, g1->dp, FP_DIGS);
 #endif
@@ -155,8 +157,11 @@ void fp_inv_binar(fp_t c, fp_t a) {
 #if FP_RDC == MONTY
 			fp_prime_conv(c, g2);
 #else
-			if (bn_sign(g2) == BN_NEG) {
+			while (bn_sign(g2) == BN_NEG) {
 				bn_add(g2, g2, p);
+			}
+			while (bn_cmp(g2, p) != CMP_LT) {
+				bn_sub(g2, g2, p);
 			}
 			dv_copy(c, g2->dp, FP_DIGS);
 #endif

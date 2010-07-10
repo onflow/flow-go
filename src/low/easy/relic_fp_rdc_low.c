@@ -130,7 +130,7 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 		if (b0 > 0) {
 			_r[first - 1] &= MASK(b0);
 		}
-		fp_addn_low(r, r, _r);
+		fp_add(r, r, _r);
 	}
 	while (fp_cmpn_low(r, m) != CMP_LT) {
 		fp_subn_low(r, r, m);
