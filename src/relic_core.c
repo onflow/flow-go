@@ -120,7 +120,7 @@ int core_clean(void) {
 	eb_curve_clean();
 #endif
 #ifdef WITH_PP
-		pp_map_clean();
+	pp_map_clean();
 #endif
 
 #ifdef CHECK
@@ -128,4 +128,3 @@ int core_clean(void) {
 #endif
 	return STS_OK;
 }
-
