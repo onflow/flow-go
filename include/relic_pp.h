@@ -683,6 +683,16 @@ void fp2_exp(fp2_t c, fp2_t a, bn_t b);
 void fp2_frb(fp2_t c, fp2_t a);
 
 /**
+ * Extracts the square root of a quadratic extension field element.
+ * Computes c = sqrt(a). The other square root is the negation of c.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the prime field element.
+ * @return					- 1 if there is a square root, 0 otherwise.
+ */
+int fp2_srt(fp2_t c, fp2_t a);
+
+/**
  * Doubles a sextic extension field element. Computes c = 2 * a.
  *
  * @param[out] c			- the result.

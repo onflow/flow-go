@@ -897,7 +897,8 @@ void fp_exp_monty(fp_t c, fp_t a, bn_t b);
  *
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element.
+ * @return					- 1 if there is a square root, 0 otherwise.
  */
-void fp_srt(fp_t c, fp_t a);
+int fp_srt(fp_t c, fp_t a);
 
 #endif /* !RELIC_FP_H */

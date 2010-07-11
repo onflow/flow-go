@@ -472,6 +472,37 @@ static int exponentiation2(void) {
 	return code;
 }
 
+static int square_root2(void) {
+	int code = STS_ERR;
+	fp2_t a, b, c;
+	int r;
+
+	TRY {
+		fp2_new(a);
+		fp2_new(b);
+		fp2_new(c);
+
+		TEST_BEGIN("square root extraction is correct") {
+			fp2_rand(a);
+			fp2_sqr(c, a);
+			r = fp2_srt(b, c);
+			fp2_neg(c, b);
+			TEST_ASSERT(r, end);
+			TEST_ASSERT(fp2_cmp(b, a) == CMP_EQ || fp2_cmp(c, a) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp2_free(a);
+	fp2_free(b);
+	fp2_free(c);
+	return code;
+}
+
 static int memory6(void) {
 	err_t e;
 	int code = STS_ERR;
@@ -1919,6 +1950,11 @@ int main(void) {
 	}
 
 	if (exponentiation2() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (square_root2() != STS_OK) {
 		core_clean();
 		return 1;
 	}

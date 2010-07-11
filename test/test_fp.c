@@ -876,6 +876,7 @@ static int exponentiation(void) {
 static int square_root(void) {
 	int code = STS_ERR;
 	fp_t a, b, c;
+	int r;
 
 	fp_null(a);
 	fp_null(b);
@@ -889,8 +890,9 @@ static int square_root(void) {
 		TEST_BEGIN("square root extraction is correct") {
 			fp_rand(a);
 			fp_sqr(c, a);
-			fp_srt(b, c);
+			r = fp_srt(b, c);
 			fp_neg(c, b);
+			TEST_ASSERT(r, end);
 			TEST_ASSERT(fp_cmp(b, a) == CMP_EQ || fp_cmp(c, a) == CMP_EQ, end);
 		} TEST_END;
 	}

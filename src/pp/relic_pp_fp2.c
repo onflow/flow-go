@@ -400,3 +400,61 @@ void fp2_exp(fp2_t c, fp2_t a, bn_t b) {
 		fp2_free(t);
 	}
 }
+
+int fp2_srt(fp2_t c, fp2_t a) {
+	int r = 0;
+	fp_t t1;
+	fp_t t2;
+	fp_t t3;
+
+	fp_null(t1);
+	fp_null(t2);
+	fp_null(t3);
+
+	TRY {
+		fp_new(t1);
+		fp_new(t2);
+		fp_new(t3);
+
+		/* t1 = a[0]^2 - u^2 * a[1]^2 */
+		fp_sqr(t1, a[0]);
+		fp_sqr(t2, a[1]);
+		if (fp_prime_get_qnr() == -2) {
+			fp_dbl(t2, t2);
+		}
+		fp_add(t1, t1, t2);
+
+		if (fp_srt(t2, t1)) {
+			/* t1 = (a[0] + sqrt(t1)) / 2 */
+			fp_add(t1, a[0], t2);
+			fp_set_dig(t3, 2);
+			fp_inv(t3, t3);
+			fp_mul(t1, t1, t3);
+
+			if (!fp_srt(t3, t1)) {
+				/* t1 = (a[0] - sqrt(t1)) / 2 */
+				fp_sub(t1, a[0], t2);
+				fp_set_dig(t3, 2);
+				fp_inv(t3, t3);
+				fp_mul(t1, t1, t3);
+				fp_srt(t3, t1);
+			}
+			/* c0 = sqrt(t1) */
+			fp_copy(c[0], t3);
+			/* c1 = a1 / (2 * sqrt(t1)) */
+			fp_dbl(t3, t3);
+			fp_inv(t3, t3);
+			fp_mul(c[1], a[1], t3);
+			r = 1;
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t1);
+		fp_free(t2);
+		fp_free(t3);
+	}
+	return r;
+}
