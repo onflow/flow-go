@@ -128,21 +128,21 @@ int fp2_cmp(fp2_t a, fp2_t b) {
 			(fp_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ : CMP_NE;
 }
 
-//void fp2_add(fp2_t c, fp2_t a, fp2_t b) {
-//  fp_add(c[0], a[0], b[0]);
-//  fp_add(c[1], a[1], b[1]);
-//}
-//
-//void fp2_sub(fp2_t c, fp2_t a, fp2_t b) {
-//  fp_sub(c[0], a[0], b[0]);
-//  fp_sub(c[1], a[1], b[1]);
-//}
+void fp2_add(fp2_t c, fp2_t a, fp2_t b) {
+  fp_add(c[0], a[0], b[0]);
+  fp_add(c[1], a[1], b[1]);
+}
 
-//void fp2_dbl(fp2_t c, fp2_t a) {
-//  /* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
-//  fp_dbl(c[0], a[0]);
-//  fp_dbl(c[1], a[1]);
-//}
+void fp2_sub(fp2_t c, fp2_t a, fp2_t b) {
+  fp_sub(c[0], a[0], b[0]);
+  fp_sub(c[1], a[1], b[1]);
+}
+
+void fp2_dbl(fp2_t c, fp2_t a) {
+  /* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
+  fp_dbl(c[0], a[0]);
+  fp_dbl(c[1], a[1]);
+}
 
 void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 	dv_t t0, t1, t2, t3;
@@ -182,7 +182,7 @@ void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 		fp_subc_low(t0, t0, t1);
 
 		/* t1 = u^2 * (a1 * b1). */
-		if (fp_prime_get_qnr() == -2) {
+		for (int i = -1; i > fp_prime_get_qnr(); i--) {
 			fp_subd_low(t0, t0, t1);
 		}
 
@@ -220,8 +220,8 @@ void fp2_mul_art(fp2_t c, fp2_t a) {
 		/* (a0 + a1 * u) * u = a1 * u^2 + a0 * u. */
 		fp_copy(t0, a[0]);
 		fp_neg(c[0], a[1]);
-		if (fp_prime_get_qnr() == -2) {
-			fp_dbl(c[0], c[0]);
+		for (int i = -1; i > fp_prime_get_qnr(); i--) {
+			fp_sub(c[0], c[0], a[1]);
 		}
 		fp_copy(c[1], t0);
 	}
@@ -292,6 +292,11 @@ void fp2_sqr(fp2_t c, fp2_t a) {
 		/* t1 = (a0 - a1). */
 		fp_sub(t1, a[0], a[1]);
 
+		/* t1 = u^2 * (a1 * b1). */
+		for (int i = -1; i > fp_prime_get_qnr(); i--) {
+			fp_sub(t1, t1, a[1]);
+		}
+
 		if (fp_prime_get_qnr() == -1) {
 			/* t2 = 2 * a0. */
 #if (FP_PRIME % WORD) == (WORD - 2)
@@ -304,13 +309,13 @@ void fp2_sqr(fp2_t c, fp2_t a) {
 			/* c_0 = a0^2 + b_0^2 * u^2. */
 			fp_mul(c[0], t0, t1);
 		} else {
-			/* t1 = (a0 - 2 * a1). */
-			fp_subm_low(t1, t1, a[1]);
 			/* c_1 = a0 * a1. */
 			fp_mul(c[1], a[0], a[1]);
 			/* c_0 = a0^2 + b_0^2 * u^2. */
 			fp_mul(c[0], t0, t1);
-			fp_add(c[0], c[0], c[1]);
+			for (int i = -1; i > fp_prime_get_qnr(); i--) {
+				fp_add(c[0], c[0], c[1]);
+			}
 			/* c_1 = 2 * a0 * a1. */
 			fp_dbl(c[1], c[1]);
 		}
