@@ -119,3 +119,16 @@ void fp_sub_dig(fp_t c, fp_t a, dig_t b) {
 	}
 #endif
 }
+
+void fp_dbl_basic(fp_t c, fp_t a) {
+	dig_t carry;
+
+	carry = fp_dbln_low(c, a);
+	if (carry || (fp_cmp(c, fp_prime_get()) != CMP_LT)) {
+		carry = fp_subn_low(c, c, fp_prime_get());
+	}
+}
+
+void fp_dbl_integ(fp_t c, fp_t a) {
+	fp_dblm_low(c, a);
+}

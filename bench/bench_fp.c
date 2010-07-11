@@ -180,6 +180,20 @@ static void arith(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fp_add_basic") {
+		fp_rand(a);
+		fp_rand(b);
+		BENCH_ADD(fp_add_basic(c, a, b));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp_add_integ") {
+		fp_rand(a);
+		fp_rand(b);
+		BENCH_ADD(fp_add_integ(c, a, b));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fp_add_dig") {
 		fp_rand(a);
 		fp_rand(b);
@@ -191,6 +205,20 @@ static void arith(void) {
 		fp_rand(a);
 		fp_rand(b);
 		BENCH_ADD(fp_sub(c, a, b));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp_sub_basic") {
+		fp_rand(a);
+		fp_rand(b);
+		BENCH_ADD(fp_sub_basic(c, a, b));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp_sub_integ") {
+		fp_rand(a);
+		fp_rand(b);
+		BENCH_ADD(fp_sub_integ(c, a, b));
 	}
 	BENCH_END;
 
@@ -284,6 +312,18 @@ static void arith(void) {
 	BENCH_BEGIN("fp_dbl") {
 		fp_rand(a);
 		BENCH_ADD(fp_dbl(c, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp_dbl_basic") {
+		fp_rand(a);
+		BENCH_ADD(fp_dbl_basic(c, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp_dbl_integ") {
+		fp_rand(a);
+		BENCH_ADD(fp_dbl_integ(c, a));
 	}
 	BENCH_END;
 

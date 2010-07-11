@@ -234,6 +234,26 @@ static int addition(void) {
 			fp_add(e, a, d);
 			TEST_ASSERT(fp_is_zero(e), end);
 		} TEST_END;
+
+#if FP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic addition is correct") {
+			fp_rand(a);
+			fp_rand(b);
+			fp_add(d, a, b);
+			fp_add_basic(e, a, b);
+			TEST_ASSERT(fp_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("integrated addition is correct") {
+			fp_rand(a);
+			fp_rand(b);
+			fp_add(d, a, b);
+			fp_add_integ(e, a, b);
+			TEST_ASSERT(fp_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -287,6 +307,25 @@ static int subtraction(void) {
 			TEST_ASSERT(fp_is_zero(c), end);
 		}
 		TEST_END;
+#if FP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic subtraction is correct") {
+			fp_rand(a);
+			fp_rand(b);
+			fp_sub(c, a, b);
+			fp_sub_basic(d, a, b);
+			TEST_ASSERT(fp_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("integrated subtraction is correct") {
+			fp_rand(a);
+			fp_rand(b);
+			fp_sub(c, a, b);
+			fp_sub_integ(d, a, b);
+			TEST_ASSERT(fp_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -508,6 +547,24 @@ static int doubling_halving(void) {
 			fp_dbl(c, a);
 			TEST_ASSERT(fp_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
+
+#if FP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic doubling is correct") {
+			fp_rand(a);
+			fp_dbl(b, a);
+			fp_dbl_basic(c, a);
+			TEST_ASSERT(fp_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("integrated doubling is correct") {
+			fp_rand(a);
+			fp_dbl(b, a);
+			fp_dbl_basic(c, a);
+			TEST_ASSERT(fp_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
 
 		TEST_BEGIN("halving is consistent") {
 			fp_rand(a);

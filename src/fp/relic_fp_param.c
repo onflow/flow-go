@@ -193,11 +193,13 @@ int fp_param_set_any(void) {
 	fp_param_set(NIST_192);
 #elif FP_PRIME == 224
 	fp_param_set(NIST_224);
+#elif FP_PRIME == 254
+	fp_param_set(BN_254);
 #elif FP_PRIME == 256
 #ifdef FP_PMERS
 	fp_param_set(NIST_256);
 #else
-	fp_param_set(BN_254);
+	fp_param_set(BN_256);
 #endif
 #elif FP_PRIME == 384
 	fp_param_set(NIST_384);
@@ -253,7 +255,7 @@ int fp_param_set_any_spars(void) {
 }
 
 int fp_param_set_any_tower() {
-#if FP_PRIME == 256
+#if FP_PRIME == 254
 	fp_param_set(BN_254);
 #else
 	do {

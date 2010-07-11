@@ -43,10 +43,6 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_dbl(fp_t c, fp_t a) {
-	fp_add(c, a, a);
-}
-
 void fp_hlv(fp_t c, fp_t a) {
 	fp_rsh1_low(c, a);
 }
