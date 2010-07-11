@@ -92,7 +92,7 @@ int core_init(void) {
 		eb_curve_init();
 #endif
 #ifdef WITH_PP
-		pp_pair_init();
+		pp_map_init();
 #endif
 	}
 	CATCH_ANY {
@@ -118,6 +118,9 @@ int core_clean(void) {
 #endif
 #ifdef WITH_EB
 	eb_curve_clean();
+#endif
+#ifdef WITH_PP
+		pp_map_clean();
 #endif
 
 #ifdef CHECK
