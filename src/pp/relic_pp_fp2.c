@@ -124,29 +124,28 @@ void fp2_print(fp2_t a) {
 }
 
 int fp2_cmp(fp2_t a, fp2_t b) {
-	return (fp_cmp(a[0], b[0]) == CMP_EQ) && (fp_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ
-			: CMP_NE;
+	return (fp_cmp(a[0], b[0]) == CMP_EQ) &&
+			(fp_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ : CMP_NE;
 }
 
 //void fp2_add(fp2_t c, fp2_t a, fp2_t b) {
-//	fp_add(c[0], a[0], b[0]);
-//	fp_add(c[1], a[1], b[1]);
+//  fp_add(c[0], a[0], b[0]);
+//  fp_add(c[1], a[1], b[1]);
 //}
 //
 //void fp2_sub(fp2_t c, fp2_t a, fp2_t b) {
-//	fp_sub(c[0], a[0], b[0]);
-//	fp_sub(c[1], a[1], b[1]);
+//  fp_sub(c[0], a[0], b[0]);
+//  fp_sub(c[1], a[1], b[1]);
 //}
 
-void fp2_dbl(fp2_t c, fp2_t a) {
-	/* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
-	fp_dbl(c[0], a[0]);
-	fp_dbl(c[1], a[1]);
-}
+//void fp2_dbl(fp2_t c, fp2_t a) {
+//  /* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
+//  fp_dbl(c[0], a[0]);
+//  fp_dbl(c[1], a[1]);
+//}
 
 void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 	dv_t t0, t1, t2, t3;
-	dig_t c0, *p;
 
 	dv_null(t0);
 	dv_null(t1);
@@ -160,54 +159,44 @@ void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 		dv_new(t2);
 		dv_new(t3);
 
-		p = fp_prime_get();
-
 		/* Karatsuba algorithm. */
-#if (FP_PRIME % WORD) == (WORD - 2)
+
 		/* t1 = a0 + a1, c1 = b0 + b1. */
+#if (FP_PRIME % WORD) == (WORD - 2)
 		fp_addn_low(t2, a[0], a[1]);
 		fp_addn_low(t1, b[0], b[1]);
 #else
-		/* t1 = a0 + a1, c1 = b0 + b1. */
 		fp_add(t2, a[0], a[1]);
 		fp_add(t1, b[0], b[1]);
 #endif
 		/* t1 = (a0 + a1) * (b0 + b1). */
-		fp_muln_low(t3, t2, t1);
-
 		/* t0 = a0 * b0, t1 = a1 * b1. */
+		fp_muln_low(t3, t2, t1);
 		fp_muln_low(t0, a[0], b[0]);
 		fp_muln_low(t1, a[1], b[1]);
 
 		/* t2 = (a0 * a1) + (b0 * b1). */
-		c0 = fp_addd_low(t2, t0, t1);
-		if (c0) {
-			fp_subn_low(t2 + FP_DIGS, t2 + FP_DIGS, p);
-		}
+		fp_addd_low(t2, t0, t1);
 
 		/* t0 = (a0 * a1) + u^2 * (a1 * b1). */
-		c0 = fp_subd_low(t0, t0, t1);
-		if (c0) {
-			fp_addn_low(t0 + FP_DIGS, t0 + FP_DIGS, p);
-		}
+		fp_subc_low(t0, t0, t1);
+
 		/* t1 = u^2 * (a1 * b1). */
 		if (fp_prime_get_qnr() == -2) {
-			c0 = fp_subd_low(t0, t0, t1);
-			if (c0) {
-				fp_addn_low(t0 + FP_DIGS, t0 + FP_DIGS, p);
-			}
+			fp_subd_low(t0, t0, t1);
 		}
 
 		/* c0 = t0 mod p. */
-		fp_rdc(c[0], t0);
+		fp_rdcn_low(c[0], t0);
 
-		c0 = fp_subd_low(t3, t3, t2);
-		if (c0) {
-			fp_addn_low(t3 + FP_DIGS, t3 + FP_DIGS, p);
-		}
+#if (FP_PRIME % WORD) == (WORD - 2)
+		fp_subc_low(t3, t3, t2);
+#else
+		fp_subd_low(t3, t3, t2);
+#endif
 
 		/* c1 = t1 mod p. */
-		fp_rdc(c[1], t3);
+		fp_rdcn_low(c[1], t3);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -259,8 +248,9 @@ void fp2_mul_nor(fp2_t c, fp2_t a) {
 				break;
 			case 3:
 				/* If p = 3 mod 8, x^2 - sqrt(1 + sqrt(-1)) is irreducible. */
-				fp2_mul_art(t0, a);
-				fp2_add(c, t0, a);
+				fp_neg(t0[0], a[1]);
+				fp_add(c[1], a[0], a[1]);
+				fp_add(c[0], t0[0], a[0]);
 				break;
 			case 7:
 				/* If p = 7 mod 8 and p = 2,3 mod 5, x^2 - sqrt(2 + sqrt(-1)) is
@@ -282,40 +272,49 @@ void fp2_mul_nor(fp2_t c, fp2_t a) {
 }
 
 void fp2_sqr(fp2_t c, fp2_t a) {
-	fp_t t0, t1;
+	fp_t t0, t1, t2;
 
 	fp_null(t0);
 	fp_null(t1);
+	fp_null(t2);
 
 	TRY {
 		fp_new(t0);
 		fp_new(t1);
+		fp_new(t2);
 
 		/* t0 = (a0 + a1). */
+#if (FP_PRIME % WORD) == (WORD - 2)
+		fp_addn_low(t0, a[0], a[1]);
+#else
 		fp_add(t0, a[0], a[1]);
+#endif
+		/* t1 = (a0 - a1). */
+		fp_sub(t1, a[0], a[1]);
 
 		if (fp_prime_get_qnr() == -1) {
-			/* t1 = (a0 - a1). */
-			fp_sub(t1, a[0], a[1]);
+			/* t2 = 2 * a0. */
+#if (FP_PRIME % WORD) == (WORD - 2)
+			fp_dbln_low(t2, a[0]);
+#else
+			fp_dbl(t2, a[0]);
+#endif
+			/* c_1 = 2 * a0 * a1. */
+			fp_mul(c[1], t2, a[1]);
+			/* c_0 = a0^2 + b_0^2 * u^2. */
+			fp_mul(c[0], t0, t1);
 		} else {
 			/* t1 = (a0 - 2 * a1). */
-			if (fp_prime_get_qnr() == -2) {
-				fp_dbl(t1, a[1]);
-				fp_sub(t1, a[0], t1);
-			}
-		}
-
-		/* c_1 = a0 * a1. */
-		fp_mul(c[1], a[0], a[1]);
-
-		/* c_0 = a0^2 + b_0^2 * u^2. */
-		fp_mul(c[0], t0, t1);
-		if (fp_prime_get_qnr() == -2) {
+			fp_subm_low(t1, t1, a[1]);
+			/* c_1 = a0 * a1. */
+			fp_mul(c[1], a[0], a[1]);
+			/* c_0 = a0^2 + b_0^2 * u^2. */
+			fp_mul(c[0], t0, t1);
 			fp_add(c[0], c[0], c[1]);
+			/* c_1 = 2 * a0 * a1. */
+			fp_dbl(c[1], c[1]);
 		}
 
-		/* c_1 = 2 * a0 * a1. */
-		fp_dbl(c[1], c[1]);
 		/* c = c_0 + c_1 * u. */
 	}
 	CATCH_ANY {
@@ -324,6 +323,7 @@ void fp2_sqr(fp2_t c, fp2_t a) {
 	FINALLY {
 		fp_free(t0);
 		fp_free(t1);
+		fp_free(t2);
 	}
 }
 
