@@ -180,6 +180,9 @@ void fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
 		carry = ((*a) < (*b)) || (carry && !diff);
 		c[i] = r0;
 	}
+	if (carry) {
+		fp_addn_low(c + FP_DIGS, c + FP_DIGS, fp_prime_get());
+	}
 }
 
 dig_t fp_dbln_low(dig_t *c, dig_t *a) {
