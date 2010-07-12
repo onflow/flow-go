@@ -1366,6 +1366,7 @@ int util(void) {
 	int code = STS_ERR;
 	ep2_t a, b, c;
 	bn_t n;
+	unsigned char msg[5];
 
 	ep2_null(a);
 	ep2_null(b);
@@ -1422,11 +1423,13 @@ int util(void) {
 		}
 		TEST_END;
 
-		TEST_BEGIN("hash is correct") {
-			ep2_map(a, "Alice", 5);
-			ep2_curve_get_ord(n);
+		ep2_curve_get_ord(n);
+
+		TEST_BEGIN("point hashing is correct") {
+			rand_bytes(msg, sizeof(msg));
+			ep2_map(a, msg, sizeof(msg));
 			ep2_mul(a, a, n);
-			TEST_ASSERT(ep2_is_infty(a), end);
+			TEST_ASSERT(ep2_is_infty(a) == 1, end);
 		}
 		TEST_END;
 	}
