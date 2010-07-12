@@ -1825,6 +1825,15 @@ static int pairing(void) {
 
 		ep_curve_get_ord(n);
 
+		TEST_BEGIN("pairing is not degenerate") {
+			ep2_rand(p);
+			ep_rand(q);
+			pp_map(e1, p, q);
+			fp12_zero(e2);
+			fp_set_dig(e2[0][0][0], 1);
+			TEST_ASSERT(fp12_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
 		TEST_BEGIN("pairing is bilinear") {
 			ep2_rand(p);
 			ep_rand(q);
