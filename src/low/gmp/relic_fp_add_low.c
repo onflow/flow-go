@@ -58,8 +58,10 @@ void fp_addm_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-dig_t fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
-	return mpn_add_n(c, a, b, 2 * FP_DIGS);
+void fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
+	if (mpn_add_n(c, a, b, 2 * FP_DIGS)) {
+		mpn_sub_n(c + FP_DIGS, c + FP_DIGS, fp_prime_get(), FP_DIGS);
+	}
 }
 
 dig_t fp_sub1_low(dig_t *c, dig_t *a, dig_t digit) {
@@ -79,6 +81,34 @@ void fp_subm_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-dig_t fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
-	return mpn_sub_n(c, a, b, 2 * FP_DIGS);
+void fp_subc_low(dig_t *c, dig_t *a, dig_t *b) {
+	int i;
+	dig_t carry, r0, diff;
+
+	/* Zero the carry. */
+	carry = 0;
+	for (i = 0; i < 2 * FP_DIGS; i++, a++, b++) {
+		diff = (*a) - (*b);
+		r0 = diff - carry;
+		carry = ((*a) < (*b)) || (carry && !diff);
+		c[i] = r0;
+	}
+	if (carry) {
+		fp_addn_low(c + FP_DIGS, c + FP_DIGS, fp_prime_get());
+	}
+}
+
+void fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
+	mpn_sub_n(c, a, b, 2 * FP_DIGS);
+}
+
+dig_t fp_dbln_low(dig_t *c, dig_t *a) {
+	return mpn_add_n(c, a, a, FP_DIGS);
+}
+
+void fp_dblm_low(dig_t *c, dig_t *a) {
+	dig_t carry = mpn_add_n(c, a, a, FP_DIGS);
+	if (carry || (fp_cmpn_low(c, fp_prime_get()) != CMP_LT)) {
+		carry = fp_subn_low(c, c, fp_prime_get());
+	}
 }

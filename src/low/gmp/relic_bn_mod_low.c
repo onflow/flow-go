@@ -29,6 +29,8 @@
  * @version $Id$
  * @ingroup bn
  */
+
+#include <gmp.h>
 #include <string.h>
 
 #include "relic_bn.h"
