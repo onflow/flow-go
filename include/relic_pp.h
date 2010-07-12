@@ -874,16 +874,16 @@ void ep2_curve_clean(void);
 /**
  * Returns the a coefficient of the currently configured elliptic curve.
  *
- * @return the a coefficient of the elliptic curve.
+ * @param[out] a			- the a coefficient of the elliptic curve.
  */
-dig_t *ep2_curve_get_a(void);
+void ep2_curve_get_a(fp2_t a);
 
 /**
  * Returns the b coefficient of the currently configured elliptic curve.
  *
- * @return the b coefficient of the elliptic curve.
+ * @param[out] b			- the b coefficient of the elliptic curve.
  */
-dig_t *ep2_curve_get_b(void);
+void ep2_curve_get_b(fp2_t b);
 
 /**
  * Returns a optimization identifier based on the coefficient a of the curve.

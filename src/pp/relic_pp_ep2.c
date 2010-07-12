@@ -34,6 +34,7 @@
 #include "relic_pp.h"
 #include "relic_error.h"
 #include "relic_conf.h"
+#include "relic_fp_low.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
@@ -44,6 +45,10 @@
  * Parameters for a pairing-friendly prime curve over a quadratic extension.
  */
 /** @{ */
+#define BN_P254_A0		"0"
+#define BN_P254_A1		"0"
+#define BN_P254_B0		"B"
+#define BN_P254_B1		"2523648240000001BA344D80000000086121000000000013A700000000000008"
 #define BN_P254_X0		"1822AA754FAFAFF95FE37842D7D5DECE88305EC19B363F6681DF06BF405F02B4"
 #define BN_P254_X1		"1AB4CC8A133A7AA970AADAE37C20D1C7191279CBA02830AFC64C19B50E8B1997"
 #define BN_P254_Y0		"16737CF6F9DEC5895A7E5A6D60316763FB6638A0A82F26888E909DA86F7F84BA"
@@ -57,6 +62,10 @@
  * Parameters for a pairing-friendly prime curve over a quadratic extension.
  */
 /** @{ */
+#define BN_P256_A0		"0"
+#define BN_P256_A1		"0"
+#define BN_P256_B0		"1"
+#define BN_P256_B1		"B64000000000ECBF9E00000073543404300018F825373836C206F994412505BE"
 #define BN_P256_X0		"4E9CC6BC6CD0B6F4A64189D362F3441A33F7ECEFA1BCBC8EE1962261F6799383"
 #define BN_P256_X1		"8E0B49853E5DD8850F228D0D3338470DE76515A084014A4D159590F362D7F387"
 #define BN_P256_Y0		"0939AC72CF41569A0E045143558A396B14559F5D0898E687D9CAC72191B4DFA8"
@@ -84,6 +93,16 @@ static fp2_st curve_gy;
  * The third coordinate of the generator.
  */
 static fp2_st curve_gz;
+
+/**
+ * The a parameter of the curve.
+ */
+static fp2_st curve_a;
+
+/**
+ * The b parameter of the curve.
+ */
+static fp2_st curve_b;
 
 /**
  * The order of the group of points in the elliptic curve.
@@ -470,6 +489,14 @@ void ep2_curve_get_gen(ep2_t g) {
 	ep2_copy(g, &curve_g);
 }
 
+void ep2_curve_get_a(fp2_t a) {
+	fp2_copy(a, curve_a);
+}
+
+void ep2_curve_get_b(fp2_t b) {
+	fp2_copy(b, curve_b);
+}
+
 void ep2_curve_get_ord(bn_t n) {
 	if (curve_is_twist) {
 		ep_curve_get_ord(n);
@@ -482,13 +509,19 @@ void ep2_curve_set(int twist) {
 	int param;
 	char *str;
 	ep2_t g;
+	fp2_t a;
+	fp2_t b;
 	bn_t r;
 
 	ep2_null(g);
+	fp2_null(a);
+	fp2_null(b);
 	bn_null(r);
 
 	TRY {
 		ep2_new(g);
+		fp2_new(a);
+		fp2_new(b);
 		bn_new(r);
 
 		param = ep_param_get();
@@ -499,6 +532,10 @@ void ep2_curve_set(int twist) {
 		switch (param) {
 #if FP_PRIME == 254
 			case BN_P254:
+				fp_read(a[0], BN_P254_A0, strlen(BN_P254_A0), 16);
+				fp_read(a[1], BN_P254_A1, strlen(BN_P254_A1), 16);
+				fp_read(b[0], BN_P254_B0, strlen(BN_P254_B0), 16);
+				fp_read(b[1], BN_P254_B1, strlen(BN_P254_B1), 16);
 				fp_read(g->x[0], BN_P254_X0, strlen(BN_P254_X0), 16);
 				fp_read(g->x[1], BN_P254_X1, strlen(BN_P254_X1), 16);
 				fp_read(g->y[0], BN_P254_Y0, strlen(BN_P254_Y0), 16);
@@ -507,6 +544,10 @@ void ep2_curve_set(int twist) {
 				break;
 #elif FP_PRIME == 256
 			case BN_P256:
+				fp_read(a[0], BN_P256_A0, strlen(BN_P256_A0), 16);
+				fp_read(a[1], BN_P256_A1, strlen(BN_P256_A1), 16);
+				fp_read(b[0], BN_P256_B0, strlen(BN_P256_B0), 16);
+				fp_read(b[1], BN_P256_B1, strlen(BN_P256_B1), 16);
 				fp_read(g->x[0], BN_P256_X0, strlen(BN_P256_X0), 16);
 				fp_read(g->x[1], BN_P256_X1, strlen(BN_P256_X1), 16);
 				fp_read(g->y[0], BN_P256_Y0, strlen(BN_P256_Y0), 16);
@@ -525,6 +566,8 @@ void ep2_curve_set(int twist) {
 		g->norm = 1;
 
 		ep2_copy(&curve_g, g);
+		fp2_copy(curve_a, a);
+		fp2_copy(curve_b, b);
 		bn_copy(&curve_r, r);
 
 		curve_is_twist = twist;
@@ -534,6 +577,8 @@ void ep2_curve_set(int twist) {
 	}
 	FINALLY {
 		ep2_free(g);
+		fp2_free(a);
+		fp2_free(b);
 		bn_free(r);
 	}
 }
@@ -888,30 +933,122 @@ void ep2_mul_gen(ep2_t r, bn_t k) {
 	}
 }
 
-void ep2_map(ep2_t p, unsigned char *msg, int len) {
-	bn_t n, k;
-	unsigned char digest[MD_LEN];
+void ep2_mul_cof(ep2_t r, ep2_t p) {
+	bn_t a, x;
+	ep2_t t1;
+	ep2_t t2;
 
-	bn_null(n);
-	bn_null(k);
+	ep2_null(t1);
+	ep2_null(t2);
+	bn_null(a);
+	bn_null(x);
 
 	TRY {
-		bn_new(n);
-		bn_new(k);
+		ep2_new(t1);
+		ep2_new(t2);
+		bn_new(a);
+		bn_new(x);
 
-		ep2_curve_get_ord(n);
+		switch (fp_param_get()) {
+			case BN_254:
+				/* x = -4080000000000001. */
+				bn_set_2b(x, 62);
+				bn_set_2b(a, 55);
+				bn_add(x, x, a);
+				bn_add_dig(x, x, 1);
+				bn_neg(x, x);
+				break;
+			case BN_256:
+				/* x = 6000000000001F2D. */
+				bn_set_2b(x, 62);
+				bn_set_2b(a, 61);
+				bn_add(x, x, a);
+				bn_set_dig(a, 0x1F);
+				bn_lsh(a, a, 8);
+				bn_add(x, x, a);
+				bn_add_dig(x, x, 0x2D);
+				break;
+			default:
+				/* TODO: generalize for non-BN curves */
+				THROW(ERR_NO_CURVE);
+		}
+
+		bn_sqr(x, x);
+		bn_mul_dig(a, x, 6);
+		ep2_frb(t1, p);
+		ep2_frb(t2, t1);
+		ep2_sub(t1, t1, t2);
+		ep2_mul(r, p, a);
+		ep2_frb(t2, r);
+		ep2_add(r, r, t1);
+		ep2_add(r, r, t2);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep2_free(t1);
+		ep2_free(t2);
+		bn_new(a);
+		bn_new(x);
+	}
+}
+
+void ep2_map(ep2_t p, unsigned char *msg, int len) {
+	fp2_t t0, t1;
+	int bits, digits;
+	unsigned char digest[MD_LEN];
+
+	fp2_null(t0);
+	fp2_null(t1);
+
+	TRY {
+		fp2_new(t0);
+		fp2_new(t1);
 
 		md_map(digest, msg, len);
-		bn_read_bin(k, digest, MD_LEN, BN_POS);
-		bn_mod(k, k, n);
+		fp_set_dig(p->z[0], 1);
+		fp_zero(p->z[1]);
+		memcpy(p->x[0], digest, MIN(FP_BYTES, MD_LEN));
+		fp_zero(p->x[1]);
 
-		ep2_curve_get_ord(n);
+		SPLIT(bits, digits, FP_BITS, FP_DIG_LOG);
+		if (bits > 0) {
+			dig_t mask = ((dig_t)1 << (dig_t)bits) - 1;
+			p->x[0][FP_DIGS - 1] &= mask;
+		}
 
-		ep2_mul_gen(p, k);
-	} CATCH_ANY {
+		while (fp_cmp(p->x[0], fp_prime_get()) != CMP_LT) {
+			fp_subn_low(p->x[0], p->x[0], fp_prime_get());
+		}
+
+		while (1) {
+			/* t0 = x1^2. */
+			fp2_sqr(t0, p->x);
+			/* t1 = x1^3. */
+			fp2_mul(t1, t0, p->x);
+
+			/* t1 = x1^3 + a * x1 + b. */
+			ep2_curve_get_a(t0);
+			fp2_mul(t0, p->x, t0);
+			fp2_add(t1, t1, t0);
+			ep2_curve_get_b(t0);
+			fp2_add(t1, t1, t0);
+
+			if (fp2_srt(p->y, t1)) {
+				p->norm = 1;
+				break;
+			}
+			fp_add_dig(p->x[0], p->x[0], 1);
+		}
+
+		ep2_mul_cof(p, p);
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
-		bn_free(n);
-		bn_free(k);
+	}
+	FINALLY {
+		fp2_free(t0);
+		fp2_free(t1);
 	}
 }

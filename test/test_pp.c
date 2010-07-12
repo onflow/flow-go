@@ -1365,15 +1365,18 @@ static int memory(void) {
 int util(void) {
 	int code = STS_ERR;
 	ep2_t a, b, c;
+	bn_t n;
 
 	ep2_null(a);
 	ep2_null(b);
 	ep2_null(c);
+	bn_null(n);
 
 	TRY {
 		ep2_new(a);
 		ep2_new(b);
 		ep2_new(c);
+		bn_new(n);
 
 		TEST_BEGIN("comparison is consistent") {
 			ep2_rand(a);
@@ -1418,6 +1421,14 @@ int util(void) {
 			TEST_ASSERT(ep2_is_infty(a), end);
 		}
 		TEST_END;
+
+		TEST_BEGIN("hash is correct") {
+			ep2_map(a, "Alice", 5);
+			ep2_curve_get_ord(n);
+			ep2_mul(a, a, n);
+			TEST_ASSERT(ep2_is_infty(a), end);
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -1428,6 +1439,7 @@ int util(void) {
 	ep_free(a);
 	ep_free(b);
 	ep_free(c);
+	bn_free(n);
 	return code;
 }
 
