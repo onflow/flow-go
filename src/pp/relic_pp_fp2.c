@@ -256,7 +256,6 @@ void fp2_mul_nor(fp2_t c, fp2_t a) {
 				/* If p = 7 mod 8 and p = 2,3 mod 5, x^2 - sqrt(2 + sqrt(-1)) is
 				 * irreducible. */
 				fp2_mul_art(t0, a);
-				fp2_add(t0, t0, a);
 				fp2_add(c, t0, a);
 				break;
 			default:

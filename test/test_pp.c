@@ -355,7 +355,6 @@ static int multiplication2(void) {
 				case 7:
 					fp2_mul_art(c, a);
 					fp2_add(c, c, a);
-					fp2_add(c, c, a);
 					break;
 			}
 			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
