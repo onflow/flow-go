@@ -34,6 +34,7 @@
 #include "relic_ep.h"
 #include "relic_error.h"
 #include "relic_conf.h"
+#include "relic_fp_low.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -103,30 +104,71 @@ void ep_rand(ep_t p) {
 }
 
 void ep_map(ep_t p, unsigned char *msg, int len) {
-	bn_t n, k;
+	fp_t t0, t1;
+	int bits, digits;
 	unsigned char digest[MD_LEN];
 
-	bn_null(n);
-	bn_null(k);
+	fp_null(t0);
+	fp_null(t1);
 
 	TRY {
-		bn_new(n);
-		bn_new(k);
-
-		ep_curve_get_ord(n);
+		fp_new(t0);
+		fp_new(t1);
 
 		md_map(digest, msg, len);
-		bn_read_bin(k, digest, MD_LEN, BN_POS);
-		bn_mod(k, k, n);
+		fp_set_dig(p->z, 1);
+		memcpy(p->x, digest, MIN(FP_BYTES, MD_LEN));
 
-		ep_curve_get_ord(n);
+		SPLIT(bits, digits, FP_BITS, FP_DIG_LOG);
+		if (bits > 0) {
+			dig_t mask = ((dig_t)1 << (dig_t)bits) - 1;
+			p->x[FP_DIGS - 1] &= mask;
+		}
 
-		ep_mul_gen(p, k);
-	} CATCH_ANY {
+		while (fp_cmp(p->x, fp_prime_get()) != CMP_LT) {
+			fp_subn_low(p->x, p->x, fp_prime_get());
+		}
+
+		while (1) {
+			/* t0 = x1^2. */
+			fp_sqr(t0, p->x);
+			/* t1 = x1^3. */
+			fp_mul(t1, t0, p->x);
+
+			/* t1 = x1^3 + a * x1 + b. */
+			switch (ep_curve_opt_a()) {
+				case OPT_ZERO:
+					break;
+				case OPT_ONE:
+					fp_add(t1, t1, p->x);
+					break;
+				case OPT_DIGIT:
+					fp_mul_dig(t0, p->x, ep_curve_get_a()[0]);
+					fp_add(t1, t1, t0);
+					break;
+				default:
+					fp_mul(t0, p->x, ep_curve_get_a());
+					fp_add(t1, t1, t0);
+					break;
+			}
+
+			fp_add(t1, t1, ep_curve_get_b());
+
+			if (fp_srt(p->y, t1)) {
+				p->norm = 1;
+				break;
+			}
+			fp_add_dig(p->x, p->x, 1);
+		}
+		/* Assuming cofactor is 1 */
+		/* TODO: generalize? */
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
-		bn_free(n);
-		bn_free(k);
+	}
+	FINALLY {
+		fp_free(t0);
+		fp_free(t1);
 	}
 }
 
