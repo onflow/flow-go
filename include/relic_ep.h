@@ -64,6 +64,8 @@ enum {
 	BN_P254 = 7,
 	/** Barreto-Naehrig curve with positive x. */
 	BN_P256 = 8,
+	/** Barreto-Naehrig curve with positive x */
+	BN_P158 = 9,
 };
 
 /**

@@ -68,7 +68,29 @@ void fp_param_set(int param) {
 		bn_new(p);
 
 		switch (param) {
-#if FP_PRIME == 160
+#if FP_PRIME == 158
+			case BN_158:
+				/* x = 4000000031. */
+				bn_set_2b(t0, 38);
+				bn_add_dig(t0, t0, 0x31);
+				/* p = 36 * x^4 + 36 * x^3 + 24 * x^2 + 6 * x + 1. */
+				bn_set_dig(p, 1);
+				bn_mul_dig(t1, t0, 6);
+				bn_add(p, p, t1);
+				bn_mul(t1, t0, t0);
+				bn_mul_dig(t1, t1, 24);
+				bn_add(p, p, t1);
+				bn_mul(t1, t0, t0);
+				bn_mul(t1, t1, t0);
+				bn_mul_dig(t1, t1, 36);
+				bn_add(p, p, t1);
+				bn_mul(t0, t0, t0);
+				bn_mul(t1, t0, t0);
+				bn_mul_dig(t1, t1, 36);
+				bn_add(p, p, t1);
+				fp_prime_set_dense(p);
+				break;
+#elif FP_PRIME == 160
 			case SECG_160:
 				/* p = 2^160 - 2^31 + 1. */
 				f[0] = -1;
@@ -187,8 +209,12 @@ void fp_param_set(int param) {
 }
 
 int fp_param_set_any(void) {
-#if FP_PRIME == 160
+#if FP_PRIME == 158
+	fp_param_set(BN_158);
+#elif FP_PRIME == 160
+#ifdef FP_PMERS
 	fp_param_set(SECG_160);
+#endif
 #elif FP_PRIME == 192
 	fp_param_set(NIST_192);
 #elif FP_PRIME == 224
@@ -255,7 +281,9 @@ int fp_param_set_any_spars(void) {
 }
 
 int fp_param_set_any_tower() {
-#if FP_PRIME == 254
+#if FP_PRIME == 158
+	fp_param_set(BN_158);
+#elif FP_PRIME == 254
 	fp_param_set(BN_254);
 #else
 	do {

@@ -40,6 +40,23 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
+#if defined(EP_ORDIN) && FP_PRIME == 158
+/**
+ * Parameters for a pairing-friendly prime curve over a quadratic extension.
+ */
+/** @{ */
+#define BN_P158_A0		"0"
+#define BN_P158_A1		"0"
+#define BN_P158_B0		"1"
+#define BN_P158_B1		"240000006ED000007FE9C000419FEC800CA035C6"
+#define BN_P158_X0		"1A7C449590DCF3E9407FB8525FB45A147A77AC47"
+#define BN_P158_X1		"057FE1D8E1401E3C848C5A2E86447DEE3FF59BD0"
+#define BN_P158_Y0		"0206982EB9A0B5AC1CC84B010CA25E5DDFDE63B1"
+#define BN_P158_Y1		"1AF3EB03CFF8840D4D2ACF8E30E1BB1364020547"
+#define BN_P158_R		"51000001F2A800053F127008131B75C7C46E42D8082B6C17A509DEDD04061A59E8DB44DDFAD4D8D"
+/** @} */
+#endif
+
 #if defined(EP_ORDIN) && FP_PRIME == 254
 /**
  * Parameters for a pairing-friendly prime curve over a quadratic extension.
@@ -73,6 +90,7 @@
 #define BN_P256_R		"81BF100000015116D47700017F273ECD1BDCF8DD36E6667F24A696812D2D81949EC008633775474AF120D8C7DC360CCCFC88442B29C2FFED277D1C2EC8F24A1D"
 /** @} */
 #endif
+
 
 /**
  * The generator of the elliptic curve.
@@ -530,7 +548,19 @@ void ep2_curve_set(int twist) {
 		fp2_const_calc();
 
 		switch (param) {
-#if FP_PRIME == 254
+#if FP_PRIME == 158
+			case BN_P158:
+				fp_read(a[0], BN_P158_A0, strlen(BN_P158_A0), 16);
+				fp_read(a[1], BN_P158_A1, strlen(BN_P158_A1), 16);
+				fp_read(b[0], BN_P158_B0, strlen(BN_P158_B0), 16);
+				fp_read(b[1], BN_P158_B1, strlen(BN_P158_B1), 16);
+				fp_read(g->x[0], BN_P158_X0, strlen(BN_P158_X0), 16);
+				fp_read(g->x[1], BN_P158_X1, strlen(BN_P158_X1), 16);
+				fp_read(g->y[0], BN_P158_Y0, strlen(BN_P158_Y0), 16);
+				fp_read(g->y[1], BN_P158_Y1, strlen(BN_P158_Y1), 16);
+				bn_read_str(r, BN_P158_R, strlen(BN_P158_R), 16);
+				break;
+#elif FP_PRIME == 254
 			case BN_P254:
 				fp_read(a[0], BN_P254_A0, strlen(BN_P254_A0), 16);
 				fp_read(a[1], BN_P254_A1, strlen(BN_P254_A1), 16);
@@ -950,6 +980,11 @@ void ep2_mul_cof(ep2_t r, ep2_t p) {
 		bn_new(x);
 
 		switch (fp_param_get()) {
+			case BN_158:
+				/* x = 4000000031. */
+				bn_set_2b(x, 38);
+				bn_add_dig(x, x, 0x31);
+				break;
 			case BN_254:
 				/* x = -4080000000000001. */
 				bn_set_2b(x, 62);

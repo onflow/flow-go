@@ -119,6 +119,19 @@
 /** @} */
 #endif
 
+#if defined(EP_ORDIN) && FP_PRIME == 158
+/**
+ * Parameters for a pairing-friendly prime curve.
+ */
+/** @{ */
+#define BN_P158_A		"0"
+#define BN_P158_B		"3"
+#define BN_P158_X		"1"
+#define BN_P158_Y		"2"
+#define BN_P158_R		"240000006ED000007FE96000419F59800C9FFD81"
+/** @} */
+#endif
+
 #if defined(EP_ORDIN) && FP_PRIME == 254
 /**
  * Parameters for a pairing-friendly prime curve.
@@ -282,6 +295,12 @@ void ep_param_set(int param) {
 				ordin = 1;
 				break;
 #endif
+#if defined(EP_ORDIN) && FP_PRIME == 158
+			case BN_P158:
+				ASSIGN(BN_P158, BN_158);
+				ordin = 1;
+				break;
+#endif
 			default:
 				(void)str;
 				THROW(ERR_INVALID);
@@ -346,6 +365,8 @@ int ep_param_set_any_pairf() {
 	ep_param_set(BN_P254);
 #elif FP_PRIME == 256
 	ep_param_set(BN_P256);
+#elif FP_PRIME == 158
+	ep_param_set(BN_P158);
 #else
 	r = STS_ERR;
 #endif
@@ -374,6 +395,9 @@ void ep_param_print() {
 			break;
 		case NIST_P521:
 			util_print_banner("Curve NIST-P521:", 0);
+			break;
+		case BN_P158:
+			util_print_banner("Curve BNP-P158:", 0);
 			break;
 		case BN_P254:
 			util_print_banner("Curve BNN-P256:", 0);

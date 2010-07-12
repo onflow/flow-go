@@ -526,6 +526,11 @@ void pp_map_r_ate(fp12_t r, ep2_t q, ep_t p) {
 		bn_new(x);
 
 		switch (fp_param_get()) {
+			case BN_158:
+				/* x = 4000000031. */
+				bn_set_2b(x, 38);
+				bn_add_dig(x, x, 0x31);
+				break;
 			case BN_254:
 				/* x = -4080000000000001. */
 				bn_set_2b(x, 62);
@@ -543,6 +548,9 @@ void pp_map_r_ate(fp12_t r, ep2_t q, ep_t p) {
 				bn_lsh(a, a, 8);
 				bn_add(x, x, a);
 				bn_add_dig(x, x, 0x2D);
+				break;
+			default:
+				THROW(ERR_INVALID);
 				break;
 		}
 
@@ -592,6 +600,11 @@ void pp_map_o_ate(fp12_t r, ep2_t q, ep_t p) {
 		bn_new(x);
 
 		switch (fp_param_get()) {
+			case BN_158:
+				/* x = 4000000031. */
+				bn_set_2b(x, 38);
+				bn_add_dig(x, x, 0x31);
+				break;
 			case BN_254:
 				/* x = -4080000000000001. */
 				bn_set_2b(x, 62);
@@ -609,6 +622,9 @@ void pp_map_o_ate(fp12_t r, ep2_t q, ep_t p) {
 				bn_lsh(a, a, 8);
 				bn_add(x, x, a);
 				bn_add_dig(x, x, 0x2D);
+				break;
+			default:
+				THROW(ERR_INVALID);
 				break;
 		}
 
@@ -660,6 +676,11 @@ void pp_map_x_ate(fp12_t r, ep2_t q, ep_t p) {
 		bn_new(x);
 
 		switch (fp_param_get()) {
+			case BN_158:
+				/* x = 4000000031. */
+				bn_set_2b(x, 38);
+				bn_add_dig(x, x, 0x31);
+				break;
 			case BN_254:
 				/* x = -4080000000000001. */
 				bn_set_2b(x, 62);
@@ -677,6 +698,9 @@ void pp_map_x_ate(fp12_t r, ep2_t q, ep_t p) {
 				bn_lsh(a, a, 8);
 				bn_add(x, x, a);
 				bn_add_dig(x, x, 0x2D);
+				break;
+			default:
+				THROW(ERR_INVALID);
 				break;
 		}
 

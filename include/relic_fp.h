@@ -89,6 +89,8 @@ enum {
 	BN_254 = 7,
 	/** 256-bit prime provided in Barreto et al. for use with BN curves. */
 	BN_256 = 8,
+	/** 158-bit prime for use with BN curves. */
+	BN_158 = 9
 };
 
 /*============================================================================*/
