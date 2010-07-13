@@ -542,7 +542,7 @@ void fp12_sub(fp12_t c, fp12_t a, fp12_t b);
 #if EP_ADD == BASIC
 #define ep2_dbl(R, P)			ep2_dbl_basic(R, P);
 #elif EP_ADD == PROJC
-#define ep2_dbl(R, P)			ep2_dbl_basic(R, P);
+#define ep2_dbl(R, P)			ep2_dbl_projc(R, P);
 #endif
 
 /**

@@ -812,8 +812,9 @@ void ep2_add_projc(ep2_t r, ep2_t p, ep2_t q) {
 	/*
 	 * TODO: Change this to ep2_add_proj_impl and sort the large code problem
 	 * with add_projc functions.
+	 * TODO: changed; check impact?
 	 */
-	ep2_add_basic_impl(r, NULL, p, q);
+	ep2_add_projc_impl(r, NULL, p, q);
 }
 
 void ep2_add_slp_projc(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
@@ -938,6 +939,9 @@ void ep2_frb(ep2_t r, ep2_t p) {
 		fp2_sqr(t, t);
 		fp2_mul(r->x, r->x, t);
 		fp2_mul(r->y, r->y, t);
+		r->norm = 1;
+		fp_set_dig(r->z[0], 1);
+		fp_zero(r->z[1]);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -1013,10 +1017,12 @@ void ep2_mul_cof(ep2_t r, ep2_t p) {
 		ep2_frb(t1, p);
 		ep2_frb(t2, t1);
 		ep2_sub(t1, t1, t2);
+		ep2_norm(t1, t1);
 		ep2_mul(r, p, a);
 		ep2_frb(t2, r);
 		ep2_add(r, r, t1);
 		ep2_add(r, r, t2);
+		ep2_norm(r, r);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
