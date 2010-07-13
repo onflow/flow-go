@@ -42,6 +42,8 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
+#if FP_ADD == BASIC || !defined(STRIP)
+
 void fp_add_basic(fp_t c, fp_t a, fp_t b) {
 	dig_t carry;
 
@@ -51,9 +53,15 @@ void fp_add_basic(fp_t c, fp_t a, fp_t b) {
 	}
 }
 
+#endif
+
+#if FP_ADD == INTEG || !defined(STRIP)
+
 void fp_add_integ(fp_t c, fp_t a, fp_t b) {
 	fp_addm_low(c, a, b);
 }
+
+#endif
 
 void fp_add_dig(fp_t c, fp_t a, dig_t b) {
 #if FP_RDC == MONTY
@@ -81,6 +89,8 @@ void fp_add_dig(fp_t c, fp_t a, dig_t b) {
 #endif
 }
 
+#if FP_ADD == BASIC || !defined(STRIP)
+
 void fp_sub_basic(fp_t c, fp_t a, fp_t b) {
 	dig_t carry;
 
@@ -90,9 +100,15 @@ void fp_sub_basic(fp_t c, fp_t a, fp_t b) {
 	}
 }
 
+#endif
+
+#if FP_ADD == INTEG || !defined(STRIP)
+
 void fp_sub_integ(fp_t c, fp_t a, fp_t b) {
 	fp_subm_low(c, a, b);
 }
+
+#endif
 
 void fp_sub_dig(fp_t c, fp_t a, dig_t b) {
 #if FP_RDC == MONTY
@@ -120,6 +136,8 @@ void fp_sub_dig(fp_t c, fp_t a, dig_t b) {
 #endif
 }
 
+#if FP_ADD == BASIC || !defined(STRIP)
+
 void fp_dbl_basic(fp_t c, fp_t a) {
 	dig_t carry;
 
@@ -129,6 +147,12 @@ void fp_dbl_basic(fp_t c, fp_t a) {
 	}
 }
 
+#endif
+
+#if FP_ADD == INTEG || !defined(STRIP)
+
 void fp_dbl_integ(fp_t c, fp_t a) {
 	fp_dblm_low(c, a);
 }
+
+#endif

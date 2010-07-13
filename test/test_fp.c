@@ -245,7 +245,7 @@ static int addition(void) {
 		} TEST_END;
 #endif
 
-#if FP_ADD == BASIC || !defined(STRIP)
+#if FP_ADD == INTEG || !defined(STRIP)
 		TEST_BEGIN("integrated addition is correct") {
 			fp_rand(a);
 			fp_rand(b);
@@ -317,7 +317,7 @@ static int subtraction(void) {
 		} TEST_END;
 #endif
 
-#if FP_ADD == BASIC || !defined(STRIP)
+#if FP_ADD == INTEG || !defined(STRIP)
 		TEST_BEGIN("integrated subtraction is correct") {
 			fp_rand(a);
 			fp_rand(b);
@@ -557,11 +557,11 @@ static int doubling_halving(void) {
 		} TEST_END;
 #endif
 
-#if FP_ADD == BASIC || !defined(STRIP)
+#if FP_ADD == INTEG || !defined(STRIP)
 		TEST_BEGIN("integrated doubling is correct") {
 			fp_rand(a);
 			fp_dbl(b, a);
-			fp_dbl_basic(c, a);
+			fp_dbl_integ(c, a);
 			TEST_ASSERT(fp_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 #endif
