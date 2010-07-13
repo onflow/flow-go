@@ -45,6 +45,14 @@
  */
 fp2_st const_frb;
 
+/**
+ * Constant used to indicate that there's some room left in the storage of
+ * prime field elements. This can be used to avoid carries.
+ */
+#if (FP_PRIME % WORD) == (WORD - 2)
+#define FP_ROOM
+#endif
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -128,21 +136,21 @@ int fp2_cmp(fp2_t a, fp2_t b) {
 			(fp_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ : CMP_NE;
 }
 
-void fp2_add(fp2_t c, fp2_t a, fp2_t b) {
-  fp_add(c[0], a[0], b[0]);
-  fp_add(c[1], a[1], b[1]);
-}
-
-void fp2_sub(fp2_t c, fp2_t a, fp2_t b) {
-  fp_sub(c[0], a[0], b[0]);
-  fp_sub(c[1], a[1], b[1]);
-}
-
-void fp2_dbl(fp2_t c, fp2_t a) {
-  /* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
-  fp_dbl(c[0], a[0]);
-  fp_dbl(c[1], a[1]);
-}
+//void fp2_add(fp2_t c, fp2_t a, fp2_t b) {
+//  fp_add(c[0], a[0], b[0]);
+//  fp_add(c[1], a[1], b[1]);
+//}
+//
+//void fp2_sub(fp2_t c, fp2_t a, fp2_t b) {
+//  fp_sub(c[0], a[0], b[0]);
+//  fp_sub(c[1], a[1], b[1]);
+//}
+//
+//void fp2_dbl(fp2_t c, fp2_t a) {
+//  /* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
+//  fp_dbl(c[0], a[0]);
+//  fp_dbl(c[1], a[1]);
+//}
 
 void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 	dv_t t0, t1, t2, t3;
@@ -162,7 +170,7 @@ void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 		/* Karatsuba algorithm. */
 
 		/* t1 = a0 + a1, c1 = b0 + b1. */
-#if (FP_PRIME % WORD) == (WORD - 2)
+#ifdef FP_ROOM
 		fp_addn_low(t2, a[0], a[1]);
 		fp_addn_low(t1, b[0], b[1]);
 #else
@@ -180,23 +188,32 @@ void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 
 		/* t0 = (a0 * a1) + u^2 * (a1 * b1). */
 		fp_subc_low(t0, t0, t1);
-
+#ifndef FP_QNRES
 		/* t1 = u^2 * (a1 * b1). */
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
-			fp_subd_low(t0, t0, t1);
+			fp_subc_low(t0, t0, t1);
 		}
-
+#endif
 		/* c0 = t0 mod p. */
+#if FP_RDC == MONTY
 		fp_rdcn_low(c[0], t0);
-
-#if (FP_PRIME % WORD) == (WORD - 2)
-		fp_subc_low(t3, t3, t2);
 #else
+		fp_rdc(c[0], t0);
+#endif
+
+		/* t3 = t3 - t2. */
+#ifdef FP_ROOM
 		fp_subd_low(t3, t3, t2);
+#else
+		fp_subc_low(t3, t3, t2);
 #endif
 
 		/* c1 = t1 mod p. */
+#if FP_RDC == MONTY
 		fp_rdcn_low(c[1], t3);
+#else
+		fp_rdc(c[1], t3);
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -217,6 +234,11 @@ void fp2_mul_art(fp2_t c, fp2_t a) {
 	TRY {
 		fp_new(t0);
 
+#ifdef FP_QNRES
+		fp_copy(t0, a[0]);
+		fp_neg(c[0], a[1]);
+		fp_copy(c[1], t0);
+#else
 		/* (a0 + a1 * u) * u = a1 * u^2 + a0 * u. */
 		fp_copy(t0, a[0]);
 		fp_neg(c[0], a[1]);
@@ -224,6 +246,7 @@ void fp2_mul_art(fp2_t c, fp2_t a) {
 			fp_sub(c[0], c[0], a[1]);
 		}
 		fp_copy(c[1], t0);
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -241,6 +264,11 @@ void fp2_mul_nor(fp2_t c, fp2_t a) {
 	TRY {
 		fp2_new(t0);
 
+#ifdef FP_QNRES
+		fp_neg(t0[0], a[1]);
+		fp_add(c[1], a[0], a[1]);
+		fp_add(c[0], t0[0], a[0]);
+#else
 		switch (fp_prime_get_mod8()) {
 			case 5:
 				/* If p = 5 mod 8, x^2 - sqrt(sqrt(-2)) is irreducible. */
@@ -261,6 +289,7 @@ void fp2_mul_nor(fp2_t c, fp2_t a) {
 			default:
 				THROW(ERR_INVALID);
 		}
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -283,13 +312,28 @@ void fp2_sqr(fp2_t c, fp2_t a) {
 		fp_new(t2);
 
 		/* t0 = (a0 + a1). */
-#if (FP_PRIME % WORD) == (WORD - 2)
+#ifdef FP_ROOM
+		/* if we have room for carries, we can avoid reductions here. */
 		fp_addn_low(t0, a[0], a[1]);
 #else
 		fp_add(t0, a[0], a[1]);
 #endif
 		/* t1 = (a0 - a1). */
-		fp_sub(t1, a[0], a[1]);
+		fp_subm_low(t1, a[0], a[1]);
+
+#ifdef FP_QNRES
+
+#ifdef FP_ROOM
+		fp_dbln_low(t2, a[0]);
+#else
+		fp_dbl(t2, a[0]);
+#endif
+		/* c_1 = 2 * a0 * a1. */
+		fp_mulm_low(c[1], t2, a[1]);
+		/* c_0 = a0^2 + b_0^2 * u^2. */
+		fp_mulm_low(c[0], t0, t1);
+
+#else /* !FP_QNRES */
 
 		/* t1 = u^2 * (a1 * b1). */
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
@@ -298,11 +342,7 @@ void fp2_sqr(fp2_t c, fp2_t a) {
 
 		if (fp_prime_get_qnr() == -1) {
 			/* t2 = 2 * a0. */
-#if (FP_PRIME % WORD) == (WORD - 2)
-			fp_dbln_low(t2, a[0]);
-#else
 			fp_dbl(t2, a[0]);
-#endif
 			/* c_1 = 2 * a0 * a1. */
 			fp_mul(c[1], t2, a[1]);
 			/* c_0 = a0^2 + b_0^2 * u^2. */
@@ -318,7 +358,7 @@ void fp2_sqr(fp2_t c, fp2_t a) {
 			/* c_1 = 2 * a0 * a1. */
 			fp_dbl(c[1], c[1]);
 		}
-
+#endif
 		/* c = c_0 + c_1 * u. */
 	}
 	CATCH_ANY {
@@ -345,9 +385,11 @@ void fp2_inv(fp2_t c, fp2_t a) {
 		fp_sqr(t0, a[0]);
 		fp_sqr(t1, a[1]);
 
+#ifndef FP_QNRES
 		if (fp_prime_get_qnr() == -2) {
 			fp_dbl(t1, t1);
 		}
+#endif
 
 		/* t1 = 1/(a0^2 + a1^2). */
 		fp_add(t0, t0, t1);

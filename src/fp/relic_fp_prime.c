@@ -177,6 +177,11 @@ void fp_prime_set(bn_t p) {
 			prime_qnr = 0;
 			break;
 	}
+#ifdef FP_QNRES
+	if (prime_qnr != -1) {
+		THROW(ERR_INVALID);
+	}
+#endif
 	bn_mod_monty_setup(&u, &prime);
 	bn_set_dig(&conv, 1);
 	bn_set_dig(&one, 1);

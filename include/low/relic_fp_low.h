@@ -269,6 +269,15 @@ void fp_muln_low(dig_t *c, dig_t *a, dig_t *b);
 void fp_mulm_low(dig_t *c, dig_t *a, dig_t *b);
 
 /**
+ * Multiplies a digit vector by a quadratic non-residue and stores the result in
+ * another vector. Computes c = a * qnr.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the digit vector to multiply.
+ */
+void fp_mulr_low(dig_t *c, dig_t *a);
+
+/**
  * Squares a digit vector. Computes c = a * a.
  *
  * @param[out] c			- the result.

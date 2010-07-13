@@ -197,6 +197,8 @@
 #define FP_KARAT @FP_KARAT@
 /** Prefer Pseudo-Mersenne primes over random primes. */
 #cmakedefine FP_PMERS
+/** Use -1 as quadratic non-residue. */ 
+#cmakedefine FP_QNRES
 /** Width of window processing for exponentiation methods. */
 #define FP_WIDTH @FP_WIDTH@
 
