@@ -558,7 +558,7 @@ int main(void) {
 	conf_print();
 	util_print_banner("Benchmarks for the EP module:", 0);
 
-#if defined(EP_STAND) && defined(EP_ORDIN)
+#if defined(EP_ORDIN)
 	r0 = ep_param_set_any_ordin();
 	if (r0 == STS_OK) {
 		bench();

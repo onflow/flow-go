@@ -655,14 +655,14 @@ int main(void) {
 	conf_print();
 	util_print_banner("Benchmarks for the EB module:", 0);
 
-#if defined(EB_STAND) && defined(EB_ORDIN)
+#if defined(EB_ORDIN)
 	r0 = eb_param_set_any_ordin();
 	if (r0 == STS_OK) {
 		bench();
 	}
 #endif
 
-#if defined(EB_STAND) && defined(EB_KBLTZ)
+#if defined(EB_KBLTZ)
 	r1 = eb_param_set_any_kbltz();
 	if (r1 == STS_OK) {
 		bench();

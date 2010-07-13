@@ -846,7 +846,7 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-#if defined(WITH_EB) && defined(EB_STAND) && defined(EB_KBLTZ)
+#if defined(WITH_EB) && defined(EB_KBLTZ)
 	if (eb_param_set_any_kbltz() == STS_OK) {
 		bn_t vm, s0, s1, n;
 

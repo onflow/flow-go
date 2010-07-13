@@ -1059,7 +1059,7 @@ int main(void) {
 
 	util_print_banner("Tests for the EB module:", 0);
 
-#if defined(EB_STAND) && defined(EB_ORDIN)
+#if defined(EB_ORDIN)
 	r0 = eb_param_set_any_ordin();
 	if (r0 == STS_OK) {
 		if (test() != STS_OK) {
@@ -1068,7 +1068,7 @@ int main(void) {
 		}
 	}
 #endif
-#if defined(EB_STAND) && defined(EB_KBLTZ)
+#if defined(EB_KBLTZ)
 	r1 = eb_param_set_any_kbltz();
 	if (r1 == STS_OK) {
 		if (test() != STS_OK) {
@@ -1078,7 +1078,7 @@ int main(void) {
 	}
 #endif
 
-#if defined(EB_STAND) && defined(EB_SUPER)
+#if defined(EB_SUPER)
 	r2 = eb_param_set_any_super();
 	if (r2 == STS_OK) {
 		if (test() != STS_OK) {

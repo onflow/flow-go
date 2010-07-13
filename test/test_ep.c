@@ -820,7 +820,7 @@ int main(void) {
 		core_clean();
 		return 1;
 	}
-#if defined(EP_STAND) && defined(EP_ORDIN)
+#if defined(EP_ORDIN)
 	r0 = ep_param_set_any_ordin();
 	if (r0 == STS_OK) {
 		if (test() != STS_OK) {
