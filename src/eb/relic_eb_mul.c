@@ -342,6 +342,11 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k) {
 
 	eb_null(t);
 
+	if (bn_is_zero(k)) {
+		eb_set_infty(r);
+		return;
+	}
+
 	TRY {
 		eb_new(t);
 
@@ -356,8 +361,7 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k) {
 			}
 		}
 
-		eb_copy(r, t);
-		eb_norm(r, r);
+		eb_norm(r, t);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -688,6 +692,11 @@ void eb_mul_dig(eb_t r, eb_t p, dig_t k) {
 
 	eb_null(t);
 
+	if (k == 0) {
+		eb_set_infty(r);
+		return;
+	}
+
 	TRY {
 		eb_new(t);
 
@@ -702,8 +711,7 @@ void eb_mul_dig(eb_t r, eb_t p, dig_t k) {
 			}
 		}
 
-		eb_copy(r, t);
-		eb_norm(r, r);
+		eb_norm(r, t);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
