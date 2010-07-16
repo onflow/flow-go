@@ -332,6 +332,8 @@ static void copy_from_rom(char *dest, const char *src) {
 	fb_read(g->y, str, strlen(str), 16);									\
 	PREPARE(str, CURVE##_R);												\
 	bn_read_str(r, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_H);												\
+	bn_read_str(h, str, strlen(str), 16);									\
 
 /**
  * Current configured elliptic curve parameters.
