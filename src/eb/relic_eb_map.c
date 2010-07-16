@@ -71,21 +71,40 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 			/* t1 = x1^3. */
 			fb_mul(t1, t0, p->x);
 
-			/* t1 = x1^3 + a * x1^2 + b. */
-			switch (eb_curve_opt_a()) {
-				case OPT_ZERO:
-					break;
-				case OPT_ONE:
-					fb_add(t1, t1, t0);
-					break;
-				case OPT_DIGIT:
-					fb_mul_dig(t2, t0, eb_curve_get_a()[0]);
-					fb_add(t1, t1, t2);
-					break;
-				default:
-					fb_mul(t2, t0, eb_curve_get_a());
-					fb_add(t1, t1, t2);
-					break;
+			if (eb_curve_is_super()) {
+				/* t1 = x1^3 + a * x1 + b. */
+				switch (eb_curve_opt_a()) {
+					case OPT_ZERO:
+						break;
+					case OPT_ONE:
+						fb_add(t1, t1, p->x);
+						break;
+					case OPT_DIGIT:
+						fb_mul_dig(t2, p->x, eb_curve_get_a()[0]);
+						fb_add(t1, t1, t2);
+						break;
+					default:
+						fb_mul(t2, p->x, eb_curve_get_a());
+						fb_add(t1, t1, t2);
+						break;
+				}
+			} else {
+				/* t1 = x1^3 + a * x1^2 + b. */
+				switch (eb_curve_opt_a()) {
+					case OPT_ZERO:
+						break;
+					case OPT_ONE:
+						fb_add(t1, t1, t0);
+						break;
+					case OPT_DIGIT:
+						fb_mul_dig(t2, t0, eb_curve_get_a()[0]);
+						fb_add(t1, t1, t2);
+						break;
+					default:
+						fb_mul(t2, t0, eb_curve_get_a());
+						fb_add(t1, t1, t2);
+						break;
+				}
 			}
 
 			switch (eb_curve_opt_b()) {
@@ -102,22 +121,44 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 					break;
 			}
 
-			/* t0 = 1/x1^2. */
-			fb_inv(t0, t0);
-			/* t0 = t1/x1^2. */
-			fb_mul(t0, t0, t1);
-			/* Solve t1^2 + t1 = t0. */
-			fb_trc(t2, t0);
-			if (t2[0] != 0) {
-				i++;
-			} else {
-				fb_slv(t1, t0);
-				/* x3 = x1, y3 = t1 * x1, z3 = 1. */
-				fb_mul(p->y, t1, p->x);
-				fb_set_dig(p->z, 1);
+			if (eb_curve_is_super()) {
+				/* t0 = c^2. */
+				fb_sqr(t0, eb_curve_get_c());
+				/* t0 = 1/c^2. */
+				fb_inv(t0, t0);
+				/* t0 = t1/c^2. */
+				fb_mul(t0, t0, t1);
+				/* Solve t1^2 + t1 = t0. */
+				fb_trc(t2, t0);
+				if (t2[0] != 0) {
+					i++;
+				} else {
+					fb_slv(t1, t0);
+					/* x3 = x1, y3 = t1 * c, z3 = 1. */
+					fb_mul(p->y, t1, eb_curve_get_c());
+					fb_set_dig(p->z, 1);
 
-				p->norm = 1;
-				break;
+					p->norm = 1;
+					break;
+				}
+			} else {
+				/* t0 = 1/x1^2. */
+				fb_inv(t0, t0);
+				/* t0 = t1/x1^2. */
+				fb_mul(t0, t0, t1);
+				/* Solve t1^2 + t1 = t0. */
+				fb_trc(t2, t0);
+				if (t2[0] != 0) {
+					i++;
+				} else {
+					fb_slv(t1, t0);
+					/* x3 = x1, y3 = t1 * x1, z3 = 1. */
+					fb_mul(p->y, t1, p->x);
+					fb_set_dig(p->z, 1);
+
+					p->norm = 1;
+					break;
+				}
 			}
 		}
 		/* Now, multiply by cofactor to get the correct group. */
