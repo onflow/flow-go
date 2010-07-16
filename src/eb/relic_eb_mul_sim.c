@@ -529,7 +529,7 @@ void eb_mul_sim_inter(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 	}
 #endif
 
-#if defined(EB_ORDIN)
+#if defined(EB_ORDIN) || defined(EB_SUPER)
 	eb_mul_sim_ordin(r, p, k, q, l, 0);
 #endif
 }
@@ -622,7 +622,7 @@ void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l) {
 #endif
 #endif
 
-#if defined(EB_ORDIN)
+#if defined(EB_ORDIN) || defined(EB_SUPER)
 #if EB_FIX == WTNAF && defined(EB_PRECO)
 	eb_mul_sim_ordin(r, gen, k, q, l, 1);
 #else
