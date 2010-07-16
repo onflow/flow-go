@@ -131,6 +131,11 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 
 	ep_null(t);
 
+	if (bn_is_zero(k)) {
+		ep_set_infty(r);
+		return;
+	}
+
 	TRY {
 		ep_new(t);
 		l = bn_bits(k);
@@ -189,4 +194,39 @@ void ep_mul_gen(ep_t r, bn_t k) {
 		ep_free(g);
 	}
 #endif
+}
+
+void ep_mul_dig(ep_t r, ep_t p, dig_t k) {
+	int i, l;
+	ep_t t;
+
+	ep_null(t);
+
+	if (k == 0) {
+		ep_set_infty(r);
+		return;
+	}
+
+	TRY {
+		ep_new(t);
+
+		l = util_bits_dig(k);
+
+		ep_copy(t, p);
+
+		for (i = l - 2; i >= 0; i--) {
+			ep_dbl(t, t);
+			if (k & ((dig_t)1 << i)) {
+				ep_add(t, t, p);
+			}
+		}
+
+		ep_norm(r, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep_free(t);
+	}
 }

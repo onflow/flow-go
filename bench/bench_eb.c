@@ -363,6 +363,13 @@ static void arith(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("eb_mul_dig") {
+		bn_rand(k, BN_POS, BN_DIGIT);
+		bn_mod(k, k, n);
+		BENCH_ADD(eb_mul_dig(p, q, k->dp[0]));
+	}
+	BENCH_END;
+
 	for (int i = 0; i < EB_TABLE; i++) {
 		eb_new(tab[i]);
 	}

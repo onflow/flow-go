@@ -486,6 +486,14 @@ static int multiplication(void) {
 		TEST_END;
 #endif
 
+		TEST_BEGIN("multiplication by digit is correct") {
+			bn_rand(k, BN_POS, BN_DIGIT);
+			ep_mul(q, p, k);
+			ep_mul_dig(r, p, k->dp[0]);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		}
+		TEST_END;
+
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -829,6 +837,14 @@ int main(void) {
 		}
 	}
 #endif
+
+	if (r0 == STS_ERR) {
+		if (ep_param_set_any() == STS_ERR) {
+			THROW(ERR_NO_CURVE);
+			core_clean();
+			return 1;
+		}
+	}
 
 	core_clean();
 	return 0;
