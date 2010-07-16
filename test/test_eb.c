@@ -448,7 +448,7 @@ static int halving(void) {
 		fb_new(t);
 
 		fb_trc(t, eb_curve_get_a());
-		if (fb_get_bit(t, 0) == 1 && !eb_curve_is_kbltz()) {
+		if (t[0] == 1 && !eb_curve_is_kbltz() && !eb_curve_is_super()) {
 			TEST_BEGIN("point halving is correct") {
 				eb_rand(a);
 				eb_hlv(b, a);
@@ -591,7 +591,7 @@ static int multiplication(void) {
 
 #if defined(EB_ORDIN) && (EB_MUL == LODAH || !defined(STRIP))
 		if (!eb_curve_is_super()) {
-			TEST_BEGIN("l?pez-dahab point multiplication is correct") {
+			TEST_BEGIN("lópez-dahab point multiplication is correct") {
 				bn_rand(k, BN_POS, bn_bits(n));
 				bn_mod(k, k, n);
 				eb_curve_get_ord(k);
@@ -616,7 +616,7 @@ static int multiplication(void) {
 #endif
 
 		fb_trc(t, eb_curve_get_a());
-		if (fb_get_bit(t, 0) == 1 && !eb_curve_is_kbltz()) {
+		if (fb_get_bit(t, 0) == 1 && !eb_curve_is_kbltz() && !eb_curve_is_super()) {
 #if EB_MUL == HALVE || !defined(STRIP)
 			TEST_BEGIN("point multiplication by halving is correct") {
 				bn_rand(k, BN_POS, bn_bits(n));
@@ -976,7 +976,7 @@ static int hashing(void) {
 
 		TEST_BEGIN("point hashing is correct") {
 			rand_bytes(msg, sizeof(msg));
-			eb_map(a, msg, sizeof(strlen));
+			eb_map(a, msg, sizeof(msg));
 			eb_mul(a, a, n);
 			TEST_ASSERT(eb_is_infty(a) == 1, end);
 		}
@@ -989,8 +989,6 @@ static int hashing(void) {
 	code = STS_OK;
   end:
 	eb_free(a);
-	eb_free(b);
-	eb_free(c);
 	return code;
 }
 
@@ -1068,6 +1066,7 @@ int main(void) {
 		}
 	}
 #endif
+
 #if defined(EB_KBLTZ)
 	r1 = eb_param_set_any_kbltz();
 	if (r1 == STS_OK) {
@@ -1089,7 +1088,11 @@ int main(void) {
 #endif
 
 	if (r0 == STS_ERR && r1 == STS_ERR && r2 == STS_ERR) {
-		eb_param_set_any();
+		if (eb_param_set_any() == STS_ERR) {
+			THROW(ERR_NO_CURVE);
+			core_clean();
+			return 1;
+		}
 	}
 
 	core_clean();
