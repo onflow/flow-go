@@ -301,20 +301,22 @@ int eb_curve_opt_b() {
 	return curve_opt_b;
 }
 
-#if defined(EB_SUPER)
-
 dig_t *eb_curve_get_c() {
+#if defined(EB_SUPER)
 	if (curve_is_super) {
 		return curve_c;
 	}
+#endif
 	return NULL;
 }
 
 int eb_curve_opt_c() {
+#if defined(EB_SUPER)
 	return curve_opt_c;
-}
-
+#else
+	return OPT_NONE
 #endif
+}
 
 int eb_curve_is_kbltz() {
 	return curve_is_koblitz;
