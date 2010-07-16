@@ -40,15 +40,27 @@
 /*============================================================================*/
 
 void eb_pck(eb_t r, eb_t p) {
-	/* z3 = y1/x1. */
-	fb_inv(r->z, p->x);
-	fb_mul(r->z, r->z, p->y);
-	/* x3 = x1. */
-	fb_copy(r->x, p->x);
-	/* y3 = b(y1/x1). */
-	fb_set_dig(r->y, fb_get_bit(r->z, 0));
-	/* z3 = 1. */
-	fb_set_dig(r->z, 1);
+	if (eb_curve_is_super()) {
+		/* z3 = y1/c. */
+		fb_inv(r->z, eb_curve_get_c());
+		fb_mul(r->z, r->z, p->y);
+		/* x3 = x1. */
+		fb_copy(r->x, p->x);
+		/* y3 = b(y1/c). */
+		fb_set_dig(r->y, fb_get_bit(r->z, 0));
+		/* z3 = 1. */
+		fb_set_dig(r->z, 1);
+	} else {
+		/* z3 = y1/x1. */
+		fb_inv(r->z, p->x);
+		fb_mul(r->z, r->z, p->y);
+		/* x3 = x1. */
+		fb_copy(r->x, p->x);
+		/* y3 = b(y1/x1). */
+		fb_set_dig(r->y, fb_get_bit(r->z, 0));
+		/* z3 = 1. */
+		fb_set_dig(r->z, 1);
+	}
 
 	r->norm = 1;
 }
@@ -70,21 +82,40 @@ void eb_upk(eb_t r, eb_t p) {
 		/* t1 = x1^3. */
 		fb_mul(t1, t0, p->x);
 
-		/* t1 = x1^3 + a * x1^2 + b. */
-		switch (eb_curve_opt_a()) {
-			case OPT_ZERO:
-				break;
-			case OPT_ONE:
-				fb_add(t1, t1, t0);
-				break;
-			case OPT_DIGIT:
-				fb_mul_dig(t2, t0, eb_curve_get_a()[0]);
-				fb_add(t1, t1, t2);
-				break;
-			default:
-				fb_mul(t2, t0, eb_curve_get_a());
-				fb_add(t1, t1, t2);
-				break;
+		if (eb_curve_is_super()) {
+			/* t1 = x1^3 + a * x1 + b. */
+			switch (eb_curve_opt_a()) {
+				case OPT_ZERO:
+					break;
+				case OPT_ONE:
+					fb_add(t1, t1, p->x);
+					break;
+				case OPT_DIGIT:
+					fb_mul_dig(t2, p->x, eb_curve_get_a()[0]);
+					fb_add(t1, t1, t2);
+					break;
+				default:
+					fb_mul(t2, p->x, eb_curve_get_a());
+					fb_add(t1, t1, t2);
+					break;
+			}
+		} else {
+			/* t1 = x1^3 + a * x1^2 + b. */
+			switch (eb_curve_opt_a()) {
+				case OPT_ZERO:
+					break;
+				case OPT_ONE:
+					fb_add(t1, t1, t0);
+					break;
+				case OPT_DIGIT:
+					fb_mul_dig(t2, t0, eb_curve_get_a()[0]);
+					fb_add(t1, t1, t2);
+					break;
+				default:
+					fb_mul(t2, t0, eb_curve_get_a());
+					fb_add(t1, t1, t2);
+					break;
+			}
 		}
 
 		switch (eb_curve_opt_b()) {
@@ -101,18 +132,35 @@ void eb_upk(eb_t r, eb_t p) {
 				break;
 		}
 
-		/* t0 = 1/x1^2. */
-		fb_inv(t0, t0);
-		/* t0 = t1/x1^2. */
-		fb_mul(t0, t0, t1);
-		/* Solve t1^2 + t1 = t0. */
-		fb_slv(t1, t0);
-		/* If this is not the correct solution, try the other. */
-		if (fb_get_bit(t1, 0) != fb_get_bit(p->y, 0)) {
-			fb_add_dig(t1, t1, 1);
+		if (eb_curve_is_super()) {
+			/* t0 = c^2. */
+			fb_sqr(t0, eb_curve_get_c());
+			/* t0 = 1/c^2. */
+			fb_inv(t0, t0);
+			/* t0 = t1/c^2. */
+			fb_mul(t0, t0, t1);
+			/* Solve t1^2 + t1 = t0. */
+			fb_slv(t1, t0);
+			/* If this is not the correct solution, try the other. */
+			if (fb_get_bit(t1, 0) != fb_get_bit(p->y, 0)) {
+				fb_add_dig(t1, t1, 1);
+			}
+			/* x3 = x1, y3 = t1 * c, z3 = 1. */
+			fb_mul(r->y, t1, eb_curve_get_c());
+		} else {
+			/* t0 = 1/x1^2. */
+			fb_inv(t0, t0);
+			/* t0 = t1/x1^2. */
+			fb_mul(t0, t0, t1);
+			/* Solve t1^2 + t1 = t0. */
+			fb_slv(t1, t0);
+			/* If this is not the correct solution, try the other. */
+			if (fb_get_bit(t1, 0) != fb_get_bit(p->y, 0)) {
+				fb_add_dig(t1, t1, 1);
+			}
+			/* x3 = x1, y3 = t1 * x1, z3 = 1. */
+			fb_mul(r->y, t1, p->x);
 		}
-		/* x3 = x1, y3 = t1 * x1, z3 = 1. */
-		fb_mul(r->y, t1, p->x);
 		fb_copy(r->x, p->x);
 		fb_set_dig(r->z, 1);
 
