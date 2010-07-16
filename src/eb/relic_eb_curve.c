@@ -314,7 +314,7 @@ int eb_curve_opt_c() {
 #if defined(EB_SUPER)
 	return curve_opt_c;
 #else
-	return OPT_NONE
+	return OPT_NONE;
 #endif
 }
 
