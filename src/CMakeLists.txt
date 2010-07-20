@@ -77,6 +77,8 @@ endif(WITH_HB)
 
 if (WITH_PP)
 	list(APPEND RELIC_SRCS ${PP_SRCS})
+	file(GLOB TEMP low/easy/relic_pp*.c)
+	list(APPEND LOW_SRCS ${TEMP})
 endif(WITH_PP)
 
 if (WITH_PB)
