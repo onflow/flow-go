@@ -117,6 +117,24 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
+#if PP_EXT == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fp2_add_basic") {
+		fp2_rand(a);
+		fp2_rand(b);
+		BENCH_ADD(fp2_add_basic(c, a, b));
+	}
+	BENCH_END;
+#endif
+
+#if PP_EXT == LOWER || !defined(STRIP)
+	BENCH_BEGIN("fp2_add_lower") {
+		fp2_rand(a);
+		fp2_rand(b);
+		BENCH_ADD(fp2_add_lower(c, a, b));
+	}
+	BENCH_END;
+#endif
+
 	BENCH_BEGIN("fp2_sub") {
 		fp2_rand(a);
 		fp2_rand(b);
@@ -124,11 +142,45 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
+#if PP_EXT == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fp2_sub_basic") {
+		fp2_rand(a);
+		fp2_rand(b);
+		BENCH_ADD(fp2_sub_basic(c, a, b));
+	}
+	BENCH_END;
+#endif
+
+#if PP_EXT == LOWER || !defined(STRIP)
+	BENCH_BEGIN("fp2_sub_lower") {
+		fp2_rand(a);
+		fp2_rand(b);
+		BENCH_ADD(fp2_sub_lower(c, a, b));
+	}
+	BENCH_END;
+#endif
+
 	BENCH_BEGIN("fp2_dbl") {
 		fp2_rand(a);
 		BENCH_ADD(fp2_dbl(c, a));
 	}
 	BENCH_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fp2_dbl_basic") {
+		fp2_rand(a);
+		BENCH_ADD(fp2_dbl_basic(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if PP_EXT == LOWER || !defined(STRIP)
+	BENCH_BEGIN("fp2_dbl_lower") {
+		fp2_rand(a);
+		BENCH_ADD(fp2_dbl_lower(c, a));
+	}
+	BENCH_END;
+#endif
 
 	BENCH_BEGIN("fp2_mul") {
 		fp2_rand(a);
@@ -136,6 +188,24 @@ static void arith2(void) {
 		BENCH_ADD(fp2_mul(c, a, b));
 	}
 	BENCH_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fp2_mul_basic") {
+		fp2_rand(a);
+		fp2_rand(b);
+		BENCH_ADD(fp2_mul_basic(c, a, b));
+	}
+	BENCH_END;
+#endif
+
+#if PP_EXT == LOWER || !defined(STRIP)
+	BENCH_BEGIN("fp2_mul_lower") {
+		fp2_rand(a);
+		fp2_rand(b);
+		BENCH_ADD(fp2_mul_lower(c, a, b));
+	}
+	BENCH_END;
+#endif
 
 	BENCH_BEGIN("fp2_mul_art") {
 		fp2_rand(a);
@@ -154,6 +224,22 @@ static void arith2(void) {
 		BENCH_ADD(fp2_sqr(c, a));
 	}
 	BENCH_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fp2_sqr_basic") {
+		fp2_rand(a);
+		BENCH_ADD(fp2_sqr_basic(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if PP_EXT == LOWER || !defined(STRIP)
+	BENCH_BEGIN("fp2_sqr_lower") {
+		fp2_rand(a);
+		BENCH_ADD(fp2_sqr_lower(c, a));
+	}
+	BENCH_END;
+#endif
 
 	BENCH_BEGIN("fp2_inv") {
 		fp2_rand(a);

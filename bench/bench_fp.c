@@ -466,7 +466,7 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-#if FP_EXP == SLIDE || !defined(STRIP)
+#if FP_EXP == BASIC || !defined(STRIP)
 	BENCH_BEGIN("fp_exp_basic") {
 		fp_rand(a);
 		bn_rand(e, BN_POS, BN_BITS);
