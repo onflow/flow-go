@@ -104,7 +104,7 @@ void fp_rdc_monty_basic(fp_t c, dv_t a) {
 
 #endif
 
-#if FP_MUL == COMBA || !defined(STRIP)
+#if FP_MUL == COMBA || FP_MUL == INTEG || !defined(STRIP)
 
 void fp_rdc_monty_comba(fp_t c, dv_t a) {
 	fp_rdcn_low(c, a);

@@ -42,7 +42,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if FB_CUB == BASIC || !defined(STRIP)
+#if FT_CUB == BASIC || !defined(STRIP)
 
 void ft_cub_basic(ft_t c, ft_t a) {
 	dv_t t;
@@ -64,7 +64,7 @@ void ft_cub_basic(ft_t c, ft_t a) {
 
 #endif
 
-#if FB_CUB == TABLE || !defined(STRIP)
+#if FT_CUB == TABLE || !defined(STRIP)
 
 void ft_cub_table(ft_t c, ft_t a) {
 	dv_t t;
@@ -86,7 +86,7 @@ void ft_cub_table(ft_t c, ft_t a) {
 
 #endif
 
-#if FB_CUB == INTEG || !defined(STRIP)
+#if FT_CUB == INTEG || !defined(STRIP)
 
 void ft_cub_integ(ft_t c, ft_t a) {
 	ft_cubm_low(c, a);

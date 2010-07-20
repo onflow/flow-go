@@ -403,7 +403,7 @@ void fp_inv_exgcd(fp_t c, fp_t a) {
 
 #endif
 
-#if FB_INV == LOWER || !defined(STRIP)
+#if FP_INV == LOWER || !defined(STRIP)
 
 void fp_inv_lower(fp_t c, fp_t a) {
 	fp_invn_low(c, a);
