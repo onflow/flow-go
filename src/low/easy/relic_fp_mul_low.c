@@ -26,7 +26,7 @@
  * Implementation of the low-level prime field multiplication functions.
  *
  * @version $Id$
- * @ingroup bn
+ * @ingroup fp
  */
 
 #include "relic_fp.h"
