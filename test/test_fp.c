@@ -823,7 +823,7 @@ static int exponentiation(void) {
 			fp_rand(a);
 			d->used = FP_DIGS;
 			dv_copy(d->dp, fp_prime_get(), FP_DIGS);
-			fp_exp_basic(c, a, d);
+			fp_exp(c, a, d);
 			TEST_ASSERT(fp_cmp(a, c) == CMP_EQ, end);
 		}
 		TEST_END;
@@ -850,7 +850,7 @@ static int exponentiation(void) {
 		TEST_END;
 #endif
 
-#if FP_EXP == SLIDE || !defined(STRIP)
+#if FP_EXP == MONTY || !defined(STRIP)
 		TEST_BEGIN("constant-time exponentiation is correct") {
 			fp_rand(a);
 			bn_rand(d, BN_POS, FP_BITS);

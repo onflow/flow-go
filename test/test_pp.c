@@ -183,6 +183,26 @@ static int addition2(void) {
 			fp2_add(e, a, d);
 			TEST_ASSERT(fp2_is_zero(e), end);
 		} TEST_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic addition is correct") {
+			fp2_rand(a);
+			fp2_rand(b);
+			fp2_add(d, a, b);
+			fp2_add_basic(e, a, b);
+			TEST_ASSERT(fp2_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LOWER || !defined(STRIP)
+		TEST_BEGIN("lower-level addition is correct") {
+			fp2_rand(a);
+			fp2_rand(b);
+			fp2_add(d, a, b);
+			fp2_add_lower(e, a, b);
+			TEST_ASSERT(fp2_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -232,6 +252,26 @@ static int subtraction2(void) {
 			TEST_ASSERT(fp2_is_zero(c), end);
 		}
 		TEST_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic subtraction is correct") {
+			fp2_rand(a);
+			fp2_rand(b);
+			fp2_sub(c, a, b);
+			fp2_sub_basic(d, a, b);
+			TEST_ASSERT(fp2_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LOWER || !defined(STRIP)
+		TEST_BEGIN("lower-level subtraction is correct") {
+			fp2_rand(a);
+			fp2_rand(b);
+			fp2_sub(c, a, b);
+			fp2_sub_lower(d, a, b);
+			TEST_ASSERT(fp2_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -261,6 +301,24 @@ static int doubling2(void) {
 			fp2_add(c, a, a);
 			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic doubling is correct") {
+			fp2_rand(a);
+			fp2_dbl(b, a);
+			fp2_dbl_basic(c, a);
+			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LOWER || !defined(STRIP)
+		TEST_BEGIN("lower-level doubling is correct") {
+			fp2_rand(a);
+			fp2_dbl(b, a);
+			fp2_dbl_lower(c, a);
+			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -331,6 +389,26 @@ static int multiplication2(void) {
 			fp2_mul(e, a, d);
 			TEST_ASSERT(fp2_is_zero(e), end);
 		} TEST_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic multiplication is correct") {
+			fp2_rand(a);
+			fp2_rand(b);
+			fp2_mul(d, a, b);
+			fp2_mul_basic(e, b, a);
+			TEST_ASSERT(fp2_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LOWER || !defined(STRIP)
+		TEST_BEGIN("lower-level multiplication is correct") {
+			fp2_rand(a);
+			fp2_rand(b);
+			fp2_mul(d, a, b);
+			fp2_mul_lower(e, b, a);
+			TEST_ASSERT(fp2_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+#endif
 
 		TEST_BEGIN("multiplication by adjoined root is correct") {
 			fp2_rand(a);
