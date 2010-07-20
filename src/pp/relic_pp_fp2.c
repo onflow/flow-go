@@ -33,6 +33,7 @@
 #include "relic_conf.h"
 #include "relic_fp.h"
 #include "relic_fp_low.h"
+#include "relic_pp_low.h"
 #include "relic_pp.h"
 #include "relic_util.h"
 
@@ -44,14 +45,6 @@
  * Constant used to compute the Frobenius map in higher extensions.
  */
 fp2_st const_frb;
-
-/**
- * Constant used to indicate that there's some room left in the storage of
- * prime field elements. This can be used to avoid carries.
- */
-#if (FP_PRIME % WORD) == (WORD - 2)
-#define FP_ROOM
-#endif
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -136,84 +129,70 @@ int fp2_cmp(fp2_t a, fp2_t b) {
 			(fp_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ : CMP_NE;
 }
 
-void fp2_add(fp2_t c, fp2_t a, fp2_t b) {
+#if PP_EXT == BASIC || !defined(STRIP)
+
+void fp2_add_basic(fp2_t c, fp2_t a, fp2_t b) {
   fp_add(c[0], a[0], b[0]);
   fp_add(c[1], a[1], b[1]);
 }
 
-void fp2_sub(fp2_t c, fp2_t a, fp2_t b) {
+void fp2_sub_basic(fp2_t c, fp2_t a, fp2_t b) {
   fp_sub(c[0], a[0], b[0]);
   fp_sub(c[1], a[1], b[1]);
 }
 
-void fp2_dbl(fp2_t c, fp2_t a) {
+void fp2_dbl_basic(fp2_t c, fp2_t a) {
   /* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
   fp_dbl(c[0], a[0]);
   fp_dbl(c[1], a[1]);
 }
 
-void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
-	dv_t t0, t1, t2, t3;
+void fp2_mul_basic(fp2_t c, fp2_t a, fp2_t b) {
+	dv_t t0, t1, t2, t3, t4;
 
 	dv_null(t0);
 	dv_null(t1);
 	dv_null(t2);
 	dv_null(t3);
+	dv_null(t4);
 
 	TRY {
-
 		dv_new(t0);
 		dv_new(t1);
 		dv_new(t2);
 		dv_new(t3);
+		dv_new(t4);
 
 		/* Karatsuba algorithm. */
 
-		/* t1 = a0 + a1, c1 = b0 + b1. */
-#ifdef FP_ROOM
-		fp_addn_low(t2, a[0], a[1]);
-		fp_addn_low(t1, b[0], b[1]);
-#else
+		/* t2 = a0 + a1, t1 = b0 + b1. */
 		fp_add(t2, a[0], a[1]);
 		fp_add(t1, b[0], b[1]);
-#endif
-		/* t1 = (a0 + a1) * (b0 + b1). */
-		/* t0 = a0 * b0, t1 = a1 * b1. */
-		fp_muln_low(t3, t2, t1);
+
+		/* t3 = (a0 + a1) * (b0 + b1). */
+		/* t0 = a0 * b0, t4 = a1 * b1. */
 		fp_muln_low(t0, a[0], b[0]);
-		fp_muln_low(t1, a[1], b[1]);
+		fp_muln_low(t4, a[1], b[1]);
+		fp_muln_low(t3, t2, t1);
 
-		/* t2 = (a0 * a1) + (b0 * b1). */
-		fp_addd_low(t2, t0, t1);
+		/* t2 = (a0 * b0) + (a1 * b1). */
+		fp_addd_low(t2, t0, t4);
 
-		/* t0 = (a0 * a1) + u^2 * (a1 * b1). */
-		fp_subc_low(t0, t0, t1);
-#ifndef FP_QNRES
+		/* t1 = (a0 * b0) + u^2 * (a1 * b1). */
+		fp_subc_low(t1, t0, t4);
+
 		/* t1 = u^2 * (a1 * b1). */
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
-			fp_subc_low(t0, t0, t1);
+			fp_subc_low(t1, t1, t4);
 		}
-#endif
-		/* c0 = t0 mod p. */
-#if FP_RDC == MONTY
-		fp_rdcn_low(c[0], t0);
-#else
-		fp_rdc(c[0], t0);
-#endif
+		/* c0 = t1 mod p. */
+		fp_rdc(c[0], t1);
 
-		/* t3 = t3 - t2. */
-#ifdef FP_ROOM
-		fp_subd_low(t3, t3, t2);
-#else
-		fp_subc_low(t3, t3, t2);
-#endif
+		/* t4 = t3 - t2. */
+		fp_subc_low(t4, t3, t2);
 
-		/* c1 = t1 mod p. */
-#if FP_RDC == MONTY
-		fp_rdcn_low(c[1], t3);
-#else
-		fp_rdc(c[1], t3);
-#endif
+		/* c1 = t4 mod p. */
+		fp_rdc(c[1], t4);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -223,8 +202,88 @@ void fp2_mul(fp2_t c, fp2_t a, fp2_t b) {
 		dv_free(t1);
 		dv_free(t2);
 		dv_free(t3);
+		dv_free(t4);
 	}
 }
+
+void fp2_sqr_basic(fp2_t c, fp2_t a) {
+	fp_t t0, t1, t2;
+
+	fp_null(t0);
+	fp_null(t1);
+	fp_null(t2);
+
+	TRY {
+		fp_new(t0);
+		fp_new(t1);
+		fp_new(t2);
+
+		/* t0 = (a0 + a1). */
+		fp_add(t0, a[0], a[1]);
+
+		/* t1 = (a0 - a1). */
+		fp_subm_low(t1, a[0], a[1]);
+
+		/* t1 = u^2 * (a1 * b1). */
+		for (int i = -1; i > fp_prime_get_qnr(); i--) {
+			fp_sub(t1, t1, a[1]);
+		}
+
+		if (fp_prime_get_qnr() == -1) {
+			/* t2 = 2 * a0. */
+			fp_dbl(t2, a[0]);
+			/* c1 = 2 * a0 * a1. */
+			fp_mul(c[1], t2, a[1]);
+			/* c0 = a0^2 + b_0^2 * u^2. */
+			fp_mul(c[0], t0, t1);
+		} else {
+			/* c1 = a0 * a1. */
+			fp_mul(c[1], a[0], a[1]);
+			/* c0 = a0^2 + b_0^2 * u^2. */
+			fp_mul(c[0], t0, t1);
+			for (int i = -1; i > fp_prime_get_qnr(); i--) {
+				fp_add(c[0], c[0], c[1]);
+			}
+			/* c1 = 2 * a0 * a1. */
+			fp_dbl(c[1], c[1]);
+		}
+		/* c = c0 + c1 * u. */
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t0);
+		fp_free(t1);
+		fp_free(t2);
+	}
+}
+
+#endif
+
+#if PP_EXT == LOWER || !defined(STRIP)
+
+void fp2_add_lower(fp2_t c, fp2_t a, fp2_t b) {
+	fp2_addn_low(c, a, b);
+}
+
+void fp2_sub_lower(fp2_t c, fp2_t a, fp2_t b) {
+	fp2_subn_low(c, a, b);
+}
+
+void fp2_dbl_lower(fp2_t c, fp2_t a) {
+	fp2_dbln_low(c, a);
+}
+
+void fp2_mul_lower(fp2_t c, fp2_t a, fp2_t b) {
+	fp2_muln_low(c, a, b);
+}
+
+void fp2_sqr_lower(fp2_t c, fp2_t a) {
+	fp2_sqrn_low(c, a);
+}
+
+#endif
 
 void fp2_mul_art(fp2_t c, fp2_t a) {
 	fp_t t0;
@@ -296,78 +355,6 @@ void fp2_mul_nor(fp2_t c, fp2_t a) {
 	}
 	FINALLY {
 		fp2_free(t0);
-	}
-}
-
-void fp2_sqr(fp2_t c, fp2_t a) {
-	fp_t t0, t1, t2;
-
-	fp_null(t0);
-	fp_null(t1);
-	fp_null(t2);
-
-	TRY {
-		fp_new(t0);
-		fp_new(t1);
-		fp_new(t2);
-
-		/* t0 = (a0 + a1). */
-#ifdef FP_ROOM
-		/* if we have room for carries, we can avoid reductions here. */
-		fp_addn_low(t0, a[0], a[1]);
-#else
-		fp_add(t0, a[0], a[1]);
-#endif
-		/* t1 = (a0 - a1). */
-		fp_subm_low(t1, a[0], a[1]);
-
-#ifdef FP_QNRES
-
-#ifdef FP_ROOM
-		fp_dbln_low(t2, a[0]);
-#else
-		fp_dbl(t2, a[0]);
-#endif
-		/* c_1 = 2 * a0 * a1. */
-		fp_mulm_low(c[1], t2, a[1]);
-		/* c_0 = a0^2 + b_0^2 * u^2. */
-		fp_mulm_low(c[0], t0, t1);
-
-#else /* !FP_QNRES */
-
-		/* t1 = u^2 * (a1 * b1). */
-		for (int i = -1; i > fp_prime_get_qnr(); i--) {
-			fp_sub(t1, t1, a[1]);
-		}
-
-		if (fp_prime_get_qnr() == -1) {
-			/* t2 = 2 * a0. */
-			fp_dbl(t2, a[0]);
-			/* c_1 = 2 * a0 * a1. */
-			fp_mul(c[1], t2, a[1]);
-			/* c_0 = a0^2 + b_0^2 * u^2. */
-			fp_mul(c[0], t0, t1);
-		} else {
-			/* c_1 = a0 * a1. */
-			fp_mul(c[1], a[0], a[1]);
-			/* c_0 = a0^2 + b_0^2 * u^2. */
-			fp_mul(c[0], t0, t1);
-			for (int i = -1; i > fp_prime_get_qnr(); i--) {
-				fp_add(c[0], c[0], c[1]);
-			}
-			/* c_1 = 2 * a0 * a1. */
-			fp_dbl(c[1], c[1]);
-		}
-#endif
-		/* c = c_0 + c_1 * u. */
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fp_free(t0);
-		fp_free(t1);
-		fp_free(t2);
 	}
 }
 
