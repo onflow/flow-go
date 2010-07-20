@@ -694,6 +694,15 @@ void ep_mul_wtnaf(ep_t r, ep_t p, bn_t k);
 void ep_mul_gen(ep_t r, bn_t k);
 
 /**
+ * Multiplies a prime elliptic point by a small integer.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ * @param[in] k				- the integer.
+ */
+void ep_mul_dig(ep_t r, ep_t p, dig_t k);
+
+/**
  * Builds a precomputation table for multiplying a fixed prime elliptic point
  * using the binary method.
  *

@@ -583,13 +583,20 @@
 /** Bilinear pairing method. */
 #define PP_METHD "@PP_METHD@"
 
+/** Basic extension field arithmetic. */
+#define BASIC    1
+/** Integrated extension field arithmetic. */
+#define LOWER    5
+/* Chosen extension field arithmetic method. */
+#define PP_EXT   @PP_EXT@ 
+
 /** R-ate pairing. */ 
 #define R_ATE    1
 /** Optimal ate pairing. */
 #define O_ATE    2
 /** X-ate pairing. */
 #define X_ATE    3
-/** Chosen prime elliptic curve point pairing method. */
+/** Chosen pairing method over prime elliptic curves. */
 #define PP_MAP   @PP_MAP@
 
 /** Parallel implementation. */
