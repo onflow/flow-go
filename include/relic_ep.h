@@ -306,8 +306,7 @@ typedef ep_st *ep_t;
 #endif
 
 /**
- * Builds a precomputation table for multiplying a fixed prime elliptic point
- * point.
+ * Builds a precomputation table for multiplying a fixed prime elliptic point.
  *
  * @param[out] T			- the precomputation table.
  * @param[in] P				- the point to multiply.
