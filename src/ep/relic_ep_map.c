@@ -23,9 +23,9 @@
 /**
  * @file
  *
- * Implementation of the prime elliptic curve utilities.
+ * Implementation of hashing to a prime elliptic curve.
  *
- * @version $Id$
+ * @version $Id: relic_ep_util.c 447 2010-07-12 02:24:21Z conradoplg $
  * @ingroup ep
  */
 
@@ -40,79 +40,71 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int ep_is_infty(ep_t p) {
-	return (fp_is_zero(p->z) == 1);
-}
+void ep_map(ep_t p, unsigned char *msg, int len) {
+	fp_t t0, t1;
+	int bits, digits;
+	unsigned char digest[MD_LEN];
 
-void ep_set_infty(ep_t p) {
-	fp_zero(p->x);
-	fp_zero(p->y);
-	fp_zero(p->z);
-	p->norm = 1;
-}
-
-void ep_copy(ep_t r, ep_t p) {
-	fp_copy(r->x, p->x);
-	fp_copy(r->y, p->y);
-	fp_copy(r->z, p->z);
-	r->norm = p->norm;
-}
-
-int ep_cmp(ep_t p, ep_t q) {
-	if (fp_cmp(p->x, q->x) != CMP_EQ) {
-		return CMP_NE;
-	}
-
-	if (fp_cmp(p->y, q->y) != CMP_EQ) {
-		return CMP_NE;
-	}
-
-	if (fp_cmp(p->z, q->z) != CMP_EQ) {
-		return CMP_NE;
-	}
-
-	return CMP_EQ;
-}
-
-void ep_rand(ep_t p) {
-	bn_t n, k;
-	ep_t gen;
-
-	bn_null(k);
-	bn_null(n);
-	ep_null(gen);
+	fp_null(t0);
+	fp_null(t1);
 
 	TRY {
-		bn_new(k);
-		bn_new(n);
-		ep_new(gen);
+		fp_new(t0);
+		fp_new(t1);
 
-		ep_curve_get_ord(n);
+		md_map(digest, msg, len);
+		fp_set_dig(p->z, 1);
+		memcpy(p->x, digest, MIN(FP_BYTES, MD_LEN));
 
-		bn_rand(k, BN_POS, bn_bits(n));
-		bn_mod(k, k, n);
-
-		ep_curve_get_gen(gen);
-		ep_mul(p, gen, k);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		bn_free(k);
-		bn_free(n);
-		ep_free(gen);
-	}
-}
-
-void ep_print(ep_t p) {
-	fp_print(p->x);
-	fp_print(p->y);
-	if (!p->norm) {
-		for (int i = FP_DIGS - 1; i >= 0; i--) {
-			util_print("%.*lX ", (int)(2 * sizeof(dig_t)),
-					(unsigned long int)p->z[i]);
+		SPLIT(bits, digits, FP_BITS, FP_DIG_LOG);
+		if (bits > 0) {
+			dig_t mask = ((dig_t)1 << (dig_t)bits) - 1;
+			p->x[FP_DIGS - 1] &= mask;
 		}
-		util_print("\n");
-	} else {
-		fp_print(p->z);
+
+		while (fp_cmp(p->x, fp_prime_get()) != CMP_LT) {
+			fp_subn_low(p->x, p->x, fp_prime_get());
+		}
+
+		while (1) {
+			/* t0 = x1^2. */
+			fp_sqr(t0, p->x);
+			/* t1 = x1^3. */
+			fp_mul(t1, t0, p->x);
+
+			/* t1 = x1^3 + a * x1 + b. */
+			switch (ep_curve_opt_a()) {
+				case OPT_ZERO:
+					break;
+				case OPT_ONE:
+					fp_add(t1, t1, p->x);
+					break;
+				case OPT_DIGIT:
+					fp_mul_dig(t0, p->x, ep_curve_get_a()[0]);
+					fp_add(t1, t1, t0);
+					break;
+				default:
+					fp_mul(t0, p->x, ep_curve_get_a());
+					fp_add(t1, t1, t0);
+					break;
+			}
+
+			fp_add(t1, t1, ep_curve_get_b());
+
+			if (fp_srt(p->y, t1)) {
+				p->norm = 1;
+				break;
+			}
+			fp_add_dig(p->x, p->x, 1);
+		}
+		/* Assuming cofactor is 1 */
+		/* TODO: generalize? */
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t0);
+		fp_free(t1);
 	}
 }

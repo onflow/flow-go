@@ -159,12 +159,12 @@ void ep_mul_pre_yaowi(ep_t *t, ep_t p) {
 
 		ep_curve_get_ord(n);
 		l = bn_bits(n);
-		l = ((l % EB_DEPTH) == 0 ? (l / EB_DEPTH) : (l / EB_DEPTH) + 1);
+		l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
 
 		ep_copy(t[0], p);
 		for (int i = 1; i < l; i++) {
 			ep_dbl_tab(t[i], t[i - 1]);
-			for (int j = 1; j < EB_DEPTH; j++) {
+			for (int j = 1; j < EP_DEPTH; j++) {
 				ep_dbl_tab(t[i], t[i]);
 			}
 		}
@@ -188,9 +188,9 @@ void ep_mul_fix_yaowi(ep_t r, ep_t *t, bn_t k) {
 		ep_set_infty(r);
 		ep_set_infty(a);
 
-		bn_rec_win(win, &l, k, EB_DEPTH);
+		bn_rec_win(win, &l, k, EP_DEPTH);
 
-		for (j = (1 << EB_DEPTH) - 1; j >= 1; j--) {
+		for (j = (1 << EP_DEPTH) - 1; j >= 1; j--) {
 			for (i = 0; i < l; i++) {
 				if (win[i] == j) {
 					ep_add(a, a, t[i]);

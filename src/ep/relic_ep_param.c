@@ -397,13 +397,13 @@ void ep_param_print() {
 			util_print_banner("Curve NIST-P521:", 0);
 			break;
 		case BN_P158:
-			util_print_banner("Curve BNP-P158:", 0);
+			util_print_banner("Curve BN-P158:", 0);
 			break;
 		case BN_P254:
-			util_print_banner("Curve BNN-P256:", 0);
+			util_print_banner("Curve BN-P254:", 0);
 			break;
 		case BN_P256:
-			util_print_banner("Curve BNP-P256:", 0);
+			util_print_banner("Curve BN-P256:", 0);
 			break;
 	}
 }
