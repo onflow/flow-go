@@ -277,7 +277,7 @@ typedef CAT(EC_LOWER, t) ec_t;
 
 /**
  * Multiplies and adds two elliptic curve points simultaneously. Computes
- * R = kP + lQ.
+ * R = kG + lQ.
  *
  * @param[out] R			- the result.
  * @param[in] K				- the first integer.
