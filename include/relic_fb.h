@@ -579,6 +579,15 @@ void fb_read(fb_t a, const char *str, int len, int radix);
 void fb_write(char *str, int len, fb_t a, int radix);
 
 /**
+ * Returns the result of a comparison between two binary field elements.
+ *
+ * @param[in] a				- the first binary field element.
+ * @param[in] b				- the second binary field element.
+ * @return FB_LT if a < b, FB_EQ if a == b and FB_GT if a > b.
+ */
+int fb_cmp(fb_t a, fb_t b);
+
+/**
  * Returns the result of a comparison between a binary field element
  * and a small binary field element.
  *
@@ -587,15 +596,6 @@ void fb_write(char *str, int len, fb_t a, int radix);
  * @return FB_LT if a < b, FB_EQ if a == b and FB_GT if a > b.
  */
 int fb_cmp_dig(fb_t a, dig_t b);
-
-/**
- * Returns the result of a comparison between two binary field elements.
- *
- * @param[in] a				- the first binary field element.
- * @param[in] b				- the second binary field element.
- * @return FB_LT if a < b, FB_EQ if a == b and FB_GT if a > b.
- */
-int fb_cmp(fb_t a, fb_t b);
 
 /**
  * Adds two binary field elements. Computes c = a + b.
