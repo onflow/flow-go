@@ -52,17 +52,32 @@
 /**
  * Prefix for function mappings.
  */
+/** @{ */
 #if PC_CUR == PRIME
 #define G1_LOWER			ep2_
+#define G1_UPPER			EP
 #define G2_LOWER			ep_
+#define G2_UPPER			EP
 #define GT_LOWER			fp12_
 #define PC_LOWER			pp_
 #elif PC_CUR == CHAR2
+#if PB_MAP == ETAT2
+#define G1_LOWER			hb_
+#define G1_UPPER			HB
+#define G2_LOWER			hb_
+#define G2_UPPER			HB
+#define GT_LOWER			fb12_
+#define PC_LOWER			pb_
+#else
 #define G1_LOWER			eb_
+#define G1_UPPER			EB
 #define G2_LOWER			eb_
+#define G2_UPPER			EB
 #define GT_LOWER			fb4_
 #define PC_LOWER			pb_
 #endif
+#endif
+/** @} */
 
 /**
  * Prefix for constant mappings.
@@ -72,6 +87,16 @@
 #elif PC_CUR == CHAR2
 #define PC_UPPER			PB_
 #endif
+
+/**
+ * Represents a G_1 precomputable table.
+ */
+#define G1_TABLE			CAT(G1_UPPER, _TABLE)
+
+/**
+ * Represents a G_2 precomputable table.
+ */
+#define G2_TABLE			CAT(G2_UPPER, _TABLE)
 
 /*============================================================================*/
 /* Type definitions                                                           */
@@ -228,7 +253,7 @@ typedef CAT(GT_LOWER, t) gt_t;
 /**
  * Prints the current configured binary elliptic curve.
  */
-#define pc_param_print()	CAT(G1_LOWER, param_print)()
+#define pc_param_print()	CAT(G2_LOWER, param_print)()
 
 /**
  * Tests if a G_1 element is the unity.
@@ -236,7 +261,7 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[in] P				- the element to test.
  * @return 1 if the element it the unity, 0 otherwise.
  */
-#define g1_is_unity(P)		CAT(G1_LOWER, is_infty)(P)
+#define g1_is_infty(P)		CAT(G1_LOWER, is_infty)(P)
 
 /**
  * Tests if a G_2 element is the unity.
@@ -244,7 +269,7 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[in] P				- the element to test.
  * @return 1 if the element it the unity, 0 otherwise.
  */
-#define g2_is_unity(P)		CAT(G2_LOWER, is_infty)(P)
+#define g2_is_infty(P)		CAT(G2_LOWER, is_infty)(P)
 
 /**
  * Tests if a G_T element is the unity.
@@ -259,14 +284,14 @@ typedef CAT(GT_LOWER, t) gt_t;
  *
  * @param[out] P			- the element to assign.
  */
-#define g1_set_unity(P)		CAT(G1_LOWER, set_infty)(P)
+#define g1_set_infty(P)		CAT(G1_LOWER, set_infty)(P)
 
 /**
  * Assigns a G_2 element to the unity.
  *
  * @param[out] P			- the element to assign.
  */
-#define g2_set_unity(P)		CAT(G2_LOWER, set_infty)(P)
+#define g2_set_infty(P)		CAT(G2_LOWER, set_infty)(P)
 
 /**
  * Assigns a G_T element to the unity.
@@ -390,7 +415,7 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[out] R			- the result.
  * @param[in] P				- the element to negate.
  */
-#define gt_inv(R, P)		CAT(GT_LOWER, neg)(R, P)
+#define gt_inv(R, P)		CAT(GT_LOWER, inv)(R, P)
 
 /**
  * Adds two elliptic elements from G_1. Computes R = P + Q.
@@ -471,6 +496,22 @@ typedef CAT(GT_LOWER, t) gt_t;
 #define g1_mul(R, P, K)		CAT(G1_LOWER, mul)(R, P, K)
 
 /**
+ * Normalizes an element of G_1.
+ *
+ * @param[out] R			- the result.
+ * @param[in] P				- the element to normalize.
+ */
+#define g1_norm(R, P)		CAT(G1_LOWER, norm)(R, P)
+
+/**
+ * Normalizes an element of G_2.
+ *
+ * @param[out] R			- the result.
+ * @param[in] P				- the element to normalize.
+ */
+#define g2_norm(R, P)		CAT(G2_LOWER, norm)(R, P)
+
+/**
  * Multiplies an element from G_2 by an integer. Computes R = kP.
  *
  * @param[out] R			- the result.
@@ -486,7 +527,7 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[in] P				- the element to exponentiate.
  * @param[in] K				- the integer.
  */
-#define gt_exp(R, P, K)		CAT(GT_LOWER, mul)(R, P, K)
+#define gt_exp(R, P, K)		CAT(GT_LOWER, exp)(R, P, K)
 
 /**
  * Multiplies the generator of G_1 by an integer.
@@ -539,6 +580,50 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[in] K				- the integer.
  */
 #define g2_mul_fix(R, T, K)	CAT(G2_LOWER, mul_fix)(R, T, K)
+
+/**
+ * Multiplies simultaneously two elements from G_1. Computes R = kP + lQ.
+ *
+ * @param[out] R			- the result.
+ * @param[out] P			- the first G_1 element to multiply.
+ * @param[out] K			- the first integer scalar.
+ * @param[out] L			- the second G_1 element to multiply.
+ * @param[out] Q			- the second integer scalar.
+ */
+#define g1_mul_sim(R, P, K, Q, L)	CAT(G1_LOWER, mul_sim)(R, P, K, Q, L)
+
+/**
+ * Multiplies simultaneously two elements from G_2. Computes R = kP + lQ.
+ *
+ * @param[out] R			- the result.
+ * @param[out] P			- the first G_2 element to multiply.
+ * @param[out] K			- the first integer scalar.
+ * @param[out] L			- the second G_2 element to multiply.
+ * @param[out] Q			- the second integer scalar.
+ */
+#define g2_mul_sim(R, P, K, Q, L)	CAT(G2_LOWER, mul_sim)(R, P, K, Q, L)
+
+/**
+ * Multiplies simultaneously two elements from G_1, where one of the is the
+ * generator. Computes R = kG + lQ.
+ *
+ * @param[out] R			- the result.
+ * @param[out] K			- the first integer scalar.
+ * @param[out] L			- the second G_1 element to multiply.
+ * @param[out] Q			- the second integer scalar.
+ */
+#define g1_mul_sim_gen(R, K, Q, L)	CAT(G1_LOWER, mul_sim_gen)(R, K, Q, L)
+
+/**
+ * Multiplies simultaneously two elements from G_1, where one of the is the
+ * generator. Computes R = kG + lQ.
+ *
+ * @param[out] R			- the result.
+ * @param[out] K			- the first integer scalar.
+ * @param[out] L			- the second G_1 element to multiply.
+ * @param[out] Q			- the second integer scalar.
+ */
+#define g2_mul_sim_gen(R, K, Q, L)	CAT(G2_LOWER, mul_sim_gen)(R, K, Q, L)
 
 /**
  * Maps a byte array to an element in G_1.
