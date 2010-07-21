@@ -115,6 +115,17 @@ int fp12_cmp(fp12_t a, fp12_t b) {
 			(fp6_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ : CMP_NE);
 }
 
+int fp12_cmp_dig(fp12_t a, dig_t b) {
+	return ((fp_cmp_dig(a[0][0][0], b) == CMP_EQ) &&
+			fp_is_zero(a[0][0][1]) && fp2_is_zero(a[0][1]) &&
+			fp2_is_zero(a[0][2]) && fp6_is_zero(a[1]));
+}
+
+void fp12_set_dig(fp12_t a, dig_t b) {
+	fp12_zero(a);
+	fp_set_dig(a[0][0][0], b);
+}
+
 void fp12_add(fp12_t c, fp12_t a, fp12_t b) {
 	fp6_add(c[0], a[0], b[0]);
 	fp6_add(c[1], a[1], b[1]);

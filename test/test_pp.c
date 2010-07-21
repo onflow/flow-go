@@ -1883,6 +1883,170 @@ static int multiplication(void) {
 	return code;
 }
 
+static int fixed(void) {
+	int code = STS_ERR;
+	ep2_t p, q, r;
+	ep2_t t[EP_TABLE_MAX];
+	bn_t n, k;
+
+	bn_null(n);
+	bn_null(k);
+	ep2_null(p);
+	ep2_null(q);
+	ep2_null(r);
+
+	for (int i = 0; i < EP_TABLE_MAX; i++) {
+		ep2_null(t[i]);
+	}
+
+	TRY {
+		ep2_new(p);
+		ep2_new(q);
+		ep2_new(r);
+		bn_new(n);
+		bn_new(k);
+
+		ep2_curve_get_gen(p);
+		ep2_curve_get_ord(n);
+
+		for (int i = 0; i < EP_TABLE; i++) {
+			ep2_new(t[i]);
+		}
+		TEST_BEGIN("fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep2_mul(q, p, k);
+			ep2_mul_pre(t, p);
+			ep2_mul_fix(q, t, k);
+			ep2_mul(r, p, k);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE; i++) {
+			ep2_free(t[i]);
+		}
+
+#if EP_FIX == BASIC || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_BASIC; i++) {
+			ep2_new(t[i]);
+		}
+		TEST_BEGIN("binary fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep2_mul(q, p, k);
+			ep2_mul_pre_basic(t, p);
+			ep2_mul_fix_basic(q, t, k);
+			ep2_mul(r, p, k);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_BASIC; i++) {
+			ep2_free(t[i]);
+		}
+#endif
+
+#if EP_FIX == YAOWI || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_YAOWI; i++) {
+			ep2_new(t[i]);
+		}
+		TEST_BEGIN("yao windowing fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep2_mul(q, p, k);
+			ep2_mul_pre_yaowi(t, p);
+			ep2_mul_fix_yaowi(q, t, k);
+			ep2_mul(r, p, k);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_YAOWI; i++) {
+			ep2_free(t[i]);
+		}
+#endif
+
+#if EP_FIX == NAFWI || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_NAFWI; i++) {
+			ep2_new(t[i]);
+		}
+		TEST_BEGIN("naf windowing fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep2_mul(q, p, k);
+			ep2_mul_pre_nafwi(t, p);
+			ep2_mul_fix_nafwi(q, t, k);
+			ep2_mul(r, p, k);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_NAFWI; i++) {
+			ep2_free(t[i]);
+		}
+#endif
+
+#if EP_FIX == COMBS || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_COMBS; i++) {
+			ep2_new(t[i]);
+		}
+		TEST_BEGIN("single-table comb fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep2_mul(q, p, k);
+			ep2_mul_pre_combs(t, p);
+			ep2_mul_fix_combs(q, t, k);
+			ep2_mul(r, p, k);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_COMBS; i++) {
+			ep2_free(t[i]);
+		}
+#endif
+
+#if EP_FIX == COMBD || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_COMBD; i++) {
+			ep2_new(t[i]);
+		}
+		TEST_BEGIN("double-table comb fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep2_mul(q, p, k);
+			ep2_mul_pre_combd(t, p);
+			ep2_mul_fix_combd(q, t, k);
+			ep2_mul(r, p, k);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_COMBD; i++) {
+			ep2_free(t[i]);
+		}
+#endif
+
+#if EP_FIX == WTNAF || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+			ep2_new(t[i]);
+		}
+		TEST_BEGIN("w(t)naf fixed point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep2_mul(q, p, k);
+			ep2_mul_pre_wtnaf(t, p);
+			ep2_mul_fix_wtnaf(q, t, k);
+			ep2_mul(r, p, k);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+		for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+			ep2_free(t[i]);
+		}
+#endif
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	ep2_free(p);
+	ep2_free(q);
+	ep2_free(r);
+	bn_free(n);
+	bn_free(k);
+	return code;
+}
+
 static int pairing(void) {
 	int code = STS_ERR;
 	fp12_t e1, e2;
@@ -1928,6 +2092,7 @@ static int pairing(void) {
 			fp12_zero(e2);
 			pp_map(e1, p, r);
 			ep2_mul(p, p, k);
+			ep2_norm(p, p);
 			pp_map(e2, p, q);
 			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
@@ -1991,6 +2156,115 @@ static int pairing(void) {
 	ep2_free(p);
 	ep_free(q);
 	ep_free(r);
+	bn_free(n);
+	bn_free(k);
+	return code;
+}
+
+static int simultaneous(void) {
+	int code = STS_ERR;
+	ep2_t p, q, r, s;
+	bn_t n, k, l;
+
+	ep2_null(p);
+	ep2_null(q);
+	ep2_null(r);
+	ep2_null(s);
+
+	TRY {
+
+		ep2_new(p);
+		ep2_new(q);
+		ep2_new(r);
+		ep2_new(s);
+		bn_new(n);
+		bn_new(k);
+		bn_new(l);
+
+		ep2_curve_get_gen(p);
+		ep2_curve_get_ord(n);
+
+		TEST_BEGIN("simultaneous point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep2_mul(q, p, k);
+			ep2_mul(s, q, l);
+			ep2_mul_sim(r, p, k, q, l);
+			ep2_add(q, q, s);
+			ep2_norm(q, q);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+
+#if EP_SIM == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic simultaneous point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep2_mul_sim(r, p, k, q, l);
+			ep2_mul_sim_basic(q, p, k, q, l);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if EP_SIM == TRICK || !defined(STRIP)
+		TEST_BEGIN("shamir's trick for simultaneous multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep2_mul_sim(r, p, k, q, l);
+			ep2_mul_sim_trick(q, p, k, q, l);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if EP_SIM == INTER || !defined(STRIP)
+		TEST_BEGIN("interleaving for simultaneous multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep2_mul_sim(r, p, k, q, l);
+			ep2_mul_sim_inter(q, p, k, q, l);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if EP_SIM == JOINT || !defined(STRIP)
+		TEST_BEGIN("jsf for simultaneous multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep2_mul_sim(r, p, k, q, l);
+			ep2_mul_sim_joint(q, p, k, q, l);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+		TEST_BEGIN("simultaneous multiplication with generator is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ep2_mul_sim_gen(r, k, q, l);
+			ep2_curve_get_gen(s);
+			ep2_mul_sim(q, s, k, q, l);
+			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	ep2_free(p);
+	ep2_free(q);
+	ep2_free(r);
 	bn_free(n);
 	bn_free(k);
 	return code;
@@ -2158,7 +2432,7 @@ int main(void) {
 		return 1;
 	}
 
-	util_print_banner("Quadratic twist:", 0);
+	util_print_banner("Sextic twist:", 0);
 	util_print_banner("Utilities:", 1);
 
  	if (memory() != STS_OK) {
@@ -2189,6 +2463,16 @@ int main(void) {
  	}
 
  	if (multiplication() != STS_OK) {
+ 		core_clean();
+ 		return 1;
+ 	}
+
+ 	if (fixed() != STS_OK) {
+ 		core_clean();
+ 		return 1;
+ 	}
+
+ 	if (simultaneous() != STS_OK) {
  		core_clean();
  		return 1;
  	}
