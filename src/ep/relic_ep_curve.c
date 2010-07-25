@@ -67,6 +67,12 @@ static bn_st curve_r;
 static int curve_opt_a;
 
 /**
+ * Optimization identifier for the configured curve derived from the b
+ * coefficient.
+ */
+static int curve_opt_b;
+
+/**
  * Flag that stores if the configured prime elliptic curve is supersingular.
  */
 static int curve_is_super;
@@ -107,8 +113,8 @@ static void detect_opt(int *opt, fp_t a) {
 			if (fp_is_zero(a)) {
 				*opt = OPT_ZERO;
 			} else {
-				fp_set_dig(a, 1);
-				if (fp_cmp(a, t) == CMP_EQ) {
+				fp_set_dig(t, 1);
+				if (fp_cmp_dig(a, 1) == CMP_EQ) {
 					*opt = OPT_ONE;
 				} else {
 					if (fp_bits(a) <= FP_DIGIT) {
@@ -178,6 +184,10 @@ int ep_curve_opt_a() {
 	return curve_opt_a;
 }
 
+int ep_curve_opt_b() {
+	return curve_opt_b;
+}
+
 int ep_curve_is_super() {
 	return curve_is_super;
 }
@@ -209,6 +219,7 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
 	fp_copy(curve_b, b);
 
 	detect_opt(&curve_opt_a, curve_a);
+	detect_opt(&curve_opt_b, curve_b);
 
 	ep_norm(g, g);
 	ep_copy(&curve_g, g);

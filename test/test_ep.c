@@ -493,7 +493,6 @@ static int multiplication(void) {
 			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
 		}
 		TEST_END;
-
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -782,10 +781,81 @@ static int simultaneous(void) {
 	return code;
 }
 
+static int compression(void) {
+	int code = STS_ERR;
+	ep_t a, b, c;
+
+	ep_null(a);
+	ep_null(b);
+	ep_null(c);
+
+	TRY {
+		ep_new(a);
+		ep_new(b);
+		ep_new(c);
+
+		TEST_BEGIN("point compression is correct") {
+			ep_rand(a);
+			ep_pck(b, a);
+			ep_upk(c, b);
+			TEST_ASSERT(ep_cmp(a, c) == CMP_EQ, end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	ep_free(a);
+	ep_free(b);
+	ep_free(c);
+	return code;
+}
+
+static int hashing(void) {
+	int code = STS_ERR;
+	ep_t a;
+	bn_t n;
+	unsigned char msg[5];
+
+	ep_null(a);
+	bn_null(n);
+
+	TRY {
+		ep_new(a);
+		bn_new(n);
+
+		ep_curve_get_ord(n);
+
+		TEST_BEGIN("point hashing is correct") {
+			rand_bytes(msg, sizeof(msg));
+			ep_map(a, msg, sizeof(msg));
+			ep_mul(a, a, n);
+			TEST_ASSERT(ep_is_infty(a) == 1, end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	ep_free(a);
+	return code;
+}
+
 int test(void) {
 	ep_param_print();
 
 	util_print_banner("Utilities:", 1);
+
+	if (memory() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	if (util() != STS_OK) {
 		return STS_ERR;
@@ -817,6 +887,14 @@ int test(void) {
 		return STS_ERR;
 	}
 
+	if (compression() != STS_OK) {
+		return STS_ERR;
+	}
+
+	if (hashing() != STS_OK) {
+		return STS_ERR;
+	}
+
 	return STS_OK;
 }
 
@@ -824,10 +902,8 @@ int main(void) {
 	int r0;
 	core_init();
 
-	if (memory() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+	util_print_banner("Tests for the EP module:", 0);
+
 #if defined(EP_ORDIN)
 	r0 = ep_param_set_any_ordin();
 	if (r0 == STS_OK) {

@@ -347,6 +347,8 @@ int ep_param_set_any_ordin() {
 	ep_param_set(NIST_P192);
 #elif FP_PRIME == 224
 	ep_param_set(NIST_P224);
+#elif FP_PRIME == 254
+	ep_param_set(BN_P254);
 #elif FP_PRIME == 256
 	ep_param_set(NIST_P256);
 #elif FP_PRIME == 384

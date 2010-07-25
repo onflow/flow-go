@@ -424,6 +424,13 @@ dig_t *ep_curve_get_b(void);
 int ep_curve_opt_a(void);
 
 /**
+ * Returns a optimization identifier based on the coefficient b of the curve.
+ *
+ * @return the optimization identifier.
+ */
+int ep_curve_opt_b(void);
+
+/**
  * Tests if the configured prime elliptic curve is supersingular.
  *
  * @return 1 if the prime elliptic curve is supersingular, 0 otherwise.
@@ -890,5 +897,21 @@ void ep_norm(ep_t r, ep_t p);
  * @param[in] len			- the array length in bytes.
  */
 void ep_map(ep_t p, unsigned char *msg, int len);
+
+/**
+ * Compresses a point.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to compress.
+ */
+void ep_pck(ep_t r, ep_t p);
+
+/**
+ * Decompresses a point.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to decompress.
+ */
+void ep_upk(ep_t r, ep_t p);
 
 #endif /* !RELIC_EP_H */
