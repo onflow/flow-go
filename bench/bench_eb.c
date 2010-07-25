@@ -584,6 +584,12 @@ static void arith(void) {
 		BENCH_ADD(eb_mul_sim_gen(r, k, q, l));
 	} BENCH_END;
 
+	BENCH_BEGIN("eb_map") {
+		unsigned char msg[5];
+		rand_bytes(msg, 5);
+		BENCH_ADD(eb_map(p, msg, 5));
+	} BENCH_END;
+
 	BENCH_BEGIN("eb_pck") {
 		eb_rand(p);
 		BENCH_ADD(eb_pck(q, p));
@@ -592,12 +598,6 @@ static void arith(void) {
 	BENCH_BEGIN("eb_upk") {
 		eb_rand(p);
 		BENCH_ADD(eb_upk(q, p));
-	} BENCH_END;
-
-	BENCH_BEGIN("eb_map") {
-		unsigned char msg[5];
-		rand_bytes(msg, 5);
-		BENCH_ADD(eb_map(p, msg, 5));
 	} BENCH_END;
 
 	eb_free(p);
