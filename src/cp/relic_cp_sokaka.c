@@ -31,10 +31,10 @@
  */
 
 #include <stdio.h>
-#include<string.h>
-#include<math.h>
-#include<stdlib.h>
-#include<stdint.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 #include "relic.h"
 #include "relic_test.h"
@@ -68,15 +68,15 @@ void cp_sokaka_gen(bn_t master) {
 }
 
 void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master) {
-        if (pc_pair_is_type1()) {
-                g1_map(k->s1, (unsigned char *)id, len);
-                g1_mul(k->s1, k->s1, master);
-        } else {
-                g1_map(k->s1, (unsigned char *)id, len);
-                g1_mul(k->s1, k->s1, master);
-                g2_map(k->s2, (unsigned char *)id, len);
-                g2_mul(k->s2, k->s2, master);
-        }
+	if (pc_map_is_type1()) {
+		g1_map(k->s1, (unsigned char *)id, len);
+		g1_mul(k->s1, k->s1, master);
+	} else {
+		g1_map(k->s1, (unsigned char *)id, len);
+		g1_mul(k->s1, k->s1, master);
+		g2_map(k->s2, (unsigned char *)id, len);
+		g2_mul(k->s2, k->s2, master);
+	}
 }
 
 void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,

@@ -240,11 +240,11 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @{
  */
 #if PC_CUR == PRIME
-#define pc_pair_is_type1()	(0)
-#define pc_pair_is_type3()	(1)
+#define pc_map_is_type1()	(0)
+#define pc_map_is_type3()	(1)
 #elif PC_CUR == CHAR2
-#define pc_pair_is_type1()	(1)
-#define pc_pair_is_type3()	(0)
+#define pc_map_is_type1()	(1)
+#define pc_map_is_type3()	(0)
 #endif
 /**
  * @}
