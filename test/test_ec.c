@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the prime elliptic curve arithmetic module.
+ * Tests for the elliptic curve cryptography module.
  *
  * @version $Id$
  * @ingroup test
@@ -427,6 +427,17 @@ static int simultaneous(void) {
 			ec_norm(q, q);
 			TEST_ASSERT(ec_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
+
+		TEST_BEGIN("simultaneous multiplication with generator is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			bn_rand(l, BN_POS, bn_bits(n));
+			bn_mod(l, l, n);
+			ec_mul_sim_gen(r, k, q, l);
+			ec_curve_get_gen(s);
+			ec_mul_sim(q, s, k, q, l);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -442,10 +453,81 @@ static int simultaneous(void) {
 	return code;
 }
 
+static int compression(void) {
+	int code = STS_ERR;
+	ec_t a, b, c;
+
+	ec_null(a);
+	ec_null(b);
+	ec_null(c);
+
+	TRY {
+		ec_new(a);
+		ec_new(b);
+		ec_new(c);
+
+		TEST_BEGIN("point compression is correct") {
+			ec_rand(a);
+			ec_pck(b, a);
+			ec_upk(c, b);
+			TEST_ASSERT(ec_cmp(a, c) == CMP_EQ, end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	ec_free(a);
+	ec_free(b);
+	ec_free(c);
+	return code;
+}
+
+static int hashing(void) {
+	int code = STS_ERR;
+	ec_t a;
+	bn_t n;
+	unsigned char msg[5];
+
+	ec_null(a);
+	bn_null(n);
+
+	TRY {
+		ec_new(a);
+		bn_new(n);
+
+		ec_curve_get_ord(n);
+
+		TEST_BEGIN("point hashing is correct") {
+			rand_bytes(msg, sizeof(msg));
+			ec_map(a, msg, sizeof(msg));
+			ec_mul(a, a, n);
+			TEST_ASSERT(ec_is_infty(a) == 1, end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	ec_free(a);
+	return code;
+}
+
 int test(void) {
 	ec_param_print();
 
 	util_print_banner("Utilities:", 1);
+
+	if (memory() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	if (util() != STS_OK) {
 		return STS_ERR;
@@ -477,16 +559,21 @@ int test(void) {
 		return STS_ERR;
 	}
 
+	if (compression() != STS_OK) {
+		return STS_ERR;
+	}
+
+	if (hashing() != STS_OK) {
+		return STS_ERR;
+	}
+
 	return STS_OK;
 }
 
 int main(void) {
 	core_init();
 
-	if (memory() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+	util_print_banner("Tests for the EC module:", 0);
 
 	if (ec_param_set_any() == STS_OK) {
 		if (test() != STS_OK) {
