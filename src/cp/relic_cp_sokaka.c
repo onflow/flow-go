@@ -115,7 +115,7 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 				}
 			}
 		}
-		if (pc_pair_is_type1()) {
+		if (pc_map_is_type1()) {
 			g2_map(q, (unsigned char *)id2, len2);
 			pc_map(e, k->s1, q);
 		} else {
