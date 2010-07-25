@@ -303,4 +303,20 @@ typedef CAT(EC_LOWER, t) ec_t;
  */
 #define ec_map(P, M, L);	CAT(EC_LOWER, map)(P, M, L)
 
+/**
+ * Compresses a point.
+ *
+ * @param[out] R			- the result.
+ * @param[in] P				- the point to compress.
+ */
+#define ec_pck(R, P);	CAT(EC_LOWER, pck)(R, P)
+
+/**
+ * Decompresses a point.
+ *
+ * @param[out] R			- the result.
+ * @param[in] P				- the point to decompress.
+ */
+#define ec_upk(R, P);	CAT(EC_LOWER, upk)(R, P)
+
 #endif /* !RELIC_EC_H */

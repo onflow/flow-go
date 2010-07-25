@@ -1008,7 +1008,7 @@ void eb_norm(eb_t r, eb_t p);
 void eb_map(eb_t p, unsigned char *msg, int len);
 
 /**
- * Compress a point.
+ * Compresses a point.
  *
  * @param[out] r			- the result.
  * @param[in] p				- the point to compress.
@@ -1016,7 +1016,7 @@ void eb_map(eb_t p, unsigned char *msg, int len);
 void eb_pck(eb_t r, eb_t p);
 
 /**
- * Decompress a point.
+ * Decompresses a point.
  *
  * @param[out] r			- the result.
  * @param[in] p				- the point to decompress.
