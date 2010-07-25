@@ -580,6 +580,9 @@
 /** Chosen binary elliptic curve simulteanous point multiplication method. */
 #define HB_SIM   @HB_SIM@ 
 
+/** Parallel implementation. */
+#cmakedefine PP_PARAL
+
 /** Bilinear pairing method. */
 #define PP_METHD "@PP_METHD@"
 

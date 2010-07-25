@@ -530,9 +530,9 @@ static void arith12(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp12_sqr_uni") {
+	BENCH_BEGIN("fp12_sqr_cyc") {
 		fp12_rand(a);
-		BENCH_ADD(fp12_sqr_uni(c, a));
+		BENCH_ADD(fp12_sqr_cyc(c, a));
 	}
 	BENCH_END;
 
@@ -542,9 +542,9 @@ static void arith12(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp12_inv_uni") {
+	BENCH_BEGIN("fp12_inv_cyc") {
 		fp12_rand(a);
-		BENCH_ADD(fp12_inv_uni(c, a));
+		BENCH_ADD(fp12_inv_cyc(c, a));
 	}
 	BENCH_END;
 
@@ -556,11 +556,17 @@ static void arith12(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp12_exp_uni") {
+	BENCH_BEGIN("fp12_exp_cyc") {
 		fp12_rand(a);
 		d->used = FP_DIGS;
 		dv_copy(d->dp, fp_prime_get(), FP_DIGS);
-		BENCH_ADD(fp12_exp_uni(c, a, d));
+		BENCH_ADD(fp12_exp_cyc(c, a, d));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp12_conv_back") {
+		fp12_rand(a);
+		BENCH_ADD(fp12_conv_back(c, a));
 	}
 	BENCH_END;
 
@@ -635,11 +641,11 @@ static void util(void) {
 }
 
 static void arith(void) {
-	ep2_t p, q, r;
+	ep2_t p, q, r, t[EP_TABLE_BASIC];;
 	ep_t _q;
-	bn_t k, n;
+	bn_t k, n, l;
 	fp12_t e;
-	fp2_t s, t;
+	fp2_t s, u;
 
 	ep2_null(p);
 	ep2_null(q);
@@ -650,6 +656,9 @@ static void arith(void) {
 	fp12_null(e);
 	fp2_null(s);
 	fp2_null(t);
+	for (int i = 0; i < EP_TABLE_BASIC; i++) {
+		ep2_null(t[i]);
+	}
 
 	ep2_new(p);
 	ep2_new(q);
@@ -657,218 +666,443 @@ static void arith(void) {
 	ep_new(_q);
 	bn_new(k);
 	bn_new(n);
+	bn_new(l);
 	fp12_new(e);
 	fp2_new(s);
 	fp2_new(t);
 
 	ep2_curve_get_ord(n);
 
-	BENCH_BEGIN("ep2_add") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add(p, p, q);
-		ep2_rand(q);
-		ep2_rand(p);
-		ep2_add(q, q, p);
-		BENCH_ADD(ep2_add(r, p, q));
-	}
-	BENCH_END;
-
-#if EP_ADD == BASIC || !defined(STRIP)
-	BENCH_BEGIN("ep2_add_basic") {
-		ep2_rand(p);
-		ep2_rand(q);
-		BENCH_ADD(ep2_add_basic(r, p, q));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("ep2_add_slp_basic") {
-		ep2_rand(p);
-		ep2_rand(q);
-		BENCH_ADD(ep2_add_slp_basic(r, s, p, q));
-	}
-	BENCH_END;
-#endif
-
-#if EP_ADD == PROJC || !defined(STRIP)
-	BENCH_BEGIN("ep2_add_projc") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add_projc(p, p, q);
-		ep2_rand(q);
-		ep2_rand(p);
-		ep2_add_projc(q, q, p);
-		BENCH_ADD(ep2_add_projc(r, p, q));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("ep2_add_slp_projc") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add_projc(p, p, q);
-		ep2_rand(q);
-		ep2_rand(p);
-		ep2_add_projc(q, q, p);
-		BENCH_ADD(ep2_add_slp_projc(r, s, p, q));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("ep2_add_projc (z2 = 1)") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add_projc(p, p, q);
-		ep2_rand(q);
-		ep2_norm(q, q);
-		BENCH_ADD(ep2_add_projc(r, p, q));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("ep2_add_projc (z1,z2 = 1)") {
-		ep2_rand(p);
-		ep2_norm(p, p);
-		ep2_rand(q);
-		ep2_norm(q, q);
-		BENCH_ADD(ep2_add_projc(r, p, q));
-	}
-	BENCH_END;
-#endif
-
-	BENCH_BEGIN("ep2_sub") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add(p, p, q);
-		ep2_rand(q);
-		ep2_rand(p);
-		ep2_add(q, q, p);
-		BENCH_ADD(ep2_sub(r, p, q));
-	}
-	BENCH_END;
-
-#if EP_ADD == BASIC || !defined(STRIP)
-	BENCH_BEGIN("ep2_sub_basic") {
-		ep2_rand(p);
-		ep2_rand(q);
-		BENCH_ADD(ep2_sub_basic(r, p, q));
-	}
-	BENCH_END;
-#endif
-
-#if EP_ADD == PROJC || !defined(STRIP)
-	BENCH_BEGIN("ep2_sub_projc") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add_projc(p, p, q);
-		ep2_rand(q);
-		ep2_rand(p);
-		ep2_add_projc(q, q, p);
-		BENCH_ADD(ep2_sub_projc(r, p, q));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("ep2_sub_projc (z2 = 1)") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add_projc(p, p, q);
-		ep2_rand(q);
-		ep2_norm(q, q);
-		BENCH_ADD(ep2_sub_projc(r, p, q));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("ep2_sub_projc (z1,z2 = 1)") {
-		ep2_rand(p);
-		ep2_norm(p, p);
-		ep2_rand(q);
-		ep2_norm(q, q);
-		BENCH_ADD(ep2_sub_projc(r, p, q));
-	}
-	BENCH_END;
-#endif
-
-	BENCH_BEGIN("ep2_dbl") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add(p, p, q);
-		BENCH_ADD(ep2_dbl(r, p));
-	}
-	BENCH_END;
-
-#if EP_ADD == BASIC || !defined(STRIP)
-	BENCH_BEGIN("ep2_dbl_basic") {
-		ep2_rand(p);
-		BENCH_ADD(ep2_dbl_basic(r, p));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("ep2_dbl_slp_basic") {
-		ep2_rand(p);
-		BENCH_ADD(ep2_dbl_slp_basic(r, s, t, p));
-	}
-	BENCH_END;
-#endif
-
-#if EP_ADD == PROJC || !defined(STRIP)
-	BENCH_BEGIN("ep2_dbl_projc") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add_projc(p, p, q);
-		BENCH_ADD(ep2_dbl_projc(r, p));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("ep2_dbl_slp_projc") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add_projc(p, p, q);
-		BENCH_ADD(ep2_dbl_slp_projc(r, s, t, p));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("ep2_dbl_projc (z1 = 1)") {
-		ep2_rand(p);
-		ep2_norm(p, p);
-		BENCH_ADD(ep2_dbl_projc(r, p));
-	}
-	BENCH_END;
-#endif
-
-	BENCH_BEGIN("ep2_neg") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add(p, p, q);
-		BENCH_ADD(ep2_neg(r, p));
-	}
-	BENCH_END;
-
-#if EP_ADD == BASIC || !defined(STRIP)
-	BENCH_BEGIN("ep2_neg_basic") {
-		ep2_rand(p);
-		BENCH_ADD(ep2_neg_basic(r, p));
-	}
-	BENCH_END;
-#endif
-
-#if EP_ADD == PROJC || !defined(STRIP)
-	BENCH_BEGIN("ep2_neg_projc") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add_projc(p, p, q);
-		BENCH_ADD(ep2_neg_projc(r, p));
-	}
-	BENCH_END;
-#endif
-
-	BENCH_BEGIN("ep2_mul") {
-		bn_rand(k, BN_POS, bn_bits(n));
-		bn_mod(k, k, n);
-		BENCH_ADD(ep2_mul(q, p, k));
-	}
-	BENCH_END;
+//	BENCH_BEGIN("ep2_add") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add(p, p, q);
+//		ep2_rand(q);
+//		ep2_rand(p);
+//		ep2_add(q, q, p);
+//		BENCH_ADD(ep2_add(r, p, q));
+//	}
+//	BENCH_END;
+//
+//#if EP_ADD == BASIC || !defined(STRIP)
+//	BENCH_BEGIN("ep2_add_basic") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		BENCH_ADD(ep2_add_basic(r, p, q));
+//	}
+//	BENCH_END;
+//
+//	BENCH_BEGIN("ep2_add_slp_basic") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		BENCH_ADD(ep2_add_slp_basic(r, s, p, q));
+//	}
+//	BENCH_END;
+//#endif
+//
+//#if EP_ADD == PROJC || !defined(STRIP)
+//	BENCH_BEGIN("ep2_add_projc") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add_projc(p, p, q);
+//		ep2_rand(q);
+//		ep2_rand(p);
+//		ep2_add_projc(q, q, p);
+//		BENCH_ADD(ep2_add_projc(r, p, q));
+//	}
+//	BENCH_END;
+//
+//	BENCH_BEGIN("ep2_add_slp_projc") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add_projc(p, p, q);
+//		ep2_rand(q);
+//		ep2_rand(p);
+//		ep2_add_projc(q, q, p);
+//		BENCH_ADD(ep2_add_slp_projc(r, s, p, q));
+//	}
+//	BENCH_END;
+//
+//	BENCH_BEGIN("ep2_add_projc (z2 = 1)") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add_projc(p, p, q);
+//		ep2_rand(q);
+//		ep2_norm(q, q);
+//		BENCH_ADD(ep2_add_projc(r, p, q));
+//	}
+//	BENCH_END;
+//
+//	BENCH_BEGIN("ep2_add_projc (z1,z2 = 1)") {
+//		ep2_rand(p);
+//		ep2_norm(p, p);
+//		ep2_rand(q);
+//		ep2_norm(q, q);
+//		BENCH_ADD(ep2_add_projc(r, p, q));
+//	}
+//	BENCH_END;
+//#endif
+//
+//	BENCH_BEGIN("ep2_sub") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add(p, p, q);
+//		ep2_rand(q);
+//		ep2_rand(p);
+//		ep2_add(q, q, p);
+//		BENCH_ADD(ep2_sub(r, p, q));
+//	}
+//	BENCH_END;
+//
+//#if EP_ADD == BASIC || !defined(STRIP)
+//	BENCH_BEGIN("ep2_sub_basic") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		BENCH_ADD(ep2_sub_basic(r, p, q));
+//	}
+//	BENCH_END;
+//#endif
+//
+//#if EP_ADD == PROJC || !defined(STRIP)
+//	BENCH_BEGIN("ep2_sub_projc") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add_projc(p, p, q);
+//		ep2_rand(q);
+//		ep2_rand(p);
+//		ep2_add_projc(q, q, p);
+//		BENCH_ADD(ep2_sub_projc(r, p, q));
+//	}
+//	BENCH_END;
+//
+//	BENCH_BEGIN("ep2_sub_projc (z2 = 1)") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add_projc(p, p, q);
+//		ep2_rand(q);
+//		ep2_norm(q, q);
+//		BENCH_ADD(ep2_sub_projc(r, p, q));
+//	}
+//	BENCH_END;
+//
+//	BENCH_BEGIN("ep2_sub_projc (z1,z2 = 1)") {
+//		ep2_rand(p);
+//		ep2_norm(p, p);
+//		ep2_rand(q);
+//		ep2_norm(q, q);
+//		BENCH_ADD(ep2_sub_projc(r, p, q));
+//	}
+//	BENCH_END;
+//#endif
+//
+//	BENCH_BEGIN("ep2_dbl") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add(p, p, q);
+//		BENCH_ADD(ep2_dbl(r, p));
+//	}
+//	BENCH_END;
+//
+//#if EP_ADD == BASIC || !defined(STRIP)
+//	BENCH_BEGIN("ep2_dbl_basic") {
+//		ep2_rand(p);
+//		BENCH_ADD(ep2_dbl_basic(r, p));
+//	}
+//	BENCH_END;
+//
+//	BENCH_BEGIN("ep2_dbl_slp_basic") {
+//		ep2_rand(p);
+//		BENCH_ADD(ep2_dbl_slp_basic(r, s, u, p));
+//	}
+//	BENCH_END;
+//#endif
+//
+//#if EP_ADD == PROJC || !defined(STRIP)
+//	BENCH_BEGIN("ep2_dbl_projc") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add_projc(p, p, q);
+//		BENCH_ADD(ep2_dbl_projc(r, p));
+//	}
+//	BENCH_END;
+//
+//	BENCH_BEGIN("ep2_dbl_slp_projc") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add_projc(p, p, q);
+//		BENCH_ADD(ep2_dbl_slp_projc(r, s, u, p));
+//	}
+//	BENCH_END;
+//
+//	BENCH_BEGIN("ep2_dbl_projc (z1 = 1)") {
+//		ep2_rand(p);
+//		ep2_norm(p, p);
+//		BENCH_ADD(ep2_dbl_projc(r, p));
+//	}
+//	BENCH_END;
+//#endif
+//
+//	BENCH_BEGIN("ep2_neg") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add(p, p, q);
+//		BENCH_ADD(ep2_neg(r, p));
+//	}
+//	BENCH_END;
+//
+//#if EP_ADD == BASIC || !defined(STRIP)
+//	BENCH_BEGIN("ep2_neg_basic") {
+//		ep2_rand(p);
+//		BENCH_ADD(ep2_neg_basic(r, p));
+//	}
+//	BENCH_END;
+//#endif
+//
+//#if EP_ADD == PROJC || !defined(STRIP)
+//	BENCH_BEGIN("ep2_neg_projc") {
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		ep2_add_projc(p, p, q);
+//		BENCH_ADD(ep2_neg_projc(r, p));
+//	}
+//	BENCH_END;
+//#endif
+//
+//	BENCH_BEGIN("ep2_mul") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		BENCH_ADD(ep2_mul(q, p, k));
+//	}
+//	BENCH_END;
+//
+//	BENCH_BEGIN("ep2_mul_gen") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		BENCH_ADD(ep2_mul_gen(q, k));
+//	} BENCH_END;
+//
+//	BENCH_BEGIN("ep2_mul_dig") {
+//		bn_rand(k, BN_POS, BN_DIGIT);
+//		bn_mod(k, k, n);
+//		BENCH_ADD(ep2_mul_dig(p, q, k->dp[0]));
+//	}
+//	BENCH_END;
+//
+//	for (int i = 0; i < EP_TABLE; i++) {
+//		ep2_new(t[i]);
+//	}
+//
+//	BENCH_BEGIN("ep2_mul_pre") {
+//		ep2_rand(p);
+//		BENCH_ADD(ep2_mul_pre(t, p));
+//	} BENCH_END;
+//
+//	BENCH_BEGIN("ep2_mul_fix") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		ep2_rand(p);
+//		ep2_mul_pre(t, p);
+//		BENCH_ADD(ep2_mul_fix(q, t, k));
+//	} BENCH_END;
+//
+//	for (int i = 0; i < EP_TABLE; i++) {
+//		ep2_free(t[i]);
+//	}
+//
+//#if EP_FIX == BASIC || !defined(STRIP)
+//	for (int i = 0; i < EP_TABLE_BASIC; i++) {
+//		ep2_new(t[i]);
+//	}
+//	BENCH_BEGIN("ep2_mul_pre_basic") {
+//		ep2_rand(p);
+//		BENCH_ADD(ep2_mul_pre_basic(t, p));
+//	} BENCH_END;
+//
+//	BENCH_BEGIN("ep2_mul_fix_basic") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		ep2_rand(p);
+//		ep2_mul_pre_basic(t, p);
+//		BENCH_ADD(ep2_mul_fix_basic(q, t, k));
+//	} BENCH_END;
+//	for (int i = 0; i < EP_TABLE_BASIC; i++) {
+//		ep2_free(t[i]);
+//	}
+//#endif
+//
+//#if EP_FIX == YAOWI || !defined(STRIP)
+//	for (int i = 0; i < EP_TABLE_YAOWI; i++) {
+//		ep2_new(t[i]);
+//	}
+//	BENCH_BEGIN("ep2_mul_pre_yaowi") {
+//		ep2_rand(p);
+//		BENCH_ADD(ep2_mul_pre_yaowi(t, p));
+//	} BENCH_END;
+//
+//	BENCH_BEGIN("ep2_mul_fix_yaowi") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		ep2_rand(p);
+//		ep2_mul_pre_yaowi(t, p);
+//		BENCH_ADD(ep2_mul_fix_yaowi(q, t, k));
+//	} BENCH_END;
+//	for (int i = 0; i < EP_TABLE_YAOWI; i++) {
+//		ep2_free(t[i]);
+//	}
+//#endif
+//
+//#if EP_FIX == NAFWI || !defined(STRIP)
+//	for (int i = 0; i < EP_TABLE_NAFWI; i++) {
+//		ep2_new(t[i]);
+//	}
+//	BENCH_BEGIN("ep2_mul_pre_nafwi") {
+//		ep2_rand(p);
+//		BENCH_ADD(ep2_mul_pre_nafwi(t, p));
+//	} BENCH_END;
+//
+//	BENCH_BEGIN("ep2_mul_fix_nafwi") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		ep2_rand(p);
+//		ep2_mul_pre_nafwi(t, p);
+//		BENCH_ADD(ep2_mul_fix_nafwi(q, t, k));
+//	} BENCH_END;
+//	for (int i = 0; i < EP_TABLE_NAFWI; i++) {
+//		ep2_free(t[i]);
+//	}
+//#endif
+//
+//#if EP_FIX == COMBS || !defined(STRIP)
+//	for (int i = 0; i < EP_TABLE_COMBS; i++) {
+//		ep2_new(t[i]);
+//	}
+//	BENCH_BEGIN("ep2_mul_pre_combs") {
+//		ep2_rand(p);
+//		BENCH_ADD(ep2_mul_pre_combs(t, p));
+//	} BENCH_END;
+//
+//	BENCH_BEGIN("ep2_mul_fix_combs") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		ep2_rand(p);
+//		ep2_mul_pre_combs(t, p);
+//		BENCH_ADD(ep2_mul_fix_combs(q, t, k));
+//	} BENCH_END;
+//	for (int i = 0; i < EP_TABLE_COMBS; i++) {
+//		ep2_free(t[i]);
+//	}
+//#endif
+//
+//#if EP_FIX == COMBD || !defined(STRIP)
+//	for (int i = 0; i < EP_TABLE_COMBD; i++) {
+//		ep2_new(t[i]);
+//	}
+//	BENCH_BEGIN("ep2_mul_pre_combd") {
+//		BENCH_ADD(ep2_mul_pre_combd(t, p));
+//	} BENCH_END;
+//
+//	BENCH_BEGIN("ep2_mul_fix_combd") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		ep2_mul_pre_combd(t, p);
+//		BENCH_ADD(ep2_mul_fix_combd(q, t, k));
+//	} BENCH_END;
+//	for (int i = 0; i < EP_TABLE_COMBD; i++) {
+//		ep2_free(t[i]);
+//	}
+//#endif
+//
+//#if EP_FIX == WTNAF || !defined(STRIP)
+//	for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+//		ep2_new(t[i]);
+//	}
+//	BENCH_BEGIN("ep2_mul_pre_wtnaf") {
+//		ep2_rand(p);
+//		BENCH_ADD(ep2_mul_pre_wtnaf(t, p));
+//	} BENCH_END;
+//
+//	BENCH_BEGIN("ep2_mul_fix_wtnaf") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		ep2_rand(p);
+//		ep2_mul_pre_wtnaf(t, p);
+//		BENCH_ADD(ep2_mul_fix_wtnaf(q, t, k));
+//	} BENCH_END;
+//	for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+//		ep2_free(t[i]);
+//	}
+//#endif
+//	BENCH_BEGIN("ep2_mul_sim") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		bn_rand(l, BN_POS, bn_bits(n));
+//		bn_mod(l, l, n);
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		BENCH_ADD(ep2_mul_sim(r, p, k, q, l));
+//	} BENCH_END;
+//
+//#if EP_SIM == BASIC || !defined(STRIP)
+//	BENCH_BEGIN("ep2_mul_sim_basic") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		bn_rand(l, BN_POS, bn_bits(n));
+//		bn_mod(l, l, n);
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		BENCH_ADD(ep2_mul_sim_basic(r, p, k, q, l));
+//	} BENCH_END;
+//#endif
+//
+//#if EP_SIM == TRICK || !defined(STRIP)
+//	BENCH_BEGIN("ep2_mul_sim_trick") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		bn_rand(l, BN_POS, bn_bits(n));
+//		bn_mod(l, l, n);
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		BENCH_ADD(ep2_mul_sim_trick(r, p, k, q, l));
+//	} BENCH_END;
+//#endif
+//
+//#if EP_SIM == INTER || !defined(STRIP)
+//	BENCH_BEGIN("ep2_mul_sim_inter") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		bn_rand(l, BN_POS, bn_bits(n));
+//		bn_mod(l, l, n);
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		BENCH_ADD(ep2_mul_sim_inter(r, p, k, q, l));
+//	} BENCH_END;
+//#endif
+//
+//#if EP_SIM == JOINT || !defined(STRIP)
+//	BENCH_BEGIN("ep2_mul_sim_joint") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		bn_rand(l, BN_POS, bn_bits(n));
+//		bn_mod(l, l, n);
+//		ep2_rand(p);
+//		ep2_rand(q);
+//		BENCH_ADD(ep2_mul_sim_joint(r, p, k, q, l));
+//	} BENCH_END;
+//#endif
+//
+//	BENCH_BEGIN("ep2_mul_sim_gen") {
+//		bn_rand(k, BN_POS, bn_bits(n));
+//		bn_mod(k, k, n);
+//		bn_rand(l, BN_POS, bn_bits(n));
+//		bn_mod(l, l, n);
+//		ep2_rand(q);
+//		BENCH_ADD(ep2_mul_sim_gen(r, k, q, l));
+//	} BENCH_END;
 
 	BENCH_BEGIN("pp_map") {
 		ep2_rand(p);
 		ep_rand(_q);
-		BENCH_ADD(pp_map(e, p, _q));
+		BENCH_ADD(pp_map(e, _q, p));
 	}
 	BENCH_END;
 
@@ -876,7 +1110,7 @@ static void arith(void) {
 	BENCH_BEGIN("pp_map_r_ate") {
 		ep2_rand(p);
 		ep_rand(_q);
-		BENCH_ADD(pp_map_r_ate(e, p, _q));
+		BENCH_ADD(pp_map_r_ate(e, _q, p));
 	}
 	BENCH_END;
 #endif
@@ -885,7 +1119,7 @@ static void arith(void) {
 	BENCH_BEGIN("pp_map_o_ate") {
 		ep2_rand(p);
 		ep_rand(_q);
-		BENCH_ADD(pp_map_o_ate(e, p, _q));
+		BENCH_ADD(pp_map_o_ate(e, _q, p));
 	}
 	BENCH_END;
 #endif
@@ -894,7 +1128,7 @@ static void arith(void) {
 	BENCH_BEGIN("pp_map_x_ate") {
 		ep2_rand(p);
 		ep_rand(_q);
-		BENCH_ADD(pp_map_x_ate(e, p, _q));
+		BENCH_ADD(pp_map_x_ate(e, _q, p));
 	}
 	BENCH_END;
 #endif
@@ -905,6 +1139,7 @@ static void arith(void) {
 	ep_free(_q);
 	bn_free(k);
 	bn_free(n);
+	bn_free(l);
 	fp12_free(e);
 	fp2_free(s);
 	fp2_free(t);
@@ -946,8 +1181,8 @@ int main(void) {
 	if (ep_param_set_any_pairf() == STS_OK) {
 		ep_param_print();
 		util_print_banner("Arithmetic:", 1);
-		memory();
-		util();
+		//memory();
+		//util();
 		arith();
 	} else {
 		THROW(ERR_NO_CURVE);

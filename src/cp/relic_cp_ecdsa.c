@@ -31,7 +31,6 @@
 
 #include "relic.h"
 #include "relic_test.h"
-#include "relic_bench.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -106,7 +105,6 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 		}
 		bn_mul(s, s, k);
 		bn_mod(s, s, n);
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

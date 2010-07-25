@@ -31,6 +31,7 @@
 
 #include "relic_core.h"
 #include "relic_pp.h"
+#include "relic_util.h"
 #include "relic_error.h"
 
 /*============================================================================*/
@@ -163,36 +164,37 @@ void pp_dbl(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	}
 }
 
+#define PART 34
+
 /**
  * Compute the Miller loop for Ate variants over the bits of r.
- * 
- * @param[out] res			- the result.
+ *
+ * @param[out] r			- the result.
  * @param[out] t			- the point rQ.
  * @param[in] q				- the first point of the pairing, in G_2.
- * @param[in] r				- the length of the loop.
+ * @param[in] a				- the length of the loop.
  * @param[in] p				- the second point of the pairing, in G_1.
  */
-void pp_miller(fp12_t res, ep2_t t, ep2_t q, bn_t r, ep_t p) {
+void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
+#ifndef PP_PARAL
 	fp12_t tmp;
-	unsigned int i;
 
 	fp12_null(tmp);
 
 	TRY {
 		fp12_new(tmp);
 
-		fp12_zero(res);
-		fp_set_dig(res[0][0][0], 1);
+		fp12_zero(r);
+		fp_set_dig(r[0][0][0], 1);
 		ep2_copy(t, q);
 
-		for (i = bn_bits(r) - 1; i > 0; i--) {
+		for (int i = bn_bits(a) - 2; i >= 0; i--) {
+			fp12_sqr(r, r);
 			pp_dbl(tmp, t, t, p);
-			fp12_sqr(res, res);
-			fp12_mul_dxs(res, res, tmp);
-
-			if (bn_test_bit(r, i - 1)) {
+			fp12_mul_dxs(r, r, tmp);
+			if (bn_test_bit(a, i)) {
 				pp_add(tmp, t, q, p);
-				fp12_mul_dxs(res, res, tmp);
+				fp12_mul_dxs(r, r, tmp);
 			}
 		}
 	}
@@ -202,6 +204,80 @@ void pp_miller(fp12_t res, ep2_t t, ep2_t q, bn_t r, ep_t p) {
 	FINALLY {
 		fp12_free(tmp);
 	}
+#else
+	fp12_t _f[CORES], _t[CORES];
+	ep2_t _q[CORES];
+	bn_t a0, a1;
+
+	bn_null(a0);
+	bn_null(a1);
+
+	TRY {
+		for (int j = 0; j < CORES; j++) {
+			fp12_null(_f[j]);
+			fp12_null(_f[j]);
+			fp12_new(_t[j]);
+			fp12_new(_t[j]);
+			ep2_null(_q[j]);
+			ep2_new(_q[j]);
+		}
+
+		bn_new(a0);
+		bn_new(a1);
+
+		bn_rsh(a0, a, PART);
+		bn_mod_2b(a1, a, PART);
+
+		omp_set_num_threads(CORES);
+#pragma omp parallel sections shared(r, _f, _t, _q, p, q, t, a, a0, a1)
+		{
+#pragma omp section
+			{
+				fp12_zero(_f[0]);
+				fp_set_dig(_f[0][0][0][0], 1);
+				ep2_copy(_q[0], q);
+				for (int i = bn_bits(a0) - 2; i >= 0; i--) {
+					fp12_sqr(_f[0], _f[0]);
+					pp_dbl(_t[0], _q[0], _q[0], p);
+					fp12_mul_dxs(_f[0], _f[0], _t[0]);
+					if (bn_test_bit(a0, i)) {
+						pp_add(_t[0], _q[0], q, p);
+						fp12_mul_dxs(_f[0], _f[0], _t[0]);
+					}
+				}
+				for (int i = PART - 1; i >= 0; i--) {
+					fp12_sqr(_f[0], _f[0]);
+				}
+			}
+#pragma omp section
+			{
+				fp12_zero(_f[1]);
+				fp_set_dig(_f[1][0][0][0], 1);
+				ep2_mul(_q[1], q, a0);
+				for (int i = PART - 1; i >= 0; i--) {
+					fp12_sqr(_f[1], _f[1]);
+					pp_dbl(_t[1], _q[1], _q[1], p);
+					fp12_mul_dxs(_f[1], _f[1], _t[1]);
+					if (bn_test_bit(a, i)) {
+						pp_add(_t[1], _q[1], q, p);
+						fp12_mul_dxs(_f[1], _f[1], _t[1]);
+					}
+				}
+				ep2_copy(t, _q[1]);
+			}
+		}
+		fp12_mul(r, _f[0], _f[1]);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep2_free(t0);
+		ep2_free(t1);
+		bn_free(a0);
+		bn_free(a1);
+	}
+#endif
 }
 
 /**
@@ -231,7 +307,7 @@ void pp_exp(fp12_t m, bn_t x) {
 		/* tmp = m^{-1}. */
 		fp12_inv(v0, m);
 		/* m' = m^(p^6). */
-		fp12_inv_uni(m, m);
+		fp12_inv_cyc(m, m);
 		/* m' = m^(p^6 - 1). */
 		fp12_mul(m, m, v0);
 
@@ -246,39 +322,39 @@ void pp_exp(fp12_t m, bn_t x) {
 		/* From here on we work with x' = -x, therefore if x is positive
 		 * we need inversions. */
 		if (bn_sign(x) == BN_POS) {
-			/* We are now on the cyclotomic subgroup, so inversion are
+			/* We are now on the cyclotomic subgroup, so inversions are
 			 * conjugations. */
-			fp12_inv_uni(v3, m);
-			fp12_exp_uni(v0, v3, x);
-			fp12_inv_uni(v3, v0);
-			fp12_exp_uni(v1, v3, x);
-			fp12_inv_uni(v3, v1);
-			fp12_exp_uni(v2, v3, x);
+			fp12_inv_cyc(v3, m);
+			fp12_exp_cyc(v0, v3, x);
+			fp12_inv_cyc(v3, v0);
+			fp12_exp_cyc(v1, v3, x);
+			fp12_inv_cyc(v3, v1);
+			fp12_exp_cyc(v2, v3, x);
 		} else {
-			fp12_exp_uni(v0, m, x);
-			fp12_exp_uni(v1, v0, x);
-			fp12_exp_uni(v2, v1, x);
+			fp12_exp_cyc(v0, m, x);
+			fp12_exp_cyc(v1, v0, x);
+			fp12_exp_cyc(v2, v1, x);
 		}
 
 		fp12_frb(v3, v2);
 		fp12_mul(v2, v2, v3);
-		fp12_sqr_uni(v2, v2);
+		fp12_sqr_cyc(v2, v2);
 		fp12_frb(v3, v1);
-		fp12_inv_uni(v3, v3);
+		fp12_inv_cyc(v3, v3);
 		fp12_mul(v3, v3, v0);
 		fp12_mul(v2, v2, v3);
 		fp12_frb(v0, v0);
-		fp12_inv_uni(v3, v1);
+		fp12_inv_cyc(v3, v1);
 		fp12_mul(v2, v2, v3);
 		fp12_mul(v0, v0, v3);
 		fp12_frb(v1, v1);
 		fp12_frb(v1, v1);
 		fp12_mul(v0, v0, v2);
 		fp12_mul(v2, v2, v1);
-		fp12_sqr_uni(v0, v0);
+		fp12_sqr_cyc(v0, v0);
 		fp12_mul(v0, v0, v2);
-		fp12_sqr_uni(v0, v0);
-		fp12_inv_uni(v1, m);
+		fp12_sqr_cyc(v0, v0);
+		fp12_inv_cyc(v1, m);
 		fp12_mul(v2, v0, v1);
 		fp12_frb(v1, m);
 		fp12_frb(v1, v1);
@@ -287,7 +363,7 @@ void pp_exp(fp12_t m, bn_t x) {
 		fp12_frb(v3, m);
 		fp12_mul(v1, v1, v3);
 		fp12_mul(v0, v0, v1);
-		fp12_sqr_uni(v2, v2);
+		fp12_sqr_cyc(v2, v2);
 		fp12_mul(m, v2, v0);
 	}
 	CATCH_ANY {
@@ -390,10 +466,10 @@ void pp_o_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 
 		pp_add(tmp, q3, q2, p);
 		fp12_mul_dxs(res, res, tmp);
-	    pp_add(tmp, q3, q1, p);
-	    fp12_mul_dxs(res, res, tmp);
-	    pp_add(tmp, q3, t, p);
-	    fp12_mul_dxs(res, res, tmp);
+		pp_add(tmp, q3, q1, p);
+		fp12_mul_dxs(res, res, tmp);
+		pp_add(tmp, q3, t, p);
+		fp12_mul_dxs(res, res, tmp);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -439,53 +515,53 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp12_mul(res, res, tmp);
 
 		/* r = r^p^3. */
-	    fp12_frb(tmp, tmp);
-	    fp12_frb(tmp, tmp);
-	    fp12_mul(res, res, tmp);
+		fp12_frb(tmp, tmp);
+		fp12_frb(tmp, tmp);
+		fp12_mul(res, res, tmp);
 
-	    /* r = r^p^5. */
-	    fp12_frb(tmp, tmp);
-	    fp12_frb(tmp, tmp);
-	    /* r = r^p^7. */
-	    fp12_frb(tmp, tmp);
-	    fp12_frb(tmp, tmp);
-	    /* r = r^p^9. */
-	    fp12_frb(tmp, tmp);
-	    fp12_frb(tmp, tmp);
-	    /* r = r^p^10. */
-	    fp12_frb(tmp, tmp);
-	    fp12_mul(res, res, tmp);
+		/* r = r^p^5. */
+		fp12_frb(tmp, tmp);
+		fp12_frb(tmp, tmp);
+		/* r = r^p^7. */
+		fp12_frb(tmp, tmp);
+		fp12_frb(tmp, tmp);
+		/* r = r^p^9. */
+		fp12_frb(tmp, tmp);
+		fp12_frb(tmp, tmp);
+		/* r = r^p^10. */
+		fp12_frb(tmp, tmp);
+		fp12_mul(res, res, tmp);
 
-	    /* q1 = p * xQ. */
-	    ep2_frb(q1, t);
-	    /* q2 = p^3 * xQ. */
-	    ep2_frb(q2, q1);
-	    ep2_frb(q2, q2);
-	    /* q3 = p^5 * xQ. */
-	    ep2_frb(q3, q2);
-	    ep2_frb(q3, q3);
-	    /* q3 = p^7 * xQ. */
-	    ep2_frb(q3, q3);
-	    ep2_frb(q3, q3);
-	    /* q3 = p^9 * xQ. */
-	    ep2_frb(q3, q3);
-	    ep2_frb(q3, q3);
-	    /* q3 = p^10 * xQ. */
-	    ep2_frb(q3, q3);
+		/* q1 = p * xQ. */
+		ep2_frb(q1, t);
+		/* q2 = p^3 * xQ. */
+		ep2_frb(q2, q1);
+		ep2_frb(q2, q2);
+		/* q3 = p^5 * xQ. */
+		ep2_frb(q3, q2);
+		ep2_frb(q3, q3);
+		/* q3 = p^7 * xQ. */
+		ep2_frb(q3, q3);
+		ep2_frb(q3, q3);
+		/* q3 = p^9 * xQ. */
+		ep2_frb(q3, q3);
+		ep2_frb(q3, q3);
+		/* q3 = p^10 * xQ. */
+		ep2_frb(q3, q3);
 
-	    /* q1 = p*xQ + xQ. */
-	    pp_add(tmp, q1, t, p);
-	    fp12_mul_dxs(res, res, tmp);
+		/* q1 = p*xQ + xQ. */
+		pp_add(tmp, q1, t, p);
+		fp12_mul_dxs(res, res, tmp);
 
-	    /* q2 = q2 + q3. */
-	    pp_add(tmp, q2, q3, p);
-	    fp12_mul_dxs(res, res, tmp);
+		/* q2 = q2 + q3. */
+		pp_add(tmp, q2, q3, p);
+		fp12_mul_dxs(res, res, tmp);
 
-	    /* Make q2 affine again. */
-	    ep2_norm(q2, q2);
+		/* Make q2 affine again. */
+		ep2_norm(q2, q2);
 
-	    pp_add(tmp, q1, q2, p);
-	    fp12_mul_dxs(res, res, tmp);
+		pp_add(tmp, q1, q2, p);
+		fp12_mul_dxs(res, res, tmp);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -512,7 +588,7 @@ void pp_map_clean(void) {
 
 #if PP_MAP == R_ATE || !defined(STRIP)
 
-void pp_map_r_ate(fp12_t r, ep2_t q, ep_t p) {
+void pp_map_r_ate(fp12_t r, ep_t p, ep2_t q) {
 	ep2_t t;
 	bn_t a, x;
 
@@ -586,7 +662,7 @@ void pp_map_r_ate(fp12_t r, ep2_t q, ep_t p) {
 
 #if PP_MAP == O_ATE || !defined(STRIP)
 
-void pp_map_o_ate(fp12_t r, ep2_t q, ep_t p) {
+void pp_map_o_ate(fp12_t r, ep_t p, ep2_t q) {
 	ep2_t t;
 	bn_t a, x;
 
@@ -637,8 +713,6 @@ void pp_map_o_ate(fp12_t r, ep2_t q, ep_t p) {
 		/* r = f_{r,Q}(P). */
 		pp_miller(r, t, q, a, p);
 
-		ep2_norm(t, t);
-
 		if (bn_sign(x) == BN_NEG) {
 			/* Since f_{-r,Q}(P) = 1/f_{r,Q}(P), we must invert the result. */
 			fp12_inv(r, r);
@@ -646,6 +720,7 @@ void pp_map_o_ate(fp12_t r, ep2_t q, ep_t p) {
 		}
 
 		pp_o_ate_mul(r, t, q, p);
+
 		pp_exp(r, x);
 	}
 	CATCH_ANY {
@@ -662,7 +737,7 @@ void pp_map_o_ate(fp12_t r, ep2_t q, ep_t p) {
 
 #if PP_MAP == X_ATE || !defined(STRIP)
 
-void pp_map_x_ate(fp12_t r, ep2_t q, ep_t p) {
+void pp_map_x_ate(fp12_t r, ep_t p, ep2_t q) {
 	ep2_t t;
 	bn_t a, x;
 

@@ -204,6 +204,12 @@ static void arith1(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("g1_map") {
+		unsigned char msg[5];
+		rand_bytes(msg, 5);
+		BENCH_ADD(g1_map(p, msg, 5));
+	} BENCH_END;
+
 	g1_free(p);
 	g1_free(q);
 	bn_free(k);
@@ -383,6 +389,12 @@ static void arith2(void) {
 		BENCH_ADD(g2_mul_sim_gen(r, k, q, l));
 	}
 	BENCH_END;
+
+	BENCH_BEGIN("g2_map") {
+		unsigned char msg[5];
+		rand_bytes(msg, 5);
+		BENCH_ADD(g2_map(p, msg, 5));
+	} BENCH_END;
 
 	g2_free(p);
 	g2_free(q);

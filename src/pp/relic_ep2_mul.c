@@ -91,3 +91,38 @@ void ep2_mul_gen(ep2_t r, bn_t k) {
 		ep2_free(gen);
 	}
 }
+
+void ep2_mul_dig(ep2_t r, ep2_t p, dig_t k) {
+	int i, l;
+	ep2_t t;
+
+	ep2_null(t);
+
+	if (k == 0) {
+		ep2_set_infty(r);
+		return;
+	}
+
+	TRY {
+		ep2_new(t);
+
+		l = util_bits_dig(k);
+
+		ep2_copy(t, p);
+
+		for (i = l - 2; i >= 0; i--) {
+			ep2_dbl(t, t);
+			if (k & ((dig_t)1 << i)) {
+				ep2_add(t, t, p);
+			}
+		}
+
+		ep2_norm(r, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep2_free(t);
+	}
+}

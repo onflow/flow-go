@@ -688,4 +688,32 @@ void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master);
  */
 void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1, int len1, sokaka_t k, char *id2, int len2);
 
+/**
+ * Generates a BLS key pair.
+ *
+ * @param[out] d			- the private key.
+ * @param[in] q				- the public key.
+ */
+void cp_bls_gen(bn_t d, g2_t q);
+
+/**
+ * Signs a message using BLS.
+ *
+ * @param[out] s				- the signature.
+ * @param[in] msg				- the message to sign.
+ * @param[in] len				- the message length in bytes.
+ * @param[in] d					- the private key.
+ */
+void cp_bls_sign(g1_t s, unsigned char *msg, int len, bn_t d);
+
+/**
+ * Verifies a message signed with BLS using the basic method.
+ *
+ * @param[out] s				- the signature.
+ * @param[in] msg				- the message to sign.
+ * @param[in] len				- the message length in bytes.
+ * @param[in] q					- the public key.
+ */
+int cp_bls_ver(g1_t s, unsigned char *msg, int len, g2_t q);
+
 #endif /* !RELIC_CP_H */
