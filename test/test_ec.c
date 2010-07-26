@@ -436,7 +436,7 @@ static int simultaneous(void) {
 			ec_mul_sim_gen(r, k, q, l);
 			ec_curve_get_gen(s);
 			ec_mul_sim(q, s, k, q, l);
-			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+			TEST_ASSERT(ec_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
