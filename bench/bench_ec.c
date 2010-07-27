@@ -204,6 +204,22 @@ static void arith(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("ec_map") {
+		unsigned char msg[5];
+		rand_bytes(msg, 5);
+		BENCH_ADD(ec_map(p, msg, 5));
+	} BENCH_END;
+
+	BENCH_BEGIN("ec_pck") {
+		ec_rand(p);
+		BENCH_ADD(ec_pck(q, p));
+	} BENCH_END;
+
+	BENCH_BEGIN("ec_upk") {
+		ec_rand(p);
+		BENCH_ADD(ec_upk(q, p));
+	} BENCH_END;
+
 	ec_free(p);
 	ec_free(q);
 	bn_free(k);
