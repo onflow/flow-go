@@ -164,7 +164,7 @@ void pp_dbl(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	}
 }
 
-#define PART 34
+#define PART 32
 
 /**
  * Compute the Miller loop for Ate variants over the bits of r.
@@ -464,11 +464,11 @@ void pp_o_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		ep2_frb(q3, q2);
 		ep2_neg(q2, q2);
 
-		pp_add(tmp, q3, q2, p);
+		pp_add(tmp, t, q1, p);
 		fp12_mul_dxs(res, res, tmp);
-		pp_add(tmp, q3, q1, p);
+		pp_add(tmp, t, q2, p);
 		fp12_mul_dxs(res, res, tmp);
-		pp_add(tmp, q3, t, p);
+		pp_add(tmp, t, q3, p);
 		fp12_mul_dxs(res, res, tmp);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
