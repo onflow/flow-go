@@ -54,9 +54,9 @@
  */
 /** @{ */
 #if PC_CUR == PRIME
-#define G1_LOWER			ep2_
+#define G1_LOWER			ep_
 #define G1_UPPER			EP
-#define G2_LOWER			ep_
+#define G2_LOWER			ep2_
 #define G2_UPPER			EP
 #define GT_LOWER			fp12_
 #define PC_LOWER			pp_
@@ -253,7 +253,7 @@ typedef CAT(GT_LOWER, t) gt_t;
 /**
  * Prints the current configured binary elliptic curve.
  */
-#define pc_param_print()	CAT(G2_LOWER, param_print)()
+#define pc_param_print()	CAT(G1_LOWER, param_print)()
 
 /**
  * Tests if a G_1 element is the unity.

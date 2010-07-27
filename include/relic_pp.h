@@ -1016,14 +1016,14 @@ void fp12_mul_dxs(fp12_t c, fp12_t a, fp12_t b);
 void fp12_sqr(fp12_t c, fp12_t a);
 
 /**
- * Computes the square of a unitary dodecic extension field element.
+ * Computes the square of a cyclotomic dodecic extension field element.
  *
- * A unitary element is one previously raised to the (p^6 - 1)-th power.
+ * A cyclotomic element is one previously raised to the (p^6 - 1)-th power.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the unitary dodecic extension element to square.
  */
-void fp12_sqr_uni(fp12_t c, fp12_t a);
+void fp12_sqr_cyc(fp12_t c, fp12_t a);
 
 /**
  * Inverts a dodecic extension field element. Computes c = a^(-1).
@@ -1034,15 +1034,15 @@ void fp12_sqr_uni(fp12_t c, fp12_t a);
 void fp12_inv(fp12_t c, fp12_t a);
 
 /**
- * Computes the inverse of a dodecic unitary extension field element.
+ * Computes the inverse of a cyclotomic dodecic extension field element.
  *
- * For unitary elements, this is equivalent to computing the conjugate.
- * A unitary element is one previously raised to the (p^6 - 1)-th power.
+ * For cyclotomic elements, this is equivalent to computing the conjugate.
+ * A cyclotomic element is one previously raised to the (p^6 - 1)-th power.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the dodecic extension field element to conjugate.
  */
-void fp12_inv_uni(fp12_t c, fp12_t a);
+void fp12_inv_cyc(fp12_t c, fp12_t a);
 
 /**
  * Computes the Frobenius endomorphism of a dodecic extension element.
@@ -1063,15 +1063,15 @@ void fp12_frb(fp12_t c, fp12_t a);
 void fp12_exp(fp12_t c, fp12_t a, bn_t b);
 
 /**
- * Computes a power of a unitary dodecic extension field element.
+ * Computes a power of a cyclotomic dodecic extension field element.
  *
- * A unitary element is one previously raised to the (p^6 - 1)-th power.
+ * A cyclotomic element is one previously raised to the (p^6 - 1)-th power.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the basis.
  * @param[in] b				- the exponent.
  */
-void fp12_exp_uni(fp12_t c, fp12_t a, bn_t b);
+void fp12_exp_cyc(fp12_t c, fp12_t a, bn_t b);
 
 /**
  * Initializes the elliptic curve over quadratic extension.
@@ -1498,6 +1498,15 @@ void ep2_mul_sim_joint(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l);
 void ep2_mul_sim_gen(ep2_t r, bn_t k, ep2_t q, bn_t l);
 
 /**
+ * Multiplies a prime elliptic point by a small integer.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ * @param[in] k				- the integer.
+ */
+void ep2_mul_dig(ep2_t r, ep2_t p, dig_t k);
+
+/**
  * Converts a point to affine coordinates.
  *
  * @param[out] r			- the result.
@@ -1543,7 +1552,7 @@ void pp_map_clean(void);
  * @param[in] q				- the first elliptic curve point.
  * @param[in] p				- the second elliptic curve point.
  */
-void pp_map_r_ate(fp12_t r, ep2_t q, ep_t p);
+void pp_map_r_ate(fp12_t r, ep_t p, ep2_t q);
 
 /**
  * Computes the Optimal ate pairing of two points in a parameterized elliptic
@@ -1553,7 +1562,7 @@ void pp_map_r_ate(fp12_t r, ep2_t q, ep_t p);
  * @param[in] q				- the first elliptic curve point.
  * @param[in] p				- the second elliptic curve point.
  */
-void pp_map_o_ate(fp12_t r, ep2_t q, ep_t p);
+void pp_map_o_ate(fp12_t r, ep_t p, ep2_t q);
 
 /**
  * Computes the X-ate pairing of two points in a parameterized elliptic curve.
@@ -1563,6 +1572,6 @@ void pp_map_o_ate(fp12_t r, ep2_t q, ep_t p);
  * @param[in] q				- the first elliptic curve point.
  * @param[in] p				- the second elliptic curve point.
  */
-void pp_map_x_ate(fp12_t r, ep2_t q, ep_t p);
+void pp_map_x_ate(fp12_t r, ep_t p, ep2_t q);
 
 #endif /* !RELIC_PP_H */
