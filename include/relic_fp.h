@@ -85,12 +85,12 @@ enum {
 	NIST_384 = 5,
 	/** NIST 521-bit fast reduction polynomial. */
 	NIST_521 = 6,
-	/** 256-bit prime provided in Nogami et al. for use with BN curves. */
-	BN_254 = 7,
-	/** 256-bit prime provided in Barreto et al. for use with BN curves. */
-	BN_256 = 8,
 	/** 158-bit prime for use with BN curves. */
-	BN_158 = 9
+	BN_158 = 7,
+	/** 256-bit prime provided in Nogami et al. for use with BN curves. */
+	BN_254 = 8,
+	/** 256-bit prime provided in Barreto et al. for use with BN curves. */
+	BN_256 = 9,
 };
 
 /*============================================================================*/
