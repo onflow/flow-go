@@ -234,7 +234,7 @@ void fp12_sqr(fp12_t c, fp12_t a) {
 	}
 }
 
-void fp12_sqr_uni(fp12_t c, fp12_t a) {
+void fp12_sqr_cyc(fp12_t c, fp12_t a) {
 	fp2_t t0, t1, t2, t3;
 
 	fp2_null(t0);
@@ -251,6 +251,10 @@ void fp12_sqr_uni(fp12_t c, fp12_t a) {
 		/* Define z = sqrt(E). */
 
 		/* Now a is seen as (t0,t1) + (t2,t3) * w + (t4,t5) * w^2. */
+
+		/* (t0, t1) = (a00 + a11*z)^2. */
+		/* (t2, t3) = (a10 + a02*z)^2. */
+		/* (t4, t5) = (a01 + a12*z)^2. */
 
 		/* (t0, t1) = (a00 + a11*z)^2. */
 		fp4_sqr(t0, t1, a[0][0], a[1][1]);
@@ -322,7 +326,7 @@ void fp12_inv(fp12_t c, fp12_t a) {
 	}
 }
 
-void fp12_inv_uni(fp12_t c, fp12_t a) {
+void fp12_inv_cyc(fp12_t c, fp12_t a) {
 	/* In this case, it's a simple conjugate. */
 	fp6_copy(c[0], a[0]);
 	fp6_neg(c[1], a[1]);
@@ -373,7 +377,7 @@ void fp12_exp(fp12_t c, fp12_t a, bn_t b) {
 	}
 }
 
-void fp12_exp_uni(fp12_t c, fp12_t a, bn_t b) {
+void fp12_exp_cyc(fp12_t c, fp12_t a, bn_t b) {
 	fp12_t t;
 
 	fp12_null(t);
@@ -384,7 +388,7 @@ void fp12_exp_uni(fp12_t c, fp12_t a, bn_t b) {
 		fp12_copy(t, a);
 
 		for (int i = bn_bits(b) - 2; i >= 0; i--) {
-			fp12_sqr_uni(t, t);
+			fp12_sqr_cyc(t, t);
 			if (bn_test_bit(b, i)) {
 				fp12_mul(t, t, a);
 			}
