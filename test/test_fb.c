@@ -823,6 +823,10 @@ static int solve(void) {
 #if FB_SLV == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic solve is correct") {
 			fb_rand(a);
+			fb_trc(c, a);
+			if (!fb_is_zero(c)) {
+				fb_add_dig(a, a, 1);
+			}
 			fb_slv(c, a);
 			fb_slv_basic(b, a);
 			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
@@ -832,8 +836,12 @@ static int solve(void) {
 #if FB_SLV == QUICK || !defined(STRIP)
 		TEST_BEGIN("fast solve is correct") {
 			fb_rand(a);
-			fb_slv(c, a);
-			fb_slv_quick(b, a);
+			fb_trc(c, a);
+			if (!fb_is_zero(c)) {
+				fb_add_dig(a, a, 1);
+			}
+			fb_slv(b, a);
+			fb_slv_quick(c, a);
 			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -905,7 +913,7 @@ static int inversion(void) {
 		} TEST_END;
 #endif
 
-#if FB_INV == INTEG || !defined(STRIP)
+#if FB_INV == LOWER || !defined(STRIP)
 		TEST_BEGIN("lower inversion is correct") {
 			fb_rand(a);
 			fb_inv(b, a);
