@@ -300,6 +300,39 @@ static int sokaka(void) {
 	return code;
 }
 
+static int bls(void) {
+	int code = STS_ERR;
+	bn_t d;
+	g1_t s;
+	g2_t q;
+	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+
+	bn_null(d);
+	g1_null(s);
+	g2_null(q);
+
+	TRY {
+		bn_new(d);
+		g1_new(s);
+		g2_new(q);
+
+		TEST_BEGIN("boneh-lynn-schacham short signature is correct") {
+			cp_bls_gen(d, q);
+			cp_bls_sign(s, msg, 5, d);
+			TEST_ASSERT(cp_bls_ver(s, msg, 5, q) == 1, end);
+		} TEST_END;
+	} CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+
+  end:
+	bn_free(d);
+	bn_free(r);
+	ec_free(q);
+	return code;
+}
+
 #endif
 
 int main(void) {
@@ -341,6 +374,10 @@ int main(void) {
 	util_print_banner("Protocols based on pairings:\n", 0);
 	if (pc_param_set_any() == STS_OK) {
 		if (sokaka() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+		if (bls() != STS_OK) {
 			core_clean();
 			return 1;
 		}
