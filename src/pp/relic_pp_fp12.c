@@ -333,22 +333,11 @@ void fp12_inv_cyc(fp12_t c, fp12_t a) {
 }
 
 void fp12_frb(fp12_t c, fp12_t a) {
-	fp2_t t;
-
-	fp2_null(t);
-
-	TRY {
-		fp2_new(t);
-
-		fp2_const_get(t);
-		fp6_frb(c[0], a[0]);
-		fp6_frb(c[1], a[1]);
-		fp6_mul_dxq(c[1], c[1], t);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fp2_free(t);
-	}
+	fp6_frb(c[0], a[0]);
+	fp6_frb(c[1], a[1]);
+	fp2_mul_frb(c[1][0], c[1][0], 1);
+	fp2_mul_frb(c[1][1], c[1][1], 1);
+	fp2_mul_frb(c[1][2], c[1][2], 1);
 }
 
 void fp12_exp(fp12_t c, fp12_t a, bn_t b) {

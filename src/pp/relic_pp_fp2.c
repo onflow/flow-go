@@ -44,7 +44,7 @@
 /**
  * Constant used to compute the Frobenius map in higher extensions.
  */
-fp2_st const_frb;
+fp2_st const_frb[6];
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -52,13 +52,17 @@ fp2_st const_frb;
 
 void fp2_const_init() {
 #if ALLOC == STATIC
-	fp2_new(const_frb);
+	for (int i = 0; i < 6; i++) {
+		fp2_new(const_frb[i]);
+	}
 #endif
 }
 
 void fp2_const_clean() {
 #if ALLOC == STATIC
-	fp2_free(const_frb);
+	for (int i = 0; i < 6; i++) {
+		fp2_free(const_frb[i]);
+	}
 #endif
 }
 
@@ -80,19 +84,19 @@ void fp2_const_calc() {
 		bn_sub_dig(e, e, 1);
 		bn_div_dig(e, e, 6);
 		fp2_exp(t, t, e);
-		fp_copy(const_frb[0], t[0]);
-		fp_copy(const_frb[1], t[1]);
+		fp_copy(const_frb[0][0], t[0]);
+		fp_copy(const_frb[0][1], t[1]);
+		fp2_sqr(const_frb[1], const_frb[0]);
+		fp2_mul(const_frb[2], const_frb[1], const_frb[0]);
+		fp2_sqr(const_frb[3], const_frb[1]);
+		fp2_mul(const_frb[4], const_frb[3], const_frb[0]);
+		fp2_sqr(const_frb[5], const_frb[3]);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
 		bn_free(e);
 		fp2_free(t);
 	}
-}
-
-void fp2_const_get(fp2_t f) {
-	fp_copy(f[0], const_frb[0]);
-	fp_copy(f[1], const_frb[1]);
 }
 
 void fp2_copy(fp2_t c, fp2_t a) {
@@ -127,6 +131,10 @@ void fp2_print(fp2_t a) {
 int fp2_cmp(fp2_t a, fp2_t b) {
 	return (fp_cmp(a[0], b[0]) == CMP_EQ) &&
 			(fp_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ : CMP_NE;
+}
+
+void fp2_mul_frb(fp2_t c, fp2_t a, int i) {
+	fp2_mul(c, a, const_frb[i-1]);
 }
 
 #if PP_EXT == BASIC || !defined(STRIP)

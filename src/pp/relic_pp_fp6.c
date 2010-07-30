@@ -334,27 +334,12 @@ void fp6_exp(fp6_t c, fp6_t a, bn_t b) {
 }
 
 void fp6_frb(fp6_t c, fp6_t a) {
-	fp2_t t;
+	fp2_frb(c[0], a[0]);
+	fp2_frb(c[1], a[1]);
+	fp2_frb(c[2], a[2]);
 
-	TRY {
-		fp2_new(t);
-
-		fp2_const_get(t);
-		fp2_sqr(t, t);
-
-		fp2_frb(c[0], a[0]);
-		fp2_frb(c[1], a[1]);
-		fp2_frb(c[2], a[2]);
-
-		fp2_mul(c[1], c[1], t);
-		fp2_sqr(t, t);
-		fp2_mul(c[2], c[2], t);
-
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fp2_free(t);
-	}
+	fp2_mul_frb(c[1], c[1], 2);
+	fp2_mul_frb(c[2], c[2], 4);
 }
 
 void fp6_inv(fp6_t c, fp6_t a) {

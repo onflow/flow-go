@@ -531,13 +531,6 @@ void fp2_const_clean(void);
 void fp2_const_calc(void);
 
 /**
- * Returns the constant needed to compute the Frobenius map.
- *
- * @param[out] f			- the result.
- */
-void fp2_const_get(fp2_t f);
-
-/**
  * Copies the second argument to the first argument.
  *
  * @param[out] C			- the result.
@@ -684,6 +677,15 @@ void fp2_mul_art(fp2_t c, fp2_t a);
  */
 void fp2_mul_nor(fp2_t c, fp2_t a);
 
+/**
+ * Multiplies a quadratic extension field element by a power of the constant
+ * needed to compute the Frobenius map.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the field element to multiply.
+ * @param[in] i				- the power of the constant.
+ */
+void fp2_mul_frb(fp2_t c, fp2_t a, int i);
 /**
  * Computes the square of a quadratic extension field element using basic
  * arithmetic.

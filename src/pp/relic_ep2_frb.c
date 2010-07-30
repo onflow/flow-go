@@ -42,27 +42,11 @@
 /*============================================================================*/
 
 void ep2_frb(ep2_t r, ep2_t p) {
-	fp2_t t;
-
-	fp2_null(t);
-
-	TRY {
-		fp2_new(t);
-
-		fp2_const_get(t);
-
-		fp2_frb(r->x, p->x);
-		fp2_frb(r->y, p->y);
-		fp2_mul(r->y, r->y, t);
-		fp2_sqr(t, t);
-		fp2_mul(r->x, r->x, t);
-		fp2_mul(r->y, r->y, t);
-		r->norm = 1;
-		fp_set_dig(r->z[0], 1);
-		fp_zero(r->z[1]);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fp2_free(t);
-	}
+	fp2_frb(r->x, p->x);
+	fp2_frb(r->y, p->y);
+	fp2_mul_frb(r->x, r->x, 2);
+	fp2_mul_frb(r->y, r->y, 3);
+	r->norm = 1;
+	fp_set_dig(r->z[0], 1);
+	fp_zero(r->z[1]);
 }
