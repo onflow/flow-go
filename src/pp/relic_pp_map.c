@@ -313,8 +313,7 @@ void pp_exp(fp12_t m, bn_t x) {
 
 		/* Second, compute m^(p^2 + 1). */
 		/* t = m^(p^2). */
-		fp12_frb(v0, m);
-		fp12_frb(v0, v0);
+		fp12_frb_sqr(v0, m);
 		/* m' = m^(p^2 + 1). */
 		fp12_mul(m, m, v0);
 
@@ -347,8 +346,7 @@ void pp_exp(fp12_t m, bn_t x) {
 		fp12_inv_cyc(v3, v1);
 		fp12_mul(v2, v2, v3);
 		fp12_mul(v0, v0, v3);
-		fp12_frb(v1, v1);
-		fp12_frb(v1, v1);
+		fp12_frb_sqr(v1, v1);
 		fp12_mul(v0, v0, v2);
 		fp12_mul(v2, v2, v1);
 		fp12_sqr_cyc(v0, v0);
@@ -356,8 +354,7 @@ void pp_exp(fp12_t m, bn_t x) {
 		fp12_sqr_cyc(v0, v0);
 		fp12_inv_cyc(v1, m);
 		fp12_mul(v2, v0, v1);
-		fp12_frb(v1, m);
-		fp12_frb(v1, v1);
+		fp12_frb_sqr(v1, m);
 		fp12_frb(v3, v1);
 		fp12_mul(v1, v1, v3);
 		fp12_frb(v3, m);
@@ -515,19 +512,15 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp12_mul(res, res, tmp);
 
 		/* r = r^p^3. */
-		fp12_frb(tmp, tmp);
-		fp12_frb(tmp, tmp);
+		fp12_frb_sqr(tmp, tmp);
 		fp12_mul(res, res, tmp);
 
 		/* r = r^p^5. */
-		fp12_frb(tmp, tmp);
-		fp12_frb(tmp, tmp);
+		fp12_frb_sqr(tmp, tmp);
 		/* r = r^p^7. */
-		fp12_frb(tmp, tmp);
-		fp12_frb(tmp, tmp);
+		fp12_frb_sqr(tmp, tmp);
 		/* r = r^p^9. */
-		fp12_frb(tmp, tmp);
-		fp12_frb(tmp, tmp);
+		fp12_frb_sqr(tmp, tmp);
 		/* r = r^p^10. */
 		fp12_frb(tmp, tmp);
 		fp12_mul(res, res, tmp);
@@ -535,17 +528,13 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		/* q1 = p * xQ. */
 		ep2_frb(q1, t);
 		/* q2 = p^3 * xQ. */
-		ep2_frb(q2, q1);
-		ep2_frb(q2, q2);
+		ep2_frb_sqr(q2, q1);
 		/* q3 = p^5 * xQ. */
-		ep2_frb(q3, q2);
-		ep2_frb(q3, q3);
+		ep2_frb_sqr(q3, q2);
 		/* q3 = p^7 * xQ. */
-		ep2_frb(q3, q3);
-		ep2_frb(q3, q3);
+		ep2_frb_sqr(q3, q3);
 		/* q3 = p^9 * xQ. */
-		ep2_frb(q3, q3);
-		ep2_frb(q3, q3);
+		ep2_frb_sqr(q3, q3);
 		/* q3 = p^10 * xQ. */
 		ep2_frb(q3, q3);
 
@@ -559,8 +548,8 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 
 		/* Make q2 affine again. */
 		ep2_norm(q2, q2);
-
 		pp_add(tmp, q1, q2, p);
+
 		fp12_mul_dxs(res, res, tmp);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);

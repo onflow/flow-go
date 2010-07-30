@@ -340,6 +340,14 @@ void fp12_frb(fp12_t c, fp12_t a) {
 	fp2_mul_frb(c[1][2], c[1][2], 1);
 }
 
+void fp12_frb_sqr(fp12_t c, fp12_t a) {
+    fp6_frb_sqr(c[0], a[0]);
+    fp6_frb_sqr(c[1], a[1]);
+	fp2_mul_frb_sqr(c[1][0], c[1][0], 1);
+	fp2_mul_frb_sqr(c[1][1], c[1][1], 1);
+	fp2_mul_frb_sqr(c[1][2], c[1][2], 1);
+}
+
 void fp12_exp(fp12_t c, fp12_t a, bn_t b) {
 	fp12_t t;
 

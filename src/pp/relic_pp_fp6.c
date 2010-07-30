@@ -342,6 +342,13 @@ void fp6_frb(fp6_t c, fp6_t a) {
 	fp2_mul_frb(c[2], c[2], 4);
 }
 
+void fp6_frb_sqr(fp6_t c, fp6_t a) {
+	fp2_copy(c[0], a[0]);
+	fp2_mul_frb_sqr(c[1], a[1], 2);
+	fp2_mul_frb_sqr(c[2], a[2], 1);
+	fp2_neg(c[2], c[2]);
+}
+
 void fp6_inv(fp6_t c, fp6_t a) {
 	fp2_t v0;
 	fp2_t v1;

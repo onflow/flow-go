@@ -1001,27 +1001,35 @@ static int memory12(void) {
 
 static int exponentiation6(void) {
 	int code = STS_ERR;
-	fp2_t a, b, c;
+	fp6_t a, b, c;
 	bn_t d;
 
-	fp2_null(a);
-	fp2_null(b);
-	fp2_null(c);
+	fp6_null(a);
+	fp6_null(b);
+	fp6_null(c);
 	bn_null(d);
 
 	TRY {
-		fp2_new(a);
-		fp2_new(b);
-		fp2_new(c);
+		fp6_new(a);
+		fp6_new(b);
+		fp6_new(c);
 		bn_new(d);
 
 		TEST_BEGIN("frobenius and exponentiation are consistent") {
-			fp2_rand(a);
-			fp2_frb(b, a);
+			fp6_rand(a);
+			fp6_frb(b, a);
 			d->used = FP_DIGS;
 			dv_copy(d->dp, fp_prime_get(), FP_DIGS);
-			fp2_exp(c, a, d);
-			TEST_ASSERT(fp2_cmp(c, b) == CMP_EQ, end);
+			fp6_exp(c, a, d);
+			TEST_ASSERT(fp6_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("frobenius and double frobenius are consistent") {
+			fp6_rand(a);
+			fp6_frb(b, a);
+			fp6_frb(b, b);
+			fp6_frb_sqr(c, a);
+			TEST_ASSERT(fp6_cmp(c, b) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
@@ -1030,9 +1038,9 @@ static int exponentiation6(void) {
 	}
 	code = STS_OK;
   end:
-	fp2_free(a);
-	fp2_free(b);
-	fp2_free(c);
+	fp6_free(a);
+	fp6_free(b);
+	fp6_free(c);
 	bn_free(d);
 	return code;
 }
@@ -1397,6 +1405,14 @@ static int exponentiation12(void) {
 			d->used = FP_DIGS;
 			dv_copy(d->dp, fp_prime_get(), FP_DIGS);
 			fp12_exp(c, a, d);
+			TEST_ASSERT(fp12_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("frobenius and double frobenius are consistent") {
+			fp12_rand(a);
+			fp12_frb(b, a);
+			fp12_frb(b, b);
+			fp12_frb_sqr(c, a);
 			TEST_ASSERT(fp12_cmp(c, b) == CMP_EQ, end);
 		} TEST_END;
 	}

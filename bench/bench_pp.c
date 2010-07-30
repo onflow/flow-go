@@ -415,6 +415,12 @@ static void arith6(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fp6_frb_sqr") {
+		fp6_rand(a);
+		BENCH_ADD(fp6_frb_sqr(c, a));
+	}
+	BENCH_END;
+
 	fp6_free(a);
 	fp6_free(b);
 	fp6_free(c);
@@ -567,6 +573,12 @@ static void arith12(void) {
 	BENCH_BEGIN("fp12_frb") {
 		fp12_rand(a);
 		BENCH_ADD(fp12_frb(c, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp12_frb_sqr") {
+		fp12_rand(a);
+		BENCH_ADD(fp12_frb_sqr(c, a));
 	}
 	BENCH_END;
 

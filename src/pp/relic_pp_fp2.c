@@ -46,6 +46,11 @@
  */
 fp2_st const_frb[6];
 
+/**
+ * Constant used to compute consecutive Frobenius maps in higher extensions.
+ */
+static fp_st const_sqr[2];
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -55,6 +60,8 @@ void fp2_const_init() {
 	for (int i = 0; i < 6; i++) {
 		fp2_new(const_frb[i]);
 	}
+	fp_new(const_frb_dbl[0]);
+	fp_new(const_frb_dbl[1]);
 #endif
 }
 
@@ -63,6 +70,8 @@ void fp2_const_clean() {
 	for (int i = 0; i < 6; i++) {
 		fp2_free(const_frb[i]);
 	}
+	fp_free(const_frb_dbl[0]);
+	fp_free(const_frb_dbl[1]);
 #endif
 }
 
@@ -91,6 +100,17 @@ void fp2_const_calc() {
 		fp2_sqr(const_frb[3], const_frb[1]);
 		fp2_mul(const_frb[4], const_frb[3], const_frb[0]);
 		fp2_sqr(const_frb[5], const_frb[3]);
+		fp2_zero(t);
+		fp_set_dig(t[0], 1);
+		fp2_mul_nor(t, t);
+		e->used = FP_DIGS;
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		bn_sqr(e, e);
+		bn_sub_dig(e, e, 1);
+		bn_div_dig(e, e, 6);
+		fp2_exp(t, t, e);
+		fp_copy(const_sqr[0], t[0]);
+		fp_sqr(const_sqr[1], const_sqr[0]);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -135,6 +155,11 @@ int fp2_cmp(fp2_t a, fp2_t b) {
 
 void fp2_mul_frb(fp2_t c, fp2_t a, int i) {
 	fp2_mul(c, a, const_frb[i-1]);
+}
+
+void fp2_mul_frb_sqr(fp2_t c, fp2_t a, int i) {
+	fp_mul(c[0], a[0], const_sqr[i-1]);
+	fp_mul(c[1], a[1], const_sqr[i-1]);
 }
 
 #if PP_EXT == BASIC || !defined(STRIP)

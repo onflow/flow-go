@@ -50,3 +50,11 @@ void ep2_frb(ep2_t r, ep2_t p) {
 	fp_set_dig(r->z[0], 1);
 	fp_zero(r->z[1]);
 }
+
+void ep2_frb_sqr(ep2_t r, ep2_t p) {
+	fp2_mul_frb_sqr(r->x, p->x, 2);
+	fp2_neg(r->y, p->y);
+	r->norm = 1;
+	fp_set_dig(r->z[0], 1);
+	fp_zero(r->z[1]);
+}

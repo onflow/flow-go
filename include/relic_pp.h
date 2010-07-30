@@ -686,6 +686,17 @@ void fp2_mul_nor(fp2_t c, fp2_t a);
  * @param[in] i				- the power of the constant.
  */
 void fp2_mul_frb(fp2_t c, fp2_t a, int i);
+
+/**
+ * Multiplies a quadratic extension field element by a power of the constant
+ * needed to compute the repeated Frobenius map.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the field element to multiply.
+ * @param[in] i				- the power of the constant.
+ */
+void fp2_mul_frb_sqr(fp2_t c, fp2_t a, int i);
+
 /**
  * Computes the square of a quadratic extension field element using basic
  * arithmetic.
@@ -896,6 +907,15 @@ void fp6_exp(fp6_t c, fp6_t a, bn_t b);
 void fp6_frb(fp6_t c, fp6_t a);
 
 /**
+* Computes two consecutive Frobenius endomorphisms of a sextic extension
+* element. Computes c = a^(p^2).
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- a sextic extension field element.
+ */
+void fp6_frb_sqr(fp6_t c, fp6_t a);
+
+/**
  * Copies the second argument to the first argument.
  *
  * @param[out] C			- the result.
@@ -1054,6 +1074,15 @@ void fp12_inv_cyc(fp12_t c, fp12_t a);
  * @param[in] a				- a dodecic extension field element.
  */
 void fp12_frb(fp12_t c, fp12_t a);
+
+/**
+ * Computes two consecutive Frobenius endomorphisms of a dodecic extension
+ * element. Computes c = a^(p^2).
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- a dodecic extension field element.
+ */
+void fp12_frb_sqr(fp12_t c, fp12_t a);
 
 /**
  * Computes a power of a dodecic extension field element.
@@ -1535,6 +1564,16 @@ void ep2_map(ep2_t p, unsigned char *msg, int len);
  * @param[in] p				- a point in affine coordinates.
  */
 void ep2_frb(ep2_t r, ep2_t p);
+
+/**
+ * Computes two consectutive Frobenius maps of a point represented in affine
+ * coordinates in an elliptic curve over a quadratic exension. Computes
+ * Frob(P = (x, y)) = (x^(p^2), y^(p^2)).
+ *
+ * @param[out] r			- the result in affine coordinates.
+ * @param[in] p				- a point in affine coordinates.
+ */
+void ep2_frb_sqr(ep2_t r, ep2_t p);
 
 /**
  * Initializes the pairing over prime fields.
