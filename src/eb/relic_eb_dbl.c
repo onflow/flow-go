@@ -345,7 +345,7 @@ void eb_dbl_basic(eb_t r, eb_t p) {
 	}
 #endif
 
-#if defined(EB_ORDIN)
+#if defined(EB_ORDIN) || defined (EB_KBLTZ)
 	eb_dbl_basic_ordin(r, p);
 #endif
 }
@@ -368,7 +368,7 @@ void eb_dbl_projc(eb_t r, eb_t p) {
 	}
 #endif
 
-#if defined(EB_ORDIN)
+#if defined(EB_ORDIN) || defined(EB_KBLTZ)
 	eb_dbl_projc_ordin(r, p);
 #endif
 }
