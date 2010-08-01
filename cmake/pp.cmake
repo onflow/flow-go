@@ -8,7 +8,7 @@ option(PP_PARAL "Parallel implementation." on)
 message("   ** Available bilinear pairing methods (default = BASIC;O-ATE):")
 
 message("      PP_METHD=BASIC    Basic extension field arithmetic.")    
-message("      PP_METHD=INTEG    Extension field arithmetic with embedded reductions.\n")
+message("      PP_METHD=LOWER    Pass extension field arithmetic to the lower level.\n")
 
 message("      PP_METHD=R_ATE    R-ate pairing.")
 message("      PP_METHD=O_ATE    O-ate pairing.")
