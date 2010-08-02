@@ -268,6 +268,8 @@ static int sokaka(void) {
 	sokaka_t s_a, s_b;
 	bn_t s;
 	unsigned char key1[MD_LEN], key2[MD_LEN];
+	char id_a[5] = {'A', 'l', 'i', 'c', 'e'};
+	char id_b[3] = {'B', 'o', 'b'};
 
 	sokaka_null(s_a);
 	sokaka_null(s_b);
@@ -282,10 +284,10 @@ static int sokaka(void) {
 		TEST_BEGIN
 				("sakai-ohgishi-kasahara authenticated key agreement is correct")
 		{
-			cp_sokaka_gen_prv(s_a, "Alice", strlen("Alice"), s);
-			cp_sokaka_gen_prv(s_b, "Bob", strlen("Bob"), s);
-			cp_sokaka_key(key1, MD_LEN, "Alice", 5, s_a, "Bob", 3);
-			cp_sokaka_key(key2, MD_LEN, "Bob", 3, s_b, "Alice", 5);
+			cp_sokaka_gen_prv(s_a, id_a, 5, s);
+			cp_sokaka_gen_prv(s_b, id_b, 3, s);
+			cp_sokaka_key(key1, MD_LEN, id_a, 5, s_a, id_b, 3);
+			cp_sokaka_key(key2, MD_LEN, id_b, 3, s_b, id_a, 5);
 			TEST_ASSERT(memcmp(key1, key2, MD_LEN) == 0, end);
 		} TEST_END;
 
