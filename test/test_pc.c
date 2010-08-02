@@ -83,6 +83,7 @@ int util1(void) {
 		TEST_BEGIN("copy and comparison are consistent") {
 			g1_rand(a);
 			g1_rand(b);
+			g1_rand(c);
 			if (g1_cmp(a, c) != CMP_EQ) {
 				g1_copy(c, a);
 				TEST_ASSERT(g1_cmp(c, a) == CMP_EQ, end);
@@ -433,7 +434,7 @@ static int simultaneous1(void) {
 			bn_mod(k, k, n);
 			bn_rand(l, BN_POS, bn_bits(n));
 			bn_mod(l, l, n);
-			g1_mul_sim_gen(r, k, q, l);
+			g1_mul_sim(r, p, k, q, l);
 			g1_get_gen(s);
 			g1_mul_sim(q, s, k, q, l);
 			TEST_ASSERT(g1_cmp(q, r) == CMP_EQ, end);
@@ -450,6 +451,39 @@ static int simultaneous1(void) {
 	g1_free(r);
 	bn_free(n);
 	bn_free(k);
+	return code;
+}
+
+static int hashing1(void) {
+	int code = STS_ERR;
+	g1_t a;
+	bn_t n;
+	unsigned char msg[5];
+
+	g1_null(a);
+	bn_null(n);
+
+	TRY {
+		g1_new(a);
+		bn_new(n);
+
+		g1_get_ord(n);
+
+		TEST_BEGIN("point hashing is correct") {
+			rand_bytes(msg, sizeof(msg));
+			g1_map(a, msg, sizeof(msg));
+			g1_mul(a, a, n);
+			TEST_ASSERT(g1_is_infty(a) == 1, end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	g1_free(a);
 	return code;
 }
 
@@ -502,6 +536,7 @@ int util2(void) {
 		TEST_BEGIN("copy and comparison are consistent") {
 			g2_rand(a);
 			g2_rand(b);
+			g2_rand(c);
 			if (g2_cmp(a, c) != CMP_EQ) {
 				g2_copy(c, a);
 				TEST_ASSERT(g2_cmp(c, a) == CMP_EQ, end);
@@ -872,6 +907,39 @@ static int simultaneous2(void) {
 	return code;
 }
 
+static int hashing2(void) {
+	int code = STS_ERR;
+	g2_t a;
+	bn_t n;
+	unsigned char msg[5];
+
+	g2_null(a);
+	bn_null(n);
+
+	TRY {
+		g2_new(a);
+		bn_new(n);
+
+		g2_get_ord(n);
+
+		TEST_BEGIN("point hashing is correct") {
+			rand_bytes(msg, sizeof(msg));
+			g2_map(a, msg, sizeof(msg));
+			g2_mul(a, a, n);
+			TEST_ASSERT(g2_is_infty(a) == 1, end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	g2_free(a);
+	return code;
+}
+
 static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
@@ -921,6 +989,7 @@ int util(void) {
 		TEST_BEGIN("copy and comparison are consistent") {
 			gt_rand(a);
 			gt_rand(b);
+			gt_rand(c);
 			if (gt_cmp(a, c) != CMP_EQ) {
 				gt_copy(c, a);
 				TEST_ASSERT(gt_cmp(c, a) == CMP_EQ, end);
@@ -1189,6 +1258,10 @@ int test1(void) {
 		return STS_ERR;
 	}
 
+	if (hashing1() != STS_OK) {
+		return STS_ERR;
+	}
+
 	return STS_OK;
 }
 
@@ -1227,6 +1300,10 @@ int test2(void) {
 	}
 
 	if (simultaneous2() != STS_OK) {
+		return STS_ERR;
+	}
+
+	if (hashing2() != STS_OK) {
 		return STS_ERR;
 	}
 
