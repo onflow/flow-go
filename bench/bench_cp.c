@@ -254,6 +254,8 @@ static void sokaka(void) {
 	sokaka_t s_a;
 	bn_t s;
 	unsigned char key1[MD_LEN];
+	char id_a[5] = {'A', 'l', 'i', 'c', 'e'};
+	char id_b[3] = {'B', 'o', 'b'};
 
 	sokaka_null(s_a);
 
@@ -267,11 +269,11 @@ static void sokaka(void) {
 	} BENCH_END;
 
 	BENCH_BEGIN("cp_sokaka_gen_prv") {
-		BENCH_ADD(cp_sokaka_gen_prv(s_a, "Alice", 5, s));
+		BENCH_ADD(cp_sokaka_gen_prv(s_a, id_a, 5, s));
 	} BENCH_END;
 
 	BENCH_BEGIN("cp_sokaka_key") {
-		BENCH_ADD(cp_sokaka_key(key1, MD_LEN, "Alice", 5, s_a, "Bob", 3));
+		BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_a, 5, s_a, id_b, 3));
 	} BENCH_END;
 
 	sokaka_free(s_a);
