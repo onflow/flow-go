@@ -158,10 +158,18 @@ void ep2_map(ep2_t p, unsigned char *msg, int len) {
 				p->norm = 1;
 				break;
 			}
+
 			fp_add_dig(p->x[0], p->x[0], 1);
 		}
 
 		ep2_mul_cof(p, p);
+
+		/* t0 = x1^2. */
+		fp2_sqr(t0, p->x);
+		/* t1 = x1^3. */
+		fp2_mul(t1, t0, p->x);
+		fp2_add(t1, t1, t0);
+		fp2_sqr(t0, p->y);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
