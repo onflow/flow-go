@@ -457,15 +457,12 @@ void pp_o_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp_zero(q3->z[1]);
 
 		ep2_frb(q1, q);
-		ep2_frb(q2, q1);
-		ep2_frb(q3, q2);
+		ep2_frb_sqr(q2, q);
 		ep2_neg(q2, q2);
 
 		pp_add(tmp, t, q1, p);
 		fp12_mul_dxs(res, res, tmp);
 		pp_add(tmp, t, q2, p);
-		fp12_mul_dxs(res, res, tmp);
-		pp_add(tmp, t, q3, p);
 		fp12_mul_dxs(res, res, tmp);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);

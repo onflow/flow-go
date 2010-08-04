@@ -149,10 +149,16 @@ void fp12_mul(fp12_t c, fp12_t a, fp12_t b) {
 		fp6_new(t2);
 
 		/* Karatsuba algorithm. */
+
+		/* t0 = a0 * b0. */
 		fp6_mul(t0, a[0], b[0]);
+		/* t1 = a1 * b1. */
 		fp6_mul(t1, a[1], b[1]);
+		/* t2 = b0 + b1. */
 		fp6_add(t2, b[0], b[1]);
-		fp6_add(c[1], a[1], a[0]);
+		/* c1 = a0 + a1. */
+		fp6_add(c[1], a[0], a[1]);
+		/* c1 = (a0 + a1) * (b0 + b1) */
 		fp6_mul(c[1], c[1], t2);
 		fp6_sub(c[1], c[1], t0);
 		fp6_sub(c[1], c[1], t1);

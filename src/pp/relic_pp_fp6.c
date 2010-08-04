@@ -366,16 +366,19 @@ void fp6_inv(fp6_t c, fp6_t a) {
 		fp2_new(v2);
 		fp2_new(t0);
 
+		/* v0 = a0^2 - E * a1 * a2. */
 		fp2_sqr(t0, a[0]);
 		fp2_mul(v0, a[1], a[2]);
 		fp2_mul_nor(v0, v0);
 		fp2_sub(v0, t0, v0);
 
+		/* v1 = E * a2^2 - a0 * a1. */
 		fp2_sqr(t0, a[2]);
 		fp2_mul_nor(t0, t0);
 		fp2_mul(v1, a[0], a[1]);
 		fp2_sub(v1, t0, v1);
 
+		/* v2 = a1^2 - a0 * a2. */
 		fp2_sqr(t0, a[1]);
 		fp2_mul(v2, a[0], a[2]);
 		fp2_sub(v2, t0, v2);
