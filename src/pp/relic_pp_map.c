@@ -452,8 +452,6 @@ void pp_o_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp_zero(q1->z[1]);
 		fp_set_dig(q2->z[0], 1);
 		fp_zero(q2->z[1]);
-		fp_set_dig(q3->z[0], 1);
-		fp_zero(q3->z[1]);
 
 		ep2_frb(q1, q);
 		ep2_frb_sqr(q2, q);
