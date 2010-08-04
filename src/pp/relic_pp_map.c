@@ -435,13 +435,12 @@ void pp_r_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
  * @param[in] p				- the second point of the pairing, in G_1.
  */
 void pp_o_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
-	ep2_t q1, q2, q3;
+	ep2_t q1, q2;
 	fp12_t tmp;
 
 	fp12_null(tmp);
 	ep2_null(q1);
 	ep2_null(q2);
-	ep2_null(q3);
 
 	TRY {
 		ep2_new(q1);
@@ -470,7 +469,6 @@ void pp_o_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp12_free(tmp);
 		ep2_free(q1);
 		ep2_free(q2);
-		ep2_free(q3);
 	}
 }
 
