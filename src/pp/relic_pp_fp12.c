@@ -339,19 +339,35 @@ void fp12_inv_cyc(fp12_t c, fp12_t a) {
 }
 
 void fp12_frb(fp12_t c, fp12_t a) {
-	fp6_frb(c[0], a[0]);
-	fp6_frb(c[1], a[1]);
+	/* t1 = conj(a00). */
+	fp2_frb(c[0][0], a[0][0]);
+	/* t2 = conj(a10). */
+	fp2_frb(c[1][0], a[1][0]);
+	/* t3 = conj(a01). */
+	fp2_frb(c[0][1], a[0][1]);
+	/* t4 = conj(a11). */
+	fp2_frb(c[1][1], a[1][1]);
+	/* t5 = conj(a02). */
+	fp2_frb(c[0][2], a[0][2]);
+	/* t6 = conj(a12). */
+	fp2_frb(c[1][2], a[1][2]);
+
 	fp2_mul_frb(c[1][0], c[1][0], 1);
-	fp2_mul_frb(c[1][1], c[1][1], 1);
-	fp2_mul_frb(c[1][2], c[1][2], 1);
+	fp2_mul_frb(c[0][1], c[0][1], 2);
+	fp2_mul_frb(c[1][1], c[1][1], 3);
+	fp2_mul_frb(c[0][2], c[0][2], 4);
+	fp2_mul_frb(c[1][2], c[1][2], 5);
 }
 
 void fp12_frb_sqr(fp12_t c, fp12_t a) {
-    fp6_frb_sqr(c[0], a[0]);
-    fp6_frb_sqr(c[1], a[1]);
-	fp2_mul_frb_sqr(c[1][0], c[1][0], 1);
-	fp2_mul_frb_sqr(c[1][1], c[1][1], 1);
-	fp2_mul_frb_sqr(c[1][2], c[1][2], 1);
+	fp2_copy(c[0][0], a[0][0]);
+	fp2_mul_frb_sqr(c[0][1], a[0][1], 2);
+	fp2_mul_frb_sqr(c[0][2], a[0][2], 1);
+	fp2_neg(c[0][2], c[0][2]);
+	fp2_mul_frb_sqr(c[1][0], a[1][0], 1);
+	fp2_mul_frb_sqr(c[1][1], a[1][1], 3);
+	fp2_mul_frb_sqr(c[1][2], a[1][2], 2);
+	fp2_neg(c[1][2], c[1][2]);
 }
 
 void fp12_exp(fp12_t c, fp12_t a, bn_t b) {
