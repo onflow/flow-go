@@ -31,6 +31,7 @@
  */
 
 #include <stdlib.h>
+#include <malloc.h>
 #include <errno.h>
 
 #include "relic_core.h"
@@ -54,6 +55,9 @@ void dv_new_dynam(dv_t *a, int digits) {
 	if (ALIGN == 1) {
 		*a = malloc(digits * sizeof(dig_t));
 	} else {
+#ifdef _WIN32
+		*a = _aligned_malloc(digits * sizeof(dig_t), ALIGN);
+#else
 		r = posix_memalign((void **)&a, ALIGN,
 				digits * sizeof(dig_t));
 		if (r == ENOMEM) {
@@ -62,6 +66,7 @@ void dv_new_dynam(dv_t *a, int digits) {
 		if (r == EINVAL) {
 			THROW(ERR_INVALID);
 		}
+#endif
 	}
 
 	if (*a == NULL) {
@@ -72,7 +77,11 @@ void dv_new_dynam(dv_t *a, int digits) {
 
 void dv_free_dynam(dv_t *a) {
 	if ((*a) != NULL) {
+#if defined(_WIN32) && ALIGN > 1
+		_aligned_free(*a);
+#else
 		free(*a);
+#endif
 	}
 	(*a) = NULL;
 }

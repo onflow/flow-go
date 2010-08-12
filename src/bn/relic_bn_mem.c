@@ -30,6 +30,7 @@
  */
 
 #include <stdlib.h>
+#include <malloc.h>
 #include <errno.h>
 
 #include "relic_conf.h"
@@ -57,6 +58,9 @@ void bn_init(bn_t a, int digits) {
 		if (ALIGN == 1) {
 			a->dp = malloc(digits * sizeof(dig_t));
 		} else {
+#ifdef _WIN32
+			a->dp = _aligned_malloc(digits * sizeof(dig_t), ALIGN);
+#else
 			r = posix_memalign((void **)&(a->dp), ALIGN,
 					digits * sizeof(dig_t));
 			if (r == ENOMEM) {
@@ -65,6 +69,7 @@ void bn_init(bn_t a, int digits) {
 			if (r == EINVAL) {
 				THROW(ERR_INVALID);
 			}
+#endif
 		}
 
 		if (a->dp == NULL) {
@@ -99,7 +104,11 @@ void bn_clean(bn_t a) {
 #if ALLOC == DYNAMIC
 	if (a != NULL) {
 		if (a->dp != NULL) {
+#if defined(_WIN32) && ALIGN > 1
+			_aligned_free(a->dp);
+#else
 			free(a->dp);
+#endif
 			a->dp = NULL;
 		}
 		a->alloc = 0;
