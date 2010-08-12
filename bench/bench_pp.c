@@ -675,7 +675,7 @@ static void arith(void) {
 	bn_new(l);
 	fp12_new(e);
 	fp2_new(s);
-	fp2_new(t);
+	fp2_new(u);
 
 	ep2_curve_get_ord(n);
 
@@ -1148,7 +1148,7 @@ static void arith(void) {
 	bn_free(l);
 	fp12_free(e);
 	fp2_free(s);
-	fp2_free(t);
+	fp2_free(u);
 }
 
 int main(void) {

@@ -55,6 +55,9 @@ static void fp4_sqr(fp2_t c, fp2_t d, fp2_t a, fp2_t b) {
 	fp2_null(t1);
 
 	TRY {
+		fp2_new(t0);
+		fp2_new(t1);
+
 		/* t0 = a^2. */
 		fp2_sqr(t0, a);
 		/* t1 = b^2. */

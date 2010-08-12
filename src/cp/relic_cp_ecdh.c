@@ -76,6 +76,6 @@ void cp_ecdh_key(unsigned char *key, int key_len, bn_t d, ec_t q) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		bn_free(n);
+		ec_free(p);
 	}
 }

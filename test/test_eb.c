@@ -1052,7 +1052,7 @@ static int test(void) {
 }
 
 int main(void) {
-	int r0, r1, r2;
+	int r0 = STS_OK, r1 = STS_OK, r2 = STS_OK;
 	core_init();
 
 	util_print_banner("Tests for the EB module:", 0);

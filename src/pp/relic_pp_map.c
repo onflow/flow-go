@@ -41,7 +41,7 @@
 /**
  * Adds two prime elliptic curve points and evaluates the corresponding line
  * function at another elliptic curve point.
- * 
+ *
  * @param[out] l			- the result of the evaluation.
  * @param[in,out] r			- the first point to add, in Affine coordinates.
  * 							The result of the addition, in Jacobian coordinates.
@@ -103,7 +103,7 @@ void pp_add(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 /**
  * Doubles a prime elliptic curve point and evaluates the corresponding line
  * function at another elliptic curve point.
- * 
+ *
  * @param[out] l			- the result of the evaluation.
  * @param[out] r			- the result, in Jacobian coordinates.
  * @param[in] q				- the point to double, in Jacobian coordinates.
@@ -282,7 +282,7 @@ void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
 
 /**
  * Compute the final exponentiation of the rate pairing in a BN curve.
- * 
+ *
  * @param[in,out] m			- the result.
  * @param[in] x				- the parameter used to generate the curve.
  */
@@ -445,7 +445,6 @@ void pp_o_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 	TRY {
 		ep2_new(q1);
 		ep2_new(q2);
-		ep2_new(q3);
 		fp12_new(tmp);
 
 		fp_set_dig(q1->z[0], 1);

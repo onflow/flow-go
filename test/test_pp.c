@@ -2189,18 +2189,18 @@ static int pairing(void) {
 
 	fp12_null(e1);
 	fp12_null(e2);
-	ep2_null(p);
-	ep_null(q);
-	ep_null(r);
+	ep_null(p);
+	ep2_null(q);
+	ep2_null(r);
 	bn_null(k);
 	bn_null(n);
 
 	TRY {
 		fp12_new(e1);
 		fp12_new(e2);
-		ep2_new(p);
-		ep_new(q);
-		ep_new(r);
+		ep_new(p);
+		ep2_new(q);
+		ep2_new(r);
 		bn_new(n);
 		bn_new(k);
 
@@ -2285,9 +2285,9 @@ static int pairing(void) {
   end:
 	fp12_free(e1);
 	fp12_free(e2);
-	ep2_free(p);
-	ep_free(q);
-	ep_free(r);
+	ep_free(p);
+	ep2_free(q);
+	ep2_free(r);
 	bn_free(n);
 	bn_free(k);
 	return code;

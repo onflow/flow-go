@@ -221,9 +221,10 @@ static int ecdh(void) {
 	code = STS_OK;
 
   end:
-	bn_free(d);
-	bn_free(r);
-	ec_free(q);
+	bn_free(d_a);
+	bn_free(d_b);
+	ec_free(q_a);
+	ec_free(q_b);
 	return code;
 }
 
@@ -330,8 +331,8 @@ static int bls(void) {
 
   end:
 	bn_free(d);
-	bn_free(r);
-	ec_free(q);
+	g1_free(s);
+	g2_free(q);
 	return code;
 }
 
