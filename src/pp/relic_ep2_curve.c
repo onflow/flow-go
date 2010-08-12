@@ -195,11 +195,13 @@ void ep2_curve_get_gen(ep2_t g) {
 }
 
 void ep2_curve_get_a(fp2_t a) {
-	fp2_copy(a, curve_a);
+	fp_copy(a[0], curve_a[0]);
+	fp_copy(a[1], curve_a[1]);
 }
 
 void ep2_curve_get_b(fp2_t b) {
-	fp2_copy(b, curve_b);
+	fp_copy(b[0], curve_b[0]);
+	fp_copy(b[1], curve_b[1]);
 }
 
 void ep2_curve_get_ord(bn_t n) {
@@ -295,8 +297,10 @@ void ep2_curve_set(int twist) {
 		g->norm = 1;
 
 		ep2_copy(&curve_g, g);
-		fp2_copy(curve_a, a);
-		fp2_copy(curve_b, b);
+		fp_copy(curve_a[0], a[0]);
+		fp_copy(curve_a[1], a[1]);
+		fp_copy(curve_b[0], b[0]);
+		fp_copy(curve_b[1], b[1]);
 		bn_copy(&curve_r, r);
 
 		curve_is_twist = twist;
