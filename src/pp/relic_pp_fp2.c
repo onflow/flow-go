@@ -122,12 +122,9 @@ void fp2_const_calc() {
 		fp2_zero(t);
 		fp_set_dig(t[0], 1);
 		fp2_mul_nor(t, t);
-		e->used = FP_DIGS;
-		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
-		bn_sqr(e, e);
-		bn_sub_dig(e, e, 1);
-		bn_div_dig(e, e, 6);
-		fp2_exp(t, t, e);
+		fp2_frb(t2, t);
+		fp2_mul(t, t2, t);
+		fp_exp(t[0], t[0], e);
 		fp_copy(const_sqr[0], t[0]);
 		fp_sqr(const_sqr[1], const_sqr[0]);
 		fp_mul(const_sqr[2], const_sqr[1], const_sqr[0]);
