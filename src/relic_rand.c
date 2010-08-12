@@ -29,6 +29,13 @@
  * @ingroup rand
  */
 
+#if SEED == CGR
+#include <windows.h>
+#include <Wincrypt.h>
+/* avoid redefinition warning */
+#undef ERROR
+#endif
+
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -106,6 +113,21 @@ void rand_init() {
 		buf[i] = (unsigned char)rand();
 	}
 #endif
+#elif SEED == CGR
+	HCRYPTPROV   hCryptProv;
+
+	if (!CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL, 0)) {
+		/* TODO: use another error? */
+		THROW(ERR_NO_READ);
+	}
+	if (hCryptProv && !CryptGenRandom(hCryptProv, STATE_SIZE, buf)) {
+		/* TODO: use another error? */
+		THROW(ERR_NO_READ);
+	}
+	if (hCryptProv && !CryptReleaseContext(hCryptProv, 0)) {
+		/* TODO: use another error? */
+		THROW(ERR_NO_READ);
+	}
 #endif
 	rand_seed(buf, STATE_SIZE);
 }

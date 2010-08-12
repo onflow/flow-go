@@ -106,6 +106,7 @@ message("   RAND=FIPS      Use the FIPS 186-2 SHA1-based generator. (recommended
 message(STATUS "Available random number generator seeders (default = DEV):")
 message("   SEED=LIBC      Use the libc rand()/random() functions. (not crypto safe!)")
 message("   SEED=DEV       Use /dev/random. (recommended)\n")
+message("   SEED=CGR       Use Windows CryptGenRandom. (recommended)\n")
 
 message(STATUS "Supported operating systems (default = LINUX):")
 message("   OPSYS=NONE     Undefined/No operating system.")
