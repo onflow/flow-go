@@ -122,18 +122,20 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 			}
 
 			if (eb_curve_is_super()) {
-				/* t0 = c^2. */
-				fb_sqr(t0, eb_curve_get_c());
-				/* t0 = 1/c^2. */
-				fb_inv(t0, t0);
-				/* t0 = t1/c^2. */
-				fb_mul(t0, t0, t1);
+				if (eb_curve_opt_c() != OPT_ONE) {
+					/* t0 = c^2. */
+					fb_sqr(t0, eb_curve_get_c());
+					/* t0 = 1/c^2. */
+					fb_inv(t0, t0);
+					/* t0 = t1/c^2. */
+					fb_mul(t1, t0, t1);
+				}
 				/* Solve t1^2 + t1 = t0. */
-				fb_trc(t2, t0);
+				fb_trc(t2, t1);
 				if (t2[0] != 0) {
 					i++;
 				} else {
-					fb_slv(t1, t0);
+					fb_slv(t1, t1);
 					/* x3 = x1, y3 = t1 * c, z3 = 1. */
 					fb_mul(p->y, t1, eb_curve_get_c());
 					fb_set_dig(p->z, 1);
