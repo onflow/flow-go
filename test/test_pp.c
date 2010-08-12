@@ -2301,7 +2301,6 @@ int main(void) {
 		core_clean();
 		return 0;
 	}
-	fp2_const_calc();
 
 	util_print_banner("Tests for the PP module", 0);
 
