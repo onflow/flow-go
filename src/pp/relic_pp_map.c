@@ -623,7 +623,7 @@ void pp_map_r_ate(fp12_t r, ep_t p, ep2_t q) {
 
 		if (bn_sign(x) == BN_NEG) {
 			/* Since f_{-r,Q}(P) = 1/f_{r,Q}(P), we must invert the result. */
-			fp12_inv(r, r);
+			fp12_inv_cyc(r, r);
 			ep2_neg(t, t);
 		}
 
@@ -697,7 +697,7 @@ void pp_map_o_ate(fp12_t r, ep_t p, ep2_t q) {
 
 		if (bn_sign(x) == BN_NEG) {
 			/* Since f_{-r,Q}(P) = 1/f_{r,Q}(P), we must invert the result. */
-			fp12_inv(r, r);
+			fp12_inv_cyc(r, r);
 			ep2_neg(t, t);
 		}
 
@@ -774,7 +774,7 @@ void pp_map_x_ate(fp12_t r, ep_t p, ep2_t q) {
 
 		if (bn_sign(x) == BN_NEG) {
 			/* Since f_{-r,Q}(P) = 1/f_{r,Q}(P), we must invert the result. */
-			fp12_inv(r, r);
+			fp12_inv_cyc(r, r);
 			ep2_neg(t, t);
 		}
 
