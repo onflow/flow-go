@@ -454,6 +454,15 @@ int fp_param_set_any_tower(void);
  * Prints the currently configured prime modulus.
  */
 void fp_param_print(void);
+
+/**
+ * Returns the BN curve parameter used to generate the given prime modulus.
+ *
+ * @param[out] x			- the parameter
+ * @param[in] param			- the prime modulus identifier.
+ */
+void fp_param_get_bn(bn_t x, int param);
+
 /**
  * Copies the second argument to the first argument.
  *

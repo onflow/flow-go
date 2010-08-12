@@ -71,8 +71,7 @@ void fp_param_set(int param) {
 #if FP_PRIME == 158
 			case BN_158:
 				/* x = 4000000031. */
-				bn_set_2b(t0, 38);
-				bn_add_dig(t0, t0, 0x31);
+				fp_param_get_bn(t0, param);
 				/* p = 36 * x^4 + 36 * x^3 + 24 * x^2 + 6 * x + 1. */
 				bn_set_dig(p, 1);
 				bn_mul_dig(t1, t0, 6);
@@ -114,11 +113,7 @@ void fp_param_set(int param) {
 #elif FP_PRIME == 254
 			case BN_254:
 				/* x = -4080000000000001. */
-				bn_set_2b(t0, 62);
-				bn_set_2b(t1, 55);
-				bn_add(t0, t0, t1);
-				bn_add_dig(t0, t0, 1);
-				bn_neg(t0, t0);
+				fp_param_get_bn(t0, param);
 				/* p = 36 * x^4 + 36 * x^3 + 24 * x^2 + 6 * x + 1. */
 				bn_set_dig(p, 1);
 				bn_mul_dig(t1, t0, 6);
@@ -147,13 +142,7 @@ void fp_param_set(int param) {
 				break;
 			case BN_256:
 				/* x = 6000000000001F2D. */
-				bn_set_2b(t0, 62);
-				bn_set_2b(t1, 61);
-				bn_add(t0, t0, t1);
-				bn_set_dig(t1, 0x1F);
-				bn_lsh(t1, t1, 8);
-				bn_add(t0, t0, t1);
-				bn_add_dig(t0, t0, 0x2D);
+				fp_param_get_bn(t0, param);
 				/* p = 36 * x^4 + 36 * x^3 + 24 * x^2 + 6 * x + 1. */
 				bn_set_dig(p, 1);
 				bn_mul_dig(t1, t0, 6);
@@ -302,4 +291,49 @@ void fp_param_print(void) {
 	util_print_banner("Prime modulus:", 0);
 	util_print("   ");
 	fp_print(fp_prime_get());
+}
+
+void fp_param_get_bn(bn_t x, int param) {
+	bn_t a;
+
+	bn_null(a);
+
+	TRY {
+		bn_new(a);
+
+		switch (param) {
+			case BN_158:
+				/* x = 4000000031. */
+				bn_set_2b(x, 38);
+				bn_add_dig(x, x, 0x31);
+				break;
+			case BN_254:
+				/* x = -4080000000000001. */
+				bn_set_2b(x, 62);
+				bn_set_2b(a, 55);
+				bn_add(x, x, a);
+				bn_add_dig(x, x, 1);
+				bn_neg(x, x);
+				break;
+			case BN_256:
+				/* x = 6000000000001F2D. */
+				bn_set_2b(x, 62);
+				bn_set_2b(a, 61);
+				bn_add(x, x, a);
+				bn_set_dig(a, 0x1F);
+				bn_lsh(a, a, 8);
+				bn_add(x, x, a);
+				bn_add_dig(x, x, 0x2D);
+				break;
+			default:
+				THROW(ERR_INVALID);
+				break;
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(a);
+	}
 }

@@ -582,34 +582,7 @@ void pp_map_r_ate(fp12_t r, ep_t p, ep2_t q) {
 		bn_new(a);
 		bn_new(x);
 
-		switch (fp_param_get()) {
-			case BN_158:
-				/* x = 4000000031. */
-				bn_set_2b(x, 38);
-				bn_add_dig(x, x, 0x31);
-				break;
-			case BN_254:
-				/* x = -4080000000000001. */
-				bn_set_2b(x, 62);
-				bn_set_2b(a, 55);
-				bn_add(x, x, a);
-				bn_add_dig(x, x, 1);
-				bn_neg(x, x);
-				break;
-			case BN_256:
-				/* x = 6000000000001F2D. */
-				bn_set_2b(x, 62);
-				bn_set_2b(a, 61);
-				bn_add(x, x, a);
-				bn_set_dig(a, 0x1F);
-				bn_lsh(a, a, 8);
-				bn_add(x, x, a);
-				bn_add_dig(x, x, 0x2D);
-				break;
-			default:
-				THROW(ERR_INVALID);
-				break;
-		}
+		fp_param_get_bn(x, fp_param_get());
 
 		bn_mul_dig(a, x, 6);
 		bn_add_dig(a, a, 2);
@@ -656,34 +629,7 @@ void pp_map_o_ate(fp12_t r, ep_t p, ep2_t q) {
 		bn_new(a);
 		bn_new(x);
 
-		switch (fp_param_get()) {
-			case BN_158:
-				/* x = 4000000031. */
-				bn_set_2b(x, 38);
-				bn_add_dig(x, x, 0x31);
-				break;
-			case BN_254:
-				/* x = -4080000000000001. */
-				bn_set_2b(x, 62);
-				bn_set_2b(a, 55);
-				bn_add(x, x, a);
-				bn_add_dig(x, x, 1);
-				bn_neg(x, x);
-				break;
-			case BN_256:
-				/* x = 6000000000001F2D. */
-				bn_set_2b(x, 62);
-				bn_set_2b(a, 61);
-				bn_add(x, x, a);
-				bn_set_dig(a, 0x1F);
-				bn_lsh(a, a, 8);
-				bn_add(x, x, a);
-				bn_add_dig(x, x, 0x2D);
-				break;
-			default:
-				THROW(ERR_INVALID);
-				break;
-		}
+		fp_param_get_bn(x, fp_param_get());
 
 		bn_mul_dig(a, x, 6);
 		bn_add_dig(a, a, 2);
@@ -731,34 +677,7 @@ void pp_map_x_ate(fp12_t r, ep_t p, ep2_t q) {
 		bn_new(a);
 		bn_new(x);
 
-		switch (fp_param_get()) {
-			case BN_158:
-				/* x = 4000000031. */
-				bn_set_2b(x, 38);
-				bn_add_dig(x, x, 0x31);
-				break;
-			case BN_254:
-				/* x = -4080000000000001. */
-				bn_set_2b(x, 62);
-				bn_set_2b(a, 55);
-				bn_add(x, x, a);
-				bn_add_dig(x, x, 1);
-				bn_neg(x, x);
-				break;
-			case BN_256:
-				/* x = 6000000000001F2D. */
-				bn_set_2b(x, 62);
-				bn_set_2b(a, 61);
-				bn_add(x, x, a);
-				bn_set_dig(a, 0x1F);
-				bn_lsh(a, a, 8);
-				bn_add(x, x, a);
-				bn_add_dig(x, x, 0x2D);
-				break;
-			default:
-				THROW(ERR_INVALID);
-				break;
-		}
+		fp_param_get_bn(x, fp_param_get());
 
 		bn_copy(a, x);
 		if (bn_sign(x) == BN_NEG) {
