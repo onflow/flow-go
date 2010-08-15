@@ -684,6 +684,8 @@
 #define LIBC     1
 /** Device node generator. */
 #define DEV      2
+/** Use Windows' CryptGenRandom. */
+#define WCGR     3
 /** Chosen random generator seeder. */
 #define SEED     @SEED@
 
@@ -694,7 +696,9 @@
 /** FreeBSD operating system. */
 #define FREEBSD  3
 /** Windows operating system. */
-#define WINDOWS  4
+#define MACOSX   4
+/** Windows operating system. */
+#define WINDOWS  5
 /** Detected operation system. */
 #define OPSYS    @OPSYS@
 
