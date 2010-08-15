@@ -91,11 +91,20 @@ void fb_param_set(int param) {
 		case PENTA_251:
 			fb_poly_set_penta(7, 4, 2);
 			break;
+		case TRINO_271:
+			fb_poly_set_trino(201);
+			break;
+		case PENTA_271:
+			fb_poly_set_penta(207, 175, 111);
+			break;
 		case SQRT_283:
 			fb_poly_set_penta(97, 89, 87);
 			break;
 		case NIST_283:
 			fb_poly_set_penta(12, 7, 5);
+			break;
+		case TRINO_367:
+			fb_poly_set_trino(21);
 			break;
 		case NIST_409:
 			fb_poly_set_trino(87);
@@ -108,12 +117,6 @@ void fb_param_set(int param) {
 			break;
 		case NIST_571:
 			fb_poly_set_penta(10, 5, 2);
-			break;
-		case TRINO_271:
-			fb_poly_set_trino(201);
-			break;
-		case PENTA_271:
-			fb_poly_set_penta(207, 175, 111);
 			break;
 		case TRINO_1223:
 			fb_poly_set_trino(255);
@@ -128,56 +131,71 @@ void fb_param_set(int param) {
 void fb_param_set_any(void) {
 #if FB_POLYN == 113
 	fb_param_set(TRINO_113);
+
 #elif FB_POLYN == 127
 	fb_param_set(TRINO_127);
+
 #elif FB_POLYN == 163
 #ifdef FB_SQRTF
 	fb_param_set(SQRT_163);
 #else
 	fb_param_set(NIST_163);
 #endif
+
 #elif FB_POLYN == 233
 #ifdef FB_SQRTF
 	fb_param_set(SQRT_233);
 #else
 	fb_param_set(NIST_233);
 #endif
+
 #elif FB_POLYN == 239
 #ifdef FB_SQRTF
 	fb_param_set(SQRT_239);
 #else
 	fb_param_set(SECG_239);
 #endif
+
 #elif FB_POLYN == 251
 #ifdef FB_SQRTF
 	fb_param_set(SQRT_251);
 #else
 	fb_param_set(PENTA_251);
 #endif
+
 #elif FB_POLYN == 257
 	fb_param_set(TRINO_257);
-#elif FB_POLYN == 283
-#ifdef FB_SQRTF
-	fb_param_set(SQRT_283);
-#else
-	fb_param_set(NIST_283);
-#endif
-#elif FB_POLYN == 409
-	fb_param_set(NIST_409);
-#elif FB_POLYN == 439
-	fb_param_set(TRINO_439);
-#elif FB_POLYN == 571
-#ifdef FB_SQRTF
-	fb_param_set(SQRT_571);
-#else
-	fb_param_set(NIST_571);
-#endif
+
 #elif FB_POLYN == 271
 #ifdef FB_TRINO
 	fb_param_set(TRINO_271);
 #else
 	fb_param_set(PENTA_271);
 #endif
+
+#elif FB_POLYN == 283
+#ifdef FB_SQRTF
+	fb_param_set(SQRT_283);
+#else
+	fb_param_set(NIST_283);
+#endif
+
+#elif FB_POLYN == 367
+	fb_param_set(TRINO_367);
+
+#elif FB_POLYN == 409
+	fb_param_set(NIST_409);
+
+#elif FB_POLYN == 439
+	fb_param_set(TRINO_439);
+
+#elif FB_POLYN == 571
+#ifdef FB_SQRTF
+	fb_param_set(SQRT_571);
+#else
+	fb_param_set(NIST_571);
+#endif
+
 #elif FB_POLYN == 1223
 	fb_param_set(TRINO_1223);
 #else
