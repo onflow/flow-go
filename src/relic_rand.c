@@ -29,13 +29,6 @@
  * @ingroup rand
  */
 
-#if SEED == CGR
-#include <windows.h>
-#include <Wincrypt.h>
-/* avoid redefinition warning */
-#undef ERROR
-#endif
-
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -72,24 +65,32 @@ static unsigned char state[64];
  */
 #define RAND_PATH		"/dev/random"
 
+#elif SEED == WCGR
+
+#include <windows.h>
+#include <Wincrypt.h>
+/* Avoid redefinition warning. */
+#undef ERROR
+
 #endif
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#include "relic_md.h"
-
 void rand_init() {
 	unsigned char buf[STATE_SIZE];
 
 	memset(state, 0, sizeof(state));
+
 #if SEED == DEV
 	int rand_fd, c, l;
+
 	rand_fd = open(RAND_PATH, O_RDONLY);
 	if (rand_fd == -1) {
 		THROW(ERR_NO_FILE);
 	}
+
 	l = 0;
 	do {
 		c = read(rand_fd, buf + l, STATE_SIZE - l);
@@ -98,10 +99,13 @@ void rand_init() {
 			THROW(ERR_NO_READ);
 		}
 	} while (l < STATE_SIZE);
+
 	if (rand_fd != -1) {
 		close(rand_fd);
 	}
+
 #elif SEED == LIBC
+
 #if OPSYS == FREEBSD
 	srandom(1);
 	for (int i = 0; i < STATE_SIZE; i++) {
@@ -113,22 +117,21 @@ void rand_init() {
 		buf[i] = (unsigned char)rand();
 	}
 #endif
-#elif SEED == CGR
+
+#elif SEED == WCGR
 	HCRYPTPROV   hCryptProv;
 
 	if (!CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL, 0)) {
-		/* TODO: use another error? */
-		THROW(ERR_NO_READ);
+		THROW(ERR_NO_FILE);
 	}
 	if (hCryptProv && !CryptGenRandom(hCryptProv, STATE_SIZE, buf)) {
-		/* TODO: use another error? */
 		THROW(ERR_NO_READ);
 	}
 	if (hCryptProv && !CryptReleaseContext(hCryptProv, 0)) {
-		/* TODO: use another error? */
 		THROW(ERR_NO_READ);
 	}
 #endif
+
 	rand_seed(buf, STATE_SIZE);
 }
 

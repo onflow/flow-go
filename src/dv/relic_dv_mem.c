@@ -52,14 +52,12 @@ void dv_new_dynam(dv_t *a, int digits) {
 		THROW(ERR_NO_PRECISION);
 	}
 
-	if (ALIGN == 1) {
+#if ALIGN == 1
 		*a = malloc(digits * sizeof(dig_t));
-	} else {
-#ifdef _WIN32
+#elif OPSYS == WINDOWS
 		*a = _aligned_malloc(digits * sizeof(dig_t), ALIGN);
 #else
-		r = posix_memalign((void **)&a, ALIGN,
-				digits * sizeof(dig_t));
+		r = posix_memalign((void **)a, ALIGN, digits * sizeof(dig_t));
 		if (r == ENOMEM) {
 			THROW(ERR_NO_MEMORY);
 		}
@@ -67,17 +65,15 @@ void dv_new_dynam(dv_t *a, int digits) {
 			THROW(ERR_INVALID);
 		}
 #endif
-	}
 
 	if (*a == NULL) {
-		free(*a);
 		THROW(ERR_NO_MEMORY);
 	}
 }
 
 void dv_free_dynam(dv_t *a) {
 	if ((*a) != NULL) {
-#if defined(_WIN32) && ALIGN > 1
+#if OPSYS == WINDOWS && ALIGN > 1
 		_aligned_free(*a);
 #else
 		free(*a);
