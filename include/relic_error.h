@@ -59,7 +59,7 @@ enum errors {
 	ERR_NO_PRECISION = 2,
 	/** Occurs when a file is not found. */
 	ERR_NO_FILE = 3,
-	/** Occurs when the specified number of bytes cannot be read from a file. */
+	/** Occurs when the specified number of bytes cannot be read from source. */
 	ERR_NO_READ = 4,
 	/** Occurs when an invalid value is passed as input. */
 	ERR_INVALID = 5,
