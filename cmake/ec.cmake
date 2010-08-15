@@ -5,7 +5,7 @@ message("      EC_KBLTZ=[off|on] Prefer Koblitz (prime or binary) curves.\n")
 
 message("   ** Available elliptic curve methods (default = PRIME):")
 message("      EC_METHD=PRIME    Use prime curves.")
-message("      EC_METHD=BINAR    Use binary curves.\n")
+message("      EC_METHD=CHAR2    Use binary curves.\n")
 
 message("      Note: these methods must be given in order. Ex: EC_METHD=\"BINAR\"\n")
 

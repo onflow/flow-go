@@ -2,7 +2,7 @@ message(STATUS "Pairing-based cryptography configuration (PC module):\n")
 
 message("   ** Available pairing computation methods (default = PRIME):")
 message("      PC_METHD=PRIME    Use prime (asymmetric) setting.")
-message("      PC_METHD=BINAR    Use binary (symmetric) setting.\n")
+message("      PC_METHD=CHAR2    Use binary (symmetric) setting.\n")
 
 # Choose the arithmetic methods.
 if (NOT PC_METHD)
