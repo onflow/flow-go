@@ -57,7 +57,7 @@ void ep2_mul_cof(ep2_t r, ep2_t p) {
 		bn_new(a);
 		bn_new(x);
 
-		fp_param_get_bn(x, fp_param_get());
+		fp_param_get_bn(x);
 
 		bn_sqr(x, x);
 		bn_mul_dig(a, x, 6);
