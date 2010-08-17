@@ -198,7 +198,7 @@ void fp12_mul_dxs(fp12_t c, fp12_t a, fp12_t b) {
 		fp6_mul_dxq(v0, a[0], b[0][0]);
 
 		/* v1 = a1b1 */
-		fp6_mul(v1, a[1], b[1]);
+		fp6_mul_dxs(v1, a[1], b[1]);
 
 		/* c1 = c1 - v0 - v1 */
 		fp6_sub(c[1], t0, v0);

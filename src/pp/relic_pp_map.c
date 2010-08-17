@@ -63,24 +63,18 @@ void pp_add(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 		ep2_copy(t, r);
 		ep2_add_slp(r, slope, r, q);
 
-		if (ep2_is_infty(r)) {
-			fp12_zero(l);
-			fp_set_dig(l[0][0][0], 1);
-		} else {
-			fp_zero(l[1][0][1]);
-			fp_copy(l[1][0][0], p->x);
-			fp2_mul(l[1][0], l[1][0], slope);
-			fp2_neg(l[1][0], l[1][0]);
+		fp_zero(l[1][0][1]);
+		fp_copy(l[1][0][0], p->x);
+		fp2_mul(l[1][0], l[1][0], slope);
+		fp2_neg(l[1][0], l[1][0]);
 
-			fp2_mul(l[1][1], slope, q->x);
-			fp2_mul(l[1][2], r->z, q->y);
-			fp2_sub(l[1][1], l[1][1], l[1][2]);
-			fp2_zero(l[1][2]);
+		fp2_mul(l[1][1], slope, q->x);
+		fp2_mul(l[1][2], r->z, q->y);
+		fp2_sub(l[1][1], l[1][1], l[1][2]);
 
-			fp_zero(l[0][0][1]);
-			fp_copy(l[0][0][0], p->y);
-			fp2_mul(l[0][0], l[0][0], r->z);
-		}
+		fp_zero(l[0][0][1]);
+		fp_copy(l[0][0][0], p->y);
+		fp2_mul(l[0][0], l[0][0], r->z);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -117,24 +111,18 @@ void pp_dbl(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 		ep2_copy(t, r);
 		ep2_dbl_slp(r, s, e, r);
 
-		if (ep2_is_infty(r)) {
-			fp12_zero(l);
-			fp_set_dig(l[0][0][0], 1);
-		} else {
-			fp2_sqr(t->z, t->z);
-			fp2_mul(l[1][0], t->z, s);
-			fp_mul(l[1][0][0], l[1][0][0], p->x);
-			fp_mul(l[1][0][1], l[1][0][1], p->x);
-			fp2_neg(l[1][0], l[1][0]);
+		fp2_sqr(t->z, t->z);
+		fp2_mul(l[1][0], t->z, s);
+		fp_mul(l[1][0][0], l[1][0][0], p->x);
+		fp_mul(l[1][0][1], l[1][0][1], p->x);
+		fp2_neg(l[1][0], l[1][0]);
 
-			fp2_mul(l[1][1], s, t->x);
-			fp2_sub(l[1][1], l[1][1], e);
+		fp2_mul(l[1][1], s, t->x);
+		fp2_sub(l[1][1], l[1][1], e);
 
-			fp2_mul(l[0][0], r->z, t->z);
-			fp_mul(l[0][0][0], l[0][0][0], p->y);
-			fp_mul(l[0][0][1], l[0][0][1], p->y);
-			fp2_zero(l[1][2]);
-		}
+		fp2_mul(l[0][0], r->z, t->z);
+		fp_mul(l[0][0][0], l[0][0][0], p->y);
+		fp_mul(l[0][0][1], l[0][0][1], p->y);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
