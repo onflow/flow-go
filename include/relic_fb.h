@@ -103,16 +103,18 @@ enum {
 	NIST_283 = 14,
 	/** Square-root friendly 283-bit polynomial. */
 	SQRT_283 = 15,
+	/** Detrey's trinomial for genus 2 curves. */
+	TRINO_367 = 16,
 	/** NIST 409-bit fast reduction polynomial. */
-	NIST_409 = 16,
+	NIST_409 = 17,
 	/** Hankerson's trinomial for genus 2 curves. */
-	TRINO_439 = 17,
+	TRINO_439 = 18,
 	/** NIST 571-bit fast reduction polynomial. */
-	NIST_571 = 18,
+	NIST_571 = 19,
 	/** Square-root friendly 571-bit polynomial. */
-	SQRT_571 = 19,
+	SQRT_571 = 20,
 	/** Mike Scott's 1223-bit pairing-friendly trinomial. */
-	TRINO_1223 = 20
+	TRINO_1223 = 21
 };
 
 /*============================================================================*/
@@ -640,7 +642,7 @@ void fb_sub_dig(fb_t c, fb_t a, dig_t b);
  *
  * @param[out] c			- the result.
  * @param[in] a				- the first binary field element to multiply.
- * @param[in] b				- the second binary field element to mltiply.
+ * @param[in] b				- the second binary field element to multiply.
  */
 void fb_mul_basic(fb_t c, fb_t a, fb_t b);
 
@@ -650,7 +652,7 @@ void fb_mul_basic(fb_t c, fb_t a, fb_t b);
  *
  * @param[out] c			- the result.
  * @param[in] a				- the first binary field element to multiply.
- * @param[in] b				- the second binary field element to mltiply.
+ * @param[in] b				- the second binary field element to multiply.
  */
 void fb_mul_integ(fb_t c, fb_t a, fb_t b);
 
@@ -659,7 +661,7 @@ void fb_mul_integ(fb_t c, fb_t a, fb_t b);
  *
  * @param[out] c			- the result.
  * @param[in] a				- the first binary field element to multiply.
- * @param[in] b				- the second binary field element to mltiply.
+ * @param[in] b				- the second binary field element to multiply.
  */
 void fb_mul_lcomb(fb_t c, fb_t a, fb_t b);
 
@@ -668,7 +670,7 @@ void fb_mul_lcomb(fb_t c, fb_t a, fb_t b);
  *
  * @param[out] c			- the result.
  * @param[in] a				- the first binary field element to multiply.
- * @param[in] b				- the second binary field element to mltiply.
+ * @param[in] b				- the second binary field element to multiply.
  */
 void fb_mul_rcomb(fb_t c, fb_t a, fb_t b);
 
@@ -677,7 +679,7 @@ void fb_mul_rcomb(fb_t c, fb_t a, fb_t b);
  *
  * @param[out] c			- the result.
  * @param[in] a				- the first binary field element to multiply.
- * @param[in] b				- the second binary field element to mltiply.
+ * @param[in] b				- the second binary field element to multiply.
  */
 void fb_mul_lodah(fb_t c, fb_t a, fb_t b);
 
