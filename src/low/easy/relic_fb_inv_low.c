@@ -123,5 +123,4 @@ void fb_invn_low(dig_t *c, dig_t *a) {
 	}
 	/* Return g1. */
 	fb_copy(c, g1);
-
 }

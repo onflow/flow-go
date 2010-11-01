@@ -43,8 +43,9 @@ void ft_add1_low(dig_t *c, dig_t *a, dig_t digit) {
 	(*c) = (*a) ^ digit;
 	c++;
 	a++;
-	for (i = 0; i < FT_DIGS - 1; i++, a++, c++)
+	for (i = 0; i < FT_DIGS - 1; i++, a++, c++) {
 		(*c) = (*a);
+	}
 }
 
 void ft_addn_low(dig_t *c, dig_t *a, dig_t *b) {
@@ -55,14 +56,14 @@ void ft_addn_low(dig_t *c, dig_t *a, dig_t *b) {
 	dig_t *b_l = b, *b_h = b + FT_DIGS / 2;
 	dig_t *c_l = c, *c_h = c + FT_DIGS / 2;
 
-	for (i = 0; i < FT_DIGS/2; i++) {
+	for (i = 0; i < FT_DIGS / 2; i++) {
 		t = (a_l[i] | a_h[i]) & (b_l[i] | b_h[i]);
 		c_l[i] = t ^ (a_l[i] | b_l[i]);
 		c_h[i] = t ^ (a_h[i] | b_h[i]);
 	}
 }
 
-void ft_addd_low(dig_t *c, dig_t *a, dig_t *b, int size) {
+void ft_addd_low(dig_t *c, dig_t *a, dig_t *b, int digits, int size) {
 	int i;
 	dig_t t;
 
@@ -70,7 +71,7 @@ void ft_addd_low(dig_t *c, dig_t *a, dig_t *b, int size) {
 	dig_t *b_l = b, *b_h = b + size / 2;
 	dig_t *c_l = c, *c_h = c + size / 2;
 
-	for (i = 0; i < size / 2; i++) {
+	for (i = 0; i < digits / 2; i++) {
 		t = (a_l[i] | a_h[i]) & (b_l[i] | b_h[i]);
 		c_l[i] = t ^ (a_l[i] | b_l[i]);
 		c_h[i] = t ^ (a_h[i] | b_h[i]);
@@ -83,8 +84,9 @@ void ft_sub1_low(dig_t *c, dig_t *a, dig_t digit) {
 	(*c) = (*a) ^ digit;
 	c++;
 	a++;
-	for (i = 0; i < FT_DIGS - 1; i++, a++, c++)
+	for (i = 0; i < FT_DIGS - 1; i++, a++, c++) {
 		(*c) = (*a);
+	}
 }
 
 void ft_subn_low(dig_t *c, dig_t *a, dig_t *b) {
@@ -94,7 +96,7 @@ void ft_subn_low(dig_t *c, dig_t *a, dig_t *b) {
 	dig_t *c_l = c, *c_h = c + FT_DIGS / 2;
 	dig_t t0, t1;
 
-	for (i = 0; i < FT_DIGS/2; i++) {
+	for (i = 0; i < FT_DIGS / 2; i++) {
 		t0 = (a_l[i] | a_h[i]) & (b_l[i] | b_h[i]);
 		t1 = (a_h[i] | b_l[i]);
 		c_l[i] = t0 ^ (a_l[i] | b_h[i]);
@@ -102,14 +104,14 @@ void ft_subn_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-void ft_subd_low(dig_t *c, dig_t *a, dig_t *b, int size) {
+void ft_subd_low(dig_t *c, dig_t *a, dig_t *b, int digits, int size) {
 	int i;
 	dig_t *a_l = a, *a_h = a + size / 2;
 	dig_t *b_l = b, *b_h = b + size / 2;
 	dig_t *c_l = c, *c_h = c + size / 2;
 	dig_t t0, t1;
 
-	for (i = 0; i < size/2; i++) {
+	for (i = 0; i < digits / 2; i++) {
 		t0 = (a_l[i] | a_h[i]) & (b_l[i] | b_h[i]);
 		t1 = (a_h[i] | b_l[i]);
 		c_l[i] = t0 ^ (a_l[i] | b_h[i]);

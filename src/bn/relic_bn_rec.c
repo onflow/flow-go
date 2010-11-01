@@ -183,7 +183,6 @@ static void wtnaf_mod(bn_t r0, bn_t r1, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 		/* hi = 0. */
 		h0 = 0;
 
-
 		/* Now we repeat the same for q1. */
 		bn_get_dig(&d1, t1);
 		n1 = d1 & MOD_CMASK;

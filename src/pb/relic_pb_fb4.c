@@ -702,7 +702,7 @@ void fb4_sqr(fb4_t c, fb4_t a) {
 	fb_add(c[2], c[2], c[3]);
 }
 
-void fb4_exp_2m(fb4_t c, fb4_t a) {
+void fb4_frb(fb4_t c, fb4_t a) {
 	int alpha;
 
 	if (FB_BITS % 4 == 3) {

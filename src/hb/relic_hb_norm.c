@@ -23,86 +23,22 @@
 /**
  * @file
  *
- * Implementation of the memory-management routines for temporary double
- * precision digit vectors.
+ * Implementation of the point normalization on binary elliptic curves.
  *
- * @version $Id$
- * @ingroup dv
+ * @version $Id: relic_eb_norm.c 390 2010-06-05 22:15:02Z dfaranha $
+ * @ingroup eb
  */
 
-#include <stdlib.h>
-#include <errno.h>
-
-#if ALLOC != AUTO
-#include <malloc.h>
-#endif
+#include "string.h"
 
 #include "relic_core.h"
-#include "relic_conf.h"
-#include "relic_dv.h"
-#include "relic_pool.h"
+#include "relic_eb.h"
+#include "relic_error.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if ALLOC == DYNAMIC
-
-void dv_new_dynam(dv_t *a, int digits) {
-	int r;
-
-	if (digits > DV_DIGS) {
-		THROW(ERR_NO_PRECISION);
-	}
-
-#if ALIGN == 1
-		*a = malloc(digits * sizeof(dig_t));
-#elif OPSYS == WINDOWS
-		*a = _aligned_malloc(digits * sizeof(dig_t), ALIGN);
-#else
-		r = posix_memalign((void **)a, ALIGN, digits * sizeof(dig_t));
-		if (r == ENOMEM) {
-			THROW(ERR_NO_MEMORY);
-		}
-		if (r == EINVAL) {
-			THROW(ERR_INVALID);
-		}
-#endif
-
-	if (*a == NULL) {
-		THROW(ERR_NO_MEMORY);
-	}
+void hb_norm(eb_t r, eb_t p) {
+	hb_copy(r, p);
 }
-
-void dv_free_dynam(dv_t *a) {
-	if ((*a) != NULL) {
-#if OPSYS == WINDOWS && ALIGN > 1
-		_aligned_free(*a);
-#else
-		free(*a);
-#endif
-	}
-	(*a) = NULL;
-}
-
-#elif ALLOC == STATIC
-
-void dv_new_statc(dv_t *a, int digits) {
-	if (digits > DV_DIGS) {
-		THROW(ERR_NO_PRECISION);
-	}
-
-	(*a) = pool_get();
-	if ((*a) == NULL) {
-		THROW(ERR_NO_MEMORY);
-	}
-}
-
-void dv_free_statc(dv_t *a) {
-	if ((*a) != NULL) {
-		pool_put((*a));
-	}
-	(*a) = NULL;
-}
-
-#endif

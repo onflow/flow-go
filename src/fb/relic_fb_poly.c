@@ -223,6 +223,7 @@ static void fb_poly_set(fb_t f) {
 #if FB_SRT == QUICK || !defined(STRIP)
 	find_srz();
 #endif
+	//F257_setup();
 }
 
 /*============================================================================*/

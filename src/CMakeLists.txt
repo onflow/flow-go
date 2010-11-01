@@ -14,7 +14,6 @@ file(GLOB EP_SRCS ep/*.c)
 file(GLOB EB_SRCS eb/*.c)
 file(GLOB HB_SRCS hb/*.c)
 file(GLOB PP_SRCS pp/*.c)
-file(GLOB PB_SRCS pb/*.c)
 file(GLOB MD_SRCS md/*.c)
 
 set(RELIC_SRCS ${CORE_SRCS})
@@ -81,7 +80,19 @@ if (WITH_PP)
 	list(APPEND LOW_SRCS ${TEMP})
 endif(WITH_PP)
 
+# Pairings over binary fields are a special case.
 if (WITH_PB)
+	# Add all the extension code.
+	file(GLOB PB_SRCS pb/relic_pb_fb*.c)
+	# Add genus-1 or genus-2 pairins (or both).
+	if (WITH_EB)
+		file(GLOB TEMP pb/relic_pb_*1.c)
+		list(APPEND PB_SRCS ${TEMP})
+	endif(WITH_EB)
+	if (WITH_HB)
+		file(GLOB TEMP pb/relic_pb_*2.c)
+		list(APPEND PB_SRCS ${TEMP})
+	endif(WITH_HB)
 	list(APPEND RELIC_SRCS ${PB_SRCS})
 endif(WITH_PB)
 

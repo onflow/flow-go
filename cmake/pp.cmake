@@ -3,7 +3,7 @@ message(STATUS "Bilinear pairings arithmetic configuration (PP module):\n")
 message("   ** Options for the bilinear pairing module (default = on):")
 message("      PP_PARAL=[off|on] Parallel implementation.\n")
 
-option(PP_PARAL "Parallel implementation." on)
+option(PP_PARAL "Parallel implementation." off)
 
 message("   ** Available bilinear pairing methods (default = BASIC;O-ATE):")
 

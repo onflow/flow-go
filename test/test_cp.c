@@ -266,18 +266,16 @@ static int ecdsa(void) {
 
 static int sokaka(void) {
 	int code = STS_ERR;
-	sokaka_t s_a, s_b;
+	sokaka_t s_i;
 	bn_t s;
 	unsigned char key1[MD_LEN], key2[MD_LEN];
 	char id_a[5] = {'A', 'l', 'i', 'c', 'e'};
 	char id_b[3] = {'B', 'o', 'b'};
 
-	sokaka_null(s_a);
-	sokaka_null(s_b);
+	sokaka_null(s_i);
 
 	TRY {
-		sokaka_new(s_a);
-		sokaka_new(s_b);
+		sokaka_new(s_i);
 		bn_new(s);
 
 		cp_sokaka_gen(s);
@@ -285,10 +283,10 @@ static int sokaka(void) {
 		TEST_BEGIN
 				("sakai-ohgishi-kasahara authenticated key agreement is correct")
 		{
-			cp_sokaka_gen_prv(s_a, id_a, 5, s);
-			cp_sokaka_gen_prv(s_b, id_b, 3, s);
-			cp_sokaka_key(key1, MD_LEN, id_a, 5, s_a, id_b, 3);
-			cp_sokaka_key(key2, MD_LEN, id_b, 3, s_b, id_a, 5);
+			cp_sokaka_gen_prv(s_i, id_a, 5, s);
+			cp_sokaka_key(key1, MD_LEN, id_a, 5, s_i, id_b, 3);
+			cp_sokaka_gen_prv(s_i, id_b, 3, s);
+			cp_sokaka_key(key2, MD_LEN, id_b, 3, s_i, id_a, 5);
 			TEST_ASSERT(memcmp(key1, key2, MD_LEN) == 0, end);
 		} TEST_END;
 
@@ -298,8 +296,7 @@ static int sokaka(void) {
 	code = STS_OK;
 
   end:
-	sokaka_free(s_a);
-	sokaka_free(s_b);
+	sokaka_free(s_i);
 	return code;
 }
 
@@ -342,7 +339,7 @@ int main(void) {
 	core_init();
 
 	util_print_banner("Tests for the CP module", 0);
-
+#if 0
 #if defined(WITH_BN)
 	util_print_banner("Protocols based on prime factorization:\n", 0);
 
@@ -372,7 +369,7 @@ int main(void) {
 		THROW(ERR_NO_CURVE);
 	}
 #endif
-
+#endif
 #if defined(WITH_PC)
 	util_print_banner("Protocols based on pairings:\n", 0);
 	if (pc_param_set_any() == STS_OK) {

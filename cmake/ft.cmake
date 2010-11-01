@@ -48,7 +48,7 @@ endif(NOT FT_METHD)
 list(LENGTH FT_METHD FT_LEN)
 if (FT_LEN LESS 5)
 	message(FATAL_ERROR "Incomplete FT_METHD specification: ${FT_METHD}")
-endif(FT_LEN LESS 7)
+endif(FT_LEN LESS 5)
 
 list(GET FT_METHD 0 FT_MUL)
 list(GET FT_METHD 1 FT_CUB)

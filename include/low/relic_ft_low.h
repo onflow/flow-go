@@ -66,9 +66,10 @@ void ft_add1_low(dig_t *c, dig_t *a, dig_t digit);
  * @param[out] c			- the result.
  * @param[in] a				- the first digit vector to add.
  * @param[in] b				- the second digit vector to add.
- * @param[in] size			- the number of digits to add.
+ * @param[in] digits		- the number of digits to add.
+ * @param[in] size			- the size in digits of the operands.
  */
-void ft_addd_low(dig_t *c, dig_t *a, dig_t *b, int size);
+void ft_addd_low(dig_t *c, dig_t *a, dig_t *b, int digits, int size);
 
 /**
  * Adds two digit vectors of the same size. Computes c = a + b.
@@ -96,9 +97,10 @@ void ft_sub1_low(dig_t *c, dig_t *a, dig_t digit);
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to subtract from.
  * @param[in] b				- the digit vector to subtract.
- * @param[in] size			- the number of digits to subtract.
+ * @param[in] digits		- the number of digits to subtract.
+ * @param[in] size			- the size in digits of the operands.
  */
-void ft_subd_low(dig_t *c, dig_t *a, dig_t *b, int size);
+void ft_subd_low(dig_t *c, dig_t *a, dig_t *b, int digits, int size);
 
 /**
  * Subtracts two digit vectors of the same size. Computes c = a 0 b.

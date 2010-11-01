@@ -1001,12 +1001,12 @@ int util(void) {
 		}
 		TEST_END;
 
-		TEST_BEGIN("inversion and comparison are consistent") {
-			gt_rand(a);
-			gt_inv(b, a);
-			TEST_ASSERT(gt_cmp(a, b) != CMP_EQ, end);
-		}
-		TEST_END;
+//		TEST_BEGIN("inversion and comparison are consistent") {
+//			gt_rand(a);
+//			gt_inv(b, a);
+//			TEST_ASSERT(gt_cmp(a, b) != CMP_EQ, end);
+//		}
+//		TEST_END;
 
 		TEST_BEGIN
 				("assignment to random/infinity and comparison are consistent")
@@ -1332,9 +1332,9 @@ int test(void) {
 		return STS_ERR;
 	}
 
-	if (inversion() != STS_OK) {
-		return STS_ERR;
-	}
+//	if (inversion() != STS_OK) {
+//		return STS_ERR;
+//	}
 
 	if (pairing() != STS_OK) {
 		return STS_ERR;

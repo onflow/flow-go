@@ -92,9 +92,9 @@ static void ft_crtf_low(dig_t *c, dig_t *a, int *crz, int *srz, int clen,
 		r[l + FT_DIGS + FT_DIGS / 2] = ft_lshb_low(r + l + FT_DIGS,
 				t1 + FT_DIGS / 2, k);
 		if (crz[i] < 0) {
-			ft_subd_low(t, t, r, 2 * FT_DIGS);
+			ft_subd_low(t, t, r, 2 * FT_DIGS, 2 * FT_DIGS);
 		} else {
-			ft_addd_low(t, t, r, 2 * FT_DIGS);
+			ft_addd_low(t, t, r, 2 * FT_DIGS, 2 * FT_DIGS);
 		}
 	}
 	for (i = 0; i < slen; i++) {
@@ -108,9 +108,9 @@ static void ft_crtf_low(dig_t *c, dig_t *a, int *crz, int *srz, int clen,
 		r[l + FT_DIGS + FT_DIGS / 2] = ft_lshb_low(r + l + FT_DIGS,
 				t2 + FT_DIGS / 2, k);
 		if (srz[i] < 0) {
-			ft_subd_low(t, t, r, 2 * FT_DIGS);
+			ft_subd_low(t, t, r, 2 * FT_DIGS, 2 * FT_DIGS);
 		} else {
-			ft_addd_low(t, t, r, 2 * FT_DIGS);
+			ft_addd_low(t, t, r, 2 * FT_DIGS, 2 * FT_DIGS);
 		}
 	}
 	ft_rdcm_low(c, t);

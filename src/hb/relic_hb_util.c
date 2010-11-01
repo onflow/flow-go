@@ -23,86 +23,66 @@
 /**
  * @file
  *
- * Implementation of the memory-management routines for temporary double
- * precision digit vectors.
+ * Implementation of the binary hyperelliptic curve utilities.
  *
- * @version $Id$
- * @ingroup dv
+ * @version $Id: relic_hb_util.c 390 2010-06-05 22:15:02Z dfaranha $
+ * @ingroup hb
  */
 
-#include <stdlib.h>
-#include <errno.h>
-
-#if ALLOC != AUTO
-#include <malloc.h>
-#endif
-
 #include "relic_core.h"
+#include "relic_hb.h"
+#include "relic_error.h"
 #include "relic_conf.h"
-#include "relic_dv.h"
-#include "relic_pool.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if ALLOC == DYNAMIC
-
-void dv_new_dynam(dv_t *a, int digits) {
-	int r;
-
-	if (digits > DV_DIGS) {
-		THROW(ERR_NO_PRECISION);
-	}
-
-#if ALIGN == 1
-		*a = malloc(digits * sizeof(dig_t));
-#elif OPSYS == WINDOWS
-		*a = _aligned_malloc(digits * sizeof(dig_t), ALIGN);
-#else
-		r = posix_memalign((void **)a, ALIGN, digits * sizeof(dig_t));
-		if (r == ENOMEM) {
-			THROW(ERR_NO_MEMORY);
-		}
-		if (r == EINVAL) {
-			THROW(ERR_INVALID);
-		}
-#endif
-
-	if (*a == NULL) {
-		THROW(ERR_NO_MEMORY);
-	}
+int hb_is_infty(hb_t p) {
+	return (fb_is_zero(p->u1) && (fb_cmp_dig(p->u0, 1) == CMP_EQ) &&
+			fb_is_zero(p->v1) && fb_is_zero(p->v0));
 }
 
-void dv_free_dynam(dv_t *a) {
-	if ((*a) != NULL) {
-#if OPSYS == WINDOWS && ALIGN > 1
-		_aligned_free(*a);
-#else
-		free(*a);
-#endif
-	}
-	(*a) = NULL;
+void hb_set_infty(hb_t p) {
+	fb_zero(p->u1);
+	fb_set_dig(p->u0, 1);
+	fb_zero(p->v1);
+	fb_zero(p->v0);
+	p->deg = 1;
 }
 
-#elif ALLOC == STATIC
-
-void dv_new_statc(dv_t *a, int digits) {
-	if (digits > DV_DIGS) {
-		THROW(ERR_NO_PRECISION);
-	}
-
-	(*a) = pool_get();
-	if ((*a) == NULL) {
-		THROW(ERR_NO_MEMORY);
-	}
+void hb_copy(hb_t r, hb_t p) {
+	fb_copy(r->u1, p->u1);
+	fb_copy(r->u0, p->u0);
+	fb_copy(r->v1, p->v1);
+	fb_copy(r->v0, p->v0);
+	r->deg = p->deg;
 }
 
-void dv_free_statc(dv_t *a) {
-	if ((*a) != NULL) {
-		pool_put((*a));
+int hb_cmp(hb_t p, hb_t q) {
+	if (fb_cmp(p->u1, q->u1) != CMP_EQ) {
+		return CMP_NE;
 	}
-	(*a) = NULL;
+
+	if (fb_cmp(p->u0, q->u0) != CMP_EQ) {
+		return CMP_NE;
+	}
+
+	if (fb_cmp(p->v1, q->v1) != CMP_EQ) {
+		return CMP_NE;
+	}
+
+	if (fb_cmp(p->v0, q->v0) != CMP_EQ) {
+		return CMP_NE;
+	}
+
+	return CMP_EQ;
 }
 
-#endif
+void hb_print(hb_t p) {
+	fb_print(p->u1);
+	fb_print(p->u0);
+	fb_print(p->v1);
+	fb_print(p->v0);
+	printf("%d\n", p->deg);
+}

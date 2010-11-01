@@ -30,8 +30,11 @@
  */
 
 #include <stdlib.h>
-#include <malloc.h>
 #include <errno.h>
+
+#if ALLOC != AUTO
+#include <malloc.h>
+#endif
 
 #include "relic_conf.h"
 #include "relic_bn.h"

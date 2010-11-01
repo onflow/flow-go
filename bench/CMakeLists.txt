@@ -46,6 +46,10 @@ if (WITH_EC)
 	ADD_MODULE(ec)
 endif(WITH_EC)
 
+if (WITH_HB)
+    ADD_MODULE(hb)
+endif(WITH_HB)
+
 if (WITH_PB)
 	ADD_MODULE(pb)
 endif(WITH_PB)
@@ -53,6 +57,10 @@ endif(WITH_PB)
 if (WITH_PP)
 	ADD_MODULE(pp)
 endif(WITH_PP)
+
+if (WITH_PC)
+	ADD_MODULE(pc)
+endif(WITH_PC)
 
 if (WITH_CP)
 	ADD_MODULE(cp)

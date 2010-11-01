@@ -77,8 +77,10 @@ enum {
 	ETAT_P271 = 13,
 	/** MIRACL low-security pairing-friendly curve. */
 	ETAT_T271 = 14,
+	/** Pairing-friendly curve with 80-bit security. */
+	ETAT_S353 = 15,
 	/** MIRACL high-security pairing-friendly curve. */
-	ETAT_S1223 = 15,
+	ETAT_S1223 = 16,
 };
 
 /**

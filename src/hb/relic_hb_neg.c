@@ -23,86 +23,35 @@
 /**
  * @file
  *
- * Implementation of the memory-management routines for temporary double
- * precision digit vectors.
+ * Implementation of divisor class negation on binary hyperelliptic curves.
  *
- * @version $Id$
- * @ingroup dv
+ * @version $Id: relic_hb_neg.c 318 2010-03-12 15:14:39Z dfaranha $
+ * @ingroup hb
  */
 
-#include <stdlib.h>
-#include <errno.h>
-
-#if ALLOC != AUTO
-#include <malloc.h>
-#endif
+#include "string.h"
 
 #include "relic_core.h"
-#include "relic_conf.h"
-#include "relic_dv.h"
-#include "relic_pool.h"
+#include "relic_hb.h"
+#include "relic_error.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if ALLOC == DYNAMIC
-
-void dv_new_dynam(dv_t *a, int digits) {
-	int r;
-
-	if (digits > DV_DIGS) {
-		THROW(ERR_NO_PRECISION);
+void hb_neg_basic(hb_t r, hb_t p) {
+	if (hb_is_infty(p)) {
+		hb_set_infty(r);
+		return;
 	}
 
-#if ALIGN == 1
-		*a = malloc(digits * sizeof(dig_t));
-#elif OPSYS == WINDOWS
-		*a = _aligned_malloc(digits * sizeof(dig_t), ALIGN);
-#else
-		r = posix_memalign((void **)a, ALIGN, digits * sizeof(dig_t));
-		if (r == ENOMEM) {
-			THROW(ERR_NO_MEMORY);
-		}
-		if (r == EINVAL) {
-			THROW(ERR_INVALID);
-		}
+	if (r != p) {
+		hb_copy(r, p);
+	}
+#if defined(HB_SUPER)
+	if (hb_curve_is_super()) {
+		fb_add_dig(r->v0, r->v0, 1);
+		return;
+	}
 #endif
-
-	if (*a == NULL) {
-		THROW(ERR_NO_MEMORY);
-	}
 }
-
-void dv_free_dynam(dv_t *a) {
-	if ((*a) != NULL) {
-#if OPSYS == WINDOWS && ALIGN > 1
-		_aligned_free(*a);
-#else
-		free(*a);
-#endif
-	}
-	(*a) = NULL;
-}
-
-#elif ALLOC == STATIC
-
-void dv_new_statc(dv_t *a, int digits) {
-	if (digits > DV_DIGS) {
-		THROW(ERR_NO_PRECISION);
-	}
-
-	(*a) = pool_get();
-	if ((*a) == NULL) {
-		THROW(ERR_NO_MEMORY);
-	}
-}
-
-void dv_free_statc(dv_t *a) {
-	if ((*a) != NULL) {
-		pool_put((*a));
-	}
-	(*a) = NULL;
-}
-
-#endif

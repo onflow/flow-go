@@ -307,7 +307,7 @@ static void eb_dbl_projc_super(eb_t r, eb_t p) {
 	if (!p->norm) {
 		/* z3 = z1^4. */
 		fb_sqr(r->z, p->z);
-		fb_sqr(r->z, p->z);
+		fb_sqr(r->z, r->z);
 		/* y3 = x1^4 + y1^4. */
 		fb_add(r->y, r->x, r->y);
 		/* x3 = x1^4 + z1^4. */

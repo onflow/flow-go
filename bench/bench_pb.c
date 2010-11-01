@@ -268,9 +268,9 @@ static void arith4(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fb4_exp_2m") {
+	BENCH_BEGIN("fb4_frb") {
 		fb4_rand(a);
-		BENCH_ADD(fb4_exp_2m(c, a));
+		BENCH_ADD(fb4_frb(c, a));
 	}
 	BENCH_END;
 
@@ -279,20 +279,239 @@ static void arith4(void) {
 	fb4_free(c);
 }
 
-static void arith(void) {
+static void memory6(void) {
+	fb6_t a[BENCH];
+
+	BENCH_SMALL("fb6_null", fb6_null(a[i]));
+
+	BENCH_SMALL("fb6_new", fb6_new(a[i]));
+	for (int i = 0; i < BENCH; i++) {
+		fb6_free(a[i]);
+	}
+
+	for (int i = 0; i < BENCH; i++) {
+		fb6_new(a[i]);
+	}
+	BENCH_SMALL("fb6_free", fb6_free(a[i]));
+
+	(void)a;
+}
+
+static void util6(void) {
+	fb6_t a, b;
+
+	fb6_null(a);
+	fb6_null(b);
+
+	fb6_new(a);
+	fb6_new(b);
+
+	BENCH_BEGIN("fb6_copy") {
+		fb6_rand(a);
+		BENCH_ADD(fb6_copy(b, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb6_neg") {
+		fb6_rand(a);
+		BENCH_ADD(fb6_neg(b, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb6_zero") {
+		fb6_rand(a);
+		BENCH_ADD(fb6_zero(a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb6_is_zero") {
+		fb6_rand(a);
+		BENCH_ADD((void)fb6_is_zero(a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb6_rand") {
+		BENCH_ADD(fb6_rand(a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb6_cmp") {
+		fb6_rand(a);
+		fb6_rand(b);
+		BENCH_ADD(fb6_cmp(b, a));
+	}
+	BENCH_END;
+
+	fb6_free(a);
+	fb6_free(b);
+}
+
+static void arith6(void) {
+	fb6_t a, b, c;
+
+	fb6_new(a);
+	fb6_new(b);
+	fb6_new(c);
+
+	BENCH_BEGIN("fb6_add") {
+		fb6_rand(a);
+		fb6_rand(b);
+		BENCH_ADD(fb6_add(c, a, b));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb6_sub") {
+		fb6_rand(a);
+		fb6_rand(b);
+		BENCH_ADD(fb6_sub(c, a, b));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb6_mul") {
+		fb6_rand(a);
+		fb6_rand(b);
+		BENCH_ADD(fb6_mul(c, a, b));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb6_sqr") {
+		fb6_rand(a);
+		BENCH_ADD(fb6_sqr(c, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb6_inv") {
+		fb6_rand(a);
+		BENCH_ADD(fb6_inv(c, a));
+	}
+	BENCH_END;
+
+	fb6_free(a);
+	fb6_free(b);
+	fb6_free(c);
+}
+
+static void memory12(void) {
+	fb12_t a[BENCH];
+
+	BENCH_SMALL("fb12_null", fb12_null(a[i]));
+
+	BENCH_SMALL("fb12_new", fb12_new(a[i]));
+	for (int i = 0; i < BENCH; i++) {
+		fb12_free(a[i]);
+	}
+
+	for (int i = 0; i < BENCH; i++) {
+		fb12_new(a[i]);
+	}
+	BENCH_SMALL("fb12_free", fb12_free(a[i]));
+
+	(void)a;
+}
+
+static void util12(void) {
+	fb12_t a, b;
+
+	fb12_null(a);
+	fb12_null(b);
+
+	fb12_new(a);
+	fb12_new(b);
+
+	BENCH_BEGIN("fb12_copy") {
+		fb12_rand(a);
+		BENCH_ADD(fb12_copy(b, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb12_neg") {
+		fb12_rand(a);
+		BENCH_ADD(fb12_neg(b, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb12_zero") {
+		fb12_rand(a);
+		BENCH_ADD(fb12_zero(a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb12_is_zero") {
+		fb12_rand(a);
+		BENCH_ADD((void)fb12_is_zero(a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb12_rand") {
+		BENCH_ADD(fb12_rand(a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb12_cmp") {
+		fb12_rand(a);
+		fb12_rand(b);
+		BENCH_ADD(fb12_cmp(b, a));
+	}
+	BENCH_END;
+
+	fb12_free(a);
+	fb12_free(b);
+}
+
+static void arith12(void) {
+	fb12_t a, b, c;
+
+	fb12_new(a);
+	fb12_new(b);
+	fb12_new(c);
+
+	BENCH_BEGIN("fb12_add") {
+		fb12_rand(a);
+		fb12_rand(b);
+		BENCH_ADD(fb12_add(c, a, b));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb12_sub") {
+		fb12_rand(a);
+		fb12_rand(b);
+		BENCH_ADD(fb12_sub(c, a, b));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb12_mul") {
+		fb12_rand(a);
+		fb12_rand(b);
+		BENCH_ADD(fb12_mul(c, a, b));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb12_sqr") {
+		fb12_rand(a);
+		BENCH_ADD(fb12_sqr(c, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb12_inv") {
+		fb12_rand(a);
+		BENCH_ADD(fb12_inv(c, a));
+	}
+	BENCH_END;
+
+	fb12_free(a);
+	fb12_free(b);
+	fb12_free(c);
+}
+
+#ifdef WITH_EB
+
+static void pairing(void) {
 	eb_t p, q;
 	fb4_t r;
 
 	fb4_new(r);
 	eb_new(p);
 	eb_new(q);
-
-	BENCH_BEGIN("pb_map") {
-		eb_rand(p);
-		eb_rand(q);
-		BENCH_ADD(pb_map(r, p, q));
-	}
-	BENCH_END;
 
 #if PB_MAP == ETATS || !defined(STRIP)
 	BENCH_BEGIN("pb_map_etats") {
@@ -317,7 +536,66 @@ static void arith(void) {
 	fb4_free(r);
 }
 
+#endif
+
+#ifdef WITH_HB
+
+static void pairing2(void) {
+	hb_t p, q;
+	fb12_t r;
+
+	fb12_new(r);
+	hb_new(p);
+	hb_new(q);
+
+	BENCH_BEGIN("pb_map_etat2 (d,d)") {
+		hb_rand_deg(p);
+		hb_rand_deg(q);
+		BENCH_ADD(pb_map_etat2(r, p, q));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("pb_map_etat2 (d,n)") {
+		hb_rand_deg(p);
+		hb_rand_non(q, 0);
+		BENCH_ADD(pb_map_etat2(r, p, q));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("pb_map_etat2 (n,d)") {
+		hb_rand_deg(p);
+		hb_rand_non(q, 0);
+		BENCH_ADD(pb_map_etat2(r, p, q));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("pb_map_etat2 (n,n)") {
+//		hb_rand_non(p, 0);
+//		hb_rand_non(q, 0);
+		hb_curve_get_gen(p);
+		hb_curve_get_gen(q);
+		BENCH_ADD(pb_map_etat2(r, p, q));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("pb_map_oate2 (n,n)") {
+//		hb_rand_non(p, 0);
+//		hb_rand_non(q, 0);
+		hb_curve_get_gen(p);
+		hb_curve_get_gen(q);
+		BENCH_ADD(pb_map_oate2(r, p, q));
+	}
+	BENCH_END;
+
+	hb_free(p);
+	hb_free(q);
+	fb12_free(r);
+}
+
+#endif
+
 int main(void) {
+	int r0, r1;
 	core_init();
 	conf_print();
 
@@ -336,17 +614,48 @@ int main(void) {
 
 	util_print_banner("Quartic extension:", 0);
 	util_print_banner("Utilities", 1)
-	memory4();
+			memory4();
 	util4();
 
 	util_print_banner("Arithmetic:", 1);
 	arith4();
 
-	if (eb_param_set_any_super() == STS_OK) {
+	util_print_banner("Sextic extension:", 0);
+	util_print_banner("Utilities", 1)
+			memory6();
+	util6();
+
+	util_print_banner("Arithmetic:", 1);
+	arith6();
+
+	util_print_banner("Dodecic extension:", 0);
+	util_print_banner("Utilities", 1)
+			memory12();
+	util12();
+
+	util_print_banner("Arithmetic:", 1);
+	arith12();
+
+	r0 = r1 = STS_ERR;
+#ifdef WITH_EB
+	r0 = eb_param_set_any_super();
+	if (r0 == STS_OK) {
 		eb_param_print();
 		util_print_banner("Arithmetic:", 1);
-		arith();
-	} else {
+		pairing();
+	}
+#endif
+
+#ifdef WITH_HB
+	r1 = hb_param_set_any_super();
+	if ( r1 == STS_OK) {
+		hb_param_print();
+		util_print_banner("Arithmetic:", 1);
+		pairing2();
+	}
+#endif
+
+	if (r0 == STS_ERR && r1 == STS_ERR) {
 		THROW(ERR_NO_CURVE);
 	}
 

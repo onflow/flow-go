@@ -43,23 +43,31 @@
 void fb2_mul(fb2_t c, fb2_t a, fb2_t b) {
 	fb_t t0, t1, t2;
 
-	fb_new(t0);
-	fb_new(t1);
-	fb_new(t2);
+	fb_null(t0);
+	fb_null(t1);
+	fb_null(t2);
 
-	fb_add(t0, a[0], a[1]);
-	fb_add(t1, b[0], b[1]);
+	TRY {
+		fb_new(t0);
+		fb_new(t1);
+		fb_new(t2);
 
-	fb_mul(t0, t0, t1);
-	fb_mul(t1, a[0], b[0]);
-	fb_mul(t2, a[1], b[1]);
+		fb_add(t0, a[0], a[1]);
+		fb_add(t1, b[0], b[1]);
 
-	fb_add(c[0], t1, t2);
-	fb_add(c[1], t0, t1);
+		fb_mul(t0, t0, t1);
+		fb_mul(t1, a[0], b[0]);
+		fb_mul(t2, a[1], b[1]);
 
-	fb_free(t0);
-	fb_free(t1);
-	fb_free(t2);
+		fb_add(c[0], t1, t2);
+		fb_add(c[1], t0, t1);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb_free(t0);
+		fb_free(t1);
+		fb_free(t2);
+	}
 }
 
 void fb2_sqr(fb2_t c, fb2_t a) {
@@ -71,23 +79,30 @@ void fb2_sqr(fb2_t c, fb2_t a) {
 void fb2_inv(fb2_t c, fb2_t a) {
 	fb_t a0, a1, m0, m1;
 
-	fb_new(a0);
-	fb_new(a1);
-	fb_new(m0);
-	fb_new(m1);
+	fb_null(a0);
+	fb_null(a1);
+	fb_null(m0);
+	fb_null(m1);
 
-	fb_add(a0, a[0], a[1]);
-	fb_sqr(m0, a[0]);
-	fb_mul(m1, a0, a[1]);
-	fb_add(a1, m0, m1);
-	fb_inv(a1, a1);
-	fb_mul(m0, a0, a1);
-	fb_mul(m1, a[1], a1);
-	fb_copy(c[0], m0);
-	fb_copy(c[1], m1);
+	TRY {
+		fb_new(a0);
+		fb_new(a1);
+		fb_new(m0);
+		fb_new(m1);
 
-	fb_free(a0);
-	fb_free(a1);
-	fb_free(m0);
-	fb_free(m1);
+		fb_add(a0, a[0], a[1]);
+		fb_sqr(m0, a[0]);
+		fb_mul(m1, a0, a[1]);
+		fb_add(a1, m0, m1);
+		fb_inv(a1, a1);
+		fb_mul(c[0], a0, a1);
+		fb_mul(c[1], a[1], a1);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb_free(a0);
+		fb_free(a1);
+		fb_free(m0);
+		fb_free(m1);
+	}
 }

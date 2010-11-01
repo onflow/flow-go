@@ -502,8 +502,7 @@ static void arith(void) {
 
 	BENCH_BEGIN("gt_exp") {
 		gt_rand(a);
-		d->used = FP_DIGS;
-		dv_copy(d->dp, fp_prime_get(), FP_DIGS);
+		g1_get_ord(d);
 		BENCH_ADD(gt_exp(c, a, d));
 	}
 	BENCH_END;

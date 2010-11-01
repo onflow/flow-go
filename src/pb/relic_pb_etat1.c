@@ -23,10 +23,11 @@
 /**
  * @file
  *
- * Implementation of the eta_t bilinear pairing.
+ * Implementation of the eta_t bilinear pairing over genus 1 supersingular
+ * curves.
  *
  * @version $Id$
- * @ingroup etat
+ * @ingroup pb
  */
 
 #include "relic_core.h"
@@ -120,7 +121,7 @@ static void etat_exp(fb4_t r, fb4_t a) {
 		/* w = w0 + w1 * t. */
 
 		/* v = v^(2m+1). */
-		fb4_exp_2m(r, v);
+		fb4_frb(r, v);
 		fb4_mul(v, r, v);
 
 		to = ((FB_BITS + 1) / 2) >> 2;
@@ -516,7 +517,7 @@ static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 						}
 						break;
 				}
-#else
+#elif CORE65NM
 				int s2[] = { 0, 309, (FB_BITS - 1) / 2 };
 				int s4[] = { 0, 158, 312, 463, (FB_BITS - 1) / 2 };
 				int s8[] = { 0, 82, 163, 242, 319, 395, 468, 540,
@@ -680,7 +681,172 @@ static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 						}
 						break;
 				}
+#else
+				int s2[] = { 0, 312, (FB_BITS - 1) / 2 };
+				int s4[] = { 0, 162, 318, 468, (FB_BITS - 1) / 2 };
+				int s8[] = { 0, 88, 174, 254, 332, 406, 477, 546,
+					(FB_BITS - 1) / 2
+				};
+				int s16[] = { 0, 51, 101, 148, 194, 237, 279, 319, 357, 394, 429,
+					463,
+					495,
+					526, 556, 584, (FB_BITS - 1) / 2
+				};
+
+				switch (CORES) {
+					case 1:
+						from = 0;
+						to = (FB_BITS - 1) / 2;
+						break;
+					case 2:
+						from = s2[i];
+						to = s2[i + 1];
+						break;
+					case 4:
+						from = s4[i];
+						to = s4[i + 1];
+						break;
+					case 8:
+						from = s8[i];
+						to = s8[i + 1];
+						break;
+					case 16:
+						from = s16[i];
+						to = s16[i + 1];
+						break;
+					case 32:
+						if (i == 0) {
+							from = 0;
+							to = 26;
+						}
+						if (i == 1) {
+							from = 26;
+							to = 52;
+						}
+						if (i == 2) {
+							from = 52;
+							to = 77;
+						}
+						if (i == 3) {
+							from = 77;
+							to = 102;
+						}
+						if (i == 4) {
+							from = 102;
+							to = 126;
+						}
+						if (i == 5) {
+							from = 126;
+							to = 150;
+						}
+						if (i == 6) {
+							from = 150;
+							to = 173;
+						}
+						if (i == 7) {
+							from = 173;
+							to = 196;
+						}
+						if (i == 8) {
+							from = 196;
+							to = 218;
+						}
+						if (i == 9) {
+							from = 218;
+							to = 240;
+						}
+						if (i == 10) {
+							from = 240;
+							to = 261;
+						}
+						if (i == 11) {
+							from = 261;
+							to = 282;
+						}
+						if (i == 12) {
+							from = 282;
+							to = 302;
+						}
+						if (i == 13) {
+							from = 302;
+							to = 322;
+						}
+						if (i == 14) {
+							from = 322;
+							to = 341;
+						}
+						if (i == 15) {
+							from = 341;
+							to = 360;
+						}
+						if (i == 16) {
+							from = 360;
+							to = 378;
+						}
+						if (i == 17) {
+							from = 378;
+							to = 397;
+						}
+						if (i == 18) {
+							from = 397;
+							to = 414;
+						}
+						if (i == 19) {
+							from = 414;
+							to = 431;
+						}
+						if (i == 20) {
+							from = 431;
+							to = 448;
+						}
+						if (i == 21) {
+							from = 448;
+							to = 465;
+						}
+						if (i == 22) {
+							from = 465;
+							to = 481;
+						}
+						if (i == 23) {
+							from = 481;
+							to = 497;
+						}
+						if (i == 24) {
+							from = 497;
+							to = 512;
+						}
+						if (i == 25) {
+							from = 512;
+							to = 527;
+						}
+						if (i == 26) {
+							from = 527;
+							to = 542;
+						}
+						if (i == 27) {
+							from = 542;
+							to = 556;
+						}
+						if (i == 28) {
+							from = 556;
+							to = 571;
+						}
+						if (i == 29) {
+							from = 571;
+							to = 584;
+						}
+						if (i == 30) {
+							from = 584;
+							to = 598;
+						}
+						if (i == 31) {
+							from = 598;
+							to = (FB_BITS - 1) / 2;
+						}
+						break;
+				}
 #endif
+
 				for (int j = 0; j < from; j++) {
 					/* Compute starting point. */
 					fb_srt(xp, xp);
