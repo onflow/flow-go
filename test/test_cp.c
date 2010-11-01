@@ -339,7 +339,7 @@ int main(void) {
 	core_init();
 
 	util_print_banner("Tests for the CP module", 0);
-#if 0
+
 #if defined(WITH_BN)
 	util_print_banner("Protocols based on prime factorization:\n", 0);
 
@@ -369,7 +369,7 @@ int main(void) {
 		THROW(ERR_NO_CURVE);
 	}
 #endif
-#endif
+
 #if defined(WITH_PC)
 	util_print_banner("Protocols based on pairings:\n", 0);
 	if (pc_param_set_any() == STS_OK) {
