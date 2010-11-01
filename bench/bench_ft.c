@@ -219,32 +219,32 @@ static void arith(void) {
 //	}
 //	BENCH_END;
 //
-//#if FT_MUL == BASIC || !defined(STRIP)
-//	BENCH_BEGIN("ft_mul_basic") {
-//		ft_rand(a);
-//		ft_rand(b);
-//		BENCH_ADD(ft_mul_basic(c, a, b));
-//	}
-//	BENCH_END;
-//#endif
-//
-//#if FT_MUL == INTEG || !defined(STRIP)
-//	BENCH_BEGIN("ft_mul_integ") {
-//		ft_rand(a);
-//		ft_rand(b);
-//		BENCH_ADD(ft_mul_integ(c, a, b));
-//	}
-//	BENCH_END;
-//#endif
-//
-//#if FT_MUL == LODAH || !defined(STRIP)
-//	BENCH_BEGIN("ft_mul_lodah") {
-//		ft_rand(a);
-//		ft_rand(b);
-//		BENCH_ADD(ft_mul_lodah(c, a, b));
-//	}
-//	BENCH_END;
-//#endif
+#if FT_MUL == BASIC || !defined(STRIP)
+	BENCH_BEGIN("ft_mul_basic") {
+		ft_rand(a);
+		ft_rand(b);
+		BENCH_ADD(ft_mul_basic(c, a, b));
+	}
+	BENCH_END;
+#endif
+
+#if FT_MUL == INTEG || !defined(STRIP)
+	BENCH_BEGIN("ft_mul_integ") {
+		ft_rand(a);
+		ft_rand(b);
+		BENCH_ADD(ft_mul_integ(c, a, b));
+	}
+	BENCH_END;
+#endif
+
+#if FT_MUL == LODAH || !defined(STRIP)
+	BENCH_BEGIN("ft_mul_lodah") {
+		ft_rand(a);
+		ft_rand(b);
+		BENCH_ADD(ft_mul_lodah(c, a, b));
+	}
+	BENCH_END;
+#endif
 //
 //#if FT_KARAT > 0 || !defined(STRIP)
 //	BENCH_BEGIN("ft_mul_karat") {

@@ -127,7 +127,7 @@ void ft_mul_lodah(ft_t c, ft_t a, ft_t b) {
 	TRY {
 		dv_new(t);
 
-		//ft_muln_low(t, a, b);
+		ft_muln_low(t, a, b);
 
 		ft_rdc_mul(c, t);
 	} CATCH_ANY {
@@ -143,7 +143,7 @@ void ft_mul_lodah(ft_t c, ft_t a, ft_t b) {
 #if FT_MUL == INTEG || !defined(STRIP)
 
 void ft_mul_integ(ft_t c, ft_t a, ft_t b) {
-	//ft_mulm_low(c, a, b);
+	ft_mulm_low(c, a, b);
 }
 
 #endif

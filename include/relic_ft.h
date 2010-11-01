@@ -79,9 +79,9 @@
  * Finite field identifiers.
  */
 enum {
-	/** Common pentanomial used for implementing pairings. */
+	/** Pentanomial commonly used for implementing pairings. */
 	TRINO_97 = 1,
-	/** Common pentanomial used for implementing pairings. */
+	/** Pentanomial commonly used for implementing pairings. */
 	PENTA_509 = 2,
 };
 
@@ -610,9 +610,28 @@ void ft_sub_dig(ft_t c, ft_t a, dig_t b);
  *
  * @param[out] c			- the result.
  * @param[in] a				- the first ternary field element to multiply.
- * @param[in] b				- the second ternary field element to mltiply.
+ * @param[in] b				- the second ternary field element to multiply.
  */
 void ft_mul_basic(ft_t c, ft_t a, ft_t b);
+
+/**
+ * Multiples two ternary field elements using multiplication integrated with
+ * modular reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first ternary field element to multiply.
+ * @param[in] b				- the second ternary field element to multiply.
+ */
+void ft_mul_integ(ft_t c, ft_t a, ft_t b);
+
+/**
+ * Multiples two ternary field elements using López-Dahab multiplication.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first ternary field element to multiply.
+ * @param[in] b				- the second ternary field element to multiply.
+ */
+void ft_mul_lodah(ft_t c, ft_t a, ft_t b);
 
 /**
  * Cubes a ternary field element using three multiplications.

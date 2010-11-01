@@ -453,27 +453,27 @@ static int multiplication(void) {
 		TEST_END;
 #endif
 
-//#if FT_MUL == LODAH || !defined(STRIP)
-//		TEST_BEGIN("lopez-dahab multiplication is correct") {
-//			ft_rand(a);
-//			ft_rand(b);
-//			ft_mul(c, a, b);
-//			ft_mul_lodah(d, a, b);
-//			TEST_ASSERT(ft_cmp(c, d) == CMP_EQ, end);
-//		}
-//		TEST_END;
-//#endif
-//
-//#if FT_MUL == INTEG || !defined(STRIP)
-//		TEST_BEGIN("integrated multiplication is correct") {
-//			ft_rand(a);
-//			ft_rand(b);
-//			ft_mul(c, a, b);
-//			ft_mul_integ(d, a, b);
-//			TEST_ASSERT(ft_cmp(c, d) == CMP_EQ, end);
-//		}
-//		TEST_END;
-//#endif
+#if FT_MUL == LODAH || !defined(STRIP)
+		TEST_BEGIN("lopez-dahab multiplication is correct") {
+			ft_rand(a);
+			ft_rand(b);
+			ft_mul(c, a, b);
+			ft_mul_lodah(d, a, b);
+			TEST_ASSERT(ft_cmp(c, d) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
+#if FT_MUL == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated multiplication is correct") {
+			ft_rand(a);
+			ft_rand(b);
+			ft_mul(c, a, b);
+			ft_mul_integ(d, a, b);
+			TEST_ASSERT(ft_cmp(c, d) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
 //
 //#if FT_MUL == LCOMB || !defined(STRIP)
 //		TEST_BEGIN("left-to-right comb multiplication is correct") {

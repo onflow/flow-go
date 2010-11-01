@@ -68,10 +68,10 @@ void ft_rdc_mul_basic(ft_t c, dv_t a) {
 			r[l + FT_DIGS + FT_DIGS / 2] = ft_lshb_low(r + l + FT_DIGS,
 					ft_poly_get() + FT_DIGS / 2, k);
 			if (j == 1) {
-				ft_subd_low(a, a, r, 2 * FT_DIGS);
+				ft_subd_low(a, a, r, 2 * FT_DIGS, 2 * FT_DIGS);
 			}
 			if (j == 2) {
-				ft_addd_low(a, a, r, 2 * FT_DIGS);
+				ft_addd_low(a, a, r, 2 * FT_DIGS, 2 * FT_DIGS);
 			}
 		}
 		dv_copy(c, a, FT_DIGS / 2);
@@ -107,10 +107,10 @@ void ft_rdc_cub_basic(ft_t c, dv_t a) {
 						ft_lshb_low(r + l + 3 * FT_DIGS / 2,
 						ft_poly_get() + FT_DIGS / 2, k);
 				if (j == 1) {
-					ft_subd_low(a, a, r, 3 * FT_DIGS);
+					ft_subd_low(a, a, r, 3 * FT_DIGS, 3 * FT_DIGS);
 				}
 				if (j == 2) {
-					ft_addd_low(a, a, r, 3 * FT_DIGS);
+					ft_addd_low(a, a, r, 3 * FT_DIGS, 3 * FT_DIGS);
 				}
 			}
 		}

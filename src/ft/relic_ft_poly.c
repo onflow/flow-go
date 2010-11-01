@@ -64,7 +64,7 @@ static int pos_a, pos_b, pos_c;
 /**
  * Maximum number of exponents to describe a sparse polynomial.
  */
-#define MAX_EXPS		10
+#define MAX_EXPS		20
 
 /**
  * Non-zero bits of polynomial stored in sparse form.
