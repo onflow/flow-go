@@ -39,10 +39,6 @@
 #include "relic_pb.h"
 
 /*============================================================================*/
-/* Private definitions                                                         */
-/*============================================================================*/
-
-/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
@@ -356,21 +352,72 @@ void fb6_frb(fb6_t c, fb6_t a) {
 		fb_new(t0);
 		fb_new(t1);
 
-		fb_copy(t0, a[1]);
-		fb_copy(t1, a[5]);
-
-		fb_add(c[5], a[4], a[5]);
-		fb_add(c[0], a[0], a[1]);
-		fb_add(c[0], c[0], a[4]);
-		fb_add(c[1], a[1], c[5]);
-		fb_add(c[4], a[2], a[3]);
-		fb_add(c[4], c[4], c[5]);
-		fb_copy(c[2], c[5]);
-		fb_add(c[5], a[3], t1);
-		fb_copy(c[3], t1);
-	} CATCH_ANY {
+		switch (FB_BITS % 6) {
+			case 1:
+				fb_add(t0, a[4], a[5]);
+				fb_copy(t1, a[3]);
+				fb_add(c[0], a[0], a[1]);
+				fb_add(c[0], c[0], a[4]);
+				fb_add(c[1], a[1], t0);
+				fb_copy(c[3], a[5]);
+				fb_add(c[4], a[2], t1);
+				fb_add(c[4], c[4], t0);
+				fb_add(c[5], t1, a[5]);
+				fb_copy(c[2], t0);
+				break;
+			case 2:
+				fb_add(t0, a[2], a[4]);
+				fb_add(c[0], a[0], a[3]);
+				fb_add(c[0], c[0], t0);
+				fb_add(c[1], a[1], a[2]);
+				fb_add(c[1], c[1], a[5]);
+				fb_add(c[3], a[3], a[5]);
+				fb_copy(c[4], a[2]);
+				fb_copy(c[5], a[5]);
+				fb_copy(c[2], t0);
+				break;
+			case 3:
+				fb_add(t0, a[3], a[5]);
+				fb_copy(t1, a[2]);
+				fb_add(c[0], a[0], a[1]);
+				fb_add(c[0], c[0], a[3]);
+				fb_add(c[1], a[1], a[4]);
+				fb_add(c[1], c[1], t0);
+				fb_copy(c[2], a[4]);
+				fb_copy(c[3], a[5]);
+				fb_add(c[4], a[4], t1);
+				fb_copy(c[5], t0);
+				break;
+			case 4:
+				fb_add(t0, a[3], a[5]);
+				fb_copy(t1, a[2]);
+				fb_add(c[0], a[0], a[2]);
+				fb_add(c[0], c[0], a[5]);
+				fb_add(c[1], a[1], a[4]);
+				fb_add(c[1], c[1], t0);
+				fb_copy(c[2], a[4]);
+				fb_copy(c[3], a[5]);
+				fb_add(c[4], a[4], t1);
+				fb_copy(c[5], t0);
+				break;
+			case 5:
+				fb_add(t0, a[2], a[3]);
+				fb_copy(t1, a[3]);
+				fb_add(c[0], a[0], a[1]);
+				fb_add(c[0], c[0], a[3]);
+				fb_add(c[1], a[1], a[2]);
+				fb_add(c[2], a[4], a[5]);
+				fb_add(c[2], c[2], t0);
+				fb_add(c[3], a[3], a[5]);
+				fb_copy(c[4], t0);
+				fb_copy(c[5], t1);
+				break;
+		}
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		fb_free(t0);
 		fb_free(t1);
 	}
