@@ -494,6 +494,10 @@ void eb_param_set(int param) {
 				break;
 		}
 
+		(void)kbltz;
+		(void)ordin;
+		(void)super;
+
 		param_id = param;
 
 		fb_zero(g->z);
