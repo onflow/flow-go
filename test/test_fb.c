@@ -350,29 +350,25 @@ static int subtraction(void) {
 
 static int multiplication(void) {
 	int code = STS_ERR;
-	fb_t a, b, c, d, e, f;
+	fb_t a, b, c, d;
 
 	fb_null(a);
 	fb_null(b);
 	fb_null(c);
 	fb_null(d);
-	fb_null(e);
-	fb_null(f);
 
 	TRY {
 		fb_new(a);
 		fb_new(b);
 		fb_new(c);
 		fb_new(d);
-		fb_new(e);
-		fb_new(f);
 
 		TEST_BEGIN("multiplication is commutative") {
 			fb_rand(a);
 			fb_rand(b);
-			fb_mul(d, a, b);
-			fb_mul(e, b, a);
-			TEST_ASSERT(fb_cmp(d, e) == CMP_EQ, end);
+			fb_mul(c, a, b);
+			fb_mul(d, b, a);
+			TEST_ASSERT(fb_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 
 		TEST_BEGIN("multiplication is associative") {
@@ -381,9 +377,9 @@ static int multiplication(void) {
 			fb_rand(c);
 			fb_mul(d, a, b);
 			fb_mul(d, d, c);
-			fb_mul(e, b, c);
-			fb_mul(e, a, e);
-			TEST_ASSERT(fb_cmp(d, e) == CMP_EQ, end);
+			fb_mul(b, b, c);
+			fb_mul(c, a, b);
+			TEST_ASSERT(fb_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 
 		TEST_BEGIN("multiplication is distributive") {
@@ -392,25 +388,25 @@ static int multiplication(void) {
 			fb_rand(c);
 			fb_add(d, a, b);
 			fb_mul(d, c, d);
-			fb_mul(e, c, a);
-			fb_mul(f, c, b);
-			fb_add(e, e, f);
-			TEST_ASSERT(fb_cmp(d, e) == CMP_EQ, end);
+			fb_mul(a, c, a);
+			fb_mul(b, c, b);
+			fb_add(c, a, b);
+			TEST_ASSERT(fb_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 
 		TEST_BEGIN("multiplication has identity") {
 			fb_rand(a);
-			fb_zero(d);
-			fb_set_bit(d, 0, 1);
-			fb_mul(e, a, d);
-			TEST_ASSERT(fb_cmp(e, a) == CMP_EQ, end);
+			fb_zero(c);
+			fb_set_bit(c, 0, 1);
+			fb_mul(d, a, c);
+			TEST_ASSERT(fb_cmp(d, a) == CMP_EQ, end);
 		} TEST_END;
 
 		TEST_BEGIN("multiplication has zero property") {
 			fb_rand(a);
-			fb_zero(d);
-			fb_mul(e, a, d);
-			TEST_ASSERT(fb_is_zero(e), end);
+			fb_zero(b);
+			fb_mul(c, a, b);
+			TEST_ASSERT(fb_is_zero(c), end);
 		} TEST_END;
 
 #if FB_MUL == BASIC || !defined(STRIP)
@@ -488,8 +484,6 @@ static int multiplication(void) {
 	fb_free(b);
 	fb_free(c);
 	fb_free(d);
-	fb_free(e);
-	fb_free(f);
 	return code;
 }
 
@@ -568,7 +562,8 @@ static int square_root(void) {
 		TEST_BEGIN("square root extraction is correct") {
 			fb_rand(a);
 			fb_sqr(c, a);
-			fb_srt(b, c);
+			fb_copy(b, c);
+			fb_srt(b, b);
 			TEST_ASSERT(fb_cmp(b, a) == CMP_EQ, end);
 		} TEST_END;
 
