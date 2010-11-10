@@ -216,7 +216,7 @@ static void arith(void) {
 	BENCH_BEGIN("fb_mul_dig") {
 		fb_rand(a);
 		fb_rand(b);
-		BENCH_ADD(fb_mul_dig(c, a, eb_curve_get_b()[0]));
+		BENCH_ADD(fb_mul_dig(c, a, b[0]));
 	}
 	BENCH_END;
 
