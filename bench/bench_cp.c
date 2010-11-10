@@ -314,6 +314,43 @@ static void bls(void) {
 	g2_free(p);
 }
 
+static void bbs(void) {
+	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+	int b;
+	g1_t s;
+	g2_t p;
+	gt_t z;
+	bn_t d;
+
+	g1_null(s);
+	g2_null(p);
+	gt_null(z);
+	bn_null(d);
+
+	g1_new(s);
+	g2_new(p);
+	gt_new(z);
+	bn_new(d);
+
+	BENCH_BEGIN("cp_bls_gen") {
+		BENCH_ADD(cp_bbs_gen(d, p, z));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("cp_bbs_sign") {
+		BENCH_ADD(cp_bbs_sign(&b, s, msg, 5, d));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("cp_bbs_ver") {
+		BENCH_ADD(cp_bbs_ver(b, s, msg, 5, p, z));
+	}
+	BENCH_END;
+
+	g1_free(s);
+	bn_free(d);
+	g2_free(p);
+}
 #endif
 
 int main(void) {
@@ -343,6 +380,7 @@ int main(void) {
 	if (pc_param_set_any() == STS_OK) {
 		sokaka();
 		bls();
+		bbs();
 	} else {
 		THROW(ERR_NO_CURVE);
 	}
