@@ -125,6 +125,7 @@ static void fp4_mul(fp2_t e, fp2_t f, fp2_t a, fp2_t b, fp2_t c, fp2_t d) {
 	TRY {
 		fp2_new(t0);
 		fp2_new(t1);
+		fp2_new(t2);
 
 		fp2_mul(t0, a, c);
 		fp2_mul(t1, b, d);
@@ -140,6 +141,7 @@ static void fp4_mul(fp2_t e, fp2_t f, fp2_t a, fp2_t b, fp2_t c, fp2_t d) {
 	} FINALLY {
 		fp2_free(t0);
 		fp2_free(t1);
+		fp2_free(t2);
 	}
 }
 

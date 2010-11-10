@@ -131,11 +131,13 @@ int cp_bbs_ver(int b, g1_t s, unsigned char *msg, int len, g2_t q, gt_t z) {
 	int result = 0;
 
 	bn_null(m);
+	bn_null(n);
 	g2_null(g);
 	gt_null(e);
 
 	TRY {
 		bn_new(m);
+		bn_new(n);
 		g2_new(g);
 		gt_new(e);
 
@@ -164,6 +166,7 @@ int cp_bbs_ver(int b, g1_t s, unsigned char *msg, int len, g2_t q, gt_t z) {
 	}
 	FINALLY {
 		bn_free(m);
+		bn_free(n);
 		g2_free(g);
 		gt_free(e);
 	}
