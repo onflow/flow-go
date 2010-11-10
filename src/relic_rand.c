@@ -83,7 +83,11 @@ void rand_init() {
 
 	memset(state, 0, sizeof(state));
 
-#if SEED == DEV
+#if SEED == ZERO
+
+	memset(buf, 0, sizeof(buf));
+
+#elif SEED == DEV
 	int rand_fd, c, l;
 
 	rand_fd = open(RAND_PATH, O_RDONLY);
