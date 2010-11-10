@@ -333,6 +333,43 @@ static int bls(void) {
 	return code;
 }
 
+static int bbs(void) {
+	int code = STS_ERR;
+	int b;
+	bn_t d;
+	g1_t s;
+	g2_t q;
+	gt_t z;
+	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+
+	bn_null(d);
+	g1_null(s);
+	g2_null(q);
+	gt_null(z);
+
+	TRY {
+		bn_new(d);
+		g1_new(s);
+		g2_new(q);
+		gt_new(z);
+
+		TEST_BEGIN("boneh-boyen short signature is correct") {
+			cp_bbs_gen(d, q, z);
+			cp_bbs_sign(&b, s, msg, 5, d);
+			TEST_ASSERT(cp_bbs_ver(b, s, msg, 5, q, z) == 1, end);
+		} TEST_END;
+	} CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+
+  end:
+	bn_free(d);
+	g1_free(s);
+	g2_free(q);
+	return code;
+}
+
 #endif
 
 int main(void) {
@@ -378,6 +415,10 @@ int main(void) {
 			return 1;
 		}
 		if (bls() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+		if (bbs() != STS_OK) {
 			core_clean();
 			return 1;
 		}
