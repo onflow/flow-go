@@ -89,6 +89,15 @@
 #endif
 
 /**
+ * Represents the size in bytes of the order of G_1 and G_2.
+ */
+#if PC_CUR == PRIME
+#define PC_BYTES			FP_BYTES
+#else
+#define PC_BYTES			FB_BYTES
+#endif
+
+/**
  * Represents a G_1 precomputable table.
  */
 #define G1_TABLE			CAT(G1_UPPER, _TABLE_MAX)
