@@ -106,6 +106,7 @@ message(STATUS "Available pseudo-random number generators (default = FIPS):")
 message("   RAND=FIPS      Use the FIPS 186-2 SHA1-based generator. (recommended)\n")
 
 message(STATUS "Available random number generator seeders (default = DEV):")
+message("   SEED=SEED      Use a zero seed. (not crypto safe!)")
 message("   SEED=LIBC      Use the libc rand()/random() functions. (not crypto safe!)")
 message("   SEED=DEV       Use /dev/random. (recommended)")
 message("   SEED=WCGR      Use Windows' CryptGenRandom. (recommended)\n")

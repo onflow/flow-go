@@ -108,6 +108,7 @@ if (WITH_CP)
 	if (WITH_PB OR WITH_PP)
 		list(APPEND RELIC_SRCS "cp/relic_cp_sokaka.c")
 		list(APPEND RELIC_SRCS "cp/relic_cp_bls.c")
+		list(APPEND RELIC_SRCS "cp/relic_cp_bbs.c")
 	endif(WITH_PB OR WITH_PP)
 endif(WITH_CP)
 
