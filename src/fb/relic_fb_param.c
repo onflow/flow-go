@@ -70,6 +70,9 @@ void fb_param_set(int param) {
 		case NIST_163:
 			fb_poly_set_penta(7, 6, 3);
 			break;
+		case TRINO_193:
+			fb_poly_set_trino(15);
+			break;
 		case SQRT_233:
 			fb_poly_set_trino(159);
 			break;
@@ -144,6 +147,9 @@ void fb_param_set_any(void) {
 #else
 	fb_param_set(NIST_163);
 #endif
+
+#elif FB_POLYN == 193
+	fb_param_set(TRINO_193);
 
 #elif FB_POLYN == 233
 #ifdef FB_SQRTF

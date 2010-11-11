@@ -68,14 +68,12 @@ void fb_inv_basic(fb_t c, fb_t a) {
 				fb_sqr(t, t);
 			}
 			fb_mul(u, u, t);
-			if ((x & 0x01) == 0) {
-				x = x >> 1;
-			} else {
+			if ((x & 0x01) != 0) {
 				/* v = v * u, u = u^2, x = (x - 1)/2. */
 				fb_mul(v, v, u);
 				fb_sqr(u, u);
-				x = (x - 1) >> 1;
 			}
+			x = x >> 1;
 		}
 		fb_copy(c, v);
 	} CATCH_ANY {
@@ -370,6 +368,59 @@ void fb_inv_almos(fb_t c, fb_t a) {
 		fb_free(_d);
 		fb_free(_u);
 		fb_free(_v);
+	}
+}
+
+#endif
+
+#if FB_INV == ITOHT || !defined(STRIP)
+
+void fb_inv_itoht(fb_t c, fb_t a) {
+	int i, j, x, y;
+	int *chain, len;
+
+	chain = fb_poly_get_chain(&len);
+
+	int u[len + 1];
+	fb_t table[len + 1];
+	for (i = 0; i <= len; i++) {
+		fb_null(table[i]);
+	}
+
+	TRY {
+		fb_new(t);
+		fb_new(u);
+		fb_new(v);
+		for (i = 0; i <= len; i++) {
+			fb_new(table[i]);
+		}
+
+		u[0] = 1;
+		u[1] = 2;
+		fb_copy(table[0], a);
+		fb_sqr(table[1], table[0]);
+		fb_mul(table[1], table[1], table[0]);
+		for (i = 2; i <= len; i++) {
+			x = chain[i - 1] >> 8;
+			y = chain[i - 1] - (x << 8);
+			if (x == y) {
+				u[i] = 2 * u[i - 1];
+			} else {
+				u[i] = u[x] + u[y];
+			}
+			fb_sqr(table[i], table[x]);
+			for (j = 1; j < u[y]; j++) {
+				fb_sqr(table[i], table[i]);
+			}
+			fb_mul(table[i], table[i], table[y]);
+		}
+		fb_sqr(c, table[len]);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		for (i = 0; i <= len; i++) {
+			fb_free(table[i]);
+		}
 	}
 }
 

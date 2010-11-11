@@ -192,7 +192,7 @@ static fb_st fb_tab_srz[256];
 /**
  * Precomputes the square root of z.
  */
-void find_srz() {
+static void find_srz() {
 	fb_set_bit(fb_srz, 1, 1);
 
 	for (int i = 1; i < FB_BITS; i++) {
@@ -203,6 +203,74 @@ void find_srz() {
 		fb_mul_dig(fb_tab_srz[i], fb_srz, i);
 	}
 #endif
+}
+
+#endif
+
+#if FB_INV == ITOHT || !defined(STRIP)
+
+/**
+ * Maximum number of elements in the addition chain for (FB_BITS - 1).
+ */
+#define MAX_CHAIN		16
+
+/**
+ * Stores an addition chain for (FB_BITS - 1).
+ */
+static int chain[MAX_CHAIN + 1];
+
+/**
+ * Stores the length of the addition chain.
+ */
+static int chain_len;
+
+/**
+ * Finds an addition chain for (FB_BITS - 1).
+ */
+static void find_chain() {
+	int i, j, k, l;
+
+	chain_len = -1;
+	for (int i = 0; i < MAX_CHAIN; i++) {
+		chain[i] = (i << 8) + i;
+	}
+	switch (FB_BITS) {
+		case 193:
+			chain[1] = (1 << 8) + 0;
+			chain_len = 8;
+			break;
+		case 233:
+			chain[1] = (1 << 8) + 0;
+			chain[3] = (3 << 8) + 0;
+			chain[6] = (6 << 8) + 0;
+			chain_len = 10;
+			break;
+		case 353:
+			chain[2] = (2 << 8) + 0;
+			chain[4] = (4 << 8) + 0;
+			chain_len = 10;
+			break;
+		default:
+			l = 0;
+			j = (FB_BITS - 1);
+			k = util_bits_dig(j) - 1;
+			for (i = 1; i < k; i++) {
+				if (j & (1 << i)) {
+					l++;
+				}
+			}
+			i = 0;
+			chain_len = k + l;
+			while (j != 1) {
+				if ((j & 0x01) != 0) {
+					i++;
+					chain[chain_len - i] = ((chain_len - i) << 8) + 0;
+				}
+				i++;
+				j = j >> 1;
+			}
+			break;
+	}
 }
 
 #endif
@@ -222,6 +290,9 @@ static void fb_poly_set(fb_t f) {
 #endif
 #if FB_SRT == QUICK || !defined(STRIP)
 	find_srz();
+#endif
+#if FB_INV == ITOHT || !defined(STRIP)
+	find_chain();
 #endif
 }
 
@@ -379,4 +450,18 @@ dig_t *fb_poly_get_slv(int i) {
 #else
 	return NULL;
 #endif
+}
+
+int *fb_poly_get_chain(int *len) {
+	if (chain_len > 0 && chain_len < MAX_CHAIN ) {
+		if (len != NULL) {
+			*len = chain_len;
+		}
+		return chain;
+	} else {
+		if (len != NULL) {
+			*len = 0;
+		}
+		return NULL;
+	}
 }

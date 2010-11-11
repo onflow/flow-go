@@ -908,6 +908,15 @@ static int inversion(void) {
 		} TEST_END;
 #endif
 
+#if FB_INV == ITOHT || !defined(STRIP)
+		TEST_BEGIN("itoh-tsuji inversion is correct") {
+			fb_rand(a);
+			fb_inv(b, a);
+			fb_inv_itoht(c, a);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
 #if FB_INV == LOWER || !defined(STRIP)
 		TEST_BEGIN("lower inversion is correct") {
 			fb_rand(a);

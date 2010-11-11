@@ -248,7 +248,7 @@
 /** Extended Euclidean algorithm. */
 #define EXGCD    4
 /** Use implementation provided by the lower layer. */
-#define LOWER    5
+#define LOWER    6
 /** Chosen prime field inversion method. */ 
 #define FP_INV   @FP_INV@ 
 
@@ -333,8 +333,10 @@
 #define ALMOS    3
 /** Extended Euclidean algorithm. */
 #define EXGCD    4
+/** Itoh-Utsji inversion. */
+#define ITOHT    5
 /** Use implementation provided by the lower layer. */
-#define LOWER    5
+#define LOWER    6
 /** Chosen binary field inversion method. */
 #define FB_INV   @FB_INV@ 
 
@@ -589,7 +591,7 @@
 /** Basic extension field arithmetic. */
 #define BASIC    1
 /** Integrated extension field arithmetic. */
-#define LOWER    5
+#define LOWER    6
 /* Chosen extension field arithmetic method. */
 #define PP_EXT   @PP_EXT@ 
 
@@ -680,12 +682,14 @@
 /** Chosen random generator. */
 #define RAND     @RAND@
 
+/** Null seed. */
+#define	ZERO     1
 /** Standard C library generator. */
-#define LIBC     1
+#define LIBC     2
 /** Device node generator. */
-#define DEV      2
+#define DEV      3
 /** Use Windows' CryptGenRandom. */
-#define WCGR     3
+#define WCGR     4
 /** Chosen random generator seeder. */
 #define SEED     @SEED@
 

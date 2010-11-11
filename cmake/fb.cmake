@@ -34,6 +34,7 @@ message("      FB_METHD=BASIC    Inversion by Fermat's Little Theorem.")
 message("      FB_METHD=BINAR    Binary Inversion algorithm.")
 message("      FB_METHD=ALMOS    Inversion by the Amost inverse algorithm.")
 message("      FB_METHD=EXGCD    Inversion by the Extended Euclidean algorithm.")
+message("      FB_METHD=ITOHT    Inversion by Itoh-Tsuji.")
 message("      FB_METHD=LOWER    Pass inversion to the lower level.\n")
 message("      Note: these methods must be given in order. Ex: FB_METHD=\"INTEG;INTEG;QUICK;QUICK;QUICK;QUICK;ALMOS\"\n")
 

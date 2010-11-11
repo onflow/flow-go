@@ -456,6 +456,14 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
+#if FB_INV == ITOHT || !defined(STRIP)
+	BENCH_BEGIN("fb_inv_itoht") {
+		fb_rand(a);
+		BENCH_ADD(fb_inv_itoht(c, a));
+	}
+	BENCH_END;
+#endif
+
 #if FB_INV == LOWER || !defined(STRIP)
 	BENCH_BEGIN("fb_inv_lower") {
 		fb_rand(a);

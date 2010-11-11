@@ -81,42 +81,44 @@ enum {
 	NIST_163 = 3,
 	/** Square-root friendly 163-bit polynomial. */
 	SQRT_163 = 4,
+	/** Example with 193 bits for Itoh-Tsuji. */
+	TRINO_193 = 5,
 	/** NIST 233-bit fast reduction polynomial. */
-	NIST_233 = 5,
+	NIST_233 = 6,
 	/** Square-root friendly 163-bit polynomial. */
-	SQRT_233 = 6,
+	SQRT_233 = 7,
 	/** SECG 239-bit fast reduction polynomial. */
-	SECG_239 = 7,
+	SECG_239 = 8,
 	/** Square-root friendly 239-bit polynomial. */
-	SQRT_239 = 8,
+	SQRT_239 = 9,
 	/** Square-root friendly 251-bit polynomial. */
-	SQRT_251 = 9,
+	SQRT_251 = 10,
 	/** eBATS curve_2_251 pentanomial. */
-	PENTA_251 = 10,
+	PENTA_251 = 11,
 	/** Hankerson's trinomial for GLS curves. */
-	TRINO_257 = 11,
-	/** Mike Scott's 271-bit pairing-friendly trinomial. */
-	TRINO_271 = 12,
-	/** Mike Scott's 271-bit pairing-friendly pentanomial. */
-	PENTA_271 = 13,
+	TRINO_257 = 12,
+	/** Scott's 271-bit pairing-friendly trinomial. */
+	TRINO_271 = 13,
+	/** Scott's 271-bit pairing-friendly pentanomial. */
+	PENTA_271 = 14,
 	/** NIST 283-bit fast reduction polynomial. */
-	NIST_283 = 14,
+	NIST_283 = 15,
 	/** Square-root friendly 283-bit polynomial. */
-	SQRT_283 = 15,
-	/** Mike Scott's 271-bit pairing-friendly trinomial. */
-	TRINO_353 = 16,
+	SQRT_283 = 16,
+	/** Scott's 271-bit pairing-friendly trinomial. */
+	TRINO_353 = 17,
 	/** Detrey's trinomial for genus 2 curves. */
-	TRINO_367 = 17,
+	TRINO_367 = 18,
 	/** NIST 409-bit fast reduction polynomial. */
-	NIST_409 = 18,
+	NIST_409 = 19,
 	/** Hankerson's trinomial for genus 2 curves. */
-	TRINO_439 = 19,
+	TRINO_439 = 20,
 	/** NIST 571-bit fast reduction polynomial. */
-	NIST_571 = 20,
+	NIST_571 = 21,
 	/** Square-root friendly 571-bit polynomial. */
-	SQRT_571 = 21,
-	/** Mike Scott's 1223-bit pairing-friendly trinomial. */
-	TRINO_1223 = 22
+	SQRT_571 = 22,
+	/** Scott's 1223-bit pairing-friendly trinomial. */
+	TRINO_1223 = 23
 };
 
 /*============================================================================*/
@@ -351,11 +353,13 @@ dig_t *fb_poly_get_srz(void);
 dig_t *fb_poly_tab_srz(int i);
 
 /**
- * Returns the consecutive squaring (i as a polynomial * z^4j)^{2^k}.
+ * Returns an addition chain for (FB_BITS - 1).
  *
- * @return the precomputed result.
+ * @param[out] len		- the number of elements in the addition chain.
+ *
+ * @return a pointer to the addition chain.
  */
-dig_t *fb_poly_get_tab_sqr(int i, int j, int k);
+int *fb_poly_get_chain(int *len);
 
 /**
  * Returns the non-zero coefficients of the configured trinomial or pentanomial.
@@ -824,14 +828,6 @@ void fb_inv_basic(fb_t c, fb_t a);
 void fb_inv_binar(fb_t c, fb_t a);
 
 /**
- * Inverts a binary field element using a direct call to the lower layer.
- *
- * @param[out] c			- the result.
- * @param[in] a				- the binary field element to invert.
- */
-void fb_inv_lower(fb_t c, fb_t a);
-
-/**
  * Inverts a binary field element using the Extended Euclidean algorithm.
  *
  * @param[out] c			- the result.
@@ -846,6 +842,22 @@ void fb_inv_exgcd(fb_t c, fb_t a);
  * @param[in] a				- the binary field element to invert.
  */
 void fb_inv_almos(fb_t c, fb_t a);
+
+/**
+ * Inverts a binary field element using Itoh-Tsuji inversion.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the binary field element to invert.
+ */
+void fb_inv_itoht(fb_t c, fb_t a);
+
+/**
+ * Inverts a binary field element using a direct call to the lower layer.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the binary field element to invert.
+ */
+void fb_inv_lower(fb_t c, fb_t a);
 
 /**
  * Solves a quadratic equation for a, Tr(a) = 0 by repeated squarings and
