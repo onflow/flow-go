@@ -173,7 +173,6 @@ static void find_solve() {
 
 #endif
 
-
 #if FB_SRT == QUICK || !defined(STRIP)
 
 /**
@@ -193,11 +192,13 @@ static fb_st fb_tab_srz[256];
  * Precomputes the square root of z.
  */
 static void find_srz() {
+
 	fb_set_bit(fb_srz, 1, 1);
 
 	for (int i = 1; i < FB_BITS; i++) {
 		fb_sqr(fb_srz, fb_srz);
 	}
+
 #ifdef FB_PRECO
 	for (int i = 0; i <= 255; i++) {
 		fb_mul_dig(fb_tab_srz[i], fb_srz, i);
@@ -223,6 +224,13 @@ static int chain[MAX_CHAIN + 1];
  * Stores the length of the addition chain.
  */
 static int chain_len;
+
+#ifdef FB_PRECO
+/**
+ * Tables for repeated squarings.
+ */
+fb_st fb_tab_sqr[MAX_CHAIN][(FB_DIGIT / 4) * FB_DIGS][16];
+#endif
 
 /**
  * Finds an addition chain for (FB_BITS - 1).
@@ -271,6 +279,46 @@ static void find_chain() {
 			}
 			break;
 	}
+#ifdef FB_PRECO
+	fb_t t;
+	int x, y, u[chain_len + 1];
+
+	fb_null(t);
+
+	TRY {
+		fb_new(t);
+
+		u[0] = 1;
+		u[1] = 2;
+		for (i = 2; i <= chain_len; i++) {
+			x = chain[i - 1] >> 8;
+			y = chain[i - 1] - (x << 8);
+			if (x == y) {
+				u[i] = 2 * u[i - 1];
+			} else {
+				u[i] = u[x] + u[y];
+			}
+		}
+
+		for (i = 0; i <= chain_len; i++) {
+			for (j = 0; j < FB_BITS; j+= 4) {
+				for (k = 0; k < 16; k++) {
+					fb_zero(t);
+					fb_set_dig(t, k);
+					fb_lsh(t, t, j);
+					for (l = 0; l < u[i]; l++) {
+						fb_sqr(t, t);
+					}
+					fb_copy(fb_tab_sqr[i][j/4][k], t);
+				}
+			}
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb_free(t);
+	}
+#endif
 }
 
 #endif
@@ -409,6 +457,20 @@ void fb_poly_set_penta(int a, int b, int c) {
 dig_t *fb_poly_get_srz(void) {
 #if FB_SRT == QUICK || !defined(STRIP)
 	return fb_srz;
+#else
+	return NULL;
+#endif
+}
+
+dig_t *fb_poly_tab_sqr(int i, int j, int k) {
+#if FB_INV == ITOHT || !defined(STRIP)
+
+#ifdef FB_PRECO
+	return fb_tab_sqr[i][j][k];
+#else
+	return NULL;
+#endif
+
 #else
 	return NULL;
 #endif

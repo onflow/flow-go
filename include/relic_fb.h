@@ -353,6 +353,13 @@ dig_t *fb_poly_get_srz(void);
 dig_t *fb_poly_tab_srz(int i);
 
 /**
+ * Returns sqrt(z) * (i represented as a polynomial).
+ *
+ * @return the precomputed result.
+ */
+dig_t *fb_poly_tab_sqr(int i, int j, int k);
+
+/**
  * Returns an addition chain for (FB_BITS - 1).
  *
  * @param[out] len		- the number of elements in the addition chain.
