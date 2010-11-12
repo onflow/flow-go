@@ -289,6 +289,8 @@ typedef align dig_t fb_st[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
 #define fb_inv(C, A)	fb_inv_exgcd(C, A)
 #elif FB_INV == ALMOS
 #define fb_inv(C, A)	fb_inv_almos(C, A)
+#elif FB_INV == ITOHT
+#define fb_inv(C, A)	fb_inv_itoht(C, A)
 #endif
 
 /*============================================================================*/
