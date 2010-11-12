@@ -260,20 +260,16 @@ static void eb_mul_tnaf_impl(eb_t r, eb_t p, bn_t k) {
 static void table_init_ordin(eb_t *t, eb_t p) {
 	int i;
 
-	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_set_infty(t[i]);
-		fb_set_bit(t[i]->z, 0, 1);
-		t[i]->norm = 1;
-	}
-
-	eb_dbl_tab(t[0], p);
+	eb_dbl(t[0], p);
 
 #if EB_WIDTH > 2
-	eb_add_tab(t[1], t[0], p);
+	eb_add(t[1], t[0], p);
 	for (i = 2; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_add_tab(t[i], t[i - 1], t[0]);
+		eb_add(t[i], t[i - 1], t[0]);
 	}
 #endif
+
+	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
 
 	eb_copy(t[0], p);
 }

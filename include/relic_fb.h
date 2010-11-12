@@ -869,6 +869,15 @@ void fb_inv_itoht(fb_t c, fb_t a);
 void fb_inv_lower(fb_t c, fb_t a);
 
 /**
+ * Inverts multiple binary field elements.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the binary field elements to invert.
+ * @param[in] n				- the number of elements.
+ */
+void fb_inv_sim(fb_t * c, fb_t * a, int n);
+
+/**
  * Solves a quadratic equation for a, Tr(a) = 0 by repeated squarings and
  * additions.
  *

@@ -1001,6 +1001,15 @@ void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l);
 void eb_norm(eb_t r, eb_t p);
 
 /**
+ * Convertes multiple points to affine coordinates.
+ *
+ * @param[out] r			- the result.
+ * @param[in] t				- the points to convert.
+ * @param[in] n				- the number of points.
+ */
+void eb_norm_sim(eb_t * r, eb_t * t, int n);
+
+/**
  * Maps a byte array to a point in a binary elliptic curve.
  *
  * @param[out] p			- the result.

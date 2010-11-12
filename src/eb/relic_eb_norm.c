@@ -49,7 +49,7 @@
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-static void eb_norm_ordin(eb_t r, eb_t p) {
+static void eb_norm_ordin(eb_t r, eb_t p, int inverted) {
 	if (!p->norm) {
 		fb_t t0;
 
@@ -58,7 +58,11 @@ static void eb_norm_ordin(eb_t r, eb_t p) {
 		TRY {
 			fb_new(t0);
 
-			fb_inv(t0, p->z);
+			if (inverted) {
+				fb_copy(t0, p->z);
+			} else {
+				fb_inv(t0, p->z);
+			}
 			fb_mul(r->x, p->x, t0);
 			fb_sqr(t0, t0);
 			fb_mul(r->y, p->y, t0);
@@ -84,7 +88,7 @@ static void eb_norm_ordin(eb_t r, eb_t p) {
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-static void eb_norm_super(eb_t r, eb_t p) {
+static void eb_norm_super(eb_t r, eb_t p, int inverted) {
 	if (!p->norm) {
 		fb_t t0;
 
@@ -93,7 +97,11 @@ static void eb_norm_super(eb_t r, eb_t p) {
 		TRY {
 			fb_new(t0);
 
-			fb_inv(t0, p->z);
+			if (inverted) {
+				fb_copy(t0, p->z);
+			} else {
+				fb_inv(t0, p->z);
+			}
 			fb_mul(r->x, p->x, t0);
 			fb_mul(r->y, p->y, t0);
 			fb_zero(r->z);
@@ -166,14 +174,57 @@ void eb_norm(eb_t r, eb_t p) {
 
 #if defined(EB_SUPER)
 	if (eb_curve_is_super()) {
-		eb_norm_super(r, p);
+		eb_norm_super(r, p, 0);
 		return;
 	}
 #endif /* EB_SUPER */
 
 #if defined(EB_ORDIN) || defined(EB_KBLTZ)
-	eb_norm_ordin(r, p);
+	eb_norm_ordin(r, p, 0);
 #endif /* EB_ORDIN || EB_KBLTZ */
 
 #endif /* EB_ADD == PROJC */
+}
+
+void eb_norm_sim(eb_t * r, eb_t * t, int n) {
+#if EB_ADD == PROJC
+	int i;
+	fb_t a[n];
+
+	for (i = 0; i < n; i++) {
+		fb_null(a[i]);
+	}
+
+	for (i = 0; i < n; i++) {
+		fb_new(a[i]);
+	}
+
+	for (i = 0; i < n; i++) {
+		fb_copy(a[i], t[i]->z);
+	}
+
+	fb_inv_sim(a, a, n);
+
+	for (i = 0; i < n; i++) {
+		fb_copy(t[i]->z, a[i]);
+	}
+
+	for (i = 0; i < n; i++) {
+#if defined(EB_SUPER)
+		if (eb_curve_is_super()) {
+			eb_norm_super(r[i], t[i], 1);
+		} else {
+#endif
+#if defined(EB_ORDIN) || defined(EB_KBLTZ)
+			eb_norm_ordin(r[i], t[i], 1);
+#endif
+#if defined(EB_SUPER)
+		}
+#endif
+	}
+
+	for (i = 0; i < n; i++) {
+		fb_free(a[i]);
+	}
+#endif /* eb_ADD == PROJC */
 }

@@ -68,19 +68,19 @@ void fb_inv_basic(fb_t c, fb_t a) {
 				fb_sqr(t, t);
 			}
 			fb_mul(u, u, t);
-			if ((x & 0x01) != 0) {
+			if ((x & 0x01) == 0) {
+				x = x >> 1;
+			} else {
 				/* v = v * u, u = u^2, x = (x - 1)/2. */
 				fb_mul(v, v, u);
 				fb_sqr(u, u);
+				x = (x - 1) >> 1;
 			}
-			x = x >> 1;
 		}
 		fb_copy(c, v);
-	}
-	CATCH_ANY {
+	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
+	} FINALLY {
 		fb_free(t);
 		fb_free(u);
 		fb_free(v);
@@ -375,65 +375,46 @@ void fb_inv_almos(fb_t c, fb_t a) {
 
 #endif
 
-#if FB_INV == ITOHT || !defined(STRIP)
-
-void fb_inv_itoht(fb_t c, fb_t a) {
-	int i, j, k, x, y;
-	int len, *chain = fb_poly_get_chain(&len);
-	int u[len + 1];
-	fb_t table[len + 1];
-
-	for (i = 0; i <= len; i++) {
-		fb_null(table[i]);
-	}
-
-	TRY {
-		for (i = 0; i <= len; i++) {
-			fb_new(table[i]);
-		}
-
-		u[0] = 1;
-		u[1] = 2;
-		fb_copy(table[0], a);
-		fb_sqr(table[1], table[0]);
-		fb_mul(table[1], table[1], table[0]);
-		for (i = 2; i <= len; i++) {
-			x = chain[i - 1] >> 8;
-			y = chain[i - 1] - (x << 8);
-			u[i] = u[x] + u[y];
-#ifndef FB_PRECO
-			fb_sqr(table[i], table[x]);
-			for (j = 1; j < u[y]; j++) {
-				fb_sqr(table[i], table[i]);
-			}
-#else
-			fb_zero(table[i]);
-			for (j = FB_DIGIT - 4; j >= 0; j -= 4) {
-				dig_t *tmpa = table[x];
-				for (k = 0; k < FB_DIGS; k++, tmpa++) {
-					dig_t v = (*tmpa >> j) & 0x0F;
-					fb_addn_low(table[i], table[i], fb_poly_tab_sqr(y,
-									(k * FB_DIGIT + j) / 4, v));
-				}
-			}
-#endif
-			fb_mul(table[i], table[i], table[y]);
-		}
-		fb_sqr(c, table[len]);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		for (i = 0; i <= len; i++) {
-			fb_free(table[i]);
-		}
-	}
-}
-
-#endif
-
 #if FB_INV == LOWER || !defined(STRIP)
 
 void fb_inv_lower(fb_t c, fb_t a) {
 	fb_invn_low(c, a);
 }
 #endif
+
+void fb_inv_sim(fb_t * c, fb_t * a, int n) {
+	int i;
+	fb_t t[n];
+	fb_t u;
+
+	for (i = 0; i < n; i++) {
+		fb_null(t[i]);
+	}
+	fb_null(u);
+
+	for (i = 0; i < n; i++) {
+		fb_new(t[i]);
+	}
+	fb_new(u);
+
+	fb_copy(c[0], a[0]);
+	fb_copy(t[0], a[0]);
+
+	for (i = 1; i < n; i++) {
+		fb_copy(t[i], a[i]);
+		fb_mul(c[i], c[i - 1], a[i]);
+	}
+
+	fb_inv(u, c[n - 1]);
+
+	for (i = n - 1; i > 0; i--) {
+		fb_mul(c[i], u, c[i - 1]);
+		fb_mul(u, u, t[i]);
+	}
+	fb_copy(c[0], u);
+
+	for (i = 0; i < n; i++) {
+		fb_free(t[i]);
+	}
+	fb_free(u);
+}
