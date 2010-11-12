@@ -47,7 +47,7 @@
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-void ep_norm_impl(ep_t r, ep_t p) {
+void ep_norm_impl(ep_t r, ep_t p, int inverted) {
 	if (!p->norm) {
 		fp_t t0, t1;
 
@@ -59,7 +59,11 @@ void ep_norm_impl(ep_t r, ep_t p) {
 			fp_new(t0);
 			fp_new(t1);
 
-			fp_inv(t1, p->z);
+			if (inverted) {
+				fp_copy(t1, p->z);
+			} else {
+				fp_inv(t1, p->z);
+			}
 			fp_sqr(t0, t1);
 			fp_mul(r->x, p->x, t0);
 			fp_mul(t0, t0, t1);
@@ -94,6 +98,39 @@ void ep_norm(ep_t r, ep_t p) {
 		return;
 	}
 #if EP_ADD == PROJC || !defined(STRIP)
-	ep_norm_impl(r, p);
+	ep_norm_impl(r, p, 0);
+#endif /* EP_ADD == PROJC */
+}
+
+void ep_norm_sim(ep_t * r, ep_t * t, int n) {
+#if EP_ADD == PROJC
+	int i;
+	fp_t a[n];
+
+	for (i = 0; i < n; i++) {
+		fp_null(a[i]);
+	}
+
+	for (i = 0; i < n; i++) {
+		fp_new(a[i]);
+	}
+
+	for (i = 0; i < n; i++) {
+		fp_copy(a[i], t[i]->z);
+	}
+
+	fp_inv_sim(a, a, n);
+
+	for (i = 0; i < n; i++) {
+		fp_copy(t[i]->z, a[i]);
+	}
+
+	for (i = 0; i < n; i++) {
+		ep_norm_impl(r[i], t[i], 1);
+	}
+
+	for (i = 0; i < n; i++) {
+		fp_free(a[i]);
+	}
 #endif /* EP_ADD == PROJC */
 }

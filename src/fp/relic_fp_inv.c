@@ -409,3 +409,40 @@ void fp_inv_lower(fp_t c, fp_t a) {
 	fp_invn_low(c, a);
 }
 #endif
+
+void fp_inv_sim(fp_t * c, fp_t * a, int n) {
+	int i;
+	fp_t t[n];
+	fp_t u;
+
+	for (i = 0; i < n; i++) {
+		fp_null(t[i]);
+	}
+	fp_null(u);
+
+	for (i = 0; i < n; i++) {
+		fp_new(t[i]);
+	}
+	fp_new(u);
+
+	fp_copy(c[0], a[0]);
+	fp_copy(t[0], a[0]);
+
+	for (i = 1; i < n; i++) {
+		fp_copy(t[i], a[i]);
+		fp_mul(c[i], c[i - 1], a[i]);
+	}
+
+	fp_inv(u, c[n - 1]);
+
+	for (i = n - 1; i > 0; i--) {
+		fp_mul(c[i], u, c[i - 1]);
+		fp_mul(u, u, t[i]);
+	}
+	fp_copy(c[0], u);
+
+	for (i = 0; i < n; i++) {
+		fp_free(t[i]);
+	}
+	fp_free(u);
+}

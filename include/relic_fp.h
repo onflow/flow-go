@@ -873,6 +873,15 @@ void fp_inv_exgcd(fp_t c, fp_t a);
 void fp_inv_lower(fp_t c, fp_t a);
 
 /**
+ * Inverts multiple prime field elements.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the prime field elements to invert.
+ * @param[in] n				- the number of elements.
+ */
+void fp_inv_sim(fp_t * c, fp_t * a, int n);
+
+/**
  * Exponentiates a prime field element using the binary
  * method.
  *

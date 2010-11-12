@@ -50,20 +50,15 @@
 static void table_init(ep_t * t, ep_t p) {
 	int i;
 
-	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-		ep_set_infty(t[i]);
-		fp_set_dig(t[i]->z, 1);
-		t[i]->norm = 1;
-	}
-
-	ep_dbl_tab(t[0], p);
+	ep_dbl(t[0], p);
 
 #if EP_WIDTH > 2
-	ep_add_tab(t[1], t[0], p);
+	ep_add(t[1], t[0], p);
 	for (i = 2; i < (1 << (EP_WIDTH - 2)); i++) {
-		ep_add_tab(t[i], t[i - 1], t[0]);
+		ep_add(t[i], t[i - 1], t[0]);
 	}
 #endif
+	ep_norm_sim(t + 1, t + 1, (1 << (EP_WIDTH - 2)) - 1);
 
 	ep_copy(t[0], p);
 }

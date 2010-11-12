@@ -890,6 +890,15 @@ void ep_mul_sim_gen(ep_t r, bn_t k, ep_t q, bn_t l);
 void ep_norm(ep_t r, ep_t p);
 
 /**
+ * Convertes multiple points to affine coordinates.
+ *
+ * @param[out] r			- the result.
+ * @param[in] t				- the points to convert.
+ * @param[in] n				- the number of points.
+ */
+void ep_norm_sim(ep_t * r, ep_t * t, int n);
+
+/**
  * Maps a byte array to a point in a prime elliptic curve.
  *
  * @param[out] p			- the result.
