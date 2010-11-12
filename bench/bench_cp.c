@@ -332,7 +332,7 @@ static void bbs(void) {
 	gt_new(z);
 	bn_new(d);
 
-	BENCH_BEGIN("cp_bls_gen") {
+	BENCH_BEGIN("cp_bbs_gen") {
 		BENCH_ADD(cp_bbs_gen(d, p, z));
 	}
 	BENCH_END;

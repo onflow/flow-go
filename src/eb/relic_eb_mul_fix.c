@@ -700,7 +700,7 @@ void eb_mul_pre_wtnaf(eb_t *t, eb_t p) {
 	}
 #endif
 
-#if defined(EB_ORDIN)
+#if defined(EB_ORDIN) || defined(EB_SUPER)
 	eb_mul_pre_ordin(t, p);
 #endif
 }
@@ -713,7 +713,7 @@ void eb_mul_fix_wtnaf(eb_t r, eb_t *t, bn_t k) {
 	}
 #endif
 
-#if defined(EB_ORDIN)
+#if defined(EB_ORDIN) || defined(EB_SUPER)
 	eb_mul_fix_ordin(r, t, k);
 #endif
 }

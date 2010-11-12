@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EB_MUL == WTNAF || !defined(STRIP)
+#if EP_MUL == WTNAF || !defined(STRIP)
 
 /**
  * Precomputes a table for a point multiplication on an ordinary curve.

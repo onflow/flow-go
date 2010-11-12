@@ -118,7 +118,7 @@ void fp_param_set(int param) {
 #if FP_PRIME == 158
 			case BN_158:
 				/* x = 4000000031. */
-				fp_param_get_bn(t0, param);
+				fp_param_get_bn(t0);
 				/* p = 36 * x^4 + 36 * x^3 + 24 * x^2 + 6 * x + 1. */
 				bn_set_dig(p, 1);
 				bn_mul_dig(t1, t0, 6);
