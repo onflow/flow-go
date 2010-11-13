@@ -395,28 +395,6 @@ typedef eb_st *eb_t;
 #define eb_mul_sim(R, P, K, Q, L)	eb_mul_sim_joint(R, P, K, Q, L)
 #endif
 
-/**
- * Renames elliptic curve arithmetic operations to build precomputation
- * tables with the right coordinate system.
- */
-#if defined(EB_MIXED)
-/** @{ */
-#define eb_add_tab			eb_add_basic
-#define eb_sub_tab			eb_sub_basic
-#define eb_neg_tab			eb_neg_basic
-#define eb_dbl_tab			eb_dbl_basic
-#define eb_frb_tab			eb_frb_basic
-/** @} */
-#else
-/**@{ */
-#define eb_add_tab			eb_add
-#define eb_sub_tab			eb_sub
-#define eb_neg_tab			eb_neg
-#define eb_dbl_tab			eb_dbl
-#define eb_frb_tab			eb_frb
-/** @} */
-#endif
-
 /*============================================================================*/
 /* Function prototypes                                                        */
 /*============================================================================*/
@@ -1001,7 +979,7 @@ void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l);
 void eb_norm(eb_t r, eb_t p);
 
 /**
- * Convertes multiple points to affine coordinates.
+ * Converts multiple points to affine coordinates.
  *
  * @param[out] r			- the result.
  * @param[in] t				- the points to convert.
