@@ -449,7 +449,6 @@ void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 
 	w = EB_WIDTH / 2;
 
-
 	TRY {
 		bn_new(n);
 
