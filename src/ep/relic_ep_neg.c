@@ -39,7 +39,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 
 void ep_neg_basic(ep_t r, ep_t p) {
 	if (ep_is_infty(p)) {

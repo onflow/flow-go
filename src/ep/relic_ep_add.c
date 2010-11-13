@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 
 /**
  * Adds two points represented in affine coordinates on an ordinary prime
@@ -110,9 +110,9 @@ static void ep_add_basic_impl(ep_t r, ep_t p, ep_t q) {
 	}
 }
 
-#endif /* EP_ADD == BASIC || EP_MIXED */
+#endif /* EP_ADD == BASIC */
 
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == PROJC || !defined(STRIP)
 
 /**
  * Adds two points represented in projective coordinates on an ordinary prime
@@ -303,13 +303,13 @@ static void ep_add_projc_impl(ep_t r, ep_t p, ep_t q) {
 	}
 }
 
-#endif /* EP_ADD == PROJC || EP_MIXED */
+#endif /* EP_ADD == PROJC */
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 
 void ep_add_basic(ep_t r, ep_t p, ep_t q) {
 	if (ep_is_infty(p)) {
@@ -353,7 +353,7 @@ void ep_sub_basic(ep_t r, ep_t p, ep_t q) {
 
 #endif
 
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == PROJC || !defined(STRIP)
 
 void ep_add_projc(ep_t r, ep_t p, ep_t q) {
 	if (ep_is_infty(p)) {

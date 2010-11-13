@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_ADD == PROJC || defined(EP_MIXED)
+#if EP_ADD == PROJC
 
 /**
  * Normalizes a point represented in projective coordinates.
@@ -69,9 +69,11 @@ void ep_norm_impl(ep_t r, ep_t p, int inverted) {
 			fp_mul(t0, t0, t1);
 			fp_mul(r->y, p->y, t0);
 			fp_set_dig(r->z, 1);
-		} CATCH_ANY {
+		}
+		CATCH_ANY {
 			THROW(ERR_CAUGHT);
-		} FINALLY {
+		}
+		FINALLY {
 			fp_free(t0);
 			fp_free(t1);
 		}
@@ -80,7 +82,7 @@ void ep_norm_impl(ep_t r, ep_t p, int inverted) {
 	r->norm = 1;
 }
 
-#endif /* EP_ADD == PROJC || EP_MIXED */
+#endif /* EP_ADD == PROJC */
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -103,7 +105,6 @@ void ep_norm(ep_t r, ep_t p) {
 }
 
 void ep_norm_sim(ep_t * r, ep_t * t, int n) {
-#if EP_ADD == PROJC
 	int i;
 	fp_t a[n];
 
@@ -111,26 +112,31 @@ void ep_norm_sim(ep_t * r, ep_t * t, int n) {
 		fp_null(a[i]);
 	}
 
-	for (i = 0; i < n; i++) {
-		fp_new(a[i]);
-	}
+	TRY {
+		for (i = 0; i < n; i++) {
+			fp_new(a[i]);
+		}
 
-	for (i = 0; i < n; i++) {
-		fp_copy(a[i], t[i]->z);
-	}
+		for (i = 0; i < n; i++) {
+			fp_copy(a[i], t[i]->z);
+		}
 
-	fp_inv_sim(a, a, n);
+		fp_inv_sim(a, a, n);
 
-	for (i = 0; i < n; i++) {
-		fp_copy(t[i]->z, a[i]);
-	}
+		for (i = 0; i < n; i++) {
+			fp_copy(t[i]->z, a[i]);
+		}
 
-	for (i = 0; i < n; i++) {
-		ep_norm_impl(r[i], t[i], 1);
+		for (i = 0; i < n; i++) {
+			ep_norm_impl(r[i], t[i], 1);
+		}
 	}
-
-	for (i = 0; i < n; i++) {
-		fp_free(a[i]);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-#endif /* EP_ADD == PROJC */
+	FINALLY {
+		for (i = 0; i < n; i++) {
+			fp_free(a[i]);
+		}
+	}
 }

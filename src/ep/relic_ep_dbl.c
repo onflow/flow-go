@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 
 /**
  * Doubles a point represented in affine coordinates on an ordinary prime
@@ -117,7 +117,7 @@ static void ep_dbl_basic_impl(ep_t r, ep_t p) {
 
 #endif /* EP_ADD == BASIC */
 
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == PROJC || !defined(STRIP)
 
 /**
  * Doubles a point represented in projective coordinates on an ordinary prime
@@ -286,7 +286,7 @@ void ep_dbl_projc_impl(ep_t r, ep_t p) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 
 void ep_dbl_basic(ep_t r, ep_t p) {
 	if (ep_is_infty(p)) {
@@ -298,7 +298,7 @@ void ep_dbl_basic(ep_t r, ep_t p) {
 
 #endif
 
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == PROJC || !defined(STRIP)
 
 void ep_dbl_projc(ep_t r, ep_t p) {
 	if (ep_is_infty(p)) {
