@@ -69,21 +69,6 @@ void fb12_mul(fb12_t c, fb12_t a, fb12_t b) {
 	}
 }
 
-void fb12_mul_dxb(fb12_t c, fb12_t a, fb_t b) {
-	fb_mul(c[0][0], a[0][0], b);
-	fb_mul(c[0][1], a[0][1], b);
-	fb_mul(c[0][2], a[0][2], b);
-	fb_mul(c[0][3], a[0][3], b);
-	fb_mul(c[0][4], a[0][4], b);
-	fb_mul(c[0][5], a[0][5], b);
-	fb_mul(c[1][0], a[1][0], b);
-	fb_mul(c[1][1], a[1][1], b);
-	fb_mul(c[1][2], a[1][2], b);
-	fb_mul(c[1][3], a[1][3], b);
-	fb_mul(c[1][4], a[1][4], b);
-	fb_mul(c[1][5], a[1][5], b);
-}
-
 void fb12_mul_dxs(fb12_t c, fb12_t a, fb12_t b) {
 	fb6_t t0, t1;
 

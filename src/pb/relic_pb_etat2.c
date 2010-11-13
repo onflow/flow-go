@@ -64,6 +64,38 @@
 #define D12		21
 #define D20		23
 
+static void fb12_mul_dxs4(fb12_t c, fb12_t a, fb12_t b) {
+	fb6_t t0, t1, t6;
+
+	fb6_null(t0);
+	fb6_null(t1);
+	fb6_null(t6);
+
+	TRY {
+		fb6_new(t0);
+		fb6_new(t1);
+		fb6_new(t6);
+		fb6_add(t0, a[0], a[1]);
+		fb6_add(t1, b[0], b[1]);
+		fb6_mul(t6, t0, t1);
+		fb6_mul(t0, a[0], b[0]);
+		fb6_zero(t1);
+		fb_mul(t1[0], a[1][0], b[1][0]);
+		fb_mul(t1[1], a[1][1], b[1][0]);
+		fb_mul(t1[2], a[1][2], b[1][0]);
+		fb_mul(t1[4], a[1][4], b[1][0]);
+		fb6_mul_nor(t1, t1);
+		fb6_add(c[0], t0, t1);
+		fb6_add(c[1], t0, t6);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb6_free(t0);
+		fb6_free(t1);
+		fb6_free(t6);
+	}
+}
+
 /**
  * Computes the final exponentiation of the eta_t pairing over genus 2 curves.
  *
@@ -1735,7 +1767,7 @@ void pb_map_etat2_gxg(fb12_t r, hb_t p, hb_t q) {
 				fb_mul(t0[0][j], l1[0][j], mubar[e1][0]);
 			}
 			fb_mul(t0[1][0], l1[1][0], mubar[e1][0]);
-			fb12_mul_dxs2(l0, l0, t0);
+			fb12_mul_dxs4(l0, l0, t0);
 			fb12_sqr(l1, l1);
 			for (j = 0; j < 6; j++) {
 				fb_mul(l1[0][j], l1[0][j], nubar[e1][0]);
@@ -1750,7 +1782,7 @@ void pb_map_etat2_gxg(fb12_t r, hb_t p, hb_t q) {
 				fb_mul(t0[0][j], l1[0][j], mubar[e1][0]);
 			}
 			fb_mul(t0[1][0], l1[1][0], mubar[e1][0]);
-			fb12_mul_dxs2(l0, l0, t0);
+			fb12_mul_dxs4(l0, l0, t0);
 			fb12_sqr(l1, l1);
 			for (j = 0; j < 6; j++) {
 				fb_mul(l1[0][j], l1[0][j], nubar[e1][0]);
@@ -1771,9 +1803,31 @@ void pb_map_etat2_gxg(fb12_t r, hb_t p, hb_t q) {
 		fb12_zero(t0);
 		fb12_sqr(t0, l0);
 		fb12_mul(l0, l0, l1);
-		fb12_mul_dxb(l0, l0, q->u1);
+		fb_mul(l0[0][0], l0[0][0], q->u1);
+		fb_mul(l0[0][1], l0[0][1], q->u1);
+		fb_mul(l0[0][2], l0[0][2], q->u1);
+		fb_mul(l0[0][3], l0[0][3], q->u1);
+		fb_mul(l0[0][4], l0[0][4], q->u1);
+		fb_mul(l0[0][5], l0[0][5], q->u1);
+		fb_mul(l0[1][0], l0[1][0], q->u1);
+		fb_mul(l0[1][1], l0[1][1], q->u1);
+		fb_mul(l0[1][2], l0[1][2], q->u1);
+		fb_mul(l0[1][3], l0[1][3], q->u1);
+		fb_mul(l0[1][4], l0[1][4], q->u1);
+		fb_mul(l0[1][5], l0[1][5], q->u1);
 		fb12_sqr(l1, l1);
-		fb12_mul_dxb(l1, l1, q->u0);
+		fb_mul(l1[0][0], l1[0][0], q->u0);
+		fb_mul(l1[0][1], l1[0][1], q->u0);
+		fb_mul(l1[0][2], l1[0][2], q->u0);
+		fb_mul(l1[0][3], l1[0][3], q->u0);
+		fb_mul(l1[0][4], l1[0][4], q->u0);
+		fb_mul(l1[0][5], l1[0][5], q->u0);
+		fb_mul(l1[1][0], l1[1][0], q->u0);
+		fb_mul(l1[1][1], l1[1][1], q->u0);
+		fb_mul(l1[1][2], l1[1][2], q->u0);
+		fb_mul(l1[1][3], l1[1][3], q->u0);
+		fb_mul(l1[1][4], l1[1][4], q->u0);
+		fb_mul(l1[1][5], l1[1][5], q->u0);
 		fb12_add(t0, t0, l0);
 		fb12_add(t0, t0, l1);
 		fb12_mul(r, r, t0);
