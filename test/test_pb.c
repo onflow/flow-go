@@ -1644,7 +1644,7 @@ static int pairing1(void) {
 
 		eb_curve_get_ord(n);
 
-		TEST_BEGIN("etat pairing is not degenerate") {
+		TEST_BEGIN("etat pairing is non-degenerate") {
 			eb_rand(p);
 			eb_rand(q);
 			pb_map_etat1(e1, p, q);
@@ -1731,19 +1731,7 @@ static int pairing2(void) {
 
 		hb_curve_get_ord(n);
 
-		TEST_BEGIN("optimal ate pairing with (type-a x type-a) divisors is bilinear") {
-			fb12_zero(e1);
-			fb12_zero(e2);
-			hb_rand_non(p, 0);
-			hb_rand_non(q, 0);
-			hb_oct(r, q);
-			pb_map_oate2(e1, p, r);
-			hb_oct(r, p);
-			pb_map_oate2(e2, r, q);
-			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
-		} TEST_END;
-
-		TEST_BEGIN("etat pairing with (deg x deg) divisors is not degenerate") {
+		TEST_BEGIN("etat pairing with (deg x deg) divisors is non-degenerate") {
 			fb12_zero(e1);
 			hb_rand_deg(p);
 			hb_rand_deg(q);
@@ -1765,7 +1753,7 @@ static int pairing2(void) {
 			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 
-		TEST_BEGIN("etat pairing with (deg x type-a non) divisors is not degenerate") {
+		TEST_BEGIN("etat pairing with (deg x type-a non) divisors is non-degenerate") {
 			fb12_zero(e1);
 			hb_rand_deg(p);
 			hb_rand_non(q, 0);
@@ -1787,7 +1775,7 @@ static int pairing2(void) {
 			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 
-		TEST_BEGIN("etat pairing with (type-a non x deg) divisors is not degenerate") {
+		TEST_BEGIN("etat pairing with (type-a non x deg) divisors is non-degenerate") {
 			fb12_zero(e1);
 			hb_rand_non(p, 0);
 			hb_rand_deg(q);
@@ -1809,7 +1797,7 @@ static int pairing2(void) {
 			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 
-		TEST_BEGIN("etat pairing with (type-a x type-a) divisors is not degenerate") {
+		TEST_BEGIN("etat pairing with (type-a x type-a) divisors is non-degenerate") {
 			fb12_zero(e1);
 			hb_rand_non(p, 0);
 			hb_rand_non(q, 0);
@@ -1831,6 +1819,16 @@ static int pairing2(void) {
 			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 
+		TEST_BEGIN("etat pairing with (type-b x type-b) divisors is non-degenerate") {
+			fb12_zero(e1);
+			hb_rand_non(p, 1);
+			hb_rand_non(q, 1);
+			pb_map_etat2(e1, p, q);
+			fb12_zero(e2);
+			fb_set_dig(e2[0][0], 1);
+			TEST_ASSERT(fb12_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
 		TEST_BEGIN("etat pairing with (type-b x type-b) divisors is bilinear") {
 			fb12_zero(e1);
 			fb12_zero(e2);
@@ -1840,6 +1838,74 @@ static int pairing2(void) {
 			pb_map_etat2(e1, p, r);
 			hb_oct(r, p);
 			pb_map_etat2(e2, r, q);
+			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+
+		hb_curve_get_ord(n);
+
+		TEST_BEGIN("optimal eta pairing with (deg x deg) divisors is non-degenerate") {
+			fb12_zero(e1);
+			fb12_zero(e2);
+			fb_set_dig(e2[0][0], 1);
+			hb_rand_deg(p);
+			hb_rand_deg(q);
+			pb_map_oeta2(e1, p, q);
+			TEST_ASSERT(fb12_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("optimal eta pairing with (deg x deg) divisors is bilinear") {
+			fb12_zero(e1);
+			fb12_zero(e2);
+			hb_rand_deg(p);
+			hb_rand_deg(q);
+			hb_oct(r, q);
+			pb_map_oeta2(e1, p, r);
+			hb_oct(r, p);
+			pb_map_oeta2(e2, r, q);
+			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("optimal eta pairing with (gen x deg) divisors is non-degenerate") {
+			fb12_zero(e1);
+			fb12_zero(e2);
+			fb_set_dig(e2[0][0], 1);
+			hb_rand_non(p, 0);
+			hb_rand_deg(q);
+			pb_map_oeta2(e1, p, q);
+			TEST_ASSERT(fb12_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("optimal eta pairing with (gen x deg) divisors is bilinear") {
+			fb12_zero(e1);
+			fb12_zero(e2);
+			hb_rand_non(p, 0);
+			hb_rand_deg(q);
+			hb_oct(r, q);
+			pb_map_oeta2(e1, p, r);
+			hb_oct(r, p);
+			pb_map_oeta2(e2, r, q);
+			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("optimal eta pairing with (gen x gen) divisors is non-degenerate") {
+			fb12_zero(e1);
+			fb12_zero(e2);
+			fb_set_dig(e2[0][0], 1);
+			hb_rand_non(p, 0);
+			hb_rand_non(q, 0);
+			pb_map_oeta2(e1, p, q);
+			TEST_ASSERT(fb12_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("optimal eta pairing with (gen x gen) divisors is bilinear") {
+			fb12_zero(e1);
+			fb12_zero(e2);
+			hb_rand_non(p, 0);
+			hb_rand_non(q, 0);
+			hb_oct(r, q);
+			pb_map_oeta2(e1, p, r);
+			hb_oct(r, p);
+			pb_map_oeta2(e2, r, q);
 			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 	}

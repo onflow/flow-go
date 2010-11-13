@@ -64,38 +64,6 @@
 #define D12		21
 #define D20		23
 
-void fb12_mul_dxs2(fb12_t c, fb12_t a, fb12_t b) {
-	fb6_t t0, t1, t6;
-
-	fb6_null(t0);
-	fb6_null(t1);
-	fb6_null(t6);
-
-	TRY {
-		fb6_new(t0);
-		fb6_new(t1);
-		fb6_new(t6);
-		fb6_add(t0, a[0], a[1]);
-		fb6_add(t1, b[0], b[1]);
-		fb6_mul(t6, t0, t1);
-		fb6_mul(t0, a[0], b[0]);
-		fb6_zero(t1);
-		fb_mul(t1[0], a[1][0], b[1][0]);
-		fb_mul(t1[1], a[1][1], b[1][0]);
-		fb_mul(t1[2], a[1][2], b[1][0]);
-		fb_mul(t1[4], a[1][4], b[1][0]);
-		fb6_mul_nor(t1, t1);
-		fb6_add(c[0], t0, t1);
-		fb6_add(c[1], t0, t6);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fb6_free(t0);
-		fb6_free(t1);
-		fb6_free(t6);
-	}
-}
-
 /**
  * Computes the final exponentiation of the eta_t pairing over genus 2 curves.
  *
@@ -948,7 +916,6 @@ static void pb_map_g4(fb12_t l1, fb12_t l0, fb_t mubar[FB_BITS][8],
 		fb_t table[FB_BITS][24]) {
 	fb_t t;
 	fb12_t g4;
-	int i;
 
 	fb_null(t);
 	fb12_null(g4);
@@ -1124,7 +1091,6 @@ static void pb_map_g8(fb12_t l1, fb12_t l0, fb_t mubar[FB_BITS][8],
 		fb_t nubar[FB_BITS][8], hb_t p, hb_t q, int e1, int e2,
 		fb_t table[FB_BITS][24]) {
 	fb_t t;
-	int i;
 	fb12_t g8;
 
 	fb_null(t);
@@ -1261,7 +1227,6 @@ static void pb_map_g8(fb12_t l1, fb12_t l0, fb_t mubar[FB_BITS][8],
 static void line(fb12_t l0, fb12_t l1, fb_t *mu, fb_t *nu, hb_t p, hb_t q,
 		int gamma, fb_t table[FB_BITS][24], fb_t delta3, fb_t epsil0,
 		fb_t epsil3) {
-	int i;
 	fb_t t;
 	fb12_t l;
 

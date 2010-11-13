@@ -53,17 +53,14 @@ static void pb_map_exp(fb12_t r, fb12_t a) {
 
 		/* Compute f = f^(2^(6m) - 1). */
 		fb12_inv(v, a);
-		fb12_copy(r, a);
-		for (i = 0; i < 6; i++) {
-			fb12_frb(r, r);
-		}
+		fb6_add(r[0], a[0], a[1]);
+		fb6_copy(r[1], a[1]);
 		fb12_mul(r, r, v);
 
 		/* r = f^(2^2m + 1). */
 		fb12_copy(v, r);
-		for (i = 0; i < 2; i++) {
-			fb12_frb(v, v);
-		}
+		fb12_frb(v, v);
+		fb12_frb(v, v);
 		fb12_mul(r, r, v);
 
 		/* v = f^(m+1)/2. */
@@ -93,7 +90,7 @@ static void pb_map_exp(fb12_t r, fb12_t a) {
 		}
 		fb12_frb(w, v);
 		fb12_mul(w, w, v);
-		fb12_inv(w, w);
+		fb6_add(w[0], w[0], w[1]);
 
 		/* v = f^(2^2m + 2^m + 1). */
 		fb12_frb(v, r);
@@ -265,7 +262,7 @@ void pb_map_res3(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
 		fb_add(l[0][i], l[0][i], r[i]);
 	}
 	for (int i = 0; i < 6; i++) {
-		fb_add(l[1][i], l[1][i], r[i+6]);
+		fb_add(l[1][i], l[1][i], r[i + 6]);
 	}
 }
 
@@ -426,7 +423,7 @@ void pb_map_res2(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
 		fb_add(l[0][i], l[0][i], r[i]);
 	}
 	for (int i = 0; i < 6; i++) {
-		fb_add(l[1][i], l[1][i], r[i+6]);
+		fb_add(l[1][i], l[1][i], r[i + 6]);
 	}
 }
 
@@ -714,8 +711,37 @@ void pb_map_res(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
 		fb_add(l[0][i], l[0][i], r[i]);
 	}
 	for (int i = 0; i < 6; i++) {
-		fb_add(l[1][i], l[1][i], r[i+6]);
+		fb_add(l[1][i], l[1][i], r[i + 6]);
 	}
+}
+
+void pb_map_l2(fb12_t f1, fb12_t f0, fb_t f[], fb_t z[], hb_t q) {
+	fb_t t0, t1, t2, t3, t4;
+	fb_t t7[4];
+
+	fb_copy(t7[0], q->u0);
+	fb_add_dig(t7[1], q->u1, 1);
+	fb_add(t7[2], q->u0, q->v0);
+	fb_add(t7[3], q->u1, q->v1);
+	fb_mul(t0, f[3], q->u0);
+	fb_mul(t1, f[3], q->u1);
+	fb_add(t2, t1, f[2]);
+	fb_mul(t3, t2, q->u0);
+	fb_mul(t4, t2, q->u1);
+
+	fb_add(f0[0][0], t7[2], t3);
+	fb_add(f0[0][0], f0[0][0], f[0]);
+	fb_add(f0[0][1], t7[3], t4);
+	fb_copy(f0[0][2], t2);
+	fb_copy(f0[0][4], t7[0]);
+	fb_copy(f0[0][5], t7[1]);
+
+	fb_add(f1[0][0], t7[3], t0);
+	fb_add(f1[0][0], f1[0][0], t4);
+	fb_add(f1[0][0], f1[0][0], f[1]);
+	fb_copy(f1[0][1], t1);
+	fb_add_dig(f1[0][2], f[3], 1);
+	fb_copy(f1[0][4], t7[1]);
 }
 
 void pb_map_l4(fb12_t f1, fb12_t f0, fb_t f[], fb_t tab[], hb_t q) {
@@ -1088,38 +1114,10 @@ void pb_map_add(fb12_t f1, fb12_t f0, fb_t f[], fb_t z[], hb_t q) {
 	fb_copy(f1[0][4], t7[1]);
 }
 
-void pb_map_l2(fb12_t f1, fb12_t f0, fb_t f[], fb_t z[], hb_t q) {
-	fb_t t0, t1, t2, t3, t4;
-	fb_t t7[4];
-
-	fb_copy(t7[0], q->u0);
-	fb_add_dig(t7[1], q->u1, 1);
-	fb_add(t7[2], q->u0, q->v0);
-	fb_add(t7[3], q->u1, q->v1);
-	fb_mul(t0, f[3], q->u0);
-	fb_mul(t1, f[3], q->u1);
-	fb_add(t2, t1, f[2]);
-	fb_mul(t3, t2, q->u0);
-	fb_mul(t4, t2, q->u1);
-
-	fb_add(f0[0][0], t7[2], t3);
-	fb_add(f0[0][0], f0[0][0], f[0]);
-	fb_add(f0[0][1], t7[3], t4);
-	fb_copy(f0[0][2], t2);
-	fb_copy(f0[0][4], t7[0]);
-	fb_copy(f0[0][5], t7[1]);
-
-	fb_add(f1[0][0], t7[3], t0);
-	fb_add(f1[0][0], f1[0][0], t4);
-	fb_add(f1[0][0], f1[0][0], f[1]);
-	fb_copy(f1[0][1], t1);
-	fb_add_dig(f1[0][2], f[3], 1);
-	fb_copy(f1[0][4], t7[1]);
-}
-
-void pb_map_oate2_gxg(fb12_t r, hb_t p, hb_t q) {
+void pb_map_oeta2_gxg(fb12_t r, hb_t p, hb_t q) {
 	fb12_t l0, l1, f4, f8;
-	fb_t t, t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15;
+	fb_t t, t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14,
+			t15;
 	fb_t tab[10], f[10];
 	fb_t z0, z1, z2, z3, z4, z5, z6, z7, z8;
 	fb_t u1, u0, v1, v0;
@@ -1379,7 +1377,7 @@ void pb_map_oate2_gxg(fb12_t r, hb_t p, hb_t q) {
 		fb_sqr(z6, z6);
 	}
 
-	for (int j = 1; j <= ((FB_BITS - 1)/6 - 1)/4; j++) {
+	for (int j = 1; j <= ((FB_BITS - 1) / 6 - 1) / 4; j++) {
 		/* r0 = r0^8, r1 = r1^8. */
 		for (int i = 0; i < 3; i++) {
 			fb12_sqr(r0, r0);
@@ -2197,12 +2195,1752 @@ void pb_map_oate2_gxg(fb12_t r, hb_t p, hb_t q) {
 	fb12_mul(r, r0, r1);
 }
 
+void pb_map_l4_dxd(fb12_t l, fb_t f[], fb_t tab[], fb_t xq, fb_t yq) {
+	fb_t t0, t1, t2, t3, t4, t5;
+
+	fb_mul(t0, f[2], tab[0]);
+	fb_mul(t1, f[1], xq);
+
+	fb_add(t2, tab[2], tab[3]);
+	fb_add(t2, t2, t0);
+	fb_add(t2, t2, t1);
+	fb_add(t2, t2, f[0]);
+	fb_add(t3, tab[0], f[1]);
+	fb_copy(t4, f[2]);
+	fb_copy(t5, tab[1]);
+
+	fb_add(l[0][0], t2, t5);
+	fb_add_dig(l[0][1], t5, 1);
+	fb_add(l[0][2], t3, t5);
+	fb_set_dig(l[0][3], 1);
+	fb_add(l[0][4], t4, t5);
+	fb_set_dig(l[0][5], 1);
+	fb_set_dig(l[1][0], 1);
+
+	fb6_t t;
+	fb6_sqr(t, l[0]);
+	fb6_mul_nor(l[0], l[1]);
+	fb6_add(l[0], l[0], t);
+}
+
+void pb_map_l8_dxd(fb12_t l, fb_t f[], fb_t tab[], fb_t xq, fb_t yq) {
+	fb_t t0, t1, t2, t3, t4, t5;
+
+	fb_mul(t0, f[2], tab[0]);
+	fb_mul(t1, f[1], xq);
+
+	fb_add(t2, tab[2], t0);
+	fb_add(t2, t2, t1);
+	fb_add(t2, t2, f[0]);
+	fb_copy(t3, f[1]);
+	fb_add(t4, xq, f[2]);
+	fb_copy(t5, tab[1]);
+
+	fb_add(l[0][0], t2, t5);
+	fb_copy(l[0][1], t5);
+	fb_add(l[0][2], t3, t5);
+	fb_add(l[0][4], t4, t5);
+	fb_set_dig(l[1][0], 1);
+}
+
+void pb_map_add_dxd(fb12_t l, fb_t f[], fb_t tab[], fb_t xq, fb_t yq) {
+	fb_t t0, t1, t2, t3, t4, t5, t6, t7;
+
+	fb_mul(t3, f[3], xq);
+	fb_mul(t4, f[3], tab[1]);
+	fb_mul(t5, f[3], tab[2]);
+
+	fb_mul(t6, f[2], tab[0]);
+	fb_mul(t7, f[1], xq);
+
+	fb_add(t0, t5, t6);
+	fb_add(t0, t0, t7);
+	fb_add(t0, t0, f[0]);
+
+	fb_copy(t1, f[1]);
+	fb_add(t2, t3, f[2]);
+
+	fb_add(l[0][0], t0, t4);
+	fb_copy(l[0][1], t4);
+	fb_add(l[0][2], t1, t4);
+	fb_add(l[0][4], t2, t4);
+	fb_copy(l[1][0], f[3]);
+}
+
+void pb_map_oeta2_dxd(fb12_t r, fb_t x1, fb_t y1, fb_t x2, fb_t y2) {
+	fb12_t l0, l1;
+	fb_t t, t0, t1, t2, t3, t4, t5;
+	fb_t tab[10], f[10];
+	fb_t xp, yp, xq, yq;
+	fb12_t r0, r1;
+	int i;
+
+	/* Let p = (x1,y1) and q = (x2, y2). */
+	fb_copy(xp, x1);
+	fb_copy(yp, y1);
+	fb_copy(xq, x2);
+	fb_copy(yq, y2);
+
+	fb12_zero(l0);
+	fb12_zero(l1);
+	fb12_zero(r0);
+	fb12_zero(r1);
+
+	fb_sqr(tab[0], xq);
+	fb_add(tab[1], tab[0], xq);
+	fb_add(tab[2], tab[0], yq);
+	fb_mul(tab[3], tab[0], xq);
+
+	/* xp = xp^2. */
+	fb_sqr(xp, xp);
+	/* yp = yp^2. */
+	fb_sqr(yp, yp);
+
+	fb_copy(t0, xp);
+	fb_copy(t1, yp);
+
+	fb_sqr(xp, xp);
+	fb_sqr(yp, yp);
+
+	fb_add(f[0], t1, xp);
+	fb_add_dig(f[0], f[0], 1);
+	fb_add_dig(f[1], t0, 1);
+	fb_add(f[2], xp, t0);
+
+	pb_map_l4_dxd(l0, f, tab, xq, yq);
+
+	fb_copy(t0, xp);
+	fb_copy(t1, yp);
+	fb_sqr(xp, xp);
+	fb_sqr(yp, yp);
+	fb_copy(f[0], t1);
+	fb_copy(f[1], t0);
+	fb_add(f[2], xp, t0);
+
+	pb_map_l4_dxd(l1, f, tab, xq, yq);
+
+	fb_copy(t0, xp);
+	fb_copy(t1, yp);
+	fb_sqr(xp, xp);
+	fb_sqr(yp, yp);
+	fb_mul(t, xp, t0);
+	fb_add(f[0], t, t1);
+	fb_add(f[1], xp, t0);
+	fb_copy(f[2], xp);
+
+	pb_map_l8_dxd(r0, f, tab, xq, yq);
+	fb12_mul_dxs(r0, r0, l0);
+
+	fb_copy(t0, xp);
+	fb_copy(t1, yp);
+	fb_sqr(xp, xp);
+	fb_sqr(yp, yp);
+	fb_sqr(t, t);
+	fb_add(f[0], t, t0);
+	fb_add(f[0], f[0], t1);
+	fb_add_dig(f[0], f[0], 1);
+	fb_add(f[1], xp, t0);
+	fb_add_dig(f[2], xp, 1);
+
+	pb_map_l8_dxd(r1, f, tab, xq, yq);
+	fb12_mul_dxs(r1, r1, l1);
+
+	fb_sqr(xp, xp);
+	fb_sqr(yp, yp);
+	fb_sqr(t, t);
+	fb_sqr(t, t);
+
+	for (int j = 1; j <= ((FB_BITS - 1) / 6 - 1) / 4; j++) {
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+
+		for (i = 0; i < 3; i++) {
+			fb12_sqr(r0, r0);
+			fb12_sqr(r1, r1);
+		}
+
+		/* j = 2 mod 4. */
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+
+		fb_add_dig(f[0], t1, 1);
+		fb_copy(f[1], t0);
+		fb_add(f[2], xp, t0);
+
+		pb_map_l4_dxd(l0, f, tab, xq, yq);
+		fb12_mul_dxs(r0, r0, l0);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_add(f[0], xp, t1);
+		fb_add_dig(f[0], f[0], 1);
+		fb_add_dig(f[1], t0, 1);
+		fb_add(f[2], xp, t0);
+
+		pb_map_l4_dxd(l1, f, tab, xq, yq);
+		fb12_mul_dxs(r1, r1, l1);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_sqr(t, t);
+		fb_sqr(t, t);
+		fb_sqr(t, t);
+		fb_add(f[0], t, t0);
+		fb_add(f[0], f[0], t1);
+		fb_add(f[1], xp, t0);
+		fb_add_dig(f[2], xp, 1);
+
+		pb_map_l8_dxd(l0, f, tab, xq, yq);
+		fb12_mul_dxs(r0, r0, l0);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_sqr(t, t);
+		fb_add(f[0], t, t1);
+		fb_add(f[1], xp, t0);
+		fb_copy(f[2], xp);
+
+		pb_map_l8_dxd(l1, f, tab, xq, yq);
+		fb12_mul_dxs(r1, r1, l1);
+
+		/* j = 3 mod 4. */
+
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+
+		for (i = 0; i < 3; i++) {
+			fb12_sqr(r0, r0);
+			fb12_sqr(r1, r1);
+		}
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+
+		fb_add(f[0], t1, xp);
+		fb_add_dig(f[1], t0, 1);
+		fb_add(f[2], xp, t0);
+
+		pb_map_l4_dxd(l0, f, tab, xq, yq);
+		fb12_mul_dxs(r0, r0, l0);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_add_dig(f[0], t1, 1);
+		fb_copy(f[1], t0);
+		fb_add(f[2], xp, t0);
+
+		pb_map_l4_dxd(l1, f, tab, xq, yq);
+		fb12_mul_dxs(r1, r1, l1);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		for (i = 0; i < 5; i++) {
+			fb_sqr(t, t);
+		}
+		fb_add(f[0], t, t1);
+		fb_add_dig(f[0], f[0], 1);
+		fb_add(f[1], xp, t0);
+		fb_copy(f[2], xp);
+
+		pb_map_l8_dxd(l0, f, tab, xq, yq);
+		fb12_mul_dxs(r0, r0, l0);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_sqr(t, t);
+		fb_add(f[0], t, t0);
+		fb_add(f[0], f[0], t1);
+		fb_add(f[1], xp, t0);
+		fb_add_dig(f[2], xp, 1);
+
+		pb_map_l8_dxd(l1, f, tab, xq, yq);
+		fb12_mul_dxs(r1, r1, l1);
+
+		/* j = 0 mod 4. */
+
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+
+		for (i = 0; i < 3; i++) {
+			fb12_sqr(r0, r0);
+			fb12_sqr(r1, r1);
+		}
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+
+		fb_copy(f[0], t1);
+		fb_copy(f[1], t0);
+		fb_add(f[2], xp, t0);
+
+		pb_map_l4_dxd(l0, f, tab, xq, yq);
+		fb12_mul_dxs(r0, r0, l0);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_add(f[0], t1, xp);
+		fb_add_dig(f[1], t0, 1);
+		fb_add(f[2], xp, t0);
+
+		pb_map_l4_dxd(l1, f, tab, xq, yq);
+		fb12_mul_dxs(r1, r1, l1);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		for (i = 0; i < 5; i++) {
+			fb_sqr(t, t);
+		}
+		fb_add(f[0], t0, t1);
+		fb_add(f[0], f[0], t);
+		fb_add_dig(f[0], f[0], 1);
+		fb_add(f[1], xp, t0);
+		fb_add_dig(f[2], xp, 1);
+
+		pb_map_l8_dxd(l0, f, tab, xq, yq);
+		fb12_mul_dxs(r0, r0, l0);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_sqr(t, t);
+		fb_add(f[0], t, t1);
+		fb_add_dig(f[0], f[0], 1);
+		fb_add(f[1], xp, t0);
+		fb_copy(f[2], xp);
+
+		pb_map_l8_dxd(l1, f, tab, xq, yq);
+		fb12_mul_dxs(r1, r1, l1);
+
+		/* j = 1 mod 4. */
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+
+		for (i = 0; i < 3; i++) {
+			fb12_sqr(r0, r0);
+			fb12_sqr(r1, r1);
+		}
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+
+		fb_add(f[0], t1, xp);
+		fb_add_dig(f[0], f[0], 1);
+		fb_add_dig(f[1], t0, 1);
+		fb_add(f[2], xp, t0);
+
+		pb_map_l4_dxd(l0, f, tab, xq, yq);
+		fb12_mul_dxs(r0, r0, l0);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_copy(f[0], t1);
+		fb_copy(f[1], t0);
+		fb_add(f[2], xp, t0);
+
+		pb_map_l4_dxd(l1, f, tab, xq, yq);
+		fb12_mul_dxs(r1, r1, l1);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		for (i = 0; i < 5; i++) {
+			fb_sqr(t, t);
+		}
+		fb_add(f[0], t, t1);
+		fb_add(f[1], xp, t0);
+		fb_copy(f[2], xp);
+
+		pb_map_l8_dxd(l0, f, tab, xq, yq);
+		fb12_mul_dxs(r0, r0, l0);
+
+		fb_copy(t0, xp);
+		fb_copy(t1, yp);
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_sqr(t, t);
+		fb_add(f[0], t, t1);
+		fb_add(f[0], f[0], t0);
+		fb_add_dig(f[0], f[0], 1);
+		fb_add(f[1], xp, t0);
+		fb_add_dig(f[2], xp, 1);
+
+		pb_map_l8_dxd(l1, f, tab, xq, yq);
+		fb12_mul_dxs(r1, r1, l1);
+
+		fb_sqr(xp, xp);
+		fb_sqr(yp, yp);
+		fb_sqr(t, t);
+		fb_sqr(t, t);
+	}
+
+	/* r1 = r1^(m-1)/2. */
+	int to = ((FB_BITS - 1) / 2) / 6;
+	to = to * 6;
+	fb12_copy(l1, r1);
+	for (i = 0; i < to; i++) {
+		/* This is faster than calling fb12_sqr(alpha, alpha) (no field additions). */
+		fb_sqr(l1[0][0], l1[0][0]);
+		fb_sqr(l1[0][1], l1[0][1]);
+		fb_sqr(l1[0][2], l1[0][2]);
+		fb_sqr(l1[0][3], l1[0][3]);
+		fb_sqr(l1[0][4], l1[0][4]);
+		fb_sqr(l1[0][5], l1[0][5]);
+		fb_sqr(l1[1][0], l1[1][0]);
+		fb_sqr(l1[1][1], l1[1][1]);
+		fb_sqr(l1[1][2], l1[1][2]);
+		fb_sqr(l1[1][3], l1[1][3]);
+		fb_sqr(l1[1][4], l1[1][4]);
+		fb_sqr(l1[1][5], l1[1][5]);
+	}
+	if ((to / 6) % 2 == 1) {
+		fb6_add(l1[0], l1[0], l1[1]);
+	}
+	for (; i < (FB_BITS - 1) / 2; i++) {
+		fb12_sqr(l1, l1);
+	}
+
+	fb12_mul(r0, r0, l1);
+	fb12_sqr(r0, r0);
+	fb12_mul(r0, r0, r1);
+
+	fb_sqr(t0, xp);
+	fb_mul(t1, xp, t0);
+	fb_sqr(t2, t0);
+	fb_add(t3, t0, xp);
+	fb_add_dig(t4, t3, 1);
+	fb_add(t5, t2, xp);
+
+	fb_mul(f[0], t4, yp);
+	fb_add(f[0], f[0], t1);
+	fb_add(f[0], f[0], t5);
+	fb_add_dig(f[0], f[0], 1);
+	fb_copy(f[1], t5);
+	fb_add(f[2], t1, t3);
+	fb_copy(f[3], t4);
+
+	pb_map_add_dxd(l0, f, tab, xq, yq);
+
+	fb12_mul(r0, r0, l0);
+
+	for (i = 0; i < 3; i++) {
+		fb12_frb(r0, r0);
+	}
+	fb12_mul(r, r0, r1);
+}
+
+void pb_map_l4_gxd(fb12_t l, fb_t f[], fb_t tab[], fb_t xq, fb_t yq) {
+	fb_t t9a, t9b, t9c, t8a, t8b, t5a, t5b, t4a, t3a, t3b, t3c;
+	fb_t t2a, t1a, tza, tzb, tzc, tzd, tze, tzf;
+
+	fb_mul(t9a, f[9], tab[0]);
+	fb_mul(t9b, f[9], tab[3]);
+	fb_mul(t9c, f[9], tab[5]);
+
+	fb_mul(t8a, f[8], xq);
+	fb_mul(t8b, f[8], tab[4]);
+
+	fb_mul(t5a, f[5], tab[1]);
+	fb_mul(t5b, t5a, xq);
+
+	fb_mul(t4a, f[4], tab[1]);
+
+	fb_mul(t3a, f[3], xq);
+	fb_mul(t3b, f[3], tab[0]);
+	fb_mul(t3c, t3b, xq);
+
+	fb_mul(t2a, f[2], tab[0]);
+	fb_mul(t1a, f[1], xq);
+
+	fb_add(tza, t9a, t8a);
+	fb_add(tza, tza, f[7]);
+	fb_add(tzb, f[9], f[8]);
+	fb_mul(tzb, tzb, tab[3]);
+	fb_add(tzc, f[9], f[5]);
+	fb_mul(tzc, tzc, xq);
+	fb_mul(tzd, tza, xq);
+	fb_mul(tze, tza, tab[3]);
+	fb_mul(tzf, tza, tab[4]);
+
+	fb_t fa, fb, fc, fd, fe, ff, fg, fh, fi;
+
+	fb_add(fa, tzf, t9b);
+	fb_add(fa, fa, tab[2]);
+	fb_add(fa, fa, t5b);
+	fb_add(fa, fa, t4a);
+	fb_add(fa, fa, t3c);
+	fb_add(fa, fa, t2a);
+	fb_add(fa, fa, t1a);
+	fb_add(fa, fa, f[0]);
+	fb_add_dig(fa, fa, 1);
+	fb_add(fb, t8b, t5a);
+	fb_add(fb, fb, t3b);
+	fb_add(fb, fb, f[1]);
+	fb_add(fc, tzd, t9c);
+	fb_add(fc, fc, tab[1]);
+	fb_add(fc, fc, t3a);
+	fb_add(fc, fc, f[2]);
+	fb_add_dig(fc, fc, 1);
+
+	fb_add(fd, t9b, t8a);
+	fb_add(fd, fd, f[3]);
+	fb_add_dig(fd, fd, 1);
+
+	fb_add(fe, tze, tzc);
+	fb_add(fe, fe, tab[0]);
+	fb_add(fe, fe, f[4]);
+
+	fb_add(ff, tzb, f[5]);
+	fb_add_dig(ff, ff, 1);
+
+	fb_copy(fg, tza);
+	fb_copy(fh, f[8]);
+	fb_copy(fi, f[9]);
+
+	fb12_zero(l);
+	fb_add(l[0][0], fa, fe);
+	fb_add(l[0][1], fd, fe);
+	fb_add(l[0][1], l[0][1], ff);
+	fb_add(l[0][2], fb, fe);
+	fb_add(l[0][2], l[0][2], ff);
+	fb_copy(l[0][3], fd);
+	fb_add(l[0][4], fc, fe);
+	fb_add(l[0][4], l[0][4], ff);
+	fb_add(l[0][5], fd, ff);
+	fb_copy(l[1][0], fg);
+	fb_copy(l[1][2], fh);
+	fb_copy(l[1][4], fi);
+}
+
+void pb_map_l8_gxd(fb12_t l, fb_t f[], fb_t tab[], fb_t xq, fb_t yq) {
+	fb_t t9a, t9b, t9c, t8a, t8b, t4a, t3a, t3b, t3c;
+	fb_t t2a, t1a, tza, tzb, tzc, tzd, tze, tzf;
+
+	fb_mul(t9a, f[9], tab[0]);
+	fb_mul(t9b, f[9], tab[3]);
+	fb_mul(t9c, f[9], tab[5]);
+
+	fb_mul(t8a, f[8], xq);
+	fb_mul(t8b, f[8], tab[4]);
+
+	fb_mul(t4a, f[4], tab[1]);
+
+	fb_mul(t3a, f[3], xq);
+	fb_mul(t3b, f[3], tab[0]);
+	fb_mul(t3c, t3b, xq);
+
+	fb_mul(t2a, f[2], tab[0]);
+	fb_mul(t1a, f[1], xq);
+
+	fb_add(tza, t9a, t8a);
+	fb_add(tza, tza, f[7]);
+	fb_add(tzb, f[9], f[8]);
+	fb_mul(tzb, tzb, tab[3]);
+	fb_add(tzc, t9a, t9b);
+	fb_add(tzc, tzc, xq);
+	fb_mul(tzd, tza, xq);
+	fb_mul(tze, tza, tab[3]);
+	fb_mul(tzf, tza, tab[4]);
+
+	fb_t fa, fb, fc, fd, fe, ff, fg, fh, fi;
+
+	fb_add(fa, tzf, t9b);
+	fb_add(fa, fa, tab[6]);
+	fb_add(fa, fa, t4a);
+	fb_add(fa, fa, t3c);
+	fb_add(fa, fa, t2a);
+	fb_add(fa, fa, t1a);
+	fb_add(fa, fa, f[0]);
+	fb_add(fb, t8b, tab[1]);
+	fb_add(fb, fb, t3b);
+	fb_add(fb, fb, f[1]);
+	fb_add(fc, tzd, t9c);
+	fb_add(fc, fc, t3a);
+	fb_add(fc, fc, f[2]);
+	fb_add(fd, t9b, t8a);
+	fb_add(fd, fd, f[3]);
+
+	fb_add(fe, tze, tzc);
+	fb_add(fe, fe, f[4]);
+
+	fb_add_dig(ff, tzb, 1);
+
+	fb_copy(fg, tza);
+	fb_copy(fh, f[8]);
+	fb_copy(fi, f[9]);
+
+	fb12_zero(l);
+	fb_add(l[0][0], fa, fe);
+	fb_add(l[0][1], fd, fe);
+	fb_add(l[0][1], l[0][1], ff);
+	fb_add(l[0][2], fb, fe);
+	fb_add(l[0][2], l[0][2], ff);
+	fb_copy(l[0][3], fd);
+	fb_add(l[0][4], fc, fe);
+	fb_add(l[0][4], l[0][4], ff);
+	fb_add(l[0][5], fd, ff);
+	fb_copy(l[1][0], fg);
+	fb_copy(l[1][2], fh);
+	fb_copy(l[1][4], fi);
+}
+
+void pb_map_l2_gxd(fb12_t l, fb_t f[], fb_t tab[], fb_t xq, fb_t yq) {
+	fb_t t0, t1, t2, t3a, t3b, t3c, t2a, t1a;
+
+	fb_sqr(t0, xq);
+	fb_add(t1, t0, xq);
+	fb_add(t2, t0, yq);
+	fb_mul(t3a, f[3], xq);
+	fb_mul(t3b, f[3], t0);
+	fb_mul(t3c, t3b, xq);
+	fb_mul(t2a, f[2], t0);
+	fb_mul(t1a, f[1], xq);
+
+	fb_t fa, fb, fc, fd, fe, fg;
+
+	fb_add(fa, t2, t3c);
+	fb_add(fa, fa, t2a);
+	fb_add(fa, fa, t1a);
+	fb_add(fa, fa, f[0]);
+
+	fb_add(fb, t3b, f[1]);
+	fb_add(fc, xq, t3a);
+	fb_add(fc, fc, f[2]);
+	fb_copy(fd, f[3]);
+	fb_copy(fe, t1);
+	fb_set_dig(fg, 1);
+
+	fb12_zero(l);
+	fb_add(l[0][0], fa, fe);
+	fb_add(l[0][1], fd, fe);
+	fb_add(l[0][2], fb, fe);
+	fb_copy(l[0][3], fd);
+	fb_add(l[0][4], fc, fe);
+	fb_copy(l[0][5], fd);
+	fb_copy(l[1][0], fg);
+}
+
+void pb_map_add_gxd(fb12_t l, fb_t f[], fb_t tab[], fb_t xq, fb_t yq) {
+	fb_t t0, t1, t2, t7a, t7b, t7c, t3a, t3b, t3c, t2a, t1a;
+
+	fb_sqr(t0, xq);
+	fb_add(t1, t0, xq);
+	fb_add(t2, t0, yq);
+	fb_mul(t7a, f[7], xq);
+	fb_mul(t7b, f[7], t1);
+	fb_mul(t7c, f[7], t2);
+	fb_mul(t3a, f[3], xq);
+	fb_mul(t3b, f[3], t0);
+	fb_mul(t3c, t3b, xq);
+	fb_mul(t2a, f[2], t0);
+	fb_mul(t1a, f[1], xq);
+
+	fb_t fa, fb, fc, fd, fe, fg;
+
+	fb_add(fa, t7c, t3c);
+	fb_add(fa, fa, t2a);
+	fb_add(fa, fa, t1a);
+	fb_add(fa, fa, f[0]);
+
+	fb_add(fb, t3b, f[1]);
+	fb_add(fc, t7a, t3a);
+	fb_add(fc, fc, f[2]);
+	fb_copy(fd, f[3]);
+	fb_copy(fe, t7b);
+	fb_copy(fg, f[7]);
+
+	fb12_zero(l);
+	fb_add(l[0][0], fa, fe);
+	fb_add(l[0][1], fd, fe);
+	fb_add(l[0][2], fb, fe);
+	fb_copy(l[0][3], fd);
+	fb_add(l[0][4], fc, fe);
+	fb_copy(l[0][5], fd);
+	fb_copy(l[1][0], fg);
+}
+
+#define U1 "37ECB65ABCC68E07C515EDDB7E6692BE8D44A5D2A9887CC3294C397EE0A6CCE9E12975AD4FDB038A680AB4360A9C"
+#define U0 "41258933CFF02DCB41D2E91399ADD46C472737C716805EC226F313EAFBF8FC54CC32CB62DD1A54860DFEBA567B2D"
+#define V1 "3F8DCCD4F5EF104B56F50113A7734BED292A24CEC8AA81BA9D04DEA938C31E24A27B142AC9C2BA2B36DBE9842905"
+#define V0 "71B725AB0D5F56DFC4FD72C8517731154705FF0563E85E7D13781AE410C5F61509ED6B1653CDE9E7EF807899ECF1"
+#define XQ "2C6309E531275402DD75F9B53B7F445FC17A829B88FEB411DDE4BF10C1962DEBD1A8D4F59778A6397B37DF8A743A"
+#define YQ "51FA323AE80CAE0EB114E1121EC344BEDB9FEE8EC799D214E717097F0400ACBA63F5915980C71A6245DECEDB64EA"
+
+void pb_map_oeta2_gxd(fb12_t r, hb_t p, fb_t x2, fb_t y2) {
+	fb12_t l0, l1;
+	fb_t t, t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14,
+			t15;
+	fb_t tab[10], f[10];
+	fb_t z0, z1, z2, z3, z4, z5, z6, z7, z8;
+	fb_t u1, u0, v1, v0, xq, yq;
+	fb12_t r0, r1;
+	int i;
+
+	/* Let p = (u1,v1,u0,v0) and q = (x2, y2). */
+	fb_copy(u1, p->u1);
+	fb_copy(u0, p->u0);
+	fb_copy(v1, p->v1);
+	fb_copy(v0, p->v0);
+
+	fb_read(u1, U1, strlen(U1), 16);
+	fb_read(u0, U0, strlen(U0), 16);
+	fb_read(v1, V1, strlen(V1), 16);
+	fb_read(v0, V0, strlen(V0), 16);
+	fb_copy(xq, x2);
+	fb_copy(yq, y2);
+	fb_read(xq, XQ, strlen(XQ), 16);
+	fb_read(yq, YQ, strlen(YQ), 16);
+	fb12_zero(l0);
+	fb12_zero(l1);
+	fb12_zero(r0);
+	fb12_zero(r1);
+
+	fb_sqr(tab[0], xq);
+	fb_sqr(tab[1], tab[0]);
+	fb_mul(tab[2], tab[0], tab[1]);
+	fb_add(tab[3], tab[0], xq);
+	fb_add(tab[4], tab[0], yq);
+	fb_add(tab[5], xq, yq);
+	fb_mul(tab[6], tab[1], xq);
+
+	/* j = 1, mu(i) = 1, vu(i) = 1. */
+	fb_sqr(u1, u1);
+	fb_sqr(u0, u0);
+	fb_sqr(v1, v1);
+	fb_sqr(v0, v0);
+	fb_copy(t1, u1);
+	fb_copy(t0, u0);
+
+	/* z0 = u0 * u1, z1 = u1 * v0, z2 = u1 * v1. */
+	fb_mul(z0, u0, u1);
+	fb_mul(z1, u1, v0);
+	fb_mul(z2, u1, v1);
+	/* z6 = u0 * u1 * v1 + u1^2 * v0. */
+	fb_mul(z6, z0, v1);
+	fb_mul(t3, z1, u1);
+	fb_add(z6, z6, t3);
+	/* z7 = u1 * v0 * v1 + u0 * v1^2 + v0^2. */
+	fb_mul(z7, z1, v1);
+	fb_sqr(u1, u1);
+	fb_sqr(u0, u0);
+	fb_sqr(v1, v1);
+	fb_sqr(v0, v0);
+	fb_mul(t3, t0, v1);
+	fb_add(z7, z7, t3);
+	fb_add(z7, z7, v0);
+	/* t2 = u1^2 + 1, t3 = u0 * u1 + u1. */
+	fb_add_dig(t2, u1, 1);
+	fb_add(t3, z0, t1);
+	/* t4 = u1 * v1 + u1^2 + 1, t5 = u1 * v1 + u0 * u1 + u1. */
+	fb_add(t4, z2, t2);
+	fb_add(t5, z2, t3);
+	/* f0 = u1 * v0 * v1 + u0 * v1^2 + v0^2 + u0 * u1 * v1 + u1^2 * v0 +
+	 * u0^2 + u1 * v1 + u1^2 + 1. */
+	fb_add(f[0], z6, z7);
+	fb_add(f[0], f[0], u0);
+	fb_add(f[0], f[0], t4);
+	/* f1 = u1 * v0 + u1^2 + u1 * v1 + u0 * u1 + u1. */
+	fb_add(f[1], z1, u1);
+	fb_add(f[1], f[1], t5);
+	/* f2 = u0 * u1 + u1 * v0 + u0 * u1 * v1 + u1^2 * v0 + u0 + u1^2 + 1. */
+	fb_add(f[2], z0, z1);
+	fb_add(f[2], f[2], z6);
+	fb_add(f[2], f[2], t0);
+	fb_add(f[2], f[2], t2);
+	/* f3 = u1 * v1 + u0 * u1 + u1 + 1. */
+	fb_add_dig(f[3], t5, 1);
+	/* f4 = u0^2 + u0 + u0 * u1 + u1. */
+	fb_add(f[4], u0, t0);
+	fb_add(f[4], f[4], t3);
+	/* f5 = u1^2 + 1 + u1. */
+	fb_add(f[5], t1, t2);
+	/* f6 = 1, f7 = u1 * v1 + u1^2 + 1, f8 = u1, f9 = u1^2 + u1. */
+	fb_set_dig(f[6], 1);
+	fb_copy(f[7], t4);
+	fb_copy(f[8], t1);
+	fb_add(f[9], u1, t1);
+
+	/* l1,l0 = l_4,R2(x,y). */
+	pb_map_l4_gxd(l0, f, tab, xq, yq);
+	fb12_sqr(r0, l0);
+
+	/* Difference between l_4,R1(x,y) and l_4,R2(x,y) is one squaring, so
+	 * square everything. */
+	fb_copy(t0, u0);
+	fb_copy(t1, u1);
+	fb_sqr(u1, u1);
+	fb_sqr(u0, u0);
+	fb_sqr(z0, z0);
+	fb_sqr(z1, z1);
+	fb_sqr(z2, z2);
+	fb_sqr(z6, z6);
+	fb_sqr(z7, z7);
+
+	/* t2 = z2 + 1. */
+	fb_add_dig(t2, z2, 1);
+	/* t3 = u1^2 + u1. */
+	fb_add(t3, u1, t1);
+	/* f0 = z7, f1 = z1, f2 = z1 + z6 + t0, f3 = z0 + t2. */
+	fb_copy(f[0], z7);
+	fb_copy(f[1], z1);
+	fb_add(f[2], z1, z6);
+	fb_add(f[2], f[2], t0);
+	fb_add(f[3], z0, t2);
+	fb_add(f[4], z0, u0);
+	/* f4 = t0 + t1, f5 = t3 + 1, f6 = 1, f7 = t2, f8 = t1, f9 = t3. */
+	fb_add(f[4], f[4], t0);
+	fb_add(f[4], f[4], t1);
+	fb_add_dig(f[5], t3, 1);
+	fb_set_dig(f[6], 1);
+	fb_copy(f[7], t2);
+	fb_copy(f[8], t1);
+	fb_copy(f[9], t3);
+
+	/* l1,l0 = l_4,R1(x,y). */
+	pb_map_l4_gxd(l1, f, tab, xq, yq);
+	fb12_sqr(r1, l1);
+
+	/* Difference between l_8,R2(x,y) and l_4,R1(x,y) is one squaring, so
+	 * square everything. */
+	fb_copy(t0, u0);
+	fb_copy(t1, u1);
+	fb_sqr(u1, u1);
+	fb_sqr(u0, u0);
+	fb_sqr(z0, z0);
+	fb_sqr(z1, z1);
+	fb_sqr(z2, z2);
+	fb_sqr(z6, z6);
+	fb_sqr(z7, z7);
+
+	fb_add(t2, u0, z1);
+	fb_mul(z3, t2, t0);
+	fb_mul(t2, z6, t1);
+	fb_add(z3, z3, t2);
+	fb_add(z3, z3, z7);
+	fb_mul(z4, z0, t0);
+	fb_add(z4, z4, z6);
+	fb_mul(z5, z0, t1);
+	fb_add(z5, z5, z1);
+	fb_mul(z8, u1, t1);
+	fb_add(z8, z8, z2);
+	fb_add_dig(t2, z0, 1);
+	fb_copy(f[0], z3);
+	fb_add(f[1], z4, z5);
+	fb_add(f[2], z0, z4);
+	fb_add(f[2], f[2], u0);
+	fb_add(f[2], f[2], t0);
+	fb_copy(f[3], t2);
+	fb_copy(f[4], u0);
+	fb_set_dig(f[5], 1);
+	fb_set_dig(f[6], 0);
+	fb_add(f[7], z8, t2);
+	fb_add(f[8], u1, t1);
+	fb_copy(f[9], u1);
+
+	/* l1,l0 = l_8,R2(x,y). */
+	pb_map_l8_gxd(l0, f, tab, xq, yq);
+	fb12_mul_dxss(r0, r0, l0);
+
+	fb_copy(t0, u0);
+	fb_copy(t1, u1);
+	fb_sqr(u1, u1);
+	fb_sqr(u0, u0);
+	fb_sqr(z0, z0);
+	fb_sqr(z3, z3);
+	fb_sqr(z4, z4);
+	fb_sqr(z5, z5);
+	fb_sqr(z8, z8);
+	fb_add(t2, u0, u1);
+	fb_add(t3, u1, t1);
+	fb_add(t4, z0, z8);
+	fb_add(t4, t4, t1);
+	fb_add_dig(t4, t4, 1);
+	fb_add(t5, t0, t4);
+	fb_add(t6, z0, t3);
+	fb_add_dig(t7, t2, 1);
+
+	fb_add(f[0], z3, z5);
+	fb_add(f[0], f[0], t5);
+	fb_add(f[1], z4, z5);
+	fb_add(f[1], f[1], t6);
+	fb_add(f[2], z4, t5);
+	fb_add(f[2], f[2], t7);
+	fb_add_dig(f[3], t6, 1);
+	fb_copy(f[4], t7);
+	fb_set_dig(f[5], 1);
+	fb_set_dig(f[6], 0);
+	fb_copy(f[7], t4);
+	fb_copy(f[8], t3);
+	fb_copy(f[9], u1);
+
+	/* l1,l0 = l_8,R1(x,y). */
+	pb_map_l8_gxd(l1, f, tab, xq, yq);
+	fb12_mul_dxss(r1, r1, l1);
+
+	/* u0 = u0^2^6, u1 = u1^2^6. */
+	fb_sqr(u0, u0);
+	fb_sqr(u1, u1);
+	for (int i = 0; i < 4; i++) {
+		fb_sqr(v0, v0);
+		fb_sqr(v1, v1);
+	}
+	for (int i = 0; i < 2; i++) {
+		fb_sqr(z0, z0);
+		fb_sqr(z3, z3);
+		fb_sqr(z4, z4);
+		fb_sqr(z5, z5);
+		fb_sqr(z8, z8);
+	}
+	for (int i = 0; i < 3; i++) {
+		fb_sqr(z1, z1);
+		fb_sqr(z2, z2);
+		fb_sqr(z7, z7);
+		fb_sqr(z6, z6);
+	}
+
+	for (int j = 1; j <= ((FB_BITS - 1) / 6 - 1) / 4; j++) {
+		/* r0 = r0^8, r1 = r1^8. */
+		for (int i = 0; i < 3; i++) {
+			fb12_sqr(r0, r0);
+			fb12_sqr(r1, r1);
+		}
+		/* j = 2 mod 4, mu(i) = 0, vu(i) = 1. */
+		fb_sqr(u0, u0);
+		fb_sqr(u1, u1);
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z1, z1);
+		fb_sqr(z2, z2);
+		fb_sqr(z6, z6);
+		fb_sqr(z7, z7);
+		fb_add_dig(t2, z2, 1);
+		fb_add(t3, u1, t1);
+		fb_add(f[0], t2, z7);
+		fb_add(f[1], z1, t1);
+		fb_add(f[2], z1, z6);
+		fb_add(f[2], f[2], t0);
+		fb_add(f[2], f[2], t3);
+		fb_add(f[3], z0, t2);
+		fb_add(f[4], u0, z0);
+		fb_add(f[4], f[4], t0);
+		fb_add(f[4], f[4], t1);
+		fb_add_dig(f[5], t3, 1);
+		fb_set_dig(f[6], 1);
+		fb_copy(f[7], t2);
+		fb_copy(f[8], t1);
+		fb_copy(f[9], t3);
+
+		pb_map_l4_gxd(l0, f, tab, xq, yq);
+		fb12_sqr(l0, l0);
+		fb12_mul_dxs2(r0, r0, l0);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z1, z1);
+		fb_sqr(z2, z2);
+		fb_sqr(z6, z6);
+		fb_sqr(z7, z7);
+		fb_add_dig(t2, u1, 1);
+		fb_add(t3, z0, t1);
+		fb_add(t4, z2, t2);
+		fb_add(t5, z2, t3);
+		fb_add(f[0], z6, z7);
+		fb_add(f[0], f[0], u0);
+		fb_add(f[0], f[0], t4);
+		/* f1 = u1 * v0 + u1^2 + u1 * v1 + u0 * u1 + u1. */
+		fb_add(f[1], z1, u1);
+		fb_add(f[1], f[1], t5);
+		/* f2 = u0 * u1 + u1 * v0 + u0 * u1 * v1 + u1^2 * v0 + u0 + u1^2 + 1. */
+		fb_add(f[2], z0, z1);
+		fb_add(f[2], f[2], z6);
+		fb_add(f[2], f[2], t0);
+		fb_add(f[2], f[2], t2);
+		/* f3 = u1 * v1 + u0 * u1 + u1 + 1. */
+		fb_add_dig(f[3], t5, 1);
+		/* f4 = u0^2 + u0 + u0 * u1 + u1. */
+		fb_add(f[4], u0, t0);
+		fb_add(f[4], f[4], t3);
+		/* f5 = u1^2 + 1 + u1. */
+		fb_add(f[5], t1, t2);
+		/* f6 = 1, f7 = u1 * v1 + u1^2 + 1, f8 = u1, f9 = u1^2 + u1. */
+		fb_set_dig(f[6], 1);
+		fb_copy(f[7], t4);
+		fb_copy(f[8], t1);
+		fb_add(f[9], u1, t1);
+
+		pb_map_l4_gxd(l1, f, tab, xq, yq);
+		fb12_sqr(l1, l1);
+		fb12_mul_dxs2(r1, r1, l1);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z3, z3);
+		fb_sqr(z3, z3);
+		fb_sqr(z3, z3);
+		fb_sqr(z4, z4);
+		fb_sqr(z4, z4);
+		fb_sqr(z4, z4);
+		fb_sqr(z5, z5);
+		fb_sqr(z5, z5);
+		fb_sqr(z5, z5);
+		fb_sqr(z8, z8);
+		fb_sqr(z8, z8);
+		fb_sqr(z8, z8);
+		fb_add(t2, z0, t1);
+		fb_add(t3, z8, t2);
+		fb_add_dig(t4, u1, 1);
+
+		fb_add(f[0], z3, z5);
+		fb_add(f[0], f[0], t0);
+		fb_add(f[1], z4, z5);
+		fb_add(f[1], f[1], z0);
+		fb_add(f[2], z4, u0);
+		fb_add(f[2], f[2], t0);
+		fb_add(f[2], f[2], t3);
+		fb_add(f[3], t2, t4);
+		fb_add(f[4], u0, t4);
+		fb_set_dig(f[5], 1);
+		fb_set_dig(f[6], 0);
+		fb_add_dig(f[7], t3, 1);
+		fb_add(f[8], u1, t1);
+		fb_copy(f[9], u1);
+
+		pb_map_l8_gxd(l0, f, tab, xq, yq);
+		fb12_mul_dxss(r0, r0, l0);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z3, z3);
+		fb_sqr(z4, z4);
+		fb_sqr(z5, z5);
+		fb_sqr(z8, z8);
+		fb_add_dig(t2, z0, 1);
+
+		fb_copy(f[0], z3);
+		fb_add(f[1], z4, z5);
+		fb_add(f[2], z0, z4);
+		fb_add(f[2], f[2], u0);
+		fb_add(f[2], f[2], t0);
+		fb_copy(f[3], t2);
+		fb_copy(f[4], u0);
+		fb_set_dig(f[5], 1);
+		fb_set_dig(f[6], 0);
+		fb_add(f[7], z8, t2);
+		fb_add(f[8], u1, t1);
+		fb_copy(f[9], u1);
+
+		pb_map_l8_gxd(l1, f, tab, xq, yq);
+		fb12_mul_dxss(r1, r1, l1);
+
+		/* r0 = r0^8, r1 = r1^8. */
+		for (int i = 0; i < 3; i++) {
+			fb12_sqr(r0, r0);
+			fb12_sqr(r1, r1);
+		}
+
+		/* j = 3 mod 4, mu(i) = 1, vu(i) = 0. */
+		fb_sqr(u0, u0);
+		fb_sqr(u0, u0);
+		fb_sqr(u1, u1);
+		fb_sqr(u1, u1);
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z0, z0);
+		fb_sqr(z0, z0);
+		for (int i = 0; i < 5; i++) {
+			fb_sqr(z1, z1);
+			fb_sqr(z2, z2);
+			fb_sqr(z6, z6);
+			fb_sqr(z7, z7);
+		}
+		fb_add(t2, z0, t1);
+		fb_add(t3, z2, u1);
+		fb_add(t4, t0, t2);
+		fb_add(t5, u1, t1);
+
+		fb_add(f[0], z6, z7);
+		fb_add(f[0], f[0], u0);
+		fb_add(f[1], z0, z1);
+		fb_add(f[1], f[1], t3);
+		fb_add(f[2], z1, z6);
+		fb_add(f[2], f[2], t4);
+		fb_add_dig(f[2], f[2], 1);
+		fb_add(f[3], z2, t2);
+		fb_add_dig(f[3], f[3], 1);
+		fb_add(f[4], u0, t4);
+		fb_add_dig(f[5], t5, 1);
+		fb_set_dig(f[6], 1);
+		fb_add_dig(f[7], t3, 1);
+		fb_copy(f[8], t1);
+		fb_copy(f[9], t5);
+
+		pb_map_l4_gxd(l0, f, tab, xq, yq);
+		fb12_sqr(l0, l0);
+		fb12_mul_dxs2(r0, r0, l0);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z1, z1);
+		fb_sqr(z2, z2);
+		fb_sqr(z6, z6);
+		fb_sqr(z7, z7);
+
+		fb_add_dig(t2, z2, 1);
+		fb_add(t3, u1, t1);
+		fb_add(f[0], z7, t2);
+		fb_add(f[1], z1, t1);
+		fb_add(f[2], z1, z6);
+		fb_add(f[2], f[2], t0);
+		fb_add(f[2], f[2], t3);
+		fb_add(f[3], z0, t2);
+		fb_add(f[4], z0, u0);
+		fb_add(f[4], f[4], t0);
+		fb_add(f[4], f[4], t1);
+		fb_add_dig(f[5], t3, 1);
+		fb_set_dig(f[6], 1);
+		fb_copy(f[7], t2);
+		fb_copy(f[8], t1);
+		fb_copy(f[9], t3);
+
+		pb_map_l4_gxd(l1, f, tab, xq, yq);
+		fb12_sqr(l1, l1);
+		fb12_mul_dxs2(r1, r1, l1);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		for (int i = 0; i < 5; i++) {
+			fb_sqr(z3, z3);
+			fb_sqr(z4, z4);
+			fb_sqr(z5, z5);
+			fb_sqr(z8, z8);
+		}
+		fb_add_dig(t2, z0, 1);
+		fb_add(t3, z8, t2);
+		fb_add(t4, z4, u1);
+
+		fb_add(f[0], z3, t3);
+		fb_add(f[1], z5, t1);
+		fb_add(f[1], f[1], t4);
+		fb_add(f[2], z0, u0);
+		fb_add(f[2], f[2], t0);
+		fb_add(f[2], f[2], t4);
+		fb_copy(f[3], t2);
+		fb_copy(f[4], u0);
+		fb_set_dig(f[5], 1);
+		fb_set_dig(f[6], 0);
+		fb_copy(f[7], t3);
+		fb_add(f[8], u1, t1);
+		fb_copy(f[9], u1);
+
+		pb_map_l8_gxd(l0, f, tab, xq, yq);
+		fb12_mul_dxss(r0, r0, l0);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z3, z3);
+		fb_sqr(z4, z4);
+		fb_sqr(z5, z5);
+		fb_sqr(z8, z8);
+		fb_add(t2, z0, t1);
+		fb_add(t3, z8, t2);
+		fb_add_dig(t4, u1, 1);
+
+		fb_add(f[0], z3, z5);
+		fb_add(f[0], f[0], t0);
+		fb_add(f[1], z4, z5);
+		fb_add(f[1], f[1], z0);
+		fb_add(f[2], z4, u0);
+		fb_add(f[2], f[2], t0);
+		fb_add(f[2], f[2], t3);
+		fb_add(f[3], t2, t4);
+		fb_add(f[4], u0, t4);
+		fb_set_dig(f[5], 1);
+		fb_set_dig(f[6], 0);
+		fb_add_dig(f[7], t3, 1);
+		fb_add(f[8], u1, t1);
+		fb_copy(f[9], u1);
+
+		pb_map_l8_gxd(l1, f, tab, xq, yq);
+		fb12_mul_dxss(r1, r1, l1);
+
+		/* r0 = r0^8, r1 = r1^8. */
+		for (int i = 0; i < 3; i++) {
+			fb12_sqr(r0, r0);
+			fb12_sqr(r1, r1);
+		}
+
+		/* j = 0 mod 4, mu(i) = 0, vu(i) = 0. */
+		fb_sqr(u0, u0);
+		fb_sqr(u0, u0);
+		fb_sqr(u1, u1);
+		fb_sqr(u1, u1);
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z0, z0);
+		fb_sqr(z0, z0);
+		for (int i = 0; i < 5; i++) {
+			fb_sqr(z1, z1);
+			fb_sqr(z2, z2);
+			fb_sqr(z6, z6);
+			fb_sqr(z7, z7);
+		}
+		fb_add_dig(t2, z2, 1);
+		fb_add(t3, u1, t1);
+
+		fb_copy(f[0], z7);
+		fb_copy(f[1], z1);
+		fb_add(f[2], z1, z6);
+		fb_add(f[2], f[2], t0);
+		fb_add(f[3], z0, t2);
+		fb_add(f[4], z0, u0);
+		fb_add(f[4], f[4], t0);
+		fb_add(f[4], f[4], t1);
+		fb_add_dig(f[5], t3, 1);
+		fb_set_dig(f[6], 1);
+		fb_copy(f[7], t2);
+		fb_copy(f[8], t1);
+		fb_copy(f[9], t3);
+
+		pb_map_l4_gxd(l0, f, tab, xq, yq);
+		fb12_sqr(l0, l0);
+		fb12_mul_dxs2(r0, r0, l0);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z1, z1);
+		fb_sqr(z2, z2);
+		fb_sqr(z6, z6);
+		fb_sqr(z7, z7);
+		fb_add(t2, z0, t1);
+		fb_add(t3, z2, u1);
+		fb_add(t4, t0, t2);
+		fb_add(t5, u1, t1);
+
+		fb_add(f[0], z6, z7);
+		fb_add(f[0], f[0], u0);
+		fb_add(f[1], z0, z1);
+		fb_add(f[1], f[1], t3);
+		fb_add(f[2], z1, z6);
+		fb_add(f[2], f[2], t4);
+		fb_add_dig(f[2], f[2], 1);
+		fb_add(f[3], z2, t2);
+		fb_add_dig(f[3], f[3], 1);
+		fb_add(f[4], u0, t4);
+		fb_add_dig(f[5], t5, 1);
+		fb_set_dig(f[6], 1);
+		fb_add_dig(f[7], t3, 1);
+		fb_copy(f[8], t1);
+		fb_copy(f[9], t5);
+
+		pb_map_l4_gxd(l1, f, tab, xq, yq);
+		fb12_sqr(l1, l1);
+		fb12_mul_dxs2(r1, r1, l1);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		for (int i = 0; i < 5; i++) {
+			fb_sqr(z3, z3);
+			fb_sqr(z4, z4);
+			fb_sqr(z5, z5);
+			fb_sqr(z8, z8);
+		}
+		fb_add(t2, u0, u1);
+		fb_add(t3, u1, t1);
+		fb_add(t4, z0, z8);
+		fb_add(t4, t4, t1);
+		fb_add_dig(t4, t4, 1);
+		fb_add(t5, t0, t4);
+		fb_add(t6, z0, t3);
+		fb_add_dig(t7, t2, 1);
+
+		fb_add(f[0], z3, z5);
+		fb_add(f[0], f[0], t5);
+		fb_add(f[1], z4, z5);
+		fb_add(f[1], f[1], t6);
+		fb_add(f[2], z4, t5);
+		fb_add(f[2], f[2], t7);
+		fb_add_dig(f[3], t6, 1);
+		fb_copy(f[4], t7);
+		fb_set_dig(f[5], 1);
+		fb_set_dig(f[6], 0);
+		fb_copy(f[7], t4);
+		fb_copy(f[8], t3);
+		fb_copy(f[9], u1);
+
+		pb_map_l8_gxd(l0, f, tab, xq, yq);
+		fb12_mul_dxss(r0, r0, l0);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z3, z3);
+		fb_sqr(z4, z4);
+		fb_sqr(z5, z5);
+		fb_sqr(z8, z8);
+		fb_add_dig(t2, z0, 1);
+		fb_add(t3, z8, t2);
+		fb_add(t4, z4, u1);
+
+		fb_add(f[0], z3, t3);
+		fb_add(f[1], z5, t1);
+		fb_add(f[1], f[1], t4);
+		fb_add(f[2], z0, u0);
+		fb_add(f[2], f[2], t0);
+		fb_add(f[2], f[2], t4);
+		fb_copy(f[3], t2);
+		fb_copy(f[4], u0);
+		fb_set_dig(f[5], 1);
+		fb_set_dig(f[6], 0);
+		fb_copy(f[7], t3);
+		fb_add(f[8], u1, t1);
+		fb_copy(f[9], u1);
+
+		pb_map_l8_gxd(l1, f, tab, xq, yq);
+		fb12_mul_dxss(r1, r1, l1);
+
+		/* r0 = r0^8, r1 = r1^8. */
+		for (int i = 0; i < 3; i++) {
+			fb12_sqr(r0, r0);
+			fb12_sqr(r1, r1);
+		}
+		/* j = 1 mod 4, mu(i) = 1, vu(i) = 1. */
+		fb_sqr(u0, u0);
+		fb_sqr(u0, u0);
+		fb_sqr(u1, u1);
+		fb_sqr(u1, u1);
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z0, z0);
+		fb_sqr(z0, z0);
+		for (int i = 0; i < 5; i++) {
+			fb_sqr(z1, z1);
+			fb_sqr(z2, z2);
+			fb_sqr(z6, z6);
+			fb_sqr(z7, z7);
+		}
+		fb_add_dig(t2, u1, 1);
+		fb_add(t3, z0, t1);
+		fb_add(t4, z2, t2);
+		fb_add(t5, z2, t3);
+
+		fb_add(f[0], z6, z7);
+		fb_add(f[0], f[0], u0);
+		fb_add(f[0], f[0], t4);
+		fb_add(f[1], z1, u1);
+		fb_add(f[1], f[1], t5);
+		fb_add(f[2], z1, z6);
+		fb_add(f[2], f[2], z0);
+		fb_add(f[2], f[2], t0);
+		fb_add(f[2], f[2], t2);
+		fb_add_dig(f[3], t5, 1);
+		fb_add(f[4], u0, t0);
+		fb_add(f[4], f[4], t3);
+		fb_add(f[5], t1, t2);
+		fb_set_dig(f[6], 1);
+		fb_copy(f[7], t4);
+		fb_copy(f[8], t1);
+		fb_add(f[9], u1, t1);
+
+		pb_map_l4_gxd(l0, f, tab, xq, yq);
+		fb12_sqr(l0, l0);
+		fb12_mul_dxs2(r0, r0, l0);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z1, z1);
+		fb_sqr(z2, z2);
+		fb_sqr(z6, z6);
+		fb_sqr(z7, z7);
+		fb_add_dig(t2, z2, 1);
+		fb_add(t3, u1, t1);
+		fb_copy(f[0], z7);
+		fb_copy(f[1], z1);
+		fb_add(f[2], z1, z6);
+		fb_add(f[2], f[2], t0);
+		fb_add(f[3], z0, t2);
+		fb_add(f[4], u0, z0);
+		fb_add(f[4], f[4], t0);
+		fb_add(f[4], f[4], t1);
+		fb_add_dig(f[5], t3, 1);
+		fb_set_dig(f[6], 1);
+		fb_copy(f[7], t2);
+		fb_copy(f[8], t1);
+		fb_copy(f[9], t3);
+
+		pb_map_l4_gxd(l1, f, tab, xq, yq);
+		fb12_sqr(l1, l1);
+		fb12_mul_dxs2(r1, r1, l1);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		for (int i = 0; i < 5; i++) {
+			fb_sqr(z3, z3);
+			fb_sqr(z4, z4);
+			fb_sqr(z5, z5);
+			fb_sqr(z8, z8);
+		}
+		fb_add_dig(t2, z0, 1);
+
+		fb_copy(f[0], z3);
+		fb_add(f[1], z4, z5);
+		fb_add(f[2], z0, z4);
+		fb_add(f[2], f[2], u0);
+		fb_add(f[2], f[2], t0);
+		fb_copy(f[3], t2);
+		fb_copy(f[4], u0);
+		fb_set_dig(f[5], 1);
+		fb_set_dig(f[6], 0);
+		fb_add(f[7], z8, t2);
+		fb_add(f[8], u1, t1);
+		fb_copy(f[9], u1);
+
+		pb_map_l8_gxd(l0, f, tab, xq, yq);
+		fb12_mul_dxss(r0, r0, l0);
+
+		fb_copy(t0, u0);
+		fb_copy(t1, u1);
+		fb_sqr(u1, u1);
+		fb_sqr(u0, u0);
+		fb_sqr(z0, z0);
+		fb_sqr(z3, z3);
+		fb_sqr(z4, z4);
+		fb_sqr(z5, z5);
+		fb_sqr(z8, z8);
+		fb_add(t2, u0, u1);
+		fb_add(t3, u1, t1);
+		fb_add(t4, z0, z8);
+		fb_add(t4, t4, t1);
+		fb_add_dig(t4, t4, 1);
+		fb_add(t5, t0, t4);
+		fb_add(t6, z0, t3);
+		fb_add_dig(t7, t2, 1);
+
+		fb_add(f[0], z3, z5);
+		fb_add(f[0], f[0], t5);
+		fb_add(f[1], z4, z5);
+		fb_add(f[1], f[1], t6);
+		fb_add(f[2], z4, t5);
+		fb_add(f[2], f[2], t7);
+		fb_add_dig(f[3], t6, 1);
+		fb_copy(f[4], t7);
+		fb_set_dig(f[5], 1);
+		fb_set_dig(f[6], 0);
+		fb_copy(f[7], t4);
+		fb_copy(f[8], t3);
+		fb_copy(f[9], u1);
+
+		pb_map_l8_gxd(l1, f, tab, xq, yq);
+		fb12_mul_dxss(r1, r1, l1);
+
+		fb_sqr(u0, u0);
+		fb_sqr(u1, u1);
+		for (int i = 0; i < 24; i++) {
+			fb_sqr(v0, v0);
+			fb_sqr(v1, v1);
+		}
+		for (int i = 0; i < 2; i++) {
+			fb_sqr(z0, z0);
+			fb_sqr(z3, z3);
+			fb_sqr(z4, z4);
+			fb_sqr(z5, z5);
+			fb_sqr(z8, z8);
+		}
+		for (int i = 0; i < 4; i++) {
+			fb_sqr(z1, z1);
+			fb_sqr(z2, z2);
+			fb_sqr(z6, z6);
+			fb_sqr(z7, z7);
+		}
+	}
+
+	/* r1 = r1^(m-1)/2. */
+	int to = ((FB_BITS - 1) / 2) / 6;
+	to = to * 6;
+	fb12_copy(l1, r1);
+	for (i = 0; i < to; i++) {
+		/* This is faster than calling fb12_sqr(alpha, alpha) (no field additions). */
+		fb_sqr(l1[0][0], l1[0][0]);
+		fb_sqr(l1[0][1], l1[0][1]);
+		fb_sqr(l1[0][2], l1[0][2]);
+		fb_sqr(l1[0][3], l1[0][3]);
+		fb_sqr(l1[0][4], l1[0][4]);
+		fb_sqr(l1[0][5], l1[0][5]);
+		fb_sqr(l1[1][0], l1[1][0]);
+		fb_sqr(l1[1][1], l1[1][1]);
+		fb_sqr(l1[1][2], l1[1][2]);
+		fb_sqr(l1[1][3], l1[1][3]);
+		fb_sqr(l1[1][4], l1[1][4]);
+		fb_sqr(l1[1][5], l1[1][5]);
+	}
+	if ((to / 6) % 2 == 1) {
+		fb6_add(l1[0], l1[0], l1[1]);
+	}
+	for (; i < (FB_BITS - 1) / 2; i++) {
+		fb12_sqr(l1, l1);
+	}
+
+	fb12_mul(r0, r0, l1);
+	fb12_sqr(r0, r0);
+	fb12_mul(r0, r0, r1);
+
+	fb_add(tab[2], u0, u1);
+	fb_add_dig(tab[2], tab[2], 1);
+	fb_copy(tab[3], u1);
+	fb_add(tab[4], v0, v1);
+	fb_add(tab[4], tab[4], tab[2]);
+	fb_add(tab[5], v1, u1);
+
+	fb_sqr(tab[6], u0);
+	fb_sqr(tab[7], u1);
+	fb_sqr(tab[8], v0);
+	fb_sqr(tab[9], v1);
+
+	fb_add(t0, tab[2], tab[6]);
+	fb_add(t1, tab[3], tab[7]);
+	fb_add(t2, tab[4], tab[8]);
+	fb_add(t3, tab[5], tab[9]);
+	fb_sqr(t4, tab[2]);
+	fb_sqr(t5, tab[6]);
+	fb_copy(t6, tab[7]);
+	fb_sqr(t7, tab[7]);
+	fb_mul(t8, tab[2], tab[6]);
+	fb_mul(t9, tab[3], tab[7]);
+	fb_add(t10, t7, t9);
+	fb_mul(t10, t10, tab[2]);
+	fb_add(t11, t6, t9);
+	fb_mul(t11, t11, tab[6]);
+	fb_add(t12, t4, t8);
+	fb_add(t12, t12, t11);
+	fb_add(t13, t5, t8);
+	fb_add(t13, t13, t10);
+	fb_add(t14, z0, u1);
+	fb_sqr(t15, t14);
+	fb_add(t15, t15, t14);
+	fb_mul(f[0], t1, t3);
+	fb_add(f[0], f[0], t2);
+	fb_mul(f[0], f[0], t8);
+	fb_add(t, t5, t11);
+	fb_mul(t, t, tab[4]);
+	fb_add(f[0], f[0], t);
+	fb_add(t, t4, t10);
+	fb_mul(t, t, tab[8]);
+	fb_add(f[0], f[0], t);
+	fb_add(t, t0, t9);
+	fb_mul(t, t, t1);
+	fb_add(t, t, t15);
+	fb_mul(f[1], t2, t);
+	fb_mul(t, tab[5], t13);
+	fb_add(f[1], f[1], t);
+	fb_mul(t, tab[9], t12);
+	fb_add(f[1], f[1], t);
+	fb_mul(f[2], t3, t15);
+	fb_sqr(t, t1);
+	fb_add(t, t, t0);
+	fb_mul(t, t, t2);
+	fb_add(f[2], f[2], t);
+	fb_mul(f[3], t3, t0);
+	fb_mul(t, t2, t1);
+	fb_add(f[3], f[3], t);
+	fb_zero(f[4]);
+	fb_zero(f[5]);
+	fb_zero(f[6]);
+	fb_add(f[7], t12, t13);
+	fb_zero(f[8]);
+	fb_zero(f[9]);
+
+	pb_map_add_gxd(l1, f, tab, xq, yq);
+	fb12_mul_dxs3(r1, r1, l1);
+
+	fb_add(z0, t9, u1);
+	fb_add_dig(z1, u1, 1);
+	fb_sqr(z6, z1);
+	fb_add(z3, z0, z6);
+	fb_sqr(z4, z6);
+	fb_add(z5, z0, tab[9]);
+
+	fb_add(t0, z2, v1);
+	fb_add_dig(t0, t0, 1);
+	fb_mul(tab[1], z6, tab[3]);
+	fb_mul(tab[0], z6, tab[2]);
+	fb_mul(tab[4], tab[4], z3);
+	fb_mul(tab[5], tab[5], z3);
+	fb_copy(tab[6], z5);
+	fb_mul(t, z3, v0);
+	fb_mul(tab[8], z5, t0);
+	fb_add(tab[8], tab[8], t);
+	fb_mul(tab[9], z3, u0);
+	fb_mul(t, z5, z6);
+	fb_add(tab[9], tab[9], t);
+	fb_add(tab[9], tab[9], t0);
+	fb_add(t0, tab[0], tab[6]);
+	fb_add_dig(t1, tab[1], 1);
+	fb_add(t2, tab[4], tab[8]);
+	fb_add(t3, tab[5], tab[9]);
+	fb_sqr(t4, tab[0]);
+	fb_sqr(t5, tab[6]);
+	fb_mul(t6, tab[1], tab[3]);
+	fb_mul(t8, tab[0], tab[6]);
+	fb_mul(t9, tab[2], tab[6]);
+	fb_add_dig(t10, tab[1], 1);
+	fb_mul(t10, t10, tab[2]);
+	fb_add(t11, tab[3], t6);
+	fb_mul(t11, t11, tab[6]);
+	fb_add(t12, t4, t8);
+	fb_add(t12, t12, t11);
+	fb_add(t13, t5, t8);
+	fb_add(t13, t13, t10);
+	fb_mul(t14, tab[0], tab[1]);
+	fb_add(t14, t14, tab[6]);
+	fb_mul(t15, z6, t0);
+
+	fb_mul(f[0], t1, t3);
+	fb_mul(t, t2, z6);
+	fb_add(f[0], f[0], t);
+	fb_mul(f[0], f[0], t9);
+	fb_add(t, t5, t11);
+	fb_mul(t, t, tab[4]);
+	fb_add(f[0], f[0], t);
+	fb_add(t, t4, t10);
+	fb_mul(t, t, tab[8]);
+	fb_add(f[0], f[0], t);
+
+	fb_add(t, t0, tab[3]);
+	fb_mul(t, t, t1);
+	fb_add(t, t, t14);
+	fb_mul(f[1], t, t2);
+	fb_mul(t, tab[5], t13);
+	fb_add(f[1], f[1], t);
+	fb_mul(t, tab[9], t12);
+	fb_add(f[1], f[1], t);
+
+	fb_sqr(f[2], t1);
+	fb_add(f[2], f[2], t15);
+	fb_mul(f[2], f[2], t2);
+	fb_mul(t, t3, t14);
+	fb_add(f[2], f[2], t);
+	fb_mul(f[3], t3, t15);
+	fb_mul(t, z6, t1);
+	fb_mul(t, t, t2);
+	fb_add(f[3], f[3], t);
+	fb_zero(f[4]);
+	fb_zero(f[5]);
+	fb_zero(f[6]);
+	fb_add(f[7], t12, t13);
+	fb_mul(f[7], f[7], z3);
+	fb_zero(f[8]);
+	fb_zero(f[9]);
+
+	pb_map_add_gxd(l0, f, tab, xq, yq);
+	fb12_mul_dxs3(r0, r0, l0);
+
+	fb_add_dig(f[0], v0, 1);
+	fb_copy(f[1], u0);
+	fb_copy(f[2], v1);
+	fb_add_dig(f[3], u1, 1);
+	fb_zero(f[4]);
+	fb_zero(f[5]);
+	fb_zero(f[6]);
+	fb_set_dig(f[7], 1);
+	fb_zero(f[8]);
+	fb_zero(f[9]);
+
+	pb_map_l2_gxd(l0, f, tab, xq, yq);
+	fb12_mul(r0, r0, l0);
+
+	fb12_frb(r0, r0);
+	fb12_frb(r0, r0);
+	fb12_frb(r0, r0);
+	fb12_mul(r, r0, r1);
+}
+
 /*============================================================================*/
 /* Public definitions                                                        */
 /*============================================================================*/
 
-void pb_map_oate2(fb12_t r, hb_t p, hb_t q) {
-	fb_t xp, yp, xq1, xq2, yq1, yq2;
+void pb_map_oeta2(fb12_t r, hb_t p, hb_t q) {
+	fb_t xp, yp, xq1, yq1;
 
 	fb_null(xp);
 	fb_null(yp);
@@ -2220,7 +3958,34 @@ void pb_map_oate2(fb12_t r, hb_t p, hb_t q) {
 		fb_new(yq2);
 
 		if (!p->deg && !q->deg) {
-			pb_map_oate2_gxg(r, p, q);
+			pb_map_oeta2_gxg(r, p, q);
+			pb_map_exp(r, r);
+			return;
+		}
+
+		if (!p->deg && q->deg) {
+			fb_neg(xq1, q->u0);
+			fb_copy(yq1, q->v0);
+			pb_map_oeta2_gxd(r, p, xq1, yq1);
+			pb_map_exp(r, r);
+			return;
+		}
+
+		if (p->deg && !q->deg) {
+			fb_neg(xp, p->u0);
+			fb_copy(yp, p->v0);
+			pb_map_oeta2_gxd(r, q, xp, yp);
+			pb_map_exp(r, r);
+			return;
+		}
+
+		if (p->deg && q->deg) {
+			fb_neg(xp, p->u0);
+			fb_copy(yp, p->v0);
+			fb_neg(xq1, q->u0);
+			fb_copy(yq1, q->v0);
+
+			pb_map_oeta2_dxd(r, xp, yp, xq1, yq1);
 			pb_map_exp(r, r);
 			return;
 		}

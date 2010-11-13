@@ -778,7 +778,7 @@ static int simultaneous(void) {
 		hb_curve_get_gen(p);
 		hb_curve_get_ord(n);
 
-		TEST_BEGIN("simultaneous point multiplication is correct") {
+		TEST_BEGIN("simultaneous divisor class multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			bn_rand(l, BN_POS, bn_bits(n));
@@ -792,7 +792,7 @@ static int simultaneous(void) {
 		} TEST_END;
 
 #if HB_SIM == BASIC || !defined(STRIP)
-		TEST_BEGIN("basic simultaneous point multiplication is correct") {
+		TEST_BEGIN("basic simultaneous divisor class multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			bn_rand(l, BN_POS, bn_bits(n));

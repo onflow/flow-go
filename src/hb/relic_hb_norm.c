@@ -32,13 +32,13 @@
 #include "string.h"
 
 #include "relic_core.h"
-#include "relic_eb.h"
+#include "relic_hb.h"
 #include "relic_error.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void hb_norm(eb_t r, eb_t p) {
+void hb_norm(hb_t r, hb_t p) {
 	hb_copy(r, p);
 }

@@ -147,7 +147,7 @@ void pp_dbl(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
  */
 void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
 #ifndef PP_PARAL
-	fp12_t tmp, tmp2;
+	fp12_t tmp;
 
 	fp12_null(tmp);
 

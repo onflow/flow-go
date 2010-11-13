@@ -178,3 +178,91 @@ void fb12_frb(fb12_t c, fb12_t a) {
 		fb6_free(t);
 	}
 }
+
+void fb12_mul_dxs2(fb12_t c, fb12_t a, fb12_t b) {
+	fb6_t t0, t1, t2;
+
+	fb6_null(t0);
+	fb6_null(t1);
+	fb6_null(t2);
+
+	TRY {
+		fb6_new(t0);
+		fb6_new(t1);
+		fb6_new(t2);
+
+		fb6_add(t0, a[0], a[1]);
+		fb6_add(t1, b[0], b[1]);
+		fb6_mul(t2, t0, t1);
+		fb6_mul(t0, a[0], b[0]);
+		fb6_mul_dxs(t1, a[1], b[1]);
+		fb6_mul_nor(t1, t1);
+		fb6_add(c[0], t0, t1);
+		fb6_add(c[1], t0, t2);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb6_free(t0);
+		fb6_free(t1);
+	}
+}
+
+void fb12_mul_dxs3(fb12_t c, fb12_t a, fb12_t b) {
+	fb6_t t0, t1, t2;
+
+	fb6_null(t0);
+	fb6_null(t1);
+	fb6_null(t2);
+
+	TRY {
+		fb6_new(t0);
+		fb6_new(t1);
+		fb6_new(t2);
+
+		fb6_add(t0, a[0], a[1]);
+		fb6_add(t1, b[0], b[1]);
+		fb6_mul(t2, t0, t1);
+		fb6_mul(t0, a[0], b[0]);
+		for (int i = 0; i < 6; i++) {
+			fb_mul(t1[i], a[1][i], b[1][0]);
+		}
+		fb6_mul_nor(t1, t1);
+		fb6_add(c[0], t0, t1);
+		fb6_add(c[1], t0, t2);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb6_free(t0);
+		fb6_free(t1);
+		fb6_free(t2);
+	}
+}
+
+void fb12_mul_dxss(fb12_t c, fb12_t a, fb12_t b) {
+	fb6_t t0, t1, t2;
+
+	fb6_null(t0);
+	fb6_null(t1);
+	fb6_null(t2);
+
+	TRY {
+		fb6_new(t0);
+		fb6_new(t1);
+		fb6_new(t2);
+
+		fb6_add(t0, a[0], a[1]);
+		fb6_add(t1, b[0], b[1]);
+		fb6_mul(t2, t0, t1);
+		fb6_mul(t0, a[0], b[0]);
+		fb6_mul_dxss(t1, a[1], b[1]);
+		fb6_mul_nor(t1, t1);
+		fb6_add(c[0], t0, t1);
+		fb6_add(c[1], t0, t2);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb6_free(t0);
+		fb6_free(t1);
+		fb6_free(t2);
+	}
+}
