@@ -68,107 +68,109 @@ static void eb_mul_pre_kbltz(eb_t *t, eb_t p) {
 
 	/* The minimum table depth for WTNAF is 3. */
 #if EB_DEPTH == 3
-	eb_frb_tab(t[1], t[0]);
+	eb_frb(t[1], t[0]);
 	if (u == 1) {
-		eb_sub_tab(t[1], t[0], t[1]);
+		eb_sub(t[1], t[0], t[1]);
 	} else {
-		eb_add_tab(t[1], t[0], t[1]);
+		eb_add(t[1], t[0], t[1]);
 	}
 #endif
 
 #if EB_DEPTH == 4
-	eb_frb_tab(t[3], t[0]);
-	eb_frb_tab(t[3], t[3]);
+	eb_frb(t[3], t[0]);
+	eb_frb(t[3], t[3]);
 
-	eb_sub_tab(t[1], t[3], p);
-	eb_add_tab(t[2], t[3], p);
-	eb_frb_tab(t[3], t[3]);
+	eb_sub(t[1], t[3], p);
+	eb_add(t[2], t[3], p);
+	eb_frb(t[3], t[3]);
 
 	if (u == 1) {
-		eb_neg_tab(t[3], t[3]);
+		eb_neg(t[3], t[3]);
 	}
-	eb_sub_tab(t[3], t[3], p);
+	eb_sub(t[3], t[3], p);
 #endif
 
 #if EB_DEPTH == 5
-	eb_frb_tab(t[3], t[0]);
-	eb_frb_tab(t[3], t[3]);
+	eb_frb(t[3], t[0]);
+	eb_frb(t[3], t[3]);
 
-	eb_sub_tab(t[1], t[3], p);
-	eb_add_tab(t[2], t[3], p);
-	eb_frb_tab(t[3], t[3]);
+	eb_sub(t[1], t[3], p);
+	eb_add(t[2], t[3], p);
+	eb_frb(t[3], t[3]);
 
 	if (u == 1) {
-		eb_neg_tab(t[3], t[3]);
+		eb_neg(t[3], t[3]);
 	}
-	eb_sub_tab(t[3], t[3], p);
+	eb_sub(t[3], t[3], p);
 
-	eb_frb_tab(t[4], t[2]);
-	eb_frb_tab(t[4], t[4]);
+	eb_frb(t[4], t[2]);
+	eb_frb(t[4], t[4]);
 
-	eb_sub_tab(t[7], t[4], t[2]);
+	eb_sub(t[7], t[4], t[2]);
 
-	eb_neg_tab(t[4], t[4]);
-	eb_sub_tab(t[5], t[4], p);
-	eb_add_tab(t[6], t[4], p);
+	eb_neg(t[4], t[4]);
+	eb_sub(t[5], t[4], p);
+	eb_add(t[6], t[4], p);
 
-	eb_frb_tab(t[4], t[4]);
+	eb_frb(t[4], t[4]);
 	if (u == -1) {
-		eb_neg_tab(t[4], t[4]);
+		eb_neg(t[4], t[4]);
 	}
-	eb_add_tab(t[4], t[4], p);
+	eb_add(t[4], t[4], p);
 #endif
 
 #if EB_DEPTH == 6
-	eb_frb_tab(t[0], t[0]);
-	eb_frb_tab(t[0], t[0]);
-	eb_neg_tab(t[14], t[0]);
+	eb_frb(t[0], t[0]);
+	eb_frb(t[0], t[0]);
+	eb_neg(t[14], t[0]);
 
-	eb_sub_tab(t[13], t[14], p);
-	eb_add_tab(t[14], t[14], p);
+	eb_sub(t[13], t[14], p);
+	eb_add(t[14], t[14], p);
 
-	eb_frb_tab(t[0], t[0]);
+	eb_frb(t[0], t[0]);
 	if (u == -1) {
-		eb_neg_tab(t[0], t[0]);
+		eb_neg(t[0], t[0]);
 	}
-	eb_sub_tab(t[11], t[0], p);
-	eb_add_tab(t[12], t[0], p);
+	eb_sub(t[11], t[0], p);
+	eb_add(t[12], t[0], p);
 
-	eb_frb_tab(t[0], t[12]);
-	eb_frb_tab(t[0], t[0]);
-	eb_sub_tab(t[1], t[0], p);
-	eb_add_tab(t[2], t[0], p);
+	eb_frb(t[0], t[12]);
+	eb_frb(t[0], t[0]);
+	eb_sub(t[1], t[0], p);
+	eb_add(t[2], t[0], p);
 
-	eb_add_tab(t[15], t[0], t[13]);
+	eb_add(t[15], t[0], t[13]);
 
-	eb_frb_tab(t[0], t[13]);
-	eb_frb_tab(t[0], t[0]);
-	eb_sub_tab(t[5], t[0], p);
-	eb_add_tab(t[6], t[0], p);
+	eb_frb(t[0], t[13]);
+	eb_frb(t[0], t[0]);
+	eb_sub(t[5], t[0], p);
+	eb_add(t[6], t[0], p);
 
-	eb_neg_tab(t[8], t[0]);
-	eb_add_tab(t[7], t[8], t[13]);
-	eb_add_tab(t[8], t[8], t[14]);
+	eb_neg(t[8], t[0]);
+	eb_add(t[7], t[8], t[13]);
+	eb_add(t[8], t[8], t[14]);
 
-	eb_frb_tab(t[0], t[0]);
+	eb_frb(t[0], t[0]);
 	if (u == -1) {
-		eb_neg_tab(t[0], t[0]);
+		eb_neg(t[0], t[0]);
 	}
-	eb_sub_tab(t[3], t[0], p);
-	eb_add_tab(t[4], t[0], p);
+	eb_sub(t[3], t[0], p);
+	eb_add(t[4], t[0], p);
 
-	eb_frb_tab(t[0], t[1]);
-	eb_frb_tab(t[0], t[0]);
+	eb_frb(t[0], t[1]);
+	eb_frb(t[0], t[0]);
 
-	eb_neg_tab(t[9], t[0]);
-	eb_sub_tab(t[9], t[9], p);
+	eb_neg(t[9], t[0]);
+	eb_sub(t[9], t[9], p);
 
-	eb_frb_tab(t[0], t[14]);
-	eb_frb_tab(t[0], t[0]);
-	eb_add_tab(t[10], t[0], p);
+	eb_frb(t[0], t[14]);
+	eb_frb(t[0], t[0]);
+	eb_add(t[10], t[0], p);
 
 	eb_copy(t[0], p);
 #endif
+
+	eb_norm_sim(t + 1, t + 1, EB_TABLE_WTNAF - 1);
 }
 
 /**
@@ -252,14 +254,17 @@ static void eb_mul_pre_ordin(eb_t *t, eb_t p) {
 		t[i]->norm = 1;
 	}
 
-	eb_dbl_tab(t[0], p);
+	eb_dbl(t[0], p);
 
 #if EB_DEPTH > 2
-	eb_add_tab(t[1], t[0], p);
+	eb_add(t[1], t[0], p);
 	for (i = 2; i < (1 << (EB_DEPTH - 2)); i++) {
-		eb_add_tab(t[i], t[i - 1], t[0]);
+		eb_add(t[i], t[i - 1], t[0]);
 	}
 #endif
+
+	eb_norm_sim(t + 1, t + 1, EB_TABLE_WTNAF - 1);
+
 	eb_copy(t[0], p);
 }
 
@@ -316,8 +321,10 @@ void eb_mul_pre_basic(eb_t *t, eb_t p) {
 
 		eb_copy(t[0], p);
 		for (int i = 1; i < bn_bits(n); i++) {
-			eb_dbl_tab(t[i], t[i - 1]);
+			eb_dbl(t[i], t[i - 1]);
 		}
+
+		eb_norm_sim(t + 1, t + 1, EB_TABLE_BASIC - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -361,11 +368,13 @@ void eb_mul_pre_yaowi(eb_t *t, eb_t p) {
 
 		eb_copy(t[0], p);
 		for (int i = 1; i < l; i++) {
-			eb_dbl_tab(t[i], t[i - 1]);
+			eb_dbl(t[i], t[i - 1]);
 			for (int j = 1; j < EB_DEPTH; j++) {
-				eb_dbl_tab(t[i], t[i]);
+				eb_dbl(t[i], t[i]);
 			}
 		}
+
+		eb_norm_sim(t + 1, t + 1, EB_TABLE_YAOWI - 1);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -430,11 +439,13 @@ void eb_mul_pre_nafwi(eb_t *t, eb_t p) {
 
 		eb_copy(t[0], p);
 		for (int i = 1; i < l; i++) {
-			eb_dbl_tab(t[i], t[i - 1]);
+			eb_dbl(t[i], t[i - 1]);
 			for (int j = 1; j < EB_DEPTH; j++) {
-				eb_dbl_tab(t[i], t[i]);
+				eb_dbl(t[i], t[i]);
 			}
 		}
+
+		eb_norm_sim(t + 1, t + 1, EB_TABLE_NAFWI - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -521,14 +532,16 @@ void eb_mul_pre_combs(eb_t *t, eb_t p) {
 
 		eb_copy(t[1], p);
 		for (j = 1; j < EB_DEPTH; j++) {
-			eb_dbl_tab(t[1 << j], t[1 << (j - 1)]);
+			eb_dbl(t[1 << j], t[1 << (j - 1)]);
 			for (i = 1; i < l; i++) {
-				eb_dbl_tab(t[1 << j], t[1 << j]);
+				eb_dbl(t[1 << j], t[1 << j]);
 			}
 			for (i = 1; i < (1 << j); i++) {
-				eb_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
+				eb_add(t[(1 << j) + i], t[1 << j], t[i]);
 			}
 		}
+
+		eb_norm_sim(t + 2, t + 2, EB_TABLE_COMBS - 2);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -611,21 +624,24 @@ void eb_mul_pre_combd(eb_t *t, eb_t p) {
 		eb_set_infty(t[0]);
 		eb_copy(t[1], p);
 		for (j = 1; j < EB_DEPTH; j++) {
-			eb_dbl_tab(t[1 << j], t[1 << (j - 1)]);
+			eb_dbl(t[1 << j], t[1 << (j - 1)]);
 			for (i = 1; i < d; i++) {
-				eb_dbl_tab(t[1 << j], t[1 << j]);
+				eb_dbl(t[1 << j], t[1 << j]);
 			}
 			for (i = 1; i < (1 << j); i++) {
-				eb_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
+				eb_add(t[(1 << j) + i], t[1 << j], t[i]);
 			}
 		}
 		eb_set_infty(t[1 << EB_DEPTH]);
 		for (j = 1; j < (1 << EB_DEPTH); j++) {
-			eb_dbl_tab(t[(1 << EB_DEPTH) + j], t[j]);
+			eb_dbl(t[(1 << EB_DEPTH) + j], t[j]);
 			for (i = 1; i < e; i++) {
-				eb_dbl_tab(t[(1 << EB_DEPTH) + j], t[(1 << EB_DEPTH) + j]);
+				eb_dbl(t[(1 << EB_DEPTH) + j], t[(1 << EB_DEPTH) + j]);
 			}
 		}
+
+		eb_norm_sim(t + 2, t + 2, (1 << EB_DEPTH) - 2);
+		eb_norm_sim(t + (1 << EB_DEPTH) + 1, t + (1 << EB_DEPTH) + 1, (1 << EB_DEPTH) - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

@@ -819,7 +819,7 @@ static int fixed(void) {
 
 static int simultaneous(void) {
 	int code = STS_ERR;
-	eb_t p, q, r, s;
+	eb_t p, q, r;
 	bn_t n, k, l;
 
 	eb_null(p);
@@ -828,16 +828,13 @@ static int simultaneous(void) {
 	eb_null(s);
 
 	TRY {
-
 		eb_new(p);
 		eb_new(q);
 		eb_new(r);
-		eb_new(s);
 		bn_new(n);
 		bn_new(k);
 		bn_new(l);
 
-		eb_curve_get_gen(p);
 		eb_curve_get_ord(n);
 
 		TEST_BEGIN("simultaneous point multiplication is correct") {
@@ -845,10 +842,12 @@ static int simultaneous(void) {
 			bn_mod(k, k, n);
 			bn_rand(l, BN_POS, bn_bits(n));
 			bn_mod(l, l, n);
-			eb_mul(q, p, k);
-			eb_mul(s, q, l);
+			eb_rand(p);
+			eb_rand(q);
 			eb_mul_sim(r, p, k, q, l);
-			eb_add(q, q, s);
+			eb_mul(p, p, k);
+			eb_mul(q, q, l);
+			eb_add(q, q, p);
 			eb_norm(q, q);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
@@ -907,8 +906,8 @@ static int simultaneous(void) {
 			bn_rand(l, BN_POS, bn_bits(n));
 			bn_mod(l, l, n);
 			eb_mul_sim_gen(r, k, q, l);
-			eb_curve_get_gen(s);
-			eb_mul_sim(q, s, k, q, l);
+			eb_curve_get_gen(p);
+			eb_mul_sim(q, p, k, q, l);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
 	}

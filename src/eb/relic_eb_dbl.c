@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EB_ADD == BASIC || defined(EB_MIXED) || !defined(STRIP)
+#if EB_ADD == BASIC || !defined(STRIP)
 
 #if defined(EB_ORDIN) || defined(EB_KBLTZ)
 /**
@@ -331,7 +331,7 @@ static void eb_dbl_projc_super(eb_t r, eb_t p) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if EB_ADD == BASIC || defined(EB_MIXED) || !defined(STRIP)
+#if EB_ADD == BASIC || !defined(STRIP)
 
 void eb_dbl_basic(eb_t r, eb_t p) {
 	if (eb_is_infty(p)) {

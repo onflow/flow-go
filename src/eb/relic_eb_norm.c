@@ -46,10 +46,11 @@
 /**
  * Normalizes a point represented in projective coordinates.
  *
- * @param r			- the result.
- * @param p			- the point to normalize.
+ * @param[out] r		- the result.
+ * @param[in] p			- the point to normalize.
+ * @param[in] flag		- if the Z coordinate is already inverted.
  */
-static void eb_norm_ordin(eb_t r, eb_t p, int inverted) {
+static void eb_norm_ordin(eb_t r, eb_t p, int flag) {
 	if (!p->norm) {
 		fb_t t0;
 
@@ -58,7 +59,7 @@ static void eb_norm_ordin(eb_t r, eb_t p, int inverted) {
 		TRY {
 			fb_new(t0);
 
-			if (inverted) {
+			if (flag) {
 				fb_copy(t0, p->z);
 			} else {
 				fb_inv(t0, p->z);
@@ -68,9 +69,11 @@ static void eb_norm_ordin(eb_t r, eb_t p, int inverted) {
 			fb_mul(r->y, p->y, t0);
 			fb_zero(r->z);
 			fb_set_bit(r->z, 0, 1);
-		} CATCH_ANY {
+		}
+		CATCH_ANY {
 			THROW(ERR_CAUGHT);
-		} FINALLY {
+		}
+		FINALLY {
 			fb_free(t0);
 		}
 	}
@@ -88,7 +91,7 @@ static void eb_norm_ordin(eb_t r, eb_t p, int inverted) {
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-static void eb_norm_super(eb_t r, eb_t p, int inverted) {
+static void eb_norm_super(eb_t r, eb_t p, int flag) {
 	if (!p->norm) {
 		fb_t t0;
 
@@ -97,7 +100,7 @@ static void eb_norm_super(eb_t r, eb_t p, int inverted) {
 		TRY {
 			fb_new(t0);
 
-			if (inverted) {
+			if (flag) {
 				fb_copy(t0, p->z);
 			} else {
 				fb_inv(t0, p->z);
@@ -107,7 +110,8 @@ static void eb_norm_super(eb_t r, eb_t p, int inverted) {
 			fb_zero(r->z);
 			fb_set_bit(r->z, 0, 1);
 
-		} CATCH_ANY {
+		}
+		CATCH_ANY {
 			THROW(ERR_CAUGHT);
 		}
 		FINALLY {
@@ -125,8 +129,8 @@ static void eb_norm_super(eb_t r, eb_t p, int inverted) {
 /**
  * Normalizes a point represented in lambda-coordinates.
  *
- * @param r			- the result.
- * @param p			- the point to normalize.
+ * @param[out] r		- the result.
+ * @param[in] p			- the point to normalize.
  */
 static void eb_norm_halve(eb_t r, eb_t p) {
 	fb_t t0;
@@ -186,8 +190,7 @@ void eb_norm(eb_t r, eb_t p) {
 #endif /* EB_ADD == PROJC */
 }
 
-void eb_norm_sim(eb_t * r, eb_t * t, int n) {
-#if EB_ADD == PROJC
+void eb_norm_sim(eb_t *r, eb_t *t, int n) {
 	int i;
 	fb_t a[n];
 
@@ -195,36 +198,39 @@ void eb_norm_sim(eb_t * r, eb_t * t, int n) {
 		fb_null(a[i]);
 	}
 
-	for (i = 0; i < n; i++) {
-		fb_new(a[i]);
+	TRY {
+		for (i = 0; i < n; i++) {
+			fb_new(a[i]);
+		}
+
+		for (i = 0; i < n; i++) {
+			fb_copy(a[i], t[i]->z);
+		}
+
+		fb_inv_sim(a, a, n);
+
+		for (i = 0; i < n; i++) {
+			fb_copy(t[i]->z, a[i]);
+		}
 	}
-
-	for (i = 0; i < n; i++) {
-		fb_copy(a[i], t[i]->z);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-
-	fb_inv_sim(a, a, n);
-
-	for (i = 0; i < n; i++) {
-		fb_copy(t[i]->z, a[i]);
+	FINALLY {
+		for (i = 0; i < n; i++) {
+			fb_free(a[i]);
+		}
 	}
 
 	for (i = 0; i < n; i++) {
 #if defined(EB_SUPER)
 		if (eb_curve_is_super()) {
 			eb_norm_super(r[i], t[i], 1);
-		} else {
-#endif
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
-			eb_norm_ordin(r[i], t[i], 1);
-#endif
-#if defined(EB_SUPER)
+			return;
 		}
 #endif
+#if defined(EB_ORDIN) || defined(EB_KBLTZ)
+		eb_norm_ordin(r[i], t[i], 1);
+#endif
 	}
-
-	for (i = 0; i < n; i++) {
-		fb_free(a[i]);
-	}
-#endif /* eb_ADD == PROJC */
 }

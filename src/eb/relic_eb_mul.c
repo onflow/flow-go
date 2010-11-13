@@ -69,106 +69,110 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
 
 	/* The minimum table depth for WTNAF is 3. */
 #if EB_WIDTH == 3
-	eb_frb_tab(t[1], t[0]);
+	eb_frb(t[1], t[0]);
 	if (u == 1) {
-		eb_sub_tab(t[1], t[0], t[1]);
+		eb_sub(t[1], t[0], t[1]);
 	} else {
-		eb_add_tab(t[1], t[0], t[1]);
+		eb_add(t[1], t[0], t[1]);
 	}
 #endif
 
 #if EB_WIDTH == 4
-	eb_frb_tab(t[3], t[0]);
-	eb_frb_tab(t[3], t[3]);
+	eb_frb(t[3], t[0]);
+	eb_frb(t[3], t[3]);
 
-	eb_sub_tab(t[1], t[3], p);
-	eb_add_tab(t[2], t[3], p);
-	eb_frb_tab(t[3], t[3]);
+	eb_sub(t[1], t[3], p);
+	eb_add(t[2], t[3], p);
+	eb_frb(t[3], t[3]);
 
 	if (u == 1) {
-		eb_neg_tab(t[3], t[3]);
+		eb_neg(t[3], t[3]);
 	}
-	eb_sub_tab(t[3], t[3], p);
+	eb_sub(t[3], t[3], p);
 #endif
 
 #if EB_WIDTH == 5
-	eb_frb_tab(t[3], t[0]);
-	eb_frb_tab(t[3], t[3]);
+	eb_frb(t[3], t[0]);
+	eb_frb(t[3], t[3]);
 
-	eb_sub_tab(t[1], t[3], p);
-	eb_add_tab(t[2], t[3], p);
-	eb_frb_tab(t[3], t[3]);
+	eb_sub(t[1], t[3], p);
+	eb_add(t[2], t[3], p);
+	eb_frb(t[3], t[3]);
 
 	if (u == 1) {
-		eb_neg_tab(t[3], t[3]);
+		eb_neg(t[3], t[3]);
 	}
-	eb_sub_tab(t[3], t[3], p);
+	eb_sub(t[3], t[3], p);
 
-	eb_frb_tab(t[4], t[2]);
-	eb_frb_tab(t[4], t[4]);
+	eb_frb(t[4], t[2]);
+	eb_frb(t[4], t[4]);
 
-	eb_sub_tab(t[7], t[4], t[2]);
+	eb_sub(t[7], t[4], t[2]);
 
-	eb_neg_tab(t[4], t[4]);
-	eb_sub_tab(t[5], t[4], p);
-	eb_add_tab(t[6], t[4], p);
+	eb_neg(t[4], t[4]);
+	eb_sub(t[5], t[4], p);
+	eb_add(t[6], t[4], p);
 
-	eb_frb_tab(t[4], t[4]);
+	eb_frb(t[4], t[4]);
 	if (u == -1) {
-		eb_neg_tab(t[4], t[4]);
+		eb_neg(t[4], t[4]);
 	}
-	eb_add_tab(t[4], t[4], p);
+	eb_add(t[4], t[4], p);
 #endif
 
 #if EB_WIDTH == 6
-	eb_frb_tab(t[0], t[0]);
-	eb_frb_tab(t[0], t[0]);
-	eb_neg_tab(t[14], t[0]);
+	eb_frb(t[0], t[0]);
+	eb_frb(t[0], t[0]);
+	eb_neg(t[14], t[0]);
 
-	eb_sub_tab(t[13], t[14], p);
-	eb_add_tab(t[14], t[14], p);
+	eb_sub(t[13], t[14], p);
+	eb_add(t[14], t[14], p);
 
-	eb_frb_tab(t[0], t[0]);
+	eb_frb(t[0], t[0]);
 	if (u == -1) {
-		eb_neg_tab(t[0], t[0]);
+		eb_neg(t[0], t[0]);
 	}
-	eb_sub_tab(t[11], t[0], p);
-	eb_add_tab(t[12], t[0], p);
+	eb_sub(t[11], t[0], p);
+	eb_add(t[12], t[0], p);
 
-	eb_frb_tab(t[0], t[12]);
-	eb_frb_tab(t[0], t[0]);
-	eb_sub_tab(t[1], t[0], p);
-	eb_add_tab(t[2], t[0], p);
+	eb_frb(t[0], t[12]);
+	eb_frb(t[0], t[0]);
+	eb_sub(t[1], t[0], p);
+	eb_add(t[2], t[0], p);
 
-	eb_add_tab(t[15], t[0], t[13]);
+	eb_add(t[15], t[0], t[13]);
 
-	eb_frb_tab(t[0], t[13]);
-	eb_frb_tab(t[0], t[0]);
-	eb_sub_tab(t[5], t[0], p);
-	eb_add_tab(t[6], t[0], p);
+	eb_frb(t[0], t[13]);
+	eb_frb(t[0], t[0]);
+	eb_sub(t[5], t[0], p);
+	eb_add(t[6], t[0], p);
 
-	eb_neg_tab(t[8], t[0]);
-	eb_add_tab(t[7], t[8], t[13]);
-	eb_add_tab(t[8], t[8], t[14]);
+	eb_neg(t[8], t[0]);
+	eb_add(t[7], t[8], t[13]);
+	eb_add(t[8], t[8], t[14]);
 
-	eb_frb_tab(t[0], t[0]);
+	eb_frb(t[0], t[0]);
 	if (u == -1) {
-		eb_neg_tab(t[0], t[0]);
+		eb_neg(t[0], t[0]);
 	}
-	eb_sub_tab(t[3], t[0], p);
-	eb_add_tab(t[4], t[0], p);
+	eb_sub(t[3], t[0], p);
+	eb_add(t[4], t[0], p);
 
-	eb_frb_tab(t[0], t[1]);
-	eb_frb_tab(t[0], t[0]);
+	eb_frb(t[0], t[1]);
+	eb_frb(t[0], t[0]);
 
-	eb_neg_tab(t[9], t[0]);
-	eb_sub_tab(t[9], t[9], p);
+	eb_neg(t[9], t[0]);
+	eb_sub(t[9], t[9], p);
 
-	eb_frb_tab(t[0], t[14]);
-	eb_frb_tab(t[0], t[0]);
-	eb_add_tab(t[10], t[0], p);
+	eb_frb(t[0], t[14]);
+	eb_frb(t[0], t[0]);
+	eb_add(t[10], t[0], p);
 
 	eb_copy(t[0], p);
+#endif
+
+#ifdef EB_MIXED
+	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 }
 
@@ -229,7 +233,6 @@ static void eb_mul_tnaf_impl(eb_t r, eb_t p, bn_t k) {
 		}
 		/* Convert r to affine coordinates. */
 		eb_norm(r, r);
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -269,7 +272,9 @@ static void table_init_ordin(eb_t *t, eb_t p) {
 	}
 #endif
 
+#ifdef EB_MIXED
 	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
+#endif
 
 	eb_copy(t[0], p);
 }

@@ -854,7 +854,7 @@ static int solve(void) {
 
 static int inversion(void) {
 	int code = STS_ERR;
-	fb_t a, b, c;
+	fb_t a, b, c, d[2];
 
 	fb_null(a);
 	fb_null(b);
@@ -926,6 +926,16 @@ static int inversion(void) {
 		} TEST_END;
 #endif
 
+		TEST_BEGIN("simultaneous inversion is correct") {
+			fb_rand(a);
+			fb_rand(b);
+			fb_copy(d[0], a);
+			fb_copy(d[1], b);
+			fb_inv(a, a);
+			fb_inv(b, b);
+			fb_inv_sim(d, d, 2);
+			TEST_ASSERT(fb_cmp(d[0], a) == CMP_EQ && fb_cmp(d[1], b) == CMP_EQ, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);

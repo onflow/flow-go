@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EB_ADD == BASIC || defined(EB_MIXED) || !defined(STRIP)
+#if EB_ADD == BASIC || !defined(STRIP)
 
 #if defined(EB_ORDIN) || defined(EB_KBLTZ)
 
@@ -210,9 +210,9 @@ static void eb_add_basic_super(eb_t r, eb_t p, eb_t q) {
 }
 
 #endif /* EB_SUPER */
-#endif /* EB_ADD == BASIC || EB_MIXED */
+#endif /* EB_ADD == BASIC */
 
-#if EB_ADD == PROJC || defined(EB_MIXED) || !defined(STRIP)
+#if EB_ADD == PROJC || !defined(STRIP)
 
 #if defined(EB_ORDIN) || defined(EB_KBLTZ)
 /**
@@ -603,13 +603,13 @@ static void eb_add_projc_super(eb_t r, eb_t p, eb_t q) {
 	}
 }
 #endif /* EB_SUPER */
-#endif /* EB_ADD == PROJC || EB_MIXED */
+#endif /* EB_ADD == PROJC */
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if EB_ADD == BASIC || defined(EB_MIXED) || !defined(STRIP)
+#if EB_ADD == BASIC || !defined(STRIP)
 
 void eb_add_basic(eb_t r, eb_t p, eb_t q) {
 	if (eb_is_infty(p)) {
@@ -661,7 +661,7 @@ void eb_sub_basic(eb_t r, eb_t p, eb_t q) {
 
 #endif
 
-#if EB_ADD == PROJC || defined(EB_MIXED) || !defined(STRIP)
+#if EB_ADD == PROJC || !defined(STRIP)
 
 void eb_add_projc(eb_t r, eb_t p, eb_t q) {
 	if (eb_is_infty(p)) {

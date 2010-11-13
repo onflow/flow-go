@@ -69,7 +69,6 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
 	} else {
 		eb_add(t[1], t[0], t[1]);
 	}
-	eb_norm(t[1], t[1]);
 #endif
 
 #if EB_WIDTH == 4
@@ -84,8 +83,6 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
 		eb_neg(t[3], t[3]);
 	}
 	eb_sub(t[3], t[3], p);
-
-	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 
 #if EB_WIDTH == 5
@@ -115,8 +112,6 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
 		eb_neg(t[4], t[4]);
 	}
 	eb_add(t[4], t[4], p);
-
-	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 
 #if EB_WIDTH == 6
@@ -168,7 +163,9 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
 	eb_add(t[10], t[0], p);
 
 	eb_copy(t[0], p);
+#endif
 
+#if defined(EB_MIXED)
 	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 }
@@ -231,6 +228,9 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
 			eb_new(table1[i]);
+			eb_set_infty(table1[i]);
+			fb_set_bit(table1[i]->z, 0, 1);
+			table1[i]->norm = 1;
 		}
 		/* Compute the precomputation table. */
 		table_init_koblitz(table1, q);
@@ -467,19 +467,24 @@ void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 
 		eb_set_infty(t0[0]);
 		for (int i = 1; i < (1 << w); i++) {
-			eb_add_tab(t0[i], t0[i - 1], p);
+			eb_add(t0[i], t0[i - 1], p);
 		}
 
 		eb_set_infty(t1[0]);
 		for (int i = 1; i < (1 << w); i++) {
-			eb_add_tab(t1[i], t1[i - 1], q);
+			eb_add(t1[i], t1[i - 1], q);
 		}
 
 		for (int i = 0; i < (1 << w); i++) {
 			for (int j = 0; j < (1 << w); j++) {
-				eb_add_tab(t[(i << w) + j], t0[i], t1[j]);
+				eb_add(t[(i << w) + j], t0[i], t1[j]);
 			}
 		}
+
+#if defined(EB_MIXED)
+		eb_norm_sim(t0 + 2, t0 + 2, (1 << (EB_WIDTH / 2)) - 2);
+		eb_norm_sim(t1 + 2, t1 + 2, (1 << (EB_WIDTH / 2)) - 2);
+#endif
 
 		bn_rec_win(w0, &l0, k, w);
 		bn_rec_win(w1, &l1, l, w);
@@ -554,8 +559,11 @@ void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 		eb_set_infty(t[0]);
 		eb_copy(t[1], q);
 		eb_copy(t[2], p);
-		eb_add_tab(t[3], p, q);
-		eb_sub_tab(t[4], p, q);
+		eb_add(t[3], p, q);
+		eb_sub(t[4], p, q);
+#if defined(EB_MIXED)
+		eb_norm_sim(t + 3, t + 3, 2);
+#endif
 
 		bn_rec_jsf(jsf, &len, k, l);
 

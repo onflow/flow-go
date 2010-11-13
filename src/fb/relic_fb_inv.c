@@ -78,9 +78,11 @@ void fb_inv_basic(fb_t c, fb_t a) {
 			}
 		}
 		fb_copy(c, v);
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		fb_free(t);
 		fb_free(u);
 		fb_free(v);
@@ -375,6 +377,60 @@ void fb_inv_almos(fb_t c, fb_t a) {
 
 #endif
 
+#if FB_INV == ITOHT || !defined(STRIP)
+
+void fb_inv_itoht(fb_t c, fb_t a) {
+	int i, j, x, y;
+	int *chain, len;
+
+	chain = fb_poly_get_chain(&len);
+
+	int u[len + 1];
+	fb_t table[len + 1];
+	for (i = 0; i <= len; i++) {
+		fb_null(table[i]);
+	}
+
+	TRY {
+		fb_new(t);
+		fb_new(u);
+		fb_new(v);
+		for (i = 0; i <= len; i++) {
+			fb_new(table[i]);
+		}
+
+		u[0] = 1;
+		u[1] = 2;
+		fb_copy(table[0], a);
+		fb_sqr(table[1], table[0]);
+		fb_mul(table[1], table[1], table[0]);
+		for (i = 2; i <= len; i++) {
+			x = chain[i - 1] >> 8;
+			y = chain[i - 1] - (x << 8);
+			if (x == y) {
+				u[i] = 2 * u[i - 1];
+			} else {
+				u[i] = u[x] + u[y];
+			}
+			fb_sqr(table[i], table[x]);
+			for (j = 1; j < u[y]; j++) {
+				fb_sqr(table[i], table[i]);
+			}
+			fb_mul(table[i], table[i], table[y]);
+		}
+		fb_sqr(c, table[len]);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		for (i = 0; i <= len; i++) {
+			fb_free(table[i]);
+		}
+	}
+}
+
+#endif
 #if FB_INV == LOWER || !defined(STRIP)
 
 void fb_inv_lower(fb_t c, fb_t a) {
@@ -382,39 +438,44 @@ void fb_inv_lower(fb_t c, fb_t a) {
 }
 #endif
 
-void fb_inv_sim(fb_t * c, fb_t * a, int n) {
+void fb_inv_sim(fb_t *c, fb_t *a, int n) {
 	int i;
-	fb_t t[n];
-	fb_t u;
+	fb_t u, t[n];
 
 	for (i = 0; i < n; i++) {
 		fb_null(t[i]);
 	}
 	fb_null(u);
 
-	for (i = 0; i < n; i++) {
-		fb_new(t[i]);
+	TRY {
+		for (i = 0; i < n; i++) {
+			fb_new(t[i]);
+		}
+		fb_new(u);
+
+		fb_copy(c[0], a[0]);
+		fb_copy(t[0], a[0]);
+
+		for (i = 1; i < n; i++) {
+			fb_copy(t[i], a[i]);
+			fb_mul(c[i], c[i - 1], a[i]);
+		}
+
+		fb_inv(u, c[n - 1]);
+
+		for (i = n - 1; i > 0; i--) {
+			fb_mul(c[i], u, c[i - 1]);
+			fb_mul(u, u, t[i]);
+		}
+		fb_copy(c[0], u);
 	}
-	fb_new(u);
-
-	fb_copy(c[0], a[0]);
-	fb_copy(t[0], a[0]);
-
-	for (i = 1; i < n; i++) {
-		fb_copy(t[i], a[i]);
-		fb_mul(c[i], c[i - 1], a[i]);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-
-	fb_inv(u, c[n - 1]);
-
-	for (i = n - 1; i > 0; i--) {
-		fb_mul(c[i], u, c[i - 1]);
-		fb_mul(u, u, t[i]);
+	FINALLY {
+		for (i = 0; i < n; i++) {
+			fb_free(t[i]);
+		}
+		fb_free(u);
 	}
-	fb_copy(c[0], u);
-
-	for (i = 0; i < n; i++) {
-		fb_free(t[i]);
-	}
-	fb_free(u);
 }

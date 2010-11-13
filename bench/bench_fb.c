@@ -156,7 +156,7 @@ static void util(void) {
 }
 
 static void arith(void) {
-	fb_t a, b, c;
+	fb_t a, b, c, d[2];
 	dv_t e;
 	int bits;
 
@@ -471,6 +471,14 @@ static void arith(void) {
 	}
 	BENCH_END;
 #endif
+
+	BENCH_BEGIN("fb_inv_sim (2)") {
+		fb_rand(d[0]);
+		fb_rand(d[1]);
+		BENCH_ADD(fb_inv_sim(d, d, 2));
+	}
+	BENCH_END;
+
 
 	fb_free(a);
 	fb_free(b);
