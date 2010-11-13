@@ -728,7 +728,7 @@ static int reduction(void) {
 
 static int inversion(void) {
 	int code = STS_ERR;
-	fp_t a, b, c;
+	fp_t a, b, c, d[2];
 
 	fp_null(a);
 	fp_null(b);
@@ -791,6 +791,17 @@ static int inversion(void) {
 			TEST_ASSERT(fp_cmp(c, b) == CMP_EQ, end);
 		} TEST_END;
 #endif
+
+		TEST_BEGIN("simultaneous inversion is correct") {
+			fp_rand(a);
+			fp_rand(b);
+			fp_copy(d[0], a);
+			fp_copy(d[1], b);
+			fp_inv(a, a);
+			fp_inv(b, b);
+			fp_inv_sim(d, d, 2);
+			TEST_ASSERT(fp_cmp(d[0], a) == CMP_EQ && fp_cmp(d[1], b) == CMP_EQ, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);

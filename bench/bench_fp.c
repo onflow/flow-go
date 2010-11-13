@@ -157,7 +157,7 @@ static void util(void) {
 }
 
 static void arith(void) {
-	fp_t a, b, c;
+	fp_t a, b, c, f[2];
 	dv_t d;
 	bn_t e;
 
@@ -166,12 +166,16 @@ static void arith(void) {
 	fp_null(c);
 	dv_null(d);
 	bn_null(e);
+	fp_null(f[0]);
+	fp_null(f[1]);
 
 	fp_new(a);
 	fp_new(b);
 	fp_new(c);
 	dv_new(d);
 	bn_new(e);
+	fp_new(f[0]);
+	fp_new(f[1]);
 
 	BENCH_BEGIN("fp_add") {
 		fp_rand(a);
@@ -459,6 +463,13 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
+	BENCH_BEGIN("fp_inv_sim (2)") {
+		fp_rand(f[0]);
+		fp_rand(f[1]);
+		BENCH_ADD(fp_inv_sim(f, f, 2));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fp_exp") {
 		fp_rand(a);
 		bn_rand(e, BN_POS, BN_BITS);
@@ -523,6 +534,8 @@ static void arith(void) {
 	fp_free(c);
 	dv_free(d);
 	bn_free(e);
+	fp_free(f[0]);
+	fp_free(f[1]);
 }
 
 int main(void) {

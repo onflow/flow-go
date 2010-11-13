@@ -55,8 +55,11 @@ static void memory(void) {
 static void util(void) {
 	int d;
 	char str[1000];
-
 	fb_t a, b;
+
+	fb_null(a);
+	fb_null(b);
+
 	fb_new(a);
 	fb_new(b);
 
@@ -160,9 +163,18 @@ static void arith(void) {
 	dv_t e;
 	int bits;
 
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
+	fb_null(d[0]);
+	fb_null(d[1]);
+	dv_null(e);
+
 	fb_new(a);
 	fb_new(b);
 	fb_new(c);
+	fb_new(d[0]);
+	fb_new(d[1]);
 	dv_new(e);
 	dv_zero(e, 2 * FB_DIGS);
 
@@ -483,6 +495,8 @@ static void arith(void) {
 	fb_free(a);
 	fb_free(b);
 	fb_free(c);
+	fb_free(d[0]);
+	fb_free(d[1]);
 	dv_free(e);
 }
 

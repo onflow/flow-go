@@ -55,15 +55,17 @@ static void ep_mul_pre_ordin(ep_t * t, ep_t p) {
 		t[i]->norm = 1;
 	}
 
-	ep_dbl_tab(t[0], p);
+	ep_dbl(t[0], p);
 
 #if EP_DEPTH > 2
-	ep_add_tab(t[1], t[0], p);
+	ep_add(t[1], t[0], p);
 	for (i = 2; i < (1 << (EP_DEPTH - 2)); i++) {
-		ep_add_tab(t[i], t[i - 1], t[0]);
+		ep_add(t[i], t[i - 1], t[0]);
 	}
 #endif
 	ep_copy(t[0], p);
+
+	ep_norm_sim(t + 1, t + 1, EP_TABLE_WTNAF - 1);
 }
 
 /**
@@ -118,8 +120,10 @@ void ep_mul_pre_basic(ep_t * t, ep_t p) {
 
 		ep_copy(t[0], p);
 		for (int i = 1; i < bn_bits(n); i++) {
-			ep_dbl_tab(t[i], t[i - 1]);
+			ep_dbl(t[i], t[i - 1]);
 		}
+
+		ep_norm_sim(t + 1, t + 1, EP_TABLE_BASIC - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -163,11 +167,13 @@ void ep_mul_pre_yaowi(ep_t *t, ep_t p) {
 
 		ep_copy(t[0], p);
 		for (int i = 1; i < l; i++) {
-			ep_dbl_tab(t[i], t[i - 1]);
+			ep_dbl(t[i], t[i - 1]);
 			for (int j = 1; j < EP_DEPTH; j++) {
-				ep_dbl_tab(t[i], t[i]);
+				ep_dbl(t[i], t[i]);
 			}
 		}
+
+		ep_norm_sim(t + 1, t + 1, EP_TABLE_YAOWI - 1);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -227,11 +233,13 @@ void ep_mul_pre_nafwi(ep_t * t, ep_t p) {
 
 		ep_copy(t[0], p);
 		for (int i = 1; i < l; i++) {
-			ep_dbl_tab(t[i], t[i - 1]);
+			ep_dbl(t[i], t[i - 1]);
 			for (int j = 1; j < EP_DEPTH; j++) {
-				ep_dbl_tab(t[i], t[i]);
+				ep_dbl(t[i], t[i]);
 			}
 		}
+
+		ep_norm_sim(t + 1, t + 1, EP_TABLE_NAFWI - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -318,14 +326,16 @@ void ep_mul_pre_combs(ep_t * t, ep_t p) {
 
 		ep_copy(t[1], p);
 		for (j = 1; j < EP_DEPTH; j++) {
-			ep_dbl_tab(t[1 << j], t[1 << (j - 1)]);
+			ep_dbl(t[1 << j], t[1 << (j - 1)]);
 			for (i = 1; i < l; i++) {
-				ep_dbl_tab(t[1 << j], t[1 << j]);
+				ep_dbl(t[1 << j], t[1 << j]);
 			}
 			for (i = 1; i < (1 << j); i++) {
-				ep_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
+				ep_add(t[(1 << j) + i], t[1 << j], t[i]);
 			}
 		}
+
+		ep_norm_sim(t + 2, t + 2, EP_TABLE_COMBS - 2);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -408,21 +418,24 @@ void ep_mul_pre_combd(ep_t * t, ep_t p) {
 		ep_set_infty(t[0]);
 		ep_copy(t[1], p);
 		for (j = 1; j < EP_DEPTH; j++) {
-			ep_dbl_tab(t[1 << j], t[1 << (j - 1)]);
+			ep_dbl(t[1 << j], t[1 << (j - 1)]);
 			for (i = 1; i < d; i++) {
-				ep_dbl_tab(t[1 << j], t[1 << j]);
+				ep_dbl(t[1 << j], t[1 << j]);
 			}
 			for (i = 1; i < (1 << j); i++) {
-				ep_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
+				ep_add(t[(1 << j) + i], t[1 << j], t[i]);
 			}
 		}
 		ep_set_infty(t[1 << EP_DEPTH]);
 		for (j = 1; j < (1 << EP_DEPTH); j++) {
-			ep_dbl_tab(t[(1 << EP_DEPTH) + j], t[j]);
+			ep_dbl(t[(1 << EP_DEPTH) + j], t[j]);
 			for (i = 1; i < e; i++) {
-				ep_dbl_tab(t[(1 << EP_DEPTH) + j], t[(1 << EP_DEPTH) + j]);
+				ep_dbl(t[(1 << EP_DEPTH) + j], t[(1 << EP_DEPTH) + j]);
 			}
 		}
+
+		ep_norm_sim(t + 2, t + 2, (1 << EP_DEPTH) - 2);
+		ep_norm_sim(t + (1 << EP_DEPTH) + 1, t + (1 << EP_DEPTH) + 1, (1 << EP_DEPTH) - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

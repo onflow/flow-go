@@ -58,7 +58,10 @@ static void table_init(ep_t * t, ep_t p) {
 		ep_add(t[i], t[i - 1], t[0]);
 	}
 #endif
+
+#if defined(EP_MIXED)
 	ep_norm_sim(t + 1, t + 1, (1 << (EP_WIDTH - 2)) - 1);
+#endif
 
 	ep_copy(t[0], p);
 }

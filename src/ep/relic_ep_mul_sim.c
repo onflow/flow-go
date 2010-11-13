@@ -195,7 +195,6 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 
 	w = EP_WIDTH / 2;
 
-
 	TRY {
 		bn_new(n);
 
@@ -212,19 +211,24 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 
 		ep_set_infty(t0[0]);
 		for (int i = 1; i < (1 << w); i++) {
-			ep_add_tab(t0[i], t0[i - 1], p);
+			ep_add(t0[i], t0[i - 1], p);
 		}
 
 		ep_set_infty(t1[0]);
 		for (int i = 1; i < (1 << w); i++) {
-			ep_add_tab(t1[i], t1[i - 1], q);
+			ep_add(t1[i], t1[i - 1], q);
 		}
 
 		for (int i = 0; i < (1 << w); i++) {
 			for (int j = 0; j < (1 << w); j++) {
-				ep_add_tab(t[(i << w) + j], t0[i], t1[j]);
+				ep_add(t[(i << w) + j], t0[i], t1[j]);
 			}
 		}
+
+#if defined(EB_MIXED)
+		ep_norm_sim(t0 + 2, t0 + 2, (1 << (EP_WIDTH / 2)) - 2);
+		ep_norm_sim(t1 + 2, t1 + 2, (1 << (EP_WIDTH / 2)) - 2);
+#endif
 
 		bn_rec_win(w0, &l0, k, w);
 		bn_rec_win(w1, &l1, l, w);
@@ -299,8 +303,11 @@ void ep_mul_sim_joint(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 		ep_set_infty(t[0]);
 		ep_copy(t[1], q);
 		ep_copy(t[2], p);
-		ep_add_tab(t[3], p, q);
-		ep_sub_tab(t[4], p, q);
+		ep_add(t[3], p, q);
+		ep_sub(t[4], p, q);
+#if defined(EP_MIXED)
+		ep_norm_sim(t + 3, t + 3, 2);
+#endif
 
 		bn_rec_jsf(jsf, &len, k, l);
 
