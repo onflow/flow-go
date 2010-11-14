@@ -422,6 +422,8 @@
 #define MONTY	 3
 /** Width-w (T)NAF. */ 
 #define WTNAF	 4
+/** RTL Width-w NAF */ 
+#define RWNAF	 5
 /** Chosen prime elliptic curve point multiplication method. */
 #define EP_MUL	 @EP_MUL@
 

@@ -331,6 +331,93 @@ static void eb_mul_naf_impl(eb_t r, eb_t p, bn_t k) {
 #endif /* EB_ORDIN || EB_SUPER */
 #endif /* EB_MUL == WTNAF */
 
+#if EB_MUL == RWNAF || !defined(STRIP)
+
+/* Support for ordinary curves. */
+#if defined(EB_ORDIN) || defined(EB_SUPER)
+
+static void eb_mul_rtlnaf_impl(eb_t r, eb_t p, bn_t k) {
+	int len, i, n;
+	signed char naf[FB_BITS + 1], *t;
+	eb_t table[1 << (EB_WIDTH - 2)];
+
+	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+		eb_null(table[i]);
+	}
+
+	TRY {
+		/* Prepare the accumulator table. */
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_new(table[i]);
+		}
+
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_set_infty(table[i]);
+		}
+
+		/* Compute the w-TNAF representation of k. */
+		bn_rec_naf(naf, &len, k, EB_WIDTH);
+
+		t = naf;
+
+		eb_copy(r, p);
+		for (i = 0; i < len; i++, t++) {
+			n = *t;
+			if (n > 0) {
+				eb_add(table[n / 2], table[n / 2], r);
+			}
+			if (n < 0) {
+				eb_sub(table[-n / 2], table[-n / 2], r);
+			}
+
+			eb_dbl(r, r);
+		}
+
+		eb_copy(r, table[0]);
+
+		/* Compute 3 * T[1] */
+		eb_dbl(table[0], table[1]);
+		eb_add(table[1], table[0], table[1]);
+
+#if EB_WIDTH >= 4
+		/* Compute 5 * T[2] */
+		eb_dbl(table[0], table[2]);
+		eb_dbl(table[0], table[0]);
+		eb_add(table[2], table[0], table[2]);
+
+		/* Compute 7 * T[3] */
+		eb_dbl(table[0], table[3]);
+		eb_dbl(table[0], table[0]);
+		eb_dbl(table[0], table[0]);
+		eb_sub(table[3], table[0], table[3]);
+#if EB_WIDTH >= 5
+		/* TODO: not implemented */
+#endif
+#endif
+
+		/* Sum accumulators */
+		for (i = 1; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_add(r, r, table[i]);
+		}
+		/* Convert r to affine coordinates. */
+		eb_norm(r, r);
+
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		/* Free the accumulator table. */
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_free(table[i]);
+		}
+	}
+}
+
+#endif /* EB_ORDIN || EB_SUPER */
+#endif /* EB_MUL == RWNAF */
+
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -572,6 +659,16 @@ void eb_mul_wtnaf(eb_t r, eb_t p, bn_t k) {
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
 	eb_mul_naf_impl(r, p, k);
+#endif
+}
+
+#endif
+
+#if EB_MUL == RWNAF || !defined(STRIP)
+
+void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k) {
+#if defined(EB_ORDIN) || defined(EB_SUPER)
+	eb_mul_rtlnaf_impl(r, p, k);
 #endif
 }
 

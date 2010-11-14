@@ -330,6 +330,8 @@ typedef eb_st *eb_t;
 #define eb_mul(R, P, K)		eb_mul_halve(R, P, K)
 #elif EB_MUL == WTNAF
 #define eb_mul(R, P, K)		eb_mul_wtnaf(R, P, K)
+#elif EB_MUL == RWNAF
+#define eb_mul(R, P, K)		eb_mul_rwnaf(R, P, K)
 #endif
 
 /**

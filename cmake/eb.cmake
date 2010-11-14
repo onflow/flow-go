@@ -17,6 +17,7 @@ message("      EB_METHD=BASIC    Binary method.")
 message("      EB_METHD=LODAH    López-Dahab constant-time point multiplication.")
 message("      EB_METHD=WTNAF    Window (T)NAF method.")
 message("      EB_METHD=HALVE    Halving method.\n")
+message("      EB_METHD=RWNAF    Right-to-left window (T)NAF method.\n")
 
 message("      EB_METHD=BASIC    Binary method for fixed point multiplication.")
 message("      EB_METHD=YAOWI    Yao's windowing method for fixed point multiplication")
