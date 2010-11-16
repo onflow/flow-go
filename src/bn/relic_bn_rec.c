@@ -488,7 +488,13 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 			if (!bn_is_even(r0)) {
 				if (w == 2) {
 					bn_get_dig(&t0, r0);
+					if (bn_sign(r0) == BN_NEG) {
+						t0 = l - t0;
+					}
 					bn_get_dig(&t1, r1);
+					if (bn_sign(r1) == BN_NEG) {
+						t1 = l - t1;
+					}
 					u_i = 2 - ((t0 - 2 * t1) & mask);
 					*tnaf = u_i;
 					if (u_i < 0) {
@@ -509,7 +515,7 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 					if (bn_sign(r1) == BN_NEG) {
 						t1 = l - t1;
 					}
-					/* u = r0 + r1 * (t_w = 6) mod_s 2^w. */
+					/* u = r0 + r1 * (t_w) mod_s 2^w. */
 					u_i = (t0 + t_w * t1) & mask;
 					if (u_i >= (l / 2)) {
 						u_i = (signed char)(u_i - l);

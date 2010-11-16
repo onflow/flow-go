@@ -49,7 +49,7 @@
  * @param[out] t				- the destination table.
  * @param[in] p					- the point to multiply.
  */
-static void table_init_koblitz(eb_t *t, eb_t p) {
+static void eb_table_kbltz(eb_t *t, eb_t p) {
 	int u;
 
 	if (eb_curve_opt_a() == OPT_ZERO) {
@@ -61,7 +61,7 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
 	/* Prepare the precomputation table. */
 	for (int i = 0; i < 1 << (EB_WIDTH - 2); i++) {
 		eb_set_infty(t[i]);
-		fb_set_bit(t[i]->z, 0, 1);
+		fb_set_dig(t[i]->z, 1);
 		t[i]->norm = 1;
 	}
 
@@ -171,7 +171,7 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
 	eb_copy(t[0], p);
 #endif
 
-#ifdef EB_MIXED
+#if EB_WIDTH > 2 && defined(EB_MIXED)
 	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 }
@@ -210,7 +210,7 @@ static void eb_mul_tnaf_impl(eb_t r, eb_t p, bn_t k) {
 			eb_new(table[i]);
 		}
 		/* Compute the precomputation table. */
-		table_init_koblitz(table, p);
+		eb_table_kbltz(table, p);
 
 		eb_curve_get_vm(vm);
 		eb_curve_get_s0(s0);
@@ -260,22 +260,17 @@ static void eb_mul_tnaf_impl(eb_t r, eb_t p, bn_t k) {
  * @param[out] t				- the destination table.
  * @param[in] p					- the point to multiply.
  */
-static void table_init_ordin(eb_t *t, eb_t p) {
-	int i;
-
-	eb_dbl(t[0], p);
-
+static void eb_table_ordin(eb_t *t, eb_t p) {
 #if EB_WIDTH > 2
+	eb_dbl(t[0], p);
 	eb_add(t[1], t[0], p);
-	for (i = 2; i < (1 << (EB_WIDTH - 2)); i++) {
+	for (int i = 2; i < (1 << (EB_WIDTH - 2)); i++) {
 		eb_add(t[i], t[i - 1], t[0]);
 	}
-#endif
-
-#ifdef EB_MIXED
+#if defined(EB_MIXED)
 	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
-
+#endif
 	eb_copy(t[0], p);
 }
 
@@ -292,9 +287,11 @@ static void eb_mul_naf_impl(eb_t r, eb_t p, bn_t k) {
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
 			eb_new(table[i]);
+			fb_set_dig(table[i]->z, 1);
+			table[i]->norm = 1;
 		}
 		/* Compute the precomputation table. */
-		table_init_ordin(table, p);
+		eb_table_ordin(table, p);
 
 		/* Compute the w-TNAF representation of k. */
 		bn_rec_naf(naf, &len, k, EB_WIDTH);
@@ -315,7 +312,6 @@ static void eb_mul_naf_impl(eb_t r, eb_t p, bn_t k) {
 		}
 		/* Convert r to affine coordinates. */
 		eb_norm(r, r);
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -349,9 +345,6 @@ static void eb_mul_rtlnaf_impl(eb_t r, eb_t p, bn_t k) {
 		/* Prepare the accumulator table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
 			eb_new(table[i]);
-		}
-
-		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
 			eb_set_infty(table[i]);
 		}
 
@@ -375,24 +368,61 @@ static void eb_mul_rtlnaf_impl(eb_t r, eb_t p, bn_t k) {
 
 		eb_copy(r, table[0]);
 
-		/* Compute 3 * T[1] */
+#if EB_WIDTH >= 3
+		/* Compute 3 * T[1]. */
 		eb_dbl(table[0], table[1]);
 		eb_add(table[1], table[0], table[1]);
-
+#endif
 #if EB_WIDTH >= 4
-		/* Compute 5 * T[2] */
+		/* Compute 5 * T[2]. */
 		eb_dbl(table[0], table[2]);
 		eb_dbl(table[0], table[0]);
 		eb_add(table[2], table[0], table[2]);
 
-		/* Compute 7 * T[3] */
+		/* Compute 7 * T[3]. */
 		eb_dbl(table[0], table[3]);
 		eb_dbl(table[0], table[0]);
 		eb_dbl(table[0], table[0]);
 		eb_sub(table[3], table[0], table[3]);
-#if EB_WIDTH >= 5
-		/* TODO: not implemented */
 #endif
+#if EB_WIDTH >= 5
+		/* Compute 9 * T[4]. */
+		eb_dbl(table[0], table[4]);
+		eb_dbl(table[0], table[0]);
+		eb_dbl(table[0], table[0]);
+		eb_add(table[4], table[0], table[4]);
+
+		/* Compute 11 * T[5]. */
+		eb_dbl(table[0], table[5]);
+		eb_dbl(table[0], table[0]);
+		eb_add(table[0], table[0], table[5]);
+		eb_dbl(table[0], table[0]);
+		eb_add(table[5], table[0], table[5]);
+
+		/* Compute 13 * T[6]. */
+		eb_dbl(table[0], table[6]);
+		eb_add(table[0], table[0], table[6]);
+		eb_dbl(table[0], table[0]);
+		eb_dbl(table[0], table[0]);
+		eb_add(table[6], table[0], table[6]);
+
+		/* Compute 15 * T[7]. */
+		eb_dbl(table[0], table[7]);
+		eb_dbl(table[0], table[0]);
+		eb_dbl(table[0], table[0]);
+		eb_dbl(table[0], table[0]);
+		eb_sub(table[7], table[0], table[7]);
+#endif
+#if EB_WIDTH == 6
+		for (i = 8; i < 15; i++) {
+			eb_mul_dig(table[i], table[i], 2 * i + 1);
+		}
+		eb_dbl(table[0], table[15]);
+		eb_dbl(table[0], table[0]);
+		eb_dbl(table[0], table[0]);
+		eb_dbl(table[0], table[0]);
+		eb_dbl(table[0], table[0]);
+		eb_sub(table[15], table[0], table[15]);
 #endif
 
 		/* Sum accumulators */
@@ -401,7 +431,6 @@ static void eb_mul_rtlnaf_impl(eb_t r, eb_t p, bn_t k) {
 		}
 		/* Convert r to affine coordinates. */
 		eb_norm(r, r);
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -734,6 +763,10 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 			}
 			eb_hlv(q, q);
 		}
+
+#if EB_WIDTH == 2
+		eb_norm(r, table[0]);
+#else
 		/* Compute Q_i = Q_i + Q_{i+2} for i from 2^{w-1}-3 to 1. */
 		for (i = (1 << (EB_WIDTH - 1)) - 3; i >= 1; i -= 2) {
 			eb_add(table[i / 2], table[i / 2], table[(i + 2) / 2]);
@@ -746,6 +779,7 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		eb_dbl(r, r);
 		eb_add(r, r, table[0]);
 		eb_norm(r, r);
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

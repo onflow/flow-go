@@ -50,6 +50,8 @@ void eb_frb_basic(eb_t r, eb_t p) {
 
 	fb_sqr(r->x, p->x);
 	fb_sqr(r->y, p->y);
+	fb_zero(r->z);
+	fb_set_bit(r->z, 0, 1);
 
 	r->norm = 1;
 }

@@ -165,7 +165,7 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
 	eb_copy(t[0], p);
 #endif
 
-#if defined(EB_MIXED)
+#if EB_WIDTH > 2 && defined(EB_MIXED)
 	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 }
@@ -301,20 +301,17 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
  * @param[in] p					- the point to multiply.
  */
 static void table_init_ordin(eb_t *t, eb_t p) {
-	int i;
-
-	eb_dbl(t[0], p);
-
 #if EB_WIDTH > 2
+	eb_dbl(t[0], p);
 	eb_add(t[1], t[0], p);
-	for (i = 2; i < (1 << (EB_WIDTH - 2)); i++) {
+	for (int i = 2; i < (1 << (EB_WIDTH - 2)); i++) {
 		eb_add(t[i], t[i - 1], t[0]);
 	}
-#endif
-
-	eb_copy(t[0], p);
-
+#if defined(EB_MIXED)
 	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
+#endif
+#endif
+	eb_copy(t[0], p);
 }
 
 static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
@@ -480,7 +477,7 @@ void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 			}
 		}
 
-#if defined(EB_MIXED)
+#if EB_WIDTH > 3 && defined(EB_MIXED)
 		eb_norm_sim(t0 + 2, t0 + 2, (1 << (EB_WIDTH / 2)) - 2);
 		eb_norm_sim(t1 + 2, t1 + 2, (1 << (EB_WIDTH / 2)) - 2);
 #endif

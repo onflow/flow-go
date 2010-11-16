@@ -344,6 +344,16 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
+#if EB_MUL == RWNAF || !defined(STRIP)
+	BENCH_BEGIN("eb_mul_rwnaf") {
+		bn_rand(k, BN_POS, bn_bits(n));
+		bn_mod(k, k, n);
+		eb_rand(p);
+		BENCH_ADD(eb_mul_rwnaf(q, p, k));
+	}
+	BENCH_END;
+#endif
+
 #if EB_MUL == HALVE || !defined(STRIP)
 	if (fb_get_bit(t, 0) == 1 && !eb_curve_is_kbltz() && !eb_curve_is_super()) {
 		BENCH_BEGIN("eb_mul_halve") {

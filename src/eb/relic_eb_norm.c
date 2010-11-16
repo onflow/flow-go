@@ -109,7 +109,6 @@ static void eb_norm_super(eb_t r, eb_t p, int flag) {
 			fb_mul(r->y, p->y, t0);
 			fb_zero(r->z);
 			fb_set_bit(r->z, 0, 1);
-
 		}
 		CATCH_ANY {
 			THROW(ERR_CAUGHT);
@@ -193,6 +192,11 @@ void eb_norm(eb_t r, eb_t p) {
 void eb_norm_sim(eb_t *r, eb_t *t, int n) {
 	int i;
 	fb_t a[n];
+
+	if (n == 1) {
+		eb_norm(r[0], t[0]);
+		return;
+	}
 
 	for (i = 0; i < n; i++) {
 		fb_null(a[i]);
