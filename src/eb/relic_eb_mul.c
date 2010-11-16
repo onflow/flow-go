@@ -251,8 +251,7 @@ static void eb_mul_tnaf_impl(eb_t r, eb_t p, bn_t k) {
 
 #endif /* EB_KBLTZ */
 
-/* Support for ordinary curves. */
-#if defined(EB_ORDIN) || defined(EB_SUPER)
+#if defined(EB_ORDIN)
 
 /**
  * Precomputes a table for a point multiplication on an ordinary curve.
@@ -274,7 +273,15 @@ static void eb_table_ordin(eb_t *t, eb_t p) {
 	eb_copy(t[0], p);
 }
 
-static void eb_mul_naf_impl(eb_t r, eb_t p, bn_t k) {
+/**
+ * Multiplies a binary elliptic curve point by an integer using the
+ * left-to-right w-NAF method.
+ *
+ * @param[out] r 				- the result.
+ * @param[in] p					- the point to multiply.
+ * @param[in] k					- the integer.
+ */
+static void eb_mul_lnaf_impl(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char naf[FB_BITS + 1], *t;
 	eb_t table[1 << (EB_WIDTH - 2)];
@@ -324,15 +331,19 @@ static void eb_mul_naf_impl(eb_t r, eb_t p, bn_t k) {
 	}
 }
 
-#endif /* EB_ORDIN || EB_SUPER */
-#endif /* EB_MUL == WTNAF */
+#endif /* EB_ORDIN */
 
-#if EB_MUL == RWNAF || !defined(STRIP)
+#if defined(EB_SUPER)
 
-/* Support for ordinary curves. */
-#if defined(EB_ORDIN) || defined(EB_SUPER)
-
-static void eb_mul_rtlnaf_impl(eb_t r, eb_t p, bn_t k) {
+/**
+ * Multiplies a binary elliptic curve point by an integer using the
+ * right-to-left w-NAF method.
+ *
+ * @param[out] r 				- the result.
+ * @param[in] p					- the point to multiply.
+ * @param[in] k					- the integer.
+ */
+static void eb_mul_rnaf_impl(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char naf[FB_BITS + 1], *t;
 	eb_t table[1 << (EB_WIDTH - 2)];
@@ -444,8 +455,7 @@ static void eb_mul_rtlnaf_impl(eb_t r, eb_t p, bn_t k) {
 }
 
 #endif /* EB_ORDIN || EB_SUPER */
-#endif /* EB_MUL == RWNAF */
-
+#endif /* EB_MUL == WTNAF */
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -686,18 +696,18 @@ void eb_mul_wtnaf(eb_t r, eb_t p, bn_t k) {
 	}
 #endif
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
-	eb_mul_naf_impl(r, p, k);
+#if defined(EB_SUPER)
+	if (eb_curve_is_super()) {
+		eb_mul_rnaf_impl(r, p, k);
+		return;
+	}
 #endif
-}
 
-#endif
-
-#if EB_MUL == RWNAF || !defined(STRIP)
-
-void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k) {
-#if defined(EB_ORDIN) || defined(EB_SUPER)
-	eb_mul_rtlnaf_impl(r, p, k);
+#if defined(EB_ORDIN)
+	if (!eb_curve_is_super()) {
+		eb_mul_lnaf_impl(r, p, k);
+		return;
+	}
 #endif
 }
 

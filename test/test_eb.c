@@ -615,17 +615,6 @@ static int multiplication(void) {
 		TEST_END;
 #endif
 
-#if EB_MUL == RWNAF || !defined(STRIP)
-		TEST_BEGIN("right-to-left w(t)naf point multiplication is correct") {
-			bn_rand(k, BN_POS, bn_bits(n));
-			bn_mod(k, k, n);
-			eb_mul(q, p, k);
-			eb_mul_rwnaf(r, p, k);
-			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
-		}
-		TEST_END;
-#endif
-
 		fb_trc(t, eb_curve_get_a());
 		if (fb_get_bit(t, 0) == 1 && !eb_curve_is_kbltz() && !eb_curve_is_super()) {
 #if EB_MUL == HALVE || !defined(STRIP)
