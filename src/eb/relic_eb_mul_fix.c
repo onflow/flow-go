@@ -167,10 +167,11 @@ static void eb_mul_pre_kbltz(eb_t *t, eb_t p) {
 	eb_frb(t[0], t[0]);
 	eb_add(t[10], t[0], p);
 
-	eb_copy(t[0], p);
 #endif
 
 	eb_norm_sim(t + 1, t + 1, EB_TABLE_WTNAF - 1);
+
+	eb_copy(t[0], p);
 }
 
 /**

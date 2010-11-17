@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EB_MUL == WTNAF || !defined(STRIP)
+#if EB_MUL == LWNAF || !defined(STRIP)
 
 #if defined(EB_KBLTZ)
 
@@ -184,7 +184,7 @@ static void eb_table_kbltz(eb_t *t, eb_t p) {
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void eb_mul_tnaf_impl(eb_t r, eb_t p, bn_t k) {
+static void eb_mul_ltnaf_impl(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char tnaf[FB_BITS + 8], *t, u;
 	eb_t table[1 << (EB_WIDTH - 2)];
@@ -249,9 +249,9 @@ static void eb_mul_tnaf_impl(eb_t r, eb_t p, bn_t k) {
 	}
 }
 
-#endif /* EB_KBLTZ */
+#endif
 
-#if defined(EB_ORDIN)
+#if defined(EB_ORDIN) || defined(EB_SUPER)
 
 /**
  * Precomputes a table for a point multiplication on an ordinary curve.
@@ -331,9 +331,315 @@ static void eb_mul_lnaf_impl(eb_t r, eb_t p, bn_t k) {
 	}
 }
 
-#endif /* EB_ORDIN */
+#endif /* EB_ORDIN || EB_SUPER */
+#endif /* EB_MUL == LWNAF */
 
-#if defined(EB_SUPER)
+#if EB_MUL == RWNAF || !defined(STRIP)
+
+#if defined(EB_KBLTZ)
+
+/**
+ * Multiplies a binary elliptic curve point by an integer using the w-TNAF
+ * method.
+ *
+ * @param[out] r 				- the result.
+ * @param[in] p					- the point to multiply.
+ * @param[in] k					- the integer.
+ */
+static void eb_mul_rtnaf_impl(eb_t r, eb_t p, bn_t k) {
+	int len, i, n;
+	signed char tnaf[FB_BITS + 8], *t, u;
+	eb_t table[1 << (EB_WIDTH - 2)];
+	bn_t vm, s0, s1;
+
+	bn_null(vm);
+	bn_null(s0);
+	bn_null(s1);
+
+	if (eb_curve_opt_a() == OPT_ZERO) {
+		u = -1;
+	} else {
+		u = 1;
+	}
+
+	TRY {
+		bn_new(vm);
+		bn_new(s0);
+		bn_new(s1);
+
+		/* Prepare the precomputation table. */
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_new(table[i]);
+			eb_set_infty(table[i]);
+		}
+		/* Compute the precomputation table. */
+
+		eb_curve_get_vm(vm);
+		eb_curve_get_s0(s0);
+		eb_curve_get_s1(s1);
+		/* Compute the w-TNAF representation of k. */
+		bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_WIDTH);
+
+		t = tnaf;
+		eb_copy(r, p);
+		for (i = 0; i < len; i++, t++) {
+			n = *t;
+			if (n > 0) {
+				eb_add(table[n / 2], table[n / 2], r);
+			}
+			if (n < 0) {
+				eb_sub(table[-n / 2], table[-n / 2], r);
+			}
+
+			eb_frb(r, r);
+		}
+
+		eb_copy(r, table[0]);
+
+#if EB_WIDTH == 3
+		eb_frb(table[0], table[1]);
+		if (u == 1) {
+			eb_sub(table[1], table[1], table[0]);
+		} else {
+			eb_add(table[1], table[1], table[0]);
+		}
+#endif
+
+#if EB_WIDTH == 4
+		eb_frb(table[0], table[3]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+
+		if (u == 1) {
+			eb_neg(table[0], table[0]);
+		}
+		eb_sub(table[3], table[0], table[3]);
+
+		eb_frb(table[0], table[1]);
+		eb_frb(table[0], table[0]);
+		eb_sub(table[1], table[0], table[1]);
+
+		eb_frb(table[0], table[2]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[2], table[0], table[2]);
+#endif
+
+#if EB_WIDTH == 5
+		eb_frb(table[0], table[3]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		if (u == 1) {
+			eb_neg(table[0], table[0]);
+		}
+		eb_sub(table[3], table[0], table[3]);
+
+		eb_frb(table[0], table[1]);
+		eb_frb(table[0], table[0]);
+		eb_sub(table[1], table[0], table[1]);
+
+		eb_frb(table[0], table[2]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[2], table[0], table[2]);
+
+		eb_frb(table[0], table[4]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[0], table[0], table[4]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		if (u == 1) {
+			eb_neg(table[0], table[0]);
+		}
+		eb_add(table[4], table[0], table[4]);
+
+		eb_frb(table[0], table[5]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[0], table[0], table[5]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_neg(table[0], table[0]);
+		eb_sub(table[5], table[0], table[5]);
+
+		eb_frb(table[0], table[6]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[0], table[0], table[6]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_neg(table[0], table[0]);
+		eb_add(table[6], table[0], table[6]);
+
+		eb_frb(table[0], table[7]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[0], table[0], table[7]);
+		eb_frb(table[7], table[0]);
+		eb_frb(table[7], table[7]);
+		eb_sub(table[7], table[7], table[0]);
+#endif
+
+#if EB_WIDTH == 6
+		eb_frb(table[0], table[1]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		if (u == -1) {
+			eb_neg(table[0], table[0]);
+		}
+		eb_add(table[0], table[0], table[1]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_sub(table[1], table[0], table[1]);
+
+		eb_frb(table[0], table[2]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		if (u == -1) {
+			eb_neg(table[0], table[0]);
+		}
+		eb_add(table[0], table[0], table[2]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[2], table[0], table[2]);
+
+		eb_frb(table[0], table[3]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[0], table[0], table[3]);
+		eb_neg(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		if (u == -1) {
+			eb_neg(table[0], table[0]);
+		}
+		eb_sub(table[3], table[0], table[3]);
+
+		eb_frb(table[0], table[4]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[0], table[0], table[4]);
+		eb_neg(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		if (u == -1) {
+			eb_neg(table[0], table[0]);
+		}
+		eb_add(table[4], table[0], table[4]);
+
+		eb_frb(table[0], table[5]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[0], table[0], table[5]);
+		eb_neg(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_sub(table[5], table[0], table[5]);
+
+		eb_frb(table[0], table[6]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[0], table[0], table[6]);
+		eb_neg(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[6], table[0], table[6]);
+
+		eb_frb(table[0], table[7]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_sub(table[7], table[0], table[7]);
+
+		eb_frb(table[0], table[8]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[8], table[0], table[8]);
+
+		eb_frb(table[0], table[9]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		if (u == -1) {
+			eb_neg(table[0], table[0]);
+		}
+		eb_add(table[0], table[0], table[9]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_sub(table[0], table[0], table[9]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[0], table[0], table[9]);
+		eb_neg(table[9], table[0]);
+
+		eb_frb(table[0], table[10]);
+		eb_frb(table[0], table[0]);
+		eb_neg(table[0], table[0]);
+		eb_add(table[0], table[0], table[10]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[10], table[0], table[10]);
+
+		eb_frb(table[0], table[11]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		if (u == -1) {
+			eb_neg(table[0], table[0]);
+		}
+		eb_sub(table[11], table[0], table[11]);
+
+		eb_frb(table[0], table[12]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		if (u == -1) {
+			eb_neg(table[0], table[0]);
+		}
+		eb_add(table[12], table[0], table[12]);
+
+		eb_frb(table[0], table[13]);
+		eb_frb(table[0], table[0]);
+		eb_add(table[0], table[0], table[13]);
+		eb_neg(table[13], table[0]);
+
+		eb_frb(table[0], table[14]);
+		eb_frb(table[0], table[0]);
+		eb_neg(table[0], table[0]);
+		eb_add(table[14], table[0], table[14]);
+
+		eb_frb(table[0], table[15]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		if (u == -1) {
+			eb_neg(table[0], table[0]);
+		}
+		eb_sub(table[15], table[0], table[15]);
+#endif
+
+		/* Sum accumulators */
+		for (i = 1; i < (1 << (EB_WIDTH - 2)); i++) {
+			if (r->norm) {
+				eb_add(r, table[i], r);
+			} else {
+				eb_add(r, r, table[i]);
+			}
+		}
+		/* Convert r to affine coordinates. */
+		eb_norm(r, r);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(vm);
+		bn_free(s0);
+		bn_free(s1);
+
+		/* Free the precomputation table. */
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_free(table[i]);
+		}
+	}
+}
+
+#endif /* EB_KBLTZ */
+
+#if defined(EB_ORDIN) || defined(EB_SUPER)
 
 /**
  * Multiplies a binary elliptic curve point by an integer using the
@@ -455,7 +761,7 @@ static void eb_mul_rnaf_impl(eb_t r, eb_t p, bn_t k) {
 }
 
 #endif /* EB_ORDIN || EB_SUPER */
-#endif /* EB_MUL == WTNAF */
+#endif /* EB_MUL == RWNAF */
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -686,28 +992,35 @@ void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
 #endif /* EB_ORDIN || EB_KBLTZ */
 #endif /* EB_MUL == LODAH */
 
-#if EB_MUL == WTNAF || !defined(STRIP)
+#if EB_MUL == LWNAF || !defined(STRIP)
 
-void eb_mul_wtnaf(eb_t r, eb_t p, bn_t k) {
+void eb_mul_lwnaf(eb_t r, eb_t p, bn_t k) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
-		eb_mul_tnaf_impl(r, p, k);
+		eb_mul_ltnaf_impl(r, p, k);
 		return;
 	}
 #endif
 
-#if defined(EB_SUPER)
-	if (eb_curve_is_super()) {
-		eb_mul_rnaf_impl(r, p, k);
+#if defined(EB_ORDIN) || defined(EB_SUPER)
+	eb_mul_lnaf_impl(r, p, k);
+#endif
+}
+
+#endif
+
+#if EB_MUL == RWNAF || !defined(STRIP)
+
+void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k) {
+#if defined(EB_KBLTZ)
+	if (eb_curve_is_kbltz()) {
+		eb_mul_rtnaf_impl(r, p, k);
 		return;
 	}
 #endif
 
-#if defined(EB_ORDIN)
-	if (!eb_curve_is_super()) {
-		eb_mul_lnaf_impl(r, p, k);
-		return;
-	}
+#if defined(EB_ORDIN) || defined(EB_SUPER)
+	eb_mul_rnaf_impl(r, p, k);
 #endif
 }
 

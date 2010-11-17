@@ -334,12 +334,22 @@ static void arith(void) {
 	}
 #endif
 
-#if EB_MUL == WTNAF || !defined(STRIP)
-	BENCH_BEGIN("eb_mul_wtnaf") {
+#if EB_MUL == LWNAF || !defined(STRIP)
+	BENCH_BEGIN("eb_mul_lwnaf") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		eb_rand(p);
-		BENCH_ADD(eb_mul_wtnaf(q, p, k));
+		BENCH_ADD(eb_mul_lwnaf(q, p, k));
+	}
+	BENCH_END;
+#endif
+
+#if EB_MUL == RWNAF || !defined(STRIP)
+	BENCH_BEGIN("eb_mul_rwnaf") {
+		bn_rand(k, BN_POS, bn_bits(n));
+		bn_mod(k, k, n);
+		eb_rand(p);
+		BENCH_ADD(eb_mul_rwnaf(q, p, k));
 	}
 	BENCH_END;
 #endif

@@ -482,8 +482,10 @@
 #define LODAH	 2
 /** Halving. */
 #define HALVE    3
-/** Width-w (T)NAF. */ 
-#define WTNAF	 4
+/** Left-to-right width-w (T)NAF. */ 
+#define LWNAF	 4
+/** Right-to-left width-w (T)NAF. */ 
+#define RWNAF	 5
 /** Chosen binary elliptic curve point multiplication method. */
 #define EB_MUL	 @EB_MUL@
 

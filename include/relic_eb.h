@@ -328,8 +328,10 @@ typedef eb_st *eb_t;
 #define eb_mul(R, P, K)		eb_mul_lodah(R, P, K)
 #elif EB_MUL == HALVE
 #define eb_mul(R, P, K)		eb_mul_halve(R, P, K)
-#elif EB_MUL == WTNAF
-#define eb_mul(R, P, K)		eb_mul_wtnaf(R, P, K)
+#elif EB_MUL == LWNAF
+#define eb_mul(R, P, K)		eb_mul_lwnaf(R, P, K)
+#elif EB_MUL == RWNAF
+#define eb_mul(R, P, K)		eb_mul_rwnaf(R, P, K)
 #endif
 
 /**
@@ -762,14 +764,24 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k);
 void eb_mul_lodah(eb_t r, eb_t p, bn_t k);
 
 /**
- * Multiplies a binary elliptic point by an integer using the w-NAF method.
- * If the binary curve is a Koblitz curve, w-TNAF is used.
+ * Multiplies a binary elliptic point by an integer using the left-to-right
+ * w-NAF method. If the binary curve is a Koblitz curve, w-TNAF is used.
  *
  * @param[out] r			- the result.
  * @param[in] p				- the point to multiply.
  * @param[in] k				- the integer.
  */
-void eb_mul_wtnaf(eb_t r, eb_t p, bn_t k);
+void eb_mul_lwnaf(eb_t r, eb_t p, bn_t k);
+
+/**
+ * Multiplies a binary elliptic point by an integer using the right-to-left
+ * w-NAF method. If the binary curve is a Koblitz curve, w-TNAF is used.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ * @param[in] k				- the integer.
+ */
+void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k);
 
 /**
  * Multiplies a binary elliptic point by an integer using the halving method.

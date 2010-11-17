@@ -594,8 +594,6 @@ static int multiplication(void) {
 			TEST_BEGIN("lópez-dahab point multiplication is correct") {
 				bn_rand(k, BN_POS, bn_bits(n));
 				bn_mod(k, k, n);
-				eb_curve_get_ord(k);
-				bn_sub_dig(k, k, 2);
 				eb_mul(q, p, k);
 				eb_mul_lodah(r, p, k);
 				TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
@@ -604,12 +602,23 @@ static int multiplication(void) {
 		}
 #endif
 
-#if EB_MUL == WTNAF || !defined(STRIP)
+#if EB_MUL == LWNAF || !defined(STRIP)
 		TEST_BEGIN("left-to-right w(t)naf point multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
-			eb_mul_wtnaf(r, p, k);
+			eb_mul_lwnaf(r, p, k);
+			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
+#if EB_MUL == RWNAF || !defined(STRIP)
+		TEST_BEGIN("right-to-left w(t)naf point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			eb_mul(q, p, k);
+			eb_mul_rwnaf(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		}
 		TEST_END;
