@@ -261,7 +261,11 @@ static void find_chain() {
 		default:
 			l = 0;
 			j = (FB_BITS - 1);
-			k = util_bits_dig(j) - 1;
+			for (k = 16; k >= 0; k--) {
+				if (j & (1 << k)) {
+					break;
+				}
+			}
 			for (i = 1; i < k; i++) {
 				if (j & (1 << i)) {
 					l++;
@@ -462,11 +466,11 @@ dig_t *fb_poly_get_srz(void) {
 #endif
 }
 
-dig_t *fb_poly_tab_sqr(int i, int j, int k) {
+dig_t *fb_poly_tab_sqr(int i) {
 #if FB_INV == ITOHT || !defined(STRIP)
 
 #ifdef FB_PRECO
-	return fb_tab_sqr[i][j][k];
+	return &(fb_tab_sqr[i]);
 #else
 	return NULL;
 #endif
@@ -515,6 +519,7 @@ dig_t *fb_poly_get_slv(int i) {
 }
 
 int *fb_poly_get_chain(int *len) {
+#if FB_INV == ITOHT || !defined(STRIP)
 	if (chain_len > 0 && chain_len < MAX_CHAIN ) {
 		if (len != NULL) {
 			*len = chain_len;
@@ -526,4 +531,7 @@ int *fb_poly_get_chain(int *len) {
 		}
 		return NULL;
 	}
+#else
+	return NULL;
+#endif
 }

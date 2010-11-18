@@ -355,11 +355,12 @@ dig_t *fb_poly_get_srz(void);
 dig_t *fb_poly_tab_srz(int i);
 
 /**
- * Returns sqrt(z) * (i represented as a polynomial).
+ * Returns a table for accelerating repeated squarings.
  *
+ * @param the number of the table.
  * @return the precomputed result.
  */
-dig_t *fb_poly_tab_sqr(int i, int j, int k);
+dig_t *fb_poly_tab_sqr(int i);
 
 /**
  * Returns an addition chain for (FB_BITS - 1).
