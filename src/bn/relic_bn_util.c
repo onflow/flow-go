@@ -70,10 +70,7 @@ void bn_neg(bn_t c, bn_t a) {
 		bn_copy(c, a);
 	}
 	if (!bn_is_zero(c)) {
-		if (a->sign == BN_POS)
-			c->sign = BN_NEG;
-		else
-			c->sign = BN_POS;
+		c->sign = a->sign ^ 1;
 	}
 }
 

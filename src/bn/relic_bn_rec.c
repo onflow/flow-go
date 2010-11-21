@@ -484,70 +484,76 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 
 		i = 0;
 		while (!bn_is_zero(r0) || !bn_is_zero(r1)) {
-			/* If r0 is odd. */
-			if (!bn_is_even(r0)) {
-				if (w == 2) {
-					bn_get_dig(&t0, r0);
-					if (bn_sign(r0) == BN_NEG) {
-						t0 = l - t0;
-					}
-					bn_get_dig(&t1, r1);
-					if (bn_sign(r1) == BN_NEG) {
-						t1 = l - t1;
-					}
-					u_i = 2 - ((t0 - 2 * t1) & mask);
-					*tnaf = u_i;
-					if (u_i < 0) {
-						bn_add_dig(r0, r0, -u_i);
-					} else {
-						bn_sub_dig(r0, r0, u_i);
-					}
+			while ((r0->dp[0] & 1) == 0) {
+				tnaf[i++] = 0;
+				/* tmp = r0. */
+				bn_hlv(tmp, r0);
+				/* r0 = r1 + mu * r0 / 2. */
+				if (u == -1) {
+					bn_sub(r0, r1, tmp);
 				} else {
-					/* t0 = r0 mod_s 2^w. */
-					bn_get_dig(&t0, r0);
-					t0 = t0 & mask;
-					if (bn_sign(r0) == BN_NEG) {
-						t0 = l - t0;
-					}
-					/* t1 = r1 mod_s 2^w. */
-					bn_get_dig(&t1, r1);
-					t1 = t1 & mask;
-					if (bn_sign(r1) == BN_NEG) {
-						t1 = l - t1;
-					}
-					/* u = r0 + r1 * (t_w) mod_s 2^w. */
-					u_i = (t0 + t_w * t1) & mask;
-					if (u_i >= (l / 2)) {
-						u_i = (signed char)(u_i - l);
-					}
-					*tnaf = u_i;
-					/* If u > 0, s = 1. */
-					if (u_i > 0) {
-						s = 1;
-						u_i = (signed char)(u_i >> 1);
-					} else {
-						/* Else s = -1 and u = -u. */
-						s = -1;
-						u_i = (signed char)(-u_i >> 1);
-					}
-					/* r0 = r0 - s * beta_u. */
-					t = (signed char)(s * beta[(int)u_i]);
-					if (t > 0) {
-						bn_sub_dig(r0, r0, t);
-					} else {
-						bn_add_dig(r0, r0, -t);
-					}
-					/* r1 = r1 - s * gama_u. */
-					t = (signed char)(s * gama[(int)u_i]);
-					if (t > 0) {
-						bn_sub_dig(r1, r1, t);
-					} else {
-						bn_add_dig(r1, r1, -t);
-					}
+					bn_add(r0, r1, tmp);
+				}
+				/* r1 = - r0 / 2. */
+				bn_copy(r1, tmp);
+				r1->sign = tmp->sign ^ 1;
+			}
+			/* If r0 is odd. */
+			if (w == 2) {
+				t0 = r0->dp[0];
+				if (bn_sign(r0) == BN_NEG) {
+					t0 = l - t0;
+				}
+				t1 = r1->dp[0];
+				if (bn_sign(r1) == BN_NEG) {
+					t1 = l - t1;
+				}
+				u_i = 2 - ((t0 - 2 * t1) & mask);
+				tnaf[i++] = u_i;
+				if (u_i < 0) {
+					bn_add_dig(r0, r0, -u_i);
+				} else {
+					bn_sub_dig(r0, r0, u_i);
 				}
 			} else {
-				/* Else u_i = 0. */
-				*tnaf = 0;
+				/* t0 = r0 mod_s 2^w. */
+				t0 = r0->dp[0];
+				if (bn_sign(r0) == BN_NEG) {
+					t0 = l - t0;
+				}
+				/* t1 = r1 mod_s 2^w. */
+				t1 = r1->dp[0];
+				if (bn_sign(r1) == BN_NEG) {
+					t1 = l - t1;
+				}
+				/* u = r0 + r1 * (t_w) mod_s 2^w. */
+				u_i = (t0 + t_w * t1) & mask;
+				if (u_i >= (l / 2)) {
+					/* If u < 0, s = -1 and u = -u. */
+					u_i = (signed char)(u_i - l);
+					tnaf[i++] = u_i;
+					u_i = (signed char)(-u_i >> 1);
+					t = -beta[u_i];
+					s = -gama[u_i];
+				} else {
+					/* If u > 0, s = 1. */
+					tnaf[i++] = u_i;
+					u_i = (signed char)(u_i >> 1);
+					t = beta[u_i];
+					s = gama[u_i];
+				}
+				/* r0 = r0 - s * beta_u. */
+				if (t > 0) {
+					bn_sub_dig(r0, r0, t);
+				} else {
+					bn_add_dig(r0, r0, -t);
+				}
+				/* r1 = r1 - s * gama_u. */
+				if (s > 0) {
+					bn_sub_dig(r1, r1, s);
+				} else {
+					bn_add_dig(r1, r1, -s);
+				}
 			}
 			/* tmp = r0. */
 			bn_hlv(tmp, r0);
@@ -558,9 +564,8 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 				bn_add(r0, r1, tmp);
 			}
 			/* r1 = - r0 / 2. */
-			bn_neg(r1, tmp);
-			tnaf++;
-			i++;
+			bn_copy(r1, tmp);
+			r1->sign = tmp->sign ^ 1;
 		}
 		*len = i;
 	}

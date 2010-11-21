@@ -72,9 +72,7 @@ void eb_frb_projc(eb_t r, eb_t p) {
 	if (!p->norm) {
 		fb_sqr(r->z, p->z);
 	} else {
-		if (r != p) {
-			fb_copy(r->z, p->z);
-		}
+		fb_set_dig(r->z, 1);
 	}
 
 	r->norm = p->norm;

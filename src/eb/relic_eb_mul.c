@@ -391,7 +391,9 @@ static void eb_mul_rtnaf_impl(eb_t r, eb_t p, bn_t k) {
 				eb_sub(table[-n / 2], table[-n / 2], r);
 			}
 
-			eb_frb(r, r);
+			/* We can avoid a function call here. */
+			fb_sqr(r->x, r->x);
+			fb_sqr(r->y, r->y);
 		}
 
 		eb_copy(r, table[0]);
