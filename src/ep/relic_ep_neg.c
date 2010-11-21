@@ -67,11 +67,6 @@ void ep_neg_projc(ep_t r, ep_t p) {
 		return;
 	}
 
-	if (p->norm) {
-		ep_neg_basic(r, p);
-		return;
-	}
-
 	if (r != p) {
 		fp_copy(r->x, p->x);
 		fp_copy(r->z, p->z);
