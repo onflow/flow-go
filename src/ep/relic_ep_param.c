@@ -363,12 +363,12 @@ int ep_param_set_any_ordin() {
 
 int ep_param_set_any_pairf() {
 	int r = STS_OK;
-#if FP_PRIME == 254
+#if FP_PRIME == 158
+	ep_param_set(BN_P158);
+#elif FP_PRIME == 254
 	ep_param_set(BN_P254);
 #elif FP_PRIME == 256
 	ep_param_set(BN_P256);
-#elif FP_PRIME == 158
-	ep_param_set(BN_P158);
 #else
 	r = STS_ERR;
 #endif
