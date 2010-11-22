@@ -207,7 +207,7 @@ void fp_param_set(int param) {
 				bn_add(p, p, t1);
 				fp_prime_set_dense(p);
 				break;
-#elif FP_PRIME == 284
+#elif FP_PRIME == 384
 			case NIST_384:
 				/* p = 2^384 - 2^128 - 2^96 + 2^32 - 1. */
 				f[0] = -1;
@@ -222,12 +222,13 @@ void fp_param_set(int param) {
 				f[0] = -1;
 				fp_prime_set_spars(f, 1);
 				break;
-#endif
+#else
 			default:
 				bn_gen_prime(p, FP_BITS);
 				fp_prime_set_dense(p);
 				generated = 1;
 				break;
+#endif
 		}
 
 		if (generated) {

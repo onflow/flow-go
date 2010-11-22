@@ -379,12 +379,12 @@ void fp_inv_exgcd(fp_t c, fp_t a) {
 			bn_copy(g1, r);
 		}
 
-#if FP_RDC == MONTY
-		fp_prime_conv(c, g1);
-#else
 		if (bn_sign(g1) == BN_NEG) {
 			bn_add(g1, g1, p);
 		}
+#if FP_RDC == MONTY
+		fp_prime_conv(c, g1);
+#else
 		dv_copy(c, g1->dp, FP_DIGS);
 #endif
 	}

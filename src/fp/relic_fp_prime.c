@@ -52,7 +52,7 @@ static bn_st prime;
 /**
  * Auxiliar value derived from the prime used in modular reduction.
  */
-static bn_st u;
+static dig_t u;
 
 /**
  * Auxiliar value computed as R^2 mod m used to convert small integers
@@ -83,7 +83,7 @@ static int prime_cnr;
 /**
  * Maximum number of powers of 2 used to describe special form moduli.
  */
-#define MAX_EXPS		10
+#define MAX_EXPS		4
 
 /**
  * Non-zero bits of special form prime.
@@ -101,14 +101,12 @@ static int spars_len = 0;
 
 void fp_prime_init() {
 	bn_init(&prime, FP_DIGS);
-	bn_init(&u, FP_DIGS);
 	bn_init(&conv, FP_DIGS);
 	bn_init(&one, FP_DIGS);
 }
 
 void fp_prime_clean() {
 	bn_clean(&prime);
-	bn_clean(&u);
 	bn_clean(&conv);
 	bn_clean(&one);
 }
@@ -118,7 +116,7 @@ dig_t *fp_prime_get(void) {
 }
 
 dig_t *fp_prime_get_rdc(void) {
-	return u.dp;
+	return &u;
 }
 
 int *fp_prime_get_spars(int *len) {
@@ -156,39 +154,62 @@ int fp_prime_get_cnr() {
 }
 
 void fp_prime_set(bn_t p) {
+	dv_t s;
+	bn_t q, t;
+
 	if (p->used != FP_DIGS) {
 		THROW(ERR_INVALID);
 	}
 
-	bn_copy(&prime, p);
+	dv_null(s);
+	bn_null(t);
+	bn_null(q);
 
-	bn_mod_dig(&prime_mod5, &prime, 5);
-	bn_mod_dig(&prime_mod8, &prime, 8);
+	TRY {
+		dv_new(s);
+		bn_new(t);
+		bn_new(q);
 
-	switch (prime_mod8) {
-		case 3:
-			prime_qnr = -1;
-			break;
-		case 5:
-		case 7:
-			prime_qnr = -2;
-			break;
-		default:
-			prime_qnr = 0;
-			break;
+		bn_copy(&prime, p);
+		bn_copy(q, p);
+
+		bn_mod_dig(&prime_mod5, &prime, 5);
+		bn_mod_dig(&prime_mod8, &prime, 8);
+
+		switch (prime_mod8) {
+			case 3:
+				prime_qnr = -1;
+				break;
+			case 5:
+			case 7:
+				prime_qnr = -2;
+				break;
+			default:
+				prime_qnr = 0;
+				break;
+		}
+	#ifdef FP_QNRES
+		if (prime_qnr != -1) {
+			THROW(ERR_INVALID);
+		}
+	#endif
+		bn_mod_monty_setup(t, &prime);
+		u = t->dp[0];
+		dv_zero(s, 2 * FP_DIGS);
+		s[2 * FP_DIGS] = 1;
+		bn_divn_low(t->dp, conv.dp, s, 2 * FP_DIGS + 1, q->dp, FP_DIGS);
+		conv.used = FP_DIGS;
+		bn_trim(&conv);
+		bn_set_dig(&one, 1);
+		bn_lsh(&one, &one, prime.used * BN_DIGIT);
+		bn_mod(&one, &one, &prime);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		bn_free(t);
+		dv_free(s);
+		bn_free(q);
 	}
-#ifdef FP_QNRES
-	if (prime_qnr != -1) {
-		THROW(ERR_INVALID);
-	}
-#endif
-	bn_mod_monty_setup(&u, &prime);
-	bn_set_dig(&conv, 1);
-	bn_set_dig(&one, 1);
-	bn_lsh(&conv, &conv, 2 * prime.used * BN_DIGIT);
-	bn_mod(&conv, &conv, &prime);
-	bn_lsh(&one, &one, prime.used * BN_DIGIT);
-	bn_mod(&one, &one, &prime);
 }
 
 void fp_prime_set_dense(bn_t p) {
@@ -251,71 +272,80 @@ void fp_prime_set_spars(int *f, int len) {
 }
 
 void fp_prime_conv(fp_t c, bn_t a) {
-	bn_t t;
-	int i;
+	dv_t r, s, t;
+	bn_t p, v;
 
-	bn_null(t);
+	dv_null(r);
+	dv_null(s);
+	dv_null(t);
+	bn_null(p);
 
 	TRY {
-		bn_new(t);
-		bn_zero(t);
+		dv_new(r);
+		dv_new(s);
+		dv_new(t);
+		bn_new(p);
+		bn_new(v);
 
 #if FP_RDC == MONTY
-		bn_mod_monty_conv(t, a, &prime);
+		bn_copy(p, &prime);
+		dv_zero(r, 2 * FP_DIGS + 1);
+		dv_zero(s, 2 * FP_DIGS + 1);
+		dv_zero(t, 2 * FP_DIGS + 1);
+		dv_copy(t + FP_DIGS, a->dp, a->used);
+		bn_divn_low(s, r, t, 2 * FP_DIGS, p->dp, FP_DIGS);
+		dv_copy(c, r, FP_DIGS);
 #else
-		bn_copy(t, a);
-#endif
-		if (t->used > FP_DIGS) {
+		if (a->used > FP_DIGS) {
 			THROW(ERR_NO_PRECISION);
 		}
 
-		if (bn_is_zero(t)) {
+		if (bn_is_zero(a)) {
 			fp_zero(c);
 		} else {
-			for (i = 0; i < t->used; i++) {
-				c[i] = t->dp[i];
+			int i;
+			for (i = 0; i < a->used; i++) {
+				c[i] = a->dp[i];
 			}
 			for (; i < FP_DIGS; i++) {
 				c[i] = 0;
 			}
 		}
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		bn_free(t);
+		dv_free(r);
+		dv_free(s);
+		dv_free(t);
+		bn_free(p);
 	}
 }
 
 void fp_prime_conv_dig(fp_t c, dig_t a) {
-	bn_t t;
-	int i;
+	dv_t t;
 
+	bn_null(s);
 	bn_null(t);
 
 	TRY {
-		bn_new(t);
-		bn_zero(t);
+		dv_new(t);
 
 #if FP_RDC == MONTY
 		if (a != 1) {
-			bn_mul_dig(t, &conv, a);
-			bn_mod_monty(t, t, &prime, &u);
+			dv_zero(t, 2 * FP_DIGS + 1);
+			t[FP_DIGS] = fp_mul1_low(t, conv.dp, a);
+			fp_rdc(c, t);
 		} else {
-			bn_copy(t, &one);
+			dv_copy(c, one.dp, FP_DIGS);
 		}
 #else
+		fp_zero(c);
+		c[0] = a;
 		bn_set_dig(t, a);
 #endif
-		if (t->used > FP_DIGS) {
-			THROW(ERR_NO_PRECISION);
-		}
-
-		fp_zero(c);
-		for (i = 0; i < t->used; i++) {
-			c[i] = t->dp[i];
-		}
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -326,21 +356,27 @@ void fp_prime_conv_dig(fp_t c, dig_t a) {
 }
 
 void fp_prime_back(bn_t c, fp_t a) {
-	bn_t t;
+	dv_t t;
 	int i;
 
-	bn_null(t);
+	dv_null(t);
 
 	TRY {
-		bn_new(t);
+		dv_new(t);
 
+		bn_grow(c, FP_DIGS);
 		for (i = 0; i < FP_DIGS; i++) {
 			c->dp[i] = a[i];
 		}
 		c->used = FP_DIGS;
 
 #if FP_RDC == MONTY
-		bn_mod_monty_back(c, c, &prime);
+		dv_zero(t, 2 * FP_DIGS + 1);
+		dv_copy(t, a, FP_DIGS);
+		fp_rdc(c->dp, t);
+		c->used = FP_DIGS;
+		c->sign = BN_POS;
+		bn_trim(c);
 #endif
 	}
 	CATCH_ANY {
