@@ -343,7 +343,7 @@ int ep_param_set_any_ordin() {
 	int r = STS_OK;
 #if FP_PRIME == 158
 	ep_param_set(BN_P158);
-#if FP_PRIME == 160
+#elif FP_PRIME == 160
 	ep_param_set(SECG_P160);
 #elif FP_PRIME == 192
 	ep_param_set(NIST_P192);
