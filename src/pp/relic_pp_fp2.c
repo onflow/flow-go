@@ -44,7 +44,7 @@
 /**
  * Constant used to compute the Frobenius map in higher extensions.
  */
-fp2_st const_frb[6];
+static fp2_st const_frb[5];
 
 /**
  * Constant used to compute consecutive Frobenius maps in higher extensions.
