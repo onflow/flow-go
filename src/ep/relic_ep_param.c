@@ -283,6 +283,12 @@ void ep_param_set(int param) {
 				ordin = 1;
 				break;
 #endif
+#if defined(EP_ORDIN) && FP_PRIME == 158
+			case BN_P158:
+				ASSIGN(BN_P158, BN_158);
+				ordin = 1;
+				break;
+#endif
 #if defined(EP_ORDIN) && FP_PRIME == 254
 			case BN_P254:
 				ASSIGN(BN_P254, BN_254);
@@ -292,12 +298,6 @@ void ep_param_set(int param) {
 #if defined(EP_ORDIN) && FP_PRIME == 256
 			case BN_P256:
 				ASSIGN(BN_P256, BN_256);
-				ordin = 1;
-				break;
-#endif
-#if defined(EP_ORDIN) && FP_PRIME == 158
-			case BN_P158:
-				ASSIGN(BN_P158, BN_158);
 				ordin = 1;
 				break;
 #endif
@@ -341,6 +341,8 @@ int ep_param_set_any() {
 
 int ep_param_set_any_ordin() {
 	int r = STS_OK;
+#if FP_PRIME == 158
+	ep_param_set(BN_P158);
 #if FP_PRIME == 160
 	ep_param_set(SECG_P160);
 #elif FP_PRIME == 192

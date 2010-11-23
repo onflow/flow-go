@@ -899,7 +899,7 @@ int test(void) {
 }
 
 int main(void) {
-	int r0;
+	int r0 = STS_ERR;
 	core_init();
 
 	util_print_banner("Tests for the EP module:", 0);
@@ -919,6 +919,11 @@ int main(void) {
 			THROW(ERR_NO_CURVE);
 			core_clean();
 			return 1;
+		} else {
+			if (test() != STS_OK) {
+				core_clean();
+				return 1;
+			}
 		}
 	}
 

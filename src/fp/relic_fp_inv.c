@@ -142,27 +142,27 @@ void fp_inv_binar(fp_t c, fp_t a) {
 		}
 		/* If u == 1 then return g1; else return g2. */
 		if (bn_cmp_dig(u, 1) == CMP_EQ) {
-#if FP_RDC == MONTY
-			fp_prime_conv(c, g1);
-#else
 			while (bn_sign(g1) == BN_NEG) {
 				bn_add(g1, g1, p);
 			}
 			while (bn_cmp(g1, p) != CMP_LT) {
 				bn_sub(g1, g1, p);
 			}
+#if FP_RDC == MONTY
+			fp_prime_conv(c, g1);
+#else
 			dv_copy(c, g1->dp, FP_DIGS);
 #endif
 		} else {
-#if FP_RDC == MONTY
-			fp_prime_conv(c, g2);
-#else
 			while (bn_sign(g2) == BN_NEG) {
 				bn_add(g2, g2, p);
 			}
 			while (bn_cmp(g2, p) != CMP_LT) {
 				bn_sub(g2, g2, p);
 			}
+#if FP_RDC == MONTY
+			fp_prime_conv(c, g2);
+#else
 			dv_copy(c, g2->dp, FP_DIGS);
 #endif
 		}
@@ -398,6 +398,7 @@ void fp_inv_exgcd(fp_t c, fp_t a) {
 		bn_free(g2);
 		bn_free(p);
 		bn_free(q);
+		bn_free(r);
 	}
 }
 

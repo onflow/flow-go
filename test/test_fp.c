@@ -733,11 +733,15 @@ static int inversion(void) {
 	fp_null(a);
 	fp_null(b);
 	fp_null(c);
+	fp_null(d[0]);
+	fp_null(d[1]);
 
 	TRY {
 		fp_new(a);
 		fp_new(b);
 		fp_new(c);
+		fp_new(d[0]);
+		fp_new(d[1]);
 
 		TEST_BEGIN("inversion is correct") {
 			fp_rand(a);
@@ -811,6 +815,8 @@ static int inversion(void) {
 	fp_free(a);
 	fp_free(b);
 	fp_free(c);
+	fp_free(d[0]);
+	fp_free(d[1]);
 	return code;
 }
 

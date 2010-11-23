@@ -70,8 +70,8 @@ void bn_lsh(bn_t c, bn_t a, int bits) {
 	int digits;
 	dig_t carry;
 
+	bn_copy(c, a);
 	if (bits <= 0) {
-		bn_copy(c, a);
 		return;
 	}
 

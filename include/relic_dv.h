@@ -49,7 +49,7 @@
  * Size in digits of a squaring result in a prime field.
  */
 #ifdef WITH_FP
-#define DV_FP	(2 * ((int)((FP_PRIME)/(DIGIT) + (FP_PRIME % DIGIT > 0))))
+#define DV_FP	(2 * ((int)((FP_PRIME)/(DIGIT) + (FP_PRIME % DIGIT > 0))) + 1)
 #else
 #define DV_FP	(0)
 #endif

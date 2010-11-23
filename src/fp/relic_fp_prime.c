@@ -154,8 +154,8 @@ int fp_prime_get_cnr() {
 }
 
 void fp_prime_set(bn_t p) {
-	dv_t s;
-	bn_t q, t;
+	dv_t s, q;
+	bn_t t;
 
 	if (p->used != FP_DIGS) {
 		THROW(ERR_INVALID);
@@ -163,15 +163,14 @@ void fp_prime_set(bn_t p) {
 
 	dv_null(s);
 	bn_null(t);
-	bn_null(q);
+	dv_null(q);
 
 	TRY {
 		dv_new(s);
 		bn_new(t);
-		bn_new(q);
+		dv_new(q);
 
 		bn_copy(&prime, p);
-		bn_copy(q, p);
 
 		bn_mod_dig(&prime_mod5, &prime, 5);
 		bn_mod_dig(&prime_mod8, &prime, 8);
@@ -197,7 +196,9 @@ void fp_prime_set(bn_t p) {
 		u = t->dp[0];
 		dv_zero(s, 2 * FP_DIGS);
 		s[2 * FP_DIGS] = 1;
-		bn_divn_low(t->dp, conv.dp, s, 2 * FP_DIGS + 1, q->dp, FP_DIGS);
+		dv_zero(q, 2 * FP_DIGS + 1);
+		dv_copy(q, prime.dp, prime.used);
+		bn_divn_low(t->dp, conv.dp, s, 2 * FP_DIGS + 1, q, prime.used);
 		conv.used = FP_DIGS;
 		bn_trim(&conv);
 		bn_set_dig(&one, 1);
@@ -208,7 +209,7 @@ void fp_prime_set(bn_t p) {
 	} FINALLY {
 		bn_free(t);
 		dv_free(s);
-		bn_free(q);
+		dv_free(q);
 	}
 }
 
@@ -272,29 +273,28 @@ void fp_prime_set_spars(int *f, int len) {
 }
 
 void fp_prime_conv(fp_t c, bn_t a) {
-	dv_t r, s, t;
-	bn_t p, v;
+	dv_t p, r, s, t;
 
 	dv_null(r);
 	dv_null(s);
 	dv_null(t);
-	bn_null(p);
+	dv_null(p);
 
 	TRY {
 		dv_new(r);
 		dv_new(s);
 		dv_new(t);
-		bn_new(p);
-		bn_new(v);
+		dv_new(p);
 
 #if FP_RDC == MONTY
-		bn_copy(p, &prime);
+		dv_zero(p, 2 * FP_DIGS + 1);
 		dv_zero(r, 2 * FP_DIGS + 1);
 		dv_zero(s, 2 * FP_DIGS + 1);
 		dv_zero(t, 2 * FP_DIGS + 1);
+		dv_copy(p, prime.dp, prime.used);
 		dv_copy(t + FP_DIGS, a->dp, a->used);
-		bn_divn_low(s, r, t, 2 * FP_DIGS, p->dp, FP_DIGS);
-		dv_copy(c, r, FP_DIGS);
+		bn_divn_low(r, s, t, FP_DIGS + a->used, p, prime.used);
+		dv_copy(c, s, FP_DIGS);
 #else
 		if (a->used > FP_DIGS) {
 			THROW(ERR_NO_PRECISION);
@@ -320,14 +320,13 @@ void fp_prime_conv(fp_t c, bn_t a) {
 		dv_free(r);
 		dv_free(s);
 		dv_free(t);
-		bn_free(p);
+		dv_free(p);
 	}
 }
 
 void fp_prime_conv_dig(fp_t c, dig_t a) {
 	dv_t t;
 
-	bn_null(s);
 	bn_null(t);
 
 	TRY {
@@ -351,7 +350,7 @@ void fp_prime_conv_dig(fp_t c, dig_t a) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		bn_free(t);
+		dv_free(t);
 	}
 }
 
@@ -383,6 +382,6 @@ void fp_prime_back(bn_t c, fp_t a) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		bn_free(t);
+		dv_free(t);
 	}
 }
