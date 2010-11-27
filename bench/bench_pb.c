@@ -570,20 +570,37 @@ static void pairing2(void) {
 	BENCH_END;
 
 	BENCH_BEGIN("pb_map_etat2 (n,n)") {
-//		hb_rand_non(p, 0);
-//		hb_rand_non(q, 0);
-		hb_curve_get_gen(p);
-		hb_curve_get_gen(q);
+		hb_rand_non(p, 0);
+		hb_rand_non(q, 0);
 		BENCH_ADD(pb_map_etat2(r, p, q));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("pb_map_oate2 (n,n)") {
-//		hb_rand_non(p, 0);
-//		hb_rand_non(q, 0);
-		hb_curve_get_gen(p);
-		hb_curve_get_gen(q);
-		BENCH_ADD(pb_map_oate2(r, p, q));
+	BENCH_BEGIN("pb_map_oeta2 (n,n)") {
+		hb_rand_non(p, 0);
+		hb_rand_non(q, 0);
+		BENCH_ADD(pb_map_oeta2(r, p, q));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("pb_map_oeta2 (d,d)") {
+		hb_rand_deg(p);
+		hb_rand_deg(q);
+		BENCH_ADD(pb_map_oeta2(r, p, q));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("pb_map_oeta2 (g,d)") {
+		hb_rand_non(p, 0);
+		hb_rand_deg(q);
+		BENCH_ADD(pb_map_oeta2(r, p, q));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("pb_map_oeta2 (n,n)") {
+		hb_rand_non(p, 0);
+		hb_rand_non(q, 0);
+		BENCH_ADD(pb_map_oeta2(r, p, q));
 	}
 	BENCH_END;
 
