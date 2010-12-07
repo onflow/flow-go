@@ -25,12 +25,12 @@
  *
  * Implementation of the quartic extension binary field arithmetic module.
  *
- * The implementations of fb4_mul() and fb4_mul_spars() are based on:
+ * The implementations of fb4_mul() and fb4_mul_dxs() are based on:
  *
  * Beuchat et al., A comparison between hardware accelerators for the modified
  * Tate pairing over F_2^m and F_3^m, 2008.
  *
- * The implementation of fb4_mul_quart() is based on:
+ * The implementation of fb4_mul_dxd() is based on:
  *
  * Shirase et al., Efficient computation of Eta pairing over binary field with
  * Vandermonde matrix, 2008.
@@ -104,9 +104,11 @@ void fb_mul_beta(dig_t *c, dig_t *a) {
 		t[FB_DIGS] ^= (b1 >> j);
 
 		fb_rdc1_low(c, t);
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		dv_free(t);
 	}
 }
@@ -133,9 +135,11 @@ void fb_mul_21(dig_t *c, dig_t *a) {
 		}
 		t[FB_DIGS] ^= (b1 >> j);
 		fb_rdc1_low(c, t);
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		dv_free(t);
 	}
 }
@@ -163,9 +167,11 @@ void fb_mul_420(dig_t *c, dig_t *a) {
 		t[FB_DIGS] ^= (b1 >> j);
 		fb_addn_low(t, t, a);
 		fb_rdc1_low(c, t);
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		dv_free(t);
 	}
 }
@@ -192,9 +198,11 @@ void fb_mul_41(dig_t *c, dig_t *a) {
 		}
 		t[FB_DIGS] ^= (b1 >> j);
 		fb_rdc1_low(c, t);
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		dv_free(t);
 	}
 }
@@ -221,9 +229,11 @@ void fb_mul_42(dig_t *c, dig_t *a) {
 		}
 		t[FB_DIGS] ^= (b1 >> j);
 		fb_rdc1_low(c, t);
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		dv_free(t);
 	}
 }
@@ -250,9 +260,11 @@ void fb_mul_51(dig_t *c, dig_t *a) {
 		}
 		t[FB_DIGS] ^= (b1 >> j);
 		fb_rdc1_low(c, t);
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		dv_free(t);
 	}
 }
@@ -724,4 +736,64 @@ void fb4_frb(fb4_t c, fb4_t a) {
 	}
 	fb_add(c[2], a[2], a[3]);
 	fb_copy(c[3], a[3]);
+}
+
+void fb4_inv(fb4_t c, fb4_t a) {
+	fb2_t a0, a1, m0, m1;
+
+	fb2_null(a0);
+	fb2_null(a1);
+	fb2_null(m0);
+	fb2_null(m1);
+
+	TRY {
+		fb2_new(a0);
+		fb2_new(a1);
+		fb2_new(m0);
+		fb2_new(m1);
+
+		fb2_add(a0, a, (a + 2));
+		fb2_mul(m1, a0, a);
+		fb2_sqr(m0, a + 2);
+		fb2_copy(a1, m0);
+		fb_add(m0[1], a1[0], a1[1]);
+		fb_copy(m0[0], a1[1]);
+		fb2_add(m1, m0, m1);
+		fb2_inv(m1, m1);
+		fb2_mul(c, a0, m1);
+		fb2_mul(c + 2, a + 2, m1);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb2_free(a0);
+		fb2_free(a1);
+		fb2_free(m0);
+		fb2_free(m1);
+	}
+}
+
+void fb4_exp(fb4_t c, fb4_t a, bn_t b) {
+	fb4_t t;
+
+	fb4_null(t);
+
+	TRY {
+		fb4_new(t);
+
+		fb4_copy(t, a);
+
+		for (int i = bn_bits(b) - 2; i >= 0; i--) {
+			fb4_sqr(t, t);
+			if (bn_test_bit(b, i)) {
+				fb4_mul(t, t, a);
+			}
+		}
+		fb4_copy(c, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fb4_free(t);
+	}
 }

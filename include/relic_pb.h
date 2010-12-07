@@ -662,6 +662,23 @@ void fb4_mul_sxs(fb4_t c, fb4_t a, fb4_t b);
 void fb4_sqr(fb4_t c, fb4_t a);
 
 /**
+ * Inverts a quartic extension field element. Computes c = a^{-1}.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quartic extension field element to invert.
+ */
+void fb4_inv(fb2_t c, fb2_t a);
+
+/**
+ * Computes a power of a quartic extension field element. Computes c = a^b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quartic extension element to exponentiate.
+ * @param[in] b				- the exponent.
+ */
+void fb4_exp(fb4_t c, fb4_t a, bn_t b);
+
+/**
  * Computes the q-th power Frobenius map of a quartic extension field element.
  * Compute c = a^{2^m}.
  *

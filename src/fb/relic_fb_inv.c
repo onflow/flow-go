@@ -392,9 +392,6 @@ void fb_inv_itoht(fb_t c, fb_t a) {
 	}
 
 	TRY {
-		fb_new(t);
-		fb_new(u);
-		fb_new(v);
 		for (i = 0; i <= len; i++) {
 			fb_new(table[i]);
 		}
