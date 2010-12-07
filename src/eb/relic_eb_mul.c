@@ -294,6 +294,7 @@ static void eb_mul_lnaf_impl(eb_t r, eb_t p, bn_t k) {
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
 			eb_new(table[i]);
+			eb_set_infty(table[i]);
 			fb_set_dig(table[i]->z, 1);
 			table[i]->norm = 1;
 		}

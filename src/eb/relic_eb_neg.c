@@ -114,7 +114,6 @@ void eb_neg_projc(eb_t r, eb_t p) {
 					break;
 			}
 
-
 			r->norm = 1;
 			return;
 		}

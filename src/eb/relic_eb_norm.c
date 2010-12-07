@@ -52,30 +52,15 @@
  */
 static void eb_norm_ordin(eb_t r, eb_t p, int flag) {
 	if (!p->norm) {
-		fb_t t0;
-
-		fb_null(t0);
-
-		TRY {
-			fb_new(t0);
-
-			if (flag) {
-				fb_copy(t0, p->z);
-			} else {
-				fb_inv(t0, p->z);
-			}
-			fb_mul(r->x, p->x, t0);
-			fb_sqr(t0, t0);
-			fb_mul(r->y, p->y, t0);
-			fb_zero(r->z);
-			fb_set_bit(r->z, 0, 1);
+		if (flag) {
+			fb_copy(r->z, p->z);
+		} else {
+			fb_inv(r->z, p->z);
 		}
-		CATCH_ANY {
-			THROW(ERR_CAUGHT);
-		}
-		FINALLY {
-			fb_free(t0);
-		}
+		fb_mul(r->x, p->x, r->z);
+		fb_sqr(r->z, r->z);
+		fb_mul(r->y, p->y, r->z);
+		fb_set_dig(r->z, 1);
 	}
 
 	r->norm = 1;
@@ -93,29 +78,14 @@ static void eb_norm_ordin(eb_t r, eb_t p, int flag) {
  */
 static void eb_norm_super(eb_t r, eb_t p, int flag) {
 	if (!p->norm) {
-		fb_t t0;
-
-		fb_null(t0);
-
-		TRY {
-			fb_new(t0);
-
-			if (flag) {
-				fb_copy(t0, p->z);
-			} else {
-				fb_inv(t0, p->z);
-			}
-			fb_mul(r->x, p->x, t0);
-			fb_mul(r->y, p->y, t0);
-			fb_zero(r->z);
-			fb_set_bit(r->z, 0, 1);
+		if (flag) {
+			fb_copy(r->z, p->z);
+		} else {
+			fb_inv(r->z, p->z);
 		}
-		CATCH_ANY {
-			THROW(ERR_CAUGHT);
-		}
-		FINALLY {
-			fb_free(t0);
-		}
+		fb_mul(r->x, p->x, r->z);
+		fb_mul(r->y, p->y, r->z);
+		fb_set_dig(r->z, 1);
 	}
 
 	r->norm = 1;
@@ -205,9 +175,6 @@ void eb_norm_sim(eb_t *r, eb_t *t, int n) {
 	TRY {
 		for (i = 0; i < n; i++) {
 			fb_new(a[i]);
-		}
-
-		for (i = 0; i < n; i++) {
 			fb_copy(a[i], t[i]->z);
 		}
 
@@ -226,15 +193,17 @@ void eb_norm_sim(eb_t *r, eb_t *t, int n) {
 		}
 	}
 
-	for (i = 0; i < n; i++) {
 #if defined(EB_SUPER)
+	for (i = 0; i < n; i++) {
 		if (eb_curve_is_super()) {
 			eb_norm_super(r[i], t[i], 1);
-			return;
 		}
+	}
+	return;
 #endif
 #if defined(EB_ORDIN) || defined(EB_KBLTZ)
+	for (i = 0; i < n; i++) {
 		eb_norm_ordin(r[i], t[i], 1);
-#endif
 	}
+#endif
 }
