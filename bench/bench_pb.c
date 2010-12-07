@@ -215,10 +215,12 @@ static void util4(void) {
 
 static void arith4(void) {
 	fb4_t a, b, c;
+	bn_t d;
 
 	fb4_new(a);
 	fb4_new(b);
 	fb4_new(c);
+	bn_new(d);
 
 	BENCH_BEGIN("fb4_add") {
 		fb4_rand(a);
@@ -268,15 +270,29 @@ static void arith4(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fb4_inv") {
+		fb4_rand(a);
+		BENCH_ADD(fb4_inv(c, a));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fb4_frb") {
 		fb4_rand(a);
 		BENCH_ADD(fb4_frb(c, a));
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fb4_exp") {
+		fb4_rand(a);
+		bn_rand(d, BN_POS, FB_BITS);
+		BENCH_ADD(fb4_exp(c, a, d));
+	}
+	BENCH_END;
+
 	fb4_free(a);
 	fb4_free(b);
 	fb4_free(c);
+	bn_free(d);
 }
 
 static void memory6(void) {

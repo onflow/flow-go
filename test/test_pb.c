@@ -781,7 +781,7 @@ static int squaring4(void) {
 	return code;
 }
 
-static int exponentiation4(void) {
+static int inversion4(void) {
 	int code = STS_ERR;
 	fb4_t a, b, c;
 
@@ -794,14 +794,11 @@ static int exponentiation4(void) {
 		fb4_new(b);
 		fb4_new(c);
 
-		TEST_BEGIN("exponentiation to 2^m is correct") {
+		TEST_BEGIN("inversion is correct") {
 			fb4_rand(a);
-			fb4_frb(b, a);
-			fb4_copy(c, a);
-			for (int j = 0; j < FB_BITS; j++) {
-				fb4_sqr(c, c);
-			}
-			TEST_ASSERT(fb4_cmp(b, c) == CMP_EQ, end);
+			fb4_inv(b, a);
+			fb4_mul(c, a, b);
+			TEST_ASSERT(fb_cmp_dig(c[0], 1) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
@@ -813,6 +810,53 @@ static int exponentiation4(void) {
 	fb4_free(a);
 	fb4_free(b);
 	fb4_free(c);
+	return code;
+}
+
+static int exponentiation4(void) {
+	int code = STS_ERR;
+	fb4_t a, b, c;
+	bn_t d;
+
+	fb4_null(a);
+	fb4_null(b);
+	fb4_null(c);
+	bn_null(d);
+
+	TRY {
+		fb4_new(a);
+		fb4_new(b);
+		fb4_new(c);
+		bn_new(d);
+
+		TEST_BEGIN("exponentiation to 2^m is correct") {
+			fb4_rand(a);
+			fb4_frb(b, a);
+			fb4_copy(c, a);
+			for (int j = 0; j < FB_BITS; j++) {
+				fb4_sqr(c, c);
+			}
+			TEST_ASSERT(fb4_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("frobenius and exponentiation are consistent") {
+			fb4_rand(a);
+			fb4_frb(b, a);
+			bn_set_2b(d, FB_BITS);
+			fb4_exp(c, a, d);
+			TEST_ASSERT(fb4_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fb4_free(a);
+	fb4_free(b);
+	fb4_free(c);
+	bn_free(d);
 	return code;
 }
 
@@ -2007,6 +2051,11 @@ int main(void) {
 	}
 
 	if (squaring4() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (inversion4() != STS_OK) {
 		core_clean();
 		return 1;
 	}
