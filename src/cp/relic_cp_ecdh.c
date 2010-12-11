@@ -70,7 +70,7 @@ void cp_ecdh_key(unsigned char *key, int key_len, bn_t d, ec_t q) {
 	TRY {
 		ec_new(p);
 		ec_mul(p, q, d);
-		md_kdf(key, key_len, (unsigned char *)p->x, sizeof(p->x));
+		md_kdf(key, key_len, (unsigned char *)p->x, EC_BYTES);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

@@ -74,6 +74,33 @@
 #define EC_TABLE			EB_TABLE
 #endif
 
+/**
+ * Size of a field element in words.
+ */
+#if EC_CUR == PRIME
+#define EC_DIGS				FP_DIGS
+#elif EC_CUR == CHAR2
+#define EC_DIGS				FB_DIGS
+#endif
+
+/**
+ * Size of a field element in bits.
+ */
+#if EC_CUR == PRIME
+#define EC_BITS				FP_BITS
+#elif EC_CUR == CHAR2
+#define EC_BITS				FB_BITS
+#endif
+
+/**
+ * Size of a field element in bytes.
+ */
+#if EC_CUR == PRIME
+#define EC_BYTES			FP_BYTES
+#elif EC_CUR == CHAR2
+#define EC_BYTES			FB_BYTES
+#endif
+
 /*============================================================================*/
 /* Type definitions                                                           */
 /*============================================================================*/
