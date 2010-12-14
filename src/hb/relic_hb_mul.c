@@ -40,7 +40,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if HB_MUL == WTNAF || !defined(STRIP)
+#if HB_MUL == LWNAF || !defined(STRIP)
 
 /* Support for ordinary curves. */
 #if defined(HB_SUPER)
@@ -70,7 +70,7 @@ static void table_init(hb_t *t, hb_t p) {
 }
 
 #endif /* HB_SUPER */
-#endif /* HB_MUL == WTNAF */
+#endif /* HB_MUL == LWNAF */
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -157,9 +157,9 @@ void hb_mul_octup(hb_t r, hb_t p, bn_t k) {
 	}
 }
 
-#if HB_MUL == WTNAF || !defined(STRIP)
+#if HB_MUL == LWNAF || !defined(STRIP)
 
-void hb_mul_wtnaf(hb_t r, hb_t p, bn_t k) {
+void hb_mul_lwnaf(hb_t r, hb_t p, bn_t k) {
 	int len, i, n;
 	signed char naf[2 * FB_BITS + 1], *t;
 	hb_t table[1 << (HB_WIDTH - 2)];

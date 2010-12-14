@@ -65,7 +65,7 @@ void conf_print(void) {
 	util_print("** Benchmarking options:\n");
 	util_print("   Number of times: %d\n", BENCH * BENCH);
 	util_print("   Estimated overhead: ");
-	bench_overhead();
+	//bench_overhead();
 	util_print("\n");
 #endif
 
@@ -86,6 +86,11 @@ void conf_print(void) {
 	util_print("   Arithmetic method: %s\n\n", EP_METHD);
 #endif
 
+#ifdef WITH_PP
+	util_print("** Pairing over prime curve module options:\n");
+	util_print("   Arithmetic method: %s\n\n", PP_METHD);
+#endif
+
 #ifdef WITH_FB
 	util_print("** Binary field module options:\n");
 	util_print("   Polynomial size: %d bits, %d words\n", FB_BITS, FB_DIGS);
@@ -95,6 +100,26 @@ void conf_print(void) {
 #ifdef WITH_EB
 	util_print("** Binary elliptic curve module options:\n");
 	util_print("   Arithmetic method: %s\n\n", EB_METHD);
+#endif
+
+#ifdef WITH_HB
+	util_print("** Binary hyperelliptic curve module options:\n");
+	util_print("   Arithmetic method: %s\n\n", HB_METHD);
+#endif
+
+#ifdef WITH_PB
+	util_print("** Pairing over binary curve module options:\n");
+	util_print("   Arithmetic method: %s\n\n", PB_METHD);
+#endif
+
+#ifdef WITH_EC
+	util_print("** Elliptic Curve Cryptography module options:\n");
+	util_print("   Arithmetic method: %s\n\n", EC_METHD);
+#endif
+
+#ifdef WITH_PC
+	util_print("** Pairing Based Cryptography module options:\n");
+	util_print("   Arithmetic method: %s\n\n", PC_METHD);
 #endif
 
 #endif

@@ -426,9 +426,9 @@ void hb_mul_fix_combd(hb_t r, hb_t *t, bn_t k) {
 
 #endif
 
-#if HB_FIX == WTNAF || !defined(STRIP)
+#if HB_FIX == LWNAF || !defined(STRIP)
 
-void hb_mul_pre_wtnaf(hb_t *t, hb_t p) {
+void hb_mul_pre_lwnaf(hb_t *t, hb_t p) {
 	int i;
 
 	for (i = 0; i < (1 << (HB_DEPTH - 2)); i++) {
@@ -446,11 +446,11 @@ void hb_mul_pre_wtnaf(hb_t *t, hb_t p) {
 	hb_copy(t[0], p);
 }
 
-void hb_mul_fix_wtnaf(hb_t r, hb_t *t, bn_t k) {
+void hb_mul_fix_lwnaf(hb_t r, hb_t *t, bn_t k) {
 	int len, i, n;
 	signed char naf[2 * FB_BITS + 1], *_t;
 
-	/* Compute the w-TNAF representation of k. */
+	/* Compute the w-NAF representation of k. */
 	bn_rec_naf(naf, &len, k, HB_DEPTH);
 
 	_t = naf + len - 1;

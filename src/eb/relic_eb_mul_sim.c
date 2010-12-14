@@ -61,7 +61,7 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
 
 	eb_copy(t[0], p);
 
-	/* The minimum table depth for WTNAF is 3. */
+	/* The minimum table depth for LWNAF is 3. */
 #if EB_WIDTH == 3
 	eb_frb(t[1], t[0]);
 	if (u == 1) {
@@ -609,7 +609,7 @@ void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l) {
 
 		eb_curve_get_gen(gen);
 #if defined(EB_KBLTZ)
-#if EB_FIX == WTNAF && defined(EB_PRECO)
+#if EB_FIX == LWNAF && defined(EB_PRECO)
 	if (eb_curve_is_kbltz()) {
 		eb_mul_sim_kbltz(r, gen, k, q, l, 1);
 		return;
@@ -623,7 +623,7 @@ void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l) {
 #endif
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
-#if EB_FIX == WTNAF && defined(EB_PRECO)
+#if EB_FIX == LWNAF && defined(EB_PRECO)
 	eb_mul_sim_ordin(r, gen, k, q, l, 1);
 #else
 	eb_mul_sim(r, gen, k, q, l);

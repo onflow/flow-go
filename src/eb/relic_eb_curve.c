@@ -110,14 +110,14 @@ static bn_st curve_h;
  * Flag that stores if the configured binary elliptic curve is a Koblitz
  * curve.
  */
-static int curve_is_koblitz;
+static int curve_is_kbltz;
 
 /**
  * Flag that stores if the configured binary elliptic curve is supersingular.
  */
 static int curve_is_super;
 
-#if defined(EB_KBLTZ) && (EB_MUL == WTNAF || EB_FIX == WTNAF || EB_SIM == INTER || !defined(STRIP))
+#if defined(EB_KBLTZ) && (EB_MUL == LWNAF || EB_MUL == RWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP))
 /**
  * V_m auxiliary parameter for Koblitz curves.
  */
@@ -259,7 +259,7 @@ void eb_curve_init(void) {
 	fb_zero(curve_g.y);
 	fb_zero(curve_g.z);
 	bn_init(&curve_r, FB_DIGS);
-#if defined(EB_KBLTZ) && (EB_MUL == WTNAF || !defined(STRIP))
+#if defined(EB_KBLTZ) && (EB_MUL == LWNAF || !defined(STRIP))
 	bn_init(&curve_vm, FB_DIGS);
 	bn_init(&curve_s0, FB_DIGS);
 	bn_init(&curve_s1, FB_DIGS);
@@ -278,7 +278,7 @@ void eb_curve_clean(void) {
 	}
 #endif
 	bn_clean(&curve_r);
-#if defined(EB_KBLTZ) && (EB_MUL == WTNAF || !defined(STRIP))
+#if defined(EB_KBLTZ) && (EB_MUL == LWNAF || !defined(STRIP))
 	bn_clean(&curve_vm);
 	bn_clean(&curve_s0);
 	bn_clean(&curve_s1);
@@ -319,7 +319,7 @@ int eb_curve_opt_c() {
 }
 
 int eb_curve_is_kbltz() {
-	return curve_is_koblitz;
+	return curve_is_kbltz;
 }
 
 int eb_curve_is_super() {
@@ -350,9 +350,9 @@ void eb_curve_get_cof(bn_t h) {
 	bn_copy(h, &curve_h);
 }
 
-#if defined(EB_KBLTZ) && (EB_MUL == WTNAF || EB_FIX == WTNAF || EB_SIM == INTER || !defined(STRIP))
+#if defined(EB_KBLTZ) && (EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP))
 void eb_curve_get_vm(bn_t vm) {
-	if (curve_is_koblitz) {
+	if (curve_is_kbltz) {
 		bn_copy(vm, &curve_vm);
 	} else {
 		bn_zero(vm);
@@ -360,7 +360,7 @@ void eb_curve_get_vm(bn_t vm) {
 }
 
 void eb_curve_get_s0(bn_t s0) {
-	if (curve_is_koblitz) {
+	if (curve_is_kbltz) {
 		bn_copy(s0, &curve_s0);
 	} else {
 		bn_zero(s0);
@@ -368,7 +368,7 @@ void eb_curve_get_s0(bn_t s0) {
 }
 
 void eb_curve_get_s1(bn_t s1) {
-	if (curve_is_koblitz) {
+	if (curve_is_kbltz) {
 		bn_copy(s1, &curve_s1);
 	} else {
 		bn_zero(s1);
@@ -386,12 +386,12 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r, bn_t h) {
 	detect_opt(&curve_opt_b, curve_b);
 
 	if (fb_cmp_dig(curve_b, 1) == CMP_EQ) {
-		curve_is_koblitz = 1;
+		curve_is_kbltz = 1;
 	} else {
-		curve_is_koblitz = 0;
+		curve_is_kbltz = 0;
 	}
-#if defined(EB_KBLTZ) && (EB_MUL == WTNAF || EB_FIX == WTNAF || EB_SIM == INTER || !defined(STRIP))
-	if (curve_is_koblitz) {
+#if defined(EB_KBLTZ) && (EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP))
+	if (curve_is_kbltz) {
 		compute_koblitz();
 	}
 #endif
@@ -410,7 +410,7 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r, bn_t h) {
 #if defined(EB_KBLTZ)
 
 void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r, bn_t h) {
-	curve_is_koblitz = 1;
+	curve_is_kbltz = 1;
 
 	fb_copy(curve_a, a);
 
@@ -420,7 +420,7 @@ void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r, bn_t h) {
 	detect_opt(&curve_opt_a, curve_a);
 	detect_opt(&curve_opt_b, curve_b);
 
-#if defined(EB_KBLTZ) && (EB_MUL == WTNAF || EB_FIX == WTNAF || EB_SIM == INTER || !defined(STRIP))
+#if EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP)
 	compute_koblitz();
 #endif
 	eb_norm(g, g);

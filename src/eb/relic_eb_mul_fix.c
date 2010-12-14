@@ -38,7 +38,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EB_FIX == WTNAF || !defined(STRIP)
+#if EB_FIX == LWNAF || !defined(STRIP)
 
 #if defined(EB_KBLTZ)
 
@@ -66,7 +66,7 @@ static void eb_mul_pre_kbltz(eb_t *t, eb_t p) {
 
 	eb_copy(t[0], p);
 
-	/* The minimum table depth for WTNAF is 3. */
+	/* The minimum table depth for LWNAF is 3. */
 #if EB_DEPTH == 3
 	eb_frb(t[1], t[0]);
 	if (u == 1) {
@@ -169,7 +169,7 @@ static void eb_mul_pre_kbltz(eb_t *t, eb_t p) {
 
 #endif
 
-	eb_norm_sim(t + 1, t + 1, EB_TABLE_WTNAF - 1);
+	eb_norm_sim(t + 1, t + 1, EB_TABLE_LWNAF - 1);
 
 	eb_copy(t[0], p);
 }
@@ -264,7 +264,7 @@ static void eb_mul_pre_ordin(eb_t *t, eb_t p) {
 	}
 #endif
 
-	eb_norm_sim(t + 1, t + 1, EB_TABLE_WTNAF - 1);
+	eb_norm_sim(t + 1, t + 1, EB_TABLE_LWNAF - 1);
 
 	eb_copy(t[0], p);
 }
@@ -302,7 +302,7 @@ static void eb_mul_fix_ordin(eb_t r, eb_t *table, bn_t k) {
 }
 
 #endif /* EB_ORDIN || EB_SUPER */
-#endif /* EB_FIX == WTNAF */
+#endif /* EB_FIX == LWNAF */
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -707,9 +707,9 @@ void eb_mul_fix_combd(eb_t r, eb_t *t, bn_t k) {
 
 #endif
 
-#if EB_FIX == WTNAF || !defined(STRIP)
+#if EB_FIX == LWNAF || !defined(STRIP)
 
-void eb_mul_pre_wtnaf(eb_t *t, eb_t p) {
+void eb_mul_pre_lwnaf(eb_t *t, eb_t p) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
 		eb_mul_pre_kbltz(t, p);
@@ -722,7 +722,7 @@ void eb_mul_pre_wtnaf(eb_t *t, eb_t p) {
 #endif
 }
 
-void eb_mul_fix_wtnaf(eb_t r, eb_t *t, bn_t k) {
+void eb_mul_fix_lwnaf(eb_t r, eb_t *t, bn_t k) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
 		eb_mul_fix_kbltz(r, t, k);

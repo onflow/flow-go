@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_FIX == WTNAF || EP_FIX == GLV || !defined(STRIP)
+#if EP_FIX == LWNAF || EP_FIX == GLV || !defined(STRIP)
 
 /**
  * Precomputes a table for a point multiplication on an ordinary curve.
@@ -100,7 +100,7 @@ static void ep2_mul_fix_ordin(ep2_t r, ep2_t * table, bn_t k) {
 	ep2_norm(r, r);
 }
 
-#endif /* EP_FIX == WTNAF */
+#endif /* EP_FIX == LWNAF */
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -488,13 +488,13 @@ void ep2_mul_fix_combd(ep2_t r, ep2_t * t, bn_t k) {
 
 #endif
 
-#if EP_FIX == WTNAF || EP_FIX == GLV || !defined(STRIP)
+#if EP_FIX == LWNAF || EP_FIX == GLV || !defined(STRIP)
 
-void ep2_mul_pre_wtnaf(ep2_t * t, ep2_t p) {
+void ep2_mul_pre_lwnaf(ep2_t * t, ep2_t p) {
 	ep2_mul_pre_ordin(t, p);
 }
 
-void ep2_mul_fix_wtnaf(ep2_t r, ep2_t * t, bn_t k) {
+void ep2_mul_fix_lwnaf(ep2_t r, ep2_t * t, bn_t k) {
 	ep2_mul_fix_ordin(r, t, k);
 }
 #endif

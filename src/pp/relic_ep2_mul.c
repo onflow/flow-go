@@ -75,21 +75,25 @@ void ep2_mul(ep2_t r, ep2_t p, bn_t k) {
 }
 
 void ep2_mul_gen(ep2_t r, bn_t k) {
-	ep2_t gen;
+#ifdef EP_PRECO
+	//ep2_mul_fix(r, ep2_curve_get_tab(), k);
+#else
+	ep2_t g;
 
-	ep2_null(gen);
+	ep2_null(g);
 
 	TRY {
-		ep2_new(gen);
-		ep2_curve_get_gen(gen);
-		ep2_mul(r, gen, k);
+		ep2_new(g);
+		ep2_curve_get_gen(g);
+		ep2_mul(r, g, k);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		ep2_free(gen);
+		ep2_free(g);
 	}
+#endif
 }
 
 void ep2_mul_dig(ep2_t r, ep2_t p, dig_t k) {

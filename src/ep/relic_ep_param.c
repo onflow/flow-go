@@ -152,10 +152,10 @@
 #define BN_P254_GLVB	"25236482400000017080EB4000000006181800000000000CD98000000000000B"
 #define BN_P254_GLV1	"1BC9BE5344535A482"
 #define BN_P254_GLV2	"-1500FD5BF02500BDE9D117E33E0953E2E"
-#define BN_P254_GLV_V10	"8100000000000001"
-#define BN_P254_GLV_V11	"61818000000000028500000000000004"
-#define BN_P254_GLV_V20	"61818000000000020400000000000003"
-#define BN_P254_GLV_V21	"-8100000000000001"
+#define BN_P254_V10		"8100000000000001"
+#define BN_P254_V11		"61818000000000028500000000000004"
+#define BN_P254_V20		"61818000000000020400000000000003"
+#define BN_P254_V21		"-8100000000000001"
 /** @} */
 #endif
 
@@ -227,11 +227,11 @@ static void copy_from_rom(char *dest, const char *src) {
 
 #define ASSIGN_GLV(CURVE, FIELD)											\
 	PREPARE(str, CURVE##_GLVB);												\
-	fp_read(glvb, str, strlen(str), 16);									\
+	fp_read(beta, str, strlen(str), 16);									\
 	PREPARE(str, CURVE##_GLV1);												\
-	bn_read_str(glv1, str, strlen(str), 16);								\
+	bn_read_str(v1, str, strlen(str), 16);									\
 	PREPARE(str, CURVE##_GLV2);												\
-	bn_read_str(glv2, str, strlen(str), 16);								\
+	bn_read_str(v2, str, strlen(str), 16);									\
 	PREPARE(str, CURVE##_GLV_V10);											\
 	bn_read_str(v10, str, strlen(str), 16);									\
 	PREPARE(str, CURVE##_GLV_V11);											\
@@ -246,27 +246,27 @@ static void copy_from_rom(char *dest, const char *src) {
  */
 static int param_id;
 
-static ep_param_set_glv(int param) {
-	fp_t glvb;
-	bn_t glv1, glv2, v10, v11, v20, v21;
+static void ep_param_set_galav(int param) {
+	fp_t beta;
+	bn_t v1, v2, v10, v11, v20, v21;
 #if ARCH == AVR
 	char str[2 * FP_DIGS + 1];
 #else
 	char *str;
 #endif
 
-	fp_null(glvb);
-	bn_null(glv1);
-	bn_null(glv2);
+	fp_null(beta);
+	bn_null(v1);
+	bn_null(v2);
 	bn_null(v10);
 	bn_null(v11);
 	bn_null(v20);
 	bn_null(v21);
 
 	TRY {
-		fp_new(glvb);
-		bn_new(glv1);
-		bn_new(glv2);
+		fp_new(beta);
+		bn_new(v1);
+		bn_new(v2);
 		bn_new(v10);
 		bn_new(v11);
 		bn_new(v20);
@@ -287,15 +287,15 @@ static ep_param_set_glv(int param) {
 				THROW(ERR_INVALID);
 				break;
 		}
-		ep_curve_set_glv(glvb, glv1, glv2, v10, v11, v20, v21);
+		ep_curve_set_kbltz(beta, v1, v2, v10, v11, v20, v21);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
 		fp_free(glvb);
-		bn_free(glv1);
-		bn_free(glv2);
+		bn_free(v1);
+		bn_free(v2);
 		bn_free(v10);
 		bn_free(v11);
 		bn_free(v20);
@@ -313,6 +313,7 @@ int ep_param_get() {
 
 void ep_param_set(int param) {
 	int ordin = 0;
+	int kbltz = 0;
 #if ARCH == AVR
 	char str[2 * FP_DIGS + 1];
 #else
@@ -373,19 +374,19 @@ void ep_param_set(int param) {
 #if defined(EP_ORDIN) && FP_PRIME == 158
 			case BN_P158:
 				ASSIGN(BN_P158, BN_158);
-				ordin = 1;
+				kbltz = 1;
 				break;
 #endif
 #if defined(EP_ORDIN) && FP_PRIME == 254
 			case BN_P254:
 				ASSIGN(BN_P254, BN_254);
-				ordin = 1;
+				kbltz = 1;
 				break;
 #endif
 #if defined(EP_ORDIN) && FP_PRIME == 256
 			case BN_P256:
 				ASSIGN(BN_P256, BN_256);
-				ordin = 1;
+				kbltz = 1;
 				break;
 #endif
 			default:
@@ -400,9 +401,22 @@ void ep_param_set(int param) {
 		fp_set_dig(g->z, 1);
 		g->norm = 1;
 
-		ep_curve_set_ordin(a, b, g, r);
-#if EP_MUL == GLV || EP_FIX == GLV
-		ep_param_set_glv(param);
+#if defined(EP_ORDIN)
+		if (ordin) {
+			ep_curve_set_ordin(a, b, g, r);
+		}
+#endif
+
+#if defined(EP_KBLTZ)
+		if (kbltz) {
+			//ep_curve_set_kbltz(a, g, r, h);
+			ep_param_set_galav(param);
+			ep_curve_set_ordin(a, b, g, r);
+		}
+#elif defined(EP_ORDIN)
+		if (kbltz) {
+			ep_curve_set_ordin(a, b, g, r);
+		}
 #endif
 	}
 	CATCH_ANY {
@@ -431,22 +445,32 @@ int ep_param_set_any() {
 
 int ep_param_set_any_ordin() {
 	int r = STS_OK;
-#if FP_PRIME == 158
-	ep_param_set(BN_P158);
-#elif FP_PRIME == 160
+#if FP_PRIME == 160
 	ep_param_set(SECG_P160);
 #elif FP_PRIME == 192
 	ep_param_set(NIST_P192);
 #elif FP_PRIME == 224
 	ep_param_set(NIST_P224);
-#elif FP_PRIME == 254
-	ep_param_set(BN_P254);
 #elif FP_PRIME == 256
 	ep_param_set(NIST_P256);
 #elif FP_PRIME == 384
 	ep_param_set(NIST_P384);
 #elif FP_PRIME == 521
 	ep_param_set(NIST_P521);
+#else
+	r = STS_ERR;
+#endif
+	return r;
+}
+
+int ep_param_set_any_kbltz() {
+	int r = STS_OK;
+#if FP_PRIME == 158
+	ep_param_set(BN_P158);
+#elif FP_PRIME == 254
+	ep_param_set(BN_P254);
+#elif FP_PRIME == 256
+	ep_param_set(BN_P256);
 #else
 	r = STS_ERR;
 #endif

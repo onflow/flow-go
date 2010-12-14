@@ -60,17 +60,21 @@ static ep_st curve_g;
  */
 static bn_st curve_r;
 
-#if EP_MUL == GLV || EP_FIX == GLV
-static fp_st curve_glvb;
-
-static bn_st curve_glv1;
-
-static bn_st curve_glv2;
-
-static bn_st curve_glv_v10;
-static bn_st curve_glv_v11;
-static bn_st curve_glv_v20;
-static bn_st curve_glv_v21;
+#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
+/**
+ * The parameters required by the GLV method.
+ * @{
+ */
+static fp_st curve_beta;
+static bn_st curve_v1;
+static bn_st curve_v2;
+static bn_st curve_v10;
+static bn_st curve_v11;
+static bn_st curve_v20;
+static bn_st curve_v21;
+/**
+ * @}
+ */
 #endif
 
 /**
@@ -84,6 +88,12 @@ static int curve_opt_a;
  * coefficient.
  */
 static int curve_opt_b;
+
+/**
+ * Flag that stores if the configured prime elliptic curve has efficient
+ * endomorphisms.
+ */
+static int curve_is_kbltz;
 
 /**
  * Flag that stores if the configured prime elliptic curve is supersingular.
@@ -193,34 +203,34 @@ dig_t *ep_curve_get_a() {
 	return curve_a;
 }
 
-#if EP_MUL == GLV || EP_FIX == GLV
+#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
 
-dig_t *ep_curve_get_glvb() {
-	return curve_glvb;
+dig_t *ep_curve_get_beta() {
+	return curve_beta;
 }
 
-void ep_curve_get_glv1(bn_t v) {
-	bn_copy(v, &curve_glv1);
+void ep_curve_get_v1(bn_t v) {
+	bn_copy(v, &curve_v1);
 }
 
-void ep_curve_get_glv2(bn_t v) {
-	bn_copy(v, &curve_glv2);
+void ep_curve_get_v2(bn_t v) {
+	bn_copy(v, &curve_v2);
 }
 
-void ep_curve_get_glv_v10(bn_t v) {
-	bn_copy(v, &curve_glv_v10);
+void ep_curve_get_v10(bn_t v) {
+	bn_copy(v, &curve_v10);
 }
 
-void ep_curve_get_glv_v11(bn_t v) {
-	bn_copy(v, &curve_glv_v11);
+void ep_curve_get_v11(bn_t v) {
+	bn_copy(v, &curve_v11);
 }
 
-void ep_curve_get_glv_v20(bn_t v) {
-	bn_copy(v, &curve_glv_v20);
+void ep_curve_get_v20(bn_t v) {
+	bn_copy(v, &curve_v20);
 }
 
-void ep_curve_get_glv_v21(bn_t v) {
-	bn_copy(v, &curve_glv_v21);
+void ep_curve_get_v21(bn_t v) {
+	bn_copy(v, &curve_v21);
 }
 
 #endif
@@ -231,6 +241,10 @@ int ep_curve_opt_a() {
 
 int ep_curve_opt_b() {
 	return curve_opt_b;
+}
+
+int ep_curve_is_kbltz() {
+	return curve_is_kbltz;
 }
 
 int ep_curve_is_super() {
@@ -276,16 +290,19 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
 
 #endif
 
-#if EP_MUL == GLV || EP_FIX == GLV
+#if defined(EP_KBLTZ)
 
-void ep_curve_set_glv(fp_t glvb, bn_t glv1, bn_t glv2, bn_t v10, bn_t v11, bn_t v20, bn_t v21) {
-	fp_copy(curve_glvb, glvb);
-	bn_copy(&curve_glv1, glv1);
-	bn_copy(&curve_glv2, glv2);
-	bn_copy(&curve_glv_v10, v10);
-	bn_copy(&curve_glv_v11, v11);
-	bn_copy(&curve_glv_v20, v20);
-	bn_copy(&curve_glv_v21, v21);
+void ep_curve_set_kbltz(fp_t beta, bn_t v1, bn_t v2, bn_t v10, bn_t v11, bn_t v20, bn_t v21) {
+	curve_is_kbltz = 1;
+#if EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP)
+	fp_copy(curve_beta, beta);
+	bn_copy(&curve_v1, v1);
+	bn_copy(&curve_v2, v2);
+	bn_copy(&curve_v10, v10);
+	bn_copy(&curve_v11, v11);
+	bn_copy(&curve_v20, v20);
+	bn_copy(&curve_v21, v21);
+#endif
 }
 
 #endif

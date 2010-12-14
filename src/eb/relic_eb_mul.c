@@ -67,7 +67,6 @@ static void eb_table_kbltz(eb_t *t, eb_t p) {
 
 	eb_copy(t[0], p);
 
-	/* The minimum table depth for WTNAF is 3. */
 #if EB_WIDTH == 3
 	eb_frb(t[1], t[0]);
 	if (u == 1) {

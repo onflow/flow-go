@@ -269,10 +269,10 @@ void ep2_mul_sim_trick(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 
 void ep2_mul_sim_inter(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 #if defined(EP_KBLTZ)
-	if (ep2_curve_is_kbltz()) {
-		ep2_mul_sim_kbltz(r, p, k, q, l, 0);
-		return;
-	}
+//	if (ep_curve_is_kbltz()) {
+//		ep_mul_sim_kbltz(r, p, k, q, l, 0);
+//		return;
+//	}
 #endif
 
 #if defined(EP_ORDIN)
@@ -354,7 +354,7 @@ void ep2_mul_sim_gen(ep2_t r, bn_t k, ep2_t q, bn_t l) {
 		ep2_new(gen);
 
 		ep2_curve_get_gen(gen);
-#if EP_FIX == WTNAF && defined(EP_PRECO)
+#if EP_FIX == LWNAF && defined(EP_PRECO)
 		ep2_mul_sim_ordin(r, gen, k, q, l, 1);
 #else
 		ep2_mul_sim(r, gen, k, q, l);
