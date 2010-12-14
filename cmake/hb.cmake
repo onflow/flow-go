@@ -10,7 +10,7 @@ option(HB_PRECO "Build precomputation table for generator" on)
 message("      EB_DEPTH=w        Width w in [2,6] of precomputation table for fixed point methods.")
 message("      HB_WIDTH=w        Width w in [2,6] of window processing for unknown point methods.\n")
 
-message("   ** Available binary elliptic curve methods (default = PROJC;WTNAF;COMBS;INTER):")
+message("   ** Available binary elliptic curve methods (default = PROJC;LWNAF;COMBS;INTER):")
 message("      HB_METHD=BASIC    Affine coordinates.")
 message("      HB_METHD=PROJC    Projective coordinates (López-Dahab for ordinary curves).\n")
 
@@ -22,14 +22,14 @@ message("      HB_METHD=YAOWI    Yao's windowing method for fixed point multipli
 message("      HB_METHD=NAFWI    NAF windowing method for fixed point multiplication.")
 message("      HB_METHD=COMBS    Single-table Comb method for fixed point multiplication.")
 message("      HB_METHD=COMBD    Double-table Comb method for fixed point multiplication.")
-message("      HB_METHD=WTNAF    Window NAF with width w (TNAF for Koblitz curves).\n")
+message("      HB_METHD=LWNAF    Window NAF with width w (TNAF for Koblitz curves).\n")
 
 message("      HB_METHD=BASIC    Multiplication-and-addition simultaneous multiplication.")
 message("      HB_METHD=TRICK    Shamir's trick for simultaneous multiplication.")
-message("      HB_METHD=INTER    Interleaving of w-(T)NAFs.")
+message("      HB_METHD=INTER    Interleaving of window NAFs.")
 message("      HB_METHD=JOINT    Joint sparse form.\n")
 
-message("      Note: these methods must be given in order. Ex: HB_METHD=\"BASIC;WTNAF;COMBD;TRICK\"\n")
+message("      Note: these methods must be given in order. Ex: HB_METHD=\"BASIC;LWNAF;COMBD;TRICK\"\n")
 
 if (NOT HB_DEPTH)
 	set(HB_DEPTH 4)
