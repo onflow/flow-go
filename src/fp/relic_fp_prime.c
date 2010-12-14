@@ -83,7 +83,7 @@ static int prime_cnr;
 /**
  * Maximum number of powers of 2 used to describe special form moduli.
  */
-#define MAX_EXPS		4
+#define MAX_EXPS		8
 
 /**
  * Non-zero bits of special form prime.
