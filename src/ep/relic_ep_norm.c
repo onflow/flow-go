@@ -115,9 +115,6 @@ void ep_norm_sim(ep_t * r, ep_t * t, int n) {
 	TRY {
 		for (i = 0; i < n; i++) {
 			fp_new(a[i]);
-		}
-
-		for (i = 0; i < n; i++) {
 			fp_copy(a[i], t[i]->z);
 		}
 
