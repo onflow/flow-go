@@ -129,6 +129,13 @@
 #define BN_P158_X		"1"
 #define BN_P158_Y		"2"
 #define BN_P158_R		"240000006ED000007FE96000419F59800C9FFD81"
+#define BN_P158_GLVB	"240000006E8800007F434000411F93C00C7F3B08"
+#define BN_P158_GLV1	"15555555348E38E3B3FE4"
+#define BN_P158_GLV2	"-1C71C71C304"
+#define BN_P158_GLV_V10	"600000009380000038A8"
+#define BN_P158_GLV_V11	"-8000000063"
+#define BN_P158_GLV_V20	"8000000063"
+#define BN_P158_GLV_V21	"6000000094000000390B"
 /** @} */
 #endif
 
@@ -142,6 +149,13 @@
 #define BN_P254_X		"2523648240000001BA344D80000000086121000000000013A700000000000012"
 #define BN_P254_Y		"1"
 #define BN_P254_R		"2523648240000001BA344D8000000007FF9F800000000010A10000000000000D"
+#define BN_P254_GLVB	"25236482400000017080EB4000000006181800000000000CD98000000000000B"
+#define BN_P254_GLV1	"1BC9BE5344535A482"
+#define BN_P254_GLV2	"-1500FD5BF02500BDE9D117E33E0953E2E"
+#define BN_P254_GLV_V10	"8100000000000001"
+#define BN_P254_GLV_V11	"61818000000000028500000000000004"
+#define BN_P254_GLV_V20	"61818000000000020400000000000003"
+#define BN_P254_GLV_V21	"-8100000000000001"
 /** @} */
 #endif
 
@@ -211,10 +225,83 @@ static void copy_from_rom(char *dest, const char *src) {
 	PREPARE(str, CURVE##_R);												\
 	bn_read_str(r, str, strlen(str), 16);									\
 
+#define ASSIGN_GLV(CURVE, FIELD)											\
+	PREPARE(str, CURVE##_GLVB);												\
+	fp_read(glvb, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_GLV1);												\
+	bn_read_str(glv1, str, strlen(str), 16);								\
+	PREPARE(str, CURVE##_GLV2);												\
+	bn_read_str(glv2, str, strlen(str), 16);								\
+	PREPARE(str, CURVE##_GLV_V10);											\
+	bn_read_str(v10, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_GLV_V11);											\
+	bn_read_str(v11, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_GLV_V20);											\
+	bn_read_str(v20, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_GLV_V21);											\
+	bn_read_str(v21, str, strlen(str), 16);									\
+
 /**
  * Current configured elliptic curve parameters.
  */
 static int param_id;
+
+static ep_param_set_glv(int param) {
+	fp_t glvb;
+	bn_t glv1, glv2, v10, v11, v20, v21;
+#if ARCH == AVR
+	char str[2 * FP_DIGS + 1];
+#else
+	char *str;
+#endif
+
+	fp_null(glvb);
+	bn_null(glv1);
+	bn_null(glv2);
+	bn_null(v10);
+	bn_null(v11);
+	bn_null(v20);
+	bn_null(v21);
+
+	TRY {
+		fp_new(glvb);
+		bn_new(glv1);
+		bn_new(glv2);
+		bn_new(v10);
+		bn_new(v11);
+		bn_new(v20);
+		bn_new(v21);
+
+		switch (param) {
+#if defined(EP_ORDIN) && FP_PRIME == 158
+			case BN_P158:
+				ASSIGN_GLV(BN_P158, BN_158);
+				break;
+#endif
+#if defined(EP_ORDIN) && FP_PRIME == 254
+			case BN_P254:
+				ASSIGN_GLV(BN_P254, BN_254);
+				break;
+#endif
+			default:
+				THROW(ERR_INVALID);
+				break;
+		}
+		ep_curve_set_glv(glvb, glv1, glv2, v10, v11, v20, v21);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(glvb);
+		bn_free(glv1);
+		bn_free(glv2);
+		bn_free(v10);
+		bn_free(v11);
+		bn_free(v20);
+		bn_free(v21);
+	}
+}
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -314,6 +401,9 @@ void ep_param_set(int param) {
 		g->norm = 1;
 
 		ep_curve_set_ordin(a, b, g, r);
+#if EP_MUL == GLV || EP_FIX == GLV
+		ep_param_set_glv(param);
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

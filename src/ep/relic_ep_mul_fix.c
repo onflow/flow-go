@@ -509,3 +509,125 @@ void ep_mul_fix_wtnaf(ep_t r, ep_t * t, bn_t k) {
 	ep_mul_fix_ordin(r, t, k);
 }
 #endif
+
+#if EP_FIX == GLV || !defined(STRIP)
+
+/* TODO: refactor?
+ * This is exactly the same as ep_mul_pre_combs, the only difference
+ * is that l is divided by 2.
+ */
+void ep_mul_pre_glv(ep_t * t, ep_t p) {
+	int i, j, l;
+	bn_t ord;
+
+	bn_null(ord);
+
+	TRY {
+		bn_new(ord);
+
+		ep_curve_get_ord(ord);
+		l = bn_bits(ord);
+		l = ((l % (2 * EP_DEPTH)) == 0 ? (l / (2 * EP_DEPTH)) : (l / (2 * EP_DEPTH)) + 1);
+
+		ep_set_infty(t[0]);
+
+		ep_copy(t[1], p);
+		for (j = 1; j < EP_DEPTH; j++) {
+			ep_dbl(t[1 << j], t[1 << (j - 1)]);
+			for (i = 1; i < l; i++) {
+				ep_dbl(t[1 << j], t[1 << j]);
+			}
+			for (i = 1; i < (1 << j); i++) {
+				ep_add(t[(1 << j) + i], t[1 << j], t[i]);
+			}
+		}
+		for (j = 1; j < (1 << EP_DEPTH); j++) {
+			ep_norm(t[j], t[j]);
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(ord);
+	}
+}
+
+void ep_mul_fix_glv(ep_t r, ep_t * t, bn_t k) {
+	int i, j, l, w0, w1, n0, n1, p0, p1, s0, s1;
+	bn_t n, k0, k1;
+	ep_t u;
+
+	bn_null(n);
+	bn_null(k0);
+	bn_null(k1);
+	ep_null(u);
+
+	TRY {
+		bn_new(n);
+		bn_new(k0);
+		bn_new(k1);
+		ep_new(u);
+
+		ep_curve_get_ord(n);
+		l = bn_bits(n);
+		l = ((l % (2 * EP_DEPTH)) == 0 ? (l / (2 * EP_DEPTH)) : (l / (2 * EP_DEPTH)) + 1);
+
+		ep_glv_dec(k0, k1, k);
+		s0 = bn_sign(k0);
+		s1 = bn_sign(k1);
+		bn_abs(k0, k0);
+		bn_abs(k1, k1);
+
+		n0 = bn_bits(k0);
+		n1 = bn_bits(k1);
+
+		p0 = (EP_DEPTH) * l - 1;
+
+		ep_set_infty(r);
+
+		for (i = l - 1; i >= 0; i--) {
+			ep_dbl(r, r);
+
+			w0 = 0;
+			w1 = 0;
+			p1 = p0--;
+			for (j = EP_DEPTH - 1; j >= 0; j--, p1 -= l) {
+				w0 = w0 << 1;
+				w1 = w1 << 1;
+				if (p1 < n0 && bn_test_bit(k0, p1)) {
+					w0 = w0 | 1;
+				}
+				if (p1 < n1 && bn_test_bit(k1, p1)) {
+					w1 = w1 | 1;
+				}
+			}
+			if (w0 > 0) {
+				if (s0 == BN_POS) {
+					ep_add(r, r, t[w0]);
+				} else {
+					ep_sub(r, r, t[w0]);
+				}
+			}
+			if (w1 > 0) {
+				ep_glv_end(u, t[w1]);
+				if (s1 == BN_NEG) {
+					ep_neg(u, u);
+				}
+				ep_add(r, r, u);
+			}
+		}
+		ep_norm(r, r);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(n);
+		bn_free(k0);
+		bn_free(k1);
+		ep_free(u);
+	}
+}
+
+#endif

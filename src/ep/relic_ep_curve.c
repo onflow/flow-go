@@ -60,6 +60,19 @@ static ep_st curve_g;
  */
 static bn_st curve_r;
 
+#if EP_MUL == GLV || EP_FIX == GLV
+static fp_st curve_glvb;
+
+static bn_st curve_glv1;
+
+static bn_st curve_glv2;
+
+static bn_st curve_glv_v10;
+static bn_st curve_glv_v11;
+static bn_st curve_glv_v20;
+static bn_st curve_glv_v21;
+#endif
+
 /**
  * Optimization identifier for the configured curve derived from the a
  * coefficient.
@@ -180,6 +193,38 @@ dig_t *ep_curve_get_a() {
 	return curve_a;
 }
 
+#if EP_MUL == GLV || EP_FIX == GLV
+
+dig_t *ep_curve_get_glvb() {
+	return curve_glvb;
+}
+
+void ep_curve_get_glv1(bn_t v) {
+	bn_copy(v, &curve_glv1);
+}
+
+void ep_curve_get_glv2(bn_t v) {
+	bn_copy(v, &curve_glv2);
+}
+
+void ep_curve_get_glv_v10(bn_t v) {
+	bn_copy(v, &curve_glv_v10);
+}
+
+void ep_curve_get_glv_v11(bn_t v) {
+	bn_copy(v, &curve_glv_v11);
+}
+
+void ep_curve_get_glv_v20(bn_t v) {
+	bn_copy(v, &curve_glv_v20);
+}
+
+void ep_curve_get_glv_v21(bn_t v) {
+	bn_copy(v, &curve_glv_v21);
+}
+
+#endif
+
 int ep_curve_opt_a() {
 	return curve_opt_a;
 }
@@ -227,6 +272,20 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
 #if defined(EP_PRECO)
 	ep_mul_pre(ep_curve_get_tab(), &curve_g);
 #endif
+}
+
+#endif
+
+#if EP_MUL == GLV || EP_FIX == GLV
+
+void ep_curve_set_glv(fp_t glvb, bn_t glv1, bn_t glv2, bn_t v10, bn_t v11, bn_t v20, bn_t v21) {
+	fp_copy(curve_glvb, glvb);
+	bn_copy(&curve_glv1, glv1);
+	bn_copy(&curve_glv2, glv2);
+	bn_copy(&curve_glv_v10, v10);
+	bn_copy(&curve_glv_v11, v11);
+	bn_copy(&curve_glv_v20, v20);
+	bn_copy(&curve_glv_v21, v21);
 }
 
 #endif

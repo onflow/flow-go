@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_FIX == WTNAF || !defined(STRIP)
+#if EP_FIX == WTNAF || EP_FIX == GLV || !defined(STRIP)
 
 /**
  * Precomputes a table for a point multiplication on an ordinary curve.
@@ -488,7 +488,7 @@ void ep2_mul_fix_combd(ep2_t r, ep2_t * t, bn_t k) {
 
 #endif
 
-#if EP_FIX == WTNAF || !defined(STRIP)
+#if EP_FIX == WTNAF || EP_FIX == GLV || !defined(STRIP)
 
 void ep2_mul_pre_wtnaf(ep2_t * t, ep2_t p) {
 	ep2_mul_pre_ordin(t, p);

@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_MUL == WTNAF || !defined(STRIP)
+#if EP_MUL == WTNAF || EP_MUL == GLV || !defined(STRIP)
 
 /**
  * Precomputes a table for a point multiplication on an ordinary curve.
@@ -65,6 +65,10 @@ static void table_init(ep_t * t, ep_t p) {
 
 	ep_copy(t[0], p);
 }
+
+#endif
+
+#if EP_MUL == WTNAF || !defined(STRIP)
 
 static void ep_mul_naf_impl(ep_t r, ep_t p, bn_t k) {
 	int len, i, n;
@@ -168,6 +172,97 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 
 void ep_mul_wtnaf(ep_t r, ep_t p, bn_t k) {
 	ep_mul_naf_impl(r, p, k);
+}
+
+#endif
+
+#if EP_MUL == GLV || !defined(STRIP)
+
+void ep_mul_glv(ep_t r, ep_t p, bn_t k) {
+	int len, l0, l1, i, n0, n1, s0, s1;
+	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
+	bn_t k0, k1;
+	ep_t q;
+	ep_t table[1 << (EP_WIDTH - 2)];
+
+	bn_null(k0);
+	bn_null(k1);
+	ep_null(q);
+
+	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
+		ep_null(table[i]);
+	}
+
+	bn_new(k0);
+	bn_new(k1);
+	ep_new(q);
+
+	ep_glv_dec(k0, k1, k);
+	s0 = bn_sign(k0);
+	s1 = bn_sign(k1);
+	bn_abs(k0, k0);
+	bn_abs(k1, k1);
+//	printf("k0 len: %d; k1 len: %d\n", bn_bits(k0), bn_bits(k1));
+
+	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
+		ep_new(table[i]);
+	}
+	if (s0 == BN_POS) {
+		table_init(table, p);
+	} else {
+		ep_neg(q, p);
+		table_init(table, q);
+	}
+
+	bn_rec_naf(naf0, &l0, k0, EP_WIDTH);
+	bn_rec_naf(naf1, &l1, k1, EP_WIDTH);
+
+	len = MAX(l0, l1);
+	t0 = naf0 + len - 1;
+	t1 = naf1 + len - 1;
+	for (i = l0; i < len; i++)
+		naf0[i] = 0;
+	for (i = l1; i < len; i++)
+		naf1[i] = 0;
+
+	ep_set_infty(r);
+	for (i = len - 1; i >= 0; i--, t0--, t1--) {
+		ep_dbl(r, r);
+
+		n0 = *t0;
+		n1 = *t1;
+		if (n0 > 0) {
+			ep_add(r, r, table[n0 / 2]);
+		}
+		if (n0 < 0) {
+			ep_sub(r, r, table[-n0 / 2]);
+		}
+		if (n1 > 0) {
+			ep_glv_end(q, table[n1 / 2]);
+			if (s0 != s1) {
+				ep_neg(q, q);
+			}
+			ep_add(r, r, q);
+		}
+		if (n1 < 0) {
+			ep_glv_end(q, table[-n1 / 2]);
+			if (s0 != s1) {
+				ep_neg(q, q);
+			}
+			ep_sub(r, r, q);
+		}
+	}
+	/* Convert r to affine coordinates. */
+	ep_norm(r, r);
+
+	bn_free(k0);
+	bn_free(k1);
+	ep_free(q);
+
+	/* Free the precomputation table. */
+	for (i = 0; i < 1 << (EP_WIDTH - 2); i++) {
+		ep_free(table[i]);
+	}
 }
 
 #endif

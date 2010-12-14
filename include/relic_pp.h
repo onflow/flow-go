@@ -419,6 +419,9 @@ typedef ep2_st *ep2_t;
 #define ep2_mul_pre(T, P)		ep2_mul_pre_combd(T, P)
 #elif EP_FIX == WTNAF
 #define ep2_mul_pre(T, P)		ep2_mul_pre_wtnaf(T, P)
+#elif EP_FIX == GLV
+//TODO: implement ep2_mul_pre_glv
+#define ep2_mul_pre(T, P)		ep2_mul_pre_wtnaf(T, P)
 #endif
 
 /**
@@ -440,6 +443,9 @@ typedef ep2_st *ep2_t;
 #elif EP_FIX == COMBD
 #define ep2_mul_fix(R, T, K)		ep2_mul_fix_combd(R, T, K)
 #elif EP_FIX == WTNAF
+#define ep2_mul_fix(R, T, K)		ep2_mul_fix_wtnaf(R, T, K)
+#elif EP_FIX == GLV
+//TODO: implement ep2_mul_pre_glv
 #define ep2_mul_fix(R, T, K)		ep2_mul_fix_wtnaf(R, T, K)
 #endif
 
