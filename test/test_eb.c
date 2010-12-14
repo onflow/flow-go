@@ -603,7 +603,7 @@ static int multiplication(void) {
 #endif
 
 #if EB_MUL == LWNAF || !defined(STRIP)
-		TEST_BEGIN("left-to-right w(t)naf point multiplication is correct") {
+		TEST_BEGIN("left-to-right w-(t)naf point multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
@@ -614,7 +614,7 @@ static int multiplication(void) {
 #endif
 
 #if EB_MUL == RWNAF || !defined(STRIP)
-		TEST_BEGIN("right-to-left w(t)naf point multiplication is correct") {
+		TEST_BEGIN("right-to-left w-(t)naf point multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
@@ -794,20 +794,20 @@ static int fixed(void) {
 		}
 #endif
 
-#if EB_FIX == WTNAF || !defined(STRIP)
-		for (int i = 0; i < EB_TABLE_WTNAF; i++) {
+#if EB_FIX == LWNAF || !defined(STRIP)
+		for (int i = 0; i < EB_TABLE_LWNAF; i++) {
 			eb_new(t[i]);
 		}
 		TEST_BEGIN("w(t)naf fixed point multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
-			eb_mul_pre_wtnaf(t, p);
-			eb_mul_fix_wtnaf(q, t, k);
+			eb_mul_pre_lwnaf(t, p);
+			eb_mul_fix_lwnaf(q, t, k);
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EB_TABLE_WTNAF; i++) {
+		for (int i = 0; i < EB_TABLE_LWNAF; i++) {
 			eb_free(t[i]);
 		}
 #endif
@@ -1100,6 +1100,11 @@ int main(void) {
 			THROW(ERR_NO_CURVE);
 			core_clean();
 			return 1;
+		} else {
+			if (test() != STS_OK) {
+				core_clean();
+				return 1;
+			}
 		}
 	}
 

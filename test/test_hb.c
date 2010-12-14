@@ -548,13 +548,13 @@ static int multiplication(void) {
 		} TEST_END;
 #endif
 
-#if HB_MUL == WTNAF || !defined(STRIP)
-		TEST_BEGIN("wnaf divisor class multiplication is correct") {
+#if HB_MUL == LWNAF || !defined(STRIP)
+		TEST_BEGIN("left-to-right w-naf divisor class multiplication is correct") {
 			hb_rand(p);
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			hb_mul(q, p, k);
-			hb_mul_wtnaf(r, p, k);
+			hb_mul_lwnaf(r, p, k);
 			TEST_ASSERT(hb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -705,20 +705,20 @@ static int fixed(void) {
 		}
 #endif
 
-#if HB_FIX == WTNAF || !defined(STRIP)
-		for (int i = 0; i < HB_TABLE_WTNAF; i++) {
+#if HB_FIX == LWNAF || !defined(STRIP)
+		for (int i = 0; i < HB_TABLE_LWNAF; i++) {
 			hb_new(t[i]);
 		}
-		TEST_BEGIN("w(t)naf fixed divisor class multiplication is correct") {
+		TEST_BEGIN("left-to-right w-naf fixed divisor class multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			hb_mul(q, p, k);
-			hb_mul_pre_wtnaf(t, p);
-			hb_mul_fix_wtnaf(q, t, k);
+			hb_mul_pre_lwnaf(t, p);
+			hb_mul_fix_lwnaf(q, t, k);
 			hb_mul(r, p, k);
 			TEST_ASSERT(hb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < HB_TABLE_WTNAF; i++) {
+		for (int i = 0; i < HB_TABLE_LWNAF; i++) {
 			hb_free(t[i]);
 		}
 #endif

@@ -475,12 +475,12 @@ static int multiplication(void) {
 		} TEST_END;
 #endif
 
-#if EP_MUL == WTNAF || !defined(STRIP)
-		TEST_BEGIN("w(t)naf point multiplication is correct") {
+#if EP_MUL == LWNAF || !defined(STRIP)
+		TEST_BEGIN("left-to-right w-naf point multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			ep_mul(q, p, k);
-			ep_mul_wtnaf(r, p, k);
+			ep_mul_lwnaf(r, p, k);
 			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
 		}
 		TEST_END;
@@ -640,20 +640,20 @@ static int fixed(void) {
 		}
 #endif
 
-#if EP_FIX == WTNAF || !defined(STRIP)
-		for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+#if EP_FIX == LWNAF || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_LWNAF; i++) {
 			ep_new(t[i]);
 		}
-		TEST_BEGIN("w(t)naf fixed point multiplication is correct") {
+		TEST_BEGIN("left-to-right w-naf point multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			ep_mul(q, p, k);
-			ep_mul_pre_wtnaf(t, p);
-			ep_mul_fix_wtnaf(q, t, k);
+			ep_mul_pre_lwnaf(t, p);
+			ep_mul_fix_lwnaf(q, t, k);
 			ep_mul(r, p, k);
 			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+		for (int i = 0; i < EP_TABLE_LWNAF; i++) {
 			ep_free(t[i]);
 		}
 #endif
@@ -899,10 +899,12 @@ int test(void) {
 }
 
 int main(void) {
-	int r0 = STS_ERR;
+	int r0, r1;
 	core_init();
 
 	util_print_banner("Tests for the EP module:", 0);
+
+	r0 = r1 = STS_ERR;
 
 #if defined(EP_ORDIN)
 	r0 = ep_param_set_any_ordin();
@@ -914,7 +916,17 @@ int main(void) {
 	}
 #endif
 
-	if (r0 == STS_ERR) {
+#if defined(EP_KBLTZ)
+	r1 = ep_param_set_any_kbltz();
+	if (r1 == STS_OK) {
+		if (test() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+	}
+#endif
+
+	if (r0 == STS_ERR && r1 == STS_ERR) {
 		if (ep_param_set_any() == STS_ERR) {
 			THROW(ERR_NO_CURVE);
 			core_clean();

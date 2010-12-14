@@ -417,11 +417,11 @@ typedef ep2_st *ep2_t;
 #define ep2_mul_pre(T, P)		ep2_mul_pre_combs(T, P)
 #elif EP_FIX == COMBD
 #define ep2_mul_pre(T, P)		ep2_mul_pre_combd(T, P)
-#elif EP_FIX == WTNAF
-#define ep2_mul_pre(T, P)		ep2_mul_pre_wtnaf(T, P)
+#elif EP_FIX == LWNAF
+#define ep2_mul_pre(T, P)		ep2_mul_pre_lwnaf(T, P)
 #elif EP_FIX == GLV
 //TODO: implement ep2_mul_pre_glv
-#define ep2_mul_pre(T, P)		ep2_mul_pre_wtnaf(T, P)
+#define ep2_mul_pre(T, P)		ep2_mul_pre_lwnaf(T, P)
 #endif
 
 /**
@@ -442,11 +442,11 @@ typedef ep2_st *ep2_t;
 #define ep2_mul_fix(R, T, K)		ep2_mul_fix_combs(R, T, K)
 #elif EP_FIX == COMBD
 #define ep2_mul_fix(R, T, K)		ep2_mul_fix_combd(R, T, K)
-#elif EP_FIX == WTNAF
-#define ep2_mul_fix(R, T, K)		ep2_mul_fix_wtnaf(R, T, K)
+#elif EP_FIX == LWNAF
+#define ep2_mul_fix(R, T, K)		ep2_mul_fix_lwnaf(R, T, K)
 #elif EP_FIX == GLV
 //TODO: implement ep2_mul_pre_glv
-#define ep2_mul_fix(R, T, K)		ep2_mul_fix_wtnaf(R, T, K)
+#define ep2_mul_fix(R, T, K)		ep2_mul_fix_lwnaf(R, T, K)
 #endif
 
 /**
@@ -1413,7 +1413,7 @@ void ep2_mul_pre_combd(ep2_t *t, ep2_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void ep2_mul_pre_wtnaf(ep2_t *t, ep2_t p);
+void ep2_mul_pre_lwnaf(ep2_t *t, ep2_t p);
 
 /**
  * Multiplies a fixed prime elliptic point using a precomputation table and
@@ -1473,7 +1473,7 @@ void ep2_mul_fix_combd(ep2_t r, ep2_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void ep2_mul_fix_wtnaf(ep2_t r, ep2_t *t, bn_t k);
+void ep2_mul_fix_lwnaf(ep2_t r, ep2_t *t, bn_t k);
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously using

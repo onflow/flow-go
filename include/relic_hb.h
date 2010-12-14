@@ -85,7 +85,7 @@ enum {
 /**
  * Size of a precomputation table using the w-(T)NAF method.
  */
-#define HB_TABLE_WTNAF		(1 << (HB_DEPTH - 2))
+#define HB_TABLE_LWNAF		(1 << (HB_DEPTH - 2))
 
 /**
  * Size of a precomputation table using the w-(T)NAF method.
@@ -105,8 +105,8 @@ enum {
 #define HB_TABLE			HB_TABLE_COMBS
 #elif HB_FIX == COMBD
 #define HB_TABLE			HB_TABLE_COMBD
-#elif HB_FIX == WTNAF
-#define HB_TABLE			HB_TABLE_WTNAF
+#elif HB_FIX == LWNAF
+#define HB_TABLE			HB_TABLE_LWNAF
 #elif HB_FIX == OCTUP
 #define HB_TABLE			HB_TABLE_OCTUP
 #endif
@@ -307,8 +307,8 @@ typedef hb_st *hb_t;
 #define hb_mul(R, P, K)		hb_mul_basic(R, P, K)
 #elif HB_MUL == OCTUP
 #define hb_mul(R, P, K)		hb_mul_octup(R, P, K)
-#elif HB_MUL == WTNAF
-#define hb_mul(R, P, K)		hb_mul_wtnaf(R, P, K)
+#elif HB_MUL == LWNAF
+#define hb_mul(R, P, K)		hb_mul_lwnaf(R, P, K)
 #endif
 
 /**
@@ -328,8 +328,8 @@ typedef hb_st *hb_t;
 #define hb_mul_pre(T, P)		hb_mul_pre_combs(T, P)
 #elif HB_FIX == COMBD
 #define hb_mul_pre(T, P)		hb_mul_pre_combd(T, P)
-#elif HB_FIX == WTNAF
-#define hb_mul_pre(T, P)		hb_mul_pre_wtnaf(T, P)
+#elif HB_FIX == LWNAF
+#define hb_mul_pre(T, P)		hb_mul_pre_lwnaf(T, P)
 #elif HB_FIX == OCTUP
 #define hb_mul_pre(T, P)		hb_mul_pre_octup(T, P)
 #endif
@@ -352,8 +352,8 @@ typedef hb_st *hb_t;
 #define hb_mul_fix(R, T, K)		hb_mul_fix_combs(R, T, K)
 #elif HB_FIX == COMBD
 #define hb_mul_fix(R, T, K)		hb_mul_fix_combd(R, T, K)
-#elif HB_FIX == WTNAF
-#define hb_mul_fix(R, T, K)		hb_mul_fix_wtnaf(R, T, K)
+#elif HB_FIX == LWNAF
+#define hb_mul_fix(R, T, K)		hb_mul_fix_lwnaf(R, T, K)
 #elif HB_FIX == OCTUP
 #define hb_mul_fix(R, T, K)		hb_mul_fix_octup(R, T, K)
 #endif
@@ -672,7 +672,7 @@ void hb_mul_basic(hb_t r, hb_t p, bn_t k);
  * @param[in] p				- the divisor class to multiply.
  * @param[in] k				- the integer.
  */
-void hb_mul_wtnaf(hb_t r, hb_t p, bn_t k);
+void hb_mul_lwnaf(hb_t r, hb_t p, bn_t k);
 
 /**
  * Multiplies a divisor class of a binary hyperelliptic curve by an integer
@@ -753,7 +753,7 @@ void hb_mul_pre_combd(hb_t *t, hb_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the divisor class to multiply.
  */
-void hb_mul_pre_wtnaf(hb_t *t, hb_t p);
+void hb_mul_pre_lwnaf(hb_t *t, hb_t p);
 
 /**
  * Builds a precomputation table for multiplying a fixed binary hyperelliptic
@@ -822,7 +822,7 @@ void hb_mul_fix_combd(hb_t r, hb_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void hb_mul_fix_wtnaf(hb_t r, hb_t *t, bn_t k);
+void hb_mul_fix_lwnaf(hb_t r, hb_t *t, bn_t k);
 
 /**
  * Multiplies a fixed binary hyperelliptic divisor class using a precomputation

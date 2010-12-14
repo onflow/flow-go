@@ -388,6 +388,8 @@
 #cmakedefine EP_ORDIN
 /** Support for supersingular curves. */
 #cmakedefine EP_SUPER
+/** Support for prime curves with efficient endormorphisms. */
+#cmakedefine EP_KBLTZ
 /** Use mixed coordinates. */
 #cmakedefine EP_MIXED
 /** Build precomputation table for generator. */
@@ -420,12 +422,8 @@
 #define SLIDE    2
 /** Montgomery powering ladder. */
 #define MONTY	 3
-/** Width-w (T)NAF. */ 
-#define WTNAF	 4
-/** RTL Width-w NAF */ 
-#define RWNAF	 5
-/** GLV */ 
-#define GLV	 7
+/** Left-to-right Width-w NAF. */ 
+#define LWNAF	 4
 /** Chosen prime elliptic curve point multiplication method. */
 #define EP_MUL	 @EP_MUL@
 
@@ -435,14 +433,12 @@
 #define YAOWI	 2
 /** NAF windowing method. */ 
 #define NAFWI	 3
-/** w-(T)NAF method. */
-#define WTNAF    4
+/** Left-to-right Width-w NAF. */ 
+#define LWNAF	 4
 /** Single-table comb method. */
 #define COMBS	 5
 /** Double-table comb method. */
 #define COMBD    6
-/** GLV */ 
-#define GLV	 7
 /** Chosen prime elliptic curve point multiplication method. */
 #define EP_FIX	 @EP_FIX@
 
@@ -501,8 +497,8 @@
 #define YAOWI	 2
 /** NAF windowing method. */ 
 #define NAFWI	 3
-/** w-(T)NAF method. */
-#define WTNAF    4
+/** Left-to-right Width-w NAF. */ 
+#define LWNAF	 4
 /** Single-table comb method. */
 #define COMBS	 5
 /** Double-table comb method. */
@@ -555,8 +551,8 @@
 
 /** Binary point multiplication. */ 
 #define BASIC	 1
-/** Width-w (T)NAF. */ 
-#define WTNAF	 4
+/** Left-to-right Width-w NAF. */ 
+#define LWNAF	 4
 /** Octupling-based windowing. */
 #define OCTUP	 7
 /** Chosen binary hyperelliptic curve point multiplication method. */
@@ -568,8 +564,8 @@
 #define YAOWI	 2
 /** NAF windowing method. */ 
 #define NAFWI	 3
-/** w-(T)NAF method. */
-#define WTNAF    4
+/** Left-to-right Width-w NAF. */ 
+#define LWNAF	 4
 /** Single-table comb method. */
 #define COMBS	 5
 /** Double-table comb method. */

@@ -96,9 +96,7 @@ enum {
 /**
  * Size of a precomputation table using the w-(T)NAF method.
  */
-#define EP_TABLE_WTNAF		(1 << (EP_DEPTH - 2))
-
-#define EP_TABLE_GLV		EP_TABLE_COMBS
+#define EP_TABLE_LWNAF		(1 << (EP_DEPTH - 2))
 
 /**
  * Size of a precomputation table using the chosen algorithm.
@@ -113,10 +111,8 @@ enum {
 #define EP_TABLE			EP_TABLE_COMBS
 #elif EP_FIX == COMBD
 #define EP_TABLE			EP_TABLE_COMBD
-#elif EP_FIX == WTNAF
-#define EP_TABLE			EP_TABLE_WTNAF
-#elif EP_FIX == GLV
-#define EP_TABLE			EP_TABLE_GLV
+#elif EP_FIX == LWNAF
+#define EP_TABLE			EP_TABLE_LWNAF
 #endif
 
 /**
@@ -305,10 +301,8 @@ typedef ep_st *ep_t;
 #define ep_mul(R, P, K)		ep_mul_const(R, P, K)
 #elif EP_MUL == SLIDE
 #define ep_mul(R, P, K)		ep_mul_slide(R, P, K)
-#elif EP_MUL == WTNAF
-#define ep_mul(R, P, K)		ep_mul_wtnaf(R, P, K)
-#elif EP_MUL == GLV
-#define ep_mul(R, P, K)		ep_mul_glv(R, P, K)
+#elif EP_MUL == LWNAF
+#define ep_mul(R, P, K)		ep_mul_lwnaf(R, P, K)
 #endif
 
 /**
@@ -327,10 +321,8 @@ typedef ep_st *ep_t;
 #define ep_mul_pre(T, P)		ep_mul_pre_combs(T, P)
 #elif EP_FIX == COMBD
 #define ep_mul_pre(T, P)		ep_mul_pre_combd(T, P)
-#elif EP_FIX == WTNAF
-#define ep_mul_pre(T, P)		ep_mul_pre_wtnaf(T, P)
-#elif EP_FIX == GLV
-#define ep_mul_pre(T, P)		ep_mul_pre_glv(T, P)
+#elif EP_FIX == LWNAF
+#define ep_mul_pre(T, P)		ep_mul_pre_lwnaf(T, P)
 #endif
 
 /**
@@ -351,10 +343,8 @@ typedef ep_st *ep_t;
 #define ep_mul_fix(R, T, K)		ep_mul_fix_combs(R, T, K)
 #elif EP_FIX == COMBD
 #define ep_mul_fix(R, T, K)		ep_mul_fix_combd(R, T, K)
-#elif EP_FIX == WTNAF
-#define ep_mul_fix(R, T, K)		ep_mul_fix_wtnaf(R, T, K)
-#elif EP_FIX == GLV
-#define ep_mul_fix(R, T, K)		ep_mul_fix_glv(R, T, K)
+#elif EP_FIX == LWNAF
+#define ep_mul_fix(R, T, K)		ep_mul_fix_lwnaf(R, T, K)
 #endif
 
 /**
@@ -405,19 +395,40 @@ dig_t *ep_curve_get_a(void);
  */
 dig_t *ep_curve_get_b(void);
 
-dig_t *ep_curve_get_glvb();
+/**
+ * Returns the efficient endormorphism associated with the prime curve.
+ */
+dig_t *ep_curve_get_beta();
 
-void ep_curve_get_glv1(bn_t v);
+/**
+ * Returns the parameter V1 of the prime curve.
+ */
+void ep_curve_get_v1(bn_t v);
 
-void ep_curve_get_glv2(bn_t v);
+/**
+ * Returns the parameter V2 of the prime curve.
+ */
+void ep_curve_get_v2(bn_t v);
 
-void ep_curve_get_glv_v10(bn_t v);
+/**
+ * Returns the parameter V10 of the prime curve.
+ */
+void ep_curve_get_v10(bn_t v);
 
-void ep_curve_get_glv_v11(bn_t v);
+/**
+ * Returns the parameter V11 of the prime curve.
+ */
+void ep_curve_get_v11(bn_t v);
 
-void ep_curve_get_glv_v20(bn_t v);
+/**
+ * Returns the parameter V20 of the prime curve.
+ */
+void ep_curve_get_v20(bn_t v);
 
-void ep_curve_get_glv_v21(bn_t v);
+/**
+ * Returns the parameter V21 of the prime curve.
+ */
+void ep_curve_get_v21(bn_t v);
 
 /**
  * Returns a optimization identifier based on the coefficient a of the curve.
@@ -432,6 +443,13 @@ int ep_curve_opt_a(void);
  * @return the optimization identifier.
  */
 int ep_curve_opt_b(void);
+
+/**
+ * Tests if the configured prime elliptic curve is a Koblitz curve.
+ *
+ * @return 1 if the prime elliptic curve is a Koblitz curve, 0 otherwise.
+ */
+int ep_curve_is_kbltz(void);
 
 /**
  * Tests if the configured prime elliptic curve is supersingular.
@@ -480,6 +498,16 @@ int ep_param_get(void);
 void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r);
 
 /**
+ * Configures a new Koblitz prime elliptic curve by its coefficients.
+ *
+ * @param[in] a			- the coefficient a of the curve.
+ * @param[in] b			- the coefficient b of the curve.
+ * @param[in] g			- the generator.
+ * @param[in] r			- the order of the group of points.
+ */
+void ep_curve_set_kbltz(fp_t glvb, bn_t glv1, bn_t glv2, bn_t v10, bn_t v11, bn_t v20, bn_t v21);
+
+/**
  * Configures a new pairing-friendly prime elliptic curve by its coefficients.
  *
  * @param[in] a			- the coefficient a of the curve.
@@ -488,8 +516,6 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r);
  * @param[in] r			- the order of the group of points.
  */
 void ep_curve_set_pairf(fp_t a, fp_t b, ep_t g, bn_t r);
-
-void ep_curve_set_glv(fp_t glvb, bn_t glv1, bn_t glv2, bn_t v10, bn_t v11, bn_t v20, bn_t v21);
 
 /**
  * Configures a new prime elliptic curve by its parameter identifier.
@@ -694,16 +720,7 @@ void ep_mul_slide(ep_t r, ep_t p, bn_t k);
  * @param[in] p				- the point to multiply.
  * @param[in] k				- the integer.
  */
-void ep_mul_wtnaf(ep_t r, ep_t p, bn_t k);
-
-/**
- * Multiplies a prime elliptic point by an integer using the GLV/w-NAF method.
- *
- * @param[out] r			- the result.
- * @param[in] p				- the point to multiply.
- * @param[in] k				- the integer.
- */
-void ep_mul_glv(ep_t r, ep_t p, bn_t k);
+void ep_mul_lwnaf(ep_t r, ep_t p, bn_t k);
 
 /**
  * Multiplies the generator of a prime elliptic curve by an integer.
@@ -774,16 +791,7 @@ void ep_mul_pre_combd(ep_t *t, ep_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void ep_mul_pre_wtnaf(ep_t *t, ep_t p);
-
-/**
- * Builds a precomputation table for multiplying a fixed prime elliptic point
- * using the GLV/Comb method.
- *
- * @param[out] t			- the precomputation table.
- * @param[in] p				- the point to multiply.
- */
-void ep_mul_pre_glv(ep_t * t, ep_t p);
+void ep_mul_pre_lwnaf(ep_t *t, ep_t p);
 
 /**
  * Multiplies a fixed prime elliptic point using a precomputation table and
@@ -843,17 +851,7 @@ void ep_mul_fix_combd(ep_t r, ep_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void ep_mul_fix_wtnaf(ep_t r, ep_t *t, bn_t k);
-
-/**
- * Multiplies a fixed prime elliptic point using a precomputation table and
- * the GLV/Comb method.
- *
- * @param[out] r			- the result.
- * @param[in] t				- the precomputation table.
- * @param[in] k				- the integer.
- */
-void ep_mul_fix_glv(ep_t r, ep_t * t, bn_t k);
+void ep_mul_fix_lwnaf(ep_t r, ep_t *t, bn_t k);
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously using
@@ -963,15 +961,5 @@ void ep_upk(ep_t r, ep_t p);
  * @param[in] p				- the point to map.
  */
 void ep_glv_end(ep_t q, ep_t p);
-
-/**
- * Recodes an integer in two parts such that k = k0 + phi(k1), where
- * phi is the efficient curve endomorphism.
- *
- * @param[out] k0			- the first part of the result.
- * @param[out] k1			- the second part of the result.
- * @param[in] k				- the number to recode.
- */
-void ep_glv_dec(bn_t k0, bn_t k1, bn_t k);
 
 #endif /* !RELIC_EP_H */

@@ -111,7 +111,7 @@ enum {
 /**
  * Size of a precomputation table using the w-(T)NAF method.
  */
-#define EB_TABLE_WTNAF		(1 << (EB_DEPTH - 2))
+#define EB_TABLE_LWNAF		(1 << (EB_DEPTH - 2))
 
 /**
  * Size of a precomputation table using the chosen algorithm.
@@ -126,8 +126,8 @@ enum {
 #define EB_TABLE			EB_TABLE_COMBS
 #elif EB_FIX == COMBD
 #define EB_TABLE			EB_TABLE_COMBD
-#elif EB_FIX == WTNAF
-#define EB_TABLE			EB_TABLE_WTNAF
+#elif EB_FIX == LWNAF
+#define EB_TABLE			EB_TABLE_LWNAF
 #endif
 
 /**
@@ -351,8 +351,8 @@ typedef eb_st *eb_t;
 #define eb_mul_pre(T, P)		eb_mul_pre_combs(T, P)
 #elif EB_FIX == COMBD
 #define eb_mul_pre(T, P)		eb_mul_pre_combd(T, P)
-#elif EB_FIX == WTNAF
-#define eb_mul_pre(T, P)		eb_mul_pre_wtnaf(T, P)
+#elif EB_FIX == LWNAF
+#define eb_mul_pre(T, P)		eb_mul_pre_lwnaf(T, P)
 #endif
 
 /**
@@ -373,8 +373,8 @@ typedef eb_st *eb_t;
 #define eb_mul_fix(R, T, K)		eb_mul_fix_combs(R, T, K)
 #elif EB_FIX == COMBD
 #define eb_mul_fix(R, T, K)		eb_mul_fix_combd(R, T, K)
-#elif EB_FIX == WTNAF
-#define eb_mul_fix(R, T, K)		eb_mul_fix_wtnaf(R, T, K)
+#elif EB_FIX == LWNAF
+#define eb_mul_fix(R, T, K)		eb_mul_fix_lwnaf(R, T, K)
 #endif
 
 /**
@@ -861,7 +861,7 @@ void eb_mul_pre_combd(eb_t *t, eb_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void eb_mul_pre_wtnaf(eb_t *t, eb_t p);
+void eb_mul_pre_lwnaf(eb_t *t, eb_t p);
 
 /**
  * Multiplies a fixed binary elliptic point using a precomputation table and
@@ -921,7 +921,7 @@ void eb_mul_fix_combd(eb_t r, eb_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void eb_mul_fix_wtnaf(eb_t r, eb_t *t, bn_t k);
+void eb_mul_fix_lwnaf(eb_t r, eb_t *t, bn_t k);
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously using

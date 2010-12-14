@@ -506,23 +506,23 @@ static void arith(void) {
 	}
 #endif
 
-#if EB_FIX == WTNAF || !defined(STRIP)
-	for (int i = 0; i < EB_TABLE_WTNAF; i++) {
+#if EB_FIX == LWNAF || !defined(STRIP)
+	for (int i = 0; i < EB_TABLE_LWNAF; i++) {
 		eb_new(tab[i]);
 	}
-	BENCH_BEGIN("eb_mul_pre_wtnaf") {
+	BENCH_BEGIN("eb_mul_pre_lwnaf") {
 		eb_rand(p);
-		BENCH_ADD(eb_mul_pre_wtnaf(tab, p));
+		BENCH_ADD(eb_mul_pre_lwnaf(tab, p));
 	} BENCH_END;
 
-	BENCH_BEGIN("eb_mul_fix_wtnaf") {
+	BENCH_BEGIN("eb_mul_fix_lwnaf") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		eb_rand(p);
-		eb_mul_pre_wtnaf(tab, p);
-		BENCH_ADD(eb_mul_fix_wtnaf(q, tab, k));
+		eb_mul_pre_lwnaf(tab, p);
+		BENCH_ADD(eb_mul_fix_lwnaf(q, tab, k));
 	} BENCH_END;
-	for (int i = 0; i < EB_TABLE_WTNAF; i++) {
+	for (int i = 0; i < EB_TABLE_LWNAF; i++) {
 		eb_free(tab[i]);
 	}
 #endif

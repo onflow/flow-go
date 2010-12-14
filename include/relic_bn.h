@@ -1289,4 +1289,14 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
  */
 void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l);
 
+/**
+ * Recodes an integer in two parts such that k = k0 + phi(k1), where
+ * phi is the efficient curve endomorphism.
+ *
+ * @param[out] k0			- the first part of the result.
+ * @param[out] k1			- the second part of the result.
+ * @param[in] k				- the integer to recode.
+ */
+void bn_rec_glv(bn_t k0, bn_t k1, bn_t k);
+
 #endif /* !RELIC_BN_H */

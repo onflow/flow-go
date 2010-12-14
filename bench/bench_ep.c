@@ -269,12 +269,12 @@ static void arith(void) {
 	} BENCH_END;
 #endif
 
-#if EP_MUL == WTNAF || !defined(STRIP)
-	BENCH_BEGIN("ep_mul_wtnaf") {
+#if EP_MUL == LWNAF || !defined(STRIP)
+	BENCH_BEGIN("ep_mul_lwnaf") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		ep_rand(p);
-		BENCH_ADD(ep_mul_wtnaf(q, p, k));
+		BENCH_ADD(ep_mul_lwnaf(q, p, k));
 	} BENCH_END;
 #endif
 
@@ -415,23 +415,23 @@ static void arith(void) {
 	}
 #endif
 
-#if EP_FIX == WTNAF || !defined(STRIP)
-	for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+#if EP_FIX == LWNAF || !defined(STRIP)
+	for (int i = 0; i < EP_TABLE_LWNAF; i++) {
 		ep_new(t[i]);
 	}
-	BENCH_BEGIN("ep_mul_pre_wtnaf") {
+	BENCH_BEGIN("ep_mul_pre_lwnaf") {
 		ep_rand(p);
-		BENCH_ADD(ep_mul_pre_wtnaf(t, p));
+		BENCH_ADD(ep_mul_pre_lwnaf(t, p));
 	} BENCH_END;
 
-	BENCH_BEGIN("ep_mul_fix_wtnaf") {
+	BENCH_BEGIN("ep_mul_fix_lwnaf") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		ep_rand(p);
-		ep_mul_pre_wtnaf(t, p);
-		BENCH_ADD(ep_mul_fix_wtnaf(q, t, k));
+		ep_mul_pre_lwnaf(t, p);
+		BENCH_ADD(ep_mul_fix_lwnaf(q, t, k));
 	} BENCH_END;
-	for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+	for (int i = 0; i < EP_TABLE_LWNAF; i++) {
 		ep_free(t[i]);
 	}
 #endif

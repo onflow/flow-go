@@ -1393,20 +1393,18 @@ static int inversion12(void) {
 static int exponentiation12(void) {
 	int code = STS_ERR;
 	fp12_t a, b, c;
-	bn_t d, e;
+	bn_t d;
 
 	fp12_null(a);
 	fp12_null(b);
 	fp12_null(c);
 	bn_null(d);
-	bn_null(e);
 
 	TRY {
 		fp12_new(a);
 		fp12_new(b);
 		fp12_new(c);
 		bn_new(d);
-		bn_new(e);
 
 		TEST_BEGIN("frobenius and exponentiation are consistent") {
 			fp12_rand(a);
@@ -1435,33 +1433,6 @@ static int exponentiation12(void) {
 	fp12_free(b);
 	fp12_free(c);
 	bn_free(d);
-	bn_free(e);
-	return code;
-}
-
-static int memory(void) {
-	err_t e;
-	int code = STS_ERR;
-	ep2_t a;
-
-	ep2_null(a);
-
-	TRY {
-		TEST_BEGIN("memory can be allocated") {
-			ep2_new(a);
-			ep2_free(a);
-		} TEST_END;
-	} CATCH(e) {
-		switch (e) {
-			case ERR_NO_MEMORY:
-				util_print("FATAL ERROR!\n");
-				ERROR(end);
-				break;
-		}
-	}
-	(void)a;
-	code = STS_OK;
-  end:
 	return code;
 }
 
@@ -2037,20 +2008,20 @@ static int fixed(void) {
 		}
 #endif
 
-#if EP_FIX == WTNAF || !defined(STRIP)
-		for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+#if EP_FIX == LWNAF || !defined(STRIP)
+		for (int i = 0; i < EP_TABLE_LWNAF; i++) {
 			ep2_new(t[i]);
 		}
-		TEST_BEGIN("w(t)naf fixed point multiplication is correct") {
+		TEST_BEGIN("left-to-right w-naf fixed point multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			ep2_mul(q, p, k);
-			ep2_mul_pre_wtnaf(t, p);
-			ep2_mul_fix_wtnaf(q, t, k);
+			ep2_mul_pre_lwnaf(t, p);
+			ep2_mul_fix_lwnaf(q, t, k);
 			ep2_mul(r, p, k);
 			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EP_TABLE_WTNAF; i++) {
+		for (int i = 0; i < EP_TABLE_LWNAF; i++) {
 			ep2_free(t[i]);
 		}
 #endif
