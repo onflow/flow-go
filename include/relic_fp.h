@@ -202,6 +202,18 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #endif
 
 /**
+ * Halves a prime field element. Computes c = a/2.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the first prime field element.
+ */
+#if FP_ADD == BASIC
+#define fp_hlv(C, A)		fp_hlv_basic(C, A)
+#elif FP_ADD == INTEG
+#define fp_hlv(C, A)		fp_hlv_integ(C, A)
+#endif
+
+/**
  * Multiples two prime field elements. Computes c = a * b.
  *
  * @param[out] C			- the result.
@@ -691,6 +703,23 @@ void fp_dbl_basic(fp_t c, fp_t a);
 void fp_dbl_integ(fp_t c, fp_t a);
 
 /**
+ * Halves a prime field element. Computes c = a/2.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the prime field element to halve.
+ */
+void fp_hlv_basic(fp_t c, fp_t a);
+
+/**
+ * Halves a prime field element with integrated modular reduction. Computes
+ * c = a/2.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the prime field element to halve.
+ */
+void fp_hlv_integ(fp_t c, fp_t a);
+
+/**
  * Multiples two prime field elements using Schoolbook multiplication.
  *
  * @param[out] c			- the result.
@@ -768,14 +797,6 @@ void fp_sqr_integ(fp_t c, fp_t a);
  * @param[in] a				- the prime field element to square.
  */
 void fp_sqr_karat(fp_t c, fp_t a);
-
-/**
- * Divides a prime field element by 2. Computes c = floor(a / 2).
- *
- * @param[out] c			- the result.
- * @param[in] a				- the prime field element to divide by 2.
- */
-void fp_hlv(fp_t c, fp_t a);
 
 /**
  * Shifts a prime field element number to the left. Computes

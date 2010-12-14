@@ -349,6 +349,22 @@ static void arith(void) {
 	}
 	BENCH_END;
 
+#if FP_ADD == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fp_hlv_basic") {
+		fp_rand(a);
+		BENCH_ADD(fp_hlv_basic(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if FP_ADD == INTEG || !defined(STRIP)
+	BENCH_BEGIN("fp_hlv_integ") {
+		fp_rand(a);
+		BENCH_ADD(fp_hlv_integ(c, a));
+	}
+	BENCH_END;
+#endif
+
 	BENCH_BEGIN("fp_lsh") {
 		fp_rand(a);
 		a[FP_DIGS - 1] = 0;

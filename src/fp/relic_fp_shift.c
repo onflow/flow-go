@@ -43,10 +43,6 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_hlv(fp_t c, fp_t a) {
-	fp_rsh1_low(c, a);
-}
-
 void fp_lsh(fp_t c, fp_t a, int bits) {
 	int digits;
 

@@ -568,14 +568,29 @@ static int doubling_halving(void) {
 
 		TEST_BEGIN("halving is consistent") {
 			fp_rand(a);
-			if (!fp_is_even(a)) {
-				a[0] &= MASK(FP_DIGIT - 1) << 1;
-			}
 			fp_hlv(b, a);
 			fp_dbl(c, b);
 			TEST_ASSERT(fp_cmp(c, a) == CMP_EQ, end);
 		}
 		TEST_END;
+
+#if FP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic halving is correct") {
+			fp_rand(a);
+			fp_hlv(b, a);
+			fp_hlv_basic(c, a);
+			TEST_ASSERT(fp_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FP_ADD == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated halving is correct") {
+			fp_rand(a);
+			fp_hlv(b, a);
+			fp_hlv_integ(c, a);
+			TEST_ASSERT(fp_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");

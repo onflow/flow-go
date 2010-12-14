@@ -132,15 +132,6 @@ void fp_subc_low(dig_t *c, dig_t *a, dig_t *b);
 void fp_subd_low(dig_t *c, dig_t *a, dig_t *b);
 
 /**
- * Doubles a digit vector. Computes c = a + a.
- *
- * @param[out] c			- the result.
- * @param[in] a				- the first digit vector to add.
- * @return the carry of the last digit addition.
- */
-dig_t fp_dbln_low(dig_t *c, dig_t *a);
-
-/**
  * Doubles a digit vector with integrated modular reduction.
  * Computes c = a + a.
  *
@@ -148,6 +139,15 @@ dig_t fp_dbln_low(dig_t *c, dig_t *a);
  * @param[in] a				- the first digit vector to add.
  */
 void fp_dblm_low(dig_t *c, dig_t *a);
+
+/**
+ * Halves a digit vector with integrated modular reduction.
+ * Computes c = a/2.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first digit vector to add.
+ */
+void fp_hlvm_low(dig_t *c, dig_t *a);
 
 /**
  * Compares two digits.

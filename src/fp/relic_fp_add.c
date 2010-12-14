@@ -141,7 +141,7 @@ void fp_sub_dig(fp_t c, fp_t a, dig_t b) {
 void fp_dbl_basic(fp_t c, fp_t a) {
 	dig_t carry;
 
-	carry = fp_dbln_low(c, a);
+	carry = fp_lsh1_low(c, a);
 	if (carry || (fp_cmp(c, fp_prime_get()) != CMP_LT)) {
 		carry = fp_subn_low(c, c, fp_prime_get());
 	}
@@ -156,3 +156,31 @@ void fp_dbl_integ(fp_t c, fp_t a) {
 }
 
 #endif
+
+#if FP_ADD == BASIC || !defined(STRIP)
+
+void fp_hlv_basic(fp_t c, fp_t a) {
+	dig_t carry = 0;
+
+	if (a[0] & 1) {
+		carry = fp_addn_low(c, a, fp_prime_get());
+	} else {
+		fp_copy(c, a);
+	}
+	fp_rsh1_low(c, c);
+	if (carry) {
+		c[FP_DIGS - 1] ^= ((dig_t)1 << 63);
+	}
+}
+
+#endif
+
+#if FP_ADD == INTEG || !defined(STRIP)
+
+void fp_hlv_integ(fp_t c, fp_t a) {
+	fp_hlvm_low(c, a);
+}
+
+#endif
+
+
