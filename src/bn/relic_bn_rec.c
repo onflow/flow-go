@@ -103,7 +103,7 @@ static char get_bits(bn_t a, int from, int to) {
  * @param[in] u			- the u curve parameter.
  * @param[in] m			- the extension degree of the binary field.
  */
-static void wtnaf_mod(bn_t r0, bn_t r1, bn_t k, bn_t vm, bn_t s0, bn_t s1,
+static void tnaf_mod(bn_t r0, bn_t r1, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 		int u, int m) {
 	bn_t t0, t1, t2, t3;
 	int a, n, n0, n1, h0, h1;
@@ -407,7 +407,7 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 		bn_new(r1);
 		bn_new(tmp);
 
-		wtnaf_mod(r0, r1, k, vm, s0, s1, u, m);
+		tnaf_mod(r0, r1, k, vm, s0, s1, u, m);
 
 		if (u == -1) {
 			switch (w) {
@@ -648,4 +648,64 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 		bn_free(n1);
 	}
 
+}
+
+void bn_rec_glv(bn_t k0, bn_t k1, bn_t k) {
+	bn_t b1, b2, t1, t2;
+	int r1, r2, bits;
+
+	bn_null(b1);
+	bn_null(b2);
+	bn_null(t1);
+	bn_null(t2);
+
+	TRY {
+		bn_new(b1);
+		bn_new(b2);
+
+		ep_curve_get_ord(t1);
+		bits = bn_bits(t1);
+
+		ep_curve_get_v1(t1);
+		ep_curve_get_v2(t2);
+		bn_neg(t2, t2);
+
+		bn_mul(b1, k, t1);
+		r1 = bn_get_bit(b1, bits);
+		bn_rsh(b1, b1, bits + 1);
+		if (r1) {
+			bn_add_dig(b1, b1, 1);
+		}
+
+		bn_mul(b2, k, t2);
+		r2 = bn_get_bit(b2, bits);
+		bn_rsh(b2, b2, bits + 1);
+		if (r2) {
+			bn_add_dig(b2, b2, 1);
+		}
+
+		ep_curve_get_v10(t1);
+		bn_mul(k0, b1, t1);
+		ep_curve_get_v20(t1);
+		bn_mul(t1, b2, t1);
+		bn_add(k0, k0, t1);
+
+		ep_curve_get_v11(t1);
+		bn_mul(k1, b1, t1);
+		ep_curve_get_v21(t1);
+		bn_mul(t1, b2, t1);
+		bn_add(k1, k1, t1);
+
+		bn_sub(k0, k, k0);
+		bn_neg(k1, k1);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(b1);
+		bn_free(b2);
+		bn_free(t1);
+		bn_free(t2);
+	}
 }
