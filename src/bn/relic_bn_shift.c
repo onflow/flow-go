@@ -121,7 +121,7 @@ void bn_rsh(bn_t c, bn_t a, int bits) {
 	c->used = a->used - digits;
 	c->sign = a->sign;
 
-	if (a->used - digits > 0 && bits > 0) {
+	if (c->used > 0 && bits > 0) {
 		if (digits == 0 && c != a) {
 			bn_rshb_low(c->dp, a->dp + digits, a->used - digits, bits);
 		} else {
