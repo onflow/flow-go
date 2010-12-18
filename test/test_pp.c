@@ -436,7 +436,8 @@ static int multiplication2(void) {
 					break;
 			}
 			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
-		} TEST_END;
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -565,7 +566,8 @@ static int square_root2(void) {
 			r = fp2_srt(b, c);
 			fp2_neg(c, b);
 			TEST_ASSERT(r, end);
-			TEST_ASSERT(fp2_cmp(b, a) == CMP_EQ || fp2_cmp(c, a) == CMP_EQ, end);
+			TEST_ASSERT(fp2_cmp(b, a) == CMP_EQ ||
+					fp2_cmp(c, a) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
@@ -1436,6 +1438,32 @@ static int exponentiation12(void) {
 	return code;
 }
 
+static int memory(void) {
+	err_t e;
+	int code = STS_ERR;
+	ep2_t a;
+
+	ep2_null(a);
+
+	TRY {
+		TEST_BEGIN("memory can be allocated") {
+			ep2_new(a);
+			ep2_free(a);
+		} TEST_END;
+	} CATCH(e) {
+		switch (e) {
+			case ERR_NO_MEMORY:
+				util_print("FATAL ERROR!\n");
+				ERROR(end);
+				break;
+		}
+	}
+	(void)a;
+	code = STS_OK;
+  end:
+	return code;
+}
+
 int util(void) {
 	int code = STS_ERR;
 	ep2_t a, b, c;
@@ -1578,22 +1606,22 @@ int addition(void) {
 
 #if EP_ADD == PROJC || !defined(STRIP)
 		/* TODO: only mixed addition supported for now */
-//		TEST_BEGIN("point addition in projective coordinates is correct") {
-//			ep2_rand(a);
-//			ep2_rand(b);
-//			ep2_add_projc(a, a, b);
-//			ep2_rand(b);
-//			ep2_rand(c);
-//			ep2_add_projc(b, b, c);
-//			/* a and b in projective coordinates. */
-//			ep2_add_projc(d, a, b);
-//			ep2_norm(d, d);
-//			ep2_norm(a, a);
-//			ep2_norm(b, b);
-//			ep2_add(e, a, b);
-//			ep2_norm(e, e);
-//			TEST_ASSERT(ep2_cmp(e, d) == CMP_EQ, end);
-//		} TEST_END;
+		//      TEST_BEGIN("point addition in projective coordinates is correct") {
+		//          ep2_rand(a);
+		//          ep2_rand(b);
+		//          ep2_add_projc(a, a, b);
+		//          ep2_rand(b);
+		//          ep2_rand(c);
+		//          ep2_add_projc(b, b, c);
+		//          /* a and b in projective coordinates. */
+		//          ep2_add_projc(d, a, b);
+		//          ep2_norm(d, d);
+		//          ep2_norm(a, a);
+		//          ep2_norm(b, b);
+		//          ep2_add(e, a, b);
+		//          ep2_norm(e, e);
+		//          TEST_ASSERT(ep2_cmp(e, d) == CMP_EQ, end);
+		//      } TEST_END;
 
 		TEST_BEGIN("point addition in mixed coordinates (z2 = 1) is correct") {
 			ep2_rand(a);
@@ -1695,22 +1723,22 @@ int subtraction(void) {
 
 #if EP_ADD == PROJC || !defined(STRIP)
 		/* TODO: only mixed subtraction supported for now */
-//		TEST_BEGIN("point subtraction in projective coordinates is correct") {
-//			ep2_rand(a);
-//			ep2_rand(b);
-//			ep2_add_projc(a, a, b);
-//			ep2_rand(b);
-//			ep2_rand(c);
-//			ep2_add_projc(b, b, c);
-//			/* a and b in projective coordinates. */
-//			ep2_sub_projc(c, a, b);
-//			ep2_norm(c, c);
-//			ep2_norm(a, a);
-//			ep2_norm(b, b);
-//			ep2_sub(d, a, b);
-//			ep2_norm(d, d);
-//			TEST_ASSERT(ep2_cmp(c, d) == CMP_EQ, end);
-//		} TEST_END;
+		//      TEST_BEGIN("point subtraction in projective coordinates is correct") {
+		//          ep2_rand(a);
+		//          ep2_rand(b);
+		//          ep2_add_projc(a, a, b);
+		//          ep2_rand(b);
+		//          ep2_rand(c);
+		//          ep2_add_projc(b, b, c);
+		//          /* a and b in projective coordinates. */
+		//          ep2_sub_projc(c, a, b);
+		//          ep2_norm(c, c);
+		//          ep2_norm(a, a);
+		//          ep2_norm(b, b);
+		//          ep2_sub(d, a, b);
+		//          ep2_norm(d, d);
+		//          TEST_ASSERT(ep2_cmp(c, d) == CMP_EQ, end);
+		//      } TEST_END;
 
 		TEST_BEGIN("point subtraction in mixed coordinates (z2 = 1) is correct") {
 			ep2_rand(a);
@@ -1727,7 +1755,9 @@ int subtraction(void) {
 			TEST_ASSERT(ep2_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 
-		TEST_BEGIN("point subtraction in mixed coordinates (z1,z2 = 1) is correct") {
+		TEST_BEGIN
+				("point subtraction in mixed coordinates (z1,z2 = 1) is correct")
+		{
 			ep2_rand(a);
 			ep2_rand(b);
 			ep2_norm(a, a);
@@ -1767,14 +1797,14 @@ int doubling(void) {
 		ep2_new(c);
 
 		/* TODO: this test does not work */
-//		TEST_BEGIN("point doubling is correct") {
-//			ep2_rand(a);
-//			ep2_add(b, a, a);
-//			ep2_norm(b, b);
-//			ep2_dbl(c, a);
-//			ep2_norm(c, c);
-//			TEST_ASSERT(ep2_cmp(b, c) == CMP_EQ, end);
-//		} TEST_END;
+		//      TEST_BEGIN("point doubling is correct") {
+		//          ep2_rand(a);
+		//          ep2_add(b, a, a);
+		//          ep2_norm(b, b);
+		//          ep2_dbl(c, a);
+		//          ep2_norm(c, c);
+		//          TEST_ASSERT(ep2_cmp(b, c) == CMP_EQ, end);
+		//      } TEST_END;
 
 #if EP_ADD == BASIC || !defined(STRIP)
 		TEST_BEGIN("point doubling in affine coordinates is correct") {
@@ -2163,16 +2193,17 @@ static int hashing(void) {
 		bn_new(n);
 		bn_new(k);
 
-        ep2_curve_get_ord(n);
+		ep2_curve_get_ord(n);
 
-        TEST_BEGIN("point hashing is correct") {
-                rand_bytes(msg, sizeof(msg));
-                ep2_map(p, msg, sizeof(msg));
-                ep2_mul(p, p, n);
-                TEST_ASSERT(ep2_is_infty(p) == 1, end);
-        }
-        TEST_END;
-	} CATCH_ANY {
+		TEST_BEGIN("point hashing is correct") {
+			rand_bytes(msg, sizeof(msg));
+			ep2_map(p, msg, sizeof(msg));
+			ep2_mul(p, p, n);
+			TEST_ASSERT(ep2_is_infty(p) == 1, end);
+		}
+		TEST_END;
+	}
+	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
 		ERROR(end);
 	}
@@ -2461,52 +2492,52 @@ int main(void) {
 	util_print_banner("Sextic twist:", 0);
 	util_print_banner("Utilities:", 1);
 
- 	if (memory() != STS_OK) {
- 		core_clean();
- 		return 1;
- 	}
+	if (memory() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
- 	if (util() != STS_OK) {
- 		core_clean();
- 		return 1;
- 	}
+	if (util() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	util_print_banner("Arithmetic:", 1);
 
- 	if (addition() != STS_OK) {
- 		core_clean();
- 		return 1;
- 	}
+	if (addition() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
- 	if (subtraction() != STS_OK) {
- 		core_clean();
- 		return 1;
- 	}
+	if (subtraction() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
- 	if (doubling() != STS_OK) {
- 		core_clean();
- 		return 1;
- 	}
+	if (doubling() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
- 	if (multiplication() != STS_OK) {
- 		core_clean();
- 		return 1;
- 	}
+	if (multiplication() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
- 	if (fixed() != STS_OK) {
- 		core_clean();
- 		return 1;
- 	}
+	if (fixed() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
- 	if (simultaneous() != STS_OK) {
- 		core_clean();
- 		return 1;
- 	}
+	if (simultaneous() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
- 	if (hashing() != STS_OK) {
- 		core_clean();
- 		return 1;
- 	}
+	if (hashing() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	util_print_banner("Bilinear pairing:\n", 0);
 
