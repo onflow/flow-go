@@ -335,21 +335,9 @@ static void copy_from_rom(char *dest, const char *src) {
  * @param[in] FIELD		- the finite field identifier.
  */
 #define ASSIGNS(CURVE, FIELD)												\
-	fb_param_set(FIELD);													\
-	PREPARE(str, CURVE##_A);												\
-	fb_read(a, str, strlen(str), 16);										\
-	PREPARE(str, CURVE##_B);												\
-	fb_read(b, str, strlen(str), 16);										\
+	ASSIGN(CURVE, FIELD);													\
 	PREPARE(str, CURVE##_C);												\
 	fb_read(c, str, strlen(str), 16);										\
-	PREPARE(str, CURVE##_X);												\
-	fb_read(g->x, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_Y);												\
-	fb_read(g->y, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_R);												\
-	bn_read_str(r, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_H);												\
-	bn_read_str(h, str, strlen(str), 16);									\
 
 /**
  * Current configured elliptic curve parameters.
