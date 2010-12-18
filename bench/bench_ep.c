@@ -535,11 +535,13 @@ static void bench(void) {
 }
 
 int main(void) {
-	int r0;
+	int r0, r1;
 
 	core_init();
 	conf_print();
 	util_print_banner("Benchmarks for the EP module:", 0);
+
+	r0 = r1 = STS_ERR;
 
 #if defined(EP_ORDIN)
 	r0 = ep_param_set_any_ordin();
@@ -548,13 +550,23 @@ int main(void) {
 	}
 #endif
 
-	if (r0 == STS_ERR) {
+#if defined(EP_KBLTZ)
+	r1 = ep_param_set_any_kbltz();
+	if (r1 == STS_OK) {
+		bench();
+	}
+#endif
+
+	if (r0 == STS_ERR && r1 == STS_ERR) {
 		if (ep_param_set_any() == STS_ERR) {
 			THROW(ERR_NO_CURVE);
 			core_clean();
 			return 1;
+		} else {
+			bench();
 		}
 	}
+
 	core_clean();
 	return 0;
 }
