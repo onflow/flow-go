@@ -356,7 +356,7 @@ void ep_mul_sim_gen(ep_t r, bn_t k, ep_t q, bn_t l) {
 		ep_new(gen);
 
 		ep_curve_get_gen(gen);
-#if EP_FIX == LWNAF && defined(EP_PRECO)
+#if EP_SIM == INTER && EP_FIX == LWNAF && defined(EP_PRECO)
 		ep_mul_sim_ordin(r, gen, k, q, l, 1);
 #else
 		ep_mul_sim(r, gen, k, q, l);

@@ -104,6 +104,8 @@ static void ep_mul_fix_ordin(ep_t r, ep_t * table, bn_t k) {
 
 #if EP_FIX == COMBS || !defined(STRIP)
 
+#if defined(EP_KBLTZ)
+
 /**
  * Multiplies a prime elliptic curve point by an integer using the COMBS
  * method.
@@ -190,6 +192,9 @@ void ep_mul_combs_kbltz(ep_t r, ep_t * t, bn_t k) {
 	}
 }
 
+#endif /* EP_KBLTZ */
+
+#if defined(EP_ORDIN) || defined(EP_SUPER)
 /**
  * Multiplies a prime elliptic curve point by an integer using the COMBS
  * method.
@@ -250,7 +255,9 @@ void ep_mul_combs_ordin(ep_t r, ep_t * t, bn_t k) {
 	}
 }
 
-#endif
+#endif /* EP_ORDIN || EP_SUPER */
+
+#endif /* EP_FIX == LWNAF */
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -470,11 +477,13 @@ void ep_mul_pre_combs(ep_t * t, ep_t p) {
 
 		ep_curve_get_ord(n);
 		l = bn_bits(n);
+		l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
+#if defined(EP_KBLTZ)
 		if (ep_curve_is_kbltz()) {
+			l = bn_bits(n);
 			l = ((l % (2 * EP_DEPTH)) == 0 ? (l / (2 * EP_DEPTH)) : (l / (2 * EP_DEPTH)) + 1);
-		} else {
-			l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
 		}
+#endif
 
 		ep_set_infty(t[0]);
 
@@ -508,7 +517,7 @@ void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
 #endif
 
 #if defined(EP_ORDIN) || defined(EB_SUPER)
-	ep_mul_fix_ordin(r, t, k);
+	ep_mul_combs_ordin(r, t, k);
 #endif
 }
 #endif

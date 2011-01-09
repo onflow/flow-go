@@ -274,7 +274,7 @@ void ep_mul_lwnaf(ep_t r, ep_t p, bn_t k) {
 	}
 #endif
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
+#if defined(EP_ORDIN) || defined(EP_SUPER)
 	ep_mul_naf_impl(r, p, k);
 #endif
 }
