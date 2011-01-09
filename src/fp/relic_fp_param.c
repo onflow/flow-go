@@ -249,9 +249,7 @@ int fp_param_set_any(void) {
 #if FP_PRIME == 158
 	fp_param_set(BN_158);
 #elif FP_PRIME == 160
-#ifdef FP_PMERS
 	fp_param_set(SECG_160);
-#endif
 #elif FP_PRIME == 192
 	fp_param_set(NIST_192);
 #elif FP_PRIME == 224

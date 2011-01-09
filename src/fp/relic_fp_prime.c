@@ -343,7 +343,6 @@ void fp_prime_conv_dig(fp_t c, dig_t a) {
 #else
 		fp_zero(c);
 		c[0] = a;
-		bn_set_dig(t, a);
 #endif
 	}
 	CATCH_ANY {
