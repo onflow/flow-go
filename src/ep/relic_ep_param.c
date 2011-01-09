@@ -43,7 +43,7 @@
 
 #if defined(EP_ORDIN) && FP_PRIME == 160
 /**
- * Parameters for the NIST P-192 binary elliptic curve.
+ * Parameters for the SECG P-160 binary elliptic curve.
  */
 /** @{ */
 #define SECG_P160_A		"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7FFFFFFC"
@@ -273,21 +273,29 @@ static void ep_param_set_galav(int param) {
 		bn_new(v21);
 
 		switch (param) {
-#if defined(EP_ORDIN) && FP_PRIME == 158
+#if defined(EP_KBLTZ) && FP_PRIME == 158
 			case BN_P158:
 				ASSIGN_GLV(BN_P158, BN_158);
 				break;
 #endif
-#if defined(EP_ORDIN) && FP_PRIME == 254
+#if defined(EP_KBLTZ) && FP_PRIME == 254
+			case BN_P254:
+				ASSIGN_GLV(BN_P254, BN_254);
+				break;
+#endif
+#if defined(EP_KBLTZ) && FP_PRIME == 254
 			case BN_P254:
 				ASSIGN_GLV(BN_P254, BN_254);
 				break;
 #endif
 			default:
+				(void)str;
 				THROW(ERR_INVALID);
 				break;
 		}
+#if defined(EP_KBLTZ)
 		ep_curve_set_kbltz(beta, v1, v2, v10, v11, v20, v21);
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -469,8 +477,6 @@ int ep_param_set_any_kbltz() {
 	ep_param_set(BN_P158);
 #elif FP_PRIME == 254
 	ep_param_set(BN_P254);
-#elif FP_PRIME == 256
-	ep_param_set(BN_P256);
 #else
 	r = STS_ERR;
 #endif
