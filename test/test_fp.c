@@ -568,8 +568,8 @@ static int doubling_halving(void) {
 
 		TEST_BEGIN("halving is consistent") {
 			fp_rand(a);
-			fp_hlv(b, a);
-			fp_dbl(c, b);
+			fp_dbl(b, a);
+			fp_hlv(c, b);
 			TEST_ASSERT(fp_cmp(c, a) == CMP_EQ, end);
 		}
 		TEST_END;
@@ -819,7 +819,8 @@ static int inversion(void) {
 			fp_inv(a, a);
 			fp_inv(b, b);
 			fp_inv_sim(d, d, 2);
-			TEST_ASSERT(fp_cmp(d[0], a) == CMP_EQ && fp_cmp(d[1], b) == CMP_EQ, end);
+			TEST_ASSERT(fp_cmp(d[0], a) == CMP_EQ &&
+					fp_cmp(d[1], b) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
@@ -919,14 +920,17 @@ static int square_root(void) {
 		fp_new(b);
 		fp_new(c);
 
-		TEST_BEGIN("square root extraction is correct") {
-			fp_rand(a);
-			fp_sqr(c, a);
-			r = fp_srt(b, c);
-			fp_neg(c, b);
-			TEST_ASSERT(r, end);
-			TEST_ASSERT(fp_cmp(b, a) == CMP_EQ || fp_cmp(c, a) == CMP_EQ, end);
-		} TEST_END;
+		if (fp_prime_get_mod8() == 3 && fp_prime_get_mod8() == 7) {
+			TEST_BEGIN("square root extraction is correct") {
+				fp_rand(a);
+				fp_sqr(c, a);
+				r = fp_srt(b, c);
+				fp_neg(c, b);
+				TEST_ASSERT(r, end);
+				TEST_ASSERT(fp_cmp(b, a) == CMP_EQ || fp_cmp(c, a) == CMP_EQ, end);
+			}
+			TEST_END;
+		}
 	}
 	CATCH_ANY {
 		ERROR(end);
