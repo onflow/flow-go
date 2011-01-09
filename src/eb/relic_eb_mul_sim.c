@@ -609,7 +609,7 @@ void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l) {
 
 		eb_curve_get_gen(gen);
 #if defined(EB_KBLTZ)
-#if EB_FIX == LWNAF && defined(EB_PRECO)
+#if EB_SIM == INTER && EB_FIX == LWNAF && defined(EB_PRECO)
 	if (eb_curve_is_kbltz()) {
 		eb_mul_sim_kbltz(r, gen, k, q, l, 1);
 		return;
@@ -623,7 +623,7 @@ void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l) {
 #endif
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
-#if EB_FIX == LWNAF && defined(EB_PRECO)
+#if EB_SIM == INTER && EB_FIX == LWNAF && defined(EB_PRECO)
 	eb_mul_sim_ordin(r, gen, k, q, l, 1);
 #else
 	eb_mul_sim(r, gen, k, q, l);
