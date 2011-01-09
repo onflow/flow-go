@@ -169,7 +169,7 @@ void fp_hlv_basic(fp_t c, fp_t a) {
 	}
 	fp_rsh1_low(c, c);
 	if (carry) {
-		c[FP_DIGS - 1] ^= ((dig_t)1 << 63);
+		c[FP_DIGS - 1] ^= ((dig_t)1 << (FP_DIGIT - 1));
 	}
 }
 
