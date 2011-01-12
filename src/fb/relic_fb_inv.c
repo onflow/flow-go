@@ -457,8 +457,8 @@ void fb_inv_itoht(fb_t c, fb_t a) {
 			fb_mul(table[i], table[i], table[y]);
 		}
 		fb_sqr(c, table[len]);
-	}
 #endif
+	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
