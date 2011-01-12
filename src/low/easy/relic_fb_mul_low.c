@@ -138,6 +138,7 @@ void fb_muln_low(dig_t *c, dig_t *a, dig_t *b) {
 		fb_lshb_low(c + FB_DIGS, c + FB_DIGS, 4);
 		c[FB_DIGS] ^= carry;
 	}
+
 	for (j = 0; j < FB_DIGS; j++, a++, c++) {
 		u = *a & 0x0F;
 		fb_addn_low(c, c, table[u]);

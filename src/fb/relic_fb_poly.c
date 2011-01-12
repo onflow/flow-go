@@ -372,7 +372,9 @@ void fb_poly_add(fb_t c, fb_t a) {
 
 	if (poly_a != 0) {
 		c[FB_DIGS - 1] ^= poly[FB_DIGS - 1];
-		c[pos_a] ^= poly[pos_a];
+		if (pos_a != FB_DIGS - 1) {
+			c[pos_a] ^= poly[pos_a];
+		}
 		if (poly_b != 0 && poly_c != 0) {
 			if (pos_b != pos_a) {
 				c[pos_b] ^= poly[pos_b];

@@ -58,6 +58,9 @@ int fb_param_get(void) {
 
 void fb_param_set(int param) {
 	switch (param) {
+		case PENTA_64:
+			fb_poly_set_penta(4, 3, 1);
+			break;
 		case TRINO_113:
 			fb_poly_set_trino(9);
 			break;
@@ -135,7 +138,10 @@ void fb_param_set(int param) {
 }
 
 void fb_param_set_any(void) {
-#if FB_POLYN == 113
+#if FB_POLYN == 64
+	fb_param_set(PENTA_64);
+
+#elif FB_POLYN == 113
 	fb_param_set(TRINO_113);
 
 #elif FB_POLYN == 127

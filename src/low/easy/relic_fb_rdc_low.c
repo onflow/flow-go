@@ -67,9 +67,26 @@ static void fb_rdct_low(dig_t *c, dig_t *a, int fa) {
 		}
 	}
 
-	d = a[sh - 1] >> rh;
+	if (FB_BITS % FB_DIGIT == 0) {
+		while (a[FB_DIGS] != 0) {
 
-	if (d != 0) {
+			d = a[sh - 1] >> rh;
+
+			a[0] ^= d;
+			d <<= rh;
+
+			if (ra == 0) {
+				a[sh - sa] ^= d;
+			} else {
+				a[sh - sa] ^= (d >> ra);
+				if (sh > sa) {
+					a[sh - sa - 1] ^= (d << la);
+				}
+			}
+			a[sh - 1] ^= d;
+		}
+	} else {
+		d = a[sh - 1] >> rh;
 		a[0] ^= d;
 		d <<= rh;
 
@@ -136,9 +153,42 @@ static void fb_rdcp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 		}
 	}
 
-	d = a[sh - 1] >> rh;
+	if (FB_BITS % FB_DIGIT == 0) {
+		while (a[FB_DIGS] != 0) {
+			d = a[sh - 1] >> rh;
 
-	if (d != 0) {
+			a[0] ^= d;
+			d <<= rh;
+
+			if (ra == 0) {
+				a[sh - sa] ^= d;
+			} else {
+				a[sh - sa] ^= (d >> ra);
+				if (sh > sa) {
+					a[sh - sa - 1] ^= (d << la);
+				}
+			}
+			if (rb == 0) {
+				a[sh - sb] ^= d;
+			} else {
+				a[sh - sb] ^= (d >> rb);
+				if (sh > sb) {
+					a[sh - sb - 1] ^= (d << lb);
+				}
+			}
+			if (rc == 0) {
+				a[sh - sc] ^= d;
+			} else {
+				a[sh - sc] ^= (d >> rc);
+				if (sh > sc) {
+					a[sh - sc - 1] ^= (d << lc);
+				}
+			}
+			a[sh - 1] ^= d;
+		}
+	} else {
+		d = a[sh - 1] >> rh;
+
 		a[0] ^= d;
 		d <<= rh;
 
@@ -168,6 +218,7 @@ static void fb_rdcp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 		}
 		a[sh - 1] ^= d;
 	}
+
 	fb_copy(c, a);
 }
 

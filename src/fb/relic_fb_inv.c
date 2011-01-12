@@ -56,6 +56,17 @@ void fb_inv_basic(fb_t c, fb_t a) {
 		fb_new(u);
 		fb_new(v);
 
+#if (FB_POLYN % 2) == 0
+		fb_sqr(v, a);
+		for (i = 2; i < FB_BITS; i++) {
+			fb_sqr(u, a);
+			for (int j = 1; j < i; j++) {
+				fb_sqr(u, u);
+			}
+			fb_mul(v, v, u);
+		}
+		fb_copy(c, v);
+#else
 		/* u = a^2, v = 1, x = (m - 1)/2. */
 		fb_sqr(u, a);
 		fb_set_dig(v, 1);
@@ -77,6 +88,7 @@ void fb_inv_basic(fb_t c, fb_t a) {
 				x = (x - 1) >> 1;
 			}
 		}
+#endif
 		fb_copy(c, v);
 	}
 	CATCH_ANY {
@@ -95,27 +107,31 @@ void fb_inv_basic(fb_t c, fb_t a) {
 
 void fb_inv_binar(fb_t c, fb_t a) {
 	int lu, lv;
-	fb_t u, v, g1, g2;
+	dv_t u, v, g1, g2;
 
-	fb_null(u);
-	fb_null(v);
-	fb_null(g1);
-	fb_null(g2);
+	dv_null(u);
+	dv_null(v);
+	dv_null(g1);
+	dv_null(g2);
 
 	TRY {
-		fb_new(u);
-		fb_new(v);
-		fb_new(g1);
-		fb_new(g2);
+		dv_new(u);
+		dv_new(v);
+		dv_new(g1);
+		dv_new(g2);
 
 		/* u = a, v = f, g1 = 1, g2 = 0. */
 		fb_copy(u, a);
 		fb_copy(v, fb_poly_get());
-		fb_set_dig(g1, 1);
-		fb_zero(g2);
+		if (FB_BITS % FB_DIGIT == 0) {
+			v[FB_DIGS] = 1;
+		}
+		dv_zero(g1, 2 * FB_DIGS);
+		g1[0] = 1;
+		dv_zero(g2, 2 * FB_DIGS);
 
 		lu = FB_DIGS;
-		lv = FB_DIGS;
+		lv = FB_DIGS + (FB_BITS % FB_DIGIT == 0);
 
 		/* While (u != 1 && v != 1. */
 		while (1) {
@@ -126,8 +142,11 @@ void fb_inv_binar(fb_t c, fb_t a) {
 				/* If z divides g1 then g1 = g1/z; else g1 = (g1 + f)/z. */
 				if ((g1[0] & 0x01) == 1) {
 					fb_poly_add(g1, g1);
+					if (FB_BITS % FB_DIGIT == 0) {
+						g1[FB_DIGS] ^= 1;
+					}
 				}
-				fb_rsh1_low(g1, g1);
+				bn_rsh1_low(g1, g1, FB_DIGS + 1);
 			}
 
 			while (u[lu - 1] == 0)
@@ -142,8 +161,11 @@ void fb_inv_binar(fb_t c, fb_t a) {
 				/* If z divides g2 then g2 = g2/z; else (g2 = g2 + f)/z. */
 				if ((g2[0] & 0x01) == 1) {
 					fb_poly_add(g2, g2);
+					if (FB_BITS % FB_DIGIT == 0) {
+						g2[FB_DIGS] ^= 1;
+					}
 				}
-				fb_rsh1_low(g2, g2);
+				bn_rsh1_low(g2, g2, FB_DIGS + 1);
 			}
 
 			while (v[lv - 1] == 0)
@@ -173,10 +195,10 @@ void fb_inv_binar(fb_t c, fb_t a) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fb_free(u);
-		fb_free(v);
-		fb_free(g1);
-		fb_free(g2);
+		dv_free(u);
+		dv_free(v);
+		dv_free(g1);
+		dv_free(g2);
 	}
 }
 
@@ -298,19 +320,19 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 
 void fb_inv_almos(fb_t c, fb_t a) {
 	int lu, lv, lt;
-	fb_t _b, _d, _u, _v;
+	dv_t _b, _d, _u, _v;
 	dig_t *t = NULL, *u = NULL, *v = NULL, *b = NULL, *d = NULL;
 
-	fb_null(_b);
-	fb_null(_d);
-	fb_null(_u);
-	fb_null(_v);
+	dv_null(_b);
+	dv_null(_d);
+	dv_null(_u);
+	dv_null(_v);
 
 	TRY {
-		fb_new(_b);
-		fb_new(_d);
-		fb_new(_u);
-		fb_new(_v);
+		dv_new(_b);
+		dv_new(_d);
+		dv_new(_u);
+		dv_new(_v);
 
 		b = _b;
 		d = _d;
@@ -318,13 +340,18 @@ void fb_inv_almos(fb_t c, fb_t a) {
 		v = _v;
 
 		/* b = 1, d = 0, u = a, v = f. */
+		dv_zero(b, 2 * FB_DIGS);
 		fb_set_dig(b, 1);
-		fb_zero(d);
+		dv_zero(d, 2 * FB_DIGS);
 		fb_copy(u, a);
 		fb_copy(v, fb_poly_get());
+		if (FB_BITS % FB_DIGIT == 0) {
+			v[FB_DIGS] = 1;
+		}
 
 		lu = FB_DIGS;
-		lv = FB_DIGS;
+		lv = FB_DIGS + (FB_BITS % FB_DIGIT == 0);
+
 		while (1) {
 			/* While z divides u do. */
 			while ((u[0] & 0x01) == 0) {
@@ -333,9 +360,12 @@ void fb_inv_almos(fb_t c, fb_t a) {
 				/* If z divide v then b = b/z; else b = (b + f)/z. */
 				if ((b[0] & 0x01) == 1) {
 					fb_poly_add(b, b);
+					if (FB_BITS % FB_DIGIT == 0) {
+						b[FB_DIGS] ^= 1;
+					}
 				}
 				/* b often has FB_DIGS digits. */
-				fb_rsh1_low(b, b);
+				bn_rsh1_low(b, b, FB_DIGS + 1);
 			}
 			/* If u = 1, return b. */
 			while (u[lu - 1] == 0)
@@ -359,7 +389,7 @@ void fb_inv_almos(fb_t c, fb_t a) {
 				d = t;
 			}
 			/* u = u + v, b = b + d. */
-			fb_addd_low(u, u, v, lu);
+			fb_addd_low(u, u, v, lv);
 			fb_addn_low(b, b, d);
 		}
 	}
@@ -368,10 +398,10 @@ void fb_inv_almos(fb_t c, fb_t a) {
 	}
 	FINALLY {
 		fb_copy(c, b);
-		fb_free(_b);
-		fb_free(_d);
-		fb_free(_u);
-		fb_free(_v);
+		dv_free(_b);
+		dv_free(_d);
+		dv_free(_u);
+		dv_free(_v);
 	}
 }
 
@@ -396,6 +426,17 @@ void fb_inv_itoht(fb_t c, fb_t a) {
 			fb_new(table[i]);
 		}
 
+#if (FB_POLYN % 2) == 0
+		fb_sqr(table[0], a);
+		for (i = 2; i < FB_BITS; i++) {
+			fb_sqr(table[1], a);
+			for (int j = 1; j < i; j++) {
+				fb_sqr(table[1], table[1]);
+			}
+			fb_mul(table[0], table[0], table[1]);
+		}
+		fb_copy(c, table[0]);
+#else
 		u[0] = 1;
 		u[1] = 2;
 		fb_copy(table[0], a);
@@ -417,6 +458,7 @@ void fb_inv_itoht(fb_t c, fb_t a) {
 		}
 		fb_sqr(c, table[len]);
 	}
+#endif
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}

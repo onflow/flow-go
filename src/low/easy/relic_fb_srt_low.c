@@ -204,7 +204,7 @@ static void fb_sqrt_low(dig_t *c, dig_t *a) {
 		}
 
 		i++;
-		if (i < sh) {
+		if (i < sh && i < FB_DIGS) {
 			d = a[i];
 
 			for (j = 0; j < FB_DIGIT / 8; j++) {

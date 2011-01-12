@@ -160,5 +160,5 @@ void fb_sqrm_low(dig_t *c, dig_t *a) {
 	dig_t align t[2 * FB_DIGS];
 
 	fb_sqrl_low(t, a);
-	fb_rdcn_low(c, t);
+	fb_rdc(c, t);
 }

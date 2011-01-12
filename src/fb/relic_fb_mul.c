@@ -1,4 +1,4 @@
-/*
+/*f
  * RELIC is an Efficient LIbrary for Cryptography
  * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
@@ -283,7 +283,7 @@ void fb_mul_basic(fb_t c, fb_t a, fb_t b) {
 		for (i = 1; i < FB_BITS; i++) {
 			/* We are already shifting a temporary value, so this is more efficient
 			 * than calling fb_lsh(). */
-			fb_lsh1_low(s, s);
+			s[FB_DIGS] = fb_lsh1_low(s, s);
 			fb_rdc(s, s);
 			if (fb_test_bit(a, i)) {
 				fb_add(t, t, s);
