@@ -47,7 +47,6 @@ option(BIGED "Build with big-endian support" off)
 option(SHLIB "Build shared library" on)
 option(STLIB "Build static library" on)
 option(STBIN "Build static binaries" off)
-option(TOOLS "Build utilitary tools" on)
 
 message(STATUS "Number of times each test or benchmark is ran (default = 50, 1000):")
 message("   TESTS=n        If n > 0, build automated tests and run them n times.")
@@ -355,10 +354,6 @@ if(DOCUM)
 	include(cmake/doxygen.cmake)
 endif(DOCUM)
 
-if(TOOLS)
-    add_subdirectory(tool)
-endif(TOOLS)
-    
 if(TESTS GREATER 0)
 	enable_testing()
 	add_subdirectory(test)
