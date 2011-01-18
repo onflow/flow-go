@@ -73,52 +73,54 @@
  * Finite field identifiers.
  */
 enum {
+	/** Toy pentanomial. */
+	PENTA_64 = 1,
 	/** Hankerson's trinomial for GLS curves. */
-	TRINO_113 = 1,
+	TRINO_113 = 2,
 	/** Hankerson's trinomial for GLS curves. */
-	TRINO_127 = 2,
+	TRINO_127 = 3,
 	/** NIST 163-bit fast reduction polynomial. */
-	NIST_163 = 3,
+	NIST_163 = 4,
 	/** Square-root friendly 163-bit polynomial. */
-	SQRT_163 = 4,
+	SQRT_163 = 5,
 	/** Example with 193 bits for Itoh-Tsuji. */
-	TRINO_193 = 5,
+	TRINO_193 = 6,
 	/** NIST 233-bit fast reduction polynomial. */
-	NIST_233 = 6,
+	NIST_233 = 7,
 	/** Square-root friendly 163-bit polynomial. */
-	SQRT_233 = 7,
+	SQRT_233 = 8,
 	/** SECG 239-bit fast reduction polynomial. */
-	SECG_239 = 8,
+	SECG_239 = 9,
 	/** Square-root friendly 239-bit polynomial. */
-	SQRT_239 = 9,
+	SQRT_239 = 10,
 	/** Square-root friendly 251-bit polynomial. */
-	SQRT_251 = 10,
+	SQRT_251 = 11,
 	/** eBATS curve_2_251 pentanomial. */
-	PENTA_251 = 11,
+	PENTA_251 = 12,
 	/** Hankerson's trinomial for GLS curves. */
-	TRINO_257 = 12,
+	TRINO_257 = 13,
 	/** Scott's 271-bit pairing-friendly trinomial. */
-	TRINO_271 = 13,
+	TRINO_271 = 14,
 	/** Scott's 271-bit pairing-friendly pentanomial. */
-	PENTA_271 = 14,
+	PENTA_271 = 15,
 	/** NIST 283-bit fast reduction polynomial. */
-	NIST_283 = 15,
+	NIST_283 = 16,
 	/** Square-root friendly 283-bit polynomial. */
-	SQRT_283 = 16,
+	SQRT_283 = 17,
 	/** Scott's 271-bit pairing-friendly trinomial. */
-	TRINO_353 = 17,
+	TRINO_353 = 18,
 	/** Detrey's trinomial for genus 2 curves. */
-	TRINO_367 = 18,
+	TRINO_367 = 19,
 	/** NIST 409-bit fast reduction polynomial. */
-	NIST_409 = 19,
+	NIST_409 = 20,
 	/** Hankerson's trinomial for genus 2 curves. */
-	TRINO_439 = 20,
+	TRINO_439 = 21,
 	/** NIST 571-bit fast reduction polynomial. */
-	NIST_571 = 21,
+	NIST_571 = 22,
 	/** Square-root friendly 571-bit polynomial. */
-	SQRT_571 = 22,
+	SQRT_571 = 23,
 	/** Scott's 1223-bit pairing-friendly trinomial. */
-	TRINO_1223 = 23
+	TRINO_1223 = 24
 };
 
 /*============================================================================*/
