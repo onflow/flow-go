@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup pp Pairings over elliptic curves.
+ * @defgroup pp Pairings over prime elliptic curves.
  */
 
 /**
