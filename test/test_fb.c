@@ -688,15 +688,21 @@ static int reduction(void) {
 		fb_new(c);
 		dv_new(t0);
 		dv_new(t1);
-		dv_zero(t0, 2 * FB_DIGS);
-		dv_zero(t1, 2 * FB_DIGS);
 
 		TEST_BEGIN("modular reduction is correct") {
 			fb_rand(a);
 			/* Test if a * f(z) mod f(z) == 0. */
 			fb_mul(b, a, fb_poly_get());
+			if (FB_POLYN % FB_DIGIT == 0) {
+				fb_copy(t0, b);
+				fb_copy(t0 + FB_DIGS, a);
+				fb_rdc(b, t0);
+			}
 			TEST_ASSERT(fb_is_zero(b) == 1, end);
 		} TEST_END;
+
+		dv_zero(t0, 2 * FB_DIGS);
+		dv_zero(t1, 2 * FB_DIGS);
 
 #if FB_RDC == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic modular reduction is correct") {
@@ -1074,9 +1080,11 @@ int main(void) {
 		return 1;
 	}
 
-	if (solve() != STS_OK) {
-		core_clean();
-		return 1;
+	if (FB_BITS % 2 != 0) {
+		if (solve() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 	}
 
 	if (inversion() != STS_OK) {
