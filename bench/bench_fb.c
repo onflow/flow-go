@@ -408,27 +408,29 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
-	BENCH_BEGIN("fb_slv") {
-		fb_rand(a);
-		BENCH_ADD(fb_slv(c, a));
-	}
-	BENCH_END;
+	if (FB_BITS % 2 != 0) {
+		BENCH_BEGIN("fb_slv") {
+			fb_rand(a);
+			BENCH_ADD(fb_slv(c, a));
+		}
+		BENCH_END;
 
 #if FB_SLV == BASIC || !defined(STRIP)
-	BENCH_BEGIN("fb_slv_basic") {
-		fb_rand(a);
-		BENCH_ADD(fb_slv_basic(c, a));
-	}
-	BENCH_END;
+		BENCH_BEGIN("fb_slv_basic") {
+			fb_rand(a);
+			BENCH_ADD(fb_slv_basic(c, a));
+		}
+		BENCH_END;
 #endif
 
 #if FB_SLV == QUICK || !defined(STRIP)
-	BENCH_BEGIN("fb_slv_quick") {
-		fb_rand(a);
-		BENCH_ADD(fb_slv_quick(c, a));
-	}
-	BENCH_END;
+		BENCH_BEGIN("fb_slv_quick") {
+			fb_rand(a);
+			BENCH_ADD(fb_slv_quick(c, a));
+		}
+		BENCH_END;
 #endif
+	}
 
 	BENCH_BEGIN("fb_inv") {
 		fb_rand(a);
