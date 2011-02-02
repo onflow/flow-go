@@ -644,7 +644,7 @@ static int fixed(void) {
 		for (int i = 0; i < EP_TABLE_LWNAF; i++) {
 			ep_new(t[i]);
 		}
-		TEST_BEGIN("left-to-right w-naf point multiplication is correct") {
+		TEST_BEGIN("left-to-right w-naf fixed point multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			ep_mul(q, p, k);
