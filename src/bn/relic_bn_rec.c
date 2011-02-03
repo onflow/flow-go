@@ -35,6 +35,10 @@
 #include "relic_error.h"
 #include "relic_util.h"
 
+#ifdef WITH_EP
+#include "relic_ep.h"
+#endif
+
 /*============================================================================*/
 /* Private definitions                                                        */
 /*============================================================================*/
@@ -650,6 +654,8 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 
 }
 
+#ifdef WITH_EP
+
 void bn_rec_glv(bn_t k0, bn_t k1, bn_t k) {
 	bn_t b1, b2, t1, t2;
 	int r1, r2, bits;
@@ -709,3 +715,5 @@ void bn_rec_glv(bn_t k0, bn_t k1, bn_t k) {
 		bn_free(t2);
 	}
 }
+
+#endif
