@@ -392,7 +392,7 @@ void fb_poly_add(fb_t c, fb_t a) {
 }
 
 void fb_poly_sub(fb_t c, fb_t a) {
-	return fb_poly_add(c, a);
+	fb_poly_add(c, a);
 }
 
 void fb_poly_set_dense(fb_t f) {

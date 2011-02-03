@@ -40,5 +40,5 @@
 /*============================================================================*/
 
 void fp_invn_low(dig_t *c, dig_t *a) {
-	return fp_inv_basic(c, a);
+	fp_inv_basic(c, a);
 }
