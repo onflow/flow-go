@@ -198,7 +198,7 @@ static int sha384(void) {
 	unsigned char message[MSG_SIZE], digest[48];
 
 	TEST_ONCE("sha384 hash function is correct") {
-		for (i = 0; i < 3; i++) {
+		for (i = 0; i < TEST_MAX; i++) {
 			message[0] = '\0';
 			for (j = 0; j < count2[i]; j++) {
 				strcat((char *)message, tests2[i]);
@@ -245,7 +245,7 @@ static int sha512(void) {
 	unsigned char message[MSG_SIZE], digest[64];
 
 	TEST_ONCE("sha512 hash function is correct") {
-		for (i = 0; i < 3; i++) {
+		for (i = 0; i < TEST_MAX; i++) {
 			message[0] = '\0';
 			for (j = 0; j < count2[i]; j++) {
 				strcat((char *)message, tests2[i]);
