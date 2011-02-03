@@ -194,16 +194,17 @@ void eb_norm_sim(eb_t *r, eb_t *t, int n) {
 	}
 
 #if defined(EB_SUPER)
-	for (i = 0; i < n; i++) {
-		if (eb_curve_is_super()) {
+	if (eb_curve_is_super()) {
+		for (i = 0; i < n; i++) {
 			eb_norm_super(r[i], t[i], 1);
 		}
 	}
-	return;
 #endif
 #if defined(EB_ORDIN) || defined(EB_KBLTZ)
-	for (i = 0; i < n; i++) {
-		eb_norm_ordin(r[i], t[i], 1);
+	if (!eb_curve_is_super()) {
+		for (i = 0; i < n; i++) {
+			eb_norm_ordin(r[i], t[i], 1);
+		}
 	}
 #endif
 }

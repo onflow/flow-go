@@ -195,7 +195,7 @@
 /** @} */
 #endif
 
-#if defined(EB_ORDIN) && FB_POLYN == 571
+#if defined(EB_KBLTZ) && FB_POLYN == 571
 /**
  * Parameters for the NIST K-571 binary elliptic curve.
  */

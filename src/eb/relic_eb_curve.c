@@ -137,7 +137,7 @@ static bn_st curve_s1;
  * Precomputes additional parameters for Koblitz curves used by the w-TNAF
  * multiplication algorithm.
  */
-static void compute_koblitz(void) {
+static void compute_kbltz(void) {
 	int u, i;
 	bn_t a, b, c;
 
@@ -392,7 +392,7 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r, bn_t h) {
 	}
 #if defined(EB_KBLTZ) && (EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP))
 	if (curve_is_kbltz) {
-		compute_koblitz();
+		compute_kbltz();
 	}
 #endif
 
@@ -421,7 +421,7 @@ void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r, bn_t h) {
 	detect_opt(&curve_opt_b, curve_b);
 
 #if EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP)
-	compute_koblitz();
+	compute_kbltz();
 #endif
 	eb_norm(g, g);
 	eb_copy(&curve_g, g);
