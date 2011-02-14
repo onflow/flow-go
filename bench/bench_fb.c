@@ -388,14 +388,14 @@ static void arith(void) {
 
 	BENCH_BEGIN("fb_trc") {
 		fb_rand(a);
-		BENCH_ADD(fb_trc(c, a));
+		BENCH_ADD(fb_trc(a));
 	}
 	BENCH_END;
 
 #if FB_TRC == BASIC || !defined(STRIP)
 	BENCH_BEGIN("fb_trc_basic") {
 		fb_rand(a);
-		BENCH_ADD(fb_trc_basic(c, a));
+		BENCH_ADD(fb_trc_basic(a));
 	}
 	BENCH_END;
 #endif
@@ -403,7 +403,7 @@ static void arith(void) {
 #if FB_TRC == QUICK || !defined(STRIP)
 	BENCH_BEGIN("fb_trc_quick") {
 		fb_rand(a);
-		BENCH_ADD(fb_trc_quick(c, a));
+		BENCH_ADD(fb_trc_quick(a));
 	}
 	BENCH_END;
 #endif

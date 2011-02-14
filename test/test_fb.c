@@ -756,29 +756,20 @@ static int trace(void) {
 			fb_rand(a);
 			fb_rand(b);
 			fb_add(c, a, b);
-			/* Test if Tr(c) = Tr(a) + Tr(b). */
-			fb_trc(c, c);
-			fb_trc(a, a);
-			fb_trc(b, b);
-			fb_add(a, a, b);
-			TEST_ASSERT(fb_cmp(c, a) == CMP_EQ, end);
+			TEST_ASSERT(fb_trc(c) == (fb_trc(a) ^ fb_trc(b)), end);
 		} TEST_END;
 
 #if FB_TRC == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic trace is correct") {
 			fb_rand(a);
-			fb_trc(c, a);
-			fb_trc_basic(b, a);
-			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+			TEST_ASSERT(fb_trc(a) == fb_trc_basic(a), end);
 		} TEST_END;
 #endif
 
 #if FB_TRC == QUICK || !defined(STRIP)
 		TEST_BEGIN("fast trace is correct") {
 			fb_rand(a);
-			fb_trc(c, a);
-			fb_trc_quick(b, a);
-			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+			TEST_ASSERT(fb_trc(a) == fb_trc_quick(a), end);
 		} TEST_END;
 #endif
 	}
@@ -810,10 +801,7 @@ static int solve(void) {
 			fb_rand(a);
 			fb_rand(b);
 			/* Make Tr(a) = 0. */
-			fb_trc(c, a);
-			if (!fb_is_zero(c)) {
-				fb_add_dig(a, a, 1);
-			}
+			fb_add_dig(a, a, fb_trc(a));
 			fb_slv(b, a);
 			/* Verify the solution. */
 			fb_sqr(c, b);
@@ -824,10 +812,8 @@ static int solve(void) {
 #if FB_SLV == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic solve is correct") {
 			fb_rand(a);
-			fb_trc(c, a);
-			if (!fb_is_zero(c)) {
-				fb_add_dig(a, a, 1);
-			}
+			/* Make Tr(a) = 0. */
+			fb_add_dig(a, a, fb_trc(a));
 			fb_slv(c, a);
 			fb_slv_basic(b, a);
 			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
@@ -837,10 +823,8 @@ static int solve(void) {
 #if FB_SLV == QUICK || !defined(STRIP)
 		TEST_BEGIN("fast solve is correct") {
 			fb_rand(a);
-			fb_trc(c, a);
-			if (!fb_is_zero(c)) {
-				fb_add_dig(a, a, 1);
-			}
+			/* Make Tr(a) = 0. */
+			fb_add_dig(a, a, fb_trc(a));
 			fb_slv(b, a);
 			fb_slv_quick(c, a);
 			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
