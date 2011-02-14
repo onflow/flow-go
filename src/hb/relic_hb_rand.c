@@ -76,8 +76,7 @@ void hb_rand_deg(hb_t p) {
 			fb_mul(y, y, x);
 			/* t = x^5 + x^3. */
 			fb_add(t, t, y);
-			fb_trc(y, t);
-			if (y[0] != 0) {
+			if (fb_trc(t) != 0) {
 				continue;
 			} else {
 				/* Solve y^2 + y = x^5 + x^3. */
@@ -104,22 +103,20 @@ void hb_rand_deg(hb_t p) {
 
 void hb_rand_non(hb_t p, int type) {
 	bn_t n, k;
-	fb_t t0, t1;
+	fb_t t;
 	hb_t g;
 
 	bn_null(n);
 	bn_null(k);
 	hb_null(g);
-	fb_null(t0);
-	fb_null(t1);
+	fb_null(t);
 
 	TRY {
 		while (1) {
 			bn_new(k);
 			bn_new(n);
 			hb_new(g);
-			fb_new(t0);
-			fb_new(t1);
+			fb_new(t);
 
 			hb_curve_get_ord(n);
 			hb_curve_get_gen(g);
@@ -130,11 +127,10 @@ void hb_rand_non(hb_t p, int type) {
 			hb_mul(p, g, k);
 
 			/* Check if x^2 + u1 * x + u0 has roots in the base field. */
-			fb_sqr(t0, p->u1);
-			fb_inv(t0, t0);
-			fb_mul(t0, t0, p->u0);
-			fb_trc(t1, t0);
-			if (t1[0] == type && p->deg == 0) {
+			fb_sqr(t, p->u1);
+			fb_inv(t, t);
+			fb_mul(t, t, p->u0);
+			if (fb_trc(t) == type && p->deg == 0) {
 				break;
 			}
 		}
@@ -146,7 +142,6 @@ void hb_rand_non(hb_t p, int type) {
 		bn_free(k);
 		bn_free(n);
 		hb_free(g);
-		fb_free(t0);
-		fb_free(t1);
+		fb_free(t);
 	}
 }
