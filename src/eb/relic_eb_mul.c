@@ -1031,10 +1031,11 @@ void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k) {
 #if EB_MUL == HALVE || !defined(STRIP)
 
 void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
-	int len, i, j;
+	int len, i, j, l, cof;
 	signed char naf[FB_BITS + 1] = { 0 }, *tmp;
-	eb_t q, table[1 << (EB_WIDTH - 2)];
+	eb_t t, q, table[1 << (EB_WIDTH - 2)];
 	bn_t n, _k;
+	fb_t u, v, w, z;
 
 	bn_null(_k);
 	bn_null(n);
@@ -1042,15 +1043,20 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
 		eb_null(table[i]);
 	}
-
-	if (fb_is_zero(eb_curve_get_a())) {
-		THROW(ERR_INVALID);
-	}
+	fb_null(u);
+	fb_null(v);
+	fb_null(w);
+	fb_null(z);
 
 	TRY {
 		bn_new(n);
 		bn_new(_k);
 		eb_new(q);
+		eb_new(t);
+		fb_new(u);
+		fb_new(v);
+		fb_new(w);
+		fb_new(z);
 
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
@@ -1076,17 +1082,73 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		tmp = naf + len - 1;
 
 		eb_copy(q, p);
-		for (i = len - 1; i >= 0; i--, tmp--) {
-			j = *tmp;
-			if (j > 0) {
-				eb_norm(q, q);
-				eb_add(table[j / 2], table[j / 2], q);
+		eb_curve_get_cof(n);
+
+		/* Test if curve has a cofactor bigger than 2. */
+		if (bn_cmp_dig(n, 2) == CMP_GT) {
+			cof = 1;
+		} else {
+			cof = 0;
+		}
+
+		if (cof) {
+			/* Curves with cofactor > 2, u = sqrt(a), v = Solve(u). */
+			fb_srt(u, eb_curve_get_a());
+			fb_slv(v, u);
+			l = fb_trc(eb_curve_get_a());
+
+			bn_rand(n, BN_POS, len);
+
+			for (i = len - 1; i >= 0; i--, tmp--) {
+				j = *tmp;
+				if (j > 0) {
+					eb_norm(t, q);
+					eb_add(table[j / 2], table[j / 2], t);
+				}
+				if (j < 0) {
+					eb_norm(t, q);
+					eb_sub(table[-j / 2], table[-j / 2], t);
+				}
+
+				/* T = 1/2(Q). */
+				eb_hlv(t, q);
+
+				/* If Tr(x_T) != Tr(a). */
+				if (fb_trc(t->x) != 0) {
+					/* z = l_t, w = sqrt(l_Q), l_T = l_T + sqrt(l_Q) + v. */
+					fb_copy(z, t->y);
+					fb_srt(w, q->y);
+					fb_add(t->y, t->y, w);
+					fb_add(t->y, t->y, v);
+					/* z = (z + x_Q + v + sqrt(a)). */
+					fb_add(z, z, q->x);
+					fb_add(z, z, v);
+					fb_add(z, z, u);
+					/* w = sqrt(w + x_Q + l_Q + sqrt(a)). */
+					fb_add(w, w, q->x);
+					fb_add(w, w, q->y);
+					fb_add(w, w, u);
+					/* x_T = sqrt(w * z), . */
+					fb_mul(w, w, z);
+					fb_srt(t->x, w);
+					fb_set_dig(t->z, 1);
+					t->norm = 2;
+				}
+				eb_copy(q, t);
 			}
-			if (j < 0) {
-				eb_norm(q, q);
-				eb_sub(table[-j / 2], table[-j / 2], q);
+		} else {
+			for (i = len - 1; i >= 0; i--, tmp--) {
+				j = *tmp;
+				if (j > 0) {
+					eb_norm(q, q);
+					eb_add(table[j / 2], table[j / 2], q);
+				}
+				if (j < 0) {
+					eb_norm(q, q);
+					eb_sub(table[-j / 2], table[-j / 2], q);
+				}
+				eb_hlv(q, q);
 			}
-			eb_hlv(q, q);
 		}
 
 #if EB_WIDTH == 2
@@ -1105,6 +1167,19 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		eb_add(r, r, table[0]);
 		eb_norm(r, r);
 #endif
+
+		/* We may need to fix an error of a 2-torsion point if the curve has a
+		 * 4-cofactor. */
+		if (cof) {
+			eb_hlv(t, r);
+			if (fb_trc(t->x) != l) {
+				fb_zero(t->x);
+				fb_srt(t->y, eb_curve_get_b());
+				fb_set_dig(t->z, 1);
+				eb_add(r, r, t);
+				eb_norm(r, r);
+			}
+		}
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -1116,6 +1191,12 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		}
 		bn_free(n);
 		bn_free(_k);
+		eb_free(t);
+		eb_free(q);
+		fb_free(u);
+		fb_free(v);
+		fb_free(w);
+		fb_free(z);
 	}
 }
 

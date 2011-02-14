@@ -236,14 +236,11 @@ static void arith(void) {
 	} BENCH_END;
 #endif
 
-	fb_trc(t, eb_curve_get_a());
-	if (t[0] == 1 && !eb_curve_is_kbltz() && !eb_curve_is_super()) {
-		BENCH_BEGIN("eb_hlv") {
-			eb_rand(p);
-			BENCH_ADD(eb_hlv(r, p));
-		}
-		BENCH_END;
+	BENCH_BEGIN("eb_hlv") {
+		eb_rand(p);
+		BENCH_ADD(eb_hlv(r, p));
 	}
+	BENCH_END;
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
 		BENCH_BEGIN("eb_frb") {

@@ -434,31 +434,25 @@ static int doubling(void) {
 static int halving(void) {
 	int code = STS_ERR;
 	eb_t a, b, c;
-	fb_t t;
 
 	eb_null(a);
 	eb_null(b);
 	eb_null(c);
-	fb_null(t);
 
 	TRY {
 		eb_new(a);
 		eb_new(b);
 		eb_new(c);
-		fb_new(t);
 
-		fb_trc(t, eb_curve_get_a());
-		if (t[0] == 1 && !eb_curve_is_kbltz() && !eb_curve_is_super()) {
-			TEST_BEGIN("point halving is correct") {
-				eb_rand(a);
-				eb_hlv(b, a);
-				eb_norm(b, b);
-				eb_dbl(c, b);
-				eb_norm(c, c);
-				TEST_ASSERT(eb_cmp(a, c) == CMP_EQ, end);
-			}
-			TEST_END;
+		TEST_BEGIN("point halving is correct") {
+			eb_rand(a);
+			eb_hlv(b, a);
+			eb_norm(b, b);
+			eb_dbl(c, b);
+			eb_norm(c, c);
+			TEST_ASSERT(eb_cmp(a, c) == CMP_EQ, end);
 		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -544,11 +538,9 @@ static int frobenius(void) {
 
 static int multiplication(void) {
 	int code = STS_ERR;
-	fb_t t;
 	eb_t p, q, r;
 	bn_t n, k;
 
-	fb_null(t);
 	bn_null(n);
 	bn_null(k);
 	eb_null(p);
@@ -556,7 +548,6 @@ static int multiplication(void) {
 	eb_null(r);
 
 	TRY {
-		fb_new(t);
 		eb_new(p);
 		eb_new(q);
 		eb_new(r);
@@ -591,7 +582,7 @@ static int multiplication(void) {
 
 #if defined(EB_ORDIN) && (EB_MUL == LODAH || !defined(STRIP))
 		if (!eb_curve_is_super()) {
-			TEST_BEGIN("lópez-dahab point multiplication is correct") {
+			TEST_BEGIN("lopez-dahab point multiplication is correct") {
 				bn_rand(k, BN_POS, bn_bits(n));
 				bn_mod(k, k, n);
 				eb_mul(q, p, k);
@@ -624,19 +615,16 @@ static int multiplication(void) {
 		TEST_END;
 #endif
 
-		fb_trc(t, eb_curve_get_a());
-		if (fb_get_bit(t, 0) == 1 && !eb_curve_is_kbltz() && !eb_curve_is_super()) {
 #if EB_MUL == HALVE || !defined(STRIP)
-			TEST_BEGIN("point multiplication by halving is correct") {
-				bn_rand(k, BN_POS, bn_bits(n));
-				bn_mod(k, k, n);
-				eb_mul(q, p, k);
-				eb_mul_halve(r, p, k);
-				TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
-			}
-			TEST_END;
-#endif
+		TEST_BEGIN("point multiplication by halving is correct") {
+			bn_rand(k, BN_POS, FB_BITS);
+			bn_mod(k, k, n);
+			eb_mul(q, p, k);
+			eb_mul_halve(r, p, k);
+			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		}
+		TEST_END;
+#endif
 
 		TEST_BEGIN("multiplication by digit is correct") {
 			bn_rand(k, BN_POS, BN_DIGIT);
@@ -653,7 +641,6 @@ static int multiplication(void) {
 	}
 	code = STS_OK;
   end:
-	fb_free(t);
 	eb_free(p);
 	eb_free(q);
 	eb_free(r);
