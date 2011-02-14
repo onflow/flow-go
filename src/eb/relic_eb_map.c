@@ -131,8 +131,7 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 					fb_mul(t1, t0, t1);
 				}
 				/* Solve t1^2 + t1 = t0. */
-				fb_trc(t2, t1);
-				if (t2[0] != 0) {
+				if (fb_trc(t1) != 0) {
 					i++;
 				} else {
 					fb_slv(t1, t1);
@@ -149,8 +148,7 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 				/* t0 = t1/x1^2. */
 				fb_mul(t0, t0, t1);
 				/* Solve t1^2 + t1 = t0. */
-				fb_trc(t2, t0);
-				if (t2[0] != 0) {
+				if (fb_trc(t0) != 0) {
 					i++;
 				} else {
 					fb_slv(t1, t0);
