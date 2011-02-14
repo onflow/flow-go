@@ -96,7 +96,6 @@ static void util(void) {
 static void arith(void) {
 	hb_t p, q, r, tab[HB_TABLE_MAX];
 	bn_t k, l, n;
-	fb_t t;
 
 	hb_null(p);
 	hb_null(q);
@@ -107,7 +106,6 @@ static void arith(void) {
 	bn_null(k);
 	bn_null(l);
 	bn_null(n);
-	fb_null(t);
 
 	hb_new(p);
 	hb_new(q);
@@ -115,7 +113,6 @@ static void arith(void) {
 	bn_new(k);
 	bn_new(n);
 	bn_new(l);
-	fb_new(t);
 
 	hb_curve_get_ord(n);
 
@@ -974,7 +971,6 @@ static void arith(void) {
 	bn_free(k);
 	bn_free(l);
 	bn_free(n);
-	fb_free(t);
 }
 
 static void bench(void) {

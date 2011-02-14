@@ -91,7 +91,6 @@ static void util(void) {
 static void arith(void) {
 	eb_t p, q, r, tab[EB_TABLE_MAX];
 	bn_t k, l, n;
-	fb_t t;
 
 	eb_null(p);
 	eb_null(q);
@@ -101,7 +100,6 @@ static void arith(void) {
 	} bn_null(k);
 	bn_null(l);
 	bn_null(n);
-	fb_null(t);
 
 	eb_new(p);
 	eb_new(q);
@@ -352,15 +350,13 @@ static void arith(void) {
 #endif
 
 #if EB_MUL == HALVE || !defined(STRIP)
-	if (fb_get_bit(t, 0) == 1 && !eb_curve_is_kbltz() && !eb_curve_is_super()) {
-		BENCH_BEGIN("eb_mul_halve") {
-			bn_rand(k, BN_POS, bn_bits(n));
-			bn_mod(k, k, n);
-			eb_rand(p);
-			BENCH_ADD(eb_mul_halve(q, p, k));
-		}
-		BENCH_END;
+	BENCH_BEGIN("eb_mul_halve") {
+		bn_rand(k, BN_POS, bn_bits(n));
+		bn_mod(k, k, n);
+		eb_rand(p);
+		BENCH_ADD(eb_mul_halve(q, p, k));
 	}
+	BENCH_END;
 #endif
 
 	BENCH_BEGIN("eb_mul_gen") {
@@ -612,7 +608,6 @@ static void arith(void) {
 	bn_free(k);
 	bn_free(l);
 	bn_free(n);
-	fb_free(t);
 }
 
 static void bench(void) {
