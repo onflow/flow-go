@@ -61,11 +61,7 @@ void fb_slv_basic(fb_t c, fb_t a) {
 			fb_add(c, c, t0);
 		}
 
-		fb_trc(t0, c);
-
-		if (t0[0] == 1) {
-			fb_add_dig(c, c, 1);
-		}
+		fb_add_dig(c, c, fb_trc(c));
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -80,23 +76,8 @@ void fb_slv_basic(fb_t c, fb_t a) {
 #if FB_SLV == QUICK || !defined(STRIP)
 
 void fb_slv_quick(fb_t c, fb_t a) {
-	fb_t t;
-
-	fb_null(t);
-
-	TRY {
-		fb_new(t);
-		fb_slvn_low(c, a);
-		fb_trc(t, c);
-
-		if (t[0] == 1) {
-			fb_add_dig(c, c, 1);
-		}
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fb_free(t);
-	}
+	fb_slvn_low(c, a);
+	fb_add_dig(c, c, fb_trc(c));
 }
 
 #endif

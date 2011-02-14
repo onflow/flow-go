@@ -158,7 +158,7 @@ static void find_solve() {
 			fb_copy(half[i/2], t0);
 			for (j = 0; j < (FB_BITS - 1) / 2; j++) {
 				fb_sqr(half[i/2], half[i/2]);
-				fb_sqr(half[i/2], half[i/2]);;
+				fb_sqr(half[i/2], half[i/2]);
 				fb_add(half[i/2], half[i/2], t0);
 			}
 		}
@@ -193,7 +193,7 @@ static fb_st fb_tab_srz[256];
  */
 static void find_srz() {
 
-	fb_set_bit(fb_srz, 1, 1);
+	fb_set_dig(fb_srz, 2);
 
 	for (int i = 1; i < FB_BITS; i++) {
 		fb_sqr(fb_srz, fb_srz);
@@ -472,7 +472,7 @@ dig_t *fb_poly_tab_sqr(int i) {
 #if FB_INV == ITOHT || !defined(STRIP)
 
 #ifdef FB_PRECO
-	return &(fb_tab_sqr[i]);
+	return (dig_t *)&(fb_tab_sqr[i]);
 #else
 	return NULL;
 #endif

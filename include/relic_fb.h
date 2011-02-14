@@ -253,13 +253,13 @@ typedef align dig_t fb_st[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
 /**
  * Compute the trace of a binary field element. Computes c = Tr(a).
  *
- * @param[out] C			- the result.
  * @param[in] A				- the binary field element.
+ * @return the trace of the binary field element.
  */
 #if FB_TRC == BASIC
-#define fb_trc(C, A)	fb_trc_basic(C, A)
+#define fb_trc(A)		fb_trc_basic(A)
 #elif FB_TRC == QUICK
-#define fb_trc(C, A)	fb_trc_quick(C, A)
+#define fb_trc(A)		fb_trc_quick(A)
 #endif
 
 /**
@@ -807,21 +807,21 @@ void fb_srt_quick(fb_t c, fb_t a);
 
 /**
  * Computes the trace of a binary field element using repeated squaring.
- * Computes c = Tr(a).
+ * Returns Tr(a).
  *
- * @param[out] c			- the result.
  * @param[in] a				- the binary field element.
+ * @return the trace of the binary field element.
  */
-void fb_trc_basic(fb_t c, fb_t a);
+dig_t fb_trc_basic(fb_t a);
 
 /**
  * Computes the trace of a binary field element using a fast trace computation
- * algorithm.
+ * algorithm. Returns Tr(a).
  *
- * @param[out] c			- the result.
  * @param[in] a				- the binary field element.
+ * @return the trace of the binary field element.
  */
-void fb_trc_quick(fb_t c, fb_t a);
+dig_t fb_trc_quick(fb_t a);
 
 /**
  * Inverts a binary field element using Fermat's Little Theorem.

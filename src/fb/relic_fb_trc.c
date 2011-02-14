@@ -38,30 +38,38 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_trc_basic(fb_t c, fb_t a) {
-	fb_t t0;
+dig_t fb_trc_basic(fb_t a) {
+	dig_t r;
+	fb_t t, u;
 
-	fb_null(t0);
+	fb_null(t);
+	fb_null(u);
 
 	TRY {
-		fb_new(t0);
+		fb_new(t);
+		fb_new(u);
 
-		fb_copy(t0, a);
-		fb_copy(c, a);
+		fb_copy(t, a);
+		fb_copy(u, a);
 		for (int i = 1; i < FB_BITS; i++) {
-			fb_sqr(t0, t0);
-			fb_add(c, c, t0);
+			fb_sqr(t, t);
+			fb_add(u, u, t);
 		}
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fb_free(t0);
+		fb_free(t);
+		fb_free(u);
 	}
+
+	r = u[0];
+
+	return r;
 }
 
-void fb_trc_quick(fb_t c, fb_t a) {
+dig_t fb_trc_quick(fb_t a) {
 	int ta, tb, tc;
 	dig_t r;
 
@@ -74,8 +82,6 @@ void fb_trc_quick(fb_t c, fb_t a) {
 	if (tc != -1) {
 		r ^= fb_get_bit(a, tc);
 	}
-	c[0] = r;
-	for (int i = 1; i < FB_DIGS; i++) {
-		c[i] = 0;
-	}
+
+	return r;
 }
