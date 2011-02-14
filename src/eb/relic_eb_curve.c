@@ -385,6 +385,7 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r, bn_t h) {
 	detect_opt(&curve_opt_a, curve_a);
 	detect_opt(&curve_opt_b, curve_b);
 
+	curve_is_super = 0;
 	if (fb_cmp_dig(curve_b, 1) == CMP_EQ) {
 		curve_is_kbltz = 1;
 	} else {
@@ -411,11 +412,10 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r, bn_t h) {
 
 void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r, bn_t h) {
 	curve_is_kbltz = 1;
+	curve_is_super = 0;
 
 	fb_copy(curve_a, a);
-
-	fb_zero(curve_b);
-	fb_set_bit(curve_b, 0, 1);
+	fb_set_dig(curve_b, 1);
 
 	detect_opt(&curve_opt_a, curve_a);
 	detect_opt(&curve_opt_b, curve_b);
@@ -437,6 +437,7 @@ void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r, bn_t h) {
 #if defined(EB_SUPER)
 
 void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t r, bn_t h) {
+	curve_is_kbltz = 0;
 	curve_is_super = 1;
 
 	fb_copy(curve_a, a);
