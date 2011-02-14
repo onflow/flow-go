@@ -40,74 +40,61 @@
 /*============================================================================*/
 
 void eb_hlv(eb_t r, eb_t p) {
-	eb_t q;
-	fb_t v, l, t;
+	fb_t l, t;
 
-	eb_null(q);
 	fb_null(l);
 	fb_null(t);
-	fb_null(v);
 
 	TRY {
-		eb_new(q);
 		fb_new(l);
 		fb_new(t);
-		fb_new(v);
-
-		if (p->norm == 0) {
-			eb_norm(q, p);
-		} else {
-			eb_copy(q, p);
-		}
 
 		/* Solve l^2 + l = u + a. */
 		switch (eb_curve_opt_a()) {
 			case OPT_ZERO:
-				fb_copy(t, q->x);
+				fb_copy(t, p->x);
 				break;
 			case OPT_ONE:
-				fb_add_dig(t, q->x, (dig_t)1);
+				fb_add_dig(t, p->x, (dig_t)1);
 				break;
 			case OPT_DIGIT:
-				fb_add_dig(t, q->x, eb_curve_get_a()[0]);
+				fb_add_dig(t, p->x, eb_curve_get_a()[0]);
 				break;
 			default:
-				fb_add(t, q->x, eb_curve_get_a());
+				fb_add(t, p->x, eb_curve_get_a());
 				break;
 		}
+
 		fb_slv(l, t);
-		if (q->norm == 1) {
+
+		if (p->norm == 1) {
 			/* Compute t = v + u * lambda. */
-			fb_mul(t, l, q->x);
-			fb_add(t, t, q->y);
+			fb_mul(t, l, p->x);
+			fb_add(t, t, p->y);
 		} else {
 			/* Compute t = u * (u + lambda_P + lambda). */
-			fb_add(t, l, q->y);
-			fb_add(t, t, q->x);
-			fb_mul(t, t, q->x);
+			fb_add(t, l, p->y);
+			fb_add(t, t, p->x);
+			fb_mul(t, t, p->x);
 		}
 		/* If Tr(t) = 0 then lambda_P = lambda, u = sqrt(t + u). */
-		fb_trc(v, t);
-		if (v[0] == 0) {
+		if (fb_trc(t) == 0) {
 			fb_copy(r->y, l);
-			fb_add(t, t, q->x);
+			fb_add(t, t, p->x);
 			fb_srt(r->x, t);
 		} else {
 			/* Else lambda_P = lambda + 1, u = sqrt(t). */
 			fb_add_dig(r->y, l, 1);
 			fb_srt(r->x, t);
 		}
-		fb_zero(r->z);
-		fb_set_bit(r->z, 0, 1);
+		fb_set_dig(r->z, 1);
 		r->norm = 2;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		eb_free(q);
 		fb_free(l);
 		fb_free(t);
-		fb_free(v);
 	}
 }
