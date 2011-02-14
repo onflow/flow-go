@@ -102,24 +102,9 @@ static void eb_norm_super(eb_t r, eb_t p, int flag) {
  * @param[in] p			- the point to normalize.
  */
 static void eb_norm_halve(eb_t r, eb_t p) {
-	fb_t t0;
-
-	fb_null(t0);
-
-	TRY {
-		fb_new(t0);
-
-		fb_sqr(t0, p->x);
-		fb_mul(r->y, p->x, p->y);
-		fb_add(r->y, r->y, t0);
-		fb_copy(r->x, p->x);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb_free(t0);
-	}
-
+	fb_add(r->y, p->x, p->y);
+	fb_mul(r->y, r->y, p->x);
+	fb_copy(r->x, p->x);
 	r->norm = 1;
 }
 
