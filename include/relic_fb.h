@@ -395,12 +395,11 @@ void fb_poly_get_rdc(int *a, int *b, int *c);
 void fb_poly_get_trc(int *a, int *b, int *c);
 
 /**
- * Returns the half-trace of z^i, for odd i.
+ * Returns the table of precomputed half-traces.
  *
- * @param[in] i				- the argument.
- * @return the precomputed half-trace.
+ * @return the table of half-traces.
  */
-dig_t *fb_poly_get_slv(int i);
+dig_t *fb_poly_get_slv(void);
 
 /**
  * Assigns a standard irreducible polynomial as modulo of the binary field.

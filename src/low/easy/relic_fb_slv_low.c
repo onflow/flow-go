@@ -43,16 +43,16 @@ static const dig_t table_evens[16] = {
 	0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15
 };
 
+static const dig_t table_odds[16] = {
+	0, 4, 1, 5, 8, 12, 9, 13, 2, 6, 3, 7, 10, 14, 11, 15
+};
+
 static void fb_slvt_low(dig_t *c, dig_t *a, int fa) {
-	int i, j, from, to, b, d;
-	dig_t u, u_e;
+	int i, j, k, from, to, b, d, v[FB_BITS];
+	dig_t u, u_e, *p;
 	align dig_t s[FB_DIGS], t[FB_DIGS];
 	dig_t mask;
-	char *ptr = (char *)&mask;
-
-	for (i = 0; i < sizeof(dig_t); i++) {
-		*ptr++ = 0xAA;
-	}
+	void *tab = fb_poly_get_slv();
 
 	fb_zero(s);
 	fb_copy(t, a);
@@ -96,25 +96,58 @@ static void fb_slvt_low(dig_t *c, dig_t *a, int fa) {
 		s[0] ^= u_e;
 	}
 
-	for (i = 1; i <= (FB_BITS - 1) / 2; i += 2) {
-		if (fb_test_bit(t, i)) {
-			fb_add(s, s, fb_poly_get_slv(i));
+	k = 0;
+	/* We need to + 1 to get the (FB_BITS - 1)/2-th even bit. */
+	SPLIT(b, d, to + 1, FB_DIG_LOG);
+	for (i = 0; i < d; i++) {
+		u = t[i];
+		for (j = 0; j < FB_DIGIT / 8; j++) {
+			v[k++] = table_odds[((u & 0x0A) + ((u & 0xA0) >> 5))];
+			u >>= 8;
 		}
 	}
-	from = MAX((FB_BITS - 1) / 2 + 1, FB_BITS - fa);
-	from = (from % 2 == 0 ? from + 1 : from);
-	for (i = from; i <= FB_BITS - 2; i += 2) {
-		if (fb_test_bit(t, i)) {
-			fb_add(s, s, fb_poly_get_slv(i));
+	mask = (b == FB_DIGIT ? DMASK : MASK(b));
+	u = t[d] & mask;
+	/* We ignore the first even bit if it is present. */
+	for (j = 1; j < b; j += 8) {
+		v[k++] = table_odds[((u & 0x0A) + ((u & 0xA0) >> 5))];
+		u >>= 8;
+	}
+
+	from = MAX(to + 1, FB_BITS - fa);
+	from = (from % 2 == 0 ? from : from - 1);
+
+	fb_rsh(t, t, from);
+	SPLIT(b, d, FB_BITS - from, FB_DIG_LOG);
+	b++;
+	for (i = 0; i < d; i++) {
+		u = t[i];
+		for (j = 0; j < FB_DIGIT / 8; j++) {
+			v[k++] = table_odds[((u & 0x0A) + ((u & 0xA0) >> 5))];
+			u >>= 8;
 		}
 	}
+	mask = (b == FB_DIGIT ? DMASK : MASK(b));
+	u = t[d] & mask;
+	for (j = 0; j < b; j += 8) {
+		v[k++] = table_odds[((u & 0x0A) + ((u & 0xA0) >> 5))];
+		u >>= 8;
+	}
+
+	for (i = 0; i < k; i++) {
+		p = (dig_t *)(tab + (16 * i + v[i]) * sizeof(fb_st));
+		fb_add(s, s, p);
+	}
+
 	fb_copy(c, s);
 }
 
 static void fb_slvp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
-	int i, j, from, to, b, d;
+	int i, j, k, from, to, b, d, v[FB_BITS];
 	fb_t s, t;
-	dig_t u, u_e;
+	dig_t u, u_e, *p;
+	dig_t mask;
+	void *tab = fb_poly_get_slv();
 
 	fb_null(s);
 	fb_null(t);
@@ -166,18 +199,49 @@ static void fb_slvp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 		s[0] ^= u_e;
 	}
 
-	for (i = 1; i <= (FB_BITS - 1) / 2; i += 2) {
-		if (fb_test_bit(t, i)) {
-			fb_add(s, s, fb_poly_get_slv(i));
+	k = 0;
+	/* We need to + 1 to get the (FB_BITS - 1)/2-th even bit. */
+	SPLIT(b, d, to + 1, FB_DIG_LOG);
+	for (i = 0; i < d; i++) {
+		u = t[i];
+		for (j = 0; j < FB_DIGIT / 8; j++) {
+			v[k++] = table_odds[((u & 0x0A) + ((u & 0xA0) >> 5))];
+			u >>= 8;
 		}
 	}
-	from = MAX((FB_BITS - 1) / 2 + 1, FB_BITS - fa);
-	from = (from % 2 == 0 ? from + 1 : from);
-	for (i = from; i <= FB_BITS - 2; i += 2) {
-		if (fb_test_bit(t, i)) {
-			fb_add(s, s, fb_poly_get_slv(i));
+	mask = (b == FB_DIGIT ? DMASK : MASK(b));
+	u = t[d] & mask;
+	/* We ignore the first even bit if it is present. */
+	for (j = 1; j < b; j += 8) {
+		v[k++] = table_odds[((u & 0x0A) + ((u & 0xA0) >> 5))];
+		u >>= 8;
+	}
+
+	from = MAX(to + 1, FB_BITS - fa);
+	from = (from % 2 == 0 ? from : from - 1);
+
+	fb_rsh(t, t, from);
+	SPLIT(b, d, FB_BITS - from, FB_DIG_LOG);
+	b++;
+	for (i = 0; i < d; i++) {
+		u = t[i];
+		for (j = 0; j < FB_DIGIT / 8; j++) {
+			v[k++] = table_odds[((u & 0x0A) + ((u & 0xA0) >> 5))];
+			u >>= 8;
 		}
 	}
+	mask = (b == FB_DIGIT ? DMASK : MASK(b));
+	u = t[d] & mask;
+	for (j = 0; j < b; j += 8) {
+		v[k++] = table_odds[((u & 0x0A) + ((u & 0xA0) >> 5))];
+		u >>= 8;
+	}
+
+	for (i = 0; i < k; i++) {
+		p = (dig_t *)(tab + (16 * i + v[i]) * sizeof(fb_st));
+		fb_add(s, s, p);
+	}
+
 	fb_copy(c, s);
 }
 
