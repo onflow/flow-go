@@ -39,21 +39,29 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-static void fb_slvt_low(dig_t *c, dig_t *a, int fa) {
-	int i, from, d, b;
-	fb_t s, t;
+static const dig_t table_evens[16] = {
+	0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15
+};
 
-	fb_null(s);
-	fb_null(t);
-	fb_new(s);
-	fb_new(t);
+static void fb_slvt_low(dig_t *c, dig_t *a, int fa) {
+	int i, j, from, to, b, d;
+	dig_t u, u_e;
+	align dig_t s[FB_DIGS], t[FB_DIGS];
+	dig_t mask;
+	char *ptr = (char *)&mask;
+
+	for (i = 0; i < sizeof(dig_t); i++) {
+		*ptr++ = 0xAA;
+	}
 
 	fb_zero(s);
 	fb_copy(t, a);
 
 	from = FB_BITS - fa;
 	from = (from % 2 == 0 ? from - 1 : from - 2);
-	for (i = from; i > (FB_BITS - 1) / 2; i -= 2) {
+	to = (FB_BITS - 1) / 2;
+
+	for (i = from; i > to; i -= 2) {
 		if (fb_test_bit(t, i)) {
 			SPLIT(b, d, 2 * i - FB_BITS + fa, FB_DIG_LOG);
 			t[d] ^= ((dig_t)1 << b);
@@ -63,13 +71,31 @@ static void fb_slvt_low(dig_t *c, dig_t *a, int fa) {
 			s[d] ^= ((dig_t)1 << b);
 		}
 	}
-	for (i = (FB_BITS - 1) / 2; i >= 1; i--) {
-		if (fb_test_bit(t, 2 * i)) {
-			SPLIT(b, d, i, FB_DIG_LOG);
-			t[d] ^= ((dig_t)1 << b);
-			s[d] ^= ((dig_t)1 << b);
+
+	for (i = FB_DIGS - 1; i > 0; i--) {
+		u = t[i];
+		u_e = table_evens[((u & 0x05) + ((u & 0x50) >> 3))];
+		for (j = 1; j < FB_DIGIT / 8; j++) {
+			u >>= 8;
+			u_e |= table_evens[((u & 0x05) + ((u & 0x50) >> 3))] << (j << 2);
 		}
+		u_e = u_e << (i & 1) * FB_DIGIT / 2;
+		t[i >> 1] ^= u_e;
+		s[i >> 1] ^= u_e;
 	}
+
+	for (i = FB_DIGIT / 2; i > 1; i = i >> 1) {
+		u = (t[0] >> i) & MASK(i);
+		u_e = table_evens[((u & 0x05) + ((u & 0x50) >> 3))];
+		for (j = 1; j < i / 8; j++) {
+			u >>= 8;
+			u_e |= table_evens[((u & 0x05) + ((u & 0x50) >> 3))] << (j << 2);
+		}
+		u_e = u_e << (i >> 1);
+		t[0] ^= u_e;
+		s[0] ^= u_e;
+	}
+
 	for (i = 1; i <= (FB_BITS - 1) / 2; i += 2) {
 		if (fb_test_bit(t, i)) {
 			fb_add(s, s, fb_poly_get_slv(i));
@@ -86,8 +112,9 @@ static void fb_slvt_low(dig_t *c, dig_t *a, int fa) {
 }
 
 static void fb_slvp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
-	int i, from, d, b;
+	int i, j, from, to, b, d;
 	fb_t s, t;
+	dig_t u, u_e;
 
 	fb_null(s);
 	fb_null(t);
@@ -99,7 +126,9 @@ static void fb_slvp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 
 	from = FB_BITS - fa;
 	from = (from % 2 == 0 ? from - 1 : from - 2);
-	for (i = from; i > (FB_BITS - 1) / 2; i -= 2) {
+	to = (FB_BITS - 1) / 2;
+
+	for (i = from; i > to; i -= 2) {
 		if (fb_test_bit(t, i)) {
 			SPLIT(b, d, 2 * i - FB_BITS + fa, FB_DIG_LOG);
 			t[d] ^= ((dig_t)1 << b);
@@ -113,13 +142,30 @@ static void fb_slvp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 			s[d] ^= ((dig_t)1 << b);
 		}
 	}
-	for (i = (FB_BITS - 1) / 2; i >= 1; i--) {
-		if (fb_test_bit(t, 2 * i)) {
-			SPLIT(b, d, i, FB_DIG_LOG);
-			t[d] ^= ((dig_t)1 << b);
-			s[d] ^= ((dig_t)1 << b);
+
+	for (i = FB_DIGS - 1; i > 0; i--) {
+		u = t[i];
+		u_e = table_evens[((u & 0x05) + ((u & 0x50) >> 3))];
+		for (j = 1; j < FB_DIGIT / 8; j++) {
+			u >>= 8;
+			u_e |= table_evens[((u & 0x05) + ((u & 0x50) >> 3))] << (j << 2);
 		}
+		u_e = u_e << (i & 1) * FB_DIGIT / 2;
+		t[i >> 1] ^= u_e;
+		s[i >> 1] ^= u_e;
 	}
+	for (i = FB_DIGIT / 2; i > 1; i = i >> 1) {
+		u = (t[0] >> i) & MASK(i);
+		u_e = table_evens[((u & 0x05) + ((u & 0x50) >> 3))];
+		for (j = 1; j < i / 8; j++) {
+			u >>= 8;
+			u_e |= table_evens[((u & 0x05) + ((u & 0x50) >> 3))] << (j << 2);
+		}
+		u_e = u_e << (i >> 1);
+		t[0] ^= u_e;
+		s[0] ^= u_e;
+	}
+
 	for (i = 1; i <= (FB_BITS - 1) / 2; i += 2) {
 		if (fb_test_bit(t, i)) {
 			fb_add(s, s, fb_poly_get_slv(i));
@@ -144,7 +190,7 @@ void fb_slvn_low(dig_t *c, dig_t *a) {
 
 	fb_poly_get_rdc(&fa, &fb, &fc);
 
-	if (fb == -1) {
+	if (fb == 0) {
 		fb_slvt_low(c, a, fa);
 	} else {
 		fb_slvp_low(c, a, fa, fb, fc);
