@@ -143,6 +143,9 @@
 #define __OPT(_1, _2, N,...)	N
 /** @} */
 
+/**
+ * Selects a real or dummy printing function depending on library flags.
+ */
 #ifndef QUIET
 #define util_print(...)			util_printf(__VA_ARGS__)
 #else
