@@ -131,12 +131,12 @@ static void find_trace() {
 /**
  * Size of the precomputed table of half-traces.
  */
-#define HALF_SIZE		(FB_BITS / 2 + 1)
+#define HALF_SIZE		((FB_BITS - 1)/ 2)
 
 /**
  * Table of precomputed half-traces.
  */
-static fb_st half[HALF_SIZE];
+static fb_st fb_half[(FB_DIGIT / 4) * FB_DIGS][16];
 
 /**
  * Precomputes half-traces for z^i with odd i.
@@ -144,7 +144,7 @@ static fb_st half[HALF_SIZE];
  * @throw ERR_NO_MEMORY if there is no available memory.
  */
 static void find_solve() {
-	int i, j;
+	int i, j, k, l, from, to;
 	fb_t t0;
 
 	fb_null(t0);
@@ -152,14 +152,41 @@ static void find_solve() {
 	TRY {
 		fb_new(t0);
 
-		for (i = FB_BITS - 2; i >= 1; i -=2 ) {
-			fb_zero(t0);
-			fb_set_bit(t0, i, 1);
-			fb_copy(half[i/2], t0);
-			for (j = 0; j < (FB_BITS - 1) / 2; j++) {
-				fb_sqr(half[i/2], half[i/2]);
-				fb_sqr(half[i/2], half[i/2]);
-				fb_add(half[i/2], half[i/2], t0);
+		to = (FB_BITS - 1) / 2;
+		l = 0;
+		for (i = 0; i < to; i += 8, l++) {
+			for (j = 0; j < 16; j++) {
+				fb_zero(t0);
+				for (k = 0; k < 4; k++) {
+					if (j & (1 << k)) {
+						fb_set_bit(t0, i + 2 * k + 1, 1);
+					}
+				}
+				fb_copy(fb_half[l][j], t0);
+				for (k = 0; k < (FB_BITS - 1) / 2; k++) {
+					fb_sqr(fb_half[l][j], fb_half[l][j]);
+					fb_sqr(fb_half[l][j], fb_half[l][j]);
+					fb_add(fb_half[l][j], fb_half[l][j], t0);
+				}
+			}
+		}
+
+		from = MAX(to + 1, FB_BITS - poly_a);
+		from = (from % 2 == 0 ? from : from - 1);
+		for (i = from; i < FB_BITS; i += 8, l++) {
+			for (j = 0; j < 16; j++) {
+				fb_zero(t0);
+				for (k = 0; k < 4; k++) {
+					if (j & (1 << k)) {
+						fb_set_bit(t0, i + 2 * k + 1, 1);
+					}
+				}
+				fb_copy(fb_half[l][j], t0);
+				for (k = 0; k < (FB_BITS - 1) / 2; k++) {
+					fb_sqr(fb_half[l][j], fb_half[l][j]);
+					fb_sqr(fb_half[l][j], fb_half[l][j]);
+					fb_add(fb_half[l][j], fb_half[l][j], t0);
+				}
 			}
 		}
 	}
@@ -305,7 +332,7 @@ static void find_chain() {
 		}
 
 		for (i = 0; i <= chain_len; i++) {
-			for (j = 0; j < FB_BITS; j+= 4) {
+			for (j = 0; j < FB_BITS; j += 4) {
 				for (k = 0; k < 16; k++) {
 					fb_zero(t);
 					fb_set_dig(t, k);
@@ -313,13 +340,15 @@ static void find_chain() {
 					for (l = 0; l < u[i]; l++) {
 						fb_sqr(t, t);
 					}
-					fb_copy(fb_tab_sqr[i][j/4][k], t);
+					fb_copy(fb_tab_sqr[i][j / 4][k], t);
 				}
 			}
 		}
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		fb_free(t);
 	}
 #endif
@@ -512,9 +541,9 @@ void fb_poly_get_rdc(int *a, int *b, int *c) {
 	*c = poly_c;
 }
 
-dig_t *fb_poly_get_slv(int i) {
+dig_t *fb_poly_get_slv() {
 #if FB_SLV == QUICK || !defined(STRIP)
-	return half[i/2];
+	return (dig_t *)&(fb_half);
 #else
 	return NULL;
 #endif
@@ -522,7 +551,7 @@ dig_t *fb_poly_get_slv(int i) {
 
 int *fb_poly_get_chain(int *len) {
 #if FB_INV == ITOHT || !defined(STRIP)
-	if (chain_len > 0 && chain_len < MAX_CHAIN ) {
+	if (chain_len > 0 && chain_len < MAX_CHAIN) {
 		if (len != NULL) {
 			*len = chain_len;
 		}
