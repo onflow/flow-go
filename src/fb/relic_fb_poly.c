@@ -47,7 +47,7 @@
 /**
  * Prime modulus.
  */
-static fb_st poly;
+static fb_st fb_poly;
 
 /**
  * Trinomial or pentanomial non-zero coefficients.
@@ -136,7 +136,7 @@ static void find_trace() {
 /**
  * Table of precomputed half-traces.
  */
-static fb_st fb_half[(FB_DIGIT / 4) * FB_DIGS][16];
+static fb_st fb_half[(FB_DIGIT / 8) * FB_DIGS][16];
 
 /**
  * Precomputes half-traces for z^i with odd i.
@@ -169,6 +169,7 @@ static void find_solve() {
 					fb_add(fb_half[l][j], fb_half[l][j], t0);
 				}
 			}
+			fb_rsh(fb_half[l][j], fb_half[l][j], 1);
 		}
 
 		from = MAX(to + 1, FB_BITS - poly_a);
@@ -188,6 +189,7 @@ static void find_solve() {
 					fb_add(fb_half[l][j], fb_half[l][j], t0);
 				}
 			}
+			fb_rsh(fb_half[l][j], fb_half[l][j], 1);
 		}
 	}
 	CATCH_ANY {
@@ -362,7 +364,7 @@ static void find_chain() {
  * @param[in] f				- the new irreducible polynomial.
  */
 static void fb_poly_set(fb_t f) {
-	fb_copy(poly, f);
+	fb_copy(fb_poly, f);
 #if FB_TRC == QUICK || !defined(STRIP)
 	find_trace();
 #endif
@@ -382,7 +384,7 @@ static void fb_poly_set(fb_t f) {
 /*============================================================================*/
 
 void fb_poly_init(void) {
-	fb_zero(poly);
+	fb_zero(fb_poly);
 	poly_a = poly_b = poly_c = 0;
 	pos_a = pos_b = pos_c = -1;
 }
@@ -391,7 +393,7 @@ void fb_poly_clean(void) {
 }
 
 dig_t *fb_poly_get(void) {
-	return poly;
+	return fb_poly;
 }
 
 void fb_poly_add(fb_t c, fb_t a) {
@@ -400,23 +402,23 @@ void fb_poly_add(fb_t c, fb_t a) {
 	}
 
 	if (poly_a != 0) {
-		c[FB_DIGS - 1] ^= poly[FB_DIGS - 1];
+		c[FB_DIGS - 1] ^= fb_poly[FB_DIGS - 1];
 		if (pos_a != FB_DIGS - 1) {
-			c[pos_a] ^= poly[pos_a];
+			c[pos_a] ^= fb_poly[pos_a];
 		}
 		if (poly_b != 0 && poly_c != 0) {
 			if (pos_b != pos_a) {
-				c[pos_b] ^= poly[pos_b];
+				c[pos_b] ^= fb_poly[pos_b];
 			}
 			if (pos_c != pos_a && pos_c != pos_b) {
-				c[pos_c] ^= poly[pos_c];
+				c[pos_c] ^= fb_poly[pos_c];
 			}
 		}
 		if (pos_a != 0 && pos_b != 0 && pos_c != 0) {
 			c[0] ^= 1;
 		}
 	} else {
-		fb_add(c, a, poly);
+		fb_add(c, a, fb_poly);
 	}
 }
 
