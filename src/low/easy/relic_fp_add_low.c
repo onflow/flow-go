@@ -182,6 +182,22 @@ void fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
+dig_t fp_dbln_low(dig_t *c, dig_t *a) {
+	int i;
+	dig_t carry, c0, c1, r0, r1;
+
+	carry = 0;
+	for (i = 0; i < FP_DIGS; i++, a++, c++) {
+		r0 = (*a) + (*a);
+		c0 = (r0 < (*a));
+		r1 = r0 + carry;
+		c1 = (r1 < r0);
+		carry = c0 | c1;
+		(*c) = r1;
+	}
+	return carry;
+}
+
 void fp_dblm_low(dig_t *c, dig_t *a) {
 	int i;
 	dig_t carry, c0, c1, r0, r1;
