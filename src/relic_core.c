@@ -71,9 +71,9 @@ int core_init(void) {
 		core_ctx->reason[ERR_NO_FIELD] = MSG_NO_FIELD;
 		core_ctx->reason[ERR_NO_CURVE] = MSG_NO_CURVE;
 	}
-	core_ctx->code = STS_OK;
 	core_ctx->last = NULL;
 #endif /* CHECK */
+	core_ctx->code = STS_OK;
 
 	TRY {
 		rand_init();
