@@ -94,7 +94,12 @@ fb_muln_table1: .space 256, 0
 #if FB_POLYN == 271
 fb_muln_table2: .space 256, 0
 #endif
+fb_sqrt_table:
+.byte 0x00, 0x01, 0x04, 0x05, 0x10, 0x11, 0x14, 0x15, 0x40, 0x41, 0x44, 0x45, 0x50, 0x51, 0x54, 0x55
 .endif
+
+.global fb_sqrt_table
+
 
 /*
  * Loads the pointer Y with the 16-bit address composed by i and j.

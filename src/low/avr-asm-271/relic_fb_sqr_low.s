@@ -43,21 +43,6 @@
 
 .arch atmega128
 
-.data
-
-/*
- * This address finishes in 0x00.
- */
-
-fb_sqrt_table:
-.byte 0x00, 0x01, 0x04, 0x05, 0x10, 0x11, 0x14, 0x15, 0x40, 0x41, 0x44, 0x45, 0x50, 0x51, 0x54, 0x55
-
-/*
- * We must skip some bytes so that the next address in this segment stars on
- * a 246-byte aligned block
- */
-.skip 256 - 16
-
 .text
 
 .global fb_sqrl_low
