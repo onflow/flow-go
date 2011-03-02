@@ -152,29 +152,8 @@ static void find_solve() {
 	TRY {
 		fb_new(t0);
 
-		to = (FB_BITS - 1) / 2;
 		l = 0;
-		for (i = 0; i < to; i += 8, l++) {
-			for (j = 0; j < 16; j++) {
-				fb_zero(t0);
-				for (k = 0; k < 4; k++) {
-					if (j & (1 << k)) {
-						fb_set_bit(t0, i + 2 * k + 1, 1);
-					}
-				}
-				fb_copy(fb_half[l][j], t0);
-				for (k = 0; k < (FB_BITS - 1) / 2; k++) {
-					fb_sqr(fb_half[l][j], fb_half[l][j]);
-					fb_sqr(fb_half[l][j], fb_half[l][j]);
-					fb_add(fb_half[l][j], fb_half[l][j], t0);
-				}
-			}
-			fb_rsh(fb_half[l][j], fb_half[l][j], 1);
-		}
-
-		from = MAX(to + 1, FB_BITS - poly_a);
-		from = (from % 2 == 0 ? from : from - 1);
-		for (i = from; i < FB_BITS; i += 8, l++) {
+		for (i = 0; i < FB_BITS; i += 8, l++) {
 			for (j = 0; j < 16; j++) {
 				fb_zero(t0);
 				for (k = 0; k < 4; k++) {
