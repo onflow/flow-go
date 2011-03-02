@@ -253,6 +253,14 @@ void fb_srtn_low(dig_t *c, dig_t *a);
 void fb_slvn_low(dig_t *c, dig_t *a);
 
 /**
+ * Computes the trace of a digit vector.
+ *
+ * @param[in] a				- the digit vector.
+ * @return the trace of the argument.
+ */
+dig_t fb_trcn_low(dig_t *a);
+
+/**
  * Reduces a digit vector modulo the configured irreducible polynomial.
  *
  * @param[out] c			- the result.

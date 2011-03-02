@@ -23,52 +23,32 @@
 /**
  * @file
  *
- * Implementation of binary field trace function.
+ * Implementation of the low-level trace function.
  *
- * @version $Id$
+ * @version $Id: relic_fb_slv_low.c 652 2011-02-20 23:50:00Z dfaranha $
  * @ingroup fb
  */
 
-#include "relic_core.h"
 #include "relic_fb.h"
 #include "relic_fb_low.h"
-#include "relic_error.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fb_trc_basic(fb_t a) {
+dig_t fb_trcn_low(dig_t *a) {
+	int ta, tb, tc;
 	dig_t r;
-	fb_t t, u;
 
-	fb_null(t);
-	fb_null(u);
+	fb_poly_get_trc(&ta, &tb, &tc);
 
-	TRY {
-		fb_new(t);
-		fb_new(u);
-
-		fb_copy(t, a);
-		fb_copy(u, a);
-		for (int i = 1; i < FB_BITS; i++) {
-			fb_sqr(t, t);
-			fb_add(u, u, t);
-		}
+	r = fb_get_bit(a, ta);
+	if (tb != -1) {
+		r ^= fb_get_bit(a, tb);
 	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+	if (tc != -1) {
+		r ^= fb_get_bit(a, tc);
 	}
-	FINALLY {
-		fb_free(t);
-		fb_free(u);
-	}
-
-	r = u[0];
 
 	return r;
-}
-
-dig_t fb_trc_quick(fb_t a) {
-	return fb_trcn_low(a);
 }
