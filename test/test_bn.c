@@ -1517,6 +1517,47 @@ static int factor(void) {
 	code = STS_OK;
   end:
 	bn_free(p);
+	bn_free(q);
+	bn_free(n);
+	return code;
+}
+
+static int recoding(void) {
+	int code = STS_ERR;
+	bn_t a, b, c;
+	int j, k, len;
+	unsigned char w[BN_BITS];
+
+	bn_null(a);
+	bn_null(b);
+	bn_null(c);
+
+	TRY {
+		bn_new(a);
+		bn_new(b);
+		bn_new(c);
+
+		TEST_BEGIN("window recoding is correct") {
+			for (j = 2; j <= 6; j++) {
+				bn_rand(a, BN_POS, BN_BITS);
+				bn_rec_win(w, &len, a, j);
+				bn_zero(b);
+				for (k = len - 1; k >= 0; k--) {
+					bn_lsh(b, b, j);
+					bn_add_dig(b, b, w[k]);
+				}
+				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
+			}
+		} TEST_END;
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	bn_free(a);
+	bn_free(b);
+	bn_free(c);
 	return code;
 }
 
@@ -1609,6 +1650,11 @@ int main(void) {
 	}
 
 	if (factor() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (recoding() != STS_OK) {
 		core_clean();
 		return 1;
 	}

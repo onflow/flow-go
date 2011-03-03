@@ -179,7 +179,7 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 	ep_t t1[1 << (EP_WIDTH / 2)];
 	ep_t t[1 << EP_WIDTH];
 	bn_t n;
-	int d, l0, l1, w;
+	int l0, l1, w;
 	unsigned char w0[FP_BITS + 1], w1[FP_BITS + 1];
 
 	bn_null(n);
@@ -199,12 +199,7 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 		bn_new(n);
 
 		ep_curve_get_ord(n);
-		d = bn_bits(n);
-		d = ((d % w) == 0 ? (d / w) : (d / w) + 1);
-		for (int i = 0; i < (1 << w); i++) {
-			ep_new(t0[i]);
-			ep_new(t1[i]);
-		}
+
 		for (int i = 0; i < (1 << EP_WIDTH); i++) {
 			ep_new(t[i]);
 		}
@@ -226,8 +221,7 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 		}
 
 #if defined(EB_MIXED)
-		ep_norm_sim(t0 + 2, t0 + 2, (1 << (EP_WIDTH / 2)) - 2);
-		ep_norm_sim(t1 + 2, t1 + 2, (1 << (EP_WIDTH / 2)) - 2);
+		ep_norm_sim(t + 1, t + 1, (1 << (EP_WIDTH)) - 1);
 #endif
 
 		bn_rec_win(w0, &l0, k, w);

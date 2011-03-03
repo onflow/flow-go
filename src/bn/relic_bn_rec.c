@@ -294,16 +294,16 @@ static void tnaf_mod(bn_t r0, bn_t r1, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 /*============================================================================*/
 
 void bn_rec_win(unsigned char *win, int *len, bn_t k, int w) {
-	int i, l;
+	int i, j, l;
 
 	l = bn_bits(k);
 
-	l = ((l % w) == 0 ? (l / w) : (l / w) + 1);
-
-	for (i = 0; i < l; i++) {
-		win[i] = get_bits(k, i * w, (i + 1) * w - 1);
+	j = 0;
+	for (i = 0; i < l - w; i += w) {
+		win[j++] = get_bits(k, i, i + w - 1);
 	}
-	*len = l;
+	win[j++] = get_bits(k, i, bn_bits(k) - 1);
+	*len = j;
 }
 
 void bn_rec_slw(unsigned char *win, int *len, bn_t k, int w) {
