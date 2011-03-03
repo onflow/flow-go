@@ -55,6 +55,8 @@
 #cmakedefine QUIET
 /** Build with colored output. */
 #cmakedefine COLOR
+/** Build with big-endian support. */
+#cmakedefine BIGED
 /** Build shared library. */
 #cmakedefine SHLIB
 /** Build static library. */
