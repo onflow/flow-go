@@ -75,22 +75,30 @@
 enum {
 	/** SECG 160-bit fast reduction prime. */
 	SECG_160 = 1,
+	/** SECG 160-bit denser reduction prime. */
+	SECG_160D,
 	/** NIST 192-bit fast reduction prime. */
-	NIST_192 = 2,
+	NIST_192,
+	/** SECG 192-bit denser reduction prime. */
+	SECG_192,
 	/** NIST 224-bit fast reduction polynomial. */
-	NIST_224 = 3,
+	NIST_224,
+	/** SECG 224-bit denser reduction prime. */
+	SECG_224,
 	/** NIST 256-bit fast reduction polynomial. */
-	NIST_256 = 4,
+	NIST_256,
+	/** SECG 256-bit denser reduction prime. */
+	SECG_256,
 	/** NIST 384-bit fast reduction polynomial. */
-	NIST_384 = 5,
+	NIST_384,
 	/** NIST 521-bit fast reduction polynomial. */
-	NIST_521 = 6,
+	NIST_521,
 	/** 158-bit prime for use with BN curves. */
-	BN_158 = 7,
+	BN_158,
 	/** 256-bit prime provided in Nogami et al. for use with BN curves. */
-	BN_254 = 8,
+	BN_254,
 	/** 256-bit prime provided in Barreto et al. for use with BN curves. */
-	BN_256 = 9,
+	BN_256,
 };
 
 /*============================================================================*/
