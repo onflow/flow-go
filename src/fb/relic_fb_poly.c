@@ -144,7 +144,7 @@ static fb_st fb_half[(FB_DIGIT / 8) * FB_DIGS][16];
  * @throw ERR_NO_MEMORY if there is no available memory.
  */
 static void find_solve() {
-	int i, j, k, l, from, to;
+	int i, j, k, l;
 	fb_t t0;
 
 	fb_null(t0);
