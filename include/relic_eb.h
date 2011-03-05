@@ -52,35 +52,37 @@ enum {
 	/** NIST B-163 binary curve. */
 	NIST_B163 = 1,
 	/** NIST K-163 Koblitz curve. */
-	NIST_K163 = 2,
+	NIST_K163,
 	/** NIST B-133 binary curve. */
-	NIST_B233 = 3,
+	NIST_B233,
 	/** NIST K-233 Koblitz curve. */
-	NIST_K233 = 4,
+	NIST_K233,
 	/** Curve over 2^{251} used in eBATs. */
-	EBATS_B251 = 5,
+	EBACS_B251,
+	/** Curve over 2^{257} good for halving. */
+	HALVE_B257,
 	/** SECG K-239 binary curve. */
-	SECG_K239 = 6,
+	SECG_K239,
 	/** NIST B-283 binary curve. */
-	NIST_B283 = 7,
+	NIST_B283,
 	/** NIST K-283 Koblitz curve. */
-	NIST_K283 = 8,
+	NIST_K283,
 	/** NIST B-409 binary curve. */
-	NIST_B409 = 9,
+	NIST_B409,
 	/** NIST K-409 Koblitz curve. */
-	NIST_K409 = 10,
+	NIST_K409,
 	/** NIST B-571 binary curve. */
-	NIST_B571 = 11,
+	NIST_B571,
 	/** NIST K-571 Koblitz curve. */
-	NIST_K571 = 12,
+	NIST_K571,
 	/** MIRACL low-security pairing-friendly curve. */
-	ETAT_P271 = 13,
+	ETAT_P271,
 	/** MIRACL low-security pairing-friendly curve. */
-	ETAT_T271 = 14,
+	ETAT_T271,
 	/** Pairing-friendly curve with 80-bit security. */
-	ETAT_S353 = 15,
+	ETAT_S353,
 	/** MIRACL high-security pairing-friendly curve. */
-	ETAT_S1223 = 16,
+	ETAT_S1223,
 };
 
 /**
@@ -584,6 +586,7 @@ int eb_param_set_any_ordin(void);
 /**
  * Configures some set of Koblitz curve parameters for the current security
  * level.
+ *
  * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
  */
 int eb_param_set_any_kbltz(void);

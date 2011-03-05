@@ -76,51 +76,51 @@ enum {
 	/** Toy pentanomial. */
 	PENTA_64 = 1,
 	/** Hankerson's trinomial for GLS curves. */
-	TRINO_113 = 2,
+	TRINO_113,
 	/** Hankerson's trinomial for GLS curves. */
-	TRINO_127 = 3,
+	TRINO_127,
 	/** NIST 163-bit fast reduction polynomial. */
-	NIST_163 = 4,
+	NIST_163,
 	/** Square-root friendly 163-bit polynomial. */
-	SQRT_163 = 5,
+	SQRT_163,
 	/** Example with 193 bits for Itoh-Tsuji. */
-	TRINO_193 = 6,
+	TRINO_193,
 	/** NIST 233-bit fast reduction polynomial. */
-	NIST_233 = 7,
-	/** Square-root friendly 163-bit polynomial. */
-	SQRT_233 = 8,
+	NIST_233,
+	/** Square-root friendly 233-bit polynomial. */
+	SQRT_233,
 	/** SECG 239-bit fast reduction polynomial. */
-	SECG_239 = 9,
+	SECG_239,
 	/** Square-root friendly 239-bit polynomial. */
-	SQRT_239 = 10,
+	SQRT_239,
 	/** Square-root friendly 251-bit polynomial. */
-	SQRT_251 = 11,
+	SQRT_251,
 	/** eBATS curve_2_251 pentanomial. */
-	PENTA_251 = 12,
-	/** Hankerson's trinomial for GLS curves. */
-	TRINO_257 = 13,
+	PENTA_251,
+	/** Hankerson's trinomial for halving curve. */
+	TRINO_257,
 	/** Scott's 271-bit pairing-friendly trinomial. */
-	TRINO_271 = 14,
+	TRINO_271,
 	/** Scott's 271-bit pairing-friendly pentanomial. */
-	PENTA_271 = 15,
+	PENTA_271,
 	/** NIST 283-bit fast reduction polynomial. */
-	NIST_283 = 16,
+	NIST_283,
 	/** Square-root friendly 283-bit polynomial. */
-	SQRT_283 = 17,
+	SQRT_283,
 	/** Scott's 271-bit pairing-friendly trinomial. */
-	TRINO_353 = 18,
+	TRINO_353,
 	/** Detrey's trinomial for genus 2 curves. */
-	TRINO_367 = 19,
+	TRINO_367,
 	/** NIST 409-bit fast reduction polynomial. */
-	NIST_409 = 20,
+	NIST_409,
 	/** Hankerson's trinomial for genus 2 curves. */
-	TRINO_439 = 21,
+	TRINO_439,
 	/** NIST 571-bit fast reduction polynomial. */
-	NIST_571 = 22,
+	NIST_571,
 	/** Square-root friendly 571-bit polynomial. */
-	SQRT_571 = 23,
+	SQRT_571,
 	/** Scott's 1223-bit pairing-friendly trinomial. */
-	TRINO_1223 = 24
+	TRINO_1223
 };
 
 /*============================================================================*/

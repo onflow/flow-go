@@ -82,7 +82,7 @@ enum {
 	/** Pentanomial commonly used for implementing pairings. */
 	TRINO_97 = 1,
 	/** Pentanomial commonly used for implementing pairings. */
-	PENTA_509 = 2,
+	PENTA_509,
 };
 
 /*============================================================================*/
