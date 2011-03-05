@@ -656,51 +656,42 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 
 #ifdef WITH_EP
 
-void bn_rec_glv(bn_t k0, bn_t k1, bn_t k) {
-	bn_t b1, b2, t1, t2;
+void bn_rec_glv(bn_t k0, bn_t k1, bn_t k, bn_t n, bn_t v1[], bn_t v2[]) {
+	bn_t t, b1, b2;
 	int r1, r2, bits;
 
 	bn_null(b1);
 	bn_null(b2);
-	bn_null(t1);
-	bn_null(t2);
+	bn_null(t);
 
 	TRY {
 		bn_new(b1);
 		bn_new(b2);
+		bn_new(t);
 
-		ep_curve_get_ord(t1);
-		bits = bn_bits(t1);
+		bits = bn_bits(n);
 
-		ep_curve_get_v1(t1);
-		ep_curve_get_v2(t2);
-		bn_neg(t2, t2);
-
-		bn_mul(b1, k, t1);
+		bn_mul(b1, k, v1[0]);
 		r1 = bn_get_bit(b1, bits);
 		bn_rsh(b1, b1, bits + 1);
 		if (r1) {
 			bn_add_dig(b1, b1, 1);
 		}
 
-		bn_mul(b2, k, t2);
+		bn_mul(b2, k, v2[0]);
 		r2 = bn_get_bit(b2, bits);
 		bn_rsh(b2, b2, bits + 1);
 		if (r2) {
 			bn_add_dig(b2, b2, 1);
 		}
 
-		ep_curve_get_v10(t1);
-		bn_mul(k0, b1, t1);
-		ep_curve_get_v20(t1);
-		bn_mul(t1, b2, t1);
-		bn_add(k0, k0, t1);
+		bn_mul(k0, b1, v1[1]);
+		bn_mul(t, b2, v2[1]);
+		bn_add(k0, k0, t);
 
-		ep_curve_get_v11(t1);
-		bn_mul(k1, b1, t1);
-		ep_curve_get_v21(t1);
-		bn_mul(t1, b2, t1);
-		bn_add(k1, k1, t1);
+		bn_mul(k1, b1, v1[2]);
+		bn_mul(t, b2, v2[2]);
+		bn_add(k1, k1, t);
 
 		bn_sub(k0, k, k0);
 		bn_neg(k1, k1);
@@ -711,8 +702,7 @@ void bn_rec_glv(bn_t k0, bn_t k1, bn_t k) {
 	FINALLY {
 		bn_free(b1);
 		bn_free(b2);
-		bn_free(t1);
-		bn_free(t2);
+		bn_free(t);
 	}
 }
 

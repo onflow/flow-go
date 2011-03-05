@@ -792,6 +792,119 @@ void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 
 #endif
 
+void bn_gcd_ext_mid(bn_t c, bn_t d, bn_t e, bn_t f, bn_t a, bn_t b) {
+	bn_t q, r, s, t, u, v, x, w, y, z;
+	int stop, flag;
+
+	bn_null(q);
+	bn_null(r);
+	bn_null(s);
+	bn_null(t);
+	bn_null(u);
+	bn_null(v);
+	bn_null(x);
+	bn_null(w);
+	bn_null(y);
+	bn_null(z);
+
+	if (bn_is_zero(a)) {
+		bn_abs(c, b);
+		bn_zero(d);
+		bn_zero(e);
+		return;
+	}
+
+	if (bn_is_zero(b)) {
+		bn_abs(c, a);
+		bn_set_dig(d, 1);
+		bn_set_dig(e, 1);
+		return;
+	}
+
+	TRY {
+		bn_new(q);
+		bn_new(r);
+		bn_new(s);
+		bn_new(t);
+		bn_new(u);
+		bn_new(v);
+		bn_new(x);
+		bn_new(w);
+		bn_new(y);
+		bn_new(z);
+
+		if (bn_cmp_abs(u, v) == CMP_GT) {
+			bn_abs(u, a);
+			bn_abs(v, b);
+		} else {
+			bn_abs(u, b);
+			bn_abs(v, a);
+		}
+
+		stop = bn_bits(u) >> 1;
+		flag = 0;
+
+		bn_set_dig(x, 1);
+		bn_zero(t);
+
+		int wait = 0;
+		while (!bn_is_zero(v)) {
+			bn_div_rem(q, r, u, v);
+
+			bn_copy(u, v);
+			bn_copy(v, r);
+
+			bn_mul(s, q, x);
+			bn_sub(s, t, s);
+			bn_copy(t, x);
+			bn_copy(x, s);
+
+			if (wait) {
+				bn_copy(e, r);
+				bn_neg(f, x);
+				wait = 0;
+			}
+			if (bn_bits(u) > stop) {
+				bn_copy(c, r);
+				bn_neg(d, x);
+				bn_copy(w, u);
+				bn_neg(y, t);
+				wait = 1;
+			}
+		}
+		/* Compute r as the norm of vector (y, z). */
+		bn_sqr(s, w);
+		bn_sqr(t, y);
+		bn_add(t, t, s);
+
+		/* Compute q as the norm of vector (d, e). */
+		bn_sqr(r, e);
+		bn_sqr(q, f);
+		bn_add(q, q, r);
+
+		/* Output (d, e) as the vector of smaller norm. */
+		if (bn_cmp(t, q) == CMP_LT) {
+			bn_copy(e, w);
+			bn_copy(f, y);
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(q);
+		bn_free(r);
+		bn_free(s);
+		bn_free(t);
+		bn_free(u);
+		bn_free(v);
+		bn_free(x);
+		bn_free(w);
+		bn_free(y);
+		bn_free(z);
+	}
+}
+
 void bn_gcd_dig(bn_t c, bn_t a, dig_t b) {
 	dig_t _u, _v, _t = 0;
 
