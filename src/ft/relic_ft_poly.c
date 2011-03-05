@@ -443,7 +443,7 @@ int *ft_poly_get_srz_spars(int *len) {
 }
 
 dig_t *ft_poly_get_tab_crz(int i) {
-#if FB_SRT == QUICK || !defined(STRIP)
+#if FT_CRT == QUICK || !defined(STRIP)
 
 #ifdef FT_PRECO
 	return ft_tab_crz[i];
@@ -457,7 +457,7 @@ dig_t *ft_poly_get_tab_crz(int i) {
 }
 
 dig_t *ft_poly_get_tab_srz(int i) {
-#if FB_SRT == QUICK || !defined(STRIP)
+#if FT_CRT == QUICK || !defined(STRIP)
 
 #ifdef FT_PRECO
 	return ft_tab_srz[i];
