@@ -77,6 +77,7 @@ void eb_hlv(eb_t r, eb_t p) {
 			fb_add(t, t, p->x);
 			fb_mul(t, t, p->x);
 		}
+
 		/* If Tr(t) = 0 then lambda_P = lambda, u = sqrt(t + u). */
 		if (fb_trc(t) == 0) {
 			fb_copy(r->y, l);

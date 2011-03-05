@@ -74,30 +74,25 @@ int eb_cmp(eb_t p, eb_t q) {
 
 void eb_rand(eb_t p) {
 	bn_t n, k;
-	eb_t g;
 
 	bn_null(n);
 	bn_null(k);
-	eb_null(g);
 
 	TRY {
 		bn_new(k);
 		bn_new(n);
-		eb_new(g);
 
 		eb_curve_get_ord(n);
-		eb_curve_get_gen(g);
 
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 
-		eb_mul(p, g, k);
+		eb_mul_gen(p, k);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
 		bn_free(k);
 		bn_free(n);
-		eb_free(g);
 	}
 }
 

@@ -102,12 +102,26 @@
  * Parameters for the eBATS B-251 binary elliptic curve.
  */
 /** @{ */
-#define EBATS_B251_A	"0"
-#define EBATS_B251_B	"2387"
-#define EBATS_B251_X	"6AD0278D8686F4BA4250B2DE565F0A373AA54D9A154ABEFACB90DC03501D57C"
-#define EBATS_B251_Y	"50B1D29DAD5616363249F477B05A1592BA16045BE1A9F218180C5150ABE8573"
-#define EBATS_B251_R	"1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF3E3AA131A2E1A8200BEF3B9ABB767E1"
-#define EBATS_B251_H	"4"
+#define EBACS_B251_A	"0"
+#define EBACS_B251_B	"2387"
+#define EBACS_B251_X	"6AD0278D8686F4BA4250B2DE565F0A373AA54D9A154ABEFACB90DC03501D57C"
+#define EBACS_B251_Y	"50B1D29DAD5616363249F477B05A1592BA16045BE1A9F218180C5150ABE8573"
+#define EBACS_B251_R	"1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF3E3AA131A2E1A8200BEF3B9ABB767E1"
+#define EBACS_B251_H	"4"
+/** @} */
+#endif
+
+#if defined(EB_ORDIN) && FB_POLYN == 257
+/**
+ * Parameters for a curve over GF(2^257) which is really nice for halving.
+ */
+/** @{ */
+#define HALVE_B257_A	"1"
+#define HALVE_B257_B	"0585C1ACA676891D5E1940D6F619FD0DD9FDA8AC46AE9331B76F172EDEF520CF0"
+#define HALVE_B257_X	"048E8B0E542D879A1E992E7407F8648F0C8248469B97DD3AF9F21F603E9632D4B"
+#define HALVE_B257_Y	"138D19BC9810C03D3FB499801F81C9E6A338B944338514E0D2D9BEDFEB0B8A310"
+#define HALVE_B257_R	"0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF60349585A0B2E1B2133B4E36C1672179"
+#define HALVE_B257_H	"2"
 /** @} */
 #endif
 
@@ -407,8 +421,14 @@ void eb_param_set(int param) {
 				break;
 #endif
 #if defined(EB_ORDIN) && FB_POLYN == 251
-			case EBATS_B251:
-				ASSIGN(EBATS_B251, PENTA_251);
+			case EBACS_B251:
+				ASSIGN(EBACS_B251, PENTA_251);
+				ordin = 1;
+				break;
+#endif
+#if defined(EB_ORDIN) && FB_POLYN == 257
+			case HALVE_B257:
+				ASSIGN(HALVE_B257, TRINO_257);
 				ordin = 1;
 				break;
 #endif
@@ -549,7 +569,9 @@ int eb_param_set_any_ordin() {
 #elif FB_POLYN == 233
 	eb_param_set(NIST_B233);
 #elif FB_POLYN == 251
-	eb_param_set(EBATS_B251);
+	eb_param_set(EBACS_B251);
+#elif FB_POLYN == 257
+	eb_param_set(HALVE_B257);
 #elif FB_POLYN == 283
 	eb_param_set(NIST_B283);
 #elif FB_POLYN == 409
@@ -617,8 +639,11 @@ void eb_param_print() {
 		case SECG_K239:
 			util_print_banner("Curve SECG-K239:", 0);
 			break;
-		case EBATS_B251:
-			util_print_banner("Curve EBATS-B251:", 0);
+		case EBACS_B251:
+			util_print_banner("Curve EBACS-B251:", 0);
+			break;
+		case HALVE_B257:
+			util_print_banner("Curve HALVE-B257:", 0);
 			break;
 		case NIST_B283:
 			util_print_banner("Curve NIST-B283:", 0);
