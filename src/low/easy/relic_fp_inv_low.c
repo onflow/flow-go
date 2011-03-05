@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Implementation of the low-le&vel in&version functions.
+ * Implementation of the low-level inversion functions.
  *
  * @&version $Id$
  * @ingroup fp
