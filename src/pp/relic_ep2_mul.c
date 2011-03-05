@@ -76,7 +76,7 @@ void ep2_mul(ep2_t r, ep2_t p, bn_t k) {
 
 void ep2_mul_gen(ep2_t r, bn_t k) {
 #ifdef EP_PRECO
-	//ep2_mul_fix(r, ep2_curve_get_tab(), k);
+	ep2_mul_fix(r, ep2_curve_get_tab(), k);
 #else
 	ep2_t g;
 

@@ -41,7 +41,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if defined(EP_ORDIN) && FP_PRIME == 158
+#if defined(EP_KBLTZ) && FP_PRIME == 158
 /**
  * Parameters for a pairing-friendly prime curve over a quadratic extension.
  */
@@ -58,7 +58,7 @@
 /** @} */
 #endif
 
-#if defined(EP_ORDIN) && FP_PRIME == 254
+#if defined(EP_KBLTZ) && FP_PRIME == 254
 /**
  * Parameters for a pairing-friendly prime curve over a quadratic extension.
  */
@@ -75,7 +75,7 @@
 /** @} */
 #endif
 
-#if defined(EP_ORDIN) && FP_PRIME == 256
+#if defined(EP_KBLTZ) && FP_PRIME == 256
 /**
  * Parameters for a pairing-friendly prime curve over a quadratic extension.
  */
@@ -216,7 +216,7 @@ void ep2_curve_get_ord(bn_t n) {
 
 ep2_t *ep2_curve_get_tab() {
 #if ALLOC == AUTO
-	return (ep2_t*) *pointer;
+	return (ep2_t *) *pointer;
 #else
 	return pointer;
 #endif
@@ -304,6 +304,10 @@ void ep2_curve_set(int twist) {
 		bn_copy(&curve_r, r);
 
 		curve_is_twist = twist;
+
+#if defined(EP_PRECO)
+		ep2_mul_pre(ep2_curve_get_tab(), &curve_g);
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
