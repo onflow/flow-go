@@ -274,7 +274,7 @@ void ft_poly_set_penta(int a, int b, int c, int d);
  *
  * @return the cube root of z.
  */
-dig_t *ft_poly_get_srz(void);
+dig_t *ft_poly_get_crz(void);
 
 /**
  * Returns the square of the cube root of z.
@@ -282,6 +282,29 @@ dig_t *ft_poly_get_srz(void);
  * @return the square of the cube root of z.
  */
 dig_t *ft_poly_get_srz(void);
+
+/**
+ * Returns the square of the cube root of z in sparse form.
+ *
+ * @param[out] len			- the number of terms in the squared cube root of z.
+ * @return the square of the cube root of z in sparse form.
+ */
+int *ft_poly_get_srz_spars(int *len);
+
+/**
+ * Returns the cube root of z.
+ *
+ * @return the cube root of z.
+ */
+dig_t *ft_poly_get_crz(void);
+
+/**
+ * Returns the cube root of z in sparse form.
+ *
+ * @param[out] len			- the number of terms in the cube root of z.
+ * @return the cube root of z in sparse form.
+ */
+int *ft_poly_get_crz_spars(int *len);
 
 /**
  * Returns sqrt(z) * (i represented as a polynomial).
@@ -360,40 +383,6 @@ void ft_poly_add(ft_t c, ft_t a);
  * @param[in] a				- the ternary field element.
  */
 void ft_poly_sub(ft_t c, ft_t a);
-
-#if ALLOC == DYNAMIC
-/**
- * Allocates and initializes a new ternary field element with dynamic allocation.
- *
- * @param[out] a			- the new ternary field element.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
- */
-void ft_new_dynam(ft_t *a);
-#elif ALLOC == STATIC
-/**
- * Allocates and initializes a new ternary field element with static allocation.
- *
- * @param[out] a			- the new ternary field element.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
- */
-void ft_new_statc(ft_t *a);
-#endif
-
-#if ALLOC == DYNAMIC
-/**
- * Cleans and frees a ternary field element with dynamic allocation.
- *
- * @param[out] a			- the ternary field element to free.
- */
-void ft_free_dynam(ft_t *a);
-#else /* ALLOC == STATIC */
-/**
- * Cleans and frees a ternary field element with static allocation.
- *
- * @param[out] a			- the ternary field element to free.
- */
-void ft_free_statc(ft_t *a);
-#endif
 
 /**
  * Copies the second argument to the first argument.

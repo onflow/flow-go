@@ -436,40 +436,6 @@ void fb_poly_add(fb_t c, fb_t a);
  */
 void fb_poly_sub(fb_t c, fb_t a);
 
-#if ALLOC == DYNAMIC
-/**
- * Allocates and initializes a new binary field element with dynamic allocation.
- *
- * @param[out] a			- the new binary field element.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
- */
-void fb_new_dynam(fb_t *a);
-#elif ALLOC == STATIC
-/**
- * Allocates and initializes a new binary field element with static allocation.
- *
- * @param[out] a			- the new binary field element.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
- */
-void fb_new_statc(fb_t *a);
-#endif
-
-#if ALLOC == DYNAMIC
-/**
- * Cleans and frees a binary field element with dynamic allocation.
- *
- * @param[out] a			- the binary field element to free.
- */
-void fb_free_dynam(fb_t *a);
-#else /* ALLOC == STATIC */
-/**
- * Cleans and frees a binary field element with static allocation.
- *
- * @param[out] a			- the binary field element to free.
- */
-void fb_free_statc(fb_t *a);
-#endif
-
 /**
  * Copies the second argument to the first argument.
  *
