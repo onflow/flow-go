@@ -66,12 +66,9 @@ static bn_st curve_r;
  * @{
  */
 static fp_st curve_beta;
-static bn_st curve_v1;
-static bn_st curve_v2;
-static bn_st curve_v10;
-static bn_st curve_v11;
-static bn_st curve_v20;
-static bn_st curve_v21;
+static bn_st curve_v1[3];
+static bn_st curve_v2[3];
+
 /**
  * @}
  */
@@ -179,6 +176,12 @@ void ep_curve_init(void) {
 #endif
 	ep_set_infty(&curve_g);
 	bn_init(&curve_r, FP_DIGS);
+#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || !defined(STRIP))
+	for (int i = 0; i < 3; i++) {
+		bn_init(&curve_v1[i], FP_DIGS);
+		bn_init(&curve_v2[i], FP_DIGS);
+	}
+#endif
 }
 
 void ep_curve_clean(void) {
@@ -193,6 +196,12 @@ void ep_curve_clean(void) {
 	}
 #endif
 	bn_clean(&curve_r);
+#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || !defined(STRIP))
+	for (int i = 0; i < 3; i++) {
+		bn_clean(&curve_v1[i]);
+		bn_clean(&curve_v2[i]);
+	}
+#endif
 }
 
 dig_t *ep_curve_get_b() {
@@ -209,28 +218,16 @@ dig_t *ep_curve_get_beta() {
 	return curve_beta;
 }
 
-void ep_curve_get_v1(bn_t v) {
-	bn_copy(v, &curve_v1);
+void ep_curve_get_v1(bn_t v[]) {
+	for (int i = 0; i < 3; i++) {
+		bn_copy(v[i], &curve_v1[i]);
+	}
 }
 
-void ep_curve_get_v2(bn_t v) {
-	bn_copy(v, &curve_v2);
-}
-
-void ep_curve_get_v10(bn_t v) {
-	bn_copy(v, &curve_v10);
-}
-
-void ep_curve_get_v11(bn_t v) {
-	bn_copy(v, &curve_v11);
-}
-
-void ep_curve_get_v20(bn_t v) {
-	bn_copy(v, &curve_v20);
-}
-
-void ep_curve_get_v21(bn_t v) {
-	bn_copy(v, &curve_v21);
+void ep_curve_get_v2(bn_t v[]) {
+	for (int i = 0; i < 3; i++) {
+		bn_copy(v[i], &curve_v2[i]);
+	}
 }
 
 #endif
@@ -274,6 +271,8 @@ ep_t *ep_curve_get_tab() {
 #if defined(EP_ORDIN)
 
 void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
+	curve_is_kbltz = 0;
+
 	fp_copy(curve_a, a);
 	fp_copy(curve_b, b);
 
@@ -292,17 +291,44 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
 
 #if defined(EP_KBLTZ)
 
-void ep_curve_set_kbltz(fp_t beta, bn_t v1, bn_t v2, bn_t v10, bn_t v11, bn_t v20, bn_t v21) {
+void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, fp_t beta, bn_t l) {
+	int bits = bn_bits(r);
+
 	curve_is_kbltz = 1;
-#if EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP)
+
+	fp_zero(curve_a);
+	fp_copy(curve_b, b);
 	fp_copy(curve_beta, beta);
-	bn_copy(&curve_v1, v1);
-	bn_copy(&curve_v2, v2);
-	bn_copy(&curve_v10, v10);
-	bn_copy(&curve_v11, v11);
-	bn_copy(&curve_v20, v20);
-	bn_copy(&curve_v21, v21);
+
+	detect_opt(&curve_opt_a, curve_a);
+	detect_opt(&curve_opt_b, curve_b);
+
+	ep_norm(g, g);
+	ep_copy(&curve_g, g);
+	bn_copy(&curve_r, r);
+
+#if EP_MUL == LWNAF || EP_FIX == LWNAF || EP_FIX == COMBS || EP_SIM == INTER || !defined(STRIP)
+	bn_gcd_ext_mid(&curve_v1[1], &curve_v1[2], &curve_v2[1], &curve_v2[2], l, r);
+	/* l = v1[1] * v2[2] - v1[2] * v2[1], r = l / 2. */
+	bn_mul(&curve_v1[0], &curve_v1[1], &curve_v2[2]);
+	bn_mul(&curve_v2[0], &curve_v1[2], &curve_v2[1]);
+	bn_sub(l, &curve_v1[0], &curve_v2[0]);
+	bn_hlv(r, l);
+	/* v1[0] = round(v2[2] * 2^|n| / l). */
+	bn_lsh(&curve_v1[0], &curve_v2[2], bits + 1);
+	bn_add(&curve_v1[0], &curve_v1[0], r);
+	bn_div(&curve_v1[0], &curve_v1[0], l);
+	/* v2[0] = round(v1[2] * 2^|n| / l). */
+	bn_lsh(&curve_v2[0], &curve_v1[2], bits + 1);
+	bn_add(&curve_v2[0], &curve_v2[0], r);
+	bn_div(&curve_v2[0], &curve_v2[0], l);
+	bn_neg(&curve_v2[0], &curve_v2[0]);
 #endif
+
+#if defined(EP_PRECO)
+	ep_mul_pre(ep_curve_get_tab(), &curve_g);
+#endif
+
 }
 
 #endif

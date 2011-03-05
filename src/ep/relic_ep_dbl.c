@@ -76,9 +76,11 @@ static void ep_dbl_basic_impl(ep_t r, ep_t p) {
 			case OPT_ONE:
 				fp_add_dig(t1, t1, (dig_t)1);
 				break;
+#if FP_RDC != MONTY
 			case OPT_DIGIT:
 				fp_add_dig(t1, t1, ep_curve_get_a()[0]);
 				break;
+#endif
 			default:
 				fp_add(t1, t1, ep_curve_get_a());
 				break;

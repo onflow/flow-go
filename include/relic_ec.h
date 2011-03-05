@@ -161,7 +161,11 @@ typedef CAT(EC_LOWER, t) ec_t;
  * Configures some set of curve parameters for the current security level.
  */
 #if EC_CUR == PRIME
+#if defined(EC_KBLTZ)
+#define ec_param_set_any()	ep_param_set_any_kbltz()
+#else
 #define ec_param_set_any()	ep_param_set_any()
+#endif
 #elif EC_CUR == CHAR2
 #if defined(EC_KBLTZ)
 #define ec_param_set_any()	eb_param_set_any_kbltz()

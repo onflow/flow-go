@@ -42,6 +42,7 @@
 void ep_pck(ep_t r, ep_t p) {
 	int b = fp_get_bit(p->y, 0);
 	fp_copy(r->x, p->x);
+	fp_zero(r->y);
 	fp_set_bit(r->y, 0, b);
 	r->norm = 1;
 }
@@ -70,10 +71,12 @@ void ep_upk(ep_t r, ep_t p) {
 			case OPT_ONE:
 				fp_add(t1, t1, p->x);
 				break;
+#if FP_RDC != MONTY
 			case OPT_DIGIT:
 				fp_mul_dig(t2, p->x, ep_curve_get_a()[0]);
 				fp_add(t1, t1, t2);
 				break;
+#endif
 			default:
 				fp_mul(t2, p->x, ep_curve_get_a());
 				fp_add(t1, t1, t2);
@@ -86,9 +89,11 @@ void ep_upk(ep_t r, ep_t p) {
 			case OPT_ONE:
 				fp_add_dig(t1, t1, 1);
 				break;
+#if FP_RDC != MONTY
 			case OPT_DIGIT:
 				fp_add_dig(t1, t1, ep_curve_get_b()[0]);
 				break;
+#endif
 			default:
 				fp_add(t1, t1, ep_curve_get_b());
 				break;

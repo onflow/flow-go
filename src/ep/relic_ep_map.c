@@ -79,9 +79,11 @@ void ep_map(ep_t p, unsigned char *msg, int len) {
 				case OPT_ONE:
 					fp_add(t1, t1, p->x);
 					break;
+#if FP_RDC != MONTY
 				case OPT_DIGIT:
 					fp_mul_dig(t0, p->x, ep_curve_get_a()[0]);
 					fp_add(t1, t1, t0);
+#endif
 					break;
 				default:
 					fp_mul(t0, p->x, ep_curve_get_a());

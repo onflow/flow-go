@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Implementation of the square root functions.
+ * Implementation of the square root function.
  *
  * @version $Id$
  * @ingroup bn

@@ -71,26 +71,34 @@ static void table_init(ep_t * t, ep_t p) {
 void ep_mul_glv_impl(ep_t r, ep_t p, bn_t k) {
 	int len, l0, l1, i, n0, n1, s0, s1;
 	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
-	bn_t k0, k1;
+	bn_t n, k0, k1, v1[3], v2[3];
 	ep_t q;
 	ep_t table[1 << (EP_WIDTH - 2)];
 
+	bn_null(n);
 	bn_null(k0);
 	bn_null(k1);
 	ep_null(q);
-	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-		ep_null(table[i]);
-	}
 
 	TRY {
 		bn_new(k0);
 		bn_new(k1);
 		ep_new(q);
 		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
+			ep_null(table[i]);
 			ep_new(table[i]);
 		}
+		for (i = 0; i < 3; i++) {
+			bn_null(v1[i]);
+			bn_null(v2[i]);
+			bn_new(v1[i]);
+			bn_new(v2[i]);
+		}
 
-		bn_rec_glv(k0, k1, k);
+		ep_curve_get_ord(n);
+		ep_curve_get_v1(v1);
+		ep_curve_get_v2(v2);
+		bn_rec_glv(k0, k1, k, n, v1, v2);
 		s0 = bn_sign(k0);
 		s1 = bn_sign(k1);
 		bn_abs(k0, k0);
@@ -152,12 +160,16 @@ void ep_mul_glv_impl(ep_t r, ep_t p, bn_t k) {
 	FINALLY {
 		bn_free(k0);
 		bn_free(k1);
+		bn_free(n)
 		ep_free(q);
-
-		/* Free the precomputation table. */
 		for (i = 0; i < 1 << (EP_WIDTH - 2); i++) {
 			ep_free(table[i]);
 		}
+		for (i = 0; i < 3; i++) {
+			bn_free(v1[i]);
+			bn_free(v2[i]);
+		}
+
 	}
 }
 

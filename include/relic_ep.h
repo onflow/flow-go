@@ -50,22 +50,30 @@
 enum {
 	/** SECG P-160 prime curve. */
 	SECG_P160 = 1,
+	/** SECG K-160 prime curve. */
+	SECG_K160,
 	/** NIST P-192 prime curve. */
-	NIST_P192 = 2,
+	NIST_P192,
+	/** SECG K-192 prime curve. */
+	SECG_K192,
 	/** NIST P-224 prime curve. */
-	NIST_P224 = 3,
+	NIST_P224,
+	/** SECG K-224 prime curve. */
+	SECG_K224,
 	/** NIST P-256 prime curve. */
-	NIST_P256 = 4,
+	NIST_P256,
+	/** SECG K-256 prime curve. */
+	SECG_K256,
 	/** NIST P-384 prime curve. */
-	NIST_P384 = 5,
+	NIST_P384,
 	/** NIST P-521 prime curve. */
-	NIST_P521 = 6,
+	NIST_P521,
 	/** Barreto-Naehrig curve with positive x */
-	BN_P158 = 7,
+	BN_P158,
 	/** Barreto-Naehrig curve with negative x (found by Nogami et al.). */
-	BN_P254 = 8,
+	BN_P254,
 	/** Barreto-Naehrig curve with positive x. */
-	BN_P256 = 9,
+	BN_P256,
 };
 
 /**
@@ -403,12 +411,12 @@ dig_t *ep_curve_get_beta();
 /**
  * Returns the parameter V1 of the prime curve.
  */
-void ep_curve_get_v1(bn_t v);
+void ep_curve_get_v1(bn_t v[]);
 
 /**
  * Returns the parameter V2 of the prime curve.
  */
-void ep_curve_get_v2(bn_t v);
+void ep_curve_get_v2(bn_t v[]);
 
 /**
  * Returns the parameter V10 of the prime curve.
@@ -500,12 +508,13 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r);
 /**
  * Configures a new Koblitz prime elliptic curve by its coefficients.
  *
- * @param[in] a			- the coefficient a of the curve.
  * @param[in] b			- the coefficient b of the curve.
  * @param[in] g			- the generator.
  * @param[in] r			- the order of the group of points.
+ * @param[in] beta		- the constant associated with the endomorphism.
+ * @param[in] l			- the exponent corresponding to the endomorphism.
  */
-void ep_curve_set_kbltz(fp_t glvb, bn_t glv1, bn_t glv2, bn_t v10, bn_t v11, bn_t v20, bn_t v21);
+void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, fp_t beta, bn_t l);
 
 /**
  * Configures a new pairing-friendly prime elliptic curve by its coefficients.
@@ -536,6 +545,14 @@ int ep_param_set_any(void);
  * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
  */
 int ep_param_set_any_ordin(void);
+
+/**
+ * Configures some set of Koblitz curve parameters for the current security
+ * level.
+ *
+ * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
+ */
+int ep_param_set_any_kbltz(void);
 
 /**
  * Configures some set of pairing-friendly curve parameters for the current

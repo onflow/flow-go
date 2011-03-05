@@ -43,7 +43,7 @@
 
 #if defined(EP_ORDIN) && FP_PRIME == 160
 /**
- * Parameters for the SECG P-160 binary elliptic curve.
+ * Parameters for the SECG P-160 prime elliptic curve.
  */
 /** @{ */
 #define SECG_P160_A		"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7FFFFFFC"
@@ -54,9 +54,24 @@
 /** @} */
 #endif
 
+#if defined(EP_KBLTZ) && FP_PRIME == 160
+/**
+ * Parameters for the SECG K-160 prime elliptic curve.
+ */
+/** @{ */
+#define SECG_K160_A		"0"
+#define SECG_K160_B		"7"
+#define SECG_K160_X		"3B4C382CE37AA192A4019E763036F4F5DD4D7EBB"
+#define SECG_K160_Y		"938CF935318FDCED6BC28286531733C3F03C4FEE"
+#define SECG_K160_R		"100000000000000000001B8FA16DFAB9ACA16B6B3"
+#define SECG_K160_BETA	"645B7345A143464942CC46D7CF4D5D1E1E6CBB68"
+#define SECG_K160_LAMB	"F3C6393C4C5C9288FE47F1DFF787A6EC6D16B2BE"
+/** @} */
+#endif
+
 #if defined(EP_ORDIN) && FP_PRIME == 192
 /**
- * Parameters for the NIST P-192 binary elliptic curve.
+ * Parameters for the NIST P-192 prime elliptic curve.
  */
 /** @{ */
 #define NIST_P192_A		"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFFFC"
@@ -67,9 +82,24 @@
 /** @} */
 #endif
 
+#if defined(EP_KBLTZ) && FP_PRIME == 192
+/**
+ * Parameters for the SECG K-192 prime elliptic curve.
+ */
+/** @{ */
+#define SECG_K192_A		"0"
+#define SECG_K192_B		"3"
+#define SECG_K192_X		"DB4FF10EC057E9AE26B07D0280B7F4341DA5D1B1EAE06C7D"
+#define SECG_K192_Y		"9B2F2F6D9C5628A7844163D015BE86344082AA88D95E2F9D"
+#define SECG_K192_R		"FFFFFFFFFFFFFFFFFFFFFFFE26F2FC170F69466A74DEFD8D"
+#define SECG_K192_BETA	"447A96E6C647963E2F7809FEAAB46947F34B0AA3CA0BBA74"
+#define SECG_K192_LAMB	"C27B0D93EDDC7284B0C2AE9813318686DBB7A0EA73692CDB"
+/** @} */
+#endif
+
 #if defined(EP_ORDIN) && FP_PRIME == 224
 /**
- * Parameters for the NIST P-192 binary elliptic curve.
+ * Parameters for the NIST P-192 prime elliptic curve.
  */
 /** @{ */
 #define NIST_P224_A		"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFE"
@@ -80,9 +110,24 @@
 /** @} */
 #endif
 
+#if defined(EP_KBLTZ) && FP_PRIME == 224
+/**
+ * Parameters for the SECG K-224 prime elliptic curve.
+ */
+/** @{ */
+#define SECG_K224_A		"0"
+#define SECG_K224_B		"5"
+#define SECG_K224_X		"A1455B334DF099DF30FC28A169A467E9E47075A90F7E650EB6B7A45C"
+#define SECG_K224_Y		"7E089FED7FBA344282CAFBD6F7E319F7C0B0BD59E2CA4BDB556D61A5"
+#define SECG_K224_R		"10000000000000000000000000001DCE8D2EC6184CAF0A971769FB1F7"
+#define SECG_K224_BETA	"FE0E87005B4E83761908C5131D552A850B3F58B749C37CF5B84D6768"
+#define SECG_K224_LAMB	"60DCD2104C4CBC0BE6EEEFC2BDD610739EC34E317F9B33046C9E4788"
+/** @} */
+#endif
+
 #if defined(EP_ORDIN) && FP_PRIME == 256
 /**
- * Parameters for the NIST P-192 binary elliptic curve.
+ * Parameters for the NIST P-256 prime elliptic curve.
  */
 /** @{ */
 #define NIST_P256_A		"FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC"
@@ -93,9 +138,24 @@
 /** @} */
 #endif
 
+#if defined(EP_KBLTZ) && FP_PRIME == 256
+/**
+ * Parameters for the SECG K-256 prime elliptic curve.
+ */
+/** @{ */
+#define SECG_K256_A		"0"
+#define SECG_K256_B		"7"
+#define SECG_K256_X		"79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"
+#define SECG_K256_Y		"483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"
+#define SECG_K256_R		"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+#define SECG_K256_BETA	"7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE"
+#define SECG_K256_LAMB	"5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72"
+/** @} */
+#endif
+
 #if defined(EP_ORDIN) && FP_PRIME == 384
 /**
- * Parameters for the NIST P-192 binary elliptic curve.
+ * Parameters for the NIST P-192 prime elliptic curve.
  */
 /** @{ */
 #define NIST_P384_A		"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFF0000000000000000FFFFFFFC"
@@ -108,7 +168,7 @@
 
 #if defined(EP_ORDIN) && FP_PRIME == 521
 /**
- * Parameters for the NIST P-192 binary elliptic curve.
+ * Parameters for the NIST P-192 prime elliptic curve.
  */
 /** @{ */
 #define NIST_P521_A		"1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC"
@@ -119,9 +179,9 @@
 /** @} */
 #endif
 
-#if defined(EP_ORDIN) && FP_PRIME == 158
+#if defined(EP_KBLTZ) && FP_PRIME == 158
 /**
- * Parameters for a pairing-friendly prime curve.
+ * Parameters for a 158-bit pairing-friendly prime curve.
  */
 /** @{ */
 #define BN_P158_A		"0"
@@ -129,19 +189,14 @@
 #define BN_P158_X		"1"
 #define BN_P158_Y		"2"
 #define BN_P158_R		"240000006ED000007FE96000419F59800C9FFD81"
-#define BN_P158_GLVB	"240000006E8800007F434000411F93C00C7F3B08"
-#define BN_P158_GLV1	"15555555348E38E3B3FE4"
-#define BN_P158_GLV2	"-1C71C71C304"
-#define BN_P158_GLV_V10	"600000009380000038A8"
-#define BN_P158_GLV_V11	"-8000000063"
-#define BN_P158_GLV_V20	"8000000063"
-#define BN_P158_GLV_V21	"6000000094000000390B"
+#define BN_P158_BETA	"240000006E8800007F434000411F93C00C7F3B08"
+#define BN_P158_LAMB	"240000006E4000007E9D800040A064000C5EB323"
 /** @} */
 #endif
 
-#if defined(EP_ORDIN) && FP_PRIME == 254
+#if defined(EP_KBLTZ) && FP_PRIME == 254
 /**
- * Parameters for a pairing-friendly prime curve.
+ * Parameters for a 254-bit pairing-friendly prime curve.
  */
 /** @{ */
 #define BN_P254_A		"0"
@@ -149,19 +204,14 @@
 #define BN_P254_X		"2523648240000001BA344D80000000086121000000000013A700000000000012"
 #define BN_P254_Y		"1"
 #define BN_P254_R		"2523648240000001BA344D8000000007FF9F800000000010A10000000000000D"
-#define BN_P254_GLVB	"25236482400000017080EB4000000006181800000000000CD98000000000000B"
-#define BN_P254_GLV1	"1BC9BE5344535A482"
-#define BN_P254_GLV2	"-1500FD5BF02500BDE9D117E33E0953E2E"
-#define BN_P254_GLV_V10	"8100000000000001"
-#define BN_P254_GLV_V11	"61818000000000028500000000000004"
-#define BN_P254_GLV_V20	"61818000000000020400000000000003"
-#define BN_P254_GLV_V21	"-8100000000000001"
+#define BN_P254_BETA	"25236482400000017080EB4000000006181800000000000CD98000000000000B"
+#define BN_P254_LAMB	"252364824000000126CD8900000000024908FFFFFFFFFFFCF9FFFFFFFFFFFFF6"
 /** @} */
 #endif
 
-#if defined(EP_ORDIN) && FP_PRIME == 256
+#if defined(EP_KBLTZ) && FP_PRIME == 256
 /**
- * Parameters for a pairing-friendly prime curve.
+ * Parameters for a 256-bit pairing-friendly prime curve.
  */
 /** @{ */
 #define BN_P256_A		"0"
@@ -169,6 +219,8 @@
 #define BN_P256_X		"1"
 #define BN_P256_Y		"2"
 #define BN_P256_R		"B64000000000ECBF9E00000073543403580018F82536ABEC4206F9942A5D7249"
+#define BN_P256_BETA	"B64000000000ECBEAB00000073534743F00018F7D85401A5A206F14178FC918C"
+#define BN_P256_LAMB	"B64000000000ECBDB800000073525A85600018F78B71E3AE0206E8EEDE64BA63"
 /** @} */
 #endif
 
@@ -225,86 +277,23 @@ static void copy_from_rom(char *dest, const char *src) {
 	PREPARE(str, CURVE##_R);												\
 	bn_read_str(r, str, strlen(str), 16);									\
 
-#define ASSIGN_GLV(CURVE, FIELD)											\
-	PREPARE(str, CURVE##_GLVB);												\
+/**
+ * Assigns a set of Koblitz elliptic curve parameters.
+ *
+ * @param[in] CURVE		- the curve parameters to assign.
+ * @param[in] FIELD		- the finite field identifier.
+ */
+#define ASSIGNK(CURVE, FIELD)												\
+	ASSIGN(CURVE, FIELD);													\
+	PREPARE(str, CURVE##_BETA);												\
 	fp_read(beta, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_GLV1);												\
-	bn_read_str(v1, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_GLV2);												\
-	bn_read_str(v2, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_GLV_V10);											\
-	bn_read_str(v10, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_GLV_V11);											\
-	bn_read_str(v11, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_GLV_V20);											\
-	bn_read_str(v20, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_GLV_V21);											\
-	bn_read_str(v21, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_LAMB);												\
+	bn_read_str(lamb, str, strlen(str), 16);								\
 
 /**
  * Current configured elliptic curve parameters.
  */
 static int param_id;
-
-static void ep_param_set_galav(int param) {
-	fp_t beta;
-	bn_t v1, v2, v10, v11, v20, v21;
-#if ARCH == AVR
-	char str[2 * FP_DIGS + 1];
-#else
-	char *str;
-#endif
-
-	fp_null(beta);
-	bn_null(v1);
-	bn_null(v2);
-	bn_null(v10);
-	bn_null(v11);
-	bn_null(v20);
-	bn_null(v21);
-
-	TRY {
-		fp_new(beta);
-		bn_new(v1);
-		bn_new(v2);
-		bn_new(v10);
-		bn_new(v11);
-		bn_new(v20);
-		bn_new(v21);
-
-		switch (param) {
-#if defined(EP_KBLTZ) && FP_PRIME == 158
-			case BN_P158:
-				ASSIGN_GLV(BN_P158, BN_158);
-				break;
-#endif
-#if defined(EP_KBLTZ) && FP_PRIME == 254
-			case BN_P254:
-				ASSIGN_GLV(BN_P254, BN_254);
-				break;
-#endif
-			default:
-				(void)str;
-				THROW(ERR_INVALID);
-				break;
-		}
-#if defined(EP_KBLTZ)
-		ep_curve_set_kbltz(beta, v1, v2, v10, v11, v20, v21);
-#endif
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fp_free(glvb);
-		bn_free(v1);
-		bn_free(v2);
-		bn_free(v10);
-		bn_free(v11);
-		bn_free(v20);
-		bn_free(v21);
-	}
-}
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -322,26 +311,42 @@ void ep_param_set(int param) {
 #else
 	char *str;
 #endif
-	fp_t a, b;
+	fp_t a, b, beta;
 	ep_t g;
-	bn_t r;
+	bn_t r, lamb;
 
 	fp_null(a);
 	fp_null(b);
+	fp_null(beta);
+	bn_null(lamb);
 	ep_null(g);
 	bn_null(r);
 
 	TRY {
 		fp_new(a);
 		fp_new(b);
+		fp_new(beta);
+		bn_new(lamb);
 		ep_new(g);
 		bn_new(r);
 
 		switch (param) {
+#if defined(EP_KBLTZ) && FP_PRIME == 158
+			case BN_P158:
+				ASSIGNK(BN_P158, BN_158);
+				kbltz = 1;
+				break;
+#endif
 #if defined(EP_ORDIN) && FP_PRIME == 160
 			case SECG_P160:
 				ASSIGN(SECG_P160, SECG_160);
 				ordin = 1;
+				break;
+#endif
+#if defined(EP_KBLTZ) && FP_PRIME == 160
+			case SECG_K160:
+				ASSIGNK(SECG_K160, SECG_160D);
+				kbltz = 1;
 				break;
 #endif
 #if defined(EP_ORDIN) && FP_PRIME == 192
@@ -350,16 +355,44 @@ void ep_param_set(int param) {
 				ordin = 1;
 				break;
 #endif
+#if defined(EP_KBLTZ) && FP_PRIME == 192
+			case SECG_K192:
+				ASSIGNK(SECG_K192, SECG_192);
+				kbltz = 1;
+				break;
+#endif
 #if defined(EP_ORDIN) && FP_PRIME == 224
 			case NIST_P224:
 				ASSIGN(NIST_P224, NIST_224);
 				ordin = 1;
 				break;
 #endif
+#if defined(EP_KBLTZ) && FP_PRIME == 224
+			case SECG_K224:
+				ASSIGNK(SECG_K224, SECG_224);
+				kbltz = 1;
+				break;
+#endif
+#if defined(EP_KBLTZ) && FP_PRIME == 254
+			case BN_P254:
+				ASSIGNK(BN_P254, BN_254);
+				kbltz = 1;
+				break;
+#endif
 #if defined(EP_ORDIN) && FP_PRIME == 256
 			case NIST_P256:
 				ASSIGN(NIST_P256, NIST_256);
 				ordin = 1;
+				break;
+#endif
+#if defined(EP_KBLTZ) && FP_PRIME == 256
+			case SECG_K256:
+				ASSIGNK(SECG_K256, SECG_256);
+				kbltz = 1;
+				break;
+			case BN_P256:
+				ASSIGNK(BN_P256, BN_256);
+				kbltz = 1;
 				break;
 #endif
 #if defined(EP_ORDIN) && FP_PRIME == 384
@@ -372,24 +405,6 @@ void ep_param_set(int param) {
 			case NIST_P521:
 				ASSIGN(NIST_P521, NIST_521);
 				ordin = 1;
-				break;
-#endif
-#if defined(EP_ORDIN) && FP_PRIME == 158
-			case BN_P158:
-				ASSIGN(BN_P158, BN_158);
-				kbltz = 1;
-				break;
-#endif
-#if defined(EP_ORDIN) && FP_PRIME == 254
-			case BN_P254:
-				ASSIGN(BN_P254, BN_254);
-				kbltz = 1;
-				break;
-#endif
-#if defined(EP_ORDIN) && FP_PRIME == 256
-			case BN_P256:
-				ASSIGN(BN_P256, BN_256);
-				kbltz = 1;
 				break;
 #endif
 			default:
@@ -412,13 +427,7 @@ void ep_param_set(int param) {
 
 #if defined(EP_KBLTZ)
 		if (kbltz) {
-			//ep_curve_set_kbltz(a, g, r, h);
-			ep_param_set_galav(param);
-			ep_curve_set_ordin(a, b, g, r);
-		}
-#elif defined(EP_ORDIN)
-		if (kbltz) {
-			ep_curve_set_ordin(a, b, g, r);
+			ep_curve_set_kbltz(b, g, r, beta, lamb);
 		}
 #endif
 	}
@@ -428,6 +437,8 @@ void ep_param_set(int param) {
 	FINALLY {
 		fp_free(a);
 		fp_free(b);
+		fp_free(beta);
+		bn_free(lamb);
 		ep_free(g);
 		bn_free(r);
 	}
@@ -470,8 +481,16 @@ int ep_param_set_any_kbltz() {
 	int r = STS_OK;
 #if FP_PRIME == 158
 	ep_param_set(BN_P158);
+#elif FP_PRIME == 160
+	ep_param_set(SECG_K160);
+#elif FP_PRIME == 192
+	ep_param_set(SECG_K192);
+#elif FP_PRIME == 224
+	ep_param_set(SECG_K224);
 #elif FP_PRIME == 254
 	ep_param_set(BN_P254);
+#elif FP_PRIME == 256
+	ep_param_set(SECG_K256);
 #else
 	r = STS_ERR;
 #endif
@@ -500,14 +519,26 @@ void ep_param_print() {
 		case SECG_P160:
 			util_print_banner("Curve SECG-P160:", 0);
 			break;
+		case SECG_K160:
+			util_print_banner("Curve SECG-K160:", 0);
+			break;
 		case NIST_P192:
 			util_print_banner("Curve NIST-P192:", 0);
+			break;
+		case SECG_K192:
+			util_print_banner("Curve SECG-K192:", 0);
 			break;
 		case NIST_P224:
 			util_print_banner("Curve NIST-P224:", 0);
 			break;
+		case SECG_K224:
+			util_print_banner("Curve SECG-K224:", 0);
+			break;
 		case NIST_P256:
 			util_print_banner("Curve NIST-P256:", 0);
+			break;
+		case SECG_K256:
+			util_print_banner("Curve SECG-K256:", 0);
 			break;
 		case NIST_P384:
 			util_print_banner("Curve NIST-P384:", 0);

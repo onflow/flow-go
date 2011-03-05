@@ -1116,10 +1116,25 @@ void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b);
 void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b);
 
 /**
+ * Computes the extended greatest common divisor of two multiple precision
+ * halfway through the algorithm returning also two short vectors
+ * v1 = (c, d), v2 = (-d, e) useful to decompose an integer k into k0, k1 such
+ * that k = k_0 + k_1 * a (mod b).
+ *
+ * @param[out] c			- the first component of the first vector.
+ * @param[out] d			- the second component of the first vector.
+ * @param[out] e			- the first component of the second vector.
+ * @param[out] f			- the second component of the second vector.
+ * @param[in] a				- the first multiple precision integer.
+ * @param[in] b				- the second multiple precision integer.
+ */
+void bn_gcd_ext_mid(bn_t c, bn_t d, bn_t e, bn_t f, bn_t a, bn_t b);
+
+/**
  * Computes the extended greatest common divisor of a multiple precision integer
  * and a digit.
  *
- * @param[out] c			- the result;
+ * @param[out] c			- the result.
  * @param[out] d			- the cofactor of the first operand, can be NULL.
  * @param[out] e			- the cofactor of the second operand, can be NULL.
  * @param[in] a				- the multiple precision integer.
@@ -1296,7 +1311,10 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l);
  * @param[out] k0			- the first part of the result.
  * @param[out] k1			- the second part of the result.
  * @param[in] k				- the integer to recode.
+ * @param[in] n				- the group order.
+ * @param[in] v1			- the set of parameters v1 for the GLV method.
+ * @param[in] v2			- the set of parameters v2 for the GLV method.
  */
-void bn_rec_glv(bn_t k0, bn_t k1, bn_t k);
+void bn_rec_glv(bn_t k0, bn_t k1, bn_t k, bn_t n, bn_t v1[], bn_t v2[]);
 
 #endif /* !RELIC_BN_H */

@@ -116,7 +116,7 @@ static void ep_mul_fix_ordin(ep_t r, ep_t * table, bn_t k) {
  */
 void ep_mul_combs_kbltz(ep_t r, ep_t * t, bn_t k) {
 	int i, j, l, w0, w1, n0, n1, p0, p1, s0, s1;
-	bn_t n, k0, k1;
+	bn_t n, k0, k1, v1[3], v2[3];
 	ep_t u;
 
 	bn_null(n);
@@ -129,12 +129,20 @@ void ep_mul_combs_kbltz(ep_t r, ep_t * t, bn_t k) {
 		bn_new(k0);
 		bn_new(k1);
 		ep_new(u);
+		for (i = 0; i < 3; i++) {
+			bn_null(v1[i]);
+			bn_null(v2[i]);
+			bn_new(v1[i]);
+			bn_new(v2[i]);
+		}
 
 		ep_curve_get_ord(n);
+		ep_curve_get_v1(v1);
+		ep_curve_get_v2(v2);
 		l = bn_bits(n);
 		l = ((l % (2 * EP_DEPTH)) == 0 ? (l / (2 * EP_DEPTH)) : (l / (2 * EP_DEPTH)) + 1);
 
-		bn_rec_glv(k0, k1, k);
+		bn_rec_glv(k0, k1, k, n, v1, v2);
 		s0 = bn_sign(k0);
 		s1 = bn_sign(k1);
 		bn_abs(k0, k0);
@@ -189,6 +197,10 @@ void ep_mul_combs_kbltz(ep_t r, ep_t * t, bn_t k) {
 		bn_free(k0);
 		bn_free(k1);
 		ep_free(u);
+		for (i = 0; i < 3; i++) {
+			bn_free(v1[i]);
+			bn_free(v2[i]);
+		}
 	}
 }
 
