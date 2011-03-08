@@ -220,7 +220,7 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 			}
 		}
 
-#if defined(EB_MIXED)
+#if defined(EP_MIXED)
 		ep_norm_sim(t + 1, t + 1, (1 << (EP_WIDTH)) - 1);
 #endif
 

@@ -528,7 +528,7 @@ void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
 	}
 #endif
 
-#if defined(EP_ORDIN) || defined(EB_SUPER)
+#if defined(EP_ORDIN) || defined(EP_SUPER)
 	ep_mul_combs_ordin(r, t, k);
 #endif
 }
