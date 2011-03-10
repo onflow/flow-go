@@ -416,7 +416,7 @@ void bn_read_bin(bn_t a, unsigned char *bin, int len, int sign) {
 	a->sign = sign;
 	bn_trim(a);
 }
-#include "assert.h"
+
 void bn_write_bin(unsigned char *bin, int *len, int *sign, bn_t a) {
 	int size, k;
 	dig_t d;
