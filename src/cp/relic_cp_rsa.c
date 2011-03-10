@@ -731,10 +731,12 @@ int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg,
 
 			if (sign == BN_POS) {
 				md_map(hash2, msg, msg_len);
-				if (memcmp(hash1, hash2, MD_LEN) == 0) {
-					/* Everything went ok, so signature status is changed. */
-					result = 1;
+				/* Everything went ok, so signature status is changed. */
+				result = 0;
+				for (int i = 0; i < MD_LEN; i++) {
+					result |= hash1[i] - hash2[i];
 				}
+				result = (result ? 0 : 1);
 			}
 		}
 	}

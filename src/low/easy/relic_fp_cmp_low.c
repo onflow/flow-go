@@ -46,14 +46,16 @@ int fp_cmp1_low(dig_t a, dig_t b) {
 }
 
 int fp_cmpn_low(dig_t *a, dig_t *b) {
-	int i;
+	int i, r;
 
 	a += (FP_DIGS - 1);
 	b += (FP_DIGS - 1);
+
+	r = CMP_EQ;
 	for (i = 0; i < FP_DIGS; i++, --a, --b) {
-		if (*a != *b) {
-			return (*a > *b ? CMP_GT : CMP_LT);
+		if (*a != *b && r == CMP_EQ) {
+			r = (*a > *b ? CMP_GT : CMP_LT);
 		}
 	}
-	return CMP_EQ;
+	return r;
 }
