@@ -316,11 +316,19 @@ void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, fp_t beta, bn_t l) {
 	bn_hlv(r, l);
 	/* v1[0] = round(v2[2] * 2^|n| / l). */
 	bn_lsh(&curve_v1[0], &curve_v2[2], bits + 1);
-	bn_add(&curve_v1[0], &curve_v1[0], r);
+	if (bn_sign(&curve_v1[0]) == BN_POS) {
+		bn_add(&curve_v1[0], &curve_v1[0], r);
+	} else {
+		bn_sub(&curve_v1[0], &curve_v1[0], r);
+	}
 	bn_div(&curve_v1[0], &curve_v1[0], l);
 	/* v2[0] = round(v1[2] * 2^|n| / l). */
 	bn_lsh(&curve_v2[0], &curve_v1[2], bits + 1);
-	bn_add(&curve_v2[0], &curve_v2[0], r);
+	if (bn_sign(&curve_v2[0]) == BN_POS) {
+		bn_add(&curve_v2[0], &curve_v2[0], r);
+	} else {
+		bn_sub(&curve_v2[0], &curve_v2[0], r);
+	}
 	bn_div(&curve_v2[0], &curve_v2[0], l);
 	bn_neg(&curve_v2[0], &curve_v2[0]);
 #endif
