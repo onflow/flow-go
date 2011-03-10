@@ -112,3 +112,17 @@ void fp_dblm_low(dig_t *c, dig_t *a) {
 		carry = fp_subn_low(c, c, fp_prime_get());
 	}
 }
+
+void fp_hlvm_low(fp_t c, fp_t a) {
+	dig_t carry = 0;
+
+	if (a[0] & 1) {
+		carry = mpn_add_n(c, a, fp_prime_get(), FP_DIGS);
+	} else {
+		fp_copy(c, a);
+	}
+	mpn_rshift(c, c, FP_DIGS, 1);
+	if (carry) {
+		c[FP_DIGS - 1] ^= ((dig_t)1 << (FP_DIGIT - 1));
+	}
+}
