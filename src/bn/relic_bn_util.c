@@ -125,7 +125,9 @@ int bn_bits(bn_t a) {
 int bn_test_bit(bn_t a, int bit) {
 	int d;
 	dig_t mask;
-
+if (bit > bn_bits(a)) {
+	printf("EITA\n");
+}
 	SPLIT(bit, d, bit, BN_DIG_LOG);
 
 	mask = ((dig_t)1) << bit;
@@ -414,9 +416,9 @@ void bn_read_bin(bn_t a, unsigned char *bin, int len, int sign) {
 	a->sign = sign;
 	bn_trim(a);
 }
-
+#include "assert.h"
 void bn_write_bin(unsigned char *bin, int *len, int *sign, bn_t a) {
-	int size;
+	int size, k;
 	dig_t d;
 
 	bn_size_bin(&size, a);
@@ -425,12 +427,19 @@ void bn_write_bin(unsigned char *bin, int *len, int *sign, bn_t a) {
 		THROW(ERR_NO_BUFFER);
 	}
 
-	for (int i = 0; i < a->used; i++) {
+	k = 0;
+	for (int i = 0; i < a->used - 1; i++) {
 		d = a->dp[i];
 		for (int j = 0; j < (int)sizeof(dig_t); j++) {
-			bin[i * sizeof(dig_t) + j] = d & 0xFF;
+			bin[k++] = d & 0xFF;
 			d = d >> 8;
 		}
+	}
+
+	d = a->dp[a->used - 1];
+	while (d != 0) {
+		bin[k++] = d & 0xFF;
+		d = d >> 8;
 	}
 
 	*len = size;
