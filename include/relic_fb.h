@@ -79,6 +79,8 @@ enum {
 	TRINO_113,
 	/** Hankerson's trinomial for GLS curves. */
 	TRINO_127,
+	/** Pentanomial for ECC2K-130 challenge. */
+	PENTA_131,
 	/** NIST 163-bit fast reduction polynomial. */
 	NIST_163,
 	/** Square-root friendly 163-bit polynomial. */
