@@ -291,11 +291,12 @@ static void find_chain() {
 			}
 			break;
 	}
+
 #ifdef FB_PRECO
-	fb_t t;
+	dv_t t;
 	int x, y, u[chain_len + 1];
 
-	fb_null(t);
+	dv_null(t);
 
 	TRY {
 		fb_new(t);
@@ -330,7 +331,7 @@ static void find_chain() {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fb_free(t);
+		dv_free(t);
 	}
 #endif
 }
