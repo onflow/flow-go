@@ -411,12 +411,10 @@ void fb_inv_almos(fb_t c, fb_t a) {
 
 void fb_inv_itoht(fb_t c, fb_t a) {
 	int i, j, x, y;
-	int *chain, len;
-
-	chain = fb_poly_get_chain(&len);
-
+	int len, *chain = fb_poly_get_chain(&len);
 	int u[len + 1];
 	fb_t table[len + 1];
+
 	for (i = 0; i <= len; i++) {
 		fb_null(table[i]);
 	}
