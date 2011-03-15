@@ -110,8 +110,9 @@ void fp_inv_binar(fp_t c, fp_t a) {
 				bn_hlv(g1, g1);
 			}
 
-			while (u->dp[u->used - 1] == 0)
+			while (u->dp[u->used - 1] == 0) {
 				u->used--;
+			}
 			if (u->used == 1 && u->dp[0] == 1)
 				break;
 
@@ -126,8 +127,9 @@ void fp_inv_binar(fp_t c, fp_t a) {
 				bn_hlv(g2, g2);
 			}
 
-			while (v->dp[v->used - 1] == 0)
+			while (v->dp[v->used - 1] == 0) {
 				v->used--;
+			}
 			if (v->used == 1 && v->dp[0] == 1)
 				break;
 
@@ -184,12 +186,10 @@ void fp_inv_binar(fp_t c, fp_t a) {
 #if FP_INV == MONTY || !defined(STRIP)
 
 void fp_inv_monty(fp_t c, fp_t a) {
-	fp_t t;
 	bn_t _a, _p, u, v, x1, x2;
 	dig_t *p = NULL, carry;
 	int i, k, flag = 0;
 
-	fp_null(t);
 	bn_null(_a);
 	bn_null(_p);
 	bn_null(u);
@@ -207,7 +207,6 @@ void fp_inv_monty(fp_t c, fp_t a) {
 		bn_new(x2);
 
 		p = fp_prime_get();
-		fp_zero(t);
 
 		/* u = a, v = p, x1 = 1, x2 = 0, k = 0. */
 		k = 0;
@@ -278,22 +277,21 @@ void fp_inv_monty(fp_t c, fp_t a) {
 		}
 
 		/* If k < Wt then x1 = x1 * R^2 * R^{-1} mod p. */
-		if (k < FP_DIGS * FP_DIGIT) {
+		if (k <= FP_DIGS * FP_DIGIT) {
 			flag = 1;
 			fp_mul(x1->dp, x1->dp, fp_prime_get_conv());
 			k = k + FP_DIGS * FP_DIGIT;
 		}
+
 		/* x1 = x1 * R^2 * R^{-1} mod p. */
 		fp_mul(x1->dp, x1->dp, fp_prime_get_conv());
-		fp_zero(t);
-		t[0] = 1;
-		if (k > FP_DIGS * FP_DIGIT) {
-			fp_lsh(t, t, 2 * FP_DIGS * FP_DIGIT - k);
-			/* c = x1 * 2^{2Wt - k} * R^{-1} mod p. */
-			fp_mul(c, x1->dp, t);
-		} else {
-			fp_prime_conv_dig(c, 1);
-		}
+
+		/* c = x1 * 2^(2Wt - k) * R^{-1} mod p. */
+		fp_copy(c, x1->dp);
+		dv_zero(x1->dp, FP_DIGS);
+		bn_set_2b(x1, 2 * FP_DIGS * FP_DIGIT - k);
+		fp_mul(c, c, x1->dp);
+		dv_print(c, FP_DIGS);
 #if FP_RDC != MONTY
 		/*
 		 * If we do not use Montgomery reduction, the result of inversion is
@@ -317,7 +315,6 @@ void fp_inv_monty(fp_t c, fp_t a) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp_free(t);
 		bn_free(_a);
 		bn_free(_p);
 		bn_free(u);
