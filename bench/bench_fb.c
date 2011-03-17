@@ -161,6 +161,7 @@ static void util(void) {
 static void arith(void) {
 	fb_t a, b, c, d[2];
 	dv_t e;
+	bn_t f;
 	int bits;
 
 	fb_null(a);
@@ -169,6 +170,7 @@ static void arith(void) {
 	fb_null(d[0]);
 	fb_null(d[1]);
 	dv_null(e);
+	bn_null(f);
 
 	fb_new(a);
 	fb_new(b);
@@ -177,6 +179,7 @@ static void arith(void) {
 	fb_new(d[1]);
 	dv_new(e);
 	dv_zero(e, 2 * FB_DIGS);
+	bn_new(f);
 
 	BENCH_BEGIN("fb_add") {
 		fb_rand(a);
@@ -493,6 +496,39 @@ static void arith(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fb_exp") {
+		fb_rand(a);
+		bn_rand(f, BN_POS, FB_BITS);
+		BENCH_ADD(fb_exp(c, a, f));
+	}
+	BENCH_END;
+
+#if FB_EXP == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fb_exp_basic") {
+		fb_rand(a);
+		bn_rand(f, BN_POS, FB_BITS);
+		BENCH_ADD(fb_exp_basic(c, a, f));
+	}
+	BENCH_END;
+#endif
+
+#if FB_EXP == SLIDE || !defined(STRIP)
+	BENCH_BEGIN("fb_exp_slide") {
+		fb_rand(a);
+		bn_rand(f, BN_POS, FB_BITS);
+		BENCH_ADD(fb_exp_slide(c, a, f));
+	}
+	BENCH_END;
+#endif
+
+#if FB_EXP == MONTY || !defined(STRIP)
+	BENCH_BEGIN("fb_exp_monty") {
+		fb_rand(a);
+		bn_rand(f, BN_POS, FB_BITS);
+		BENCH_ADD(fb_exp_monty(c, a, f));
+	}
+	BENCH_END;
+#endif
 
 	fb_free(a);
 	fb_free(b);
@@ -500,6 +536,7 @@ static void arith(void) {
 	fb_free(d[0]);
 	fb_free(d[1]);
 	dv_free(e);
+	bn_free(f);
 }
 
 int main(void) {

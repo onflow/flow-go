@@ -273,6 +273,17 @@
 #cmakedefine FB_SQRTF
 /** Precompute multiplication table for sqrt(z). */
 #cmakedefine FB_PRECO
+/** Width of window processing for exponentiation methods. */
+#define FB_WIDTH @FB_WIDTH@
+
+/** Binary modular exponentiation. */
+#define BASIC    1
+/** Sliding window modular exponentiation. */
+#define SLIDE    2
+/** Constant-time Montgomery powering ladder. */
+#define MONTY    3
+/** Chosen multiple precision modular exponentiation method. */
+#define FB_EXP   @FB_EXP@
 
 /** Binary field arithmetic method */
 #define FB_METHD "@FB_METHD@"

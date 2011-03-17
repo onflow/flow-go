@@ -36,6 +36,7 @@
 #ifndef RELIC_FB_H
 #define RELIC_FB_H
 
+#include "relic_bn.h"
 #include "relic_dv.h"
 #include "relic_conf.h"
 #include "relic_types.h"
@@ -295,6 +296,21 @@ typedef align dig_t fb_st[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
 #define fb_inv(C, A)	fb_inv_almos(C, A)
 #elif FB_INV == ITOHT
 #define fb_inv(C, A)	fb_inv_itoht(C, A)
+#endif
+
+/**
+ * Exponentiates a binary field element. Computes c = a^b.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the basis.
+ * @param[in] B				- the exponent.
+ */
+#if FB_EXP == BASIC
+#define fb_exp(C, A, B)		fb_exp_basic(C, A, B)
+#elif FB_EXP == SLIDE
+#define fb_exp(C, A, B)		fb_exp_slide(C, A, B)
+#elif FB_EXP == MONTY
+#define fb_exp(C, A, B)		fb_exp_monty(C, A, B)
 #endif
 
 /*============================================================================*/
@@ -729,15 +745,6 @@ void fb_lsh(fb_t c, fb_t a, int bits);
 void fb_rsh(fb_t c, fb_t a, int bits);
 
 /**
- * Exponentiates a binary field element. Computes c = a^b.
- *
- * @param[out] c			- the result.
- * @param[in] a				- the basis.
- * @param[in] b				- the exponent.
- */
-void fb_exp(fb_t c, fb_t a, fb_t b);
-
-/**
  * Reduces a multiplication result modulo an irreducible polynomial using
  * shift-and-add modular reduction.
  *
@@ -846,6 +853,35 @@ void fb_inv_lower(fb_t c, fb_t a);
  * @param[in] n				- the number of elements.
  */
 void fb_inv_sim(fb_t * c, fb_t * a, int n);
+
+/**
+ * Exponentiates a binary field element using the binary
+ * method.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fb_exp_basic(fb_t c, fb_t a, bn_t b);
+
+/**
+ * Exponentiates a binary field element using the sliding window method.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fb_exp_slide(fb_t c, fb_t a, bn_t b);
+
+/**
+ * Exponentiates a binary field element using the constant-time Montgomery
+ * powering ladder method.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fb_exp_monty(fb_t c, fb_t a, bn_t b);
 
 /**
  * Solves a quadratic equation for a, Tr(a) = 0 by repeated squarings and

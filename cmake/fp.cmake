@@ -7,7 +7,7 @@ message("      FP_PMERS=[off|on] Prefer Pseudo-Mersenne primes over random prime
 message("      FP_QNRES=[off|on] Use -1 as quadratic non-residue (make sure that p = 3 mod 8).")
 message("      FP_WIDTH=w        Width w in [2,6] of window processing for exponentiation methods.\n")
 
-message("   ** Available prime field arithmetic methods (default = COMBA;COMBA;MONTY;SLIDE):")
+message("   ** Available prime field arithmetic methods (default = BASIC;COMBA;COMBA;MONTY;MONTY;SLIDE):")
 message("      FP_METHD=BASIC    Schoolbook addition.")
 message("      FP_METHD=INTEG    Integrated modular addition.\n")
 

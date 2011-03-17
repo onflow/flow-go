@@ -257,7 +257,7 @@ static void eb_dbl_projc_ordin(eb_t r, eb_t p) {
 				fb_add(r->x, r->z, r->x);
 				break;
 			case OPT_DIGIT:
-				fb_mul(r->y, r->z, eb_curve_get_a());
+				fb_mul_dig(r->y, r->z, eb_curve_get_a()[0]);
 				fb_add(r->x, r->y, r->x);
 				break;
 			default:

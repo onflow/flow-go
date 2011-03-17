@@ -701,11 +701,10 @@ static int reduction(void) {
 			TEST_ASSERT(fb_is_zero(b) == 1, end);
 		} TEST_END;
 
-		dv_zero(t0, 2 * FB_DIGS);
-		dv_zero(t1, 2 * FB_DIGS);
-
 #if FB_RDC == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic modular reduction is correct") {
+			dv_zero(t0, 2 * FB_DIGS);
+			dv_zero(t1, 2 * FB_DIGS);
 			fb_rand(a);
 			fb_copy(t0 + FB_DIGS - 1, a);
 			fb_copy(t1 + FB_DIGS - 1, a);
@@ -717,6 +716,8 @@ static int reduction(void) {
 
 #if FB_RDC == QUICK || !defined(STRIP)
 		TEST_BEGIN("fast modular reduction is correct") {
+			dv_zero(t0, 2 * FB_DIGS);
+			dv_zero(t1, 2 * FB_DIGS);
 			fb_rand(a);
 			fb_copy(t0 + FB_DIGS - 1, a);
 			fb_copy(t1 + FB_DIGS - 1, a);
@@ -938,6 +939,75 @@ static int inversion(void) {
 	return code;
 }
 
+static int exponentiation(void) {
+	int code = STS_ERR;
+	fb_t a, b, c;
+	bn_t d;
+
+	fb_null(a);
+	fb_null(b);
+	fb_null(c);
+	bn_null(d);
+
+	TRY {
+		fb_new(a);
+		fb_new(b);
+		fb_new(c);
+		bn_new(d);
+
+		TEST_BEGIN("exponentiation is correct") {
+			fb_rand(a);
+			bn_set_2b(d, FB_BITS);
+			fb_exp(c, a, d);
+			TEST_ASSERT(fb_cmp(a, c) == CMP_EQ, end);
+		}
+		TEST_END;
+
+#if FB_EXP == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic exponentiation is correct") {
+			fb_rand(a);
+			bn_rand(d, BN_POS, FB_BITS);
+			fb_exp(c, a, d);
+			fb_exp_basic(b, a, d);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
+#if FB_EXP == SLIDE || !defined(STRIP)
+		TEST_BEGIN("sliding window exponentiation is correct") {
+			fb_rand(a);
+			bn_rand(d, BN_POS, FB_BITS);
+			fb_exp(c, a, d);
+			fb_exp_slide(b, a, d);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
+#if FB_EXP == MONTY || !defined(STRIP)
+		TEST_BEGIN("constant-time exponentiation is correct") {
+			fb_rand(a);
+			bn_rand(d, BN_POS, FB_BITS);
+			fb_exp(c, a, d);
+			fb_exp_monty(b, a, d);
+			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fb_free(a);
+	fb_free(b);
+	fb_free(c);
+	bn_free(d);
+	return code;
+}
+
 static int digit(void) {
 	int code = STS_ERR;
 	fb_t a, b, c, d;
@@ -1072,6 +1142,11 @@ int main(void) {
 	}
 
 	if (inversion() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (exponentiation() != STS_OK) {
 		core_clean();
 		return 1;
 	}
