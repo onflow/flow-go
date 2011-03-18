@@ -47,7 +47,7 @@
  * @param[in] a			- the dividend.
  * @param[in] b			- the the divisor.
  */
-static void bn_div_impl(bn_t c, bn_t d, bn_t a, bn_t b) {
+static void bn_div_imp(bn_t c, bn_t d, bn_t a, bn_t b) {
 	bn_t q, x, y, r;
 	int sign;
 
@@ -116,14 +116,14 @@ void bn_div(bn_t c, bn_t a, bn_t b) {
 	if (bn_is_zero(b)) {
 		THROW(ERR_INVALID);
 	}
-	bn_div_impl(c, NULL, a, b);
+	bn_div_imp(c, NULL, a, b);
 }
 
 void bn_div_rem(bn_t c, bn_t d, bn_t a, bn_t b) {
 	if (bn_is_zero(b)) {
 		THROW(ERR_INVALID);
 	}
-	bn_div_impl(c, d, a, b);
+	bn_div_imp(c, d, a, b);
 }
 
 void bn_div_dig(bn_t c, bn_t a, dig_t b) {

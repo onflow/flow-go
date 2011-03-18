@@ -276,15 +276,6 @@
 /** Width of window processing for exponentiation methods. */
 #define FB_WIDTH @FB_WIDTH@
 
-/** Binary modular exponentiation. */
-#define BASIC    1
-/** Sliding window modular exponentiation. */
-#define SLIDE    2
-/** Constant-time Montgomery powering ladder. */
-#define MONTY    3
-/** Chosen multiple precision modular exponentiation method. */
-#define FB_EXP   @FB_EXP@
-
 /** Binary field arithmetic method */
 #define FB_METHD "@FB_METHD@"
 
@@ -352,6 +343,22 @@
 #define LOWER    6
 /** Chosen binary field inversion method. */
 #define FB_INV   @FB_INV@ 
+
+/** Binary modular exponentiation. */
+#define BASIC    1
+/** Sliding window modular exponentiation. */
+#define SLIDE    2
+/** Constant-time Montgomery powering ladder. */
+#define MONTY    3
+/** Chosen multiple precision modular exponentiation method. */
+#define FB_EXP   @FB_EXP@
+
+/** Iterated squaring/square-root by consecutive squaring/square-root. */
+#define BASIC    1
+/** Iterated squaring/square-root by table-based method. */
+#define QUICK	 2
+/** Chosen method to solve a quadratic equation. */
+#define FB_ITR   @FB_ITR@
 
 /** Irreducible polynomial size in bits. */
 #define FT_POLYN @FT_POLYN@

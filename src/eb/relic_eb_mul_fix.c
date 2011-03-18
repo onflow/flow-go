@@ -375,7 +375,7 @@ void eb_mul_pre_yaowi(eb_t *t, eb_t p) {
 			}
 		}
 
-		eb_norm_sim(t + 1, t + 1, EB_TABLE_YAOWI - 1);
+		eb_norm_sim(t + 1, t + 1, EB_TABLE_YAOWI - 2);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {

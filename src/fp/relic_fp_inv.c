@@ -198,7 +198,6 @@ void fp_inv_monty(fp_t c, fp_t a) {
 	bn_null(x2);
 
 	TRY {
-		fp_new(t);
 		bn_new(_a);
 		bn_new(_p);
 		bn_new(u);

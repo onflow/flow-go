@@ -50,7 +50,7 @@
  * @param[in] size			- the number of digits to multiply.
  * @param[in] level			- the number of Karatsuba steps to apply.
  */
-static void fp_mul_karat_impl(dv_t c, fp_t a, fp_t b, int size, int level) {
+static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
 	int i, h, h1;
 	dv_t a1, b1, a0b0, a1b1;
 	dig_t carry;
@@ -91,8 +91,8 @@ static void fp_mul_karat_impl(dv_t c, fp_t a, fp_t b, int size, int level) {
 			bn_muln_low(a1b1, a + h, b + h, h1);
 #endif
 		} else {
-			fp_mul_karat_impl(a0b0, a, b, h, level - 1);
-			fp_mul_karat_impl(a1b1, a + h, b + h, h1, level - 1);
+			fp_mul_karat_imp(a0b0, a, b, h, level - 1);
+			fp_mul_karat_imp(a1b1, a + h, b + h, h1, level - 1);
 		}
 
 		for (i = 0; i < 2 * h; i++) {
@@ -137,7 +137,7 @@ static void fp_mul_karat_impl(dv_t c, fp_t a, fp_t b, int size, int level) {
 			bn_muln_low(a1b1, a1, b1, h1 + 1);
 #endif
 		} else {
-			fp_mul_karat_impl(a1b1, a1, b1, h1 + 1, level - 1);
+			fp_mul_karat_imp(a1b1, a1, b1, h1 + 1, level - 1);
 		}
 
 		/* c = c + [(a1 + a0)*(b1 + b0) << digits] */
@@ -254,7 +254,7 @@ void fp_mul_karat(fp_t c, fp_t a, fp_t b) {
 		dv_new(t);
 		dv_zero(t, 2 * FP_DIGS);
 
-		fp_mul_karat_impl(t, a, b, FP_DIGS, FP_KARAT);
+		fp_mul_karat_imp(t, a, b, FP_DIGS, FP_KARAT);
 
 		fp_rdc(c, t);
 	} CATCH_ANY {

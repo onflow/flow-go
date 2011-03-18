@@ -1519,23 +1519,9 @@ void pb_map_etat2_gxg(fb12_t r, hb_t p, hb_t q) {
 	}
 
 	fb_null(t);
-	for (i = 0; i < 3; i++) {
-		fb12_null(a[i]);
-		fb12_null(c[i]);
-	}
 	for (i = 0; i < 4; i++) {
 		fb_null(delta[i]);
 		fb_null(epsil[i]);
-	}
-	for (i = 0; i < 12; i++) {
-		fb_null(m[i]);
-		fb_null(m[i]);
-	}
-	for (i = 0; i < FB_BITS; i++) {
-		fb_null(x1[i]);
-		fb_null(x2[i]);
-		fb_null(y1[i]);
-		fb_null(y2[i]);
 	}
 
 	TRY {
@@ -1543,10 +1529,6 @@ void pb_map_etat2_gxg(fb12_t r, hb_t p, hb_t q) {
 		for (i = 0; i < 4; i++) {
 			fb_new(delta[i]);
 			fb_new(epsil[i]);
-		}
-		for (i = 0; i < 11; i++) {
-			fb_new(m[i]);
-			fb_new(n[i]);
 		}
 
 		/* d0 = p.u1^2+p.u1. */
@@ -1836,7 +1818,11 @@ void pb_map_etat2_gxg(fb12_t r, hb_t p, hb_t q) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-
+		fb_free(t);
+		for (i = 0; i < 4; i++) {
+			fb_free(delta[i]);
+			fb_free(epsil[i]);
+		}
 	}
 }
 

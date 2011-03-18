@@ -45,7 +45,7 @@
  * @param[in] a         - the first multiple precision integer to add.
  * @param[in] b         - the second multiple precision integer to add.
  */
-static void bn_add_impl(bn_t c, bn_t a, bn_t b) {
+static void bn_add_imp(bn_t c, bn_t a, bn_t b) {
 	int max, min;
 	dig_t carry;
 
@@ -76,7 +76,7 @@ static void bn_add_impl(bn_t c, bn_t a, bn_t b) {
  * @param[in] a         - the first multiple precision integer to subtract.
  * @param[in] b         - the second multiple precision integer to subtract.
  */
-static void bn_sub_impl(bn_t c, bn_t a, bn_t b) {
+static void bn_sub_imp(bn_t c, bn_t a, bn_t b) {
 	int max, min;
 	dig_t carry;
 
@@ -110,18 +110,18 @@ void bn_add(bn_t c, bn_t a, bn_t b) {
 		/* If the signs are equal, copy the sign and add. */
 		c->sign = sa;
 		if (bn_cmp_abs(a, b) == CMP_LT) {
-			bn_add_impl(c, b, a);
+			bn_add_imp(c, b, a);
 		} else {
-			bn_add_impl(c, a, b);
+			bn_add_imp(c, a, b);
 		}
 	} else {
 		/* If the signs are different, subtract. */
 		if (bn_cmp_abs(a, b) == CMP_LT) {
 			c->sign = sb;
-			bn_sub_impl(c, b, a);
+			bn_sub_imp(c, b, a);
 		} else {
 			c->sign = sa;
-			bn_sub_impl(c, a, b);
+			bn_sub_imp(c, a, b);
 		}
 	}
 }
@@ -170,18 +170,18 @@ void bn_sub(bn_t c, bn_t a, bn_t b) {
 		 * add. */
 		c->sign = sa;
 		if (bn_cmp_abs(a, b) == CMP_LT) {
-			bn_add_impl(c, b, a);
+			bn_add_imp(c, b, a);
 		} else {
-			bn_add_impl(c, a, b);
+			bn_add_imp(c, a, b);
 		}
 	} else {
 		/* If the signs are equal, adjust the sign and subtract. */
 		if (bn_cmp_abs(a, b) != CMP_LT) {
 			c->sign = sa;
-			bn_sub_impl(c, a, b);
+			bn_sub_imp(c, a, b);
 		} else {
 			c->sign = (sa == BN_POS) ? BN_NEG : BN_POS;
-			bn_sub_impl(c, b, a);
+			bn_sub_imp(c, b, a);
 		}
 	}
 }

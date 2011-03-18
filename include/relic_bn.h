@@ -285,20 +285,20 @@ typedef bn_st *bn_t;
  * @param[in] M				- the modulus.
  */
 #if BN_MOD == BASIC
-#define bn_mod_setup(U, M)	(void)U, (void)M
+#define bn_mod_pre(U, M)	(void)U, (void)M
 #elif BN_MOD == BARRT
-#define bn_mod_setup(U, M)	bn_mod_barrt_setup(U, M)
+#define bn_mod_pre(U, M)	bn_mod_pre_barrt(U, M)
 #elif BN_MOD == MONTY
-#define bn_mod_setup(U, M)	bn_mod_monty_setup(U, M)
+#define bn_mod_pre(U, M)	bn_mod_pre_monty(U, M)
 #elif BN_MOD == PMERS
-#define bn_mod_setup(U, M)	bn_mod_pmers_setup(U, M)
+#define bn_mod_pre(U, M)	bn_mod_pre_pmers(U, M)
 #endif
 
 /**
  * Reduces a multiple precision integer modulo another integer. If the number
  * of arguments is 3, then simple division is used. If the number of arguments
  * is 4, then a modular reduction algorithm is used and the fourth argument
- * is an auxiliar value derived from the modulus. The variant with 4 arguments
+ * is an auxiliary value derived from the modulus. The variant with 4 arguments
  * should be used when several modular reductions are computed with the same
  * modulus. Computes c = a mod m.
  *
@@ -318,13 +318,13 @@ typedef bn_st *bn_t;
  * @param[in] U				- the auxiliar value derived from the modulus.
  */
 #if BN_MOD == BASIC
-#define bn_mod_impl(C, A, M, U)	bn_mod_basic(C, A, M)
+#define bn_mod_imp(C, A, M, U)	bn_mod_basic(C, A, M)
 #elif BN_MOD == BARRT
-#define bn_mod_impl(C, A, M, U)	bn_mod_barrt(C, A, M, U)
+#define bn_mod_imp(C, A, M, U)	bn_mod_barrt(C, A, M, U)
 #elif BN_MOD == MONTY
-#define bn_mod_impl(C, A, M, U)	bn_mod_monty(C, A, M, U)
+#define bn_mod_imp(C, A, M, U)	bn_mod_monty(C, A, M, U)
 #elif BN_MOD == PMERS
-#define bn_mod_impl(C, A, M, U)	bn_mod_pmers(C, A, M, U)
+#define bn_mod_imp(C, A, M, U)	bn_mod_pmers(C, A, M, U)
 #endif
 
 /**
@@ -925,7 +925,7 @@ void bn_mod_basic(bn_t c, bn_t a, bn_t m);
  * @param[out] u			- the result.
  * @param[in] m				- the modulus.
  */
-void bn_mod_barrt_setup(bn_t u, bn_t m);
+void bn_mod_pre_barrt(bn_t u, bn_t m);
 
 /**
  * Reduces a multiple precision integer modulo a modulus using Barrett
@@ -945,7 +945,7 @@ void bn_mod_barrt(bn_t c, bn_t a, bn_t m, bn_t u);
  * @param[out] u			- the result.
  * @param[in] m				- the modulus.
  */
-void bn_mod_monty_setup(bn_t u, bn_t m);
+void bn_mod_pre_monty(bn_t u, bn_t m);
 
 /**
  * Converts a multiple precision integer to Montgomery form.
@@ -993,7 +993,7 @@ void bn_mod_monty_comba(bn_t c, bn_t a, bn_t m, bn_t u);
  * @param[out] u			- the result.
  * @param[in] m				- the modulus.
  */
-void bn_mod_pmers_setup(bn_t u, bn_t m);
+void bn_mod_pre_pmers(bn_t u, bn_t m);
 
 /**
  * Reduces a multiple precision integer modulo a modulus using Pseudo-Mersenne

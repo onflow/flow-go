@@ -3946,16 +3946,12 @@ void pb_map_oeta2(fb12_t r, hb_t p, hb_t q) {
 	fb_null(yp);
 	fb_null(xq1);
 	fb_null(yq1);
-	fb_null(xq2);
-	fb_null(yq2);
 
 	TRY {
 		fb_new(xp);
 		fb_new(yp);
 		fb_new(xq1);
 		fb_new(yq1);
-		fb_new(xq2);
-		fb_new(yq2);
 
 		if (!p->deg && !q->deg) {
 			pb_map_oeta2_gxg(r, p, q);
@@ -3998,7 +3994,5 @@ void pb_map_oeta2(fb12_t r, hb_t p, hb_t q) {
 		fb_free(yp);
 		fb_free(xq1);
 		fb_free(yq1);
-		fb_free(xq2);
-		fb_free(yq2);
 	}
 }

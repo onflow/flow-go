@@ -192,7 +192,7 @@ void fp_prime_set(bn_t p) {
 			THROW(ERR_INVALID);
 		}
 	#endif
-		bn_mod_monty_setup(t, &prime);
+		bn_mod_pre_monty(t, &prime);
 		u = t->dp[0];
 		dv_zero(s, 2 * FP_DIGS);
 		s[2 * FP_DIGS] = 1;

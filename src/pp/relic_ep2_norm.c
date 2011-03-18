@@ -49,7 +49,7 @@
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-void ep2_norm_impl(ep2_t r, ep2_t p) {
+void ep2_norm_imp(ep2_t r, ep2_t p) {
 	if (!p->norm) {
 		fp2_t t0, t1;
 
@@ -98,6 +98,6 @@ void ep2_norm(ep2_t r, ep2_t p) {
 		ep2_copy(r, p);
 	}
 #if EP_ADD == PROJC || !defined(STRIP)
-	ep2_norm_impl(r, p);
+	ep2_norm_imp(r, p);
 #endif
 }

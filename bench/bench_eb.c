@@ -89,14 +89,14 @@ static void util(void) {
 }
 
 static void arith(void) {
-	eb_t p, q, r, tab[EB_TABLE_MAX];
+	eb_t p, q, r, t[EB_TABLE_MAX];
 	bn_t k, l, n;
 
 	eb_null(p);
 	eb_null(q);
 	eb_null(r);
 	for (int i = 0; i < EB_TABLE_MAX; i++) {
-		eb_null(tab[i]);
+		eb_null(t[i]);
 	} bn_null(k);
 	bn_null(l);
 	bn_null(n);
@@ -374,149 +374,149 @@ static void arith(void) {
 	BENCH_END;
 
 	for (int i = 0; i < EB_TABLE; i++) {
-		eb_new(tab[i]);
+		eb_new(t[i]);
 	}
 
 	BENCH_BEGIN("eb_mul_pre") {
 		eb_rand(p);
-		BENCH_ADD(eb_mul_pre(tab, p));
+		BENCH_ADD(eb_mul_pre(t, p));
 	} BENCH_END;
 
 	BENCH_BEGIN("eb_mul_fix") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		eb_rand(p);
-		eb_mul_pre(tab, p);
-		BENCH_ADD(eb_mul_fix(q, tab, k));
+		eb_mul_pre(t, p);
+		BENCH_ADD(eb_mul_fix(q, t, k));
 	} BENCH_END;
 
 	for (int i = 0; i < EB_TABLE; i++) {
-		eb_free(tab[i]);
+		eb_free(t[i]);
 	}
 
 #if EB_FIX == BASIC || !defined(STRIP)
 	for (int i = 0; i < EB_TABLE_BASIC; i++) {
-		eb_new(tab[i]);
+		eb_new(t[i]);
 	}
 	BENCH_BEGIN("eb_mul_pre_basic") {
 		eb_rand(p);
-		BENCH_ADD(eb_mul_pre_basic(tab, p));
+		BENCH_ADD(eb_mul_pre_basic(t, p));
 	} BENCH_END;
 
 	BENCH_BEGIN("eb_mul_fix_basic") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		eb_rand(p);
-		eb_mul_pre_basic(tab, p);
-		BENCH_ADD(eb_mul_fix_basic(q, tab, k));
+		eb_mul_pre_basic(t, p);
+		BENCH_ADD(eb_mul_fix_basic(q, t, k));
 	} BENCH_END;
 	for (int i = 0; i < EB_TABLE_BASIC; i++) {
-		eb_free(tab[i]);
+		eb_free(t[i]);
 	}
 #endif
 
 #if EB_FIX == YAOWI || !defined(STRIP)
 	for (int i = 0; i < EB_TABLE_YAOWI; i++) {
-		eb_new(tab[i]);
+		eb_new(t[i]);
 	}
 	BENCH_BEGIN("eb_mul_pre_yaowi") {
 		eb_rand(p);
-		BENCH_ADD(eb_mul_pre_yaowi(tab, p));
+		BENCH_ADD(eb_mul_pre_yaowi(t, p));
 	} BENCH_END;
 
 	BENCH_BEGIN("eb_mul_fix_yaowi") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		eb_rand(p);
-		eb_mul_pre_yaowi(tab, p);
-		BENCH_ADD(eb_mul_fix_yaowi(q, tab, k));
+		eb_mul_pre_yaowi(t, p);
+		BENCH_ADD(eb_mul_fix_yaowi(q, t, k));
 	} BENCH_END;
 	for (int i = 0; i < EB_TABLE_YAOWI; i++) {
-		eb_free(tab[i]);
+		eb_free(t[i]);
 	}
 #endif
 
 #if EB_FIX == NAFWI || !defined(STRIP)
 	for (int i = 0; i < EB_TABLE_NAFWI; i++) {
-		eb_new(tab[i]);
+		eb_new(t[i]);
 	}
 	BENCH_BEGIN("eb_mul_pre_nafwi") {
 		eb_rand(p);
-		BENCH_ADD(eb_mul_pre_nafwi(tab, p));
+		BENCH_ADD(eb_mul_pre_nafwi(t, p));
 	} BENCH_END;
 
 	BENCH_BEGIN("eb_mul_fix_nafwi") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		eb_rand(p);
-		eb_mul_pre_nafwi(tab, p);
-		BENCH_ADD(eb_mul_fix_nafwi(q, tab, k));
+		eb_mul_pre_nafwi(t, p);
+		BENCH_ADD(eb_mul_fix_nafwi(q, t, k));
 	} BENCH_END;
 	for (int i = 0; i < EB_TABLE_NAFWI; i++) {
-		eb_free(tab[i]);
+		eb_free(t[i]);
 	}
 #endif
 
 #if EB_FIX == COMBS || !defined(STRIP)
 	for (int i = 0; i < EB_TABLE_COMBS; i++) {
-		eb_new(tab[i]);
+		eb_new(t[i]);
 	}
 	BENCH_BEGIN("eb_mul_pre_combs") {
 		eb_rand(p);
-		BENCH_ADD(eb_mul_pre_combs(tab, p));
+		BENCH_ADD(eb_mul_pre_combs(t, p));
 	} BENCH_END;
 
 	BENCH_BEGIN("eb_mul_fix_combs") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		eb_rand(p);
-		eb_mul_pre_combs(tab, p);
-		BENCH_ADD(eb_mul_fix_combs(q, tab, k));
+		eb_mul_pre_combs(t, p);
+		BENCH_ADD(eb_mul_fix_combs(q, t, k));
 	} BENCH_END;
 	for (int i = 0; i < EB_TABLE_COMBS; i++) {
-		eb_free(tab[i]);
+		eb_free(t[i]);
 	}
 #endif
 
 #if EB_FIX == COMBD || !defined(STRIP)
 	for (int i = 0; i < EB_TABLE_COMBD; i++) {
-		eb_new(tab[i]);
+		eb_new(t[i]);
 	}
 	BENCH_BEGIN("eb_mul_pre_combd") {
 		eb_rand(p);
-		BENCH_ADD(eb_mul_pre_combd(tab, p));
+		BENCH_ADD(eb_mul_pre_combd(t, p));
 	} BENCH_END;
 
 	BENCH_BEGIN("eb_mul_fix_combd") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		eb_rand(p);
-		eb_mul_pre_combd(tab, p);
-		BENCH_ADD(eb_mul_fix_combd(q, tab, k));
+		eb_mul_pre_combd(t, p);
+		BENCH_ADD(eb_mul_fix_combd(q, t, k));
 	} BENCH_END;
 	for (int i = 0; i < EB_TABLE_COMBD; i++) {
-		eb_free(tab[i]);
+		eb_free(t[i]);
 	}
 #endif
 
 #if EB_FIX == LWNAF || !defined(STRIP)
 	for (int i = 0; i < EB_TABLE_LWNAF; i++) {
-		eb_new(tab[i]);
+		eb_new(t[i]);
 	}
 	BENCH_BEGIN("eb_mul_pre_lwnaf") {
 		eb_rand(p);
-		BENCH_ADD(eb_mul_pre_lwnaf(tab, p));
+		BENCH_ADD(eb_mul_pre_lwnaf(t, p));
 	} BENCH_END;
 
 	BENCH_BEGIN("eb_mul_fix_lwnaf") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		eb_rand(p);
-		eb_mul_pre_lwnaf(tab, p);
-		BENCH_ADD(eb_mul_fix_lwnaf(q, tab, k));
+		eb_mul_pre_lwnaf(t, p);
+		BENCH_ADD(eb_mul_fix_lwnaf(q, t, k));
 	} BENCH_END;
 	for (int i = 0; i < EB_TABLE_LWNAF; i++) {
-		eb_free(tab[i]);
+		eb_free(t[i]);
 	}
 #endif
 

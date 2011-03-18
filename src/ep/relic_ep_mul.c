@@ -68,7 +68,7 @@ static void table_init(ep_t * t, ep_t p) {
 
 #if defined(EP_KBLTZ)
 
-void ep_mul_glv_impl(ep_t r, ep_t p, bn_t k) {
+void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 	int len, l0, l1, i, n0, n1, s0, s1;
 	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
 	bn_t n, k0, k1, v1[3], v2[3];
@@ -177,7 +177,7 @@ void ep_mul_glv_impl(ep_t r, ep_t p, bn_t k) {
 
 #if defined(EP_ORDIN) || defined(EP_SUPER)
 
-static void ep_mul_naf_impl(ep_t r, ep_t p, bn_t k) {
+static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
 	int len, i, n;
 	signed char naf[FP_BITS + 1], *t;
 	ep_t table[1 << (EP_WIDTH - 2)];
@@ -281,13 +281,13 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 void ep_mul_lwnaf(ep_t r, ep_t p, bn_t k) {
 #if defined(EP_KBLTZ)
 	if (ep_curve_is_kbltz()) {
-		ep_mul_glv_impl(r, p, k);
+		ep_mul_glv_imp(r, p, k);
 		return;
 	}
 #endif
 
 #if defined(EP_ORDIN) || defined(EP_SUPER)
-	ep_mul_naf_impl(r, p, k);
+	ep_mul_naf_imp(r, p, k);
 #endif
 }
 

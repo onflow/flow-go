@@ -51,7 +51,7 @@
  * @param[in] size			- the number of digits to square.
  * @param[in] level			- the number of Karatsuba steps to apply.
  */
-static void fp_sqr_karat_impl(dv_t c, fp_t a, int size, int level) {
+static void fp_sqr_karat_imp(dv_t c, fp_t a, int size, int level) {
 	int i, h, h1;
 	dv_t t, b1, a0a0, a1a1;
 	dig_t carry;
@@ -90,8 +90,8 @@ static void fp_sqr_karat_impl(dv_t c, fp_t a, int size, int level) {
 			bn_sqrn_low(a1a1, a + h, h1);
 #endif
 		} else {
-			fp_sqr_karat_impl(a0a0, a, h, level - 1);
-			fp_sqr_karat_impl(a1a1, a + h, h1, level - 1);
+			fp_sqr_karat_imp(a0a0, a, h, level - 1);
+			fp_sqr_karat_imp(a1a1, a + h, h1, level - 1);
 		}
 
 		/* t2 = a1 * a1 << 2*h digits + a0 * a0. */
@@ -129,7 +129,7 @@ static void fp_sqr_karat_impl(dv_t c, fp_t a, int size, int level) {
 			bn_sqrn_low(a1a1, t, h1 + 1);
 #endif
 		} else {
-			fp_sqr_karat_impl(a1a1, t, h1 + 1, level - 1);
+			fp_sqr_karat_imp(a1a1, t, h1 + 1, level - 1);
 		}
 
 		/* c = c + [(a1 + a0)*(a1 + a0) << h] */
@@ -223,7 +223,7 @@ void fp_sqr_karat(fp_t c, fp_t a) {
 	TRY {
 		dv_new(t);
 		dv_zero(t, 2 * FP_DIGS);
-		fp_sqr_karat_impl(t, a, FP_DIGS, FP_KARAT);
+		fp_sqr_karat_imp(t, a, FP_DIGS, FP_KARAT);
 		fp_rdc(c, t);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);

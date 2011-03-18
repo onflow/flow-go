@@ -51,7 +51,7 @@
  * @param s					- the resulting slope.
  * @param p					- the point to double.
  */
-static void ep2_dbl_basic_impl(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
+static void ep2_dbl_basic_imp(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 	fp2_t t0, t1, t2;
 
 	fp2_null(t0);
@@ -145,7 +145,7 @@ static void ep2_dbl_basic_impl(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
  * @param r					- the result.
  * @param p					- the point to double.
  */
-static void ep2_dbl_projc_impl(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
+static void ep2_dbl_projc_imp(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 	fp2_t t0, t1, t2, t3;
 
 	fp2_null(t0);
@@ -212,7 +212,7 @@ void ep2_dbl_basic(ep2_t r, ep2_t p) {
 		return;
 	}
 
-	ep2_dbl_basic_impl(r, NULL, NULL, p);
+	ep2_dbl_basic_imp(r, NULL, NULL, p);
 }
 
 void ep2_dbl_slp_basic(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
@@ -221,7 +221,7 @@ void ep2_dbl_slp_basic(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 		return;
 	}
 
-	ep2_dbl_basic_impl(r, s, e, p);
+	ep2_dbl_basic_imp(r, s, e, p);
 }
 
 #endif
@@ -234,7 +234,7 @@ void ep2_dbl_projc(ep2_t r, ep2_t p) {
 		return;
 	}
 
-	ep2_dbl_projc_impl(r, NULL, NULL, p);
+	ep2_dbl_projc_imp(r, NULL, NULL, p);
 }
 
 void ep2_dbl_slp_projc(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
@@ -243,7 +243,7 @@ void ep2_dbl_slp_projc(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 		return;
 	}
 
-	ep2_dbl_projc_impl(r, s, e, p);
+	ep2_dbl_projc_imp(r, s, e, p);
 }
 
 #endif

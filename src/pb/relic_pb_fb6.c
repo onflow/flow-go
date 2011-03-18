@@ -139,17 +139,11 @@ void fb6_mul(fb6_t c, fb6_t a, fb6_t b) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fb_free(t2[0]);
-		fb_free(t2[1]);
-		fb_free(t2[2]);
-		fb_free(t2[3]);
-		fb_free(t2[4]);
-		for (i = 0; i < 3; i++) {
-			fb_free(t0[i]);
-			fb_free(t1[i]);
-		}
-		for (i = 0; i < 12; i++) {
+		for (i = 0; i < 15; i++) {
 			fb_free(t[i]);
+			fb_free(p[i]);
+			fb_free(u[i]);
+			fb_free(v[i]);
 		}
 	}
 }
@@ -251,17 +245,11 @@ void fb6_mul_dxs(fb6_t c, fb6_t a, fb6_t b) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fb_free(t2[0]);
-		fb_free(t2[1]);
-		fb_free(t2[2]);
-		fb_free(t2[3]);
-		fb_free(t2[4]);
-		for (i = 0; i < 3; i++) {
-			fb_free(t0[i]);
-			fb_free(t1[i]);
-		}
-		for (i = 0; i < 12; i++) {
+		for (i = 0; i < 15; i++) {
 			fb_free(t[i]);
+			fb_free(p[i]);
+			fb_free(u[i]);
+			fb_free(v[i]);
 		}
 	}
 }
@@ -363,17 +351,11 @@ void fb6_mul_dxss(fb6_t c, fb6_t a, fb6_t b) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fb_free(t2[0]);
-		fb_free(t2[1]);
-		fb_free(t2[2]);
-		fb_free(t2[3]);
-		fb_free(t2[4]);
-		for (i = 0; i < 3; i++) {
-			fb_free(t0[i]);
-			fb_free(t1[i]);
-		}
-		for (i = 0; i < 12; i++) {
+		for (i = 0; i < 15; i++) {
 			fb_free(t[i]);
+			fb_free(p[i]);
+			fb_free(u[i]);
+			fb_free(v[i]);
 		}
 	}
 }

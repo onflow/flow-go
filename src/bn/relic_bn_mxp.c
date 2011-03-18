@@ -64,7 +64,7 @@ void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m) {
 		bn_new(u);
 		bn_new(r);
 
-		bn_mod_setup(u, m);
+		bn_mod_pre(u, m);
 
 		l = bn_bits(b);
 
@@ -141,7 +141,7 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 		bn_new(t);
 		bn_new(u);
 		bn_new(r);
-		bn_mod_setup(u, m);
+		bn_mod_pre(u, m);
 
 #if BN_MOD == MONTY
 		bn_set_dig(r, 1);
@@ -211,7 +211,7 @@ void bn_mxp_monty(bn_t c, bn_t a, bn_t b, bn_t m) {
 
 	TRY {
 		bn_new(u);
-		bn_mod_setup(u, m);
+		bn_mod_pre(u, m);
 
 		bn_new(tab[0]);
 		bn_new(tab[1]);

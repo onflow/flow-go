@@ -61,7 +61,7 @@ static void table_init(hb_t *t, hb_t p) {
 	hb_add(t[7], t[6], p);
 }
 
-static void hb_mul_sim_impl(hb_t r, hb_t p, bn_t k, hb_t q, bn_t l, int gen) {
+static void hb_mul_sim_imp(hb_t r, hb_t p, bn_t k, hb_t q, bn_t l, int gen) {
 	int len, l0, l1, i, n0, n1;
 	unsigned char win0[2 * FB_BITS + 1], win1[2 * FB_BITS + 1], *t0, *t1;
 	hb_t table0[8];
@@ -255,7 +255,7 @@ void hb_mul_sim_trick(hb_t r, hb_t p, bn_t k, hb_t q, bn_t l) {
 #if HB_SIM == INTER || !defined(STRIP)
 
 void hb_mul_sim_inter(hb_t r, hb_t p, bn_t k, hb_t q, bn_t l) {
-	hb_mul_sim_impl(r, p, k, q, l, 0);
+	hb_mul_sim_imp(r, p, k, q, l, 0);
 }
 
 #endif
@@ -334,7 +334,7 @@ void hb_mul_sim_gen(hb_t r, bn_t k, hb_t q, bn_t l) {
 		hb_curve_get_gen(gen);
 
 #if HB_FIX == OCTUP && defined(HB_PRECO)
-	hb_mul_sim_impl(r, gen, k, q, l, 1);
+	hb_mul_sim_imp(r, gen, k, q, l, 1);
 #else
 	hb_mul_sim(r, gen, k, q, l);
 #endif

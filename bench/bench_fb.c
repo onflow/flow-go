@@ -159,7 +159,7 @@ static void util(void) {
 }
 
 static void arith(void) {
-	fb_t a, b, c, d[2];
+	fb_t a, b, c, d[2], t[FB_TABLE_MAX];
 	dv_t e;
 	bn_t f;
 	int bits;
@@ -169,6 +169,9 @@ static void arith(void) {
 	fb_null(c);
 	fb_null(d[0]);
 	fb_null(d[1]);
+	for (int i = 0; i < FB_TABLE_MAX; i++) {
+		fb_null(t[i]);
+	}
 	dv_null(e);
 	bn_null(f);
 
@@ -528,6 +531,47 @@ static void arith(void) {
 		BENCH_ADD(fb_exp_monty(c, a, f));
 	}
 	BENCH_END;
+#endif
+
+	for (int i = 0; i < FB_TABLE; i++) {
+		fb_new(t[i]);
+	}
+
+	BENCH_BEGIN("fb_itr") {
+		fb_rand(a);
+		bn_rand(f, BN_POS, 8);
+		fb_itr_pre(t, f->dp[0]);
+		BENCH_ADD(fb_itr(c, a, f->dp[0], t));
+	}
+	BENCH_END;
+
+	for (int i = 0; i < FB_TABLE; i++) {
+		fb_free(t[i]);
+	}
+
+#if FB_ITR == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fb_itr_basic") {
+		fb_rand(a);
+		bn_rand(f, BN_POS, 8);
+		BENCH_ADD(fb_itr_basic(c, a, f->dp[0]));
+	}
+	BENCH_END;
+#endif
+
+#if FB_ITR == QUICK || !defined(STRIP)
+	for (int i = 0; i < FB_TABLE_QUICK; i++) {
+		eb_new(t[i]);
+	}
+	BENCH_BEGIN("fb_itr_quick") {
+		fb_rand(a);
+		bn_rand(f, BN_POS, 8);
+		fb_itr_pre_quick(t, f->dp[0]);
+		BENCH_ADD(fb_itr_quick(c, a, t));
+	}
+	BENCH_END;
+	for (int i = 0; i < FB_TABLE_QUICK; i++) {
+		fb_new(t[i]);
+	}
 #endif
 
 	fb_free(a);

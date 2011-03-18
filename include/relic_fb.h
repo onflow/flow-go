@@ -126,6 +126,34 @@ enum {
 	TRINO_1223
 };
 
+/**
+ * Size of a precomputation table using the .
+ */
+#define FB_TABLE_BASIC		(0)
+
+/**
+ * Size of a precomputation table using Yao's windowing method.
+ */
+#define FB_TABLE_QUICK      ((FB_DIGIT / 4) * FB_DIGS * 16)
+
+/**
+ * Size of a precomputation table using the chosen algorithm.
+ */
+#if FB_ITR == BASIC
+#define FB_TABLE 			FB_TABLE_BASIC
+#else
+#define FB_TABLE			FB_TABLE_QUICK
+#endif
+
+/**
+ * Maximum size of a precomputation table.
+ */
+#ifdef STRIP
+#define FB_TABLE_MAX 		FB_TABLE
+#else
+#define FB_TABLE_MAX 		FB_TABLE_QUICK
+#endif
+
 /*============================================================================*/
 /* Type definitions                                                           */
 /*============================================================================*/
@@ -311,6 +339,49 @@ typedef align dig_t fb_st[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
 #define fb_exp(C, A, B)		fb_exp_slide(C, A, B)
 #elif FB_EXP == MONTY
 #define fb_exp(C, A, B)		fb_exp_monty(C, A, B)
+#endif
+
+/**
+ * Precomputed the table for repeated squaring/square-root.
+ *
+ * @param[out] T			- the table.
+ * @param[in] B				- the exponent.
+ */
+#if FB_ITR == BASIC
+#define fb_itr_pre(T, B)	(void)T, (void)B
+#elif FB_ITR == QUICK
+#define fb_itr_pre(T, B)	fb_itr_pre_quick(T, B)
+#endif
+
+/**
+ * Computes the repeated Frobenius (squaring) or inverse Frobenius (square-root)
+ * of a binary field element. If the number of arguments is 3, then simple
+ * consecutive squaring/square-root is used. If the number of arguments if 4,
+ * then a table-based method is used and the fourth argument is
+ * a pointer fo the precomputed table. The variant with 4 arguments
+ * should be used when several 2^k/2^-k powers are computed with the same
+ * k. Computes c = a^(2^b), where b can be positive or negative.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the binary field element to exponentiate.
+ * @param[in] B				- the exponent.
+ * @param[in] ...			- the modulus and an optional argument.
+ */
+#define fb_itr(C, A, ...)CAT(fb_itr, OPT(__VA_ARGS__))(C, A, __VA_ARGS__)
+
+/**
+ * Reduces a multiple precision integer modulo another integer. This macro
+ * should not be called directly. Use bn_mod() with 4 arguments instead.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the binary field element to exponentiate.
+ * @param[in] B				- the exponent.
+ * @param[in] T				- the precomputed table for the exponent.
+ */
+#if FB_ITR == BASIC
+#define fb_itr_imp(C, A, B, T)		fb_itr_basic(C, A, B)
+#elif FB_ITR == QUICK
+#define fb_itr_imp(C, A, B, T)		fb_itr_quick(C, A, T)
 #endif
 
 /*============================================================================*/
@@ -855,6 +926,16 @@ void fb_inv_lower(fb_t c, fb_t a);
 void fb_inv_sim(fb_t * c, fb_t * a, int n);
 
 /**
+ * Exponentiates a binary field element through consecutive squaring. Computes
+ * c = a^(2^b).
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fb_exp_2b(fb_t c, fb_t a, int b);
+
+/**
  * Exponentiates a binary field element using the binary
  * method.
  *
@@ -899,5 +980,34 @@ void fb_slv_basic(fb_t c, fb_t a);
  * @param[in] a				- the binary field element to solve.
  */
 void fb_slv_quick(fb_t c, fb_t a);
+
+/**
+ * Computes the iterated squaring/square-root of a binary field element by
+ * consecutive squaring/square-root. Computes c = a^(2^b).
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fb_itr_basic(fb_t c, fb_t a, int b);
+
+/**
+ * Precomputed a table for iterated squaring/square-root of a binary field
+ * element.
+ *
+ * @param[out] t			- the precomputed table.
+ * @param[in] b				- the exponent.
+ */
+void fb_itr_pre_quick(fb_t *t, int b);
+
+/**
+ * Computes the iterated squaring/square-root of a binary field element by
+ * a table based method. Computes c = a^(2^b).
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] t				- the precomputed table.
+ */
+void fb_itr_quick(fb_t c, fb_t a, fb_t *t);
 
 #endif /* !RELIC_FB_H */

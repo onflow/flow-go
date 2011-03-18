@@ -183,7 +183,7 @@ static void eb_table_kbltz(eb_t *t, eb_t p) {
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void eb_mul_ltnaf_impl(eb_t r, eb_t p, bn_t k) {
+static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char tnaf[FB_BITS + 8], *t, u;
 	eb_t table[1 << (EB_WIDTH - 2)];
@@ -280,7 +280,7 @@ static void eb_table_ordin(eb_t *t, eb_t p) {
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void eb_mul_lnaf_impl(eb_t r, eb_t p, bn_t k) {
+static void eb_mul_lnaf_imp(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char naf[FB_BITS + 1], *t;
 	eb_t table[1 << (EB_WIDTH - 2)];
@@ -346,7 +346,7 @@ static void eb_mul_lnaf_impl(eb_t r, eb_t p, bn_t k) {
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void eb_mul_rtnaf_impl(eb_t r, eb_t p, bn_t k) {
+static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char tnaf[FB_BITS + 8], *t, u;
 	eb_t table[1 << (EB_WIDTH - 2)];
@@ -651,7 +651,7 @@ static void eb_mul_rtnaf_impl(eb_t r, eb_t p, bn_t k) {
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void eb_mul_rnaf_impl(eb_t r, eb_t p, bn_t k) {
+static void eb_mul_rnaf_imp(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
 	signed char naf[FB_BITS + 1], *t;
 	eb_t table[1 << (EB_WIDTH - 2)];
@@ -999,13 +999,13 @@ void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
 void eb_mul_lwnaf(eb_t r, eb_t p, bn_t k) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
-		eb_mul_ltnaf_impl(r, p, k);
+		eb_mul_ltnaf_imp(r, p, k);
 		return;
 	}
 #endif
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
-	eb_mul_lnaf_impl(r, p, k);
+	eb_mul_lnaf_imp(r, p, k);
 #endif
 }
 
@@ -1016,13 +1016,13 @@ void eb_mul_lwnaf(eb_t r, eb_t p, bn_t k) {
 void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
-		eb_mul_rtnaf_impl(r, p, k);
+		eb_mul_rtnaf_imp(r, p, k);
 		return;
 	}
 #endif
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
-	eb_mul_rnaf_impl(r, p, k);
+	eb_mul_rnaf_imp(r, p, k);
 #endif
 }
 

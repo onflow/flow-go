@@ -49,7 +49,7 @@
  * @param[in] a				- the multiple precision integer to square.
  * @param[in] level			- the number of Karatsuba steps to apply.
  */
-static void bn_sqr_karat_impl(bn_t c, bn_t a, int level) {
+static void bn_sqr_karat_imp(bn_t c, bn_t a, int level) {
 	int h;
 	bn_t a0, a1, a0a0, a1a1, t;
 	dig_t *tmpa, *t0;
@@ -96,8 +96,8 @@ static void bn_sqr_karat_impl(bn_t c, bn_t a, int level) {
 			bn_sqr_comba(a1a1, a1);
 #endif
 		} else {
-			bn_sqr_karat_impl(a0a0, a0, level - 1);
-			bn_sqr_karat_impl(a1a1, a1, level - 1);
+			bn_sqr_karat_imp(a0a0, a0, level - 1);
+			bn_sqr_karat_imp(a1a1, a1, level - 1);
 		}
 
 		/* t = (a1 + a0) */
@@ -111,7 +111,7 @@ static void bn_sqr_karat_impl(bn_t c, bn_t a, int level) {
 			bn_sqr_comba(t, t);
 #endif
 		} else {
-			bn_sqr_karat_impl(t, t, level - 1);
+			bn_sqr_karat_imp(t, t, level - 1);
 		}
 
 		/* t2 = (a0*a0 + a1*a1) */
@@ -217,7 +217,7 @@ void bn_sqr_comba(bn_t c, bn_t a) {
 #if BN_KARAT > 0 || !defined(STRIP)
 
 void bn_sqr_karat(bn_t c, bn_t a) {
-	bn_sqr_karat_impl(c, a, BN_KARAT);
+	bn_sqr_karat_imp(c, a, BN_KARAT);
 }
 
 #endif

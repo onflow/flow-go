@@ -47,7 +47,7 @@
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-void ep_norm_impl(ep_t r, ep_t p, int inverted) {
+void ep_norm_imp(ep_t r, ep_t p, int inverted) {
 	if (!p->norm) {
 		fp_t t0, t1;
 
@@ -100,7 +100,7 @@ void ep_norm(ep_t r, ep_t p) {
 		return;
 	}
 #if EP_ADD == PROJC || !defined(STRIP)
-	ep_norm_impl(r, p, 0);
+	ep_norm_imp(r, p, 0);
 #endif /* EP_ADD == PROJC */
 }
 
@@ -125,7 +125,7 @@ void ep_norm_sim(ep_t * r, ep_t * t, int n) {
 		}
 
 		for (i = 0; i < n; i++) {
-			ep_norm_impl(r[i], t[i], 1);
+			ep_norm_imp(r[i], t[i], 1);
 		}
 	}
 	CATCH_ANY {

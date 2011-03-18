@@ -474,14 +474,14 @@ static void arith(void) {
 		bn_set_2b(b, BN_BITS);
 		bn_rand(c, BN_POS, BN_DIGIT);
 		bn_sub(b, b, c);
-		bn_mod_setup(d, b);
+		bn_mod_pre(d, b);
 #else
 		bn_rand(a, BN_POS, 2 * BN_BITS - BN_DIGIT / 2);
 		bn_rand(b, BN_POS, BN_BITS);
 		if (bn_is_even(b)) {
 			bn_add_dig(b, b, 1);
 		}
-		bn_mod_setup(d, b);
+		bn_mod_pre(d, b);
 #endif
 		BENCH_ADD(bn_mod(c, a, b, d));
 	}
@@ -497,9 +497,9 @@ static void arith(void) {
 #endif
 
 #if BN_MOD == BARRT || !defined(STRIP)
-	BENCH_BEGIN("bn_mod_barrt_setup") {
+	BENCH_BEGIN("bn_mod_pre_barrt") {
 		bn_rand(b, BN_POS, BN_BITS);
-		BENCH_ADD(bn_mod_barrt_setup(d, b));
+		BENCH_ADD(bn_mod_pre_barrt(d, b));
 	}
 	BENCH_END;
 #endif
@@ -508,19 +508,19 @@ static void arith(void) {
 	BENCH_BEGIN("bn_mod_barrt") {
 		bn_rand(a, BN_POS, 2 * BN_BITS - BN_DIGIT / 2);
 		bn_rand(b, BN_POS, BN_BITS);
-		bn_mod_barrt_setup(d, b);
+		bn_mod_pre_barrt(d, b);
 		BENCH_ADD(bn_mod_barrt(c, a, b, d));
 	}
 	BENCH_END;
 #endif
 
 #if BN_MOD == MONTY || !defined(STRIP)
-	BENCH_BEGIN("bn_mod_monty_setup") {
+	BENCH_BEGIN("bn_mod_pre_monty") {
 		bn_rand(b, BN_POS, BN_BITS);
 		if (bn_is_even(b)) {
 			bn_add_dig(b, b, 1);
 		}
-		BENCH_ADD(bn_mod_monty_setup(d, b));
+		BENCH_ADD(bn_mod_pre_monty(d, b));
 	}
 	BENCH_END;
 
@@ -542,7 +542,7 @@ static void arith(void) {
 			bn_add_dig(b, b, 1);
 		}
 		bn_mod(a, a, b);
-		bn_mod_monty_setup(d, b);
+		bn_mod_pre_monty(d, b);
 		BENCH_ADD(bn_mod_monty(c, a, b, d));
 	}
 	BENCH_END;
@@ -555,7 +555,7 @@ static void arith(void) {
 			bn_add_dig(b, b, 1);
 		}
 		bn_mod(a, a, b);
-		bn_mod_monty_setup(d, b);
+		bn_mod_pre_monty(d, b);
 		BENCH_ADD(bn_mod_monty_basic(c, a, b, d));
 	}
 	BENCH_END;
@@ -569,7 +569,7 @@ static void arith(void) {
 			bn_add_dig(b, b, 1);
 		}
 		bn_mod(a, a, b);
-		bn_mod_monty_setup(d, b);
+		bn_mod_pre_monty(d, b);
 		BENCH_ADD(bn_mod_monty_comba(c, a, b, d));
 	}
 	BENCH_END;
@@ -582,19 +582,19 @@ static void arith(void) {
 			bn_add_dig(b, b, 1);
 		}
 		bn_mod(a, a, b);
-		bn_mod_monty_setup(d, b);
+		bn_mod_pre_monty(d, b);
 		BENCH_ADD(bn_mod_monty_back(c, c, b));
 	}
 	BENCH_END;
 #endif
 
 #if BN_MOD == PMERS || !defined(STRIP)
-	BENCH_BEGIN("bn_mod_pmers_setup") {
+	BENCH_BEGIN("bn_mod_pre_pmers") {
 		bn_rand(a, BN_POS, 2 * BN_BITS - BN_DIGIT / 2);
 		bn_set_2b(b, BN_BITS);
 		bn_rand(c, BN_POS, BN_DIGIT);
 		bn_sub(b, b, c);
-		BENCH_ADD(bn_mod_pmers_setup(d, b));
+		BENCH_ADD(bn_mod_pre_pmers(d, b));
 	}
 	BENCH_END;
 
@@ -603,7 +603,7 @@ static void arith(void) {
 		bn_set_2b(b, BN_BITS);
 		bn_rand(c, BN_POS, BN_DIGIT);
 		bn_sub(b, b, c);
-		bn_mod_pmers_setup(d, b);
+		bn_mod_pre_pmers(d, b);
 		BENCH_ADD(bn_mod_pmers(c, a, b, d));
 	}
 	BENCH_END;

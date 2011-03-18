@@ -49,7 +49,7 @@
  * @param p					- the first point to add.
  * @param q					- the second point to add.
  */
-static void ep_add_basic_impl(ep_t r, ep_t p, ep_t q) {
+static void ep_add_basic_imp(ep_t r, ep_t p, ep_t q) {
 	fp_t t0, t1, t2;
 
 	fp_null(t0);
@@ -122,7 +122,7 @@ static void ep_add_basic_impl(ep_t r, ep_t p, ep_t q) {
  * @param p					- the first point to add.
  * @param q					- the second point to add.
  */
-static void ep_add_projc_impl(ep_t r, ep_t p, ep_t q) {
+static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 	fp_t t0, t1, t2, t3, t4, t5, t6;
 
 	fp_null(t0);
@@ -322,7 +322,7 @@ void ep_add_basic(ep_t r, ep_t p, ep_t q) {
 		return;
 	}
 
-	ep_add_basic_impl(r, p, q);
+	ep_add_basic_imp(r, p, q);
 }
 
 void ep_sub_basic(ep_t r, ep_t p, ep_t q) {
@@ -366,7 +366,7 @@ void ep_add_projc(ep_t r, ep_t p, ep_t q) {
 		return;
 	}
 
-	ep_add_projc_impl(r, p, q);
+	ep_add_projc_imp(r, p, q);
 }
 
 void ep_sub_projc(ep_t r, ep_t p, ep_t q) {

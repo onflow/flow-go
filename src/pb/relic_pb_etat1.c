@@ -152,7 +152,7 @@ static void etat_exp(fb4_t r, fb4_t a) {
 
 #if PB_MAP == ETATS || !defined(STRIP)
 
-static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
+static void pb_map_etats_imp(fb4_t r, eb_t p, eb_t q) {
 	dig_t alpha, beta, delta, b;
 	int mod;
 
@@ -917,7 +917,7 @@ static void pb_map_etats_impl(fb4_t r, eb_t p, eb_t q) {
 
 #if PB_MAP == ETATN || !defined(STRIP)
 
-static void pb_map_etatn_impl(fb4_t r, eb_t p, eb_t q) {
+static void pb_map_etatn_imp(fb4_t r, eb_t p, eb_t q) {
 	dig_t delta, b;
 	int mod;
 
@@ -1215,7 +1215,7 @@ static void pb_map_etatn_impl(fb4_t r, eb_t p, eb_t q) {
 #if PB_MAP == ETATS || !defined(STRIP)
 
 void pb_map_etats(fb4_t r, eb_t p, eb_t q) {
-	pb_map_etats_impl(r, p, q);
+	pb_map_etats_imp(r, p, q);
 	etat_exp(r, r);
 }
 
@@ -1224,7 +1224,7 @@ void pb_map_etats(fb4_t r, eb_t p, eb_t q) {
 #if PB_MAP == ETATN || !defined(STRIP)
 
 void pb_map_etatn(fb4_t r, eb_t p, eb_t q) {
-	pb_map_etatn_impl(r, p, q);
+	pb_map_etatn_imp(r, p, q);
 	etat_exp(r, r);
 }
 

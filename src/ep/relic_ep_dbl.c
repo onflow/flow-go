@@ -48,7 +48,7 @@
  * @param r					- the result.
  * @param p					- the point to double.
  */
-static void ep_dbl_basic_impl(ep_t r, ep_t p) {
+static void ep_dbl_basic_imp(ep_t r, ep_t p) {
 	fp_t t0, t1, t2;
 
 	fp_null(t0);
@@ -128,7 +128,7 @@ static void ep_dbl_basic_impl(ep_t r, ep_t p) {
  * @param r					- the result.
  * @param p					- the point to double.
  */
-void ep_dbl_projc_impl(ep_t r, ep_t p) {
+void ep_dbl_projc_imp(ep_t r, ep_t p) {
 	fp_t t0, t1, t2, t3, t4, t5;
 
 	fp_null(t1);
@@ -295,7 +295,7 @@ void ep_dbl_basic(ep_t r, ep_t p) {
 		ep_set_infty(r);
 		return;
 	}
-	ep_dbl_basic_impl(r, p);
+	ep_dbl_basic_imp(r, p);
 }
 
 #endif
@@ -312,7 +312,7 @@ void ep_dbl_projc(ep_t r, ep_t p) {
 		ep_set_infty(r);
 		return;
 	}
-	ep_dbl_projc_impl(r, p);
+	ep_dbl_projc_imp(r, p);
 }
 
 #endif

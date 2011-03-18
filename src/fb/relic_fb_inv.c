@@ -410,7 +410,7 @@ void fb_inv_almos(fb_t c, fb_t a) {
 #if FB_INV == ITOHT || !defined(STRIP)
 
 void fb_inv_itoht(fb_t c, fb_t a) {
-	int i, j, x, y;
+	int i, x, y;
 	int len, *chain = fb_poly_get_chain(&len);
 	int u[len + 1];
 	fb_t table[len + 1];
@@ -448,10 +448,7 @@ void fb_inv_itoht(fb_t c, fb_t a) {
 			} else {
 				u[i] = u[x] + u[y];
 			}
-			fb_sqr(table[i], table[x]);
-			for (j = 1; j < u[y]; j++) {
-				fb_sqr(table[i], table[i]);
-			}
+			fb_itr(table[i], table[x], u[y], fb_poly_tab_sqr(y));
 			fb_mul(table[i], table[i], table[y]);
 		}
 		fb_sqr(c, table[len]);

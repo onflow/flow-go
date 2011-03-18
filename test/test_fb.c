@@ -163,7 +163,8 @@ static int util(void) {
 			fb_rand(b);
 			fb_set_dig(b, a[0]);
 			TEST_ASSERT(a[0] == b[0], end);
-		} TEST_END;
+		}
+		TEST_END;
 
 		bits = 0;
 		TEST_BEGIN("bit setting and testing are consistent") {
@@ -699,7 +700,8 @@ static int reduction(void) {
 				fb_rdc(b, t0);
 			}
 			TEST_ASSERT(fb_is_zero(b) == 1, end);
-		} TEST_END;
+		}
+		TEST_END;
 
 #if FB_RDC == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic modular reduction is correct") {
@@ -711,7 +713,8 @@ static int reduction(void) {
 			fb_rdc(b, t0);
 			fb_rdc_basic(c, t1);
 			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
-		} TEST_END;
+		}
+		TEST_END;
 #endif
 
 #if FB_RDC == QUICK || !defined(STRIP)
@@ -724,7 +727,8 @@ static int reduction(void) {
 			fb_rdc(b, t0);
 			fb_rdc_quick(c, t1);
 			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
-		} TEST_END;
+		}
+		TEST_END;
 #endif
 	}
 	CATCH_ANY {
@@ -850,11 +854,15 @@ static int inversion(void) {
 	fb_null(a);
 	fb_null(b);
 	fb_null(c);
+	fb_null(d[0]);
+	fb_null(d[1]);
 
 	TRY {
 		fb_new(a);
 		fb_new(b);
 		fb_new(c);
+		fb_new(d[0]);
+		fb_new(d[1]);
 
 		TEST_BEGIN("inversion is correct") {
 			fb_rand(a);
@@ -925,7 +933,8 @@ static int inversion(void) {
 			fb_inv(a, a);
 			fb_inv(b, b);
 			fb_inv_sim(d, d, 2);
-			TEST_ASSERT(fb_cmp(d[0], a) == CMP_EQ && fb_cmp(d[1], b) == CMP_EQ, end);
+			TEST_ASSERT(fb_cmp(d[0], a) == CMP_EQ &&
+					fb_cmp(d[1], b) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
@@ -936,17 +945,22 @@ static int inversion(void) {
 	fb_free(a);
 	fb_free(b);
 	fb_free(c);
+	fb_free(d[0]);
+	fb_free(d[1]);
 	return code;
 }
 
 static int exponentiation(void) {
 	int code = STS_ERR;
-	fb_t a, b, c;
+	fb_t a, b, c, t[FB_TABLE_MAX];
 	bn_t d;
 
 	fb_null(a);
 	fb_null(b);
 	fb_null(c);
+	for (int i = 0; i < FB_TABLE_MAX; i++) {
+		fb_null(t[i]);
+	}
 	bn_null(d);
 
 	TRY {
@@ -960,8 +974,7 @@ static int exponentiation(void) {
 			bn_set_2b(d, FB_BITS);
 			fb_exp(c, a, d);
 			TEST_ASSERT(fb_cmp(a, c) == CMP_EQ, end);
-		}
-		TEST_END;
+		} TEST_END;
 
 #if FB_EXP == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic exponentiation is correct") {
@@ -970,8 +983,7 @@ static int exponentiation(void) {
 			fb_exp(c, a, d);
 			fb_exp_basic(b, a, d);
 			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
-		}
-		TEST_END;
+		} TEST_END;
 #endif
 
 #if FB_EXP == SLIDE || !defined(STRIP)
@@ -981,8 +993,7 @@ static int exponentiation(void) {
 			fb_exp(c, a, d);
 			fb_exp_slide(b, a, d);
 			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
-		}
-		TEST_END;
+		} TEST_END;
 #endif
 
 #if FB_EXP == MONTY || !defined(STRIP)
@@ -992,8 +1003,91 @@ static int exponentiation(void) {
 			fb_exp(c, a, d);
 			fb_exp_monty(b, a, d);
 			TEST_ASSERT(fb_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+		for (int i = 0; i < FB_TABLE; i++) {
+			fb_new(t[i]);
 		}
-		TEST_END;
+
+		TEST_BEGIN("iterated squaring is correct") {
+			fb_rand(a);
+			bn_rand(d, BN_POS, 8);
+			fb_itr_pre(t, d->dp[0]);
+			fb_itr(b, a, d->dp[0], t);
+			for (int j = 0; j < d->dp[0]; j++) {
+				fb_sqr(a, a);
+			}
+			TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("iterated square-root is correct") {
+			fb_rand(a);
+			bn_rand(d, BN_POS, 8);
+			fb_itr_pre(t, -d->dp[0]);
+			fb_itr(b, a, -d->dp[0], t);
+			for (int j = 0; j < d->dp[0]; j++) {
+				fb_srt(a, a);
+			}
+			TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);
+		} TEST_END;
+
+		for (int i = 0; i < FB_TABLE; i++) {
+			fb_free(t[i]);
+		}
+
+#if FB_ITR == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic iterated squaring is correct") {
+			fb_rand(a);
+			bn_rand(d, BN_POS, 8);
+			fb_itr_basic(b, a, d->dp[0]);
+			for (int j = 0; j < d->dp[0]; j++) {
+				fb_sqr(a, a);
+			}
+			TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("basic iterated square-root is correct") {
+			fb_rand(a);
+			bn_rand(d, BN_POS, 8);
+			fb_itr_basic(b, a, -d->dp[0]);
+			for (int j = 0; j < d->dp[0]; j++) {
+				fb_srt(a, a);
+			}
+			TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FB_ITR == BASIC || !defined(STRIP)
+		for (int i = 0; i < FB_TABLE_QUICK; i++) {
+			fb_new(t[i]);
+			fb_zero(t[i]);
+		}
+		TEST_BEGIN("fast iterated squaring is correct") {
+			fb_rand(a);
+			bn_rand(d, BN_POS, 8);
+			fb_itr_pre_quick(t, d->dp[0]);
+			fb_itr_quick(b, a, t);
+			for (int j = 0; j < d->dp[0]; j++) {
+				fb_sqr(a, a);
+			}
+			TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("fast iterated square-root is correct") {
+			fb_rand(a);
+			bn_rand(d, BN_POS, 8);
+			fb_itr_pre_quick(t, -d->dp[0]);
+			fb_itr_quick(b, a, t);
+			for (int j = 0; j < d->dp[0]; j++) {
+				fb_srt(a, a);
+			}
+			TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);
+		} TEST_END;
+
+		for (int i = 0; i < FB_TABLE_QUICK; i++) {
+			fb_free(t[i]);
+		}
 #endif
 	}
 	CATCH_ANY {

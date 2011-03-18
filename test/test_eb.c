@@ -821,7 +821,6 @@ static int simultaneous(void) {
 	eb_null(p);
 	eb_null(q);
 	eb_null(r);
-	eb_null(s);
 
 	TRY {
 		eb_new(p);

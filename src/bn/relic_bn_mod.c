@@ -78,7 +78,7 @@ void bn_mod_basic(bn_t c, bn_t a, bn_t m) {
 
 #if BN_MOD == BARRT || !defined(STRIP)
 
-void bn_mod_barrt_setup(bn_t u, bn_t m) {
+void bn_mod_pre_barrt(bn_t u, bn_t m) {
 	bn_set_2b(u, m->used * 2 * BN_DIGIT);
 	bn_div(u, u, m);
 }
@@ -157,7 +157,7 @@ void bn_mod_barrt(bn_t c, bn_t a, bn_t m, bn_t u) {
 
 #if BN_MOD == MONTY || !defined(STRIP)
 
-void bn_mod_monty_setup(bn_t u, bn_t m) {
+void bn_mod_pre_monty(bn_t u, bn_t m) {
 	dig_t x, b;
 	b = m->dp[0];
 
@@ -198,7 +198,7 @@ void bn_mod_monty_back(bn_t c, bn_t a, bn_t m) {
 	TRY {
 		bn_new(u);
 
-		bn_mod_monty_setup(u, m);
+		bn_mod_pre_monty(u, m);
 		bn_mod_monty(c, a, m, u);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -285,7 +285,7 @@ void bn_mod_monty_comba(bn_t c, bn_t a, bn_t m, bn_t u) {
 
 #if BN_MOD == PMERS || !defined(STRIP)
 
-void bn_mod_pmers_setup(bn_t u, bn_t m) {
+void bn_mod_pre_pmers(bn_t u, bn_t m) {
 	int bits;
 
 	bits = bn_bits(m);

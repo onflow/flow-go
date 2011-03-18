@@ -23,52 +23,37 @@
 /**
  * @file
  *
- * Implementation of binary field trace function.
+ * Implementation of the low-level iterated squaring/square-root.
  *
- * @version $Id$
+ * @version $Id: relic_fb_sqr_low.c 677 2011-03-05 22:19:43Z dfaranha $
  * @ingroup fb
  */
 
-#include "relic_core.h"
 #include "relic_fb.h"
+#include "relic_dv.h"
 #include "relic_fb_low.h"
-#include "relic_error.h"
+#include "relic_util.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fb_trc_basic(fb_t a) {
-	dig_t r;
-	fb_t t, u;
+void fb_itrn_low(dig_t *c, dig_t *a, dig_t *t) {
+	int i, j;
+	dig_t u, *tmp, *p;
 
-	fb_null(t);
-	fb_null(u);
+	fb_zero(c);
 
-	TRY {
-		fb_new(t);
-		fb_new(u);
-
-		fb_copy(t, a);
-		fb_copy(u, a);
-		for (int i = 1; i < FB_BITS; i++) {
-			fb_sqr(t, t);
-			fb_add(u, u, t);
+	for (i = FB_DIGIT - 4; i >= 0; i -= 4) {
+		tmp = a;
+		for (j = 0; j < FB_DIGS; j++, tmp++) {
+			u = (*tmp >> i) & 0x0F;
+#if ALLOC == STACK || ALLOC == AUTO
+			p = (t + ((j * FB_DIGIT + i) * 4 + u) * FB_DIGS);
+#else
+			p = (t[(j * FB_DIGIT + i) * 4 + u]);
+#endif
+			fb_add(c, c, p);
 		}
-
-		r = u[0];
 	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb_free(t);
-		fb_free(u);
-	}
-
-	return r;
-}
-
-dig_t fb_trc_quick(fb_t a) {
-	return fb_trcn_low(a);
 }

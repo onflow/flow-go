@@ -234,10 +234,22 @@ static int chain[MAX_CHAIN + 1];
 static int chain_len;
 
 #ifdef FB_PRECO
+
 /**
  * Tables for repeated squarings.
  */
 fb_st fb_tab_sqr[MAX_CHAIN][(FB_DIGIT / 4) * FB_DIGS][16];
+
+/**
+ * Threshold where iterated squaring becomes faster.
+ */
+int fb_sqr_thres;
+
+/**
+ * Threshold where iterated square-root becomes faster.
+ */
+int fb_sqr_thres;
+
 #endif
 
 /**
@@ -292,48 +304,23 @@ static void find_chain() {
 			break;
 	}
 
-#ifdef FB_PRECO
-	dv_t t;
 	int x, y, u[chain_len + 1];
 
-	dv_null(t);
-
-	TRY {
-		fb_new(t);
-
-		u[0] = 1;
-		u[1] = 2;
-		for (i = 2; i <= chain_len; i++) {
-			x = chain[i - 1] >> 8;
-			y = chain[i - 1] - (x << 8);
-			if (x == y) {
-				u[i] = 2 * u[i - 1];
-			} else {
-				u[i] = u[x] + u[y];
-			}
-		}
-
-		for (i = 0; i <= chain_len; i++) {
-			for (j = 0; j < FB_BITS; j += 4) {
-				for (k = 0; k < 16; k++) {
-					fb_zero(t);
-					fb_set_dig(t, k);
-					fb_lsh(t, t, j);
-					for (l = 0; l < u[i]; l++) {
-						fb_sqr(t, t);
-					}
-					fb_copy(fb_tab_sqr[i][j / 4][k], t);
-				}
-			}
+	u[0] = 1;
+	u[1] = 2;
+	for (i = 2; i <= chain_len; i++) {
+		x = chain[i - 1] >> 8;
+		y = chain[i - 1] - (x << 8);
+		if (x == y) {
+			u[i] = 2 * u[i - 1];
+		} else {
+			u[i] = u[x] + u[y];
 		}
 	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+
+	for (i = 0; i <= chain_len; i++) {
+		fb_itr_pre(fb_tab_sqr[i], u[i]);
 	}
-	FINALLY {
-		dv_free(t);
-	}
-#endif
 }
 
 #endif

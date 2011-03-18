@@ -23,52 +23,77 @@
 /**
  * @file
  *
- * Implementation of binary field trace function.
+ * Implementation of the iterated squaring/square-root of a binary field
+ * element.
  *
- * @version $Id$
+ * @version $Id: relic_fb_sqr.c 677 2011-03-05 22:19:43Z dfaranha $
  * @ingroup fb
  */
 
+#include <string.h>
+
 #include "relic_core.h"
+#include "relic_conf.h"
 #include "relic_fb.h"
 #include "relic_fb_low.h"
-#include "relic_error.h"
+#include "relic_bn_low.h"
+#include "relic_util.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fb_trc_basic(fb_t a) {
-	dig_t r;
-	fb_t t, u;
-
-	fb_null(t);
-	fb_null(u);
-
-	TRY {
-		fb_new(t);
-		fb_new(u);
-
-		fb_copy(t, a);
-		fb_copy(u, a);
-		for (int i = 1; i < FB_BITS; i++) {
-			fb_sqr(t, t);
-			fb_add(u, u, t);
+void fb_itr_basic(fb_t c, fb_t a, int b) {
+	fb_copy(c, a);
+	if (b >= 0) {
+		for (int i = 0; i < b; i++) {
+			fb_sqr(c, c);
 		}
-
-		r = u[0];
+	} else {
+		for (int i = 0; i < -b; i++) {
+			fb_srt(c, c);
+		}
 	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb_free(t);
-		fb_free(u);
-	}
-
-	return r;
 }
 
-dig_t fb_trc_quick(fb_t a) {
-	return fb_trcn_low(a);
+void fb_itr_pre_quick(fb_t *t, int b) {
+	int i, j, k;
+	fb_t r;
+
+	fb_null(r);
+
+	TRY {
+		fb_new(r);
+
+		for (i = 0; i < FB_BITS; i += 4) {
+			for (j = 0; j < 16; j++) {
+				fb_zero(r);
+				fb_set_dig(r, j);
+				fb_lsh(r, r, i);
+				if (b >= 0) {
+					for (k = 0; k < b; k++) {
+						fb_sqr(r, r);
+					}
+				} else {
+					for (k = 0; k < -b; k++) {
+						fb_srt(r, r);
+					}
+				}
+
+#if ALLOC == STACK || ALLOC == AUTO
+				fb_copy((dig_t *)t + (4 * i + j) * FB_DIGS, r);
+#else
+				fb_copy(t[4 * i + j], r);
+#endif
+			}
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb_free(r);
+	}
+}
+
+void fb_itr_quick(fb_t c, fb_t a, fb_t *t) {
+	fb_itrn_low(c, a, (dig_t *)t);
 }

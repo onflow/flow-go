@@ -50,7 +50,7 @@
  * @param[in] b				- the second multiple precision integer.
  * @param[in] level			- the number of Karatsuba steps to apply.
  */
-static void bn_mul_karat_impl(bn_t c, bn_t a, bn_t b, int level) {
+static void bn_mul_karat_imp(bn_t c, bn_t a, bn_t b, int level) {
 	int h;
 	bn_t a0, a1, b0, b1, a0b0, a1b1;
 	bn_t t;
@@ -115,8 +115,8 @@ static void bn_mul_karat_impl(bn_t c, bn_t a, bn_t b, int level) {
 			bn_mul_comba(a1b1, a1, b1);
 #endif
 		} else {
-			bn_mul_karat_impl(a0b0, a0, b0, level - 1);
-			bn_mul_karat_impl(a1b1, a1, b1, level - 1);
+			bn_mul_karat_imp(a0b0, a0, b0, level - 1);
+			bn_mul_karat_imp(a1b1, a1, b1, level - 1);
 		}
 
 		/* t = (a1 + a0) */
@@ -132,7 +132,7 @@ static void bn_mul_karat_impl(bn_t c, bn_t a, bn_t b, int level) {
 			bn_mul_comba(t, a1, b1);
 #endif
 		} else {
-			bn_mul_karat_impl(t, a1, b1, level - 1);
+			bn_mul_karat_imp(t, a1, b1, level - 1);
 		}
 		/* t2 = (a0*b0 + a1*b1) */
 		bn_sub(t, t, a0b0);
@@ -267,7 +267,7 @@ void bn_mul_comba(bn_t c, bn_t a, bn_t b) {
 #if BN_KARAT > 0 || !defined(STRIP)
 
 void bn_mul_karat(bn_t c, bn_t a, bn_t b) {
-	bn_mul_karat_impl(c, a, b, BN_KARAT);
+	bn_mul_karat_imp(c, a, b, BN_KARAT);
 }
 
 #endif
