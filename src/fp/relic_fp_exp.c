@@ -79,7 +79,7 @@ void fp_exp_basic(fp_t c, fp_t a, bn_t b) {
 void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 	fp_t tab[1 << FP_WIDTH], t, r;
 	int i, j, l;
-	unsigned char win[BN_BITS];
+	unsigned char win[FP_BITS];
 
 	fp_null(t);
 	fp_null(r);
