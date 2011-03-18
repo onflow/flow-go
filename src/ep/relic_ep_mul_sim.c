@@ -200,6 +200,10 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 
 		ep_curve_get_ord(n);
 
+		for (int i = 0; i < (1 << w); i++) {
+			ep_new(t0[i]);
+			ep_new(t1[i]);
+		}
 		for (int i = 0; i < (1 << EP_WIDTH); i++) {
 			ep_new(t[i]);
 		}
@@ -262,10 +266,7 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 
 void ep_mul_sim_inter(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 #if defined(EP_KBLTZ)
-	//if (ep_curve_is_kbltz()) {
-		//ep_mul_sim_galav(r, p, k, q, l, 0);
-		//return;
-	//}
+	/* TODO: Implement GLV method here? */
 #endif
 
 #if defined(EP_ORDIN)

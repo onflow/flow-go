@@ -81,6 +81,7 @@ void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 	ep_null(q);
 
 	TRY {
+		bn_new(n);
 		bn_new(k0);
 		bn_new(k1);
 		ep_new(q);
@@ -158,6 +159,7 @@ void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+		bn_free(n);
 		bn_free(k0);
 		bn_free(k1);
 		bn_free(n)

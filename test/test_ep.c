@@ -674,20 +674,21 @@ static int fixed(void) {
 
 static int simultaneous(void) {
 	int code = STS_ERR;
-	ep_t p, q, r, s;
+	ep_t p, q, r;
 	bn_t n, k, l;
 
 	ep_null(p);
 	ep_null(q);
 	ep_null(r);
-	ep_null(s);
+	bn_null(n);
+	bn_null(k);
+	bn_null(l);
 
 	TRY {
 
 		ep_new(p);
 		ep_new(q);
 		ep_new(r);
-		ep_new(s);
 		bn_new(n);
 		bn_new(k);
 		bn_new(l);
@@ -700,10 +701,12 @@ static int simultaneous(void) {
 			bn_mod(k, k, n);
 			bn_rand(l, BN_POS, bn_bits(n));
 			bn_mod(l, l, n);
-			ep_mul(q, p, k);
-			ep_mul(s, q, l);
+			ep_rand(p);
+			ep_rand(q);
 			ep_mul_sim(r, p, k, q, l);
-			ep_add(q, q, s);
+			ep_mul(p, p, k);
+			ep_mul(q, q, l);
+			ep_add(q, q, p);
 			ep_norm(q, q);
 			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
@@ -762,8 +765,8 @@ static int simultaneous(void) {
 			bn_rand(l, BN_POS, bn_bits(n));
 			bn_mod(l, l, n);
 			ep_mul_sim_gen(r, k, q, l);
-			ep_curve_get_gen(s);
-			ep_mul_sim(q, s, k, q, l);
+			ep_curve_get_gen(p);
+			ep_mul_sim(q, p, k, q, l);
 			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
 	}
@@ -778,6 +781,7 @@ static int simultaneous(void) {
 	ep_free(r);
 	bn_free(n);
 	bn_free(k);
+	bn_free(l);
 	return code;
 }
 
@@ -844,6 +848,7 @@ static int hashing(void) {
 	code = STS_OK;
   end:
 	ep_free(a);
+	bn_free(n);
 	return code;
 }
 
