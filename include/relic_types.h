@@ -34,11 +34,12 @@
 
 #include <stdint.h>
 
+#include "relic_conf.h"
+
 #if ARITH == GMP
 #include <gmp.h>
 #endif
 
-#include "relic_conf.h"
 
 /*============================================================================*/
 /* Constant definitions                                                       */
