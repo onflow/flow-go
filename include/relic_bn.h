@@ -285,7 +285,7 @@ typedef bn_st *bn_t;
  * @param[in] M				- the modulus.
  */
 #if BN_MOD == BASIC
-#define bn_mod_pre(U, M)	(void)U, (void)M
+#define bn_mod_pre(U, M)	(void)(U), (void)(M)
 #elif BN_MOD == BARRT
 #define bn_mod_pre(U, M)	bn_mod_pre_barrt(U, M)
 #elif BN_MOD == MONTY
