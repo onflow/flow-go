@@ -348,7 +348,7 @@ typedef align dig_t fb_st[FB_DIGS + PADDING(FB_BYTES)/sizeof(dig_t)];
  * @param[in] B				- the exponent.
  */
 #if FB_ITR == BASIC
-#define fb_itr_pre(T, B)	(void)T, (void)B
+#define fb_itr_pre(T, B)	(void)(T), (void)(B)
 #elif FB_ITR == QUICK
 #define fb_itr_pre(T, B)	fb_itr_pre_quick(T, B)
 #endif
