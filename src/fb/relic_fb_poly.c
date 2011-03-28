@@ -136,7 +136,7 @@ static void find_trace() {
 /**
  * Table of precomputed half-traces.
  */
-static fb_st fb_half[(FB_DIGIT / 4) * FB_DIGS][16];
+static fb_st fb_half[(FB_DIGIT / 8 + 1) * FB_DIGS][16];
 
 /**
  * Precomputes half-traces for z^i with odd i.
@@ -273,10 +273,28 @@ static void find_chain() {
 			chain[6] = (6 << 8) + 0;
 			chain_len = 10;
 			break;
+		case 251:
+			chain[1] = (1 << 8) + 0;
+			chain[2] = (2 << 8) + 1;
+			chain[4] = (4 << 8) + 3;
+			chain[5] = (5 << 8) + 4;
+			chain[7] = (7 << 8) + 6;
+			chain[8] = (8 << 8) + 7;
+			chain_len = 10;
+			break;
 		case 353:
 			chain[2] = (2 << 8) + 0;
 			chain[4] = (4 << 8) + 0;
 			chain_len = 10;
+			break;
+		case 1223:
+			chain[1] = (1 << 8) + 0;
+			chain[2] = (2 << 8) + 0;
+			chain[4] = (4 << 8) + 2;
+			chain[5] = (5 << 8) + 4;
+			chain[10] = (10 << 8) + 2;
+			chain[11] = (11 << 8) + 10;
+			chain_len = 13;
 			break;
 		default:
 			l = 0;

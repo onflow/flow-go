@@ -58,14 +58,14 @@ void fb_itr_basic(fb_t c, fb_t a, int b) {
 
 void fb_itr_pre_quick(fb_t *t, int b) {
 	int i, j, k;
-	fb_t r;
+	dv_t r;
 
-	fb_null(r);
+	dv_null(r);
 
 	TRY {
-		fb_new(r);
+		dv_new(r);
 
-		for (i = 0; i < FB_BITS; i += 4) {
+		for (i = 0; i < FB_DIGS * FB_DIGIT; i += 4) {
 			for (j = 0; j < 16; j++) {
 				fb_zero(r);
 				fb_set_dig(r, j);
@@ -90,7 +90,7 @@ void fb_itr_pre_quick(fb_t *t, int b) {
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
-		fb_free(r);
+		dv_free(r);
 	}
 }
 

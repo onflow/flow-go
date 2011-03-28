@@ -143,7 +143,8 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 #if FB_EXP == MONTY || !defined(STRIP)
 
 void fb_exp_monty(fb_t c, fb_t a, bn_t b) {
-	fb_t tab[2];
+	fb_t tab0, tab1;
+	dig_t *tab[2];
 	dig_t buf;
 	int bitcnt, digidx, j;
 
@@ -151,11 +152,15 @@ void fb_exp_monty(fb_t c, fb_t a, bn_t b) {
 	fb_null(tab[1]);
 
 	TRY {
-		fb_new(tab[0]);
-		fb_new(tab[1]);
+		fb_new(tab0);
+		fb_new(tab1);
 
-		fb_set_dig(tab[0], 1);
-		fb_copy(tab[1], a);
+		fb_set_dig(tab0, 1);
+		fb_copy(tab1, a);
+
+		/* This trick avoid buggy compilers with alignment issues. */
+		tab[0] = tab0;
+		tab[1] = tab1;
 
 		/* Set initial mode and bitcnt, */
 		bitcnt = 1;
