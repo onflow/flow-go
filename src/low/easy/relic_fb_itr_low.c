@@ -41,8 +41,9 @@
 void fb_itrn_low(dig_t *c, dig_t *a, dig_t *t) {
 	int i, j;
 	dig_t u, *tmp, *p;
+	align dig_t v[FB_DIGS];
 
-	fb_zero(c);
+	fb_zero(v);
 
 	for (i = FB_DIGIT - 4; i >= 0; i -= 4) {
 		tmp = a;
@@ -53,7 +54,9 @@ void fb_itrn_low(dig_t *c, dig_t *a, dig_t *t) {
 #else
 			p = (t[(j * FB_DIGIT + i) * 4 + u]);
 #endif
-			fb_add(c, c, p);
+			fb_add(v, v, p);
 		}
 	}
+
+	fb_copy(c, v);
 }
