@@ -69,7 +69,7 @@ option(FB_PRECO "Precompute multiplication table for sqrt(z)." on)
 
 # Choose the arithmetic methods.
 if (NOT FB_METHD)
-	set(FB_METHD "LODAH;TABLE;QUICK;BASIC;QUICK;QUICK;EXGCD;SLIDE;QUICK")
+	set(FB_METHD "LODAH;TABLE;QUICK;QUICK;QUICK;QUICK;EXGCD;SLIDE;QUICK")
 endif(NOT FB_METHD)
 list(LENGTH FB_METHD FB_LEN)
 if (FB_LEN LESS 9)
