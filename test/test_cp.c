@@ -260,6 +260,38 @@ static int ecdsa(void) {
 	return code;
 }
 
+static int schnorr(void) {
+	int code = STS_ERR;
+	bn_t d, r;
+	ec_t q;
+	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+
+	bn_null(d);
+	bn_null(r);
+	ec_null(q);
+
+	TRY {
+		bn_new(d);
+		bn_new(r);
+		ec_new(q);
+
+		TEST_BEGIN("schnorr is correct") {
+			cp_schnorr_gen(d, q);
+			cp_schnorr_sign(r, d, msg, 5, d);
+			TEST_ASSERT(cp_schnorr_ver(r, d, msg, 5, q) == 1, end);
+		} TEST_END;
+	} CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+
+  end:
+	bn_free(d);
+	bn_free(r);
+	ec_free(q);
+	return code;
+}
+
 #endif
 
 #if defined(WITH_PC)
@@ -399,6 +431,10 @@ int main(void) {
 			return 1;
 		}
 		if (ecdsa() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+		if (schnorr() != STS_OK) {
 			core_clean();
 			return 1;
 		}

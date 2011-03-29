@@ -246,6 +246,42 @@ static void ecdsa(void) {
 	ec_free(p);
 }
 
+static void schnorr(void) {
+	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+	bn_t r, s, d;
+	ec_t p;
+
+	bn_null(r);
+	bn_null(s);
+	bn_null(d);
+	ec_null(p);
+
+	bn_new(r);
+	bn_new(s);
+	bn_new(d);
+	ec_new(p);
+
+	BENCH_BEGIN("cp_schnorr_gen") {
+		BENCH_ADD(cp_schnorr_gen(d, p));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("cp_schnorr_sign") {
+		BENCH_ADD(cp_schnorr_sign(r, s, msg, 5, d));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("cp_schnorr_ver") {
+		BENCH_ADD(cp_schnorr_ver(r, s, msg, 5, p));
+	}
+	BENCH_END;
+
+	bn_free(r);
+	bn_free(s);
+	bn_free(d);
+	ec_free(p);
+}
+
 #endif
 
 #if defined(WITH_PC)
@@ -370,6 +406,7 @@ int main(void) {
 	if (ec_param_set_any() == STS_OK) {
 		ecdh();
 		ecdsa();
+		schnorr();
 	} else {
 		THROW(ERR_NO_CURVE);
 	}
