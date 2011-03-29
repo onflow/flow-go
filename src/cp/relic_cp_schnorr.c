@@ -121,6 +121,7 @@ void cp_schnorr_sign(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
 
 int cp_schnorr_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q) {
 	bn_t n, ev, rv;
+	dig_t d;
 	ec_t p;
 	unsigned char hash[MD_LEN];
 	unsigned char m[len + PC_BYTES];
@@ -155,8 +156,14 @@ int cp_schnorr_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q) {
 				bn_read_bin(ev, hash, MD_LEN, BN_POS);
 				bn_mod(ev, ev, n);
 
-				if (bn_cmp(ev, e) == CMP_EQ) {
-					result = 1;
+				d = 0;
+				for (int i = 0; i < MIN(ev->used, e->used); i++) {
+					d |= ev->dp[i] - e->dp[i];
+				}
+				result = (d ? 0 : 1);
+
+				if (ev->used != e->used) {
+					result = 0;
 				}
 			}
 		}
