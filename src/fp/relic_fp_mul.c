@@ -40,6 +40,9 @@
 /*============================================================================*/
 /* Private definitions                                                        */
 /*============================================================================*/
+
+#if FP_KARAT > 0 || !defined(STRIP)
+
 /**
  * Multiplies two prime field elements using recursive Karatsuba
  * multiplication.
@@ -156,6 +159,8 @@ static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
 		dv_free(a1b1);
 	}
 }
+
+#endif
 
 /*============================================================================*/
 /* Public definitions                                                         */

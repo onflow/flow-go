@@ -1044,6 +1044,16 @@ void fp12_mul_dxs(fp12_t c, fp12_t a, fp12_t b);
 void fp12_sqr(fp12_t c, fp12_t a);
 
 /**
+ * Computes the doubled square of a dodecic extension field element. Computes
+ * c = 2 * a * a.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the dodecic extension field element to double
+ * 							  square.
+ */
+void fp12_sqr_dbl(fp12_t c, fp12_t a);
+
+/**
  * Computes the square of a cyclotomic dodecic extension field element.
  *
  * A cyclotomic element is one previously raised to the (p^6 - 1)-th power.

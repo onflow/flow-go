@@ -107,6 +107,9 @@ void fp_param_set(int param) {
 	int f[10] = { 0 };
 	int generated = 0;
 
+	/* Suppress possible unused parameter warning. */
+	(void) f;
+
 	TRY {
 		bn_new(t0);
 		bn_new(t1);
