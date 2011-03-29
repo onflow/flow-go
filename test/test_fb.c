@@ -1058,7 +1058,7 @@ static int exponentiation(void) {
 		} TEST_END;
 #endif
 
-#if FB_ITR == BASIC || !defined(STRIP)
+#if FB_ITR == QUICK || !defined(STRIP)
 		for (int i = 0; i < FB_TABLE_QUICK; i++) {
 			fb_new(t[i]);
 			fb_zero(t[i]);
