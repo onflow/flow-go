@@ -622,7 +622,7 @@ void fp_write(char *str, int len, fp_t a, int radix);
  *
  * @param[in] a				- the first prime field element.
  * @param[in] b				- the second prime field element.
- * @return FP_LT if a < b, FP_EQ if a == b and FP_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int fp_cmp(fp_t a, fp_t b);
 
@@ -632,7 +632,7 @@ int fp_cmp(fp_t a, fp_t b);
  *
  * @param[in] a				- the prime field element.
  * @param[in] b				- the digit.
- * @return FP_LT if a < b, FP_EQ if a == b and FP_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int fp_cmp_dig(fp_t a, dig_t b);
 

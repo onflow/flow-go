@@ -84,7 +84,7 @@ void fb_addd_low(dig_t *c, dig_t *a, dig_t *b, int size);
  *
  * @param[in] a				- the first digit to compare.
  * @param[in] b				- the second digit to compare.
- * @return FB_LT if a < b, FB_EQ if a == b and FB_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int fb_cmp1_low(dig_t a, dig_t b);
 
@@ -93,7 +93,7 @@ int fb_cmp1_low(dig_t a, dig_t b);
  *
  * @param[in] a				- the first digit vector to compare.
  * @param[in] b				- the second digit vector to compare.
- * @return FB_LT if a < b, FB_EQ if a == b and FB_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int fb_cmpn_low(dig_t *a, dig_t *b);
 

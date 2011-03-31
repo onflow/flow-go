@@ -163,7 +163,7 @@ void fp_hlvm_low(dig_t *c, dig_t *a);
  *
  * @param[in] a				- the first digit to compare.
  * @param[in] b				- the second digit to compare.
- * @return FP_LT if a < b, FP_EQ if a == b and FP_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int fp_cmp1_low(dig_t a, dig_t b);
 
@@ -172,7 +172,7 @@ int fp_cmp1_low(dig_t a, dig_t b);
  *
  * @param[in] a				- the first digit vector to compare.
  * @param[in] b				- the second digit vector to compare.
- * @return FP_LT if a < b, FP_EQ if a == b and FP_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int fp_cmpn_low(dig_t *a, dig_t *b);
 

@@ -982,7 +982,7 @@ int fp12_cmp(fp12_t a, fp12_t b);
  *
  * @param[in] a				- the dodecic extension field element.
  * @param[in] b				- the digit.
- * @return FP_LT if a < b, FP_EQ if a == b and FP_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int fp12_cmp_dig(fp12_t a, dig_t b);
 

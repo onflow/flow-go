@@ -657,7 +657,7 @@ void fb_write(char *str, int len, fb_t a, int radix);
  *
  * @param[in] a				- the first binary field element.
  * @param[in] b				- the second binary field element.
- * @return FB_LT if a < b, FB_EQ if a == b and FB_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int fb_cmp(fb_t a, fb_t b);
 
@@ -667,7 +667,7 @@ int fb_cmp(fb_t a, fb_t b);
  *
  * @param[in] a				- the binary field element.
  * @param[in] b				- the small binary field element.
- * @return FB_LT if a < b, FB_EQ if a == b and FB_GT if a > b.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
 int fb_cmp_dig(fb_t a, dig_t b);
 
