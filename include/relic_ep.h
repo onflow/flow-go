@@ -625,6 +625,21 @@ int ep_cmp(ep_t p, ep_t q);
 void ep_rand(ep_t p);
 
 /**
+ * Computes the right-hand side of the elliptic curve equation at a certain
+ * elliptic curve point.
+ *
+ * @param[out] rhs			- the result.
+ * @param[in] p				- the point.
+ */
+void ep_rhs(fp_t rhs, ep_t p);
+
+/** Tests if a point is in the curve.
+ *
+ * @param[in] p				- the point to test.
+ */
+int ep_is_valid(ep_t p);
+
+/**
  * Prints a prime elliptic curve point.
  *
  * @param[in] p				- the prime elliptic curve point to print.

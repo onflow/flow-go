@@ -98,6 +98,90 @@ void ep_rand(ep_t p) {
 	}
 }
 
+void ep_rhs(fp_t rhs, ep_t p) {
+	fp_t t0;
+	fp_t t1;
+
+	fp_null(t0);
+	fp_null(t1);
+
+	TRY {
+		fp_new(t0);
+		fp_new(t1);
+
+		/* t0 = x1^2. */
+		fp_sqr(t0, p->x);
+		/* t1 = x1^3. */
+		fp_mul(t1, t0, p->x);
+
+		/* t1 = x1^3 + a * x1 + b. */
+		switch (ep_curve_opt_a()) {
+			case OPT_ZERO:
+				break;
+			case OPT_ONE:
+				fp_add(t1, t1, p->x);
+				break;
+#if FP_RDC != MONTY
+			case OPT_DIGIT:
+				fp_mul_dig(t0, p->x, ep_curve_get_a()[0]);
+				fp_add(t1, t1, t0);
+				break;
+#endif
+			default:
+				fp_mul(t0, p->x, ep_curve_get_a());
+				fp_add(t1, t1, t0);
+				break;
+		}
+
+		switch (ep_curve_opt_b()) {
+			case OPT_ZERO:
+				break;
+			case OPT_ONE:
+				fp_add_dig(t1, t1, 1);
+				break;
+#if FP_RDC != MONTY
+			case OPT_DIGIT:
+				fp_add_dig(t1, t1, ep_curve_get_b()[0]);
+				break;
+#endif
+			default:
+				fp_add(t1, t1, ep_curve_get_b());
+				break;
+		}
+
+		fp_copy(rhs, t1);
+
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp_free(t0);
+		fp_free(t1);
+	}
+}
+
+int ep_is_valid(ep_t p) {
+	ep_t t;
+	int r = 0;
+
+	ep_null(t);
+
+	TRY {
+		ep_new(t);
+
+		ep_norm(t, p);
+
+		ep_rhs(t->x, t);
+		fp_sqr(t->y, t->y);
+		r = (fp_cmp(t->x, t->y) == CMP_EQ) || ep_is_infty(p);
+
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		ep_free(t);
+	}
+	return r;
+}
+
 void ep_print(ep_t p) {
 	fp_print(p->x);
 	fp_print(p->y);

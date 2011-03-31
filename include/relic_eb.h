@@ -644,6 +644,21 @@ int eb_cmp(eb_t p, eb_t q);
 void eb_rand(eb_t p);
 
 /**
+ * Computes the right-hand side of the elliptic curve equation at a certain
+ * elliptic curve point.
+ *
+ * @param[out] rhs			- the result.
+ * @param[in] p				- the point.
+ */
+void eb_rhs(fb_t rhs, eb_t p);
+
+/** Tests if a point is in the curve.
+ *
+ * @param[in] p				- the point to test.
+ */
+int eb_is_valid(eb_t p);
+
+/**
  * Prints a binary elliptic curve point.
  *
  * @param[in] p				- the binary elliptic curve point to print.

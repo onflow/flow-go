@@ -41,16 +41,14 @@
 /*============================================================================*/
 
 void ep_map(ep_t p, unsigned char *msg, int len) {
-	fp_t t0, t1;
+	fp_t t;
 	int bits, digits;
 	unsigned char digest[MD_LEN];
 
-	fp_null(t0);
-	fp_null(t1);
+	fp_null(t);
 
 	TRY {
-		fp_new(t0);
-		fp_new(t1);
+		fp_new(t);
 
 		md_map(digest, msg, len);
 		fp_set_dig(p->z, 1);
@@ -67,33 +65,9 @@ void ep_map(ep_t p, unsigned char *msg, int len) {
 		}
 
 		while (1) {
-			/* t0 = x1^2. */
-			fp_sqr(t0, p->x);
-			/* t1 = x1^3. */
-			fp_mul(t1, t0, p->x);
+			ep_rhs(t, p);
 
-			/* t1 = x1^3 + a * x1 + b. */
-			switch (ep_curve_opt_a()) {
-				case OPT_ZERO:
-					break;
-				case OPT_ONE:
-					fp_add(t1, t1, p->x);
-					break;
-#if FP_RDC != MONTY
-				case OPT_DIGIT:
-					fp_mul_dig(t0, p->x, ep_curve_get_a()[0]);
-					fp_add(t1, t1, t0);
-#endif
-					break;
-				default:
-					fp_mul(t0, p->x, ep_curve_get_a());
-					fp_add(t1, t1, t0);
-					break;
-			}
-
-			fp_add(t1, t1, ep_curve_get_b());
-
-			if (fp_srt(p->y, t1)) {
+			if (fp_srt(p->y, t)) {
 				p->norm = 1;
 				break;
 			}
@@ -106,7 +80,6 @@ void ep_map(ep_t p, unsigned char *msg, int len) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp_free(t0);
-		fp_free(t1);
+		fp_free(t);
 	}
 }

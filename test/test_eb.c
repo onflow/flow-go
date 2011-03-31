@@ -110,6 +110,14 @@ static int util(void) {
 			TEST_ASSERT(eb_is_infty(a), end);
 		}
 		TEST_END;
+
+		TEST_BEGIN("validity test is correct") {
+			eb_rand(a);
+			TEST_ASSERT(eb_is_valid(a), end);
+			fb_rand(a->x);
+			TEST_ASSERT(!eb_is_valid(a), end);
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);

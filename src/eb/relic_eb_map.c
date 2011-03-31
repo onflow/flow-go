@@ -42,20 +42,18 @@
 
 void eb_map(eb_t p, unsigned char *msg, int len) {
 	bn_t k;
-	fb_t t0, t1, t2;
+	fb_t t0, t1;
 	int i;
 	unsigned char digest[MD_LEN];
 
 	bn_null(k);
 	fb_null(t0);
 	fb_null(t1);
-	fb_null(t2);
 
 	TRY {
 		bn_new(k);
 		fb_new(t0);
 		fb_new(t1);
-		fb_new(t2);
 
 		md_map(digest, msg, len);
 		bn_read_bin(k, digest, MD_LEN, BN_POS);
@@ -66,60 +64,8 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 			bn_add_dig(k, k, 1);
 			bn_mod_2b(k, k, FB_BITS);
 			dv_copy(p->x, k->dp, FB_DIGS);
-			/* t0 = x1^2. */
-			fb_sqr(t0, p->x);
-			/* t1 = x1^3. */
-			fb_mul(t1, t0, p->x);
 
-			if (eb_curve_is_super()) {
-				/* t1 = x1^3 + a * x1 + b. */
-				switch (eb_curve_opt_a()) {
-					case OPT_ZERO:
-						break;
-					case OPT_ONE:
-						fb_add(t1, t1, p->x);
-						break;
-					case OPT_DIGIT:
-						fb_mul_dig(t2, p->x, eb_curve_get_a()[0]);
-						fb_add(t1, t1, t2);
-						break;
-					default:
-						fb_mul(t2, p->x, eb_curve_get_a());
-						fb_add(t1, t1, t2);
-						break;
-				}
-			} else {
-				/* t1 = x1^3 + a * x1^2 + b. */
-				switch (eb_curve_opt_a()) {
-					case OPT_ZERO:
-						break;
-					case OPT_ONE:
-						fb_add(t1, t1, t0);
-						break;
-					case OPT_DIGIT:
-						fb_mul_dig(t2, t0, eb_curve_get_a()[0]);
-						fb_add(t1, t1, t2);
-						break;
-					default:
-						fb_mul(t2, t0, eb_curve_get_a());
-						fb_add(t1, t1, t2);
-						break;
-				}
-			}
-
-			switch (eb_curve_opt_b()) {
-				case OPT_ZERO:
-					break;
-				case OPT_ONE:
-					fb_add_dig(t1, t1, 1);
-					break;
-				case OPT_DIGIT:
-					fb_add_dig(t1, t1, eb_curve_get_b()[0]);
-					break;
-				default:
-					fb_add(t1, t1, eb_curve_get_b());
-					break;
-			}
+			eb_rhs(t1, p);
 
 			if (eb_curve_is_super()) {
 				if (eb_curve_opt_c() != OPT_ONE) {
@@ -144,6 +90,7 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 				}
 			} else {
 				/* t0 = 1/x1^2. */
+				fb_sqr(t0, p->x);
 				fb_inv(t0, t0);
 				/* t0 = t1/x1^2. */
 				fb_mul(t0, t0, t1);
@@ -176,6 +123,5 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 		bn_free(k);
 		fb_free(t0);
 		fb_free(t1);
-		fb_free(t2);
 	}
 }

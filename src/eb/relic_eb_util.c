@@ -96,6 +96,118 @@ void eb_rand(eb_t p) {
 	}
 }
 
+void eb_rhs(fb_t rhs, eb_t p) {
+	fb_t t0, t1;
+
+	fb_null(t0);
+	fb_null(t1);
+	fb_null(t0);
+
+	TRY {
+		fb_new(t0);
+		fb_new(t1);
+		fb_new(t0);
+
+		/* t0 = x1^2. */
+		fb_sqr(t0, p->x);
+		/* t1 = x1^3. */
+		fb_mul(t1, t0, p->x);
+
+		if (eb_curve_is_super()) {
+			/* t1 = x1^3 + a * x1 + b. */
+			switch (eb_curve_opt_a()) {
+				case OPT_ZERO:
+					break;
+				case OPT_ONE:
+					fb_add(t1, t1, p->x);
+					break;
+				case OPT_DIGIT:
+					fb_mul_dig(t0, p->x, eb_curve_get_a()[0]);
+					fb_add(t1, t1, t0);
+					break;
+				default:
+					fb_mul(t0, p->x, eb_curve_get_a());
+					fb_add(t1, t1, t0);
+					break;
+			}
+		} else {
+			/* t1 = x1^3 + a * x1^2 + b. */
+			switch (eb_curve_opt_a()) {
+				case OPT_ZERO:
+					break;
+				case OPT_ONE:
+					fb_add(t1, t1, t0);
+					break;
+				case OPT_DIGIT:
+					fb_mul_dig(t0, t0, eb_curve_get_a()[0]);
+					fb_add(t1, t1, t0);
+					break;
+				default:
+					fb_mul(t0, t0, eb_curve_get_a());
+					fb_add(t1, t1, t0);
+					break;
+			}
+		}
+
+		switch (eb_curve_opt_b()) {
+			case OPT_ZERO:
+				break;
+			case OPT_ONE:
+				fb_add_dig(t1, t1, 1);
+				break;
+			case OPT_DIGIT:
+				fb_add_dig(t1, t1, eb_curve_get_b()[0]);
+				break;
+			default:
+				fb_add(t1, t1, eb_curve_get_b());
+				break;
+		}
+
+		fb_copy(rhs, t1);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fb_free(t0);
+		fb_free(t1);
+		fb_free(t0);
+	}
+}
+
+int eb_is_valid(eb_t p) {
+	eb_t t;
+	fb_t lhs;
+	int r = 0;
+
+	eb_null(t);
+	fb_null(lhs);
+
+	TRY {
+		eb_new(t);
+		fb_new(lhs);
+
+		eb_norm(t, p);
+
+		if (eb_curve_is_super()) {
+			fb_mul(lhs, t->y, eb_curve_get_c());
+		} else {
+			fb_mul(lhs, t->x, t->y);
+		}
+		eb_rhs(t->x, t);
+		fb_sqr(t->y, t->y);
+		fb_add(lhs, lhs, t->y);
+		r = (fb_cmp(lhs, t->x) == CMP_EQ) || eb_is_infty(p);
+
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		eb_free(t);
+		fb_free(lhs);
+	}
+	return r;
+}
+
 void eb_print(eb_t p) {
 	fb_print(p->x);
 	fb_print(p->y);

@@ -66,71 +66,16 @@ void eb_pck(eb_t r, eb_t p) {
 }
 
 void eb_upk(eb_t r, eb_t p) {
-	fb_t t0, t1, t2;
+	fb_t t0, t1;
 
 	fb_null(t0);
 	fb_null(t1);
-	fb_null(t2);
 
 	TRY {
 		fb_new(t0);
 		fb_new(t1);
-		fb_new(t2);
 
-		/* t0 = x1^2. */
-		fb_sqr(t0, p->x);
-		/* t1 = x1^3. */
-		fb_mul(t1, t0, p->x);
-
-		if (eb_curve_is_super()) {
-			/* t1 = x1^3 + a * x1 + b. */
-			switch (eb_curve_opt_a()) {
-				case OPT_ZERO:
-					break;
-				case OPT_ONE:
-					fb_add(t1, t1, p->x);
-					break;
-				case OPT_DIGIT:
-					fb_mul_dig(t2, p->x, eb_curve_get_a()[0]);
-					fb_add(t1, t1, t2);
-					break;
-				default:
-					fb_mul(t2, p->x, eb_curve_get_a());
-					fb_add(t1, t1, t2);
-					break;
-			}
-		} else {
-			/* t1 = x1^3 + a * x1^2 + b. */
-			switch (eb_curve_opt_a()) {
-				case OPT_ZERO:
-					break;
-				case OPT_ONE:
-					fb_add(t1, t1, t0);
-					break;
-				case OPT_DIGIT:
-					fb_mul_dig(t2, t0, eb_curve_get_a()[0]);
-					fb_add(t1, t1, t2);
-					break;
-				default:
-					fb_mul(t2, t0, eb_curve_get_a());
-					fb_add(t1, t1, t2);
-					break;
-			}
-		}
-
-		switch (eb_curve_opt_b()) {
-			case OPT_ZERO:
-				break;
-			case OPT_ONE:
-				fb_add_dig(t1, t1, 1);
-				break;
-			case OPT_DIGIT:
-				fb_add_dig(t1, t1, eb_curve_get_b()[0]);
-				break;
-			default:
-				fb_add(t1, t1, eb_curve_get_b());
-				break;
-		}
+		eb_rhs(t1, p);
 
 		if (eb_curve_is_super()) {
 			/* t0 = c^2. */
@@ -148,6 +93,7 @@ void eb_upk(eb_t r, eb_t p) {
 			/* x3 = x1, y3 = t1 * c, z3 = 1. */
 			fb_mul(r->y, t1, eb_curve_get_c());
 		} else {
+			fb_sqr(t0, p->x);
 			/* t0 = 1/x1^2. */
 			fb_inv(t0, t0);
 			/* t0 = t1/x1^2. */
@@ -172,6 +118,5 @@ void eb_upk(eb_t r, eb_t p) {
 	FINALLY {
 		fb_free(t0);
 		fb_free(t1);
-		fb_free(t2);
 	}
 }

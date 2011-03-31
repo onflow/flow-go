@@ -109,6 +109,14 @@ int util(void) {
 			TEST_ASSERT(ep_is_infty(a), end);
 		}
 		TEST_END;
+
+		TEST_BEGIN("validity test is correct") {
+			ep_rand(a);
+			TEST_ASSERT(ep_is_valid(a), end);
+			fp_rand(a->x);
+			TEST_ASSERT(!ep_is_valid(a), end);
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
