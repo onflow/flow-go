@@ -1039,7 +1039,8 @@ void eb_pck(eb_t r, eb_t p);
  *
  * @param[out] r			- the result.
  * @param[in] p				- the point to decompress.
+ * @return if the decompression was successful
  */
-void eb_upk(eb_t r, eb_t p);
+int eb_upk(eb_t r, eb_t p);
 
 #endif /* !RELIC_EB_H */

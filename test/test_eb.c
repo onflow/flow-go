@@ -944,7 +944,7 @@ static int compression(void) {
 		TEST_BEGIN("point compression is correct") {
 			eb_rand(a);
 			eb_pck(b, a);
-			eb_upk(c, b);
+			TEST_ASSERT(eb_upk(c, b) == 1, end);
 			TEST_ASSERT(eb_cmp(a, c) == CMP_EQ, end);
 		}
 		TEST_END;

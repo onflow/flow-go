@@ -983,8 +983,9 @@ void ep_pck(ep_t r, ep_t p);
  *
  * @param[out] r			- the result.
  * @param[in] p				- the point to decompress.
+ * @return if the decompression was successful
  */
-void ep_upk(ep_t r, ep_t p);
+int ep_upk(ep_t r, ep_t p);
 
 /**
  * Computes the efficient curve endomorphism for the GLV method.

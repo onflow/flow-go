@@ -809,7 +809,7 @@ static int compression(void) {
 		TEST_BEGIN("point compression is correct") {
 			ep_rand(a);
 			ep_pck(b, a);
-			ep_upk(c, b);
+			TEST_ASSERT(ep_upk(c, b) == 1, end);
 			TEST_ASSERT(ep_cmp(a, c) == CMP_EQ, end);
 		}
 		TEST_END;

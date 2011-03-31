@@ -65,8 +65,9 @@ void eb_pck(eb_t r, eb_t p) {
 	r->norm = 1;
 }
 
-void eb_upk(eb_t r, eb_t p) {
+int eb_upk(eb_t r, eb_t p) {
 	fb_t t0, t1;
+	int res = 0;
 
 	fb_null(t0);
 	fb_null(t1);
@@ -84,6 +85,7 @@ void eb_upk(eb_t r, eb_t p) {
 			fb_inv(t0, t0);
 			/* t0 = t1/c^2. */
 			fb_mul(t0, t0, t1);
+			res = (fb_trc(t0) == 0);
 			/* Solve t1^2 + t1 = t0. */
 			fb_slv(t1, t0);
 			/* If this is not the correct solution, try the other. */
@@ -98,6 +100,7 @@ void eb_upk(eb_t r, eb_t p) {
 			fb_inv(t0, t0);
 			/* t0 = t1/x1^2. */
 			fb_mul(t0, t0, t1);
+			res = (fb_trc(t0) == 0);
 			/* Solve t1^2 + t1 = t0. */
 			fb_slv(t1, t0);
 			/* If this is not the correct solution, try the other. */
@@ -119,4 +122,5 @@ void eb_upk(eb_t r, eb_t p) {
 		fb_free(t0);
 		fb_free(t1);
 	}
+	return res;
 }

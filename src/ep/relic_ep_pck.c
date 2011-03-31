@@ -47,8 +47,9 @@ void ep_pck(ep_t r, ep_t p) {
 	r->norm = 1;
 }
 
-void ep_upk(ep_t r, ep_t p) {
+int ep_upk(ep_t r, ep_t p) {
 	fp_t t;
+	int res = 0;
 
 	fp_null(t);
 
@@ -58,7 +59,7 @@ void ep_upk(ep_t r, ep_t p) {
 		ep_rhs(t, p);
 
 		/* t0 = sqrt(x1^3 + a * x1 + b). */
-		fp_srt(t, t);
+		res = fp_srt(t, t);
 
 		/* Verify if least significant bit of the result matches the
 		 * compressed y-coordinate. */
@@ -77,4 +78,5 @@ void ep_upk(ep_t r, ep_t p) {
 	FINALLY {
 		fp_free(t);
 	}
+	return res;
 }
