@@ -246,6 +246,9 @@ static void eb_add_projc_ordin(eb_t r, eb_t p, eb_t q) {
 		fb_new(t7);
 
 		if (!q->norm) {
+#if defined(EB_MIXED)
+			THROW(ERR_INVALID);
+#else
 			/* t0 = B = x2 * z1. */
 			fb_mul(t0, q->x, p->z);
 
@@ -312,6 +315,7 @@ static void eb_add_projc_ordin(eb_t r, eb_t p, eb_t q) {
 				fb_mul(t7, t7, r->x);
 				fb_add(r->y, r->y, t7);
 			}
+#endif
 		} else {
 			/* Mixed addition. */
 			if (!p->norm) {
@@ -452,6 +456,9 @@ static void eb_add_projc_super(eb_t r, eb_t p, eb_t q) {
 		fb_new(t5);
 
 		if (!q->norm) {
+#if defined(EB_MIXED)
+			THROW(ERR_INVALID);
+#else
 			/* t0 = A = y2 * z1. */
 			fb_mul(t0, p->z, q->y);
 			/* t1 = B = y1 * z2. */
@@ -512,6 +519,7 @@ static void eb_add_projc_super(eb_t r, eb_t p, eb_t q) {
 				fb_add(r->y, r->y, t5);
 				fb_add(r->y, r->y, r->z);
 			}
+#endif
 		} else {
 			/* Mixed addition. */
 			if (p->norm) {

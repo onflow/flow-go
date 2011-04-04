@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EB_ADD == PROJC || defined(EB_MIXED)
+#if EB_ADD == PROJC
 
 #if defined(EB_ORDIN) || defined(EB_KBLTZ)
 
@@ -93,7 +93,7 @@ static void eb_norm_super(eb_t r, eb_t p, int flag) {
 
 #endif /* EB_SUPER */
 
-#endif /* EB_ADD == PROJC || EB_MIXED */
+#endif /* EB_ADD == PROJC */
 
 /**
  * Normalizes a point represented in lambda-coordinates.

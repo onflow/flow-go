@@ -41,7 +41,7 @@
 
 #if defined(EB_KBLTZ)
 
-#if EB_ADD == BASIC || defined(EB_MIXED) || !defined(STRIP)
+#if EB_ADD == BASIC || !defined(STRIP)
 
 void eb_frb_basic(eb_t r, eb_t p) {
 	if (eb_is_infty(p)) {
@@ -59,7 +59,7 @@ void eb_frb_basic(eb_t r, eb_t p) {
 
 #endif
 
-#if EB_ADD == PROJC || defined(EB_MIXED) || !defined(STRIP)
+#if EB_ADD == PROJC || !defined(STRIP)
 
 void eb_frb_projc(eb_t r, eb_t p) {
 	if (eb_is_infty(p)) {
