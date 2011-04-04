@@ -199,6 +199,7 @@ int addition(void) {
 #endif
 
 #if EP_ADD == PROJC || !defined(STRIP)
+#if !defined(EP_MIXED)
 		TEST_BEGIN("point addition in projective coordinates is correct") {
 			ep_rand(a);
 			ep_rand(b);
@@ -215,6 +216,7 @@ int addition(void) {
 			ep_norm(e, e);
 			TEST_ASSERT(ep_cmp(e, d) == CMP_EQ, end);
 		} TEST_END;
+#endif
 
 		TEST_BEGIN("point addition in mixed coordinates (z2 = 1) is correct") {
 			ep_rand(a);
@@ -315,6 +317,7 @@ int subtraction(void) {
 #endif
 
 #if EP_ADD == PROJC || !defined(STRIP)
+#if !defined(EP_MIXED)
 		TEST_BEGIN("point subtraction in projective coordinates is correct") {
 			ep_rand(a);
 			ep_rand(b);
@@ -331,6 +334,7 @@ int subtraction(void) {
 			ep_norm(d, d);
 			TEST_ASSERT(ep_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
+#endif
 
 		TEST_BEGIN("point subtraction in mixed coordinates (z2 = 1) is correct") {
 			ep_rand(a);

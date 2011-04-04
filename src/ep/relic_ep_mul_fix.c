@@ -56,6 +56,9 @@ static void ep_mul_pre_ordin(ep_t * t, ep_t p) {
 	}
 
 	ep_dbl(t[0], p);
+#if defined(EP_MIXED)
+	ep_norm(t[0], t[0]);
+#endif
 
 #if EP_DEPTH > 2
 	ep_add(t[1], t[0], p);
@@ -505,8 +508,11 @@ void ep_mul_pre_combs(ep_t * t, ep_t p) {
 			for (i = 1; i < l; i++) {
 				ep_dbl(t[1 << j], t[1 << j]);
 			}
+#if defined(EP_MIXED)
+			ep_norm(t[1 << j], t[1 << j]);
+#endif
 			for (i = 1; i < (1 << j); i++) {
-				ep_add(t[(1 << j) + i], t[1 << j], t[i]);
+				ep_add(t[(1 << j) + i], t[i], t[1 << j]);
 			}
 		}
 
@@ -557,8 +563,11 @@ void ep_mul_pre_combd(ep_t * t, ep_t p) {
 			for (i = 1; i < d; i++) {
 				ep_dbl(t[1 << j], t[1 << j]);
 			}
+#if defined(EP_MIXED)
+			ep_norm(t[1 << j], t[1 << j]);
+#endif
 			for (i = 1; i < (1 << j); i++) {
-				ep_add(t[(1 << j) + i], t[1 << j], t[i]);
+				ep_add(t[(1 << j) + i], t[i], t[1 << j]);
 			}
 		}
 		ep_set_infty(t[1 << EP_DEPTH]);

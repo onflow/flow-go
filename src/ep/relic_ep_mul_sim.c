@@ -52,7 +52,9 @@ static void table_init_ordin(ep_t *t, ep_t p) {
 	int i;
 
 	ep_dbl(t[0], p);
-	ep_norm(p, p);
+#if defined(EP_MIXED)
+	ep_norm(t[0], t[0]);
+#endif
 
 #if EP_WIDTH > 2
 	ep_add(t[1], t[0], p);

@@ -52,7 +52,7 @@ void ep_neg_basic(ep_t r, ep_t p) {
 		fp_copy(r->z, p->z);
 	}
 
-	fp_sub(r->y, fp_prime_get(), p->y);
+	fp_neg(r->y, p->y);
 
 	r->norm = 1;
 }
@@ -72,9 +72,9 @@ void ep_neg_projc(ep_t r, ep_t p) {
 		fp_copy(r->z, p->z);
 	}
 
-	fp_sub(r->y, fp_prime_get(), p->y);
+	fp_neg(r->y, p->y);
 
-	r->norm = 0;
+	r->norm = p->norm;
 }
 
 #endif

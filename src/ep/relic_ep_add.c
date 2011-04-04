@@ -143,6 +143,9 @@ static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 		fp_new(t6);
 
 		if (!q->norm) {
+#if defined(EP_MIXED)
+			THROW(ERR_INVALID);
+#else
 			/* t0 = z1^2. */
 			fp_sqr(t0, p->z);
 
@@ -212,6 +215,7 @@ static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 				fp_sub(r->z, r->z, t6);
 				fp_mul(r->z, r->z, t3);
 			}
+#endif
 		} else {
 			if (!p->norm) {
 				/* t0 = z1^2. */
