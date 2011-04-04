@@ -1026,8 +1026,10 @@ static int test(void) {
 		return STS_ERR;
 	}
 
-	if (halving() != STS_OK) {
-		return STS_ERR;
+	if (!eb_curve_is_super()) {
+		if (halving() != STS_OK) {
+			return STS_ERR;
+		}
 	}
 
 	if (frobenius() != STS_OK) {
