@@ -40,38 +40,9 @@
 /*============================================================================*/
 
 #if EP_MUL == LWNAF || !defined(STRIP)
-
-/**
- * Precomputes a table for a point multiplication on an ordinary curve.
- *
- * @param[out] t				- the destination table.
- * @param[in] p					- the point to multiply.
- */
-static void table_init(ep_t * t, ep_t p) {
-	int i;
-
-	ep_dbl(t[0], p);
-#if defined(EP_MIXED)
-	ep_norm(t[0], t[0]);
-#endif
-
-#if EP_WIDTH > 2
-	ep_add(t[1], t[0], p);
-	for (i = 2; i < (1 << (EP_WIDTH - 2)); i++) {
-		ep_add(t[i], t[i - 1], t[0]);
-	}
-#endif
-
-#if defined(EP_MIXED)
-	ep_norm_sim(t + 1, t + 1, (1 << (EP_WIDTH - 2)) - 1);
-#endif
-
-	ep_copy(t[0], p);
-}
-
 #if defined(EP_KBLTZ)
 
-void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
+static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 	int len, l0, l1, i, n0, n1, s0, s1;
 	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
 	bn_t n, k0, k1, v1[3], v2[3];
@@ -109,10 +80,10 @@ void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 		bn_abs(k1, k1);
 
 		if (s0 == BN_POS) {
-			table_init(table, p);
+			ep_mul_table(table, p, (1 << (EP_WIDTH - 2)));
 		} else {
 			ep_neg(q, p);
-			table_init(table, q);
+			ep_mul_table(table, q, (1 << (EP_WIDTH - 2)));
 		}
 
 		bn_rec_naf(naf0, &l0, k0, EP_WIDTH);
@@ -197,7 +168,7 @@ static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
 			ep_new(table[i]);
 		}
 		/* Compute the precomputation table. */
-		table_init(table, p);
+		ep_mul_table(table, p, (1 << (EP_WIDTH - 2)));
 
 		/* Compute the w-TNAF representation of k. */
 		bn_rec_naf(naf, &len, k, EP_WIDTH);
@@ -237,6 +208,26 @@ static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
+
+void ep_mul_table(ep_t * t, ep_t p, int n) {
+	int i;
+
+	ep_dbl(t[0], p);
+#if defined(EP_MIXED)
+	ep_norm(t[0], t[0]);
+#endif
+
+	ep_add(t[1], t[0], p);
+	for (i = 2; i < n; i++) {
+		ep_add(t[i], t[i - 1], t[0]);
+	}
+
+#if defined(EP_MIXED)
+	ep_norm_sim(t + 1, t + 1, n - 1);
+#endif
+
+	ep_copy(t[0], p);
+}
 
 #if EP_MUL == BASIC || !defined(STRIP)
 

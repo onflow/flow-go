@@ -41,37 +41,6 @@
 #if EP_FIX == LWNAF || !defined(STRIP)
 
 /**
- * Precomputes a table for a point multiplication on an ordinary curve.
- *
- * @param[out] t				- the destination table.
- * @param[in] p					- the point to multiply.
- */
-static void ep_mul_pre_ordin(ep_t * t, ep_t p) {
-	int i;
-
-	for (i = 0; i < (1 << (EP_DEPTH - 2)); i++) {
-		ep_set_infty(t[i]);
-		fp_set_dig(t[i]->z, 1);
-		t[i]->norm = 1;
-	}
-
-	ep_dbl(t[0], p);
-#if defined(EP_MIXED)
-	ep_norm(t[0], t[0]);
-#endif
-
-#if EP_DEPTH > 2
-	ep_add(t[1], t[0], p);
-	for (i = 2; i < (1 << (EP_DEPTH - 2)); i++) {
-		ep_add(t[i], t[i - 1], t[0]);
-	}
-#endif
-	ep_copy(t[0], p);
-
-	ep_norm_sim(t + 1, t + 1, EP_TABLE_LWNAF - 1);
-}
-
-/**
  * Multiplies a binary elliptic curve point by an integer using the w-NAF
  * method.
  *
@@ -646,7 +615,7 @@ void ep_mul_fix_combd(ep_t r, ep_t * t, bn_t k) {
 #if EP_FIX == LWNAF || !defined(STRIP)
 
 void ep_mul_pre_lwnaf(ep_t * t, ep_t p) {
-	ep_mul_pre_ordin(t, p);
+	ep_mul_table(t, p, (1 << (EP_DEPTH - 2)));
 }
 
 void ep_mul_fix_lwnaf(ep_t r, ep_t * t, bn_t k) {

@@ -42,31 +42,6 @@
 
 #if EP_SIM == INTER || !defined(STRIP)
 
-/**
- * Precomputes a table for a point multiplication on an ordinary curve.
- *
- * @param[out] t				- the destination table.
- * @param[in] p					- the point to multiply.
- */
-static void table_init_ordin(ep_t *t, ep_t p) {
-	int i;
-
-	ep_dbl(t[0], p);
-#if defined(EP_MIXED)
-	ep_norm(t[0], t[0]);
-#endif
-
-#if EP_WIDTH > 2
-	ep_add(t[1], t[0], p);
-	for (i = 2; i < (1 << (EP_WIDTH - 2)); i++) {
-		ep_add(t[i], t[i - 1], t[0]);
-	}
-#endif
-	ep_norm_sim(t + 1, t + 1, (1 << (EP_WIDTH - 2)) - 1);
-
-	ep_copy(t[0], p);
-}
-
 static void ep_mul_sim_ordin(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
 	int len, l0, l1, i, n0, n1, w;
 	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
@@ -87,7 +62,7 @@ static void ep_mul_sim_ordin(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
 		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
 			ep_new(table0[i]);
 		}
-		table_init_ordin(table0, p);
+		ep_mul_table(table0, p, (1 << (EP_WIDTH - 2)));
 		t = table0;
 	}
 
@@ -96,7 +71,7 @@ static void ep_mul_sim_ordin(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
 		ep_new(table1[i]);
 	}
 	/* Compute the precomputation table. */
-	table_init_ordin(table1, q);
+	ep_mul_table(table1, q, (1 << (EP_WIDTH - 2)));
 
 	/* Compute the w-TNAF representation of k. */
 	if (gen) {

@@ -717,6 +717,17 @@ void ep_dbl_basic(ep_t r, ep_t p);
 void ep_dbl_projc(ep_t r, ep_t p);
 
 /**
+ * Generates a precomputation table.
+ *
+ * Precomputes 1p, 3p, 5p, etc.
+ *
+ * @param[out] t				- the destination table.
+ * @param[in] p					- the point to multiply.
+ * @param[in n					- the number of points in the table.
+ */
+void ep_mul_table(ep_t * t, ep_t p, int n);
+
+/**
  * Multiplies a prime elliptic point by an integer using the binary method.
  *
  * @param[out] r			- the result.
