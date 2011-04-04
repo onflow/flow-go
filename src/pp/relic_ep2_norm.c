@@ -41,7 +41,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == PROJC || !defined(STRIP)
 
 /**
  * Normalizes a point represented in projective coordinates.
@@ -81,7 +81,7 @@ void ep2_norm_imp(ep2_t r, ep2_t p) {
 	r->norm = 1;
 }
 
-#endif /* EP_ADD == PROJC || EP_MIXED */
+#endif /* EP_ADD == PROJC */
 
 /*============================================================================*/
 /* Public definitions                                                         */

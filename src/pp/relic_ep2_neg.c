@@ -41,7 +41,7 @@
 	/* Public definitions                                                         */
 /*============================================================================*/
 
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 
 void ep2_neg_basic(ep2_t r, ep2_t p) {
 	if (ep2_is_infty(p)) {
@@ -61,16 +61,11 @@ void ep2_neg_basic(ep2_t r, ep2_t p) {
 
 #endif
 
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == PROJC || !defined(STRIP)
 
 void ep2_neg_projc(ep2_t r, ep2_t p) {
 	if (ep2_is_infty(p)) {
 		ep2_set_infty(r);
-		return;
-	}
-
-	if (p->norm) {
-		ep2_neg_basic(r, p);
 		return;
 	}
 
@@ -81,7 +76,7 @@ void ep2_neg_projc(ep2_t r, ep2_t p) {
 
 	fp2_neg(r->y, p->y);
 
-	r->norm = 0;
+	r->norm = p->norm;
 }
 
 #endif

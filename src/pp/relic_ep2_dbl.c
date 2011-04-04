@@ -41,7 +41,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 
 /**
  * Doubles a point represented in affine coordinates on an ordinary prime
@@ -136,7 +136,7 @@ static void ep2_dbl_basic_imp(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 
 #endif /* EP_ADD == BASIC */
 
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == PROJC || !defined(STRIP)
 
 /**
  * Doubles a point represented in affine coordinates on an ordinary prime
@@ -198,13 +198,13 @@ static void ep2_dbl_projc_imp(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 	}
 }
 
-#endif /* EP_ADD == PROJC || EP_MIXED */
+#endif /* EP_ADD == PROJC */
 
 /*============================================================================*/
 	/* Public definitions                                                         */
 /*============================================================================*/
 
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 
 void ep2_dbl_basic(ep2_t r, ep2_t p) {
 	if (ep2_is_infty(p)) {
@@ -226,7 +226,7 @@ void ep2_dbl_slp_basic(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 
 #endif
 
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == PROJC || !defined(STRIP)
 
 void ep2_dbl_projc(ep2_t r, ep2_t p) {
 	if (ep2_is_infty(p)) {

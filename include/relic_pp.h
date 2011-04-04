@@ -470,27 +470,6 @@ typedef ep2_st *ep2_t;
 #endif
 
 /**
- * Renames elliptic curve arithmetic operations to build precomputation
- * tables with the right coordinate system.
- */
-#if defined(EP_MIXED)
-/** @{ */
-#define ep2_add_tab			ep2_add_basic
-#define ep2_sub_tab			ep2_sub_basic
-#define ep2_neg_tab			ep2_neg_basic
-#define ep2_dbl_tab			ep2_dbl_basic
-/** @} */
-#else
-/**@{ */
-#define ep2_add_tab			ep2_add
-#define ep2_sub_tab			ep2_sub
-#define ep2_neg_tab			ep2_neg
-#define ep2_dbl_tab			ep2_dbl
-#define ep2_frb_tab			ep2_frb
-/** @} */
-#endif
-
-/**
  * Computes the pairing of two binary elliptic curve points. Computes e(P, Q).
  *
  * @param[out] R			- the result.

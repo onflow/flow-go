@@ -50,20 +50,23 @@
 static void ep2_mul_pre_ordin(ep2_t * t, ep2_t p) {
 	int i;
 
-	for (i = 0; i < (1 << (EP_DEPTH - 2)); i++) {
-		ep2_set_infty(t[i]);
-		fp_set_dig(t[i]->z[0], 1);
-		fp_zero(t[i]->z[1]);
-		t[i]->norm = 1;
-	}
-
-	ep2_dbl_tab(t[0], p);
+	ep2_dbl(t[0], p);
+#if defined(EP_MIXED)
+	ep2_norm(t[0], t[0]);
+#endif
 
 #if EP_DEPTH > 2
-	ep2_add_tab(t[1], t[0], p);
+	ep2_add(t[1], t[0], p);
 	for (i = 2; i < (1 << (EP_DEPTH - 2)); i++) {
-		ep2_add_tab(t[i], t[i - 1], t[0]);
+		ep2_add(t[i], t[i - 1], t[0]);
 	}
+
+#if defined(EP_MIXED)
+	for (i = 1; i < (1 << (EP_DEPTH - 2)); i++) {
+		ep2_norm(t[i], t[i]);
+	}
+#endif
+
 #endif
 	ep2_copy(t[0], p);
 }
@@ -320,14 +323,22 @@ void ep2_mul_pre_combs(ep2_t * t, ep2_t p) {
 
 		ep2_copy(t[1], p);
 		for (j = 1; j < EP_DEPTH; j++) {
-			ep2_dbl_tab(t[1 << j], t[1 << (j - 1)]);
+			ep2_dbl(t[1 << j], t[1 << (j - 1)]);
 			for (i = 1; i < l; i++) {
-				ep2_dbl_tab(t[1 << j], t[1 << j]);
+				ep2_dbl(t[1 << j], t[1 << j]);
 			}
+#if defined(EP_MIXED)
+			ep2_norm(t[1 << j], t[1 << j]);
+#endif
 			for (i = 1; i < (1 << j); i++) {
-				ep2_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
+				ep2_add(t[(1 << j) + i], t[i], t[1 << j]);
 			}
 		}
+#if defined(EP_MIXED)
+		for (i = 1; i < EP_TABLE_COMBS; i++) {
+			ep2_norm(t[i], t[i]);
+		}
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -410,21 +421,29 @@ void ep2_mul_pre_combd(ep2_t * t, ep2_t p) {
 		ep2_set_infty(t[0]);
 		ep2_copy(t[1], p);
 		for (j = 1; j < EP_DEPTH; j++) {
-			ep2_dbl_tab(t[1 << j], t[1 << (j - 1)]);
+			ep2_dbl(t[1 << j], t[1 << (j - 1)]);
 			for (i = 1; i < d; i++) {
-				ep2_dbl_tab(t[1 << j], t[1 << j]);
+				ep2_dbl(t[1 << j], t[1 << j]);
 			}
+#if defined(EP_MIXED)
+			ep2_norm(t[1 << j], t[1 << j]);
+#endif
 			for (i = 1; i < (1 << j); i++) {
-				ep2_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
+				ep2_add(t[(1 << j) + i], t[i], t[1 << j]);
 			}
 		}
 		ep2_set_infty(t[1 << EP_DEPTH]);
 		for (j = 1; j < (1 << EP_DEPTH); j++) {
-			ep2_dbl_tab(t[(1 << EP_DEPTH) + j], t[j]);
+			ep2_dbl(t[(1 << EP_DEPTH) + j], t[j]);
 			for (i = 1; i < e; i++) {
-				ep2_dbl_tab(t[(1 << EP_DEPTH) + j], t[(1 << EP_DEPTH) + j]);
+				ep2_dbl(t[(1 << EP_DEPTH) + j], t[(1 << EP_DEPTH) + j]);
 			}
 		}
+#if defined(EP_MIXED)
+		for (i = 1; i < EP_TABLE_COMBD; i++) {
+			ep2_norm(t[i], t[i]);
+		}
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

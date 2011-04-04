@@ -41,7 +41,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 
 /**
  * Adds two points represented in affine coordinates on an ordinary prime
@@ -63,6 +63,10 @@ static void ep2_add_basic_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 		fp2_new(t0);
 		fp2_new(t1);
 		fp2_new(t2);
+
+		if (!q->norm) {
+			THROW(ERR_INVALID);
+		}
 
 		/* t0 = x2 - x1. */
 		fp2_sub(t0, q->x, p->x);
@@ -115,9 +119,9 @@ static void ep2_add_basic_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 	}
 }
 
-#endif /* EP_ADD == BASIC || EP_MIXED */
+#endif /* EP_ADD == BASIC */
 
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == PROJC || !defined(STRIP)
 
 /**
  * Adds two points represented in projective coordinates on an ordinary prime
@@ -150,6 +154,9 @@ static void ep2_add_projc_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 
 		/* We include this case here to support the ep2_mul_fix() algorithms. */
 		if (!q->norm) {
+#if defined(EP_MIXED)
+			THROW(ERR_INVALID);
+#else
 			/* t0 = z1^2. */
 			fp2_sqr(t0, p->z);
 
@@ -219,6 +226,7 @@ static void ep2_add_projc_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 				fp2_sub(r->z, r->z, t6);
 				fp2_mul(r->z, r->z, t3);
 			}
+#endif
 		} else {
 			fp2_copy(t3, q->x);
 			fp2_copy(t4, q->y);
@@ -260,13 +268,13 @@ static void ep2_add_projc_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 	}
 }
 
-#endif /* EP_ADD == PROJC || EP_MIXED */
+#endif /* EP_ADD == PROJC */
 
 /*============================================================================*/
 	/* Public definitions                                                         */
 /*============================================================================*/
 
-#if EP_ADD == BASIC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 
 void ep2_add_basic(ep2_t r, ep2_t p, ep2_t q) {
 	if (ep2_is_infty(p)) {
@@ -324,7 +332,7 @@ void ep2_sub_basic(ep2_t r, ep2_t p, ep2_t q) {
 
 #endif
 
-#if EP_ADD == PROJC || defined(EP_MIXED) || !defined(STRIP)
+#if EP_ADD == PROJC || !defined(STRIP)
 
 void ep2_add_projc(ep2_t r, ep2_t p, ep2_t q) {
 	if (ep2_is_infty(p)) {

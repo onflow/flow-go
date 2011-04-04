@@ -51,19 +51,21 @@
 static void table_init_ordin(ep2_t *t, ep2_t p) {
 	int i;
 
-	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-		ep2_set_infty(t[i]);
-		fp_set_dig(t[i]->z[0], 1);
-		fp_zero(t[i]->z[1]);
-		t[i]->norm = 1;
-	}
-
-	ep2_dbl_tab(t[0], p);
+	ep2_dbl(t[0], p);
+#if defined(EP_MIXED)
+	ep2_norm(t[0], t[0]);
+#endif
 
 #if EP_WIDTH > 2
-	ep2_add_tab(t[1], t[0], p);
+	ep2_add(t[1], t[0], p);
 	for (i = 2; i < (1 << (EP_WIDTH - 2)); i++) {
-		ep2_add_tab(t[i], t[i - 1], t[0]);
+		ep2_add(t[i], t[i - 1], t[0]);
+	}
+#endif
+
+#if defined(EP_MIXED)
+	for (i = 1; i < (1 << (EP_WIDTH - 2)); i++) {
+		ep2_norm(t[i], t[i]);
 	}
 #endif
 
@@ -217,17 +219,17 @@ void ep2_mul_sim_trick(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 
 		ep2_set_infty(t0[0]);
 		for (int i = 1; i < (1 << w); i++) {
-			ep2_add_tab(t0[i], t0[i - 1], p);
+			ep2_add(t0[i], t0[i - 1], p);
 		}
 
 		ep2_set_infty(t1[0]);
 		for (int i = 1; i < (1 << w); i++) {
-			ep2_add_tab(t1[i], t1[i - 1], q);
+			ep2_add(t1[i], t1[i - 1], q);
 		}
 
 		for (int i = 0; i < (1 << w); i++) {
 			for (int j = 0; j < (1 << w); j++) {
-				ep2_add_tab(t[(i << w) + j], t0[i], t1[j]);
+				ep2_add(t[(i << w) + j], t0[i], t1[j]);
 			}
 		}
 
@@ -304,8 +306,8 @@ void ep2_mul_sim_joint(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 		ep2_set_infty(t[0]);
 		ep2_copy(t[1], q);
 		ep2_copy(t[2], p);
-		ep2_add_tab(t[3], p, q);
-		ep2_sub_tab(t[4], p, q);
+		ep2_add(t[3], p, q);
+		ep2_sub(t[4], p, q);
 
 		bn_rec_jsf(jsf, &len, k, l);
 
