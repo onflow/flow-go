@@ -125,9 +125,7 @@ int bn_bits(bn_t a) {
 int bn_test_bit(bn_t a, int bit) {
 	int d;
 	dig_t mask;
-if (bit > bn_bits(a)) {
-	printf("EITA\n");
-}
+
 	SPLIT(bit, d, bit, BN_DIG_LOG);
 
 	mask = ((dig_t)1) << bit;
