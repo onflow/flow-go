@@ -82,9 +82,10 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 		ec_curve_get_ord(n);
 		do {
 			do {
-				bn_rand(k, BN_POS, bn_bits(n));
-				bn_mod(k, k, n);
-			} while (bn_is_zero(k));
+				do {
+					bn_rand(k, BN_POS, bn_bits(n));
+					bn_mod(k, k, n);
+				} while (bn_is_zero(k));
 
 			ec_mul_gen(p, k);
 			bn_read_raw(x, p->x, EC_DIGS, BN_POS);
@@ -95,16 +96,17 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 
 		bn_read_bin(e, hash, MD_LEN, BN_POS);
 
-		bn_mul(s, d, r);
-		bn_mod(s, s, n);
-		bn_add(s, s, e);
-		bn_mod(s, s, n);
-		bn_gcd_ext(x, k, NULL, k, n);
-		if (bn_sign(k) == BN_NEG) {
-			bn_add(k, k, n);
-		}
-		bn_mul(s, s, k);
-		bn_mod(s, s, n);
+			bn_mul(s, d, r);
+			bn_mod(s, s, n);
+			bn_add(s, s, e);
+			bn_mod(s, s, n);
+			bn_gcd_ext(x, k, NULL, k, n);
+			if (bn_sign(k) == BN_NEG) {
+				bn_add(k, k, n);
+			}
+			bn_mul(s, s, k);
+			bn_mod(s, s, n);
+		} while (bn_is_zero(s));
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -169,6 +171,10 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
 				result = (d ? 0 : 1);
 
 				if (v->used != r->used) {
+					result = 0;
+				}
+
+				if (ec_is_infty(p)) {
 					result = 0;
 				}
 			}
