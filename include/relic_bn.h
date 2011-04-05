@@ -637,6 +637,17 @@ void bn_size_bin(int *size, bn_t a);
  */
 void bn_read_bin(bn_t a, unsigned char *bin, int len, int sign);
 
+
+/**
+ * Reads a multiple precision integer from a byte vector in big endian format.
+ *
+ * @param[out] a			- the result.
+ * @param[in] bin			- the byte vector.
+ * @param[in] len			- the size of the string.
+ * @param[in] sign			- the sign of the multiple precision integer.
+ */
+void bn_read_bin_big(bn_t a, unsigned char *bin, int len, int sign);
+
 /**
  * Writes a multiple precision integer to a byte vector.
  *
@@ -647,6 +658,18 @@ void bn_read_bin(bn_t a, unsigned char *bin, int len, int sign);
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
 void bn_write_bin(unsigned char *bin, int *len, int *sign, bn_t a);
+
+
+/**
+ * Writes a multiple precision integer to a byte vector in big endian format.
+ *
+ * @param[out] bin			- the byte vector.
+ * @param[in,out] len		- the buffer capacity/number of bytes written.
+ * @param[out] sign			- the sign of the multiple precision integer.
+ * @param[in] a				- the multiple integer to write.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
+ */
+void bn_write_bin_big(unsigned char *bin, int *len, int *sign, bn_t a);
 
 /**
  * Returns the number of digits necessary to store a multiple precision integer.

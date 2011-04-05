@@ -384,7 +384,7 @@ void bn_size_bin(int *size, bn_t a) {
 	*size = digits;
 }
 
-void bn_read_bin(bn_t a, unsigned char *bin, int len, int sign) {
+static void bn_read_bin_imp(bn_t a, unsigned char *bin, int len, int sign, int little) {
 	int i, j;
 	dig_t d;
 	int digs = (len % sizeof(dig_t) ==
@@ -398,7 +398,11 @@ void bn_read_bin(bn_t a, unsigned char *bin, int len, int sign) {
 		d = 0;
 		for (j = sizeof(dig_t) - 1; j >= 0; j--) {
 			d = d << 8;
-			d |= bin[i * sizeof(dig_t) + j];
+			if (little) {
+				d |= bin[i * sizeof(dig_t) + j];
+			} else {
+				d |= bin[len - 1 - (i * sizeof(dig_t) + j)];
+			}
 		}
 		a->dp[i] = d;
 	}
@@ -406,7 +410,11 @@ void bn_read_bin(bn_t a, unsigned char *bin, int len, int sign) {
 	for (j = sizeof(dig_t) - 1; j >= 0; j--) {
 		if ((int)(i * sizeof(dig_t) + j) < len) {
 			d = d << 8;
-			d |= bin[i * sizeof(dig_t) + j];
+			if (little) {
+				d |= bin[i * sizeof(dig_t) + j];
+			} else {
+				d |= bin[len - 1 - (i * sizeof(dig_t) + j)];
+			}
 		}
 	}
 	a->dp[i] = d;
@@ -415,9 +423,18 @@ void bn_read_bin(bn_t a, unsigned char *bin, int len, int sign) {
 	bn_trim(a);
 }
 
-void bn_write_bin(unsigned char *bin, int *len, int *sign, bn_t a) {
-	int size, k;
+void bn_read_bin(bn_t a, unsigned char *bin, int len, int sign) {
+	return bn_read_bin_imp(a, bin, len, sign, 1);
+}
+
+void bn_read_bin_big(bn_t a, unsigned char *bin, int len, int sign) {
+	return bn_read_bin_imp(a, bin, len, sign, 0);
+}
+
+static void bn_write_bin_imp(unsigned char *bin, int *len, int *sign, bn_t a, int little) {
+	int size, k, i, j;
 	dig_t d;
+	unsigned char c;
 
 	bn_size_bin(&size, a);
 
@@ -440,8 +457,32 @@ void bn_write_bin(unsigned char *bin, int *len, int *sign, bn_t a) {
 		d = d >> 8;
 	}
 
-	*len = size;
+	if (!little) {
+		/* Reverse the digits of the string. */
+		while (k < *len) {
+			bin[k++] = 0;
+		}
+		i = 0;
+		j = *len - 1;
+		while (i < j) {
+			c = bin[i];
+			bin[i] = bin[j];
+			bin[j] = c;
+			++i;
+			--j;
+		}
+	} else {
+		*len = size;
+	}
 	*sign = a->sign;
+}
+
+void bn_write_bin(unsigned char *bin, int *len, int *sign, bn_t a) {
+	bn_write_bin_imp(bin, len, sign, a, 1);
+}
+
+void bn_write_bin_big(unsigned char *bin, int *len, int *sign, bn_t a) {
+	bn_write_bin_imp(bin, len, sign, a, 0);
 }
 
 void bn_size_raw(int *size, bn_t a) {
