@@ -218,6 +218,12 @@ typedef CAT(EC_LOWER, t) ec_t;
  */
 #define ec_rand(P)			CAT(EC_LOWER, rand)(P)
 
+ /** Tests if a point is in the curve.
+  *
+  * @param[in] P			- the point to test.
+  */
+#define ec_is_valid(P)		CAT(EC_LOWER, is_valid)(P)
+
 /**
  * Prints a elliptic curve point.
  *
@@ -332,7 +338,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[in] M				- the byte array to map.
  * @param[in] L				- the array length in bytes.
  */
-#define ec_map(P, M, L);	CAT(EC_LOWER, map)(P, M, L)
+#define ec_map(P, M, L)	CAT(EC_LOWER, map)(P, M, L)
 
 /**
  * Compresses a point.
@@ -340,7 +346,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[out] R			- the result.
  * @param[in] P				- the point to compress.
  */
-#define ec_pck(R, P);	CAT(EC_LOWER, pck)(R, P)
+#define ec_pck(R, P)	CAT(EC_LOWER, pck)(R, P)
 
 /**
  * Decompresses a point.
@@ -348,6 +354,6 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[out] R			- the result.
  * @param[in] P				- the point to decompress.
  */
-#define ec_upk(R, P);	CAT(EC_LOWER, upk)(R, P)
+#define ec_upk(R, P)	CAT(EC_LOWER, upk)(R, P)
 
 #endif /* !RELIC_EC_H */
