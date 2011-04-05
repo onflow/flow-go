@@ -87,14 +87,14 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 					bn_mod(k, k, n);
 				} while (bn_is_zero(k));
 
-			ec_mul_gen(p, k);
-			bn_read_raw(x, p->x, EC_DIGS, BN_POS);
-			bn_mod(r, x, n);
-		} while (bn_is_zero(r));
+				ec_mul_gen(p, k);
+				bn_read_raw(x, p->x, EC_DIGS, BN_POS);
+				bn_mod(r, x, n);
+			} while (bn_is_zero(r));
 
-		md_map(hash, msg, len);
+			md_map(hash, msg, len);
 
-		bn_read_bin(e, hash, MD_LEN, BN_POS);
+			bn_read_bin(e, hash, MD_LEN, BN_POS);
 
 			bn_mul(s, d, r);
 			bn_mod(s, s, n);
