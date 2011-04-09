@@ -171,13 +171,16 @@ static void table_init_koblitz(eb_t *t, eb_t p) {
 }
 
 /**
- * Multiplies a binary elliptic curve point by an integer using the w-TNAF
- * method.
+ * Multiplies and adds two binary elliptic curve points simultaneously,
+ * optionally choosing the first point as the generator depending on the value
+ * of flag.
  *
  * @param[out] r 				- the result.
- * @param[in] p					- the point to multiply.
- * @param[in] k					- the integer.
- * @param[in] w					- the window size.
+ * @param[in] p					- the first point to multiply.
+ * @param[in] k					- the first integer.
+ * @param[in] q					- the second point to multiply.
+ * @param[in] l					- the second integer.
+ * @param[in] gen				- the flag.
  */
 static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 	int l0, l1, len, i, n0, n1, w;
@@ -314,6 +317,18 @@ static void table_init_ordin(eb_t *t, eb_t p) {
 	eb_copy(t[0], p);
 }
 
+/**
+ * Multiplies and adds two binary elliptic curve points simultaneously,
+ * optionally choosing the first point as the generator depending on the value
+ * of flag.
+ *
+ * @param[out] r 				- the result.
+ * @param[in] p					- the first point to multiply.
+ * @param[in] k					- the first integer.
+ * @param[in] q					- the second point to multiply.
+ * @param[in] l					- the second integer.
+ * @param[in] gen				- the flag.
+ */
 static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 	int len, l0, l1, i, n0, n1, w;
 	signed char naf0[FB_BITS + 1], naf1[FB_BITS + 1], *t0, *t1;
