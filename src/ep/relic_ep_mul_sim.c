@@ -42,6 +42,20 @@
 
 #if EP_SIM == INTER || !defined(STRIP)
 
+#if defined(EP_ORDIN) || defined(EP_SUPER)
+
+/**
+ * Multiplies and adds two prime elliptic curve points simultaneously,
+ * optionally choosing the first point as the generator depending on the value
+ * of flag.
+ *
+ * @param[out] r 				- the result.
+ * @param[in] p					- the first point to multiply.
+ * @param[in] k					- the first integer.
+ * @param[in] q					- the second point to multiply.
+ * @param[in] l					- the second integer.
+ * @param[in] gen				- the flag.
+ */
 static void ep_mul_sim_ordin(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
 	int len, l0, l1, i, n0, n1, w;
 	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
@@ -119,6 +133,22 @@ static void ep_mul_sim_ordin(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
 	}
 }
 
+#endif /* EP_ORDIN || EP_SUPER */
+
+#if defined(EP_KBLTZ)
+
+/**
+ * Multiplies and adds two prime elliptic curve points simultaneously,
+ * optionally choosing the first point as the generator depending on the value
+ * of flag.
+ *
+ * @param[out] r 				- the result.
+ * @param[in] p					- the first point to multiply.
+ * @param[in] k					- the first integer.
+ * @param[in] q					- the second point to multiply.
+ * @param[in] l					- the second integer.
+ * @param[in] gen				- the flag.
+ */
 void ep_mul_sim_kbltz(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
 	int len, len0, len1, len2, len3, i, n, sk0, sk1, sl0, sl1, w;
 	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
@@ -307,18 +337,7 @@ void ep_mul_sim_kbltz(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
 	}
 }
 
-static void ep_mul_sim_choose(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
-#if defined(EP_KBLTZ)
-	if (ep_curve_is_kbltz()) {
-		ep_mul_sim_kbltz(r, p, k, q, l, gen);
-		return;
-	}
-#endif
-
-#if defined(EP_ORDIN)
-	ep_mul_sim_ordin(r, p, k, q, l, gen);
-#endif
-}
+#endif /* EP_KBLTZ */
 
 #endif /* EP_SIM == INTER */
 
@@ -443,7 +462,16 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 #if EP_SIM == INTER || !defined(STRIP)
 
 void ep_mul_sim_inter(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
-	ep_mul_sim_choose(r, p, k, q, l, 0);
+#if defined(EP_KBLTZ)
+	if (ep_curve_is_kbltz()) {
+		ep_mul_sim_kbltz(r, p, k, q, l, 0);
+		return;
+	}
+#endif
+
+#if defined(EP_ORDIN)
+	ep_mul_sim_ordin(r, p, k, q, l, 0);
+#endif
 }
 
 #endif
@@ -524,7 +552,12 @@ void ep_mul_sim_gen(ep_t r, bn_t k, ep_t q, bn_t l) {
 
 		ep_curve_get_gen(gen);
 #if EP_SIM == INTER && EP_FIX == LWNAF && defined(EP_PRECO)
-		ep_mul_sim_choose(r, gen, k, q, l, 1);
+#if defined(EP_ORDIN) || defined(EP_SUPER)
+	ep_mul_sim_ordin(r, gen, k, q, l, 1);
+#else
+	ep_mul_sim_kbltz(r, gen, k, q, l, 1);
+#endif
+
 #else
 		ep_mul_sim(r, gen, k, q, l);
 #endif
