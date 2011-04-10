@@ -274,6 +274,24 @@ static void arith(void) {
 	} BENCH_END;
 #endif
 
+#if EP_MUL == SLIDE || !defined(STRIP)
+	BENCH_BEGIN("ep_mul_slide") {
+		bn_rand(k, BN_POS, bn_bits(n));
+		bn_mod(k, k, n);
+		ep_rand(p);
+		BENCH_ADD(ep_mul_slide(q, p, k));
+	} BENCH_END;
+#endif
+
+#if EP_MUL == MONTY || !defined(STRIP)
+	BENCH_BEGIN("ep_mul_monty") {
+		bn_rand(k, BN_POS, bn_bits(n));
+		bn_mod(k, k, n);
+		ep_rand(p);
+		BENCH_ADD(ep_mul_monty(q, p, k));
+	} BENCH_END;
+#endif
+
 #if EP_MUL == LWNAF || !defined(STRIP)
 	BENCH_BEGIN("ep_mul_lwnaf") {
 		bn_rand(k, BN_POS, bn_bits(n));

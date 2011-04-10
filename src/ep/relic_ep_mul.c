@@ -40,6 +40,7 @@
 /*============================================================================*/
 
 #if EP_MUL == LWNAF || !defined(STRIP)
+
 #if defined(EP_KBLTZ)
 
 static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
@@ -80,10 +81,10 @@ static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 		bn_abs(k1, k1);
 
 		if (s0 == BN_POS) {
-			ep_mul_table(table, p, (1 << (EP_WIDTH - 2)));
+			ep_tab(table, p, EP_WIDTH);
 		} else {
 			ep_neg(q, p);
-			ep_mul_table(table, q, (1 << (EP_WIDTH - 2)));
+			ep_tab(table, q, EP_WIDTH);
 		}
 
 		bn_rec_naf(naf0, &l0, k0, EP_WIDTH);
@@ -137,7 +138,7 @@ static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 		bn_free(k0);
 		bn_free(k1);
 		bn_free(n)
-		ep_free(q);
+				ep_free(q);
 		for (i = 0; i < 1 << (EP_WIDTH - 2); i++) {
 			ep_free(table[i]);
 		}
@@ -168,7 +169,7 @@ static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
 			ep_new(table[i]);
 		}
 		/* Compute the precomputation table. */
-		ep_mul_table(table, p, (1 << (EP_WIDTH - 2)));
+		ep_tab(table, p, EP_WIDTH);
 
 		/* Compute the w-TNAF representation of k. */
 		bn_rec_naf(naf, &len, k, EP_WIDTH);
@@ -209,26 +210,6 @@ static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void ep_mul_table(ep_t * t, ep_t p, int n) {
-	int i;
-
-	ep_dbl(t[0], p);
-#if defined(EP_MIXED)
-	ep_norm(t[0], t[0]);
-#endif
-
-	ep_add(t[1], t[0], p);
-	for (i = 2; i < n; i++) {
-		ep_add(t[i], t[i - 1], t[0]);
-	}
-
-#if defined(EP_MIXED)
-	ep_norm_sim(t + 1, t + 1, n - 1);
-#endif
-
-	ep_copy(t[0], p);
-}
-
 #if EP_MUL == BASIC || !defined(STRIP)
 
 void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
@@ -267,6 +248,130 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 	}
 	FINALLY {
 		ep_free(t);
+	}
+}
+
+#endif
+
+#if EP_MUL == SLIDE || !defined(STRIP)
+
+void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
+	ep_t tab[1 << (EP_WIDTH - 1)], t;
+	int i, j, l;
+	unsigned char win[FP_BITS];
+
+	ep_null(t);
+	ep_null(r);
+
+	/* Initialize table. */
+	for (i = 0; i < (1 << (EP_WIDTH - 1)); i++) {
+		ep_null(tab[i]);
+	}
+
+	TRY {
+
+		/* Find window size. */
+		for (i = 1; i < (1 << (EP_WIDTH - 1)); i += 2) {
+			ep_new(tab[i]);
+		}
+
+		ep_new(t);
+		ep_new(r);
+
+		ep_copy(tab[0], p);
+		ep_dbl(t, p);
+
+#if defined(EP_MIXED)
+		ep_norm(t, t);
+#endif
+
+		/* Create table. */
+		for (i = 1; i < (1 << (EP_WIDTH - 1)); i++) {
+			ep_add(tab[i], tab[i - 1], t);
+		}
+
+#if defined(EP_MIXED)
+		ep_norm_sim(tab + 1, tab + 1, (1 << (EP_WIDTH - 1)) - 1);
+#endif
+
+		ep_set_infty(t);
+		bn_rec_slw(win, &l, k, EP_WIDTH);
+		for (i = 0; i < l; i++) {
+			if (win[i] == 0) {
+				ep_dbl(t, t);
+			} else {
+				for (j = 0; j < util_bits_dig(win[i]); j++) {
+					ep_dbl(t, t);
+				}
+				ep_add(t, t, tab[win[i] >> 1]);
+			}
+		}
+
+		ep_norm(r, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		for (i = 1; i < (1 << (EP_WIDTH - 1)); i++) {
+			ep_free(tab[i]);
+		}
+		ep_free(t);
+	}
+}
+
+#endif
+
+#if EP_MUL == MONTY || !defined(STRIP)
+
+void ep_mul_monty(ep_t r, ep_t p, bn_t k) {
+	ep_t tab[2];
+	dig_t buf;
+	int bitcnt, digidx, j;
+
+	ep_null(tab[0]);
+	ep_null(tab[1]);
+
+	TRY {
+		ep_new(tab[0]);
+		ep_new(tab[1]);
+
+		ep_set_infty(tab[0]);
+		ep_copy(tab[1], p);
+
+		/* Set initial mode and bitcnt, */
+		bitcnt = 1;
+		buf = 0;
+		digidx = k->used - 1;
+
+		for (;;) {
+			/* Grab next digit as required. */
+			if (--bitcnt == 0) {
+				/* If digidx == -1 we are out of digits so break. */
+				if (digidx == -1) {
+					break;
+				}
+				/* Read next digit and reset bitcnt. */
+				buf = k->dp[digidx--];
+				bitcnt = (int)BN_DIGIT;
+			}
+
+			/* Grab the next msb from the exponent. */
+			j = (buf >> (BN_DIGIT - 1)) & 0x01;
+			buf <<= (dig_t)1;
+
+			ep_add(tab[j ^ 1], tab[0], tab[1]);
+			ep_dbl(tab[j], tab[j]);
+		}
+
+		ep_norm(r, tab[0]);
+
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep_free(tab[1]);
+		ep_free(tab[0]);
 	}
 }
 

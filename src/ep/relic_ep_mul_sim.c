@@ -76,7 +76,7 @@ static void ep_mul_sim_ordin(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
 		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
 			ep_new(table0[i]);
 		}
-		ep_mul_table(table0, p, (1 << (EP_WIDTH - 2)));
+		ep_tab(table0, p, EP_WIDTH);
 		t = table0;
 	}
 
@@ -85,7 +85,7 @@ static void ep_mul_sim_ordin(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
 		ep_new(table1[i]);
 	}
 	/* Compute the precomputation table. */
-	ep_mul_table(table1, q, (1 << (EP_WIDTH - 2)));
+	ep_tab(table1, q, EP_WIDTH);
 
 	/* Compute the w-TNAF representation of k. */
 	if (gen) {
@@ -210,7 +210,7 @@ void ep_mul_sim_kbltz(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
 		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
 			ep_new(table0[i]);
 		}
-		ep_mul_table(table0, p, (1 << (EP_WIDTH - 2)));
+		ep_tab(table0, p, EP_WIDTH);
 		t = table0;
 	}
 
@@ -219,7 +219,7 @@ void ep_mul_sim_kbltz(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l, int gen) {
 		ep_new(table1[i]);
 	}
 	/* Compute the precomputation table. */
-	ep_mul_table(table1, q, (1 << (EP_WIDTH - 2)));
+	ep_tab(table1, q, EP_WIDTH);
 
 	/* Compute the w-TNAF representation of k and l */
 	if (gen) {
@@ -543,29 +543,35 @@ void ep_mul_sim_joint(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 #endif
 
 void ep_mul_sim_gen(ep_t r, bn_t k, ep_t q, bn_t l) {
-	ep_t gen;
+	ep_t g;
 
-	ep_null(gen);
+	ep_null(g);
 
 	TRY {
-		ep_new(gen);
+		ep_new(g);
 
-		ep_curve_get_gen(gen);
+		ep_curve_get_gen(g);
 #if EP_SIM == INTER && EP_FIX == LWNAF && defined(EP_PRECO)
+
+#if defined(EP_KBLTZ)
+	if (ep_curve_is_kbltz()) {
+		ep_mul_sim_kbltz(r, g, k, q, l, 1);
+	}
+#endif
+
 #if defined(EP_ORDIN) || defined(EP_SUPER)
-	ep_mul_sim_ordin(r, gen, k, q, l, 1);
-#else
-	ep_mul_sim_kbltz(r, gen, k, q, l, 1);
+	if (!ep_curve_is_kbltz()) {
+		ep_mul_sim_ordin(r, g, k, q, l, 1);
 #endif
 
 #else
-		ep_mul_sim(r, gen, k, q, l);
+		ep_mul_sim(r, g, k, q, l);
 #endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		ep_free(gen);
+		ep_free(g);
 	}
 }

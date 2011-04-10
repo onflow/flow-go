@@ -159,6 +159,23 @@ void ep_rhs(fp_t rhs, ep_t p) {
 	}
 }
 
+void ep_tab(ep_t * t, ep_t p, int w) {
+	if (w > 2) {
+		ep_dbl(t[0], p);
+#if defined(EP_MIXED)
+		ep_norm(t[0], t[0]);
+#endif
+		ep_add(t[1], t[0], p);
+		for (int i = 2; i < (1 << (w - 2)); i++) {
+			ep_add(t[i], t[i - 1], t[0]);
+		}
+#if defined(EP_MIXED)
+		ep_norm_sim(t + 1, t + 1, (1 << (w - 2)) - 1);
+#endif
+	}
+	ep_copy(t[0], p);
+}
+
 int ep_is_valid(ep_t p) {
 	ep_t t;
 	int r = 0;

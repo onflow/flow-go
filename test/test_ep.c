@@ -483,6 +483,28 @@ static int multiplication(void) {
 		} TEST_END;
 #endif
 
+#if EP_MUL == MONTY || !defined(STRIP)
+		TEST_BEGIN("sliding window point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(q, p, k);
+			ep_mul_slide(r, p, k);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
+#if EP_MUL == MONTY || !defined(STRIP)
+		TEST_BEGIN("montgomery laddering point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(q, p, k);
+			ep_mul_monty(r, p, k);
+			TEST_ASSERT(ep_cmp(q, r) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
 #if EP_MUL == LWNAF || !defined(STRIP)
 		TEST_BEGIN("left-to-right w-naf point multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));

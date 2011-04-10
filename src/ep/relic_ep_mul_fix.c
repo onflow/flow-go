@@ -112,7 +112,8 @@ void ep_mul_combs_kbltz(ep_t r, ep_t * t, bn_t k) {
 		ep_curve_get_v1(v1);
 		ep_curve_get_v2(v2);
 		l = bn_bits(n);
-		l = ((l % (2 * EP_DEPTH)) == 0 ? (l / (2 * EP_DEPTH)) : (l / (2 * EP_DEPTH)) + 1);
+		l = ((l % (2 * EP_DEPTH)) ==
+				0 ? (l / (2 * EP_DEPTH)) : (l / (2 * EP_DEPTH)) + 1);
 
 		bn_rec_glv(k0, k1, k, n, v1, v2);
 		s0 = bn_sign(k0);
@@ -293,7 +294,7 @@ void ep_mul_fix_basic(ep_t r, ep_t * t, bn_t k) {
 
 #if EP_FIX == YAOWI || !defined(STRIP)
 
-void ep_mul_pre_yaowi(ep_t *t, ep_t p) {
+void ep_mul_pre_yaowi(ep_t * t, ep_t p) {
 	int l;
 	bn_t n;
 
@@ -322,7 +323,7 @@ void ep_mul_pre_yaowi(ep_t *t, ep_t p) {
 	}
 }
 
-void ep_mul_fix_yaowi(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_fix_yaowi(ep_t r, ep_t * t, bn_t k) {
 	int i, j, l;
 	ep_t a;
 	unsigned char win[FP_BITS + 1];
@@ -465,7 +466,8 @@ void ep_mul_pre_combs(ep_t * t, ep_t p) {
 #if defined(EP_KBLTZ)
 		if (ep_curve_is_kbltz()) {
 			l = bn_bits(n);
-			l = ((l % (2 * EP_DEPTH)) == 0 ? (l / (2 * EP_DEPTH)) : (l / (2 * EP_DEPTH)) + 1);
+			l = ((l % (2 * EP_DEPTH)) ==
+					0 ? (l / (2 * EP_DEPTH)) : (l / (2 * EP_DEPTH)) + 1);
 		}
 #endif
 
@@ -495,7 +497,7 @@ void ep_mul_pre_combs(ep_t * t, ep_t p) {
 	}
 }
 
-void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_fix_combs(ep_t r, ep_t * t, bn_t k) {
 #if defined(EP_KBLTZ)
 	if (ep_curve_is_kbltz()) {
 		ep_mul_combs_kbltz(r, t, k);
@@ -548,7 +550,8 @@ void ep_mul_pre_combd(ep_t * t, ep_t p) {
 		}
 
 		ep_norm_sim(t + 2, t + 2, (1 << EP_DEPTH) - 2);
-		ep_norm_sim(t + (1 << EP_DEPTH) + 1, t + (1 << EP_DEPTH) + 1, (1 << EP_DEPTH) - 1);
+		ep_norm_sim(t + (1 << EP_DEPTH) + 1, t + (1 << EP_DEPTH) + 1,
+				(1 << EP_DEPTH) - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -615,7 +618,7 @@ void ep_mul_fix_combd(ep_t r, ep_t * t, bn_t k) {
 #if EP_FIX == LWNAF || !defined(STRIP)
 
 void ep_mul_pre_lwnaf(ep_t * t, ep_t p) {
-	ep_mul_table(t, p, (1 << (EP_DEPTH - 2)));
+	ep_tab(t, p, EP_DEPTH);
 }
 
 void ep_mul_fix_lwnaf(ep_t r, ep_t * t, bn_t k) {
