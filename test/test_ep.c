@@ -94,9 +94,7 @@ int util(void) {
 		}
 		TEST_END;
 
-		TEST_BEGIN
-				("assignment to random/infinity and comparison are consistent")
-		{
+		TEST_BEGIN("assignment to random and comparison are consistent") {
 			ep_rand(a);
 			ep_set_infty(c);
 			TEST_ASSERT(ep_cmp(a, c) != CMP_EQ, end);
