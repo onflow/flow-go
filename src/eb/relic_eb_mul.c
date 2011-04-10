@@ -1095,11 +1095,12 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 			cof = 0;
 		}
 
+		l = fb_trc(eb_curve_get_a());
+
 		if (cof) {
 			/* Curves with cofactor > 2, u = sqrt(a), v = Solve(u). */
 			fb_srt(u, eb_curve_get_a());
 			fb_slv(v, u);
-			l = fb_trc(eb_curve_get_a());
 
 			bn_rand(n, BN_POS, len);
 
