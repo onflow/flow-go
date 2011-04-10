@@ -123,6 +123,70 @@ static void ep2_add_basic_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 
 #if EP_ADD == PROJC || !defined(STRIP)
 
+#if defined(EP_MIXED) || !defined(STRIP)
+
+/**
+ * Adds a point represented in affine coordinates to a point represented in
+ * projective coordinates.
+ *
+ * @param r					- the result.
+ * @param s					- the resulting slope.
+ * @param p					- the affine point.
+ * @param q					- the projective point.
+ */
+static void ep2_add_projc_mix(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
+	fp2_t t0, t1, t2, t3;
+
+	fp2_null(t0);
+	fp2_null(t1);
+	fp2_null(t2);
+	fp2_null(t3);
+
+	TRY {
+		fp2_new(t0);
+		fp2_new(t1);
+		fp2_new(t2);
+		fp2_new(t3);
+
+		fp2_sqr(t1, p->z);
+		fp2_mul(t2, q->x, t1);
+		fp2_mul(t1, t1, p->z);
+		fp2_mul(t3, q->y, t1);
+
+		fp2_sub(t2, t2, p->x);
+		fp2_sub(t0, t3, p->y);
+		fp2_mul(r->z, p->z, t2);
+		fp2_sqr(t1, t2);
+		fp2_mul(t3, t1, t2);
+		fp2_mul(t1, t1, p->x);
+		fp2_copy(t2, t1);
+		fp2_add(t2, t2, t2);
+		fp2_sqr(r->x, t0);
+		fp2_sub(r->x, r->x, t2);
+		fp2_sub(r->x, r->x, t3);
+		fp2_sub(t1, t1, r->x);
+		fp2_mul(t1, t1, t0);
+		fp2_mul(t3, t3, p->y);
+		fp2_sub(r->y, t1, t3);
+
+		if (s != NULL) {
+			fp2_copy(s, t0);
+		}
+		r->norm = 0;
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp2_free(t0);
+		fp2_free(t1);
+		fp2_free(t2);
+		fp2_free(t3);
+	}
+}
+
+#endif
+
 /**
  * Adds two points represented in projective coordinates on an ordinary prime
  * elliptic curve.
@@ -133,6 +197,9 @@ static void ep2_add_basic_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
  * @param q					- the second point to add.
  */
 static void ep2_add_projc_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
+#if defined(EP_MIXED) && defined(STRIP)
+	ep2_add_projc_mix(r, s, p, q);
+#else /* General addition. */
 	fp2_t t0, t1, t2, t3, t4, t5, t6;
 
 	fp2_null(t0);
@@ -152,11 +219,9 @@ static void ep2_add_projc_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 		fp2_new(t5);
 		fp2_new(t6);
 
-		/* We include this case here to support the ep2_mul_fix() algorithms. */
-		if (!q->norm) {
-#if defined(EP_MIXED)
-			THROW(ERR_INVALID);
-#else
+		if (q->norm) {
+			ep2_add_projc_mix(r, s, p, q);
+		} else {
 			/* t0 = z1^2. */
 			fp2_sqr(t0, p->z);
 
@@ -226,34 +291,6 @@ static void ep2_add_projc_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 				fp2_sub(r->z, r->z, t6);
 				fp2_mul(r->z, r->z, t3);
 			}
-#endif
-		} else {
-			fp2_copy(t3, q->x);
-			fp2_copy(t4, q->y);
-			fp2_sqr(t1, p->z);
-			fp2_mul(t3, t3, t1);
-			fp2_mul(t1, t1, p->z);
-			fp2_mul(t4, t4, t1);
-
-			fp2_sub(t3, t3, p->x);
-			fp2_sub(t0, t4, p->y);
-			fp2_mul(r->z, p->z, t3);
-			fp2_sqr(t1, t3);
-			fp2_mul(t4, t1, t3);
-			fp2_mul(t1, t1, p->x);
-			fp2_copy(t3, t1);
-			fp2_add(t3, t3, t3);
-			fp2_sqr(r->x, t0);
-			fp2_sub(r->x, r->x, t3);
-			fp2_sub(r->x, r->x, t4);
-			fp2_sub(t1, t1, r->x);
-			fp2_mul(t1, t1, t0);
-			fp2_mul(t4, t4, p->y);
-			fp2_sub(r->y, t1, t4);
-
-			if (s != NULL) {
-				fp2_copy(s, t0);
-			}
 		}
 		r->norm = 0;
 	}
@@ -265,7 +302,11 @@ static void ep2_add_projc_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 		fp2_free(t1);
 		fp2_free(t3);
 		fp2_free(t4);
+		fp2_free(t5);
+		fp2_free(t6);
 	}
+#endif
+
 }
 
 #endif /* EP_ADD == PROJC */
