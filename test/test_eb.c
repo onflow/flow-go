@@ -627,16 +627,18 @@ static int multiplication(void) {
 		TEST_END;
 #endif
 
+		if (!eb_curve_is_super()) {
 #if EB_MUL == HALVE || !defined(STRIP)
-		TEST_BEGIN("point multiplication by halving is correct") {
-			bn_rand(k, BN_POS, FB_BITS);
-			bn_mod(k, k, n);
-			eb_mul(q, p, k);
-			eb_mul_halve(r, p, k);
-			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
-		}
-		TEST_END;
+			TEST_BEGIN("point multiplication by halving is correct") {
+				bn_rand(k, BN_POS, FB_BITS);
+				bn_mod(k, k, n);
+				eb_mul(q, p, k);
+				eb_mul_halve(r, p, k);
+				TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
+			}
+			TEST_END;
 #endif
+		}
 
 		TEST_BEGIN("multiplication by digit is correct") {
 			bn_rand(k, BN_POS, BN_DIGIT);

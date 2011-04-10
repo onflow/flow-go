@@ -349,15 +349,17 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
+	if (!eb_curve_is_super()) {
 #if EB_MUL == HALVE || !defined(STRIP)
-	BENCH_BEGIN("eb_mul_halve") {
-		bn_rand(k, BN_POS, bn_bits(n));
-		bn_mod(k, k, n);
-		eb_rand(p);
-		BENCH_ADD(eb_mul_halve(q, p, k));
-	}
-	BENCH_END;
+		BENCH_BEGIN("eb_mul_halve") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			eb_rand(p);
+			BENCH_ADD(eb_mul_halve(q, p, k));
+		}
+		BENCH_END;
 #endif
+	}
 
 	BENCH_BEGIN("eb_mul_gen") {
 		bn_rand(k, BN_POS, bn_bits(n));
