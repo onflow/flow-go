@@ -186,7 +186,7 @@ void ep2_mul_sim_trick(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 	ep2_t t1[1 << (EP_WIDTH / 2)];
 	ep2_t t[1 << EP_WIDTH];
 	bn_t n;
-	int d, l0, l1, w;
+	int l0, l1, w;
 	unsigned char w0[FP_BITS + 1], w1[FP_BITS + 1];
 
 	bn_null(n);
@@ -202,13 +202,11 @@ void ep2_mul_sim_trick(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 
 	w = EP_WIDTH / 2;
 
-
 	TRY {
 		bn_new(n);
 
 		ep2_curve_get_ord(n);
-		d = bn_bits(n);
-		d = ((d % w) == 0 ? (d / w) : (d / w) + 1);
+
 		for (int i = 0; i < (1 << w); i++) {
 			ep2_new(t0[i]);
 			ep2_new(t1[i]);

@@ -123,7 +123,7 @@ void ep2_mul_pre_basic(ep2_t * t, ep2_t p) {
 
 		ep2_copy(t[0], p);
 		for (int i = 1; i < bn_bits(n); i++) {
-			ep2_dbl_tab(t[i], t[i - 1]);
+			ep2_dbl(t[i], t[i - 1]);
 		}
 	}
 	CATCH_ANY {
@@ -232,9 +232,9 @@ void ep2_mul_pre_nafwi(ep2_t * t, ep2_t p) {
 
 		ep2_copy(t[0], p);
 		for (int i = 1; i < l; i++) {
-			ep2_dbl_tab(t[i], t[i - 1]);
+			ep2_dbl(t[i], t[i - 1]);
 			for (int j = 1; j < EP_DEPTH; j++) {
-				ep2_dbl_tab(t[i], t[i]);
+				ep2_dbl(t[i], t[i]);
 			}
 		}
 	}
