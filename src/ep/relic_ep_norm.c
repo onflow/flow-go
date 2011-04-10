@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_ADD == PROJC
+#if EP_ADD == PROJC || !defined(STRIP)
 
 /**
  * Normalizes a point represented in projective coordinates.

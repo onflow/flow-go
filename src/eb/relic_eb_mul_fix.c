@@ -325,7 +325,7 @@ void eb_mul_pre_basic(eb_t *t, eb_t p) {
 			eb_dbl(t[i], t[i - 1]);
 		}
 
-		eb_norm_sim(t + 1, t + 1, EB_TABLE_BASIC - 2);
+		eb_norm_sim(t + 1, t + 1, bn_bits(n));
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

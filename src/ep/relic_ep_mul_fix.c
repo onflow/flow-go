@@ -264,7 +264,7 @@ void ep_mul_pre_basic(ep_t * t, ep_t p) {
 			ep_dbl(t[i], t[i - 1]);
 		}
 
-		ep_norm_sim(t + 1, t + 1, EP_TABLE_BASIC - 2);
+		ep_norm_sim(t + 1, t + 1, bn_bits(n));
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

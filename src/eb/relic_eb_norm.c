@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EB_ADD == PROJC
+#if EB_ADD == PROJC || !defined(STRIP)
 
 #if defined(EB_ORDIN) || defined(EB_KBLTZ)
 
