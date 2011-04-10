@@ -128,6 +128,7 @@ void eb_norm(eb_t r, eb_t p) {
 		eb_norm_halve(r, p);
 		return;
 	}
+
 #if EB_ADD == PROJC || !defined(STRIP)
 
 #if defined(EB_SUPER)
