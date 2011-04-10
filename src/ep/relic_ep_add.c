@@ -217,6 +217,7 @@ static void ep_add_projc_mix(ep_t r, ep_t p, ep_t q) {
 				fp_dbl(r->z, t3);
 			}
 		}
+		r->norm = 0;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

@@ -340,7 +340,6 @@ static void eb_add_projc_ordin_mix(eb_t r, eb_t p, eb_t q) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		r->norm = 0;
 		fb_free(t0);
 		fb_free(t1);
 		fb_free(t2);
@@ -462,7 +461,6 @@ static void eb_add_projc_ordin(eb_t r, eb_t p, eb_t q) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		r->norm = 0;
 		fb_free(t0);
 		fb_free(t1);
 		fb_free(t2);
