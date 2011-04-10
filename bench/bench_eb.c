@@ -86,6 +86,11 @@ static void util(void) {
 	BENCH_BEGIN("eb_rand") {
 		BENCH_ADD(eb_rand(p));
 	} BENCH_END;
+
+	BENCH_BEGIN("eb_is_valid") {
+		eb_rand(p);
+		BENCH_ADD(eb_is_valid(p));
+	} BENCH_END;
 }
 
 static void arith(void) {

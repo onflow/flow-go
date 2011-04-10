@@ -116,6 +116,14 @@ int util(void) {
 			TEST_ASSERT(ec_is_infty(a), end);
 		}
 		TEST_END;
+
+		TEST_BEGIN("validity test is correct") {
+			ec_rand(a);
+			TEST_ASSERT(ec_is_valid(a), end);
+			dv_zero(a->x, EC_DIGS);
+			TEST_ASSERT(!ec_is_valid(a), end);
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
