@@ -337,8 +337,8 @@ static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 				fp_sub(r->z, r->z, t6);
 				fp_mul(r->z, r->z, t3);
 			}
-			r->norm = 0;
 		}
+		r->norm = 0;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
