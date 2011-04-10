@@ -298,26 +298,6 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 #if defined(EB_ORDIN) || defined(EB_SUPER)
 
 /**
- * Precomputes a table for a point multiplication on an ordinary curve.
- *
- * @param[out] t				- the destination table.
- * @param[in] p					- the point to multiply.
- */
-static void table_init_ordin(eb_t *t, eb_t p) {
-#if EB_WIDTH > 2
-	eb_dbl(t[0], p);
-	eb_add(t[1], t[0], p);
-	for (int i = 2; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_add(t[i], t[i - 1], t[0]);
-	}
-#if defined(EB_MIXED)
-	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
-#endif
-#endif
-	eb_copy(t[0], p);
-}
-
-/**
  * Multiplies and adds two binary elliptic curve points simultaneously,
  * optionally choosing the first point as the generator depending on the value
  * of flag.
@@ -349,7 +329,7 @@ static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
 			eb_new(table0[i]);
 		}
-		table_init_ordin(table0, p);
+		eb_tab(table0, p, EB_WIDTH);
 		t = table0;
 	}
 
@@ -358,7 +338,7 @@ static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 		eb_new(table1[i]);
 	}
 	/* Compute the precomputation table. */
-	table_init_ordin(table1, q);
+	eb_tab(table1, q, EB_WIDTH);
 
 	/* Compute the w-TNAF representation of k. */
 	if (gen) {

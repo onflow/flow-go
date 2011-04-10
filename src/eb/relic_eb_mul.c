@@ -253,26 +253,6 @@ static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
 #if defined(EB_ORDIN) || defined(EB_SUPER)
 
 /**
- * Precomputes a table for a point multiplication on an ordinary curve.
- *
- * @param[out] t				- the destination table.
- * @param[in] p					- the point to multiply.
- */
-static void eb_table_ordin(eb_t *t, eb_t p) {
-#if EB_WIDTH > 2
-	eb_dbl(t[0], p);
-	eb_add(t[1], t[0], p);
-	for (int i = 2; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_add(t[i], t[i - 1], t[0]);
-	}
-#if defined(EB_MIXED)
-	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
-#endif
-#endif
-	eb_copy(t[0], p);
-}
-
-/**
  * Multiplies a binary elliptic curve point by an integer using the
  * left-to-right w-NAF method.
  *
@@ -298,7 +278,7 @@ static void eb_mul_lnaf_imp(eb_t r, eb_t p, bn_t k) {
 			table[i]->norm = 1;
 		}
 		/* Compute the precomputation table. */
-		eb_table_ordin(table, p);
+		eb_tab(table, p, EB_WIDTH);
 
 		/* Compute the w-TNAF representation of k. */
 		bn_rec_naf(naf, &len, k, EB_WIDTH);

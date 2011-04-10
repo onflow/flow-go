@@ -199,13 +199,32 @@ int eb_is_valid(eb_t p) {
 		fb_add(lhs, lhs, t->y);
 		r = (fb_cmp(lhs, t->x) == CMP_EQ) || eb_is_infty(p);
 
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		eb_free(t);
 		fb_free(lhs);
 	}
 	return r;
+}
+
+void eb_tab(eb_t *t, eb_t p, int w) {
+	if (w > 2) {
+		eb_dbl(t[0], p);
+#if defined(EB_MIXED)
+		eb_norm(t[0], t[0]);
+#endif
+		eb_add(t[1], t[0], p);
+		for (int i = 2; i < (1 << (w - 2)); i++) {
+			eb_add(t[i], t[i - 1], t[0]);
+		}
+#if defined(EB_MIXED)
+		eb_norm_sim(t + 1, t + 1, (1 << (w - 2)) - 1);
+#endif
+	}
+	eb_copy(t[0], p);
 }
 
 void eb_print(eb_t p) {

@@ -241,35 +241,6 @@ static void eb_mul_fix_kbltz(eb_t r, eb_t *table, bn_t k) {
 #if defined(EB_ORDIN) || defined(EB_SUPER)
 
 /**
- * Precomputes a table for a point multiplication on an ordinary curve.
- *
- * @param[out] t				- the destination table.
- * @param[in] p					- the point to multiply.
- */
-static void eb_mul_pre_ordin(eb_t *t, eb_t p) {
-	int i;
-
-	for (i = 0; i < (1 << (EB_DEPTH - 2)); i++) {
-		eb_set_infty(t[i]);
-		fb_set_bit(t[i]->z, 0, 1);
-		t[i]->norm = 1;
-	}
-
-	eb_dbl(t[0], p);
-
-#if EB_DEPTH > 2
-	eb_add(t[1], t[0], p);
-	for (i = 2; i < (1 << (EB_DEPTH - 2)); i++) {
-		eb_add(t[i], t[i - 1], t[0]);
-	}
-#endif
-
-	eb_norm_sim(t + 1, t + 1, EB_TABLE_LWNAF - 1);
-
-	eb_copy(t[0], p);
-}
-
-/**
  * Multiplies a binary elliptic curve point by an integer using the w-NAF
  * method.
  *
@@ -718,7 +689,7 @@ void eb_mul_pre_lwnaf(eb_t *t, eb_t p) {
 #endif
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
-	eb_mul_pre_ordin(t, p);
+	eb_tab(t, p, EB_DEPTH);
 #endif
 }
 

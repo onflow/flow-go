@@ -305,10 +305,10 @@ typedef ep_st *ep_t;
  */
 #if EP_MUL == BASIC
 #define ep_mul(R, P, K)		ep_mul_basic(R, P, K)
-#elif EP_MUL == CONST
-#define ep_mul(R, P, K)		ep_mul_const(R, P, K)
 #elif EP_MUL == SLIDE
 #define ep_mul(R, P, K)		ep_mul_slide(R, P, K)
+#elif EP_MUL == MONTY
+#define ep_mul(R, P, K)		ep_mul_monty(R, P, K)
 #elif EP_MUL == LWNAF
 #define ep_mul(R, P, K)		ep_mul_lwnaf(R, P, K)
 #endif
@@ -640,6 +640,15 @@ void ep_rhs(fp_t rhs, ep_t p);
 int ep_is_valid(ep_t p);
 
 /**
+ * Builds a precomputation table for multiplying a random prime elliptic point.
+ *
+ * @param[out] t			- the precomputation table.
+ * @param[in] p				- the point to multiply.
+ * @param[in] w				- the window width.
+ */
+void ep_tab(ep_t *t, ep_t p, int w);
+
+/**
  * Prints a prime elliptic curve point.
  *
  * @param[in] p				- the prime elliptic curve point to print.
@@ -717,17 +726,6 @@ void ep_dbl_basic(ep_t r, ep_t p);
 void ep_dbl_projc(ep_t r, ep_t p);
 
 /**
- * Generates a precomputation table.
- *
- * Precomputes 1p, 3p, 5p, etc.
- *
- * @param[out] t				- the destination table.
- * @param[in] p					- the point to multiply.
- * @param[in n					- the number of points in the table.
- */
-void ep_mul_table(ep_t * t, ep_t p, int n);
-
-/**
  * Multiplies a prime elliptic point by an integer using the binary method.
  *
  * @param[out] r			- the result.
@@ -735,16 +733,6 @@ void ep_mul_table(ep_t * t, ep_t p, int n);
  * @param[in] k				- the integer.
  */
 void ep_mul_basic(ep_t r, ep_t p, bn_t k);
-
-/**
- * Multiplies a prime elliptic point by an integer using the constant-time
- * López-Dahab point multiplication method.
- *
- * @param[out] r			- the result.
- * @param[in] p				- the point to multiply.
- * @param[in] k				- the integer.
- */
-void ep_mul_const(ep_t r, ep_t p, bn_t k);
 
 /**
  * Multiplies a prime elliptic point by an integer using the sliding window
@@ -755,6 +743,16 @@ void ep_mul_const(ep_t r, ep_t p, bn_t k);
  * @param[in] k				- the integer.
  */
 void ep_mul_slide(ep_t r, ep_t p, bn_t k);
+
+/**
+ * Multiplies a prime elliptic point by an integer using the constant-time
+ * Montgomery laddering point multiplication method.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ * @param[in] k				- the integer.
+ */
+void ep_mul_monty(ep_t r, ep_t p, bn_t k);
 
 /**
  * Multiplies a prime elliptic point by an integer using the w-NAF method.

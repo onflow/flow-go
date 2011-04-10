@@ -659,6 +659,15 @@ void eb_rhs(fb_t rhs, eb_t p);
 int eb_is_valid(eb_t p);
 
 /**
+ * Builds a precomputation table for multiplying a random binary elliptic point.
+ *
+ * @param[out] t			- the precomputation table.
+ * @param[in] p				- the point to multiply.
+ * @param[in] w				- the window width.
+ */
+void eb_tab(eb_t *t, eb_t p, int w);
+
+/**
  * Prints a binary elliptic curve point.
  *
  * @param[in] p				- the binary elliptic curve point to print.
