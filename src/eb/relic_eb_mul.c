@@ -44,138 +44,6 @@
 #if defined(EB_KBLTZ)
 
 /**
- * Precomputes a table for a point multiplication on a Koblitz curve.
- *
- * @param[out] t				- the destination table.
- * @param[in] p					- the point to multiply.
- */
-static void eb_table_kbltz(eb_t *t, eb_t p) {
-	int u;
-
-	if (eb_curve_opt_a() == OPT_ZERO) {
-		u = -1;
-	} else {
-		u = 1;
-	}
-
-	/* Prepare the precomputation table. */
-	for (int i = 0; i < 1 << (EB_WIDTH - 2); i++) {
-		eb_set_infty(t[i]);
-		fb_set_dig(t[i]->z, 1);
-		t[i]->norm = 1;
-	}
-
-	eb_copy(t[0], p);
-
-#if EB_WIDTH == 3
-	eb_frb(t[1], t[0]);
-	if (u == 1) {
-		eb_sub(t[1], t[0], t[1]);
-	} else {
-		eb_add(t[1], t[0], t[1]);
-	}
-#endif
-
-#if EB_WIDTH == 4
-	eb_frb(t[3], t[0]);
-	eb_frb(t[3], t[3]);
-
-	eb_sub(t[1], t[3], p);
-	eb_add(t[2], t[3], p);
-	eb_frb(t[3], t[3]);
-
-	if (u == 1) {
-		eb_neg(t[3], t[3]);
-	}
-	eb_sub(t[3], t[3], p);
-#endif
-
-#if EB_WIDTH == 5
-	eb_frb(t[3], t[0]);
-	eb_frb(t[3], t[3]);
-
-	eb_sub(t[1], t[3], p);
-	eb_add(t[2], t[3], p);
-	eb_frb(t[3], t[3]);
-
-	if (u == 1) {
-		eb_neg(t[3], t[3]);
-	}
-	eb_sub(t[3], t[3], p);
-
-	eb_frb(t[4], t[2]);
-	eb_frb(t[4], t[4]);
-
-	eb_sub(t[7], t[4], t[2]);
-
-	eb_neg(t[4], t[4]);
-	eb_sub(t[5], t[4], p);
-	eb_add(t[6], t[4], p);
-
-	eb_frb(t[4], t[4]);
-	if (u == -1) {
-		eb_neg(t[4], t[4]);
-	}
-	eb_add(t[4], t[4], p);
-#endif
-
-#if EB_WIDTH == 6
-	eb_frb(t[0], t[0]);
-	eb_frb(t[0], t[0]);
-	eb_neg(t[14], t[0]);
-
-	eb_sub(t[13], t[14], p);
-	eb_add(t[14], t[14], p);
-
-	eb_frb(t[0], t[0]);
-	if (u == -1) {
-		eb_neg(t[0], t[0]);
-	}
-	eb_sub(t[11], t[0], p);
-	eb_add(t[12], t[0], p);
-
-	eb_frb(t[0], t[12]);
-	eb_frb(t[0], t[0]);
-	eb_sub(t[1], t[0], p);
-	eb_add(t[2], t[0], p);
-
-	eb_add(t[15], t[0], t[13]);
-
-	eb_frb(t[0], t[13]);
-	eb_frb(t[0], t[0]);
-	eb_sub(t[5], t[0], p);
-	eb_add(t[6], t[0], p);
-
-	eb_neg(t[8], t[0]);
-	eb_add(t[7], t[8], t[13]);
-	eb_add(t[8], t[8], t[14]);
-
-	eb_frb(t[0], t[0]);
-	if (u == -1) {
-		eb_neg(t[0], t[0]);
-	}
-	eb_sub(t[3], t[0], p);
-	eb_add(t[4], t[0], p);
-
-	eb_frb(t[0], t[1]);
-	eb_frb(t[0], t[0]);
-
-	eb_neg(t[9], t[0]);
-	eb_sub(t[9], t[9], p);
-
-	eb_frb(t[0], t[14]);
-	eb_frb(t[0], t[0]);
-	eb_add(t[10], t[0], p);
-
-	eb_copy(t[0], p);
-#endif
-
-#if EB_WIDTH > 2 && defined(EB_MIXED)
-	eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
-#endif
-}
-
-/**
  * Multiplies a binary elliptic curve point by an integer using the w-TNAF
  * method.
  *
@@ -209,7 +77,7 @@ static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
 			eb_new(table[i]);
 		}
 		/* Compute the precomputation table. */
-		eb_table_kbltz(table, p);
+		eb_tab(table, p, EB_WIDTH);
 
 		eb_curve_get_vm(vm);
 		eb_curve_get_s0(s0);

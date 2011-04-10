@@ -211,20 +211,156 @@ int eb_is_valid(eb_t p) {
 }
 
 void eb_tab(eb_t *t, eb_t p, int w) {
-	if (w > 2) {
-		eb_dbl(t[0], p);
+	int u;
+
+#if defined(EB_ORDIN) || defined(EB_SUPER)
+	if (!eb_curve_is_kbltz()) {
+		if (w > 2) {
+			eb_dbl(t[0], p);
 #if defined(EB_MIXED)
-		eb_norm(t[0], t[0]);
+			eb_norm(t[0], t[0]);
 #endif
-		eb_add(t[1], t[0], p);
-		for (int i = 2; i < (1 << (w - 2)); i++) {
-			eb_add(t[i], t[i - 1], t[0]);
+			eb_add(t[1], t[0], p);
+			for (int i = 2; i < (1 << (w - 2)); i++) {
+				eb_add(t[i], t[i - 1], t[0]);
+			}
+#if defined(EB_MIXED)
+			eb_norm_sim(t + 1, t + 1, (1 << (w - 2)) - 1);
+#endif
+		}
+		eb_copy(t[0], p);
+	}
+#endif /* EB_ORDIN || EB_SUPER */
+
+#if defined(EB_KBLTZ)
+	if (eb_curve_is_kbltz()) {
+		u = (eb_curve_opt_a() == OPT_ZERO ? -1 : 1);
+
+		/* Prepare the precomputation table. */
+		for (int i = 0; i < 1 << (w - 2); i++) {
+			eb_set_infty(t[i]);
+			fb_set_dig(t[i]->z, 1);
+			t[i]->norm = 1;
+		}
+
+		eb_copy(t[0], p);
+
+		switch (w) {
+#if EB_DEPTH == 3 || EB_WIDTH ==  3
+			case 3:
+				eb_frb(t[1], t[0]);
+				if (u == 1) {
+					eb_sub(t[1], t[0], t[1]);
+				} else {
+					eb_add(t[1], t[0], t[1]);
+				}
+				break;
+#endif
+#if EB_DEPTH == 4 || EB_WIDTH ==  4
+			case 4:
+				eb_frb(t[3], t[0]);
+				eb_frb(t[3], t[3]);
+
+				eb_sub(t[1], t[3], p);
+				eb_add(t[2], t[3], p);
+				eb_frb(t[3], t[3]);
+
+				if (u == 1) {
+					eb_neg(t[3], t[3]);
+				}
+				eb_sub(t[3], t[3], p);
+				break;
+#endif
+#if EB_DEPTH == 5 || EB_WIDTH ==  5
+			case 5:
+				eb_frb(t[3], t[0]);
+				eb_frb(t[3], t[3]);
+
+				eb_sub(t[1], t[3], p);
+				eb_add(t[2], t[3], p);
+				eb_frb(t[3], t[3]);
+
+				if (u == 1) {
+					eb_neg(t[3], t[3]);
+				}
+				eb_sub(t[3], t[3], p);
+
+				eb_frb(t[4], t[2]);
+				eb_frb(t[4], t[4]);
+
+				eb_sub(t[7], t[4], t[2]);
+
+				eb_neg(t[4], t[4]);
+				eb_sub(t[5], t[4], p);
+				eb_add(t[6], t[4], p);
+
+				eb_frb(t[4], t[4]);
+				if (u == -1) {
+					eb_neg(t[4], t[4]);
+				}
+				eb_add(t[4], t[4], p);
+				break;
+#endif
+#if EB_DEPTH == 6 || EB_WIDTH ==  6
+			case 6:
+				eb_frb(t[0], t[0]);
+				eb_frb(t[0], t[0]);
+				eb_neg(t[14], t[0]);
+
+				eb_sub(t[13], t[14], p);
+				eb_add(t[14], t[14], p);
+
+				eb_frb(t[0], t[0]);
+				if (u == -1) {
+					eb_neg(t[0], t[0]);
+				}
+				eb_sub(t[11], t[0], p);
+				eb_add(t[12], t[0], p);
+
+				eb_frb(t[0], t[12]);
+				eb_frb(t[0], t[0]);
+				eb_sub(t[1], t[0], p);
+				eb_add(t[2], t[0], p);
+
+				eb_add(t[15], t[0], t[13]);
+
+				eb_frb(t[0], t[13]);
+				eb_frb(t[0], t[0]);
+				eb_sub(t[5], t[0], p);
+				eb_add(t[6], t[0], p);
+
+				eb_neg(t[8], t[0]);
+				eb_add(t[7], t[8], t[13]);
+				eb_add(t[8], t[8], t[14]);
+
+				eb_frb(t[0], t[0]);
+				if (u == -1) {
+					eb_neg(t[0], t[0]);
+				}
+				eb_sub(t[3], t[0], p);
+				eb_add(t[4], t[0], p);
+
+				eb_frb(t[0], t[1]);
+				eb_frb(t[0], t[0]);
+
+				eb_neg(t[9], t[0]);
+				eb_sub(t[9], t[9], p);
+
+				eb_frb(t[0], t[14]);
+				eb_frb(t[0], t[0]);
+				eb_add(t[10], t[0], p);
+
+				eb_copy(t[0], p);
+				break;
+#endif
 		}
 #if defined(EB_MIXED)
-		eb_norm_sim(t + 1, t + 1, (1 << (w - 2)) - 1);
+		if (w > 2) {
+			eb_norm_sim(t + 1, t + 1, (1 << (w - 2)) - 1);
+		}
 #endif
 	}
-	eb_copy(t[0], p);
+#endif /* EB_KBLTZ */
 }
 
 void eb_print(eb_t p) {
