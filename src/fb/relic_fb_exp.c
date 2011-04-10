@@ -78,7 +78,7 @@ void fb_exp_basic(fb_t c, fb_t a, bn_t b) {
 #if FB_EXP == SLIDE || !defined(STRIP)
 
 void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
-	fb_t tab[1 << FB_WIDTH], t, r;
+	fb_t tab[1 << (FB_WIDTH - 1)], t, r;
 	int i, j, l;
 	unsigned char win[FB_BITS];
 
@@ -86,16 +86,12 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 	fb_null(r);
 
 	/* Initialize table. */
-	for (i = 0; i < (1 << FB_WIDTH); i++) {
+	for (i = 0; i < (1 << (FB_WIDTH - 1)); i++) {
 		fb_null(tab[i]);
 	}
 
 	TRY {
-
-		/* Find window size. */
-		i = bn_bits(b);
-
-		for (i = 1; i < (1 << FB_WIDTH); i += 2) {
+		for (i = 1; i < (1 << (FB_WIDTH - 1)); i++) {
 			fb_new(tab[i]);
 		}
 
@@ -104,12 +100,12 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 
 		fb_set_dig(r, 1);
 
-		fb_copy(tab[1], a);
+		fb_copy(tab[0], a);
 		fb_sqr(t, a);
 
 		/* Create table. */
 		for (i = 1; i < 1 << (FB_WIDTH - 1); i++) {
-			fb_mul(tab[2 * i + 1], tab[2 * i - 1], t);
+			fb_mul(tab[i], tab[i - 1], t);
 		}
 
 		bn_rec_slw(win, &l, b, FB_WIDTH);
@@ -120,7 +116,7 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 				for (j = 0; j < util_bits_dig(win[i]); j++) {
 					fb_sqr(r, r);
 				}
-				fb_mul(r, r, tab[win[i]]);
+				fb_mul(r, r, tab[win[i] >> 1]);
 			}
 		}
 
@@ -130,7 +126,7 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		for (i = 1; i < (1 << FB_WIDTH); i++) {
+		for (i = 1; i < (1 << (FB_WIDTH - 1)); i++) {
 			fb_free(tab[i]);
 		}
 		fb_free(t);
