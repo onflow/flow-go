@@ -114,15 +114,17 @@ static void ep_add_basic_imp(ep_t r, ep_t p, ep_t q) {
 
 #if EP_ADD == PROJC || !defined(STRIP)
 
+#if defined(EP_MIXED) || !defined(STRIP)
+
 /**
- * Adds two points represented in projective coordinates on an ordinary prime
- * elliptic curve.
+ * Adds a point represented in affine coordinates to a point represented in
+ * projective coordinates.
  *
  * @param r					- the result.
- * @param p					- the first point to add.
- * @param q					- the second point to add.
+ * @param p					- the projective point.
+ * @param q					- the affine point.
  */
-static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
+static void ep_add_projc_mix(ep_t r, ep_t p, ep_t q) {
 	fp_t t0, t1, t2, t3, t4, t5, t6;
 
 	fp_null(t0);
@@ -142,10 +144,130 @@ static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 		fp_new(t5);
 		fp_new(t6);
 
-		if (!q->norm) {
-#if defined(EP_MIXED)
-			THROW(ERR_INVALID);
-#else
+		if (!p->norm) {
+			/* t0 = z1^2. */
+			fp_sqr(t0, p->z);
+
+			/* t3 = U2 = x2 * z1^2. */
+			fp_mul(t3, q->x, t0);
+
+			/* t1 = S2 = y2 * z1^3. */
+			fp_mul(t1, t0, p->z);
+			fp_mul(t1, t1, q->y);
+
+			/* t3 = H = U2 - x1. */
+			fp_sub(t3, t3, p->x);
+
+			/* t1 = R = 2 * (S2 - y1). */
+			fp_sub(t1, t1, p->y);
+			fp_dbl(t1, t1);
+		} else {
+			/* H = x2 - x1. */
+			fp_sub(t3, q->x, p->x);
+
+			/* t1 = R = 2 * (y2 - y1). */
+			fp_sub(t1, q->y, p->y);
+			fp_dbl(t1, t1);
+		}
+
+		/* t2 = HH = H^2. */
+		fp_sqr(t2, t3);
+
+		/* If E is zero. */
+		if (fp_is_zero(t3)) {
+			if (fp_is_zero(t1)) {
+				/* If I is zero, p = q, should have doubled. */
+				ep_dbl_projc(r, p);
+			} else {
+				/* If I is not zero, q = -p, r = infinity. */
+				ep_set_infty(r);
+			}
+		} else {
+			/* t4 = I = 4*HH. */
+			fp_dbl(t4, t2);
+			fp_dbl(t4, t4);
+
+			/* t5 = J = H * I. */
+			fp_mul(t5, t3, t4);
+
+			/* t4 = V = x1 * I. */
+			fp_mul(t4, p->x, t4);
+
+			/* x3 = R^2 - J - 2 * V. */
+			fp_sqr(r->x, t1);
+			fp_sub(r->x, r->x, t5);
+			fp_dbl(t6, t4);
+			fp_sub(r->x, r->x, t6);
+
+			/* y3 = R * (V - x3) - 2 * Y1 * J. */
+			fp_sub(t4, t4, r->x);
+			fp_mul(t4, t4, t1);
+			fp_mul(t1, p->y, t5);
+			fp_dbl(t1, t1);
+			fp_sub(r->y, t4, t1);
+
+			if (!p->norm) {
+				/* z3 = (z1 + H)^2 - z1^2 - HH. */
+				fp_add(r->z, p->z, t3);
+				fp_sqr(r->z, r->z);
+				fp_sub(r->z, r->z, t0);
+				fp_sub(r->z, r->z, t2);
+			} else {
+				/* z3 = 2 * H. */
+				fp_dbl(r->z, t3);
+			}
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t0);
+		fp_free(t1);
+		fp_free(t2);
+		fp_free(t3);
+		fp_free(t4);
+		fp_free(t5);
+		fp_free(t6);
+	}
+}
+
+#endif
+
+/**
+ * Adds two points represented in projective coordinates on an ordinary prime
+ * elliptic curve.
+ *
+ * @param r					- the result.
+ * @param p					- the first point to add.
+ * @param q					- the second point to add.
+ */
+static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
+#if defined(EP_MIXED) && defined(STRIP)
+	ep_add_projc_mix(r, p, q);
+#else /* General addition. */
+	fp_t t0, t1, t2, t3, t4, t5, t6;
+
+	fp_null(t0);
+	fp_null(t1);
+	fp_null(t2);
+	fp_null(t3);
+	fp_null(t4);
+	fp_null(t5);
+	fp_null(t6);
+
+	TRY {
+		fp_new(t0);
+		fp_new(t1);
+		fp_new(t2);
+		fp_new(t3);
+		fp_new(t4);
+		fp_new(t5);
+		fp_new(t6);
+
+		if (q->norm) {
+			ep_add_projc_mix(r, p, q);
+		} else {
 			/* t0 = z1^2. */
 			fp_sqr(t0, p->z);
 
@@ -215,83 +337,8 @@ static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 				fp_sub(r->z, r->z, t6);
 				fp_mul(r->z, r->z, t3);
 			}
-#endif
-		} else {
-			if (!p->norm) {
-				/* t0 = z1^2. */
-				fp_sqr(t0, p->z);
-
-				/* t3 = U2 = x2 * z1^2. */
-				fp_mul(t3, q->x, t0);
-
-				/* t1 = S2 = y2 * z1^3. */
-				fp_mul(t1, t0, p->z);
-				fp_mul(t1, t1, q->y);
-
-				/* t3 = H = U2 - x1. */
-				fp_sub(t3, t3, p->x);
-
-				/* t1 = R = 2 * (S2 - y1). */
-				fp_sub(t1, t1, p->y);
-				fp_dbl(t1, t1);
-			} else {
-				/* H = x2 - x1. */
-				fp_sub(t3, q->x, p->x);
-
-				/* t1 = R = 2 * (y2 - y1). */
-				fp_sub(t1, q->y, p->y);
-				fp_dbl(t1, t1);
-			}
-
-			/* t2 = HH = H^2. */
-			fp_sqr(t2, t3);
-
-			/* If E is zero. */
-			if (fp_is_zero(t3)) {
-				if (fp_is_zero(t1)) {
-					/* If I is zero, p = q, should have doubled. */
-					ep_dbl_projc(r, p);
-				} else {
-					/* If I is not zero, q = -p, r = infinity. */
-					ep_set_infty(r);
-				}
-			} else {
-				/* t4 = I = 4*HH. */
-				fp_dbl(t4, t2);
-				fp_dbl(t4, t4);
-
-				/* t5 = J = H * I. */
-				fp_mul(t5, t3, t4);
-
-				/* t4 = V = x1 * I. */
-				fp_mul(t4, p->x, t4);
-
-				/* x3 = R^2 - J - 2 * V. */
-				fp_sqr(r->x, t1);
-				fp_sub(r->x, r->x, t5);
-				fp_dbl(t6, t4);
-				fp_sub(r->x, r->x, t6);
-
-				/* y3 = R * (V - x3) - 2 * Y1 * J. */
-				fp_sub(t4, t4, r->x);
-				fp_mul(t4, t4, t1);
-				fp_mul(t1, p->y, t5);
-				fp_dbl(t1, t1);
-				fp_sub(r->y, t4, t1);
-
-				if (!p->norm) {
-					/* z3 = (z1 + H)^2 - z1^2 - HH. */
-					fp_add(r->z, p->z, t3);
-					fp_sqr(r->z, r->z);
-					fp_sub(r->z, r->z, t0);
-					fp_sub(r->z, r->z, t2);
-				} else {
-					/* z3 = 2 * H. */
-					fp_dbl(r->z, t3);
-				}
-			}
+			r->norm = 0;
 		}
-		r->norm = 0;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -305,12 +352,13 @@ static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 		fp_free(t5);
 		fp_free(t6);
 	}
+#endif
 }
 
 #endif /* EP_ADD == PROJC */
 
 /*============================================================================*/
-/* Public definitions                                                         */
+	/* Public definitions                                                         */
 /*============================================================================*/
 
 #if EP_ADD == BASIC || !defined(STRIP)

@@ -817,6 +817,10 @@ void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
 	fb_t x1, z1, x2, z2, r1, r2, r3, r4;
 	dig_t *b;
 
+	if (eb_curve_is_super()) {
+		THROW(ERR_INVALID);
+	}
+
 	fb_null(x1);
 	fb_null(z1);
 	fb_null(x2);
