@@ -338,7 +338,7 @@ static void find_chain() {
 	}
 
 	for (i = 0; i <= chain_len; i++) {
-		fb_itr_pre(fb_tab_sqr[i], u[i]);
+		fb_itr_pre(fb_poly_tab_sqr(i), u[i]);
 	}
 
 #endif
@@ -488,11 +488,11 @@ dig_t *fb_poly_get_srz(void) {
 #endif
 }
 
-dig_t *fb_poly_tab_sqr(int i) {
+fb_t *fb_poly_tab_sqr(int i) {
 #if FB_INV == ITOHT || !defined(STRIP)
 
 #ifdef FB_PRECO
-	return (dig_t *)&(fb_tab_sqr[i]);
+	return (fb_t *)&(fb_tab_sqr[i]);
 #else
 	return NULL;
 #endif

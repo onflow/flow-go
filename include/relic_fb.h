@@ -451,7 +451,7 @@ dig_t *fb_poly_tab_srz(int i);
  * @param the number of the table.
  * @return the precomputed result.
  */
-dig_t *fb_poly_tab_sqr(int i);
+fb_t *fb_poly_tab_sqr(int i);
 
 /**
  * Returns an addition chain for (FB_BITS - 1).
