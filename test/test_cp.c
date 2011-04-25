@@ -260,7 +260,7 @@ static int ecdsa(void) {
 	return code;
 }
 
-static int schnorr(void) {
+static int ecss(void) {
 	int code = STS_ERR;
 	bn_t d, r;
 	ec_t q;
@@ -275,10 +275,10 @@ static int schnorr(void) {
 		bn_new(r);
 		ec_new(q);
 
-		TEST_BEGIN("schnorr is correct") {
-			cp_schnorr_gen(d, q);
-			cp_schnorr_sign(r, d, msg, 5, d);
-			TEST_ASSERT(cp_schnorr_ver(r, d, msg, 5, q) == 1, end);
+		TEST_BEGIN("ecss is correct") {
+			cp_ecss_gen(d, q);
+			cp_ecss_sign(r, d, msg, 5, d);
+			TEST_ASSERT(cp_ecss_ver(r, d, msg, 5, q) == 1, end);
 		} TEST_END;
 	} CATCH_ANY {
 		ERROR(end);
@@ -347,6 +347,8 @@ static int bls(void) {
 		bn_new(d);
 		g1_new(s);
 		g2_new(q);
+		bn_t n;
+		ep_curve_get_ord(n);
 
 		TEST_BEGIN("boneh-lynn-schacham short signature is correct") {
 			cp_bls_gen(d, q);
@@ -384,6 +386,8 @@ static int bbs(void) {
 		g1_new(s);
 		g2_new(q);
 		gt_new(z);
+		bn_t n;
+		ep_curve_get_ord(n);
 
 		TEST_BEGIN("boneh-boyen short signature is correct") {
 			cp_bbs_gen(d, q, z);
@@ -434,7 +438,7 @@ int main(void) {
 			core_clean();
 			return 1;
 		}
-		if (schnorr() != STS_OK) {
+		if (ecss() != STS_OK) {
 			core_clean();
 			return 1;
 		}

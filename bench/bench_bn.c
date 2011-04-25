@@ -93,7 +93,7 @@ static void memory(void) {
 }
 
 static void util(void) {
-	int d, len, sign;
+	int d, len;
 	dig_t digit;
 	char str[BN_DIGS * sizeof(dig_t) * 3 + 1];
 	unsigned char bin[BN_DIGS * sizeof(dig_t)];
@@ -224,14 +224,14 @@ static void util(void) {
 	BENCH_BEGIN("bn_write_bin") {
 		bn_rand(a, BN_POS, BN_BITS);
 		bn_size_bin(&len, a);
-		BENCH_ADD(bn_write_bin(bin, &len, &sign, a));
+		BENCH_ADD(bn_write_bin(bin, len, a));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("bn_read_bin") {
 		bn_rand(a, BN_POS, BN_BITS);
 		bn_size_bin(&len, a);
-		BENCH_ADD(bn_read_bin(a, bin, len, BN_POS));
+		BENCH_ADD(bn_read_bin(a, bin, len));
 	}
 	BENCH_END;
 
@@ -244,14 +244,14 @@ static void util(void) {
 	BENCH_BEGIN("bn_write_raw") {
 		bn_rand(a, BN_POS, BN_BITS);
 		bn_size_bin(&len, a);
-		BENCH_ADD(bn_write_raw(raw, &len, &sign, a));
+		BENCH_ADD(bn_write_raw(raw, len, a));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("bn_read_raw") {
 		bn_rand(a, BN_POS, BN_BITS);
 		bn_size_raw(&len, a);
-		BENCH_ADD(bn_read_raw(a, raw, len, BN_POS));
+		BENCH_ADD(bn_read_raw(a, raw, len));
 	}
 	BENCH_END;
 

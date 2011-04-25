@@ -658,15 +658,15 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d);
 int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q);
 
 /**
- * Generates an Schnorr key pair.
+ * Generates an Elliptic Curve Schnorr Signature key pair.
  *
  * @param[out] d			- the private key.
  * @param[in] q				- the public key.
  */
-void cp_schnorr_gen(bn_t d, ec_t q);
+void cp_ecss_gen(bn_t d, ec_t q);
 
 /**
- * Signs a message using Schnorr.
+ * Signs a message using the Elliptic Curve Schnorr Signature.
  *
  * @param[out] r				- the first component of the signature.
  * @param[out] s				- the second component of the signature.
@@ -674,10 +674,11 @@ void cp_schnorr_gen(bn_t d, ec_t q);
  * @param[in] len				- the message length in bytes.
  * @param[in] d					- the private key.
  */
-void cp_schnorr_sign(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d);
+void cp_ecss_sign(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d);
 
 /**
- * Verifies a message signed with Schnorr using the basic method.
+ * Verifies a message signed with the Elliptic Curve Schnorr Signature using the
+ * basic method.
  *
  * @param[out] r				- the first component of the signature.
  * @param[out] s				- the second component of the signature.
@@ -685,7 +686,7 @@ void cp_schnorr_sign(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d);
  * @param[in] len				- the message length in bytes.
  * @param[in] q					- the public key.
  */
-int cp_schnorr_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q);
+int cp_ecss_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q);
 
 /**
  * Generates a master key for the SOK identity-based non-interactive

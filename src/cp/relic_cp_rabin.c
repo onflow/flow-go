@@ -49,6 +49,11 @@
  */
 #define RABIN_PAD_LEN		8
 
+/**
+ * Byte used as padding unit in signatures.
+ */
+#define RABIN_PAD			(0xFF)
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -101,14 +106,14 @@ int cp_rabin_gen(rabin_t pub, rabin_t prv, int bits) {
 int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
 		rabin_t pub) {
 	bn_t m, t;
-	int sign, size, result = STS_OK;
+	int size, result = STS_OK;
 
 	bn_null(m);
 	bn_null(t);
 
 	bn_size_bin(&size, pub->n);
 
-	if (in_len > (size - RABIN_PAD_LEN - 1)) {
+	if (in_len > (size - RABIN_PAD_LEN - 2)) {
 		return STS_ERR;
 	}
 
@@ -117,7 +122,12 @@ int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len
 		bn_new(t);
 		bn_zero(m);
 
-		bn_read_bin(m, in, in_len, BN_POS);
+		/* EB = 00 | FF || D || SUFFIX */
+		bn_lsh(m, m, 8);
+		bn_add_dig(m, m, RABIN_PAD);
+		bn_lsh(m, m, in_len * 8);
+		bn_read_bin(t, in, in_len);
+		bn_add(m, m, t);
 		bn_mod_2b(t, m, 8 * RABIN_PAD_LEN);
 		bn_lsh(m, m, 8 * RABIN_PAD_LEN);
 		bn_add(m, m, t);
@@ -128,12 +138,8 @@ int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len
 		if (size <= *out_len) {
 			*out_len = size;
 			memset(out, 0, *out_len);
-			bn_write_bin(out, &size, &sign, m);
+			bn_write_bin(out, size, m);
 		} else {
-			result = STS_ERR;
-		}
-
-		if (sign == BN_NEG) {
 			result = STS_ERR;
 		}
 	}
@@ -151,7 +157,8 @@ int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len
 int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in,
 		int in_len, rabin_t prv) {
 	bn_t m, m0, m1, t, n;
-	int sign, size, result = STS_OK;
+	int size, result = STS_OK;
+	unsigned char pad;
 
 	if (in_len < 0 || in_len < RABIN_PAD_LEN) {
 		return STS_ERR;
@@ -170,7 +177,7 @@ int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in,
 		bn_new(n);
 		bn_new(t);
 
-		bn_read_bin(m, in, in_len, BN_POS);
+		bn_read_bin(m, in, in_len);
 
 		bn_add_dig(t, prv->p, 1);
 		bn_rsh(t, t, 2);
@@ -228,22 +235,34 @@ int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in,
 		}
 
 		if (result == STS_OK) {
-			bn_size_bin(&size, m);
+			bn_size_bin(&size, prv->n);
+			size--;
+			bn_rsh(t, m, 8 * size);
+
+			if (!bn_is_zero(t)) {
+				result = STS_ERR;
+			} else {
+				do {
+					size--;
+					bn_rsh(t, m, 8 * size);
+					pad = (unsigned char)t->dp[0];
+				} while (pad == 0);
+
+				if (pad != RABIN_PAD) {
+					result = STS_ERR;
+				} else {
+					bn_mod_2b(m, m, size * 8);
+				}
+			}
 
 			if (size <= *out_len) {
 				*out_len = size;
 				memset(out, 0, size);
-				bn_size_bin(&size, m);
-				bn_write_bin(out, &size, &sign, m);
+				bn_write_bin(out, size, m);
 			} else {
 				result = STS_ERR;
 			}
-
-			if (sign == BN_NEG) {
-				result = STS_ERR;
-			}
 		}
-
 	}
 	CATCH_ANY {
 		result = STS_ERR;

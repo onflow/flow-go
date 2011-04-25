@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void cp_schnorr_gen(bn_t d, ec_t q) {
+void cp_ecss_gen(bn_t d, ec_t q) {
 	bn_t n;
 
 	bn_null(n);
@@ -61,10 +61,9 @@ void cp_schnorr_gen(bn_t d, ec_t q) {
 	}
 }
 
-void cp_schnorr_sign(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
+void cp_ecss_sign(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
 	bn_t n, k, x, r;
 	ec_t p;
-	int l, sign;
 	unsigned char hash[MD_LEN];
 	unsigned char m[len + PC_BYTES];
 
@@ -89,16 +88,15 @@ void cp_schnorr_sign(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
 			} while (bn_is_zero(k));
 
 			ec_mul_gen(p, k);
-			bn_read_raw(x, p->x, EC_DIGS, BN_POS);
+			bn_read_raw(x, p->x, EC_DIGS);
 			bn_mod(r, x, n);
 		} while (bn_is_zero(r));
 
-		l = PC_BYTES;
 		memcpy(m, msg, len);
-		bn_write_bin(m + len, &l, &sign, r);
-		md_map(hash, m, len + l);
+		bn_write_bin(m + len, EC_BYTES, r);
+		md_map(hash, m, len + EC_BYTES);
 
-		bn_read_bin(e, hash, MD_LEN, BN_POS);
+		bn_read_bin(e, hash, MD_LEN);
 		bn_mod(e, e, n);
 
 		bn_mul(s, d, e);
@@ -119,13 +117,12 @@ void cp_schnorr_sign(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
 	}
 }
 
-int cp_schnorr_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q) {
+int cp_ecss_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q) {
 	bn_t n, ev, rv;
 	dig_t d;
 	ec_t p;
 	unsigned char hash[MD_LEN];
 	unsigned char m[len + PC_BYTES];
-	int l, sign;
 	int result = 0;
 
 	bn_null(n);
@@ -145,15 +142,14 @@ int cp_schnorr_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q) {
 			if (bn_cmp(e, n) == CMP_LT && bn_cmp(s, n) == CMP_LT) {
 				ec_mul_sim_gen(p, s, q, e);
 
-				bn_read_raw(rv, p->x, EC_DIGS, BN_POS);
+				bn_read_raw(rv, p->x, EC_DIGS);
 				bn_mod(rv, rv, n);
 
-				l = PC_BYTES;
 				memcpy(m, msg, len);
-				bn_write_bin(m + len, &l, &sign, rv);
-				md_map(hash, m, len + l);
+				bn_write_bin(m + len, EC_BYTES, rv);
+				md_map(hash, m, len + EC_BYTES);
 
-				bn_read_bin(ev, hash, MD_LEN, BN_POS);
+				bn_read_bin(ev, hash, MD_LEN);
 				bn_mod(ev, ev, n);
 
 				d = 0;

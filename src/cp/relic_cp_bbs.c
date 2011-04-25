@@ -77,7 +77,6 @@ void cp_bbs_sign(int *b, g1_t s, unsigned char *msg, int len, bn_t d) {
 	bn_t m, n, r;
 	unsigned char hash[MD_LEN];
 	unsigned char key[len + PC_BYTES];
-	int l;
 
 	bn_null(m);
 	bn_null(n);
@@ -92,16 +91,15 @@ void cp_bbs_sign(int *b, g1_t s, unsigned char *msg, int len, bn_t d) {
 
 		/* hash = H(SJ, msg). */
 		memcpy(key, msg, len);
-		l = PC_BYTES;
-		bn_write_bin(key + len, &l, b, d);
-		md_map(hash, key, len + l);
+		bn_write_bin(key + len, PC_BYTES, d);
+		md_map(hash, key, len + PC_BYTES);
 
 		*b =hash[0] & 0x01;
 
 		/* m = H(b, msg). */
 		key[len] = *b;
 		md_map(hash, key, len + 1);
-		bn_read_bin(m, hash, MD_LEN, BN_POS);
+		bn_read_bin(m, hash, MD_LEN);
 
 		/* m = 1/(m + d) mod n. */
 		bn_add(m, m, d);
@@ -148,7 +146,7 @@ int cp_bbs_ver(int b, g1_t s, unsigned char *msg, int len, g2_t q, gt_t z) {
 		h[len] = b;
 
 		md_map(hash, h, len + 1);
-		bn_read_bin(m, hash, MD_LEN, BN_POS);
+		bn_read_bin(m, hash, MD_LEN);
 		bn_mod(m, m, n);
 
 		g2_mul_gen(g, m);

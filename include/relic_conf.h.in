@@ -668,27 +668,27 @@
 #define MD_MAP   @MD_MAP@
 
 /** RSA without padding. */
-#define EMPTY    1
+#define BASIC    1
 /** RSA PKCS#1 v1.5 padding. */
 #define PKCS1    2
 /** RSA PKCS#1 v2.1 padding. */
 #define PKCS2    3
 /** Chosen RSA padding method. */
-#define CP_RSAPD   @CP_RSAPD@
+#define CP_RSAPD @CP_RSAPD@
 
 /** Slow RSA decryption/signature. */
 #define BASIC    1
 /** Fast RSA decryption/signature with CRT. */
 #define QUICK    2
 /** Chosen RSA method. */
-#define CP_RSA     @CP_RSA@
+#define CP_RSA   @CP_RSA@
 
 /** Standard ECDSA. */
 #define BASIC    1
 /** ECDSA with fast verification. */
 #define QUICK    2
 /** Chosen ECDSA method. */
-#define CP_ECDSA     @CP_ECDSA@
+#define CP_ECDSA @CP_ECDSA@
 
 /** Automatic memory allocation. */
 #define AUTO     1

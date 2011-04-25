@@ -1,8 +1,9 @@
 message(STATUS "Cryptographic protocols configuration (CP module):\n")
 
-message("   ** Options for the binary elliptic curve module (default = PKCS1):")
-message("      CP_RSAPD=EMPTY    RSA without any padding.")
-message("      CP_RSAPD=PKCS1    RSA with PKCS#1 v1.5 padding.\n")
+message("   ** Options for the cryptographic protocols module (default = PKCS1):")
+message("      CP_RSAPD=BASIC    RSA with basic padding.")
+message("      CP_RSAPD=PKCS1    RSA with PKCS#1 v1.5 padding.")
+message("      CP_RSAPD=PKCS2    RSA with PKCS#1 v2.1 padding.\n")
 
 message("   ** Available cryptographic protocols methods (default = QUICK;BASIC):")
 message("      CP_METHD=BASIC    Slow RSA decryption/signature.")

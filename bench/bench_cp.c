@@ -246,7 +246,7 @@ static void ecdsa(void) {
 	ec_free(p);
 }
 
-static void schnorr(void) {
+static void ecss(void) {
 	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
 	bn_t r, s, d;
 	ec_t p;
@@ -261,18 +261,18 @@ static void schnorr(void) {
 	bn_new(d);
 	ec_new(p);
 
-	BENCH_BEGIN("cp_schnorr_gen") {
-		BENCH_ADD(cp_schnorr_gen(d, p));
+	BENCH_BEGIN("cp_ecss_gen") {
+		BENCH_ADD(cp_ecss_gen(d, p));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("cp_schnorr_sign") {
-		BENCH_ADD(cp_schnorr_sign(r, s, msg, 5, d));
+	BENCH_BEGIN("cp_ecss_sign") {
+		BENCH_ADD(cp_ecss_sign(r, s, msg, 5, d));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("cp_schnorr_ver") {
-		BENCH_ADD(cp_schnorr_ver(r, s, msg, 5, p));
+	BENCH_BEGIN("cp_ecss_ver") {
+		BENCH_ADD(cp_ecss_ver(r, s, msg, 5, p));
 	}
 	BENCH_END;
 
@@ -406,7 +406,7 @@ int main(void) {
 	if (ec_param_set_any() == STS_OK) {
 		ecdh();
 		ecdsa();
-		schnorr();
+		ecss();
 	} else {
 		THROW(ERR_NO_CURVE);
 	}

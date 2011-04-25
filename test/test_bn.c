@@ -217,17 +217,16 @@ static int util(void) {
 
 		TEST_BEGIN("reading and writing a positive number are consistent") {
 			int len = BN_DIGS * sizeof(dig_t);
-			int sign;
 			bn_rand(a, BN_POS, BN_BITS);
 			bn_write_str(str, sizeof(str), a, 10);
 			bn_read_str(b, str, sizeof(str), 10);
 			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
-			bn_write_bin(bin, &len, &sign, a);
-			bn_read_bin(b, bin, len, sign);
+			bn_write_bin(bin, len, a);
+			bn_read_bin(b, bin, len);
 			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
 			len = BN_DIGS;
-			bn_write_raw(raw, &len, &sign, a);
-			bn_read_raw(b, raw, len, sign);
+			bn_write_raw(raw, len, a);
+			bn_read_raw(b, raw, len);
 			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
 		}
 		TEST_END;
@@ -249,18 +248,18 @@ static int util(void) {
 
 		TEST_BEGIN("reading and writing a negative number are consistent") {
 			int len = BN_DIGS * sizeof(dig_t);
-			int sign;
 			bn_rand(a, BN_NEG, BN_BITS);
 			bn_write_str(str, sizeof(str), a, 10);
 			bn_read_str(b, str, sizeof(str), 10);
 			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
-			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
-			bn_write_bin(bin, &len, &sign, a);
-			bn_read_bin(b, bin, len, sign);
+			bn_write_bin(bin, len, a);
+			bn_read_bin(b, bin, len);
+			bn_neg(b, b);
 			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
 			len = BN_DIGS;
-			bn_write_raw(raw, &len, &sign, a);
-			bn_read_raw(b, raw, len, sign);
+			bn_write_raw(raw, len, a);
+			bn_read_raw(b, raw, len);
+			bn_neg(b, b);
 			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
 		}
 		TEST_END;
