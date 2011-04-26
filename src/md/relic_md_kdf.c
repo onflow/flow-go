@@ -42,7 +42,7 @@
 /*============================================================================*/
 
 void md_kdf(unsigned char *key, int key_len, unsigned char *in, int in_len) {
-	int i, d;
+	uint32_t i, j, d;
 	unsigned char buffer[in_len + sizeof(int)];
 	unsigned char t[key_len + MD_LEN];
 
@@ -50,8 +50,9 @@ void md_kdf(unsigned char *key, int key_len, unsigned char *in, int in_len) {
 	d = CEIL(key_len, MD_LEN);
 	memcpy(buffer, in, in_len);
 	for (i = 0; i < d; i++) {
+		j = util_conv_big(i);
 		/* c = integer_to_string(c, 4). */
-		memcpy(buffer + in_len, &i, sizeof(int));
+		memcpy(buffer + in_len, &j, sizeof(uint32_t));
 		/* t = t || hash(z || c). */
 		md_map(t + i * MD_LEN, buffer, in_len + sizeof(int));
 	}
