@@ -35,6 +35,10 @@
 #include "relic_bn.h"
 #include "relic_fp.h"
 #include "relic_fb.h"
+#include "relic_ep.h"
+#include "relic_eb.h"
+#include "relic_ec.h"
+#include "relic_pc.h"
 #include "relic_core.h"
 #include "relic_bench.h"
 
@@ -114,12 +118,14 @@ void conf_print(void) {
 
 #ifdef WITH_EC
 	util_print("** Elliptic Curve Cryptography module options:\n");
-	util_print("   Arithmetic method: %s\n\n", EC_METHD);
+	util_print("   Arithmetic method: %s\n", EC_METHD);
+	util_print("   Security level: %d\n\n", ec_param_level());
 #endif
 
 #ifdef WITH_PC
 	util_print("** Pairing Based Cryptography module options:\n");
-	util_print("   Arithmetic method: %s\n\n", PC_METHD);
+	util_print("   Arithmetic method: %s\n", PC_METHD);
+	util_print("   Security level: %d\n\n", pc_param_level());
 #endif
 
 #endif

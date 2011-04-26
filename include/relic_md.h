@@ -181,4 +181,14 @@ void md_map_sh512(unsigned char *hash, unsigned char *msg, int len);
  */
 void md_kdf(unsigned char *key, int key_len, unsigned char *in, int in_len);
 
+/**
+ * Derives a mask from shared secret material.
+ *
+ * @param[out] key				- the resulting mask.
+ * @param[in] key_len			- the intended mask length in bytes.
+ * @param[in] in				- the shared secret.
+ * @param[in] in_len			- the length of the shared secret in bytes.
+ */
+void md_mgf(unsigned char *mask, int mask_len, unsigned char *in, int in_len);
+
 #endif /* !RELIC_MD_H */
