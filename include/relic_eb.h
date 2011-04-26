@@ -605,6 +605,11 @@ int eb_param_set_any_super(void);
 void eb_param_print(void);
 
 /**
+ * Returns the current security level.
+ */
+int eb_param_level(void);
+
+/**
  * Tests if a point on a binary elliptic curve is at the infinity.
  *
  * @param[in] p				- the point to test.

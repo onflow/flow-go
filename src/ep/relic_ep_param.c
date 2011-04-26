@@ -557,3 +557,28 @@ void ep_param_print() {
 			break;
 	}
 }
+
+int ep_param_level() {
+	switch (param_id) {
+		case SECG_P160:
+		case SECG_K160:
+		case BN_P158:
+			return 80;
+		case NIST_P192:
+		case SECG_K192:
+			return 96;
+		case NIST_P224:
+		case SECG_K224:
+			return 112;
+		case NIST_P256:
+		case SECG_K256:
+		case BN_P254:
+		case BN_P256:
+			return 128;
+		case NIST_P384:
+			return 192;
+		case NIST_P521:
+			return 128;
+	}
+	return 0;
+}

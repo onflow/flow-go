@@ -240,7 +240,11 @@ typedef CAT(GT_LOWER, t) gt_t;
 #if PC_CUR == PRIME
 #define pc_param_set_any()	ep_param_set_any_pairf()
 #elif PC_CUR == CHAR2
+#if PB_MAP == ETAT2 || PB_MAP == OETA2
+#define pc_param_set_any()	hb_param_set_any_super()
+#else
 #define pc_param_set_any()	eb_param_set_any_super()
+#endif
 #endif
 
 /**
@@ -263,6 +267,11 @@ typedef CAT(GT_LOWER, t) gt_t;
  * Prints the current configured binary elliptic curve.
  */
 #define pc_param_print()	CAT(G1_LOWER, param_print)()
+
+/**
+ * Returns the current security level.
+ */
+#define pc_param_level()	CAT(G1_LOWER, param_level)()
 
 /**
  * Tests if a G_1 element is the unity.

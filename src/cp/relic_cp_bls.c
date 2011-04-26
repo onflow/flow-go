@@ -48,7 +48,7 @@ void cp_bls_gen(bn_t d, g2_t q) {
 		g2_get_ord(n);
 
 		do {
-			bn_rand(d, BN_POS, bn_bits(n));
+			bn_rand(d, BN_POS, 2 * pc_param_level());
 			bn_mod(d, d, n);
 		} while (bn_is_zero(d));
 

@@ -677,3 +677,34 @@ void eb_param_print() {
 			break;
 	}
 }
+
+int eb_param_level() {
+	switch (param_id) {
+		case NIST_B163:
+		case NIST_K163:
+			return 80;
+		case NIST_B233:
+		case NIST_K233:
+		case SECG_K239:
+			return 112;
+		case EBACS_B251:
+		case HALVE_B257:
+		case NIST_B283:
+		case NIST_K283:
+			return 128;
+		case NIST_B409:
+		case NIST_K409:
+			return 192;
+		case NIST_B571:
+		case NIST_K571:
+			return 256;
+		case ETAT_P271:
+		case ETAT_T271:
+			return 64;
+		case ETAT_S353:
+			return 80;
+		case ETAT_S1223:
+			return 128;
+	}
+	return 0;
+}

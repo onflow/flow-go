@@ -568,6 +568,11 @@ int ep_param_set_any_pairf(void);
 void ep_param_print(void);
 
 /**
+ * Returns the current security level.
+ */
+int ep_param_level(void);
+
+/**
  * Initializes a previously allocated prime elliptic curve point.
  *
  * @param[out] a			- the point to initialize.

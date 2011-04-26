@@ -180,6 +180,11 @@ typedef CAT(EC_LOWER, t) ec_t;
 #define ec_param_print()	CAT(EC_LOWER, param_print)()
 
 /**
+ * Returns the current security level.
+ */
+#define ec_param_level()	CAT(EC_LOWER, param_level)()
+
+/**
  * Tests if a point on a elliptic curve is at the infinity.
  *
  * @param[in] P				- the point to test.

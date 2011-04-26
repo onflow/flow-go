@@ -249,3 +249,13 @@ void hb_param_print() {
 			break;
 	}
 }
+
+void hb_param_level() {
+	switch (param_id) {
+		case ETAT_S367:
+			return 128;
+		case ETAT_S439:
+			return 136;
+	}
+	return 0;
+}

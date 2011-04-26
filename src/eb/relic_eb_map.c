@@ -56,7 +56,7 @@ void eb_map(eb_t p, unsigned char *msg, int len) {
 		fb_new(t1);
 
 		md_map(digest, msg, len);
-		bn_read_bin(k, digest, MD_LEN, BN_POS);
+		bn_read_bin(k, digest, MD_LEN);
 		fb_set_dig(p->z, 1);
 
 		i = 0;
