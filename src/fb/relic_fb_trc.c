@@ -39,7 +39,7 @@
 /*============================================================================*/
 
 dig_t fb_trc_basic(fb_t a) {
-	dig_t r = 0;
+	int r = 0;
 	fb_t t, u;
 
 	fb_null(t);
@@ -56,7 +56,7 @@ dig_t fb_trc_basic(fb_t a) {
 			fb_add(u, u, t);
 		}
 
-		r = u[0];
+		r = u[0] & 1;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
