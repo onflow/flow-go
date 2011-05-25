@@ -114,8 +114,6 @@ static void ep_add_basic_imp(ep_t r, ep_t p, ep_t q) {
 
 #if EP_ADD == PROJC || !defined(STRIP)
 
-#if defined(EP_MIXED) || !defined(STRIP)
-
 /**
  * Adds a point represented in affine coordinates to a point represented in
  * projective coordinates.
@@ -232,8 +230,6 @@ static void ep_add_projc_mix(ep_t r, ep_t p, ep_t q) {
 		fp_free(t6);
 	}
 }
-
-#endif
 
 /**
  * Adds two points represented in projective coordinates on an ordinary prime
