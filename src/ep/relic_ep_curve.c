@@ -60,7 +60,7 @@ static ep_st curve_g;
  */
 static bn_st curve_r;
 
-#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
+#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
 /**
  * The parameters required by the GLV method.
  * @{
@@ -176,7 +176,7 @@ void ep_curve_init(void) {
 #endif
 	ep_set_infty(&curve_g);
 	bn_init(&curve_r, FP_DIGS);
-#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || !defined(STRIP))
+#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || !defined(STRIP))
 	for (int i = 0; i < 3; i++) {
 		bn_init(&curve_v1[i], FP_DIGS);
 		bn_init(&curve_v2[i], FP_DIGS);
@@ -212,7 +212,7 @@ dig_t *ep_curve_get_a() {
 	return curve_a;
 }
 
-#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
+#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
 
 dig_t *ep_curve_get_beta() {
 	return curve_beta;
@@ -298,7 +298,6 @@ void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, fp_t beta, bn_t l) {
 
 	fp_zero(curve_a);
 	fp_copy(curve_b, b);
-	fp_copy(curve_beta, beta);
 
 	detect_opt(&curve_opt_a, curve_a);
 	detect_opt(&curve_opt_b, curve_b);
@@ -307,7 +306,8 @@ void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, fp_t beta, bn_t l) {
 	ep_copy(&curve_g, g);
 	bn_copy(&curve_r, r);
 
-#if EP_MUL == LWNAF || EP_FIX == LWNAF || EP_FIX == COMBS || EP_SIM == INTER || !defined(STRIP)
+#if EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP)
+	fp_copy(curve_beta, beta);
 	bn_gcd_ext_mid(&curve_v1[1], &curve_v1[2], &curve_v2[1], &curve_v2[2], l, r);
 	/* l = v1[1] * v2[2] - v1[2] * v2[1], r = l / 2. */
 	bn_mul(&curve_v1[0], &curve_v1[1], &curve_v2[2]);
