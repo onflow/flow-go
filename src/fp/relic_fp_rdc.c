@@ -95,7 +95,7 @@ void fp_rdc_monty_basic(fp_t c, dv_t a) {
 		r = (dig_t)(*tmp * u0);
 		c0 = fp_muladd_low(tmp, fp_prime_get(), r);
 		/* We must use this because the size (FP_DIGS - i) is variable. */
-		c1 += bn_add1_low(tmp + FP_DIGS, tmp + FP_DIGS, c1, FP_DIGS - i);
+		c1 += bn_add1_low(tmp + FP_DIGS, tmp + FP_DIGS, c0, FP_DIGS - i);
 	}
 	fp_copy(c, a + FP_DIGS);
 

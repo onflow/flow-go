@@ -55,7 +55,7 @@
  */
 static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
 	int i, h, h1;
-	dv_t a1, b1, a0b0, a1b1;
+	dv_t a1, b1, a0b0, a1b1, t;
 	dig_t carry;
 
 	/* Compute half the digits of a or b. */
@@ -76,7 +76,8 @@ static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
 		dv_zero(a1, h1 + 1);
 		dv_zero(b1, h1 + 1);
 		dv_zero(a0b0, 2 * h);
-		dv_zero(a1b1, 2 * (h1 + 1));
+		dv_zero(a1b1, 2 * h1);
+		dv_zero(t, 2 * (h1 + 1));
 
 		/* a0b0 = a0 * b0 and a1b1 = a1 * b1 */
 		if (level <= 1) {
@@ -101,53 +102,51 @@ static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
 		for (i = 0; i < 2 * h; i++) {
 			c[i] = a0b0[i];
 		}
-		for (i = 0; i < 2 * h1; i++) {
+		for (i = 0; i < 2 * (h1 + 1); i++) {
 			c[2 * h + i] = a1b1[i];
 		}
 
-		/* c = c - (a0*b0 << h digits) */
-		carry = bn_subn_low(c + h, c + h, a0b0, 2 * h);
-		carry = bn_sub1_low(c + 3 * h, c + 3 * h, carry, 1);
-
-		/* c = c - (a1*b1 << h digits) */
-		carry = bn_subn_low(c + h, c + h, a1b1, 2 * h1);
-		carry = bn_sub1_low(c + h + 2 * h1, c + h + 2 * h1, carry, 1);
-
 		/* a1 = (a1 + a0) */
 		carry = bn_addn_low(a1, a, a + h, h);
-		carry = bn_add1_low(a1 + h, a1 + h, carry, 2);
+		bn_add1_low(a1 + h, a1 + h, carry, 2);
 		if (h1 > h) {
-			carry = bn_add1_low(a1 + h, a1 + h, *(a + 2 * h), 2);
+			bn_add1_low(a1 + h, a1 + h, *(a + 2 * h), 2);
 		}
 
 		/* b1 = (b1 + b0) */
 		carry = bn_addn_low(b1, b, b + h, h);
-		carry = bn_add1_low(b1 + h, b1 + h, carry, 2);
+		bn_add1_low(b1 + h, b1 + h, carry, 2);
 		if (h1 > h) {
-			carry = bn_add1_low(b1 + h, b1 + h, *(b + 2 * h), 2);
+			bn_add1_low(b1 + h, b1 + h, *(b + 2 * h), 2);
 		}
-
-		dv_zero(a1b1, 2 * (h1 + 1));
 
 		if (level <= 1) {
-			/* a1b1 = (a1 + a0)*(b1 + b0) */
+			/* t = (a1 + a0)*(b1 + b0) */
 #if FP_MUL == BASIC
 			for (i = 0; i < h1 + 1; i++) {
-				carry = bn_muladd_low(a1b1 + i, a1, *(b1 + i), h1 + 1);
-				*(a1b1 + i + h1 + 1) = carry;
+				carry = bn_muladd_low(t + i, a1, *(b1 + i), h1 + 1);
+				*(t + i + h1 + 1) = carry;
 			}
 #elif FP_MUL == COMBA || FP_MUL == INTEG
-			bn_muln_low(a1b1, a1, b1, h1 + 1);
+			bn_muln_low(t, a1, b1, h1 + 1);
 #endif
 		} else {
-			fp_mul_karat_imp(a1b1, a1, b1, h1 + 1, level - 1);
+			fp_mul_karat_imp(t, a1, b1, h1 + 1, level - 1);
 		}
 
-		/* c = c + [(a1 + a0)*(b1 + b0) << digits] */
-		carry = bn_addn_low(c + h, c + h, a1b1, 2 * (h1 + 1));
-		carry = bn_add1_low(c + h + 2 * (h1 + 1), c + h + 2 * (h1 + 1), carry,
-				1);
+		/* t = t - (a0*b0 << h digits) */
+		carry = bn_subn_low(t, t, a0b0, 2 * h);
+		bn_sub1_low(t + 2 * h, t + 2 * h, carry, 2 * (h1 + 1) - 2 * h);
 
+		/* t = t - (a1*b1 << h digits) */
+		carry = bn_subn_low(t, t, a1b1, 2 * h1);
+		bn_sub1_low(t + 2 * h1, t + 2 * h1, carry, 2 * (h1 + 1) - 2 * h1);
+
+		/* c = c + [(a1 + a0)*(b1 + b0) << digits] */
+		c += h;
+		carry = bn_addn_low(c, c, t, 2 * (h1 + 1));
+		c += 2 * (h1 + 1);
+		bn_add1_low(c, c, carry, 2 * size - h - 2 * (h1 + 1));
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -157,6 +156,7 @@ static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
 		dv_free(b1);
 		dv_free(a0b0);
 		dv_free(a1b1);
+		dv_free(t);
 	}
 }
 
