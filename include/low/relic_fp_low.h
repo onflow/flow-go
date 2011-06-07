@@ -32,14 +32,24 @@
 #ifndef RELIC_FP_LOW_H
 #define RELIC_FP_LOW_H
 
+/*============================================================================*/
+/* Constant definitions                                                       */
+/*============================================================================*/
+
 #ifdef ASM
+
 #include "relic_conf.h"
+
 #if (FP_PRIME % WORD) > 0
 #define FP_DIGS	(FP_PRIME/WORD + 1)
 #else
 #define FP_DIGS	(FP_PRIME/WORD)
 #endif
 #else
+
+/*============================================================================*/
+/* Function prototypes                                                        */
+/*============================================================================*/
 
 /**
  * Adds a digit vector and a digit. Computes c = a + digit.
@@ -313,7 +323,7 @@ void fp_sqrm_low(dig_t *c, dig_t *a);
 void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m);
 
 /**
- * Reduces a digit vector modulo m. Computes c = a * u mod m.
+ * Reduces a digit vector modulo the configured prime p. Computes c = a mod p.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to reduce.

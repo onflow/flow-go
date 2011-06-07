@@ -35,9 +35,10 @@
 #ifndef RELIC_BN_LOW_H
 #define RELIC_BN_LOW_H
 
-/*
- * Provides useful constants for Assembly backends.
- */
+/*============================================================================*/
+/* Constant definitions                                                       */
+/*============================================================================*/
+
 #ifdef ASM
 
 #include "relic_conf.h"
@@ -51,6 +52,10 @@
 #else
 
 #include "relic_types.h"
+
+/*============================================================================*/
+/* Function prototypes                                                        */
+/*============================================================================*/
 
 /**
  * Adds a digit to a digit vector. Computes c = a + digit.
