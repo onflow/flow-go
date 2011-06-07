@@ -461,7 +461,7 @@ void bn_read_raw(bn_t a, dig_t *raw, int len) {
 }
 
 void bn_write_raw(dig_t *raw, int len, bn_t a) {
-	int size;
+	int i, size;
 
 	size = a->used;
 
@@ -469,7 +469,10 @@ void bn_write_raw(dig_t *raw, int len, bn_t a) {
 		THROW(ERR_INVALID);
 	}
 
-	for (int i = 0; i < size; i++) {
+	for (i = 0; i < size; i++) {
 		raw[i] = a->dp[i];
+	}
+	for (; i < len; i++) {
+		raw[i] = 0;
 	}
 }
