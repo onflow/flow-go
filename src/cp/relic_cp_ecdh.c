@@ -64,13 +64,24 @@ void cp_ecdh_gen(bn_t d, ec_t q) {
 
 void cp_ecdh_key(unsigned char *key, int key_len, bn_t d, ec_t q) {
 	ec_t p;
+	bn_t x;
+	unsigned char _x[EC_BYTES];
 
 	ec_null(p);
+	bn_null(x);
 
 	TRY {
 		ec_new(p);
+		bn_new(x);
+
 		ec_mul(p, q, d);
-		md_kdf(key, key_len, (unsigned char *)p->x, EC_BYTES);
+#if EC_CUR == PRIME
+		fp_prime_back(x, p->x);
+		bn_write_bin(_x, EC_BYTES, x);
+#else
+		fb_copy(_x, p->x);
+		md_kdf(key, key_len, _x, EC_BYTES);
+#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
