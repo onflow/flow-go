@@ -48,15 +48,9 @@ void fb_add1_low(dig_t *c, dig_t *a, dig_t digit) {
 }
 
 void fb_addn_low(dig_t *c, dig_t *a, dig_t *b) {
-	int i;
-
-	for (i = 0; i < FB_DIGS; i++, a++, b++, c++)
-		(*c) = (*a) ^ (*b);
+	mpn_xor_n(c, a, b, FB_DIGS);
 }
 
 void fb_addd_low(dig_t *c, dig_t *a, dig_t *b, int size) {
-	int i;
-
-	for (i = 0; i < size; i++, a++, b++, c++)
-		(*c) = (*a) ^ (*b);
+	mpn_xor_n(c, a, b, size);
 }

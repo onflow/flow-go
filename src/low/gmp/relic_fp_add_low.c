@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2011 RELIC Authors
+ * Copyright (C) 2007, 2008, 2009 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -59,7 +59,12 @@ void fp_addm_low(dig_t *c, dig_t *a, dig_t *b) {
 }
 
 void fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
-	if (mpn_add_n(c, a, b, 2 * FP_DIGS)) {
+	mpn_add_n(c, a, b, 2 * FP_DIGS);
+}
+
+void fp_addc_low(dig_t *c, dig_t *a, dig_t *b) {
+	mpn_add_n(c, a, b, 2 * FP_DIGS);
+	if (fp_cmpn_low(c + FP_DIGS, fp_prime_get()) != CMP_LT) {
 		mpn_sub_n(c + FP_DIGS, c + FP_DIGS, fp_prime_get(), FP_DIGS);
 	}
 }
@@ -73,33 +78,19 @@ dig_t fp_subn_low(dig_t *c, dig_t *a, dig_t *b) {
 }
 
 void fp_subm_low(dig_t *c, dig_t *a, dig_t *b) {
-	dig_t carry;
-
-	carry = mpn_sub_n(c, a, b, FP_DIGS);
-	if (carry) {
-		fp_addn_low(c, c, fp_prime_get());
-	}
-}
-
-void fp_subc_low(dig_t *c, dig_t *a, dig_t *b) {
-	int i;
-	dig_t carry, r0, diff;
-
-	/* Zero the carry. */
-	carry = 0;
-	for (i = 0; i < 2 * FP_DIGS; i++, a++, b++) {
-		diff = (*a) - (*b);
-		r0 = diff - carry;
-		carry = ((*a) < (*b)) || (carry && !diff);
-		c[i] = r0;
-	}
-	if (carry) {
-		fp_addn_low(c + FP_DIGS, c + FP_DIGS, fp_prime_get());
+	if (mpn_sub_n(c, a, b, FP_DIGS)) {
+		mpn_add_n(c, c, fp_prime_get(), FP_DIGS);
 	}
 }
 
 void fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
 	mpn_sub_n(c, a, b, 2 * FP_DIGS);
+}
+
+void fp_subc_low(dig_t *c, dig_t *a, dig_t *b) {
+	if (mpn_sub_n(c, a, b, 2 * FP_DIGS)) {
+		mpn_add_n(c + FP_DIGS, c + FP_DIGS, fp_prime_get(), FP_DIGS);
+	}
 }
 
 dig_t fp_dbln_low(dig_t *c, dig_t *a) {
@@ -114,15 +105,15 @@ void fp_dblm_low(dig_t *c, dig_t *a) {
 }
 
 void fp_hlvm_low(fp_t c, fp_t a) {
-	dig_t carry = 0;
+        dig_t carry = 0;
 
-	if (a[0] & 1) {
-		carry = mpn_add_n(c, a, fp_prime_get(), FP_DIGS);
-	} else {
-		fp_copy(c, a);
-	}
-	mpn_rshift(c, c, FP_DIGS, 1);
-	if (carry) {
-		c[FP_DIGS - 1] ^= ((dig_t)1 << (FP_DIGIT - 1));
-	}
+        if (a[0] & 1) {
+                carry = mpn_add_n(c, a, fp_prime_get(), FP_DIGS);
+        } else {
+                fp_copy(c, a);
+        }
+        mpn_rshift(c, c, FP_DIGS, 1);
+        if (carry) {
+                c[FP_DIGS - 1] ^= ((dig_t)1 << (FP_DIGIT - 1));
+        }
 }
