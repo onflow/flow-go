@@ -69,7 +69,7 @@ void conf_print(void) {
 	util_print("** Benchmarking options:\n");
 	util_print("   Number of times: %d\n", BENCH * BENCH);
 	util_print("   Estimated overhead: ");
-	//bench_overhead();
+	bench_overhead();
 	util_print("\n");
 #endif
 
@@ -118,14 +118,12 @@ void conf_print(void) {
 
 #ifdef WITH_EC
 	util_print("** Elliptic Curve Cryptography module options:\n");
-	util_print("   Arithmetic method: %s\n", EC_METHD);
-	util_print("   Security level: %d\n\n", ec_param_level());
+	util_print("   Arithmetic method: %s\n\n", EC_METHD);
 #endif
 
 #ifdef WITH_PC
 	util_print("** Pairing Based Cryptography module options:\n");
-	util_print("   Arithmetic method: %s\n", PC_METHD);
-	util_print("   Security level: %d\n\n", pc_param_level());
+	util_print("   Arithmetic method: %s\n\n", PC_METHD);
 #endif
 
 #endif
