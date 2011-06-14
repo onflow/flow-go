@@ -44,7 +44,7 @@ message("      FB_METHD=MONTY    Constant-time Montgomery powering ladder.\n")
 
 message("      FB_METHD=BASIC    Iterated squaring/square-root by consecutive squaring/square-root.")
 message("      FB_METHD=QUICK    Iterated squaring/square-root by table-based method.\n")
-message("      Note: these methods must be given in order. Ex: FB_METHD=\"INTEG;INTEG;QUICK;QUICK;QUICK;QUICK;ALMOS;MONTY;BASIC\"\n")
+message("      Note: these methods must be given in order. Ex: FB_METHD=\"INTEG;INTEG;QUICK;QUICK;QUICK;QUICK;ALMOS;BASIC;BASIC\"\n")
 
 # Choose the polynomial size.
 if (NOT FB_POLYN)
