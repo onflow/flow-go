@@ -75,7 +75,7 @@
 void ft_muln_low(dig_t *c, dig_t *a, dig_t *b) {
 	dv_t table[81];
 	dig_t r0, r1, r2, r4, r8, u, carry;
-	unsigned char k[FT_TRITS];
+	unsigned char k[FT_TRITS] = { 0 };
 	int i, l;
 
 	for (i = 0; i < 81; i++) {
