@@ -56,7 +56,7 @@ int fp_cmp_dig(fp_t a, dig_t b) {
 
 	return r;
 #else
-	for (int i = 0; i < FP_DIGS; i++) {
+	for (int i = 1; i < FP_DIGS; i++) {
 		if (a[i] > 0) {
 			return CMP_GT;
 		}

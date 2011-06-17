@@ -370,6 +370,8 @@ int fp_param_set_any_tower() {
 	fp_param_set(BN_158);
 #elif FP_PRIME == 254
 	fp_param_set(BN_254);
+#elif FP_PRIME == 256
+	fp_param_set(BN_256);
 #else
 	do {
 		fp_param_set_any_dense();

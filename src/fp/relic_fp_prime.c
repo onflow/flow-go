@@ -177,14 +177,15 @@ void fp_prime_set(bn_t p) {
 
 		switch (prime_mod8) {
 			case 3:
+			case 7:
 				prime_qnr = -1;
 				break;
 			case 5:
-			case 7:
 				prime_qnr = -2;
 				break;
 			default:
 				prime_qnr = 0;
+				THROW(ERR_INVALID);
 				break;
 		}
 	#ifdef FP_QNRES
