@@ -80,8 +80,8 @@ void cp_ecdh_key(unsigned char *key, int key_len, bn_t d, ec_t q) {
 		bn_write_bin(_x, EC_BYTES, x);
 #else
 		fb_copy(_x, p->x);
-		md_kdf(key, key_len, _x, EC_BYTES);
 #endif
+		md_kdf(key, key_len, _x, EC_BYTES);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
