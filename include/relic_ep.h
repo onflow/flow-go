@@ -488,14 +488,6 @@ ep_t *ep_curve_get_tab(void);
 void ep_curve_get_ord(bn_t n);
 
 /**
- * Returns the parameter identifier of the currently configured prime elliptic
- * curve.
- *
- * @return the parameter identifier.
- */
-int ep_param_get(void);
-
-/**
  * Configures a new ordinary prime elliptic curve by its coefficients.
  *
  * @param[in] a			- the coefficient a of the curve.
@@ -561,6 +553,14 @@ int ep_param_set_any_kbltz(void);
  * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
  */
 int ep_param_set_any_pairf(void);
+
+/**
+ * Returns the parameter identifier of the currently configured prime elliptic
+ * curve.
+ *
+ * @return the parameter identifier.
+ */
+int ep_param_get(void);
 
 /**
  * Prints the current configured prime elliptic curve.
