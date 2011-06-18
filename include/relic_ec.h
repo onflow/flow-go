@@ -179,6 +179,11 @@ typedef CAT(EC_LOWER, t) ec_t;
  */
 #define ec_param_print()	CAT(EC_LOWER, param_print)()
 
+ /**
+  * Returns the current configured elliptic curve.
+  */
+#define ec_param_get()		CAT(EC_LOWER, param_get)()
+
 /**
  * Returns the current security level.
  */
