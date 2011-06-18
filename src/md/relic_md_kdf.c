@@ -43,18 +43,18 @@
 
 void md_kdf(unsigned char *key, int key_len, unsigned char *in, int in_len) {
 	uint32_t i, j, d;
-	unsigned char buffer[in_len + sizeof(int)];
+	unsigned char buffer[in_len + sizeof(uint32_t)];
 	unsigned char t[key_len + MD_LEN];
 
 	/* d = ceil(kLen/hLen). */
 	d = CEIL(key_len, MD_LEN);
 	memcpy(buffer, in, in_len);
-	for (i = 0; i < d; i++) {
+	for (i = 1; i <= d; i++) {
 		j = util_conv_big(i);
 		/* c = integer_to_string(c, 4). */
 		memcpy(buffer + in_len, &j, sizeof(uint32_t));
 		/* t = t || hash(z || c). */
-		md_map(t + i * MD_LEN, buffer, in_len + sizeof(int));
+		md_map(t + (i - 1) * MD_LEN, buffer, in_len + sizeof(int));
 	}
 	memcpy(key, t, key_len);
 }
