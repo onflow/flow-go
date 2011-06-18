@@ -65,6 +65,7 @@ void cp_ecdh_gen(bn_t d, ec_t q) {
 void cp_ecdh_key(unsigned char *key, int key_len, bn_t d, ec_t q) {
 	ec_t p;
 	bn_t x;
+	int l;
 	unsigned char _x[EC_BYTES];
 
 	ec_null(p);
@@ -77,11 +78,12 @@ void cp_ecdh_key(unsigned char *key, int key_len, bn_t d, ec_t q) {
 		ec_mul(p, q, d);
 #if EC_CUR == PRIME
 		fp_prime_back(x, p->x);
-		bn_write_bin(_x, EC_BYTES, x);
+		bn_size_bin(&l, x);
+		bn_write_bin(_x, l, x);
 #else
 		fb_copy(_x, p->x);
 #endif
-		md_kdf(key, key_len, _x, EC_BYTES);
+		md_kdf(key, key_len, _x, l);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
