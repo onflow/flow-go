@@ -67,7 +67,7 @@
 /**
  * Size in bytes of a block sufficient to store a binary field element.
  */
-#define FP_BYTES 	(FP_DIGS * sizeof(dig_t))
+#define FP_BYTES 	((int)((FP_BITS)/8 + (FP_BITS % 8 > 0)))
 
 /*
  * Finite field identifiers.
@@ -100,6 +100,14 @@ enum {
 	/** 256-bit prime provided in Barreto et al. for use with BN curves. */
 	BN_256,
 };
+
+/**
+ * Constant used to indicate that there's some room left in the storage of
+ * prime field elements. This can be used to avoid carries.
+ */
+#if (FP_PRIME % WORD) == (WORD - 2)
+#define FP_SPACE
+#endif
 
 /*============================================================================*/
 /* Type definitions                                                           */

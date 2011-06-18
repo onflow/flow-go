@@ -68,7 +68,7 @@
 /**
  * Size in bytes of a block sufficient to store a binary field element.
  */
-#define FB_BYTES 	(FB_DIGS * sizeof(dig_t))
+#define FB_BYTES 	((int)((FB_BITS)/8 + (FB_BITS % 8 > 0)))
 
 /**
  * Finite field identifiers.
