@@ -30,10 +30,6 @@
  */
 
 #include <stdio.h>
-#include<string.h>
-#include<math.h>
-#include<stdlib.h>
-#include<stdint.h>
 
 #include "relic.h"
 #include "relic_test.h"
@@ -191,8 +187,41 @@ static int rabin(void) {
 
 #if defined(WITH_EC)
 
+#if defined(EP_ORDIN) && FP_PRIME == 160
+
+#define SECG_P160_A		"AA374FFC3CE144E6B073307972CB6D57B2A4E982"
+#define SECG_P160_B		"45FB58A92A17AD4B15101C66E74F277E2B460866"
+#define SECG_P160_A_X	"51B4496FECC406ED0E75A24A3C03206251419DC0"
+#define SECG_P160_A_Y	"C28DCB4B73A514B468D793894F381CCC1756AA6C"
+#define SECG_P160_B_X	"49B41E0E9C0369C2328739D90F63D56707C6E5BC"
+#define SECG_P160_B_Y	"26E008B567015ED96D232A03111C3EDC0E9C8F83"
+
+unsigned char key[] = {
+	0x74, 0x4A, 0xB7, 0x03, 0xF5, 0xBC, 0x08, 0x2E, 0x59, 0x18, 0x5F, 0x6D,
+	0x04, 0x9D, 0x2D, 0x36, 0x7D, 0xB2, 0x45, 0xC2
+};
+
+#endif
+
+#define ASSIGNP(CURVE)														\
+	PREPARE(str, CURVE##_A);												\
+	bn_read_str(d_a, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_A_X);												\
+	fp_read(q_a->x, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_A_Y);												\
+	fp_read(q_a->y, str, strlen(str), 16);									\
+	fp_set_dig(q_b->z, 1);													\
+	PREPARE(str, CURVE##_B);												\
+	bn_read_str(d_b, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_B_X);												\
+	fp_read(q_b->x, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_B_Y);												\
+	fp_read(q_b->y, str, strlen(str), 16);									\
+	fp_set_dig(q_b->z, 1);
+
 static int ecdh(void) {
 	int code = STS_ERR;
+	char *str = NULL;
 	bn_t d_a, d_b;
 	ec_t q_a, q_b;
 	unsigned char key1[MD_LEN], key2[MD_LEN];
@@ -215,7 +244,35 @@ static int ecdh(void) {
 			cp_ecdh_key(key2, MD_LEN, d_a, q_b);
 			TEST_ASSERT(memcmp(key1, key2, MD_LEN) == 0, end);
 		} TEST_END;
-	} CATCH_ANY {
+
+#if MD_MAP == SHONE
+		TEST_BEGIN("ecdh satisfies test vectors") {
+			switch (ec_param_get()) {
+#if defined(EP_ORDIN) && FP_PRIME == 160
+				case SECG_P160:
+					ASSIGNP(SECG_P160);
+					break;
+#else /* EC_CUR == CHAR2 */
+#endif
+				default:
+					cp_ecdh_gen(d_a, q_a);
+					cp_ecdh_gen(d_b, q_b);
+					cp_ecdh_key(key1, MD_LEN, d_b, q_a);
+					cp_ecdh_key(key2, MD_LEN, d_a, q_b);
+					TEST_ASSERT(memcmp(key1, key2, MD_LEN) == 0, end);
+					break;
+			}
+			TEST_ASSERT(ec_is_valid(q_a) == 1, end);
+			TEST_ASSERT(ec_is_valid(q_b) == 1, end);
+			cp_ecdh_key(key1, MD_LEN, d_b, q_a);
+			cp_ecdh_key(key2, MD_LEN, d_b, q_a);
+			TEST_ASSERT(memcmp(key1, key, MD_LEN) == 0, end);
+			TEST_ASSERT(memcmp(key2, key, MD_LEN) == 0, end);
+		}
+		TEST_END;
+#endif
+	}
+	CATCH_ANY {
 		ERROR(end);
 	}
 	code = STS_OK;
@@ -301,8 +358,8 @@ static int sokaka(void) {
 	sokaka_t s_i;
 	bn_t s;
 	unsigned char key1[MD_LEN], key2[MD_LEN];
-	char id_a[5] = {'A', 'l', 'i', 'c', 'e'};
-	char id_b[3] = {'B', 'o', 'b'};
+	char id_a[5] = { 'A', 'l', 'i', 'c', 'e' };
+	char id_b[3] = { 'B', 'o', 'b' };
 
 	sokaka_null(s_i);
 
@@ -347,8 +404,6 @@ static int bls(void) {
 		bn_new(d);
 		g1_new(s);
 		g2_new(q);
-		bn_t n;
-		ep_curve_get_ord(n);
 
 		TEST_BEGIN("boneh-lynn-schacham short signature is correct") {
 			cp_bls_gen(d, q);
@@ -386,8 +441,6 @@ static int bbs(void) {
 		g1_new(s);
 		g2_new(q);
 		gt_new(z);
-		bn_t n;
-		ep_curve_get_ord(n);
 
 		TEST_BEGIN("boneh-boyen short signature is correct") {
 			cp_bbs_gen(d, q, z);
