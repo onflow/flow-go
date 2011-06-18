@@ -65,6 +65,7 @@ static int util(void) {
 	int bits, code = STS_ERR;
 	char str[1000];
 	fp_t a, b, c;
+	dig_t d;
 
 	fp_null(a);
 	fp_null(b);
@@ -145,6 +146,13 @@ static int util(void) {
 		TEST_BEGIN("assignment to zero and zero test are consistent") {
 			fp_zero(a);
 			TEST_ASSERT(fp_is_zero(a), end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to a constant and comparison are consistent") {
+			rand_bytes((unsigned char *)&d, sizeof(dig_t));
+			fp_set_dig(a, d);
+			TEST_ASSERT(fp_cmp_dig(a, d) == CMP_EQ, end);
 		}
 		TEST_END;
 

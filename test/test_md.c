@@ -62,7 +62,7 @@ char *tests[3] = {
 	TEST3a TEST3b,
 };
 
-long int count[3] = { 1, 1, 10000};
+long int count[3] = { 1, 1, 10000 };
 
 unsigned char result1[3][20] = {
 	{0xA9, 0x99, 0x3E, 0x36, 0x47, 0x06, 0x81, 0x6A, 0xBA, 0x3E,
@@ -172,7 +172,7 @@ char *tests2[3] = {
 	TEST3a TEST3b
 };
 
-long int count2[3] = { 1, 1, 10000};
+long int count2[3] = { 1, 1, 10000 };
 
 unsigned char result384[4][48] = {
 	{0xCB, 0x00, 0x75, 0x3F, 0x45, 0xA3, 0x5E, 0x8B, 0xB5, 0xA0, 0x3D, 0x69,
