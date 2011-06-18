@@ -145,6 +145,20 @@
 /** @} */
 
 /**
+ * Prepares a set of elliptic curve parameters.
+ *
+ * @param[out] STR		- the resulting prepared parameter.
+ * @param[in] ID		- the parameter represented as a string.
+ */
+#if ARCH == AVR
+#define PREPARE(STR, ID)													\
+	util_copy_rom(STR, PSTR(ID));
+#else
+#define PREPARE(STR, ID)													\
+	STR = ID;
+#endif
+
+/**
  * Selects a real or dummy printing function depending on library flags.
  */
 #ifndef QUIET
