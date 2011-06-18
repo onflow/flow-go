@@ -172,7 +172,8 @@ void md_map_sh384(unsigned char *hash, unsigned char *msg, int len);
 void md_map_sh512(unsigned char *hash, unsigned char *msg, int len);
 
 /**
- * Derives a key from shared secret material.
+ * Derives a key from shared secret material through the standardized KDF2
+ * function.
  *
  * @param[out] key				- the resulting key.
  * @param[in] key_len			- the intended key length in bytes.
