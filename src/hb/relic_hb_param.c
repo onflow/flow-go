@@ -77,39 +77,6 @@
 /** @} */
 #endif
 
-#if ARCH == AVR
-
-#include <avr/pgmspace.h>
-
-/**
- * Copies a string from the text section to the destination vector.
- *
- * @param[out] dest		- the destination vector.
- * @param[in] src		- the pointer to the string stored on the text section.
- */
-static void copy_from_rom(char *dest, const char *src) {
-	char c;
-	while ((c = pgm_read_byte(src++)))
-		*dest++ = c;
-	*dest = 0;
-}
-
-#endif
-
-/**
- * Prepares a set of hyperelliptic curve parameters.
- *
- * @param[out] STR		- the resulting prepared parameter.
- * @param[in] ID		- the parameter represented as a string.
- */
-#if ARCH == AVR
-#define PREPARE(STR, ID)													\
-	copy_from_rom(STR, PSTR(ID));
-#else
-#define PREPARE(STR, ID)													\
-	str = ID;
-#endif
-
 /**
  * Assigns a set of supersingular hyperelliptic curve parameters.
  *
@@ -250,7 +217,7 @@ void hb_param_print() {
 	}
 }
 
-void hb_param_level() {
+int hb_param_level() {
 	switch (param_id) {
 		case ETAT_S367:
 			return 128;
