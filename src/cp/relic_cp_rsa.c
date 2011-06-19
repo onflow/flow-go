@@ -325,13 +325,13 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 			case RSA_FIN_ENC:
 				/* EB = 00 | maskedSeed | maskedDB. */
 				rand_bytes(h1, MD_LEN);
-				md_mgf(mask, k_len - MD_LEN - 1, h1, MD_LEN);
+				md_mgf1(mask, k_len - MD_LEN - 1, h1, MD_LEN);
 				bn_read_bin(t, mask, k_len - MD_LEN - 1);
 				for (int i = 0; i < t->used; i++) {
 					m->dp[i] ^= t->dp[i];
 				}
 				bn_write_bin(mask, k_len - MD_LEN - 1, m);
-				md_mgf(h2, MD_LEN, mask, k_len - MD_LEN - 1);
+				md_mgf1(h2, MD_LEN, mask, k_len - MD_LEN - 1);
 				for (int i = 0; i < MD_LEN; i++) {
 					h1[i] ^= h2[i];
 				}
@@ -351,11 +351,11 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 				bn_write_bin(h1, MD_LEN, t);
 				bn_mod_2b(m, m, 8 * m_len);
 				bn_write_bin(mask, m_len, m);
-				md_mgf(h2, MD_LEN, mask, m_len);
+				md_mgf1(h2, MD_LEN, mask, m_len);
 				for (int i = 0; i < MD_LEN; i++) {
 					h1[i] ^= h2[i];
 				}
-				md_mgf(mask, k_len - MD_LEN - 1, h1, MD_LEN);
+				md_mgf1(mask, k_len - MD_LEN - 1, h1, MD_LEN);
 				bn_read_bin(t, mask, k_len - MD_LEN - 1);
 				for (int i = 0; i < t->used; i++) {
 					m->dp[i] ^= t->dp[i];
@@ -392,7 +392,7 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 				bn_write_bin(mask + 8, MD_LEN, m);
 				md_map(h1, mask, MD_LEN + 8);
 				bn_read_bin(m, h1, MD_LEN);
-				md_mgf(mask, k_len - MD_LEN - 1, h1, MD_LEN);
+				md_mgf1(mask, k_len - MD_LEN - 1, h1, MD_LEN);
 				bn_read_bin(t, mask, k_len - MD_LEN - 1);
 				t->dp[0] ^= 0x01;
 				/* m_len is now the size in bits of the modulus. */
@@ -419,7 +419,7 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 					bn_write_bin(h2, MD_LEN, t);
 					bn_rsh(m, m, 8 * MD_LEN);
 					bn_write_bin(h1, MD_LEN, t);
-					md_mgf(mask, k_len - MD_LEN - 1, h1, MD_LEN);
+					md_mgf1(mask, k_len - MD_LEN - 1, h1, MD_LEN);
 					bn_read_bin(t, mask, k_len - MD_LEN - 1);
 					for (int i = 0; i < t -> used; i++) {
 						m->dp[i] ^= t->dp[i];
