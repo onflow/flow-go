@@ -88,7 +88,7 @@ void cp_ecss_sign(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
 			} while (bn_is_zero(k));
 
 			ec_mul_gen(p, k);
-			bn_read_raw(x, p->x, EC_DIGS);
+			ec_get_x(x, p);
 			bn_mod(r, x, n);
 		} while (bn_is_zero(r));
 
@@ -141,8 +141,8 @@ int cp_ecss_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q) {
 		if (bn_sign(e) == BN_POS && bn_sign(s) == BN_POS && !bn_is_zero(s)) {
 			if (bn_cmp(e, n) == CMP_LT && bn_cmp(s, n) == CMP_LT) {
 				ec_mul_sim_gen(p, s, q, e);
+				ec_get_x(rv, p);
 
-				bn_read_raw(rv, p->x, EC_DIGS);
 				bn_mod(rv, rv, n);
 
 				memcpy(m, msg, len);
