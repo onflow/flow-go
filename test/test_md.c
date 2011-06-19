@@ -292,12 +292,18 @@ static int kdf(void) {
 		TEST_ASSERT(memcmp(key, key2, 32) == 0, end);
 	}
 	TEST_END;
-#endif
 
 	code = STS_OK;
 
   end:
 	return code;
+
+#else
+	(void) message;
+	(void) code;
+	(void) key;
+	return STS_OK;
+#endif
 }
 
 static int mgf(void) {
@@ -312,12 +318,18 @@ static int mgf(void) {
 		TEST_ASSERT(memcmp(key, key1, 32) == 0, end);
 	}
 	TEST_END;
-#endif
 
 	code = STS_OK;
 
   end:
 	return code;
+
+#else
+	(void) message;
+	(void) code;
+	(void) key;
+	return STS_OK;
+#endif
 }
 
 int main(void) {
