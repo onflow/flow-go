@@ -83,7 +83,7 @@ void cp_ecdh_key(unsigned char *key, int key_len, bn_t d, ec_t q) {
 #else
 		fb_copy(_x, p->x);
 #endif
-		md_kdf(key, key_len, _x, l);
+		md_kdf2(key, key_len, _x, l);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
