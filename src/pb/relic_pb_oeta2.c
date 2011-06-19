@@ -72,7 +72,7 @@ static void pb_map_exp(fb12_t r, fb12_t a) {
 		fb12_mul(r, r, v);
 
 		/* v = f^(m+1)/2. */
-		to = ((FB_BITS + 1) / 2) / 6;
+		to = ((FB_BITS - 1) / 2) / 6;
 		to = to * 6;
 		fb12_copy(v, r);
 		for (i = 0; i < 6; i++) {

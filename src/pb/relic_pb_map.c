@@ -121,7 +121,7 @@ void pb_map_init() {
 #endif
 
 #if PB_MAP == ETAT2 || PB_MAP == ETAT2
-	fb_itr_pre(pb_tab_exp, 6 * (((FB_BITS + 1) / 2) / 6));
+	fb_itr_pre(pb_tab_exp, 6 * (((FB_BITS - 1) / 2) / 6));
 #endif
 
 #if defined(PB_PARAL) && (PB_MAP == ETATS || PB_MAP == ETATN)
