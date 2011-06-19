@@ -41,6 +41,6 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void md_mgf(unsigned char *mask, int mask_len, unsigned char *in, int in_len) {
-	md_kdf(mask, mask_len, in, in_len);
+void md_mgf1(unsigned char *mask, int mask_len, unsigned char *in, int in_len) {
+	md_kdf1(mask, mask_len, in, in_len);
 }
