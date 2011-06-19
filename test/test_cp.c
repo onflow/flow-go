@@ -246,7 +246,7 @@ static int ecdh(void) {
 		} TEST_END;
 
 #if MD_MAP == SHONE
-		TEST_BEGIN("ecdh satisfies test vectors") {
+		TEST_ONCE("ecdh satisfies test vectors") {
 			switch (ec_param_get()) {
 #if defined(EP_ORDIN) && FP_PRIME == 160
 				case SECG_P160:
