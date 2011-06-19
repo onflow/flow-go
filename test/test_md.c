@@ -262,6 +262,64 @@ static int sha512(void) {
 	return code;
 }
 
+unsigned char key1[] = {
+	0xB0, 0xAD, 0x56, 0x5B, 0x14, 0xB4, 0x78, 0xCA, 0xD4, 0x76, 0x38, 0x56,
+	0xFF, 0x30, 0x16, 0xB1, 0xA9, 0x3D, 0x84, 0x0F, 0x87, 0x26, 0x1B, 0xED,
+	0xE7, 0xDD, 0xF0, 0xF9, 0x30, 0x5A, 0x6E, 0x44
+};
+
+unsigned char key2[] = {
+	0x87, 0x26, 0x1B, 0xED, 0xE7, 0xDD, 0xF0, 0xF9, 0x30, 0x5A, 0x6E, 0x44,
+	0xA7, 0x4E, 0x6A, 0x08, 0x46, 0xDE, 0xDE, 0x27, 0xF4, 0x82, 0x05, 0xC6,
+	0xB1, 0x41, 0x88, 0x87, 0x42, 0xB0, 0xCE, 0x2C
+};
+
+static int kdf(void) {
+	int code = STS_ERR;
+	unsigned char message[] =
+			{ 0XDE, 0XAD, 0xBE, 0xEF, 0xFE, 0xEB, 0xDA, 0xED };
+	unsigned char key[32];
+
+#if MD_MAP == SHONE
+	TEST_ONCE("kdf1 key derivation function is correct") {
+		md_kdf1(key, 32, message, sizeof(message));
+		TEST_ASSERT(memcmp(key, key1, 32) == 0, end);
+	}
+	TEST_END;
+
+	TEST_ONCE("kdf2 key derivation function is correct") {
+		md_kdf2(key, 32, message, sizeof(message));
+		TEST_ASSERT(memcmp(key, key2, 32) == 0, end);
+	}
+	TEST_END;
+#endif
+
+	code = STS_OK;
+
+  end:
+	return code;
+}
+
+static int mgf(void) {
+	int code = STS_ERR;
+	unsigned char message[] =
+			{ 0XDE, 0XAD, 0xBE, 0xEF, 0xFE, 0xEB, 0xDA, 0xED };
+	unsigned char key[32];
+
+#if MD_MAP == SHONE
+	TEST_ONCE("mgf1 mask generation function is correct") {
+		md_mgf1(key, 32, message, sizeof(message));
+		TEST_ASSERT(memcmp(key, key1, 32) == 0, end);
+	}
+	TEST_END;
+#endif
+
+	code = STS_OK;
+
+  end:
+	return code;
+}
+
 int main(void) {
 	core_init();
 
@@ -271,21 +329,36 @@ int main(void) {
 		core_clean();
 		return 1;
 	}
+
 	if (sha224() != STS_OK) {
 		core_clean();
 		return 1;
 	}
+
 	if (sha256() != STS_OK) {
 		core_clean();
 		return 1;
 	}
+
 	if (sha384() != STS_OK) {
 		core_clean();
 		return 1;
 	}
+
 	if (sha512() != STS_OK) {
 		core_clean();
 		return 1;
 	}
+
+	if (kdf() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (mgf() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
 	core_clean();
 }
