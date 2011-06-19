@@ -40,6 +40,14 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
+/**
+ * Computes the final exponentiation of the eta_t pairing over genus 2 curves.
+ *
+ * This function maps a random coset element to a fixed coset representative.
+ *
+ * @param[out] r					- the result.
+ * @param[in] a						- the random coset element.
+ */
 static void pb_map_exp(fb12_t r, fb12_t a) {
 	fb12_t v, w;
 	int i, to;
@@ -67,25 +75,15 @@ static void pb_map_exp(fb12_t r, fb12_t a) {
 		to = ((FB_BITS + 1) / 2) / 6;
 		to = to * 6;
 		fb12_copy(v, r);
-		for (i = 0; i < to; i++) {
+		for (i = 0; i < 6; i++) {
 			/* This is faster than calling fb12_sqr(alpha, alpha) (no field additions). */
-			fb_sqr(v[0][0], v[0][0]);
-			fb_sqr(v[0][1], v[0][1]);
-			fb_sqr(v[0][2], v[0][2]);
-			fb_sqr(v[0][3], v[0][3]);
-			fb_sqr(v[0][4], v[0][4]);
-			fb_sqr(v[0][5], v[0][5]);
-			fb_sqr(v[1][0], v[1][0]);
-			fb_sqr(v[1][1], v[1][1]);
-			fb_sqr(v[1][2], v[1][2]);
-			fb_sqr(v[1][3], v[1][3]);
-			fb_sqr(v[1][4], v[1][4]);
-			fb_sqr(v[1][5], v[1][5]);
+			fb_itr(v[0][i], v[0][i], to, pb_map_get_tab());
+			fb_itr(v[1][i], v[1][i], to, pb_map_get_tab());
 		}
 		if ((to / 6) % 2 == 1) {
 			fb6_add(v[0], v[0], v[1]);
 		}
-		for (; i < (FB_BITS + 1) / 2; i++) {
+		for (i = to; i < (FB_BITS + 1) / 2; i++) {
 			fb12_sqr(v, v);
 		}
 		fb12_frb(w, v);
@@ -108,7 +106,7 @@ static void pb_map_exp(fb12_t r, fb12_t a) {
 	}
 }
 
-void pb_map_res3(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
+static void pb_map_res3(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
 	fb_t s0[10];
 	fb_t s1[7], t0, t1, t2, t3, t4, t5, t6, t7, r[12];
 	fb_t u0, u1, u2, u3, u6, u7, u8, u9, u10, u11, u12, u13, u14;
@@ -266,7 +264,7 @@ void pb_map_res3(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
 	}
 }
 
-void pb_map_res2(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
+static void pb_map_res2(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
 	fb_t s0[10];
 	fb_t s1[7], t, t0, t1, t2, t3, t4, t5, t6, t7, r[12];
 
@@ -427,7 +425,7 @@ void pb_map_res2(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
 	}
 }
 
-void pb_map_res(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
+static void pb_map_res(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
 	fb_t s0[10];
 	fb_t s1[7], t, t0, t1, t2, t3, t4, t5, t6, t7, r[12];
 	fb_t u0, u1, u2, u3, u4, u5, u6, u7, u8, u9, u10, u11, u12, u13, u14;
@@ -715,7 +713,7 @@ void pb_map_res(fb12_t l, fb12_t f1, fb12_t f0, hb_t q) {
 	}
 }
 
-void pb_map_l2(fb12_t f1, fb12_t f0, fb_t f[], fb_t z[], hb_t q) {
+static void pb_map_l2(fb12_t f1, fb12_t f0, fb_t f[], fb_t z[], hb_t q) {
 	fb_t t0, t1, t2, t3, t4;
 	fb_t t7[4];
 
@@ -744,7 +742,7 @@ void pb_map_l2(fb12_t f1, fb12_t f0, fb_t f[], fb_t z[], hb_t q) {
 	fb_copy(f1[0][4], t7[1]);
 }
 
-void pb_map_l4(fb12_t f1, fb12_t f0, fb_t f[], fb_t tab[], hb_t q) {
+static void pb_map_l4(fb12_t f1, fb12_t f0, fb_t f[], fb_t tab[], hb_t q) {
 	fb_t t, t0, t1, t2, t3, t4, t5, t6, t7, t8;
 
 	fb_null(t);
@@ -934,7 +932,7 @@ void pb_map_l4(fb12_t f1, fb12_t f0, fb_t f[], fb_t tab[], hb_t q) {
 	}
 }
 
-void pb_map_l8(fb12_t f1, fb12_t f0, fb_t f[], fb_t tab[], hb_t q) {
+static void pb_map_l8(fb12_t f1, fb12_t f0, fb_t f[], fb_t tab[], hb_t q) {
 	fb_t t, t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10;
 
 	fb_null(t);
@@ -1080,7 +1078,7 @@ void pb_map_l8(fb12_t f1, fb12_t f0, fb_t f[], fb_t tab[], hb_t q) {
 	}
 }
 
-void pb_map_add(fb12_t f1, fb12_t f0, fb_t f[], fb_t z[], hb_t q) {
+static void pb_map_add(fb12_t f1, fb12_t f0, fb_t f[], fb_t z[], hb_t q) {
 	fb_t t, t0, t1, t2, t3, t4, t5;
 	fb_t t7[4];
 
@@ -1114,7 +1112,7 @@ void pb_map_add(fb12_t f1, fb12_t f0, fb_t f[], fb_t z[], hb_t q) {
 	fb_copy(f1[0][4], t7[1]);
 }
 
-void pb_map_oeta2_gxg(fb12_t r, hb_t p, hb_t q) {
+static void pb_map_oeta2_gxg(fb12_t r, hb_t p, hb_t q) {
 	fb12_t l0, l1, f4, f8;
 	fb_t t, t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14,
 			t15;
@@ -1996,25 +1994,15 @@ void pb_map_oeta2_gxg(fb12_t r, hb_t p, hb_t q) {
 	int to = ((FB_BITS - 1) / 2) / 6;
 	to = to * 6;
 	fb12_copy(l1, r1);
-	for (i = 0; i < to; i++) {
+	for (i = 0; i < 6; i++) {
 		/* This is faster than calling fb12_sqr(alpha, alpha) (no field additions). */
-		fb_sqr(l1[0][0], l1[0][0]);
-		fb_sqr(l1[0][1], l1[0][1]);
-		fb_sqr(l1[0][2], l1[0][2]);
-		fb_sqr(l1[0][3], l1[0][3]);
-		fb_sqr(l1[0][4], l1[0][4]);
-		fb_sqr(l1[0][5], l1[0][5]);
-		fb_sqr(l1[1][0], l1[1][0]);
-		fb_sqr(l1[1][1], l1[1][1]);
-		fb_sqr(l1[1][2], l1[1][2]);
-		fb_sqr(l1[1][3], l1[1][3]);
-		fb_sqr(l1[1][4], l1[1][4]);
-		fb_sqr(l1[1][5], l1[1][5]);
+		fb_itr(l1[0][i], l1[0][i], to, pb_map_get_tab());
+		fb_itr(l1[1][i], l1[1][i], to, pb_map_get_tab());
 	}
 	if ((to / 6) % 2 == 1) {
 		fb6_add(l1[0], l1[0], l1[1]);
 	}
-	for (; i < (FB_BITS - 1) / 2; i++) {
+	for (i = to; i < (FB_BITS - 1) / 2; i++) {
 		fb12_sqr(l1, l1);
 	}
 
@@ -2616,25 +2604,15 @@ void pb_map_oeta2_dxd(fb12_t r, fb_t x1, fb_t y1, fb_t x2, fb_t y2) {
 	int to = ((FB_BITS - 1) / 2) / 6;
 	to = to * 6;
 	fb12_copy(l1, r1);
-	for (i = 0; i < to; i++) {
+	for (i = 0; i < 6; i++) {
 		/* This is faster than calling fb12_sqr(alpha, alpha) (no field additions). */
-		fb_sqr(l1[0][0], l1[0][0]);
-		fb_sqr(l1[0][1], l1[0][1]);
-		fb_sqr(l1[0][2], l1[0][2]);
-		fb_sqr(l1[0][3], l1[0][3]);
-		fb_sqr(l1[0][4], l1[0][4]);
-		fb_sqr(l1[0][5], l1[0][5]);
-		fb_sqr(l1[1][0], l1[1][0]);
-		fb_sqr(l1[1][1], l1[1][1]);
-		fb_sqr(l1[1][2], l1[1][2]);
-		fb_sqr(l1[1][3], l1[1][3]);
-		fb_sqr(l1[1][4], l1[1][4]);
-		fb_sqr(l1[1][5], l1[1][5]);
+		fb_itr(l1[0][i], l1[0][i], to, pb_map_get_tab());
+		fb_itr(l1[1][i], l1[1][i], to, pb_map_get_tab());
 	}
 	if ((to / 6) % 2 == 1) {
 		fb6_add(l1[0], l1[0], l1[1]);
 	}
-	for (; i < (FB_BITS - 1) / 2; i++) {
+	for (i = to; i < (FB_BITS - 1) / 2; i++) {
 		fb12_sqr(l1, l1);
 	}
 
@@ -2897,13 +2875,6 @@ void pb_map_add_gxd(fb12_t l, fb_t f[], fb_t tab[], fb_t xq, fb_t yq) {
 	fb_copy(l[1][0], fg);
 }
 
-#define U1 "37ECB65ABCC68E07C515EDDB7E6692BE8D44A5D2A9887CC3294C397EE0A6CCE9E12975AD4FDB038A680AB4360A9C"
-#define U0 "41258933CFF02DCB41D2E91399ADD46C472737C716805EC226F313EAFBF8FC54CC32CB62DD1A54860DFEBA567B2D"
-#define V1 "3F8DCCD4F5EF104B56F50113A7734BED292A24CEC8AA81BA9D04DEA938C31E24A27B142AC9C2BA2B36DBE9842905"
-#define V0 "71B725AB0D5F56DFC4FD72C8517731154705FF0563E85E7D13781AE410C5F61509ED6B1653CDE9E7EF807899ECF1"
-#define XQ "2C6309E531275402DD75F9B53B7F445FC17A829B88FEB411DDE4BF10C1962DEBD1A8D4F59778A6397B37DF8A743A"
-#define YQ "51FA323AE80CAE0EB114E1121EC344BEDB9FEE8EC799D214E717097F0400ACBA63F5915980C71A6245DECEDB64EA"
-
 void pb_map_oeta2_gxd(fb12_t r, hb_t p, fb_t x2, fb_t y2) {
 	fb12_t l0, l1;
 	fb_t t, t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14,
@@ -2920,14 +2891,8 @@ void pb_map_oeta2_gxd(fb12_t r, hb_t p, fb_t x2, fb_t y2) {
 	fb_copy(v1, p->v1);
 	fb_copy(v0, p->v0);
 
-	fb_read(u1, U1, strlen(U1), 16);
-	fb_read(u0, U0, strlen(U0), 16);
-	fb_read(v1, V1, strlen(V1), 16);
-	fb_read(v0, V0, strlen(V0), 16);
 	fb_copy(xq, x2);
 	fb_copy(yq, y2);
-	fb_read(xq, XQ, strlen(XQ), 16);
-	fb_read(yq, YQ, strlen(YQ), 16);
 	fb12_zero(l0);
 	fb12_zero(l1);
 	fb12_zero(r0);
@@ -3739,25 +3704,15 @@ void pb_map_oeta2_gxd(fb12_t r, hb_t p, fb_t x2, fb_t y2) {
 	int to = ((FB_BITS - 1) / 2) / 6;
 	to = to * 6;
 	fb12_copy(l1, r1);
-	for (i = 0; i < to; i++) {
+	for (i = 0; i < 6; i++) {
 		/* This is faster than calling fb12_sqr(alpha, alpha) (no field additions). */
-		fb_sqr(l1[0][0], l1[0][0]);
-		fb_sqr(l1[0][1], l1[0][1]);
-		fb_sqr(l1[0][2], l1[0][2]);
-		fb_sqr(l1[0][3], l1[0][3]);
-		fb_sqr(l1[0][4], l1[0][4]);
-		fb_sqr(l1[0][5], l1[0][5]);
-		fb_sqr(l1[1][0], l1[1][0]);
-		fb_sqr(l1[1][1], l1[1][1]);
-		fb_sqr(l1[1][2], l1[1][2]);
-		fb_sqr(l1[1][3], l1[1][3]);
-		fb_sqr(l1[1][4], l1[1][4]);
-		fb_sqr(l1[1][5], l1[1][5]);
+		fb_itr(l1[0][i], l1[0][i], to, pb_map_get_tab());
+		fb_itr(l1[1][i], l1[1][i], to, pb_map_get_tab());
 	}
 	if ((to / 6) % 2 == 1) {
 		fb6_add(l1[0], l1[0], l1[1]);
 	}
-	for (; i < (FB_BITS - 1) / 2; i++) {
+	for (i = to; i < (FB_BITS - 1) / 2; i++) {
 		fb12_sqr(l1, l1);
 	}
 

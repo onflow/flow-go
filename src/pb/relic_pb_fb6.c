@@ -361,10 +361,10 @@ void fb6_mul_dxss(fb6_t c, fb6_t a, fb6_t b) {
 }
 
 void fb6_mul_nor(fb6_t c, fb6_t a) {
-	fb_t t[12];
+	fb_t t[3];
 	int i;
 
-	for (i = 0; i < 12; i++) {
+	for (i = 0; i < 3; i++) {
 		fb_null(t[i]);
 	}
 
@@ -384,7 +384,7 @@ void fb6_mul_nor(fb6_t c, fb6_t a) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		for (i = 0; i < 12; i++) {
+		for (i = 0; i < 3; i++) {
 			fb_free(t[i]);
 		}
 	}
@@ -593,5 +593,31 @@ void fb6_inv(fb6_t c, fb6_t a) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+	}
+}
+
+void fb6_exp(fb6_t c, fb6_t a, bn_t b) {
+	fb6_t t;
+
+	fb6_null(t);
+
+	TRY {
+		fb6_new(t);
+
+		fb6_copy(t, a);
+
+		for (int i = bn_bits(b) - 2; i >= 0; i--) {
+			fb6_sqr(t, t);
+			if (bn_test_bit(b, i)) {
+				fb6_mul(t, t, a);
+			}
+		}
+		fb6_copy(c, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fb6_free(t);
 	}
 }

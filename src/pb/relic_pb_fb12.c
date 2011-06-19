@@ -113,6 +113,80 @@ void fb12_sqr(fb12_t c, fb12_t a) {
 	}
 }
 
+void fb12_frb(fb12_t c, fb12_t a) {
+	fb6_t t;
+
+	fb6_null(t);
+
+	TRY {
+		fb6_frb(c[0], a[0]);
+		fb6_frb(c[1], a[1]);
+		switch (FB_BITS % 12) {
+			case 1:
+				fb6_mul_nor(t, c[1]);
+				fb6_add(c[0], c[0], t);
+				break;
+			case 5:
+				fb_add(t[0], a[0][3], a[1][0]);
+				fb_add(t[0], t[0], a[1][2]);
+				fb_add(t[1], a[1][4], a[1][5]);
+				fb_add(t[2], a[1][1], a[1][3]);
+				fb_add(t[3], a[0][2], t[1]);
+				fb_add(t[4], a[0][5], t[0]);
+				fb_add(t[5], a[1][2], a[1][3]);
+				fb6_zero(c[0]);
+				fb_add(c[0][5], a[0][3], a[1][0]);
+				fb_add(c[0][5], c[0][5], a[1][2]);
+				fb_add(c[0][0], a[0][0], a[0][1]);
+				fb_add(c[0][0], c[0][0], a[0][3]);
+				fb_add(c[0][0], c[0][0], a[1][1]);
+				fb_add(c[0][0], c[0][0], a[1][4]);
+				fb_add(c[0][1], a[0][1], a[1][0]);
+				fb_add(c[0][1], c[0][1], t[3]);
+				fb_add(c[0][2], a[0][4], t[3]);
+				fb_add(c[0][2], c[0][2], t[4]);
+				fb_add(c[0][3], a[1][5], t[2]);
+				fb_add(c[0][3], c[0][3], t[4]);
+				fb_add(c[0][4], a[0][2], a[0][3]);
+				fb_add(c[0][4], c[0][4], t[2]);
+				break;
+			case 6:
+				fb6_add(c[0], c[0], c[1]);
+				break;
+			case 7:
+				fb6_add(c[0], c[0], c[1]);
+				fb6_mul_nor(t, c[1]);
+				fb6_add(c[0], c[0], t);
+				break;
+			case 11:
+				fb_add(t[0], a[0][3], a[1][0]);
+				fb_add(t[1], a[1][3], t[0]);
+				fb_add(t[2], a[1][1], a[1][2]);
+				fb_add(t[3], a[0][1], a[1][4]);
+				fb_add(t[4], a[0][2], t[2]);
+				fb_add(c[0][0], a[0][0], t[1]);
+				fb_add(c[0][0], c[0][0], t[3]);
+				fb_add(c[0][1], a[1][0], a[1][5]);
+				fb_add(c[0][1], c[0][1], t[3]);
+				fb_add(c[0][1], c[0][1], t[4]);
+				fb_add(c[0][2], a[0][2], a[0][4]);
+				fb_add(c[0][2], c[0][2], a[0][5]);
+				fb_add(c[0][2], c[0][2], t[1]);
+				fb_add(c[0][4], a[0][3], t[4]);
+				fb_add(c[0][3], a[0][5], t[2]);
+				fb_add(c[0][3], c[0][3], t[0]);
+				fb_add(c[0][5], a[1][2], t[1]);
+				break;
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fb6_free(t);
+	}
+}
+
 void fb12_inv(fb12_t c, fb12_t a) {
 	fb6_t t0, t1, t6;
 
@@ -142,25 +216,29 @@ void fb12_inv(fb12_t c, fb12_t a) {
 	}
 }
 
-void fb12_frb(fb12_t c, fb12_t a) {
-	fb6_t t;
+void fb12_exp(fb12_t c, fb12_t a, bn_t b) {
+	fb12_t t;
 
-	fb6_null(t);
+	fb12_null(t);
 
 	TRY {
-		fb6_frb(c[0], a[0]);
-		fb6_frb(c[1], a[1]);
-		if ((FB_BITS / 6) % 2 == 1) {
-			fb6_add(c[0], c[0], c[1]);
+		fb12_new(t);
+
+		fb12_copy(t, a);
+
+		for (int i = bn_bits(b) - 2; i >= 0; i--) {
+			fb12_sqr(t, t);
+			if (bn_test_bit(b, i)) {
+				fb12_mul(t, t, a);
+			}
 		}
-		fb6_mul_nor(t, c[1]);
-		fb6_add(c[0], c[0], t);
+		fb12_copy(c, t);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fb6_free(t);
+		fb12_free(t);
 	}
 }
 

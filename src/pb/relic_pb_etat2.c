@@ -117,51 +117,41 @@ static void pb_map_exp(fb12_t r, fb12_t a) {
 
 		/* Compute f = f^(2^(6m) - 1). */
 		fb12_inv(v, a);
-		fb12_copy(r, a);
-		for (i = 0; i < 6; i++) {
-			fb12_frb(r, r);
-		}
+		fb6_add(r[0], a[0], a[1]);
+		fb6_copy(r[1], a[1]);
 		fb12_mul(r, r, v);
 
-		/* v = f^4m. */
+		/* r = f^(2^2m + 1). */
 		fb12_copy(v, r);
-		for (i = 0; i < 4; i++) {
-			fb12_frb(v, v);
-		}
+		fb12_frb(v, v);
+		fb12_frb(v, v);
+		fb12_mul(r, r, v);
 
-		/* v = f^(4m)^(m+1)/2. */
+		/* v = f^(m+1)/2. */
 		to = ((FB_BITS + 1) / 2) / 6;
 		to = to * 6;
-		for (i = 0; i < to; i++) {
+		fb12_copy(v, r);
+		for (i = 0; i < 6; i++) {
 			/* This is faster than calling fb12_sqr(alpha, alpha) (no field additions). */
-			fb_sqr(v[0][0], v[0][0]);
-			fb_sqr(v[0][1], v[0][1]);
-			fb_sqr(v[0][2], v[0][2]);
-			fb_sqr(v[0][3], v[0][3]);
-			fb_sqr(v[0][4], v[0][4]);
-			fb_sqr(v[0][5], v[0][5]);
-			fb_sqr(v[1][0], v[1][0]);
-			fb_sqr(v[1][1], v[1][1]);
-			fb_sqr(v[1][2], v[1][2]);
-			fb_sqr(v[1][3], v[1][3]);
-			fb_sqr(v[1][4], v[1][4]);
-			fb_sqr(v[1][5], v[1][5]);
+			fb_itr(v[0][i], v[0][i], to, pb_map_get_tab());
+			fb_itr(v[1][i], v[1][i], to, pb_map_get_tab());
 		}
 		if ((to / 6) % 2 == 1) {
 			fb6_add(v[0], v[0], v[1]);
 		}
-		for (; i < (FB_BITS + 1) / 2; i++) {
+		for (i = to; i < (FB_BITS + 1) / 2; i++) {
 			fb12_sqr(v, v);
 		}
-		fb12_mul(w, v, r);
-		fb12_inv(w, w);
+		fb12_frb(w, v);
+		fb12_mul(w, w, v);
+		fb6_add(w[0], w[0], w[1]);
 
-		/* v = f^3m. */
-		fb12_copy(v, r);
-		for (i = 0; i < 3; i++) {
-			fb12_frb(v, v);
-		}
-		fb12_mul(r, v, w);
+		/* v = f^(2^2m + 2^m + 1). */
+		fb12_frb(v, r);
+		fb12_mul(r, r, v);
+		fb12_frb(v, v);
+		fb12_mul(r, r, v);
+		fb12_mul(r, r, w);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
