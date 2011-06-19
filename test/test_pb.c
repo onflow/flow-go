@@ -829,16 +829,6 @@ static int exponentiation4(void) {
 		fb4_new(c);
 		bn_new(d);
 
-		TEST_BEGIN("exponentiation to 2^m is correct") {
-			fb4_rand(a);
-			fb4_frb(b, a);
-			fb4_copy(c, a);
-			for (int j = 0; j < FB_BITS; j++) {
-				fb4_sqr(c, c);
-			}
-			TEST_ASSERT(fb4_cmp(b, c) == CMP_EQ, end);
-		} TEST_END;
-
 		TEST_BEGIN("frobenius and exponentiation are consistent") {
 			fb4_rand(a);
 			fb4_frb(b, a);
@@ -1146,6 +1136,17 @@ static int multiplication6(void) {
 			fb6_mul(e, a, d);
 			TEST_ASSERT(fb6_is_zero(e), end);
 		} TEST_END;
+
+		TEST_BEGIN("multiplication by quadratic non-residue is correct") {
+			fb6_rand(a);
+			fb6_mul_nor(c, a);
+			fb6_zero(b);
+			fb_set_dig(b[2], 1);
+			fb_set_dig(b[3], 1);
+			fb_set_dig(b[4], 1);
+			fb6_mul(d, a, b);
+			TEST_ASSERT(fb6_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -1229,25 +1230,25 @@ static int inversion6(void) {
 static int exponentiation6(void) {
 	int code = STS_ERR;
 	fb6_t a, b, c;
+	bn_t d;
 
 	fb6_null(a);
 	fb6_null(b);
 	fb6_null(c);
+	bn_null(d);
 
 	TRY {
 		fb6_new(a);
 		fb6_new(b);
 		fb6_new(c);
+		bn_new(d);
 
-		TEST_BEGIN("frobenius action is correct") {
+		TEST_BEGIN("frobenius and exponentiation are consistent") {
 			fb6_rand(a);
-			fb6_copy(b, a);
-			fb6_frb(b, b);
-			fb6_copy(c, a);
-			for (int j = 0; j < FB_BITS; j++) {
-				fb6_sqr(c, c);
-			}
-			TEST_ASSERT(fb6_cmp(b, c) == CMP_EQ, end);
+			fb6_frb(b, a);
+			bn_set_2b(d, FB_BITS);
+			fb6_exp(c, a, d);
+			TEST_ASSERT(fb6_cmp(c, b) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
@@ -1259,6 +1260,7 @@ static int exponentiation6(void) {
 	fb6_free(a);
 	fb6_free(b);
 	fb6_free(c);
+	bn_free(d);
 	return code;
 }
 
@@ -1613,7 +1615,7 @@ static int inversion12(void) {
 			fb12_rand(a);
 			fb12_inv(b, a);
 			fb12_mul(c, a, b);
-			//TEST_ASSERT(fb_cmp_dig(c[0][0], 1) == CMP_EQ, end);
+			TEST_ASSERT(fb_cmp_dig(c[0][0], 1) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
@@ -1631,24 +1633,25 @@ static int inversion12(void) {
 static int exponentiation12(void) {
 	int code = STS_ERR;
 	fb12_t a, b, c;
+	bn_t d;
 
 	fb12_null(a);
 	fb12_null(b);
 	fb12_null(c);
+	bn_null(d);
 
 	TRY {
 		fb12_new(a);
 		fb12_new(b);
 		fb12_new(c);
+		bn_new(d);
 
-		TEST_BEGIN("frobenius action is correct") {
+		TEST_BEGIN("frobenius and exponentiation are consistent") {
 			fb12_rand(a);
 			fb12_frb(b, a);
-			fb12_copy(c, a);
-			for (int j = 0; j < FB_BITS; j++) {
-				fb12_sqr(c, c);
-			}
-			//TEST_ASSERT(fb12_cmp(b, c) == CMP_EQ, end);
+			bn_set_2b(d, FB_BITS);
+			fb12_exp(c, a, d);
+			TEST_ASSERT(fb12_cmp(c, b) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
@@ -1660,6 +1663,7 @@ static int exponentiation12(void) {
 	fb12_free(a);
 	fb12_free(b);
 	fb12_free(c);
+	bn_free(d);
 	return code;
 }
 
@@ -1688,16 +1692,17 @@ static int pairing1(void) {
 
 		eb_curve_get_ord(n);
 
-		TEST_BEGIN("etat pairing is non-degenerate") {
+#if PB_MAP == ETATS || PB_MAP == ETATN
+		TEST_BEGIN("pairing is non-degenerate") {
 			eb_rand(p);
 			eb_rand(q);
-			pb_map_etat1(e1, p, q);
+			pb_map_gens1(e1, p, q);
 			fb4_zero(e2);
 			fb_set_dig(e2[0], 1);
 			TEST_ASSERT(fb4_cmp(e1, e2) != CMP_EQ, end);
 		} TEST_END;
 
-		TEST_BEGIN("etat pairing is bilinear") {
+		TEST_BEGIN("pairing is bilinear") {
 			eb_rand(p);
 			eb_rand(q);
 			bn_rand(k, BN_POS, bn_bits(n));
@@ -1705,18 +1710,19 @@ static int pairing1(void) {
 			eb_mul(r, q, k);
 			fb4_zero(e1);
 			fb4_zero(e2);
-			pb_map_etat1(e1, p, r);
+			pb_map_gens1(e1, p, r);
 			TEST_ASSERT(!bn_is_zero(n), end);
 			eb_mul(r, p, k);
-			pb_map_etat1(e2, r, q);
+			pb_map_gens1(e2, r, q);
 			TEST_ASSERT(fb4_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
+#endif
 
 #if PB_MAP == ETATS || !defined(STRIP)
 		TEST_BEGIN("etat pairing with square roots is correct") {
 			eb_rand(p);
 			eb_rand(q);
-			pb_map_etat1(e1, p, q);
+			pb_map_gens1(e1, p, q);
 			pb_map_etats(e2, p, q);
 			TEST_ASSERT(fb4_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
@@ -1726,7 +1732,7 @@ static int pairing1(void) {
 		TEST_BEGIN("etat pairing without square roots is correct") {
 			eb_rand(p);
 			eb_rand(q);
-			pb_map_etat1(e1, p, q);
+			pb_map_gens1(e1, p, q);
 			pb_map_etatn(e2, p, q);
 			TEST_ASSERT(fb4_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
@@ -1775,6 +1781,30 @@ static int pairing2(void) {
 
 		hb_curve_get_ord(n);
 
+#if PB_MAP == ETAT2 || PB_MAP == OETA2
+		TEST_BEGIN("pairing is non-degenerate") {
+			hb_rand(p);
+			hb_rand(q);
+			pb_map_gens2(e1, p, q);
+			fb12_zero(e2);
+			fb_set_dig(e2[0][0], 1);
+			TEST_ASSERT(fb12_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("pairing is bilinear") {
+			fb12_zero(e1);
+			fb12_zero(e2);
+			hb_rand(p);
+			hb_rand_non(q, 0);
+			hb_oct(r, q);
+			pb_map_gens2(e1, p, r);
+			hb_oct(r, p);
+			pb_map_gens2(e2, r, q);
+			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PB_MAP == ETAT2 || !defined(STRIP)
 		TEST_BEGIN("etat pairing with (deg x deg) divisors is non-degenerate") {
 			fb12_zero(e1);
 			hb_rand_deg(p);
@@ -1884,9 +1914,9 @@ static int pairing2(void) {
 			pb_map_etat2(e2, r, q);
 			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
+#endif
 
-		hb_curve_get_ord(n);
-
+#if PB_MAP == OETA2 || !defined(STRIP)
 		TEST_BEGIN("optimal eta pairing with (deg x deg) divisors is non-degenerate") {
 			fb12_zero(e1);
 			fb12_zero(e2);
@@ -1952,6 +1982,7 @@ static int pairing2(void) {
 			pb_map_oeta2(e2, r, q);
 			TEST_ASSERT(fb12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
