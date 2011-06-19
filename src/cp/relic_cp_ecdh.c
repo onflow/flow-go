@@ -76,13 +76,9 @@ void cp_ecdh_key(unsigned char *key, int key_len, bn_t d, ec_t q) {
 		bn_new(x);
 
 		ec_mul(p, q, d);
-#if EC_CUR == PRIME
-		fp_prime_back(x, p->x);
+		ec_get_x(x, p);
 		bn_size_bin(&l, x);
 		bn_write_bin(_x, l, x);
-#else
-		fb_copy(_x, p->x);
-#endif
 		md_kdf2(key, key_len, _x, l);
 	}
 	CATCH_ANY {

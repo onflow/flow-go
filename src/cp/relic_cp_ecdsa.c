@@ -88,7 +88,7 @@ void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 				} while (bn_is_zero(k));
 
 				ec_mul_gen(p, k);
-				bn_read_raw(x, p->x, EC_DIGS);
+				ec_get_x(x, p);
 				bn_mod(r, x, n);
 			} while (bn_is_zero(r));
 
@@ -159,8 +159,7 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
 				bn_mod(v, v, n);
 
 				ec_mul_sim_gen(p, e, q, v);
-
-				bn_read_raw(v, p->x, EC_DIGS);
+				ec_get_x(v, p);
 
 				bn_mod(v, v, n);
 

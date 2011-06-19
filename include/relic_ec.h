@@ -348,7 +348,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[in] M				- the byte array to map.
  * @param[in] L				- the array length in bytes.
  */
-#define ec_map(P, M, L)	CAT(EC_LOWER, map)(P, M, L)
+#define ec_map(P, M, L)		CAT(EC_LOWER, map)(P, M, L)
 
 /**
  * Compresses a point.
@@ -356,7 +356,7 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[out] R			- the result.
  * @param[in] P				- the point to compress.
  */
-#define ec_pck(R, P)	CAT(EC_LOWER, pck)(R, P)
+#define ec_pck(R, P)		CAT(EC_LOWER, pck)(R, P)
 
 /**
  * Decompresses a point.
@@ -364,6 +364,32 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[out] R			- the result.
  * @param[in] P				- the point to decompress.
  */
-#define ec_upk(R, P)	CAT(EC_LOWER, upk)(R, P)
+#define ec_upk(R, P)		CAT(EC_LOWER, upk)(R, P)
+
+/**
+ * Returns the x-coordinate of an elliptic curve point represented as a
+ * multiple precision integer.
+ *
+ * @param[out] X			- the x-coordinate.
+ * @param[in] P				- the point to read.
+ */
+#if EC_CUR == PRIME
+#define ec_get_x(X, P)		fp_prime_back(X, P->x)
+#else
+#define ec_get_x(X, P)		bn_read_raw(X, P->x, EC_DIGS)
+#endif
+
+/**
+* Returns the y-coordinate of an elliptic curve point represented as a
+* multiple precision integer.
+*
+* @param[out] Y				- the y-coordinate.
+* @param[in] P				- the point to read.
+*/
+#if EC_CUR == PRIME
+#define ec_get_y(Y, P)		fp_prime_back(Y, (P)->y)
+#else
+#define ec_get_y(Y, P)		bn_read_raw(Y, (P)->y, EC_DIGS)
+#endif
 
 #endif /* !RELIC_EC_H */
