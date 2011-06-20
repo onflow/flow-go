@@ -57,6 +57,25 @@ static char buffer[64 + 1];
 /* Public definitions                                                         */
 /*============================================================================*/
 
+#if ARCH == AVR
+
+#include <avr/pgmspace.h>
+
+/**
+ * Copies a string from the text section to the destination vector.
+ *
+ * @param[out] dest		- the destination vector.
+ * @param[in] src		- the pointer to the string stored on the text section.
+ */
+void util_copy_rom(char *dest, const char *src) {
+	char c;
+	while ((c = pgm_read_byte(src++)))
+		*dest++ = c;
+	*dest = 0;
+}
+
+#endif
+
 uint32_t util_conv_endian(uint32_t i) {
 	uint32_t i1, i2, i3, i4;
 	i1 = i & 0xFF;
@@ -77,9 +96,9 @@ uint32_t util_conv_big(uint32_t i) {
 
 uint32_t util_conv_little(uint32_t i) {
 #ifndef BIGED
-	return i;
-#else
 	return util_conv_endian(i);
+#else
+	return i;
 #endif
 }
 
