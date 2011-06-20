@@ -151,6 +151,9 @@
  * @param[in] ID		- the parameter represented as a string.
  */
 #if ARCH == AVR
+
+#include <avr/pgmspace.h>
+
 #define PREPARE(STR, ID)													\
 	util_copy_rom(STR, PSTR(ID));
 #else

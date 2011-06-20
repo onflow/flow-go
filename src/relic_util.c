@@ -59,8 +59,6 @@ static char buffer[64 + 1];
 
 #if ARCH == AVR
 
-#include <avr/pgmspace.h>
-
 /**
  * Copies a string from the text section to the destination vector.
  *
