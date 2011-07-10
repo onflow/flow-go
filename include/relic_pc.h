@@ -61,7 +61,7 @@
 #define GT_LOWER			fp12_
 #define PC_LOWER			pp_
 #elif PC_CUR == CHAR2
-#if PB_MAP == ETAT2
+#if PB_MAP == ETAT2 || PB_MAP == OETA2
 #define G1_LOWER			hb_
 #define G1_UPPER			HB
 #define G2_LOWER			hb_
