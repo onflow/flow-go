@@ -74,7 +74,7 @@ typedef fb_t fb6_t[6];
  * Represents a dodecic extension binary field element.
  *
  * This extension field is constructed with the basis {1, s0}, where
- * s0^2 = s0 + w^5 + w^3.
+ * s0^2 + s0 = w^5 + w^3.
  */
 typedef fb6_t fb12_t[2];
 
@@ -565,10 +565,24 @@ typedef fb6_t fb12_t[2];
  * @param[in] P				- the first elliptic curve point.
  * @param[in] Q				- the second elliptic curve point.
  */
-#if PB_MAP == ETATS
-#define pb_map_etat1(R, P, Q)		pb_map_etats(R, P, Q)
-#elif PB_MAP == ETATN
-#define pb_map_etat1(R, P, Q)		pb_map_etatn(R, P, Q)
+#define pb_map_gens1(R, P, Q)		pb_map_etats(R, P, Q)
+#if PB_MAP == ETATN
+#undef pb_map_gens1
+#define pb_map_gens1(R, P, Q)		pb_map_etatn(R, P, Q)
+#endif
+
+/**
+ * Computes the pairing of two binary hyperelliptic divisors. Computes
+ * R = e(P, Q).
+ *
+ * @param[out] R			- the result.
+ * @param[in] P				- the first divisor.
+ * @param[in] Q				- the second divisor.
+ */
+#if PB_MAP == ETAT2
+#define pb_map_gens2(R, P, Q)		pb_map_etat2(R, P, Q)
+#elif PB_MAP == OETA2
+#define pb_map_gens2(R, P, Q)		pb_map_oeta2(R, P, Q)
 #endif
 
 /**
@@ -579,11 +593,9 @@ typedef fb6_t fb12_t[2];
  * @param[in] Q				- the second elliptic curve point.
  */
 #if PB_MAP == ETATS || PB_MAP == ETATN
-#define pb_map(R, P, Q)				pb_map_etat1(R, P, Q)
-#elif PB_MAP == ETAT2
-#define pb_map(R, P, Q)				pb_map_etat2(R, P, Q)
-#elif PB_MAP == OETA2
-#define pb_map(R, P, Q)				pb_map_oeta2(R, P, Q)
+#define pb_map(R, P, Q)				pb_map_gens1(R, P, Q)
+#elif PB_MAP == ETAT2 || PB_MAP == OETA2
+#define pb_map(R, P, Q)				pb_map_gens2(R, P, Q)
 #endif
 
 /*============================================================================*/
@@ -732,6 +744,15 @@ void fb6_sqr(fb6_t c, fb6_t a);
  */
 void fb6_inv(fb6_t c, fb6_t a);
 
+/**
+ * Computes a power of a sextic extension field element. Computes c = a^b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the sextic extension element to exponentiate.
+ * @param[in] b				- the exponent.
+ */
+void fb6_exp(fb6_t c, fb6_t a, bn_t b);
+
 /*
  * Computes the Frobenius action of a sextic extension field element. Computes
  * c = a^(2^m).
@@ -774,11 +795,38 @@ void fb12_sqr(fb12_t c, fb12_t a);
  */
 void fb12_inv(fb12_t c, fb12_t a);
 
+/**
+ * Computes a power of a dodecic extension field element. Computes c = a^b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the dodecic extension element to exponentiate.
+ * @param[in] b				- the exponent.
+ */
+void fb12_exp(fb12_t c, fb12_t a, bn_t b);
+
 /*
  * Computes the q-th power Frobenius map of a dodecic extension field element.
  * Compute c = a^{2^m}.
  */
 void fb12_frb(fb12_t c, fb12_t a);
+
+/**
+ * Initializes the module for computing pairings over binary fields.
+ */
+void pb_map_init();
+
+/**
+ * Finalizes the module for computing pairings over binary fields.
+ */
+void pb_map_clean();
+
+/**
+ * Returns the table for computing the final exponentiation in the selected
+ * pairing.
+ *
+ * @return The precomputed table.
+ */
+fb_t *pb_map_get_tab();
 
 /**
  * Computes the etat pairing of two binary elliptic curve points without using
