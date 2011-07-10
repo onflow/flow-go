@@ -116,7 +116,6 @@ static void pb_compute_par() {
 void pb_map_init() {
 
 #if PB_MAP == ETATS || PB_MAP == ETATN
-	printf("%d\n", 4 * (((FB_BITS + 1) / 2) / 4));
 	fb_itr_pre(pb_tab_exp, 4 * (((FB_BITS + 1) / 2) / 4));
 #endif
 
