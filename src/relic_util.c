@@ -59,12 +59,6 @@ static char buffer[64 + 1];
 
 #if ARCH == AVR
 
-/**
- * Copies a string from the text section to the destination vector.
- *
- * @param[out] dest		- the destination vector.
- * @param[in] src		- the pointer to the string stored on the text section.
- */
 void util_copy_rom(char *dest, const char *src) {
 	char c;
 	while ((c = pgm_read_byte(src++)))

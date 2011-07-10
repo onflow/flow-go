@@ -187,6 +187,18 @@
 /* Function prototypes                                                        */
 /*============================================================================*/
 
+#if ARCH == AVR
+
+/**
+ * Copies a string from the text section to the destination vector.
+ *
+ * @param[out] dest		- the destination vector.
+ * @param[in] src		- the pointer to the string stored on the text section.
+ */
+void util_copy_rom(char *dest, const char *src);
+
+#endif
+
 /**
  * Toggle endianess of a digit.
  */
