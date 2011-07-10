@@ -612,10 +612,17 @@
 /** Bilinear pairing method. */
 #define PP_METHD "@PP_METHD@"
 
-/** Basic extension field arithmetic. */
+/** Basic quadratic extension field arithmetic. */
 #define BASIC    1
 /** Integrated extension field arithmetic. */
-#define LOWER    6
+#define INTEG    3
+/* Chosen extension field arithmetic method. */
+#define PP_QUD   @PP_QUD@ 
+
+/** Basic quadratic extension field arithmetic. */
+#define BASIC    1
+/** Integrated extension field arithmetic. */
+#define LAZYR    2
 /* Chosen extension field arithmetic method. */
 #define PP_EXT   @PP_EXT@ 
 

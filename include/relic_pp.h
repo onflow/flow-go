@@ -47,11 +47,16 @@
 /**
  * Represents a quadratic extension prime field element.
  *
- * This extension is constructed with the basis {1, u}, where u is an
- * adjoined square root in the prime field. If p = 3 mod 8, u^2 = -1; otherwise
- * u^2 = -2.
+ * This extension is constructed with the basis {1, B}, where B is an
+ * adjoined square root in the prime field. If p = 3 mod 8, u = i, i^2 = -1;
+ * otherwise u^2 = -2.
  */
 typedef fp_t fp2_t[2];
+
+/**
+ * Represents a double-precision quadratic extension field element.
+ */
+typedef dv_t dv2_t[2];
 
 /**
  * Represents a quadratic extension field element with automatic memory
@@ -60,7 +65,7 @@ typedef fp_t fp2_t[2];
 typedef fp_st fp2_st[2];
 
 /**
- * Represents a sextic extension field element.
+ * Represents a dodecic extension field element.
  *
  * This extension is constructed with the basis {1, v, v^2}, where v^3 = E is an
  * adjoined cube root in the underlying quadratic extension.  If p = 3 mod 8,
@@ -70,10 +75,15 @@ typedef fp_st fp2_st[2];
 typedef fp2_t fp6_t[3];
 
 /**
+ * Represents a double-precision dodecic extension field element.
+ */
+typedef dv2_t dv6_t[3];
+
+/**
  * Represents a dodecic extension field element.
  *
  * This extension is constructed with the basis {1, w}, where w^2 = v is an
- * adjoined square root in the underlying sextic extension.
+ * adjoined square root in the underlying dodecic extension.
  */
 typedef fp6_t fp12_t[2];
 
@@ -114,12 +124,29 @@ typedef ep2_st *ep2_t;
 		fp_null(A[0]); fp_null(A[1]);										\
 
 /**
+ * Initializes a double-precision quadratic extension field element with a null
+ * value.
+ *
+* @param[out] A			- the quadratic extension element to initialize.
+ */
+#define dv2_null(A)															\
+		dv_null(A[0]); dv_null(A[1]);										\
+
+/**
  * Allocate and initializes a quadratic extension field element.
  *
  * @param[out] A			- the new quadratic extension field element.
  */
 #define fp2_new(A)															\
 		fp_new(A[0]); fp_new(A[1]);											\
+
+/**
+ * Allocate and initializes a double-precision quadratic extension field element.
+ *
+ * @param[out] A			- the new quadratic extension field element.
+ */
+#define dv2_new(A)															\
+		dv_new(A[0]); dv_new(A[1]);											\
 
 /**
  * Calls a function to clean and free a quadratic extension field element.
@@ -130,16 +157,25 @@ typedef ep2_st *ep2_t;
 		fp_free(A[0]); fp_free(A[1]); 										\
 
 /**
+ * Calls a function to clean and free a double-precision quadratic extension
+ * field element.
+ *
+ * @param[out] A			- the quadratic extension field element to free.
+ */
+#define dv2_free(A)															\
+		dv_free(A[0]); dv_free(A[1]); 										\
+
+/**
  * Adds two quadratic extension field elements. Computes C = A + B.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the first quadratic extension field element.
  * @param[in] B				- the second quadratic extension field element.
  */
-#if PP_EXT == BASIC
+#if PP_QUD == BASIC
 #define fp2_add(C, A, B)	fp2_add_basic(C, A, B)
-#elif PP_EXT == LOWER
-#define fp2_add(C, A, B)	fp2_add_lower(C, A, B)
+#elif PP_QUD == INTEG
+#define fp2_add(C, A, B)	fp2_add_integ(C, A, B)
 #endif
 
 /**
@@ -150,10 +186,10 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the first quadratic extension field element.
  * @param[in] B				- the second quadratic extension field element.
  */
-#if PP_EXT == BASIC
+#if PP_QUD == BASIC
 #define fp2_sub(C, A, B)	fp2_sub_basic(C, A, B)
-#elif PP_EXT == LOWER
-#define fp2_sub(C, A, B)	fp2_sub_lower(C, A, B)
+#elif PP_QUD == INTEG
+#define fp2_sub(C, A, B)	fp2_sub_integ(C, A, B)
 #endif
 
 /**
@@ -162,10 +198,10 @@ typedef ep2_st *ep2_t;
  * @param[out] C			- the result.
  * @param[in] A				- the quadratic extension field element.
  */
-#if PP_EXT == BASIC
+#if PP_QUD == BASIC
 #define fp2_dbl(C, A)		fp2_dbl_basic(C, A)
-#elif PP_EXT == LOWER
-#define fp2_dbl(C, A)		fp2_dbl_lower(C, A)
+#elif PP_QUD == INTEG
+#define fp2_dbl(C, A)		fp2_dbl_integ(C, A)
 #endif
 
 /**
@@ -175,10 +211,10 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the first quadratic extension field element.
  * @param[in] B				- the second quadratic extension field element.
  */
-#if PP_EXT == BASIC
+#if PP_QUD == BASIC
 #define fp2_mul(C, A, B)	fp2_mul_basic(C, A, B)
-#elif PP_EXT == LOWER
-#define fp2_mul(C, A, B)	fp2_mul_lower(C, A, B)
+#elif PP_QUD == INTEG
+#define fp2_mul(C, A, B)	fp2_mul_integ(C, A, B)
 #endif
 
 /**
@@ -187,35 +223,85 @@ typedef ep2_st *ep2_t;
  * @param[out] C			- the result.
  * @param[in] A				- the quadratic extension field element to square.
  */
-#if PP_EXT == BASIC
+#if PP_QUD == BASIC
 #define fp2_sqr(C, A)		fp2_sqr_basic(C, A)
-#elif PP_EXT == LOWER
-#define fp2_sqr(C, A)		fp2_sqr_lower(C, A)
+#elif PP_QUD == INTEG
+#define fp2_sqr(C, A)		fp2_sqr_integ(C, A)
 #endif
 
 /**
- * Initializes a sextic extension field with a null value.
+ * Initializes a dodecic extension field with a null value.
  *
- * @param[out] A			- the sextic extension element to initialize.
+ * @param[out] A			- the dodecic extension element to initialize.
  */
 #define fp6_null(A)															\
 		fp2_null(A[0]); fp2_null(A[1]); fp2_null(A[2]);						\
 
 /**
- * Allocate and initializes a sextic extension field element.
+ * Initializes a double-precision dodecic extension field with a null value.
  *
- * @param[out] A			- the new sextic extension field element.
+ * @param[out] A			- the dodecic extension element to initialize.
+ */
+#define dv6_null(A)															\
+		dv2_null(A[0]); dv2_null(A[1]); dv2_null(A[2]);						\
+
+/**
+ * Allocate and initializes a dodecic extension field element.
+ *
+ * @param[out] A			- the new dodecic extension field element.
  */
 #define fp6_new(A)															\
 		fp2_new(A[0]); fp2_new(A[1]); fp2_new(A[2]);						\
 
 /**
- * Calls a function to clean and free a sextic extension field element.
+ * Calls a function to clean and free a dodecic extension field element.
  *
- * @param[out] A			- the sextic extension field element to free.
+ * @param[out] A			- the dodecic extension field element to free.
  */
 #define fp6_free(A)															\
-		fp2_free(A[0]); fp2_free(A[1]); fp2_new(A[2]); 						\
+		fp2_free(A[0]); fp2_free(A[1]); fp2_free(A[2]); 					\
+
+/**
+ * Allocate and initializes a double-precision dodecic extension field element.
+ *
+ * @param[out] A			- the new dodecic extension field element.
+ */
+#define dv6_new(A)															\
+		dv2_new(A[0]); dv2_new(A[1]); dv2_new(A[2]);						\
+
+/**
+ * Calls a function to clean and free a double-precision dodecic extension field
+ * element.
+ *
+ * @param[out] A			- the dodecic extension field element to free.
+ */
+#define dv6_free(A)															\
+		dv2_free(A[0]); dv2_free(A[1]); dv2_free(A[2]); 					\
+
+/**
+ * Multiplies two sextic extension field elements. Computes C = A * B.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the first dodecic extension field element.
+ * @param[in] B				- the second dodecic extension field element.
+ */
+#if PP_EXT == BASIC
+#define fp6_mul(C, A, B)	fp6_mul_basic(C, A, B)
+#elif PP_EXT == LAZYR
+#define fp6_mul(C, A, B)	fp6_mul_lazyr(C, A, B)
+#endif
+
+/**
+ * Squares a sextic extension field element. Computes C = A * A.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the dodecic extension field element to square.
+ */
+#if PP_EXT == BASIC
+#define fp6_sqr(C, A)		fp6_sqr_basic(C, A)
+#elif PP_EXT == LAZYR
+#define fp6_sqr(C, A)		fp6_sqr_lazyr(C, A)
+#endif
 
 /**
  * Initializes a dodecic extension field with a null value.
@@ -240,6 +326,45 @@ typedef ep2_st *ep2_t;
  */
 #define fp12_free(A)														\
 		fp6_free(A[0]); fp6_free(A[1]); 									\
+
+/**
+ * Multiplies two dodecic extension field elements. Computes C = A * B.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the first dodecic extension field element.
+ * @param[in] B				- the second dodecic extension field element.
+ */
+#if PP_EXT == BASIC
+#define fp12_mul(C, A, B)		fp12_mul_basic(C, A, B)
+#elif PP_EXT == LAZYR
+#define fp12_mul(C, A, B)		fp12_mul_lazyr(C, A, B)
+#endif
+
+/**
+ * Squares a dodecic extension field elements in the cyclotomic subgroup.
+ * Computes C = A * B.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the dodecic extension field element to square.
+ */
+#if PP_EXT == BASIC
+#define fp12_sqr_cyc(C, A)		fp12_sqr_cyc_basic(C, A)
+#elif PP_EXT == LAZYR
+#define fp12_sqr_cyc(C, A)		fp12_sqr_cyc_lazyr(C, A)
+#endif
+
+/**
+ * Squares a dodecic extension field elements in the cyclotomic subgroup in.
+ * compressed form. Computes C = A * B.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the dodecic extension field element to square.
+ */
+#if PP_EXT == BASIC
+#define fp12_sqr_pck(C, A)		fp12_sqr_pck_basic(C, A)
+#elif PP_EXT == LAZYR
+#define fp12_sqr_pck(C, A)		fp12_sqr_pck_lazyr(C, A)
+#endif
 
 /**
  * Initializes a point on a elliptic curve with a null value.
@@ -586,7 +711,7 @@ void fp2_add_basic(fp2_t c, fp2_t a, fp2_t b);
  * @param[in] a				- the first quadratic extension field element.
  * @param[in] b				- the second quadratic extension field element.
  */
-void fp2_add_lower(fp2_t c, fp2_t a, fp2_t b);
+void fp2_add_integ(fp2_t c, fp2_t a, fp2_t b);
 
 /**
  * Subtracts a quadratic extension field element from another using basic
@@ -606,7 +731,7 @@ void fp2_sub_basic(fp2_t c, fp2_t a, fp2_t b);
  * @param[in] A				- the first quadratic extension field element.
  * @param[in] B				- the second quadratic extension field element.
  */
-void fp2_sub_lower(fp2_t c, fp2_t a, fp2_t b);
+void fp2_sub_integ(fp2_t c, fp2_t a, fp2_t b);
 
 /**
  * Doubles a quadratic extension field element.
@@ -622,7 +747,7 @@ void fp2_dbl_basic(fp2_t c, fp2_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the quadratic extension field element to double.
  */
-void fp2_dbl_lower(fp2_t c, fp2_t a);
+void fp2_dbl_integ(fp2_t c, fp2_t a);
 
 /**
  * Multiples two quadratic extension field elements using basic arithmetic.
@@ -641,7 +766,7 @@ void fp2_mul_basic(fp2_t c, fp2_t a, fp2_t b);
  * @param[in] a				- the first quadratic extension field element.
  * @param[in] b				- the second quadratic extension field element.
  */
-void fp2_mul_lower(fp2_t c, fp2_t a, fp2_t b);
+void fp2_mul_integ(fp2_t c, fp2_t a, fp2_t b);
 
 /**
  * Multiplies a quadratic extension field element by the adjoined square root.
@@ -698,7 +823,7 @@ void fp2_sqr_basic(fp2_t c, fp2_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the quadratic extension field element to square.
  */
-void fp2_sqr_lower(fp2_t c, fp2_t a);
+void fp2_sqr_integ(fp2_t c, fp2_t a);
 
 /**
  * Inverts a quadratic extension field element. Computes c = a^(-1).
@@ -819,13 +944,32 @@ void fp6_sub(fp6_t c, fp6_t a, fp6_t b);
 void fp6_dbl(fp6_t c, fp6_t a);
 
 /**
- * Multiples two sextic extension field elements. Computes c = a * b.
+ * Multiples two sextic extension field elements without performing modular
+ * reduction.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the sextic extension field element.
  * @param[in] b				- the sextic extension field element.
  */
-void fp6_mul(fp6_t c, fp6_t a, fp6_t b);
+void fp6_mul_unr(dv6_t c, fp6_t a, fp6_t b);
+
+/**
+ * Multiples two sextic extension field elements.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the sextic extension field element.
+ * @param[in] b				- the sextic extension field element.
+ */
+void fp6_mul_basic(fp6_t c, fp6_t a, fp6_t b);
+
+/**
+ * Multiples two sextic extension field elements using lazy reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the sextic extension field element.
+ * @param[in] b				- the sextic extension field element.
+ */
+void fp6_mul_lazyr(fp6_t c, fp6_t a, fp6_t b);
 
 /**
  * Multiplies a sextic extension field element by the adjoined cube root.
@@ -857,12 +1001,20 @@ void fp6_mul_dxq(fp6_t c, fp6_t a, fp2_t b);
 void fp6_mul_dxs(fp6_t c, fp6_t a, fp6_t b);
 
 /**
- * Computes the square of a sextic extension field element. Computes c = a * a.
+ * Squares a sextic extension field element.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the sextic extension field element to square.
  */
-void fp6_sqr(fp6_t c, fp6_t a);
+void fp6_sqr_basic(fp6_t c, fp6_t a);
+
+/**
+ * Squares a sextic extension field element using lazy reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the sextic extension field element to square.
+ */
+void fp6_sqr_lazyr(fp6_t c, fp6_t a);
 
 /**
  * Inverts a sextic extension field element. Computes c = a^(-1).
@@ -993,13 +1145,32 @@ void fp12_add(fp12_t c, fp12_t a, fp12_t b);
 void fp12_sub(fp12_t c, fp12_t a, fp12_t b);
 
 /**
- * Multiples two dodecic extension field elements. Compute c = a * b.
+ * Multiples two dodecic extension field elements without performing modular
+ * reduction.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the first dodecic extension field element.
- * @param[in] b				- the second dodecic extension field element.
+ * @param[in] a				- the dodecic extension field element.
+ * @param[in] b				- the dodecic extension field element.
  */
-void fp12_mul(fp12_t c, fp12_t a, fp12_t b);
+void fp12_mul_unr(dv6_t c, fp12_t a, fp12_t b);
+
+/**
+ * Multiples two dodecic extension field elements.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the dodecic extension field element.
+ * @param[in] b				- the dodecic extension field element.
+ */
+void fp12_mul_basic(fp12_t c, fp12_t a, fp12_t b);
+
+/**
+ * Multiples two dodecic extension field elements using lazy reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the dodecic extension field element.
+ * @param[in] b				- the dodecic extension field element.
+ */
+void fp12_mul_lazyr(fp12_t c, fp12_t a, fp12_t b);
 
 /**
  * Multiples a dense dodecic extension field element by a sparse element.
@@ -1035,12 +1206,62 @@ void fp12_sqr_dbl(fp12_t c, fp12_t a);
 /**
  * Computes the square of a cyclotomic dodecic extension field element.
  *
- * A cyclotomic element is one previously raised to the (p^6 - 1)-th power.
+ * A cyclotomic element is one raised to the (p^6 - 1)(p^2 + 1)-th power.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the unitary dodecic extension element to square.
+ * @param[in] a				- the cyclotomic extension element to square.
  */
-void fp12_sqr_cyc(fp12_t c, fp12_t a);
+void fp12_sqr_cyc_basic(fp12_t c, fp12_t a);
+
+/**
+ * Computes the square of a cyclotomic dodecic extension field element using
+ * lazy reduction.
+ *
+ * A cyclotomic element is one raised to the (p^6 - 1)(p^2 + 1)-th power.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the cyclotomic extension element to square.
+ */
+void fp12_sqr_cyc_lazyr(fp12_t c, fp12_t a);
+
+/**
+ * Computes the square of a compressed cyclotomic extension field element.
+ *
+ * A cyclotomic element is one raised to the (p^6 - 1)(p^2 + 1)-th power.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the cyclotomic extension element to square.
+ */
+void fp12_sqr_pck_basic(fp12_t c, fp12_t a);
+
+/**
+ * Computes the square of a compressed cyclotomic extension field element using
+ * lazy reduction.
+ *
+ * A cyclotomic element is one raised to the (p^6 - 1)(p^2 + 1)-th power.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the cyclotomic extension element to square.
+ */
+void fp12_sqr_pck_lazyr(fp12_t c, fp12_t a);
+
+/**
+ * Converts a dodecic extension field element to a cyclotomic element.
+ * Computes c = a^(p^12 - 1)*(p^2 + 1).
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- a dodecic extension field element.
+ */
+void fp12_conv_cyc(fp12_t c, fp12_t a);
+
+/**
+ * Decompresses a compressed cyclotomic extension field element to its
+ * usual representation.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- a dodecic extension field element to decompress.
+ */
+void fp12_back_cyc(fp12_t c, fp12_t a);
 
 /**
  * Inverts a dodecic extension field element. Computes c = a^(-1).
@@ -1051,15 +1272,24 @@ void fp12_sqr_cyc(fp12_t c, fp12_t a);
 void fp12_inv(fp12_t c, fp12_t a);
 
 /**
- * Computes the inverse of a cyclotomic dodecic extension field element.
+ * Computes the inverse of a unitary dodecic extension field element.
  *
- * For cyclotomic elements, this is equivalent to computing the conjugate.
- * A cyclotomic element is one previously raised to the (p^6 - 1)-th power.
+ * For unitary elements, this is equivalent to computing the conjugate.
+ * A unitary element is one previously raised to the (p^6 - 1)-th power.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the dodecic extension field element to conjugate.
+ * @param[in] a				- the dodecic extension field element to invert.
  */
-void fp12_inv_cyc(fp12_t c, fp12_t a);
+void fp12_inv_uni(fp12_t c, fp12_t a);
+
+/**
+ * Converts a dodecic extension field element to a unitary element.
+ * Computes c = a^(p^12 - 1).
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- a dodecic extension field element.
+ */
+void fp12_conv_uni(fp12_t c, fp12_t a);
 
 /**
  * Computes the Frobenius endomorphism of a dodecic extension element.
@@ -1199,11 +1429,36 @@ void ep2_copy(ep2_t r, ep2_t p);
 int ep2_cmp(ep2_t p, ep2_t q);
 
 /**
- * Assigns a random value to a elliptic curve point.
+ * Assigns a random value to an elliptic curve point.
  *
  * @param[out] p			- the elliptic curve point to assign.
  */
 void ep2_rand(ep2_t p);
+
+/**
+ * Computes the right-hand side of the elliptic curve equation at a certain
+ * elliptic curve point.
+ *
+ * @param[out] rhs			- the result.
+ * @param[in] p				- the point.
+ */
+void ep2_rhs(fp2_t rhs, ep2_t p);
+
+/**
+ * Tests if a point is in the curve.
+ *
+ * @param[in] p				- the point to test.
+ */
+int ep2_is_valid(ep2_t p);
+
+/**
+ * Builds a precomputation table for multiplying a random prime elliptic point.
+ *
+ * @param[out] t			- the precomputation table.
+ * @param[in] p				- the point to multiply.
+ * @param[in] w				- the window width.
+ */
+void ep2_tab(ep2_t *t, ep2_t p, int w);
 
 /**
  * Prints a elliptic curve point.
