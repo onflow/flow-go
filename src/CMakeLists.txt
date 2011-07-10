@@ -82,9 +82,12 @@ endif(WITH_PP)
 
 # Pairings over binary fields are a special case.
 if (WITH_PB)
+	file(GLOB TEMP pb/relic_pb_map*.c)
+	list(APPEND PB_SRCS ${TEMP})
 	# Add all the extension code.
-	file(GLOB PB_SRCS pb/relic_pb_fb*.c)
-	# Add genus-1 or genus-2 pairins (or both).
+	file(GLOB TEMP pb/relic_pb_fb*.c)
+	list(APPEND PB_SRCS ${TEMP})
+	# Add genus-1 or genus-2 pairings (or both).
 	if (WITH_EB)
 		file(GLOB TEMP pb/relic_pb_*1.c)
 		list(APPEND PB_SRCS ${TEMP})
