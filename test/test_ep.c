@@ -938,12 +938,12 @@ int test(void) {
 }
 
 int main(void) {
-	int r0, r1;
+	int r0, r1, r2;
 	core_init();
 
 	util_print_banner("Tests for the EP module:", 0);
 
-	r0 = r1 = STS_ERR;
+	r0 = r1 = r2 = STS_ERR;
 
 #if defined(EP_ORDIN)
 	r0 = ep_param_set_any_ordin();
@@ -965,7 +965,15 @@ int main(void) {
 	}
 #endif
 
-	if (r0 == STS_ERR && r1 == STS_ERR) {
+	r2 = ep_param_set_any_pairf();
+	if (r2 == STS_OK) {
+		if (test() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+	}
+
+	if (r0 == STS_ERR && r1 == STS_ERR && r2 == STS_ERR) {
 		if (ep_param_set_any() == STS_ERR) {
 			THROW(ERR_NO_CURVE);
 			core_clean();
