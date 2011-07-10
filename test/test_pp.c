@@ -2007,7 +2007,6 @@ static int multiplication(void) {
 
 		TEST_BEGIN("generator has the right order") {
 			ep2_mul(r, p, n);
-			ep2_map(p, "diego", 5);
 			TEST_ASSERT(ep2_is_infty(r) == 1, end);
 		} TEST_END;
 
