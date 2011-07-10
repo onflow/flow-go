@@ -316,10 +316,9 @@ static int ecdh(void) {
 			TEST_ASSERT(memcmp(key2, key, MD_LEN) == 0, end);
 		}
 		TEST_END;
-#else /* MD_MAP != SHONE */
+#endif
 		(void)str;
 		(void)key;
-#endif
 	}
 	CATCH_ANY {
 		ERROR(end);
