@@ -120,3 +120,22 @@ void fp_hlvm_low(fp_t c, fp_t a) {
                 c[FP_DIGS - 1] ^= ((dig_t)1 << (FP_DIGIT - 1));
         }
 }
+
+void fp_hlvd_low(dig_t *c, dig_t *a) {
+	dig_t carry = 0;
+
+	if (a[0] & 1) {
+		carry = mpn_add_n(c, a, fp_prime_get(), FP_DIGS);
+	} else {
+		fp_copy(c, a);
+	}
+
+	mpn_add_1(c + FP_DIGS, a + FP_DIGS, FP_DIGS, carry);
+
+	carry = mpn_rshift(c + FP_DIGS, c + FP_DIGS, FP_DIGS, 1);
+	mpn_rshift(c, c, FP_DIGS, 1);
+	if (carry) {
+		c[FP_DIGS - 1] ^= ((dig_t)1 << (FP_DIGIT - 1));
+	}
+}
+
