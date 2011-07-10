@@ -172,6 +172,17 @@ void md_map_sh384(unsigned char *hash, unsigned char *msg, int len);
 void md_map_sh512(unsigned char *hash, unsigned char *msg, int len);
 
 /**
+ * Derives a key from shared secret material through the standardized KDF1
+ * function.
+ *
+ * @param[out] key				- the resulting key.
+ * @param[in] key_len			- the intended key length in bytes.
+ * @param[in] in				- the shared secret.
+ * @param[in] in_len			- the length of the shared secret in bytes.
+ */
+void md_kdf1(unsigned char *key, int key_len, unsigned char *in, int in_len);
+
+/**
  * Derives a key from shared secret material through the standardized KDF2
  * function.
  *
@@ -180,16 +191,17 @@ void md_map_sh512(unsigned char *hash, unsigned char *msg, int len);
  * @param[in] in				- the shared secret.
  * @param[in] in_len			- the length of the shared secret in bytes.
  */
-void md_kdf(unsigned char *key, int key_len, unsigned char *in, int in_len);
+void md_kdf2(unsigned char *key, int key_len, unsigned char *in, int in_len);
 
 /**
- * Derives a mask from shared secret material.
+ * Derives a mask from shared secret material through the PKCS#1 2.0 MGF1
+ * function .
  *
  * @param[out] key				- the resulting mask.
  * @param[in] key_len			- the intended mask length in bytes.
  * @param[in] in				- the shared secret.
  * @param[in] in_len			- the length of the shared secret in bytes.
  */
-void md_mgf(unsigned char *mask, int mask_len, unsigned char *in, int in_len);
+void md_mgf1(unsigned char *mask, int mask_len, unsigned char *in, int in_len);
 
 #endif /* !RELIC_MD_H */
