@@ -253,6 +253,6 @@ void bench_print() {
 	}
 }
 
-unsigned long long bench_get_total() {
+unsigned long long bench_total() {
 	return total;
 }

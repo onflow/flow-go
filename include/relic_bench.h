@@ -149,8 +149,6 @@ void bench_print(void);
  *
  * @return the last benchmark.
  */
-unsigned long long bench_get_total(void);
-
-
+unsigned long long bench_total(void);
 
 #endif /* !RELIC_BENCH_H */
