@@ -175,13 +175,12 @@ void fp2_mul_frb(fp2_t c, fp2_t a, int i) {
 #if ALLOC == AUTO
 	fp2_mul(c, a, const_frb[i-1]);
 #else
-    fp2_t t;
+	fp2_t t;
 
 	fp2_null(t);
 
 	TRY {
 		fp2_new(t);
-
 		fp_copy(t[0], const_frb[i-1][0]);
 		fp_copy(t[1], const_frb[i-1][1]);
 		fp2_mul(c, a, t);
@@ -200,7 +199,7 @@ void fp2_mul_frb_sqr(fp2_t c, fp2_t a, int i) {
 	fp_mul(c[1], a[1], const_sqr[i-1]);
 }
 
-#if PP_EXT == BASIC || !defined(STRIP)
+#if PP_QUD == BASIC || !defined(STRIP)
 
 void fp2_add_basic(fp2_t c, fp2_t a, fp2_t b) {
   fp_add(c[0], a[0], b[0]);
@@ -213,7 +212,7 @@ void fp2_sub_basic(fp2_t c, fp2_t a, fp2_t b) {
 }
 
 void fp2_dbl_basic(fp2_t c, fp2_t a) {
-  /* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
+  /* 2 * (a_0 + a_1 * u) = 2 * a_0 + 2 * a_1 * u. */
   fp_dbl(c[0], a[0]);
   fp_dbl(c[1], a[1]);
 }
@@ -236,33 +235,34 @@ void fp2_mul_basic(fp2_t c, fp2_t a, fp2_t b) {
 
 		/* Karatsuba algorithm. */
 
-		/* t2 = a0 + a1, t1 = b0 + b1. */
+		/* t2 = a_0 + a_1, t1 = b0 + b1. */
 		fp_add(t2, a[0], a[1]);
 		fp_add(t1, b[0], b[1]);
 
-		/* t3 = (a0 + a1) * (b0 + b1). */
-		/* t0 = a0 * b0, t4 = a1 * b1. */
-		fp_muln_low(t0, a[0], b[0]);
-		fp_muln_low(t4, a[1], b[1]);
+		/* t3 = (a_0 + a_1) * (b0 + b1). */
 		fp_muln_low(t3, t2, t1);
 
-		/* t2 = (a0 * b0) + (a1 * b1). */
-		fp_addd_low(t2, t0, t4);
+		/* t0 = a_0 * b0, t4 = a_1 * b1. */
+		fp_muln_low(t0, a[0], b[0]);
+		fp_muln_low(t4, a[1], b[1]);
 
-		/* t1 = (a0 * b0) + u^2 * (a1 * b1). */
+		/* t2 = (a_0 * b0) + (a_1 * b1). */
+		fp_addc_low(t2, t0, t4);
+
+		/* t1 = (a_0 * b0) + u^2 * (a_1 * b1). */
 		fp_subc_low(t1, t0, t4);
 
-		/* t1 = u^2 * (a1 * b1). */
+		/* t1 = u^2 * (a_1 * b1). */
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
 			fp_subc_low(t1, t1, t4);
 		}
-		/* c0 = t1 mod p. */
+		/* c_0 = t1 mod p. */
 		fp_rdc(c[0], t1);
 
 		/* t4 = t3 - t2. */
 		fp_subc_low(t4, t3, t2);
 
-		/* c1 = t4 mod p. */
+		/* c_1 = t4 mod p. */
 		fp_rdc(c[1], t4);
 	}
 	CATCH_ANY {
@@ -289,36 +289,36 @@ void fp2_sqr_basic(fp2_t c, fp2_t a) {
 		fp_new(t1);
 		fp_new(t2);
 
-		/* t0 = (a0 + a1). */
+		/* t0 = (a_0 + a_1). */
 		fp_add(t0, a[0], a[1]);
 
-		/* t1 = (a0 - a1). */
-		fp_subm_low(t1, a[0], a[1]);
+		/* t1 = (a_0 - a_1). */
+		fp_sub(t1, a[0], a[1]);
 
-		/* t1 = u^2 * (a1 * b1). */
+		/* t1 = a_0 + u^2 * a_1. */
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
 			fp_sub(t1, t1, a[1]);
 		}
 
 		if (fp_prime_get_qnr() == -1) {
-			/* t2 = 2 * a0. */
+			/* t2 = 2 * a_0. */
 			fp_dbl(t2, a[0]);
-			/* c1 = 2 * a0 * a1. */
+			/* c_1 = 2 * a_0 * a_1. */
 			fp_mul(c[1], t2, a[1]);
-			/* c0 = a0^2 + b_0^2 * u^2. */
+			/* c_0 = a_0^2 + a_1^2 * u^2. */
 			fp_mul(c[0], t0, t1);
 		} else {
-			/* c1 = a0 * a1. */
+			/* c_1 = a_0 * a_1. */
 			fp_mul(c[1], a[0], a[1]);
-			/* c0 = a0^2 + b_0^2 * u^2. */
+			/* c_0 = a_0^2 + a_1^2 * u^2. */
 			fp_mul(c[0], t0, t1);
 			for (int i = -1; i > fp_prime_get_qnr(); i--) {
 				fp_add(c[0], c[0], c[1]);
 			}
-			/* c1 = 2 * a0 * a1. */
+			/* c_1 = 2 * a_0 * a_1. */
 			fp_dbl(c[1], c[1]);
 		}
-		/* c = c0 + c1 * u. */
+		/* c = c_0 + c_1 * u. */
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -330,91 +330,102 @@ void fp2_sqr_basic(fp2_t c, fp2_t a) {
 	}
 }
 
+void fp2_rdc_basic(fp2_t c, dv2_t a) {
+	fp_rdc(c[0], a[0]);
+	fp_rdc(c[1], a[1]);
+}
+
 #endif
 
-#if PP_EXT == LOWER || !defined(STRIP)
+#if PP_QUD == INTEG || !defined(STRIP)
 
-void fp2_add_lower(fp2_t c, fp2_t a, fp2_t b) {
-	fp2_addn_low(c, a, b);
+void fp2_add_integ(fp2_t c, fp2_t a, fp2_t b) {
+	fp2_addm_low(c, a, b);
 }
 
-void fp2_sub_lower(fp2_t c, fp2_t a, fp2_t b) {
-	fp2_subn_low(c, a, b);
+void fp2_sub_integ(fp2_t c, fp2_t a, fp2_t b) {
+	fp2_subm_low(c, a, b);
 }
 
-void fp2_dbl_lower(fp2_t c, fp2_t a) {
-	fp2_dbln_low(c, a);
+void fp2_dbl_integ(fp2_t c, fp2_t a) {
+	fp2_dblm_low(c, a);
 }
 
-void fp2_mul_lower(fp2_t c, fp2_t a, fp2_t b) {
-	fp2_muln_low(c, a, b);
+void fp2_mul_integ(fp2_t c, fp2_t a, fp2_t b) {
+	fp2_mulm_low(c, a, b);
 }
 
-void fp2_sqr_lower(fp2_t c, fp2_t a) {
-	fp2_sqrn_low(c, a);
+void fp2_sqr_integ(fp2_t c, fp2_t a) {
+	fp2_sqrm_low(c, a);
+}
+
+void fp2_rdc_integ(fp2_t c, dv2_t a) {
+	fp2_rdcn_low(c, a);
 }
 
 #endif
 
 void fp2_mul_art(fp2_t c, fp2_t a) {
-	fp_t t0;
+	fp_t t;
 
-	fp_null(t0);
+	fp_null(t);
 
 	TRY {
-		fp_new(t0);
+		fp_new(t);
 
 #ifdef FP_QNRES
-		fp_copy(t0, a[0]);
+		/* (a_0 + a_1 * i) * i = -a_1 + a_0 * i. */
+		fp_copy(t, a[0]);
 		fp_neg(c[0], a[1]);
-		fp_copy(c[1], t0);
+		fp_copy(c[1], t);
 #else
-		/* (a0 + a1 * u) * u = a1 * u^2 + a0 * u. */
-		fp_copy(t0, a[0]);
+		/* (a_0 + a_1 * u) * u = (a_1 * u^2) + a_0 * u. */
+		fp_copy(t, a[0]);
 		fp_neg(c[0], a[1]);
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
 			fp_sub(c[0], c[0], a[1]);
 		}
-		fp_copy(c[1], t0);
+		fp_copy(c[1], t);
 #endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp_free(t0);
+		fp_free(t);
 	}
 }
 
 void fp2_mul_nor(fp2_t c, fp2_t a) {
-	fp2_t t0;
+	fp2_t t;
 
-	fp2_null(t0);
+	fp2_null(t);
 
 	TRY {
-		fp2_new(t0);
+		fp2_new(t);
 
 #ifdef FP_QNRES
-		fp_neg(t0[0], a[1]);
+		/* If p = 3 mod 8, (1 + i) is a QNR/CNR. */
+		fp_neg(t[0], a[1]);
 		fp_add(c[1], a[0], a[1]);
-		fp_add(c[0], t0[0], a[0]);
+		fp_add(c[0], t[0], a[0]);
 #else
 		switch (fp_prime_get_mod8()) {
+			case 3:
+				/* If p = 3 mod 8, (1 + u) is a QNR/CNR. */
+				fp_neg(t[0], a[1]);
+				fp_add(c[1], a[0], a[1]);
+				fp_add(c[0], t[0], a[0]);
+				break;
 			case 5:
-				/* If p = 5 mod 8, x^2 - sqrt(sqrt(-2)) is irreducible. */
+				/* If p = 5 mod 8, (u) is a QNR/CNR. */
 				fp2_mul_art(c, a);
 				break;
-			case 3:
-				/* If p = 3 mod 8, x^2 - sqrt(1 + sqrt(-1)) is irreducible. */
-				fp_neg(t0[0], a[1]);
-				fp_add(c[1], a[0], a[1]);
-				fp_add(c[0], t0[0], a[0]);
-				break;
 			case 7:
-				/* If p = 7 mod 8 and p = 2,3 mod 5, x^2 - sqrt(2 + sqrt(-1)) is
-				 * irreducible. */
-				fp2_mul_art(t0, a);
-				fp2_add(c, t0, a);
+				/* If p = 7 mod 8 and p = 2,3 mod 5, (2 + u) is a QNR/CNR. */
+				fp_add(t[1], a[0], a[1]);
+				fp_sub(t[0], a[0], a[1]);
+				fp2_add(c, t, a);
 				break;
 			default:
 				THROW(ERR_INVALID);
@@ -425,7 +436,7 @@ void fp2_mul_nor(fp2_t c, fp2_t a) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp2_free(t0);
+		fp2_free(t);
 	}
 }
 
@@ -439,7 +450,7 @@ void fp2_inv(fp2_t c, fp2_t a) {
 		fp_new(t0);
 		fp_new(t1);
 
-		/* t0 = a0^2, t1 = a1^2. */
+		/* t0 = a_0^2, t1 = a_1^2. */
 		fp_sqr(t0, a[0]);
 		fp_sqr(t1, a[1]);
 
@@ -449,13 +460,13 @@ void fp2_inv(fp2_t c, fp2_t a) {
 		}
 #endif
 
-		/* t1 = 1/(a0^2 + a1^2). */
+		/* t1 = 1/(a_0^2 + a_1^2). */
 		fp_add(t0, t0, t1);
 		fp_inv(t1, t0);
 
-		/* c_0 = a0/(a0^2 + a1^2). */
+		/* c_0 = a_0/(a_0^2 + a_1^2). */
 		fp_mul(c[0], a[0], t1);
-		/* c_1 = - a1/(a0^2 + a1^2). */
+		/* c_1 = - a_1/(a_0^2 + a_1^2). */
 		fp_mul(c[1], a[1], t1);
 		fp_neg(c[1], c[1]);
 	}
@@ -469,7 +480,7 @@ void fp2_inv(fp2_t c, fp2_t a) {
 }
 
 void fp2_frb(fp2_t c, fp2_t a) {
-	/* (a0 + a1 * u)^p = a0 - a1 * u. */
+	/* (a_0 + a_1 * u)^p = a_0 - a_1 * u. */
 	fp_copy(c[0], a[0]);
 	fp_neg(c[1], a[1]);
 }
@@ -524,23 +535,23 @@ int fp2_srt(fp2_t c, fp2_t a) {
 		fp_add(t1, t1, t2);
 
 		if (fp_srt(t2, t1)) {
-			/* t1 = (a[0] + sqrt(t1)) / 2 */
+			/* t1 = (a_0 + sqrt(t1)) / 2 */
 			fp_add(t1, a[0], t2);
 			fp_set_dig(t3, 2);
 			fp_inv(t3, t3);
 			fp_mul(t1, t1, t3);
 
 			if (!fp_srt(t3, t1)) {
-				/* t1 = (a[0] - sqrt(t1)) / 2 */
+				/* t1 = (a_0 - sqrt(t1)) / 2 */
 				fp_sub(t1, a[0], t2);
 				fp_set_dig(t3, 2);
 				fp_inv(t3, t3);
 				fp_mul(t1, t1, t3);
 				fp_srt(t3, t1);
 			}
-			/* c0 = sqrt(t1) */
+			/* c_0 = sqrt(t1) */
 			fp_copy(c[0], t3);
-			/* c1 = a1 / (2 * sqrt(t1)) */
+			/* c_1 = a_1 / (2 * sqrt(t1)) */
 			fp_dbl(t3, t3);
 			fp_inv(t3, t3);
 			fp_mul(c[1], a[1], t3);

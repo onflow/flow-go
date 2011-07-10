@@ -194,12 +194,12 @@ static int addition2(void) {
 		} TEST_END;
 #endif
 
-#if PP_EXT == LOWER || !defined(STRIP)
-		TEST_BEGIN("lower-level addition is correct") {
+#if PP_EXT == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated addition is correct") {
 			fp2_rand(a);
 			fp2_rand(b);
 			fp2_add(d, a, b);
-			fp2_add_lower(e, a, b);
+			fp2_add_integ(e, a, b);
 			TEST_ASSERT(fp2_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -263,12 +263,12 @@ static int subtraction2(void) {
 		} TEST_END;
 #endif
 
-#if PP_EXT == LOWER || !defined(STRIP)
-		TEST_BEGIN("lower-level subtraction is correct") {
+#if PP_EXT == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated subtraction is correct") {
 			fp2_rand(a);
 			fp2_rand(b);
 			fp2_sub(c, a, b);
-			fp2_sub_lower(d, a, b);
+			fp2_sub_integ(d, a, b);
 			TEST_ASSERT(fp2_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -311,11 +311,11 @@ static int doubling2(void) {
 		} TEST_END;
 #endif
 
-#if PP_EXT == LOWER || !defined(STRIP)
-		TEST_BEGIN("lower-level doubling is correct") {
+#if PP_EXT == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated doubling is correct") {
 			fp2_rand(a);
 			fp2_dbl(b, a);
-			fp2_dbl_lower(c, a);
+			fp2_dbl_integ(c, a);
 			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -390,7 +390,7 @@ static int multiplication2(void) {
 			TEST_ASSERT(fp2_is_zero(e), end);
 		} TEST_END;
 
-#if PP_EXT == BASIC || !defined(STRIP)
+#if PP_QUD == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic multiplication is correct") {
 			fp2_rand(a);
 			fp2_rand(b);
@@ -400,12 +400,12 @@ static int multiplication2(void) {
 		} TEST_END;
 #endif
 
-#if PP_EXT == LOWER || !defined(STRIP)
-		TEST_BEGIN("lower-level multiplication is correct") {
+#if PP_QUD == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated multiplication is correct") {
 			fp2_rand(a);
 			fp2_rand(b);
 			fp2_mul(d, a, b);
-			fp2_mul_lower(e, b, a);
+			fp2_mul_integ(e, b, a);
 			TEST_ASSERT(fp2_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -432,6 +432,7 @@ static int multiplication2(void) {
 					break;
 				case 7:
 					fp2_mul_art(c, a);
+					fp2_add(c, c, a);
 					fp2_add(c, c, a);
 					break;
 			}
@@ -469,6 +470,24 @@ static int squaring2(void) {
 			fp2_sqr(c, a);
 			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
+
+#if PP_QUD == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic squaring is correct") {
+			fp2_rand(a);
+			fp2_sqr(b, a);
+			fp2_sqr_basic(c, a);
+			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_QUD == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated squaring is correct") {
+			fp2_rand(a);
+			fp2_sqr(b, a);
+			fp2_sqr_integ(c, a);
+			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -877,24 +896,6 @@ static int multiplication6(void) {
 			TEST_ASSERT(fp6_is_zero(e), end);
 		} TEST_END;
 
-		TEST_BEGIN("sparse multiplication is correct") {
-			fp6_rand(a);
-			fp6_rand(b);
-			fp2_zero(b[2]);
-			fp6_mul(d, a, b);
-			fp6_mul_dxs(e, a, b);
-			TEST_ASSERT(fp6_cmp(d, e) == CMP_EQ, end);
-		} TEST_END;
-
-		TEST_BEGIN("multiplication by quadratic extension element is correct") {
-			fp6_rand(a);
-			fp6_zero(b);
-			fp2_rand(b[0]);
-			fp6_mul(d, a, b);
-			fp6_mul_dxq(e, a, b[0]);
-			TEST_ASSERT(fp6_cmp(d, e) == CMP_EQ, end);
-		} TEST_END;
-
 		TEST_BEGIN("multiplication by adjoined root is correct") {
 			fp6_rand(a);
 			fp6_zero(b);
@@ -903,6 +904,26 @@ static int multiplication6(void) {
 			fp6_mul_art(d, a);
 			TEST_ASSERT(fp6_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
+
+#if PP_EXT == BASIC | !defined(STRIP)
+		TEST_BEGIN("basic multiplication is correct") {
+			fp6_rand(a);
+			fp6_rand(b);
+			fp6_mul(c, a, b);
+			fp6_mul_basic(d, a, b);
+			TEST_ASSERT(fp6_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy reduced multiplication is correct") {
+			fp6_rand(a);
+			fp6_rand(b);
+			fp6_mul(c, a, b);
+			fp6_mul_lazyr(d, a, b);
+			TEST_ASSERT(fp6_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -934,6 +955,24 @@ static int squaring6(void) {
 			fp6_sqr(c, a);
 			TEST_ASSERT(fp6_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
+
+#if PP_EXT == BASIC | !defined(STRIP)
+		TEST_BEGIN("basic squaring is correct") {
+			fp6_rand(a);
+			fp6_sqr(b, a);
+			fp6_sqr_basic(c, a);
+			TEST_ASSERT(fp6_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy reduced squaring is correct") {
+			fp6_rand(a);
+			fp6_sqr(b, a);
+			fp6_sqr_lazyr(c, a);
+			TEST_ASSERT(fp6_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -974,30 +1013,6 @@ static int inversion6(void) {
 	fp6_free(a);
 	fp6_free(b);
 	fp6_free(c);
-	return code;
-}
-
-static int memory12(void) {
-	err_t e;
-	int code = STS_ERR;
-	fp12_t a;
-
-	TRY {
-		TEST_BEGIN("memory can be allocated") {
-			fp12_new(a);
-			fp12_free(a);
-		} TEST_END;
-	} CATCH(e) {
-		switch (e) {
-			case ERR_NO_MEMORY:
-				util_print("FATAL ERROR!\n");
-				ERROR(end);
-				break;
-		}
-	}
-	(void)a;
-	code = STS_OK;
-  end:
 	return code;
 }
 
@@ -1044,6 +1059,30 @@ static int exponentiation6(void) {
 	fp6_free(b);
 	fp6_free(c);
 	bn_free(d);
+	return code;
+}
+
+static int memory12(void) {
+	err_t e;
+	int code = STS_ERR;
+	fp12_t a;
+
+	TRY {
+		TEST_BEGIN("memory can be allocated") {
+			fp12_new(a);
+			fp12_free(a);
+		} TEST_END;
+	} CATCH(e) {
+		switch (e) {
+			case ERR_NO_MEMORY:
+				util_print("FATAL ERROR!\n");
+				ERROR(end);
+				break;
+		}
+	}
+	(void)a;
+	code = STS_OK;
+  end:
 	return code;
 }
 
@@ -1290,16 +1329,25 @@ static int multiplication12(void) {
 			TEST_ASSERT(fp12_is_zero(e), end);
 		} TEST_END;
 
-		TEST_BEGIN("sparse multiplication is correct") {
+#if PP_EXT == BASIC | !defined(STRIP)
+		TEST_BEGIN("basic multiplication is correct") {
 			fp12_rand(a);
-			fp12_zero(b);
-			fp2_rand(b[0][0]);
-			fp2_rand(b[1][0]);
-			fp2_rand(b[1][1]);
-			fp12_mul(d, a, b);
-			fp12_mul_dxs(e, a, b);
-			TEST_ASSERT(fp12_cmp(d, e) == CMP_EQ, end);
+			fp12_rand(b);
+			fp12_mul(c, a, b);
+			fp12_mul_basic(d, a, b);
+			TEST_ASSERT(fp12_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy reduced multiplication is correct") {
+			fp12_rand(a);
+			fp12_rand(b);
+			fp12_mul(c, a, b);
+			fp12_mul_lazyr(d, a, b);
+			TEST_ASSERT(fp12_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	} CATCH_ANY {
 		util_print("FATAL ERROR!\n");
 		ERROR(end);
@@ -1330,15 +1378,106 @@ static int squaring12(void) {
 			fp12_sqr(c, a);
 			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp12_free(a);
+	fp12_free(b);
+	fp12_free(c);
+	return code;
+}
 
-		TEST_BEGIN("doubled squaring is correct") {
+static int cyclotomic12(void) {
+	int code = STS_ERR;
+	fp12_t a, b, c;
+
+	TRY {
+		fp12_new(a);
+		fp12_new(b);
+		fp12_new(c);
+
+		TEST_BEGIN("compression in cyclotomic subgroup is correct") {
 			fp12_rand(a);
-			fp12_sqr(b, a);
-			fp6_dbl(b[0], b[0]);
-			fp6_dbl(b[1], b[1]);
-			fp12_sqr_dbl(c, a);
+			fp12_conv_cyc(a, a);
+			fp12_back_cyc(c, a);
+			TEST_ASSERT(fp12_cmp(a, c) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("squaring is correct") {
+			fp12_rand(a);
+			fp12_mul(b, a, a);
+			fp12_sqr(c, a);
 			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
+
+		TEST_BEGIN("cyclotomic squaring is correct") {
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			fp12_sqr(b, a);
+			fp12_sqr_cyc(c, a);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+
+#if PP_EXT == BASIC | !defined(STRIP)
+		TEST_BEGIN("basic cyclotomic squaring is correct") {
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			fp12_sqr_cyc(b, a);
+			fp12_sqr_cyc_basic(c, a);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == BASIC | !defined(STRIP)
+		TEST_BEGIN("lazy reduced cyclotomic squaring is correct") {
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			fp12_sqr_cyc(b, a);
+			fp12_sqr_cyc_lazyr(c, a);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+		TEST_BEGIN("compressed squaring is correct") {
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			fp12_sqr(b, a);
+			fp12_sqr_pck(c, a);
+			fp12_back_cyc(c, c);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+
+#if PP_EXT == BASIC | !defined(STRIP)
+		TEST_BEGIN("basic compressed squaring is correct") {
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			fp2_zero(b[0][0]);
+			fp2_zero(b[1][1]);
+			fp2_zero(c[0][0]);
+			fp2_zero(c[1][1]);
+			fp12_sqr_pck(b, a);
+			fp12_sqr_pck_basic(c, a);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == BASIC | !defined(STRIP)
+		TEST_BEGIN("lazy reduced compressed squaring is correct") {
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			fp2_zero(b[0][0]);
+			fp2_zero(b[1][1]);
+			fp2_zero(c[0][0]);
+			fp2_zero(c[1][1]);
+			fp12_sqr_pck(b, a);
+			fp12_sqr_pck_lazyr(c, a);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -1370,13 +1509,11 @@ static int inversion12(void) {
 			TEST_ASSERT(fp12_cmp(c, b) == CMP_EQ, end);
 		} TEST_END;
 
-		TEST_BEGIN("inversion of a cyclotomic element is correct") {
+		TEST_BEGIN("inversion of a unitary element is correct") {
 			fp12_rand(a);
+			fp12_conv_uni(a, a);
 			fp12_inv(b, a);
-			fp12_inv_cyc(a, a);
-			fp12_mul(a, a, b);
-			fp12_inv(b, a);
-			fp12_inv_cyc(c, a);
+			fp12_inv_uni(c, a);
 			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 	}
@@ -1870,6 +2007,7 @@ static int multiplication(void) {
 
 		TEST_BEGIN("generator has the right order") {
 			ep2_mul(r, p, n);
+			ep2_map(p, "diego", 5);
 			TEST_ASSERT(ep2_is_infty(r) == 1, end);
 		} TEST_END;
 
@@ -2472,6 +2610,11 @@ int main(void) {
 	}
 
 	if (squaring12() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (cyclotomic12() != STS_OK) {
 		core_clean();
 		return 1;
 	}
