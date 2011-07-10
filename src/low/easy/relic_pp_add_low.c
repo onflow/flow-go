@@ -27,7 +27,7 @@
  * functions.
  *
  * @version $Id$
- * @ingroup fp
+ * @ingroup pp
  */
 
 #include "relic_fp.h"
@@ -41,17 +41,106 @@
 /*============================================================================*/
 
 void fp2_addn_low(fp2_t c, fp2_t a, fp2_t b) {
-  fp_add(c[0], a[0], b[0]);
-  fp_add(c[1], a[1], b[1]);
+	fp_addn_low(c[0], a[0], b[0]);
+	fp_addn_low(c[1], a[1], b[1]);
+}
+
+void fp2_addm_low(fp2_t c, fp2_t a, fp2_t b) {
+	fp_addm_low(c[0], a[0], b[0]);
+	fp_addm_low(c[1], a[1], b[1]);
+}
+
+void fp2_addd_low(dv2_t c, dv2_t a, dv2_t b) {
+	fp_addd_low(c[0], a[0], b[0]);
+	fp_addd_low(c[1], a[1], b[1]);
+}
+
+void fp2_addc_low(dv2_t c, dv2_t a, dv2_t b) {
+	fp_addc_low(c[0], a[0], b[0]);
+	fp_addc_low(c[1], a[1], b[1]);
 }
 
 void fp2_subn_low(fp2_t c, fp2_t a, fp2_t b) {
-  fp_sub(c[0], a[0], b[0]);
-  fp_sub(c[1], a[1], b[1]);
+	fp_subn_low(c[0], a[0], b[0]);
+	fp_subn_low(c[1], a[1], b[1]);
+}
+
+void fp2_subm_low(fp2_t c, fp2_t a, fp2_t b) {
+	fp_subm_low(c[0], a[0], b[0]);
+	fp_subm_low(c[1], a[1], b[1]);
 }
 
 void fp2_dbln_low(fp2_t c, fp2_t a) {
-  /* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
-  fp_dbl(c[0], a[0]);
-  fp_dbl(c[1], a[1]);
+	/* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
+	fp_dbln_low(c[0], a[0]);
+	fp_dbln_low(c[1], a[1]);
+}
+
+void fp2_subd_low(dv2_t c, dv2_t a, dv2_t b) {
+	fp_subd_low(c[0], a[0], b[0]);
+	fp_subd_low(c[1], a[1], b[1]);
+}
+
+void fp2_subc_low(dv2_t c, dv2_t a, dv2_t b) {
+	fp_subc_low(c[0], a[0], b[0]);
+	fp_subc_low(c[1], a[1], b[1]);
+}
+
+void fp2_dblm_low(fp2_t c, fp2_t a) {
+	/* 2 * (a0 + a1 * u) = 2 * a0 + 2 * a1 * u. */
+	fp_dblm_low(c[0], a[0]);
+	fp_dblm_low(c[1], a[1]);
+}
+
+void fp2_nord_low(dv2_t c, dv2_t a) {
+	dv2_t t;
+
+	dv2_null(t);
+
+	TRY {
+		dv_new(t);
+
+#ifdef FP_QNRES
+		/* If p = 3 mod 8, (1 + i) is a QNR/CNR. */
+		/* (a_0 + a_1 * i) * (1 + i) = (a_0 - a_1) + (a_0 + a_1) * u. */
+		dv_copy(t[0], a[1], 2 * FP_DIGS);
+		fp_addc_low(c[1], a[0], a[1]);
+		fp_subc_low(c[0], a[0], t[0]);
+#else
+		switch (fp_prime_get_mod8()) {
+			case 3:
+				/* If p = 3 mod 8, (1 + u) is a QNR, u^2 = -1. */
+				/* (a_0 + a_1 * u) * (1 + u) = (a_0 - a_1) + (a_0 + a_1) * u. */
+				dv_copy(t[0], a[1], 2 * FP_DIGS);
+				fp_addc_low(c[1], a[0], a[1]);
+				fp_subc_low(c[0], a[0], t[0]);
+				break;
+			case 5:
+				/* If p = 5 mod 8, (u) is a QNR, u^2 = -2. */
+				dv_copy(t[0], a[0], 2 * FP_DIGS);
+				dv_copy(c[0], a[1], FP_DIGS);
+				fp_subn_low(c[0] + FP_DIGS, fp_prime_get(), a[1] + FP_DIGS);
+				for (int i = -1; i > fp_prime_get_qnr(); i--) {
+					fp_subc_low(c[0], c[0], a[1]);
+				}
+				dv_copy(c[1], t[0], 2 * FP_DIGS);
+				break;
+			case 7:
+				/* If p = 7 mod 8 and p = 2,3 mod 5, (2 + u) is a QNR/CNR.   */
+				/* (a_0 + a_1 * u)(2 + u) = (2a_0 - a_1) + (a_0 + 2a_1) * u. */
+				fp_addc_low(t[1], a[0], a[1]);
+				fp_subc_low(t[0], a[0], a[1]);
+				fp2_addc_low(c, t, a);
+				break;
+			default:
+				THROW(ERR_INVALID);
+		}
+#endif
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		dv2_free(t);
+	}
 }

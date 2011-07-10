@@ -23,40 +23,30 @@
 /**
  * @file
  *
- * Implementation of the low-level iterated squaring/square-root.
+ * Implementation of the low-level quadratic extension field modular reduction
+ * functions.
  *
- * @version $Id: relic_fb_sqr_low.c 677 2011-03-05 22:19:43Z dfaranha $
- * @ingroup fb
+ * @version $Id$
+ * @ingroup pp
  */
 
-#include "relic_fb.h"
-#include "relic_dv.h"
-#include "relic_fb_low.h"
-#include "relic_util.h"
+#include "relic_fp.h"
+#include "relic_pp.h"
+#include "relic_core.h"
+#include "relic_conf.h"
+#include "relic_error.h"
+#include "relic_fp_low.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_itrn_low(dig_t *c, dig_t *a, dig_t *t) {
-	int i, j;
-	dig_t u, *tmp, *p;
-	align dig_t v[FB_DIGS];
-
-	fb_zero(v);
-
-	for (i = FB_DIGIT - 4; i >= 0; i -= 4) {
-		tmp = a;
-		for (j = 0; j < FB_DIGS; j++, tmp++) {
-			u = (*tmp >> i) & 0x0F;
-#if ALLOC == STACK || ALLOC == AUTO
-			p = (t + ((j * FB_DIGIT + i) * 4 + u) * FB_DIGS);
+void fp2_rdcn_low(fp2_t c, dv2_t a) {
+#if FP_RDC == MONTY
+	fp_rdcn_low(c[0], a[0]);
+	fp_rdcn_low(c[1], a[1]);
 #else
-			p = (t[(j * FB_DIGIT + i) * 4 + u]);
+	fp_rdc(c[0], a[0]);
+	fp_rdc(c[1], a[1]);
 #endif
-			fb_addn_low(v, v, p);
-		}
-	}
-
-	fb_copy(c, v);
 }

@@ -101,8 +101,23 @@ void fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
 		carry = c0 | c1;
 		c[i] = r1;
 	}
-	if (carry) {
-		fp_subn_low(c + FP_DIGS, c + FP_DIGS, fp_prime_get());
+}
+
+void fp_addc_low(dig_t *c, dig_t *a, dig_t *b) {
+	int i;
+	dig_t carry, c0, c1, r0, r1;
+
+	carry = 0;
+	for (i = 0; i < 2 * FP_DIGS; i++, a++, b++) {
+		r0 = (*a) + (*b);
+		c0 = (r0 < (*a));
+		r1 = r0 + carry;
+		c1 = (r1 < r0);
+		carry = c0 | c1;
+		c[i] = r1;
+	}
+	if (carry || (fp_cmpn_low(c + FP_DIGS, fp_prime_get()) != CMP_LT)) {
+		carry = fp_subn_low(c + FP_DIGS, c + FP_DIGS, fp_prime_get());
 	}
 }
 
@@ -216,7 +231,7 @@ void fp_dblm_low(dig_t *c, dig_t *a) {
 	}
 }
 
-void fp_hlvm_low(fp_t c, fp_t a) {
+void fp_hlvm_low(dig_t *c, dig_t *a) {
 	dig_t carry = 0;
 
 	if (a[0] & 1) {
@@ -229,3 +244,22 @@ void fp_hlvm_low(fp_t c, fp_t a) {
 		c[FP_DIGS - 1] ^= ((dig_t)1 << (FP_DIGIT - 1));
 	}
 }
+
+void fp_hlvd_low(dig_t *c, dig_t *a) {
+	dig_t carry = 0;
+
+	if (a[0] & 1) {
+		carry = fp_addn_low(c, a, fp_prime_get());
+	} else {
+		fp_copy(c, a);
+	}
+
+	fp_add1_low(c + FP_DIGS, a + FP_DIGS, carry);
+
+	carry = fp_rsh1_low(c + FP_DIGS, c + FP_DIGS);
+	fp_rsh1_low(c, c);
+	if (carry) {
+		c[FP_DIGS - 1] ^= ((dig_t)1 << (FP_DIGIT - 1));
+	}
+}
+

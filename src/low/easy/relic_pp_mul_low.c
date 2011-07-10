@@ -35,97 +35,99 @@
 #include "relic_core.h"
 #include "relic_conf.h"
 #include "relic_error.h"
+#include "relic_bn_low.h"
 #include "relic_fp_low.h"
-
-/*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * Constant used to indicate that there's some room left in the storage of
- * prime field elements. This can be used to avoid carries.
- */
-#if (FP_PRIME % WORD) == (WORD - 2)
-#define FP_ROOM
-#endif
+#include "relic_pp_low.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp2_muln_low(fp2_t c, fp2_t a, fp2_t b) {
-	dv_t t0, t1, t2, t3, t4;
+void fp2_muln_low(dv2_t c, fp2_t a, fp2_t b) {
+	align dig_t t0[2 * FP_DIGS], t1[2 * FP_DIGS], t2[2 * FP_DIGS];
 
-	dv_null(t0);
-	dv_null(t1);
-	dv_null(t2);
-	dv_null(t3);
-	dv_null(t4);
+	/* Karatsuba algorithm. */
+
+	/* t0 = a_0 + a_1, t1 = b_0 + b_1. */
+#ifdef FP_SPACE
+	fp_addn_low(t0, a[0], a[1]);
+	fp_addn_low(t1, b[0], b[1]);
+#else
+	fp_add(t0, a[0], a[1]);
+	fp_add(t1, b[0], b[1]);
+#endif
+	/* c_0 = a_0 * b_0, c_1 = a_1 * b_1. */
+	fp_muln_low(c[0], a[0], b[0]);
+	fp_muln_low(c[1], a[1], b[1]);
+	/* t2 = (a_0 + a_1) * (b_0 + b_1). */
+	fp_muln_low(t2, t0, t1);
+
+	/* t0 = (a_0 * b_0) + (a_1 * b_1). */
+#ifdef FP_SPACE
+	fp_addd_low(t0, c[0], c[1]);
+#else
+	fp_addc_low(t0, c[0], c[1]);
+#endif
+
+	/* c_0 = (a_0 * b_0) + u^2 * (a_1 * b_1). */
+	fp_subc_low(c[0], c[0], c[1]);
+
+#ifndef FP_QNRES
+	/* t1 = u^2 * (a_1 * b_1). */
+	for (int i = -1; i > fp_prime_get_qnr(); i--) {
+		fp_subc_low(c[0], c[0], c[1]);
+	}
+#endif
+
+	/* c_1 = t2 - t0. */
+#ifdef FP_SPACE
+	fp_subd_low(c[1], t2, t0);
+#else
+	fp_subc_low(c[1], t2, t0);
+#endif
+}
+
+void fp2_mulc_low(dv2_t c, fp2_t a, fp2_t b) {
+	align dig_t t0[2 * FP_DIGS], t1[2 * FP_DIGS], t2[2 * FP_DIGS];
+
+	/* Karatsuba algorithm. */
+
+	/* t0 = a_0 + a_1, t1 = b_0 + b_1. */
+	fp_addn_low(t0, a[0], a[1]);
+	fp_addn_low(t1, b[0], b[1]);
+
+	/* c_0 = a_0 * b_0, c_1 = a_1 * b_1, t2 = (a_0 + a_1) * (b_0 + b_1). */
+	fp_muln_low(c[0], a[0], b[0]);
+	fp_muln_low(c[1], a[1], b[1]);
+	fp_muln_low(t2, t0, t1);
+
+	/* t0 = (a_0 * b_0) + (a_1 * b_1). */
+	fp_addd_low(t0, c[0], c[1]);
+
+	/* c_0 = (a_0 * b_0) + u^2 * (a_1 * b_1). */
+	fp_subd_low(c[0], c[0], c[1]);
+
+	/* c_1 = t2 - t0. */
+	fp_subd_low(c[1], t2, t0);
+
+	/* c_0 = c_0 + 2^N * p/4. */
+	bn_lshb_low(c[0] + FP_DIGS - 1, c[0] + FP_DIGS - 1, FP_DIGS + 1, 2);
+	fp_addn_low(c[0] + FP_DIGS, c[0] + FP_DIGS, fp_prime_get());
+	bn_rshb_low(c[0] + FP_DIGS - 1, c[0] + FP_DIGS - 1, FP_DIGS + 1, 2);
+}
+
+void fp2_mulm_low(fp2_t c, fp2_t a, fp2_t b) {
+	align dv2_t t;
+
+	dv2_null(t);
 
 	TRY {
-
-		dv_new(t0);
-		dv_new(t1);
-		dv_new(t2);
-		dv_new(t3);
-		dv_new(t4);
-
-		/* Karatsuba algorithm. */
-
-		/* t2 = a0 + a1, t1 = b0 + b1. */
-#ifdef FP_ROOM
-		fp_addn_low(t2, a[0], a[1]);
-		fp_addn_low(t1, b[0], b[1]);
-#else
-		fp_add(t2, a[0], a[1]);
-		fp_add(t1, b[0], b[1]);
-#endif
-		/* t3 = (a0 + a1) * (b0 + b1). */
-		/* t0 = a0 * b0, t4 = a1 * b1. */
-		fp_muln_low(t0, a[0], b[0]);
-		fp_muln_low(t4, a[1], b[1]);
-		fp_muln_low(t3, t2, t1);
-
-		/* t2 = (a0 * b0) + (a1 * b1). */
-		fp_addd_low(t2, t0, t4);
-
-		/* t1 = (a0 * b0) + u^2 * (a1 * b1). */
-		fp_subc_low(t1, t0, t4);
-#ifndef FP_QNRES
-		/* t1 = u^2 * (a1 * b1). */
-		for (int i = -1; i > fp_prime_get_qnr(); i--) {
-			fp_subc_low(t1, t1, t4);
-		}
-#endif
-		/* c0 = t1 mod p. */
-#if FP_RDC == MONTY
-		fp_rdcn_low(c[0], t1);
-#else
-		fp_rdc(c[0], t1);
-#endif
-
-		/* t4 = t3 - t2. */
-#ifdef FP_ROOM
-		fp_subd_low(t4, t3, t2);
-#else
-		fp_subc_low(t4, t3, t2);
-#endif
-
-		/* c1 = t4 mod p. */
-#if FP_RDC == MONTY
-		fp_rdcn_low(c[1], t4);
-#else
-		fp_rdc(c[1], t4);
-#endif
-	}
-	CATCH_ANY {
+		dv2_new(t);
+		fp2_muln_low(t, a, b);
+		fp2_rdcn_low(c, t);
+	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		dv_free(t0);
-		dv_free(t1);
-		dv_free(t2);
-		dv_free(t3);
-		dv_free(t4);
+	} FINALLY {
+		dv2_free(t);
 	}
 }

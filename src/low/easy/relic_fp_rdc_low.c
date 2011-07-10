@@ -177,7 +177,7 @@ void fp_rdcn_low(dig_t *c, dig_t *a) {
 	COMBA_ADD(r2, r1, r0, *a);
 	c[FP_DIGS - 1] = r0;
 
-	if (r1 || fp_cmp(c, m) != CMP_LT) {
+	if (r1 || fp_cmpn_low(c, m) != CMP_LT) {
 		fp_subn_low(c, c, m);
 	}
 }
