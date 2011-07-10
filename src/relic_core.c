@@ -98,6 +98,9 @@ int core_init(void) {
 #ifdef WITH_PP
 		pp_map_init();
 #endif
+#ifdef WITH_PB
+		pb_map_init();
+#endif
 	}
 	CATCH_ANY {
 		return STS_ERR;
@@ -128,6 +131,9 @@ int core_clean(void) {
 #endif
 #ifdef WITH_PP
 	pp_map_clean();
+#endif
+#ifdef WITH_PB
+	pb_map_clean();
 #endif
 
 #ifdef CHECK
