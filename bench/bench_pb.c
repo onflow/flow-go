@@ -364,10 +364,12 @@ static void util6(void) {
 
 static void arith6(void) {
 	fb6_t a, b, c;
+	bn_t d;
 
 	fb6_new(a);
 	fb6_new(b);
 	fb6_new(c);
+	bn_new(d);
 
 	BENCH_BEGIN("fb6_add") {
 		fb6_rand(a);
@@ -402,9 +404,23 @@ static void arith6(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fb6_exp") {
+		fb6_rand(a);
+		bn_rand(d, BN_POS, FB_BITS);
+		BENCH_ADD(fb6_exp(c, a, d));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb6_frb") {
+		fb6_rand(a);
+		BENCH_ADD(fb6_frb(c, a));
+	}
+	BENCH_END;
+
 	fb6_free(a);
 	fb6_free(b);
 	fb6_free(c);
+	bn_free(d);
 }
 
 static void memory12(void) {
@@ -476,10 +492,12 @@ static void util12(void) {
 
 static void arith12(void) {
 	fb12_t a, b, c;
+	bn_t d;
 
 	fb12_new(a);
 	fb12_new(b);
 	fb12_new(c);
+	bn_new(d);
 
 	BENCH_BEGIN("fb12_add") {
 		fb12_rand(a);
@@ -514,9 +532,23 @@ static void arith12(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fb12_exp") {
+		fb12_rand(a);
+		bn_rand(d, BN_POS, FB_BITS);
+		BENCH_ADD(fb12_exp(c, a, d));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb12_frb") {
+		fb12_rand(a);
+		BENCH_ADD(fb12_frb(c, a));
+	}
+	BENCH_END;
+
 	fb12_free(a);
 	fb12_free(b);
 	fb12_free(c);
+	bn_free(d);
 }
 
 #ifdef WITH_EB
