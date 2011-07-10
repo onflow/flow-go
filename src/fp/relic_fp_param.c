@@ -80,14 +80,15 @@ void fp_param_get_bn(bn_t x) {
 				bn_neg(x, x);
 				break;
 			case BN_256:
-				/* x = 6000000000001F2D. */
+				/* x = 600000000000219B. */
 				bn_set_2b(x, 62);
 				bn_set_2b(a, 61);
 				bn_add(x, x, a);
-				bn_set_dig(a, 0x1F);
+				bn_set_dig(a, 0x21);
 				bn_lsh(a, a, 8);
 				bn_add(x, x, a);
-				bn_add_dig(x, x, 0x2D);
+				bn_add_dig(x, x, 0x9B);
+				bn_neg(x, x);
 				break;
 			default:
 				THROW(ERR_INVALID);
