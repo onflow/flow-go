@@ -196,9 +196,25 @@ static int rabin(void) {
 #define SECG_P160_B_X	"49B41E0E9C0369C2328739D90F63D56707C6E5BC"
 #define SECG_P160_B_Y	"26E008B567015ED96D232A03111C3EDC0E9C8F83"
 
-unsigned char key[] = {
+unsigned char resultp[] = {
 	0x74, 0x4A, 0xB7, 0x03, 0xF5, 0xBC, 0x08, 0x2E, 0x59, 0x18, 0x5F, 0x6D,
 	0x04, 0x9D, 0x2D, 0x36, 0x7D, 0xB2, 0x45, 0xC2
+};
+
+#endif
+
+#if defined(EB_KBLTZ) && FB_POLYN == 163
+
+#define NIST_K163_A		"3A41434AA99C2EF40C8495B2ED9739CB2155A1E0D"
+#define NIST_K163_B		"057E8A78E842BF4ACD5C315AA0569DB1703541D96"
+#define NIST_K163_A_X	"37D529FA37E42195F10111127FFB2BB38644806BC"
+#define NIST_K163_A_Y	"447026EEE8B34157F3EB51BE5185D2BE0249ED776"
+#define NIST_K163_B_X	"72783FAAB9549002B4F13140B88132D1C75B3886C"
+#define NIST_K163_B_Y	"5A976794EA79A4DE26E2E19418F097942C08641C7"
+
+unsigned char resultk[] = {
+	0x66, 0x55, 0xA9, 0xC8, 0xF9, 0xE5, 0x93, 0x14, 0x9D, 0xB2, 0x4C, 0x91,
+	0xCE, 0x62, 0x16, 0x41, 0x03, 0x5C, 0x92, 0x82
 };
 
 #endif
@@ -219,12 +235,28 @@ unsigned char key[] = {
 	fp_read(q_b->y, str, strlen(str), 16);									\
 	fp_set_dig(q_b->z, 1);
 
+#define ASSIGNK(CURVE)														\
+	PREPARE(str, CURVE##_A);												\
+	bn_read_str(d_a, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_A_X);												\
+	fb_read(q_a->x, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_A_Y);												\
+	fb_read(q_a->y, str, strlen(str), 16);									\
+	fb_set_dig(q_b->z, 1);													\
+	PREPARE(str, CURVE##_B);												\
+	bn_read_str(d_b, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_B_X);												\
+	fb_read(q_b->x, str, strlen(str), 16);									\
+	PREPARE(str, CURVE##_B_Y);												\
+	fb_read(q_b->y, str, strlen(str), 16);									\
+	fb_set_dig(q_b->z, 1);
+
 static int ecdh(void) {
 	int code = STS_ERR;
 	char *str = NULL;
 	bn_t d_a, d_b;
 	ec_t q_a, q_b;
-	unsigned char key1[MD_LEN], key2[MD_LEN];
+	unsigned char key[MD_LEN], key1[MD_LEN], key2[MD_LEN];
 
 	bn_null(d_a);
 	bn_null(d_b);
@@ -248,17 +280,31 @@ static int ecdh(void) {
 #if MD_MAP == SHONE
 		TEST_ONCE("ecdh satisfies test vectors") {
 			switch (ec_param_get()) {
+#if EC_CUR == PRIME
+
 #if defined(EP_ORDIN) && FP_PRIME == 160
 				case SECG_P160:
 					ASSIGNP(SECG_P160);
+					memcpy(key, resultp, MD_LEN);
 					break;
+#endif
+
 #else /* EC_CUR == CHAR2 */
+
+#if defined(EB_KBLTZ) && FB_POLYN == 163
+				case NIST_K163:
+					ASSIGNK(NIST_K163);
+					memcpy(key, resultk, MD_LEN);
+					break;
+#endif
+
 #endif
 				default:
 					cp_ecdh_gen(d_a, q_a);
 					cp_ecdh_gen(d_b, q_b);
 					cp_ecdh_key(key1, MD_LEN, d_b, q_a);
 					cp_ecdh_key(key2, MD_LEN, d_a, q_b);
+					memcpy(key, key1, MD_LEN);
 					TEST_ASSERT(memcmp(key1, key2, MD_LEN) == 0, end);
 					break;
 			}
@@ -270,6 +316,9 @@ static int ecdh(void) {
 			TEST_ASSERT(memcmp(key2, key, MD_LEN) == 0, end);
 		}
 		TEST_END;
+#else /* MD_MAP != SHONE */
+		(void)str;
+		(void)key;
 #endif
 	}
 	CATCH_ANY {
