@@ -41,7 +41,13 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-void ep2_mul_cof(ep2_t r, ep2_t p) {
+/**
+ * Multiplies a point by the curve cofactor.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ */
+static void ep2_mul_cof(ep2_t r, ep2_t p) {
 	bn_t a, x;
 	ep2_t t1;
 	ep2_t t2;
@@ -136,13 +142,6 @@ void ep2_map(ep2_t p, unsigned char *msg, int len) {
 		}
 
 		ep2_mul_cof(p, p);
-
-		/* t0 = x1^2. */
-		fp2_sqr(t0, p->x);
-		/* t1 = x1^3. */
-		fp2_mul(t1, t0, p->x);
-		fp2_add(t1, t1, t0);
-		fp2_sqr(t0, p->y);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

@@ -239,6 +239,7 @@ void ep2_mul_sim_trick(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 
 void ep2_mul_sim_inter(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 #if defined(EP_KBLTZ)
+/* TODO. */
 //	if (ep_curve_is_kbltz()) {
 //		ep_mul_sim_kbltz(r, p, k, q, l, 0);
 //		return;
