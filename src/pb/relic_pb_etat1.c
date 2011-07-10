@@ -245,7 +245,7 @@ static void pb_map_etats_imp(fb4_t r, eb_t p, eb_t q) {
 		/* F = L * G. */
 		fb4_mul_sxs(r, l, g);
 
-		for (int i = 0; i < ((FB_BITS - 1) / 2); i ++) {
+		for (int i = 0; i < ((FB_BITS - 1) / 2); i++) {
 			/* x_P = sqrt(x_P), y_P = sqr(y_P). */
 			fb_srt(xp, xp);
 			fb_srt(yp, yp);
@@ -367,10 +367,61 @@ static void pb_map_etats_imp(fb4_t r, eb_t p, eb_t q) {
 				} else {
 					fb_set_bit(f[i][0], 0, 1);
 				}
+//#define COREI7
+#ifdef COREI5
+				int s2[] = { 0, 311, (FB_BITS - 1) / 2 };
+				int s4[] = { 0, 162, 317, 467, (FB_BITS - 1) / 2 };
+				int s8[] = { 0, 87, 171, 252, 330, 404, 476, 545,
+					(FB_BITS - 1) / 2
+				};
 
+				switch (CORES) {
+					case 1:
+						from = 0;
+						to = (FB_BITS - 1) / 2;
+						break;
+					case 2:
+						from = s2[i];
+						to = s2[i + 1];
+						break;
+					case 4:
+						from = s4[i];
+						to = s4[i + 1];
+						break;
+					case 8:
+						from = s8[i];
+						to = s8[i + 1];
+						break;
+				}
+#elif defined(COREI7)
+				int s2[] = { 0, 310, (FB_BITS - 1) / 2 };
+				int s4[] = { 0, 160, 315, 465, (FB_BITS - 1) / 2 };
+				int s8[] = { 0, 86, 169, 247, 324, 399, 472, 543,
+					(FB_BITS - 1) / 2
+				};
+
+				switch (CORES) {
+					case 1:
+						from = 0;
+						to = (FB_BITS - 1) / 2;
+						break;
+					case 2:
+						from = s2[i];
+						to = s2[i + 1];
+						break;
+					case 4:
+						from = s4[i];
+						to = s4[i + 1];
+						break;
+					case 8:
+						from = s8[i];
+						to = s8[i + 1];
+						break;
+				}
+#else
 				from = pb_map_get_par(i);
 				to = pb_map_get_par(i + 1);
-
+#endif
 				fb_itr(xp, xp, -from, table_sr[i]);
 				fb_itr(yp, yp, -from, table_sr[i]);
 				fb_itr(xq, xq, from, table_sq[i]);
