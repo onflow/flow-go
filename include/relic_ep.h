@@ -638,7 +638,8 @@ void ep_rand(ep_t p);
  */
 void ep_rhs(fp_t rhs, ep_t p);
 
-/** Tests if a point is in the curve.
+/**
+ * Tests if a point is in the curve.
  *
  * @param[in] p				- the point to test.
  */

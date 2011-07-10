@@ -105,6 +105,81 @@ void ep2_rand(ep2_t p) {
 	}
 }
 
+void ep2_rhs(fp2_t rhs, ep2_t p) {
+	fp2_t t0;
+	fp2_t t1;
+
+	fp2_null(t0);
+	fp2_null(t1);
+
+	TRY {
+		fp2_new(t0);
+		fp2_new(t1);
+
+		/* t0 = x1^2. */
+		fp2_sqr(t0, p->x);
+		/* t1 = x1^3. */
+		fp2_mul(t1, t0, p->x);
+
+		ep2_curve_get_a(t0);
+		fp2_mul(t0, p->x, t0);
+		fp2_add(t1, t1, t0);
+
+		ep2_curve_get_b(t0);
+		fp2_add(t1, t1, t0);
+
+		fp2_copy(rhs, t1);
+
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp2_free(t0);
+		fp2_free(t1);
+	}
+}
+
+void ep2_tab(ep2_t * t, ep2_t p, int w) {
+	if (w > 2) {
+		ep2_dbl(t[0], p);
+#if defined(EP_MIXED)
+		ep2_norm(t[0], t[0]);
+#endif
+		ep2_add(t[1], t[0], p);
+		for (int i = 2; i < (1 << (w - 2)); i++) {
+			ep2_add(t[i], t[i - 1], t[0]);
+		}
+#if defined(EP_MIXED)
+		for (int i = 1; i < (1 << (EP_WIDTH - 2)); i++) {
+			ep2_norm(t[i], t[i]);
+		}
+#endif
+	}
+	ep2_copy(t[0], p);
+}
+
+int ep2_is_valid(ep2_t p) {
+	ep2_t t;
+	int r = 0;
+
+	ep2_null(t);
+
+	TRY {
+		ep2_new(t);
+
+		ep2_norm(t, p);
+
+		ep2_rhs(t->x, t);
+		fp2_sqr(t->y, t->y);
+		r = (fp2_cmp(t->x, t->y) == CMP_EQ) || ep2_is_infty(p);
+
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		ep2_free(t);
+	}
+	return r;
+}
+
 void ep2_print(ep2_t p) {
 	fp2_print(p->x);
 	fp2_print(p->y);
