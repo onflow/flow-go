@@ -135,42 +135,102 @@ static void ep2_add_basic_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
  * @param q					- the projective point.
  */
 static void ep2_add_projc_mix(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
-	fp2_t t0, t1, t2, t3;
+	fp2_t t0, t1, t2, t3, t4, t5, t6;
 
 	fp2_null(t0);
 	fp2_null(t1);
 	fp2_null(t2);
 	fp2_null(t3);
+	fp2_null(t4);
+	fp2_null(t5);
+	fp2_null(t6);
 
 	TRY {
 		fp2_new(t0);
 		fp2_new(t1);
 		fp2_new(t2);
 		fp2_new(t3);
+		fp2_new(t4);
+		fp2_new(t5);
+		fp2_new(t6);
 
-		fp2_sqr(t1, p->z);
-		fp2_mul(t2, q->x, t1);
-		fp2_mul(t1, t1, p->z);
-		fp2_mul(t3, q->y, t1);
+		if (!p->norm) {
+			/* t0 = z1^2. */
+			fp2_sqr(t0, p->z);
 
-		fp2_sub(t2, t2, p->x);
-		fp2_sub(t0, t3, p->y);
-		fp2_mul(r->z, p->z, t2);
-		fp2_sqr(t1, t2);
-		fp2_mul(t3, t1, t2);
-		fp2_mul(t1, t1, p->x);
-		fp2_copy(t2, t1);
-		fp2_add(t2, t2, t2);
-		fp2_sqr(r->x, t0);
-		fp2_sub(r->x, r->x, t2);
-		fp2_sub(r->x, r->x, t3);
-		fp2_sub(t1, t1, r->x);
-		fp2_mul(t1, t1, t0);
-		fp2_mul(t3, t3, p->y);
-		fp2_sub(r->y, t1, t3);
+			/* t3 = U2 = x2 * z1^2. */
+			fp2_mul(t3, q->x, t0);
 
-		if (s != NULL) {
-			fp2_copy(s, t0);
+			/* t1 = S2 = y2 * z1^3. */
+			fp2_mul(t1, t0, p->z);
+			fp2_mul(t1, t1, q->y);
+
+			/* t3 = H = U2 - x1. */
+			fp2_sub(t3, t3, p->x);
+
+			/* t1 = R = 2 * (S2 - y1). */
+			fp2_sub(t1, t1, p->y);
+
+			if (s != NULL) {
+				fp2_copy(s, t1);
+			}
+
+			fp2_dbl(t1, t1);
+		} else {
+			/* H = x2 - x1. */
+			fp2_sub(t3, q->x, p->x);
+
+			/* t1 = R = 2 * (y2 - y1). */
+			fp2_sub(t1, q->y, p->y);
+			fp2_dbl(t1, t1);
+		}
+
+		/* t2 = HH = H^2. */
+		fp2_sqr(t2, t3);
+
+		/* If E is zero. */
+		if (fp2_is_zero(t3)) {
+			if (fp2_is_zero(t1)) {
+				/* If I is zero, p = q, should have doubled. */
+				ep2_dbl_projc(r, p);
+			} else {
+				/* If I is not zero, q = -p, r = infinity. */
+				ep2_set_infty(r);
+			}
+		} else {
+			/* t4 = I = 4*HH. */
+			fp2_dbl(t4, t2);
+			fp2_dbl(t4, t4);
+
+			/* t5 = J = H * I. */
+			fp2_mul(t5, t3, t4);
+
+			/* t4 = V = x1 * I. */
+			fp2_mul(t4, p->x, t4);
+
+			/* x3 = R^2 - J - 2 * V. */
+			fp2_sqr(r->x, t1);
+			fp2_sub(r->x, r->x, t5);
+			fp2_dbl(t6, t4);
+			fp2_sub(r->x, r->x, t6);
+
+			/* y3 = R * (V - x3) - 2 * Y1 * J. */
+			fp2_sub(t4, t4, r->x);
+			fp2_mul(t4, t4, t1);
+			fp2_mul(t1, p->y, t5);
+			fp2_dbl(t1, t1);
+			fp2_sub(r->y, t4, t1);
+
+			if (!p->norm) {
+				/* z3 = (z1 + H)^2 - z1^2 - HH. */
+				fp2_add(r->z, p->z, t3);
+				fp2_sqr(r->z, r->z);
+				fp2_sub(r->z, r->z, t0);
+				fp2_sub(r->z, r->z, t2);
+			} else {
+				/* z3 = 2 * H. */
+				fp2_dbl(r->z, t3);
+			}
 		}
 		r->norm = 0;
 	}
@@ -182,6 +242,9 @@ static void ep2_add_projc_mix(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 		fp2_free(t1);
 		fp2_free(t2);
 		fp2_free(t3);
+		fp2_free(t4);
+		fp2_free(t5);
+		fp2_free(t6);
 	}
 }
 
@@ -306,7 +369,6 @@ static void ep2_add_projc_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 		fp2_free(t6);
 	}
 #endif
-
 }
 
 #endif /* EP_ADD == PROJC */
