@@ -1407,13 +1407,6 @@ static int cyclotomic12(void) {
 			TEST_ASSERT(fp12_cmp(a, c) == CMP_EQ, end);
 		} TEST_END;
 
-		TEST_BEGIN("squaring is correct") {
-			fp12_rand(a);
-			fp12_mul(b, a, a);
-			fp12_sqr(c, a);
-			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
-		} TEST_END;
-
 		TEST_BEGIN("cyclotomic squaring is correct") {
 			fp12_rand(a);
 			fp12_conv_cyc(a, a);
@@ -1445,6 +1438,10 @@ static int cyclotomic12(void) {
 		TEST_BEGIN("compressed squaring is correct") {
 			fp12_rand(a);
 			fp12_conv_cyc(a, a);
+			fp2_zero(b[0][0]);
+			fp2_zero(b[1][1]);
+			fp2_zero(c[0][0]);
+			fp2_zero(c[1][1]);
 			fp12_sqr(b, a);
 			fp12_sqr_pck(c, a);
 			fp12_back_cyc(c, c);
@@ -2349,6 +2346,52 @@ static int hashing(void) {
 	return code;
 }
 
+static int frobenius(void) {
+	int code = STS_ERR;
+	ep2_t a, b, c;
+	bn_t d;
+
+	ep2_null(a);
+	ep2_null(b);
+	ep2_null(c);
+	bn_null(d);
+
+	TRY {
+		ep2_new(a);
+		ep2_new(b);
+		ep2_new(c);
+		bn_new(d);
+
+		TEST_BEGIN("frobenius and scalar multiplication are consistent") {
+			ep2_rand(a);
+			ep2_frb(b, a);
+			d->used = FP_DIGS;
+			dv_copy(d->dp, fp_prime_get(), FP_DIGS);
+			ep2_mul(c, a, d);
+			TEST_ASSERT(ep2_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("double frobenius is consistent") {
+			ep2_rand(a);
+			ep2_frb(b, a);
+			ep2_frb(b, b);
+			ep2_frb_sqr(c, a);
+			TEST_ASSERT(ep2_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	ep2_free(a);
+	ep2_free(b);
+	ep2_free(c);
+	bn_free(d);
+	return code;
+}
+
 static int pairing(void) {
 	int code = STS_ERR;
 	fp12_t e1, e2;
@@ -2674,6 +2717,11 @@ int main(void) {
 	}
 
 	if (hashing() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (frobenius() != STS_OK) {
 		core_clean();
 		return 1;
 	}
