@@ -178,10 +178,10 @@ void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
 		for (int i = bn_bits(a) - 2; i >= 0; i--) {
 			fp12_sqr(r, r);
 			pp_dbl(tmp, t, t, p);
-			fp12_mul(r, r, tmp);
+			fp12_mul_dxs(r, r, tmp);
 			if (bn_test_bit(a, i)) {
 				pp_add(tmp, t, q, p);
-				fp12_mul(r, r, tmp);
+				fp12_mul_dxs(r, r, tmp);
 			}
 		}
 	}
@@ -226,10 +226,10 @@ void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
 				for (int i = bn_bits(a0) - 2; i >= 0; i--) {
 					fp12_sqr(_f[0], _f[0]);
 					pp_dbl(_t[0], _q[0], _q[0], p);
-					fp12_mul(_f[0], _f[0], _t[0]);
+					fp12_mul_dxs(_f[0], _f[0], _t[0]);
 					if (bn_test_bit(a0, i)) {
 						pp_add(_t[0], _q[0], q, p);
-						fp12_mul(_f[0], _f[0], _t[0]);
+						fp12_mul_dxs(_f[0], _f[0], _t[0]);
 					}
 				}
 				for (int i = PART - 1; i >= 0; i--) {
@@ -244,10 +244,10 @@ void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
 				for (int i = PART - 1; i >= 0; i--) {
 					fp12_sqr(_f[1], _f[1]);
 					pp_dbl(_t[1], _q[1], _q[1], p);
-					fp12_mul(_f[1], _f[1], _t[1]);
+					fp12_mul_dxs(_f[1], _f[1], _t[1]);
 					if (bn_test_bit(a, i)) {
 						pp_add(_t[1], _q[1], q, p);
-						fp12_mul(_f[1], _f[1], _t[1]);
+						fp12_mul_dxs(_f[1], _f[1], _t[1]);
 					}
 				}
 				ep2_copy(t, _q[1]);
@@ -395,7 +395,7 @@ void pp_r_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp_zero(q1->z[1]);
 
 		pp_add(tmp1, r1q, q, p);
-		fp12_mul(tmp2, res, tmp1);
+		fp12_mul_dxs(tmp2, res, tmp1);
 		fp12_frb(tmp2, tmp2);
 		fp12_mul(res, res, tmp2);
 
@@ -407,7 +407,7 @@ void pp_r_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		ep2_copy(r1q, t);
 
 		pp_add(tmp1, r1q, q1, p);
-		fp12_mul(res, res, tmp1);
+		fp12_mul_dxs(res, res, tmp1);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -450,9 +450,9 @@ void pp_o_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		ep2_neg(q2, q2);
 
 		pp_add(tmp, t, q1, p);
-		fp12_mul(res, res, tmp);
+		fp12_mul_dxs(res, res, tmp);
 		pp_add(tmp, t, q2, p);
-		fp12_mul(res, res, tmp);
+		fp12_mul_dxs(res, res, tmp);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -526,7 +526,7 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp12_zero(tmp);
 		/* q1 = p*xQ + xQ. */
 		pp_add(tmp, q1, t, p);
-		fp12_mul(res, res, tmp);
+		fp12_mul_dxs(res, res, tmp);
 
 		/* q2 = q2 + q3. */
 		pp_add(tmp, q2, q3, p);
@@ -536,7 +536,7 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		ep2_norm(q2, q2);
 		pp_add(tmp, q1, q2, p);
 
-		fp12_mul(res, res, tmp);
+		fp12_mul_dxs(res, res, tmp);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {

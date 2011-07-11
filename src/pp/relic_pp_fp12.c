@@ -589,6 +589,46 @@ void fp12_sqr_pck_lazyr(fp12_t c, fp12_t a) {
 
 #endif
 
+void fp12_mul_dxs(fp12_t c, fp12_t a, fp12_t b) {
+	fp6_t v0, v1, t0;
+
+	fp6_null(v0);
+	fp6_null(v1);
+	fp6_null(t0);
+
+	TRY {
+		fp6_new(v0);
+		fp6_new(v1);
+		fp6_new(t0);
+
+		/* c1 = (a0 + a1)(b0 + b1) */
+		fp6_add(v0, a[0], a[1]);
+		fp2_add(v1[0], b[0][0], b[1][0]);
+		fp2_copy(v1[1], b[1][1]);
+		fp6_mul_dxs(t0, v0, v1);
+
+		/* v0 = a0b0 */
+		fp6_mul_dxq(v0, a[0], b[0][0]);
+
+		/* v1 = a1b1 */
+		fp6_mul_dxs(v1, a[1], b[1]);
+
+		/* c1 = c1 - v0 - v1 */
+		fp6_sub(c[1], t0, v0);
+		fp6_sub(c[1], c[1], v1);
+
+		/* c0 = v0 + v * v1 */
+		fp6_mul_art(v1, v1);
+		fp6_add(c[0], v0, v1);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp6_free(v0);
+		fp6_free(v1);
+		fp6_free(t0);
+	}
+}
+
 void fp12_inv(fp12_t c, fp12_t a) {
 	fp6_t t0;
 	fp6_t t1;

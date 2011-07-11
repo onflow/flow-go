@@ -64,10 +64,6 @@ static void ep2_add_basic_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 		fp2_new(t1);
 		fp2_new(t2);
 
-		if (!q->norm) {
-			THROW(ERR_INVALID);
-		}
-
 		/* t0 = x2 - x1. */
 		fp2_sub(t0, q->x, p->x);
 		/* t1 = y2 - y1. */

@@ -575,6 +575,69 @@ void fp6_sqr_lazyr2(fp6_t c, fp6_t a) {
 
 #endif
 
+void fp6_mul_dxs(fp6_t c, fp6_t a, fp6_t b) {
+	fp2_t v0, v1, t0, t1, t2;
+
+	fp2_null(v0);
+	fp2_null(v1);
+	fp2_null(t0);
+	fp2_null(t1);
+	fp2_null(t2);
+
+	TRY {
+		fp2_new(v0);
+		fp2_new(v1);
+		fp2_new(t0);
+		fp2_new(t1);
+		fp2_new(t2);
+
+		/* v0 = a0b0 */
+		fp2_mul(v0, a[0], b[0]);
+
+		/* v1 = a1b1 */
+		fp2_mul(v1, a[1], b[1]);
+
+		/* v2 = a2b2 = 0 */
+
+		/* t2 (c0) = v0 + E((a1 + a2)(b1 + b2) - v1 - v2) */
+		fp2_add(t0, a[1], a[2]);
+		fp2_mul(t2, t0, b[1]);
+		fp2_sub(t2, t2, v1);
+		fp2_mul_nor(t2, t2);
+		fp2_add(t2, t2, v0);
+
+		/* c1 = (a0 + a1)(b0 + b1) - v0 - v1 + Ev2 */
+		fp2_add(t0, a[0], a[1]);
+		fp2_add(t1, b[0], b[1]);
+		fp2_mul(c[1], t0, t1);
+		fp2_sub(c[1], c[1], v0);
+		fp2_sub(c[1], c[1], v1);
+
+		/* c2 = (a0 + a2)(b0 + b2) - v0 + v1 - v2 */
+		fp2_add(t0, a[0], a[2]);
+		fp2_mul(c[2], t0, b[0]);
+		fp2_sub(c[2], c[2], v0);
+		fp2_add(c[2], c[2], v1);
+
+		/* c0 = t2 */
+		fp2_copy(c[0], t2);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp2_free(v0);
+		fp2_free(v1);
+		fp2_free(t0);
+		fp2_free(t1);
+		fp2_free(t2);
+	}
+}
+
+void fp6_mul_dxq(fp6_t c, fp6_t a, fp2_t b) {
+	fp2_mul(c[0], a[0], b);
+	fp2_mul(c[1], a[1], b);
+	fp2_mul(c[2], a[2], b);
+}
+
 void fp6_mul_art(fp6_t c, fp6_t a) {
 	fp2_t t0;
 
