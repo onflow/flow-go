@@ -541,6 +541,14 @@ int bn_get_bit(bn_t a, int bit);
 void bn_set_bit(bn_t a, int bit, int value);
 
 /**
+ * Returns the Hamming weight of a multiple precision integer.
+ *
+ * @param[in] a				- the multiple precision integer.
+ * @return the number of non-zero bits.
+ */
+int bn_ham(bn_t a);
+
+/**
  * Reads the first digit in a multiple precision integer.
  *
  * @param[out] digit		- the result.

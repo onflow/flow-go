@@ -179,6 +179,17 @@ static int util(void) {
 		}
 		TEST_END;
 
+		bits = 0;
+		TEST_BEGIN("hamming weight is correct") {
+			bn_zero(a);
+			for (int j = 0; j < bits; j++) {
+				bn_set_bit(a, j, 1);
+			}
+			TEST_ASSERT(bn_ham(a) == bits, end);
+			bits = (bits + 1) % BN_BITS;
+		}
+		TEST_END;
+
 		TEST_BEGIN("reading and writing the first digit are consistent") {
 			bn_rand(a, BN_POS, BN_DIGIT);
 			bn_rand(b, BN_POS, BN_DIGIT);

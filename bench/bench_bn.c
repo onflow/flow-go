@@ -174,6 +174,12 @@ static void util(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("bn_ham") {
+		bn_rand(a, BN_POS, BN_BITS);
+		BENCH_ADD(bn_ham(a));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("bn_get_dig") {
 		bn_rand(a, BN_POS, BN_BITS);
 		BENCH_ADD(bn_get_dig(&digit, a));
@@ -243,7 +249,7 @@ static void util(void) {
 
 	BENCH_BEGIN("bn_write_raw") {
 		bn_rand(a, BN_POS, BN_BITS);
-		bn_size_bin(&len, a);
+		bn_size_raw(&len, a);
 		BENCH_ADD(bn_write_raw(raw, len, a));
 	}
 	BENCH_END;
