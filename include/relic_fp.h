@@ -910,7 +910,7 @@ void fp_inv_exgcd(fp_t c, fp_t a);
 void fp_inv_lower(fp_t c, fp_t a);
 
 /**
- * Inverts multiple prime field elements.
+ * Inverts multiple prime field elements simultaneously.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the prime field elements to invert.

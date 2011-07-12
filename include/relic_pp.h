@@ -372,7 +372,7 @@ typedef ep2_st *ep2_t;
  * @param[out] A			- the point to initialize.
  */
 #if ALLOC == AUTO
-#define ep2_null(A)			/* empty */
+#define ep2_null(A)				/* empty */
 #else
 #define ep2_null(A)			A = NULL
 #endif
@@ -404,7 +404,7 @@ typedef ep2_st *ep2_t;
 	fp2_new((A)->z);														\
 
 #elif ALLOC == AUTO
-#define ep2_new(A)			/* empty */
+#define ep2_new(A)				/* empty */
 
 #elif ALLOC == STACK
 #define ep2_new(A)															\
@@ -437,7 +437,7 @@ typedef ep2_st *ep2_t;
 	}																		\
 
 #elif ALLOC == AUTO
-#define ep2_free(A)			/* empty */
+#define ep2_free(A)				/* empty */
 
 #elif ALLOC == STACK
 #define ep2_free(A)															\
@@ -824,6 +824,15 @@ void fp2_sqr_basic(fp2_t c, fp2_t a);
  * @param[in] a				- the quadratic extension field element to square.
  */
 void fp2_sqr_integ(fp2_t c, fp2_t a);
+
+/**
+ * Inverts multiple quadratic extension field elements simultaneously.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quadratic extension field elements to invert.
+ * @param[in] n				- the number of elements.
+ */
+void fp2_inv_sim(fp2_t *c, fp2_t *a, int n);
 
 /**
  * Inverts a quadratic extension field element. Computes c = a^(-1).
@@ -1264,6 +1273,16 @@ void fp12_conv_cyc(fp12_t c, fp12_t a);
 void fp12_back_cyc(fp12_t c, fp12_t a);
 
 /**
+ * Decompresses multiple compressed cyclotomic extension field elements to its
+ * usual representation.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the dodecic field elements to decompress.
+ * @param[in] n				- the number of field elements to decompress.
+ */
+void fp12_back_cyc_sim(fp12_t *c, fp12_t *a, int n);
+
+/**
  * Inverts a dodecic extension field element. Computes c = a^(-1).
  *
  * @param[out] c			- the result.
@@ -1458,7 +1477,7 @@ int ep2_is_valid(ep2_t p);
  * @param[in] p				- the point to multiply.
  * @param[in] w				- the window width.
  */
-void ep2_tab(ep2_t *t, ep2_t p, int w);
+void ep2_tab(ep2_t * t, ep2_t p, int w);
 
 /**
  * Prints a elliptic curve point.
@@ -1612,7 +1631,7 @@ void ep2_mul_gen(ep2_t r, bn_t k);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void ep2_mul_pre_basic(ep2_t *t, ep2_t p);
+void ep2_mul_pre_basic(ep2_t * t, ep2_t p);
 
 /**
  * Builds a precomputation table for multiplying a fixed prime elliptic point
@@ -1621,7 +1640,7 @@ void ep2_mul_pre_basic(ep2_t *t, ep2_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void ep2_mul_pre_yaowi(ep2_t *t, ep2_t p);
+void ep2_mul_pre_yaowi(ep2_t * t, ep2_t p);
 
 /**
  * Builds a precomputation table for multiplying a fixed prime elliptic point
@@ -1630,7 +1649,7 @@ void ep2_mul_pre_yaowi(ep2_t *t, ep2_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void ep2_mul_pre_nafwi(ep2_t *t, ep2_t p);
+void ep2_mul_pre_nafwi(ep2_t * t, ep2_t p);
 
 /**
  * Builds a precomputation table for multiplying a fixed prime elliptic point
@@ -1639,7 +1658,7 @@ void ep2_mul_pre_nafwi(ep2_t *t, ep2_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void ep2_mul_pre_combs(ep2_t *t, ep2_t p);
+void ep2_mul_pre_combs(ep2_t * t, ep2_t p);
 
 /**
  * Builds a precomputation table for multiplying a fixed prime elliptic point
@@ -1648,7 +1667,7 @@ void ep2_mul_pre_combs(ep2_t *t, ep2_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void ep2_mul_pre_combd(ep2_t *t, ep2_t p);
+void ep2_mul_pre_combd(ep2_t * t, ep2_t p);
 
 /**
  * Builds a precomputation table for multiplying a fixed prime elliptic point
@@ -1657,7 +1676,7 @@ void ep2_mul_pre_combd(ep2_t *t, ep2_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void ep2_mul_pre_lwnaf(ep2_t *t, ep2_t p);
+void ep2_mul_pre_lwnaf(ep2_t * t, ep2_t p);
 
 /**
  * Multiplies a fixed prime elliptic point using a precomputation table and
@@ -1667,7 +1686,7 @@ void ep2_mul_pre_lwnaf(ep2_t *t, ep2_t p);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void ep2_mul_fix_basic(ep2_t r, ep2_t *t, bn_t k);
+void ep2_mul_fix_basic(ep2_t r, ep2_t * t, bn_t k);
 
 /**
  * Multiplies a fixed prime elliptic point using a precomputation table and
@@ -1677,7 +1696,7 @@ void ep2_mul_fix_basic(ep2_t r, ep2_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void ep2_mul_fix_yaowi(ep2_t r, ep2_t *t, bn_t k);
+void ep2_mul_fix_yaowi(ep2_t r, ep2_t * t, bn_t k);
 
 /**
  * Multiplies a fixed prime elliptic point using a precomputation table and
@@ -1687,7 +1706,7 @@ void ep2_mul_fix_yaowi(ep2_t r, ep2_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void ep2_mul_fix_nafwi(ep2_t r, ep2_t *t, bn_t k);
+void ep2_mul_fix_nafwi(ep2_t r, ep2_t * t, bn_t k);
 
 /**
  * Multiplies a fixed prime elliptic point using a precomputation table and
@@ -1697,7 +1716,7 @@ void ep2_mul_fix_nafwi(ep2_t r, ep2_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void ep2_mul_fix_combs(ep2_t r, ep2_t *t, bn_t k);
+void ep2_mul_fix_combs(ep2_t r, ep2_t * t, bn_t k);
 
 /**
  * Multiplies a fixed prime elliptic point using a precomputation table and
@@ -1707,7 +1726,7 @@ void ep2_mul_fix_combs(ep2_t r, ep2_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void ep2_mul_fix_combd(ep2_t r, ep2_t *t, bn_t k);
+void ep2_mul_fix_combd(ep2_t r, ep2_t * t, bn_t k);
 
 /**
  * Multiplies a fixed prime elliptic point using a precomputation table and
@@ -1717,7 +1736,7 @@ void ep2_mul_fix_combd(ep2_t r, ep2_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void ep2_mul_fix_lwnaf(ep2_t r, ep2_t *t, bn_t k);
+void ep2_mul_fix_lwnaf(ep2_t r, ep2_t * t, bn_t k);
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously using

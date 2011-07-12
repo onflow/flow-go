@@ -479,6 +479,48 @@ void fp2_inv(fp2_t c, fp2_t a) {
 	}
 }
 
+void fp2_inv_sim(fp2_t *c, fp2_t *a, int n) {
+	int i;
+	fp2_t u, t[n];
+
+	for (i = 0; i < n; i++) {
+		fp2_null(t[i]);
+	}
+	fp2_null(u);
+
+	TRY {
+		for (i = 0; i < n; i++) {
+			fp2_new(t[i]);
+		}
+		fp2_new(u);
+
+		fp2_copy(c[0], a[0]);
+		fp2_copy(t[0], a[0]);
+
+		for (i = 1; i < n; i++) {
+			fp2_copy(t[i], a[i]);
+			fp2_mul(c[i], c[i - 1], t[i]);
+		}
+
+		fp2_inv(u, c[n - 1]);
+
+		for (i = n - 1; i > 0; i--) {
+			fp2_mul(c[i], c[i - 1], u);
+			fp2_mul(u, u, t[i]);
+		}
+		fp2_copy(c[0], u);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		for (i = 0; i < n; i++) {
+			fp2_free(t[i]);
+		}
+		fp2_free(u);
+	}
+}
+
 void fp2_frb(fp2_t c, fp2_t a) {
 	/* (a_0 + a_1 * u)^p = a_0 - a_1 * u. */
 	fp_copy(c[0], a[0]);

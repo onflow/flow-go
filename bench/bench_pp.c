@@ -102,13 +102,15 @@ static void util2(void) {
 }
 
 static void arith2(void) {
-	fp2_t a, b, c;
-	bn_t d;
+	fp2_t a, b, c, d[2];
+	bn_t e;
 
 	fp2_new(a);
 	fp2_new(b);
 	fp2_new(c);
-	bn_new(d);
+	fp2_new(d[0]);
+	fp2_new(d[1]);
+	bn_new(e);
 
 	BENCH_BEGIN("fp2_add") {
 		fp2_rand(a);
@@ -247,11 +249,18 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fp2_inv_sim (2)") {
+		fp2_rand(d[0]);
+		fp2_rand(d[1]);
+		BENCH_ADD(fp2_inv_sim(d, d, 2));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fp2_exp") {
 		fp2_rand(a);
-		d->used = FP_DIGS;
-		dv_copy(d->dp, fp_prime_get(), FP_DIGS);
-		BENCH_ADD(fp2_exp(c, a, d));
+		e->used = FP_DIGS;
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		BENCH_ADD(fp2_exp(c, a, e));
 	}
 	BENCH_END;
 
@@ -276,6 +285,9 @@ static void arith2(void) {
 	fp2_free(a);
 	fp2_free(b);
 	fp2_free(c);
+	fp2_free(d[0]);
+	fp2_free(d[1]);
+	bn_free(e);
 }
 
 static void memory6(void) {
@@ -526,13 +538,15 @@ static void util12(void) {
 }
 
 static void arith12(void) {
-	fp12_t a, b, c;
-	bn_t d;
+	fp12_t a, b, c, d[2];
+	bn_t e;
 
 	fp12_new(a);
 	fp12_new(b);
 	fp12_new(c);
-	bn_new(d);
+	fp12_new(d[0]);
+	fp12_new(d[1]);
+	bn_new(e);
 
 	BENCH_BEGIN("fp12_add") {
 		fp12_rand(a);
@@ -639,6 +653,13 @@ static void arith12(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fp12_back_cyc (2)") {
+		fp12_rand(d[0]);
+		fp12_rand(d[1]);
+		BENCH_ADD(fp12_back_cyc_sim(d, d, 2));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fp12_conv_uni") {
 		fp12_rand(a);
 		BENCH_ADD(fp12_conv_uni(c, a));
@@ -659,17 +680,17 @@ static void arith12(void) {
 
 	BENCH_BEGIN("fp12_exp") {
 		fp12_rand(a);
-		d->used = FP_DIGS;
-		dv_copy(d->dp, fp_prime_get(), FP_DIGS);
-		BENCH_ADD(fp12_exp(c, a, d));
+		e->used = FP_DIGS;
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		BENCH_ADD(fp12_exp(c, a, e));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("fp12_exp_cyc") {
 		fp12_rand(a);
-		d->used = FP_DIGS;
-		dv_copy(d->dp, fp_prime_get(), FP_DIGS);
-		BENCH_ADD(fp12_exp_cyc(c, a, d));
+		e->used = FP_DIGS;
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		BENCH_ADD(fp12_exp_cyc(c, a, e));
 	}
 	BENCH_END;
 
@@ -688,6 +709,9 @@ static void arith12(void) {
 	fp12_free(a);
 	fp12_free(b);
 	fp12_free(c);
+	fp12_free(d[0]);
+	fp12_free(d[1]);
+	bn_free(e);
 }
 
 static void memory(void) {

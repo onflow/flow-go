@@ -503,12 +503,14 @@ static int squaring2(void) {
 
 static int inversion2(void) {
 	int code = STS_ERR;
-	fp2_t a, b, c;
+	fp2_t a, b, c, d[2];
 
 	TRY {
 		fp2_new(a);
 		fp2_new(b);
 		fp2_new(c);
+		fp2_new(d[0]);
+		fp2_new(d[1]);
 
 		TEST_BEGIN("inversion is correct") {
 			fp2_rand(a);
@@ -517,6 +519,18 @@ static int inversion2(void) {
 			fp2_zero(b);
 			fp_set_dig(b[0], 1);
 			TEST_ASSERT(fp2_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("simultaneous inversion is correct") {
+			fp2_rand(a);
+			fp2_rand(b);
+			fp2_copy(d[0], a);
+			fp2_copy(d[1], b);
+			fp2_inv(a, a);
+			fp2_inv(b, b);
+			fp2_inv_sim(d, d, 2);
+			TEST_ASSERT(fp2_cmp(d[0], a) == CMP_EQ &&
+					fp2_cmp(d[1], b) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
@@ -528,6 +542,8 @@ static int inversion2(void) {
 	fp2_free(a);
 	fp2_free(b);
 	fp2_free(c);
+	fp2_free(d[0]);
+	fp2_free(d[1]);
 	return code;
 }
 
@@ -1393,18 +1409,32 @@ static int squaring12(void) {
 
 static int cyclotomic12(void) {
 	int code = STS_ERR;
-	fp12_t a, b, c;
+	fp12_t a, b, c, d[2], e[2];
 
 	TRY {
 		fp12_new(a);
 		fp12_new(b);
 		fp12_new(c);
+		fp12_new(d[0]);
+		fp12_new(d[1]);
+		fp12_new(e[0]);
+		fp12_new(e[1]);
 
 		TEST_BEGIN("compression in cyclotomic subgroup is correct") {
 			fp12_rand(a);
 			fp12_conv_cyc(a, a);
 			fp12_back_cyc(c, a);
 			TEST_ASSERT(fp12_cmp(a, c) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("simultaneous compression in cyclotomic subgroup is correct") {
+			fp12_rand(d[0]);
+			fp12_rand(d[1]);
+			fp12_conv_cyc(d[0], d[0]);
+			fp12_conv_cyc(d[1], d[1]);
+			fp12_back_cyc_sim(e, d, 2);
+			TEST_ASSERT(fp12_cmp(d[0], e[0]) == CMP_EQ &&
+					fp12_cmp(d[1], e[1]) == CMP_EQ, end);
 		} TEST_END;
 
 		TEST_BEGIN("cyclotomic squaring is correct") {
@@ -1485,6 +1515,10 @@ static int cyclotomic12(void) {
 	fp12_free(a);
 	fp12_free(b);
 	fp12_free(c);
+	fp12_free(d[0]);
+	fp12_free(d[1]);
+	fp12_free(e[0]);
+	fp12_free(e[1]);
 	return code;
 }
 

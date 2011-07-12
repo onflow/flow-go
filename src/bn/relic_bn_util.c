@@ -156,6 +156,18 @@ void bn_set_bit(bn_t a, int bit, int value) {
 	}
 }
 
+int bn_ham(bn_t a) {
+	int c = 0;
+
+	for (int i = 0; i < bn_bits(a); i++) {
+		if (bn_test_bit(a, i)) {
+			c++;
+		}
+	}
+
+	return c;
+}
+
 void bn_get_dig(dig_t *c, bn_t a) {
 	*c = a->dp[0];
 }
