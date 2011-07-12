@@ -723,7 +723,7 @@ void fp12_exp(fp12_t c, fp12_t a, bn_t b) {
 
 void fp12_exp_cyc(fp12_t c, fp12_t a, bn_t b) {
 	fp12_t t;
-	int i, j, w = bn_ham(b);
+	int i, j, k, w = bn_ham(b);
 
 	fp12_null(t);
 
@@ -749,8 +749,8 @@ void fp12_exp_cyc(fp12_t c, fp12_t a, bn_t b) {
 		}
 	} else {
 		TRY {
-			fp12_t u[w - 1];
-			for (i = 0; i < w - 1; i++) {
+			fp12_t u[w];
+			for (i = 0; i < w; i++) {
 				fp12_null(u[i]);
 				fp12_new(u[i]);
 			}
@@ -765,15 +765,23 @@ void fp12_exp_cyc(fp12_t c, fp12_t a, bn_t b) {
 				}
 			}
 
-			fp12_back_cyc_sim(u, u, w - 1);
+			if (!bn_is_even(b)) {
+				j = 0;
+				k = w - 1;
+			} else {
+				j = 1;
+				k = w;
+			}
+
+			fp12_back_cyc_sim(u, u, k);
 
 			if (!bn_is_even(b)) {
 				fp12_copy(c, a);
 			} else {
-				fp12_zero(c);
-				fp_set_dig(c[0][0][0], 1);
+				fp12_copy(c, u[0]);
 			}
-			for (i = 0; i < w - 1; i++) {
+
+			for (i = j; i < k; i++) {
 				fp12_mul(c, c, u[i]);
 			}
 		}

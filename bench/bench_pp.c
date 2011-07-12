@@ -694,6 +694,15 @@ static void arith12(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fp12_exp_cyc (3)") {
+		fp12_rand(a);
+		bn_set_2b(e, FP_BITS - 1);
+		bn_set_bit(e, FP_BITS / 2, 1);
+		bn_set_bit(e, 0, 1);
+		BENCH_ADD(fp12_exp_cyc(c, a, e));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fp12_frb") {
 		fp12_rand(a);
 		BENCH_ADD(fp12_frb(c, a));

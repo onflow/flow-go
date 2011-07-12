@@ -1410,6 +1410,7 @@ static int squaring12(void) {
 static int cyclotomic12(void) {
 	int code = STS_ERR;
 	fp12_t a, b, c, d[2], e[2];
+	bn_t f;
 
 	TRY {
 		fp12_new(a);
@@ -1419,6 +1420,7 @@ static int cyclotomic12(void) {
 		fp12_new(d[1]);
 		fp12_new(e[0]);
 		fp12_new(e[1]);
+		bn_new(f);
 
 		TEST_BEGIN("compression in cyclotomic subgroup is correct") {
 			fp12_rand(a);
@@ -1505,6 +1507,27 @@ static int cyclotomic12(void) {
 			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 #endif
+
+		TEST_BEGIN("cyclotomic exponentiation is correct") {
+			bn_rand(f, BN_POS, FP_BITS);
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			fp12_exp(b, a, f);
+			fp12_exp_cyc(c, a, f);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("sparse cyclotomic exponentiation is correct") {
+			bn_rand(f, BN_POS, BN_DIGIT);
+			d[0][0][0][0][0] = f->dp[0];
+			bn_set_2b(f, FP_BITS - 1);
+			bn_set_bit(f, d[0][0][0][0][0] % FP_BITS, 1);
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			fp12_exp(b, a, f);
+			fp12_exp_cyc(c, a, f);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -1519,6 +1542,7 @@ static int cyclotomic12(void) {
 	fp12_free(d[1]);
 	fp12_free(e[0]);
 	fp12_free(e[1]);
+	bn_free(f);
 	return code;
 }
 
