@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Implementation of the R-Ate bilinear pairing.
+ * Implementation of the pairings over prime curves.
  *
  * @version $Id$
  * @ingroup pp
@@ -37,118 +37,6 @@
 /*============================================================================*/
 /* Private definitions                                                        */
 /*============================================================================*/
-
-/**
- * Adds two prime elliptic curve points and evaluates the corresponding line
- * function at another elliptic curve point.
- *
- * @param[out] l			- the result of the evaluation.
- * @param[in,out] r			- the first point to add, in Affine coordinates.
- * 							The result of the addition, in Jacobian coordinates.
- * @param[in] q				- the second point to add, in Jacobian coordinates.
- * @param[in] p				- the point where the line function will be
- * 							evaluated, in Affine coordinates.
- */
-void pp_add(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
-	fp2_t slope;
-	ep2_t t;
-
-	fp2_null(slope);
-	ep2_null(t);
-
-	TRY {
-		fp2_new(slope);
-		ep2_new(t);
-
-		ep2_copy(t, r);
-		ep2_add_slp(r, slope, r, q);
-
-#if EP_ADD == BASIC
-		fp_mul(l[1][0][0], slope[0], p->x);
-		fp_mul(l[1][0][1], slope[1], p->x);
-		fp2_mul(l[1][1], slope, t->x);
-		fp2_sub(l[1][1], t->y, l[1][1]);
-		fp_neg(l[0][0][0], p->y);
-		fp_zero(l[0][0][1]);
-#else
-		fp_mul(l[1][0][0], slope[0], p->x);
-		fp_mul(l[1][0][1], slope[1], p->x);
-		fp2_neg(l[1][0], l[1][0]);
-
-		fp2_mul(l[1][1], slope, q->x);
-		fp2_mul(slope, r->z, q->y);
-		fp2_sub(l[1][1], l[1][1], slope);
-
-		fp_mul(l[0][0][0], r->z[0], p->y);
-		fp_mul(l[0][0][1], r->z[1], p->y);
-#endif
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fp2_free(slope);
-		ep2_free(t);
-	}
-}
-
-/**
- * Doubles a prime elliptic curve point and evaluates the corresponding line
- * function at another elliptic curve point.
- *
- * @param[out] l			- the result of the evaluation.
- * @param[out] r			- the result, in Jacobian coordinates.
- * @param[in] q				- the point to double, in Jacobian coordinates.
- * @param[in] p				- the point where the line function will be
- * 							evaluated, in Affine coordinates.
- */
-void pp_dbl(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
-	fp2_t s;
-	fp2_t e;
-	ep2_t t;
-
-	fp2_null(s);
-	fp2_null(e);
-	ep2_null(t);
-
-	TRY {
-		fp2_new(s);
-		fp2_new(e);
-		ep2_new(t);
-		ep2_copy(t, r);
-		ep2_dbl_slp(r, s, e, r);
-
-#if EP_ADD == BASIC
-		fp_mul(l[1][0][0], s[0], p->x);
-		fp_mul(l[1][0][1], s[1], p->x);
-		fp2_mul(l[1][1], s, t->x);
-		fp2_sub(l[1][1], t->y, l[1][1]);
-		fp_neg(l[0][0][0], p->y);
-		fp_zero(l[0][0][1]);
-#else
-		fp2_sqr(t->z, t->z);
-		fp2_mul(l[1][0], t->z, s);
-		fp_mul(l[1][0][0], l[1][0][0], p->x);
-		fp_mul(l[1][0][1], l[1][0][1], p->x);
-		fp2_neg(l[1][0], l[1][0]);
-
-		fp2_mul(l[1][1], s, t->x);
-		fp2_sub(l[1][1], l[1][1], e);
-
-		fp2_mul(l[0][0], r->z, t->z);
-		fp_mul(l[0][0][0], l[0][0][0], p->y);
-		fp_mul(l[0][0][1], l[0][0][1], p->y);
-#endif
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fp2_free(s);
-		fp2_free(e);
-		ep2_free(t);
-	}
-}
 
 #define PART 32
 
@@ -178,10 +66,10 @@ void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
 		for (int i = bn_bits(a) - 2; i >= 0; i--) {
 			fp12_sqr(r, r);
 			pp_dbl(tmp, t, t, p);
-			fp12_mul_dxs(r, r, tmp);
+			fp12_mul(r, r, tmp);
 			if (bn_test_bit(a, i)) {
 				pp_add(tmp, t, q, p);
-				fp12_mul_dxs(r, r, tmp);
+				fp12_mul(r, r, tmp);
 			}
 		}
 	}
@@ -226,10 +114,10 @@ void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
 				for (int i = bn_bits(a0) - 2; i >= 0; i--) {
 					fp12_sqr(_f[0], _f[0]);
 					pp_dbl(_t[0], _q[0], _q[0], p);
-					fp12_mul_dxs(_f[0], _f[0], _t[0]);
+					fp12_mul(_f[0], _f[0], _t[0]);
 					if (bn_test_bit(a0, i)) {
 						pp_add(_t[0], _q[0], q, p);
-						fp12_mul_dxs(_f[0], _f[0], _t[0]);
+						fp12_mul(_f[0], _f[0], _t[0]);
 					}
 				}
 				for (int i = PART - 1; i >= 0; i--) {
@@ -244,10 +132,10 @@ void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
 				for (int i = PART - 1; i >= 0; i--) {
 					fp12_sqr(_f[1], _f[1]);
 					pp_dbl(_t[1], _q[1], _q[1], p);
-					fp12_mul_dxs(_f[1], _f[1], _t[1]);
+					fp12_mul(_f[1], _f[1], _t[1]);
 					if (bn_test_bit(a, i)) {
 						pp_add(_t[1], _q[1], q, p);
-						fp12_mul_dxs(_f[1], _f[1], _t[1]);
+						fp12_mul(_f[1], _f[1], _t[1]);
 					}
 				}
 				ep2_copy(t, _q[1]);
@@ -395,7 +283,7 @@ void pp_r_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp_zero(q1->z[1]);
 
 		pp_add(tmp1, r1q, q, p);
-		fp12_mul_dxs(tmp2, res, tmp1);
+		fp12_mul(tmp2, res, tmp1);
 		fp12_frb(tmp2, tmp2);
 		fp12_mul(res, res, tmp2);
 
@@ -407,7 +295,7 @@ void pp_r_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		ep2_copy(r1q, t);
 
 		pp_add(tmp1, r1q, q1, p);
-		fp12_mul_dxs(res, res, tmp1);
+		fp12_mul(res, res, tmp1);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -450,9 +338,9 @@ void pp_o_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		ep2_neg(q2, q2);
 
 		pp_add(tmp, t, q1, p);
-		fp12_mul_dxs(res, res, tmp);
+		fp12_mul(res, res, tmp);
 		pp_add(tmp, t, q2, p);
-		fp12_mul_dxs(res, res, tmp);
+		fp12_mul(res, res, tmp);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -526,7 +414,7 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp12_zero(tmp);
 		/* q1 = p*xQ + xQ. */
 		pp_add(tmp, q1, t, p);
-		fp12_mul_dxs(res, res, tmp);
+		fp12_mul(res, res, tmp);
 
 		/* q2 = q2 + q3. */
 		pp_add(tmp, q2, q3, p);
@@ -536,7 +424,7 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		ep2_norm(q2, q2);
 		pp_add(tmp, q1, q2, p);
 
-		fp12_mul_dxs(res, res, tmp);
+		fp12_mul(res, res, tmp);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {

@@ -595,6 +595,36 @@ typedef ep2_st *ep2_t;
 #endif
 
 /**
+ * Adds two prime elliptic curve points and evaluates the corresponding line
+ * function at another elliptic curve point.
+ *
+ * @param[out] L			- the result of the evaluation.
+ * @param[in, out] R		- the resulting point and first point to add.
+ * @param[in] Q				- the second point to add.
+ * @param[in] P				- the affine point to evaluate the line function.
+ */
+#if EP_ADD == BASIC
+#define pp_add(L, R, Q, P)		pp_add_basic(L, R, Q, P)
+#elif EP_ADD == PROJC
+#define pp_add(L, R, Q, P)		pp_add_projc(L, R, Q, P)
+#endif
+
+/**
+ * Doubles a prime elliptic curve point and evaluates the corresponding line
+ * function at another elliptic curve point.
+ *
+ * @param[out] L			- the result of the evaluation.
+ * @param[out] R			- the resulting point.
+ * @param[in] Q				- the point to double.
+ * @param[in] P				- the affine point to evaluate the line function.
+ */
+#if EP_ADD == BASIC
+#define pp_dbl(L, R, Q, P)		pp_dbl_basic(L, R, Q, P)
+#elif EP_ADD == PROJC
+#define pp_dbl(L, R, Q, P)		pp_dbl_projc(L, R, Q, P)
+#endif
+
+/**
  * Computes the pairing of two binary elliptic curve points. Computes e(P, Q).
  *
  * @param[out] R			- the result.
@@ -602,26 +632,16 @@ typedef ep2_st *ep2_t;
  * @param[in] Q				- the second elliptic curve point.
  */
 #if PP_MAP == R_ATE
-#define pp_map(R, P, Q)		pp_map_r_ate(R, P, Q)
+#define pp_map(R, P, Q)				pp_map_r_ate(R, P, Q)
 #elif PP_MAP == O_ATE
-#define pp_map(R, P, Q)		pp_map_o_ate(R, P, Q)
+#define pp_map(R, P, Q)				pp_map_o_ate(R, P, Q)
 #elif PP_MAP == X_ATE
-#define pp_map(R, P, Q)		pp_map_x_ate(R, P, Q)
+#define pp_map(R, P, Q)				pp_map_x_ate(R, P, Q)
 #endif
 
 /*============================================================================*/
 /* Function prototypes                                                        */
 /*============================================================================*/
-
-/**
- * Initializes the pairing over elliptic curves.
- */
-void pp_map_init(void);
-
-/**
- * Finalizes the pairing over elliptic curves.
- */
-void pp_map_clean(void);
 
 /**
  * Initializes the constant needed to compute the Frobenius map.
@@ -1488,7 +1508,7 @@ void ep2_print(ep2_t p);
 
 /**
  * Negates a point represented in affine coordinates in an elliptic curve over
- * a quadratic twist.
+ * a quadratic extension.
  *
  * @param[out] r			- the result.
  * @param[out] p			- the point to negate.
@@ -1496,8 +1516,8 @@ void ep2_print(ep2_t p);
 void ep2_neg_basic(ep2_t r, ep2_t p);
 
 /**
- * Negates a point represented in projective coordinates in an elliptic curve over
- * a quadratic twist.
+ * Negates a point represented in projective coordinates in an elliptic curve
+ * over a quadratic exyension.
  *
  * @param[out] r			- the result.
  * @param[out] p			- the point to negate.
@@ -1853,6 +1873,28 @@ void pp_map_init(void);
  * Finalizes the pairing over prime fields.
  */
 void pp_map_clean(void);
+
+/**
+ * Adds two prime elliptic curve points and evaluates the corresponding line
+ * function at another elliptic curve point using affine coordinates.
+ *
+ * @param[out] l			- the result of the evaluation.
+ * @param[in, out] r		- the resulting point and first point to add.
+ * @param[in] q				- the second point to add.
+ * @param[in] p				- the affine point to evaluate the line function.
+ */
+void pp_add_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p);
+
+/**
+ * Adds two prime elliptic curve points and evaluates the corresponding line
+ * function at another elliptic curve point using projective coordinates.
+ *
+ * @param[out] l			- the result of the evaluation.
+ * @param[in, out] r		- the resulting point and first point to add.
+ * @param[in] q				- the second point to add.
+ * @param[in] p				- the affine point to evaluate the line function.
+ */
+void pp_add_projc(fp12_t l, ep2_t r, ep2_t q, ep_t p);
 
 /**
  * Computes the R-ate pairing of two points in a parameterized elliptic curve.
