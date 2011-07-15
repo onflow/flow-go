@@ -38,7 +38,12 @@
 -T fb_t
 -T fb2_t
 -T fb4_t
+-T fp2_t
+-T fp6_t
+-T fp12_t
 -T eb_t
+-T ep_t
+-T ep2_t
 -T err_t
 -T ctx_t
 -T state_t
