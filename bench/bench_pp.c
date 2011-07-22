@@ -221,6 +221,22 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
+#if PP_QUD == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fp2_mul_nor_basic") {
+		fp2_rand(a);
+		BENCH_ADD(fp2_mul_nor_basic(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if PP_QUD == INTEG || !defined(STRIP)
+	BENCH_BEGIN("fp2_mul_nor_integ") {
+		fp2_rand(a);
+		BENCH_ADD(fp2_mul_nor_integ(c, a));
+	}
+	BENCH_END;
+#endif
+
 	BENCH_BEGIN("fp2_sqr") {
 		fp2_rand(a);
 		BENCH_ADD(fp2_sqr(c, a));
@@ -536,7 +552,7 @@ static void util12(void) {
 	fp12_free(a);
 	fp12_free(b);
 }
-
+#include <assert.h>
 static void arith12(void) {
 	fp12_t a, b, c, d[2];
 	bn_t e;
@@ -586,6 +602,13 @@ static void arith12(void) {
 	}
 	BENCH_END;
 #endif
+
+	BENCH_BEGIN("fp12_mul_dxs") {
+		fp12_rand(a);
+		fp12_rand(b);
+		BENCH_ADD(fp12_mul_dxs(c, a, b));
+	}
+	BENCH_END;
 
 	BENCH_BEGIN("fp12_sqr") {
 		fp12_rand(a);
@@ -641,6 +664,13 @@ static void arith12(void) {
 	BENCH_END;
 #endif
 
+	BENCH_BEGIN("fp12_test_cyc") {
+		fp12_rand(a);
+		fp12_conv_cyc(a, a);
+		BENCH_ADD(fp12_test_cyc(a));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fp12_conv_cyc") {
 		fp12_rand(a);
 		BENCH_ADD(fp12_conv_cyc(c, a));
@@ -686,22 +716,37 @@ static void arith12(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp12_exp_cyc") {
+	BENCH_BEGIN("fp12_exp (cyc)") {
 		fp12_rand(a);
+		fp12_conv_cyc(a, a);
 		e->used = FP_DIGS;
 		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
-		BENCH_ADD(fp12_exp_cyc(c, a, e));
+		BENCH_ADD(fp12_exp(c, a, e));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp12_exp_cyc (3)") {
+	BENCH_BEGIN("fp12_exp_cyc (param or sparse)") {
 		fp12_rand(a);
-		bn_set_2b(e, FP_BITS - 1);
-		bn_set_bit(e, FP_BITS / 2, 1);
-		bn_set_bit(e, 0, 1);
-		BENCH_ADD(fp12_exp_cyc(c, a, e));
+		fp12_conv_cyc(a, a);
+		bn_zero(e);
+		fp_param_get_var(e);
+		if (bn_is_zero(e)) {
+			bn_set_2b(e, FP_BITS - 1);
+			bn_set_bit(e, FP_BITS / 2, 1);
+			bn_set_bit(e, 0, 1);
+		}
+		BENCH_ADD(fp12_exp(c, a, e));
 	}
 	BENCH_END;
+
+	int l, *k = fp_param_get_sps(&l);
+	if (k != NULL) {
+		BENCH_BEGIN("fp12_exp_cyc_sps (param)") {
+			fp12_rand(a);
+			BENCH_ADD(fp12_exp_cyc_sps(c, a, k, l));
+		}
+		BENCH_END;
+	}
 
 	BENCH_BEGIN("fp12_frb") {
 		fp12_rand(a);
@@ -1173,7 +1218,7 @@ static void arith(void) {
 	for (int i = 0; i < EP_TABLE_LWNAF; i++) {
 		ep2_free(t[i]);
 	}
-#endif
+
 	BENCH_BEGIN("ep2_mul_sim") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
@@ -1241,6 +1286,100 @@ static void arith(void) {
 		BENCH_ADD(ep2_mul_sim_gen(r, k, q, l));
 	} BENCH_END;
 
+	BENCH_BEGIN("pp_dbl") {
+		ep2_rand(p);
+		ep_rand(_q);
+		BENCH_ADD(pp_dbl(e, p, p, _q));
+	}
+	BENCH_END;
+
+#if EP_ADD == BASIC || !defined(STRIP)
+
+	BENCH_BEGIN("pp_dbl_basic") {
+		ep2_rand(p);
+		ep_rand(_q);
+		BENCH_ADD(pp_dbl_basic(e, p, p, _q));
+	}
+	BENCH_END;
+
+#endif
+#endif
+#if EP_ADD == PROJC || !defined(STRIP)
+
+#if PP_EXT == BASIC || !defined(STRIP)
+
+	BENCH_BEGIN("pp_dbl_projc_basic") {
+		ep2_rand(p);
+		ep_rand(_q);
+		BENCH_ADD(pp_dbl_projc_basic(e, p, p, _q));
+	}
+	BENCH_END;
+
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+
+	BENCH_BEGIN("pp_dbl_projc_lazyr") {
+		ep2_rand(p);
+		ep_rand(_q);
+		BENCH_ADD(pp_dbl_projc_lazyr(e, p, p, _q));
+	}
+	BENCH_END;
+
+#endif
+
+#endif
+
+	BENCH_BEGIN("pp_add") {
+		ep2_rand(p);
+		ep_rand(_q);
+		BENCH_ADD(pp_add(e, p, p, _q));
+	}
+	BENCH_END;
+
+#if EP_ADD == BASIC || !defined(STRIP)
+
+	BENCH_BEGIN("pp_add_basic") {
+		ep2_rand(p);
+		ep_rand(_q);
+		BENCH_ADD(pp_add_basic(e, p, p, _q));
+	}
+	BENCH_END;
+
+#endif
+
+#if EP_ADD == PROJC || !defined(STRIP)
+
+#if PP_EXT == BASIC || !defined(STRIP)
+
+	BENCH_BEGIN("pp_add_projc_basic") {
+		ep2_rand(p);
+		ep_rand(_q);
+		BENCH_ADD(pp_add_projc_basic(e, p, p, _q));
+	}
+	BENCH_END;
+
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+
+	BENCH_BEGIN("pp_add_projc_lazyr") {
+		ep2_rand(p);
+		ep_rand(_q);
+		BENCH_ADD(pp_add_projc_lazyr(e, p, p, _q));
+	}
+	BENCH_END;
+
+#endif
+
+#endif
+
+	BENCH_BEGIN("pp_exp") {
+		fp12_rand(e);
+		BENCH_ADD(pp_exp(e, e));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("pp_map") {
 		ep2_rand(p);
 		ep_rand(_q);
@@ -1296,31 +1435,31 @@ int main(void) {
 	fp_param_set_any_tower();
 	fp_param_print();
 
-	util_print_banner("Quadratic extension:", 0);
-	util_print_banner("Utilities:", 1);
-	memory2();
-	util2();
-
-	util_print_banner("Arithmetic:", 1);
-	arith2();
-
-	util_print_banner("Sextic extension:", 0);
-	util_print_banner("Utilities:", 1);
-	memory6();
-	util6();
-
-	util_print_banner("Arithmetic:", 1);
-	arith6();
-
-	util_print_banner("Dodecic extension:", 0);
-	util_print_banner("Utilities:", 1);
-	memory12();
-	util12();
-
-	util_print_banner("Arithmetic:", 1);
-	arith12();
-
 	if (ep_param_set_any_pairf() == STS_OK) {
+		util_print_banner("Quadratic extension:", 0);
+		util_print_banner("Utilities:", 1);
+		memory2();
+		util2();
+
+		util_print_banner("Arithmetic:", 1);
+		arith2();
+
+		util_print_banner("Sextic extension:", 0);
+		util_print_banner("Utilities:", 1);
+		memory6();
+		util6();
+
+		util_print_banner("Arithmetic:", 1);
+		arith6();
+
+		util_print_banner("Dodecic extension:", 0);
+		util_print_banner("Utilities:", 1);
+		memory12();
+		util12();
+
+		util_print_banner("Arithmetic:", 1);
+		arith12();
+
 		ep_param_print();
 		util_print_banner("Arithmetic:", 1);
 		memory();

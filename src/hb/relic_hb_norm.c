@@ -25,7 +25,7 @@
  *
  * Implementation of the point normalization on binary elliptic curves.
  *
- * @version $Id: relic_eb_norm.c 390 2010-06-05 22:15:02Z dfaranha $
+ * @version $Id$
  * @ingroup eb
  */
 

@@ -123,8 +123,8 @@ static void ft_crtf_low(dig_t *c, dig_t *a, int *crz, int *srz, int clen,
 void ft_crtn_low(dig_t *c, dig_t *a) {
 	int *crz, *srz, clen, slen;
 
-	crz = ft_poly_get_crz_spars(&clen);
-	srz = ft_poly_get_srz_spars(&slen);
+	crz = ft_poly_get_crz_sps(&clen);
+	srz = ft_poly_get_srz_sps(&slen);
 
 	if (clen != 0 && slen != 0) {
 		ft_crtf_low(c, a, crz, srz, clen, slen);

@@ -72,8 +72,10 @@ enum {
 	BN_P158,
 	/** Barreto-Naehrig curve with negative x (found by Nogami et al.). */
 	BN_P254,
-	/** Barreto-Naehrig curve with positive x. */
+	/** Barreto-Naehrig curve with negative x. */
 	BN_P256,
+	/** Barreto-Naehrig curve with positive x. */
+	BN_P638,
 };
 
 /**

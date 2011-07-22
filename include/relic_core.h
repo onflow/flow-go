@@ -92,19 +92,24 @@
 #define OPT_ONE			1
 
 /**
+ * Optimization identifer for the case where a coefficient is 1.
+ */
+#define OPT_TWO			2
+
+/**
  * Optimization identifer for the case where a coefficient is small.
  */
-#define OPT_DIGIT		2
+#define OPT_DIGIT		3
 
 /**
  * Optimization identifier for the case where a coefficient is -3.
  */
-#define OPT_MINUS3		3
+#define OPT_MINUS3		4
 
 /**
  * Optimization identifier for the case where the coefficient is random
  */
-#define OPT_NONE		4
+#define OPT_NONE		5
 
 /*============================================================================*/
 /* Type definitions                                                           */

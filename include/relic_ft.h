@@ -289,7 +289,7 @@ dig_t *ft_poly_get_srz(void);
  * @param[out] len			- the number of terms in the squared cube root of z.
  * @return the square of the cube root of z in sparse form.
  */
-int *ft_poly_get_srz_spars(int *len);
+int *ft_poly_get_srz_sps(int *len);
 
 /**
  * Returns the cube root of z.
@@ -304,7 +304,7 @@ dig_t *ft_poly_get_crz(void);
  * @param[out] len			- the number of terms in the cube root of z.
  * @return the cube root of z in sparse form.
  */
-int *ft_poly_get_crz_spars(int *len);
+int *ft_poly_get_crz_sps(int *len);
 
 /**
  * Returns sqrt(z) * (i represented as a polynomial).

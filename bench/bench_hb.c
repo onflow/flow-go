@@ -25,7 +25,7 @@
  *
  * Benchmarks for the binary hyperelliptic curve module.
  *
- * @version $Id: bench_eb.c 390 2010-06-05 22:15:02Z dfaranha $
+ * @version $Id$
  * @ingroup bench
  */
 

@@ -25,7 +25,7 @@
  *
  * Implementation of fixed point multiplication on binary elliptic curves.
  *
- * @version $Id: relic_hb_mul_fix.c 275 2010-02-06 06:16:03Z dfaranha $
+ * @version $Id$
  * @ingroup eb
  */
 

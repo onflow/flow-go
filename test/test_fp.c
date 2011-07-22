@@ -315,6 +315,7 @@ static int subtraction(void) {
 			TEST_ASSERT(fp_is_zero(c), end);
 		}
 		TEST_END;
+
 #if FP_ADD == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic subtraction is correct") {
 			fp_rand(a);
@@ -331,6 +332,24 @@ static int subtraction(void) {
 			fp_rand(b);
 			fp_sub(c, a, b);
 			fp_sub_integ(d, a, b);
+			TEST_ASSERT(fp_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FP_ADD == INTEG || !defined(STRIP)
+		TEST_BEGIN("basic negation is correct") {
+			fp_rand(a);
+			fp_neg(c, a);
+			fp_neg_basic(d, a);
+			TEST_ASSERT(fp_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if FP_ADD == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated negation is correct") {
+			fp_rand(a);
+			fp_neg(c, a);
+			fp_neg_integ(d, a);
 			TEST_ASSERT(fp_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -727,7 +746,7 @@ static int reduction(void) {
 #endif
 
 #if FP_RDC == QUICK || !defined(STRIP)
-		if (fp_prime_get_spars(NULL) != NULL) {
+		if (fp_prime_get_sps(NULL) != NULL) {
 			TEST_BEGIN("fast modular reduction is correct") {
 				fp_rand(a);
 				fp_muln_low(t, a, fp_prime_get());

@@ -25,7 +25,7 @@
  *
  * Tests for the binary hyperelliptic curve arithmetic module.
  *
- * @version $Id: test_HB.c 390 2010-06-05 22:15:02Z dfaranha $
+ * @version $Id$
  * @ingroup test
  */
 

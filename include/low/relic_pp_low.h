@@ -25,7 +25,7 @@
  *
  * Interface of the low-level prime field arithmetic module.
  *
- * @version $Id: relic_fp_low.h 459 2010-07-13 01:34:41Z dfaranha $
+ * @version $Id$
  * @ingroup fp
  */
 
@@ -138,8 +138,17 @@ void fp2_dbln_low(fp2_t c, fp2_t a);
 void fp2_dblm_low(fp2_t c, fp2_t a);
 
 /**
+ * Multiplies a quadratic extension field element by the quadratic/cubic
+ * non-residue. Computes c = a * E.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the field element to multiply.
+ */
+void fp2_norm_low(fp2_t c, fp2_t a);
+
+/**
  * Multiplies a double-precision quadratic extension field element by the
- * quadratic/cubic non-residue. Computes c = a * b.
+ * quadratic/cubic non-residue. Computes c = a * E.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the field element to multiply.

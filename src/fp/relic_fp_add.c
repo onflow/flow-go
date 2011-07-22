@@ -138,6 +138,22 @@ void fp_sub_dig(fp_t c, fp_t a, dig_t b) {
 
 #if FP_ADD == BASIC || !defined(STRIP)
 
+void fp_neg_basic(fp_t c, fp_t a) {
+	fp_subn_low(c, fp_prime_get(), a);
+}
+
+#endif
+
+#if FP_ADD == INTEG || !defined(STRIP)
+
+void fp_neg_integ(fp_t c, fp_t a) {
+	fp_negm_low(c, a);
+}
+
+#endif
+
+#if FP_ADD == BASIC || !defined(STRIP)
+
 void fp_dbl_basic(fp_t c, fp_t a) {
 	dig_t carry;
 

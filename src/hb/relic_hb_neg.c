@@ -25,7 +25,7 @@
  *
  * Implementation of divisor class negation on binary hyperelliptic curves.
  *
- * @version $Id: relic_hb_neg.c 318 2010-03-12 15:14:39Z dfaranha $
+ * @version $Id$
  * @ingroup hb
  */
 

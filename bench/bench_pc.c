@@ -25,7 +25,7 @@
  *
  * Benchmarks for the binary elliptic curve module.
  *
- * @version $Id: bench_ec.c 366 2010-06-04 06:23:16Z dfaranha $
+ * @version $Id$
  * @ingroup bench
  */
 

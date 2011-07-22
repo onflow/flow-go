@@ -37,6 +37,7 @@
 #include "relic_conf.h"
 #include "relic_dv.h"
 #include "relic_fb.h"
+#include "relic_pb.h"
 #include "relic_fb_low.h"
 #include "relic_error.h"
 
@@ -365,6 +366,11 @@ static void fb_poly_set(fb_t f) {
 #endif
 #if FB_INV == ITOHT || !defined(STRIP)
 	find_chain();
+#endif
+
+#ifdef WITH_PB
+	/* Refresh configuration on pairing module. */
+	pb_map_init();
 #endif
 }
 

@@ -197,6 +197,10 @@ void fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
+void fp_negm_low(dig_t *c, dig_t *a) {
+	fp_subn_low(c, fp_prime_get(), a);
+}
+
 dig_t fp_dbln_low(dig_t *c, dig_t *a) {
 	int i;
 	dig_t carry, c0, c1, r0, r1;

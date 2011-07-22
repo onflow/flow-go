@@ -81,7 +81,7 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 	int first, i, j, b0, d0, b1, d1;
 	dig_t carry;
 
-	sform = fp_prime_get_spars(&len);
+	sform = fp_prime_get_sps(&len);
 
 	SPLIT(b0, d0, FP_BITS, FP_DIG_LOG);
 	first = (d0) + (b0 == 0 ? 0 : 1);

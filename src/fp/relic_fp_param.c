@@ -49,6 +49,21 @@
  */
 static int param_id;
 
+/**
+ * Maximum number of powers of 2 used to describe specia form moduli.
+ */
+#define MAX_EXPS		10
+
+/**
+ * Non-zero bits of special form prime.
+ */
+static int spars[MAX_EXPS + 1] = { 0 };
+
+/**
+ * Number of bits of special form parameter.
+ */
+static int spars_len = 0;
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -57,7 +72,7 @@ int fp_param_get(void) {
 	return param_id;
 }
 
-void fp_param_get_bn(bn_t x) {
+void fp_param_get_var(bn_t x) {
 	bn_t a;
 
 	bn_null(a);
@@ -80,7 +95,7 @@ void fp_param_get_bn(bn_t x) {
 				bn_neg(x, x);
 				break;
 			case BN_256:
-				/* x = 600000000000219B. */
+				/* x = -600000000000219B. */
 				bn_set_2b(x, 62);
 				bn_set_2b(a, 61);
 				bn_add(x, x, a);
@@ -89,6 +104,15 @@ void fp_param_get_bn(bn_t x) {
 				bn_add(x, x, a);
 				bn_add_dig(x, x, 0x9B);
 				bn_neg(x, x);
+				break;
+			case BN_638:
+				/* x = 2^158 - 2^128 - 2^68 + 1. */
+				bn_set_2b(x, 158);
+				bn_set_2b(a, 128);
+				bn_sub(x, x, a);
+				bn_set_2b(a, 68);
+				bn_sub(x, x, a);
+				bn_add_dig(x, x, 1);
 				break;
 			default:
 				THROW(ERR_INVALID);
@@ -101,6 +125,65 @@ void fp_param_get_bn(bn_t x) {
 	FINALLY {
 		bn_free(a);
 	}
+}
+
+int *fp_param_get_sps(int *len) {
+	bn_t a;
+
+	bn_null(a);
+
+	TRY {
+		bn_new(a);
+
+		spars_len = 0;
+
+		switch (param_id) {
+			case BN_158:
+			case BN_254:
+			case BN_256:
+				fp_param_get_var(a);
+				if (bn_sign(a) == BN_NEG) {
+					bn_neg(a, a);
+				}
+				spars_len = bn_ham(a);
+				for (int i = 0, j = 0; j < bn_bits(a); j++) {
+					if (bn_test_bit(a, j)) {
+						spars[i++] = j;
+					}
+				}
+				break;
+			case BN_638:
+				spars_len = 4;
+				spars[0] = 0;
+				spars[1] = -68;
+				spars[2] = -128;
+				spars[3] = 158;
+				break;
+			default:
+				THROW(ERR_INVALID);
+				break;
+		}
+
+		if (spars_len > 0 && spars_len < MAX_EXPS ) {
+			if (len != NULL) {
+				*len = spars_len;
+			}
+			return spars;
+		} else {
+			if (len != NULL) {
+				*len = 0;
+			}
+			return NULL;
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(a);
+	}
+
+	return NULL;
 }
 
 void fp_param_set(int param) {
@@ -122,7 +205,7 @@ void fp_param_set(int param) {
 #if FP_PRIME == 158
 			case BN_158:
 				/* x = 4000000031. */
-				fp_param_get_bn(t0);
+				fp_param_get_var(t0);
 				/* p = 36 * x^4 + 36 * x^3 + 24 * x^2 + 6 * x + 1. */
 				bn_set_dig(p, 1);
 				bn_mul_dig(t1, t0, 6);
@@ -145,7 +228,7 @@ void fp_param_set(int param) {
 				/* p = 2^160 - 2^31 + 1. */
 				f[0] = -1;
 				f[1] = -31;
-				fp_prime_set_spars(f, 2);
+				fp_prime_set_pmers(f, 2);
 				break;
 			case SECG_160D:
 				/* p = 2^160 - 2^32 - 2^14 - 2^12 - 2^9 - 2^8 - 2^7 - 2^3 - 2^2 - 1.*/
@@ -158,14 +241,14 @@ void fp_param_set(int param) {
 				f[6] = -12;
 				f[7] = -14;
 				f[8] = -32;
-				fp_prime_set_spars(f, 9);
+				fp_prime_set_pmers(f, 9);
 				break;
 #elif FP_PRIME == 192
 			case NIST_192:
 				/* p = 2^192 - 2^64 - 1. */
 				f[0] = -1;
 				f[1] = -64;
-				fp_prime_set_spars(f, 2);
+				fp_prime_set_pmers(f, 2);
 				break;
 			case SECG_192:
 				/* p = 2^192 - 2^32 - 2^12 - 2^8 - 2^7 - 2^6 - 2^3 - 1.*/
@@ -176,14 +259,14 @@ void fp_param_set(int param) {
 				f[4] = -8;
 				f[5] = -12;
 				f[6] = -32;
-				fp_prime_set_spars(f, 7);
+				fp_prime_set_pmers(f, 7);
 				break;
 #elif FP_PRIME == 224
 			case NIST_224:
 				/* p = 2^224 - 2^96 + 1. */
 				f[0] = 1;
 				f[1] = -96;
-				fp_prime_set_spars(f, 2);
+				fp_prime_set_pmers(f, 2);
 				break;
 			case SECG_224:
 				/* p = 2^224 - 2^32 - 2^12 - 2^11 - 2^9 - 2^7 - 2^4 - 2 - 1.*/
@@ -195,12 +278,12 @@ void fp_param_set(int param) {
 				f[5] = -11;
 				f[6] = -12;
 				f[7] = -32;
-				fp_prime_set_spars(f, 8);
+				fp_prime_set_pmers(f, 8);
 				break;
 #elif FP_PRIME == 254
 			case BN_254:
 				/* x = -4080000000000001. */
-				fp_param_get_bn(t0);
+				fp_param_get_var(t0);
 				/* p = 36 * x^4 + 36 * x^3 + 24 * x^2 + 6 * x + 1. */
 				bn_set_dig(p, 1);
 				bn_mul_dig(t1, t0, 6);
@@ -225,7 +308,7 @@ void fp_param_set(int param) {
 				f[1] = 96;
 				f[2] = 192;
 				f[3] = -224;
-				fp_prime_set_spars(f, 4);
+				fp_prime_set_pmers(f, 4);
 				break;
 			case SECG_256:
 				/* p = 2^256 - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1. */
@@ -236,11 +319,11 @@ void fp_param_set(int param) {
 				f[4] = -8;
 				f[5] = -9;
 				f[6] = -32;
-				fp_prime_set_spars(f, 7);
+				fp_prime_set_pmers(f, 7);
 				break;
 			case BN_256:
 				/* x = 6000000000001F2D. */
-				fp_param_get_bn(t0);
+				fp_param_get_var(t0);
 				/* p = 36 * x^4 + 36 * x^3 + 24 * x^2 + 6 * x + 1. */
 				bn_set_dig(p, 1);
 				bn_mul_dig(t1, t0, 6);
@@ -265,13 +348,33 @@ void fp_param_set(int param) {
 				f[1] = 32;
 				f[2] = -96;
 				f[3] = -128;
-				fp_prime_set_spars(f, 4);
+				fp_prime_set_pmers(f, 4);
 				break;
 #elif FP_PRIME == 521
 			case NIST_521:
 				/* p = 2^521 - 1. */
 				f[0] = -1;
-				fp_prime_set_spars(f, 1);
+				fp_prime_set_pmers(f, 1);
+				break;
+#elif FP_PRIME == 638
+			case BN_638:
+				fp_param_get_var(t0);
+				/* p = 36 * x^4 + 36 * x^3 + 24 * x^2 + 6 * x + 1. */
+				bn_set_dig(p, 1);
+				bn_mul_dig(t1, t0, 6);
+				bn_add(p, p, t1);
+				bn_mul(t1, t0, t0);
+				bn_mul_dig(t1, t1, 24);
+				bn_add(p, p, t1);
+				bn_mul(t1, t0, t0);
+				bn_mul(t1, t1, t0);
+				bn_mul_dig(t1, t1, 36);
+				bn_add(p, p, t1);
+				bn_mul(t0, t0, t0);
+				bn_mul(t1, t0, t0);
+				bn_mul_dig(t1, t1, 36);
+				bn_add(p, p, t1);
+				fp_prime_set_dense(p);
 				break;
 #else
 			default:
@@ -317,6 +420,8 @@ int fp_param_set_any(void) {
 	fp_param_set(NIST_384);
 #elif FP_PRIME == 521
 	fp_param_set(NIST_521);
+#elif FP_PRIME == 638
+	fp_param_set(BN_638);
 #else
 	return fp_param_set_any_dense();
 #endif
@@ -347,7 +452,7 @@ int fp_param_set_any_dense() {
 	return result;
 }
 
-int fp_param_set_any_spars(void) {
+int fp_param_set_any_pmers(void) {
 #if FP_PRIME == 160
 	fp_param_set(SECG_160);
 #elif FP_PRIME == 192
@@ -373,6 +478,8 @@ int fp_param_set_any_tower() {
 	fp_param_set(BN_254);
 #elif FP_PRIME == 256
 	fp_param_set(BN_256);
+#elif FP_PRIME == 638
+	fp_param_set(BN_638);
 #else
 	do {
 		fp_param_set_any_dense();

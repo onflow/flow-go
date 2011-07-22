@@ -25,7 +25,7 @@
  *
  * Implementation of the binary hyperelliptic curve utilities.
  *
- * @version $Id: relic_hb_util.c 390 2010-06-05 22:15:02Z dfaranha $
+ * @version $Id$
  * @ingroup hb
  */
 

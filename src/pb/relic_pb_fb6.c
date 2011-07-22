@@ -25,7 +25,7 @@
  *
  * Implementation of the sextic extension binary field arithmetic module.
  *
- * @version $Id: relic_pb_fb2.c 88 2009-09-06 21:27:19Z dfaranha $
+ * @version $Id$
  * @ingroup pb
  */
 

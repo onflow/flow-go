@@ -23,10 +23,9 @@
 /**
  * @file
  *
- * Implementation of point normalization on prime elliptic curves over quadratic
- * extensions.
+ * Implementation of point normalization for points used in pairing computation.
  *
- * @version $Id$
+ * @version $Id: relic_pp_norm.c 463 2010-07-13 21:12:13Z conradoplg $
  * @ingroup pp
  */
 
@@ -49,34 +48,13 @@
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-void ep2_norm_imp(ep2_t r, ep2_t p) {
-	if (!p->norm) {
-		fp2_t t0, t1;
-
-		fp2_null(t0);
-		fp2_null(t1);
-
-		TRY {
-			fp2_new(t0);
-			fp2_new(t1);
-
-			fp2_inv(t1, p->z);
-			fp2_sqr(t0, t1);
-			fp2_mul(r->x, p->x, t0);
-			fp2_mul(t0, t0, t1);
-			fp2_mul(r->y, p->y, t0);
-			fp_zero(r->z[0]);
-			fp_zero(r->z[1]);
-			fp_set_dig(r->z[0], 1);
-		}
-		CATCH_ANY {
-			THROW(ERR_CAUGHT);
-		}
-		FINALLY {
-			fp2_free(t0);
-			fp2_free(t1);
-		}
-	}
+void pp_norm_imp(ep2_t r, ep2_t p) {
+	fp2_inv(r->z, p->z);
+	fp2_mul(r->x, p->x, r->z);
+	fp2_mul(r->y, p->y, r->z);
+	fp_zero(r->z[0]);
+	fp_zero(r->z[1]);
+	fp_set_dig(r->z[0], 1);
 
 	r->norm = 1;
 }
@@ -87,7 +65,7 @@ void ep2_norm_imp(ep2_t r, ep2_t p) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void ep2_norm(ep2_t r, ep2_t p) {
+void pp_norm(ep2_t r, ep2_t p) {
 	if (ep2_is_infty(p)) {
 		ep2_set_infty(r);
 		return;
@@ -98,6 +76,6 @@ void ep2_norm(ep2_t r, ep2_t p) {
 		ep2_copy(r, p);
 	}
 #if EP_ADD == PROJC || !defined(STRIP)
-	ep2_norm_imp(r, p);
+	pp_norm_imp(r, p);
 #endif
 }

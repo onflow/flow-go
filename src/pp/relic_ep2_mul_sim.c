@@ -26,7 +26,7 @@
  * Implementation of simultaneous point multiplication on binary elliptic
  * curves.
  *
- * @version $Id: relic_ep2_mul_sim.c 274 2010-02-06 05:34:38Z dfaranha $
+ * @version $Id$
  * @ingroup ep
  */
 

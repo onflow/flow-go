@@ -68,12 +68,6 @@ static void util(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp_neg") {
-		fp_rand(a);
-		BENCH_ADD(fp_neg(b, a));
-	}
-	BENCH_END;
-
 	BENCH_BEGIN("fp_zero") {
 		fp_rand(a);
 		BENCH_ADD(fp_zero(a));
@@ -240,6 +234,28 @@ static void arith(void) {
 		BENCH_ADD(fp_sub_dig(c, a, b[0]));
 	}
 	BENCH_END;
+
+	BENCH_BEGIN("fp_neg") {
+		fp_rand(a);
+		BENCH_ADD(fp_neg(b, a));
+	}
+	BENCH_END;
+
+#if FP_ADD == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fp_neg_basic") {
+		fp_rand(a);
+		BENCH_ADD(fp_neg_basic(c, a));
+	}
+	BENCH_END;
+#endif
+
+#if FP_ADD == INTEG || !defined(STRIP)
+	BENCH_BEGIN("fp_neg_integ") {
+		fp_rand(a);
+		BENCH_ADD(fp_neg_integ(c, a));
+	}
+	BENCH_END;
+#endif
 
 	BENCH_BEGIN("fp_mul") {
 		fp_rand(a);
@@ -423,7 +439,7 @@ static void arith(void) {
 #endif
 
 #if FP_RDC == QICK || !defined(STRIP)
-	if (fp_prime_get_spars(NULL) != NULL) {
+	if (fp_prime_get_sps(NULL) != NULL) {
 		BENCH_BEGIN("fp_rdc_quick") {
 			fp_rand(a);
 			fp_lsh(d, a, FP_BITS);

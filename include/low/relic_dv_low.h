@@ -25,7 +25,7 @@
  *
  * Interface of the low-level digit vector module.
  *
- * @version $Id: relic_dv.h 677 2011-03-05 22:19:43Z dfaranha $
+ * @version $Id$
  * @ingroup dv
  */
 

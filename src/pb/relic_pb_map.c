@@ -26,7 +26,7 @@
  * Implementation of the core functions for computing pairings over binary
  * fields.
  *
- * @version $Id: relic_pb_etat1.c 692 2011-03-18 00:43:02Z dfaranha $
+ * @version $Id$
  * @ingroup pb
  */
 
@@ -119,7 +119,7 @@ void pb_map_init() {
 	fb_itr_pre(pb_tab_exp, 4 * (((FB_BITS + 1) / 2) / 4));
 #endif
 
-#if PB_MAP == ETAT2 || PB_MAP == ETAT2
+#if PB_MAP == ETAT2 || PB_MAP == OETA2
 	fb_itr_pre(pb_tab_exp, 6 * (((FB_BITS - 1) / 2) / 6));
 #endif
 

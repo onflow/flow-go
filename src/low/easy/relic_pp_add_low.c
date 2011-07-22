@@ -92,13 +92,68 @@ void fp2_dblm_low(fp2_t c, fp2_t a) {
 	fp_dblm_low(c[1], a[1]);
 }
 
-void fp2_nord_low(dv2_t c, dv2_t a) {
-	dv2_t t;
+void fp2_norm_low(fp2_t c, fp2_t a) {
+	fp2_t t;
+	bn_t b;
 
-	dv2_null(t);
+	fp2_null(t);
+	bn_null(b);
 
 	TRY {
-		dv_new(t);
+		fp2_new(t);
+		bn_new(b);
+
+#ifdef FP_QNRES
+		/* If p = 3 mod 8, (1 + i) is a QNR/CNR. */
+		fp_neg(t[0], a[1]);
+		fp_add(c[1], a[0], a[1]);
+		fp_add(c[0], t[0], a[0]);
+#else
+		switch (fp_prime_get_mod8()) {
+			case 3:
+				/* If p = 3 mod 8, (1 + u) is a QNR/CNR. */
+				fp_neg(t[0], a[1]);
+				fp_add(c[1], a[0], a[1]);
+				fp_add(c[0], t[0], a[0]);
+				break;
+			case 5:
+				/* If p = 5 mod 8, (u) is a QNR/CNR. */
+				fp2_mul_art(c, a);
+				break;
+			case 7:
+				/* If p = 7 mod 8, we choose (2^(lg_4(b-1)) + u) as QNR/CNR. */
+				fp2_mul_art(t, a);
+				fp2_dbl(c, a);
+				fp_prime_back(b, ep_curve_get_b());
+				for (int i = 1; i < bn_bits(b) / 2; i++) {
+					fp2_dbl(c, c);
+				}
+				fp2_add(c, c, t);
+				break;
+			default:
+				THROW(ERR_INVALID);
+		}
+#endif
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp2_free(t);
+		bn_free(b);
+	}
+}
+
+void fp2_nord_low(dv2_t c, dv2_t a) {
+	dv2_t t;
+	bn_t b;
+
+	dv2_null(t);
+	bn_null(b);
+
+	TRY {
+		dv2_new(t);
+		bn_new(b);
 
 #ifdef FP_QNRES
 		/* If p = 3 mod 8, (1 + i) is a QNR/CNR. */
@@ -126,11 +181,16 @@ void fp2_nord_low(dv2_t c, dv2_t a) {
 				dv_copy(c[1], t[0], 2 * FP_DIGS);
 				break;
 			case 7:
-				/* If p = 7 mod 8 and p = 2,3 mod 5, (2 + u) is a QNR/CNR.   */
-				/* (a_0 + a_1 * u)(2 + u) = (2a_0 - a_1) + (a_0 + 2a_1) * u. */
-				fp_addc_low(t[1], a[0], a[1]);
-				fp_subc_low(t[0], a[0], a[1]);
-				fp2_addc_low(c, t, a);
+				/* If p = 7 mod 8, (2^lg_4(b-1) + u) is a QNR/CNR.   */
+				/* (a_0 + a_1 * u)(2^lg_4(b-1) + u) =
+				 * (2^lg_4(b-1)a_0 - a_1) + (a_0 + 2^lg_4(b-1)a_1 * u. */
+				fp2_addc_low(t, a, a);
+				fp_prime_back(b, ep_curve_get_b());
+				for (int i = 1; i < bn_bits(b) / 2; i++) {
+					fp2_addc_low(t, t, t);
+				}
+				fp_subc_low(c[0], t[0], a[1]);
+				fp_addc_low(c[1], t[1], a[0]);
 				break;
 			default:
 				THROW(ERR_INVALID);
@@ -142,5 +202,6 @@ void fp2_nord_low(dv2_t c, dv2_t a) {
 	}
 	FINALLY {
 		dv2_free(t);
+		bn_free(b);
 	}
 }

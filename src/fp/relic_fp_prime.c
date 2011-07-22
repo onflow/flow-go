@@ -119,7 +119,7 @@ dig_t *fp_prime_get_rdc(void) {
 	return &u;
 }
 
-int *fp_prime_get_spars(int *len) {
+int *fp_prime_get_sps(int *len) {
 	if (spars_len > 0 && spars_len < MAX_EXPS ) {
 		if (len != NULL) {
 			*len = spars_len;
@@ -223,7 +223,7 @@ void fp_prime_set_dense(bn_t p) {
 #endif
 }
 
-void fp_prime_set_spars(int *f, int len) {
+void fp_prime_set_pmers(int *f, int len) {
 	bn_t p, t;
 
 	bn_null(p);

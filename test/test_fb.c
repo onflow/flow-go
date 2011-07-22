@@ -1012,7 +1012,7 @@ static int exponentiation(void) {
 
 		TEST_BEGIN("iterated squaring is correct") {
 			fb_rand(a);
-			bn_rand(d, BN_POS, 8);
+			bn_rand(d, BN_POS, 4);
 			fb_itr_pre(t, d->dp[0]);
 			fb_itr(b, a, d->dp[0], t);
 			for (int j = 0; j < d->dp[0]; j++) {
@@ -1023,7 +1023,7 @@ static int exponentiation(void) {
 
 		TEST_BEGIN("iterated square-root is correct") {
 			fb_rand(a);
-			bn_rand(d, BN_POS, 8);
+			bn_rand(d, BN_POS, 4);
 			fb_itr_pre(t, -d->dp[0]);
 			fb_itr(b, a, -d->dp[0], t);
 			for (int j = 0; j < d->dp[0]; j++) {
@@ -1039,7 +1039,7 @@ static int exponentiation(void) {
 #if FB_ITR == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic iterated squaring is correct") {
 			fb_rand(a);
-			bn_rand(d, BN_POS, 8);
+			bn_rand(d, BN_POS, 4);
 			fb_itr_basic(b, a, d->dp[0]);
 			for (int j = 0; j < d->dp[0]; j++) {
 				fb_sqr(a, a);
@@ -1049,7 +1049,7 @@ static int exponentiation(void) {
 
 		TEST_BEGIN("basic iterated square-root is correct") {
 			fb_rand(a);
-			bn_rand(d, BN_POS, 8);
+			bn_rand(d, BN_POS, 4);
 			fb_itr_basic(b, a, -d->dp[0]);
 			for (int j = 0; j < d->dp[0]; j++) {
 				fb_srt(a, a);
@@ -1065,7 +1065,7 @@ static int exponentiation(void) {
 		}
 		TEST_BEGIN("fast iterated squaring is correct") {
 			fb_rand(a);
-			bn_rand(d, BN_POS, 8);
+			bn_rand(d, BN_POS, 4);
 			fb_itr_pre_quick(t, d->dp[0]);
 			fb_itr_quick(b, a, t);
 			for (int j = 0; j < d->dp[0]; j++) {
@@ -1076,7 +1076,7 @@ static int exponentiation(void) {
 
 		TEST_BEGIN("fast iterated square-root is correct") {
 			fb_rand(a);
-			bn_rand(d, BN_POS, 8);
+			bn_rand(d, BN_POS, 4);
 			fb_itr_pre_quick(t, -d->dp[0]);
 			fb_itr_quick(b, a, t);
 			for (int j = 0; j < d->dp[0]; j++) {

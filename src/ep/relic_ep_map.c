@@ -25,7 +25,7 @@
  *
  * Implementation of hashing to a prime elliptic curve.
  *
- * @version $Id: relic_ep_util.c 447 2010-07-12 02:24:21Z conradoplg $
+ * @version $Id$
  * @ingroup ep
  */
 

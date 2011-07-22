@@ -26,7 +26,7 @@
  * Implementation of divisor class multiplication on binary hyperelliptic
  * curves.
  *
- * @version $Id: relic_hb_mul.c 390 2010-06-05 22:15:02Z dfaranha $
+ * @version $Id$
  * @ingroup hb
  */
 

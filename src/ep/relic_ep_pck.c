@@ -25,7 +25,7 @@
  *
  * Implementation of point compression on prime elliptic curves.
  *
- * @version $Id: relic_ep_pck.c 466 2010-07-16 02:24:36Z dfaranha $
+ * @version $Id$
  * @ingroup ep
  */
 

@@ -277,6 +277,58 @@ void fp2_mul_basic(fp2_t c, fp2_t a, fp2_t b) {
 	}
 }
 
+void fp2_mul_nor_basic(fp2_t c, fp2_t a) {
+	fp2_t t;
+	bn_t b;
+
+	fp2_null(t);
+	bn_null(b);
+
+	TRY {
+		fp2_new(t);
+		bn_new(b);
+
+#ifdef FP_QNRES
+		/* If p = 3 mod 8, (1 + i) is a QNR/CNR. */
+		fp_neg(t[0], a[1]);
+		fp_add(c[1], a[0], a[1]);
+		fp_add(c[0], t[0], a[0]);
+#else
+		switch (fp_prime_get_mod8()) {
+			case 3:
+				/* If p = 3 mod 8, (1 + u) is a QNR/CNR. */
+				fp_neg(t[0], a[1]);
+				fp_add(c[1], a[0], a[1]);
+				fp_add(c[0], t[0], a[0]);
+				break;
+			case 5:
+				/* If p = 5 mod 8, (u) is a QNR/CNR. */
+				fp2_mul_art(c, a);
+				break;
+			case 7:
+				/* If p = 7 mod 8, we choose (2^log_4(b-1) + u) is a QNR/CNR. */
+				fp2_mul_art(t, a);
+				fp2_dbl(c, a);
+				fp_prime_back(b, ep_curve_get_b());
+				for (int i = 1; i < bn_bits(b) / 2; i++) {
+					fp2_dbl(c, c);
+				}
+				fp2_add(c, c, t);
+				break;
+			default:
+				THROW(ERR_INVALID);
+		}
+#endif
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp2_free(t);
+		bn_free(b);
+	}
+}
+
 void fp2_sqr_basic(fp2_t c, fp2_t a) {
 	fp_t t0, t1, t2;
 
@@ -355,6 +407,9 @@ void fp2_mul_integ(fp2_t c, fp2_t a, fp2_t b) {
 	fp2_mulm_low(c, a, b);
 }
 
+void fp2_mul_nor_integ(fp2_t c, fp2_t a) {
+	fp2_norm_low(c, a);
+}
 void fp2_sqr_integ(fp2_t c, fp2_t a) {
 	fp2_sqrm_low(c, a);
 }
@@ -393,50 +448,6 @@ void fp2_mul_art(fp2_t c, fp2_t a) {
 	}
 	FINALLY {
 		fp_free(t);
-	}
-}
-
-void fp2_mul_nor(fp2_t c, fp2_t a) {
-	fp2_t t;
-
-	fp2_null(t);
-
-	TRY {
-		fp2_new(t);
-
-#ifdef FP_QNRES
-		/* If p = 3 mod 8, (1 + i) is a QNR/CNR. */
-		fp_neg(t[0], a[1]);
-		fp_add(c[1], a[0], a[1]);
-		fp_add(c[0], t[0], a[0]);
-#else
-		switch (fp_prime_get_mod8()) {
-			case 3:
-				/* If p = 3 mod 8, (1 + u) is a QNR/CNR. */
-				fp_neg(t[0], a[1]);
-				fp_add(c[1], a[0], a[1]);
-				fp_add(c[0], t[0], a[0]);
-				break;
-			case 5:
-				/* If p = 5 mod 8, (u) is a QNR/CNR. */
-				fp2_mul_art(c, a);
-				break;
-			case 7:
-				/* If p = 7 mod 8 and p = 2,3 mod 5, (2 + u) is a QNR/CNR. */
-				fp_add(t[1], a[0], a[1]);
-				fp_sub(t[0], a[0], a[1]);
-				fp2_add(c, t, a);
-				break;
-			default:
-				THROW(ERR_INVALID);
-		}
-#endif
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fp2_free(t);
 	}
 }
 

@@ -25,7 +25,7 @@
  *
  * Implementation of the low-level iterated squaring/square-root.
  *
- * @version $Id: relic_fb_sqr_low.c 677 2011-03-05 22:19:43Z dfaranha $
+ * @version $Id$
  * @ingroup fb
  */
 

@@ -110,7 +110,7 @@
  */
 #define RSA_FIN_SIG			6
 
-#if CP_RSAPD == BASIC || !defined(STRIP)
+#if CP_RSAPD == BASIC
 
 /**
  * Applies or removes a PKCS#1 v1.5 encryption padding.
@@ -174,7 +174,7 @@ static int pad_basic(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 
 #endif
 
-#if CP_RSAPD == PKCS1 || !defined(STRIP)
+#if CP_RSAPD == PKCS1
 
 /**
  * Applies or removes a PKCS#1 v1.5 encryption padding.
@@ -289,7 +289,7 @@ static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 
 #endif
 
-#if CP_RSAPD == PKCS2 || !defined(STRIP)
+#if CP_RSAPD == PKCS2
 
 /**
  * Applies or removes a PKCS#1 v2.1 encryption padding.
@@ -450,7 +450,7 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 #endif
 
 /*============================================================================*/
-	/* Public definitions                                                         */
+	/* Public definitions                                                     */
 /*============================================================================*/
 
 #if CP_RSA == BASIC || !defined(STRIP)

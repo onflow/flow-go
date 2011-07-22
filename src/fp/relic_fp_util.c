@@ -52,10 +52,6 @@ void fp_copy(fp_t c, fp_t a) {
 	}
 }
 
-void fp_neg(fp_t c, fp_t a) {
-	fp_subn_low(c, fp_prime_get(), a);
-}
-
 void fp_zero(fp_t a) {
 	for (int i = 0; i < FP_DIGS; i++, a++)
 		*a = 0;

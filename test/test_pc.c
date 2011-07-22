@@ -25,7 +25,7 @@
  *
  * Tests for the pairing-based cryptography module.
  *
- * @version $Id: test_ec.c 275 2010-02-06 06:16:03Z dfaranha $
+ * @version $Id$
  * @ingroup test
  */
 

@@ -25,7 +25,7 @@
  *
  * Implementation of divisor class doubling on binary hyperelliptic curves.
  *
- * @version $Id: relic_hb_add.c 181 2009-11-17 18:33:42Z dfaranha $
+ * @version $Id$
  * @ingroup hb
  */
 

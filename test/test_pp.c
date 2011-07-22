@@ -335,6 +335,7 @@ static int doubling2(void) {
 static int multiplication2(void) {
 	int code = STS_ERR;
 	fp2_t a, b, c, d, e, f;
+	bn_t g;
 
 	TRY {
 		fp2_new(a);
@@ -343,6 +344,7 @@ static int multiplication2(void) {
 		fp2_new(d);
 		fp2_new(e);
 		fp2_new(f);
+		bn_new(g);
 
 		TEST_BEGIN("multiplication is commutative") {
 			fp2_rand(a);
@@ -431,14 +433,38 @@ static int multiplication2(void) {
 					fp2_add(c, c, a);
 					break;
 				case 7:
-					fp2_mul_art(c, a);
-					fp2_add(c, c, a);
-					fp2_add(c, c, a);
+					fp2_mul_art(d, a);
+					fp2_dbl(c, a);
+					fp_prime_back(g, ep_curve_get_b());
+					for (int i = 1; i < bn_bits(g) / 2; i++) {
+						fp2_dbl(c, c);
+					}
+					fp2_add(c, c, d);
 					break;
 			}
 			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
 		}
 		TEST_END;
+
+#if PP_QUD == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic multiplication by qnr/cnr is correct") {
+			fp2_rand(a);
+			fp2_mul_nor(b, a);
+			fp2_mul_nor_basic(c, a);
+			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
+
+#if PP_QUD == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated multiplication by qnr/cnr is correct") {
+			fp2_rand(a);
+			fp2_mul_nor(b, a);
+			fp2_mul_nor_integ(c, a);
+			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
+		}
+		TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -452,6 +478,7 @@ static int multiplication2(void) {
 	fp2_free(d);
 	fp2_free(e);
 	fp2_free(f);
+	bn_free(g);
 	return code;
 }
 
@@ -1422,6 +1449,12 @@ static int cyclotomic12(void) {
 		fp12_new(e[1]);
 		bn_new(f);
 
+		TEST_BEGIN("cyclotomic test is correct") {
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			TEST_ASSERT(fp12_test_cyc(a) == 1, end);
+		} TEST_END;
+
 		TEST_BEGIN("compression in cyclotomic subgroup is correct") {
 			fp12_rand(a);
 			fp12_conv_cyc(a, a);
@@ -1508,24 +1541,26 @@ static int cyclotomic12(void) {
 		} TEST_END;
 #endif
 
-		TEST_BEGIN("cyclotomic exponentiation is correct") {
-			bn_rand(f, BN_POS, FP_BITS);
-			fp12_rand(a);
-			fp12_conv_cyc(a, a);
-			fp12_exp(b, a, f);
-			fp12_exp_cyc(c, a, f);
-			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
-		} TEST_END;
+        TEST_BEGIN("cyclotomic exponentiation is correct") {
+                bn_rand(f, BN_POS, FP_BITS);
+                fp12_rand(a);
+                fp12_conv_cyc(a, a);
+                fp12_exp(b, a, f);
+                fp12_exp_cyc(c, a, f);
+                TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+        } TEST_END;
 
 		TEST_BEGIN("sparse cyclotomic exponentiation is correct") {
 			bn_rand(f, BN_POS, BN_DIGIT);
+			int g[3] = {0, f->dp[0] % FP_BITS, FP_BITS - 1};
 			d[0][0][0][0][0] = f->dp[0];
 			bn_set_2b(f, FP_BITS - 1);
 			bn_set_bit(f, d[0][0][0][0][0] % FP_BITS, 1);
+			bn_add_dig(f, f, 1);
 			fp12_rand(a);
 			fp12_conv_cyc(a, a);
 			fp12_exp(b, a, f);
-			fp12_exp_cyc(c, a, f);
+			fp12_exp_cyc_sps(c, a, g, 3);
 			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 	}
@@ -2453,7 +2488,7 @@ static int frobenius(void) {
 static int pairing(void) {
 	int code = STS_ERR;
 	fp12_t e1, e2;
-	ep2_t q, r;
+	ep2_t q, r, s;
 	ep_t p;
 	bn_t k, n;
 
@@ -2462,6 +2497,7 @@ static int pairing(void) {
 	ep_null(p);
 	ep2_null(q);
 	ep2_null(r);
+	ep2_null(s);
 	bn_null(k);
 	bn_null(n);
 
@@ -2471,10 +2507,35 @@ static int pairing(void) {
 		ep_new(p);
 		ep2_new(q);
 		ep2_new(r);
+		ep2_new(s);
 		bn_new(n);
 		bn_new(k);
 
 		ep_curve_get_ord(n);
+
+		TEST_BEGIN("miller addition is consistent") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			ep2_copy(s, r);
+			pp_add(e1, r, q, p);
+			pp_norm(r, r);
+			ep2_add(s, s, q);
+			ep2_norm(s, s);
+			TEST_ASSERT(ep2_cmp(r, s) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("miller doubling is consistent") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			ep2_copy(s, r);
+			pp_dbl(e1, r, q, p);
+			pp_norm(r, r);
+			ep2_dbl_basic(s, q);
+			ep2_norm(s, s);
+			TEST_ASSERT(ep2_cmp(r, s) == CMP_EQ, end);
+		} TEST_END;
 
 		TEST_BEGIN("pairing is not degenerate") {
 			ep_rand(p);
@@ -2500,6 +2561,15 @@ static int pairing(void) {
 		} TEST_END;
 
 #if PP_MAP == R_ATE || !defined(STRIP)
+		TEST_BEGIN("r-ate pairing is not degenerate") {
+			ep_rand(p);
+			ep2_rand(q);
+			pp_map_r_ate(e1, p, q);
+			fp12_zero(e2);
+			fp_set_dig(e2[0][0][0], 1);
+			TEST_ASSERT(fp12_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
 		TEST_BEGIN("r-ate pairing is bilinear") {
 			ep_rand(p);
 			ep2_rand(q);
@@ -2516,6 +2586,15 @@ static int pairing(void) {
 #endif
 
 #if PP_MAP == O_ATE || !defined(STRIP)
+		TEST_BEGIN("o-ate pairing is not degenerate") {
+			ep_rand(p);
+			ep2_rand(q);
+			pp_map_o_ate(e1, p, q);
+			fp12_zero(e2);
+			fp_set_dig(e2[0][0][0], 1);
+			TEST_ASSERT(fp12_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
 		TEST_BEGIN("o-ate pairing is bilinear") {
 			ep_rand(p);
 			ep2_rand(q);
@@ -2532,6 +2611,15 @@ static int pairing(void) {
 #endif
 
 #if PP_MAP == X_ATE || !defined(STRIP)
+		TEST_BEGIN("x-ate pairing is not degenerate") {
+			ep_rand(p);
+			ep2_rand(q);
+			pp_map_x_ate(e1, p, q);
+			fp12_zero(e2);
+			fp_set_dig(e2[0][0][0], 1);
+			TEST_ASSERT(fp12_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
 		TEST_BEGIN("x-ate pairing is bilinear") {
 			ep_rand(p);
 			ep2_rand(q);

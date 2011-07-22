@@ -26,7 +26,7 @@
  * Implementation of hashing to a prime elliptic curve over a quadratic
  * extension.
  *
- * @version $Id: relic_pp_ep2.c 463 2010-07-13 21:12:13Z conradoplg $
+ * @version $Id$
  * @ingroup pp
  */
 
@@ -47,7 +47,7 @@
  * @param[out] r			- the result.
  * @param[in] p				- the point to multiply.
  */
-static void ep2_mul_cof(ep2_t r, ep2_t p) {
+void ep2_mul_cof(ep2_t r, ep2_t p) {
 	bn_t a, x;
 	ep2_t t1;
 	ep2_t t2;
@@ -63,7 +63,7 @@ static void ep2_mul_cof(ep2_t r, ep2_t p) {
 		bn_new(a);
 		bn_new(x);
 
-		fp_param_get_bn(x);
+		fp_param_get_var(x);
 
 		bn_sqr(x, x);
 		bn_mul_dig(a, x, 6);

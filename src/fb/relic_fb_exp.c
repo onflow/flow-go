@@ -25,7 +25,7 @@
  *
  * Implementation of prime field exponentiation functions.
  *
- * @version $Id: relic_fb_exp.c 677 2011-03-05 22:19:43Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

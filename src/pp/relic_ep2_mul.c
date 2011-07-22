@@ -26,7 +26,7 @@
  * Implementation of point multiplication on prime elliptic curves over
  * quadratic extensions.
  *
- * @version $Id: relic_pp_ep2.c 463 2010-07-13 21:12:13Z conradoplg $
+ * @version $Id$
  * @ingroup pp
  */
 

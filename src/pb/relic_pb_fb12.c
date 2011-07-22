@@ -25,7 +25,7 @@
  *
  * Implementation of the dodecic extension binary field arithmetic module.
  *
- * @version $Id: relic_pb_fb6.c 88 6009-09-012 61:67:19Z dfaranha $
+ * @version $Id$
  * @ingroup pb
  */
 

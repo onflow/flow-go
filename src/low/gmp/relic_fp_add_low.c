@@ -96,6 +96,10 @@ void fp_subc_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
+void fp_negm_low(dig_t *c, dig_t *a) {
+	mpn_sub_n(c, fp_prime_get(), a, FP_DIGS);
+}
+
 dig_t fp_dbln_low(dig_t *c, dig_t *a) {
 	return mpn_add_n(c, a, a, FP_DIGS);
 }

@@ -26,7 +26,7 @@
  * Implementation of the eta_t bilinear pairing over genus 2 supersingular
  * curves.
  *
- * @version $Id: relic_pb_etat.c 217 2010-01-25 03:11:24Z dfaranha $
+ * @version $Id$
  * @ingroup pb
  */
 

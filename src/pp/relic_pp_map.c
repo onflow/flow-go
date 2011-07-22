@@ -38,8 +38,6 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#define PART 32
-
 /**
  * Compute the Miller loop for Ate variants over the bits of r.
  *
@@ -50,26 +48,30 @@
  * @param[in] p				- the second point of the pairing, in G_1.
  */
 void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
-#ifndef PP_PARAL
 	fp12_t tmp;
+	ep_t _p;
 
 	fp12_null(tmp);
+	ep_null(_p);
 
 	TRY {
 		fp12_new(tmp);
+		ep_new(_p);
 
 		fp12_zero(tmp);
 		fp12_zero(r);
 		fp_set_dig(r[0][0][0], 1);
 		ep2_copy(t, q);
 
+		ep_neg(_p, p);
+
 		for (int i = bn_bits(a) - 2; i >= 0; i--) {
 			fp12_sqr(r, r);
-			pp_dbl(tmp, t, t, p);
-			fp12_mul(r, r, tmp);
+			pp_dbl(tmp, t, t, _p);
+			fp12_mul_dxs(r, r, tmp);
 			if (bn_test_bit(a, i)) {
 				pp_add(tmp, t, q, p);
-				fp12_mul(r, r, tmp);
+				fp12_mul_dxs(r, r, tmp);
 			}
 		}
 	}
@@ -78,139 +80,61 @@ void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
 	}
 	FINALLY {
 		fp12_free(tmp);
+		ep_free(_p);
 	}
-#else
-	fp12_t _f[CORES], _t[CORES];
-	ep2_t _q[CORES];
-	bn_t a0, a1;
-
-	bn_null(a0);
-	bn_null(a1);
-
-	TRY {
-		for (int j = 0; j < CORES; j++) {
-			fp12_null(_f[j]);
-			fp12_null(_f[j]);
-			fp12_new(_t[j]);
-			fp12_new(_t[j]);
-			ep2_null(_q[j]);
-			ep2_new(_q[j]);
-		}
-
-		bn_new(a0);
-		bn_new(a1);
-
-		bn_rsh(a0, a, PART);
-		bn_mod_2b(a1, a, PART);
-
-		omp_set_num_threads(CORES);
-#pragma omp parallel sections shared(r, _f, _t, _q, p, q, t, a, a0, a1)
-		{
-#pragma omp section
-			{
-				fp12_zero(_f[0]);
-				fp_set_dig(_f[0][0][0][0], 1);
-				ep2_copy(_q[0], q);
-				for (int i = bn_bits(a0) - 2; i >= 0; i--) {
-					fp12_sqr(_f[0], _f[0]);
-					pp_dbl(_t[0], _q[0], _q[0], p);
-					fp12_mul(_f[0], _f[0], _t[0]);
-					if (bn_test_bit(a0, i)) {
-						pp_add(_t[0], _q[0], q, p);
-						fp12_mul(_f[0], _f[0], _t[0]);
-					}
-				}
-				for (int i = PART - 1; i >= 0; i--) {
-					fp12_sqr(_f[0], _f[0]);
-				}
-			}
-#pragma omp section
-			{
-				fp12_zero(_f[1]);
-				fp_set_dig(_f[1][0][0][0], 1);
-				ep2_mul(_q[1], q, a0);
-				for (int i = PART - 1; i >= 0; i--) {
-					fp12_sqr(_f[1], _f[1]);
-					pp_dbl(_t[1], _q[1], _q[1], p);
-					fp12_mul(_f[1], _f[1], _t[1]);
-					if (bn_test_bit(a, i)) {
-						pp_add(_t[1], _q[1], q, p);
-						fp12_mul(_f[1], _f[1], _t[1]);
-					}
-				}
-				ep2_copy(t, _q[1]);
-			}
-		}
-		fp12_mul(r, _f[0], _f[1]);
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		ep2_free(t0);
-		ep2_free(t1);
-		bn_free(a0);
-		bn_free(a1);
-	}
-#endif
 }
 
 /**
  * Compute the final exponentiation of the rate pairing in a BN curve.
  *
- * @param[in,out] m			- the result.
+ * @param[out] m			- the result.
  * @param[in] x				- the parameter used to generate the curve.
  */
-void pp_exp(fp12_t m, bn_t x) {
+void pp_exp(fp12_t c, fp12_t a) {
 	fp12_t v0;
 	fp12_t v1;
 	fp12_t v2;
 	fp12_t v3;
+	bn_t x;
 
 	fp12_null(v0);
 	fp12_null(v1);
 	fp12_null(v2);
 	fp12_null(v3);
+	bn_null(x);
 
 	TRY {
 		fp12_new(v0);
 		fp12_new(v1);
 		fp12_new(v2);
 		fp12_new(v3);
+		bn_new(x);
+
+		fp_param_get_var(x);
 
 		/* First, compute m^(p^6 - 1). */
-		/* tmp = m^{-1}. */
-		fp12_inv(v0, m);
-		/* m' = m^(p^6). */
-		fp12_inv_uni(m, m);
-		/* m' = m^(p^6 - 1). */
-		fp12_mul(m, m, v0);
+		fp12_conv_cyc(c, a);
 
-		/* Second, compute m^(p^2 + 1). */
-		/* t = m^(p^2). */
-		fp12_frb_sqr(v0, m);
-		/* m' = m^(p^2 + 1). */
-		fp12_mul(m, m, v0);
-
-		/* Third, compute m^((p^4 - p^2 + 1) / r). */
+		/* Now compute m^((p^4 - p^2 + 1) / r). */
 		/* From here on we work with x' = -x, therefore if x is positive
 		 * we need inversions. */
+		int l, *b = fp_param_get_sps(&l);
 		if (bn_sign(x) == BN_POS) {
 			/* We are now on the cyclotomic subgroup, so inversions are
 			 * conjugations. */
-			fp12_inv_uni(v3, m);
-			fp12_exp_cyc(v0, v3, x);
+			fp12_inv_uni(v3, c);
+			fp12_exp_cyc_sps(v0, v3, b, l);
 			fp12_inv_uni(v3, v0);
-			fp12_exp_cyc(v1, v3, x);
+			fp12_exp_cyc_sps(v1, v3, b, l);
 			fp12_inv_uni(v3, v1);
-			fp12_exp_cyc(v2, v3, x);
+			fp12_exp_cyc_sps(v2, v3, b, l);
 		} else {
 			/* v0 = m^x. */
-			fp12_exp_cyc(v0, m, x);
+			fp12_exp_cyc_sps(v0, c, b, l);
 			/* v1 = m^x^2. */
-			fp12_exp_cyc(v1, v0, x);
+			fp12_exp_cyc_sps(v1, v0, b, l);
 			/* v2 = m^x^3. */
-			fp12_exp_cyc(v2, v1, x);
+			fp12_exp_cyc_sps(v2, v1, b, l);
 		}
 
 		fp12_frb(v3, v2);
@@ -230,16 +154,16 @@ void pp_exp(fp12_t m, bn_t x) {
 		fp12_sqr_cyc(v0, v0);
 		fp12_mul(v0, v0, v2);
 		fp12_sqr_cyc(v0, v0);
-		fp12_inv_uni(v1, m);
+		fp12_inv_uni(v1, c);
 		fp12_mul(v2, v0, v1);
-		fp12_frb_sqr(v1, m);
+		fp12_frb_sqr(v1, c);
 		fp12_frb(v3, v1);
 		fp12_mul(v1, v1, v3);
-		fp12_frb(v3, m);
+		fp12_frb(v3, c);
 		fp12_mul(v1, v1, v3);
 		fp12_mul(v0, v0, v1);
 		fp12_sqr_cyc(v2, v2);
-		fp12_mul(m, v2, v0);
+		fp12_mul(c, v2, v0);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -249,6 +173,7 @@ void pp_exp(fp12_t m, bn_t x) {
 		fp12_free(v1);
 		fp12_free(v2);
 		fp12_free(v3);
+		bn_free(x);
 	}
 }
 
@@ -288,7 +213,7 @@ void pp_r_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp12_mul(res, res, tmp2);
 
 		r1q->norm = 0;
-		ep2_norm(r1q, r1q);
+		pp_norm(r1q, r1q);
 
 		ep2_frb(q1, r1q);
 
@@ -421,7 +346,7 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp12_mul(res, res, tmp);
 
 		/* Make q2 affine again. */
-		ep2_norm(q2, q2);
+		pp_norm(q2, q2);
 		pp_add(tmp, q1, q2, p);
 
 		fp12_mul(res, res, tmp);
@@ -464,7 +389,7 @@ void pp_map_r_ate(fp12_t r, ep_t p, ep2_t q) {
 		bn_new(a);
 		bn_new(x);
 
-		fp_param_get_bn(x);
+		fp_param_get_var(x);
 
 		bn_mul_dig(a, x, 6);
 		bn_add_dig(a, a, 2);
@@ -482,7 +407,7 @@ void pp_map_r_ate(fp12_t r, ep_t p, ep2_t q) {
 		}
 
 		pp_r_ate_mul(r, t, q, p);
-		pp_exp(r, x);
+		pp_exp(r, r);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -511,7 +436,7 @@ void pp_map_o_ate(fp12_t r, ep_t p, ep2_t q) {
 		bn_new(a);
 		bn_new(x);
 
-		fp_param_get_bn(x);
+		fp_param_get_var(x);
 
 		bn_mul_dig(a, x, 6);
 		bn_add_dig(a, a, 2);
@@ -529,8 +454,7 @@ void pp_map_o_ate(fp12_t r, ep_t p, ep2_t q) {
 		}
 
 		pp_o_ate_mul(r, t, q, p);
-
-		pp_exp(r, x);
+		pp_exp(r, r);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -559,7 +483,7 @@ void pp_map_x_ate(fp12_t r, ep_t p, ep2_t q) {
 		bn_new(a);
 		bn_new(x);
 
-		fp_param_get_bn(x);
+		fp_param_get_var(x);
 
 		bn_copy(a, x);
 		if (bn_sign(x) == BN_NEG) {
@@ -570,7 +494,7 @@ void pp_map_x_ate(fp12_t r, ep_t p, ep2_t q) {
 		pp_miller(r, t, q, a, p);
 
 		/* Make xQ affine. */
-		ep2_norm(t, t);
+		pp_norm(t, t);
 
 		if (bn_sign(x) == BN_NEG) {
 			/* Since f_{-r,Q}(P) = 1/f_{r,Q}(P), we must invert the result. */
@@ -579,7 +503,7 @@ void pp_map_x_ate(fp12_t r, ep_t p, ep2_t q) {
 		}
 
 		pp_x_ate_mul(r, t, q, p);
-		pp_exp(r, x);
+		pp_exp(r, r);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

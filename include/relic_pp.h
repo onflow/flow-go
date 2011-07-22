@@ -218,6 +218,20 @@ typedef ep2_st *ep2_t;
 #endif
 
 /**
+ * Multiplies a quadratic extension field by the quadratic/cubic non-residue.
+ * Computes C = A * E, where E is a non-square/non-cube in the quadratic
+ * extension.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the quadratic extension field element to multiply.
+ */
+#if PP_QUD == BASIC
+#define fp2_mul_nor(C, A)	fp2_mul_nor_basic(C, A)
+#elif PP_QUD == INTEG
+#define fp2_mul_nor(C, A)	fp2_mul_nor_integ(C, A)
+#endif
+
+/**
  * Squares a quadratic extension field elements. Computes C = A * A.
  *
  * @param[out] C			- the result.
@@ -338,6 +352,20 @@ typedef ep2_st *ep2_t;
 #define fp12_mul(C, A, B)		fp12_mul_basic(C, A, B)
 #elif PP_EXT == LAZYR
 #define fp12_mul(C, A, B)		fp12_mul_lazyr(C, A, B)
+#endif
+
+/**
+ * Multiplies a dense and a sparse dodecic extension field elements. Computes
+ * C = A * B.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the dense dodecic extension field element.
+ * @param[in] B				- the sparse dodecic extension field element.
+ */
+#if PP_EXT == BASIC
+#define fp12_mul_dxs(C, A, B)	fp12_mul_dxs_basic(C, A, B)
+#elif PP_EXT == LAZYR
+#define fp12_mul_dxs(C, A, B)	fp12_mul_dxs_lazyr(C, A, B)
 #endif
 
 /**
@@ -604,10 +632,26 @@ typedef ep2_st *ep2_t;
  * @param[in] P				- the affine point to evaluate the line function.
  */
 #if EP_ADD == BASIC
-#define pp_add(L, R, Q, P)		pp_add_basic(L, R, Q, P)
+#define pp_add(L, R, Q, P)			pp_add_basic(L, R, Q, P)
 #elif EP_ADD == PROJC
-#define pp_add(L, R, Q, P)		pp_add_projc(L, R, Q, P)
+#define pp_add(L, R, Q, P)			pp_add_projc(L, R, Q, P)
 #endif
+
+/**
+ * Adds two prime elliptic curve points and evaluates the corresponding line
+ * function at another elliptic curve point using projective coordinates.
+ *
+ * @param[out] L			- the result of the evaluation.
+ * @param[in, out] R		- the resulting point and first point to add.
+ * @param[in] Q				- the second point to add.
+ * @param[in] P				- the affine point to evaluate the line function.
+ */
+#if PP_EXT == BASIC
+#define pp_add_projc(L, R, Q, P)	pp_add_projc_basic(L, R, Q, P)
+#elif PP_EXT == LAZYR
+#define pp_add_projc(L, R, Q, P)	pp_add_projc_lazyr(L, R, Q, P)
+#endif
+
 
 /**
  * Doubles a prime elliptic curve point and evaluates the corresponding line
@@ -622,6 +666,21 @@ typedef ep2_st *ep2_t;
 #define pp_dbl(L, R, Q, P)		pp_dbl_basic(L, R, Q, P)
 #elif EP_ADD == PROJC
 #define pp_dbl(L, R, Q, P)		pp_dbl_projc(L, R, Q, P)
+#endif
+
+/**
+ * Doubles a prime elliptic curve point and evaluates the corresponding line
+ * function at another elliptic curve point using projective coordinates.
+ *
+ * @param[out] L			- the result of the evaluation.
+ * @param[in, out] R		- the resulting point.
+ * @param[in] Q				- the point to double.
+ * @param[in] P				- the affine point to evaluate the line function.
+ */
+#if PP_EXT == BASIC
+#define pp_dbl_projc(L, R, Q, P)	pp_dbl_projc_basic(L, R, Q, P)
+#elif PP_EXT == LAZYR
+#define pp_dbl_projc(L, R, Q, P)	pp_dbl_projc_lazyr(L, R, Q, P)
 #endif
 
 /**
@@ -799,13 +858,21 @@ void fp2_mul_art(fp2_t c, fp2_t a);
 
 /**
  * Multiplies a quadratic extension field element by a quadratic/cubic
- * non-residue. Computes c = a * E, where E is a non-square/non-cube in the
- * quadratic extension.
+ * non-residue.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the quadratic extension field element to multiply.
  */
-void fp2_mul_nor(fp2_t c, fp2_t a);
+void fp2_mul_nor_basic(fp2_t c, fp2_t a);
+
+/**
+ * Multiplies a quadratic extension field element by a quadratic/cubic
+ * non-residue using integrated reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quadratic extension field element to multiply.
+ */
+void fp2_mul_nor_integ(fp2_t c, fp2_t a);
 
 /**
  * Multiplies a quadratic extension field element by a power of the constant
@@ -1275,6 +1342,15 @@ void fp12_sqr_pck_basic(fp12_t c, fp12_t a);
 void fp12_sqr_pck_lazyr(fp12_t c, fp12_t a);
 
 /**
+ * Tests if a dodecic extension field element belongs to the cyclotomic
+ * subgroup.
+ *
+ * @param[in] a				- the dodecic extension field element to test.
+ * @return 1 if the extension field element is in the subgroup. 0 otherwise.
+ */
+int fp12_test_cyc(fp12_t a);
+
+/**
  * Converts a dodecic extension field element to a cyclotomic element.
  * Computes c = a^(p^12 - 1)*(p^2 + 1).
  *
@@ -1349,7 +1425,9 @@ void fp12_frb(fp12_t c, fp12_t a);
 void fp12_frb_sqr(fp12_t c, fp12_t a);
 
 /**
- * Computes a power of a dodecic extension field element.
+ * Computes a power of a dodecic extension field element. Detects if the
+ * extension field element is in a cyclotomic subgroup and if this is the case,
+ * a faster squaring is used.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the basis.
@@ -1367,6 +1445,18 @@ void fp12_exp(fp12_t c, fp12_t a, bn_t b);
  * @param[in] b				- the exponent.
  */
 void fp12_exp_cyc(fp12_t c, fp12_t a, bn_t b);
+
+/**
+ * Computes a power of a cyclotomic dodecic extension field element.
+ *
+ * A cyclotomic element is one previously raised to the (p^6 - 1)-th power.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent in sparse form.
+ * @param[in] l				- the length of the exponent in sparse form.
+ */
+void fp12_exp_cyc_sps(fp12_t c, fp12_t a, int *b, int l);
 
 /**
  * Initializes the elliptic curve over quadratic extension.
@@ -1894,7 +1984,70 @@ void pp_add_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p);
  * @param[in] q				- the second point to add.
  * @param[in] p				- the affine point to evaluate the line function.
  */
-void pp_add_projc(fp12_t l, ep2_t r, ep2_t q, ep_t p);
+void pp_add_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p);
+
+/**
+ * Adds two prime elliptic curve points and evaluates the corresponding line
+ * function at another elliptic curve point using projective coordinates and
+ * lazy reduction.
+ *
+ * @param[out] l			- the result of the evaluation.
+ * @param[in, out] r		- the resulting point and first point to add.
+ * @param[in] q				- the second point to add.
+ * @param[in] p				- the affine point to evaluate the line function.
+ */
+void pp_add_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p);
+
+/**
+ * Doubles a prime elliptic curve point and evaluates the corresponding line
+ * function at another elliptic curve point using affine coordinates.
+ *
+ * @param[out] l			- the result of the evaluation.
+ * @param[in, out] r		- the resulting point.
+ * @param[in] q				- the point to double.
+ * @param[in] p				- the affine point to evaluate the line function.
+ */
+void pp_dbl_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p);
+
+/**
+ * Doubles a prime elliptic curve point and evaluates the corresponding line
+ * function at another elliptic curve point using projective coordinates.
+ *
+ * @param[out] l			- the result of the evaluation.
+ * @param[in, out] r		- the resulting point.
+ * @param[in] q				- the point to double.
+ * @param[in] p				- the affine point to evaluate the line function.
+ */
+void pp_dbl_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p);
+
+/**
+ * Doubles a prime elliptic curve point and evaluates the corresponding line
+ * function at another elliptic curve point using projective coordinates and
+ * lazy reduction.
+ *
+ * @param[out] l			- the result of the evaluation.
+ * @param[in, out] r		- the resulting point.
+ * @param[in] q				- the point to double.
+ * @param[in] p				- the affine point to evaluate the line function.
+ */
+void pp_dbl_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p);
+
+/**
+ * Computes the final exponentiation for the pairing. Computes
+ * c = a^(p^12 - 1)/r.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the extension field element to exponentiate.
+ */
+void pp_exp(fp12_t c, fp12_t a);
+
+/**
+ * Normalizes the accumulator point used inside pairing computation.
+ *
+ * @param[out] r			- the resulting point.
+ * @param[in] p				- the point to normalize.
+ */
+void pp_norm(ep2_t c, ep2_t a);
 
 /**
  * Computes the R-ate pairing of two points in a parameterized elliptic curve.

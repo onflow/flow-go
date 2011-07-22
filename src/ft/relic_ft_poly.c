@@ -396,7 +396,7 @@ dig_t *ft_poly_get_crz(void) {
 #endif
 }
 
-int *ft_poly_get_crz_spars(int *len) {
+int *ft_poly_get_crz_sps(int *len) {
 #if FT_CRT == QUICK || !defined(STRIP)
 	if (crz_len > 0 && crz_len < MAX_EXPS ) {
 		if (len != NULL) {
@@ -423,7 +423,7 @@ dig_t *ft_poly_get_srz(void) {
 #endif
 }
 
-int *ft_poly_get_srz_spars(int *len) {
+int *ft_poly_get_srz_sps(int *len) {
 #if FT_CRT == QUICK || !defined(STRIP)
 	if (srz_len > 0 && srz_len < MAX_EXPS ) {
 		if (len != NULL) {

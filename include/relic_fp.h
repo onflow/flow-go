@@ -99,6 +99,8 @@ enum {
 	BN_254,
 	/** 256-bit prime provided in Barreto et al. for use with BN curves. */
 	BN_256,
+	/** 256-bit prime provided in Barreto et al. for use with BN curves. */
+	BN_638,
 };
 
 /**
@@ -193,7 +195,7 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #endif
 
 /**
- * Subtracts a prime field element from another. Computes c = a - b.
+ * Subtracts a prime field element from another. Computes C = A - B.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the first prime field element.
@@ -206,7 +208,19 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #endif
 
 /**
- * Doubles a prime field element. Computes c = a + a.
+ * Negates a prime field element from another. Computes C = -A.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the prime field element to negate.
+ */
+#if FP_ADD == BASIC
+#define fp_neg(C, A)		fp_neg_basic(C, A)
+#elif FP_ADD == INTEG
+#define fp_neg(C, A)		fp_neg_integ(C, A)
+#endif
+
+/**
+ * Doubles a prime field element. Computes C = A + A.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the first prime field element.
@@ -218,7 +232,7 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #endif
 
 /**
- * Halves a prime field element. Computes c = a/2.
+ * Halves a prime field element. Computes C = A/2.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the first prime field element.
@@ -230,7 +244,7 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #endif
 
 /**
- * Multiples two prime field elements. Computes c = a * b.
+ * Multiples two prime field elements. Computes C = A * B.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the first prime field element.
@@ -247,7 +261,7 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #endif
 
 /**
- * Squares a prime field element. Computes c = a * a.
+ * Squares a prime field element. Computes C = A * A.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the prime field element to square.
@@ -264,7 +278,7 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 
 /**
  * Reduces a multiplication result modulo a prime field order. Computes
- * c = a mod m.
+ * C = A mod p.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the multiplication result to reduce.
@@ -291,7 +305,7 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #endif
 
 /**
- * Inverts a prime field element. Computes c = a^{-1}.
+ * Inverts a prime field element. Computes C = A^{-1}.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the prime field element to invert.
@@ -309,7 +323,7 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/sizeof(dig_t)];
 #endif
 
 /**
- * Exponentiates a prime field element. Computes c = a^b (mod p).
+ * Exponentiates a prime field element. Computes C = A^B (mod p).
  *
  * @param[out] C			- the result.
  * @param[in] A				- the basis.
@@ -381,7 +395,7 @@ dig_t fp_prime_get_mod8(void);
  *
  * @return the prime represented by it non-zero bits.
  */
-int *fp_prime_get_spars(int *len);
+int *fp_prime_get_sps(int *len);
 
 /**
  * Returns a non-quadratic residue in the prime field.
@@ -416,7 +430,7 @@ void fp_prime_set_dense(bn_t p);
  *
  * @param[in] p			- the new prime field order.
  */
-void fp_prime_set_spars(int *spars, int len);
+void fp_prime_set_pmers(int *spars, int len);
 
 /**
  * Imports a multiple precision integer as a prime field element, doing the
@@ -469,7 +483,7 @@ int fp_param_set_any_dense(void);
  *
  * @return STS_OK if no errors occurred; STS_ERR otherwise.
  */
-int fp_param_set_any_spars(void);
+int fp_param_set_any_pmers(void);
 
 /**
  * Assigns the order of the prime field to any towering-friendly prime.
@@ -484,11 +498,20 @@ int fp_param_set_any_tower(void);
 void fp_param_print(void);
 
 /**
- * Returns the BN curve parameter used to generate the given prime modulus.
+ * Returns the variable used to parameterize the given prime modulus.
  *
- * @param[out] x			- the parameter
+ * @param[out] x			- the integer parameter.
  */
-void fp_param_get_bn(bn_t x);
+void fp_param_get_var(bn_t x);
+
+/**
+ * Returns the variable used to parametereize the given prime modulus in sparse
+ * form.
+ *
+ * @param[out] len			- the length of the parameter in sparse form.
+ * @return the integer parameter in sparse form.
+ */
+int *fp_param_get_sps(int *len);
 
 /**
  * Copies the second argument to the first argument.
@@ -497,14 +520,6 @@ void fp_param_get_bn(bn_t x);
  * @param[in] a				- the prime field element to copy.
  */
 void fp_copy(fp_t c, fp_t a);
-
-/**
- * Negates a prime field element.
- *
- * @param[out] c			- the result.
- * @param[out] a			- the prime field element to negate.
- */
-void fp_neg(fp_t c, fp_t a);
 
 /**
  * Assigns zero to a prime field element.
@@ -702,7 +717,23 @@ void fp_sub_integ(fp_t c, fp_t a, fp_t b);
 void fp_sub_dig(fp_t c, fp_t a, dig_t b);
 
 /**
- * Doubles a prime field element using basic addition. Computes c = a + a.
+ * Negates a prime field element using basic negation.
+ *
+ * @param[out] c			- the result.
+ * @param[out] a			- the prime field element to negate.
+ */
+void fp_neg_basic(fp_t c, fp_t a);
+
+/**
+ * Negates a prime field element using integrated negation.
+ *
+ * @param[out] c			- the result.
+ * @param[out] a			- the prime field element to negate.
+ */
+void fp_neg_integ(fp_t c, fp_t a);
+
+/**
+ * Doubles a prime field element using basic addition.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the first prime field element to add.
@@ -710,8 +741,7 @@ void fp_sub_dig(fp_t c, fp_t a, dig_t b);
 void fp_dbl_basic(fp_t c, fp_t a);
 
 /**
- * Doubles a prime field element with integrated modular reduction. Computes
- * c = a + a.
+ * Doubles a prime field element with integrated modular reduction.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the first prime field element to add.
@@ -719,7 +749,7 @@ void fp_dbl_basic(fp_t c, fp_t a);
 void fp_dbl_integ(fp_t c, fp_t a);
 
 /**
- * Halves a prime field element. Computes c = a/2.
+ * Halves a prime field element.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to halve.
@@ -727,8 +757,7 @@ void fp_dbl_integ(fp_t c, fp_t a);
 void fp_hlv_basic(fp_t c, fp_t a);
 
 /**
- * Halves a prime field element with integrated modular reduction. Computes
- * c = a/2.
+ * Halves a prime field element with integrated modular reduction.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to halve.

@@ -137,10 +137,14 @@ static void detect_opt(int *opt, fp_t a) {
 				if (fp_cmp_dig(a, 1) == CMP_EQ) {
 					*opt = OPT_ONE;
 				} else {
-					if (fp_bits(a) <= FP_DIGIT) {
-						*opt = OPT_DIGIT;
+					if (fp_cmp_dig(a, 2) == CMP_EQ) {
+						*opt = OPT_TWO;
 					} else {
-						*opt = OPT_NONE;
+						if (fp_bits(a) <= FP_DIGIT) {
+							*opt = OPT_DIGIT;
+						} else {
+							*opt = OPT_NONE;
+						}
 					}
 				}
 			}
