@@ -44,6 +44,7 @@ void ep_pck(ep_t r, ep_t p) {
 	fp_copy(r->x, p->x);
 	fp_zero(r->y);
 	fp_set_bit(r->y, 0, b);
+	fp_set_dig(r->z, 1);
 	r->norm = 1;
 }
 
