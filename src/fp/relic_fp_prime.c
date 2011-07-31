@@ -180,6 +180,7 @@ void fp_prime_set(bn_t p) {
 			case 7:
 				prime_qnr = -1;
 				break;
+			case 1:
 			case 5:
 				prime_qnr = -2;
 				break;
