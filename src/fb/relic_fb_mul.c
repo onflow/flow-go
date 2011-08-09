@@ -330,7 +330,9 @@ void fb_mul_lcomb(fb_t c, fb_t a, fb_t b) {
 		for (int i = FB_DIGIT - 1; i >= 0; i--) {
 			for (int j = 0; j < FB_DIGS; j++) {
 				if (a[j] & ((dig_t)1 << i)) {
-					fb_addn_low(t + j, t + j, b);
+					/* This cannot use fb_addn_low() because there is no
+					 * guarantee that operands will be aligned. */
+					fb_addd_low(t + j, t + j, b, FB_DIGS);
 				}
 			}
 			if (i != 0) {
