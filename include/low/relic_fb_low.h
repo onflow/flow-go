@@ -181,7 +181,7 @@ void fb_rshd_low(dig_t *c, dig_t *a, int digits);
 dig_t fb_lshadd_low(dig_t *c, dig_t *a, int bits, int size);
 
 /**
- * Multiplies a digit vector by a digit with embedded modular reduction.
+ * Multiplies a digit vector by a digit.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to multiply.

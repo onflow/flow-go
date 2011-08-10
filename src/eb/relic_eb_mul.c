@@ -660,7 +660,7 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k) {
 
 #if EB_MUL == LODAH || !defined(STRIP)
 
-void eb_mul_lodah2(eb_t r, eb_t p, bn_t k) {
+void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
         int i, t;
         dv_t x1, z1, x2, z2, r1, r2, r3, r4;
         dig_t *b;
@@ -669,25 +669,24 @@ void eb_mul_lodah2(eb_t r, eb_t p, bn_t k) {
                 THROW(ERR_INVALID);
         }
 
-        fb_null(x1);
-        fb_null(z1);
-        fb_null(x2);
-        fb_null(z2);
-        fb_null(r1);
-        fb_null(r2);
-        fb_null(r3);
-        fb_null(r4);
-        fb_null(b);
+        dv_null(x1);
+        dv_null(z1);
+        dv_null(x2);
+        dv_null(z2);
+        dv_null(r1);
+        dv_null(r2);
+        dv_null(r3);
+        dv_null(r4);
 
         TRY {
-                fb_new(x1);
-                fb_new(z1);
-                fb_new(x2);
-                fb_new(z2);
-                fb_new(r1);
-                fb_new(r2);
-                fb_new(r3);
-                fb_new(r4);
+                dv_new(x1);
+                dv_new(z1);
+                dv_new(x2);
+                dv_new(z2);
+                dv_new(r1);
+                dv_new(r2);
+                dv_new(r3);
+                dv_new(r4);
 
                 fb_copy(x1, p->x);
                 fb_zero(z1);
@@ -713,38 +712,70 @@ void eb_mul_lodah2(eb_t r, eb_t p, bn_t k) {
 
                 t = bn_bits(k);
                 for (i = t - 2; i >= 0; i--) {
-                        fb_mulm_low(r1, x1, z2);
-                        fb_mulm_low(r2, x2, z1);
-                        fb_addn_low(r3, r1, r2);
+                        fb_mul(r1, x1, z2);
+                        fb_mul(r2, x2, z1);
+                        fb_add(r3, r1, r2);
                         fb_muln_low(r4, r1, r2);
                         if (bn_test_bit(k, i) == 1) {
-//                                fb_sqr(z1, r3);
-//                                fb_mul(r1, z1, p->x);
-//                                fb_add(x1, r1, r4);
-								fb_sqrm_low(z1, r3);
-								fb_muln_low(r1, z1, p->x);
-								fb_rdcn_low(r1, r1);
-								fb_addn_low(x1, r1, r4);
-                                fb_sqrm_low(r1, z2);
-                                fb_sqrm_low(r2, x2);
-                                fb_mulm_low(z2, r1, r2);
-								fb_sqrm_low(r1, r1);
-								fb_sqrl_low(r3, r2);
-								fb_mul1_low(r2, r1, b[0]);
-								fb_addd_low(r3, r3, r2);
-								fb_rdcn_low(x2, r3);
+                                fb_sqr(z1, r3);
+                                fb_muln_low(r1, z1, p->x);
+                                fb_addd_low(x1, r1, r4, 2 * FB_DIGS);
+                                fb_rdcn_low(x1, x1);
+                                fb_sqr(r1, z2);
+                                fb_sqr(r2, x2);
+                                fb_mul(z2, r1, r2);
+                                switch (eb_curve_opt_b()) {
+                                        case OPT_ZERO:
+                                                fb_sqr(x2, r2);
+                                                break;
+                                        case OPT_ONE:
+                                                fb_add(r1, r1, r2);
+                                                fb_sqr(x2, r1);
+                                                break;
+                                        case OPT_DIGIT:
+                                            	fb_sqr(r1, r1);
+                                                fb_sqrl_low(x2, r2);
+                                                fb_mul1_low(r2, r1, b[0]);
+                                                fb_addd_low(x2, x2, r2, FB_DIGS + 1);
+                                                fb_rdcn_low(x2, x2);
+                                                break;
+                                        default:
+                                                fb_sqr(x2, r2);
+                                                fb_sqr(r1, r1);
+                                                fb_mul(r2, r1, b);
+                                                fb_add(x2, x2, r2);
+                                                break;
+                                }
                         } else {
-                                fb_sqrm_low(z2, r3);
-                                fb_mulm_low(r1, z2, p->x);
-                                fb_addn_low(x2, r1, r4);
-                                fb_sqrm_low(r1, z1);
-                                fb_sqrm_low(r2, x1);
-                                fb_mulm_low(z1, r1, r2);
-								fb_sqrm_low(r1, r1);
-								fb_sqrl_low(r3, r2);
-								fb_mul1_low(r2, r1, b[0]);
-								fb_addd_low(r3, r3, r2);
-								fb_rdcn_low(x1, r3);
+                                fb_sqr(z2, r3);
+                                fb_muln_low(r1, z2, p->x);
+                                fb_addd_low(x2, r1, r4, 2 * FB_DIGS);
+                                fb_rdcn_low(x2, x2);
+                                fb_sqr(r1, z1);
+                                fb_sqr(r2, x1);
+                                fb_mul(z1, r1, r2);
+                                switch (eb_curve_opt_b()) {
+                                        case OPT_ZERO:
+                                                fb_sqr(x1, r2);
+                                                break;
+                                        case OPT_ONE:
+                                                fb_add(r1, r1, r2);
+                                                fb_sqr(x1, r1);
+                                                break;
+                                        case OPT_DIGIT:
+                                            	fb_sqr(r1, r1);
+                                                fb_sqrl_low(x1, r2);
+                                                fb_mul1_low(r2, r1, b[0]);
+                                                fb_addd_low(x1, x1, r2, FB_DIGS + 1);
+                                                fb_rdcn_low(x1, x1);
+                                                break;
+                                        default:
+                                                fb_sqr(x1, r2);
+                                                fb_sqr(r1, r1);
+                                                fb_mul(r2, r1, b);
+                                                fb_add(x1, x1, r2);
+                                                break;
+                                }
                         }
                 }
 
@@ -759,37 +790,37 @@ void eb_mul_lodah2(eb_t r, eb_t p, bn_t k) {
                                 fb_set_bit(r->z, 0, 1);
                         } else {
                                 /* r3 = z1 * z2. */
-                                fb_mulm_low(r3, z1, z2);
+                                fb_mul(r3, z1, z2);
                                 /* z1 = (x1 + x * z1). */
-                                fb_mulm_low(z1, z1, p->x);
-                                fb_addn_low(z1, z1, x1);
+                                fb_mul(z1, z1, p->x);
+                                fb_add(z1, z1, x1);
                                 /* z2 = x * z2. */
-                                fb_mulm_low(z2, z2, p->x);
+                                fb_mul(z2, z2, p->x);
                                 /* x1 = x1 * z2. */
-                                fb_mulm_low(x1, x1, z2);
+                                fb_mul(x1, x1, z2);
                                 /* z2 = (x2 + x * z2)(x1 + x * z1). */
-                                fb_addn_low(z2, z2, x2);
-                                fb_mulm_low(z2, z2, z1);
+                                fb_add(z2, z2, x2);
+                                fb_mul(z2, z2, z1);
 
                                 /* r4 = (x^2 + y) * z1 * z2 + (x2 + x * z2)(x1 + x * z1). */
-                                fb_sqrm_low(r4, p->x);
-                                fb_addn_low(r4, r4, p->y);
-                                fb_mulm_low(r4, r4, r3);
-                                fb_addn_low(r4, r4, z2);
+                                fb_sqr(r4, p->x);
+                                fb_add(r4, r4, p->y);
+                                fb_mul(r4, r4, r3);
+                                fb_add(r4, r4, z2);
 
                                 /* r3 = (z1 * z2 * x)^{-1}. */
-                                fb_mulm_low(r3, r3, p->x);
-                                fb_invn_low(r3, r3);
+                                fb_mul(r3, r3, p->x);
+                                fb_inv(r3, r3);
                                 /* r4 = (x^2 + y) * z1 * z2 + (x2 + x * z2)(x1 + x * z1) * r3. */
-                                fb_mulm_low(r4, r4, r3);
+                                fb_mul(r4, r4, r3);
                                 /* x2 = x1 * x * z2 * (z1 * z2 * x)^{-1} = x1/z1. */
-                                fb_mulm_low(x2, x1, r3);
+                                fb_mul(x2, x1, r3);
                                 /* z2 = x + x1/z1. */
-                                fb_addn_low(z2, x2, p->x);
+                                fb_add(z2, x2, p->x);
 
                                 /* z2 = z2 * r4 + y. */
-                                fb_mulm_low(z2, z2, r4);
-                                fb_addn_low(z2, z2, p->y);
+                                fb_mul(z2, z2, r4);
+                                fb_add(z2, z2, p->y);
 
                                 fb_copy(r->x, x2);
                                 fb_copy(r->y, z2);
@@ -804,172 +835,15 @@ void eb_mul_lodah2(eb_t r, eb_t p, bn_t k) {
                 THROW(ERR_CAUGHT);
         }
         FINALLY {
-                fb_free(x1);
-                fb_free(z1);
-                fb_free(x2);
-                fb_free(z2);
-                fb_free(r1);
-                fb_free(r2);
-                fb_free(r3);
-                fb_free(r4);
+                dv_free(x1);
+                dv_free(z1);
+                dv_free(x2);
+                dv_free(z2);
+                dv_free(r1);
+                dv_free(r2);
+                dv_free(r3);
+                dv_free(r4);
         }
-}
-
-void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
-	int i, t;
-	dv_t x1, z1, x2, z2, r1, r2, r3, r4;
-	dig_t *b;
-
-	if (eb_curve_is_super()) {
-		THROW(ERR_INVALID);
-	}
-
-	fb_null(x1);
-	fb_null(z1);
-	fb_null(x2);
-	fb_null(z2);
-	fb_null(r1);
-	fb_null(r2);
-	fb_null(r3);
-	fb_null(r4);
-	fb_null(b);
-
-	TRY {
-		fb_new(x1);
-		fb_new(z1);
-		fb_new(x2);
-		fb_new(z2);
-		fb_new(r1);
-		fb_new(r2);
-		fb_new(r3);
-		fb_new(r4);
-
-		fb_copy(x1, p->x);
-		fb_zero(z1);
-		fb_set_bit(z1, 0, 1);
-		fb_sqr(z2, p->x);
-		fb_sqr(x2, z2);
-
-		b = eb_curve_get_b();
-
-		switch (eb_curve_opt_b()) {
-			case OPT_ZERO:
-				break;
-			case OPT_ONE:
-				fb_add_dig(x2, x2, (dig_t)1);
-				break;
-			case OPT_DIGIT:
-				fb_add_dig(x2, x2, b[0]);
-				break;
-			default:
-				fb_add(x2, x2, b);
-				break;
-		}
-
-		t = bn_bits(k);
-		for (i = t - 2; i >= 0; i--) {
-			fb_mulm_low(r1, x1, z2);
-			fb_mulm_low(r2, x2, z1);
-			fb_addn_low(r3, r1, r2);
-			fb_muln_low(r4, r1, r2);
-			if (bn_test_bit(k, i)) {
-				fb_sqrm_low(z1, r3);
-
-				fb_muln_low(r1, z1, p->x);
-				//fb_add2_low(x1, r1, r4);
-				fb_addd_low(x1, r1, r4, 2 * FB_DIGS);
-
-				fb_sqrm_low(r1, z2);
-				fb_sqrm_low(r2, x2);
-				fb_mulm_low(z2, r1, r2);
-				fb_sqrm_low(r1, r1);
-				fb_sqrl_low(r3, r2);
-				fb_mul1_low(r2, r1, b[0]);
-				fb_addd_low(r3, r3, r2);
-				fb_rdcn_low(x2, r3);
-			} else {
-				fb_sqrm_low(z2, r3);
-
-				fb_muln_low(r1, z2, p->x);
-				//fb_add2_low(x2, r1, r4);
-				fb_addd_low(x2, r1, r4, 2 * FB_DIGS);
-
-				fb_sqrm_low(r1, z1);
-				fb_sqrm_low(r2, x1);
-				fb_mulm_low(z1, r1, r2);
-				fb_sqrm_low(r1, r1);
-				fb_sqrl_low(r3, r2);
-				fb_mul1_low(r2, r1, b[0]);
-				fb_addd_low(r3, r3, r2);
-				fb_rdcn_low(x1, r3);
-			}
-		}
-
-		if (fb_is_zero(z1)) {
-			/* The point q is at infinity. */
-			eb_set_infty(r);
-		} else {
-			if (fb_is_zero(z2)) {
-				fb_copy(r->x, p->x);
-				fb_add(r->y, p->x, p->y);
-				fb_zero(r->z);
-				fb_set_bit(r->z, 0, 1);
-			} else {
-				/* r3 = z1 * z2. */
-				fb_mulm_low(r3, z1, z2);
-				/* z1 = (x1 + x * z1). */
-				fb_mulm_low(z1, z1, p->x);
-				fb_addn_low(z1, z1, x1);
-				/* z2 = x * z2. */
-				fb_mulm_low(z2, z2, p->x);
-				/* x1 = x1 * z2. */
-				fb_mulm_low(x1, x1, z2);
-				/* z2 = (x2 + x * z2)(x1 + x * z1). */
-				fb_addn_low(z2, z2, x2);
-				fb_mulm_low(z2, z2, z1);
-
-				/* r4 = (x^2 + y) * z1 * z2 + (x2 + x * z2)(x1 + x * z1). */
-				fb_sqrm_low(r4, p->x);
-				fb_addn_low(r4, r4, p->y);
-				fb_mulm_low(r4, r4, r3);
-				fb_addn_low(r4, r4, z2);
-
-				/* r3 = (z1 * z2 * x)^{-1}. */
-				fb_mulm_low(r3, r3, p->x);
-				fb_invn_low(r3, r3);
-				/* r4 = (x^2 + y) * z1 * z2 + (x2 + x * z2)(x1 + x * z1) * r3. */
-				fb_mulm_low(r4, r4, r3);
-				/* x2 = x1 * x * z2 * (z1 * z2 * x)^{-1} = x1/z1. */
-				fb_mulm_low(x2, x1, r3);
-				/* z2 = x + x1/z1. */
-				fb_addn_low(z2, x2, p->x);
-
-				/* z2 = z2 * r4 + y. */
-				fb_mulm_low(z2, z2, r4);
-				fb_addn_low(z2, z2, p->y);
-
-				fb_copy(r->x, x2);
-				fb_copy(r->y, z2);
-				fb_zero(r->z);
-				fb_set_bit(r->z, 0, 1);
-
-				r->norm = 1;
-			}
-		}
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb_free(x1);
-		fb_free(z1);
-		fb_free(x2);
-		fb_free(z2);
-		fb_free(r1);
-		fb_free(r2);
-		fb_free(r3);
-		fb_free(r4);
-	}
 }
 
 #endif /* EB_ORDIN || EB_KBLTZ */

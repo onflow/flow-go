@@ -563,8 +563,7 @@ static int square_root(void) {
 		TEST_BEGIN("square root extraction is correct") {
 			fb_rand(a);
 			fb_sqr(c, a);
-			fb_copy(b, c);
-			fb_srt(b, b);
+			fb_srt(b, c);
 			TEST_ASSERT(fb_cmp(b, a) == CMP_EQ, end);
 		} TEST_END;
 
@@ -1143,8 +1142,9 @@ static int digit(void) {
 		TEST_BEGIN("multiplication by a single digit is consistent") {
 			fb_rand(a);
 			fb_rand(b);
-			for (int j = 1; j < FB_DIGS; j++)
+			for (int j = 1; j < FB_DIGS; j++) {
 				b[j] = 0;
+			}
 			g = b[0];
 			fb_mul(c, a, b);
 			fb_mul_dig(d, a, g);

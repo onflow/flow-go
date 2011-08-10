@@ -445,5 +445,21 @@ void fb_mul_karat(fb_t c, fb_t a, fb_t b) {
 #endif
 
 void fb_mul_dig(fb_t c, fb_t a, dig_t b) {
-	fb_mul1_low(c, a, b);
+	dv_t t;
+
+	dv_null(t);
+
+	TRY {
+		/* We need a temporary variable so that c can be a or b. */
+		dv_new(t);
+
+		fb_mul1_low(t, a, b);
+
+		fb_rdc1_low(c, t);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		dv_free(t);
+	}
 }
