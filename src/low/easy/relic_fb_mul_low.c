@@ -41,7 +41,6 @@
 /*============================================================================*/
 
 void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
-	align dig_t t[FB_DIGS + 1];
 	int j, k;
 	dig_t b1, b2;
 
@@ -54,24 +53,23 @@ void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
 		return;
 	}
 
-	t[FB_DIGS] = fb_lshb_low(t, a, util_bits_dig(digit) - 1);
+	c[FB_DIGS] = fb_lshb_low(c, a, util_bits_dig(digit) - 1);
 	for (int i = util_bits_dig(digit) - 2; i > 0; i--) {
 		if (digit & ((dig_t)1 << i)) {
 			j = FB_DIGIT - i;
 			b1 = a[0];
-			t[0] ^= (b1 << i);
+			c[0] ^= (b1 << i);
 			for (k = 1; k < FB_DIGS; k++) {
 				b2 = a[k];
-				t[k] ^= ((b2 << i) | (b1 >> j));
+				c[k] ^= ((b2 << i) | (b1 >> j));
 				b1 = b2;
 			}
-			t[FB_DIGS] ^= (b1 >> j);
+			c[FB_DIGS] ^= (b1 >> j);
 		}
 	}
 	if (digit & (dig_t)1) {
-		fb_add(t, t, a);
+		fb_add(c, c, a);
 	}
-	fb_rdc1_low(c, t);
 }
 
 void fb_muln_low(dig_t *c, dig_t *a, dig_t *b) {
