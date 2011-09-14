@@ -95,7 +95,7 @@ void bn_lsh(bn_t c, bn_t a, int bits) {
 		if (c != a) {
 			carry = bn_lshb_low(c->dp + digits, a->dp, a->used, bits);
 		} else {
-			carry = bn_lshb_low(c->dp + digits, c->dp + digits, c->used, bits);
+			carry = bn_lshb_low(c->dp + digits, c->dp + digits, c->used - digits, bits);
 		}
 		if (carry != 0) {
 			c->dp[c->used] = carry;
