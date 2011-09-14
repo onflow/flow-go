@@ -54,7 +54,7 @@
  */
 static unsigned char state[64];
 
-#if SEED == DEV
+#if SEED == DEV || SEED == UDEV
 
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -63,7 +63,11 @@ static unsigned char state[64];
 /**
  * The path to the char device that supplies entropy.
  */
+#if SEED == DEV
 #define RAND_PATH		"/dev/random"
+#else
+#define RAND_PATH		"/dev/urandom"
+#endif
 
 #elif SEED == WCGR
 
@@ -87,7 +91,7 @@ void rand_init() {
 
 	memset(buf, 0, sizeof(buf));
 
-#elif SEED == DEV
+#elif SEED == DEV || SEED == UDEV
 	int rand_fd, c, l;
 
 	rand_fd = open(RAND_PATH, O_RDONLY);

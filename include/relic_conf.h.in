@@ -719,8 +719,10 @@
 #define LIBC     2
 /** Device node generator. */
 #define DEV      3
+/** Device node generator. */
+#define UDEV     4
 /** Use Windows' CryptGenRandom. */
-#define WCGR     4
+#define WCGR     5
 /** Chosen random generator seeder. */
 #define SEED     @SEED@
 

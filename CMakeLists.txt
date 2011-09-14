@@ -108,6 +108,7 @@ message(STATUS "Available random number generator seeders (default = DEV):")
 message("   SEED=ZERO      Use a zero seed. (not crypto safe!)")
 message("   SEED=LIBC      Use the libc rand()/random() functions. (not crypto safe!)")
 message("   SEED=DEV       Use /dev/random. (recommended)")
+message("   SEED=UDEV      Use /dev/urandom.")
 message("   SEED=WCGR      Use Windows' CryptGenRandom. (recommended)\n")
 
 message(STATUS "Supported operating systems (default = LINUX):")
