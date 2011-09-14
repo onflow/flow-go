@@ -38,7 +38,7 @@
 #include "relic_conf.h"
 #include "relic_error.h"
 
-#ifdef VERBS
+#if defined(VERBS) && OPSYS == LINUX
 #include <execinfo.h>
 #endif
 
@@ -65,6 +65,7 @@ void err_full_msg(const char *function, const char *file, int line,
 		fprintf(stderr, "\nERROR in %s() at %s,%d: %s.\n", function, file, line,
 				core_ctx->reason[error]);
 
+#if OPSYS == LINUX
 		/* Print the stack trace. */
 		fprintf(stderr, "\tCall stack:\n");
 		n = backtrace(trace, 100);
@@ -77,6 +78,7 @@ void err_full_msg(const char *function, const char *file, int line,
 			fprintf(stderr, "\t\t#%d %s\n", i - 1, symbols[i]);
 		}
 		free(symbols);
+#endif
 	}
 }
 #endif
