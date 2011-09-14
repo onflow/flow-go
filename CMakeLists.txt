@@ -306,7 +306,11 @@ if(OPSYS STREQUAL LINUX)
 	set(LFLAGS "${LFLAGS} -lrt")
 endif(OPSYS STREQUAL LINUX)
 
-set(TIMER "HPROC" CACHE STRING "Timer")
+if(OPSYS STREQUAL LINUX)
+	set(TIMER "HPROC" CACHE STRING "Timer")
+else(OPSYS STREQUAL LINUX)
+	set(TIMER "ANSI" CACHE STRING "Timer")
+endif(OPSYS STREQUAL LINUX)
 
 if(DEBUG)
 	# If the user did not specify compile flags, we turn off all optimizations.
