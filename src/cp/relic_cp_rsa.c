@@ -364,6 +364,7 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 				bn_rsh(t, m, 8 * m_len);
 				bn_write_bin(h2, MD_LEN, t);
 				md_map(h1, NULL, 0);
+				pad = 0;
 				for (int i = 0; i < MD_LEN; i++) {
 					pad |= h1[i] - h2[i];
 				}
