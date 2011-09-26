@@ -210,6 +210,39 @@ static void ecdh(void) {
 	ec_free(p);
 }
 
+static void ecmqv(void) {
+	bn_t d1, d2;
+	ec_t p1, p2;
+	unsigned char key[MD_LEN];
+
+	bn_null(d1);
+	bn_null(d2);
+	ec_null(p1);
+	ec_null(p2);
+
+	bn_new(d1);
+	bn_new(d2);
+	ec_new(p1);
+	ec_new(p2);
+
+	BENCH_BEGIN("cp_ecmqv_gen") {
+		BENCH_ADD(cp_ecmqv_gen(d1, p1));
+	}
+	BENCH_END;
+
+	cp_ecmqv_gen(d2, p2);
+
+	BENCH_BEGIN("cp_ecmqv_key") {
+		BENCH_ADD(cp_ecmqv_key(key, MD_LEN, d1, d2, p1, p1, p2));
+	}
+	BENCH_END;
+
+	bn_free(d1);
+	bn_free(d2);
+	ec_free(p1);
+	ec_free(p2);
+}
+
 static void ecdsa(void) {
 	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
 	bn_t r, s, d;
@@ -405,6 +438,7 @@ int main(void) {
 	util_print_banner("Protocols based on elliptic curves:\n", 0);
 	if (ec_param_set_any() == STS_OK) {
 		ecdh();
+		ecmqv();
 		ecdsa();
 		ecss();
 	} else {

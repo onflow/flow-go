@@ -333,6 +333,64 @@ static int ecdh(void) {
 	return code;
 }
 
+static int ecmqv(void) {
+	int code = STS_ERR;
+	char *str = NULL;
+	bn_t d1_a, d1_b;
+	bn_t d2_a, d2_b;
+	ec_t q1_a, q1_b;
+	ec_t q2_a, q2_b;
+	unsigned char key[MD_LEN], key1[MD_LEN], key2[MD_LEN];
+
+	bn_null(d1_a);
+	bn_null(d1_b);
+	ec_null(q1_a);
+	ec_null(q1_b);
+	bn_null(d2_a);
+	bn_null(d2_b);
+	ec_null(q2_a);
+	ec_null(q2_b);
+
+	TRY {
+		bn_new(d1_a);
+		bn_new(d1_b);
+		ec_new(q1_a);
+		ec_new(q1_b);
+		bn_new(d2_a);
+		bn_new(d2_b);
+		ec_new(q2_a);
+		ec_new(q2_b);
+
+		TEST_BEGIN("ecmqv is correct") {
+			cp_ecmqv_gen(d1_a, q1_a);
+			cp_ecmqv_gen(d2_a, q2_a);
+			cp_ecmqv_gen(d1_b, q1_b);
+			cp_ecmqv_gen(d2_b, q2_b);
+			cp_ecmqv_key(key1, MD_LEN, d1_b, d2_b, q2_b, q1_a, q2_a);
+			cp_ecmqv_key(key2, MD_LEN, d1_a, d2_a, q2_a, q1_b, q2_b);
+			TEST_ASSERT(memcmp(key1, key2, MD_LEN) == 0, end);
+		} TEST_END;
+
+		(void)str;
+		(void)key;
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+
+  end:
+	bn_free(d1_a);
+	bn_free(d1_b);
+	ec_free(q1_a);
+	ec_free(q1_b);
+	bn_free(d2_a);
+	bn_free(d2_b);
+	ec_free(q2_a);
+	ec_free(q2_b);
+	return code;
+}
+
 static int ecdsa(void) {
 	int code = STS_ERR;
 	bn_t d, r;
@@ -532,6 +590,10 @@ int main(void) {
 	util_print_banner("Protocols based on elliptic curves:\n", 0);
 	if (ec_param_set_any() == STS_OK) {
 		if (ecdh() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+		if (ecmqv() != STS_OK) {
 			core_clean();
 			return 1;
 		}
