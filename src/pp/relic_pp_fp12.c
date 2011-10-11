@@ -1195,7 +1195,7 @@ int fp12_test_cyc(fp12_t a) {
 	fp12_null(t);
 
 	TRY {
-		fp2_new(t);
+		fp12_new(t);
 
 		fp12_back_cyc(t, a);
 		result = (fp12_cmp(t, a) == CMP_EQ);
