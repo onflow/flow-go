@@ -286,6 +286,7 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
 	ep_norm(g, g);
 	ep_copy(&curve_g, g);
 	bn_copy(&curve_r, r);
+
 #if defined(EP_PRECO)
 	ep_mul_pre(ep_curve_get_tab(), &curve_g);
 #endif
