@@ -202,13 +202,5 @@ int ep_is_valid(ep_t p) {
 void ep_print(ep_t p) {
 	fp_print(p->x);
 	fp_print(p->y);
-	if (!p->norm) {
-		for (int i = FP_DIGS - 1; i >= 0; i--) {
-			util_print("%.*lX ", (int)(2 * sizeof(dig_t)),
-					(unsigned long int)p->z[i]);
-		}
-		util_print("\n");
-	} else {
-		fp_print(p->z);
-	}
+	fp_print(p->z);
 }
