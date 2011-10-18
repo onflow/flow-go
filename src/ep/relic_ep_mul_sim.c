@@ -562,6 +562,7 @@ void ep_mul_sim_gen(ep_t r, bn_t k, ep_t q, bn_t l) {
 #if defined(EP_ORDIN) || defined(EP_SUPER)
 	if (!ep_curve_is_kbltz()) {
 		ep_mul_sim_ordin(r, g, k, q, l, 1);
+	}
 #endif
 
 #else
