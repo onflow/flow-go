@@ -947,17 +947,25 @@ static int square_root(void) {
 		fp_new(b);
 		fp_new(c);
 
-		if (fp_prime_get_mod8() == 3 && fp_prime_get_mod8() == 7) {
-			TEST_BEGIN("square root extraction is correct") {
-				fp_rand(a);
-				fp_sqr(c, a);
-				r = fp_srt(b, c);
-				fp_neg(c, b);
-				TEST_ASSERT(r, end);
-				TEST_ASSERT(fp_cmp(b, a) == CMP_EQ || fp_cmp(c, a) == CMP_EQ, end);
-			}
-			TEST_END;
+		TEST_BEGIN("square root extraction is correct") {
+			fp_rand(a);
+			fp_sqr(c, a);
+			r = fp_srt(b, c);
+			fp_neg(c, b);
+			TEST_ASSERT(r, end);
+			TEST_ASSERT(fp_cmp(b, a) == CMP_EQ || fp_cmp(c, a) == CMP_EQ, end);
 		}
+		TEST_END;
+
+		TEST_BEGIN("square root extraction works for any input") {
+			fp_rand(a);
+			r = fp_srt(b, a);
+			fp_sqr(c, b);
+			if (r) {
+				TEST_ASSERT(fp_cmp(c, a) == CMP_EQ, end);
+			}
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);
