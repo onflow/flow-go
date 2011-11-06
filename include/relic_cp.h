@@ -622,13 +622,13 @@ void cp_ecdh_gen(bn_t d, ec_t q);
  *
  * @param[out] key				- the shared key.
  * @param[int] key_len			- the intended shared key length in bytes.
- * @param[in] k					- the private key.
- * @param[in] q					- the point received by the other party.
+ * @param[in] d					- the private key.
+ * @param[in] q					- the point received from the other party.
  */
 void cp_ecdh_key(unsigned char *key, int key_len, bn_t d, ec_t q);
 
 /**
- * Generate a ECMQV key pair.
+ * Generate an ECMQV key pair.
  *
  * Should also be used to generate the ephemeral key pair.
  *
@@ -645,8 +645,8 @@ void cp_ecmqv_gen(bn_t d, ec_t q);
  * @param[in] d1				- the private key.
  * @param[in] d2				- the ephemeral private key.
  * @param[in] q2u				- the ephemeral public key.
- * @param[in] q1v				- the point received by the other party.
- * @param[in] q2v				- the ephemeral point received by the other party.
+ * @param[in] q1v				- the point received from the other party.
+ * @param[in] q2v				- the ephemeral point received from the other party.
  */
 void cp_ecmqv_key(unsigned char *key, int key_len, bn_t d1, bn_t d2, ec_t q2u, ec_t q1v, ec_t q2v);
 
