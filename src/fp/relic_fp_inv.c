@@ -290,6 +290,7 @@ void fp_inv_monty(fp_t c, fp_t a) {
 		dv_zero(x1->dp, FP_DIGS);
 		bn_set_2b(x1, 2 * FP_DIGS * FP_DIGIT - k);
 		fp_mul(c, c, x1->dp);
+
 #if FP_RDC != MONTY
 		/*
 		 * If we do not use Montgomery reduction, the result of inversion is
@@ -308,6 +309,7 @@ void fp_inv_monty(fp_t c, fp_t a) {
 		fp_zero(c);
 		dv_copy(c, _a->dp, _a->used);
 #endif
+		(void)flag;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

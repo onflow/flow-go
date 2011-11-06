@@ -214,7 +214,7 @@ int bn_is_prime_basic(bn_t a) {
 
 int bn_is_prime_rabin(bn_t a) {
 	bn_t t, n1, y, r;
-	int i, first, s, j, result, b, tests = 0;
+	int i, s, j, result, b, tests = 0;
 
 	tests = 0;
 	result = 1;
@@ -273,8 +273,6 @@ int bn_is_prime_rabin(bn_t a) {
 			bn_rsh(n1, n1, 1);
 		}
 		bn_lsh(r, n1, s);
-
-		first = 0;
 
 		for (i = 0; i < tests; i++) {
 			/* Fix the basis as the first few primes. */

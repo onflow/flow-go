@@ -224,7 +224,7 @@ void ft_read(ft_t a, const char *str, int len) {
 }
 
 void ft_write(char *str, int len, ft_t a) {
-	int i, j, l;
+	int i, l;
 
 	ft_size(&l, a);
 	if (len <= l) {
@@ -238,7 +238,6 @@ void ft_write(char *str, int len, ft_t a) {
 		return;
 	}
 
-	j = 0;
 	for (i = ft_trits(a) - 1; i >= 0; i--) {
 		*str++ = util_conv_char(ft_get_trit(a, i));
 	}
