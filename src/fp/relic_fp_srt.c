@@ -41,18 +41,18 @@
 
 int fp_srt(fp_t c, fp_t a) {
 	bn_t e;
+	fp_t t0;
 	fp_t t1;
-	fp_t t2;
 	int r = 0;
 
 	bn_null(e);
+	fp_null(t0);
 	fp_null(t1);
-	fp_null(t2);
 
 	TRY {
 		bn_new(e);
+		fp_new(t0);
 		fp_new(t1);
-		fp_new(t2);
 
 		/* Make e = p. */
 		e->used = FP_DIGS;
@@ -63,18 +63,18 @@ int fp_srt(fp_t c, fp_t a) {
 			bn_add_dig(e, e, 1);
 			bn_rsh(e, e, 2);
 
-			fp_exp(t1, a, e);
-			fp_sqr(t2, t1);
-			r = (fp_cmp(t2, a) == CMP_EQ);
-			fp_copy(c, t1);
+			fp_exp(t0, a, e);
+			fp_sqr(t1, t0);
+			r = (fp_cmp(t1, a) == CMP_EQ);
+			fp_copy(c, t0);
 		} else {
 			int f = 0, m = 0;
 
 			/* First, check if there is a root. Compute t1 = a^((p - 1)/2). */
 			bn_rsh(e, e, 1);
-			fp_exp(t1, a, e);
+			fp_exp(t0, a, e);
 
-			if (fp_cmp_dig(t1, 1) != CMP_EQ) {
+			if (fp_cmp_dig(t0, 1) != CMP_EQ) {
 				/* Nope, there is no square root. */
 				r = 0;
 			} else {
@@ -82,9 +82,9 @@ int fp_srt(fp_t c, fp_t a) {
 				/* Find a quadratic non-residue modulo p, that is a number t2
 				 * such that (t2 | p) = t2^((p - 1)/2)!= 1. */
 				do {
-					fp_rand(t2);
-					fp_exp(t1, t2, e);
-				} while (fp_cmp_dig(t1, 1) == CMP_EQ);
+					fp_rand(t1);
+					fp_exp(t0, t1, e);
+				} while (fp_cmp_dig(t0, 1) == CMP_EQ);
 
 				/* Write p - 1 as (e * 2^f), odd e. */
 				bn_lsh(e, e, 1);
@@ -94,30 +94,31 @@ int fp_srt(fp_t c, fp_t a) {
 				}
 
 				/* Compute t2 = t2^e. */
-				fp_exp(t2, t2, e);
+				fp_exp(t1, t1, e);
 
 				/* Compute t1 = a^e, c = a^((e + 1)/2) = a^(e/2 + 1), odd e. */
 				bn_rsh(e, e, 1);
-				fp_exp(t1, a, e);
-				fp_mul(c, t1, a);
-				fp_sqr(t1, t1);
-				fp_mul(t1, t1, a);
+				fp_exp(t0, a, e);
+				fp_mul(e->dp, t0, a);
+				fp_sqr(t0, t0);
+				fp_mul(t0, t0, a);
+				fp_copy(c, e->dp);
 
 				while (1) {
-					if (fp_cmp_dig(t1, 1) == CMP_EQ) {
+					if (fp_cmp_dig(t0, 1) == CMP_EQ) {
 						break;
 					}
-					fp_copy(e->dp, t1);
-					for (m = 0; (m < f) && (fp_cmp_dig(t1, 1) != CMP_EQ); m++) {
+					fp_copy(e->dp, t0);
+					for (m = 0; (m < f) && (fp_cmp_dig(t0, 1) != CMP_EQ); m++) {
+						fp_sqr(t0, t0);
+					}
+					fp_copy(t0, e->dp);
+					for (int i = 0; i < f - m - 1; i++) {
 						fp_sqr(t1, t1);
 					}
-					fp_copy(t1, e->dp);
-					for (int i = 0; i < f - m - 1; i++) {
-						fp_sqr(t2, t2);
-					}
-					fp_mul(c, c, t2);
-					fp_sqr(t2, t2);
-					fp_mul(t1, t1, t2);
+					fp_mul(c, c, t1);
+					fp_sqr(t1, t1);
+					fp_mul(t0, t0, t1);
 					f = m;
 				}
 			}
@@ -128,8 +129,8 @@ int fp_srt(fp_t c, fp_t a) {
 	}
 	FINALLY {
 		bn_free(e);
+		fp_free(t0);
 		fp_free(t1);
-		fp_free(t2);
 	}
 	return r;
 }
