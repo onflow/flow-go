@@ -129,8 +129,8 @@ static void bn_sqr_karat_imp(bn_t c, bn_t a, int level) {
 		bn_add(t, t, a0a0);
 		/* c = t + a1*a1 */
 		bn_add(t, t, a1a1);
-		t->sign = a->sign;
 
+		t->sign = BN_POS;
 		bn_copy(c, t);
 	}
 	CATCH_ANY {
@@ -170,6 +170,7 @@ void bn_sqr_basic(bn_t c, bn_t a) {
 			bn_sqradd_low(t->dp + (2 * i), a->dp + i, a->used - i);
 		}
 
+		t->sign = BN_POS;
 		bn_trim(t);
 		bn_copy(c, t);
 	}
@@ -200,9 +201,8 @@ void bn_sqr_comba(bn_t c, bn_t a) {
 
 		bn_sqrn_low(t->dp, a->dp, a->used);
 
-		t->sign = a->sign ^ a->sign;
+		t->sign = BN_POS;
 		bn_trim(t);
-
 		bn_copy(c, t);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
