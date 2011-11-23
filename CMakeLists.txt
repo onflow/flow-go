@@ -304,7 +304,6 @@ else(CMAKE_SYSTEM_NAME STREQUAL Linux)
 endif(CMAKE_SYSTEM_NAME STREQUAL Linux)
 if(OPSYS STREQUAL LINUX)
 	add_definitions(-D_GNU_SOURCE)
-	set(LFLAGS "${LFLAGS} -lrt")
 endif(OPSYS STREQUAL LINUX)
 
 if(OPSYS STREQUAL LINUX)
@@ -325,7 +324,6 @@ endif(DEBUG)
 
 if(MULTI)
 	set(CFLAGS "${CFLAGS} -fopenmp")
-	set(LFLAGS "${LFLAGS} -lgomp -lm")
 endif(MULTI)
 
 if(PROFL)
@@ -336,7 +334,6 @@ endif(PROFL)
 
 if(TRACE)
 	set(DFLAGS "${DFLAGS} -fPIC -finstrument-functions")
-	set(LFLAGS "${LFLAGS} -ldl")
 endif(TRACE)
 
 if(ARITH STREQUAL "gmp")
@@ -344,6 +341,7 @@ if(ARITH STREQUAL "gmp")
 endif(ARITH STREQUAL "gmp")
 
 set(CMAKE_C_FLAGS "-pipe -std=c99 ${WFLAGS} ${DFLAGS} ${PFLAGS} ${CFLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS ${LFLAGS})
 
 message(STATUS "Compiler flags: -pipe -std=c99 -pedantic ${WFLAGS} ${DFLAGS} ${PFLAGS} ${CFLAGS}")
 message(STATUS "Linker flags: ${LFLAGS}\n")
