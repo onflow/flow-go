@@ -315,7 +315,7 @@ void ep_mul_pre_yaowi(ep_t * t, ep_t p) {
 			}
 		}
 
-		ep_norm_sim(t + 1, t + 1, EP_TABLE_YAOWI - 1);
+		ep_norm_sim(t + 1, t + 1, l - 1);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -381,7 +381,7 @@ void ep_mul_pre_nafwi(ep_t * t, ep_t p) {
 			}
 		}
 
-		ep_norm_sim(t + 1, t + 1, EP_TABLE_NAFWI - 1);
+		ep_norm_sim(t + 1, t + 1, l - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
