@@ -839,7 +839,6 @@ static int compression(void) {
 			TEST_ASSERT(ep_cmp(a, c) == CMP_EQ, end);
 		}
 		TEST_END;
-
 	}
 	CATCH_ANY {
 		ERROR(end);
