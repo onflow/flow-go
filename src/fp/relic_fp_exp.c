@@ -26,7 +26,7 @@
  * Implementation of prime field exponentiation functions.
  *
  * @version $Id$
- * @ingroup bn
+ * @ingroup fp
  */
 
 #include <string.h>
