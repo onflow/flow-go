@@ -38,10 +38,6 @@
 /*============================================================================*/
 
 int bn_cmp_abs(bn_t a, bn_t b) {
-	int result;
-
-	result = bn_cmpn_low(a->dp, b->dp, a->used);
-
 	if (a->used > b->used) {
 		return CMP_GT;
 	}
@@ -50,12 +46,10 @@ int bn_cmp_abs(bn_t a, bn_t b) {
 		return CMP_LT;
 	}
 
-	return result;
+	return bn_cmpn_low(a->dp, b->dp, a->used);
 }
 
 int bn_cmp_dig(bn_t a, dig_t b) {
-	int result;
-
 	if (a->sign == BN_NEG) {
 		return CMP_LT;
 	}
@@ -64,9 +58,7 @@ int bn_cmp_dig(bn_t a, dig_t b) {
 		return CMP_GT;
 	}
 
-	result = bn_cmp1_low(a->dp[0], b);
-
-	return result;
+	return bn_cmp1_low(a->dp[0], b);
 }
 
 int bn_cmp(bn_t a, bn_t b) {

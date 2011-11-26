@@ -45,7 +45,7 @@
 /**
  * Number of trial division tests.
  */
-#define BASIC_TESTS	((int)(sizeof(primes)/(sizeof(dig_t))))
+#define BASIC_TESTS	((int)(sizeof(primes)/(BN_DIGIT / 8)))
 
 /**
  * Small prime numbers table.

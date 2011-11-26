@@ -49,8 +49,6 @@
 
 void bn_init(bn_t a, int digits) {
 #if ALLOC == DYNAMIC
-	int r;
-
 	if (digits % BN_SIZE != 0) {
 		/* Pad the number of digits to a multiple of the block. */
 		digits += (BN_SIZE - digits % BN_SIZE);
@@ -58,11 +56,11 @@ void bn_init(bn_t a, int digits) {
 
 	if (a != NULL && a->dp == NULL) {
 #if ALIGN == 1
-		a->dp = malloc(digits * sizeof(dig_t));
+		a->dp = malloc(digits * (BN_DIGIT / 8));
 #elif OPSYS == WINDOWS
-		a->dp = _aligned_malloc(digits * sizeof(dig_t), ALIGN);
+		a->dp = _aligned_malloc(digits * (BN_DIGIT / 8), ALIGN);
 #else
-		r = posix_memalign((void **)&(a->dp), ALIGN, digits * sizeof(dig_t));
+		int r = posix_memalign((void **)&a->dp, ALIGN, digits * (BN_DIGIT / 8));
 		if (r == ENOMEM) {
 			THROW(ERR_NO_MEMORY);
 		}
@@ -76,7 +74,6 @@ void bn_init(bn_t a, int digits) {
 		free(a);
 		THROW(ERR_NO_MEMORY);
 	}
-
 #else
 	/* Verify if the number of digits is sane. */
 	if (digits > BN_SIZE) {
@@ -133,7 +130,7 @@ void bn_grow(bn_t a, int digits) {
 	if (a->alloc < digits) {
 		/* At least add BN_SIZE more digits. */
 		digits += (BN_SIZE * 2) - (digits % BN_SIZE);
-		t = (dig_t *)realloc(a->dp, sizeof(dig_t) * digits);
+		t = (dig_t *)realloc(a->dp, (BN_DIGIT / 8) * digits);
 		if (t == NULL) {
 			THROW(ERR_NO_MEMORY);
 		}

@@ -200,7 +200,9 @@ void bn_rand(bn_t a, int sign, int bits) {
 
 	bn_grow(a, digits);
 
-	rand_bytes((unsigned char *)a->dp, digits * sizeof(dig_t));
+	for (int i = 0; i < BN_DIGS; i++) {
+		rand_bytes((unsigned char *)&a->dp[i], (BN_DIGIT / 8));
+	}
 	a->used = digits;
 	a->sign = sign;
 	if (bits > 0) {
@@ -221,7 +223,7 @@ void bn_print(bn_t a) {
 	} else {
 		util_print("%lX", (unsigned long int)a->dp[a->used - 1]);
 		for (i = a->used - 2; i >= 0; i--) {
-			util_print("%.*lX", (int)(2 * sizeof(dig_t)),
+			util_print("%.*lX", (int)(2 * (BN_DIGIT / 8)),
 					(unsigned long int)a->dp[i]);
 		}
 		util_print("\n");
@@ -386,7 +388,7 @@ void bn_size_bin(int *size, bn_t a) {
 	dig_t d;
 	int digits;
 
-	digits = (a->used - 1) * sizeof(dig_t);
+	digits = (a->used - 1) * (BN_DIGIT / 8);
 	d = a->dp[a->used - 1];
 
 	while (d != 0) {
@@ -398,9 +400,8 @@ void bn_size_bin(int *size, bn_t a) {
 
 void bn_read_bin(bn_t a, unsigned char *bin, int len) {
 	int i, j;
-	dig_t d;
-	int digs = (len % sizeof(dig_t) ==
-			0 ? len / sizeof(dig_t) : len / sizeof(dig_t) + 1);
+	dig_t d = (BN_DIGIT / 8);
+	int digs = (len % d == 0 ? len / d : len / d + 1);
 
 	bn_grow(a, digs);
 	bn_zero(a);
@@ -408,17 +409,17 @@ void bn_read_bin(bn_t a, unsigned char *bin, int len) {
 
 	for (i = 0; i < digs - 1; i++) {
 		d = 0;
-		for (j = sizeof(dig_t) - 1; j >= 0; j--) {
+		for (j = (BN_DIGIT / 8) - 1; j >= 0; j--) {
 			d = d << 8;
-			d |= bin[len - 1 - (i * sizeof(dig_t) + j)];
+			d |= bin[len - 1 - (i * (BN_DIGIT / 8) + j)];
 		}
 		a->dp[i] = d;
 	}
 	d = 0;
-	for (j = sizeof(dig_t) - 1; j >= 0; j--) {
-		if ((int)(i * sizeof(dig_t) + j) < len) {
+	for (j = (BN_DIGIT / 8) - 1; j >= 0; j--) {
+		if ((int)(i * (BN_DIGIT / 8) + j) < len) {
 			d = d << 8;
-			d |= bin[len - 1 - (i * sizeof(dig_t) + j)];
+			d |= bin[len - 1 - (i * (BN_DIGIT / 8) + j)];
 		}
 	}
 	a->dp[i] = d;
@@ -440,7 +441,7 @@ void bn_write_bin(unsigned char *bin, int len, bn_t a) {
 	k = 0;
 	for (int i = 0; i < a->used - 1; i++) {
 		d = a->dp[i];
-		for (int j = 0; j < (int)sizeof(dig_t); j++) {
+		for (int j = 0; j < (int)(BN_DIGIT / 8); j++) {
 			bin[len - 1 - k++] = d & 0xFF;
 			d = d >> 8;
 		}
