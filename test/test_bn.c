@@ -65,9 +65,9 @@ static int memory(void) {
 static int util(void) {
 	int code = STS_ERR;
 	int bits;
-	char str[BN_DIGS * sizeof(dig_t) * 3 + 1];
+	char str[BN_DIGS * (BN_DIGIT / 8) * 3 + 1];
 	dig_t digit;
-	unsigned char bin[BN_DIGS * sizeof(dig_t)];
+	unsigned char bin[BN_BYTES];
 	dig_t raw[BN_DIGS];
 	bn_t a, b, c;
 
@@ -227,7 +227,7 @@ static int util(void) {
 		} TEST_END;
 
 		TEST_BEGIN("reading and writing a positive number are consistent") {
-			int len = BN_DIGS * sizeof(dig_t);
+			int len = BN_BYTES;
 			bn_rand(a, BN_POS, BN_BITS);
 			bn_write_str(str, sizeof(str), a, 10);
 			bn_read_str(b, str, sizeof(str), 10);
@@ -258,7 +258,7 @@ static int util(void) {
 		TEST_END;
 
 		TEST_BEGIN("reading and writing a negative number are consistent") {
-			int len = BN_DIGS * sizeof(dig_t);
+			int len = BN_BYTES;
 			bn_rand(a, BN_NEG, BN_BITS);
 			bn_write_str(str, sizeof(str), a, 10);
 			bn_read_str(b, str, sizeof(str), 10);
