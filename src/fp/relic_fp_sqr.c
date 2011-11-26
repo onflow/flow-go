@@ -60,13 +60,15 @@ static void fp_sqr_karat_imp(dv_t c, fp_t a, int size, int level) {
 	h = size >> 1;
 	h1 = size - h;
 
-	dv_null(t);
+	dv_null(t0);
+	dv_null(t1);
 	dv_null(a0a0);
 	dv_null(a1a1);
 
 	TRY {
 		/* Allocate the temp variables. */
-		dv_new(t);
+		dv_new(t0);
+		dv_new(t1);
 		dv_new(a0a0);
 		dv_new(a1a1);
 		dv_zero(t0, 2 * h1);

@@ -134,7 +134,9 @@ void fp_set_dig(fp_t c, dig_t a) {
 void fp_rand(fp_t a) {
 	int bits, digits;
 
-	rand_bytes((unsigned char *)a, FP_DIGS * sizeof(dig_t));
+	for (int i = 0; i < FP_DIGS; i++) {
+		rand_bytes((unsigned char *)&a[i], (FP_DIGIT / 8));
+	}
 
 	SPLIT(bits, digits, FP_BITS, FP_DIG_LOG);
 	if (bits > 0) {
@@ -170,10 +172,10 @@ void fp_print(fp_t a) {
 
 		for (i = FP_DIGS - 1; i >= 0; i--) {
 			if (i >= t->used) {
-				util_print("%.*lX ", (int)(2 * sizeof(dig_t)),
+				util_print("%.*lX ", (int)(2 * (FP_DIGIT / 8)),
 						(unsigned long int)0);
 			} else {
-				util_print("%.*lX ", (int)(2 * sizeof(dig_t)),
+				util_print("%.*lX ", (int)(2 * (FP_DIGIT / 8)),
 						(unsigned long int)t->dp[i]);
 			}
 		}

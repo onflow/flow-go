@@ -73,11 +73,12 @@ static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
 		dv_new(b1);
 		dv_new(a0b0);
 		dv_new(a1b1);
+		dv_new(t);
 		dv_zero(a1, h1 + 1);
 		dv_zero(b1, h1 + 1);
 		dv_zero(a0b0, 2 * h);
 		dv_zero(a1b1, 2 * h1);
-		dv_zero(t, 2 * (h1 + 1));
+		dv_zero(t, 2 * h1 + 1);
 
 		/* a0b0 = a0 * b0 and a1b1 = a1 * b1 */
 		if (level <= 1) {

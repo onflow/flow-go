@@ -90,7 +90,7 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 	}
 
 	TRY {
-		for (i = 1; i < (1 << (FP_WIDTH - 1)); i ++) {
+		for (i = 0; i < (1 << (FP_WIDTH - 1)); i ++) {
 			fp_new(tab[i]);
 		}
 
