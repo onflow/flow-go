@@ -211,7 +211,6 @@ static void util(void) {
 
 	BENCH_BEGIN("bn_write_str") {
 		bn_rand(a, BN_POS, BN_BITS);
-		printf("%d\n", bn_bits(a));
 		BENCH_ADD(bn_write_str(str, sizeof(str), a, 10));
 	}
 	BENCH_END;
