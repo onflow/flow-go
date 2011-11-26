@@ -91,6 +91,9 @@ static void util(void) {
 		ep_rand(p);
 		BENCH_ADD(ep_is_valid(p));
 	} BENCH_END;
+
+	ep_free(p);
+	ep_free(q);
 }
 
 static void arith(void) {
