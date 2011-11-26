@@ -140,7 +140,7 @@ void fb_sqrl_low(dig_t *c, dig_t *a) {
 		d = a[i];
 		*tmpt = (table[d & 0xF]) | (table[(d >> 4) & 0xF] << 8) | (table[(d >> 8) & 0xF] << 16) | (table[(d >> 12) & 0xF] << 24);
 		tmpt++;
-		*tmpt = (table[(d >> 16) & 0xF] << 00) | (table[(d >> 20) & 0xF] << 8) | (table[(d >> 24) & 0xF] << 16) | (table[(d >> 28)] << 24);
+		*tmpt = (table[(d >> 16) & 0xF] << 00) | (table[(d >> 20) & 0xF] << 8) | (table[(d >> 24) & 0xF] << 16) | (table[(d >> 28) & 0xF] << 24);
 	}
 #elif WORD == 64
 	for (int i = 0; i < FB_DIGS; i++, tmpt++) {
