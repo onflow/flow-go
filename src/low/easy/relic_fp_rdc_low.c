@@ -79,7 +79,6 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 	align dig_t _r[2 * FP_DIGS], r[2 * FP_DIGS], t[2 * FP_DIGS];
 	int *sform, len;
 	int first, i, j, b0, d0, b1, d1;
-	dig_t carry;
 
 	sform = fp_prime_get_sps(&len);
 
@@ -99,7 +98,6 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 		r[first - 1] &= MASK(b0);
 	}
 
-	carry = 0;
 	while (!fp_is_zero(q)) {
 		dv_zero(_q, 2 * FP_DIGS);
 		for (i = len - 1; i > 0; i--) {
