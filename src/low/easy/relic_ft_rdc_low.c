@@ -90,7 +90,6 @@ static void ft_rdct_low(dig_t *c, dig_t *a, int fa, int fb, int size) {
 		FT_ADD(a[i - sh + 1 + size], a[i - sh + 1], d1, d0, t, fb)
 	} else {
 		FT_ADD(a[i - sh + 1 + size], a[i - sh + 1], d1 >> rh, d0 >> rh, t, fb)
-		FT_ADD(a[i - sh + size], a[i - sh], d1 << lh, d0 << lh, t, fb)
 	}
 	if (ra == 0) {
 		FT_ADD(a[i - sa + 1 + size], a[i - sa + 1], d1, d0, t, fa)
@@ -165,7 +164,6 @@ static void ft_rdcp_low(dig_t *c, dig_t *a, int fa, int fb, int fc, int fd, int 
 		FT_ADD(a[i - sh + 1 + size], a[i - sh + 1], d1, d0, t, fd)
 	} else {
 		FT_ADD(a[i - sh + 1 + size], a[i - sh + 1], d1 >> rh, d0 >> rh, t, fd)
-		FT_ADD(a[i - sh + size], a[i - sh], d1 << lh, d0 << lh, t, fd)
 	}
 	if (ra == 0) {
 		FT_ADD(a[i - sa + 1 + size], a[i - sa + 1], d1, d0, t, fa)

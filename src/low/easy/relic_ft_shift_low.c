@@ -80,7 +80,7 @@ void ft_lshd_low(dig_t *c, dig_t *a, int digits) {
 	top = c + FT_DIGS / 2 - 1;
 	bot = a + FT_DIGS / 2 - 1 - digits;
 
-	for (i = 0; i < FT_DIGS - digits; i++, top--, bot--) {
+	for (i = 0; i < FT_DIGS / 2 - digits; i++, top--, bot--) {
 		*top = *bot;
 	}
 	for (i = 0; i < digits; i++, c++) {
@@ -138,7 +138,7 @@ void ft_rshd_low(dig_t *c, dig_t *a, int digits) {
 	for (i = 0; i < FT_DIGS / 2 - digits; i++, top++, bot++) {
 		*bot = *top;
 	}
-	for (; i < FT_DIGS; i++, bot++) {
+	for (; i < FT_DIGS / 2; i++, bot++) {
 		*bot = 0;
 	}
 }
