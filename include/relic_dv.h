@@ -83,7 +83,7 @@
 /**
  * Size in bytes of a temporary vector.
  */
-#define DV_BYTES	(DV_DIGS * sizeof(dig_t))
+#define DV_BYTES	(DV_DIGS * (DIGIT / 8))
 
 /*============================================================================*/
 /* Type definitions                                                           */
@@ -93,7 +93,7 @@
  * Represents a temporary double precision digit vector.
  */
 #if ALLOC == AUTO
-typedef align dig_t dv_t[DV_DIGS + PADDING(DV_BYTES)/sizeof(dig_t)];
+typedef align dig_t dv_t[DV_DIGS + PADDING(DV_BYTES)/(DIGIT / 8)];
 #else
 typedef dig_t *dv_t;
 #endif
