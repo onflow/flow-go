@@ -674,16 +674,12 @@ void bn_rec_glv(bn_t k0, bn_t k1, bn_t k, bn_t n, bn_t v1[], bn_t v2[]) {
 		bn_mul(b1, k, v1[0]);
 		r1 = bn_get_bit(b1, bits);
 		bn_rsh(b1, b1, bits + 1);
-		if (r1) {
-			bn_add_dig(b1, b1, 1);
-		}
+		bn_add_dig(b1, b1, r1);
 
 		bn_mul(b2, k, v2[0]);
 		r2 = bn_get_bit(b2, bits);
 		bn_rsh(b2, b2, bits + 1);
-		if (r2) {
-			bn_add_dig(b2, b2, 1);
-		}
+		bn_add_dig(b2, b2, r2);
 
 		bn_mul(k0, b1, v1[1]);
 		bn_mul(t, b2, v2[1]);
