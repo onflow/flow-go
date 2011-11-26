@@ -259,6 +259,7 @@ void eb_curve_init(void) {
 	fb_zero(curve_g.y);
 	fb_zero(curve_g.z);
 	bn_init(&curve_r, FB_DIGS);
+	bn_init(&curve_h, FB_DIGS);
 #if defined(EB_KBLTZ) && (EB_MUL == LWNAF || !defined(STRIP))
 	bn_init(&curve_vm, FB_DIGS);
 	bn_init(&curve_s0, FB_DIGS);
@@ -278,6 +279,7 @@ void eb_curve_clean(void) {
 	}
 #endif
 	bn_clean(&curve_r);
+	bn_clean(&curve_h);
 #if defined(EB_KBLTZ) && (EB_MUL == LWNAF || !defined(STRIP))
 	bn_clean(&curve_vm);
 	bn_clean(&curve_s0);
