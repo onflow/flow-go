@@ -101,12 +101,10 @@ void eb_rhs(fb_t rhs, eb_t p) {
 
 	fb_null(t0);
 	fb_null(t1);
-	fb_null(t0);
 
 	TRY {
 		fb_new(t0);
 		fb_new(t1);
-		fb_new(t0);
 
 		/* t0 = x1^2. */
 		fb_sqr(t0, p->x);
@@ -171,7 +169,6 @@ void eb_rhs(fb_t rhs, eb_t p) {
 	FINALLY {
 		fb_free(t0);
 		fb_free(t1);
-		fb_free(t0);
 	}
 }
 
