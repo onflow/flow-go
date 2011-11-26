@@ -1322,6 +1322,8 @@ static int symbol(void) {
 	bn_free(a);
 	bn_free(b);
 	bn_free(c);
+	bn_free(p);
+	bn_free(q);
 	return code;
 }
 
