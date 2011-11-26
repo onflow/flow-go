@@ -261,7 +261,6 @@ void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
 	unsigned char win[FP_BITS];
 
 	ep_null(t);
-	ep_null(r);
 
 	/* Initialize table. */
 	for (i = 0; i < (1 << (EP_WIDTH - 1)); i++) {
@@ -269,14 +268,11 @@ void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
 	}
 
 	TRY {
-
-		/* Find window size. */
-		for (i = 1; i < (1 << (EP_WIDTH - 1)); i += 2) {
+		for (i = 0; i < (1 << (EP_WIDTH - 1)); i ++) {
 			ep_new(tab[i]);
 		}
 
 		ep_new(t);
-		ep_new(r);
 
 		ep_copy(tab[0], p);
 		ep_dbl(t, p);
@@ -313,7 +309,7 @@ void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		for (i = 1; i < (1 << (EP_WIDTH - 1)); i++) {
+		for (i = 0; i < (1 << (EP_WIDTH - 1)); i++) {
 			ep_free(tab[i]);
 		}
 		ep_free(t);
