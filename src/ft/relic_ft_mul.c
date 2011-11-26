@@ -61,7 +61,8 @@ void ft_mul_basic(ft_t c, ft_t a, ft_t b) {
 		/* We need a temporary variable so that c can be a or b. */
 		dv_new(s);
 		ft_new(t);
-		ft_null(u);
+		ft_new(u);
+
 		ft_zero(t);
 		ft_copy(u, b);
 		dv_zero(s + 2 * FT_DIGS, FT_DIGS);
