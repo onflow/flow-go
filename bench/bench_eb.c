@@ -112,7 +112,6 @@ static void arith(void) {
 	bn_new(k);
 	bn_new(n);
 	bn_new(l);
-	fb_new(t);
 
 	eb_curve_get_ord(n);
 

@@ -543,6 +543,7 @@ static void arith(void) {
 
 	ep_free(p);
 	ep_free(q);
+	ep_free(r);
 	bn_free(k);
 	bn_free(l);
 	bn_free(n);
