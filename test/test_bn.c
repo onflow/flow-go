@@ -65,7 +65,7 @@ static int memory(void) {
 static int util(void) {
 	int code = STS_ERR;
 	int bits;
-	char str[BN_DIGS * (BN_DIGIT / 8) * 3 + 1];
+	char str[BN_BYTES * 3 + 1];
 	dig_t digit;
 	unsigned char bin[BN_BYTES];
 	dig_t raw[BN_DIGS];

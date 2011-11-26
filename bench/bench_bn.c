@@ -95,8 +95,8 @@ static void memory(void) {
 static void util(void) {
 	int d, len;
 	dig_t digit;
-	char str[BN_DIGS * sizeof(dig_t) * 3 + 1];
-	unsigned char bin[BN_DIGS * sizeof(dig_t)];
+	char str[BN_BYTES * 3 + 1];
+	unsigned char bin[BN_BYTES];
 	dig_t raw[BN_DIGS];
 	bn_t a, b;
 
@@ -211,6 +211,7 @@ static void util(void) {
 
 	BENCH_BEGIN("bn_write_str") {
 		bn_rand(a, BN_POS, BN_BITS);
+		printf("%d\n", bn_bits(a));
 		BENCH_ADD(bn_write_str(str, sizeof(str), a, 10));
 	}
 	BENCH_END;
