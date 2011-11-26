@@ -137,7 +137,11 @@ int bn_get_bit(bn_t a, int bit) {
 
 	SPLIT(bit, d, bit, BN_DIG_LOG);
 
-	return ((a->dp[d] & ((dig_t)1 << bit)) >> bit);
+	if (d > a->used) {
+		return 0;
+	} else {
+		return ((a->dp[d] & ((dig_t)1 << bit)) >> bit);
+	}
 }
 
 void bn_set_bit(bn_t a, int bit, int value) {
