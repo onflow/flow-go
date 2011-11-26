@@ -103,7 +103,7 @@ static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
 		for (i = 0; i < 2 * h; i++) {
 			c[i] = a0b0[i];
 		}
-		for (i = 0; i < 2 * (h1 + 1); i++) {
+		for (i = 0; i < 2 * h1 + 1; i++) {
 			c[2 * h + i] = a1b1[i];
 		}
 
