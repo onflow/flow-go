@@ -51,9 +51,7 @@ static const dig_t table_odds[16] = {
 static void fb_srtt_low(dig_t *c, dig_t *a, int fa) {
 	int i, j, n, h, sh, rh, lh, sa, la, ra;
 	dig_t d, d_e, d_o;
-	align dig_t t[2 * FB_DIGS];
-
-	dv_zero(t, 2 * FB_DIGS);
+	align dig_t t[2 * FB_DIGS] = { 0 };
 
 	sh = 1 + (FB_BITS >> FB_DIG_LOG);
 	h = (sh + 1) >> 1;
@@ -108,9 +106,7 @@ static void fb_srtt_low(dig_t *c, dig_t *a, int fa) {
 static void fb_srtp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 	int i, j, n, h, sh, rh, lh, sa, la, ra, sb, lb, rb, sc, lc, rc;
 	dig_t d, d_e, d_o;
-	align dig_t t[DV_DIGS];
-
-	dv_zero(t, 2 * FB_DIGS);
+	align dig_t t[DV_DIGS] = { 0 };
 
 	sh = 1 + (FB_BITS >> FB_DIG_LOG);
 	h = (sh + 1) >> 1;
@@ -180,17 +176,12 @@ static void fb_srtp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 }
 
 static void fb_sqrt_low(dig_t *c, dig_t *a) {
-	int i, j, n, h, sh;
+	int i, j, n, sh;
 	dig_t d, d_e, d_o;
-	align dig_t t[2 * FB_DIGS], s[FB_DIGS + 1], t_e[FB_DIGS], t_o[FB_DIGS];
-
-	dv_zero(t, 2 * FB_DIGS);
-	dv_zero(s, FB_DIGS + 1);
-	dv_zero(t_e + HALF, FB_DIGS - HALF);
-	dv_zero(t_o + HALF, FB_DIGS - HALF);
+	align dig_t t[2 * FB_DIGS] = { 0 }, s[FB_DIGS + 1] = { 0 };
+	align dig_t t_e[FB_DIGS] = { 0 }, t_o[FB_DIGS] = { 0 };
 
 	sh = 1 + (FB_BITS >> FB_DIG_LOG);
-	h = (sh + 1) >> 1;
 
 	for (i = 0; i < FB_DIGS; i++) {
 		n = i >> 1;
@@ -243,6 +234,7 @@ static void fb_sqrt_low(dig_t *c, dig_t *a) {
 			u = t_o[j] & 0xFF;
 			fb_addn_low(t + j, t + j, fb_poly_tab_srz(u));
 		}
+		fb_zero(c);
 		fb_rdcn_low(c, t);
 		fb_addd_low(c, c, t_e, HALF);
 	}
