@@ -150,7 +150,7 @@ static int util(void) {
 		TEST_END;
 
 		TEST_BEGIN("assignment to a constant and comparison are consistent") {
-			rand_bytes((unsigned char *)&d, sizeof(dig_t));
+			rand_bytes((unsigned char *)&d, (FP_DIGIT / 8));
 			fp_set_dig(a, d);
 			TEST_ASSERT(fp_cmp_dig(a, d) == CMP_EQ, end);
 		}
