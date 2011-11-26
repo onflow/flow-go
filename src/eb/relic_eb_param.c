@@ -510,6 +510,7 @@ void eb_param_set(int param) {
 		fb_free(c);
 		eb_free(g);
 		bn_free(r);
+		bn_free(h);
 	}
 }
 
