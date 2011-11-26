@@ -560,7 +560,7 @@ static void arith(void) {
 
 #if FB_ITR == QUICK || !defined(STRIP)
 	for (int i = 0; i < FB_TABLE_QUICK; i++) {
-		eb_new(t[i]);
+		fb_new(t[i]);
 	}
 	BENCH_BEGIN("fb_itr_quick") {
 		fb_rand(a);
