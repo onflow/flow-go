@@ -171,7 +171,9 @@ void fb_set_dig(fb_t c, dig_t a) {
 void fb_rand(fb_t a) {
 	int bits, digits;
 
-	rand_bytes((unsigned char *)a, FB_DIGS * sizeof(dig_t));
+	for (int i = 0; i < FB_DIGS; i++) {
+		rand_bytes((unsigned char *)&a[i], (BN_DIGIT / 8));
+	}
 	SPLIT(bits, digits, FB_BITS, FB_DIG_LOG);
 	if (bits > 0) {
 		dig_t mask = MASK(bits);
@@ -184,9 +186,8 @@ void fb_print(fb_t a) {
 
 	/* Suppress possible unused parameter warning. */
 	(void)a;
-	util_print("%lX ", (unsigned long int)a[FB_DIGS - 1]);
-	for (i = FB_DIGS - 2; i >= 0; i--) {
-		util_print("%.*lX ", (int)(2 * sizeof(dig_t)), (unsigned long int)a[i]);
+	for (i = FB_DIGS - 1; i >= 0; i--) {
+		util_print("%.*lX ", (int)(2 * (FB_DIGIT / 8)), (unsigned long int)a[i]);
 	}
 	util_print("\n");
 }
