@@ -172,11 +172,13 @@ void ep_curve_init(void) {
 	fp_new(curve_g.x);
 	fp_new(curve_g.y);
 	fp_new(curve_g.z);
+#ifdef EP_PRECO
 	for (int i = 0; i < EP_TABLE; i++) {
 		fp_new(table[i].x);
 		fp_new(table[i].y);
 		fp_new(table[i].z);
 	}
+#endif
 #endif
 	ep_set_infty(&curve_g);
 	bn_init(&curve_r, FP_DIGS);
@@ -193,11 +195,13 @@ void ep_curve_clean(void) {
 	fp_free(curve_g.x);
 	fp_free(curve_g.y);
 	fp_free(curve_g.z);
+#ifdef EP_PRECO
 	for (int i = 0; i < EP_TABLE; i++) {
 		fp_free(table[i].x);
 		fp_free(table[i].y);
 		fp_free(table[i].z);
 	}
+#endif
 #endif
 	bn_clean(&curve_r);
 #if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || !defined(STRIP))
