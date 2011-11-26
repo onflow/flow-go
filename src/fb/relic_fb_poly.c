@@ -288,6 +288,13 @@ static void find_chain() {
 			chain[4] = (4 << 8) + 0;
 			chain_len = 10;
 			break;
+		case 367:
+			chain[1] = (1 << 8) + 0;
+			chain[2] = (2 << 8) + 1;
+			chain[6] = (6 << 8) + 3;
+			chain[9] = (9 << 8) + 2;
+			chain_len = 11;
+			break;
 		case 1223:
 			chain[1] = (1 << 8) + 0;
 			chain[2] = (2 << 8) + 0;
