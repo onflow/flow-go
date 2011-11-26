@@ -26,7 +26,7 @@
  * Implementation of the ternary field modulus manipulation.
  *
  * @version $Id$
- * @ingroup fb
+ * @ingroup ft
  */
 
 #include <stdlib.h>

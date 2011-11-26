@@ -26,7 +26,7 @@
  * Implementation of the ternary field multiplication functions.
  *
  * @version $Id$
- * @ingroup fb
+ * @ingroup ft
  */
 
 #include <string.h>

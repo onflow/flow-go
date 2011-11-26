@@ -26,7 +26,7 @@
  * Implementation of the ternary field cube root.
  *
  * @version $Id$
- * @ingroup fb
+ * @ingroup ft
  */
 
 #include <string.h>
