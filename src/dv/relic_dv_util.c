@@ -42,9 +42,9 @@ void dv_print(dv_t a, int digits) {
 	int i;
 
 	/* Suppress possible unused parameter warning. */
-	(void) a;
+	(void)a;
 	for (i = digits - 1; i >= 0; i--) {
-		util_print("%.*lX", (int)(2 * sizeof(dig_t)), (unsigned long int)a[i]);
+		util_print("%.*lX", (int)(2 * (DIGIT / 8)), (unsigned long int)a[i]);
 	}
 	util_print("\n");
 

@@ -56,11 +56,11 @@ void bn_init(bn_t a, int digits) {
 
 	if (a != NULL && a->dp == NULL) {
 #if ALIGN == 1
-		a->dp = malloc(digits * (BN_DIGIT / 8));
+		a->dp = (dig_t *)malloc(digits * sizeof(dig_t));
 #elif OPSYS == WINDOWS
-		a->dp = _aligned_malloc(digits * (BN_DIGIT / 8), ALIGN);
+		a->dp = _aligned_malloc(digits * sizeof(dig_t), ALIGN);
 #else
-		int r = posix_memalign((void **)&a->dp, ALIGN, digits * (BN_DIGIT / 8));
+		int r = posix_memalign((void **)&a->dp, ALIGN, digits * sizeof(dig_t));
 		if (r == ENOMEM) {
 			THROW(ERR_NO_MEMORY);
 		}
