@@ -754,7 +754,7 @@ static int fixed(void) {
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = EB_TABLE; i < EB_TABLE_NAFWI; i++) {
+		for (int i = 0; i < EB_TABLE_NAFWI; i++) {
 			eb_free(t[i]);
 		}
 #endif
@@ -819,11 +819,11 @@ static int fixed(void) {
 	}
 	code = STS_OK;
   end:
+	bn_free(n);
+	bn_free(k);
 	eb_free(p);
 	eb_free(q);
 	eb_free(r);
-	bn_free(n);
-	bn_free(k);
 	return code;
 }
 
@@ -931,6 +931,7 @@ static int simultaneous(void) {
 	eb_free(r);
 	bn_free(n);
 	bn_free(k);
+	bn_free(l);
 	return code;
 }
 
@@ -997,6 +998,7 @@ static int hashing(void) {
 	code = STS_OK;
   end:
 	eb_free(a);
+	bn_free(n);
 	return code;
 }
 
