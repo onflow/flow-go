@@ -171,6 +171,8 @@ static void arith(void) {
 	fp_new(f[0]);
 	fp_new(f[1]);
 
+	dv_zero(d, DV_DIGS);
+
 	BENCH_BEGIN("fp_add") {
 		fp_rand(a);
 		fp_rand(b);
