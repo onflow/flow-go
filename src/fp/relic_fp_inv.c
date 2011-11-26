@@ -337,7 +337,7 @@ void fp_inv_exgcd(fp_t c, fp_t a) {
 	bn_null(g2);
 	bn_null(p);
 	bn_null(q);
-	bn_null(v);
+	bn_null(r);
 
 	TRY {
 		bn_new(u);
