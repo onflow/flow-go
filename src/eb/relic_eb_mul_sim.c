@@ -46,29 +46,33 @@
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously,
- * optionally choosing the first point as the generator depending on the value
- * of flag.
+ * optionally choosing the first point as the generator depending on an optional
+ * table of precomputed points.
  *
  * @param[out] r 				- the result.
  * @param[in] p					- the first point to multiply.
  * @param[in] k					- the first integer.
  * @param[in] q					- the second point to multiply.
  * @param[in] l					- the second integer.
- * @param[in] gen				- the flag.
+ * @param[in] t					- the pointer to a precomputed table.
  */
-static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
-	int l0, l1, len, i, n0, n1, w;
+static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
+	int l0, l1, len, i, n0, n1, w, gen;
 	signed char u;
 	signed char tnaf0[FB_BITS + 8], *t0;
 	signed char tnaf1[FB_BITS + 8], *t1;
 	eb_t table0[1 << (EB_WIDTH - 2)];
 	eb_t table1[1 << (EB_WIDTH - 2)];
-	eb_t *t = NULL;
 	bn_t vm, s0, s1;
 
 	bn_null(vm);
 	bn_null(s0);
 	bn_null(s1);
+
+	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+		eb_null(table0[i]);
+		eb_null(table1[i]);
+	}
 
 	TRY {
 		bn_new(vm);
@@ -82,16 +86,8 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 			u = 1;
 		}
 
-		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_null(table0[i]);
-			eb_null(table1[i]);
-		}
-
-		if (gen == 1) {
-#if defined(EB_PRECO)
-			t = eb_curve_get_tab();
-#endif
-		} else {
+		gen = (t == NULL ? 0 : 1);
+		if (!gen) {
 			for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
 				eb_new(table0[i]);
 				eb_set_infty(table0[i]);
@@ -161,6 +157,14 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+		if (!gen) {
+			for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+				eb_free(table0[i]);
+			}
+		}
+		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+			eb_free(table1[i]);
+		}
 		bn_free(vm);
 		bn_free(s0);
 		bn_free(s1);
@@ -173,90 +177,98 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously,
- * optionally choosing the first point as the generator depending on the value
- * of flag.
+ * optionally choosing the first point as the generator depending on an optional
+ * table of precomputed points.
  *
  * @param[out] r 				- the result.
  * @param[in] p					- the first point to multiply.
  * @param[in] k					- the first integer.
  * @param[in] q					- the second point to multiply.
  * @param[in] l					- the second integer.
- * @param[in] gen				- the flag.
+ * @param[in] t					- the pointer to a precomputed table.
  */
-static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, int gen) {
-	int len, l0, l1, i, n0, n1, w;
+static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
+	int len, l0, l1, i, n0, n1, w, gen;
 	signed char naf0[FB_BITS + 1], naf1[FB_BITS + 1], *t0, *t1;
 	eb_t table0[1 << (EB_WIDTH - 2)];
 	eb_t table1[1 << (EB_WIDTH - 2)];
-	eb_t *t = NULL;
 
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
 		eb_null(table0[i]);
 		eb_null(table1[i]);
 	}
 
-	if (gen) {
-#if defined(EB_PRECO)
-		t = eb_curve_get_tab();
-#endif
-	} else {
+	TRY {
+		gen = (t == NULL ? 0 : 1);
+		if (!gen) {
+			for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
+				eb_new(table0[i]);
+			}
+			eb_tab(table0, p, EB_WIDTH);
+			t = table0;
+		}
+
+		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_new(table0[i]);
+			eb_new(table1[i]);
 		}
-		eb_tab(table0, p, EB_WIDTH);
-		t = table0;
+		/* Compute the precomputation table. */
+		eb_tab(table1, q, EB_WIDTH);
+
+		/* Compute the w-TNAF representation of k. */
+		if (gen) {
+			w = EB_DEPTH;
+		} else {
+			w = EB_WIDTH;
+		}
+		bn_rec_naf(naf0, &l0, k, w);
+		bn_rec_naf(naf1, &l1, l, EB_WIDTH);
+
+		len = MAX(l0, l1);
+		t0 = naf0 + len - 1;
+		t1 = naf1 + len - 1;
+		for (i = l0; i < len; i++) {
+			naf0[i] = 0;
+		}
+		for (i = l1; i < len; i++) {
+			naf1[i] = 0;
+		}
+
+		eb_set_infty(r);
+		for (i = len - 1; i >= 0; i--, t0--, t1--) {
+			eb_dbl(r, r);
+
+			n0 = *t0;
+			n1 = *t1;
+			if (n0 > 0) {
+				eb_add(r, r, t[n0 / 2]);
+			}
+			if (n0 < 0) {
+				eb_sub(r, r, t[-n0 / 2]);
+			}
+			if (n1 > 0) {
+				eb_add(r, r, table1[n1 / 2]);
+			}
+			if (n1 < 0) {
+				eb_sub(r, r, table1[-n1 / 2]);
+			}
+		}
+		/* Convert r to affine coordinates. */
+		eb_norm(r, r);
 	}
-
-	/* Prepare the precomputation table. */
-	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_new(table1[i]);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-	/* Compute the precomputation table. */
-	eb_tab(table1, q, EB_WIDTH);
-
-	/* Compute the w-TNAF representation of k. */
-	if (gen) {
-		w = EB_DEPTH;
-	} else {
-		w = EB_WIDTH;
-	}
-	bn_rec_naf(naf0, &l0, k, w);
-	bn_rec_naf(naf1, &l1, l, EB_WIDTH);
-
-	len = MAX(l0, l1);
-	t0 = naf0 + len - 1;
-	t1 = naf1 + len - 1;
-	for (i = l0; i < len; i++)
-		naf0[i] = 0;
-	for (i = l1; i < len; i++)
-		naf1[i] = 0;
-
-	eb_set_infty(r);
-	for (i = len - 1; i >= 0; i--, t0--, t1--) {
-		eb_dbl(r, r);
-
-		n0 = *t0;
-		n1 = *t1;
-		if (n0 > 0) {
-			eb_add(r, r, t[n0 / 2]);
+	FINALLY {
+		/* Free the precomputation tables. */
+		if (!gen) {
+			for (i = 0; i < 1 << (EB_WIDTH - 2); i++) {
+				eb_free(table0[i]);
+			}
 		}
-		if (n0 < 0) {
-			eb_sub(r, r, t[-n0 / 2]);
+		for (i = 0; i < 1 << (EB_WIDTH - 2); i++) {
+			eb_free(table1[i]);
 		}
-		if (n1 > 0) {
-			eb_add(r, r, table1[n1 / 2]);
-		}
-		if (n1 < 0) {
-			eb_sub(r, r, table1[-n1 / 2]);
-		}
-	}
-	/* Convert r to affine coordinates. */
-	eb_norm(r, r);
-
-	/* Free the precomputation table. */
-	for (i = 0; i < 1 << (EB_WIDTH - 2); i++) {
-		eb_free(table0[i]);
-		eb_free(table1[i]);
 	}
 }
 
@@ -387,13 +399,13 @@ void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 void eb_mul_sim_inter(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
-		eb_mul_sim_kbltz(r, p, k, q, l, 0);
+		eb_mul_sim_kbltz(r, p, k, q, l, NULL);
 		return;
 	}
 #endif
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
-	eb_mul_sim_ordin(r, p, k, q, l, 0);
+	eb_mul_sim_ordin(r, p, k, q, l, NULL);
 #endif
 }
 
@@ -474,25 +486,28 @@ void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l) {
 		eb_new(gen);
 
 		eb_curve_get_gen(gen);
+
 #if defined(EB_KBLTZ)
 #if EB_SIM == INTER && EB_FIX == LWNAF && defined(EB_PRECO)
-	if (eb_curve_is_kbltz()) {
-		eb_mul_sim_kbltz(r, gen, k, q, l, 1);
-		return;
-	}
+		if (eb_curve_is_kbltz()) {
+			eb_mul_sim_kbltz(r, gen, k, q, l, eb_curve_get_tab());
+		}
 #else
-	if (eb_curve_is_kbltz()) {
-		eb_mul_sim(r, gen, k, q, l);
-		return;
-	}
+		if (eb_curve_is_kbltz()) {
+			eb_mul_sim(r, gen, k, q, l);
+		}
 #endif
 #endif
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
 #if EB_SIM == INTER && EB_FIX == LWNAF && defined(EB_PRECO)
-	eb_mul_sim_ordin(r, gen, k, q, l, 1);
+		if (!eb_curve_is_kbltz()) {
+			eb_mul_sim_ordin(r, gen, k, q, l, eb_curve_get_tab());
+		}
 #else
-	eb_mul_sim(r, gen, k, q, l);
+		if (!eb_curve_is_kbltz()) {
+			eb_mul_sim(r, gen, k, q, l);
+		}
 #endif
 #endif
 	}
