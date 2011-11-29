@@ -93,7 +93,7 @@ enum {
  * Represents a ternary field element.
  */
 #if ALLOC == AUTO
-typedef align dig_t ft_t[FT_DIGS + PADDING(FT_BYTES)/sizeof(dig_t)];
+typedef align dig_t ft_t[FT_DIGS + PADDING(FT_BYTES)/(FT_DIGIT / 8)];
 #else
 typedef dig_t *ft_t;
 #endif
@@ -101,7 +101,7 @@ typedef dig_t *ft_t;
 /**
  * Represents a ternary field element with automatic memory allocation.
  */
-typedef align dig_t ft_st[FT_DIGS + PADDING(FT_BYTES)/sizeof(dig_t)];
+typedef align dig_t ft_st[FT_DIGS + PADDING(FT_BYTES)/(FT_DIGIT / 8)];
 
 /*============================================================================*/
 /* Macro definitions                                                          */
