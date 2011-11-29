@@ -353,6 +353,7 @@ static void ep2_add_projc_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 	FINALLY {
 		fp2_free(t0);
 		fp2_free(t1);
+		fp2_free(t2);
 		fp2_free(t3);
 		fp2_free(t4);
 		fp2_free(t5);
