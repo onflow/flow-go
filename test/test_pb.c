@@ -1992,9 +1992,9 @@ static int pairing2(void) {
   end:
 	fb12_free(e1);
 	fb12_free(e2);
-	eb_free(p);
-	eb_free(q);
-	eb_free(r);
+	hb_free(p);
+	hb_free(q);
+	hb_free(r);
 	bn_free(k);
 	bn_free(n);
 	return code;
