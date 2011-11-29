@@ -516,7 +516,7 @@ void hb_mul_fix_octup(hb_t r, hb_t *t, bn_t k) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		hb_free(t);
+		hb_free(p);
 	}
 }
 
