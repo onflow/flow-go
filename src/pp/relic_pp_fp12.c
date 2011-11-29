@@ -259,7 +259,7 @@ void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
 		fp6_new(v1);
 		fp6_new(t0);
 
-		/* c1 = (a0 + a1)(b0 + b1) */
+		/* c_1 = (a0 + a1)(b0 + b1) */
 		fp6_add(v0, a[0], a[1]);
 		fp2_add(v1[0], b[0][0], b[1][0]);
 		fp2_copy(v1[1], b[1][1]);
@@ -271,11 +271,11 @@ void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
 		/* v1 = a1b1 */
 		fp6_mul_dxs(v1, a[1], b[1]);
 
-		/* c1 = c1 - v0 - v1 */
+		/* c_1 = c_1 - v0 - v1 */
 		fp6_sub(c[1], t0, v0);
 		fp6_sub(c[1], c[1], v1);
 
-		/* c0 = v0 + v * v1 */
+		/* c_0 = v0 + v * v1 */
 		fp6_mul_art(v1, v1);
 		fp6_add(c[0], v0, v1);
 	} CATCH_ANY {
@@ -330,7 +330,7 @@ void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
 		/* (0,t6) = b0 + b1. */
 		fp2_add(t6, b[1][1], b[0][2]);
 
-		/* c1 = (a0 + a1) * (b0 + b1) - (t0,t1) - (t2,t3). */
+		/* c_1 = (a0 + a1) * (b0 + b1) - (t0,t1) - (t2,t3). */
 		fp4_mul(t7, t8, t4, t5, b[0][0], t6);
 		fp2_sub(t7, t7, t0);
 		fp2_sub(c[1][0], t7, t2);
@@ -382,12 +382,18 @@ void fp12_sqr_cyc_basic(fp12_t c, fp12_t a) {
 	fp2_null(t1);
 	fp2_null(t2);
 	fp2_null(t3);
+	fp2_null(t4);
+	fp2_null(t5);
+	fp2_null(t6);
 
 	TRY {
 		fp2_new(t0);
 		fp2_new(t1);
 		fp2_new(t2);
 		fp2_new(t3);
+		fp2_new(t4);
+		fp2_new(t5);
+		fp2_new(t6);
 
 		/* Define z = sqrt(E) */
 
@@ -457,6 +463,9 @@ void fp12_sqr_cyc_basic(fp12_t c, fp12_t a) {
 		fp2_free(t1);
 		fp2_free(t2);
 		fp2_free(t3);
+		fp2_free(t4);
+		fp2_free(t5);
+		fp2_free(t6);
 	}
 }
 
@@ -543,8 +552,8 @@ void fp12_mul_lazyr(fp12_t c, fp12_t a, fp12_t b) {
 	dv6_null(u2);
 	dv6_null(u3);
 	fp6_null(t0);
+	fp6_null(t0);
 	fp6_null(t1);
-	fp6_null(t2);
 
 	TRY {
 		dv6_new(u0);
@@ -607,7 +616,7 @@ void fp12_mul_dxs_lazyr(fp12_t c, fp12_t a, fp12_t b) {
 		fp6_new(v1);
 		fp6_new(t0);
 
-		/* c1 = (a0 + a1)(b0 + b1) */
+		/* c_1 = (a0 + a1)(b0 + b1) */
 		fp6_add(v0, a[0], a[1]);
 		fp2_add(v1[0], b[0][0], b[1][0]);
 		fp2_copy(v1[1], b[1][1]);
@@ -619,11 +628,11 @@ void fp12_mul_dxs_lazyr(fp12_t c, fp12_t a, fp12_t b) {
 		/* v1 = a1b1 */
 		fp6_mul_dxs(v1, a[1], b[1]);
 
-		/* c1 = c1 - v0 - v1 */
+		/* c_1 = c_1 - v0 - v1 */
 		fp6_sub(c[1], t0, v0);
 		fp6_sub(c[1], c[1], v1);
 
-		/* c0 = v0 + v * v1 */
+		/* c_0 = v0 + v * v1 */
 		fp6_mul_art(v1, v1);
 		fp6_add(c[0], v0, v1);
 	} CATCH_ANY {
@@ -674,7 +683,7 @@ void fp12_mul_dxs_lazyr(fp12_t c, fp12_t a, fp12_t b) {
 		/* (0,t2) = b0 + b1. */
 		fp2_add(t2, b[1][1], b[0][2]);
 
-		/* c1 = (a0 + a1) * (b0 + b1) - (t0,t1) - (t2,t3). */
+		/* c_1 = (a0 + a1) * (b0 + b1) - (t0,t1) - (t2,t3). */
 		fp4_mul_unr(u4, u5, t0, t1, b[0][0], t2);
 		fp2_subc_low(u4, u4, u0);
 		fp2_subc_low(u4, u4, u2);
@@ -715,13 +724,6 @@ void fp12_mul_dxs_lazyr(fp12_t c, fp12_t a, fp12_t b) {
 		fp2_free(t0);
 		fp2_free(t1);
 		fp2_free(t2);
-		fp2_free(t3);
-		fp2_free(t4);
-		fp2_free(t5);
-		fp2_free(t6);
-		fp2_free(t7);
-		fp2_free(t8);
-		fp2_free(t9);
 		dv2_free(u0);
 		dv2_free(u1);
 		dv2_free(u2);
@@ -1024,11 +1026,12 @@ void fp12_exp_cyc(fp12_t c, fp12_t a, bn_t b) {
 			THROW(ERR_CAUGHT);
 		}
 		FINALLY {
-			fp12_free(u);
+			fp12_free(t);
 		}
 	} else {
+		fp12_t u[w];
+
 		TRY {
-			fp12_t u[w];
 			for (i = 0; i < w; i++) {
 				fp12_null(u[i]);
 				fp12_new(u[i]);
@@ -1071,19 +1074,18 @@ void fp12_exp_cyc(fp12_t c, fp12_t a, bn_t b) {
 			for (i = 0; i < w - 1; i++) {
 				fp12_free(u[i]);
 			}
-			fp12_free(u);
+			fp12_free(t);
 		}
 	}
 }
 
 void fp12_exp_cyc_sps(fp12_t c, fp12_t a, int *b, int len) {
-	fp12_t t;
 	int i, j, k, w = len;
+	fp12_t t, u[w];
 
 	fp12_null(t);
 
 	TRY {
-		fp12_t u[w];
 		for (i = 0; i < w; i++) {
 			fp12_null(u[i]);
 			fp12_new(u[i]);
@@ -1091,36 +1093,44 @@ void fp12_exp_cyc_sps(fp12_t c, fp12_t a, int *b, int len) {
 		fp12_new(t);
 
 		fp12_copy(t, a);
-		for (j = 0, i = 0; i < len; i++) {
-			k = (b[i] < 0 ? -b[i] : b[i]);
-			for (; j < k; j++) {
-				fp12_sqr_pck(t, t);
+		if (b[0] == 0) {
+			for (j = 0, i = 1; i < len; i++) {
+				k = (b[i] < 0 ? -b[i] : b[i]);
+				for (; j < k; j++) {
+					fp12_sqr_pck(t, t);
+				}
+				if (b[i] < 0) {
+					fp12_inv_uni(u[i - 1], t);
+				} else {
+					fp12_copy(u[i - 1], t);
+				}
 			}
-			if (b[i] < 0) {
-				fp12_inv_uni(u[i], t);
-			} else {
-				fp12_copy(u[i], t);
-			}
-		}
 
-		if (b[0] != 0) {
-			j = 0;
-			k = w - 1;
-		} else {
-			j = 1;
-			k = w;
-		}
+			fp12_back_cyc_sim(u, u, w - 1);
 
-		fp12_back_cyc_sim(u, u, k);
-
-		if (b[0] != 0) {
 			fp12_copy(c, a);
+			for (i = 0; i < w - 1; i++) {
+				fp12_mul(c, c, u[i]);
+			}
 		} else {
-			fp12_copy(c, u[0]);
-		}
+			for (j = 0, i = 0; i < len; i++) {
+				k = (b[i] < 0 ? -b[i] : b[i]);
+				for (; j < k; j++) {
+					fp12_sqr_pck(t, t);
+				}
+				if (b[i] < 0) {
+					fp12_inv_uni(u[i], t);
+				} else {
+					fp12_copy(u[i], t);
+				}
+			}
 
-		for (i = j; i < k; i++) {
-			fp12_mul(c, c, u[i]);
+			fp12_back_cyc_sim(u, u, w);
+
+			fp12_copy(c, u[0]);
+			for (i = 1; i < w; i++) {
+				fp12_mul(c, c, u[i]);
+			}
 		}
 	}
 	CATCH_ANY {
@@ -1130,7 +1140,7 @@ void fp12_exp_cyc_sps(fp12_t c, fp12_t a, int *b, int len) {
 		for (i = 0; i < w - 1; i++) {
 			fp12_free(u[i]);
 		}
-		fp12_free(u);
+		fp12_free(t);
 	}
 }
 
@@ -1142,7 +1152,6 @@ void fp12_conv_uni(fp12_t c, fp12_t a) {
 	TRY {
 		fp12_new(t);
 
-		/* First, compute m^(p^6 - 1). */
 		/* t = a^{-1}. */
 		fp12_inv(t, a);
 		/* c = a^(p^6). */
@@ -1204,7 +1213,7 @@ int fp12_test_cyc(fp12_t a) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp2_free(t);
+		fp12_free(t);
 	}
 
 	return result;
@@ -1236,7 +1245,7 @@ void fp12_back_cyc(fp12_t c, fp12_t a) {
 		fp2_dbl(t1, a[1][0]);
 		fp2_dbl(t1, t1);
 		fp2_inv(t1, t1);
-		/* c1 = g1. */
+		/* c_1 = g1. */
 		fp2_mul(c[1][1], t0, t1);
 
 		/* t1 = g3 * g4. */
@@ -1248,7 +1257,7 @@ void fp12_back_cyc(fp12_t c, fp12_t a) {
 		fp2_sub(t2, t2, t1);
 		/* t1 = g2 * g5. */
 		fp2_mul(t1, a[1][0], a[1][2]);
-		/* c0 = E * (2 * g1^2 + g2 * g5 - 3 * g3 * g4) + 1. */
+		/* c_0 = E * (2 * g1^2 + g2 * g5 - 3 * g3 * g4) + 1. */
 		fp2_add(t2, t2, t1);
 		fp2_mul_nor(c[0][0], t2);
 		fp_add_dig(c[0][0][0], c[0][0][0], 1);
@@ -1329,8 +1338,10 @@ void fp12_back_cyc_sim(fp12_t c[], fp12_t a[], int n) {
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
-		fp2_free(t0);
-		fp2_free(t1);
-		fp2_free(t2);
+		for (int i = 0; i < n; i++) {
+			fp2_free(t0[i]);
+			fp2_free(t1[i]);
+			fp2_free(t2[i]);
+		}
 	}
 }
