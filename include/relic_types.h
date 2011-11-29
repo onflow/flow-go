@@ -48,7 +48,7 @@
 /**
  * Size in bits of a digit.
  */
-#define DIGIT	(8 * sizeof(dig_t))
+#define DIGIT			(WORD)
 
 /**
  * Logarithm of the digit size in bits in base two.
