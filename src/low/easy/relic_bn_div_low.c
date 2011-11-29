@@ -131,7 +131,8 @@ void bn_divn_low(dig_t *c, dig_t *d, dig_t *a, int sa, dig_t *b, int sb) {
 			c[i - t - 1]--;
 		}
 	}
-	bn_rshb_low(d, a, sa, norm);
+	/* Remainder should be not be longer than the divisor. */
+	bn_rshb_low(d, a, sb, norm);
 }
 
 void bn_div1_low(dig_t *c, dig_t *d, dig_t *a, int size, dig_t b) {
