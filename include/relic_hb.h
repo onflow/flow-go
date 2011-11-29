@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup hb hyperelliptic genus 2 curves over binary fields.
+ * @defgroup hb Hyperelliptic genus 2 curves over binary fields.
  */
 
 /**
