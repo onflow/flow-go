@@ -336,17 +336,21 @@ void eb_curve_get_ord(bn_t n) {
 	bn_copy(n, &curve_r);
 }
 
+eb_t *eb_curve_get_tab() {
 #if defined(EB_PRECO)
 
-eb_t *eb_curve_get_tab() {
+	/* Return a meaningful pointer. */
 #if ALLOC == AUTO
-	return (eb_t *) *pointer;
+	return (eb_t *)*pointer;
 #else
 	return pointer;
 #endif
-}
 
+#else
+	/* Return a null pointer. */
+	return NULL;
 #endif
+}
 
 void eb_curve_get_cof(bn_t h) {
 	bn_copy(h, &curve_h);

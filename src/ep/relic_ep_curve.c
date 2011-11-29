@@ -264,17 +264,21 @@ void ep_curve_get_ord(bn_t n) {
 	bn_copy(n, &curve_r);
 }
 
+ep_t *ep_curve_get_tab() {
 #if defined(EP_PRECO)
 
-ep_t *ep_curve_get_tab() {
+	/* Return a meaningful pointer. */
 #if ALLOC == AUTO
-	return (ep_t*) *pointer;
+	return (ep_t *)*pointer;
 #else
 	return pointer;
 #endif
-}
 
+#else
+	/* Return a null pointer. */
+	return NULL;
 #endif
+}
 
 #if defined(EP_ORDIN)
 
