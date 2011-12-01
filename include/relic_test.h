@@ -73,7 +73,7 @@
 #define TEST_ASSERT(C, LABEL)												\
 	if (!(C)) {																\
 		test_fail();														\
-		util_printf("(at %s:%d)\n", __FILE__, __LINE__);					\
+		util_print("(at %s:%d)\n", __FILE__, __LINE__);						\
 		ERROR(LABEL);														\
 	}
 
