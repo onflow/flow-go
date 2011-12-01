@@ -63,13 +63,14 @@ int core_init(void) {
 		return STS_ERR;
 	} else {
 		core_ctx->reason[ERR_NO_MEMORY] = MSG_NO_MEMORY;
-		core_ctx->reason[ERR_NO_PRECISION] = MSG_NO_PRECISION;
+		core_ctx->reason[ERR_NO_PRECI] = MSG_NO_PRECI;
 		core_ctx->reason[ERR_NO_FILE] = MSG_NO_FILE;
 		core_ctx->reason[ERR_NO_READ] = MSG_NO_READ;
-		core_ctx->reason[ERR_INVALID] = MSG_INVALID;
+		core_ctx->reason[ERR_NO_VALID] = MSG_NO_VALID;
 		core_ctx->reason[ERR_NO_BUFFER] = MSG_NO_BUFFER;
 		core_ctx->reason[ERR_NO_FIELD] = MSG_NO_FIELD;
 		core_ctx->reason[ERR_NO_CURVE] = MSG_NO_CURVE;
+		core_ctx->reason[ERR_NO_CONFIG] = MSG_NO_CONFIG;
 	}
 	core_ctx->last = NULL;
 #endif /* CHECK */
