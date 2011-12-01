@@ -50,12 +50,12 @@ static SHA384Context ctx;
 
 void md_map_sh384(unsigned char *hash, unsigned char *msg, int len) {
 	if (SHA384Reset(&ctx) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 	if (SHA384Input(&ctx, msg, len) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 	if (SHA384Result(&ctx, hash) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 }

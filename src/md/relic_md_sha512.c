@@ -50,12 +50,12 @@ static SHA512Context ctx;
 
 void md_map_sh512(unsigned char *hash, unsigned char *msg, int len) {
 	if (SHA512Reset(&ctx) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 	if (SHA512Input(&ctx, msg, len) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 	if (SHA512Result(&ctx, hash) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 }

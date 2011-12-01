@@ -51,31 +51,31 @@ static SHA1Context ctx;
 
 void md_map_shone(unsigned char *hash, unsigned char *msg, int len) {
 	if (SHA1Reset(&ctx) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 	if (SHA1Input(&ctx, msg, len) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 	if (SHA1Result(&ctx, hash) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 }
 
 void md_map_shone_init(void) {
 	if (SHA1Reset(&ctx) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 }
 
 void md_map_shone_update(unsigned char *msg, int len) {
 	if (SHA1Input(&ctx, msg, len) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 }
 
 void md_map_shone_final(unsigned char *hash) {
 	if (SHA1Result(&ctx, hash) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 }
 

@@ -50,12 +50,12 @@ static SHA256Context ctx;
 
 void md_map_sh256(unsigned char *hash, unsigned char *msg, int len) {
 	if (SHA256Reset(&ctx) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 	if (SHA256Input(&ctx, msg, len) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 	if (SHA256Result(&ctx, hash) != shaSuccess) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 }
