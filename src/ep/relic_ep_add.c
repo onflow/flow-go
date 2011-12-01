@@ -241,8 +241,18 @@ static void ep_add_projc_mix(ep_t r, ep_t p, ep_t q) {
  */
 static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 #if defined(EP_MIXED) && defined(STRIP)
+	/* If code size is a problem, leave only the mixed version. */
 	ep_add_projc_mix(r, p, q);
 #else /* General addition. */
+
+#if defined(EB_MIXED) || !defined(STRIP)
+	/* Test if z2 = 1 only if mixed coordinates are turned on. */
+	if (q->norm) {
+		ep_add_projc_mix(r, p, q);
+		return;
+	}
+#endif
+
 	fp_t t0, t1, t2, t3, t4, t5, t6;
 
 	fp_null(t0);
@@ -262,78 +272,74 @@ static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 		fp_new(t5);
 		fp_new(t6);
 
-		if (q->norm) {
-			ep_add_projc_mix(r, p, q);
-		} else {
-			/* t0 = z1^2. */
-			fp_sqr(t0, p->z);
+		/* t0 = z1^2. */
+		fp_sqr(t0, p->z);
 
-			/* t1 = z2^2. */
-			fp_sqr(t1, q->z);
+		/* t1 = z2^2. */
+		fp_sqr(t1, q->z);
 
-			/* t2 = U1 = x1 * z2^2. */
-			fp_mul(t2, p->x, t1);
+		/* t2 = U1 = x1 * z2^2. */
+		fp_mul(t2, p->x, t1);
 
-			/* t3 = U2 = x2 * z1^2. */
-			fp_mul(t3, q->x, t0);
+		/* t3 = U2 = x2 * z1^2. */
+		fp_mul(t3, q->x, t0);
 
-			/* t6 = z1^2 + z2^2. */
-			fp_add(t6, t0, t1);
+		/* t6 = z1^2 + z2^2. */
+		fp_add(t6, t0, t1);
 
-			/* t0 = S2 = y2 * z1^3. */
-			fp_mul(t0, t0, p->z);
-			fp_mul(t0, t0, q->y);
+		/* t0 = S2 = y2 * z1^3. */
+		fp_mul(t0, t0, p->z);
+		fp_mul(t0, t0, q->y);
 
-			/* t1 = S1 = y1 * z2^3. */
-			fp_mul(t1, t1, q->z);
-			fp_mul(t1, t1, p->y);
+		/* t1 = S1 = y1 * z2^3. */
+		fp_mul(t1, t1, q->z);
+		fp_mul(t1, t1, p->y);
 
-			/* t3 = H = U2 - U1. */
-			fp_sub(t3, t3, t2);
+		/* t3 = H = U2 - U1. */
+		fp_sub(t3, t3, t2);
 
-			/* t0 = R = 2 * (S2 - S1). */
-			fp_sub(t0, t0, t1);
-			fp_dbl(t0, t0);
+		/* t0 = R = 2 * (S2 - S1). */
+		fp_sub(t0, t0, t1);
+		fp_dbl(t0, t0);
 
-			/* If E is zero. */
-			if (fp_is_zero(t3)) {
-				if (fp_is_zero(t0)) {
-					/* If I is zero, p = q, should have doubled. */
-					ep_dbl_projc(r, p);
-				} else {
-					/* If I is not zero, q = -p, r = infinity. */
-					ep_set_infty(r);
-				}
+		/* If E is zero. */
+		if (fp_is_zero(t3)) {
+			if (fp_is_zero(t0)) {
+				/* If I is zero, p = q, should have doubled. */
+				ep_dbl_projc(r, p);
 			} else {
-				/* t4 = I = (2*H)^2. */
-				fp_dbl(t4, t3);
-				fp_sqr(t4, t4);
-
-				/* t5 = J = H * I. */
-				fp_mul(t5, t3, t4);
-
-				/* t4 = V = U1 * I. */
-				fp_mul(t4, t2, t4);
-
-				/* x3 = R^2 - J - 2 * V. */
-				fp_sqr(r->x, t0);
-				fp_sub(r->x, r->x, t5);
-				fp_dbl(t2, t4);
-				fp_sub(r->x, r->x, t2);
-
-				/* y3 = R * (V - x3) - 2 * S1 * J. */
-				fp_sub(t4, t4, r->x);
-				fp_mul(t4, t4, t0);
-				fp_mul(t1, t1, t5);
-				fp_dbl(t1, t1);
-				fp_sub(r->y, t4, t1);
-
-				/* z3 = ((z1 + z2)^2 - z1^2 - z2^2) * H. */
-				fp_add(r->z, p->z, q->z);
-				fp_sqr(r->z, r->z);
-				fp_sub(r->z, r->z, t6);
-				fp_mul(r->z, r->z, t3);
+				/* If I is not zero, q = -p, r = infinity. */
+				ep_set_infty(r);
 			}
+		} else {
+			/* t4 = I = (2*H)^2. */
+			fp_dbl(t4, t3);
+			fp_sqr(t4, t4);
+
+			/* t5 = J = H * I. */
+			fp_mul(t5, t3, t4);
+
+			/* t4 = V = U1 * I. */
+			fp_mul(t4, t2, t4);
+
+			/* x3 = R^2 - J - 2 * V. */
+			fp_sqr(r->x, t0);
+			fp_sub(r->x, r->x, t5);
+			fp_dbl(t2, t4);
+			fp_sub(r->x, r->x, t2);
+
+			/* y3 = R * (V - x3) - 2 * S1 * J. */
+			fp_sub(t4, t4, r->x);
+			fp_mul(t4, t4, t0);
+			fp_mul(t1, t1, t5);
+			fp_dbl(t1, t1);
+			fp_sub(r->y, t4, t1);
+
+			/* z3 = ((z1 + z2)^2 - z1^2 - z2^2) * H. */
+			fp_add(r->z, p->z, q->z);
+			fp_sqr(r->z, r->z);
+			fp_sub(r->z, r->z, t6);
+			fp_mul(r->z, r->z, t3);
 		}
 		r->norm = 0;
 	}
