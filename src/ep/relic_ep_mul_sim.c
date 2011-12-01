@@ -585,11 +585,11 @@ void ep_mul_sim_gen(ep_t r, bn_t k, ep_t q, bn_t l) {
 		if (!ep_curve_is_kbltz()) {
 			ep_mul_sim_ordin(r, g, k, q, l, ep_curve_get_tab());
 		}
-#endif
 #else
 		if (!ep_curve_is_kbltz()) {
 			ep_mul_sim(r, g, k, q, l);
 		}
+#endif
 #endif
 	}
 	CATCH_ANY {
