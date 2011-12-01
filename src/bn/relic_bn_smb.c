@@ -52,7 +52,7 @@ void bn_smb_leg(bn_t c, bn_t a, bn_t b) {
 		bn_new(t);
 
 		if (bn_sign(b) == BN_NEG) {
-			THROW(ERR_INVALID);
+			THROW(ERR_NO_VALID);
 		}
 
 		/* t = (b - 1)/2. */
@@ -93,7 +93,7 @@ void bn_smb_jac(bn_t c, bn_t a, bn_t b) {
 
 		/* Argument b must be odd. */
 		if (bn_is_even(b) || bn_sign(b) == BN_NEG) {
-			THROW(ERR_INVALID);
+			THROW(ERR_NO_VALID);
 		}
 
 		if (bn_sign(a) == BN_NEG) {

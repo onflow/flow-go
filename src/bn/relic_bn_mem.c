@@ -77,7 +77,7 @@ void bn_init(bn_t a, int digits) {
 #else
 	/* Verify if the number of digits is sane. */
 	if (digits > BN_SIZE) {
-		THROW(ERR_NO_PRECISION);
+		THROW(ERR_NO_PRECI);
 	} else {
 		digits = BN_SIZE;
 	}
@@ -140,7 +140,7 @@ void bn_grow(bn_t a, int digits) {
 	}
 #else /* ALLOC == STATIC || ALLOC == STACK */
 	if (digits > BN_SIZE) {
-		THROW(ERR_NO_PRECISION)
+		THROW(ERR_NO_PRECI)
 	}
 	(void)a;
 #endif

@@ -250,7 +250,7 @@ void bn_size_str(int *size, bn_t a, int radix) {
 
 	/* Check the radix. */
 	if (radix < 2 || radix > 64) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 
 	if (bn_is_zero(a)) {
@@ -290,7 +290,7 @@ void bn_read_str(bn_t a, const char *str, int len, int radix) {
 	bn_zero(a);
 
 	if (radix < 2 || radix > 64) {
-		THROW(ERR_INVALID)
+		THROW(ERR_NO_VALID)
 	}
 
 	j = 0;
@@ -335,7 +335,7 @@ void bn_write_str(char *str, int len, bn_t a, int radix) {
 	}
 
 	if (radix < 2 || radix > 64) {
-		THROW(ERR_INVALID)
+		THROW(ERR_NO_VALID)
 	}
 
 	if (bn_is_zero(a) == 1) {
@@ -483,7 +483,7 @@ void bn_write_raw(dig_t *raw, int len, bn_t a) {
 	size = a->used;
 
 	if (len < size) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 
 	for (i = 0; i < size; i++) {

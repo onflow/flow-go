@@ -162,7 +162,7 @@ void bn_mod_pre_monty(bn_t u, bn_t m) {
 	b = m->dp[0];
 
 	if ((b & 0x01) == 0) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 
 	x = (((b + 2) & 4) << 1) + b;	/* here x*a==1 mod 2**4 */
