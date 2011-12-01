@@ -161,13 +161,19 @@ void eb_norm_sim(eb_t *r, eb_t *t, int n) {
 	TRY {
 		for (i = 0; i < n; i++) {
 			fb_new(a[i]);
-			fb_copy(a[i], t[i]->z);
+			if (!eb_is_infty(t[i])) {
+				fb_copy(a[i], t[i]->z);
+			} else {
+				fb_set_dig(a[i], 1);
+			}
 		}
 
 		fb_inv_sim(a, a, n);
 
 		for (i = 0; i < n; i++) {
-			fb_copy(t[i]->z, a[i]);
+			if (!eb_is_infty(t[i])) {
+				fb_copy(t[i]->z, a[i]);
+			}
 		}
 	}
 	CATCH_ANY {
