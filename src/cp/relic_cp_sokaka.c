@@ -97,7 +97,7 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 
 		if (len1 == len2) {
 			if (strncmp(id1, id2, len1) == 0) {
-				THROW(ERR_INVALID);
+				THROW(ERR_NO_VALID);
 			}
 			first = (strncmp(id1, id2, len1) == -1 ? 1 : 2);
 		} else {
