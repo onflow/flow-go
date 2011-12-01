@@ -465,7 +465,7 @@ void eb_param_set(int param) {
 #endif
 			default:
 				(void)str;
-				THROW(ERR_INVALID);
+				THROW(ERR_NO_VALID);
 				break;
 		}
 
