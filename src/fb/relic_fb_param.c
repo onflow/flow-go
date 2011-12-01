@@ -137,7 +137,7 @@ void fb_param_set(int param) {
 			fb_poly_set_trino(255);
 			break;
 		default:
-			THROW(ERR_INVALID);
+			THROW(ERR_NO_VALID);
 			break;
 	}
 	param = param_id;

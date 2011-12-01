@@ -71,7 +71,7 @@ static int trc_a, trc_b, trc_c;
  * Find non-zero bits for fast trace computation.
  *
  * @throw ERR_NO_MEMORY if there is no available memory.
- * @throw ERR_INVALID if the polynomial is invalid.
+ * @throw ERR_NO_VALID if the polynomial is invalid.
  */
 static void find_trace() {
 	fb_t t0, t1;
@@ -109,7 +109,7 @@ static void find_trace() {
 						trc_c = i;
 						break;
 					default:
-						THROW(ERR_INVALID);
+						THROW(ERR_NO_VALID);
 						break;
 				}
 				counter++;

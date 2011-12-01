@@ -208,7 +208,7 @@ void fb_size(int *size, fb_t a, int radix) {
 
 	/* Check the radix. */
 	if (!valid_radix(radix)) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 	l = log_radix(radix);
 
@@ -245,7 +245,7 @@ void fb_read(fb_t a, const char *str, int len, int radix) {
 	fb_zero(a);
 
 	if (!valid_radix(radix)) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 	l = log_radix(radix);
 
@@ -286,7 +286,7 @@ void fb_write(char *str, int len, fb_t a, int radix) {
 
 	l = log_radix(radix);
 	if (!valid_radix(radix)) {
-		THROW(ERR_INVALID)
+		THROW(ERR_NO_VALID)
 	}
 
 	if (fb_is_zero(a) == 1) {
