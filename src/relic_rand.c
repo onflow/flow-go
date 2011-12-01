@@ -151,7 +151,7 @@ void rand_seed(unsigned char *buf, int size) {
     int i;
 
     if (size < STATE_SIZE) {
-    	THROW(ERR_INVALID);
+    	THROW(ERR_NO_VALID);
     }
 
     /* XKEY = SEED  */
