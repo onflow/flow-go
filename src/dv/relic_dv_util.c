@@ -55,7 +55,7 @@ void dv_zero(dv_t a, int digits) {
 	int i;
 
 	if (digits > DV_DIGS) {
-		THROW(ERR_NO_PRECISION);
+		THROW(ERR_NO_PRECI);
 	}
 
 	for (i = 0; i < digits; i++, a++)

@@ -62,7 +62,7 @@ void dv_new_dynam(dv_t *a, int digits) {
 		THROW(ERR_NO_MEMORY);
 	}
 	if (r == EINVAL) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_CONFIG);
 	}
 #endif
 
