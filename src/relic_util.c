@@ -50,7 +50,9 @@ static const char conv_table[] =
  * Buffer to hold printed messages.
  */
 #if ARCH == AVR
+#ifndef QUIET
 static char buffer[64 + 1];
+#endif
 #endif
 
 /*============================================================================*/
