@@ -469,9 +469,11 @@ void eb_param_set(int param) {
 				break;
 		}
 
+		/* Do not generate warnings. */
 		(void)kbltz;
 		(void)ordin;
 		(void)super;
+		(void)c;
 
 		param_id = param;
 
