@@ -80,10 +80,10 @@ static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
 		/* Compute the precomputation table. */
 		eb_tab(table, p, EB_WIDTH);
 
+		/* Compute the w-TNAF representation of k. */
 		eb_curve_get_vm(vm);
 		eb_curve_get_s0(s0);
 		eb_curve_get_s1(s1);
-		/* Compute the w-TNAF representation of k. */
 		bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_WIDTH);
 
 		t = tnaf + len - 1;
@@ -247,6 +247,10 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 
 		eb_copy(r, table[0]);
 
+#if defined(EB_MIXED) && defined(STRIP)
+		eb_norm_sim(table + 1, table + 1, (1 << (EB_WIDTH - 2)) - 1);
+#endif
+
 #if EB_WIDTH == 3
 		eb_frb(table[0], table[1]);
 		if (u == 1) {
@@ -321,10 +325,9 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 
 		eb_frb(table[0], table[7]);
 		eb_frb(table[0], table[0]);
-		eb_add(table[0], table[0], table[7]);
-		eb_frb(table[7], table[0]);
-		eb_frb(table[7], table[7]);
-		eb_sub(table[7], table[7], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_frb(table[0], table[0]);
+		eb_sub(table[7], table[0], table[7]);
 #endif
 
 #if EB_WIDTH == 6
@@ -462,7 +465,11 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 		eb_sub(table[15], table[0], table[15]);
 #endif
 
-		/* Sum accumulators */
+#if defined(EB_MIXED) && defined(STRIP)
+		eb_norm_sim(table + 1, table + 1, (1 << (EB_WIDTH - 2)) - 1);
+#endif
+
+		/* Add accumulators */
 		for (i = 1; i < (1 << (EB_WIDTH - 2)); i++) {
 			if (r->norm) {
 				eb_add(r, table[i], r);
@@ -593,9 +600,13 @@ static void eb_mul_rnaf_imp(eb_t r, eb_t p, bn_t k) {
 		eb_sub(table[15], table[0], table[15]);
 #endif
 
-		/* Sum accumulators */
+		/* Add accumulators */
 		for (i = 1; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_add(r, r, table[i]);
+			if (r->norm) {
+				eb_add(r, table[i], r);
+			} else {
+				eb_add(r, r, table[i]);
+			}
 		}
 		/* Convert r to affine coordinates. */
 		eb_norm(r, r);
@@ -667,7 +678,7 @@ void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
 	dig_t *b;
 
 	if (eb_curve_is_super()) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 
 	dv_null(x1);
@@ -884,7 +895,13 @@ void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k) {
 #endif
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
+#if defined(EB_MIXED) && defined(STRIP)
+	/* It is impossible to run a right-to-left algorithm using ordinary curves
+	 * and only mixed additions. */
+	THROW(ERR_NO_CONFIG);
+#else
 	eb_mul_rnaf_imp(r, p, k);
+#endif
 #endif
 }
 
