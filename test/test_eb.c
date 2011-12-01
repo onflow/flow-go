@@ -490,7 +490,7 @@ static int frobenius(void) {
 		eb_new(b);
 		eb_new(c);
 
-#ifdef EB_KBLTZ
+#if defined(EB_KBLTZ)
 		if (eb_curve_is_kbltz()) {
 			TEST_BEGIN("frobenius map is correct") {
 				/* Test if (t^2 + 2)P = utP. */
@@ -592,7 +592,7 @@ static int multiplication(void) {
 		} TEST_END;
 #endif
 
-#if defined(EB_ORDIN) && (EB_MUL == LODAH || !defined(STRIP))
+#if (defined(EB_ORDIN) || defined(EB_KBLTZ)) && (EB_MUL == LODAH || !defined(STRIP))
 		if (!eb_curve_is_super()) {
 			TEST_BEGIN("lopez-dahab point multiplication is correct") {
 				bn_rand(k, BN_POS, bn_bits(n));
