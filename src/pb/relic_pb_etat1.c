@@ -285,6 +285,7 @@ static void pb_map_etats_imp(fb4_t r, eb_t p, eb_t q) {
 
 	fb4_t _f[CORES];
 	omp_set_num_threads(CORES);
+
 	TRY {
 		for (int j = 0; j < CORES; j++) {
 			fb4_null(_f[j]);
@@ -333,7 +334,7 @@ static void pb_map_etats_imp(fb4_t r, eb_t p, eb_t q) {
 				/* y_P = y_P + delta^bar. */
 				fb_add_dig(yp, yp, 1 - delta);
 
-				fb4_zero(_f[i]);
+				fb4_zero(f[i]);
 				fb_zero(g[2]);
 				fb_set_bit(g[2], 0, 1);
 				fb_zero(g[3]);
@@ -367,7 +368,7 @@ static void pb_map_etats_imp(fb4_t r, eb_t p, eb_t q) {
 				} else {
 					fb_set_bit(f[i][0], 0, 1);
 				}
-//#define COREI7
+//#define COREI5
 #ifdef COREI5
 				int s2[] = { 0, 311, (FB_BITS - 1) / 2 };
 				int s4[] = { 0, 162, 317, 467, (FB_BITS - 1) / 2 };
@@ -459,14 +460,13 @@ static void pb_map_etats_imp(fb4_t r, eb_t p, eb_t q) {
 				fb_free(yq);
 				fb_free(u);
 				fb_free(v);
-				fb4_free(f);
 				fb4_free(g);
 				fb4_free(l);
 			}
 #pragma omp barrier
 			for (int s = 1; s < CORES; s *= 2) {
 				if (i % (2 * s) == 0) {
-					fb4_mul(f[i], f[i], f[i + s]);
+					fb4_mul(_f[i], _f[i], _f[i + s]);
 				}
 #pragma omp barrier
 			}
@@ -478,7 +478,7 @@ static void pb_map_etats_imp(fb4_t r, eb_t p, eb_t q) {
 		THROW(ERR_CAUGHT)
 	}
 	FINALLY {
-		for (int j = 1; j < CORES; j++) {
+		for (int j = 0; j < CORES; j++) {
 			fb4_free(_f[j]);
 		}
 	}

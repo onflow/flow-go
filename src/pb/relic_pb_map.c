@@ -48,12 +48,22 @@
 /**
  * Precomputed table for computing fixed 2^i powers in the pairing.
  */
-fb_st pb_tab_sqr[CORES][FB_TABLE_MAX];
+fb_st pb_tab_sqr[CORES][FB_TABLE];
+
+/**
+ * Pointers to the precomputed table of fixed 2^i powers.
+ */
+fb_st *pb_sqr_ptr[CORES][FB_TABLE];
 
 /**
  * Precomputed table for computing fixed 1/(2^i) powers in the pairing.
  */
-fb_st pb_tab_srt[CORES][FB_TABLE_MAX];
+fb_st pb_tab_srt[CORES][FB_TABLE];
+
+/**
+ * Pointers to the precomputed table of fixed 1/(2^i) powers.
+ */
+fb_st *pb_srt_ptr[CORES][FB_TABLE];
 
 /**
  * Partition for the parallel execution.
@@ -65,7 +75,12 @@ double pb_par[CORES];
 /**
  * Precomputed table for the final exponentiation.
  */
-fb_st pb_tab_exp[FB_TABLE_MAX];
+fb_st pb_tab_exp[FB_TABLE];
+
+/**
+ * Pointers to the precomputed table for the final exponentiation.
+ */
+fb_st *pb_exp_ptr[FB_TABLE];
 
 /**
  * Computes a partition of the main loop in the pairing algorithm.
@@ -115,12 +130,16 @@ static void pb_compute_par() {
 
 void pb_map_init() {
 
+	for (int i = 0; i < FB_TABLE; i++) {
+		pb_exp_ptr[i] = &(pb_tab_exp[i]);
+	}
+
 #if PB_MAP == ETATS || PB_MAP == ETATN
-	fb_itr_pre(pb_tab_exp, 4 * (((FB_BITS + 1) / 2) / 4));
+	fb_itr_pre(pb_map_get_tab(), 4 * (((FB_BITS + 1) / 2) / 4));
 #endif
 
 #if PB_MAP == ETAT2 || PB_MAP == OETA2
-	fb_itr_pre(pb_tab_exp, 6 * (((FB_BITS - 1) / 2) / 6));
+	fb_itr_pre(pb_map_get_tab(), 6 * (((FB_BITS - 1) / 2) / 6));
 #endif
 
 #if defined(PB_PARAL) && (PB_MAP == ETATS || PB_MAP == ETATN)
@@ -130,8 +149,15 @@ void pb_map_init() {
 	int chunk = (int)ceilf((FB_BITS - 1) / (2.0 * CORES));
 
 	for (int i = 0; i < CORES; i++) {
-		fb_itr_pre(pb_tab_sqr[i], i * chunk);
-		fb_itr_pre(pb_tab_srt[i], -i * chunk);
+		for (int j = 0; j < FB_TABLE; j++) {
+			pb_sqr_ptr[i][j] = &(pb_tab_sqr[i][j]);
+			pb_srt_ptr[i][j] = &(pb_tab_srt[i][j]);
+		}
+	}
+
+	for (int i = 0; i < CORES; i++) {
+		fb_itr_pre(pb_map_get_sqr(i), i * chunk);
+		fb_itr_pre(pb_map_get_srt(i), -i * chunk);
 	}
 
 #endif
@@ -142,12 +168,22 @@ void pb_map_clean() {
 }
 
 fb_t *pb_map_get_tab() {
-	return pb_tab_exp;
+#if ALLOC == AUTO
+	return (fb_t *)*pb_exp_ptr;
+#else
+	return (fb_t *)pb_exp_ptr;
+#endif
 }
 
 fb_t *pb_map_get_sqr(int core) {
 #ifdef PB_PARAL
-	return pb_tab_sqr[core];
+
+#if ALLOC == AUTO
+	return (fb_t *)*pb_sqr_ptr[core];
+#else
+	return (fb_t *)pb_sqr_ptr[core];
+#endif
+
 #else
 	return NULL;
 #endif
@@ -155,7 +191,13 @@ fb_t *pb_map_get_sqr(int core) {
 
 fb_t *pb_map_get_srt(int core) {
 #ifdef PB_PARAL
-	return pb_tab_srt[core];
+
+#if ALLOC == AUTO
+	return (fb_t *)*pb_srt_ptr[core];
+#else
+	return (fb_t *)pb_srt_ptr[core];
+#endif
+
 #else
 	return NULL;
 #endif
