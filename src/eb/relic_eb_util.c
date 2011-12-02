@@ -288,7 +288,7 @@ void eb_tab(eb_t *t, eb_t p, int w) {
 				eb_frb(t[4], t[2]);
 				eb_frb(t[4], t[4]);
 
-#if defined(EB_MIXED)
+#if defined(EB_MIXED) && defined(STRIP)
 				eb_norm(t[2], t[2]);
 #endif
 				eb_sub(t[7], t[4], t[2]);
@@ -325,7 +325,7 @@ void eb_tab(eb_t *t, eb_t p, int w) {
 				eb_sub(t[1], t[0], p);
 				eb_add(t[2], t[0], p);
 
-#if defined(EB_MIXED)
+#if defined(EB_MIXED) && defined(STRIP)
 				eb_norm(t[13], t[13]);
 #endif
 				eb_add(t[15], t[0], t[13]);
@@ -337,7 +337,7 @@ void eb_tab(eb_t *t, eb_t p, int w) {
 
 				eb_neg(t[8], t[0]);
 				eb_add(t[7], t[8], t[13]);
-#if defined(EB_MIXED)
+#if defined(EB_MIXED) && defined(STRIP)
 				eb_norm(t[14], t[14]);
 #endif
 				eb_add(t[8], t[8], t[14]);

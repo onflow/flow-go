@@ -247,7 +247,7 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 
 		eb_copy(r, table[0]);
 
-#if defined(EB_MIXED) && defined(STRIP)
+#if defined(EB_MIXED) && defined(STRIP) && (EB_WIDTH > 2)
 		eb_norm_sim(table + 1, table + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 
@@ -465,7 +465,7 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 		eb_sub(table[15], table[0], table[15]);
 #endif
 
-#if defined(EB_MIXED) && defined(STRIP)
+#if defined(EB_MIXED) && defined(STRIP) && (EB_WIDTH > 2)
 		eb_norm_sim(table + 1, table + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 
