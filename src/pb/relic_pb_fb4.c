@@ -597,6 +597,7 @@ void fb4_mul_dxd(fb4_t c, fb4_t a, fb4_t b) {
 		fb_free(t7);
 		fb_free(t8);
 		fb_free(t9);
+		dv_free(t);
 	}
 }
 

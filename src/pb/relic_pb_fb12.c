@@ -119,6 +119,8 @@ void fb12_frb(fb12_t c, fb12_t a) {
 	fb6_null(t);
 
 	TRY {
+		fb6_new(t);
+
 		fb6_frb(c[0], a[0]);
 		fb6_frb(c[1], a[1]);
 		switch (FB_BITS % 12) {
@@ -188,22 +190,22 @@ void fb12_frb(fb12_t c, fb12_t a) {
 }
 
 void fb12_inv(fb12_t c, fb12_t a) {
-	fb6_t t0, t1, t6;
+	fb6_t t0, t1, t2;
 
 	fb6_null(t0);
 	fb6_null(t1);
-	fb6_null(t6);
+	fb6_null(t2);
 
 	TRY {
 		fb6_new(t0);
 		fb6_new(t1);
-		fb6_new(t6);
+		fb6_new(t2);
 
 		fb6_add(t0, a[0], a[1]);
 		fb6_mul(t1, t0, a[0]);
-		fb6_sqr(t6, a[1]);
-		fb6_mul_nor(t6, t6);
-		fb6_add(t1, t1, t6);
+		fb6_sqr(t2, a[1]);
+		fb6_mul_nor(t2, t2);
+		fb6_add(t1, t1, t2);
 		fb6_inv(t1, t1);
 		fb6_mul(c[0], t0, t1);
 		fb6_mul(c[1], a[1], t1);
@@ -212,7 +214,7 @@ void fb12_inv(fb12_t c, fb12_t a) {
 	} FINALLY {
 		fb6_free(t0);
 		fb6_free(t1);
-		fb6_free(t6);
+		fb6_free(t2);
 	}
 }
 
