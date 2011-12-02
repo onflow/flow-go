@@ -599,8 +599,9 @@ typedef fb6_t fb12_t[2];
 #endif
 
 /*============================================================================*/
-		/* Function prototypes                                                        */
+/* Function prototypes                                                        */
 /*============================================================================*/
+
 /**
  * Multiples two quadratic extension field elements. Computes c = a * b.
  *
@@ -609,6 +610,16 @@ typedef fb6_t fb12_t[2];
  * @param[in] b				- the quadratic extension binary field element.
  */
 void fb2_mul(fb2_t c, fb2_t a, fb2_t b);
+
+ /**
+  * Multiples a quadratic extension field element by a quadratic non-residue.
+  * Computes c = a * s.
+  *
+  * @param[out] c			- the result.
+  * @param[in] a				- the quadratic extension binary field element.
+  * @param[in] b				- the quadratic extension binary field element.
+  */
+ void fb2_mul_nor(fb2_t c, fb2_t a);
 
 /**
  * Computes the square of a quadratic extension field element. Computes
@@ -827,6 +838,22 @@ void pb_map_clean();
  * @return The precomputed table.
  */
 fb_t *pb_map_get_tab();
+
+/**
+ * Returns the table for computing the repeated squarings needed for parallel
+ * execution.
+ *
+ * @return The precomputed table.
+ */
+fb_t *pb_map_get_sqr();
+
+/**
+ * Returns the table for computing the repeated square-roots needed for parallel
+ * execution.
+ *
+ * @return The precomputed table.
+ */
+fb_t *pb_map_get_srt();
 
 /**
  * Computes the etat pairing of two binary elliptic curve points without using
