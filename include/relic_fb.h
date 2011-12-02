@@ -627,7 +627,7 @@ void fb_print(fb_t a);
  * @param[out] size			- the result.
  * @param[in] a				- the binary field element.
  * @param[in] radix			- the radix.
- * @throw ERR_INVALID		- if the radix is invalid.
+ * @throw ERR_NO_VALID		- if the radix is invalid.
  */
 void fb_size(int *size, fb_t a, int radix);
 
@@ -640,7 +640,7 @@ void fb_size(int *size, fb_t a, int radix);
  * @param[in] len			- the size of the string.
  * @param[in] radix			- the radix.
  * @throw ERR_NO_BUFFER		- if the string if too long.
- * @throw ERR_INVALID		- if the radix is invalid.
+ * @throw ERR_NO_VALID		- if the radix is invalid.
  */
 void fb_read(fb_t a, const char *str, int len, int radix);
 
@@ -653,7 +653,7 @@ void fb_read(fb_t a, const char *str, int len, int radix);
  * @param[in] a				- the binary field element to write.
  * @param[in] radix			- the radix.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
- * @throw ERR_INVALID		- if the radix is invalid.
+ * @throw ERR_NO_VALID		- if the radix is invalid.
  */
 void fb_write(char *str, int len, fb_t a, int radix);
 

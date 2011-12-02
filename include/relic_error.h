@@ -88,7 +88,7 @@ enum errors {
 #define MSG_NO_FILE			"file not found"
 /** Error message respective to ERR_NO_READ. */
 #define MSG_NO_READ			"can't read bytes from file"
-/** Error message respective to ERR_INVALID. */
+/** Error message respective to ERR_NO_VALID. */
 #define MSG_NO_VALID		"invalid value passed as input"
 /** Error message respective to ERR_NO_BUFFER. */
 #define MSG_NO_BUFFER		"insufficient buffer capacity"

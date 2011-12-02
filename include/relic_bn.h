@@ -598,7 +598,7 @@ void bn_print(bn_t a);
  * @param[out] size			- the result.
  * @param[in] a				- the multiple precision integer.
  * @param[in] radix			- the radix.
- * @throw ERR_INVALID		- if the radix is invalid.
+ * @throw ERR_NO_VALID		- if the radix is invalid.
  */
 void bn_size_str(int *size, bn_t a, int radix);
 
@@ -610,7 +610,7 @@ void bn_size_str(int *size, bn_t a, int radix);
  * @param[in] str			- the string.
  * @param[in] len			- the size of the string.
  * @param[in] radix			- the radix.
- * @throw ERR_INVALID		- if the radix is invalid.
+ * @throw ERR_NO_VALID		- if the radix is invalid.
  */
 void bn_read_str(bn_t a, const char *str, int len, int radix);
 
@@ -623,7 +623,7 @@ void bn_read_str(bn_t a, const char *str, int len, int radix);
  * @param[in] a				- the multiple integer to write.
  * @param[in] radix			- the radix.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
- * @throw ERR_INVALID		- if the radix is invalid.
+ * @throw ERR_NO_VALID		- if the radix is invalid.
  */
 void bn_write_str(char *str, int len, bn_t a, int radix);
 
@@ -855,7 +855,7 @@ void bn_rsh(bn_t c, bn_t a, int bits);
  * @param[out] c			- the resultint quotient.
  * @param[in] a				- the dividend.
  * @param[in] b				- the divisor.
- * @throw ERR_INVALID		- if the divisor is zero.
+ * @throw ERR_NO_VALID		- if the divisor is zero.
  */
 void bn_div(bn_t c, bn_t a, bn_t b);
 
@@ -867,7 +867,7 @@ void bn_div(bn_t c, bn_t a, bn_t b);
  * @param[out] d			- the remainder.
  * @param[in] a				- the dividend.
  * @param[in] b				- the divisor.
- * @throw ERR_INVALID		- if the divisor is zero.
+ * @throw ERR_NO_VALID		- if the divisor is zero.
  */
 void bn_div_rem(bn_t c, bn_t d, bn_t a, bn_t b);
 
@@ -879,7 +879,7 @@ void bn_div_rem(bn_t c, bn_t d, bn_t a, bn_t b);
  * @param[out] d			- the remainder.
  * @param[in] a				- the dividend.
  * @param[in] b				- the divisor.
- * @throw ERR_INVALID		- if the divisor is zero.
+ * @throw ERR_NO_VALID		- if the divisor is zero.
  */
 void bn_div_dig(bn_t c, bn_t a, dig_t b);
 
@@ -891,7 +891,7 @@ void bn_div_dig(bn_t c, bn_t a, dig_t b);
  * @param[out] d			- the remainder.
  * @param[in] a				- the dividend.
  * @param[in] b				- the divisor.
- * @throw ERR_INVALID		- if the divisor is zero.
+ * @throw ERR_NO_VALID		- if the divisor is zero.
  */
 void bn_div_rem_dig(bn_t c, dig_t *d, bn_t a, dig_t b);
 
