@@ -112,12 +112,12 @@ void hb_rand_non(hb_t p, int type) {
 	fb_null(t);
 
 	TRY {
-		while (1) {
-			bn_new(k);
-			bn_new(n);
-			hb_new(g);
-			fb_new(t);
+		bn_new(k);
+		bn_new(n);
+		hb_new(g);
+		fb_new(t);
 
+		while (1) {
 			hb_curve_get_ord(n);
 			hb_curve_get_gen(g);
 

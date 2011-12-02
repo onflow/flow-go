@@ -156,6 +156,7 @@ void hb_curve_init(void) {
 	fb_zero(curve_g.v1);
 	fb_zero(curve_g.v0);
 	bn_init(&curve_r, FB_DIGS);
+	bn_init(&curve_h, FB_DIGS);
 }
 
 void hb_curve_clean(void) {
@@ -172,6 +173,7 @@ void hb_curve_clean(void) {
 	}
 #endif
 	bn_clean(&curve_r);
+	bn_clean(&curve_h);
 }
 
 dig_t *hb_curve_get_f3() {

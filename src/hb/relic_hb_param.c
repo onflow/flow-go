@@ -159,7 +159,7 @@ void hb_param_set(int param) {
 #endif
 			default:
 				(void)str;
-				THROW(ERR_INVALID);
+				THROW(ERR_NO_VALID);
 				break;
 		}
 
@@ -181,6 +181,7 @@ void hb_param_set(int param) {
 		fb_free(f3);
 		hb_free(g);
 		bn_free(r);
+		bn_free(h);
 	}
 }
 

@@ -45,12 +45,12 @@
 #if defined(HB_SUPER)
 
 /**
- * Precomputes a table for a point multiplication on an ordinary curve.
+ * Precomputes a table for a divisor class multiplication.
  *
  * @param[out] t				- the destination table.
  * @param[in] p					- the point to multiply.
  */
-static void table_init(hb_t *t, hb_t p) {
+static void table_init(hb_t * t, hb_t p) {
 	hb_set_infty(t[0]);
 	hb_copy(t[1], p);
 	hb_dbl(t[2], t[1]);
@@ -61,83 +61,89 @@ static void table_init(hb_t *t, hb_t p) {
 	hb_add(t[7], t[6], p);
 }
 
-static void hb_mul_sim_imp(hb_t r, hb_t p, bn_t k, hb_t q, bn_t l, int gen) {
-	int len, l0, l1, i, n0, n1;
+static void hb_mul_sim_imp(hb_t r, hb_t p, bn_t k, hb_t q, bn_t l, hb_t *t) {
+	int len, l0, l1, i, n0, n1, gen;
 	unsigned char win0[2 * FB_BITS + 1], win1[2 * FB_BITS + 1], *t0, *t1;
 	hb_t table0[8];
 	hb_t table1[8];
-	hb_t *t = NULL;
 
-	for (i = 0; i < (1 << (HB_WIDTH - 2)); i++) {
+	for (i = 0; i < 8; i++) {
 		hb_null(table0[i]);
 		hb_null(table1[i]);
 	}
-
-	if (gen) {
-#if defined(HB_PRECO)
-		t = hb_curve_get_tab();
-#endif
-	} else {
-		for (i = 0; i < (1 << (HB_WIDTH - 2)); i++) {
-			hb_new(table0[i]);
+	TRY {
+		gen = (t == NULL ? 0 : 1);
+		if (!gen) {
+			for (i = 0; i < 8; i++) {
+				hb_new(table0[i]);
+			}
+			table_init(table0, p);
+			t = table0;
 		}
-		table_init(table0, p);
-		t = table0;
+
+		/* Prepare the precomputation table. */
+		for (i = 0; i < 8; i++) {
+			hb_new(table1[i]);
+		}
+		/* Compute the precomputation table. */
+		table_init(table1, q);
+
+		bn_rec_win(win0, &l0, k, 3);
+		bn_rec_win(win1, &l1, l, 3);
+
+		len = MAX(l0, l1);
+		t0 = win0 + len - 1;
+		t1 = win1 + len - 1;
+		for (i = l0; i < len; i++) {
+			win0[i] = 0;
+		}
+		for (i = l1; i < len; i++) {
+			win1[i] = 0;
+		}
+
+		hb_set_infty(r);
+		for (i = len - 1; i >= 0; i--, t0--, t1--) {
+			hb_oct(r, r);
+
+			n0 = *t0;
+			n1 = *t1;
+			if (n0 > 0) {
+				hb_add(r, r, t[n0]);
+			}
+			if (n0 < 0) {
+				hb_sub(r, r, t[-n0]);
+			}
+			if (n1 > 0) {
+				hb_add(r, r, table1[n1]);
+			}
+			if (n1 < 0) {
+				hb_sub(r, r, table1[-n1]);
+			}
+		}
+		/* Convert r to affine coordinates. */
+		hb_norm(r, r);
 	}
-
-	/* Prepare the precomputation table. */
-	for (i = 0; i < (1 << (HB_WIDTH - 2)); i++) {
-		hb_new(table1[i]);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-	/* Compute the precomputation table. */
-	table_init(table1, q);
-
-	bn_rec_win(win0, &l0, k, 3);
-	bn_rec_win(win1, &l1, l, 3);
-
-	len = MAX(l0, l1);
-	t0 = win0 + len - 1;
-	t1 = win1 + len - 1;
-	for (i = l0; i < len; i++)
-		win0[i] = 0;
-	for (i = l1; i < len; i++)
-		win1[i] = 0;
-
-	hb_set_infty(r);
-	for (i = len - 1; i >= 0; i--, t0--, t1--) {
-		hb_oct(r, r);
-
-		n0 = *t0;
-		n1 = *t1;
-		if (n0 > 0) {
-			hb_add(r, r, t[n0]);
+	FINALLY {
+		/* Free the precomputation tables. */
+		if (!gen) {
+			for (i = 0; i < 8; i++) {
+				hb_free(table0[i]);
+			}
 		}
-		if (n0 < 0) {
-			hb_sub(r, r, t[-n0]);
+		for (i = 0; i < 8; i++) {
+			hb_free(table1[i]);
 		}
-		if (n1 > 0) {
-			hb_add(r, r, table1[n1]);
-		}
-		if (n1 < 0) {
-			hb_sub(r, r, table1[-n1]);
-		}
-	}
-	/* Convert r to affine coordinates. */
-	hb_norm(r, r);
-
-	/* Free the precomputation table. */
-	for (i = 0; i < 1 << (HB_WIDTH - 2); i++) {
-		hb_free(table0[i]);
-		hb_free(table1[i]);
 	}
 }
-
 #endif /* HB_ORDIN || HB_SUPER */
 
 #endif /* HB_SIM == INTER */
 
 /*============================================================================*/
-/* Public definitions                                                         */
+	/* Public definitions                                                         */
 /*============================================================================*/
 
 #if HB_SIM == BASIC || !defined(STRIP)
@@ -204,17 +210,17 @@ void hb_mul_sim_trick(hb_t r, hb_t p, bn_t k, hb_t q, bn_t l) {
 
 		hb_set_infty(t0[0]);
 		for (int i = 1; i < (1 << w); i++) {
-			hb_add_tab(t0[i], t0[i - 1], p);
+			hb_add(t0[i], t0[i - 1], p);
 		}
 
 		hb_set_infty(t1[0]);
 		for (int i = 1; i < (1 << w); i++) {
-			hb_add_tab(t1[i], t1[i - 1], q);
+			hb_add(t1[i], t1[i - 1], q);
 		}
 
 		for (int i = 0; i < (1 << w); i++) {
 			for (int j = 0; j < (1 << w); j++) {
-				hb_add_tab(t[(i << w) + j], t0[i], t1[j]);
+				hb_add(t[(i << w) + j], t0[i], t1[j]);
 			}
 		}
 
@@ -282,8 +288,8 @@ void hb_mul_sim_joint(hb_t r, hb_t p, bn_t k, hb_t q, bn_t l) {
 		hb_set_infty(t[0]);
 		hb_copy(t[1], q);
 		hb_copy(t[2], p);
-		hb_add_tab(t[3], p, q);
-		hb_sub_tab(t[4], p, q);
+		hb_add(t[3], p, q);
+		hb_sub(t[4], p, q);
 
 		bn_rec_jsf(jsf, &len, k, l);
 
@@ -334,9 +340,9 @@ void hb_mul_sim_gen(hb_t r, bn_t k, hb_t q, bn_t l) {
 		hb_curve_get_gen(gen);
 
 #if HB_FIX == OCTUP && defined(HB_PRECO)
-	hb_mul_sim_imp(r, gen, k, q, l, 1);
+		hb_mul_sim_imp(r, gen, k, q, l, hb_curve_get_tab());
 #else
-	hb_mul_sim(r, gen, k, q, l);
+		hb_mul_sim(r, gen, k, q, l);
 #endif
 	}
 	CATCH_ANY {

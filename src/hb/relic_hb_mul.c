@@ -58,12 +58,12 @@ static void table_init(hb_t *t, hb_t p) {
 		hb_set_infty(t[i]);
 	}
 
-	hb_dbl_tab(t[0], p);
+	hb_dbl(t[0], p);
 
 #if HB_WIDTH > 2
-	hb_add_tab(t[1], t[0], p);
+	hb_add(t[1], t[0], p);
 	for (i = 2; i < (1 << (HB_WIDTH - 2)); i++) {
-		hb_add_tab(t[i], t[i - 1], t[0]);
+		hb_add(t[i], t[i - 1], t[0]);
 	}
 #endif
 	hb_copy(t[0], p);
@@ -119,6 +119,9 @@ void hb_mul_octup(hb_t r, hb_t p, bn_t k) {
 	hb_t t;
 
 	hb_null(t);
+	for (i = 0; i < 8; i++) {
+		hb_null(table[i]);
+	}
 
 	if (bn_is_zero(k)) {
 		hb_set_infty(r);
@@ -127,6 +130,9 @@ void hb_mul_octup(hb_t r, hb_t p, bn_t k) {
 
 	TRY {
 		hb_new(t);
+		for (i = 0; i < 8; i++) {
+			hb_new(table[i]);
+		}
 
 		bn_rec_win(win, &l, k, 3);
 
@@ -154,6 +160,9 @@ void hb_mul_octup(hb_t r, hb_t p, bn_t k) {
 	}
 	FINALLY {
 		hb_free(t);
+		for (i = 0; i < 8; i++) {
+			hb_free(table[i]);
+		}
 	}
 }
 

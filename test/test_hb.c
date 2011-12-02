@@ -664,7 +664,7 @@ static int fixed(void) {
 			hb_mul(r, p, k);
 			TEST_ASSERT(hb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = HB_TABLE; i < HB_TABLE_NAFWI; i++) {
+		for (int i = 0; i < HB_TABLE_NAFWI; i++) {
 			hb_free(t[i]);
 		}
 #endif
@@ -709,7 +709,7 @@ static int fixed(void) {
 		for (int i = 0; i < HB_TABLE_LWNAF; i++) {
 			hb_new(t[i]);
 		}
-		TEST_BEGIN("left-to-right w-naf fixed divisor class multiplication is correct") {
+		TEST_BEGIN("left-to-right w-naf fixed divisor multiplication is correct") {
 			bn_rand(k, BN_POS, bn_bits(n));
 			bn_mod(k, k, n);
 			hb_mul(q, p, k);
@@ -859,8 +859,10 @@ static int simultaneous(void) {
 	hb_free(p);
 	hb_free(q);
 	hb_free(r);
+	hb_free(s);
 	bn_free(n);
 	bn_free(k);
+	bn_free(l);
 	return code;
 }
 

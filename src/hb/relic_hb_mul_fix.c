@@ -52,7 +52,7 @@ void hb_mul_pre_basic(hb_t *t, hb_t p) {
 
 		hb_copy(t[0], p);
 		for (int i = 1; i < bn_bits(n); i++) {
-			hb_dbl_tab(t[i], t[i - 1]);
+			hb_dbl(t[i], t[i - 1]);
 		}
 	}
 	CATCH_ANY {
@@ -97,9 +97,9 @@ void hb_mul_pre_yaowi(hb_t *t, hb_t p) {
 
 		hb_copy(t[0], p);
 		for (int i = 1; i < l; i++) {
-			hb_dbl_tab(t[i], t[i - 1]);
+			hb_dbl(t[i], t[i - 1]);
 			for (int j = 1; j < HB_DEPTH; j++) {
-				hb_dbl_tab(t[i], t[i]);
+				hb_dbl(t[i], t[i]);
 			}
 		}
 	} CATCH_ANY {
@@ -166,9 +166,9 @@ void hb_mul_pre_nafwi(hb_t *t, hb_t p) {
 
 		hb_copy(t[0], p);
 		for (int i = 1; i < l; i++) {
-			hb_dbl_tab(t[i], t[i - 1]);
+			hb_dbl(t[i], t[i - 1]);
 			for (int j = 1; j < HB_DEPTH; j++) {
-				hb_dbl_tab(t[i], t[i]);
+				hb_dbl(t[i], t[i]);
 			}
 		}
 	}
@@ -257,12 +257,12 @@ void hb_mul_pre_combs(hb_t *t, hb_t p) {
 
 		hb_copy(t[1], p);
 		for (j = 1; j < HB_DEPTH; j++) {
-			hb_dbl_tab(t[1 << j], t[1 << (j - 1)]);
+			hb_dbl(t[1 << j], t[1 << (j - 1)]);
 			for (i = 1; i < l; i++) {
-				hb_dbl_tab(t[1 << j], t[1 << j]);
+				hb_dbl(t[1 << j], t[1 << j]);
 			}
 			for (i = 1; i < (1 << j); i++) {
-				hb_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
+				hb_add(t[(1 << j) + i], t[1 << j], t[i]);
 			}
 		}
 	}
@@ -347,19 +347,19 @@ void hb_mul_pre_combd(hb_t *t, hb_t p) {
 		hb_set_infty(t[0]);
 		hb_copy(t[1], p);
 		for (j = 1; j < HB_DEPTH; j++) {
-			hb_dbl_tab(t[1 << j], t[1 << (j - 1)]);
+			hb_dbl(t[1 << j], t[1 << (j - 1)]);
 			for (i = 1; i < d; i++) {
-				hb_dbl_tab(t[1 << j], t[1 << j]);
+				hb_dbl(t[1 << j], t[1 << j]);
 			}
 			for (i = 1; i < (1 << j); i++) {
-				hb_add_tab(t[(1 << j) + i], t[1 << j], t[i]);
+				hb_add(t[(1 << j) + i], t[1 << j], t[i]);
 			}
 		}
 		hb_set_infty(t[1 << HB_DEPTH]);
 		for (j = 1; j < (1 << HB_DEPTH); j++) {
-			hb_dbl_tab(t[(1 << HB_DEPTH) + j], t[j]);
+			hb_dbl(t[(1 << HB_DEPTH) + j], t[j]);
 			for (i = 1; i < e; i++) {
-				hb_dbl_tab(t[(1 << HB_DEPTH) + j], t[(1 << HB_DEPTH) + j]);
+				hb_dbl(t[(1 << HB_DEPTH) + j], t[(1 << HB_DEPTH) + j]);
 			}
 		}
 	}
@@ -435,12 +435,12 @@ void hb_mul_pre_lwnaf(hb_t *t, hb_t p) {
 		hb_set_infty(t[i]);
 	}
 
-	hb_dbl_tab(t[0], p);
+	hb_dbl(t[0], p);
 
 #if HB_DEPTH > 2
-	hb_add_tab(t[1], t[0], p);
+	hb_add(t[1], t[0], p);
 	for (i = 2; i < (1 << (HB_DEPTH - 2)); i++) {
-		hb_add_tab(t[i], t[i - 1], t[0]);
+		hb_add(t[i], t[i - 1], t[0]);
 	}
 #endif
 	hb_copy(t[0], p);
