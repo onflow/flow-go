@@ -86,7 +86,7 @@ void dv_free_dynam(dv_t *a) {
 
 void dv_new_statc(dv_t *a, int digits) {
 	if (digits > DV_DIGS) {
-		THROW(ERR_NO_PRECISION);
+		THROW(ERR_NO_PRECI);
 	}
 
 	(*a) = pool_get();

@@ -65,7 +65,7 @@ void bn_init(bn_t a, int digits) {
 			THROW(ERR_NO_MEMORY);
 		}
 		if (r == EINVAL) {
-			THROW(ERR_INVALID);
+			THROW(ERR_NO_VALID);
 		}
 #endif
 	}
