@@ -378,28 +378,6 @@ typedef hb_st *hb_t;
 #define hb_mul_sim(R, P, K, Q, L)	hb_mul_sim_joint(R, P, K, Q, L)
 #endif
 
-/**
- * Renames hyperelliptic curve arithmetic operations to build precomputation
- * tables with the right coordinate system.
- */
-#if defined(HB_MIXED)
-/** @{ */
-#define hb_add_tab			hb_add_basic
-#define hb_sub_tab			hb_sub_basic
-#define hb_neg_tab			hb_neg_basic
-#define hb_dbl_tab			hb_dbl_basic
-#define hb_frb_tab			hb_frb_basic
-/** @} */
-#else
-/**@{ */
-#define hb_add_tab			hb_add
-#define hb_sub_tab			hb_sub
-#define hb_neg_tab			hb_neg
-#define hb_dbl_tab			hb_dbl
-#define hb_frb_tab			hb_frb
-/** @} */
-#endif
-
 /*============================================================================*/
 /* Function prototypes                                                        */
 /*============================================================================*/
