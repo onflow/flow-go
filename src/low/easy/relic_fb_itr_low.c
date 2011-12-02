@@ -49,10 +49,10 @@ void fb_itrn_low(dig_t *c, dig_t *a, dig_t *t) {
 		tmp = a;
 		for (j = 0; j < FB_DIGS; j++, tmp++) {
 			u = (*tmp >> i) & 0x0F;
-#if ALLOC == STACK || ALLOC == AUTO
+#if ALLOC == AUTO
 			p = (t + ((j * FB_DIGIT + i) * 4 + u) * FB_DIGS);
 #else
-			p = (t[(j * FB_DIGIT + i) * 4 + u]);
+			p = ((fb_t *)t)[(j * FB_DIGIT + i) * 4 + u];
 #endif
 			fb_addn_low(v, v, p);
 		}
