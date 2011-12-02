@@ -129,6 +129,6 @@ void ft_crtn_low(dig_t *c, dig_t *a) {
 	if (clen != 0 && slen != 0) {
 		ft_crtf_low(c, a, crz, srz, clen, slen);
 	} else {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 }
