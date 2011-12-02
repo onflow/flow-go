@@ -50,6 +50,8 @@ void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
 	}
 }
 
+void fb_muli_low(dig_t *c, dig_t *t, dig_t *a, dig_t *b);
+
 void fb_mulm_low(dig_t *c, dig_t *a, dig_t *b) {
 	dv_t t;
 
@@ -57,4 +59,3 @@ void fb_mulm_low(dig_t *c, dig_t *a, dig_t *b) {
 	fb_muli_low(c, t, a, b);
 	dv_free(t);
 }
-
