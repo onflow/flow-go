@@ -93,7 +93,6 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 		for (i = 0; i < (1 << (FB_WIDTH - 1)); i++) {
 			fb_new(tab[i]);
 		}
-
 		fb_new(t);
 
 		fb_copy(tab[0], a);
@@ -123,7 +122,7 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		for (i = 1; i < (1 << (FB_WIDTH - 1)); i++) {
+		for (i = 0; i < (1 << (FB_WIDTH - 1)); i++) {
 			fb_free(tab[i]);
 		}
 		fb_free(t);

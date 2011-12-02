@@ -234,24 +234,15 @@ static int chain[MAX_CHAIN + 1];
  */
 static int chain_len;
 
-#ifdef FB_PRECO
-
 /**
  * Tables for repeated squarings.
  */
-fb_st fb_tab_sqr[MAX_CHAIN][(FB_DIGIT / 4) * FB_DIGS][16];
+fb_st fb_tab_sqr[MAX_CHAIN][FB_TABLE];
 
 /**
- * Threshold where iterated squaring becomes faster.
+ * Pointers to the elements in the tables of repeated squarings.
  */
-int fb_sqr_thres;
-
-/**
- * Threshold where iterated square-root becomes faster.
- */
-int fb_sqr_thres;
-
-#endif
+fb_st *fb_tab_ptr[MAX_CHAIN][FB_TABLE];
 
 /**
  * Finds an addition chain for (FB_BITS - 1).
@@ -330,8 +321,13 @@ static void find_chain() {
 			break;
 	}
 
-#ifdef FB_PRECO
 	int x, y, u[chain_len + 1];
+
+	for (i = 0; i < MAX_CHAIN; i++) {
+		for (j = 0; j < FB_TABLE; j++) {
+			fb_tab_ptr[i][j] = &(fb_tab_sqr[i][j]);
+		}
+	}
 
 	u[0] = 1;
 	u[1] = 2;
@@ -348,9 +344,6 @@ static void find_chain() {
 	for (i = 0; i <= chain_len; i++) {
 		fb_itr_pre(fb_poly_tab_sqr(i), u[i]);
 	}
-
-#endif
-
 }
 
 #endif
@@ -503,11 +496,11 @@ dig_t *fb_poly_get_srz(void) {
 
 fb_t *fb_poly_tab_sqr(int i) {
 #if FB_INV == ITOHT || !defined(STRIP)
-
-#ifdef FB_PRECO
-	return (fb_t *)&(fb_tab_sqr[i]);
+	/* If ITOHT inversion is used and tables are precomputed, return them. */
+#if ALLOC == AUTO
+	return (fb_t *)*fb_tab_ptr[i];
 #else
-	return NULL;
+	return (fb_t *)fb_tab_ptr[i];
 #endif
 
 #else

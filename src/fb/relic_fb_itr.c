@@ -80,7 +80,7 @@ void fb_itr_pre_quick(fb_t *t, int b) {
 					}
 				}
 
-#if ALLOC == STACK || ALLOC == AUTO
+#if ALLOC == AUTO
 				fb_copy((dig_t *)t + (4 * i + j) * FB_DIGS, r);
 #else
 				fb_copy(t[4 * i + j], r);
