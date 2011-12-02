@@ -65,7 +65,7 @@ void ft_param_set(int param) {
 			ft_poly_set_penta(-318, -191, 127, 1);
 			break;
 		default:
-			THROW(ERR_INVALID);
+			THROW(ERR_NO_VALID);
 			break;
 	}
 	param = param_id;
