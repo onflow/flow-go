@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Implementation of the low-level binary field bit shifting functions.
+ * Implementation of the low-level multiple precision bit shifting functions.
  *
  * @version $Id$
  * @ingroup bn

@@ -23,10 +23,10 @@
 /**
  * @file
  *
- * Implementation of the low-level binary field bit shifting functions.
+ * Implementation of the low-level binary field addition functions.
  *
  * @version $Id$
- * @ingroup bn
+ * @ingroup fb
  */
 
 #include "relic_fb_low.h"
