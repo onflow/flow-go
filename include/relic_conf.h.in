@@ -79,7 +79,7 @@
 /** ARM 32-bit architecture. */
 #define ARM      3
 /** Intel x86-compatible 32-bit architecture. */
-#define X86		 4
+#define X86      4
 /** AMD64-compatible 64-bit architecture. */
 #define X86_64	 5 
 /** Architecture. */
@@ -121,7 +121,7 @@
 /** Easy C-only backend. */
 #define EASY	 1
 /** GMP backend. */
-#define GMP		 2
+#define GMP      2
 /** Arithmetic backend. */
 #define ARITH    @ARITH@
 
@@ -617,7 +617,7 @@
 /** Integrated extension field arithmetic. */
 #define INTEG    3
 /* Chosen extension field arithmetic method. */
-#define PP_QUD   @PP_QUD@ 
+#define PP_QDR   @PP_QDR@ 
 
 /** Basic quadratic extension field arithmetic. */
 #define BASIC    1
@@ -658,7 +658,7 @@
 /** Chosen elliptic curve cryptography method. */
 #define PC_CUR	 @PC_CUR@
 
-/** Bilinear pairing method. */
+/** Choice of hash function. */
 #define MD_METHD "@MD_METHD@"
 
 /** SHA-1 hash function. */
