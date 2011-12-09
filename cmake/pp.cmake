@@ -13,9 +13,7 @@ message("      PP_METHD=INTEG    Quadratic extension field arithmetic with embed
 message("      PP_METHD=BASIC    Basic extension field arithmetic.")    
 message("      PP_METHD=LAZYR    Lazy reduced extension field arithmetic.\n")
 
-message("      PP_METHD=R_ATE    R-ate pairing.")
-message("      PP_METHD=O_ATE    O-ate pairing.")
-message("      PP_METHD=X_ATE    X-ate pairing.\n")
+message("      PP_METHD=O_ATE    Optimal ate pairing.\n")
 
 # Choose the arithmetic methods.
 if (NOT PP_METHD)
@@ -26,7 +24,7 @@ if (PP_LEN LESS 3)
 	message(FATAL_ERROR "Incomplete PP_METHD specification: ${PP_METHD}")
 endif(PP_LEN LESS 3)
 
-list(GET PP_METHD 0 PP_QUD)
+list(GET PP_METHD 0 PP_QDR)
 list(GET PP_METHD 1 PP_EXT)
 list(GET PP_METHD 2 PP_MAP)
 set(PP_METHD ${PP_METHD} CACHE STRING "Bilinear pairings arithmetic method.")
