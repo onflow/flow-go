@@ -74,9 +74,27 @@ enum {
 	BN_P254,
 	/** Barreto-Naehrig curve with negative x. */
 	BN_P256,
+	/** Kachisa-Schafer-Scott with positive x. */
+	KSS_P512,
 	/** Barreto-Naehrig curve with positive x. */
 	BN_P638,
+	/** Brezing-Weng curve. */
+	BW_P638,
 };
+
+/*============================================================================*/
+/* Constant definitions                                                       */
+/*============================================================================*/
+
+/**
+ * Denotes a twist of type D.
+ */
+#define EP_DTYPE		1
+
+/**
+ * Denotes a twist of type M.
+ */
+#define EP_MTYPE		2
 
 /**
  * Size of a precomputation table using the binary method.
