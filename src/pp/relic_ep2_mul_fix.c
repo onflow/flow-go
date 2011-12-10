@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_FIX == LWNAF || EP_FIX == GLV || !defined(STRIP)
+#if EP_FIX == LWNAF || !defined(STRIP)
 
 /**
  * Precomputes a table for a point multiplication on an ordinary curve.
@@ -47,7 +47,7 @@
  * @param[out] t				- the destination table.
  * @param[in] p					- the point to multiply.
  */
-static void ep2_mul_pre_ordin(ep2_t * t, ep2_t p) {
+static void ep2_mul_pre_ordin(ep2_t *t, ep2_t p) {
 	int i;
 
 	ep2_dbl(t[0], p);
@@ -79,7 +79,7 @@ static void ep2_mul_pre_ordin(ep2_t * t, ep2_t p) {
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void ep2_mul_fix_ordin(ep2_t r, ep2_t * table, bn_t k) {
+static void ep2_mul_fix_ordin(ep2_t r, ep2_t *table, bn_t k) {
 	int len, i, n;
 	signed char naf[FP_BITS + 1], *t;
 
@@ -111,7 +111,7 @@ static void ep2_mul_fix_ordin(ep2_t r, ep2_t * table, bn_t k) {
 
 #if EP_FIX == BASIC || !defined(STRIP)
 
-void ep2_mul_pre_basic(ep2_t * t, ep2_t p) {
+void ep2_mul_pre_basic(ep2_t *t, ep2_t p) {
 	bn_t n;
 
 	bn_null(n);
@@ -134,7 +134,7 @@ void ep2_mul_pre_basic(ep2_t * t, ep2_t p) {
 	}
 }
 
-void ep2_mul_fix_basic(ep2_t r, ep2_t * t, bn_t k) {
+void ep2_mul_fix_basic(ep2_t r, ep2_t *t, bn_t k) {
 	int i, l;
 
 	l = bn_bits(k);
@@ -217,7 +217,7 @@ void ep2_mul_fix_yaowi(ep2_t r, ep2_t *t, bn_t k) {
 
 #if EP_FIX == NAFWI || !defined(STRIP)
 
-void ep2_mul_pre_nafwi(ep2_t * t, ep2_t p) {
+void ep2_mul_pre_nafwi(ep2_t *t, ep2_t p) {
 	int l;
 	bn_t n;
 
@@ -246,7 +246,7 @@ void ep2_mul_pre_nafwi(ep2_t * t, ep2_t p) {
 	}
 }
 
-void ep2_mul_fix_nafwi(ep2_t r, ep2_t * t, bn_t k) {
+void ep2_mul_fix_nafwi(ep2_t r, ep2_t *t, bn_t k) {
 	int i, j, l, d, m;
 	ep2_t a;
 	signed char naf[FP_BITS + 1];
@@ -306,7 +306,7 @@ void ep2_mul_fix_nafwi(ep2_t r, ep2_t * t, bn_t k) {
 
 #if EP_FIX == COMBS || !defined(STRIP)
 
-void ep2_mul_pre_combs(ep2_t * t, ep2_t p) {
+void ep2_mul_pre_combs(ep2_t *t, ep2_t p) {
 	int i, j, l;
 	bn_t ord;
 
@@ -348,7 +348,7 @@ void ep2_mul_pre_combs(ep2_t * t, ep2_t p) {
 	}
 }
 
-void ep2_mul_fix_combs(ep2_t r, ep2_t * t, bn_t k) {
+void ep2_mul_fix_combs(ep2_t r, ep2_t *t, bn_t k) {
 	int i, j, l, w, n0, p0, p1;
 	bn_t n;
 
@@ -404,7 +404,7 @@ void ep2_mul_fix_combs(ep2_t r, ep2_t * t, bn_t k) {
 
 #if EP_FIX == COMBD || !defined(STRIP)
 
-void ep2_mul_pre_combd(ep2_t * t, ep2_t p) {
+void ep2_mul_pre_combd(ep2_t *t, ep2_t p) {
 	int i, j, d, e;
 	bn_t n;
 
@@ -453,7 +453,7 @@ void ep2_mul_pre_combd(ep2_t * t, ep2_t p) {
 	}
 }
 
-void ep2_mul_fix_combd(ep2_t r, ep2_t * t, bn_t k) {
+void ep2_mul_fix_combd(ep2_t r, ep2_t *t, bn_t k) {
 	int i, j, d, e, w0, w1, n0, p0, p1;
 	bn_t n;
 
@@ -507,13 +507,14 @@ void ep2_mul_fix_combd(ep2_t r, ep2_t * t, bn_t k) {
 
 #endif
 
-#if EP_FIX == LWNAF || EP_FIX == GLV || !defined(STRIP)
+#if EP_FIX == LWNAF || !defined(STRIP)
 
-void ep2_mul_pre_lwnaf(ep2_t * t, ep2_t p) {
+void ep2_mul_pre_lwnaf(ep2_t *t, ep2_t p) {
 	ep2_mul_pre_ordin(t, p);
 }
 
-void ep2_mul_fix_lwnaf(ep2_t r, ep2_t * t, bn_t k) {
+void ep2_mul_fix_lwnaf(ep2_t r, ep2_t *t, bn_t k) {
 	ep2_mul_fix_ordin(r, t, k);
 }
+
 #endif
