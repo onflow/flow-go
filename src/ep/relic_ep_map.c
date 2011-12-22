@@ -52,6 +52,7 @@ void ep_map(ep_t p, unsigned char *msg, int len) {
 
 		md_map(digest, msg, len);
 		fp_set_dig(p->z, 1);
+		fp_zero(p->x);
 		memcpy(p->x, digest, MIN(FP_BYTES, MD_LEN));
 
 		SPLIT(bits, digits, FP_BITS, FP_DIG_LOG);

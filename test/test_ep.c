@@ -855,14 +855,17 @@ static int compression(void) {
 static int hashing(void) {
 	int code = STS_ERR;
 	ep_t a;
+	ep_t b;
 	bn_t n;
 	unsigned char msg[5];
 
 	ep_null(a);
+	ep_null(b);
 	bn_null(n);
 
 	TRY {
 		ep_new(a);
+		ep_new(b);
 		bn_new(n);
 
 		ep_curve_get_ord(n);
@@ -875,6 +878,16 @@ static int hashing(void) {
 		}
 		TEST_END;
 
+		TEST_BEGIN("point hashing is consistent") {
+			rand_bytes(msg, sizeof(msg));
+			ep_rand(a);
+			ep_map(a, msg, sizeof(msg));
+			ep_rand(b);
+			ep_map(b, msg, sizeof(msg));
+			TEST_ASSERT(ep_cmp(a, b) == CMP_EQ, end);
+		}
+		TEST_END;
+
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -882,6 +895,7 @@ static int hashing(void) {
 	code = STS_OK;
   end:
 	ep_free(a);
+	ep_free(b);
 	bn_free(n);
 	return code;
 }
