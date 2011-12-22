@@ -41,29 +41,23 @@
 /*============================================================================*/
 
 void ep_map(ep_t p, unsigned char *msg, int len) {
+	bn_t k;
 	fp_t t;
-	int bits, digits;
 	unsigned char digest[MD_LEN];
 
+	bn_null(k);
 	fp_null(t);
 
 	TRY {
+		bn_new(k);
 		fp_new(t);
 
 		md_map(digest, msg, len);
+		memcpy(k->dp, digest, MIN(FP_BYTES, MD_LEN));
+
+		fp_prime_conv(p->x, k);
+		fp_zero(p->y);
 		fp_set_dig(p->z, 1);
-		fp_zero(p->x);
-		memcpy(p->x, digest, MIN(FP_BYTES, MD_LEN));
-
-		SPLIT(bits, digits, FP_BITS, FP_DIG_LOG);
-		if (bits > 0) {
-			dig_t mask = ((dig_t)1 << (dig_t)bits) - 1;
-			p->x[FP_DIGS - 1] &= mask;
-		}
-
-		while (fp_cmp(p->x, fp_prime_get()) != CMP_LT) {
-			fp_subn_low(p->x, p->x, fp_prime_get());
-		}
 
 		while (1) {
 			ep_rhs(t, p);
@@ -74,13 +68,20 @@ void ep_map(ep_t p, unsigned char *msg, int len) {
 			}
 			fp_add_dig(p->x, p->x, 1);
 		}
-		/* Assuming cofactor is 1 */
-		/* TODO: generalize? */
+
+		/* Now, multiply by cofactor to get the correct group. */
+		ep_curve_get_cof(k);
+		if (bn_bits(k) < BN_DIGIT) {
+			ep_mul_dig(p, p, k->dp[0]);
+		} else {
+			ep_mul(p, p, k);
+		}
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+		bn_free(k);
 		fp_free(t);
 	}
 }
