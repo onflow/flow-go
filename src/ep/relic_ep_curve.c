@@ -60,6 +60,11 @@ static ep_st curve_g;
  */
 static bn_st curve_r;
 
+/**
+ * The cofactor of the group order in the elliptic curve.
+ */
+static bn_st curve_h;
+
 #if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
 /**
  * The parameters required by the GLV method.
@@ -182,6 +187,7 @@ void ep_curve_init(void) {
 #endif
 	ep_set_infty(&curve_g);
 	bn_init(&curve_r, FP_DIGS);
+	bn_init(&curve_h, FP_DIGS);
 #if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || !defined(STRIP))
 	for (int i = 0; i < 3; i++) {
 		bn_init(&curve_v1[i], FP_DIGS);
@@ -204,6 +210,7 @@ void ep_curve_clean(void) {
 #endif
 #endif
 	bn_clean(&curve_r);
+	bn_clean(&curve_h);
 #if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || !defined(STRIP))
 	for (int i = 0; i < 3; i++) {
 		bn_clean(&curve_v1[i]);
@@ -264,6 +271,10 @@ void ep_curve_get_ord(bn_t n) {
 	bn_copy(n, &curve_r);
 }
 
+void ep_curve_get_cof(bn_t h) {
+	bn_copy(h, &curve_h);
+}
+
 ep_t *ep_curve_get_tab() {
 #if defined(EP_PRECO)
 
@@ -282,7 +293,7 @@ ep_t *ep_curve_get_tab() {
 
 #if defined(EP_ORDIN)
 
-void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
+void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h) {
 	curve_is_kbltz = 0;
 
 	fp_copy(curve_a, a);
@@ -294,6 +305,7 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
 	ep_norm(g, g);
 	ep_copy(&curve_g, g);
 	bn_copy(&curve_r, r);
+	bn_copy(&curve_h, h);
 
 #if defined(EP_PRECO)
 	ep_mul_pre(ep_curve_get_tab(), &curve_g);
@@ -304,7 +316,7 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r) {
 
 #if defined(EP_KBLTZ)
 
-void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, fp_t beta, bn_t l) {
+void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, bn_t h, fp_t beta, bn_t l) {
 	int bits = bn_bits(r);
 
 	curve_is_kbltz = 1;
@@ -318,6 +330,7 @@ void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, fp_t beta, bn_t l) {
 	ep_norm(g, g);
 	ep_copy(&curve_g, g);
 	bn_copy(&curve_r, r);
+	bn_copy(&curve_h, h);
 
 #if EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP)
 	fp_copy(curve_beta, beta);
