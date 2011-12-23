@@ -53,9 +53,7 @@ void ep_map(ep_t p, unsigned char *msg, int len) {
 		fp_new(t);
 
 		md_map(digest, msg, len);
-		dv_zero(k->dp, FP_DIGS);
-		memcpy(k->dp, digest, MIN(FP_BYTES, MD_LEN));
-		k->used = FP_DIGS;
+		bn_read_bin(k, digest, MIN(FP_BYTES, MD_LEN));
 
 		fp_prime_conv(p->x, k);
 		fp_zero(p->y);
