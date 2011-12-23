@@ -1029,7 +1029,7 @@ int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg,
 			}
 			result = (result ? 0 : 1);
 		} else {
-			result = STS_ERR;
+			result = 0;
 		}
 	}
 	CATCH_ANY {
