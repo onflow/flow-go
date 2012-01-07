@@ -1021,12 +1021,4 @@ void ep_pck(ep_t r, ep_t p);
  */
 int ep_upk(ep_t r, ep_t p);
 
-/**
- * Computes the efficient curve endomorphism for the GLV method.
- *
- * @param[out] q			- the result.
- * @param[in] p				- the point to map.
- */
-void ep_glv_end(ep_t q, ep_t p);
-
 #endif /* !RELIC_EP_H */
