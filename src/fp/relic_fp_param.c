@@ -26,7 +26,7 @@
  * Implementation of the prime field modulus manipulation.
  *
  * @version $Id$
- * @ingroup fb
+ * @ingroup fp
  */
 
 #include <stdlib.h>
@@ -105,6 +105,17 @@ void fp_param_get_var(bn_t x) {
 				bn_add_dig(x, x, 0x9B);
 				bn_neg(x, x);
 				break;
+			case KSS_508:
+				/* x = -(2^64 + 2^51 - 2^46 - 2^12). */
+				bn_set_2b(x, 64);
+				bn_set_2b(a, 51);
+				bn_add(x, x, a);
+				bn_set_2b(a, 46);
+				bn_sub(x, x, a);
+				bn_set_2b(a, 12);
+				bn_sub(x, x, a);
+				bn_neg(x, x);
+				break;
 			case BN_638:
 				/* x = 2^158 - 2^128 - 2^68 + 1. */
 				bn_set_2b(x, 158);
@@ -114,8 +125,19 @@ void fp_param_get_var(bn_t x) {
 				bn_sub(x, x, a);
 				bn_add_dig(x, x, 1);
 				break;
+			case BW_638:
+				/* x = -2^107 + 2^105 + 2^93 + 2^5. */
+				bn_set_2b(x, 107);
+				bn_set_2b(a, 105);
+				bn_sub(x, x, a);
+				bn_set_2b(a, 93);
+				bn_sub(x, x, a);
+				bn_set_2b(a, 5);
+				bn_sub(x, x, a);
+				bn_neg(x, x);
+				break;
 			default:
-				THROW(ERR_INVALID);
+				THROW(ERR_NO_VALID);
 				break;
 		}
 	}
@@ -128,6 +150,7 @@ void fp_param_get_var(bn_t x) {
 }
 
 int *fp_param_get_sps(int *len) {
+	int *ptr = NULL;
 	bn_t a;
 
 	bn_null(a);
@@ -152,6 +175,13 @@ int *fp_param_get_sps(int *len) {
 					}
 				}
 				break;
+			case KSS_508:
+				spars_len = 4;
+				spars[0] = -12;
+				spars[1] = -46;
+				spars[2] = 51;
+				spars[3] = 64;
+				break;
 			case BN_638:
 				spars_len = 4;
 				spars[0] = 0;
@@ -159,8 +189,15 @@ int *fp_param_get_sps(int *len) {
 				spars[2] = -128;
 				spars[3] = 158;
 				break;
+			case BW_638:
+				spars_len = 4;
+				spars[0] = -5;
+				spars[1] = -93;
+				spars[2] = -105;
+				spars[3] = 107;
+				break;
 			default:
-				THROW(ERR_INVALID);
+				THROW(ERR_NO_VALID);
 				break;
 		}
 
@@ -168,12 +205,12 @@ int *fp_param_get_sps(int *len) {
 			if (len != NULL) {
 				*len = spars_len;
 			}
-			return spars;
+			ptr = spars;
 		} else {
 			if (len != NULL) {
 				*len = 0;
 			}
-			return NULL;
+			ptr = NULL;
 		}
 	}
 	CATCH_ANY {
@@ -183,11 +220,11 @@ int *fp_param_get_sps(int *len) {
 		bn_free(a);
 	}
 
-	return NULL;
+	return ptr;
 }
 
 void fp_param_set(int param) {
-	bn_t t0, t1, p;
+	bn_t t0, t1, t2, p;
 	int f[10] = { 0 };
 	int generated = 0;
 
@@ -197,6 +234,7 @@ void fp_param_set(int param) {
 	TRY {
 		bn_new(t0);
 		bn_new(t1);
+		bn_new(t2);
 		bn_new(p);
 
 		param_id = param;
@@ -349,6 +387,37 @@ void fp_param_set(int param) {
 				f[2] = -96;
 				f[3] = -128;
 				fp_prime_set_pmers(f, 4);
+#elif FP_PRIME == 508
+			case KSS_508:
+				fp_param_get_var(t0);
+				/* h = (49*u^2 + 245 * u + 343)/3 */
+				bn_mul_dig(p, t0, 245);
+				bn_add_dig(p, p, 200);
+				bn_add_dig(p, p, 143);
+				bn_sqr(t1, t0);
+				bn_mul_dig(t2, t1, 49);
+				bn_add(p, p, t2);
+				bn_div_dig(p, p, 3);
+				/* n = (u^6 + 37 * u^3 + 343)/343. */
+				bn_mul(t1, t1, t0);
+				bn_mul_dig(t2, t1, 37);
+				bn_sqr(t1, t1);
+				bn_add(t2, t2, t1);
+				bn_add_dig(t2, t2, 200);
+				bn_add_dig(t2, t2, 143);
+				bn_div_dig(t2, t2, 49);
+				bn_div_dig(t2, t2, 7);
+				bn_mul(p, p, t2);
+				/* t = (u^4 + 16 * u + 7)/7. */
+				bn_mul_dig(t1, t0, 16);
+				bn_add_dig(t1, t1, 7);
+				bn_sqr(t2, t0);
+				bn_sqr(t2, t2);
+				bn_add(t2, t2, t1);
+				bn_div_dig(t2, t2, 7);
+				bn_add(p, p, t2);
+				bn_sub_dig(p, p, 1);
+				fp_prime_set_dense(p);
 				break;
 #elif FP_PRIME == 521
 			case NIST_521:
@@ -376,6 +445,21 @@ void fp_param_set(int param) {
 				bn_add(p, p, t1);
 				fp_prime_set_dense(p);
 				break;
+			case BW_638:
+				fp_param_get_var(t0);
+				/* p = (x^2 - 2x + 1) * (x^4 - x^2 + 1)/3 + x. */
+				bn_sqr(t1, t0);
+				bn_sqr(p, t1);
+				bn_sub(p, p, t1);
+				bn_add_dig(p, p, 1);
+				bn_sub(t1, t1, t0);
+				bn_sub(t1, t1, t0);
+				bn_add_dig(t1, t1, 1);
+				bn_mul(p, p, t1);
+				bn_div_dig(p, p, 3);
+				bn_add(p, p, t0);
+				fp_prime_set_dense(p);
+				break;
 #else
 			default:
 				bn_gen_prime(p, FP_BITS);
@@ -395,6 +479,7 @@ void fp_param_set(int param) {
 	FINALLY {
 		bn_free(t0);
 		bn_free(t1);
+		bn_free(t2);
 		bn_free(p);
 	}
 }
@@ -418,10 +503,12 @@ int fp_param_set_any(void) {
 #endif
 #elif FP_PRIME == 384
 	fp_param_set(NIST_384);
+#elif FP_PRIME == 508
+	fp_param_set(KSS_508);
 #elif FP_PRIME == 521
 	fp_param_set(NIST_521);
 #elif FP_PRIME == 638
-	fp_param_set(BN_638);
+	fp_param_set(BW_638);
 #else
 	return fp_param_set_any_dense();
 #endif
@@ -478,16 +565,16 @@ int fp_param_set_any_tower() {
 	fp_param_set(BN_254);
 #elif FP_PRIME == 256
 	fp_param_set(BN_256);
+#elif FP_PRIME == 508
+	fp_param_set(KSS_508);
 #elif FP_PRIME == 638
-	fp_param_set(BN_638);
+	fp_param_set(BW_638);
 #else
 	do {
 		fp_param_set_any_dense();
-	} while (fp_prime_get_mod5() == 1 || fp_prime_get_mod5() == 4 ||
-			fp_prime_get_mod8() == 1);
+	} while (fp_prime_get_mod8() == 1 || fp_prime_get_mod8() == 5);
 #endif
-	if (fp_prime_get_mod5() == 1 || fp_prime_get_mod5() == 4 ||
-			fp_prime_get_mod8() == 1) {
+	if (fp_prime_get_mod8() == 1 || fp_prime_get_mod8() == 5) {
 		return STS_ERR;
 	}
 	return STS_OK;
