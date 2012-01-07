@@ -74,8 +74,8 @@ enum {
 	BN_P254,
 	/** Barreto-Naehrig curve with negative x. */
 	BN_P256,
-	/** Kachisa-Schafer-Scott with positive x. */
-	KSS_P512,
+	/** Kachisa-Schafer-Scott with negative x. */
+	KSS_P508,
 	/** Barreto-Naehrig curve with positive x. */
 	BN_P638,
 	/** Brezing-Weng curve. */
@@ -508,14 +508,22 @@ ep_t *ep_curve_get_tab(void);
 void ep_curve_get_ord(bn_t n);
 
 /**
+ * Returns the cofactor of the binary elliptic curve.
+ *
+ * @param[out] n			- the returned cofactor.
+ */
+void ep_curve_get_cof(bn_t h);
+
+/**
  * Configures a new ordinary prime elliptic curve by its coefficients.
  *
  * @param[in] a			- the coefficient a of the curve.
  * @param[in] b			- the coefficient b of the curve.
  * @param[in] g			- the generator.
  * @param[in] r			- the order of the group of points.
+ * @param[in] h			- the cofactor of the group order.
  */
-void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r);
+void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h);
 
 /**
  * Configures a new Koblitz prime elliptic curve by its coefficients.
@@ -525,18 +533,9 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r);
  * @param[in] r			- the order of the group of points.
  * @param[in] beta		- the constant associated with the endomorphism.
  * @param[in] l			- the exponent corresponding to the endomorphism.
+ * @param[in] h			- the cofactor of the group order.
  */
-void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, fp_t beta, bn_t l);
-
-/**
- * Configures a new pairing-friendly prime elliptic curve by its coefficients.
- *
- * @param[in] a			- the coefficient a of the curve.
- * @param[in] b			- the coefficient b of the curve.
- * @param[in] g			- the generator.
- * @param[in] r			- the order of the group of points.
- */
-void ep_curve_set_pairf(fp_t a, fp_t b, ep_t g, bn_t r);
+void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, bn_t h, fp_t beta, bn_t l);
 
 /**
  * Configures a new prime elliptic curve by its parameter identifier.
