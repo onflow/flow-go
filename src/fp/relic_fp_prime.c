@@ -19,6 +19,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
  */
+
 /**
  * @file
  *
@@ -66,11 +67,6 @@ static bn_st conv, one;
 static dig_t prime_mod8;
 
 /**
- * Prime modulus modulo 5.
- */
-static dig_t prime_mod5;
-
-/**
  * Quadratic non-residue.
  */
 static int prime_qnr;
@@ -106,9 +102,9 @@ void fp_prime_init() {
 }
 
 void fp_prime_clean() {
-	bn_clean(&prime);
-	bn_clean(&conv);
 	bn_clean(&one);
+	bn_clean(&conv);
+	bn_clean(&prime);
 }
 
 dig_t *fp_prime_get(void) {
@@ -141,10 +137,6 @@ dig_t fp_prime_get_mod8() {
 	return prime_mod8;
 }
 
-dig_t fp_prime_get_mod5() {
-	return prime_mod5;
-}
-
 int fp_prime_get_qnr() {
 	return prime_qnr;
 }
@@ -158,7 +150,7 @@ void fp_prime_set(bn_t p) {
 	bn_t t;
 
 	if (p->used != FP_DIGS) {
-		THROW(ERR_INVALID);
+		THROW(ERR_NO_VALID);
 	}
 
 	dv_null(s);
@@ -172,40 +164,44 @@ void fp_prime_set(bn_t p) {
 
 		bn_copy(&prime, p);
 
-		bn_mod_dig(&prime_mod5, &prime, 5);
 		bn_mod_dig(&prime_mod8, &prime, 8);
 
 		switch (prime_mod8) {
 			case 3:
 			case 7:
 				prime_qnr = -1;
+				/* The current code for extensions of Fp^3 relies on prime_qnr
+				 * being also a cubic non-residue. */
+				prime_cnr = 0;
 				break;
 			case 1:
 			case 5:
-				prime_qnr = -2;
+				prime_qnr = prime_cnr = -2;
 				break;
 			default:
-				prime_qnr = 0;
-				THROW(ERR_INVALID);
+				prime_qnr = prime_cnr = 0;
+				THROW(ERR_NO_VALID);
 				break;
 		}
 	#ifdef FP_QNRES
-		if (prime_qnr != -1) {
-			THROW(ERR_INVALID);
+		if (prime_mod8 != 3) {
+			THROW(ERR_NO_VALID);
 		}
 	#endif
+
 		bn_mod_pre_monty(t, &prime);
 		u = t->dp[0];
 		dv_zero(s, 2 * FP_DIGS);
 		s[2 * FP_DIGS] = 1;
 		dv_zero(q, 2 * FP_DIGS + 1);
-		dv_copy(q, prime.dp, prime.used);
-		bn_divn_low(t->dp, conv.dp, s, 2 * FP_DIGS + 1, q, prime.used);
+		dv_copy(q, prime.dp, FP_DIGS);
+		bn_divn_low(t->dp, conv.dp, s, 2 * FP_DIGS + 1, q, FP_DIGS);
 		conv.used = FP_DIGS;
 		bn_trim(&conv);
 		bn_set_dig(&one, 1);
 		bn_lsh(&one, &one, prime.used * BN_DIGIT);
 		bn_mod(&one, &one, &prime);
+
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -219,8 +215,9 @@ void fp_prime_set_dense(bn_t p) {
 	fp_prime_set(p);
 	spars_len = 0;
 	spars[0] = 0;
+
 #if FP_RDC == QUICK
-	THROW(ERR_INVALID);
+	THROW(ERR_NO_CONFIG);
 #endif
 }
 
@@ -235,7 +232,7 @@ void fp_prime_set_pmers(int *f, int len) {
 		bn_new(t);
 
 		if (len >= MAX_EXPS) {
-			THROW(ERR_INVALID);
+			THROW(ERR_NO_VALID);
 		}
 
 		bn_set_2b(p, FP_BITS);
@@ -275,31 +272,18 @@ void fp_prime_set_pmers(int *f, int len) {
 }
 
 void fp_prime_conv(fp_t c, bn_t a) {
-	dv_t p, r, s, t;
+	bn_t t;
 
-	dv_null(r);
-	dv_null(s);
-	dv_null(t);
-	dv_null(p);
+	bn_null(t);
 
 	TRY {
-		dv_new(r);
-		dv_new(s);
-		dv_new(t);
-		dv_new(p);
-
 #if FP_RDC == MONTY
-		dv_zero(p, 2 * FP_DIGS + 1);
-		dv_zero(r, 2 * FP_DIGS + 1);
-		dv_zero(s, 2 * FP_DIGS + 1);
-		dv_zero(t, 2 * FP_DIGS + 1);
-		dv_copy(p, prime.dp, prime.used);
-		dv_copy(t + FP_DIGS, a->dp, a->used);
-		bn_divn_low(r, s, t, FP_DIGS + a->used, p, prime.used);
-		dv_copy(c, s, FP_DIGS);
+		bn_lsh(t, a, FP_DIGS * FP_DIGIT);
+		bn_mod(t, t, &prime);
+		dv_copy(c, t->dp, FP_DIGS);
 #else
 		if (a->used > FP_DIGS) {
-			THROW(ERR_NO_PRECISION);
+			THROW(ERR_NO_PRECI);
 		}
 
 		if (bn_is_zero(a)) {
@@ -313,16 +297,14 @@ void fp_prime_conv(fp_t c, bn_t a) {
 				c[i] = 0;
 			}
 		}
+		(void)t;
 #endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		dv_free(r);
-		dv_free(s);
-		dv_free(t);
-		dv_free(p);
+		bn_free(t);
 	}
 }
 
@@ -368,16 +350,14 @@ void fp_prime_back(bn_t c, fp_t a) {
 		for (i = 0; i < FP_DIGS; i++) {
 			c->dp[i] = a[i];
 		}
-		c->used = FP_DIGS;
-
 #if FP_RDC == MONTY
 		dv_zero(t, 2 * FP_DIGS + 1);
 		dv_copy(t, a, FP_DIGS);
 		fp_rdc(c->dp, t);
+#endif
 		c->used = FP_DIGS;
 		c->sign = BN_POS;
 		bn_trim(c);
-#endif
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
