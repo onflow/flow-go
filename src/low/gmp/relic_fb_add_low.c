@@ -30,6 +30,8 @@
  * @ingroup fb
  */
 
+#include <gmp.h>
+
 #include "relic_fb.h"
 #include "relic_fb_low.h"
 
