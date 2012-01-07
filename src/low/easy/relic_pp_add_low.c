@@ -131,7 +131,8 @@ void fp2_norm_low(fp2_t c, fp2_t a) {
 				fp2_add(c, c, t);
 				break;
 			default:
-				THROW(ERR_INVALID);
+				THROW(ERR_NO_VALID);
+				break;
 		}
 #endif
 	}
@@ -171,10 +172,11 @@ void fp2_nord_low(dv2_t c, dv2_t a) {
 				fp_subc_low(c[0], a[0], t[0]);
 				break;
 			case 5:
-				/* If p = 5 mod 8, (u) is a QNR, u^2 = -2. */
+				/* If p = 5 mod 8, (u) is a QNR. */
 				dv_copy(t[0], a[0], 2 * FP_DIGS);
-				dv_copy(c[0], a[1], FP_DIGS);
-				fp_subn_low(c[0] + FP_DIGS, fp_prime_get(), a[1] + FP_DIGS);
+				dv_zero(t[1], FP_DIGS);
+				dv_copy(t[1] + FP_DIGS, fp_prime_get(), FP_DIGS);
+				fp_subc_low(c[0], t[1], a[1]);
 				for (int i = -1; i > fp_prime_get_qnr(); i--) {
 					fp_subc_low(c[0], c[0], a[1]);
 				}
@@ -193,7 +195,8 @@ void fp2_nord_low(dv2_t c, dv2_t a) {
 				fp_addc_low(c[1], t[1], a[0]);
 				break;
 			default:
-				THROW(ERR_INVALID);
+				THROW(ERR_NO_VALID);
+				break;
 		}
 #endif
 	}
