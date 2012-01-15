@@ -23,8 +23,8 @@
 /**
  * @file
  *
- * Implementation of simultaneous point multiplication on binary elliptic
- * curves.
+ * Implementation of simultaneous point multiplication on a prime elliptic
+ * curve over a quadratic extension.
  *
  * @version $Id$
  * @ingroup ep
