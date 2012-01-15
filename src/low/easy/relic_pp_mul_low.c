@@ -53,8 +53,8 @@ void fp2_muln_low(dv2_t c, fp2_t a, fp2_t b) {
 	fp_addn_low(t0, a[0], a[1]);
 	fp_addn_low(t1, b[0], b[1]);
 #else
-	fp_add(t0, a[0], a[1]);
-	fp_add(t1, b[0], b[1]);
+	fp_addm_low(t0, a[0], a[1]);
+	fp_addm_low(t1, b[0], b[1]);
 #endif
 	/* c_0 = a_0 * b_0, c_1 = a_1 * b_1. */
 	fp_muln_low(c[0], a[0], b[0]);
