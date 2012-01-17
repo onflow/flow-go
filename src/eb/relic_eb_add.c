@@ -244,6 +244,9 @@ static void eb_add_projc_ordin_mix(eb_t r, eb_t p, eb_t q) {
 		fb_new(t4);
 		fb_new(t5);
 
+		/* madd-2005-dl formulas: 7M + 4S + 9add + 1*4 + 3*2. */
+		/* http://www.hyperelliptic.org/EFD/g12o/auto-shortw-lopezdahab-1.html#addition-madd-2005-dl */
+
 		if (!p->norm) {
 			/* A = y1 + y2 * z1^2. */
 			fb_sqr(t0, p->z);

@@ -142,6 +142,9 @@ static void ep_add_projc_mix(ep_t r, ep_t p, ep_t q) {
 		fp_new(t5);
 		fp_new(t6);
 
+		/* madd-2007-bl formulas: 7M + 4S + 9add + 1*4 + 3*2. */
+		/* http://www.hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-3.html#addition-madd-2007-bl */
+
 		if (!p->norm) {
 			/* t0 = z1^2. */
 			fp_sqr(t0, p->z);
@@ -271,6 +274,9 @@ static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 		fp_new(t4);
 		fp_new(t5);
 		fp_new(t6);
+
+		/* add-2007-bl formulas: 11M + 5S + 9add + 4*2 */
+		/* http://www.hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-3.html#addition-add-2007-bl */
 
 		/* t0 = z1^2. */
 		fp_sqr(t0, p->z);
