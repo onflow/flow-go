@@ -110,6 +110,39 @@
  */
 #define RSA_FIN_SIG			6
 
+#if CP_RSAPD == PKCS1
+
+static const unsigned char shone_id[] = {0x30u, 0x21u, 0x30u, 0x09u, 0x06u, 0x05u, 0x2bu, 0x0eu, 0x03u, 0x02u, 0x1au, 0x05u, 0x00u, 0x04u, 0x14u};
+static const unsigned char sh224_id[] = {0x30u, 0x2du, 0x30u, 0x0du, 0x06u, 0x09u, 0x60u, 0x86u, 0x48u, 0x01u, 0x65u, 0x03u, 0x04u, 0x02u, 0x04u, 0x05u, 0x00u, 0x04u, 0x1cu};
+static const unsigned char sh256_id[] = {0x30u, 0x31u, 0x30u, 0x0du, 0x06u, 0x09u, 0x60u, 0x86u, 0x48u, 0x01u, 0x65u, 0x03u, 0x04u, 0x02u, 0x01u, 0x05u, 0x00u, 0x04u, 0x20u};
+static const unsigned char sh384_id[] = {0x30u, 0x41u, 0x30u, 0x0du, 0x06u, 0x09u, 0x60u, 0x86u, 0x48u, 0x01u, 0x65u, 0x03u, 0x04u, 0x02u, 0x02u, 0x05u, 0x00u, 0x04u, 0x30u};
+static const unsigned char sh512_id[] = {0x30u, 0x51u, 0x30u, 0x0du, 0x06u, 0x09u, 0x60u, 0x86u, 0x48u, 0x01u, 0x65u, 0x03u, 0x04u, 0x02u, 0x03u, 0x05u, 0x00u, 0x04u, 0x40u};
+
+static unsigned char *hash_id(int md, int *len) {
+	switch (md) {
+	case SHONE:
+		*len = sizeof(shone_id);
+		return (unsigned char *) shone_id;
+	case SH224:
+		*len = sizeof(sh224_id);
+		return (unsigned char *) sh224_id;
+	case SH256:
+		*len = sizeof(sh256_id);
+		return (unsigned char *) sh256_id;
+	case SH384:
+		*len = sizeof(sh384_id);
+		return (unsigned char *) sh384_id;
+	case SH512:
+		*len = sizeof(sh512_id);
+		return (unsigned char *) sh512_id;
+	default:
+		THROW(ERR_INVALID);
+		return NULL;
+	}
+}
+
+#endif
+
 #if CP_RSAPD == BASIC
 
 /**
@@ -188,7 +221,9 @@ static int pad_basic(bn_t m, int *p_len, int m_len, int k_len, int operation) {
  */
 static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 	unsigned char pad = 0;
+	unsigned char *id;
 	int result = STS_OK;
+	int len;
 	bn_t t;
 
 	TRY {
@@ -240,17 +275,21 @@ static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 				break;
 			case RSA_SIG:
 				/* EB = 00 | 01 | PS | 00 | D. */
+				id = hash_id(MD_MAP, &len);
 				bn_zero(m);
 				bn_lsh(m, m, 8);
 				bn_add_dig(m, m, RSA_PRV);
 
-				*p_len = k_len - 3 - m_len;
+				*p_len = k_len - 3 - m_len - len;
 				for (int i = 0; i < *p_len; i++) {
 					bn_lsh(m, m, 8);
 					bn_add_dig(m, m, RSA_PAD);
 				}
 				bn_lsh(m, m, 8);
 				bn_add_dig(m, m, 0);
+				bn_read_bin(t, id, len);
+				bn_lsh(m, m, 8 * len);
+				bn_add(m, m, t);
 				/* Make room for the real message. */
 				bn_lsh(m, m, m_len * 8);
 				break;
@@ -260,7 +299,6 @@ static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 				if (!bn_is_zero(t)) {
 					result = STS_ERR;
 				}
-				*p_len = m_len;
 				m_len--;
 				bn_rsh(t, m, 8 * m_len);
 				pad = (unsigned char)t->dp[0];
@@ -271,10 +309,15 @@ static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 					m_len--;
 					bn_rsh(t, m, 8 * m_len);
 					pad = (unsigned char)t->dp[0];
-				} while (pad != 0);
+				} while (pad != 0 && m_len > 0);
+				if (m_len == 0) {
+					result = STS_ERR;
+				}
 				/* Remove padding and trailing zero. */
-				*p_len -= (m_len - 1);
-				bn_mod_2b(m, m, (k_len - *p_len) * 8);
+				id = hash_id(MD_MAP, &len);
+				m_len -= len;
+				*p_len = k_len - m_len;
+				bn_mod_2b(m, m, m_len * 8);
 				break;
 		}
 	}
