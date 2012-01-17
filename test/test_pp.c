@@ -184,7 +184,7 @@ static int addition2(void) {
 			TEST_ASSERT(fp2_is_zero(e), end);
 		} TEST_END;
 
-#if PP_EXT == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic addition is correct") {
 			fp2_rand(a);
 			fp2_rand(b);
@@ -194,7 +194,7 @@ static int addition2(void) {
 		} TEST_END;
 #endif
 
-#if PP_EXT == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 		TEST_BEGIN("integrated addition is correct") {
 			fp2_rand(a);
 			fp2_rand(b);
@@ -253,7 +253,7 @@ static int subtraction2(void) {
 		}
 		TEST_END;
 
-#if PP_EXT == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic subtraction is correct") {
 			fp2_rand(a);
 			fp2_rand(b);
@@ -263,7 +263,7 @@ static int subtraction2(void) {
 		} TEST_END;
 #endif
 
-#if PP_EXT == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 		TEST_BEGIN("integrated subtraction is correct") {
 			fp2_rand(a);
 			fp2_rand(b);
@@ -302,7 +302,7 @@ static int doubling2(void) {
 			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 
-#if PP_EXT == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic doubling is correct") {
 			fp2_rand(a);
 			fp2_dbl(b, a);
@@ -311,7 +311,7 @@ static int doubling2(void) {
 		} TEST_END;
 #endif
 
-#if PP_EXT == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 		TEST_BEGIN("integrated doubling is correct") {
 			fp2_rand(a);
 			fp2_dbl(b, a);
