@@ -82,6 +82,7 @@ void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master) {
 void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 		int len1, sokaka_t k, char *id2, int len2) {
 	int first = 0;
+	int i, j, m;
 	g1_t p;
 	g2_t q;
 	gt_t e;
@@ -130,40 +131,22 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 #if PC_CUR == PRIME
 		unsigned char buf[12 * FP_BYTES], *ptr;
 		ptr = buf;
-		memcpy(ptr, e[0][0][0], FP_BYTES);
-		ptr += FP_BYTES;
-		memcpy(ptr, e[0][0][1], FP_BYTES);
-		ptr += FP_BYTES;
-		memcpy(ptr, e[0][1][0], FP_BYTES);
-		ptr += FP_BYTES;
-		memcpy(ptr, e[0][1][1], FP_BYTES);
-		ptr += FP_BYTES;
-		memcpy(ptr, e[0][2][0], FP_BYTES);
-		ptr += FP_BYTES;
-		memcpy(ptr, e[0][2][1], FP_BYTES);
-		ptr += FP_BYTES;
-		memcpy(ptr, e[1][0][0], FP_BYTES);
-		ptr += FP_BYTES;
-		memcpy(ptr, e[1][0][1], FP_BYTES);
-		ptr += FP_BYTES;
-		memcpy(ptr, e[1][1][0], FP_BYTES);
-		ptr += FP_BYTES;
-		memcpy(ptr, e[1][1][1], FP_BYTES);
-		ptr += FP_BYTES;
-		memcpy(ptr, e[1][2][0], FP_BYTES);
-		ptr += FP_BYTES;
-		memcpy(ptr, e[1][2][1], FP_BYTES);
+		for (i = 0; i < 2; i++) {
+			for (j = 0; j < 3; j++) {
+				for (m = 0; m < 2; m++) {
+					memcpy(ptr, e[i][j][m], FP_BYTES);
+					ptr += FP_BYTES;
+				}
+			}
+		}
 		md_kdf1(key, key_len, buf, 12 * FP_BYTES);
 #else
 		unsigned char buf[4 * FB_BYTES], *ptr;
 		ptr = buf;
-		memcpy(ptr, e[0], FB_BYTES);
-		ptr += FB_BYTES;
-		memcpy(ptr, e[1], FB_BYTES);
-		ptr += FB_BYTES;
-		memcpy(ptr, e[2], FB_BYTES);
-		ptr += FB_BYTES;
-		memcpy(ptr, e[3], FB_BYTES);
+		for (i = 0; i < 4; i++) {
+			memcpy(ptr, e[i], FB_BYTES);
+			ptr += FB_BYTES;
+		}
 		md_kdf1(key, key_len, buf, 4 * FB_BYTES);
 #endif
 	}
