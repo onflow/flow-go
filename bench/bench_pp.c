@@ -119,7 +119,7 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
-#if PP_QUD == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 	BENCH_BEGIN("fp2_add_basic") {
 		fp2_rand(a);
 		fp2_rand(b);
@@ -128,7 +128,7 @@ static void arith2(void) {
 	BENCH_END;
 #endif
 
-#if PP_QUD == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 	BENCH_BEGIN("fp2_add_integ") {
 		fp2_rand(a);
 		fp2_rand(b);
@@ -144,7 +144,7 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
-#if PP_QUD == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 	BENCH_BEGIN("fp2_sub_basic") {
 		fp2_rand(a);
 		fp2_rand(b);
@@ -153,7 +153,7 @@ static void arith2(void) {
 	BENCH_END;
 #endif
 
-#if PP_QUD == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 	BENCH_BEGIN("fp2_sub_integ") {
 		fp2_rand(a);
 		fp2_rand(b);
@@ -168,7 +168,7 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
-#if PP_QUD == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 	BENCH_BEGIN("fp2_dbl_basic") {
 		fp2_rand(a);
 		BENCH_ADD(fp2_dbl_basic(c, a));
@@ -176,7 +176,7 @@ static void arith2(void) {
 	BENCH_END;
 #endif
 
-#if PP_QUD == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 	BENCH_BEGIN("fp2_dbl_integ") {
 		fp2_rand(a);
 		BENCH_ADD(fp2_dbl_integ(c, a));
@@ -191,7 +191,7 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
-#if PP_QUD == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 	BENCH_BEGIN("fp2_mul_basic") {
 		fp2_rand(a);
 		fp2_rand(b);
@@ -200,7 +200,7 @@ static void arith2(void) {
 	BENCH_END;
 #endif
 
-#if PP_QUD == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 	BENCH_BEGIN("fp2_mul_integ") {
 		fp2_rand(a);
 		fp2_rand(b);
@@ -221,7 +221,7 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
-#if PP_QUD == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 	BENCH_BEGIN("fp2_mul_nor_basic") {
 		fp2_rand(a);
 		BENCH_ADD(fp2_mul_nor_basic(c, a));
@@ -229,7 +229,7 @@ static void arith2(void) {
 	BENCH_END;
 #endif
 
-#if PP_QUD == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 	BENCH_BEGIN("fp2_mul_nor_integ") {
 		fp2_rand(a);
 		BENCH_ADD(fp2_mul_nor_integ(c, a));
@@ -243,7 +243,7 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
-#if PP_QUD == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 	BENCH_BEGIN("fp2_sqr_basic") {
 		fp2_rand(a);
 		BENCH_ADD(fp2_sqr_basic(c, a));
@@ -251,7 +251,7 @@ static void arith2(void) {
 	BENCH_END;
 #endif
 
-#if PP_QUD == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 	BENCH_BEGIN("fp2_sqr_integ") {
 		fp2_rand(a);
 		BENCH_ADD(fp2_sqr_integ(c, a));

@@ -172,9 +172,9 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the first quadratic extension field element.
  * @param[in] B				- the second quadratic extension field element.
  */
-#if PP_QUD == BASIC
+#if PP_QDR == BASIC
 #define fp2_add(C, A, B)	fp2_add_basic(C, A, B)
-#elif PP_QUD == INTEG
+#elif PP_QDR == INTEG
 #define fp2_add(C, A, B)	fp2_add_integ(C, A, B)
 #endif
 
@@ -186,9 +186,9 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the first quadratic extension field element.
  * @param[in] B				- the second quadratic extension field element.
  */
-#if PP_QUD == BASIC
+#if PP_QDR == BASIC
 #define fp2_sub(C, A, B)	fp2_sub_basic(C, A, B)
-#elif PP_QUD == INTEG
+#elif PP_QDR == INTEG
 #define fp2_sub(C, A, B)	fp2_sub_integ(C, A, B)
 #endif
 
@@ -198,9 +198,9 @@ typedef ep2_st *ep2_t;
  * @param[out] C			- the result.
  * @param[in] A				- the quadratic extension field element.
  */
-#if PP_QUD == BASIC
+#if PP_QDR == BASIC
 #define fp2_dbl(C, A)		fp2_dbl_basic(C, A)
-#elif PP_QUD == INTEG
+#elif PP_QDR == INTEG
 #define fp2_dbl(C, A)		fp2_dbl_integ(C, A)
 #endif
 
@@ -211,9 +211,9 @@ typedef ep2_st *ep2_t;
  * @param[in] A				- the first quadratic extension field element.
  * @param[in] B				- the second quadratic extension field element.
  */
-#if PP_QUD == BASIC
+#if PP_QDR == BASIC
 #define fp2_mul(C, A, B)	fp2_mul_basic(C, A, B)
-#elif PP_QUD == INTEG
+#elif PP_QDR == INTEG
 #define fp2_mul(C, A, B)	fp2_mul_integ(C, A, B)
 #endif
 
@@ -225,9 +225,9 @@ typedef ep2_st *ep2_t;
  * @param[out] C			- the result.
  * @param[in] A				- the quadratic extension field element to multiply.
  */
-#if PP_QUD == BASIC
+#if PP_QDR == BASIC
 #define fp2_mul_nor(C, A)	fp2_mul_nor_basic(C, A)
-#elif PP_QUD == INTEG
+#elif PP_QDR == INTEG
 #define fp2_mul_nor(C, A)	fp2_mul_nor_integ(C, A)
 #endif
 
@@ -237,9 +237,9 @@ typedef ep2_st *ep2_t;
  * @param[out] C			- the result.
  * @param[in] A				- the quadratic extension field element to square.
  */
-#if PP_QUD == BASIC
+#if PP_QDR == BASIC
 #define fp2_sqr(C, A)		fp2_sqr_basic(C, A)
-#elif PP_QUD == INTEG
+#elif PP_QDR == INTEG
 #define fp2_sqr(C, A)		fp2_sqr_integ(C, A)
 #endif
 

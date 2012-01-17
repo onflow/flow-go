@@ -392,7 +392,7 @@ static int multiplication2(void) {
 			TEST_ASSERT(fp2_is_zero(e), end);
 		} TEST_END;
 
-#if PP_QUD == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic multiplication is correct") {
 			fp2_rand(a);
 			fp2_rand(b);
@@ -402,7 +402,7 @@ static int multiplication2(void) {
 		} TEST_END;
 #endif
 
-#if PP_QUD == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 		TEST_BEGIN("integrated multiplication is correct") {
 			fp2_rand(a);
 			fp2_rand(b);
@@ -446,7 +446,7 @@ static int multiplication2(void) {
 		}
 		TEST_END;
 
-#if PP_QUD == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic multiplication by qnr/cnr is correct") {
 			fp2_rand(a);
 			fp2_mul_nor(b, a);
@@ -456,7 +456,7 @@ static int multiplication2(void) {
 		TEST_END;
 #endif
 
-#if PP_QUD == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 		TEST_BEGIN("integrated multiplication by qnr/cnr is correct") {
 			fp2_rand(a);
 			fp2_mul_nor(b, a);
@@ -498,7 +498,7 @@ static int squaring2(void) {
 			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
 
-#if PP_QUD == BASIC || !defined(STRIP)
+#if PP_QDR == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic squaring is correct") {
 			fp2_rand(a);
 			fp2_sqr(b, a);
@@ -507,7 +507,7 @@ static int squaring2(void) {
 		} TEST_END;
 #endif
 
-#if PP_QUD == INTEG || !defined(STRIP)
+#if PP_QDR == INTEG || !defined(STRIP)
 		TEST_BEGIN("integrated squaring is correct") {
 			fp2_rand(a);
 			fp2_sqr(b, a);
