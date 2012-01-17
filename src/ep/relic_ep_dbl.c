@@ -184,6 +184,45 @@ void ep_dbl_projc_imp(ep_t r, ep_t p) {
 			fp_sub(r->y, t2, r->x);
 			fp_mul(r->y, r->y, t3);
 			fp_sub(r->y, r->y, t1);
+		} else if (ep_curve_opt_a() == OPT_ZERO) {
+			/* A = X1^2 */
+			fp_sqr(t0, p->x);
+
+			/* B = Y1^2 */
+			fp_sqr(t1, p->y);
+
+			/* C = B^2 */
+			fp_sqr(t2, t1);
+
+			/* D = 2*((X1+B)^2-A-C) */
+			fp_add(t1, t1, p->x);
+			fp_sqr(t1, t1);
+			fp_sub(t1, t1, t0);
+			fp_sub(t1, t1, t2);
+			fp_dbl(t1, t1);
+
+			/* E = 3*A */
+			fp_dbl(t3, t0);
+			fp_add(t0, t3, t0);
+
+			/* F = E^2 */
+			fp_sqr(t3, t0);
+
+			/* Z3 = 2*Y1*Z1 */
+			fp_mul(r->z, p->y, p->z);
+			fp_dbl(r->z, r->z);
+
+			/* X3 = F-2*D */
+			fp_sub(r->x, t3, t1);
+			fp_sub(r->x, r->x, t1);
+
+			/* Y3 = E*(D-X3)-8*C */
+			fp_sub(r->y, t1, r->x);
+			fp_mul(r->y, r->y, t0);
+			fp_dbl(t2, t2);
+			fp_dbl(t2, t2);
+			fp_dbl(t2, t2);
+			fp_sub(r->y, r->y, t2);
 		} else {
 			/* t0 = x1^2, t1 = y1^2, t2 = y1^4. */
 			fp_sqr(t0, p->x);
