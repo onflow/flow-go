@@ -427,7 +427,7 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 					}
 					m->dp[0] ^= 0x01;
 					for (int i = m_len - 1; i < 8 * k_len; i++) {
-						bn_set_bit(m, i, 0);
+						bn_set_bit(m, i - ((MD_LEN + 1) * 8), 0);
 					}
 					if (!bn_is_zero(m)) {
 						result = STS_ERR;
@@ -800,11 +800,7 @@ int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
 
 #if CP_RSAPD == PKCS2
 	size = bn_bits(prv->n) - 1;
-	if (size % 8 == 0) {
-		size = size / 8 - 1;
-	} else {
-		bn_size_bin(&size, prv->n);
-	}
+	size = (size / 8) + (size % 8 > 0);
 	if (MD_LEN > (size - 2)) {
 		return STS_ERR;
 	}
@@ -875,11 +871,7 @@ int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
 
 #if CP_RSAPD == PKCS2
 	size = bn_bits(prv->n) - 1;
-	if (size % 8 == 0) {
-		size = size / 8 - 1;
-	} else {
-		bn_size_bin(&size, prv->n);
-	}
+	size = (size / 8) + (size % 8 > 0);
 	if (MD_LEN > (size - 2)) {
 		return STS_ERR;
 	}
