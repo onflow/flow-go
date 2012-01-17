@@ -580,8 +580,7 @@ int ep_param_set_any_pairf() {
 			ep2_curve_set(twist);
 		}
 		if (degree == 3) {
-			fp2_const_calc();
-			ep3_curve_set(twist);
+			r = STS_ERR;
 		}
 	}
 #endif
