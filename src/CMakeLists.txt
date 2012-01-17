@@ -137,18 +137,8 @@ endforeach(SRC)
 
 list(APPEND RELIC_SRCS ${ARITH_SRCS})
 
-foreach(INC ${INCLUDE})
-	set(RELIC_INCS -I ${INC} ${RELIC_INCS})
-endforeach(INC)
-
-foreach(SRC ${ARITH_ASMS})
-	get_filename_component(FILE ${SRC} NAME_WE)
-	set(OBJ ${CMAKE_CURRENT_BINARY_DIR}/${FILE}.o)
-	add_custom_command(OUTPUT ${OBJ}
-		MAIN_DEPENDENCY ${SRC}
-		COMMAND ${CMAKE_C_COMPILER} ${RELIC_INCS} -DASM -x assembler-with-cpp -o ${OBJ} -c ${SRC})
-		set(ARITH_OBJS ${ARITH_OBJS} ${OBJ})
-endforeach(SRC)
+list(APPEND RELIC_SRCS ${ARITH_ASMS})
+set_source_files_properties(${ARITH_ASMS} PROPERTIES LANGUAGE C COMPILE_FLAGS "-DASM -x assembler-with-cpp")
 
 add_custom_target(arith_objs DEPENDS ${ARITH_OBJS})
 
