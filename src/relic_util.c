@@ -131,7 +131,7 @@ int util_bits_dig(dig_t a) {
 #elif WORD == 32
 	return DIGIT - __builtin_clz(a);
 #elif WORD == 64
-	return DIGIT - __builtin_clzl(a);
+	return DIGIT - __builtin_clzll(a);
 #endif
 }
 
