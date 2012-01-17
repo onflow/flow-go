@@ -225,11 +225,19 @@ void bn_print(bn_t a) {
 	if (a->used == 0) {
 		util_print("0\n");
 	} else {
+#if WORD == 64
 		util_print("%lX", (unsigned long int)a->dp[a->used - 1]);
 		for (i = a->used - 2; i >= 0; i--) {
 			util_print("%.*lX", (int)(2 * (BN_DIGIT / 8)),
 					(unsigned long int)a->dp[i]);
 		}
+#else
+		util_print("%llX", (unsigned long long int)a->dp[a->used - 1]);
+		for (i = a->used - 2; i >= 0; i--) {
+			util_print("%.*llX", (int)(2 * (BN_DIGIT / 8)),
+					(unsigned long long int)a->dp[i]);
+		}
+#endif
 		util_print("\n");
 	}
 }

@@ -171,6 +171,15 @@ void fp_print(fp_t a) {
 #endif
 
 		for (i = FP_DIGS - 1; i >= 0; i--) {
+#if WORD == 64
+			if (i >= t->used) {
+				util_print("%.*llX ", (int)(2 * (FP_DIGIT / 8)),
+						(unsigned long long int)0);
+			} else {
+				util_print("%.*llX ", (int)(2 * (FP_DIGIT / 8)),
+						(unsigned long long int)t->dp[i]);
+			}
+#else
 			if (i >= t->used) {
 				util_print("%.*lX ", (int)(2 * (FP_DIGIT / 8)),
 						(unsigned long int)0);
@@ -178,6 +187,8 @@ void fp_print(fp_t a) {
 				util_print("%.*lX ", (int)(2 * (FP_DIGIT / 8)),
 						(unsigned long int)t->dp[i]);
 			}
+
+#endif
 		}
 		util_print("\n");
 

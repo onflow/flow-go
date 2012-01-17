@@ -186,9 +186,15 @@ void fb_print(fb_t a) {
 
 	/* Suppress possible unused parameter warning. */
 	(void)a;
+#if WORD == 64
+	for (i = FB_DIGS - 1; i >= 0; i--) {
+		util_print("%.*llX ", (int)(2 * (FB_DIGIT / 8)), (unsigned long long int)a[i]);
+	}
+#else
 	for (i = FB_DIGS - 1; i >= 0; i--) {
 		util_print("%.*lX ", (int)(2 * (FB_DIGIT / 8)), (unsigned long int)a[i]);
 	}
+#endif
 	util_print("\n");
 }
 
