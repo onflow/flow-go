@@ -114,6 +114,8 @@
  */
 static ep2_st curve_g;
 
+#if ALLOC != AUTO
+
 /**
  * The first coordinate of the generator.
  */
@@ -128,6 +130,8 @@ static fp2_st curve_gy;
  * The third coordinate of the generator.
  */
 static fp2_st curve_gz;
+
+#endif
 
 /**
  * The a parameter of the curve.
@@ -178,11 +182,7 @@ void ep2_curve_init(void) {
 	fp2_new(curve_gy);
 	fp2_new(curve_gz);
 #endif
-#if ALLOC == AUTO
-	fp2_copy(curve_g.x, curve_gx);
-	fp2_copy(curve_g.y, curve_gy);
-	fp2_copy(curve_g.z, curve_gz);
-#else
+#if ALLOC != AUTO
 	curve_g.x[0] = curve_gx[0];
 	curve_g.x[1] = curve_gx[1];
 	curve_g.y[0] = curve_gy[0];
