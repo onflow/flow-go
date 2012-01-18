@@ -508,7 +508,7 @@ int fp_param_set_any(void) {
 #elif FP_PRIME == 521
 	fp_param_set(NIST_521);
 #elif FP_PRIME == 638
-	fp_param_set(BW_638);
+	fp_param_set(BN_638);
 #else
 	return fp_param_set_any_dense();
 #endif
