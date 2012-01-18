@@ -52,7 +52,7 @@ static void rsa(void) {
 
 	BENCH_BEGIN("cp_rsa_enc") {
 		bn_size_bin(&in_len, pub->n);
-		in_len -= 11;
+		in_len -= (2 * MD_LEN + 2);
 		out_len = BN_BITS / 8 + 1;
 		rand_bytes(in, in_len);
 		BENCH_ADD(cp_rsa_enc(out, &out_len, in, in_len, pub));
@@ -61,7 +61,7 @@ static void rsa(void) {
 
 	BENCH_BEGIN("cp_rsa_dec") {
 		bn_size_bin(&in_len, pub->n);
-		in_len -= 11;
+		in_len -= (2 * MD_LEN + 2);
 		new_len = in_len;
 		out_len = BN_BITS / 8 + 1;
 		rand_bytes(in, in_len);
@@ -74,7 +74,7 @@ static void rsa(void) {
 
 	BENCH_BEGIN("cp_rsa_dec_basic") {
 		bn_size_bin(&in_len, pub->n);
-		in_len -= 11;
+		in_len -= (2 * MD_LEN + 2);
 		new_len = in_len;
 		out_len = BN_BITS / 8 + 1;
 		rand_bytes(in, in_len);
@@ -88,7 +88,7 @@ static void rsa(void) {
 
 	BENCH_BEGIN("cp_rsa_dec_quick") {
 		bn_size_bin(&in_len, pub->n);
-		in_len -= 11;
+		in_len -= (2 * MD_LEN + 2);
 		new_len = in_len;
 		out_len = BN_BITS / 8 + 1;
 		rand_bytes(in, in_len);
@@ -101,7 +101,7 @@ static void rsa(void) {
 
 	BENCH_BEGIN("cp_rsa_sign") {
 		bn_size_bin(&in_len, pub->n);
-		in_len -= 11;
+		in_len -= (2 * MD_LEN + 2);
 		out_len = BN_BITS / 8 + 1;
 		rand_bytes(in, in_len);
 		BENCH_ADD(cp_rsa_sign(out, &out_len, in, in_len, prv));
@@ -109,7 +109,7 @@ static void rsa(void) {
 
 	BENCH_BEGIN("cp_rsa_ver") {
 		bn_size_bin(&in_len, pub->n);
-		in_len -= 11;
+		in_len -= (2 * MD_LEN + 2);
 		out_len = BN_BITS / 8 + 1;
 		rand_bytes(in, in_len);
 		cp_rsa_sign(out, &out_len, in, in_len, prv);
@@ -121,7 +121,7 @@ static void rsa(void) {
 
 	BENCH_BEGIN("cp_rsa_sign_basic") {
 		bn_size_bin(&in_len, pub->n);
-		in_len -= 11;
+		in_len -= (2 * MD_LEN + 2);
 		out_len = BN_BITS / 8 + 1;
 		rand_bytes(in, in_len);
 		BENCH_ADD(cp_rsa_sign_basic(out, &out_len, in, in_len, prv));
@@ -429,7 +429,7 @@ int main(void) {
 	util_print_banner("Benchmarks for the CP module:", 0);
 
 #if defined(WITH_BN)
-	util_print_banner("Protocols based on prime factorization:\n", 0);
+	util_print_banner("Protocols based on integer factorization:\n", 0);
 	rsa();
 	rabin();
 #endif
