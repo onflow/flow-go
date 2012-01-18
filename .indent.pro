@@ -33,6 +33,7 @@
 -ut	--use-tabs
 -ts4	--tab-size4
 -T bn_t
+-T dv_t
 -T fp_t
 -T ft_t
 -T fb_t
@@ -44,6 +45,7 @@
 -T eb_t
 -T ep_t
 -T ep2_t
+-T ep3_t
 -T err_t
 -T ctx_t
 -T state_t
