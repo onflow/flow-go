@@ -93,47 +93,29 @@ void ep2_mul_cof(ep2_t r, ep2_t p) {
 /*============================================================================*/
 
 void ep2_map(ep2_t p, unsigned char *msg, int len) {
-	fp2_t t0, t1;
-	int bits, digits;
+	bn_t k;
+	fp2_t t;
 	unsigned char digest[MD_LEN];
 
-	fp2_null(t0);
-	fp2_null(t1);
+	bn_null(k);
+	fp2_null(t);
 
 	TRY {
-		fp2_new(t0);
-		fp2_new(t1);
+		bn_new(k);
+		fp2_new(t);
 
 		md_map(digest, msg, len);
+		bn_read_bin(k, digest, MIN(FP_BYTES, MD_LEN));
+
+		fp_prime_conv(p->x[0], k);
+		fp_zero(p->x[1]);
 		fp_set_dig(p->z[0], 1);
 		fp_zero(p->z[1]);
-		memcpy(p->x[0], digest, MIN(FP_BYTES, MD_LEN));
-		fp_zero(p->x[1]);
-
-		SPLIT(bits, digits, FP_BITS, FP_DIG_LOG);
-		if (bits > 0) {
-			dig_t mask = ((dig_t)1 << (dig_t)bits) - 1;
-			p->x[0][FP_DIGS - 1] &= mask;
-		}
-
-		while (fp_cmp(p->x[0], fp_prime_get()) != CMP_LT) {
-			fp_subn_low(p->x[0], p->x[0], fp_prime_get());
-		}
 
 		while (1) {
-			/* t0 = x1^2. */
-			fp2_sqr(t0, p->x);
-			/* t1 = x1^3. */
-			fp2_mul(t1, t0, p->x);
+			ep2_rhs(t, p);
 
-			/* t1 = x1^3 + a * x1 + b. */
-			ep2_curve_get_a(t0);
-			fp2_mul(t0, p->x, t0);
-			fp2_add(t1, t1, t0);
-			ep2_curve_get_b(t0);
-			fp2_add(t1, t1, t0);
-
-			if (fp2_srt(p->y, t1)) {
+			if (fp2_srt(p->y, t)) {
 				p->norm = 1;
 				break;
 			}
@@ -147,6 +129,7 @@ void ep2_map(ep2_t p, unsigned char *msg, int len) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+		bn_free(k);
 		fp2_free(t0);
 		fp2_free(t1);
 	}
