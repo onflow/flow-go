@@ -23,10 +23,11 @@
 /**
  * @file
  *
- * Implementation of fixed point multiplication on binary elliptic curves.
+ * Implementation of fixed point multiplication on a prime elliptic curve over
+ * a quadratic extension.
  *
  * @version $Id$
- * @ingroup ep
+ * @ingroup pp
  */
 
 #include "string.h"
