@@ -314,7 +314,7 @@ void ep2_curve_set(int twist) {
 #endif
 			default:
 				(void)str;
-				THROW(ERR_INVALID);
+				THROW(ERR_NO_VALID);
 				break;
 		}
 

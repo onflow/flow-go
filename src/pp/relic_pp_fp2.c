@@ -316,7 +316,7 @@ void fp2_mul_nor_basic(fp2_t c, fp2_t a) {
 				fp2_add(c, c, t);
 				break;
 			default:
-				THROW(ERR_INVALID);
+				THROW(ERR_NO_VALID);
 		}
 #endif
 	}
