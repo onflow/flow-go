@@ -38,7 +38,7 @@
 #include "relic_fp_low.h"
 
 /*============================================================================*/
-	/* Public definitions                                                         */
+/* Public definitions                                                         */
 /*============================================================================*/
 
 int ep2_is_infty(ep2_t p) {
@@ -170,8 +170,8 @@ int ep2_is_valid(ep2_t p) {
 
 		ep2_rhs(t->x, t);
 		fp2_sqr(t->y, t->y);
-		r = (fp2_cmp(t->x, t->y) == CMP_EQ) || ep2_is_infty(p);
 
+		r = (fp2_cmp(t->x, t->y) == CMP_EQ) || ep2_is_infty(p);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
