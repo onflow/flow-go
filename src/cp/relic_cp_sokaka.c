@@ -82,19 +82,22 @@ void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master) {
 void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 		int len1, sokaka_t k, char *id2, int len2) {
 	int first = 0;
-	int i, j, m;
+	int i, j, l, m;
 	g1_t p;
 	g2_t q;
 	gt_t e;
+	bn_t n;
 
 	g1_null(p);
 	g2_null(q);
 	gt_null(e);
+	bn_null(n);
 
 	TRY {
 		g1_new(p);
 		g2_new(q);
 		gt_new(e);
+		bn_new(n);
 
 		if (len1 == len2) {
 			if (strncmp(id1, id2, len1) == 0) {
@@ -134,7 +137,9 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 		for (i = 0; i < 2; i++) {
 			for (j = 0; j < 3; j++) {
 				for (m = 0; m < 2; m++) {
-					memcpy(ptr, e[i][j][m], FP_BYTES);
+					fp_prime_back(n, e[i][j][m]);
+					bn_size_bin(&l, n);
+					bn_write_bin(ptr, l, n);
 					ptr += FP_BYTES;
 				}
 			}
@@ -157,5 +162,6 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 		g1_free(p);
 		g2_free(q);
 		gt_free(e);
+		bn_free(n);
 	}
 }
