@@ -568,8 +568,8 @@ int ep_param_set_any_pairf() {
 	twist = EP_DTYPE;
 	degree = 3;
 #elif FP_PRIME == 638
-	ep_param_set(BW_P638);
-	twist = EP_MTYPE;
+	ep_param_set(BN_P638);
+	twist = EP_DTYPE;
 	degree = 2;
 #else
 	r = STS_ERR;

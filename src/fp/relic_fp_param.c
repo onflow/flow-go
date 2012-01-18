@@ -568,7 +568,7 @@ int fp_param_set_any_tower() {
 #elif FP_PRIME == 508
 	fp_param_set(KSS_508);
 #elif FP_PRIME == 638
-	fp_param_set(BW_638);
+	fp_param_set(BN_638);
 #else
 	do {
 		fp_param_set_any_dense();
