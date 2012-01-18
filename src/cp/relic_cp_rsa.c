@@ -110,39 +110,6 @@
  */
 #define RSA_FIN_SIG			6
 
-#if CP_RSAPD == PKCS1
-
-static const unsigned char shone_id[] = {0x30u, 0x21u, 0x30u, 0x09u, 0x06u, 0x05u, 0x2bu, 0x0eu, 0x03u, 0x02u, 0x1au, 0x05u, 0x00u, 0x04u, 0x14u};
-static const unsigned char sh224_id[] = {0x30u, 0x2du, 0x30u, 0x0du, 0x06u, 0x09u, 0x60u, 0x86u, 0x48u, 0x01u, 0x65u, 0x03u, 0x04u, 0x02u, 0x04u, 0x05u, 0x00u, 0x04u, 0x1cu};
-static const unsigned char sh256_id[] = {0x30u, 0x31u, 0x30u, 0x0du, 0x06u, 0x09u, 0x60u, 0x86u, 0x48u, 0x01u, 0x65u, 0x03u, 0x04u, 0x02u, 0x01u, 0x05u, 0x00u, 0x04u, 0x20u};
-static const unsigned char sh384_id[] = {0x30u, 0x41u, 0x30u, 0x0du, 0x06u, 0x09u, 0x60u, 0x86u, 0x48u, 0x01u, 0x65u, 0x03u, 0x04u, 0x02u, 0x02u, 0x05u, 0x00u, 0x04u, 0x30u};
-static const unsigned char sh512_id[] = {0x30u, 0x51u, 0x30u, 0x0du, 0x06u, 0x09u, 0x60u, 0x86u, 0x48u, 0x01u, 0x65u, 0x03u, 0x04u, 0x02u, 0x03u, 0x05u, 0x00u, 0x04u, 0x40u};
-
-static unsigned char *hash_id(int md, int *len) {
-	switch (md) {
-	case SHONE:
-		*len = sizeof(shone_id);
-		return (unsigned char *) shone_id;
-	case SH224:
-		*len = sizeof(sh224_id);
-		return (unsigned char *) sh224_id;
-	case SH256:
-		*len = sizeof(sh256_id);
-		return (unsigned char *) sh256_id;
-	case SH384:
-		*len = sizeof(sh384_id);
-		return (unsigned char *) sh384_id;
-	case SH512:
-		*len = sizeof(sh512_id);
-		return (unsigned char *) sh512_id;
-	default:
-		THROW(ERR_INVALID);
-		return NULL;
-	}
-}
-
-#endif
-
 #if CP_RSAPD == BASIC
 
 /**
@@ -208,6 +175,52 @@ static int pad_basic(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 #endif
 
 #if CP_RSAPD == PKCS1
+
+static const unsigned char shone_id[] =
+		{ 0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e, 0x03, 0x02, 0x1a, 0x05, 0x00, 0x04, 0x14 };
+
+static const unsigned char sh224_id[] =
+		{ 0x30, 0x2d, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x04, 0x05, 0x00, 0x04, 0x1c };
+
+static const unsigned char sh256_id[] =
+		{ 0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20 };
+
+static const unsigned char sh384_id[] =
+		{ 0x30, 0x41, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02, 0x05, 0x00, 0x04, 0x30 };
+
+static const unsigned char sh512_id[] =
+		{ 0x30, 0x51, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05, 0x00, 0x04, 0x40 };
+
+/**
+ * Returns a pointer to the identifier of a hash function according to the
+ * PKCS#1 v1.5 padding standard.
+ *
+ * @param[in] md			- the hash function.
+ * @param[in, out] len		- the length of the identifier.
+ * @return The pointer to the hash function identifier.
+ */
+static unsigned char *hash_id(int md, int *len) {
+	switch (md) {
+		case SHONE:
+			*len = sizeof(shone_id);
+			return (unsigned char *)shone_id;
+		case SH224:
+			*len = sizeof(sh224_id);
+			return (unsigned char *)sh224_id;
+		case SH256:
+			*len = sizeof(sh256_id);
+			return (unsigned char *)sh256_id;
+		case SH384:
+			*len = sizeof(sh384_id);
+			return (unsigned char *)sh384_id;
+		case SH512:
+			*len = sizeof(sh512_id);
+			return (unsigned char *)sh512_id;
+		default:
+			THROW(ERR_NO_VALID);
+			return NULL;
+	}
+}
 
 /**
  * Applies or removes a PKCS#1 v1.5 encryption padding.
@@ -465,7 +478,7 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 					bn_write_bin(h1, MD_LEN, t);
 					md_mgf1(mask, k_len - MD_LEN - 1, h1, MD_LEN);
 					bn_read_bin(t, mask, k_len - MD_LEN - 1);
-					for (int i = 0; i < t -> used; i++) {
+					for (int i = 0; i < t->used; i++) {
 						m->dp[i] ^= t->dp[i];
 					}
 					m->dp[0] ^= 0x01;
@@ -713,7 +726,6 @@ int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
 		if (bn_cmp(eb, prv->n) != CMP_LT) {
 			result = STS_ERR;
 		}
-
 #if CP_RSAPD == BASIC
 		if (pad_basic(eb, &pad_len, in_len, size, RSA_DEC) == STS_OK) {
 #elif CP_RSAPD == PKCS1
@@ -793,7 +805,6 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 		if (bn_cmp(eb, prv->n) != CMP_LT) {
 			result = STS_ERR;
 		}
-
 #if CP_RSAPD == BASIC
 		if (pad_basic(eb, &pad_len, in_len, size, RSA_DEC) == STS_OK) {
 #elif CP_RSAPD == PKCS1
