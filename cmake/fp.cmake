@@ -1,6 +1,6 @@
 message(STATUS "Prime field arithmetic configuration (FP module):\n")
 
-message("   ** Arithmetic precision of the prime field module (default = 254,0,off,off):")
+message("   ** Arithmetic precision of the prime field module (default = 256,0,off,off):")
 message("      FP_PRIME=n        The prime modulus size in bits.\n")
 message("      FP_KARAT=n        The number of Karatsuba levels.")
 message("      FP_PMERS=[off|on] Prefer Pseudo-Mersenne primes over random primes.")
