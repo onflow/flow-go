@@ -1541,30 +1541,30 @@ static int cyclotomic12(void) {
 		} TEST_END;
 #endif
 
-	TEST_BEGIN("cyclotomic exponentiation is correct") {
-		bn_rand(f, BN_POS, FP_BITS);
-		fp12_rand(a);
-		fp12_conv_cyc(a, a);
-		fp12_exp(b, a, f);
-		fp12_exp_cyc(c, a, f);
-		TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
-	} TEST_END;
+		TEST_BEGIN("cyclotomic exponentiation is correct") {
+			bn_rand(f, BN_POS, FP_BITS);
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			fp12_exp(b, a, f);
+			fp12_exp_cyc(c, a, f);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
 
-	TEST_BEGIN("sparse cyclotomic exponentiation is correct") {
-		int g[3] = {0, 0, FP_BITS - 1};
-		do {
-			bn_rand(f, BN_POS, BN_DIGIT);
-			g[1] = f->dp[0] % FP_BITS;
-		} while (g[1] == 0 || g[1] == FP_BITS - 1);
-		bn_set_2b(f, FP_BITS - 1);
-		bn_set_bit(f, g[1], 1);
-		bn_set_bit(f, 0, 1);
-		fp12_rand(a);
-		fp12_conv_cyc(a, a);
-		fp12_exp(b, a, f);
-		fp12_exp_cyc_sps(c, a, g, 3);
-		TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
-	} TEST_END;
+		TEST_BEGIN("sparse cyclotomic exponentiation is correct") {
+			int g[3] = {0, 0, FP_BITS - 1};
+			do {
+				bn_rand(f, BN_POS, BN_DIGIT);
+				g[1] = f->dp[0] % FP_BITS;
+			} while (g[1] == 0 || g[1] == FP_BITS - 1);
+			bn_set_2b(f, FP_BITS - 1);
+			bn_set_bit(f, g[1], 1);
+			bn_set_bit(f, 0, 1);
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			fp12_exp(b, a, f);
+			fp12_exp_cyc_sps(c, a, g, 3);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
