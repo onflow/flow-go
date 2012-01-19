@@ -29,9 +29,9 @@
  * @ingroup fb
  */
 
-#include <smmintrin.h>
 #include <tmmintrin.h>
 #ifdef __PCLMUL__
+#include <smmintrin.h>
 #include <wmmintrin.h>
 #endif
 
@@ -163,11 +163,21 @@ void fb_slvn_low(dig_t *c, dig_t *a) {
 	m4 = _mm_shuffle_epi8(sqrt1, m4);
 	m3 = _mm_shuffle_epi8(sqrt0, m3);
 	m1 = _mm_or_si128(m1, m2);
+	m3 = _mm_or_si128(m3, m4);
+#ifndef __PCLMUL__
+	align dig_t x[2];
+	_mm_store_si128((__m128i *)x, m1);
+	u0 = x[0];
+	u1 = x[1];
+	_mm_store_si128((__m128i *)x, m3);
+	u2 = x[0];
+	u3 = x[1];
+#else
 	u0 = _mm_extract_epi64(m1, 0);
 	u1 = _mm_extract_epi64(m1, 1);
-	m3 = _mm_or_si128(m3, m4);
 	u2 = _mm_extract_epi64(m3, 0);
 	u3 = _mm_extract_epi64(m3, 1);
+#endif
 
 	for (i = 0; i < 8; i++) {
 		p = (dig_t *)(tab + (16 * i + (u0 & 0x0F)) * sizeof(fb_st));

@@ -100,7 +100,7 @@ void fb_mulh_low(dig_t *c, dig_t *a) {
 #else
 
 void fb_mulh_low(dig_t *c, dig_t *a) {
-	__m128i ma0, ma1, mb0, mb1, m0, m1, m2, m3, m4, m5, m8, m9, t0, t1, t2, t3;
+	__m128i ma0, mb0, mb1, m0, m1, m2, m4, m8, m9, t0, t1, t2, t3;
 	dig_t *b = fb_poly_get_srz();
 
 	ma0 = _mm_load_si128((__m128i *)a);
