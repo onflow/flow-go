@@ -690,15 +690,21 @@ static int reduction(void) {
 		dv_new(t1);
 
 		TEST_BEGIN("modular reduction is correct") {
-			fb_rand(a);
-			/* Test if a * f(z) mod f(z) == 0. */
-			fb_mul(b, a, fb_poly_get());
 			if (FB_POLYN % FB_DIGIT == 0) {
+				/* Test if a * f(z) mod f(z) == 0. */
+				fb_rand(a);
+				fb_mul(b, a, fb_poly_get());
 				fb_copy(t0, b);
 				fb_copy(t0 + FB_DIGS, a);
-				fb_rdc(b, t0);
+				fb_rdc(a, t0);
+			} else {
+				/* Test if f(z) * z^(m-1) mod f(z) == 0. */
+				dv_zero(t0, FB_DIGS);
+				t0[FB_DIGS - 1] = (dig_t)1 << (FB_DIGIT - 1);
+				fb_rsh(t0 + FB_DIGS, fb_poly_get(), 1);
+				fb_rdc(a, t0);
 			}
-			TEST_ASSERT(fb_is_zero(b) == 1, end);
+			TEST_ASSERT(fb_is_zero(a) == 1, end);
 		}
 		TEST_END;
 
