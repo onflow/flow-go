@@ -1,0 +1,1 @@
+set(ARITH_LIBS "gmp")
