@@ -1490,7 +1490,7 @@ static int cyclotomic12(void) {
 		} TEST_END;
 #endif
 
-#if PP_EXT == BASIC | !defined(STRIP)
+#if PP_EXT == LAZYR | !defined(STRIP)
 		TEST_BEGIN("lazy reduced cyclotomic squaring is correct") {
 			fp12_rand(a);
 			fp12_conv_cyc(a, a);
@@ -1527,7 +1527,7 @@ static int cyclotomic12(void) {
 		} TEST_END;
 #endif
 
-#if PP_EXT == BASIC | !defined(STRIP)
+#if PP_EXT == LAZYR | !defined(STRIP)
 		TEST_BEGIN("lazy reduced compressed squaring is correct") {
 			fp12_rand(a);
 			fp12_conv_cyc(a, a);
@@ -2534,7 +2534,7 @@ static int pairing(void) {
 			ep2_copy(s, r);
 			pp_dbl(e1, r, q, p);
 			pp_norm(r, r);
-			ep2_dbl_basic(s, q);
+			ep2_dbl(s, q);
 			ep2_norm(s, s);
 			TEST_ASSERT(ep2_cmp(r, s) == CMP_EQ, end);
 		} TEST_END;
