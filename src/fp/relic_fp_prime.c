@@ -277,6 +277,8 @@ void fp_prime_conv(fp_t c, bn_t a) {
 	bn_null(t);
 
 	TRY {
+		bn_new(t);
+
 #if FP_RDC == MONTY
 		bn_lsh(t, a, FP_DIGS * FP_DIGIT);
 		bn_mod(t, t, &prime);
