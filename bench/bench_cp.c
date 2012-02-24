@@ -320,15 +320,15 @@ static void ecss(void) {
 #if defined(WITH_PC)
 
 static void sokaka(void) {
-	sokaka_t s_a;
+	sokaka_t k;
 	bn_t s;
 	unsigned char key1[MD_LEN];
 	char id_a[5] = {'A', 'l', 'i', 'c', 'e'};
 	char id_b[3] = {'B', 'o', 'b'};
 
-	sokaka_null(s_a);
+	sokaka_null(k);
 
-	sokaka_new(s_a);
+	sokaka_new(k);
 	bn_new(s);
 
 	cp_sokaka_gen(s);
@@ -339,25 +339,25 @@ static void sokaka(void) {
 	BENCH_END;
 
 	BENCH_BEGIN("cp_sokaka_gen_prv") {
-		BENCH_ADD(cp_sokaka_gen_prv(s_a, id_a, sizeof(id_a), s));
+		BENCH_ADD(cp_sokaka_gen_prv(k, id_b, sizeof(id_b), s));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("cp_sokaka_key G1") {
-		BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_b, sizeof(id_b), s_b, id_a, sizeof(id_a)));
+		BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_b, sizeof(id_b), k, id_a, sizeof(id_a)));
 	}
 	BENCH_END;
 
 	if (pc_map_is_type3()) {
-		cp_sokaka_gen_prv(s_b, id_b, sizeof(id_b), s);
+		cp_sokaka_gen_prv(k, id_a, sizeof(id_a), s);
 
 		BENCH_BEGIN("cp_sokaka_key G2") {
-			BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_a, sizeof(id_a), s_a, id_b, sizeof(id_b)));
+			BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_a, sizeof(id_a), k, id_b, sizeof(id_b)));
 		}
 		BENCH_END;
 	}
 
-	sokaka_free(s_a);
+	sokaka_free(k);
 	bn_free(s);
 }
 
