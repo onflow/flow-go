@@ -843,7 +843,7 @@ static void arith(void) {
 	fp12_null(e);
 	fp2_null(s);
 	fp2_null(t);
-	for (int i = 0; i < EP_TABLE_BASIC; i++) {
+	for (int i = 0; i < EP_TABLE_MAX; i++) {
 		ep2_null(t[i]);
 	}
 
@@ -1075,7 +1075,7 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-	for (int i = 0; i < EP_TABLE; i++) {
+	for (int i = 0; i < EP_TABLE_MAX; i++) {
 		ep2_new(t[i]);
 	}
 
@@ -1092,7 +1092,7 @@ static void arith(void) {
 		BENCH_ADD(ep2_mul_fix(q, t, k));
 	} BENCH_END;
 
-	for (int i = 0; i < EP_TABLE; i++) {
+	for (int i = 0; i < EP_TABLE_MAX; i++) {
 		ep2_free(t[i]);
 	}
 
