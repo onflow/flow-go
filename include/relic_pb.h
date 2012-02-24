@@ -729,6 +729,8 @@ void fb6_mul(fb6_t c, fb6_t a, fb6_t b);
  */
 void fb6_mul_dxs(fb6_t c, fb6_t a, fb6_t b);
 
+void fb6_mul_dxss(fb6_t c, fb6_t a, fb6_t b);
+
 /**
  * Multiples a sextic extension field element by the quadratic non-residue.
  * Computes c = a * (t^5 + t^3).
@@ -788,6 +790,12 @@ void fb12_mul(fb12_t c, fb12_t a, fb12_t b);
  * @param[in] b				- the sparse extension binary field element.
  */
 void fb12_mul_dxs(fb12_t c, fb12_t a, fb12_t b);
+
+void fb12_mul_dxss(fb12_t c, fb12_t a, fb12_t b);
+
+void fb12_mul_dxs2(fb12_t c, fb12_t a, fb12_t b);
+
+void fb12_mul_dxs3(fb12_t c, fb12_t a, fb12_t b);
 
 /**
  * Computes the square of a dodecic extension field element. Computes
