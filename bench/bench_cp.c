@@ -335,15 +335,27 @@ static void sokaka(void) {
 
 	BENCH_BEGIN("cp_sokaka_gen") {
 		BENCH_ADD(cp_sokaka_gen(s));
-	} BENCH_END;
+	}
+	BENCH_END;
 
 	BENCH_BEGIN("cp_sokaka_gen_prv") {
-		BENCH_ADD(cp_sokaka_gen_prv(s_a, id_a, 5, s));
-	} BENCH_END;
+		BENCH_ADD(cp_sokaka_gen_prv(s_a, id_a, sizeof(id_a), s));
+	}
+	BENCH_END;
 
-	BENCH_BEGIN("cp_sokaka_key") {
-		BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_a, 5, s_a, id_b, 3));
-	} BENCH_END;
+	BENCH_BEGIN("cp_sokaka_key G1") {
+		BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_b, sizeof(id_b), s_b, id_a, sizeof(id_a)));
+	}
+	BENCH_END;
+
+	if (pc_map_is_type3()) {
+		cp_sokaka_gen_prv(s_b, id_b, sizeof(id_b), s);
+
+		BENCH_BEGIN("cp_sokaka_key G2") {
+			BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_a, sizeof(id_a), s_a, id_b, sizeof(id_b)));
+		}
+		BENCH_END;
+	}
 
 	sokaka_free(s_a);
 	bn_free(s);
