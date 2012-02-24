@@ -15,6 +15,7 @@ message("      BN_METHD=KnMUL    Karatsuba for (n > 0) steps and MUL multiplicat
 message("      BN_METHD=BASIC    Schoolbook squaring.")
 message("      BN_METHD=COMBA    Comba squaring.")
 message("      BN_METHD=KnSQR    Karatsuba for (n > 0) steps and SQR squaring.\n")
+message("      BN_METHD=MULTP    Reuse multiplication for squaring.")
 
 message("      BN_METHD=BASIC    Division-based modular reduction.")
 message("      BN_METHD=BARRT    Barrett modular reduction.")

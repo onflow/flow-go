@@ -88,6 +88,9 @@ static void fp_sqr_karat_imp(dv_t c, fp_t a, int size, int level) {
 #elif FP_SQR == COMBA || FP_SQR == INTEG
 			bn_sqrn_low(a0a0, a, h);
 			bn_sqrn_low(a1a1, a + h, h1);
+#elif FP_SQR == MULTP
+			bn_muln_low(a0a0, a, a, h);
+			bn_muln_low(a1a1, a + h, a + h, h1);
 #endif
 		} else {
 			fp_sqr_karat_imp(a0a0, a, h, level - 1);
@@ -117,6 +120,8 @@ static void fp_sqr_karat_imp(dv_t c, fp_t a, int size, int level) {
 			}
 #elif FP_SQR == COMBA || FP_SQR == INTEG
 			bn_sqrn_low(t1, t0, h1 + 1);
+#elif FP_SQR == MULTP
+			bn_muln_low(t1, t0, t0, h1 + 1);
 #endif
 		} else {
 			fp_sqr_karat_imp(t1, t0, h1 + 1, level - 1);

@@ -275,6 +275,8 @@ typedef bn_st *bn_t;
 #define bn_sqr(C, A)		bn_sqr_basic(C, A)
 #elif BN_SQR == COMBA
 #define bn_sqr(C, A)		bn_sqr_comba(C, A)
+#elif BN_SQR == MULTP
+#define bn_sqr(C, A)		bn_mul(C, A, A)
 #endif
 
 /**

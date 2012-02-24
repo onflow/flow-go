@@ -276,6 +276,8 @@ typedef align dig_t fp_st[FP_DIGS + PADDING(FP_BYTES)/(FP_DIGIT / 8)];
 #define fp_sqr(C, A)		fp_sqr_basic(C, A)
 #elif FP_SQR == COMBA
 #define fp_sqr(C, A)		fp_sqr_comba(C, A)
+#elif FP_SQR == MULTP
+#define fp_sqr(C, A)		fp_mul(C, A, A)
 #elif FP_SQR == INTEG
 #define fp_sqr(C, A)		fp_sqr_integ(C, A)
 #endif

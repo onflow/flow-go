@@ -152,6 +152,8 @@
 #define BASIC    1
 /** Comba squaring. */
 #define COMBA    2
+/** Reuse multiplication for squaring. */
+#define MULTP    4
 /** Chosen multiple precision multiplication method. */
 #define BN_SQR   @BN_SQR@
 
@@ -229,6 +231,8 @@
 #define COMBA    2
 /** Integrated modular squaring. */
 #define INTEG    3
+/** Reuse multiplication for squaring. */
+#define MULTP    4
 /** Chosen prime field multiplication method. */
 #define FP_SQR   @FP_SQR@
 
