@@ -35,6 +35,7 @@
 #include "relic_bench.h"
 #include "relic_conf.h"
 #include "relic_util.h"
+#include "relic_arch.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
@@ -75,8 +76,7 @@ static inline bench_t cycles(void) {
 	return ((bench_t) lo) | (((bench_t) hi) << 32);
 }
 #elif ARCH == MSP
-#include "msp430util.h"
-#define cycles()		msp430_get_cycles()
+#define cycles()		arch_get_cycles()
 #endif
 
 #else
