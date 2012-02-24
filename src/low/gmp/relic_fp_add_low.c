@@ -58,8 +58,8 @@ void fp_addm_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-void fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
-	mpn_add_n(c, a, b, 2 * FP_DIGS);
+dig_t fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
+	return mpn_add_n(c, a, b, 2 * FP_DIGS);
 }
 
 void fp_addc_low(dig_t *c, dig_t *a, dig_t *b) {

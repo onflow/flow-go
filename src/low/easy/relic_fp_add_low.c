@@ -88,7 +88,7 @@ void fp_addm_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-void fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
+dig_t fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
 	int i;
 	dig_t carry, c0, c1, r0, r1;
 
@@ -101,6 +101,7 @@ void fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
 		carry = c0 | c1;
 		c[i] = r1;
 	}
+	return carry;
 }
 
 void fp_addc_low(dig_t *c, dig_t *a, dig_t *b) {
