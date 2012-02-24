@@ -132,7 +132,7 @@ enum {
  * Size of a precomputation table for repeated squaring/square-root using the
  * trivial approach.
  */
-#define FB_TABLE_BASIC		(0)
+#define FB_TABLE_BASIC		(1)
 
 /**
  * Size of a precomputation table for repeated squaring/square-root using the
