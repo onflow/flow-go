@@ -65,7 +65,7 @@ void conf_print(void) {
 	util_print("** Arithmetic backend: gmp\n\n");
 #endif
 
-#if BENCH > 1
+#if BENCH > 0
 	util_print("** Benchmarking options:\n");
 	util_print("   Number of times: %d\n", BENCH * BENCH);
 	util_print("   Estimated overhead: ");
