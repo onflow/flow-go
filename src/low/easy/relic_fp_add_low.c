@@ -184,7 +184,7 @@ void fp_subc_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-void fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
+dig_t fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
 	int i;
 	dig_t carry, r0, diff;
 
@@ -196,6 +196,7 @@ void fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
 		carry = ((*a) < (*b)) || (carry && !diff);
 		c[i] = r0;
 	}
+	return carry;
 }
 
 void fp_negm_low(dig_t *c, dig_t *a) {

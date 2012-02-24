@@ -139,8 +139,9 @@ void fp_subm_low(dig_t *c, dig_t *a, dig_t *b);
  * @param[out] c			- the result.
  * @param[in] a				- the first digit vector to add.
  * @param[in] b				- the second digit vector to add.
+ * @return the carry of the last digit subtraction.
  */
-void fp_subd_low(dig_t *c, dig_t *a, dig_t *b);
+dig_t fp_subd_low(dig_t *c, dig_t *a, dig_t *b);
 
 /**
  * Subtracts a double-length digit vector from another digit vector.

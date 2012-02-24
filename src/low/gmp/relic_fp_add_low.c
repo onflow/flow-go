@@ -86,8 +86,8 @@ void fp_subm_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-void fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
-	mpn_sub_n(c, a, b, 2 * FP_DIGS);
+dig_t fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
+	return mpn_sub_n(c, a, b, 2 * FP_DIGS);
 }
 
 void fp_subc_low(dig_t *c, dig_t *a, dig_t *b) {
