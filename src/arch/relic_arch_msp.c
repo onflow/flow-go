@@ -30,7 +30,7 @@
  */
 
 #ifdef __MSP430__
-//Support for MSPGCC with custom MSPsim simulator
+/* Support for MSPGCC with custom MSPsim simulator. */
 
 static volatile unsigned char TEST_TEXTOUT __asm__("0x01b0");
 static volatile unsigned int BENCH_CYCLES_0 __asm__("0x01b2");
@@ -53,7 +53,7 @@ int putchar(int c) {
     return c;
 }
 
-unsigned long long arch_get_cycles()
+unsigned long long arch_cycles()
 {
     union cycles_t cycles;
     cycles.e.e0 = BENCH_CYCLES_0;
@@ -66,11 +66,11 @@ unsigned long long arch_get_cycles()
 #endif
 
 #if __ICC430__
-//Support for IAR using simulator with custom macro
+/* Support for IAR using simulator with custom macro. */
 
 volatile unsigned long long __cycles = 0;
 
-unsigned long long arch_get_cycles() {
+unsigned long long arch_cycles() {
 	return __cycles;
 }
 

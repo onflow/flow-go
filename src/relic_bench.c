@@ -63,25 +63,6 @@ typedef struct timeval bench_t;
 #elif TIMER == CYCLE
 
 typedef unsigned long long bench_t;
-#if ARCH == X86
-static inline bench_t cycles(void) {
-	unsigned long long int x;
-	asm volatile (".byte 0x0f, 0x31\n\t":"=A" (x));
-	return x;
-}
-#elif ARCH == X86_64
-static inline bench_t cycles(void) {
-	unsigned int hi, lo;
-	asm volatile ("rdtsc\n\t":"=a" (lo), "=d"(hi));
-	return ((bench_t) lo) | (((bench_t) hi) << 32);
-}
-#elif ARCH == MSP
-#define cycles()		arch_get_cycles()
-#endif
-
-#else
-
-typedef unsigned long long bench_t;
 
 #endif
 
@@ -203,7 +184,7 @@ void bench_before() {
 #elif TIMER == POSIX
 	gettimeofday(&before, NULL);
 #elif TIMER == CYCLE
-	before = cycles();
+	before = arch_cycles();
 #endif
 }
 
@@ -221,7 +202,7 @@ void bench_after() {
 	result = ((long)after.tv_sec - (long)before.tv_sec) * 1000000000;
 	result += (after.tv_usec - before.tv_usec) * 1000;
 #elif TIMER == CYCLE
-	after = cycles();
+	after = arch_cycles();
 	result = (after - before);
 #endif
 
