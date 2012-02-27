@@ -64,6 +64,10 @@ typedef struct timeval bench_t;
 
 typedef unsigned long long bench_t;
 
+#else
+
+typedef unsigned long long bench_t;
+
 #endif
 
 /**
