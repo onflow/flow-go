@@ -317,7 +317,7 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-	for (int i = 0; i < EP_TABLE_MAX; i++) {
+	for (int i = 0; i < EP_TABLE; i++) {
 		ep_new(t[i]);
 	}
 
@@ -334,7 +334,7 @@ static void arith(void) {
 		BENCH_ADD(ep_mul_fix(q, t, k));
 	} BENCH_END;
 
-	for (int i = 0; i < EP_TABLE_MAX; i++) {
+	for (int i = 0; i < EP_TABLE; i++) {
 		ep_free(t[i]);
 	}
 
