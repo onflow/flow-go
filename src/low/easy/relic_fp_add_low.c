@@ -105,18 +105,8 @@ dig_t fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
 }
 
 void fp_addc_low(dig_t *c, dig_t *a, dig_t *b) {
-	int i;
-	dig_t carry, c0, c1, r0, r1;
+	dig_t carry = fp_addd_low(c, a, b);
 
-	carry = 0;
-	for (i = 0; i < 2 * FP_DIGS; i++, a++, b++) {
-		r0 = (*a) + (*b);
-		c0 = (r0 < (*a));
-		r1 = r0 + carry;
-		c1 = (r1 < r0);
-		carry = c0 | c1;
-		c[i] = r1;
-	}
 	if (carry || (fp_cmpn_low(c + FP_DIGS, fp_prime_get()) != CMP_LT)) {
 		carry = fp_subn_low(c + FP_DIGS, c + FP_DIGS, fp_prime_get());
 	}
@@ -168,17 +158,8 @@ void fp_subm_low(dig_t *c, dig_t *a, dig_t *b) {
 }
 
 void fp_subc_low(dig_t *c, dig_t *a, dig_t *b) {
-	int i;
-	dig_t carry, r0, diff;
+	dig_t carry = fp_subd_low(c, a, b);
 
-	/* Zero the carry. */
-	carry = 0;
-	for (i = 0; i < 2 * FP_DIGS; i++, a++, b++) {
-		diff = (*a) - (*b);
-		r0 = diff - carry;
-		carry = ((*a) < (*b)) || (carry && !diff);
-		c[i] = r0;
-	}
 	if (carry) {
 		fp_addn_low(c + FP_DIGS, c + FP_DIGS, fp_prime_get());
 	}
