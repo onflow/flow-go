@@ -110,7 +110,7 @@ typedef uint32_t dbl_t;
 #elif WORD == 32
 typedef uint64_t dbl_t;
 #elif WORD == 64
-#if defined(__GNUC__) && !defined(__ICC)
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
 typedef __uint128_t dbl_t;
 #elif ARITH == EASY
 #error "Easy backend in 64-bit mode supported only in GCC compiler."
