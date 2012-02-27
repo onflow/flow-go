@@ -227,12 +227,7 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 		ep_new(t);
 		l = bn_bits(k);
 
-		if (bn_test_bit(k, l - 1)) {
-			ep_copy(t, p);
-		} else {
-			ep_set_infty(t);
-		}
-
+		ep_copy(t, p);
 		for (i = l - 2; i >= 0; i--) {
 			ep_dbl(t, t);
 			if (bn_test_bit(k, i)) {
@@ -240,8 +235,7 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 			}
 		}
 
-		ep_copy(r, t);
-		ep_norm(r, r);
+		ep_norm(r, t);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
