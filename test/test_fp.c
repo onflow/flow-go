@@ -336,7 +336,7 @@ static int subtraction(void) {
 		} TEST_END;
 #endif
 
-#if FP_ADD == INTEG || !defined(STRIP)
+#if FP_ADD == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic negation is correct") {
 			fp_rand(a);
 			fp_neg(c, a);
