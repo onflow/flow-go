@@ -27,7 +27,7 @@
 /**
  * @file
  *
- * Interface of architecture-dependet utilitles.
+ * Interface of architecture-dependent utilities.
  *
  * @version $Id$
  * @ingroup arch
@@ -39,17 +39,12 @@
 #include "relic_types.h"
 
 /*============================================================================*/
-/* Macro definitions                                                          */
-/*============================================================================*/
-
-
-/*============================================================================*/
 /* Function prototypes                                                        */
 /*============================================================================*/
 
 /**
  * Return the number of elapsed cycles.
  */
-unsigned long long arch_get_cycles();
+unsigned long long arch_cycles();
 
 #endif /* !RELIC_ARCH_H */
