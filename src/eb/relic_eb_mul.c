@@ -648,7 +648,6 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k) {
 		l = bn_bits(k);
 
 		eb_copy(t, p);
-
 		for (i = l - 2; i >= 0; i--) {
 			eb_dbl(t, t);
 			if (bn_test_bit(k, i)) {
