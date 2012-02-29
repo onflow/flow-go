@@ -521,7 +521,7 @@ int eb_param_set_any() {
 
 	r0 = eb_param_set_any_ordin();
 	if (r0 == STS_ERR) {
-		r1 = eb_param_set_any_ordin();
+		r1 = eb_param_set_any_kbltz();
 		if (r1 == STS_ERR) {
 			r2 = eb_param_set_any_super();
 			if (r2 == STS_ERR) {
