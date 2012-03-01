@@ -1834,6 +1834,7 @@ int addition(void) {
 #endif
 
 #if EP_ADD == PROJC || !defined(STRIP)
+#if !defined(EP_MIXED) || !defined(STRIP)
 		TEST_BEGIN("point addition in projective coordinates is correct") {
 			ep2_rand(a);
 			ep2_rand(b);
@@ -1841,6 +1842,7 @@ int addition(void) {
 			ep2_rand(b);
 			ep2_rand(c);
 			ep2_add_projc(b, b, c);
+			ep2_norm(b, b);
 			/* a and b in projective coordinates. */
 			ep2_add_projc(d, a, b);
 			ep2_norm(d, d);
@@ -1850,6 +1852,7 @@ int addition(void) {
 			ep2_norm(e, e);
 			TEST_ASSERT(ep2_cmp(e, d) == CMP_EQ, end);
 		} TEST_END;
+#endif
 
 		TEST_BEGIN("point addition in mixed coordinates (z2 = 1) is correct") {
 			ep2_rand(a);
