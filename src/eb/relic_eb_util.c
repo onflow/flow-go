@@ -195,7 +195,6 @@ int eb_is_valid(eb_t p) {
 		fb_sqr(t->y, t->y);
 		fb_add(lhs, lhs, t->y);
 		r = (fb_cmp(lhs, t->x) == CMP_EQ) || eb_is_infty(p);
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
