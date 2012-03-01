@@ -1953,6 +1953,7 @@ int subtraction(void) {
 #endif
 
 #if EP_ADD == PROJC || !defined(STRIP)
+#if !defined(EP_MIXED) || !defined(STRIP)
 		TEST_BEGIN("point subtraction in projective coordinates is correct") {
 			ep2_rand(a);
 			ep2_rand(b);
@@ -1969,6 +1970,7 @@ int subtraction(void) {
 			ep2_norm(d, d);
 			TEST_ASSERT(ep2_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
+#endif
 
 		TEST_BEGIN("point subtraction in mixed coordinates (z2 = 1) is correct") {
 			ep2_rand(a);
