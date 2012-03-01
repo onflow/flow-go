@@ -376,8 +376,11 @@ void eb_mul_pre_combs(eb_t *t, eb_t p) {
 			for (i = 1; i < l; i++) {
 				eb_dbl(t[1 << j], t[1 << j]);
 			}
+#if defined(EB_MIXED)
+			eb_norm(t[1 << j], t[1 << j]);
+#endif
 			for (i = 1; i < (1 << j); i++) {
-				eb_add(t[(1 << j) + i], t[1 << j], t[i]);
+				eb_add(t[(1 << j) + i], t[i], t[1 << j]);
 			}
 		}
 
