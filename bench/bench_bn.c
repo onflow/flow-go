@@ -852,7 +852,7 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-#if defined(WITH_EB) && defined(EB_KBLTZ)
+#if defined(WITH_EB) && defined(EB_KBLTZ) && (EB_MUL == LWNAF || EB_MUL == RWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP))
 	if (eb_param_set_any_kbltz() == STS_OK) {
 		bn_t vm, s0, s1, n;
 
