@@ -60,8 +60,8 @@ void fp2_const_init() {
 	for (int i = 0; i < 5; i++) {
 		fp2_new(const_frb[i]);
 	}
-	fp_new(const_frb_sqr[0]);
-	fp_new(const_frb_sqr[1]);
+	fp_new(const_sqr[0]);
+	fp_new(const_sqr[1]);
 #endif
 }
 
@@ -70,8 +70,8 @@ void fp2_const_clean() {
 	for (int i = 0; i < 5; i++) {
 		fp2_free(const_frb[i]);
 	}
-	fp_free(const_frb_sqr[0]);
-	fp_free(const_frb_sqr[1]);
+	fp_free(const_sqr[0]);
+	fp_free(const_sqr[1]);
 #endif
 }
 
