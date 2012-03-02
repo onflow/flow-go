@@ -411,6 +411,12 @@ void fp6_sqr_lazyr(fp6_t c, fp6_t a) {
 	fp2_null(t3);
 
 	TRY {
+		dv2_new(u0);
+		dv2_new(u1);
+		dv2_new(u2);
+		dv2_new(u3);
+		dv2_new(u4);
+		dv2_new(u5);
 		fp2_new(t0);
 		fp2_new(t0);
 		fp2_new(t1);
@@ -481,6 +487,12 @@ void fp6_sqr_lazyr(fp6_t c, fp6_t a) {
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
+		dv2_free(u0);
+		dv2_free(u1);
+		dv2_free(u2);
+		dv2_free(u3);
+		dv2_free(u4);
+		dv2_free(u5);
 		fp2_free(t0);
 		fp2_free(t0);
 		fp2_free(t1);
