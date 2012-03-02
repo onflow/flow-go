@@ -2216,7 +2216,7 @@ int main(void) {
 	if (r0 == STS_ERR && r1 == STS_ERR) {
 		THROW(ERR_NO_CURVE);
 		core_clean();
-		return 1;
+		return 0;
 	}
 
 	core_clean();

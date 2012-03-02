@@ -1040,8 +1040,13 @@ int main(void) {
 
 	util_print_banner("Tests for the FP module", 0);
 
-	fp_param_set_any();
-	fp_param_print();
+        TRY {
+                fp_param_set_any();
+                fp_param_print();
+        } CATCH_ANY {
+                core_clean();
+                return 0;
+        }
 
 	util_print_banner("Utilities", 1);
 	if (memory() != STS_OK) {
