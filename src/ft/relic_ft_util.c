@@ -144,18 +144,13 @@ int ft_test_trit(ft_t a, int trit) {
 }
 
 int ft_bits(ft_t a) {
-	int i, j;
-	dig_t t;
+	int i = FT_DIGS - 1;
 
-	for (i = FT_DIGS - 1; i >= 0; i--) {
-		t = a[i];
-		if (t == 0 ) {
-			continue;
-		}
-		j = util_bits_dig(t);
-		return (i << FT_DIG_LOG) + j;
+	while (a[i] == 0) {
+		i--;
 	}
-	return 0;
+
+	return (i << FT_DIG_LOG) + util_bits_dig(a[i]);
 }
 
 int ft_trits(ft_t a) {

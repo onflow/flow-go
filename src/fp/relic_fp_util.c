@@ -110,21 +110,13 @@ void fp_set_bit(fp_t a, int bit, int value) {
 }
 
 int fp_bits(fp_t a) {
-	int i, j;
-	dig_t t;
+	int i = FP_DIGS - 1;
 
-	for (i = FP_DIGS - 1; i >= 0; i--) {
-		t = a[i];
-		if (t == 0) {
-			continue;
-		}
-		j = util_bits_dig(t);
-		if (j == 0) {
-			continue;
-		}
-		return (i << FP_DIG_LOG) + j;
+	while (a[i] == 0) {
+		i--;
 	}
-	return 0;
+
+	return (i << FP_DIG_LOG) + util_bits_dig(a[i]);
 }
 
 void fp_set_dig(fp_t c, dig_t a) {
@@ -134,9 +126,7 @@ void fp_set_dig(fp_t c, dig_t a) {
 void fp_rand(fp_t a) {
 	int bits, digits;
 
-	for (int i = 0; i < FP_DIGS; i++) {
-		rand_bytes((unsigned char *)&a[i], (FP_DIGIT / 8));
-	}
+	rand_bytes((unsigned char *)a, FP_DIGS * sizeof(dig_t));
 
 	SPLIT(bits, digits, FP_BITS, FP_DIG_LOG);
 	if (bits > 0) {
