@@ -149,18 +149,13 @@ void fb_set_bit(fb_t a, int bit, int value) {
 }
 
 int fb_bits(fb_t a) {
-	int i, j;
-	dig_t t;
+	int i = FB_DIGS - 1;
 
-	for (i = FB_DIGS - 1; i >= 0; i--) {
-		t = a[i];
-		if (t == 0) {
-			continue;
-		}
-		j = util_bits_dig(t);
-		return (i << FB_DIG_LOG) + j;
+	while (a[i] == 0) {
+		i--;
 	}
-	return 0;
+
+	return (i << FB_DIG_LOG) + util_bits_dig(a[i]);
 }
 
 void fb_set_dig(fb_t c, dig_t a) {
@@ -171,9 +166,8 @@ void fb_set_dig(fb_t c, dig_t a) {
 void fb_rand(fb_t a) {
 	int bits, digits;
 
-	for (int i = 0; i < FB_DIGS; i++) {
-		rand_bytes((unsigned char *)&a[i], (BN_DIGIT / 8));
-	}
+	rand_bytes((unsigned char *)a, FB_DIGS * sizeof(dig_t));
+
 	SPLIT(bits, digits, FB_BITS, FB_DIG_LOG);
 	if (bits > 0) {
 		dig_t mask = MASK(bits);
