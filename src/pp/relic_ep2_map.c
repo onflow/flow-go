@@ -130,7 +130,6 @@ void ep2_map(ep2_t p, unsigned char *msg, int len) {
 	}
 	FINALLY {
 		bn_free(k);
-		fp2_free(t0);
-		fp2_free(t1);
+		fp2_free(t);
 	}
 }
