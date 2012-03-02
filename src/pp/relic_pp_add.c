@@ -65,7 +65,7 @@ void pp_add_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp2_free(slope);
+		fp2_free(s);
 		ep2_free(t);
 	}
 }
