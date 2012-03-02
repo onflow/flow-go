@@ -114,7 +114,7 @@
  */
 static ep2_st curve_g;
 
-#if ALLOC != AUTO
+#if ALLOC == STATIC || ALLOC == DYNAMIC || ALLOC == STACK
 
 /**
  * The first coordinate of the generator.
@@ -173,25 +173,27 @@ static ep2_st *pointer[EP_TABLE];
 
 void ep2_curve_init(void) {
 #ifdef EP_PRECO
-	for (int i = 0; i < EP_TABLE; i++) {
-		pointer[i] = &(table[i]);
-	}
+        for (int i = 0; i < EP_TABLE; i++) {
+                pointer[i] = &(table[i]);
+        }
 #endif
-#if ALLOC == STATIC
-	fp2_new(curve_gx);
-	fp2_new(curve_gy);
-	fp2_new(curve_gz);
+#if ALLOC == STATIC || ALLOC == DYNAMIC || ALLOC == STACK
+        curve_g.x[0] = curve_gx[0];
+        curve_g.x[1] = curve_gx[1];
+        curve_g.y[0] = curve_gy[0];
+        curve_g.y[1] = curve_gy[1];
+        curve_g.z[0] = curve_gz[0];
+        curve_g.z[1] = curve_gz[1];
+#ifdef EP_PRECO
+        for (int i = 0; i < EP_TABLE; i++) {
+                fp2_new(table[i].x);
+                fp2_new(table[i].y);
+                fp2_new(table[i].z);
+        }
 #endif
-#if ALLOC != AUTO
-	curve_g.x[0] = curve_gx[0];
-	curve_g.x[1] = curve_gx[1];
-	curve_g.y[0] = curve_gy[0];
-	curve_g.y[1] = curve_gy[1];
-	curve_g.z[0] = curve_gz[0];
-	curve_g.z[1] = curve_gz[1];
 #endif
-	ep2_set_infty(&curve_g);
-	bn_init(&curve_r, FP_DIGS);
+        ep2_set_infty(&curve_g);
+        bn_init(&curve_r, FP_DIGS);
 }
 
 void ep2_curve_clean(void) {
