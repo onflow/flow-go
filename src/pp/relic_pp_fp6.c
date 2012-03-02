@@ -234,7 +234,6 @@ void fp6_sqr_basic(fp6_t c, fp6_t a) {
 		fp2_free(t2);
 		fp2_free(t3);
 		fp2_free(t4);
-		fp2_free(t5);
 	}
 }
 
@@ -485,7 +484,6 @@ void fp6_sqr_lazyr(fp6_t c, fp6_t a) {
 		fp2_free(t1);
 		fp2_free(t2);
 		fp2_free(t3);
-		fp2_free(t5);
 	}
 }
 
