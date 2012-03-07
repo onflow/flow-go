@@ -37,6 +37,7 @@
 #include "relic_rand.h"
 #include "relic_types.h"
 #include "relic_error.h"
+#include "relic_arch.h"
 #include "relic_fp.h"
 #include "relic_fb.h"
 #include "relic_ft.h"
@@ -75,6 +76,10 @@ int core_init(void) {
 	core_ctx->last = NULL;
 #endif /* CHECK */
 	core_ctx->code = STS_OK;
+
+	if (arch_init() != STS_OK) {
+		return STS_ERR;
+	}
 
 	TRY {
 		rand_init();
@@ -140,5 +145,6 @@ int core_clean(void) {
 #ifdef CHECK
 	free(core_ctx->reason);
 #endif
+	arch_clean();
 	return STS_OK;
 }

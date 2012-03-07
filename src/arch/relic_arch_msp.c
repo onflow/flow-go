@@ -29,6 +29,8 @@
  * @ingroup arch
  */
 
+#include "relic_core.h"
+
 #ifdef __MSP430__
 /* Support for MSPGCC with custom MSPsim simulator. */
 
@@ -75,3 +77,10 @@ unsigned long long arch_cycles() {
 }
 
 #endif
+
+int arch_init(void) {
+	return STS_OK;
+}
+
+void arch_clean(void) {
+}

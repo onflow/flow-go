@@ -9,6 +9,8 @@ set(CORE_SRCS relic_core.c relic_rand.c relic_conf.c relic_pool.c relic_util.c)
 string(TOLOWER ${ARCH} ARCH_PATH)
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/arch/relic_arch_${ARCH_PATH}.c")
 	list(APPEND CORE_SRCS "arch/relic_arch_${ARCH_PATH}.c")
+elseif (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/arch/relic_arch_${ARCH_PATH}.c")
+	list(APPEND CORE_SRCS "arch/relic_arch_default.c")
 endif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/arch/relic_arch_${ARCH_PATH}.c")
 
 file(GLOB BN_SRCS bn/*.c)

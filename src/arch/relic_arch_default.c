@@ -23,24 +23,13 @@
 /**
  * @file
  *
- * Implementation of Intel x86-dependent routines.
+ * Implementation of architecture-dependent routines.
  *
  * @version $Id$
  * @ingroup arch
  */
 
-#include "relic_util.h"
 #include "relic_core.h"
-
-/*============================================================================*/
-/* Public definitions                                                         */
-/*============================================================================*/
-
-unsigned long long arch_cycles(void) {
-	unsigned long long int x;
-	asm volatile (".byte 0x0f, 0x31\n\t":"=A" (x));
-	return x;
-}
 
 int arch_init(void) {
 	return STS_OK;
