@@ -552,7 +552,7 @@ static void util12(void) {
 	fp12_free(a);
 	fp12_free(b);
 }
-#include <assert.h>
+
 static void arith12(void) {
 	fp12_t a, b, c, d[2];
 	bn_t e;
