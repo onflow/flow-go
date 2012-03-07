@@ -46,6 +46,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
+#ifdef CHECK
 void err_simple_msg(int error) {
 	if (error != ERR_CAUGHT) {
 		fprintf(stderr, "\nERROR: %s.\n", core_ctx->reason[error]);
@@ -81,6 +82,7 @@ void err_full_msg(const char *function, const char *file, int line,
 #endif
 	}
 }
+#endif
 #endif
 
 int err_get_code(void) {
