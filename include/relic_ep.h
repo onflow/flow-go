@@ -45,7 +45,7 @@
 /*============================================================================*/
 
 /**
- * Binary elliptic curve identifiers.
+ * Prime elliptic curve identifiers.
  */
 enum {
 	/** SECG P-160 prime curve. */
