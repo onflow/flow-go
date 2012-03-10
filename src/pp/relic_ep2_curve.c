@@ -197,11 +197,6 @@ void ep2_curve_init(void) {
 }
 
 void ep2_curve_clean(void) {
-#if ALLOC == STATIC
-	fp2_free(curve_gx);
-	fp2_free(curve_gy);
-	fp2_free(curve_gz);
-#endif
 	bn_clean(&curve_r);
 }
 

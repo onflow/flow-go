@@ -57,21 +57,11 @@ static fp_st const_sqr[3];
 
 void fp2_const_init() {
 #if ALLOC == STATIC
-	for (int i = 0; i < 5; i++) {
-		fp2_new(const_frb[i]);
-	}
-	fp_new(const_sqr[0]);
-	fp_new(const_sqr[1]);
 #endif
 }
 
 void fp2_const_clean() {
 #if ALLOC == STATIC
-	for (int i = 0; i < 5; i++) {
-		fp2_free(const_frb[i]);
-	}
-	fp_free(const_sqr[0]);
-	fp_free(const_sqr[1]);
 #endif
 }
 
