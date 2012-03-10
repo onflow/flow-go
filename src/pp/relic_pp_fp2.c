@@ -55,16 +55,6 @@ static fp_st const_sqr[3];
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp2_const_init() {
-#if ALLOC == STATIC
-#endif
-}
-
-void fp2_const_clean() {
-#if ALLOC == STATIC
-#endif
-}
-
 void fp2_const_calc() {
 	bn_t e;
 	fp2_t t;

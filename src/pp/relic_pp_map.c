@@ -365,12 +365,10 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 /*============================================================================*/
 
 void pp_map_init(void) {
-	fp2_const_init();
 	ep2_curve_init();
 }
 
 void pp_map_clean(void) {
-	fp2_const_clean();
 	ep2_curve_clean();
 }
 
