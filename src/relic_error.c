@@ -47,6 +47,7 @@
 /*============================================================================*/
 
 #ifdef CHECK
+
 void err_simple_msg(int error) {
 	if (error != ERR_CAUGHT) {
 		fprintf(stderr, "\nERROR: %s.\n", core_ctx->reason[error]);
@@ -54,6 +55,7 @@ void err_simple_msg(int error) {
 }
 
 #ifdef VERBS
+
 void err_full_msg(const char *function, const char *file, int line,
 		int error) {
 	if (error == ERR_CAUGHT) {
@@ -82,19 +84,19 @@ void err_full_msg(const char *function, const char *file, int line,
 #endif
 	}
 }
-#endif
-#endif
+
+#endif /* VERBS */
+
+void err_get_msg(err_t *e, char **msg) {
+	*e = *(core_ctx->last->error);
+	*msg = core_ctx->reason[*e];
+	core_ctx->last = NULL;
+}
+
+#endif /* CHECK */
 
 int err_get_code(void) {
 	int r = core_ctx->code;
 	core_ctx->code = STS_OK;
 	return r;
 }
-
-#ifdef CHECK
-void err_get_msg(err_t *e, char **msg) {
-	*e = *(core_ctx->last->error);
-	*msg = core_ctx->reason[*e];
-	core_ctx->last = NULL;
-}
-#endif
