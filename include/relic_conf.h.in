@@ -72,16 +72,18 @@
 /** Number of available cores. */
 #define CORES    @CORES@
 
+/** Generic architecture. */
+#define NONE     1
 /** Atmel AVR ATMega128 8-bit architecture. */
-#define AVR		 1
+#define AVR      2
 /** MSP430 16-bit architecture. */
-#define MSP      2
+#define MSP      3
 /** ARM 32-bit architecture. */
-#define ARM      3
+#define ARM      4
 /** Intel x86-compatible 32-bit architecture. */
-#define X86      4
+#define X86      5
 /** AMD64-compatible 64-bit architecture. */
-#define X86_64	 5 
+#define X86_64	 6 
 /** Architecture. */
 #define ARCH	 @ARCH@
 

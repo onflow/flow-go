@@ -43,11 +43,6 @@
 /*============================================================================*/
 
 /**
- * Return the number of elapsed cycles.
- */
-unsigned long long arch_cycles(void);
-
-/**
  * Performs architecture-dependent initialization.
  *
  * @return STS_OK if no error occurs, STS_ERR otherwise.
@@ -60,5 +55,10 @@ int arch_init(void);
  * @return STS_OK if no error occurs, STS_ERR otherwise.
  */
 void arch_clean(void);
+
+/**
+ * Return the number of elapsed cycles.
+ */
+unsigned long long arch_cycles(void);
 
 #endif /* !RELIC_ARCH_H */
