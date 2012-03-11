@@ -36,6 +36,7 @@
 #include "relic_util.h"
 #include "relic_error.h"
 #include "relic_conf.h"
+#include "relic_arch.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
@@ -296,17 +297,17 @@
  */
 #define ASSIGN(CURVE, FIELD)												\
 	fb_param_set(FIELD);													\
-	PREPARE(str, CURVE##_A);												\
+	FETCH(str, CURVE##_A, sizeof(CURVE##_A));								\
 	fb_read(a, str, strlen(str), 16);										\
-	PREPARE(str, CURVE##_B);												\
+	FETCH(str, CURVE##_B, sizeof(CURVE##_B));								\
 	fb_read(b, str, strlen(str), 16);										\
-	PREPARE(str, CURVE##_X);												\
+	FETCH(str, CURVE##_X, sizeof(CURVE##_X));								\
 	fb_read(g->x, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_Y);												\
+	FETCH(str, CURVE##_Y, sizeof(CURVE##_Y));								\
 	fb_read(g->y, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_R);												\
+	FETCH(str, CURVE##_R, sizeof(CURVE##_R));								\
 	bn_read_str(r, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_H);												\
+	FETCH(str, CURVE##_H, sizeof(CURVE##_H));								\
 	bn_read_str(h, str, strlen(str), 16);									\
 
 /**
@@ -317,7 +318,7 @@
  */
 #define ASSIGNS(CURVE, FIELD)												\
 	ASSIGN(CURVE, FIELD);													\
-	PREPARE(str, CURVE##_C);												\
+	FETCH(str, CURVE##_C, sizeof(CURVE##_C));								\
 	fb_read(c, str, strlen(str), 16);										\
 
 /**
@@ -337,11 +338,7 @@ void eb_param_set(int param) {
 	int super = 0;
 	int ordin = 0;
 	int kbltz = 0;
-#if ARCH == AVR
-	char str[2 * FB_DIGS + 1];
-#else
-	char *str;
-#endif
+	char str[2 * FB_BYTES + 1];
 	fb_t a, b, c;
 	eb_t g;
 	bn_t r;

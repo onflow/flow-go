@@ -41,12 +41,6 @@
 /*============================================================================*/
 
 /**
- * Table to convert between digits and chars.
- */
-static const char conv_table[] =
-		"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
-
-/**
  * Buffer to hold printed messages.
  */
 #if ARCH == AVR
@@ -58,17 +52,6 @@ static char buffer[64 + 1];
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
-
-#if ARCH == AVR
-
-void util_copy_rom(char *dest, const char *src) {
-	char c;
-	while ((c = pgm_read_byte(src++)))
-		*dest++ = c;
-	*dest = 0;
-}
-
-#endif
 
 uint32_t util_conv_endian(uint32_t i) {
 	uint32_t i1, i2, i3, i4;
@@ -97,7 +80,28 @@ uint32_t util_conv_little(uint32_t i) {
 }
 
 char util_conv_char(dig_t i) {
+#if WORD == 8 || WORD == 16
+	/* Avoid tables to save up some memory. This is not performance-critical. */
+	if (i < 10) {
+		return i + '0';
+	}
+	if (i < 36) {
+		return (i - 10) + 'A';
+	}
+	if (i < 62) {
+		return (i - 36) + 'a';
+	}
+	if (i == 62) {
+		return '+';
+	} else {
+		return '/';
+	}
+#else
+	/* Use a table. */
+	static const char conv_table[] =
+			"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
 	return conv_table[i];
+#endif
 }
 
 int util_bits_dig(dig_t a) {

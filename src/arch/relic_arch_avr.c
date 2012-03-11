@@ -29,6 +29,8 @@
  * @ingroup arch
  */
 
+#include <avr/pgmspace.h>
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -37,4 +39,14 @@ void arch_init(void) {
 }
 
 void arch_clean(void) {
+}
+
+void arch_copy_rom(char *dest, const char *src, int len) {
+	int i;
+	char c;
+
+	while ((c = pgm_read_byte(src++)) && (i++ < len - 1)) {
+		*dest++ = c;
+	}
+	*dest = 0;
 }

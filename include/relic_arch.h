@@ -37,6 +37,39 @@
 #define RELIC_ARCH_H
 
 #include "relic_types.h"
+#include "relic_util.h"
+
+#if ARCH == AVR
+#include <avr/pgmspace.h>
+#endif
+
+/*============================================================================*/
+/* Macro definitions                                                          */
+/*============================================================================*/
+
+/**
+ * Chooses a proper way to store a string in the target architecture.
+ *
+ * @param[in] STR		- the string to store.
+ */
+#if ARCH == AVR
+#define STRING(STR)			PSTR(STR)
+#else
+#define STRING(STR)			STR
+#endif
+
+/**
+ * Fetches a constant string to be used by the library.
+ *
+ * @param[out] STR		- the resulting prepared parameter.
+ * @param[in] ID		- the parameter represented as a string.
+ * @param[in] L			- the length of the string.
+ */
+#if ARCH == AVR
+#define FETCH(STR, ID, L)	arch_copy_rom(STR, STRING(ID), L - 1);
+#else
+#define FETCH(STR, ID, L)	strncpy(STR, ID, L);
+#endif
 
 /*============================================================================*/
 /* Function prototypes                                                        */
@@ -56,5 +89,19 @@ void arch_clean(void);
  * Return the number of elapsed cycles.
  */
 unsigned long long arch_cycles(void);
+
+
+#if ARCH == AVR
+
+/**
+ * Copies a string from the text section to the destination vector.
+ *
+ * @param[out] dest		- the destination vector.
+ * @param[in] src		- the pointer to the string stored on the text section.
+ * @param[in] len		- the length of the string.
+ */
+void arch_copy_rom(char *dest, const char *src, int len);
+
+#endif
 
 #endif /* !RELIC_ARCH_H */

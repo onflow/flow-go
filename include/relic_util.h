@@ -124,14 +124,14 @@
 /**
  * Renames the inline assembly macro to a prettier name.
  */
-#define asm			__asm__ volatile
+#define asm					__asm__ volatile
 
 /**
  * Concatenates two tokens.
  */
 /** @{ */
-#define CAT(A, B)						_CAT(A, B)
-#define _CAT(A, B)						A ## B
+#define CAT(A, B)			_CAT(A, B)
+#define _CAT(A, B)			A ## B
 /** @} */
 
 /**
@@ -145,36 +145,19 @@
 /** @} */
 
 /**
- * Prepares a set of elliptic curve parameters.
- *
- * @param[out] STR		- the resulting prepared parameter.
- * @param[in] ID		- the parameter represented as a string.
- */
-#if ARCH == AVR
-
-#include <avr/pgmspace.h>
-
-#define PREPARE(STR, ID)													\
-	util_copy_rom(STR, PSTR(ID));
-#else
-#define PREPARE(STR, ID)													\
-	STR = ID;
-#endif
-
-/**
  * Selects a real or dummy printing function depending on library flags.
  */
 #ifndef QUIET
-#define util_print(...)			util_printf(__VA_ARGS__)
+#define util_print(...)		util_printf(__VA_ARGS__)
 #else
-#define util_print(...)			/* empty */
+#define util_print(...)		/* empty */
 #endif
 
 /**
  * Prints a standard label.
  *
- * @param[in] L					- the label of the banner.
- * @param[in] I					- if the banner is inside an hierarchy.
+ * @param[in] L			- the label of the banner.
+ * @param[in] I			- if the banner is inside an hierarchy.
  */
 #define util_print_banner(L, I)												\
 	if (!I) {																\
@@ -186,18 +169,6 @@
 /*============================================================================*/
 /* Function prototypes                                                        */
 /*============================================================================*/
-
-#if ARCH == AVR
-
-/**
- * Copies a string from the text section to the destination vector.
- *
- * @param[out] dest		- the destination vector.
- * @param[in] src		- the pointer to the string stored on the text section.
- */
-void util_copy_rom(char *dest, const char *src);
-
-#endif
 
 /**
  * Toggle endianess of a digit.

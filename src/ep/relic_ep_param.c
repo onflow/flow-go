@@ -36,6 +36,7 @@
 #include "relic_pp.h"
 #include "relic_error.h"
 #include "relic_conf.h"
+#include "relic_arch.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
@@ -293,17 +294,17 @@
  */
 #define ASSIGN(CURVE, FIELD)												\
 	fp_param_set(FIELD);													\
-	PREPARE(str, CURVE##_A);												\
+	FETCH(str, CURVE##_A, sizeof(CURVE##_A));								\
 	fp_read(a, str, strlen(str), 16);										\
-	PREPARE(str, CURVE##_B);												\
+	FETCH(str, CURVE##_B, sizeof(CURVE##_B));								\
 	fp_read(b, str, strlen(str), 16);										\
-	PREPARE(str, CURVE##_X);												\
+	FETCH(str, CURVE##_X, sizeof(CURVE##_X));								\
 	fp_read(g->x, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_Y);												\
+	FETCH(str, CURVE##_Y, sizeof(CURVE##_Y));								\
 	fp_read(g->y, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_R);												\
+	FETCH(str, CURVE##_R, sizeof(CURVE##_R));								\
 	bn_read_str(r, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_H);												\
+	FETCH(str, CURVE##_H, sizeof(CURVE##_H));								\
 	bn_read_str(h, str, strlen(str), 16);									\
 
 /**
@@ -314,9 +315,9 @@
  */
 #define ASSIGNK(CURVE, FIELD)												\
 	ASSIGN(CURVE, FIELD);													\
-	PREPARE(str, CURVE##_BETA);												\
+	FETCH(str, CURVE##_BETA, sizeof(CURVE##_BETA));							\
 	fp_read(beta, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_LAMB);												\
+	FETCH(str, CURVE##_LAMB, sizeof(CURVE##_LAMB));							\
 	bn_read_str(lamb, str, strlen(str), 16);								\
 
 /**
@@ -335,11 +336,7 @@ int ep_param_get() {
 void ep_param_set(int param) {
 	int ordin = 0;
 	int kbltz = 0;
-#if ARCH == AVR
-	char str[2 * FP_DIGS + 1];
-#else
-	char *str;
-#endif
+	char str[2 * FP_BYTES + 1];
 	fp_t a, b, beta;
 	ep_t g;
 	bn_t r, h, lamb;

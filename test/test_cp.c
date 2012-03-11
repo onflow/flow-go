@@ -220,40 +220,40 @@ unsigned char resultk[] = {
 #endif
 
 #define ASSIGNP(CURVE)														\
-	PREPARE(str, CURVE##_A);												\
+	FETCH(str, CURVE##_A, sizeof(CURVE##_A));								\
 	bn_read_str(d_a, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_A_X);												\
+	FETCH(str, CURVE##_A_X, sizeof(CURVE##_A_X));							\
 	fp_read(q_a->x, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_A_Y);												\
+	FETCH(str, CURVE##_A_Y, sizeof(CURVE##_A_Y));							\
 	fp_read(q_a->y, str, strlen(str), 16);									\
 	fp_set_dig(q_b->z, 1);													\
-	PREPARE(str, CURVE##_B);												\
+	FETCH(str, CURVE##_B, sizeof(CURVE##_B));								\
 	bn_read_str(d_b, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_B_X);												\
+	FETCH(str, CURVE##_B_X, sizeof(CURVE##_B_X));							\
 	fp_read(q_b->x, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_B_Y);												\
+	FETCH(str, CURVE##_B_Y, sizeof(CURVE##_B_Y));							\
 	fp_read(q_b->y, str, strlen(str), 16);									\
 	fp_set_dig(q_b->z, 1);
 
 #define ASSIGNK(CURVE)														\
-	PREPARE(str, CURVE##_A);												\
+	FETCH(str, CURVE##_A, sizeof(CURVE##_A));								\
 	bn_read_str(d_a, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_A_X);												\
+	FETCH(str, CURVE##_A_X, sizeof(CURVE##_A_X));							\
 	fb_read(q_a->x, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_A_Y);												\
+	FETCH(str, CURVE##_A_Y, sizeof(CURVE##_A_Y));							\
 	fb_read(q_a->y, str, strlen(str), 16);									\
 	fb_set_dig(q_b->z, 1);													\
-	PREPARE(str, CURVE##_B);												\
+	FETCH(str, CURVE##_B, sizeof(CURVE##_B));								\
 	bn_read_str(d_b, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_B_X);												\
+	FETCH(str, CURVE##_B_X, sizeof(CURVE##_B_X));							\
 	fb_read(q_b->x, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_B_Y);												\
+	FETCH(str, CURVE##_B_Y, sizeof(CURVE##_B_Y));							\
 	fb_read(q_b->y, str, strlen(str), 16);									\
 	fb_set_dig(q_b->z, 1);
 
 static int ecdh(void) {
 	int code = STS_ERR;
-	char *str = NULL;
+	char str[2 * EC_BYTES + 1];
 	bn_t d_a, d_b;
 	ec_t q_a, q_b;
 	unsigned char key[MD_LEN], key1[MD_LEN], key2[MD_LEN];
@@ -335,12 +335,11 @@ static int ecdh(void) {
 
 static int ecmqv(void) {
 	int code = STS_ERR;
-	char *str = NULL;
 	bn_t d1_a, d1_b;
 	bn_t d2_a, d2_b;
 	ec_t q1_a, q1_b;
 	ec_t q2_a, q2_b;
-	unsigned char key[MD_LEN], key1[MD_LEN], key2[MD_LEN];
+	unsigned char key1[MD_LEN], key2[MD_LEN];
 
 	bn_null(d1_a);
 	bn_null(d1_b);
@@ -370,9 +369,6 @@ static int ecmqv(void) {
 			cp_ecmqv_key(key2, MD_LEN, d1_a, d2_a, q2_a, q1_b, q2_b);
 			TEST_ASSERT(memcmp(key1, key2, MD_LEN) == 0, end);
 		} TEST_END;
-
-		(void)str;
-		(void)key;
 	}
 	CATCH_ANY {
 		ERROR(end);
