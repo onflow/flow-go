@@ -124,7 +124,7 @@
 /**
  * Renames the inline assembly macro to a prettier name.
  */
-#define asm			__asm__
+#define asm			__asm__ volatile
 
 /**
  * Concatenates two tokens.

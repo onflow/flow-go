@@ -23,13 +23,23 @@
 /**
  * @file
  *
- * Implementation of architecture-dependent routines.
+ * Implementation of MSP-dependent routines.
  *
  * @version $Id$
  * @ingroup arch
  */
 
 #include "relic_core.h"
+
+/*============================================================================*/
+/* Public definitions                                                         */
+/*============================================================================*/
+
+void arch_init(void) {
+}
+
+void arch_clean(void) {
+}
 
 #ifdef __MSP430__
 /* Support for MSPGCC with custom MSPsim simulator. */
@@ -77,10 +87,3 @@ unsigned long long arch_cycles() {
 }
 
 #endif
-
-int arch_init(void) {
-	return STS_OK;
-}
-
-void arch_clean(void) {
-}

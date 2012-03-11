@@ -77,11 +77,8 @@ int core_init(void) {
 #endif /* CHECK */
 	core_ctx->code = STS_OK;
 
-	if (arch_init() != STS_OK) {
-		return STS_ERR;
-	}
-
 	TRY {
+		arch_init();
 		rand_init();
 #ifdef WITH_FP
 		fp_prime_init();

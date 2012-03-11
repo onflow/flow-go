@@ -29,11 +29,16 @@
  * @ingroup arch
  */
 
-#include "relic_core.h"
+/*============================================================================*/
+/* Public definitions                                                         */
+/*============================================================================*/
 
-int arch_init(void) {
-	return STS_OK;
+void arch_init(void) {
 }
 
 void arch_clean(void) {
+}
+
+unsigned long long arch_cycles(void) {
+	return 0;
 }

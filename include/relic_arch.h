@@ -44,15 +44,11 @@
 
 /**
  * Performs architecture-dependent initialization.
- *
- * @return STS_OK if no error occurs, STS_ERR otherwise.
  */
-int arch_init(void);
+void arch_init(void);
 
 /**
  * Performs architecture-dependent finalization.
- *
- * @return STS_OK if no error occurs, STS_ERR otherwise.
  */
 void arch_clean(void);
 

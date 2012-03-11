@@ -30,21 +30,19 @@
  */
 
 #include "relic_util.h"
-#include "relic_core.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-unsigned long long arch_cycles(void) {
-	unsigned long long int x;
-	asm volatile (".byte 0x0f, 0x31\n\t":"=A" (x));
-	return x;
-}
-
-int arch_init(void) {
-	return STS_OK;
+void arch_init(void) {
 }
 
 void arch_clean(void) {
+}
+
+unsigned long long arch_cycles(void) {
+	unsigned long long int x;
+	asm(".byte 0x0f, 0x31\n\t":"=A" (x));
+	return x;
 }

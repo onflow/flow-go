@@ -30,21 +30,20 @@
  */
 
 #include "relic_util.h"
-#include "relic_core.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-unsigned long long arch_cycles(void) {
-	unsigned int hi, lo;
-	asm volatile ("rdtsc\n\t":"=a" (lo), "=d"(hi));
-	return ((unsigned long long) lo) | (((unsigned long long) hi) << 32);
-}
-
-int arch_init(void) {
-	return STS_OK;
+void arch_init(void) {
 }
 
 void arch_clean(void) {
 }
+
+unsigned long long arch_cycles(void) {
+	unsigned int hi, lo;
+	asm("rdtsc\n\t":"=a" (lo), "=d"(hi));
+	return ((unsigned long long) lo) | (((unsigned long long) hi) << 32);
+}
+
