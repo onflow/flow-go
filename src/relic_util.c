@@ -45,7 +45,7 @@
  */
 #if ARCH == AVR
 #ifndef QUIET
-volatile char print_buffer[128 + 1];
+volatile char print_buffer[64 + 1];
 volatile char *print_pointer;
 #endif
 #endif
@@ -146,7 +146,7 @@ void util_printf(const char *format, ...) {
 	print_pointer = print_buffer + 1;
 	va_list list;
 	va_start(list, format);
-	vsnprintf_P((char *)print_pointer, 128, format, list);
+	vsnprintf_P((char *)print_pointer, 64, format, list);
 	print_buffer[0] = (unsigned char)2;
 	va_end(list);
 #elif ARCH == MSP
