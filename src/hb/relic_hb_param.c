@@ -43,8 +43,8 @@
 
 #if defined(HB_SUPER) && FB_POLYN == 367
 /**
- * Parameters for the MIRACL supersingular pairing-friendly elliptic curve over
- * GF(2^1223).
+ * Parameters for the genus-2 supersingular pairing-friendly elliptic curve over
+ * GF(2^367).
  */
 /** @{ */
 #define ETAT_S367_F3	"1"
@@ -62,7 +62,7 @@
 #if defined(HB_SUPER) && FB_POLYN == 439
 /**
  * Parameters for the MIRACL supersingular pairing-friendly elliptic curve over
- * GF(2^1223).
+ * GF(2^439).
  */
 /** @{ */
 #define ETAT_S439_F3	"1"
@@ -85,23 +85,23 @@
  */
 #define ASSIGNS(CURVE, FIELD)												\
 	fb_param_set(FIELD);													\
-	PREPARE(str, CURVE##_F0);												\
+	FETCH(str, CURVE##_F0, sizeof(CURVE##_F0));								\
 	fb_read(f0, str, strlen(str), 16);										\
-	PREPARE(str, CURVE##_F1);												\
+	FETCH(str, CURVE##_F1, sizeof(CURVE##_F1));								\
 	fb_read(f1, str, strlen(str), 16);										\
-	PREPARE(str, CURVE##_F3);												\
+	FETCH(str, CURVE##_F3, sizeof(CURVE##_F3));								\
 	fb_read(f3, str, strlen(str), 16);										\
-	PREPARE(str, CURVE##_U0);												\
+	FETCH(str, CURVE##_U0, sizeof(CURVE##_U0));								\
 	fb_read(g->u0, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_U1);												\
+	FETCH(str, CURVE##_U1, sizeof(CURVE##_U1));								\
 	fb_read(g->u1, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_V0);												\
+	FETCH(str, CURVE##_V0, sizeof(CURVE##_V0));								\
 	fb_read(g->v0, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_V1);												\
+	FETCH(str, CURVE##_V1, sizeof(CURVE##_V1));								\
 	fb_read(g->v1, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_R);												\
+	FETCH(str, CURVE##_R, sizeof(CURVE##_R));								\
 	bn_read_str(r, str, strlen(str), 16);									\
-	PREPARE(str, CURVE##_H);												\
+	FETCH(str, CURVE##_H, sizeof(CURVE##_H));								\
 	bn_read_str(h, str, strlen(str), 16);									\
 
 /**
@@ -119,11 +119,7 @@ int hb_param_get() {
 
 void hb_param_set(int param) {
 	int super = 0;
-#if ARCH == AVR
-	char str[2 * FB_DIGS + 1];
-#else
-	char *str;
-#endif
+	char str[4 * FB_BYTES + 1];
 	fb_t f0, f1, f3;
 	hb_t g;
 	bn_t r;
