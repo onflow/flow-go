@@ -50,7 +50,7 @@
  * @param[in] P				- the property description.
  */
 #define TEST_ONCE(P)														\
-	util_print("Testing if %s... %*s", P, (int)(64 - strlen(P)), " ");		\
+	util_print("Testing if " P "...%*c", (64 - strlen(P)), ' ');			\
 
 /**
  * Tests a sequence of commands to see if they respect some property.
@@ -58,7 +58,7 @@
  * @param[in] P				- the property description.
  */
 #define TEST_BEGIN(P)														\
-	util_print("Testing if %s... %*s", P, (int)(64 - strlen(P)), " ");		\
+	util_print("Testing if " P "...%*c", (64 - strlen(P)), ' ');			\
 	for (int i = 0; i < TESTS; i++)											\
 
 /**
@@ -73,7 +73,9 @@
 #define TEST_ASSERT(C, LABEL)												\
 	if (!(C)) {																\
 		test_fail();														\
-		util_print("(at %s:%d)\n", __FILE__, __LINE__);						\
+		util_print("(at ");													\
+		util_print(__FILE__);												\
+		util_print(":%d)\n", __LINE__);										\
 		ERROR(LABEL);														\
 	}
 

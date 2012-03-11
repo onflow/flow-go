@@ -66,7 +66,7 @@ static int gen(void) {
 int main(void) {
 	core_init();
 
-	util_print_banner("Tests for the RAND module:\n", 0);
+	util_banner("Tests for the RAND module:\n", 0);
 
 	if (gen() != STS_OK) {
 		core_clean();

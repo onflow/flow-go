@@ -915,11 +915,11 @@ static void arith(void) {
 int main(void) {
 	core_init();
 	conf_print();
-	util_print_banner("Benchmarks for the BN module:", 0);
-	util_print_banner("Utilities:", 1);
+	util_banner("Benchmarks for the BN module:", 0);
+	util_banner("Utilities:", 1);
 	memory();
 	util();
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 	arith();
 
 	core_clean();

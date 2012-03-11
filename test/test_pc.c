@@ -1221,7 +1221,7 @@ static int pairing(void) {
 }
 
 int test1(void) {
-	util_print_banner("Utilities:", 1);
+	util_banner("Utilities:", 1);
 
 	if (memory1() != STS_OK) {
 		core_clean();
@@ -1232,7 +1232,7 @@ int test1(void) {
 		return STS_ERR;
 	}
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 
 	if (addition1() != STS_OK) {
 		return STS_ERR;
@@ -1266,7 +1266,7 @@ int test1(void) {
 }
 
 int test2(void) {
-	util_print_banner("Utilities:", 1);
+	util_banner("Utilities:", 1);
 
 	if (memory2() != STS_OK) {
 		core_clean();
@@ -1277,7 +1277,7 @@ int test2(void) {
 		return STS_ERR;
 	}
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 
 	if (addition2() != STS_OK) {
 		return STS_ERR;
@@ -1311,7 +1311,7 @@ int test2(void) {
 }
 
 int test(void) {
-	util_print_banner("Utilities:", 1);
+	util_banner("Utilities:", 1);
 
 	if (memory() != STS_OK) {
 		core_clean();
@@ -1322,7 +1322,7 @@ int test(void) {
 		return STS_ERR;
 	}
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 
 	if (multiplication() != STS_OK) {
 		return STS_ERR;
@@ -1346,21 +1346,21 @@ int test(void) {
 int main(void) {
 	core_init();
 
-	util_print_banner("Tests for the PC module:", 0);
+	util_banner("Tests for the PC module:", 0);
 
 	if (pc_param_set_any() == STS_OK) {
 		pc_param_print();
-		util_print_banner("Group G_1:", 0);
+		util_banner("Group G_1:", 0);
 		if (test1() != STS_OK) {
 			core_clean();
 			return 1;
 		} else {
-			util_print_banner("Group G_2:", 0);
+			util_banner("Group G_2:", 0);
 			if (test2() != STS_OK) {
 				core_clean();
 				return 1;
 			} else {
-				util_print_banner("Group G_T:", 0);
+				util_banner("Group G_T:", 0);
 				if (test() != STS_OK) {
 					core_clean();
 					return 1;

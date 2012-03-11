@@ -1172,7 +1172,7 @@ static int digit(void) {
 int main(void) {
 	core_init();
 
-	util_print_banner("Tests for the FB module", 0);
+	util_banner("Tests for the FB module", 0);
 
 	TRY {
 		fb_param_set_any();
@@ -1182,7 +1182,7 @@ int main(void) {
 		return 0;
 	}
 
-	util_print_banner("Utilities", 1);
+	util_banner("Utilities", 1);
 	if (memory() != STS_OK) {
 		core_clean();
 		return 1;
@@ -1193,7 +1193,7 @@ int main(void) {
 		return 1;
 	}
 
-	util_print_banner("Arithmetic", 1);
+	util_banner("Arithmetic", 1);
 
 	if (addition() != STS_OK) {
 		core_clean();

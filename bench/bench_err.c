@@ -63,7 +63,7 @@ static void error(void) {
 int main(void) {
 	core_init();
 	conf_print();
-	util_print_banner("Benchmarks for the ERR module:\n", 0);
+	util_banner("Benchmarks for the ERR module:\n", 0);
 	error();
 	core_clean();
 }

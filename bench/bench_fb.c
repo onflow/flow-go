@@ -586,14 +586,14 @@ static void arith(void) {
 int main(void) {
 	core_init();
 	conf_print();
-	util_print_banner("Benchmarks for the FB module:", 0);
+	util_banner("Benchmarks for the FB module:", 0);
 
 	fb_param_set_any();
 	fb_param_print();
-	util_print_banner("Utilities:\n", 0);
+	util_banner("Utilities:\n", 0);
 	memory();
 	util();
-	util_print_banner("Arithmetic:\n", 0);
+	util_banner("Arithmetic:\n", 0);
 	arith();
 
 	core_clean();

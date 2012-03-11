@@ -45,7 +45,8 @@
  */
 #if ARCH == AVR
 #ifndef QUIET
-static char buffer[64 + 1];
+volatile char print_buffer[128 + 1];
+volatile char *print_pointer;
 #endif
 #endif
 
@@ -139,14 +140,14 @@ int util_bits_dig(dig_t a) {
 #endif
 }
 
-void util_printf(char *format, ...) {
+void util_printf(const char *format, ...) {
 #ifndef QUIET
 #if ARCH == AVR
-	char *pointer = &buffer[1];
+	print_pointer = print_buffer + 1;
 	va_list list;
 	va_start(list, format);
-	vsnprintf(pointer, 128, format, list);
-	buffer[0] = (unsigned char)2;
+	vsnprintf_P((char *)print_pointer, 128, format, list);
+	print_buffer[0] = (unsigned char)2;
 	va_end(list);
 #elif ARCH == MSP
 	va_list list;

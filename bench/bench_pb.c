@@ -686,41 +686,41 @@ int main(void) {
 	core_init();
 	conf_print();
 
-	util_print_banner("Benchmarks for the PB module:", 0);
+	util_banner("Benchmarks for the PB module:", 0);
 
 	fb_param_set_any();
 	fb_param_print();
 
-	util_print_banner("Quadratic extension:", 0);
-	util_print_banner("Utilities:", 1);
+	util_banner("Quadratic extension:", 0);
+	util_banner("Utilities:", 1);
 	memory2();
 	util2();
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 	arith2();
 
-	util_print_banner("Quartic extension:", 0);
-	util_print_banner("Utilities", 1)
+	util_banner("Quartic extension:", 0);
+	util_banner("Utilities", 1)
 			memory4();
 	util4();
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 	arith4();
 
-	util_print_banner("Sextic extension:", 0);
-	util_print_banner("Utilities", 1)
+	util_banner("Sextic extension:", 0);
+	util_banner("Utilities", 1)
 			memory6();
 	util6();
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 	arith6();
 
-	util_print_banner("Dodecic extension:", 0);
-	util_print_banner("Utilities", 1)
+	util_banner("Dodecic extension:", 0);
+	util_banner("Utilities", 1)
 			memory12();
 	util12();
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 	arith12();
 
 	r0 = r1 = STS_ERR;
@@ -728,7 +728,7 @@ int main(void) {
 	r0 = eb_param_set_any_super();
 	if (r0 == STS_OK) {
 		eb_param_print();
-		util_print_banner("Arithmetic:", 1);
+		util_banner("Arithmetic:", 1);
 		pairing();
 	}
 #endif
@@ -737,7 +737,7 @@ int main(void) {
 	r1 = hb_param_set_any_super();
 	if ( r1 == STS_OK) {
 		hb_param_print();
-		util_print_banner("Arithmetic:", 1);
+		util_banner("Arithmetic:", 1);
 		pairing2();
 	}
 #endif

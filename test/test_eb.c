@@ -1005,7 +1005,7 @@ static int hashing(void) {
 static int test(void) {
 	eb_param_print();
 
-	util_print_banner("Utilities:", 1);
+	util_banner("Utilities:", 1);
 
 	if (memory() != STS_OK) {
 		core_clean();
@@ -1016,7 +1016,7 @@ static int test(void) {
 		return STS_ERR;
 	}
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 
 	if (addition() != STS_OK) {
 		return STS_ERR;
@@ -1067,7 +1067,7 @@ int main(void) {
 	int r0 = STS_OK, r1 = STS_OK, r2 = STS_OK;
 	core_init();
 
-	util_print_banner("Tests for the EB module:", 0);
+	util_banner("Tests for the EB module:", 0);
 
 #if defined(EB_ORDIN)
 	r0 = eb_param_set_any_ordin();

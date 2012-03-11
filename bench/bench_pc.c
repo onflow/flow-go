@@ -523,30 +523,30 @@ static void arith(void) {
 
 static void bench(void) {
 	pc_param_print();
-	util_print_banner("Group G_1:", 0);
-	util_print_banner("Utilities:", 1);
+	util_banner("Group G_1:", 0);
+	util_banner("Utilities:", 1);
 	memory1();
 	util1();
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 	arith1();
-	util_print_banner("Group G_2:", 0);
-	util_print_banner("Utilities:", 1);
+	util_banner("Group G_2:", 0);
+	util_banner("Utilities:", 1);
 	memory2();
 	util2();
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 	arith2();
-	util_print_banner("Group G_T:", 0);
-	util_print_banner("Utilities:", 1);
+	util_banner("Group G_T:", 0);
+	util_banner("Utilities:", 1);
 	memory();
 	util();
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 	arith();
 }
 
 int main(void) {
 	core_init();
 	conf_print();
-	util_print_banner("Benchmarks for the PC module:", 0);
+	util_banner("Benchmarks for the PC module:", 0);
 
 	if (pc_param_set_any() == STS_OK) {
 		bench();

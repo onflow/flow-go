@@ -87,7 +87,7 @@ void ft_param_print(void) {
 	ft_poly_get_rdc(&fa, &fb, &fc, &fd);
 
 	if (fc == 0) {
-		util_print_banner("Irreducible trinomial:", 0);
+		util_banner("Irreducible trinomial:", 0);
 		util_print("   z^%d", FT_TRITS);
 		if (fa > 0) {
 			util_print(" + z^%d", fa);
@@ -100,7 +100,7 @@ void ft_param_print(void) {
 			util_print(" - 1\n");
 		}
 	} else {
-		util_print_banner("Irreducible pentanomial:", 0);
+		util_banner("Irreducible pentanomial:", 0);
 		util_print("   z^%d", FT_TRITS);
 		if (fa > 0) {
 			util_print(" + z^%d", fa);

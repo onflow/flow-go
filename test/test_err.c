@@ -62,9 +62,9 @@ int main(void) {
 
 	core_init();
 
-	util_print_banner("Tests for the ERR module:\n", 0);
+	util_banner("Tests for the ERR module:\n", 0);
 
-	fprintf(stderr, "Testing if not using try-catch is correct... ");
+	TEST_ONCE("not using try-catch is correct");
 	dummy();
 	if (err_get_code() == STS_ERR) {
 		err_get_msg(&e, &msg);
@@ -75,8 +75,7 @@ int main(void) {
 
 	j = 0;
 
-	fprintf(stderr,
-			"Testing if try-catch is correct and error message is printed... ");
+	TEST_ONCE("try-catch is correct and error message is printed");
 	TRY {
 		dummy();
 	}

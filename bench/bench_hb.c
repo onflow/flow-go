@@ -975,10 +975,10 @@ static void arith(void) {
 
 static void bench(void) {
 	hb_param_print();
-	util_print_banner("Utilities:", 1);
+	util_banner("Utilities:", 1);
 	memory();
 	util();
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 	arith();
 }
 
@@ -987,7 +987,7 @@ int main(void) {
 
 	core_init();
 	conf_print();
-	util_print_banner("Benchmarks for the HB module:", 0);
+	util_banner("Benchmarks for the HB module:", 0);
 
 #if defined(HB_SUPER)
 	r0 = hb_param_set_any_super();

@@ -1430,38 +1430,38 @@ int main(void) {
 	core_init();
 	conf_print();
 
-	util_print_banner("Benchmarks for the PP module:", 0);
+	util_banner("Benchmarks for the PP module:", 0);
 
 	fp_param_set_any_tower();
 	fp_param_print();
 
 	if (ep_param_set_any_pairf() == STS_OK) {
-		util_print_banner("Quadratic extension:", 0);
-		util_print_banner("Utilities:", 1);
+		util_banner("Quadratic extension:", 0);
+		util_banner("Utilities:", 1);
 		memory2();
 		util2();
 
-		util_print_banner("Arithmetic:", 1);
+		util_banner("Arithmetic:", 1);
 		arith2();
 
-		util_print_banner("Sextic extension:", 0);
-		util_print_banner("Utilities:", 1);
+		util_banner("Sextic extension:", 0);
+		util_banner("Utilities:", 1);
 		memory6();
 		util6();
 
-		util_print_banner("Arithmetic:", 1);
+		util_banner("Arithmetic:", 1);
 		arith6();
 
-		util_print_banner("Dodecic extension:", 0);
-		util_print_banner("Utilities:", 1);
+		util_banner("Dodecic extension:", 0);
+		util_banner("Utilities:", 1);
 		memory12();
 		util12();
 
-		util_print_banner("Arithmetic:", 1);
+		util_banner("Arithmetic:", 1);
 		arith12();
 
 		ep_param_print();
-		util_print_banner("Arithmetic:", 1);
+		util_banner("Arithmetic:", 1);
 		memory();
 		util();
 		arith();

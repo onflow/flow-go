@@ -903,7 +903,7 @@ static int hashing(void) {
 int test(void) {
 	ep_param_print();
 
-	util_print_banner("Utilities:", 1);
+	util_banner("Utilities:", 1);
 
 	if (memory() != STS_OK) {
 		core_clean();
@@ -914,7 +914,7 @@ int test(void) {
 		return STS_ERR;
 	}
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 
 	if (addition() != STS_OK) {
 		return STS_ERR;
@@ -955,7 +955,7 @@ int main(void) {
 	int r0, r1, r2;
 	core_init();
 
-	util_print_banner("Tests for the EP module:", 0);
+	util_banner("Tests for the EP module:", 0);
 
 	r0 = r1 = r2 = STS_ERR;
 

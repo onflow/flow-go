@@ -210,10 +210,10 @@ int hb_param_set_any_super() {
 void hb_param_print() {
 	switch (param_id) {
 		case ETAT_S367:
-			util_print_banner("Curve ETAT-S367:", 0);
+			util_banner("Curve ETAT-S367:", 0);
 			break;
 		case ETAT_S439:
-			util_print_banner("Curve ETAT-S439:", 0);
+			util_banner("Curve ETAT-S439:", 0);
 			break;
 	}
 }

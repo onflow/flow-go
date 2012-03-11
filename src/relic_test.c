@@ -50,7 +50,7 @@
 /**
  * Command to set terminal colors.
  */
-#define CMD_SET		27
+#define CMD_SET			27
 
 /**
  * Command to reset terminal colors.

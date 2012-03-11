@@ -2667,10 +2667,10 @@ int main(void) {
 		return 0;
 	}
 
-	util_print_banner("Tests for the PP module", 0);
+	util_banner("Tests for the PP module", 0);
 
-	util_print_banner("Quadratic extension:", 0);
-	util_print_banner("Utilities:", 1);
+	util_banner("Quadratic extension:", 0);
+	util_banner("Utilities:", 1);
 
 	if (memory2() != STS_OK) {
 		core_clean();
@@ -2682,7 +2682,7 @@ int main(void) {
 		return 1;
 	}
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 
 	if (addition2() != STS_OK) {
 		core_clean();
@@ -2724,8 +2724,8 @@ int main(void) {
 		return 1;
 	}
 
-	util_print_banner("Sextic extension:", 0);
-	util_print_banner("Utilities:", 1);
+	util_banner("Sextic extension:", 0);
+	util_banner("Utilities:", 1);
 
 	if (memory6() != STS_OK) {
 		core_clean();
@@ -2737,7 +2737,7 @@ int main(void) {
 		return 1;
 	}
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 
 	if (addition6() != STS_OK) {
 		core_clean();
@@ -2774,8 +2774,8 @@ int main(void) {
 		return 1;
 	}
 
-	util_print_banner("Dodecic extension:", 0);
-	util_print_banner("Utilities:", 1);
+	util_banner("Dodecic extension:", 0);
+	util_banner("Utilities:", 1);
 
 	if (memory12() != STS_OK) {
 		core_clean();
@@ -2787,7 +2787,7 @@ int main(void) {
 		return 1;
 	}
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 
 	if (addition12() != STS_OK) {
 		core_clean();
@@ -2824,8 +2824,8 @@ int main(void) {
 		return 1;
 	}
 
-	util_print_banner("Sextic twist:", 0);
-	util_print_banner("Utilities:", 1);
+	util_banner("Sextic twist:", 0);
+	util_banner("Utilities:", 1);
 
 	if (memory() != STS_OK) {
 		core_clean();
@@ -2837,7 +2837,7 @@ int main(void) {
 		return 1;
 	}
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 
 	if (addition() != STS_OK) {
 		core_clean();
@@ -2879,7 +2879,7 @@ int main(void) {
 		return 1;
 	}
 
-	util_print_banner("Bilinear pairing:\n", 0);
+	util_banner("Bilinear pairing:\n", 0);
 
 	if (pairing() != STS_OK) {
 		core_clean();

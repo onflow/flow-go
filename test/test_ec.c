@@ -530,7 +530,7 @@ static int hashing(void) {
 int test(void) {
 	ec_param_print();
 
-	util_print_banner("Utilities:", 1);
+	util_banner("Utilities:", 1);
 
 	if (memory() != STS_OK) {
 		core_clean();
@@ -541,7 +541,7 @@ int test(void) {
 		return STS_ERR;
 	}
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 
 	if (addition() != STS_OK) {
 		return STS_ERR;
@@ -581,7 +581,7 @@ int test(void) {
 int main(void) {
 	core_init();
 
-	util_print_banner("Tests for the EC module:", 0);
+	util_banner("Tests for the EC module:", 0);
 
 	if (ec_param_set_any() == STS_OK) {
 		if (test() != STS_OK) {

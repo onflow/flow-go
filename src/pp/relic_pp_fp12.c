@@ -1199,7 +1199,7 @@ void fp12_conv_cyc(fp12_t c, fp12_t a) {
 
 int fp12_test_cyc(fp12_t a) {
 	fp12_t t;
-	int result;
+	int result = 0;
 
 	fp12_null(t);
 

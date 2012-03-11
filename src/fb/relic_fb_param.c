@@ -239,10 +239,10 @@ void fb_param_print(void) {
 	fb_poly_get_rdc(&fa, &fb, &fc);
 
 	if (fb == 0) {
-		util_print_banner("Irreducible trinomial:", 0);
+		util_banner("Irreducible trinomial:", 0);
 		util_print("   z^%d + z^%d + 1\n", FB_BITS, fa);
 	} else {
-		util_print_banner("Irreducible pentanomial:", 0);
+		util_banner("Irreducible pentanomial:", 0);
 		util_print("   z^%d + z^%d + z^%d + z^%d + 1\n", FB_BITS, fa, fb, fc);
 	}
 }

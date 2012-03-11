@@ -36,6 +36,7 @@
 #ifndef RELIC_UTIL_H
 #define RELIC_UTIL_H
 
+#include "relic_arch.h"
 #include "relic_types.h"
 
 /*============================================================================*/
@@ -146,11 +147,13 @@
 
 /**
  * Selects a real or dummy printing function depending on library flags.
+ *
+ * @param[in] F			- the format string.
  */
 #ifndef QUIET
-#define util_print(...)		util_printf(__VA_ARGS__)
+#define util_print(F, ...)		util_printf(STRING(F), ##__VA_ARGS__)
 #else
-#define util_print(...)		/* empty */
+#define util_print(F, ...)		/* empty */
 #endif
 
 /**
@@ -159,11 +162,11 @@
  * @param[in] L			- the label of the banner.
  * @param[in] I			- if the banner is inside an hierarchy.
  */
-#define util_print_banner(L, I)												\
+#define util_banner(L, I)													\
 	if (!I) {																\
-		util_print("\n-- %s\n", L);											\
+		util_print("\n-- " L "\n");											\
 	} else {																\
-		util_print("\n** %s\n\n", L);										\
+		util_print("\n** " L "\n\n");										\
 	}																		\
 
 /*============================================================================*/
@@ -204,6 +207,6 @@ int util_bits_dig(dig_t a);
  * @param[in] format			- the format.
  * @param[in] ...				- the list of arguments matching the format.
  */
-void util_printf(char *format, ...);
+void util_printf(const char *format, ...);
 
 #endif /* !RELIC_UTIL_H */

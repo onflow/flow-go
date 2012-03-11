@@ -55,8 +55,8 @@ static void memory(void) {
 int main(void) {
 	core_init();
 	conf_print();
-	util_print_banner("Benchmarks for the DV module:\n", 0);
-	util_print_banner("Utilities:\n", 0);
+	util_banner("Benchmarks for the DV module:\n", 0);
+	util_banner("Utilities:\n", 0);
 	memory();
 	core_clean();
 	return 0;

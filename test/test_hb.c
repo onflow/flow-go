@@ -869,7 +869,7 @@ static int simultaneous(void) {
 static int test(void) {
 	hb_param_print();
 
-	util_print_banner("Utilities:", 1);
+	util_banner("Utilities:", 1);
 
 	if (memory() != STS_OK) {
 		core_clean();
@@ -880,7 +880,7 @@ static int test(void) {
 		return STS_ERR;
 	}
 
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 
 	if (addition() != STS_OK) {
 		return STS_ERR;
@@ -917,7 +917,7 @@ int main(void) {
 	int r0;
 	core_init();
 
-	util_print_banner("Tests for the HB module:", 0);
+	util_banner("Tests for the HB module:", 0);
 
 #if defined(HB_SUPER)
 	r0 = hb_param_set_any_super();

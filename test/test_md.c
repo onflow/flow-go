@@ -335,7 +335,7 @@ static int mgf(void) {
 int main(void) {
 	core_init();
 
-	util_print_banner("Tests for the MD module:\n", 0);
+	util_banner("Tests for the MD module:\n", 0);
 
 	if (sha1() != STS_OK) {
 		core_clean();

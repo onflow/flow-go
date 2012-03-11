@@ -592,55 +592,55 @@ int eb_param_set_any_super() {
 void eb_param_print() {
 	switch (param_id) {
 		case NIST_B163:
-			util_print_banner("Curve NIST-B163:", 0);
+			util_banner("Curve NIST-B163:", 0);
 			break;
 		case NIST_K163:
-			util_print_banner("Curve NIST-K163:", 0);
+			util_banner("Curve NIST-K163:", 0);
 			break;
 		case NIST_B233:
-			util_print_banner("Curve NIST-B233:", 0);
+			util_banner("Curve NIST-B233:", 0);
 			break;
 		case NIST_K233:
-			util_print_banner("Curve NIST-K233:", 0);
+			util_banner("Curve NIST-K233:", 0);
 			break;
 		case SECG_K239:
-			util_print_banner("Curve SECG-K239:", 0);
+			util_banner("Curve SECG-K239:", 0);
 			break;
 		case EBACS_B251:
-			util_print_banner("Curve EBACS-B251:", 0);
+			util_banner("Curve EBACS-B251:", 0);
 			break;
 		case HALVE_B257:
-			util_print_banner("Curve HALVE-B257:", 0);
+			util_banner("Curve HALVE-B257:", 0);
 			break;
 		case NIST_B283:
-			util_print_banner("Curve NIST-B283:", 0);
+			util_banner("Curve NIST-B283:", 0);
 			break;
 		case NIST_K283:
-			util_print_banner("Curve NIST-K283:", 0);
+			util_banner("Curve NIST-K283:", 0);
 			break;
 		case NIST_B409:
-			util_print_banner("Curve NIST-B409:", 0);
+			util_banner("Curve NIST-B409:", 0);
 			break;
 		case NIST_K409:
-			util_print_banner("Curve NIST-K409:", 0);
+			util_banner("Curve NIST-K409:", 0);
 			break;
 		case NIST_B571:
-			util_print_banner("Curve NIST-B571:", 0);
+			util_banner("Curve NIST-B571:", 0);
 			break;
 		case NIST_K571:
-			util_print_banner("Curve NIST-K571:", 0);
+			util_banner("Curve NIST-K571:", 0);
 			break;
 		case ETAT_P271:
-			util_print_banner("Curve ETAT-P271:", 0);
+			util_banner("Curve ETAT-P271:", 0);
 			break;
 		case ETAT_T271:
-			util_print_banner("Curve ETAT-T271:", 0);
+			util_banner("Curve ETAT-T271:", 0);
 			break;
 		case ETAT_S353:
-			util_print_banner("Curve ETAT-S353:", 0);
+			util_banner("Curve ETAT-S353:", 0);
 			break;
 		case ETAT_S1223:
-			util_print_banner("Curve ETAT-S1223:", 0);
+			util_banner("Curve ETAT-S1223:", 0);
 			break;
 	}
 }

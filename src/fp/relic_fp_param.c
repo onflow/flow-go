@@ -581,7 +581,7 @@ int fp_param_set_any_tower() {
 }
 
 void fp_param_print(void) {
-	util_print_banner("Prime modulus:", 0);
+	util_banner("Prime modulus:", 0);
 	util_print("   ");
 	fp_print(fp_prime_get());
 }

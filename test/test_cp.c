@@ -566,10 +566,10 @@ static int bbs(void) {
 int main(void) {
 	core_init();
 
-	util_print_banner("Tests for the CP module", 0);
+	util_banner("Tests for the CP module", 0);
 
 #if defined(WITH_BN)
-	util_print_banner("Protocols based on prime factorization:\n", 0);
+	util_banner("Protocols based on prime factorization:\n", 0);
 
 	if (rsa() != STS_OK) {
 		core_clean();
@@ -583,7 +583,7 @@ int main(void) {
 #endif
 
 #if defined(WITH_EC)
-	util_print_banner("Protocols based on elliptic curves:\n", 0);
+	util_banner("Protocols based on elliptic curves:\n", 0);
 	if (ec_param_set_any() == STS_OK) {
 		if (ecdh() != STS_OK) {
 			core_clean();
@@ -607,7 +607,7 @@ int main(void) {
 #endif
 
 #if defined(WITH_PC)
-	util_print_banner("Protocols based on pairings:\n", 0);
+	util_banner("Protocols based on pairings:\n", 0);
 	if (pc_param_set_any() == STS_OK) {
 		if (sokaka() != STS_OK) {
 			core_clean();

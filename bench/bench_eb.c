@@ -618,10 +618,10 @@ static void arith(void) {
 
 static void bench(void) {
 	eb_param_print();
-	util_print_banner("Utilities:", 1);
+	util_banner("Utilities:", 1);
 	memory();
 	util();
-	util_print_banner("Arithmetic:", 1);
+	util_banner("Arithmetic:", 1);
 	arith();
 }
 
@@ -632,7 +632,7 @@ int main(void) {
 
 	core_init();
 	conf_print();
-	util_print_banner("Benchmarks for the EB module:", 0);
+	util_banner("Benchmarks for the EB module:", 0);
 
 #if defined(EB_ORDIN)
 	r0 = eb_param_set_any_ordin();

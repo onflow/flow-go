@@ -276,7 +276,7 @@ typedef struct _state_t {
 #else
 #define THROW(E)															\
 	core_ctx->code = STS_ERR; 												\
-	util_print("FATAL ERROR in %s:%d\n", __FILE__, __LINE__);				\
+	util_print("FATAL ERROR in " __FILE__ ":%d\n", __LINE__);				\
 
 #endif
 #endif

@@ -587,52 +587,52 @@ int ep_param_set_any_pairf() {
 void ep_param_print() {
 	switch (param_id) {
 		case SECG_P160:
-			util_print_banner("Curve SECG-P160:", 0);
+			util_banner("Curve SECG-P160:", 0);
 			break;
 		case SECG_K160:
-			util_print_banner("Curve SECG-K160:", 0);
+			util_banner("Curve SECG-K160:", 0);
 			break;
 		case NIST_P192:
-			util_print_banner("Curve NIST-P192:", 0);
+			util_banner("Curve NIST-P192:", 0);
 			break;
 		case SECG_K192:
-			util_print_banner("Curve SECG-K192:", 0);
+			util_banner("Curve SECG-K192:", 0);
 			break;
 		case NIST_P224:
-			util_print_banner("Curve NIST-P224:", 0);
+			util_banner("Curve NIST-P224:", 0);
 			break;
 		case SECG_K224:
-			util_print_banner("Curve SECG-K224:", 0);
+			util_banner("Curve SECG-K224:", 0);
 			break;
 		case NIST_P256:
-			util_print_banner("Curve NIST-P256:", 0);
+			util_banner("Curve NIST-P256:", 0);
 			break;
 		case SECG_K256:
-			util_print_banner("Curve SECG-K256:", 0);
+			util_banner("Curve SECG-K256:", 0);
 			break;
 		case NIST_P384:
-			util_print_banner("Curve NIST-P384:", 0);
+			util_banner("Curve NIST-P384:", 0);
 			break;
 		case NIST_P521:
-			util_print_banner("Curve NIST-P521:", 0);
+			util_banner("Curve NIST-P521:", 0);
 			break;
 		case BN_P158:
-			util_print_banner("Curve BN-P158:", 0);
+			util_banner("Curve BN-P158:", 0);
 			break;
 		case BN_P254:
-			util_print_banner("Curve BN-P254:", 0);
+			util_banner("Curve BN-P254:", 0);
 			break;
 		case BN_P256:
-			util_print_banner("Curve BN-P256:", 0);
+			util_banner("Curve BN-P256:", 0);
 			break;
 		case KSS_P508:
-			util_print_banner("Curve KSS-P508:", 0);
+			util_banner("Curve KSS-P508:", 0);
 			break;
 		case BN_P638:
-			util_print_banner("Curve BN-P638:", 0);
+			util_banner("Curve BN-P638:", 0);
 			break;
 		case BW_P638:
-			util_print_banner("Curve BW-P638:", 0);
+			util_banner("Curve BW-P638:", 0);
 			break;
 	}
 }
