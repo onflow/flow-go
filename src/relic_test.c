@@ -43,19 +43,9 @@
 #define FAIL_COLOR		31
 
 /**
- * String to print when the test fails.
- */
-#define FAIL_STRING	"FAIL"
-
-/**
  * Color of the string printed when the test passes (green).
  */
 #define PASS_COLOR		32
-
-/**
- * String to print when the test passes.
- */
-#define PASS_STRING	"PASS"
 
 /**
  * Command to set terminal colors.
@@ -79,19 +69,19 @@
 void test_fail(void) {
 #ifdef COLOR
 	util_print("[%c[%d;%dm", CMD_SET, CMD_ATTR, FAIL_COLOR);
-	util_print("%s", FAIL_STRING);
+	util_print("FAIL");
 	util_print("%c[%dm]\n", CMD_SET, CMD_RESET);
 #else
-	util_print("[%s]\n", FAIL_STRING);
+	util_print("[FAIL]\n");
 #endif
 }
 
 void test_pass(void) {
 #ifdef COLOR
 	util_print("[%c[%d;%dm", CMD_SET, CMD_ATTR, PASS_COLOR);
-	util_print("%s", PASS_STRING);
+	util_print("PASS");
 	util_print("%c[%dm]\n", CMD_SET, CMD_RESET);
 #else
-	util_print("[%s]\n", PASS_STRING);
+	util_print("[PASS]\n");
 #endif
 }
