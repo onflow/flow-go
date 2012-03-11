@@ -51,7 +51,7 @@
  */
 #define BENCH_ONCE(LABEL, FUNCTION)											\
 	bench_reset();															\
-	util_print("BENCH: %s %*s = ", LABEL, (int)(32 - strlen(LABEL)), " ");	\
+	util_print("BENCH: " LABEL "%*c = ", (int)(32 - strlen(LABEL)), ' ');	\
 	bench_before();															\
 	FUNCTION;																\
 	bench_after();															\
@@ -66,7 +66,7 @@
  */
 #define BENCH_SMALL(LABEL, FUNCTION)										\
 	bench_reset();															\
-	util_print("BENCH: %s %*s = ", LABEL, (int)(32 - strlen(LABEL)), " ");	\
+	util_print("BENCH: " LABEL "%*c = ", (int)(32 - strlen(LABEL)), ' ');	\
 	bench_before();															\
 	for (int i = 0; i < BENCH; i++)	{										\
 		FUNCTION;															\
@@ -82,7 +82,7 @@
  */
 #define BENCH_BEGIN(LABEL)													\
 	bench_reset();															\
-	util_print("BENCH: %s %*s = ", LABEL, (int)(32 - strlen(LABEL)), " ");	\
+	util_print("BENCH: " LABEL "%*c = ", (int)(32 - strlen(LABEL)), ' ');	\
 	for (int i = 0; i < BENCH; i++)	{										\
 
 /**

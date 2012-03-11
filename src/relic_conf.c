@@ -48,7 +48,7 @@
 
 void conf_print(void) {
 #ifndef QUIET
-	util_print("-- RELIC %s configuration:\n\n", VERSION);
+	util_print("-- RELIC " VERSION " configuration:\n\n");
 #if ALLOC == STATIC
 	util_print("** Allocation mode: STATIC\n\n");
 #elif ALLOC == DYNAMIC
@@ -65,7 +65,7 @@ void conf_print(void) {
 	util_print("** Arithmetic backend: gmp\n\n");
 #endif
 
-#if BENCH > 0
+#if BENCH > 1
 	util_print("** Benchmarking options:\n");
 	util_print("   Number of times: %d\n", BENCH * BENCH);
 	util_print("   Estimated overhead: ");
@@ -75,54 +75,54 @@ void conf_print(void) {
 #ifdef WITH_BN
 	util_print("** Multiple precision module options:\n");
 	util_print("   Precision: %d bits, %d words\n", BN_BITS, BN_DIGS);
-	util_print("   Arithmetic method: %s\n\n", BN_METHD);
+	util_print("   Arithmetic method:" BN_METHD "\n\n");
 #endif
 
 #ifdef WITH_FP
 	util_print("** Prime field module options:\n");
 	util_print("   Prime size: %d bits, %d words\n", FP_BITS, FP_DIGS);
-	util_print("   Arithmetic method: %s\n\n", FP_METHD);
+	util_print("   Arithmetic method:" FP_METHD "\n\n");
 #endif
 
 #ifdef WITH_EP
 	util_print("** Prime elliptic curve module options:\n");
-	util_print("   Arithmetic method: %s\n\n", EP_METHD);
+	util_print("   Arithmetic method:" EP_METHD "\n\n");
 #endif
 
 #ifdef WITH_PP
 	util_print("** Pairing over prime curve module options:\n");
-	util_print("   Arithmetic method: %s\n\n", PP_METHD);
+	util_print("   Arithmetic method:" PP_METHD "\n\n");
 #endif
 
 #ifdef WITH_FB
 	util_print("** Binary field module options:\n");
 	util_print("   Polynomial size: %d bits, %d words\n", FB_BITS, FB_DIGS);
-	util_print("   Arithmetic method: %s\n\n", FB_METHD);
+	util_print("   Arithmetic method:" FB_METHD "\n\n");
 #endif
 
 #ifdef WITH_EB
 	util_print("** Binary elliptic curve module options:\n");
-	util_print("   Arithmetic method: %s\n\n", EB_METHD);
+	util_print("   Arithmetic method:" EB_METHD "\n\n");
 #endif
 
 #ifdef WITH_HB
 	util_print("** Binary hyperelliptic curve module options:\n");
-	util_print("   Arithmetic method: %s\n\n", HB_METHD);
+	util_print("   Arithmetic method:" HB_METHD "\n\n");
 #endif
 
 #ifdef WITH_PB
 	util_print("** Pairing over binary curve module options:\n");
-	util_print("   Arithmetic method: %s\n\n", PB_METHD);
+	util_print("   Arithmetic method:" PB_METHD "\n\n");
 #endif
 
 #ifdef WITH_EC
 	util_print("** Elliptic Curve Cryptography module options:\n");
-	util_print("   Arithmetic method: %s\n\n", EC_METHD);
+	util_print("   Arithmetic method:" EC_METHD "\n\n");
 #endif
 
 #ifdef WITH_PC
 	util_print("** Pairing Based Cryptography module options:\n");
-	util_print("   Arithmetic method: %s\n\n", PC_METHD);
+	util_print("   Arithmetic method:" PC_METHD "\n\n");
 #endif
 
 #endif
