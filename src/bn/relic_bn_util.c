@@ -204,9 +204,7 @@ void bn_rand(bn_t a, int sign, int bits) {
 
 	bn_grow(a, digits);
 
-	for (int i = 0; i < digits; i++) {
-		rand_bytes((unsigned char *)&(a->dp[i]), (BN_DIGIT / 8));
-	}
+	rand_bytes((unsigned char *)a->dp, digits * (BN_DIGIT / 8));
 				
 	a->used = digits;
 	a->sign = sign;
