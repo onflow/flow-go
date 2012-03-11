@@ -116,7 +116,11 @@ void fb_param_set(int param) {
 			fb_poly_set_penta(12, 7, 5);
 			break;
 		case TRINO_353:
+#if WORD == 8
 			fb_poly_set_trino(69);
+#else
+			fb_poly_set_trino(95);
+#endif
 			break;
 		case TRINO_367:
 			fb_poly_set_trino(21);
