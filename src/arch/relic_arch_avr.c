@@ -42,7 +42,7 @@ void arch_clean(void) {
 }
 
 void arch_copy_rom(char *dest, const char *src, int len) {
-	int i;
+	int i = 0;
 	char c;
 
 	while ((c = pgm_read_byte(src++)) && (i++ < len - 1)) {
