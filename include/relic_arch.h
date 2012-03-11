@@ -66,7 +66,7 @@
  * @param[in] L			- the length of the string.
  */
 #if ARCH == AVR
-#define FETCH(STR, ID, L)	arch_copy_rom(STR, STRING(ID), L - 1);
+#define FETCH(STR, ID, L)	arch_copy_rom(STR, STRING(ID), L);
 #else
 #define FETCH(STR, ID, L)	strncpy(STR, ID, L);
 #endif
