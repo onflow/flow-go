@@ -110,7 +110,7 @@ bn_sub1_low:
 	sbc		r23, r20
 	st		z+, r23
 	dec		r18
-	breq	bn_add1_end
+	breq	bn_sub1_end
 
 bn_sub1_loop:
 	ld		r23, x+
@@ -135,7 +135,7 @@ bn_subn_low:
 
 	clc
 	tst		r18
-	breq	bn_add1_end
+	breq	bn_subn_end
 
 bn_subn_loop:
 	ld		r23, x+
