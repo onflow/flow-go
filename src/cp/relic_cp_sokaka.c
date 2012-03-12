@@ -132,7 +132,7 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 			}
 		}
 #if PC_CUR == PRIME
-		unsigned char buf[12 * FP_BYTES], *ptr;
+		unsigned char buf[12 * FP_BYTES] = { 0 }, *ptr;
 		ptr = buf;
 		for (i = 0; i < 2; i++) {
 			for (j = 0; j < 3; j++) {
@@ -146,7 +146,7 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 		}
 		md_kdf1(key, key_len, buf, 12 * FP_BYTES);
 #else
-		unsigned char buf[4 * FB_BYTES], *ptr;
+		unsigned char buf[4 * FB_BYTES] = { 0 }, *ptr;
 		ptr = buf;
 		for (i = 0; i < 4; i++) {
 			memcpy(ptr, e[i], FB_BYTES);
