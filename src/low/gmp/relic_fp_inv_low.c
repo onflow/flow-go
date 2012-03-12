@@ -42,7 +42,7 @@
 
 void fp_invn_low(dig_t *c, dig_t *a) {
 	mp_size_t cn;
-	align dig_t s[FP_DIGS], t[2 * FP_DIGS], u[FP_DIGS];
+	align dig_t s[FP_DIGS], t[2 * FP_DIGS], u[FP_DIGS + 1];
 
 #if FP_RDC == MONTY
 	dv_zero(t + FP_DIGS, FP_DIGS);
