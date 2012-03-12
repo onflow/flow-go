@@ -45,11 +45,6 @@
 /*============================================================================*/
 
 /**
- * Default RSA public exponent.
- */
-#define RSA_EXP 			"65537"
-
-/**
  * Length of chosen padding scheme.
  */
 #if CP_RSAPD == PKCS1
@@ -113,7 +108,7 @@
 #if CP_RSAPD == BASIC
 
 /**
- * Applies or removes a PKCS#1 v1.5 encryption padding.
+ * Applies or removes simple encryption padding.
  *
  * @param[out] m		- the buffer to pad.
  * @param[out] p_len	- the number of added pad bytes.
@@ -558,7 +553,8 @@ int cp_rsa_gen_basic(rsa_t pub, rsa_t prv, int bits) {
 
 		bn_mul(t, prv->p, prv->q);
 
-		bn_read_str(pub->e, RSA_EXP, strlen(RSA_EXP), 10);
+		bn_set_2b(pub->e, 16);
+		bn_add_dig(pub->e, pub->e, 1);
 
 		bn_gcd_ext(r, prv->d, NULL, pub->e, t);
 		if (bn_sign(prv->d) == BN_NEG) {
@@ -618,7 +614,8 @@ int cp_rsa_gen_quick(rsa_t pub, rsa_t prv, int bits) {
 		/* phi(n) = (p - 1)(q - 1). */
 		bn_mul(t, prv->p, prv->q);
 
-		bn_read_str(pub->e, RSA_EXP, strlen(RSA_EXP), 10);
+		bn_set_2b(pub->e, 16);
+		bn_add_dig(pub->e, pub->e, 1);
 
 		/* d = e^(-1) mod phi(n). */
 		bn_gcd_ext(r, prv->d, NULL, pub->e, t);
@@ -786,7 +783,7 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 
 	bn_size_bin(&size, prv->n);
 
-	if (in_len < 0 || in_len > size) {
+	if (in_len < 0 || in_len != size || in_len < RSA_PAD_LEN) {
 		return STS_ERR;
 	}
 
