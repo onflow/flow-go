@@ -675,6 +675,7 @@ static int reduction(void) {
 	int code = STS_ERR;
 	fb_t a, b, c;
 	dv_t t0, t1;
+	dig_t carry;
 
 	fb_null(a);
 	fb_null(b);
@@ -700,8 +701,8 @@ static int reduction(void) {
 			} else {
 				/* Test if f(z) * z^(m-1) mod f(z) == 0. */
 				dv_zero(t0, FB_DIGS);
-				t0[FB_DIGS - 1] = (dig_t)1 << (FB_DIGIT - 1);
-				fb_rsh(t0 + FB_DIGS, fb_poly_get(), 1);
+				carry = fb_lshb_low(t0 + FB_DIGS - 1, fb_poly_get(), FB_POLYN % FB_DIGIT - 1);
+				t0[2 * FB_DIGS - 1] = carry;
 				fb_rdc(a, t0);
 			}
 			TEST_ASSERT(fb_is_zero(a) == 1, end);
