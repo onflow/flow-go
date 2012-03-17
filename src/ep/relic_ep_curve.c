@@ -20,7 +20,7 @@
  * along with RELIC. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/**
+/**f
  * @file
  *
  * Implementation of the prime elliptic curve utilities.
@@ -235,13 +235,13 @@ dig_t *ep_curve_get_beta() {
 
 void ep_curve_get_v1(bn_t v[]) {
 	for (int i = 0; i < 3; i++) {
-		bn_copy(v[i], &curve_v1[i]);
+		bn_copy(v[i], &(curve_v1[i]));
 	}
 }
 
 void ep_curve_get_v2(bn_t v[]) {
 	for (int i = 0; i < 3; i++) {
-		bn_copy(v[i], &curve_v2[i]);
+		bn_copy(v[i], &(curve_v2[i]));
 	}
 }
 

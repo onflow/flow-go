@@ -138,7 +138,7 @@ static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 		bn_free(k0);
 		bn_free(k1);
 		bn_free(n)
-				ep_free(q);
+		ep_free(q);
 		for (i = 0; i < 1 << (EP_WIDTH - 2); i++) {
 			ep_free(table[i]);
 		}
