@@ -75,7 +75,7 @@
 /**
  * Size in bytes of a block sufficient to store the required precision.
  */
-#define BN_BYTES 	((int)((BN_BITS)/8 + (BN_BITS % 8 > 0)))
+#define BN_BYTES 	((int)((BN_BITS)/8 + ((BN_BITS % 8) > 0)))
 
 /**
  * Size in digits of a block sufficient to store a multiple precision integer.
