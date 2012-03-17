@@ -228,8 +228,9 @@ void bn_mul_comba(bn_t c, bn_t a, bn_t b) {
 	int digits;
 	bn_t t;
 
-	TRY {
+	bn_null(t);
 
+	TRY {
 		digits = a->used + b->used;
 
 		/* We need a temporary variable so that c can be a or b. */
@@ -251,8 +252,6 @@ void bn_mul_comba(bn_t c, bn_t a, bn_t b) {
 		t->sign = a->sign ^ b->sign;
 		bn_trim(t);
 		bn_copy(c, t);
-
-		bn_free(t);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
