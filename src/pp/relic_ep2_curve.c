@@ -167,36 +167,65 @@ static ep2_st *pointer[EP_TABLE];
 
 #endif
 
+#if ALLOC == STACK
+
+/**
+ * In case of stack allocation, we need to get global memory for the table.
+ */
+static fp2_st _table[3 * EP_TABLE];
+
+#endif
+
 /*============================================================================*/
-	/* Public definitions                                                         */
+/* Public definitions                                                         */
 /*============================================================================*/
 
 void ep2_curve_init(void) {
 #ifdef EP_PRECO
-        for (int i = 0; i < EP_TABLE; i++) {
-                pointer[i] = &(table[i]);
-        }
+	for (int i = 0; i < EP_TABLE; i++) {
+		pointer[i] = &(table[i]);
+	}
 #endif
+
 #if ALLOC == STATIC || ALLOC == DYNAMIC || ALLOC == STACK
-        curve_g.x[0] = curve_gx[0];
-        curve_g.x[1] = curve_gx[1];
-        curve_g.y[0] = curve_gy[0];
-        curve_g.y[1] = curve_gy[1];
-        curve_g.z[0] = curve_gz[0];
-        curve_g.z[1] = curve_gz[1];
+	curve_g.x[0] = curve_gx[0];
+	curve_g.x[1] = curve_gx[1];
+	curve_g.y[0] = curve_gy[0];
+	curve_g.y[1] = curve_gy[1];
+	curve_g.z[0] = curve_gz[0];
+	curve_g.z[1] = curve_gz[1];
+#endif
+
 #ifdef EP_PRECO
-        for (int i = 0; i < EP_TABLE; i++) {
-                fp2_new(table[i].x);
-                fp2_new(table[i].y);
-                fp2_new(table[i].z);
-        }
+#if ALLOC == STATIC || ALLOC == DYNAMIC
+	for (int i = 0; i < EP_TABLE; i++) {
+		fp2_new(table[i].x);
+		fp2_new(table[i].y);
+		fp2_new(table[i].z);
+	}
+#elif ALLOC == STACK
+	for (int i = 0; i < EP_TABLE; i++) {
+		table[i].x[0] = _table[3 * i][0];
+		table[i].x[1] = _table[3 * i][1];
+		table[i].y[0] = _table[3 * i + 1][0];
+		table[i].y[1] = _table[3 * i + 1][1];
+		table[i].z[0] = _table[3 * i + 2][0];
+		table[i].z[1] = _table[3 * i + 2][1];
+	}
 #endif
 #endif
-        ep2_set_infty(&curve_g);
-        bn_init(&curve_r, FP_DIGS);
+	ep2_set_infty(&curve_g);
+	bn_init(&curve_r, FP_DIGS);
 }
 
 void ep2_curve_clean(void) {
+#ifdef EP_PRECO
+	for (int i = 0; i < EP_TABLE; i++) {
+		fp2_free(table[i].x);
+		fp2_free(table[i].y);
+		fp2_free(table[i].z);
+	}
+#endif
 	bn_clean(&curve_r);
 }
 
@@ -230,7 +259,7 @@ void ep2_curve_get_ord(bn_t n) {
 
 ep2_t *ep2_curve_get_tab() {
 #if ALLOC == AUTO
-	return (ep2_t *) *pointer;
+	return (ep2_t *)*pointer;
 #else
 	return pointer;
 #endif

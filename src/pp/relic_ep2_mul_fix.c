@@ -309,15 +309,15 @@ void ep2_mul_fix_nafwi(ep2_t r, ep2_t *t, bn_t k) {
 
 void ep2_mul_pre_combs(ep2_t *t, ep2_t p) {
 	int i, j, l;
-	bn_t ord;
+	bn_t n;
 
-	bn_null(ord);
+	bn_null(n);
 
 	TRY {
-		bn_new(ord);
+		bn_new(n);
 
-		ep2_curve_get_ord(ord);
-		l = bn_bits(ord);
+		ep2_curve_get_ord(n);
+		l = bn_bits(n);
 		l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
 
 		ep2_set_infty(t[0]);
@@ -345,7 +345,7 @@ void ep2_mul_pre_combs(ep2_t *t, ep2_t p) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		bn_free(ord);
+		bn_free(n);
 	}
 }
 
