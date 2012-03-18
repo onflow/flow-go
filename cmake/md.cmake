@@ -17,4 +17,4 @@ if (MD_LEN LESS 1)
 endif(MD_LEN LESS 1)
 
 list(GET MD_METHD 0 MD_MAP)
-set(MD_METHD ${MD_METHD} CACHE STRING "Hash function.")
+set(MD_METHD ${MD_METHD} CACHE STRING "Method for hash functions.")

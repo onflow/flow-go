@@ -26,4 +26,4 @@ if (CP_LEN LESS 1)
 endif(CP_LEN LESS 1)
 
 list(GET CP_METHD 0 CP_RSA)
-set(CP_METHD ${CP_METHD} CACHE STRING "Cryptographic protocols methods")
+set(CP_METHD ${CP_METHD} CACHE STRING "Method for cryptographic protocols.")

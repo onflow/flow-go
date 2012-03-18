@@ -86,4 +86,4 @@ list(GET FB_METHD 6 FB_INV)
 list(GET FB_METHD 7 FB_EXP)
 list(GET FB_METHD 8 FB_ITR)
 
-set(FB_METHD ${FB_METHD} CACHE STRING "Binary field arithmetic method")
+set(FB_METHD ${FB_METHD} CACHE STRING "Method for binary field arithmetic.")

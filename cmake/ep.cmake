@@ -28,7 +28,7 @@ message("      EP_METHD=TRICK    Shamir's trick for simultaneous multiplication.
 message("      EP_METHD=INTER    Interleaving of window NAFs (GLV for Koblitz curves).")
 message("      EP_METHD=JOINT    Joint sparse form.\n")
 
-message("      Note: these methods must be given in order. Ex: EB_METHD=\"BASIC;LWNAF;COMBD;TRICK\"\n")
+message("      Note: these methods must be given in order. Ex: EP_METHD=\"BASIC;LWNAF;COMBD;TRICK\"\n")
 
 if (NOT EP_DEPTH)
 	set(EP_DEPTH 4)
@@ -58,4 +58,4 @@ list(GET EP_METHD 0 EP_ADD)
 list(GET EP_METHD 1 EP_MUL)
 list(GET EP_METHD 2 EP_FIX)
 list(GET EP_METHD 3 EP_SIM)
-set(EP_METHD ${EP_METHD} CACHE STRING "Prime elliptic curve arithmetic method.")
+set(EP_METHD ${EP_METHD} CACHE STRING "Method for prime elliptic curve arithmetic.")

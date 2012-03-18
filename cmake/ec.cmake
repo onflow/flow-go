@@ -21,4 +21,4 @@ if (EC_LEN LESS 1)
 endif(EC_LEN LESS 1)
 
 list(GET EC_METHD 0 EC_CUR)
-set(EC_METHD ${EC_METHD} CACHE STRING "Choice of elliptic curve.")
+set(EC_METHD ${EC_METHD} CACHE STRING "Method for Elliptic Curve Cryptography.")

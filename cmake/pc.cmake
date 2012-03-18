@@ -14,4 +14,4 @@ if (PC_LEN LESS 1)
 endif(PC_LEN LESS 1)
 
 list(GET PC_METHD 0 PC_CUR )
-set(PC_METHD ${PC_METHD} CACHE STRING "Choice of pairing setting.")
+set(PC_METHD ${PC_METHD} CACHE STRING "Method for Pairing-Based Cryptography.")

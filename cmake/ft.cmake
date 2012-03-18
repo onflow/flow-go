@@ -56,4 +56,4 @@ list(GET FT_METHD 2 FT_RDC)
 list(GET FT_METHD 3 FT_CRT)
 list(GET FT_METHD 4 FT_INV)
 
-set(FT_METHD ${FT_METHD} CACHE STRING "Ternary field arithmetic method")
+set(FT_METHD ${FT_METHD} CACHE STRING "Method for ternary field arithmetic.")
