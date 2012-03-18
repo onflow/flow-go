@@ -91,7 +91,7 @@ if (WITH_PB)
 	file(GLOB TEMP pb/relic_pb_map*.c)
 	list(APPEND PB_SRCS ${TEMP})
 	# Add all the extension code.
-	file(GLOB TEMP pb/relic_pb_fb*.c)
+	file(GLOB TEMP fbx/*.c)
 	list(APPEND PB_SRCS ${TEMP})
 	# Add genus-1 or genus-2 pairings (or both).
 	if (WITH_EB)

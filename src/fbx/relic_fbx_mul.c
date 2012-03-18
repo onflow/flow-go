@@ -49,7 +49,8 @@
 #include "relic_core.h"
 #include "relic_conf.h"
 #include "relic_util.h"
-#include "relic_pb.h"
+#include "relic_fbx.h"
+#include "relic_fb_low.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
