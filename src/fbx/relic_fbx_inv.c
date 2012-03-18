@@ -25,7 +25,7 @@
  *
  * Implementation of inversion in extensions defined over binary fields.
  *
- * @version $Id: relic_pb_fb2.c 1108 2012-03-11 21:45:01Z dfaranha $
+ * @version $Id$
  * @ingroup fbx
  */
 

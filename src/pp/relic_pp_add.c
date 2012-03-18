@@ -25,7 +25,7 @@
  *
  * Implementation of the Miller addition function.
  *
- * @version $Id: relic_pp_add.c 818 2011-07-11 06:54:02Z dfaranha $
+ * @version $Id$
  * @ingroup pp
  */
 

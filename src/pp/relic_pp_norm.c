@@ -25,7 +25,7 @@
  *
  * Implementation of point normalization for points used in pairing computation.
  *
- * @version $Id: relic_pp_norm.c 463 2010-07-13 21:12:13Z conradoplg $
+ * @version $Id$
  * @ingroup pp
  */
 

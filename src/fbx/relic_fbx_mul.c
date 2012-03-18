@@ -40,7 +40,7 @@
  * Bodrato, Towards optimal Toom-Cook multiplication for univariate and
  * multivariate polynomials in characteristic 2 and 0, 2007.
  *
- * @version $Id: relic_pb_fb2.c 1108 2012-03-11 21:45:01Z dfaranha $
+ * @version $Id$
  * @ingroup fbx
  */
 
