@@ -29,8 +29,8 @@
  *
  * Interface of the module for extension field arithmetic over binary fields.
  *
- * @version $Id: relic_pb.h 1108 2012-03-11 21:45:01Z dfaranha $
- * @ingroup pb
+ * @version $Id$
+ * @ingroup fbx
  */
 
 #ifndef RELIC_FBX_H
