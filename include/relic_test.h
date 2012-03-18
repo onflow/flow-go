@@ -27,7 +27,7 @@
 /**
  * @file
  *
- * Useful routines for testing.
+ * Interface of useful routines for testing.
  *
  * @version $Id$
  * @ingroup test

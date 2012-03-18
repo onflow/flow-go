@@ -21,13 +21,13 @@
  */
 
 /**
- * @defgroup hb Hyperelliptic genus 2 curves over binary fields.
+ * @defgroup hb Hyperelliptic genus-2 curves over binary fields.
  */
 
 /**
  * @file
  *
- * Interface of the binary hyperelliptic curves functions.
+ * Interface of the module for arithmetic on binary hyperelliptic curves.
  *
  * @version $Id$
  * @ingroup hb

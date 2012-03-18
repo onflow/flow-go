@@ -27,7 +27,7 @@
 /**
  * @file
  *
- * Interface of the pseudo-random number generator.
+ * Interface of the module for pseudo-random number generation.
  *
  * @version $Id$
  * @ingroup rand

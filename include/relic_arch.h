@@ -27,7 +27,7 @@
 /**
  * @file
  *
- * Interface of architecture-dependent utilities.
+ * Interface of architecture-dependent functions.
  *
  * @version $Id$
  * @ingroup arch

@@ -27,7 +27,8 @@
 /**
  * @file
  *
- * Interface of the bilinear pairing over elliptic curves functions.
+ * Interface of the module for computing bilinear pairings over prime elliptic
+ * curves.
  *
  * @version $Id$
  * @ingroup pp

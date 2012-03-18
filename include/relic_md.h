@@ -27,7 +27,7 @@
 /**
  * @file
  *
- * Interface of the hash functions module.
+ * Interface of the module for computing hash functions.
  *
  * @version $Id$
  * @ingroup md

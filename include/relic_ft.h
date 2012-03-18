@@ -27,7 +27,7 @@
 /**
  * @file
  *
- * Interface of the ternary field arithmetic module.
+ * Interface of the module for ternary field arithmetic.
  *
  * @version $Id$
  * @ingroup fb

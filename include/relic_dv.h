@@ -21,13 +21,13 @@
  */
 
 /**
- * @defgroup dv Temporary double precision digit vector handling.
+ * @defgroup dv Temporary double-precision digit vector handling.
  */
 
 /**
  * @file
  *
- * Interface of the function which manipulate temporary double precision digit
+ * Interface of the module for manipulating temporary double-precision digit
  * vectors.
  *
  * @version $Id$
@@ -90,7 +90,7 @@
 /*============================================================================*/
 
 /**
- * Represents a temporary double precision digit vector.
+ * Represents a temporary double-precision digit vector.
  */
 #if ALLOC == AUTO
 typedef align dig_t dv_t[DV_DIGS + PADDING(DV_BYTES)/(DIGIT / 8)];
@@ -114,9 +114,9 @@ typedef dig_t *dv_t;
 #endif
 
 /**
- * Calls a function to allocate a temporary double precision digit vector.
+ * Calls a function to allocate a temporary double-precision digit vector.
  *
- * @param[out] A			- the double precision result.
+ * @param[out] A			- the double-precision result.
  */
 #if ALLOC == DYNAMIC
 #define dv_new(A)			dv_new_dynam(&(A), DV_DIGS)
@@ -159,7 +159,7 @@ typedef dig_t *dv_t;
 void dv_print(dv_t a, int digits);
 
 /**
- * Assigns zero to a temporary double precision digit vector.
+ * Assigns zero to a temporary double-precision digit vector.
  *
  * @param[out] a			- the temporary digit vector to assign.
  * @param[in] digits		- the number of words to initialize with zero.
@@ -176,7 +176,7 @@ void dv_zero(dv_t a, int digits);
 void dv_copy(dv_t c, dv_t a, int digits);
 
 /**
- * Allocates and initializes a temporary double precision digit vector.
+ * Allocates and initializes a temporary double-precision digit vector.
  *
  * @param[out] a			- the new temporary digit vector.
  * @param[in] digits		- the required precision in digits.
@@ -191,7 +191,7 @@ void dv_new_statc(dv_t *a, int digits);
 #endif
 
 /**
- * Cleans and frees a temporary double precision digit vector.
+ * Cleans and frees a temporary double-precision digit vector.
  *
  * @param[out] a			- the temporary digit vector to clean and free.
  */

@@ -23,8 +23,7 @@
 /**
  * @file
  *
- * Interface of the memory-management routines for the finite field
- * arithmetic modules.
+ * Interface of the memory-management routines for the static memory allocator.
  *
  * @version $Id$
  * @ingroup relic
