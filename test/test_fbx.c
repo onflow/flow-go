@@ -1670,7 +1670,12 @@ static int exponentiation12(void) {
 int main(void) {
 	core_init();
 
-	fb_param_set_any();
+	TRY {
+		fb_param_set_any();
+	} CATCH_ANY {
+		core_clean();
+		return 0;
+	}
 
 	util_banner("Tests for the FBX module", 0);
 
