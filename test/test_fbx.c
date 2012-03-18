@@ -25,7 +25,7 @@
  *
  * Tests for extensions defined over binary fields.
  *
- * @version $Id: test_pb.c 1108 2012-03-11 21:45:01Z dfaranha $
+ * @version $Id$
  * @ingroup test
  */
 
