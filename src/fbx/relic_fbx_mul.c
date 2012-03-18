@@ -302,9 +302,6 @@ void fb2_mul(fb2_t c, fb2_t a, fb2_t b) {
 	}
 }
 
-
- */
-
 void fb4_mul(fb4_t c, fb4_t a, fb4_t b) {
 	fb_t t0, t1, t2, t3, t4, t5, t6, t7, t8, t9;
 
