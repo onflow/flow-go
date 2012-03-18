@@ -457,6 +457,10 @@ void ep_param_set(int param) {
 				break;
 		}
 
+		/* Do not generate warnings. */
+		(void)kbltz;
+		(void)ordin;
+
 		param_id = param;
 
 		fp_zero(g->z);
