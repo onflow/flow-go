@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the ternary field arithmetic module.
+ * Tests for ternary field arithmetic.
  *
  * @version $Id$
  * @ingroup test

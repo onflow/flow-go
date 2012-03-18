@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the prime elliptic curve arithmetic module.
+ * Tests for arithmetic on prime elliptic curves.
  *
  * @version $Id$
  * @ingroup test

@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Benchmarks for the binary elliptic curve module.
+ * Benchmarks for arithmetic on binary elliptic curves.
  *
  * @version $Id$
  * @ingroup bench

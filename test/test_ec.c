@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the elliptic curve cryptography module.
+ * Tests for the Elliptic Curve Cryptography module.
  *
  * @version $Id$
  * @ingroup test

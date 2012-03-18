@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Benchmarks for the multiple precision integer arithmetic functions.
+ * Benchmarks for multiple precision integer arithmetic.
  *
  * @version $Id$
  * @ingroup bench

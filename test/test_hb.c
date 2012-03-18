@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the binary hyperelliptic curve arithmetic module.
+ * Tests for arithmetic on binary hyperelliptic curves.
  *
  * @version $Id$
  * @ingroup test

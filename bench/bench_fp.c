@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Benchmarks for the elementary prime field arithmetic functions.
+ * Benchmarks for prime field arithmetic.
  *
  * @version $Id$
  * @ingroup bench

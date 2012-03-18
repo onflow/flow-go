@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Benchmarks for the temporary vector memory-management routines.
+ * Benchmarks for manipulating temporary double-precision digit vectors.
  *
  * @version $Id$
  * @ingroup bench

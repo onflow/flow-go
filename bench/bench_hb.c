@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Benchmarks for the binary hyperelliptic curve module.
+ * Benchmarks for arithmetic on binary hyperelliptic curves.
  *
  * @version $Id$
  * @ingroup bench

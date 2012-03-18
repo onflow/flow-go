@@ -10,7 +10,7 @@ macro(ADD_MODULE MODULE)
 	if (STBIN)
 		set_target_properties(test_${MODULE} PROPERTIES LINK_SEARCH_END_STATIC 1)
 	endif(STBIN)
-	add_test(test_${MODULE} ${SIMULATOR_PATH} ${SIMULATOR_PARAMS} ${EXECUTABLE_OUTPUT_PATH}/test_${MODULE})
+	add_test(test_${MODULE} ${SIMP} ${SIMA} ${EXECUTABLE_OUTPUT_PATH}/test_${MODULE})
 endmacro(ADD_MODULE)
 
 if (CHECK)
@@ -62,6 +62,7 @@ if (WITH_PP)
 endif(WITH_PP)	
 
 if (WITH_PB)
+	ADD_MODULE(fbx)
 	ADD_MODULE(pb)
 endif(WITH_PB)
 

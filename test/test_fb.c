@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the binary field arithmetic module.
+ * Tests for binary field arithmetic.
  *
  * @version $Id$
  * @ingroup test

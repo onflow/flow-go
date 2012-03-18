@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the hash functions.
+ * Tests for hash functions.
  *
  * @version $Id$
  * @ingroup test

@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the quartic extension binary field arithmetic module.
+ * Tests for pairings defined over prime elliptic curves.
  *
  * @version $Id$
  * @ingroup test

@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the binary elliptic curve arithmetic module.
+ * Tests for arithmetic on binary elliptic curves.
  *
  * @version $Id$
  * @ingroup test

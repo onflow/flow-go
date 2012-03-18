@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the multiple precision integer arithmetic module.
+ * Tests for multiple precision integer arithmetic.
  *
  * @version $Id$
  * @ingroup test

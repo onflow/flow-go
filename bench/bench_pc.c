@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Benchmarks for the binary elliptic curve module.
+ * Benchmarks for Pairing-Based Cryptography.
  *
  * @version $Id$
  * @ingroup bench

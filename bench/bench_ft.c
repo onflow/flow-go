@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Benchmarks for the ternary field module.
+ * Benchmarks for ternary field arithmetic.
  *
  * @version $Id$
  * @ingroup bench

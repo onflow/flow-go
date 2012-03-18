@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Benchmarks for the binary field module.
+ * Benchmarks for binary field arithmetic.
  *
  * @version $Id$
  * @ingroup bench

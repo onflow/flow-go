@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Benchmarks for the cryptographic protocols.
+ * Benchmarks for cryptographic protocols.
  *
  * @version $Id$
  * @ingroup bench

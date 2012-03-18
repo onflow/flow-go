@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the prime field arithmetic module.
+ * Tests for prime field arithmetic.
  *
  * @version $Id$
  * @ingroup test

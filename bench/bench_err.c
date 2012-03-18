@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Benchmarks for the error-management routines.
+ * Benchmarks for error-management routines.
  *
  * @version $Id$
  * @ingroup bench

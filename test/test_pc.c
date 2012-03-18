@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the pairing-based cryptography module.
+ * Tests for the Pairing-Based Cryptography module.
  *
  * @version $Id$
  * @ingroup test

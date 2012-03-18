@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Benchmarks for the binary elliptic curve module.
+ * Benchmarks for pairings defined over prime elliptic curves.
  *
  * @version $Id$
  * @ingroup bench
