@@ -32,6 +32,7 @@
 #include <stdio.h>
 
 #include "relic.h"
+#include "relic_fb_low.h"
 #include "relic_test.h"
 
 static int memory(void) {
