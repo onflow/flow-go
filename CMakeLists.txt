@@ -282,6 +282,12 @@ set(SEED "DEV" CACHE STRING "Random number generator seeder")
 set(COMP "$ENV{COMP}" CACHE STRING "User-chosen compiler flags.")
 set(COMP "-O2 -funroll-loops -fomit-frame-pointer" CACHE STRING "User-chosen compiler flags.")
 
+# Simulator of the target platform.
+set(SIMP "$ENV{SIMP}" CACHE STRING "Path to call a simulator of the target platform.")
+set(SIMP "" CACHE STRING "Path to call a simulator of the target platform.")
+set(SIMA "$ENV{SIMA}" CACHE STRING "Path to call a simulator of the target platform.")
+set(SIMA "" CACHE STRING "Path to call a simulator of the target platform.")
+
 # Linker flags.
 string(TOLOWER ${ARITH} LFLAGS)
 set(LFLAGS "-L${CMAKE_CURRENT_SOURCE_DIR}/src/low/${LFLAGS}/")
