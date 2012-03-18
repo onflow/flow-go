@@ -75,54 +75,54 @@ void conf_print(void) {
 #ifdef WITH_BN
 	util_print("** Multiple precision module options:\n");
 	util_print("   Precision: %d bits, %d words\n", BN_BITS, BN_DIGS);
-	util_print("   Arithmetic method:" BN_METHD "\n\n");
+	util_print("   Arithmetic method: " BN_METHD "\n\n");
 #endif
 
 #ifdef WITH_FP
 	util_print("** Prime field module options:\n");
 	util_print("   Prime size: %d bits, %d words\n", FP_BITS, FP_DIGS);
-	util_print("   Arithmetic method:" FP_METHD "\n\n");
+	util_print("   Arithmetic method: " FP_METHD "\n\n");
 #endif
 
 #ifdef WITH_EP
 	util_print("** Prime elliptic curve module options:\n");
-	util_print("   Arithmetic method:" EP_METHD "\n\n");
+	util_print("   Arithmetic method: " EP_METHD "\n\n");
 #endif
 
 #ifdef WITH_PP
 	util_print("** Pairing over prime curve module options:\n");
-	util_print("   Arithmetic method:" PP_METHD "\n\n");
+	util_print("   Arithmetic method: " PP_METHD "\n\n");
 #endif
 
 #ifdef WITH_FB
 	util_print("** Binary field module options:\n");
 	util_print("   Polynomial size: %d bits, %d words\n", FB_BITS, FB_DIGS);
-	util_print("   Arithmetic method:" FB_METHD "\n\n");
+	util_print("   Arithmetic method: " FB_METHD "\n\n");
 #endif
 
 #ifdef WITH_EB
 	util_print("** Binary elliptic curve module options:\n");
-	util_print("   Arithmetic method:" EB_METHD "\n\n");
+	util_print("   Arithmetic method: " EB_METHD "\n\n");
 #endif
 
 #ifdef WITH_HB
 	util_print("** Binary hyperelliptic curve module options:\n");
-	util_print("   Arithmetic method:" HB_METHD "\n\n");
+	util_print("   Arithmetic method: " HB_METHD "\n\n");
 #endif
 
 #ifdef WITH_PB
 	util_print("** Pairing over binary curve module options:\n");
-	util_print("   Arithmetic method:" PB_METHD "\n\n");
+	util_print("   Arithmetic method: " PB_METHD "\n\n");
 #endif
 
 #ifdef WITH_EC
 	util_print("** Elliptic Curve Cryptography module options:\n");
-	util_print("   Arithmetic method:" EC_METHD "\n\n");
+	util_print("   Arithmetic method: " EC_METHD "\n\n");
 #endif
 
 #ifdef WITH_PC
 	util_print("** Pairing Based Cryptography module options:\n");
-	util_print("   Arithmetic method:" PC_METHD "\n\n");
+	util_print("   Arithmetic method: " PC_METHD "\n\n");
 #endif
 
 #endif
