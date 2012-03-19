@@ -81,7 +81,7 @@ bn_addn_low:
 
 	clc
 	tst		r18
-	breq	bn_add1_end
+	breq	bn_addn_end
 
 bn_addn_loop:
 	ld		r23, x+
