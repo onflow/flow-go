@@ -101,7 +101,6 @@ static void arith(void) {
 	ep2_null(p);
 	ep2_null(q);
 	ep2_null(r);
-	ep_null(_q);
 	bn_null(k);
 	bn_null(n);
 	fp2_null(s);
@@ -567,17 +566,17 @@ static void pairing(void) {
 
 	ep2_null(p);
 	ep2_null(q);
-	ep2_null(r);
 	bn_null(k);
 	bn_null(n);
-	fp12_new(e);
+	bn_null(l);
+	fp12_null(e);
+
 	ep2_new(p);
 	ep2_new(q);
-	ep2_new(r);
-	ep_new(_q);
 	bn_new(k);
 	bn_new(n);
 	bn_new(l);
+	fp12_new(e);
 
 	ep2_curve_get_ord(n);
 
@@ -714,9 +713,9 @@ int main(void) {
 	if (ep_param_set_any_pairf() == STS_OK) {
 		ep_param_print();
 		util_banner("Arithmetic:", 1);
-		//memory();
-		//util();
-		//arith();
+		memory();
+		util();
+		arith();
 		pairing();
 	} else {
 		THROW(ERR_NO_CURVE);
