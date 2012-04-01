@@ -612,9 +612,6 @@
 /** Chosen binary elliptic curve simulteanous point multiplication method. */
 #define HB_SIM   @HB_SIM@ 
 
-/** Parallel implementation. */
-#cmakedefine PP_PARAL
-
 /** Bilinear pairing method. */
 #define PP_METHD "@PP_METHD@"
 
@@ -625,12 +622,22 @@
 /* Chosen extension field arithmetic method. */
 #define PP_QDR   @PP_QDR@ 
 
-/** Basic quadratic extension field arithmetic. */
+/** Basic cubic extension field arithmetic. */
 #define BASIC    1
 /** Integrated extension field arithmetic. */
+#define INTEG    3
+/* Chosen extension field arithmetic method. */
+#define PP_CBC   @PP_CBC@ 
+
+/** Basic quadratic extension field arithmetic. */
+#define BASIC    1
+/** Lazy-reduced extension field arithmetic. */
 #define LAZYR    2
 /* Chosen extension field arithmetic method. */
 #define PP_EXT   @PP_EXT@ 
+
+/** Parallel implementation. */
+#cmakedefine PP_PARAL
 
 /** Optimal ate pairing. */
 #define O_ATE    1

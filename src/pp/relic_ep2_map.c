@@ -48,43 +48,52 @@
  * @param[in] p				- the point to multiply.
  */
 void ep2_mul_cof(ep2_t r, ep2_t p) {
-	bn_t a, x;
-	ep2_t t1;
-	ep2_t t2;
+	bn_t x;
+	ep2_t t0, t1, t2;
 
+	ep2_null(t0);
 	ep2_null(t1);
 	ep2_null(t2);
-	bn_null(a);
 	bn_null(x);
 
 	TRY {
+		ep2_new(t0);
 		ep2_new(t1);
 		ep2_new(t2);
-		bn_new(a);
 		bn_new(x);
 
 		fp_param_get_var(x);
 
-		bn_sqr(x, x);
-		bn_mul_dig(a, x, 6);
-		ep2_frb(t1, p);
-		ep2_frb(t2, t1);
-		ep2_sub(t1, t1, t2);
+		/* Compute t0 = xP. */
+		ep2_mul(t0, p, x);
+		if (bn_sign(x) == BN_NEG) {
+			ep2_neg(t0, t0);
+		}
+
+		/* Compute t1 = p(3xP). */
+		ep2_dbl(t1, t0);
+		ep2_add(t1, t1, t0);
 		ep2_norm(t1, t1);
-		ep2_mul(r, p, a);
-		ep2_frb(t2, r);
-		ep2_add(r, r, t1);
-		ep2_add(r, r, t2);
-		ep2_norm(r, r);
+		ep2_frb(t1, t1, 1);
+
+		/* Compute t2 = p^3(P) + t0 + t1 + p^2(xP). */
+		ep2_frb(t2, p, 2);
+		ep2_frb(t2, t2, 1);
+		ep2_add(t2, t2, t0);
+		ep2_add(t2, t2, t1);
+		ep2_frb(t1, t0, 2);
+		ep2_add(t2, t2, t1);
+
+		ep2_norm(r, t2);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+		ep2_free(t0);
 		ep2_free(t1);
 		ep2_free(t2);
-		bn_new(a);
-		bn_new(x);
+		bn_free(x);
 	}
 }
 
@@ -93,29 +102,29 @@ void ep2_mul_cof(ep2_t r, ep2_t p) {
 /*============================================================================*/
 
 void ep2_map(ep2_t p, unsigned char *msg, int len) {
-	bn_t k;
-	fp2_t t;
+	bn_t x;
+	fp2_t t0;
 	unsigned char digest[MD_LEN];
 
-	bn_null(k);
-	fp2_null(t);
+	bn_null(x);
+	fp2_null(t0);
 
 	TRY {
-		bn_new(k);
-		fp2_new(t);
+		bn_new(x);
+		fp2_new(t0);
 
 		md_map(digest, msg, len);
-		bn_read_bin(k, digest, MIN(FP_BYTES, MD_LEN));
+		memcpy(x->dp, digest, MIN(FP_BYTES, MD_LEN));
 
-		fp_prime_conv(p->x[0], k);
+		fp_prime_conv(p->x[0], x);
 		fp_zero(p->x[1]);
 		fp_set_dig(p->z[0], 1);
 		fp_zero(p->z[1]);
 
 		while (1) {
-			ep2_rhs(t, p);
+			ep2_rhs(t0, p);
 
-			if (fp2_srt(p->y, t)) {
+			if (fp2_srt(p->y, t0)) {
 				p->norm = 1;
 				break;
 			}
@@ -129,7 +138,7 @@ void ep2_map(ep2_t p, unsigned char *msg, int len) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		bn_free(k);
-		fp2_free(t);
+		bn_free(x);
+		fp2_free(t0);
 	}
 }

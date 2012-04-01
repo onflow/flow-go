@@ -81,9 +81,12 @@ if (WITH_HB)
 endif(WITH_HB)
 
 if (WITH_PP)
-	list(APPEND RELIC_SRCS ${PP_SRCS})
 	file(GLOB TEMP low/easy/relic_pp*.c)
 	list(APPEND LOW_SRCS ${TEMP})
+	# Add all the extension code.
+	file(GLOB TEMP fpx/*.c)
+	list(APPEND PP_SRCS ${TEMP})
+	list(APPEND RELIC_SRCS ${PP_SRCS})
 endif(WITH_PP)
 
 # Pairings over binary fields are a special case.

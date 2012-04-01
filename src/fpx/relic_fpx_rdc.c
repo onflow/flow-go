@@ -23,45 +23,37 @@
 /**
  * @file
  *
- * Implementation of frobenius action on prime elliptic curves over
- * quadratic extensions.
+ * Implementation of modular reduction in extensions defined over prime fields.
  *
  * @version $Id$
- * @ingroup pp
+ * @ingroup fpx
  */
 
 #include "relic_core.h"
-#include "relic_md.h"
-#include "relic_pp.h"
-#include "relic_error.h"
 #include "relic_conf.h"
+#include "relic_fp.h"
 #include "relic_fp_low.h"
+#include "relic_pp_low.h"
+#include "relic_pp.h"
+#include "relic_util.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void ep2_frb(ep2_t r, ep2_t p, int i) {
-	switch (i) {
-		case 1:
-			fp2_frb(r->x, p->x, 1);
-			fp2_frb(r->y, p->y, 1);
-			fp2_mul_frb(r->x, r->x, 1, 2);
-			fp2_mul_frb(r->y, r->y, 1, 3);
-			break;
-		case 2:
-			fp2_mul_frb(r->x, p->x, 2, 2);
-			fp2_neg(r->y, p->y);
-			break;
-		case 3:
-			fp2_frb(r->x, p->x, 1);
-			fp2_mul_frb(r->x, r->x, 3, 2);
-			fp_neg(r->y[0], p->y[0]);
-			fp_copy(r->y[1], p->y[1]);
-			fp2_mul_frb(r->y, r->y, 1, 3);
-			break;
-	}
-	r->norm = 1;
-	fp_set_dig(r->z[0], 1);
-	fp_zero(r->z[1]);
+#if PP_QDR == BASIC || !defined(STRIP)
+
+void fp2_rdc_basic(fp2_t c, dv2_t a) {
+	fp_rdc(c[0], a[0]);
+	fp_rdc(c[1], a[1]);
 }
+
+#endif
+
+#if PP_QDR == INTEG || !defined(STRIP)
+
+void fp2_rdc_integ(fp2_t c, dv2_t a) {
+	fp2_rdcn_low(c, a);
+}
+
+#endif

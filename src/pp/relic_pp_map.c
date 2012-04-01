@@ -137,18 +137,18 @@ void pp_exp(fp12_t c, fp12_t a) {
 			fp12_exp_cyc_sps(v2, v1, b, l);
 		}
 
-		fp12_frb(v3, v2);
+		fp12_frb(v3, v2, 1);
 		fp12_mul(v2, v2, v3);
 		fp12_sqr_cyc(v2, v2);
-		fp12_frb(v3, v1);
+		fp12_frb(v3, v1, 1);
 		fp12_inv_uni(v3, v3);
 		fp12_mul(v3, v3, v0);
 		fp12_mul(v2, v2, v3);
-		fp12_frb(v0, v0);
+		fp12_frb(v0, v0, 1);
 		fp12_inv_uni(v3, v1);
 		fp12_mul(v2, v2, v3);
 		fp12_mul(v0, v0, v3);
-		fp12_frb_sqr(v1, v1);
+		fp12_frb(v1, v1, 2);
 		fp12_mul(v0, v0, v2);
 		fp12_mul(v2, v2, v1);
 		fp12_sqr_cyc(v0, v0);
@@ -156,10 +156,10 @@ void pp_exp(fp12_t c, fp12_t a) {
 		fp12_sqr_cyc(v0, v0);
 		fp12_inv_uni(v1, c);
 		fp12_mul(v2, v0, v1);
-		fp12_frb_sqr(v1, c);
-		fp12_frb(v3, v1);
+		fp12_frb(v1, c, 2);
+		fp12_frb(v3, v1, 1);
 		fp12_mul(v1, v1, v3);
-		fp12_frb(v3, c);
+		fp12_frb(v3, c, 1);
 		fp12_mul(v1, v1, v3);
 		fp12_mul(v0, v0, v1);
 		fp12_sqr_cyc(v2, v2);
@@ -209,13 +209,13 @@ void pp_r_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 
 		pp_add(tmp1, r1q, q, p);
 		fp12_mul(tmp2, res, tmp1);
-		fp12_frb(tmp2, tmp2);
+		fp12_frb(tmp2, tmp2, 1);
 		fp12_mul(res, res, tmp2);
 
 		r1q->norm = 0;
 		pp_norm(r1q, r1q);
 
-		ep2_frb(q1, r1q);
+		ep2_frb(q1, r1q, 1);
 
 		ep2_copy(r1q, t);
 
@@ -258,8 +258,8 @@ void pp_o_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp_set_dig(q2->z[0], 1);
 		fp_zero(q2->z[1]);
 
-		ep2_frb(q1, q);
-		ep2_frb_sqr(q2, q);
+		ep2_frb(q1, q, 1);
+		ep2_frb(q2, q, 2);
 		ep2_neg(q2, q2);
 
 		pp_add(tmp, t, q1, p);
@@ -306,35 +306,35 @@ void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
 		fp_zero(q3->z[1]);
 
 		/* r = r^p. */
-		fp12_frb(tmp, res);
+		fp12_frb(tmp, res, 1);
 		fp12_mul(res, res, tmp);
 
 		/* r = r^p^3. */
-		fp12_frb_sqr(tmp, tmp);
+		fp12_frb(tmp, tmp, 2);
 		fp12_mul(res, res, tmp);
 
 		/* r = r^p^5. */
-		fp12_frb_sqr(tmp, tmp);
+		fp12_frb(tmp, tmp, 2);
 		/* r = r^p^7. */
-		fp12_frb_sqr(tmp, tmp);
+		fp12_frb(tmp, tmp, 2);
 		/* r = r^p^9. */
-		fp12_frb_sqr(tmp, tmp);
+		fp12_frb(tmp, tmp, 2);
 		/* r = r^p^10. */
-		fp12_frb(tmp, tmp);
+		fp12_frb(tmp, tmp, 1);
 		fp12_mul(res, res, tmp);
 
 		/* q1 = p * xQ. */
-		ep2_frb(q1, t);
+		ep2_frb(q1, t, 1);
 		/* q2 = p^3 * xQ. */
-		ep2_frb_sqr(q2, q1);
+		ep2_frb(q2, q1, 2);
 		/* q3 = p^5 * xQ. */
-		ep2_frb_sqr(q3, q2);
+		ep2_frb(q3, q2, 2);
 		/* q3 = p^7 * xQ. */
-		ep2_frb_sqr(q3, q3);
+		ep2_frb(q3, q3, 2);
 		/* q3 = p^9 * xQ. */
-		ep2_frb_sqr(q3, q3);
+		ep2_frb(q3, q3, 2);
 		/* q3 = p^10 * xQ. */
-		ep2_frb(q3, q3);
+		ep2_frb(q3, q3, 1);
 
 		fp12_zero(tmp);
 		/* q1 = p*xQ + xQ. */

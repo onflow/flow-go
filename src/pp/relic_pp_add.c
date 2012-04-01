@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Implementation of the Miller addition function.
+ * Implementation of the Miller addition functions.
  *
  * @version $Id$
  * @ingroup pp

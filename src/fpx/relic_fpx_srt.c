@@ -23,45 +23,78 @@
 /**
  * @file
  *
- * Implementation of frobenius action on prime elliptic curves over
- * quadratic extensions.
+ * Implementation of square root in extensions defined over prime fields.
  *
  * @version $Id$
- * @ingroup pp
+ * @ingroup fpx
  */
 
 #include "relic_core.h"
-#include "relic_md.h"
-#include "relic_pp.h"
-#include "relic_error.h"
 #include "relic_conf.h"
+#include "relic_fp.h"
 #include "relic_fp_low.h"
+#include "relic_pp_low.h"
+#include "relic_pp.h"
+#include "relic_util.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void ep2_frb(ep2_t r, ep2_t p, int i) {
-	switch (i) {
-		case 1:
-			fp2_frb(r->x, p->x, 1);
-			fp2_frb(r->y, p->y, 1);
-			fp2_mul_frb(r->x, r->x, 1, 2);
-			fp2_mul_frb(r->y, r->y, 1, 3);
-			break;
-		case 2:
-			fp2_mul_frb(r->x, p->x, 2, 2);
-			fp2_neg(r->y, p->y);
-			break;
-		case 3:
-			fp2_frb(r->x, p->x, 1);
-			fp2_mul_frb(r->x, r->x, 3, 2);
-			fp_neg(r->y[0], p->y[0]);
-			fp_copy(r->y[1], p->y[1]);
-			fp2_mul_frb(r->y, r->y, 1, 3);
-			break;
+int fp2_srt(fp2_t c, fp2_t a) {
+	int r = 0;
+	fp_t t1;
+	fp_t t2;
+	fp_t t3;
+
+	fp_null(t1);
+	fp_null(t2);
+	fp_null(t3);
+
+	TRY {
+		fp_new(t1);
+		fp_new(t2);
+		fp_new(t3);
+
+		/* t1 = a[0]^2 - u^2 * a[1]^2 */
+		fp_sqr(t1, a[0]);
+		fp_sqr(t2, a[1]);
+		for (int i = -1; i > fp_prime_get_qnr(); i--) {
+			fp_add(t1, t1, t2);
+		}
+		fp_add(t1, t1, t2);
+
+		if (fp_srt(t2, t1)) {
+			/* t1 = (a_0 + sqrt(t1)) / 2 */
+			fp_add(t1, a[0], t2);
+			fp_set_dig(t3, 2);
+			fp_inv(t3, t3);
+			fp_mul(t1, t1, t3);
+
+			if (!fp_srt(t3, t1)) {
+				/* t1 = (a_0 - sqrt(t1)) / 2 */
+				fp_sub(t1, a[0], t2);
+				fp_set_dig(t3, 2);
+				fp_inv(t3, t3);
+				fp_mul(t1, t1, t3);
+				fp_srt(t3, t1);
+			}
+			/* c_0 = sqrt(t1) */
+			fp_copy(c[0], t3);
+			/* c_1 = a_1 / (2 * sqrt(t1)) */
+			fp_dbl(t3, t3);
+			fp_inv(t3, t3);
+			fp_mul(c[1], a[1], t3);
+			r = 1;
+		}
 	}
-	r->norm = 1;
-	fp_set_dig(r->z[0], 1);
-	fp_zero(r->z[1]);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t1);
+		fp_free(t2);
+		fp_free(t3);
+	}
+	return r;
 }
