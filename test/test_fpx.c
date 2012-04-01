@@ -25,7 +25,7 @@
  *
  * Tests for extensions defined over prime fields.
  *
- * @version $Id: test_fpx.c 1127 2012-03-18 13:03:33Z dfaranha $
+ * @version $Id$
  * @ingroup test
  */
 

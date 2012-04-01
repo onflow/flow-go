@@ -25,7 +25,7 @@
  *
  * Benchmarks for extensions of prime fields
  *
- * @version $Id: bench_pp.c 1127 2012-03-18 13:03:33Z dfaranha $
+ * @version $Id$
  * @ingroup bench
  */
 
@@ -465,6 +465,12 @@ static void arith6(void) {
 		BENCH_ADD(fp6_sqr_lazyr(c, a));
 	}
 	BENCH_END;
+
+	BENCH_BEGIN("fp6_sqr_lazyr2") {
+		fp6_rand(a);
+		BENCH_ADD(fp6_sqr_lazyr(c, a));
+	}
+	BENCH_END;
 #endif
 
 	BENCH_BEGIN("fp6_inv") {
@@ -625,6 +631,12 @@ static void arith12(void) {
 	BENCH_BEGIN("fp12_sqr") {
 		fp12_rand(a);
 		BENCH_ADD(fp12_sqr(c, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp12_sqr2") {
+		fp12_rand(a);
+		BENCH_ADD(fp12_sqr2(c, a));
 	}
 	BENCH_END;
 

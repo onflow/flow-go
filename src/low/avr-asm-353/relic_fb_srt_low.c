@@ -25,7 +25,7 @@
  *
  * Implementation of the low-level binary field square root.
  *
- * @version $Id: relic_fb_srt_low.c 376 2010-06-04 06:48:40Z dfaranha $
+ * @version $Id$
  * @ingroup fb
  */
 

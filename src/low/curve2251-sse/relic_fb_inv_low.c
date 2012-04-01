@@ -25,7 +25,7 @@
  *
  * Implementation of the low-level inversion functions.
  *
- * @version $Id: relic_fb_inv_low.c 553 2010-11-01 22:59:38Z dfaranha $
+ * @version $Id$
  * @ingroup fb
  */
 

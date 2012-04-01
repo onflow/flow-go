@@ -25,7 +25,7 @@
  *
  * Implementation of squaring in a sextic extension of a prime field.
  *
- * @version $Id: relic_pp_fp6.c 838 2011-07-22 01:03:12Z dfaranha $
+ * @version $Id$
  * @ingroup fpx
  */
 

@@ -25,7 +25,7 @@
  *
  * Implementation of the low-level modular reduction functions.
  *
- * @version $Id: relic_fb_rdc_low.c 337 2010-05-30 20:42:27Z dfaranha $
+ * @version $Id$
  * @ingroup fb
  */
 

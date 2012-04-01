@@ -25,7 +25,7 @@
  *
  * Implementation of squaring in a dodecic extension of a prime field.
  *
- * @version $Id: relic_pp_fp12.c 915 2011-11-29 02:51:48Z dfaranha $
+ * @version $Id$
  * @ingroup fpx
  */
 

@@ -25,7 +25,7 @@
  *
  * Implementation of the low-level multiple precision division functions.
  *
- * @version $Id: relic_bn_div_low.c 677 2011-03-05 22:19:43Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

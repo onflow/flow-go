@@ -95,9 +95,7 @@ static void util(void) {
 
 static void arith(void) {
 	ep2_t p, q, r, t[EP_TABLE_MAX];
-	ep_t _q;
 	bn_t k, n, l;
-	fp12_t e;
 	fp2_t s, u;
 
 	ep2_null(p);
@@ -106,7 +104,6 @@ static void arith(void) {
 	ep_null(_q);
 	bn_null(k);
 	bn_null(n);
-	fp12_null(e);
 	fp2_null(s);
 	fp2_null(t);
 	for (int i = 0; i < EP_TABLE_MAX; i++) {
@@ -120,7 +117,6 @@ static void arith(void) {
 	bn_new(k);
 	bn_new(n);
 	bn_new(l);
-	fp12_new(e);
 	fp2_new(s);
 	fp2_new(u);
 
@@ -484,6 +480,7 @@ static void arith(void) {
 	for (int i = 0; i < EP_TABLE_LWNAF; i++) {
 		ep2_free(t[i]);
 	}
+#endif
 
 	BENCH_BEGIN("ep2_mul_sim") {
 		bn_rand(k, BN_POS, bn_bits(n));
@@ -552,90 +549,110 @@ static void arith(void) {
 		BENCH_ADD(ep2_mul_sim_gen(r, k, q, l));
 	} BENCH_END;
 
+	ep2_free(p);
+	ep2_free(q);
+	ep2_free(r);
+	bn_free(k);
+	bn_free(n);
+	bn_free(l);
+	fp2_free(s);
+	fp2_free(u);
+}
+
+static void pairing(void) {
+	ep2_t p;
+	ep_t q;
+	fp12_t e;
+	bn_t k, n, l;
+
+	ep2_null(p);
+	ep2_null(q);
+	ep2_null(r);
+	bn_null(k);
+	bn_null(n);
+	fp12_new(e);
+	ep2_new(p);
+	ep2_new(q);
+	ep2_new(r);
+	ep_new(_q);
+	bn_new(k);
+	bn_new(n);
+	bn_new(l);
+
+	ep2_curve_get_ord(n);
+
 	BENCH_BEGIN("pp_dbl") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_dbl(e, p, p, _q));
+		ep_rand(q);
+		BENCH_ADD(pp_dbl(e, p, p, q));
 	}
 	BENCH_END;
 
 #if EP_ADD == BASIC || !defined(STRIP)
-
 	BENCH_BEGIN("pp_dbl_basic") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_dbl_basic(e, p, p, _q));
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_basic(e, p, p, q));
 	}
 	BENCH_END;
+#endif
 
-#endif
-#endif
 #if EP_ADD == PROJC || !defined(STRIP)
 
 #if PP_EXT == BASIC || !defined(STRIP)
-
 	BENCH_BEGIN("pp_dbl_projc_basic") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_dbl_projc_basic(e, p, p, _q));
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_projc_basic(e, p, p, q));
 	}
 	BENCH_END;
-
 #endif
 
 #if PP_EXT == LAZYR || !defined(STRIP)
-
 	BENCH_BEGIN("pp_dbl_projc_lazyr") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_dbl_projc_lazyr(e, p, p, _q));
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_projc_lazyr(e, p, p, q));
 	}
 	BENCH_END;
-
 #endif
 
 #endif
 
 	BENCH_BEGIN("pp_add") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_add(e, p, p, _q));
+		ep_rand(q);
+		BENCH_ADD(pp_add(e, p, p, q));
 	}
 	BENCH_END;
 
 #if EP_ADD == BASIC || !defined(STRIP)
-
 	BENCH_BEGIN("pp_add_basic") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_add_basic(e, p, p, _q));
+		ep_rand(q);
+		BENCH_ADD(pp_add_basic(e, p, p, q));
 	}
 	BENCH_END;
-
 #endif
 
 #if EP_ADD == PROJC || !defined(STRIP)
 
 #if PP_EXT == BASIC || !defined(STRIP)
-
 	BENCH_BEGIN("pp_add_projc_basic") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_add_projc_basic(e, p, p, _q));
+		ep_rand(q);
+		BENCH_ADD(pp_add_projc_basic(e, p, p, q));
 	}
 	BENCH_END;
-
 #endif
 
 #if PP_EXT == LAZYR || !defined(STRIP)
-
 	BENCH_BEGIN("pp_add_projc_lazyr") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_add_projc_lazyr(e, p, p, _q));
+		ep_rand(q);
+		BENCH_ADD(pp_add_projc_lazyr(e, p, p, q));
 	}
 	BENCH_END;
-
 #endif
 
 #endif
@@ -648,16 +665,16 @@ static void arith(void) {
 
 	BENCH_BEGIN("pp_map") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_map(e, _q, p));
+		ep_rand(q);
+		BENCH_ADD(pp_map(e, q, p));
 	}
 	BENCH_END;
 
 #if PP_MAP == R_ATE || !defined(STRIP)
 	BENCH_BEGIN("pp_map_r_ate") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_map_r_ate(e, _q, p));
+		ep_rand(q);
+		BENCH_ADD(pp_map_r_ate(e, q, p));
 	}
 	BENCH_END;
 #endif
@@ -665,8 +682,8 @@ static void arith(void) {
 #if PP_MAP == O_ATE || !defined(STRIP)
 	BENCH_BEGIN("pp_map_o_ate") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_map_o_ate(e, _q, p));
+		ep_rand(q);
+		BENCH_ADD(pp_map_o_ate(e, q, p));
 	}
 	BENCH_END;
 #endif
@@ -674,22 +691,18 @@ static void arith(void) {
 #if PP_MAP == X_ATE || !defined(STRIP)
 	BENCH_BEGIN("pp_map_x_ate") {
 		ep2_rand(p);
-		ep_rand(_q);
-		BENCH_ADD(pp_map_x_ate(e, _q, p));
+		ep_rand(q);
+		BENCH_ADD(pp_map_x_ate(e, q, p));
 	}
 	BENCH_END;
 #endif
 
 	ep2_free(p);
-	ep2_free(q);
-	ep2_free(r);
-	ep_free(_q);
+	ep_free(q);
 	bn_free(k);
 	bn_free(n);
 	bn_free(l);
 	fp12_free(e);
-	fp2_free(s);
-	fp2_free(u);
 }
 
 int main(void) {
@@ -701,9 +714,10 @@ int main(void) {
 	if (ep_param_set_any_pairf() == STS_OK) {
 		ep_param_print();
 		util_banner("Arithmetic:", 1);
-		memory();
-		util();
-		arith();
+		//memory();
+		//util();
+		//arith();
+		pairing();
 	} else {
 		THROW(ERR_NO_CURVE);
 	}

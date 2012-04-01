@@ -26,7 +26,7 @@
  * Implementation of the multiple precision integer arithmetic multiplication
  * functions.
  *
- * @version $Id: relic_bn_mul_low.c 976 2012-01-07 02:21:45Z dfaranha $
+ * @version $Id$
  * @ingroup bn
  */
 

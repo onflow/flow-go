@@ -25,7 +25,7 @@
  *
  * Implementation of multiplication in dodecic extensions of binary fields.
  *
- * @version $Id: relic_fbx_mul.c 1137 2012-03-18 13:35:48Z dfaranha $
+ * @version $Id$
  * @ingroup fbx
  */
 

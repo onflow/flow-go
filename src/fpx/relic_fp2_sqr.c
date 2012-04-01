@@ -25,7 +25,7 @@
  *
  * Implementation of squaring in a quadratic extension of a prime field.
  *
- * @version $Id: relic_pp_fp2.c 1108 2012-03-11 21:45:01Z dfaranha $
+ * @version $Id$
  * @ingroup fpx
  */
 

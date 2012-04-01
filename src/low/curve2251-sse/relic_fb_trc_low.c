@@ -25,7 +25,7 @@
  *
  * Implementation of the low-level trace function.
  *
- * @version $Id: relic_fb_slv_low.c 652 2011-02-20 23:50:00Z dfaranha $
+ * @version $Id$
  * @ingroup fb
  */
 
