@@ -142,6 +142,8 @@ void fp12_sqr(fp12_t c, fp12_t a) {
 	}
 }
 
+#if PP_EXT == LAZYR || !defined(STRIP)
+
 void fp12_sqr2(fp12_t c, fp12_t a) {
 	fp2_t t0, t1, t2, t3, t4, t5, t6, t7, t8, t9;
 	dv2_t u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
@@ -247,6 +249,8 @@ void fp12_sqr2(fp12_t c, fp12_t a) {
 		fp2_free(t5);
 	}
 }
+
+#endif
 
 #if PP_EXT == BASIC || !defined(STRIP)
 
