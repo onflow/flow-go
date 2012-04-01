@@ -112,7 +112,6 @@ static void arith(void) {
 	ep2_new(p);
 	ep2_new(q);
 	ep2_new(r);
-	ep_new(_q);
 	bn_new(k);
 	bn_new(n);
 	bn_new(l);
@@ -565,14 +564,14 @@ static void pairing(void) {
 	bn_t k, n, l;
 
 	ep2_null(p);
-	ep2_null(q);
+	ep_null(q);
 	bn_null(k);
 	bn_null(n);
 	bn_null(l);
 	fp12_null(e);
 
 	ep2_new(p);
-	ep2_new(q);
+	ep_new(q);
 	bn_new(k);
 	bn_new(n);
 	bn_new(l);
