@@ -85,94 +85,91 @@ void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
 }
 
 /**
- * Compute the final exponentiation of the rate pairing in a BN curve.
+ * Compute the final exponentiation of a pairing defined over a Barreto-Naehrig
+ * curve.
  *
  * @param[out] m			- the result.
  * @param[in] x				- the parameter used to generate the curve.
  */
 void pp_exp(fp12_t c, fp12_t a) {
-	fp12_t v0;
-	fp12_t v1;
-	fp12_t v2;
-	fp12_t v3;
+	fp12_t t0, t1, t2, t3;
+	int l, *b = fp_param_get_sps(&l);
 	bn_t x;
 
-	fp12_null(v0);
-	fp12_null(v1);
-	fp12_null(v2);
-	fp12_null(v3);
+	fp12_null(t0);
+	fp12_null(t1);
+	fp12_null(t2);
+	fp12_null(t3);
 	bn_null(x);
 
 	TRY {
-		fp12_new(v0);
-		fp12_new(v1);
-		fp12_new(v2);
-		fp12_new(v3);
+		fp12_new(t0);
+		fp12_new(t1);
+		fp12_new(t2);
+		fp12_new(t3);
 		bn_new(x);
+
+		/*
+		 * New final exponentiation following Fuentes-Castañeda, Knapp and
+		 * Rodríguez-Henríquez: Fast Hashing to G_2.
+		 */
 
 		fp_param_get_var(x);
 
-		/* First, compute m^(p^6 - 1). */
+#ifndef PP_PARAL
+		/* First, compute m = f^(p^6 - 1)(p^2 + 1). */
 		fp12_conv_cyc(c, a);
+#else
+		fp12_copy(c, a);
+#endif
 
 		/* Now compute m^((p^4 - p^2 + 1) / r). */
-		/* From here on we work with x' = -x, therefore if x is positive
-		 * we need inversions. */
-		int l, *b = fp_param_get_sps(&l);
-		if (bn_sign(x) == BN_POS) {
-			/* We are now on the cyclotomic subgroup, so inversions are
-			 * conjugations. */
-			fp12_inv_uni(v3, c);
-			fp12_exp_cyc_sps(v0, v3, b, l);
-			fp12_inv_uni(v3, v0);
-			fp12_exp_cyc_sps(v1, v3, b, l);
-			fp12_inv_uni(v3, v1);
-			fp12_exp_cyc_sps(v2, v3, b, l);
-		} else {
-			/* v0 = m^x. */
-			fp12_exp_cyc_sps(v0, c, b, l);
-			/* v1 = m^x^2. */
-			fp12_exp_cyc_sps(v1, v0, b, l);
-			/* v2 = m^x^3. */
-			fp12_exp_cyc_sps(v2, v1, b, l);
+		/* t0 = m^2x. */
+		fp12_exp_cyc_sps(t0, c, b, l);
+		fp12_sqr_cyc(t0, t0);
+		/* t1 = m^6x. */
+		fp12_sqr_cyc(t1, t0);
+		fp12_mul(t1, t1, t0);
+		/* t2 = m^6x^2. */
+		fp12_exp_cyc_sps(t2, t1, b, l);
+		/* t3 = m^12x^3. */
+		fp12_sqr_cyc(t3, t2);
+		fp12_exp_cyc_sps(t3, t3, b, l);
+
+		if (bn_sign(x) == BN_NEG) {
+			fp12_inv_uni(t0, t0);
+			fp12_inv_uni(t1, t1);
+			fp12_inv_uni(t3, t3);
 		}
 
-		fp12_frb(v3, v2, 1);
-		fp12_mul(v2, v2, v3);
-		fp12_sqr_cyc(v2, v2);
-		fp12_frb(v3, v1, 1);
-		fp12_inv_uni(v3, v3);
-		fp12_mul(v3, v3, v0);
-		fp12_mul(v2, v2, v3);
-		fp12_frb(v0, v0, 1);
-		fp12_inv_uni(v3, v1);
-		fp12_mul(v2, v2, v3);
-		fp12_mul(v0, v0, v3);
-		fp12_frb(v1, v1, 2);
-		fp12_mul(v0, v0, v2);
-		fp12_mul(v2, v2, v1);
-		fp12_sqr_cyc(v0, v0);
-		fp12_mul(v0, v0, v2);
-		fp12_sqr_cyc(v0, v0);
-		fp12_inv_uni(v1, c);
-		fp12_mul(v2, v0, v1);
-		fp12_frb(v1, c, 2);
-		fp12_frb(v3, v1, 1);
-		fp12_mul(v1, v1, v3);
-		fp12_frb(v3, c, 1);
-		fp12_mul(v1, v1, v3);
-		fp12_mul(v0, v0, v1);
-		fp12_sqr_cyc(v2, v2);
-		fp12_mul(c, v2, v0);
+		/* t3 = a = m^12x^3 * m^6x^2 * m^6x. */
+		fp12_mul(t3, t3, t2);
+		fp12_mul(t3, t3, t1);
+
+		/* t0 = b = 1/(m^2x) * t3. */
+		fp12_inv_uni(t0, t0);
+		fp12_mul(t0, t0, t3);
+
+		/* Compute t2 * t3 * m * b^p * a^p^2 * [b * 1/m]^p^3. */
+		fp12_mul(t2, t2, t3);
+		fp12_mul(t2, t2, c);
+		fp12_inv_uni(c, c);
+		fp12_mul(c, c, t0);
+		fp12_frb(c, c, 3);
+		fp12_mul(c, c, t2);
+		fp12_frb(t0, t0, 1);
+		fp12_mul(c, c, t0);
+		fp12_frb(t3, t3, 2);
+		fp12_mul(c, c, t3);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp12_free(v0);
-		fp12_free(v1);
-		fp12_free(v2);
-		fp12_free(v3);
+		fp12_free(t0);
+		fp12_free(t1);
+		fp12_free(t2);
+		fp12_free(t3);
 		bn_free(x);
 	}
 }
