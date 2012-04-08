@@ -652,6 +652,499 @@ static int square_root2(void) {
 	return code;
 }
 
+static int memory3(void) {
+	err_t e;
+	int code = STS_ERR;
+	fp3_t a;
+
+	TRY {
+		TEST_BEGIN("memory can be allocated") {
+			fp3_new(a);
+			fp3_free(a);
+		} TEST_END;
+	} CATCH(e) {
+		switch (e) {
+			case ERR_NO_MEMORY:
+				util_print("FATAL ERROR!\n");
+				ERROR(end);
+				break;
+		}
+	}
+	(void)a;
+	code = STS_OK;
+  end:
+	return code;
+}
+
+static int util3(void) {
+	int code = STS_ERR;
+	fp3_t a, b, c;
+
+	fp3_null(a);
+	fp3_null(b);
+	fp3_null(c);
+
+	TRY {
+		fp3_new(a);
+		fp3_new(b);
+		fp3_new(c);
+
+		TEST_BEGIN("comparison is consistent") {
+			fp3_rand(a);
+			fp3_rand(b);
+			if (fp3_cmp(a, b) != CMP_EQ) {
+				TEST_ASSERT(fp3_cmp(b, a) == CMP_NE, end);
+			}
+		}
+		TEST_END;
+
+		TEST_BEGIN("copy and comparison are consistent") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_rand(c);
+			if (fp3_cmp(a, c) != CMP_EQ) {
+				fp3_copy(c, a);
+				TEST_ASSERT(fp3_cmp(c, a) == CMP_EQ, end);
+			}
+			if (fp3_cmp(b, c) != CMP_EQ) {
+				fp3_copy(c, b);
+				TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
+			}
+		}
+		TEST_END;
+
+		TEST_BEGIN("negation is consistent") {
+			fp3_rand(a);
+			fp3_neg(b, a);
+			if (fp3_cmp(a, b) != CMP_EQ) {
+				TEST_ASSERT(fp3_cmp(b, a) == CMP_NE, end);
+			}
+			fp3_neg(b, b);
+			TEST_ASSERT(fp3_cmp(a, b) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to zero and comparison are consistent") {
+			fp3_rand(a);
+			fp3_zero(c);
+			TEST_ASSERT(fp3_cmp(a, c) == CMP_NE, end);
+			TEST_ASSERT(fp3_cmp(c, a) == CMP_NE, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to random and comparison are consistent") {
+			fp3_rand(a);
+			fp3_zero(c);
+			TEST_ASSERT(fp3_cmp(a, c) == CMP_NE, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to zero and zero test are consistent") {
+			fp3_zero(a);
+			TEST_ASSERT(fp3_is_zero(a), end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp3_free(a);
+	fp3_free(b);
+	fp3_free(c);
+	return code;
+}
+
+static int addition3(void) {
+	int code = STS_ERR;
+	fp3_t a, b, c, d, e;
+
+	TRY {
+		fp3_new(a);
+		fp3_new(b);
+		fp3_new(c);
+		fp3_new(d);
+		fp3_new(e);
+
+		TEST_BEGIN("addition is commutative") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_add(d, a, b);
+			fp3_add(e, b, a);
+			TEST_ASSERT(fp3_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("addition is associative") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_rand(c);
+			fp3_add(d, a, b);
+			fp3_add(d, d, c);
+			fp3_add(e, b, c);
+			fp3_add(e, a, e);
+			TEST_ASSERT(fp3_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("addition has identity") {
+			fp3_rand(a);
+			fp3_zero(d);
+			fp3_add(e, a, d);
+			TEST_ASSERT(fp3_cmp(e, a) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("addition has inverse") {
+			fp3_rand(a);
+			fp3_neg(d, a);
+			fp3_add(e, a, d);
+			TEST_ASSERT(fp3_is_zero(e), end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp3_free(a);
+	fp3_free(b);
+	fp3_free(c);
+	fp3_free(d);
+	fp3_free(e);
+	return code;
+}
+
+static int subtraction3(void) {
+	int code = STS_ERR;
+	fp3_t a, b, c, d;
+
+	TRY {
+		fp3_new(a);
+		fp3_new(b);
+		fp3_new(c);
+		fp3_new(d);
+
+		TEST_BEGIN("subtraction is anti-commutative") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_sub(c, a, b);
+			fp3_sub(d, b, a);
+			fp3_neg(d, d);
+			TEST_ASSERT(fp3_cmp(c, d) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("subtraction has identity") {
+			fp3_rand(a);
+			fp3_zero(c);
+			fp3_sub(d, a, c);
+			TEST_ASSERT(fp3_cmp(d, a) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("subtraction has inverse") {
+			fp3_rand(a);
+			fp3_sub(c, a, a);
+			TEST_ASSERT(fp3_is_zero(c), end);
+		}
+		TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp3_free(a);
+	fp3_free(b);
+	fp3_free(c);
+	fp3_free(d);
+	return code;
+}
+
+static int doubling3(void) {
+	int code = STS_ERR;
+	fp3_t a, b, c;
+
+	TRY {
+		fp3_new(a);
+		fp3_new(b);
+		fp3_new(c);
+
+		TEST_BEGIN("doubling is correct") {
+			fp3_rand(a);
+			fp3_dbl(b, a);
+			fp3_add(c, a, a);
+			TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp3_free(a);
+	fp3_free(b);
+	fp3_free(c);
+	return code;
+}
+
+static int multiplication3(void) {
+	int code = STS_ERR;
+	fp3_t a, b, c, d, e, f;
+	bn_t g;
+
+	TRY {
+		fp3_new(a);
+		fp3_new(b);
+		fp3_new(c);
+		fp3_new(d);
+		fp3_new(e);
+		fp3_new(f);
+		bn_new(g);
+
+		TEST_BEGIN("multiplication is commutative") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_mul(d, a, b);
+			fp3_mul(e, b, a);
+			TEST_ASSERT(fp3_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("multiplication is associative") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_rand(c);
+			fp3_mul(d, a, b);
+			fp3_mul(d, d, c);
+			fp3_mul(e, b, c);
+			fp3_mul(e, a, e);
+			TEST_ASSERT(fp3_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("multiplication is distributive") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_rand(c);
+			fp3_add(d, a, b);
+			fp3_mul(d, c, d);
+			fp3_mul(e, c, a);
+			fp3_mul(f, c, b);
+			fp3_add(e, e, f);
+			TEST_ASSERT(fp3_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("multiplication has identity") {
+			fp3_rand(a);
+			fp3_zero(d);
+			fp_set_dig(d[0], 1);
+			fp3_mul(e, a, d);
+			TEST_ASSERT(fp3_cmp(e, a) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("multiplication has zero property") {
+			fp3_rand(a);
+			fp3_zero(d);
+			fp3_mul(e, a, d);
+			TEST_ASSERT(fp3_is_zero(e), end);
+		} TEST_END;
+
+		TEST_BEGIN("multiplication by adjoined root is correct") {
+			fp3_rand(a);
+			fp3_zero(b);
+			fp_set_dig(b[1], 1);
+			fp3_mul(c, a, b);
+			fp3_mul_art(d, a);
+			TEST_ASSERT(fp3_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("multiplication by quadratic/cubic non-residue is correct") {
+			fp3_rand(a);
+			fp3_mul_nor(b, a);
+			fp3_mul_art(c, a);
+			TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
+		}
+		TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp3_free(a);
+	fp3_free(b);
+	fp3_free(c);
+	fp3_free(d);
+	fp3_free(e);
+	fp3_free(f);
+	bn_free(g);
+	return code;
+}
+
+static int squaring3(void) {
+	int code = STS_ERR;
+	fp3_t a, b, c;
+
+	TRY {
+		fp3_new(a);
+		fp3_new(b);
+		fp3_new(c);
+
+		TEST_BEGIN("squaring is correct") {
+			fp3_rand(a);
+			fp3_mul(b, a, a);
+			fp3_sqr(c, a);
+			TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp3_free(a);
+	fp3_free(b);
+	fp3_free(c);
+	return code;
+}
+
+static int inversion3(void) {
+	int code = STS_ERR;
+	fp3_t a, b, c, d[2];
+
+	TRY {
+		fp3_new(a);
+		fp3_new(b);
+		fp3_new(c);
+		fp3_new(d[0]);
+		fp3_new(d[1]);
+
+		TEST_BEGIN("inversion is correct") {
+			fp3_rand(a);
+			fp3_inv(b, a);
+			fp3_mul(c, a, b);
+			fp3_zero(b);
+			fp_set_dig(b[0], 1);
+			TEST_ASSERT(fp3_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("simultaneous inversion is correct") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_copy(d[0], a);
+			fp3_copy(d[1], b);
+			fp3_inv(a, a);
+			fp3_inv(b, b);
+			fp3_inv_sim(d, d, 2);
+			TEST_ASSERT(fp3_cmp(d[0], a) == CMP_EQ &&
+					fp3_cmp(d[1], b) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp3_free(a);
+	fp3_free(b);
+	fp3_free(c);
+	fp3_free(d[0]);
+	fp3_free(d[1]);
+	return code;
+}
+
+static int exponentiation3(void) {
+	int code = STS_ERR;
+	fp3_t a, b, c;
+	bn_t d;
+
+	fp3_null(a);
+	fp3_null(b);
+	fp3_null(c);
+	bn_null(d);
+
+	TRY {
+		fp3_new(a);
+		fp3_new(b);
+		fp3_new(c);
+		bn_new(d);
+
+		TEST_BEGIN("frobenius and exponentiation are consistent") {
+			fp3_rand(a);
+			fp3_frb(b, a, 1);
+			d->used = FP_DIGS;
+			dv_copy(d->dp, fp_prime_get(), FP_DIGS);
+			fp3_exp(c, a, d);
+			TEST_ASSERT(fp3_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("frobenius and squared frobenius are consistent") {
+			fp3_rand(a);
+			fp3_frb(b, a, 1);
+			fp3_frb(b, b, 1);
+			fp3_frb(c, a, 2);
+			TEST_ASSERT(fp3_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("frobenius and cubed frobenius are consistent") {
+			fp3_rand(a);
+			fp3_frb(b, a, 1);
+			fp3_frb(b, b, 1);
+			fp3_frb(b, b, 1);
+			fp3_frb(c, a, 3);
+			TEST_ASSERT(fp3_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp3_free(a);
+	fp3_free(b);
+	fp3_free(c);
+	bn_free(d);
+	return code;
+}
+
+static int square_root3(void) {
+	int code = STS_ERR;
+	fp3_t a, b, c;
+	int r;
+
+	TRY {
+		fp3_new(a);
+		fp3_new(b);
+		fp3_new(c);
+
+		TEST_BEGIN("square root extraction is correct") {
+			fp3_rand(a);
+			fp3_sqr(c, a);
+			r = fp3_srt(b, c);
+			fp3_neg(c, b);
+			TEST_ASSERT(r, end);
+			TEST_ASSERT(fp3_cmp(b, a) == CMP_EQ ||
+					fp3_cmp(c, a) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp3_free(a);
+	fp3_free(b);
+	fp3_free(c);
+	return code;
+}
+
 static int memory6(void) {
 	err_t e;
 	int code = STS_ERR;
@@ -1684,10 +2177,572 @@ static int exponentiation12(void) {
 	return code;
 }
 
+static int memory18(void) {
+	err_t e;
+	int code = STS_ERR;
+	fp18_t a;
+
+	TRY {
+		TEST_BEGIN("memory can be allocated") {
+			fp18_new(a);
+			fp18_free(a);
+		} TEST_END;
+	} CATCH(e) {
+		switch (e) {
+			case ERR_NO_MEMORY:
+				util_print("FATAL ERROR!\n");
+				ERROR(end);
+				break;
+		}
+	}
+	(void)a;
+	code = STS_OK;
+  end:
+	return code;
+}
+
+static int util18(void) {
+	int code = STS_ERR;
+	fp18_t a, b, c;
+
+	fp18_null(a);
+	fp18_null(b);
+	fp18_null(c);
+
+	TRY {
+		fp18_new(a);
+		fp18_new(b);
+		fp18_new(c);
+
+		TEST_BEGIN("comparison is consistent") {
+			fp18_rand(a);
+			fp18_rand(b);
+			if (fp18_cmp(a, b) != CMP_EQ) {
+				TEST_ASSERT(fp18_cmp(b, a) == CMP_NE, end);
+			}
+		}
+		TEST_END;
+
+		TEST_BEGIN("copy and comparison are consistent") {
+			fp18_rand(a);
+			fp18_rand(b);
+			fp18_rand(c);
+			if (fp18_cmp(a, c) != CMP_EQ) {
+				fp18_copy(c, a);
+				TEST_ASSERT(fp18_cmp(c, a) == CMP_EQ, end);
+			}
+			if (fp18_cmp(b, c) != CMP_EQ) {
+				fp18_copy(c, b);
+				TEST_ASSERT(fp18_cmp(b, c) == CMP_EQ, end);
+			}
+		}
+		TEST_END;
+
+		TEST_BEGIN("negation is consistent") {
+			fp18_rand(a);
+			fp18_neg(b, a);
+			if (fp18_cmp(a, b) != CMP_EQ) {
+				TEST_ASSERT(fp18_cmp(b, a) == CMP_NE, end);
+			}
+			fp18_neg(b, b);
+			TEST_ASSERT(fp18_cmp(a, b) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to zero and comparison are consistent") {
+			fp18_rand(a);
+			fp18_zero(c);
+			TEST_ASSERT(fp18_cmp(a, c) == CMP_NE, end);
+			TEST_ASSERT(fp18_cmp(c, a) == CMP_NE, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to random and comparison are consistent") {
+			fp18_rand(a);
+			fp18_zero(c);
+			TEST_ASSERT(fp18_cmp(a, c) == CMP_NE, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("assignment to zero and zero test are consistent") {
+			fp18_zero(a);
+			TEST_ASSERT(fp18_is_zero(a), end);
+		}
+		TEST_END;
+
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp18_free(a);
+	fp18_free(b);
+	fp18_free(c);
+	return code;
+}
+
+static int addition18(void) {
+	int code = STS_ERR;
+	fp18_t a, b, c, d, e;
+
+	TRY {
+		fp18_new(a);
+		fp18_new(b);
+		fp18_new(c);
+		fp18_new(d);
+		fp18_new(e);
+
+		TEST_BEGIN("addition is commutative") {
+			fp18_rand(a);
+			fp18_rand(b);
+			fp18_add(d, a, b);
+			fp18_add(e, b, a);
+			TEST_ASSERT(fp18_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("addition is associative") {
+			fp18_rand(a);
+			fp18_rand(b);
+			fp18_rand(c);
+			fp18_add(d, a, b);
+			fp18_add(d, d, c);
+			fp18_add(e, b, c);
+			fp18_add(e, a, e);
+			TEST_ASSERT(fp18_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("addition has identity") {
+			fp18_rand(a);
+			fp18_zero(d);
+			fp18_add(e, a, d);
+			TEST_ASSERT(fp18_cmp(e, a) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("addition has inverse") {
+			fp18_rand(a);
+			fp18_neg(d, a);
+			fp18_add(e, a, d);
+			TEST_ASSERT(fp18_is_zero(e), end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp18_free(a);
+	fp18_free(b);
+	fp18_free(c);
+	fp18_free(d);
+	fp18_free(e);
+	return code;
+}
+
+static int subtraction18(void) {
+	int code = STS_ERR;
+	fp18_t a, b, c, d;
+
+	TRY {
+		fp18_new(a);
+		fp18_new(b);
+		fp18_new(c);
+		fp18_new(d);
+
+		TEST_BEGIN("subtraction is anti-commutative") {
+			fp18_rand(a);
+			fp18_rand(b);
+			fp18_sub(c, a, b);
+			fp18_sub(d, b, a);
+			fp18_neg(d, d);
+			TEST_ASSERT(fp18_cmp(c, d) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("subtraction has identity") {
+			fp18_rand(a);
+			fp18_zero(c);
+			fp18_sub(d, a, c);
+			TEST_ASSERT(fp18_cmp(d, a) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("subtraction has inverse") {
+			fp18_rand(a);
+			fp18_sub(c, a, a);
+			TEST_ASSERT(fp18_is_zero(c), end);
+		}
+		TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp18_free(a);
+	fp18_free(b);
+	fp18_free(c);
+	fp18_free(d);
+	return code;
+}
+
+static int multiplication18(void) {
+	int code = STS_ERR;
+	fp18_t a, b, c, d, e, f;
+
+	TRY {
+		fp18_new(a);
+		fp18_new(b);
+		fp18_new(c);
+		fp18_new(d);
+		fp18_new(e);
+		fp18_new(f);
+
+		TEST_BEGIN("multiplication is commutative") {
+			fp18_rand(a);
+			fp18_rand(b);
+			fp18_mul(d, a, b);
+			fp18_mul(e, b, a);
+			TEST_ASSERT(fp18_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("multiplication is associative") {
+			fp18_rand(a);
+			fp18_rand(b);
+			fp18_rand(c);
+			fp18_mul(d, a, b);
+			fp18_mul(d, d, c);
+			fp18_mul(e, b, c);
+			fp18_mul(e, a, e);
+			TEST_ASSERT(fp18_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("multiplication is distributive") {
+			fp18_rand(a);
+			fp18_rand(b);
+			fp18_rand(c);
+			fp18_add(d, a, b);
+			fp18_mul(d, c, d);
+			fp18_mul(e, c, a);
+			fp18_mul(f, c, b);
+			fp18_add(e, e, f);
+			TEST_ASSERT(fp18_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("multiplication has identity") {
+			fp18_zero(d);
+			fp_set_dig(d[0][0][0], 1);
+			fp18_mul(e, a, d);
+			TEST_ASSERT(fp18_cmp(e, a) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("multiplication has zero property") {
+			fp18_zero(d);
+			fp18_mul(e, a, d);
+			TEST_ASSERT(fp18_is_zero(e), end);
+		} TEST_END;
+
+#if PP_EXT == BASIC | !defined(STRIP)
+		TEST_BEGIN("basic multiplication is correct") {
+			fp18_rand(a);
+			fp18_rand(b);
+			fp18_mul(c, a, b);
+			fp18_mul_basic(d, a, b);
+			TEST_ASSERT(fp18_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy reduced multiplication is correct") {
+			fp18_rand(a);
+			fp18_rand(b);
+			fp18_mul(c, a, b);
+			fp18_mul_lazyr(d, a, b);
+			TEST_ASSERT(fp18_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
+	} CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp18_free(a);
+	fp18_free(b);
+	fp18_free(c);
+	fp18_free(d);
+	fp18_free(e);
+	fp18_free(f);
+	return code;
+}
+
+static int squaring18(void) {
+	int code = STS_ERR;
+	fp18_t a, b, c;
+
+	TRY {
+		fp18_new(a);
+		fp18_new(b);
+		fp18_new(c);
+
+		TEST_BEGIN("squaring is correct") {
+			fp18_rand(a);
+			fp18_mul(b, a, a);
+			fp18_sqr(c, a);
+			TEST_ASSERT(fp18_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+
+#if PP_EXT == BASIC | !defined(STRIP)
+		TEST_BEGIN("basic squaring is correct") {
+			fp18_rand(a);
+			fp18_sqr(b, a);
+			fp18_sqr_basic(c, a);
+			TEST_ASSERT(fp18_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy reduced squaring is correct") {
+			fp18_rand(a);
+			fp18_sqr(b, a);
+			fp18_sqr_lazyr(c, a);
+			TEST_ASSERT(fp18_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp18_free(a);
+	fp18_free(b);
+	fp18_free(c);
+	return code;
+}
+
+static int cyclotomic18(void) {
+	int code = STS_ERR;
+	fp18_t a, b, c, d[2], e[2];
+	bn_t f;
+
+	TRY {
+		fp18_new(a);
+		fp18_new(b);
+		fp18_new(c);
+		fp18_new(d[0]);
+		fp18_new(d[1]);
+		fp18_new(e[0]);
+		fp18_new(e[1]);
+		bn_new(f);
+
+		TEST_BEGIN("cyclotomic test is correct") {
+			fp18_rand(a);
+			fp18_conv_cyc(a, a);
+			TEST_ASSERT(fp18_test_cyc(a) == 1, end);
+		} TEST_END;
+
+		TEST_BEGIN("compression in cyclotomic subgroup is correct") {
+			fp18_rand(a);
+			fp18_conv_cyc(a, a);
+			fp18_back_cyc(c, a);
+			TEST_ASSERT(fp18_cmp(a, c) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("simultaneous compression in cyclotomic subgroup is correct") {
+			fp18_rand(d[0]);
+			fp18_rand(d[1]);
+			fp18_conv_cyc(d[0], d[0]);
+			fp18_conv_cyc(d[1], d[1]);
+			fp18_back_cyc_sim(e, d, 2);
+			TEST_ASSERT(fp18_cmp(d[0], e[0]) == CMP_EQ &&
+					fp18_cmp(d[1], e[1]) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("cyclotomic squaring is correct") {
+			fp18_rand(a);
+			fp18_conv_cyc(a, a);
+			fp18_sqr(b, a);
+			fp18_sqr_cyc(c, a);
+			TEST_ASSERT(fp18_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("compressed squaring is correct") {
+			fp18_rand(a);
+			fp18_conv_cyc(a, a);
+			fp2_zero(b[0][0]);
+			fp2_zero(b[1][1]);
+			fp2_zero(c[0][0]);
+			fp2_zero(c[1][1]);
+			fp18_sqr(b, a);
+			fp18_sqr_pck(c, a);
+			fp18_back_cyc(c, c);
+			TEST_ASSERT(fp18_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+
+        TEST_BEGIN("cyclotomic exponentiation is correct") {
+			bn_rand(f, BN_POS, FP_BITS);
+			fp18_rand(a);
+			fp18_conv_cyc(a, a);
+			fp18_exp(b, a, f);
+			fp18_exp_cyc(c, a, f);
+			TEST_ASSERT(fp18_cmp(b, c) == CMP_EQ, end);
+        } TEST_END;
+
+		TEST_BEGIN("sparse cyclotomic exponentiation is correct") {
+			int g[3] = {0, 0, FP_BITS - 1};
+			do {
+				bn_rand(f, BN_POS, BN_DIGIT);
+				g[1] = f->dp[0] % FP_BITS;
+			} while (g[1] == 0 || g[1] == FP_BITS - 1);
+			bn_set_2b(f, FP_BITS - 1);
+			bn_set_bit(f, g[1] % FP_BITS, 1);
+			bn_add_dig(f, f, 1);
+			fp18_rand(a);
+			fp18_conv_cyc(a, a);
+			fp18_exp(b, a, f);
+			fp18_exp_cyc_sps(c, a, g, 3);
+			TEST_ASSERT(fp18_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp18_free(a);
+	fp18_free(b);
+	fp18_free(c);
+	fp18_free(d[0]);
+	fp18_free(d[1]);
+	fp18_free(e[0]);
+	fp18_free(e[1]);
+	bn_free(f);
+	return code;
+}
+
+static int inversion18(void) {
+	int code = STS_ERR;
+	fp18_t a, b, c;
+
+	TRY {
+		fp18_new(a);
+		fp18_new(b);
+		fp18_new(c);
+
+		TEST_BEGIN("inversion is correct") {
+			fp18_rand(a);
+			fp18_inv(b, a);
+			fp18_mul(c, a, b);
+			fp18_zero(b);
+			fp_set_dig(b[0][0][0], 1);
+			TEST_ASSERT(fp18_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("inversion of a unitary element is correct") {
+			fp18_rand(a);
+			fp18_conv_uni(a, a);
+			fp18_inv(b, a);
+			fp18_inv_uni(c, a);
+			TEST_ASSERT(fp18_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp18_free(a);
+	fp18_free(b);
+	fp18_free(c);
+	return code;
+}
+
+static int exponentiation18(void) {
+	int code = STS_ERR;
+	fp18_t a, b, c;
+	bn_t d;
+
+	fp18_null(a);
+	fp18_null(b);
+	fp18_null(c);
+	bn_null(d);
+
+	TRY {
+		fp18_new(a);
+		fp18_new(b);
+		fp18_new(c);
+		bn_new(d);
+
+		TEST_BEGIN("frobenius and exponentiation are consistent") {
+			fp18_rand(a);
+			fp18_frb(b, a, 1);
+			d->used = FP_DIGS;
+			dv_copy(d->dp, fp_prime_get(), FP_DIGS);
+			fp18_exp(c, a, d);
+			TEST_ASSERT(fp18_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("frobenius and squared frobenius are consistent") {
+			fp18_rand(a);
+			fp18_frb(b, a, 1);
+			fp18_frb(b, b, 1);
+			fp18_frb(c, a, 2);
+			TEST_ASSERT(fp18_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("frobenius and cubed frobenius are consistent") {
+			fp18_rand(a);
+			fp18_frb(b, a, 1);
+			fp18_frb(b, b, 1);
+			fp18_frb(b, b, 1);
+			fp18_frb(c, a, 3);
+			TEST_ASSERT(fp18_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("frobenius and quartered frobenius are consistent") {
+			fp18_rand(a);
+			fp18_frb(b, a, 1);
+			fp18_frb(b, b, 1);
+			fp18_frb(b, b, 1);
+			fp18_frb(b, b, 1);
+			fp18_frb(c, a, 4);
+			TEST_ASSERT(fp18_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("frobenius and quintered frobenius are consistent") {
+			fp18_rand(a);
+			fp18_frb(b, a, 1);
+			fp18_frb(b, b, 1);
+			fp18_frb(b, b, 1);
+			fp18_frb(b, b, 1);
+			fp18_frb(b, b, 1);
+			fp18_frb(c, a, 5);
+			TEST_ASSERT(fp18_cmp(c, b) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp18_free(a);
+	fp18_free(b);
+	fp18_free(c);
+	bn_free(d);
+	return code;
+}
+
 int main(void) {
 	core_init();
 
-	if (ep_param_set_any_pairf() == STS_ERR) {
+	if (fp_param_set_any_tower() == STS_ERR) {
 		THROW(ERR_NO_CURVE);
 		core_clean();
 		return 0;
@@ -1695,159 +2750,281 @@ int main(void) {
 
 	util_banner("Tests for the FPX module", 0);
 
-	util_banner("Quadratic extension:", 0);
-	util_banner("Utilities:", 1);
+	/* Only execute these if there is an assigned quadratic non-residue. */
+	if (fp_prime_get_qnr()) {
+		util_banner("Quadratic extension:", 0);
+		util_banner("Utilities:", 1);
 
-	if (memory2() != STS_OK) {
-		core_clean();
-		return 1;
+		if (memory2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (util2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		util_banner("Arithmetic:", 1);
+
+		if (addition2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (subtraction2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (doubling2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (multiplication2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (squaring2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (inversion2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (exponentiation2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (square_root2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 	}
 
-	if (util2() != STS_OK) {
-		core_clean();
-		return 1;
+	/* Only execute these if there is an assigned cubic non-residue. */
+	if (fp_prime_get_cnr()) {
+		util_banner("Cubic extension:", 0);
+		util_banner("Utilities:", 1);
+
+		if (memory3() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (util3() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		util_banner("Arithmetic:", 1);
+
+		if (addition3() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (subtraction3() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (doubling3() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (multiplication3() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (squaring3() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (inversion3() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (exponentiation3() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (square_root3() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 	}
 
-	util_banner("Arithmetic:", 1);
+	/* Fp^6 is defined as a cubic extension of Fp^2. */
+	if (fp_prime_get_qnr()) {
+		util_banner("Sextic extension:", 0);
+		util_banner("Utilities:", 1);
 
-	if (addition2() != STS_OK) {
-		core_clean();
-		return 1;
+		if (memory6() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (util6() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		util_banner("Arithmetic:", 1);
+
+		if (addition6() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (subtraction6() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (doubling6() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (multiplication6() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (squaring6() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (inversion6() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (exponentiation6() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		util_banner("Dodecic extension:", 0);
+		util_banner("Utilities:", 1);
+
+		if (memory12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (util12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		util_banner("Arithmetic:", 1);
+
+		if (addition12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (subtraction12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (multiplication12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (squaring12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (cyclotomic12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (inversion12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (exponentiation12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 	}
 
-	if (subtraction2() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+	/*
+	 * Fp^18 is defined as a cubic extension of Fp^6, which in turn is defined
+	 * as a quadratic extension of Fp^3, but defined as a cubic extension of
+	 * Fp^2. Only run this there is a cubic and quadratic non-residue in Fp.
+	 */
+	if (fp_prime_get_cnr() == fp_prime_get_qnr()) {
 
-	if (doubling2() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+		util_banner("Octdecic extension:", 0);
+		util_banner("Utilities:", 1);
 
-	if (multiplication2() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+		if (memory18() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 
-	if (squaring2() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+		if (util18() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 
-	if (inversion2() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+		util_banner("Arithmetic:", 1);
 
-	if (exponentiation2() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+		if (addition18() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 
-	if (square_root2() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+		if (subtraction18() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 
-	util_banner("Sextic extension:", 0);
-	util_banner("Utilities:", 1);
+		if (multiplication18() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 
-	if (memory6() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+		if (squaring18() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 
-	if (util6() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+		if (cyclotomic18() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 
-	util_banner("Arithmetic:", 1);
+		if (inversion18() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 
-	if (addition6() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (subtraction6() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (doubling6() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (multiplication6() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (squaring6() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (inversion6() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (exponentiation6() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	util_banner("Dodecic extension:", 0);
-	util_banner("Utilities:", 1);
-
-	if (memory12() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (util12() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	util_banner("Arithmetic:", 1);
-
-	if (addition12() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (subtraction12() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (multiplication12() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (squaring12() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (cyclotomic12() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (inversion12() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
-	if (exponentiation12() != STS_OK) {
-		core_clean();
-		return 1;
+		if (exponentiation18() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 	}
 
 	core_clean();
