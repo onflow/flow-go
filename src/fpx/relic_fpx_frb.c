@@ -54,6 +54,21 @@ void fp2_frb(fp2_t c, fp2_t a, int i) {
 	}
 }
 
+
+void fp3_frb(fp3_t c, fp3_t a, int i) {
+	switch (i % 3) {
+		case 0:
+			fp3_copy(c, a);
+			break;
+		case 1:
+			fp3_mul_frb(c, a, 0, 1, 1);
+			break;
+		case 2:
+			fp3_mul_frb(c, a, 0, 2, 1);
+			break;
+	}
+}
+
 void fp6_frb(fp6_t c, fp6_t a, int i) {
 	if (i == 1) {
 		fp2_frb(c[0], a[0], 1);
@@ -109,5 +124,44 @@ void fp12_frb(fp12_t c, fp12_t a, int i) {
 			fp2_mul_frb(c[1][2], c[1][2], 3, 5);
 			fp2_neg(c[1][2], c[1][2]);
 			break;
+	}
+}
+
+void fp18_frb(fp18_t c, fp18_t a, int i) {
+	fp3_t t;
+
+	fp3_null(t);
+
+	TRY {
+		fp3_new(t);
+
+		fp18_copy(c, a);
+		for (int j = 0; j < 3; j++) {
+			fp_copy(t[0], a[j][0][0]);
+			fp_copy(t[1], a[j][2][0]);
+			fp_copy(t[2], a[j][1][1]);
+			fp3_frb(t, t, i % 3);
+			if (j != 0) {
+				fp3_mul_frb(t, t, 1, i, j);
+			}
+			fp_copy(c[j][0][0], t[0]);
+			fp_copy(c[j][2][0], t[1]);
+			fp_copy(c[j][1][1], t[2]);
+
+			fp_copy(t[0], a[j][1][0]);
+			fp_copy(t[1], a[j][0][1]);
+			fp_copy(t[2], a[j][2][1]);
+			fp3_frb(t, t, i % 3);
+			fp3_mul_frb(t, t, 1, i, j + 3);
+			fp_copy(c[j][1][0], t[0]);
+			fp_copy(c[j][0][1], t[1]);
+			fp_copy(c[j][2][1], t[2]);
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp3_free(t);
 	}
 }

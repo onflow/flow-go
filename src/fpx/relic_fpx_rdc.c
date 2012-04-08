@@ -57,3 +57,21 @@ void fp2_rdc_integ(fp2_t c, dv2_t a) {
 }
 
 #endif
+
+#if PP_CBC == BASIC || !defined(STRIP)
+
+void fp3_rdc_basic(fp3_t c, dv3_t a) {
+	fp_rdc(c[0], a[0]);
+	fp_rdc(c[1], a[1]);
+	fp_rdc(c[2], a[2]);
+}
+
+#endif
+
+#if PP_CBC == INTEG || !defined(STRIP)
+
+void fp3_rdc_integ(fp3_t c, dv3_t a) {
+	fp3_rdcn_low(c, a);
+}
+
+#endif

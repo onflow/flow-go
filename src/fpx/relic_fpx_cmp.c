@@ -46,6 +46,12 @@ int fp2_cmp(fp2_t a, fp2_t b) {
 			(fp_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ : CMP_NE;
 }
 
+int fp3_cmp(fp3_t a, fp3_t b) {
+	return (fp_cmp(a[0], b[0]) == CMP_EQ) &&
+			(fp_cmp(a[1], b[1]) == CMP_EQ) &&
+			(fp_cmp(a[2], b[2]) == CMP_EQ) ? CMP_EQ : CMP_NE;
+}
+
 int fp6_cmp(fp6_t a, fp6_t b) {
 	return ((fp2_cmp(a[0], b[0]) == CMP_EQ) && (fp2_cmp(a[1], b[1]) == CMP_EQ)
 			&& (fp2_cmp(a[2], b[2]) == CMP_EQ) ? CMP_EQ : CMP_NE);
@@ -60,4 +66,16 @@ int fp12_cmp_dig(fp12_t a, dig_t b) {
 	return ((fp_cmp_dig(a[0][0][0], b) == CMP_EQ) &&
 			fp_is_zero(a[0][0][1]) && fp2_is_zero(a[0][1]) &&
 			fp2_is_zero(a[0][2]) && fp6_is_zero(a[1]));
+}
+
+int fp18_cmp(fp18_t a, fp18_t b) {
+	return ((fp6_cmp(a[0], b[0]) == CMP_EQ) &&
+			(fp6_cmp(a[1], b[1]) == CMP_EQ) &&
+			(fp6_cmp(a[2], b[2]) == CMP_EQ) ? CMP_EQ : CMP_NE);
+}
+
+int fp18_cmp_dig(fp18_t a, dig_t b) {
+	return ((fp_cmp_dig(a[0][0][0], b) == CMP_EQ) &&
+			fp_is_zero(a[0][0][1]) && fp2_is_zero(a[0][1]) &&
+			fp2_is_zero(a[0][2]) && fp6_is_zero(a[1]) && fp6_is_zero(a[2]));
 }

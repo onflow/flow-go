@@ -65,6 +65,35 @@ void fp2_print(fp2_t a) {
 	fp_print(a[1]);
 }
 
+void fp3_copy(fp3_t c, fp3_t a) {
+	fp_copy(c[0], a[0]);
+	fp_copy(c[1], a[1]);
+	fp_copy(c[2], a[2]);
+}
+
+void fp3_zero(fp3_t a) {
+	fp_zero(a[0]);
+	fp_zero(a[1]);
+	fp_zero(a[2]);
+}
+
+int fp3_is_zero(fp3_t a) {
+	return fp_is_zero(a[0]) && fp_is_zero(a[1]) && fp_is_zero(a[2]);
+}
+
+void fp3_rand(fp3_t a) {
+	fp_rand(a[0]);
+	fp_rand(a[1]);
+	fp_rand(a[2]);
+}
+
+void fp3_print(fp3_t a) {
+	fp_print(a[0]);
+	fp_print(a[1]);
+	fp_print(a[2]);
+}
+
+
 void fp6_copy(fp6_t c, fp6_t a) {
 	fp2_copy(c[0], a[0]);
 	fp2_copy(c[1], a[1]);
@@ -119,5 +148,38 @@ void fp12_print(fp12_t a) {
 
 void fp12_set_dig(fp12_t a, dig_t b) {
 	fp12_zero(a);
+	fp_set_dig(a[0][0][0], b);
+}
+
+void fp18_copy(fp18_t c, fp18_t a) {
+	fp6_copy(c[0], a[0]);
+	fp6_copy(c[1], a[1]);
+	fp6_copy(c[2], a[2]);
+}
+
+void fp18_zero(fp18_t a) {
+	fp6_zero(a[0]);
+	fp6_zero(a[1]);
+	fp6_zero(a[2]);
+}
+
+int fp18_is_zero(fp18_t a) {
+	return (fp6_is_zero(a[0]) && fp6_is_zero(a[1]) && fp6_is_zero(a[2]));
+}
+
+void fp18_rand(fp18_t a) {
+	fp6_rand(a[0]);
+	fp6_rand(a[1]);
+	fp6_rand(a[2]);
+}
+
+void fp18_print(fp18_t a) {
+	fp6_print(a[0]);
+	fp6_print(a[1]);
+	fp6_print(a[2]);
+}
+
+void fp18_set_dig(fp18_t a, dig_t b) {
+	fp18_zero(a);
 	fp_set_dig(a[0][0][0], b);
 }

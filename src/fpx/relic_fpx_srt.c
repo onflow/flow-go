@@ -98,3 +98,64 @@ int fp2_srt(fp2_t c, fp2_t a) {
 	}
 	return r;
 }
+
+int fp3_srt(fp3_t c, fp3_t a) {
+	int r = 0;
+	fp3_t t0, t1, t2, t3;
+	bn_t e;
+
+	fp3_null(t0);
+	fp3_null(t1);
+	fp3_null(t2);
+	fp3_null(t3);
+	bn_null(e);
+
+	TRY {
+		fp3_new(t0);
+		fp3_new(t1);
+		fp3_new(t2);
+		fp3_new(t3);
+		bn_new(e);
+
+		fp3_dbl(t3, a);
+		fp3_frb(t0, t3, 1);
+
+		fp3_sqr(t1, t0);
+		fp3_mul(t2, t1, t0);
+		fp3_mul(t1, t1, t2);
+
+		fp3_frb(t0, t0, 1);
+		fp3_mul(t3, t3, t1);
+		fp3_mul(t0, t0, t3);
+
+		e->used = FP_DIGS;
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		bn_sub_dig(e, e, 5);
+		bn_div_dig(e, e, 8);
+		fp3_exp(t0, t0, e);
+
+		fp3_mul(t0, t0, t2);
+		fp3_sqr(t1, t0);
+		fp3_mul(t1, t1, a);
+		fp3_dbl(t1, t1);
+
+		fp3_mul(t0, t0, a);
+		fp_sub_dig(t1[0], t1[0], 1);
+		fp3_mul(c, t0, t1);
+
+		fp3_sqr(t0, c);
+		if (fp3_cmp(t0, a) == CMP_EQ) {
+			r = 1;
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp3_free(t0);
+		fp3_free(t1);
+		fp3_free(t2);
+		fp3_free(t3);
+		bn_free(e);
+	}
+
+	return r;
+}
