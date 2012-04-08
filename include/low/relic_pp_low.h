@@ -212,4 +212,118 @@ void fp2_sqrm_low(fp2_t c, fp2_t a);
  */
 void fp2_rdcn_low(fp2_t c, dv2_t a);
 
+/**
+ * Adds two cubic extension field elements of the same size.
+ * Computes c = a + b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first field element to add.
+ * @param[in] b				- the second field element to add.
+ */
+void fp3_addn_low(fp3_t c, fp3_t a, fp3_t b);
+
+/**
+ * Adds two cubic extension field elements of the same size with integrated
+ * modular reduction. Computes c = a + b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first field element to add.
+ * @param[in] b				- the second field element to add.
+ */
+void fp3_addm_low(fp3_t c, fp3_t a, fp3_t b);
+
+/**
+ * Subtracts a cubic extension field element from another of the same size.
+ * Computes c = a - b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first field element.
+ * @param[in] b				- the field element to subtract.
+ */
+void fp3_subn_low(fp3_t c, fp3_t a, fp3_t b);
+
+/**
+ * Subtracts a cubic extension field element from another of the same size
+ * with integrated modular reduction. Computes c = a - b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first field element.
+ * @param[in] b				- the field element to subtract.
+ */
+void fp3_subm_low(fp3_t c, fp3_t a, fp3_t b);
+
+/**
+ * Subtracts a double-precision cubic extension field element from another
+ * of the same size and corrects the result by conditionally adding
+ * 2^(FP_DIGS * WORD) * p. Computes c = a - b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first field element to add.
+ * @param[in] b				- the second field element to add.
+ */
+void fp3_subc_low(dv3_t c, dv3_t a, dv3_t b);
+
+/**
+ * Doubles a cubic extension field element. Computes c = a + a.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first field element to multiply.
+ */
+void fp3_dbln_low(fp3_t c, fp3_t a);
+
+/**
+ * Doubles a cubic extension field element with integrated modular
+ * reduction. Computes c = a + a.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the field element to double.
+ */
+void fp3_dblm_low(fp3_t c, fp3_t a);
+
+/**
+ * Multiplies two cubic extension field elements of the same size.
+ * Computes c = a * b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first field element to multiply.
+ * @param[in] b				- the second field element to multiply.
+ */
+void fp3_muln_low(dv3_t c, fp3_t a, fp3_t b);
+
+/**
+ * Multiplies two cubic extension field elements of the same size with
+ * embedded modular reduction. Computes c = (a * b) mod p.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the first field element to multiply.
+ * @param[in] b				- the second field element to multiply.
+ */
+void fp3_mulm_low(fp3_t c, fp3_t a, fp3_t b);
+
+/**
+ * Squares a cubic extension element. Computes c = a * a.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the field element to square.
+ */
+void fp3_sqrn_low(dv2_t c, fp3_t a);
+
+/**
+ * Squares a cubic extension field element with integrated modular
+ * reduction. Computes c = (a * a) mod p.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the field element to square.
+ */
+void fp3_sqrm_low(fp3_t c, fp3_t a);
+
+/**
+ * Reduces a cubic extension element modulo the configured prime p.
+ * Computes c = a mod p.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the digit vector to reduce.
+ */
+void fp3_rdcn_low(fp3_t c, dv3_t a);
+
 #endif /* !RELIC_FP_LOW_H */
