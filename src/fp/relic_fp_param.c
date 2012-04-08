@@ -53,7 +53,7 @@ static int param_id;
 /**
  * Maximum number of powers of 2 used to describe specia form moduli.
  */
-#define MAX_EXPS		8
+#define MAX_EXPS		10
 
 /**
  * Non-zero bits of special form prime.
