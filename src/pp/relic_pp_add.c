@@ -41,7 +41,7 @@
 
 #if EP_ADD == BASIC || !defined(STRIP)
 
-void pp_add_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
+void pp_add_k12_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	fp2_t s;
 	ep2_t t;
 
@@ -76,7 +76,7 @@ void pp_add_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 
 #if PP_EXT == BASIC || !defined(STRIP)
 
-void pp_add_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
+void pp_add_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	fp2_t t0, t1, t2, t3, t4;
 
 	fp2_null(t0);
@@ -147,7 +147,7 @@ void pp_add_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 
 #if PP_EXT == LAZYR || !defined(STRIP)
 
-void pp_add_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
+void pp_add_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	fp2_t t1, t2, t3, t4;
 	dv2_t u1, u2;
 
@@ -228,3 +228,57 @@ void pp_add_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 #endif
 
 #endif
+
+void pp_add_k12_lit(fp12_t l, ep_t r, ep_t p, ep2_t q) {
+	fp_t t0, t1, t2, t3, t4, t5, t6, t7;
+
+	fp12_zero(l);
+
+	fp_mul(t1, r->z, p->x);
+	fp_sub(t1, r->x, t1);
+	fp_mul(t2, r->z, p->y);
+	fp_sub(t2, r->y, t2);
+	fp_mul(t3, p->x, t2);
+	r->norm = 0;
+
+	if (ep2_curve_is_twist() == EP_DTYPE) {
+		fp_mul(l[0][0][0], t1, p->y);
+		fp_sub(l[0][0][0], t3, l[0][0][0]);
+
+		fp_mul(l[0][1][0], q->x[0], t2);
+		fp_mul(l[0][1][1], q->x[1], t2);
+		fp2_neg(l[0][1], l[0][1]);
+
+		fp_mul(l[1][1][0], q->y[0], t1);
+		fp_mul(l[1][1][1], q->y[1], t1);
+	} else {
+		fp_mul(l[0][0][0], t1, p->y);
+		fp_sub(l[0][0][0], t3, l[0][0][0]);
+
+		fp_mul(l[0][2][0], q->x[0], t2);
+		fp_mul(l[0][2][1], q->x[1], t2);
+		fp2_neg(l[0][2], l[0][2]);
+
+		fp_mul(l[1][1][0], q->y[0], t1);
+		fp_mul(l[1][1][1], q->y[1], t1);
+
+		fp2_t t;
+		fp2_copy(t, l[0][0]);
+		fp2_mul_nor(l[0][0], t);
+	}
+
+	fp_sqr(t3, t1);
+	fp_mul(r->x, t3, r->x);
+	fp_mul(t3, t1, t3);
+	fp_sqr(t4, t2);
+	fp_mul(t4, t4, r->z);
+	fp_add(t4, t3, t4);
+	fp_sub(t4, t4, r->x);
+	fp_sub(t4, t4, r->x);
+	fp_sub(r->x, r->x, t4);
+	fp_mul(t2, t2, r->x);
+	fp_mul(r->y, t3, r->y);
+	fp_sub(r->y, t2, r->y);
+	fp_mul(r->x, t1, t4);
+	fp_mul(r->z, r->z, t3);
+}

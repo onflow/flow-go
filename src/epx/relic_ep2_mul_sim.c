@@ -27,7 +27,7 @@
  * curve over a quadratic extension.
  *
  * @version $Id$
- * @ingroup ep
+ * @ingroup epx
  */
 
 #include "string.h"

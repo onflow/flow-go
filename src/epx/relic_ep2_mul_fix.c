@@ -27,7 +27,7 @@
  * a quadratic extension.
  *
  * @version $Id$
- * @ingroup pp
+ * @ingroup epx
  */
 
 #include "string.h"

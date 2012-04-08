@@ -27,7 +27,7 @@
  * extensions.
  *
  * @version $Id$
- * @ingroup pp
+ * @ingroup epx
  */
 
 #include "relic_core.h"

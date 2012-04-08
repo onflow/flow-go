@@ -225,6 +225,11 @@ int *fp_param_get_sps(int *len) {
 }
 
 void fp_param_get_map(int *s, int *len) {
+
+	for (int i = 0; i < FP_BITS; i++) {
+		s[i] = 0;
+	}
+
 	switch (param_id) {
 		case BN_158:
 			s[3] = s[5] = s[8] = s[39] = s[40] = 1;

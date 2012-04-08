@@ -39,39 +39,44 @@
 /*============================================================================*/
 
 /**
- * Compute the Miller loop for Ate variants over the bits of r.
+ * Compute the Miller loop for a pairings of type G_2 x G_1 over the bits of a
+ * given parameter.
  *
  * @param[out] r			- the result.
- * @param[out] t			- the point rQ.
+ * @param[out] t			- the resulting point.
  * @param[in] q				- the first point of the pairing, in G_2.
- * @param[in] a				- the length of the loop.
  * @param[in] p				- the second point of the pairing, in G_1.
+ * @param[in] a				- the loop parameter.
  */
-void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
-	fp12_t tmp;
+static void pp_mil_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, bn_t a) {
+	fp12_t l;
 	ep_t _p;
+	ep2_t _q;
 
-	fp12_null(tmp);
+	fp12_null(l);
 	ep_null(_p);
+	ep2_null(_q);
 
 	TRY {
-		fp12_new(tmp);
+		fp12_new(l);
 		ep_new(_p);
+		ep2_new(_q);
 
-		fp12_zero(tmp);
+		fp12_zero(l);
 		fp12_zero(r);
 		fp_set_dig(r[0][0][0], 1);
 		ep2_copy(t, q);
 
 		ep_neg(_p, p);
+		ep2_neg(_q, q);
 
 		for (int i = bn_bits(a) - 2; i >= 0; i--) {
 			fp12_sqr(r, r);
-			pp_dbl(tmp, t, t, _p);
-			fp12_mul_dxs(r, r, tmp);
+			pp_dbl_k12(l, t, t, _p);
+			fp12_mul_dxs(r, r, l);
 			if (bn_test_bit(a, i)) {
-				pp_add(tmp, t, q, p);
-				fp12_mul_dxs(r, r, tmp);
+				pp_add_k12(l, t, q, p);
+				fp12_mul_dxs(r, r, l);
 			}
 		}
 	}
@@ -79,8 +84,95 @@ void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp12_free(tmp);
+		fp12_free(l);
 		ep_free(_p);
+	}
+}
+
+/**
+ * Compute the Miller loop for a pairings of type G_2 x G_1 over the bits of a
+ * given parameter represented in sparse form.
+ *
+ * @param[out] r			- the result.
+ * @param[out] t			- the resulting point.
+ * @param[in] q				- the first point of the pairing, in G_2.
+ * @param[in] p				- the second point of the pairing, in G_1.
+ * @param[in] s				- the loop parameter in sparse form.
+ * @paramin] len			- the length of the loop parameter.
+ */
+static void pp_mil_k12_sps(fp12_t r, ep2_t t, ep2_t q, ep_t p, int *s, int len) {
+	fp12_t l;
+	ep_t _p;
+	ep2_t _q;
+
+	fp12_null(l);
+	ep_null(_p);
+	ep2_null(_q);
+
+	TRY {
+		fp12_new(l);
+		ep_new(_p);
+		ep2_new(_q);
+
+		fp12_zero(l);
+		fp12_zero(r);
+		fp_set_dig(r[0][0][0], 1);
+		ep2_copy(t, q);
+
+		ep_neg(_p, p);
+		ep2_neg(_q, q);
+
+		for (int i = len - 2; i >= 0; i--) {
+			fp12_sqr(r, r);
+			pp_dbl_k12(l, t, t, _p);
+			fp12_mul_dxs(r, r, l);
+			if (s[i] > 0) {
+				pp_add_k12(l, t, q, p);
+				fp12_mul_dxs(r, r, l);
+			}
+			if (s[i] < 0) {
+				pp_add_k12(l, t, _q, p);
+				fp12_mul_dxs(r, r, l);
+			}
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp12_free(l);
+		ep_free(_p);
+	}
+}
+
+static void pp_mil_k12_lit(fp12_t r, ep_t t, ep_t p, ep2_t q, bn_t a) {
+	fp12_t l;
+
+	fp12_null(l);
+
+	TRY {
+		fp12_new(l);
+		fp12_zero(l);
+
+		ep_copy(t, p);
+		fp12_zero(r);
+		fp_set_dig(r[0][0][0], 1);
+		fp12_zero(l);
+
+		for (int i = bn_bits(a) - 2; i >= 0; i--) {
+			fp12_sqr(r, r);
+			pp_dbl_k12_lit(l, t, t, q);
+			fp12_mul(r, r, l);
+			if (bn_test_bit(a, i)) {
+				pp_add_k12_lit(l, t, p, q);
+				fp12_mul(r, r, l);
+			}
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
 	}
 }
 
@@ -88,10 +180,10 @@ void pp_miller(fp12_t r, ep2_t t, ep2_t q, bn_t a, ep_t p) {
  * Compute the final exponentiation of a pairing defined over a Barreto-Naehrig
  * curve.
  *
- * @param[out] m			- the result.
- * @param[in] x				- the parameter used to generate the curve.
+ * @param[out] c			- the result.
+ * @param[in] a				- the extension field element to exponentiate.
  */
-void pp_exp(fp12_t c, fp12_t a) {
+static void pp_exp_bn(fp12_t c, fp12_t a) {
 	fp12_t t0, t1, t2, t3;
 	int l, *b = fp_param_get_sps(&l);
 	bn_t x;
@@ -113,15 +205,10 @@ void pp_exp(fp12_t c, fp12_t a) {
 		 * New final exponentiation following Fuentes-Castañeda, Knapp and
 		 * Rodríguez-Henríquez: Fast Hashing to G_2.
 		 */
-
 		fp_param_get_var(x);
 
-#ifndef PP_PARAL
 		/* First, compute m = f^(p^6 - 1)(p^2 + 1). */
 		fp12_conv_cyc(c, a);
-#else
-		fp12_copy(c, a);
-#endif
 
 		/* Now compute m^((p^4 - p^2 + 1) / r). */
 		/* t0 = m^2x. */
@@ -174,189 +261,6 @@ void pp_exp(fp12_t c, fp12_t a) {
 	}
 }
 
-/**
- * Compute the additional multiplication required by the R-ate pairing.
- *
- * @param[in,out] res		- the result.
- * @param[in] t				- the elliptic point produced by the Miller loop.
- * @param[in] q				- the first point of the pairing, in G_2.
- * @param[in] p				- the second point of the pairing, in G_1.
- */
-void pp_r_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
-	ep2_t q1, r1q;
-	fp12_t tmp1;
-	fp12_t tmp2;
-
-	fp12_null(tmp1);
-	fp12_null(tmp2);
-	ep2_null(q1);
-	ep2_null(r1q);
-
-	TRY {
-		ep2_new(q1);
-		ep2_new(r1q);
-		fp12_new(tmp1);
-		fp12_new(tmp2);
-		fp12_zero(tmp1);
-		fp12_zero(tmp2);
-
-		ep2_copy(r1q, t);
-		fp_set_dig(q1->z[0], 1);
-		fp_zero(q1->z[1]);
-
-		pp_add(tmp1, r1q, q, p);
-		fp12_mul(tmp2, res, tmp1);
-		fp12_frb(tmp2, tmp2, 1);
-		fp12_mul(res, res, tmp2);
-
-		r1q->norm = 0;
-		pp_norm(r1q, r1q);
-
-		ep2_frb(q1, r1q, 1);
-
-		ep2_copy(r1q, t);
-
-		pp_add(tmp1, r1q, q1, p);
-		fp12_mul(res, res, tmp1);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fp12_free(tmp1);
-		fp12_free(tmp2);
-		ep2_free(q1);
-		ep2_free(r1q);
-	}
-}
-
-/**
- * Compute the additional multiplication required by the Optimal Ate pairing.
- *
- * @param[in,out] res		- the result.
- * @param[in] t				- the elliptic point produced by the Miller loop.
- * @param[in] q				- the first point of the pairing, in G_2.
- * @param[in] p				- the second point of the pairing, in G_1.
- */
-void pp_o_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
-	ep2_t q1, q2;
-	fp12_t tmp;
-
-	fp12_null(tmp);
-	ep2_null(q1);
-	ep2_null(q2);
-
-	TRY {
-		ep2_new(q1);
-		ep2_new(q2);
-		fp12_new(tmp);
-		fp12_zero(tmp);
-
-		fp_set_dig(q1->z[0], 1);
-		fp_zero(q1->z[1]);
-		fp_set_dig(q2->z[0], 1);
-		fp_zero(q2->z[1]);
-
-		ep2_frb(q1, q, 1);
-		ep2_frb(q2, q, 2);
-		ep2_neg(q2, q2);
-
-		pp_add(tmp, t, q1, p);
-		fp12_mul(res, res, tmp);
-		pp_add(tmp, t, q2, p);
-		fp12_mul(res, res, tmp);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fp12_free(tmp);
-		ep2_free(q1);
-		ep2_free(q2);
-	}
-}
-
-/**
- * Compute the additional multiplication required by the X-ate pairing.
- *
- * @param[in,out] res		- the result.
- * @param[in] t				- the elliptic point produced by the Miller loop.
- * @param[in] q				- the first point of the pairing, in G_2.
- * @param[in] p				- the second point of the pairing, in G_1.
- */
-void pp_x_ate_mul(fp12_t res, ep2_t t, ep2_t q, ep_t p) {
-	ep2_t q1, q2, q3;
-	fp12_t tmp;
-
-	fp12_null(tmp);
-	ep2_null(q1);
-	ep2_null(q2);
-	ep2_null(q3);
-
-	TRY {
-		ep2_new(q1);
-		ep2_new(q2);
-		ep2_new(q3);
-		fp12_new(tmp);
-
-		fp_set_dig(q1->z[0], 1);
-		fp_zero(q1->z[1]);
-		fp_set_dig(q2->z[0], 1);
-		fp_zero(q2->z[1]);
-		fp_set_dig(q3->z[0], 1);
-		fp_zero(q3->z[1]);
-
-		/* r = r^p. */
-		fp12_frb(tmp, res, 1);
-		fp12_mul(res, res, tmp);
-
-		/* r = r^p^3. */
-		fp12_frb(tmp, tmp, 2);
-		fp12_mul(res, res, tmp);
-
-		/* r = r^p^5. */
-		fp12_frb(tmp, tmp, 2);
-		/* r = r^p^7. */
-		fp12_frb(tmp, tmp, 2);
-		/* r = r^p^9. */
-		fp12_frb(tmp, tmp, 2);
-		/* r = r^p^10. */
-		fp12_frb(tmp, tmp, 1);
-		fp12_mul(res, res, tmp);
-
-		/* q1 = p * xQ. */
-		ep2_frb(q1, t, 1);
-		/* q2 = p^3 * xQ. */
-		ep2_frb(q2, q1, 2);
-		/* q3 = p^5 * xQ. */
-		ep2_frb(q3, q2, 2);
-		/* q3 = p^7 * xQ. */
-		ep2_frb(q3, q3, 2);
-		/* q3 = p^9 * xQ. */
-		ep2_frb(q3, q3, 2);
-		/* q3 = p^10 * xQ. */
-		ep2_frb(q3, q3, 1);
-
-		fp12_zero(tmp);
-		/* q1 = p*xQ + xQ. */
-		pp_add(tmp, q1, t, p);
-		fp12_mul(res, res, tmp);
-
-		/* q2 = q2 + q3. */
-		pp_add(tmp, q2, q3, p);
-		fp12_mul(res, res, tmp);
-
-		/* Make q2 affine again. */
-		pp_norm(q2, q2);
-		pp_add(tmp, q1, q2, p);
-
-		fp12_mul(res, res, tmp);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fp12_free(tmp);
-		ep2_free(q1);
-		ep2_free(q2);
-		ep2_free(q3);
-	}
-}
-
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -369,39 +273,122 @@ void pp_map_clean(void) {
 	ep2_curve_clean();
 }
 
-#if PP_MAP == R_ATE || !defined(STRIP)
+#if PP_MAP == TATEP || !defined(STRIP)
 
-void pp_map_r_ate(fp12_t r, ep_t p, ep2_t q) {
-	ep2_t t;
-	bn_t a, x;
+void pp_map_tatep(fp12_t r, ep_t p, ep2_t q) {
+	ep_t t;
+	bn_t n;
+
+	ep_null(t);
+	bn_null(n);
+
+	TRY {
+		ep_new(t);
+		bn_new(n);
+
+		ep_curve_get_ord(n);
+		pp_mil_k12_lit(r, t, p, q, n);
+		pp_exp(r, r);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep_free(t);
+		bn_free(n);
+	}
+}
+
+#endif
+
+#if PP_MAP == WEILP || !defined(STRIP)
+
+void pp_map_weilp(fp12_t r, ep_t p, ep2_t q) {
+	ep_t t0;
+	ep2_t t1;
+	fp12_t r0, r1;
+	bn_t n;
+
+	ep_null(t0);
+	ep_null(t1);
+	fp12_null(r0);
+	fp12_null(r1);
+	bn_null(n);
+
+	TRY {
+		ep_curve_get_ord(n);
+		pp_mil_k12_lit(r0, t0, p, q, n);
+		pp_mil_k12(r1, t1, q, p, n);
+		fp12_inv(r1, r1);
+		fp12_mul(r0, r0, r1);
+
+		fp12_inv(r1, r0);
+		fp12_inv_uni(r0, r0);
+		fp12_mul(r, r0, r1);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep_free(t0);
+		ep_free(t1);
+		fp12_null(r0);
+		fp12_null(r1);
+		bn_free(n);
+	}
+}
+
+#endif
+
+
+#if PP_MAP == OATEP || !defined(STRIP)
+
+void pp_map_oatep(fp12_t r, ep_t p, ep2_t q) {
+	ep2_t t, q1, q2;
+	bn_t a;
+	int len, s[FP_BITS];
+	fp12_t l;
 
 	ep2_null(t);
+	ep2_null(q1);
+	ep2_null(q2);
+	fp12_null(l);
 	bn_null(a);
-	bn_null(x);
 
 	TRY {
 		ep2_new(t);
+		ep2_new(q1);
+		ep2_new(q2);
+		fp12_new(l);
 		bn_new(a);
-		bn_new(x);
 
-		fp_param_get_var(x);
-
-		bn_mul_dig(a, x, 6);
-		bn_add_dig(a, a, 2);
-		if (bn_sign(x) == BN_NEG) {
-			bn_neg(a, a);
-		}
+		fp_param_get_var(a);
+		fp_param_get_map(s, &len);
 
 		/* r = f_{r,Q}(P). */
-		pp_miller(r, t, q, a, p);
+		pp_mil_k12_sps(r, t, q, p, s, len);
 
-		if (bn_sign(x) == BN_NEG) {
-			/* Since f_{-r,Q}(P) = 1/f_{r,Q}(P), we must invert the result. */
+		if (bn_sign(a) == BN_NEG) {
+			/* Since f_{-a,Q}(P) = 1/f_{a,Q}(P), we must invert the result. */
 			fp12_inv_uni(r, r);
 			ep2_neg(t, t);
 		}
 
-		pp_r_ate_mul(r, t, q, p);
+		fp_set_dig(q1->z[0], 1);
+		fp_zero(q1->z[1]);
+		fp_set_dig(q2->z[0], 1);
+		fp_zero(q2->z[1]);
+
+		ep2_frb(q1, q, 1);
+		ep2_frb(q2, q, 2);
+		ep2_neg(q2, q2);
+
+		fp12_zero(l);
+		pp_add_k12(l, t, q1, p);
+		fp12_mul_dxs(r, r, l);
+		pp_add_k12(l, t, q2, p);
+		fp12_mul_dxs(r, r, l);
+
 		pp_exp(r, r);
 	}
 	CATCH_ANY {
@@ -410,104 +397,18 @@ void pp_map_r_ate(fp12_t r, ep_t p, ep2_t q) {
 	FINALLY {
 		ep2_free(t);
 		bn_free(a);
-		bn_free(x);
 	}
 }
 
 #endif
 
-#if PP_MAP == O_ATE || !defined(STRIP)
-
-void pp_map_o_ate(fp12_t r, ep_t p, ep2_t q) {
-	ep2_t t;
-	bn_t a, x;
-
-	ep2_null(t);
-	bn_null(a);
-	bn_null(x);
-
-	TRY {
-		ep2_new(t);
-		bn_new(a);
-		bn_new(x);
-
-		fp_param_get_var(x);
-
-		bn_mul_dig(a, x, 6);
-		bn_add_dig(a, a, 2);
-		if (bn_sign(x) == BN_NEG) {
-			bn_neg(a, a);
-		}
-
-		/* r = f_{r,Q}(P). */
-		pp_miller(r, t, q, a, p);
-
-		if (bn_sign(x) == BN_NEG) {
-			/* Since f_{-r,Q}(P) = 1/f_{r,Q}(P), we must invert the result. */
-			fp12_inv_uni(r, r);
-			ep2_neg(t, t);
-		}
-
-		pp_o_ate_mul(r, t, q, p);
-		pp_exp(r, r);
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		ep2_free(t);
-		bn_free(a);
-		bn_free(x);
+void pp_exp(fp12_t c, fp12_t a) {
+	switch (ep_param_get()) {
+		case BN_P158:
+		case BN_P254:
+		case BN_P256:
+		case BN_P638:
+			pp_exp_bn(c, a);
+			break;
 	}
 }
-
-#endif
-
-#if PP_MAP == X_ATE || !defined(STRIP)
-
-void pp_map_x_ate(fp12_t r, ep_t p, ep2_t q) {
-	ep2_t t;
-	bn_t a, x;
-
-	ep2_null(t);
-	bn_null(a);
-	bn_null(x);
-
-	TRY {
-		ep2_new(t);
-		bn_new(a);
-		bn_new(x);
-
-		fp_param_get_var(x);
-
-		bn_copy(a, x);
-		if (bn_sign(x) == BN_NEG) {
-			bn_neg(a, a);
-		}
-
-		/* r = f_{r,Q}(P). */
-		pp_miller(r, t, q, a, p);
-
-		/* Make xQ affine. */
-		pp_norm(t, t);
-
-		if (bn_sign(x) == BN_NEG) {
-			/* Since f_{-r,Q}(P) = 1/f_{r,Q}(P), we must invert the result. */
-			fp12_inv_uni(r, r);
-			ep2_neg(t, t);
-		}
-
-		pp_x_ate_mul(r, t, q, p);
-		pp_exp(r, r);
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		ep2_free(t);
-		bn_free(a);
-		bn_free(x);
-	}
-}
-
-#endif

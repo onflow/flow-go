@@ -41,7 +41,7 @@
 
 #if EP_ADD == BASIC || !defined(STRIP)
 
-void pp_dbl_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
+void pp_dbl_k12_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	fp2_t s;
 	fp2_t e;
 	ep2_t t;
@@ -79,7 +79,7 @@ void pp_dbl_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 
 #if PP_EXT == BASIC || !defined(STRIP)
 
-void pp_dbl_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
+void pp_dbl_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	fp2_t t0, t1, t2, t3, t4, t5, t6;
 
 	fp2_null(t0);
@@ -220,7 +220,7 @@ void pp_dbl_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 
 #if PP_EXT == LAZYR || !defined(STRIP)
 
-void pp_dbl_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
+void pp_dbl_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	fp2_t t0, t1, t2, t3, t4, t5, t6;
 	dv2_t u0, u1;
 
@@ -372,3 +372,100 @@ void pp_dbl_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 #endif
 
 #endif
+
+void pp_dbl_k12_lit(fp12_t l, ep_t r, ep_t p, ep2_t q) {
+	fp_t t0, t1, t2, t3, t4, t5, t6;
+
+	fp_null(t0);
+	fp_null(t1);
+	fp_null(t2);
+	fp_null(t3);
+	fp_null(t4);
+	fp_null(t5);
+	fp_null(t6);
+
+	TRY {
+		fp_new(t0);
+		fp_new(t1);
+		fp_new(t2);
+		fp_new(t3);
+		fp_new(t4);
+		fp_new(t5);
+		fp_new(t6);
+
+		fp_sqr(t0, p->x);
+		fp_sqr(t1, p->y);
+		fp_sqr(t2, p->z);
+
+		fp_mul(t4, ep_curve_get_b(), t2);
+
+		fp_dbl(t3, t4);
+		fp_add(t3, t3, t4);
+
+		fp_add(t4, p->x, p->y);
+		fp_sqr(t4, t4);
+		fp_sub(t4, t4, t0);
+		fp_sub(t4, t4, t1);
+		fp_add(t5, p->y, p->z);
+		fp_sqr(t5, t5);
+		fp_sub(t5, t5, t1);
+		fp_sub(t5, t5, t2);
+		fp_dbl(t6, t3);
+		fp_add(t6, t6, t3);
+		fp_sub(r->x, t1, t6);
+		fp_mul(r->x, r->x, t4);
+		fp_add(r->y, t1, t6);
+		fp_sqr(r->y, r->y);
+		fp_sqr(t4, t3);
+		fp_dbl(t6, t4);
+		fp_add(t6, t6, t4);
+		fp_dbl(t6, t6);
+		fp_dbl(t6, t6);
+		fp_sub(r->y, r->y, t6);
+		fp_mul(r->z, t1, t5);
+		fp_dbl(r->z, r->z);
+		fp_dbl(r->z, r->z);
+		r->norm = 0;
+
+		fp12_zero(l);
+		if (ep2_curve_is_twist() == EP_DTYPE) {
+			fp2_dbl(l[0][1], q->x);
+			fp2_add(l[0][1], l[0][1], q->x);
+			fp_mul(l[0][1][0], l[0][1][0], t0);
+			fp_mul(l[0][1][1], l[0][1][1], t0);
+
+			fp_sub(l[0][0][0], t3, t1);
+
+			fp_neg(t5, t5);
+			fp_mul(l[1][1][0], q->y[0], t5);
+			fp_mul(l[1][1][1], q->y[1], t5);
+		} else {
+			fp2_dbl(l[0][2], q->x);
+			fp2_add(l[0][2], l[0][2], q->x);
+			fp_mul(l[0][2][0], l[0][2][0], t0);
+			fp_mul(l[0][2][1], l[0][2][1], t0);
+
+			fp_sub(l[0][0][0], t3, t1);
+
+			fp_neg(t5, t5);
+			fp_mul(l[1][1][0], q->y[0], t5);
+			fp_mul(l[1][1][1], q->y[1], t5);
+
+			fp2_t t;
+			fp2_copy(t, l[0][0]);
+			fp2_mul_nor(l[0][0], t);
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t0);
+		fp_free(t1);
+		fp_free(t2);
+		fp_free(t3);
+		fp_free(t4);
+		fp_free(t5);
+		fp_free(t6);
+	}
+}
