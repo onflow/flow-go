@@ -365,7 +365,7 @@ void fp6_mul1_basic(fp6_t c, fp6_t a, fp6_t b) {
 
 void fp18_mul_dxs_basic(fp18_t c, fp18_t a, fp18_t b) {
 #if EP_ADD == BASIC
-	fp6_t t0, t1, t2, t2, t3, t4;
+	fp6_t t0, t1, t2, t3, t4;
 
 	fp6_null(t0);
 	fp6_null(t1);
@@ -555,14 +555,13 @@ void fp18_mul_lazyr(fp18_t c, fp18_t a, fp18_t b) {
 
 void fp18_mul_dxs_lazyr(fp18_t c, fp18_t a, fp18_t b) {
 #if EP_ADD == BASIC
-	fp6_t t0, t1, t2, t3, t4, t5;
+	fp6_t t0, t1, t2, t3, t4;
 
 	fp6_null(t0);
 	fp6_null(t1);
 	fp6_null(t2);
 	fp6_null(t3);
 	fp6_null(t4);
-	fp6_null(t5);
 
 	TRY {
 		fp6_new(t0);
@@ -570,7 +569,6 @@ void fp18_mul_dxs_lazyr(fp18_t c, fp18_t a, fp18_t b) {
 		fp6_new(t2);
 		fp6_new(t3);
 		fp6_new(t4);
-		fp6_new(t5);
 
 		/* Karatsuba algorithm. */
 		/* t0 = a_0 * b_0. */
@@ -579,21 +577,21 @@ void fp18_mul_dxs_lazyr(fp18_t c, fp18_t a, fp18_t b) {
 		fp6_mul1_basic(t1, a[1], b[1]);
 		/* t2 = a_2 * b_2 = 0. */
 
-		fp6_mul1_basic(t3, a[2], b[1]);
-		fp6_mul_art(t3, t3);
-		fp6_add(t3, t3, t0);
+		fp6_mul1_basic(t2, a[2], b[1]);
+		fp6_mul_art(t2, t2);
+		fp6_add(t2, t2, t0);
 
-		fp6_add(t4, a[0], a[1]);
-		fp6_add(t5, b[0], b[1]);
+		fp6_add(t3, a[0], a[1]);
+		fp6_add(t4, b[0], b[1]);
 
-		fp6_mul(t4, t4, t5);
-		fp6_sub(t4, t4, t0);
-		fp6_sub(c[1], t4, t1);
+		fp6_mul(t3, t3, t4);
+		fp6_sub(t3, t3, t0);
+		fp6_sub(c[1], t3, t1);
 
 		fp6_mul0_basic(c[2], a[2], b[0]);
 		fp6_add(c[2], c[2], t1);
 
-		fp6_copy(c[0], t3);
+		fp6_copy(c[0], t2);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -602,7 +600,6 @@ void fp18_mul_dxs_lazyr(fp18_t c, fp18_t a, fp18_t b) {
 		fp6_free(t2);
 		fp6_free(t3);
 		fp6_free(t4);
-		fp6_free(t5);
 	}
 #elif EP_ADD == PROJC
 	dv6_t u0, u1, u2, u3, u4, u5;
