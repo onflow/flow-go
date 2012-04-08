@@ -86,6 +86,8 @@ if (WITH_PP)
 	# Add all the extension code.
 	file(GLOB TEMP fpx/*.c)
 	list(APPEND PP_SRCS ${TEMP})
+	file(GLOB TEMP epx/*.c)
+	list(APPEND PP_SRCS ${TEMP})
 	list(APPEND RELIC_SRCS ${PP_SRCS})
 endif(WITH_PP)
 
