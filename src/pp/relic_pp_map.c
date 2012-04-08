@@ -51,16 +51,13 @@
 static void pp_mil_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, bn_t a) {
 	fp12_t l;
 	ep_t _p;
-	ep2_t _q;
 
 	fp12_null(l);
 	ep_null(_p);
-	ep2_null(_q);
 
 	TRY {
 		fp12_new(l);
 		ep_new(_p);
-		ep2_new(_q);
 
 		fp12_zero(l);
 		fp12_zero(r);
@@ -68,7 +65,6 @@ static void pp_mil_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, bn_t a) {
 		ep2_copy(t, q);
 
 		ep_neg(_p, p);
-		ep2_neg(_q, q);
 
 		for (int i = bn_bits(a) - 2; i >= 0; i--) {
 			fp12_sqr(r, r);
@@ -142,6 +138,7 @@ static void pp_mil_k12_sps(fp12_t r, ep2_t t, ep2_t q, ep_t p, int *s, int len) 
 	FINALLY {
 		fp12_free(l);
 		ep_free(_p);
+		ep2_free(_q);
 	}
 }
 
@@ -173,6 +170,7 @@ static void pp_mil_k12_lit(fp12_t r, ep_t t, ep_t p, ep2_t q, bn_t a) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+		fp12_free(l);
 	}
 }
 
