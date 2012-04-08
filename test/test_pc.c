@@ -1349,26 +1349,29 @@ int main(void) {
 	util_banner("Tests for the PC module:", 0);
 
 	if (pc_param_set_any() == STS_OK) {
-		pc_param_print();
-		util_banner("Group G_1:", 0);
-		if (test1() != STS_OK) {
-			core_clean();
-			return 1;
-		} else {
-			util_banner("Group G_2:", 0);
-			if (test2() != STS_OK) {
-				core_clean();
-				return 1;
-			} else {
-				util_banner("Group G_T:", 0);
-				if (test() != STS_OK) {
-					core_clean();
-					return 1;
-				}
-			}
-		}
-	} else {
 		THROW(ERR_NO_CURVE);
+		core_clean();
+		return 0;
+	}
+
+	pc_param_print();
+
+	util_banner("Group G_1:", 0);
+	if (test1() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	util_banner("Group G_2:", 0);
+	if (test2() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	util_banner("Group G_T:", 0);
+	if (test() != STS_OK) {
+		core_clean();
+		return 1;
 	}
 
 	core_clean();

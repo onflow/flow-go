@@ -59,6 +59,7 @@ endif(WITH_HB)
 
 if (WITH_PP)
 	ADD_MODULE(fpx)
+	ADD_MODULE(epx)
 	ADD_MODULE(pp)
 endif(WITH_PP)	
 

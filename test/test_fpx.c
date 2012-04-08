@@ -2742,13 +2742,13 @@ static int exponentiation18(void) {
 int main(void) {
 	core_init();
 
+	util_banner("Tests for the FPX module", 0);
+
 	if (fp_param_set_any_tower() == STS_ERR) {
-		THROW(ERR_NO_CURVE);
+		THROW(ERR_NO_FIELD);
 		core_clean();
 		return 0;
 	}
-
-	util_banner("Tests for the FPX module", 0);
 
 	/* Only execute these if there is an assigned quadratic non-residue. */
 	if (fp_prime_get_qnr()) {
