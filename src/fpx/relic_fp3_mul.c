@@ -209,8 +209,8 @@ void fp3_mul_basic(fp3_t c, fp3_t a, fp3_t b) {
 		fp_muln_low(t2, a[2], b[2]);
 
 		/* t3 = (a_1 + a_2) * (b_1 + b_2). */
-		fp_addn_low(t3, a[1], a[2]);
-		fp_addn_low(t4, b[1], b[2]);
+		fp_add(t3, a[1], a[2]);
+		fp_add(t4, b[1], b[2]);
 		fp_muln_low(t, t3, t4);
 		fp_addd_low(t6, t1, t2);
 		fp_subd_low(t4, t, t6);
@@ -219,8 +219,8 @@ void fp3_mul_basic(fp3_t c, fp3_t a, fp3_t b) {
 			fp_subc_low(t3, t3, t4);
 		}
 
-		fp_addn_low(t4, a[0], a[1]);
-		fp_addn_low(t5, b[0], b[1]);
+		fp_add(t4, a[0], a[1]);
+		fp_add(t5, b[0], b[1]);
 		fp_muln_low(t, t4, t5);
 		fp_addd_low(t4, t0, t1);
 		fp_subd_low(t4, t, t4);
@@ -229,8 +229,8 @@ void fp3_mul_basic(fp3_t c, fp3_t a, fp3_t b) {
 			fp_subc_low(t4, t4, t2);
 		}
 
-		fp_addn_low(t5, a[0], a[2]);
-		fp_addn_low(t6, b[0], b[2]);
+		fp_add(t5, a[0], a[2]);
+		fp_add(t6, b[0], b[2]);
 		fp_muln_low(t, t5, t6);
 		fp_addd_low(t6, t0, t2);
 		fp_subd_low(t5, t, t6);

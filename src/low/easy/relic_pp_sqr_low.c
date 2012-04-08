@@ -128,15 +128,25 @@ void fp3_sqrn_low(dv3_t c, fp3_t a) {
 	fp_sqrn_low(t0, a[0]);
 
 	/* t1 = 2 * a_1 * a_2. */
+#ifdef FP_SPACE
 	fp_dbln_low(t2, a[1]);
+#else
+	fp_dblm_low(t2, a[1]);
+#endif
+
 	fp_muln_low(t1, t2, a[2]);
 
 	/* t2 = a_2^2. */
 	fp_sqrn_low(t2, a[2]);
 
 	/* t3 = (a_0 + a_2 + a_1)^2, t4 = (a_0 + a_2 - a_1)^2. */
+#ifdef FP_SPACE
 	fp_addn_low(t3, a[0], a[2]);
 	fp_addn_low(t4, t3, a[1]);
+#else
+	fp_addm_low(t3, a[0], a[2]);
+	fp_addm_low(t4, t3, a[1]);
+#endif
 	fp_subm_low(t5, t3, a[1]);
 	fp_sqrn_low(t3, t4);
 	fp_sqrn_low(t4, t5);
