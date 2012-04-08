@@ -514,8 +514,8 @@ int *fp_param_get_sps(int *len);
 
 /**
  * Returns the value of the parameter used to construct the optimal ate pairing
- * on the currently configured elliptic curve. The first argument must be a
- * zero-filled array.
+ * on the currently configured elliptic curve. The first argument must be an
+ * array of size FP_BITS.
  *
  * @param[ou] s				- the parameter in sparse form.
  * @param[out] len			- the length of the parameter in sparse form.

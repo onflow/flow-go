@@ -639,8 +639,14 @@
 /** Parallel implementation. */
 #cmakedefine PP_PARAL
 
+/** Tate pairing. */
+#define TATEP    1
+/** Weil pairing. */
+#define WEILP    2
 /** Optimal ate pairing. */
-#define O_ATE    1
+#define OATEP    3
+/** Beta Weil pairing. */
+#define BWEIL    4
 /** Chosen pairing method over prime elliptic curves. */
 #define PP_MAP   @PP_MAP@
 
