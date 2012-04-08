@@ -37,6 +37,7 @@
 #include "relic_conf.h"
 #include "relic_dv.h"
 #include "relic_fp.h"
+#include "relic_fpx.h"
 #include "relic_fp_low.h"
 #include "relic_error.h"
 
@@ -571,11 +572,15 @@ int fp_param_set_any_tower() {
 	fp_param_set(BN_638);
 #else
 	do {
+		/* Since we have to generate a prime number, pick a nice towering. */
 		fp_param_set_any_dense();
 	} while (fp_prime_get_mod8() == 1 || fp_prime_get_mod8() == 5);
 #endif
-	if (fp_prime_get_mod8() == 1 || fp_prime_get_mod8() == 5) {
-		return STS_ERR;
+	if (fp_prime_get_qnr()) {
+		fp2_const_calc();
+	}
+	if (fp_prime_get_cnr()) {
+		fp3_const_calc();
 	}
 	return STS_OK;
 }

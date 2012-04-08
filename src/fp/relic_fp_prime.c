@@ -201,7 +201,6 @@ void fp_prime_set(bn_t p) {
 		bn_set_dig(&one, 1);
 		bn_lsh(&one, &one, prime.used * BN_DIGIT);
 		bn_mod(&one, &one, &prime);
-
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
