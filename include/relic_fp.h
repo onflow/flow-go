@@ -513,6 +513,17 @@ void fp_param_get_var(bn_t x);
 int *fp_param_get_sps(int *len);
 
 /**
+ * Returns the value of the parameter used to construct the optimal ate pairing
+ * on the currently configured elliptic curve. The first argument must be a
+ * zero-filled array.
+ *
+ * @param[ou] s				- the parameter in sparse form.
+ * @param[out] len			- the length of the parameter in sparse form.
+ *
+ */
+void fp_param_get_map(int *s, int *len);
+
+/**
  * Copies the second argument to the first argument.
  *
  * @param[out] c			- the result.

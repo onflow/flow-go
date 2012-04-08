@@ -53,7 +53,7 @@ static int param_id;
 /**
  * Maximum number of powers of 2 used to describe specia form moduli.
  */
-#define MAX_EXPS		10
+#define MAX_EXPS		8
 
 /**
  * Non-zero bits of special form prime.
@@ -222,6 +222,43 @@ int *fp_param_get_sps(int *len) {
 	}
 
 	return ptr;
+}
+
+void fp_param_get_map(int *s, int *len) {
+	switch (param_id) {
+		case BN_158:
+			s[3] = s[5] = s[8] = s[39] = s[40] = 1;
+			*len = 41;
+			break;
+		case BN_254:
+			s[2] = s[56] = s[57] = s[63] = s[64] = 1;
+			*len = 65;
+			break;
+		case BN_256:
+			s[5] = s[7] = s[8] = s[11] = s[14] = s[15] = s[62] = s[65] = 1;
+			*len = 66;
+			break;
+		case BN_638:
+			s[3] = s[159] = s[160] = 1;
+			s[69] = s[70] = s[129] = s[130] = -1;
+			*len = 161;
+			break;
+		case KSS_508:
+			s[64] = 1;
+			s[51] = 1;
+			s[46] = -1;
+			s[12] = -1;
+			*len = 65;
+			break;
+		case BW_638:
+			s[5] = s[93] = s[105] = -1;
+			s[107] = 1;
+			*len = 108;
+			break;
+		default:
+			THROW(ERR_NO_VALID);
+			break;
+	}
 }
 
 void fp_param_set(int param) {
