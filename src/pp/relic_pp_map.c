@@ -310,12 +310,18 @@ void pp_map_weilp(fp12_t r, ep_t p, ep2_t q) {
 	bn_t n;
 
 	ep_null(t0);
-	ep_null(t1);
+	ep2_null(t1);
 	fp12_null(r0);
 	fp12_null(r1);
 	bn_null(n);
 
 	TRY {
+		ep_new(t0);
+		ep2_new(t1);
+		fp12_new(r0);
+		fp12_new(r1);
+		bn_new(n);
+
 		ep_curve_get_ord(n);
 		pp_mil_k12_lit(r0, t0, p, q, n);
 		pp_mil_k12(r1, t1, q, p, n);
@@ -331,7 +337,7 @@ void pp_map_weilp(fp12_t r, ep_t p, ep2_t q) {
 	}
 	FINALLY {
 		ep_free(t0);
-		ep_free(t1);
+		ep2_free(t1);
 		fp12_null(r0);
 		fp12_null(r1);
 		bn_free(n);
