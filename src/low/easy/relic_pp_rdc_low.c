@@ -50,3 +50,15 @@ void fp2_rdcn_low(fp2_t c, dv2_t a) {
 	fp_rdc(c[1], a[1]);
 #endif
 }
+
+void fp3_rdcn_low(fp3_t c, dv3_t a) {
+#if FP_RDC == MONTY
+	fp_rdcn_low(c[0], a[0]);
+	fp_rdcn_low(c[1], a[1]);
+	fp_rdcn_low(c[2], a[2]);
+#else
+	fp_rdc(c[0], a[0]);
+	fp_rdc(c[1], a[1]);
+	fp_rdc(c[2], a[2]);
+#endif
+}

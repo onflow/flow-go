@@ -208,3 +208,45 @@ void fp2_nord_low(dv2_t c, dv2_t a) {
 		bn_free(b);
 	}
 }
+
+void fp3_addn_low(fp3_t c, fp3_t a, fp3_t b) {
+	fp_addn_low(c[0], a[0], b[0]);
+	fp_addn_low(c[1], a[1], b[1]);
+	fp_addn_low(c[2], a[2], b[2]);
+}
+
+void fp3_addm_low(fp3_t c, fp3_t a, fp3_t b) {
+	fp_addm_low(c[0], a[0], b[0]);
+	fp_addm_low(c[1], a[1], b[1]);
+	fp_addm_low(c[2], a[2], b[2]);
+}
+
+void fp3_subn_low(fp3_t c, fp3_t a, fp3_t b) {
+	fp_subn_low(c[0], a[0], b[0]);
+	fp_subn_low(c[1], a[1], b[1]);
+	fp_subn_low(c[2], a[2], b[2]);
+}
+
+void fp3_subm_low(fp3_t c, fp3_t a, fp3_t b) {
+	fp_subm_low(c[0], a[0], b[0]);
+	fp_subm_low(c[1], a[1], b[1]);
+	fp_subm_low(c[2], a[2], b[2]);
+}
+
+void fp3_dbln_low(fp3_t c, fp3_t a) {
+	fp_dbln_low(c[0], a[0]);
+	fp_dbln_low(c[1], a[1]);
+	fp_dbln_low(c[2], a[2]);
+}
+
+void fp3_subc_low(dv3_t c, dv3_t a, dv3_t b) {
+	fp_subc_low(c[0], a[0], b[0]);
+	fp_subc_low(c[1], a[1], b[1]);
+	fp_subc_low(c[2], a[2], b[2]);
+}
+
+void fp3_dblm_low(fp3_t c, fp3_t a) {
+	fp_dblm_low(c[0], a[0]);
+	fp_dblm_low(c[1], a[1]);
+	fp_dblm_low(c[2], a[2]);
+}
