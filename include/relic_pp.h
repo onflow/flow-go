@@ -155,6 +155,17 @@ void pp_add_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p);
 void pp_add_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p);
 
 /**
+ * Adds two prime elliptic curve points and evaluates the corresponding line
+ * function at another elliptic curve point using projective coordinates.
+ *
+ * @param[out] l			- the result of the evaluation.
+ * @param[in, out] r		- the resulting point and first point to add.
+ * @param[in] p				- the second point to add.
+ * @param[in] q				- the affine point to evaluate the line function.
+ */
+void pp_add_k12_lit(fp12_t l, ep_t r, ep_t p, ep2_t q);
+
+/**
  * Doubles a prime elliptic curve point and evaluates the corresponding line
  * function at another elliptic curve point using affine coordinates.
  *
@@ -187,6 +198,17 @@ void pp_dbl_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p);
  * @param[in] p				- the affine point to evaluate the line function.
  */
 void pp_dbl_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p);
+
+/**
+ * Doubles a prime elliptic curve point and evaluates the corresponding line
+ * function at another elliptic curve point using affine coordinates.
+ *
+ * @param[out] l			- the result of the evaluation.
+ * @param[in, out] r		- the resulting point.
+ * @param[in] p				- the point to double.
+ * @param[in] q				- the affine point to evaluate the line function.
+ */
+void pp_dbl_k12_lit(fp12_t l, ep_t r, ep_t p, ep2_t q);
 
 /**
  * Computes the final exponentiation for the pairing. Computes
