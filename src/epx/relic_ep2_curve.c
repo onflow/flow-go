@@ -109,6 +109,23 @@
 /** @} */
 #endif
 
+#if defined(EP_KBLTZ) && FP_PRIME == 638
+/**
+ * Parameters for a pairing-friendly prime curve over a quadratic extension.
+ */
+/** @{ */
+#define B12_P638_A0		"0"
+#define B12_P638_A1		"0"
+#define B12_P638_B0		"4"
+#define B12_P638_B1		"4"
+#define B12_P638_X0		"3C57F8F05130D336804E30CAA7BB45E06244DFC0BA836056B036038703719449A42CCC7C34452B4EE2DCA3CBCE0B7637E14E9CA88BDEF105440FB3F84AA95C75DE0BA05686394492B8648BB71D5E7F39"
+#define B12_P638_X1		"07B30040203566584002D6DBB49A3DA1D99ECA3CBCD113C07E0CF1FFB3FA4F87F034A034C86F56DB380F2810AC329ED8BD6FE0F4D5C1FA26949739AF82D3AAD4702D2186862B0293E16C5EDDDDA3C922"
+#define B12_P638_Y0		"29ED1A1C4F3F5AFC64AB2BA97CFA4D17998061179331A1C34E024B7D82134C60A3569F644E4155753C48698C8A01C80C0C3CEC9E3BDE2E5E22D81BBB514FD24DE186FEBA69B82E88809BFCCE51A1840F"
+#define B12_P638_Y1		"3795191221DB4917EEE4B7B85BC7D7CA0C60E82116064463FED0892BA82ACECF905E6DB8083C5F589F04DB80E3203C1B2BEB52ACDED6DF96FC515F36761E7152AEED13369A504FE38C4FF93860B89550"
+#define B12_P638_R		"50F94035FF4000FFFFFFFFFFF9406BFDC0040000000000000035FB801DFFBFFFFFFFFFFFFFFF401BFF80000000000000000000FFC01"
+/** @} */
+#endif
+
 /**
  * The generator of the elliptic curve.
  */
@@ -175,6 +192,31 @@ static ep2_st *pointer[EP_TABLE];
 static fp2_st _table[3 * EP_TABLE];
 
 #endif
+
+/**
+ * Assigns a set of ordinary elliptic curve parameters.
+ *
+ * @param[in] CURVE		- the curve parameters to assign.
+ */
+#define ASSIGN(CURVE)														\
+	FETCH(str, CURVE##_A0, sizeof(CURVE##_A0));								\
+	fp_read(a[0], str, strlen(str), 16);									\
+	FETCH(str, CURVE##_A1, sizeof(CURVE##_A1));								\
+	fp_read(a[1], str, strlen(str), 16);									\
+	FETCH(str, CURVE##_B0, sizeof(CURVE##_B0));								\
+	fp_read(b[0], str, strlen(str), 16);									\
+	FETCH(str, CURVE##_B1, sizeof(CURVE##_B1));								\
+	fp_read(b[1], str, strlen(str), 16);									\
+	FETCH(str, CURVE##_X0, sizeof(CURVE##_X0));								\
+	fp_read(g->x[0], str, strlen(str), 16);									\
+	FETCH(str, CURVE##_X1, sizeof(CURVE##_X1));								\
+	fp_read(g->x[1], str, strlen(str), 16);									\
+	FETCH(str, CURVE##_Y0, sizeof(CURVE##_Y0));								\
+	fp_read(g->y[0], str, strlen(str), 16);									\
+	FETCH(str, CURVE##_Y1, sizeof(CURVE##_Y1));								\
+	fp_read(g->y[1], str, strlen(str), 16);									\
+	FETCH(str, CURVE##_R, sizeof(CURVE##_R));								\
+	bn_read_str(r, str, strlen(str), 16);									\
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -269,7 +311,7 @@ ep2_t *ep2_curve_get_tab() {
 
 void ep2_curve_set(int twist) {
 	int param;
-	char *str;
+	char str[2 * FP_BYTES + 1];
 	ep2_t g;
 	fp2_t a;
 	fp2_t b;
@@ -291,51 +333,22 @@ void ep2_curve_set(int twist) {
 		switch (param) {
 #if FP_PRIME == 158
 			case BN_P158:
-				fp_read(a[0], BN_P158_A0, strlen(BN_P158_A0), 16);
-				fp_read(a[1], BN_P158_A1, strlen(BN_P158_A1), 16);
-				fp_read(b[0], BN_P158_B0, strlen(BN_P158_B0), 16);
-				fp_read(b[1], BN_P158_B1, strlen(BN_P158_B1), 16);
-				fp_read(g->x[0], BN_P158_X0, strlen(BN_P158_X0), 16);
-				fp_read(g->x[1], BN_P158_X1, strlen(BN_P158_X1), 16);
-				fp_read(g->y[0], BN_P158_Y0, strlen(BN_P158_Y0), 16);
-				fp_read(g->y[1], BN_P158_Y1, strlen(BN_P158_Y1), 16);
-				bn_read_str(r, BN_P158_R, strlen(BN_P158_R), 16);
+				ASSIGN(BN_P158);
 				break;
 #elif FP_PRIME == 254
 			case BN_P254:
-				fp_read(a[0], BN_P254_A0, strlen(BN_P254_A0), 16);
-				fp_read(a[1], BN_P254_A1, strlen(BN_P254_A1), 16);
-				fp_read(b[0], BN_P254_B0, strlen(BN_P254_B0), 16);
-				fp_read(b[1], BN_P254_B1, strlen(BN_P254_B1), 16);
-				fp_read(g->x[0], BN_P254_X0, strlen(BN_P254_X0), 16);
-				fp_read(g->x[1], BN_P254_X1, strlen(BN_P254_X1), 16);
-				fp_read(g->y[0], BN_P254_Y0, strlen(BN_P254_Y0), 16);
-				fp_read(g->y[1], BN_P254_Y1, strlen(BN_P254_Y1), 16);
-				bn_read_str(r, BN_P254_R, strlen(BN_P254_R), 16);
+				ASSIGN(BN_P254);
 				break;
 #elif FP_PRIME == 256
 			case BN_P256:
-				fp_read(a[0], BN_P256_A0, strlen(BN_P256_A0), 16);
-				fp_read(a[1], BN_P256_A1, strlen(BN_P256_A1), 16);
-				fp_read(b[0], BN_P256_B0, strlen(BN_P256_B0), 16);
-				fp_read(b[1], BN_P256_B1, strlen(BN_P256_B1), 16);
-				fp_read(g->x[0], BN_P256_X0, strlen(BN_P256_X0), 16);
-				fp_read(g->x[1], BN_P256_X1, strlen(BN_P256_X1), 16);
-				fp_read(g->y[0], BN_P256_Y0, strlen(BN_P256_Y0), 16);
-				fp_read(g->y[1], BN_P256_Y1, strlen(BN_P256_Y1), 16);
-				bn_read_str(r, BN_P256_R, strlen(BN_P256_R), 16);
+				ASSIGN(BN_P256);
 				break;
 #elif FP_PRIME == 638
 			case BN_P638:
-				fp_read(a[0], BN_P638_A0, strlen(BN_P638_A0), 16);
-				fp_read(a[1], BN_P638_A1, strlen(BN_P638_A1), 16);
-				fp_read(b[0], BN_P638_B0, strlen(BN_P638_B0), 16);
-				fp_read(b[1], BN_P638_B1, strlen(BN_P638_B1), 16);
-				fp_read(g->x[0], BN_P638_X0, strlen(BN_P638_X0), 16);
-				fp_read(g->x[1], BN_P638_X1, strlen(BN_P638_X1), 16);
-				fp_read(g->y[0], BN_P638_Y0, strlen(BN_P638_Y0), 16);
-				fp_read(g->y[1], BN_P638_Y1, strlen(BN_P638_Y1), 16);
-				bn_read_str(r, BN_P638_R, strlen(BN_P638_R), 16);
+				ASSIGN(BN_P638);
+				break;
+			case B12_P638:
+				ASSIGN(B12_P638);
 				break;
 #endif
 			default:
