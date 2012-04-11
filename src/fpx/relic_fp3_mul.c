@@ -199,8 +199,6 @@ void fp3_mul_basic(fp3_t c, fp3_t a, fp3_t b) {
 		dv_new(t5);
 		dv_new(t6);
 
-		/* TODO: Move to BASIC/INTEG structure. */
-
 		/* Karatsuba algorithm. */
 
 		/* t0 = a_0 * b_0, t1 = a_1 * b_1, t2 = a_2 * b_2. */
@@ -213,7 +211,7 @@ void fp3_mul_basic(fp3_t c, fp3_t a, fp3_t b) {
 		fp_add(t4, b[1], b[2]);
 		fp_muln_low(t, t3, t4);
 		fp_addd_low(t6, t1, t2);
-		fp_subd_low(t4, t, t6);
+		fp_subc_low(t4, t, t6);
 		fp_subc_low(t3, t0, t4);
 		for (int i = -1; i > fp_prime_get_cnr(); i--) {
 			fp_subc_low(t3, t3, t4);
@@ -223,7 +221,7 @@ void fp3_mul_basic(fp3_t c, fp3_t a, fp3_t b) {
 		fp_add(t5, b[0], b[1]);
 		fp_muln_low(t, t4, t5);
 		fp_addd_low(t4, t0, t1);
-		fp_subd_low(t4, t, t4);
+		fp_subc_low(t4, t, t4);
 		fp_subc_low(t4, t4, t2);
 		for (int i = -1; i > fp_prime_get_cnr(); i--) {
 			fp_subc_low(t4, t4, t2);
@@ -233,7 +231,7 @@ void fp3_mul_basic(fp3_t c, fp3_t a, fp3_t b) {
 		fp_add(t6, b[0], b[2]);
 		fp_muln_low(t, t5, t6);
 		fp_addd_low(t6, t0, t2);
-		fp_subd_low(t5, t, t6);
+		fp_subc_low(t5, t, t6);
 		fp_addc_low(t5, t5, t1);
 
 		/* c_0 = t3 mod p. */

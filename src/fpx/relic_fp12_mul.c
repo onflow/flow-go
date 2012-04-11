@@ -409,7 +409,6 @@ void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
 		fp2_null(t9);
 
 		TRY {
-
 			fp2_new(t0);
 			fp2_new(t1);
 			fp2_new(t2);
