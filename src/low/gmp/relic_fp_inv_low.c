@@ -54,15 +54,16 @@ void fp_invn_low(dig_t *c, dig_t *a) {
 
 	fp_copy(s, fp_prime_get());
 
-	mpn_gcdext(t, c, &cn, u, FP_DIGS, s, FP_DIGS); 
+	mpn_gcdext(t, c, &cn, u, FP_DIGS, s, FP_DIGS);
 	if (cn < 0) {
+		cn = -cn;
 		mpn_sub_n(c, fp_prime_get(), c, FP_DIGS);
 	}
+	dv_zero(c + cn, FP_DIGS - cn);
 
 #if FP_RDC == MONTY
 	dv_zero(t, FP_DIGS);
 	dv_copy(t + FP_DIGS, c, FP_DIGS);
-	fp_copy(s, fp_prime_get());
-	mpn_tdiv_qr(u, c, 0, t, 2 * FP_DIGS, s, FP_DIGS);
+	mpn_tdiv_qr(u, c, 0, t, 2 * FP_DIGS, fp_prime_get(), FP_DIGS);
 #endif
 }
