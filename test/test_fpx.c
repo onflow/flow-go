@@ -800,6 +800,26 @@ static int addition3(void) {
 			fp3_add(e, a, d);
 			TEST_ASSERT(fp3_is_zero(e), end);
 		} TEST_END;
+
+#if PP_CBC == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic addition is correct") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_add(d, a, b);
+			fp3_add_basic(e, a, b);
+			TEST_ASSERT(fp3_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_CBC == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated addition is correct") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_add(d, a, b);
+			fp3_add_integ(e, a, b);
+			TEST_ASSERT(fp3_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -849,6 +869,26 @@ static int subtraction3(void) {
 			TEST_ASSERT(fp3_is_zero(c), end);
 		}
 		TEST_END;
+
+#if PP_CBC == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic subtraction is correct") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_sub(c, a, b);
+			fp3_sub_basic(d, a, b);
+			TEST_ASSERT(fp3_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_CBC == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated subtraction is correct") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_sub(c, a, b);
+			fp3_sub_integ(d, a, b);
+			TEST_ASSERT(fp3_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -878,6 +918,24 @@ static int doubling3(void) {
 			fp3_add(c, a, a);
 			TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
+
+#if PP_CBC == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic doubling is correct") {
+			fp3_rand(a);
+			fp3_dbl(b, a);
+			fp3_dbl_basic(c, a);
+			TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_CBC == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated doubling is correct") {
+			fp3_rand(a);
+			fp3_dbl(b, a);
+			fp3_dbl_integ(c, a);
+			TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -967,6 +1025,60 @@ static int multiplication3(void) {
 			TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
 		}
 		TEST_END;
+
+#if PP_CBC == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic multiplication is correct") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_mul(d, a, b);
+			fp3_mul_basic(e, b, a);
+			TEST_ASSERT(fp3_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_CBC == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated multiplication is correct") {
+			fp3_rand(a);
+			fp3_rand(b);
+			fp3_mul(d, a, b);
+			fp3_mul_integ(e, b, a);
+			TEST_ASSERT(fp3_cmp(d, e) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+		TEST_BEGIN("multiplication by adjoined root is correct") {
+			fp3_rand(a);
+			fp3_zero(b);
+			fp_set_dig(b[1], 1);
+			fp3_mul(c, a, b);
+			fp3_mul_art(d, a);
+			TEST_ASSERT(fp3_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("multiplication by quadratic/cubic non-residue is correct") {
+			fp3_rand(a);
+			fp3_mul_nor(b, a);
+			switch (fp_prime_get_mod8()) {
+				case 5:
+					fp3_mul_art(c, a);
+					break;
+				case 3:
+					fp3_mul_art(c, a);
+					fp3_add(c, c, a);
+					break;
+				case 7:
+					fp3_mul_art(d, a);
+					fp3_dbl(c, a);
+					fp_prime_back(g, ep_curve_get_b());
+					for (int i = 1; i < bn_bits(g) / 2; i++) {
+						fp3_dbl(c, c);
+					}
+					fp3_add(c, c, d);
+					break;
+			}
+			TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -999,6 +1111,24 @@ static int squaring3(void) {
 			fp3_sqr(c, a);
 			TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
+
+#if PP_CBC == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic squaring is correct") {
+			fp3_rand(a);
+			fp3_sqr(b, a);
+			fp3_sqr_basic(c, a);
+			TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_CBC == INTEG || !defined(STRIP)
+		TEST_BEGIN("integrated squaring is correct") {
+			fp3_rand(a);
+			fp3_sqr(b, a);
+			fp3_sqr_integ(c, a);
+			TEST_ASSERT(fp3_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
