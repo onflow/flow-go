@@ -142,7 +142,7 @@
 /** @{ */
 #define OPT(...)				_OPT(__VA_ARGS__, _imp, _basic, _error)
 #define _OPT(...)				__OPT(__VA_ARGS__)
-#define __OPT(_1, _2, N,...)	N
+#define __OPT(_1, _2, N, ...)	N
 /** @} */
 
 /**
