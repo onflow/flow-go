@@ -78,8 +78,8 @@ enum {
 	KSS_P508,
 	/** Barreto-Naehrig curve with positive x. */
 	BN_P638,
-	/** Brezing-Weng curve. */
-	BW_P638,
+	/** Barreto-Lynn-Scott curve with embedding degree 12. */
+	BLS12_P638,
 };
 
 /*============================================================================*/

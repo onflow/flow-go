@@ -126,7 +126,7 @@ void fp_param_get_var(bn_t x) {
 				bn_sub(x, x, a);
 				bn_add_dig(x, x, 1);
 				break;
-			case BW_638:
+			case BLS12_638:
 				/* x = -2^107 + 2^105 + 2^93 + 2^5. */
 				bn_set_2b(x, 107);
 				bn_set_2b(a, 105);
@@ -190,7 +190,7 @@ int *fp_param_get_sps(int *len) {
 				spars[2] = -128;
 				spars[3] = 158;
 				break;
-			case BW_638:
+			case BLS12_638:
 				spars_len = 4;
 				spars[0] = -5;
 				spars[1] = -93;
@@ -255,7 +255,7 @@ void fp_param_get_map(int *s, int *len) {
 			s[12] = -1;
 			*len = 65;
 			break;
-		case BW_638:
+		case BLS12_638:
 			s[5] = s[93] = s[105] = -1;
 			s[107] = 1;
 			*len = 108;
@@ -488,7 +488,7 @@ void fp_param_set(int param) {
 				bn_add(p, p, t1);
 				fp_prime_set_dense(p);
 				break;
-			case BW_638:
+			case BLS12_638:
 				fp_param_get_var(t0);
 				/* p = (x^2 - 2x + 1) * (x^4 - x^2 + 1)/3 + x. */
 				bn_sqr(t1, t0);
