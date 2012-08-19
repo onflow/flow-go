@@ -1,3 +1,21 @@
+RELIC is licensed under the GNU Lesser General Public License (LGPL), with
+the following exceptions/clarifications:
+
+   1. Making modifications to RELIC configuration files, build scripts and
+      configuration headers such as "relic_conf.h" in order to create a
+      customized build setup of RELIC with the otherwise unmodified source code,
+      does not constitute a derived work.
+   2. Statically linking the RELIC library into a user application does not
+      make the user application a derived work, and therefore does not require
+      the user to distribute the source code or object code of their own
+      application. The RELIC source code with all modifications must still be
+      passed on in the same way as using RELIC as a shared library.
+   3. Using source code obfuscation on the RELIC source code when distributing
+      it is not permitted.
+
+These exceptions/clarifications shall be deemed to amend the base LGPL text,
+as reproduced below.
+
 		  GNU LESSER GENERAL PUBLIC LICENSE
 		       Version 2.1, February 1999
 
