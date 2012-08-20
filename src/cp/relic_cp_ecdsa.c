@@ -61,7 +61,7 @@ void cp_ecdsa_gen(bn_t d, ec_t q) {
 	}
 }
 
-void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
+void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 	bn_t n, k, x, e;
 	ec_t p;
 	unsigned char hash[MD_LEN];
@@ -191,4 +191,3 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
 	}
 	return result;
 }
-

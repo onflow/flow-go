@@ -73,7 +73,7 @@ void cp_bbs_gen(bn_t d, g2_t q, gt_t z) {
 	}
 }
 
-void cp_bbs_sign(int *b, g1_t s, unsigned char *msg, int len, bn_t d) {
+void cp_bbs_sig(int *b, g1_t s, unsigned char *msg, int len, bn_t d) {
 	bn_t m, n, r;
 	unsigned char hash[MD_LEN];
 	unsigned char key[len + PC_BYTES];

@@ -97,10 +97,10 @@ static int rsa(void) {
 			il = 10;
 			ol = BN_BITS / 8 + 1;
 			rand_bytes(in, il);
-			TEST_ASSERT(cp_rsa_sign(out, &ol, in, il, 0, prv) == STS_OK, end);
+			TEST_ASSERT(cp_rsa_sig(out, &ol, in, il, 0, prv) == STS_OK, end);
 			TEST_ASSERT(cp_rsa_ver(out, ol, in, il, 0, pub) == 1, end);
 			md_map(h, in, il);
-			TEST_ASSERT(cp_rsa_sign(out, &ol, h, MD_LEN, 1, prv) == STS_OK,
+			TEST_ASSERT(cp_rsa_sig(out, &ol, h, MD_LEN, 1, prv) == STS_OK,
 					end);
 			TEST_ASSERT(cp_rsa_ver(out, ol, h, MD_LEN, 1, pub) == 1, end);
 		} TEST_END;
@@ -113,11 +113,11 @@ static int rsa(void) {
 			il = 10;
 			ol = BN_BITS / 8 + 1;
 			rand_bytes(in, il);
-			TEST_ASSERT(cp_rsa_sign_basic(out, &ol, in, il, 0, prv) == STS_OK,
+			TEST_ASSERT(cp_rsa_sig_basic(out, &ol, in, il, 0, prv) == STS_OK,
 					end);
 			TEST_ASSERT(cp_rsa_ver(out, ol, in, il, 0, pub) == 1, end);
 			md_map(h, in, il);
-			TEST_ASSERT(cp_rsa_sign_basic(out, &ol, h, MD_LEN, 1,
+			TEST_ASSERT(cp_rsa_sig_basic(out, &ol, h, MD_LEN, 1,
 							prv) == STS_OK, end);
 			TEST_ASSERT(cp_rsa_ver(out, ol, h, MD_LEN, 1, pub) == 1, end);
 		} TEST_END;
@@ -131,11 +131,11 @@ static int rsa(void) {
 			il = 10;
 			ol = BN_BITS / 8 + 1;
 			rand_bytes(in, il);
-			TEST_ASSERT(cp_rsa_sign_quick(out, &ol, in, il, 0, prv) == STS_OK,
+			TEST_ASSERT(cp_rsa_sig_quick(out, &ol, in, il, 0, prv) == STS_OK,
 					end);
 			TEST_ASSERT(cp_rsa_ver(out, ol, in, il, 0, pub) == 1, end);
 			md_map(h, in, il);
-			TEST_ASSERT(cp_rsa_sign_quick(out, &ol, h, MD_LEN, 1, prv) == STS_OK,
+			TEST_ASSERT(cp_rsa_sig_quick(out, &ol, h, MD_LEN, 1, prv) == STS_OK,
 					end);
 			TEST_ASSERT(cp_rsa_ver(out, ol, h, MD_LEN, 1, pub) == 1, end);
 		} TEST_END;
@@ -410,7 +410,7 @@ static int ecdsa(void) {
 
 		TEST_BEGIN("ecdsa is correct") {
 			cp_ecdsa_gen(d, q);
-			cp_ecdsa_sign(r, d, msg, 5, d);
+			cp_ecdsa_sig(r, d, msg, 5, d);
 			TEST_ASSERT(cp_ecdsa_ver(r, d, msg, 5, q) == 1, end);
 		} TEST_END;
 	} CATCH_ANY {
@@ -442,7 +442,7 @@ static int ecss(void) {
 
 		TEST_BEGIN("ecss is correct") {
 			cp_ecss_gen(d, q);
-			cp_ecss_sign(r, d, msg, 5, d);
+			cp_ecss_sig(r, d, msg, 5, d);
 			TEST_ASSERT(cp_ecss_ver(r, d, msg, 5, q) == 1, end);
 		} TEST_END;
 	} CATCH_ANY {
@@ -515,7 +515,7 @@ static int bls(void) {
 
 		TEST_BEGIN("boneh-lynn-schacham short signature is correct") {
 			cp_bls_gen(d, q);
-			cp_bls_sign(s, msg, 5, d);
+			cp_bls_sig(s, msg, 5, d);
 			TEST_ASSERT(cp_bls_ver(s, msg, 5, q) == 1, end);
 		} TEST_END;
 	} CATCH_ANY {
@@ -552,7 +552,7 @@ static int bbs(void) {
 
 		TEST_BEGIN("boneh-boyen short signature is correct") {
 			cp_bbs_gen(d, q, z);
-			cp_bbs_sign(&b, s, msg, 5, d);
+			cp_bbs_sig(&b, s, msg, 5, d);
 			TEST_ASSERT(cp_bbs_ver(b, s, msg, 5, q, z) == 1, end);
 		} TEST_END;
 	} CATCH_ANY {

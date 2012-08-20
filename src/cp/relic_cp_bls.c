@@ -62,7 +62,7 @@ void cp_bls_gen(bn_t d, g2_t q) {
 	}
 }
 
-void cp_bls_sign(g1_t s, unsigned char *msg, int len, bn_t d) {
+void cp_bls_sig(g1_t s, unsigned char *msg, int len, bn_t d) {
 	g1_t p;
 
 	g1_null(p);

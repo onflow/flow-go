@@ -61,7 +61,7 @@ void cp_ecss_gen(bn_t d, ec_t q) {
 	}
 }
 
-void cp_ecss_sign(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
+void cp_ecss_sig(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
 	bn_t n, k, x, r;
 	ec_t p;
 	unsigned char hash[MD_LEN];

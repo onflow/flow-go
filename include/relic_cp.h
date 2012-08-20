@@ -46,6 +46,31 @@
 /* Constant definitions                                                       */
 /*============================================================================*/
 
+/**
+ * Flag used to indicate that the message being signed is plaintext.
+ */
+#define CP_TEXT		0
+
+/**
+ * Flag used to indicate that the message being signed is a hash value.
+ */
+#define CP_HASH		1
+
+/**
+ * Flag used to indicate that no padding should be used.
+ */
+#define CP_EMPTY	0
+
+/**
+ * Flag used to indicate that PKCS#1 v1.5 padding should be used.
+ */
+#define CP_PKCS1	1
+
+/**
+ * Flag used to indicate that PKCS#1 v2.5 padding should be used.
+ */
+#define CP_PKCS2	2
+
 /*============================================================================*/
 /* Type definitions.                                                          */
 /*============================================================================*/
@@ -135,7 +160,7 @@ typedef sokaka_st *sokaka_t;
  * @param[out] A			- the key pair to initialize.
  */
 #if ALLOC == AUTO
-#define rsa_null(A)			/* empty */
+#define rsa_null(A)				/* empty */
 #else
 #define rsa_null(A)			A = NULL;
 #endif
@@ -235,7 +260,7 @@ typedef sokaka_st *sokaka_t;
 	}																		\
 
 #elif ALLOC == AUTO
-#define rsa_free(A)			/* empty */
+#define rsa_free(A)				/* empty */
 
 #elif ALLOC == STACK
 #define rsa_free(A)															\
@@ -257,7 +282,7 @@ typedef sokaka_st *sokaka_t;
  * @param[out] A			- the key pair to initialize.
  */
 #if ALLOC == AUTO
-#define rabin_null(A)		/* empty */
+#define rabin_null(A)			/* empty */
 #else
 #define rabin_null(A)		A = NULL;
 #endif
@@ -358,7 +383,7 @@ typedef sokaka_st *sokaka_t;
  * @param[out] A			- the key pair to initialize.
  */
 #if ALLOC == AUTO
-#define sokaka_null(A)		/* empty */
+#define sokaka_null(A)			/* empty */
 #else
 #define sokaka_null(A)		A = NULL;
 #endif
@@ -451,13 +476,13 @@ typedef sokaka_st *sokaka_t;
  * @param[out] OL			- the number of bytes written in the output buffer.
  * @param[in] I				- the input buffer.
  * @param[in] IL			- the number of bytes to encrypt.
- * @param[in] P				- the private key.
+ * @param[in] K				- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 #if CP_RSA == BASIC
-#define cp_rsa_dec(O, OL, I, IL, P)			cp_rsa_dec_basic(O, OL, I, IL, P)
+#define cp_rsa_dec(O, OL, I, IL, K)			cp_rsa_dec_basic(O, OL, I, IL, K)
 #elif CP_RSA == QUICK
-#define cp_rsa_dec(O, OL, I, IL, P)			cp_rsa_dec_quick(O, OL, I, IL, P)
+#define cp_rsa_dec(O, OL, I, IL, K)			cp_rsa_dec_quick(O, OL, I, IL, K)
 #endif
 
 /**
@@ -466,15 +491,15 @@ typedef sokaka_st *sokaka_t;
  * @param[out] O			- the output buffer.
  * @param[out] OL			- the number of bytes written in the output buffer.
  * @param[in] I				- the input buffer.
- * @param[in] L			- the number of bytes to sign.
- * @param[in] H				- the flag to indicate message format.
- * @param[in] P				- the private key.
+ * @param[in] IL			- the number of bytes to sign.
+ * @param[in] H				- the flag to indicate the message format.
+ * @param[in] K				- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 #if CP_RSA == BASIC
-#define cp_rsa_sign(O, OL, I, L, H, P)	cp_rsa_sign_basic(O, OL, I, L, H, P)
+#define cp_rsa_sig(O, OL, I, IL, H, K)	cp_rsa_sig_basic(O, OL, I, IL, H, K)
 #elif CP_RSA == QUICK
-#define cp_rsa_sign(O, OL, I, L, H, P)	cp_rsa_sign_quick(O, OL, I, L, H, P)
+#define cp_rsa_sig(O, OL, I, IL, H, K)	cp_rsa_sig_quick(O, OL, I, IL, H, K)
 #endif
 
 /*============================================================================*/
@@ -552,7 +577,7 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
+int cp_rsa_sig_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
 		int msg_len, int hash, rsa_t prv);
 
 /**
@@ -567,7 +592,7 @@ int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
+int cp_rsa_sig_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
 		int msg_len, int hash, rsa_t prv);
 
 /**
@@ -605,8 +630,8 @@ int cp_rabin_gen(rabin_t pub, rabin_t prv, int bits);
  * @param[in] pub			- the public key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
-		rabin_t pub);
+int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in,
+		int in_len, rabin_t pub);
 
 /**
  * Decrypts using the Rabin cryptosystem.
@@ -618,8 +643,8 @@ int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in, int in_len,
-		rabin_t prv);
+int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in,
+		int in_len, rabin_t prv);
 
 /**
  * Generates an ECDH key pair.
@@ -660,7 +685,8 @@ void cp_ecmqv_gen(bn_t d, ec_t q);
  * @param[in] q1v				- the point received from the other party.
  * @param[in] q2v				- the ephemeral point received from the other party.
  */
-void cp_ecmqv_key(unsigned char *key, int key_len, bn_t d1, bn_t d2, ec_t q2u, ec_t q1v, ec_t q2v);
+void cp_ecmqv_key(unsigned char *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
+		ec_t q1v, ec_t q2v);
 
 /**
  * Generates an ECDSA key pair.
@@ -679,7 +705,7 @@ void cp_ecdsa_gen(bn_t d, ec_t q);
  * @param[in] len				- the message length in bytes.
  * @param[in] d					- the private key.
  */
-void cp_ecdsa_sign(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d);
+void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d);
 
 /**
  * Verifies a message signed with ECDSA using the basic method.
@@ -709,7 +735,7 @@ void cp_ecss_gen(bn_t d, ec_t q);
  * @param[in] len				- the message length in bytes.
  * @param[in] d					- the private key.
  */
-void cp_ecss_sign(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d);
+void cp_ecss_sig(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d);
 
 /**
  * Verifies a message signed with the Elliptic Curve Schnorr Signature using the
@@ -752,7 +778,8 @@ void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master);
  * @param[in] id2				- the second identity.
  * @param[in] len2				- the length of the second identity in bytes.
  */
-void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1, int len1, sokaka_t k, char *id2, int len2);
+void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
+		int len1, sokaka_t k, char *id2, int len2);
 
 /**
  * Generates a BLS key pair.
@@ -770,7 +797,7 @@ void cp_bls_gen(bn_t d, g2_t q);
  * @param[in] len				- the message length in bytes.
  * @param[in] d					- the private key.
  */
-void cp_bls_sign(g1_t s, unsigned char *msg, int len, bn_t d);
+void cp_bls_sig(g1_t s, unsigned char *msg, int len, bn_t d);
 
 /**
  * Verifies a message signed with BLS using the basic method.
@@ -801,7 +828,7 @@ void cp_bbs_gen(bn_t d, g2_t q, gt_t z);
  * @param[in] len				- the message length in bytes.
  * @param[in] d					- the private key.
  */
-void cp_bbs_sign(int *b, g1_t s, unsigned char *msg, int len, bn_t d);
+void cp_bbs_sig(int *b, g1_t s, unsigned char *msg, int len, bn_t d);
 
 /**
  * Verifies a message signed with BLS using the basic method.

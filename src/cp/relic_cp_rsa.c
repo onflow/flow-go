@@ -915,7 +915,7 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 
 #if CP_RSA == BASIC || !defined(STRIP)
 
-int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
+int cp_rsa_sig_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
 		int msg_len, int hash, rsa_t prv) {
 	bn_t m, eb;
 	int size, pad_len, result = STS_OK;
@@ -998,7 +998,7 @@ int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
 
 #if CP_RSA == QUICK || !defined(STRIP)
 
-int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
+int cp_rsa_sig_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
 		int msg_len, int hash, rsa_t prv) {
 	bn_t m, eb;
 	int pad_len, size, result = STS_OK;
