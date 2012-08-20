@@ -43,6 +43,10 @@
 #include "relic_pc.h"
 
 /*============================================================================*/
+/* Constant definitions                                                       */
+/*============================================================================*/
+
+/*============================================================================*/
 /* Type definitions.                                                          */
 /*============================================================================*/
 
@@ -458,17 +462,19 @@ typedef sokaka_st *sokaka_t;
 
 /**
  * Signs a message using the RSA cryptosystem.
+ *
  * @param[out] O			- the output buffer.
  * @param[out] OL			- the number of bytes written in the output buffer.
  * @param[in] I				- the input buffer.
- * @param[in] IL			- the number of bytes to sign.
+ * @param[in] L			- the number of bytes to sign.
+ * @param[in] H				- the flag to indicate message format.
  * @param[in] P				- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 #if CP_RSA == BASIC
-#define cp_rsa_sign(O, OL, I, IL, P)		cp_rsa_sign_basic(O, OL, I, IL, P)
+#define cp_rsa_sign(O, OL, I, L, H, P)	cp_rsa_sign_basic(O, OL, I, L, H, P)
 #elif CP_RSA == QUICK
-#define cp_rsa_sign(O, OL, I, IL, P)		cp_rsa_sign_quick(O, OL, I, IL, P)
+#define cp_rsa_sign(O, OL, I, L, H, P)	cp_rsa_sign_quick(O, OL, I, L, H, P)
 #endif
 
 /*============================================================================*/
@@ -535,43 +541,49 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 		int in_len, rsa_t prv);
 
 /**
- * Signs using the basic RSA signature algorithm.
+ * Signs using the basic RSA signature algorithm. The flag must be non-zero if
+ * the message being signed is already a hash value.
  *
  * @param[out] sig			- the signature
  * @param[out] sig_len		- the number of bytes written in the signature.
  * @param[in] msg			- the message to sign.
  * @param[in] msg_len		- the number of bytes to sign.
+ * @param[in] hash			- the flag to indicate the message format.
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 int cp_rsa_sign_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
-		int msg_len, rsa_t prv);
+		int msg_len, int hash, rsa_t prv);
 
 /**
- * Signs using the fast RSA signature algorithm with CRT optimization.
+ * Signs using the fast RSA signature algorithm with CRT optimization. The flag
+ * must be non-zero if the message being signed is already a hash value.
  *
  * @param[out] sig			- the signature
  * @param[out] sig_len		- the number of bytes written in the signature.
  * @param[in] msg			- the message to sign.
  * @param[in] msg_len		- the number of bytes to sign.
+ * @param[in] hash			- the flag to indicate the message format.
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 int cp_rsa_sign_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
-		int msg_len, rsa_t prv);
+		int msg_len, int hash, rsa_t prv);
 
 /**
- * Verifies an RSA signature.
+ * Verifies an RSA signature. The flag must be non-zero if the message being
+ * signed is already a hash value.
  *
  * @param[in] sig			- the signature to verify.
  * @param[in] sig_len		- the signature length in bytes.
  * @param[in] msg			- the signed message.
  * @param[in] msg_len		- the message length in bytes.
+ * @param[in] hash			- the flag to indicate the message format.
  * @param[in] pub			- the public key.
  * @return 1 if the signature is valid, 0 otherwise.
  */
 int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg, int msg_len,
-		rsa_t pub);
+		int hash, rsa_t pub);
 
 /**
  * Generates a new key pair for the Rabin cryptosystem.

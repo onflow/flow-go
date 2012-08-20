@@ -37,9 +37,8 @@
 static int rsa(void) {
 	int code = STS_ERR;
 	rsa_t pub, prv;
-	unsigned char in[10];
-	unsigned char out[BN_BITS / 8 + 1];
-	int in_len, out_len;
+	unsigned char in[10], out[BN_BITS / 8 + 1], h[MD_LEN];
+	int il, ol;
 	int result;
 
 	rsa_null(pub);
@@ -53,14 +52,12 @@ static int rsa(void) {
 
 		TEST_BEGIN("rsa encryption/decryption is correct") {
 			TEST_ASSERT(result == STS_OK, end);
-			in_len = 10;
-			out_len = BN_BITS / 8 + 1;
-			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_enc(out, &out_len, in, in_len, pub) == STS_OK,
-					end);
-			TEST_ASSERT(cp_rsa_dec(out, &out_len, out, out_len, prv) == STS_OK,
-					end);
-			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
+			il = 10;
+			ol = BN_BITS / 8 + 1;
+			rand_bytes(in, il);
+			TEST_ASSERT(cp_rsa_enc(out, &ol, in, il, pub) == STS_OK, end);
+			TEST_ASSERT(cp_rsa_dec(out, &ol, out, ol, prv) == STS_OK, end);
+			TEST_ASSERT(memcmp(in, out, ol) == 0, end);
 		} TEST_END;
 
 #if CP_RSA == BASIC || !defined(STRIP)
@@ -68,14 +65,13 @@ static int rsa(void) {
 
 		TEST_BEGIN("basic rsa encryption/decryption is correct") {
 			TEST_ASSERT(result == STS_OK, end);
-			in_len = 10;
-			out_len = BN_BITS / 8 + 1;
-			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_enc(out, &out_len, in, in_len, pub) == STS_OK,
+			il = 10;
+			ol = BN_BITS / 8 + 1;
+			rand_bytes(in, il);
+			TEST_ASSERT(cp_rsa_enc(out, &ol, in, il, pub) == STS_OK, end);
+			TEST_ASSERT(cp_rsa_dec_basic(out, &ol, out, ol, prv) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_dec_basic(out, &out_len, out, out_len,
-							prv) == STS_OK, end);
-			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
+			TEST_ASSERT(memcmp(in, out, ol) == 0, end);
 		} TEST_END;
 #endif
 
@@ -84,14 +80,13 @@ static int rsa(void) {
 
 		TEST_BEGIN("fast rsa encryption/decryption is correct") {
 			TEST_ASSERT(result == STS_OK, end);
-			in_len = 10;
-			out_len = BN_BITS / 8 + 1;
-			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_enc(out, &out_len, in, in_len, pub) == STS_OK,
+			il = 10;
+			ol = BN_BITS / 8 + 1;
+			rand_bytes(in, il);
+			TEST_ASSERT(cp_rsa_enc(out, &ol, in, il, pub) == STS_OK, end);
+			TEST_ASSERT(cp_rsa_dec_quick(out, &ol, out, ol, prv) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_dec_quick(out, &out_len, out, out_len,
-							prv) == STS_OK, end);
-			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
+			TEST_ASSERT(memcmp(in, out, ol) == 0, end);
 		} TEST_END;
 #endif
 
@@ -99,12 +94,15 @@ static int rsa(void) {
 
 		TEST_BEGIN("rsa signature/verification is correct") {
 			TEST_ASSERT(result == STS_OK, end);
-			in_len = 10;
-			out_len = BN_BITS / 8 + 1;
-			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_sign(out, &out_len, in, in_len, prv) == STS_OK,
+			il = 10;
+			ol = BN_BITS / 8 + 1;
+			rand_bytes(in, il);
+			TEST_ASSERT(cp_rsa_sign(out, &ol, in, il, 0, prv) == STS_OK, end);
+			TEST_ASSERT(cp_rsa_ver(out, ol, in, il, 0, pub) == 1, end);
+			md_map(h, in, il);
+			TEST_ASSERT(cp_rsa_sign(out, &ol, h, MD_LEN, 1, prv) == STS_OK,
 					end);
-			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1, end);
+			TEST_ASSERT(cp_rsa_ver(out, ol, h, MD_LEN, 1, pub) == 1, end);
 		} TEST_END;
 
 #if CP_RSA == BASIC || !defined(STRIP)
@@ -112,12 +110,16 @@ static int rsa(void) {
 
 		TEST_BEGIN("basic rsa signature/verification is correct") {
 			TEST_ASSERT(result == STS_OK, end);
-			in_len = 10;
-			out_len = BN_BITS / 8 + 1;
-			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_sign_basic(out, &out_len, in, in_len,
+			il = 10;
+			ol = BN_BITS / 8 + 1;
+			rand_bytes(in, il);
+			TEST_ASSERT(cp_rsa_sign_basic(out, &ol, in, il, 0, prv) == STS_OK,
+					end);
+			TEST_ASSERT(cp_rsa_ver(out, ol, in, il, 0, pub) == 1, end);
+			md_map(h, in, il);
+			TEST_ASSERT(cp_rsa_sign_basic(out, &ol, h, MD_LEN, 1,
 							prv) == STS_OK, end);
-			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1, end);
+			TEST_ASSERT(cp_rsa_ver(out, ol, h, MD_LEN, 1, pub) == 1, end);
 		} TEST_END;
 #endif
 
@@ -126,12 +128,16 @@ static int rsa(void) {
 
 		TEST_BEGIN("fast rsa signature/verification is correct") {
 			TEST_ASSERT(result == STS_OK, end);
-			in_len = 10;
-			out_len = BN_BITS / 8 + 1;
-			rand_bytes(in, in_len);
-			TEST_ASSERT(cp_rsa_sign_quick(out, &out_len, in, in_len,
-							prv) == STS_OK, end);
-			TEST_ASSERT(cp_rsa_ver(out, out_len, in, in_len, pub) == 1, end);
+			il = 10;
+			ol = BN_BITS / 8 + 1;
+			rand_bytes(in, il);
+			TEST_ASSERT(cp_rsa_sign_quick(out, &ol, in, il, 0, prv) == STS_OK,
+					end);
+			TEST_ASSERT(cp_rsa_ver(out, ol, in, il, 0, pub) == 1, end);
+			md_map(h, in, il);
+			TEST_ASSERT(cp_rsa_sign_quick(out, &ol, h, MD_LEN, 1, prv) == STS_OK,
+					end);
+			TEST_ASSERT(cp_rsa_ver(out, ol, h, MD_LEN, 1, pub) == 1, end);
 		} TEST_END;
 #endif
 
