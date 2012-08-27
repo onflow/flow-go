@@ -397,10 +397,10 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 		signed char u, int m, int w) {
 	int i, l;
 	bn_t tmp, r0, r1;
-	signed char beta[16];
-	signed char gama[16];
+	signed char beta[64];
+	signed char gama[64];
 	dig_t t0, t1, t_w = 0, mask;
-	signed char s, t, u_i;
+	int s, t, u_i;
 
 	bn_null(r0);
 	bn_null(r1);
@@ -410,8 +410,6 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 		bn_new(r0);
 		bn_new(r1);
 		bn_new(tmp);
-
-		tnaf_mod(r0, r1, k, vm, s0, s1, u, m);
 
 		if (u == -1) {
 			switch (w) {
@@ -426,6 +424,10 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 				case 6:
 					t_w = 26;
 					break;
+				case 7:
+				case 8:
+					t_w = 90;
+					break;
 			}
 		} else {
 			switch (w) {
@@ -438,15 +440,17 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 					t_w = 6;
 					break;
 				case 6:
+				case 7:
 					t_w = 38;
+					break;
+				case 8:
+					t_w = 166;
 					break;
 			}
 		}
 
-		if (w >= 2) {
-			beta[0] = 1;
-			gama[0] = 0;
-		}
+		beta[0] = 1;
+		gama[0] = 0;
 
 		if (w >= 3) {
 			beta[1] = 1;
@@ -460,7 +464,7 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 			gama[1] = gama[2] = gama[3] = (signed char)u;
 		}
 
-		if (w == 5) {
+		if (w >= 5) {
 			beta[4] = -3;
 			beta[5] = -1;
 			beta[6] = beta[7] = 1;
@@ -468,7 +472,7 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 			gama[7] = (signed char)(-3 * u);
 		}
 
-		if (w == 6) {
+		if (w >= 6) {
 			beta[1] = beta[8] = beta[14] = 3;
 			beta[2] = beta[9] = beta[15] = 5;
 			beta[3] = -5;
@@ -479,9 +483,65 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 			gama[3] = gama[4] = gama[5] = gama[6] = (signed char)(2 * u);
 			gama[7] = gama[8] = gama[9] = (signed char)(-3 * u);
 			gama[10] = (signed char)(4 * u);
-			gama[11] = gama[12] = gama[13] = gama[14] = gama[15] =
-					(signed char)(-u);
+			gama[11] = gama[12] = gama[13] = (signed char)(-u);
+			gama[14] = gama[15] = (signed char)(-u);
 		}
+
+		if (w >= 7) {
+			beta[3] = beta[22] = beta[29] = 7;
+			beta[4] = beta[16] = beta[23] = -5;
+			beta[5] = beta[10] = beta[17] = beta[24] = -3;
+			beta[6] = beta[11] = beta[18] = beta[25] = beta[30] = -1;
+			beta[7] = beta[12] = beta[14] = beta[19] = beta[26] = beta[31] = 1;
+			beta[8] = beta[13] = beta[20] = beta[27] = 3;
+			beta[9] = beta[21] = beta[28] = 5;
+			beta[15] = -7;
+			gama[3] = 0;
+			gama[4] = gama[5] = gama[6] = (signed char)(-3 * u);
+			gama[11] = gama[12] = gama[13] = (signed char)(4 * u);
+			gama[14] = (signed char)(-6 * u);
+			gama[15] = gama[16] = gama[17] = gama[18] = (signed char)u;
+			gama[19] = gama[20] = gama[21] = gama[22] = (signed char)u;
+			gama[23] = gama[24] = gama[25] = gama[26] = (signed char)(-2 * u);
+			gama[27] = gama[28] = gama[29] = (signed char)(-2 * u);
+			gama[30] = gama[31] = (signed char)(5 * u);
+		}
+
+		if (w == 8) {
+			beta[10] = beta[17] = beta[48] = beta[55] = beta[62] = 7;
+			beta[11] = beta[18] = beta[49] = beta[56] = beta[63] = 9;
+			beta[12] = beta[22] = beta[29] = -3;
+			beta[36] = beta[43] = beta[50] = -3;
+			beta[13] = beta[23] = beta[30] = beta[37] = -1;
+			beta[44] = beta[51] = beta[58] = -1;
+			beta[14] = beta[24] = beta[31] = beta[38] = 1;
+			beta[45] = beta[52] = beta[59] = 1;
+			beta[15] = beta[32] = beta[39] = beta[46] = beta[53] = beta[60] = 3;
+			beta[16] = beta[40] = beta[47] = beta[54] = beta[61] = 5;
+			beta[19] = beta[57] = 11;
+			beta[20] = beta[27] = beta[34] = beta[41] = -7;
+			beta[21] = beta[28] = beta[35] = beta[42] = -5;
+			beta[25] = -11;
+			beta[26] = beta[33] = -9;
+			gama[10] = gama[11] = (signed char)(-3 * u);
+			gama[12] = gama[13] = gama[14] = gama[15] = (signed char)(-6 * u);
+			gama[16] = gama[17] = gama[18] = gama[19] = (signed char)(-6 * u);
+			gama[20] = gama[21] = gama[22] = (signed char)(8 * u);
+			gama[23] = gama[24] = (signed char)(8 * u);
+			gama[25] = gama[26] = gama[27] = gama[28] = (signed char)(5 * u);
+			gama[29] = gama[30] = gama[31] = gama[32] = (signed char)(5 * u);
+			gama[33] = gama[34] = gama[35] = gama[36] = (signed char)(2 * u);
+			gama[37] = gama[38] = gama[39] = gama[40] = (signed char)(2 * u);
+			gama[41] = gama[42] = gama[43] = gama[44] = (signed char)(-1 * u);
+			gama[45] = gama[46] = gama[47] = gama[48] = (signed char)(-1 * u);
+			gama[49] = (signed char)(-1 * u);
+			gama[50] = gama[51] = gama[52] = gama[53] = (signed char)(-4 * u);
+			gama[54] = gama[55] = gama[56] = gama[57] = (signed char)(-4 * u);
+			gama[58] = gama[59] = gama[60] = (signed char)(-7 * u);
+			gama[61] = gama[62] = gama[63] = (signed char)(-7 * u);
+		}
+
+		tnaf_mod(r0, r1, k, vm, s0, s1, u, m);
 
 		mask = MASK(w);
 		l = 1 << w;
@@ -532,6 +592,7 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 				}
 				/* u = r0 + r1 * (t_w) mod_s 2^w. */
 				u_i = (t0 + t_w * t1) & mask;
+
 				if (u_i >= (l / 2)) {
 					/* If u < 0, s = -1 and u = -u. */
 					u_i = (signed char)(u_i - l);
