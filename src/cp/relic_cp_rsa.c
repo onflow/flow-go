@@ -949,11 +949,11 @@ int cp_rsa_sig_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
 		int operation = (!hash ? RSA_SIG : RSA_SIG_HASH);
 
 #if CP_RSAPD == BASIC
-		if (pad_basic(eb, &pad_len, MD_LEN, size, operation) == STS_OK) {
+		if (pad_basic(eb, &pad_len, pad_len, size, operation) == STS_OK) {
 #elif CP_RSAPD == PKCS1
-		if (pad_pkcs1(eb, &pad_len, MD_LEN, size, operation) == STS_OK) {
+		if (pad_pkcs1(eb, &pad_len, pad_len, size, operation) == STS_OK) {
 #elif CP_RSAPD == PKCS2
-		if (pad_pkcs2(eb, &pad_len, MD_LEN, size, operation) == STS_OK) {
+		if (pad_pkcs2(eb, &pad_len, pad_len, size, operation) == STS_OK) {
 #endif
 			if (!hash) {
 				md_map(h, msg, msg_len);
@@ -1032,11 +1032,11 @@ int cp_rsa_sig_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
 		int operation = (!hash ? RSA_SIG : RSA_SIG_HASH);
 
 #if CP_RSAPD == BASIC
-		if (pad_basic(eb, &pad_len, MD_LEN, size, operation) == STS_OK) {
+		if (pad_basic(eb, &pad_len, pad_len, size, operation) == STS_OK) {
 #elif CP_RSAPD == PKCS1
-		if (pad_pkcs1(eb, &pad_len, MD_LEN, size, operation) == STS_OK) {
+		if (pad_pkcs1(eb, &pad_len, pad_len, size, operation) == STS_OK) {
 #elif CP_RSAPD == PKCS2
-		if (pad_pkcs2(eb, &pad_len, MD_LEN, size, operation) == STS_OK) {
+		if (pad_pkcs2(eb, &pad_len, pad_len, size, operation) == STS_OK) {
 #endif
 			if (!hash) {
 				md_map(h, msg, msg_len);
