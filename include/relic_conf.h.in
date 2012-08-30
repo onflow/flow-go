@@ -546,7 +546,7 @@
 /** Prefer Koblitz anomalous (binary or prime) curves. */
 #cmakedefine EC_KBLTZ
 
-/** Binary elliptic curve arithmetic method. */
+/** Chosen elliptic curve cryptography method. */
 #define EC_METHD "@EC_METHD@"
 
 /** Prime curves. */
