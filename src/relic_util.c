@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#include "relic_core.h"
 #include "relic_conf.h"
 #include "relic_util.h"
 #include "relic_types.h"
@@ -138,6 +139,19 @@ int util_bits_dig(dig_t a) {
 #elif WORD == 64
 	return DIGIT - __builtin_clzll(a);
 #endif
+}
+
+int util_const_cmp(const void * a, const void *b, size_t n) {
+	const unsigned char *pa = (const unsigned char *) a;
+	const unsigned char *pb = (const unsigned char *) b;
+	unsigned char result = 0;
+	size_t i;
+
+	for (i = 0; i < n; i++) {
+		result |= pa[i] ^ pb[i];
+	}
+
+	return (result == 0 ? CMP_EQ : CMP_NE);
 }
 
 void util_printf(const char *format, ...) {
