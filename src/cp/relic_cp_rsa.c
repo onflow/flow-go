@@ -1118,12 +1118,12 @@ int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg,
 		bn_size_bin(&size, pub->n);
 	}
 	if (pad_len > (size - 2)) {
-		return STS_ERR;
+		return 0;
 	}
 #else
 	bn_size_bin(&size, pub->n);
 	if (pad_len > (size - RSA_PAD_LEN)) {
-		return STS_ERR;
+		return 0;
 	}
 #endif
 
