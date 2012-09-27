@@ -209,7 +209,7 @@ int util_bits_dig(dig_t a);
  * @param[in] n				- the length in bytes of the buffers.
  * @return CMP_EQ if they are equal and CMP_NE otherwise.
  */
-int util_const_cmp(const void * a, const void *b, size_t n);
+int util_const_cmp(const void * a, const void *b, int n);
 
 /**
  * Formats and prints data following a printf-like syntax.
