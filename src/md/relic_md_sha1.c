@@ -29,6 +29,8 @@
  * @ingroup md
  */
 
+#include <string.h>
+
 #include "relic_conf.h"
 #include "relic_core.h"
 #include "relic_error.h"
@@ -80,9 +82,12 @@ void md_map_shone_final(unsigned char *hash) {
 }
 
 void md_map_shone_state(unsigned char *state) {
-	*(uint32_t *)(state) = util_conv_big(ctx.Intermediate_Hash[0]);
-	*(uint32_t *)(state + 4) = util_conv_big(ctx.Intermediate_Hash[1]);
-	*(uint32_t *)(state + 8) = util_conv_big(ctx.Intermediate_Hash[2]);
-	*(uint32_t *)(state + 12) = util_conv_big(ctx.Intermediate_Hash[3]);
-	*(uint32_t *)(state + 16) = util_conv_big(ctx.Intermediate_Hash[4]);
+	uint32_t t[5];
+	int i;
+
+	for (i = 0; i < 5; i++) {
+		t[i] = util_conv_big(ctx.Intermediate_Hash[i]);
+	}
+
+	memcpy(state, t, sizeof(t));
 }
