@@ -407,6 +407,7 @@ void fp_inv_exgcd(fp_t c, fp_t a) {
 void fp_inv_lower(fp_t c, fp_t a) {
 	fp_invn_low(c, a);
 }
+
 #endif
 
 void fp_inv_sim(fp_t *c, fp_t *a, int n) {
