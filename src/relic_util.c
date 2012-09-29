@@ -141,14 +141,14 @@ int util_bits_dig(dig_t a) {
 #endif
 }
 
-int util_const_cmp(const void * a, const void *b, int n) {
-	const unsigned char *pa = (const unsigned char *) a;
-	const unsigned char *pb = (const unsigned char *) b;
+int util_cmp_const(const void * a, const void *b, int size) {
+	const unsigned char *_a = (const unsigned char *) a;
+	const unsigned char *_b = (const unsigned char *) b;
 	unsigned char result = 0;
 	int i;
 
-	for (i = 0; i < n; i++) {
-		result |= pa[i] ^ pb[i];
+	for (i = 0; i < size; i++) {
+		result |= _a[i] ^ _b[i];
 	}
 
 	return (result == 0 ? CMP_EQ : CMP_NE);
