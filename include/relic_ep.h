@@ -149,7 +149,7 @@ enum {
 #ifdef STRIP
 #define EP_TABLE_MAX EP_TABLE
 #else
-#define EP_TABLE_MAX EP_TABLE_BASIC
+#define EP_TABLE_MAX MAX(EP_TABLE_BASIC, EP_TABLE_COMBD)
 #endif
 
 /*============================================================================*/

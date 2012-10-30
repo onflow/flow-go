@@ -138,7 +138,7 @@ enum {
 #ifdef STRIP
 #define EB_TABLE_MAX 		EB_TABLE
 #else
-#define EB_TABLE_MAX 		EB_TABLE_BASIC
+#define EB_TABLE_MAX 		MAX(EB_TABLE_BASIC, EB_TABLE_COMBD)
 #endif
 
 /*============================================================================*/

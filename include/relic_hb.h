@@ -117,7 +117,7 @@ enum {
 #ifdef STRIP
 #define HB_TABLE_MAX HB_TABLE
 #else
-#define HB_TABLE_MAX HB_TABLE_BASIC
+#define HB_TABLE_MAX MAX(HB_TABLE_BASIC, HB_TABLE_COMBD)
 #endif
 
 /*============================================================================*/
