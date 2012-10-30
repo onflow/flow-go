@@ -591,6 +591,7 @@ void eb_tab(eb_t *t, eb_t p, int w) {
 					}
 					len = i;
 
+					/*
 					printf("(");
 					for (int j = len - 1; j >= 0; j--) {
 						if (j > 0) {
@@ -600,6 +601,7 @@ void eb_tab(eb_t *t, eb_t p, int w) {
 						}
 					}
 					printf("\n");
+					*/
 					eb_mul_frb(t[_k], p, tnaf, len);
 				}
 /*
