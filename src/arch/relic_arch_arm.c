@@ -43,6 +43,6 @@ void arch_clean(void) {
 
 unsigned long long arch_cycles(void) {
 	unsigned int value;
-	asm ("MRC p15, 0, %0, c9, c13, 0\t\n": "=r"(value));  
+	asm ("mcr p15, 0, %0, c9, c13, 0\t\n": "=r"(value));  
 	return value;
 }
