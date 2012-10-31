@@ -116,7 +116,8 @@ message("   OPSYS=NONE     Undefined/No operating system.")
 message("   OPSYS=LINUX    GNU/Linux operating system.")
 message("   OPSYS=FREEBSD  FreeBSD operating system.")
 message("   OPSYS=MACOSX   Mac OS X.")
-message("   OPSYS=WINDOWS  Windows operating system.\n")
+message("   OPSYS=WINDOWS  Windows operating system.")
+message("   OPSYS=DROID    Android operating system.\n")
 
 message(STATUS "Supported timers (default = HIGH):")
 message("   TIMER=NONE     No timer.")
@@ -285,8 +286,8 @@ set(COMP "-O2 -funroll-loops -fomit-frame-pointer" CACHE STRING "User-chosen com
 # Simulator of the target platform.
 set(SIMP "$ENV{SIMP}" CACHE STRING "Path to call a simulator of the target platform.")
 set(SIMP "" CACHE STRING "Path to call a simulator of the target platform.")
-set(SIMA "$ENV{SIMA}" CACHE STRING "Path to call a simulator of the target platform.")
-set(SIMA "" CACHE STRING "Path to call a simulator of the target platform.")
+set(SIMA "$ENV{SIMA}" CACHE STRING "Arguments to call a simulator of the target platform.")
+set(SIMA "" CACHE STRING "Arguments to call a simulator of the target platform.")
 
 # Linker flags.
 string(TOLOWER ${ARITH} LFLAGS)
@@ -311,6 +312,7 @@ endif(CMAKE_SYSTEM_NAME STREQUAL Linux)
 if(OPSYS STREQUAL LINUX)
 	add_definitions(-D_GNU_SOURCE)
 endif(OPSYS STREQUAL LINUX)
+message(STATUS "Configured operating system: ${OPSYS}")
 
 if(OPSYS STREQUAL LINUX)
 	set(TIMER "HPROC" CACHE STRING "Timer")
