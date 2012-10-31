@@ -553,7 +553,7 @@
 #define PRIME    1
 /** Binary curves. */
 #define CHAR2    2
-/** Chosen elliptic curve cryptography method. */
+/** Chosen elliptic curve type. */
 #define EC_CUR	 @EC_CUR@
 
 /** Support for supersingular curves. */
@@ -674,7 +674,7 @@
 #define PRIME	 1
 /** Binary curves. */
 #define CHAR2	 2
-/** Chosen elliptic curve cryptography method. */
+/** Chosen elliptic curve type. */
 #define PC_CUR	 @PC_CUR@
 
 /** Choice of hash function. */
@@ -755,6 +755,8 @@
 #define MACOSX   4
 /** Windows operating system. */
 #define WINDOWS  5
+/** Android operating system. */
+#define DROID    6
 /** Detected operation system. */
 #define OPSYS    @OPSYS@
 
