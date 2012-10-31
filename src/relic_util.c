@@ -37,6 +37,10 @@
 #include "relic_util.h"
 #include "relic_types.h"
 
+#if ARCH == ARM && OPSYS == DROID
+#include <android/log.h>
+#endif
+
 /*============================================================================*/
 /* Private definitions                                                        */
 /*============================================================================*/
@@ -156,17 +160,22 @@ int util_cmp_const(const void * a, const void *b, int size) {
 
 void util_printf(const char *format, ...) {
 #ifndef QUIET
-#if ARCH == AVR
+#if ARCH == AVR && OPSYS == NONE
 	print_pointer = print_buffer + 1;
 	va_list list;
 	va_start(list, format);
 	vsnprintf_P((char *)print_pointer, 64, format, list);
 	print_buffer[0] = (unsigned char)2;
 	va_end(list);
-#elif ARCH == MSP
+#elif ARCH == MSP && OPSYS == NONE
 	va_list list;
 	va_start(list, format);
 	vprintf(format, list);
+	va_end(list);
+#elif ARCH == ARM && OPSYS == DROID
+	va_list list;
+	va_start(list, format);
+	__android_log_vprint(ANDROID_LOG_DEBUG, "relic-toolkit", format, list);
 	va_end(list);
 #else
 	va_list list;
