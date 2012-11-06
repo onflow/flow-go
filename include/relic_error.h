@@ -36,6 +36,7 @@
 #include <setjmp.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "relic_core.h"
 #include "relic_conf.h"
@@ -98,6 +99,13 @@ enum errors {
 #define MSG_NO_CURVE		"no curve supported at this security level"
 /** Error message respective to ERR_NO_CONFIG. */
 #define MSG_NO_CONFIG		"invalid library configuration"
+
+/** Truncate file name if verbosity is turned off. */
+#ifdef VERBS
+#define THIS_FILE			__FILE__
+#else
+#define THIS_FILE			((strrchr(__FILE__, '/') ? : __FILE__ - 1) + 1)
+#endif
 
 /*============================================================================*/
 /* Type definitions                                                           */
@@ -276,7 +284,7 @@ typedef struct _state_t {
 #else
 #define THROW(E)															\
 	core_ctx->code = STS_ERR; 												\
-	util_print("FATAL ERROR in " __FILE__ ":%d\n", __LINE__);				\
+	util_print("FATAL ERROR in %s:%d\n", THIS_FILE, __LINE__);				\
 
 #endif
 #endif
