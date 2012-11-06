@@ -870,7 +870,8 @@ int main(void) {
 		return 1;
 	}
 
-	core_clean();
+	util_banner("All tests have passed.", 0);
 
+	core_clean();
 	return 0;
 }

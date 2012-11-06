@@ -1115,6 +1115,8 @@ int main(void) {
 		return 1;
 	}
 
+	util_banner("All tests have passed.", 0);
+
 	core_clean();
 	return 0;
 }

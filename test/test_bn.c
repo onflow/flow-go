@@ -930,8 +930,9 @@ static int mxp(void) {
 		bn_gen_prime(p, BN_BITS);
 #elif BN_PRECI >= 128
 		/* Let's try a Mersenne prime. */
-		char str[] = "170141183460469231731687303715884105727";
-		bn_read_str(p, str, sizeof(str), 10);
+		bn_zero(p);
+		bn_set_bit(p, 127, 1);
+		bn_sub(p, p, 1);
 #endif
 
 		TEST_BEGIN("modular exponentiation is correct") {
@@ -1670,6 +1671,8 @@ int main(void) {
 		core_clean();
 		return 1;
 	}
+
+	util_banner("All tests have passed.", 0);
 
 	core_clean();
 	return 0;

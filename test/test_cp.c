@@ -632,6 +632,8 @@ int main(void) {
 	}
 #endif
 
+	util_banner("All tests have passed.", 0);
+
 	core_clean();
 	return 0;
 }
