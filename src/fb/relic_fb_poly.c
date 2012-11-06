@@ -255,6 +255,12 @@ static void find_chain() {
 		chain[i] = (i << 8) + i;
 	}
 	switch (FB_BITS) {
+		case 127:
+			chain[1] = (1 << 8) + 0;
+			chain[4] = (4 << 8) + 2;
+			chain[7] = (7 << 8) + 2;
+			chain_len = 9;
+			break;
 		case 193:
 			chain[1] = (1 << 8) + 0;
 			chain_len = 8;
