@@ -283,12 +283,14 @@ static int kdf(void) {
 #if MD_MAP == SHONE
 	TEST_ONCE("kdf1 key derivation function is correct") {
 		md_kdf1(key, 32, message, sizeof(message));
+		util_print("%d %d\n", key[0], key1[0]);
 		TEST_ASSERT(memcmp(key, key1, 32) == 0, end);
 	}
 	TEST_END;
 
 	TEST_ONCE("kdf2 key derivation function is correct") {
 		md_kdf2(key, 32, message, sizeof(message));
+		util_print("%d %d\n", key[0], key2[0]);
 		TEST_ASSERT(memcmp(key, key2, 32) == 0, end);
 	}
 	TEST_END;
@@ -337,30 +339,40 @@ int main(void) {
 
 	util_banner("Tests for the MD module:\n", 0);
 
+#if MD_MAP == SHONE || !defined(STRIP)
 	if (sha1() != STS_OK) {
 		core_clean();
 		return 1;
 	}
+#endif
 
+#if MD_MAP == SH224 || !defined(STRIP)
 	if (sha224() != STS_OK) {
 		core_clean();
 		return 1;
 	}
+#endif
 
+#if MD_MAP == SH256 || !defined(STRIP)
 	if (sha256() != STS_OK) {
 		core_clean();
 		return 1;
 	}
+#endif
 
+#if MD_MAP == SH384 || !defined(STRIP)
 	if (sha384() != STS_OK) {
 		core_clean();
 		return 1;
 	}
+#endif
 
+#if MD_MAP == SH512 || !defined(STRIP)
 	if (sha512() != STS_OK) {
 		core_clean();
 		return 1;
 	}
+#endif
 
 	if (kdf() != STS_OK) {
 		core_clean();
