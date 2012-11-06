@@ -72,7 +72,7 @@ void md_kdf2(unsigned char *key, int key_len, unsigned char *in, int in_len) {
 		/* c = integer_to_string(c, 4). */
 		memcpy(buffer + in_len, &j, sizeof(uint32_t));
 		/* t = t || hash(z || c). */
-		md_map(t + (i - 1) * MD_LEN, buffer, in_len + sizeof(int));
+		md_map(t + (i - 1) * MD_LEN, buffer, in_len + sizeof(uint32_t));
 	}
 	memcpy(key, t, key_len);
 }
