@@ -96,7 +96,16 @@ void cp_ecss_sig(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
 		bn_write_bin(m + len, EC_BYTES, r);
 		md_map(hash, m, len + EC_BYTES);
 
-		bn_read_bin(e, hash, MD_LEN);
+		if (8 * MD_LEN > bn_bits(n)) {
+			len = CEIL(bn_bits(n), 8);
+			bn_read_bin(e, hash, len);
+		} else {
+			bn_read_bin(e, hash, MD_LEN);
+		}
+		if (8 * MD_LEN > bn_bits(n)) {
+			bn_rsh(e, e, 8 * MD_LEN - bn_bits(n));
+		}
+
 		bn_mod(e, e, n);
 
 		bn_mul(s, d, e);
@@ -149,7 +158,16 @@ int cp_ecss_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q) {
 				bn_write_bin(m + len, EC_BYTES, rv);
 				md_map(hash, m, len + EC_BYTES);
 
-				bn_read_bin(ev, hash, MD_LEN);
+				if (8 * MD_LEN > bn_bits(n)) {
+					len = CEIL(bn_bits(n), 8);
+					bn_read_bin(ev, hash, len);
+				} else {
+					bn_read_bin(ev, hash, MD_LEN);
+				}
+				if (8 * MD_LEN > bn_bits(n)) {
+					bn_rsh(ev, ev, 8 * MD_LEN - bn_bits(n));
+				}
+
 				bn_mod(ev, ev, n);
 
 				d = 0;
