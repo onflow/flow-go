@@ -94,7 +94,15 @@ void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 
 			md_map(hash, msg, len);
 
-			bn_read_bin(e, hash, MD_LEN);
+			if (8 * MD_LEN > bn_bits(n)) {
+				len = CEIL(bn_bits(n), 8);
+				bn_read_bin(e, hash, len);
+			} else {
+				bn_read_bin(e, hash, MD_LEN);
+			}
+			if (bn_bits(e) > bn_bits(n)) {
+				bn_rsh(e, e, bn_bits(e) - bn_bits(n));
+			}
 
 			bn_mul(s, d, r);
 			bn_mod(s, s, n);
@@ -125,6 +133,7 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
 	dig_t d;
 	ec_t p;
 	unsigned char hash[MD_LEN];
+
 	int result = 0;
 
 	bn_null(n);
@@ -151,7 +160,15 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
 					bn_add(k, k, n);
 				}
 
-				bn_read_bin(e, hash, MD_LEN);
+				if (8 * MD_LEN > bn_bits(n)) {
+					len = CEIL(bn_bits(n), 8);
+					bn_read_bin(e, hash, len);
+				} else {
+					bn_read_bin(e, hash, MD_LEN);
+				}
+				if (bn_bits(e) > bn_bits(n)) {
+					bn_rsh(e, e, bn_bits(e) - bn_bits(n));
+				}
 
 				bn_mul(e, e, k);
 				bn_mod(e, e, n);
