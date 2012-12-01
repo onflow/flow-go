@@ -490,7 +490,7 @@ void bn_gen_prime_stron(bn_t a, int bits) {
 					break;
 				}
 			} while (!bn_is_prime(a));
-		} while (found == 0);
+		} while (found == 0 && bn_bits(a) != bits);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
