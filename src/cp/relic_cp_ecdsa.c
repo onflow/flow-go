@@ -61,10 +61,11 @@ void cp_ecdsa_gen(bn_t d, ec_t q) {
 	}
 }
 
-void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
+void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, int hash,
+		bn_t d) {
 	bn_t n, k, x, e;
 	ec_t p;
-	unsigned char hash[MD_LEN];
+	unsigned char h[MD_LEN];
 
 	bn_null(n);
 	bn_null(k);
@@ -92,16 +93,24 @@ void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 				bn_mod(r, x, n);
 			} while (bn_is_zero(r));
 
-			md_map(hash, msg, len);
+			if (!hash) {
+				md_map(h, msg, len);
 
-			if (8 * MD_LEN > bn_bits(n)) {
-				len = CEIL(bn_bits(n), 8);
-				bn_read_bin(e, hash, len);
+				if (8 * MD_LEN > bn_bits(n)) {
+					len = CEIL(bn_bits(n), 8);
+					bn_read_bin(e, h, len);
+					bn_rsh(e, e, 8 * MD_LEN - bn_bits(n));
+				} else {
+					bn_read_bin(e, h, MD_LEN);
+				}
 			} else {
-				bn_read_bin(e, hash, MD_LEN);
-			}
-			if (8 * MD_LEN > bn_bits(n)) {
-				bn_rsh(e, e, 8 * MD_LEN - bn_bits(n));
+				if (8 * len > bn_bits(n)) {
+					len = CEIL(bn_bits(n), 8);
+					bn_read_bin(e, msg, len);
+					bn_rsh(e, e, 8 * len - bn_bits(n));
+				} else {
+					bn_read_bin(e, msg, len);
+				}
 			}
 
 			bn_mul(s, d, r);
@@ -128,11 +137,11 @@ void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d) {
 	}
 }
 
-int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
+int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, int hash, ec_t q) {
 	bn_t n, k, e, v;
 	dig_t d;
 	ec_t p;
-	unsigned char hash[MD_LEN];
+	unsigned char h[MD_LEN];
 	int result = 0;
 
 	bn_null(n);
@@ -149,7 +158,6 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
 		ec_new(p);
 
 		ec_curve_get_ord(n);
-		md_map(hash, msg, len);
 
 		if (bn_sign(r) == BN_POS && bn_sign(s) == BN_POS &&
 				!bn_is_zero(r) && !bn_is_zero(s)) {
@@ -159,14 +167,24 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q) {
 					bn_add(k, k, n);
 				}
 
-				if (8 * MD_LEN > bn_bits(n)) {
-					len = CEIL(bn_bits(n), 8);
-					bn_read_bin(e, hash, len);
+				if (!hash) {
+					md_map(h, msg, len);
+
+					if (8 * MD_LEN > bn_bits(n)) {
+						len = CEIL(bn_bits(n), 8);
+						bn_read_bin(e, h, len);
+						bn_rsh(e, e, 8 * MD_LEN - bn_bits(n));
+					} else {
+						bn_read_bin(e, h, MD_LEN);
+					}
 				} else {
-					bn_read_bin(e, hash, MD_LEN);
-				}
-				if (8 * MD_LEN > bn_bits(n)) {
-					bn_rsh(e, e, 8 * MD_LEN - bn_bits(n));
+					if (8 * len > bn_bits(n)) {
+						len = CEIL(bn_bits(n), 8);
+						bn_read_bin(e, msg, len);
+						bn_rsh(e, e, 8 * len - bn_bits(n));
+					} else {
+						bn_read_bin(e, msg, len);
+					}
 				}
 
 				bn_mul(e, e, k);

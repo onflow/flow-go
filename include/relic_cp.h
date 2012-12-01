@@ -703,9 +703,11 @@ void cp_ecdsa_gen(bn_t d, ec_t q);
  * @param[out] s				- the second component of the signature.
  * @param[in] msg				- the message to sign.
  * @param[in] len				- the message length in bytes.
+ * @param[in] hash				- the flag to indicate the message format.
  * @param[in] d					- the private key.
  */
-void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d);
+void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, int hash,
+		bn_t d);
 
 /**
  * Verifies a message signed with ECDSA using the basic method.
@@ -714,9 +716,10 @@ void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, bn_t d);
  * @param[out] s				- the second component of the signature.
  * @param[in] msg				- the message to sign.
  * @param[in] len				- the message length in bytes.
+ * @param[in] hash				- the flag to indicate the message format.
  * @param[in] q					- the public key.
  */
-int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, ec_t q);
+int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, int hash, ec_t q);
 
 /**
  * Generates an Elliptic Curve Schnorr Signature key pair.

@@ -395,23 +395,29 @@ static int ecmqv(void) {
 
 static int ecdsa(void) {
 	int code = STS_ERR;
-	bn_t d, r;
+	bn_t d, r, s;
 	ec_t q;
-	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+	unsigned char msg[5] = { 0, 1, 2, 3, 4 }, h[MD_LEN];
 
 	bn_null(d);
 	bn_null(r);
+	bn_null(s);
 	ec_null(q);
 
 	TRY {
 		bn_new(d);
 		bn_new(r);
+		bn_new(s);
 		ec_new(q);
 
 		TEST_BEGIN("ecdsa is correct") {
 			cp_ecdsa_gen(d, q);
-			cp_ecdsa_sig(r, d, msg, 5, d);
-			TEST_ASSERT(cp_ecdsa_ver(r, d, msg, 5, q) == 1, end);
+			cp_ecdsa_sig(r, s, msg, 5, 0, d);
+			TEST_ASSERT(cp_ecdsa_ver(r, s, msg, 5, 0, q) == 1, end);
+			md_map(h, msg, 5);
+			cp_ecdsa_sig(r, s, h, MD_LEN, 1, d);
+			TEST_ASSERT(cp_ecdsa_ver(r, s, h, MD_LEN, 1, q) == 1, end);
+
 		} TEST_END;
 	} CATCH_ANY {
 		ERROR(end);
@@ -421,6 +427,7 @@ static int ecdsa(void) {
   end:
 	bn_free(d);
 	bn_free(r);
+	bn_free(s);
 	ec_free(q);
 	return code;
 }
