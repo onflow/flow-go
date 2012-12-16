@@ -29,11 +29,7 @@
  * @ingroup ep
  */
 
-#include "string.h"
-
 #include "relic_core.h"
-#include "relic_ep.h"
-#include "relic_error.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */

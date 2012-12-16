@@ -29,92 +29,11 @@
  * @ingroup ep
  */
 
-#include <string.h>
-
 #include "relic_core.h"
-#include "relic_ep.h"
-#include "relic_error.h"
-#include "relic_conf.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
 /*============================================================================*/
-
-/**
- * The A coefficient of the elliptic curve.
- */
-static fp_st curve_a;
-
-/**
- * The B coefficient of the elliptic curve.
- */
-static fp_st curve_b;
-
-/**
- * The generator of the elliptic curve.
- */
-static ep_st curve_g;
-
-/**
- * The order of the group of points in the elliptic curve.
- */
-static bn_st curve_r;
-
-/**
- * The cofactor of the group order in the elliptic curve.
- */
-static bn_st curve_h;
-
-#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
-/**
- * The parameters required by the GLV method.
- * @{
- */
-static fp_st curve_beta;
-static bn_st curve_v1[3];
-static bn_st curve_v2[3];
-
-/**
- * @}
- */
-#endif
-
-/**
- * Optimization identifier for the configured curve derived from the a
- * coefficient.
- */
-static int curve_opt_a;
-
-/**
- * Optimization identifier for the configured curve derived from the b
- * coefficient.
- */
-static int curve_opt_b;
-
-/**
- * Flag that stores if the configured prime elliptic curve has efficient
- * endomorphisms.
- */
-static int curve_is_kbltz;
-
-/**
- * Flag that stores if the configured prime elliptic curve is supersingular.
- */
-static int curve_is_super;
-
-#ifdef EP_PRECO
-
-/**
- * Precomputation table for generator multiplication.
- */
-static ep_st table[EP_TABLE];
-
-/**
- * Array of pointers to the precomputation table.
- */
-static ep_st *pointer[EP_TABLE];
-
-#endif
 
 /**
  * Detects an optimization based on the curve coefficients.
@@ -168,111 +87,115 @@ static void detect_opt(int *opt, fp_t a) {
 /*============================================================================*/
 
 void ep_curve_init(void) {
+	ctx_t *ctx = core_get();
 #ifdef EP_PRECO
 	for (int i = 0; i < EP_TABLE; i++) {
-		pointer[i] = &(table[i]);
+		ctx->ep_ptr[i] = &(ctx->ep_pre[i]);
 	}
 #endif
 #if ALLOC == STATIC
-	fp_new(curve_g.x);
-	fp_new(curve_g.y);
-	fp_new(curve_g.z);
+	fp_new(ctx->ep_g.x);
+	fp_new(ctx->ep_g.y);
+	fp_new(ctx->ep_g.z);
 #ifdef EP_PRECO
 	for (int i = 0; i < EP_TABLE; i++) {
-		fp_new(table[i].x);
-		fp_new(table[i].y);
-		fp_new(table[i].z);
+		fp_new(ctx->ep_pre[i].x);
+		fp_new(ctx->ep_pre[i].y);
+		fp_new(ctx->ep_pre[i].z);
 	}
 #endif
 #endif
-	ep_set_infty(&curve_g);
-	bn_init(&curve_r, FP_DIGS);
-	bn_init(&curve_h, FP_DIGS);
+	ep_set_infty(&ctx->ep_g);
+	bn_init(&ctx->ep_r, FP_DIGS);
+	bn_init(&ctx->ep_h, FP_DIGS);
 #if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || !defined(STRIP))
 	for (int i = 0; i < 3; i++) {
-		bn_init(&curve_v1[i], FP_DIGS);
-		bn_init(&curve_v2[i], FP_DIGS);
+		bn_init(&(ctx->v1[i]), FP_DIGS);
+		bn_init(&(ctx->v2[i]), FP_DIGS);
 	}
 #endif
 }
 
 void ep_curve_clean(void) {
+	ctx_t *ctx = core_get();
 #if ALLOC == STATIC
-	fp_free(curve_g.x);
-	fp_free(curve_g.y);
-	fp_free(curve_g.z);
+	fp_free(ctx->ep_g.x);
+	fp_free(ctx->ep_g.y);
+	fp_free(ctx->ep_g.z);
 #ifdef EP_PRECO
 	for (int i = 0; i < EP_TABLE; i++) {
-		fp_free(table[i].x);
-		fp_free(table[i].y);
-		fp_free(table[i].z);
+		fp_free(ctx->ep_pre[i].x);
+		fp_free(ctx->ep_pre[i].y);
+		fp_free(ctx->ep_pre[i].z);
 	}
 #endif
 #endif
-	bn_clean(&curve_r);
-	bn_clean(&curve_h);
+	bn_clean(&ctx->ep_r);
+	bn_clean(&ctx->ep_h);
 #if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || !defined(STRIP))
 	for (int i = 0; i < 3; i++) {
-		bn_clean(&curve_v1[i]);
-		bn_clean(&curve_v2[i]);
+		bn_clean(&(ctx->v1[i]));
+		bn_clean(&(ctx->v2[i]));
 	}
 #endif
 }
 
 dig_t *ep_curve_get_b() {
-	return curve_b;
+	return core_get()->ep_b;
 }
 
 dig_t *ep_curve_get_a() {
-	return curve_a;
+	return core_get()->ep_a;
 }
 
 #if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
 
 dig_t *ep_curve_get_beta() {
-	return curve_beta;
+	return core_get()->beta;
 }
 
 void ep_curve_get_v1(bn_t v[]) {
+	ctx_t *ctx = core_get();
 	for (int i = 0; i < 3; i++) {
-		bn_copy(v[i], &(curve_v1[i]));
+		bn_copy(v[i], &(ctx->v1[i]));
 	}
 }
 
 void ep_curve_get_v2(bn_t v[]) {
+	ctx_t *ctx = core_get();
 	for (int i = 0; i < 3; i++) {
-		bn_copy(v[i], &(curve_v2[i]));
+		bn_copy(v[i], &(ctx->v2[i]));
 	}
 }
 
 #endif
 
 int ep_curve_opt_a() {
-	return curve_opt_a;
+	return core_get()->ep_opt_a;
 }
 
 int ep_curve_opt_b() {
-	return curve_opt_b;
+	return core_get()->ep_opt_b;
 }
 
 int ep_curve_is_kbltz() {
-	return curve_is_kbltz;
+	return core_get()->ep_is_kbltz;
 }
 
 int ep_curve_is_super() {
-	return curve_is_super;
+	return core_get()->ep_is_super;
 }
 
 void ep_curve_get_gen(ep_t g) {
-	ep_copy(g, &curve_g);
+	ep_copy(g, &core_get()->ep_g);
 }
 
 void ep_curve_get_ord(bn_t n) {
-	bn_copy(n, &curve_r);
+	bn_copy(n, &core_get()->ep_r);
 }
 
 void ep_curve_get_cof(bn_t h) {
-	bn_copy(h, &curve_h);
+	bn_copy(h, &core_get()->ep_h);
 }
 
 ep_t *ep_curve_get_tab() {
@@ -280,9 +203,9 @@ ep_t *ep_curve_get_tab() {
 
 	/* Return a meaningful pointer. */
 #if ALLOC == AUTO
-	return (ep_t *)*pointer;
+	return (ep_t *)*core_get()->ep_ptr;
 #else
-	return pointer;
+	return core_get()->ep_ptr;
 #endif
 
 #else
@@ -294,21 +217,22 @@ ep_t *ep_curve_get_tab() {
 #if defined(EP_ORDIN)
 
 void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h) {
-	curve_is_kbltz = 0;
+	ctx_t *ctx = core_get();
+	ctx->ep_is_kbltz = 0;
 
-	fp_copy(curve_a, a);
-	fp_copy(curve_b, b);
+	fp_copy(ctx->ep_a, a);
+	fp_copy(ctx->ep_b, b);
 
-	detect_opt(&curve_opt_a, curve_a);
-	detect_opt(&curve_opt_b, curve_b);
+	detect_opt(&(ctx->ep_opt_a), ctx->ep_a);
+	detect_opt(&(ctx->ep_opt_b), ctx->ep_b);
 
 	ep_norm(g, g);
-	ep_copy(&curve_g, g);
-	bn_copy(&curve_r, r);
-	bn_copy(&curve_h, h);
+	ep_copy(&(ctx->ep_g), g);
+	bn_copy(&(ctx->ep_r), r);
+	bn_copy(&(ctx->ep_h), h);
 
 #if defined(EP_PRECO)
-	ep_mul_pre(ep_curve_get_tab(), &curve_g);
+	ep_mul_pre(ep_curve_get_tab(), &(ctx->ep_g));
 #endif
 }
 
@@ -318,51 +242,50 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h) {
 
 void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, bn_t h, fp_t beta, bn_t l) {
 	int bits = bn_bits(r);
+	ctx_t *ctx = core_get();
+	ctx->ep_is_kbltz = 1;
 
-	curve_is_kbltz = 1;
+	fp_zero(ctx->ep_a);
+	fp_copy(ctx->ep_b, b);
 
-	fp_zero(curve_a);
-	fp_copy(curve_b, b);
-
-	detect_opt(&curve_opt_a, curve_a);
-	detect_opt(&curve_opt_b, curve_b);
+	detect_opt(&(ctx->ep_opt_a), ctx->ep_a);
+	detect_opt(&(ctx->ep_opt_b), ctx->ep_b);
 
 	ep_norm(g, g);
-	ep_copy(&curve_g, g);
-	bn_copy(&curve_r, r);
-	bn_copy(&curve_h, h);
+	ep_copy(&(ctx->ep_g), g);
+	bn_copy(&(ctx->ep_r), r);
+	bn_copy(&(ctx->ep_h), h);
 
 #if EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP)
-	fp_copy(curve_beta, beta);
-	bn_gcd_ext_mid(&curve_v1[1], &curve_v1[2], &curve_v2[1], &curve_v2[2], l, r);
+	fp_copy(ctx->beta, beta);
+	bn_gcd_ext_mid(&(ctx->v1[1]), &(ctx->v1[2]), &(ctx->v2[1]), &(ctx->v2[2]), l, r);
 	/* l = v1[1] * v2[2] - v1[2] * v2[1], r = l / 2. */
-	bn_mul(&curve_v1[0], &curve_v1[1], &curve_v2[2]);
-	bn_mul(&curve_v2[0], &curve_v1[2], &curve_v2[1]);
-	bn_sub(l, &curve_v1[0], &curve_v2[0]);
+	bn_mul(&(ctx->v1[0]), &(ctx->v1[1]), &(ctx->v2[2]));
+	bn_mul(&(ctx->v2[0]), &(ctx->v1[2]), &(ctx->v2[1]));
+	bn_sub(l, &(ctx->v1[0]), &(ctx->v2[0]));
 	bn_hlv(r, l);
 	/* v1[0] = round(v2[2] * 2^|n| / l). */
-	bn_lsh(&curve_v1[0], &curve_v2[2], bits + 1);
-	if (bn_sign(&curve_v1[0]) == BN_POS) {
-		bn_add(&curve_v1[0], &curve_v1[0], r);
+	bn_lsh(&(ctx->v1[0]), &(ctx->v2[2]), bits + 1);
+	if (bn_sign(&(ctx->v1[0])) == BN_POS) {
+		bn_add(&(ctx->v1[0]), &(ctx->v1[0]), r);
 	} else {
-		bn_sub(&curve_v1[0], &curve_v1[0], r);
+		bn_sub(&(ctx->v1[0]), &(ctx->v1[0]), r);
 	}
-	bn_div(&curve_v1[0], &curve_v1[0], l);
+	bn_div(&(ctx->v1[0]), &(ctx->v1[0]), l);
 	/* v2[0] = round(v1[2] * 2^|n| / l). */
-	bn_lsh(&curve_v2[0], &curve_v1[2], bits + 1);
-	if (bn_sign(&curve_v2[0]) == BN_POS) {
-		bn_add(&curve_v2[0], &curve_v2[0], r);
+	bn_lsh(&(ctx->v2[0]), &(ctx->v1[2]), bits + 1);
+	if (bn_sign(&(ctx->v2[0])) == BN_POS) {
+		bn_add(&(ctx->v2[0]), &(ctx->v2[0]), r);
 	} else {
-		bn_sub(&curve_v2[0], &curve_v2[0], r);
+		bn_sub(&(ctx->v2[0]), &(ctx->v2[0]), r);
 	}
-	bn_div(&curve_v2[0], &curve_v2[0], l);
-	bn_neg(&curve_v2[0], &curve_v2[0]);
+	bn_div(&(ctx->v2[0]), &(ctx->v2[0]), l);
+	bn_neg(&(ctx->v2[0]), &(ctx->v2[0]));
 #endif
 
 #if defined(EP_PRECO)
-	ep_mul_pre(ep_curve_get_tab(), &curve_g);
+	ep_mul_pre(ep_curve_get_tab(), &(ctx->ep_g));
 #endif
-
 }
 
 #endif

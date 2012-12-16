@@ -182,6 +182,44 @@ typedef struct _ctx_t {
 	int var[MAX_TERMS + 1];
 #endif
 
+#ifdef WITH_EP
+	/** Currently configured prime elliptic curve identifier. */
+	int ep_id;
+	/** The a-coefficient of the elliptic curve. */
+	fp_st ep_a;
+	/** The b-coefficient of the elliptic curve. */
+	fp_st ep_b;
+	/** The generator of the elliptic curve. */
+	ep_st ep_g;
+	/** The order of the group of points in the elliptic curve. */
+	bn_st ep_r;
+	/** The cofactor of the group order in the elliptic curve. */
+	bn_st ep_h;
+#ifdef EP_KBLTZ
+#if EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP)
+	/** Parameters required by the GLV method. @{ */
+	fp_st beta;
+	bn_st v1[3];
+	bn_st v2[3];
+	/** @} */
+#endif
+#endif
+	/** Optimization identifier for the a-coefficient. */
+	int ep_opt_a;
+	/** Optimization identifier for the b-coefficient. */
+	int ep_opt_b;
+	/** Flag that stores if the prime curve has efficient endomorphisms. */
+	int ep_is_kbltz;
+	/** Flag that stores if the prime curve is supersingular. */
+	int ep_is_super;
+#ifdef EP_PRECO
+	/** Precomputation table for generator multiplication. */
+	ep_st ep_pre[EP_TABLE];
+	/** Array of pointers to the precomputation table. */
+	ep_st *ep_ptr[EP_TABLE];
+#endif
+#endif
+
 	/** Internal state of the PRNG. */
 	unsigned char rand[RAND_SIZE];
 } ctx_t;

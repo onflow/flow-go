@@ -29,14 +29,8 @@
  * @ingroup ep
  */
 
-#include <string.h>
-
 #include "relic_core.h"
-#include "relic_ep.h"
-#include "relic_pp.h"
-#include "relic_error.h"
-#include "relic_conf.h"
-#include "relic_arch.h"
+#include "relic_epx.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
@@ -320,17 +314,12 @@
 	FETCH(str, CURVE##_LAMB, sizeof(CURVE##_LAMB));							\
 	bn_read_str(lamb, str, strlen(str), 16);								\
 
-/**
- * Current configured elliptic curve parameters.
- */
-static int param_id;
-
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 int ep_param_get() {
-	return param_id;
+	return core_get()->ep_id;
 }
 
 void ep_param_set(int param) {
@@ -461,7 +450,7 @@ void ep_param_set(int param) {
 		(void)kbltz;
 		(void)ordin;
 
-		param_id = param;
+		core_get()->ep_id = param;
 
 		fp_zero(g->z);
 		fp_set_dig(g->z, 1);
@@ -589,7 +578,7 @@ int ep_param_set_any_pairf() {
 }
 
 void ep_param_print() {
-	switch (param_id) {
+	switch (ep_param_get()) {
 		case SECG_P160:
 			util_banner("Curve SECG-P160:", 0);
 			break;
@@ -642,7 +631,7 @@ void ep_param_print() {
 }
 
 int ep_param_level() {
-	switch (param_id) {
+	switch (ep_param_get()) {
 		case BN_P158:
 			return 78;
 		case SECG_P160:
