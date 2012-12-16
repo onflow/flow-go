@@ -29,14 +29,7 @@
  * @ingroup bn
  */
 
-#include <string.h>
-#include <ctype.h>
-
 #include "relic_core.h"
-#include "relic_bn.h"
-#include "relic_util.h"
-#include "relic_rand.h"
-#include "relic_error.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */

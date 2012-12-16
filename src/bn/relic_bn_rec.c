@@ -30,14 +30,6 @@
  */
 
 #include "relic_core.h"
-#include "relic_bn.h"
-#include "relic_bn_low.h"
-#include "relic_error.h"
-#include "relic_util.h"
-
-#ifdef WITH_EP
-#include "relic_ep.h"
-#endif
 
 /*============================================================================*/
 /* Private definitions                                                        */

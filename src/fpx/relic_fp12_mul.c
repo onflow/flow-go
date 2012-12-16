@@ -29,13 +29,8 @@
  * @ingroup fpx
  */
 
-#include <string.h>
-
 #include "relic_core.h"
-#include "relic_conf.h"
-#include "relic_pp.h"
 #include "relic_pp_low.h"
-#include "relic_util.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
