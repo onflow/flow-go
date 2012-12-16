@@ -44,16 +44,6 @@
 
 #include <string.h>
 
-/**
- * Size of the PRNG internal state in bytes.
- */
-#define STATE_SIZE	    20
-
-/**
- * Internal state of the PRNG.
- */
-static unsigned char state[64];
-
 #if SEED == DEV || SEED == UDEV
 
 #include <sys/stat.h>
@@ -83,9 +73,9 @@ static unsigned char state[64];
 /*============================================================================*/
 
 void rand_init() {
-	unsigned char buf[STATE_SIZE];
+	unsigned char buf[MD_LEN_SHONE];
 
-	memset(state, 0, sizeof(state));
+	memset(core_get()->rand, 0, RAND_SIZE);
 
 #if SEED == ZERO
 
@@ -101,12 +91,12 @@ void rand_init() {
 
 	l = 0;
 	do {
-		c = read(rand_fd, buf + l, STATE_SIZE - l);
+		c = read(rand_fd, buf + l, MD_LEN_SHONE - l);
 		l += c;
 		if (c == -1) {
 			THROW(ERR_NO_READ);
 		}
-	} while (l < STATE_SIZE);
+	} while (l < MD_LEN_SHONE);
 
 	if (rand_fd != -1) {
 		close(rand_fd);
@@ -116,12 +106,12 @@ void rand_init() {
 
 #if OPSYS == FREEBSD
 	srandom(1);
-	for (int i = 0; i < STATE_SIZE; i++) {
+	for (int i = 0; i < MD_LEN_SHONE; i++) {
 		buf[i] = (unsigned char)random();
 	}
 #else
 	srand(1);
-	for (int i = 0; i < STATE_SIZE; i++) {
+	for (int i = 0; i < MD_LEN_SHONE; i++) {
 		buf[i] = (unsigned char)rand();
 	}
 #endif
@@ -132,7 +122,7 @@ void rand_init() {
 	if (!CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL, 0)) {
 		THROW(ERR_NO_FILE);
 	}
-	if (hCryptProv && !CryptGenRandom(hCryptProv, STATE_SIZE, buf)) {
+	if (hCryptProv && !CryptGenRandom(hCryptProv, MD_LEN_SHONE, buf)) {
 		THROW(ERR_NO_READ);
 	}
 	if (hCryptProv && !CryptReleaseContext(hCryptProv, 0)) {
@@ -140,26 +130,27 @@ void rand_init() {
 	}
 #endif
 
-	rand_seed(buf, STATE_SIZE);
+	rand_seed(buf, MD_LEN_SHONE);
 }
 
 void rand_clean() {
-	memset(state, 0, sizeof(state));
+	memset(core_get()->rand, 0, sizeof(core_get()->rand));
 }
 
 void rand_seed(unsigned char *buf, int size) {
     int i;
+    ctx_t *ctx = core_get();
 
-    if (size < STATE_SIZE) {
+    if (size < MD_LEN_SHONE) {
     	THROW(ERR_NO_VALID);
     }
 
+    /* Zero the current state. */
+    memset(ctx->rand, 0, sizeof(ctx->rand));
+
     /* XKEY = SEED  */
-    for (i = 0; i < STATE_SIZE; i++) {
-        state[i] = buf[i];
-    }
-    for (i = STATE_SIZE; i < 64; i++) {
-    	state[i] = 0;
+    for (i = 0; i < MIN(size, MD_LEN_SHONE); i++) {
+        ctx->rand[i] = buf[i];
     }
 }
 
@@ -167,24 +158,24 @@ void rand_bytes(unsigned char *buf, int size) {
     unsigned char carry, c0, c1, r0, r1;
     int i, j;
     unsigned char hash[20];
+    ctx_t *ctx = core_get();
 
     j = 0;
     while (j < size) {
         /* x = G(t, XKEY) */
-        md_map_shone_init();
-        md_map_shone_update(state, 64);
-        md_map_shone_state(hash);
+        md_map_shone_mid(ctx->rand, 64, hash);
+
         /* XKEY = (XKEY + x + 1) mod 2^b */
         carry = 1;
-        for (i = 19; i >= 0; i--) {
-    		r0 = (unsigned char)(state[i] + hash[i]);
+        for (i = MD_LEN_SHONE - 1; i >= 0; i--) {
+    		r0 = (unsigned char)(ctx->rand[i] + hash[i]);
     		c0 = (unsigned char)(r0 < hash[i] ? 1 : 0);
     		r1 = (unsigned char)(r0 + carry);
     		c1 = (unsigned char)(r1 < r0 ? 1 : 0);
     		carry = (unsigned char)(c0 | c1);
-    		state[i] = r1;
+    		ctx->rand[i] = r1;
         }
-        for (i = 0; i < STATE_SIZE && j < size; i++) {
+        for (i = 0; i < MD_LEN_SHONE && j < size; i++) {
             buf[j] = hash[i];
             j++;
         }

@@ -51,30 +51,39 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
+/**
+ * Default library context.
+ */
 ctx_t first_ctx;
 
-ctx_t *core_ctx = &(first_ctx);
+/**
+ * Active library context.
+ */
+ctx_t *core_ctx = NULL;
+
+#ifdef MULTI
+#pragma omp threadprivate(first_ctx, core_ctx)
+#endif
 
 int core_init(void) {
+	if (core_ctx == NULL) {
+		core_ctx = &(first_ctx);
+	}
+
 #if defined(CHECK) || defined(TRACE)
 	core_ctx->trace = 0;
 #endif
 
 #ifdef CHECK
-	core_ctx->reason = (char **)malloc(ERR_MAX * sizeof(char *));
-	if (core_ctx->reason == NULL) {
-		return STS_ERR;
-	} else {
-		core_ctx->reason[ERR_NO_MEMORY] = MSG_NO_MEMORY;
-		core_ctx->reason[ERR_NO_PRECI] = MSG_NO_PRECI;
-		core_ctx->reason[ERR_NO_FILE] = MSG_NO_FILE;
-		core_ctx->reason[ERR_NO_READ] = MSG_NO_READ;
-		core_ctx->reason[ERR_NO_VALID] = MSG_NO_VALID;
-		core_ctx->reason[ERR_NO_BUFFER] = MSG_NO_BUFFER;
-		core_ctx->reason[ERR_NO_FIELD] = MSG_NO_FIELD;
-		core_ctx->reason[ERR_NO_CURVE] = MSG_NO_CURVE;
-		core_ctx->reason[ERR_NO_CONFIG] = MSG_NO_CONFIG;
-	}
+	core_ctx->reason[ERR_NO_MEMORY] = MSG_NO_MEMORY;
+	core_ctx->reason[ERR_NO_PRECI] = MSG_NO_PRECI;
+	core_ctx->reason[ERR_NO_FILE] = MSG_NO_FILE;
+	core_ctx->reason[ERR_NO_READ] = MSG_NO_READ;
+	core_ctx->reason[ERR_NO_VALID] = MSG_NO_VALID;
+	core_ctx->reason[ERR_NO_BUFFER] = MSG_NO_BUFFER;
+	core_ctx->reason[ERR_NO_FIELD] = MSG_NO_FIELD;
+	core_ctx->reason[ERR_NO_CURVE] = MSG_NO_CURVE;
+	core_ctx->reason[ERR_NO_CONFIG] = MSG_NO_CONFIG;
 	core_ctx->last = NULL;
 #endif /* CHECK */
 
@@ -146,10 +155,8 @@ int core_clean(void) {
 	pb_map_clean();
 #endif
 
-#ifdef CHECK
-	free(core_ctx->reason);
-#endif
 	arch_clean();
+	core_ctx = NULL;
 	return STS_OK;
 }
 

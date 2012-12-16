@@ -68,7 +68,7 @@ int main(void) {
 		dummy();
 		if (err_get_code() == STS_ERR) {
 			err_get_msg(&e, &msg);
-			TEST_ASSERT(msg == core_ctx->reason[ERR_NO_MEMORY], end);
+			TEST_ASSERT(msg == core_get()->reason[ERR_NO_MEMORY], end);
 			TEST_ASSERT(err_get_code() != STS_ERR, end);
 		}
 	} TEST_END;

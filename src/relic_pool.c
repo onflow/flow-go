@@ -48,33 +48,36 @@
 
 dig_t *pool_get(void) {
 	int i, r;
+	ctx_t *ctx = core_get();
 
-	if (core_ctx->next == POOL_EMPTY)
+	if (ctx->next == POOL_EMPTY)
 		return NULL;
 
 	/** Allocate a free element. */
-	r = core_ctx->next;
-	core_ctx->pool[r].state = POOL_USED;
+	r = ctx->next;
+	ctx->pool[r].state = POOL_USED;
 
 	/* Search for a new free element. */
 	for (i = (r + 1) % POOL_SIZE; i != r; i = (i + 1) % POOL_SIZE) {
-		if (core_ctx->pool[i].state == POOL_FREE) {
+		if (ctx->pool[i].state == POOL_FREE) {
 			break;
 		}
 	}
 	if (i == r) {
-		core_ctx->next = POOL_EMPTY;
+		ctx->next = POOL_EMPTY;
 	} else {
-		core_ctx->next = i;
+		ctx->next = i;
 	}
-	core_ctx->pool[r].elem[DV_DIGS] = r;
-	return (core_ctx->pool[r].elem);
+	ctx->pool[r].elem[DV_DIGS] = r;
+	return (ctx->pool[r].elem);
 }
 
 void pool_put(dig_t *a) {
 	int pos = a[DV_DIGS];
-	core_ctx->pool[pos].state = POOL_FREE;
-	core_ctx->next = pos;
+	ctx_t *ctx = core_get();
+
+	ctx->pool[pos].state = POOL_FREE;
+	ctx->next = pos;
 }
 
 #endif /* ALLOC == STATIC */

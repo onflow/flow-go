@@ -146,10 +146,11 @@ typedef struct _state_t {
  */
 #define ERR_TRY															\
 	{																	\
-		state_t *_last, _this; 											\
-		_last = core_ctx->last; 										\
+		state_t *_last, _this;											\
+		ctx_t *_ctx = core_get();										\
+		_last = _ctx->last; 											\
 		_this.block = 1;												\
-		core_ctx->last = &_this; 										\
+		_ctx->last = &_this; 											\
 		for (int _r = 0; ; _r = 1) 										\
 			if (_r) { 													\
 				if (setjmp(_this.addr) == 0) { 							\
@@ -167,17 +168,17 @@ typedef struct _state_t {
  */
 #define ERR_CATCH(ADDR)													\
 					else { } 											\
-					core_ctx->caught = 0; 								\
+					_ctx->caught = 0; 									\
 				} else {												\
-					core_ctx->caught = 1; 								\
+					_ctx->caught = 1; 									\
 				}														\
-				core_ctx->last = _last;									\
+				_ctx->last = _last;										\
 				break; 													\
 			} else														\
 				_this.error = ADDR; 									\
 	} 																	\
 	for (int _r = 0; _r < 2; _r++) 										\
-		if (_r == 1 && core_ctx->caught) 								\
+		if (_r == 1 && core_get()->caught) 								\
 
 /**
  * Implements the THROW clause of the error-handling routines.
@@ -198,24 +199,25 @@ typedef struct _state_t {
  */
 #define ERR_THROW(E)													\
 	{																	\
-		core_ctx->code = STS_ERR;										\
-		if (core_ctx->last != NULL && core_ctx->last->block == 0) {		\
+		ctx_t *_ctx = core_get();										\
+		_ctx->code = STS_ERR;											\
+		if (_ctx->last != NULL && _ctx->last->block == 0) {				\
 			exit(E);													\
 		}																\
-		if (core_ctx->last == NULL) {									\
+		if (_ctx->last == NULL) {										\
 			static state_t _error;										\
 			static err_t _err;											\
-			core_ctx->last = &_error;									\
+			_ctx->last = &_error;										\
 			_error.error = &_err;										\
 			_error.block = 0;											\
 			_err = E;													\
 			ERR_PRINT(E);												\
 		} else {														\
-			for (; ; longjmp(core_ctx->last->addr, 1)) {				\
+			for (; ; longjmp(_ctx->last->addr, 1)) {					\
 				ERR_PRINT(E);											\
-				if (core_ctx->last->error) {							\
+				if (_ctx->last->error) {								\
 					if (E != ERR_CAUGHT) {								\
-						*(core_ctx->last->error) = E;					\
+						*(_ctx->last->error) = E;						\
 					}													\
 				}														\
 			}															\
@@ -280,10 +282,10 @@ typedef struct _state_t {
  * Stub for the THROW clause.
  */
 #ifdef QUIET
-#define THROW(E)			core_ctx->code = STS_ERR;
+#define THROW(E)			core_get()->code = STS_ERR;
 #else
 #define THROW(E)															\
-	core_ctx->code = STS_ERR; 												\
+	core_get()->code = STS_ERR; 											\
 	util_print("FATAL ERROR in %s:%d\n", THIS_FILE, __LINE__);				\
 
 #endif

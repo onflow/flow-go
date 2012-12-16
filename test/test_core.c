@@ -43,7 +43,7 @@ int main(void) {
 	util_banner("Tests for the CORE module:\n", 0);
 
 	TEST_ONCE("the library context is consistent") {
-		TEST_ASSERT(core_get() == core_ctx, end);
+		TEST_ASSERT(core_get() != NULL, end);
 	} TEST_END;
 
 	TEST_ONCE("switching the library context is correct") {
@@ -66,14 +66,32 @@ int main(void) {
 		core_set(old_ctx);
 	} TEST_END;
 
-	util_banner("All tests have passed.\n", 0);
-
 	code = STS_OK;
-  end:
+
+#ifdef MULTI
+	TEST_ONCE("library context is thread-safe") {
+	omp_set_num_threads(CORES);
+#pragma omp parallel shared(code)
+		{
+			if (omp_get_thread_num() == 0) {
+				THROW(ERR_NO_MEMORY);
+				if (err_get_code() != STS_ERR) {
+					code = STS_ERR;
+				}
+			} else {
+				core_init();
+				if (err_get_code() != STS_OK) {
+					code = STS_ERR;
+				}
+				core_clean();
+			}
+		}
+		TEST_ASSERT(code == STS_OK, end);
+	} TEST_END;
+#endif
+
+	util_banner("All tests have passed.\n", 0);
+	  end:
 	core_clean();
-	if (code == STS_ERR)
-		return 0;
-	else {
-		return 1;
-	}
+	return code;
 }

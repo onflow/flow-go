@@ -38,6 +38,7 @@
 
 #include "relic_error.h"
 #include "relic_conf.h"
+#include "relic_rand.h"
 #include "relic_pool.h"
 
 #ifdef MULTI
@@ -126,7 +127,7 @@ typedef struct _ctx_t {
 	/** The state of the last error caught. */
 	state_t *last;
 	/** The error message respective to the last error. */
-	char **reason;
+	char *reason[ERR_MAX];
 	/** A flag to indicate if the last error was already caught. */
 	int caught;
 #endif /* CHECK */
@@ -140,12 +141,9 @@ typedef struct _ctx_t {
 	/** The index of the next free digit vector in the pool. */
 	int next;
 #endif
+	/** Internal state of the PRNG. */
+	unsigned char rand[RAND_SIZE];
 } ctx_t;
-
-/**
- * The active library context.
- */
-extern ctx_t *core_ctx;
 
 /*============================================================================*/
 /* Function prototypes                                                        */
