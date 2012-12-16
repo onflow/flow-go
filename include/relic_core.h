@@ -38,6 +38,7 @@
 
 #include "relic_error.h"
 #include "relic_conf.h"
+#include "relic_pool.h"
 
 #ifdef MULTI
 #include <omp.h>
@@ -133,6 +134,12 @@ typedef struct _ctx_t {
 	/** The current trace size. */
 	int trace;
 #endif /* CHECK || TRACE */
+#if ALLOC == STATIC
+	/** The static pool of digit vectors. */
+	pool_t pool[POOL_SIZE];
+	/** The index of the next free digit vector in the pool. */
+	int next;
+#endif
 } ctx_t;
 
 /**

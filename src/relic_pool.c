@@ -23,8 +23,8 @@
 /**
  * @file
  *
- * Implementation of the memory-management routines for the finite field
- * arithmetic modules.
+ * Implementation of the memory-management routines for manipulating the
+ * global pool of digit vectors used by the static allocation mode.
  *
  * @version $Id$
  * @ingroup relic
@@ -41,70 +41,40 @@
 #include "relic_pool.h"
 
 /*============================================================================*/
-/* Private definitions                                                        */
+/* Public definitions                                                         */
 /*============================================================================*/
 
 #if ALLOC == STATIC
 
-/**
- * Type that represents a element of a pool of digit vectors.
- */
-typedef struct {
-	/** Indicates if this pool element is being used. */
-	int state;
-	/** The pool element. The extra digit stores the pool position. */
-	align dig_t elem[DV_DIGS + 1];
-} pool_t;
-
-/** Indicates that the pool element is already used. */
-#define POOL_USED	(1)
-/** Indicates that the pool element is free. */
-#define POOL_FREE	(0)
-/** Indicates that the pool is empty. */
-#define POOL_EMPTY (-1)
-
-/**
- * The static pool of multiple precision integers.
- */
-static pool_t pool[POOL_SIZE];
-
-/**
- * The index of the next multiple precision integer not being used in the pool.
- */
-static int next = 0;
-
-/*============================================================================*/
-/* Public definitions                                                         */
-/*============================================================================*/
-
 dig_t *pool_get(void) {
 	int i, r;
 
-	if (next == POOL_EMPTY)
+	if (core_ctx->next == POOL_EMPTY)
 		return NULL;
 
 	/** Allocate a free element. */
-	r = next;
-	pool[r].state = POOL_USED;
+	r = core_ctx->next;
+	core_ctx->pool[r].state = POOL_USED;
 
 	/* Search for a new free element. */
-	for (i = (next + 1) % POOL_SIZE; i != next; i = (i + 1) % POOL_SIZE) {
-		if (pool[i].state == POOL_FREE) {
+	for (i = (r + 1) % POOL_SIZE; i != r; i = (i + 1) % POOL_SIZE) {
+		if (core_ctx->pool[i].state == POOL_FREE) {
 			break;
 		}
 	}
-	if (i == next) {
-		next = POOL_EMPTY;
+	if (i == r) {
+		core_ctx->next = POOL_EMPTY;
 	} else {
-		next = i;
+		core_ctx->next = i;
 	}
-	pool[r].elem[DV_DIGS] = r;
-	return (pool[r].elem);
+	core_ctx->pool[r].elem[DV_DIGS] = r;
+	return (core_ctx->pool[r].elem);
 }
 
 void pool_put(dig_t *a) {
 	int pos = a[DV_DIGS];
-	pool[pos].state = POOL_FREE;
-	next = pos;
+	core_ctx->pool[pos].state = POOL_FREE;
+	core_ctx->next = pos;
 }
+
 #endif /* ALLOC == STATIC */

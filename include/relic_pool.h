@@ -37,6 +37,7 @@
 #define RELIC_POOL_H
 
 #include "relic_conf.h"
+#include "relic_dv.h"
 #include "relic_util.h"
 
 /*============================================================================*/
@@ -52,7 +53,30 @@
 #define POOL_SIZE	(500 * MAX(TESTS, BENCH * BENCH))
 #endif
 
+/** Indicates that the pool element is already used. */
+#define POOL_USED	(1)
+
+/** Indicates that the pool element is free. */
+#define POOL_FREE	(0)
+
+/** Indicates that the pool is empty. */
+#define POOL_EMPTY (-1)
+
 #endif
+
+/*============================================================================*/
+/* Type definitions                                                           */
+/*============================================================================*/
+
+/**
+ * Type that represents a element of a pool of digit vectors.
+ */
+typedef struct {
+	/** Indicates if this pool element is being used. */
+	int state;
+	/** The pool element. The extra digit stores the pool position. */
+	align dig_t elem[DV_DIGS + 1];
+} pool_t;
 
 /*============================================================================*/
 /* Function prototypes                                                        */
