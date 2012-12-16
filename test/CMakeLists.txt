@@ -14,7 +14,7 @@ macro(ADD_MODULE MODULE)
 endmacro(ADD_MODULE)
 
 if (CHECK)
-	ADD_MODULE(err)
+	ADD_MODULE(error)
 endif(CHECK)
 
 if (WITH_BN)
