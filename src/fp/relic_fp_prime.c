@@ -29,98 +29,49 @@
  * @ingroup fp
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "relic_core.h"
-#include "relic_bn.h"
 #include "relic_bn_low.h"
-#include "relic_fp.h"
 #include "relic_fp_low.h"
-#include "relic_error.h"
-#include "relic_pp.h"
-
-/*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * Prime modulus.
- */
-static bn_st prime;
-
-/**
- * Auxiliar value derived from the prime used in modular reduction.
- */
-static dig_t u;
-
-/**
- * Auxiliar value computed as R^2 mod m used to convert small integers
- * to Montgomery form.
- */
-static bn_st conv, one;
-
-/**
- * Prime modulus modulo 8.
- */
-static dig_t prime_mod8;
-
-/**
- * Quadratic non-residue.
- */
-static int prime_qnr;
-
-/**
- * Cubic non-residue.
- */
-static int prime_cnr;
-
-/**
- * Maximum number of powers of 2 used to describe special form moduli.
- */
-#define MAX_EXPS		10
-
-/**
- * Non-zero bits of special form prime.
- */
-static int spars[MAX_EXPS + 1] = { 0 };
-
-/**
- * Number of bits of special form prime.
- */
-static int spars_len = 0;
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 void fp_prime_init() {
-	bn_init(&prime, FP_DIGS);
-	bn_init(&conv, FP_DIGS);
-	bn_init(&one, FP_DIGS);
+	ctx_t *ctx = core_get();
+	ctx->prime_id = ctx->len = 0;
+	memset(ctx->sps, 0, sizeof(ctx->sps));
+	memset(ctx->var, 0, sizeof(ctx->var));
+	bn_init(&(ctx->prime), FP_DIGS);
+	bn_init(&(ctx->conv), FP_DIGS);
+	bn_init(&(ctx->one), FP_DIGS);
 }
 
 void fp_prime_clean() {
-	bn_clean(&one);
-	bn_clean(&conv);
-	bn_clean(&prime);
+	ctx_t *ctx = core_get();
+	ctx->prime_id = ctx->len = 0;
+	memset(ctx->sps, 0, sizeof(ctx->sps));
+	memset(ctx->var, 0, sizeof(ctx->var));
+	bn_clean(&(ctx->one));
+	bn_clean(&(ctx->conv));
+	bn_clean(&(ctx->prime));
 }
 
 dig_t *fp_prime_get(void) {
-	return prime.dp;
+	return core_get()->prime.dp;
 }
 
 dig_t *fp_prime_get_rdc(void) {
-	return &u;
+	return &(core_get()->u);
 }
 
 int *fp_prime_get_sps(int *len) {
-	if (spars_len > 0 && spars_len < MAX_EXPS ) {
+	ctx_t *ctx = core_get();
+	if (ctx->len > 0 && ctx->len < MAX_TERMS ) {
 		if (len != NULL) {
-			*len = spars_len;
+			*len = ctx->len;
 		}
-		return spars;
+		return ctx->sps;
 	} else {
 		if (len != NULL) {
 			*len = 0;
@@ -130,24 +81,25 @@ int *fp_prime_get_sps(int *len) {
 }
 
 dig_t *fp_prime_get_conv(void) {
-	return conv.dp;
+	return core_get()->conv.dp;
 }
 
 dig_t fp_prime_get_mod8() {
-	return prime_mod8;
+	return core_get()->mod8;
 }
 
 int fp_prime_get_qnr() {
-	return prime_qnr;
+	return core_get()->qnr;
 }
 
 int fp_prime_get_cnr() {
-	return prime_cnr;
+	return core_get()->cnr;
 }
 
 void fp_prime_set(bn_t p) {
 	dv_t s, q;
 	bn_t t;
+	ctx_t *ctx = core_get();
 
 	if (p->used != FP_DIGS) {
 		THROW(ERR_NO_VALID);
@@ -162,45 +114,45 @@ void fp_prime_set(bn_t p) {
 		bn_new(t);
 		dv_new(q);
 
-		bn_copy(&prime, p);
+		bn_copy(&(ctx->prime), p);
 
-		bn_mod_dig(&prime_mod8, &prime, 8);
+		bn_mod_dig(&(ctx->mod8), &(ctx->prime), 8);
 
-		switch (prime_mod8) {
+		switch (ctx->mod8) {
 			case 3:
 			case 7:
-				prime_qnr = -1;
+				ctx->qnr = -1;
 				/* The current code for extensions of Fp^3 relies on prime_qnr
 				 * being also a cubic non-residue. */
-				prime_cnr = 0;
+				ctx->cnr = 0;
 				break;
 			case 1:
 			case 5:
-				prime_qnr = prime_cnr = -2;
+				ctx->qnr = ctx->cnr = -2;
 				break;
 			default:
-				prime_qnr = prime_cnr = 0;
+				ctx->qnr = ctx->cnr = 0;
 				THROW(ERR_NO_VALID);
 				break;
 		}
 	#ifdef FP_QNRES
-		if (prime_mod8 != 3) {
+		if (ctx->mod8 != 3) {
 			THROW(ERR_NO_VALID);
 		}
 	#endif
 
-		bn_mod_pre_monty(t, &prime);
-		u = t->dp[0];
+		bn_mod_pre_monty(t, &(ctx->prime));
+		ctx->u = t->dp[0];
 		dv_zero(s, 2 * FP_DIGS);
 		s[2 * FP_DIGS] = 1;
 		dv_zero(q, 2 * FP_DIGS + 1);
-		dv_copy(q, prime.dp, FP_DIGS);
-		bn_divn_low(t->dp, conv.dp, s, 2 * FP_DIGS + 1, q, FP_DIGS);
-		conv.used = FP_DIGS;
-		bn_trim(&conv);
-		bn_set_dig(&one, 1);
-		bn_lsh(&one, &one, prime.used * BN_DIGIT);
-		bn_mod(&one, &one, &prime);
+		dv_copy(q, ctx->prime.dp, FP_DIGS);
+		bn_divn_low(t->dp, ctx->conv.dp, s, 2 * FP_DIGS + 1, q, FP_DIGS);
+		ctx->conv.used = FP_DIGS;
+		bn_trim(&(ctx->conv));
+		bn_set_dig(&(ctx->one), 1);
+		bn_lsh(&(ctx->one), &(ctx->one), ctx->prime.used * BN_DIGIT);
+		bn_mod(&(ctx->one), &(ctx->one), &(ctx->prime));
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -212,8 +164,7 @@ void fp_prime_set(bn_t p) {
 
 void fp_prime_set_dense(bn_t p) {
 	fp_prime_set(p);
-	spars_len = 0;
-	spars[0] = 0;
+	core_get()->len = 0;
 
 #if FP_RDC == QUICK
 	THROW(ERR_NO_CONFIG);
@@ -222,6 +173,7 @@ void fp_prime_set_dense(bn_t p) {
 
 void fp_prime_set_pmers(int *f, int len) {
 	bn_t p, t;
+	ctx_t *ctx = core_get();
 
 	bn_null(p);
 	bn_null(t);
@@ -230,7 +182,7 @@ void fp_prime_set_pmers(int *f, int len) {
 		bn_new(p);
 		bn_new(t);
 
-		if (len >= MAX_EXPS) {
+		if (len >= MAX_TERMS) {
 			THROW(ERR_NO_VALID);
 		}
 
@@ -256,10 +208,10 @@ void fp_prime_set_pmers(int *f, int len) {
 
 		fp_prime_set(p);
 		for (int i = 0; i < len; i++) {
-			spars[i] = f[i];
+			ctx->sps[i] = f[i];
 		}
-		spars[len] = 0;
-		spars_len = len;
+		ctx->sps[len] = 0;
+		ctx->len = len;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -280,7 +232,7 @@ void fp_prime_conv(fp_t c, bn_t a) {
 
 #if FP_RDC == MONTY
 		bn_lsh(t, a, FP_DIGS * FP_DIGIT);
-		bn_mod(t, t, &prime);
+		bn_mod(t, t, &(core_get()->prime));
 		dv_copy(c, t->dp, FP_DIGS);
 #else
 		if (a->used > FP_DIGS) {
@@ -311,6 +263,7 @@ void fp_prime_conv(fp_t c, bn_t a) {
 
 void fp_prime_conv_dig(fp_t c, dig_t a) {
 	dv_t t;
+	ctx_t *ctx = core_get();
 
 	bn_null(t);
 
@@ -320,10 +273,10 @@ void fp_prime_conv_dig(fp_t c, dig_t a) {
 #if FP_RDC == MONTY
 		if (a != 1) {
 			dv_zero(t, 2 * FP_DIGS + 1);
-			t[FP_DIGS] = fp_mul1_low(t, conv.dp, a);
+			t[FP_DIGS] = fp_mul1_low(t, ctx->conv.dp, a);
 			fp_rdc(c, t);
 		} else {
-			dv_copy(c, one.dp, FP_DIGS);
+			dv_copy(c, ctx->one.dp, FP_DIGS);
 		}
 #else
 		fp_zero(c);

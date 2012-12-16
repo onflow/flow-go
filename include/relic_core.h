@@ -36,7 +36,13 @@
 #ifndef RELIC_CORE_H
 #define RELIC_CORE_H
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "relic_error.h"
+#include "relic_bn.h"
+#include "relic_ep.h"
 #include "relic_conf.h"
 #include "relic_rand.h"
 #include "relic_pool.h"
@@ -113,6 +119,11 @@
  */
 #define OPT_NONE		5
 
+/**
+ * Maximum number of terms to describe a sparse object.
+ */
+#define MAX_TERMS		16
+
 /*============================================================================*/
 /* Type definitions                                                           */
 /*============================================================================*/
@@ -123,24 +134,53 @@
 typedef struct _ctx_t {
 	/** The value returned by the last call, can be STS_OK or STS_ERR. */
 	int code;
+
 #ifdef CHECK
 	/** The state of the last error caught. */
-	state_t *last;
+	sts_t *last;
 	/** The error message respective to the last error. */
 	char *reason[ERR_MAX];
 	/** A flag to indicate if the last error was already caught. */
 	int caught;
 #endif /* CHECK */
+
 #if defined(CHECK) || defined(TRACE)
 	/** The current trace size. */
 	int trace;
 #endif /* CHECK || TRACE */
+
 #if ALLOC == STATIC
 	/** The static pool of digit vectors. */
 	pool_t pool[POOL_SIZE];
 	/** The index of the next free digit vector in the pool. */
 	int next;
+#endif /* ALLOC == STATIC */
+
+#ifdef WITH_FP
+	/** Currently configured prime field identifier. */
+	int prime_id;
+	/** Currently configured prime modulus. */
+	bn_st prime;
+	/** Prime modulus modulo 8. */
+	dig_t mod8;
+	/** Value derived from the prime used for modular reduction. */
+	dig_t u;
+	/** Value (R^2 mod p) for converting small integers to Montgomery form. */
+	bn_st conv;
+	/** Value of constant one in Montgomery form. */
+	bn_st one;
+	/** Quadratic non-residue. */
+	int qnr;
+	/** Cubic non-residue. */
+	int cnr;
+	/** Sparse representation of prime modulus. */
+	int sps[MAX_TERMS + 1];
+	/** Length of sparse prime representation. */
+	int len;
+	/** Sparse representation of parameter used to generate prime. */
+	int var[MAX_TERMS + 1];
 #endif
+
 	/** Internal state of the PRNG. */
 	unsigned char rand[RAND_SIZE];
 } ctx_t;

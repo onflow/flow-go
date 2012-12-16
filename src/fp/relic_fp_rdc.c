@@ -29,16 +29,9 @@
  * @ingroup fp
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "relic_core.h"
 #include "relic_bn_low.h"
-#include "relic_dv.h"
-#include "relic_fp.h"
 #include "relic_fp_low.h"
-#include "relic_error.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */

@@ -57,29 +57,27 @@ enum errors {
 	/** Occurs when memory-allocating functions fail. */
 	ERR_NO_MEMORY = 1,
 	/** Occcurs when the library precision is not sufficient. */
-	ERR_NO_PRECI = 2,
+	ERR_NO_PRECI,
 	/** Occurs when a file is not found. */
-	ERR_NO_FILE = 3,
+	ERR_NO_FILE,
 	/** Occurs when the specified number of bytes cannot be read from source. */
-	ERR_NO_READ = 4,
+	ERR_NO_READ,
 	/** Occurs when an invalid value is passed as input. */
-	ERR_NO_VALID = 5,
+	ERR_NO_VALID,
 	/** Occurs when a buffer capacity is insufficient. */
-	ERR_NO_BUFFER = 6,
+	ERR_NO_BUFFER,
 	/** Occurs when there is not a supported field in the security level. */
-	ERR_NO_FIELD = 7,
+	ERR_NO_FIELD,
 	/** Occurs when there is not a supported curve in the security level. */
-	ERR_NO_CURVE = 8,
+	ERR_NO_CURVE,
 	/** Occurs when the library configuration is incorrect. */
-	ERR_NO_CONFIG = 9,
+	ERR_NO_CONFIG,
 	/** Constant to indicate the number of errors. */
-	ERR_LAST = 10
+	ERR_LAST
 };
 
 /** Constant to indicate the number of possible errors. */
 #define ERR_MAX			(ERR_LAST - ERR_FIRST + 1)
-/** Maximum size of an error message. */
-#define ERR_LENGTH		256
 
 /** Error message respective to ERR_NO_MEMORY. */
 #define MSG_NO_MEMORY 		"not enough memory"
@@ -117,17 +115,17 @@ enum errors {
 typedef int err_t;
 
 /**
- * Type that defines an error state, including the error and the program
+ * Type that describes an error status, including the error code and the program
  * location where the error occurred.
  */
-typedef struct _state_t {
+typedef struct _sts_t {
 	/** Error occurred. */
 	err_t *error;
 	/** Pointer to the program location where the error occurred. */
 	jmp_buf addr;
 	/** Flag to tell if there is a surrounding try-catch block. */
 	int block;
-} state_t;
+} sts_t;
 
 /*============================================================================*/
 /* Macro definitions                                                          */
@@ -146,7 +144,7 @@ typedef struct _state_t {
  */
 #define ERR_TRY															\
 	{																	\
-		state_t *_last, _this;											\
+		sts_t *_last, _this;											\
 		ctx_t *_ctx = core_get();										\
 		_last = _ctx->last; 											\
 		_this.block = 1;												\
@@ -205,7 +203,7 @@ typedef struct _state_t {
 			exit(E);													\
 		}																\
 		if (_ctx->last == NULL) {										\
-			static state_t _error;										\
+			static sts_t _error;										\
 			static err_t _err;											\
 			_ctx->last = &_error;										\
 			_error.error = &_err;										\

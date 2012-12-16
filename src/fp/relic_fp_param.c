@@ -29,48 +29,15 @@
  * @ingroup fp
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "relic_core.h"
-#include "relic_conf.h"
-#include "relic_dv.h"
-#include "relic_fp.h"
 #include "relic_fpx.h"
-#include "relic_fp_low.h"
-#include "relic_error.h"
-
-/*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * Current configured prime field identifier.
- */
-static int param_id;
-
-/**
- * Maximum number of powers of 2 used to describe specia form moduli.
- */
-#define MAX_EXPS		10
-
-/**
- * Non-zero bits of special form prime.
- */
-static int spars[MAX_EXPS + 1] = { 0 };
-
-/**
- * Number of bits of special form parameter.
- */
-static int spars_len = 0;
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 int fp_param_get(void) {
-	return param_id;
+	return core_get()->prime_id;
 }
 
 void fp_param_get_var(bn_t x) {
@@ -81,7 +48,7 @@ void fp_param_get_var(bn_t x) {
 	TRY {
 		bn_new(a);
 
-		switch (param_id) {
+		switch (fp_param_get()) {
 			case BN_158:
 				/* x = 4000000031. */
 				bn_set_2b(x, 38);
@@ -151,7 +118,8 @@ void fp_param_get_var(bn_t x) {
 }
 
 int *fp_param_get_sps(int *len) {
-	int *ptr = NULL;
+	ctx_t *ctx = core_get();
+	int *ptr = NULL, *var = ctx->var;
 	bn_t a;
 
 	bn_null(a);
@@ -159,9 +127,9 @@ int *fp_param_get_sps(int *len) {
 	TRY {
 		bn_new(a);
 
-		spars_len = 0;
+		*len = 0;
 
-		switch (param_id) {
+		switch (fp_param_get()) {
 			case BN_158:
 			case BN_254:
 			case BN_256:
@@ -169,48 +137,42 @@ int *fp_param_get_sps(int *len) {
 				if (bn_sign(a) == BN_NEG) {
 					bn_neg(a, a);
 				}
-				spars_len = bn_ham(a);
+				*len = bn_ham(a);
 				for (int i = 0, j = 0; j < bn_bits(a); j++) {
 					if (bn_test_bit(a, j)) {
-						spars[i++] = j;
+						var[i++] = j;
 					}
 				}
 				break;
 			case KSS_508:
-				spars_len = 4;
-				spars[0] = -12;
-				spars[1] = -46;
-				spars[2] = 51;
-				spars[3] = 64;
+				var[0] = -12;
+				var[1] = -46;
+				var[2] = 51;
+				var[3] = 64;
+				*len = 4;
 				break;
 			case BN_638:
-				spars_len = 4;
-				spars[0] = 0;
-				spars[1] = -68;
-				spars[2] = -128;
-				spars[3] = 158;
+				var[0] = 0;
+				var[1] = -68;
+				var[2] = -128;
+				var[3] = 158;
+				*len = 4;
 				break;
 			case BLS12_638:
-				spars_len = 4;
-				spars[0] = -5;
-				spars[1] = -93;
-				spars[2] = -105;
-				spars[3] = 107;
+				var[0] = -5;
+				var[1] = -93;
+				var[2] = -105;
+				var[3] = 107;
+				*len = 4;
 				break;
 			default:
 				THROW(ERR_NO_VALID);
 				break;
 		}
 
-		if (spars_len > 0 && spars_len < MAX_EXPS ) {
-			if (len != NULL) {
-				*len = spars_len;
-			}
-			ptr = spars;
+		if (*len > 0 && *len < MAX_TERMS ) {
+			ptr = var;
 		} else {
-			if (len != NULL) {
-				*len = 0;
-			}
 			ptr = NULL;
 		}
 	}
@@ -225,12 +187,11 @@ int *fp_param_get_sps(int *len) {
 }
 
 void fp_param_get_map(int *s, int *len) {
-
 	for (int i = 0; i < FP_BITS; i++) {
 		s[i] = 0;
 	}
 
-	switch (param_id) {
+	switch (fp_param_get()) {
 		case BN_158:
 			s[3] = s[5] = s[8] = s[39] = s[40] = 1;
 			*len = 41;
@@ -249,10 +210,8 @@ void fp_param_get_map(int *s, int *len) {
 			*len = 161;
 			break;
 		case KSS_508:
-			s[64] = 1;
-			s[51] = 1;
-			s[46] = -1;
-			s[12] = -1;
+			s[64] = s[51] = 1;
+			s[12] = s[46] = -1;
 			*len = 65;
 			break;
 		case BLS12_638:
@@ -269,7 +228,6 @@ void fp_param_get_map(int *s, int *len) {
 void fp_param_set(int param) {
 	bn_t t0, t1, t2, p;
 	int f[10] = { 0 };
-	int generated = 0;
 
 	/* Suppress possible unused parameter warning. */
 	(void) f;
@@ -280,7 +238,7 @@ void fp_param_set(int param) {
 		bn_new(t2);
 		bn_new(p);
 
-		param_id = param;
+		core_get()->prime_id = param;
 
 		switch (param) {
 #if FP_PRIME == 158
@@ -507,13 +465,9 @@ void fp_param_set(int param) {
 			default:
 				bn_gen_prime(p, FP_BITS);
 				fp_prime_set_dense(p);
-				generated = 1;
+				core_get()->prime_id = 0;
 				break;
 #endif
-		}
-
-		if (generated) {
-			param_id = 0;
 		}
 	}
 	CATCH_ANY {
@@ -618,6 +572,7 @@ int fp_param_set_any_tower() {
 		fp_param_set_any_dense();
 	} while (fp_prime_get_mod8() == 1 || fp_prime_get_mod8() == 5);
 #endif
+
 #ifdef WITH_PP
 	if (fp_prime_get_qnr()) {
 		fp2_const_calc();
@@ -626,6 +581,7 @@ int fp_param_set_any_tower() {
 		fp3_const_calc();
 	}
 #endif
+
 	return STS_OK;
 }
 

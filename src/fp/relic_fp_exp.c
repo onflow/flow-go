@@ -29,11 +29,7 @@
  * @ingroup fp
  */
 
-#include <string.h>
-
-#include "relic_conf.h"
 #include "relic_core.h"
-#include "relic_fp.h"
 #include "relic_util.h"
 
 /*============================================================================*/
