@@ -109,32 +109,13 @@ enum {
 void md_map_shone(unsigned char *hash, unsigned char *msg, int len);
 
 /**
- * Initializes the hash function context.
- */
-void md_map_shone_init(void);
-
-/**
- * Updates the hash function context with more data.
+ * Returns the internal state of the hash function.
  *
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
- */
-void md_map_shone_update(unsigned char *msg, int len);
-
-/**
- * Finalizes the hash function computation.
- *
- * @param[out] hash				- the digest.
- */
-void md_map_shone_final(unsigned char *hash);
-
-/**
- * Returns the internal state of the hash function.
- *
  * @param[out] state			- the internal state.
  */
-void md_map_shone_state(unsigned char *state);
-
+void md_map_shone_mid(unsigned char *msg, int len, unsigned char *state);
 /**
  * Computes the SHA-224 hash function.
  *

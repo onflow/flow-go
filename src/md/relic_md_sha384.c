@@ -36,19 +36,12 @@
 #include "sha.h"
 
 /*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * SHA-284 internal context.
- */
-static SHA384Context ctx;
-
-/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 void md_map_sh384(unsigned char *hash, unsigned char *msg, int len) {
+	SHA384Context ctx;
+
 	if (SHA384Reset(&ctx) != shaSuccess) {
 		THROW(ERR_NO_VALID);
 	}

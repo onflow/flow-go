@@ -36,19 +36,12 @@
 #include "sha.h"
 
 /*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * SHA-224 internal context.
- */
-static SHA224Context ctx;
-
-/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 void md_map_sh224(unsigned char *hash, unsigned char *msg, int len) {
+	SHA224Context ctx;
+
 	if (SHA224Reset(&ctx) != shaSuccess) {
 		THROW(ERR_NO_VALID);
 	}

@@ -36,19 +36,12 @@
 #include "sha.h"
 
 /*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * SHA-256 internal context.
- */
-static SHA256Context ctx;
-
-/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 void md_map_sh256(unsigned char *hash, unsigned char *msg, int len) {
+	SHA256Context ctx;
+
 	if (SHA256Reset(&ctx) != shaSuccess) {
 		THROW(ERR_NO_VALID);
 	}

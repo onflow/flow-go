@@ -39,19 +39,12 @@
 #include "sha.h"
 
 /*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * SHA-1 internal context.
- */
-static SHA1Context ctx;
-
-/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 void md_map_shone(unsigned char *hash, unsigned char *msg, int len) {
+	SHA1Context ctx;
+
 	if (SHA1Reset(&ctx) != shaSuccess) {
 		THROW(ERR_NO_VALID);
 	}
@@ -63,25 +56,17 @@ void md_map_shone(unsigned char *hash, unsigned char *msg, int len) {
 	}
 }
 
-void md_map_shone_init(void) {
+void md_map_shone_mid(unsigned char *msg, int len, unsigned char *state) {
+	SHA1Context ctx;
+
 	if (SHA1Reset(&ctx) != shaSuccess) {
 		THROW(ERR_NO_VALID);
 	}
-}
 
-void md_map_shone_update(unsigned char *msg, int len) {
 	if (SHA1Input(&ctx, msg, len) != shaSuccess) {
 		THROW(ERR_NO_VALID);
 	}
-}
 
-void md_map_shone_final(unsigned char *hash) {
-	if (SHA1Result(&ctx, hash) != shaSuccess) {
-		THROW(ERR_NO_VALID);
-	}
-}
-
-void md_map_shone_state(unsigned char *state) {
 	uint32_t t[5];
 	int i;
 

@@ -36,19 +36,12 @@
 #include "sha.h"
 
 /*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * SHA-512 internal context.
- */
-static SHA512Context ctx;
-
-/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 void md_map_sh512(unsigned char *hash, unsigned char *msg, int len) {
+	SHA512Context ctx;
+
 	if (SHA512Reset(&ctx) != shaSuccess) {
 		THROW(ERR_NO_VALID);
 	}
