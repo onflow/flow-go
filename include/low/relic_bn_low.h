@@ -173,7 +173,7 @@ dig_t bn_rsh1_low(dig_t *c, dig_t *a, int size);
  * @param[in] bits			- the shift amount.
  * @return the carry of the last digit shift.
  */
-extern dig_t bn_rshb_low(dig_t *c, dig_t *a, int size, int bits);
+dig_t bn_rshb_low(dig_t *c, dig_t *a, int size, int bits);
 
 /**
  * Shifts a digit vector to the right by some digits.
