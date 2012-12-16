@@ -50,7 +50,7 @@
 
 void err_simple_msg(int error) {
 	if (error != ERR_CAUGHT) {
-		fprintf(stderr, "\nERROR: %s.\n", core_ctx->reason[error]);
+		fprintf(stderr, "\nERROR: %s.\n", core_get()->reason[error]);
 	}
 }
 
@@ -58,6 +58,8 @@ void err_simple_msg(int error) {
 
 void err_full_msg(const char *function, const char *file, int line,
 		int error) {
+	ctx_t *ctx = core_get();
+
 	if (error == ERR_CAUGHT) {
 		fprintf(stderr, "\tCAUGHT in %s() at %s,%d.\n", function, file, line);
 	} else {
@@ -66,7 +68,7 @@ void err_full_msg(const char *function, const char *file, int line,
 		int n;
 
 		fprintf(stderr, "\nERROR in %s() at %s,%d: %s.\n", function, file, line,
-				core_ctx->reason[error]);
+				ctx->reason[error]);
 
 #if OPSYS == LINUX
 		/* Print the stack trace. */
@@ -88,15 +90,17 @@ void err_full_msg(const char *function, const char *file, int line,
 #endif /* VERBS */
 
 void err_get_msg(err_t *e, char **msg) {
-	*e = *(core_ctx->last->error);
-	*msg = core_ctx->reason[*e];
-	core_ctx->last = NULL;
+	ctx_t *ctx = core_get();
+	*e = *(ctx->last->error);
+	*msg = ctx->reason[*e];
+	ctx->last = NULL;
 }
 
 #endif /* CHECK */
 
 int err_get_code(void) {
-	int r = core_ctx->code;
-	core_ctx->code = STS_OK;
+	ctx_t *ctx = core_get();
+	int r = ctx->code;
+	ctx->code = STS_OK;
 	return r;
 }

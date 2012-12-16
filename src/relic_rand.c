@@ -73,22 +73,22 @@
 /*============================================================================*/
 
 /**
- * Size of the PRNG seed..
+ * Minimum size of the PRNG seed.
  */
-#define STATE_SIZE	    20
+#define SEED_SIZE	    20
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 void rand_init() {
-	unsigned char buf[STATE_SIZE];
+	unsigned char buf[SEED_SIZE];
 
 	memset(core_get()->rand, 0, RAND_SIZE);
 
 #if SEED == ZERO
 
-	memset(buf, 0, sizeof(buf));
+	memset(buf, 0, SEED_SIZE);
 
 #elif SEED == DEV || SEED == UDEV
 	int rand_fd, c, l;
@@ -100,12 +100,12 @@ void rand_init() {
 
 	l = 0;
 	do {
-		c = read(rand_fd, buf + l, STATE_SIZE - l);
+		c = read(rand_fd, buf + l, SEED_SIZE - l);
 		l += c;
 		if (c == -1) {
 			THROW(ERR_NO_READ);
 		}
-	} while (l < STATE_SIZE);
+	} while (l < SEED_SIZE);
 
 	if (rand_fd != -1) {
 		close(rand_fd);
@@ -115,12 +115,12 @@ void rand_init() {
 
 #if OPSYS == FREEBSD
 	srandom(1);
-	for (int i = 0; i < STATE_SIZE; i++) {
+	for (int i = 0; i < SEED_SIZE; i++) {
 		buf[i] = (unsigned char)random();
 	}
 #else
 	srand(1);
-	for (int i = 0; i < STATE_SIZE; i++) {
+	for (int i = 0; i < SEED_SIZE; i++) {
 		buf[i] = (unsigned char)rand();
 	}
 #endif
@@ -131,7 +131,7 @@ void rand_init() {
 	if (!CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL, 0)) {
 		THROW(ERR_NO_FILE);
 	}
-	if (hCryptProv && !CryptGenRandom(hCryptProv, STATE_SIZE, buf)) {
+	if (hCryptProv && !CryptGenRandom(hCryptProv, SEED_SIZE, buf)) {
 		THROW(ERR_NO_READ);
 	}
 	if (hCryptProv && !CryptReleaseContext(hCryptProv, 0)) {
@@ -139,7 +139,7 @@ void rand_init() {
 	}
 #endif
 
-	rand_seed(buf, STATE_SIZE);
+	rand_seed(buf, SEED_SIZE);
 }
 
 void rand_clean() {
@@ -150,7 +150,7 @@ void rand_seed(unsigned char *buf, int size) {
     int i;
     ctx_t *ctx = core_get();
 
-    if (size < STATE_SIZE) {
+    if (size < SEED_SIZE) {
     	THROW(ERR_NO_VALID);
     }
 
@@ -158,7 +158,7 @@ void rand_seed(unsigned char *buf, int size) {
     memset(ctx->rand, 0, sizeof(ctx->rand));
 
     /* XKEY = SEED  */
-    for (i = 0; i < MIN(size, STATE_SIZE); i++) {
+    for (i = 0; i < MIN(size, SEED_SIZE); i++) {
         ctx->rand[i] = buf[i];
     }
 }
@@ -176,7 +176,7 @@ void rand_bytes(unsigned char *buf, int size) {
 
         /* XKEY = (XKEY + x + 1) mod 2^b */
         carry = 1;
-        for (i = STATE_SIZE - 1; i >= 0; i--) {
+        for (i = SEED_SIZE - 1; i >= 0; i--) {
     		r0 = (unsigned char)(ctx->rand[i] + hash[i]);
     		c0 = (unsigned char)(r0 < hash[i] ? 1 : 0);
     		r1 = (unsigned char)(r0 + carry);
@@ -184,7 +184,7 @@ void rand_bytes(unsigned char *buf, int size) {
     		carry = (unsigned char)(c0 | c1);
     		ctx->rand[i] = r1;
         }
-        for (i = 0; i < STATE_SIZE && j < size; i++) {
+        for (i = 0; i < SEED_SIZE && j < size; i++) {
             buf[j] = hash[i];
             j++;
         }
