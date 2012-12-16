@@ -77,3 +77,4 @@ if (WITH_CP)
 endif(WITH_CP)
 
 ADD_MODULE(rand)
+ADD_MODULE(core)

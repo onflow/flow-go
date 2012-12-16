@@ -51,7 +51,9 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-ctx_t core_ctx[1];
+ctx_t first_ctx;
+
+ctx_t *core_ctx = &(first_ctx);
 
 int core_init(void) {
 #if defined(CHECK) || defined(TRACE)
@@ -149,4 +151,12 @@ int core_clean(void) {
 #endif
 	arch_clean();
 	return STS_OK;
+}
+
+ctx_t *core_get() {
+	return core_ctx;
+}
+
+void core_set(ctx_t *ctx) {
+	core_ctx = ctx;
 }

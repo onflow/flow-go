@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for the error-management routines.
+ * Tests for configuration management.
  *
  * @version $Id$
  * @ingroup test
@@ -32,61 +32,39 @@
 #include <stdio.h>
 
 #include "relic.h"
-#include "relic_error.h"
 #include "relic_test.h"
 
-static void dummy(void);
-static void dummy2(void);
-
-int j;
-
-static void dummy(void) {
-	j++;
-	if (j < 6)
-		dummy2();
-}
-
-static void dummy2(void) {
-	j++;
-	if (j < 5)
-		dummy();
-	else {
-		THROW(ERR_NO_MEMORY);
-	}
-}
-
 int main(void) {
-	err_t e;
-	char *msg = NULL;
 	int code = STS_ERR;
 
+	/* Initialize library with default configuration. */
 	core_init();
 
-	util_banner("Tests for the ERR module:\n", 0);
+	util_banner("Tests for the CORE module:\n", 0);
 
-	TEST_ONCE("not using try-catch is correct") {
-		dummy();
-		if (err_get_code() == STS_ERR) {
-			err_get_msg(&e, &msg);
-			TEST_ASSERT(msg == core_ctx->reason[ERR_NO_MEMORY], end);
-			TEST_ASSERT(err_get_code() != STS_ERR, end);
-		}
+	TEST_ONCE("the library context is consistent") {
+		TEST_ASSERT(core_get() == core_ctx, end);
 	} TEST_END;
 
-	j = 0;
-
-	TEST_ONCE("try-catch is correct and error message is printed");
-	TRY {
-		dummy();
-	}
-	CATCH(e) {
-		switch (e) {
-			case ERR_NO_MEMORY:
-				TEST_END;
-				ERROR(end);
-				break;
-		}
-	}
+	TEST_ONCE("switching the library context is correct") {
+		ctx_t new_ctx, *old_ctx;
+		/* Backup the old context. */
+		old_ctx = core_get();
+		/* Switch the library context. */
+		core_set(&new_ctx);
+		/* Reinitialize library with new context. */
+		core_init();
+		/* Run function to manipulate the library context. */
+		THROW(ERR_NO_MEMORY);
+		core_set(old_ctx);
+		TEST_ASSERT(err_get_code() == STS_OK, end);
+		core_set(&new_ctx);
+		TEST_ASSERT(err_get_code() == STS_ERR, end);
+		/* Now we need to finalize the new context. */
+		core_clean();
+		/* And restore the original context. */
+		core_set(old_ctx);
+	} TEST_END;
 
 	util_banner("All tests have passed.\n", 0);
 

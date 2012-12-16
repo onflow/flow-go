@@ -145,7 +145,7 @@ typedef struct _ctx_t {
 /**
  * The active library context.
  */
-extern ctx_t core_ctx[1];
+extern ctx_t *core_ctx;
 
 /*============================================================================*/
 /* Function prototypes                                                        */
@@ -164,5 +164,19 @@ int core_init(void);
  * @return STS_OK if no error occurs, STS_ERR otherwise.
  */
 int core_clean(void);
+
+/**
+ * Returns a pointer to the current library context.
+ *
+ * @return a pointer to the library context.
+ */
+ctx_t *core_get(void);
+
+/**
+ * Switched the library context to a new context.
+ *
+ * @param[in] ctx					- the new library context.
+ */
+void core_set(ctx_t *ctx);
 
 #endif /* !RELIC_CORE_H */
