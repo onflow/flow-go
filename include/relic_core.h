@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "relic_error.h"
 #include "relic_bn.h"
@@ -161,14 +162,14 @@ typedef struct _ctx_t {
 	int prime_id;
 	/** Currently configured prime modulus. */
 	bn_st prime;
-	/** Prime modulus modulo 8. */
-	dig_t mod8;
-	/** Value derived from the prime used for modular reduction. */
-	dig_t u;
 	/** Value (R^2 mod p) for converting small integers to Montgomery form. */
 	bn_st conv;
 	/** Value of constant one in Montgomery form. */
 	bn_st one;
+	/** Prime modulus modulo 8. */
+	dig_t mod8;
+	/** Value derived from the prime used for modular reduction. */
+	dig_t u;
 	/** Quadratic non-residue. */
 	int qnr;
 	/** Cubic non-residue. */

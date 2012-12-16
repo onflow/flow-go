@@ -37,7 +37,6 @@
 #define RELIC_BENCH_H
 
 #include "relic_core.h"
-#include "relic_conf.h"
 
 /*============================================================================*/
 /* Macro definitions                                                          */

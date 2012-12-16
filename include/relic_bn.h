@@ -36,11 +36,9 @@
 #ifndef RELIC_BN_H
 #define RELIC_BN_H
 
-#include <string.h>
-
 #include "relic_dv.h"
+#include "relic_bn_low.h"
 #include "relic_conf.h"
-#include "relic_util.h"
 #include "relic_types.h"
 
 /*============================================================================*/
