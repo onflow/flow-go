@@ -69,7 +69,8 @@ void conf_print(void) {
 	util_print("** Benchmarking options:\n");
 	util_print("   Number of times: %d\n", BENCH * BENCH);
 	util_print("   Estimated overhead: ");
-	//bench_overhead();
+	bench_overhead();
+	util_print("\n");
 #endif
 
 #ifdef WITH_BN

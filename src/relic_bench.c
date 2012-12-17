@@ -137,33 +137,27 @@ void bench_overhead(void) {
 			/* Add the cost of (n^2 + over). */
 			overhead += total;
 		}
-		/* Overhead stores the cost of n*(n^2 + over). */
-		for (int l = 0; l < BENCH; l++) {
-			total = 0;
-			/* Measure the cost of (n^3 + over). */
-			bench_before();
-			for (int i = 0; i < BENCH; i++) {
-				for (int k = 0; k < BENCH; k++) {
-					tmpa = a;
-					for (int j = 0; j < BENCH; j++) {
-						empty(tmpa++);
-					}
+		/* Overhead stores the cost of n*(n^2 + over) = n^3 + n*over. */
+		total = 0;
+		/* Measure the cost of (n^3 + over). */
+		bench_before();
+		for (int i = 0; i < BENCH; i++) {
+			for (int k = 0; k < BENCH; k++) {
+				tmpa = a;
+				for (int j = 0; j < BENCH; j++) {
+					empty(tmpa++);
 				}
 			}
-			bench_after();
-			/* Subtract the cost of n^2. */
-			overhead -= total / BENCH;
 		}
-		/* Now overhead stores n*over, so take the average to obtain the overhead
-		 * to execute BENCH operations inside a benchmark. */
-		overhead /= BENCH;
+		bench_after();
+		/* Subtract the cost of (n^3 + over). */
+		overhead -= total;
+		/* Now overhead stores (n - 1)*over, so take the average to obtain the
+		 * overhead to execute BENCH operations inside a benchmark. */
+		overhead /= (BENCH - 1);
 		/* Divide to obtain the overhead of one operation pair. */
 		overhead /= BENCH;
-		/* We assume that our overhead estimate is too high (due to cache
-		 * effects, per example). The ratio 1/2 was found experimentally. */
-		overhead = overhead / 2;
 	} while (overhead < 0);
-	overhead = 0;
 	total = overhead;
 	bench_print();
 #endif
