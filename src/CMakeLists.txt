@@ -4,7 +4,7 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/low/${ARITH_PATH}/CMakeLists.txt")
 	include("${CMAKE_CURRENT_SOURCE_DIR}/low/${ARITH_PATH}/CMakeLists.txt")
 endif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/low/${ARITH_PATH}/CMakeLists.txt")
 
-set(CORE_SRCS relic_core.c relic_rand.c relic_conf.c relic_pool.c relic_util.c)
+set(CORE_SRCS relic_error.c relic_core.c relic_rand.c relic_conf.c relic_pool.c relic_util.c)
 
 string(TOLOWER ${ARCH} ARCH_PATH)
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/arch/relic_arch_${ARCH_PATH}.c")
@@ -23,10 +23,6 @@ file(GLOB PP_SRCS pp/*.c)
 file(GLOB MD_SRCS md/*.c)
 
 set(RELIC_SRCS ${CORE_SRCS})
-
-if (CHECK)
-	list(APPEND RELIC_SRCS "relic_error.c")
-endif(CHECK)
 
 if (TRACE)
 	list(APPEND RELIC_SRCS "relic_trace.c")
