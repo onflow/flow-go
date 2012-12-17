@@ -244,7 +244,7 @@ static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 	ep_add_projc_mix(r, p, q);
 #else /* General addition. */
 
-#if defined(EB_MIXED) || !defined(STRIP)
+#if defined(EP_MIXED) || !defined(STRIP)
 	/* Test if z2 = 1 only if mixed coordinates are turned on. */
 	if (q->norm) {
 		ep_add_projc_mix(r, p, q);
