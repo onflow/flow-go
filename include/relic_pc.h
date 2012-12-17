@@ -392,6 +392,20 @@ typedef CAT(GT_LOWER, t) gt_t;
 #define gt_rand(P)			CAT(GT_LOWER, rand)(P)
 
 /**
+ * Tests if G_1 element is valid.
+ *
+ * @param[out] P			- the element to assign.
+ */
+#define g1_is_valid(P)		CAT(G1_LOWER, is_valid)(P)
+
+/**
+ * Tests if G_2 element is valid.
+ *
+ * @param[out] P			- the element to assign.
+ */
+#define g2_is_valid(P)		CAT(G2_LOWER, is_valid)(P)
+
+/**
  * Prints a G_1 element.
  *
  * @param[in] P				- the element to print.

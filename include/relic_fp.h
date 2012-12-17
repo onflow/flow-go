@@ -38,7 +38,6 @@
 
 #include "relic_dv.h"
 #include "relic_bn.h"
-#include "relic_fp_low.h"
 #include "relic_conf.h"
 #include "relic_types.h"
 
