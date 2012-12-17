@@ -185,7 +185,6 @@ int ep_is_valid(ep_t p) {
 		ep_rhs(t->x, t);
 		fp_sqr(t->y, t->y);
 		r = (fp_cmp(t->x, t->y) == CMP_EQ) || ep_is_infty(p);
-
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
