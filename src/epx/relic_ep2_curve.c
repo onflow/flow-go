@@ -127,73 +127,6 @@
 #endif
 
 /**
- * The generator of the elliptic curve.
- */
-static ep2_st curve_g;
-
-#if ALLOC == STATIC || ALLOC == DYNAMIC || ALLOC == STACK
-
-/**
- * The first coordinate of the generator.
- */
-static fp2_st curve_gx;
-
-/**
- * The second coordinate of the generator.
- */
-static fp2_st curve_gy;
-
-/**
- * The third coordinate of the generator.
- */
-static fp2_st curve_gz;
-
-#endif
-
-/**
- * The a parameter of the curve.
- */
-static fp2_st curve_a;
-
-/**
- * The b parameter of the curve.
- */
-static fp2_st curve_b;
-
-/**
- * The order of the group of points in the elliptic curve.
- */
-static bn_st curve_r;
-
-/**
- * Flag that stores if the configured prime elliptic curve is twisted.
- */
-static int curve_is_twist;
-
-#ifdef EP_PRECO
-
-/**
- * Precomputation table for generator multiplication.
- */
-static ep2_st table[EP_TABLE];
-
-/**
- * Array of pointers to the precomputation table.
- */
-static ep2_st *pointer[EP_TABLE];
-
-#endif
-
-#if ALLOC == STACK
-
-/**
- * In case of stack allocation, we need to get global memory for the table.
- */
-static fp2_st _table[3 * EP_TABLE];
-
-#endif
-
-/**
  * Assigns a set of ordinary elliptic curve parameters.
  *
  * @param[in] CURVE		- the curve parameters to assign.
@@ -223,77 +156,83 @@ static fp2_st _table[3 * EP_TABLE];
 /*============================================================================*/
 
 void ep2_curve_init(void) {
+	ctx_t *ctx = core_get();
+
 #ifdef EP_PRECO
 	for (int i = 0; i < EP_TABLE; i++) {
-		pointer[i] = &(table[i]);
+		ctx->ep2_ptr[i] = &(ctx->ep2_pre[i]);
 	}
 #endif
 
 #if ALLOC == STATIC || ALLOC == DYNAMIC || ALLOC == STACK
-	curve_g.x[0] = curve_gx[0];
-	curve_g.x[1] = curve_gx[1];
-	curve_g.y[0] = curve_gy[0];
-	curve_g.y[1] = curve_gy[1];
-	curve_g.z[0] = curve_gz[0];
-	curve_g.z[1] = curve_gz[1];
+	ctx->ep2_g.x[0] = ctx->ep2_gx[0];
+	ctx->ep2_g.x[1] = ctx->ep2_gx[1];
+	ctx->ep2_g.y[0] = ctx->ep2_gy[0];
+	ctx->ep2_g.y[1] = ctx->ep2_gy[1];
+	ctx->ep2_g.z[0] = ctx->ep2_gz[0];
+	ctx->ep2_g.z[1] = ctx->ep2_gz[1];
 #endif
 
 #ifdef EP_PRECO
 #if ALLOC == STATIC || ALLOC == DYNAMIC
 	for (int i = 0; i < EP_TABLE; i++) {
-		fp2_new(table[i].x);
-		fp2_new(table[i].y);
-		fp2_new(table[i].z);
+		fp2_new(ctx->ep2_pre[i].x);
+		fp2_new(ctx->ep2_pre[i].y);
+		fp2_new(ctx->ep2_pre[i].z);
 	}
 #elif ALLOC == STACK
 	for (int i = 0; i < EP_TABLE; i++) {
-		table[i].x[0] = _table[3 * i][0];
-		table[i].x[1] = _table[3 * i][1];
-		table[i].y[0] = _table[3 * i + 1][0];
-		table[i].y[1] = _table[3 * i + 1][1];
-		table[i].z[0] = _table[3 * i + 2][0];
-		table[i].z[1] = _table[3 * i + 2][1];
+		ctx->ep2_pre[i].x[0] = ctx->_ep2_pre[3 * i][0];
+		ctx->ep2_pre[i].x[1] = ctx->_ep2_pre[3 * i][1];
+		ctx->ep2_pre[i].y[0] = ctx->_ep2_pre[3 * i + 1][0];
+		ctx->ep2_pre[i].y[1] = ctx->_ep2_pre[3 * i + 1][1];
+		ctx->ep2_pre[i].z[0] = ctx->_ep2_pre[3 * i + 2][0];
+		ctx->ep2_pre[i].z[1] = ctx->_ep2_pre[3 * i + 2][1];
 	}
 #endif
 #endif
-	ep2_set_infty(&curve_g);
-	bn_init(&curve_r, FP_DIGS);
+	ep2_set_infty(&(ctx->ep2_g));
+	bn_init(&(ctx->ep2_r), FP_DIGS);
 }
 
 void ep2_curve_clean(void) {
+	ctx_t *ctx = core_get();
 #ifdef EP_PRECO
 	for (int i = 0; i < EP_TABLE; i++) {
-		fp2_free(table[i].x);
-		fp2_free(table[i].y);
-		fp2_free(table[i].z);
+		fp2_free(ctx->ep2_pre[i].x);
+		fp2_free(ctx->ep2_pre[i].y);
+		fp2_free(ctx->ep2_pre[i].z);
 	}
 #endif
-	bn_clean(&curve_r);
+	bn_clean(&(ctx->ep2_r));
 }
 
 int ep2_curve_is_twist() {
-	return curve_is_twist;
+	return core_get()->ep2_is_twist;
 }
 
 void ep2_curve_get_gen(ep2_t g) {
-	ep2_copy(g, &curve_g);
+	ep2_copy(g, &(core_get()->ep2_g));
 }
 
 void ep2_curve_get_a(fp2_t a) {
-	fp_copy(a[0], curve_a[0]);
-	fp_copy(a[1], curve_a[1]);
+	ctx_t *ctx = core_get();
+	fp_copy(a[0], ctx->ep2_a[0]);
+	fp_copy(a[1], ctx->ep2_a[1]);
 }
 
 void ep2_curve_get_b(fp2_t b) {
-	fp_copy(b[0], curve_b[0]);
-	fp_copy(b[1], curve_b[1]);
+	ctx_t *ctx = core_get();
+	fp_copy(b[0], ctx->ep2_b[0]);
+	fp_copy(b[1], ctx->ep2_b[1]);
 }
 
 void ep2_curve_get_ord(bn_t n) {
-	if (curve_is_twist) {
+	ctx_t *ctx = core_get();
+	if (ctx->ep2_is_twist) {
 		ep_curve_get_ord(n);
 	} else {
-		bn_copy(n, &curve_r);
+		bn_copy(n, &(ctx->ep2_r));
 	}
 }
 
@@ -301,17 +240,17 @@ void ep2_curve_get_ord(bn_t n) {
 
 ep2_t *ep2_curve_get_tab() {
 #if ALLOC == AUTO
-	return (ep2_t *)*pointer;
+	return (ep2_t *)*(core_get()->ep2_ptr);
 #else
-	return pointer;
+	return core_get()->ep2_ptr;
 #endif
 }
 
 #endif
 
 void ep2_curve_set(int twist) {
-	int param;
 	char str[2 * FP_BYTES + 1];
+	ctx_t *ctx = core_get();
 	ep2_t g;
 	fp2_t a;
 	fp2_t b;
@@ -328,9 +267,7 @@ void ep2_curve_set(int twist) {
 		fp2_new(b);
 		bn_new(r);
 
-		param = ep_param_get();
-
-		switch (param) {
+		switch (ep_param_get()) {
 #if FP_PRIME == 158
 			case BN_P158:
 				ASSIGN(BN_P158);
@@ -361,20 +298,20 @@ void ep2_curve_set(int twist) {
 		fp_set_dig(g->z[0], 1);
 		g->norm = 1;
 
-		curve_is_twist = twist;
+		ctx->ep2_is_twist = twist;
 
-		ep2_copy(&curve_g, g);
-		fp_copy(curve_a[0], a[0]);
-		fp_copy(curve_a[1], a[1]);
-		fp_copy(curve_b[0], b[0]);
-		fp_copy(curve_b[1], b[1]);
-		bn_copy(&curve_r, r);
+		ep2_copy(&(ctx->ep2_g), g);
+		fp_copy(ctx->ep2_a[0], a[0]);
+		fp_copy(ctx->ep2_a[1], a[1]);
+		fp_copy(ctx->ep2_b[0], b[0]);
+		fp_copy(ctx->ep2_b[1], b[1]);
+		bn_copy(&(ctx->ep2_r), r);
 
 		/* I don't have a better place for this. */
 		fp2_const_calc();
 
 #if defined(EP_PRECO)
-		ep2_mul_pre(ep2_curve_get_tab(), &curve_g);
+		ep2_mul_pre(ep2_curve_get_tab(), &(ctx->ep2_g));
 #endif
 	}
 	CATCH_ANY {

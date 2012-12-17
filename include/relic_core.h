@@ -43,7 +43,7 @@
 
 #include "relic_error.h"
 #include "relic_bn.h"
-#include "relic_ep.h"
+#include "relic_epx.h"
 #include "relic_conf.h"
 #include "relic_rand.h"
 #include "relic_pool.h"
@@ -217,6 +217,37 @@ typedef struct _ctx_t {
 	ep_st ep_pre[EP_TABLE];
 	/** Array of pointers to the precomputation table. */
 	ep_st *ep_ptr[EP_TABLE];
+#endif
+#endif
+
+#ifdef WITH_PP
+	/** The generator of the elliptic curve. */
+	ep2_st ep2_g;
+#if ALLOC == STATIC || ALLOC == DYNAMIC || ALLOC == STACK
+	/** The first coordinate of the generator. */
+	fp2_st ep2_gx;
+	/** The second coordinate of the generator. */
+	fp2_st ep2_gy;
+	/** The third coordinate of the generator. */
+	fp2_st ep2_gz;
+#endif
+	/** The a parameter of the curve. */
+	fp2_st ep2_a;
+	/** The b parameter of the curve. */
+	fp2_st ep2_b;
+	/** The order of the group of points in the elliptic curve. */
+	bn_st ep2_r;
+	/** Flag that stores if the prime curve is twisted. */
+	int ep2_is_twist;
+#ifdef EP_PRECO
+	/** Precomputation table for generator multiplication.*/
+	ep2_st ep2_pre[EP_TABLE];
+	/** Array of pointers to the precomputation table. */
+	ep2_st *ep2_ptr[EP_TABLE];
+#endif
+#if ALLOC == STACK
+/** In case of stack allocation, we need to get global memory for the table. */
+	fp2_st _ep2_pre[3 * EP_TABLE];
 #endif
 #endif
 
