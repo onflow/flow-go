@@ -48,7 +48,8 @@ void bn_init(bn_t a, int digits) {
 		digits += (BN_SIZE - digits % BN_SIZE);
 	}
 
-	if (a != NULL && a->dp == NULL) {
+	if (a != NULL) {
+		a->dp = NULL;
 #if ALIGN == 1
 		a->dp = (dig_t *)malloc(digits * sizeof(dig_t));
 #elif OPSYS == WINDOWS
