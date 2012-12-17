@@ -31,6 +31,7 @@
  */
 
 #include "relic_core.h"
+#include "relic_bn_low.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */

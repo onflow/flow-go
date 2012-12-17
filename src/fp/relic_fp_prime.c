@@ -279,6 +279,7 @@ void fp_prime_conv_dig(fp_t c, dig_t a) {
 			dv_copy(c, ctx->one.dp, FP_DIGS);
 		}
 #else
+		(void)ctx;
 		fp_zero(c);
 		c[0] = a;
 #endif

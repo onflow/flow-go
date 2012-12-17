@@ -30,6 +30,7 @@
  */
 
 #include "relic_core.h"
+#include "relic_fp_low.h"
 #include "relic_pp_low.h"
 
 /*============================================================================*/
