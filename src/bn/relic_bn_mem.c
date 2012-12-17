@@ -77,7 +77,7 @@ void bn_init(bn_t a, int digits) {
 		digits = BN_SIZE;
 	}
 #if ALLOC == STATIC
-	if (a != NULL && a->dp == NULL) {
+	if (a != NULL) {
 		a->dp = pool_get();
 		if (a->dp == NULL) {
 			THROW(ERR_NO_MEMORY);
