@@ -56,10 +56,11 @@ void fp_invn_low(dig_t *c, dig_t *a) {
 
 	mpn_gcdext(t, c, &cn, u, FP_DIGS, s, FP_DIGS);
 	if (cn < 0) {
-		cn = -cn;
+		dv_zero(c - cn, FP_DIGS + cn);
 		mpn_sub_n(c, fp_prime_get(), c, FP_DIGS);
+	} else {
+		dv_zero(c + cn, FP_DIGS - cn);
 	}
-	dv_zero(c + cn, FP_DIGS - cn);
 
 #if FP_RDC == MONTY
 	dv_zero(t, FP_DIGS);
