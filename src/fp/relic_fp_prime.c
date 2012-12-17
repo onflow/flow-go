@@ -231,7 +231,8 @@ void fp_prime_conv(fp_t c, bn_t a) {
 		bn_new(t);
 
 #if FP_RDC == MONTY
-		bn_lsh(t, a, FP_DIGS * FP_DIGIT);
+		bn_mod(t, a, &(core_get()->prime));
+		bn_lsh(t, t, FP_DIGS * FP_DIGIT);
 		bn_mod(t, t, &(core_get()->prime));
 		dv_copy(c, t->dp, FP_DIGS);
 #else
@@ -239,12 +240,14 @@ void fp_prime_conv(fp_t c, bn_t a) {
 			THROW(ERR_NO_PRECI);
 		}
 
-		if (bn_is_zero(a)) {
+		bn_mod(t, a, &(core_get()->prime));
+
+		if (bn_is_zero(t)) {
 			fp_zero(c);
 		} else {
 			int i;
-			for (i = 0; i < a->used; i++) {
-				c[i] = a->dp[i];
+			for (i = 0; i < t->used; i++) {
+				c[i] = t->dp[i];
 			}
 			for (; i < FP_DIGS; i++) {
 				c[i] = 0;
