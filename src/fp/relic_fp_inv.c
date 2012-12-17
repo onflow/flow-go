@@ -82,12 +82,7 @@ void fp_inv_binar(fp_t c, fp_t a) {
 		bn_new(p);
 
 		/* u = a, v = p, g1 = 1, g2 = 0. */
-#if FP_RDC == MONTY
 		fp_prime_back(u, a);
-#else
-		u->used = FP_DIGS;
-		dv_copy(u->dp, a, FP_DIGS);
-#endif
 		p->used = FP_DIGS;
 		dv_copy(p->dp, fp_prime_get(), FP_DIGS);
 		bn_copy(v, p);
@@ -346,12 +341,7 @@ void fp_inv_exgcd(fp_t c, fp_t a) {
 		bn_new(r);
 
 		/* u = a, v = p, g1 = 1, g2 = 0. */
-#if FP_RDC == MONTY
 		fp_prime_back(u, a);
-#else
-		u->used = FP_DIGS;
-		dv_copy(u->dp, a, FP_DIGS);
-#endif
 		p->used = FP_DIGS;
 		dv_copy(p->dp, fp_prime_get(), FP_DIGS);
 		bn_copy(v, p);
