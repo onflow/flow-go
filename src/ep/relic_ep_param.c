@@ -449,6 +449,7 @@ void ep_param_set(int param) {
 		/* Do not generate warnings. */
 		(void)kbltz;
 		(void)ordin;
+		(void)beta;
 
 		core_get()->ep_id = param;
 
@@ -562,6 +563,8 @@ int ep_param_set_any_pairf() {
 	twist = EP_DTYPE;
 	degree = 2;
 #else
+	(void)twist;
+	(void)degree;
 	r = STS_ERR;
 #endif
 #ifdef WITH_PP
