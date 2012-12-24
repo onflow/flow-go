@@ -37,6 +37,33 @@
 static int memory(void) {
 	err_t e;
 	int code = STS_ERR;
+
+#if ALLOC == STATIC
+	dv_t a[POOL_SIZE + 1];
+
+	for (int i = 0; i < POOL_SIZE; i++) {
+		dv_null(a[i]);
+	}
+	dv_null(a[POOL_SIZE]);
+
+	TRY {
+		TEST_BEGIN("all memory can be allocated") {
+			for (int j = 0; j < POOL_SIZE; j++) {
+				dv_new(a[j]);
+			}
+			dv_new(a[POOL_SIZE]);
+		}
+	} CATCH(e) {
+		switch (e) {
+			case ERR_NO_MEMORY:
+				for (int j = 0; j < POOL_SIZE; j++) {
+					dv_free(a[j]);
+				}
+				dv_free(a[POOL_SIZE]);
+				break;
+		}
+	}
+#else
 	dv_t a;
 
 	dv_null(a);
@@ -54,6 +81,7 @@ static int memory(void) {
 				break;
 		}
 	}
+#endif
 	code = STS_OK;
   end:
 	return code;
