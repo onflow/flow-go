@@ -175,7 +175,7 @@ void util_printf(const char *format, ...) {
 #elif ARCH == ARM && OPSYS == DROID
 	va_list list;
 	va_start(list, format);
-	__android_log_vprint(ANDROID_LOG_DEBUG, "relic-toolkit", format, list);
+	__android_log_vprint(ANDROID_LOG_INFO, "relic-toolkit", format, list);
 	va_end(list);
 #else
 	va_list list;
