@@ -117,7 +117,7 @@ static void empty(int *a) {
 /*============================================================================*/
 
 void bench_overhead(void) {
-#if TIMER != NONE
+#if TIMER != NONE && BENCH > 1
 	int a[BENCH + 1];
 	int *tmpa;
 
