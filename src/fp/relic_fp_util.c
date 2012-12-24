@@ -182,6 +182,25 @@ void fp_print(fp_t a) {
 	}
 }
 
+void fp_size(int *size, fp_t a, int radix) {
+	bn_t t;
+
+	bn_null(t);
+
+	TRY {
+		bn_new(t);
+
+		fp_prime_back(t, a);
+
+		bn_size_str(size, t, radix);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
+	}
+}
+
 void fp_read(fp_t a, const char *str, int len, int radix) {
 	bn_t t;
 

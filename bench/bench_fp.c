@@ -53,6 +53,7 @@ static void memory(void) {
 }
 
 static void util(void) {
+	int d;
 	char str[1000];
 	fp_t a, b;
 
@@ -118,6 +119,12 @@ static void util(void) {
 
 	BENCH_BEGIN("fp_rand") {
 		BENCH_ADD(fp_rand(a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp_size") {
+		fp_rand(a);
+		BENCH_ADD(fp_size(&d, a, 16));
 	}
 	BENCH_END;
 

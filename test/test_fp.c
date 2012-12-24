@@ -65,16 +65,19 @@ static int util(void) {
 	int bits, code = STS_ERR;
 	char str[1000];
 	fp_t a, b, c;
-	dig_t d;
+	bn_t d;
+	dig_t e;
 
 	fp_null(a);
 	fp_null(b);
 	fp_null(c);
+	bn_null(d);
 
 	TRY {
 		fp_new(a);
 		fp_new(b);
 		fp_new(c);
+		bn_new(d);
 
 		TEST_BEGIN("comparison is consistent") {
 			fp_rand(a);
@@ -150,9 +153,9 @@ static int util(void) {
 		TEST_END;
 
 		TEST_BEGIN("assignment to a constant and comparison are consistent") {
-			rand_bytes((unsigned char *)&d, (FP_DIGIT / 8));
-			fp_set_dig(a, d);
-			TEST_ASSERT(fp_cmp_dig(a, d) == CMP_EQ, end);
+			rand_bytes((unsigned char *)&e, (FP_DIGIT / 8));
+			fp_set_dig(a, e);
+			TEST_ASSERT(fp_cmp_dig(a, e) == CMP_EQ, end);
 		}
 		TEST_END;
 
@@ -181,6 +184,15 @@ static int util(void) {
 			TEST_ASSERT(fp_cmp(a, b) == CMP_EQ, end);
 		}
 		TEST_END;
+
+		TEST_BEGIN("getting the size of a prime field element is correct") {
+			fp_rand(a);
+			fp_prime_back(d, a);
+			fp_size(&bits, a, 2);
+			bits--;
+			TEST_ASSERT(bits == bn_bits(d), end);
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -190,6 +202,7 @@ static int util(void) {
 	fp_free(a);
 	fp_free(b);
 	fp_free(c);
+	bn_free(d);
 	return code;
 }
 
