@@ -196,6 +196,7 @@ static int pairing(void) {
 	ep_free(p);
 	ep2_free(q);
 	ep2_free(r);
+	ep2_free(s);
 	bn_free(n);
 	bn_free(k);
 	return code;

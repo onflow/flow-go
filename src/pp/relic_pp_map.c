@@ -336,8 +336,8 @@ void pp_map_weilp(fp12_t r, ep_t p, ep2_t q) {
 	FINALLY {
 		ep_free(t0);
 		ep2_free(t1);
-		fp12_null(r0);
-		fp12_null(r1);
+		fp12_free(r0);
+		fp12_free(r1);
 		bn_free(n);
 	}
 }
@@ -400,6 +400,9 @@ void pp_map_oatep(fp12_t r, ep_t p, ep2_t q) {
 	}
 	FINALLY {
 		ep2_free(t);
+		ep2_free(q1);
+		ep2_free(q2);
+		fp12_free(l);
 		bn_free(a);
 	}
 }
