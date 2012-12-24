@@ -103,6 +103,8 @@ static long long total;
  */
 static long long overhead = 0;
 
+#if TIMER != NONE && BENCH > 1
+
 /**
  * Dummy function for measuring benchmarking overhead.
  *
@@ -111,6 +113,8 @@ static long long overhead = 0;
 static void empty(int *a) {
 	(*a)++;
 }
+
+#endif
 
 /*============================================================================*/
 /* Public definitions                                                         */
