@@ -176,6 +176,14 @@ typedef sokaka_st *sokaka_t;
 	if (A == NULL) {														\
 		THROW(ERR_NO_MEMORY);												\
 	}																		\
+	bn_null((A)->e);														\
+	bn_null((A)->n);														\
+	bn_null((A)->d);														\
+	bn_null((A)->dp);														\
+	bn_null((A)->dq);														\
+	bn_null((A)->p);														\
+	bn_null((A)->q);														\
+	bn_null((A)->qi);														\
 	bn_new((A)->e);															\
 	bn_new((A)->n);															\
 	bn_new((A)->d);															\
@@ -191,6 +199,14 @@ typedef sokaka_st *sokaka_t;
 	if (A == NULL) {														\
 		THROW(ERR_NO_MEMORY);												\
 	}																		\
+	bn_null((A)->e);														\
+	bn_null((A)->n);														\
+	bn_null((A)->d);														\
+	bn_null((A)->dp);														\
+	bn_null((A)->dq);														\
+	bn_null((A)->p);														\
+	bn_null((A)->q);														\
+	bn_null((A)->qi);														\
 	bn_new((A)->e);															\
 	bn_new((A)->n);															\
 	bn_new((A)->d);															\

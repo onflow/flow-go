@@ -211,6 +211,9 @@ typedef eb_st *eb_t;
 	if (A == NULL) {														\
 		THROW(ERR_NO_MEMORY);												\
 	}																		\
+	fb_null((A)->x);														\
+	fb_null((A)->y);														\
+	fb_null((A)->z);														\
 	fb_new((A)->x);															\
 	fb_new((A)->y);															\
 	fb_new((A)->z);															\

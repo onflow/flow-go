@@ -100,19 +100,19 @@ typedef ep3_st *ep3_t;
 /**
  * Initializes a point on a elliptic curve with a null value.
  *
- * @param[out] A			- the point to initialize.
+ * @param[out] A				- the point to initialize.
  */
 #if ALLOC == AUTO
 #define ep2_null(A)				/* empty */
 #else
-#define ep2_null(A)			A = NULL
+#define ep2_null(A)				A = NULL
 #endif
 
 /**
  * Calls a function to allocate a point on a elliptic curve.
  *
- * @param[out] A			- the new point.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
+ * @param[out] A				- the new point.
+ * @throw ERR_NO_MEMORY			- if there is no available memory.
  */
 #if ALLOC == DYNAMIC
 #define ep2_new(A)															\
@@ -120,6 +120,9 @@ typedef ep3_st *ep3_t;
 	if (A == NULL) {														\
 		THROW(ERR_NO_MEMORY);												\
 	}																		\
+	fp2_null((A)->x);														\
+	fp2_null((A)->y);														\
+	fp2_null((A)->z);														\
 	fp2_new((A)->x);														\
 	fp2_new((A)->y);														\
 	fp2_new((A)->z);														\
@@ -130,6 +133,9 @@ typedef ep3_st *ep3_t;
 	if (A == NULL) {														\
 		THROW(ERR_NO_MEMORY);												\
 	}																		\
+	fp2_null((A)->x);														\
+	fp2_null((A)->y);														\
+	fp2_null((A)->z);														\
 	fp2_new((A)->x);														\
 	fp2_new((A)->y);														\
 	fp2_new((A)->z);														\
@@ -149,7 +155,7 @@ typedef ep3_st *ep3_t;
 /**
  * Calls a function to clean and free a point on a elliptic curve.
  *
- * @param[out] A			- the point to free.
+ * @param[out] A				- the point to free.
  */
 #if ALLOC == DYNAMIC
 #define ep2_free(A)															\
@@ -159,7 +165,7 @@ typedef ep3_st *ep3_t;
 		fp2_free((A)->z);													\
 		free(A);															\
 		A = NULL;															\
-	}
+	}																		\
 
 #elif ALLOC == STATIC
 #define ep2_free(A)															\
@@ -172,11 +178,8 @@ typedef ep3_st *ep3_t;
 
 #elif ALLOC == AUTO
 #define ep2_free(A)				/* empty */
-
 #elif ALLOC == STACK
-#define ep2_free(A)															\
-	A = NULL;																\
-
+#define ep2_free(A)				A = NULL;
 #endif
 
 /**
@@ -223,9 +226,9 @@ typedef ep3_st *ep3_t;
  * Subtracts a point in an elliptic curve over a quadratic extension field from
  * another point in this curve. Computes R = P - Q.
  *
- * @param[out] R			- the result.
- * @param[in] P				- the first point.
- * @param[in] Q				- the second point.
+ * @param[out] R				- the result.
+ * @param[in] P					- the first point.
+ * @param[in] Q					- the second point.
  */
 #if EP_ADD == BASIC
 #define ep2_sub(R, P, Q)		ep2_sub_basic(R, P, Q)
@@ -263,8 +266,8 @@ typedef ep3_st *ep3_t;
  * Builds a precomputation table for multiplying a fixed prime elliptic point
  * over a quadratic extension.
  *
- * @param[out] T			- the precomputation table.
- * @param[in] P				- the point to multiply.
+ * @param[out] T				- the precomputation table.
+ * @param[in] P					- the point to multiply.
  */
 #if EP_FIX == BASIC
 #define ep2_mul_pre(T, P)		ep2_mul_pre_basic(T, P)
@@ -287,36 +290,36 @@ typedef ep3_st *ep3_t;
  * Multiplies a fixed prime elliptic point over a quadratic extension using a
  * precomputation table. Computes R = kP.
  *
- * @param[out] R			- the result.
- * @param[in] T				- the precomputation table.
- * @param[in] K				- the integer.
+ * @param[out] R				- the result.
+ * @param[in] T					- the precomputation table.
+ * @param[in] K					- the integer.
  */
 #if EP_FIX == BASIC
-#define ep2_mul_fix(R, T, K)		ep2_mul_fix_basic(R, T, K)
+#define ep2_mul_fix(R, T, K)	ep2_mul_fix_basic(R, T, K)
 #elif EP_FIX == YAOWI
-#define ep2_mul_fix(R, T, K)		ep2_mul_fix_yaowi(R, T, K)
+#define ep2_mul_fix(R, T, K)	ep2_mul_fix_yaowi(R, T, K)
 #elif EP_FIX == NAFWI
-#define ep2_mul_fix(R, T, K)		ep2_mul_fix_nafwi(R, T, K)
+#define ep2_mul_fix(R, T, K)	ep2_mul_fix_nafwi(R, T, K)
 #elif EP_FIX == COMBS
-#define ep2_mul_fix(R, T, K)		ep2_mul_fix_combs(R, T, K)
+#define ep2_mul_fix(R, T, K)	ep2_mul_fix_combs(R, T, K)
 #elif EP_FIX == COMBD
-#define ep2_mul_fix(R, T, K)		ep2_mul_fix_combd(R, T, K)
+#define ep2_mul_fix(R, T, K)	ep2_mul_fix_combd(R, T, K)
 #elif EP_FIX == LWNAF
-#define ep2_mul_fix(R, T, K)		ep2_mul_fix_lwnaf(R, T, K)
+#define ep2_mul_fix(R, T, K)	ep2_mul_fix_lwnaf(R, T, K)
 #elif EP_FIX == GLV
 //TODO: implement ep2_mul_pre_glv
-#define ep2_mul_fix(R, T, K)		ep2_mul_fix_lwnaf(R, T, K)
+#define ep2_mul_fix(R, T, K)	ep2_mul_fix_lwnaf(R, T, K)
 #endif
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously. Computes
  * R = kP + lQ.
  *
- * @param[out] R			- the result.
- * @param[in] P				- the first point to multiply.
- * @param[in] K				- the first integer.
- * @param[in] Q				- the second point to multiply.
- * @param[in] L				- the second integer,
+ * @param[out] R				- the result.
+ * @param[in] P					- the first point to multiply.
+ * @param[in] K					- the first integer.
+ * @param[in] Q					- the second point to multiply.
+ * @param[in] L					- the second integer,
  */
 #if EP_SIM == BASIC
 #define ep2_mul_sim(R, P, K, Q, L)	ep2_mul_sim_basic(R, P, K, Q, L)
@@ -338,9 +341,9 @@ typedef ep3_st *ep3_t;
  * @param[in] P				- the affine point to evaluate the line function.
  */
 #if EP_ADD == BASIC
-#define pp_add_k12(L, R, Q, P)			pp_add_k12_basic(L, R, Q, P)
+#define pp_add_k12(L, R, Q, P)		pp_add_k12_basic(L, R, Q, P)
 #elif EP_ADD == PROJC
-#define pp_add_k12(L, R, Q, P)			pp_add_k12_projc(L, R, Q, P)
+#define pp_add_k12(L, R, Q, P)		pp_add_k12_projc(L, R, Q, P)
 #endif
 
 /**

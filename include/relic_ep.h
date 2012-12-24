@@ -222,6 +222,9 @@ typedef ep_st *ep_t;
 	if (A == NULL) {														\
 		THROW(ERR_NO_MEMORY);												\
 	}																		\
+	fp_null((A)->x);														\
+	fp_null((A)->y);														\
+	fp_null((A)->z);														\
 	fp_new((A)->x);															\
 	fp_new((A)->y);															\
 	fp_new((A)->z);															\
