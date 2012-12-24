@@ -43,6 +43,7 @@
 
 #include "relic_error.h"
 #include "relic_bn.h"
+#include "relic_fb.h"
 #include "relic_epx.h"
 #include "relic_conf.h"
 #include "relic_rand.h"
@@ -157,9 +158,46 @@ typedef struct _ctx_t {
 	int next;
 #endif /* ALLOC == STATIC */
 
+#ifdef WITH_FB
+	/** Currently configured binary field identifier. */
+	int fb_id;
+	/** Currently configured irreducible binary polynomial. */
+	fb_st fb_poly;
+	/** Non-zero coefficients of a trinomial or pentanomial. */
+	int fb_pa, fb_pb, fb_pc;
+	/** Positions of the non-zero coefficients of trinomials or pentanomials. */
+	int fb_na, fb_nb, fb_nc;
+#if FB_TRC == QUICK || !defined(STRIP)
+	/** Powers of z with non-zero traces. */
+	int fb_ta, fb_tb, fb_tc;
+#endif /* FB_TRC == QUICK */
+#if FB_SLV == QUICK || !defined(STRIP)
+	/** Table of precomputed half-traces. */
+	fb_st fb_half[(FB_DIGIT / 8 + 1) * FB_DIGS][16];
+#endif /* FB_SLV == QUICK */
+#if FB_SRT == QUICK || !defined(STRIP)
+	/** Square root of z. */
+	fb_st fb_srz;
+#ifdef FB_PRECO
+	/** Multiplication table for the z^(1/2). */
+	fb_st fb_tab_srz[256];
+#endif /* FB_PRECO */
+#endif /* FB_SRT == QUICK */
+#if FB_INV == ITOHT || !defined(STRIP)
+	/** Stores an addition chain for (FB_BITS - 1). */
+	int chain[MAX_TERMS + 1];
+	/** Stores the length of the addition chain. */
+	int chain_len;
+	/** Tables for repeated squarings. */
+	fb_st fb_tab_sqr[MAX_TERMS][FB_TABLE];
+	/** Pointers to the elements in the tables of repeated squarings. */
+	fb_st *fb_tab_ptr[MAX_TERMS][FB_TABLE];
+#endif /* FB_INV == ITOHT */
+#endif /* WITH_FB */
+
 #ifdef WITH_FP
 	/** Currently configured prime field identifier. */
-	int prime_id;
+	int fp_id;
 	/** Currently configured prime modulus. */
 	bn_st prime;
 	/** Value (R^2 mod p) for converting small integers to Montgomery form. */
@@ -177,10 +215,10 @@ typedef struct _ctx_t {
 	/** Sparse representation of prime modulus. */
 	int sps[MAX_TERMS + 1];
 	/** Length of sparse prime representation. */
-	int len;
+	int sps_len;
 	/** Sparse representation of parameter used to generate prime. */
 	int var[MAX_TERMS + 1];
-#endif
+#endif /* WITH_FP */
 
 #ifdef WITH_EP
 	/** Currently configured prime elliptic curve identifier. */
@@ -202,8 +240,8 @@ typedef struct _ctx_t {
 	bn_st v1[3];
 	bn_st v2[3];
 	/** @} */
-#endif
-#endif
+#endif /* EP_KBLTZ */
+#endif /* EP_MUL */
 	/** Optimization identifier for the a-coefficient. */
 	int ep_opt_a;
 	/** Optimization identifier for the b-coefficient. */
@@ -217,8 +255,8 @@ typedef struct _ctx_t {
 	ep_st ep_pre[EP_TABLE];
 	/** Array of pointers to the precomputation table. */
 	ep_st *ep_ptr[EP_TABLE];
-#endif
-#endif
+#endif /* EP_PRECO */
+#endif /* WITH_EP */
 
 #ifdef WITH_PP
 	/** The generator of the elliptic curve. */
@@ -244,12 +282,12 @@ typedef struct _ctx_t {
 	ep2_st ep2_pre[EP_TABLE];
 	/** Array of pointers to the precomputation table. */
 	ep2_st *ep2_ptr[EP_TABLE];
-#endif
+#endif /* EP_PRECO */
 #if ALLOC == STACK
 /** In case of stack allocation, we need to get global memory for the table. */
 	fp2_st _ep2_pre[3 * EP_TABLE];
-#endif
-#endif
+#endif /* ALLOC == STACK */
+#endif /* WITH_PP */
 
 	/** Internal state of the PRNG. */
 	unsigned char rand[RAND_SIZE];

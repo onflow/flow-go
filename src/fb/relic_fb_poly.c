@@ -45,27 +45,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-/**
- * Prime modulus.
- */
-static fb_st fb_poly;
-
-/**
- * Trinomial or pentanomial non-zero coefficients.
- */
-static int poly_a, poly_b, poly_c;
-
-/**
- * Positions of the non-null coefficients on trinomials and pentanomials.
- */
-static int pos_a, pos_b, pos_c;
-
 #if FB_TRC == QUICK || !defined(STRIP)
-
-/**
- * Powers of z with non-zero traces.
- */
-static int trc_a, trc_b, trc_c;
 
 /**
  * Find non-zero bits for fast trace computation.
@@ -76,11 +56,12 @@ static int trc_a, trc_b, trc_c;
 static void find_trace() {
 	fb_t t0, t1;
 	int counter;
+	ctx_t *ctx = core_get();
 
 	fb_null(t0);
 	fb_null(t1);
 
-	trc_a = trc_b = trc_c = -1;
+	ctx->fb_ta = ctx->fb_tb = ctx->fb_tc = -1;
 
 	TRY {
 		fb_new(t0);
@@ -98,15 +79,15 @@ static void find_trace() {
 			if (!fb_is_zero(t0)) {
 				switch (counter) {
 					case 0:
-						trc_a = i;
-						trc_b = trc_c = -1;
+						ctx->fb_ta = i;
+						ctx->fb_tb = ctx->fb_tc = -1;
 						break;
 					case 1:
-						trc_b = i;
-						trc_c = -1;
+						ctx->fb_tb = i;
+						ctx->fb_tc = -1;
 						break;
 					case 2:
-						trc_c = i;
+						ctx->fb_tc = i;
 						break;
 					default:
 						THROW(ERR_NO_VALID);
@@ -130,16 +111,6 @@ static void find_trace() {
 #if FB_SLV == QUICK || !defined(STRIP)
 
 /**
- * Size of the precomputed table of half-traces.
- */
-#define HALF_SIZE		((FB_BITS - 1)/ 2)
-
-/**
- * Table of precomputed half-traces.
- */
-static fb_st fb_half[(FB_DIGIT / 8 + 1) * FB_DIGS][16];
-
-/**
  * Precomputes half-traces for z^i with odd i.
  *
  * @throw ERR_NO_MEMORY if there is no available memory.
@@ -147,6 +118,7 @@ static fb_st fb_half[(FB_DIGIT / 8 + 1) * FB_DIGS][16];
 static void find_solve() {
 	int i, j, k, l;
 	fb_t t0;
+	ctx_t *ctx = core_get();
 
 	fb_null(t0);
 
@@ -162,14 +134,14 @@ static void find_solve() {
 						fb_set_bit(t0, i + 2 * k + 1, 1);
 					}
 				}
-				fb_copy(fb_half[l][j], t0);
+				fb_copy(ctx->fb_half[l][j], t0);
 				for (k = 0; k < (FB_BITS - 1) / 2; k++) {
-					fb_sqr(fb_half[l][j], fb_half[l][j]);
-					fb_sqr(fb_half[l][j], fb_half[l][j]);
-					fb_add(fb_half[l][j], fb_half[l][j], t0);
+					fb_sqr(ctx->fb_half[l][j], ctx->fb_half[l][j]);
+					fb_sqr(ctx->fb_half[l][j], ctx->fb_half[l][j]);
+					fb_add(ctx->fb_half[l][j], ctx->fb_half[l][j], t0);
 				}
 			}
-			fb_rsh(fb_half[l][j], fb_half[l][j], 1);
+			fb_rsh(ctx->fb_half[l][j], ctx->fb_half[l][j], 1);
 		}
 	}
 	CATCH_ANY {
@@ -185,32 +157,20 @@ static void find_solve() {
 #if FB_SRT == QUICK || !defined(STRIP)
 
 /**
- * Square root of z.
- */
-static fb_st fb_srz;
-
-#ifdef FB_PRECO
-/**
- * Multiplication table for the z^(1/2).
- */
-static fb_st fb_tab_srz[256];
-
-#endif
-
-/**
  * Precomputes the square root of z.
  */
 static void find_srz() {
+	ctx_t *ctx = core_get();
 
-	fb_set_dig(fb_srz, 2);
+	fb_set_dig(ctx->fb_srz, 2);
 
 	for (int i = 1; i < FB_BITS; i++) {
-		fb_sqr(fb_srz, fb_srz);
+		fb_sqr(ctx->fb_srz, ctx->fb_srz);
 	}
 
 #ifdef FB_PRECO
 	for (int i = 0; i <= 255; i++) {
-		fb_mul_dig(fb_tab_srz[i], fb_srz, i);
+		fb_mul_dig(ctx->fb_tab_srz[i], ctx->fb_srz, i);
 	}
 #endif
 }
@@ -220,86 +180,62 @@ static void find_srz() {
 #if FB_INV == ITOHT || !defined(STRIP)
 
 /**
- * Maximum number of elements in the addition chain for (FB_BITS - 1).
- */
-#define MAX_CHAIN		16
-
-/**
- * Stores an addition chain for (FB_BITS - 1).
- */
-static int chain[MAX_CHAIN + 1];
-
-/**
- * Stores the length of the addition chain.
- */
-static int chain_len;
-
-/**
- * Tables for repeated squarings.
- */
-fb_st fb_tab_sqr[MAX_CHAIN][FB_TABLE];
-
-/**
- * Pointers to the elements in the tables of repeated squarings.
- */
-fb_st *fb_tab_ptr[MAX_CHAIN][FB_TABLE];
-
-/**
  * Finds an addition chain for (FB_BITS - 1).
  */
 static void find_chain() {
 	int i, j, k, l;
+	ctx_t *ctx = core_get();
 
-	chain_len = -1;
-	for (int i = 0; i < MAX_CHAIN; i++) {
-		chain[i] = (i << 8) + i;
+	ctx->chain_len = -1;
+	for (int i = 0; i < MAX_TERMS; i++) {
+		ctx->chain[i] = (i << 8) + i;
 	}
 	switch (FB_BITS) {
 		case 127:
-			chain[1] = (1 << 8) + 0;
-			chain[4] = (4 << 8) + 2;
-			chain[7] = (7 << 8) + 2;
-			chain_len = 9;
+			ctx->chain[1] = (1 << 8) + 0;
+			ctx->chain[4] = (4 << 8) + 2;
+			ctx->chain[7] = (7 << 8) + 2;
+			ctx->chain_len = 9;
 			break;
 		case 193:
-			chain[1] = (1 << 8) + 0;
-			chain_len = 8;
+			ctx->chain[1] = (1 << 8) + 0;
+			ctx->chain_len = 8;
 			break;
 		case 233:
-			chain[1] = (1 << 8) + 0;
-			chain[3] = (3 << 8) + 0;
-			chain[6] = (6 << 8) + 0;
-			chain_len = 10;
+			ctx->chain[1] = (1 << 8) + 0;
+			ctx->chain[3] = (3 << 8) + 0;
+			ctx->chain[6] = (6 << 8) + 0;
+			ctx->chain_len = 10;
 			break;
 		case 251:
-			chain[1] = (1 << 8) + 0;
-			chain[2] = (2 << 8) + 1;
-			chain[4] = (4 << 8) + 3;
-			chain[5] = (5 << 8) + 4;
-			chain[7] = (7 << 8) + 6;
-			chain[8] = (8 << 8) + 7;
-			chain_len = 10;
+			ctx->chain[1] = (1 << 8) + 0;
+			ctx->chain[2] = (2 << 8) + 1;
+			ctx->chain[4] = (4 << 8) + 3;
+			ctx->chain[5] = (5 << 8) + 4;
+			ctx->chain[7] = (7 << 8) + 6;
+			ctx->chain[8] = (8 << 8) + 7;
+			ctx->chain_len = 10;
 			break;
 		case 353:
-			chain[2] = (2 << 8) + 0;
-			chain[4] = (4 << 8) + 0;
-			chain_len = 10;
+			ctx->chain[2] = (2 << 8) + 0;
+			ctx->chain[4] = (4 << 8) + 0;
+			ctx->chain_len = 10;
 			break;
 		case 367:
-			chain[1] = (1 << 8) + 0;
-			chain[2] = (2 << 8) + 1;
-			chain[6] = (6 << 8) + 3;
-			chain[9] = (9 << 8) + 2;
-			chain_len = 11;
+			ctx->chain[1] = (1 << 8) + 0;
+			ctx->chain[2] = (2 << 8) + 1;
+			ctx->chain[6] = (6 << 8) + 3;
+			ctx->chain[9] = (9 << 8) + 2;
+			ctx->chain_len = 11;
 			break;
 		case 1223:
-			chain[1] = (1 << 8) + 0;
-			chain[2] = (2 << 8) + 0;
-			chain[4] = (4 << 8) + 2;
-			chain[5] = (5 << 8) + 4;
-			chain[10] = (10 << 8) + 2;
-			chain[11] = (11 << 8) + 10;
-			chain_len = 13;
+			ctx->chain[1] = (1 << 8) + 0;
+			ctx->chain[2] = (2 << 8) + 0;
+			ctx->chain[4] = (4 << 8) + 2;
+			ctx->chain[5] = (5 << 8) + 4;
+			ctx->chain[10] = (10 << 8) + 2;
+			ctx->chain[11] = (11 << 8) + 10;
+			ctx->chain_len = 13;
 			break;
 		default:
 			l = 0;
@@ -315,11 +251,11 @@ static void find_chain() {
 				}
 			}
 			i = 0;
-			chain_len = k + l;
+			ctx->chain_len = k + l;
 			while (j != 1) {
 				if ((j & 0x01) != 0) {
 					i++;
-					chain[chain_len - i] = ((chain_len - i) << 8) + 0;
+					ctx->chain[ctx->chain_len - i] = ((ctx->chain_len - i) << 8) + 0;
 				}
 				i++;
 				j = j >> 1;
@@ -327,19 +263,19 @@ static void find_chain() {
 			break;
 	}
 
-	int x, y, u[chain_len + 1];
+	int x, y, u[ctx->chain_len + 1];
 
-	for (i = 0; i < MAX_CHAIN; i++) {
+	for (i = 0; i < MAX_TERMS; i++) {
 		for (j = 0; j < FB_TABLE; j++) {
-			fb_tab_ptr[i][j] = &(fb_tab_sqr[i][j]);
+			ctx->fb_tab_ptr[i][j] = &(ctx->fb_tab_sqr[i][j]);
 		}
 	}
 
 	u[0] = 1;
 	u[1] = 2;
-	for (i = 2; i <= chain_len; i++) {
-		x = chain[i - 1] >> 8;
-		y = chain[i - 1] - (x << 8);
+	for (i = 2; i <= ctx->chain_len; i++) {
+		x = ctx->chain[i - 1] >> 8;
+		y = ctx->chain[i - 1] - (x << 8);
 		if (x == y) {
 			u[i] = 2 * u[i - 1];
 		} else {
@@ -347,7 +283,7 @@ static void find_chain() {
 		}
 	}
 
-	for (i = 0; i <= chain_len; i++) {
+	for (i = 0; i <= ctx->chain_len; i++) {
 		fb_itr_pre(fb_poly_tab_sqr(i), u[i]);
 	}
 }
@@ -360,7 +296,7 @@ static void find_chain() {
  * @param[in] f				- the new irreducible polynomial.
  */
 static void fb_poly_set(fb_t f) {
-	fb_copy(fb_poly, f);
+	fb_copy(core_get()->fb_poly, f);
 #if FB_TRC == QUICK || !defined(STRIP)
 	find_trace();
 #endif
@@ -385,41 +321,45 @@ static void fb_poly_set(fb_t f) {
 /*============================================================================*/
 
 void fb_poly_init(void) {
-	fb_zero(fb_poly);
-	poly_a = poly_b = poly_c = 0;
-	pos_a = pos_b = pos_c = -1;
+	ctx_t *ctx = core_get();
+
+	fb_zero(ctx->fb_poly);
+	ctx->fb_pa = ctx->fb_pb = ctx->fb_pc = 0;
+	ctx->fb_na = ctx->fb_nb = ctx->fb_nc = -1;
 }
 
 void fb_poly_clean(void) {
 }
 
 dig_t *fb_poly_get(void) {
-	return fb_poly;
+	return core_get()->fb_poly;
 }
 
 void fb_poly_add(fb_t c, fb_t a) {
+	ctx_t *ctx = core_get();
+
 	if (c != a) {
 		fb_copy(c, a);
 	}
 
-	if (poly_a != 0) {
-		c[FB_DIGS - 1] ^= fb_poly[FB_DIGS - 1];
-		if (pos_a != FB_DIGS - 1) {
-			c[pos_a] ^= fb_poly[pos_a];
+	if (ctx->fb_pa != 0) {
+		c[FB_DIGS - 1] ^= ctx->fb_poly[FB_DIGS - 1];
+		if (ctx->fb_na != FB_DIGS - 1) {
+			c[ctx->fb_na] ^= ctx->fb_poly[ctx->fb_na];
 		}
-		if (poly_b != 0 && poly_c != 0) {
-			if (pos_b != pos_a) {
-				c[pos_b] ^= fb_poly[pos_b];
+		if (ctx->fb_pb != 0 && ctx->fb_pc != 0) {
+			if (ctx->fb_nb != ctx->fb_na) {
+				c[ctx->fb_nb] ^= ctx->fb_poly[ctx->fb_nb];
 			}
-			if (pos_c != pos_a && pos_c != pos_b) {
-				c[pos_c] ^= fb_poly[pos_c];
+			if (ctx->fb_nc != ctx->fb_na && ctx->fb_nc != ctx->fb_nb) {
+				c[ctx->fb_nc] ^= ctx->fb_poly[ctx->fb_nc];
 			}
 		}
-		if (pos_a != 0 && pos_b != 0 && pos_c != 0) {
+		if (ctx->fb_na != 0 && ctx->fb_nb != 0 && ctx->fb_nc != 0) {
 			c[0] ^= 1;
 		}
 	} else {
-		fb_add(c, a, fb_poly);
+		fb_add(c, a, ctx->fb_poly);
 	}
 }
 
@@ -428,22 +368,24 @@ void fb_poly_sub(fb_t c, fb_t a) {
 }
 
 void fb_poly_set_dense(fb_t f) {
+	ctx_t *ctx = core_get();
 	fb_poly_set(f);
-	poly_a = poly_b = poly_c = 0;
-	pos_a = pos_b = pos_c = -1;
+	ctx->fb_pa = ctx->fb_pb = ctx->fb_pc = 0;
+	ctx->fb_na = ctx->fb_nb = ctx->fb_nc = -1;
 }
 
 void fb_poly_set_trino(int a) {
 	fb_t f;
+	ctx_t *ctx = core_get();
 
 	fb_null(f);
 
 	TRY {
-		poly_a = a;
-		poly_b = poly_c = 0;
+		ctx->fb_pa = a;
+		ctx->fb_pb = ctx->fb_pc = 0;
 
-		pos_a = poly_a >> FB_DIG_LOG;
-		pos_b = pos_c = -1;
+		ctx->fb_na = ctx->fb_pa >> FB_DIG_LOG;
+		ctx->fb_nb = ctx->fb_nc = -1;
 
 		fb_new(f);
 		fb_zero(f);
@@ -462,19 +404,20 @@ void fb_poly_set_trino(int a) {
 
 void fb_poly_set_penta(int a, int b, int c) {
 	fb_t f;
+	ctx_t *ctx = core_get();
 
 	fb_null(f);
 
 	TRY {
 		fb_new(f);
 
-		poly_a = a;
-		poly_b = b;
-		poly_c = c;
+		ctx->fb_pa = a;
+		ctx->fb_pb = b;
+		ctx->fb_pc = c;
 
-		pos_a = poly_a >> FB_DIG_LOG;
-		pos_b = poly_b >> FB_DIG_LOG;
-		pos_c = poly_c >> FB_DIG_LOG;
+		ctx->fb_na = ctx->fb_pa >> FB_DIG_LOG;
+		ctx->fb_nb = ctx->fb_pb >> FB_DIG_LOG;
+		ctx->fb_nc = ctx->fb_pc >> FB_DIG_LOG;
 
 		fb_zero(f);
 		fb_set_bit(f, FB_BITS, 1);
@@ -494,7 +437,7 @@ void fb_poly_set_penta(int a, int b, int c) {
 
 dig_t *fb_poly_get_srz(void) {
 #if FB_SRT == QUICK || !defined(STRIP)
-	return fb_srz;
+	return core_get()->fb_srz;
 #else
 	return NULL;
 #endif
@@ -504,9 +447,9 @@ fb_t *fb_poly_tab_sqr(int i) {
 #if FB_INV == ITOHT || !defined(STRIP)
 	/* If ITOHT inversion is used and tables are precomputed, return them. */
 #if ALLOC == AUTO
-	return (fb_t *)*fb_tab_ptr[i];
+	return (fb_t *)*core_get()->fb_tab_ptr[i];
 #else
-	return (fb_t *)fb_tab_ptr[i];
+	return (fb_t *)core_get()->fb_tab_ptr[i];
 #endif
 
 #else
@@ -518,7 +461,7 @@ dig_t *fb_poly_tab_srz(int i) {
 #if FB_SRT == QUICK || !defined(STRIP)
 
 #ifdef FB_PRECO
-	return fb_tab_srz[i];
+	return core_get()->fb_tab_srz[i];
 #else
 	return NULL;
 #endif
@@ -530,23 +473,25 @@ dig_t *fb_poly_tab_srz(int i) {
 
 void fb_poly_get_trc(int *a, int *b, int *c) {
 #if FB_TRC == QUICK || !defined(STRIP)
-	*a = trc_a;
-	*b = trc_b;
-	*c = trc_c;
+	ctx_t *ctx = core_get();
+	*a = ctx->fb_ta;
+	*b = ctx->fb_tb;
+	*c = ctx->fb_tc;
 #else
 	*a = *b = *c = -1;
 #endif
 }
 
 void fb_poly_get_rdc(int *a, int *b, int *c) {
-	*a = poly_a;
-	*b = poly_b;
-	*c = poly_c;
+	ctx_t *ctx = core_get();
+	*a = ctx->fb_pa;
+	*b = ctx->fb_pb;
+	*c = ctx->fb_pc;
 }
 
 dig_t *fb_poly_get_slv() {
 #if FB_SLV == QUICK || !defined(STRIP)
-	return (dig_t *)&(fb_half);
+	return (dig_t *)&(core_get()->fb_half);
 #else
 	return NULL;
 #endif
@@ -554,11 +499,12 @@ dig_t *fb_poly_get_slv() {
 
 int *fb_poly_get_chain(int *len) {
 #if FB_INV == ITOHT || !defined(STRIP)
-	if (chain_len > 0 && chain_len < MAX_CHAIN) {
+	ctx_t *ctx = core_get();
+	if (ctx->chain_len > 0 && ctx->chain_len < MAX_TERMS) {
 		if (len != NULL) {
-			*len = chain_len;
+			*len = ctx->chain_len;
 		}
-		return chain;
+		return ctx->chain;
 	} else {
 		if (len != NULL) {
 			*len = 0;
