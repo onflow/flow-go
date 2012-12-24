@@ -154,6 +154,9 @@ typedef ep3_st *ep3_t;
 #if ALLOC == DYNAMIC
 #define ep2_free(A)															\
 	if (A != NULL) {														\
+		fp2_free((A)->x);													\
+		fp2_free((A)->y);													\
+		fp2_free((A)->z);													\
 		free(A);															\
 		A = NULL;															\
 	}

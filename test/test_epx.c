@@ -127,9 +127,9 @@ int util(void) {
 	}
 	code = STS_OK;
   end:
-	ep_free(a);
-	ep_free(b);
-	ep_free(c);
+	ep2_free(a);
+	ep2_free(b);
+	ep2_free(c);
 	bn_free(n);
 	return code;
 }
@@ -773,8 +773,10 @@ static int simultaneous(void) {
 	ep2_free(p);
 	ep2_free(q);
 	ep2_free(r);
+	ep2_free(s);
 	bn_free(n);
 	bn_free(k);
+	bn_free(l);
 	return code;
 }
 
