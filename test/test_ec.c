@@ -456,8 +456,10 @@ static int simultaneous(void) {
 	ec_free(p);
 	ec_free(q);
 	ec_free(r);
+	ec_free(s);
 	bn_free(n);
 	bn_free(k);
+	bn_free(l);
 	return code;
 }
 
@@ -524,6 +526,7 @@ static int hashing(void) {
 	code = STS_OK;
   end:
 	ec_free(a);
+	bn_free(n);
 	return code;
 }
 
