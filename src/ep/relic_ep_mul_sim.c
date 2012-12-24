@@ -481,7 +481,7 @@ void ep_mul_sim_inter(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 	}
 #endif
 
-#if defined(EP_ORDIN)
+#if defined(EP_ORDIN) || defined(EP_SUPER)
 	ep_mul_sim_ordin(r, p, k, q, l, NULL);
 #endif
 }

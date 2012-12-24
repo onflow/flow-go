@@ -563,8 +563,6 @@ int ep_param_set_any_pairf() {
 	twist = EP_DTYPE;
 	degree = 2;
 #else
-	(void)twist;
-	(void)degree;
 	r = STS_ERR;
 #endif
 #ifdef WITH_PP
@@ -576,6 +574,9 @@ int ep_param_set_any_pairf() {
 			r = STS_ERR;
 		}
 	}
+#else
+	(void)twist;
+	(void)degree;
 #endif
 	return r;
 }
