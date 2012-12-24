@@ -43,7 +43,7 @@
 
 #include "relic_error.h"
 #include "relic_bn.h"
-#include "relic_fb.h"
+#include "relic_eb.h"
 #include "relic_epx.h"
 #include "relic_conf.h"
 #include "relic_rand.h"
@@ -195,6 +195,49 @@ typedef struct _ctx_t {
 #endif /* FB_INV == ITOHT */
 #endif /* WITH_FB */
 
+#ifdef WITH_EB
+	/** Currently configured binary elliptic curve identifier. */
+	int eb_id;
+	/** The a-coefficient of the elliptic curve. */
+	fb_st eb_a;
+	/** The b-coefficient of the elliptic curve. */
+	fb_st eb_b;
+	/** Optimization identifier for the a-coefficient. */
+	int eb_opt_a;
+	/** Optimization identifier for the b-coefficient. */
+	int eb_opt_b;
+#if defined(EB_SUPER)
+	/** The b-coefficient of the elliptic curve. */
+	fb_st eb_c;
+	/** Optimization identifier for the a-coefficient. */
+	int eb_opt_c;
+#endif
+	/** The generator of the elliptic curve. */
+	eb_st eb_g;
+	/** The order of the group of points in the elliptic curve. */
+	bn_st eb_r;
+	/** The cofactor of the group order in the elliptic curve. */
+	bn_st eb_h;
+#ifdef EB_KBLTZ
+#if (EB_MUL == LWNAF || EB_MUL == RWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP))
+	/** Parameters required by Koblitz curves. @{ */
+	bn_st eb_vm;
+	bn_st eb_s0;
+	bn_st eb_s1;
+#endif /* EB_KBLTZ */
+#endif /* EB_MUL */
+	/** Flag that stores if the prime curve has efficient endomorphisms. */
+	int eb_is_kbltz;
+	/** Flag that stores if the prime curve is supersingular. */
+	int eb_is_super;
+#ifdef EB_PRECO
+	/** Precomputation table for generator multiplication. */
+	eb_st eb_pre[EB_TABLE];
+	/** Array of pointers to the precomputation table. */
+	eb_st *eb_ptr[EB_TABLE];
+#endif /* EB_PRECO */
+#endif /* WITH_EB */
+
 #ifdef WITH_FP
 	/** Currently configured prime field identifier. */
 	int fp_id;
@@ -237,8 +280,8 @@ typedef struct _ctx_t {
 #if EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP)
 	/** Parameters required by the GLV method. @{ */
 	fp_st beta;
-	bn_st v1[3];
-	bn_st v2[3];
+	bn_st ep_v1[3];
+	bn_st ep_v2[3];
 	/** @} */
 #endif /* EP_KBLTZ */
 #endif /* EP_MUL */

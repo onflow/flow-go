@@ -326,17 +326,12 @@
 	FETCH(str, CURVE##_C, sizeof(CURVE##_C));								\
 	fb_read(c, str, strlen(str), 16);										\
 
-/**
- * Current configured elliptic curve parameters.
- */
-static int param_id;
-
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 int eb_param_get() {
-	return param_id;
+	return core_get()->eb_id;
 }
 
 void eb_param_set(int param) {
@@ -477,7 +472,7 @@ void eb_param_set(int param) {
 		(void)super;
 		(void)c;
 
-		param_id = param;
+		core_get()->eb_id = param;
 
 		fb_zero(g->z);
 		fb_set_bit(g->z, 0, 1);
@@ -595,7 +590,7 @@ int eb_param_set_any_super() {
 }
 
 void eb_param_print() {
-	switch (param_id) {
+	switch (core_get()->eb_id) {
 		case NIST_B163:
 			util_banner("Curve NIST-B163:", 0);
 			break;
@@ -651,7 +646,7 @@ void eb_param_print() {
 }
 
 int eb_param_level() {
-	switch (param_id) {
+	switch (core_get()->eb_id) {
 		case NIST_B163:
 		case NIST_K163:
 			return 80;

@@ -40,98 +40,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-/**
- * The A coefficient of the elliptic curve.
- */
-static fb_st curve_a;
-
-/**
- * Optimization identifier for the configured curve derived from the a
- * coefficient.
- */
-static int curve_opt_a;
-
-/**
- * The B coefficient of the elliptic curve.
- */
-static fb_st curve_b;
-
-/**
- * Optimization identifier for the configured curve derived from the b
- * coefficient.
- */
-static int curve_opt_b;
-
-#if defined(EB_SUPER)
-
-/**
- * The C coefficient of the supersingular elliptic curve.
- */
-static fb_st curve_c;
-
-/**
- * Optimization identifier for the configured curve derived from the c
- * coefficient.
- */
-static int curve_opt_c;
-
-#endif
-
-/**
- * The generator of the elliptic curve.
- */
-static eb_st curve_g;
-
-#ifdef EB_PRECO
-
-/**
- * Precomputation table for generator multiplication.
- */
-static eb_st table[EB_TABLE];
-
-/**
- * Array of pointers to the precomputation table.
- */
-static eb_st *pointer[EB_TABLE];
-
-#endif
-
-/**
- * The order of the group of points in the elliptic curve.
- */
-static bn_st curve_r;
-
-/**
- * The cofactor of the group order in the elliptic curve.
- */
-static bn_st curve_h;
-
-/**
- * Flag that stores if the configured binary elliptic curve is a Koblitz
- * curve.
- */
-static int curve_is_kbltz;
-
-/**
- * Flag that stores if the configured binary elliptic curve is supersingular.
- */
-static int curve_is_super;
-
 #if defined(EB_KBLTZ) && (EB_MUL == LWNAF || EB_MUL == RWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP))
-/**
- * V_m auxiliary parameter for Koblitz curves.
- */
-static bn_st curve_vm;
-
-/**
- * S_0 auxiliary parameter for Koblitz curves.
- */
-static bn_st curve_s0;
-
-/**
- * S_1 auxiliary parameter for Koblitz curves.
- */
-static bn_st curve_s1;
 
 /**
  * Precomputes additional parameters for Koblitz curves used by the w-TNAF
@@ -140,6 +49,7 @@ static bn_st curve_s1;
 static void compute_kbltz(void) {
 	int u, i;
 	bn_t a, b, c;
+	ctx_t *ctx = core_get();
 
 	bn_null(a);
 	bn_null(b);
@@ -150,7 +60,7 @@ static void compute_kbltz(void) {
 		bn_new(b);
 		bn_new(c);
 
-		if (curve_opt_a == OPT_ZERO) {
+		if (ctx->eb_opt_a == OPT_ZERO) {
 			u = -1;
 		} else {
 			u = 1;
@@ -170,7 +80,7 @@ static void compute_kbltz(void) {
 			bn_sub(b, b, a);
 			bn_copy(a, c);
 		}
-		bn_copy(&curve_vm, b);
+		bn_copy(&(ctx->eb_vm), b);
 
 		bn_zero(a);
 		bn_set_dig(b, 1);
@@ -184,7 +94,7 @@ static void compute_kbltz(void) {
 			bn_add_dig(b, b, 1);
 			bn_copy(a, c);
 		}
-		bn_copy(&curve_s0, b);
+		bn_copy(&(ctx->eb_s0), b);
 
 		bn_zero(a);
 		bn_zero(b);
@@ -198,7 +108,7 @@ static void compute_kbltz(void) {
 			bn_sub_dig(b, b, 1);
 			bn_copy(a, c);
 		}
-		bn_copy(&curve_s1, b);
+		bn_copy(&(ctx->eb_s1), b);
 
 	}
 	CATCH_ANY {
@@ -240,9 +150,10 @@ static void detect_opt(int *opt, fb_t a) {
 /*============================================================================*/
 
 void eb_curve_init(void) {
+	ctx_t *ctx = core_get();
 #ifdef EB_PRECO
 	for (int i = 0; i < EB_TABLE; i++) {
-		pointer[i] = &(table[i]);
+		ctx->eb_ptr[i] = &(ctx->eb_pre[i]);
 	}
 #endif
 #if ALLOC == STATIC
@@ -255,19 +166,20 @@ void eb_curve_init(void) {
 		fb_new(table[i].z);
 	}
 #endif
-	fb_zero(curve_g.x);
-	fb_zero(curve_g.y);
-	fb_zero(curve_g.z);
-	bn_init(&curve_r, FB_DIGS);
-	bn_init(&curve_h, FB_DIGS);
+	fb_zero(ctx->eb_g.x);
+	fb_zero(ctx->eb_g.y);
+	fb_zero(ctx->eb_g.z);
+	bn_init(&(ctx->eb_r), FB_DIGS);
+	bn_init(&(ctx->eb_h), FB_DIGS);
 #if defined(EB_KBLTZ) && (EB_MUL == LWNAF || !defined(STRIP))
-	bn_init(&curve_vm, FB_DIGS);
-	bn_init(&curve_s0, FB_DIGS);
-	bn_init(&curve_s1, FB_DIGS);
+	bn_init(&(ctx->eb_vm), FB_DIGS);
+	bn_init(&(ctx->eb_s0), FB_DIGS);
+	bn_init(&(ctx->eb_s1), FB_DIGS);
 #endif
 }
 
 void eb_curve_clean(void) {
+	ctx_t *ctx = core_get();
 #if ALLOC == STATIC
 	fb_free(curve_g.x);
 	fb_free(curve_g.y);
@@ -278,35 +190,35 @@ void eb_curve_clean(void) {
 		fb_free(table[i].z);
 	}
 #endif
-	bn_clean(&curve_r);
-	bn_clean(&curve_h);
+	bn_clean(&(ctx->eb_r));
+	bn_clean(&(ctx->eb_h));
 #if defined(EB_KBLTZ) && (EB_MUL == LWNAF || !defined(STRIP))
-	bn_clean(&curve_vm);
-	bn_clean(&curve_s0);
-	bn_clean(&curve_s1);
+	bn_clean(&(ctx->eb_vm));
+	bn_clean(&(ctx->eb_s0));
+	bn_clean(&(ctx->eb_s1));
 #endif
 }
 
 dig_t *eb_curve_get_a() {
-	return curve_a;
+	return core_get()->eb_a;
 }
 
 int eb_curve_opt_a() {
-	return curve_opt_a;
+	return core_get()->eb_opt_a;
 }
 
 dig_t *eb_curve_get_b() {
-	return curve_b;
+	return core_get()->eb_b;
 }
 
 int eb_curve_opt_b() {
-	return curve_opt_b;
+	return core_get()->eb_opt_b;
 }
 
 dig_t *eb_curve_get_c() {
 #if defined(EB_SUPER)
-	if (curve_is_super) {
-		return curve_c;
+	if (core_get()->eb_is_super) {
+		return core_get()->eb_c;
 	}
 #endif
 	return NULL;
@@ -314,52 +226,53 @@ dig_t *eb_curve_get_c() {
 
 int eb_curve_opt_c() {
 #if defined(EB_SUPER)
-	return curve_opt_c;
-#else
-	return OPT_NONE;
+	if (core_get()->eb_is_super) {
+		return core_get()->eb_opt_c;
+	}
 #endif
+	return OPT_NONE;
 }
 
 int eb_curve_is_kbltz() {
-	return curve_is_kbltz;
+	return core_get()->eb_is_kbltz;
 }
 
 int eb_curve_is_super() {
-	return curve_is_super;
+	return core_get()->eb_is_super;
 }
 
 void eb_curve_get_gen(eb_t g) {
-	eb_copy(g, &curve_g);
+	eb_copy(g, &(core_get()->eb_g));
 }
 
 void eb_curve_get_ord(bn_t n) {
-	bn_copy(n, &curve_r);
+	bn_copy(n, &(core_get()->eb_r));
 }
 
 void eb_curve_get_cof(bn_t h) {
-	bn_copy(h, &curve_h);
+	bn_copy(h, &(core_get()->eb_h));
 }
 
 #if defined(EB_KBLTZ) && (EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP))
 void eb_curve_get_vm(bn_t vm) {
-	if (curve_is_kbltz) {
-		bn_copy(vm, &curve_vm);
+	if (core_get()->eb_is_kbltz) {
+		bn_copy(vm, &(core_get()->eb_vm));
 	} else {
 		bn_zero(vm);
 	}
 }
 
 void eb_curve_get_s0(bn_t s0) {
-	if (curve_is_kbltz) {
-		bn_copy(s0, &curve_s0);
+	if (core_get()->eb_is_kbltz) {
+		bn_copy(s0, &(core_get()->eb_s0));
 	} else {
 		bn_zero(s0);
 	}
 }
 
 void eb_curve_get_s1(bn_t s1) {
-	if (curve_is_kbltz) {
-		bn_copy(s1, &curve_s1);
+	if (core_get()->eb_is_kbltz) {
+		bn_copy(s1, &(core_get()->eb_s1));
 	} else {
 		bn_zero(s1);
 	}
@@ -371,9 +284,9 @@ eb_t *eb_curve_get_tab() {
 
 	/* Return a meaningful pointer. */
 #if ALLOC == AUTO
-	return (eb_t *)*pointer;
+	return (eb_t *)*(core_get()->eb_ptr);
 #else
-	return pointer;
+	return core_get()->eb_ptr;
 #endif
 
 #else
@@ -385,30 +298,31 @@ eb_t *eb_curve_get_tab() {
 #if defined(EB_ORDIN)
 
 void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r, bn_t h) {
-	fb_copy(curve_a, a);
-	fb_copy(curve_b, b);
+	ctx_t *ctx = core_get();
+	fb_copy(ctx->eb_a, a);
+	fb_copy(ctx->eb_b, b);
 
-	detect_opt(&curve_opt_a, curve_a);
-	detect_opt(&curve_opt_b, curve_b);
+	detect_opt(&(ctx->eb_opt_a), ctx->eb_a);
+	detect_opt(&(ctx->eb_opt_b), ctx->eb_b);
 
-	curve_is_super = 0;
-	if (fb_cmp_dig(curve_b, 1) == CMP_EQ) {
-		curve_is_kbltz = 1;
+	ctx->eb_is_super = 0;
+	if (fb_cmp_dig(ctx->eb_b, 1) == CMP_EQ) {
+		ctx->eb_is_kbltz = 1;
 	} else {
-		curve_is_kbltz = 0;
+		ctx->eb_is_kbltz = 0;
 	}
 #if defined(EB_KBLTZ) && (EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP))
-	if (curve_is_kbltz) {
+	if (ctx->eb_is_kbltz) {
 		compute_kbltz();
 	}
 #endif
 
 	eb_norm(g, g);
-	eb_copy(&curve_g, g);
-	bn_copy(&curve_r, r);
-	bn_copy(&curve_h, h);
+	eb_copy(&(ctx->eb_g), g);
+	bn_copy(&(ctx->eb_r), r);
+	bn_copy(&(ctx->eb_h), h);
 #if defined(EB_PRECO)
-	eb_mul_pre(eb_curve_get_tab(), &curve_g);
+	eb_mul_pre(eb_curve_get_tab(), &(ctx->eb_g));
 #endif
 }
 
@@ -417,24 +331,26 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r, bn_t h) {
 #if defined(EB_KBLTZ)
 
 void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r, bn_t h) {
-	curve_is_kbltz = 1;
-	curve_is_super = 0;
+	ctx_t *ctx = core_get();
 
-	fb_copy(curve_a, a);
-	fb_set_dig(curve_b, 1);
+	ctx->eb_is_kbltz = 1;
+	ctx->eb_is_super = 0;
 
-	detect_opt(&curve_opt_a, curve_a);
-	detect_opt(&curve_opt_b, curve_b);
+	fb_copy(ctx->eb_a, a);
+	fb_set_dig(ctx->eb_b, 1);
+
+	detect_opt(&(ctx->eb_opt_a), ctx->eb_a);
+	detect_opt(&(ctx->eb_opt_b), ctx->eb_b);
 
 #if EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP)
 	compute_kbltz();
 #endif
 	eb_norm(g, g);
-	eb_copy(&curve_g, g);
-	bn_copy(&curve_r, r);
-	bn_copy(&curve_h, h);
+	eb_copy(&(ctx->eb_g), g);
+	bn_copy(&(ctx->eb_r), r);
+	bn_copy(&(ctx->eb_h), h);
 #if defined(EB_PRECO)
-	eb_mul_pre(eb_curve_get_tab(), &curve_g);
+	eb_mul_pre(eb_curve_get_tab(), &(ctx->eb_g));
 #endif
 }
 
@@ -443,23 +359,25 @@ void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r, bn_t h) {
 #if defined(EB_SUPER)
 
 void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t r, bn_t h) {
-	curve_is_kbltz = 0;
-	curve_is_super = 1;
+	ctx_t *ctx = core_get();
 
-	fb_copy(curve_a, a);
-	fb_copy(curve_b, b);
-	fb_copy(curve_c, c);
+	ctx->eb_is_kbltz = 0;
+	ctx->eb_is_super = 1;
 
-	detect_opt(&curve_opt_a, curve_a);
-	detect_opt(&curve_opt_b, curve_b);
-	detect_opt(&curve_opt_c, curve_c);
+	fb_copy(ctx->eb_a, a);
+	fb_copy(ctx->eb_b, b);
+	fb_copy(ctx->eb_c, c);
+
+	detect_opt(&(ctx->eb_opt_a), ctx->eb_a);
+	detect_opt(&(ctx->eb_opt_b), ctx->eb_b);
+	detect_opt(&(ctx->eb_opt_c), ctx->eb_c);
 
 	eb_norm(g, g);
-	eb_copy(&curve_g, g);
-	bn_copy(&curve_r, r);
-	bn_copy(&curve_h, h);
+	eb_copy(&(ctx->eb_g), g);
+	bn_copy(&(ctx->eb_r), r);
+	bn_copy(&(ctx->eb_h), h);
 #if defined(EB_PRECO)
-	eb_mul_pre(eb_curve_get_tab(), &curve_g);
+	eb_mul_pre(eb_curve_get_tab(), &(ctx->eb_g));
 #endif
 }
 
