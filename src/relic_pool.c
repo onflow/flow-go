@@ -50,8 +50,9 @@ dig_t *pool_get(void) {
 	int i, r;
 	ctx_t *ctx = core_get();
 
-	if (ctx->next == POOL_EMPTY)
+	if (ctx->next == POOL_EMPTY) {
 		return NULL;
+	}
 
 	/** Allocate a free element. */
 	r = ctx->next;
