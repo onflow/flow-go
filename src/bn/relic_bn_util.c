@@ -117,12 +117,14 @@ int bn_bits(bn_t a) {
 
 int bn_test_bit(bn_t a, int bit) {
 	int d;
-	dig_t mask;
 
 	SPLIT(bit, d, bit, BN_DIG_LOG);
 
-	mask = ((dig_t)1) << bit;
-	return (a->dp[d] & mask) != 0;
+	if (d >= a->used) {
+		return 0;
+	} else {
+		return (a->dp[d] & ((dig_t)1 << bit)) != 0;
+	}
 }
 
 int bn_get_bit(bn_t a, int bit) {
@@ -130,7 +132,7 @@ int bn_get_bit(bn_t a, int bit) {
 
 	SPLIT(bit, d, bit, BN_DIG_LOG);
 
-	if (d > a->used) {
+	if (d >= a->used) {
 		return 0;
 	} else {
 		return ((a->dp[d] & ((dig_t)1 << bit)) >> bit);
