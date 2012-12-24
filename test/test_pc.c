@@ -449,8 +449,10 @@ static int simultaneous1(void) {
 	g1_free(p);
 	g1_free(q);
 	g1_free(r);
+	g1_free(s);
 	bn_free(n);
 	bn_free(k);
+	bn_free(l);
 	return code;
 }
 
@@ -484,6 +486,7 @@ static int hashing1(void) {
 	code = STS_OK;
   end:
 	g1_free(a);
+	bn_free(n);
 	return code;
 }
 
@@ -902,8 +905,10 @@ static int simultaneous2(void) {
 	g2_free(p);
 	g2_free(q);
 	g2_free(r);
+	g2_free(s);
 	bn_free(n);
 	bn_free(k);
+	bn_free(l);
 	return code;
 }
 
@@ -937,6 +942,7 @@ static int hashing2(void) {
 	code = STS_OK;
   end:
 	g2_free(a);
+	bn_free(n);
 	return code;
 }
 
