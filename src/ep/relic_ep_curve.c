@@ -110,8 +110,8 @@ void ep_curve_init(void) {
 	bn_init(&ctx->ep_h, FP_DIGS);
 #if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || !defined(STRIP))
 	for (int i = 0; i < 3; i++) {
-		bn_init(&(ctx->v1[i]), FP_DIGS);
-		bn_init(&(ctx->v2[i]), FP_DIGS);
+		bn_init(&(ctx->ep_v1[i]), FP_DIGS);
+		bn_init(&(ctx->ep_v2[i]), FP_DIGS);
 	}
 #endif
 }
@@ -134,8 +134,8 @@ void ep_curve_clean(void) {
 	bn_clean(&ctx->ep_h);
 #if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || !defined(STRIP))
 	for (int i = 0; i < 3; i++) {
-		bn_clean(&(ctx->v1[i]));
-		bn_clean(&(ctx->v2[i]));
+		bn_clean(&(ctx->ep_v1[i]));
+		bn_clean(&(ctx->ep_v2[i]));
 	}
 #endif
 }
@@ -157,14 +157,14 @@ dig_t *ep_curve_get_beta() {
 void ep_curve_get_v1(bn_t v[]) {
 	ctx_t *ctx = core_get();
 	for (int i = 0; i < 3; i++) {
-		bn_copy(v[i], &(ctx->v1[i]));
+		bn_copy(v[i], &(ctx->ep_v1[i]));
 	}
 }
 
 void ep_curve_get_v2(bn_t v[]) {
 	ctx_t *ctx = core_get();
 	for (int i = 0; i < 3; i++) {
-		bn_copy(v[i], &(ctx->v2[i]));
+		bn_copy(v[i], &(ctx->ep_v2[i]));
 	}
 }
 
@@ -258,29 +258,29 @@ void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, bn_t h, fp_t beta, bn_t l) {
 
 #if EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP)
 	fp_copy(ctx->beta, beta);
-	bn_gcd_ext_mid(&(ctx->v1[1]), &(ctx->v1[2]), &(ctx->v2[1]), &(ctx->v2[2]), l, r);
+	bn_gcd_ext_mid(&(ctx->ep_v1[1]), &(ctx->ep_v1[2]), &(ctx->ep_v2[1]), &(ctx->ep_v2[2]), l, r);
 	/* l = v1[1] * v2[2] - v1[2] * v2[1], r = l / 2. */
-	bn_mul(&(ctx->v1[0]), &(ctx->v1[1]), &(ctx->v2[2]));
-	bn_mul(&(ctx->v2[0]), &(ctx->v1[2]), &(ctx->v2[1]));
-	bn_sub(l, &(ctx->v1[0]), &(ctx->v2[0]));
+	bn_mul(&(ctx->ep_v1[0]), &(ctx->ep_v1[1]), &(ctx->ep_v2[2]));
+	bn_mul(&(ctx->ep_v2[0]), &(ctx->ep_v1[2]), &(ctx->ep_v2[1]));
+	bn_sub(l, &(ctx->ep_v1[0]), &(ctx->ep_v2[0]));
 	bn_hlv(r, l);
 	/* v1[0] = round(v2[2] * 2^|n| / l). */
-	bn_lsh(&(ctx->v1[0]), &(ctx->v2[2]), bits + 1);
-	if (bn_sign(&(ctx->v1[0])) == BN_POS) {
-		bn_add(&(ctx->v1[0]), &(ctx->v1[0]), r);
+	bn_lsh(&(ctx->ep_v1[0]), &(ctx->ep_v2[2]), bits + 1);
+	if (bn_sign(&(ctx->ep_v1[0])) == BN_POS) {
+		bn_add(&(ctx->ep_v1[0]), &(ctx->ep_v1[0]), r);
 	} else {
-		bn_sub(&(ctx->v1[0]), &(ctx->v1[0]), r);
+		bn_sub(&(ctx->ep_v1[0]), &(ctx->ep_v1[0]), r);
 	}
-	bn_div(&(ctx->v1[0]), &(ctx->v1[0]), l);
+	bn_div(&(ctx->ep_v1[0]), &(ctx->ep_v1[0]), l);
 	/* v2[0] = round(v1[2] * 2^|n| / l). */
-	bn_lsh(&(ctx->v2[0]), &(ctx->v1[2]), bits + 1);
-	if (bn_sign(&(ctx->v2[0])) == BN_POS) {
-		bn_add(&(ctx->v2[0]), &(ctx->v2[0]), r);
+	bn_lsh(&(ctx->ep_v2[0]), &(ctx->ep_v1[2]), bits + 1);
+	if (bn_sign(&(ctx->ep_v2[0])) == BN_POS) {
+		bn_add(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), r);
 	} else {
-		bn_sub(&(ctx->v2[0]), &(ctx->v2[0]), r);
+		bn_sub(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), r);
 	}
-	bn_div(&(ctx->v2[0]), &(ctx->v2[0]), l);
-	bn_neg(&(ctx->v2[0]), &(ctx->v2[0]));
+	bn_div(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), l);
+	bn_neg(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]));
 #endif
 
 #if defined(EP_PRECO)
