@@ -39,7 +39,7 @@
 
 void fp_prime_init() {
 	ctx_t *ctx = core_get();
-	ctx->prime_id = ctx->len = 0;
+	ctx->fp_id = ctx->sps_len = 0;
 	memset(ctx->sps, 0, sizeof(ctx->sps));
 	memset(ctx->var, 0, sizeof(ctx->var));
 	bn_init(&(ctx->prime), FP_DIGS);
@@ -49,7 +49,7 @@ void fp_prime_init() {
 
 void fp_prime_clean() {
 	ctx_t *ctx = core_get();
-	ctx->prime_id = ctx->len = 0;
+	ctx->fp_id = ctx->sps_len = 0;
 	memset(ctx->sps, 0, sizeof(ctx->sps));
 	memset(ctx->var, 0, sizeof(ctx->var));
 	bn_clean(&(ctx->one));
@@ -67,9 +67,9 @@ dig_t *fp_prime_get_rdc(void) {
 
 int *fp_prime_get_sps(int *len) {
 	ctx_t *ctx = core_get();
-	if (ctx->len > 0 && ctx->len < MAX_TERMS ) {
+	if (ctx->sps_len > 0 && ctx->sps_len < MAX_TERMS ) {
 		if (len != NULL) {
-			*len = ctx->len;
+			*len = ctx->sps_len;
 		}
 		return ctx->sps;
 	} else {
@@ -164,7 +164,7 @@ void fp_prime_set(bn_t p) {
 
 void fp_prime_set_dense(bn_t p) {
 	fp_prime_set(p);
-	core_get()->len = 0;
+	core_get()->sps_len = 0;
 
 #if FP_RDC == QUICK
 	THROW(ERR_NO_CONFIG);
@@ -211,7 +211,7 @@ void fp_prime_set_pmers(int *f, int len) {
 			ctx->sps[i] = f[i];
 		}
 		ctx->sps[len] = 0;
-		ctx->len = len;
+		ctx->sps_len = len;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

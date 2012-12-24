@@ -37,7 +37,7 @@
 /*============================================================================*/
 
 int fp_param_get(void) {
-	return core_get()->prime_id;
+	return core_get()->fp_id;
 }
 
 void fp_param_get_var(bn_t x) {
@@ -238,7 +238,7 @@ void fp_param_set(int param) {
 		bn_new(t2);
 		bn_new(p);
 
-		core_get()->prime_id = param;
+		core_get()->fp_id = param;
 
 		switch (param) {
 #if FP_PRIME == 158
@@ -465,7 +465,7 @@ void fp_param_set(int param) {
 			default:
 				bn_gen_prime(p, FP_BITS);
 				fp_prime_set_dense(p);
-				core_get()->prime_id = 0;
+				core_get()->fp_id = 0;
 				break;
 #endif
 		}
