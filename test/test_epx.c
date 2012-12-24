@@ -87,6 +87,7 @@ int util(void) {
 		TEST_BEGIN("copy and comparison are consistent") {
 			ep2_rand(a);
 			ep2_rand(b);
+			ep2_rand(c);
 			if (ep2_cmp(a, c) != CMP_EQ) {
 				ep2_copy(c, a);
 				TEST_ASSERT(ep2_cmp(c, a) == CMP_EQ, end);
