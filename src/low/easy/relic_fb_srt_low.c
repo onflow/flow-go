@@ -41,10 +41,10 @@
 
 #define HALF ((int)((FB_BITS / 2)/(FB_DIGIT) + ((FB_BITS / 2) % FB_DIGIT > 0)))
 
-static const dig_t table_evens[16] = {
+static const dig_t t0[16] = {
 	0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15
 };
-static const dig_t table_odds[16] = {
+static const dig_t t1[16] = {
 	0, 4, 1, 5, 8, 12, 9, 13, 2, 6, 3, 7, 10, 14, 11, 15
 };
 
@@ -66,9 +66,9 @@ static void fb_srtt_low(dig_t *c, dig_t *a, int fa) {
 		d = a[i];
 
 		d_e = d_o = 0;
-		for (j = 0; j < FB_DIGIT / 8; j++) {
-			d_e |= table_evens[((d & 0x05) + ((d & 0x50) >> 3))] << (j << 2);
-			d_o |= table_odds[((d & 0x0A) + ((d & 0xA0) >> 5))] << (j << 2);
+		for (j = 0; j < FB_DIGIT / 2; j += 4) {
+			d_e |= t0[((d & 0x05) + ((d & 0x50) >> 3))] << j;
+			d_o |= t1[((d & 0x0A) + ((d & 0xA0) >> 5))] << j;
 			d >>= 8;
 		}
 
@@ -76,11 +76,9 @@ static void fb_srtt_low(dig_t *c, dig_t *a, int fa) {
 		if (i < sh) {
 			d = a[i];
 
-			for (j = 0; j < FB_DIGIT / 8; j++) {
-				d_e |= table_evens[((d & 0x05) + ((d & 0x50) >> 3))] <<
-						((FB_DIGIT / 2) + (j << 2));
-				d_o |= table_odds[((d & 0x0A) + ((d & 0xA0) >> 5))] <<
-						((FB_DIGIT / 2) + (j << 2));
+			for (j = FB_DIGIT / 2; j < FB_DIGIT; j += 4) {
+				d_e |= t0[((d & 0x05) + ((d & 0x50) >> 3))] << j;
+				d_o |= t1[((d & 0x0A) + ((d & 0xA0) >> 5))] << j;
 				d >>= 8;
 			}
 		}
@@ -127,20 +125,18 @@ static void fb_srtp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 		d = a[i];
 
 		d_e = d_o = 0;
-		for (j = 0; j < FB_DIGIT / 8; j++) {
-			d_e |= table_evens[((d & 0x5) + ((d & 0x50) >> 3))] << (j << 2);
-			d_o |= table_odds[((d & 0xA) + ((d & 0xA0) >> 5))] << (j << 2);
+		for (j = 0; j < FB_DIGIT / 2; j += 4) {
+			d_e |= t0[((d & 0x5) + ((d & 0x50) >> 3))] << j;
+			d_o |= t1[((d & 0xA) + ((d & 0xA0) >> 5))] << j;
 			d >>= 8;
 		}
 		i++;
 
 		if (i < sh) {
 			d = a[i];
-			for (j = 0; j < FB_DIGIT / 8; j++) {
-				d_e |= table_evens[((d & 0x5) + ((d & 0x50) >> 3))] <<
-						(FB_DIGIT / 2 + (j << 2));
-				d_o |= table_odds[((d & 0xA) + ((d & 0xA0) >> 5))] <<
-						(FB_DIGIT / 2 + (j << 2));
+			for (j = FB_DIGIT / 2; j < FB_DIGIT; j += 4) {
+				d_e |= t0[((d & 0x5) + ((d & 0x50) >> 3))] << j;
+				d_o |= t1[((d & 0xA) + ((d & 0xA0) >> 5))] << j;
 				d >>= 8;
 			}
 		}
@@ -188,9 +184,9 @@ static void fb_sqrt_low(dig_t *c, dig_t *a) {
 		d = a[i];
 
 		d_e = d_o = 0;
-		for (j = 0; j < FB_DIGIT / 8; j++) {
-			d_e |= table_evens[((d & 0x05) + ((d & 0x50) >> 3))] << (j << 2);
-			d_o |= table_odds[((d & 0x0A) + ((d & 0xA0) >> 5))] << (j << 2);
+		for (j = 0; j < FB_DIGIT / 2; j += 4) {
+			d_e |= t0[((d & 0x05) + ((d & 0x50) >> 3))] << j;
+			d_o |= t1[((d & 0x0A) + ((d & 0xA0) >> 5))] << j;
 			d >>= 8;
 		}
 
@@ -198,11 +194,9 @@ static void fb_sqrt_low(dig_t *c, dig_t *a) {
 		if (i < sh && i < FB_DIGS) {
 			d = a[i];
 
-			for (j = 0; j < FB_DIGIT / 8; j++) {
-				d_e |= table_evens[((d & 0x05) + ((d & 0x50) >> 3))] <<
-						((FB_DIGIT / 2) + (j << 2));
-				d_o |= table_odds[((d & 0x0A) + ((d & 0xA0) >> 5))] <<
-						((FB_DIGIT / 2) + (j << 2));
+			for (j = FB_DIGIT / 2; j < FB_DIGIT; j += 4) {
+				d_e |= t0[((d & 0x05) + ((d & 0x50) >> 3))] << j;
+				d_o |= t1[((d & 0x0A) + ((d & 0xA0) >> 5))] << j;
 				d >>= 8;
 			}
 		}
