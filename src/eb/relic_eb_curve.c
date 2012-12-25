@@ -157,13 +157,13 @@ void eb_curve_init(void) {
 	}
 #endif
 #if ALLOC == STATIC
-	fb_new(curve_g.x);
-	fb_new(curve_g.y);
-	fb_new(curve_g.z);
+	fb_new(ctx->eb_g.x);
+	fb_new(ctx->eb_g.y);
+	fb_new(ctx->eb_g.z);
 	for (int i = 0; i < EB_TABLE; i++) {
-		fb_new(table[i].x);
-		fb_new(table[i].y);
-		fb_new(table[i].z);
+		fb_new(ctx->eb_pre[i].x);
+		fb_new(ctx->eb_pre[i].y);
+		fb_new(ctx->eb_pre[i].z);
 	}
 #endif
 	fb_zero(ctx->eb_g.x);
@@ -181,13 +181,13 @@ void eb_curve_init(void) {
 void eb_curve_clean(void) {
 	ctx_t *ctx = core_get();
 #if ALLOC == STATIC
-	fb_free(curve_g.x);
-	fb_free(curve_g.y);
-	fb_free(curve_g.z);
+	fb_free(ctx->eb_g.x);
+	fb_free(ctx->eb_g.y);
+	fb_free(ctx->eb_g.z);
 	for (int i = 0; i < EB_TABLE; i++) {
-		fb_free(table[i].x);
-		fb_free(table[i].y);
-		fb_free(table[i].z);
+		fb_free(ctx->eb_pre[i].x);
+		fb_free(ctx->eb_pre[i].y);
+		fb_free(ctx->eb_pre[i].z);
 	}
 #endif
 	bn_clean(&(ctx->eb_r));
