@@ -278,13 +278,11 @@ typedef struct _ctx_t {
 	fb_st *pb_ptr[FB_TABLE];
 #ifdef PB_PARAL
 	/** Precomputed table for computing fixed 2^i powers in the pairing. */
-	fb_st pb_tab_sqr[CORES][FB_TABLE];
-	/** Pointers to the precomputed table of fixed 2^i powers. */
-	fb_st *pb_sqr_ptr[CORES][FB_TABLE];
+	fb_st pb_sqr[CORES][FB_TABLE];
 	/** Precomputed table for computing fixed 1/(2^i) powers in the pairing. */
-	fb_st pb_tab_srt[CORES][FB_TABLE];
+	fb_st pb_srt[CORES][FB_TABLE];
 	/** Pointers to the precomputed table of fixed 1/(2^i) powers. */
-	fb_st *pb_srt_ptr[CORES][FB_TABLE];
+	fb_st *pb_pow[2][CORES][FB_TABLE];
 	/** Partition for the parallel execution. */
 	double pb_par[CORES];
 #endif

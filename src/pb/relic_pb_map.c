@@ -112,8 +112,8 @@ void pb_map_init() {
 
 	for (int i = 0; i < CORES; i++) {
 		for (int j = 0; j < FB_TABLE; j++) {
-			ctx->pb_sqr_ptr[i][j] = &(ctx->pb_tab_sqr[i][j]);
-			ctx->pb_srt_ptr[i][j] = &(ctx->pb_tab_srt[i][j]);
+			ctx->pb_pow[0][i][j] = &(ctx->pb_sqr[i][j]);
+			ctx->pb_pow[1][i][j] = &(ctx->pb_srt[i][j]);
 		}
 	}
 
@@ -141,9 +141,9 @@ fb_t *pb_map_get_sqr(int core) {
 #ifdef PB_PARAL
 
 #if ALLOC == AUTO
-	return (fb_t *)*core_get()->pb_sqr_ptr[core];
+	return (fb_t *)*core_get()->pb_pow[0][core];
 #else
-	return (fb_t *)core_get()->pb_sqr_ptr[core];
+	return (fb_t *)core_get()->pb_pow[0][core];
 #endif
 
 #else
@@ -155,9 +155,9 @@ fb_t *pb_map_get_srt(int core) {
 #ifdef PB_PARAL
 
 #if ALLOC == AUTO
-	return (fb_t *)*core_get()->pb_srt_ptr[core];
+	return (fb_t *)*core_get()->pb_pow[1][core];
 #else
-	return (fb_t *)core_get()->pb_srt_ptr[core];
+	return (fb_t *)core_get()->pb_pow[1][core];
 #endif
 
 #else
