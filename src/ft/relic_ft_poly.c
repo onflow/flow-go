@@ -44,109 +44,47 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-/**
- * Prime modulus.
- */
-static ft_st poly;
-
-/**
- * Trinomial or pentanomial non-zero coefficients.
- */
-static int poly_a, poly_b, poly_c, poly_d;
-
-/**
- * Positions of the non-null coefficients on trinomials and pentanomials.
- */
-static int pos_a, pos_b, pos_c;
-
 #if FT_CRT == QUICK || !defined(STRIP)
-
-/**
- * Maximum number of exponents to describe a sparse polynomial.
- */
-#define MAX_EXPS		20
-
-/**
- * Non-zero bits of polynomial stored in sparse form.
- */
-static int crz[MAX_EXPS + 1] = { 0 };
-
-/**
- * Number of bits of special form polynomial.
- */
-static int crz_len = 0;
-
-/**
- * Cube root of z.
- */
-static ft_st ft_crz;
-
-/**
- * Non-zero bits of polynomial stored in sparse form.
- */
-static int srz[MAX_EXPS + 1] = { 0 };
-
-/**
- * Number of bits of special form polynomial.
- */
-static int srz_len = 0;
-
-/**
- * Square of cube root of z.
- */
-static ft_st ft_srz;
-
-#ifdef FT_PRECO
-/**
- * Multiplication table for the z^(1/3).
- */
-static ft_st ft_tab_crz[256];
-
-/**
- * Multiplication table for the z^(2/3).
- */
-static ft_st ft_tab_srz[256];
-
-#endif
 
 /**
  * Precomputes the cube root of z and its square.
  */
 void find_crz() {
-	ft_set_trit(ft_crz, 1, 1);
+	ctx_t *ctx = core_get();
+	ft_set_trit(ctx->ft_crz, 1, 1);
 
 	for (int i = 1; i < FT_TRITS; i++) {
-		ft_cub(ft_crz, ft_crz);
+		ft_cub(ctx->ft_crz, ctx->ft_crz);
 	}
 	for (int i = 0; i < FT_TRITS; i++) {
-		if (ft_get_trit(ft_crz, i) == 1) {
-			crz[crz_len++] = i;
+		if (ft_get_trit(ctx->ft_crz, i) == 1) {
+			ctx->crz[ctx->crz_len++] = i;
 		}
-		if (ft_get_trit(ft_crz, i) == 2) {
-			crz[crz_len++] = -i;
+		if (ft_get_trit(ctx->ft_crz, i) == 2) {
+			ctx->crz[ctx->crz_len++] = -i;
 		}
-		if (crz_len == MAX_EXPS) {
-			crz_len = 0;
+		if (ctx->crz_len == MAX_TERMS) {
+			ctx->crz_len = 0;
 			break;
 		}
 	}
-	ft_mul(ft_srz, ft_crz, ft_crz);
+	ft_mul(ctx->ft_srz, ctx->ft_crz, ctx->ft_crz);
 
 	for (int i = 0; i < FT_TRITS; i++) {
-		if (ft_get_trit(ft_srz, i) == 1) {
-			srz[srz_len++] = i;
+		if (ft_get_trit(ctx->ft_srz, i) == 1) {
+			ctx->srz[ctx->srz_len++] = i;
 		}
-		if (ft_get_trit(ft_srz, i) == 2) {
-			srz[srz_len++] = -i;
+		if (ft_get_trit(ctx->ft_srz, i) == 2) {
+			ctx->srz[ctx->srz_len++] = -i;
 		}
-		if (srz_len == MAX_EXPS) {
-			srz_len = 0;
+		if (ctx->srz_len == MAX_TERMS) {
+			ctx->srz_len = 0;
 			break;
 		}
 	}
 #ifdef FT_PRECO
 	for (int i = 0; i <= 255; i++) {
-		//ft_mul_dig(ft_tab_crz[i], ft_crz, i);
+		//ft_mul_dig(ctx->ft_tab_crz[i], ctx->ft_crz, i);
 	}
 #endif
 }
@@ -158,20 +96,22 @@ void find_crz() {
 /*============================================================================*/
 
 void ft_poly_init(void) {
-	ft_zero(poly);
-	poly_a = poly_b = poly_c = 0;
-	pos_a = pos_b = pos_c = -1;
+	ctx_t *ctx = core_get();
+	ft_zero(ctx->ft_poly);
+	ctx->ft_pa = ctx->ft_pb = ctx->ft_pc = 0;
+	ctx->ft_na = ctx->ft_nb = ctx->ft_nc = -1;
+	ctx->crz_len = ctx->srz_len = 0;
 }
 
 void ft_poly_clean(void) {
 }
 
 dig_t *ft_poly_get(void) {
-	return poly;
+	return core_get()->ft_poly;
 }
 
 void ft_poly_set(ft_t f) {
-	ft_copy(poly, f);
+	ft_copy(core_get()->ft_poly, f);
 
 #if FT_CRT == QUICK || !defined(STRIP)
 	find_crz();
@@ -180,16 +120,17 @@ void ft_poly_set(ft_t f) {
 }
 
 void ft_poly_add(ft_t c, ft_t a) {
+	ctx_t *ctx = core_get();
 	dig_t t;
 	dig_t *c_l = c, *c_h = c + FT_DIGS / 2;
-	dig_t *f_l = poly, *f_h = poly + FT_DIGS / 2;
+	dig_t *f_l = ctx->ft_poly, *f_h = ctx->ft_poly + FT_DIGS / 2;
 
 	if (c != a) {
 		ft_copy(c, a);
 	}
 
 	/* Polynomial is sparse. */
-	if (poly_a != 0 && poly_b != 0) {
+	if (ctx->ft_pa != 0 && ctx->ft_pb != 0) {
 		t = (c_l[FT_DIGS / 2 - 1] | c_h[FT_DIGS / 2 - 1]) &
 				(f_l[FT_DIGS / 2 - 1] | f_h[FT_DIGS / 2 - 1]);
 		c_l[FT_DIGS / 2 - 1] = t ^
@@ -198,25 +139,25 @@ void ft_poly_add(ft_t c, ft_t a) {
 				(c_h[FT_DIGS / 2 - 1] | f_h[FT_DIGS / 2 - 1]);
 
 		/* At least it is a trinomial. */
-		if (pos_a != FT_DIGS / 2 - 1) {
-			t = (c_l[pos_a] | c_h[pos_a]) & (f_l[pos_a] | f_h[pos_a]);
-			c_l[pos_a] = t ^ (c_l[pos_a] | f_l[pos_a]);
-			c_h[pos_a] = t ^ (c_h[pos_a] | f_h[pos_a]);
+		if (ctx->ft_na != FT_DIGS / 2 - 1) {
+			t = (c_l[ctx->ft_na] | c_h[ctx->ft_na]) & (f_l[ctx->ft_na] | f_h[ctx->ft_na]);
+			c_l[ctx->ft_na] = t ^ (c_l[ctx->ft_na] | f_l[ctx->ft_na]);
+			c_h[ctx->ft_na] = t ^ (c_h[ctx->ft_na] | f_h[ctx->ft_na]);
 		}
-		if (pos_b != pos_a) {
-			t = (c_l[pos_b] | c_h[pos_b]) & (f_l[pos_b] | f_h[pos_b]);
-			c_l[pos_b] = t ^ (c_l[pos_b] | f_l[pos_b]);
-			c_h[pos_b] = t ^ (c_h[pos_b] | f_h[pos_b]);
+		if (ctx->ft_nb != ctx->ft_na) {
+			t = (c_l[ctx->ft_nb] | c_h[ctx->ft_nb]) & (f_l[ctx->ft_nb] | f_h[ctx->ft_nb]);
+			c_l[ctx->ft_nb] = t ^ (c_l[ctx->ft_nb] | f_l[ctx->ft_nb]);
+			c_h[ctx->ft_nb] = t ^ (c_h[ctx->ft_nb] | f_h[ctx->ft_nb]);
 		}
 
 		/* Maybe a pentanomial? */
-		if (poly_c != 0 && poly_d != 0) {
-			if (pos_c != pos_a && pos_c != pos_b) {
-				t = (c_l[pos_c] | c_h[pos_c]) & (f_l[pos_c] | f_h[pos_c]);
-				c_l[pos_c] = t ^ (c_l[pos_c] | f_l[pos_c]);
-				c_h[pos_c] = t ^ (c_h[pos_c] | f_h[pos_c]);
+		if (ctx->ft_pc != 0 && ctx->ft_pd != 0) {
+			if (ctx->ft_nc != ctx->ft_na && ctx->ft_nc != ctx->ft_nb) {
+				t = (c_l[ctx->ft_nc] | c_h[ctx->ft_nc]) & (f_l[ctx->ft_nc] | f_h[ctx->ft_nc]);
+				c_l[ctx->ft_nc] = t ^ (c_l[ctx->ft_nc] | f_l[ctx->ft_nc]);
+				c_h[ctx->ft_nc] = t ^ (c_h[ctx->ft_nc] | f_h[ctx->ft_nc]);
 			}
-			if (pos_a != 0 && pos_b != 0 && pos_c != 0) {
+			if (ctx->ft_na != 0 && ctx->ft_nb != 0 && ctx->ft_nc != 0) {
 				t = (c_l[0] | c_h[0]) & (f_l[0] | f_h[0]);
 				c_l[0] = t ^ (c_l[0] | f_l[0]);
 				c_h[0] = t ^ (c_h[0] | f_h[0]);
@@ -224,21 +165,22 @@ void ft_poly_add(ft_t c, ft_t a) {
 		}
 	} else {
 		/* Polynomial is dense. */
-		ft_add(c, a, poly);
+		ft_add(c, a, ctx->ft_poly);
 	}
 }
 
 void ft_poly_sub(ft_t c, ft_t a) {
+	ctx_t *ctx = core_get();
 	dig_t t0, t1;
 	dig_t *c_l = c, *c_h = c + FT_DIGS / 2;
-	dig_t *f_l = poly, *f_h = poly + FT_DIGS / 2;
+	dig_t *f_l = ctx->ft_poly, *f_h = ctx->ft_poly + FT_DIGS / 2;
 
 	if (c != a) {
 		ft_copy(c, a);
 	}
 
 	/* Polynomial is sparse. */
-	if (poly_a != 0 && poly_b != 0) {
+	if (ctx->ft_pa != 0 && ctx->ft_pb != 0) {
 		t0 = (c_l[FT_DIGS / 2 - 1] | c_h[FT_DIGS / 2 - 1]) &
 				(f_l[FT_DIGS / 2 - 1] | f_h[FT_DIGS / 2 - 1]);
 		t1 = (c_h[FT_DIGS / 2 - 1] | f_l[FT_DIGS / 2 - 1]);
@@ -247,28 +189,28 @@ void ft_poly_sub(ft_t c, ft_t a) {
 		c_h[FT_DIGS / 2 - 1] = t0 ^ t1;
 
 		/* At least it is a trinomial. */
-		if (pos_a != FT_DIGS / 2 - 1) {
-			t0 = (c_l[pos_a] | c_h[pos_a]) & (f_l[pos_a] | f_h[pos_a]);
-			t1 = (c_h[pos_a] | f_l[pos_a]);
-			c_l[pos_a] = t0 ^ (c_l[pos_a] | f_h[pos_a]);
-			c_h[pos_a] = t0 ^ t1;
+		if (ctx->ft_na != FT_DIGS / 2 - 1) {
+			t0 = (c_l[ctx->ft_na] | c_h[ctx->ft_na]) & (f_l[ctx->ft_na] | f_h[ctx->ft_na]);
+			t1 = (c_h[ctx->ft_na] | f_l[ctx->ft_na]);
+			c_l[ctx->ft_na] = t0 ^ (c_l[ctx->ft_na] | f_h[ctx->ft_na]);
+			c_h[ctx->ft_na] = t0 ^ t1;
 		}
-		if (pos_b != pos_a) {
-			t0 = (c_l[pos_b] | c_h[pos_b]) & (f_l[pos_b] | f_h[pos_b]);
-			t1 = (c_h[pos_b] | f_l[pos_b]);
-			c_l[pos_b] = t0 ^ (c_l[pos_b] | f_h[pos_b]);
-			c_h[pos_b] = t0 ^ t1;
+		if (ctx->ft_nb != ctx->ft_na) {
+			t0 = (c_l[ctx->ft_nb] | c_h[ctx->ft_nb]) & (f_l[ctx->ft_nb] | f_h[ctx->ft_nb]);
+			t1 = (c_h[ctx->ft_nb] | f_l[ctx->ft_nb]);
+			c_l[ctx->ft_nb] = t0 ^ (c_l[ctx->ft_nb] | f_h[ctx->ft_nb]);
+			c_h[ctx->ft_nb] = t0 ^ t1;
 		}
 
 		/* Maybe a pentanomial? */
-		if (poly_c != 0 && poly_d != 0) {
-			if (pos_c != pos_a && pos_c != pos_b) {
-				t0 = (c_l[pos_c] | c_h[pos_c]) & (f_l[pos_c] | f_h[pos_c]);
-				t1 = (c_h[pos_c] | f_l[pos_c]);
-				c_l[pos_c] = t0 ^ (c_l[pos_c] | f_h[pos_c]);
-				c_h[pos_c] = t0 ^ t1;
+		if (ctx->ft_pc != 0 && ctx->ft_pd != 0) {
+			if (ctx->ft_nc != ctx->ft_na && ctx->ft_nc != ctx->ft_nb) {
+				t0 = (c_l[ctx->ft_nc] | c_h[ctx->ft_nc]) & (f_l[ctx->ft_nc] | f_h[ctx->ft_nc]);
+				t1 = (c_h[ctx->ft_nc] | f_l[ctx->ft_nc]);
+				c_l[ctx->ft_nc] = t0 ^ (c_l[ctx->ft_nc] | f_h[ctx->ft_nc]);
+				c_h[ctx->ft_nc] = t0 ^ t1;
 			}
-			if (pos_a != 0 && pos_b != 0 && pos_c != 0) {
+			if (ctx->ft_na != 0 && ctx->ft_nb != 0 && ctx->ft_nc != 0) {
 				t0 = (c_l[0] | c_h[0]) & (f_l[0] | f_h[0]);
 				t1 = (c_h[0] | f_l[0]);
 				c_l[0] = t0 ^ (c_l[0] | f_h[0]);
@@ -277,33 +219,34 @@ void ft_poly_sub(ft_t c, ft_t a) {
 		}
 	} else {
 		/* Polynomial is dense. */
-		ft_add(c, a, poly);
+		ft_add(c, a, ctx->ft_poly);
 	}
 }
 
 void ft_poly_set_trino(int a, int b) {
 	ft_t f;
+	ctx_t *ctx = core_get();
 
 	ft_null(f);
 
 	TRY {
 		ft_new(f);
 
-		poly_a = a;
-		poly_b = b;
-		poly_c = poly_d = 0;
+		ctx->ft_pa = a;
+		ctx->ft_pb = b;
+		ctx->ft_pc = ctx->ft_pd = 0;
 
-		if (poly_a > 0) {
-			pos_a = poly_a >> FT_DIG_LOG;
+		if (ctx->ft_pa > 0) {
+			ctx->ft_na = ctx->ft_pa >> FT_DIG_LOG;
 		} else {
-			pos_a = -poly_a >> FT_DIG_LOG;
+			ctx->ft_na = -ctx->ft_pa >> FT_DIG_LOG;
 		}
-		if (poly_b > 0) {
-			pos_b = poly_b >> FT_DIG_LOG;
+		if (ctx->ft_pb > 0) {
+			ctx->ft_nb = ctx->ft_pb >> FT_DIG_LOG;
 		} else {
-			pos_b = -poly_b >> FT_DIG_LOG;
+			ctx->ft_nb = -ctx->ft_pb >> FT_DIG_LOG;
 		}
-		pos_c = -1;
+		ctx->ft_nc = -1;
 
 		ft_zero(f);
 		ft_set_trit(f, FT_TRITS, 1);
@@ -329,31 +272,32 @@ void ft_poly_set_trino(int a, int b) {
 
 void ft_poly_set_penta(int a, int b, int c, int d) {
 	ft_t f;
+	ctx_t *ctx = core_get();
 
 	ft_null(f);
 
 	TRY {
 		ft_new(f);
 
-		poly_a = a;
-		poly_b = b;
-		poly_c = c;
-		poly_d = d;
+		ctx->ft_pa = a;
+		ctx->ft_pb = b;
+		ctx->ft_pc = c;
+		ctx->ft_pd = d;
 
-		if (poly_a > 0) {
-			pos_a = poly_a >> FT_DIG_LOG;
+		if (ctx->ft_pa > 0) {
+			ctx->ft_na = ctx->ft_pa >> FT_DIG_LOG;
 		} else {
-			pos_a = -poly_a >> FT_DIG_LOG;
+			ctx->ft_na = -ctx->ft_pa >> FT_DIG_LOG;
 		}
-		if (poly_b > 0) {
-			pos_b = poly_b >> FT_DIG_LOG;
+		if (ctx->ft_pb > 0) {
+			ctx->ft_nb = ctx->ft_pb >> FT_DIG_LOG;
 		} else {
-			pos_b = -poly_b >> FT_DIG_LOG;
+			ctx->ft_nb = -ctx->ft_pb >> FT_DIG_LOG;
 		}
-		if (poly_c > 0) {
-			pos_c = poly_c >> FT_DIG_LOG;
+		if (ctx->ft_pc > 0) {
+			ctx->ft_nc = ctx->ft_pc >> FT_DIG_LOG;
 		} else {
-			pos_c = -poly_c >> FT_DIG_LOG;
+			ctx->ft_nc = -ctx->ft_pc >> FT_DIG_LOG;
 		}
 
 		ft_zero(f);
@@ -390,19 +334,20 @@ void ft_poly_set_penta(int a, int b, int c, int d) {
 
 dig_t *ft_poly_get_crz(void) {
 #if FT_CRT == QUICK || !defined(STRIP)
-	return ft_crz;
+	return core_get()->ft_crz;
 #else
 	return NULL;
 #endif
 }
 
 int *ft_poly_get_crz_sps(int *len) {
+	ctx_t *ctx = core_get();
 #if FT_CRT == QUICK || !defined(STRIP)
-	if (crz_len > 0 && crz_len < MAX_EXPS ) {
+	if (ctx->crz_len > 0 && ctx->crz_len < MAX_TERMS ) {
 		if (len != NULL) {
-			*len = crz_len;
+			*len = ctx->crz_len;
 		}
-		return crz;
+		return ctx->crz;
 	} else {
 		if (len != NULL) {
 			*len = 0;
@@ -417,19 +362,20 @@ int *ft_poly_get_crz_sps(int *len) {
 
 dig_t *ft_poly_get_srz(void) {
 #if FT_CRT == QUICK || !defined(STRIP)
-	return ft_srz;
+	return core_get()->ft_srz;
 #else
 	return NULL;
 #endif
 }
 
 int *ft_poly_get_srz_sps(int *len) {
+	ctx_t *ctx = core_get();
 #if FT_CRT == QUICK || !defined(STRIP)
-	if (srz_len > 0 && srz_len < MAX_EXPS ) {
+	if (ctx->srz_len > 0 && ctx->srz_len < MAX_TERMS ) {
 		if (len != NULL) {
-			*len = srz_len;
+			*len = ctx->srz_len;
 		}
-		return srz;
+		return ctx->srz;
 	} else {
 		if (len != NULL) {
 			*len = 0;
@@ -446,7 +392,7 @@ dig_t *ft_poly_get_tab_crz(int i) {
 #if FT_CRT == QUICK || !defined(STRIP)
 
 #ifdef FT_PRECO
-	return ft_tab_crz[i];
+	return core_get()->ft_tab_crz[i];
 #else
 	return NULL;
 #endif
@@ -460,7 +406,7 @@ dig_t *ft_poly_get_tab_srz(int i) {
 #if FT_CRT == QUICK || !defined(STRIP)
 
 #ifdef FT_PRECO
-	return ft_tab_srz[i];
+	return core_get()->ft_tab_srz[i];
 #else
 	return NULL;
 #endif
@@ -471,8 +417,9 @@ dig_t *ft_poly_get_tab_srz(int i) {
 }
 
 void ft_poly_get_rdc(int *a, int *b, int *c, int *d) {
-	*a = poly_a;
-	*b = poly_b;
-	*c = poly_c;
-	*d = poly_d;
+	ctx_t *ctx = core_get();
+	*a = ctx->ft_pa;
+	*b = ctx->ft_pb;
+	*c = ctx->ft_pc;
+	*d = ctx->ft_pd;
 }

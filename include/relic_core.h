@@ -44,6 +44,7 @@
 #include "relic_error.h"
 #include "relic_bn.h"
 #include "relic_eb.h"
+#include "relic_ft.h"
 #include "relic_epx.h"
 #include "relic_conf.h"
 #include "relic_rand.h"
@@ -237,6 +238,37 @@ typedef struct _ctx_t {
 	eb_st *eb_ptr[EB_TABLE];
 #endif /* EB_PRECO */
 #endif /* WITH_EB */
+
+#ifdef WITH_FT
+	/** Currently configured ternary field identifier. */
+	int ft_id;
+	/** Currently configured irreducible ternary polynomial. */
+	ft_st ft_poly;
+	/** Non-zero coefficients of a trinomial or pentanomial. */
+	int ft_pa, ft_pb, ft_pc, ft_pd;
+	/** Positions of the non-zero coefficients of trinomials or pentanomials. */
+	int ft_na, ft_nb, ft_nc;
+#if FT_CRT == QUICK || !defined(STRIP)
+	/** Non-zero bits of polynomial stored in sparse form. */
+	int crz[MAX_TERMS + 1];
+	/** Number of bits of special form polynomial. */
+	int crz_len;
+	/** Cube root of z. */
+	ft_st ft_crz;
+	/** Non-zero bits of polynomial stored in sparse form. */
+	int srz[MAX_TERMS + 1];
+	/** Number of bits of special form polynomial. */
+	int srz_len;
+	/** Square of cube root of z. */
+	ft_st ft_srz;
+#ifdef FT_PRECO
+	/** Multiplication table for the z^(1/3). */
+	ft_st ft_tab_crz[256];
+	/** Multiplication table for the z^(2/3). */
+	ft_st ft_tab_srz[256];
+#endif /* FT_PRECO */
+#endif /* FT_CRT == QUICK */
+#endif /* WITH_FT */
 
 #ifdef WITH_FP
 	/** Currently configured prime field identifier. */
