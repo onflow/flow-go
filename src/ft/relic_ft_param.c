@@ -40,20 +40,11 @@
 #include "relic_error.h"
 
 /*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * Current configured ternary field identifier.
- */
-static int param_id;
-
-/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 int ft_param_get(void) {
-	return param_id;
+	return core_get()->ft_id;
 }
 
 void ft_param_set(int param) {
@@ -68,7 +59,7 @@ void ft_param_set(int param) {
 			THROW(ERR_NO_VALID);
 			break;
 	}
-	param = param_id;
+	core_get()->ft_id = param;
 }
 
 void ft_param_set_any(void) {

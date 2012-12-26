@@ -104,17 +104,12 @@
 	FETCH(str, CURVE##_H, sizeof(CURVE##_H));								\
 	bn_read_str(h, str, strlen(str), 16);									\
 
-/**
- * Current configured hyperelliptic curve parameters.
- */
-static int param_id;
-
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 int hb_param_get() {
-	return param_id;
+	return core_get()->hb_id;
 }
 
 void hb_param_set(int param) {
@@ -159,7 +154,7 @@ void hb_param_set(int param) {
 				break;
 		}
 
-		param_id = param;
+		core_get()->hb_id = param;
 		g->deg = 0;
 
 #if defined(HB_SUPER)
@@ -204,7 +199,7 @@ int hb_param_set_any_super() {
 }
 
 void hb_param_print() {
-	switch (param_id) {
+	switch (core_get()->hb_id) {
 		case ETAT_S367:
 			util_banner("Curve ETAT-S367:", 0);
 			break;
@@ -215,7 +210,7 @@ void hb_param_print() {
 }
 
 int hb_param_level() {
-	switch (param_id) {
+	switch (core_get()->hb_id) {
 		case ETAT_S367:
 			return 128;
 		case ETAT_S439:

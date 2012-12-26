@@ -41,73 +41,6 @@
 /*============================================================================*/
 
 /**
- * The f3 coefficient of the elliptic curve.
- */
-static fb_st curve_f3;
-
-/**
- * Optimization identifier for the configured curve derived from the f3
- * coefficient.
- */
-static int curve_opt_f3;
-
-/**
- * The f1 coefficient of the elliptic curve.
- */
-static fb_st curve_f1;
-
-/**
- * Optimization identifier for the configured curve derived from the f1
- * coefficient.
- */
-static int curve_opt_f1;
-
-/**
- * The f0 coefficient of the elliptic curve.
- */
-static fb_st curve_f0;
-
-/**
- * Optimization identifier for the configured curve derived from the f0
- * coefficient.
- */
-static int curve_opt_f0;
-
-/**
- * The generator of the elliptic curve.
- */
-static hb_st curve_g;
-
-#ifdef HB_PRECO
-
-/**
- * Precomputation table for generator multiplication.
- */
-static hb_st table[HB_TABLE];
-
-/**
- * Array of pointers to the precomputation table.
- */
-static hb_st *pointer[HB_TABLE];
-
-#endif
-
-/**
- * The order of the group of points in the elliptic curve.
- */
-static bn_st curve_r;
-
-/**
- * The cofactor of the group order in the elliptic curve.
- */
-static bn_st curve_h;
-
-/**
- * Flag that stores if the configured binary elliptic curve is supersingular.
- */
-static int curve_is_super;
-
-/**
  * Detects an optimization based on the curve coefficients.
  *
  * @param opt		- the resulting optimization.
@@ -134,85 +67,94 @@ static void detect_opt(int *opt, fb_t a) {
 /*============================================================================*/
 
 void hb_curve_init(void) {
+	ctx_t *ctx = core_get();
 #ifdef HB_PRECO
 	for (int i = 0; i < HB_TABLE; i++) {
-		pointer[i] = &(table[i]);
+		ctx->hb_ptr[i] = &(ctx->hb_pre[i]);
 	}
 #endif
 #if ALLOC == STATIC
-	fb_new(curve_g.u1);
-	fb_new(curve_g.u0);
-	fb_new(curve_g.v1);
-	fb_new(curve_g.v0);
+	fb_new(ctx->hb_g.u1);
+	fb_new(ctx->hb_g.u0);
+	fb_new(ctx->hb_g.v1);
+	fb_new(ctx->hb_g.v0);
 	for (int i = 0; i < HB_TABLE; i++) {
-		fb_new(table[i].u1);
-		fb_new(table[i].u0);
-		fb_new(table[i].v1);
-		fb_new(table[i].v0);
+		fb_new(ctx->hb_pre[i].u1);
+		fb_new(ctx->hb_pre[i].u0);
+		fb_new(ctx->hb_pre[i].v1);
+		fb_new(ctx->hb_pre[i].v0);
 	}
 #endif
-	fb_zero(curve_g.u1);
-	fb_zero(curve_g.u0);
-	fb_zero(curve_g.v1);
-	fb_zero(curve_g.v0);
-	bn_init(&curve_r, FB_DIGS);
-	bn_init(&curve_h, FB_DIGS);
+	fb_zero(ctx->hb_g.u1);
+	fb_zero(ctx->hb_g.u0);
+	fb_zero(ctx->hb_g.v1);
+	fb_zero(ctx->hb_g.v0);
+	bn_init(&(ctx->hb_r), FB_DIGS);
+	bn_init(&(ctx->hb_h), FB_DIGS);
 }
 
 void hb_curve_clean(void) {
+	ctx_t *ctx = core_get();
 #if ALLOC == STATIC
-	fb_free(curve_g.u1);
-	fb_free(curve_g.u0);
-	fb_free(curve_g.v1);
-	fb_free(curve_g.v0);
+	fb_free(ctx->hb_g.u1);
+	fb_free(ctx->hb_g.u0);
+	fb_free(ctx->hb_g.v1);
+	fb_free(ctx->hb_g.v0);
 	for (int i = 0; i < HB_TABLE; i++) {
-		fb_free(table[i].u1);
-		fb_free(table[i].u0);
-		fb_free(table[i].v1);
-		fb_free(table[i].v0);
+		fb_free(ctx->hb_pre[i].u1);
+		fb_free(ctx->hb_pre[i].u0);
+		fb_free(ctx->hb_pre[i].v1);
+		fb_free(ctx->hb_pre[i].v0);
 	}
 #endif
-	bn_clean(&curve_r);
-	bn_clean(&curve_h);
+	bn_clean(&(ctx->hb_r));
+	bn_clean(&(ctx->hb_h));
 }
 
 dig_t *hb_curve_get_f3() {
-	return curve_f3;
+	return core_get()->hb_f3;
 }
 
 int hb_curve_opt_f3() {
-	return curve_opt_f3;
+	return core_get()->hb_opt_f3;
 }
 
 dig_t *hb_curve_get_f1() {
-	return curve_f1;
+	return core_get()->hb_f1;
 }
 
 int hb_curve_opt_f1() {
-	return curve_opt_f1;
+	return core_get()->hb_opt_f1;
 }
 
 dig_t *hb_curve_get_f0() {
-	if (curve_is_super) {
-		return curve_f0;
+#if defined(HB_SUPER)
+	if (core_get()->hb_is_super) {
+		return core_get()->hb_f0;
 	}
+#endif
 	return NULL;
 }
 
 int hb_curve_opt_f0() {
-	return curve_opt_f0;
+#if defined(HB_SUPER)
+	if (core_get()->hb_is_super) {
+		return core_get()->hb_opt_f0;
+	}
+#endif
+	return OPT_NONE;
 }
 
 int hb_curve_is_super() {
-	return curve_is_super;
+	return core_get()->hb_is_super;
 }
 
 void hb_curve_get_gen(hb_t g) {
-	hb_copy(g, &curve_g);
+	hb_copy(g, &(core_get()->hb_g));
 }
 
 void hb_curve_get_ord(bn_t n) {
-	bn_copy(n, &curve_r);
+	bn_copy(n, &(core_get()->hb_r));
 }
 
 #if defined(HB_PRECO)
@@ -221,34 +163,36 @@ hb_t *hb_curve_get_tab() {
 #if ALLOC == AUTO
 	return (hb_t *) *pointer;
 #else
-	return pointer;
+	return core_get()->hb_ptr;
 #endif
 }
 
 #endif
 
 void hb_curve_get_cof(bn_t h) {
-	bn_copy(h, &curve_h);
+	bn_copy(h, &(core_get()->hb_h));
 }
 
 #if defined(HB_SUPER)
 
 void hb_curve_set_super(fb_t f3, fb_t f1, fb_t f0, hb_t g, bn_t r, bn_t h) {
-	curve_is_super = 1;
+	ctx_t *ctx = core_get();
 
-	fb_copy(curve_f3, f3);
-	fb_copy(curve_f1, f1);
-	fb_copy(curve_f0, f0);
+	ctx->hb_is_super = 1;
 
-	detect_opt(&curve_opt_f3, curve_f3);
-	detect_opt(&curve_opt_f1, curve_f1);
-	detect_opt(&curve_opt_f0, curve_f0);
+	fb_copy(ctx->hb_f3, f3);
+	fb_copy(ctx->hb_f1, f1);
+	fb_copy(ctx->hb_f0, f0);
 
-	hb_copy(&curve_g, g);
-	bn_copy(&curve_r, r);
-	bn_copy(&curve_h, h);
+	detect_opt(&(ctx->hb_opt_f3), ctx->hb_f3);
+	detect_opt(&(ctx->hb_opt_f1), ctx->hb_f1);
+	detect_opt(&(ctx->hb_opt_f0), ctx->hb_f0);
+
+	hb_copy(&(ctx->hb_g), g);
+	bn_copy(&(ctx->hb_r), r);
+	bn_copy(&(ctx->hb_h), h);
 #if defined(HB_PRECO)
-	hb_mul_pre(hb_curve_get_tab(), &curve_g);
+	hb_mul_pre(hb_curve_get_tab(), &(ctx->hb_g));
 #endif
 }
 
