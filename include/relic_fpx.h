@@ -592,13 +592,6 @@ typedef fp6_t fp18_t[3];
 /*============================================================================*/
 
 /**
- * Computes the constants needed to compute powers of the Frobenius map.
- *
- * @param[out] f			- the result.
- */
-void fp2_const_calc(void);
-
-/**
  * Copies the second argument to the first argument.
  *
  * @param[out] C			- the result.
@@ -830,13 +823,6 @@ void fp2_frb(fp2_t c, fp2_t a, int i);
  * @return					- 1 if there is a square root, 0 otherwise.
  */
 int fp2_srt(fp2_t c, fp2_t a);
-
-/**
- * Computes the constants needed to compute powers of the Frobenius map.
- *
- * @param[out] f			- the result.
- */
-void fp3_const_calc(void);
 
 /**
  * Copies the second argument to the first argument.

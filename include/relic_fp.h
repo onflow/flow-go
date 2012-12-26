@@ -433,6 +433,12 @@ void fp_prime_set_dense(bn_t p);
 void fp_prime_set_pmers(int *spars, int len);
 
 /**
+ * Computes the constants needed for evaluating Frobenius maps in higher
+ * extension fields.
+ */
+void fp_prime_calc(void);
+
+/**
  * Imports a multiple precision integer as a prime field element, doing the
  * necessary conversion.
  *

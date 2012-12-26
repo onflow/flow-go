@@ -330,6 +330,19 @@ typedef struct _ctx_t {
 /** In case of stack allocation, we need to get global memory for the table. */
 	fp2_st _ep2_pre[3 * EP_TABLE];
 #endif /* ALLOC == STACK */
+	/** Constants for computing Frobenius maps in higher extensions. @{ */
+	fp2_st fp2_p[5];
+	fp_st fp2_p2[3];
+	fp2_st fp2_p3[5];
+	/** @} */
+	/** Constants for computing Frobenius maps in higher extensions. @{ */
+	fp_st fp3_base[2];
+	fp_st fp3_p[5];
+	fp_st fp3_p2[5];
+	fp_st fp3_p3[5];
+	fp_st fp3_p4[5];
+	fp_st fp3_p5[5];
+	/** @} */
 #endif /* WITH_PP */
 
 	/** Internal state of the PRNG. */

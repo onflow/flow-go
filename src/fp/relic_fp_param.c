@@ -573,15 +573,6 @@ int fp_param_set_any_tower() {
 	} while (fp_prime_get_mod8() == 1 || fp_prime_get_mod8() == 5);
 #endif
 
-#ifdef WITH_PP
-	if (fp_prime_get_qnr()) {
-		fp2_const_calc();
-	}
-	if (fp_prime_get_cnr()) {
-		fp3_const_calc();
-	}
-#endif
-
 	return STS_OK;
 }
 

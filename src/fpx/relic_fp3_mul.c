@@ -34,142 +34,8 @@
 #include "relic_pp_low.h"
 
 /*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * Constant used to compute consecutive Frobenius maps in cubic extension.
- */
-static fp_st const_base[2];
-
-/**
- * Constant used to compute the Frobenius map in higher extensions.
- */
-static fp_st const_frb[5];
-
-/**
- * Constant used to compute consecutive Frobenius maps in higher extensions.
- */
-static fp_st const_sqr[5];
-
-/**
- * Constant used to compute consecutive Frobenius maps in higher extensions.
- */
-static fp_st const_cub[5];
-
-/**
- * Constant used to compute consecutive Frobenius maps in higher extensions.
- */
-static fp_st const_qua[5];
-
-/**
- * Constant used to compute consecutive Frobenius maps in higher extensions.
- */
-static fp_st const_qui[5];
-
-/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
-
-void fp3_const_calc() {
-	bn_t e;
-	fp3_t t0, t1, t2;
-
-	bn_null(e);
-	fp3_null(t0);
-	fp3_null(t1);
-	fp3_null(t2);
-
-	TRY {
-		bn_new(e);
-		fp3_new(t0);
-		fp3_new(t1);
-		fp3_new(t2);
-
-		fp_set_dig(const_base[0], -fp_prime_get_cnr());
-		fp_neg(const_base[0], const_base[0]);
-		e->used = FP_DIGS;
-		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
-		bn_sub_dig(e, e, 1);
-		bn_div_dig(e, e, 3);
-		fp_exp(const_base[0], const_base[0], e);
-		fp_sqr(const_base[1], const_base[0]);
-
-		fp3_zero(t0);
-		fp_set_dig(t0[1], 1);
-		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
-		bn_sub_dig(e, e, 1);
-		bn_div_dig(e, e, 6);
-
-		/* t0 = u^((p-1)/6). */
-		fp3_exp(t0, t0, e);
-		fp_copy(const_frb[0], t0[2]);
-		fp3_sqr(t1, t0);
-		fp_copy(const_frb[1], t1[1]);
-		fp3_mul(t2, t1, t0);
-		fp_copy(const_frb[2], t2[0]);
-		fp3_sqr(t2, t1);
-		fp_copy(const_frb[3], t2[2]);
-		fp3_mul(t2, t2, t0);
-		fp_copy(const_frb[4], t2[1]);
-
-		fp_mul(const_sqr[0], const_frb[0], const_base[1]);
-		fp_mul(t0[0], const_sqr[0], const_frb[0]);
-		fp_neg(const_sqr[0], t0[0]);
-		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_sub(const_sqr[0], const_sqr[0], t0[0]);
-		}
-		fp_mul(const_sqr[1], const_frb[1], const_base[0]);
-		fp_mul(const_sqr[1], const_sqr[1], const_frb[1]);
-		fp_sqr(const_sqr[2], const_frb[2]);
-		fp_mul(const_sqr[3], const_frb[3], const_base[1]);
-		fp_mul(t0[0], const_sqr[3], const_frb[3]);
-		fp_neg(const_sqr[3], t0[0]);
-		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_sub(const_sqr[3], const_sqr[3], t0[0]);
-		}
-		fp_mul(const_sqr[4], const_frb[4], const_base[0]);
-		fp_mul(const_sqr[4], const_sqr[4], const_frb[4]);
-
-		fp_mul(const_cub[0], const_frb[0], const_base[0]);
-		fp_mul(t0[0], const_cub[0], const_sqr[0]);
-		fp_neg(const_cub[0], t0[0]);
-		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_sub(const_cub[0], const_cub[0], t0[0]);
-		}
-		fp_mul(const_cub[1], const_frb[1], const_base[1]);
-		fp_mul(t0[0], const_cub[1], const_sqr[1]);
-		fp_neg(const_cub[1], t0[0]);
-		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_sub(const_cub[1], const_cub[1], t0[0]);
-		}
-		fp_mul(const_cub[2], const_frb[2], const_sqr[2]);
-		fp_mul(const_cub[3], const_frb[3], const_base[0]);
-		fp_mul(t0[0], const_cub[3], const_sqr[3]);
-		fp_neg(const_cub[3], t0[0]);
-		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_sub(const_cub[3], const_cub[3], t0[0]);
-		}
-		fp_mul(const_cub[4], const_frb[4], const_base[1]);
-		fp_mul(t0[0], const_cub[4], const_sqr[4]);
-		fp_neg(const_cub[4], t0[0]);
-		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_sub(const_cub[4], const_cub[4], t0[0]);
-		}
-
-		for (int i = 0; i < 5; i++) {
-			fp_mul(const_qua[i], const_frb[i], const_cub[i]);
-			fp_mul(const_qui[i], const_sqr[i], const_cub[i]);
-		}
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		bn_free(e);
-		fp3_free(t0);
-		fp3_free(t1);
-		fp3_free(t2);
-	}
-}
 
 #if PP_CBC == BASIC || !defined(STRIP)
 
@@ -295,6 +161,8 @@ void fp3_mul_art(fp3_t c, fp3_t a) {
 }
 
 void fp3_mul_frb(fp3_t c, fp3_t a, int i, int j, int k) {
+	ctx_t *ctx = core_get();
+
 	if (i == 0) {
 		switch (j % 3) {
 		case 0:
@@ -302,13 +170,13 @@ void fp3_mul_frb(fp3_t c, fp3_t a, int i, int j, int k) {
 			break;
 		case 1:
 			fp_copy(c[0], a[0]);
-			fp_mul(c[1], a[1], const_base[0]);
-			fp_mul(c[2], a[2], const_base[1]);
+			fp_mul(c[1], a[1], ctx->fp3_base[0]);
+			fp_mul(c[2], a[2], ctx->fp3_base[1]);
 			break;
 		case 2:
 			fp_copy(c[0], a[0]);
-			fp_mul(c[1], a[1], const_base[1]);
-			fp_mul(c[2], a[2], const_base[0]);
+			fp_mul(c[1], a[1], ctx->fp3_base[1]);
+			fp_mul(c[2], a[2], ctx->fp3_base[0]);
 			break;
 		}
 	} else {
@@ -317,9 +185,9 @@ void fp3_mul_frb(fp3_t c, fp3_t a, int i, int j, int k) {
 				fp3_copy(c, a);
 				break;
 			case 1:
-				fp_mul(c[0], a[0], const_frb[k - 1]);
-				fp_mul(c[1], a[1], const_frb[k - 1]);
-				fp_mul(c[2], a[2], const_frb[k - 1]);
+				fp_mul(c[0], a[0], ctx->fp3_p[k - 1]);
+				fp_mul(c[1], a[1], ctx->fp3_p[k - 1]);
+				fp_mul(c[2], a[2], ctx->fp3_p[k - 1]);
 				if (k != 3) {
 					for (int l = 0; l < 3 - (k % 3); l++) {
 						fp3_mul_art(c, c);
@@ -327,22 +195,22 @@ void fp3_mul_frb(fp3_t c, fp3_t a, int i, int j, int k) {
 				}
 				break;
 			case 2:
-				fp_mul(c[0], a[0], const_sqr[k - 1]);
-				fp_mul(c[1], a[1], const_sqr[k - 1]);
-				fp_mul(c[2], a[2], const_sqr[k - 1]);
+				fp_mul(c[0], a[0], ctx->fp3_p2[k - 1]);
+				fp_mul(c[1], a[1], ctx->fp3_p2[k - 1]);
+				fp_mul(c[2], a[2], ctx->fp3_p2[k - 1]);
 				for (int l = 0; l < (k % 3); l++) {
 					fp3_mul_art(c, c);
 				}
 				break;
 			case 3:
-				fp_mul(c[0], a[0], const_cub[k - 1]);
-				fp_mul(c[1], a[1], const_cub[k - 1]);
-				fp_mul(c[2], a[2], const_cub[k - 1]);
+				fp_mul(c[0], a[0], ctx->fp3_p3[k - 1]);
+				fp_mul(c[1], a[1], ctx->fp3_p3[k - 1]);
+				fp_mul(c[2], a[2], ctx->fp3_p3[k - 1]);
 				break;
 			case 4:
-				fp_mul(c[0], a[0], const_qua[k - 1]);
-				fp_mul(c[1], a[1], const_qua[k - 1]);
-				fp_mul(c[2], a[2], const_qua[k - 1]);
+				fp_mul(c[0], a[0], ctx->fp3_p4[k - 1]);
+				fp_mul(c[1], a[1], ctx->fp3_p4[k - 1]);
+				fp_mul(c[2], a[2], ctx->fp3_p4[k - 1]);
 				if (k != 3) {
 					for (int l = 0; l < 3 - (k % 3); l++) {
 						fp3_mul_art(c, c);
@@ -350,9 +218,9 @@ void fp3_mul_frb(fp3_t c, fp3_t a, int i, int j, int k) {
 				}
 				break;
 			case 5:
-				fp_mul(c[0], a[0], const_qui[k - 1]);
-				fp_mul(c[1], a[1], const_qui[k - 1]);
-				fp_mul(c[2], a[2], const_qui[k - 1]);
+				fp_mul(c[0], a[0], ctx->fp3_p5[k - 1]);
+				fp_mul(c[1], a[1], ctx->fp3_p5[k - 1]);
+				fp_mul(c[2], a[2], ctx->fp3_p5[k - 1]);
 				for (int l = 0; l < (k % 3); l++) {
 					fp3_mul_art(c, c);
 				}

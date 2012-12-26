@@ -34,102 +34,21 @@
 #include "relic_pp_low.h"
 
 /*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * Constant used to compute the Frobenius map in higher extensions.
- */
-static fp2_st const_frb[5];
-
-/**
- * Constant used to compute consecutive Frobenius maps in higher extensions.
- */
-static fp_st const_sqr[3];
-
-/**
- * Constant used to compute the Frobenius map in higher extensions.
- */
-static fp2_st const_cub[5];
-
-/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp2_const_calc() {
-	bn_t e;
-	fp2_t t0;
-	fp2_t t1;
-
-	bn_null(e);
-	fp2_null(t0);
-	fp2_null(t1);
-
-	TRY {
-		bn_new(e);
-		fp2_new(t0);
-		fp2_new(t1);
-
-		fp2_zero(t0);
-		fp_set_dig(t0[0], 1);
-		fp2_mul_nor(t0, t0);
-		e->used = FP_DIGS;
-		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
-		bn_sub_dig(e, e, 1);
-		bn_div_dig(e, e, 6);
-		fp2_exp(t0, t0, e);
-#if ALLOC == AUTO
-		fp2_copy(const_frb[0], t0);
-		fp2_sqr(const_frb[1], const_frb[0]);
-		fp2_mul(const_frb[2], const_frb[1], const_frb[0]);
-		fp2_sqr(const_frb[3], const_frb[1]);
-		fp2_mul(const_frb[4], const_frb[3], const_frb[0]);
-#else
-		fp_copy(const_frb[0][0], t0[0]);
-		fp_copy(const_frb[0][1], t0[1]);
-		fp2_sqr(t1, t0);
-		fp_copy(const_frb[1][0], t1[0]);
-		fp_copy(const_frb[1][1], t1[1]);
-		fp2_mul(t1, t1, t0);
-		fp_copy(const_frb[2][0], t1[0]);
-		fp_copy(const_frb[2][1], t1[1]);
-		fp2_sqr(t1, t0);
-		fp2_sqr(t1, t1);
-		fp_copy(const_frb[3][0], t1[0]);
-		fp_copy(const_frb[3][1], t1[1]);
-		fp2_mul(t1, t1, t0);
-		fp_copy(const_frb[4][0], t1[0]);
-		fp_copy(const_frb[4][1], t1[1]);
-#endif
-		fp2_frb(t1, t0, 1);
-		fp2_mul(t0, t1, t0);
-		fp_copy(const_sqr[0], t0[0]);
-		fp_sqr(const_sqr[1], const_sqr[0]);
-		fp_mul(const_sqr[2], const_sqr[1], const_sqr[0]);
-
-		for (int i = 0; i < 5; i++) {
-			fp_mul(const_cub[i][0], const_sqr[i % 3], const_frb[i][0]);
-			fp_mul(const_cub[i][1], const_sqr[i % 3], const_frb[i][1]);
-		}
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		bn_free(e);
-		fp2_free(t0);
-		fp2_free(t1);
-	}
-}
-
 void fp2_mul_frb(fp2_t c, fp2_t a, int i, int j) {
+	ctx_t *ctx = core_get();
+
 	if (i == 2) {
-		fp_mul(c[0], a[0], const_sqr[j - 1]);
-		fp_mul(c[1], a[1], const_sqr[j - 1]);
+		fp_mul(c[0], a[0], ctx->fp2_p2[j - 1]);
+		fp_mul(c[1], a[1], ctx->fp2_p2[j - 1]);
 	} else {
 #if ALLOC == AUTO
 		if (i == 1) {
-			fp2_mul(c, a, const_frb[j - 1]);
+			fp2_mul(c, a, ctx->fp2_p[j - 1]);
 		} else {
-			fp2_mul(c, a, const_cub[j - 1]);
+			fp2_mul(c, a, ctx->fp2_p3[j - 1]);
 		}
 #else
 		fp2_t t;
@@ -139,11 +58,11 @@ void fp2_mul_frb(fp2_t c, fp2_t a, int i, int j) {
 		TRY {
 			fp2_new(t);
 			if (i == 1) {
-				fp_copy(t[0], const_frb[j - 1][0]);
-				fp_copy(t[1], const_frb[j - 1][1]);
+				fp_copy(t[0], ctx->fp2_p[j - 1][0]);
+				fp_copy(t[1], ctx->fp2_p[j - 1][1]);
 			} else {
-				fp_copy(t[0], const_cub[j - 1][0]);
-				fp_copy(t[1], const_cub[j - 1][1]);
+				fp_copy(t[0], ctx->fp2_p3[j - 1][0]);
+				fp_copy(t[1], ctx->fp2_p3[j - 1][1]);
 			}
 			fp2_mul(c, a, t);
 		}

@@ -34,6 +34,185 @@
 #include "relic_fp_low.h"
 
 /*============================================================================*/
+/* Private definitions                                                        */
+/*============================================================================*/
+
+#ifdef WITH_PP
+
+/**
+ * Computes the constantes required for evaluating Frobenius maps.
+ */
+static void fp2_calc() {
+	bn_t e;
+	fp2_t t0;
+	fp2_t t1;
+	ctx_t *ctx = core_get();
+
+	bn_null(e);
+	fp2_null(t0);
+	fp2_null(t1);
+
+	TRY {
+		bn_new(e);
+		fp2_new(t0);
+		fp2_new(t1);
+
+		fp2_zero(t0);
+		fp_set_dig(t0[0], 1);
+		fp2_mul_nor(t0, t0);
+		e->used = FP_DIGS;
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		bn_sub_dig(e, e, 1);
+		bn_div_dig(e, e, 6);
+		fp2_exp(t0, t0, e);
+#if ALLOC == AUTO
+		fp2_copy(ctx->fp2_p[0], t0);
+		fp2_sqr(ctx->fp2_p[1], ctx->fp2_p[0]);
+		fp2_mul(ctx->fp2_p[2], ctx->fp2_p[1], ctx->fp2_p[0]);
+		fp2_sqr(ctx->fp2_p[3], ctx->fp2_p[1]);
+		fp2_mul(ctx->fp2_p[4], ctx->fp2_p[3], ctx->fp2_p[0]);
+#else
+		fp_copy(ctx->fp2_p[0][0], t0[0]);
+		fp_copy(ctx->fp2_p[0][1], t0[1]);
+		fp2_sqr(t1, t0);
+		fp_copy(ctx->fp2_p[1][0], t1[0]);
+		fp_copy(ctx->fp2_p[1][1], t1[1]);
+		fp2_mul(t1, t1, t0);
+		fp_copy(ctx->fp2_p[2][0], t1[0]);
+		fp_copy(ctx->fp2_p[2][1], t1[1]);
+		fp2_sqr(t1, t0);
+		fp2_sqr(t1, t1);
+		fp_copy(ctx->fp2_p[3][0], t1[0]);
+		fp_copy(ctx->fp2_p[3][1], t1[1]);
+		fp2_mul(t1, t1, t0);
+		fp_copy(ctx->fp2_p[4][0], t1[0]);
+		fp_copy(ctx->fp2_p[4][1], t1[1]);
+#endif
+		fp2_frb(t1, t0, 1);
+		fp2_mul(t0, t1, t0);
+		fp_copy(ctx->fp2_p2[0], t0[0]);
+		fp_sqr(ctx->fp2_p2[1], ctx->fp2_p2[0]);
+		fp_mul(ctx->fp2_p2[2], ctx->fp2_p2[1], ctx->fp2_p2[0]);
+
+		for (int i = 0; i < 5; i++) {
+			fp_mul(ctx->fp2_p3[i][0], ctx->fp2_p2[i % 3], ctx->fp2_p[i][0]);
+			fp_mul(ctx->fp2_p3[i][1], ctx->fp2_p2[i % 3], ctx->fp2_p[i][1]);
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		bn_free(e);
+		fp2_free(t0);
+		fp2_free(t1);
+	}
+}
+
+/**
+ * Computes the constantes required for evaluating Frobenius maps.
+ */
+static void fp3_calc() {
+	bn_t e;
+	fp3_t t0, t1, t2;
+	ctx_t *ctx = core_get();
+
+	bn_null(e);
+	fp3_null(t0);
+	fp3_null(t1);
+	fp3_null(t2);
+
+	TRY {
+		bn_new(e);
+		fp3_new(t0);
+		fp3_new(t1);
+		fp3_new(t2);
+
+		fp_set_dig(ctx->fp3_base[0], -fp_prime_get_cnr());
+		fp_neg(ctx->fp3_base[0], ctx->fp3_base[0]);
+		e->used = FP_DIGS;
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		bn_sub_dig(e, e, 1);
+		bn_div_dig(e, e, 3);
+		fp_exp(ctx->fp3_base[0], ctx->fp3_base[0], e);
+		fp_sqr(ctx->fp3_base[1], ctx->fp3_base[0]);
+
+		fp3_zero(t0);
+		fp_set_dig(t0[1], 1);
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		bn_sub_dig(e, e, 1);
+		bn_div_dig(e, e, 6);
+
+		/* t0 = u^((p-1)/6). */
+		fp3_exp(t0, t0, e);
+		fp_copy(ctx->fp3_p[0], t0[2]);
+		fp3_sqr(t1, t0);
+		fp_copy(ctx->fp3_p[1], t1[1]);
+		fp3_mul(t2, t1, t0);
+		fp_copy(ctx->fp3_p[2], t2[0]);
+		fp3_sqr(t2, t1);
+		fp_copy(ctx->fp3_p[3], t2[2]);
+		fp3_mul(t2, t2, t0);
+		fp_copy(ctx->fp3_p[4], t2[1]);
+
+		fp_mul(ctx->fp3_p2[0], ctx->fp3_p[0], ctx->fp3_base[1]);
+		fp_mul(t0[0], ctx->fp3_p2[0], ctx->fp3_p[0]);
+		fp_neg(ctx->fp3_p2[0], t0[0]);
+		for (int i = -1; i > fp_prime_get_cnr(); i--) {
+			fp_sub(ctx->fp3_p2[0], ctx->fp3_p2[0], t0[0]);
+		}
+		fp_mul(ctx->fp3_p2[1], ctx->fp3_p[1], ctx->fp3_base[0]);
+		fp_mul(ctx->fp3_p2[1], ctx->fp3_p2[1], ctx->fp3_p[1]);
+		fp_sqr(ctx->fp3_p2[2], ctx->fp3_p[2]);
+		fp_mul(ctx->fp3_p2[3], ctx->fp3_p[3], ctx->fp3_base[1]);
+		fp_mul(t0[0], ctx->fp3_p2[3], ctx->fp3_p[3]);
+		fp_neg(ctx->fp3_p2[3], t0[0]);
+		for (int i = -1; i > fp_prime_get_cnr(); i--) {
+			fp_sub(ctx->fp3_p2[3], ctx->fp3_p2[3], t0[0]);
+		}
+		fp_mul(ctx->fp3_p2[4], ctx->fp3_p[4], ctx->fp3_base[0]);
+		fp_mul(ctx->fp3_p2[4], ctx->fp3_p2[4], ctx->fp3_p[4]);
+
+		fp_mul(ctx->fp3_p[0], ctx->fp3_p[0], ctx->fp3_base[0]);
+		fp_mul(t0[0], ctx->fp3_p[0], ctx->fp3_p2[0]);
+		fp_neg(ctx->fp3_p[0], t0[0]);
+		for (int i = -1; i > fp_prime_get_cnr(); i--) {
+			fp_sub(ctx->fp3_p[0], ctx->fp3_p[0], t0[0]);
+		}
+		fp_mul(ctx->fp3_p[1], ctx->fp3_p[1], ctx->fp3_base[1]);
+		fp_mul(t0[0], ctx->fp3_p[1], ctx->fp3_p2[1]);
+		fp_neg(ctx->fp3_p[1], t0[0]);
+		for (int i = -1; i > fp_prime_get_cnr(); i--) {
+			fp_sub(ctx->fp3_p[1], ctx->fp3_p[1], t0[0]);
+		}
+		fp_mul(ctx->fp3_p[2], ctx->fp3_p[2], ctx->fp3_p2[2]);
+		fp_mul(ctx->fp3_p[3], ctx->fp3_p[3], ctx->fp3_base[0]);
+		fp_mul(t0[0], ctx->fp3_p[3], ctx->fp3_p2[3]);
+		fp_neg(ctx->fp3_p[3], t0[0]);
+		for (int i = -1; i > fp_prime_get_cnr(); i--) {
+			fp_sub(ctx->fp3_p[3], ctx->fp3_p[3], t0[0]);
+		}
+		fp_mul(ctx->fp3_p[4], ctx->fp3_p[4], ctx->fp3_base[1]);
+		fp_mul(t0[0], ctx->fp3_p[4], ctx->fp3_p2[4]);
+		fp_neg(ctx->fp3_p[4], t0[0]);
+		for (int i = -1; i > fp_prime_get_cnr(); i--) {
+			fp_sub(ctx->fp3_p[4], ctx->fp3_p[4], t0[0]);
+		}
+		for (int i = 0; i < 5; i++) {
+			fp_mul(ctx->fp3_p4[i], ctx->fp3_p[i], ctx->fp3_p[i]);
+			fp_mul(ctx->fp3_p5[i], ctx->fp3_p2[i], ctx->fp3_p[i]);
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		bn_free(e);
+		fp3_free(t0);
+		fp3_free(t1);
+		fp3_free(t2);
+	}
+}
+
+#endif /* WITH_PP */
+
+/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
@@ -67,7 +246,7 @@ dig_t *fp_prime_get_rdc(void) {
 
 int *fp_prime_get_sps(int *len) {
 	ctx_t *ctx = core_get();
-	if (ctx->sps_len > 0 && ctx->sps_len < MAX_TERMS ) {
+	if (ctx->sps_len > 0 && ctx->sps_len < MAX_TERMS) {
 		if (len != NULL) {
 			*len = ctx->sps_len;
 		}
@@ -135,11 +314,11 @@ void fp_prime_set(bn_t p) {
 				THROW(ERR_NO_VALID);
 				break;
 		}
-	#ifdef FP_QNRES
+#ifdef FP_QNRES
 		if (ctx->mod8 != 3) {
 			THROW(ERR_NO_VALID);
 		}
-	#endif
+#endif
 
 		bn_mod_pre_monty(t, &(ctx->prime));
 		ctx->u = t->dp[0];
@@ -153,9 +332,13 @@ void fp_prime_set(bn_t p) {
 		bn_set_dig(&(ctx->one), 1);
 		bn_lsh(&(ctx->one), &(ctx->one), ctx->prime.used * BN_DIGIT);
 		bn_mod(&(ctx->one), &(ctx->one), &(ctx->prime));
-	} CATCH_ANY {
+
+		fp_prime_calc();
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		bn_free(t);
 		dv_free(s);
 		dv_free(q);
@@ -220,6 +403,17 @@ void fp_prime_set_pmers(int *f, int len) {
 		bn_free(p);
 		bn_free(t);
 	}
+}
+
+void fp_prime_calc() {
+#ifdef WITH_PP
+	if (fp_prime_get_qnr() != 0) {
+		fp2_calc();
+	}
+	if (fp_prime_get_cnr() != 0) {
+		fp3_calc();
+	}
+#endif
 }
 
 void fp_prime_conv(fp_t c, bn_t a) {
