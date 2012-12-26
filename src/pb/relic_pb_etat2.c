@@ -915,22 +915,30 @@ void pb_map_etat2_axd(fb12_t r, fb_t xp1, fb_t yp1, fb_t xp2, fb_t yp2, fb_t xq,
 static void fb6_conv(fb6_t c, fb6_t a) {
 	fb6_t t;
 
-	fb6_zero(t);
-	fb_copy(t[0], a[0]);
-	fb_copy(t[1], a[4]);
-	fb_copy(t[2], a[1]);
-	fb_copy(t[3], a[3]);
-	fb_copy(t[4], a[2]);
-	fb_copy(t[5], a[5]);
-	fb_add(t[0], t[0], a[4]);
-	fb_add(t[1], t[1], a[3]);
-	fb_add(t[1], t[1], a[5]);
-	fb_add(t[2], t[2], a[4]);
-	fb_add(t[2], t[2], a[5]);
-	fb_add(t[4], t[4], a[4]);
-	fb_add(t[4], t[4], a[5]);
-	fb_add(t[5], t[5], a[3]);
-	fb6_copy(c, t);
+	fb6_null(t);
+
+	TRY {
+		fb6_new(t);
+		fb_copy(t[0], a[0]);
+		fb_copy(t[1], a[4]);
+		fb_copy(t[2], a[1]);
+		fb_copy(t[3], a[3]);
+		fb_copy(t[4], a[2]);
+		fb_copy(t[5], a[5]);
+		fb_add(t[0], t[0], a[4]);
+		fb_add(t[1], t[1], a[3]);
+		fb_add(t[1], t[1], a[5]);
+		fb_add(t[2], t[2], a[4]);
+		fb_add(t[2], t[2], a[5]);
+		fb_add(t[4], t[4], a[4]);
+		fb_add(t[4], t[4], a[5]);
+		fb_add(t[5], t[5], a[3]);
+		fb6_copy(c, t);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb6_free(t);
+	}
 }
 
 static void pb_map_g4(fb12_t l1, fb12_t l0, fb_t mubar[FB_BITS][8],
@@ -1513,12 +1521,32 @@ void pb_map_etat2_gxg(fb12_t r, hb_t p, hb_t q) {
 		fb_null(delta[i]);
 		fb_null(epsil[i]);
 	}
+	for (i = 0; i < 11; i++) {
+		fb_null(mu[i]);
+		fb_null(nu[i]);
+	}
+	for (i = 0; i < FB_BITS; i++) {
+		for (j = 0; j < 8; j++) {
+			fb_null(mubar[i][j]);
+			fb_null(nubar[i][j]);
+		}
+	}
 
 	TRY {
 		fb_new(t);
 		for (i = 0; i < 4; i++) {
 			fb_new(delta[i]);
 			fb_new(epsil[i]);
+		}
+		for (i = 0; i < 11; i++) {
+			fb_new(mu[i]);
+			fb_new(nu[i]);
+		}
+		for (i = 0; i < FB_BITS; i++) {
+			for (j = 0; j < 8; j++) {
+				fb_new(mubar[i][j]);
+				fb_new(nubar[i][j]);
+			}
 		}
 
 		/* d0 = p.u1^2+p.u1. */
@@ -1812,6 +1840,16 @@ void pb_map_etat2_gxg(fb12_t r, hb_t p, hb_t q) {
 		for (i = 0; i < 4; i++) {
 			fb_free(delta[i]);
 			fb_free(epsil[i]);
+		}
+		for (i = 0; i < 11; i++) {
+			fb_free(mu[i]);
+			fb_free(nu[i]);
+		}
+		for (i = 0; i < FB_BITS; i++) {
+			for (j = 0; j < 8; j++) {
+				fb_free(mubar[i][j]);
+				fb_free(nubar[i][j]);
+			}
 		}
 	}
 }

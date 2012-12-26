@@ -271,6 +271,25 @@ typedef struct _ctx_t {
 #endif
 #endif /* WITH_HB */
 
+#ifdef WITH_PB
+	/** Precomputed table for the final exponentiation. */
+	fb_st pb_exp[FB_TABLE];
+	/** Pointers to the precomputed table for the final exponentiation. */
+	fb_st *pb_ptr[FB_TABLE];
+#ifdef PB_PARAL
+	/** Precomputed table for computing fixed 2^i powers in the pairing. */
+	fb_st pb_tab_sqr[CORES][FB_TABLE];
+	/** Pointers to the precomputed table of fixed 2^i powers. */
+	fb_st *pb_sqr_ptr[CORES][FB_TABLE];
+	/** Precomputed table for computing fixed 1/(2^i) powers in the pairing. */
+	fb_st pb_tab_srt[CORES][FB_TABLE];
+	/** Pointers to the precomputed table of fixed 1/(2^i) powers. */
+	fb_st *pb_srt_ptr[CORES][FB_TABLE];
+	/** Partition for the parallel execution. */
+	double pb_par[CORES];
+#endif
+#endif /* WITH_PB */
+
 #ifdef WITH_FT
 	/** Currently configured ternary field identifier. */
 	int ft_id;

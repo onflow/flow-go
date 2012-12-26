@@ -43,45 +43,6 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#ifdef PB_PARAL
-
-/**
- * Precomputed table for computing fixed 2^i powers in the pairing.
- */
-fb_st pb_tab_sqr[CORES][FB_TABLE];
-
-/**
- * Pointers to the precomputed table of fixed 2^i powers.
- */
-fb_st *pb_sqr_ptr[CORES][FB_TABLE];
-
-/**
- * Precomputed table for computing fixed 1/(2^i) powers in the pairing.
- */
-fb_st pb_tab_srt[CORES][FB_TABLE];
-
-/**
- * Pointers to the precomputed table of fixed 1/(2^i) powers.
- */
-fb_st *pb_srt_ptr[CORES][FB_TABLE];
-
-/**
- * Partition for the parallel execution.
- */
-double pb_par[CORES];
-
-#endif
-
-/**
- * Precomputed table for the final exponentiation.
- */
-fb_st pb_tab_exp[FB_TABLE];
-
-/**
- * Pointers to the precomputed table for the final exponentiation.
- */
-fb_st *pb_exp_ptr[FB_TABLE];
-
 /**
  * Computes a partition of the main loop in the pairing algorithm.
  */
@@ -129,9 +90,10 @@ static void pb_compute_par() {
 /*============================================================================*/
 
 void pb_map_init() {
+	ctx_t *ctx = core_get();
 
 	for (int i = 0; i < FB_TABLE; i++) {
-		pb_exp_ptr[i] = &(pb_tab_exp[i]);
+		ctx->pb_ptr[i] = &(ctx->pb_exp[i]);
 	}
 
 #if PB_MAP == ETATS || PB_MAP == ETATN
@@ -150,8 +112,8 @@ void pb_map_init() {
 
 	for (int i = 0; i < CORES; i++) {
 		for (int j = 0; j < FB_TABLE; j++) {
-			pb_sqr_ptr[i][j] = &(pb_tab_sqr[i][j]);
-			pb_srt_ptr[i][j] = &(pb_tab_srt[i][j]);
+			ctx->pb_sqr_ptr[i][j] = &(ctx->pb_tab_sqr[i][j]);
+			ctx->pb_srt_ptr[i][j] = &(ctx->pb_tab_srt[i][j]);
 		}
 	}
 
@@ -169,9 +131,9 @@ void pb_map_clean() {
 
 fb_t *pb_map_get_tab() {
 #if ALLOC == AUTO
-	return (fb_t *)*pb_exp_ptr;
+	return (fb_t *)*core_get()->pb_ptr;
 #else
-	return (fb_t *)pb_exp_ptr;
+	return (fb_t *)core_get()->pb_ptr;
 #endif
 }
 
@@ -179,9 +141,9 @@ fb_t *pb_map_get_sqr(int core) {
 #ifdef PB_PARAL
 
 #if ALLOC == AUTO
-	return (fb_t *)*pb_sqr_ptr[core];
+	return (fb_t *)*core_get()->pb_sqr_ptr[core];
 #else
-	return (fb_t *)pb_sqr_ptr[core];
+	return (fb_t *)core_get()->pb_sqr_ptr[core];
 #endif
 
 #else
@@ -193,9 +155,9 @@ fb_t *pb_map_get_srt(int core) {
 #ifdef PB_PARAL
 
 #if ALLOC == AUTO
-	return (fb_t *)*pb_srt_ptr[core];
+	return (fb_t *)*core_get()->pb_srt_ptr[core];
 #else
-	return (fb_t *)pb_srt_ptr[core];
+	return (fb_t *)core_get()->pb_srt_ptr[core];
 #endif
 
 #else
