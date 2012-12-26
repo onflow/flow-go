@@ -308,7 +308,7 @@ void ep2_curve_set(int twist) {
 		bn_copy(&(ctx->ep2_r), r);
 
 		/* I don't have a better place for this. */
-		fp2_const_calc();
+		fp_prime_calc();
 
 #if defined(EP_PRECO)
 		ep2_mul_pre(ep2_curve_get_tab(), &(ctx->ep2_g));
