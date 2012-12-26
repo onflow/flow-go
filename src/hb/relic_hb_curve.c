@@ -157,17 +157,21 @@ void hb_curve_get_ord(bn_t n) {
 	bn_copy(n, &(core_get()->hb_r));
 }
 
+hb_t *hb_curve_get_tab() {
 #if defined(HB_PRECO)
 
-hb_t *hb_curve_get_tab() {
+	/* Return a meaningful pointer. */
 #if ALLOC == AUTO
-	return (hb_t *) *pointer;
+	return (hb_t *)*(core_get()->hb_ptr);
 #else
 	return core_get()->hb_ptr;
 #endif
-}
 
+#else
+	/* Return a null pointer. */
+	return NULL;
 #endif
+}
 
 void hb_curve_get_cof(bn_t h) {
 	bn_copy(h, &(core_get()->hb_h));
