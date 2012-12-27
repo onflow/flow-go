@@ -183,7 +183,7 @@ typedef struct _sts_t {
  *
  * If the error pointer is not NULL but there is no surrounding TRY-CATCH
  * block, then the code threw an exception after an exception was thrown.
- * In this case, we end execution.
+ * In this case, we finish execution.
  *
  * If the error pointer is NULL, the error was thrown outside of a TRY-CATCH
  * block. An error message is printed and the function returns.
@@ -203,12 +203,10 @@ typedef struct _sts_t {
 			exit(E);													\
 		}																\
 		if (_ctx->last == NULL) {										\
-			static sts_t _error;										\
-			static err_t _err;											\
-			_ctx->last = &_error;										\
-			_error.error = &_err;										\
-			_error.block = 0;											\
-			_err = E;													\
+			_ctx->last = &(_ctx->error);								\
+			_ctx->error.error = &(_ctx->number);						\
+			_ctx->error.block = 0;										\
+			_ctx->number = E;											\
 			ERR_PRINT(E);												\
 		} else {														\
 			for (; ; longjmp(_ctx->last->addr, 1)) {					\

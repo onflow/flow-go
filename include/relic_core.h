@@ -143,6 +143,10 @@ typedef struct _ctx_t {
 #ifdef CHECK
 	/** The state of the last error caught. */
 	sts_t *last;
+	/** Error state to be used outside try-catch blocks. */
+	sts_t error;
+	/** Error number to be used outside try-catch blocks. */
+	err_t number;
 	/** The error message respective to the last error. */
 	char *reason[ERR_MAX];
 	/** A flag to indicate if the last error was already caught. */
