@@ -32,76 +32,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "relic_bench.h"
+#include "relic_core.h"
 #include "relic_conf.h"
-#include "relic_util.h"
-#include "relic_arch.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
 /*============================================================================*/
-
-/**
- * Timer type.
- */
-#if TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
-
-#include <sys/time.h>
-#include <time.h>
-typedef struct timespec bench_t;
-
-#elif TIMER == ANSI
-
-#include <time.h>
-typedef clock_t bench_t;
-
-#elif TIMER == POSIX
-
-#include <sys/time.h>
-typedef struct timeval bench_t;
-
-#elif TIMER == CYCLE
-
-typedef unsigned long long bench_t;
-
-#else
-
-typedef unsigned long long bench_t;
-
-#endif
-
-/**
- * Shared parameter for these timer.
- */
-#if TIMER == HREAL
-#define CLOCK			CLOCK_REALTIME
-#elif TIMER == HPROC
-#define CLOCK			CLOCK_PROCESS_CPUTIME_ID
-#elif TIMER == HTHRD
-#define CLOCK			CLOCK_THREAD_CPUTIME_ID
-#else
-#define CLOCK			NULL
-#endif
-
-/**
- * Stores the time measured before the execution of the benchmark.
- */
-static bench_t before;
-
-/**
- * Stores the time measured after the execution of the benchmark.
- */
-static bench_t after;
-
-/**
- * Stores the sum of timings for the current benchmark.
- */
-static long long total;
-
-/**
- * Benchmarking overhead to be measured and subtracted from benchmarks.
- */
-static long long overhead = 0;
 
 #if TIMER != NONE && BENCH > 1
 
@@ -121,14 +57,15 @@ static void empty(int *a) {
 /*============================================================================*/
 
 void bench_overhead(void) {
+	ctx_t *ctx = core_get();
 #if TIMER != NONE && BENCH > 1
 	int a[BENCH + 1];
 	int *tmpa;
 
 	do {
-		overhead = 0;
+		ctx->overhead = 0;
 		for (int l = 0; l < BENCH; l++) {
-			total = 0;
+			ctx->total = 0;
 			/* Measure the cost of (n^2 + over). */
 			bench_before();
 			for (int i = 0; i < BENCH; i++) {
@@ -139,10 +76,10 @@ void bench_overhead(void) {
 			}
 			bench_after();
 			/* Add the cost of (n^2 + over). */
-			overhead += total;
+			ctx->overhead += ctx->total;
 		}
 		/* Overhead stores the cost of n*(n^2 + over) = n^3 + n*over. */
-		total = 0;
+		ctx->total = 0;
 		/* Measure the cost of (n^3 + over). */
 		bench_before();
 		for (int i = 0; i < BENCH; i++) {
@@ -155,21 +92,21 @@ void bench_overhead(void) {
 		}
 		bench_after();
 		/* Subtract the cost of (n^3 + over). */
-		overhead -= total;
+		ctx->overhead -= ctx->total;
 		/* Now overhead stores (n - 1)*over, so take the average to obtain the
 		 * overhead to execute BENCH operations inside a benchmark. */
-		overhead /= (BENCH - 1);
+		ctx->overhead /= (BENCH - 1);
 		/* Divide to obtain the overhead of one operation pair. */
-		overhead /= BENCH;
-	} while (overhead < 0);
-	total = overhead;
+		ctx->overhead /= BENCH;
+	} while (ctx->overhead < 0);
+	ctx->total = ctx->overhead;
 	bench_print();
 #endif
 }
 
 void bench_reset() {
 #if TIMER != NONE
-	total = 0;
+	core_get()->total = 0;
 #else
 	(void)before;
 	(void)after;
@@ -180,22 +117,24 @@ void bench_reset() {
 
 void bench_before() {
 #if TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
-	clock_gettime(CLOCK, &before);
+	clock_gettime(CLOCK, &(core_get()->before));
 #elif TIMER == ANSI
 	before = clock();
 #elif TIMER == POSIX
-	gettimeofday(&before, NULL);
+	gettimeofday(&(core_get()->before), NULL);
 #elif TIMER == CYCLE
 	before = arch_cycles();
 #endif
 }
 
 void bench_after() {
+	ctx_t *ctx = core_get();
 	long long result;
+
 #if TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
-	clock_gettime(CLOCK, &after);
-	result = ((long)after.tv_sec - (long)before.tv_sec) * 1000000000;
-	result += (after.tv_nsec - before.tv_nsec);
+	clock_gettime(CLOCK, &(ctx->after));
+	result = ((long)ctx->after.tv_sec - (long)ctx->before.tv_sec) * 1000000000;
+	result += (ctx->after.tv_nsec - ctx->before.tv_nsec);
 #elif TIMER == ANSI
 	after = clock();
 	result = (after - before) * 1000000000 / CLOCKS_PER_SEC;
@@ -209,27 +148,30 @@ void bench_after() {
 #endif
 
 #if TIMER != NONE
-	total += result;
+	ctx->total += result;
 #else
 	(void)result;
 #endif
 }
 
 void bench_compute(int benches) {
+	ctx_t *ctx = core_get();
 #if TIMER != NONE
-	total = total / benches - overhead;
+	ctx->total = ctx->total / benches - ctx->overhead;
 #else
 	(void)benches;
 #endif
 }
 
 void bench_print() {
+	ctx_t *ctx = core_get();
+
 #if TIMER == CYCLE
-	util_print("%lld cycles", total);
+	util_print("%lld cycles", ctx->total);
 #else
-	util_print("%lld nanosec", total);
+	util_print("%lld nanosec", ctx->total);
 #endif
-	if (total < 0) {
+	if (ctx->total < 0) {
 		util_print(" (bad overhead estimation)\n");
 	} else {
 		util_print("\n");
@@ -237,5 +179,5 @@ void bench_print() {
 }
 
 unsigned long long bench_total() {
-	return total;
+	return core_get()->total;
 }

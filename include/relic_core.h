@@ -48,6 +48,7 @@
 #include "relic_ft.h"
 #include "relic_epx.h"
 #include "relic_conf.h"
+#include "relic_bench.h"
 #include "relic_rand.h"
 #include "relic_pool.h"
 
@@ -425,6 +426,17 @@ typedef struct _ctx_t {
 	fp_st fp3_p5[5];
 	/** @} */
 #endif /* WITH_PP */
+
+#if BENCH > 0
+	/** Stores the time measured before the execution of the benchmark. */
+	bench_t before;
+	/** Stores the time measured after the execution of the benchmark. */
+	bench_t after;
+	/** Stores the sum of timings for the current benchmark. */
+	long long total;
+	/** Benchmarking overhead to be measured and subtracted from benchmarks. */
+	long long overhead;
+#endif
 
 	/** Internal state of the PRNG. */
 	unsigned char rand[RAND_SIZE];

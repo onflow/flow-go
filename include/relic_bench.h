@@ -36,7 +36,22 @@
 #ifndef RELIC_BENCH_H
 #define RELIC_BENCH_H
 
-#include "relic_core.h"
+/*============================================================================*/
+/* Constant definitions                                                       */
+/*============================================================================*/
+
+/**
+ * Shared parameter for these timer.
+ */
+#if TIMER == HREAL
+#define CLOCK			CLOCK_REALTIME
+#elif TIMER == HPROC
+#define CLOCK			CLOCK_PROCESS_CPUTIME_ID
+#elif TIMER == HTHRD
+#define CLOCK			CLOCK_THREAD_CPUTIME_ID
+#else
+#define CLOCK			NULL
+#endif
 
 /*============================================================================*/
 /* Macro definitions                                                          */
@@ -104,6 +119,39 @@
 		FUNCTION;															\
 	}																		\
 	bench_after();															\
+
+/*============================================================================*/
+/* Type definitions                                                           */
+/*============================================================================*/
+
+/**
+ * Timer type.
+ */
+#if TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
+
+#include <sys/time.h>
+#include <time.h>
+typedef struct timespec bench_t;
+
+#elif TIMER == ANSI
+
+#include <time.h>
+typedef clock_t bench_t;
+
+#elif TIMER == POSIX
+
+#include <sys/time.h>
+typedef struct timeval bench_t;
+
+#elif TIMER == CYCLE
+
+typedef unsigned long long bench_t;
+
+#else
+
+typedef unsigned long long bench_t;
+
+#endif
 
 /*============================================================================*/
 /* Function prototypes                                                        */
