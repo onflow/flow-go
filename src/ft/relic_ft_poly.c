@@ -100,7 +100,6 @@ void ft_poly_init(void) {
 	ft_zero(ctx->ft_poly);
 	ctx->ft_pa = ctx->ft_pb = ctx->ft_pc = 0;
 	ctx->ft_na = ctx->ft_nb = ctx->ft_nc = -1;
-	ctx->crz_len = ctx->srz_len = 0;
 }
 
 void ft_poly_clean(void) {
@@ -341,8 +340,9 @@ dig_t *ft_poly_get_crz(void) {
 }
 
 int *ft_poly_get_crz_sps(int *len) {
-	ctx_t *ctx = core_get();
 #if FT_CRT == QUICK || !defined(STRIP)
+	ctx_t *ctx = core_get();
+
 	if (ctx->crz_len > 0 && ctx->crz_len < MAX_TERMS ) {
 		if (len != NULL) {
 			*len = ctx->crz_len;
@@ -369,8 +369,9 @@ dig_t *ft_poly_get_srz(void) {
 }
 
 int *ft_poly_get_srz_sps(int *len) {
-	ctx_t *ctx = core_get();
 #if FT_CRT == QUICK || !defined(STRIP)
+	ctx_t *ctx = core_get();
+
 	if (ctx->srz_len > 0 && ctx->srz_len < MAX_TERMS ) {
 		if (len != NULL) {
 			*len = ctx->srz_len;
