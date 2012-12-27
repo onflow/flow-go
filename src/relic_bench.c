@@ -108,9 +108,6 @@ void bench_reset() {
 #if TIMER != NONE
 	core_get()->total = 0;
 #else
-	(void)before;
-	(void)after;
-	(void)overhead;
 	(void)empty;
 #endif
 }
@@ -119,11 +116,11 @@ void bench_before() {
 #if TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
 	clock_gettime(CLOCK, &(core_get()->before));
 #elif TIMER == ANSI
-	before = clock();
+	core_get()->before = clock();
 #elif TIMER == POSIX
 	gettimeofday(&(core_get()->before), NULL);
 #elif TIMER == CYCLE
-	before = arch_cycles();
+	core_get()->before = arch_cycles();
 #endif
 }
 
