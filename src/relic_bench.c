@@ -133,15 +133,15 @@ void bench_after() {
 	result = ((long)ctx->after.tv_sec - (long)ctx->before.tv_sec) * 1000000000;
 	result += (ctx->after.tv_nsec - ctx->before.tv_nsec);
 #elif TIMER == ANSI
-	after = clock();
-	result = (after - before) * 1000000000 / CLOCKS_PER_SEC;
+	ctx->after = clock();
+	result = (ctx->after - ctx->before) * 1000000000 / CLOCKS_PER_SEC;
 #elif TIMER == POSIX
-	gettimeofday(&after, NULL);
-	result = ((long)after.tv_sec - (long)before.tv_sec) * 1000000000;
-	result += (after.tv_usec - before.tv_usec) * 1000;
+	gettimeofday(&(ctx->after), NULL);
+	result = ((long)ctx->after.tv_sec - (long)ctx->before.tv_sec) * 1000000000;
+	result += (ctx->after.tv_usec - ctx->before.tv_usec) * 1000;
 #elif TIMER == CYCLE
-	after = arch_cycles();
-	result = (after - before);
+	ctx->after = arch_cycles();
+	result = (ctx->after - ctx->before);
 #endif
 
 #if TIMER != NONE
