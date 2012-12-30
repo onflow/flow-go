@@ -1100,6 +1100,19 @@ static int gcd(void) {
 			TEST_ASSERT(bn_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 #endif
+
+		bn_gen_prime(b, BN_BITS);
+
+		TEST_BEGIN("midway extended greatest common divisor is correct") {
+			bn_rand(a, BN_POS, BN_BITS);
+			bn_gcd_ext_mid(c, d, e, f, a, b);
+			bn_abs(d, d);
+			bn_abs(f, f);
+			bn_mul(c, c, f);
+			bn_mul(e, e, d);
+			bn_add(c, c, e);
+			TEST_ASSERT(bn_cmp(b, c) == CMP_EQ || bn_cmp(a, c) == CMP_EQ, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -1537,31 +1550,131 @@ static int factor(void) {
 
 static int recoding(void) {
 	int code = STS_ERR;
-	bn_t a, b, c;
-	int j, k, len;
-	unsigned char w[BN_BITS];
+	bn_t a, b, c, v1[3], v2[3];
+	int w, k, l;
+	unsigned char d[BN_BITS];
+	signed char e[2 * BN_BITS + 1];
 
 	bn_null(a);
 	bn_null(b);
 	bn_null(c);
+	for (k = 0; k < 3; k++) {
+		bn_null(v1[k]);
+		bn_null(v2[k]);
+	}
 
 	TRY {
 		bn_new(a);
 		bn_new(b);
 		bn_new(c);
+		for (k = 0; k < 3; k++) {
+			bn_new(v1[k]);
+			bn_new(v2[k]);
+		}
 
 		TEST_BEGIN("window recoding is correct") {
-			for (j = 2; j <= 6; j++) {
+			for (w = 2; w <= 8; w++) {
 				bn_rand(a, BN_POS, BN_BITS);
-				bn_rec_win(w, &len, a, j);
+				bn_rec_win(d, &l, a, w);
 				bn_zero(b);
-				for (k = len - 1; k >= 0; k--) {
-					bn_lsh(b, b, j);
-					bn_add_dig(b, b, w[k]);
+				for (k = l - 1; k >= 0; k--) {
+					bn_lsh(b, b, w);
+					bn_add_dig(b, b, d[k]);
 				}
 				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
 			}
 		} TEST_END;
+
+		TEST_BEGIN("sliding window recoding is correct") {
+			for (w = 2; w <= 8; w++) {
+				bn_rand(a, BN_POS, BN_BITS);
+				bn_rec_slw(d, &l, a, w);
+				bn_zero(b);
+				for (k = 0; k < l; k++) {
+					if (d[k] == 0) {
+						bn_dbl(b, b);
+					} else {
+						bn_lsh(b, b, util_bits_dig(d[k]));
+						bn_add_dig(b, b, d[k]);
+					}
+				}
+				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
+			}
+		} TEST_END;
+
+		TEST_BEGIN("naf recoding is correct") {
+			for (w = 2; w <= 8; w++) {
+				bn_rand(a, BN_POS, BN_BITS);
+				bn_rec_naf(e, &l, a, w);
+				bn_zero(b);
+				for (k = l - 1; k >= 0; k--) {
+					bn_dbl(b, b);
+					if (e[k] >= 0) {
+						bn_add_dig(b, b, e[k]);
+					} else {
+						bn_sub_dig(b, b, -e[k]);
+					}
+				}
+				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
+			}
+		} TEST_END;
+
+		TEST_BEGIN("jsf recoding is correct") {
+			bn_rand(a, BN_POS, BN_BITS);
+			bn_rand(b, BN_POS, BN_BITS);
+			bn_rec_jsf(e, &l, a, b);
+			w = MAX(bn_bits(a), bn_bits(b)) + 1;
+			bn_add(a, a, b);
+			bn_zero(b);
+			for (k = l - 1; k >= 0; k--) {
+				bn_dbl(b, b);
+				if (e[k] >= 0) {
+					bn_add_dig(b, b, e[k]);
+				} else {
+					bn_sub_dig(b, b, -e[k]);
+				}
+				if (e[k + w] >= 0) {
+					bn_add_dig(b, b, e[k + w]);
+				} else {
+					bn_sub_dig(b, b, -e[k + w]);
+				}
+			}
+			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
+		} TEST_END;
+
+#if defined(WITH_EP) && defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
+		TEST_BEGIN("glv recoding is correct") {
+			if (ep_param_set_any_kbltz() == STS_OK) {
+				bn_rand(a, BN_POS, FP_BITS);
+				ep_curve_get_ord(b);
+				bn_mod(a, a, b);
+				ep_curve_get_v1(v1);
+				ep_curve_get_v2(v2);
+				bn_rec_glv(b, c, a, b, v1, v2);
+				bn_print(a);
+				bn_print(b);
+				bn_print(c);
+				ep_curve_get_ord(v2[0]);
+				/* Recover parameter lambda. */
+				bn_gcd_ext(v1[0], v2[1], NULL, v1[2], v2[0]);
+				if (bn_sign(v2[1]) == BN_NEG) {
+					bn_add(v2[1], v2[1], v2[0]);
+				}
+				bn_mul(v1[0], v2[1], v1[1]);
+				bn_mod(v1[0], v1[0], v2[0]);
+				/* Check if b + c * lambda = k (mod n). */
+				bn_mul(c, c, v1[0]);
+				bn_add(b, b, c);
+				bn_mod(b, b, v2[0]);
+				if (bn_sign(b) == BN_NEG) {
+					bn_add(b, b, v2[0]);
+				}
+				bn_print(a);
+				bn_print(b);
+				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
+			}
+		} TEST_END;
+#endif /* WITH_EP && EP_KBLTZ */
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -1571,6 +1684,10 @@ static int recoding(void) {
 	bn_free(a);
 	bn_free(b);
 	bn_free(c);
+	for (k = 0; k < 3; k++) {
+		bn_free(v1[k]);
+		bn_free(v2[k]);
+	}
 	return code;
 }
 

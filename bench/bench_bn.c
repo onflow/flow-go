@@ -763,6 +763,13 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
+	BENCH_BEGIN("bn_gcd_ext_mid") {
+		bn_rand(a, BN_POS, BN_BITS);
+		bn_rand(b, BN_POS, BN_BITS);
+		BENCH_ADD(bn_gcd_ext_mid(c, c, d, d, a, b));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("bn_gcd_ext_dig") {
 		bn_rand(a, BN_POS, BN_BITS);
 		bn_rand(b, BN_POS, BN_DIGIT);
@@ -854,45 +861,22 @@ static void arith(void) {
 
 #if defined(WITH_EB) && defined(EB_KBLTZ) && (EB_MUL == LWNAF || EB_MUL == RWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP))
 	if (eb_param_set_any_kbltz() == STS_OK) {
-		bn_t vm, s0, s1, n;
-
-		bn_null(vm);
-		bn_null(s0);
-		bn_null(s1);
-		bn_null(n);
-
-		TRY {
-			bn_new(vm);
-			bn_new(s0);
-			bn_new(s1);
-			bn_new(n);
-
-			eb_curve_get_vm(vm);
-			eb_curve_get_s0(s0);
-			eb_curve_get_s1(s1);
-			BENCH_BEGIN("bn_rec_tnaf") {
-				signed char tnaf[FB_BITS + 8];
-				int len;
-				bn_rand(a, BN_POS, BN_BITS);
-				eb_curve_get_ord(n);
-				bn_mod(a, a, n);
-				if (eb_curve_opt_a() == OPT_ZERO) {
-					BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, vm, s0, s1, -1, FB_BITS, 4));
-				} else {
-					BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, vm, s0, s1, 1, FB_BITS, 4));
-				}
+		eb_curve_get_vm(b);
+		eb_curve_get_s0(c);
+		eb_curve_get_s1(d);
+		BENCH_BEGIN("bn_rec_tnaf") {
+			signed char tnaf[FB_BITS + 8];
+			int len;
+			bn_rand(a, BN_POS, BN_BITS);
+			eb_curve_get_ord(e);
+			bn_mod(a, a, e);
+			if (eb_curve_opt_a() == OPT_ZERO) {
+				BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, b, c, d, -1, FB_BITS, 4));
+			} else {
+				BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, b, c, d, 1, FB_BITS, 4));
 			}
-			BENCH_END;
 		}
-		CATCH_ANY {
-			THROW(ERR_CAUGHT);
-		}
-		FINALLY {
-			bn_free(vm);
-			bn_free(s0);
-			bn_free(s1);
-			bn_free(n);
-		}
+		BENCH_END;
 	}
 #endif
 
@@ -904,6 +888,33 @@ static void arith(void) {
 		BENCH_ADD(bn_rec_jsf(jsf, &len, a, b));
 	}
 	BENCH_END;
+
+#if defined(WITH_EP) && defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
+	if (ep_param_set_any_kbltz() == STS_OK) {
+		bn_t v1[3], v2[3];
+
+		for (int j = 0; j < 3; j++) {
+			bn_new(v1[j]);
+			bn_new(v2[j]);
+		}
+
+		BENCH_BEGIN("bn_rec_glv") {
+			bn_rand(a, BN_POS, FP_BITS);
+			ep_curve_get_v1(v1);
+			ep_curve_get_v2(v2);
+			ep_curve_get_ord(e);
+			bn_mod(a, a, e);
+			BENCH_ADD(bn_rec_glv(b, c, a, e, v1, v2));
+		}
+		BENCH_END;
+
+		for (int j = 0; j < 3; j++) {
+			bn_free(v1[j]);
+			bn_free(v2[j]);
+		}
+	}
+
+#endif /* WITH_EP && EP_KBLTZ */
 
 	bn_free(a);
 	bn_free(b);
