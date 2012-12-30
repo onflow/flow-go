@@ -83,7 +83,7 @@ typedef dv_t dv3_t[3];
 typedef fp_st fp3_st[3];
 
 /**
- * Represents a dodecic extension field element.
+ * Represents a sextic extension field element.
  *
  * This extension is constructed with the basis {1, v, v^2}, where v^3 = E is an
  * adjoined cube root in the underlying quadratic extension.  If p = 3 mod 8,
@@ -93,17 +93,29 @@ typedef fp_st fp3_st[3];
 typedef fp2_t fp6_t[3];
 
 /**
- * Represents a double-precision dodecic extension field element.
+ * Represents a double-precision sextic extension field element.
  */
 typedef dv2_t dv6_t[3];
+
+/**
+ * Represents a sextic extension field element with automatic memory
+ * allocation.
+ */
+typedef fp2_st fp6_st[3];
 
 /**
  * Represents a dodecic extension field element.
  *
  * This extension is constructed with the basis {1, w}, where w^2 = v is an
- * adjoined square root in the underlying dodecic extension.
+ * adjoined square root in the underlying sextic extension.
  */
 typedef fp6_t fp12_t[2];
+
+/**
+ * Represents a dodecic extension field element with automatic memory
+ * allocation.
+ */
+typedef fp6_st fp12_st[2];
 
 /**
  * Represents a octdecic extension field element.
@@ -112,6 +124,12 @@ typedef fp6_t fp12_t[2];
  * adjoined cube root in the underlying sextic extension.
  */
 typedef fp6_t fp18_t[3];
+
+/**
+ * Represents a octdecic extension field element with automatic memory
+ * allocation.
+ */
+typedef fp6_st fp18_st[3];
 
 /*============================================================================*/
 /* Macro definitions                                                          */
@@ -373,50 +391,50 @@ typedef fp6_t fp18_t[3];
 #endif
 
 /**
- * Initializes a dodecic extension field with a null value.
+ * Initializes a sextic extension field with a null value.
  *
- * @param[out] A			- the dodecic extension element to initialize.
+ * @param[out] A			- the sextic extension element to initialize.
  */
 #define fp6_null(A)															\
 		fp2_null(A[0]); fp2_null(A[1]); fp2_null(A[2]);						\
 
 /**
- * Initializes a double-precision dodecic extension field with a null value.
+ * Initializes a double-precision sextic extension field with a null value.
  *
- * @param[out] A			- the dodecic extension element to initialize.
+ * @param[out] A			- the sextic extension element to initialize.
  */
 #define dv6_null(A)															\
 		dv2_null(A[0]); dv2_null(A[1]); dv2_null(A[2]);						\
 
 /**
- * Allocate and initializes a dodecic extension field element.
+ * Allocate and initializes a sextic extension field element.
  *
- * @param[out] A			- the new dodecic extension field element.
+ * @param[out] A			- the new sextic extension field element.
  */
 #define fp6_new(A)															\
 		fp2_new(A[0]); fp2_new(A[1]); fp2_new(A[2]);						\
 
 /**
- * Calls a function to clean and free a dodecic extension field element.
+ * Calls a function to clean and free a sextic extension field element.
  *
- * @param[out] A			- the dodecic extension field element to free.
+ * @param[out] A			- the sextic extension field element to free.
  */
 #define fp6_free(A)															\
 		fp2_free(A[0]); fp2_free(A[1]); fp2_free(A[2]); 					\
 
 /**
- * Allocate and initializes a double-precision dodecic extension field element.
+ * Allocate and initializes a double-precision sextic extension field element.
  *
- * @param[out] A			- the new dodecic extension field element.
+ * @param[out] A			- the new sextic extension field element.
  */
 #define dv6_new(A)															\
 		dv2_new(A[0]); dv2_new(A[1]); dv2_new(A[2]);						\
 
 /**
- * Calls a function to clean and free a double-precision dodecic extension field
+ * Calls a function to clean and free a double-precision sextic extension field
  * element.
  *
- * @param[out] A			- the dodecic extension field element to free.
+ * @param[out] A			- the sextic extension field element to free.
  */
 #define dv6_free(A)															\
 		dv2_free(A[0]); dv2_free(A[1]); dv2_free(A[2]); 					\
@@ -425,8 +443,8 @@ typedef fp6_t fp18_t[3];
  * Multiplies two sextic extension field elements. Computes C = A * B.
  *
  * @param[out] C			- the result.
- * @param[in] A				- the first dodecic extension field element.
- * @param[in] B				- the second dodecic extension field element.
+ * @param[in] A				- the first sextic extension field element.
+ * @param[in] B				- the second sextic extension field element.
  */
 #if PP_EXT == BASIC
 #define fp6_mul(C, A, B)	fp6_mul_basic(C, A, B)
@@ -438,7 +456,7 @@ typedef fp6_t fp18_t[3];
  * Squares a sextic extension field element. Computes C = A * A.
  *
  * @param[out] C			- the result.
- * @param[in] A				- the dodecic extension field element to square.
+ * @param[in] A				- the sextic extension field element to square.
  */
 #if PP_EXT == BASIC
 #define fp6_sqr(C, A)		fp6_sqr_basic(C, A)
