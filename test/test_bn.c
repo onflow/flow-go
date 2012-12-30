@@ -1651,9 +1651,6 @@ static int recoding(void) {
 				ep_curve_get_v1(v1);
 				ep_curve_get_v2(v2);
 				bn_rec_glv(b, c, a, b, v1, v2);
-				bn_print(a);
-				bn_print(b);
-				bn_print(c);
 				ep_curve_get_ord(v2[0]);
 				/* Recover parameter lambda. */
 				bn_gcd_ext(v1[0], v2[1], NULL, v1[2], v2[0]);
@@ -1669,8 +1666,6 @@ static int recoding(void) {
 				if (bn_sign(b) == BN_NEG) {
 					bn_add(b, b, v2[0]);
 				}
-				bn_print(a);
-				bn_print(b);
 				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
 			}
 		} TEST_END;
