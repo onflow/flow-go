@@ -83,7 +83,7 @@ void cp_bls_sig(g1_t s, unsigned char *msg, int len, bn_t d) {
 int cp_bls_ver(g1_t s, unsigned char *msg, int len, g2_t q) {
 	g1_t p;
 	g2_t g;
-	gt_t e1, e2;
+	gt_st e1, e2;
 	int result = 0;
 
 	g1_null(p);
@@ -103,7 +103,8 @@ int cp_bls_ver(g1_t s, unsigned char *msg, int len, g2_t q) {
 		pc_map(e1, p, q);
 		pc_map(e2, s, g);
 
-		if (gt_cmp(e1, e2) == CMP_EQ) {
+		if (dv_cmp_const((dig_t *)e1, (dig_t *)e2,
+						sizeof(gt_st) / sizeof(dig_t)) == CMP_EQ) {
 			result = 1;
 		}
 	}

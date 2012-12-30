@@ -133,9 +133,14 @@ typedef CAT(G2_LOWER, t) g2_t;
 typedef CAT(G2_LOWER, st) g2_st;
 
 /**
- * Represents a G_1 element.
+ * Represents a G_T element.
  */
 typedef CAT(GT_LOWER, t) gt_t;
+
+/**
+ * Represents a G_T element with automatic allocation.
+ */
+typedef CAT(GT_LOWER, t) gt_st;
 
 /*============================================================================*/
 /* Macro definitions                                                          */
