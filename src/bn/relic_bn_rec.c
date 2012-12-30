@@ -707,7 +707,7 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 
 }
 
-#ifdef WITH_EP
+#if defined(WITH_EP) && defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
 
 void bn_rec_glv(bn_t k0, bn_t k1, bn_t k, bn_t n, bn_t v1[], bn_t v2[]) {
 	bn_t t, b1, b2;
@@ -755,4 +755,4 @@ void bn_rec_glv(bn_t k0, bn_t k1, bn_t k, bn_t n, bn_t v1[], bn_t v2[]) {
 	}
 }
 
-#endif
+#endif /* WITH_EP && EP_KBLTZ */
