@@ -67,3 +67,23 @@ void dv_copy(dv_t c, dv_t a, int digits) {
 		*c = *a;
 	}
 }
+
+void dv_copy_cond(dig_t *c, dig_t *a, int digits, dig_t cond) {
+	dig_t mask, t;
+
+	mask = -cond;
+	for (int i = 0; i < digits; i++) {
+		t = (a[i] ^ c[i]) & mask;
+		c[i] ^= t;
+	}
+}
+
+int dv_cmp_const(dig_t *a, dig_t *b, int size) {
+	int result = 0;
+
+	for (int i = 0; i < size; i++) {
+		result |= a[i] ^ b[i];
+	}
+
+	return (result == 0 ? CMP_EQ : CMP_NE);
+}
