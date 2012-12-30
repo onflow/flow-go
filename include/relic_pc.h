@@ -140,7 +140,7 @@ typedef CAT(GT_LOWER, t) gt_t;
 /**
  * Represents a G_T element with automatic allocation.
  */
-typedef CAT(GT_LOWER, t) gt_st;
+typedef CAT(GT_LOWER, st) gt_st;
 
 /*============================================================================*/
 /* Macro definitions                                                          */

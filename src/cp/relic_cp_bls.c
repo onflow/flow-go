@@ -88,14 +88,10 @@ int cp_bls_ver(g1_t s, unsigned char *msg, int len, g2_t q) {
 
 	g1_null(p);
 	g2_null(g);
-	gt_null(e1);
-	gt_null(e2);
 
 	TRY {
 		g1_new(p);
 		g2_new(g);
-		gt_new(e1);
-		gt_new(e2);
 
 		g2_get_gen(g);
 
@@ -103,6 +99,11 @@ int cp_bls_ver(g1_t s, unsigned char *msg, int len, g2_t q) {
 		pc_map(e1, p, q);
 		pc_map(e2, s, g);
 
+		/*
+		 * This is currently the only possible way to do securely verify
+		 * signatures in the PC module: use automatic allocation combined
+		 * with constant-time comparison.
+		 */
 		if (dv_cmp_const((dig_t *)e1, (dig_t *)e2,
 						sizeof(gt_st) / sizeof(dig_t)) == CMP_EQ) {
 			result = 1;
@@ -114,8 +115,6 @@ int cp_bls_ver(g1_t s, unsigned char *msg, int len, g2_t q) {
 	FINALLY {
 		g1_null(p);
 		g2_null(g);
-		gt_null(e1);
-		gt_null(e2);
 	}
 	return result;
 }
