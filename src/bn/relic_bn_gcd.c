@@ -203,7 +203,7 @@ void bn_gcd_lehme(bn_t c, bn_t a, bn_t b) {
 		bn_new(t2);
 		bn_new(t3);
 
-		if (bn_cmp(a, b) != CMP_LT) {
+		if (bn_cmp(a, b) == CMP_GT) {
 			bn_abs(x, a);
 			bn_abs(y, b);
 		} else {
@@ -871,7 +871,7 @@ void bn_gcd_ext_mid(bn_t c, bn_t d, bn_t e, bn_t f, bn_t a, bn_t b) {
 		bn_new(y);
 		bn_new(z);
 
-		if (bn_cmp_abs(u, v) == CMP_GT) {
+		if (bn_cmp_abs(a, b) == CMP_GT) {
 			bn_abs(u, a);
 			bn_abs(v, b);
 		} else {
@@ -909,17 +909,17 @@ void bn_gcd_ext_mid(bn_t c, bn_t d, bn_t e, bn_t f, bn_t a, bn_t b) {
 				wait = 1;
 			}
 		}
-		/* Compute r as the norm of vector (y, z). */
+		/* Compute r as the norm of vector (w, y). */
 		bn_sqr(s, w);
 		bn_sqr(t, y);
 		bn_add(t, t, s);
 
-		/* Compute q as the norm of vector (d, e). */
+		/* Compute q as the norm of vector (e, f). */
 		bn_sqr(r, e);
 		bn_sqr(q, f);
 		bn_add(q, q, r);
 
-		/* Output (d, e) as the vector of smaller norm. */
+		/* Output (e, f) as the vector of smaller norm. */
 		if (bn_cmp(t, q) == CMP_LT) {
 			bn_copy(e, w);
 			bn_copy(f, y);
@@ -984,9 +984,7 @@ void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b) {
 
 	if (bn_is_zero(a)) {
 		bn_set_dig(c, b);
-		if (d != NULL) {
-			bn_zero(d);
-		}
+		bn_zero(d);
 		if (e != NULL) {
 			bn_set_dig(e, 1);
 		}
@@ -995,9 +993,7 @@ void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b) {
 
 	if (b == 0) {
 		bn_abs(c, a);
-		if (d != NULL) {
-			bn_set_dig(d, 1);
-		}
+		bn_set_dig(d, 1);
 		if (e != NULL) {
 			bn_zero(e);
 		}
@@ -1017,9 +1013,8 @@ void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b) {
 
 		bn_zero(x1);
 		bn_set_dig(y1, 1);
-		if (d != NULL) {
-			bn_set_dig(d, 1);
-		}
+		bn_set_dig(d, 1);
+
 		if (e != NULL) {
 			bn_zero(e);
 		}
@@ -1029,12 +1024,10 @@ void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b) {
 		bn_copy(u, v);
 		bn_copy(v, r);
 
-		if (d != NULL) {
-			bn_mul(c, q, x1);
-			bn_sub(r, d, c);
-			bn_copy(d, x1);
-			bn_copy(x1, r);
-		}
+		bn_mul(c, q, x1);
+		bn_sub(r, d, c);
+		bn_copy(d, x1);
+		bn_copy(x1, r);
 
 		if (e != NULL) {
 			bn_mul(c, q, y1);
@@ -1052,12 +1045,10 @@ void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b) {
 			_u = _v;
 			_v = _t;
 
-			if (d != NULL) {
-				bn_mul_dig(c, x1, _q);
-				bn_sub(r, d, c);
-				bn_copy(d, x1);
-				bn_copy(x1, r);
-			}
+			bn_mul_dig(c, x1, _q);
+			bn_sub(r, d, c);
+			bn_copy(d, x1);
+			bn_copy(x1, r);
 
 			if (e != NULL) {
 				bn_mul_dig(c, y1, _q);
