@@ -520,8 +520,7 @@ void ep_mul_sim_joint(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l) {
 
 		ep_set_infty(r);
 
-		i = bn_bits(k);
-		offset = MAX(i, bn_bits(l)) + 1;
+		offset = MAX(bn_bits(k), bn_bits(l)) + 1;
 		for (i = len - 1; i >= 0; i--) {
 			ep_dbl(r, r);
 			if (jsf[i] != 0 && jsf[i] == -jsf[i + offset]) {

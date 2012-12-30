@@ -443,8 +443,7 @@ void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 
 		eb_set_infty(r);
 
-		i = bn_bits(k);
-		offset = MAX(i, bn_bits(l)) + 1;
+		offset = MAX(bn_bits(k), bn_bits(l)) + 1;
 		for (i = len - 1; i >= 0; i--) {
 			eb_dbl(r, r);
 			if (jsf[i] != 0 && jsf[i] == -jsf[i + offset]) {
