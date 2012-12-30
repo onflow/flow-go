@@ -139,7 +139,6 @@ void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, int hash,
 
 int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, int hash, ec_t q) {
 	bn_t n, k, e, v;
-	dig_t d;
 	ec_t p;
 	unsigned char h[MD_LEN];
 	int result = 0;
@@ -197,11 +196,8 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, int hash, ec_t q) 
 
 				bn_mod(v, v, n);
 
-				d = 0;
-				for (int i = 0; i < MIN(v->used, r->used); i++) {
-					d |= v->dp[i] - r->dp[i];
-				}
-				result = (d ? 0 : 1);
+				result = dv_cmp_const(v->dp, r->dp, MIN(v->used, r->used));
+				result = (result == CMP_NE ? 0 : 1);
 
 				if (v->used != r->used) {
 					result = 0;

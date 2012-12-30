@@ -176,6 +176,26 @@ void dv_zero(dv_t a, int digits);
 void dv_copy(dv_t c, dv_t a, int digits);
 
 /**
+ * Conditionally opies some digits from a digit vector to another digit vector.
+ *
+ * @param[out] c			- the destination.
+ * @paraim[in] a			- the source.
+ * @param[in] digits		- the number of digits to copy.
+ * @param[in] cond			- the condition to evaluate.
+ */
+void dv_copy_cond(dv_t c, dv_t a, int digits, dig_t cond);
+
+/**
+ * Compares two digit vectors in constant time.
+ *
+ * @param[in] a				- the first digit vector.
+ * @param[in] b				- the second digit vector.
+ * @param[in] size			- the length in digits of the vectors.
+ * @return CMP_EQ if they are equal and CMP_NE otherwise.
+ */
+int dv_cmp_const(dig_t *a, dig_t *b, int size);
+
+/**
  * Allocates and initializes a temporary double-precision digit vector.
  *
  * @param[out] a			- the new temporary digit vector.

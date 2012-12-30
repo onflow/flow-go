@@ -126,7 +126,6 @@ void cp_ecss_sig(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
 
 int cp_ecss_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q) {
 	bn_t n, ev, rv;
-	dig_t d;
 	ec_t p;
 	unsigned char hash[MD_LEN];
 	unsigned char m[len + EC_BYTES];
@@ -166,11 +165,8 @@ int cp_ecss_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q) {
 
 				bn_mod(ev, ev, n);
 
-				d = 0;
-				for (int i = 0; i < MIN(ev->used, e->used); i++) {
-					d |= ev->dp[i] - e->dp[i];
-				}
-				result = (d ? 0 : 1);
+				result = dv_cmp_const(ev->dp, e->dp, MIN(ev->used, e->used));
+				result = (result == CMP_NE ? 0 : 1);
 
 				if (ev->used != e->used) {
 					result = 0;

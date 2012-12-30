@@ -87,12 +87,52 @@ static int memory(void) {
 	return code;
 }
 
+static int copy(void) {
+	dv_t a, b;
+	int code = STS_ERR;
+
+	dv_null(a);
+	dv_null(b);
+
+	TRY {
+		TEST_BEGIN("copy and comparison are consistent") {
+			rand_bytes((unsigned char *)a, DV_DIGS * sizeof(dig_t));
+			rand_bytes((unsigned char *)b, DV_DIGS * sizeof(dig_t));
+			dv_copy(a, b, DV_DIGS);
+			TEST_ASSERT(dv_cmp_const(a, b, DV_DIGS) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("conditional and comparison are consistent") {
+			rand_bytes((unsigned char *)a, DV_DIGS * sizeof(dig_t));
+			rand_bytes((unsigned char *)b, DV_DIGS * sizeof(dig_t));
+			dv_copy_cond(a, b, DV_DIGS, 0);
+			TEST_ASSERT(dv_cmp_const(a, b, DV_DIGS) == CMP_NE, end);
+			dv_copy_cond(a, b, DV_DIGS, 1);
+			TEST_ASSERT(dv_cmp_const(a, b, DV_DIGS) == CMP_EQ, end);
+		}
+		TEST_END;
+	} CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	dv_free(a);
+	dv_free(b);
+	return code;
+}
+
 int main(void) {
 	core_init();
 
 	util_banner("Tests for the DV module:\n", 0);
 
 	if (memory() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (copy() != STS_OK) {
 		core_clean();
 		return 1;
 	}

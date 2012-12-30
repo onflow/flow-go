@@ -52,12 +52,44 @@ static void memory(void) {
 	(void)a;
 }
 
+static void copy(void) {
+	dv_t a, b;
+
+	dv_null(a);
+	dv_null(b);
+
+	dv_new(a);
+	dv_new(b);
+
+	BENCH_BEGIN("dv_copy") {
+		rand_bytes((unsigned char *)a, DV_DIGS * sizeof(dig_t));
+		rand_bytes((unsigned char *)b, DV_DIGS * sizeof(dig_t));
+		BENCH_ADD(dv_copy(a, b, DV_DIGS));
+	} BENCH_END;
+
+	BENCH_BEGIN("dv_copy_cond") {
+		rand_bytes((unsigned char *)a, DV_DIGS * sizeof(dig_t));
+		rand_bytes((unsigned char *)b, DV_DIGS * sizeof(dig_t));
+		BENCH_ADD(dv_copy_cond(a, b, DV_DIGS, 1));
+	} BENCH_END;
+
+	BENCH_BEGIN("dv_cmp_const") {
+		rand_bytes((unsigned char *)a, DV_DIGS * sizeof(dig_t));
+		rand_bytes((unsigned char *)b, DV_DIGS * sizeof(dig_t));
+		BENCH_ADD(dv_cmp_const(a, b, DV_DIGS));
+	} BENCH_END;
+
+	dv_free(a);
+	dv_free(b);
+}
+
 int main(void) {
 	core_init();
 	conf_print();
-	util_banner("Benchmarks for the DV module:\n", 0);
+	util_banner("Benchmarks for the DV module:", 0);
 	util_banner("Utilities:\n", 0);
 	memory();
+	copy();
 	core_clean();
 	return 0;
 }
