@@ -372,6 +372,8 @@ static int pairing2(void) {
 int main(void) {
 	int r0, r1;
 
+	r0 = r1 = STS_ERR;
+
 	core_init();
 
 	fb_param_set_any();

@@ -983,7 +983,7 @@ static void bench(void) {
 }
 
 int main(void) {
-	int r0;
+	int r0 = STS_ERR;
 
 	core_init();
 	conf_print();
