@@ -95,6 +95,9 @@ static int copy(void) {
 	dv_null(b);
 
 	TRY {
+		dv_new(a);
+		dv_new(b);
+
 		TEST_BEGIN("copy and comparison are consistent") {
 			rand_bytes((unsigned char *)a, DV_DIGS * sizeof(dig_t));
 			rand_bytes((unsigned char *)b, DV_DIGS * sizeof(dig_t));
