@@ -98,12 +98,6 @@ typedef fp2_t fp6_t[3];
 typedef dv2_t dv6_t[3];
 
 /**
- * Represents a sextic extension field element with automatic memory
- * allocation.
- */
-typedef fp2_st fp6_st[3];
-
-/**
  * Represents a dodecic extension field element.
  *
  * This extension is constructed with the basis {1, w}, where w^2 = v is an
@@ -112,24 +106,12 @@ typedef fp2_st fp6_st[3];
 typedef fp6_t fp12_t[2];
 
 /**
- * Represents a dodecic extension field element with automatic memory
- * allocation.
- */
-typedef fp6_st fp12_st[2];
-
-/**
  * Represents a octdecic extension field element.
  *
  * This extension is constructed with the basis {1, w}, where w^3 = v is an
  * adjoined cube root in the underlying sextic extension.
  */
 typedef fp6_t fp18_t[3];
-
-/**
- * Represents a octdecic extension field element with automatic memory
- * allocation.
- */
-typedef fp6_st fp18_st[3];
 
 /*============================================================================*/
 /* Macro definitions                                                          */
