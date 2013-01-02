@@ -172,8 +172,9 @@ typedef struct _sts_t {
 				}														\
 				_ctx->last = _last;										\
 				break; 													\
-			} else														\
+			} else {													\
 				_this.error = ADDR; 									\
+			}															\
 	} 																	\
 	for (int _r = 0; _r < 2; _r++) 										\
 		if (_r == 1 && core_get()->caught) 								\
