@@ -110,7 +110,7 @@ void ep2_map(ep2_t p, unsigned char *msg, int len) {
 		fp2_new(t0);
 
 		md_map(digest, msg, len);
-		memcpy(x->dp, digest, MIN(FP_BYTES, MD_LEN));
+		bn_read_bin(x, digest, MIN(FP_BYTES, MD_LEN));
 
 		fp_prime_conv(p->x[0], x);
 		fp_zero(p->x[1]);
