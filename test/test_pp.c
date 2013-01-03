@@ -63,7 +63,74 @@ static int pairing(void) {
 
 		ep_curve_get_ord(n);
 
-		TEST_BEGIN("miller addition is consistent") {
+		TEST_BEGIN("miller doubling is correct") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			pp_dbl_k12(e1, r, q, p);
+			pp_norm(r, r);
+			ep2_dbl(s, q);
+			ep2_norm(s, s);
+			TEST_ASSERT(ep2_cmp(r, s) == CMP_EQ, end);
+		} TEST_END;
+
+#if EP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("miller doubling in affine coordinates is correct") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_dbl_k12(e1, r, q, p);
+			pp_exp(e1, e1);
+			pp_dbl_k12_basic(e2, r, q, p);
+			pp_exp(e2, e2);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if EP_ADD == PROJC || !defined(STRIP)
+		TEST_BEGIN("miller doubling in projective coordinates is correct") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_dbl_k12(e1, r, q, p);
+			pp_exp(e1, e1);
+			pp_dbl_k12_projc(e2, r, q, p);
+			pp_exp(e2, e2);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic projective miller doubling is correct") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_dbl_k12_projc(e1, r, q, p);
+			pp_dbl_k12_projc_basic(e2, r, q, p);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy-reduced projective miller doubling is consistent") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_dbl_k12_projc(e1, r, q, p);
+			pp_dbl_k12_projc_lazyr(e2, r, q, p);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+#endif /* EP_ADD = PROJC */
+
+		TEST_BEGIN("miller addition is correct") {
 			ep_rand(p);
 			ep2_rand(q);
 			ep2_rand(r);
@@ -75,17 +142,65 @@ static int pairing(void) {
 			TEST_ASSERT(ep2_cmp(r, s) == CMP_EQ, end);
 		} TEST_END;
 
-		TEST_BEGIN("miller doubling is consistent") {
+#if EP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("miller addition in affine coordinates is correct") {
 			ep_rand(p);
 			ep2_rand(q);
 			ep2_rand(r);
 			ep2_copy(s, r);
-			pp_dbl_k12(e1, r, q, p);
-			pp_norm(r, r);
-			ep2_dbl(s, q);
-			ep2_norm(s, s);
-			TEST_ASSERT(ep2_cmp(r, s) == CMP_EQ, end);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_add_k12(e1, r, q, p);
+			pp_exp(e1, e1);
+			pp_add_k12_basic(e2, s, q, p);
+			pp_exp(e2, e2);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
+#endif
+
+#if EP_ADD == PROJC || !defined(STRIP)
+		TEST_BEGIN("miller addition in projective coordinates is correct") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			ep2_copy(s, r);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_add_k12(e1, r, q, p);
+			pp_exp(e1, e1);
+			pp_add_k12_projc(e2, s, q, p);
+			pp_exp(e2, e2);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic projective miller addition is consistent") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			ep2_copy(s, r);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_add_k12_projc(e1, r, q, p);
+			pp_add_k12_projc_basic(e2, s, q, p);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy-reduced projective miller addition is consistent") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			ep2_copy(s, r);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_add_k12_projc(e1, r, q, p);
+			pp_add_k12_projc_lazyr(e2, s, q, p);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+#endif /* EP_ADD = PROJC */
 
 		TEST_BEGIN("pairing is not degenerate") {
 			ep_rand(p);

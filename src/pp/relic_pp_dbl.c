@@ -54,7 +54,7 @@ void pp_dbl_k12_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 		fp2_new(s);
 		fp2_new(e);
 		ep2_new(t);
-		ep2_copy(t, r);
+		ep2_copy(t, q);
 		ep2_dbl_slp_basic(r, s, e, q);
 
 		fp_mul(l[1][0][0], s[0], p->x);
@@ -100,44 +100,57 @@ void pp_dbl_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 		fp2_new(t6);
 
 		if (ep_curve_opt_b() == OPT_TWO) {
+			/* t0 = x1^2. */
 			fp2_sqr(t0, q->x);
+			/* t1 = B = x1^2. */
 			fp2_sqr(t1, q->y);
+			/* t2 = C = z1^2. */
 			fp2_sqr(t2, q->z);
+			/* t4 = A = (x1 * y1)/2. */
 			fp2_mul(t4, q->x, q->y);
 			fp_hlv(t4[0], t4[0]);
 			fp_hlv(t4[1], t4[1]);
+			/* t3 = E = 3b'C = 3C * (1 - i). */
 			fp2_dbl(t3, t2);
 			fp2_add(t2, t2, t3);
 			fp_add(t3[0], t2[0], t2[1]);
 			fp_sub(t3[1], t2[1], t2[0]);
+			/* t2 = F = 3E. */
 			fp2_dbl(t2, t3);
 			fp2_add(t2, t3, t2);
+			/* x3 = A * (B - F). */
 			fp2_sub(r->x, t1, t2);
 			fp2_mul(r->x, r->x, t4);
-
+			/* t2 = G = (B + F)/2. */
 			fp2_add(t2, t1, t2);
 			fp_hlv(t2[0], t2[0]);
 			fp_hlv(t2[1], t2[1]);
+			/* y3 = G^2 - 3E^2. */
 			fp2_sqr(t2, t2);
 			fp2_sqr(t4, t3);
+			/* t5 = y1 * z1. */
 			fp2_mul(t5, q->y, q->z);
 			fp2_dbl(r->y, t4);
 			fp2_add(r->y, r->y, t4);
 			fp2_sub(r->y, t2, r->y);
 
+			/* t2 = H = 2 * y1 * z1. */
 			fp2_dbl(t2, t5);
-			fp2_mul(r->z, t2, t1);
+			/* z3 = B * H. */
+			fp2_mul(r->z, t1, t2);
 
-			fp2_sub(t3, t3, t1);
-			fp2_mul_nor(l[0][0], t3);
+			/* l11 = E - B. */
+			fp2_sub(l[1][1], t3, t1);
 
-			fp2_add(l[0][2], t0, t0);
-			fp2_add(l[0][2], l[0][2], t0);
-			fp_mul(l[0][2][0], l[0][2][0], p->x);
-			fp_mul(l[0][2][1], l[0][2][1], p->x);
+			/* l10 = 3 * t0 * xp. */
+			fp2_add(l[1][0], t0, t0);
+			fp2_add(l[1][0], l[1][0], t0);
+			fp_mul(l[1][0][0], l[1][0][0], p->x);
+			fp_mul(l[1][0][1], l[1][0][1], p->x);
 
-			fp_mul(l[1][1][0], t2[0], p->y);
-			fp_mul(l[1][1][1], t2[1], p->y);
+			/* l00 = H * (-yp). */
+			fp_mul(l[0][0][0], t2[0], p->y);
+			fp_mul(l[0][0][1], t2[1], p->y);
 		} else {
 			/* A = x1^2. */
 			fp2_sqr(t0, q->x);
@@ -145,8 +158,7 @@ void pp_dbl_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 			fp2_sqr(t1, q->y);
 			/* C = z1^2. */
 			fp2_sqr(t2, q->z);
-			/* D = 3bC. */
-			// TODO: Optimize considering that B = 1 - i. //
+			/* D = 3bC, general b. */
 			fp2_dbl(t3, t2);
 			fp2_add(t3, t3, t2);
 			ep2_curve_get_b(t4);
@@ -186,19 +198,18 @@ void pp_dbl_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 			fp2_dbl(r->z, r->z);
 			fp2_mul(r->z, r->z, t5);
 
-			/* l00 = D - B. */
-			fp2_sub(t3, t3, t1);
-			fp2_mul_nor(l[0][0], t3);
+			/* l11 = D - B. */
+			fp2_sub(l[1][1], t3, t1);
 
-			/* l10 = 3A * xp */
-			fp2_add(l[0][2], t0, t0);
-			fp2_add(l[0][2], l[0][2], t0);
-			fp_mul(l[0][2][0], l[0][2][0], p->x);
-			fp_mul(l[0][2][1], l[0][2][1], p->x);
+			/* l10 = 3 * A * xp. */
+			fp2_add(l[1][0], t0, t0);
+			fp2_add(l[1][0], l[1][0], t0);
+			fp_mul(l[1][0][0], l[1][0][0], p->x);
+			fp_mul(l[1][0][1], l[1][0][1], p->x);
 
-			/* l01 = -F * yp. */
-			fp_mul(l[1][1][0], t5[0], p->y);
-			fp_mul(l[1][1][1], t5[1], p->y);
+			/* l00 = F * (-yp). */
+			fp_mul(l[0][0][0], t5[0], p->y);
+			fp_mul(l[0][0][1], t5[1], p->y);
 		}
 		r->norm = 0;
 	}
@@ -246,49 +257,65 @@ void pp_dbl_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 		dv2_new(u1);
 
 		if (ep_curve_opt_b() == OPT_TWO) {
+			/* C = z1^2. */
 			fp2_sqr(t0, q->z);
+			/* B = y1^2. */
 			fp2_sqr(t1, q->y);
+			/* t5 = B + C. */
 			fp2_add(t5, t0, t1);
+			/* t3 = E = 3b'C = 3C * (1 - i). */
 			fp2_dbl(t3, t0);
 			fp2_add(t0, t0, t3);
 			fp_add(t2[0], t0[0], t0[1]);
 			fp_sub(t2[1], t0[1], t0[0]);
 
+			/* t0 = x1^2. */
 			fp2_sqr(t0, q->x);
+			/* t4 = A = (x1 * y1)/2. */
 			fp2_mul(t4, q->x, q->y);
 			fp_hlv(t4[0], t4[0]);
 			fp_hlv(t4[1], t4[1]);
+			/* t3 = F = 3E. */
 			fp2_dbl(t3, t2);
 			fp2_add(t3, t3, t2);
+			/* x3 = A * (B - F). */
 			fp2_sub(r->x, t1, t3);
 			fp2_mul(r->x, r->x, t4);
 
+			/* G = (B + F)/2. */
 			fp2_add(t3, t1, t3);
 			fp_hlv(t3[0], t3[0]);
 			fp_hlv(t3[1], t3[1]);
+
+			/* y3 = G^2 - 3E^2. */
 			fp2_sqrn_low(u0, t2);
 			fp2_addd_low(u1, u0, u0);
 			fp2_addd_low(u1, u1, u0);
 			fp2_sqrn_low(u0, t3);
 			fp2_subc_low(u0, u0, u1);
 
+			/* H = (Y + Z)^2 - B - C. */
 			fp2_add(t3, q->y, q->z);
 			fp2_sqr(t3, t3);
 			fp2_sub(t3, t3, t5);
 
 			fp2_rdcn_low(r->y, u0);
-			fp2_mul(r->z, t3, t1);
 
-			fp2_sub(t2, t2, t1);
-			fp2_mul_nor(l[0][0], t2);
+			/* z3 = B * H. */
+			fp2_mul(r->z, t1, t3);
 
-			fp2_addn_low(l[0][2], t0, t0);
-			fp2_addn_low(l[0][2], l[0][2], t0);
-			fp_mul(l[0][2][0], l[0][2][0], p->x);
-			fp_mul(l[0][2][1], l[0][2][1], p->x);
+			/* l11 = E - B. */
+			fp2_sub(l[1][1], t2, t1);
 
-			fp_mul(l[1][1][0], t3[0], p->y);
-			fp_mul(l[1][1][1], t3[1], p->y);
+			/* l10 = 3 * t0 * xp. */
+			fp2_addn_low(l[1][0], t0, t0);
+			fp2_addn_low(l[1][0], l[1][0], t0);
+			fp_mul(l[1][0][0], l[1][0][0], p->x);
+			fp_mul(l[1][0][1], l[1][0][1], p->x);
+
+			/* l01 = F * (-yp). */
+			fp_mul(l[0][0][0], t3[0], p->y);
+			fp_mul(l[0][0][1], t3[1], p->y);
 		} else {
 			/* A = x1^2. */
 			fp2_sqr(t0, q->x);
@@ -296,8 +323,7 @@ void pp_dbl_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 			fp2_sqr(t1, q->y);
 			/* C = z1^2. */
 			fp2_sqr(t2, q->z);
-			/* D = 3bC. */
-			// TODO: Optimize considering that B = 1 - i. //
+			/* D = 3bC, for general b. */
 			fp2_dbl(t3, t2);
 			fp2_add(t3, t3, t2);
 			ep2_curve_get_b(t4);
@@ -338,18 +364,17 @@ void pp_dbl_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 			fp2_mul(r->z, r->z, t5);
 
 			/* l00 = D - B. */
-			fp2_sub(t3, t3, t1);
-			fp2_mul_nor(l[0][0], t3);
+			fp2_sub(l[1][1], t3, t1);
 
 			/* l10 = 3A * xp */
-			fp2_add(l[0][2], t0, t0);
-			fp2_add(l[0][2], l[0][2], t0);
-			fp_mul(l[0][2][0], l[0][2][0], p->x);
-			fp_mul(l[0][2][1], l[0][2][1], p->x);
+			fp2_add(l[1][0], t0, t0);
+			fp2_add(l[1][0], l[1][0], t0);
+			fp_mul(l[1][0][0], l[1][0][0], p->x);
+			fp_mul(l[1][0][1], l[1][0][1], p->x);
 
-			/* l01 = -F * yp. */
-			fp_mul(l[1][1][0], t5[0], p->y);
-			fp_mul(l[1][1][1], t5[1], p->y);
+			/* l01 = F * (-yp). */
+			fp_mul(l[0][0][0], t5[0], p->y);
+			fp_mul(l[0][0][1], t5[1], p->y);
 		}
 		r->norm = 0;
 	}

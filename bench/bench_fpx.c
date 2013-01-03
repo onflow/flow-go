@@ -926,6 +926,24 @@ static void arith12(void) {
 	}
 	BENCH_END;
 
+#if PP_EXT == BASIC || !defined(STRIP)
+	BENCH_BEGIN("fp12_mul_dxs_basic") {
+		fp12_rand(a);
+		fp12_rand(b);
+		BENCH_ADD(fp12_mul_dxs_basic(c, a, b));
+	}
+	BENCH_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+	BENCH_BEGIN("fp12_mul_dxs_lazyr") {
+		fp12_rand(a);
+		fp12_rand(b);
+		BENCH_ADD(fp12_mul_dxs_lazyr(c, a, b));
+	}
+	BENCH_END;
+#endif
+
 	BENCH_BEGIN("fp12_sqr") {
 		fp12_rand(a);
 		BENCH_ADD(fp12_sqr(c, a));
