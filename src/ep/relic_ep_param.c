@@ -232,9 +232,25 @@
 /** @} */
 #endif
 
+#if defined(EP_KBLTZ) && FP_PRIME == 477
+/**
+ * Parameters for a 477-bit pairing-friendly prime curve at the 192-bit security level.
+ */
+/** @{ */
+#define B24_P477_A		"0"
+#define B24_P477_B		"4"
+#define B24_P477_X		"15DFD8E4893A408A34B600532B51CC86CAB3AF07103CFCF3EC7B9AF836904CFB60AB0FA8AC91EE6255E5EF6286FA0C24DF9D76EA50599C2E103E40AD"
+#define B24_P477_Y		"0A683957A59B1B488FA657E11B44815056BDE33C09D6AAD392D299F89C7841B91A683BF01B7E70547E48E0FBE1CA9E991983131470F886BA9B6FCE2E"
+#define B24_P477_R		"57F52EE445CC41781FCD53D13E45F6ACDFE4F9F2A3CD414E71238AFC9FCFC7D38CAEF64F4FF79F90013FFFFFF0000001"
+#define B24_P477_H		"41550AAAC04B3FD5000015AB"
+#define B24_P477_BETA	"926C960A5EC3B3A6C6B9CEF2CB923D3240E4780BC1AE423EE39586AD923B1C949768022369DD2CE502E7FCA0670B3A996AC44B48B523DAA7390CCB1F6D9012F"
+#define B24_P477_LAMB	"1001740B431D14BFD17F4BD000300173FFFFFFFEFFFFFFFED"
+/** @} */
+#endif
+
 #if defined(EP_KBLTZ) && FP_PRIME == 508
 /**
- * Parameters for a 512-bit pairing-friendly prime curve at the 192-bit security level.
+ * Parameters for a 508-bit pairing-friendly prime curve at the 192-bit security level.
  */
 /** @{ */
 #define KSS_P508_A		"0"
@@ -266,7 +282,7 @@
 
 #if defined(EP_KBLTZ) && FP_PRIME == 638
 /**
- * Parameters for a 641-bit pairing-friendly prime curve.
+ * Parameters for a 638-bit pairing-friendly prime curve.
  */
 /** @{ */
 #define B12_P638_A		"0"
@@ -418,6 +434,12 @@ void ep_param_set(int param) {
 				ordin = 1;
 				break;
 #endif
+#if defined(EP_ORDIN) && FP_PRIME == 477
+			case B24_P477:
+				ASSIGN(B24_P477, B24_477);
+				ordin = 1;
+				break;
+#endif
 #if defined(EP_ORDIN) && FP_PRIME == 508
 			case KSS_P508:
 				ASSIGNK(KSS_P508, KSS_508);
@@ -530,10 +552,12 @@ int ep_param_set_any_kbltz() {
 	ep_param_set(BN_P254);
 #elif FP_PRIME == 256
 	ep_param_set(SECG_K256);
+#elif FP_PRIME == 477
+	ep_param_set(B24_P477);
 #elif FP_PRIME == 508
 	ep_param_set(KSS_P508);
 #elif FP_PRIME == 638
-	ep_param_set(BN_P638);
+	ep_param_set(B12_P638);
 #else
 	r = STS_ERR;
 #endif
@@ -554,13 +578,17 @@ int ep_param_set_any_pairf() {
 	ep_param_set(BN_P256);
 	twist = EP_DTYPE;
 	degree = 2;
+#elif FP_PRIME == 477
+	ep_param_set(B24_P477);
+	twist = EP_MTYPE;
+	degree = 4;
 #elif FP_PRIME == 508
-	ep_param_set(KSS_508);
+	ep_param_set(KSS_P508);
 	twist = EP_DTYPE;
 	degree = 3;
 #elif FP_PRIME == 638
-	ep_param_set(BN_P638);
-	twist = EP_DTYPE;
+	ep_param_set(B12_P638);
+	twist = EP_MTYPE;
 	degree = 2;
 #else
 	r = STS_ERR;
@@ -570,7 +598,7 @@ int ep_param_set_any_pairf() {
 		if (degree == 2) {
 			ep2_curve_set(twist);
 		}
-		if (degree == 3) {
+		if (degree == 3 || degree == 4) {
 			r = STS_ERR;
 		}
 	}
@@ -621,6 +649,9 @@ void ep_param_print() {
 			break;
 		case BN_P256:
 			util_banner("Curve BN-P256:", 0);
+			break;
+		case B24_P477:
+			util_banner("Curve B24-P477:", 0);
 			break;
 		case KSS_P508:
 			util_banner("Curve KSS-P508:", 0);
