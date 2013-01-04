@@ -171,34 +171,34 @@ static void fp3_calc() {
 		fp_mul(ctx->fp3_p2[4], ctx->fp3_p[4], ctx->fp3_base[0]);
 		fp_mul(ctx->fp3_p2[4], ctx->fp3_p2[4], ctx->fp3_p[4]);
 
-		fp_mul(ctx->fp3_p[0], ctx->fp3_p[0], ctx->fp3_base[0]);
-		fp_mul(t0[0], ctx->fp3_p[0], ctx->fp3_p2[0]);
-		fp_neg(ctx->fp3_p[0], t0[0]);
+		fp_mul(ctx->fp3_p3[0], ctx->fp3_p[0], ctx->fp3_base[0]);
+		fp_mul(t0[0], ctx->fp3_p3[0], ctx->fp3_p2[0]);
+		fp_neg(ctx->fp3_p3[0], t0[0]);
 		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_sub(ctx->fp3_p[0], ctx->fp3_p[0], t0[0]);
+			fp_sub(ctx->fp3_p3[0], ctx->fp3_p3[0], t0[0]);
 		}
-		fp_mul(ctx->fp3_p[1], ctx->fp3_p[1], ctx->fp3_base[1]);
-		fp_mul(t0[0], ctx->fp3_p[1], ctx->fp3_p2[1]);
-		fp_neg(ctx->fp3_p[1], t0[0]);
+		fp_mul(ctx->fp3_p3[1], ctx->fp3_p[1], ctx->fp3_base[1]);
+		fp_mul(t0[0], ctx->fp3_p3[1], ctx->fp3_p2[1]);
+		fp_neg(ctx->fp3_p3[1], t0[0]);
 		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_sub(ctx->fp3_p[1], ctx->fp3_p[1], t0[0]);
+			fp_sub(ctx->fp3_p3[1], ctx->fp3_p3[1], t0[0]);
 		}
-		fp_mul(ctx->fp3_p[2], ctx->fp3_p[2], ctx->fp3_p2[2]);
-		fp_mul(ctx->fp3_p[3], ctx->fp3_p[3], ctx->fp3_base[0]);
-		fp_mul(t0[0], ctx->fp3_p[3], ctx->fp3_p2[3]);
-		fp_neg(ctx->fp3_p[3], t0[0]);
+		fp_mul(ctx->fp3_p3[2], ctx->fp3_p[2], ctx->fp3_p2[2]);
+		fp_mul(ctx->fp3_p3[3], ctx->fp3_p[3], ctx->fp3_base[0]);
+		fp_mul(t0[0], ctx->fp3_p3[3], ctx->fp3_p2[3]);
+		fp_neg(ctx->fp3_p3[3], t0[0]);
 		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_sub(ctx->fp3_p[3], ctx->fp3_p[3], t0[0]);
+			fp_sub(ctx->fp3_p3[3], ctx->fp3_p3[3], t0[0]);
 		}
-		fp_mul(ctx->fp3_p[4], ctx->fp3_p[4], ctx->fp3_base[1]);
-		fp_mul(t0[0], ctx->fp3_p[4], ctx->fp3_p2[4]);
-		fp_neg(ctx->fp3_p[4], t0[0]);
+		fp_mul(ctx->fp3_p3[4], ctx->fp3_p[4], ctx->fp3_base[1]);
+		fp_mul(t0[0], ctx->fp3_p3[4], ctx->fp3_p2[4]);
+		fp_neg(ctx->fp3_p3[4], t0[0]);
 		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_sub(ctx->fp3_p[4], ctx->fp3_p[4], t0[0]);
+			fp_sub(ctx->fp3_p3[4], ctx->fp3_p3[4], t0[0]);
 		}
 		for (int i = 0; i < 5; i++) {
-			fp_mul(ctx->fp3_p4[i], ctx->fp3_p[i], ctx->fp3_p[i]);
-			fp_mul(ctx->fp3_p5[i], ctx->fp3_p2[i], ctx->fp3_p[i]);
+			fp_mul(ctx->fp3_p4[i], ctx->fp3_p[i], ctx->fp3_p3[i]);
+			fp_mul(ctx->fp3_p5[i], ctx->fp3_p2[i], ctx->fp3_p3[i]);
 		}
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
