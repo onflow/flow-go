@@ -164,24 +164,16 @@ void fp3_sqrn_low(dv3_t c, fp3_t a) {
 	fp_subc_low(c[2], t4, t5);
 
 	/* c_0 = t0 + t1 * B. */
-	dv_copy(t4, t1, 2 * FP_DIGS);
-	dv_zero(t5, FP_DIGS);
-	dv_copy(t5 + FP_DIGS, fp_prime_get(), FP_DIGS);
-	fp_subd_low(t5, t5, t4);
+	fp_subc_low(c[0], t0, t1);
 	for (int i = -1; i > fp_prime_get_cnr(); i--) {
-		fp_subd_low(t5, t5, t4);
+		fp_subc_low(c[0], c[0], t1);
 	}
-	fp_addc_low(c[0], t0, t5);
 
 	/* c_1 = t3 + t2 * B. */
-	dv_copy(t4, t2, 2 * FP_DIGS);
-	dv_zero(t5, FP_DIGS);
-	dv_copy(t5 + FP_DIGS, fp_prime_get(), FP_DIGS);
-	fp_subd_low(t5, t5, t4);
+	fp_subc_low(c[1], t3, t2);
 	for (int i = -1; i > fp_prime_get_cnr(); i--) {
-		fp_subd_low(t5, t5, t4);
+		fp_subc_low(c[1], c[1], t2);
 	}
-	fp_addc_low(c[1], t3, t5);
 }
 
 void fp3_sqrm_low(fp3_t c, fp3_t a) {
