@@ -486,7 +486,7 @@ void fp_param_set(int param) {
 				bn_add(p, p, t1);
 				fp_prime_set_dense(p);
 				break;
-			case BLS12_638:
+			case B12_638:
 				fp_param_get_var(t0);
 				/* p = (x^2 - 2x + 1) * (x^4 - x^2 + 1)/3 + x. */
 				bn_sqr(t1, t0);
