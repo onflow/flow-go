@@ -73,6 +73,17 @@ void fp_param_get_var(bn_t x) {
 				bn_add_dig(x, x, 0x9B);
 				bn_neg(x, x);
 				break;
+			case B24_477:
+				/* x = -2^48 + 2^45 + 2^31 - 2^7. */
+				bn_set_2b(x, 48);
+				bn_set_2b(a, 45);
+				bn_sub(x, x, a);
+				bn_set_2b(a, 31);
+				bn_sub(x, x, a);
+				bn_set_2b(a, 7);
+				bn_add(x, x, a);
+				bn_neg(x, x);
+				break;
 			case KSS_508:
 				/* x = -(2^64 + 2^51 - 2^46 - 2^12). */
 				bn_set_2b(x, 64);
@@ -93,7 +104,7 @@ void fp_param_get_var(bn_t x) {
 				bn_sub(x, x, a);
 				bn_add_dig(x, x, 1);
 				break;
-			case BLS12_638:
+			case B12_638:
 				/* x = -2^107 + 2^105 + 2^93 + 2^5. */
 				bn_set_2b(x, 107);
 				bn_set_2b(a, 105);
@@ -144,6 +155,13 @@ int *fp_param_get_sps(int *len) {
 					}
 				}
 				break;
+			case B24_477:
+				var[0] = +7;
+				var[1] = -31;
+				var[2] = -45;
+				var[3] = 48;
+				*len = 4;
+				break;
 			case KSS_508:
 				var[0] = -12;
 				var[1] = -46;
@@ -158,7 +176,7 @@ int *fp_param_get_sps(int *len) {
 				var[3] = 158;
 				*len = 4;
 				break;
-			case BLS12_638:
+			case B12_638:
 				var[0] = -5;
 				var[1] = -93;
 				var[2] = -105;
@@ -204,17 +222,22 @@ void fp_param_get_map(int *s, int *len) {
 			s[5] = s[7] = s[8] = s[11] = s[14] = s[15] = s[62] = s[65] = 1;
 			*len = 66;
 			break;
-		case BN_638:
-			s[3] = s[159] = s[160] = 1;
-			s[69] = s[70] = s[129] = s[130] = -1;
-			*len = 161;
+		case B24_477:
+			s[7] = s[48] = 1;
+			s[31] = s[45] = -1;
+			*len = 49;
 			break;
 		case KSS_508:
 			s[64] = s[51] = 1;
 			s[12] = s[46] = -1;
 			*len = 65;
 			break;
-		case BLS12_638:
+		case BN_638:
+			s[3] = s[159] = s[160] = 1;
+			s[69] = s[70] = s[129] = s[130] = -1;
+			*len = 161;
+			break;
+		case B12_638:
 			s[5] = s[93] = s[105] = -1;
 			s[107] = 1;
 			*len = 108;
@@ -388,6 +411,23 @@ void fp_param_set(int param) {
 				f[2] = -96;
 				f[3] = -128;
 				fp_prime_set_pmers(f, 4);
+				break;
+#elif FP_PRIME == 477
+			case B24_477:
+				fp_param_get_var(t0);
+				/* p = (u - 1)^2 * (u^8 - u^4 + 1) div 3 + u. */
+				bn_sub_dig(p, t0, 1);
+				bn_sqr(p, p);
+				bn_sqr(t1, t0);
+				bn_sqr(t1, t1);
+				bn_sqr(t2, t1);
+				bn_sub(t2, t2, t1);
+				bn_add_dig(t2, t2, 1);
+				bn_mul(p, p, t2);
+				bn_div_dig(p, p, 3);
+				bn_add(p, p, t0);
+				fp_prime_set_dense(p);
+				break;
 #elif FP_PRIME == 508
 			case KSS_508:
 				fp_param_get_var(t0);
@@ -500,12 +540,14 @@ int fp_param_set_any(void) {
 #endif
 #elif FP_PRIME == 384
 	fp_param_set(NIST_384);
+#elif FP_PRIME == 477
+	fp_param_set(B24_477);
 #elif FP_PRIME == 508
 	fp_param_set(KSS_508);
 #elif FP_PRIME == 521
 	fp_param_set(NIST_521);
 #elif FP_PRIME == 638
-	fp_param_set(BN_638);
+	fp_param_set(B12_638);
 #else
 	return fp_param_set_any_dense();
 #endif
@@ -562,10 +604,12 @@ int fp_param_set_any_tower() {
 	fp_param_set(BN_254);
 #elif FP_PRIME == 256
 	fp_param_set(BN_256);
+#elif FP_PRIME == 477
+	fp_param_set(B24_477);
 #elif FP_PRIME == 508
 	fp_param_set(KSS_508);
 #elif FP_PRIME == 638
-	fp_param_set(BN_638);
+	fp_param_set(B12_638);
 #else
 	do {
 		/* Since we have to generate a prime number, pick a nice towering. */
