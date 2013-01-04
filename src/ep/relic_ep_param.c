@@ -557,7 +557,7 @@ int ep_param_set_any_kbltz() {
 #elif FP_PRIME == 508
 	ep_param_set(KSS_P508);
 #elif FP_PRIME == 638
-	ep_param_set(B12_P638);
+	ep_param_set(BN_P638);
 #else
 	r = STS_ERR;
 #endif
