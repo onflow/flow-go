@@ -74,12 +74,14 @@ enum {
 	BN_P254,
 	/** Barreto-Naehrig curve with negative x. */
 	BN_P256,
+	/** Barreto-Lynn-Scott curve with embedding degree 24. */
+	B24_P477,
 	/** Kachisa-Schafer-Scott with negative x. */
 	KSS_P508,
 	/** Barreto-Naehrig curve with positive x. */
 	BN_P638,
 	/** Barreto-Lynn-Scott curve with embedding degree 12. */
-	BLS12_P638,
+	B12_P638,
 };
 
 /*============================================================================*/
