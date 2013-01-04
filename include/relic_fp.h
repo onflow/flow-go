@@ -114,7 +114,7 @@ enum {
  * Constant used to indicate that there's some room left in the storage of
  * prime field elements. This can be used to avoid carries.
  */
-#if (FP_PRIME % WORD) <= (WORD - 2)
+#if ((FP_PRIME % WORD) != 0) && ((FP_PRIME % WORD) <= (WORD - 2))
 #define FP_SPACE
 #else
 #undef FP_SPACE
