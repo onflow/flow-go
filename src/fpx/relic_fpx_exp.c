@@ -341,7 +341,7 @@ void fp12_conv_cyc(fp12_t c, fp12_t a) {
 
 int fp12_test_cyc(fp12_t a) {
 	fp12_t t;
-	int result;
+	int result = 0;
 
 	fp12_null(t);
 
@@ -349,7 +349,7 @@ int fp12_test_cyc(fp12_t a) {
 		fp12_new(t);
 
 		fp12_back_cyc(t, a);
-		result = (fp12_cmp(t, a) == CMP_EQ);
+		result = ((fp12_cmp(t, a) == CMP_EQ) ? 1 : 0);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -716,7 +716,7 @@ void fp18_conv_cyc(fp18_t c, fp18_t a) {
 
 int fp18_test_cyc(fp18_t a) {
 	fp18_t t;
-	int result;
+	int result = 0;
 
 	fp18_null(t);
 
@@ -724,7 +724,7 @@ int fp18_test_cyc(fp18_t a) {
 		fp18_new(t);
 
 		fp18_back_cyc(t, a);
-		result = (fp18_cmp(t, a) == CMP_EQ);
+		result = ((fp18_cmp(t, a) == CMP_EQ) ? 1 : 0);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
