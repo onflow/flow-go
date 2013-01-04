@@ -74,7 +74,6 @@ static void ep2_add_basic_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 				ep2_set_infty(r);
 			}
 		} else {
-
 			/* t2 = 1/(x2 - x1). */
 			fp2_inv(t2, t0);
 			/* t2 = lambda = (y2 - y1)/(x2 - x1). */
