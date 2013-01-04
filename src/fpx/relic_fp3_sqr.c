@@ -88,25 +88,17 @@ void fp3_sqr_basic(fp3_t c, fp3_t a) {
 		fp_rdc(c[2], t4);
 
 		/* c_0 = t0 + t1 * B. */
-		dv_copy(t4, t1, 2 * FP_DIGS);
-		dv_zero(t5, FP_DIGS);
-		dv_copy(t5 + FP_DIGS, fp_prime_get(), FP_DIGS);
-		fp_subd_low(t5, t5, t4);
+		fp_subc_low(t0, t0, t1);
 		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_subd_low(t5, t5, t4);
+			fp_subc_low(t0, t0, t1);
 		}
-		fp_addc_low(t0, t0, t5);
 		fp_rdc(c[0], t0);
 
 		/* c_1 = t3 + t2 * B. */
-		dv_copy(t4, t2, 2 * FP_DIGS);
-		dv_zero(t5, FP_DIGS);
-		dv_copy(t5 + FP_DIGS, fp_prime_get(), FP_DIGS);
-		fp_subd_low(t5, t5, t4);
+		fp_subc_low(t3, t3, t2);
 		for (int i = -1; i > fp_prime_get_cnr(); i--) {
-			fp_subd_low(t5, t5, t4);
+			fp_subc_low(t3, t3, t2);
 		}
-		fp_addc_low(t3, t3, t5);
 		fp_rdc(c[1], t3);
 	}
 	CATCH_ANY {
