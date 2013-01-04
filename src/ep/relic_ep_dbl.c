@@ -101,7 +101,6 @@ static void ep_dbl_basic_imp(ep_t r, ep_t p) {
 		fp_copy(r->z, p->z);
 
 		r->norm = 1;
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
