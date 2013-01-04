@@ -107,6 +107,13 @@ void fp2_mulc_low(dv2_t c, fp2_t a, fp2_t b) {
 	/* c_0 = (a_0 * b_0) + u^2 * (a_1 * b_1). */
 	fp_subd_low(c[0], c[0], c[1]);
 
+#ifndef FP_QNRES
+	/* t1 = u^2 * (a_1 * b_1). */
+	for (int i = -1; i > fp_prime_get_qnr(); i--) {
+		fp_subd_low(c[0], c[0], c[1]);
+	}
+#endif
+
 	/* c_1 = (t2 - t0). */
 	fp_subd_low(c[1], t2, t0);
 
