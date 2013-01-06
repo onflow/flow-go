@@ -300,19 +300,19 @@ void fp12_mul_basic2(fp12_t c, fp12_t a, fp12_t b) {
 }
 
 void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
+	fp6_t t0, t1, t2;
+
+	fp6_null(t0);
+	fp6_null(t1);
+	fp6_null(t2);
+
+	TRY {
+		fp6_new(t0);
+		fp6_new(t1);
+		fp6_new(t2);
+
+		if (ep2_curve_is_twist() == EP_DTYPE) {
 #if EP_ADD == BASIC
-	if (ep2_curve_is_twist() == EP_DTYPE) {
-		fp6_t t0, t1, t2;
-
-		fp6_null(t0);
-		fp6_null(t1);
-		fp6_null(t2);
-
-		TRY {
-			fp6_new(t0);
-			fp6_new(t1);
-			fp6_new(t2);
-
 			/* t0 = a_0 * b_0 */
 			fp_mul(t0[0][0], a[0][0][0], b[0][0][0]);
 			fp_mul(t0[0][1], a[0][0][1], b[0][0][0]);
@@ -320,96 +320,38 @@ void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
 			fp_mul(t0[1][1], a[0][1][1], b[0][0][0]);
 			fp_mul(t0[2][0], a[0][2][0], b[0][0][0]);
 			fp_mul(t0[2][1], a[0][2][1], b[0][0][0]);
-
-			/* t1 = a_1 * b_1. */
-			fp6_mul_dxs(t1, a[1], b[1]);
-
 			/* t2 = b_0 + b_1. */
 			fp_add(t2[0][0], b[0][0][0], b[1][0][0]);
 			fp_copy(t2[0][1], b[1][0][1]);
 			fp2_copy(t2[1], b[1][1]);
-
-			/* c_1 = a_0 + a_1. */
-			fp6_add(c[1], a[0], a[1]);
-
-			/* c_1 = (a_0 + a_1) * (b_0 + b_1) - a_0 * b_0 - a_1 * b_1. */
-			fp6_mul_dxs(c[1], c[1], t2);
-			fp6_sub(c[1], c[1], t0);
-			fp6_sub(c[1], c[1], t1);
-
-			/* c_0 = a_0 * b_0 + v * a_1 * b_1. */
-			fp6_mul_art(t1, t1);
-			fp6_add(c[0], t0, t1);
-		} CATCH_ANY {
-			THROW(ERR_CAUGHT);
-		} FINALLY {
-			fp6_free(t0);
-			fp6_free(t1);
-			fp6_free(t2);
-		}
-	} else {
-		/* TODO: Optimize this. */
-		fp12_mul(c, a, b);
-	}
 #elif EP_ADD == PROJC
-	if (ep2_curve_is_twist() == EP_DTYPE) {
-		fp6_t t0, t1, t2;
-
-		fp6_null(t0);
-		fp6_null(t1);
-		fp6_null(t2);
-
-		TRY {
-			fp6_new(t0);
-			fp6_new(t1);
-			fp6_new(t2);
-
 			/* t0 = a_0 * b_0 */
 			fp2_mul(t0[0], a[0][0], b[0][0]);
 			fp2_mul(t0[1], a[0][1], b[0][0]);
 			fp2_mul(t0[2], a[0][2], b[0][0]);
-
-			/* t1 = a_1 * b_1. */
-			fp6_mul_dxs(t1, a[1], b[1]);
-
 			/* t2 = b_0 + b_1. */
 			fp2_add(t2[0], b[0][0], b[1][0]);
 			fp2_copy(t2[1], b[1][1]);
-
-			/* c_1 = a_0 + a_1. */
-			fp6_add(c[1], a[0], a[1]);
-
-			/* c_1 = (a_0 + a_1) * (b_0 + b_1) - a_0 * b_0 - a_1 * b_1. */
-			fp6_mul_dxs(c[1], c[1], t2);
-			fp6_sub(c[1], c[1], t0);
-			fp6_sub(c[1], c[1], t1);
-
-			/* c_0 = a_0 * b_0 + v * a_1 * b_1. */
-			fp6_mul_art(t1, t1);
-			fp6_add(c[0], t0, t1);
-		} CATCH_ANY {
-			THROW(ERR_CAUGHT);
-		} FINALLY {
-			fp6_free(t0);
-			fp6_free(t1);
-			fp6_free(t2);
-		}
-	} else {
-		fp6_t t0, t1, t2;
-
-		fp6_null(t0);
-		fp6_null(t1);
-		fp6_null(t2);
-
-		TRY {
-			fp6_new(t0);
-			fp6_new(t1);
-			fp6_new(t2);
-
-			/* Karatsuba algorithm. */
-
+#endif
+			/* t1 = a_1 * b_1. */
+			fp6_mul_dxs(t1, a[1], b[1]);
+		} else {
 			/* t0 = a_0 * b_0. */
 			fp6_mul_dxs(t0, a[0], b[0]);
+#if EP_ADD == BASIC
+			/* t1 = a_1 * b_1. */
+			fp_mul(t1[1][0], a[1][0][0], b[1][1][0]);
+			fp_mul(t1[1][1], a[1][0][1], b[1][1][0]);
+			fp_mul(t1[2][0], a[1][1][0], b[1][1][0]);
+			fp_mul(t1[2][1], a[1][1][1], b[1][1][0]);
+			fp_mul(t1[0][0], a[1][2][0], b[1][1][0]);
+			fp_mul(t1[0][1], a[1][2][1], b[1][1][0]);
+			fp2_mul_nor(t1[0], t1[0]);
+			/* t2 = b_0 + b_1. */
+			fp2_copy(t2[0], b[0][0]);
+			fp_add(t2[1][0], b[0][1][0], b[1][1][0]);
+			fp_copy(t2[1][1], b[0][1][1]);
+#elif EP_ADD == PROJC
 			/* t1 = a_1 * b_1. */
 			fp2_mul(t1[0], a[1][2], b[1][1]);
 			fp2_mul_nor(t1[0], t1[0]);
@@ -418,24 +360,24 @@ void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
 			/* t2 = b_0 + b_1. */
 			fp2_copy(t2[0], b[0][0]);
 			fp2_add(t2[1], b[0][1], b[1][1]);
-			/* c_1 = a_0 + a_1. */
-			fp6_add(c[1], a[0], a[1]);
-			/* c_1 = (a_0 + a_1) * (b_0 + b_1) */
-			fp6_mul_dxs(c[1], c[1], t2);
-			fp6_sub(c[1], c[1], t0);
-			fp6_sub(c[1], c[1], t1);
-			/* c_0 = a_0b_0 + v * a_1b_1. */
-			fp6_mul_art(t1, t1);
-			fp6_add(c[0], t0, t1);
-		} CATCH_ANY {
-			THROW(ERR_CAUGHT);
-		} FINALLY {
-			fp6_free(t0);
-			fp6_free(t1);
-			fp6_free(t2);
-		}
-	}
 #endif
+		}
+		/* c_1 = a_0 + a_1. */
+		fp6_add(c[1], a[0], a[1]);
+		/* c_1 = (a_0 + a_1) * (b_0 + b_1) - a_0 * b_0 - a_1 * b_1. */
+		fp6_mul_dxs(c[1], c[1], t2);
+		fp6_sub(c[1], c[1], t0);
+		fp6_sub(c[1], c[1], t1);
+		/* c_0 = a_0 * b_0 + v * a_1 * b_1. */
+		fp6_mul_art(t1, t1);
+		fp6_add(c[0], t0, t1);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp6_free(t0);
+		fp6_free(t1);
+		fp6_free(t2);
+	}
 }
 
 #endif
