@@ -42,6 +42,7 @@
 #if EP_ADD == BASIC || !defined(STRIP)
 
 void pp_add_k12_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
+	int one = 1, zero = 0;
 	fp2_t s;
 	ep2_t t;
 
@@ -55,11 +56,16 @@ void pp_add_k12_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 		ep2_copy(t, r);
 		ep2_add_slp_basic(r, s, r, q);
 
-		fp_mul(l[1][0][0], s[0], p->x);
-		fp_mul(l[1][0][1], s[1], p->x);
-		fp2_mul(l[1][1], s, t->x);
-		fp2_sub(l[1][1], t->y, l[1][1]);
-		fp_neg(l[0][0][0], p->y);
+		if (ep2_curve_is_twist() == EP_MTYPE) {
+			one ^= 1;
+			zero ^= 1;
+		}
+
+		fp_mul(l[one][zero][0], s[0], p->x);
+		fp_mul(l[one][zero][1], s[1], p->x);
+		fp2_mul(l[one][one], s, t->x);
+		fp2_sub(l[one][one], t->y, l[one][one]);
+		fp_neg(l[zero][zero][0], p->y);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -78,6 +84,7 @@ void pp_add_k12_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 
 void pp_add_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	fp2_t t0, t1, t2, t3, t4;
+	int one = 1, zero = 0;
 
 	fp2_null(t0);
 	fp2_null(t1);
@@ -111,10 +118,15 @@ void pp_add_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 		fp2_mul(t3, t3, r->z);
 		fp2_add(t3, t2, t3);
 
+		if (ep2_curve_is_twist() == EP_MTYPE) {
+			one ^= 1;
+			zero ^= 1;
+		}
+
 		/* l10 = - (A * xp). */
-		fp_mul(l[1][0][0], t1[0], p->x);
-		fp_mul(l[1][0][1], t1[1], p->x);
-		fp2_neg(l[1][0], l[1][0]);
+		fp_mul(l[one][zero][0], t1[0], p->x);
+		fp_mul(l[one][zero][1], t1[1], p->x);
+		fp2_neg(l[one][zero], l[one][zero]);
 
 		/* t4 = B * x2. */
 		fp2_mul(t4, q->x, t1);
@@ -134,11 +146,11 @@ void pp_add_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 
 		/* l11 = J = B * x2 - A * y2. */
 		fp2_mul(t2, q->y, t0);
-		fp2_sub(l[1][1], t4, t2);
+		fp2_sub(l[one][one], t4, t2);
 
 		/* l00 = B * yp. */
-		fp_mul(l[0][0][0], t0[0], p->y);
-		fp_mul(l[0][0][1], t0[1], p->y);
+		fp_mul(l[zero][zero][0], t0[0], p->y);
+		fp_mul(l[zero][zero][1], t0[1], p->y);
 
 		r->norm = 0;
 	}
@@ -160,6 +172,7 @@ void pp_add_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 void pp_add_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	fp2_t t1, t2, t3, t4;
 	dv2_t u1, u2;
+	int one = 1, zero = 0;
 
 	fp2_null(t1);
 	fp2_null(t2);
@@ -203,9 +216,14 @@ void pp_add_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 		fp2_mul(r->x, t1, t4);
 		fp2_mul(r->z, r->z, t3);
 
-		fp_mul(l[1][0][0], t2[0], p->x);
-		fp_mul(l[1][0][1], t2[1], p->x);
-		fp2_neg(l[1][0], l[1][0]);
+		if (ep2_curve_is_twist() == EP_MTYPE) {
+			one ^= 1;
+			zero ^= 1;
+		}
+
+		fp_mul(l[one][zero][0], t2[0], p->x);
+		fp_mul(l[one][zero][1], t2[1], p->x);
+		fp2_neg(l[one][zero], l[one][zero]);
 
 #ifdef FP_SPACE
 		fp2_mulc_low(u1, q->x, t2);
@@ -215,10 +233,10 @@ void pp_add_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 		fp2_muln_low(u2, q->y, t1);
 #endif
 		fp2_subc_low(u1, u1, u2);
-		fp2_rdcn_low(l[1][1], u1);
+		fp2_rdcn_low(l[one][one], u1);
 
-		fp_mul(l[0][0][0], t1[0], p->y);
-		fp_mul(l[0][0][1], t1[1], p->y);
+		fp_mul(l[zero][zero][0], t1[0], p->y);
+		fp_mul(l[zero][zero][1], t1[1], p->y);
 
 		r->norm = 0;
 	}
@@ -238,8 +256,9 @@ void pp_add_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 
 #endif
 
-void pp_add_k12_lit(fp12_t l, ep_t r, ep_t p, ep2_t q) {
+void pp_add_lit_k12(fp12_t l, ep_t r, ep_t p, ep2_t q) {
 	fp_t t0, t1, t2, t3;
+	int one = 1, zero = 0;
 
 	fp_null(t0);
 	fp_null(t1);
@@ -259,31 +278,20 @@ void pp_add_k12_lit(fp12_t l, ep_t r, ep_t p, ep2_t q) {
 		fp_mul(t2, p->x, t1);
 		r->norm = 0;
 
-		if (ep2_curve_is_twist() == EP_DTYPE) {
-			fp_mul(l[0][0][0], t0, p->y);
-			fp_sub(l[0][0][0], t2, l[0][0][0]);
-
-			fp_mul(l[0][1][0], q->x[0], t1);
-			fp_mul(l[0][1][1], q->x[1], t1);
-			fp2_neg(l[0][1], l[0][1]);
-
-			fp_mul(l[1][1][0], q->y[0], t0);
-			fp_mul(l[1][1][1], q->y[1], t0);
-		} else {
-			fp_mul(l[0][0][0], t0, p->y);
-			fp_sub(l[0][0][0], t2, l[0][0][0]);
-
-			fp_mul(l[0][2][0], q->x[0], t1);
-			fp_mul(l[0][2][1], q->x[1], t1);
-			fp2_neg(l[0][2], l[0][2]);
-
-			fp_mul(l[1][1][0], q->y[0], t0);
-			fp_mul(l[1][1][1], q->y[1], t0);
-
-			fp2_t t;
-			fp2_copy(t, l[0][0]);
-			fp2_mul_nor(l[0][0], t);
+		if (ep2_curve_is_twist() == EP_MTYPE) {
+			one ^= 1;
+			zero ^= 1;
 		}
+
+		fp_mul(l[zero][zero][0], t0, p->y);
+		fp_sub(l[zero][zero][0], t2, l[zero][zero][0]);
+
+		fp_mul(l[zero][one][0], q->x[0], t1);
+		fp_mul(l[zero][one][1], q->x[1], t1);
+		fp2_neg(l[zero][one], l[zero][one]);
+
+		fp_mul(l[one][one][0], q->y[0], t0);
+		fp_mul(l[one][one][1], q->y[1], t0);
 
 		fp_sqr(t2, t0);
 		fp_mul(r->x, t2, r->x);
