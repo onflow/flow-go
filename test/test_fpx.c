@@ -2022,6 +2022,47 @@ static int multiplication12(void) {
 			TEST_ASSERT(fp12_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 #endif
+
+		TEST_BEGIN("sparse multiplication is correct") {
+			fp12_rand(a);
+			fp12_rand(b);
+			/* Test common case among configurations. */
+			fp2_zero(b[0][1]);
+			fp_zero(b[0][0][1]);
+			fp2_zero(b[0][2]);
+			fp2_zero(b[1][0]);
+			fp_zero(b[1][1][1]);
+			fp2_zero(b[1][2]);
+			fp12_mul(c, a, b);
+			fp12_mul_dxs(d, a, b);
+			TEST_ASSERT(fp12_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+
+#if PP_EXT == BASIC | !defined(STRIP)
+		TEST_BEGIN("basic sparse multiplication is correct") {
+			fp12_rand(a);
+			fp12_rand(b);
+			fp2_zero(b[0][1]);
+			fp2_zero(b[0][2]);
+			fp2_zero(b[1][2]);
+			fp12_mul_dxs(c, a, b);
+			fp12_mul_dxs_basic(d, a, b);
+			TEST_ASSERT(fp12_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy reduced sparse multiplication is correct") {
+			fp12_rand(a);
+			fp12_rand(b);
+			fp2_zero(b[0][1]);
+			fp2_zero(b[0][2]);
+			fp2_zero(b[1][2]);
+			fp12_mul_dxs(c, a, b);
+			fp12_mul_dxs_lazyr(d, a, b);
+			TEST_ASSERT(fp12_cmp(c, d) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	} CATCH_ANY {
 		util_print("FATAL ERROR!\n");
 		ERROR(end);
