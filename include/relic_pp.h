@@ -163,7 +163,7 @@ void pp_add_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p);
  * @param[in] p				- the second point to add.
  * @param[in] q				- the affine point to evaluate the line function.
  */
-void pp_add_k12_lit(fp12_t l, ep_t r, ep_t p, ep2_t q);
+void pp_add_lit_k12(fp12_t l, ep_t r, ep_t p, ep2_t q);
 
 /**
  * Doubles a prime elliptic curve point and evaluates the corresponding line
@@ -208,16 +208,16 @@ void pp_dbl_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p);
  * @param[in] p				- the point to double.
  * @param[in] q				- the affine point to evaluate the line function.
  */
-void pp_dbl_k12_lit(fp12_t l, ep_t r, ep_t p, ep2_t q);
+void pp_dbl_lit_k12(fp12_t l, ep_t r, ep_t p, ep2_t q);
 
 /**
- * Computes the final exponentiation for the pairing. Computes
- * c = a^(p^12 - 1)/r.
+ * Computes the final exponentiation for the pairing defined over curves of
+ * embedding degree 12. Computes c = a^(p^12 - 1)/r.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the extension field element to exponentiate.
  */
-void pp_exp(fp12_t c, fp12_t a);
+void pp_exp_k12(fp12_t c, fp12_t a);
 
 /**
  * Normalizes the accumulator point used inside pairing computation.
