@@ -93,6 +93,7 @@ static void fp2_calc() {
 		fp_copy(ctx->fp2_p2[0], t0[0]);
 		fp_sqr(ctx->fp2_p2[1], ctx->fp2_p2[0]);
 		fp_mul(ctx->fp2_p2[2], ctx->fp2_p2[1], ctx->fp2_p2[0]);
+		fp_sqr(ctx->fp2_p2[3], ctx->fp2_p2[1]);
 
 		for (int i = 0; i < 5; i++) {
 			fp_mul(ctx->fp2_p3[i][0], ctx->fp2_p2[i % 3], ctx->fp2_p[i][0]);
