@@ -39,7 +39,7 @@
 /*============================================================================*/
 
 /**
- * Compute the Miller loop for a pairings of type G_2 x G_1 over the bits of a
+ * Compute the Miller loop for pairings of type G_2 x G_1 over the bits of a
  * given parameter.
  *
  * @param[out] r			- the result.
@@ -86,7 +86,7 @@ static void pp_mil_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, bn_t a) {
 }
 
 /**
- * Compute the Miller loop for a pairings of type G_2 x G_1 over the bits of a
+ * Compute the Miller loop for pairings of type G_2 x G_1 over the bits of a
  * given parameter represented in sparse form.
  *
  * @param[out] r			- the result.
@@ -96,7 +96,7 @@ static void pp_mil_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, bn_t a) {
  * @param[in] s				- the loop parameter in sparse form.
  * @paramin] len			- the length of the loop parameter.
  */
-static void pp_mil_k12_sps(fp12_t r, ep2_t t, ep2_t q, ep_t p, int *s, int len) {
+static void pp_mil_sps_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, int *s, int len) {
 	fp12_t l;
 	ep_t _p;
 	ep2_t _q;
@@ -142,7 +142,17 @@ static void pp_mil_k12_sps(fp12_t r, ep2_t t, ep2_t q, ep_t p, int *s, int len) 
 	}
 }
 
-static void pp_mil_k12_lit(fp12_t r, ep_t t, ep_t p, ep2_t q, bn_t a) {
+/**
+ * Compute the Miller loop for pairings of type G_1 x G_2 over the bits of a
+ * given parameter.
+ *
+ * @param[out] r			- the result.
+ * @param[out] t			- the resulting point.
+ * @param[in] p				- the first point of the pairing, in G_1.
+ * @param[in] q				- the second point of the pairing, in G_2.
+ * @param[in] a				- the loop parameter.
+ */
+static void pp_mil_lit_k12(fp12_t r, ep_t t, ep_t p, ep2_t q, bn_t a) {
 	fp12_t l;
 
 	fp12_null(l);
@@ -158,10 +168,10 @@ static void pp_mil_k12_lit(fp12_t r, ep_t t, ep_t p, ep2_t q, bn_t a) {
 
 		for (int i = bn_bits(a) - 2; i >= 0; i--) {
 			fp12_sqr(r, r);
-			pp_dbl_k12_lit(l, t, t, q);
+			pp_dbl_lit_k12(l, t, t, q);
 			fp12_mul(r, r, l);
 			if (bn_test_bit(a, i)) {
-				pp_add_k12_lit(l, t, p, q);
+				pp_add_lit_k12(l, t, p, q);
 				fp12_mul(r, r, l);
 			}
 		}
@@ -175,89 +185,50 @@ static void pp_mil_k12_lit(fp12_t r, ep_t t, ep_t p, ep2_t q, bn_t a) {
 }
 
 /**
- * Compute the final exponentiation of a pairing defined over a Barreto-Naehrig
- * curve.
+ * Compute the final lines for optimal ate pairings.
  *
- * @param[out] c			- the result.
- * @param[in] a				- the extension field element to exponentiate.
+ * @param[out] r			- the result.
+ * @param[out] t			- the resulting point.
+ * @param[in] q				- the first point of the pairing, in G_2.
+ * @param[in] p				- the second point of the pairing, in G_1.
+ * @param[in] a				- the loop parameter.
  */
-static void pp_exp_bn(fp12_t c, fp12_t a) {
-	fp12_t t0, t1, t2, t3;
-	int l, *b = fp_param_get_sps(&l);
-	bn_t x;
+void pp_fin_k12_oatep(fp12_t r, ep2_t t, ep2_t q, ep_t p) {
+	ep2_t q1, q2;
+	fp12_t tmp;
 
-	fp12_null(t0);
-	fp12_null(t1);
-	fp12_null(t2);
-	fp12_null(t3);
-	bn_null(x);
+	fp12_null(tmp);
+	ep2_null(q1);
+	ep2_null(q2);
 
 	TRY {
-		fp12_new(t0);
-		fp12_new(t1);
-		fp12_new(t2);
-		fp12_new(t3);
-		bn_new(x);
+		ep2_new(q1);
+		ep2_new(q2);
+		fp12_new(tmp);
+		fp12_zero(tmp);
 
-		/*
-		 * New final exponentiation following Fuentes-Castañeda, Knapp and
-		 * Rodríguez-Henríquez: Fast Hashing to G_2.
-		 */
-		fp_param_get_var(x);
+		fp_set_dig(q1->z[0], 1);
+		fp_zero(q1->z[1]);
+		fp_set_dig(q2->z[0], 1);
+		fp_zero(q2->z[1]);
 
-		/* First, compute m = f^(p^6 - 1)(p^2 + 1). */
-		fp12_conv_cyc(c, a);
+		ep2_frb(q1, q, 1);
+		ep2_frb(q2, q, 2);
+		ep2_neg(q2, q2);
 
-		/* Now compute m^((p^4 - p^2 + 1) / r). */
-		/* t0 = m^2x. */
-		fp12_exp_cyc_sps(t0, c, b, l);
-		fp12_sqr_cyc(t0, t0);
-		/* t1 = m^6x. */
-		fp12_sqr_cyc(t1, t0);
-		fp12_mul(t1, t1, t0);
-		/* t2 = m^6x^2. */
-		fp12_exp_cyc_sps(t2, t1, b, l);
-		/* t3 = m^12x^3. */
-		fp12_sqr_cyc(t3, t2);
-		fp12_exp_cyc_sps(t3, t3, b, l);
-
-		if (bn_sign(x) == BN_NEG) {
-			fp12_inv_uni(t0, t0);
-			fp12_inv_uni(t1, t1);
-			fp12_inv_uni(t3, t3);
-		}
-
-		/* t3 = a = m^12x^3 * m^6x^2 * m^6x. */
-		fp12_mul(t3, t3, t2);
-		fp12_mul(t3, t3, t1);
-
-		/* t0 = b = 1/(m^2x) * t3. */
-		fp12_inv_uni(t0, t0);
-		fp12_mul(t0, t0, t3);
-
-		/* Compute t2 * t3 * m * b^p * a^p^2 * [b * 1/m]^p^3. */
-		fp12_mul(t2, t2, t3);
-		fp12_mul(t2, t2, c);
-		fp12_inv_uni(c, c);
-		fp12_mul(c, c, t0);
-		fp12_frb(c, c, 3);
-		fp12_mul(c, c, t2);
-		fp12_frb(t0, t0, 1);
-		fp12_mul(c, c, t0);
-		fp12_frb(t3, t3, 2);
-		fp12_mul(c, c, t3);
-	}
-	CATCH_ANY {
+		pp_add_k12(tmp, t, q1, p);
+		fp12_mul(r, r, tmp);
+		pp_add_k12(tmp, t, q2, p);
+		fp12_mul(r, r, tmp);
+	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fp12_free(t0);
-		fp12_free(t1);
-		fp12_free(t2);
-		fp12_free(t3);
-		bn_free(x);
+	} FINALLY {
+		fp12_free(tmp);
+		ep2_free(q1);
+		ep2_free(q2);
 	}
 }
+
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -285,8 +256,8 @@ void pp_map_tatep(fp12_t r, ep_t p, ep2_t q) {
 		bn_new(n);
 
 		ep_curve_get_ord(n);
-		pp_mil_k12_lit(r, t, p, q, n);
-		pp_exp(r, r);
+		pp_mil_lit_k12(r, t, p, q, n);
+		pp_exp_k12(r, r);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -321,7 +292,7 @@ void pp_map_weilp(fp12_t r, ep_t p, ep2_t q) {
 		bn_new(n);
 
 		ep_curve_get_ord(n);
-		pp_mil_k12_lit(r0, t0, p, q, n);
+		pp_mil_lit_k12(r0, t0, p, q, n);
 		pp_mil_k12(r1, t1, q, p, n);
 		fp12_inv(r1, r1);
 		fp12_mul(r0, r0, r1);
@@ -348,74 +319,53 @@ void pp_map_weilp(fp12_t r, ep_t p, ep2_t q) {
 #if PP_MAP == OATEP || !defined(STRIP)
 
 void pp_map_oatep(fp12_t r, ep_t p, ep2_t q) {
-	ep2_t t, q1, q2;
+	ep2_t t;
 	bn_t a;
-	int len, s[FP_BITS];
-	fp12_t l;
+	int len = FP_BITS, s[FP_BITS];
 
 	ep2_null(t);
-	ep2_null(q1);
-	ep2_null(q2);
-	fp12_null(l);
 	bn_null(a);
 
 	TRY {
 		ep2_new(t);
-		ep2_new(q1);
-		ep2_new(q2);
-		fp12_new(l);
 		bn_new(a);
 
 		fp_param_get_var(a);
 		fp_param_get_map(s, &len);
 
-		/* r = f_{r,Q}(P). */
-		pp_mil_k12_sps(r, t, q, p, s, len);
-
-		if (bn_sign(a) == BN_NEG) {
-			/* Since f_{-a,Q}(P) = 1/f_{a,Q}(P), we must invert the result. */
-			fp12_inv_uni(r, r);
-			ep2_neg(t, t);
+		switch (ep_param_get()) {
+			case BN_P158:
+			case BN_P254:
+			case BN_P256:
+			case BN_P638:
+				/* r = f_{|a|,Q}(P). */
+				pp_mil_sps_k12(r, t, q, p, s, len);
+				if (bn_sign(a) == BN_NEG) {
+					/* f_{-a,Q}(P) = 1/f_{a,Q}(P). */
+					fp12_inv_uni(r, r);
+					ep2_neg(t, t);
+				}
+				pp_fin_k12_oatep(r, t, q, p);
+				pp_exp_k12(r, r);
+				break;
+			case B12_P638:
+				/* r = f_{|a|,Q}(P). */
+				pp_mil_sps_k12(r, t, q, p, s, len);
+				if (bn_sign(a) == BN_NEG) {
+					fp12_inv_uni(r, r);
+					ep2_neg(t, t);
+				}
+				pp_exp_k12(r, r);
+				break;
 		}
-
-		fp_set_dig(q1->z[0], 1);
-		fp_zero(q1->z[1]);
-		fp_set_dig(q2->z[0], 1);
-		fp_zero(q2->z[1]);
-
-		ep2_frb(q1, q, 1);
-		ep2_frb(q2, q, 2);
-		ep2_neg(q2, q2);
-
-		fp12_zero(l);
-		pp_add_k12(l, t, q1, p);
-		fp12_mul_dxs(r, r, l);
-		pp_add_k12(l, t, q2, p);
-		fp12_mul_dxs(r, r, l);
-
-		pp_exp(r, r);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
 		ep2_free(t);
-		ep2_free(q1);
-		ep2_free(q2);
-		fp12_free(l);
 		bn_free(a);
 	}
 }
 
 #endif
-
-void pp_exp(fp12_t c, fp12_t a) {
-	switch (ep_param_get()) {
-		case BN_P158:
-		case BN_P254:
-		case BN_P256:
-		case BN_P638:
-			pp_exp_bn(c, a);
-			break;
-	}
-}
