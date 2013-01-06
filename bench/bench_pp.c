@@ -56,44 +56,6 @@ static void pairing(void) {
 
 	ep2_curve_get_ord(n);
 
-	BENCH_BEGIN("pp_dbl_k12") {
-		ep2_rand(p);
-		ep_rand(q);
-		BENCH_ADD(pp_dbl_k12(e, p, p, q));
-	}
-	BENCH_END;
-
-#if EP_ADD == BASIC || !defined(STRIP)
-	BENCH_BEGIN("pp_dbl_k12_basic") {
-		ep2_rand(p);
-		ep_rand(q);
-		BENCH_ADD(pp_dbl_k12_basic(e, p, p, q));
-	}
-	BENCH_END;
-#endif
-
-#if EP_ADD == PROJC || !defined(STRIP)
-
-#if PP_EXT == BASIC || !defined(STRIP)
-	BENCH_BEGIN("pp_dbl_k12_projc_basic") {
-		ep2_rand(p);
-		ep_rand(q);
-		BENCH_ADD(pp_dbl_k12_projc_basic(e, p, p, q));
-	}
-	BENCH_END;
-#endif
-
-#if PP_EXT == LAZYR || !defined(STRIP)
-	BENCH_BEGIN("pp_dbl_k12_projc_lazyr") {
-		ep2_rand(p);
-		ep_rand(q);
-		BENCH_ADD(pp_dbl_k12_projc_lazyr(e, p, p, q));
-	}
-	BENCH_END;
-#endif
-
-#endif
-
 	BENCH_BEGIN("pp_add") {
 		ep2_rand(p);
 		ep_rand(q);
@@ -132,9 +94,47 @@ static void pairing(void) {
 
 #endif
 
-	BENCH_BEGIN("pp_exp") {
+	BENCH_BEGIN("pp_dbl_k12") {
+		ep2_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_k12(e, p, p, q));
+	}
+	BENCH_END;
+
+#if EP_ADD == BASIC || !defined(STRIP)
+	BENCH_BEGIN("pp_dbl_k12_basic") {
+		ep2_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_k12_basic(e, p, p, q));
+	}
+	BENCH_END;
+#endif
+
+#if EP_ADD == PROJC || !defined(STRIP)
+
+#if PP_EXT == BASIC || !defined(STRIP)
+	BENCH_BEGIN("pp_dbl_k12_projc_basic") {
+		ep2_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_k12_projc_basic(e, p, p, q));
+	}
+	BENCH_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+	BENCH_BEGIN("pp_dbl_k12_projc_lazyr") {
+		ep2_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_k12_projc_lazyr(e, p, p, q));
+	}
+	BENCH_END;
+#endif
+
+#endif
+
+	BENCH_BEGIN("pp_exp_k12") {
 		fp12_rand(e);
-		BENCH_ADD(pp_exp(e, e));
+		BENCH_ADD(pp_exp_k12(e, e));
 	}
 	BENCH_END;
 
