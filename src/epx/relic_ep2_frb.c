@@ -41,19 +41,40 @@ void ep2_frb(ep2_t r, ep2_t p, int i) {
 		case 1:
 			fp2_frb(r->x, p->x, 1);
 			fp2_frb(r->y, p->y, 1);
-			fp2_mul_frb(r->x, r->x, 1, 2);
+			if (ep2_curve_is_twist() == EP_MTYPE) {
+				fp2_mul_frb(r->x, r->x, 1, 4);
+				fp2_mul_art(r->x, r->x);
+				fp2_mul_art(r->y, r->y);
+			} else {
+				fp2_mul_frb(r->x, r->x, 1, 2);
+			}
 			fp2_mul_frb(r->y, r->y, 1, 3);
 			break;
 		case 2:
-			fp2_mul_frb(r->x, p->x, 2, 2);
+			if (ep2_curve_is_twist() == EP_MTYPE) {
+				fp2_mul_frb(r->x, p->x, 2, 4);
+			} else {
+				fp2_mul_frb(r->x, p->x, 2, 2);
+			}
 			fp2_neg(r->y, p->y);
 			break;
 		case 3:
-			fp2_frb(r->x, p->x, 1);
-			fp2_mul_frb(r->x, r->x, 3, 2);
-			fp_neg(r->y[0], p->y[0]);
-			fp_copy(r->y[1], p->y[1]);
-			fp2_mul_frb(r->y, r->y, 1, 3);
+			if (ep2_curve_is_twist() == EP_MTYPE) {
+				fp2_frb(r->x, p->x, 1);
+				fp2_frb(r->y, p->y, 1);
+				fp2_mul_frb(r->x, r->x, 1, 4);
+				fp2_mul_frb(r->x, r->x, 2, 4);
+				fp2_mul_art(r->x, r->x);
+				fp2_mul_frb(r->y, r->y, 1, 3);
+				fp2_mul_art(r->y, r->y);
+				fp2_neg(r->y, r->y);
+			} else {
+				fp2_frb(r->x, p->x, 1);
+				fp2_mul_frb(r->x, r->x, 3, 2);
+				fp_neg(r->y[0], p->y[0]);
+				fp_copy(r->y[1], p->y[1]);
+				fp2_mul_frb(r->y, r->y, 1, 3);
+			}
 			break;
 	}
 	r->norm = 1;
