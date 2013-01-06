@@ -35,7 +35,124 @@
 #include "relic_test.h"
 #include "relic_bench.h"
 
-static int pairing(void) {
+static int addition(void) {
+	int code = STS_ERR;
+	fp12_t e1, e2;
+	ep2_t q, r, s;
+	ep_t p;
+	bn_t k, n;
+
+	fp12_null(e1);
+	fp12_null(e2);
+	ep_null(p);
+	ep2_null(q);
+	ep2_null(r);
+	ep2_null(s);
+	bn_null(k);
+	bn_null(n);
+
+	TRY {
+		fp12_new(e1);
+		fp12_new(e2);
+		ep_new(p);
+		ep2_new(q);
+		ep2_new(r);
+		ep2_new(s);
+		bn_new(n);
+		bn_new(k);
+
+		ep_curve_get_ord(n);
+
+		TEST_BEGIN("miller addition is correct") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			ep2_copy(s, r);
+			pp_add_k12(e1, r, q, p);
+			pp_norm(r, r);
+			ep2_add(s, s, q);
+			ep2_norm(s, s);
+			TEST_ASSERT(ep2_cmp(r, s) == CMP_EQ, end);
+		} TEST_END;
+
+#if EP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("miller addition in affine coordinates is correct") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			ep2_copy(s, r);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_add_k12(e1, r, q, p);
+			pp_exp_k12(e1, e1);
+			pp_add_k12_basic(e2, s, q, p);
+			pp_exp_k12(e2, e2);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if EP_ADD == PROJC || !defined(STRIP)
+		TEST_BEGIN("miller addition in projective coordinates is correct") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			ep2_copy(s, r);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_add_k12(e1, r, q, p);
+			pp_exp_k12(e1, e1);
+			pp_add_k12_projc(e2, s, q, p);
+			pp_exp_k12(e2, e2);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic projective miller addition is consistent") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			ep2_copy(s, r);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_add_k12_projc(e1, r, q, p);
+			pp_add_k12_projc_basic(e2, s, q, p);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy-reduced projective miller addition is consistent") {
+			ep_rand(p);
+			ep2_rand(q);
+			ep2_rand(r);
+			ep2_copy(s, r);
+			fp12_zero(e1);
+			fp12_zero(e2);
+			pp_add_k12_projc(e1, r, q, p);
+			pp_add_k12_projc_lazyr(e2, s, q, p);
+			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+#endif /* EP_ADD = PROJC */
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp12_free(e1);
+	fp12_free(e2);
+	ep_free(p);
+	ep2_free(q);
+	ep2_free(r);
+	ep2_free(s);
+	bn_free(n);
+	bn_free(k);
+	return code;
+}
+
+static int doubling(void) {
 	int code = STS_ERR;
 	fp12_t e1, e2;
 	ep2_t q, r, s;
@@ -82,9 +199,9 @@ static int pairing(void) {
 			fp12_zero(e1);
 			fp12_zero(e2);
 			pp_dbl_k12(e1, r, q, p);
-			pp_exp(e1, e1);
+			pp_exp_k12(e1, e1);
 			pp_dbl_k12_basic(e2, r, q, p);
-			pp_exp(e2, e2);
+			pp_exp_k12(e2, e2);
 			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -97,9 +214,9 @@ static int pairing(void) {
 			fp12_zero(e1);
 			fp12_zero(e2);
 			pp_dbl_k12(e1, r, q, p);
-			pp_exp(e1, e1);
+			pp_exp_k12(e1, e1);
 			pp_dbl_k12_projc(e2, r, q, p);
-			pp_exp(e2, e2);
+			pp_exp_k12(e2, e2);
 			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 
@@ -129,78 +246,49 @@ static int pairing(void) {
 		} TEST_END;
 #endif
 #endif /* EP_ADD = PROJC */
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp12_free(e1);
+	fp12_free(e2);
+	ep_free(p);
+	ep2_free(q);
+	ep2_free(r);
+	ep2_free(s);
+	bn_free(n);
+	bn_free(k);
+	return code;
+}
 
-		TEST_BEGIN("miller addition is correct") {
-			ep_rand(p);
-			ep2_rand(q);
-			ep2_rand(r);
-			ep2_copy(s, r);
-			pp_add_k12(e1, r, q, p);
-			pp_norm(r, r);
-			ep2_add(s, s, q);
-			ep2_norm(s, s);
-			TEST_ASSERT(ep2_cmp(r, s) == CMP_EQ, end);
-		} TEST_END;
+static int pairing(void) {
+	int code = STS_ERR;
+	fp12_t e1, e2;
+	ep2_t q, r;
+	ep_t p;
+	bn_t k, n;
 
-#if EP_ADD == BASIC || !defined(STRIP)
-		TEST_BEGIN("miller addition in affine coordinates is correct") {
-			ep_rand(p);
-			ep2_rand(q);
-			ep2_rand(r);
-			ep2_copy(s, r);
-			fp12_zero(e1);
-			fp12_zero(e2);
-			pp_add_k12(e1, r, q, p);
-			pp_exp(e1, e1);
-			pp_add_k12_basic(e2, s, q, p);
-			pp_exp(e2, e2);
-			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
-		} TEST_END;
-#endif
+	fp12_null(e1);
+	fp12_null(e2);
+	ep_null(p);
+	ep2_null(q);
+	ep2_null(r);
+	bn_null(k);
+	bn_null(n);
 
-#if EP_ADD == PROJC || !defined(STRIP)
-		TEST_BEGIN("miller addition in projective coordinates is correct") {
-			ep_rand(p);
-			ep2_rand(q);
-			ep2_rand(r);
-			ep2_copy(s, r);
-			fp12_zero(e1);
-			fp12_zero(e2);
-			pp_add_k12(e1, r, q, p);
-			pp_exp(e1, e1);
-			pp_add_k12_projc(e2, s, q, p);
-			pp_exp(e2, e2);
-			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
-		} TEST_END;
+	TRY {
+		fp12_new(e1);
+		fp12_new(e2);
+		ep_new(p);
+		ep2_new(q);
+		ep2_new(r);
+		bn_new(n);
+		bn_new(k);
 
-#if PP_EXT == BASIC || !defined(STRIP)
-		TEST_BEGIN("basic projective miller addition is consistent") {
-			ep_rand(p);
-			ep2_rand(q);
-			ep2_rand(r);
-			ep2_copy(s, r);
-			fp12_zero(e1);
-			fp12_zero(e2);
-			pp_add_k12_projc(e1, r, q, p);
-			pp_add_k12_projc_basic(e2, s, q, p);
-			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
-		} TEST_END;
-#endif
-
-#if PP_EXT == LAZYR || !defined(STRIP)
-		TEST_BEGIN("lazy-reduced projective miller addition is consistent") {
-			ep_rand(p);
-			ep2_rand(q);
-			ep2_rand(r);
-			ep2_copy(s, r);
-			fp12_zero(e1);
-			fp12_zero(e2);
-			pp_add_k12_projc(e1, r, q, p);
-			pp_add_k12_projc_lazyr(e2, s, q, p);
-			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
-		} TEST_END;
-#endif
-#endif /* EP_ADD = PROJC */
+		ep_curve_get_ord(n);
 
 		TEST_BEGIN("pairing is not degenerate") {
 			ep_rand(p);
@@ -311,7 +399,6 @@ static int pairing(void) {
 	ep_free(p);
 	ep2_free(q);
 	ep2_free(r);
-	ep2_free(s);
 	bn_free(n);
 	bn_free(k);
 	return code;
@@ -331,6 +418,16 @@ int main(void) {
 	ep_param_print();
 
 	util_banner("Arithmetic", 1);
+
+	if (addition() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (doubling() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	if (pairing() != STS_OK) {
 		core_clean();
