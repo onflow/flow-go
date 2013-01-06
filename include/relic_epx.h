@@ -856,10 +856,12 @@ void ep2_norm(ep2_t r, ep2_t p);
 void ep2_map(ep2_t p, unsigned char *msg, int len);
 
 /**
- * Computes a power of the Frobenius map of a point represented in affine
- * coordinates in an elliptic curve over a quadratic exension. Computes
- * Frob^i(P = (x, y)) = (x^p^i, y^p^i). On a quadratic twist, this is the same
- * as multiplying by the field characteristic.
+ * Computes a power of the Gailbraith-Lin-Scott homomorphism of a point
+ * represented in affine coordinates on a twisted elliptic curve over a
+ * quadratic exension. Computes Psi^i(P) = Twist(P)(Frob^i(unTwist(P)).
+ * On the trace-zero group of a quadratic twist, computes a power of the
+ * Frobenius map of a point represented in affine coordinates in an elliptic
+ * curve over a quadratic exension. Computes Frob^i(P) = (p^i)P.
  *
  * @param[out] r			- the result in affine coordinates.
  * @param[in] p				- a point in affine coordinates.
