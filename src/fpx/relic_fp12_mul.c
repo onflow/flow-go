@@ -98,17 +98,17 @@ void fp6_mul_dxs_unr_lazyr(dv6_t c, fp6_t a, fp6_t b) {
 #ifdef FP_SPACE
 		fp2_mulc_low(u0, a[0], b[0]);
 		fp2_mulc_low(u1, a[1], b[1]);
-        fp2_addd_low(c[1], u0, u1);
+		fp2_addd_low(c[1], u0, u1);
 		fp2_addn_low(t0, a[1], a[2]);
 #else
 		fp2_muln_low(u0, a[0], b[0]);
 		fp2_muln_low(u1, a[1], b[1]);
-        fp2_addc_low(c[1], u0, u1);
+		fp2_addc_low(c[1], u0, u1);
 		fp2_addm_low(t0, a[1], a[2]);
 #endif
 		/* t2 (c_0) = v0 + E((a_1 + a_2)(b_1 + b_2) - v1 - v2) */
-        fp2_muln_low(u3, t0, b[1]);
-        fp2_subc_low(u3, u3, u1);
+		fp2_muln_low(u3, t0, b[1]);
+		fp2_subc_low(u3, u3, u1);
 		fp2_nord_low(c[0], u3);
 		fp2_addc_low(c[0], c[0], u0);
 
@@ -340,13 +340,13 @@ void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
 			fp6_mul_dxs(t0, a[0], b[0]);
 #if EP_ADD == BASIC
 			/* t1 = a_1 * b_1. */
+			fp_mul(t1[0][0], a[1][2][0], b[1][1][0]);
+			fp_mul(t1[0][1], a[1][2][1], b[1][1][0]);
+			fp2_mul_nor(t1[0], t1[0]);
 			fp_mul(t1[1][0], a[1][0][0], b[1][1][0]);
 			fp_mul(t1[1][1], a[1][0][1], b[1][1][0]);
 			fp_mul(t1[2][0], a[1][1][0], b[1][1][0]);
 			fp_mul(t1[2][1], a[1][1][1], b[1][1][0]);
-			fp_mul(t1[0][0], a[1][2][0], b[1][1][0]);
-			fp_mul(t1[0][1], a[1][2][1], b[1][1][0]);
-			fp2_mul_nor(t1[0], t1[0]);
 			/* t2 = b_0 + b_1. */
 			fp2_copy(t2[0], b[0][0]);
 			fp_add(t2[1][0], b[0][1][0], b[1][1][0]);
@@ -371,9 +371,11 @@ void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
 		/* c_0 = a_0 * b_0 + v * a_1 * b_1. */
 		fp6_mul_art(t1, t1);
 		fp6_add(c[0], t0, t1);
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	} FINALLY {
+	}
+	FINALLY {
 		fp6_free(t0);
 		fp6_free(t1);
 		fp6_free(t2);
@@ -445,24 +447,22 @@ void fp12_mul_lazyr(fp12_t c, fp12_t a, fp12_t b) {
 }
 
 void fp12_mul_dxs_lazyr(fp12_t c, fp12_t a, fp12_t b) {
+	fp6_t t0;
+	dv6_t u0, u1, u2;
+
+	fp6_null(t0);
+	dv6_null(u0);
+	dv6_null(u1);
+	dv6_null(u2);
+
+	TRY {
+		fp6_new(t0);
+		dv6_new(u0);
+		dv6_new(u1);
+		dv6_new(u2);
+
+		if (ep2_curve_is_twist() == EP_DTYPE) {
 #if EP_ADD == BASIC
-	if (ep2_curve_is_twist() == EP_DTYPE) {
-		fp6_t t0;
-		dv6_t u0, u1, u2;
-
-		fp6_null(t0);
-		dv6_null(u0);
-		dv6_null(u1);
-		dv6_null(u2);
-
-		TRY {
-			fp6_new(t0);
-			dv6_new(u0);
-			dv6_new(u1);
-			dv6_new(u2);
-
-			/* Karatsuba algorithm. */
-
 			/* t0 = a_0 * b_0. */
 			fp_muln_low(u0[0][0], a[0][0][0], b[0][0][0]);
 			fp_muln_low(u0[0][1], a[0][0][1], b[0][0][0]);
@@ -470,166 +470,76 @@ void fp12_mul_dxs_lazyr(fp12_t c, fp12_t a, fp12_t b) {
 			fp_muln_low(u0[1][1], a[0][1][1], b[0][0][0]);
 			fp_muln_low(u0[2][0], a[0][2][0], b[0][0][0]);
 			fp_muln_low(u0[2][1], a[0][2][1], b[0][0][0]);
-
-			/* t1 = a_1 * b_1. */
-			fp6_mul_dxs_unr_lazyr(u1, a[1], b[1]);
-
 			/* t2 = b_0 + b_1. */
 			fp_add(t0[0][0], b[0][0][0], b[1][0][0]);
 			fp_copy(t0[0][1], b[1][0][1]);
 			fp2_copy(t0[1], b[1][1]);
-
-			/* c_1 = a_0 + a_1. */
-			fp6_add(c[1], a[0], a[1]);
-			/* c_1 = (a_0 + a_1) * (b_0 + b_1) */
-			fp6_mul_dxs_unr_lazyr(u2, c[1], t0);
-			for (int i = 0; i < 3; i++) {
-				fp2_subc_low(u2[i], u2[i], u0[i]);
-				fp2_subc_low(u2[i], u2[i], u1[i]);
-			}
-			fp2_rdcn_low(c[1][0], u2[0]);
-			fp2_rdcn_low(c[1][1], u2[1]);
-			fp2_rdcn_low(c[1][2], u2[2]);
-
-			fp2_nord_low(u2[0], u1[2]);
-			fp2_addc_low(u0[0], u0[0], u2[0]);
-			fp2_addc_low(u0[1], u0[1], u1[0]);
-			fp2_addc_low(u0[2], u0[2], u1[1]);
-			/* c_0 = a_0b_0 + v * a_1b_1. */
-			fp2_rdcn_low(c[0][0], u0[0]);
-			fp2_rdcn_low(c[0][1], u0[1]);
-			fp2_rdcn_low(c[0][2], u0[2]);
-		} CATCH_ANY {
-			THROW(ERR_CAUGHT);
-		} FINALLY {
-			fp6_free(t0);
-			dv6_free(u0);
-			dv6_free(u1);
-			dv6_free(u2);
-		}
-	} else {
-		fp12_mul(c, a, b);
-	}
-#elif EP_ADD == PROJC
-	if (ep2_curve_is_twist() == EP_DTYPE) {
-		fp6_t t0;
-		dv6_t u0, u1, u2;
-
-		fp6_null(t0);
-		dv6_null(u0);
-		dv6_null(u1);
-		dv6_null(u2);
-
-		TRY {
-			fp6_new(t0);
-			dv6_new(u0);
-			dv6_new(u1);
-			dv6_new(u2);
-
-			/* Karatsuba algorithm. */
-
+#else
 			/* t0 = a_0 * b_0. */
 			fp2_muln_low(u0[0], a[0][0], b[0][0]);
 			fp2_muln_low(u0[1], a[0][1], b[0][0]);
 			fp2_muln_low(u0[2], a[0][2], b[0][0]);
-
-			/* t1 = a_1 * b_1. */
-			fp6_mul_dxs_unr_lazyr(u1, a[1], b[1]);
-
 			/* t2 = b_0 + b_1. */
 			fp2_add(t0[0], b[0][0], b[1][0]);
 			fp2_copy(t0[1], b[1][1]);
-			fp2_zero(t0[2]);
-
-			/* c_1 = a_0 + a_1. */
-			fp6_add(c[1], a[0], a[1]);
-			/* c_1 = (a_0 + a_1) * (b_0 + b_1) */
-			fp6_mul_dxs_unr_lazyr(u2, c[1], t0);
-			for (int i = 0; i < 3; i++) {
-				fp2_subc_low(u2[i], u2[i], u0[i]);
-				fp2_subc_low(u2[i], u2[i], u1[i]);
-			}
-			fp2_rdcn_low(c[1][0], u2[0]);
-			fp2_rdcn_low(c[1][1], u2[1]);
-			fp2_rdcn_low(c[1][2], u2[2]);
-
-			fp2_nord_low(u2[0], u1[2]);
-			fp2_addc_low(u0[0], u0[0], u2[0]);
-			fp2_addc_low(u0[1], u0[1], u1[0]);
-			fp2_addc_low(u0[2], u0[2], u1[1]);
-			/* c_0 = a_0b_0 + v * a_1b_1. */
-			fp2_rdcn_low(c[0][0], u0[0]);
-			fp2_rdcn_low(c[0][1], u0[1]);
-			fp2_rdcn_low(c[0][2], u0[2]);
-		} CATCH_ANY {
-			THROW(ERR_CAUGHT);
-		} FINALLY {
-			fp6_free(t0);
-			dv6_free(u0);
-			dv6_free(u1);
-			dv6_free(u2);
-		}
-	} else {
-		fp6_t t0;
-		dv6_t u0, u1, u2;
-
-		fp6_null(t0);
-		dv6_null(u0);
-		dv6_null(u1);
-		dv6_null(u2);
-
-		TRY {
-			fp6_new(t0);
-			dv6_new(u0);
-			dv6_new(u1);
-			dv6_new(u2);
-
-			/* Karatsuba algorithm. */
-
+#endif
+			/* t1 = a_1 * b_1. */
+			fp6_mul_dxs_unr_lazyr(u1, a[1], b[1]);
+		} else {
 			/* t0 = a_0 * b_0. */
 			fp6_mul_dxs_unr_lazyr(u0, a[0], b[0]);
-
+#if EP_ADD == BASIC
+			/* t0 = a_0 * b_0. */
+			fp_muln_low(u1[1][0], a[1][2][0], b[1][1][0]);
+			fp_muln_low(u1[1][1], a[1][2][1], b[1][1][0]);
+			fp2_nord_low(u1[0], u1[1]);
+			fp_muln_low(u1[1][0], a[1][0][0], b[1][1][0]);
+			fp_muln_low(u1[1][1], a[1][0][1], b[1][1][0]);
+			fp_muln_low(u1[2][0], a[1][1][0], b[1][1][0]);
+			fp_muln_low(u1[2][1], a[1][1][1], b[1][1][0]);
+			/* t2 = b_0 + b_1. */
+			fp2_copy(t0[0], b[0][0]);
+			fp_add(t0[1][0], b[0][1][0], b[1][1][0]);
+			fp_copy(t0[1][1], b[0][1][1]);
+#else
 			/* t1 = a_1 * b_1. */
 			fp2_muln_low(u1[1], a[1][2], b[1][1]);
 			fp2_nord_low(u1[0], u1[1]);
 			fp2_muln_low(u1[1], a[1][0], b[1][1]);
 			fp2_muln_low(u1[2], a[1][1], b[1][1]);
-
 			/* t2 = b_0 + b_1. */
 			fp2_copy(t0[0], b[0][0]);
 			fp2_add(t0[1], b[0][1], b[1][1]);
-			fp2_zero(t0[2]);
-
-			/* c_1 = a_0 + a_1. */
-			fp6_add(c[1], a[0], a[1]);
-			/* c_1 = (a_0 + a_1) * (b_0 + b_1) */
-			fp6_mul_dxs_unr_lazyr(u2, c[1], t0);
-			for (int i = 0; i < 3; i++) {
-				fp2_subc_low(u2[i], u2[i], u0[i]);
-				fp2_subc_low(u2[i], u2[i], u1[i]);
-			}
-			fp2_rdcn_low(c[1][0], u2[0]);
-			fp2_rdcn_low(c[1][1], u2[1]);
-			fp2_rdcn_low(c[1][2], u2[2]);
-
-			fp2_nord_low(u2[0], u1[2]);
-			fp2_addc_low(u0[0], u0[0], u2[0]);
-			fp2_addc_low(u0[1], u0[1], u1[0]);
-			fp2_addc_low(u0[2], u0[2], u1[1]);
-			/* c_0 = a_0b_0 + v * a_1b_1. */
-			fp2_rdcn_low(c[0][0], u0[0]);
-			fp2_rdcn_low(c[0][1], u0[1]);
-			fp2_rdcn_low(c[0][2], u0[2]);
-		} CATCH_ANY {
-			THROW(ERR_CAUGHT);
-		} FINALLY {
-			fp6_free(t0);
-			dv6_free(u0);
-			dv6_free(u1);
-			dv6_free(u2);
+#endif
 		}
+		/* c_1 = a_0 + a_1. */
+		fp6_add(c[1], a[0], a[1]);
+		/* c_1 = (a_0 + a_1) * (b_0 + b_1) */
+		fp6_mul_dxs_unr_lazyr(u2, c[1], t0);
+		for (int i = 0; i < 3; i++) {
+			fp2_subc_low(u2[i], u2[i], u0[i]);
+			fp2_subc_low(u2[i], u2[i], u1[i]);
+		}
+		fp2_rdcn_low(c[1][0], u2[0]);
+		fp2_rdcn_low(c[1][1], u2[1]);
+		fp2_rdcn_low(c[1][2], u2[2]);
+
+		fp2_nord_low(u2[0], u1[2]);
+		fp2_addc_low(u0[0], u0[0], u2[0]);
+		fp2_addc_low(u0[1], u0[1], u1[0]);
+		fp2_addc_low(u0[2], u0[2], u1[1]);
+		/* c_0 = a_0b_0 + v * a_1b_1. */
+		fp2_rdcn_low(c[0][0], u0[0]);
+		fp2_rdcn_low(c[0][1], u0[1]);
+		fp2_rdcn_low(c[0][2], u0[2]);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp6_free(t0);
+		dv6_free(u0);
+		dv6_free(u1);
+		dv6_free(u2);
 	}
 #endif
 }
 
-#endif
