@@ -38,12 +38,12 @@
 /*============================================================================*/
 
 /**
- * Multiplies a point by the curve cofactor.
+ * Multiplies a point on a Barreto-Naehrig curve by the cofactor.
  *
  * @param[out] r			- the result.
  * @param[in] p				- the point to multiply.
  */
-void ep2_mul_cof(ep2_t r, ep2_t p) {
+void ep2_mul_cof_bn(ep2_t r, ep2_t p) {
 	bn_t x;
 	ep2_t t0, t1, t2;
 
@@ -66,13 +66,13 @@ void ep2_mul_cof(ep2_t r, ep2_t p) {
 			ep2_neg(t0, t0);
 		}
 
-		/* Compute t1 = p(3xP). */
+		/* Compute t1 = \psi(3xP). */
 		ep2_dbl(t1, t0);
 		ep2_add(t1, t1, t0);
 		ep2_norm(t1, t1);
 		ep2_frb(t1, t1, 1);
 
-		/* Compute t2 = p^3(P) + t0 + t1 + p^2(xP). */
+		/* Compute t2 = \psi^3(P) + t0 + t1 + \psi^2(xP). */
 		ep2_frb(t2, p, 2);
 		ep2_frb(t2, t2, 1);
 		ep2_add(t2, t2, t0);
@@ -89,6 +89,69 @@ void ep2_mul_cof(ep2_t r, ep2_t p) {
 		ep2_free(t0);
 		ep2_free(t1);
 		ep2_free(t2);
+		bn_free(x);
+	}
+}
+
+/**
+ * Multiplies a point on a Barreto-Lynn-Soctt curve by the cofactor.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ */
+void ep2_mul_cof_b12(ep2_t r, ep2_t p) {
+	bn_t x;
+	ep2_t t0, t1, t2, t3;
+
+	ep2_null(t0);
+	ep2_null(t1);
+	ep2_null(t2);
+	ep2_null(t3);
+	bn_null(x);
+
+	TRY {
+		ep2_new(t0);
+		ep2_new(t1);
+		ep2_new(t2);
+		ep2_new(t3);
+		bn_new(x);
+
+		fp_param_get_var(x);
+
+		/* Compute t0 = xP. */
+		ep2_mul(t0, p, x);
+		if (bn_sign(x) == BN_NEG) {
+			ep2_neg(t0, t0);
+		}
+		/* Compute t1 = [x^2]P. */
+		ep2_mul(t1, t0, x);
+		if (bn_sign(x) == BN_NEG) {
+			ep2_neg(t1, t1);
+		}
+
+		/* t2 = (x^2 - x - 1)P = x^2P - x*P - P. */
+		ep2_sub(t2, t1, t0);
+		ep2_sub(t2, t2, p);
+		/* t3 = \psi(x - 1)P. */
+		ep2_sub(t3, t0, p);
+		ep2_norm(t3, t3);
+		ep2_frb(t3, t3, 1);
+		ep2_add(t2, t2, t3);
+		/* t3 = \psi^2(2P). */
+		ep2_dbl(t3, p);
+		ep2_norm(t3, t3);
+		ep2_frb(t3, t3, 2);
+		ep2_add(t2, t2, t3);
+		ep2_norm(r, t2);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep2_free(t0);
+		ep2_free(t1);
+		ep2_free(t2);
+		ep2_free(t3);
 		bn_free(x);
 	}
 }
@@ -128,7 +191,17 @@ void ep2_map(ep2_t p, unsigned char *msg, int len) {
 			fp_add_dig(p->x[0], p->x[0], 1);
 		}
 
-		ep2_mul_cof(p, p);
+		switch (ep_param_get()) {
+			case BN_P158:
+			case BN_P254:
+			case BN_P256:
+			case BN_P638:
+				ep2_mul_cof_bn(p, p);
+				break;
+			case B12_P638:
+				ep2_mul_cof_b12(p, p);
+				break;
+		}
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
