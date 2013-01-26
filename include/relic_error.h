@@ -149,8 +149,8 @@ typedef struct _sts_t {
 		_last = _ctx->last; 											\
 		_this.block = 1;												\
 		_ctx->last = &_this; 											\
-		for (int _r = 0; ; _r = 1) 										\
-			if (_r) { 													\
+		for (int _z = 0; ; _z = 1) 										\
+			if (_z) { 													\
 				if (setjmp(_this.addr) == 0) { 							\
 					if (1)												\
 
@@ -176,8 +176,8 @@ typedef struct _sts_t {
 				_this.error = ADDR; 									\
 			}															\
 	} 																	\
-	for (int _r = 0; _r < 2; _r++) 										\
-		if (_r == 1 && core_get()->caught) 								\
+	for (int _z = 0; _z < 2; _z++) 										\
+		if (_z == 1 && core_get()->caught) 								\
 
 /**
  * Implements the THROW clause of the error-handling routines.
@@ -264,7 +264,7 @@ typedef struct _sts_t {
 /**
  * Implements a FINALLY clause.
  */
-#define FINALLY				else if (_r == 0)
+#define FINALLY				else if (_z == 0)
 #else
 #define FINALLY				if (1)
 #endif
