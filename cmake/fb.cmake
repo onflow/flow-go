@@ -36,6 +36,7 @@ message("      FB_METHD=BINAR    Binary Inversion algorithm.")
 message("      FB_METHD=ALMOS    Inversion by the Amost inverse algorithm.")
 message("      FB_METHD=EXGCD    Inversion by the Extended Euclidean algorithm.")
 message("      FB_METHD=ITOHT    Inversion by Itoh-Tsuji.")
+message("      FB_METHD=BRUCH    Hardware-friendly inversion by Brunner et al.") 
 message("      FB_METHD=LOWER    Pass inversion to the lower level.\n")
 
 message("      FB_METHD=BASIC    Binary exponentiation.")

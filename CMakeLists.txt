@@ -119,7 +119,7 @@ message("   OPSYS=MACOSX   Mac OS X.")
 message("   OPSYS=WINDOWS  Windows operating system.")
 message("   OPSYS=DROID    Android operating system.\n")
 
-message(STATUS "Supported timers (default = HIGH):")
+message(STATUS "Supported timers (default = HPROC):")
 message("   TIMER=NONE     No timer.")
 message("   TIMER=HREAL    GNU/Linux realtime high-resolution timer.")
 message("   TIMER=HPROC    GNU/Linux per-process high-resolution timer.")
@@ -127,6 +127,9 @@ message("   TIMER=HTHRD    GNU/Linux per-thread high-resolution timer.")
 message("   TIMER=ANSI     ANSI-compatible timer.")
 message("   TIMER=POSIX    POSIX-compatible timer.")
 message("   TIMER=CYCLE    Cycle-counting timer. (architecture-dependant)\n")
+
+message(STATUS "Prefix to identity this build of the library (default = ""):")
+message("   LABEL=relic\n")
 
 include(cmake/bn.cmake)
 include(cmake/fp.cmake)
@@ -364,6 +367,14 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/relic_conf.h.in
 message(STATUS "Configured ${CMAKE_CURRENT_SOURCE_DIR}/include/relic_conf.h.in")	
 string(TOLOWER ${ARITH} ARITH)
 
+if (LABEL)
+	set(RELIC "relic_${LABEL}")
+	set(RELIC_S "relic_s_${LABEL}")
+else(LABEL)
+	set(RELIC "relic")
+	set(RELIC_S "relic_s")
+endif(LABEL)
+
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 if(DOCUM)
@@ -378,3 +389,6 @@ endif(TESTS GREATER 0)
 if(BENCH GREATER 0)
 	add_subdirectory(bench)
 endif(BENCH GREATER 0)
+
+# Choose the arithmetic backend.
+set(LABEL "" CACHE STRING "Build label")
