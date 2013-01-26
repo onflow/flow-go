@@ -339,7 +339,7 @@ void bn_rec_naf(signed char *naf, int *len, bn_t k, int w) {
 			while (!bn_is_zero(t)) {
 				if (!bn_is_even(t)) {
 					bn_get_dig(&t0, t);
-					u_i = 2 - (t0 & MASK(2));
+					u_i = 2 - (t0 & mask);
 					if (u_i < 0) {
 						bn_add_dig(t, t, -u_i);
 					} else {
@@ -636,6 +636,61 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 	}
 }
 
+void bn_rec_reg(signed char *naf, int *len, bn_t k, int n, int w) {
+	int i, l;
+	bn_t t;
+	dig_t t0, mask;
+	signed char u_i;
+
+	bn_null(t);
+
+	mask = MASK(w);
+	l = CEIL(n, (w - 1));
+
+	TRY {
+		bn_new(t);
+		bn_copy(t, k);
+
+		i = 0;
+		if (w == 2) {
+			for (i = 0; i < l; i++, naf++) {
+				bn_get_dig(&t0, t);
+				u_i = (t0 & mask) - 2;
+				if (u_i < 0) {
+					bn_add_dig(t, t, -u_i);
+				} else {
+					bn_sub_dig(t, t, u_i);
+				}
+				*naf = u_i;
+				bn_hlv(t, t);
+			}
+			bn_get_dig(&t0, t);
+			*naf = t0;
+		} else {
+			for (i = 0; i < l; i++, naf++) {
+				bn_get_dig(&t0, t);
+				u_i = (t0 & mask) - (1 << (w - 1));
+				if (u_i < 0) {
+					bn_add_dig(t, t, -u_i);
+				} else {
+					bn_sub_dig(t, t, u_i);
+				}
+				*naf = u_i;
+				bn_rsh(t, t, w - 1);
+			}
+			bn_get_dig(&t0, t);
+			*naf = t0;
+		}
+		*len = l + 1;
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
+	}
+}
+
 void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 	bn_t n0, n1;
 	dig_t l0, l1;
@@ -707,8 +762,6 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 
 }
 
-#if defined(WITH_EP) && defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
-
 void bn_rec_glv(bn_t k0, bn_t k1, bn_t k, bn_t n, bn_t v1[], bn_t v2[]) {
 	bn_t t, b1, b2;
 	int r1, r2, bits;
@@ -754,5 +807,3 @@ void bn_rec_glv(bn_t k0, bn_t k1, bn_t k, bn_t n, bn_t v1[], bn_t v2[]) {
 		bn_free(t);
 	}
 }
-
-#endif /* WITH_EP && EP_KBLTZ */
