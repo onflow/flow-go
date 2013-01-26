@@ -23,18 +23,14 @@
 /**
  * @file
  *
- * Implementation of frobenius action in extensions defined over binary fields.
+ * Implementation of frobenius action in binary fields extensions.
  *
  * @version $Id$
  * @ingroup fbx
  */
 
-#include <string.h>
-
 #include "relic_core.h"
-#include "relic_conf.h"
-#include "relic_util.h"
-#include "relic_pb.h"
+#include "relic_fbx.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */

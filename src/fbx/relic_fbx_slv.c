@@ -23,10 +23,10 @@
 /**
  * @file
  *
- * Implementation of exponentiation in binary field extensions.
+ * Implementation of quadratic equation solution on binary extension fields.
  *
  * @version $Id$
- * @ingroup fbx
+ * @ingroup fb
  */
 
 #include "relic_core.h"
@@ -36,80 +36,27 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb4_exp(fb4_t c, fb4_t a, bn_t b) {
-	fb4_t t;
+void fb2_slv(fb2_t c, fb2_t a) {
+	fb_t t;
 
-	fb4_null(t);
-
-	TRY {
-		fb4_new(t);
-
-		fb4_copy(t, a);
-
-		for (int i = bn_bits(b) - 2; i >= 0; i--) {
-			fb4_sqr(t, t);
-			if (bn_test_bit(b, i)) {
-				fb4_mul(t, t, a);
-			}
-		}
-		fb4_copy(c, t);
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb4_free(t);
-	}
-}
-
-void fb6_exp(fb6_t c, fb6_t a, bn_t b) {
-	fb6_t t;
-
-	fb6_null(t);
+	fb_null(t);
 
 	TRY {
-		fb6_new(t);
+		fb_new(t);
 
-		fb6_copy(t, a);
-
-		for (int i = bn_bits(b) - 2; i >= 0; i--) {
-			fb6_sqr(t, t);
-			if (bn_test_bit(b, i)) {
-				fb6_mul(t, t, a);
-			}
-		}
-		fb6_copy(c, t);
-	}
-	CATCH_ANY {
+		/* Compute t^2 + t = a_1. */
+		fb_slv(t, a[1]);
+		/* Compute c_0 = a_0 + a_1 + t. */
+		fb_add(c[0], t, a[0]);
+		fb_add(c[0], c[0], a[1]);
+		fb_add_dig(c[0], c[0], fb_trc(t));
+		/* Make Trc(c_0) = 0. */
+		fb_slv(c[0], c[0]);
+		/* Compute c_0^2 + c_0 = c_0. */
+		fb_add_dig(c[1], t, fb_trc(t));
+	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb6_free(t);
-	}
-}
-
-void fb12_exp(fb12_t c, fb12_t a, bn_t b) {
-	fb12_t t;
-
-	fb12_null(t);
-
-	TRY {
-		fb12_new(t);
-
-		fb12_copy(t, a);
-
-		for (int i = bn_bits(b) - 2; i >= 0; i--) {
-			fb12_sqr(t, t);
-			if (bn_test_bit(b, i)) {
-				fb12_mul(t, t, a);
-			}
-		}
-		fb12_copy(c, t);
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb12_free(t);
+	} FINALLY {
+		fb_free(t);
 	}
 }

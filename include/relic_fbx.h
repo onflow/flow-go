@@ -588,6 +588,15 @@ void fb2_mul(fb2_t c, fb2_t a, fb2_t b);
 void fb2_sqr(fb2_t c, fb2_t a);
 
 /**
+ * Solves a quadratic equation for c, Tr(a) = 0. Computes c such that
+ * c^2 + c = a.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quadratic extension field element.
+ */
+void fb2_slv(fb2_t c, fb2_t a);
+
+/**
  * Inverts a quadratic extension field element. Computes c = a^{-1}.
  *
  * @param[out] c			- the result.

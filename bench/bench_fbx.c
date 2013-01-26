@@ -135,6 +135,12 @@ static void arith2(void) {
 	}
 	BENCH_END;
 
+	BENCH_BEGIN("fb2_slv") {
+		fb2_rand(a);
+		BENCH_ADD(fb2_slv(c, a));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fb2_inv") {
 		fb2_rand(a);
 		BENCH_ADD(fb2_inv(c, a));

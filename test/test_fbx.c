@@ -370,6 +370,46 @@ static int squaring2(void) {
 	return code;
 }
 
+static int solve2(void) {
+	int code = STS_ERR;
+	fb2_t a, b, c;
+
+	fb2_null(a);
+	fb2_null(b);
+	fb2_null(c);
+
+	TRY {
+		fb2_new(a);
+		fb2_new(b);
+		fb2_new(c);
+
+		TEST_BEGIN("solving a quadratic equation is correct") {
+			fb2_rand(a);
+			fb2_rand(b);
+			/* Make Tr(a_1) = 0. */
+			fb_add_dig(a[0], a[0], fb_trc(a[0]));
+			fb_add_dig(a[1], a[1], fb_trc(a[1]));
+			fb2_slv(b, a);
+			/* Verify the solution. */
+			fb2_sqr(c, b);
+			fb2_add(c, c, b);
+			fb2_print(a);
+			fb2_print(b);
+			fb2_print(c);
+			TEST_ASSERT(fb2_cmp(c, a) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fb2_free(a);
+	fb2_free(b);
+	fb2_free(c);
+	return code;
+}
+
 static int inversion2(void) {
 	int code = STS_ERR;
 	fb2_t a, b, c;
@@ -1710,6 +1750,11 @@ int main(void) {
 	}
 
 	if (squaring2() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (solve2() != STS_OK) {
 		core_clean();
 		return 1;
 	}
