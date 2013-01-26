@@ -914,6 +914,15 @@ void fb_inv_almos(fb_t c, fb_t a);
 void fb_inv_itoht(fb_t c, fb_t a);
 
 /**
+ * Inverts a binary field element using the hardware-friendly
+ * Brunner-Curiger-Hofstetter algorithm.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the binary field element to invert.
+ */
+void fb_inv_bruch(fb_t c, fb_t a);
+
+/**
  * Inverts a binary field element using a direct call to the lower layer.
  *
  * @param[out] c			- the result.

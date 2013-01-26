@@ -211,16 +211,17 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 	dv_t _u, _v, _g1, _g2;
 	dig_t *t = NULL, *u = NULL, *v = NULL, *g1 = NULL, *g2 = NULL, carry;
 
-	dv_null(_u);
-	dv_null(_v);
-	dv_null(_g1);
-	dv_null(_g2);
+	fb_null(_u);
+	fb_null(_v);
+	fb_null(_g1);
+	fb_null(_g2);
 
 	TRY {
 		dv_new(_u);
 		dv_new(_v);
 		dv_new(_g1);
 		dv_new(_g2);
+
 		dv_zero(_g1, FB_DIGS + 1);
 		dv_zero(_g2, FB_DIGS + 1);
 
@@ -301,7 +302,6 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 		}
 		/* Return g1. */
 		fb_copy(c, g1);
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -465,6 +465,74 @@ void fb_inv_itoht(fb_t c, fb_t a) {
 }
 
 #endif
+
+#if FB_INV == BRUCH || !defined(STRIP)
+
+void fb_inv_bruch(fb_t c, fb_t a) {
+	fb_t _r, _s, _u, _v;
+	dig_t *r = NULL, *s = NULL, *t = NULL, *u = NULL, *v = NULL;
+	int delta = 0;
+
+	fb_null(_r);
+	fb_null(_s);
+	fb_null(_u);
+	fb_null(_v);
+
+	TRY {
+		fb_new(_r);
+		fb_new(_s);
+		fb_new(_u);
+		fb_new(_v);
+
+		fb_copy(_r, a);
+		fb_copy(_s, fb_poly_get());
+		fb_zero(_v);
+		fb_set_dig(_u, 1);
+
+		r = _r;
+		s = _s;
+		u = _u;
+		v = _v;
+
+		for (int i = 1; i <= 2 * FB_BITS; i++) {
+			if ((r[FB_DIGS - 1] & ((dig_t)1 << (FB_BITS % FB_DIGIT))) == 0) {
+				fb_lsh(r, r, 1);
+				fb_lsh(u, u, 1);
+				delta++;
+			} else {
+				if ((s[FB_DIGS - 1] & ((dig_t)1 << (FB_BITS % FB_DIGIT)))) {
+					fb_add(s, s, r);
+					fb_add(v, v, u);
+				}
+				fb_lsh(s, s, 1);
+				if (delta == 0) {
+					t = r;
+					r = s;
+					s = t;
+					t = u;
+					u = v;
+					v = t;
+					fb_lsh(u, u, 1);
+					delta++;
+				} else {
+					fb_rsh(u, u, 1);
+					delta--;
+				}
+			}
+		}
+		fb_copy(c, u);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fb_free(_r);
+		fb_free(_s);
+		fb_free(_u);
+		fb_free(_v);
+	}
+}
+
+#endif
+
 #if FB_INV == LOWER || !defined(STRIP)
 
 void fb_inv_lower(fb_t c, fb_t a) {
