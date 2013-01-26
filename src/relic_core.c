@@ -91,6 +91,10 @@ int core_init(void) {
 	core_ctx->next = 0;
 #endif
 
+#ifdef OVERH
+	core_ctx->over = 0;
+#endif
+
 	core_ctx->code = STS_OK;
 
 	TRY {

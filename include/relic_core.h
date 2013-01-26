@@ -57,6 +57,10 @@
 #include <math.h>
 #endif
 
+#ifdef LABEL
+#include "relic_label.h"
+#endif
+
 /*============================================================================*/
 /* Constant definitions                                                       */
 /*============================================================================*/
@@ -418,7 +422,7 @@ typedef struct _ctx_t {
 #endif /* ALLOC == STACK */
 	/** Constants for computing Frobenius maps in higher extensions. @{ */
 	fp2_st fp2_p[5];
-	fp_st fp2_p2[3];
+	fp_st fp2_p2[4];
 	fp2_st fp2_p3[5];
 	/** @} */
 	/** Constants for computing Frobenius maps in higher extensions. @{ */
@@ -438,8 +442,10 @@ typedef struct _ctx_t {
 	bench_t after;
 	/** Stores the sum of timings for the current benchmark. */
 	long long total;
+#ifdef OVERH
 	/** Benchmarking overhead to be measured and subtracted from benchmarks. */
-	long long overhead;
+	long long over;
+#endif
 #endif
 
 	/** Internal state of the PRNG. */
