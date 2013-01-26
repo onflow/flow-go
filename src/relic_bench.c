@@ -39,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if TIMER != NONE && BENCH > 1
+#if defined(OVERH) && TIMER != NONE && BENCH > 1
 
 /**
  * Dummy function for measuring benchmarking overhead.
@@ -50,20 +50,21 @@ static void empty(int *a) {
 	(*a)++;
 }
 
-#endif
+#endif /* OVER && TIMER != NONE && BENCH > 1 */
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
+#if defined(OVERH) && TIMER != NONE && BENCH > 1
+
 void bench_overhead(void) {
 	ctx_t *ctx = core_get();
-#if TIMER != NONE && BENCH > 1
 	int a[BENCH + 1];
 	int *tmpa;
 
 	do {
-		ctx->overhead = 0;
+		ctx->over = 0;
 		for (int l = 0; l < BENCH; l++) {
 			ctx->total = 0;
 			/* Measure the cost of (n^2 + over). */
@@ -76,7 +77,7 @@ void bench_overhead(void) {
 			}
 			bench_after();
 			/* Add the cost of (n^2 + over). */
-			ctx->overhead += ctx->total;
+			ctx->over += ctx->total;
 		}
 		/* Overhead stores the cost of n*(n^2 + over) = n^3 + n*over. */
 		ctx->total = 0;
@@ -92,17 +93,18 @@ void bench_overhead(void) {
 		}
 		bench_after();
 		/* Subtract the cost of (n^3 + over). */
-		ctx->overhead -= ctx->total;
+		ctx->over -= ctx->total;
 		/* Now overhead stores (n - 1)*over, so take the average to obtain the
 		 * overhead to execute BENCH operations inside a benchmark. */
-		ctx->overhead /= (BENCH - 1);
+		ctx->over /= (BENCH - 1);
 		/* Divide to obtain the overhead of one operation pair. */
-		ctx->overhead /= BENCH;
-	} while (ctx->overhead < 0);
-	ctx->total = ctx->overhead;
+		ctx->over /= BENCH;
+	} while (ctx->over < 0);
+	ctx->total = ctx->over;
 	bench_print();
-#endif
 }
+
+#endif /* OVER && TIMER != NONE && BENCH > 1 */
 
 void bench_reset() {
 #if TIMER != NONE
@@ -154,10 +156,13 @@ void bench_after() {
 void bench_compute(int benches) {
 	ctx_t *ctx = core_get();
 #if TIMER != NONE
-	ctx->total = ctx->total / benches - ctx->overhead;
+	ctx->total = ctx->total / benches;
+#ifdef OVERH
+	ctx->total = ctx->total - ctx->over;
+#endif /* OVERH */
 #else
 	(void)benches;
-#endif
+#endif /* TIMER != NONE */
 }
 
 void bench_print() {

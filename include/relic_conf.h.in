@@ -45,8 +45,10 @@
 #cmakedefine VERBS
 /** Trace support. */
 #cmakedefine TRACE
-/** Multithreading. */
+/** Build with multithreading support. */
 #cmakedefine MULTI
+/** Build with overhead estimation. */
+#cmakedefine OVERH
 /** Build documentation. */
 #cmakedefine DOCUM
 /** Build only the selected algorithms. */
@@ -61,8 +63,6 @@
 #cmakedefine SHLIB
 /** Build static library. */
 #cmakedefine STLIB
-/** Build with multithreading support. */
-#cmakedefine MULTI
 
 /** Number of times each test is ran. */
 #define TESTS    @TESTS@
