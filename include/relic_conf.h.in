@@ -256,7 +256,7 @@
 /** Extended Euclidean algorithm. */
 #define EXGCD    4
 /** Use implementation provided by the lower layer. */
-#define LOWER    6
+#define LOWER    7
 /** Chosen prime field inversion method. */ 
 #define FP_INV   @FP_INV@ 
 
@@ -343,10 +343,12 @@
 #define ALMOS    3
 /** Extended Euclidean algorithm. */
 #define EXGCD    4
-/** Itoh-Utsji inversion. */
+/** Itoh-Tsuji inversion. */
 #define ITOHT    5
+/** Hardware-friendly inversion by Brunner-Curiger-Hofstetter.*/
+#define BRUCH    6
 /** Use implementation provided by the lower layer. */
-#define LOWER    6
+#define LOWER    7
 /** Chosen binary field inversion method. */
 #define FB_INV   @FB_INV@ 
 
@@ -776,6 +778,9 @@
 #define CYCLE    7
 /** Chosen timer. */
 #define TIMER    @TIMER@
+
+/** Prefix to identity this build of the library. */
+#cmakedefine LABEL    @LABEL@
 
 #ifndef ASM
 
