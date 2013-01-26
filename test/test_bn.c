@@ -1619,6 +1619,26 @@ static int recoding(void) {
 			}
 		} TEST_END;
 
+		TEST_BEGIN("regular recoding is correct") {
+			for (w = 2; w <= 8; w++) {
+				bn_rand(a, BN_POS, BN_BITS);
+				if (bn_is_even(a)) {
+					bn_add_dig(a, a, 1);
+				}
+				bn_rec_reg(e, &l, a, BN_BITS, w);
+				bn_zero(b);
+				for (k = l - 1; k >= 0; k--) {
+					bn_lsh(b, b, w - 1);
+					if (e[k] > 0) {
+						bn_add_dig(b, b, e[k]);
+					} else {
+						bn_sub_dig(b, b, -e[k]);
+					}
+				}
+				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
+			}
+		} TEST_END;
+
 		TEST_BEGIN("jsf recoding is correct") {
 			bn_rand(a, BN_POS, BN_BITS);
 			bn_rand(b, BN_POS, BN_BITS);

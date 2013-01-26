@@ -39,6 +39,7 @@
 #include "relic_dv.h"
 #include "relic_conf.h"
 #include "relic_types.h"
+#include "relic_label.h"
 
 /*============================================================================*/
 /* Constant definitions                                                       */
@@ -1298,6 +1299,17 @@ void bn_rec_naf(signed char *naf, int *len, bn_t k, int w);
  */
 void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 		signed char u, int m, int w);
+
+/**
+ * Recodes an integer in regular fixed-length width-w NAF.
+ *
+ * @param[out] naf			- the recoded integer.
+ * @param[out] len			- the number of bytes written.
+ * @param[in] k				- the integer to recode.
+ * @param[in] n				- the length of the recoding.
+ * @param[in] w				- the window size in bits.
+ */
+void bn_rec_reg(signed char *naf, int *len, bn_t k, int n, int w);
 
 /**
  * Recodes a pair of integers in Joint Sparse Form.

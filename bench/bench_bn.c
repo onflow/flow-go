@@ -880,6 +880,14 @@ static void arith(void) {
 	}
 #endif
 
+	BENCH_BEGIN("bn_rec_reg") {
+		signed char naf[BN_BITS + 1];
+		int len;
+		bn_rand(a, BN_POS, BN_BITS);
+		BENCH_ADD(bn_rec_reg(naf, &len, a, BN_BITS, 4));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("bn_rec_jsf") {
 		signed char jsf[10 * BN_BITS];
 		int len;
