@@ -393,9 +393,6 @@ static int solve2(void) {
 			/* Verify the solution. */
 			fb2_sqr(c, b);
 			fb2_add(c, c, b);
-			fb2_print(a);
-			fb2_print(b);
-			fb2_print(c);
 			TEST_ASSERT(fb2_cmp(c, a) == CMP_EQ, end);
 		} TEST_END;
 	}
