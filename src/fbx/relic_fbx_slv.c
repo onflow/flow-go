@@ -37,26 +37,15 @@
 /*============================================================================*/
 
 void fb2_slv(fb2_t c, fb2_t a) {
-	fb_t t;
-
-	fb_null(t);
-
-	TRY {
-		fb_new(t);
-
-		/* Compute t^2 + t = a_1. */
-		fb_slv(t, a[1]);
-		/* Compute c_0 = a_0 + a_1 + t. */
-		fb_add(c[0], t, a[0]);
-		fb_add(c[0], c[0], a[1]);
-		fb_add_dig(c[0], c[0], fb_trc(t));
-		/* Make Trc(c_0) = 0. */
-		fb_slv(c[0], c[0]);
-		/* Compute c_0^2 + c_0 = c_0. */
-		fb_add_dig(c[1], t, fb_trc(t));
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fb_free(t);
-	}
+	/* Compute c_0 = a_0 + a_1. */
+	fb_add(c[0], a[0], a[1]);
+	/* Compute c_1^2 + c_1 = a_1. */
+	fb_slv(c[1], a[1]);
+	/* Compute c_0 = a_0 + a_1 + c_1 + Tr(c_1). */
+	fb_add(c[0], c[0], c[1]);
+	//fb_add_dig(c[0], c[0], fb_trc(c[1]));
+	/* Make Tr(c_0) = 0. */
+	fb_slv(c[0], c[0]);
+	/* Compute c_0^2 + c_0 = c_0. */
+	fb_add_dig(c[1], c[1], fb_trc(c[1]));
 }
