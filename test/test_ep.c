@@ -877,17 +877,6 @@ static int hashing(void) {
 			TEST_ASSERT(ep_is_infty(a) == 1, end);
 		}
 		TEST_END;
-
-		TEST_BEGIN("point hashing is consistent") {
-			rand_bytes(msg, sizeof(msg));
-			ep_rand(a);
-			ep_map(a, msg, sizeof(msg));
-			ep_rand(b);
-			ep_map(b, msg, sizeof(msg));
-			TEST_ASSERT(ep_cmp(a, b) == CMP_EQ, end);
-		}
-		TEST_END;
-
 	}
 	CATCH_ANY {
 		ERROR(end);
