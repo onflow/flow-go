@@ -670,11 +670,7 @@ void bn_rec_reg(signed char *naf, int *len, bn_t k, int n, int w) {
 			for (i = 0; i < l; i++, naf++) {
 				bn_get_dig(&t0, t);
 				u_i = (t0 & mask) - (1 << (w - 1));
-				if (u_i < 0) {
-					bn_add_dig(t, t, -u_i);
-				} else {
-					bn_sub_dig(t, t, u_i);
-				}
+				t->dp[0] -= u_i;
 				*naf = u_i;
 				bn_rsh(t, t, w - 1);
 			}
