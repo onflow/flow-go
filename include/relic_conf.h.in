@@ -432,17 +432,10 @@
 
 /** Affine coordinates. */
 #define BASIC	 1
-/** López-Dahab Projective coordinates. */
+/** Projective coordinates. */
 #define PROJC	 2
-/** Chosen binary elliptic curve coordinate method. */
+/** Chosen prime elliptic curve coordinate method. */
 #define EP_ADD	 @EP_ADD@
-
-/** Affine coordinates. */
-#define BASIC	 1
-/** López-Dahab Projective coordinates. */
-#define PROJC	 2
-/** Chosen binary elliptic curve coordinate method. */
-#define EB_ADD	 @EB_ADD@
 
 /** Binary point multiplication. */ 
 #define BASIC	 1
@@ -575,7 +568,7 @@
 /** López-Dahab Projective coordinates. */
 #define PROJC	 2
 /** Chosen binary elliptic curve coordinate method. */
-#define HB_ADD	 @EB_ADD@
+#define HB_ADD	 @HB_ADD@
 
 /** Binary point multiplication. */ 
 #define BASIC	 1
