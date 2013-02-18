@@ -165,13 +165,17 @@ static void pairing2(void) {
 #endif
 
 int main(void) {
-	int r0, r1;
-	core_init();
+	int r0 = STS_ERR, r1 = STS_ERR;
+
+	if (core_init() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
 	conf_print();
 
 	util_banner("Benchmarks for the PB module:", 0);
 
-	r0 = r1 = STS_ERR;
 #ifdef WITH_EB
 	r0 = eb_param_set_any_super();
 	if (r0 == STS_OK) {

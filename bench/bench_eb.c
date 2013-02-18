@@ -626,11 +626,13 @@ static void bench(void) {
 }
 
 int main(void) {
-	int r0, r1, r2;
+	int r0 = STS_ERR, r1 = STS_ERR, r2 = STS_ERR;
 
-	r0 = r1 = r2 = STS_ERR;
+	if (core_init() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
-	core_init();
 	conf_print();
 	util_banner("Benchmarks for the EB module:", 0);
 

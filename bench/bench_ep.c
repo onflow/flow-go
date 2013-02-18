@@ -562,13 +562,15 @@ static void bench(void) {
 }
 
 int main(void) {
-	int r0, r1;
+	int r0 = STS_ERR, r1 = STS_ERR;
 
-	core_init();
+	if (core_init() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
 	conf_print();
 	util_banner("Benchmarks for the EP module:", 0);
-
-	r0 = r1 = STS_ERR;
 
 #if defined(EP_ORDIN)
 	r0 = ep_param_set_any_ordin();
