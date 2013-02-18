@@ -61,10 +61,13 @@
 
 #elif SEED == WCGR
 
-#include <windows.h>
-#include <Wincrypt.h>
 /* Avoid redefinition warning. */
 #undef ERROR
+#undef WORD
+#undef DOUBLE
+
+#include <windows.h>
+#include <Wincrypt.h>
 
 #endif
 
