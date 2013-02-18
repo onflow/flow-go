@@ -63,14 +63,14 @@ void err_full_msg(const char *function, const char *file, int line,
 	if (error == ERR_CAUGHT) {
 		fprintf(stderr, "\tCAUGHT in %s() at %s,%d.\n", function, file, line);
 	} else {
-		void *trace[100];
-		char **symbols;
-		int n;
-
 		fprintf(stderr, "\nERROR in %s() at %s,%d: %s.\n", function, file, line,
 				ctx->reason[error]);
 
 #if OPSYS == LINUX
+		void *trace[100];
+		char **symbols;
+		int n;
+
 		/* Print the stack trace. */
 		fprintf(stderr, "\tCall stack:\n");
 		n = backtrace(trace, 100);
