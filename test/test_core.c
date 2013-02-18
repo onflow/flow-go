@@ -38,7 +38,10 @@ int main(void) {
 	int code = STS_ERR;
 
 	/* Initialize library with default configuration. */
-	core_init();
+	if (core_init() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	util_banner("Tests for the CORE module:\n", 0);
 

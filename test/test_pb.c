@@ -370,11 +370,12 @@ static int pairing2(void) {
 #endif
 
 int main(void) {
-	int r0, r1;
+	int r0 = STS_ERR, r1 = STS_ERR;
 
-	r0 = r1 = STS_ERR;
-
-	core_init();
+	if (core_init() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	fb_param_set_any();
 

@@ -60,7 +60,10 @@ int main(void) {
 	char *msg = NULL;
 	int code = STS_ERR;
 
-	core_init();
+	if (core_init() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	util_banner("Tests for the ERR module:\n", 0);
 

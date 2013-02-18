@@ -335,7 +335,10 @@ static int mgf(void) {
 }
 
 int main(void) {
-	core_init();
+	if (core_init() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	util_banner("Tests for the MD module:\n", 0);
 

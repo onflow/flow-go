@@ -1064,8 +1064,12 @@ static int test(void) {
 }
 
 int main(void) {
-	int r0 = STS_OK, r1 = STS_OK, r2 = STS_OK;
-	core_init();
+	int r0 = STS_ERR, r1 = STS_ERR, r2 = STS_ERR;
+
+	if (core_init() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	util_banner("Tests for the EB module:", 0);
 

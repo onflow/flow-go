@@ -582,17 +582,22 @@ int test(void) {
 }
 
 int main(void) {
-	core_init();
+	if (core_init() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	util_banner("Tests for the EC module:", 0);
 
-	if (ec_param_set_any() == STS_OK) {
-		if (test() != STS_OK) {
-			core_clean();
-			return 1;
-		}
-	} else {
+	if (ec_param_set_any() == STS_ERR) {
 		THROW(ERR_NO_CURVE);
+		core_clean();
+		return 0;
+	}
+
+	if (test() != STS_OK) {
+		core_clean();
+		return 1;
 	}
 
 	util_banner("All tests have passed.\n", 0);

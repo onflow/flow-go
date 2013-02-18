@@ -915,7 +915,11 @@ static int test(void) {
 
 int main(void) {
 	int r0 = STS_ERR;
-	core_init();
+
+	if (core_init() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
 	util_banner("Tests for the HB module:", 0);
 
