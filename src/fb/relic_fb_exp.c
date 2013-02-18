@@ -80,7 +80,7 @@ void fb_exp_basic(fb_t c, fb_t a, bn_t b) {
 void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 	fb_t tab[1 << (FB_WIDTH - 1)], t;
 	int i, j, l;
-	unsigned char win[FB_BITS];
+	unsigned char win[FB_BITS + 1];
 
 	fb_null(t);
 
