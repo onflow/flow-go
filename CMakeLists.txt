@@ -130,7 +130,7 @@ message("   TIMER=ANSI     ANSI-compatible timer.")
 message("   TIMER=POSIX    POSIX-compatible timer.")
 message("   TIMER=CYCLE    Cycle-counting timer. (architecture-dependant)\n")
 
-message(STATUS "Prefix to identity this build of the library (default = ""):")
+message(STATUS "Prefix to identify this build of the library (default = ""):")
 message("   LABEL=relic\n")
 
 include(cmake/bn.cmake)
@@ -361,7 +361,7 @@ set(CMAKE_C_FLAGS "-pipe -std=c99 ${WFLAGS} ${DFLAGS} ${PFLAGS} ${CFLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS ${LFLAGS})
 
 message(STATUS "Compiler flags: -pipe -std=c99 -pedantic ${WFLAGS} ${DFLAGS} ${PFLAGS} ${CFLAGS}")
-message(STATUS "Linker flags: ${LFLAGS}\n")
+message(STATUS "Linker flags: ${LFLAGS}")
 
 string(TOUPPER ${ARITH} ARITH)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/relic_conf.h.in
