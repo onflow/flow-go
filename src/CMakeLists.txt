@@ -174,5 +174,3 @@ if (STLIB)
 	target_link_libraries(${RELIC_S} ${ARITH_LIBS})
 	LINK_LIBS(${RELIC_S})
 endif(STLIB)
-
-message("${RELIC}")
