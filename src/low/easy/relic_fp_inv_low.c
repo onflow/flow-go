@@ -30,6 +30,7 @@
  */
 
 #include "relic_bn.h"
+#include "relic_bn_low.h"
 #include "relic_fp.h"
 #include "relic_fp_low.h"
 #include "relic_core.h"
@@ -40,5 +41,14 @@
 /*============================================================================*/
 
 void fp_invn_low(dig_t *c, dig_t *a) {
-	fp_inv_basic(c, a);
+	bn_st e;
+
+	bn_init(&e, FP_DIGS);
+
+	e.used = FP_DIGS;
+	dv_copy(e.dp, fp_prime_get(), FP_DIGS);
+	bn_sub1_low(e.dp, e.dp, 2, FP_DIGS);
+	fp_exp(c, a, &e);
+
+	bn_clean(&e);
 }

@@ -39,8 +39,8 @@
 
 void fb_invn_low(dig_t *c, dig_t *a) {
 	int j, d, lu, lv, lt, l1, l2, bu, bv;
-	align dig_t _u[2 * FB_DIGS], _v[2 * FB_DIGS], _g1[2 * FB_DIGS],
-			_g2[2 * FB_DIGS];
+	align dig_t _u[2 * FB_DIGS], _v[2 * FB_DIGS];
+	align dig_t _g1[2 * FB_DIGS], _g2[2 * FB_DIGS];
 	dig_t *t = NULL, *u = NULL, *v = NULL, *g1 = NULL, *g2 = NULL, carry;
 
 	dv_zero(_g1, FB_DIGS + 1);
