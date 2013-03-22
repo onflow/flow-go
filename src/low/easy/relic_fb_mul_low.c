@@ -204,6 +204,7 @@ void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size) {
 		}
 		bn_lshb_low(c, c, 2 * size, 4);
 	}
+
 	for (j = 0; j < size; j++, a++, c++) {
 		u = *a & 0x0F;
 		fb_addd_low(c, c, t[u], size + 1);
