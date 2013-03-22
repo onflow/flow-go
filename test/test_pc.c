@@ -1350,15 +1350,9 @@ int test(void) {
 }
 
 int main(void) {
-	if (ep_param_set_any() == STS_ERR) {
-		THROW(ERR_NO_CURVE);
+	if (core_init() != STS_OK) {
 		core_clean();
-		return 0;
-	} else {
-		if (test() != STS_OK) {
-			core_clean();
-			return 1;
-		}
+		return 1;
 	}
 
 	util_banner("Tests for the PC module:", 0);
