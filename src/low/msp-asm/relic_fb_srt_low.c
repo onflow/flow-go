@@ -255,7 +255,8 @@ static void fb_sqrt_low(dig_t *c, dig_t *a) {
 		t_o[n] = d_o;
 	}
 	if (fb_poly_tab_srz(0) == NULL) {
-		fb_muld_low(t + HALF, t_o, fb_poly_get_srz() + HALF, HALF);
+		dv_copy(s, fb_poly_get_srz() + HALF, FB_DIGS - HALF);
+		fb_muld_low(t + HALF, t_o, s, HALF);
 		fb_muld_low(s, t_o, fb_poly_get_srz(), HALF);
 		fb_addd_low(t, t, s, FB_DIGS + 1);
 		fb_rdcn_low(c, t);
