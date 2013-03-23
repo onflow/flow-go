@@ -285,14 +285,15 @@ set(RAND "FIPS" CACHE STRING "Pseudo-random number generator")
 set(SEED "DEV" CACHE STRING "Random number generator seeder")
 
 # Compiler flags.
-set(COMP "$ENV{COMP}" CACHE STRING "User-chosen compiler flags.")
-set(COMP "-O2 -funroll-loops -fomit-frame-pointer" CACHE STRING "User-chosen compiler flags.")
+if("$ENV{COMP}" STREQUAL "")
+	set(COMP "-O2 -funroll-loops -fomit-frame-pointer" CACHE STRING "User-chosen compiler flags.")
+else("$ENV{COMP}" STREQUAL "")
+	set(COMP "$ENV{COMP}" CACHE STRING "User-chosen compiler flags.")
+endif("$ENV{COMP}" STREQUAL "")
 
 # Simulator of the target platform.
 set(SIMP "$ENV{SIMP}" CACHE STRING "Path to call a simulator of the target platform.")
-set(SIMP "" CACHE STRING "Path to call a simulator of the target platform.")
 set(SIMA "$ENV{SIMA}" CACHE STRING "Arguments to call a simulator of the target platform.")
-set(SIMA "" CACHE STRING "Arguments to call a simulator of the target platform.")
 
 # Linker flags.
 string(TOLOWER ${ARITH} LFLAGS)
@@ -394,3 +395,4 @@ endif(BENCH GREATER 0)
 
 # Choose the arithmetic backend.
 set(LABEL "" CACHE STRING "Build label")
+
