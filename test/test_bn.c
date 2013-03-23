@@ -1533,7 +1533,7 @@ static int factor(void) {
 			if (bn_factor(q, n) == 1) {
 				TEST_ASSERT(bn_is_factor(q, n) == 1, end);
 			} else {
-				TEST_ASSERT(bn_is_factor(q, n) == 0, end);
+				TEST_ASSERT(bn_is_factor(p, n) == 1, end);
 			}
 		} TEST_END;
 	}
