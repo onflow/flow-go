@@ -360,7 +360,7 @@ endif(ARITH STREQUAL "gmp")
 set(CMAKE_C_FLAGS "-pipe -std=c99 ${WFLAGS} ${DFLAGS} ${PFLAGS} ${CFLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS ${LFLAGS})
 
-message(STATUS "Compiler flags: -pipe -std=c99 -pedantic ${WFLAGS} ${DFLAGS} ${PFLAGS} ${CFLAGS}")
+message(STATUS "Compiler flags: ${CMAKE_C_FLAGS}")
 message(STATUS "Linker flags: ${LFLAGS}")
 
 string(TOUPPER ${ARITH} ARITH)
