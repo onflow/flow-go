@@ -78,8 +78,9 @@ void bn_zero(bn_t a) {
 	a->sign = BN_POS;
 	a->used = 1;
 	tmp = a->dp;
-	for (i = 0; i < a->alloc; i++, tmp++)
+	for (i = 0; i < a->alloc; i++, tmp++) {
 		*tmp = 0;
+	}
 }
 
 int bn_is_zero(bn_t a) {
