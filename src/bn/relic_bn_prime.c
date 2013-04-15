@@ -41,7 +41,7 @@
 /**
  * Number of trial division tests.
  */
-#define BASIC_TESTS	((int)(sizeof(primes)/(BN_DIGIT / 8)))
+#define BASIC_TESTS	((int)(sizeof(primes)/sizeof(dig_t)))
 
 /**
  * Small prime numbers table.
@@ -170,6 +170,13 @@ static void bn_exp(bn_t c, bn_t a, bn_t b, bn_t m) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
+dig_t bn_get_prime(int pos) {
+	if (pos >= BASIC_TESTS) {
+		return 0;
+	}
+	return primes[pos];
+}
+
 int bn_is_prime(bn_t a) {
 	int result;
 
@@ -200,7 +207,7 @@ int bn_is_prime_basic(bn_t a) {
 	/* Trial division. */
 	for (i = 0; i < BASIC_TESTS; i++) {
 		bn_mod_dig(&t, a, primes[i]);
-		if (t == 0) {
+		if (t == 0 && bn_cmp_dig(a, primes[i]) != CMP_EQ) {
 			result = 0;
 			break;
 		}
