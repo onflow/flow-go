@@ -109,8 +109,6 @@ void bench_overhead(void) {
 void bench_reset() {
 #if TIMER != NONE
 	core_get()->total = 0;
-#else
-	(void)empty;
 #endif
 }
 
