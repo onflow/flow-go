@@ -235,15 +235,6 @@ static void arith(void) {
 	}
 }
 
-static void bench(void) {
-	ec_param_print();
-	util_banner("Utilities:", 1);
-	memory();
-	util();
-	util_banner("Arithmetic:", 1);
-	arith();
-}
-
 int main(void) {
 	if (core_init() != STS_OK) {
 		core_clean();
@@ -253,11 +244,20 @@ int main(void) {
 	conf_print();
 	util_banner("Benchmarks for the EC module:", 0);
 
-	if (ec_param_set_any() == STS_OK) {
-		bench();
-	} else {
+	if (ec_param_set_any() != STS_OK) {
 		THROW(ERR_NO_CURVE);
+		core_clean();
+		return 0;
 	}
+
+	ec_param_print();
+
+	util_banner("Utilities:", 1);
+	memory();
+	util();
+
+	util_banner("Arithmetic:", 1);
+	arith();
 
 	core_clean();
 	return 0;

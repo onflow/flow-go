@@ -1416,60 +1416,60 @@ int main(void) {
 
 	util_banner("Benchmarks for the FPX module:", 0);
 
-	if (fp_param_set_any_tower() == STS_OK) {
-
-		fp_param_print();
-
-		if (fp_prime_get_qnr()) {
-			util_banner("Quadratic extension:", 0);
-			util_banner("Utilities:", 1);
-			memory2();
-			util2();
-
-			util_banner("Arithmetic:", 1);
-			arith2();
-		}
-
-		if (fp_prime_get_cnr()) {
-			util_banner("Cubic extension:", 0);
-			util_banner("Utilities:", 1);
-			memory3();
-			util3();
-
-			util_banner("Arithmetic:", 1);
-			arith3();
-		}
-
-		if (fp_prime_get_qnr()) {
-			util_banner("Sextic extension:", 0);
-			util_banner("Utilities:", 1);
-			memory6();
-			util6();
-
-			util_banner("Arithmetic:", 1);
-			arith6();
-
-			util_banner("Dodecic extension:", 0);
-			util_banner("Utilities:", 1);
-			memory12();
-			util12();
-
-			util_banner("Arithmetic:", 1);
-			arith12();
-		}
-
-		if (fp_prime_get_qnr() == fp_prime_get_cnr()) {
-			util_banner("Octodecic extension:", 0);
-			util_banner("Utilities:", 1);
-			memory18();
-			util18();
-
-			util_banner("Arithmetic:", 1);
-			arith18();
-		}
-
-	} else {
+	if (fp_param_set_any_tower() != STS_OK) {
 		THROW(ERR_NO_CURVE);
+		core_clean();
+		return 0;
+	}
+
+	fp_param_print();
+
+	if (fp_prime_get_qnr()) {
+		util_banner("Quadratic extension:", 0);
+		util_banner("Utilities:", 1);
+		memory2();
+		util2();
+
+		util_banner("Arithmetic:", 1);
+		arith2();
+	}
+
+	if (fp_prime_get_cnr()) {
+		util_banner("Cubic extension:", 0);
+		util_banner("Utilities:", 1);
+		memory3();
+		util3();
+
+		util_banner("Arithmetic:", 1);
+		arith3();
+	}
+
+	if (fp_prime_get_qnr()) {
+		util_banner("Sextic extension:", 0);
+		util_banner("Utilities:", 1);
+		memory6();
+		util6();
+
+		util_banner("Arithmetic:", 1);
+		arith6();
+
+		util_banner("Dodecic extension:", 0);
+		util_banner("Utilities:", 1);
+		memory12();
+		util12();
+
+		util_banner("Arithmetic:", 1);
+		arith12();
+	}
+
+	if (fp_prime_get_qnr() == fp_prime_get_cnr()) {
+		util_banner("Octodecic extension:", 0);
+		util_banner("Utilities:", 1);
+		memory18();
+		util18();
+
+		util_banner("Arithmetic:", 1);
+		arith18();
 	}
 
 	core_clean();

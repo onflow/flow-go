@@ -1003,10 +1003,9 @@ int main(void) {
 	if (r0 == STS_ERR) {
 		if (hb_param_set_any() == STS_ERR) {
 			THROW(ERR_NO_CURVE);
-			core_clean();
-			return 1;
 		}
 	}
+
 	core_clean();
 	return 0;
 }
