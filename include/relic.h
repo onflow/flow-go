@@ -41,7 +41,6 @@
 #include "relic_fpx.h"
 #include "relic_fb.h"
 #include "relic_fbx.h"
-#include "relic_ft.h"
 #include "relic_ep.h"
 #include "relic_eb.h"
 #include "relic_ec.h"

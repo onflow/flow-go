@@ -99,8 +99,6 @@
 #cmakedefine WITH_FP
 /** Build binary field module. */
 #cmakedefine WITH_FB
-/** Build ternary field module. */
-#cmakedefine WITH_FT
 /** Build prime elliptic curve module. */
 #cmakedefine WITH_EP
 /** Build binary elliptic curve module. */
@@ -367,50 +365,6 @@
 #define QUICK	 2
 /** Chosen method to solve a quadratic equation. */
 #define FB_ITR   @FB_ITR@
-
-/** Irreducible polynomial size in bits. */
-#define FT_POLYN @FT_POLYN@
-/** Number of Karatsuba steps. */
-#define FT_KARAT @FT_KARAT@
-/** Prefer trinomials over pentanomials. */
-#cmakedefine FT_TRINO
-/** Precompute multiplication table for cbrt(z). */
-#cmakedefine FT_PRECO
-
-/** Ternary field arithmetic method */
-#define FT_METHD "@FT_METHD@"
-
-/** Shift-and-add multiplication. */
-#define BASIC    1
-/** Lopez-Dahab multiplication. */
-#define LODAH	 2
-/** Integrated modular multiplication. */
-#define INTEG	 3
-/** Chosen ternary field multiplication method. */
-#define FT_MUL   @FT_MUL@
-
-/** Basic cubing. */
-#define BASIC    1
-/** Table-based cubing. */
-#define TABLE    2
-/** Integrated modular cubing. */
-#define INTEG	 3
-/** Chosen ternary field cubing method. */
-#define FT_CUB   @FT_CUB@
-
-/** Shift-and-add modular reduction. */
-#define BASIC    1
-/** Fast reduction modulo a trinomial or pentanomial. */
-#define QUICK	 2
-/** Chosen ternary field modular reduction method. */
-#define FT_RDC   @FT_RDC@
-
-/** Square root by repeated cubing. */
-#define BASIC    1
-/** Fast cube root extraction. */
-#define QUICK	 2
-/** Chosen binary field modular reduction method. */
-#define FT_CRT   @FT_CRT@
 
 /** Support for ordinary curves. */
 #cmakedefine EP_ORDIN
