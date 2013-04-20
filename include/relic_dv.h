@@ -64,21 +64,12 @@
 #endif
 
 /**
- * Size in digits of a cubing result in a ternary field.
- */
-#ifdef WITH_FT
-#define DV_FT	(6 * ((int)((FT_POLYN)/(DIGIT) + (FT_POLYN % DIGIT > 0))))
-#else
-#define DV_FT	(0)
-#endif
-
-/**
  * Size in digits of a temporary vector.
  *
  * A temporary vector has enough size to store a multiplication/squaring/cubing
  * result in any finite field.
  */
-#define DV_DIGS		MAX(MAX(DV_FB, DV_FP), DV_FT)
+#define DV_DIGS		MAX(DV_FB, DV_FP)
 
 /**
  * Size in bytes of a temporary vector.

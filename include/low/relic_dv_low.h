@@ -59,15 +59,6 @@
 #endif
 
 /**
- * Size in digits of a cubing result in a ternary field.
- */
-#ifdef WITH_FT
-#define DV_FT	(6 * FT_DIGS)
-#else
-#define DV_FT	(0)
-#endif
-
-/**
  * Size in digits of a temporary vector.
  *
  * A temporary vector has enough size to store a multiplication/squaring/cubing
@@ -77,11 +68,6 @@
 #define DV_DIGS	DV_FB
 #else
 #define DV_DIGS	DV_FP
-#endif
-
-#if DV_FT > DV_DIGS
-#undef DV_DIGS
-#define DV_DIGS	DV_FT
 #endif
 
 #endif /* !RELIC_DV_LOW_H */
