@@ -45,7 +45,6 @@
 #include "relic_bn.h"
 #include "relic_eb.h"
 #include "relic_hb.h"
-#include "relic_ft.h"
 #include "relic_epx.h"
 #include "relic_conf.h"
 #include "relic_bench.h"
