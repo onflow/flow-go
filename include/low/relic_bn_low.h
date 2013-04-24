@@ -49,6 +49,14 @@
 #define BN_DIGS	(BN_PRECI/WORD)
 #endif
 
+#if BN_MAGNI == DOUBLE
+#define BN_SIZE	(2 * BN_DIGS + 2)
+#elif BN_MAGNI == CARRY
+#define BN_SIZE	((BN_DIGS + 1)
+#elif BN_MAGNI == SINGLE
+#define BN_SIZE	(BN_DIGS)
+#endif
+
 #else
 
 #include "relic_types.h"

@@ -32,6 +32,7 @@
 #ifndef RELIC_DV_LOW_H
 #define RELIC_DV_LOW_H
 
+#include "relic_bn_low.h"
 #include "relic_fb_low.h"
 #include "relic_fp_low.h"
 #include "relic_ft_low.h"
@@ -39,6 +40,8 @@
 /*============================================================================*/
 /* Constant definitions                                                       */
 /*============================================================================*/
+
+#ifdef ASM
 
 /**
  * Size in digits of a squaring result in a prime field.
@@ -69,5 +72,12 @@
 #else
 #define DV_DIGS	DV_FP
 #endif
+
+#if BN_SIZE > DV_DIGS
+#undef DV_DIGS
+#define DV_DIGS BN_SIZE
+#endif
+
+#endif /* ASM */
 
 #endif /* !RELIC_DV_LOW_H */

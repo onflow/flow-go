@@ -37,6 +37,7 @@
 #ifndef RELIC_DV_H
 #define RELIC_DV_H
 
+#include "relic_bn.h"
 #include "relic_conf.h"
 #include "relic_types.h"
 #include "relic_util.h"
@@ -66,10 +67,10 @@
 /**
  * Size in digits of a temporary vector.
  *
- * A temporary vector has enough size to store a multiplication/squaring/cubing
- * result in any finite field.
+ * A temporary vector has enough size to store a multiplication/squaring result
+ * produced by any module.
  */
-#define DV_DIGS		MAX(DV_FB, DV_FP)
+#define DV_DIGS		MAX(MAX(DV_FP, DV_FB), BN_SIZE)
 
 /**
  * Size in bytes of a temporary vector.
