@@ -50,6 +50,11 @@ void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m) {
 	int i, l;
 	bn_t t, u, r;
 
+	if (bn_is_zero(b)) {
+		bn_set_dig(c, 1);
+		return;
+	}
+
 	bn_null(t);
 	bn_null(u);
 	bn_null(r);
@@ -264,3 +269,58 @@ void bn_mxp_monty(bn_t c, bn_t a, bn_t b, bn_t m) {
 }
 
 #endif
+
+void bn_mxp_dig(bn_t c, bn_t a, dig_t b, bn_t m) {
+	int i, l;
+	bn_t t, u, r;
+
+	if (b == 0) {
+		bn_set_dig(c, 1);
+		return;
+	}
+
+	bn_null(t);
+	bn_null(u);
+	bn_null(r);
+
+	TRY {
+		bn_new(t);
+		bn_new(u);
+		bn_new(r);
+
+		bn_mod_pre(u, m);
+
+		l = util_bits_dig(b);
+
+#if BN_MOD == MONTY
+		bn_mod_monty_conv(t, a, m);
+#else
+		bn_copy(t, a);
+#endif
+
+		bn_copy(r, t);
+
+		for (i = l - 2; i >= 0; i--) {
+			bn_sqr(r, r);
+			bn_mod(r, r, m, u);
+			if (b & ((dig_t)1 << i)) {
+				bn_mul(r, r, t);
+				bn_mod(r, r, m, u);
+			}
+		}
+
+#if BN_MOD == MONTY
+		bn_mod_monty_back(c, r, m);
+#else
+		bn_copy(c, r);
+#endif
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
+		bn_free(u);
+		bn_free(r);
+	}
+}

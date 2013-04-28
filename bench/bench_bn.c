@@ -634,15 +634,6 @@ static void arith(void) {
 
 #if BN_MXP == BASIC || !defined(STRIP)
 	BENCH_BEGIN("bn_mxp_basic") {
-#if BN_MOD != PMERS
-		if (bn_is_even(b)) {
-			bn_add_dig(b, b, 1);
-		}
-#else
-		bn_set_2b(b, BN_BITS);
-		bn_rand(c, BN_POS, BN_DIGIT);
-		bn_sub(b, b, c);
-#endif
 		bn_mod(a, a, b);
 		BENCH_ADD(bn_mxp_basic(c, a, b, b));
 	}
@@ -652,16 +643,6 @@ static void arith(void) {
 #if BN_MXP == SLIDE || !defined(STRIP)
 	BENCH_BEGIN("bn_mxp_slide") {
 		bn_rand(a, BN_POS, 2 * BN_BITS - BN_DIGIT / 2);
-		bn_rand(b, BN_POS, BN_BITS);
-#if BN_MOD != PMERS
-		if (bn_is_even(b)) {
-			bn_add_dig(b, b, 1);
-		}
-#else
-		bn_set_2b(b, BN_BITS);
-		bn_rand(c, BN_POS, BN_DIGIT);
-		bn_sub(b, b, c);
-#endif
 		bn_mod(a, a, b);
 		BENCH_ADD(bn_mxp_slide(c, a, b, b));
 	}
@@ -671,21 +652,19 @@ static void arith(void) {
 #if BN_MXP == CONST || !defined(STRIP)
 	BENCH_BEGIN("bn_mxp_monty") {
 		bn_rand(a, BN_POS, 2 * BN_BITS - BN_DIGIT / 2);
-		bn_rand(b, BN_POS, BN_BITS);
-#if BN_MOD != PMERS
-		if (bn_is_even(b)) {
-			bn_add_dig(b, b, 1);
-		}
-#else
-		bn_set_2b(b, BN_BITS);
-		bn_rand(c, BN_POS, BN_DIGIT);
-		bn_sub(b, b, c);
-#endif
 		bn_mod(a, a, b);
 		BENCH_ADD(bn_mxp_monty(c, a, b, b));
 	}
 	BENCH_END;
 #endif
+
+	BENCH_BEGIN("bn_mxp_dig") {
+		bn_rand(a, BN_POS, BN_BITS);
+		bn_rand(d, BN_POS, BN_DIGIT);
+		bn_get_dig(&f, d);
+		BENCH_ADD(bn_mxp_dig(c, a, f, b));
+	}
+	BENCH_END;
 
 	BENCH_BEGIN("bn_gcd") {
 		bn_rand(a, BN_POS, BN_BITS);

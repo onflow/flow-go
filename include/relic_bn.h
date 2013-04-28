@@ -1012,7 +1012,7 @@ void bn_mod_pre_pmers(bn_t u, bn_t m);
 void bn_mod_pmers(bn_t c, bn_t a, bn_t m, bn_t u);
 
 /**
- * Exponentiates a multiple precision integer modulo a modulus using the Binary
+ * Exponentiates a multiple precision integer modulo a modulus using the binary
  * method.
  *
  * @param[out] c			- the result.
@@ -1024,7 +1024,7 @@ void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m);
 
 /**
  * Exponentiates a multiple precision integer modulo a modulus using the
- * Sliding window method.
+ * sliding window method.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the basis.
@@ -1043,6 +1043,17 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m);
  * @param[in] m				- the modulus.
  */
 void bn_mxp_monty(bn_t c, bn_t a, bn_t b, bn_t m);
+
+/**
+ * Exponentiates a multiple precision integer by a small power modulo a modulus
+ * using the binary method.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ * @param[in] m				- the modulus.
+ */
+void bn_mxp_dig(bn_t c, bn_t a, dig_t b, bn_t m);
 
 /**
  * Computes the greatest common divisor of two multiple precision integers

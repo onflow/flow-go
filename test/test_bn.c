@@ -913,7 +913,7 @@ static int reduction(void) {
 	return code;
 }
 
-static int mxp(void) {
+static int exponentiation(void) {
 	int code = STS_ERR;
 	bn_t a, b, p;
 
@@ -940,6 +940,14 @@ static int mxp(void) {
 			bn_mod(a, a, p);
 			bn_mxp(b, a, p, p);
 			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("modular exponentiation with zero power is correct") {
+			bn_rand(a, BN_POS, BN_BITS);
+			bn_zero(b);
+			bn_mxp(a, a, b, p);
+			TEST_ASSERT(bn_cmp_dig(a, 1) == CMP_EQ, end);
 		}
 		TEST_END;
 
@@ -1437,6 +1445,25 @@ static int digit(void) {
 			TEST_ASSERT(bn_cmp(c, d) == CMP_EQ, end);
 		}
 		TEST_END;
+
+#if BN_MOD != PMERS
+		bn_gen_prime(d, BN_BITS);
+#elif BN_PRECI >= 128
+		/* Let's try a Mersenne prime. */
+		bn_zero(d);
+		bn_set_bit(d, 127, 1);
+		bn_sub(p, p, 1);
+#endif
+
+		TEST_BEGIN("modular exponentiation with a digit is consistent") {
+			bn_rand(a, BN_POS, BN_BITS);
+			bn_rand(b, BN_POS, BN_DIGIT);
+			bn_get_dig(&g, b);
+			bn_mxp(c, a, b, d);
+			bn_mxp_dig(e, a, g, d);
+			TEST_ASSERT(bn_cmp(c, e) == CMP_EQ, end);
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -1767,7 +1794,7 @@ int main(void) {
 		return 1;
 	}
 
-	if (mxp() != STS_OK) {
+	if (exponentiation() != STS_OK) {
 		core_clean();
 		return 1;
 	}
