@@ -44,6 +44,7 @@ dig_t fb_lshadd4_low(dig_t *c, dig_t *a, int size);
 dig_t fb_lshadd5_low(dig_t *c, dig_t *a, int size);
 dig_t fb_lshadd6_low(dig_t *c, dig_t *a, int size);
 dig_t fb_lshadd7_low(dig_t *c, dig_t *a, int size);
+dig_t fb_lshadd8_low(dig_t *c, dig_t *a, int size);
 
 dig_t fb_lsh1_low(dig_t *c, dig_t *a) {
 	int i;
@@ -157,7 +158,7 @@ dig_t fb_lshadd_low(dig_t *c, dig_t *a, int bits, int size) {
 
 	switch (bits) {
 	case 0:
-		return;
+		return 0;
 	case 1:
 		return fb_lshadd1_low(c, a, size);
 	case 2:
