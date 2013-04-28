@@ -44,7 +44,6 @@ void fp_invn_low(dig_t *c, dig_t *a) {
 	bn_t bna;
 	bn_t gcd;
 	bn_t bnp;
-	int i;
 	dig_t *p;
 
 	bn_null(bnc);
@@ -81,7 +80,7 @@ void fp_invn_low(dig_t *c, dig_t *a) {
 	fp_prime_conv(c, bnc);
 #else
 	dv_copy(c, bnc->dp, bnc->used);
-	for (i = bnc->used; i < FP_DIGS; i++) {
+	for (int i = bnc->used; i < FP_DIGS; i++) {
 		c[i] = 0;
 	}
 #endif
