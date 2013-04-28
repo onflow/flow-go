@@ -47,5 +47,6 @@
 #include "relic_fb_rdc_low_271.s"
 #elif FB_POLYN == 353
 #include "relic_fb_rdc_low_353.s"
-#else "Field not supported"
+#else 
+#error "Field not supported"
 #endif
