@@ -152,37 +152,6 @@ static int rsa(void) {
 	return code;
 }
 
-static int drsa(void) {
-	int code = STS_ERR;
-	rsa_t pub, prv;
-	dig_t in, out;
-	unsigned char buf[BN_BITS / 8 + 1];
-	int len;
-	int result;
-
-	rsa_null(pub);
-	rsa_null(prv);
-
-	TRY {
-		rsa_new(pub);
-		rsa_new(prv);
-
-		result = cp_drsa_gen(pub, prv, BN_BITS);
-
-		TEST_BEGIN("distributed rsa signature is correct") {
-			TEST_ASSERT(result == STS_OK, end);
-		} TEST_END;
-	} CATCH_ANY {
-		ERROR(end);
-	}
-	code = STS_OK;
-
-  end:
-	rsa_free(pub);
-	rsa_free(prv);
-	return code;
-}
-
 static int rabin(void) {
 	int code = STS_ERR;
 	rabin_t pub, prv;
@@ -219,44 +188,6 @@ static int rabin(void) {
   end:
 	rabin_free(pub);
 	rabin_free(prv);
-	return code;
-}
-
-static int bdpe(void) {
-	int code = STS_ERR;
-	bdpe_t pub, prv;
-	dig_t in, out;
-	unsigned char buf[BN_BITS / 8 + 1];
-	int len;
-	int result;
-
-	bdpe_null(pub);
-	bdpe_null(prv);
-
-	TRY {
-		bdpe_new(pub);
-		bdpe_new(prv);
-
-		result = cp_bdpe_gen(pub, prv, bn_get_prime(47), BN_BITS);
-
-		TEST_BEGIN("benaloh encryption/decryption is correct") {
-			TEST_ASSERT(result == STS_OK, end);
-			len = BN_BITS / 8 + 1;
-			rand_bytes(buf, 1);
-			in = buf[0] % bn_get_prime(47);
-			TEST_ASSERT(cp_bdpe_enc(buf, &len, in, pub) == STS_OK,
-					end);
-			TEST_ASSERT(cp_bdpe_dec(&out, buf, len, prv) == STS_OK, end);
-			TEST_ASSERT(in == out, end);
-		} TEST_END;
-	} CATCH_ANY {
-		ERROR(end);
-	}
-	code = STS_OK;
-
-  end:
-	bdpe_free(pub);
-	bdpe_free(prv);
 	return code;
 }
 
@@ -656,22 +587,12 @@ int main(void) {
 #if defined(WITH_BN)
 	util_banner("Protocols based on prime factorization:\n", 0);
 
-//	if (rsa() != STS_OK) {
-//		core_clean();
-//		return 1;
-//	}
-//
-//	if (rabin() != STS_OK) {
-//		core_clean();
-//		return 1;
-//	}
-
-	if (drsa() != STS_OK) {
+	if (rsa() != STS_OK) {
 		core_clean();
 		return 1;
 	}
 
-	if (bdpe() != STS_OK) {
+	if (rabin() != STS_OK) {
 		core_clean();
 		return 1;
 	}
