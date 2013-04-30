@@ -148,6 +148,7 @@ void bench_after() {
 	ctx->total += result;
 #else
 	(void)result;
+	(void)ctx;
 #endif
 }
 
@@ -160,6 +161,7 @@ void bench_compute(int benches) {
 #endif /* OVERH */
 #else
 	(void)benches;
+	(void)ctx;
 #endif /* TIMER != NONE */
 }
 
