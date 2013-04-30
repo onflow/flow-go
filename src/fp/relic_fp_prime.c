@@ -321,6 +321,7 @@ void fp_prime_set(bn_t p) {
 		}
 #endif
 
+#if FP_RDC == MONTY
 		bn_mod_pre_monty(t, &(ctx->prime));
 		ctx->u = t->dp[0];
 		dv_zero(s, 2 * FP_DIGS);
@@ -333,7 +334,7 @@ void fp_prime_set(bn_t p) {
 		bn_set_dig(&(ctx->one), 1);
 		bn_lsh(&(ctx->one), &(ctx->one), ctx->prime.used * BN_DIGIT);
 		bn_mod(&(ctx->one), &(ctx->one), &(ctx->prime));
-
+#endif
 		fp_prime_calc();
 	}
 	CATCH_ANY {

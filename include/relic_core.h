@@ -301,10 +301,12 @@ typedef struct _ctx_t {
 	int fp_id;
 	/** Currently configured prime modulus. */
 	bn_st prime;
+#if FP_RDC == MONTY || !defined(STRIP)
 	/** Value (R^2 mod p) for converting small integers to Montgomery form. */
 	bn_st conv;
 	/** Value of constant one in Montgomery form. */
 	bn_st one;
+#endif /* FP_RDC */
 	/** Prime modulus modulo 8. */
 	dig_t mod8;
 	/** Value derived from the prime used for modular reduction. */
