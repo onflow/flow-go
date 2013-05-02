@@ -176,11 +176,14 @@ static void bn_mul_karat_imp(bn_t c, bn_t a, bn_t b, int level) {
 void bn_mul_dig(bn_t c, bn_t a, dig_t b) {
 	dig_t carry;
 
-	bn_grow(c, a->used + 1);
-	carry = bn_mul1_low(c->dp, a->dp, b, a->used);
-	c->dp[a->used] = carry;
-	c->used = a->used + 1;
+	c->used = a->used;
 	c->sign = a->sign;
+	carry = bn_mul1_low(c->dp, a->dp, b, a->used);
+	if (carry) {
+		bn_grow(c, a->used + 1);
+		c->dp[a->used] = carry;
+		c->used = a->used + 1;
+	}
 	bn_trim(c);
 }
 
