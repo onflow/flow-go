@@ -234,11 +234,11 @@ void fp_prime_clean() {
 	ctx->fp_id = ctx->sps_len = 0;
 	memset(ctx->sps, 0, sizeof(ctx->sps));
 	memset(ctx->var, 0, sizeof(ctx->var));
-	bn_clean(&(ctx->one));
 #if FP_RDC == MONTY || !defined(STRIP)
+	bn_clean(&(ctx->one));
 	bn_clean(&(ctx->conv));
-	bn_clean(&(ctx->prime));
 #endif
+	bn_clean(&(ctx->prime));
 }
 
 dig_t *fp_prime_get(void) {
