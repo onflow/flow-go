@@ -223,8 +223,10 @@ void fp_prime_init() {
 	memset(ctx->sps, 0, sizeof(ctx->sps));
 	memset(ctx->var, 0, sizeof(ctx->var));
 	bn_init(&(ctx->prime), FP_DIGS);
+#if FP_RDC == MONTY || !defined(STRIP)
 	bn_init(&(ctx->conv), FP_DIGS);
 	bn_init(&(ctx->one), FP_DIGS);
+#endif
 }
 
 void fp_prime_clean() {
@@ -233,8 +235,10 @@ void fp_prime_clean() {
 	memset(ctx->sps, 0, sizeof(ctx->sps));
 	memset(ctx->var, 0, sizeof(ctx->var));
 	bn_clean(&(ctx->one));
+#if FP_RDC == MONTY || !defined(STRIP)
 	bn_clean(&(ctx->conv));
 	bn_clean(&(ctx->prime));
+#endif
 }
 
 dig_t *fp_prime_get(void) {
@@ -261,7 +265,11 @@ int *fp_prime_get_sps(int *len) {
 }
 
 dig_t *fp_prime_get_conv(void) {
+#if FP_RDC == MONTY || !defined(STRIP)
 	return core_get()->conv.dp;
+#else
+	return NULL;
+#endif
 }
 
 dig_t fp_prime_get_mod8() {
