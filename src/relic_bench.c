@@ -35,7 +35,12 @@
 #include "relic_core.h"
 #include "relic_conf.h"
 
-#if OPSYS == DUINO
+#if OPSYS == DUINO && TIMER == HREAL
+/*
+ * Prototype for Arduino timing function.
+ *
+ * @return The time in microseconds since the program began running.
+ */ 
 uint32_t micros();
 #endif
 

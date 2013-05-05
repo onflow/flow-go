@@ -127,7 +127,11 @@
 /**
  * Timer type.
  */
-#if TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
+#if OPSYS == DUINO && TIMER == HREAL
+
+typedef uint32_t bench_t;
+
+#elif TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
 
 #include <sys/time.h>
 #include <time.h>
