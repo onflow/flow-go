@@ -82,6 +82,8 @@ enum {
 	BN_P638,
 	/** Barreto-Lynn-Scott curve with embedding degree 12. */
 	B12_P638,
+	/** 1536-bit supersingular curve. */
+	SS_P1536,
 };
 
 /*============================================================================*/
@@ -382,22 +384,22 @@ typedef ep_st *ep_t;
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously. Computes
- * R = kP + lQ.
+ * R = kP + mQ.
  *
  * @param[out] R			- the result.
  * @param[in] P				- the first point to multiply.
  * @param[in] K				- the first integer.
  * @param[in] Q				- the second point to multiply.
- * @param[in] L				- the second integer,
+ * @param[in] M				- the second integer,
  */
 #if EP_SIM == BASIC
-#define ep_mul_sim(R, P, K, Q, L)	ep_mul_sim_basic(R, P, K, Q, L)
+#define ep_mul_sim(R, P, K, Q, M)	ep_mul_sim_basic(R, P, K, Q, M)
 #elif EP_SIM == TRICK
-#define ep_mul_sim(R, P, K, Q, L)	ep_mul_sim_trick(R, P, K, Q, L)
+#define ep_mul_sim(R, P, K, Q, M)	ep_mul_sim_trick(R, P, K, Q, M)
 #elif EP_SIM == INTER
-#define ep_mul_sim(R, P, K, Q, L)	ep_mul_sim_inter(R, P, K, Q, L)
+#define ep_mul_sim(R, P, K, Q, M)	ep_mul_sim_inter(R, P, K, Q, M)
 #elif EP_SIM == JOINT
-#define ep_mul_sim(R, P, K, Q, L)	ep_mul_sim_joint(R, P, K, Q, L)
+#define ep_mul_sim(R, P, K, Q, M)	ep_mul_sim_joint(R, P, K, Q, M)
 #endif
 
 /*============================================================================*/
@@ -543,6 +545,17 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h);
 void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, bn_t h, fp_t beta, bn_t l);
 
 /**
+ * Configures a new supersingular prime elliptic curve by its coefficients.
+ *
+ * @param[in] a			- the coefficient a of the curve.
+ * @param[in] b			- the coefficient b of the curve.
+ * @param[in] g			- the generator.
+ * @param[in] r			- the order of the group of points.
+ * @param[in] h			- the cofactor of the group order.
+ */
+void ep_curve_set_super(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h);
+
+/**
  * Configures a new prime elliptic curve by its parameter identifier.
  *
  * @param				- the parameter identifier.
@@ -571,6 +584,14 @@ int ep_param_set_any_ordin(void);
 int ep_param_set_any_kbltz(void);
 
 /**
+ * Configures some set of supersingular curve parameters for the current
+ * security level.
+ *
+ * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
+ */
+int ep_param_set_any_super(void);
+
+/**
  * Configures some set of pairing-friendly curve parameters for the current
  * security level.
  *
@@ -597,22 +618,9 @@ void ep_param_print(void);
 int ep_param_level(void);
 
 /**
- * Initializes a previously allocated prime elliptic curve point.
- *
- * @param[out] a			- the point to initialize.
- * @param[in] digits		- the required precision in digits.
- * @throw ERR_NO_MEMORY		- if there is no available memory.
- * @throw ERR_PRECISION		- if the required precision cannot be represented
- * 							by the library.
+ * Returns the embedding degree of the currently configured elliptic curve.
  */
-void ep_init(ep_t a);
-
-/**
- * Cleans an prime elliptic curve point..
- *
- * @param[out] a			- the point to free.
- */
-void ep_clean(ep_t a);
+int ep_param_embed(void);
 
 /**
  * Tests if a point on a prime elliptic curve is at the infinity.
@@ -711,6 +719,17 @@ void ep_neg_projc(ep_t r, ep_t p);
 void ep_add_basic(ep_t r, ep_t p, ep_t q);
 
 /**
+ * Adds two prime elliptic curve points represented in affine coordinates and
+ * returns the computed slope.
+ *
+ * @param[out] r			- the result.
+ * @param[out] s			- the slope.
+ * @param[in] p				- the first point to add.
+ * @param[in] q				- the second point to add.
+ */
+void ep_add_slp_basic(ep_t r, fp_t s, ep_t p, ep_t q);
+
+/**
  * Adds two prime elliptic curve points represented in projective coordinates.
  *
  * @param[out] r			- the result.
@@ -746,6 +765,16 @@ void ep_sub_projc(ep_t r, ep_t p, ep_t q);
  * @param[in] p				- the point to double.
  */
 void ep_dbl_basic(ep_t r, ep_t p);
+
+/**
+ * Doubles a prime elliptic curve point represented in affine coordinates and
+ * returns the computed slope.
+ *
+ * @param[out] r			- the result.
+ * @param[out] s			- the slope.
+ * @param[in] p				- the point to double.
+ */
+void ep_dbl_slp_basic(ep_t r, fp_t s, ep_t p);
 
 /**
  * Doubles a prime elliptic curve point represented in projective coordinates.
@@ -932,9 +961,9 @@ void ep_mul_fix_lwnaf(ep_t r, ep_t *t, bn_t k);
  * @param[in] p				- the first point to multiply.
  * @param[in] k				- the first integer.
  * @param[in] q				- the second point to multiply.
- * @param[in] l				- the second integer,
+ * @param[in] m				- the second integer,
  */
-void ep_mul_sim_basic(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l);
+void ep_mul_sim_basic(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m);
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously using
@@ -944,9 +973,9 @@ void ep_mul_sim_basic(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l);
  * @param[in] p				- the first point to multiply.
  * @param[in] k				- the first integer.
  * @param[in] q				- the second point to multiply.
- * @param[in] l				- the second integer,
+ * @param[in] m				- the second integer,
  */
-void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l);
+void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m);
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously using
@@ -956,9 +985,9 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l);
  * @param[in] p				- the first point to multiply.
  * @param[in] k				- the first integer.
  * @param[in] q				- the second point to multiply.
- * @param[in] l				- the second integer,
+ * @param[in] m				- the second integer,
  */
-void ep_mul_sim_inter(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l);
+void ep_mul_sim_inter(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m);
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously using
@@ -968,20 +997,20 @@ void ep_mul_sim_inter(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l);
  * @param[in] p				- the first point to multiply.
  * @param[in] k				- the first integer.
  * @param[in] q				- the second point to multiply.
- * @param[in] l				- the second integer,
+ * @param[in] m				- the second integer,
  */
-void ep_mul_sim_joint(ep_t r, ep_t p, bn_t k, ep_t q, bn_t l);
+void ep_mul_sim_joint(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m);
 
 /**
  * Multiplies and adds the generator and a prime elliptic curve point
- * simultaneously. Computes R = kG + lQ.
+ * simultaneously. Computes R = kG + mQ.
  *
  * @param[out] r			- the result.
  * @param[in] k				- the first integer.
  * @param[in] q				- the second point to multiply.
- * @param[in] l				- the second integer,
+ * @param[in] m				- the second integer.
  */
-void ep_mul_sim_gen(ep_t r, bn_t k, ep_t q, bn_t l);
+void ep_mul_sim_gen(ep_t r, bn_t k, ep_t q, bn_t m);
 
 /**
  * Converts a point to affine coordinates.

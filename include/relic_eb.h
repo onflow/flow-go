@@ -1008,12 +1008,12 @@ void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
 
 /**
  * Multiplies and adds the generator and a binary elliptic curve point
- * simultaneously. Computes R = kG + lQ.
+ * simultaneously. Computes R = kG + mQ.
  *
  * @param[out] r			- the result.
  * @param[in] k				- the first integer.
  * @param[in] q				- the second point to multiply.
- * @param[in] m				- the second integer,
+ * @param[in] m				- the second integer.
  */
 void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t m);
 
