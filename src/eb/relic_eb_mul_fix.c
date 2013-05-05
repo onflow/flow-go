@@ -48,12 +48,12 @@
  *
  * @param[out] r 				- the result.
  * @param[in] p					- the point to multiply.
+ * @param[in] t					- the precomputed table.
  * @param[in] k					- the integer.
- * @param[in] w					- the window size.
  */
-static void eb_mul_fix_kbltz(eb_t r, eb_t *table, bn_t k) {
-	int len, i, n;
-	signed char u, tnaf[FB_BITS + 8], *t;
+static void eb_mul_fix_kbltz(eb_t r, eb_t *t, bn_t k) {
+	int l, i, n;
+	signed char u, tnaf[FB_BITS + 8], *_k;
 	bn_t vm, s0, s1;
 
 	bn_null(vm);
@@ -76,19 +76,19 @@ static void eb_mul_fix_kbltz(eb_t r, eb_t *table, bn_t k) {
 		eb_curve_get_s0(s0);
 		eb_curve_get_s1(s1);
 		/* Compute the w-TNAF representation of k. */
-		bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_DEPTH);
+		bn_rec_tnaf(tnaf, &l, k, vm, s0, s1, u, FB_BITS, EB_DEPTH);
 
-		t = tnaf + len - 1;
+		_k = tnaf + l - 1;
 		eb_set_infty(r);
-		for (i = len - 1; i >= 0; i--, t--) {
+		for (i = l - 1; i >= 0; i--, _k--) {
 			eb_frb(r, r);
 
-			n = *t;
+			n = *_k;
 			if (n > 0) {
-				eb_add(r, r, table[n / 2]);
+				eb_add(r, r, t[n / 2]);
 			}
 			if (n < 0) {
-				eb_sub(r, r, table[-n / 2]);
+				eb_sub(r, r, t[-n / 2]);
 			}
 		}
 		/* Convert r to affine coordinates. */
@@ -113,27 +113,27 @@ static void eb_mul_fix_kbltz(eb_t r, eb_t *table, bn_t k) {
  * method.
  *
  * @param[out] r 				- the result.
- * @param[in] p					- the point to multiply.
+ * @param[in] t				- the precomputed table.
  * @param[in] k					- the integer.
  */
-static void eb_mul_fix_ordin(eb_t r, eb_t *table, bn_t k) {
-	int len, i, n;
-	signed char naf[FB_BITS + 1], *t;
+static void eb_mul_fix_ordin(eb_t r, eb_t *t, bn_t k) {
+	int l, i, n;
+	signed char naf[FB_BITS + 1], *_k;
 
 	/* Compute the w-TNAF representation of k. */
-	bn_rec_naf(naf, &len, k, EB_DEPTH);
+	bn_rec_naf(naf, &l, k, EB_DEPTH);
 
-	t = naf + len - 1;
+	_k = naf + l - 1;
 	eb_set_infty(r);
-	for (i = len - 1; i >= 0; i--, t--) {
+	for (i = l - 1; i >= 0; i--, _k--) {
 		eb_dbl(r, r);
 
-		n = *t;
+		n = *_k;
 		if (n > 0) {
-			eb_add(r, r, table[n / 2]);
+			eb_add(r, r, t[n / 2]);
 		}
 		if (n < 0) {
-			eb_sub(r, r, table[-n / 2]);
+			eb_sub(r, r, t[-n / 2]);
 		}
 	}
 	/* Convert r to affine coordinates. */

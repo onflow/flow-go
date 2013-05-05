@@ -54,8 +54,8 @@
  */
 static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
-	signed char tnaf[FB_BITS + 8], *t, u;
-	eb_t table[1 << (EB_WIDTH - 2)];
+	signed char tnaf[FB_BITS + 8], *_k, u;
+	eb_t t[1 << (EB_WIDTH - 2)];
 	bn_t vm, s0, s1;
 
 	bn_null(vm);
@@ -75,10 +75,10 @@ static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
 
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_new(table[i]);
+			eb_new(t[i]);
 		}
 		/* Compute the precomputation table. */
-		eb_tab(table, p, EB_WIDTH);
+		eb_tab(t, p, EB_WIDTH);
 
 		/* Compute the w-TNAF representation of k. */
 		eb_curve_get_vm(vm);
@@ -86,17 +86,17 @@ static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
 		eb_curve_get_s1(s1);
 		bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_WIDTH);
 
-		t = tnaf + len - 1;
+		_k = tnaf + len - 1;
 		eb_set_infty(r);
-		for (i = len - 1; i >= 0; i--, t--) {
+		for (i = len - 1; i >= 0; i--, _k--) {
 			eb_frb(r, r);
 
-			n = *t;
+			n = *_k;
 			if (n > 0) {
-				eb_add(r, r, table[n / 2]);
+				eb_add(r, r, t[n / 2]);
 			}
 			if (n < 0) {
-				eb_sub(r, r, table[-n / 2]);
+				eb_sub(r, r, t[-n / 2]);
 			}
 		}
 		/* Convert r to affine coordinates. */
@@ -112,7 +112,7 @@ static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
 
 		/* Free the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_free(table[i]);
+			eb_free(t[i]);
 		}
 	}
 }
@@ -131,39 +131,39 @@ static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
  */
 static void eb_mul_lnaf_imp(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
-	signed char naf[FB_BITS + 1], *t;
-	eb_t table[1 << (EB_WIDTH - 2)];
+	signed char naf[FB_BITS + 1], *_k;
+	eb_t t[1 << (EB_WIDTH - 2)];
 
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_null(table[i]);
+		eb_null(t[i]);
 	}
 
 	TRY {
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_new(table[i]);
-			eb_set_infty(table[i]);
-			fb_set_dig(table[i]->z, 1);
-			table[i]->norm = 1;
+			eb_new(t[i]);
+			eb_set_infty(t[i]);
+			fb_set_dig(t[i]->z, 1);
+			t[i]->norm = 1;
 		}
 		/* Compute the precomputation table. */
-		eb_tab(table, p, EB_WIDTH);
+		eb_tab(t, p, EB_WIDTH);
 
 		/* Compute the w-TNAF representation of k. */
 		bn_rec_naf(naf, &len, k, EB_WIDTH);
 
-		t = naf + len - 1;
+		_k = naf + len - 1;
 
 		eb_set_infty(r);
-		for (i = len - 1; i >= 0; i--, t--) {
+		for (i = len - 1; i >= 0; i--, _k--) {
 			eb_dbl(r, r);
 
-			n = *t;
+			n = *_k;
 			if (n > 0) {
-				eb_add(r, r, table[n / 2]);
+				eb_add(r, r, t[n / 2]);
 			}
 			if (n < 0) {
-				eb_sub(r, r, table[-n / 2]);
+				eb_sub(r, r, t[-n / 2]);
 			}
 		}
 		/* Convert r to affine coordinates. */
@@ -175,7 +175,7 @@ static void eb_mul_lnaf_imp(eb_t r, eb_t p, bn_t k) {
 	FINALLY {
 		/* Free the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_free(table[i]);
+			eb_free(t[i]);
 		}
 	}
 }
@@ -197,8 +197,8 @@ static void eb_mul_lnaf_imp(eb_t r, eb_t p, bn_t k) {
  */
 static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
-	signed char tnaf[FB_BITS + 8], *t, u;
-	eb_t table[1 << (EB_WIDTH - 2)];
+	signed char tnaf[FB_BITS + 8], *_k, u;
+	eb_t t[1 << (EB_WIDTH - 2)];
 	bn_t vm, s0, s1;
 
 	bn_null(vm);
@@ -218,8 +218,8 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_new(table[i]);
-			eb_set_infty(table[i]);
+			eb_new(t[i]);
+			eb_set_infty(t[i]);
 		}
 		/* Compute the precomputation table. */
 
@@ -229,15 +229,15 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 		/* Compute the w-TNAF representation of k. */
 		bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_WIDTH);
 
-		t = tnaf;
+		_k = tnaf;
 		eb_copy(r, p);
-		for (i = 0; i < len; i++, t++) {
-			n = *t;
+		for (i = 0; i < len; i++, _k++) {
+			n = *_k;
 			if (n > 0) {
-				eb_add(table[n / 2], table[n / 2], r);
+				eb_add(t[n / 2], t[n / 2], r);
 			}
 			if (n < 0) {
-				eb_sub(table[-n / 2], table[-n / 2], r);
+				eb_sub(t[-n / 2], t[-n / 2], r);
 			}
 
 			/* We can avoid a function call here. */
@@ -245,236 +245,236 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 			fb_sqr(r->y, r->y);
 		}
 
-		eb_copy(r, table[0]);
+		eb_copy(r, t[0]);
 
 #if defined(EB_MIXED) && defined(STRIP) && (EB_WIDTH > 2)
-		eb_norm_sim(table + 1, table + 1, (1 << (EB_WIDTH - 2)) - 1);
+		eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 
 #if EB_WIDTH == 3
-		eb_frb(table[0], table[1]);
+		eb_frb(t[0], t[1]);
 		if (u == 1) {
-			eb_sub(table[1], table[1], table[0]);
+			eb_sub(t[1], t[1], t[0]);
 		} else {
-			eb_add(table[1], table[1], table[0]);
+			eb_add(t[1], t[1], t[0]);
 		}
 #endif
 
 #if EB_WIDTH == 4
-		eb_frb(table[0], table[3]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
+		eb_frb(t[0], t[3]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
 
 		if (u == 1) {
-			eb_neg(table[0], table[0]);
+			eb_neg(t[0], t[0]);
 		}
-		eb_sub(table[3], table[0], table[3]);
+		eb_sub(t[3], t[0], t[3]);
 
-		eb_frb(table[0], table[1]);
-		eb_frb(table[0], table[0]);
-		eb_sub(table[1], table[0], table[1]);
+		eb_frb(t[0], t[1]);
+		eb_frb(t[0], t[0]);
+		eb_sub(t[1], t[0], t[1]);
 
-		eb_frb(table[0], table[2]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[2], table[0], table[2]);
+		eb_frb(t[0], t[2]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[2], t[0], t[2]);
 #endif
 
 #if EB_WIDTH == 5
-		eb_frb(table[0], table[3]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
+		eb_frb(t[0], t[3]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
 		if (u == 1) {
-			eb_neg(table[0], table[0]);
+			eb_neg(t[0], t[0]);
 		}
-		eb_sub(table[3], table[0], table[3]);
+		eb_sub(t[3], t[0], t[3]);
 
-		eb_frb(table[0], table[1]);
-		eb_frb(table[0], table[0]);
-		eb_sub(table[1], table[0], table[1]);
+		eb_frb(t[0], t[1]);
+		eb_frb(t[0], t[0]);
+		eb_sub(t[1], t[0], t[1]);
 
-		eb_frb(table[0], table[2]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[2], table[0], table[2]);
+		eb_frb(t[0], t[2]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[2], t[0], t[2]);
 
-		eb_frb(table[0], table[4]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[0], table[0], table[4]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
+		eb_frb(t[0], t[4]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[0], t[0], t[4]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
 		if (u == 1) {
-			eb_neg(table[0], table[0]);
+			eb_neg(t[0], t[0]);
 		}
-		eb_add(table[4], table[0], table[4]);
+		eb_add(t[4], t[0], t[4]);
 
-		eb_frb(table[0], table[5]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[0], table[0], table[5]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_neg(table[0], table[0]);
-		eb_sub(table[5], table[0], table[5]);
+		eb_frb(t[0], t[5]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[0], t[0], t[5]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_neg(t[0], t[0]);
+		eb_sub(t[5], t[0], t[5]);
 
-		eb_frb(table[0], table[6]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[0], table[0], table[6]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_neg(table[0], table[0]);
-		eb_add(table[6], table[0], table[6]);
+		eb_frb(t[0], t[6]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[0], t[0], t[6]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_neg(t[0], t[0]);
+		eb_add(t[6], t[0], t[6]);
 
-		eb_frb(table[0], table[7]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_sub(table[7], table[0], table[7]);
+		eb_frb(t[0], t[7]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_sub(t[7], t[0], t[7]);
 #endif
 
 #if EB_WIDTH == 6
-		eb_frb(table[0], table[1]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
+		eb_frb(t[0], t[1]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
 		if (u == -1) {
-			eb_neg(table[0], table[0]);
+			eb_neg(t[0], t[0]);
 		}
-		eb_add(table[0], table[0], table[1]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_sub(table[1], table[0], table[1]);
+		eb_add(t[0], t[0], t[1]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_sub(t[1], t[0], t[1]);
 
-		eb_frb(table[0], table[2]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
+		eb_frb(t[0], t[2]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
 		if (u == -1) {
-			eb_neg(table[0], table[0]);
+			eb_neg(t[0], t[0]);
 		}
-		eb_add(table[0], table[0], table[2]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[2], table[0], table[2]);
+		eb_add(t[0], t[0], t[2]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[2], t[0], t[2]);
 
-		eb_frb(table[0], table[3]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[0], table[0], table[3]);
-		eb_neg(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
+		eb_frb(t[0], t[3]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[0], t[0], t[3]);
+		eb_neg(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
 		if (u == -1) {
-			eb_neg(table[0], table[0]);
+			eb_neg(t[0], t[0]);
 		}
-		eb_sub(table[3], table[0], table[3]);
+		eb_sub(t[3], t[0], t[3]);
 
-		eb_frb(table[0], table[4]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[0], table[0], table[4]);
-		eb_neg(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
+		eb_frb(t[0], t[4]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[0], t[0], t[4]);
+		eb_neg(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
 		if (u == -1) {
-			eb_neg(table[0], table[0]);
+			eb_neg(t[0], t[0]);
 		}
-		eb_add(table[4], table[0], table[4]);
+		eb_add(t[4], t[0], t[4]);
 
-		eb_frb(table[0], table[5]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[0], table[0], table[5]);
-		eb_neg(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_sub(table[5], table[0], table[5]);
+		eb_frb(t[0], t[5]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[0], t[0], t[5]);
+		eb_neg(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_sub(t[5], t[0], t[5]);
 
-		eb_frb(table[0], table[6]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[0], table[0], table[6]);
-		eb_neg(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[6], table[0], table[6]);
+		eb_frb(t[0], t[6]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[0], t[0], t[6]);
+		eb_neg(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[6], t[0], t[6]);
 
-		eb_frb(table[0], table[7]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_sub(table[7], table[0], table[7]);
+		eb_frb(t[0], t[7]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_sub(t[7], t[0], t[7]);
 
-		eb_frb(table[0], table[8]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[8], table[0], table[8]);
+		eb_frb(t[0], t[8]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[8], t[0], t[8]);
 
-		eb_frb(table[0], table[9]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
+		eb_frb(t[0], t[9]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
 		if (u == -1) {
-			eb_neg(table[0], table[0]);
+			eb_neg(t[0], t[0]);
 		}
-		eb_add(table[0], table[0], table[9]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_sub(table[0], table[0], table[9]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[0], table[0], table[9]);
-		eb_neg(table[9], table[0]);
+		eb_add(t[0], t[0], t[9]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_sub(t[0], t[0], t[9]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[0], t[0], t[9]);
+		eb_neg(t[9], t[0]);
 
-		eb_frb(table[0], table[10]);
-		eb_frb(table[0], table[0]);
-		eb_neg(table[0], table[0]);
-		eb_add(table[0], table[0], table[10]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[10], table[0], table[10]);
+		eb_frb(t[0], t[10]);
+		eb_frb(t[0], t[0]);
+		eb_neg(t[0], t[0]);
+		eb_add(t[0], t[0], t[10]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[10], t[0], t[10]);
 
-		eb_frb(table[0], table[11]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
+		eb_frb(t[0], t[11]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
 		if (u == -1) {
-			eb_neg(table[0], table[0]);
+			eb_neg(t[0], t[0]);
 		}
-		eb_sub(table[11], table[0], table[11]);
+		eb_sub(t[11], t[0], t[11]);
 
-		eb_frb(table[0], table[12]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
+		eb_frb(t[0], t[12]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
 		if (u == -1) {
-			eb_neg(table[0], table[0]);
+			eb_neg(t[0], t[0]);
 		}
-		eb_add(table[12], table[0], table[12]);
+		eb_add(t[12], t[0], t[12]);
 
-		eb_frb(table[0], table[13]);
-		eb_frb(table[0], table[0]);
-		eb_add(table[0], table[0], table[13]);
-		eb_neg(table[13], table[0]);
+		eb_frb(t[0], t[13]);
+		eb_frb(t[0], t[0]);
+		eb_add(t[0], t[0], t[13]);
+		eb_neg(t[13], t[0]);
 
-		eb_frb(table[0], table[14]);
-		eb_frb(table[0], table[0]);
-		eb_neg(table[0], table[0]);
-		eb_add(table[14], table[0], table[14]);
+		eb_frb(t[0], t[14]);
+		eb_frb(t[0], t[0]);
+		eb_neg(t[0], t[0]);
+		eb_add(t[14], t[0], t[14]);
 
-		eb_frb(table[0], table[15]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
-		eb_frb(table[0], table[0]);
+		eb_frb(t[0], t[15]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
+		eb_frb(t[0], t[0]);
 		if (u == -1) {
-			eb_neg(table[0], table[0]);
+			eb_neg(t[0], t[0]);
 		}
-		eb_sub(table[15], table[0], table[15]);
+		eb_sub(t[15], t[0], t[15]);
 #endif
 
 #if defined(EB_MIXED) && defined(STRIP) && (EB_WIDTH > 2)
-		eb_norm_sim(table + 1, table + 1, (1 << (EB_WIDTH - 2)) - 1);
+		eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 
 		/* Add accumulators */
 		for (i = 1; i < (1 << (EB_WIDTH - 2)); i++) {
 			if (r->norm) {
-				eb_add(r, table[i], r);
+				eb_add(r, t[i], r);
 			} else {
-				eb_add(r, r, table[i]);
+				eb_add(r, r, t[i]);
 			}
 		}
 		/* Convert r to affine coordinates. */
@@ -490,7 +490,7 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 
 		/* Free the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_free(table[i]);
+			eb_free(t[i]);
 		}
 	}
 }
@@ -509,103 +509,103 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
  */
 static void eb_mul_rnaf_imp(eb_t r, eb_t p, bn_t k) {
 	int len, i, n;
-	signed char naf[FB_BITS + 1], *t;
-	eb_t table[1 << (EB_WIDTH - 2)];
+	signed char naf[FB_BITS + 1], *_k;
+	eb_t t[1 << (EB_WIDTH - 2)];
 
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_null(table[i]);
+		eb_null(t[i]);
 	}
 
 	TRY {
 		/* Prepare the accumulator table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_new(table[i]);
-			eb_set_infty(table[i]);
+			eb_new(t[i]);
+			eb_set_infty(t[i]);
 		}
 
 		/* Compute the w-TNAF representation of k. */
 		bn_rec_naf(naf, &len, k, EB_WIDTH);
 
-		t = naf;
+		_k = naf;
 
 		eb_copy(r, p);
-		for (i = 0; i < len; i++, t++) {
-			n = *t;
+		for (i = 0; i < len; i++, _k++) {
+			n = *_k;
 			if (n > 0) {
-				eb_add(table[n / 2], table[n / 2], r);
+				eb_add(t[n / 2], t[n / 2], r);
 			}
 			if (n < 0) {
-				eb_sub(table[-n / 2], table[-n / 2], r);
+				eb_sub(t[-n / 2], t[-n / 2], r);
 			}
 
 			eb_dbl(r, r);
 		}
 
-		eb_copy(r, table[0]);
+		eb_copy(r, t[0]);
 
 #if EB_WIDTH >= 3
 		/* Compute 3 * T[1]. */
-		eb_dbl(table[0], table[1]);
-		eb_add(table[1], table[0], table[1]);
+		eb_dbl(t[0], t[1]);
+		eb_add(t[1], t[0], t[1]);
 #endif
 #if EB_WIDTH >= 4
 		/* Compute 5 * T[2]. */
-		eb_dbl(table[0], table[2]);
-		eb_dbl(table[0], table[0]);
-		eb_add(table[2], table[0], table[2]);
+		eb_dbl(t[0], t[2]);
+		eb_dbl(t[0], t[0]);
+		eb_add(t[2], t[0], t[2]);
 
 		/* Compute 7 * T[3]. */
-		eb_dbl(table[0], table[3]);
-		eb_dbl(table[0], table[0]);
-		eb_dbl(table[0], table[0]);
-		eb_sub(table[3], table[0], table[3]);
+		eb_dbl(t[0], t[3]);
+		eb_dbl(t[0], t[0]);
+		eb_dbl(t[0], t[0]);
+		eb_sub(t[3], t[0], t[3]);
 #endif
 #if EB_WIDTH >= 5
 		/* Compute 9 * T[4]. */
-		eb_dbl(table[0], table[4]);
-		eb_dbl(table[0], table[0]);
-		eb_dbl(table[0], table[0]);
-		eb_add(table[4], table[0], table[4]);
+		eb_dbl(t[0], t[4]);
+		eb_dbl(t[0], t[0]);
+		eb_dbl(t[0], t[0]);
+		eb_add(t[4], t[0], t[4]);
 
 		/* Compute 11 * T[5]. */
-		eb_dbl(table[0], table[5]);
-		eb_dbl(table[0], table[0]);
-		eb_add(table[0], table[0], table[5]);
-		eb_dbl(table[0], table[0]);
-		eb_add(table[5], table[0], table[5]);
+		eb_dbl(t[0], t[5]);
+		eb_dbl(t[0], t[0]);
+		eb_add(t[0], t[0], t[5]);
+		eb_dbl(t[0], t[0]);
+		eb_add(t[5], t[0], t[5]);
 
 		/* Compute 13 * T[6]. */
-		eb_dbl(table[0], table[6]);
-		eb_add(table[0], table[0], table[6]);
-		eb_dbl(table[0], table[0]);
-		eb_dbl(table[0], table[0]);
-		eb_add(table[6], table[0], table[6]);
+		eb_dbl(t[0], t[6]);
+		eb_add(t[0], t[0], t[6]);
+		eb_dbl(t[0], t[0]);
+		eb_dbl(t[0], t[0]);
+		eb_add(t[6], t[0], t[6]);
 
 		/* Compute 15 * T[7]. */
-		eb_dbl(table[0], table[7]);
-		eb_dbl(table[0], table[0]);
-		eb_dbl(table[0], table[0]);
-		eb_dbl(table[0], table[0]);
-		eb_sub(table[7], table[0], table[7]);
+		eb_dbl(t[0], t[7]);
+		eb_dbl(t[0], t[0]);
+		eb_dbl(t[0], t[0]);
+		eb_dbl(t[0], t[0]);
+		eb_sub(t[7], t[0], t[7]);
 #endif
 #if EB_WIDTH == 6
 		for (i = 8; i < 15; i++) {
-			eb_mul_dig(table[i], table[i], 2 * i + 1);
+			eb_mul_dig(t[i], t[i], 2 * i + 1);
 		}
-		eb_dbl(table[0], table[15]);
-		eb_dbl(table[0], table[0]);
-		eb_dbl(table[0], table[0]);
-		eb_dbl(table[0], table[0]);
-		eb_dbl(table[0], table[0]);
-		eb_sub(table[15], table[0], table[15]);
+		eb_dbl(t[0], t[15]);
+		eb_dbl(t[0], t[0]);
+		eb_dbl(t[0], t[0]);
+		eb_dbl(t[0], t[0]);
+		eb_dbl(t[0], t[0]);
+		eb_sub(t[15], t[0], t[15]);
 #endif
 
 		/* Add accumulators */
 		for (i = 1; i < (1 << (EB_WIDTH - 2)); i++) {
 			if (r->norm) {
-				eb_add(r, table[i], r);
+				eb_add(r, t[i], r);
 			} else {
-				eb_add(r, r, table[i]);
+				eb_add(r, r, t[i]);
 			}
 		}
 		/* Convert r to affine coordinates. */
@@ -617,7 +617,7 @@ static void eb_mul_rnaf_imp(eb_t r, eb_t p, bn_t k) {
 	FINALLY {
 		/* Free the accumulator table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_free(table[i]);
+			eb_free(t[i]);
 		}
 	}
 }
@@ -909,17 +909,17 @@ void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k) {
 #if EB_MUL == HALVE || !defined(STRIP)
 
 void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
-	int len, i, j, l, cof;
-	signed char naf[FB_BITS + 1] = { 0 }, *tmp;
-	eb_t t, q, table[1 << (EB_WIDTH - 2)];
-	bn_t n, _k;
+	int l, i, j, trc, cof;
+	signed char naf[FB_BITS + 1] = { 0 }, *_k;
+	eb_t q, t[1 << (EB_WIDTH - 2)];
+	bn_t n, m;
 	fb_t u, v, w, z;
 
-	bn_null(_k);
+	bn_null(m);
 	bn_null(n);
 	eb_null(q);
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_null(table[i]);
+		eb_null(t[i]);
 	}
 	fb_null(u);
 	fb_null(v);
@@ -928,7 +928,7 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 
 	TRY {
 		bn_new(n);
-		bn_new(_k);
+		bn_new(m);
 		eb_new(q);
 		eb_new(t);
 		fb_new(u);
@@ -938,26 +938,26 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_new(table[i]);
-			eb_set_infty(table[i]);
+			eb_new(t[i]);
+			eb_set_infty(t[i]);
 		}
 
 		/* Convert k to alternate representation k' = (2^{t-1}k mod n). */
 		eb_curve_get_ord(n);
-		bn_lsh(_k, k, bn_bits(n) - 1);
-		bn_mod(_k, _k, n);
+		bn_lsh(m, k, bn_bits(n) - 1);
+		bn_mod(m, m, n);
 
 		/* Compute the w-NAF representation of k'. */
-		bn_rec_naf(naf, &len, _k, EB_WIDTH);
+		bn_rec_naf(naf, &l, m, EB_WIDTH);
 
-		for (i = len; i <= bn_bits(n); i++) {
+		for (i = l; i <= bn_bits(n); i++) {
 			naf[i] = 0;
 		}
 		if (naf[bn_bits(n)] == 1) {
-			eb_dbl(table[0], p);
+			eb_dbl(t[0], p);
 		}
-		len = bn_bits(n);
-		tmp = naf + len - 1;
+		l = bn_bits(n);
+		_k = naf + l - 1;
 
 		eb_copy(q, p);
 		eb_curve_get_cof(n);
@@ -969,24 +969,24 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 			cof = 0;
 		}
 
-		l = fb_trc(eb_curve_get_a());
+		trc = fb_trc(eb_curve_get_a());
 
 		if (cof) {
 			/* Curves with cofactor > 2, u = sqrt(a), v = Solve(u). */
 			fb_srt(u, eb_curve_get_a());
 			fb_slv(v, u);
 
-			bn_rand(n, BN_POS, len);
+			bn_rand(n, BN_POS, l);
 
-			for (i = len - 1; i >= 0; i--, tmp--) {
-				j = *tmp;
+			for (i = l - 1; i >= 0; i--, _k--) {
+				j = *_k;
 				if (j > 0) {
 					eb_norm(t, q);
-					eb_add(table[j / 2], table[j / 2], t);
+					eb_add(t[j / 2], t[j / 2], t);
 				}
 				if (j < 0) {
 					eb_norm(t, q);
-					eb_sub(table[-j / 2], table[-j / 2], t);
+					eb_sub(t[-j / 2], t[-j / 2], t);
 				}
 
 				/* T = 1/2(Q). */
@@ -1016,34 +1016,34 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 				eb_copy(q, t);
 			}
 		} else {
-			for (i = len - 1; i >= 0; i--, tmp--) {
-				j = *tmp;
+			for (i = l - 1; i >= 0; i--, _k--) {
+				j = *_k;
 				if (j > 0) {
 					eb_norm(q, q);
-					eb_add(table[j / 2], table[j / 2], q);
+					eb_add(t[j / 2], t[j / 2], q);
 				}
 				if (j < 0) {
 					eb_norm(q, q);
-					eb_sub(table[-j / 2], table[-j / 2], q);
+					eb_sub(t[-j / 2], t[-j / 2], q);
 				}
 				eb_hlv(q, q);
 			}
 		}
 
 #if EB_WIDTH == 2
-		eb_norm(r, table[0]);
+		eb_norm(r, t[0]);
 #else
 		/* Compute Q_i = Q_i + Q_{i+2} for i from 2^{w-1}-3 to 1. */
 		for (i = (1 << (EB_WIDTH - 1)) - 3; i >= 1; i -= 2) {
-			eb_add(table[i / 2], table[i / 2], table[(i + 2) / 2]);
+			eb_add(t[i / 2], t[i / 2], t[(i + 2) / 2]);
 		}
 		/* Compute R = Q_1 + 2 * sum_{i != 1}Q_i. */
-		eb_copy(r, table[1]);
+		eb_copy(r, t[1]);
 		for (i = 2; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_add(r, r, table[i]);
+			eb_add(r, r, t[i]);
 		}
 		eb_dbl(r, r);
-		eb_add(r, r, table[0]);
+		eb_add(r, r, t[0]);
 		eb_norm(r, r);
 #endif
 
@@ -1051,7 +1051,7 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		 * 4-cofactor. */
 		if (cof) {
 			eb_hlv(t, r);
-			if (fb_trc(t->x) != l) {
+			if (fb_trc(t->x) != trc) {
 				fb_zero(t->x);
 				fb_srt(t->y, eb_curve_get_b());
 				fb_set_dig(t->z, 1);
@@ -1066,10 +1066,10 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 	FINALLY {
 		/* Free the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_free(table[i]);
+			eb_free(t[i]);
 		}
 		bn_free(n);
-		bn_free(_k);
+		bn_free(m);
 		eb_free(t);
 		eb_free(q);
 		fb_free(u);
@@ -1085,20 +1085,20 @@ void eb_mul_gen(eb_t r, bn_t k) {
 #ifdef EB_PRECO
 	eb_mul_fix(r, eb_curve_get_tab(), k);
 #else
-	eb_t gen;
+	eb_t g;
 
-	eb_null(gen);
+	eb_null(g);
 
 	TRY {
-		eb_new(gen);
-		eb_curve_get_gen(gen);
-		eb_mul(r, gen, k);
+		eb_new(g);
+		eb_curve_get_gen(g);
+		eb_mul(r, g, k);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		eb_free(gen);
+		eb_free(g);
 	}
 #endif
 }

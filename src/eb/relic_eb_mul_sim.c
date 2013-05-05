@@ -53,16 +53,14 @@
  * @param[in] p					- the first point to multiply.
  * @param[in] k					- the first integer.
  * @param[in] q					- the second point to multiply.
- * @param[in] l					- the second integer.
+ * @param[in] m					- the second integer.
  * @param[in] t					- the pointer to a precomputed table.
  */
-static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
-	int l0, l1, len, i, n0, n1, w, gen;
-	signed char u;
-	signed char tnaf0[FB_BITS + 8], *t0;
-	signed char tnaf1[FB_BITS + 8], *t1;
-	eb_t table0[1 << (EB_WIDTH - 2)];
-	eb_t table1[1 << (EB_WIDTH - 2)];
+static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m, eb_t *t) {
+	int l0, l1, l, i, n0, n1, w, g;
+	signed char u, tnaf0[FB_BITS + 8], tnaf1[FB_BITS + 8], *_k, *_m;
+	eb_t t0[1 << (EB_WIDTH - 2)];
+	eb_t t1[1 << (EB_WIDTH - 2)];
 	bn_t vm, s0, s1;
 
 	bn_null(vm);
@@ -70,8 +68,8 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
 	bn_null(s1);
 
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_null(table0[i]);
-		eb_null(table1[i]);
+		eb_null(t0[i]);
+		eb_null(t1[i]);
 	}
 
 	TRY {
@@ -86,30 +84,30 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
 			u = 1;
 		}
 
-		gen = (t == NULL ? 0 : 1);
-		if (!gen) {
+		g = (t == NULL ? 0 : 1);
+		if (!g) {
 			for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-				eb_new(table0[i]);
-				eb_set_infty(table0[i]);
-				fb_set_bit(table0[i]->z, 0, 1);
-				table0[i]->norm = 1;
+				eb_new(t0[i]);
+				eb_set_infty(t0[i]);
+				fb_set_bit(t0[i]->z, 0, 1);
+				t0[i]->norm = 1;
 			}
-			eb_tab(table0, p, EB_WIDTH);
-			t = table0;
+			eb_tab(t0, p, EB_WIDTH);
+			t = t0;
 		}
 
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_new(table1[i]);
-			eb_set_infty(table1[i]);
-			fb_set_bit(table1[i]->z, 0, 1);
-			table1[i]->norm = 1;
+			eb_new(t1[i]);
+			eb_set_infty(t1[i]);
+			fb_set_bit(t1[i]->z, 0, 1);
+			t1[i]->norm = 1;
 		}
 		/* Compute the precomputation table. */
-		eb_tab(table1, q, EB_WIDTH);
+		eb_tab(t1, q, EB_WIDTH);
 
 		/* Compute the w-TNAF representation of k. */
-		if (gen) {
+		if (g) {
 			w = EB_DEPTH;
 		} else {
 			w = EB_WIDTH;
@@ -119,24 +117,24 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
 		eb_curve_get_s1(s1);
 		bn_rec_tnaf(tnaf0, &l0, k, vm, s0, s1, u, FB_BITS, w);
 
-		bn_rec_tnaf(tnaf1, &l1, l, vm, s0, s1, u, FB_BITS, EB_WIDTH);
+		bn_rec_tnaf(tnaf1, &l1, m, vm, s0, s1, u, FB_BITS, EB_WIDTH);
 
-		len = MAX(l0, l1);
-		t0 = tnaf0 + len - 1;
-		t1 = tnaf1 + len - 1;
-		for (i = l0; i < len; i++)
+		l = MAX(l0, l1);
+		_k = tnaf0 + l - 1;
+		_m = tnaf1 + l - 1;
+		for (i = l0; i < l; i++)
 			tnaf0[i] = 0;
-		for (i = l1; i < len; i++)
+		for (i = l1; i < l; i++)
 			tnaf1[i] = 0;
 
-		t0 = tnaf0 + len - 1;
-		t1 = tnaf1 + len - 1;
+		_k = tnaf0 + l - 1;
+		_m = tnaf1 + l - 1;
 		eb_set_infty(r);
-		for (i = len - 1; i >= 0; i--, t0--, t1--) {
+		for (i = l - 1; i >= 0; i--, _k--, _m--) {
 			eb_frb(r, r);
 
-			n0 = *t0;
-			n1 = *t1;
+			n0 = *_k;
+			n1 = *_m;
 			if (n0 > 0) {
 				eb_add(r, r, t[n0 / 2]);
 			}
@@ -144,10 +142,10 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
 				eb_sub(r, r, t[-n0 / 2]);
 			}
 			if (n1 > 0) {
-				eb_add(r, r, table1[n1 / 2]);
+				eb_add(r, r, t1[n1 / 2]);
 			}
 			if (n1 < 0) {
-				eb_sub(r, r, table1[-n1 / 2]);
+				eb_sub(r, r, t1[-n1 / 2]);
 			}
 		}
 		/* Convert r to affine coordinates. */
@@ -157,13 +155,13 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		if (!gen) {
+		if (!g) {
 			for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-				eb_free(table0[i]);
+				eb_free(t0[i]);
 			}
 		}
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_free(table1[i]);
+			eb_free(t1[i]);
 		}
 		bn_free(vm);
 		bn_free(s0);
@@ -184,62 +182,62 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
  * @param[in] p					- the first point to multiply.
  * @param[in] k					- the first integer.
  * @param[in] q					- the second point to multiply.
- * @param[in] l					- the second integer.
+ * @param[in] m					- the second integer.
  * @param[in] t					- the pointer to a precomputed table.
  */
-static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
-	int len, l0, l1, i, n0, n1, w, gen;
-	signed char naf0[FB_BITS + 1], naf1[FB_BITS + 1], *t0, *t1;
-	eb_t table0[1 << (EB_WIDTH - 2)];
-	eb_t table1[1 << (EB_WIDTH - 2)];
+static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m, eb_t *t) {
+	int l, l0, l1, i, n0, n1, w, g;
+	signed char naf0[FB_BITS + 1], naf1[FB_BITS + 1], *_k, *_m;
+	eb_t t0[1 << (EB_WIDTH - 2)];
+	eb_t t1[1 << (EB_WIDTH - 2)];
 
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-		eb_null(table0[i]);
-		eb_null(table1[i]);
+		eb_null(t0[i]);
+		eb_null(t1[i]);
 	}
 
 	TRY {
-		gen = (t == NULL ? 0 : 1);
-		if (!gen) {
+		g = (t == NULL ? 0 : 1);
+		if (!g) {
 			for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-				eb_new(table0[i]);
+				eb_new(t0[i]);
 			}
-			eb_tab(table0, p, EB_WIDTH);
-			t = table0;
+			eb_tab(t0, p, EB_WIDTH);
+			t = t0;
 		}
 
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
-			eb_new(table1[i]);
+			eb_new(t1[i]);
 		}
 		/* Compute the precomputation table. */
-		eb_tab(table1, q, EB_WIDTH);
+		eb_tab(t1, q, EB_WIDTH);
 
 		/* Compute the w-TNAF representation of k. */
-		if (gen) {
+		if (g) {
 			w = EB_DEPTH;
 		} else {
 			w = EB_WIDTH;
 		}
 		bn_rec_naf(naf0, &l0, k, w);
-		bn_rec_naf(naf1, &l1, l, EB_WIDTH);
+		bn_rec_naf(naf1, &l1, m, EB_WIDTH);
 
-		len = MAX(l0, l1);
-		t0 = naf0 + len - 1;
-		t1 = naf1 + len - 1;
-		for (i = l0; i < len; i++) {
+		l = MAX(l0, l1);
+		_k = naf0 + l - 1;
+		_m = naf1 + l - 1;
+		for (i = l0; i < l; i++) {
 			naf0[i] = 0;
 		}
-		for (i = l1; i < len; i++) {
+		for (i = l1; i < l; i++) {
 			naf1[i] = 0;
 		}
 
 		eb_set_infty(r);
-		for (i = len - 1; i >= 0; i--, t0--, t1--) {
+		for (i = l - 1; i >= 0; i--, _k--, _m--) {
 			eb_dbl(r, r);
 
-			n0 = *t0;
-			n1 = *t1;
+			n0 = *_k;
+			n1 = *_m;
 			if (n0 > 0) {
 				eb_add(r, r, t[n0 / 2]);
 			}
@@ -247,10 +245,10 @@ static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
 				eb_sub(r, r, t[-n0 / 2]);
 			}
 			if (n1 > 0) {
-				eb_add(r, r, table1[n1 / 2]);
+				eb_add(r, r, t1[n1 / 2]);
 			}
 			if (n1 < 0) {
-				eb_sub(r, r, table1[-n1 / 2]);
+				eb_sub(r, r, t1[-n1 / 2]);
 			}
 		}
 		/* Convert r to affine coordinates. */
@@ -261,13 +259,13 @@ static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
 	}
 	FINALLY {
 		/* Free the precomputation tables. */
-		if (!gen) {
+		if (!g) {
 			for (i = 0; i < 1 << (EB_WIDTH - 2); i++) {
-				eb_free(table0[i]);
+				eb_free(t0[i]);
 			}
 		}
 		for (i = 0; i < 1 << (EB_WIDTH - 2); i++) {
-			eb_free(table1[i]);
+			eb_free(t1[i]);
 		}
 	}
 }
@@ -282,14 +280,14 @@ static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l, eb_t *t) {
 
 #if EB_SIM == BASIC || !defined(STRIP)
 
-void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
+void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m) {
 	eb_t t;
 
 	eb_null(t);
 
 	TRY {
 		eb_new(t);
-		eb_mul(t, q, l);
+		eb_mul(t, q, m);
 		eb_mul(r, p, k);
 		eb_add(t, t, r);
 		eb_norm(r, t);
@@ -306,7 +304,7 @@ void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 
 #if EB_SIM == TRICK || !defined(STRIP)
 
-void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
+void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m) {
 	eb_t t0[1 << (EB_WIDTH / 2)];
 	eb_t t1[1 << (EB_WIDTH / 2)];
 	eb_t t[1 << EB_WIDTH];
@@ -361,7 +359,7 @@ void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 #endif
 
 		bn_rec_win(w0, &l0, k, w);
-		bn_rec_win(w1, &l1, l, w);
+		bn_rec_win(w1, &l1, m, w);
 
 		for (int i = l0; i < l1; i++) {
 			w0[i] = 0;
@@ -396,16 +394,16 @@ void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 
 #if EB_SIM == INTER || !defined(STRIP)
 
-void eb_mul_sim_inter(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
+void eb_mul_sim_inter(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
-		eb_mul_sim_kbltz(r, p, k, q, l, NULL);
+		eb_mul_sim_kbltz(r, p, k, q, m, NULL);
 		return;
 	}
 #endif
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
-	eb_mul_sim_ordin(r, p, k, q, l, NULL);
+	eb_mul_sim_ordin(r, p, k, q, m, NULL);
 #endif
 }
 
@@ -413,7 +411,7 @@ void eb_mul_sim_inter(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 
 #if EB_SIM == JOINT || !defined(STRIP)
 
-void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
+void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m) {
 	eb_t t[5];
 	int u_i, len, offset;
 	signed char jsf[2 * (FB_BITS + 1)];
@@ -439,11 +437,11 @@ void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 		eb_norm_sim(t + 3, t + 3, 2);
 #endif
 
-		bn_rec_jsf(jsf, &len, k, l);
+		bn_rec_jsf(jsf, &len, k, m);
 
 		eb_set_infty(r);
 
-		offset = MAX(bn_bits(k), bn_bits(l)) + 1;
+		offset = MAX(bn_bits(k), bn_bits(m)) + 1;
 		for (i = len - 1; i >= 0; i--) {
 			eb_dbl(r, r);
 			if (jsf[i] != 0 && jsf[i] == -jsf[i + offset]) {
@@ -476,24 +474,24 @@ void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l) {
 
 #endif
 
-void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l) {
-	eb_t gen;
+void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t m) {
+	eb_t g;
 
-	eb_null(gen);
+	eb_null(g);
 
 	TRY {
-		eb_new(gen);
+		eb_new(g);
 
-		eb_curve_get_gen(gen);
+		eb_curve_get_gen(g);
 
 #if defined(EB_KBLTZ)
 #if EB_SIM == INTER && EB_FIX == LWNAF && defined(EB_PRECO)
 		if (eb_curve_is_kbltz()) {
-			eb_mul_sim_kbltz(r, gen, k, q, l, eb_curve_get_tab());
+			eb_mul_sim_kbltz(r, g, k, q, m, eb_curve_get_tab());
 		}
 #else
 		if (eb_curve_is_kbltz()) {
-			eb_mul_sim(r, gen, k, q, l);
+			eb_mul_sim(r, g, k, q, m);
 		}
 #endif
 #endif
@@ -501,11 +499,11 @@ void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l) {
 #if defined(EB_ORDIN) || defined(EB_SUPER)
 #if EB_SIM == INTER && EB_FIX == LWNAF && defined(EB_PRECO)
 		if (!eb_curve_is_kbltz()) {
-			eb_mul_sim_ordin(r, gen, k, q, l, eb_curve_get_tab());
+			eb_mul_sim_ordin(r, g, k, q, m, eb_curve_get_tab());
 		}
 #else
 		if (!eb_curve_is_kbltz()) {
-			eb_mul_sim(r, gen, k, q, l);
+			eb_mul_sim(r, g, k, q, m);
 		}
 #endif
 #endif
@@ -514,6 +512,6 @@ void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		eb_free(gen);
+		eb_free(g);
 	}
 }
