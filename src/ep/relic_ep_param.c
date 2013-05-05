@@ -538,6 +538,8 @@ int ep_param_set_any_ordin() {
 	ep_param_set(NIST_P384);
 #elif FP_PRIME == 521
 	ep_param_set(NIST_P521);
+#else
+	r = STS_ERR;
 #endif
 #else
 	r = STS_ERR;
@@ -566,6 +568,8 @@ int ep_param_set_any_kbltz() {
 	ep_param_set(KSS_P508);
 #elif FP_PRIME == 638
 	ep_param_set(BN_P638);
+#else
+	r = STS_ERR;
 #endif
 #else
 	r = STS_ERR;
@@ -574,7 +578,7 @@ int ep_param_set_any_kbltz() {
 }
 
 int ep_param_set_any_pairf() {
-	int twist, degree, r = STS_OK;
+	int twist = 0, degree = 0, r = STS_OK;
 #if defined(EP_KBLTZ)
 #if FP_PRIME == 158
 	ep_param_set(BN_P158);
@@ -600,6 +604,8 @@ int ep_param_set_any_pairf() {
 	ep_param_set(B12_P638);
 	twist = EP_MTYPE;
 	degree = 2;
+#else
+	r = STS_ERR;
 #endif
 #else
 	r = STS_ERR;

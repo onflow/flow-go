@@ -546,6 +546,8 @@ int eb_param_set_any_ordin() {
 	eb_param_set(NIST_B409);
 #elif FB_POLYN == 571
 	eb_param_set(NIST_B571);
+#else
+	r = STS_ERR;
 #endif
 #else
 	r = STS_ERR;
@@ -568,6 +570,8 @@ int eb_param_set_any_kbltz() {
 	eb_param_set(NIST_K409);
 #elif FB_POLYN == 571
 	eb_param_set(NIST_K571);
+#else
+	r = STS_ERR;
 #endif
 #else
 	r = STS_ERR;
@@ -588,6 +592,8 @@ int eb_param_set_any_super() {
 	eb_param_set(ETAT_S353);
 #elif FB_POLYN == 1223
 	eb_param_set(ETAT_S1223);
+#else
+	r = STS_ERR;
 #endif
 #else
 	r = STS_ERR;
