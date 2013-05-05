@@ -359,6 +359,8 @@ void eb_param_set(int param) {
 		bn_new(r);
 		bn_new(h);
 
+		core_get()->eb_id = 0;
+
 		switch (param) {
 #if defined(EB_ORDIN) && FB_POLYN == 163
 			case NIST_B163:
@@ -472,31 +474,33 @@ void eb_param_set(int param) {
 		(void)super;
 		(void)c;
 
-		core_get()->eb_id = param;
-
 		fb_zero(g->z);
 		fb_set_bit(g->z, 0, 1);
 		g->norm = 1;
 
-#if defined(EB_SUPER)
-		if (super) {
-			eb_curve_set_super(a, b, c, g, r, h);
-		}
-#endif
-
 #if defined(EB_ORDIN)
 		if (ordin) {
 			eb_curve_set_ordin(a, b, g, r, h);
+			core_get()->eb_id = param;
 		}
 #endif
 
 #if defined(EB_KBLTZ)
 		if (kbltz) {
 			eb_curve_set_kbltz(a, g, r, h);
+			core_get()->eb_id = param;
 		}
 #elif defined(EB_ORDIN)
 		if (kbltz) {
 			eb_curve_set_ordin(a, b, g, r, h);
+			core_get()->eb_id = param;
+		}
+#endif
+
+#if defined(EB_SUPER)
+		if (super) {
+			eb_curve_set_super(a, b, c, g, r, h);
+			core_get()->eb_id = param;
 		}
 #endif
 	}
