@@ -304,51 +304,6 @@ typedef ep3_st *ep3_t;
 #define ep2_mul_sim(R, P, K, Q, L)	ep2_mul_sim_joint(R, P, K, Q, L)
 #endif
 
-/**
- * Adds two prime elliptic curve points and evaluates the corresponding line
- * function at another elliptic curve point.
- *
- * @param[out] L			- the result of the evaluation.
- * @param[in, out] R		- the resulting point and first point to add.
- * @param[in] Q				- the second point to add.
- * @param[in] P				- the affine point to evaluate the line function.
- */
-#if EP_ADD == BASIC
-#define pp_add_k12(L, R, Q, P)		pp_add_k12_basic(L, R, Q, P)
-#elif EP_ADD == PROJC
-#define pp_add_k12(L, R, Q, P)		pp_add_k12_projc(L, R, Q, P)
-#endif
-
-/**
- * Adds two prime elliptic curve points and evaluates the corresponding line
- * function at another elliptic curve point using projective coordinates.
- *
- * @param[out] L			- the result of the evaluation.
- * @param[in, out] R		- the resulting point and first point to add.
- * @param[in] Q				- the second point to add.
- * @param[in] P				- the affine point to evaluate the line function.
- */
-#if PP_EXT == BASIC
-#define pp_add_k12_projc(L, R, Q, P)	pp_add_k12_projc_basic(L, R, Q, P)
-#elif PP_EXT == LAZYR
-#define pp_add_k12_projc(L, R, Q, P)	pp_add_k12_projc_lazyr(L, R, Q, P)
-#endif
-
-/**
- * Doubles a prime elliptic curve point and evaluates the corresponding line
- * function at another elliptic curve point.
- *
- * @param[out] L			- the result of the evaluation.
- * @param[out] R			- the resulting point.
- * @param[in] Q				- the point to double.
- * @param[in] P				- the affine point to evaluate the line function.
- */
-#if EP_ADD == BASIC
-#define pp_dbl_k12(L, R, Q, P)			pp_dbl_k12_basic(L, R, Q, P)
-#elif EP_ADD == PROJC
-#define pp_dbl_k12(L, R, Q, P)			pp_dbl_k12_projc(L, R, Q, P)
-#endif
-
 /*============================================================================*/
 /* Function prototypes                                                        */
 /*============================================================================*/
@@ -585,7 +540,7 @@ void ep2_dbl_basic(ep2_t r, ep2_t p);
  * a quadratic extension and returns the computed slope.
  *
  * @param[out] r			- the result.
- * @param[out] s			- the numerator of the slope.
+ * @param[out] s			- the slope.
  * @param[in] p				- the point to double.
  */
 void ep2_dbl_slp_basic(ep2_t r, fp2_t s, ep2_t p);
