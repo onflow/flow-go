@@ -259,7 +259,7 @@ static void arith(void) {
 
 	BENCH_BEGIN("ep2_dbl_slp_basic") {
 		ep2_rand(p);
-		BENCH_ADD(ep2_dbl_slp_basic(r, s, u, p));
+		BENCH_ADD(ep2_dbl_slp_basic(r, s, p));
 	}
 	BENCH_END;
 #endif
