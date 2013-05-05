@@ -78,11 +78,11 @@ void fb_exp_basic(fb_t c, fb_t a, bn_t b) {
 #if FB_EXP == SLIDE || !defined(STRIP)
 
 void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
-	fb_t tab[1 << (FB_WIDTH - 1)], t;
+	fb_t tab[1 << (FB_WIDTH - 1)], r;
 	int i, j, l;
 	unsigned char win[FB_BITS + 1];
 
-	fb_null(t);
+	fb_null(r);
 
 	/* Initialize table. */
 	for (i = 0; i < (1 << (FB_WIDTH - 1)); i++) {
@@ -93,30 +93,30 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 		for (i = 0; i < (1 << (FB_WIDTH - 1)); i++) {
 			fb_new(tab[i]);
 		}
-		fb_new(t);
+		fb_new(r);
 
 		fb_copy(tab[0], a);
-		fb_sqr(t, a);
+		fb_sqr(r, a);
 
 		/* Create table. */
 		for (i = 1; i < 1 << (FB_WIDTH - 1); i++) {
-			fb_mul(tab[i], tab[i - 1], t);
+			fb_mul(tab[i], tab[i - 1], r);
 		}
 
-		fb_set_dig(t, 1);
+		fb_set_dig(r, 1);
 		bn_rec_slw(win, &l, b, FB_WIDTH);
 		for (i = 0; i < l; i++) {
 			if (win[i] == 0) {
-				fb_sqr(t, t);
+				fb_sqr(r, r);
 			} else {
 				for (j = 0; j < util_bits_dig(win[i]); j++) {
-					fb_sqr(t, t);
+					fb_sqr(r, r);
 				}
-				fb_mul(t, t, tab[win[i] >> 1]);
+				fb_mul(r, r, tab[win[i] >> 1]);
 			}
 		}
 
-		fb_copy(c, t);
+		fb_copy(c, r);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -125,7 +125,7 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 		for (i = 0; i < (1 << (FB_WIDTH - 1)); i++) {
 			fb_free(tab[i]);
 		}
-		fb_free(t);
+		fb_free(r);
 	}
 }
 

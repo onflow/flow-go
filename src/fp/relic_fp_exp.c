@@ -73,11 +73,11 @@ void fp_exp_basic(fp_t c, fp_t a, bn_t b) {
 #if FP_EXP == SLIDE || !defined(STRIP)
 
 void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
-	fp_t tab[1 << (FP_WIDTH - 1)], t;
+	fp_t tab[1 << (FP_WIDTH - 1)], r;
 	int i, j, l;
 	unsigned char win[FP_BITS];
 
-	fp_null(t);
+	fp_null(r);
 
 	/* Initialize table. */
 	for (i = 0; i < (1 << (FP_WIDTH - 1)); i++) {
@@ -88,30 +88,30 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 		for (i = 0; i < (1 << (FP_WIDTH - 1)); i ++) {
 			fp_new(tab[i]);
 		}
-		fp_new(t);
+		fp_new(r);
 
 		fp_copy(tab[0], a);
-		fp_sqr(t, a);
+		fp_sqr(r, a);
 
 		/* Create table. */
 		for (i = 1; i < 1 << (FP_WIDTH - 1); i++) {
-			fp_mul(tab[i], tab[i - 1], t);
+			fp_mul(tab[i], tab[i - 1], r);
 		}
 
-		fp_set_dig(t, 1);
+		fp_set_dig(r, 1);
 		bn_rec_slw(win, &l, b, FP_WIDTH);
 		for (i = 0; i < l; i++) {
 			if (win[i] == 0) {
-				fp_sqr(t, t);
+				fp_sqr(r, r);
 			} else {
 				for (j = 0; j < util_bits_dig(win[i]); j++) {
-					fp_sqr(t, t);
+					fp_sqr(r, r);
 				}
-				fp_mul(t, t, tab[win[i] >> 1]);
+				fp_mul(r, r, tab[win[i] >> 1]);
 			}
 		}
 
-		fp_copy(c, t);
+		fp_copy(c, r);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -120,7 +120,7 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 		for (i = 0; i < (1 << (FP_WIDTH - 1)); i++) {
 			fp_free(tab[i]);
 		}
-		fp_free(t);
+		fp_free(r);
 	}
 }
 
