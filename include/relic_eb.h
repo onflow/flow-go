@@ -384,22 +384,22 @@ typedef eb_st *eb_t;
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously. Computes
- * R = kP + lQ.
+ * R = kP + mQ.
  *
  * @param[out] R			- the result.
  * @param[in] P				- the first point to multiply.
  * @param[in] K				- the first integer.
  * @param[in] Q				- the second point to multiply.
- * @param[in] L				- the second integer,
+ * @param[in] M				- the second integer,
  */
 #if EB_SIM == BASIC
-#define eb_mul_sim(R, P, K, Q, L)	eb_mul_sim_basic(R, P, K, Q, L)
+#define eb_mul_sim(R, P, K, Q, M)	eb_mul_sim_basic(R, P, K, Q, M)
 #elif EB_SIM == TRICK
-#define eb_mul_sim(R, P, K, Q, L)	eb_mul_sim_trick(R, P, K, Q, L)
+#define eb_mul_sim(R, P, K, Q, M)	eb_mul_sim_trick(R, P, K, Q, M)
 #elif EB_SIM == INTER
-#define eb_mul_sim(R, P, K, Q, L)	eb_mul_sim_inter(R, P, K, Q, L)
+#define eb_mul_sim(R, P, K, Q, M)	eb_mul_sim_inter(R, P, K, Q, M)
 #elif EB_SIM == JOINT
-#define eb_mul_sim(R, P, K, Q, L)	eb_mul_sim_joint(R, P, K, Q, L)
+#define eb_mul_sim(R, P, K, Q, M)	eb_mul_sim_joint(R, P, K, Q, M)
 #endif
 
 /*============================================================================*/
@@ -966,9 +966,9 @@ void eb_mul_fix_lwnaf(eb_t r, eb_t *t, bn_t k);
  * @param[in] p				- the first point to multiply.
  * @param[in] k				- the first integer.
  * @param[in] q				- the second point to multiply.
- * @param[in] l				- the second integer,
+ * @param[in] m				- the second integer,
  */
-void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l);
+void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously using
@@ -978,9 +978,9 @@ void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l);
  * @param[in] p				- the first point to multiply.
  * @param[in] k				- the first integer.
  * @param[in] q				- the second point to multiply.
- * @param[in] l				- the second integer,
+ * @param[in] m				- the second integer,
  */
-void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l);
+void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously using
@@ -990,9 +990,9 @@ void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l);
  * @param[in] p				- the first point to multiply.
  * @param[in] k				- the first integer.
  * @param[in] q				- the second point to multiply.
- * @param[in] l				- the second integer,
+ * @param[in] m				- the second integer,
  */
-void eb_mul_sim_inter(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l);
+void eb_mul_sim_inter(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously using
@@ -1002,9 +1002,9 @@ void eb_mul_sim_inter(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l);
  * @param[in] p				- the first point to multiply.
  * @param[in] k				- the first integer.
  * @param[in] q				- the second point to multiply.
- * @param[in] l				- the second integer,
+ * @param[in] m				- the second integer,
  */
-void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l);
+void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
 
 /**
  * Multiplies and adds the generator and a binary elliptic curve point
@@ -1013,9 +1013,9 @@ void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t l);
  * @param[out] r			- the result.
  * @param[in] k				- the first integer.
  * @param[in] q				- the second point to multiply.
- * @param[in] l				- the second integer,
+ * @param[in] m				- the second integer,
  */
-void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t l);
+void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t m);
 
 /**
  * Converts a point to affine coordinates.
