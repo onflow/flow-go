@@ -363,6 +363,8 @@ void ep_param_set(int param) {
 		bn_new(r);
 		bn_new(h);
 
+		core_get()->ep_id = 0;
+
 		switch (param) {
 #if defined(EP_KBLTZ) && FP_PRIME == 158
 			case BN_P158:
@@ -473,8 +475,6 @@ void ep_param_set(int param) {
 		(void)ordin;
 		(void)beta;
 
-		core_get()->ep_id = param;
-
 		fp_zero(g->z);
 		fp_set_dig(g->z, 1);
 		g->norm = 1;
@@ -482,12 +482,14 @@ void ep_param_set(int param) {
 #if defined(EP_ORDIN)
 		if (ordin) {
 			ep_curve_set_ordin(a, b, g, r, h);
+			core_get()->ep_id = param;
 		}
 #endif
 
 #if defined(EP_KBLTZ)
 		if (kbltz) {
 			ep_curve_set_kbltz(b, g, r, h, beta, lamb);
+			core_get()->ep_id = param;
 		}
 #endif
 	}
@@ -506,13 +508,16 @@ void ep_param_set(int param) {
 }
 
 int ep_param_set_any() {
-	int r0, r1;
+	int r0, r1, r2;
 
 	r0 = ep_param_set_any_ordin();
 	if (r0 == STS_ERR) {
-		r1 = ep_param_set_any_pairf();
+		r1 = ep_param_set_any_kbltz();
 		if (r1 == STS_ERR) {
-			return STS_ERR;
+			r2 = ep_param_set_any_pairf();
+			if (r2 == STS_ERR) {
+				return STS_ERR;
+			}
 		}
 	}
 	return STS_OK;
@@ -520,18 +525,20 @@ int ep_param_set_any() {
 
 int ep_param_set_any_ordin() {
 	int r = STS_OK;
+#if defined(EP_ORDIN)
 #if FP_PRIME == 160
-	ep_param_set(SECG_P160);
+	r = ep_param_set(SECG_P160);
 #elif FP_PRIME == 192
-	ep_param_set(NIST_P192);
+	r = ep_param_set(NIST_P192);
 #elif FP_PRIME == 224
-	ep_param_set(NIST_P224);
+	r = ep_param_set(NIST_P224);
 #elif FP_PRIME == 256
-	ep_param_set(NIST_P256);
+	r = ep_param_set(NIST_P256);
 #elif FP_PRIME == 384
-	ep_param_set(NIST_P384);
+	r = ep_param_set(NIST_P384);
 #elif FP_PRIME == 521
-	ep_param_set(NIST_P521);
+	r = ep_param_set(NIST_P521);
+#endif
 #else
 	r = STS_ERR;
 #endif
@@ -540,16 +547,17 @@ int ep_param_set_any_ordin() {
 
 int ep_param_set_any_kbltz() {
 	int r = STS_OK;
+#if defined(EP_KBLTZ)
 #if FP_PRIME == 158
-	ep_param_set(BN_P158);
+	r = ep_param_set(BN_P158);
 #elif FP_PRIME == 160
-	ep_param_set(SECG_K160);
+	r = ep_param_set(SECG_K160);
 #elif FP_PRIME == 192
-	ep_param_set(SECG_K192);
+	r = ep_param_set(SECG_K192);
 #elif FP_PRIME == 224
-	ep_param_set(SECG_K224);
+	r = ep_param_set(SECG_K224);
 #elif FP_PRIME == 254
-	ep_param_set(BN_P254);
+	r = ep_param_set(BN_P254);
 #elif FP_PRIME == 256
 	ep_param_set(SECG_K256);
 #elif FP_PRIME == 477
@@ -558,6 +566,7 @@ int ep_param_set_any_kbltz() {
 	ep_param_set(KSS_P508);
 #elif FP_PRIME == 638
 	ep_param_set(BN_P638);
+#endif
 #else
 	r = STS_ERR;
 #endif
@@ -566,6 +575,7 @@ int ep_param_set_any_kbltz() {
 
 int ep_param_set_any_pairf() {
 	int twist, degree, r = STS_OK;
+#if defined(EP_KBLTZ)
 #if FP_PRIME == 158
 	ep_param_set(BN_P158);
 	twist = EP_DTYPE;
@@ -590,6 +600,7 @@ int ep_param_set_any_pairf() {
 	ep_param_set(B12_P638);
 	twist = EP_MTYPE;
 	degree = 2;
+#endif
 #else
 	r = STS_ERR;
 #endif

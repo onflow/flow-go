@@ -531,6 +531,7 @@ int eb_param_set_any() {
 
 int eb_param_set_any_ordin() {
 	int r = STS_OK;
+#if defined(EB_ORDIN)
 #if FB_POLYN == 163
 	eb_param_set(NIST_B163);
 #elif FB_POLYN == 233
@@ -545,6 +546,7 @@ int eb_param_set_any_ordin() {
 	eb_param_set(NIST_B409);
 #elif FB_POLYN == 571
 	eb_param_set(NIST_B571);
+#endif
 #else
 	r = STS_ERR;
 #endif
@@ -553,6 +555,7 @@ int eb_param_set_any_ordin() {
 
 int eb_param_set_any_kbltz() {
 	int r = STS_OK;
+#if defined(EB_KBLTZ)
 #if FB_POLYN == 163
 	eb_param_set(NIST_K163);
 #elif FB_POLYN == 233
@@ -565,6 +568,7 @@ int eb_param_set_any_kbltz() {
 	eb_param_set(NIST_K409);
 #elif FB_POLYN == 571
 	eb_param_set(NIST_K571);
+#endif
 #else
 	r = STS_ERR;
 #endif
@@ -573,6 +577,7 @@ int eb_param_set_any_kbltz() {
 
 int eb_param_set_any_super() {
 	int r = STS_OK;
+#if defined(EB_SUPER)
 #if FB_POLYN == 271
 #ifdef FB_TRINO
 	eb_param_set(ETAT_T271);
@@ -583,6 +588,7 @@ int eb_param_set_any_super() {
 	eb_param_set(ETAT_S353);
 #elif FB_POLYN == 1223
 	eb_param_set(ETAT_S1223);
+#endif
 #else
 	r = STS_ERR;
 #endif
