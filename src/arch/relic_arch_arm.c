@@ -31,18 +31,38 @@
 
 #include "relic_util.h"
 
+#ifdef __ARM_ARCH_7M__
+	volatile unsigned int *DWT_CYCCNT = (unsigned int *)0xE0001004; //address of the register
+	volatile unsigned int *DWT_CONTROL = (unsigned int *)0xE0001000; //address of the register
+	volatile unsigned int *SCB_DEMCR = (unsigned int *)0xE000EDFC; //address of the register
+#endif
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
 void arch_init(void) {
+#ifdef __ARM_ARCH_7M__
+	*SCB_DEMCR = *SCB_DEMCR | 0x01000000;
+	*DWT_CYCCNT = 0; // reset the counter
+	*DWT_CONTROL = *DWT_CONTROL | 1 ; // enable the counter
+#elif __ARM_ARCH_7A__
+	asm("mcr p15, 0, %0, c9, c12, 0" :: "r"(17));
+	asm("mcr p15, 0, %0, c9, c12, 1" :: "r"(0x8000000f));
+	asm("mcr p15, 0, %0, c9, c12, 3" :: "r"(0x8000000f));
+#endif
 }
 
 void arch_clean(void) {
 }
 
+
 unsigned long long arch_cycles(void) {
-	unsigned int value;
-	asm ("mcr p15, 0, %0, c9, c13, 0\t\n": "=r"(value));  
+	unsigned int value = 0;
+#ifdef __ARM_ARCH_7M__
+	value = *DWT_CYCCNT;
+#elif __ARM_ARCH_7A__
+	asm("mcr p15, 0, %0, c9, c13, 0" : "=r"(value));  
+#endif
 	return value;
 }

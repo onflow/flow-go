@@ -35,6 +35,10 @@
 #include "relic_core.h"
 #include "relic_conf.h"
 
+#if OPSYS == DUINO
+uint32_t micros();
+#endif
+
 /*============================================================================*/
 /* Private definitions                                                        */
 /*============================================================================*/
@@ -113,7 +117,9 @@ void bench_reset() {
 }
 
 void bench_before() {
-#if TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
+#if OPSYS == DUINO && TIMER == HREAL
+	core_get()->before = micros();
+#elif TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
 	clock_gettime(CLOCK, &(core_get()->before));
 #elif TIMER == ANSI
 	core_get()->before = clock();
@@ -128,17 +134,20 @@ void bench_after() {
 	ctx_t *ctx = core_get();
 	long long result;
 
-#if TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
+#if OPSYS == DUINO && TIMER == HREAL
+	core_get()->after = micros();
+	result = (ctx->after - ctx->before);
+#elif TIMER == HREAL || TIMER == HPROC || TIMER == HTHRD
 	clock_gettime(CLOCK, &(ctx->after));
 	result = ((long)ctx->after.tv_sec - (long)ctx->before.tv_sec) * 1000000000;
 	result += (ctx->after.tv_nsec - ctx->before.tv_nsec);
 #elif TIMER == ANSI
 	ctx->after = clock();
-	result = (ctx->after - ctx->before) * 1000000000 / CLOCKS_PER_SEC;
+	result = (ctx->after - ctx->before) * 1000000 / CLOCKS_PER_SEC;
 #elif TIMER == POSIX
 	gettimeofday(&(ctx->after), NULL);
-	result = ((long)ctx->after.tv_sec - (long)ctx->before.tv_sec) * 1000000000;
-	result += (ctx->after.tv_usec - ctx->before.tv_usec) * 1000;
+	result = ((long)ctx->after.tv_sec - (long)ctx->before.tv_sec) * 1000000;
+	result += (ctx->after.tv_usec - ctx->before.tv_usec);
 #elif TIMER == CYCLE
 	ctx->after = arch_cycles();
 	result = (ctx->after - ctx->before);
@@ -168,7 +177,9 @@ void bench_compute(int benches) {
 void bench_print() {
 	ctx_t *ctx = core_get();
 
-#if TIMER == CYCLE
+#if TIMER == POSIX || TIMER == ANSI || (OPSYS == DUINO && TIMER == HREAL)
+	util_print("%lld microsec", ctx->total);
+#elif TIMER == CYCLE
 	util_print("%lld cycles", ctx->total);
 #else
 	util_print("%lld nanosec", ctx->total);

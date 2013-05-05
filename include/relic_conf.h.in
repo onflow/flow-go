@@ -706,6 +706,8 @@
 #define WINDOWS  5
 /** Android operating system. */
 #define DROID    6
+/* Arduino platform. */
+#define DUINO    7
 /** Detected operation system. */
 #define OPSYS    @OPSYS@
 
