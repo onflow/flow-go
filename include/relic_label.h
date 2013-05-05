@@ -144,6 +144,7 @@
 #undef bn_mxp_basic
 #undef bn_mxp_slide
 #undef bn_mxp_monty
+#undef bn_mxp_dig
 #undef bn_gcd_basic
 #undef bn_gcd_lehme
 #undef bn_gcd_stein
@@ -240,6 +241,7 @@
 #define bn_mxp_basic		PREFIX(_bn_mxp_basic)
 #define bn_mxp_slide		PREFIX(_bn_mxp_slide)
 #define bn_mxp_monty		PREFIX(_bn_mxp_monty)
+#define bn_mxp_dig			PREFIX(_bn_mxp_dig)
 #define bn_gcd_basic		PREFIX(_bn_gcd_basic)
 #define bn_gcd_lehme		PREFIX(_bn_gcd_lehme)
 #define bn_gcd_stein		PREFIX(_bn_gcd_stein)
