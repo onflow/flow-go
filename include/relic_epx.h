@@ -209,20 +209,6 @@ typedef ep3_st *ep3_t;
 #endif
 
 /**
- * Adds two points in an elliptic curve over a quadratic extension field and
- * returns the computed slope. Computes R = P + Q and the slope S.
- *
- * @param[out] R				- the result.
- * @param[in] P					- the first point to add.
- * @param[in] Q					- the second point to add.
- */
-#if EP_ADD == BASIC
-#define ep2_add_slp(R, S, P, Q)	ep2_add_slp_basic(R, S, P, Q);
-#elif EP_ADD == PROJC
-#define ep2_add_slp(R, S, P, Q)	ep2_add_slp_projc(R, S, P, Q);
-#endif
-
-/**
  * Subtracts a point in an elliptic curve over a quadratic extension field from
  * another point in this curve. Computes R = P - Q.
  *
@@ -247,19 +233,6 @@ typedef ep3_st *ep3_t;
 #define ep2_dbl(R, P)			ep2_dbl_basic(R, P);
 #elif EP_ADD == PROJC
 #define ep2_dbl(R, P)			ep2_dbl_projc(R, P);
-#endif
-
-/**
- * Doubles a point in an elliptic curve over a quadratic extension field and
- * returns the computed slope. Computes R = 2 * P and the slope S.
- *
- * @param[out] R				- the result.
- * @param[in] P					- the point to double.
- */
-#if EP_ADD == BASIC
-#define ep2_dbl_slp(R, S, E, P)	ep2_dbl_slp_basic(R, S, E, P);
-#elif EP_ADD == PROJC
-#define ep2_dbl_slp(R, S, E, P)	ep2_dbl_slp_projc(R, S, E, P);
 #endif
 
 /**
@@ -613,10 +586,9 @@ void ep2_dbl_basic(ep2_t r, ep2_t p);
  *
  * @param[out] r			- the result.
  * @param[out] s			- the numerator of the slope.
- * @param[out] e			- the denominator of the slope.
  * @param[in] p				- the point to double.
  */
-void ep2_dbl_slp_basic(ep2_t r, fp2_t s, fp2_t e, ep2_t p);
+void ep2_dbl_slp_basic(ep2_t r, fp2_t s, ep2_t p);
 
 /**
  * Doubles a points represented in projective coordinates in an elliptic curve
