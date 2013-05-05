@@ -527,17 +527,17 @@ int ep_param_set_any_ordin() {
 	int r = STS_OK;
 #if defined(EP_ORDIN)
 #if FP_PRIME == 160
-	r = ep_param_set(SECG_P160);
+	ep_param_set(SECG_P160);
 #elif FP_PRIME == 192
-	r = ep_param_set(NIST_P192);
+	ep_param_set(NIST_P192);
 #elif FP_PRIME == 224
-	r = ep_param_set(NIST_P224);
+	ep_param_set(NIST_P224);
 #elif FP_PRIME == 256
-	r = ep_param_set(NIST_P256);
+	ep_param_set(NIST_P256);
 #elif FP_PRIME == 384
-	r = ep_param_set(NIST_P384);
+	ep_param_set(NIST_P384);
 #elif FP_PRIME == 521
-	r = ep_param_set(NIST_P521);
+	ep_param_set(NIST_P521);
 #endif
 #else
 	r = STS_ERR;
@@ -549,15 +549,15 @@ int ep_param_set_any_kbltz() {
 	int r = STS_OK;
 #if defined(EP_KBLTZ)
 #if FP_PRIME == 158
-	r = ep_param_set(BN_P158);
+	ep_param_set(BN_P158);
 #elif FP_PRIME == 160
-	r = ep_param_set(SECG_K160);
+	ep_param_set(SECG_K160);
 #elif FP_PRIME == 192
-	r = ep_param_set(SECG_K192);
+	ep_param_set(SECG_K192);
 #elif FP_PRIME == 224
-	r = ep_param_set(SECG_K224);
+	ep_param_set(SECG_K224);
 #elif FP_PRIME == 254
-	r = ep_param_set(BN_P254);
+	ep_param_set(BN_P254);
 #elif FP_PRIME == 256
 	ep_param_set(SECG_K256);
 #elif FP_PRIME == 477
