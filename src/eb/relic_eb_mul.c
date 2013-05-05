@@ -911,13 +911,14 @@ void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k) {
 void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 	int l, i, j, trc, cof;
 	signed char naf[FB_BITS + 1] = { 0 }, *_k;
-	eb_t q, t[1 << (EB_WIDTH - 2)];
+	eb_t q, s, t[1 << (EB_WIDTH - 2)];
 	bn_t n, m;
 	fb_t u, v, w, z;
 
 	bn_null(m);
 	bn_null(n);
 	eb_null(q);
+	eb_null(s);
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
 		eb_null(t[i]);
 	}
@@ -930,7 +931,7 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		bn_new(n);
 		bn_new(m);
 		eb_new(q);
-		eb_new(t);
+		eb_new(s);
 		fb_new(u);
 		fb_new(v);
 		fb_new(w);
@@ -981,24 +982,24 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 			for (i = l - 1; i >= 0; i--, _k--) {
 				j = *_k;
 				if (j > 0) {
-					eb_norm(t, q);
-					eb_add(t[j / 2], t[j / 2], t);
+					eb_norm(s, q);
+					eb_add(t[j / 2], t[j / 2], s);
 				}
 				if (j < 0) {
-					eb_norm(t, q);
-					eb_sub(t[-j / 2], t[-j / 2], t);
+					eb_norm(s, q);
+					eb_sub(t[-j / 2], t[-j / 2], s);
 				}
 
 				/* T = 1/2(Q). */
-				eb_hlv(t, q);
+				eb_hlv(s, q);
 
 				/* If Tr(x_T) != Tr(a). */
-				if (fb_trc(t->x) != 0) {
+				if (fb_trc(s->x) != 0) {
 					/* z = l_t, w = sqrt(l_Q), l_T = l_T + sqrt(l_Q) + v. */
-					fb_copy(z, t->y);
+					fb_copy(z, s->y);
 					fb_srt(w, q->y);
-					fb_add(t->y, t->y, w);
-					fb_add(t->y, t->y, v);
+					fb_add(s->y, s->y, w);
+					fb_add(s->y, s->y, v);
 					/* z = (z + x_Q + v + sqrt(a)). */
 					fb_add(z, z, q->x);
 					fb_add(z, z, v);
@@ -1009,11 +1010,11 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 					fb_add(w, w, u);
 					/* x_T = sqrt(w * z), . */
 					fb_mul(w, w, z);
-					fb_srt(t->x, w);
-					fb_set_dig(t->z, 1);
-					t->norm = 2;
+					fb_srt(s->x, w);
+					fb_set_dig(s->z, 1);
+					s->norm = 2;
 				}
-				eb_copy(q, t);
+				eb_copy(q, s);
 			}
 		} else {
 			for (i = l - 1; i >= 0; i--, _k--) {
@@ -1050,12 +1051,12 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		/* We may need to fix an error of a 2-torsion point if the curve has a
 		 * 4-cofactor. */
 		if (cof) {
-			eb_hlv(t, r);
-			if (fb_trc(t->x) != trc) {
-				fb_zero(t->x);
-				fb_srt(t->y, eb_curve_get_b());
-				fb_set_dig(t->z, 1);
-				eb_add(r, r, t);
+			eb_hlv(s, r);
+			if (fb_trc(s->x) != trc) {
+				fb_zero(s->x);
+				fb_srt(s->y, eb_curve_get_b());
+				fb_set_dig(s->z, 1);
+				eb_add(r, r, s);
 				eb_norm(r, r);
 			}
 		}
@@ -1070,8 +1071,8 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		}
 		bn_free(n);
 		bn_free(m);
-		eb_free(t);
 		eb_free(q);
+		eb_free(s);
 		fb_free(u);
 		fb_free(v);
 		fb_free(w);
