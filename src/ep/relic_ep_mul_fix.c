@@ -42,27 +42,27 @@
  * method.
  *
  * @param[out] r 				- the result.
- * @param[in] table				- the precomputed table.
+ * @param[in] t				- the precomputed table.
  * @param[in] k					- the integer.
  */
-static void ep_mul_fix_ordin(ep_t r, ep_t *table, bn_t k) {
-	int len, i, n;
-	signed char naf[FP_BITS + 1], *t;
+static void ep_mul_fix_ordin(ep_t r, ep_t *t, bn_t k) {
+	int l, i, n;
+	signed char naf[FP_BITS + 1], *_k;
 
 	/* Compute the w-TNAF representation of k. */
-	bn_rec_naf(naf, &len, k, EP_DEPTH);
+	bn_rec_naf(naf, &l, k, EP_DEPTH);
 
-	t = naf + len - 1;
+	_k = naf + l - 1;
 	ep_set_infty(r);
-	for (i = len - 1; i >= 0; i--, t--) {
+	for (i = l - 1; i >= 0; i--, _k--) {
 		ep_dbl(r, r);
 
-		n = *t;
+		n = *_k;
 		if (n > 0) {
-			ep_add(r, r, table[n / 2]);
+			ep_add(r, r, t[n / 2]);
 		}
 		if (n < 0) {
-			ep_sub(r, r, table[-n / 2]);
+			ep_sub(r, r, t[-n / 2]);
 		}
 	}
 	/* Convert r to affine coordinates. */

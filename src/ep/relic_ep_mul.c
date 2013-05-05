@@ -40,11 +40,10 @@
 #if defined(EP_KBLTZ)
 
 static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
-	int len, l0, l1, i, n0, n1, s0, s1;
+	int l, l0, l1, i, n0, n1, s0, s1;
 	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
 	bn_t n, k0, k1, v1[3], v2[3];
-	ep_t q;
-	ep_t table[1 << (EP_WIDTH - 2)];
+	ep_t q, t[1 << (EP_WIDTH - 2)];
 
 	bn_null(n);
 	bn_null(k0);
@@ -57,8 +56,8 @@ static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 		bn_new(k1);
 		ep_new(q);
 		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-			ep_null(table[i]);
-			ep_new(table[i]);
+			ep_null(t[i]);
+			ep_new(t[i]);
 		}
 		for (i = 0; i < 3; i++) {
 			bn_null(v1[i]);
@@ -77,37 +76,37 @@ static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 		bn_abs(k1, k1);
 
 		if (s0 == BN_POS) {
-			ep_tab(table, p, EP_WIDTH);
+			ep_tab(t, p, EP_WIDTH);
 		} else {
 			ep_neg(q, p);
-			ep_tab(table, q, EP_WIDTH);
+			ep_tab(t, q, EP_WIDTH);
 		}
 
 		bn_rec_naf(naf0, &l0, k0, EP_WIDTH);
 		bn_rec_naf(naf1, &l1, k1, EP_WIDTH);
 
-		len = MAX(l0, l1);
-		t0 = naf0 + len - 1;
-		t1 = naf1 + len - 1;
-		for (i = l0; i < len; i++)
+		l = MAX(l0, l1);
+		t0 = naf0 + l - 1;
+		t1 = naf1 + l - 1;
+		for (i = l0; i < l; i++)
 			naf0[i] = 0;
-		for (i = l1; i < len; i++)
+		for (i = l1; i < l; i++)
 			naf1[i] = 0;
 
 		ep_set_infty(r);
-		for (i = len - 1; i >= 0; i--, t0--, t1--) {
+		for (i = l - 1; i >= 0; i--, t0--, t1--) {
 			ep_dbl(r, r);
 
 			n0 = *t0;
 			n1 = *t1;
 			if (n0 > 0) {
-				ep_add(r, r, table[n0 / 2]);
+				ep_add(r, r, t[n0 / 2]);
 			}
 			if (n0 < 0) {
-				ep_sub(r, r, table[-n0 / 2]);
+				ep_sub(r, r, t[-n0 / 2]);
 			}
 			if (n1 > 0) {
-				ep_copy(q, table[n1 / 2]);
+				ep_copy(q, t[n1 / 2]);
 				fp_mul(q->x, q->x, ep_curve_get_beta());
 				if (s0 != s1) {
 					ep_neg(q, q);
@@ -115,7 +114,7 @@ static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 				ep_add(r, r, q);
 			}
 			if (n1 < 0) {
-				ep_copy(q, table[-n1 / 2]);
+				ep_copy(q, t[-n1 / 2]);
 				fp_mul(q->x, q->x, ep_curve_get_beta());
 				if (s0 != s1) {
 					ep_neg(q, q);
@@ -136,7 +135,7 @@ static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 		bn_free(n)
 		ep_free(q);
 		for (i = 0; i < 1 << (EP_WIDTH - 2); i++) {
-			ep_free(table[i]);
+			ep_free(t[i]);
 		}
 		for (i = 0; i < 3; i++) {
 			bn_free(v1[i]);
@@ -151,42 +150,41 @@ static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 #if defined(EP_ORDIN) || defined(EP_SUPER)
 
 static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
-	int len, i, n;
-	signed char naf[FP_BITS + 1], *t;
-	ep_t table[1 << (EP_WIDTH - 2)];
+	int l, i, n;
+	signed char naf[FP_BITS + 1], *_k;
+	ep_t t[1 << (EP_WIDTH - 2)];
 
 	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-		ep_null(table[i]);
+		ep_null(t[i]);
 	}
 
 	TRY {
 		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-			ep_new(table[i]);
+			ep_new(t[i]);
 		}
 		/* Compute the precomputation table. */
-		ep_tab(table, p, EP_WIDTH);
+		ep_tab(t, p, EP_WIDTH);
 
-		/* Compute the w-TNAF representation of k. */
-		bn_rec_naf(naf, &len, k, EP_WIDTH);
+		/* Compute the w-NAF representation of k. */
+		bn_rec_naf(naf, &l, k, EP_WIDTH);
 
-		t = naf + len - 1;
+		_k = naf + l - 1;
 
 		ep_set_infty(r);
-		for (i = len - 1; i >= 0; i--, t--) {
+		for (i = l - 1; i >= 0; i--, _k--) {
 			ep_dbl(r, r);
 
-			n = *t;
+			n = *_k;
 			if (n > 0) {
-				ep_add(r, r, table[n / 2]);
+				ep_add(r, r, t[n / 2]);
 			}
 			if (n < 0) {
-				ep_sub(r, r, table[-n / 2]);
+				ep_sub(r, r, t[-n / 2]);
 			}
 		}
 		/* Convert r to affine coordinates. */
 		ep_norm(r, r);
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -194,7 +192,7 @@ static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
 	FINALLY {
 		/* Free the precomputation table. */
 		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-			ep_free(table[i]);
+			ep_free(t[i]);
 		}
 	}
 }
@@ -246,63 +244,63 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 #if EP_MUL == SLIDE || !defined(STRIP)
 
 void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
-	ep_t tab[1 << (EP_WIDTH - 1)], t;
+	ep_t t[1 << (EP_WIDTH - 1)], q;
 	int i, j, l;
 	unsigned char win[FP_BITS];
 
-	ep_null(t);
+	ep_null(q);
 
 	/* Initialize table. */
 	for (i = 0; i < (1 << (EP_WIDTH - 1)); i++) {
-		ep_null(tab[i]);
+		ep_null(t[i]);
 	}
 
 	TRY {
 		for (i = 0; i < (1 << (EP_WIDTH - 1)); i ++) {
-			ep_new(tab[i]);
+			ep_new(t[i]);
 		}
 
-		ep_new(t);
+		ep_new(q);
 
-		ep_copy(tab[0], p);
-		ep_dbl(t, p);
+		ep_copy(t[0], p);
+		ep_dbl(q, p);
 
 #if defined(EP_MIXED)
-		ep_norm(t, t);
+		ep_norm(q, q);
 #endif
 
 		/* Create table. */
 		for (i = 1; i < (1 << (EP_WIDTH - 1)); i++) {
-			ep_add(tab[i], tab[i - 1], t);
+			ep_add(t[i], t[i - 1], q);
 		}
 
 #if defined(EP_MIXED)
-		ep_norm_sim(tab + 1, tab + 1, (1 << (EP_WIDTH - 1)) - 1);
+		ep_norm_sim(t + 1, t + 1, (1 << (EP_WIDTH - 1)) - 1);
 #endif
 
-		ep_set_infty(t);
+		ep_set_infty(q);
 		bn_rec_slw(win, &l, k, EP_WIDTH);
 		for (i = 0; i < l; i++) {
 			if (win[i] == 0) {
-				ep_dbl(t, t);
+				ep_dbl(q, q);
 			} else {
 				for (j = 0; j < util_bits_dig(win[i]); j++) {
-					ep_dbl(t, t);
+					ep_dbl(q, q);
 				}
-				ep_add(t, t, tab[win[i] >> 1]);
+				ep_add(q, q, t[win[i] >> 1]);
 			}
 		}
 
-		ep_norm(r, t);
+		ep_norm(r, q);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
 		for (i = 0; i < (1 << (EP_WIDTH - 1)); i++) {
-			ep_free(tab[i]);
+			ep_free(t[i]);
 		}
-		ep_free(t);
+		ep_free(q);
 	}
 }
 
@@ -311,19 +309,19 @@ void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
 #if EP_MUL == MONTY || !defined(STRIP)
 
 void ep_mul_monty(ep_t r, ep_t p, bn_t k) {
-	ep_t tab[2];
+	ep_t t[2];
 	dig_t buf;
 	int bitcnt, digidx, j;
 
-	ep_null(tab[0]);
-	ep_null(tab[1]);
+	ep_null(t[0]);
+	ep_null(t[1]);
 
 	TRY {
-		ep_new(tab[0]);
-		ep_new(tab[1]);
+		ep_new(t[0]);
+		ep_new(t[1]);
 
-		ep_set_infty(tab[0]);
-		ep_copy(tab[1], p);
+		ep_set_infty(t[0]);
+		ep_copy(t[1], p);
 
 		/* Set initial mode and bitcnt, */
 		bitcnt = 1;
@@ -346,18 +344,18 @@ void ep_mul_monty(ep_t r, ep_t p, bn_t k) {
 			j = (buf >> (BN_DIGIT - 1)) & 0x01;
 			buf <<= (dig_t)1;
 
-			ep_add(tab[j ^ 1], tab[0], tab[1]);
-			ep_dbl(tab[j], tab[j]);
+			ep_add(t[j ^ 1], t[0], t[1]);
+			ep_dbl(t[j], t[j]);
 		}
 
-		ep_norm(r, tab[0]);
+		ep_norm(r, t[0]);
 
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		ep_free(tab[1]);
-		ep_free(tab[0]);
+		ep_free(t[1]);
+		ep_free(t[0]);
 	}
 }
 
