@@ -75,6 +75,11 @@ void fp2_inv(fp2_t c, fp2_t a) {
 	}
 }
 
+void fp2_inv_uni(fp2_t c, fp2_t a) {
+	fp_copy(c[0], a[0]);
+	fp_neg(c[1], a[1]);
+}
+
 void fp2_inv_sim(fp2_t *c, fp2_t *a, int n) {
 	int i;
 	fp2_t u, t[n];
@@ -300,8 +305,8 @@ void fp12_inv(fp12_t c, fp12_t a) {
 		fp6_new(t0);
 		fp6_new(t1);
 
-		fp6_sqr(t0, a[0]);
-		fp6_sqr(t1, a[1]);
+		fp6_sqr_basic(t0, a[0]);
+		fp6_sqr_basic(t1, a[1]);
 		fp6_mul_art(t1, t1);
 		fp6_sub(t0, t0, t1);
 		fp6_inv(t0, t0);

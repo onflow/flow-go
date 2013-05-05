@@ -778,6 +778,22 @@ void fp2_sqr_basic(fp2_t c, fp2_t a);
 void fp2_sqr_integ(fp2_t c, fp2_t a);
 
 /**
+ * Inverts a quadratic extension field element. Computes c = 1/a.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quadratic extension field element to invert.
+ */
+void fp2_inv(fp2_t c, fp2_t a);
+
+/**
+ * Computes the inverse of a unitary quadratic extension field element.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quadratic extension field element to invert.
+ */
+void fp2_inv_uni(fp2_t c, fp2_t a);
+
+/**
  * Inverts multiple quadratic extension field elements simultaneously.
  *
  * @param[out] c			- the result.
@@ -787,12 +803,13 @@ void fp2_sqr_integ(fp2_t c, fp2_t a);
 void fp2_inv_sim(fp2_t *c, fp2_t *a, int n);
 
 /**
- * Inverts a quadratic extension field element. Computes c = 1/a.
+ * Converts a quadratic extension field element to a unitary element. Computes
+ * c = a^(p - 1).
  *
  * @param[out] c			- the result.
- * @param[in] a				- the quadratic extension field element to invert.
+ * @param[in] a				- the quadratic extension field element.
  */
-void fp2_inv(fp2_t c, fp2_t a);
+void fp2_conv_uni(fp2_t c, fp2_t a);
 
 /**
  * Computes a power of a quadratic extension field element.
@@ -802,6 +819,15 @@ void fp2_inv(fp2_t c, fp2_t a);
  * @param[in] b				- the exponent.
  */
 void fp2_exp(fp2_t c, fp2_t a, bn_t b);
+
+/**
+ * Computes a power of a unitary quadratic extension field element.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the unitary element to exponentiate.
+ * @param[in] b				- the exponent.
+ */
+void fp2_exp_uni(fp2_t c, fp2_t a, bn_t b);
 
 /**
  * Computes a power of the Frobenius map of a quadratic extension field element.
@@ -1011,6 +1037,14 @@ void fp3_sqr_basic(fp3_t c, fp3_t a);
 void fp3_sqr_integ(fp3_t c, fp3_t a);
 
 /**
+ * Inverts a cubic extension field element. Computes c = 1/a.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the cubic extension field element to invert.
+ */
+void fp3_inv(fp3_t c, fp3_t a);
+
+/**
  * Inverts multiple cubic extension field elements simultaneously.
  *
  * @param[out] c			- the result.
@@ -1018,14 +1052,6 @@ void fp3_sqr_integ(fp3_t c, fp3_t a);
  * @param[in] n				- the number of elements.
  */
 void fp3_inv_sim(fp3_t *c, fp3_t *a, int n);
-
-/**
- * Inverts a cubic extension field element. Computes c = 1/a.
- *
- * @param[out] c			- the result.
- * @param[in] a				- the cubic extension field element to invert.
- */
-void fp3_inv(fp3_t c, fp3_t a);
 
 /**
  * Computes a power of a cubic extension field element. Computes c = a^b.
@@ -1500,7 +1526,7 @@ void fp12_inv_uni(fp12_t c, fp12_t a);
  * c = a^(p^6 - 1).
  *
  * @param[out] c			- the result.
- * @param[in] a				- a dodecic extension field element.
+ * @param[in] a				- the dodecic extension field element.
  */
 void fp12_conv_uni(fp12_t c, fp12_t a);
 

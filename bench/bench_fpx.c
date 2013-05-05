@@ -259,9 +259,21 @@ static void arith2(void) {
 	BENCH_END;
 #endif
 
+	BENCH_BEGIN("fp2_conv_uni") {
+		fp2_rand(a);
+		BENCH_ADD(fp2_conv_uni(c, a));
+	}
+	BENCH_END;
+
 	BENCH_BEGIN("fp2_inv") {
 		fp2_rand(a);
 		BENCH_ADD(fp2_inv(c, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp2_inv_uni") {
+		fp2_rand(a);
+		BENCH_ADD(fp2_inv_uni(c, a));
 	}
 	BENCH_END;
 
@@ -277,6 +289,14 @@ static void arith2(void) {
 		e->used = FP_DIGS;
 		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
 		BENCH_ADD(fp2_exp(c, a, e));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp2_exp_uni") {
+		fp2_rand(a);
+		e->used = FP_DIGS;
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		BENCH_ADD(fp2_exp_uni(c, a, e));
 	}
 	BENCH_END;
 

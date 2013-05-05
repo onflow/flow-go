@@ -62,6 +62,92 @@ void fp2_exp(fp2_t c, fp2_t a, bn_t b) {
 	}
 }
 
+void fp2_conv_uni(fp2_t c, fp2_t a) {
+	fp2_t t;
+
+	fp2_null(t);
+
+	TRY {
+		fp2_new(t);
+
+		/* t = a^{-1}. */
+		fp2_inv(t, a);
+		/* c = a^p. */
+		fp2_inv_uni(c, a);
+		/* c = a^(p - 1). */
+		fp2_mul(c, c, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp2_free(t);
+	}
+}
+
+
+void fp2_exp_uni(fp2_t c, fp2_t a, bn_t b) {
+	fp2_t t[1 << (FP_WIDTH - 2)], r, s;
+	int i, l;
+	signed char naf[FP_BITS], *k, n;
+
+	fp_null(s);
+	fp_null(r);
+
+	/* Initialize table. */
+	for (i = 0; i < (1 << (FP_WIDTH - 2)); i++) {
+		fp2_null(t[i]);
+	}
+
+	TRY {
+		for (i = 0; i < (1 << (FP_WIDTH - 2)); i ++) {
+			fp2_new(t[i]);
+		}
+		fp_new(r);
+		fp_new(s);
+
+#if FP_WIDTH > 2
+		fp2_sqr(t[0], a);
+		fp2_mul(t[1], t[0], a);
+		for (int i = 2; i < (1 << (FP_WIDTH - 2)); i++) {
+			fp2_mul(t[i], t[i - 1], t[0]);
+		}
+#endif
+		fp2_copy(t[0], a);
+
+		fp2_zero(r);
+		fp_set_dig(r[0], 1);
+		bn_rec_naf(naf, &l, b, FP_WIDTH);
+
+		k = naf + l - 1;
+
+		for (i = l - 1; i >= 0; i--, k--) {
+			fp2_sqr(r, r);
+
+			n = *k;
+			if (n > 0) {
+				fp2_mul(r, r, t[n / 2]);
+			}
+			if (n < 0) {
+				fp2_inv_uni(s, t[-n / 2]);
+				fp2_mul(r, r, s);
+			}
+		}
+
+		fp2_copy(c, r);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		for (i = 0; i < (1 << (FP_WIDTH - 2)); i++) {
+			fp2_free(t[i]);
+		}
+		fp2_free(r);
+		fp2_free(s);
+	}
+}
+
 void fp3_exp(fp3_t c, fp3_t a, bn_t b) {
 	fp3_t t;
 

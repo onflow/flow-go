@@ -548,6 +548,14 @@ static int inversion2(void) {
 			TEST_ASSERT(fp2_cmp(c, b) == CMP_EQ, end);
 		} TEST_END;
 
+		TEST_BEGIN("inversion of a unitary element is correct") {
+			fp2_rand(a);
+			fp2_conv_uni(a, a);
+			fp2_inv(b, a);
+			fp2_inv_uni(c, a);
+			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+
 		TEST_BEGIN("simultaneous inversion is correct") {
 			fp2_rand(a);
 			fp2_rand(b);
@@ -606,6 +614,15 @@ static int exponentiation2(void) {
 			fp2_frb(c, a, 2);
 			TEST_ASSERT(fp2_cmp(c, b) == CMP_EQ, end);
 		} TEST_END;
+
+        TEST_BEGIN("exponentiation of unitary element is correct") {
+			bn_rand(d, BN_POS, FP_BITS);
+			fp2_rand(a);
+			fp2_conv_uni(a, a);
+			fp2_exp(b, a, d);
+			fp2_exp_uni(c, a, d);
+			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
+        } TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
