@@ -329,7 +329,7 @@ void fp_prime_set(bn_t p) {
 		}
 #endif
 
-#if FP_RDC == MONTY
+#if FP_RDC == MONTY || !defined(STRIP)
 		bn_mod_pre_monty(t, &(ctx->prime));
 		ctx->u = t->dp[0];
 		dv_zero(s, 2 * FP_DIGS);
