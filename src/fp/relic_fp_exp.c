@@ -73,7 +73,7 @@ void fp_exp_basic(fp_t c, fp_t a, bn_t b) {
 #if FP_EXP == SLIDE || !defined(STRIP)
 
 void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
-	fp_t tab[1 << (FP_WIDTH - 1)], r;
+	fp_t t[1 << (FP_WIDTH - 1)], r;
 	int i, j, l;
 	unsigned char win[FP_BITS];
 
@@ -81,21 +81,21 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 
 	/* Initialize table. */
 	for (i = 0; i < (1 << (FP_WIDTH - 1)); i++) {
-		fp_null(tab[i]);
+		fp_null(t[i]);
 	}
 
 	TRY {
 		for (i = 0; i < (1 << (FP_WIDTH - 1)); i ++) {
-			fp_new(tab[i]);
+			fp_new(t[i]);
 		}
 		fp_new(r);
 
-		fp_copy(tab[0], a);
+		fp_copy(t[0], a);
 		fp_sqr(r, a);
 
 		/* Create table. */
 		for (i = 1; i < 1 << (FP_WIDTH - 1); i++) {
-			fp_mul(tab[i], tab[i - 1], r);
+			fp_mul(t[i], t[i - 1], r);
 		}
 
 		fp_set_dig(r, 1);
@@ -107,7 +107,7 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 				for (j = 0; j < util_bits_dig(win[i]); j++) {
 					fp_sqr(r, r);
 				}
-				fp_mul(r, r, tab[win[i] >> 1]);
+				fp_mul(r, r, t[win[i] >> 1]);
 			}
 		}
 
@@ -118,7 +118,7 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 	}
 	FINALLY {
 		for (i = 0; i < (1 << (FP_WIDTH - 1)); i++) {
-			fp_free(tab[i]);
+			fp_free(t[i]);
 		}
 		fp_free(r);
 	}
@@ -129,19 +129,19 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 #if FP_EXP == MONTY || !defined(STRIP)
 
 void fp_exp_monty(fp_t c, fp_t a, bn_t b) {
-	fp_t tab[2];
+	fp_t t[2];
 	dig_t buf;
 	int bitcnt, digidx, j;
 
-	fp_null(tab[0]);
-	fp_null(tab[1]);
+	fp_null(t[0]);
+	fp_null(t[1]);
 
 	TRY {
-		fp_new(tab[0]);
-		fp_new(tab[1]);
+		fp_new(t[0]);
+		fp_new(t[1]);
 
-		fp_set_dig(tab[0], 1);
-		fp_copy(tab[1], a);
+		fp_set_dig(t[0], 1);
+		fp_copy(t[1], a);
 
 		/* Set initial mode and bitcnt, */
 		bitcnt = 1;
@@ -164,18 +164,18 @@ void fp_exp_monty(fp_t c, fp_t a, bn_t b) {
 			j = (buf >> (FP_DIGIT - 1)) & 0x01;
 			buf <<= (dig_t)1;
 
-			fp_mul(tab[j ^ 1], tab[0], tab[1]);
-			fp_sqr(tab[j], tab[j]);
+			fp_mul(t[j ^ 1], t[0], t[1]);
+			fp_sqr(t[j], t[j]);
 		}
 
-		fp_copy(c, tab[0]);
+		fp_copy(c, t[0]);
 
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp_free(tab[1]);
-		fp_free(tab[0]);
+		fp_free(t[1]);
+		fp_free(t[0]);
 	}
 }
 

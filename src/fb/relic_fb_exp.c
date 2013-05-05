@@ -78,7 +78,7 @@ void fb_exp_basic(fb_t c, fb_t a, bn_t b) {
 #if FB_EXP == SLIDE || !defined(STRIP)
 
 void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
-	fb_t tab[1 << (FB_WIDTH - 1)], r;
+	fb_t t[1 << (FB_WIDTH - 1)], r;
 	int i, j, l;
 	unsigned char win[FB_BITS + 1];
 
@@ -86,21 +86,21 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 
 	/* Initialize table. */
 	for (i = 0; i < (1 << (FB_WIDTH - 1)); i++) {
-		fb_null(tab[i]);
+		fb_null(t[i]);
 	}
 
 	TRY {
 		for (i = 0; i < (1 << (FB_WIDTH - 1)); i++) {
-			fb_new(tab[i]);
+			fb_new(t[i]);
 		}
 		fb_new(r);
 
-		fb_copy(tab[0], a);
+		fb_copy(t[0], a);
 		fb_sqr(r, a);
 
 		/* Create table. */
 		for (i = 1; i < 1 << (FB_WIDTH - 1); i++) {
-			fb_mul(tab[i], tab[i - 1], r);
+			fb_mul(t[i], t[i - 1], r);
 		}
 
 		fb_set_dig(r, 1);
@@ -112,7 +112,7 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 				for (j = 0; j < util_bits_dig(win[i]); j++) {
 					fb_sqr(r, r);
 				}
-				fb_mul(r, r, tab[win[i] >> 1]);
+				fb_mul(r, r, t[win[i] >> 1]);
 			}
 		}
 
@@ -123,7 +123,7 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 	}
 	FINALLY {
 		for (i = 0; i < (1 << (FB_WIDTH - 1)); i++) {
-			fb_free(tab[i]);
+			fb_free(t[i]);
 		}
 		fb_free(r);
 	}
@@ -134,24 +134,24 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 #if FB_EXP == MONTY || !defined(STRIP)
 
 void fb_exp_monty(fb_t c, fb_t a, bn_t b) {
-	fb_t tab0, tab1;
-	dig_t *tab[2];
+	fb_t t0, t1;
+	dig_t *t[2];
 	dig_t buf;
 	int bitcnt, digidx, j;
 
-	fb_null(tab[0]);
-	fb_null(tab[1]);
+	fb_null(t[0]);
+	fb_null(t[1]);
 
 	TRY {
-		fb_new(tab0);
-		fb_new(tab1);
+		fb_new(t0);
+		fb_new(t1);
 
-		fb_set_dig(tab0, 1);
-		fb_copy(tab1, a);
+		fb_set_dig(t0, 1);
+		fb_copy(t1, a);
 
 		/* This trick avoid buggy compilers with alignment issues. */
-		tab[0] = tab0;
-		tab[1] = tab1;
+		t[0] = t0;
+		t[1] = t1;
 
 		/* Set initial mode and bitcnt, */
 		bitcnt = 1;
@@ -174,18 +174,18 @@ void fb_exp_monty(fb_t c, fb_t a, bn_t b) {
 			j = (buf >> (FB_DIGIT - 1)) & 0x01;
 			buf <<= (dig_t)1;
 
-			fb_mul(tab[j ^ 1], tab[0], tab[1]);
-			fb_sqr(tab[j], tab[j]);
+			fb_mul(t[j ^ 1], t[0], t[1]);
+			fb_sqr(t[j], t[j]);
 		}
 
-		fb_copy(c, tab[0]);
+		fb_copy(c, t[0]);
 
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fb_free(tab[1]);
-		fb_free(tab[0]);
+		fb_free(t[1]);
+		fb_free(t[0]);
 	}
 }
 
