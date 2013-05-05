@@ -305,9 +305,7 @@ void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m) {
 #if EB_SIM == TRICK || !defined(STRIP)
 
 void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m) {
-	eb_t t0[1 << (EB_WIDTH / 2)];
-	eb_t t1[1 << (EB_WIDTH / 2)];
-	eb_t t[1 << EB_WIDTH];
+	eb_t t0[1 << (EB_WIDTH / 2)], t1[1 << (EB_WIDTH / 2)], t[1 << EB_WIDTH];
 	bn_t n;
 	int l0, l1, w;
 	unsigned char w0[FB_BITS + 1], w1[FB_BITS + 1];
