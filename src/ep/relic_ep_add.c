@@ -41,11 +41,12 @@
  * Adds two points represented in affine coordinates on an ordinary prime
  * elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the first point to add.
- * @param q					- the second point to add.
+ * @param[out] r			- the result.
+ * @param[out] s			- the slope.
+ * @param[in] p				- the first point to add.
+ * @param[in] q				- the second point to add.
  */
-static void ep_add_basic_imp(ep_t r, ep_t p, ep_t q) {
+static void ep_add_basic_imp(ep_t r, fp_t s, ep_t p, ep_t q) {
 	fp_t t0, t1, t2;
 
 	fp_null(t0);
@@ -90,6 +91,10 @@ static void ep_add_basic_imp(ep_t r, ep_t p, ep_t q) {
 			fp_copy(r->x, t0);
 			fp_copy(r->z, p->z);
 
+			if (s != NULL) {
+				fp_copy(s, t2);
+			}
+
 			r->norm = 1;
 		}
 		fp_free(t0);
@@ -114,9 +119,9 @@ static void ep_add_basic_imp(ep_t r, ep_t p, ep_t q) {
  * Adds a point represented in affine coordinates to a point represented in
  * projective coordinates.
  *
- * @param r					- the result.
- * @param p					- the projective point.
- * @param q					- the affine point.
+ * @param[out] r			- the result.
+ * @param[in] p				- the projective point.
+ * @param[in] q				- the affine point.
  */
 static void ep_add_projc_mix(ep_t r, ep_t p, ep_t q) {
 	fp_t t0, t1, t2, t3, t4, t5, t6;
@@ -234,9 +239,9 @@ static void ep_add_projc_mix(ep_t r, ep_t p, ep_t q) {
  * Adds two points represented in projective coordinates on an ordinary prime
  * elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the first point to add.
- * @param q					- the second point to add.
+ * @param[out] r			- the result.
+ * @param[in] p				- the first point to add.
+ * @param[in] q				- the second point to add.
  */
 static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 #if defined(EP_MIXED) && defined(STRIP)
@@ -379,7 +384,21 @@ void ep_add_basic(ep_t r, ep_t p, ep_t q) {
 		return;
 	}
 
-	ep_add_basic_imp(r, p, q);
+	ep_add_basic_imp(r, NULL, p, q);
+}
+
+void ep_add_slp_basic(ep_t r, fp_t s, ep_t p, ep_t q) {
+	if (ep_is_infty(p)) {
+		ep_copy(r, q);
+		return;
+	}
+
+	if (ep_is_infty(q)) {
+		ep_copy(r, p);
+		return;
+	}
+
+	ep_add_basic_imp(r, s, p, q);
 }
 
 void ep_sub_basic(ep_t r, ep_t p, ep_t q) {
