@@ -89,7 +89,7 @@ void fp2_conv_uni(fp2_t c, fp2_t a) {
 void fp2_exp_uni(fp2_t c, fp2_t a, bn_t b) {
 	fp2_t r, s, t[1 << (FP_WIDTH - 2)];
 	int i, l;
-	signed char naf[FP_BITS], *k, n;
+	signed char naf[FP_BITS + 1], *k, n;
 
 	fp2_null(r);
 	fp2_null(s);
