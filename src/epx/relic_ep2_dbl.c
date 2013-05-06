@@ -42,9 +42,9 @@
  * Doubles a point represented in affine coordinates on an ordinary prime
  * elliptic curve.
  *
- * @param r					- the result.
- * @param s					- the resulting slope.
- * @param p					- the point to double.
+ * @param[out] r			- the result.
+ * @param[out] s			- the resulting slope.
+ * @param[in] p				- the point to double.
  */
 static void ep2_dbl_basic_imp(ep2_t r, fp2_t s, ep2_t p) {
 	fp2_t t0, t1, t2;
@@ -137,10 +137,10 @@ static void ep2_dbl_basic_imp(ep2_t r, fp2_t s, ep2_t p) {
  * Doubles a point represented in affine coordinates on an ordinary prime
  * elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the point to double.
+ * @param[out] r				- the result.
+ * @param[in] p					- the point to double.
  */
-static void ep2_dbl_projc_imp(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
+static void ep2_dbl_projc_imp(ep2_t r, ep2_t p) {
 	fp2_t t0, t1, t2, t3;
 
 	fp2_null(t0);
@@ -168,12 +168,7 @@ static void ep2_dbl_projc_imp(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
 		fp2_mul(r->z, p->z, p->y);
 		fp2_add(r->z, r->z, r->z);
 		fp2_add(t3, t3, t3);
-		if (s != NULL) {
-			fp2_copy(s, t0);
-		}
-		if (e != NULL) {
-			fp2_copy(e, t3);
-		}
+
 		fp2_sqr(t3, t3);
 		fp2_add(t3, t3, t3);
 		fp2_sub(t1, t1, r->x);
@@ -229,16 +224,7 @@ void ep2_dbl_projc(ep2_t r, ep2_t p) {
 		return;
 	}
 
-	ep2_dbl_projc_imp(r, NULL, NULL, p);
-}
-
-void ep2_dbl_slp_projc(ep2_t r, fp2_t s, fp2_t e, ep2_t p) {
-	if (ep2_is_infty(p)) {
-		ep2_set_infty(r);
-		return;
-	}
-
-	ep2_dbl_projc_imp(r, s, e, p);
+	ep2_dbl_projc_imp(r, p);
 }
 
 #endif
