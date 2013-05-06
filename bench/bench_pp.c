@@ -35,23 +35,22 @@
 #include "relic_bench.h"
 
 static void pairing2(void) {
-	ep_t p;
-	ep_t q;
-	fp2_t e;
 	bn_t k, n, l;
+	ep_t p, q;
+	fp2_t e;
 
-	ep_null(p);
-	ep_null(q);
 	bn_null(k);
 	bn_null(n);
 	bn_null(l);
+	ep_null(p);
+	ep_null(q);
 	fp2_null(e);
 
-	ep_new(p);
-	ep_new(q);
 	bn_new(k);
 	bn_new(n);
 	bn_new(l);
+	ep_new(p);
+	ep_new(q);
 	fp2_new(e);
 
 	ep_curve_get_ord(n);
@@ -177,19 +176,19 @@ static void pairing2(void) {
 	BENCH_END;
 #endif
 
-	ep_free(p);
-	ep_free(q);
 	bn_free(k);
 	bn_free(n);
 	bn_free(l);
-	fp12_free(e);
+	ep_free(p);
+	ep_free(q);
+	fp2_free(e);
 }
 
 static void pairing12(void) {
+	bn_t k, n, l;
 	ep2_t p;
 	ep_t q;
 	fp12_t e;
-	bn_t k, n, l;
 
 	ep2_null(p);
 	ep_null(q);
@@ -198,11 +197,11 @@ static void pairing12(void) {
 	bn_null(l);
 	fp12_null(e);
 
-	ep2_new(p);
-	ep_new(q);
 	bn_new(k);
 	bn_new(n);
 	bn_new(l);
+	ep2_new(p);
+	ep_new(q);
 	fp12_new(e);
 
 	ep2_curve_get_ord(n);
@@ -330,11 +329,11 @@ static void pairing12(void) {
 	BENCH_END;
 #endif
 
-	ep2_free(p);
-	ep_free(q);
 	bn_free(k);
 	bn_free(n);
 	bn_free(l);
+	ep2_free(p);
+	ep_free(q);
 	fp12_free(e);
 }
 
