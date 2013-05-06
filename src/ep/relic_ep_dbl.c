@@ -41,10 +41,11 @@
  * Doubles a point represented in affine coordinates on an ordinary prime
  * elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the point to double.
+ * @param[out] r			- the result.
+ * @param[out] s			- the slope.
+ * @param[in] p				- the point to double.
  */
-static void ep_dbl_basic_imp(ep_t r, ep_t p) {
+static void ep_dbl_basic_imp(ep_t r, fp_t s, ep_t p) {
 	fp_t t0, t1, t2;
 
 	fp_null(t0);
@@ -84,6 +85,10 @@ static void ep_dbl_basic_imp(ep_t r, ep_t p) {
 
 		/* t1 = (3 * x1^2 + a)/(2 * y1). */
 		fp_mul(t1, t1, t0);
+
+		if (s != NULL) {
+			fp_copy(s, t1);
+		}
 
 		/* t2 = t1^2. */
 		fp_sqr(t2, t1);
@@ -175,9 +180,8 @@ void ep_dbl_projc_imp(ep_t r, ep_t p) {
 			fp_sub(r->z, r->z, t0);
 
 			/* y3 = alpha * (4 * beta - x3) - 8 * gamma^2. */
+			fp_dbl(t1, t1);
 			fp_sqr(t1, t1);
-			fp_dbl(t1, t1);
-			fp_dbl(t1, t1);
 			fp_dbl(t1, t1);
 			fp_sub(r->y, t2, r->x);
 			fp_mul(r->y, r->y, t3);
@@ -338,7 +342,16 @@ void ep_dbl_basic(ep_t r, ep_t p) {
 		ep_set_infty(r);
 		return;
 	}
-	ep_dbl_basic_imp(r, p);
+	ep_dbl_basic_imp(r, NULL, p);
+}
+
+void ep_dbl_slp_basic(ep_t r, fp_t s, ep_t p) {
+	if (ep_is_infty(p)) {
+		ep_set_infty(r);
+		return;
+	}
+
+	ep_dbl_basic_imp(r, s, p);
 }
 
 #endif
