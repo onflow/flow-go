@@ -562,7 +562,7 @@ static void bench(void) {
 }
 
 int main(void) {
-	int r0 = STS_ERR, r1 = STS_ERR;
+	int r0 = STS_ERR, r1 = STS_ERR, r2 = STS_ERR;
 
 	if (core_init() != STS_OK) {
 		core_clean();
@@ -586,7 +586,14 @@ int main(void) {
 	}
 #endif
 
-	if (r0 == STS_ERR && r1 == STS_ERR) {
+#if defined(EP_SUPER)
+	r2 = ep_param_set_any_super();
+	if (r2 == STS_OK) {
+		bench();
+	}
+#endif
+
+	if (r0 == STS_ERR && r1 == STS_ERR && r2 == STS_ERR) {
 		if (ep_param_set_any() == STS_ERR) {
 			THROW(ERR_NO_CURVE);
 		}
