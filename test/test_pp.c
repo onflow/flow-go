@@ -37,29 +37,28 @@
 
 static int addition2(void) {
 	int code = STS_ERR;
-	fp2_t e1, e2;
-	ep_t q, r, s;
-	ep_t p;
 	bn_t k, n;
+	ep_t p, q, r, s;
+	fp2_t e1, e2;
 
-	fp2_null(e1);
-	fp2_null(e2);
+	bn_null(k);
+	bn_null(n);
 	ep_null(p);
 	ep_null(q);
 	ep_null(r);
 	ep_null(s);
-	bn_null(k);
-	bn_null(n);
+	fp2_null(e1);
+	fp2_null(e2);
 
 	TRY {
-		fp2_new(e1);
-		fp2_new(e2);
+		bn_new(n);
+		bn_new(k);
 		ep_new(p);
 		ep_new(q);
 		ep_new(r);
 		ep_new(s);
-		bn_new(n);
-		bn_new(k);
+		fp2_new(e1);
+		fp2_new(e2);
 
 		ep_curve_get_ord(n);
 
@@ -105,7 +104,7 @@ static int addition2(void) {
 			pp_exp_k2(e2, e2);
 			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
-#if 0
+
 #if PP_EXT == BASIC || !defined(STRIP)
 		TEST_BEGIN("basic projective miller addition is consistent") {
 			ep_rand(p);
@@ -134,7 +133,6 @@ static int addition2(void) {
 		} TEST_END;
 #endif
 #endif /* EP_ADD = PROJC */
-#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -142,42 +140,41 @@ static int addition2(void) {
 	}
 	code = STS_OK;
   end:
-	fp2_free(e1);
-	fp2_free(e2);
+	bn_free(n);
+	bn_free(k);
 	ep_free(p);
 	ep_free(q);
 	ep_free(r);
 	ep_free(s);
-	bn_free(n);
-	bn_free(k);
+	fp2_free(e1);
+	fp2_free(e2);
 	return code;
 }
 
 static int doubling2(void) {
 	int code = STS_ERR;
-	fp2_t e1, e2;
-	ep_t q, r, s;
-	ep_t p;
 	bn_t k, n;
+	ep_t p, q, r, s;
+	fp2_t e1, e2;
 
-	fp2_null(e1);
-	fp2_null(e2);
+	bn_null(k);
+	bn_null(n);
 	ep_null(p);
 	ep_null(q);
 	ep_null(r);
 	ep_null(s);
-	bn_null(k);
-	bn_null(n);
+	fp2_null(e1);
+	fp2_null(e2);
 
 	TRY {
-		fp2_new(e1);
-		fp2_new(e2);
+		bn_new(n);
+		bn_new(k);
 		ep_new(p);
 		ep_new(q);
 		ep_new(r);
 		ep_new(s);
-		bn_new(n);
-		bn_new(k);
+		fp2_new(e1);
+		fp2_new(e2);
 
 		ep_curve_get_ord(n);
 
@@ -254,40 +251,39 @@ static int doubling2(void) {
 	}
 	code = STS_OK;
   end:
-	fp12_free(e1);
-	fp12_free(e2);
-	ep_free(p);
-	ep2_free(q);
-	ep2_free(r);
-	ep2_free(s);
 	bn_free(n);
 	bn_free(k);
+	ep_free(p);
+	ep_free(q);
+	ep_free(r);
+	ep_free(s);
+	fp2_free(e1);
+	fp2_free(e2);
 	return code;
 }
 
 static int pairing2(void) {
 	int code = STS_ERR;
-	fp2_t e1, e2;
-	ep_t q, r;
-	ep_t p;
 	bn_t k, n;
+	ep_t p, q, r;
+	fp2_t e1, e2;
 
-	fp2_null(e1);
-	fp2_null(e2);
+	bn_null(k);
+	bn_null(n);
 	ep_null(p);
 	ep_null(q);
 	ep_null(r);
-	bn_null(k);
-	bn_null(n);
+	fp2_null(e1);
+	fp2_null(e2);
 
 	TRY {
-		fp2_new(e1);
-		fp2_new(e2);
+		bn_new(n);
+		bn_new(k);
 		ep_new(p);
 		ep_new(q);
 		ep_new(r);
-		bn_new(n);
-		bn_new(k);
+		fp2_new(e1);
+		fp2_new(e2);
 
 		ep_curve_get_ord(n);
 
@@ -370,41 +366,41 @@ static int pairing2(void) {
 	}
 	code = STS_OK;
   end:
-	fp2_free(e1);
-	fp2_free(e2);
+	bn_free(n);
+	bn_free(k);
 	ep_free(p);
 	ep_free(q);
 	ep_free(r);
-	bn_free(n);
-	bn_free(k);
+	fp2_free(e1);
+	fp2_free(e2);
 	return code;
 }
 
 static int addition12(void) {
 	int code = STS_ERR;
-	fp12_t e1, e2;
-	ep2_t q, r, s;
-	ep_t p;
 	bn_t k, n;
+	ep_t p;
+	ep2_t q, r, s;
+	fp12_t e1, e2;
 
-	fp12_null(e1);
-	fp12_null(e2);
+	bn_null(k);
+	bn_null(n);
 	ep_null(p);
 	ep2_null(q);
 	ep2_null(r);
 	ep2_null(s);
-	bn_null(k);
-	bn_null(n);
+	fp12_null(e1);
+	fp12_null(e2);
 
 	TRY {
-		fp12_new(e1);
-		fp12_new(e2);
+		bn_new(n);
+		bn_new(k);
 		ep_new(p);
 		ep2_new(q);
 		ep2_new(r);
 		ep2_new(s);
-		bn_new(n);
-		bn_new(k);
+		fp12_new(e1);
+		fp12_new(e2);
 
 		ep_curve_get_ord(n);
 
@@ -486,42 +482,42 @@ static int addition12(void) {
 	}
 	code = STS_OK;
   end:
-	fp12_free(e1);
-	fp12_free(e2);
+	bn_free(n);
+	bn_free(k);
 	ep_free(p);
 	ep2_free(q);
 	ep2_free(r);
 	ep2_free(s);
-	bn_free(n);
-	bn_free(k);
+	fp12_free(e1);
+	fp12_free(e2);
 	return code;
 }
 
 static int doubling12(void) {
 	int code = STS_ERR;
-	fp12_t e1, e2;
-	ep2_t q, r, s;
-	ep_t p;
 	bn_t k, n;
+	ep_t p;
+	ep2_t q, r, s;
+	fp12_t e1, e2;
 
-	fp12_null(e1);
-	fp12_null(e2);
+	bn_null(k);
+	bn_null(n);
 	ep_null(p);
 	ep2_null(q);
 	ep2_null(r);
 	ep2_null(s);
-	bn_null(k);
-	bn_null(n);
+	fp12_null(e1);
+	fp12_null(e2);
 
 	TRY {
-		fp12_new(e1);
-		fp12_new(e2);
+		bn_new(n);
+		bn_new(k);
 		ep_new(p);
 		ep2_new(q);
 		ep2_new(r);
 		ep2_new(s);
-		bn_new(n);
-		bn_new(k);
+		fp12_new(e1);
+		fp12_new(e2);
 
 		ep_curve_get_ord(n);
 
@@ -598,40 +594,40 @@ static int doubling12(void) {
 	}
 	code = STS_OK;
   end:
-	fp12_free(e1);
-	fp12_free(e2);
+	bn_free(n);
+	bn_free(k);
 	ep_free(p);
 	ep2_free(q);
 	ep2_free(r);
 	ep2_free(s);
-	bn_free(n);
-	bn_free(k);
+	fp12_free(e1);
+	fp12_free(e2);
 	return code;
 }
 
 static int pairing12(void) {
 	int code = STS_ERR;
-	fp12_t e1, e2;
-	ep2_t q, r;
-	ep_t p;
 	bn_t k, n;
+	ep_t p;
+	ep2_t q, r;
+	fp12_t e1, e2;
 
-	fp12_null(e1);
-	fp12_null(e2);
+	bn_null(k);
+	bn_null(n);
 	ep_null(p);
 	ep2_null(q);
 	ep2_null(r);
-	bn_null(k);
-	bn_null(n);
+	fp12_null(e1);
+	fp12_null(e2);
 
 	TRY {
-		fp12_new(e1);
-		fp12_new(e2);
+		bn_new(n);
+		bn_new(k);
 		ep_new(p);
 		ep2_new(q);
 		ep2_new(r);
-		bn_new(n);
-		bn_new(k);
+		fp12_new(e1);
+		fp12_new(e2);
 
 		ep_curve_get_ord(n);
 
@@ -739,13 +735,13 @@ static int pairing12(void) {
 	}
 	code = STS_OK;
   end:
-	fp12_free(e1);
-	fp12_free(e2);
+	bn_free(n);
+	bn_free(k);
 	ep_free(p);
 	ep2_free(q);
 	ep2_free(r);
-	bn_free(n);
-	bn_free(k);
+	fp12_free(e1);
+	fp12_free(e2);
 	return code;
 }
 
