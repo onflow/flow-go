@@ -296,6 +296,20 @@
 /** @} */
 #endif
 
+#if defined(EP_SUPER) && FP_PRIME == 1536
+/**
+ * Parameters for the NIST P-192 prime elliptic curve.
+ */
+/** @{ */
+#define SS_P1536_A		"83093742908D4D529CEF06C72191A05D5E6073FE861E637D7747C5F154989D1DE125ACE7F997AD228B84EB0A0D0D719E34E83DBD68219BCE952167753C07B5DF0611625004D2959D9A5A42AB197DCF3FA8BB79D93C4F23D5437D6EA2C29D00A4D98BF0BD32E7FE4E8154DC52BCA7785F13D71C425551390B52972C085099A435EC00764313622A1C3A96FE4A97EF944DD3F62C726C5ABBBDF0B6C4E5D07763421DA034AE92B0EFFD8A8C98F08F182516C5159C215CDABF599329A51DD30571B0"
+#define SS_P1536_B		"0"
+#define SS_P1536_X		"3E230AF83F4F4D131622DFF03F35BD464BB9257B2BF87A6809AF0606DB21260C50BC5513DA44AB1E8B5333F2D164487E30DE6C39A1494831153E084A58A416BFA07009B16D12B883510E2DBE903E153FD64D75C02B1E33C93E3994BB8B3AD6810901518C3A0E9EA46F4D77DA416502ACD7A5E939EE25D3AE640AFB8AE5A650AF2748986C8C0DD9B755233F8AF25EC124711BE74F08FF3D01CED42493AAAF7E1D692A8339AD2A51F29B6E0D1B82A6648390CEC06811FA9F55FD337455BEC72A43"
+#define SS_P1536_Y		"76F05A21A057DB46D591CED876EDCA9241A4A9618E13E091EE383BE3D8ECDA72C42449CB20CEA8C21B4A58B08F5871C6E101473933ABCD0BBB61C36F51BE5309138BA1040325EFE2D47B2216923BAC07BA64E6668C67D4647DA5916BF2305280A1BFFA1407ED68F0D28C2C2FC200BA7D1B7C5D71492CD39A2FC6BB7EF2D162B69984460A81D324DA69B0949DA2C7D0F79E39333EAF074F360243BAA824C762A039EBB3DEFF1ABDE3157482134BE93D73B4D8CB308C3ED0E72BA644DEFE22AAB9"
+#define SS_P1536_R		"8000000000000000000000000000000000000000000000000000020000000001"
+#define SS_P1536_H		"106126E85211A9AA539DE0D8E432340BABCC0E7FD0C3CC6FAEE8F87CA5F7725B54BBBE7DE38C3EBEE164AD00490346D95FD32BFC679AA8029708CEA26C981A77064FB3C8A6CDD411E36688D584793A96CAD10CE6351A0AC319F434764054488B5741CEF8BE9E019424732EB40A6EE109E4ADBD540FA43899E5484F37822EC07596F62045187571F182E85ACE872AE0376040E3510D06083B388463D1DD30571B4"
+/** @} */
+#endif
+
 /**
  * Assigns a set of ordinary elliptic curve parameters.
  *
@@ -339,8 +353,7 @@ int ep_param_get() {
 }
 
 void ep_param_set(int param) {
-	int ordin = 0;
-	int kbltz = 0;
+	int ordin = 0, kbltz = 0, super = 0;
 	char str[2 * FP_BYTES + 1];
 	fp_t a, b, beta;
 	ep_t g;
@@ -464,6 +477,12 @@ void ep_param_set(int param) {
 				kbltz = 1;
 				break;
 #endif
+#if defined(EP_SUPER) && FP_PRIME == 1536
+			case SS_P1536:
+				ASSIGN(SS_P1536, SS_1536);
+				super = 1;
+				break;
+#endif
 			default:
 				(void)str;
 				THROW(ERR_NO_VALID);
@@ -489,6 +508,19 @@ void ep_param_set(int param) {
 #if defined(EP_KBLTZ)
 		if (kbltz) {
 			ep_curve_set_kbltz(b, g, r, h, beta, lamb);
+			core_get()->ep_id = param;
+		}
+#elif defined(EP_ORDIN)
+		if (kbltz) {
+			eb_curve_set_ordin(a, b, g, r, h);
+			core_get()->ep_id = param;
+		}
+#endif
+
+
+#if defined(EP_SUPER)
+		if (super) {
+			ep_curve_set_super(a, b, g, r, h);
 			core_get()->ep_id = param;
 		}
 #endif
@@ -577,6 +609,20 @@ int ep_param_set_any_kbltz() {
 	return r;
 }
 
+int ep_param_set_any_super() {
+	int r = STS_OK;
+#if defined(EP_SUPER)
+#if FP_PRIME == 1536
+	ep_param_set(SS_P1536);
+#else
+	r = STS_ERR;
+#endif
+#else
+	r = STS_ERR;
+#endif
+	return r;
+}
+
 int ep_param_set_any_pairf() {
 	int twist = 0, degree = 0, r = STS_OK;
 #if defined(EP_KBLTZ)
@@ -604,6 +650,9 @@ int ep_param_set_any_pairf() {
 	ep_param_set(B12_P638);
 	twist = EP_MTYPE;
 	degree = 2;
+#elif FP_PRIME == 1536
+	ep_param_set(SS_P1536);
+	degree = 0;
 #else
 	r = STS_ERR;
 #endif
@@ -679,6 +728,9 @@ void ep_param_print() {
 		case B12_P638:
 			util_banner("Curve B12-P638:", 0);
 			break;
+		case SS_P1536:
+			util_banner("Curve SS-P1536:", 0);
+			break;
 	}
 }
 
@@ -700,6 +752,7 @@ int ep_param_level() {
 		case NIST_P256:
 		case SECG_K256:
 		case BN_P256:
+		case SS_P1536:
 			return 128;
 		case NIST_P384:
 			return 192;
@@ -708,6 +761,20 @@ int ep_param_level() {
 		case BN_P638:
 		case B12_P638:
 			return 192;
+	}
+	return 0;
+}
+
+int ep_param_embed() {
+	switch (ep_param_get()) {
+		case BN_P158:
+		case BN_P254:
+		case BN_P256:
+		case BN_P638:
+		case B12_P638:
+			return 12;
+		case SS_P1536:
+			return 2;
 	}
 	return 0;
 }
