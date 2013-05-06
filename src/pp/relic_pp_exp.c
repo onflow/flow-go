@@ -232,6 +232,33 @@ void pp_exp_b12(fp12_t c, fp12_t a) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
+void pp_exp_k2(fp2_t c, fp2_t a) {
+	bn_t e, n;
+
+	bn_null(n);
+	bn_null(e);
+
+	TRY {
+		bn_new(n);
+		bn_new(e);
+
+		ep_curve_get_ord(n);
+
+		fp2_conv_uni(c, a);
+		dv_copy(e->dp, fp_prime_get(), FP_DIGS);
+		e->used = FP_DIGS;
+		e->sign = BN_POS;
+		bn_add_dig(e, e, 1);
+		bn_div(e, e, n);
+		fp2_exp_uni(c, c, e);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		bn_free(n);
+		bn_free(e);
+	}
+}
+
 void pp_exp_k12(fp12_t c, fp12_t a) {
 	switch (ep_param_get()) {
 		case BN_P158:

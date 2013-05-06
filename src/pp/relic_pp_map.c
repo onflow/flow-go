@@ -44,6 +44,53 @@
  *
  * @param[out] r			- the result.
  * @param[out] t			- the resulting point.
+ * @param[in] p				- the first point of the pairing, in G_1.
+ * @param[in] q				- the second point of the pairing, in G_1.
+ * @param[in] a				- the loop parameter.
+ */
+static void pp_mil_k2(fp2_t r, ep_t t, ep_t p, ep_t q, bn_t a) {
+	fp2_t l;
+	ep_t _q;
+
+	fp2_null(l);
+	ep_null(_q);
+
+	TRY {
+		fp2_new(l);
+		ep_new(_q);
+
+		fp2_zero(l);
+		fp2_zero(r);
+		fp_set_dig(r[0], 1);
+		ep_copy(t, p);
+
+		ep_neg(_q, q);
+
+		for (int i = bn_bits(a) - 2; i >= 0; i--) {
+			fp2_sqr(r, r);
+			pp_dbl_k2(l, t, t, _q);
+			fp2_mul(r, r, l);
+			if (bn_test_bit(a, i)) {
+				pp_add_k2(l, t, p, q);
+				fp2_mul(r, r, l);
+			}
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp12_free(l);
+		ep_free(_p);
+	}
+}
+
+/**
+ * Compute the Miller loop for pairings of type G_2 x G_1 over the bits of a
+ * given parameter.
+ *
+ * @param[out] r			- the result.
+ * @param[out] t			- the resulting point.
  * @param[in] q				- the first point of the pairing, in G_2.
  * @param[in] p				- the second point of the pairing, in G_1.
  * @param[in] a				- the loop parameter.
@@ -244,7 +291,33 @@ void pp_map_clean(void) {
 
 #if PP_MAP == TATEP || !defined(STRIP)
 
-void pp_map_tatep(fp12_t r, ep_t p, ep2_t q) {
+void pp_map_tatep_k2(fp2_t r, ep_t p, ep_t q) {
+	ep_t t;
+	bn_t n;
+
+	ep_null(t);
+	bn_null(n);
+
+	TRY {
+		ep_new(t);
+		bn_new(n);
+
+		ep_curve_get_ord(n);
+		/* Since p has order n, we do not have to perform last iteration. */
+		bn_sub_dig(n, n, 1);
+		pp_mil_k2(r, t, p, q, n);
+		pp_exp_k2(r, r);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep_free(t);
+		bn_free(n);
+	}
+}
+
+void pp_map_tatep_k12(fp12_t r, ep_t p, ep2_t q) {
 	ep_t t;
 	bn_t n;
 
@@ -272,7 +345,46 @@ void pp_map_tatep(fp12_t r, ep_t p, ep2_t q) {
 
 #if PP_MAP == WEILP || !defined(STRIP)
 
-void pp_map_weilp(fp12_t r, ep_t p, ep2_t q) {
+void pp_map_weilp_k2(fp2_t r, ep_t p, ep_t q) {
+	ep_t t0;
+	ep_t t1;
+	fp2_t r0, r1;
+	bn_t n;
+
+	ep_null(t0);
+	ep_null(t1);
+	fp2_null(r0);
+	fp2_null(r1);
+	bn_null(n);
+
+	TRY {
+		ep_new(t0);
+		ep_new(t1);
+		fp2_new(r0);
+		fp2_new(r1);
+		bn_new(n);
+
+		ep_curve_get_ord(n);
+		/* Since p has order n, we do not have to perform last iteration. */
+		bn_sub_dig(n, n, 1);
+		pp_mil_k2(r0, t0, p, q, n);
+		pp_mil_k2(r1, t1, q, p, n);
+		fp2_inv(r1, r1);
+		fp2_mul(r0, r0, r1);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep_free(t0);
+		ep2_free(t1);
+		fp12_free(r0);
+		fp12_free(r1);
+		bn_free(n);
+	}
+}
+
+void pp_map_weilp_k12(fp12_t r, ep_t p, ep2_t q) {
 	ep_t t0;
 	ep2_t t1;
 	fp12_t r0, r1;
@@ -318,7 +430,7 @@ void pp_map_weilp(fp12_t r, ep_t p, ep2_t q) {
 
 #if PP_MAP == OATEP || !defined(STRIP)
 
-void pp_map_oatep(fp12_t r, ep_t p, ep2_t q) {
+void pp_map_oatep_k12(fp12_t r, ep_t p, ep2_t q) {
 	ep2_t t;
 	bn_t a;
 	int len = FP_BITS, s[FP_BITS];

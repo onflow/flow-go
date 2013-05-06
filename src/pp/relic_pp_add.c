@@ -41,6 +41,32 @@
 
 #if EP_ADD == BASIC || !defined(STRIP)
 
+void pp_add_k2_basic(fp2_t l, ep_t r, ep_t p, ep_t q) {
+	fp_t s;
+	ep_t t;
+
+	fp_null(s);
+	ep_null(t);
+
+	TRY {
+		fp_new(s);
+		ep_new(t);
+
+		ep_copy(t, r);
+		ep_add_slp_basic(r, s, r, p);
+		fp2_zero(l);
+		fp_add(l[0], t->x, q->x);
+		fp_mul(l[0], l[0], s);
+		fp_sub(l[0], t->y, l[0]);
+		fp_neg(l[1], q->y);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp_free(s);
+		ep_free(t);
+	}
+}
+
 void pp_add_k12_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	int one = 1, zero = 0;
 	fp2_t s;
@@ -81,6 +107,84 @@ void pp_add_k12_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 #if EP_ADD == PROJC || !defined(STRIP)
 
 #if PP_EXT == BASIC || !defined(STRIP)
+
+void pp_add_k2_projc_basic(fp2_t l, ep_t r, ep_t p, ep_t q) {
+	fp_t t0, t1, t2, t3, t4, t5;
+
+	fp_null(t0);
+	fp_null(t1);
+	fp_null(t2);
+	fp_null(t3);
+	fp_null(t4);
+	fp_null(t5);
+
+	TRY {
+		fp_new(t0);
+		fp_new(t1);
+		fp_new(t2);
+		fp_new(t3);
+		fp_new(t4);
+		fp_new(t5);
+
+		/* t0 = z1^2. */
+		fp_sqr(t0, r->z);
+
+		/* t3 = x2 * z1^2. */
+		fp_mul(t3, p->x, t0);
+
+		/* t1 = y2 * z1^3. */
+		fp_mul(t1, t0, r->z);
+		fp_mul(t1, t1, p->y);
+
+		/* t2 = x1 - t3. */
+		fp_sub(t2, r->x, t3);
+
+		/* t4 = y1 - t1. */
+		fp_sub(t4, r->y, t1);
+
+		/* l0 = slope * (x2 + xq) - z3 * y2. */
+		fp_add(l[0], p->x, q->x);
+		fp_mul(l[0], l[0], t4);
+
+		fp_dbl(t0, t3);
+		fp_add(t3, t0, t2);
+		fp_dbl(t0, t1);
+		fp_add(t1, t0, t4);
+
+		fp_mul(r->z, t2, r->z);
+		fp_sqr(t0, t2);
+		fp_mul(t2, t0, t2);
+		fp_mul(t0, t0, t3);
+		fp_sqr(t3, t4);
+
+		fp_sub(r->x, t3, t0);
+		fp_sub(t0, t0, r->x);
+		fp_sub(t0, t0, r->x);
+		fp_mul(t5, t0, t4);
+		fp_mul(t2, t2, t1);
+		fp_sub(t1, t5, t2);
+
+		fp_mul(t5, r->z, p->y);
+		fp_sub(l[0], l[0], t5);
+
+		fp_mul(l[1], r->z, q->y);
+
+		fp_hlv(r->y, t1);
+
+		r->norm = 0;
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t0);
+		fp_free(t1);
+		fp_free(t2);
+		fp_free(t3);
+		fp_free(t4);
+		fp_free(t5);
+	}
+}
 
 void pp_add_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	fp2_t t0, t1, t2, t3, t4;
@@ -168,6 +272,84 @@ void pp_add_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 #endif
 
 #if PP_EXT == LAZYR || !defined(STRIP)
+
+void pp_add_k2_projc_lazyr(fp2_t l, ep_t r, ep_t p, ep_t q) {
+	fp_t t0, t1, t2, t3, t4, t5;
+
+	fp_null(t0);
+	fp_null(t1);
+	fp_null(t2);
+	fp_null(t3);
+	fp_null(t4);
+	fp_null(t5);
+
+	TRY {
+		fp_new(t0);
+		fp_new(t1);
+		fp_new(t2);
+		fp_new(t3);
+		fp_new(t4);
+		fp_new(t5);
+
+		/* t0 = z1^2. */
+		fp_sqr(t0, r->z);
+
+		/* t3 = x2 * z1^2. */
+		fp_mul(t3, p->x, t0);
+
+		/* t1 = y2 * z1^3. */
+		fp_mul(t1, t0, r->z);
+		fp_mul(t1, t1, p->y);
+
+		/* t2 = x1 - t3. */
+		fp_sub(t2, r->x, t3);
+
+		/* t4 = y1 - t1. */
+		fp_sub(t4, r->y, t1);
+
+		/* l0 = slope * (x2 + xq) - z3 * y2. */
+		fp_add(l[0], p->x, q->x);
+		fp_mul(l[0], l[0], t4);
+
+		fp_dbl(t0, t3);
+		fp_add(t3, t0, t2);
+		fp_dbl(t0, t1);
+		fp_add(t1, t0, t4);
+
+		fp_mul(r->z, t2, r->z);
+		fp_sqr(t0, t2);
+		fp_mul(t2, t0, t2);
+		fp_mul(t0, t0, t3);
+		fp_sqr(t3, t4);
+
+		fp_sub(r->x, t3, t0);
+		fp_sub(t0, t0, r->x);
+		fp_sub(t0, t0, r->x);
+		fp_mul(t5, t0, t4);
+		fp_mul(t2, t2, t1);
+		fp_sub(t1, t5, t2);
+
+		fp_mul(t5, r->z, p->y);
+		fp_sub(l[0], l[0], t5);
+
+		fp_mul(l[1], r->z, q->y);
+
+		fp_hlv(r->y, t1);
+
+		r->norm = 0;
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t0);
+		fp_free(t1);
+		fp_free(t2);
+		fp_free(t3);
+		fp_free(t4);
+		fp_free(t5);
+	}
+}
 
 void pp_add_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 	fp2_t t1, t2, t3, t4;

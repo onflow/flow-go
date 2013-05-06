@@ -65,7 +65,11 @@ void pp_norm_imp(ep2_t r, ep2_t p) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void pp_norm(ep2_t r, ep2_t p) {
+void pp_norm_k2(ep_t r, ep_t p) {
+	ep_norm(r, p);
+}
+
+void pp_norm_k12(ep2_t r, ep2_t p) {
 	if (ep2_is_infty(p)) {
 		ep2_set_infty(r);
 		return;
