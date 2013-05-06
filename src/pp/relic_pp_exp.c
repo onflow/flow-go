@@ -131,7 +131,7 @@ static void pp_exp_bn(fp12_t c, fp12_t a) {
  * @param[in] a				- the extension field element to exponentiate.
  */
 void pp_exp_b12(fp12_t c, fp12_t a) {
-	fp12_t t[9];
+	fp12_t t[10];
 	bn_t x;
 	int l, *b = fp_param_get_sps(&l);
 

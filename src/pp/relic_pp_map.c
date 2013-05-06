@@ -80,8 +80,8 @@ static void pp_mil_k2(fp2_t r, ep_t t, ep_t p, ep_t q, bn_t a) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fp12_free(l);
-		ep_free(_p);
+		fp2_free(l);
+		ep_free(_q);
 	}
 }
 
@@ -378,8 +378,8 @@ void pp_map_weilp_k2(fp2_t r, ep_t p, ep_t q) {
 	FINALLY {
 		ep_free(t0);
 		ep2_free(t1);
-		fp12_free(r0);
-		fp12_free(r1);
+		fp2_free(r0);
+		fp2_free(r1);
 		bn_free(n);
 	}
 }
