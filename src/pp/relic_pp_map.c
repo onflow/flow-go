@@ -289,7 +289,7 @@ void pp_map_clean(void) {
 	ep2_curve_clean();
 }
 
-#if PP_MAP == TATEP || !defined(STRIP)
+#if PP_MAP == TATEP || PP_MAP == OATEP || !defined(STRIP)
 
 void pp_map_tatep_k2(fp2_t r, ep_t p, ep_t q) {
 	ep_t t;
@@ -316,6 +316,10 @@ void pp_map_tatep_k2(fp2_t r, ep_t p, ep_t q) {
 		bn_free(n);
 	}
 }
+
+#endif
+
+#if PP_MAP == TATEP || !defined(STRIP)
 
 void pp_map_tatep_k12(fp12_t r, ep_t p, ep2_t q) {
 	ep_t t;
