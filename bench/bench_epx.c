@@ -104,7 +104,6 @@ static void arith(void) {
 	bn_null(k);
 	bn_null(n);
 	fp2_null(s);
-	fp2_null(t);
 	for (int i = 0; i < EP_TABLE_MAX; i++) {
 		ep2_null(t[i]);
 	}
