@@ -96,7 +96,7 @@ static void util(void) {
 static void arith(void) {
 	ep2_t p, q, r, t[EP_TABLE_MAX];
 	bn_t k, n, l;
-	fp2_t s, u;
+	fp2_t s;
 
 	ep2_null(p);
 	ep2_null(q);
@@ -116,7 +116,6 @@ static void arith(void) {
 	bn_new(n);
 	bn_new(l);
 	fp2_new(s);
-	fp2_new(u);
 
 	ep2_curve_get_ord(n);
 
@@ -156,17 +155,6 @@ static void arith(void) {
 		ep2_rand(p);
 		ep2_add_projc(q, q, p);
 		BENCH_ADD(ep2_add_projc(r, p, q));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("ep2_add_slp_projc") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add_projc(p, p, q);
-		ep2_rand(q);
-		ep2_rand(p);
-		ep2_add_projc(q, q, p);
-		BENCH_ADD(ep2_add_slp_projc(r, s, p, q));
 	}
 	BENCH_END;
 
@@ -270,14 +258,6 @@ static void arith(void) {
 		ep2_rand(q);
 		ep2_add_projc(p, p, q);
 		BENCH_ADD(ep2_dbl_projc(r, p));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("ep2_dbl_slp_projc") {
-		ep2_rand(p);
-		ep2_rand(q);
-		ep2_add_projc(p, p, q);
-		BENCH_ADD(ep2_dbl_slp_projc(r, s, u, p));
 	}
 	BENCH_END;
 
@@ -554,7 +534,6 @@ static void arith(void) {
 	bn_free(n);
 	bn_free(l);
 	fp2_free(s);
-	fp2_free(u);
 }
 
 int main(void) {

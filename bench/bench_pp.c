@@ -34,7 +34,158 @@
 #include "relic.h"
 #include "relic_bench.h"
 
-static void pairing(void) {
+static void pairing2(void) {
+	ep_t p;
+	ep_t q;
+	fp2_t e;
+	bn_t k, n, l;
+
+	ep_null(p);
+	ep_null(q);
+	bn_null(k);
+	bn_null(n);
+	bn_null(l);
+	fp2_null(e);
+
+	ep_new(p);
+	ep_new(q);
+	bn_new(k);
+	bn_new(n);
+	bn_new(l);
+	fp2_new(e);
+
+	ep_curve_get_ord(n);
+
+	BENCH_BEGIN("pp_add_k2") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_add_k2(e, p, p, q));
+	}
+	BENCH_END;
+
+#if EP_ADD == BASIC || !defined(STRIP)
+	BENCH_BEGIN("pp_add_k2_basic") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_add_k2_basic(e, p, p, q));
+	}
+	BENCH_END;
+#endif
+
+#if EP_ADD == PROJC || !defined(STRIP)
+
+	BENCH_BEGIN("pp_add_k2_projc") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_add_k2_projc(e, p, p, q));
+	}
+	BENCH_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+	BENCH_BEGIN("pp_add_k2_projc_basic") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_add_k2_projc_basic(e, p, p, q));
+	}
+	BENCH_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+	BENCH_BEGIN("pp_add_k2_projc_lazyr") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_add_k2_projc_lazyr(e, p, p, q));
+	}
+	BENCH_END;
+#endif
+
+#endif
+
+	BENCH_BEGIN("pp_dbl_k2") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_k2(e, p, p, q));
+	}
+	BENCH_END;
+
+#if EP_ADD == BASIC || !defined(STRIP)
+	BENCH_BEGIN("pp_dbl_k2_basic") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_k2_basic(e, p, p, q));
+	}
+	BENCH_END;
+#endif
+
+#if EP_ADD == PROJC || !defined(STRIP)
+
+	BENCH_BEGIN("pp_dbl_k2_projc") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_k2_projc(e, p, p, q));
+	}
+	BENCH_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+	BENCH_BEGIN("pp_dbl_k2_projc_basic") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_k2_projc_basic(e, p, p, q));
+	}
+	BENCH_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+	BENCH_BEGIN("pp_dbl_k2_projc_lazyr") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_dbl_k2_projc_lazyr(e, p, p, q));
+	}
+	BENCH_END;
+#endif
+
+#endif
+
+	BENCH_BEGIN("pp_exp_k2") {
+		fp2_rand(e);
+		BENCH_ADD(pp_exp_k2(e, e));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("pp_map_k2") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_map_k2(e, q, p));
+	}
+	BENCH_END;
+
+#if PP_MAP == TATEP || PP_MAP == OATEP || !defined(STRIP)
+	BENCH_BEGIN("pp_map_tatep_k2") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_map_tatep_k2(e, q, p));
+	}
+	BENCH_END;
+#endif
+
+#if PP_MAP == WEILP || !defined(STRIP)
+	BENCH_BEGIN("pp_map_weilp_k2") {
+		ep_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_map_weilp_k2(e, q, p));
+	}
+	BENCH_END;
+#endif
+
+	ep_free(p);
+	ep_free(q);
+	bn_free(k);
+	bn_free(n);
+	bn_free(l);
+	fp12_free(e);
+}
+
+static void pairing12(void) {
 	ep2_t p;
 	ep_t q;
 	fp12_t e;
@@ -56,7 +207,7 @@ static void pairing(void) {
 
 	ep2_curve_get_ord(n);
 
-	BENCH_BEGIN("pp_add") {
+	BENCH_BEGIN("pp_add_k12") {
 		ep2_rand(p);
 		ep_rand(q);
 		BENCH_ADD(pp_add_k12(e, p, p, q));
@@ -73,6 +224,13 @@ static void pairing(void) {
 #endif
 
 #if EP_ADD == PROJC || !defined(STRIP)
+
+	BENCH_BEGIN("pp_add_k12_projc") {
+		ep2_rand(p);
+		ep_rand(q);
+		BENCH_ADD(pp_add_k12_projc(e, p, p, q));
+	}
+	BENCH_END;
 
 #if PP_EXT == BASIC || !defined(STRIP)
 	BENCH_BEGIN("pp_add_k12_projc_basic") {
@@ -138,36 +296,36 @@ static void pairing(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("pp_map") {
+	BENCH_BEGIN("pp_map_k12") {
 		ep2_rand(p);
 		ep_rand(q);
-		BENCH_ADD(pp_map(e, q, p));
+		BENCH_ADD(pp_map_k12(e, q, p));
 	}
 	BENCH_END;
 
 #if PP_MAP == TATEP || !defined(STRIP)
-	BENCH_BEGIN("pp_map_tatep") {
+	BENCH_BEGIN("pp_map_tatep_k12") {
 		ep2_rand(p);
 		ep_rand(q);
-		BENCH_ADD(pp_map_tatep(e, q, p));
+		BENCH_ADD(pp_map_tatep_k12(e, q, p));
 	}
 	BENCH_END;
 #endif
 
 #if PP_MAP == WEILP || !defined(STRIP)
-	BENCH_BEGIN("pp_map_weilp") {
+	BENCH_BEGIN("pp_map_weilp_k12") {
 		ep2_rand(p);
 		ep_rand(q);
-		BENCH_ADD(pp_map_weilp(e, q, p));
+		BENCH_ADD(pp_map_weilp_k12(e, q, p));
 	}
 	BENCH_END;
 #endif
 
 #if PP_MAP == OATEP || !defined(STRIP)
-	BENCH_BEGIN("pp_map_oatep") {
+	BENCH_BEGIN("pp_map_oatep_k12") {
 		ep2_rand(p);
 		ep_rand(q);
-		BENCH_ADD(pp_map_oatep(e, q, p));
+		BENCH_ADD(pp_map_oatep_k12(e, q, p));
 	}
 	BENCH_END;
 #endif
@@ -198,7 +356,14 @@ int main(void) {
 
 	ep_param_print();
 	util_banner("Arithmetic:", 1);
-	pairing();
+
+	if (ep_param_embed() == 2) {
+		pairing2();
+	}
+
+	if (ep_param_embed() == 12) {
+		pairing12();
+	}
 
 	core_clean();
 	return 0;
