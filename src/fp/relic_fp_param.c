@@ -280,6 +280,11 @@ void fp_param_set(int param) {
 	bn_t t0, t1, t2, p;
 	int f[10] = { 0 };
 
+	bn_null(t0);
+	bn_null(t1);
+	bn_null(t2);
+	bn_null(p);
+
 	/* Suppress possible unused parameter warning. */
 	(void) f;
 
