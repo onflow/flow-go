@@ -298,8 +298,8 @@ int doubling(void) {
 
 static int multiplication(void) {
 	int code = STS_ERR;
-	ec_t p, q, r;
 	bn_t n, k;
+	ec_t p, q, r;
 
 	bn_null(n);
 	bn_null(k);
@@ -308,11 +308,11 @@ static int multiplication(void) {
 	ec_null(r);
 
 	TRY {
+		bn_new(n);
+		bn_new(k);
 		ec_new(p);
 		ec_new(q);
 		ec_new(r);
-		bn_new(n);
-		bn_new(k);
 
 		ec_curve_get_gen(p);
 		ec_curve_get_ord(n);
@@ -346,9 +346,8 @@ static int multiplication(void) {
 
 static int fixed(void) {
 	int code = STS_ERR;
-	ec_t p, q, r;
-	ec_t t[EC_TABLE];
 	bn_t n, k;
+	ec_t p, q, r, t[EC_TABLE];
 
 	bn_null(n);
 	bn_null(k);
@@ -402,23 +401,25 @@ static int fixed(void) {
 
 static int simultaneous(void) {
 	int code = STS_ERR;
-	ec_t p, q, r, s;
 	bn_t n, k, l;
+	ec_t p, q, r, s;
 
+	bn_null(n);
+	bn_null(k);
+	bn_null(l);
 	ec_null(p);
 	ec_null(q);
 	ec_null(r);
 	ec_null(s);
 
 	TRY {
-
+		bn_new(n);
+		bn_new(k);
+		bn_new(l);
 		ec_new(p);
 		ec_new(q);
 		ec_new(r);
 		ec_new(s);
-		bn_new(n);
-		bn_new(k);
-		bn_new(l);
 
 		ec_curve_get_gen(p);
 		ec_curve_get_ord(n);
@@ -453,13 +454,13 @@ static int simultaneous(void) {
 	}
 	code = STS_OK;
   end:
+	bn_free(n);
+	bn_free(k);
+	bn_free(l);
 	ec_free(p);
 	ec_free(q);
 	ec_free(r);
 	ec_free(s);
-	bn_free(n);
-	bn_free(k);
-	bn_free(l);
 	return code;
 }
 

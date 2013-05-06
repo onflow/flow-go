@@ -2262,7 +2262,6 @@ static int cyclotomic12(void) {
 	fp12_null(d[0]);
 	fp12_null(d[1])
 	fp12_null(e[0]);
-	fp12_null(f[1]);
 	bn_null(f);
 
 	TRY {
