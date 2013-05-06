@@ -512,7 +512,7 @@ void ep_param_set(int param) {
 		}
 #elif defined(EP_ORDIN)
 		if (kbltz) {
-			eb_curve_set_ordin(a, b, g, r, h);
+			ep_curve_set_ordin(a, b, g, r, h);
 			core_get()->ep_id = param;
 		}
 #endif

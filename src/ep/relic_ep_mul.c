@@ -200,6 +200,64 @@ static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
 #endif /* EP_ORDIN || EP_SUPER */
 #endif /* EP_MUL == LWNAF */
 
+#if EP_MUL == LWREG || !defined(STRIP)
+
+#if defined(EP_ORDIN) || defined(EP_SUPER)
+
+static void ep_mul_reg_imp(ep_t r, ep_t p, bn_t k) {
+	int l, i, j, n;
+	signed char reg[FP_BITS + 1], *_k;
+	ep_t t[1 << (EP_WIDTH - 2)];
+
+	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
+		ep_null(t[i]);
+	}
+
+	TRY {
+		/* Prepare the precomputation table. */
+		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
+			ep_new(t[i]);
+		}
+		/* Compute the precomputation table. */
+		ep_tab(t, p, EP_WIDTH);
+
+		/* Compute the w-NAF representation of k. */
+		bn_rec_reg(reg, &l, k, FP_BITS, EP_WIDTH);
+
+		_k = reg + l - 1;
+
+		ep_set_infty(r);
+		for (i = l - 1; i >= 0; i--, _k--) {
+			for (j = 0; j < EP_WIDTH - 1; j++) {
+				ep_dbl(r, r);
+			}
+
+			n = *_k;
+			if (n > 0) {
+				ep_add(r, r, t[n / 2]);
+			}
+			if (n < 0) {
+				ep_sub(r, r, t[-n / 2]);
+			}
+		}
+
+		/* Convert r to affine coordinates. */
+		ep_norm(r, r);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		/* Free the precomputation table. */
+		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
+			ep_free(t[i]);
+		}
+	}
+}
+
+#endif /* EP_ORDIN || EP_SUPER */
+#endif /* EP_MUL == LWNAF */
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -373,6 +431,23 @@ void ep_mul_lwnaf(ep_t r, ep_t p, bn_t k) {
 
 #if defined(EP_ORDIN) || defined(EP_SUPER)
 	ep_mul_naf_imp(r, p, k);
+#endif
+}
+
+#endif
+
+#if EP_MUL == LWREG || !defined(STRIP)
+
+void ep_mul_lwreg(ep_t r, ep_t p, bn_t k) {
+#if defined(EP_KBLTZ)
+	if (ep_curve_is_kbltz()) {
+		ep_mul_glv_imp(r, p, k);
+		return;
+	}
+#endif
+
+#if defined(EP_ORDIN) || defined(EP_SUPER)
+	ep_mul_reg_imp(r, p, k);
 #endif
 }
 
