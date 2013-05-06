@@ -452,8 +452,8 @@ int doubling(void) {
 
 static int multiplication(void) {
 	int code = STS_ERR;
-	ep2_t p, q, r;
 	bn_t n, k;
+	ep2_t p, q, r;
 
 	bn_null(n);
 	bn_null(k);
@@ -462,11 +462,11 @@ static int multiplication(void) {
 	ep2_null(r);
 
 	TRY {
+		bn_new(n);
+		bn_new(k);
 		ep2_new(p);
 		ep2_new(q);
 		ep2_new(r);
-		bn_new(n);
-		bn_new(k);
 
 		ep2_curve_get_gen(p);
 		ep2_curve_get_ord(n);
@@ -498,19 +498,18 @@ static int multiplication(void) {
 	}
 	code = STS_OK;
   end:
+	bn_free(n);
+	bn_free(k);
 	ep2_free(p);
 	ep2_free(q);
 	ep2_free(r);
-	bn_free(n);
-	bn_free(k);
 	return code;
 }
 
 static int fixed(void) {
 	int code = STS_ERR;
-	ep2_t p, q, r;
-	ep2_t t[EP_TABLE_MAX];
 	bn_t n, k;
+	ep2_t p, q, r, t[EP_TABLE_MAX];
 
 	bn_null(n);
 	bn_null(k);
@@ -523,11 +522,11 @@ static int fixed(void) {
 	}
 
 	TRY {
+		bn_new(n);
+		bn_new(k);
 		ep2_new(p);
 		ep2_new(q);
 		ep2_new(r);
-		bn_new(n);
-		bn_new(k);
 
 		ep2_curve_get_gen(p);
 		ep2_curve_get_ord(n);
@@ -672,23 +671,25 @@ static int fixed(void) {
 
 static int simultaneous(void) {
 	int code = STS_ERR;
-	ep2_t p, q, r, s;
 	bn_t n, k, l;
+	ep2_t p, q, r, s;
 
+	bn_null(n);
+	bn_null(k);
+	bn_null(l);
 	ep2_null(p);
 	ep2_null(q);
 	ep2_null(r);
 	ep2_null(s);
 
 	TRY {
-
+		bn_new(n);
+		bn_new(k);
+		bn_new(l);
 		ep2_new(p);
 		ep2_new(q);
 		ep2_new(r);
 		ep2_new(s);
-		bn_new(n);
-		bn_new(k);
-		bn_new(l);
 
 		ep2_curve_get_gen(p);
 		ep2_curve_get_ord(n);
@@ -771,29 +772,28 @@ static int simultaneous(void) {
 	}
 	code = STS_OK;
   end:
+	bn_free(n);
+	bn_free(k);
+	bn_free(l);
 	ep2_free(p);
 	ep2_free(q);
 	ep2_free(r);
 	ep2_free(s);
-	bn_free(n);
-	bn_free(k);
-	bn_free(l);
 	return code;
 }
 
 static int hashing(void) {
 	int code = STS_ERR;
+	bn_t n;
 	ep2_t p;
-	bn_t n, k;
 	unsigned char msg[5];
 
 	bn_null(n);
 	ep2_null(p);
 
 	TRY {
-		ep2_new(p);
 		bn_new(n);
-		bn_new(k);
+		ep2_new(p);
 
 		ep2_curve_get_ord(n);
 
@@ -811,9 +811,8 @@ static int hashing(void) {
 	}
 	code = STS_OK;
   end:
-	ep2_free(p);
 	bn_free(n);
-	bn_free(k);
+	ep2_free(p);
 	return code;
 }
 

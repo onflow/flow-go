@@ -550,8 +550,8 @@ static int frobenius(void) {
 
 static int multiplication(void) {
 	int code = STS_ERR;
-	eb_t p, q, r;
 	bn_t n, k;
+	eb_t p, q, r;
 
 	bn_null(n);
 	bn_null(k);
@@ -560,11 +560,11 @@ static int multiplication(void) {
 	eb_null(r);
 
 	TRY {
+		bn_new(n);
+		bn_new(k);
 		eb_new(p);
 		eb_new(q);
 		eb_new(r);
-		bn_new(n);
-		bn_new(k);
 
 		eb_curve_get_gen(p);
 		eb_curve_get_ord(n);
@@ -655,19 +655,18 @@ static int multiplication(void) {
 	}
 	code = STS_OK;
   end:
+	bn_free(n);
+	bn_free(k);
 	eb_free(p);
 	eb_free(q);
 	eb_free(r);
-	bn_free(n);
-	bn_free(k);
 	return code;
 }
 
 static int fixed(void) {
 	int code = STS_ERR;
-	eb_t p, q, r;
-	eb_t t[EB_TABLE_MAX];
 	bn_t n, k;
+	eb_t p, q, r, t[EB_TABLE_MAX];
 
 	bn_null(n);
 	bn_null(k);
@@ -680,11 +679,11 @@ static int fixed(void) {
 	}
 
 	TRY {
+		bn_new(n);
+		bn_new(k);
 		eb_new(p);
 		eb_new(q);
 		eb_new(r);
-		bn_new(n);
-		bn_new(k);
 
 		eb_curve_get_gen(p);
 		eb_curve_get_ord(n);
@@ -829,20 +828,23 @@ static int fixed(void) {
 
 static int simultaneous(void) {
 	int code = STS_ERR;
-	eb_t p, q, r;
 	bn_t n, k, l;
+	eb_t p, q, r;
 
+	bn_null(n);
+	bn_null(k);
+	bn_null(l);
 	eb_null(p);
 	eb_null(q);
 	eb_null(r);
 
 	TRY {
-		eb_new(p);
-		eb_new(q);
-		eb_new(r);
 		bn_new(n);
 		bn_new(k);
 		bn_new(l);
+		eb_new(p);
+		eb_new(q);
+		eb_new(r);
 
 		eb_curve_get_ord(n);
 
@@ -926,12 +928,12 @@ static int simultaneous(void) {
 	}
 	code = STS_OK;
   end:
-	eb_free(p);
-	eb_free(q);
-	eb_free(r);
 	bn_free(n);
 	bn_free(k);
 	bn_free(l);
+	eb_free(p);
+	eb_free(q);
+	eb_free(r);
 	return code;
 }
 
