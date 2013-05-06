@@ -937,7 +937,7 @@ int test(void) {
 }
 
 int main(void) {
-	int r0 = STS_ERR, r1 = STS_ERR, r2 = STS_ERR;
+	int r0 = STS_ERR, r1 = STS_ERR, r2 = STS_ERR, r3 = STS_ERR;
 
 	if (core_init() != STS_OK) {
 		core_clean();
@@ -974,7 +974,17 @@ int main(void) {
 		}
 	}
 
-	if (r0 == STS_ERR && r1 == STS_ERR && r2 == STS_ERR) {
+#if defined(EP_SUPER)
+	r3 = ep_param_set_any_super();
+	if (r3 == STS_OK) {
+		if (test() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+	}
+#endif
+
+	if (r0 == STS_ERR && r1 == STS_ERR && r2 == STS_ERR && r3 == STS_ERR) {
 		if (ep_param_set_any() == STS_ERR) {
 			THROW(ERR_NO_CURVE);
 			core_clean();
