@@ -33,6 +33,17 @@
 #include "relic_fpx.h"
 
 /*============================================================================*/
+/* Private definitions                                                        */
+/*============================================================================*/
+
+#if FP_PRIME == 1536
+/**
+ * Cofactor description of 1536-bit prime modulus.
+ */
+#define SS_P1536	"83093742908D4D529CEF06C72191A05D5E6073FE861E637D7747C3E52FBB92DAA5DDF3EF1C61F5F70B256802481A36CAFE995FE33CD54014B846751364C0D3B8327D9E45366EA08F1B3446AC23C9D4B656886731A8D05618CFA1A3B202A2445ABA0E77C5F4F00CA1239975A05377084F256DEAA07D21C4CF2A4279BC117603ACB7B10228C3AB8F8C1742D674395701BB02071A88683041D9C4231E8EE982B8DA"
+#endif
+
+/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
@@ -115,6 +126,13 @@ void fp_param_get_var(bn_t x) {
 				bn_sub(x, x, a);
 				bn_neg(x, x);
 				break;
+			case SS_1536:
+				/* x = 2^255 + 2^41 + 1. */
+				bn_set_2b(x, 255);
+				bn_set_2b(a, 41);
+				bn_add(x, x, a);
+				bn_add_dig(x, x, 1);
+				break;
 			default:
 				THROW(ERR_NO_VALID);
 				break;
@@ -183,6 +201,12 @@ int *fp_param_get_sps(int *len) {
 				var[3] = 107;
 				*len = 4;
 				break;
+			case SS_1536:
+				var[0] = 0;
+				var[1] = 41;
+				var[2] = 255;
+				*len = 3;
+				break;
 			default:
 				THROW(ERR_NO_VALID);
 				break;
@@ -241,6 +265,10 @@ void fp_param_get_map(int *s, int *len) {
 			s[5] = s[93] = s[105] = -1;
 			s[107] = 1;
 			*len = 108;
+			break;
+		case SS_1536:
+			s[0] = s[41] = s[255] = 1;
+			*len = 256;
 			break;
 		default:
 			THROW(ERR_NO_VALID);
@@ -501,6 +529,15 @@ void fp_param_set(int param) {
 				bn_add(p, p, t0);
 				fp_prime_set_dense(p);
 				break;
+#elif FP_PRIME == 1536
+			case SS_1536:
+				fp_param_get_var(t0);
+				bn_read_str(p, SS_P1536, strlen(SS_P1536), 16);
+				bn_mul(p, p, t0);
+				bn_dbl(p, p);
+				bn_sub_dig(p, p, 1);
+				fp_prime_set_dense(p);
+				break;
 #else
 			default:
 				bn_gen_prime(p, FP_BITS);
@@ -548,6 +585,8 @@ int fp_param_set_any(void) {
 	fp_param_set(NIST_521);
 #elif FP_PRIME == 638
 	fp_param_set(B12_638);
+#elif FP_PRIME == 1536
+	fp_param_set(SS_1536);
 #else
 	return fp_param_set_any_dense();
 #endif
@@ -610,6 +649,8 @@ int fp_param_set_any_tower() {
 	fp_param_set(KSS_508);
 #elif FP_PRIME == 638
 	fp_param_set(B12_638);
+#elif FP_PRIME == 1536
+	fp_param_set(SS_1536);
 #else
 	do {
 		/* Since we have to generate a prime number, pick a nice towering. */
