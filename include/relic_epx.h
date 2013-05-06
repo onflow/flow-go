@@ -506,17 +506,6 @@ void ep2_sub_basic(ep2_t r, ep2_t p, ep2_t q);
 void ep2_add_projc(ep2_t r, ep2_t p, ep2_t q);
 
 /**
- * Adds two points represented in projective coordinates in an elliptic curve
- * over a quadratic extension and returns the computed slope.
- *
- * @param[out] r			- the result.
- * @param[out] s			- the slope.
- * @param[in] p				- the first point to add.
- * @param[in] q				- the second point to add.
- */
-void ep2_add_slp_projc(ep2_t r, fp2_t s, ep2_t p, ep2_t q);
-
-/**
  * Subtracts a points represented in projective coordinates in an elliptic curve
  * over a quadratic extension from another point.
  *
@@ -553,17 +542,6 @@ void ep2_dbl_slp_basic(ep2_t r, fp2_t s, ep2_t p);
  * @param[in] p				- the point to double.
  */
 void ep2_dbl_projc(ep2_t r, ep2_t p);
-
-/**
- * Doubles a points represented in projective coordinates in an elliptic curve
- * over a quadratic extension and returns the computed slope.
- *
- * @param[out] r			- the result.
- * @param[out] s			- the numerator of the slope.
- * @param[out] e			- the denominator of the slope.
- * @param[in] p				- the point to double.
- */
-void ep2_dbl_slp_projc(ep2_t r, fp2_t s, fp2_t e, ep2_t p);
 
 /**
  * Multiplies a point in a elliptic curve over a quadratic extension by an
