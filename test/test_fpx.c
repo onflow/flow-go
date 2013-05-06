@@ -40,6 +40,8 @@ static int memory2(void) {
 	int code = STS_ERR;
 	fp2_t a;
 
+	fp2_null(a);
+
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
 			fp2_new(a);
@@ -144,6 +146,12 @@ static int addition2(void) {
 	int code = STS_ERR;
 	fp2_t a, b, c, d, e;
 
+	fp2_null(a);
+	fp2_null(b);
+	fp2_null(c);
+	fp2_null(d);
+	fp2_null(e);
+
 	TRY {
 		fp2_new(a);
 		fp2_new(b);
@@ -222,6 +230,11 @@ static int subtraction2(void) {
 	int code = STS_ERR;
 	fp2_t a, b, c, d;
 
+	fp2_null(a);
+	fp2_null(b);
+	fp2_null(c);
+	fp2_null(d);
+
 	TRY {
 		fp2_new(a);
 		fp2_new(b);
@@ -290,6 +303,10 @@ static int doubling2(void) {
 	int code = STS_ERR;
 	fp2_t a, b, c;
 
+	fp2_null(a);
+	fp2_null(b);
+	fp2_null(c);
+
 	TRY {
 		fp2_new(a);
 		fp2_new(b);
@@ -336,6 +353,14 @@ static int multiplication2(void) {
 	int code = STS_ERR;
 	fp2_t a, b, c, d, e, f;
 	bn_t g;
+
+	bn_null(g);
+	fp2_null(a);
+	fp2_null(b);
+	fp2_null(c);
+	fp2_null(d);
+	fp2_null(e);
+	fp2_null(f);
 
 	TRY {
 		fp2_new(a);
@@ -485,6 +510,10 @@ static int multiplication2(void) {
 static int squaring2(void) {
 	int code = STS_ERR;
 	fp2_t a, b, c;
+
+	fp2_null(a);
+	fp2_null(b);
+	fp2_null(c);
 
 	TRY {
 		fp2_new(a);
@@ -642,6 +671,10 @@ static int square_root2(void) {
 	fp2_t a, b, c;
 	int r;
 
+	fp2_null(a);
+	fp2_null(b);
+	fp2_null(c);
+
 	TRY {
 		fp2_new(a);
 		fp2_new(b);
@@ -673,6 +706,8 @@ static int memory3(void) {
 	err_t e;
 	int code = STS_ERR;
 	fp3_t a;
+
+	fp3_null(a);
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
@@ -778,6 +813,12 @@ static int addition3(void) {
 	int code = STS_ERR;
 	fp3_t a, b, c, d, e;
 
+	fp3_null(a);
+	fp3_null(b);
+	fp3_null(c);
+	fp3_null(d);
+	fp3_null(e);
+
 	TRY {
 		fp3_new(a);
 		fp3_new(b);
@@ -856,6 +897,11 @@ static int subtraction3(void) {
 	int code = STS_ERR;
 	fp3_t a, b, c, d;
 
+	fp3_null(a);
+	fp3_null(b);
+	fp3_null(c);
+	fp3_null(d);
+
 	TRY {
 		fp3_new(a);
 		fp3_new(b);
@@ -924,6 +970,10 @@ static int doubling3(void) {
 	int code = STS_ERR;
 	fp3_t a, b, c;
 
+	fp3_null(a);
+	fp3_null(b);
+	fp3_null(c);
+
 	TRY {
 		fp3_new(a);
 		fp3_new(b);
@@ -970,6 +1020,14 @@ static int multiplication3(void) {
 	int code = STS_ERR;
 	fp3_t a, b, c, d, e, f;
 	bn_t g;
+
+	fp3_null(a);
+	fp3_null(b);
+	fp3_null(c);
+	fp3_null(d);
+	fp3_null(e);
+	fp3_null(f);
+	bn_null(g);
 
 	TRY {
 		fp3_new(a);
@@ -1117,6 +1175,10 @@ static int squaring3(void) {
 	int code = STS_ERR;
 	fp3_t a, b, c;
 
+	fp3_null(a);
+	fp3_null(b);
+	fp3_null(c);
+
 	TRY {
 		fp3_new(a);
 		fp3_new(b);
@@ -1162,6 +1224,12 @@ static int squaring3(void) {
 static int inversion3(void) {
 	int code = STS_ERR;
 	fp3_t a, b, c, d[2];
+
+	fp3_null(a);
+	fp3_null(b);
+	fp3_null(c);
+	fp3_null(d[0]);
+	fp3_null(d[1]);
 
 	TRY {
 		fp3_new(a);
@@ -1265,6 +1333,10 @@ static int square_root3(void) {
 	fp3_t a, b, c;
 	int r;
 
+	fp3_null(a);
+	fp3_null(b);
+	fp3_null(c);
+
 	TRY {
 		fp3_new(a);
 		fp3_new(b);
@@ -1296,6 +1368,8 @@ static int memory6(void) {
 	err_t e;
 	int code = STS_ERR;
 	fp6_t a;
+
+	fp6_null(a);
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
@@ -1401,6 +1475,12 @@ static int addition6(void) {
 	int code = STS_ERR;
 	fp6_t a, b, c, d, e;
 
+	fp6_null(a);
+	fp6_null(b);
+	fp6_null(c);
+	fp6_null(d);
+	fp6_null(e);
+
 	TRY {
 		fp6_new(a);
 		fp6_new(b);
@@ -1459,6 +1539,11 @@ static int subtraction6(void) {
 	int code = STS_ERR;
 	fp6_t a, b, c, d;
 
+	fp6_null(a);
+	fp6_null(b);
+	fp6_null(c);
+	fp6_null(d);
+
 	TRY {
 		fp6_new(a);
 		fp6_new(b);
@@ -1507,6 +1592,10 @@ static int doubling6(void) {
 	int code = STS_ERR;
 	fp6_t a, b, c;
 
+	fp6_null(a);
+	fp6_null(b);
+	fp6_null(c);
+
 	TRY {
 		fp6_new(a);
 		fp6_new(b);
@@ -1534,6 +1623,13 @@ static int doubling6(void) {
 static int multiplication6(void) {
 	int code = STS_ERR;
 	fp6_t a, b, c, d, e, f;
+
+	fp6_null(a);
+	fp6_null(b);
+	fp6_null(c);
+	fp6_null(d);
+	fp6_null(e);
+	fp6_null(f);
 
 	TRY {
 		fp6_new(a);
@@ -1635,6 +1731,10 @@ static int squaring6(void) {
 	int code = STS_ERR;
 	fp6_t a, b, c;
 
+	fp6_null(a);
+	fp6_null(b);
+	fp6_null(c);
+
 	TRY {
 		fp6_new(a);
 		fp6_new(b);
@@ -1680,6 +1780,10 @@ static int squaring6(void) {
 static int inversion6(void) {
 	int code = STS_ERR;
 	fp6_t a, b, c;
+
+	fp6_null(a);
+	fp6_null(b);
+	fp6_null(c);
 
 	TRY {
 		fp6_new(a);
@@ -1757,6 +1861,8 @@ static int memory12(void) {
 	err_t e;
 	int code = STS_ERR;
 	fp12_t a;
+
+	fp12_null(a);
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
@@ -1862,6 +1968,12 @@ static int addition12(void) {
 	int code = STS_ERR;
 	fp12_t a, b, c, d, e;
 
+	fp12_null(a);
+	fp12_null(b);
+	fp12_null(c);
+	fp12_null(d);
+	fp12_null(e);
+
 	TRY {
 		fp12_new(a);
 		fp12_new(b);
@@ -1920,6 +2032,11 @@ static int subtraction12(void) {
 	int code = STS_ERR;
 	fp12_t a, b, c, d;
 
+	fp12_null(a);
+	fp12_null(b);
+	fp12_null(c);
+	fp12_null(d);
+
 	TRY {
 		fp12_new(a);
 		fp12_new(b);
@@ -1967,6 +2084,13 @@ static int subtraction12(void) {
 static int multiplication12(void) {
 	int code = STS_ERR;
 	fp12_t a, b, c, d, e, f;
+
+	fp12_null(a);
+	fp12_null(b);
+	fp12_null(c);
+	fp12_null(d);
+	fp12_null(e);
+	fp12_null(f);
 
 	TRY {
 		fp12_new(a);
@@ -2099,6 +2223,10 @@ static int squaring12(void) {
 	int code = STS_ERR;
 	fp12_t a, b, c;
 
+	fp12_null(a);
+	fp12_null(b);
+	fp12_null(c);
+
 	TRY {
 		fp12_new(a);
 		fp12_new(b);
@@ -2127,6 +2255,15 @@ static int cyclotomic12(void) {
 	int code = STS_ERR;
 	fp12_t a, b, c, d[2], e[2];
 	bn_t f;
+
+	fp12_null(a);
+	fp12_null(b);
+	fp12_null(c);
+	fp12_null(d[0]);
+	fp12_null(d[1])
+	fp12_null(e[0]);
+	fp12_null(f[1]);
+	bn_null(f);
 
 	TRY {
 		fp12_new(a);
@@ -2276,6 +2413,10 @@ static int inversion12(void) {
 	int code = STS_ERR;
 	fp12_t a, b, c;
 
+	fp12_null(a);
+	fp12_null(b);
+	fp12_null(c);
+
 	TRY {
 		fp12_new(a);
 		fp12_new(b);
@@ -2369,6 +2510,8 @@ static int memory18(void) {
 	err_t e;
 	int code = STS_ERR;
 	fp18_t a;
+
+	fp18_null(a);
 
 	TRY {
 		TEST_BEGIN("memory can be allocated") {
@@ -2473,6 +2616,12 @@ static int util18(void) {
 static int addition18(void) {
 	int code = STS_ERR;
 	fp18_t a, b, c, d, e;
+
+	fp18_null(a);
+	fp18_null(b);
+	fp18_null(c);
+	fp18_null(d);
+	fp18_null(e);
 
 	TRY {
 		fp18_new(a);
@@ -2670,6 +2819,10 @@ static int squaring18(void) {
 	int code = STS_ERR;
 	fp18_t a, b, c;
 
+	fp18_null(a);
+	fp18_null(b);
+	fp18_null(c);
+
 	TRY {
 		fp18_new(a);
 		fp18_new(b);
@@ -2716,6 +2869,15 @@ static int cyclotomic18(void) {
 	int code = STS_ERR;
 	fp18_t a, b, c, d[2], e[2];
 	bn_t f;
+
+	fp18_null(a);
+	fp18_null(b);
+	fp18_null(c);
+	fp18_null(d[0]);
+	fp18_null(d[1]);
+	fp18_null(e[0]);
+	fp18_null(e[1]);
+	bn_null(f);
 
 	TRY {
 		fp18_new(a);
@@ -2816,6 +2978,10 @@ static int cyclotomic18(void) {
 static int inversion18(void) {
 	int code = STS_ERR;
 	fp18_t a, b, c;
+
+	fp18_null(a);
+	fp18_null(b);
+	fp18_null(c);
 
 	TRY {
 		fp18_new(a);
