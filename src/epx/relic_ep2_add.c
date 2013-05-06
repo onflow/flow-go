@@ -235,7 +235,7 @@ static void ep2_add_projc_mix(ep2_t r, ep2_t p, ep2_t q) {
  */
 static void ep2_add_projc_imp(ep2_t r, ep2_t p, ep2_t q) {
 #if defined(EP_MIXED) && defined(STRIP)
-	ep2_add_projc_mix(r, s, p, q);
+	ep2_add_projc_mix(r, p, q);
 #else /* General addition. */
 	fp2_t t0, t1, t2, t3, t4, t5, t6;
 
