@@ -53,7 +53,7 @@
  * @param[in] t					- the pointer to the precomputed table.
  */
 void ep_mul_sim_kbltz(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m, ep_t *t) {
-	int len, len0, len1, len2, len3, i, n, sk0, sk1, sl0, sl1, w, gen;
+	int len, len0, len1, len2, len3, i, n, sk0, sk1, sl0, sl1, w, g = 0;
 	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
 	signed char naf2[FP_BITS + 1], naf3[FP_BITS + 1], *t2, *t3;
 	bn_t k0, k1, l0, l1;
@@ -105,8 +105,8 @@ void ep_mul_sim_kbltz(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m, ep_t *t) {
 		bn_abs(l0, l0);
 		bn_abs(l1, l1);
 
-		gen = (t == NULL ? 0 : 1);
-		if (!gen) {
+		g = (t == NULL ? 0 : 1);
+		if (!g) {
 			for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
 				ep_new(tab0[i]);
 			}
@@ -122,7 +122,7 @@ void ep_mul_sim_kbltz(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m, ep_t *t) {
 		ep_tab(tab1, q, EP_WIDTH);
 
 		/* Compute the w-TNAF representation of k and l */
-		if (gen) {
+		if (g) {
 			w = EP_DEPTH;
 		} else {
 			w = EP_WIDTH;
@@ -234,7 +234,7 @@ void ep_mul_sim_kbltz(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m, ep_t *t) {
 		bn_free(l1);
 		ep_free(u);
 
-		if (!gen) {
+		if (!g) {
 			for (i = 0; i < 1 << (EP_WIDTH - 2); i++) {
 				ep_free(tab0[i]);
 			}
