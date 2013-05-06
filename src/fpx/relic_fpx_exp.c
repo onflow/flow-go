@@ -87,24 +87,20 @@ void fp2_conv_uni(fp2_t c, fp2_t a) {
 
 
 void fp2_exp_uni(fp2_t c, fp2_t a, bn_t b) {
-	fp2_t t[1 << (FP_WIDTH - 2)], r, s;
+	fp2_t r, s, t[1 << (FP_WIDTH - 2)];
 	int i, l;
 	signed char naf[FP_BITS], *k, n;
 
-	fp2_null(s);
 	fp2_null(r);
-
-	/* Initialize table. */
-	for (i = 0; i < (1 << (FP_WIDTH - 2)); i++) {
-		fp2_null(t[i]);
-	}
+	fp2_null(s);
 
 	TRY {
+		fp2_new(r);
+		fp2_new(s);
 		for (i = 0; i < (1 << (FP_WIDTH - 2)); i ++) {
+			fp2_null(t[i]);
 			fp2_new(t[i]);
 		}
-		fp_new(r);
-		fp_new(s);
 
 #if FP_WIDTH > 2
 		fp2_sqr(t[0], a);
@@ -140,11 +136,11 @@ void fp2_exp_uni(fp2_t c, fp2_t a, bn_t b) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
+		fp2_free(r);
+		fp2_free(s);
 		for (i = 0; i < (1 << (FP_WIDTH - 2)); i++) {
 			fp2_free(t[i]);
 		}
-		fp2_free(r);
-		fp2_free(s);
 	}
 }
 
