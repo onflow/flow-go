@@ -135,12 +135,13 @@ void pp_exp_b12(fp12_t c, fp12_t a) {
 	bn_t x;
 	int l, *b = fp_param_get_sps(&l);
 
+	bn_null(x);
+
 	TRY {
 		for (int i = 0; i < 10; i++) {
 			fp12_null(t[i]);
 			fp12_new(t[i]);
 		}
-		bn_null(x);
 		bn_new(x);
 
 		fp_param_get_var(x);
