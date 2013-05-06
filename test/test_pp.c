@@ -35,7 +35,352 @@
 #include "relic_test.h"
 #include "relic_bench.h"
 
-static int addition(void) {
+static int addition2(void) {
+	int code = STS_ERR;
+	fp2_t e1, e2;
+	ep_t q, r, s;
+	ep_t p;
+	bn_t k, n;
+
+	fp2_null(e1);
+	fp2_null(e2);
+	ep_null(p);
+	ep_null(q);
+	ep_null(r);
+	ep_null(s);
+	bn_null(k);
+	bn_null(n);
+
+	TRY {
+		fp2_new(e1);
+		fp2_new(e2);
+		ep_new(p);
+		ep_new(q);
+		ep_new(r);
+		ep_new(s);
+		bn_new(n);
+		bn_new(k);
+
+		ep_curve_get_ord(n);
+
+		TEST_BEGIN("miller addition is correct") {
+			ep_rand(p);
+			ep_rand(q);
+			ep_rand(r);
+			ep_copy(s, r);
+			pp_add_k2(e1, r, q, p);
+			pp_norm_k2(r, r);
+			ep_add(s, s, q);
+			ep_norm(s, s);
+			TEST_ASSERT(ep_cmp(r, s) == CMP_EQ, end);
+		} TEST_END;
+
+#if EP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("miller addition in affine coordinates is correct") {
+			ep_rand(p);
+			ep_rand(q);
+			ep_rand(r);
+			ep_copy(s, r);
+			fp2_zero(e1);
+			fp2_zero(e2);
+			pp_add_k2(e1, r, q, p);
+			pp_exp_k2(e1, e1);
+			pp_add_k2_basic(e2, s, q, p);
+			pp_exp_k2(e2, e2);
+			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if EP_ADD == PROJC || !defined(STRIP)
+		TEST_BEGIN("miller addition in projective coordinates is correct") {
+			ep_rand(p);
+			ep_rand(q);
+			ep_rand(r);
+			ep_copy(s, r);
+			fp2_zero(e1);
+			fp2_zero(e2);
+			pp_add_k2(e1, r, q, p);
+			pp_exp_k2(e1, e1);
+			pp_add_k2_projc(e2, s, q, p);
+			pp_exp_k2(e2, e2);
+			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#if 0
+#if PP_EXT == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic projective miller addition is consistent") {
+			ep_rand(p);
+			ep_rand(q);
+			ep_rand(r);
+			ep_copy(s, r);
+			fp2_zero(e1);
+			fp2_zero(e2);
+			pp_add_k2_projc(e1, r, q, p);
+			pp_add_k2_projc_basic(e2, s, q, p);
+			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy-reduced projective miller addition is consistent") {
+			ep_rand(p);
+			ep_rand(q);
+			ep_rand(r);
+			ep_copy(s, r);
+			fp2_zero(e1);
+			fp2_zero(e2);
+			pp_add_k2_projc(e1, r, q, p);
+			pp_add_k2_projc_lazyr(e2, s, q, p);
+			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+#endif /* EP_ADD = PROJC */
+#endif
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp2_free(e1);
+	fp2_free(e2);
+	ep_free(p);
+	ep_free(q);
+	ep_free(r);
+	ep_free(s);
+	bn_free(n);
+	bn_free(k);
+	return code;
+}
+
+static int doubling2(void) {
+	int code = STS_ERR;
+	fp2_t e1, e2;
+	ep_t q, r, s;
+	ep_t p;
+	bn_t k, n;
+
+	fp2_null(e1);
+	fp2_null(e2);
+	ep_null(p);
+	ep_null(q);
+	ep_null(r);
+	ep_null(s);
+	bn_null(k);
+	bn_null(n);
+
+	TRY {
+		fp2_new(e1);
+		fp2_new(e2);
+		ep_new(p);
+		ep_new(q);
+		ep_new(r);
+		ep_new(s);
+		bn_new(n);
+		bn_new(k);
+
+		ep_curve_get_ord(n);
+
+		TEST_BEGIN("miller doubling is correct") {
+			ep_rand(p);
+			ep_rand(q);
+			ep_rand(r);
+			pp_dbl_k2(e1, r, q, p);
+			pp_norm_k2(r, r);
+			ep_dbl(s, q);
+			ep_norm(s, s);
+			TEST_ASSERT(ep_cmp(r, s) == CMP_EQ, end);
+		} TEST_END;
+
+#if EP_ADD == BASIC || !defined(STRIP)
+		TEST_BEGIN("miller doubling in affine coordinates is correct") {
+			ep_rand(p);
+			ep_rand(q);
+			ep_rand(r);
+			fp2_zero(e1);
+			fp2_zero(e2);
+			pp_dbl_k2(e1, r, q, p);
+			pp_exp_k2(e1, e1);
+			pp_dbl_k2_basic(e2, r, q, p);
+			pp_exp_k2(e2, e2);
+			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if EP_ADD == PROJC || !defined(STRIP)
+		TEST_BEGIN("miller doubling in projective coordinates is correct") {
+			ep_rand(p);
+			ep_rand(q);
+			ep_rand(r);
+			fp2_zero(e1);
+			fp2_zero(e2);
+			pp_dbl_k2(e1, r, q, p);
+			pp_exp_k2(e1, e1);
+			pp_dbl_k2_projc(e2, r, q, p);
+			pp_exp_k2(e2, e2);
+			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+
+#if PP_EXT == BASIC || !defined(STRIP)
+		TEST_BEGIN("basic projective miller doubling is correct") {
+			ep_rand(p);
+			ep_rand(q);
+			ep_rand(r);
+			fp2_zero(e1);
+			fp2_zero(e2);
+			pp_dbl_k2_projc(e1, r, q, p);
+			pp_dbl_k2_projc_basic(e2, r, q, p);
+			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy-reduced projective miller doubling is consistent") {
+			ep_rand(p);
+			ep_rand(q);
+			ep_rand(r);
+			fp2_zero(e1);
+			fp2_zero(e2);
+			pp_dbl_k2_projc(e1, r, q, p);
+			pp_dbl_k2_projc_lazyr(e2, r, q, p);
+			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+#endif /* EP_ADD = PROJC */
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp12_free(e1);
+	fp12_free(e2);
+	ep_free(p);
+	ep2_free(q);
+	ep2_free(r);
+	ep2_free(s);
+	bn_free(n);
+	bn_free(k);
+	return code;
+}
+
+static int pairing2(void) {
+	int code = STS_ERR;
+	fp2_t e1, e2;
+	ep_t q, r;
+	ep_t p;
+	bn_t k, n;
+
+	fp2_null(e1);
+	fp2_null(e2);
+	ep_null(p);
+	ep_null(q);
+	ep_null(r);
+	bn_null(k);
+	bn_null(n);
+
+	TRY {
+		fp2_new(e1);
+		fp2_new(e2);
+		ep_new(p);
+		ep_new(q);
+		ep_new(r);
+		bn_new(n);
+		bn_new(k);
+
+		ep_curve_get_ord(n);
+
+		TEST_BEGIN("pairing is not degenerate") {
+			ep_rand(p);
+			ep_rand(q);
+			pp_map_k2(e1, p, q);
+			fp2_zero(e2);
+			fp_set_dig(e2[0], 1);
+			TEST_ASSERT(fp2_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("pairing is bilinear") {
+			ep_rand(p);
+			ep_rand(q);
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(r, q, k);
+			fp2_zero(e1);
+			fp2_zero(e2);
+			pp_map_k2(e1, p, r);
+			ep_mul(p, p, k);
+			pp_map_k2(e2, p, q);
+			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+
+#if PP_MAP == TATEP || PP_MAP == OATEP || !defined(STRIP)
+		TEST_BEGIN("tate pairing is not degenerate") {
+			ep_rand(p);
+			ep_rand(q);
+			pp_map_tatep_k2(e1, p, q);
+			fp2_zero(e2);
+			fp_set_dig(e2[0], 1);
+			TEST_ASSERT(fp2_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("tate pairing is bilinear") {
+			ep_rand(p);
+			ep_rand(q);
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(r, q, k);
+			fp2_zero(e1);
+			fp2_zero(e2);
+			pp_map_tatep_k2(e1, p, r);
+			ep_mul(p, p, k);
+			pp_map_tatep_k2(e2, p, q);
+			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_MAP == WEIL || !defined(STRIP)
+		TEST_BEGIN("weil pairing is not degenerate") {
+			ep_rand(p);
+			ep_rand(q);
+			pp_map_weilp_k2(e1, p, q);
+			fp2_zero(e2);
+			fp_set_dig(e2[0], 1);
+			TEST_ASSERT(fp2_cmp(e1, e2) != CMP_EQ, end);
+		} TEST_END;
+
+		TEST_BEGIN("weil pairing is bilinear") {
+			ep_rand(p);
+			ep_rand(q);
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			ep_mul(r, q, k);
+			fp2_zero(e1);
+			fp2_zero(e2);
+			pp_map_weilp_k2(e1, p, r);
+			ep_mul(p, p, k);
+			pp_map_weilp_k2(e2, p, q);
+			TEST_ASSERT(fp2_cmp(e1, e2) == CMP_EQ, end);
+		} TEST_END;
+#endif
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp2_free(e1);
+	fp2_free(e2);
+	ep_free(p);
+	ep_free(q);
+	ep_free(r);
+	bn_free(n);
+	bn_free(k);
+	return code;
+}
+
+static int addition12(void) {
 	int code = STS_ERR;
 	fp12_t e1, e2;
 	ep2_t q, r, s;
@@ -69,7 +414,7 @@ static int addition(void) {
 			ep2_rand(r);
 			ep2_copy(s, r);
 			pp_add_k12(e1, r, q, p);
-			pp_norm(r, r);
+			pp_norm_k12(r, r);
 			ep2_add(s, s, q);
 			ep2_norm(s, s);
 			TEST_ASSERT(ep2_cmp(r, s) == CMP_EQ, end);
@@ -152,7 +497,7 @@ static int addition(void) {
 	return code;
 }
 
-static int doubling(void) {
+static int doubling12(void) {
 	int code = STS_ERR;
 	fp12_t e1, e2;
 	ep2_t q, r, s;
@@ -185,7 +530,7 @@ static int doubling(void) {
 			ep2_rand(q);
 			ep2_rand(r);
 			pp_dbl_k12(e1, r, q, p);
-			pp_norm(r, r);
+			pp_norm_k12(r, r);
 			ep2_dbl(s, q);
 			ep2_norm(s, s);
 			TEST_ASSERT(ep2_cmp(r, s) == CMP_EQ, end);
@@ -264,7 +609,7 @@ static int doubling(void) {
 	return code;
 }
 
-static int pairing(void) {
+static int pairing12(void) {
 	int code = STS_ERR;
 	fp12_t e1, e2;
 	ep2_t q, r;
@@ -293,7 +638,7 @@ static int pairing(void) {
 		TEST_BEGIN("pairing is not degenerate") {
 			ep_rand(p);
 			ep2_rand(q);
-			pp_map(e1, p, q);
+			pp_map_k12(e1, p, q);
 			fp12_zero(e2);
 			fp_set_dig(e2[0][0][0], 1);
 			TEST_ASSERT(fp12_cmp(e1, e2) != CMP_EQ, end);
@@ -307,9 +652,9 @@ static int pairing(void) {
 			ep2_mul(r, q, k);
 			fp12_zero(e1);
 			fp12_zero(e2);
-			pp_map(e1, p, r);
+			pp_map_k12(e1, p, r);
 			ep_mul(p, p, k);
-			pp_map(e2, p, q);
+			pp_map_k12(e2, p, q);
 			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 
@@ -317,7 +662,7 @@ static int pairing(void) {
 		TEST_BEGIN("tate pairing is not degenerate") {
 			ep_rand(p);
 			ep2_rand(q);
-			pp_map_tatep(e1, p, q);
+			pp_map_tatep_k12(e1, p, q);
 			fp12_zero(e2);
 			fp_set_dig(e2[0][0][0], 1);
 			TEST_ASSERT(fp12_cmp(e1, e2) != CMP_EQ, end);
@@ -331,9 +676,9 @@ static int pairing(void) {
 			ep2_mul(r, q, k);
 			fp12_zero(e1);
 			fp12_zero(e2);
-			pp_map_tatep(e1, p, r);
+			pp_map_tatep_k12(e1, p, r);
 			ep_mul(p, p, k);
-			pp_map_tatep(e2, p, q);
+			pp_map_tatep_k12(e2, p, q);
 			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -342,7 +687,7 @@ static int pairing(void) {
 		TEST_BEGIN("weil pairing is not degenerate") {
 			ep_rand(p);
 			ep2_rand(q);
-			pp_map_weilp(e1, p, q);
+			pp_map_weilp_k12(e1, p, q);
 			fp12_zero(e2);
 			fp_set_dig(e2[0][0][0], 1);
 			TEST_ASSERT(fp12_cmp(e1, e2) != CMP_EQ, end);
@@ -356,9 +701,9 @@ static int pairing(void) {
 			ep2_mul(r, q, k);
 			fp12_zero(e1);
 			fp12_zero(e2);
-			pp_map_weilp(e1, p, r);
+			pp_map_weilp_k12(e1, p, r);
 			ep_mul(p, p, k);
-			pp_map_weilp(e2, p, q);
+			pp_map_weilp_k12(e2, p, q);
 			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -367,7 +712,7 @@ static int pairing(void) {
 		TEST_BEGIN("optimal ate pairing is not degenerate") {
 			ep_rand(p);
 			ep2_rand(q);
-			pp_map_oatep(e1, p, q);
+			pp_map_oatep_k12(e1, p, q);
 			fp12_zero(e2);
 			fp_set_dig(e2[0][0][0], 1);
 			TEST_ASSERT(fp12_cmp(e1, e2) != CMP_EQ, end);
@@ -381,9 +726,9 @@ static int pairing(void) {
 			ep2_mul(r, q, k);
 			fp12_zero(e1);
 			fp12_zero(e2);
-			pp_map_oatep(e1, p, r);
+			pp_map_oatep_k12(e1, p, r);
 			ep_mul(p, p, k);
-			pp_map_oatep(e2, p, q);
+			pp_map_oatep_k12(e2, p, q);
 			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -422,19 +767,38 @@ int main(void) {
 
 	util_banner("Arithmetic", 1);
 
-	if (addition() != STS_OK) {
-		core_clean();
-		return 1;
+	if (ep_param_embed() == 2) {
+		if (addition2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (doubling2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (pairing2() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 	}
 
-	if (doubling() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+	if (ep_param_embed() == 12) {
+		if (addition12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 
-	if (pairing() != STS_OK) {
-		core_clean();
-		return 1;
+		if (doubling12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+
+		if (pairing12() != STS_OK) {
+			core_clean();
+			return 1;
+		}
 	}
 
 	util_banner("All tests have passed.\n", 0);
