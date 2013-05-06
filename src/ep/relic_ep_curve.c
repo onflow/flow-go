@@ -219,6 +219,32 @@ ep_t *ep_curve_get_tab() {
 void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h) {
 	ctx_t *ctx = core_get();
 	ctx->ep_is_kbltz = 0;
+	ctx->ep_is_super = 0;
+
+	fp_copy(ctx->ep_a, a);
+	fp_copy(ctx->ep_b, b);
+
+	detect_opt(&(ctx->ep_opt_a), ctx->ep_a);
+	detect_opt(&(ctx->ep_opt_b), ctx->ep_b);
+
+	ep_norm(g, g);
+	ep_copy(&(ctx->ep_g), g);
+	bn_copy(&(ctx->ep_r), r);
+	bn_copy(&(ctx->ep_h), h);
+
+#if defined(EP_PRECO)
+	ep_mul_pre(ep_curve_get_tab(), &(ctx->ep_g));
+#endif
+}
+
+#endif
+
+#if defined(EP_SUPER)
+
+void ep_curve_set_super(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h) {
+	ctx_t *ctx = core_get();
+	ctx->ep_is_kbltz = 0;
+	ctx->ep_is_super = 1;
 
 	fp_copy(ctx->ep_a, a);
 	fp_copy(ctx->ep_b, b);
@@ -244,6 +270,7 @@ void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, bn_t h, fp_t beta, bn_t l) {
 	int bits = bn_bits(r);
 	ctx_t *ctx = core_get();
 	ctx->ep_is_kbltz = 1;
+	ctx->ep_is_super = 0;
 
 	fp_zero(ctx->ep_a);
 	fp_copy(ctx->ep_b, b);
