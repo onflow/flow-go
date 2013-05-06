@@ -684,6 +684,6 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[in] P				- the first element.
  * @param[in] Q				- the second element.
  */
-#define pc_map(R, P, Q);	CAT(PC_LOWER, map)(R, P, Q)
+#define pc_map(R, P, Q);	CAT(PC_LOWER, map_k12)(R, P, Q)
 
 #endif /* !RELIC_PC_H */
