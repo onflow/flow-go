@@ -91,8 +91,8 @@ void fp2_exp_uni(fp2_t c, fp2_t a, bn_t b) {
 	int i, l;
 	signed char naf[FP_BITS], *k, n;
 
-	fp_null(s);
-	fp_null(r);
+	fp2_null(s);
+	fp2_null(r);
 
 	/* Initialize table. */
 	for (i = 0; i < (1 << (FP_WIDTH - 2)); i++) {
