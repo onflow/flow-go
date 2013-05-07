@@ -121,13 +121,9 @@ void fp2_norm_low(fp2_t c, fp2_t a) {
 				fp2_mul_art(c, a);
 				break;
 			case 7:
-				/* If p = 7 mod 8, we choose (2^(lg_4(b-1)) + u) as QNR/CNR. */
+				/* If p = 7 mod 8, we choose (2 + u) as QNR/CNR. */
 				fp2_mul_art(t, a);
 				fp2_dbl(c, a);
-				fp_prime_back(b, ep_curve_get_b());
-				for (int i = 1; i < bn_bits(b) / 2; i++) {
-					fp2_dbl(c, c);
-				}
 				fp2_add(c, c, t);
 				break;
 			default:
@@ -183,14 +179,8 @@ void fp2_nord_low(dv2_t c, dv2_t a) {
 				dv_copy(c[1], t[0], 2 * FP_DIGS);
 				break;
 			case 7:
-				/* If p = 7 mod 8, (2^lg_4(b-1) + u) is a QNR/CNR.   */
-				/* (a_0 + a_1 * u)(2^lg_4(b-1) + u) =
-				 * (2^lg_4(b-1)a_0 - a_1) + (a_0 + 2^lg_4(b-1)a_1 * u. */
+				/* If p = 7 mod 8, (2 + u) is a QNR/CNR.   */
 				fp2_addc_low(t, a, a);
-				fp_prime_back(b, ep_curve_get_b());
-				for (int i = 1; i < bn_bits(b) / 2; i++) {
-					fp2_addc_low(t, t, t);
-				}
 				fp_subc_low(c[0], t[0], a[1]);
 				fp_addc_low(c[1], t[1], a[0]);
 				break;

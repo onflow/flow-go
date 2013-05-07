@@ -170,10 +170,6 @@ void fp2_mul_nor_basic(fp2_t c, fp2_t a) {
 				/* If p = 7 mod 8, we choose (2^log_4(b-1) + u) is a QNR/CNR. */
 				fp2_mul_art(t, a);
 				fp2_dbl(c, a);
-				fp_prime_back(b, ep_curve_get_b());
-				for (int i = 1; i < bn_bits(b) / 2; i++) {
-					fp2_dbl(c, c);
-				}
 				fp2_add(c, c, t);
 				break;
 			default:
