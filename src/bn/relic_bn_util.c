@@ -72,15 +72,9 @@ int bn_sign(bn_t a) {
 }
 
 void bn_zero(bn_t a) {
-	int i;
-	dig_t *tmp;
-
 	a->sign = BN_POS;
-	a->used = 1;
-	tmp = a->dp;
-	for (i = 0; i < a->alloc; i++, tmp++) {
-		*tmp = 0;
-	}
+	a->used = 0;
+	dv_zero(a->dp, a->alloc);
 }
 
 int bn_is_zero(bn_t a) {
@@ -471,13 +465,10 @@ void bn_size_raw(int *size, bn_t a) {
 
 void bn_read_raw(bn_t a, dig_t *raw, int len) {
 	bn_grow(a, len);
-	bn_zero(a);
-
-	for (int i = len - 1; i >= 0; i--) {
-		bn_lsh(a, a, BN_DIGIT);
-		a->dp[0] = raw[i];
-	}
+	a->used = len;
 	a->sign = BN_POS;
+	dv_copy(a->dp, raw, len);
+	bn_trim(a);
 }
 
 void bn_write_raw(dig_t *raw, int len, bn_t a) {

@@ -146,8 +146,8 @@ void bn_trim(bn_t a) {
 		--(a->used);
 	}
 	/* Zero can't be negative. */
-	if (a->used <= 0) {
-		a->used = 1;
+	if (a->used < 0) {
+		a->used = 0;
 		a->dp[0] = 0;
 		a->sign = BN_POS;
 	}
