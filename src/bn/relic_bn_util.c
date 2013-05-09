@@ -73,7 +73,7 @@ int bn_sign(bn_t a) {
 
 void bn_zero(bn_t a) {
 	a->sign = BN_POS;
-	a->used = 0;
+	a->used = 1;
 	dv_zero(a->dp, a->alloc);
 }
 
