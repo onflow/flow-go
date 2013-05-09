@@ -109,7 +109,7 @@ static void fp2_calc() {
 }
 
 /**
- * Computes the constantes required for evaluating Frobenius maps.
+ * Computes the constants required for evaluating Frobenius maps.
  */
 static void fp3_calc() {
 	bn_t e;
