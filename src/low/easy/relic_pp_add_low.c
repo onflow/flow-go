@@ -121,9 +121,10 @@ void fp2_norm_low(fp2_t c, fp2_t a) {
 				fp2_mul_art(c, a);
 				break;
 			case 7:
-				/* If p = 7 mod 8, we choose (2 + u) as QNR/CNR. */
+				/* If p = 7 mod 8, we choose (4 + u) as QNR/CNR. */
 				fp2_mul_art(t, a);
 				fp2_dbl(c, a);
+				fp2_dbl(c, c);
 				fp2_add(c, c, t);
 				break;
 			default:
@@ -179,8 +180,9 @@ void fp2_nord_low(dv2_t c, dv2_t a) {
 				dv_copy(c[1], t[0], 2 * FP_DIGS);
 				break;
 			case 7:
-				/* If p = 7 mod 8, (2 + u) is a QNR/CNR.   */
+				/* If p = 7 mod 8, (4 + u) is a QNR/CNR.   */
 				fp2_addc_low(t, a, a);
+				fp2_addc_low(t, t, t);
 				fp_subc_low(c[0], t[0], a[1]);
 				fp_addc_low(c[1], t[1], a[0]);
 				break;

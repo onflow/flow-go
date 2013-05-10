@@ -460,10 +460,7 @@ static int multiplication2(void) {
 				case 7:
 					fp2_mul_art(d, a);
 					fp2_dbl(c, a);
-					fp_prime_back(g, ep_curve_get_b());
-					for (int i = 1; i < bn_bits(g) / 2; i++) {
-						fp2_dbl(c, c);
-					}
+					fp2_dbl(c, c);
 					fp2_add(c, c, d);
 					break;
 			}
