@@ -29,6 +29,8 @@
  * @ingroup bn
  */
 
+#include <inttypes.h>
+
 #include "relic_core.h"
 
 /*============================================================================*/
@@ -195,7 +197,7 @@ void bn_rand(bn_t a, int sign, int bits) {
 	bn_grow(a, digits);
 
 	rand_bytes((unsigned char *)a->dp, digits * (BN_DIGIT / 8));
-				
+
 	a->used = digits;
 	a->sign = sign;
 	if (bits > 0) {
@@ -215,16 +217,16 @@ void bn_print(bn_t a) {
 		util_print("0\n");
 	} else {
 #if WORD == 64
-		util_print("%lX", (unsigned long int)a->dp[a->used - 1]);
+		util_print("%" PRIX64, (uint64_t)a->dp[a->used - 1]);
 		for (i = a->used - 2; i >= 0; i--) {
-			util_print("%.*lX", (int)(2 * (BN_DIGIT / 8)),
-					(unsigned long int)a->dp[i]);
+			util_print("%.*" PRIX64, (int)(2 * (BN_DIGIT / 8)),
+					(uint64_t)a->dp[i]);
 		}
 #else
-		util_print("%llX", (unsigned long long int)a->dp[a->used - 1]);
+		util_print("%" PRIX32, (uint32_t)a->dp[a->used - 1]);
 		for (i = a->used - 2; i >= 0; i--) {
-			util_print("%.*llX", (int)(2 * (BN_DIGIT / 8)),
-					(unsigned long long int)a->dp[i]);
+			util_print("%.*" PRIX32, (int)(2 * (BN_DIGIT / 8)),
+					(uint32_t)a->dp[i]);
 		}
 #endif
 		util_print("\n");

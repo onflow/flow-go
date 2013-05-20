@@ -30,6 +30,7 @@
  */
 
 #include <ctype.h>
+#include <inttypes.h>
 
 #include "relic_core.h"
 #include "relic_fb.h"
@@ -180,15 +181,13 @@ void fb_print(fb_t a) {
 
 	/* Suppress possible unused parameter warning. */
 	(void)a;
+	for (i = FB_DIGS - 1; i >= 0; i--) {
 #if WORD == 64
-	for (i = FB_DIGS - 1; i >= 0; i--) {
-		util_print("%.*llX ", (int)(2 * (FB_DIGIT / 8)), (unsigned long long int)a[i]);
-	}
+		util_print("%.*" PRIX64 " ", (int)(2 * (FB_DIGIT / 8)), (uint64_t)a[i]);
 #else
-	for (i = FB_DIGS - 1; i >= 0; i--) {
-		util_print("%.*lX ", (int)(2 * (FB_DIGIT / 8)), (unsigned long int)a[i]);
-	}
+		util_print("%.*" PRIX32 " ", (int)(2 * (FB_DIGIT / 8)), (uint32_t)a[i]);
 #endif
+	}
 	util_print("\n");
 }
 
