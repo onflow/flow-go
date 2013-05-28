@@ -893,7 +893,14 @@ void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k) {
 	}
 #endif
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
+#if defined(EB_SUPER)
+	if (eb_curve_is_super()) {
+		eb_mul_rnaf_imp(r, p, k);
+		return;
+	}
+#endif
+
+#if defined(EB_ORDIN) 
 #if defined(EB_MIXED) && defined(STRIP)
 	/* It is impossible to run a right-to-left algorithm using ordinary curves
 	 * and only mixed additions. */
