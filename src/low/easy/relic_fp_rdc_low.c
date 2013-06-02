@@ -75,10 +75,9 @@
 /*============================================================================*/
 
 void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
-	align dig_t q[2 * FP_DIGS], _q[2 * FP_DIGS];
-	align dig_t _r[2 * FP_DIGS], r[2 * FP_DIGS], t[2 * FP_DIGS];
+	align dig_t q[2 * FP_DIGS], _q[2 * FP_DIGS], t[2 * FP_DIGS], r[FP_DIGS];
 	int *sform, len;
-	int first, i, j, b0, d0, b1, d1;
+	int first, i, j, k, b0, d0, b1, d1;
 
 	sform = fp_prime_get_sps(&len);
 
@@ -98,6 +97,7 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 		r[first - 1] &= MASK(b0);
 	}
 
+	k = 0;
 	while (!fp_is_zero(q)) {
 		dv_zero(_q, 2 * FP_DIGS);
 		for (i = len - 2; i > 0; i--) {
@@ -108,27 +108,37 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 			if (b1 > 0) {
 				bn_lshb_low(t, t, 2 * FP_DIGS, b1);
 			}
-			if (sform[i] > 0) {
-				bn_subn_low(_q, _q, t, 2 * FP_DIGS);
-			} else {
+			/* Check if these two have the same sign. */
+			if ((sform[len - 2] ^ sform[i]) >= 0) {
 				bn_addn_low(_q, _q, t, 2 * FP_DIGS);
+			} else {
+				bn_subn_low(_q, _q, t, 2 * FP_DIGS);
 			}
 		}
-		if (sform[0] > 0) {
-			bn_subn_low(_q, _q, q, 2 * FP_DIGS);
-		} else {
+		/* Check if these two have the same sign. */
+		if ((sform[len - 2] ^ sform[0]) >= 0) {
 			bn_addn_low(_q, _q, q, 2 * FP_DIGS);
+		} else {
+			bn_subn_low(_q, _q, q, 2 * FP_DIGS);
 		}
 		bn_rshd_low(q, _q, 2 * FP_DIGS, d0);
 		if (b0 > 0) {
 			bn_rshb_low(q, q, 2 * FP_DIGS, b0);
 		}
-
-		dv_copy(_r, _q, first);
 		if (b0 > 0) {
-			_r[first - 1] &= MASK(b0);
+			_q[first - 1] &= MASK(b0);
 		}
-		fp_add(r, r, _r);
+		if (sform[len - 2] < 0) {
+			fp_add(r, r, _q);
+		} else {
+			if (k++ % 2 == 0) {
+				if (fp_subn_low(r, r, _q)) {
+					fp_addn_low(r, r, m);
+				}
+			} else {
+				fp_addn_low(r, r, _q);
+			}
+		}
 	}
 	while (fp_cmpn_low(r, m) != CMP_LT) {
 		fp_subn_low(r, r, m);
