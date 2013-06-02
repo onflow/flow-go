@@ -116,8 +116,9 @@ void fp2_norm_low(fp2_t c, fp2_t a) {
 				fp_add(c[1], a[0], a[1]);
 				fp_add(c[0], t[0], a[0]);
 				break;
+			case 1:
 			case 5:
-				/* If p = 5 mod 8, (u) is a QNR/CNR. */
+				/* If p = 1,5 mod 8, (u) is a QNR/CNR. */
 				fp2_mul_art(c, a);
 				break;
 			case 7:
@@ -168,8 +169,9 @@ void fp2_nord_low(dv2_t c, dv2_t a) {
 				fp_addc_low(c[1], a[0], a[1]);
 				fp_subc_low(c[0], a[0], t[0]);
 				break;
+			case 1:
 			case 5:
-				/* If p = 5 mod 8, (u) is a QNR. */
+				/* If p = 1,5 mod 8, (u) is a QNR. */
 				dv_copy(t[0], a[0], 2 * FP_DIGS);
 				dv_zero(t[1], FP_DIGS);
 				dv_copy(t[1] + FP_DIGS, fp_prime_get(), FP_DIGS);

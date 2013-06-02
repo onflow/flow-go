@@ -162,6 +162,7 @@ void fp2_mul_nor_basic(fp2_t c, fp2_t a) {
 				fp_add(c[1], a[0], a[1]);
 				fp_add(c[0], t[0], a[0]);
 				break;
+			case 1:
 			case 5:
 				/* If p = 5 mod 8, (u) is a QNR/CNR. */
 				fp2_mul_art(c, a);
