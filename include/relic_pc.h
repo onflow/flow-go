@@ -61,14 +61,6 @@
 #define G2_UPPER			EP
 #define GT_LOWER			fp12_
 #define PC_LOWER			pp_
-#elif PC_CUR == CHAR2
-#if PB_MAP == ETAT2 || PB_MAP == OETA2
-#define G1_LOWER			hb_
-#define G1_UPPER			HB
-#define G2_LOWER			hb_
-#define G2_UPPER			HB
-#define GT_LOWER			fb12_
-#define PC_LOWER			pb_
 #else
 #define G1_LOWER			eb_
 #define G1_UPPER			EB
@@ -76,7 +68,6 @@
 #define G2_UPPER			EB
 #define GT_LOWER			fb4_
 #define PC_LOWER			pb_
-#endif
 #endif
 /** @} */
 
@@ -684,6 +675,10 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[in] P				- the first element.
  * @param[in] Q				- the second element.
  */
+#if PC_CUR == PRIME
 #define pc_map(R, P, Q);	CAT(PC_LOWER, map_k12)(R, P, Q)
+#else
+#define pc_map(R, P, Q);	CAT(PC_LOWER, map)(R, P, Q)
+#endif
 
 #endif /* !RELIC_PC_H */

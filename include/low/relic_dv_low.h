@@ -35,7 +35,6 @@
 #include "relic_bn_low.h"
 #include "relic_fb_low.h"
 #include "relic_fp_low.h"
-#include "relic_ft_low.h"
 
 /*============================================================================*/
 /* Constant definitions                                                       */

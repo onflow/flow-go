@@ -40,7 +40,6 @@
 #include "relic_fb.h"
 #include "relic_fbx.h"
 #include "relic_eb.h"
-#include "relic_hb.h"
 #include "relic_types.h"
 
 /*============================================================================*/
@@ -145,23 +144,5 @@ void pb_map_etats(fb4_t r, eb_t p, eb_t q);
  * @param[in] q				- the second elliptic curve point.
  */
 void pb_map_etatn(fb4_t r, eb_t p, eb_t q);
-
-/**
- * Computes the etat pairing of two binary hyperelliptic curve points.
- *
- * @param[out] r			- the result.
- * @param[in] p				- the first hyperelliptic curve point.
- * @param[in] q				- the second hyperelliptic curve point.
- */
-void pb_map_etat2(fb12_t r, hb_t p, hb_t q);
-
-/**
- * Computes the optimal eta pairing of two binary hyperelliptic curve points.
- *
- * @param[out] r			- the result.
- * @param[in] p				- the first hyperelliptic curve point.
- * @param[in] q				- the second hyperelliptic curve point.
- */
-void pb_map_oeta2(fb12_t r, hb_t p, hb_t q);
 
 #endif /* !RELIC_PB_H */

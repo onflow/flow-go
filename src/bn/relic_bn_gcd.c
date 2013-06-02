@@ -169,7 +169,7 @@ void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 void bn_gcd_lehme(bn_t c, bn_t a, bn_t b) {
 	bn_t x, y, u, v, t0, t1, t2, t3;
 	dig_t _x, _y, q, _q, t, _t;
-	dsi_t _a, _b, _c, _d;
+	dis_t _a, _b, _c, _d;
 
 	bn_null(x);
 	bn_null(y);
@@ -350,7 +350,7 @@ void bn_gcd_lehme(bn_t c, bn_t a, bn_t b) {
 void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 	bn_t x, y, u, v, t0, t1, t2, t3, t4;
 	dig_t _x, _y, q, _q, t, _t;
-	dsi_t _a, _b, _c, _d;
+	dis_t _a, _b, _c, _d;
 	int swap;
 
 	bn_null(x);
