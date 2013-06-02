@@ -379,12 +379,7 @@ void fp_prime_set_pmers(int *f, int len) {
 			THROW(ERR_NO_VALID);
 		}
 
-		bn_set_2b(p, FP_BITS);
 		for (int i = len - 1; i > 0; i--) {
-			if (f[i] == FP_BITS) {
-				continue;
-			}
-
 			if (f[i] > 0) {
 				bn_set_2b(t, f[i]);
 				bn_add(p, p, t);
