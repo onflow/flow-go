@@ -394,12 +394,12 @@ void fp_prime_set_pmers(int *f, int len) {
 			bn_sub_dig(p, p, -f[0]);
 		}
 
-		fp_prime_set(p);
 		for (int i = 0; i < len; i++) {
 			ctx->sps[i] = f[i];
 		}
 		ctx->sps[len] = 0;
 		ctx->sps_len = len;
+		fp_prime_set(p);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
