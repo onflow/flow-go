@@ -42,7 +42,6 @@
 #include "relic_fb.h"
 #include "relic_ep.h"
 #include "relic_eb.h"
-#include "relic_hb.h"
 #include "relic_cp.h"
 #include "relic_pp.h"
 
@@ -114,9 +113,6 @@ int core_init(void) {
 #ifdef WITH_EB
 		eb_curve_init();
 #endif
-#ifdef WITH_HB
-		hb_curve_init();
-#endif
 #ifdef WITH_PP
 		pp_map_init();
 #endif
@@ -147,9 +143,6 @@ int core_clean(void) {
 #endif
 #ifdef WITH_EB
 	eb_curve_clean();
-#endif
-#ifdef WITH_HB
-	hb_curve_clean();
 #endif
 #ifdef WITH_PP
 	pp_map_clean();

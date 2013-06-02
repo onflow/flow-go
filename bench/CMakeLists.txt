@@ -45,10 +45,6 @@ if (WITH_EC)
 	ADD_MODULE(ec)
 endif(WITH_EC)
 
-if (WITH_HB)
-    ADD_MODULE(hb)
-endif(WITH_HB)
-
 if (WITH_PB)
 	ADD_MODULE(fbx)
 	ADD_MODULE(pb)

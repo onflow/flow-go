@@ -8,8 +8,6 @@ option(PB_PARAL "Parallel implementation." off)
 message("   ** Available bilinear pairing methods (default = ETATS):")
 message("      PB_METHD=ETATS    Eta-t pairing in genus 1 with square roots.")
 message("      PB_METHD=ETATN    Eta-t pairing in genus 1 without square roots.\n")
-message("      PB_METHD=ETAT2    Eta-t pairing in genus 2.")
-message("      PB_METHD=ETATN    Optimal eta pairing in genus 2.\n")
 
 # Choose the arithmetic methods.
 if (NOT PB_METHD)

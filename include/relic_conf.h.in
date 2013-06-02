@@ -105,8 +105,6 @@
 #cmakedefine WITH_EB
 /** Build elliptic curve cryptography module. */
 #cmakedefine WITH_EC
-/** Build hyperelliptic curve cryptography module. */
-#cmakedefine WITH_HB
 /** Build pairings over prime curves module. */
 #cmakedefine WITH_PP
 /** Build pairings over binary curves module. */
@@ -609,10 +607,6 @@
 #define ETATS    1
 /** Pairing computation in genus 1 curves without square roots. */
 #define ETATN    2
-/** Pairing computation in genus 2 curves. */
-#define ETAT2    3
-/** Optimal pairing computation in genus 2 curves. */
-#define OETA2    4
 /** Chosen binary elliptic curve point pairing method. */
 #define PB_MAP	 @PB_MAP@
 

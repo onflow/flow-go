@@ -44,7 +44,6 @@
 #include "relic_error.h"
 #include "relic_bn.h"
 #include "relic_eb.h"
-#include "relic_hb.h"
 #include "relic_epx.h"
 #include "relic_conf.h"
 #include "relic_bench.h"
@@ -247,37 +246,6 @@ typedef struct _ctx_t {
 	eb_st *eb_ptr[EB_TABLE];
 #endif /* EB_PRECO */
 #endif /* WITH_EB */
-
-#ifdef WITH_HB
-	/** Currently configured binary hyperelliptic curve identifier. */
-	int hb_id;
-	/** The f3 coefficient of the hyperelliptic curve. */
-	fb_st hb_f3;
-	/** Optimization identifier for the f3-coefficient. */
-	int hb_opt_f3;
-	/** The f1 coefficient of the elliptic curve. */
-	fb_st hb_f1;
-	/** Optimization identifier for the f1-coefficient. */
-	int hb_opt_f1;
-	/** The f0 coefficient of the elliptic curve. */
-	fb_st hb_f0;
-	/** Optimization identifier for the f0-coefficient. */
-	int hb_opt_f0;
-	/** The generator of the hyperelliptic curve. */
-	hb_st hb_g;
-	/** The order of the group of points in the hyperelliptic curve. */
-	bn_st hb_r;
-	/** The cofactor of the group order in the hyperelliptic curve. */
-	bn_st hb_h;
-	/** Flag that stores if the binary hyperelliptic curve is supersingular. */
-	int hb_is_super;
-#ifdef HB_PRECO
-	/** Precomputation table for generator multiplication. */
-	hb_st hb_pre[HB_TABLE];
-	/** Array of pointers to the precomputation table. */
-	hb_st *hb_ptr[HB_TABLE];
-#endif
-#endif /* WITH_HB */
 
 #ifdef WITH_PB
 	/** Precomputed table for the final exponentiation. */

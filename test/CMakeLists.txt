@@ -49,10 +49,6 @@ if (WITH_PC)
 	ADD_MODULE(pc)
 endif(WITH_PC)
 
-if (WITH_HB)
-	ADD_MODULE(hb)
-endif(WITH_HB)
-
 if (WITH_PP)
 	ADD_MODULE(fpx)
 	ADD_MODULE(epx)
