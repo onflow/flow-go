@@ -136,9 +136,6 @@
 /** Number of Karatsuba steps. */
 #define BN_KARAT @BN_KARAT@
 
-/** Multiple precision arithmetic method */
-#define BN_METHD "@BN_METHD@"
-
 /** Schoolbook multiplication. */
 #define BASIC    1
 /** Comba multiplication. */
@@ -193,6 +190,9 @@
 /** Chosen prime generation algorithm. */
 #define BN_GEN   @BN_GEN@
 
+/** Multiple precision arithmetic method */
+#define BN_METHD "@BN_METHD@"
+
 /** Prime field size in bits. */
 #define FP_PRIME @FP_PRIME@
 /** Number of Karatsuba steps. */
@@ -203,9 +203,6 @@
 #cmakedefine FP_QNRES
 /** Width of window processing for exponentiation methods. */
 #define FP_WIDTH @FP_WIDTH@
-
-/** Prime field arithmetic method */
-#define FP_METHD "@FP_METHD@"
 
 /** Schoolbook addition. */
 #define BASIC    1
@@ -265,6 +262,9 @@
 /** Chosen multiple precision modular exponentiation method. */
 #define FP_EXP   @FP_EXP@
 
+/** Prime field arithmetic method */
+#define FP_METHD "@FP_METHD@"
+
 /** Irreducible polynomial size in bits. */
 #define FB_POLYN @FB_POLYN@
 /** Number of Karatsuba steps. */
@@ -277,9 +277,6 @@
 #cmakedefine FB_PRECO
 /** Width of window processing for exponentiation methods. */
 #define FB_WIDTH @FB_WIDTH@
-
-/** Binary field arithmetic method */
-#define FB_METHD "@FB_METHD@"
 
 /** Shift-and-add multiplication. */
 #define BASIC    1
@@ -364,6 +361,9 @@
 /** Chosen method to solve a quadratic equation. */
 #define FB_ITR   @FB_ITR@
 
+/** Binary field arithmetic method */
+#define FB_METHD "@FB_METHD@"
+
 /** Support for ordinary curves. */
 #cmakedefine EP_ORDIN
 /** Support for supersingular curves. */
@@ -378,9 +378,6 @@
 #define EP_DEPTH @EP_DEPTH@
 /** Width of window processing for unknown point methods. */
 #define EP_WIDTH @EP_WIDTH@
-
-/** Prime elliptic curve arithmetic method. */
-#define EP_METHD "@EP_METHD@"
 
 /** Affine coordinates. */
 #define BASIC	 1
@@ -425,6 +422,9 @@
 #define JOINT    4
 /** Chosen prime elliptic curve simulteanous point multiplication method. */
 #define EP_SIM   @EP_SIM@ 
+
+/** Prime elliptic curve arithmetic method. */
+#define EP_METHD "@EP_METHD@"
 
 /** Support for ordinary curves. */
 #cmakedefine EB_ORDIN
@@ -493,9 +493,6 @@
 /** Prefer Koblitz anomalous (binary or prime) curves. */
 #cmakedefine EC_KBLTZ
 
-/** Chosen elliptic curve cryptography method. */
-#define EC_METHD "@EC_METHD@"
-
 /** Prime curves. */
 #define PRIME    1
 /** Binary curves. */
@@ -503,64 +500,11 @@
 /** Chosen elliptic curve type. */
 #define EC_CUR	 @EC_CUR@
 
-/** Support for supersingular curves. */
-#cmakedefine HB_SUPER
-/** Build precomputation table for generator. */
-#cmakedefine HB_PRECO
-/** Width of precomputation table for fixed point methods. */
-#define HB_DEPTH @HB_DEPTH@
-/** Width of window processing for unknown point methods. */
-#define HB_WIDTH @HB_WIDTH@
+/** Chosen elliptic curve cryptography method. */
+#define EC_METHD "@EC_METHD@"
 
-/** Binary elliptic curve arithmetic method. */
-#define HB_METHD "@HB_METHD@"
-
-/** Affine coordinates. */
-#define BASIC	 1
-/** López-Dahab Projective coordinates. */
-#define PROJC	 2
-/** Chosen binary elliptic curve coordinate method. */
-#define HB_ADD	 @HB_ADD@
-
-/** Binary point multiplication. */ 
-#define BASIC	 1
-/** Left-to-right Width-w NAF. */ 
-#define LWNAF	 4
-/** Octupling-based windowing. */
-#define OCTUP	 7
-/** Chosen binary hyperelliptic curve point multiplication method. */
-#define HB_MUL	 @HB_MUL@
-
-/** Binary point multiplication. */ 
-#define BASIC	 1
-/** Yao's windowing method. */
-#define YAOWI	 2
-/** NAF windowing method. */ 
-#define NAFWI	 3
-/** Left-to-right Width-w NAF. */ 
-#define LWNAF	 4
-/** Single-table comb method. */
-#define COMBS	 5
-/** Double-table comb method. */
-#define COMBD    6
-/** Yao's windowing method. */
-#define OCTUP	 7
-/** Chosen binary hyperelliptic curve point multiplication method. */
-#define HB_FIX	 @HB_FIX@
-
-/** Basic simultaneouns point multiplication. */
-#define BASIC    1
-/** Shamir's trick. */
-#define TRICK    2
-/** Interleaving of w-(T)NAFs. */
-#define INTER    3
-/** Joint sparse form. */
-#define JOINT    4
-/** Chosen binary elliptic curve simulteanous point multiplication method. */
-#define HB_SIM   @HB_SIM@ 
-
-/** Bilinear pairing method. */
-#define PP_METHD "@PP_METHD@"
+/** Parallel implementation. */
+#cmakedefine PP_PARAL
 
 /** Basic quadratic extension field arithmetic. */
 #define BASIC    1
@@ -583,8 +527,8 @@
 /* Chosen extension field arithmetic method. */
 #define PP_EXT   @PP_EXT@ 
 
-/** Parallel implementation. */
-#cmakedefine PP_PARAL
+/** Bilinear pairing method. */
+#define PP_METHD "@PP_METHD@"
 
 /** Tate pairing. */
 #define TATEP    1
@@ -600,9 +544,6 @@
 /** Parallel implementation. */
 #cmakedefine PB_PARAL
 
-/** Bilinear pairing method. */
-#define PB_METHD "@PB_METHD@"
-
 /** Pairing computation in genus 1 curves with square roots. */ 
 #define ETATS    1
 /** Pairing computation in genus 1 curves without square roots. */
@@ -610,8 +551,8 @@
 /** Chosen binary elliptic curve point pairing method. */
 #define PB_MAP	 @PB_MAP@
 
-/** Binary elliptic curve arithmetic method. */
-#define PC_METHD "@PC_METHD@"
+/** Bilinear pairing method. */
+#define PB_METHD "@PB_METHD@"
 
 /** Prime curves. */
 #define PRIME	 1
@@ -620,8 +561,8 @@
 /** Chosen elliptic curve type. */
 #define PC_CUR	 @PC_CUR@
 
-/** Choice of hash function. */
-#define MD_METHD "@MD_METHD@"
+/** Binary elliptic curve arithmetic method. */
+#define PC_METHD "@PC_METHD@"
 
 /** SHA-1 hash function. */
 #define SHONE    1
@@ -635,6 +576,9 @@
 #define SH512    5
 /** Chosen hash function. */
 #define MD_MAP   @MD_MAP@
+
+/** Choice of hash function. */
+#define MD_METHD "@MD_METHD@"
 
 /** RSA without padding. */
 #define BASIC    1
