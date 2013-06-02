@@ -44,7 +44,6 @@
 #include "relic_ep.h"
 #include "relic_eb.h"
 #include "relic_ec.h"
-#include "relic_hb.h"
 #include "relic_pp.h"
 #include "relic_pb.h"
 #include "relic_pc.h"
