@@ -354,7 +354,7 @@ int ep_param_get() {
 
 void ep_param_set(int param) {
 	int ordin = 0, kbltz = 0, super = 0;
-	char str[2 * FP_BYTES + 1];
+	char str[2 * FP_BYTES + 2];
 	fp_t a, b, beta;
 	ep_t g;
 	bn_t r, h, lamb;
