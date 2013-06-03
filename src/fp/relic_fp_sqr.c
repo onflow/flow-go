@@ -78,10 +78,10 @@ static void fp_sqr_karat_imp(dv_t c, fp_t a, int size, int level) {
 			/* a0a0 = a0 * a0 and a1a1 = a1 * a1 */
 #if FP_SQR == BASIC
 			for (i = 0; i < h; i++) {
-				bn_sqradd_low(a0a0 + (2 * i), a + i, h - i);
+				bn_sqra_low(a0a0 + (2 * i), a + i, h - i);
 			}
 			for (i = 0; i < h1; i++) {
-				bn_sqradd_low(a1a1 + (2 * i), a + h + i, h1 - i);
+				bn_sqra_low(a1a1 + (2 * i), a + h + i, h1 - i);
 			}
 #elif FP_SQR == COMBA || FP_SQR == INTEG
 			bn_sqrn_low(a0a0, a, h);
@@ -114,7 +114,7 @@ static void fp_sqr_karat_imp(dv_t c, fp_t a, int size, int level) {
 			/* a1a1 = (a1 + a0)*(a1 + a0) */
 #if FP_SQR == BASIC
 			for (i = 0; i < h1 + 1; i++) {
-				bn_sqradd_low(t1 + (2 * i), t0 + i, h1 + 1 - i);
+				bn_sqra_low(t1 + (2 * i), t0 + i, h1 + 1 - i);
 			}
 #elif FP_SQR == COMBA || FP_SQR == INTEG
 			bn_sqrn_low(t1, t0, h1 + 1);
@@ -168,7 +168,7 @@ void fp_sqr_basic(fp_t c, fp_t a) {
 		dv_zero(t, 2 * FP_DIGS);
 
 		for (i = 0; i < FP_DIGS; i++) {
-			bn_sqradd_low(t + (2 * i), a + i, FP_DIGS - i);
+			bn_sqra_low(t + (2 * i), a + i, FP_DIGS - i);
 		}
 
 		fp_rdc(c, t);

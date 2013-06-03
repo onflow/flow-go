@@ -79,11 +79,11 @@ static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
 		if (level <= 1) {
 #if FP_MUL == BASIC
 			for (i = 0; i < h; i++) {
-				carry = bn_muladd_low(a0b0 + i, a, *(b + i), h);
+				carry = bn_mula_low(a0b0 + i, a, *(b + i), h);
 				*(a0b0 + i + h) = carry;
 			}
 			for (i = 0; i < h1; i++) {
-				carry = bn_muladd_low(a1b1 + i, a + h, *(b + h + i), h1);
+				carry = bn_mula_low(a1b1 + i, a + h, *(b + h + i), h1);
 				*(a1b1 + i + h1) = carry;
 			}
 #elif FP_MUL == COMBA || FP_MUL == INTEG
@@ -120,7 +120,7 @@ static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
 			/* t = (a1 + a0)*(b1 + b0) */
 #if FP_MUL == BASIC
 			for (i = 0; i < h1 + 1; i++) {
-				carry = bn_muladd_low(t + i, a1, *(b1 + i), h1 + 1);
+				carry = bn_mula_low(t + i, a1, *(b1 + i), h1 + 1);
 				*(t + i + h1 + 1) = carry;
 			}
 #elif FP_MUL == COMBA || FP_MUL == INTEG
@@ -193,7 +193,7 @@ void fp_mul_basic(fp_t c, fp_t a, fp_t b) {
 		dv_new(t);
 		dv_zero(t, 2 * FP_DIGS);
 		for (i = 0; i < FP_DIGS; i++) {
-			carry = fp_muladd_low(t + i, b, *(a + i));
+			carry = fp_mula_low(t + i, b, *(a + i));
 			*(t + i + FP_DIGS) = carry;
 		}
 

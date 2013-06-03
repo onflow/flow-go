@@ -203,7 +203,7 @@ void bn_mul_basic(bn_t c, bn_t a, bn_t b) {
 		t->used = a->used + b->used;
 
 		for (i = 0; i < a->used; i++) {
-			carry = bn_muladd_low(t->dp + i, b->dp, *(a->dp + i), b->used);
+			carry = bn_mula_low(t->dp + i, b->dp, *(a->dp + i), b->used);
 			*(t->dp + i + b->used) = carry;
 		}
 		t->sign = a->sign ^ b->sign;

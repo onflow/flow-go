@@ -170,7 +170,7 @@ void bn_sqr_basic(bn_t c, bn_t a) {
 		t->used = digits;
 
 		for (i = 0; i < a->used; i++) {
-			bn_sqradd_low(t->dp + (2 * i), a->dp + i, a->used - i);
+			bn_sqra_low(t->dp + (2 * i), a->dp + i, a->used - i);
 		}
 
 		t->sign = BN_POS;

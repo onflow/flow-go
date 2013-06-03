@@ -222,7 +222,7 @@ void bn_mod_monty_basic(bn_t c, bn_t a, bn_t m, bn_t u) {
 
 		for (i = 0; i < m->used; i++, tmp++) {
 			r = (dig_t)(*tmp * u0);
-			carry = bn_muladd_low(tmp, m->dp, r, m->used);
+			carry = bn_mula_low(tmp, m->dp, r, m->used);
 			bn_add1_low(tmp + m->used, tmp + m->used, carry, m->used - i + 1);
 		}
 		bn_rsh(t, t, m->used * BN_DIGIT);
