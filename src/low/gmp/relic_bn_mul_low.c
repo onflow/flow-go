@@ -40,7 +40,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t bn_muladd_low(dig_t *c, dig_t *a, dig_t digit, int size) {
+dig_t bn_mula_low(dig_t *c, dig_t *a, dig_t digit, int size) {
 	return mpn_addmul_1(c, a, size, digit);
 }
 

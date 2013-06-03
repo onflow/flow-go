@@ -40,7 +40,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_sqradd_low(dig_t *c, dig_t *a, int size) {
+void bn_sqra_low(dig_t *c, dig_t *a, int size) {
 	dig_t carry;
 	dig_t digit;
 

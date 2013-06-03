@@ -204,7 +204,7 @@ void bn_rshd_low(dig_t *c, dig_t *a, int size, int digits);
  * @param[in] size			- the number of digits to multiply.
  * @return the carry of the addition.
  */
-dig_t bn_muladd_low(dig_t *c, dig_t *a, dig_t digit, int size);
+dig_t bn_mula_low(dig_t *c, dig_t *a, dig_t digit, int size);
 
 /**
  * Multiplies a digit vector by a digit and stores this result in another digit
@@ -252,7 +252,7 @@ void bn_muld_low(dig_t *c, dig_t *a, int sizea, dig_t *b, int sizeb,
  * @param[in] a				- the digit vector to square.
  * @param[in] size			- the number of digitss to square.
  */
-void bn_sqradd_low(dig_t *c, dig_t *a, int size);
+void bn_sqra_low(dig_t *c, dig_t *a, int size);
 
 /**
  * Squares a digit vector. Computes c = a * a.

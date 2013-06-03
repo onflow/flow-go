@@ -38,7 +38,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fp_muladd_low(dig_t *c, dig_t *a, dig_t digit) {
+dig_t fp_mula_low(dig_t *c, dig_t *a, dig_t digit) {
 	return mpn_addmul_1(c, a, FP_DIGS, digit);
 }
 
