@@ -425,16 +425,17 @@ int fp_prime_get_cnr(void);
 int fp_param_get(void);
 
 /**
- * Assigns the order of the prime field to a non-sparse prime p.
+ * Assigns the prime field modulus to a non-sparse prime.
  *
- * @param[in] p			- the new prime field order.
+ * @param[in] p			- the new prime field modulus.
  */
 void fp_prime_set_dense(bn_t p);
 
 /**
- * Assigns the order of the prime field to a special form prime p.
+ * Assigns the prime field modulus to a special form sparse prime.
  *
- * @param[in] p			- the new prime field order.
+ * @param[in] spars		- the list of powers of 2 describing the prime.
+ * @param[in] len		- the number of powers.
  */
 void fp_prime_set_pmers(int *spars, int len);
 

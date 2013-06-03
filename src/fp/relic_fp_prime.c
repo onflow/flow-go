@@ -37,6 +37,82 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
+/**
+ * Assigns the prime field modulus.
+ *
+ * @param[in] p			- the new prime field modulus.
+ */
+static void fp_prime_set(bn_t p) {
+	dv_t s, q;
+	bn_t t;
+	ctx_t *ctx = core_get();
+
+	if (p->used != FP_DIGS) {
+		THROW(ERR_NO_VALID);
+	}
+
+	dv_null(s);
+	bn_null(t);
+	dv_null(q);
+
+	TRY {
+		dv_new(s);
+		bn_new(t);
+		dv_new(q);
+
+		bn_copy(&(ctx->prime), p);
+
+		bn_mod_dig(&(ctx->mod8), &(ctx->prime), 8);
+
+		switch (ctx->mod8) {
+			case 3:
+			case 7:
+				ctx->qnr = -1;
+				/* The current code for extensions of Fp^3 relies on prime_qnr
+				 * being also a cubic non-residue. */
+				ctx->cnr = 0;
+				break;
+			case 1:
+			case 5:
+				ctx->qnr = ctx->cnr = -2;
+				break;
+			default:
+				ctx->qnr = ctx->cnr = 0;
+				THROW(ERR_NO_VALID);
+				break;
+		}
+#ifdef FP_QNRES
+		if (ctx->mod8 != 3) {
+			THROW(ERR_NO_VALID);
+		}
+#endif
+
+#if FP_RDC == MONTY || !defined(STRIP)
+		bn_mod_pre_monty(t, &(ctx->prime));
+		ctx->u = t->dp[0];
+		dv_zero(s, 2 * FP_DIGS);
+		s[2 * FP_DIGS] = 1;
+		dv_zero(q, 2 * FP_DIGS + 1);
+		dv_copy(q, ctx->prime.dp, FP_DIGS);
+		bn_divn_low(t->dp, ctx->conv.dp, s, 2 * FP_DIGS + 1, q, FP_DIGS);
+		ctx->conv.used = FP_DIGS;
+		bn_trim(&(ctx->conv));
+		bn_set_dig(&(ctx->one), 1);
+		bn_lsh(&(ctx->one), &(ctx->one), ctx->prime.used * BN_DIGIT);
+		bn_mod(&(ctx->one), &(ctx->one), &(ctx->prime));
+#endif
+		fp_prime_calc();
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
+		dv_free(s);
+		dv_free(q);
+	}
+}
+
 #ifdef WITH_PP
 
 /**
@@ -282,77 +358,6 @@ int fp_prime_get_qnr() {
 
 int fp_prime_get_cnr() {
 	return core_get()->cnr;
-}
-
-void fp_prime_set(bn_t p) {
-	dv_t s, q;
-	bn_t t;
-	ctx_t *ctx = core_get();
-
-	if (p->used != FP_DIGS) {
-		THROW(ERR_NO_VALID);
-	}
-
-	dv_null(s);
-	bn_null(t);
-	dv_null(q);
-
-	TRY {
-		dv_new(s);
-		bn_new(t);
-		dv_new(q);
-
-		bn_copy(&(ctx->prime), p);
-
-		bn_mod_dig(&(ctx->mod8), &(ctx->prime), 8);
-
-		switch (ctx->mod8) {
-			case 3:
-			case 7:
-				ctx->qnr = -1;
-				/* The current code for extensions of Fp^3 relies on prime_qnr
-				 * being also a cubic non-residue. */
-				ctx->cnr = 0;
-				break;
-			case 1:
-			case 5:
-				ctx->qnr = ctx->cnr = -2;
-				break;
-			default:
-				ctx->qnr = ctx->cnr = 0;
-				THROW(ERR_NO_VALID);
-				break;
-		}
-#ifdef FP_QNRES
-		if (ctx->mod8 != 3) {
-			THROW(ERR_NO_VALID);
-		}
-#endif
-
-#if FP_RDC == MONTY || !defined(STRIP)
-		bn_mod_pre_monty(t, &(ctx->prime));
-		ctx->u = t->dp[0];
-		dv_zero(s, 2 * FP_DIGS);
-		s[2 * FP_DIGS] = 1;
-		dv_zero(q, 2 * FP_DIGS + 1);
-		dv_copy(q, ctx->prime.dp, FP_DIGS);
-		bn_divn_low(t->dp, ctx->conv.dp, s, 2 * FP_DIGS + 1, q, FP_DIGS);
-		ctx->conv.used = FP_DIGS;
-		bn_trim(&(ctx->conv));
-		bn_set_dig(&(ctx->one), 1);
-		bn_lsh(&(ctx->one), &(ctx->one), ctx->prime.used * BN_DIGIT);
-		bn_mod(&(ctx->one), &(ctx->one), &(ctx->prime));
-#endif
-		fp_prime_calc();
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		bn_free(t);
-		dv_free(s);
-		dv_free(q);
-	}
 }
 
 void fp_prime_set_dense(bn_t p) {
