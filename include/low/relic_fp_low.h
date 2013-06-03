@@ -284,7 +284,7 @@ void fp_rshd_low(dig_t *c, dig_t *a, int digits);
  * @param[in] digit			- the digit to multiply.
  * @return the carry of the addition.
  */
-dig_t fp_muladd_low(dig_t *c, dig_t *a, dig_t digit);
+dig_t fp_mula_low(dig_t *c, dig_t *a, dig_t digit);
 
 /**
  * Multiplies a digit vector by a digit and stores this result in another digit
