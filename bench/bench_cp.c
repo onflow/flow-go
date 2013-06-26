@@ -432,7 +432,7 @@ static void bls(void) {
 }
 
 static void bbs(void) {
-	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+	unsigned char msg[5] = { 0, 1, 2, 3, 4 }, h[MD_LEN];
 	g1_t s;
 	g2_t p;
 	gt_t z;
@@ -453,13 +453,25 @@ static void bbs(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("cp_bbs_sign") {
-		BENCH_ADD(cp_bbs_sig(s, msg, 5, d));
+	BENCH_BEGIN("cp_bbs_sign (h = 0)") {
+		BENCH_ADD(cp_bbs_sig(s, msg, 5, 0, d));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("cp_bbs_ver") {
-		BENCH_ADD(cp_bbs_ver(s, msg, 5, p, z));
+	BENCH_BEGIN("cp_bbs_sign (h = 1)") {
+		md_map(h, msg, 5);
+		BENCH_ADD(cp_bbs_sig(s, h, MD_LEN, 1, d));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("cp_bbs_ver (h = 0)") {
+		BENCH_ADD(cp_bbs_ver(s, msg, 5, 0, p, z));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("cp_bbs_ver (h = 1)") {
+		md_map(h, msg, 5);
+		BENCH_ADD(cp_bbs_ver(s, h, MD_LEN, 1, p, z));
 	}
 	BENCH_END;
 
