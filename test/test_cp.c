@@ -539,7 +539,6 @@ static int bls(void) {
 
 static int bbs(void) {
 	int code = STS_ERR;
-	int b;
 	bn_t d;
 	g1_t s;
 	g2_t q;
@@ -559,8 +558,8 @@ static int bbs(void) {
 
 		TEST_BEGIN("boneh-boyen short signature is correct") {
 			cp_bbs_gen(d, q, z);
-			cp_bbs_sig(&b, s, msg, 5, d);
-			TEST_ASSERT(cp_bbs_ver(b, s, msg, 5, q, z) == 1, end);
+			cp_bbs_sig(s, msg, 5, d);
+			TEST_ASSERT(cp_bbs_ver(s, msg, 5, q, z) == 1, end);
 		} TEST_END;
 	} CATCH_ANY {
 		ERROR(end);

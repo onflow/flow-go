@@ -841,24 +841,22 @@ void cp_bbs_gen(bn_t d, g2_t q, gt_t z);
 /**
  * Signs a message using Boneh-Boyen Short Signature.
  *
- * @param[out] b				- the first component of the signature (a bit).
- * @param[out] s				- the second component of the signature.
+ * @param[out] s				- the signature.
  * @param[in] msg				- the message to sign.
  * @param[in] len				- the message length in bytes.
  * @param[in] d					- the private key.
  */
-void cp_bbs_sig(int *b, g1_t s, unsigned char *msg, int len, bn_t d);
+void cp_bbs_sig(g1_t s, unsigned char *msg, int len, bn_t d);
 
 /**
  * Verifies a message signed with BLS using the basic method.
  *
- * @param[in] b					- the first component of the signature (a bit).
- * @param[in] s					- the second component of the signature.
+ * @param[in] s					- the signature.
  * @param[in] msg				- the message to sign.
  * @param[in] len				- the message length in bytes.
  * @param[in] q					- the public key.
  * @return a boolean value indicating the verification result.
  */
-int cp_bbs_ver(int b, g1_t s, unsigned char *msg, int len, g2_t q, gt_t z);
+int cp_bbs_ver(g1_t s, unsigned char *msg, int len, g2_t q, gt_t z);
 
 #endif /* !RELIC_CP_H */

@@ -433,7 +433,6 @@ static void bls(void) {
 
 static void bbs(void) {
 	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
-	int b;
 	g1_t s;
 	g2_t p;
 	gt_t z;
@@ -455,12 +454,12 @@ static void bbs(void) {
 	BENCH_END;
 
 	BENCH_BEGIN("cp_bbs_sign") {
-		BENCH_ADD(cp_bbs_sig(&b, s, msg, 5, d));
+		BENCH_ADD(cp_bbs_sig(s, msg, 5, d));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("cp_bbs_ver") {
-		BENCH_ADD(cp_bbs_ver(b, s, msg, 5, p, z));
+		BENCH_ADD(cp_bbs_ver(s, msg, 5, p, z));
 	}
 	BENCH_END;
 
