@@ -543,7 +543,7 @@ static int bbs(void) {
 	g1_t s;
 	g2_t q;
 	gt_t z;
-	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+	unsigned char msg[5] = { 0, 1, 2, 3, 4 }, h[MD_LEN];
 
 	bn_null(d);
 	g1_null(s);
@@ -558,8 +558,11 @@ static int bbs(void) {
 
 		TEST_BEGIN("boneh-boyen short signature is correct") {
 			cp_bbs_gen(d, q, z);
-			cp_bbs_sig(s, msg, 5, d);
-			TEST_ASSERT(cp_bbs_ver(s, msg, 5, q, z) == 1, end);
+			cp_bbs_sig(s, msg, 5, 0, d);
+			TEST_ASSERT(cp_bbs_ver(s, msg, 5, 0, q, z) == 1, end);
+			md_map(h, msg, 5);
+			cp_bbs_sig(s, msg, 5, 1, d);
+			TEST_ASSERT(cp_bbs_ver(s, msg, 5, 1, q, z) == 1, end);
 		} TEST_END;
 	} CATCH_ANY {
 		ERROR(end);

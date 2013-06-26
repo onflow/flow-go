@@ -844,9 +844,10 @@ void cp_bbs_gen(bn_t d, g2_t q, gt_t z);
  * @param[out] s				- the signature.
  * @param[in] msg				- the message to sign.
  * @param[in] len				- the message length in bytes.
+ * @param[in] hash				- the flag to indicate the message format.
  * @param[in] d					- the private key.
  */
-void cp_bbs_sig(g1_t s, unsigned char *msg, int len, bn_t d);
+void cp_bbs_sig(g1_t s, unsigned char *msg, int len, int hash, bn_t d);
 
 /**
  * Verifies a message signed with BLS using the basic method.
@@ -854,9 +855,10 @@ void cp_bbs_sig(g1_t s, unsigned char *msg, int len, bn_t d);
  * @param[in] s					- the signature.
  * @param[in] msg				- the message to sign.
  * @param[in] len				- the message length in bytes.
+ * @param[in] hash				- the flag to indicate the message format.
  * @param[in] q					- the public key.
  * @return a boolean value indicating the verification result.
  */
-int cp_bbs_ver(g1_t s, unsigned char *msg, int len, g2_t q, gt_t z);
+int cp_bbs_ver(g1_t s, unsigned char *msg, int len, int hash, g2_t q, gt_t z);
 
 #endif /* !RELIC_CP_H */

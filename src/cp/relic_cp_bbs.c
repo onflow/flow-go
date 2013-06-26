@@ -73,9 +73,9 @@ void cp_bbs_gen(bn_t d, g2_t q, gt_t z) {
 	}
 }
 
-void cp_bbs_sig(g1_t s, unsigned char *msg, int len, bn_t d) {
+void cp_bbs_sig(g1_t s, unsigned char *msg, int len, int hash, bn_t d) {
 	bn_t m, n, r;
-	unsigned char hash[MD_LEN];
+	unsigned char h[MD_LEN];
 
 	bn_null(m);
 	bn_null(n);
@@ -89,8 +89,13 @@ void cp_bbs_sig(g1_t s, unsigned char *msg, int len, bn_t d) {
 		g1_get_ord(n);
 
 		/* m = H(msg). */
-		md_map(hash, msg, len);
-		bn_read_bin(m, hash, MD_LEN);
+		if (hash) {
+			bn_read_bin(m, msg, len);
+		} else {
+			md_map(h, msg, len);
+			bn_read_bin(m, h, MD_LEN);
+		}
+		bn_mod(m, m, n);
 
 		/* m = 1/(m + d) mod n. */
 		bn_add(m, m, d);
@@ -111,11 +116,11 @@ void cp_bbs_sig(g1_t s, unsigned char *msg, int len, bn_t d) {
 	}
 }
 
-int cp_bbs_ver(g1_t s, unsigned char *msg, int len, g2_t q, gt_t z) {
+int cp_bbs_ver(g1_t s, unsigned char *msg, int len, int hash, g2_t q, gt_t z) {
 	bn_t m, n;
 	g2_t g;
 	gt_t e;
-	unsigned char hash[MD_LEN];
+	unsigned char h[MD_LEN];
 	int result = 0;
 
 	bn_null(m);
@@ -131,9 +136,13 @@ int cp_bbs_ver(g1_t s, unsigned char *msg, int len, g2_t q, gt_t z) {
 
 		g2_get_ord(n);
 
-		/* hash = H(msg). */
-		md_map(hash, msg, len);
-		bn_read_bin(m, hash, MD_LEN);
+		/* m = H(msg). */
+		if (hash) {
+			bn_read_bin(m, msg, len);
+		} else {
+			md_map(h, msg, len);
+			bn_read_bin(m, h, MD_LEN);
+		}
 		bn_mod(m, m, n);
 
 		g2_mul_gen(g, m);
