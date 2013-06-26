@@ -99,7 +99,7 @@ void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, int hash,
 				if (8 * MD_LEN > bn_bits(n)) {
 					len = CEIL(bn_bits(n), 8);
 					bn_read_bin(e, h, len);
-					bn_rsh(e, e, 8 * MD_LEN - bn_bits(n));
+					bn_rsh(e, e, 8 * len - bn_bits(n));
 				} else {
 					bn_read_bin(e, h, MD_LEN);
 				}
@@ -172,7 +172,7 @@ int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, int hash, ec_t q) 
 					if (8 * MD_LEN > bn_bits(n)) {
 						len = CEIL(bn_bits(n), 8);
 						bn_read_bin(e, h, len);
-						bn_rsh(e, e, 8 * MD_LEN - bn_bits(n));
+						bn_rsh(e, e, 8 * len - bn_bits(n));
 					} else {
 						bn_read_bin(e, h, MD_LEN);
 					}
