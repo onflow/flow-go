@@ -63,6 +63,9 @@ void gt_get_gen(gt_t a) {
 		g1_new(g1);
 		g2_new(g2);
 
+		g1_get_gen(g1);
+		g2_get_gen(g2);
+
 		pc_map(a, g1, g2);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
