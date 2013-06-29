@@ -322,6 +322,12 @@ static int multiplication1(void) {
 			g1_mul_gen(r, k);
 			TEST_ASSERT(g1_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
+
+		TEST_BEGIN("random element has the right order") {
+			g1_rand(p);
+			g1_mul(r, p, n);
+			TEST_ASSERT(g1_is_infty(r) == 1, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -778,6 +784,12 @@ static int multiplication2(void) {
 			g2_mul_gen(r, k);
 			TEST_ASSERT(g2_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
+
+		TEST_BEGIN("random element has the right order") {
+			g2_rand(p);
+			g2_mul(r, p, n);
+			TEST_ASSERT(g2_is_infty(r) == 1, end);
+		} TEST_END;
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -1161,6 +1173,47 @@ static int inversion(void) {
 	return code;
 }
 
+int exponentiation(void) {
+	int code = STS_ERR;
+	gt_t a, c;
+	bn_t n;
+
+	gt_null(a);
+	gt_null(c);
+	bn_null(n);
+
+	TRY {
+		gt_new(a);
+		gt_new(c);
+		bn_new(n);
+
+		gt_get_gen(a);
+		gt_get_ord(n);
+
+		TEST_BEGIN("generator has the right order") {
+			gt_exp(c, a, n);
+			TEST_ASSERT(gt_is_unity(c), end);
+		} TEST_END;
+
+		TEST_BEGIN("random element has the correct order") {
+			gt_rand(a);
+			gt_exp(c, a, n);
+			TEST_ASSERT(gt_is_unity(c), end);
+		}
+		TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	gt_free(a);
+	gt_free(c);
+	bn_free(n);
+	return code;
+}
+
 static int pairing(void) {
 	int code = STS_ERR;
 	gt_t e1, e2;
@@ -1339,6 +1392,10 @@ int test(void) {
 	}
 
 	if (inversion() != STS_OK) {
+		return STS_ERR;
+	}
+
+	if (exponentiation() != STS_OK) {
 		return STS_ERR;
 	}
 

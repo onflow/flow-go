@@ -21,6 +21,7 @@ file(GLOB EB_SRCS eb/*.c)
 file(GLOB HB_SRCS hb/*.c)
 file(GLOB PP_SRCS pp/*.c)
 file(GLOB MD_SRCS md/*.c)
+file(GLOB PC_SRCS pc/*.c)
 
 set(RELIC_SRCS ${CORE_SRCS})
 
@@ -105,6 +106,10 @@ if (WITH_PB)
 	endif(WITH_HB)
 	list(APPEND RELIC_SRCS ${PB_SRCS})
 endif(WITH_PB)
+
+if (WITH_PC)
+	list(APPEND RELIC_SRCS ${PC_SRCS})
+endif(WITH_PC)
 
 if (WITH_CP)
 	if (WITH_BN)

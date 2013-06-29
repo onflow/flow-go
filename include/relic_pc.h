@@ -227,6 +227,13 @@ typedef CAT(GT_LOWER, t) gt_t;
 #define g2_get_ord(N)		CAT(G2_LOWER, curve_get_ord)(N)
 
 /**
+ * Returns the order of the group G_T.
+ *
+ * @param[out] N			0 the returned order.
+ */
+#define gt_get_ord(N)		CAT(G1_LOWER, curve_get_ord)(N)
+
+/**
  * Configures some set of curve parameters for the current security level.
  */
 #if PC_CUR == PRIME
@@ -374,13 +381,6 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[out] P			- the element to assign.
  */
 #define g2_rand(P)			CAT(G2_LOWER, rand)(P)
-
-/**
- * Assigns a random value to a G_T element.
- *
- * @param[out] P			- the element to assign.
- */
-#define gt_rand(P)			CAT(GT_LOWER, rand)(P)
 
 /**
  * Tests if G_1 element is valid.
@@ -680,5 +680,23 @@ typedef CAT(GT_LOWER, t) gt_t;
 #else
 #define pc_map(R, P, Q);	CAT(PC_LOWER, map)(R, P, Q)
 #endif
+
+/*============================================================================*/
+/* Function prototypes                                                        */
+/*============================================================================*/
+
+/**
+ * Assigns a random value to a G_T element.
+ *
+ * @param[out] a			- the element to assign.
+ */
+void gt_rand(gt_t a);
+
+ /**
+  * Returns the generator of the group G_T.
+  *
+  * @param[out] G			- the returned generator.
+  */
+void gt_get_gen(gt_t a);
 
 #endif /* !RELIC_PC_H */
