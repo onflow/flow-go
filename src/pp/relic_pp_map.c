@@ -264,9 +264,9 @@ void pp_fin_k12_oatep(fp12_t r, ep2_t t, ep2_t q, ep_t p) {
 		ep2_neg(q2, q2);
 
 		pp_add_k12(tmp, t, q1, p);
-		fp12_mul(r, r, tmp);
+		fp12_mul_dxs(r, r, tmp);
 		pp_add_k12(tmp, t, q2, p);
-		fp12_mul(r, r, tmp);
+		fp12_mul_dxs(r, r, tmp);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
