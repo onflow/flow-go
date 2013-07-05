@@ -340,9 +340,9 @@ void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
 			fp6_mul_dxs(t0, a[0], b[0]);
 #if EP_ADD == BASIC
 			/* t1 = a_1 * b_1. */
-			fp_mul(t1[0][0], a[1][2][0], b[1][1][0]);
-			fp_mul(t1[0][1], a[1][2][1], b[1][1][0]);
-			fp2_mul_nor(t1[0], t1[0]);
+			fp_mul(t2[0][0], a[1][2][0], b[1][1][0]);
+			fp_mul(t2[0][1], a[1][2][1], b[1][1][0]);
+			fp2_mul_nor(t1[0], t2[0]);
 			fp_mul(t1[1][0], a[1][0][0], b[1][1][0]);
 			fp_mul(t1[1][1], a[1][0][1], b[1][1][0]);
 			fp_mul(t1[2][0], a[1][1][0], b[1][1][0]);
@@ -353,8 +353,8 @@ void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
 			fp_copy(t2[1][1], b[0][1][1]);
 #elif EP_ADD == PROJC
 			/* t1 = a_1 * b_1. */
-			fp2_mul(t1[0], a[1][2], b[1][1]);
-			fp2_mul_nor(t1[0], t1[0]);
+			fp2_mul(t2[0], a[1][2], b[1][1]);
+			fp2_mul_nor(t1[0], t2[0]);
 			fp2_mul(t1[1], a[1][0], b[1][1]);
 			fp2_mul(t1[2], a[1][1], b[1][1]);
 			/* t2 = b_0 + b_1. */
