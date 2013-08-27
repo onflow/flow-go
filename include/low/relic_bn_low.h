@@ -74,7 +74,7 @@
  * @param[in] size			- the number of digits in the first operand.
  * @return the carry of the last digit addition.
  */
-dig_t bn_add1_low(dig_t *c, dig_t *a, dig_t digit, int size);
+dig_t bn_add1_low(dig_t *c, const dig_t *a, const dig_t digit, const int size);
 
 /**
  * Adds two digit vectors of the same size. Computes c = a + b.
@@ -85,7 +85,7 @@ dig_t bn_add1_low(dig_t *c, dig_t *a, dig_t digit, int size);
  * @param[in] size			- the number of digits to add.
  * @return the carry of the last digit addition.
  */
-dig_t bn_addn_low(dig_t *c, dig_t *a, dig_t *b, int size);
+dig_t bn_addn_low(dig_t *c, const dig_t *a, const dig_t *b, int size);
 
 /**
  * Subtracts a digit from a digit vector. Computes c = a - digit.
@@ -96,7 +96,7 @@ dig_t bn_addn_low(dig_t *c, dig_t *a, dig_t *b, int size);
  * @param[in] size			- the number of digits in a.
  * @return the carry of the last digit subtraction.
  */
-dig_t bn_sub1_low(dig_t *c, dig_t *a, dig_t digit, int size);
+dig_t bn_sub1_low(dig_t *c, const dig_t *a, dig_t digit, int size);
 
 /**
  * Subtracts a digit vector from another digit vector. Computes c = a - b.
@@ -107,7 +107,7 @@ dig_t bn_sub1_low(dig_t *c, dig_t *a, dig_t digit, int size);
  * @param[in] size			- the number of digits to subtract.
  * @return the carry of the last digit subtraction.
  */
-dig_t bn_subn_low(dig_t *c, dig_t *a, dig_t *b, int size);
+dig_t bn_subn_low(dig_t *c, const dig_t *a, const dig_t *b, int size);
 
 /**
  * Compares two digits.
@@ -126,7 +126,7 @@ int bn_cmp1_low(dig_t a, dig_t b);
  * @param[in] size			- the number of digits to compare.
  * @return BN_LT if a < b, BN_EQ if a == b and BN_GT if a > b.
  */
-int bn_cmpn_low(dig_t *a, dig_t *b, int size);
+int bn_cmpn_low(const dig_t *a, const dig_t *b, int size);
 
 /**
  * Shifts a digit vector to the left by 1 bit. Computes c = a << 1.
@@ -136,7 +136,7 @@ int bn_cmpn_low(dig_t *a, dig_t *b, int size);
  * @param[in] size			- the number of digits to shift.
  * @return the carry of the last digit shift.
  */
-dig_t bn_lsh1_low(dig_t *c, dig_t *a, int size);
+dig_t bn_lsh1_low(dig_t *c, const dig_t *a, int size);
 
 /**
  * Shifts a digit vector to the left by an amount smaller than a digit. Computes
@@ -148,7 +148,7 @@ dig_t bn_lsh1_low(dig_t *c, dig_t *a, int size);
  * @param[in] bits			- the shift amount.
  * @return the carry of the last digit shift.
  */
-dig_t bn_lshb_low(dig_t *c, dig_t *a, int size, int bits);
+dig_t bn_lshb_low(dig_t *c, const dig_t *a, int size, int bits);
 
 /**
  * Shifts a digit vector to the left by some digits.
@@ -159,7 +159,7 @@ dig_t bn_lshb_low(dig_t *c, dig_t *a, int size, int bits);
  * @param[in] size			- the number of digits to shift.
  * @param[in] digits		- the shift amount.
  */
-void bn_lshd_low(dig_t *c, dig_t *a, int size, int digits);
+void bn_lshd_low(dig_t *c, const dig_t *a, int size, int digits);
 
 /**
  * Shifts a digit vector to the right by 1 bit. Computes c = a >> 1.
@@ -169,7 +169,7 @@ void bn_lshd_low(dig_t *c, dig_t *a, int size, int digits);
  * @param[in] size			- the number of digits to shift.
  * @return the carry of the last digit shift.
  */
-dig_t bn_rsh1_low(dig_t *c, dig_t *a, int size);
+dig_t bn_rsh1_low(dig_t *c, const dig_t *a, int size);
 
 /**
  * Shifts a digit vector to the right by an amount smaller than a digit.
@@ -181,7 +181,7 @@ dig_t bn_rsh1_low(dig_t *c, dig_t *a, int size);
  * @param[in] bits			- the shift amount.
  * @return the carry of the last digit shift.
  */
-dig_t bn_rshb_low(dig_t *c, dig_t *a, int size, int bits);
+dig_t bn_rshb_low(dig_t *c, const dig_t *a, int size, int bits);
 
 /**
  * Shifts a digit vector to the right by some digits.
@@ -192,7 +192,7 @@ dig_t bn_rshb_low(dig_t *c, dig_t *a, int size, int bits);
  * @param[in] size			- the number of digits to shift.
  * @param[in] digits		- the shift amount.
  */
-void bn_rshd_low(dig_t *c, dig_t *a, int size, int digits);
+void bn_rshd_low(dig_t *c, const dig_t *a, int size, int digits);
 
 /**
  * Multiplies a digit vector by a digit and adds this result to another digit
@@ -204,7 +204,7 @@ void bn_rshd_low(dig_t *c, dig_t *a, int size, int digits);
  * @param[in] size			- the number of digits to multiply.
  * @return the carry of the addition.
  */
-dig_t bn_mula_low(dig_t *c, dig_t *a, dig_t digit, int size);
+dig_t bn_mula_low(dig_t *c, const dig_t *a, dig_t digit, int size);
 
 /**
  * Multiplies a digit vector by a digit and stores this result in another digit
@@ -216,7 +216,7 @@ dig_t bn_mula_low(dig_t *c, dig_t *a, dig_t digit, int size);
  * @param[in] size			- the number of digits to multiply.
  * @return the most significant digit.
  */
-dig_t bn_mul1_low(dig_t *c, dig_t *a, dig_t digit, int size);
+dig_t bn_mul1_low(dig_t *c, const dig_t *a, dig_t digit, int size);
 
 /**
  * Multiplies two digit vectors of the same size. Computes c = a * b.
@@ -226,7 +226,7 @@ dig_t bn_mul1_low(dig_t *c, dig_t *a, dig_t digit, int size);
  * @param[in] b				- the second digit vector to multiply.
  * @param[in] size			- the number of digits to multiply.
  */
-void bn_muln_low(dig_t *c, dig_t *a, dig_t *b, int size);
+void bn_muln_low(dig_t *c, const dig_t *a, const dig_t *b, int size);
 
 /**
  * Multiplies two digit vectors of different sizes, with sizea > sizeb. Computes
@@ -241,7 +241,7 @@ void bn_muln_low(dig_t *c, dig_t *a, dig_t *b, int size);
  * @param[in] low			- the first digit to compute.
  * @param[in] high			- the last digit to compute.
  */
-void bn_muld_low(dig_t *c, dig_t *a, int sizea, dig_t *b, int sizeb,
+void bn_muld_low(dig_t *c, const dig_t *a, int sizea, const dig_t *b, int sizeb,
 		int low, int high);
 
 /**
@@ -252,7 +252,7 @@ void bn_muld_low(dig_t *c, dig_t *a, int sizea, dig_t *b, int sizeb,
  * @param[in] a				- the digit vector to square.
  * @param[in] size			- the number of digitss to square.
  */
-void bn_sqra_low(dig_t *c, dig_t *a, int size);
+void bn_sqra_low(dig_t *c, const dig_t *a, int size);
 
 /**
  * Squares a digit vector. Computes c = a * a.
@@ -261,7 +261,7 @@ void bn_sqra_low(dig_t *c, dig_t *a, int size);
  * @param[in] a				- the digit vector to square.
  * @param[in] size			- the number of digits to square.
  */
-void bn_sqrn_low(dig_t *c, dig_t *a, int size);
+void bn_sqrn_low(dig_t *c, const dig_t *a, int size);
 
 /**
  * Divides a digit vector by another digit vector. Computes c = floor(a / b) and
@@ -287,7 +287,7 @@ void bn_divn_low(dig_t *c, dig_t *d, dig_t *a, int sizea, dig_t *b,
  * @param[in] size			- the size of the dividend.
  * @param[in] digit				- the divisor.
  */
-void bn_div1_low(dig_t *c, dig_t *d, dig_t *a, int size, dig_t digit);
+void bn_div1_low(dig_t *c, dig_t *d, const dig_t *a, int size, dig_t digit);
 
 /**
  * Reduces a digit vector modulo m by Montgomery's algorithm.
@@ -299,7 +299,7 @@ void bn_div1_low(dig_t *c, dig_t *d, dig_t *a, int size, dig_t digit);
  * @param[in] sizem			- the size of the modulus.
  * @param[in] u				- the reciprocal of the modulus.
  */
-void bn_modn_low(dig_t *c, dig_t *a, int sizea, dig_t *m, int sizem,
+void bn_modn_low(dig_t *c, const dig_t *a, int sizea, const dig_t *m, int sizem,
 		dig_t u);
 
 #endif /* !ASM */

@@ -45,7 +45,7 @@ int bn_cmp1_low(dig_t a, dig_t b) {
 	return CMP_EQ;
 }
 
-int bn_cmpn_low(dig_t *a, dig_t *b, int size) {
+int bn_cmpn_low(const dig_t *a, const dig_t *b, int size) {
 	int i, r;
 
 	a += (size - 1);

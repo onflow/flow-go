@@ -59,7 +59,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t bn_mula_low(dig_t *c, dig_t *a, dig_t digit, int size) {
+dig_t bn_mula_low(dig_t *c, const dig_t *a, dig_t digit, int size) {
 	int i;
 	dig_t carry;
 	dbl_t r;
@@ -77,7 +77,7 @@ dig_t bn_mula_low(dig_t *c, dig_t *a, dig_t digit, int size) {
 	return carry;
 }
 
-dig_t bn_mul1_low(dig_t *c, dig_t *a, dig_t digit, int size) {
+dig_t bn_mul1_low(dig_t *c, const dig_t *a, dig_t digit, int size) {
 	int i;
 	dig_t carry;
 	dbl_t r;
@@ -95,9 +95,10 @@ dig_t bn_mul1_low(dig_t *c, dig_t *a, dig_t digit, int size) {
 	return carry;
 }
 
-void bn_muln_low(dig_t *c, dig_t *a, dig_t *b, int size) {
+void bn_muln_low(dig_t *c, const dig_t *a, const dig_t *b, int size) {
 	int i, j;
-	dig_t *tmpa, *tmpb, r0, r1, r2;
+	const dig_t *tmpa, *tmpb;
+	dig_t r0, r1, r2;
 
 	r0 = r1 = r2 = 0;
 	for (i = 0; i < size; i++, c++) {
@@ -124,9 +125,11 @@ void bn_muln_low(dig_t *c, dig_t *a, dig_t *b, int size) {
 	}
 }
 
-void bn_muld_low(dig_t *c, dig_t *a, int sa, dig_t *b, int sb, int l, int h) {
+void bn_muld_low(dig_t *c, const dig_t *a, int sa, const dig_t *b, int sb,
+		int l, int h) {
 	int i, j, ta;
-	dig_t *tmpa, *tmpb, r0, r1, r2;
+	const dig_t *tmpa, *tmpb;
+	dig_t r0, r1, r2;
 
 	c += l;
 

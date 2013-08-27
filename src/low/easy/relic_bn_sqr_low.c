@@ -78,7 +78,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_sqra_low(dig_t *c, dig_t *a, int size) {
+void bn_sqra_low(dig_t *c, const dig_t *a, int size) {
 	int i;
 	dig_t c0, c1;
 	dig_t digit;
@@ -113,9 +113,10 @@ void bn_sqra_low(dig_t *c, dig_t *a, int size) {
 	*c += c1;
 }
 
-void bn_sqrn_low(dig_t *c, dig_t *a, int size) {
+void bn_sqrn_low(dig_t *c, const dig_t *a, int size) {
 	int i, j;
-	dig_t *tmpa, *tmpb, r0, r1, r2;
+	const dig_t *tmpa, *tmpb;
+	dig_t r0, r1, r2;
 
 	/* Zero the accumulator. */
 	r0 = r1 = r2 = 0;
