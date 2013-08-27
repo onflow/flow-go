@@ -33,7 +33,6 @@
 #include "relic_fp.h"
 #include "relic_pp.h"
 #include "relic_core.h"
-#include "relic_error.h"
 #include "relic_fp_low.h"
 
 /*============================================================================*/
