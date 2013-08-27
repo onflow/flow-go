@@ -64,6 +64,36 @@
 #define arch_cycles 	PREFIX(arch_cycles)
 #define arch_copy_rom 	PREFIX(arch_copy_rom)
 
+#undef bench_overhead
+#undef bench_reset
+#undef bench_before
+#undef bench_after
+#undef bench_compute
+#undef bench_print
+#undef bench_total
+
+#define bench_overhead 	PREFIX(bench_overhead)
+#define bench_reset 	PREFIX(bench_reset)
+#define bench_before 	PREFIX(bench_before)
+#define bench_after 	PREFIX(bench_after)
+#define bench_compute 	PREFIX(bench_compute)
+#define bench_print 	PREFIX(bench_print)
+#define bench_total 	PREFIX(bench_total)
+
+#undef conf_print
+
+#define conf_print 	PREFIX(conf_print)
+
+#undef err_simple_msg
+#undef err_full_msg
+#undef err_get_msg
+#undef err_get_code
+
+#define err_simple_msg 	PREFIX(err_simple_msg)
+#define err_full_msg 	PREFIX(err_full_msg)
+#define err_get_msg 	PREFIX(err_get_msg)
+#define err_get_code 	PREFIX(err_get_code)
+
 #undef rand_init
 #undef rand_clean
 #undef rand_seed
@@ -79,6 +109,34 @@
 
 #define pool_get 	PREFIX(pool_get)
 #define pool_put 	PREFIX(pool_put)
+
+#undef test_fail
+#undef test_pass
+
+#define test_fail 	PREFIX(test_fail)
+#define test_pass 	PREFIX(test_pass)
+
+#undef trace_enter
+#undef trace_exit
+
+#define trace_enter 	PREFIX(trace_enter)
+#define trace_exit 	PREFIX(trace_exit)
+
+#undef util_conv_endian
+#undef util_conv_big
+#undef util_conv_little
+#undef util_conv_char
+#undef util_bits_dig
+#undef util_cmp_const
+#undef util_printf
+
+#define util_conv_endian 	PREFIX(util_conv_endian)
+#define util_conv_big 	PREFIX(util_conv_big)
+#define util_conv_little 	PREFIX(util_conv_little)
+#define util_conv_char 	PREFIX(util_conv_char)
+#define util_bits_dig 	PREFIX(util_bits_dig)
+#define util_cmp_const 	PREFIX(util_cmp_const)
+#define util_printf 	PREFIX(util_printf)
 
 #undef dv_t
 #define dv_t	PREFIX(dv_t)
