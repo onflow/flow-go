@@ -33,7 +33,6 @@
 
 #include "relic_conf.h"
 #include "relic_core.h"
-#include "relic_error.h"
 #include "relic_util.h"
 #include "relic_md.h"
 #include "sha.h"
