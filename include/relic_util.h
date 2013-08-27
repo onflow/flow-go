@@ -38,6 +38,7 @@
 
 #include "relic_arch.h"
 #include "relic_types.h"
+#include "relic_label.h"
 
 /*============================================================================*/
 /* Macro definitions                                                          */

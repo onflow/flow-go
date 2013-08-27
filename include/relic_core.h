@@ -49,14 +49,11 @@
 #include "relic_bench.h"
 #include "relic_rand.h"
 #include "relic_pool.h"
+#include "relic_label.h"
 
 #ifdef MULTI
 #include <omp.h>
 #include <math.h>
-#endif
-
-#ifdef LABEL
-#include "relic_label.h"
 #endif
 
 /*============================================================================*/

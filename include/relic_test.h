@@ -39,6 +39,7 @@
 #include <string.h>
 
 #include "relic_conf.h"
+#include "relic_label.h"
 
 /*============================================================================*/
 /* Macro definitions                                                          */

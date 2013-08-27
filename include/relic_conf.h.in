@@ -32,6 +32,8 @@
 #ifndef RELIC_CONF_H
 #define RELIC_CONF_H
 
+#include "relic_label.h"
+
 /** Project version. */
 #define VERSION "@VERSION@"
 

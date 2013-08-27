@@ -41,6 +41,7 @@
 #include "relic_core.h"
 #include "relic_conf.h"
 #include "relic_util.h"
+#include "relic_label.h"
 
 /*============================================================================*/
 /* Constant definitions                                                       */
