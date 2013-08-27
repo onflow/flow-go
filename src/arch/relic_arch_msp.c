@@ -79,9 +79,9 @@ unsigned long long arch_cycles() {
 #if __ICC430__
 /* Support for IAR using simulator with custom macro. */
 
-volatile unsigned long long __cycles = 0;
+volatile ull_t  __cycles = 0;
 
-unsigned long long arch_cycles() {
+ull_t arch_cycles() {
 	return __cycles;
 }
 

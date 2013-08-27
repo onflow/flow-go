@@ -39,6 +39,6 @@ void arch_init(void) {
 void arch_clean(void) {
 }
 
-unsigned long long arch_cycles(void) {
+ull_t arch_cycles(void) {
 	return 0;
 }

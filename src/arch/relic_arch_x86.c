@@ -41,7 +41,7 @@ void arch_init(void) {
 void arch_clean(void) {
 }
 
-unsigned long long arch_cycles(void) {
+ull_t arch_cycles(void) {
 	unsigned long long int x;
 	asm(".byte 0x0f, 0x31\n\t":"=A" (x));
 	return x;

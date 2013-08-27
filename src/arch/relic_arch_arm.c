@@ -57,7 +57,7 @@ void arch_clean(void) {
 }
 
 
-unsigned long long arch_cycles(void) {
+ull_t arch_cycles(void) {
 	unsigned int value = 0;
 #ifdef __ARM_ARCH_7M__
 	value = *DWT_CYCCNT;

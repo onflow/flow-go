@@ -43,7 +43,7 @@ void arch_init(void) {
 void arch_clean(void) {
 }
 
-unsigned long long arch_cycles(void) {
+ull_t arch_cycles(void) {
 	unsigned int hi, lo;
 	asm("rdtsc\n\t":"=a" (lo), "=d"(hi));
 	return ((unsigned long long) lo) | (((unsigned long long) hi) << 32);
