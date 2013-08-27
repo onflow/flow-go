@@ -131,7 +131,7 @@ void rand_init() {
 #elif SEED == WCGR
 	HCRYPTPROV   hCryptProv;
 
-	if (!CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
+	if (!CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT)) {
 		THROW(ERR_NO_FILE);
 	}
 	if (hCryptProv && !CryptGenRandom(hCryptProv, SEED_SIZE, buf)) {
