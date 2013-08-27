@@ -38,7 +38,6 @@
 #include "relic_dv.h"
 #include "relic_fb.h"
 #include "relic_util.h"
-#include "relic_error.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */

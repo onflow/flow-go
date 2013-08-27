@@ -35,7 +35,6 @@
 #include "relic_bn_low.h"
 #include "relic_util.h"
 #include "relic_rand.h"
-#include "relic_error.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
