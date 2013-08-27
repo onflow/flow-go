@@ -202,6 +202,6 @@ void bench_print(void);
  *
  * @return the last benchmark.
  */
-bench_t bench_total(void);
+ull_t bench_total(void);
 
 #endif /* !RELIC_BENCH_H */

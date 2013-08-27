@@ -196,6 +196,6 @@ void bench_print() {
 	}
 }
 
-bench_t bench_total() {
+ull_t bench_total() {
 	return core_get()->total;
 }
