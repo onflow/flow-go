@@ -35,7 +35,6 @@
 #include "relic_core.h"
 #include "relic_pb.h"
 #include "relic_util.h"
-#include "relic_error.h"
 
 #ifdef PB_PARAL
 #include <omp.h>

@@ -37,7 +37,6 @@
 #include "relic_bench.h"
 #include "relic_pb.h"
 #include "relic_util.h"
-#include "relic_error.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
