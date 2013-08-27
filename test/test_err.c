@@ -32,7 +32,7 @@
 #include <stdio.h>
 
 #include "relic.h"
-#include "relic_error.h"
+#include "relic_err.h"
 #include "relic_test.h"
 
 static void dummy(void);

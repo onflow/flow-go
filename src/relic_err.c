@@ -36,7 +36,7 @@
 
 #include "relic_core.h"
 #include "relic_conf.h"
-#include "relic_error.h"
+#include "relic_err.h"
 
 #if defined(VERBS) && OPSYS == LINUX
 #include <execinfo.h>
