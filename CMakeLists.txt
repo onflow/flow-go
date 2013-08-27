@@ -377,7 +377,16 @@ else(LABEL)
 	set(RELIC_S "relic_s")
 endif(LABEL)
 
+# Choose the arithmetic backend.
+set(LABEL "" CACHE STRING "Build label")
+
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+file(GLOB includes "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
+install(FILES ${includes} DESTINATION include/${RELIC})
+file(GLOB includes "${CMAKE_CURRENT_SOURCE_DIR}/include/low/*.h")
+install(FILES ${includes} DESTINATION include/${RELIC}/low)
+install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include/" DESTINATION include/${RELIC})
 
 if(DOCUM)
 	include(cmake/doxygen.cmake)
@@ -391,7 +400,4 @@ endif(TESTS GREATER 0)
 if(BENCH GREATER 0)
 	add_subdirectory(bench)
 endif(BENCH GREATER 0)
-
-# Choose the arithmetic backend.
-set(LABEL "" CACHE STRING "Build label")
 
