@@ -88,8 +88,7 @@ void arch_clean(void);
 /**
  * Return the number of elapsed cycles.
  */
-unsigned long long arch_cycles(void);
-
+ull_t arch_cycles(void);
 
 #if ARCH == AVR
 

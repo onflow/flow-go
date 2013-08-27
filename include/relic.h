@@ -50,7 +50,7 @@
 #include "relic_cp.h"
 #include "relic_md.h"
 #include "relic_arch.h"
-#include "relic_error.h"
+#include "relic_err.h"
 #include "relic_rand.h"
 #include "relic_util.h"
 

@@ -41,7 +41,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "relic_error.h"
+#include "relic_err.h"
 #include "relic_bn.h"
 #include "relic_eb.h"
 #include "relic_epx.h"

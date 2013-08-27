@@ -40,7 +40,6 @@
 #include <gmp.h>
 #endif
 
-
 /*============================================================================*/
 /* Constant definitions                                                       */
 /*============================================================================*/
@@ -117,6 +116,11 @@ typedef __uint128_t dbl_t;
 #else
 #endif
 #endif
+
+/*
+ * Represents the unsigned integer with maximum precision.
+ */
+typedef unsigned long long ull_t;
 
 /*============================================================================*/
 /* Macro definitions                                                          */
