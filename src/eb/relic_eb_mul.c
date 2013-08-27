@@ -34,7 +34,6 @@
 #include "relic_core.h"
 #include "relic_fb_low.h"
 #include "relic_eb.h"
-#include "relic_error.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */

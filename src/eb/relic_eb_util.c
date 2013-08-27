@@ -31,7 +31,6 @@
 
 #include "relic_core.h"
 #include "relic_eb.h"
-#include "relic_error.h"
 #include "relic_conf.h"
 
 /*============================================================================*/
