@@ -33,7 +33,6 @@
 #include "relic_pp.h"
 #include "relic_pp_low.h"
 #include "relic_util.h"
-#include "relic_error.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
