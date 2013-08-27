@@ -196,6 +196,6 @@ void bench_print() {
 	}
 }
 
-unsigned long long bench_total() {
+bench_t bench_total() {
 	return core_get()->total;
 }

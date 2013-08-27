@@ -376,10 +376,10 @@ typedef struct _ctx_t {
 	/** Stores the time measured after the execution of the benchmark. */
 	bench_t after;
 	/** Stores the sum of timings for the current benchmark. */
-	long long total;
+	bench_t total;
 #ifdef OVERH
 	/** Benchmarking overhead to be measured and subtracted from benchmarks. */
-	long long over;
+	bench_t over;
 #endif
 #endif
 
