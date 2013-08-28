@@ -268,7 +268,7 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 
 			/* u = u + v * z^j. */
 			if (j > 0) {
-				carry = fb_lshadd_low(u + d, v, j, lv);
+				carry = fb_lsha_low(u + d, v, j, lv);
 				u[d + lv] ^= carry;
 			} else {
 				fb_addd_low(u + d, u + d, v, lv);
@@ -276,7 +276,7 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 
 			/* g1 = g1 + g2 * z^j. */
 			if (j > 0) {
-				carry = fb_lshadd_low(g1 + d, g2, j, l2);
+				carry = fb_lsha_low(g1 + d, g2, j, l2);
 				l1 = (l2 + d >= l1 ? l2 + d : l1);
 				if (carry) {
 					g1[d + l2] ^= carry;
