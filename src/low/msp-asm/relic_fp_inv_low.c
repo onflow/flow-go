@@ -38,7 +38,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_invn_low(dig_t *c, dig_t *a) {
+void fp_invn_low(dig_t *c, const dig_t *a) {
 	bn_t bnc;
 	bn_t bna;
 	bn_t gcd;

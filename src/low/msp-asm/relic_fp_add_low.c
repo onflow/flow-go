@@ -38,34 +38,34 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_subc_low(dig_t *c, dig_t *a, dig_t *b) {
+void fp_subc_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	dig_t carry = fp_subd_low(c, a, b);
 	if (carry) {
 		fp_addn_low(c + FP_DIGS, c + FP_DIGS, fp_prime_get());
 	}
 }
 
-void fp_addc_low(dig_t *c, dig_t *a, dig_t *b) {
+void fp_addc_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	dig_t carry = fp_addd_low(c, a, b);
 	if (carry || (fp_cmpn_low(c + FP_DIGS, fp_prime_get()) != CMP_LT)) {
 		fp_subn_low(c + FP_DIGS, c + FP_DIGS, fp_prime_get());
 	}
 }
 
-void fp_dblm_low(dig_t *c, dig_t *a) {
+void fp_dblm_low(dig_t *c, const dig_t *a) {
 	fp_dbl(c, a);
 }
 
 
-void fp_subm_low(dig_t *c, dig_t *a, dig_t *b) {
+void fp_subm_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	fp_sub(c, a, b);
 }
 
-void fp_addm_low(dig_t *c, dig_t *a, dig_t *b) {
+void fp_addm_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	fp_add(c, a, b);
 }
 
-void fp_hlvd_low(dig_t *c, dig_t *a) {
+void fp_hlvd_low(dig_t *c, const dig_t *a) {
 	dig_t carry = 0;
 
 	if (a[0] & 1) {

@@ -35,7 +35,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fp_mula_low(dig_t *c, dig_t *a, dig_t digit) {
+dig_t fp_mula_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int i;
 	dig_t carry;
 	dbl_t r;
@@ -53,7 +53,7 @@ dig_t fp_mula_low(dig_t *c, dig_t *a, dig_t digit) {
 	return carry;
 }
 
-dig_t fp_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
+dig_t fp_mul1_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int i;
 	dig_t carry;
 	dbl_t r;

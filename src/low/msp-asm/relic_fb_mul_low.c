@@ -40,7 +40,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
+void fb_mul1_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int j, k;
 	dig_t b1, b2;
 
@@ -151,7 +151,7 @@ void fb_muln_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 */
-void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size) {
+void fb_muld_low(dig_t *c, const dig_t *a, const dig_t *b, int size) {
 	dv_t table[16];
 	dig_t u, *tmpa, *tmpc, r0, r1, r2, r4, r8;
 	int i, j;
@@ -224,7 +224,7 @@ void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size) {
 	}
 }
 
-void fb_mulm_low(dig_t *c, dig_t *a, dig_t *b) {
+void fb_mulm_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	dig_t align t[2 * FB_DIGS];
 
 	fb_muln_low(t, a, b);
