@@ -69,8 +69,10 @@ void dv_zero(dv_t a, int digits) {
 }
 
 void dv_copy(dv_t c, const dv_t a, int digits) {
-	for (int i = 0; i < digits; i++, c++, a++) {
-		*c = *a;
+	const dig_t *tmp = a;
+
+	for (int i = 0; i < digits; i++, c++, tmp++) {
+		*c = *tmp;
 	}
 }
 
