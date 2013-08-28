@@ -51,15 +51,15 @@ static const dig_t table_odds[16] = {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_slvn_low(dig_t *c, dig_t *a) {
+void fb_slvn_low(dig_t *c, const dig_t *a) {
 	int i, j, k, b, d, v[FB_BITS];
 	dig_t u, *p;
 	align dig_t s[FB_DIGS], t[FB_DIGS];
 	dig_t mask;
 	void *tab = fb_poly_get_slv();
 
-	fb_zero(s);
-	fb_copy(t, a);
+	dv_zero(s, FB_DIGS);
+	dv_copy(t, a, FB_DIGS);
 
 	for (i = (FB_BITS - 1)/2; i > 0; i--) {
 		if (fb_test_bit(t, i + i)) {

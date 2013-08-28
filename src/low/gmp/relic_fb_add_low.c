@@ -39,7 +39,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_add1_low(dig_t *c, dig_t *a, dig_t digit) {
+void fb_add1_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int i;
 
 	(*c) = (*a) ^ digit;
@@ -49,10 +49,10 @@ void fb_add1_low(dig_t *c, dig_t *a, dig_t digit) {
 		(*c) = (*a);
 }
 
-void fb_addn_low(dig_t *c, dig_t *a, dig_t *b) {
+void fb_addn_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	mpn_xor_n(c, a, b, FB_DIGS);
 }
 
-void fb_addd_low(dig_t *c, dig_t *a, dig_t *b, int size) {
+void fb_addd_low(dig_t *c, const dig_t *a, const dig_t *b, int size) {
 	mpn_xor_n(c, a, b, size);
 }

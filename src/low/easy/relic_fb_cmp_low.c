@@ -45,7 +45,7 @@ int fb_cmp1_low(dig_t a, dig_t b) {
 	return CMP_EQ;
 }
 
-int fb_cmpn_low(dig_t *a, dig_t *b) {
+int fb_cmpn_low(const dig_t *a, const dig_t *b) {
 	int i, r;
 
 	a += (FB_DIGS - 1);

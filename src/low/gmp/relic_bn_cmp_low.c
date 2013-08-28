@@ -42,6 +42,6 @@ int bn_cmp1_low(dig_t a, dig_t b) {
 	return mpn_cmp(&a, &b, 1);
 }
 
-int bn_cmpn_low(dig_t *a, dig_t *b, int size) {
+int bn_cmpn_low(const dig_t *a, const dig_t *b, int size) {
 	return mpn_cmp(a, b, size);
 }

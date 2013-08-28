@@ -77,9 +77,10 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_sqrn_low(dig_t *c, dig_t *a) {
+void fp_sqrn_low(dig_t *c, const dig_t *a) {
 	int i, j;
-	dig_t *tmpa, *tmpb, r0, r1, r2;
+	const dig_t *tmpa, *tmpb;
+	dig_t r0, r1, r2;
 
 	/* Zero the accumulator. */
 	r0 = r1 = r2 = 0;
@@ -119,7 +120,7 @@ void fp_sqrn_low(dig_t *c, dig_t *a) {
 	}
 }
 
-void fp_sqrm_low(dig_t *c, dig_t *a) {
+void fp_sqrm_low(dig_t *c, const dig_t *a) {
 	dig_t align t[2 * FP_DIGS];
 
 	fp_sqrn_low(t, a);

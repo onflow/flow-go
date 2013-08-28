@@ -42,6 +42,6 @@ void bn_divn_low(dig_t *c, dig_t *d, dig_t *a, int sa, dig_t *b, int sb) {
 	mpn_tdiv_qr(c, d, 0, a, sa, b, sb);
 }
 
-void bn_div1_low(dig_t *c, dig_t *d, dig_t *a, int size, dig_t b) {
+void bn_div1_low(dig_t *c, dig_t *d, const dig_t *a, int size, dig_t b) {
 	*d = mpn_divrem_1(c, 0, a, size, b); 
 }

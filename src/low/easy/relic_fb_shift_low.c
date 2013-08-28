@@ -37,7 +37,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fb_lsh1_low(dig_t *c, dig_t *a) {
+dig_t fb_lsh1_low(dig_t *c, const dig_t *a) {
 	int i;
 	dig_t r, carry;
 
@@ -54,7 +54,7 @@ dig_t fb_lsh1_low(dig_t *c, dig_t *a) {
 	return carry;
 }
 
-dig_t fb_lshb_low(dig_t *c, dig_t *a, int bits) {
+dig_t fb_lshb_low(dig_t *c, const dig_t *a, int bits) {
 	int i;
 	dig_t r, carry, mask, shift;
 
@@ -73,8 +73,9 @@ dig_t fb_lshb_low(dig_t *c, dig_t *a, int bits) {
 	return carry;
 }
 
-void fb_lshd_low(dig_t *c, dig_t *a, int digits) {
-	dig_t *top, *bot;
+void fb_lshd_low(dig_t *c, const dig_t *a, int digits) {
+	dig_t *top;
+	const dig_t *bot;
 	int i;
 
 	top = c + FB_DIGS - 1;
@@ -88,7 +89,7 @@ void fb_lshd_low(dig_t *c, dig_t *a, int digits) {
 	}
 }
 
-dig_t fb_rsh1_low(dig_t *c, dig_t *a) {
+dig_t fb_rsh1_low(dig_t *c, const dig_t *a) {
 	int i;
 	dig_t r, carry;
 
@@ -107,7 +108,7 @@ dig_t fb_rsh1_low(dig_t *c, dig_t *a) {
 	return carry;
 }
 
-dig_t fb_rshb_low(dig_t *c, dig_t *a, int bits) {
+dig_t fb_rshb_low(dig_t *c, const dig_t *a, int bits) {
 	int i;
 	dig_t r, carry, mask, shift;
 
@@ -128,8 +129,9 @@ dig_t fb_rshb_low(dig_t *c, dig_t *a, int bits) {
 	return carry;
 }
 
-void fb_rshd_low(dig_t *c, dig_t *a, int digits) {
-	dig_t *top, *bot;
+void fb_rshd_low(dig_t *c, const dig_t *a, int digits) {
+	const dig_t *top;
+	dig_t *bot;
 	int i;
 
 	top = a + digits;
@@ -143,7 +145,7 @@ void fb_rshd_low(dig_t *c, dig_t *a, int digits) {
 	}
 }
 
-dig_t fb_lshadd_low(dig_t *c, dig_t *a, int bits, int size) {
+dig_t fb_lsha_low(dig_t *c, const dig_t *a, int bits, int size) {
 	int i, j;
 	dig_t b1, b2;
 

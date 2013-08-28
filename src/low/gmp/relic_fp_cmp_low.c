@@ -42,6 +42,6 @@ int fp_cmp1_low(dig_t a, dig_t b) {
 	return mpn_cmp(&a, &b, 1);
 }
 
-int fp_cmpn_low(dig_t *a, dig_t *b) {
+int fp_cmpn_low(const dig_t *a, const dig_t *b) {
 	return mpn_cmp(a, b, FP_DIGS);
 }

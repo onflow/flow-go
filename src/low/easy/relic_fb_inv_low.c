@@ -37,7 +37,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_invn_low(dig_t *c, dig_t *a) {
+void fb_invn_low(dig_t *c, const dig_t *a) {
 	int j, d, lu, lv, lt, l1, l2, bu, bv;
 	align dig_t _u[2 * FB_DIGS], _v[2 * FB_DIGS];
 	align dig_t _g1[2 * FB_DIGS], _g2[2 * FB_DIGS];
@@ -52,8 +52,8 @@ void fb_invn_low(dig_t *c, dig_t *a) {
 	g2 = _g2;
 
 	/* u = a, v = f, g1 = 1, g2 = 0. */
-	fb_copy(u, a);
-	fb_copy(v, fb_poly_get());
+	dv_copy(u, a, FB_DIGS);
+	dv_copy(v, fb_poly_get(), DV_DIGS);
 	g1[0] = 1;
 
 	lu = lv = FB_DIGS;
@@ -90,7 +90,7 @@ void fb_invn_low(dig_t *c, dig_t *a) {
 
 		/* u = u + v * z^j. */
 		if (j > 0) {
-			carry = fb_lshadd_low(u + d, v, j, lv);
+			carry = fb_lsha_low(u + d, v, j, lv);
 			u[d + lv] ^= carry;
 		} else {
 			fb_addd_low(u + d, u + d, v, lv);
@@ -98,7 +98,7 @@ void fb_invn_low(dig_t *c, dig_t *a) {
 
 		/* g1 = g1 + g2 * z^j. */
 		if (j > 0) {
-			carry = fb_lshadd_low(g1 + d, g2, j, l2);
+			carry = fb_lsha_low(g1 + d, g2, j, l2);
 			l1 = (l2 + d >= l1 ? l2 + d : l1);
 			if (carry) {
 				g1[d + l2] ^= carry;

@@ -50,7 +50,7 @@ static const dig_t table[16] = {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_sqrn_low(dig_t *c, dig_t *a) {
+void fb_sqrn_low(dig_t *c, const dig_t *a) {
 	dig_t *tmp, x, y, z;
 
 	tmp = c;
@@ -117,7 +117,7 @@ void fb_sqrn_low(dig_t *c, dig_t *a) {
 #endif
 }
 
-void fb_sqrl_low(dig_t *c, dig_t *a) {
+void fb_sqrl_low(dig_t *c, const dig_t *a) {
 	dig_t d, *tmpt;
 
 	tmpt = c;
@@ -156,7 +156,7 @@ void fb_sqrl_low(dig_t *c, dig_t *a) {
 #endif
 }
 
-void fb_sqrm_low(dig_t *c, dig_t *a) {
+void fb_sqrm_low(dig_t *c, const dig_t *a) {
 	dig_t align t[2 * FB_DIGS];
 
 	fb_sqrl_low(t, a);

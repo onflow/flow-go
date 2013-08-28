@@ -48,7 +48,7 @@ static const dig_t t1[16] = {
 	0, 4, 1, 5, 8, 12, 9, 13, 2, 6, 3, 7, 10, 14, 11, 15
 };
 
-static void fb_srtt_low(dig_t *c, dig_t *a, int fa) {
+static void fb_srtt_low(dig_t *c, const dig_t *a, int fa) {
 	int i, j, n, h, sh, rh, lh, sa, la, ra;
 	dig_t d, d_e, d_o;
 	align dig_t t[2 * FB_DIGS] = { 0 };
@@ -101,7 +101,7 @@ static void fb_srtt_low(dig_t *c, dig_t *a, int fa) {
 	fb_copy(c, t);
 }
 
-static void fb_srtp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
+static void fb_srtp_low(dig_t *c, const dig_t *a, int fa, int fb, int fc) {
 	int i, j, n, h, sh, rh, lh, sa, la, ra, sb, lb, rb, sc, lc, rc;
 	dig_t d, d_e, d_o;
 	align dig_t t[DV_DIGS] = { 0 };
@@ -171,7 +171,7 @@ static void fb_srtp_low(dig_t *c, dig_t *a, int fa, int fb, int fc) {
 	fb_copy(c, t);
 }
 
-static void fb_sqrt_low(dig_t *c, dig_t *a) {
+static void fb_sqrt_low(dig_t *c, const dig_t *a) {
 	int i, j, n, sh;
 	dig_t d, d_e, d_o;
 	align dig_t t[2 * FB_DIGS] = { 0 }, s[FB_DIGS + 1] = { 0 };
@@ -239,7 +239,7 @@ static void fb_sqrt_low(dig_t *c, dig_t *a) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_srtn_low(dig_t *c, dig_t *a) {
+void fb_srtn_low(dig_t *c, const dig_t *a) {
 	int fa, fb, fc;
 
 	fb_poly_get_rdc(&fa, &fb, &fc);

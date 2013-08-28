@@ -38,7 +38,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fp_add1_low(dig_t *c, dig_t *a, dig_t digit) {
+dig_t fp_add1_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int i;
 	dig_t carry, r0;
 
@@ -54,7 +54,7 @@ dig_t fp_add1_low(dig_t *c, dig_t *a, dig_t digit) {
 	return carry;
 }
 
-dig_t fp_addn_low(dig_t *c, dig_t *a, dig_t *b) {
+dig_t fp_addn_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	int i;
 	dig_t carry, c0, c1, r0, r1;
 
@@ -70,7 +70,7 @@ dig_t fp_addn_low(dig_t *c, dig_t *a, dig_t *b) {
 	return carry;
 }
 
-void fp_addm_low(dig_t *c, dig_t *a, dig_t *b) {
+void fp_addm_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	int i;
 	dig_t carry, c0, c1, r0, r1;
 
@@ -88,7 +88,7 @@ void fp_addm_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-dig_t fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
+dig_t fp_addd_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	int i;
 	dig_t carry, c0, c1, r0, r1;
 
@@ -104,7 +104,7 @@ dig_t fp_addd_low(dig_t *c, dig_t *a, dig_t *b) {
 	return carry;
 }
 
-void fp_addc_low(dig_t *c, dig_t *a, dig_t *b) {
+void fp_addc_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	dig_t carry = fp_addd_low(c, a, b);
 
 	if (carry || (fp_cmpn_low(c + FP_DIGS, fp_prime_get()) != CMP_LT)) {
@@ -112,7 +112,7 @@ void fp_addc_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-dig_t fp_sub1_low(dig_t *c, dig_t *a, dig_t digit) {
+dig_t fp_sub1_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int i;
 	dig_t carry, r0;
 
@@ -125,7 +125,7 @@ dig_t fp_sub1_low(dig_t *c, dig_t *a, dig_t digit) {
 	return carry;
 }
 
-dig_t fp_subn_low(dig_t *c, dig_t *a, dig_t *b) {
+dig_t fp_subn_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	int i;
 	dig_t carry, r0, diff;
 
@@ -140,7 +140,7 @@ dig_t fp_subn_low(dig_t *c, dig_t *a, dig_t *b) {
 	return carry;
 }
 
-void fp_subm_low(dig_t *c, dig_t *a, dig_t *b) {
+void fp_subm_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	int i;
 	dig_t carry, r0, diff;
 
@@ -157,7 +157,7 @@ void fp_subm_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-void fp_subc_low(dig_t *c, dig_t *a, dig_t *b) {
+void fp_subc_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	dig_t carry = fp_subd_low(c, a, b);
 
 	if (carry) {
@@ -165,7 +165,7 @@ void fp_subc_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-dig_t fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
+dig_t fp_subd_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	int i;
 	dig_t carry, r0, diff;
 
@@ -180,11 +180,11 @@ dig_t fp_subd_low(dig_t *c, dig_t *a, dig_t *b) {
 	return carry;
 }
 
-void fp_negm_low(dig_t *c, dig_t *a) {
+void fp_negm_low(dig_t *c, const dig_t *a) {
 	fp_subn_low(c, fp_prime_get(), a);
 }
 
-dig_t fp_dbln_low(dig_t *c, dig_t *a) {
+dig_t fp_dbln_low(dig_t *c, const dig_t *a) {
 	int i;
 	dig_t carry, c0, c1, r0, r1;
 
@@ -200,7 +200,7 @@ dig_t fp_dbln_low(dig_t *c, dig_t *a) {
 	return carry;
 }
 
-void fp_dblm_low(dig_t *c, dig_t *a) {
+void fp_dblm_low(dig_t *c, const dig_t *a) {
 	int i;
 	dig_t carry, c0, c1, r0, r1;
 
@@ -218,13 +218,13 @@ void fp_dblm_low(dig_t *c, dig_t *a) {
 	}
 }
 
-void fp_hlvm_low(dig_t *c, dig_t *a) {
+void fp_hlvm_low(dig_t *c, const dig_t *a) {
 	dig_t carry = 0;
 
 	if (a[0] & 1) {
 		carry = fp_addn_low(c, a, fp_prime_get());
 	} else {
-		fp_copy(c, a);
+		dv_copy(c, a, FP_DIGS);
 	}
 	fp_rsh1_low(c, c);
 	if (carry) {
@@ -232,13 +232,13 @@ void fp_hlvm_low(dig_t *c, dig_t *a) {
 	}
 }
 
-void fp_hlvd_low(dig_t *c, dig_t *a) {
+void fp_hlvd_low(dig_t *c, const dig_t *a) {
 	dig_t carry = 0;
 
 	if (a[0] & 1) {
 		carry = fp_addn_low(c, a, fp_prime_get());
 	} else {
-		fp_copy(c, a);
+		dv_copy(c, a, FP_DIGS);
 	}
 
 	fp_add1_low(c + FP_DIGS, a + FP_DIGS, carry);

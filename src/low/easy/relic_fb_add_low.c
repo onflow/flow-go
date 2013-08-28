@@ -37,7 +37,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_add1_low(dig_t *c, dig_t *a, dig_t digit) {
+void fb_add1_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int i;
 
 	(*c) = (*a) ^ digit;
@@ -48,7 +48,7 @@ void fb_add1_low(dig_t *c, dig_t *a, dig_t digit) {
 	}
 }
 
-void fb_addn_low(dig_t *c, dig_t *a, dig_t *b) {
+void fb_addn_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	int i;
 
 	for (i = 0; i < FB_DIGS; i++, a++, b++, c++) {
@@ -56,7 +56,7 @@ void fb_addn_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-void fb_addd_low(dig_t *c, dig_t *a, dig_t *b, int size) {
+void fb_addd_low(dig_t *c, const dig_t *a, const dig_t *b, int size) {
 	int i;
 
 	for (i = 0; i < size; i++, a++, b++, c++) {

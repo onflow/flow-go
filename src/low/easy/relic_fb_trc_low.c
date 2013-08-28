@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fb_trcn_low(dig_t *a) {
+dig_t fb_trcn_low(const dig_t *a) {
 	int ta, tb, tc;
 	dig_t r;
 

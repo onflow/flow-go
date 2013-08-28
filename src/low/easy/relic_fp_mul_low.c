@@ -58,7 +58,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fp_mula_low(dig_t *c, dig_t *a, dig_t digit) {
+dig_t fp_mula_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int i;
 	dig_t carry;
 	dbl_t r;
@@ -76,7 +76,7 @@ dig_t fp_mula_low(dig_t *c, dig_t *a, dig_t digit) {
 	return carry;
 }
 
-dig_t fp_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
+dig_t fp_mul1_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int i;
 	dig_t carry;
 	dbl_t r;
@@ -94,9 +94,10 @@ dig_t fp_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
 	return carry;
 }
 
-void fp_muln_low(dig_t *c, dig_t *a, dig_t *b) {
+void fp_muln_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	int i, j;
-	dig_t *tmpa, *tmpb, r0, r1, r2;
+	const dig_t *tmpa, *tmpb;
+	dig_t r0, r1, r2;
 
 	r0 = r1 = r2 = 0;
 	for (i = 0; i < FP_DIGS; i++, c++) {
@@ -123,7 +124,7 @@ void fp_muln_low(dig_t *c, dig_t *a, dig_t *b) {
 	}
 }
 
-void fp_mulm_low(dig_t *c, dig_t *a, dig_t *b) {
+void fp_mulm_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	dig_t align t[2 * FP_DIGS];
 
 	fp_muln_low(t, a, b);

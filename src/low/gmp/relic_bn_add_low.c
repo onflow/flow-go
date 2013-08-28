@@ -39,18 +39,18 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t bn_add1_low(dig_t *c, dig_t *a, dig_t digit, int size) {
+dig_t bn_add1_low(dig_t *c, const dig_t *a, dig_t digit, int size) {
 	return mpn_add_1(c, a, size, digit);
 }
 
-dig_t bn_addn_low(dig_t *c, dig_t *a, dig_t *b, int size) {
+dig_t bn_addn_low(dig_t *c, const dig_t *a, const dig_t *b, int size) {
 	return mpn_add_n(c, a, b, size);
 }
 
-dig_t bn_sub1_low(dig_t *c, dig_t *a, dig_t digit, int size) {
+dig_t bn_sub1_low(dig_t *c, const dig_t *a, dig_t digit, int size) {
 	return mpn_sub_1(c, a, size, digit);
 }
 
-dig_t bn_subn_low(dig_t *c, dig_t *a, dig_t *b, int size) {
+dig_t bn_subn_low(dig_t *c, const dig_t *a, const dig_t *b, int size) {
 	return mpn_sub_n(c, a, b, size);
 }

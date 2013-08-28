@@ -39,7 +39,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_invn_low(dig_t *c, dig_t *a) {
+void fp_invn_low(dig_t *c, const dig_t *a) {
 	bn_st e;
 
 	bn_init(&e, FP_DIGS);

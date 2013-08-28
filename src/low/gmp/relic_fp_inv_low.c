@@ -39,7 +39,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_invn_low(dig_t *c, dig_t *a) {
+void fp_invn_low(dig_t *c, const dig_t *a) {
 	mp_size_t cn;
 	align dig_t s[FP_DIGS], t[2 * FP_DIGS], u[FP_DIGS + 1];
 

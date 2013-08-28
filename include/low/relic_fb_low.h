@@ -65,7 +65,7 @@
  * @param[in] a				- the first digit vector to add.
  * @param[in] digit			- the digit to add.
  */
-void fb_add1_low(dig_t *c, dig_t *a, dig_t digit);
+void fb_add1_low(dig_t *c, const dig_t *a, dig_t digit);
 
 /**
  * Adds two digit vectors of the same size. Computes c = a + b.
@@ -74,7 +74,7 @@ void fb_add1_low(dig_t *c, dig_t *a, dig_t digit);
  * @param[in] a				- the first digit vector to add.
  * @param[in] b				- the second digit vector to add.
  */
-void fb_addn_low(dig_t *c, dig_t *a, dig_t *b);
+void fb_addn_low(dig_t *c, const dig_t *a, const dig_t *b);
 
 /**
  * Adds two digit vectors of the same size, with this size different than the
@@ -85,7 +85,7 @@ void fb_addn_low(dig_t *c, dig_t *a, dig_t *b);
  * @param[in] b				- the second digit vector to add.
  * @param[in] size			- the number of digits to add.
  */
-void fb_addd_low(dig_t *c, dig_t *a, dig_t *b, int size);
+void fb_addd_low(dig_t *c, const dig_t *a, const dig_t *b, int size);
 
 /**
  * Compares two digits.
@@ -103,7 +103,7 @@ int fb_cmp1_low(dig_t a, dig_t b);
  * @param[in] b				- the second digit vector to compare.
  * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
-int fb_cmpn_low(dig_t *a, dig_t *b);
+int fb_cmpn_low(const dig_t *a, const dig_t *b);
 
 /**
  * Shifts a digit vector to the left by 1 bit. Computes c = a * z.
@@ -112,7 +112,7 @@ int fb_cmpn_low(dig_t *a, dig_t *b);
  * @param[in] a				- the digit vector to shift.
  * @return the carry of the last digit shift.
  */
-dig_t fb_lsh1_low(dig_t *c, dig_t *a);
+dig_t fb_lsh1_low(dig_t *c, const dig_t *a);
 
 /**
  * Shifts a digit vector to the left by an amount smaller than a digit.
@@ -124,7 +124,7 @@ dig_t fb_lsh1_low(dig_t *c, dig_t *a);
  * @param[in] bits			- the shift ammount.
  * @return the carry of the last digit shift.
  */
-dig_t fb_lshb_low(dig_t *c, dig_t *a, int bits);
+dig_t fb_lshb_low(dig_t *c, const dig_t *a, int bits);
 
 /**
  * Shifts a digit vector to the left by some digits.
@@ -134,7 +134,7 @@ dig_t fb_lshb_low(dig_t *c, dig_t *a, int bits);
  * @param[in] a				- the multiple precision integer to shift.
  * @param[in] digits		- the shift amount.
  */
-void fb_lshd_low(dig_t *c, dig_t *a, int digits);
+void fb_lshd_low(dig_t *c, const dig_t *a, int digits);
 
 /**
  * Shifts a digit vector to the right by 1 bit. Computes c = a / z.
@@ -143,7 +143,7 @@ void fb_lshd_low(dig_t *c, dig_t *a, int digits);
  * @param[in] a				- the digit vector to shift.
  * @return the carry of the last digit shift.
  */
-dig_t fb_rsh1_low(dig_t *c, dig_t *a);
+dig_t fb_rsh1_low(dig_t *c, const dig_t *a);
 
 /**
  * Shifts a digit vector to the right by an amount smaller than a digit.
@@ -155,7 +155,7 @@ dig_t fb_rsh1_low(dig_t *c, dig_t *a);
  * @param[in] bits			- the shift amount.
  * @return the carry of the last digit shift.
  */
-dig_t fb_rshb_low(dig_t *c, dig_t *a, int bits);
+dig_t fb_rshb_low(dig_t *c, const dig_t *a, int bits);
 
 /**
  * Shifts a digit vector to the right by some digits.
@@ -165,7 +165,7 @@ dig_t fb_rshb_low(dig_t *c, dig_t *a, int bits);
  * @param[in] a				- the multiple precision integer to shift.
  * @param[in] digits		- the shift amount.
  */
-void fb_rshd_low(dig_t *c, dig_t *a, int digits);
+void fb_rshd_low(dig_t *c, const dig_t *a, int digits);
 
 /**
  * Adds a left-shifted digit vector to another digit vector.
@@ -178,7 +178,7 @@ void fb_rshd_low(dig_t *c, dig_t *a, int digits);
  * @param[in] bits			- the shift amount.
  * @return the carry of the last shift.
  */
-dig_t fb_lshadd_low(dig_t *c, dig_t *a, int bits, int size);
+dig_t fb_lsha_low(dig_t *c, const dig_t *a, int bits, int size);
 
 /**
  * Multiplies a digit vector by a digit.
@@ -187,7 +187,7 @@ dig_t fb_lshadd_low(dig_t *c, dig_t *a, int bits, int size);
  * @param[in] a				- the digit vector to multiply.
  * @param[in] digit			- the digit to multiply.
  */
-void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit);
+void fb_mul1_low(dig_t *c, const dig_t *a, dig_t digit);
 
 /**
  * Multiplies two digit vectors of the same size.
@@ -196,7 +196,7 @@ void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit);
  * @param[in] a				- the first digit vector to multiply.
  * @param[in] b				- the second digit vector to multiply.
  */
-void fb_muln_low(dig_t *c, dig_t *a, dig_t *b);
+void fb_muln_low(dig_t *c, const dig_t *a, const dig_t *b);
 
 /**
  * Multiplies two digit vectors of the same size but smaller than the standard
@@ -207,7 +207,7 @@ void fb_muln_low(dig_t *c, dig_t *a, dig_t *b);
  * @param[in] b				- the second digit vector to multiply.
  * @param[in] size			- the size of the digit vectors.
  */
-void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size);
+void fb_muld_low(dig_t *c, const dig_t *a, const dig_t *b, int size);
 
 /**
  * Multiplies two digit vectors of the same size with embedded modular
@@ -217,7 +217,7 @@ void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size);
  * @param[in] a				- the first digit vector to multiply.
  * @param[in] b				- the second digit vector to multiply.
  */
-void fb_mulm_low(dig_t *c, dig_t *a, dig_t *b);
+void fb_mulm_low(dig_t *c, const dig_t *a, const dig_t *b);
 
 /**
  * Squares a digit vector using bit manipulation.
@@ -225,7 +225,7 @@ void fb_mulm_low(dig_t *c, dig_t *a, dig_t *b);
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to square.
  */
-void fb_sqrn_low(dig_t *c, dig_t *a);
+void fb_sqrn_low(dig_t *c, const dig_t *a);
 
 /**
  * Squares a digit vector using a lookup table.
@@ -233,7 +233,7 @@ void fb_sqrn_low(dig_t *c, dig_t *a);
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to square.
  */
-void fb_sqrl_low(dig_t *c, dig_t *a);
+void fb_sqrl_low(dig_t *c, const dig_t *a);
 
 /**
  * Squares a digit vector with embedded modular reduction.
@@ -241,7 +241,7 @@ void fb_sqrl_low(dig_t *c, dig_t *a);
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to square.
  */
-void fb_sqrm_low(dig_t *c, dig_t *a);
+void fb_sqrm_low(dig_t *c, const dig_t *a);
 
 /**
  * Exponentiates consecutively a digit vector to a fixed power 2^k/2^-k given a
@@ -251,7 +251,7 @@ void fb_sqrm_low(dig_t *c, dig_t *a);
  * @param[in] a				- the digit vector to square.
  * @param[in] t				- the
  */
-void fb_itrn_low(dig_t *c, dig_t *a, dig_t *t);
+void fb_itrn_low(dig_t *c, const dig_t *a, dig_t *t);
 
 /**
  * Extracts the square root of a digit vector.
@@ -259,7 +259,7 @@ void fb_itrn_low(dig_t *c, dig_t *a, dig_t *t);
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to extract the square root.
  */
-void fb_srtn_low(dig_t *c, dig_t *a);
+void fb_srtn_low(dig_t *c, const dig_t *a);
 
 /**
  * Solves a quadratic equation for c^2 + c = a.
@@ -267,7 +267,7 @@ void fb_srtn_low(dig_t *c, dig_t *a);
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector.
  */
-void fb_slvn_low(dig_t *c, dig_t *a);
+void fb_slvn_low(dig_t *c, const dig_t *a);
 
 /**
  * Computes the trace of a digit vector.
@@ -275,7 +275,7 @@ void fb_slvn_low(dig_t *c, dig_t *a);
  * @param[in] a				- the digit vector.
  * @return the trace of the argument.
  */
-dig_t fb_trcn_low(dig_t *a);
+dig_t fb_trcn_low(const dig_t *a);
 
 /**
  * Reduces a digit vector modulo the configured irreducible polynomial.
@@ -301,7 +301,7 @@ void fb_rdc1_low(dig_t *c, dig_t *a);
  * @param[out] c			- the result.
  * @param[in] a				- the digit vector to invert.
  */
-void fb_invn_low(dig_t *c, dig_t *a);
+void fb_invn_low(dig_t *c, const dig_t *a);
 
 #endif /* !ASM */
 

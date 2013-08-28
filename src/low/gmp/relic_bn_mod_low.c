@@ -41,7 +41,8 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_modn_low(dig_t *c, dig_t *a, int sa, dig_t *m, int sm, dig_t u) {
+void bn_modn_low(dig_t *c, const dig_t *a, int sa, const dig_t *m, int sm,
+		dig_t u) {
 	int i;
 	dig_t r, carry, *tmpc;
 
@@ -56,7 +57,7 @@ void bn_modn_low(dig_t *c, dig_t *a, int sa, dig_t *m, int sm, dig_t u) {
 	for (i = 0; i < sm; i++, tmpc++) {
 		r = (dig_t)(*tmpc * u);
 		carry = mpn_addmul_1(tmpc, m, sm, r);
-		mpn_add_1(tmpc + sm, tmpc + sm,  sm - i + 1, carry);
+		mpn_add_1(tmpc + sm, tmpc + sm, sm - i + 1, carry);
 	}
 	bn_rshd_low(c, c, 2 * sm + 1, sm);
 }

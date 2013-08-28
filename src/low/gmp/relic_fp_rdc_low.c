@@ -40,7 +40,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
+void fp_rdcs_low(dig_t *c, const dig_t *a, const dig_t *m) {
 	align dig_t q[2 * FP_DIGS], _q[2 * FP_DIGS];
 	align dig_t _r[2 * FP_DIGS], r[2 * FP_DIGS], t[2 * FP_DIGS];
 	int *sform, len;
@@ -109,7 +109,8 @@ void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
 
 void fp_rdcn_low(dig_t *c, dig_t *a) {
 	int i;
-	dig_t r, c0, c1, *tmp, u, *m;
+	dig_t r, c0, c1, u, *m;
+	dig_t *tmp;
 
 	u = *(fp_prime_get_rdc());
 	m = fp_prime_get();
@@ -117,7 +118,7 @@ void fp_rdcn_low(dig_t *c, dig_t *a) {
 	tmp = a;
 
 	c1 = 0;
-	for (i = 0; i < FP_DIGS; i++, tmp++) {
+	for (i = 0; i < FP_DIGS; i++, a++) {
 		r = (dig_t)(*tmp * u);
 		c0 = mpn_addmul_1(tmp, m, FP_DIGS, r);
 		c1 += mpn_add_1(tmp + FP_DIGS, tmp + FP_DIGS, FP_DIGS - i, c0);

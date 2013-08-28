@@ -41,16 +41,17 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t bn_lsh1_low(dig_t *c, dig_t *a, int size) {
+dig_t bn_lsh1_low(dig_t *c, const dig_t *a, int size) {
 	return mpn_lshift(c, a, size, 1);
 }
 
-dig_t bn_lshb_low(dig_t *c, dig_t *a, int size, int bits) {
+dig_t bn_lshb_low(dig_t *c, const dig_t *a, int size, int bits) {
 	return mpn_lshift(c, a, size, bits);
 }
 
-void bn_lshd_low(dig_t *c, dig_t *a, int size, int digits) {
-	dig_t *top, *bot;
+void bn_lshd_low(dig_t *c, const dig_t *a, int size, int digits) {
+	dig_t *top;
+	const dig_t *bot;
 	int i;
 
 	top = c + size + digits - 1;
@@ -64,16 +65,17 @@ void bn_lshd_low(dig_t *c, dig_t *a, int size, int digits) {
 	}
 }
 
-dig_t bn_rsh1_low(dig_t *c, dig_t *a, int size) {
+dig_t bn_rsh1_low(dig_t *c, const dig_t *a, int size) {
 	return mpn_rshift(c, a, size, 1);
 }
 
-dig_t bn_rshb_low(dig_t *c, dig_t *a, int size, int bits) {
+dig_t bn_rshb_low(dig_t *c, const dig_t *a, int size, int bits) {
 	return mpn_rshift(c, a, size, bits);
 }
 
-void bn_rshd_low(dig_t *c, dig_t *a, int size, int digits) {
-	dig_t *top, *bot;
+void bn_rshd_low(dig_t *c, const dig_t *a, int size, int digits) {
+	const dig_t *top;
+	dig_t *bot;
 	int i;
 
 	top = a + digits;
