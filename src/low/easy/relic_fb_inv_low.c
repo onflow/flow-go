@@ -53,7 +53,7 @@ void fb_invn_low(dig_t *c, const dig_t *a) {
 
 	/* u = a, v = f, g1 = 1, g2 = 0. */
 	dv_copy(u, a, FB_DIGS);
-	dv_copy(v, fb_poly_get(), DV_DIGS);
+	dv_copy(v, fb_poly_get(), FB_DIGS);
 	g1[0] = 1;
 
 	lu = lv = FB_DIGS;
