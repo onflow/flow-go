@@ -49,7 +49,7 @@ void fb_mul1_low(dig_t *c, const dig_t *a, dig_t digit) {
 		return;
 	}
 	if (digit == 1) {
-		fb_copy(c, a);
+		dv_copy(c, a, FB_DIGS);
 		return;
 	}
 
@@ -68,7 +68,7 @@ void fb_mul1_low(dig_t *c, const dig_t *a, dig_t digit) {
 		}
 	}
 	if (digit & (dig_t)1) {
-		fb_add(c, c, a);
+		fb_addn_low(c, c, a);
 	}
 }
 
@@ -153,7 +153,8 @@ void fb_muln_low(dig_t *c, dig_t *a, dig_t *b) {
 */
 void fb_muld_low(dig_t *c, const dig_t *a, const dig_t *b, int size) {
 	dv_t table[16];
-	dig_t u, *tmpa, *tmpc, r0, r1, r2, r4, r8;
+	dig_t u, *tmpc, r0, r1, r2, r4, r8;
+	const dig_t *tmpa;
 	int i, j;
 
 	for (i = 0; i < 16; i++) {

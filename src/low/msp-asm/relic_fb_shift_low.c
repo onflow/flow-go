@@ -37,14 +37,14 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fb_lshadd1_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd2_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd3_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd4_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd5_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd6_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd7_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd8_low(dig_t *c, dig_t *a, int size);
+dig_t fb_lshadd1_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd2_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd3_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd4_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd5_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd6_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd7_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd8_low(dig_t *c, const dig_t *a, int size);
 
 dig_t fb_lsh1_low(dig_t *c, const dig_t *a) {
 	int i;
@@ -83,7 +83,8 @@ dig_t fb_lshb_low(dig_t *c, const dig_t *a, int bits) {
 }
 
 void fb_lshd_low(dig_t *c, const dig_t *a, int digits) {
-	dig_t *top, *bot;
+	dig_t *top;
+	const dig_t *bot;
 	int i;
 
 	top = c + FB_DIGS - 1;
@@ -138,7 +139,8 @@ dig_t fb_rshb_low(dig_t *c, const dig_t *a, int bits) {
 }
 
 void fb_rshd_low(dig_t *c, const dig_t *a, int digits) {
-	dig_t *top, *bot;
+	const dig_t *top;
+	dig_t *bot;
 	int i;
 
 	top = a + digits;
