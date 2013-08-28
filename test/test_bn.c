@@ -1579,8 +1579,8 @@ static int recoding(void) {
 	int code = STS_ERR;
 	bn_t a, b, c, v1[3], v2[3];
 	int w, k, l;
-	unsigned char d[BN_BITS];
-	signed char e[2 * BN_BITS + 1];
+	unsigned char d[BN_BITS + 1];
+	signed char e[2 * (BN_BITS + 1)];
 
 	bn_null(a);
 	bn_null(b);
@@ -1602,6 +1602,7 @@ static int recoding(void) {
 		TEST_BEGIN("window recoding is correct") {
 			for (w = 2; w <= 8; w++) {
 				bn_rand(a, BN_POS, BN_BITS);
+				l = BN_BITS + 1;
 				bn_rec_win(d, &l, a, w);
 				bn_zero(b);
 				for (k = l - 1; k >= 0; k--) {
@@ -1615,6 +1616,7 @@ static int recoding(void) {
 		TEST_BEGIN("sliding window recoding is correct") {
 			for (w = 2; w <= 8; w++) {
 				bn_rand(a, BN_POS, BN_BITS);
+				l = BN_BITS + 1;
 				bn_rec_slw(d, &l, a, w);
 				bn_zero(b);
 				for (k = 0; k < l; k++) {
@@ -1632,6 +1634,7 @@ static int recoding(void) {
 		TEST_BEGIN("naf recoding is correct") {
 			for (w = 2; w <= 8; w++) {
 				bn_rand(a, BN_POS, BN_BITS);
+				l = BN_BITS + 1;
 				bn_rec_naf(e, &l, a, w);
 				bn_zero(b);
 				for (k = l - 1; k >= 0; k--) {
@@ -1652,6 +1655,7 @@ static int recoding(void) {
 				if (bn_is_even(a)) {
 					bn_add_dig(a, a, 1);
 				}
+				l = BN_BITS + 1;
 				bn_rec_reg(e, &l, a, BN_BITS, w);
 				bn_zero(b);
 				for (k = l - 1; k >= 0; k--) {
@@ -1669,6 +1673,7 @@ static int recoding(void) {
 		TEST_BEGIN("jsf recoding is correct") {
 			bn_rand(a, BN_POS, BN_BITS);
 			bn_rand(b, BN_POS, BN_BITS);
+			l = 2 * (BN_BITS + 1);
 			bn_rec_jsf(e, &l, a, b);
 			w = MAX(bn_bits(a), bn_bits(b)) + 1;
 			bn_add(a, a, b);
