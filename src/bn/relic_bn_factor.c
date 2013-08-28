@@ -35,7 +35,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int bn_factor(bn_t c, bn_t a) {
+int bn_factor(bn_t c, const bn_t a) {
 	bn_t t0, t1;
 	int result;
 	unsigned int i, tests;
@@ -82,7 +82,7 @@ int bn_factor(bn_t c, bn_t a) {
 	return result;
 }
 
-int bn_is_factor(bn_t c, bn_t a) {
+int bn_is_factor(bn_t c, const bn_t a) {
 	bn_t t;
 	int result;
 

@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_dbl(bn_t c, bn_t a) {
+void bn_dbl(bn_t c, const bn_t a) {
 	dig_t carry;
 
 	bn_grow(c, a->used + 1);
@@ -53,7 +53,7 @@ void bn_dbl(bn_t c, bn_t a) {
 	c->sign = a->sign;
 }
 
-void bn_hlv(bn_t c, bn_t a) {
+void bn_hlv(bn_t c, const bn_t a) {
 	bn_grow(c, a->used);
 
 	c->used = a->used;
@@ -63,7 +63,7 @@ void bn_hlv(bn_t c, bn_t a) {
 	bn_trim(c);
 }
 
-void bn_lsh(bn_t c, bn_t a, int bits) {
+void bn_lsh(bn_t c, const bn_t a, int bits) {
 	int digits;
 	dig_t carry;
 
@@ -102,7 +102,7 @@ void bn_lsh(bn_t c, bn_t a, int bits) {
 	bn_trim(c);
 }
 
-void bn_rsh(bn_t c, bn_t a, int bits) {
+void bn_rsh(bn_t c, const bn_t a, int bits) {
 	int digits = 0;
 
 	if (bits <= 0) {

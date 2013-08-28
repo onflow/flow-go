@@ -37,7 +37,7 @@
 
 #if BN_GCD == BASIC || !defined(STRIP)
 
-void bn_gcd_basic(bn_t c, bn_t a, bn_t b) {
+void bn_gcd_basic(bn_t c, const bn_t a, const bn_t b) {
 	bn_t u, v;
 
 	bn_null(u);
@@ -74,7 +74,7 @@ void bn_gcd_basic(bn_t c, bn_t a, bn_t b) {
 	}
 }
 
-void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
+void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, const bn_t a, const bn_t b) {
 	bn_t u, v, x_1, y_1, q, r;
 
 	bn_null(u);
@@ -166,7 +166,7 @@ void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 
 #if BN_GCD == LEHME || !defined(STRIP)
 
-void bn_gcd_lehme(bn_t c, bn_t a, bn_t b) {
+void bn_gcd_lehme(bn_t c, const bn_t a, const bn_t b) {
 	bn_t x, y, u, v, t0, t1, t2, t3;
 	dig_t _x, _y, q, _q, t, _t;
 	dis_t _a, _b, _c, _d;
@@ -347,7 +347,7 @@ void bn_gcd_lehme(bn_t c, bn_t a, bn_t b) {
 	}
 }
 
-void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
+void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, const bn_t a, const bn_t b) {
 	bn_t x, y, u, v, t0, t1, t2, t3, t4;
 	dig_t _x, _y, q, _q, t, _t;
 	dis_t _a, _b, _c, _d;
@@ -599,7 +599,7 @@ void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 
 #if BN_GCD == STEIN || !defined(STRIP)
 
-void bn_gcd_stein(bn_t c, bn_t a, bn_t b) {
+void bn_gcd_stein(bn_t c, const bn_t a, const bn_t b) {
 	bn_t u, v, t;
 	int shift;
 
@@ -659,7 +659,7 @@ void bn_gcd_stein(bn_t c, bn_t a, bn_t b) {
 	}
 }
 
-void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
+void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, const bn_t a, const bn_t b) {
 	bn_t x, y, u, v, _a, _b, _e;
 	int shift, found;
 
@@ -830,7 +830,7 @@ void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b) {
 
 #endif
 
-void bn_gcd_ext_mid(bn_t c, bn_t d, bn_t e, bn_t f, bn_t a, bn_t b) {
+void bn_gcd_ext_mid(bn_t c, bn_t d, bn_t e, bn_t f, const bn_t a, const bn_t b) {
 	bn_t q, r, s, t, u, v, x, w, y, z;
 	int stop;
 
@@ -942,7 +942,7 @@ void bn_gcd_ext_mid(bn_t c, bn_t d, bn_t e, bn_t f, bn_t a, bn_t b) {
 	}
 }
 
-void bn_gcd_dig(bn_t c, bn_t a, dig_t b) {
+void bn_gcd_dig(bn_t c, const bn_t a, dig_t b) {
 	dig_t _u, _v, _t = 0;
 
 	if (bn_is_zero(a)) {
@@ -966,7 +966,7 @@ void bn_gcd_dig(bn_t c, bn_t a, dig_t b) {
 	bn_set_dig(c, _u);
 }
 
-void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b) {
+void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, const bn_t a, const dig_t b) {
 	bn_t u, v, x1, y1, q, r;
 	dig_t _v, _q, _t, _u;
 

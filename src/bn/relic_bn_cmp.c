@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int bn_cmp_abs(bn_t a, bn_t b) {
+int bn_cmp_abs(const bn_t a, const bn_t b) {
 	if (a->used > b->used) {
 		return CMP_GT;
 	}
@@ -48,7 +48,7 @@ int bn_cmp_abs(bn_t a, bn_t b) {
 	return bn_cmpn_low(a->dp, b->dp, a->used);
 }
 
-int bn_cmp_dig(bn_t a, dig_t b) {
+int bn_cmp_dig(const bn_t a, dig_t b) {
 	if (a->sign == BN_NEG) {
 		return CMP_LT;
 	}
@@ -60,7 +60,7 @@ int bn_cmp_dig(bn_t a, dig_t b) {
 	return bn_cmp1_low(a->dp[0], b);
 }
 
-int bn_cmp(bn_t a, bn_t b) {
+int bn_cmp(const bn_t a, const bn_t b) {
 	if (a->sign == BN_POS && b->sign == BN_NEG) {
 		return CMP_GT;
 	}

@@ -37,7 +37,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_copy(bn_t c, bn_t a) {
+void bn_copy(bn_t c, const bn_t a) {
 	int i;
 
 	if (c->dp == a->dp)
@@ -53,14 +53,14 @@ void bn_copy(bn_t c, bn_t a) {
 	c->sign = a->sign;
 }
 
-void bn_abs(bn_t c, bn_t a) {
+void bn_abs(bn_t c, const bn_t a) {
 	if (c->dp != a->dp) {
 		bn_copy(c, a);
 	}
 	c->sign = BN_POS;
 }
 
-void bn_neg(bn_t c, bn_t a) {
+void bn_neg(bn_t c, const bn_t a) {
 	if (c->dp != a->dp) {
 		bn_copy(c, a);
 	}
@@ -69,7 +69,7 @@ void bn_neg(bn_t c, bn_t a) {
 	}
 }
 
-int bn_sign(bn_t a) {
+int bn_sign(const bn_t a) {
 	return a->sign;
 }
 
@@ -79,7 +79,7 @@ void bn_zero(bn_t a) {
 	dv_zero(a->dp, a->alloc);
 }
 
-int bn_is_zero(bn_t a) {
+int bn_is_zero(const bn_t a) {
 	if (a->used == 0) {
 		return 1;
 	}
@@ -89,7 +89,7 @@ int bn_is_zero(bn_t a) {
 	return 0;
 }
 
-int bn_is_even(bn_t a) {
+int bn_is_even(const bn_t a) {
 	if (bn_is_zero(a)) {
 		return 1;
 	}
@@ -99,7 +99,7 @@ int bn_is_even(bn_t a) {
 	return 0;
 }
 
-int bn_bits(bn_t a) {
+int bn_bits(const bn_t a) {
 	int bits;
 
 	if (a->used == 0) {
@@ -112,7 +112,7 @@ int bn_bits(bn_t a) {
 	return bits + util_bits_dig(a->dp[a->used - 1]);
 }
 
-int bn_test_bit(bn_t a, int bit) {
+int bn_test_bit(const bn_t a, int bit) {
 	int d;
 
 	SPLIT(bit, d, bit, BN_DIG_LOG);
@@ -124,7 +124,7 @@ int bn_test_bit(bn_t a, int bit) {
 	}
 }
 
-int bn_get_bit(bn_t a, int bit) {
+int bn_get_bit(const bn_t a, int bit) {
 	int d;
 
 	SPLIT(bit, d, bit, BN_DIG_LOG);
@@ -152,7 +152,7 @@ void bn_set_bit(bn_t a, int bit, int value) {
 	}
 }
 
-int bn_ham(bn_t a) {
+int bn_ham(const bn_t a) {
 	int c = 0;
 
 	for (int i = 0; i < bn_bits(a); i++) {
@@ -164,7 +164,7 @@ int bn_ham(bn_t a) {
 	return c;
 }
 
-void bn_get_dig(dig_t *c, bn_t a) {
+void bn_get_dig(dig_t *c, const bn_t a) {
 	*c = a->dp[0];
 }
 
@@ -207,7 +207,7 @@ void bn_rand(bn_t a, int sign, int bits) {
 	bn_trim(a);
 }
 
-void bn_print(bn_t a) {
+void bn_print(const bn_t a) {
 	int i;
 
 	if (a->sign == BN_NEG) {
@@ -233,7 +233,7 @@ void bn_print(bn_t a) {
 	}
 }
 
-void bn_size_str(int *size, bn_t a, int radix) {
+void bn_size_str(int *size, const bn_t a, int radix) {
 	int digits;
 	bn_t t;
 
@@ -320,7 +320,7 @@ void bn_read_str(bn_t a, const char *str, int len, int radix) {
 	a->sign = sign;
 }
 
-void bn_write_str(char *str, int len, bn_t a, int radix) {
+void bn_write_str(char *str, int len, const bn_t a, int radix) {
 	bn_t t;
 	dig_t d;
 	int digits, l, i, j;
@@ -367,6 +367,7 @@ void bn_write_str(char *str, int len, bn_t a, int radix) {
 		if (str[0] == '-') {
 			i = 1;
 		}
+
 		j = l - 2;
 		while (i < j) {
 			c = str[i];
@@ -377,7 +378,6 @@ void bn_write_str(char *str, int len, bn_t a, int radix) {
 		}
 
 		str[l - 1] = '\0';
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -387,7 +387,7 @@ void bn_write_str(char *str, int len, bn_t a, int radix) {
 	}
 }
 
-void bn_size_bin(int *size, bn_t a) {
+void bn_size_bin(int *size, const bn_t a) {
 	dig_t d;
 	int digits;
 
@@ -401,7 +401,7 @@ void bn_size_bin(int *size, bn_t a) {
 	*size = digits;
 }
 
-void bn_read_bin(bn_t a, unsigned char *bin, int len) {
+void bn_read_bin(bn_t a, const unsigned char *bin, int len) {
 	int i, j;
 	dig_t d = (BN_DIGIT / 8);
 	int digs = (len % d == 0 ? len / d : len / d + 1);
@@ -431,7 +431,7 @@ void bn_read_bin(bn_t a, unsigned char *bin, int len) {
 	bn_trim(a);
 }
 
-void bn_write_bin(unsigned char *bin, int len, bn_t a) {
+void bn_write_bin(unsigned char *bin, int len, const bn_t a) {
 	int size, k;
 	dig_t d;
 
@@ -461,11 +461,11 @@ void bn_write_bin(unsigned char *bin, int len, bn_t a) {
 	}
 }
 
-void bn_size_raw(int *size, bn_t a) {
+void bn_size_raw(int *size, const bn_t a) {
 	*size = a->used;
 }
 
-void bn_read_raw(bn_t a, dig_t *raw, int len) {
+void bn_read_raw(bn_t a, const dig_t *raw, int len) {
 	bn_grow(a, len);
 	a->used = len;
 	a->sign = BN_POS;
@@ -473,13 +473,13 @@ void bn_read_raw(bn_t a, dig_t *raw, int len) {
 	bn_trim(a);
 }
 
-void bn_write_raw(dig_t *raw, int len, bn_t a) {
+void bn_write_raw(dig_t *raw, int len, const bn_t a) {
 	int i, size;
 
 	size = a->used;
 
 	if (len < size) {
-		THROW(ERR_NO_VALID);
+		THROW(ERR_NO_BUFFER);
 	}
 
 	for (i = 0; i < size; i++) {

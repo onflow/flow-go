@@ -141,7 +141,7 @@ typedef bn_st *bn_t;
  * @param[out] A			- the multiple precision integer to initialize.
  */
 #if ALLOC == AUTO
-#define bn_null(A)			/* empty */
+#define bn_null(A)				/* empty */
 #else
 #define bn_null(A)			A = NULL;
 #endif
@@ -455,7 +455,7 @@ void bn_trim(bn_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the multiple precision integer to copy.
  */
-void bn_copy(bn_t c, bn_t a);
+void bn_copy(bn_t c, const bn_t a);
 
 /**
  * Returns the absolute value of a multiple precision integer.
@@ -463,7 +463,7 @@ void bn_copy(bn_t c, bn_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the argument of the absolute function.
  */
-void bn_abs(bn_t c, bn_t a);
+void bn_abs(bn_t c, const bn_t a);
 
 /**
  * Inverts the sign of a multiple precision integer.
@@ -471,7 +471,7 @@ void bn_abs(bn_t c, bn_t a);
  * @param[out] c			- the result.
  * @param[out] a			- the multiple precision integer to negate.
  */
-void bn_neg(bn_t c, bn_t a);
+void bn_neg(bn_t c, const bn_t a);
 
 /**
  * Returns the sign of a multiple precision integer.
@@ -479,7 +479,7 @@ void bn_neg(bn_t c, bn_t a);
  * @param[in] a				- the multiple precision integer.
  * @return BN_POS if the argument is positive and BN_NEG otherwise.
  */
-int bn_sign(bn_t a);
+int bn_sign(const bn_t a);
 
 /**
  * Assigns zero to a multiple precision integer.
@@ -494,7 +494,7 @@ void bn_zero(bn_t a);
  * @param[in] a				- the multiple precision integer to test.
  * @return 1 if the argument is zero, 0 otherwise.
  */
-int bn_is_zero(bn_t a);
+int bn_is_zero(const bn_t a);
 
 /**
  * Tests if a multiple precision integer is even or odd.
@@ -502,7 +502,7 @@ int bn_is_zero(bn_t a);
  * @param[in] a				- the multiple precision integer to test.
  * @return 1 if the argument is even, 0 otherwise.
  */
-int bn_is_even(bn_t a);
+int bn_is_even(const bn_t a);
 
 /**
  * Returns the number of bits of a multiple precision integer.
@@ -510,7 +510,7 @@ int bn_is_even(bn_t a);
  * @param[in] a				- the multiple precision integer.
  * @return number of bits.
  */
-int bn_bits(bn_t a);
+int bn_bits(const bn_t a);
 
 /**
  * Tests the bit in the given position on a multiple precision integer.
@@ -519,7 +519,7 @@ int bn_bits(bn_t a);
  * @param[in] bit			- the bit position.
  * @return 0 is the bit is zero, not zero otherwise.
  */
-int bn_test_bit(bn_t a, int bit);
+int bn_test_bit(const bn_t a, int bit);
 
 /**
  * Reads the bit stored in the given position on a multiple precision integer.
@@ -528,7 +528,7 @@ int bn_test_bit(bn_t a, int bit);
  * @param[in] bit			- the bit position to read.
  * @return the bit value.
  */
-int bn_get_bit(bn_t a, int bit);
+int bn_get_bit(const bn_t a, int bit);
 
 /**
  * Stores a bit in a given position on a multiple precision integer.
@@ -545,7 +545,7 @@ void bn_set_bit(bn_t a, int bit, int value);
  * @param[in] a				- the multiple precision integer.
  * @return the number of non-zero bits.
  */
-int bn_ham(bn_t a);
+int bn_ham(const bn_t a);
 
 /**
  * Reads the first digit in a multiple precision integer.
@@ -553,7 +553,7 @@ int bn_ham(bn_t a);
  * @param[out] digit		- the result.
  * @param[in] a				- the multiple precision integer.
  */
-void bn_get_dig(dig_t *digit, bn_t a);
+void bn_get_dig(dig_t *digit, const bn_t a);
 
 /**
  * Assigns a small positive constant to a multiple precision integer.
@@ -588,7 +588,7 @@ void bn_rand(bn_t a, int sign, int bits);
  *
  * @param[in] a				- the multiple precision integer to print.
  */
-void bn_print(bn_t a);
+void bn_print(const bn_t a);
 
 /**
  * Returns the number of digits in radix necessary to store a multiple precision
@@ -599,7 +599,7 @@ void bn_print(bn_t a);
  * @param[in] radix			- the radix.
  * @throw ERR_NO_VALID		- if the radix is invalid.
  */
-void bn_size_str(int *size, bn_t a, int radix);
+void bn_size_str(int *size, const bn_t a, int radix);
 
 /**
  * Reads a multiple precision integer from a string in a given radix. The radix
@@ -624,7 +624,7 @@ void bn_read_str(bn_t a, const char *str, int len, int radix);
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  * @throw ERR_NO_VALID		- if the radix is invalid.
  */
-void bn_write_str(char *str, int len, bn_t a, int radix);
+void bn_write_str(char *str, int len, const bn_t a, int radix);
 
 /**
  * Returns the number of bytes necessary to store a multiple precision integer.
@@ -632,7 +632,7 @@ void bn_write_str(char *str, int len, bn_t a, int radix);
  * @param[out] size			- the result.
  * @param[in] a				- the multiple precision integer.
  */
-void bn_size_bin(int *size, bn_t a);
+void bn_size_bin(int *size, const bn_t a);
 
 /**
  * Reads a positive multiple precision integer from a byte vector in big-endian
@@ -640,20 +640,20 @@ void bn_size_bin(int *size, bn_t a);
  *
  * @param[out] a			- the result.
  * @param[in] bin			- the byte vector.
- * @param[in] little		- the endianness of the data being read.
+ * @param[in] len			- the buffer capacity.
  */
-void bn_read_bin(bn_t a, unsigned char *bin, int len);
+void bn_read_bin(bn_t a, const unsigned char *bin, int len);
 
 /**
  * Writes a positive multiple precision integer to a byte vector in big-endian
  * format.
  *
  * @param[out] bin			- the byte vector.
- * @param[in] len		- the buffer capacity/number of bytes written.
+ * @param[in] len			- the buffer capacity.
  * @param[in] a				- the multiple integer to write.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_write_bin(unsigned char *bin, int len, bn_t a);
+void bn_write_bin(unsigned char *bin, int len, const bn_t a);
 
 /**
  * Returns the number of digits necessary to store a multiple precision integer.
@@ -661,7 +661,7 @@ void bn_write_bin(unsigned char *bin, int len, bn_t a);
  * @param[out] size			- the result.
  * @param[in] a				- the multiple precision integer.
  */
-void bn_size_raw(int *size, bn_t a);
+void bn_size_raw(int *size, const bn_t a);
 
 /**
  * Reads a positive multiple precision integer from a digit vector.
@@ -670,7 +670,7 @@ void bn_size_raw(int *size, bn_t a);
  * @param[in] raw			- the digit vector.
  * @param[in] len			- the size of the string.
  */
-void bn_read_raw(bn_t a, dig_t *raw, int len);
+void bn_read_raw(bn_t a, const dig_t *raw, int len);
 
 /**
  * Writes a positive multiple precision integer to a byte vector.
@@ -681,7 +681,7 @@ void bn_read_raw(bn_t a, dig_t *raw, int len);
  * @param[in] sign			- the sign.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_write_raw(dig_t *raw, int len, bn_t a);
+void bn_write_raw(dig_t *raw, int len, const bn_t a);
 
 /**
  * Returns the result of an unsigned comparison between two multiple precision
@@ -691,7 +691,7 @@ void bn_write_raw(dig_t *raw, int len, bn_t a);
  * @param[in] b				- the second multiple precision integer.
  * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
-int bn_cmp_abs(bn_t a, bn_t b);
+int bn_cmp_abs(const bn_t a, const bn_t b);
 
 /**
  * Returns the result of a signed comparison between a multiple precision
@@ -701,7 +701,7 @@ int bn_cmp_abs(bn_t a, bn_t b);
  * @param[in] b				- the digit.
  * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
-int bn_cmp_dig(bn_t a, dig_t b);
+int bn_cmp_dig(const bn_t a, dig_t b);
 
 /**
  * Returns the result of a signed comparison between two multiple precision
@@ -711,7 +711,7 @@ int bn_cmp_dig(bn_t a, dig_t b);
  * @param[in] b				- the second multiple precision integer.
  * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
-int bn_cmp(bn_t a, bn_t b);
+int bn_cmp(const bn_t a, const bn_t b);
 
 /**
  * Adds two multiple precision integers. Computes c = a + b.
@@ -720,7 +720,7 @@ int bn_cmp(bn_t a, bn_t b);
  * @param[in] a				- the first multiple precision integer to add.
  * @param[in] b				- the second multiple precision integer to add.
  */
-void bn_add(bn_t c, bn_t a, bn_t b);
+void bn_add(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Adds a multiple precision integers and a digit. Computes c = a + b.
@@ -729,7 +729,7 @@ void bn_add(bn_t c, bn_t a, bn_t b);
  * @param[in] a				- the multiple precision integer to add.
  * @param[in] b				- the digit to add.
  */
-void bn_add_dig(bn_t c, bn_t a, dig_t b);
+void bn_add_dig(bn_t c, const bn_t a, dig_t b);
 
 /**
  * Subtracts a multiple precision integer from another, that is, computes
@@ -739,7 +739,7 @@ void bn_add_dig(bn_t c, bn_t a, dig_t b);
  * @param[in] a				- the multiple precision integer.
  * @param[in] b				- the multiple precision integer to subtract.
  */
-void bn_sub(bn_t c, bn_t a, bn_t b);
+void bn_sub(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Subtracts a digit from a multiple precision integer. Computes c = a - b.
@@ -748,7 +748,7 @@ void bn_sub(bn_t c, bn_t a, bn_t b);
  * @param[in] a				- the multiple precision integer.
  * @param[in] b				- the digit to subtract.
  */
-void bn_sub_dig(bn_t c, bn_t a, dig_t b);
+void bn_sub_dig(bn_t c, const bn_t a, const dig_t b);
 
 /**
  * Multiplies a multiple precision integer by a digit. Computes c = a * b.
@@ -757,7 +757,7 @@ void bn_sub_dig(bn_t c, bn_t a, dig_t b);
  * @param[in] a				- the multiple precision integer to multiply.
  * @param[in] b				- the digit to multiply.
  */
-void bn_mul_dig(bn_t c, bn_t a, dig_t b);
+void bn_mul_dig(bn_t c, const bn_t a, dig_t b);
 
 /**
  * Multiplies two multiple precision integers using Schoolbook multiplication.
@@ -766,7 +766,7 @@ void bn_mul_dig(bn_t c, bn_t a, dig_t b);
  * @param[in] a				- the first multiple precision integer to multiply.
  * @param[in] b				- the second multiple precision integer to multiply.
  */
-void bn_mul_basic(bn_t c, bn_t a, bn_t b);
+void bn_mul_basic(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Multiplies two multiple precision integers using Comba multiplication.
@@ -775,7 +775,7 @@ void bn_mul_basic(bn_t c, bn_t a, bn_t b);
  * @param[in] a				- the first multiple precision integer to multiply.
  * @param[in] b				- the second multiple precision integer to multiply.
  */
-void bn_mul_comba(bn_t c, bn_t a, bn_t b);
+void bn_mul_comba(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Multiplies two multiple precision integers using Karatsuba multiplication.
@@ -784,7 +784,7 @@ void bn_mul_comba(bn_t c, bn_t a, bn_t b);
  * @param[in] a				- the first multiple precision integer to multiply.
  * @param[in] b				- the second multiple precision integer to multiply.
  */
-void bn_mul_karat(bn_t c, bn_t a, bn_t b);
+void bn_mul_karat(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Computes the square of a multiple precision integer using Schoolbook
@@ -793,7 +793,7 @@ void bn_mul_karat(bn_t c, bn_t a, bn_t b);
  * @param[out] c			- the result.
  * @param[in] a				- the multiple precision integer to square.
  */
-void bn_sqr_basic(bn_t c, bn_t a);
+void bn_sqr_basic(bn_t c, const bn_t a);
 
 /**
  * Computes the square of a multiple precision integer using Comba squaring.
@@ -801,7 +801,7 @@ void bn_sqr_basic(bn_t c, bn_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the multiple precision integer to square.
  */
-void bn_sqr_comba(bn_t c, bn_t a);
+void bn_sqr_comba(bn_t c, const bn_t a);
 
 /**
  * Computes the square of a multiple precision integer using Karatsuba squaring.
@@ -809,7 +809,7 @@ void bn_sqr_comba(bn_t c, bn_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the multiple precision integer to square.
  */
-void bn_sqr_karat(bn_t c, bn_t a);
+void bn_sqr_karat(bn_t c, const bn_t a);
 
 /**
  * Doubles a multiple precision. Computes c = a + a.
@@ -817,7 +817,7 @@ void bn_sqr_karat(bn_t c, bn_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the multiple precision integer to double.
  */
-void bn_dbl(bn_t c, bn_t a);
+void bn_dbl(bn_t c, const bn_t a);
 
 /**
  * Halves a multiple precision. Computes c = floor(a / 2)
@@ -825,7 +825,7 @@ void bn_dbl(bn_t c, bn_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the multiple precision integer to halve.
  */
-void bn_hlv(bn_t c, bn_t a);
+void bn_hlv(bn_t c, const bn_t a);
 
 /**
  * Shifts a multiple precision number to the left. Computes c = a * 2^bits.
@@ -835,7 +835,7 @@ void bn_hlv(bn_t c, bn_t a);
  * @param[in] a				- the multiple precision integer to shift.
  * @param[in] bits			- the number of bits to shift.
  */
-void bn_lsh(bn_t c, bn_t a, int bits);
+void bn_lsh(bn_t c, const bn_t a, int bits);
 
 /**
  * Shifts a multiple precision number to the right. Computes
@@ -845,7 +845,7 @@ void bn_lsh(bn_t c, bn_t a, int bits);
  * @param[in] a				- the multiple precision integer to shift.
  * @param[in] bits			- the number of bits to shift.
  */
-void bn_rsh(bn_t c, bn_t a, int bits);
+void bn_rsh(bn_t c, const bn_t a, int bits);
 
 /**
  * Divides a multiple precision integer by another multiple precision integer
@@ -856,7 +856,7 @@ void bn_rsh(bn_t c, bn_t a, int bits);
  * @param[in] b				- the divisor.
  * @throw ERR_NO_VALID		- if the divisor is zero.
  */
-void bn_div(bn_t c, bn_t a, bn_t b);
+void bn_div(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Divides a multiple precision integer by another multiple precision integer.
@@ -868,7 +868,7 @@ void bn_div(bn_t c, bn_t a, bn_t b);
  * @param[in] b				- the divisor.
  * @throw ERR_NO_VALID		- if the divisor is zero.
  */
-void bn_div_rem(bn_t c, bn_t d, bn_t a, bn_t b);
+void bn_div_rem(bn_t c, bn_t d, const bn_t a, const bn_t b);
 
 /**
  * Divides a multiple precision integers by a digit without computing the
@@ -880,7 +880,7 @@ void bn_div_rem(bn_t c, bn_t d, bn_t a, bn_t b);
  * @param[in] b				- the divisor.
  * @throw ERR_NO_VALID		- if the divisor is zero.
  */
-void bn_div_dig(bn_t c, bn_t a, dig_t b);
+void bn_div_dig(bn_t c, const bn_t a, dig_t b);
 
 /**
  * Divides a multiple precision integers by a digit. Computes c = floor(a / b)
@@ -892,7 +892,7 @@ void bn_div_dig(bn_t c, bn_t a, dig_t b);
  * @param[in] b				- the divisor.
  * @throw ERR_NO_VALID		- if the divisor is zero.
  */
-void bn_div_rem_dig(bn_t c, dig_t *d, bn_t a, dig_t b);
+void bn_div_rem_dig(bn_t c, dig_t *d, const bn_t a, const dig_t b);
 
 /**
  * Reduces a multiple precision integer modulo a power of 2. Computes
@@ -902,7 +902,7 @@ void bn_div_rem_dig(bn_t c, dig_t *d, bn_t a, dig_t b);
  * @param[in] a				- the dividend.
  * @param[in] b				- the exponent of the divisor.
  */
-void bn_mod_2b(bn_t c, bn_t a, int b);
+void bn_mod_2b(bn_t c, const bn_t a, int b);
 
 /**
  * Reduces a multiple precision integer modulo a digit. Computes c = a mod b.
@@ -911,7 +911,7 @@ void bn_mod_2b(bn_t c, bn_t a, int b);
  * @param[in] a				- the dividend.
  * @param[in] b				- the divisor.
  */
-void bn_mod_dig(dig_t *c, bn_t a, dig_t b);
+void bn_mod_dig(dig_t *c, const bn_t a, dig_t b);
 
 /**
  * Reduces a multiple precision integer modulo a modulus using straightforward
@@ -921,7 +921,7 @@ void bn_mod_dig(dig_t *c, bn_t a, dig_t b);
  * @param[in] a				- the multiple precision integer to reduce.
  * @param[in] m				- the modulus.
  */
-void bn_mod_basic(bn_t c, bn_t a, bn_t m);
+void bn_mod_basic(bn_t c, const bn_t a, const bn_t m);
 
 /**
  * Computes the reciprocal of the modulus to be used in the Barrett modular
@@ -930,7 +930,7 @@ void bn_mod_basic(bn_t c, bn_t a, bn_t m);
  * @param[out] u			- the result.
  * @param[in] m				- the modulus.
  */
-void bn_mod_pre_barrt(bn_t u, bn_t m);
+void bn_mod_pre_barrt(bn_t u, const bn_t m);
 
 /**
  * Reduces a multiple precision integer modulo a modulus using Barrett
@@ -941,7 +941,7 @@ void bn_mod_pre_barrt(bn_t u, bn_t m);
  * @param[in] m				- the modulus.
  * @param[in] u				- the reciprocal of the modulus.
  */
-void bn_mod_barrt(bn_t c, bn_t a, bn_t m, bn_t u);
+void bn_mod_barrt(bn_t c, const bn_t a, const bn_t m, const bn_t u);
 
 /**
  * Computes the reciprocal of the modulus to be used in the Montgomery reduction
@@ -949,8 +949,9 @@ void bn_mod_barrt(bn_t c, bn_t a, bn_t m, bn_t u);
  *
  * @param[out] u			- the result.
  * @param[in] m				- the modulus.
+ * @throw ERR_NO_VALID		- if the modulus is even.
  */
-void bn_mod_pre_monty(bn_t u, bn_t m);
+void bn_mod_pre_monty(bn_t u, const bn_t m);
 
 /**
  * Converts a multiple precision integer to Montgomery form.
@@ -959,7 +960,7 @@ void bn_mod_pre_monty(bn_t u, bn_t m);
  * @param[in] a				- the multiple precision integer to convert.
  * @param[in] m				- the modulus.
  */
-void bn_mod_monty_conv(bn_t c, bn_t a, bn_t m);
+void bn_mod_monty_conv(bn_t c, const bn_t a, const bn_t m);
 
 /**
  * Converts a multiple precision integer from Montgomery form.
@@ -968,7 +969,7 @@ void bn_mod_monty_conv(bn_t c, bn_t a, bn_t m);
  * @param[in] a				- the multiple precision integer to convert.
  * @param[in] m				- the modulus.
  */
-void bn_mod_monty_back(bn_t c, bn_t a, bn_t m);
+void bn_mod_monty_back(bn_t c, const bn_t a, const bn_t m);
 
 /**
  * Reduces a multiple precision integer modulo a modulus using Montgomery
@@ -979,7 +980,7 @@ void bn_mod_monty_back(bn_t c, bn_t a, bn_t m);
  * @param[in] m				- the modulus.
  * @param[in] u				- the reciprocal of the modulus.
  */
-void bn_mod_monty_basic(bn_t c, bn_t a, bn_t m, bn_t u);
+void bn_mod_monty_basic(bn_t c, const bn_t a, const bn_t m, const bn_t u);
 
 /**
  * Reduces a multiple precision integer modulo a modulus using Montgomery
@@ -990,7 +991,7 @@ void bn_mod_monty_basic(bn_t c, bn_t a, bn_t m, bn_t u);
  * @param[in] m				- the modulus.
  * @param[in] u				- the reciprocal of the modulus.
  */
-void bn_mod_monty_comba(bn_t c, bn_t a, bn_t m, bn_t u);
+void bn_mod_monty_comba(bn_t c, const bn_t a, const bn_t m, const bn_t u);
 
 /**
  * Computes u if the modulus has the form 2^b - u.
@@ -998,7 +999,7 @@ void bn_mod_monty_comba(bn_t c, bn_t a, bn_t m, bn_t u);
  * @param[out] u			- the result.
  * @param[in] m				- the modulus.
  */
-void bn_mod_pre_pmers(bn_t u, bn_t m);
+void bn_mod_pre_pmers(bn_t u, const bn_t m);
 
 /**
  * Reduces a multiple precision integer modulo a modulus using Pseudo-Mersenne
@@ -1009,7 +1010,7 @@ void bn_mod_pre_pmers(bn_t u, bn_t m);
  * @param[in] m				- the modulus.
  * @param[in] u				- the auxiliar value derived from the modulus.
  */
-void bn_mod_pmers(bn_t c, bn_t a, bn_t m, bn_t u);
+void bn_mod_pmers(bn_t c, const bn_t a, const bn_t m, const bn_t u);
 
 /**
  * Exponentiates a multiple precision integer modulo a modulus using the binary
@@ -1020,7 +1021,7 @@ void bn_mod_pmers(bn_t c, bn_t a, bn_t m, bn_t u);
  * @param[in] b				- the exponent.
  * @param[in] m				- the modulus.
  */
-void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m);
+void bn_mxp_basic(bn_t c, const bn_t a, const bn_t b, const bn_t m);
 
 /**
  * Exponentiates a multiple precision integer modulo a modulus using the
@@ -1031,7 +1032,7 @@ void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m);
  * @param[in] b				- the exponent.
  * @param[in] m				- the modulus.
  */
-void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m);
+void bn_mxp_slide(bn_t c, const bn_t a, const bn_t b, const bn_t m);
 
 /**
  * Exponentiates a multiple precision integer modulo a modulus using a
@@ -1042,7 +1043,7 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m);
  * @param[in] b				- the exponent.
  * @param[in] m				- the modulus.
  */
-void bn_mxp_monty(bn_t c, bn_t a, bn_t b, bn_t m);
+void bn_mxp_monty(bn_t c, const bn_t a, const bn_t b, const bn_t m);
 
 /**
  * Exponentiates a multiple precision integer by a small power modulo a modulus
@@ -1053,7 +1054,7 @@ void bn_mxp_monty(bn_t c, bn_t a, bn_t b, bn_t m);
  * @param[in] b				- the exponent.
  * @param[in] m				- the modulus.
  */
-void bn_mxp_dig(bn_t c, bn_t a, dig_t b, bn_t m);
+void bn_mxp_dig(bn_t c, const bn_t a, dig_t b, const bn_t m);
 
 /**
  * Computes the greatest common divisor of two multiple precision integers
@@ -1063,7 +1064,7 @@ void bn_mxp_dig(bn_t c, bn_t a, dig_t b, bn_t m);
  * @param[in] a				- the first multiple precision integer.
  * @param[in] b				- the second multiple precision integer.
  */
-void bn_gcd_basic(bn_t c, bn_t a, bn_t b);
+void bn_gcd_basic(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Computes the greatest common divisor of two multiple precision integers
@@ -1073,7 +1074,7 @@ void bn_gcd_basic(bn_t c, bn_t a, bn_t b);
  * @param[in] a				- the first multiple precision integer.
  * @param[in] b				- the second multiple precision integer.
  */
-void bn_gcd_lehme(bn_t c, bn_t a, bn_t b);
+void bn_gcd_lehme(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Computes the greatest common divisor of two multiple precision integers
@@ -1083,7 +1084,7 @@ void bn_gcd_lehme(bn_t c, bn_t a, bn_t b);
  * @param[in] a				- the first multiple precision integer.
  * @param[in] b				- the second multiple precision integer.
  */
-void bn_gcd_stein(bn_t c, bn_t a, bn_t b);
+void bn_gcd_stein(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Computes the greatest common divisor of a multiple precision integer and a
@@ -1093,7 +1094,7 @@ void bn_gcd_stein(bn_t c, bn_t a, bn_t b);
  * @param[in] a				- the multiple precision integer.
  * @param[in] b				- the digit.
  */
-void bn_gcd_dig(bn_t c, bn_t a, dig_t b);
+void bn_gcd_dig(bn_t c, const bn_t a, dig_t b);
 
 /**
  * Computes the extended greatest common divisor of two multiple precision
@@ -1105,7 +1106,7 @@ void bn_gcd_dig(bn_t c, bn_t a, dig_t b);
  * @param[in] a				- the first multiple precision integer.
  * @param[in] b				- the second multiple precision integer.
  */
-void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b);
+void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, const bn_t a, const bn_t b);
 
 /**
  * Computes the greatest common divisor of two multiple precision integers
@@ -1117,7 +1118,7 @@ void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b);
  * @param[in] a				- the first multiple precision integer.
  * @param[in] b				- the second multiple precision integer.
  */
-void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b);
+void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, const bn_t a, const bn_t b);
 
 /**
  * Computes the greatest common divisor of two multiple precision integers
@@ -1129,7 +1130,7 @@ void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b);
  * @param[in] a				- the first multiple precision integer.
  * @param[in] b				- the second multiple precision integer.
  */
-void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b);
+void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, const bn_t a, const bn_t b);
 
 /**
  * Computes the extended greatest common divisor of two multiple precision
@@ -1144,7 +1145,7 @@ void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, bn_t a, bn_t b);
  * @param[in] a				- the first multiple precision integer.
  * @param[in] b				- the second multiple precision integer.
  */
-void bn_gcd_ext_mid(bn_t c, bn_t d, bn_t e, bn_t f, bn_t a, bn_t b);
+void bn_gcd_ext_mid(bn_t c, bn_t d, bn_t e, bn_t f, const bn_t a, const bn_t b);
 
 /**
  * Computes the extended greatest common divisor of a multiple precision integer
@@ -1156,7 +1157,7 @@ void bn_gcd_ext_mid(bn_t c, bn_t d, bn_t e, bn_t f, bn_t a, bn_t b);
  * @param[in] a				- the multiple precision integer.
  * @param[in] b				- the digit.
  */
-void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b);
+void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, const bn_t a, dig_t b);
 
 /**
  * Computes the last common multiple of two multiple precision integers.
@@ -1166,7 +1167,7 @@ void bn_gcd_ext_dig(bn_t c, bn_t d, bn_t e, bn_t a, dig_t b);
  * @param[in] a				- the first integer.
  * @param[in] b				- the second integer.
  */
-void bn_lcm(bn_t c, bn_t a, bn_t b);
+void bn_lcm(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Computes the Legendre symbol c = (a|b), b prime.
@@ -1175,7 +1176,7 @@ void bn_lcm(bn_t c, bn_t a, bn_t b);
  * @param[in] a				- the first parameter.
  * @param[in] b				- the second parameter.
  */
-void bn_smb_leg(bn_t c, bn_t a, bn_t b);
+void bn_smb_leg(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Computes the Jacobi symbol c = (a|b).
@@ -1184,7 +1185,7 @@ void bn_smb_leg(bn_t c, bn_t a, bn_t b);
  * @param[in] a				- the first parameter.
  * @param[in] b				- the second parameter.
  */
-void bn_smb_jac(bn_t c, bn_t a, bn_t b);
+void bn_smb_jac(bn_t c, const bn_t a, const bn_t b);
 
 /**
  * Returns a small precomputed prime from a given position in the list of prime
@@ -1201,7 +1202,7 @@ dig_t bn_get_prime(int pos);
  * @param[in] a				- the multiple precision integer to test.
  * @return 1 if a is prime, 0 otherwise.
  */
-int bn_is_prime(bn_t a);
+int bn_is_prime(const bn_t a);
 
 /**
  * Tests if a number is prime using a series of trial divisions.
@@ -1209,7 +1210,7 @@ int bn_is_prime(bn_t a);
  * @param[in] a				- the number to test.
  * @return 1 if a is a probable prime, 0 otherwise.
  */
-int bn_is_prime_basic(bn_t a);
+int bn_is_prime_basic(const bn_t a);
 
 /**
  * Tests if a number a > 2 is prime using the Miller-Rabin test with probability
@@ -1218,7 +1219,7 @@ int bn_is_prime_basic(bn_t a);
  * @param[in] a				- the number to test.
  * @return 1 if a is a probable prime, 0 otherwise.
  */
-int bn_is_prime_rabin(bn_t a);
+int bn_is_prime_rabin(const bn_t a);
 
 /**
  * Tests if a number a > 2 is prime using the Solovay-Strassen test with
@@ -1227,7 +1228,7 @@ int bn_is_prime_rabin(bn_t a);
  * @param[in] a				- the number to test.
  * @return 1 if a is a probable prime, 0 otherwise.
  */
-int bn_is_prime_solov(bn_t a);
+int bn_is_prime_solov(const bn_t a);
 
 /**
  * Generates a probable prime number.
@@ -1262,7 +1263,7 @@ void bn_gen_prime_stron(bn_t a, int bits);
  * @param[in] a				- the integer to fatorize.
  * @return 1 if a factor is found and stored into c; 0 otherwise.
  */
-int bn_factor(bn_t c, bn_t a);
+int bn_factor(bn_t c, const bn_t a);
 
 /**
  * Tests if an integer divides other integer.
@@ -1271,7 +1272,7 @@ int bn_factor(bn_t c, bn_t a);
  * @param[in] a				- the integer.
  * @return 1 if the first integer is a factor; 0 otherwise.
  */
-int bn_is_factor(bn_t c, bn_t a);
+int bn_is_factor(bn_t c, const bn_t a);
 
 /**
  * Recodes an integer in window form.
@@ -1280,8 +1281,9 @@ int bn_is_factor(bn_t c, bn_t a);
  * @param[out] len			- the number of bytes written.
  * @param[in] k				- the integer to recode.
  * @param[in] w				- the window size in bits.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_win(unsigned char *win, int *len, bn_t k, int w);
+void bn_rec_win(unsigned char *win, int *len, const bn_t k, int w);
 
 /**
  * Recodes an integer in sliding window form.
@@ -1290,8 +1292,9 @@ void bn_rec_win(unsigned char *win, int *len, bn_t k, int w);
  * @param[out] len			- the number of bytes written.
  * @param[in] k				- the integer to recode.
  * @param[in] w				- the window size in bits.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_slw(unsigned char *win, int *len, bn_t k, int w);
+void bn_rec_slw(unsigned char *win, int *len, const bn_t k, int w);
 
 /**
  * Recodes an integer in width-w Non-Adjacent Form.
@@ -1300,8 +1303,9 @@ void bn_rec_slw(unsigned char *win, int *len, bn_t k, int w);
  * @param[out] len			- the number of bytes written.
  * @param[in] k				- the integer to recode.
  * @param[in] w				- the window size in bits.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_naf(signed char *naf, int *len, bn_t k, int w);
+void bn_rec_naf(signed char *naf, int *len, const bn_t k, int w);
 
 /**
  * Recodes an integer in width-w t-NAF.
@@ -1315,9 +1319,10 @@ void bn_rec_naf(signed char *naf, int *len, bn_t k, int w);
  * @param[in] u				- the u curve parameter.
  * @param[in] m				- the extension degree of the binary field.
  * @param[in] w				- the window size in bits.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
-		signed char u, int m, int w);
+void bn_rec_tnaf(signed char *tnaf, int *len, const bn_t k, const bn_t vm,
+		const bn_t s0, const bn_t s1, signed char u, int m, int w);
 
 /**
  * Recodes an integer in regular fixed-length width-w NAF.
@@ -1327,8 +1332,9 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
  * @param[in] k				- the integer to recode.
  * @param[in] n				- the length of the recoding.
  * @param[in] w				- the window size in bits.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_reg(signed char *naf, int *len, bn_t k, int n, int w);
+void bn_rec_reg(signed char *naf, int *len, const bn_t k, int n, int w);
 
 /**
  * Recodes a pair of integers in Joint Sparse Form.
@@ -1337,8 +1343,9 @@ void bn_rec_reg(signed char *naf, int *len, bn_t k, int n, int w);
  * @param[out] len			- the number of bytes written.
  * @param[in] k				- the first integer to recode.
  * @param[in] l				- the second integer to recode.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l);
+void bn_rec_jsf(signed char *jsf, int *len, const bn_t k, const bn_t l);
 
 /**
  * Recodes an integer in two parts such that k = k0 + phi(k1), where
@@ -1351,6 +1358,7 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l);
  * @param[in] v1			- the set of parameters v1 for the GLV method.
  * @param[in] v2			- the set of parameters v2 for the GLV method.
  */
-void bn_rec_glv(bn_t k0, bn_t k1, bn_t k, bn_t n, bn_t v1[], bn_t v2[]);
+void bn_rec_glv(bn_t k0, bn_t k1, const bn_t k, const bn_t n, const bn_t v1[],
+		const bn_t v2[]);
 
 #endif /* !RELIC_BN_H */

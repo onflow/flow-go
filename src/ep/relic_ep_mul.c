@@ -82,6 +82,7 @@ static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 			ep_tab(t, q, EP_WIDTH);
 		}
 
+		l0 = l1 = FP_BITS + 1;
 		bn_rec_naf(naf0, &l0, k0, EP_WIDTH);
 		bn_rec_naf(naf1, &l1, k1, EP_WIDTH);
 
@@ -167,6 +168,7 @@ static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
 		ep_tab(t, p, EP_WIDTH);
 
 		/* Compute the w-NAF representation of k. */
+		l = FP_BITS + 1;
 		bn_rec_naf(naf, &l, k, EP_WIDTH);
 
 		_k = naf + l - 1;
@@ -206,7 +208,7 @@ static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
 
 static void ep_mul_reg_imp(ep_t r, ep_t p, bn_t k) {
 	int l, i, j, n;
-	signed char reg[FP_BITS + 1], *_k;
+	signed char reg[CEIL(FP_BITS + 1, EP_WIDTH - 1)], *_k;
 	ep_t t[1 << (EP_WIDTH - 2)];
 
 	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
@@ -222,6 +224,7 @@ static void ep_mul_reg_imp(ep_t r, ep_t p, bn_t k) {
 		ep_tab(t, p, EP_WIDTH);
 
 		/* Compute the w-NAF representation of k. */
+		l = CEIL(FP_BITS + 1, EP_WIDTH - 1);
 		bn_rec_reg(reg, &l, k, FP_BITS, EP_WIDTH);
 
 		_k = reg + l - 1;
@@ -304,7 +307,7 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
 	ep_t t[1 << (EP_WIDTH - 1)], q;
 	int i, j, l;
-	unsigned char win[FP_BITS];
+	unsigned char win[CEIL(FP_BITS, EP_WIDTH)];
 
 	ep_null(q);
 
@@ -337,6 +340,7 @@ void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
 #endif
 
 		ep_set_infty(q);
+		l = CEIL(FP_BITS, EP_WIDTH);
 		bn_rec_slw(win, &l, k, EP_WIDTH);
 		for (i = 0; i < l; i++) {
 			if (win[i] == 0) {

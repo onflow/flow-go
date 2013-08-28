@@ -35,7 +35,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_smb_leg(bn_t c, bn_t a, bn_t b) {
+void bn_smb_leg(bn_t c, const bn_t a, const bn_t b) {
 	bn_t t;
 
 	bn_null(t);
@@ -74,7 +74,7 @@ void bn_smb_leg(bn_t c, bn_t a, bn_t b) {
 	}
 }
 
-void bn_smb_jac(bn_t c, bn_t a, bn_t b) {
+void bn_smb_jac(bn_t c, const bn_t a, const bn_t b) {
 	bn_t t0, t1, r;
 	int t, h;
 

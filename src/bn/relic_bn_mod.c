@@ -37,7 +37,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_mod_2b(bn_t c, bn_t a, int b) {
+void bn_mod_2b(bn_t c, const bn_t a, int b) {
 	int i, first, d;
 
 	if (b <= 0) {
@@ -63,22 +63,22 @@ void bn_mod_2b(bn_t c, bn_t a, int b) {
 	bn_trim(c);
 }
 
-void bn_mod_dig(dig_t *c, bn_t a, dig_t b) {
+void bn_mod_dig(dig_t *c, const bn_t a, dig_t b) {
 	bn_div_rem_dig(NULL, c, a, b);
 }
 
-void bn_mod_basic(bn_t c, bn_t a, bn_t m) {
+void bn_mod_basic(bn_t c, const bn_t a, const bn_t m) {
 	bn_div_rem(NULL, c, a, m);
 }
 
 #if BN_MOD == BARRT || !defined(STRIP)
 
-void bn_mod_pre_barrt(bn_t u, bn_t m) {
+void bn_mod_pre_barrt(bn_t u, const bn_t m) {
 	bn_set_2b(u, m->used * 2 * BN_DIGIT);
 	bn_div(u, u, m);
 }
 
-void bn_mod_barrt(bn_t c, bn_t a, bn_t m, bn_t u) {
+void bn_mod_barrt(bn_t c, const bn_t a, const bn_t m, const bn_t u) {
 	unsigned long mu;
 	bn_t q, t;
 
@@ -152,7 +152,7 @@ void bn_mod_barrt(bn_t c, bn_t a, bn_t m, bn_t u) {
 
 #if BN_MOD == MONTY || !defined(STRIP)
 
-void bn_mod_pre_monty(bn_t u, bn_t m) {
+void bn_mod_pre_monty(bn_t u, const bn_t m) {
 	dig_t x, b;
 	b = m->dp[0];
 
@@ -175,7 +175,7 @@ void bn_mod_pre_monty(bn_t u, bn_t m) {
 	bn_set_dig(u, -x);
 }
 
-void bn_mod_monty_conv(bn_t c, bn_t a, bn_t m) {
+void bn_mod_monty_conv(bn_t c, const bn_t a, const bn_t m) {
 	if (bn_sign(a) == BN_NEG) {
 		bn_add(c, m, a);
 	} else {
@@ -185,7 +185,7 @@ void bn_mod_monty_conv(bn_t c, bn_t a, bn_t m) {
 	bn_mod(c, c, m);
 }
 
-void bn_mod_monty_back(bn_t c, bn_t a, bn_t m) {
+void bn_mod_monty_back(bn_t c, const bn_t a, const bn_t m) {
 	bn_t u;
 
 	bn_null(u);
@@ -204,7 +204,7 @@ void bn_mod_monty_back(bn_t c, bn_t a, bn_t m) {
 
 #if BN_MUL == BASIC || !defined(STRIP)
 
-void bn_mod_monty_basic(bn_t c, bn_t a, bn_t m, bn_t u) {
+void bn_mod_monty_basic(bn_t c, const bn_t a, const bn_t m, const bn_t u) {
 	int digits, i;
 	dig_t r, carry, u0, *tmp;
 	bn_t t;
@@ -246,7 +246,7 @@ void bn_mod_monty_basic(bn_t c, bn_t a, bn_t m, bn_t u) {
 
 #if BN_MUL == COMBA || !defined(STRIP)
 
-void bn_mod_monty_comba(bn_t c, bn_t a, bn_t m, bn_t u) {
+void bn_mod_monty_comba(bn_t c, const bn_t a, const bn_t m, const bn_t u) {
 	int digits;
 	bn_t t;
 
@@ -280,7 +280,7 @@ void bn_mod_monty_comba(bn_t c, bn_t a, bn_t m, bn_t u) {
 
 #if BN_MOD == PMERS || !defined(STRIP)
 
-void bn_mod_pre_pmers(bn_t u, bn_t m) {
+void bn_mod_pre_pmers(bn_t u, const bn_t m) {
 	int bits;
 
 	bits = bn_bits(m);
@@ -289,7 +289,7 @@ void bn_mod_pre_pmers(bn_t u, bn_t m) {
 	bn_sub(u, u, m);
 }
 
-void bn_mod_pmers(bn_t c, bn_t a, bn_t m, bn_t u) {
+void bn_mod_pmers(bn_t c, const bn_t a, const bn_t m, const bn_t u) {
 	bn_t q, t, r;
 	int bits;
 

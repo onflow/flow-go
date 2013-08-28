@@ -35,7 +35,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_lcm(bn_t c, bn_t a, bn_t b) {
+void bn_lcm(bn_t c, const bn_t a, const bn_t b) {
 	bn_t u, v;
 
 	bn_null(u);

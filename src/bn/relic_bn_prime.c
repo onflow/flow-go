@@ -132,7 +132,7 @@ static const dig_t primes[] = {
  * @param b				- the exponent.
  * @param m				- the modulus.
  */
-static void bn_exp(bn_t c, bn_t a, bn_t b, bn_t m) {
+static void bn_exp(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 	int i, l;
 	bn_t t;
 
@@ -177,7 +177,7 @@ dig_t bn_get_prime(int pos) {
 	return primes[pos];
 }
 
-int bn_is_prime(bn_t a) {
+int bn_is_prime(const bn_t a) {
 	int result;
 
 	result = 0;
@@ -194,7 +194,7 @@ int bn_is_prime(bn_t a) {
 	return result;
 }
 
-int bn_is_prime_basic(bn_t a) {
+int bn_is_prime_basic(const bn_t a) {
 	dig_t t;
 	int i, result;
 
@@ -215,7 +215,7 @@ int bn_is_prime_basic(bn_t a) {
 	return result;
 }
 
-int bn_is_prime_rabin(bn_t a) {
+int bn_is_prime_rabin(const bn_t a) {
 	bn_t t, n1, y, r;
 	int i, s, j, result, b, tests = 0;
 
@@ -323,7 +323,7 @@ int bn_is_prime_rabin(bn_t a) {
 	return result;
 }
 
-int bn_is_prime_solov(bn_t a) {
+int bn_is_prime_solov(const bn_t a) {
 	bn_t t0, t1, t2;
 	int i, result;
 

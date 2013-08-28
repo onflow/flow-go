@@ -43,7 +43,7 @@
  * @param[in] to			- the last bit position, inclusive.
  * @return the bits in the chosen positions.
  */
-static char get_bits(bn_t a, int from, int to) {
+static char get_bits(const bn_t a, int from, int to) {
 	int f, t;
 	dig_t mf, mt;
 
@@ -90,17 +90,17 @@ static char get_bits(bn_t a, int from, int to) {
 /**
  * Computes k partmod d = r0 + r1 * t, where d = (t^m - 1)/(t - 1).
  *
- * @param[out] r0		- the result.
- * @param[out] r1		- the result.
+ * @param[out] r0		- the first half of the result.
+ * @param[out] r1		- the second half of the result.
  * @param[in] k			- the number to reduce.
  * @param[in] vm		- the V_m curve parameter.
- * @param[in] s0		- the S0 curve parameter.
- * @param[in] s1		- the S1 curve parameter.
+ * @param[in] s0		- the S_0 curve parameter.
+ * @param[in] s1		- the S_1 curve parameter.
  * @param[in] u			- the u curve parameter.
  * @param[in] m			- the extension degree of the binary field.
  */
-static void tnaf_mod(bn_t r0, bn_t r1, bn_t k, bn_t vm, bn_t s0, bn_t s1,
-		int u, int m) {
+static void tnaf_mod(bn_t r0, bn_t r1, const bn_t k, const bn_t vm,
+		const bn_t s0, const bn_t s1, int u, int m) {
 	bn_t t0, t1, t2, t3;
 	int a, n, n0, n1, h0, h1;
 	dig_t d0, d1;
@@ -285,10 +285,14 @@ static void tnaf_mod(bn_t r0, bn_t r1, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_rec_win(unsigned char *win, int *len, bn_t k, int w) {
+void bn_rec_win(unsigned char *win, int *len, const bn_t k, int w) {
 	int i, j, l;
 
 	l = bn_bits(k);
+
+	if (*len < CEIL(l, w)) {
+		THROW(ERR_NO_BUFFER);
+	}
 
 	j = 0;
 	for (i = 0; i < l - w; i += w) {
@@ -298,10 +302,16 @@ void bn_rec_win(unsigned char *win, int *len, bn_t k, int w) {
 	*len = j;
 }
 
-void bn_rec_slw(unsigned char *win, int *len, bn_t k, int w) {
-	int i, j, s;
+void bn_rec_slw(unsigned char *win, int *len, const bn_t k, int w) {
+	int i, j, l, s;
 
-	i = bn_bits(k) - 1;
+	l = bn_bits(k);
+
+	if (*len < CEIL(l, w)) {
+		THROW(ERR_NO_BUFFER);
+	}
+
+	i = l - 1;
 	j = 0;
 	while (i >= 0) {
 		if (!bn_test_bit(k, i)) {
@@ -319,7 +329,7 @@ void bn_rec_slw(unsigned char *win, int *len, bn_t k, int w) {
 	*len = j;
 }
 
-void bn_rec_naf(signed char *naf, int *len, bn_t k, int w) {
+void bn_rec_naf(signed char *naf, int *len, const bn_t k, int w) {
 	int i, l;
 	bn_t t;
 	dig_t t0, mask;
@@ -329,6 +339,10 @@ void bn_rec_naf(signed char *naf, int *len, bn_t k, int w) {
 
 	mask = MASK(w);
 	l = (1 << w);
+
+	if (*len < (bn_bits(k) + 1)) {
+		THROW(ERR_NO_BUFFER);
+	}
 
 	TRY {
 		bn_new(t);
@@ -385,8 +399,8 @@ void bn_rec_naf(signed char *naf, int *len, bn_t k, int w) {
 	}
 }
 
-void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
-		signed char u, int m, int w) {
+void bn_rec_tnaf(signed char *tnaf, int *len, const bn_t k, const bn_t vm,
+		const bn_t s0, const bn_t s1, signed char u, int m, int w) {
 	int i, l;
 	bn_t tmp, r0, r1;
 	signed char beta[64];
@@ -397,6 +411,10 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 	bn_null(r0);
 	bn_null(r1);
 	bn_null(tmp);
+
+	if (*len < (bn_bits(k) + 1)) {
+		THROW(ERR_NO_BUFFER);
+	}
 
 	TRY {
 		bn_new(r0);
@@ -636,7 +654,7 @@ void bn_rec_tnaf(signed char *tnaf, int *len, bn_t k, bn_t vm, bn_t s0, bn_t s1,
 	}
 }
 
-void bn_rec_reg(signed char *naf, int *len, bn_t k, int n, int w) {
+void bn_rec_reg(signed char *naf, int *len, const bn_t k, int n, int w) {
 	int i, l;
 	bn_t t;
 	dig_t t0, mask;
@@ -646,6 +664,10 @@ void bn_rec_reg(signed char *naf, int *len, bn_t k, int n, int w) {
 
 	mask = MASK(w);
 	l = CEIL(n, (w - 1));
+
+	if (*len < l) {
+		THROW(ERR_NO_BUFFER);
+	}
 
 	TRY {
 		bn_new(t);
@@ -687,7 +709,7 @@ void bn_rec_reg(signed char *naf, int *len, bn_t k, int n, int w) {
 	}
 }
 
-void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
+void bn_rec_jsf(signed char *jsf, int *len, const bn_t k, const bn_t l) {
 	bn_t n0, n1;
 	dig_t l0, l1;
 	signed char u0, u1, d0, d1;
@@ -695,6 +717,10 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 
 	bn_null(n0);
 	bn_null(n1);
+
+	if (*len < (2 * bn_bits(k) + 1)) {
+		THROW(ERR_NO_BUFFER);
+	}
 
 	TRY {
 		bn_new(n0);
@@ -758,7 +784,8 @@ void bn_rec_jsf(signed char *jsf, int *len, bn_t k, bn_t l) {
 
 }
 
-void bn_rec_glv(bn_t k0, bn_t k1, bn_t k, bn_t n, bn_t v1[], bn_t v2[]) {
+void bn_rec_glv(bn_t k0, bn_t k1, const bn_t k, const bn_t n, const bn_t *v1,
+		const bn_t *v2) {
 	bn_t t, b1, b2;
 	int r1, r2, bits;
 

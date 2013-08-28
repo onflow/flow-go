@@ -46,7 +46,7 @@
 
 #if BN_MXP == BASIC || !defined(STRIP)
 
-void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m) {
+void bn_mxp_basic(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 	int i, l;
 	bn_t t, u, r;
 
@@ -105,7 +105,7 @@ void bn_mxp_basic(bn_t c, bn_t a, bn_t b, bn_t m) {
 
 #if BN_MXP == SLIDE || !defined(STRIP)
 
-void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
+void bn_mxp_slide(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 	bn_t tab[TABLE_SIZE], t, u, r;
 	int i, j, l, w = 1;
 	unsigned char win[BN_BITS];
@@ -200,7 +200,7 @@ void bn_mxp_slide(bn_t c, bn_t a, bn_t b, bn_t m) {
 
 #if BN_MXP == MONTY || !defined(STRIP)
 
-void bn_mxp_monty(bn_t c, bn_t a, bn_t b, bn_t m) {
+void bn_mxp_monty(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 	bn_t tab[2], u;
 	dig_t buf;
 	int bitcnt, digidx, j;
@@ -270,7 +270,7 @@ void bn_mxp_monty(bn_t c, bn_t a, bn_t b, bn_t m) {
 
 #endif
 
-void bn_mxp_dig(bn_t c, bn_t a, dig_t b, bn_t m) {
+void bn_mxp_dig(bn_t c, const bn_t a, dig_t b, const bn_t m) {
 	int i, l;
 	bn_t t, u, r;
 

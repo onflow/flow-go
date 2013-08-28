@@ -47,11 +47,12 @@
  * @param[in] b				- the second multiple precision integer.
  * @param[in] level			- the number of Karatsuba steps to apply.
  */
-static void bn_mul_karat_imp(bn_t c, bn_t a, bn_t b, int level) {
+static void bn_mul_karat_imp(bn_t c, const bn_t a, const bn_t b, int level) {
 	int h;
 	bn_t a0, a1, b0, b1, a0b0, a1b1;
 	bn_t t;
-	dig_t *tmpa, *tmpb, *t0;
+	const dig_t *tmpa, *tmpb;
+	dig_t *t0;
 
 	bn_null(a0);
 	bn_null(a1);
@@ -173,7 +174,7 @@ static void bn_mul_karat_imp(bn_t c, bn_t a, bn_t b, int level) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_mul_dig(bn_t c, bn_t a, dig_t b) {
+void bn_mul_dig(bn_t c, const bn_t a, dig_t b) {
 	dig_t carry;
 
 	c->used = a->used;
@@ -189,7 +190,7 @@ void bn_mul_dig(bn_t c, bn_t a, dig_t b) {
 
 #if BN_MUL == BASIC || !defined(STRIP)
 
-void bn_mul_basic(bn_t c, bn_t a, bn_t b) {
+void bn_mul_basic(bn_t c, const bn_t a, const bn_t b) {
 	int i;
 	bn_t t;
 	dig_t carry;
@@ -224,7 +225,7 @@ void bn_mul_basic(bn_t c, bn_t a, bn_t b) {
 
 #if BN_MUL == COMBA || !defined(STRIP)
 
-void bn_mul_comba(bn_t c, bn_t a, bn_t b) {
+void bn_mul_comba(bn_t c, const bn_t a, const bn_t b) {
 	int digits;
 	bn_t t;
 
@@ -265,7 +266,7 @@ void bn_mul_comba(bn_t c, bn_t a, bn_t b) {
 
 #if BN_KARAT > 0 || !defined(STRIP)
 
-void bn_mul_karat(bn_t c, bn_t a, bn_t b) {
+void bn_mul_karat(bn_t c, const bn_t a, const bn_t b) {
 	bn_mul_karat_imp(c, a, b, BN_KARAT);
 }
 

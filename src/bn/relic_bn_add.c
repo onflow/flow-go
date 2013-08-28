@@ -43,7 +43,7 @@
  * @param[in] a         - the first multiple precision integer to add.
  * @param[in] b         - the second multiple precision integer to add.
  */
-static void bn_add_imp(bn_t c, bn_t a, bn_t b) {
+static void bn_add_imp(bn_t c, const bn_t a, const bn_t b) {
 	int max, min;
 	dig_t carry;
 
@@ -70,11 +70,11 @@ static void bn_add_imp(bn_t c, bn_t a, bn_t b) {
 /**
  * Subtracts two multiple precision integers, where a >= b.
  *
- * @param[out] c        - the destination.
+ * @param[out] c        - the result.
  * @param[in] a         - the first multiple precision integer to subtract.
  * @param[in] b         - the second multiple precision integer to subtract.
  */
-static void bn_sub_imp(bn_t c, bn_t a, bn_t b) {
+static void bn_sub_imp(bn_t c, const bn_t a, const bn_t b) {
 	int max, min;
 	dig_t carry;
 
@@ -98,7 +98,7 @@ static void bn_sub_imp(bn_t c, bn_t a, bn_t b) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void bn_add(bn_t c, bn_t a, bn_t b) {
+void bn_add(bn_t c, const bn_t a, const bn_t b) {
 	int sa, sb;
 
 	sa = a->sign;
@@ -124,7 +124,7 @@ void bn_add(bn_t c, bn_t a, bn_t b) {
 	}
 }
 
-void bn_add_dig(bn_t c, bn_t a, dig_t b) {
+void bn_add_dig(bn_t c, const bn_t a, dig_t b) {
 	dig_t carry;
 
 	bn_grow(c, a->used);
@@ -157,7 +157,7 @@ void bn_add_dig(bn_t c, bn_t a, dig_t b) {
 	bn_trim(c);
 }
 
-void bn_sub(bn_t c, bn_t a, bn_t b) {
+void bn_sub(bn_t c, const bn_t a, const bn_t b) {
 	int sa, sb;
 
 	sa = a->sign;
@@ -184,7 +184,7 @@ void bn_sub(bn_t c, bn_t a, bn_t b) {
 	}
 }
 
-void bn_sub_dig(bn_t c, bn_t a, dig_t b) {
+void bn_sub_dig(bn_t c, const bn_t a, dig_t b) {
 	dig_t carry;
 
 	bn_grow(c, a->used);
