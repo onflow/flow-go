@@ -75,7 +75,7 @@ void fp_exp_basic(fp_t c, fp_t a, bn_t b) {
 void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 	fp_t t[1 << (FP_WIDTH - 1)], r;
 	int i, j, l;
-	unsigned char win[FP_BITS];
+	unsigned char win[FP_BITS + 1];
 
 	fp_null(r);
 
@@ -99,6 +99,7 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 		}
 
 		fp_set_dig(r, 1);
+		l = FP_BITS + 1;
 		bn_rec_slw(win, &l, b, FP_WIDTH);
 		for (i = 0; i < l; i++) {
 			if (win[i] == 0) {

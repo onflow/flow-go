@@ -104,6 +104,7 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 		}
 
 		fb_set_dig(r, 1);
+		l = FB_BITS +  1;
 		bn_rec_slw(win, &l, b, FB_WIDTH);
 		for (i = 0; i < l; i++) {
 			if (win[i] == 0) {
