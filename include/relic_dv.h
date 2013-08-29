@@ -149,7 +149,7 @@ typedef dig_t *dv_t;
  * @param[in] a				- the temporary digit vector to print.
  * @param[in] digits		- the number of digits to print.
  */
-void dv_print(dv_t a, int digits);
+void dv_print(dig_t *a, int digits);
 
 /**
  * Assigns zero to a temporary double-precision digit vector.
@@ -157,7 +157,7 @@ void dv_print(dv_t a, int digits);
  * @param[out] a			- the temporary digit vector to assign.
  * @param[in] digits		- the number of words to initialize with zero.
  */
-void dv_zero(dv_t a, int digits);
+void dv_zero(dig_t *a, int digits);
 
 /**
  * Copies some digits from a digit vector to another digit vector.
@@ -166,7 +166,7 @@ void dv_zero(dv_t a, int digits);
  * @param[in] a				- the source.
  * @param[in] digits		- the number of digits to copy.
  */
-void dv_copy(dv_t c, const dv_t a, int digits);
+void dv_copy(dig_t *c, const dig_t *a, int digits);
 
 /**
  * Conditionally copies some digits from a digit vector to another digit vector.
@@ -176,7 +176,7 @@ void dv_copy(dv_t c, const dv_t a, int digits);
  * @param[in] digits		- the number of digits to copy.
  * @param[in] cond			- the condition to evaluate.
  */
-void dv_copy_cond(dv_t c, const dv_t a, int digits, dig_t cond);
+void dv_copy_cond(dig_t *c, const dig_t *a, int digits, dig_t cond);
 
 /**
  * Compares two digit vectors in constant time.
@@ -186,7 +186,7 @@ void dv_copy_cond(dv_t c, const dv_t a, int digits, dig_t cond);
  * @param[in] size			- the length in digits of the vectors.
  * @return CMP_EQ if they are equal and CMP_NE otherwise.
  */
-int dv_cmp_const(const dv_t a, const dv_t b, int size);
+int dv_cmp_const(const dig_t *a, const dig_t *b, int size);
 
 /**
  * Allocates and initializes a temporary double-precision digit vector.
