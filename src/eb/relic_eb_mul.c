@@ -83,6 +83,7 @@ static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
 		eb_curve_get_vm(vm);
 		eb_curve_get_s0(s0);
 		eb_curve_get_s1(s1);
+		len = FB_BITS + 8;
 		bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_WIDTH);
 
 		_k = tnaf + len - 1;
@@ -148,7 +149,8 @@ static void eb_mul_lnaf_imp(eb_t r, eb_t p, bn_t k) {
 		/* Compute the precomputation table. */
 		eb_tab(t, p, EB_WIDTH);
 
-		/* Compute the w-TNAF representation of k. */
+		/* Compute the w-NAF representation of k. */
+		len = FB_BITS + 1;
 		bn_rec_naf(naf, &len, k, EB_WIDTH);
 
 		_k = naf + len - 1;
@@ -226,6 +228,7 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
 		eb_curve_get_s0(s0);
 		eb_curve_get_s1(s1);
 		/* Compute the w-TNAF representation of k. */
+		len = FB_BITS + 8;
 		bn_rec_tnaf(tnaf, &len, k, vm, s0, s1, u, FB_BITS, EB_WIDTH);
 
 		_k = tnaf;
@@ -522,7 +525,8 @@ static void eb_mul_rnaf_imp(eb_t r, eb_t p, bn_t k) {
 			eb_set_infty(t[i]);
 		}
 
-		/* Compute the w-TNAF representation of k. */
+		/* Compute the w-NAF representation of k. */
+		len = FB_BITS + 1;
 		bn_rec_naf(naf, &len, k, EB_WIDTH);
 
 		_k = naf;
@@ -955,6 +959,7 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 		bn_mod(m, m, n);
 
 		/* Compute the w-NAF representation of k'. */
+		l = FB_BITS + 1;
 		bn_rec_naf(naf, &l, m, EB_WIDTH);
 
 		for (i = l; i <= bn_bits(n); i++) {

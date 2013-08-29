@@ -402,8 +402,6 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m) {
 		ep_null(t1[i]);
 	}
 
-	w = EP_WIDTH / 2;
-
 	TRY {
 		bn_new(n);
 

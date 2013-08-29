@@ -42,7 +42,7 @@
  * method.
  *
  * @param[out] r 				- the result.
- * @param[in] t				- the precomputed table.
+ * @param[in] t					- the precomputed table.
  * @param[in] k					- the integer.
  */
 static void ep_mul_fix_ordin(ep_t r, ep_t *t, bn_t k) {
@@ -50,6 +50,7 @@ static void ep_mul_fix_ordin(ep_t r, ep_t *t, bn_t k) {
 	signed char naf[FP_BITS + 1], *_k;
 
 	/* Compute the w-TNAF representation of k. */
+	l = FP_BITS + 1;
 	bn_rec_naf(naf, &l, k, EP_DEPTH);
 
 	_k = naf + l - 1;
@@ -323,7 +324,7 @@ void ep_mul_pre_yaowi(ep_t *t, ep_t p) {
 void ep_mul_fix_yaowi(ep_t r, ep_t *t, bn_t k) {
 	int i, j, l;
 	ep_t a;
-	unsigned char win[CEIL(FP_BITS, EP_WIDTH)];
+	unsigned char win[CEIL(FP_BITS, EP_DEPTH)];
 
 	ep_null(a);
 
@@ -333,7 +334,7 @@ void ep_mul_fix_yaowi(ep_t r, ep_t *t, bn_t k) {
 		ep_set_infty(r);
 		ep_set_infty(a);
 
-		l = CEIL(FP_BITS, EP_WIDTH);
+		l = CEIL(FP_BITS, EP_DEPTH);
 		bn_rec_win(win, &l, k, EP_DEPTH);
 
 		for (j = (1 << EP_DEPTH) - 1; j >= 1; j--) {

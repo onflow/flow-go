@@ -75,7 +75,9 @@ static void eb_mul_fix_kbltz(eb_t r, eb_t *t, bn_t k) {
 		eb_curve_get_vm(vm);
 		eb_curve_get_s0(s0);
 		eb_curve_get_s1(s1);
+
 		/* Compute the w-TNAF representation of k. */
+		l = FB_BITS + 8;
 		bn_rec_tnaf(tnaf, &l, k, vm, s0, s1, u, FB_BITS, EB_DEPTH);
 
 		_k = tnaf + l - 1;
@@ -121,6 +123,7 @@ static void eb_mul_fix_ordin(eb_t r, eb_t *t, bn_t k) {
 	signed char naf[FB_BITS + 1], *_k;
 
 	/* Compute the w-TNAF representation of k. */
+	l = FB_BITS + 1;
 	bn_rec_naf(naf, &l, k, EB_DEPTH);
 
 	_k = naf + l - 1;
@@ -225,7 +228,7 @@ void eb_mul_pre_yaowi(eb_t *t, eb_t p) {
 void eb_mul_fix_yaowi(eb_t r, eb_t *t, bn_t k) {
 	int i, j, l;
 	eb_t a;
-	unsigned char win[FB_BITS + 1];
+	unsigned char win[CEIL(FB_BITS, EP_DEPTH)];
 
 	eb_null(a);
 
@@ -240,6 +243,7 @@ void eb_mul_fix_yaowi(eb_t r, eb_t *t, bn_t k) {
 		eb_set_infty(r);
 		eb_set_infty(a);
 
+		l = CEIL(FB_BITS, EP_DEPTH);
 		bn_rec_win(win, &l, k, EB_DEPTH);
 
 		for (j = (1 << EB_DEPTH) - 1; j >= 1; j--) {
@@ -309,6 +313,7 @@ void eb_mul_fix_nafwi(eb_t r, eb_t *t, bn_t k) {
 		eb_set_infty(r);
 		eb_set_infty(a);
 
+		l = FB_BITS + 1;
 		bn_rec_naf(naf, &l, k, 2);
 
 		d = ((l % EB_DEPTH) == 0 ? (l / EB_DEPTH) : (l / EB_DEPTH) + 1);

@@ -115,8 +115,9 @@ static void eb_mul_sim_kbltz(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m, eb_t *t) {
 		eb_curve_get_vm(vm);
 		eb_curve_get_s0(s0);
 		eb_curve_get_s1(s1);
-		bn_rec_tnaf(tnaf0, &l0, k, vm, s0, s1, u, FB_BITS, w);
 
+		l0 = l1 = FB_BITS + 8;
+		bn_rec_tnaf(tnaf0, &l0, k, vm, s0, s1, u, FB_BITS, w);
 		bn_rec_tnaf(tnaf1, &l1, m, vm, s0, s1, u, FB_BITS, EB_WIDTH);
 
 		l = MAX(l0, l1);
@@ -213,12 +214,14 @@ static void eb_mul_sim_ordin(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m, eb_t *t) {
 		/* Compute the precomputation table. */
 		eb_tab(t1, q, EB_WIDTH);
 
-		/* Compute the w-TNAF representation of k. */
+		/* Compute the w-NAF representation of k. */
 		if (g) {
 			w = EB_DEPTH;
 		} else {
 			w = EB_WIDTH;
 		}
+
+		l0 = l1 = FB_BITS + 1;
 		bn_rec_naf(naf0, &l0, k, w);
 		bn_rec_naf(naf1, &l1, m, EB_WIDTH);
 
@@ -307,8 +310,8 @@ void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m) {
 void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m) {
 	eb_t t0[1 << (EB_WIDTH / 2)], t1[1 << (EB_WIDTH / 2)], t[1 << EB_WIDTH];
 	bn_t n;
-	int l0, l1, w;
-	unsigned char w0[FB_BITS + 1], w1[FB_BITS + 1];
+	int l0, l1, w = EB_WIDTH / 2;
+	unsigned char w0[CEIL(FB_BITS, 2)], w1[CEIL(FB_BITS, w)];
 
 	bn_null(n);
 
@@ -320,8 +323,6 @@ void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m) {
 		eb_null(t0[i]);
 		eb_null(t1[i]);
 	}
-
-	w = EB_WIDTH / 2;
 
 	TRY {
 		bn_new(n);
@@ -356,6 +357,7 @@ void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m) {
 		eb_norm_sim(t + 1, t + 1, (1 << EB_WIDTH) - 1);
 #endif
 
+		l0 = l1 = CEIL(FB_BITS, w);
 		bn_rec_win(w0, &l0, k, w);
 		bn_rec_win(w1, &l1, m, w);
 
@@ -435,6 +437,7 @@ void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m) {
 		eb_norm_sim(t + 3, t + 3, 2);
 #endif
 
+		len = 2 * (FB_BITS + 1);
 		bn_rec_jsf(jsf, &len, k, m);
 
 		eb_set_infty(r);
