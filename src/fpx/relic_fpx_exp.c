@@ -111,6 +111,7 @@ void fp2_exp_uni(fp2_t c, fp2_t a, bn_t b) {
 #endif
 		fp2_copy(t[0], a);
 
+		l = FP_BITS + 1;
 		fp2_zero(r);
 		fp_set_dig(r[0], 1);
 		bn_rec_naf(naf, &l, b, FP_WIDTH);
