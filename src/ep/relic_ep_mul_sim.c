@@ -93,13 +93,13 @@ void ep_mul_sim_kbltz(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m, ep_t *t) {
 		ep_curve_get_v1(v1);
 		ep_curve_get_v2(v2);
 
-		bn_rec_glv(k0, k1, k, ord, v1, v2);
+		bn_rec_glv(k0, k1, k, ord, (const bn_t *)v1, (const bn_t *)v2);
 		sk0 = bn_sign(k0);
 		sk1 = bn_sign(k1);
 		bn_abs(k0, k0);
 		bn_abs(k1, k1);
 
-		bn_rec_glv(l0, l1, m, ord, v1, v2);
+		bn_rec_glv(l0, l1, m, ord, (const bn_t *)v1, (const bn_t *)v2);
 		sl0 = bn_sign(l0);
 		sl1 = bn_sign(l1);
 		bn_abs(l0, l0);
@@ -127,6 +127,7 @@ void ep_mul_sim_kbltz(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m, ep_t *t) {
 		} else {
 			w = EP_WIDTH;
 		}
+		len0 = len1 = len2 = len3 = FP_BITS + 1;
 		bn_rec_naf(naf0, &len0, k0, w);
 		bn_rec_naf(naf1, &len1, k1, w);
 		bn_rec_naf(naf2, &len2, l0, EP_WIDTH);
@@ -300,6 +301,7 @@ static void ep_mul_sim_ordin(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m, ep_t *t) {
 		} else {
 			w = EP_WIDTH;
 		}
+		l0 = l1 = FP_BITS + 1;
 		bn_rec_naf(naf0, &l0, k, w);
 		bn_rec_naf(naf1, &l1, m, EP_WIDTH);
 
@@ -386,8 +388,8 @@ void ep_mul_sim_basic(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m) {
 void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m) {
 	ep_t t0[1 << (EP_WIDTH / 2)], t1[1 << (EP_WIDTH / 2)], t[1 << EP_WIDTH];
 	bn_t n;
-	int l0, l1, w;
-	unsigned char w0[FP_BITS + 1], w1[FP_BITS + 1];
+	int l0, l1, w = EP_WIDTH / 2;
+	unsigned char w0[CEIL(FP_BITS + 1, w)], w1[CEIL(FP_BITS + 1, w)];
 
 	bn_null(n);
 
@@ -435,6 +437,7 @@ void ep_mul_sim_trick(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m) {
 		ep_norm_sim(t + 1, t + 1, (1 << (EP_WIDTH)) - 1);
 #endif
 
+		l0 = l1 = CEIL(FP_BITS, w);
 		bn_rec_win(w0, &l0, k, w);
 		bn_rec_win(w1, &l1, m, w);
 
@@ -514,6 +517,7 @@ void ep_mul_sim_joint(ep_t r, ep_t p, bn_t k, ep_t q, bn_t m) {
 		ep_norm_sim(t + 3, t + 3, 2);
 #endif
 
+		len = 2 * (FP_BITS + 1);
 		bn_rec_jsf(jsf, &len, k, m);
 
 		ep_set_infty(r);

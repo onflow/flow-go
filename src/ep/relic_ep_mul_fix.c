@@ -112,7 +112,7 @@ void ep_mul_combs_kbltz(ep_t r, ep_t *t, bn_t k) {
 		l = ((l % (2 * EP_DEPTH)) ==
 				0 ? (l / (2 * EP_DEPTH)) : (l / (2 * EP_DEPTH)) + 1);
 
-		bn_rec_glv(k0, k1, k, n, v1, v2);
+		bn_rec_glv(k0, k1, k, n, (const bn_t *)v1, (const bn_t *)v2);
 		s0 = bn_sign(k0);
 		s1 = bn_sign(k1);
 		bn_abs(k0, k0);
@@ -323,7 +323,7 @@ void ep_mul_pre_yaowi(ep_t *t, ep_t p) {
 void ep_mul_fix_yaowi(ep_t r, ep_t *t, bn_t k) {
 	int i, j, l;
 	ep_t a;
-	unsigned char win[FP_BITS + 1];
+	unsigned char win[CEIL(FP_BITS, EP_WIDTH)];
 
 	ep_null(a);
 
@@ -333,6 +333,7 @@ void ep_mul_fix_yaowi(ep_t r, ep_t *t, bn_t k) {
 		ep_set_infty(r);
 		ep_set_infty(a);
 
+		l = CEIL(FP_BITS, EP_WIDTH);
 		bn_rec_win(win, &l, k, EP_DEPTH);
 
 		for (j = (1 << EP_DEPTH) - 1; j >= 1; j--) {
@@ -402,6 +403,7 @@ void ep_mul_fix_nafwi(ep_t r, ep_t *t, bn_t k) {
 		ep_set_infty(r);
 		ep_set_infty(a);
 
+		l = FP_BITS + 1;
 		bn_rec_naf(naf, &l, k, 2);
 
 		d = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);

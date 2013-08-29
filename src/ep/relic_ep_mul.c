@@ -307,7 +307,7 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
 	ep_t t[1 << (EP_WIDTH - 1)], q;
 	int i, j, l;
-	unsigned char win[CEIL(FP_BITS, EP_WIDTH)];
+	unsigned char win[FP_BITS + 1];
 
 	ep_null(q);
 
@@ -340,7 +340,7 @@ void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
 #endif
 
 		ep_set_infty(q);
-		l = CEIL(FP_BITS, EP_WIDTH);
+		l = FP_BITS + 1;
 		bn_rec_slw(win, &l, k, EP_WIDTH);
 		for (i = 0; i < l; i++) {
 			if (win[i] == 0) {
