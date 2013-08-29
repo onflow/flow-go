@@ -891,7 +891,8 @@ static void arith(void) {
 			ep_curve_get_v2(v2);
 			ep_curve_get_ord(e);
 			bn_mod(a, a, e);
-			BENCH_ADD(bn_rec_glv(b, c, a, e, v1, v2));
+			BENCH_ADD(bn_rec_glv(b, c, a, e, (const bn_t *)v1,
+							(const bn_t *)v2));
 		}
 		BENCH_END;
 
@@ -900,7 +901,6 @@ static void arith(void) {
 			bn_free(v2[j]);
 		}
 	}
-
 #endif /* WITH_EP && EP_KBLTZ */
 
 	bn_free(a);

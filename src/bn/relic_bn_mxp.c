@@ -161,6 +161,7 @@ void bn_mxp_slide(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 			bn_mod(tab[2 * i + 1], tab[2 * i + 1], m, u);
 		}
 
+		l = BN_BITS + 1;
 		bn_rec_slw(win, &l, b, w);
 		for (i = 0; i < l; i++) {
 			if (win[i] == 0) {

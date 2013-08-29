@@ -69,7 +69,7 @@ static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 		ep_curve_get_ord(n);
 		ep_curve_get_v1(v1);
 		ep_curve_get_v2(v2);
-		bn_rec_glv(k0, k1, k, n, v1, v2);
+		bn_rec_glv(k0, k1, k, n, (const bn_t *)v1, (const bn_t *)v2);
 		s0 = bn_sign(k0);
 		s1 = bn_sign(k1);
 		bn_abs(k0, k0);
