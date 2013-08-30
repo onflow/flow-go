@@ -519,7 +519,8 @@ void fp_param_get_var(bn_t x);
 
 /**
  * Returns the absolute value of the variable used to parameterize the currently
- * configured prime modulus in sparse form.
+ * configured prime modulus in sparse form. The first argument must be an array
+ * of size (MAX_TERMS + 1).
  *
  * @param[out] s			- the parameter in sparse form.
  * @param[out] len			- the length of the parameter in sparse form.
