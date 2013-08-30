@@ -115,7 +115,7 @@ void ep_norm_sim(ep_t * r, ep_t * t, int n) {
 			fp_copy(a[i], t[i]->z);
 		}
 
-		fp_inv_sim(a, a, n);
+		fp_inv_sim(a, (const fp_t *)a, n);
 
 		for (i = 0; i < n; i++) {
 			fp_copy(t[i]->z, a[i]);

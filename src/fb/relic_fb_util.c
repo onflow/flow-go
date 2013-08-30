@@ -78,10 +78,8 @@ static int log_radix(int radix) {
 /*============================================================================*/
 
 void fb_copy(fb_t c, fb_t a) {
-	int i;
-
-	for (i = 0; i < FB_DIGS; i++, c++, a++) {
-		*c = *a;
+	for (int i = 0; i < FB_DIGS; i++) {
+		c[i] = a[i];
 	}
 }
 

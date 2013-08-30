@@ -858,7 +858,7 @@ static int inversion(void) {
 			fp_copy(d[1], b);
 			fp_inv(a, a);
 			fp_inv(b, b);
-			fp_inv_sim(d, d, 2);
+			fp_inv_sim(d, (const fp_t *)d, 2);
 			TEST_ASSERT(fp_cmp(d[0], a) == CMP_EQ &&
 					fp_cmp(d[1], b) == CMP_EQ, end);
 		} TEST_END;
