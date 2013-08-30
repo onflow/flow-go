@@ -148,8 +148,8 @@ void fp_rdcs_low(dig_t *c, const dig_t *a, const dig_t *m) {
 
 void fp_rdcn_low(dig_t *c, dig_t *a) {
 	int i, j;
-	dig_t r0, r1, r2, u, *tmp, *tmpm, *tmpc;
-	const dig_t *m;
+	dig_t r0, r1, r2, u, *tmp, *tmpc;
+	const dig_t *m, *tmpm;
 
 	u = *(fp_prime_get_rdc());
 	m = fp_prime_get();

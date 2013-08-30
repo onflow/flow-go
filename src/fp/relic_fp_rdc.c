@@ -96,7 +96,7 @@ void fp_rdc_monty_basic(fp_t c, dv_t a) {
 	for (i = 0; i < c1; i++) {
 		fp_subn_low(c, c, p);
 	}
-	if (fp_cmp(c, p) != CMP_LT) {
+	if (fp_cmpn_low(c, p) != CMP_LT) {
 		fp_subn_low(c, c, p);
 	}
 }

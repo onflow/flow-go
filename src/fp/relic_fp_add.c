@@ -42,7 +42,7 @@ void fp_add_basic(fp_t c, const fp_t a, const fp_t b) {
 	dig_t carry;
 
 	carry = fp_addn_low(c, a, b);
-	if (carry || (fp_cmp(c, fp_prime_get()) != CMP_LT)) {
+	if (carry || (fp_cmpn_low(c, fp_prime_get()) != CMP_LT)) {
 		carry = fp_subn_low(c, c, fp_prime_get());
 	}
 }
@@ -77,7 +77,7 @@ void fp_add_dig(fp_t c, const fp_t a, dig_t b) {
 	dig_t carry;
 
 	carry = fp_add1_low(c, a, b);
-	if (carry || fp_cmp(c, fp_prime_get()) != CMP_LT) {
+	if (carry || fp_cmpn_low(c, fp_prime_get()) != CMP_LT) {
 		carry = fp_subn_low(c, c, fp_prime_get());
 	}
 #endif
@@ -152,7 +152,7 @@ void fp_dbl_basic(fp_t c, const fp_t a) {
 	dig_t carry;
 
 	carry = fp_lsh1_low(c, a);
-	if (carry || (fp_cmp(c, fp_prime_get()) != CMP_LT)) {
+	if (carry || (fp_cmpn_low(c, fp_prime_get()) != CMP_LT)) {
 		carry = fp_subn_low(c, c, fp_prime_get());
 	}
 }

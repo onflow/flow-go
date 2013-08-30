@@ -126,7 +126,7 @@ void fp_rand(fp_t a) {
 		a[FP_DIGS - 1] &= mask;
 	}
 
-	while (fp_cmp(a, fp_prime_get()) != CMP_LT) {
+	while (fp_cmpn_low(a, fp_prime_get()) != CMP_LT) {
 		fp_subn_low(a, a, fp_prime_get());
 	}
 }
@@ -145,7 +145,7 @@ void fp_print(const fp_t a) {
 			fp_prime_back(t, a);
 		} else {
 			t->used = FP_DIGS;
-			fp_copy(t->dp, fp_prime_get());
+			dv_copy(t->dp, fp_prime_get(), FP_DIGS);
 		}
 #else
 		t->used = FP_DIGS;
