@@ -677,5 +677,9 @@ int fp_param_set_any_tower() {
 void fp_param_print(void) {
 	util_banner("Prime modulus:", 0);
 	util_print("   ");
+#if ALLOC == AUTO
+	fp_print(fp_prime_get());
+#else
 	fp_print((const fp_t)fp_prime_get());
+#endif
 }
