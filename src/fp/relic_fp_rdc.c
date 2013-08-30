@@ -76,7 +76,8 @@ void fp_rdc_basic(fp_t c, dv_t a) {
 
 void fp_rdc_monty_basic(fp_t c, dv_t a) {
 	int i;
-	dig_t r, c0, c1, *tmp, u0, *p;
+	dig_t r, c0, c1, *tmp, u0;
+	const dig_t *p;
 
 	tmp = a;
 

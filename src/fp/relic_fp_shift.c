@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_lsh(fp_t c, fp_t a, int bits) {
+void fp_lsh(fp_t c, const fp_t a, int bits) {
 	int digits;
 
 	SPLIT(bits, digits, bits, FP_DIG_LOG);
@@ -62,7 +62,7 @@ void fp_lsh(fp_t c, fp_t a, int bits) {
 
 }
 
-void fp_rsh(fp_t c, fp_t a, int bits) {
+void fp_rsh(fp_t c, const fp_t a, int bits) {
 	int digits;
 
 	SPLIT(bits, digits, bits, FP_DIG_LOG);

@@ -39,7 +39,7 @@
 
 #if FP_INV == BASIC || !defined(STRIP)
 
-void fp_inv_basic(fp_t c, fp_t a) {
+void fp_inv_basic(fp_t c, const fp_t a) {
 	bn_t e;
 
 	bn_null(e);
@@ -65,7 +65,7 @@ void fp_inv_basic(fp_t c, fp_t a) {
 
 #if FP_INV == BINAR || !defined(STRIP)
 
-void fp_inv_binar(fp_t c, fp_t a) {
+void fp_inv_binar(fp_t c, const fp_t a) {
 	bn_t u, v, g1, g2, p;
 
 	bn_null(u);
@@ -177,9 +177,10 @@ void fp_inv_binar(fp_t c, fp_t a) {
 
 #if FP_INV == MONTY || !defined(STRIP)
 
-void fp_inv_monty(fp_t c, fp_t a) {
+void fp_inv_monty(fp_t c, const fp_t a) {
 	bn_t _a, _p, u, v, x1, x2;
-	dig_t *p = NULL, carry;
+	const dig_t *p = NULL;
+	dig_t carry;
 	int i, k, flag = 0;
 
 	bn_null(_a);
@@ -320,7 +321,7 @@ void fp_inv_monty(fp_t c, fp_t a) {
 
 #if FP_INV == EXGCD || !defined(STRIP)
 
-void fp_inv_exgcd(fp_t c, fp_t a) {
+void fp_inv_exgcd(fp_t c, const fp_t a) {
 	bn_t u, v, g1, g2, p, q, r;
 
 	bn_null(u);
@@ -390,13 +391,13 @@ void fp_inv_exgcd(fp_t c, fp_t a) {
 
 #if FP_INV == LOWER || !defined(STRIP)
 
-void fp_inv_lower(fp_t c, fp_t a) {
+void fp_inv_lower(fp_t c, const fp_t a) {
 	fp_invn_low(c, a);
 }
 
 #endif
 
-void fp_inv_sim(fp_t *c, fp_t *a, int n) {
+void fp_inv_sim(fp_t *c, const fp_t *a, int n) {
 	int i;
 	fp_t u, t[n];
 

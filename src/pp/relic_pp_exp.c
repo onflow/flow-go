@@ -46,7 +46,7 @@
  */
 static void pp_exp_bn(fp12_t c, fp12_t a) {
 	fp12_t t0, t1, t2, t3;
-	int l, *b = fp_param_get_sps(&l);
+	int l = MAX_TERMS + 1, b[MAX_TERMS + 1];
 	bn_t x;
 
 	fp12_null(t0);
@@ -67,6 +67,7 @@ static void pp_exp_bn(fp12_t c, fp12_t a) {
 		 * Rodríguez-Henríquez: Fast Hashing to G_2.
 		 */
 		fp_param_get_var(x);
+		fp_param_get_sps(b, &l);
 
 		/* First, compute m = f^(p^6 - 1)(p^2 + 1). */
 		fp12_conv_cyc(c, a);
@@ -132,7 +133,7 @@ static void pp_exp_bn(fp12_t c, fp12_t a) {
 void pp_exp_b12(fp12_t c, fp12_t a) {
 	fp12_t t[10];
 	bn_t x;
-	int l, *b = fp_param_get_sps(&l);
+	int l = MAX_TERMS + 1, b[MAX_TERMS + 1];
 
 	bn_null(x);
 
@@ -144,6 +145,7 @@ void pp_exp_b12(fp12_t c, fp12_t a) {
 		bn_new(x);
 
 		fp_param_get_var(x);
+		fp_param_get_sps(b, &l);
 
 		/* First, compute m^(p^6 - 1)(p^2 + 1). */
 		fp12_conv_cyc(c, a);

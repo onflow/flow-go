@@ -38,7 +38,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_copy(fp_t c, fp_t a) {
+void fp_copy(fp_t c, const fp_t a) {
 	int i;
 
 	for (i = 0; i < FP_DIGS; i++, c++, a++) {
@@ -51,7 +51,7 @@ void fp_zero(fp_t a) {
 		*a = 0;
 }
 
-int fp_is_zero(fp_t a) {
+int fp_is_zero(const fp_t a) {
 	for (int i = 0; i < FP_DIGS; i++) {
 		if (a[i] != 0) {
 			return 0;
@@ -60,14 +60,14 @@ int fp_is_zero(fp_t a) {
 	return 1;
 }
 
-int fp_is_even(fp_t a) {
+int fp_is_even(const fp_t a) {
 	if ((a[0] & 0x01) == 0) {
 		return 1;
 	}
 	return 0;
 }
 
-int fp_test_bit(fp_t a, int bit) {
+int fp_test_bit(const fp_t a, int bit) {
 	int d;
 	dig_t mask;
 
@@ -77,7 +77,7 @@ int fp_test_bit(fp_t a, int bit) {
 	return (a[d] & mask) != 0;
 }
 
-int fp_get_bit(fp_t a, int bit) {
+int fp_get_bit(const fp_t a, int bit) {
 	int d;
 	dig_t mask;
 
@@ -103,7 +103,7 @@ void fp_set_bit(fp_t a, int bit, int value) {
 	}
 }
 
-int fp_bits(fp_t a) {
+int fp_bits(const fp_t a) {
 	int i = FP_DIGS - 1;
 
 	while (a[i] == 0) {
@@ -133,7 +133,7 @@ void fp_rand(fp_t a) {
 	}
 }
 
-void fp_print(fp_t a) {
+void fp_print(const fp_t a) {
 	int i;
 	bn_t t;
 
@@ -184,7 +184,7 @@ void fp_print(fp_t a) {
 	}
 }
 
-void fp_size(int *size, fp_t a, int radix) {
+void fp_size(int *size, const fp_t a, int radix) {
 	bn_t t;
 
 	bn_null(t);
@@ -229,7 +229,7 @@ void fp_read(fp_t a, const char *str, int len, int radix) {
 	}
 }
 
-void fp_write(char *str, int len, fp_t a, int radix) {
+void fp_write(char *str, int len, const fp_t a, int radix) {
 	bn_t t;
 
 	bn_null(t);

@@ -146,12 +146,14 @@ void fp_param_get_var(bn_t x) {
 	}
 }
 
-int *fp_param_get_sps(int *len) {
-	ctx_t *ctx = core_get();
-	int *ptr = NULL, *var = ctx->var;
+void fp_param_get_sps(int *s, int *len) {
 	bn_t a;
 
 	bn_null(a);
+
+	if (*len < MAX_TERMS) {
+		THROW(ERR_NO_BUFFER);
+	}
 
 	TRY {
 		bn_new(a);
@@ -169,53 +171,47 @@ int *fp_param_get_sps(int *len) {
 				*len = bn_ham(a);
 				for (int i = 0, j = 0; j < bn_bits(a); j++) {
 					if (bn_test_bit(a, j)) {
-						var[i++] = j;
+						s[i++] = j;
 					}
 				}
 				break;
 			case B24_477:
-				var[0] = +7;
-				var[1] = -31;
-				var[2] = -45;
-				var[3] = 48;
+				s[0] = 7;
+				s[1] = -31;
+				s[2] = -45;
+				s[3] = 48;
 				*len = 4;
 				break;
 			case KSS_508:
-				var[0] = -12;
-				var[1] = -46;
-				var[2] = 51;
-				var[3] = 64;
+				s[0] = -12;
+				s[1] = -46;
+				s[2] = 51;
+				s[3] = 64;
 				*len = 4;
 				break;
 			case BN_638:
-				var[0] = 0;
-				var[1] = -68;
-				var[2] = -128;
-				var[3] = 158;
+				s[0] = 0;
+				s[1] = -68;
+				s[2] = -128;
+				s[3] = 158;
 				*len = 4;
 				break;
 			case B12_638:
-				var[0] = -5;
-				var[1] = -93;
-				var[2] = -105;
-				var[3] = 107;
+				s[0] = -5;
+				s[1] = -93;
+				s[2] = -105;
+				s[3] = 107;
 				*len = 4;
 				break;
 			case SS_1536:
-				var[0] = 0;
-				var[1] = 41;
-				var[2] = 255;
+				s[0] = 0;
+				s[1] = 41;
+				s[2] = 255;
 				*len = 3;
 				break;
 			default:
 				THROW(ERR_NO_VALID);
 				break;
-		}
-
-		if (*len > 0 && *len < MAX_TERMS ) {
-			ptr = var;
-		} else {
-			ptr = NULL;
 		}
 	}
 	CATCH_ANY {
@@ -224,11 +220,13 @@ int *fp_param_get_sps(int *len) {
 	FINALLY {
 		bn_free(a);
 	}
-
-	return ptr;
 }
 
 void fp_param_get_map(int *s, int *len) {
+	if (*len < FP_BITS) {
+		THROW(ERR_NO_BUFFER);
+	}
+
 	for (int i = 0; i < FP_BITS; i++) {
 		s[i] = 0;
 	}

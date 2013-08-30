@@ -38,7 +38,7 @@
 
 #if FP_EXP == BASIC || !defined(STRIP)
 
-void fp_exp_basic(fp_t c, fp_t a, bn_t b) {
+void fp_exp_basic(fp_t c, const fp_t a, const bn_t b) {
 	int i, l;
 	fp_t r;
 
@@ -72,7 +72,7 @@ void fp_exp_basic(fp_t c, fp_t a, bn_t b) {
 
 #if FP_EXP == SLIDE || !defined(STRIP)
 
-void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
+void fp_exp_slide(fp_t c, const fp_t a, const bn_t b) {
 	fp_t t[1 << (FP_WIDTH - 1)], r;
 	int i, j, l;
 	unsigned char win[FP_BITS + 1];
@@ -129,7 +129,7 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b) {
 
 #if FP_EXP == MONTY || !defined(STRIP)
 
-void fp_exp_monty(fp_t c, fp_t a, bn_t b) {
+void fp_exp_monty(fp_t c, const fp_t a, const bn_t b) {
 	fp_t t[2];
 	dig_t buf;
 	int bitcnt, digidx, j;

@@ -369,14 +369,14 @@ void fp_prime_clean(void);
  *
  * @return the order of the prime field.
  */
-dig_t *fp_prime_get(void);
+const dig_t *fp_prime_get(void);
 
 /**
  * Returns the additional value used for modular reduction.
  *
  * @return the additional value used for modular reduction.
  */
-dig_t *fp_prime_get_rdc(void);
+const dig_t *fp_prime_get_rdc(void);
 
 /**
  * Returns the additional value used for conversion from multiple precision
@@ -384,7 +384,7 @@ dig_t *fp_prime_get_rdc(void);
  *
  * @return the additional value used for importing integers.
  */
-dig_t *fp_prime_get_conv(void);
+const dig_t *fp_prime_get_conv(void);
 
 /**
  * Returns the result of prime order mod 8.
@@ -401,7 +401,7 @@ dig_t fp_prime_get_mod8(void);
  *
  * @return the prime represented by it non-zero bits.
  */
-int *fp_prime_get_sps(int *len);
+const int *fp_prime_get_sps(int *len);
 
 /**
  * Returns a non-quadratic residue in the prime field.
@@ -429,7 +429,7 @@ int fp_param_get(void);
  *
  * @param[in] p			- the new prime field modulus.
  */
-void fp_prime_set_dense(bn_t p);
+void fp_prime_set_dense(const bn_t p);
 
 /**
  * Assigns the prime field modulus to a special form sparse prime.
@@ -437,7 +437,7 @@ void fp_prime_set_dense(bn_t p);
  * @param[in] spars		- the list of powers of 2 describing the prime.
  * @param[in] len		- the number of powers.
  */
-void fp_prime_set_pmers(int *spars, int len);
+void fp_prime_set_pmers(const int *spars, int len);
 
 /**
  * Computes the constants needed for evaluating Frobenius maps in higher
@@ -452,7 +452,7 @@ void fp_prime_calc(void);
  * @param[out] c			- the result.
  * @param[in] a				- the multiple precision integer to import.
  */
-void fp_prime_conv(fp_t c, bn_t a);
+void fp_prime_conv(fp_t c, const bn_t a);
 
 /**
  * Imports a single digit as a prime field element, doing the necessary
@@ -470,7 +470,7 @@ void fp_prime_conv_dig(fp_t c, dig_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to export.
  */
-void fp_prime_back(bn_t c, fp_t a);
+void fp_prime_back(bn_t c, const fp_t a);
 
 /**
  * Assigns a prime modulus based on its identifier.
@@ -521,19 +521,23 @@ void fp_param_get_var(bn_t x);
  * Returns the absolute value of the variable used to parameterize the currently
  * configured prime modulus in sparse form.
  *
+ * @param[out] s			- the parameter in sparse form.
  * @param[out] len			- the length of the parameter in sparse form.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
+ * @throw ERR_NO_VALID		- if the current configuration is invalid.
  * @return the integer parameter in sparse form.
  */
-int *fp_param_get_sps(int *len);
+void fp_param_get_sps(int *s, int *len);
 
 /**
  * Returns the value of the parameter used to construct the optimal ate pairing
  * on the currently configured elliptic curve. The first argument must be an
  * array of size FP_BITS.
  *
- * @param[ou] s				- the parameter in sparse form.
+ * @param[out] s			- the parameter in sparse form.
  * @param[out] len			- the length of the parameter in sparse form.
- *
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
+ * @throw ERR_NO_VALID		- if the current configuration is invalid.
  */
 void fp_param_get_map(int *s, int *len);
 
@@ -543,7 +547,7 @@ void fp_param_get_map(int *s, int *len);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to copy.
  */
-void fp_copy(fp_t c, fp_t a);
+void fp_copy(fp_t c, const fp_t a);
 
 /**
  * Assigns zero to a prime field element.
@@ -558,7 +562,7 @@ void fp_zero(fp_t a);
  * @param[in] a				- the prime field element to test.
  * @return 1 if the argument is zero, 0 otherwise.
  */
-int fp_is_zero(fp_t a);
+int fp_is_zero(const fp_t a);
 
 /**
  * Tests if a prime field element is even or odd.
@@ -566,7 +570,7 @@ int fp_is_zero(fp_t a);
  * @param[in] a				- the prime field element to test.
  * @return 1 if the argument is even, 0 otherwise.
  */
-int fp_is_even(fp_t a);
+int fp_is_even(const fp_t a);
 
 /**
  * Tests the bit in the given position on a multiple precision integer.
@@ -575,7 +579,7 @@ int fp_is_even(fp_t a);
  * @param[in] bit			- the bit position.
  * @return 0 is the bit is zero, not zero otherwise.
  */
-int fp_test_bit(fp_t a, int bit);
+int fp_test_bit(const fp_t a, int bit);
 
 /**
  * Reads the bit stored in the given position on a prime field element.
@@ -584,7 +588,7 @@ int fp_test_bit(fp_t a, int bit);
  * @param[in] bit			- the bit position.
  * @return the bit value.
  */
-int fp_get_bit(fp_t a, int bit);
+int fp_get_bit(const fp_t a, int bit);
 
 /**
  * Stores a bit in a given position on a prime field element.
@@ -612,7 +616,7 @@ void fp_set_dig(fp_t c, dig_t a);
  * @param[in] a				- the prime field element.
  * @return the number of bits.
  */
-int fp_bits(fp_t a);
+int fp_bits(const fp_t a);
 
 /**
  * Assigns a random value to a prime field element.
@@ -626,7 +630,7 @@ void fp_rand(fp_t a);
  *
  * @param[in] a				- the prime field element to print.
  */
-void fp_print(fp_t a);
+void fp_print(const fp_t a);
 
 /**
  * Returns the number of digits in radix necessary to store a multiple precision
@@ -637,7 +641,7 @@ void fp_print(fp_t a);
  * @param[in] radix			- the radix.
  * @throw ERR_NO_VALID		- if the radix is invalid.
  */
-void fp_size(int *size, fp_t a, int radix);
+void fp_size(int *size, const fp_t a, int radix);
 
 /**
  * Reads a prime field element from a string in a given radix. The radix must
@@ -662,7 +666,7 @@ void fp_read(fp_t a, const char *str, int len, int radix);
  * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
  * @throw ERR_NO_VALID		- if the radix is invalid.
  */
-void fp_write(char *str, int len, fp_t a, int radix);
+void fp_write(char *str, int len, const fp_t a, int radix);
 
 /**
  * Returns the result of a comparison between two prime field elements.
@@ -671,7 +675,7 @@ void fp_write(char *str, int len, fp_t a, int radix);
  * @param[in] b				- the second prime field element.
  * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
-int fp_cmp(fp_t a, fp_t b);
+int fp_cmp(const fp_t a, const fp_t b);
 
 /**
  * Returns the result of a signed comparison between a prime field element
@@ -681,7 +685,7 @@ int fp_cmp(fp_t a, fp_t b);
  * @param[in] b				- the digit.
  * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
-int fp_cmp_dig(fp_t a, dig_t b);
+int fp_cmp_dig(const fp_t a, dig_t b);
 
 /**
  * Adds two prime field elements using basic addition. Computes c = a + b.
@@ -690,7 +694,7 @@ int fp_cmp_dig(fp_t a, dig_t b);
  * @param[in] a				- the first prime field element to add.
  * @param[in] b				- the second prime field element to add.
  */
-void fp_add_basic(fp_t c, fp_t a, fp_t b);
+void fp_add_basic(fp_t c, const fp_t a, const fp_t b);
 
 /**
  * Adds two prime field elements with integrated modular reduction. Computes
@@ -700,7 +704,7 @@ void fp_add_basic(fp_t c, fp_t a, fp_t b);
  * @param[in] a				- the first prime field element to add.
  * @param[in] b				- the second prime field element to add.
  */
-void fp_add_integ(fp_t c, fp_t a, fp_t b);
+void fp_add_integ(fp_t c, const fp_t a, const fp_t b);
 
 /**
  * Adds a prime field element and a digit. Computes c = a + b.
@@ -709,7 +713,7 @@ void fp_add_integ(fp_t c, fp_t a, fp_t b);
  * @param[in] a				- the first prime field element to add.
  * @param[in] b				- the digit to add.
  */
-void fp_add_dig(fp_t c, fp_t a, dig_t b);
+void fp_add_dig(fp_t c, const fp_t a, dig_t b);
 
 /**
  * Subtracts a prime field element from another using basic subtraction.
@@ -719,7 +723,7 @@ void fp_add_dig(fp_t c, fp_t a, dig_t b);
  * @param[in] a				- the prime field element.
  * @param[in] b				- the prime field element to subtract.
  */
-void fp_sub_basic(fp_t c, fp_t a, fp_t b);
+void fp_sub_basic(fp_t c, const fp_t a, const fp_t b);
 
 /**
  * Subtracts a prime field element from another with integrated modular
@@ -729,7 +733,7 @@ void fp_sub_basic(fp_t c, fp_t a, fp_t b);
  * @param[in] a				- the prime field element.
  * @param[in] b				- the prime field element to subtract.
  */
-void fp_sub_integ(fp_t c, fp_t a, fp_t b);
+void fp_sub_integ(fp_t c, const fp_t a, const fp_t b);
 
 /**
  * Subtracts a digit from a prime field element. Computes c = a - b.
@@ -738,7 +742,7 @@ void fp_sub_integ(fp_t c, fp_t a, fp_t b);
  * @param[in] a				- the prime field element.
  * @param[in] b				- the digit to subtract.
  */
-void fp_sub_dig(fp_t c, fp_t a, dig_t b);
+void fp_sub_dig(fp_t c, const fp_t a, dig_t b);
 
 /**
  * Negates a prime field element using basic negation.
@@ -746,7 +750,7 @@ void fp_sub_dig(fp_t c, fp_t a, dig_t b);
  * @param[out] c			- the result.
  * @param[out] a			- the prime field element to negate.
  */
-void fp_neg_basic(fp_t c, fp_t a);
+void fp_neg_basic(fp_t c, const fp_t a);
 
 /**
  * Negates a prime field element using integrated negation.
@@ -754,7 +758,7 @@ void fp_neg_basic(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[out] a			- the prime field element to negate.
  */
-void fp_neg_integ(fp_t c, fp_t a);
+void fp_neg_integ(fp_t c, const fp_t a);
 
 /**
  * Doubles a prime field element using basic addition.
@@ -762,7 +766,7 @@ void fp_neg_integ(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the first prime field element to add.
  */
-void fp_dbl_basic(fp_t c, fp_t a);
+void fp_dbl_basic(fp_t c, const fp_t a);
 
 /**
  * Doubles a prime field element with integrated modular reduction.
@@ -770,7 +774,7 @@ void fp_dbl_basic(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the first prime field element to add.
  */
-void fp_dbl_integ(fp_t c, fp_t a);
+void fp_dbl_integ(fp_t c, const fp_t a);
 
 /**
  * Halves a prime field element.
@@ -778,7 +782,7 @@ void fp_dbl_integ(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to halve.
  */
-void fp_hlv_basic(fp_t c, fp_t a);
+void fp_hlv_basic(fp_t c, const fp_t a);
 
 /**
  * Halves a prime field element with integrated modular reduction.
@@ -786,7 +790,7 @@ void fp_hlv_basic(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to halve.
  */
-void fp_hlv_integ(fp_t c, fp_t a);
+void fp_hlv_integ(fp_t c, const fp_t a);
 
 /**
  * Multiples two prime field elements using Schoolbook multiplication.
@@ -795,7 +799,7 @@ void fp_hlv_integ(fp_t c, fp_t a);
  * @param[in] a				- the first prime field element to multiply.
  * @param[in] b				- the second prime field element to multiply.
  */
-void fp_mul_basic(fp_t c, fp_t a, fp_t b);
+void fp_mul_basic(fp_t c, const fp_t a, const fp_t b);
 
 /**
  * Multiples two prime field elements using Comba multiplication.
@@ -804,7 +808,7 @@ void fp_mul_basic(fp_t c, fp_t a, fp_t b);
  * @param[in] a				- the first prime field element to multiply.
  * @param[in] b				- the second prime field element to multiply.
  */
-void fp_mul_comba(fp_t c, fp_t a, fp_t b);
+void fp_mul_comba(fp_t c, const fp_t a, const fp_t b);
 
 /**
  * Multiples two prime field elements using multiplication integrated with
@@ -814,7 +818,7 @@ void fp_mul_comba(fp_t c, fp_t a, fp_t b);
  * @param[in] a				- the first prime field element to multiply.
  * @param[in] b				- the second prime field element to multiply.
  */
-void fp_mul_integ(fp_t c, fp_t a, fp_t b);
+void fp_mul_integ(fp_t c, const fp_t a, const fp_t b);
 
 /**
  * Multiples two prime field elements using Karatsuba multiplication.
@@ -823,7 +827,7 @@ void fp_mul_integ(fp_t c, fp_t a, fp_t b);
  * @param[in] a				- the first prime field element to multiply.
  * @param[in] b				- the second prime field element to multiply.
  */
-void fp_mul_karat(fp_t c, fp_t a, fp_t b);
+void fp_mul_karat(fp_t c, const fp_t a, const fp_t b);
 
 /**
  * Multiplies a prime field element by a digit. Computes c = a * b.
@@ -832,7 +836,7 @@ void fp_mul_karat(fp_t c, fp_t a, fp_t b);
  * @param[in] a				- the prime field element.
  * @param[in] b				- the digit to multiply.
  */
-void fp_mul_dig(fp_t c, fp_t a, dig_t b);
+void fp_mul_dig(fp_t c, const fp_t a, dig_t b);
 
 /**
  * Squares a prime field element using Schoolbook squaring.
@@ -840,7 +844,7 @@ void fp_mul_dig(fp_t c, fp_t a, dig_t b);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to square.
  */
-void fp_sqr_basic(fp_t c, fp_t a);
+void fp_sqr_basic(fp_t c, const fp_t a);
 
 /**
  * Squares a prime field element using Comba squaring.
@@ -848,7 +852,7 @@ void fp_sqr_basic(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to square.
  */
-void fp_sqr_comba(fp_t c, fp_t a);
+void fp_sqr_comba(fp_t c, const fp_t a);
 
 /**
  * Squares two prime field elements using squaring integrated with
@@ -857,7 +861,7 @@ void fp_sqr_comba(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to square.
  */
-void fp_sqr_integ(fp_t c, fp_t a);
+void fp_sqr_integ(fp_t c, const fp_t a);
 
 /**
  * Squares a prime field element using Karatsuba squaring.
@@ -865,7 +869,7 @@ void fp_sqr_integ(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to square.
  */
-void fp_sqr_karat(fp_t c, fp_t a);
+void fp_sqr_karat(fp_t c, const fp_t a);
 
 /**
  * Shifts a prime field element number to the left. Computes
@@ -875,7 +879,7 @@ void fp_sqr_karat(fp_t c, fp_t a);
  * @param[in] a				- the prime field element to shift.
  * @param[in] bits			- the number of bits to shift.
  */
-void fp_lsh(fp_t c, fp_t a, int bits);
+void fp_lsh(fp_t c, const fp_t a, int bits);
 
 /**
  * Shifts a prime field element to the right. Computes c = floor(a / 2^bits).
@@ -884,7 +888,7 @@ void fp_lsh(fp_t c, fp_t a, int bits);
  * @param[in] a				- the prime field element to shift.
  * @param[in] bits			- the number of bits to shift.
  */
-void fp_rsh(fp_t c, fp_t a, int bits);
+void fp_rsh(fp_t c, const fp_t a, int bits);
 
 /**
  * Reduces a multiplication result modulo the prime field modulo using
@@ -928,7 +932,7 @@ void fp_rdc_quick(fp_t c, dv_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to invert.
  */
-void fp_inv_basic(fp_t c, fp_t a);
+void fp_inv_basic(fp_t c, const fp_t a);
 
 /**
  * Inverts a prime field element using the binary method.
@@ -936,7 +940,7 @@ void fp_inv_basic(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to invert.
  */
-void fp_inv_binar(fp_t c, fp_t a);
+void fp_inv_binar(fp_t c, const fp_t a);
 
 /**
  * Inverts a prime field element using Montgomery inversion.
@@ -944,7 +948,7 @@ void fp_inv_binar(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to invert.
  */
-void fp_inv_monty(fp_t c, fp_t a);
+void fp_inv_monty(fp_t c, const fp_t a);
 
 /**
  * Inverts a prime field element using the Euclidean Extended Algorithm.
@@ -952,7 +956,7 @@ void fp_inv_monty(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to invert.
  */
-void fp_inv_exgcd(fp_t c, fp_t a);
+void fp_inv_exgcd(fp_t c, const fp_t a);
 
 /**
  * Inverts a prime field element using a direct call to the lower layer.
@@ -960,7 +964,7 @@ void fp_inv_exgcd(fp_t c, fp_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the prime field element to invert.
  */
-void fp_inv_lower(fp_t c, fp_t a);
+void fp_inv_lower(fp_t c, const fp_t a);
 
 /**
  * Inverts multiple prime field elements simultaneously.
@@ -969,7 +973,7 @@ void fp_inv_lower(fp_t c, fp_t a);
  * @param[in] a				- the prime field elements to invert.
  * @param[in] n				- the number of elements.
  */
-void fp_inv_sim(fp_t * c, fp_t * a, int n);
+void fp_inv_sim(fp_t *c, const fp_t *a, int n);
 
 /**
  * Exponentiates a prime field element using the binary
@@ -979,7 +983,7 @@ void fp_inv_sim(fp_t * c, fp_t * a, int n);
  * @param[in] a				- the basis.
  * @param[in] b				- the exponent.
  */
-void fp_exp_basic(fp_t c, fp_t a, bn_t b);
+void fp_exp_basic(fp_t c, const fp_t a, const bn_t b);
 
 /**
  * Exponentiates a prime field element using the sliding window method.
@@ -988,7 +992,7 @@ void fp_exp_basic(fp_t c, fp_t a, bn_t b);
  * @param[in] a				- the basis.
  * @param[in] b				- the exponent.
  */
-void fp_exp_slide(fp_t c, fp_t a, bn_t b);
+void fp_exp_slide(fp_t c, const fp_t a, const bn_t b);
 
 /**
  * Exponentiates a prime field element using the constant-time Montgomery
@@ -998,7 +1002,7 @@ void fp_exp_slide(fp_t c, fp_t a, bn_t b);
  * @param[in] a				- the basis.
  * @param[in] b				- the exponent.
  */
-void fp_exp_monty(fp_t c, fp_t a, bn_t b);
+void fp_exp_monty(fp_t c, const fp_t a, const bn_t b);
 
 /**
  * Extracts the square root of a prime field element. Computes c = sqrt(a). The
@@ -1008,6 +1012,6 @@ void fp_exp_monty(fp_t c, fp_t a, bn_t b);
  * @param[in] a				- the prime field element.
  * @return					- 1 if there is a square root, 0 otherwise.
  */
-int fp_srt(fp_t c, fp_t a);
+int fp_srt(fp_t c, const fp_t a);
 
 #endif /* !RELIC_FP_H */

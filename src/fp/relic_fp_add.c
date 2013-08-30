@@ -38,7 +38,7 @@
 
 #if FP_ADD == BASIC || !defined(STRIP)
 
-void fp_add_basic(fp_t c, fp_t a, fp_t b) {
+void fp_add_basic(fp_t c, const fp_t a, const fp_t b) {
 	dig_t carry;
 
 	carry = fp_addn_low(c, a, b);
@@ -51,13 +51,13 @@ void fp_add_basic(fp_t c, fp_t a, fp_t b) {
 
 #if FP_ADD == INTEG || !defined(STRIP)
 
-void fp_add_integ(fp_t c, fp_t a, fp_t b) {
+void fp_add_integ(fp_t c, const fp_t a, const fp_t b) {
 	fp_addm_low(c, a, b);
 }
 
 #endif
 
-void fp_add_dig(fp_t c, fp_t a, dig_t b) {
+void fp_add_dig(fp_t c, const fp_t a, dig_t b) {
 #if FP_RDC == MONTY
 	fp_t t;
 
@@ -85,7 +85,7 @@ void fp_add_dig(fp_t c, fp_t a, dig_t b) {
 
 #if FP_ADD == BASIC || !defined(STRIP)
 
-void fp_sub_basic(fp_t c, fp_t a, fp_t b) {
+void fp_sub_basic(fp_t c, const fp_t a, const fp_t b) {
 	dig_t carry;
 
 	carry = fp_subn_low(c, a, b);
@@ -98,13 +98,13 @@ void fp_sub_basic(fp_t c, fp_t a, fp_t b) {
 
 #if FP_ADD == INTEG || !defined(STRIP)
 
-void fp_sub_integ(fp_t c, fp_t a, fp_t b) {
+void fp_sub_integ(fp_t c, const fp_t a, const fp_t b) {
 	fp_subm_low(c, a, b);
 }
 
 #endif
 
-void fp_sub_dig(fp_t c, fp_t a, dig_t b) {
+void fp_sub_dig(fp_t c, const fp_t a, dig_t b) {
 #if FP_RDC == MONTY
 	fp_t t;
 
@@ -132,7 +132,7 @@ void fp_sub_dig(fp_t c, fp_t a, dig_t b) {
 
 #if FP_ADD == BASIC || !defined(STRIP)
 
-void fp_neg_basic(fp_t c, fp_t a) {
+void fp_neg_basic(fp_t c, const fp_t a) {
 	fp_subn_low(c, fp_prime_get(), a);
 }
 
@@ -140,7 +140,7 @@ void fp_neg_basic(fp_t c, fp_t a) {
 
 #if FP_ADD == INTEG || !defined(STRIP)
 
-void fp_neg_integ(fp_t c, fp_t a) {
+void fp_neg_integ(fp_t c, const fp_t a) {
 	fp_negm_low(c, a);
 }
 
@@ -148,7 +148,7 @@ void fp_neg_integ(fp_t c, fp_t a) {
 
 #if FP_ADD == BASIC || !defined(STRIP)
 
-void fp_dbl_basic(fp_t c, fp_t a) {
+void fp_dbl_basic(fp_t c, const fp_t a) {
 	dig_t carry;
 
 	carry = fp_lsh1_low(c, a);
@@ -161,7 +161,7 @@ void fp_dbl_basic(fp_t c, fp_t a) {
 
 #if FP_ADD == INTEG || !defined(STRIP)
 
-void fp_dbl_integ(fp_t c, fp_t a) {
+void fp_dbl_integ(fp_t c, const fp_t a) {
 	fp_dblm_low(c, a);
 }
 
@@ -169,7 +169,7 @@ void fp_dbl_integ(fp_t c, fp_t a) {
 
 #if FP_ADD == BASIC || !defined(STRIP)
 
-void fp_hlv_basic(fp_t c, fp_t a) {
+void fp_hlv_basic(fp_t c, const fp_t a) {
 	dig_t carry = 0;
 
 	if (a[0] & 1) {
@@ -187,10 +187,8 @@ void fp_hlv_basic(fp_t c, fp_t a) {
 
 #if FP_ADD == INTEG || !defined(STRIP)
 
-void fp_hlv_integ(fp_t c, fp_t a) {
+void fp_hlv_integ(fp_t c, const fp_t a) {
 	fp_hlvm_low(c, a);
 }
 
 #endif
-
-

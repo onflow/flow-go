@@ -48,7 +48,8 @@
  * @param[in] size			- the number of digits to multiply.
  * @param[in] level			- the number of Karatsuba steps to apply.
  */
-static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
+static void fp_mul_karat_imp(dv_t c, const fp_t a, const fp_t b, int size,
+		int level) {
 	int i, h, h1;
 	dv_t a1, b1, a0b0, a1b1, t;
 	dig_t carry;
@@ -162,7 +163,7 @@ static void fp_mul_karat_imp(dv_t c, fp_t a, fp_t b, int size, int level) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_mul_dig(fp_t c, fp_t a, dig_t b) {
+void fp_mul_dig(fp_t c, const fp_t a, dig_t b) {
 	dv_t t;
 
 	dv_null(t);
@@ -181,7 +182,7 @@ void fp_mul_dig(fp_t c, fp_t a, dig_t b) {
 
 #if FP_MUL == BASIC || !defined(STRIP)
 
-void fp_mul_basic(fp_t c, fp_t a, fp_t b) {
+void fp_mul_basic(fp_t c, const fp_t a, const fp_t b) {
 	int i;
 	dv_t t;
 	dig_t carry;
@@ -211,7 +212,7 @@ void fp_mul_basic(fp_t c, fp_t a, fp_t b) {
 
 #if FP_MUL == COMBA || !defined(STRIP)
 
-void fp_mul_comba(fp_t c, fp_t a, fp_t b) {
+void fp_mul_comba(fp_t c, const fp_t a, const fp_t b) {
 	dv_t t;
 
 	dv_null(t);
@@ -237,7 +238,7 @@ void fp_mul_comba(fp_t c, fp_t a, fp_t b) {
 
 #if FP_MUL == INTEG || !defined(STRIP)
 
-void fp_mul_integ(fp_t c, fp_t a, fp_t b) {
+void fp_mul_integ(fp_t c, const fp_t a, const fp_t b) {
 	fp_mulm_low(c, a, b);
 }
 
@@ -245,7 +246,7 @@ void fp_mul_integ(fp_t c, fp_t a, fp_t b) {
 
 #if FP_KARAT > 0 || !defined(STRIP)
 
-void fp_mul_karat(fp_t c, fp_t a, fp_t b) {
+void fp_mul_karat(fp_t c, const fp_t a, const fp_t b) {
 	dv_t t;
 
 	dv_null(t);

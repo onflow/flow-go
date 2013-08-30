@@ -35,7 +35,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int fp_srt(fp_t c, fp_t a) {
+int fp_srt(fp_t c, const fp_t a) {
 	bn_t e;
 	fp_t t0;
 	fp_t t1;

@@ -35,7 +35,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int fp_cmp_dig(fp_t a, dig_t b) {
+int fp_cmp_dig(const fp_t a, dig_t b) {
 #if FP_RDC == MONTY
 	fp_t t;
 	int r = CMP_EQ;
@@ -65,6 +65,6 @@ int fp_cmp_dig(fp_t a, dig_t b) {
 #endif
 }
 
-int fp_cmp(fp_t a, fp_t b) {
+int fp_cmp(const fp_t a, const fp_t b) {
 	return fp_cmpn_low(a, b);
 }

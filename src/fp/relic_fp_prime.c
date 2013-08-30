@@ -42,7 +42,7 @@
  *
  * @param[in] p			- the new prime field modulus.
  */
-static void fp_prime_set(bn_t p) {
+static void fp_prime_set(const bn_t p) {
 	dv_t s, q;
 	bn_t t;
 	ctx_t *ctx = core_get();
@@ -297,7 +297,6 @@ void fp_prime_init() {
 	ctx_t *ctx = core_get();
 	ctx->fp_id = ctx->sps_len = 0;
 	memset(ctx->sps, 0, sizeof(ctx->sps));
-	memset(ctx->var, 0, sizeof(ctx->var));
 	bn_init(&(ctx->prime), FP_DIGS);
 #if FP_RDC == MONTY || !defined(STRIP)
 	bn_init(&(ctx->conv), FP_DIGS);
@@ -309,7 +308,6 @@ void fp_prime_clean() {
 	ctx_t *ctx = core_get();
 	ctx->fp_id = ctx->sps_len = 0;
 	memset(ctx->sps, 0, sizeof(ctx->sps));
-	memset(ctx->var, 0, sizeof(ctx->var));
 #if FP_RDC == MONTY || !defined(STRIP)
 	bn_clean(&(ctx->one));
 	bn_clean(&(ctx->conv));
@@ -317,15 +315,15 @@ void fp_prime_clean() {
 	bn_clean(&(ctx->prime));
 }
 
-dig_t *fp_prime_get(void) {
+const dig_t *fp_prime_get(void) {
 	return core_get()->prime.dp;
 }
 
-dig_t *fp_prime_get_rdc(void) {
+const dig_t *fp_prime_get_rdc(void) {
 	return &(core_get()->u);
 }
 
-int *fp_prime_get_sps(int *len) {
+const int *fp_prime_get_sps(int *len) {
 	ctx_t *ctx = core_get();
 	if (ctx->sps_len > 0 && ctx->sps_len < MAX_TERMS) {
 		if (len != NULL) {
@@ -340,7 +338,7 @@ int *fp_prime_get_sps(int *len) {
 	}
 }
 
-dig_t *fp_prime_get_conv(void) {
+const dig_t *fp_prime_get_conv(void) {
 #if FP_RDC == MONTY || !defined(STRIP)
 	return core_get()->conv.dp;
 #else
@@ -360,7 +358,7 @@ int fp_prime_get_cnr() {
 	return core_get()->cnr;
 }
 
-void fp_prime_set_dense(bn_t p) {
+void fp_prime_set_dense(const bn_t p) {
 	fp_prime_set(p);
 	core_get()->sps_len = 0;
 
@@ -369,7 +367,7 @@ void fp_prime_set_dense(bn_t p) {
 #endif
 }
 
-void fp_prime_set_pmers(int *f, int len) {
+void fp_prime_set_pmers(const int *f, int len) {
 	bn_t p, t;
 	ctx_t *ctx = core_get();
 
@@ -426,7 +424,7 @@ void fp_prime_calc() {
 #endif
 }
 
-void fp_prime_conv(fp_t c, bn_t a) {
+void fp_prime_conv(fp_t c, const bn_t a) {
 	bn_t t;
 
 	bn_null(t);
@@ -499,7 +497,7 @@ void fp_prime_conv_dig(fp_t c, dig_t a) {
 	}
 }
 
-void fp_prime_back(bn_t c, fp_t a) {
+void fp_prime_back(bn_t c, const fp_t a) {
 	dv_t t;
 	int i;
 

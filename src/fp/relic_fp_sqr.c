@@ -49,7 +49,7 @@
  * @param[in] size			- the number of digits to square.
  * @param[in] level			- the number of Karatsuba steps to apply.
  */
-static void fp_sqr_karat_imp(dv_t c, fp_t a, int size, int level) {
+static void fp_sqr_karat_imp(dv_t c, const fp_t a, int size, int level) {
 	int i, h, h1;
 	dv_t t0, t1, a0a0, a1a1;
 	dig_t carry;
@@ -157,7 +157,7 @@ static void fp_sqr_karat_imp(dv_t c, fp_t a, int size, int level) {
 
 #if FP_SQR == BASIC || !defined(STRIP)
 
-void fp_sqr_basic(fp_t c, fp_t a) {
+void fp_sqr_basic(fp_t c, const fp_t a) {
 	int i;
 	dv_t t;
 
@@ -185,7 +185,7 @@ void fp_sqr_basic(fp_t c, fp_t a) {
 
 #if FP_SQR == COMBA || !defined(STRIP)
 
-void fp_sqr_comba(fp_t c, fp_t a) {
+void fp_sqr_comba(fp_t c, const fp_t a) {
 	dv_t t;
 
 	dv_null(t);
@@ -208,7 +208,7 @@ void fp_sqr_comba(fp_t c, fp_t a) {
 
 #if FP_SQR == INTEG || !defined(STRIP)
 
-void fp_sqr_integ(fp_t c, fp_t a) {
+void fp_sqr_integ(fp_t c, const fp_t a) {
 	fp_sqrm_low(c, a);
 }
 
@@ -216,7 +216,7 @@ void fp_sqr_integ(fp_t c, fp_t a) {
 
 #if FP_KARAT > 0 || !defined(STRIP)
 
-void fp_sqr_karat(fp_t c, fp_t a) {
+void fp_sqr_karat(fp_t c, const fp_t a) {
 	dv_t t;
 
 	dv_null(t);

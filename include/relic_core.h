@@ -284,8 +284,6 @@ typedef struct _ctx_t {
 	int sps[MAX_TERMS + 1];
 	/** Length of sparse prime representation. */
 	int sps_len;
-	/** Sparse representation of parameter used to generate prime. */
-	int var[MAX_TERMS + 1];
 #endif /* WITH_FP */
 
 #ifdef WITH_EP

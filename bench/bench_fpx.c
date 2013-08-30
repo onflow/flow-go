@@ -1093,14 +1093,13 @@ static void arith12(void) {
 	}
 	BENCH_END;
 
-	int l, *k = fp_param_get_sps(&l);
-	if (k != NULL) {
-		BENCH_BEGIN("fp12_exp_cyc_sps (param)") {
-			fp12_rand(a);
-			BENCH_ADD(fp12_exp_cyc_sps(c, a, k, l));
-		}
-		BENCH_END;
+	BENCH_BEGIN("fp12_exp_cyc_sps (param)") {
+		int l = MAX_TERMS + 1, k[MAX_TERMS + 1];
+		fp_param_get_sps(k, &l);
+		fp12_rand(a);
+		BENCH_ADD(fp12_exp_cyc_sps(c, a, k, l));
 	}
+	BENCH_END;
 
 	BENCH_BEGIN("fp12_frb (1)") {
 		fp12_rand(a);
@@ -1379,14 +1378,13 @@ static void arith18(void) {
 	}
 	BENCH_END;
 
-	int l, *k = fp_param_get_sps(&l);
-	if (k != NULL) {
-		BENCH_BEGIN("fp18_exp_cyc_sps (param)") {
-			fp18_rand(a);
-			BENCH_ADD(fp18_exp_cyc_sps(c, a, k, l));
-		}
-		BENCH_END;
+	BENCH_BEGIN("fp18_exp_cyc_sps (param)") {
+		int l = MAX_TERMS + 1, k[MAX_TERMS + 1];
+		fp_param_get_sps(k, &l);
+		fp18_rand(a);
+		BENCH_ADD(fp18_exp_cyc_sps(c, a, k, l));
 	}
+	BENCH_END;
 
 	BENCH_BEGIN("fp18_frb (1)") {
 		fp18_rand(a);
