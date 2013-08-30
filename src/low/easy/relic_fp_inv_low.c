@@ -47,7 +47,11 @@ void fp_invn_low(dig_t *c, const dig_t *a) {
 	e.used = FP_DIGS;
 	dv_copy(e.dp, fp_prime_get(), FP_DIGS);
 	bn_sub1_low(e.dp, e.dp, 2, FP_DIGS);
+#if AUTO == ALLOC
+	fp_exp(c, a, &e);
+#else
 	fp_exp(c, (const fp_t)a, &e);
+#endif
 
 	bn_clean(&e);
 }
