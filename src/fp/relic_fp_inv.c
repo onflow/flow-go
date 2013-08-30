@@ -268,15 +268,17 @@ void fp_inv_monty(fp_t c, const fp_t a) {
 			fp_subn_low(x1->dp, x1->dp, fp_prime_get());
 		}
 
+		dv_copy(x2->dp, fp_prime_get_conv(), FP_DIGS);
+
 		/* If k < Wt then x1 = x1 * R^2 * R^{-1} mod p. */
 		if (k <= FP_DIGS * FP_DIGIT) {
 			flag = 1;
-			fp_mulm_low(x1->dp, x1->dp, fp_prime_get_conv());
+			fp_mul(x1->dp, x1->dp, x2->dp);
 			k = k + FP_DIGS * FP_DIGIT;
 		}
 
 		/* x1 = x1 * R^2 * R^{-1} mod p. */
-		fp_mulm_low(x1->dp, x1->dp, fp_prime_get_conv());
+		fp_mul(x1->dp, x1->dp, x2->dp);
 
 		/* c = x1 * 2^(2Wt - k) * R^{-1} mod p. */
 		fp_copy(c, x1->dp);

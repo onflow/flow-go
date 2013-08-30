@@ -63,7 +63,6 @@ static int memory(void) {
 				break;
 		}
 		code = STS_OK;
-		return code;
 	}
 #else
 	dv_t a;
@@ -85,8 +84,8 @@ static int memory(void) {
 	}
 	code = STS_OK;
   end:
-	return code;
 #endif
+	return code;
 }
 
 static int copy(void) {
