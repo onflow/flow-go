@@ -62,6 +62,8 @@ static int memory(void) {
 				dv_free(a[POOL_SIZE]);
 				break;
 		}
+		code = STS_OK;
+		return code;
 	}
 #else
 	dv_t a;
@@ -81,10 +83,10 @@ static int memory(void) {
 				break;
 		}
 	}
-#endif
 	code = STS_OK;
   end:
 	return code;
+#endif
 }
 
 static int copy(void) {

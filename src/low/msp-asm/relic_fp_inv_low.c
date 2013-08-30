@@ -43,7 +43,7 @@ void fp_invn_low(dig_t *c, const dig_t *a) {
 	bn_t bna;
 	bn_t gcd;
 	bn_t bnp;
-	dig_t *p;
+	const dig_t *p;
 
 	bn_null(bnc);
 	bn_null(bna);

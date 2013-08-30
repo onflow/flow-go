@@ -507,7 +507,7 @@ static void arith(void) {
 	BENCH_BEGIN("fp_inv_sim (2)") {
 		fp_rand(f[0]);
 		fp_rand(f[1]);
-		BENCH_ADD(fp_inv_sim(f, f, 2));
+		BENCH_ADD(fp_inv_sim(f, (const fp_t *)f, 2));
 	}
 	BENCH_END;
 
