@@ -76,8 +76,8 @@
 
 void fp_rdcs_low(dig_t *c, const dig_t *a, const dig_t *m) {
 	align dig_t q[2 * FP_DIGS], _q[2 * FP_DIGS], t[2 * FP_DIGS], r[FP_DIGS];
-	int *sform, len;
-	int first, i, j, k, b0, d0, b1, d1;
+	const int *sform;
+	int len, first, i, j, k, b0, d0, b1, d1;
 
 	sform = fp_prime_get_sps(&len);
 
