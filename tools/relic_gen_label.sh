@@ -50,25 +50,25 @@ cat << PREAMBLE
 PREAMBLE
 
 REDEFIN() {
-	cat "relic_$1.h.in" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/\*//' | sed -r 's/[a-z,_0-9]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
+	cat "relic_$1.h.in" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_0-9]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
 	echo
-	cat "relic_$1.h.in" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | sed 's/\*//' | sed -r 's/[a-z,_,0-9]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
+	cat "relic_$1.h.in" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_,0-9]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
 	echo
 }
 
 REDEF() {
-	cat "relic_$1.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/\*//' | sed -r 's/[a-z,_0-9]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
+	cat "relic_$1.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/const //' | sed 's/\*//' | sed -r 's/[a-z,_0-9]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
 	echo
-	cat "relic_$1.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | sed 's/\*//' | sed -r 's/[a-z,_,0-9]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
+	cat "relic_$1.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_,0-9]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
 	echo
 }
 
 REDEF_LOW() {
-	cat "relic_$1.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/\*//' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
-	cat "low/relic_$1_low.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep -v '\}' | grep -v '^ \*' | sed 's/\*//' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
+	cat "relic_$1.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
+	cat "low/relic_$1_low.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep -v '\}' | grep -v '^ \*' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
 	echo
-	cat "relic_$1.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/\*//' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
-	cat "low/relic_$1_low.h" | grep "$1_" | grep -v define | grep -v @version | grep -v typedef | grep -v '\\' | grep -v '\}' | grep -v '^ \*' | sed 's/\*//' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
+	cat "relic_$1.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
+	cat "low/relic_$1_low.h" | grep "$1_" | grep -v define | grep -v @version | grep -v typedef | grep -v '\\' | grep -v '\}' | grep -v '^ \*' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
 	echo
 }
 

@@ -720,7 +720,7 @@
 #undef fb_rsh1_low
 #undef fb_rshb_low
 #undef fb_rshd_low
-#undef fb_lshadd_low
+#undef fb_lsha_low
 #undef fb_mul1_low
 #undef fb_muln_low
 #undef fb_muld_low
@@ -820,7 +820,7 @@
 #define fb_rsh1_low 	PREFIX(fb_rsh1_low)
 #define fb_rshb_low 	PREFIX(fb_rshb_low)
 #define fb_rshd_low 	PREFIX(fb_rshd_low)
-#define fb_lshadd_low 	PREFIX(fb_lshadd_low)
+#define fb_lsha_low 	PREFIX(fb_lsha_low)
 #define fb_mul1_low 	PREFIX(fb_mul1_low)
 #define fb_muln_low 	PREFIX(fb_muln_low)
 #define fb_muld_low 	PREFIX(fb_muld_low)
