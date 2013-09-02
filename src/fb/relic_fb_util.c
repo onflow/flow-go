@@ -151,7 +151,11 @@ int fb_bits(const fb_t a) {
 		i--;
 	}
 
-	return (i << FB_DIG_LOG) + util_bits_dig(a[i]);
+	if (i > 0) {
+		return (i << FB_DIG_LOG) + util_bits_dig(a[i]);
+	} else {
+		return util_bits_dig(a[0]);
+	}
 }
 
 void fb_set_dig(fb_t c, dig_t a) {
@@ -194,6 +198,11 @@ void fb_size(int *size, const fb_t a, int radix) {
 
 	*size = 0;
 
+	if (fb_is_zero(a)) {
+		*size = 2;
+		return;
+	}
+
 	/* Binary case. */
 	if (radix == 2) {
 		*size = fb_bits(a) + 1;
@@ -205,11 +214,6 @@ void fb_size(int *size, const fb_t a, int radix) {
 		THROW(ERR_NO_VALID);
 	}
 	l = log_radix(radix);
-
-	if (fb_is_zero(a)) {
-		*size = 2;
-		return;
-	}
 
 	TRY {
 		fb_new(t);

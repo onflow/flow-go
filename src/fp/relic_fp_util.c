@@ -108,7 +108,11 @@ int fp_bits(const fp_t a) {
 		i--;
 	}
 
-	return (i << FP_DIG_LOG) + util_bits_dig(a[i]);
+	if (i > 0) {
+		return (i << FP_DIG_LOG) + util_bits_dig(a[i]);
+	} else {
+		return util_bits_dig(a[0]);
+	}
 }
 
 void fp_set_dig(fp_t c, dig_t a) {
