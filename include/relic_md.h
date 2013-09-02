@@ -107,7 +107,7 @@ enum {
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void md_map_shone(unsigned char *hash, unsigned char *msg, int len);
+void md_map_shone(unsigned char *hash, const unsigned char *msg, int len);
 
 /**
  * Returns the internal state of the hash function.
@@ -124,7 +124,7 @@ void md_map_shone_mid(unsigned char *msg, int len, unsigned char *state);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void md_map_sh224(unsigned char *hash, unsigned char *msg, int len);
+void md_map_sh224(unsigned char *hash, const unsigned char *msg, int len);
 
 /**
  * Computes the SHA-256 hash function.
@@ -133,7 +133,7 @@ void md_map_sh224(unsigned char *hash, unsigned char *msg, int len);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void md_map_sh256(unsigned char *hash, unsigned char *msg, int len);
+void md_map_sh256(unsigned char *hash, const unsigned char *msg, int len);
 
 /**
  * Computes the SHA-384 hash function.
@@ -142,7 +142,7 @@ void md_map_sh256(unsigned char *hash, unsigned char *msg, int len);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void md_map_sh384(unsigned char *hash, unsigned char *msg, int len);
+void md_map_sh384(unsigned char *hash, const unsigned char *msg, int len);
 
 /**
  * Computes the SHA-512 hash function.
@@ -151,7 +151,7 @@ void md_map_sh384(unsigned char *hash, unsigned char *msg, int len);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void md_map_sh512(unsigned char *hash, unsigned char *msg, int len);
+void md_map_sh512(unsigned char *hash, const unsigned char *msg, int len);
 
 /**
  * Derives a key from shared secret material through the standardized KDF1
@@ -162,7 +162,8 @@ void md_map_sh512(unsigned char *hash, unsigned char *msg, int len);
  * @param[in] in				- the shared secret.
  * @param[in] in_len			- the length of the shared secret in bytes.
  */
-void md_kdf1(unsigned char *key, int key_len, unsigned char *in, int in_len);
+void md_kdf1(unsigned char *key, int key_len, const unsigned char *in,
+		int in_len);
 
 /**
  * Derives a key from shared secret material through the standardized KDF2
@@ -173,7 +174,8 @@ void md_kdf1(unsigned char *key, int key_len, unsigned char *in, int in_len);
  * @param[in] in				- the shared secret.
  * @param[in] in_len			- the length of the shared secret in bytes.
  */
-void md_kdf2(unsigned char *key, int key_len, unsigned char *in, int in_len);
+void md_kdf2(unsigned char *key, int key_len, const unsigned char *in,
+		int in_len);
 
 /**
  * Derives a mask from shared secret material through the PKCS#1 2.0 MGF1
@@ -184,6 +186,7 @@ void md_kdf2(unsigned char *key, int key_len, unsigned char *in, int in_len);
  * @param[in] in				- the shared secret.
  * @param[in] in_len			- the length of the shared secret in bytes.
  */
-void md_mgf1(unsigned char *mask, int mask_len, unsigned char *in, int in_len);
+void md_mgf1(unsigned char *mask, int mask_len, const unsigned char *in,
+		int in_len);
 
 #endif /* !RELIC_MD_H */

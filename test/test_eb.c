@@ -696,7 +696,7 @@ static int fixed(void) {
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
 			eb_mul_pre(t, p);
-			eb_mul_fix(q, t, k);
+			eb_mul_fix(q, (const eb_t *)t, k);
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
@@ -713,7 +713,7 @@ static int fixed(void) {
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
 			eb_mul_pre_basic(t, p);
-			eb_mul_fix_basic(q, t, k);
+			eb_mul_fix_basic(q, (const eb_t *)t, k);
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
@@ -731,7 +731,7 @@ static int fixed(void) {
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
 			eb_mul_pre_yaowi(t, p);
-			eb_mul_fix_yaowi(q, t, k);
+			eb_mul_fix_yaowi(q, (const eb_t *)t, k);
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
@@ -749,7 +749,7 @@ static int fixed(void) {
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
 			eb_mul_pre_nafwi(t, p);
-			eb_mul_fix_nafwi(q, t, k);
+			eb_mul_fix_nafwi(q, (const eb_t *)t, k);
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
@@ -767,7 +767,7 @@ static int fixed(void) {
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
 			eb_mul_pre_combs(t, p);
-			eb_mul_fix_combs(q, t, k);
+			eb_mul_fix_combs(q, (const eb_t *)t, k);
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
@@ -785,7 +785,7 @@ static int fixed(void) {
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
 			eb_mul_pre_combd(t, p);
-			eb_mul_fix_combd(q, t, k);
+			eb_mul_fix_combd(q, (const eb_t *)t, k);
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
@@ -803,7 +803,7 @@ static int fixed(void) {
 			bn_mod(k, k, n);
 			eb_mul(q, p, k);
 			eb_mul_pre_lwnaf(t, p);
-			eb_mul_fix_lwnaf(q, t, k);
+			eb_mul_fix_lwnaf(q, (const eb_t *)t, k);
 			eb_mul(r, p, k);
 			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;

@@ -38,7 +38,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void md_map_sh384(unsigned char *hash, unsigned char *msg, int len) {
+void md_map_sh384(unsigned char *hash, const unsigned char *msg, int len) {
 	SHA384Context ctx;
 
 	if (SHA384Reset(&ctx) != shaSuccess) {

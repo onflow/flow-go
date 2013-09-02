@@ -188,7 +188,7 @@ typedef eb_st *eb_t;
  * @param[out] A			- the point to initialize.
  */
 #if ALLOC == AUTO
-#define eb_null(A)		/* empty */
+#define eb_null(A)				/* empty */
 #else
 #define eb_null(A)		A = NULL;
 #endif
@@ -220,7 +220,7 @@ typedef eb_st *eb_t;
 	fb_new((A)->z);															\
 
 #elif ALLOC == AUTO
-#define eb_new(A)			/* empty */
+#define eb_new(A)				/* empty */
 
 #elif ALLOC == STACK
 #define eb_new(A)															\
@@ -250,7 +250,7 @@ typedef eb_st *eb_t;
 	}																		\
 
 #elif ALLOC == AUTO
-#define eb_free(A)			/* empty */
+#define eb_free(A)				/* empty */
 
 #elif ALLOC == STACK
 #define eb_free(A)															\
@@ -422,14 +422,14 @@ void eb_curve_clean(void);
  *
  * @return the a coefficient of the elliptic curve.
  */
-dig_t *eb_curve_get_a(void);
+const dig_t *eb_curve_get_a(void);
 
 /**
  * Returns the b coefficient of the currently configured binary elliptic curve.
  *
  * @return the b coefficient of the elliptic curve.
  */
-dig_t *eb_curve_get_b(void);
+const dig_t *eb_curve_get_b(void);
 
 /**
  * Returns the c coefficient of the currently configured supersingular binary
@@ -437,7 +437,7 @@ dig_t *eb_curve_get_b(void);
  *
  * @return the c coefficient of the supersingular elliptic curve.
  */
-dig_t *eb_curve_get_c(void);
+const dig_t *eb_curve_get_c(void);
 
 /**
  * Returns a optimization identifier based on the coefficient a of the curve.
@@ -486,7 +486,7 @@ void eb_curve_get_gen(eb_t g);
  *
  * @return the table.
  */
-eb_t *eb_curve_get_tab(void);
+const eb_t *eb_curve_get_tab(void);
 
 /**
  * Returns the order of the group of points in the binary elliptic curve.
@@ -533,7 +533,8 @@ void eb_curve_get_s1(bn_t s1);
  * @param[in] n				- the order of the generator.
  * @param[in] h				- the cofactor.
  */
-void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t n, bn_t h);
+void eb_curve_set_ordin(const fb_t a, const fb_t b, const eb_t g, const bn_t n,
+		const bn_t h);
 
 /**
  * Configures a new Koblitz binary elliptic curve by its coefficients and
@@ -544,7 +545,7 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t n, bn_t h);
  * @param[in] n				- the order of the generator.
  * @param[in] h				- the cofactor.
  */
-void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t n, bn_t h);
+void eb_curve_set_kbltz(const fb_t a, const eb_t g, const bn_t n, const bn_t h);
 
 /**
  * Configures a new supersingular binary elliptic curve by its coefficients and
@@ -557,7 +558,8 @@ void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t n, bn_t h);
  * @param[in] n				- the order of the generator.
  * @param[in] h				- the cofactor.
  */
-void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t n, bn_t h);
+void eb_curve_set_super(const fb_t a, const fb_t b, const fb_t c, const eb_t g,
+		const bn_t n, const bn_t h);
 
 /**
  * Configures a new binary elliptic curve by its parameter identifier.
@@ -619,7 +621,7 @@ int eb_param_level(void);
  * @param[in] p				- the point to test.
  * @return 1 if the point is at infinity, 0 otherise.
  */
-int eb_is_infty(eb_t p);
+int eb_is_infty(const eb_t p);
 
 /**
  * Assigns a binary elliptic curve point to a point at the infinity.
@@ -634,7 +636,7 @@ void eb_set_infty(eb_t p);
  * @param[out] r			- the result.
  * @param[in] p				- the binary elliptic curve point to copy.
  */
-void eb_copy(eb_t r, eb_t p);
+void eb_copy(eb_t r, const eb_t p);
 
 /**
  * Compares two binary elliptic curve points.
@@ -643,7 +645,7 @@ void eb_copy(eb_t r, eb_t p);
  * @param[in] q				- the second binary elliptic curve point.
  * @return CMP_EQ if p == q and CMP_NE if p != q.
  */
-int eb_cmp(eb_t p, eb_t q);
+int eb_cmp(const eb_t p, const eb_t q);
 
 /**
  * Assigns a random value to a binary elliptic curve point.
@@ -659,13 +661,13 @@ void eb_rand(eb_t p);
  * @param[out] rhs			- the result.
  * @param[in] p				- the point.
  */
-void eb_rhs(fb_t rhs, eb_t p);
+void eb_rhs(fb_t rhs, const eb_t p);
 
 /** Tests if a point is in the curve.
  *
  * @param[in] p				- the point to test.
  */
-int eb_is_valid(eb_t p);
+int eb_is_valid(const eb_t p);
 
 /**
  * Builds a precomputation table for multiplying a random binary elliptic point.
@@ -674,14 +676,14 @@ int eb_is_valid(eb_t p);
  * @param[in] p				- the point to multiply.
  * @param[in] w				- the window width.
  */
-void eb_tab(eb_t *t, eb_t p, int w);
+void eb_tab(eb_t *t, const eb_t p, int w);
 
 /**
  * Prints a binary elliptic curve point.
  *
  * @param[in] p				- the binary elliptic curve point to print.
  */
-void eb_print(eb_t p);
+void eb_print(const eb_t p);
 
 /**
  * Negates a binary elliptic curve point represented by affine coordinates.
@@ -689,7 +691,7 @@ void eb_print(eb_t p);
  * @param[out] r			- the result.
  * @param[in] p				- the point to negate.
  */
-void eb_neg_basic(eb_t r, eb_t p);
+void eb_neg_basic(eb_t r, const eb_t p);
 
 /**
  * Negates a binary elliptic curve point represented by projective coordinates.
@@ -697,7 +699,7 @@ void eb_neg_basic(eb_t r, eb_t p);
  * @param[out] r			- the result.
  * @param[in] p				- the point to negate.
  */
-void eb_neg_projc(eb_t r, eb_t p);
+void eb_neg_projc(eb_t r, const eb_t p);
 
 /**
  * Adds two binary elliptic curve points represented in affine coordinates.
@@ -706,7 +708,7 @@ void eb_neg_projc(eb_t r, eb_t p);
  * @param[in] p				- the first point to add.
  * @param[in] q				- the second point to add.
  */
-void eb_add_basic(eb_t r, eb_t p, eb_t q);
+void eb_add_basic(eb_t r, const eb_t p, const eb_t q);
 
 /**
  * Adds two binary elliptic curve points represented in projective coordinates.
@@ -716,7 +718,7 @@ void eb_add_basic(eb_t r, eb_t p, eb_t q);
  * @param[in] p				- the first point to add.
  * @param[in] q				- the second point to add.
  */
-void eb_add_projc(eb_t r, eb_t p, eb_t q);
+void eb_add_projc(eb_t r, const eb_t p, const eb_t q);
 
 /**
  * Subtracts a binary elliptic curve point from another, both points represented
@@ -726,7 +728,7 @@ void eb_add_projc(eb_t r, eb_t p, eb_t q);
  * @param[in] p				- the first point.
  * @param[in] q				- the second point.
  */
-void eb_sub_basic(eb_t r, eb_t p, eb_t q);
+void eb_sub_basic(eb_t r, const eb_t p, const eb_t q);
 
 /**
  * Subtracts a binary elliptic curve point from another, both points represented
@@ -736,7 +738,7 @@ void eb_sub_basic(eb_t r, eb_t p, eb_t q);
  * @param[in] p				- the first point.
  * @param[in] q				- the second point.
  */
-void eb_sub_projc(eb_t r, eb_t p, eb_t q);
+void eb_sub_projc(eb_t r, const eb_t p, const eb_t q);
 
 /**
  * Doubles a binary elliptic curve point represented in affine coordinates.
@@ -744,7 +746,7 @@ void eb_sub_projc(eb_t r, eb_t p, eb_t q);
  * @param[out] r			- the result.
  * @param[in] p				- the point to double.
  */
-void eb_dbl_basic(eb_t r, eb_t p);
+void eb_dbl_basic(eb_t r, const eb_t p);
 
 /**
  * Doubles a binary elliptic curve point represented in projective coordinates.
@@ -752,7 +754,7 @@ void eb_dbl_basic(eb_t r, eb_t p);
  * @param[out] r			- the result.
  * @param[in] p				- the point to double.
  */
-void eb_dbl_projc(eb_t r, eb_t p);
+void eb_dbl_projc(eb_t r, const eb_t p);
 
 /**
  * Halves a point represented in affine coordinates.
@@ -760,7 +762,7 @@ void eb_dbl_projc(eb_t r, eb_t p);
  * @param[out] r			- the result.
  * @param[in] p				- the point to halve.
  */
-void eb_hlv(eb_t r, eb_t p);
+void eb_hlv(eb_t r, const eb_t p);
 
 /**
  * Computes the Frobenius map of a binary elliptic curve point represented
@@ -769,7 +771,7 @@ void eb_hlv(eb_t r, eb_t p);
  * @param[out] r			- the result.
  * @param[in] p				- the point.
  */
-void eb_frb_basic(eb_t r, eb_t p);
+void eb_frb_basic(eb_t r, const eb_t p);
 
 /**
  * Computes the Frobenius map of a binary elliptic curve point represented
@@ -778,7 +780,7 @@ void eb_frb_basic(eb_t r, eb_t p);
  * @param[out] r			- the result.
  * @param[in] p				- the point.
  */
-void eb_frb_projc(eb_t r, eb_t p);
+void eb_frb_projc(eb_t r, const eb_t p);
 
 /**
  * Multiplies a binary elliptic point by an integer using the binary method.
@@ -787,7 +789,7 @@ void eb_frb_projc(eb_t r, eb_t p);
  * @param[in] p				- the point to multiply.
  * @param[in] k				- the integer.
  */
-void eb_mul_basic(eb_t r, eb_t p, bn_t k);
+void eb_mul_basic(eb_t r, const eb_t p, const bn_t k);
 
 /**
  * Multiplies a binary elliptic point by an integer using the constant-time
@@ -797,7 +799,7 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k);
  * @param[in] p				- the point to multiply.
  * @param[in] k				- the integer.
  */
-void eb_mul_lodah(eb_t r, eb_t p, bn_t k);
+void eb_mul_lodah(eb_t r, const eb_t p, const bn_t k);
 
 /**
  * Multiplies a binary elliptic point by an integer using the left-to-right
@@ -807,7 +809,7 @@ void eb_mul_lodah(eb_t r, eb_t p, bn_t k);
  * @param[in] p				- the point to multiply.
  * @param[in] k				- the integer.
  */
-void eb_mul_lwnaf(eb_t r, eb_t p, bn_t k);
+void eb_mul_lwnaf(eb_t r, const eb_t p, const bn_t k);
 
 /**
  * Multiplies a binary elliptic point by an integer using the right-to-left
@@ -817,7 +819,7 @@ void eb_mul_lwnaf(eb_t r, eb_t p, bn_t k);
  * @param[in] p				- the point to multiply.
  * @param[in] k				- the integer.
  */
-void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k);
+void eb_mul_rwnaf(eb_t r, const eb_t p, const bn_t k);
 
 /**
  * Multiplies a binary elliptic point by an integer using the halving method.
@@ -826,7 +828,7 @@ void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k);
  * @param[in] p				- the point to multiply.
  * @param[in] k				- the integer.
  */
-void eb_mul_halve(eb_t r, eb_t p, bn_t k);
+void eb_mul_halve(eb_t r, const eb_t p, const bn_t k);
 
 /**
  * Multiplies the generator of a binary elliptic curve by an integer.
@@ -834,7 +836,7 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k);
  * @param[out] r			- the result.
  * @param[in] k				- the integer.
  */
-void eb_mul_gen(eb_t r, bn_t k);
+void eb_mul_gen(eb_t r, const bn_t k);
 
 /**
  * Multiplies a binary elliptic point by a small integer.
@@ -843,7 +845,7 @@ void eb_mul_gen(eb_t r, bn_t k);
  * @param[in] p				- the point to multiply.
  * @param[in] k				- the integer.
  */
-void eb_mul_dig(eb_t r, eb_t p, dig_t k);
+void eb_mul_dig(eb_t r, const eb_t p, const dig_t k);
 
 /**
  * Builds a precomputation table for multiplying a fixed binary elliptic point
@@ -852,7 +854,7 @@ void eb_mul_dig(eb_t r, eb_t p, dig_t k);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void eb_mul_pre_basic(eb_t *t, eb_t p);
+void eb_mul_pre_basic(eb_t *t, const eb_t p);
 
 /**
  * Builds a precomputation table for multiplying a fixed binary elliptic point
@@ -861,7 +863,7 @@ void eb_mul_pre_basic(eb_t *t, eb_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void eb_mul_pre_yaowi(eb_t *t, eb_t p);
+void eb_mul_pre_yaowi(eb_t *t, const eb_t p);
 
 /**
  * Builds a precomputation table for multiplying a fixed binary elliptic point
@@ -870,7 +872,7 @@ void eb_mul_pre_yaowi(eb_t *t, eb_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void eb_mul_pre_nafwi(eb_t *t, eb_t p);
+void eb_mul_pre_nafwi(eb_t *t, const eb_t p);
 
 /**
  * Builds a precomputation table for multiplying a fixed binary elliptic point
@@ -879,7 +881,7 @@ void eb_mul_pre_nafwi(eb_t *t, eb_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void eb_mul_pre_combs(eb_t *t, eb_t p);
+void eb_mul_pre_combs(eb_t *t, const eb_t p);
 
 /**
  * Builds a precomputation table for multiplying a fixed binary elliptic point
@@ -888,7 +890,7 @@ void eb_mul_pre_combs(eb_t *t, eb_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void eb_mul_pre_combd(eb_t *t, eb_t p);
+void eb_mul_pre_combd(eb_t *t, const eb_t p);
 
 /**
  * Builds a precomputation table for multiplying a fixed binary elliptic point
@@ -897,7 +899,7 @@ void eb_mul_pre_combd(eb_t *t, eb_t p);
  * @param[out] t			- the precomputation table.
  * @param[in] p				- the point to multiply.
  */
-void eb_mul_pre_lwnaf(eb_t *t, eb_t p);
+void eb_mul_pre_lwnaf(eb_t *t, const eb_t p);
 
 /**
  * Multiplies a fixed binary elliptic point using a precomputation table and
@@ -907,7 +909,7 @@ void eb_mul_pre_lwnaf(eb_t *t, eb_t p);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void eb_mul_fix_basic(eb_t r, eb_t *t, bn_t k);
+void eb_mul_fix_basic(eb_t r, const eb_t *t, const bn_t k);
 
 /**
  * Multiplies a fixed binary elliptic point using a precomputation table and
@@ -917,7 +919,7 @@ void eb_mul_fix_basic(eb_t r, eb_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void eb_mul_fix_yaowi(eb_t r, eb_t *t, bn_t k);
+void eb_mul_fix_yaowi(eb_t r, const eb_t *t, const bn_t k);
 
 /**
  * Multiplies a fixed binary elliptic point using a precomputation table and
@@ -927,7 +929,7 @@ void eb_mul_fix_yaowi(eb_t r, eb_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void eb_mul_fix_nafwi(eb_t r, eb_t *t, bn_t k);
+void eb_mul_fix_nafwi(eb_t r, const eb_t *t, const bn_t k);
 
 /**
  * Multiplies a fixed binary elliptic point using a precomputation table and
@@ -937,7 +939,7 @@ void eb_mul_fix_nafwi(eb_t r, eb_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void eb_mul_fix_combs(eb_t r, eb_t *t, bn_t k);
+void eb_mul_fix_combs(eb_t r, const eb_t *t, const bn_t k);
 
 /**
  * Multiplies a fixed binary elliptic point using a precomputation table and
@@ -947,7 +949,7 @@ void eb_mul_fix_combs(eb_t r, eb_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void eb_mul_fix_combd(eb_t r, eb_t *t, bn_t k);
+void eb_mul_fix_combd(eb_t r, const eb_t *t, const bn_t k);
 
 /**
  * Multiplies a fixed binary elliptic point using a precomputation table and
@@ -957,7 +959,7 @@ void eb_mul_fix_combd(eb_t r, eb_t *t, bn_t k);
  * @param[in] t				- the precomputation table.
  * @param[in] k				- the integer.
  */
-void eb_mul_fix_lwnaf(eb_t r, eb_t *t, bn_t k);
+void eb_mul_fix_lwnaf(eb_t r, const eb_t *t, const bn_t k);
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously using
@@ -969,7 +971,8 @@ void eb_mul_fix_lwnaf(eb_t r, eb_t *t, bn_t k);
  * @param[in] q				- the second point to multiply.
  * @param[in] m				- the second integer,
  */
-void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
+void eb_mul_sim_basic(eb_t r, const eb_t p, const bn_t k, const eb_t q,
+		const bn_t m);
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously using
@@ -981,7 +984,8 @@ void eb_mul_sim_basic(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
  * @param[in] q				- the second point to multiply.
  * @param[in] m				- the second integer,
  */
-void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
+void eb_mul_sim_trick(eb_t r, const eb_t p, const bn_t k, const eb_t q,
+		const bn_t m);
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously using
@@ -993,7 +997,8 @@ void eb_mul_sim_trick(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
  * @param[in] q				- the second point to multiply.
  * @param[in] m				- the second integer,
  */
-void eb_mul_sim_inter(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
+void eb_mul_sim_inter(eb_t r, const eb_t p, const bn_t k, const eb_t q,
+		const bn_t m);
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously using
@@ -1005,7 +1010,8 @@ void eb_mul_sim_inter(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
  * @param[in] q				- the second point to multiply.
  * @param[in] m				- the second integer,
  */
-void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
+void eb_mul_sim_joint(eb_t r, const eb_t p, const bn_t k, const eb_t q,
+		const bn_t m);
 
 /**
  * Multiplies and adds the generator and a binary elliptic curve point
@@ -1016,7 +1022,7 @@ void eb_mul_sim_joint(eb_t r, eb_t p, bn_t k, eb_t q, bn_t m);
  * @param[in] q				- the second point to multiply.
  * @param[in] m				- the second integer.
  */
-void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t m);
+void eb_mul_sim_gen(eb_t r, const bn_t k, const eb_t q, const bn_t m);
 
 /**
  * Converts a point to affine coordinates.
@@ -1024,7 +1030,7 @@ void eb_mul_sim_gen(eb_t r, bn_t k, eb_t q, bn_t m);
  * @param[out] r			- the result.
  * @param[in] p				- the point to convert.
  */
-void eb_norm(eb_t r, eb_t p);
+void eb_norm(eb_t r, const eb_t p);
 
 /**
  * Converts multiple points to affine coordinates.
@@ -1033,7 +1039,7 @@ void eb_norm(eb_t r, eb_t p);
  * @param[in] t				- the points to convert.
  * @param[in] n				- the number of points.
  */
-void eb_norm_sim(eb_t * r, eb_t * t, int n);
+void eb_norm_sim(eb_t *r, const eb_t *t, int n);
 
 /**
  * Maps a byte array to a point in a binary elliptic curve.
@@ -1042,7 +1048,7 @@ void eb_norm_sim(eb_t * r, eb_t * t, int n);
  * @param[in] msg			- the byte array to map.
  * @param[in] len			- the array length in bytes.
  */
-void eb_map(eb_t p, unsigned char *msg, int len);
+void eb_map(eb_t p, const unsigned char *msg, int len);
 
 /**
  * Compresses a point.
@@ -1050,7 +1056,7 @@ void eb_map(eb_t p, unsigned char *msg, int len);
  * @param[out] r			- the result.
  * @param[in] p				- the point to compress.
  */
-void eb_pck(eb_t r, eb_t p);
+void eb_pck(eb_t r, const eb_t p);
 
 /**
  * Decompresses a point.
@@ -1059,6 +1065,6 @@ void eb_pck(eb_t r, eb_t p);
  * @param[in] p				- the point to decompress.
  * @return if the decompression was successful
  */
-int eb_upk(eb_t r, eb_t p);
+int eb_upk(eb_t r, const eb_t p);
 
 #endif /* !RELIC_EB_H */

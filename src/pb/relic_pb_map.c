@@ -56,7 +56,6 @@ void pb_map_init() {
 #endif
 
 #if defined(PB_PARAL) && (PB_MAP == ETATS || PB_MAP == ETATN)
-
 	int chunk = (int)ceilf((FB_BITS - 1) / (2.0 * CORES));
 
 	for (int i = 0; i < CORES; i++) {
@@ -115,6 +114,7 @@ const fb_t *pb_map_get_srt(int core) {
 }
 
 int pb_map_get_par(int core) {
+#ifdef PB_PARAL
 	int chunk = (int)ceilf((FB_BITS - 1) / (2.0 * CORES));
 
 	if (core == CORES) {
@@ -122,4 +122,7 @@ int pb_map_get_par(int core) {
 	} else {
 		return core * chunk;
 	}
+#else
+	return 0;
+#endif
 }

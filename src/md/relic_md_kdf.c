@@ -40,7 +40,8 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void md_kdf1(unsigned char *key, int key_len, unsigned char *in, int in_len) {
+void md_kdf1(unsigned char *key, int key_len, const unsigned char *in,
+		int in_len) {
 	uint32_t i, j, d;
 	unsigned char buffer[in_len + sizeof(uint32_t)];
 	unsigned char t[key_len + MD_LEN];
@@ -58,7 +59,8 @@ void md_kdf1(unsigned char *key, int key_len, unsigned char *in, int in_len) {
 	memcpy(key, t, key_len);
 }
 
-void md_kdf2(unsigned char *key, int key_len, unsigned char *in, int in_len) {
+void md_kdf2(unsigned char *key, int key_len, const unsigned char *in,
+		int in_len) {
 	uint32_t i, j, d;
 	unsigned char buffer[in_len + sizeof(uint32_t)];
 	unsigned char t[key_len + MD_LEN];

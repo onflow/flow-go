@@ -38,7 +38,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void md_map_sh512(unsigned char *hash, unsigned char *msg, int len) {
+void md_map_sh512(unsigned char *hash, const unsigned char *msg, int len) {
 	SHA512Context ctx;
 
 	if (SHA512Reset(&ctx) != shaSuccess) {

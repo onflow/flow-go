@@ -45,10 +45,10 @@
  * Doubles a point represented in affine coordinates on an ordinary binary
  * elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the point to double.
+ * @param[out] r				- the result.
+ * @param[in] p					- the point to double.
  */
-static void eb_dbl_basic_ordin(eb_t r, eb_t p) {
+static void eb_dbl_basic_ordin(eb_t r, const eb_t p) {
 	fb_t t0, t1, t2;
 
 	fb_null(t0);
@@ -117,10 +117,10 @@ static void eb_dbl_basic_ordin(eb_t r, eb_t p) {
  * Doubles a point represented in affine coordinates on a supersingular binary
  * elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the point to double.
+ * @param[out] r				- the result.
+ * @param[in] p					- the point to double.
  */
-static void eb_dbl_basic_super(eb_t r, eb_t p) {
+static void eb_dbl_basic_super(eb_t r, const eb_t p) {
 	fb_t t0, t1, t2;
 
 	fb_null(t0);
@@ -211,10 +211,10 @@ static void eb_dbl_basic_super(eb_t r, eb_t p) {
  * Doubles a point represented in projective coordinates on an ordinary binary
  * elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the point to double.
+ * @param[out] r				- the result.
+ * @param[in] p					- the point to double.
  */
-static void eb_dbl_projc_ordin(eb_t r, eb_t p) {
+static void eb_dbl_projc_ordin(eb_t r, const eb_t p) {
 	fb_t t0, t1;
 
 	fb_null(t0);
@@ -292,10 +292,10 @@ static void eb_dbl_projc_ordin(eb_t r, eb_t p) {
  * Doubles a point represented in projective coordinates on an supersingular
  * binary elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the point to double.
+ * @param[out] r				- the result.
+ * @param[in] p					- the point to double.
  */
-static void eb_dbl_projc_super(eb_t r, eb_t p) {
+static void eb_dbl_projc_super(eb_t r, const eb_t p) {
 	/* x3 = x1^4 */
 	fb_sqr(r->x, p->x);
 	fb_sqr(r->x, r->x);
@@ -332,7 +332,7 @@ static void eb_dbl_projc_super(eb_t r, eb_t p) {
 
 #if EB_ADD == BASIC || !defined(STRIP)
 
-void eb_dbl_basic(eb_t r, eb_t p) {
+void eb_dbl_basic(eb_t r, const eb_t p) {
 	if (eb_is_infty(p)) {
 		eb_set_infty(r);
 		return;
@@ -353,7 +353,7 @@ void eb_dbl_basic(eb_t r, eb_t p) {
 
 #if EB_ADD == PROJC || !defined(STRIP)
 
-void eb_dbl_projc(eb_t r, eb_t p) {
+void eb_dbl_projc(eb_t r, const eb_t p) {
 
 	if (eb_is_infty(p)) {
 		eb_set_infty(r);

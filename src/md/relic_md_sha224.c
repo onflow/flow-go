@@ -38,7 +38,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void md_map_sh224(unsigned char *hash, unsigned char *msg, int len) {
+void md_map_sh224(unsigned char *hash, const unsigned char *msg, int len) {
 	SHA224Context ctx;
 
 	if (SHA224Reset(&ctx) != shaSuccess) {

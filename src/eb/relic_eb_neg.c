@@ -40,7 +40,7 @@
 
 #if EB_ADD == BASIC || !defined(STRIP)
 
-void eb_neg_basic(eb_t r, eb_t p) {
+void eb_neg_basic(eb_t r, const eb_t p) {
 	if (eb_is_infty(p)) {
 		eb_set_infty(r);
 		return;
@@ -81,7 +81,7 @@ void eb_neg_basic(eb_t r, eb_t p) {
 
 #if EB_ADD == PROJC || !defined(STRIP)
 
-void eb_neg_projc(eb_t r, eb_t p) {
+void eb_neg_projc(eb_t r, const eb_t p) {
 	fb_t t;
 
 	fb_null(t);

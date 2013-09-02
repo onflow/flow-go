@@ -37,7 +37,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int eb_is_infty(eb_t p) {
+int eb_is_infty(const eb_t p) {
 	return (fb_is_zero(p->z) == 1);
 }
 
@@ -48,14 +48,14 @@ void eb_set_infty(eb_t p) {
 	p->norm = 1;
 }
 
-void eb_copy(eb_t r, eb_t p) {
+void eb_copy(eb_t r, const eb_t p) {
 	fb_copy(r->x, p->x);
 	fb_copy(r->y, p->y);
 	fb_copy(r->z, p->z);
 	r->norm = p->norm;
 }
 
-int eb_cmp(eb_t p, eb_t q) {
+int eb_cmp(const eb_t p, const eb_t q) {
 	if (fb_cmp(p->x, q->x) != CMP_EQ) {
 		return CMP_NE;
 	}
@@ -95,7 +95,7 @@ void eb_rand(eb_t p) {
 	}
 }
 
-void eb_rhs(fb_t rhs, eb_t p) {
+void eb_rhs(fb_t rhs, const eb_t p) {
 	fb_t t0, t1;
 
 	fb_null(t0);
@@ -171,7 +171,7 @@ void eb_rhs(fb_t rhs, eb_t p) {
 	}
 }
 
-int eb_is_valid(eb_t p) {
+int eb_is_valid(const eb_t p) {
 	eb_t t;
 	fb_t lhs;
 	int r = 0;
@@ -205,7 +205,7 @@ int eb_is_valid(eb_t p) {
 	return r;
 }
 
-void eb_mul_frb(eb_t r, eb_t p, signed char *k, int l) {
+void eb_mul_frb(eb_t r, const eb_t p, const signed char *k, int l) {
 	int i;
 	eb_t t;
 
@@ -239,7 +239,7 @@ void eb_mul_frb(eb_t r, eb_t p, signed char *k, int l) {
 	}
 }
 
-void eb_tab(eb_t *t, eb_t p, int w) {
+void eb_tab(eb_t *t, const eb_t p, int w) {
 	int u;
 
 #if defined(EB_ORDIN) || defined(EB_SUPER)
@@ -254,7 +254,7 @@ void eb_tab(eb_t *t, eb_t p, int w) {
 				eb_add(t[i], t[i - 1], t[0]);
 			}
 #if defined(EB_MIXED)
-			eb_norm_sim(t + 1, t + 1, (1 << (w - 2)) - 1);
+			eb_norm_sim(t + 1, (const eb_t *)t + 1, (1 << (w - 2)) - 1);
 #endif
 		}
 		eb_copy(t[0], p);
@@ -1011,14 +1011,14 @@ void eb_tab(eb_t *t, eb_t p, int w) {
 		}
 #if defined(EB_MIXED)
 		if (w > 2) {
-			eb_norm_sim(t + 1, t + 1, (1 << (w - 2)) - 1);
+			eb_norm_sim(t + 1, (const eb_t *)t + 1, (1 << (w - 2)) - 1);
 		}
 #endif
 	}
 #endif /* EB_KBLTZ */
 }
 
-void eb_print(eb_t p) {
+void eb_print(const eb_t p) {
 	fb_print(p->x);
 	fb_print(p->y);
 	fb_print(p->z);

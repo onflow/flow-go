@@ -51,7 +51,7 @@
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
+static void eb_mul_ltnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 	int len, i, n;
 	signed char tnaf[FB_BITS + 8], *_k, u;
 	eb_t t[1 << (EB_WIDTH - 2)];
@@ -129,7 +129,7 @@ static void eb_mul_ltnaf_imp(eb_t r, eb_t p, bn_t k) {
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void eb_mul_lnaf_imp(eb_t r, eb_t p, bn_t k) {
+static void eb_mul_lnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 	int len, i, n;
 	signed char naf[FB_BITS + 1], *_k;
 	eb_t t[1 << (EB_WIDTH - 2)];
@@ -196,7 +196,7 @@ static void eb_mul_lnaf_imp(eb_t r, eb_t p, bn_t k) {
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
+static void eb_mul_rtnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 	int len, i, n;
 	signed char tnaf[FB_BITS + 8], *_k, u;
 	eb_t t[1 << (EB_WIDTH - 2)];
@@ -509,7 +509,7 @@ static void eb_mul_rtnaf_imp(eb_t r, eb_t p, bn_t k) {
  * @param[in] p					- the point to multiply.
  * @param[in] k					- the integer.
  */
-static void eb_mul_rnaf_imp(eb_t r, eb_t p, bn_t k) {
+static void eb_mul_rnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 	int len, i, n;
 	signed char naf[FB_BITS + 1], *_k;
 	eb_t t[1 << (EB_WIDTH - 2)];
@@ -634,7 +634,7 @@ static void eb_mul_rnaf_imp(eb_t r, eb_t p, bn_t k) {
 
 #if EB_MUL == BASIC || !defined(STRIP)
 
-void eb_mul_basic(eb_t r, eb_t p, bn_t k) {
+void eb_mul_basic(eb_t r, const eb_t p, const bn_t k) {
 	int i, l;
 	eb_t t;
 
@@ -674,10 +674,10 @@ void eb_mul_basic(eb_t r, eb_t p, bn_t k) {
 
 #if EB_MUL == LODAH || !defined(STRIP)
 
-void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
+void eb_mul_lodah(eb_t r, const eb_t p, const bn_t k) {
 	int i, t;
 	dv_t x1, z1, x2, z2, r1, r2, r3, r4, r5;
-	dig_t *b;
+	const dig_t *b;
 
 	if (eb_curve_is_super()) {
 		THROW(ERR_NO_VALID);
@@ -871,7 +871,7 @@ void eb_mul_lodah(eb_t r, eb_t p, bn_t k) {
 
 #if EB_MUL == LWNAF || !defined(STRIP)
 
-void eb_mul_lwnaf(eb_t r, eb_t p, bn_t k) {
+void eb_mul_lwnaf(eb_t r, const eb_t p, const bn_t k) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
 		eb_mul_ltnaf_imp(r, p, k);
@@ -888,7 +888,7 @@ void eb_mul_lwnaf(eb_t r, eb_t p, bn_t k) {
 
 #if EB_MUL == RWNAF || !defined(STRIP)
 
-void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k) {
+void eb_mul_rwnaf(eb_t r, const eb_t p, const bn_t k) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
 		eb_mul_rtnaf_imp(r, p, k);
@@ -918,7 +918,7 @@ void eb_mul_rwnaf(eb_t r, eb_t p, bn_t k) {
 
 #if EB_MUL == HALVE || !defined(STRIP)
 
-void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
+void eb_mul_halve(eb_t r, const eb_t p, const bn_t k) {
 	int l, i, j, trc, cof;
 	signed char naf[FB_BITS + 1] = { 0 }, *_k;
 	eb_t q, s, t[1 << (EB_WIDTH - 2)];
@@ -1093,7 +1093,7 @@ void eb_mul_halve(eb_t r, eb_t p, bn_t k) {
 
 #endif
 
-void eb_mul_gen(eb_t r, bn_t k) {
+void eb_mul_gen(eb_t r, const bn_t k) {
 #ifdef EB_PRECO
 	eb_mul_fix(r, eb_curve_get_tab(), k);
 #else
@@ -1115,7 +1115,7 @@ void eb_mul_gen(eb_t r, bn_t k) {
 #endif
 }
 
-void eb_mul_dig(eb_t r, eb_t p, dig_t k) {
+void eb_mul_dig(eb_t r, const eb_t p, dig_t k) {
 	int i, l;
 	eb_t t;
 

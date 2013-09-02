@@ -38,7 +38,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void eb_pck(eb_t r, eb_t p) {
+void eb_pck(eb_t r, const eb_t p) {
 	if (eb_curve_is_super()) {
 		/* z3 = y1/c. */
 		fb_inv(r->z, eb_curve_get_c());
@@ -64,7 +64,7 @@ void eb_pck(eb_t r, eb_t p) {
 	r->norm = 1;
 }
 
-int eb_upk(eb_t r, eb_t p) {
+int eb_upk(eb_t r, const eb_t p) {
 	fb_t t0, t1;
 	int res = 0;
 

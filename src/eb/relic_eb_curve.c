@@ -198,7 +198,7 @@ void eb_curve_clean(void) {
 #endif
 }
 
-dig_t *eb_curve_get_a() {
+const dig_t *eb_curve_get_a() {
 	return core_get()->eb_a;
 }
 
@@ -206,7 +206,7 @@ int eb_curve_opt_a() {
 	return core_get()->eb_opt_a;
 }
 
-dig_t *eb_curve_get_b() {
+const dig_t *eb_curve_get_b() {
 	return core_get()->eb_b;
 }
 
@@ -214,7 +214,7 @@ int eb_curve_opt_b() {
 	return core_get()->eb_opt_b;
 }
 
-dig_t *eb_curve_get_c() {
+const dig_t *eb_curve_get_c() {
 #if defined(EB_SUPER)
 	if (core_get()->eb_is_super) {
 		return core_get()->eb_c;
@@ -278,14 +278,14 @@ void eb_curve_get_s1(bn_t s1) {
 }
 #endif
 
-eb_t *eb_curve_get_tab() {
+const eb_t *eb_curve_get_tab() {
 #if defined(EB_PRECO)
 
 	/* Return a meaningful pointer. */
 #if ALLOC == AUTO
-	return (eb_t *)*(core_get()->eb_ptr);
+	return (const eb_t *)*(core_get()->eb_ptr);
 #else
-	return core_get()->eb_ptr;
+	return (const eb_t *)core_get()->eb_ptr;
 #endif
 
 #else
@@ -296,7 +296,8 @@ eb_t *eb_curve_get_tab() {
 
 #if defined(EB_ORDIN)
 
-void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r, bn_t h) {
+void eb_curve_set_ordin(const fb_t a, const fb_t b, const eb_t g, const bn_t r,
+		const bn_t h) {
 	ctx_t *ctx = core_get();
 	fb_copy(ctx->eb_a, a);
 	fb_copy(ctx->eb_b, b);
@@ -316,12 +317,11 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r, bn_t h) {
 	}
 #endif
 
-	eb_norm(g, g);
-	eb_copy(&(ctx->eb_g), g);
+	eb_norm(&(ctx->eb_g), g);
 	bn_copy(&(ctx->eb_r), r);
 	bn_copy(&(ctx->eb_h), h);
 #if defined(EB_PRECO)
-	eb_mul_pre(eb_curve_get_tab(), &(ctx->eb_g));
+	eb_mul_pre((eb_t *)eb_curve_get_tab(), &(ctx->eb_g));
 #endif
 }
 
@@ -329,7 +329,7 @@ void eb_curve_set_ordin(fb_t a, fb_t b, eb_t g, bn_t r, bn_t h) {
 
 #if defined(EB_KBLTZ)
 
-void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r, bn_t h) {
+void eb_curve_set_kbltz(const fb_t a, const eb_t g, const bn_t r, const bn_t h) {
 	ctx_t *ctx = core_get();
 
 	ctx->eb_is_kbltz = 1;
@@ -344,12 +344,11 @@ void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r, bn_t h) {
 #if EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP)
 	compute_kbltz();
 #endif
-	eb_norm(g, g);
-	eb_copy(&(ctx->eb_g), g);
+	eb_norm(&(ctx->eb_g), g);
 	bn_copy(&(ctx->eb_r), r);
 	bn_copy(&(ctx->eb_h), h);
 #if defined(EB_PRECO)
-	eb_mul_pre(eb_curve_get_tab(), &(ctx->eb_g));
+	eb_mul_pre((eb_t *)eb_curve_get_tab(), &(ctx->eb_g));
 #endif
 }
 
@@ -357,7 +356,8 @@ void eb_curve_set_kbltz(fb_t a, eb_t g, bn_t r, bn_t h) {
 
 #if defined(EB_SUPER)
 
-void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t r, bn_t h) {
+void eb_curve_set_super(const fb_t a, const fb_t b, const fb_t c, const eb_t g,
+		const bn_t r, const bn_t h) {
 	ctx_t *ctx = core_get();
 
 	ctx->eb_is_kbltz = 0;
@@ -371,12 +371,11 @@ void eb_curve_set_super(fb_t a, fb_t b, fb_t c, eb_t g, bn_t r, bn_t h) {
 	detect_opt(&(ctx->eb_opt_b), ctx->eb_b);
 	detect_opt(&(ctx->eb_opt_c), ctx->eb_c);
 
-	eb_norm(g, g);
-	eb_copy(&(ctx->eb_g), g);
+	eb_norm(&(ctx->eb_g), g);
 	bn_copy(&(ctx->eb_r), r);
 	bn_copy(&(ctx->eb_h), h);
 #if defined(EB_PRECO)
-	eb_mul_pre(eb_curve_get_tab(), &(ctx->eb_g));
+	eb_mul_pre((eb_t *)eb_curve_get_tab(), &(ctx->eb_g));
 #endif
 }
 

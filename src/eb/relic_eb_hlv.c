@@ -38,7 +38,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void eb_hlv(eb_t r, eb_t p) {
+void eb_hlv(eb_t r, const eb_t p) {
 	fb_t l, t;
 
 	fb_null(l);

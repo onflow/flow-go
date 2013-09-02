@@ -46,11 +46,11 @@
  * Adds two points represented in affine coordinates on an ordinary binary
  * elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the first point to add.
- * @param q					- the second point to add.
+ * @param[out] r				- the result.
+ * @param[in] p					- the first point to add.
+ * @param[in] q					- the second point to add.
  */
-static void eb_add_basic_ordin(eb_t r, eb_t p, eb_t q) {
+static void eb_add_basic_ordin(eb_t r, const eb_t p, const eb_t q) {
 	fb_t t0, t1, t2;
 
 	fb_null(t0);
@@ -131,11 +131,11 @@ static void eb_add_basic_ordin(eb_t r, eb_t p, eb_t q) {
  * Adds two points represented in affine coordinates on a supersingular binary
  * elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the first point to add.
- * @param q					- the second point to add.
+ * @param[out] r				- the result.
+ * @param[in] p					- the first point to add.
+ * @param[in] q					- the second point to add.
  */
-static void eb_add_basic_super(eb_t r, eb_t p, eb_t q) {
+static void eb_add_basic_super(eb_t r, const eb_t p, const eb_t q) {
 	fb_t t0, t1, t2;
 
 	fb_null(t0);
@@ -221,11 +221,11 @@ static void eb_add_basic_super(eb_t r, eb_t p, eb_t q) {
  * Adds a point represented in affine coordinates to a point represented in
  * projective coordinates.
  *
- * @param r					- the result.
- * @param p					- the affine point.
- * @param q					- the projective point.
+ * @param[out] r				- the result.
+ * @param[in] p					- the affine point.
+ * @param[in] q					- the projective point.
  */
-static void eb_add_projc_ordin_mix(eb_t r, eb_t p, eb_t q) {
+static void eb_add_projc_ordin_mix(eb_t r, const eb_t p, const eb_t q) {
 	fb_t t0, t1, t2, t3, t4, t5;
 
 	fb_null(t0);
@@ -357,11 +357,11 @@ static void eb_add_projc_ordin_mix(eb_t r, eb_t p, eb_t q) {
  * Adds two points represented in projective coordinates on an ordinary binary
  * elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the first point to add.
- * @param q					- the second point to add.
+ * @param[out] r				- the result.
+ * @param[in] p					- the first point to add.
+ * @param[in] q					- the second point to add.
  */
-static void eb_add_projc_ordin(eb_t r, eb_t p, eb_t q) {
+static void eb_add_projc_ordin(eb_t r, const eb_t p, const eb_t q) {
 #if defined(EB_MIXED) && defined(STRIP)
 	/* If code size is a problem, leave only the mixed version. */
 	eb_add_projc_ordin_mix(r, p, q);
@@ -490,11 +490,11 @@ static void eb_add_projc_ordin(eb_t r, eb_t p, eb_t q) {
  * Adds two points represented in projective coordinates on a supersingular
  * binary elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the first point to add.
- * @param q					- the second point to add.
+ * @param[out] r				- the result.
+ * @param[in] p					- the first point to add.
+ * @param[in] q					- the second point to add.
  */
-static void eb_add_projc_super_mix(eb_t r, eb_t p, eb_t q) {
+static void eb_add_projc_super_mix(eb_t r, const eb_t p, const eb_t q) {
 	fb_t t0, t1, t2, t3, t4, t5;
 
 	fb_null(t0);
@@ -607,11 +607,11 @@ static void eb_add_projc_super_mix(eb_t r, eb_t p, eb_t q) {
  * Adds two points represented in projective coordinates on a supersingular
  * binary elliptic curve.
  *
- * @param r					- the result.
- * @param p					- the first point to add.
- * @param q					- the second point to add.
+ * @param[out] r				- the result.
+ * @param[in] p					- the first point to add.
+ * @param[in] q					- the second point to add.
  */
-static void eb_add_projc_super(eb_t r, eb_t p, eb_t q) {
+static void eb_add_projc_super(eb_t r, const eb_t p, const eb_t q) {
 #if defined(EB_MIXED) && defined(STRIP)
 	/* If code size is a problem, leave only the mixed version. */
 	eb_add_projc_super_mix(r, p, q);
@@ -727,7 +727,7 @@ static void eb_add_projc_super(eb_t r, eb_t p, eb_t q) {
 
 #if EB_ADD == BASIC || !defined(STRIP)
 
-void eb_add_basic(eb_t r, eb_t p, eb_t q) {
+void eb_add_basic(eb_t r, const eb_t p, const eb_t q) {
 	if (eb_is_infty(p)) {
 		eb_copy(r, q);
 		return;
@@ -749,7 +749,7 @@ void eb_add_basic(eb_t r, eb_t p, eb_t q) {
 #endif
 }
 
-void eb_sub_basic(eb_t r, eb_t p, eb_t q) {
+void eb_sub_basic(eb_t r, const eb_t p, const eb_t q) {
 	eb_t t;
 
 	eb_null(t);
@@ -779,7 +779,7 @@ void eb_sub_basic(eb_t r, eb_t p, eb_t q) {
 
 #if EB_ADD == PROJC || !defined(STRIP)
 
-void eb_add_projc(eb_t r, eb_t p, eb_t q) {
+void eb_add_projc(eb_t r, const eb_t p, const eb_t q) {
 	if (eb_is_infty(p)) {
 		eb_copy(r, q);
 		return;
@@ -801,7 +801,7 @@ void eb_add_projc(eb_t r, eb_t p, eb_t q) {
 #endif
 }
 
-void eb_sub_projc(eb_t r, eb_t p, eb_t q) {
+void eb_sub_projc(eb_t r, const eb_t p, const eb_t q) {
 	eb_t t;
 
 	eb_null(t);

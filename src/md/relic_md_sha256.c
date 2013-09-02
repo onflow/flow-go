@@ -38,7 +38,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void md_map_sh256(unsigned char *hash, unsigned char *msg, int len) {
+void md_map_sh256(unsigned char *hash, const unsigned char *msg, int len) {
 	SHA256Context ctx;
 
 	if (SHA256Reset(&ctx) != shaSuccess) {

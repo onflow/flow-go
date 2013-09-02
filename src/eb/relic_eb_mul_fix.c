@@ -51,7 +51,7 @@
  * @param[in] t					- the precomputed table.
  * @param[in] k					- the integer.
  */
-static void eb_mul_fix_kbltz(eb_t r, eb_t *t, bn_t k) {
+static void eb_mul_fix_kbltz(eb_t r, const eb_t *t, const bn_t k) {
 	int l, i, n;
 	signed char u, tnaf[FB_BITS + 8], *_k;
 	bn_t vm, s0, s1;
@@ -118,7 +118,7 @@ static void eb_mul_fix_kbltz(eb_t r, eb_t *t, bn_t k) {
  * @param[in] t				- the precomputed table.
  * @param[in] k					- the integer.
  */
-static void eb_mul_fix_ordin(eb_t r, eb_t *t, bn_t k) {
+static void eb_mul_fix_ordin(eb_t r, const eb_t *t, const bn_t k) {
 	int l, i, n;
 	signed char naf[FB_BITS + 1], *_k;
 
@@ -152,7 +152,7 @@ static void eb_mul_fix_ordin(eb_t r, eb_t *t, bn_t k) {
 
 #if EB_FIX == BASIC || !defined(STRIP)
 
-void eb_mul_pre_basic(eb_t *t, eb_t p) {
+void eb_mul_pre_basic(eb_t *t, const eb_t p) {
 	bn_t n;
 
 	bn_null(n);
@@ -167,7 +167,7 @@ void eb_mul_pre_basic(eb_t *t, eb_t p) {
 			eb_dbl(t[i], t[i - 1]);
 		}
 
-		eb_norm_sim(t + 1, t + 1, bn_bits(n) - 1);
+		eb_norm_sim(t + 1, (const eb_t *)t + 1, bn_bits(n) - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -177,7 +177,7 @@ void eb_mul_pre_basic(eb_t *t, eb_t p) {
 	}
 }
 
-void eb_mul_fix_basic(eb_t r, eb_t *t, bn_t k) {
+void eb_mul_fix_basic(eb_t r, const eb_t *t, const bn_t k) {
 	int i, l;
 
 	l = bn_bits(k);
@@ -196,7 +196,7 @@ void eb_mul_fix_basic(eb_t r, eb_t *t, bn_t k) {
 
 #if EB_FIX == YAOWI || !defined(STRIP)
 
-void eb_mul_pre_yaowi(eb_t *t, eb_t p) {
+void eb_mul_pre_yaowi(eb_t *t, const eb_t p) {
 	int l;
 	bn_t n;
 
@@ -217,7 +217,7 @@ void eb_mul_pre_yaowi(eb_t *t, eb_t p) {
 			}
 		}
 
-		eb_norm_sim(t + 1, t + 1, l - 1);
+		eb_norm_sim(t + 1, (const eb_t *)t + 1, l - 1);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -225,7 +225,7 @@ void eb_mul_pre_yaowi(eb_t *t, eb_t p) {
 	}
 }
 
-void eb_mul_fix_yaowi(eb_t r, eb_t *t, bn_t k) {
+void eb_mul_fix_yaowi(eb_t r, const eb_t *t, const bn_t k) {
 	int i, j, l;
 	eb_t a;
 	unsigned char win[CEIL(FB_BITS, EP_DEPTH)];
@@ -268,7 +268,7 @@ void eb_mul_fix_yaowi(eb_t r, eb_t *t, bn_t k) {
 
 #if EB_FIX == NAFWI || !defined(STRIP)
 
-void eb_mul_pre_nafwi(eb_t *t, eb_t p) {
+void eb_mul_pre_nafwi(eb_t *t, const eb_t p) {
 	bn_t n;
 
 	bn_null(n);
@@ -289,7 +289,7 @@ void eb_mul_pre_nafwi(eb_t *t, eb_t p) {
 			}
 		}
 
-		eb_norm_sim(t + 1, t + 1, l - 1);
+		eb_norm_sim(t + 1, (const eb_t *)t + 1, l - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -299,7 +299,7 @@ void eb_mul_pre_nafwi(eb_t *t, eb_t p) {
 	}
 }
 
-void eb_mul_fix_nafwi(eb_t r, eb_t *t, bn_t k) {
+void eb_mul_fix_nafwi(eb_t r, const eb_t *t, const bn_t k) {
 	int i, j, l, d, m;
 	eb_t a;
 	signed char naf[FB_BITS + 1];
@@ -360,7 +360,7 @@ void eb_mul_fix_nafwi(eb_t r, eb_t *t, bn_t k) {
 
 #if EB_FIX == COMBS || !defined(STRIP)
 
-void eb_mul_pre_combs(eb_t *t, eb_t p) {
+void eb_mul_pre_combs(eb_t *t, const eb_t p) {
 	int i, j, l;
 	bn_t ord;
 
@@ -389,7 +389,7 @@ void eb_mul_pre_combs(eb_t *t, eb_t p) {
 			}
 		}
 
-		eb_norm_sim(t + 2, t + 2, EB_TABLE_COMBS - 2);
+		eb_norm_sim(t + 2, (const eb_t *)t + 2, EB_TABLE_COMBS - 2);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -399,7 +399,7 @@ void eb_mul_pre_combs(eb_t *t, eb_t p) {
 	}
 }
 
-void eb_mul_fix_combs(eb_t r, eb_t *t, bn_t k) {
+void eb_mul_fix_combs(eb_t r, const eb_t *t, const bn_t k) {
 	int i, j, l, w, n, p0, p1;
 	bn_t ord;
 
@@ -455,7 +455,7 @@ void eb_mul_fix_combs(eb_t r, eb_t *t, bn_t k) {
 
 #if EB_FIX == COMBD || !defined(STRIP)
 
-void eb_mul_pre_combd(eb_t *t, eb_t p) {
+void eb_mul_pre_combd(eb_t *t, const eb_t p) {
 	bn_t n;
 
 	bn_null(n);
@@ -488,8 +488,9 @@ void eb_mul_pre_combd(eb_t *t, eb_t p) {
 			}
 		}
 
-		eb_norm_sim(t + 2, t + 2, (1 << EB_DEPTH) - 2);
-		eb_norm_sim(t + (1 << EB_DEPTH) + 1, t + (1 << EB_DEPTH) + 1, (1 << EB_DEPTH) - 1);
+		eb_norm_sim(t + 2, (const eb_t *)t + 2, (1 << EB_DEPTH) - 2);
+		eb_norm_sim(t + (1 << EB_DEPTH) + 1,
+				(const eb_t *)t + (1 << EB_DEPTH) + 1, (1 << EB_DEPTH) - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -499,7 +500,7 @@ void eb_mul_pre_combd(eb_t *t, eb_t p) {
 	}
 }
 
-void eb_mul_fix_combd(eb_t r, eb_t *t, bn_t k) {
+void eb_mul_fix_combd(eb_t r, const eb_t *t, const bn_t k) {
 	int i, j, d, e, w0, w1, n0, p0, p1;
 	bn_t n;
 
@@ -556,7 +557,7 @@ void eb_mul_fix_combd(eb_t r, eb_t *t, bn_t k) {
 
 #if EB_FIX == LWNAF || !defined(STRIP)
 
-void eb_mul_pre_lwnaf(eb_t *t, eb_t p) {
+void eb_mul_pre_lwnaf(eb_t *t, const eb_t p) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
 		eb_tab(t, p, EB_DEPTH);
@@ -569,7 +570,7 @@ void eb_mul_pre_lwnaf(eb_t *t, eb_t p) {
 #endif
 }
 
-void eb_mul_fix_lwnaf(eb_t r, eb_t *t, bn_t k) {
+void eb_mul_fix_lwnaf(eb_t r, const eb_t *t, const bn_t k) {
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {
 		eb_mul_fix_kbltz(r, t, k);

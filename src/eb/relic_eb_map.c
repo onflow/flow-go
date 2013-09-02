@@ -39,7 +39,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void eb_map(eb_t p, unsigned char *msg, int len) {
+void eb_map(eb_t p, const unsigned char *msg, int len) {
 	bn_t k;
 	fb_t t0, t1;
 	int i;

@@ -41,7 +41,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void md_map_shone(unsigned char *hash, unsigned char *msg, int len) {
+void md_map_shone(unsigned char *hash, const unsigned char *msg, int len) {
 	SHA1Context ctx;
 
 	if (SHA1Reset(&ctx) != shaSuccess) {
