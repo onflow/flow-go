@@ -132,7 +132,7 @@ const fb_t *pb_map_get_tab() {
 #if ALLOC == AUTO
 	return (const fb_t *)*core_get()->pb_ptr;
 #else
-	return ((const fp_t *)fb_t *)core_get()->pb_ptr;
+	return (const fb_t *)core_get()->pb_ptr;
 #endif
 }
 
