@@ -35,7 +35,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int ep_is_infty(ep_t p) {
+int ep_is_infty(const ep_t p) {
 	return (fp_is_zero(p->z) == 1);
 }
 
@@ -46,14 +46,14 @@ void ep_set_infty(ep_t p) {
 	p->norm = 1;
 }
 
-void ep_copy(ep_t r, ep_t p) {
+void ep_copy(ep_t r, const ep_t p) {
 	fp_copy(r->x, p->x);
 	fp_copy(r->y, p->y);
 	fp_copy(r->z, p->z);
 	r->norm = p->norm;
 }
 
-int ep_cmp(ep_t p, ep_t q) {
+int ep_cmp(const ep_t p, const ep_t q) {
 	if (fp_cmp(p->x, q->x) != CMP_EQ) {
 		return CMP_NE;
 	}
@@ -93,7 +93,7 @@ void ep_rand(ep_t p) {
 	}
 }
 
-void ep_rhs(fp_t rhs, ep_t p) {
+void ep_rhs(fp_t rhs, const ep_t p) {
 	fp_t t0;
 	fp_t t1;
 
@@ -154,7 +154,7 @@ void ep_rhs(fp_t rhs, ep_t p) {
 	}
 }
 
-void ep_tab(ep_t * t, ep_t p, int w) {
+void ep_tab(ep_t *t, const ep_t p, int w) {
 	if (w > 2) {
 		ep_dbl(t[0], p);
 #if defined(EP_MIXED)
@@ -165,13 +165,13 @@ void ep_tab(ep_t * t, ep_t p, int w) {
 			ep_add(t[i], t[i - 1], t[0]);
 		}
 #if defined(EP_MIXED)
-		ep_norm_sim(t + 1, t + 1, (1 << (w - 2)) - 1);
+		ep_norm_sim(t + 1, (const ep_t *)t + 1, (1 << (w - 2)) - 1);
 #endif
 	}
 	ep_copy(t[0], p);
 }
 
-int ep_is_valid(ep_t p) {
+int ep_is_valid(const ep_t p) {
 	ep_t t;
 	int r = 0;
 
@@ -193,7 +193,7 @@ int ep_is_valid(ep_t p) {
 	return r;
 }
 
-void ep_print(ep_t p) {
+void ep_print(const ep_t p) {
 	fp_print(p->x);
 	fp_print(p->y);
 	fp_print(p->z);

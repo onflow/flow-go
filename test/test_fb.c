@@ -265,11 +265,7 @@ static int addition(void) {
 		TEST_BEGIN("addition of the modulo f(z) is correct") {
 			fb_rand(a);
 			fb_poly_add(d, a);
-#if ALLOC == AUTO
 			fb_add(e, a, fb_poly_get());
-#else
-			fb_add(e, a, (const fb_t)fb_poly_get());
-#endif
 			TEST_ASSERT(fb_cmp(d, e) == CMP_EQ, end);
 		} TEST_END;
 	}
@@ -329,11 +325,7 @@ static int subtraction(void) {
 		TEST_BEGIN("subtraction of the modulo f(z) is correct") {
 			fb_rand(a);
 			fb_poly_sub(c, a);
-#if ALLOC == AUTO
 			fb_sub(d, a, fb_poly_get());
-#else
-			fb_sub(d, a, (const fb_t)fb_poly_get());
-#endif
 			TEST_ASSERT(fb_cmp(c, d) == CMP_EQ, end);
 		} TEST_END;
 
@@ -703,11 +695,7 @@ static int reduction(void) {
 			if (FB_POLYN % FB_DIGIT == 0) {
 				/* Test if a * f(z) mod f(z) == 0. */
 				fb_rand(a);
-#if AUTO == ALLOC
 				fb_mul(b, a, fb_poly_get());
-#else
-				fb_mul(b, a, (const fb_t)fb_poly_get());
-#endif
 				fb_copy(t0, b);
 				fb_copy(t0 + FB_DIGS, a);
 				fb_rdc(a, t0);

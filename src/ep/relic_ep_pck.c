@@ -35,7 +35,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void ep_pck(ep_t r, ep_t p) {
+void ep_pck(ep_t r, const ep_t p) {
 	int b = fp_get_bit(p->y, 0);
 	fp_copy(r->x, p->x);
 	fp_zero(r->y);
@@ -44,7 +44,7 @@ void ep_pck(ep_t r, ep_t p) {
 	r->norm = 1;
 }
 
-int ep_upk(ep_t r, ep_t p) {
+int ep_upk(ep_t r, const ep_t p) {
 	fp_t t;
 	int res = 0;
 

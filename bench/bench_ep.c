@@ -331,7 +331,7 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		ep_rand(p);
 		ep_mul_pre(t, p);
-		BENCH_ADD(ep_mul_fix(q, t, k));
+		BENCH_ADD(ep_mul_fix(q, (const ep_t *)t, k));
 	} BENCH_END;
 
 	for (int i = 0; i < EP_TABLE; i++) {
@@ -352,7 +352,7 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		ep_rand(p);
 		ep_mul_pre_basic(t, p);
-		BENCH_ADD(ep_mul_fix_basic(q, t, k));
+		BENCH_ADD(ep_mul_fix_basic(q, (const ep_t *)t, k));
 	} BENCH_END;
 	for (int i = 0; i < EP_TABLE_BASIC; i++) {
 		ep_free(t[i]);
@@ -373,7 +373,7 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		ep_rand(p);
 		ep_mul_pre_yaowi(t, p);
-		BENCH_ADD(ep_mul_fix_yaowi(q, t, k));
+		BENCH_ADD(ep_mul_fix_yaowi(q, (const ep_t *)t, k));
 	} BENCH_END;
 	for (int i = 0; i < EP_TABLE_YAOWI; i++) {
 		ep_free(t[i]);
@@ -394,7 +394,7 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		ep_rand(p);
 		ep_mul_pre_nafwi(t, p);
-		BENCH_ADD(ep_mul_fix_nafwi(q, t, k));
+		BENCH_ADD(ep_mul_fix_nafwi(q, (const ep_t *)t, k));
 	} BENCH_END;
 	for (int i = 0; i < EP_TABLE_NAFWI; i++) {
 		ep_free(t[i]);
@@ -415,7 +415,7 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		ep_rand(p);
 		ep_mul_pre_combs(t, p);
-		BENCH_ADD(ep_mul_fix_combs(q, t, k));
+		BENCH_ADD(ep_mul_fix_combs(q, (const ep_t *)t, k));
 	} BENCH_END;
 	for (int i = 0; i < EP_TABLE_COMBS; i++) {
 		ep_free(t[i]);
@@ -434,7 +434,7 @@ static void arith(void) {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		ep_mul_pre_combd(t, p);
-		BENCH_ADD(ep_mul_fix_combd(q, t, k));
+		BENCH_ADD(ep_mul_fix_combd(q, (const ep_t *)t, k));
 	} BENCH_END;
 	for (int i = 0; i < EP_TABLE_COMBD; i++) {
 		ep_free(t[i]);
@@ -455,7 +455,7 @@ static void arith(void) {
 		bn_mod(k, k, n);
 		ep_rand(p);
 		ep_mul_pre_lwnaf(t, p);
-		BENCH_ADD(ep_mul_fix_lwnaf(q, t, k));
+		BENCH_ADD(ep_mul_fix_lwnaf(q, (const ep_t *)t, k));
 	} BENCH_END;
 	for (int i = 0; i < EP_TABLE_LWNAF; i++) {
 		ep_free(t[i]);

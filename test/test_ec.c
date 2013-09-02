@@ -377,7 +377,7 @@ static int fixed(void) {
 			bn_mod(k, k, n);
 			ec_mul(q, p, k);
 			ec_mul_pre(t, p);
-			ec_mul_fix(q, t, k);
+			ec_mul_fix(q, (const ep_t *)t, k);
 			ec_mul(r, p, k);
 			TEST_ASSERT(ec_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;

@@ -377,7 +377,7 @@ static int fixed1(void) {
 			bn_mod(k, k, n);
 			g1_mul(q, p, k);
 			g1_mul_pre(t, p);
-			g1_mul_fix(q, t, k);
+			g1_mul_fix(q, (const g1_t *)t, k);
 			g1_mul(r, p, k);
 			TEST_ASSERT(g1_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
@@ -404,20 +404,22 @@ static int simultaneous1(void) {
 	g1_t p, q, r, s;
 	bn_t n, k, l;
 
+	bn_null(n);
+	bn_null(k);
+	bn_null(l);
 	g1_null(p);
 	g1_null(q);
 	g1_null(r);
 	g1_null(s);
 
 	TRY {
-
+		bn_new(n);
+		bn_new(k);
+		bn_new(l);
 		g1_new(p);
 		g1_new(q);
 		g1_new(r);
 		g1_new(s);
-		bn_new(n);
-		bn_new(k);
-		bn_new(l);
 
 		g1_get_gen(p);
 		g1_get_ord(n);
@@ -452,13 +454,13 @@ static int simultaneous1(void) {
 	}
 	code = STS_OK;
   end:
+	bn_free(n);
+	bn_free(k);
+	bn_free(l);
 	g1_free(p);
 	g1_free(q);
 	g1_free(r);
 	g1_free(s);
-	bn_free(n);
-	bn_free(k);
-	bn_free(l);
 	return code;
 }
 

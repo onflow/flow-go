@@ -46,7 +46,7 @@
  * @param[in] p				- the first point to add.
  * @param[in] q				- the second point to add.
  */
-static void ep_add_basic_imp(ep_t r, fp_t s, ep_t p, ep_t q) {
+static void ep_add_basic_imp(ep_t r, fp_t s, const ep_t p, const ep_t q) {
 	fp_t t0, t1, t2;
 
 	fp_null(t0);
@@ -123,7 +123,7 @@ static void ep_add_basic_imp(ep_t r, fp_t s, ep_t p, ep_t q) {
  * @param[in] p				- the projective point.
  * @param[in] q				- the affine point.
  */
-static void ep_add_projc_mix(ep_t r, ep_t p, ep_t q) {
+static void ep_add_projc_mix(ep_t r, const ep_t p, const ep_t q) {
 	fp_t t0, t1, t2, t3, t4, t5, t6;
 
 	fp_null(t0);
@@ -243,7 +243,7 @@ static void ep_add_projc_mix(ep_t r, ep_t p, ep_t q) {
  * @param[in] p				- the first point to add.
  * @param[in] q				- the second point to add.
  */
-static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
+static void ep_add_projc_imp(ep_t r, const ep_t p, const ep_t q) {
 #if defined(EP_MIXED) && defined(STRIP)
 	/* If code size is a problem, leave only the mixed version. */
 	ep_add_projc_mix(r, p, q);
@@ -373,7 +373,7 @@ static void ep_add_projc_imp(ep_t r, ep_t p, ep_t q) {
 
 #if EP_ADD == BASIC || !defined(STRIP)
 
-void ep_add_basic(ep_t r, ep_t p, ep_t q) {
+void ep_add_basic(ep_t r, const ep_t p, const ep_t q) {
 	if (ep_is_infty(p)) {
 		ep_copy(r, q);
 		return;
@@ -387,7 +387,7 @@ void ep_add_basic(ep_t r, ep_t p, ep_t q) {
 	ep_add_basic_imp(r, NULL, p, q);
 }
 
-void ep_add_slp_basic(ep_t r, fp_t s, ep_t p, ep_t q) {
+void ep_add_slp_basic(ep_t r, fp_t s, const ep_t p, const ep_t q) {
 	if (ep_is_infty(p)) {
 		ep_copy(r, q);
 		return;
@@ -401,7 +401,7 @@ void ep_add_slp_basic(ep_t r, fp_t s, ep_t p, ep_t q) {
 	ep_add_basic_imp(r, s, p, q);
 }
 
-void ep_sub_basic(ep_t r, ep_t p, ep_t q) {
+void ep_sub_basic(ep_t r, const ep_t p, const ep_t q) {
 	ep_t t;
 
 	ep_null(t);
@@ -431,7 +431,7 @@ void ep_sub_basic(ep_t r, ep_t p, ep_t q) {
 
 #if EP_ADD == PROJC || !defined(STRIP)
 
-void ep_add_projc(ep_t r, ep_t p, ep_t q) {
+void ep_add_projc(ep_t r, const ep_t p, const ep_t q) {
 	if (ep_is_infty(p)) {
 		ep_copy(r, q);
 		return;
@@ -445,7 +445,7 @@ void ep_add_projc(ep_t r, ep_t p, ep_t q) {
 	ep_add_projc_imp(r, p, q);
 }
 
-void ep_sub_projc(ep_t r, ep_t p, ep_t q) {
+void ep_sub_projc(ep_t r, const ep_t p, const ep_t q) {
 	ep_t t;
 
 	ep_null(t);

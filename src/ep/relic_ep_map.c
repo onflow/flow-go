@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void ep_map(ep_t p, unsigned char *msg, int len) {
+void ep_map(ep_t p, const unsigned char *msg, int len) {
 	bn_t k;
 	fp_t t;
 	unsigned char digest[MD_LEN];

@@ -422,14 +422,14 @@ void eb_curve_clean(void);
  *
  * @return the a coefficient of the elliptic curve.
  */
-const dig_t *eb_curve_get_a(void);
+dig_t *eb_curve_get_a(void);
 
 /**
  * Returns the b coefficient of the currently configured binary elliptic curve.
  *
  * @return the b coefficient of the elliptic curve.
  */
-const dig_t *eb_curve_get_b(void);
+dig_t *eb_curve_get_b(void);
 
 /**
  * Returns the c coefficient of the currently configured supersingular binary
@@ -437,7 +437,7 @@ const dig_t *eb_curve_get_b(void);
  *
  * @return the c coefficient of the supersingular elliptic curve.
  */
-const dig_t *eb_curve_get_c(void);
+dig_t *eb_curve_get_c(void);
 
 /**
  * Returns a optimization identifier based on the coefficient a of the curve.

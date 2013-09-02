@@ -179,7 +179,7 @@ static void arith1(void) {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		g1_mul_pre(t, p);
-		BENCH_ADD(g1_mul_fix(q, t, k));
+		BENCH_ADD(g1_mul_fix(q, (const g1_t *)t, k));
 	}
 	BENCH_END;
 

@@ -39,7 +39,7 @@
 
 #if defined(EP_KBLTZ)
 
-static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
+static void ep_mul_glv_imp(ep_t r, const ep_t p, const bn_t k) {
 	int l, l0, l1, i, n0, n1, s0, s1;
 	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
 	bn_t n, k0, k1, v1[3], v2[3];
@@ -150,7 +150,7 @@ static void ep_mul_glv_imp(ep_t r, ep_t p, bn_t k) {
 
 #if defined(EP_ORDIN) || defined(EP_SUPER)
 
-static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
+static void ep_mul_naf_imp(ep_t r, const ep_t p, const bn_t k) {
 	int l, i, n;
 	signed char naf[FP_BITS + 1], *_k;
 	ep_t t[1 << (EP_WIDTH - 2)];
@@ -206,7 +206,7 @@ static void ep_mul_naf_imp(ep_t r, ep_t p, bn_t k) {
 
 #if defined(EP_ORDIN) || defined(EP_SUPER)
 
-static void ep_mul_reg_imp(ep_t r, ep_t p, bn_t k) {
+static void ep_mul_reg_imp(ep_t r, const ep_t p, const bn_t k) {
 	int l, i, j, n;
 	signed char reg[CEIL(FP_BITS + 1, EP_WIDTH - 1)], *_k;
 	ep_t t[1 << (EP_WIDTH - 2)];
@@ -267,7 +267,7 @@ static void ep_mul_reg_imp(ep_t r, ep_t p, bn_t k) {
 
 #if EP_MUL == BASIC || !defined(STRIP)
 
-void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
+void ep_mul_basic(ep_t r, const ep_t p, const bn_t k) {
 	int i, l;
 	ep_t t;
 
@@ -304,7 +304,7 @@ void ep_mul_basic(ep_t r, ep_t p, bn_t k) {
 
 #if EP_MUL == SLIDE || !defined(STRIP)
 
-void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
+void ep_mul_slide(ep_t r, const ep_t p, const bn_t k) {
 	ep_t t[1 << (EP_WIDTH - 1)], q;
 	int i, j, l;
 	unsigned char win[FP_BITS + 1];
@@ -336,7 +336,7 @@ void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
 		}
 
 #if defined(EP_MIXED)
-		ep_norm_sim(t + 1, t + 1, (1 << (EP_WIDTH - 1)) - 1);
+		ep_norm_sim(t + 1, (const ep_t *)t + 1, (1 << (EP_WIDTH - 1)) - 1);
 #endif
 
 		ep_set_infty(q);
@@ -370,7 +370,7 @@ void ep_mul_slide(ep_t r, ep_t p, bn_t k) {
 
 #if EP_MUL == MONTY || !defined(STRIP)
 
-void ep_mul_monty(ep_t r, ep_t p, bn_t k) {
+void ep_mul_monty(ep_t r, const ep_t p, const bn_t k) {
 	ep_t t[2];
 	dig_t buf;
 	int bitcnt, digidx, j;
@@ -425,7 +425,7 @@ void ep_mul_monty(ep_t r, ep_t p, bn_t k) {
 
 #if EP_MUL == LWNAF || !defined(STRIP)
 
-void ep_mul_lwnaf(ep_t r, ep_t p, bn_t k) {
+void ep_mul_lwnaf(ep_t r, const ep_t p, const bn_t k) {
 #if defined(EP_KBLTZ)
 	if (ep_curve_is_kbltz()) {
 		ep_mul_glv_imp(r, p, k);
@@ -442,7 +442,7 @@ void ep_mul_lwnaf(ep_t r, ep_t p, bn_t k) {
 
 #if EP_MUL == LWREG || !defined(STRIP)
 
-void ep_mul_lwreg(ep_t r, ep_t p, bn_t k) {
+void ep_mul_lwreg(ep_t r, const ep_t p, const bn_t k) {
 #if defined(EP_KBLTZ)
 	if (ep_curve_is_kbltz()) {
 		ep_mul_glv_imp(r, p, k);
@@ -457,7 +457,7 @@ void ep_mul_lwreg(ep_t r, ep_t p, bn_t k) {
 
 #endif
 
-void ep_mul_gen(ep_t r, bn_t k) {
+void ep_mul_gen(ep_t r, const bn_t k) {
 #ifdef EP_PRECO
 	ep_mul_fix(r, ep_curve_get_tab(), k);
 #else
@@ -479,7 +479,7 @@ void ep_mul_gen(ep_t r, bn_t k) {
 #endif
 }
 
-void ep_mul_dig(ep_t r, ep_t p, dig_t k) {
+void ep_mul_dig(ep_t r, const ep_t p, dig_t k) {
 	int i, l;
 	ep_t t;
 

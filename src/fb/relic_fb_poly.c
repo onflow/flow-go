@@ -330,7 +330,7 @@ void fb_poly_init(void) {
 void fb_poly_clean(void) {
 }
 
-const dig_t *fb_poly_get(void) {
+dig_t *fb_poly_get(void) {
 	return core_get()->fb_poly;
 }
 

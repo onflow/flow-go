@@ -43,7 +43,7 @@
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-void ep_norm_imp(ep_t r, ep_t p, int inverted) {
+void ep_norm_imp(ep_t r, const ep_t p, int inverted) {
 	if (!p->norm) {
 		fp_t t0, t1;
 
@@ -84,7 +84,7 @@ void ep_norm_imp(ep_t r, ep_t p, int inverted) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void ep_norm(ep_t r, ep_t p) {
+void ep_norm(ep_t r, const ep_t p) {
 	if (ep_is_infty(p)) {
 		ep_set_infty(r);
 		return;
@@ -100,7 +100,7 @@ void ep_norm(ep_t r, ep_t p) {
 #endif /* EP_ADD == PROJC */
 }
 
-void ep_norm_sim(ep_t *r, ep_t *t, int n) {
+void ep_norm_sim(ep_t *r, const ep_t *t, int n) {
 	int i;
 	fp_t a[n];
 
@@ -117,11 +117,13 @@ void ep_norm_sim(ep_t *r, ep_t *t, int n) {
 		fp_inv_sim(a, (const fp_t *)a, n);
 
 		for (i = 0; i < n; i++) {
-			fp_copy(t[i]->z, a[i]);
+			fp_copy(r[i]->x, t[i]->x);
+			fp_copy(r[i]->y, t[i]->y);
+			fp_copy(r[i]->z, a[i]);
 		}
 
 		for (i = 0; i < n; i++) {
-			ep_norm_imp(r[i], t[i], 1);
+			ep_norm_imp(r[i], r[i], 1);
 		}
 	}
 	CATCH_ANY {

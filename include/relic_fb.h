@@ -409,7 +409,7 @@ void fb_poly_clean(void);
  *
  * @return the irreducible polynomial.
  */
-const dig_t *fb_poly_get(void);
+dig_t *fb_poly_get(void);
 
 /**
  * Configures the irreducible polynomial of the binary field as a dense

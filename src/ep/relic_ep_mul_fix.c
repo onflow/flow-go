@@ -45,7 +45,7 @@
  * @param[in] t					- the precomputed table.
  * @param[in] k					- the integer.
  */
-static void ep_mul_fix_ordin(ep_t r, ep_t *t, bn_t k) {
+static void ep_mul_fix_ordin(ep_t r, const ep_t *t, const bn_t k) {
 	int l, i, n;
 	signed char naf[FP_BITS + 1], *_k;
 
@@ -84,7 +84,7 @@ static void ep_mul_fix_ordin(ep_t r, ep_t *t, bn_t k) {
  * @param[in] t					- the precomputed table.
  * @param[in] k					- the integer.
  */
-void ep_mul_combs_kbltz(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_combs_kbltz(ep_t r, const ep_t *t, const bn_t k) {
 	int i, j, l, w0, w1, n0, n1, p0, p1, s0, s1;
 	bn_t n, k0, k1, v1[3], v2[3];
 	ep_t u;
@@ -186,7 +186,7 @@ void ep_mul_combs_kbltz(ep_t r, ep_t *t, bn_t k) {
  * @param[in] t					- the precomputed table.
  * @param[in] k					- the integer.
  */
-void ep_mul_combs_ordin(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_combs_ordin(ep_t r, const ep_t *t, const bn_t k) {
 	int i, j, l, w, n0, p0, p1;
 	bn_t n;
 
@@ -248,7 +248,7 @@ void ep_mul_combs_ordin(ep_t r, ep_t *t, bn_t k) {
 
 #if EP_FIX == BASIC || !defined(STRIP)
 
-void ep_mul_pre_basic(ep_t *t, ep_t p) {
+void ep_mul_pre_basic(ep_t *t, const ep_t p) {
 	bn_t n;
 
 	bn_null(n);
@@ -263,7 +263,7 @@ void ep_mul_pre_basic(ep_t *t, ep_t p) {
 			ep_dbl(t[i], t[i - 1]);
 		}
 
-		ep_norm_sim(t + 1, t + 1, bn_bits(n) - 1);
+		ep_norm_sim(t + 1, (const ep_t *)t + 1, bn_bits(n) - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -273,7 +273,7 @@ void ep_mul_pre_basic(ep_t *t, ep_t p) {
 	}
 }
 
-void ep_mul_fix_basic(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_fix_basic(ep_t r, const ep_t *t, const bn_t k) {
 	int i, l;
 
 	l = bn_bits(k);
@@ -292,7 +292,7 @@ void ep_mul_fix_basic(ep_t r, ep_t *t, bn_t k) {
 
 #if EP_FIX == YAOWI || !defined(STRIP)
 
-void ep_mul_pre_yaowi(ep_t *t, ep_t p) {
+void ep_mul_pre_yaowi(ep_t *t, const ep_t p) {
 	int l;
 	bn_t n;
 
@@ -313,7 +313,7 @@ void ep_mul_pre_yaowi(ep_t *t, ep_t p) {
 			}
 		}
 
-		ep_norm_sim(t + 1, t + 1, l - 1);
+		ep_norm_sim(t + 1, (const ep_t *)t + 1, l - 1);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -321,7 +321,7 @@ void ep_mul_pre_yaowi(ep_t *t, ep_t p) {
 	}
 }
 
-void ep_mul_fix_yaowi(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_fix_yaowi(ep_t r, const ep_t *t, const bn_t k) {
 	int i, j, l;
 	ep_t a;
 	unsigned char win[CEIL(FP_BITS, EP_DEPTH)];
@@ -359,7 +359,7 @@ void ep_mul_fix_yaowi(ep_t r, ep_t *t, bn_t k) {
 
 #if EP_FIX == NAFWI || !defined(STRIP)
 
-void ep_mul_pre_nafwi(ep_t *t, ep_t p) {
+void ep_mul_pre_nafwi(ep_t *t, const ep_t p) {
 	int l;
 	bn_t n;
 
@@ -380,7 +380,7 @@ void ep_mul_pre_nafwi(ep_t *t, ep_t p) {
 			}
 		}
 
-		ep_norm_sim(t + 1, t + 1, l - 1);
+		ep_norm_sim(t + 1, (const ep_t *)t + 1, l - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -390,7 +390,7 @@ void ep_mul_pre_nafwi(ep_t *t, ep_t p) {
 	}
 }
 
-void ep_mul_fix_nafwi(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_fix_nafwi(ep_t r, const ep_t *t, const bn_t k) {
 	int i, j, l, d, m;
 	ep_t a;
 	signed char naf[FP_BITS + 1];
@@ -451,7 +451,7 @@ void ep_mul_fix_nafwi(ep_t r, ep_t *t, bn_t k) {
 
 #if EP_FIX == COMBS || !defined(STRIP)
 
-void ep_mul_pre_combs(ep_t *t, ep_t p) {
+void ep_mul_pre_combs(ep_t *t, const ep_t p) {
 	int i, j, l;
 	bn_t n;
 
@@ -487,7 +487,7 @@ void ep_mul_pre_combs(ep_t *t, ep_t p) {
 			}
 		}
 
-		ep_norm_sim(t + 2, t + 2, EP_TABLE_COMBS - 2);
+		ep_norm_sim(t + 2, (const ep_t *)t + 2, EP_TABLE_COMBS - 2);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -497,7 +497,7 @@ void ep_mul_pre_combs(ep_t *t, ep_t p) {
 	}
 }
 
-void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_fix_combs(ep_t r, const ep_t *t, const bn_t k) {
 #if defined(EP_KBLTZ)
 	if (ep_curve_is_kbltz()) {
 		ep_mul_combs_kbltz(r, t, k);
@@ -513,7 +513,7 @@ void ep_mul_fix_combs(ep_t r, ep_t *t, bn_t k) {
 
 #if EP_FIX == COMBD || !defined(STRIP)
 
-void ep_mul_pre_combd(ep_t *t, ep_t p) {
+void ep_mul_pre_combd(ep_t *t, const ep_t p) {
 	int i, j, d, e;
 	bn_t n;
 
@@ -549,9 +549,9 @@ void ep_mul_pre_combd(ep_t *t, ep_t p) {
 			}
 		}
 
-		ep_norm_sim(t + 2, t + 2, (1 << EP_DEPTH) - 2);
-		ep_norm_sim(t + (1 << EP_DEPTH) + 1, t + (1 << EP_DEPTH) + 1,
-				(1 << EP_DEPTH) - 1);
+		ep_norm_sim(t + 2, (const ep_t *)t + 2, (1 << EP_DEPTH) - 2);
+		ep_norm_sim(t + (1 << EP_DEPTH) + 1,
+				(const ep_t *)t + (1 << EP_DEPTH) + 1, (1 << EP_DEPTH) - 1);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -561,7 +561,7 @@ void ep_mul_pre_combd(ep_t *t, ep_t p) {
 	}
 }
 
-void ep_mul_fix_combd(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_fix_combd(ep_t r, const ep_t *t, const bn_t k) {
 	int i, j, d, e, w0, w1, n0, p0, p1;
 	bn_t n;
 
@@ -617,11 +617,11 @@ void ep_mul_fix_combd(ep_t r, ep_t *t, bn_t k) {
 
 #if EP_FIX == LWNAF || !defined(STRIP)
 
-void ep_mul_pre_lwnaf(ep_t *t, ep_t p) {
+void ep_mul_pre_lwnaf(ep_t *t, const ep_t p) {
 	ep_tab(t, p, EP_DEPTH);
 }
 
-void ep_mul_fix_lwnaf(ep_t r, ep_t *t, bn_t k) {
+void ep_mul_fix_lwnaf(ep_t r, const ep_t *t, const bn_t k) {
 	ep_mul_fix_ordin(r, t, k);
 }
 #endif

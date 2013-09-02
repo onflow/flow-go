@@ -184,7 +184,7 @@ static void arith(void) {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		ec_mul_pre(t, p);
-		BENCH_ADD(ec_mul_fix(q, t, k));
+		BENCH_ADD(ec_mul_fix(q, (const ec_t *)t, k));
 	}
 	BENCH_END;
 

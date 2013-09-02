@@ -45,7 +45,7 @@
  * @param[out] s			- the slope.
  * @param[in] p				- the point to double.
  */
-static void ep_dbl_basic_imp(ep_t r, fp_t s, ep_t p) {
+static void ep_dbl_basic_imp(ep_t r, fp_t s, const ep_t p) {
 	fp_t t0, t1, t2;
 
 	fp_null(t0);
@@ -128,7 +128,7 @@ static void ep_dbl_basic_imp(ep_t r, fp_t s, ep_t p) {
  * @param r					- the result.
  * @param p					- the point to double.
  */
-void ep_dbl_projc_imp(ep_t r, ep_t p) {
+void ep_dbl_projc_imp(ep_t r, const ep_t p) {
 	fp_t t0, t1, t2, t3, t4, t5;
 
 	fp_null(t1);
@@ -337,7 +337,7 @@ void ep_dbl_projc_imp(ep_t r, ep_t p) {
 
 #if EP_ADD == BASIC || !defined(STRIP)
 
-void ep_dbl_basic(ep_t r, ep_t p) {
+void ep_dbl_basic(ep_t r, const ep_t p) {
 	if (ep_is_infty(p)) {
 		ep_set_infty(r);
 		return;
@@ -345,7 +345,7 @@ void ep_dbl_basic(ep_t r, ep_t p) {
 	ep_dbl_basic_imp(r, NULL, p);
 }
 
-void ep_dbl_slp_basic(ep_t r, fp_t s, ep_t p) {
+void ep_dbl_slp_basic(ep_t r, fp_t s, const ep_t p) {
 	if (ep_is_infty(p)) {
 		ep_set_infty(r);
 		return;
@@ -358,7 +358,7 @@ void ep_dbl_slp_basic(ep_t r, fp_t s, ep_t p) {
 
 #if EP_ADD == PROJC || !defined(STRIP)
 
-void ep_dbl_projc(ep_t r, ep_t p) {
+void ep_dbl_projc(ep_t r, const ep_t p) {
 	if (ep_is_infty(p)) {
 		ep_set_infty(r);
 		return;

@@ -38,8 +38,8 @@
 /**
  * Detects an optimization based on the curve coefficients.
  *
- * @param opt		- the resulting optimization.
- * @param a			- the curve coefficient.
+ * @param[out] opt		- the resulting optimization.
+ * @param[in] a			- the curve coefficient.
  */
 static void detect_opt(int *opt, fp_t a) {
 	fp_t t;
@@ -198,14 +198,14 @@ void ep_curve_get_cof(bn_t h) {
 	bn_copy(h, &core_get()->ep_h);
 }
 
-ep_t *ep_curve_get_tab() {
+const ep_t *ep_curve_get_tab() {
 #if defined(EP_PRECO)
 
 	/* Return a meaningful pointer. */
 #if ALLOC == AUTO
-	return (ep_t *)*core_get()->ep_ptr;
+	return (const ep_t *)*core_get()->ep_ptr;
 #else
-	return core_get()->ep_ptr;
+	return (const ep_t *)core_get()->ep_ptr;
 #endif
 
 #else
@@ -216,7 +216,8 @@ ep_t *ep_curve_get_tab() {
 
 #if defined(EP_ORDIN)
 
-void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h) {
+void ep_curve_set_ordin(const fp_t a, const fp_t b, const ep_t g, const bn_t r,
+		const bn_t h) {
 	ctx_t *ctx = core_get();
 	ctx->ep_is_kbltz = 0;
 	ctx->ep_is_super = 0;
@@ -227,13 +228,12 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h) {
 	detect_opt(&(ctx->ep_opt_a), ctx->ep_a);
 	detect_opt(&(ctx->ep_opt_b), ctx->ep_b);
 
-	ep_norm(g, g);
-	ep_copy(&(ctx->ep_g), g);
+	ep_norm(&(ctx->ep_g), g);
 	bn_copy(&(ctx->ep_r), r);
 	bn_copy(&(ctx->ep_h), h);
 
 #if defined(EP_PRECO)
-	ep_mul_pre(ep_curve_get_tab(), &(ctx->ep_g));
+	ep_mul_pre((ep_t *)ep_curve_get_tab(), &(ctx->ep_g));
 #endif
 }
 
@@ -241,7 +241,8 @@ void ep_curve_set_ordin(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h) {
 
 #if defined(EP_SUPER)
 
-void ep_curve_set_super(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h) {
+void ep_curve_set_super(const fp_t a, const fp_t b, const ep_t g, const bn_t r,
+		const bn_t h) {
 	ctx_t *ctx = core_get();
 	ctx->ep_is_kbltz = 0;
 	ctx->ep_is_super = 1;
@@ -252,13 +253,12 @@ void ep_curve_set_super(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h) {
 	detect_opt(&(ctx->ep_opt_a), ctx->ep_a);
 	detect_opt(&(ctx->ep_opt_b), ctx->ep_b);
 
-	ep_norm(g, g);
-	ep_copy(&(ctx->ep_g), g);
+	ep_norm(&(ctx->ep_g), g);
 	bn_copy(&(ctx->ep_r), r);
 	bn_copy(&(ctx->ep_h), h);
 
 #if defined(EP_PRECO)
-	ep_mul_pre(ep_curve_get_tab(), &(ctx->ep_g));
+	ep_mul_pre((ep_t *)ep_curve_get_tab(), &(ctx->ep_g));
 #endif
 }
 
@@ -266,7 +266,8 @@ void ep_curve_set_super(fp_t a, fp_t b, ep_t g, bn_t r, bn_t h) {
 
 #if defined(EP_KBLTZ)
 
-void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, bn_t h, fp_t beta, bn_t l) {
+void ep_curve_set_kbltz(const fp_t b, const ep_t g, const bn_t r, const bn_t h,
+		const fp_t beta, const bn_t l) {
 	int bits = bn_bits(r);
 	ctx_t *ctx = core_get();
 	ctx->ep_is_kbltz = 1;
@@ -278,40 +279,41 @@ void ep_curve_set_kbltz(fp_t b, ep_t g, bn_t r, bn_t h, fp_t beta, bn_t l) {
 	detect_opt(&(ctx->ep_opt_a), ctx->ep_a);
 	detect_opt(&(ctx->ep_opt_b), ctx->ep_b);
 
-	ep_norm(g, g);
-	ep_copy(&(ctx->ep_g), g);
-	bn_copy(&(ctx->ep_r), r);
-	bn_copy(&(ctx->ep_h), h);
-
 #if EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP)
 	fp_copy(ctx->beta, beta);
-	bn_gcd_ext_mid(&(ctx->ep_v1[1]), &(ctx->ep_v1[2]), &(ctx->ep_v2[1]), &(ctx->ep_v2[2]), l, r);
+	bn_gcd_ext_mid(&(ctx->ep_v1[1]), &(ctx->ep_v1[2]), &(ctx->ep_v2[1]),
+			&(ctx->ep_v2[2]), l, r);
 	/* l = v1[1] * v2[2] - v1[2] * v2[1], r = l / 2. */
 	bn_mul(&(ctx->ep_v1[0]), &(ctx->ep_v1[1]), &(ctx->ep_v2[2]));
 	bn_mul(&(ctx->ep_v2[0]), &(ctx->ep_v1[2]), &(ctx->ep_v2[1]));
-	bn_sub(l, &(ctx->ep_v1[0]), &(ctx->ep_v2[0]));
-	bn_hlv(r, l);
+	bn_sub(&(ctx->ep_r), &(ctx->ep_v1[0]), &(ctx->ep_v2[0]));
+	bn_hlv(&(ctx->ep_r), &(ctx->ep_r));
 	/* v1[0] = round(v2[2] * 2^|n| / l). */
 	bn_lsh(&(ctx->ep_v1[0]), &(ctx->ep_v2[2]), bits + 1);
 	if (bn_sign(&(ctx->ep_v1[0])) == BN_POS) {
-		bn_add(&(ctx->ep_v1[0]), &(ctx->ep_v1[0]), r);
+		bn_add(&(ctx->ep_v1[0]), &(ctx->ep_v1[0]), &(ctx->ep_r));
 	} else {
-		bn_sub(&(ctx->ep_v1[0]), &(ctx->ep_v1[0]), r);
+		bn_sub(&(ctx->ep_v1[0]), &(ctx->ep_v1[0]), &(ctx->ep_r));
 	}
-	bn_div(&(ctx->ep_v1[0]), &(ctx->ep_v1[0]), l);
+	bn_dbl(&(ctx->ep_r), &(ctx->ep_r));
+	bn_div(&(ctx->ep_v1[0]), &(ctx->ep_v1[0]), &(ctx->ep_r));
 	/* v2[0] = round(v1[2] * 2^|n| / l). */
 	bn_lsh(&(ctx->ep_v2[0]), &(ctx->ep_v1[2]), bits + 1);
 	if (bn_sign(&(ctx->ep_v2[0])) == BN_POS) {
-		bn_add(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), r);
+		bn_add(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), &(ctx->ep_r));
 	} else {
-		bn_sub(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), r);
+		bn_sub(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), &(ctx->ep_r));
 	}
-	bn_div(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), l);
+	bn_div(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), &(ctx->ep_r));
 	bn_neg(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]));
 #endif
 
+	ep_norm(&(ctx->ep_g), g);
+	bn_copy(&(ctx->ep_r), r);
+	bn_copy(&(ctx->ep_h), h);
+
 #if defined(EP_PRECO)
-	ep_mul_pre(ep_curve_get_tab(), &(ctx->ep_g));
+	ep_mul_pre((ep_t *)ep_curve_get_tab(), &(ctx->ep_g));
 #endif
 }
 
