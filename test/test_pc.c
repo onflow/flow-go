@@ -866,20 +866,22 @@ static int simultaneous2(void) {
 	g2_t p, q, r, s;
 	bn_t n, k, l;
 
+	bn_null(n);
+	bn_null(k);
+	bn_null(l);
 	g2_null(p);
 	g2_null(q);
 	g2_null(r);
 	g2_null(s);
 
 	TRY {
-
+		bn_new(n);
+		bn_new(k);
+		bn_new(l);
 		g2_new(p);
 		g2_new(q);
 		g2_new(r);
 		g2_new(s);
-		bn_new(n);
-		bn_new(k);
-		bn_new(l);
 
 		g2_get_gen(p);
 		g2_get_ord(n);
@@ -914,13 +916,13 @@ static int simultaneous2(void) {
 	}
 	code = STS_OK;
   end:
+	bn_free(n);
+	bn_free(k);
+	bn_free(l);
 	g2_free(p);
 	g2_free(q);
 	g2_free(r);
 	g2_free(s);
-	bn_free(n);
-	bn_free(k);
-	bn_free(l);
 	return code;
 }
 
