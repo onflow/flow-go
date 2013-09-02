@@ -43,7 +43,7 @@
 
 #if FB_SLV == BASIC || !defined(STRIP)
 
-void fb_slv_basic(fb_t c, fb_t a) {
+void fb_slv_basic(fb_t c, const fb_t a) {
 	int i;
 	fb_t t0;
 
@@ -75,7 +75,7 @@ void fb_slv_basic(fb_t c, fb_t a) {
 
 #if FB_SLV == QUICK || !defined(STRIP)
 
-void fb_slv_quick(fb_t c, fb_t a) {
+void fb_slv_quick(fb_t c, const fb_t a) {
 	fb_slvn_low(c, a);
 	fb_add_dig(c, c, fb_trc(c));
 }

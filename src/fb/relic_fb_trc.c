@@ -37,7 +37,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fb_trc_basic(fb_t a) {
+dig_t fb_trc_basic(const fb_t a) {
 	int r = 0;
 	fb_t t, u;
 
@@ -68,6 +68,6 @@ dig_t fb_trc_basic(fb_t a) {
 	return r;
 }
 
-dig_t fb_trc_quick(fb_t a) {
+dig_t fb_trc_quick(const fb_t a) {
 	return fb_trcn_low(a);
 }

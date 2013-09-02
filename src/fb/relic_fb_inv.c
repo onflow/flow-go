@@ -42,7 +42,7 @@
 
 #if FB_INV == BASIC || !defined(STRIP)
 
-void fb_inv_basic(fb_t c, fb_t a) {
+void fb_inv_basic(fb_t c, const fb_t a) {
 	fb_t t, u, v;
 	int i, x;
 
@@ -104,7 +104,7 @@ void fb_inv_basic(fb_t c, fb_t a) {
 
 #if FB_INV == BINAR || !defined(STRIP)
 
-void fb_inv_binar(fb_t c, fb_t a) {
+void fb_inv_binar(fb_t c, const fb_t a) {
 	int lu, lv;
 	dv_t u, v, g1, g2;
 
@@ -205,7 +205,7 @@ void fb_inv_binar(fb_t c, fb_t a) {
 
 #if FB_INV == EXGCD || !defined(STRIP)
 
-void fb_inv_exgcd(fb_t c, fb_t a) {
+void fb_inv_exgcd(fb_t c, const fb_t a) {
 	int j, d, lu, lv, lt, l1, l2, bu, bv;
 	dv_t _u, _v, _g1, _g2;
 	dig_t *t = NULL, *u = NULL, *v = NULL, *g1 = NULL, *g2 = NULL, carry;
@@ -317,7 +317,7 @@ void fb_inv_exgcd(fb_t c, fb_t a) {
 
 #if FB_INV == ALMOS || !defined(STRIP)
 
-void fb_inv_almos(fb_t c, fb_t a) {
+void fb_inv_almos(fb_t c, const fb_t a) {
 	int lu, lv, lt;
 	dv_t _b, _d, _u, _v;
 	dig_t *t = NULL, *u = NULL, *v = NULL, *b = NULL, *d = NULL;
@@ -408,9 +408,9 @@ void fb_inv_almos(fb_t c, fb_t a) {
 
 #if FB_INV == ITOHT || !defined(STRIP)
 
-void fb_inv_itoht(fb_t c, fb_t a) {
-	int i, x, y;
-	int len, *chain = fb_poly_get_chain(&len);
+void fb_inv_itoht(fb_t c, const fb_t a) {
+	int i, x, y, len;
+	const int *chain = fb_poly_get_chain(&len);
 	int u[len + 1];
 	fb_t table[len + 1];
 
@@ -467,7 +467,7 @@ void fb_inv_itoht(fb_t c, fb_t a) {
 
 #if FB_INV == BRUCH || !defined(STRIP)
 
-void fb_inv_bruch(fb_t c, fb_t a) {
+void fb_inv_bruch(fb_t c, const fb_t a) {
 	fb_t _r, _s, _u, _v;
 	dig_t *r = NULL, *s = NULL, *t = NULL, *u = NULL, *v = NULL;
 	int delta = 0;
@@ -534,12 +534,12 @@ void fb_inv_bruch(fb_t c, fb_t a) {
 
 #if FB_INV == LOWER || !defined(STRIP)
 
-void fb_inv_lower(fb_t c, fb_t a) {
+void fb_inv_lower(fb_t c, const fb_t a) {
 	fb_invn_low(c, a);
 }
 #endif
 
-void fb_inv_sim(fb_t *c, fb_t *a, int n) {
+void fb_inv_sim(fb_t *c, const fb_t *a, int n) {
 	int i;
 	fb_t u, t[n];
 

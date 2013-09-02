@@ -41,19 +41,19 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_add(fb_t c, fb_t a, fb_t b) {
+void fb_add(fb_t c, const fb_t a, const fb_t b) {
 	fb_addn_low(c, a, b);
 }
 
-void fb_add_dig(fb_t c, fb_t a, dig_t b) {
+void fb_add_dig(fb_t c, const fb_t a, dig_t b) {
 	fb_add1_low(c, a, b);
 }
 
-void fb_sub(fb_t c, fb_t a, fb_t b) {
+void fb_sub(fb_t c, const fb_t a, const fb_t b) {
 	fb_addn_low(c, a, b);
 }
 
-void fb_sub_dig(fb_t c, fb_t a, dig_t b) {
+void fb_sub_dig(fb_t c, const fb_t a, dig_t b) {
 	fb_add1_low(c, a, b);
 }
 

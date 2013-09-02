@@ -409,7 +409,7 @@ void fb_poly_clean(void);
  *
  * @return the irreducible polynomial.
  */
-dig_t *fb_poly_get(void);
+const dig_t *fb_poly_get(void);
 
 /**
  * Configures the irreducible polynomial of the binary field as a dense
@@ -417,7 +417,7 @@ dig_t *fb_poly_get(void);
  *
  * @param[in] f				- the new irreducible polynomial.
  */
-void fb_poly_set_dense(fb_t f);
+void fb_poly_set_dense(const fb_t f);
 
 /**
  * Configures a trinomial as the irreducible polynomial by its non-zero
@@ -449,7 +449,7 @@ dig_t *fb_poly_get_srz(void);
  *
  * @return the precomputed result.
  */
-dig_t *fb_poly_tab_srz(int i);
+const dig_t *fb_poly_tab_srz(int i);
 
 /**
  * Returns a table for accelerating repeated squarings.
@@ -457,7 +457,7 @@ dig_t *fb_poly_tab_srz(int i);
  * @param the number of the table.
  * @return the precomputed result.
  */
-fb_t *fb_poly_tab_sqr(int i);
+const fb_t *fb_poly_tab_sqr(int i);
 
 /**
  * Returns an addition chain for (FB_BITS - 1).
@@ -466,7 +466,7 @@ fb_t *fb_poly_tab_sqr(int i);
  *
  * @return a pointer to the addition chain.
  */
-int *fb_poly_get_chain(int *len);
+const int *fb_poly_get_chain(int *len);
 
 /**
  * Returns the non-zero coefficients of the configured trinomial or pentanomial.
@@ -494,7 +494,7 @@ void fb_poly_get_trc(int *a, int *b, int *c);
  *
  * @return the table of half-traces.
  */
-dig_t *fb_poly_get_slv(void);
+const dig_t *fb_poly_get_slv(void);
 
 /**
  * Assigns a standard irreducible polynomial as modulo of the binary field.
@@ -520,7 +520,7 @@ void fb_param_print(void);
  * @param[out] c			- the destination.
  * @param[in] a				- the binary field element.
  */
-void fb_poly_add(fb_t c, fb_t a);
+void fb_poly_add(fb_t c, const fb_t a);
 
 /**
  * Subtracts the irreducible polynomial from a binary field element. Computes
@@ -529,7 +529,7 @@ void fb_poly_add(fb_t c, fb_t a);
  * @param[out] c			- the destination.
  * @param[in] a				- the binary field element.
  */
-void fb_poly_sub(fb_t c, fb_t a);
+void fb_poly_sub(fb_t c, const fb_t a);
 
 /**
  * Copies the second argument to the first argument.
@@ -537,7 +537,7 @@ void fb_poly_sub(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to copy.
  */
-void fb_copy(fb_t c, fb_t a);
+void fb_copy(fb_t c, const fb_t a);
 
 /**
  * Negates a binary field element.
@@ -545,7 +545,7 @@ void fb_copy(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[out] a			- the binary field element to negate.
  */
-void fb_neg(fb_t c, fb_t a);
+void fb_neg(fb_t c, const fb_t a);
 
 /**
  * Assigns zero to a binary field element.
@@ -560,7 +560,7 @@ void fb_zero(fb_t a);
  * @param[in] a				- the binary field element to test.
  * @return 1 if the argument is zero, 0 otherwise.
  */
-int fb_is_zero(fb_t a);
+int fb_is_zero(const fb_t a);
 
 /**
  * Tests if the bit in a given position is non-zero on a binary field element.
@@ -569,7 +569,7 @@ int fb_is_zero(fb_t a);
  * @param[in] bit			- the bit position.
  * @return 0 is the bit is zero, not zero otherwise.
  */
-int fb_test_bit(fb_t a, int bit);
+int fb_test_bit(const fb_t a, int bit);
 
 /**
  * Reads the bit stored in the given position on a binary field element.
@@ -578,7 +578,7 @@ int fb_test_bit(fb_t a, int bit);
  * @param[in] bit			- the bit position.
  * @return the bit value.
  */
-int fb_get_bit(fb_t a, int bit);
+int fb_get_bit(const fb_t a, int bit);
 
 /**
  * Stores a bit in a given position on a binary field element.
@@ -605,7 +605,7 @@ void fb_set_dig(fb_t c, dig_t a);
  * @param[in] a				- the binary field element.
  * @return the number of bits.
  */
-int fb_bits(fb_t a);
+int fb_bits(const fb_t a);
 
 /**
  * Assigns a random value to a binary field element.
@@ -619,7 +619,7 @@ void fb_rand(fb_t a);
  *
  * @param[in] a				- the binary field element to print.
  */
-void fb_print(fb_t a);
+void fb_print(const fb_t a);
 
 /**
  * Returns the number of digits in radix necessary to store a binary field
@@ -630,7 +630,7 @@ void fb_print(fb_t a);
  * @param[in] radix			- the radix.
  * @throw ERR_NO_VALID		- if the radix is invalid.
  */
-void fb_size(int *size, fb_t a, int radix);
+void fb_size(int *size, const fb_t a, int radix);
 
 /**
  * Reads a binary field element from a string in a given radix. The radix must
@@ -656,7 +656,7 @@ void fb_read(fb_t a, const char *str, int len, int radix);
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  * @throw ERR_NO_VALID		- if the radix is invalid.
  */
-void fb_write(char *str, int len, fb_t a, int radix);
+void fb_write(char *str, int len, const fb_t a, int radix);
 
 /**
  * Returns the result of a comparison between two binary field elements.
@@ -665,7 +665,7 @@ void fb_write(char *str, int len, fb_t a, int radix);
  * @param[in] b				- the second binary field element.
  * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
-int fb_cmp(fb_t a, fb_t b);
+int fb_cmp(const fb_t a, const fb_t b);
 
 /**
  * Returns the result of a comparison between a binary field element
@@ -675,7 +675,7 @@ int fb_cmp(fb_t a, fb_t b);
  * @param[in] b				- the small binary field element.
  * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
  */
-int fb_cmp_dig(fb_t a, dig_t b);
+int fb_cmp_dig(const fb_t a, dig_t b);
 
 /**
  * Adds two binary field elements. Computes c = a + b.
@@ -684,7 +684,7 @@ int fb_cmp_dig(fb_t a, dig_t b);
  * @param[in] a				- the first binary field element to add.
  * @param[in] b				- the second binary field element to add.
  */
-void fb_add(fb_t c, fb_t a, fb_t b);
+void fb_add(fb_t c, const fb_t a, const fb_t b);
 
 /**
  * Adds a binary field element and a small binary field element.
@@ -694,7 +694,7 @@ void fb_add(fb_t c, fb_t a, fb_t b);
  * @param[in] a				- the binary field element to add.
  * @param[in] b				- the small binary field element to add.
  */
-void fb_add_dig(fb_t c, fb_t a, dig_t b);
+void fb_add_dig(fb_t c, const fb_t a, dig_t b);
 
 /**
  * Subtracts a binary field element from another. Computes c = a - b.
@@ -703,7 +703,7 @@ void fb_add_dig(fb_t c, fb_t a, dig_t b);
  * @param[in] a				- the binary field element.
  * @param[in] b				- the binary field element to subtract.
  */
-void fb_sub(fb_t c, fb_t a, fb_t b);
+void fb_sub(fb_t c, const fb_t a, const fb_t b);
 
 /**
  * Subtracts a small binary field element from a binary field element.
@@ -713,7 +713,7 @@ void fb_sub(fb_t c, fb_t a, fb_t b);
  * @param[in] a				- the binary field element.
  * @param[in] b				- the small binary field element to subtract.
  */
-void fb_sub_dig(fb_t c, fb_t a, dig_t b);
+void fb_sub_dig(fb_t c, const fb_t a, dig_t b);
 
 /**
  * Multiples two binary field elements using Shift-and-add multiplication.
@@ -722,7 +722,7 @@ void fb_sub_dig(fb_t c, fb_t a, dig_t b);
  * @param[in] a				- the first binary field element to multiply.
  * @param[in] b				- the second binary field element to multiply.
  */
-void fb_mul_basic(fb_t c, fb_t a, fb_t b);
+void fb_mul_basic(fb_t c, const fb_t a, const fb_t b);
 
 /**
  * Multiples two binary field elements using multiplication integrated with
@@ -732,7 +732,7 @@ void fb_mul_basic(fb_t c, fb_t a, fb_t b);
  * @param[in] a				- the first binary field element to multiply.
  * @param[in] b				- the second binary field element to multiply.
  */
-void fb_mul_integ(fb_t c, fb_t a, fb_t b);
+void fb_mul_integ(fb_t c, const fb_t a, const fb_t b);
 
 /**
  * Multiples two binary field elements using Left-to-right comb multiplication.
@@ -741,7 +741,7 @@ void fb_mul_integ(fb_t c, fb_t a, fb_t b);
  * @param[in] a				- the first binary field element to multiply.
  * @param[in] b				- the second binary field element to multiply.
  */
-void fb_mul_lcomb(fb_t c, fb_t a, fb_t b);
+void fb_mul_lcomb(fb_t c, const fb_t a, const fb_t b);
 
 /**
  * Multiples two binary field elements using Right-to-left comb multiplication.
@@ -750,7 +750,7 @@ void fb_mul_lcomb(fb_t c, fb_t a, fb_t b);
  * @param[in] a				- the first binary field element to multiply.
  * @param[in] b				- the second binary field element to multiply.
  */
-void fb_mul_rcomb(fb_t c, fb_t a, fb_t b);
+void fb_mul_rcomb(fb_t c, const fb_t a, const fb_t b);
 
 /**
  * Multiples two binary field elements using López-Dahab multiplication.
@@ -759,7 +759,7 @@ void fb_mul_rcomb(fb_t c, fb_t a, fb_t b);
  * @param[in] a				- the first binary field element to multiply.
  * @param[in] b				- the second binary field element to multiply.
  */
-void fb_mul_lodah(fb_t c, fb_t a, fb_t b);
+void fb_mul_lodah(fb_t c, const fb_t a, const fb_t b);
 
 /**
  * Multiplies a binary field element by a small binary field element.
@@ -768,7 +768,7 @@ void fb_mul_lodah(fb_t c, fb_t a, fb_t b);
  * @param[in] a				- the binary field element.
  * @param[in] b				- the small binary field element to multiply.
  */
-void fb_mul_dig(fb_t c, fb_t a, dig_t b);
+void fb_mul_dig(fb_t c, const fb_t a, dig_t b);
 
 /**
  * Multiples two binary field elements using Karatsuba multiplication.
@@ -777,7 +777,7 @@ void fb_mul_dig(fb_t c, fb_t a, dig_t b);
  * @param[in] a				- the first binary field element.
  * @param[in] b				- the second binary field element.
  */
-void fb_mul_karat(fb_t c, fb_t a, fb_t b);
+void fb_mul_karat(fb_t c, const fb_t a, const fb_t b);
 
 /**
  * Squares a binary field element using bit-manipulation squaring.
@@ -785,7 +785,7 @@ void fb_mul_karat(fb_t c, fb_t a, fb_t b);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to square.
  */
-void fb_sqr_basic(fb_t c, fb_t a);
+void fb_sqr_basic(fb_t c, const fb_t a);
 
 /**
  * Squares a binary field element with integrated modular reduction.
@@ -793,7 +793,7 @@ void fb_sqr_basic(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to square.
  */
-void fb_sqr_integ(fb_t c, fb_t a);
+void fb_sqr_integ(fb_t c, const fb_t a);
 
 /**
  * Squares a binary field element using table-based squaring.
@@ -801,7 +801,7 @@ void fb_sqr_integ(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to square.
  */
-void fb_sqr_table(fb_t c, fb_t a);
+void fb_sqr_table(fb_t c, const fb_t a);
 
 /**
  * Shifts a binary field element to the left. Computes c = a * z^bits mod f(z).
@@ -810,7 +810,7 @@ void fb_sqr_table(fb_t c, fb_t a);
  * @param[in] a				- the binary field element to shift.
  * @param[in] bits			- the number of bits to shift.
  */
-void fb_lsh(fb_t c, fb_t a, int bits);
+void fb_lsh(fb_t c, const fb_t a, int bits);
 
 /**
 * Shifts a binary field element to the right. Computes c = a / (z^bits).
@@ -819,7 +819,7 @@ void fb_lsh(fb_t c, fb_t a, int bits);
  * @param[in] a				- the binary field element to shift.
  * @param[in] bits			- the number of bits to shift.
  */
-void fb_rsh(fb_t c, fb_t a, int bits);
+void fb_rsh(fb_t c, const fb_t a, int bits);
 
 /**
  * Reduces a multiplication result modulo an irreducible polynomial using
@@ -845,7 +845,7 @@ void fb_rdc_quick(fb_t c, dv_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to take a square root.
  */
-void fb_srt_basic(fb_t c, fb_t a);
+void fb_srt_basic(fb_t c, const fb_t a);
 
 /**
  * Extracts the square root of a binary field element using a fast square root
@@ -854,7 +854,7 @@ void fb_srt_basic(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to take a square root.
  */
-void fb_srt_quick(fb_t c, fb_t a);
+void fb_srt_quick(fb_t c, const fb_t a);
 
 /**
  * Computes the trace of a binary field element using repeated squaring.
@@ -863,7 +863,7 @@ void fb_srt_quick(fb_t c, fb_t a);
  * @param[in] a				- the binary field element.
  * @return the trace of the binary field element.
  */
-dig_t fb_trc_basic(fb_t a);
+dig_t fb_trc_basic(const fb_t a);
 
 /**
  * Computes the trace of a binary field element using a fast trace computation
@@ -872,7 +872,7 @@ dig_t fb_trc_basic(fb_t a);
  * @param[in] a				- the binary field element.
  * @return the trace of the binary field element.
  */
-dig_t fb_trc_quick(fb_t a);
+dig_t fb_trc_quick(const fb_t a);
 
 /**
  * Inverts a binary field element using Fermat's Little Theorem.
@@ -880,7 +880,7 @@ dig_t fb_trc_quick(fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to invert.
  */
-void fb_inv_basic(fb_t c, fb_t a);
+void fb_inv_basic(fb_t c, const fb_t a);
 
 /**
  * Inverts a binary field element using the binary method.
@@ -888,7 +888,7 @@ void fb_inv_basic(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to invert.
  */
-void fb_inv_binar(fb_t c, fb_t a);
+void fb_inv_binar(fb_t c, const fb_t a);
 
 /**
  * Inverts a binary field element using the Extended Euclidean algorithm.
@@ -896,7 +896,7 @@ void fb_inv_binar(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to invert.
  */
-void fb_inv_exgcd(fb_t c, fb_t a);
+void fb_inv_exgcd(fb_t c, const fb_t a);
 
 /**
  * Inverts a binary field element using the Almost Inverse algorithm.
@@ -904,7 +904,7 @@ void fb_inv_exgcd(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to invert.
  */
-void fb_inv_almos(fb_t c, fb_t a);
+void fb_inv_almos(fb_t c, const fb_t a);
 
 /**
  * Inverts a binary field element using Itoh-Tsuji inversion.
@@ -912,7 +912,7 @@ void fb_inv_almos(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to invert.
  */
-void fb_inv_itoht(fb_t c, fb_t a);
+void fb_inv_itoht(fb_t c, const fb_t a);
 
 /**
  * Inverts a binary field element using the hardware-friendly
@@ -921,7 +921,7 @@ void fb_inv_itoht(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to invert.
  */
-void fb_inv_bruch(fb_t c, fb_t a);
+void fb_inv_bruch(fb_t c, const fb_t a);
 
 /**
  * Inverts a binary field element using a direct call to the lower layer.
@@ -929,7 +929,7 @@ void fb_inv_bruch(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to invert.
  */
-void fb_inv_lower(fb_t c, fb_t a);
+void fb_inv_lower(fb_t c, const fb_t a);
 
 /**
  * Inverts multiple binary field elements.
@@ -938,7 +938,7 @@ void fb_inv_lower(fb_t c, fb_t a);
  * @param[in] a				- the binary field elements to invert.
  * @param[in] n				- the number of elements.
  */
-void fb_inv_sim(fb_t * c, fb_t * a, int n);
+void fb_inv_sim(fb_t *c, const fb_t *a, int n);
 
 /**
  * Exponentiates a binary field element through consecutive squaring. Computes
@@ -948,7 +948,7 @@ void fb_inv_sim(fb_t * c, fb_t * a, int n);
  * @param[in] a				- the basis.
  * @param[in] b				- the exponent.
  */
-void fb_exp_2b(fb_t c, fb_t a, int b);
+void fb_exp_2b(fb_t c, const fb_t a, int b);
 
 /**
  * Exponentiates a binary field element using the binary
@@ -958,7 +958,7 @@ void fb_exp_2b(fb_t c, fb_t a, int b);
  * @param[in] a				- the basis.
  * @param[in] b				- the exponent.
  */
-void fb_exp_basic(fb_t c, fb_t a, bn_t b);
+void fb_exp_basic(fb_t c, const fb_t a, const bn_t b);
 
 /**
  * Exponentiates a binary field element using the sliding window method.
@@ -967,7 +967,7 @@ void fb_exp_basic(fb_t c, fb_t a, bn_t b);
  * @param[in] a				- the basis.
  * @param[in] b				- the exponent.
  */
-void fb_exp_slide(fb_t c, fb_t a, bn_t b);
+void fb_exp_slide(fb_t c, const fb_t a, const bn_t b);
 
 /**
  * Exponentiates a binary field element using the constant-time Montgomery
@@ -977,7 +977,7 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b);
  * @param[in] a				- the basis.
  * @param[in] b				- the exponent.
  */
-void fb_exp_monty(fb_t c, fb_t a, bn_t b);
+void fb_exp_monty(fb_t c, const fb_t a, const bn_t b);
 
 /**
  * Solves a quadratic equation for a, Tr(a) = 0 by repeated squarings and
@@ -986,7 +986,7 @@ void fb_exp_monty(fb_t c, fb_t a, bn_t b);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to solve.
  */
-void fb_slv_basic(fb_t c, fb_t a);
+void fb_slv_basic(fb_t c, const fb_t a);
 
 /**
  * Solves a quadratic equation for a, Tr(a) = 0 with precomputed half-traces.
@@ -994,7 +994,7 @@ void fb_slv_basic(fb_t c, fb_t a);
  * @param[out] c			- the result.
  * @param[in] a				- the binary field element to solve.
  */
-void fb_slv_quick(fb_t c, fb_t a);
+void fb_slv_quick(fb_t c, const fb_t a);
 
 /**
  * Computes the iterated squaring/square-root of a binary field element by
@@ -1004,10 +1004,10 @@ void fb_slv_quick(fb_t c, fb_t a);
  * @param[in] a				- the basis.
  * @param[in] b				- the exponent.
  */
-void fb_itr_basic(fb_t c, fb_t a, int b);
+void fb_itr_basic(fb_t c, const fb_t a, int b);
 
 /**
- * Precomputed a table for iterated squaring/square-root of a binary field
+ * Precomputes a table for iterated squaring/square-root of a binary field
  * element.
  *
  * @param[out] t			- the precomputed table.
@@ -1023,6 +1023,6 @@ void fb_itr_pre_quick(fb_t *t, int b);
  * @param[in] a				- the basis.
  * @param[in] t				- the precomputed table.
  */
-void fb_itr_quick(fb_t c, fb_t a, fb_t *t);
+void fb_itr_quick(fb_t c, const fb_t a, const fb_t *t);
 
 #endif /* !RELIC_FB_H */

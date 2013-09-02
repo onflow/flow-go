@@ -77,13 +77,13 @@ static int log_radix(int radix) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_copy(fb_t c, fb_t a) {
+void fb_copy(fb_t c, const fb_t a) {
 	for (int i = 0; i < FB_DIGS; i++) {
 		c[i] = a[i];
 	}
 }
 
-void fb_neg(fb_t c, fb_t a) {
+void fb_neg(fb_t c, const fb_t a) {
 	int i;
 
 	for (i = 0; i < FB_DIGS; i++, c++, a++) {
@@ -99,7 +99,7 @@ void fb_zero(fb_t a) {
 	}
 }
 
-int fb_is_zero(fb_t a) {
+int fb_is_zero(const fb_t a) {
 	int i;
 
 	for (i = 0; i < FB_DIGS; i++) {
@@ -110,7 +110,7 @@ int fb_is_zero(fb_t a) {
 	return 1;
 }
 
-int fb_test_bit(fb_t a, int bit) {
+int fb_test_bit(const fb_t a, int bit) {
 	int d;
 	dig_t mask;
 
@@ -120,7 +120,7 @@ int fb_test_bit(fb_t a, int bit) {
 	return (a[d] & mask) != 0;
 }
 
-int fb_get_bit(fb_t a, int bit) {
+int fb_get_bit(const fb_t a, int bit) {
 	int d;
 	dig_t mask;
 
@@ -146,7 +146,7 @@ void fb_set_bit(fb_t a, int bit, int value) {
 	}
 }
 
-int fb_bits(fb_t a) {
+int fb_bits(const fb_t a) {
 	int i = FB_DIGS - 1;
 
 	while (a[i] == 0) {
@@ -173,7 +173,7 @@ void fb_rand(fb_t a) {
 	}
 }
 
-void fb_print(fb_t a) {
+void fb_print(const fb_t a) {
 	int i;
 
 	/* Suppress possible unused parameter warning. */
@@ -188,7 +188,7 @@ void fb_print(fb_t a) {
 	util_print("\n");
 }
 
-void fb_size(int *size, fb_t a, int radix) {
+void fb_size(int *size, const fb_t a, int radix) {
 	int digits = 0, l;
 	fb_t t;
 
@@ -267,7 +267,7 @@ void fb_read(fb_t a, const char *str, int len, int radix) {
 	}
 }
 
-void fb_write(char *str, int len, fb_t a, int radix) {
+void fb_write(char *str, int len, const fb_t a, int radix) {
 	fb_t t;
 	int d, l, i, j;
 	char c;

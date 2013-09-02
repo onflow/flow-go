@@ -51,7 +51,7 @@
  * @param b					- the second binary field element.
  * @param size				- the number of digits to multiply.
  */
-static void fb_mul_basic_imp(dig_t *c, dig_t *a, dig_t *b, int size) {
+static void fb_mul_basic_imp(dig_t *c, const dig_t *a, const dig_t *b, int size) {
 	int i;
 	dv_t s;
 
@@ -94,7 +94,7 @@ static void fb_mul_basic_imp(dig_t *c, dig_t *a, dig_t *b, int size) {
  * @param b					- the second binary field element.
  * @param size				- the number of digits to multiply.
  */
-static void fb_mul_lcomb_imp(dig_t *c, dig_t *a, dig_t *b, int size) {
+static void fb_mul_lcomb_imp(dig_t *c, const dig_t *a, const dig_t *b, int size) {
 	dv_zero(c, 2 * size);
 
 	for (int i = FB_DIGIT - 1; i >= 0; i--) {
@@ -119,7 +119,7 @@ static void fb_mul_lcomb_imp(dig_t *c, dig_t *a, dig_t *b, int size) {
  * @param b					- the second binary field element.
  * @param size				- the number of digits to multiply.
  */
-static void fb_mul_rcomb_imp(dig_t *c, dig_t *a, dig_t *b, int size) {
+static void fb_mul_rcomb_imp(dig_t *c, const dig_t *a, const dig_t *b, int size) {
 	dv_t _b;
 
 	dv_null(_b);
@@ -163,7 +163,8 @@ static void fb_mul_rcomb_imp(dig_t *c, dig_t *a, dig_t *b, int size) {
  * @param[in] size			- the number of digits to multiply.
  * @param[in] level			- the number of Karatsuba steps to apply.
  */
-static void fb_mul_karat_imp(dv_t c, fb_t a, fb_t b, int size, int level) {
+static void fb_mul_karat_imp(dv_t c, const fb_t a, const fb_t b, int size,
+		int level) {
 	int i, h, h1;
 	dv_t a1, b1, ab;
 	dig_t *a0b0, *a1b1;
@@ -261,7 +262,7 @@ static void fb_mul_karat_imp(dv_t c, fb_t a, fb_t b, int size, int level) {
 
 #if FB_MUL == BASIC || !defined(STRIP)
 
-void fb_mul_basic(fb_t c, fb_t a, fb_t b) {
+void fb_mul_basic(fb_t c, const fb_t a, const fb_t b) {
 	int i;
 	dv_t s;
 	fb_t t;
@@ -309,7 +310,7 @@ void fb_mul_basic(fb_t c, fb_t a, fb_t b) {
 
 #if FB_MUL == INTEG || !defined(STRIP)
 
-void fb_mul_integ(fb_t c, fb_t a, fb_t b) {
+void fb_mul_integ(fb_t c, const fb_t a, const fb_t b) {
 	fb_mulm_low(c, a, b);
 }
 
@@ -317,7 +318,7 @@ void fb_mul_integ(fb_t c, fb_t a, fb_t b) {
 
 #if FB_MUL == LCOMB || !defined(STRIP)
 
-void fb_mul_lcomb(fb_t c, fb_t a, fb_t b) {
+void fb_mul_lcomb(fb_t c, const fb_t a, const fb_t b) {
 	dv_t t;
 	dig_t carry;
 
@@ -356,7 +357,7 @@ void fb_mul_lcomb(fb_t c, fb_t a, fb_t b) {
 
 #if FB_MUL == RCOMB || !defined(STRIP)
 
-void fb_mul_rcomb(fb_t c, fb_t a, fb_t b) {
+void fb_mul_rcomb(fb_t c, const fb_t a, const fb_t b) {
 	dv_t t, _b;
 	dig_t carry;
 
@@ -398,7 +399,7 @@ void fb_mul_rcomb(fb_t c, fb_t a, fb_t b) {
 
 #if FB_MUL == LODAH || !defined(STRIP)
 
-void fb_mul_lodah(fb_t c, fb_t a, fb_t b) {
+void fb_mul_lodah(fb_t c, const fb_t a, const fb_t b) {
 	dv_t t;
 
 	dv_null(t);
@@ -421,7 +422,7 @@ void fb_mul_lodah(fb_t c, fb_t a, fb_t b) {
 
 #if FB_KARAT > 0 || !defined(STRIP)
 
-void fb_mul_karat(fb_t c, fb_t a, fb_t b) {
+void fb_mul_karat(fb_t c, const fb_t a, const fb_t b) {
 	dv_t t;
 
 	dv_null(t);
@@ -444,7 +445,7 @@ void fb_mul_karat(fb_t c, fb_t a, fb_t b) {
 
 #endif
 
-void fb_mul_dig(fb_t c, fb_t a, dig_t b) {
+void fb_mul_dig(fb_t c, const fb_t a, dig_t b) {
 	dv_t t;
 
 	dv_null(t);

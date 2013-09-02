@@ -107,7 +107,7 @@ void pb_map_clean();
  *
  * @return The precomputed table.
  */
-fb_t *pb_map_get_tab();
+const fb_t *pb_map_get_tab();
 
 /**
  * Returns the table for computing the repeated squarings needed for parallel
@@ -115,7 +115,7 @@ fb_t *pb_map_get_tab();
  *
  * @return The precomputed table.
  */
-fb_t *pb_map_get_sqr();
+const fb_t *pb_map_get_sqr();
 
 /**
  * Returns the table for computing the repeated square-roots needed for parallel
@@ -123,7 +123,7 @@ fb_t *pb_map_get_sqr();
  *
  * @return The precomputed table.
  */
-fb_t *pb_map_get_srt();
+const fb_t *pb_map_get_srt();
 
 /**
  * Computes the etat pairing of two binary elliptic curve points without using
@@ -133,7 +133,7 @@ fb_t *pb_map_get_srt();
  * @param[in] p				- the first elliptic curve point.
  * @param[in] q				- the second elliptic curve point.
  */
-void pb_map_etats(fb4_t r, eb_t p, eb_t q);
+void pb_map_etats(fb4_t r, const eb_t p, const eb_t q);
 
 /**
  * Computes the etat pairing of two binary elliptic curve points using
@@ -143,6 +143,6 @@ void pb_map_etats(fb4_t r, eb_t p, eb_t q);
  * @param[in] p				- the first elliptic curve point.
  * @param[in] q				- the second elliptic curve point.
  */
-void pb_map_etatn(fb4_t r, eb_t p, eb_t q);
+void pb_map_etatn(fb4_t r, const eb_t p, const eb_t q);
 
 #endif /* !RELIC_PB_H */

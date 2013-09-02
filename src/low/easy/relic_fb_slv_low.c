@@ -56,7 +56,7 @@ void fb_slvn_low(dig_t *c, const dig_t *a) {
 	dig_t u, *p;
 	align dig_t s[FB_DIGS], t[FB_DIGS];
 	dig_t mask;
-	void *tab = fb_poly_get_slv();
+	const void *tab = fb_poly_get_slv();
 
 	dv_zero(s, FB_DIGS);
 	dv_copy(t, a, FB_DIGS);

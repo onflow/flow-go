@@ -43,7 +43,7 @@
 
 #if FB_EXP == BASIC || !defined(STRIP)
 
-void fb_exp_basic(fb_t c, fb_t a, bn_t b) {
+void fb_exp_basic(fb_t c, const fb_t a, const bn_t b) {
 	int i, l;
 	fb_t r;
 
@@ -77,7 +77,7 @@ void fb_exp_basic(fb_t c, fb_t a, bn_t b) {
 
 #if FB_EXP == SLIDE || !defined(STRIP)
 
-void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
+void fb_exp_slide(fb_t c, const fb_t a, const bn_t b) {
 	fb_t t[1 << (FB_WIDTH - 1)], r;
 	int i, j, l;
 	unsigned char win[FB_BITS + 1];
@@ -134,7 +134,7 @@ void fb_exp_slide(fb_t c, fb_t a, bn_t b) {
 
 #if FB_EXP == MONTY || !defined(STRIP)
 
-void fb_exp_monty(fb_t c, fb_t a, bn_t b) {
+void fb_exp_monty(fb_t c, const fb_t a, const bn_t b) {
 	fb_t t0, t1;
 	dig_t *t[2];
 	dig_t buf;

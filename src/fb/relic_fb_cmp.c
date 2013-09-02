@@ -37,7 +37,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int fb_cmp_dig(fb_t a, dig_t b) {
+int fb_cmp_dig(const fb_t a, dig_t b) {
 	for (int i = 1; i < FB_DIGS; i++) {
 		if (a[i] > 0) {
 			return CMP_GT;
@@ -47,6 +47,6 @@ int fb_cmp_dig(fb_t a, dig_t b) {
 	return fb_cmp1_low(a[0], b);
 }
 
-int fb_cmp(fb_t a, fb_t b) {
+int fb_cmp(const fb_t a, const fb_t b) {
 	return fb_cmpn_low(a, b);
 }

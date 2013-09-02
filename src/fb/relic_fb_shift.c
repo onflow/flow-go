@@ -38,7 +38,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_lsh(fb_t c, fb_t a, int bits) {
+void fb_lsh(fb_t c, const fb_t a, int bits) {
 	int digits;
 
 	SPLIT(bits, digits, bits, FB_DIG_LOG);
@@ -63,7 +63,7 @@ void fb_lsh(fb_t c, fb_t a, int bits) {
 	}
 }
 
-void fb_rsh(fb_t c, fb_t a, int bits) {
+void fb_rsh(fb_t c, const fb_t a, int bits) {
 	int digits;
 
 	SPLIT(bits, digits, bits, FB_DIG_LOG);

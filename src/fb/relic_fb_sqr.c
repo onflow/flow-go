@@ -44,7 +44,7 @@
 
 #if FB_SQR == BASIC || !defined(STRIP)
 
-void fb_sqr_basic(fb_t c, fb_t a) {
+void fb_sqr_basic(fb_t c, const fb_t a) {
 	dv_t t;
 
 	dv_null(t);
@@ -66,7 +66,7 @@ void fb_sqr_basic(fb_t c, fb_t a) {
 
 #if FB_SQR == TABLE || !defined(STRIP)
 
-void fb_sqr_table(fb_t c, fb_t a) {
+void fb_sqr_table(fb_t c, const fb_t a) {
 	dv_t t;
 
 	dv_null(t);
@@ -88,7 +88,7 @@ void fb_sqr_table(fb_t c, fb_t a) {
 
 #if FB_SQR == INTEG || !defined(STRIP)
 
-void fb_sqr_integ(fb_t c, fb_t a) {
+void fb_sqr_integ(fb_t c, const fb_t a) {
 	fb_sqrm_low(c, a);
 }
 

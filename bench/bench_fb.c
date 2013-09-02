@@ -503,7 +503,7 @@ static void arith(void) {
 	BENCH_BEGIN("fb_inv_sim (2)") {
 		fb_rand(d[0]);
 		fb_rand(d[1]);
-		BENCH_ADD(fb_inv_sim(d, d, 2));
+		BENCH_ADD(fb_inv_sim(d, (const fb_t *)d, 2));
 	}
 	BENCH_END;
 
@@ -549,7 +549,7 @@ static void arith(void) {
 		fb_rand(a);
 		bn_rand(f, BN_POS, 8);
 		fb_itr_pre(t, f->dp[0]);
-		BENCH_ADD(fb_itr(c, a, f->dp[0], t));
+		BENCH_ADD(fb_itr(c, a, f->dp[0], (const fb_t *)t));
 	}
 	BENCH_END;
 
@@ -574,7 +574,7 @@ static void arith(void) {
 		fb_rand(a);
 		bn_rand(f, BN_POS, 8);
 		fb_itr_pre_quick(t, f->dp[0]);
-		BENCH_ADD(fb_itr_quick(c, a, t));
+		BENCH_ADD(fb_itr_quick(c, a, (const fb_t *)t));
 	}
 	BENCH_END;
 	for (int i = 0; i < FB_TABLE_QUICK; i++) {

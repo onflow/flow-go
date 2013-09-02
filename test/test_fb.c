@@ -948,7 +948,7 @@ static int inversion(void) {
 			fb_copy(d[1], b);
 			fb_inv(a, a);
 			fb_inv(b, b);
-			fb_inv_sim(d, d, 2);
+			fb_inv_sim(d, (const fb_t *)d, 2);
 			TEST_ASSERT(fb_cmp(d[0], a) == CMP_EQ &&
 					fb_cmp(d[1], b) == CMP_EQ, end);
 		} TEST_END;
@@ -1030,7 +1030,7 @@ static int exponentiation(void) {
 			fb_rand(a);
 			bn_rand(d, BN_POS, 4);
 			fb_itr_pre(t, d->dp[0]);
-			fb_itr(b, a, d->dp[0], t);
+			fb_itr(b, a, d->dp[0], (const fb_t *)t);
 			for (int j = 0; j < d->dp[0]; j++) {
 				fb_sqr(a, a);
 			}
@@ -1041,7 +1041,7 @@ static int exponentiation(void) {
 			fb_rand(a);
 			bn_rand(d, BN_POS, 4);
 			fb_itr_pre(t, -d->dp[0]);
-			fb_itr(b, a, -d->dp[0], t);
+			fb_itr(b, a, -d->dp[0], (const fb_t *)t);
 			for (int j = 0; j < d->dp[0]; j++) {
 				fb_srt(a, a);
 			}
@@ -1083,7 +1083,7 @@ static int exponentiation(void) {
 			fb_rand(a);
 			bn_rand(d, BN_POS, 4);
 			fb_itr_pre_quick(t, d->dp[0]);
-			fb_itr_quick(b, a, t);
+			fb_itr_quick(b, a, (const fb_t *)t);
 			for (int j = 0; j < d->dp[0]; j++) {
 				fb_sqr(a, a);
 			}
@@ -1094,7 +1094,7 @@ static int exponentiation(void) {
 			fb_rand(a);
 			bn_rand(d, BN_POS, 4);
 			fb_itr_pre_quick(t, -d->dp[0]);
-			fb_itr_quick(b, a, t);
+			fb_itr_quick(b, a, (const fb_t *)t);
 			for (int j = 0; j < d->dp[0]; j++) {
 				fb_srt(a, a);
 			}

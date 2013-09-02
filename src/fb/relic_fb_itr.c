@@ -43,7 +43,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_itr_basic(fb_t c, fb_t a, int b) {
+void fb_itr_basic(fb_t c, const fb_t a, int b) {
 	fb_copy(c, a);
 	if (b >= 0) {
 		for (int i = 0; i < b; i++) {
@@ -94,6 +94,6 @@ void fb_itr_pre_quick(fb_t *t, int b) {
 	}
 }
 
-void fb_itr_quick(fb_t c, fb_t a, fb_t *t) {
+void fb_itr_quick(fb_t c, const fb_t a, const fb_t *t) {
 	fb_itrn_low(c, a, (dig_t *)t);
 }

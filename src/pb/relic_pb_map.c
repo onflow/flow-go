@@ -96,7 +96,7 @@ void pb_map_init() {
 	}
 
 #if PB_MAP == ETATS || PB_MAP == ETATN
-	fb_itr_pre(pb_map_get_tab(), 4 * (((FB_BITS + 1) / 2) / 4));
+	fb_itr_pre((fb_t *)pb_map_get_tab(), 4 * (((FB_BITS + 1) / 2) / 4));
 #endif
 
 #if PB_MAP == ETAT2 || PB_MAP == OETA2
@@ -128,21 +128,21 @@ void pb_map_clean() {
 
 }
 
-fb_t *pb_map_get_tab() {
+const fb_t *pb_map_get_tab() {
 #if ALLOC == AUTO
-	return (fb_t *)*core_get()->pb_ptr;
+	return (const fb_t *)*core_get()->pb_ptr;
 #else
-	return (fb_t *)core_get()->pb_ptr;
+	return ((const fp_t *)fb_t *)core_get()->pb_ptr;
 #endif
 }
 
-fb_t *pb_map_get_sqr(int core) {
+const fb_t *pb_map_get_sqr(int core) {
 #ifdef PB_PARAL
 
 #if ALLOC == AUTO
-	return (fb_t *)*core_get()->pb_pow[0][core];
+	return (const fb_t *)*core_get()->pb_pow[0][core];
 #else
-	return (fb_t *)core_get()->pb_pow[0][core];
+	return (const fb_t *)core_get()->pb_pow[0][core];
 #endif
 
 #else
@@ -150,13 +150,13 @@ fb_t *pb_map_get_sqr(int core) {
 #endif
 }
 
-fb_t *pb_map_get_srt(int core) {
+const fb_t *pb_map_get_srt(int core) {
 #ifdef PB_PARAL
 
 #if ALLOC == AUTO
-	return (fb_t *)*core_get()->pb_pow[1][core];
+	return (const fb_t *)*core_get()->pb_pow[1][core];
 #else
-	return (fb_t *)core_get()->pb_pow[1][core];
+	return (const fb_t *)core_get()->pb_pow[1][core];
 #endif
 
 #else

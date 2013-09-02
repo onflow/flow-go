@@ -283,7 +283,7 @@ static void find_chain() {
 	}
 
 	for (i = 0; i <= ctx->chain_len; i++) {
-		fb_itr_pre(fb_poly_tab_sqr(i), u[i]);
+		fb_itr_pre((fb_t *)fb_poly_tab_sqr(i), u[i]);
 	}
 }
 
@@ -294,7 +294,7 @@ static void find_chain() {
  *
  * @param[in] f				- the new irreducible polynomial.
  */
-static void fb_poly_set(fb_t f) {
+static void fb_poly_set(const fb_t f) {
 	fb_copy(core_get()->fb_poly, f);
 #if FB_TRC == QUICK || !defined(STRIP)
 	find_trace();
@@ -330,11 +330,11 @@ void fb_poly_init(void) {
 void fb_poly_clean(void) {
 }
 
-dig_t *fb_poly_get(void) {
+const dig_t *fb_poly_get(void) {
 	return core_get()->fb_poly;
 }
 
-void fb_poly_add(fb_t c, fb_t a) {
+void fb_poly_add(fb_t c, const fb_t a) {
 	ctx_t *ctx = core_get();
 
 	if (c != a) {
@@ -362,11 +362,11 @@ void fb_poly_add(fb_t c, fb_t a) {
 	}
 }
 
-void fb_poly_sub(fb_t c, fb_t a) {
+void fb_poly_sub(fb_t c, const fb_t a) {
 	fb_poly_add(c, a);
 }
 
-void fb_poly_set_dense(fb_t f) {
+void fb_poly_set_dense(const fb_t f) {
 	ctx_t *ctx = core_get();
 	fb_poly_set(f);
 	ctx->fb_pa = ctx->fb_pb = ctx->fb_pc = 0;
@@ -442,13 +442,13 @@ dig_t *fb_poly_get_srz(void) {
 #endif
 }
 
-fb_t *fb_poly_tab_sqr(int i) {
+const fb_t *fb_poly_tab_sqr(int i) {
 #if FB_INV == ITOHT || !defined(STRIP)
 	/* If ITOHT inversion is used and tables are precomputed, return them. */
 #if ALLOC == AUTO
-	return (fb_t *)*core_get()->fb_tab_ptr[i];
+	return (const fb_t *)*core_get()->fb_tab_ptr[i];
 #else
-	return (fb_t *)core_get()->fb_tab_ptr[i];
+	return (const fb_t *)core_get()->fb_tab_ptr[i];
 #endif
 
 #else
@@ -456,7 +456,7 @@ fb_t *fb_poly_tab_sqr(int i) {
 #endif
 }
 
-dig_t *fb_poly_tab_srz(int i) {
+const dig_t *fb_poly_tab_srz(int i) {
 #if FB_SRT == QUICK || !defined(STRIP)
 
 #ifdef FB_PRECO
@@ -488,7 +488,7 @@ void fb_poly_get_rdc(int *a, int *b, int *c) {
 	*c = ctx->fb_pc;
 }
 
-dig_t *fb_poly_get_slv() {
+const dig_t *fb_poly_get_slv() {
 #if FB_SLV == QUICK || !defined(STRIP)
 	return (dig_t *)&(core_get()->fb_half);
 #else
@@ -496,7 +496,7 @@ dig_t *fb_poly_get_slv() {
 #endif
 }
 
-int *fb_poly_get_chain(int *len) {
+const int *fb_poly_get_chain(int *len) {
 #if FB_INV == ITOHT || !defined(STRIP)
 	ctx_t *ctx = core_get();
 	if (ctx->chain_len > 0 && ctx->chain_len < MAX_TERMS) {
