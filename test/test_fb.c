@@ -119,7 +119,9 @@ static int util(void) {
 		TEST_END;
 
 		TEST_BEGIN("assignment to zero and comparison are consistent") {
-			fb_rand(a);
+			do {
+				fb_rand(a);
+			} while (fb_is_zero(a));
 			fb_zero(c);
 			TEST_ASSERT(fb_cmp(a, c) == CMP_GT, end);
 			TEST_ASSERT(fb_cmp(c, a) == CMP_LT, end);
@@ -127,8 +129,10 @@ static int util(void) {
 		TEST_END;
 
 		TEST_BEGIN("assignment to random and comparison are consistent") {
-			fb_rand(a);
-			fb_rand(b);
+			do {
+				fb_rand(a);
+				fb_rand(b);
+			} while (fb_is_zero(a) || fb_is_zero(b));
 			fb_zero(c);
 			TEST_ASSERT(fb_cmp(a, c) == CMP_GT, end);
 			TEST_ASSERT(fb_cmp(b, c) == CMP_GT, end);
@@ -643,23 +647,25 @@ static int shifting(void) {
 			TEST_ASSERT(fb_cmp(c, a) == CMP_EQ, end);
 		} TEST_END;
 
-		TEST_BEGIN("shifting by 2 digits is consistent") {
-			fb_rand(a);
-			a[FB_DIGS - 1] = 0;
-			a[FB_DIGS - 2] = 0;
-			fb_lsh(b, a, 2 * FB_DIGIT);
-			fb_rsh(c, b, 2 * FB_DIGIT);
-			TEST_ASSERT(fb_cmp(c, a) == CMP_EQ, end);
-		} TEST_END;
+		if (FB_DIGS > 1) {
+			TEST_BEGIN("shifting by 2 digits is consistent") {
+				fb_rand(a);
+				a[FB_DIGS - 1] = 0;
+				a[FB_DIGS - 2] = 0;
+				fb_lsh(b, a, 2 * FB_DIGIT);
+				fb_rsh(c, b, 2 * FB_DIGIT);
+				TEST_ASSERT(fb_cmp(c, a) == CMP_EQ, end);
+			} TEST_END;
 
-		TEST_BEGIN("shifting by 1 digit and half is consistent") {
-			fb_rand(a);
-			a[FB_DIGS - 1] = 0;
-			a[FB_DIGS - 2] = 0;
-			fb_lsh(b, a, FB_DIGIT + FB_DIGIT / 2);
-			fb_rsh(c, b, (FB_DIGIT + FB_DIGIT / 2));
-			TEST_ASSERT(fb_cmp(c, a) == CMP_EQ, end);
-		} TEST_END;
+			TEST_BEGIN("shifting by 1 digit and half is consistent") {
+				fb_rand(a);
+				a[FB_DIGS - 1] = 0;
+				a[FB_DIGS - 2] = 0;
+				fb_lsh(b, a, FB_DIGIT + FB_DIGIT / 2);
+				fb_rsh(c, b, (FB_DIGIT + FB_DIGIT / 2));
+				TEST_ASSERT(fb_cmp(c, a) == CMP_EQ, end);
+			} TEST_END;
+		}
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -702,7 +708,8 @@ static int reduction(void) {
 			} else {
 				/* Test if f(z) * z^(m-1) mod f(z) == 0. */
 				dv_zero(t0, FB_DIGS);
-				carry = fb_lshb_low(t0 + FB_DIGS - 1, fb_poly_get(), FB_POLYN % FB_DIGIT - 1);
+				carry = fb_lshb_low(t0 + FB_DIGS - 1, fb_poly_get(),
+						FB_POLYN % FB_DIGIT - 1);
 				t0[2 * FB_DIGS - 1] = carry;
 				fb_rdc(a, t0);
 			}
@@ -1191,7 +1198,8 @@ int main(void) {
 	TRY {
 		fb_param_set_any();
 		fb_param_print();
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		core_clean();
 		return 0;
 	}
