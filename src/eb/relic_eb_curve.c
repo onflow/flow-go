@@ -198,7 +198,7 @@ void eb_curve_clean(void) {
 #endif
 }
 
-const dig_t *eb_curve_get_a() {
+dig_t *eb_curve_get_a() {
 	return core_get()->eb_a;
 }
 
@@ -206,7 +206,7 @@ int eb_curve_opt_a() {
 	return core_get()->eb_opt_a;
 }
 
-const dig_t *eb_curve_get_b() {
+dig_t *eb_curve_get_b() {
 	return core_get()->eb_b;
 }
 
@@ -214,7 +214,7 @@ int eb_curve_opt_b() {
 	return core_get()->eb_opt_b;
 }
 
-const dig_t *eb_curve_get_c() {
+dig_t *eb_curve_get_c() {
 #if defined(EB_SUPER)
 	if (core_get()->eb_is_super) {
 		return core_get()->eb_c;

@@ -41,11 +41,7 @@
 void eb_pck(eb_t r, const eb_t p) {
 	if (eb_curve_is_super()) {
 		/* z3 = y1/c. */
-#if ALLOC == AUTO
 		fb_inv(r->z, eb_curve_get_c());
-#else
-		fb_inv(r->z, (const fb_t)eb_curve_get_c());
-#endif
 		fb_mul(r->z, r->z, p->y);
 		/* x3 = x1. */
 		fb_copy(r->x, p->x);
@@ -83,11 +79,7 @@ int eb_upk(eb_t r, const eb_t p) {
 
 		if (eb_curve_is_super()) {
 			/* t0 = c^2. */
-#if ALLOC == AUTO
 			fb_sqr(t0, eb_curve_get_c());
-#else
-			fb_sqr(t0, (const fb_t)eb_curve_get_c());
-#endif
 			/* t0 = 1/c^2. */
 			fb_inv(t0, t0);
 			/* t0 = t1/c^2. */
@@ -100,11 +92,7 @@ int eb_upk(eb_t r, const eb_t p) {
 				fb_add_dig(t1, t1, 1);
 			}
 			/* x3 = x1, y3 = t1 * c, z3 = 1. */
-#if ALLOC == AUTO
 			fb_mul(r->y, t1, eb_curve_get_c());
-#else
-			fb_mul(r->y, t1, (const fb_t)eb_curve_get_c());
-#endif
 		} else {
 			fb_sqr(t0, p->x);
 			/* t0 = 1/x1^2. */

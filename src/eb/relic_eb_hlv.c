@@ -60,11 +60,7 @@ void eb_hlv(eb_t r, const eb_t p) {
 				fb_add_dig(t, p->x, eb_curve_get_a()[0]);
 				break;
 			default:
-#if ALLOC == AUTO
 				fb_add(t, p->x, eb_curve_get_a());
-#else
-				fb_add(t, p->x, (const fb_t)eb_curve_get_a());
-#endif
 				break;
 		}
 

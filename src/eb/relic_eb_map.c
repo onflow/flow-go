@@ -69,11 +69,7 @@ void eb_map(eb_t p, const unsigned char *msg, int len) {
 			if (eb_curve_is_super()) {
 				if (eb_curve_opt_c() != OPT_ONE) {
 					/* t0 = c^2. */
-#if ALLOC == AUTO
 					fb_sqr(t0, eb_curve_get_c());
-#else
-					fb_sqr(t0, (const fb_t)eb_curve_get_c());
-#endif
 					/* t0 = 1/c^2. */
 					fb_inv(t0, t0);
 					/* t0 = t1/c^2. */
@@ -85,11 +81,7 @@ void eb_map(eb_t p, const unsigned char *msg, int len) {
 				} else {
 					fb_slv(t1, t1);
 					/* x3 = x1, y3 = t1 * c, z3 = 1. */
-#if ALLOC == AUTO
 					fb_mul(p->y, t1, eb_curve_get_c());
-#else
-					fb_mul(p->y, t1, (const fb_t)eb_curve_get_c());
-#endif
 					fb_set_dig(p->z, 1);
 
 					p->norm = 1;
