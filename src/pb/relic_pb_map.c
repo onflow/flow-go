@@ -30,59 +30,11 @@
  * @ingroup pb
  */
 
-#include <math.h>
-
 #include "relic_core.h"
 #include "relic_conf.h"
 #include "relic_bench.h"
 #include "relic_pb.h"
 #include "relic_util.h"
-
-/*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/**
- * Computes a partition of the main loop in the pairing algorithm.
- */
-static void pb_compute_par() {
-	fb_t a, b;
-	long long r;
-
-	fb_null(a);
-	fb_null(b);
-
-	TRY {
-		fb_new(a);
-		fb_new(b);
-
-		fb_rand(a);
-		fb_rand(b);
-
-		bench_reset();
-		bench_before();
-		for (int i = 0; i < BENCH; i++) {
-			fb_mul(a, a, b);
-		}
-		bench_after();
-		bench_compute(BENCH);
-		r = bench_total();
-
-		bench_reset();
-		bench_before();
-		for (int i = 0; i < BENCH; i++) {
-			fb_sqr(a, b);
-		}
-		bench_after();
-		bench_compute(BENCH);
-		r /= bench_total();
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fb_free(a);
-		fb_free(b);
-	}
-}
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -104,8 +56,6 @@ void pb_map_init() {
 #endif
 
 #if defined(PB_PARAL) && (PB_MAP == ETATS || PB_MAP == ETATN)
-
-	pb_compute_par();
 
 	int chunk = (int)ceilf((FB_BITS - 1) / (2.0 * CORES));
 
