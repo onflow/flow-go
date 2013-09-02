@@ -260,8 +260,9 @@ static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 	int len;
 	bn_t t;
 
+	bn_null(t);
+
 	TRY {
-		bn_null(t);
 		bn_new(t);
 
 		switch (operation) {
