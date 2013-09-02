@@ -167,7 +167,7 @@ void eb_norm_sim(eb_t *r, eb_t *t, int n) {
 			}
 		}
 
-		fb_inv_sim(a, a, n);
+		fb_inv_sim(a, (const fb_t *)a, n);
 
 		for (i = 0; i < n; i++) {
 			if (!eb_is_infty(t[i])) {
