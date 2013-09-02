@@ -82,7 +82,11 @@ static void eb_dbl_basic_ordin(eb_t r, const eb_t p) {
 				fb_add_dig(t2, t2, eb_curve_get_a()[0]);
 				break;
 			default:
+#if ALLOC == AUTO
 				fb_add(t2, t2, eb_curve_get_a());
+#else
+				fb_add(t2, t2, (const fb_t)eb_curve_get_a());
+#endif
 				break;
 		}
 
@@ -146,7 +150,11 @@ static void eb_dbl_basic_super(eb_t r, const eb_t p) {
 				fb_add_dig(t0, t0, eb_curve_get_a()[0]);
 				break;
 			default:
+#if ALLOC == AUTO
 				fb_add(t0, t0, eb_curve_get_a());
+#else
+				fb_add(t0, t0, (const fb_t)eb_curve_get_a());
+#endif
 				break;
 		}
 
@@ -156,9 +164,15 @@ static void eb_dbl_basic_super(eb_t r, const eb_t p) {
 				break;
 			case OPT_DIGIT:
 			default:
+#if ALLOC == AUTO
 				fb_inv(t2, eb_curve_get_c());
 				fb_mul(t0, t0, t2);
 				fb_add(t0, t0, eb_curve_get_a());
+#else
+				fb_inv(t2, (const fb_t)eb_curve_get_c());
+				fb_mul(t0, t0, t2);
+				fb_add(t0, t0, (const fb_t)eb_curve_get_a());
+#endif
 				break;
 		}
 
@@ -181,7 +195,11 @@ static void eb_dbl_basic_super(eb_t r, const eb_t p) {
 				fb_add_dig(r->y, r->y, eb_curve_get_c()[0]);
 				break;
 			default:
+#if ALLOC == AUTO
 				fb_add(r->y, r->y, eb_curve_get_c());
+#else
+				fb_add(r->y, r->y, (const fb_t)eb_curve_get_c());
+#endif
 				break;
 		}
 
@@ -260,7 +278,11 @@ static void eb_dbl_projc_ordin(eb_t r, const eb_t p) {
 				fb_add(r->x, r->y, r->x);
 				break;
 			default:
+#if ALLOC == AUTO
 				fb_mul(r->y, r->z, eb_curve_get_a());
+#else
+				fb_mul(r->y, r->z, (const fb_t)eb_curve_get_a());
+#endif
 				fb_add(r->x, r->y, r->x);
 				break;
 		}

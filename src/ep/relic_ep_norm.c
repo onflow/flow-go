@@ -95,13 +95,12 @@ void ep_norm(ep_t r, ep_t p) {
 		ep_copy(r, p);
 		return;
 	}
-
 #if EP_ADD == PROJC || !defined(STRIP)
 	ep_norm_imp(r, p, 0);
 #endif /* EP_ADD == PROJC */
 }
 
-void ep_norm_sim(ep_t * r, ep_t * t, int n) {
+void ep_norm_sim(ep_t *r, ep_t *t, int n) {
 	int i;
 	fp_t a[n];
 

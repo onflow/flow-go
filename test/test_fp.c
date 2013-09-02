@@ -735,12 +735,9 @@ static int reduction(void) {
 
 		TEST_BEGIN("modular reduction is correct") {
 			fp_rand(a);
-			/* Test if a * f(z) mod f(z) == 0. */
-#if ALLOC == AUTO
-			fp_mul(b, a, fp_prime_get());
-#else
-			fp_mul(b, a, (const fp_t)fp_prime_get());
-#endif
+			dv_copy(t, fp_prime_get(), FP_DIGS);
+			/* Test if a * p mod p == 0. */
+			fp_mul(b, a, t);
 			TEST_ASSERT(fp_is_zero(b) == 1, end);
 		} TEST_END;
 

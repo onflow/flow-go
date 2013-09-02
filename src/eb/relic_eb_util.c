@@ -123,7 +123,11 @@ void eb_rhs(fb_t rhs, const eb_t p) {
 					fb_add(t1, t1, t0);
 					break;
 				default:
+#if ALLOC == AUTO
 					fb_mul(t0, p->x, eb_curve_get_a());
+#else
+					fb_mul(t0, p->x, (const fb_t)eb_curve_get_a());
+#endif
 					fb_add(t1, t1, t0);
 					break;
 			}
@@ -140,7 +144,11 @@ void eb_rhs(fb_t rhs, const eb_t p) {
 					fb_add(t1, t1, t0);
 					break;
 				default:
+#if ALLOC == AUTO
 					fb_mul(t0, t0, eb_curve_get_a());
+#else
+					fb_mul(t0, t0, (const fb_t)eb_curve_get_a());
+#endif
 					fb_add(t1, t1, t0);
 					break;
 			}
@@ -156,7 +164,11 @@ void eb_rhs(fb_t rhs, const eb_t p) {
 				fb_add_dig(t1, t1, eb_curve_get_b()[0]);
 				break;
 			default:
+#if ALLOC == AUTO
 				fb_add(t1, t1, eb_curve_get_b());
+#else
+				fb_add(t1, t1, (const fb_t)eb_curve_get_b());
+#endif
 				break;
 		}
 
@@ -186,7 +198,11 @@ int eb_is_valid(const eb_t p) {
 		eb_norm(t, p);
 
 		if (eb_curve_is_super()) {
+#if ALLOC == AUTO
 			fb_mul(lhs, t->y, eb_curve_get_c());
+#else
+			fb_mul(lhs, t->y, (const fb_t)eb_curve_get_c());
+#endif
 		} else {
 			fb_mul(lhs, t->x, t->y);
 		}

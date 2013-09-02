@@ -203,7 +203,7 @@ typedef ep_st *ep_t;
  * @param[out] A			- the point to initialize.
  */
 #if ALLOC == AUTO
-#define ep_null(A)		/* empty */
+#define ep_null(A)				/* empty */
 #else
 #define ep_null(A)		A = NULL;
 #endif
@@ -235,7 +235,7 @@ typedef ep_st *ep_t;
 	fp_new((A)->z);															\
 
 #elif ALLOC == AUTO
-#define ep_new(A)			/* empty */
+#define ep_new(A)				/* empty */
 
 #elif ALLOC == STACK
 #define ep_new(A)															\
@@ -265,7 +265,7 @@ typedef ep_st *ep_t;
 	}																		\
 
 #elif ALLOC == AUTO
-#define ep_free(A)			/* empty */
+#define ep_free(A)				/* empty */
 
 #elif ALLOC == STACK
 #define ep_free(A)															\
@@ -1028,7 +1028,7 @@ void ep_norm(ep_t r, ep_t p);
  * @param[in] t				- the points to convert.
  * @param[in] n				- the number of points.
  */
-void ep_norm_sim(ep_t * r, ep_t * t, int n);
+void ep_norm_sim(ep_t *r, ep_t *t, int n);
 
 /**
  * Maps a byte array to a point in a prime elliptic curve.

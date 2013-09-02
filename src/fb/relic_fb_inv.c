@@ -121,7 +121,11 @@ void fb_inv_binar(fb_t c, const fb_t a) {
 
 		/* u = a, v = f, g1 = 1, g2 = 0. */
 		fb_copy(u, a);
+#if ALLOC == AUTO
 		fb_copy(v, fb_poly_get());
+#else
+		fb_copy(v, (const fb_t)fb_poly_get());
+#endif
 		if (FB_BITS % FB_DIGIT == 0) {
 			v[FB_DIGS] = 1;
 		}
@@ -231,7 +235,11 @@ void fb_inv_exgcd(fb_t c, const fb_t a) {
 
 		/* u = a, v = f, g1 = 1, g2 = 0. */
 		fb_copy(u, a);
+#if ALLOC == AUTO
 		fb_copy(v, fb_poly_get());
+#else
+		fb_copy(v, (const fb_t)fb_poly_get());
+#endif
 		g1[0] = 1;
 
 		lu = lv = FB_DIGS;
@@ -343,7 +351,11 @@ void fb_inv_almos(fb_t c, const fb_t a) {
 		fb_set_dig(b, 1);
 		dv_zero(d, 2 * FB_DIGS);
 		fb_copy(u, a);
+#if ALLOC == AUTO
 		fb_copy(v, fb_poly_get());
+#else
+		fb_copy(v, (const fb_t)fb_poly_get());
+#endif
 		if (FB_BITS % FB_DIGIT == 0) {
 			v[FB_DIGS] = 1;
 		}
@@ -484,7 +496,11 @@ void fb_inv_bruch(fb_t c, const fb_t a) {
 		fb_new(_v);
 
 		fb_copy(_r, a);
+#if ALLOC == AUTO
 		fb_copy(_s, fb_poly_get());
+#else
+		fb_copy(_s, (const fb_t)fb_poly_get());
+#endif
 		fb_zero(_v);
 		fb_set_dig(_u, 1);
 

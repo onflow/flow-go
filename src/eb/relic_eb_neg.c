@@ -63,7 +63,11 @@ void eb_neg_basic(eb_t r, const eb_t p) {
 				fb_add_dig(r->y, p->y, eb_curve_get_c()[0]);
 				break;
 			default:
+#if ALLOC == AUTO
 				fb_add(r->y, p->y, eb_curve_get_c());
+#else
+				fb_add(r->y, p->y, (const fb_t)eb_curve_get_c());
+#endif
 				break;
 		}
 
@@ -109,7 +113,11 @@ void eb_neg_projc(eb_t r, const eb_t p) {
 					fb_add_dig(r->y, p->y, eb_curve_get_c()[0]);
 					break;
 				default:
+#if ALLOC == AUTO
 					fb_add(r->y, p->y, eb_curve_get_c());
+#else
+					fb_add(r->y, p->y, (const fb_t)eb_curve_get_c());
+#endif
 					break;
 			}
 

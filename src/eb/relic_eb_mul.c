@@ -723,7 +723,11 @@ void eb_mul_lodah(eb_t r, const eb_t p, const bn_t k) {
 				fb_add_dig(x2, x2, b[0]);
 				break;
 			default:
+#if ALLOC == AUTO
 				fb_add(x2, x2, b);
+#else
+				fb_add(x2, x2, (const fb_t)b);
+#endif
 				break;
 		}
 
@@ -981,11 +985,19 @@ void eb_mul_halve(eb_t r, const eb_t p, const bn_t k) {
 			cof = 0;
 		}
 
+#if ALLOC == AUTO
 		trc = fb_trc(eb_curve_get_a());
+#else
+		trc = fb_trc((const fb_t)eb_curve_get_a());
+#endif
 
 		if (cof) {
 			/* Curves with cofactor > 2, u = sqrt(a), v = Solve(u). */
+#if ALLOC == AUTO
 			fb_srt(u, eb_curve_get_a());
+#else
+			fb_srt(u, (const fb_t)eb_curve_get_a());
+#endif
 			fb_slv(v, u);
 
 			bn_rand(n, BN_POS, l);
@@ -1065,7 +1077,11 @@ void eb_mul_halve(eb_t r, const eb_t p, const bn_t k) {
 			eb_hlv(s, r);
 			if (fb_trc(s->x) != trc) {
 				fb_zero(s->x);
+#if ALLOC == AUTO
 				fb_srt(s->y, eb_curve_get_b());
+#else
+				fb_srt(s->y, (const fb_t)eb_curve_get_b());
+#endif
 				fb_set_dig(s->z, 1);
 				eb_add(r, r, s);
 				eb_norm(r, r);

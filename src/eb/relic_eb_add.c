@@ -97,7 +97,11 @@ static void eb_add_basic_ordin(eb_t r, const eb_t p, const eb_t q) {
 					fb_add_dig(t2, t2, eb_curve_get_a()[0]);
 					break;
 				default:
+#if ALLOC == AUTO
 					fb_add(t2, t2, eb_curve_get_a());
+#else
+					fb_add(t2, t2, (const fb_t)eb_curve_get_a());
+#endif
 					break;
 			}
 
@@ -187,7 +191,11 @@ static void eb_add_basic_super(eb_t r, const eb_t p, const eb_t q) {
 					fb_add_dig(r->y, r->y, eb_curve_get_c()[0]);
 					break;
 				default:
+#if ALLOC == AUTO
 					fb_add(r->y, r->y, eb_curve_get_c());
+#else
+					fb_add(r->y, r->y, (const fb_t)eb_curve_get_c());
+#endif
 					break;
 			}
 
@@ -311,7 +319,11 @@ static void eb_add_projc_ordin_mix(eb_t r, const eb_t p, const eb_t q) {
 					break;
 				default:
 					/* t5 = a2 * C. */
+#if ALLOC == AUTO
 					fb_mul(t5, eb_curve_get_a(), t2);
+#else
+					fb_mul(t5, (const fb_t)eb_curve_get_a(), t2);
+#endif
 					fb_add(t1, t1, t5);
 					break;
 			}
