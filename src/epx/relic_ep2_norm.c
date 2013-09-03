@@ -44,7 +44,7 @@
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-void ep2_norm_imp(ep2_t r, ep2_t p) {
+static void ep2_norm_imp(ep2_t r, ep2_t p) {
 	if (!p->norm) {
 		fp2_t t0, t1;
 

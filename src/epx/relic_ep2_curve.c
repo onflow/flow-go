@@ -31,10 +31,6 @@
  */
 
 #include "relic_core.h"
-#include "relic_md.h"
-#include "relic_pp.h"
-#include "relic_conf.h"
-#include "relic_fp_low.h"
 
 /*============================================================================*/
 /* Private definitions                                                        */
