@@ -99,6 +99,15 @@ const fb_t *pb_map_get_sqr();
 const fb_t *pb_map_get_srt();
 
 /**
+ * Returns the parallel partition of the pairing algorithm for a given core.
+ *
+ * @param[in] core			- the core identifier.
+ *
+ * @return The chunk size.
+ */
+int pb_map_get_par(int core);
+
+/**
  * Computes the etat pairing of two binary elliptic curve points without using
  * square roots.
  *
