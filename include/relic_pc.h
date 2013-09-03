@@ -261,11 +261,11 @@ typedef CAT(GT_LOWER, t) gt_t;
 #if PC_CUR == PRIME
 
 #if FP_PRIME < 1536
-#define pc_map_is_type1()	(1)
-#define pc_map_is_type3()	(0)
-#else
 #define pc_map_is_type1()	(0)
 #define pc_map_is_type3()	(1)
+#else
+#define pc_map_is_type1()	(1)
+#define pc_map_is_type3()	(0)
 #endif
 
 #elif PC_CUR == CHAR2
