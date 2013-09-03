@@ -155,17 +155,15 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 			ptr += FP_BYTES;
 		}
 #endif
-		md_kdf1(key, key_len, buf, sizeof(buf));
-
 #else
 		unsigned char buf[4 * FB_BYTES], *ptr;
 		ptr = buf;
-		for (i = 0; i < 4; i++) {
+		for (int i = 0; i < 4; i++) {
 			memcpy(ptr, e[i], FB_BYTES);
 			ptr += FB_BYTES;
 		}
-		md_kdf1(key, key_len, buf, 4 * FB_BYTES);
 #endif
+		md_kdf1(key, key_len, buf, sizeof(buf));
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
