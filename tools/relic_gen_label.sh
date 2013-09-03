@@ -161,6 +161,10 @@ REDEF2 fpx fp6
 REDEF2 fpx fp12
 REDEF2 fpx fp18
 
+REDEF2 fbx fb2
+
+REDEF2 fbx fb4
+
 REDEF pb
 
 REDEF pp

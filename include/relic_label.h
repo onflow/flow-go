@@ -1640,6 +1640,38 @@
 #define fp18_exp_cyc 	PREFIX(fp18_exp_cyc)
 #define fp18_exp_cyc_sps 	PREFIX(fp18_exp_cyc_sps)
 
+#undef fb2_mul
+ #undef fb2_mul_nor
+#undef fb2_sqr
+#undef fb2_slv
+#undef fb2_inv
+#undef fb4_inv
+
+#define fb2_mul 	PREFIX(fb2_mul)
+ #define fb2_mul_nor 	PREFIX(fb2_mul_nor)
+#define fb2_sqr 	PREFIX(fb2_sqr)
+#define fb2_slv 	PREFIX(fb2_slv)
+#define fb2_inv 	PREFIX(fb2_inv)
+#define fb4_inv 	PREFIX(fb4_inv)
+
+#undef fb4_mul
+#undef fb4_mul_dxd
+#undef fb4_mul_dxs
+#undef fb4_mul_sxs
+#undef fb4_sqr
+#undef fb4_inv
+#undef fb4_exp
+#undef fb4_frb
+
+#define fb4_mul 	PREFIX(fb4_mul)
+#define fb4_mul_dxd 	PREFIX(fb4_mul_dxd)
+#define fb4_mul_dxs 	PREFIX(fb4_mul_dxs)
+#define fb4_mul_sxs 	PREFIX(fb4_mul_sxs)
+#define fb4_sqr 	PREFIX(fb4_sqr)
+#define fb4_inv 	PREFIX(fb4_inv)
+#define fb4_exp 	PREFIX(fb4_exp)
+#define fb4_frb 	PREFIX(fb4_frb)
+
 #undef pb_map_init
 #undef pb_map_clean
 #undef pb_map_get_tab
