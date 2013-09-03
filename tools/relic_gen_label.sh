@@ -49,13 +49,6 @@ cat << PREAMBLE
 
 PREAMBLE
 
-REDEFIN() {
-	cat "relic_$1.h.in" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_0-9]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
-	echo
-	cat "relic_$1.h.in" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_,0-9]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
-	echo
-}
-
 REDEF() {
 	cat "relic_$1.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/const //' | sed 's/\*//' | sed -r 's/[a-z,_0-9]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
 	echo
@@ -63,19 +56,33 @@ REDEF() {
 	echo
 }
 
-REDEF_LOW() {
-	cat "relic_$1.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
-	cat "low/relic_$1_low.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep -v '\}' | grep -v '^ \*' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
+REDEF2() {
+	cat "relic_$1.h" | grep "$2_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/const //' | sed 's/\*//' | sed -r 's/[a-z,_0-9]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
 	echo
-	cat "relic_$1.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | grep -v '^ \*' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
-	cat "low/relic_$1_low.h" | grep "$1_" | grep -v define | grep -v @version | grep -v typedef | grep -v '\\' | grep -v '\}' | grep -v '^ \*' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
+	cat "relic_$1.h" | grep "$2_" | grep -v define | grep -v typedef | grep -v '\\' | grep '(' | sed 's/\*//' | sed 's/const //' | sed -r 's/[a-z,_,0-9]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
 	echo
 }
 
+REDEF_LOW() {
+	cat "low/relic_$1_low.h" | grep "$1_" | grep -v define | grep -v typedef | grep -v '\\' | grep -v '\}' | grep -v '^ \*' | sed 's/const //' | sed 's/\*//' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
+	echo
+	cat "low/relic_$1_low.h" | grep "$1_" | grep -v define | grep -v @version | grep -v typedef | grep -v '\\' | grep -v '\}' | grep -v '^ \*' | sed 's/const //' | sed 's/\*//' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
+	echo
+}
+
+REDEF2_LOW() {
+	cat "low/relic_$1_low.h" | grep "$2_" | grep -v define | grep -v typedef | grep -v '\\' | grep -v '\}' | grep -v '^ \*' | sed 's/const //' | sed 's/\*//' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#undef \1/'
+	echo
+	cat "low/relic_$1_low.h" | grep "$2_" | grep -v define | grep -v @version | grep -v typedef | grep -v '\\' | grep -v '\}' | grep -v '^ \*' | sed 's/const //' | sed 's/\*//' | sed -r 's/[a-z,_]+ ([a-z,_,0-9]+)\(.*/\#define \1 \tPREFIX\(\1\)/'
+	echo
+}
+
+echo "#undef core_ctx"
+echo "#define core_ctx	PREFIX(core_ctx)"
+echo
 REDEF core
 REDEF arch
 REDEF bench
-REDEFIN conf
 REDEF err
 REDEF rand
 REDEF pool
@@ -86,6 +93,7 @@ REDEF util
 echo "#undef dv_t"
 echo "#define dv_t	PREFIX(dv_t)"
 echo
+REDEF dv
 REDEF_LOW dv
 
 echo "#undef bn_st"
@@ -93,6 +101,7 @@ echo "#undef bn_t"
 echo "#define bn_st	PREFIX(bn_st)"
 echo "#define bn_t	PREFIX(bn_t)"
 echo
+REDEF bn
 REDEF_LOW bn
 
 echo "#undef fp_st"
@@ -100,6 +109,7 @@ echo "#undef fp_t"
 echo "#define fp_st	PREFIX(fp_st)"
 echo "#define fp_t	PREFIX(fp_t)"
 echo
+REDEF fp
 REDEF_LOW fp
 
 echo "#undef fp_st"
@@ -107,6 +117,7 @@ echo "#undef fp_t"
 echo "#define fp_st	PREFIX(fp_st)"
 echo "#define fp_t	PREFIX(fp_t)"
 echo
+REDEF fb
 REDEF_LOW fb
 
 echo "#undef ep_st"
@@ -114,7 +125,7 @@ echo "#undef ep_t"
 echo "#define ep_st	PREFIX(ep_st)"
 echo "#define ep_t	PREFIX(ep_t)"
 echo
-REDEF eb
+REDEF ep
 
 echo "#undef eb_st"
 echo "#undef eb_t"
@@ -122,6 +133,37 @@ echo "#define eb_st	PREFIX(eb_st)"
 echo "#define eb_t	PREFIX(eb_t)"
 echo
 REDEF eb
+
+echo "#undef ep2_st"
+echo "#undef ep2_t"
+echo "#define ep2_st	PREFIX(ep2_st)"
+echo "#define ep2_t	PREFIX(ep2_t)"
+echo
+REDEF2 epx ep2
+
+echo "#undef fp2_st"
+echo "#undef fp2_t"
+echo "#undef dv2_t"
+echo "#undef fp3_st"
+echo "#undef fp3_t"
+echo "#undef dv3_t"
+echo "#undef fp6_st"
+echo "#undef fp6_t"
+echo "#undef dv6_t"
+echo "#undef fp12_t"
+echo "#undef fp18_t"
+echo
+REDEF2 fpx fp2
+REDEF2_LOW pp fp2
+REDEF2 fpx fp3
+REDEF2_LOW pp fp3
+REDEF2 fpx fp6
+REDEF2 fpx fp12
+REDEF2 fpx fp18
+
+REDEF pb
+
+REDEF pp
 
 echo "#endif /* LABEL */"
 echo
