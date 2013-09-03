@@ -81,8 +81,7 @@ void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master) {
 
 void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 		int len1, sokaka_t k, char *id2, int len2) {
-	int first = 0;
-	int i, j, l, m;
+	int l, first = 0;
 	g1_t p;
 	g2_t q;
 	gt_t e;
@@ -132,11 +131,13 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 			}
 		}
 #if PC_CUR == PRIME
+
+#if FP_PRIME < 1536
 		unsigned char buf[12 * FP_BYTES], *ptr;
 		ptr = buf;
 		for (i = 0; i < 2; i++) {
-			for (j = 0; j < 3; j++) {
-				for (m = 0; m < 2; m++) {
+			for (int j = 0; j < 3; j++) {
+				for (int m = 0; m < 2; m++) {
 					fp_prime_back(n, e[i][j][m]);
 					bn_size_bin(&l, n);
 					bn_write_bin(ptr, FP_BYTES, n);
@@ -144,7 +145,18 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 				}
 			}
 		}
-		md_kdf1(key, key_len, buf, 12 * FP_BYTES);
+#else
+		unsigned char buf[2 * FP_BYTES], *ptr;
+		ptr = buf;
+		for (int i = 0; i < 2; i++) {
+			fp_prime_back(n, e[i]);
+			bn_size_bin(&l, n);
+			bn_write_bin(ptr, FP_BYTES, n);
+			ptr += FP_BYTES;
+		}
+#endif
+		md_kdf1(key, key_len, buf, sizeof(buf));
+
 #else
 		unsigned char buf[4 * FB_BYTES], *ptr;
 		ptr = buf;

@@ -55,12 +55,23 @@
  */
 /** @{ */
 #if PC_CUR == PRIME
+
+#if FP_PRIME < 1536
 #define G1_LOWER			ep_
 #define G1_UPPER			EP
 #define G2_LOWER			ep2_
 #define G2_UPPER			EP
 #define GT_LOWER			fp12_
 #define PC_LOWER			pp_
+#else
+#define G1_LOWER			ep_
+#define G1_UPPER			EP
+#define G2_LOWER			ep_
+#define G2_UPPER			EP
+#define GT_LOWER			fp2_
+#define PC_LOWER			pp_
+#endif
+
 #else
 #define G1_LOWER			eb_
 #define G1_UPPER			EB
@@ -672,7 +683,13 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[in] Q				- the second element.
  */
 #if PC_CUR == PRIME
+
+#if FP_PRIME < 1536
 #define pc_map(R, P, Q);	CAT(PC_LOWER, map_k12)(R, P, Q)
+#else
+#define pc_map(R, P, Q);	CAT(PC_LOWER, map_k2)(R, P, Q)
+#endif
+
 #else
 #define pc_map(R, P, Q);	CAT(PC_LOWER, map)(R, P, Q)
 #endif

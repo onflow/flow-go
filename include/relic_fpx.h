@@ -639,6 +639,24 @@ void fp2_print(fp2_t a);
 int fp2_cmp(fp2_t a, fp2_t b);
 
 /**
+ * Returns the result of a signed comparison between a quadratic extension field
+ * element and a digit.
+ *
+ * @param[in] a				- the quadratic extension field element.
+ * @param[in] b				- the digit.
+ * @return CMP_LT if a < b, CMP_EQ if a == b and CMP_GT if a > b.
+ */
+int fp2_cmp_dig(fp2_t a, dig_t b);
+
+/**
+ * Assigns a quadratic extension field element to a digit.
+ *
+ * @param[in] a				- the quadratic extension field element.
+ * @param[in] b				- the digit.
+ */
+void fp2_set_dig(fp2_t a, dig_t b);
+
+/**
  * Adds two quadratic extension field elements using basic arithmetic.
  *
  * @param[out] c			- the result.

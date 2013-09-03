@@ -60,6 +60,12 @@ void fp2_print(fp2_t a) {
 	fp_print(a[1]);
 }
 
+void fp2_set_dig(fp2_t a, dig_t b) {
+	fp_set_dig(a[0], b);
+	fp_zero(a[1]);
+}
+
+
 void fp3_copy(fp3_t c, fp3_t a) {
 	fp_copy(c[0], a[0]);
 	fp_copy(c[1], a[1]);

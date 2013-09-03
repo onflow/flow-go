@@ -41,6 +41,10 @@ int fp2_cmp(fp2_t a, fp2_t b) {
 			(fp_cmp(a[1], b[1]) == CMP_EQ) ? CMP_EQ : CMP_NE;
 }
 
+int fp2_cmp_dig(fp2_t a, dig_t b) {
+	return ((fp_cmp_dig(a[0], b) == CMP_EQ) && fp_is_zero(a[1]));
+}
+
 int fp3_cmp(fp3_t a, fp3_t b) {
 	return (fp_cmp(a[0], b[0]) == CMP_EQ) &&
 			(fp_cmp(a[1], b[1]) == CMP_EQ) &&
