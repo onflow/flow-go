@@ -51,10 +51,6 @@ void pb_map_init() {
 	fb_itr_pre((fb_t *)pb_map_get_tab(), 4 * (((FB_BITS + 1) / 2) / 4));
 #endif
 
-#if PB_MAP == ETAT2 || PB_MAP == OETA2
-	fb_itr_pre(pb_map_get_tab(), 6 * (((FB_BITS - 1) / 2) / 6));
-#endif
-
 #if defined(PB_PARAL) && (PB_MAP == ETATS || PB_MAP == ETATN)
 	int chunk = (int)ceilf((FB_BITS - 1) / (2.0 * CORES));
 

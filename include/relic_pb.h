@@ -54,37 +54,10 @@
  * @param[in] P				- the first elliptic curve point.
  * @param[in] Q				- the second elliptic curve point.
  */
-#define pb_map_gens1(R, P, Q)		pb_map_etats(R, P, Q)
-#if PB_MAP == ETATN
-#undef pb_map_gens1
-#define pb_map_gens1(R, P, Q)		pb_map_etatn(R, P, Q)
-#endif
-
-/**
- * Computes the pairing of two binary hyperelliptic divisors. Computes
- * R = e(P, Q).
- *
- * @param[out] R			- the result.
- * @param[in] P				- the first divisor.
- * @param[in] Q				- the second divisor.
- */
-#if PB_MAP == ETAT2
-#define pb_map_gens2(R, P, Q)		pb_map_etat2(R, P, Q)
-#elif PB_MAP == OETA2
-#define pb_map_gens2(R, P, Q)		pb_map_oeta2(R, P, Q)
-#endif
-
-/**
- * Computes the pairing of two points. Computes R = e(P, Q).
- *
- * @param[out] R			- the result.
- * @param[in] P				- the first elliptic curve point.
- * @param[in] Q				- the second elliptic curve point.
- */
-#if PB_MAP == ETATS || PB_MAP == ETATN
-#define pb_map(R, P, Q)				pb_map_gens1(R, P, Q)
-#elif PB_MAP == ETAT2 || PB_MAP == OETA2
-#define pb_map(R, P, Q)				pb_map_gens2(R, P, Q)
+#if PB_MAP == ETATS
+#define pb_map(R, P, Q)		pb_map_etats(R, P, Q)
+#elif PB_MAP == ETATN
+#define pb_map(R, P, Q)		pb_map_etatn(R, P, Q)
 #endif
 
 /*============================================================================*/

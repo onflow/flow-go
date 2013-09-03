@@ -45,10 +45,10 @@ static void pairing(void) {
 	eb_new(q);
 
 #if PB_MAP == ETATS || PB_MAP == ETATN
-	BENCH_BEGIN("pb_map_gens1") {
+	BENCH_BEGIN("pb_map") {
 		eb_rand(p);
 		eb_rand(q);
-		BENCH_ADD(pb_map_gens1(r, p, q));
+		BENCH_ADD(pb_map(r, p, q));
 	}
 	BENCH_END;
 #endif
@@ -78,92 +78,6 @@ static void pairing(void) {
 
 #endif
 
-#ifdef WITH_HB
-
-static void pairing2(void) {
-	hb_t p, q;
-	fb12_t r;
-
-	fb12_new(r);
-	hb_new(p);
-	hb_new(q);
-
-#if PB_MAP == ETAT2 || PB_MAP == OETA2
-	BENCH_BEGIN("pb_map_gens2") {
-		hb_rand(p);
-		hb_rand(q);
-		BENCH_ADD(pb_map_gens2(r, p, q));
-	}
-	BENCH_END;
-#endif
-
-#if PB_MAP == ETAT2 || !defined(STRIP)
-	BENCH_BEGIN("pb_map_etat2 (d,d)") {
-		hb_rand_deg(p);
-		hb_rand_deg(q);
-		BENCH_ADD(pb_map_etat2(r, p, q));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("pb_map_etat2 (d,n)") {
-		hb_rand_deg(p);
-		hb_rand_non(q, 0);
-		BENCH_ADD(pb_map_etat2(r, p, q));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("pb_map_etat2 (n,d)") {
-		hb_rand_deg(p);
-		hb_rand_non(q, 0);
-		BENCH_ADD(pb_map_etat2(r, q, p));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("pb_map_etat2 (n,n)") {
-		hb_rand_non(p, 0);
-		hb_rand_non(q, 0);
-		BENCH_ADD(pb_map_etat2(r, p, q));
-	}
-	BENCH_END;
-#endif
-
-#if PB_MAP == OETA2 || !defined(STRIP)
-	BENCH_BEGIN("pb_map_oeta2 (d,d)") {
-		hb_rand_deg(p);
-		hb_rand_deg(q);
-		BENCH_ADD(pb_map_oeta2(r, p, q));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("pb_map_oeta2 (d,n)") {
-		hb_rand_deg(p);
-		hb_rand_non(q, 0);
-		BENCH_ADD(pb_map_oeta2(r, p, q));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("pb_map_oeta2 (n,d)") {
-		hb_rand_non(p, 0);
-		hb_rand_deg(q);
-		BENCH_ADD(pb_map_oeta2(r, q, p));
-	}
-	BENCH_END;
-
-	BENCH_BEGIN("pb_map_oeta2 (n,n)") {
-		hb_rand_non(p, 0);
-		hb_rand_non(q, 0);
-		BENCH_ADD(pb_map_oeta2(r, p, q));
-	}
-	BENCH_END;
-#endif
-
-	hb_free(p);
-	hb_free(q);
-	fb12_free(r);
-}
-
-#endif
-
 int main(void) {
 	int r0 = STS_ERR, r1 = STS_ERR;
 
@@ -182,15 +96,6 @@ int main(void) {
 		eb_param_print();
 		util_banner("Arithmetic:", 1);
 		pairing();
-	}
-#endif
-
-#ifdef WITH_HB
-	r1 = hb_param_set_any_super();
-	if ( r1 == STS_OK) {
-		hb_param_print();
-		util_banner("Arithmetic:", 1);
-		pairing2();
 	}
 #endif
 

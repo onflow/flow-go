@@ -239,11 +239,7 @@ typedef CAT(GT_LOWER, t) gt_t;
 #if PC_CUR == PRIME
 #define pc_param_set_any()	ep_param_set_any_pairf()
 #elif PC_CUR == CHAR2
-#if PB_MAP == ETAT2 || PB_MAP == OETA2
-#define pc_param_set_any()	hb_param_set_any_super()
-#else
 #define pc_param_set_any()	eb_param_set_any_super()
-#endif
 #endif
 
 /**
