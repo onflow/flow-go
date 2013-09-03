@@ -34,6 +34,44 @@
 #include "relic_conf.h"
 
 /*============================================================================*/
+/* Private definitions                                                        */
+/*============================================================================*/
+
+static void eb_mul_frb(eb_t r, const eb_t p, const signed char *k, int l) {
+	int i;
+	eb_t t;
+
+	eb_null(t);
+
+	TRY {
+		eb_new(t);
+
+		if (k[l - 1] >= 0) {
+			eb_copy(t, p);
+		} else {
+			eb_neg(t, p);
+		}
+		for (i = l - 2; i >= 0; i--) {
+			eb_frb(t, t);
+			if (k[i] > 0) {
+				eb_add(t, t, p);
+			}
+			if (k[i] < 0) {
+				eb_sub(t, t, p);
+			}
+		}
+
+		eb_norm(r, t);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		eb_free(t);
+	}
+}
+
+/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
@@ -203,40 +241,6 @@ int eb_is_valid(const eb_t p) {
 		fb_free(lhs);
 	}
 	return r;
-}
-
-void eb_mul_frb(eb_t r, const eb_t p, const signed char *k, int l) {
-	int i;
-	eb_t t;
-
-	eb_null(t);
-
-	TRY {
-		eb_new(t);
-
-		if (k[l - 1] >= 0) {
-			eb_copy(t, p);
-		} else {
-			eb_neg(t, p);
-		}
-		for (i = l - 2; i >= 0; i--) {
-			eb_frb(t, t);
-			if (k[i] > 0) {
-				eb_add(t, t, p);
-			}
-			if (k[i] < 0) {
-				eb_sub(t, t, p);
-			}
-		}
-
-		eb_norm(r, t);
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		eb_free(t);
-	}
 }
 
 void eb_tab(eb_t *t, const eb_t p, int w) {
