@@ -1218,16 +1218,6 @@ void fp6_mul_lazyr(fp6_t c, fp6_t a, fp6_t b);
 void fp6_mul_art(fp6_t c, fp6_t a);
 
 /**
- * Multiples a sextic extension field element by a quadratic extension
- * field element.
- *
- * @param[out] c			- the result.
- * @param[in] a				- the sextic extension field element.
- * @param[in] b				- the quadratic extension field element.
- */
-void fp6_mul_dxq(fp6_t c, fp6_t a, fp2_t b);
-
-/**
  * Multiples a dense sextic extension field element by a sparse element.
  *
  * The sparse element must have a[2] = 0.
