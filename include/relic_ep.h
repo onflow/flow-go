@@ -807,6 +807,15 @@ void ep_mul_monty(ep_t r, const ep_t p, const bn_t k);
 void ep_mul_lwnaf(ep_t r, const ep_t p, const bn_t k);
 
 /**
+ * Multiplies a prime elliptic point by an integer using a regular method.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ * @param[in] k				- the integer.
+ */
+void ep_mul_lwreg(ep_t r, const ep_t p, const bn_t k);
+
+/**
  * Multiplies the generator of a prime elliptic curve by an integer.
  *
  * @param[out] r			- the result.
