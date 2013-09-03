@@ -32,8 +32,6 @@
 #ifndef RELIC_CONF_H
 #define RELIC_CONF_H
 
-#include "relic_label.h"
-
 /** Project version. */
 #define VERSION "@VERSION@"
 
@@ -672,6 +670,13 @@
 #cmakedefine LABEL    @LABEL@
 
 #ifndef ASM
+
+#define PREFIX(F)			_PREFIX(LABEL, F)
+#define _PREFIX(A, B)		__PREFIX(A, B)
+#define __PREFIX(A, B)		A ## _ ## B
+
+#undef conf_print
+#define conf_print 	PREFIX(conf_print)
 
 /**
  * Prints the project options selected at build time.
