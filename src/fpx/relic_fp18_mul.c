@@ -102,7 +102,7 @@ void fp18_mul_basic(fp18_t c, fp18_t a, fp18_t b) {
 	}
 }
 
-void fp6_mul_dxs_basic(fp6_t c, fp6_t a, fp6_t b) {
+static void fp6_mul_dxs_basic(fp6_t c, fp6_t a, fp6_t b) {
 	fp3_t t0, t1, t2, t3, t4;
 
 	fp3_null(t0);
@@ -151,7 +151,7 @@ void fp6_mul_dxs_basic(fp6_t c, fp6_t a, fp6_t b) {
 	}
 }
 
-void fp6_mul_dxs_unr(dv6_t c, fp6_t a, fp6_t b) {
+static void fp6_mul_dxs_unr(dv6_t c, fp6_t a, fp6_t b) {
 	fp3_t t0, t1, t2;
 	dv3_t t3, t4, t5;
 
@@ -210,7 +210,7 @@ void fp6_mul_dxs_unr(dv6_t c, fp6_t a, fp6_t b) {
 	}
 }
 
-void fp6_mul0_basic(fp6_t c, fp6_t a, fp6_t b) {
+static void fp6_mul0_basic(fp6_t c, fp6_t a, fp6_t b) {
 	fp2_t v0, v1, v2, t0, t1, t2;
 
 	fp2_null(v0);
@@ -283,7 +283,7 @@ void fp6_mul0_basic(fp6_t c, fp6_t a, fp6_t b) {
 	}
 }
 
-void fp6_mul1_basic(fp6_t c, fp6_t a, fp6_t b) {
+static void fp6_mul1_basic(fp6_t c, fp6_t a, fp6_t b) {
 	fp2_t v0, v1, v2, t0, t1, t2;
 
 	fp2_null(v0);

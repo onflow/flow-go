@@ -107,6 +107,7 @@ void fp6_sqr_basic(fp6_t c, fp6_t a) {
 	}
 }
 
+#if 0
 void fp6_sqr_basic2(fp6_t c, fp6_t a) {
 	fp2_t t0, t1, t2, t3, t4;
 
@@ -165,6 +166,7 @@ void fp6_sqr_basic2(fp6_t c, fp6_t a) {
 		fp2_free(t4);
 	}
 }
+#endif
 
 #endif
 
@@ -289,6 +291,7 @@ void fp6_sqr_lazyr(fp6_t c, fp6_t a) {
 	}
 }
 
+#if 0
 void fp6_sqr_lazyr2(fp6_t c, fp6_t a) {
 	dv2_t u0, u1, u2, u3, u4;
 	fp2_t t0, t1;
@@ -369,5 +372,6 @@ void fp6_sqr_lazyr2(fp6_t c, fp6_t a) {
 		fp2_free(t1);
 	}
 }
+#endif
 
 #endif

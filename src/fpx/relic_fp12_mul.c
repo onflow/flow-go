@@ -73,7 +73,7 @@ static void fp4_mul(fp2_t e, fp2_t f, fp2_t a, fp2_t b, fp2_t c, fp2_t d) {
 
 #if PP_EXT == LAZYR || !defined(STRIP)
 
-void fp6_mul_dxs_unr_lazyr(dv6_t c, fp6_t a, fp6_t b) {
+static void fp6_mul_dxs_unr_lazyr(dv6_t c, fp6_t a, fp6_t b) {
 	dv2_t u0, u1, u2, u3;
 	fp2_t t0, t1;
 
@@ -193,6 +193,7 @@ void fp12_mul_basic(fp12_t c, fp12_t a, fp12_t b) {
 	}
 }
 
+#if 0
 void fp12_mul_basic2(fp12_t c, fp12_t a, fp12_t b) {
 	/* a0 = (a00, a11). */
 	/* a1 = (a10, a02). */
@@ -298,6 +299,7 @@ void fp12_mul_basic2(fp12_t c, fp12_t a, fp12_t b) {
 		fp2_free(t9);
 	}
 }
+#endif
 
 void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b) {
 	fp6_t t0, t1, t2;
