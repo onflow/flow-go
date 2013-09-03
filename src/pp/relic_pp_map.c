@@ -239,7 +239,7 @@ static void pp_mil_lit_k12(fp12_t r, ep_t t, ep_t p, ep2_t q, bn_t a) {
  * @param[in] p				- the second point of the pairing, in G_1.
  * @param[in] a				- the loop parameter.
  */
-void pp_fin_k12_oatep(fp12_t r, ep2_t t, ep2_t q, ep_t p) {
+static void pp_fin_k12_oatep(fp12_t r, ep2_t t, ep2_t q, ep_t p) {
 	ep2_t q1, q2;
 	fp12_t tmp;
 

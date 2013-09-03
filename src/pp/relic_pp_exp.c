@@ -130,7 +130,7 @@ static void pp_exp_bn(fp12_t c, fp12_t a) {
  * @param[out] c			- the result.
  * @param[in] a				- the extension field element to exponentiate.
  */
-void pp_exp_b12(fp12_t c, fp12_t a) {
+static void pp_exp_b12(fp12_t c, fp12_t a) {
 	fp12_t t[10];
 	bn_t x;
 	int l = MAX_TERMS + 1, b[MAX_TERMS + 1];
