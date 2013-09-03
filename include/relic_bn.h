@@ -309,7 +309,7 @@ typedef bn_st *bn_t;
 
 /**
  * Reduces a multiple precision integer modulo another integer. This macro
- * should not be called directly. Use bn_mod() with 4 arguments instead.
+ * should not be called directly. Use bn_mod with 4 arguments instead.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the the multiple precision integer to reduce.
