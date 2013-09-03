@@ -128,7 +128,7 @@ static void ep_dbl_basic_imp(ep_t r, fp_t s, const ep_t p) {
  * @param r					- the result.
  * @param p					- the point to double.
  */
-void ep_dbl_projc_imp(ep_t r, const ep_t p) {
+static void ep_dbl_projc_imp(ep_t r, const ep_t p) {
 	fp_t t0, t1, t2, t3, t4, t5;
 
 	fp_null(t1);

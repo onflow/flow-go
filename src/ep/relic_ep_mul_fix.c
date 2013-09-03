@@ -84,7 +84,7 @@ static void ep_mul_fix_ordin(ep_t r, const ep_t *t, const bn_t k) {
  * @param[in] t					- the precomputed table.
  * @param[in] k					- the integer.
  */
-void ep_mul_combs_kbltz(ep_t r, const ep_t *t, const bn_t k) {
+static void ep_mul_combs_kbltz(ep_t r, const ep_t *t, const bn_t k) {
 	int i, j, l, w0, w1, n0, n1, p0, p1, s0, s1;
 	bn_t n, k0, k1, v1[3], v2[3];
 	ep_t u;
@@ -186,7 +186,7 @@ void ep_mul_combs_kbltz(ep_t r, const ep_t *t, const bn_t k) {
  * @param[in] t					- the precomputed table.
  * @param[in] k					- the integer.
  */
-void ep_mul_combs_ordin(ep_t r, const ep_t *t, const bn_t k) {
+static void ep_mul_combs_ordin(ep_t r, const ep_t *t, const bn_t k) {
 	int i, j, l, w, n0, p0, p1;
 	bn_t n;
 
