@@ -135,7 +135,7 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 #if FP_PRIME < 1536
 		unsigned char buf[12 * FP_BYTES], *ptr;
 		ptr = buf;
-		for (i = 0; i < 2; i++) {
+		for (int i = 0; i < 2; i++) {
 			for (int j = 0; j < 3; j++) {
 				for (int m = 0; m < 2; m++) {
 					fp_prime_back(n, e[i][j][m]);

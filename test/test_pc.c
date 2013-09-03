@@ -841,7 +841,7 @@ static int fixed2(void) {
 			bn_mod(k, k, n);
 			g2_mul(q, p, k);
 			g2_mul_pre(t, p);
-			g2_mul_fix(q, (const g2_t *)t, k);
+			g2_mul_fix(q, t, k);
 			g2_mul(r, p, k);
 			TEST_ASSERT(g2_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
