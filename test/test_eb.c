@@ -536,6 +536,9 @@ static int frobenius(void) {
 #endif
 		}
 #endif
+	(void)a;
+	(void)b;
+	(void)c;
 	}
 	CATCH_ANY {
 		ERROR(end);
