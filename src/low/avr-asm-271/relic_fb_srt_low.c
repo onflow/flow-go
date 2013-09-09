@@ -39,7 +39,7 @@ void fb_srtp_low(dig_t *c, dig_t *t, dig_t *a);
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_srtn_low(dig_t *c, dig_t *a) {
+void fb_srtn_low(dig_t *c, const dig_t *a) {
 	dig_t t[FB_DIGS] = { 0 };
 
 	fb_srtp_low(c, t, a);

@@ -46,13 +46,13 @@
  * @param bits
  * @return
  */
-dig_t fb_lshadd1_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd2_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd3_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd4_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd5_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd6_low(dig_t *c, dig_t *a, int size);
-dig_t fb_lshadd7_low(dig_t *c, dig_t *a, int size);
+dig_t fb_lshadd1_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd2_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd3_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd4_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd5_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd6_low(dig_t *c, const dig_t *a, int size);
+dig_t fb_lshadd7_low(dig_t *c, const dig_t *a, int size);
 /*@} */
 
 
@@ -60,7 +60,7 @@ dig_t fb_lshadd7_low(dig_t *c, dig_t *a, int size);
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fb_lshb_low(dig_t *c, dig_t *a, int bits) {
+dig_t fb_lshb_low(dig_t *c, const dig_t *a, int bits) {
 	int i;
 	dig_t r, carry, shift;
 
@@ -81,8 +81,9 @@ dig_t fb_lshb_low(dig_t *c, dig_t *a, int bits) {
 	return carry;
 }
 
-void fb_lshd_low(dig_t *c, dig_t *a, int digits) {
-	dig_t *top, *bot;
+void fb_lshd_low(dig_t *c, const dig_t *a, int digits) {
+	dig_t *top;
+	const dig_t *bot;
 	int i;
 
 	top = c + FB_DIGS + digits - 1;
@@ -96,7 +97,7 @@ void fb_lshd_low(dig_t *c, dig_t *a, int digits) {
 	}
 }
 
-dig_t fb_rshb_low(dig_t *c, dig_t *a, int bits) {
+dig_t fb_rshb_low(dig_t *c, const dig_t *a, int bits) {
 	int i;
 	dig_t r, carry, mask, shift;
 
@@ -120,8 +121,9 @@ dig_t fb_rshb_low(dig_t *c, dig_t *a, int bits) {
 	return carry;
 }
 
-void fb_rshd_low(dig_t *c, dig_t *a, int digits) {
-	dig_t *top, *bot;
+void fb_rshd_low(dig_t *c, const dig_t *a, int digits) {
+	const dig_t *top;
+	dig_t *bot;
 	int i;
 
 	top = a + digits;
@@ -137,7 +139,7 @@ void fb_rshd_low(dig_t *c, dig_t *a, int digits) {
 
 #if FB_INV == EXGCD || !defined(STRIP)
 
-dig_t fb_lshadd_low(dig_t *c, dig_t *a, int bits, int size) {
+dig_t fb_lsha_low(dig_t *c, const dig_t *a, int bits, int size) {
 	if (bits == 1)
 		return fb_lshadd1_low(c, a, size);
 	if (bits == 2)
@@ -160,7 +162,7 @@ dig_t fb_lshadd_low(dig_t *c, dig_t *a, int bits, int size) {
 
 #else
 
-dig_t fb_lshadd_low(dig_t *c, dig_t *a, int bits, int size) {
+dig_t fb_lsha_low(dig_t *c, const dig_t *a, int bits, int size) {
 	int i, j;
 	dig_t b1, b2;
 

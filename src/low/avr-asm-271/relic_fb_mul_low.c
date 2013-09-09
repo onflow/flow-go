@@ -34,7 +34,7 @@
 #include "relic_fb_low.h"
 #include "relic_util.h"
 
-void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
+void fb_mul1_low(dig_t *c, const dig_t *a, dig_t digit) {
 	dig_t carry;
 
 	fb_zero(c);
@@ -52,7 +52,7 @@ void fb_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
 
 #if FB_POLYN == 271
 
-void fb_mulm_low(dig_t *c, dig_t *a, dig_t *b) {
+void fb_mulm_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	dv_t t;
 
 	dv_new(t);
