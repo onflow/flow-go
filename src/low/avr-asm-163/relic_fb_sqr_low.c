@@ -37,9 +37,9 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_sqri_low(dig_t *c, dig_t *t, dig_t *a);
+void fb_sqri_low(dig_t *c, dig_t *t, const dig_t *a);
 
-void fb_sqrm_low(dig_t *c, dig_t *a) {
+void fb_sqrm_low(dig_t *c, const dig_t *a) {
 	dv_t t;
 
 	dv_new(t);

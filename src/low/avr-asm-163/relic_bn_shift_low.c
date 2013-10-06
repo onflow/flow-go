@@ -37,18 +37,16 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t bn_lshb_low(dig_t *c, dig_t *a, int size, int bits) {
+dig_t bn_lshb_low(dig_t *c, const dig_t *a, int size, int bits) {
 	int i;
-	dig_t r, carry, shift;
-
-	if (bits == 1)
-		return bn_lsh1_low(c, a, size);
+	dig_t r, carry, shift, mask;
 
 	shift = BN_DIGIT - bits;
 	carry = 0;
+	mask = MASK(bits);
 	for (i = 0; i < size; i++, a++, c++) {
 		/* Get the needed least significant bits. */
-		r = ((*a) >> shift) & MASK(bits);
+		r = ((*a) >> shift) & mask;
 		/* Shift left the operand. */
 		*c = ((*a) << bits) | carry;
 		/* Update the carry. */
@@ -57,8 +55,9 @@ dig_t bn_lshb_low(dig_t *c, dig_t *a, int size, int bits) {
 	return carry;
 }
 
-void bn_lshd_low(dig_t *c, dig_t *a, int size, int digits) {
-	dig_t *top, *bot;
+void bn_lshd_low(dig_t *c, const dig_t *a, int size, int digits) {
+	dig_t *top;
+	const dig_t *bot;
 	int i;
 
 	top = c + size + digits - 1;
@@ -72,21 +71,19 @@ void bn_lshd_low(dig_t *c, dig_t *a, int size, int digits) {
 	}
 }
 
-dig_t bn_rshb_low(dig_t *c, dig_t *a, int size, int bits) {
+dig_t bn_rshb_low(dig_t *c, const dig_t *a, int size, int bits) {
 	int i;
-	dig_t r, carry, shift;
-
-	if (bits == 1)
-		return bn_rsh1_low(c, a, size);
+	dig_t r, carry, shift, mask;
 
 	c += size - 1;
 	a += size - 1;
 	/* Prepare the bit mask. */
 	shift = BN_DIGIT - bits;
 	carry = 0;
+	mask = MASK(bits);
 	for (i = size - 1; i >= 0; i--, a--, c--) {
 		/* Get the needed least significant bits. */
-		r = (*a) & MASK(bits);
+		r = (*a) & mask;
 		/* Shift left the operand. */
 		*c = ((*a) >> bits) | (carry << shift);
 		/* Update the carry. */
@@ -95,8 +92,9 @@ dig_t bn_rshb_low(dig_t *c, dig_t *a, int size, int bits) {
 	return carry;
 }
 
-void bn_rshd_low(dig_t *c, dig_t *a, int size, int digits) {
-	dig_t *top, *bot;
+void bn_rshd_low(dig_t *c, const dig_t *a, int size, int digits) {
+	const dig_t *top;
+	dig_t *bot;
 	int i;
 
 	top = a + digits;

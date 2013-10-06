@@ -41,8 +41,6 @@
 
 .global bn_rsh1_low
 .global bn_lsh1_low
-.global bn_lsh2_low
-.global bn_lsh4_low
 
 bn_rsh1_low:
 	movw 	r30, r24

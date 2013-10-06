@@ -90,33 +90,33 @@ fb_lsh1_low:
 
 #if FB_INV == EXGCD || !defined(STRIP)
 
-.global fb_lshadd1_low
-.global fb_lshadd2_low
-.global fb_lshadd3_low
-.global fb_lshadd4_low
-.global fb_lshadd5_low
-.global fb_lshadd6_low
-.global fb_lshadd7_low
+.global fb_lsha1_low
+.global fb_lsha2_low
+.global fb_lsha3_low
+.global fb_lsha4_low
+.global fb_lsha5_low
+.global fb_lsha6_low
+.global fb_lsha7_low
 
-fb_lshadd1_low:
+fb_lsha1_low:
 	movw	r30, r24
 	movw	r26, r22
 
 	clc
-fb_lshadd1_loop:
+fb_lsha1_loop:
 	ld		r25, z
 	ld		r21, x+
 	rol		r21
 	eor		r25, r21
 	st		z+, r25
 	dec		r20
-	brne	fb_lshadd1_loop
+	brne	fb_lsha1_loop
 
 	clr		r24
 	rol		r24
 	ret
 
-fb_lshadd2_low:
+fb_lsha2_low:
 	movw	r30, r24
 	movw	r26, r22
 
@@ -130,8 +130,8 @@ fb_lshadd2_low:
 	eor		r25, r21
 	st		z+, r25
 	dec		r20
-	breq	fb_lshadd2_end
-fb_lshadd2_loop:
+	breq	fb_lsha2_end
+fb_lsha2_loop:
 	ld		r25, z
 	ld		r21, x+
 	eor		r25, r24
@@ -143,12 +143,12 @@ fb_lshadd2_loop:
 	eor		r25, r21
 	st		z+, r25
 	dec		r20
-	brne	fb_lshadd2_loop
+	brne	fb_lsha2_loop
 
-fb_lshadd2_end:
+fb_lsha2_end:
 	ret
 
-fb_lshadd3_low:
+fb_lsha3_low:
 	movw	r30, r24
 	movw	r26, r22
 
@@ -164,8 +164,8 @@ fb_lshadd3_low:
 	eor		r25, r21
 	st		z+, r25
 	dec		r20
-	breq	fb_lshadd3_end
-fb_lshadd3_loop:
+	breq	fb_lsha3_end
+fb_lsha3_loop:
 	ld		r25, z
 	ld		r21, x+
 	eor		r25, r24
@@ -179,12 +179,12 @@ fb_lshadd3_loop:
 	eor		r25, r21
 	st		z+, r25
 	dec		r20
-	brne	fb_lshadd3_loop
+	brne	fb_lsha3_loop
 
-fb_lshadd3_end:
+fb_lsha3_end:
 	ret
 
-fb_lshadd4_low:
+fb_lsha4_low:
 	movw	r30, r24
 	movw	r26, r22
 
@@ -197,8 +197,8 @@ fb_lshadd4_low:
 	eor		r25, r21
 	st		z+, r25
 	dec		r20
-	breq	fb_lshadd4_end
-fb_lshadd4_loop:
+	breq	fb_lsha4_end
+fb_lsha4_loop:
 	ld		r25, z
 	ld		r21, x+
 	eor		r25, r24
@@ -209,12 +209,12 @@ fb_lshadd4_loop:
 	eor		r25, r21
 	st		z+, r25
 	dec		r20
-	brne	fb_lshadd4_loop
+	brne	fb_lsha4_loop
 
-fb_lshadd4_end:
+fb_lsha4_end:
 	ret
 
-fb_lshadd5_low:
+fb_lsha5_low:
 	movw	r30, r24
 	movw	r26, r22
 
@@ -229,8 +229,8 @@ fb_lshadd5_low:
 	eor		r25, r21
 	st		z+, r25
 	dec		r20
-	breq	fb_lshadd5_end
-fb_lshadd5_loop:
+	breq	fb_lsha5_end
+fb_lsha5_loop:
 	ld		r25, z
 	ld		r21, x+
 	eor		r25, r24
@@ -243,12 +243,12 @@ fb_lshadd5_loop:
 	eor		r25, r21
 	st		z+, r25
 	dec		r20
-	brne	fb_lshadd5_loop
+	brne	fb_lsha5_loop
 
-fb_lshadd5_end:
+fb_lsha5_end:
 	ret
 
-fb_lshadd6_low:
+fb_lsha6_low:
 	movw	r30, r24
 	movw	r26, r22
 
@@ -264,8 +264,8 @@ fb_lshadd6_low:
 	eor		r25, r23
 	st		z+, r25
 	dec		r20
-	breq	fb_lshadd6_end
-fb_lshadd6_loop:
+	breq	fb_lsha6_end
+fb_lsha6_loop:
 	ld		r25, z
 	eor		r25, r24
 	ld		r24, x+
@@ -278,12 +278,12 @@ fb_lshadd6_loop:
 	lsr		r24
 	st		z+, r25
 	dec		r20
-	brne	fb_lshadd6_loop
+	brne	fb_lsha6_loop
 
-fb_lshadd6_end:
+fb_lsha6_end:
 	ret
 
-fb_lshadd7_low:
+fb_lsha7_low:
 	movw	r30, r24
 	movw	r26, r22
 
@@ -296,8 +296,8 @@ fb_lshadd7_low:
 	eor		r25, r23
 	st		z+, r25
 	dec		r20
-	breq	fb_lshadd7_end
-fb_lshadd7_loop:
+	breq	fb_lsha7_end
+fb_lsha7_loop:
 	ld		r25, z
 	eor		r25, r24
 	ld		r24, x+
@@ -307,9 +307,9 @@ fb_lshadd7_loop:
 	lsr		r24
 	st		z+, r25
 	dec		r20
-	brne	fb_lshadd7_loop
+	brne	fb_lsha7_loop
 
-fb_lshadd7_end:
+fb_lsha7_end:
 	ret
 
 #endif
