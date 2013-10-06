@@ -849,9 +849,9 @@ void bn_rsh(bn_t c, const bn_t a, int bits);
 
 /**
  * Divides a multiple precision integer by another multiple precision integer
- * without computing the remainder. Computes c = floor(a / b).
+ * without computing the positive remainder. Computes c = floor(a / b).
  *
- * @param[out] c			- the resultint quotient.
+ * @param[out] c			- the resulting quotient.
  * @param[in] a				- the dividend.
  * @param[in] b				- the divisor.
  * @throw ERR_NO_VALID		- if the divisor is zero.
@@ -859,11 +859,11 @@ void bn_rsh(bn_t c, const bn_t a, int bits);
 void bn_div(bn_t c, const bn_t a, const bn_t b);
 
 /**
- * Divides a multiple precision integer by another multiple precision integer.
- * Computes c = floor(a / b) and d = a mod b.
+ * Divides a multiple precision integer by another multiple precision integer
+ * and produces a positive remainder. Computes c = floor(a / b) and d = a mod b.
  *
  * @param[out] c			- the resulting quotient.
- * @param[out] d			- the remainder.
+ * @param[out] d			- the positive remainder.
  * @param[in] a				- the dividend.
  * @param[in] b				- the divisor.
  * @throw ERR_NO_VALID		- if the divisor is zero.
