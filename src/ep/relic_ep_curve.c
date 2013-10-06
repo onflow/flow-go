@@ -297,6 +297,9 @@ void ep_curve_set_kbltz(const fp_t b, const ep_t g, const bn_t r, const bn_t h,
 	}
 	bn_dbl(&(ctx->ep_r), &(ctx->ep_r));
 	bn_div(&(ctx->ep_v1[0]), &(ctx->ep_v1[0]), &(ctx->ep_r));
+	if (bn_sign(&ctx->ep_v1[0]) == BN_NEG) {
+		bn_add_dig(&(ctx->ep_v1[0]), &(ctx->ep_v1[0]), 1);
+	}
 	/* v2[0] = round(v1[2] * 2^|n| / l). */
 	bn_lsh(&(ctx->ep_v2[0]), &(ctx->ep_v1[2]), bits + 1);
 	if (bn_sign(&(ctx->ep_v2[0])) == BN_POS) {
@@ -305,6 +308,9 @@ void ep_curve_set_kbltz(const fp_t b, const ep_t g, const bn_t r, const bn_t h,
 		bn_sub(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), &(ctx->ep_r));
 	}
 	bn_div(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), &(ctx->ep_r));
+	if (bn_sign(&ctx->ep_v2[0]) == BN_NEG) {
+		bn_add_dig(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]), 1);
+	}
 	bn_neg(&(ctx->ep_v2[0]), &(ctx->ep_v2[0]));
 #endif
 

@@ -771,7 +771,7 @@ static int division(void) {
 			bn_add(e, e, d);
 			TEST_ASSERT(bn_cmp(a, e) == CMP_EQ, end);
 			TEST_ASSERT(bn_sign(a) == bn_sign(c), end);
-			TEST_ASSERT(bn_sign(b) == bn_sign(d), end);
+			TEST_ASSERT(bn_sign(d) == BN_POS, end);
 		} TEST_END;
 
 		TEST_BEGIN("trivial negative division is correct") {
@@ -784,7 +784,7 @@ static int division(void) {
 			bn_add(e, e, d);
 			TEST_ASSERT(bn_cmp(a, e) == CMP_EQ, end);
 			TEST_ASSERT(bn_sign(a) == bn_sign(c), end);
-			TEST_ASSERT(bn_sign(b) == bn_sign(d), end);
+			TEST_ASSERT(bn_sign(d) == BN_POS, end);
 		} TEST_END;
 
 		TEST_BEGIN("trivial division by negative is correct") {
@@ -796,8 +796,8 @@ static int division(void) {
 			bn_mul(e, c, b);
 			bn_add(e, e, d);
 			TEST_ASSERT(bn_cmp(a, e) == CMP_EQ, end);
-			TEST_ASSERT(bn_sign(a) != bn_sign(c), end);
-			TEST_ASSERT(bn_sign(b) == bn_sign(d), end);
+			TEST_ASSERT(bn_sign(a) == bn_sign(c), end);
+			TEST_ASSERT(bn_sign(d) == BN_POS, end);
 		} TEST_END;
 
 		TEST_BEGIN("division is correct") {
@@ -810,7 +810,7 @@ static int division(void) {
 			bn_add(e, e, d);
 			TEST_ASSERT(bn_cmp(a, e) == CMP_EQ, end);
 			TEST_ASSERT(bn_sign(a) == bn_sign(c), end);
-			TEST_ASSERT(bn_sign(b) == bn_sign(d), end);
+			TEST_ASSERT(bn_sign(d) == BN_POS, end);
 		} TEST_END;
 
 		TEST_BEGIN("negative division is correct") {
@@ -823,7 +823,7 @@ static int division(void) {
 			bn_add(e, e, d);
 			TEST_ASSERT(bn_cmp(a, e) == CMP_EQ, end);
 			TEST_ASSERT(bn_sign(a) == bn_sign(c), end);
-			TEST_ASSERT(bn_sign(b) == bn_sign(d), end);
+			TEST_ASSERT(bn_sign(d) == BN_POS, end);
 		} TEST_END;
 
 		TEST_BEGIN("division by negative is correct") {
@@ -836,7 +836,7 @@ static int division(void) {
 			bn_add(e, e, d);
 			TEST_ASSERT(bn_cmp(a, e) == CMP_EQ, end);
 			TEST_ASSERT(bn_sign(a) != bn_sign(c), end);
-			TEST_ASSERT(bn_sign(b) == bn_sign(d), end);
+			TEST_ASSERT(bn_sign(d) == BN_POS, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
