@@ -56,7 +56,7 @@ static void bn_div_imp(bn_t c, bn_t d, const bn_t a, const bn_t b) {
 
 	/* If a < b, we're done. */
 	if (bn_cmp_abs(a, b) == CMP_LT) {
-		if (bn_sign(a) == bn_sign(b)) {
+		if (bn_sign(a) == BN_POS) {
 			if (c != NULL) {
 				bn_zero(c);
 			}
@@ -66,10 +66,13 @@ static void bn_div_imp(bn_t c, bn_t d, const bn_t a, const bn_t b) {
 		} else {
 			if (c != NULL) {
 				bn_set_dig(c, 1);
-				bn_neg(c, c);
+				if (bn_sign(b) == BN_POS) {
+					bn_neg(c, c);
+				}
 			}
 			if (d != NULL) {
-				bn_add(d, a, b);
+				bn_abs(d, b);
+				bn_add(d, d, a);
 			}
 		}
 		return;
@@ -95,9 +98,10 @@ static void bn_div_imp(bn_t c, bn_t d, const bn_t a, const bn_t b) {
 			q->used = a->used - b->used + 1;
 			q->sign = sign;
 			bn_trim(q);
-			bn_copy(c, q);
-			if (bn_sign(a) != bn_sign(b)) {
-				bn_sub_dig(c, c, 1);
+			if (bn_sign(a) == BN_NEG) {
+				bn_sub_dig(c, q, 1);
+			} else {
+				bn_copy(c, q);
 			}
 		}
 
@@ -105,9 +109,10 @@ static void bn_div_imp(bn_t c, bn_t d, const bn_t a, const bn_t b) {
 			r->used = b->used;
 			r->sign = a->sign;
 			bn_trim(r);
-			bn_copy(d, r);
-			if (bn_sign(a) != bn_sign(b)) {
-				bn_add(d, d, b);
+			if (bn_sign(a) == BN_NEG) {
+				bn_add(d, r, b);
+			} else {
+				bn_copy(d, r);
 			}
 		}
 	}
