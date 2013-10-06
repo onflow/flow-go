@@ -849,7 +849,7 @@ void bn_rsh(bn_t c, const bn_t a, int bits);
 
 /**
  * Divides a multiple precision integer by another multiple precision integer
- * without computing the positive remainder. Computes c = floor(a / b).
+ * without producing the positive remainder. Computes c = floor(a / b).
  *
  * @param[out] c			- the resulting quotient.
  * @param[in] a				- the dividend.
