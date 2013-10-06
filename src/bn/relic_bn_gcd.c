@@ -567,6 +567,9 @@ void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, const bn_t a, const bn_t b) {
 			bn_mul(x, b, t4);
 			bn_sub(x, c, x);
 			bn_div(d, x, a);
+			if (bn_sign(x) != bn_sign(a)) {
+				bn_add_dig(d, d, 1);
+			}
 		} else {
 			bn_mul(t0, t4, u);
 			bn_mul(t1, d, v);
@@ -574,6 +577,9 @@ void bn_gcd_ext_lehme(bn_t c, bn_t d, bn_t e, const bn_t a, const bn_t b) {
 			bn_mul(x, a, d);
 			bn_sub(x, c, x);
 			bn_div(t4, x, b);
+			if (bn_sign(x) != bn_sign(b)) {
+				bn_add_dig(t4, t4, 1);
+			}
 		}
 		if (e != NULL) {
 			bn_copy(e, t4);
