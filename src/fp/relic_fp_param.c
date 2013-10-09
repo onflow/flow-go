@@ -400,6 +400,12 @@ void fp_param_set(int param) {
 				bn_add(p, p, t1);
 				fp_prime_set_dense(p);
 				break;
+#elif FP_PRIME == 255
+			case PRIME_25519:
+				bn_set_2b(p, 255);
+				bn_sub_dig(p, p, 19);
+				fp_prime_set_dense(p);
+				break;
 #elif FP_PRIME == 256
 			case NIST_256:
 				/* p = 2^256 - 2^224 + 2^192 + 2^96 - 1. */
@@ -440,6 +446,12 @@ void fp_param_set(int param) {
 				bn_mul(t1, t0, t0);
 				bn_mul_dig(t1, t1, 36);
 				bn_add(p, p, t1);
+				fp_prime_set_dense(p);
+				break;
+#elif FP_PRIME == 383
+			case PRIME_383187:
+				bn_set_2b(p, 383);
+				bn_sub_dig(p, p, 187);
 				fp_prime_set_dense(p);
 				break;
 #elif FP_PRIME == 384
