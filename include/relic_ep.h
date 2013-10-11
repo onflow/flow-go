@@ -57,6 +57,8 @@ enum {
 	NIST_P192,
 	/** SECG K-192 prime curve. */
 	SECG_K192,
+	/**	Curve22103 prime curve. */
+	CURVE_22103,
 	/** NIST P-224 prime curve. */
 	NIST_P224,
 	/** SECG K-224 prime curve. */

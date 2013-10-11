@@ -358,6 +358,12 @@ void fp_param_set(int param) {
 				f[7] = 192;
 				fp_prime_set_pmers(f, 8);
 				break;
+#elif FP_PRIME == 221
+			case PRIME_22103:
+				bn_set_2b(p, 221);
+				bn_sub_dig(p, p, 3);
+				fp_prime_set_dense(p);
+				break;
 #elif FP_PRIME == 224
 			case NIST_224:
 				/* p = 2^224 - 2^96 + 1. */
@@ -590,10 +596,14 @@ int fp_param_set_any(void) {
 	fp_param_set(SECG_160);
 #elif FP_PRIME == 192
 	fp_param_set(NIST_192);
+#elif FP_PRIME == 221
+	fp_param_set(PRIME_22103);
 #elif FP_PRIME == 224
 	fp_param_set(NIST_224);
 #elif FP_PRIME == 254
 	fp_param_set(BN_254);
+#elif FP_PRIME == 255
+	fp_param_set(PRIME_25519);
 #elif FP_PRIME == 256
 #ifdef FP_PMERS
 	fp_param_set(SECG_256);
