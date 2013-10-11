@@ -173,7 +173,7 @@ void fb_rshd_low(dig_t *c, const dig_t *a, int digits);
  * Computes c = c + (a * z^bits).
  *
  * @param[out] c			- the result.
- * @param[in] a				- the first digit vector to shift and add.
+ * @param[in] a				- the digit vector to shift and add.
  * @param[in] size			- the number of digits to add.
  * @param[in] bits			- the shift amount.
  * @return the carry of the last shift.
