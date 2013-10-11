@@ -88,12 +88,18 @@ enum {
 	NIST_224,
 	/** SECG 224-bit denser reduction prime. */
 	SECG_224,
+	/** Curve4417 226-bit prime modulus. */
+	PRIME_22605,
+	/* Curve1174 251-bit prime modulus. */
+	PRIME_25109,
 	/** Curve25519 255-bit prime modulus. */
 	PRIME_25519,
 	/** NIST 256-bit fast reduction polynomial. */
 	NIST_256,
 	/** SECG 256-bit denser reduction prime. */
 	SECG_256,
+	/** Curve67254 382-bit prime modulus. */
+	PRIME_382105,
 	/** Curve383187 383-bit prime modulus. */
 	PRIME_383187,
 	/** NIST 384-bit fast reduction polynomial. */
