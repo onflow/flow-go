@@ -536,6 +536,12 @@ void fp_param_set(int param) {
 				bn_sub_dig(p, p, 1);
 				fp_prime_set_dense(p);
 				break;
+#elif FP_PRIME == 511
+			case PRIME_511187:
+				bn_set_2b(p, 511);
+				bn_sub_dig(p, p, 187);
+				fp_prime_set_dense(p);
+				break;
 #elif FP_PRIME == 521
 			case NIST_521:
 				/* p = 2^521 - 1. */
@@ -642,6 +648,8 @@ int fp_param_set_any(void) {
 	fp_param_set(B24_477);
 #elif FP_PRIME == 508
 	fp_param_set(KSS_508);
+#elif FP_PRIME == 511
+	fp_param_set(PRIME_511187);
 #elif FP_PRIME == 521
 	fp_param_set(NIST_521);
 #elif FP_PRIME == 638

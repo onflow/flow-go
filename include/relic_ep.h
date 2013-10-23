@@ -79,6 +79,8 @@ enum {
 	CURVE_383187,
 	/** NIST P-384 prime curve. */
 	NIST_P384,
+	/** Curve 511187 prime curve. */
+	CURVE_511187,
 	/** NIST P-521 prime curve. */
 	NIST_P521,
 	/** Barreto-Naehrig curve with positive x */
