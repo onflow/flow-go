@@ -725,99 +725,57 @@ void bn_gcd_ext_stein(bn_t c, bn_t d, bn_t e, const bn_t a, const bn_t b) {
 		bn_zero(d);
 		bn_set_dig(_e, 1);
 
+		found = 0;
+		while (!found) {
+			/* While u is even, u = u/2. */
+			while ((u->dp[0] & 0x01) == 0) {
+				bn_hlv(u, u);
+				/* If A = B = 0 (mod 2) then A = A/2, B = B/2. */
+				if ((_a->dp[0] & 0x01) == 0 && (_b->dp[0] & 0x01) == 0) {
+					bn_hlv(_a, _a);
+					bn_hlv(_b, _b);
+				} else {
+					/* Otherwise A = (A + y)/2, B = (B - x)/2. */
+					bn_add(_a, _a, y);
+					bn_hlv(_a, _a);
+					bn_sub(_b, _b, x);
+					bn_hlv(_b, _b);
+				}
+			}
+			/* While v is even, v = v/2. */
+			while ((v->dp[0] & 0x01) == 0) {
+				bn_hlv(v, v);
+				/* If C = D = 0 (mod 2) then C = C/2, D = D/2. */
+				if ((d->dp[0] & 0x01) == 0 && (_e->dp[0] & 0x01) == 0) {
+					bn_hlv(d, d);
+					bn_hlv(_e, _e);
+				} else {
+					/* Otherwise C = (C + y)/2, D = (D - x)/2. */
+					bn_add(d, d, y);
+					bn_hlv(d, d);
+					bn_sub(_e, _e, x);
+					bn_hlv(_e, _e);
+				}
+			}
+			/* If u >= v then u = u - v, A = A - C, B = B - D. */
+			if (bn_cmp(u, v) != CMP_LT) {
+				bn_sub(u, u, v);
+				bn_sub(_a, _a, d);
+				bn_sub(_b, _b, _e);
+			} else {
+				/* Otherwise, v = v - u, C = C - a, D = D - B. */
+				bn_sub(v, v, u);
+				bn_sub(d, d, _a);
+				bn_sub(_e, _e, _b);
+			}
+			/* If u = 0 then d = C, e = D and return (d, e, g * v). */
+			if (bn_is_zero(u)) {
+				bn_lsh(c, v, shift);
+				found = 1;
+			}
+		}
 		if (e != NULL) {
-			found = 0;
-			while (!found) {
-				/* While u is even, u = u/2. */
-				while ((u->dp[0] & 0x01) == 0) {
-					bn_hlv(u, u);
-					/* If A = B = 0 (mod 2) then A = A/2, B = B/2. */
-					if ((_a->dp[0] & 0x01) == 0 && (_b->dp[0] & 0x01) == 0) {
-						bn_hlv(_a, _a);
-						bn_hlv(_b, _b);
-					} else {
-						/* Otherwise A = (A + y)/2, B = (B - x)/2. */
-						bn_add(_a, _a, y);
-						bn_hlv(_a, _a);
-						bn_sub(_b, _b, x);
-						bn_hlv(_b, _b);
-					}
-				}
-				/* While v is even, v = v/2. */
-				while ((v->dp[0] & 0x01) == 0) {
-					bn_hlv(v, v);
-					/* If C = D = 0 (mod 2) then C = C/2, D = D/2. */
-					if ((d->dp[0] & 0x01) == 0 && (_e->dp[0] & 0x01) == 0) {
-						bn_hlv(d, d);
-						bn_hlv(_e, _e);
-					} else {
-						/* Otherwise C = (C + y)/2, D = (D - x)/2. */
-						bn_add(d, d, y);
-						bn_hlv(d, d);
-						bn_sub(_e, _e, x);
-						bn_hlv(_e, _e);
-					}
-				}
-				/* If u >= v then u = u - v, A = A - C, B = B - D. */
-				if (bn_cmp(u, v) != CMP_LT) {
-					bn_sub(u, u, v);
-					bn_sub(_a, _a, d);
-					bn_sub(_b, _b, _e);
-				} else {
-					/* Otherwise, v = v - u, C = C - a, D = D - B. */
-					bn_sub(v, v, u);
-					bn_sub(d, d, _a);
-					bn_sub(_e, _e, _b);
-				}
-				/* If u = 0 then d = C, e = D and return (d, e, g * v). */
-				if (bn_is_zero(u)) {
-					bn_lsh(c, v, shift);
-					found = 1;
-				}
-			}
 			bn_copy(e, _e);
-		} else {
-			found = 0;
-			while (!found) {
-				/* While u is even, u = u/2. */
-				while ((u->dp[0] & 0x01) == 0) {
-					bn_hlv(u, u);
-					/* If A = B = 0 (mod 2) then A = A/2. */
-					if ((_a->dp[0] & 0x01) == 0) {
-						bn_hlv(_a, _a);
-					} else {
-						/* Otherwise A = (A + y)/2. */
-						bn_add(_a, _a, y);
-						bn_hlv(_a, _a);
-					}
-				}
-				/* While v is even, v = v/2. */
-				while ((v->dp[0] & 0x01) == 0) {
-					bn_hlv(v, v);
-					/* If C = D = 0 (mod 2) then C = C/2. */
-					if ((d->dp[0] & 0x01) == 0) {
-						bn_hlv(d, d);
-					} else {
-						/* Otherwise C = (C + y)/2. */
-						bn_add(d, d, y);
-						bn_hlv(d, d);
-					}
-				}
-				/* If u >= v then u = u - v, A = A - C, B = B - D. */
-				if (bn_cmp(u, v) != CMP_LT) {
-					bn_sub(u, u, v);
-					bn_sub(_a, _a, d);
-				} else {
-					/* Otherwise, v = v - u, C = C - a, D = D - B. */
-					bn_sub(v, v, u);
-					bn_sub(d, d, _a);
-				}
-				/* If u = 0 then d = C, e = D and return (d, e, g * v). */
-				if (bn_is_zero(u)) {
-					bn_lsh(c, v, shift);
-					found = 1;
-				}
-			}
 		}
 	}
 	CATCH_ANY {
