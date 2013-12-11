@@ -48,6 +48,7 @@
 #include "relic_pb.h"
 #include "relic_pc.h"
 #include "relic_cp.h"
+#include "relic_bc.h"
 #include "relic_md.h"
 #include "relic_arch.h"
 #include "relic_err.h"
