@@ -114,7 +114,7 @@ int cp_ecies_enc(unsigned char *out, int *out_len, unsigned char *in,
 		result = STS_ERR;
 	} FINALLY {
 		bn_free(k);
-		bn_free(r);
+		bn_free(n);
 		bn_free(x);
 		ec_free(p);
 	}
