@@ -205,6 +205,40 @@ static void rabin(void) {
 	rabin_free(prv);
 }
 
+static void bdpe(void) {
+	bdpe_t pub, prv;
+	dig_t in, new;
+	unsigned char out[BN_BITS / 8 + 1];
+	int out_len;
+
+	bdpe_null(pub);
+	bdpe_null(prv);
+
+	bdpe_new(pub);
+	bdpe_new(prv);
+
+	BENCH_ONCE("cp_bdpe_gen", cp_bdpe_gen(pub, prv, bn_get_prime(47), BN_BITS));
+
+	BENCH_BEGIN("cp_bdpe_enc") {
+		out_len = BN_BITS / 8 + 1;
+		rand_bytes(out, 1);
+		in = out[0] % bn_get_prime(47);
+		BENCH_ADD(cp_bdpe_enc(out, &out_len, in, pub));
+		cp_bdpe_dec(&new, out, out_len, prv);
+	} BENCH_END;
+
+	BENCH_BEGIN("cp_bdpe_dec") {
+		out_len = BN_BITS / 8 + 1;
+		rand_bytes(out, 1);
+		in = out[0] % bn_get_prime(47);
+		cp_bdpe_enc(out, &out_len, in, pub);
+		BENCH_ADD(cp_bdpe_dec(&new, out, out_len, prv));
+	} BENCH_END;
+
+	bdpe_free(pub);
+	bdpe_free(prv);
+}
+
 #endif
 
 #if defined(WITH_EC)
@@ -495,6 +529,7 @@ int main(void) {
 	util_banner("Protocols based on integer factorization:\n", 0);
 	rsa();
 	rabin();
+	bdpe();
 #endif
 
 #if defined(WITH_EC)

@@ -132,6 +132,31 @@ typedef rabin_st *rabin_t;
 #endif
 
 /**
+ * Represents a Benaloh's Dense Probabilistic Encryption key pair.
+ */
+typedef struct _bdpe_t {
+	/** The modulus n = pq. */
+	bn_t n;
+	/** The first prime p. */
+	bn_t p;
+	/** The second prime q. */
+	bn_t q;
+	/** The random element in {0, ..., n - 1}. */
+	bn_t y;
+	/** The divisor of (p-1) such that gcd(t, (p-1)/t) = gcd(t, q-1) = 1. */
+	dig_t t;
+} bdpe_st;
+
+/**
+ * Pointer to a Benaloh's Dense Probabilistic Encryption key pair.
+ */
+#if ALLOC == AUTO
+typedef bdpe_st bdpe_t[1];
+#else
+typedef bdpe_st *bdpe_t;
+#endif
+
+/**
  * Represents a SOK key pair.
  */
 typedef struct _sokaka {
@@ -394,6 +419,106 @@ typedef sokaka_st *sokaka_t;
 #endif
 
 /**
+ * Initializes a Benaloh's key pair with a null value.
+ *
+ * @param[out] A			- the key pair to initialize.
+ */
+#if ALLOC == AUTO
+#define bdpe_null(A)			/* empty */
+#else
+#define bdpe_null(A)			A = NULL;
+#endif
+
+/**
+ * Calls a function to allocate and initialize a Benaloh's key pair.
+ *
+ * @param[out] A			- the new key pair.
+ */
+#if ALLOC == DYNAMIC
+#define bdpe_new(A)															\
+	A = (bdpe_t)calloc(1, sizeof(bdpe_st));									\
+	if (A == NULL) {														\
+		THROW(ERR_NO_MEMORY);												\
+	}																		\
+	bn_new((A)->n);															\
+	bn_new((A)->y);															\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+	(A)->t = 0;																\
+
+#elif ALLOC == STATIC
+#define bdpe_new(A)															\
+	A = (bdpe_t)alloca(sizeof(bdpe_st));									\
+	if (A == NULL) {														\
+		THROW(ERR_NO_MEMORY);												\
+	}																		\
+	bn_new((A)->n);															\
+	bn_new((A)->y);															\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+	(A)->t = 0;																\
+
+#elif ALLOC == AUTO
+#define bdpe_new(A)															\
+	bn_new((A)->n);															\
+	bn_new((A)->y);															\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+	(A)->t = 0;																\
+
+#elif ALLOC == STACK
+#define bdpe_new(A)															\
+	A = (bdpe_t)alloca(sizeof(bdpe_st));									\
+	bn_new((A)->n);															\
+	bn_new((A)->y);															\
+	bn_new((A)->p);															\
+	bn_new((A)->q);															\
+
+#endif
+
+/**
+ * Calls a function to clean and free a Benaloh's key pair.
+ *
+ * @param[out] A			- the key pair to clean and free.
+ */
+#if ALLOC == DYNAMIC
+#define bdpe_free(A)														\
+	if (A != NULL) {														\
+		bn_free((A)->n);													\
+		bn_free((A)->y);													\
+		bn_free((A)->p);													\
+		bn_free((A)->q);													\
+		(A)->t = 0;															\
+		free(A);															\
+		A = NULL;															\
+	}
+
+#elif ALLOC == STATIC
+#define bdpe_free(A)														\
+	if (A != NULL) {														\
+		bn_free((A)->n);													\
+		bn_free((A)->y);													\
+		bn_free((A)->p);													\
+		bn_free((A)->q);													\
+		(A)->t = 0;															\
+		A = NULL;															\
+	}																		\
+
+#elif ALLOC == AUTO
+#define bdpe_free(A)			/* empty */
+
+#elif ALLOC == STACK
+#define bdpe_free(A)														\
+	bn_free((A)->n);														\
+	bn_free((A)->y);														\
+	bn_free((A)->p);														\
+	bn_free((A)->q);														\
+	(A)->t = 0;																\
+	A = NULL;																\
+
+#endif
+
+/**
  * Initializes a SOKAKA key pair with a null value.
  *
  * @param[out] A			- the key pair to initialize.
@@ -561,7 +686,7 @@ int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
  * @param[out] out			- the output buffer.
  * @param[out] out_len		- the number of bytes written in the output buffer.
  * @param[in] in			- the input buffer.
- * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] in_len		- the number of bytes to decrypt.
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
@@ -574,7 +699,7 @@ int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
  * @param[out] out			- the output buffer.
  * @param[out] out_len		- the number of bytes written in the output buffer.
  * @param[in] in			- the input buffer.
- * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] in_len		- the number of bytes to decrypt.
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
@@ -655,12 +780,45 @@ int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in,
  * @param[out] out			- the output buffer.
  * @param[out] out_len		- the number of bytes written in the output buffer.
  * @param[in] in			- the input buffer.
- * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] in_len		- the number of bytes to decrypt.
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in,
 		int in_len, rabin_t prv);
+
+/**
+ * Generates a new key pair gor Benaloh's Dense Probabilistic Encryption system.
+ *
+ * @param[out] pub			- the public key.
+ * @param[out] prv			- the private key.
+ * @param[in] block			- the block size.
+ * @param[in] bits			- the key length in bits.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_bdpe_gen(bdpe_t pub, bdpe_t prv, dig_t block, int bits);
+
+/**
+ * Encrypts using Benaloh's cryptosystem.
+ *
+ * @param[out] out			- the output buffer.
+ * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in] in			- the plaintext as a small integer.
+ * @param[in] pub			- the public key.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_bdpe_enc(unsigned char *out, int *out_len, dig_t in, bdpe_t pub);
+
+/**
+ * Decrypts using Benaloh's cryptosystem.
+ *
+ * @param[out] out			- the decrypted small integer.
+ * @param[in] in			- the input buffer.
+ * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] prv			- the private key.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_bdpe_dec(dig_t *out, unsigned char *in, int in_len, bdpe_t prv);
 
 /**
  * Generates an ECDH key pair.

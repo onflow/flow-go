@@ -100,8 +100,7 @@ static int rsa(void) {
 			TEST_ASSERT(cp_rsa_sig(out, &ol, in, il, 0, prv) == STS_OK, end);
 			TEST_ASSERT(cp_rsa_ver(out, ol, in, il, 0, pub) == 1, end);
 			md_map(h, in, il);
-			TEST_ASSERT(cp_rsa_sig(out, &ol, h, MD_LEN, 1, prv) == STS_OK,
-					end);
+			TEST_ASSERT(cp_rsa_sig(out, &ol, h, MD_LEN, 1, prv) == STS_OK, end);
 			TEST_ASSERT(cp_rsa_ver(out, ol, h, MD_LEN, 1, pub) == 1, end);
 		} TEST_END;
 
@@ -188,6 +187,70 @@ static int rabin(void) {
   end:
 	rabin_free(pub);
 	rabin_free(prv);
+	return code;
+}
+
+static int bdpe(void) {
+	int code = STS_ERR;
+	bdpe_t pub, prv;
+	bn_t a, b;
+	dig_t in, out;
+	unsigned char buf[BN_BITS / 8 + 1];
+	int len;
+	int result;
+
+	bn_null(a);
+	bn_null(b);
+	bdpe_null(pub);
+	bdpe_null(prv);
+
+	TRY {
+		bn_new(a);
+		bn_new(b);
+		bdpe_new(pub);
+		bdpe_new(prv);
+
+		result = cp_bdpe_gen(pub, prv, bn_get_prime(47), BN_BITS);
+
+		TEST_BEGIN("benaloh encryption/decryption is correct") {
+			TEST_ASSERT(result == STS_OK, end);
+			len = BN_BITS / 8 + 1;
+			rand_bytes(buf, 1);
+			in = buf[0] % bn_get_prime(47);
+			TEST_ASSERT(cp_bdpe_enc(buf, &len, in, pub) == STS_OK, end);
+			TEST_ASSERT(cp_bdpe_dec(&out, buf, len, prv) == STS_OK, end);
+			TEST_ASSERT(in == out, end);
+		} TEST_END;
+
+		TEST_BEGIN("benaloh encryption/decryption is homomorphic") {
+			TEST_ASSERT(result == STS_OK, end);
+			len = BN_BITS / 8 + 1;
+			rand_bytes(buf, 1);
+			in = buf[0] % bn_get_prime(47);
+			TEST_ASSERT(cp_bdpe_enc(buf, &len, in, pub) == STS_OK, end);
+			bn_read_bin(a, buf, len);
+			rand_bytes(buf, 1);
+			in *= buf[0];
+			in %= bn_get_prime(47);
+			TEST_ASSERT(cp_bdpe_enc(buf, &len, in, pub) == STS_OK, end);
+			bn_read_bin(b, buf, len);
+			bn_mul(a, a, b);
+			bn_mod(a, a, pub->n);
+			len = BN_BITS/8 + 1;
+			bn_write_bin(buf, len, a);
+			TEST_ASSERT(cp_bdpe_dec(&out, buf, len, prv) == STS_OK, end);
+			TEST_ASSERT(in == out, end);
+		} TEST_END;
+	} CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+
+  end:
+	bn_free(a);
+	bn_free(b);
+	bdpe_free(pub);
+	bdpe_free(prv);
 	return code;
 }
 
@@ -587,7 +650,7 @@ int main(void) {
 	util_banner("Tests for the CP module", 0);
 
 #if defined(WITH_BN)
-	util_banner("Protocols based on prime factorization:\n", 0);
+	util_banner("Protocols based on integer factorization:\n", 0);
 
 	if (rsa() != STS_OK) {
 		core_clean();
@@ -595,6 +658,11 @@ int main(void) {
 	}
 
 	if (rabin() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (bdpe() != STS_OK) {
 		core_clean();
 		return 1;
 	}

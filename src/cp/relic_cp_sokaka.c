@@ -81,7 +81,7 @@ void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master) {
 
 void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 		int len1, sokaka_t k, char *id2, int len2) {
-	int l, first = 0;
+	int first = 0;
 	g1_t p;
 	g2_t q;
 	gt_t e;
@@ -131,7 +131,7 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 			}
 		}
 #if PC_CUR == PRIME
-
+		int l;
 #if FP_PRIME < 1536
 		unsigned char buf[12 * FP_BYTES], *ptr;
 		ptr = buf;
