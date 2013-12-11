@@ -189,4 +189,16 @@ void md_kdf2(unsigned char *key, int key_len, const unsigned char *in,
 void md_mgf1(unsigned char *mask, int mask_len, const unsigned char *in,
 		int in_len);
 
+/**
+ * Computes a Message Authentication Code through HMAC.
+ *
+ * @param[out] mac				- the authentication.
+ * @param[in] in				- the date to authenticate.
+ * @param[in] in_len			- the number of bytes to authenticate.
+ * @param[in] key				- the cryptographic key.
+ * @param[in] key_len			- the size of the key in bytes.
+ */
+void md_hmac(unsigned char *mac, unsigned char *in, int in_len,
+		unsigned char *key, int key_len);
+
 #endif /* !RELIC_MD_H */

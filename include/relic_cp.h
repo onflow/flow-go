@@ -863,6 +863,41 @@ void cp_ecmqv_key(unsigned char *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
 		ec_t q1v, ec_t q2v);
 
 /**
+ * Generates an ECIES key pair.
+ *
+ * @param[out] d			- the private key.
+ * @param[in] q				- the public key.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_ecies_gen(bn_t d, ec_t q);
+
+/**
+ * Encrypts using the ECIES cryptosystem.
+ *
+ * @param[out] out			- the output buffer.
+ * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in] in			- the input buffer.
+ * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] q				- the public key.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_ecies_enc(unsigned char *out, int *out_len, unsigned char *in,
+		int in_len, unsigned char *iv, unsigned char *mac, ec_t r, ec_t q);
+
+/**
+ * Decrypts using the ECIES cryptosystem.
+ *
+ * @param[out] out			- the output buffer.
+ * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in] in			- the input buffer.
+ * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] d				- the private key.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_ecies_dec(unsigned char *out, int *out_len, unsigned char *in,
+		int in_len, unsigned char *iv, unsigned char *mac, ec_t r, bn_t d);
+
+/**
  * Generates an ECDSA key pair.
  *
  * @param[out] d			- the private key.
