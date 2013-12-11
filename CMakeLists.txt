@@ -131,7 +131,7 @@ message("   TIMER=ANSI     ANSI-compatible timer.")
 message("   TIMER=POSIX    POSIX-compatible timer.")
 message("   TIMER=CYCLE    Cycle-counting timer. (architecture-dependant)\n")
 
-message(STATUS "Prefix to identify this build of the library (default = ""):")
+message(STATUS "Prefix to identify this build of the library (default = \"\"):")
 message("   LABEL=relic\n")
 
 include(cmake/bn.cmake)
