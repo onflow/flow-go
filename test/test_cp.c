@@ -230,13 +230,13 @@ static int bdpe(void) {
 			TEST_ASSERT(cp_bdpe_enc(buf, &len, in, pub) == STS_OK, end);
 			bn_read_bin(a, buf, len);
 			rand_bytes(buf, 1);
-			in *= buf[0];
-			in %= bn_get_prime(47);
-			TEST_ASSERT(cp_bdpe_enc(buf, &len, in, pub) == STS_OK, end);
+			out = (buf[0] % bn_get_prime(47));
+			in = (in + out) % bn_get_prime(47);
+			TEST_ASSERT(cp_bdpe_enc(buf, &len, out, pub) == STS_OK, end);
 			bn_read_bin(b, buf, len);
 			bn_mul(a, a, b);
 			bn_mod(a, a, pub->n);
-			len = BN_BITS/8 + 1;
+			bn_size_bin(&len, pub->n);
 			bn_write_bin(buf, len, a);
 			TEST_ASSERT(cp_bdpe_dec(&out, buf, len, prv) == STS_OK, end);
 			TEST_ASSERT(in == out, end);
@@ -338,7 +338,7 @@ static int ecdh(void) {
 		ec_new(q_a);
 		ec_new(q_b);
 
-		TEST_BEGIN("ecdh is correct") {
+		TEST_BEGIN("ecdh key agreement is correct") {
 			cp_ecdh_gen(d_a, q_a);
 			cp_ecdh_gen(d_b, q_b);
 			cp_ecdh_key(key1, MD_LEN, d_b, q_a);
@@ -429,7 +429,7 @@ static int ecmqv(void) {
 		ec_new(q2_a);
 		ec_new(q2_b);
 
-		TEST_BEGIN("ecmqv is correct") {
+		TEST_BEGIN("ecmqv authenticated key agreement is correct") {
 			cp_ecmqv_gen(d1_a, q1_a);
 			cp_ecmqv_gen(d2_a, q2_a);
 			cp_ecmqv_gen(d1_b, q1_b);
@@ -456,6 +456,49 @@ static int ecmqv(void) {
 	return code;
 }
 
+static int ecies(void) {
+	int code = STS_ERR;
+	ec_t q, r;
+	bn_t d;
+	unsigned char in[10], out[16], iv[BC_LEN], mac[MD_LEN];
+	int in_len, out_len;
+	int result;
+
+	bn_null(d);
+	ec_null(q);
+	ec_null(r);
+
+	TRY {
+		ec_new(q);
+		ec_new(r);
+		bn_new(d);
+
+		result = cp_ecies_gen(d, q);
+
+		TEST_BEGIN("ecies encryption/decryption is correct") {
+			TEST_ASSERT(result == STS_OK, end);
+			in_len = 10;
+			out_len = 16;
+			rand_bytes(in, in_len);
+			rand_bytes(iv, BC_LEN);
+			TEST_ASSERT(cp_ecies_enc(out, &out_len, in, in_len, iv, mac, r, q)
+					== STS_OK, end);
+			TEST_ASSERT(cp_ecies_dec(out, &out_len, out, out_len, iv, mac, r, d)
+					== STS_OK, end);
+			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
+		} TEST_END;
+	} CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+
+  end:
+	ec_free(q);
+	ec_free(r);
+	bn_free(d);
+	return code;
+}
+
 static int ecdsa(void) {
 	int code = STS_ERR;
 	bn_t d, r, s;
@@ -473,7 +516,7 @@ static int ecdsa(void) {
 		bn_new(s);
 		ec_new(q);
 
-		TEST_BEGIN("ecdsa is correct") {
+		TEST_BEGIN("ecdsa signature is correct") {
 			cp_ecdsa_gen(d, q);
 			cp_ecdsa_sig(r, s, msg, 5, 0, d);
 			TEST_ASSERT(cp_ecdsa_ver(r, s, msg, 5, 0, q) == 1, end);
@@ -510,7 +553,7 @@ static int ecss(void) {
 		bn_new(r);
 		ec_new(q);
 
-		TEST_BEGIN("ecss is correct") {
+		TEST_BEGIN("ecss signature is correct") {
 			cp_ecss_gen(d, q);
 			cp_ecss_sig(r, d, msg, 5, d);
 			TEST_ASSERT(cp_ecss_ver(r, d, msg, 5, q) == 1, end);
@@ -676,6 +719,10 @@ int main(void) {
 			return 1;
 		}
 		if (ecmqv() != STS_OK) {
+			core_clean();
+			return 1;
+		}
+		if (ecies() != STS_OK) {
 			core_clean();
 			return 1;
 		}
