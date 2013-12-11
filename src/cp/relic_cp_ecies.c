@@ -78,7 +78,7 @@ int cp_ecies_enc(unsigned char *out, int *out_len, unsigned char *in,
 		int in_len, unsigned char *iv, unsigned char *mac, ec_t r, ec_t q) {
 	bn_t k, n, x;
 	ec_t p;
-	int l, size = ec_param_level()/8, result = STS_OK;
+	int l, result = STS_OK, size = CEIL(ec_param_level(), 8);
 	unsigned char _x[EC_BYTES], key[2 * size];
 	
 	bn_null(k);
@@ -126,7 +126,7 @@ int cp_ecies_dec(unsigned char *out, int *out_len, unsigned char *in,
 		int in_len, unsigned char *iv, unsigned char *mac, ec_t r, bn_t d) {
 	ec_t p;
 	bn_t x;
-	int l, size = ec_param_level()/8, result = STS_OK;
+	int l, result = STS_OK, size = CEIL(ec_param_level(), 8);
 	unsigned char _x[EC_BYTES], h[MD_LEN], key[2 * size];
 	
 	bn_null(x);
