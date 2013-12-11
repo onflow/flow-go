@@ -382,7 +382,8 @@ void fp_prime_set_pmers(const int *f, int len) {
 			THROW(ERR_NO_VALID);
 		}
 
-		for (int i = len - 1; i > 0; i--) {
+		bn_set_2b(p, f[len - 1]);
+		for (int i = len - 2; i > 0; i--) {
 			if (f[i] > 0) {
 				bn_set_2b(t, f[i]);
 				bn_add(p, p, t);
