@@ -178,7 +178,7 @@ if (SHLIB)
 	add_dependencies(${RELIC} arith_objs)
 	target_link_libraries(${RELIC} ${ARITH_LIBS})
 	LINK_LIBS(${RELIC})
-	install(TARGETS ${RELIC} LIBRARY DESTINATION lib)
+	install(TARGETS ${RELIC} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 endif(SHLIB)
 
 if (STLIB)
