@@ -39,10 +39,6 @@
 #include "relic_bc.h"
 
 /*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-/*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
@@ -105,7 +101,8 @@ int cp_ecies_enc(unsigned char *out, int *out_len, unsigned char *in,
 		bn_size_bin(&l, x);
 		bn_write_bin(_x, l, x);
 		md_kdf2(key, 2 * size, _x, l);
-		if (bc_aes_cbc_enc(out, out_len, in, in_len, key, 8 * size, iv) != STS_OK) {
+		if (bc_aes_cbc_enc(out, out_len, in, in_len, key, 8 * size, iv)
+				!= STS_OK) {
 			result = STS_ERR;
 		} else {
 			md_hmac(mac, out, *out_len, key + size, size);
@@ -145,7 +142,8 @@ int cp_ecies_dec(unsigned char *out, int *out_len, unsigned char *in,
 		if (util_cmp_const(h, mac, MD_LEN)) {
 			result = STS_ERR;
 		} else {
-			if (bc_aes_cbc_dec(out, out_len, in, in_len, key, 8 * size, iv) != STS_OK) {
+			if (bc_aes_cbc_dec(out, out_len, in, in_len, key, 8 * size, iv)
+					!= STS_OK) {
 				result = STS_ERR;
 			}
 		}

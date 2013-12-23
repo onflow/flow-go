@@ -62,7 +62,8 @@ void cp_ecmqv_gen(bn_t d, ec_t q) {
 	}
 }
 
-void cp_ecmqv_key(unsigned char *key, int key_len, bn_t d1, bn_t d2, ec_t q2u, ec_t q1v, ec_t q2v) {
+void cp_ecmqv_key(unsigned char *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
+		ec_t q1v, ec_t q2v) {
 	ec_t p;
 	bn_t x, n, s;
 	int l;
