@@ -9,7 +9,7 @@ message("      EC_METHD=CHAR2    Use binary curves.\n")
 
 message("      Note: these methods must be given in order. Ex: EC_METHD=\"BINAR\"\n")
 
-option(EC_KBLTZ "Prefer Koblitz curves" on)
+option(EC_KBLTZ "Prefer Koblitz curves" off)
 
 # Choose the arithmetic methods.
 if (NOT EC_METHD)
