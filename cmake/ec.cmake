@@ -1,7 +1,7 @@
 message(STATUS "Elliptic curve cryptography configuration (EC module):\n")
 
 message("   ** Options for the binary elliptic curve module (default = on):")
-message("      EC_KBLTZ=[off|on] Prefer Koblitz (prime or binary) curves.\n")
+message("      EC_KBLTZ=[off|on] Prefer (prime or binary) curves with endomorphisms.\n")
 
 message("   ** Available elliptic curve methods (default = PRIME):")
 message("      EC_METHD=PRIME    Use prime curves.")
