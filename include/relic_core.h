@@ -383,6 +383,9 @@ typedef struct _ctx_t {
 
 	/** Internal state of the PRNG. */
 	unsigned char rand[RAND_SIZE];
+	/** Flag to indicate if PRNG is seed. */
+	int seeded;
+	int counter;
 } ctx_t;
 
 /*============================================================================*/
