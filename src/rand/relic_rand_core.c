@@ -40,7 +40,7 @@
 #include "relic_md.h"
 #include "relic_err.h"
 
-#if SEED == DEV || SEED == UDEV
+#if RAND == UDEV || SEED == DEV || SEED == UDEV
 
 #include <sys/stat.h>
 #include <fcntl.h>
