@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Implementation of the pseudo-random number generator.
+ * Implementation of utilities for pseudo-random number generation.
  *
  * @version $Id$
  * @ingroup rand
@@ -31,6 +31,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "relic_conf.h"
 #include "relic_core.h"
@@ -39,26 +40,11 @@
 #include "relic_md.h"
 #include "relic_err.h"
 
-/*============================================================================*/
-/* Private definitions                                                        */
-/*============================================================================*/
-
-#include <string.h>
-
 #if SEED == DEV || SEED == UDEV
 
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-/**
- * The path to the char device that supplies entropy.
- */
-#if SEED == DEV
-#define RAND_PATH		"/dev/random"
-#else
-#define RAND_PATH		"/dev/urandom"
-#endif
 
 #elif SEED == WCGR
 
@@ -73,13 +59,17 @@
 #endif
 
 /*============================================================================*/
-/* Constant definitions                                                       */
+/* Private definitions                                                        */
 /*============================================================================*/
 
 /**
- * Minimum size of the PRNG seed.
+ * The path to the char device that supplies entropy.
  */
-#define SEED_SIZE	    20
+#if SEED == DEV
+#define RAND_PATH		"/dev/random"
+#else
+#define RAND_PATH		"/dev/urandom"
+#endif
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -88,33 +78,39 @@
 void rand_init() {
 	unsigned char buf[SEED_SIZE];
 
-	memset(core_get()->rand, 0, RAND_SIZE);
+#if RAND == UDEV
+	int *fd = (int *)&(core_get()->rand);
+
+	*fd = open(RAND_PATH, O_RDONLY);
+	if (*fd == -1) {
+		THROW(ERR_NO_FILE);
+	}
+#else
 
 #if SEED == ZERO
 
 	memset(buf, 0, SEED_SIZE);
 
 #elif SEED == DEV || SEED == UDEV
-	int rand_fd, c, l;
+	int fd, c, l;
 
-	rand_fd = open(RAND_PATH, O_RDONLY);
-	if (rand_fd == -1) {
+	fd = open(RAND_PATH, O_RDONLY);
+	if (fd == -1) {
 		THROW(ERR_NO_FILE);
 	}
 
 	l = 0;
 	do {
-		c = read(rand_fd, buf + l, SEED_SIZE - l);
+		c = read(fd, buf + l, SEED_SIZE - l);
 		l += c;
 		if (c == -1) {
 			THROW(ERR_NO_READ);
 		}
 	} while (l < SEED_SIZE);
 
-	if (rand_fd != -1) {
-		close(rand_fd);
+	if (fd != -1) {
+		close(fd);
 	}
-
 #elif SEED == LIBC
 
 #if OPSYS == FREEBSD
@@ -130,9 +126,10 @@ void rand_init() {
 #endif
 
 #elif SEED == WCGR
-	HCRYPTPROV   hCryptProv;
+	HCRYPTPROV hCryptProv;
 
-	if (!CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT)) {
+	if (!CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL,
+					CRYPT_VERIFYCONTEXT | CRYPT_SILENT)) {
 		THROW(ERR_NO_FILE);
 	}
 	if (hCryptProv && !CryptGenRandom(hCryptProv, SEED_SIZE, buf)) {
@@ -143,54 +140,19 @@ void rand_init() {
 	}
 #endif
 
+#endif /* RAND == UDEV */
+
+	core_get()->seeded = 0;
 	rand_seed(buf, SEED_SIZE);
 }
 
 void rand_clean() {
+
+#if RAND == UDEV
+	int *fd = (int *)&(core_get()->rand);
+	close(*fd);
+#endif
+
 	memset(core_get()->rand, 0, sizeof(core_get()->rand));
-}
-
-void rand_seed(unsigned char *buf, int size) {
-    int i;
-    ctx_t *ctx = core_get();
-
-    if (size < SEED_SIZE) {
-    	THROW(ERR_NO_VALID);
-    }
-
-    /* Zero the current state. */
-    memset(ctx->rand, 0, sizeof(ctx->rand));
-
-    /* XKEY = SEED  */
-    for (i = 0; i < MIN(size, SEED_SIZE); i++) {
-        ctx->rand[i] = buf[i];
-    }
-}
-
-void rand_bytes(unsigned char *buf, int size) {
-    unsigned char carry, c0, c1, r0, r1;
-    int i, j;
-    unsigned char hash[MD_LEN_SHONE];
-    ctx_t *ctx = core_get();
-
-    j = 0;
-    while (j < size) {
-        /* x = G(t, XKEY) */
-        md_map_shone_mid(ctx->rand, RAND_SIZE, hash);
-
-        /* XKEY = (XKEY + x + 1) mod 2^b */
-        carry = 1;
-        for (i = SEED_SIZE - 1; i >= 0; i--) {
-    		r0 = (unsigned char)(ctx->rand[i] + hash[i]);
-    		c0 = (unsigned char)(r0 < hash[i] ? 1 : 0);
-    		r1 = (unsigned char)(r0 + carry);
-    		c1 = (unsigned char)(r1 < r0 ? 1 : 0);
-    		carry = (unsigned char)(c0 | c1);
-    		ctx->rand[i] = r1;
-        }
-        for (i = 0; i < SEED_SIZE && j < size; i++) {
-            buf[j] = hash[i];
-            j++;
-        }
-    }
+	core_get()->seeded = 0;
 }
