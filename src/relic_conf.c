@@ -108,11 +108,6 @@ void conf_print(void) {
 	util_print("   Arithmetic method: " EB_METHD "\n\n");
 #endif
 
-#ifdef WITH_HB
-	util_print("** Binary hyperelliptic curve module options:\n");
-	util_print("   Arithmetic method: " HB_METHD "\n\n");
-#endif
-
 #ifdef WITH_PB
 	util_print("** Pairing over binary curve module options:\n");
 	util_print("   Arithmetic method: " PB_METHD "\n\n");
@@ -126,6 +121,11 @@ void conf_print(void) {
 #ifdef WITH_PC
 	util_print("** Pairing Based Cryptography module options:\n");
 	util_print("   Arithmetic method: " PC_METHD "\n\n");
+#endif
+
+#ifdef WITH_MD
+	util_print("** Hash function module options:\n");
+	util_print("   Chosen method: " MD_METHD "\n\n");
 #endif
 
 #endif
