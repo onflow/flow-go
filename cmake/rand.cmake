@@ -1,0 +1,20 @@
+message(STATUS "Available pseudo-random number generators (default = HASH):")
+
+message("   RAND=HASH      Use the HASH-DRBG generator. (recommended)")
+message("   RAND=HMAC      Use the HMAC-DRBG generator. (recommended)")
+message("   RAND=UDEV      Use the operating system underlying generator.")
+message("   RAND=FIPS      Use the FIPS 186-2 (CN1) SHA1-based generator.\n")
+
+message(STATUS "Available random number generator seeders (default = UDEV):")
+
+message("   SEED=WCGR      Use Windows' CryptGenRandom. (recommended)")
+message("   SEED=DEV       Use blocking /dev/random. (recommended)")
+message("   SEED=UDEV      Use non-blocking /dev/urandom. (recommended)")
+message("   SEED=LIBC      Use the libc rand()/random() functions. (insecure!)")
+message("   SEED=ZERO      Use a zero seed. (insecure!)\n")
+
+# Choose the pseudo-random number generator.
+set(RAND "UDEV" CACHE STRING "Pseudo-random number generator")
+
+# Choose the pseudo-random number generator.
+set(SEED "UDEV" CACHE STRING "Random number generator seeder")
