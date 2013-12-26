@@ -57,25 +57,6 @@ message("   BENCH=n        If n > 0, build automated benchmarks and run them n *
 message(STATUS "Number of available processor cores (default = 1):")
 message("   CORES=n        If n > 1, build with multithreading support.\n")
 
-message(STATUS "Available architectures (default = X86_64):")
-message("   ARCH=AVR       Atmel AVR ATMega128 8-bit architecture.")
-message("   ARCH=MSP       TI MSP430 16-bit architecture.")
-message("   ARCH=ARM       ARM 32-bit architecture.")
-message("   ARCH=X86       Intel x86-compatible 32-bit architecture.")
-message("   ARCH=X86_64    AMD x86_64-compatible 64-bit architecture.\n")
-
-message(STATUS "Available word sizes (default = 64):")
-message("   WORD=8         Build a 8-bit library.")
-message("   WORD=16        Build a 16-bit library.")
-message("   WORD=32        Build a 32-bit library.")
-message("   WORD=64        Build a 64-bit library.\n")
-
-message(STATUS "Byte boundary to align digit vectors (default = 1):")
-message("   ALIGN=1        Do not align digit vectors.")
-message("   ALIGN=2        Align digit vectors into 16-bit boundaries.")
-message("   ALIGN=8        Align digit vectors into 64-bit boundaries.")
-message("   ALIGN=16       Align digit vectors into 128-bit boundaries.\n")
-
 message(STATUS "Available modules (default = ALL)")
 message("   WITH=BN       Multiple precision arithmetic.")
 message("   WITH=DV       Temporary double-precision digit vectors.")
@@ -84,7 +65,6 @@ message("   WITH=FB       Binary field arithmetic.")
 message("   WITH=EP       Elliptic curves over prime fields.")
 message("   WITH=EB       Elliptic curves over binary fields.")
 message("   WTTH=EC       Elliptic curve cryptography.")
-message("   WITH=HB       Hyperelliptic curve cryptography.")
 message("   WITH=PB       Pairings over binary elliptic curves.")
 message("   WITH=PP       Pairings over prime elliptic curves.")
 message("   WTTH=PC       Pairing-based cryptography.")
@@ -102,16 +82,6 @@ message("   ALLOC=AUTO     All memory is automatically allocated.")
 message("   ALLOC=STATIC   All memory is allocated statically once.")
 message("   ALLOC=DYNAMIC  All memory is allocated dynamically on demand.")
 message("   ALLOC=STACK    All memory is allocated from the stack.\n")
-
-message(STATUS "Available pseudo-random number generators (default = FIPS):")
-message("   RAND=FIPS      Use the FIPS 186-2 SHA1-based generator. (recommended)\n")
-
-message(STATUS "Available random number generator seeders (default = DEV):")
-message("   SEED=ZERO      Use a zero seed. (not crypto safe!)")
-message("   SEED=LIBC      Use the libc rand()/random() functions. (not crypto safe!)")
-message("   SEED=DEV       Use /dev/random. (recommended)")
-message("   SEED=UDEV      Use /dev/urandom.")
-message("   SEED=WCGR      Use Windows' CryptGenRandom. (recommended)\n")
 
 message(STATUS "Supported operating systems (default = LINUX):")
 message("   OPSYS=NONE     Undefined/No operating system.")
@@ -134,6 +104,7 @@ message("   TIMER=CYCLE    Cycle-counting timer. (architecture-dependant)\n")
 message(STATUS "Prefix to identify this build of the library (default = \"\"):")
 message("   LABEL=relic\n")
 
+include(cmake/arch.cmake)
 include(cmake/bn.cmake)
 include(cmake/fp.cmake)
 include(cmake/fb.cmake)
@@ -145,6 +116,7 @@ include(cmake/pb.cmake)
 include(cmake/pc.cmake)
 include(cmake/md.cmake)
 include(cmake/cp.cmake)
+include(cmake/rand.cmake)
 
 # Number of tests and benchmarks
 set(BENCH 100 CACHE INTEGER "Number of times each benchmark is ran.")
@@ -152,20 +124,6 @@ set(TESTS 100 CACHE INTEGER "Number of times each test is ran.")
 
 # Number of cores.
 set(CORES 1 CACHE INTEGER "Number of available processor cores.")
-
-# Architecture and memory layout.
-if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-	set(ARCH "X86_64" CACHE STRING "Architecture")
-	set(WORD 64 CACHE INTEGER "Processor word size")
-else(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-	if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86")
-		set(ARCH "X86" CACHE STRING "Architecture")
-		set(WORD 32 CACHE INTEGER "Processor word size")
-	endif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86")
-endif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-set(ARCH "X86_64" CACHE STRING "Architecture")
-set(WORD 64 CACHE INTEGER "Processor word size")
-set(ALIGN 1 CACHE INTEGER "Boundary to align digit vectors")
 
 # Default modules.
 set(WITH "ALL" CACHE STRING "Selected modules")
@@ -179,7 +137,6 @@ if(TEMP GREATER -1)
 	set(WITH_EP 1)
 	set(WITH_EB 1)
 	set(WITH_EC 1)
-	set(WITH_HB 1)
 	set(WITH_PP 1)
 	set(WITH_PB 1)
 	set(WITH_PC 1)
@@ -212,12 +169,6 @@ if(TEMP GREATER -1)
 	set(WITH_FB 1)
 endif(TEMP GREATER -1)
 
-# See if ternary field arithmetic is required.
-LIST(FIND WITH "FT" TEMP)
-if(TEMP GREATER -1)
-	set(WITH_FT 1)
-endif(TEMP GREATER -1)
-
 # See if prime elliptic curve support is required.
 LIST(FIND WITH "EP" TEMP)
 if(TEMP GREATER -1)
@@ -234,12 +185,6 @@ endif(TEMP GREATER -1)
 LIST(FIND WITH "EC" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_EC 1)
-endif(TEMP GREATER -1)
-
-# See if binary hyperelliptic curve support is required.
-LIST(FIND WITH "HB" TEMP)
-if(TEMP GREATER -1)
-	set(WITH_HB 1)
 endif(TEMP GREATER -1)
 
 # See if support for pairings over prime curves is required.
@@ -277,12 +222,6 @@ set(ARITH "easy" CACHE STRING "Arithmetic backend")
 
 # Choose the memory-allocation policy.
 set(ALLOC "AUTO" CACHE STRING "Allocation policy")
-
-# Choose the pseudo-random number generator.
-set(RAND "FIPS" CACHE STRING "Pseudo-random number generator")
-
-# Choose the pseudo-random number generator.
-set(SEED "DEV" CACHE STRING "Random number generator seeder")
 
 # Compiler flags.
 if("$ENV{COMP}" STREQUAL "")
