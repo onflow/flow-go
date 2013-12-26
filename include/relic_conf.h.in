@@ -614,21 +614,27 @@
 /** Chosen memory allocation policy. */
 #define ALLOC    @ALLOC@
 
-/** FIPS 186-2 generator. */
-#define FIPS     1
+/** NIST HASH-DRBG generator. */
+#define HASH     1
+/** NIST HMAC-DRBG generator. */
+#define HMAC     2
+/** Operating system underlying generator. */
+#define UDEV     3
+/** FIPS 186-2 (CN1) SHA-1 based generator. */
+#define FIPS     4
 /** Chosen random generator. */
 #define RAND     @RAND@
 
-/** Null seed. */
-#define	ZERO     1
-/** Standard C library generator. */
-#define LIBC     2
-/** Device node generator. */
-#define DEV      3
-/** Device node generator. */
-#define UDEV     4
 /** Use Windows' CryptGenRandom. */
-#define WCGR     5
+#define WCGR     1
+/** Device node generator. */
+#define DEV      2
+/** Device node generator. */
+#define UDEV     3
+/** Null seed. */
+#define	ZERO     4
+/** Standard C library generator. */
+#define LIBC     5
 /** Chosen random generator seeder. */
 #define SEED     @SEED@
 

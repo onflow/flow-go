@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup rand Pseudo-random number generator.
+ * @defgroup rand Pseudo-random number generators.
  */
 
 /**
@@ -45,7 +45,24 @@
 /**
  * Size of the PRNG internal state in bytes.
  */
-#define RAND_SIZE	    64
+#if RAND == HASH
+
+#if MD_MAP == SHONE || MD_MAP == SH224 || MD_MAP == SH256
+#define RAND_SIZE		(1 + 2*440/8)
+#elif MD_MAP == SH384 || MD_MAP == SH512
+#define RAND_SIZE		(1 + 2*888/8)
+#endif
+
+#elif RAND == UDEV
+#define RAND_SIZE		(sizeof(int))
+#elif RAND == FIPS
+#define RAND_SIZE	    20
+#endif
+
+/**
+ * Minimum size of the PRNG seed.
+ */
+#define SEED_SIZE	    64
 
 /*============================================================================*/
 /* Function prototypes                                                        */
@@ -66,15 +83,17 @@ void rand_clean(void);
  * 
  * @param[in] buf			- the buffer that represents the initial state.
  * @param[in] size			- the number of bytes.
+ * @throw ERR_NO_VALID		- if the entropy length is too small or too large.
  */
 void rand_seed(unsigned char *buf, int size);
 
 /**
- * Writes size pseudo-random bytes in the passed buffer.
+ * Gathers pseudo-random bytes from the pseudo-random number generator.
  * 
  * @param[out] buf			- the buffer to write.
- * @param[in] size			- the number of bytes to write.
- * @throw ERR_NO_READ		- it the pseudo-random number generator can't
+ * @param[in] size			- the number of bytes to gather.
+ * @throw ERR_NO_VALID		- if the required length is too large.
+ * @throw ERR_NO_READ		- it the pseudo-random number generator cannot
  * 							generate the specified number of bytes.
  */
 void rand_bytes(unsigned char *buf, int size);
