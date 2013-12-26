@@ -41,6 +41,8 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
+#if MD_MAP == SHONE || !defined(STRIP)
+
 void md_map_shone(unsigned char *hash, const unsigned char *msg, int len) {
 	SHA1Context ctx;
 
@@ -55,8 +57,13 @@ void md_map_shone(unsigned char *hash, const unsigned char *msg, int len) {
 	}
 }
 
-void md_map_shone_mid(unsigned char *msg, int len, unsigned char *state) {
+#endif
+
+#if RAND == FIPS
+
+void md_map_shone_mid(unsigned char *state, unsigned char *msg, int len) {
 	SHA1Context ctx;
+	unsigned char dummy[64 - MD_LEN_SHONE] = { 0 };
 
 	if (SHA1Reset(&ctx) != shaSuccess) {
 		THROW(ERR_NO_VALID);
@@ -65,13 +72,16 @@ void md_map_shone_mid(unsigned char *msg, int len, unsigned char *state) {
 	if (SHA1Input(&ctx, msg, len) != shaSuccess) {
 		THROW(ERR_NO_VALID);
 	}
+	if (SHA1Input(&ctx, dummy, sizeof(dummy)) != shaSuccess) {
+		THROW(ERR_NO_VALID);
+	}
 
 	uint32_t t[5];
-	int i;
-
-	for (i = 0; i < 5; i++) {
+	for (int i = 0; i < 5; i++) {
 		t[i] = util_conv_big(ctx.Intermediate_Hash[i]);
 	}
 
 	memcpy(state, t, sizeof(t));
 }
+
+#endif

@@ -38,6 +38,8 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
+#if MD_MAP == SH384 || !defined(STRIP)
+
 void md_map_sh384(unsigned char *hash, const unsigned char *msg, int len) {
 	SHA384Context ctx;
 
@@ -51,3 +53,5 @@ void md_map_sh384(unsigned char *hash, const unsigned char *msg, int len) {
 		THROW(ERR_NO_VALID);
 	}
 }
+
+#endif
