@@ -83,7 +83,7 @@
 /** Intel x86-compatible 32-bit architecture. */
 #define X86      5
 /** AMD64-compatible 64-bit architecture. */
-#define X86_64	 6 
+#define X64      6 
 /** Architecture. */
 #define ARCH	 @ARCH@
 
