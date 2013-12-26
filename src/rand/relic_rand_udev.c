@@ -64,5 +64,5 @@ void rand_bytes(unsigned char *buf, int size) {
 
 void rand_seed(unsigned char *buf, int size) {
 	/* Do nothing, only mark as seeded. */
-	ctx->seeded = 1;
+	core_get()->seeded = 1;
 }
