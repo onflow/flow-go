@@ -112,11 +112,11 @@ void md_map_shone(unsigned char *hash, const unsigned char *msg, int len);
 /**
  * Returns the internal state of the hash function.
  *
+ * @param[out] state			- the internal state.
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
- * @param[out] state			- the internal state.
  */
-void md_map_shone_mid(unsigned char *msg, int len, unsigned char *state);
+void md_map_shone_mid(unsigned char *state, unsigned char *msg, int len);
 /**
  * Computes the SHA-224 hash function.
  *
