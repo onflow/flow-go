@@ -81,7 +81,7 @@ void rand_bytes(unsigned char *buf, int size) {
 		/* XKEY = (XKEY + w_1 + 1) mod 2^b */
 		rand_add_inc(ctx->rand, hash);
 
-		memcpy(buf + j, hash, MIN(size, MD_LEN_SHONE));
+		memcpy(buf + j, hash, MIN(size - j, MD_LEN_SHONE));
 		j += MIN(size, MD_LEN_SHONE);
 	}
 }
