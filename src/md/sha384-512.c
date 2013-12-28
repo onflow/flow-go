@@ -457,7 +457,7 @@ int SHA512Input(SHA512Context *context,
 
   while (length-- && !context->Corrupted) {
     context->Message_Block[context->Message_Block_Index++] =
-    		(unsigned char)(*message_array & 0xFF);
+    		(uint8_t)(*message_array & 0xFF);
 
 #ifdef USE_32BIT_ONLY
     uint32_t ADDTO4_temp, ADDTO4_temp2, addTemp[4] = { 0, 0, 0, 0 };

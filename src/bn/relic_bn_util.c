@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -196,7 +196,7 @@ void bn_rand(bn_t a, int sign, int bits) {
 
 	bn_grow(a, digits);
 
-	rand_bytes((unsigned char *)a->dp, digits * (BN_DIGIT / 8));
+	rand_bytes((uint8_t *)a->dp, digits * (BN_DIGIT / 8));
 
 	a->used = digits;
 	a->sign = sign;
@@ -401,7 +401,7 @@ void bn_size_bin(int *size, const bn_t a) {
 	*size = digits;
 }
 
-void bn_read_bin(bn_t a, const unsigned char *bin, int len) {
+void bn_read_bin(bn_t a, const uint8_t *bin, int len) {
 	int i, j;
 	dig_t d = (BN_DIGIT / 8);
 	int digs = (len % d == 0 ? len / d : len / d + 1);
@@ -431,7 +431,7 @@ void bn_read_bin(bn_t a, const unsigned char *bin, int len) {
 	bn_trim(a);
 }
 
-void bn_write_bin(unsigned char *bin, int len, const bn_t a) {
+void bn_write_bin(uint8_t *bin, int len, const bn_t a) {
 	int size, k;
 	dig_t d;
 

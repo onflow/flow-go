@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -40,7 +40,7 @@
 
 #if MD_MAP == SH384 || !defined(STRIP)
 
-void md_map_sh384(unsigned char *hash, const unsigned char *msg, int len) {
+void md_map_sh384(uint8_t *hash, const uint8_t *msg, int len) {
 	SHA384Context ctx;
 
 	if (SHA384Reset(&ctx) != shaSuccess) {

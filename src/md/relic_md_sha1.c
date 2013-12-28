@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -43,7 +43,7 @@
 
 #if MD_MAP == SHONE || !defined(STRIP)
 
-void md_map_shone(unsigned char *hash, const unsigned char *msg, int len) {
+void md_map_shone(uint8_t *hash, const uint8_t *msg, int len) {
 	SHA1Context ctx;
 
 	if (SHA1Reset(&ctx) != shaSuccess) {
@@ -61,9 +61,9 @@ void md_map_shone(unsigned char *hash, const unsigned char *msg, int len) {
 
 #if RAND == FIPS
 
-void md_map_shone_mid(unsigned char *state, unsigned char *msg, int len) {
+void md_map_shone_mid(uint8_t *state, uint8_t *msg, int len) {
 	SHA1Context ctx;
-	unsigned char dummy[64 - MD_LEN_SHONE] = { 0 };
+	uint8_t dummy[64 - MD_LEN_SHONE] = { 0 };
 
 	if (SHA1Reset(&ctx) != shaSuccess) {
 		THROW(ERR_NO_VALID);

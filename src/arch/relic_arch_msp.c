@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -44,7 +44,7 @@ void arch_clean(void) {
 #ifdef __MSP430__
 /* Support for MSPGCC with custom MSPsim simulator. */
 
-static volatile unsigned char TEST_TEXTOUT __asm__("0x01b0");
+static volatile uint8_t TEST_TEXTOUT __asm__("0x01b0");
 static volatile unsigned int BENCH_CYCLES_0 __asm__("0x01b2");
 static volatile unsigned int BENCH_CYCLES_1 __asm__("0x01b4");
 static volatile unsigned int BENCH_CYCLES_2 __asm__("0x01b6");

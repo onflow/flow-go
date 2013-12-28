@@ -62,7 +62,7 @@
  *    name              meaning
  *  uint64_t         unsigned 64 bit integer
  *  uint32_t         unsigned 32 bit integer
- *  uint8_t          unsigned 8 bit integer (i.e., unsigned char)
+ *  uint8_t          unsigned 8 bit integer (i.e., uint8_t)
  *  int_least16_t    integer of >= 16 bits
  *
  */
@@ -197,7 +197,7 @@ typedef struct HMACContext {
     int hashSize;               /* hash size of SHA being used */
     int blockSize;              /* block size of SHA being used */
     USHAContext shaContext;     /* SHA context */
-    unsigned char k_opad[USHA_Max_Message_Block_Size];
+    uint8_t k_opad[USHA_Max_Message_Block_Size];
                         /* outer padding - key XORd with opad */
 } HMACContext;
 

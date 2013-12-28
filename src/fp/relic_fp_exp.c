@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -75,7 +75,7 @@ void fp_exp_basic(fp_t c, const fp_t a, const bn_t b) {
 void fp_exp_slide(fp_t c, const fp_t a, const bn_t b) {
 	fp_t t[1 << (FP_WIDTH - 1)], r;
 	int i, j, l;
-	unsigned char win[FP_BITS + 1];
+	uint8_t win[FP_BITS + 1];
 
 	fp_null(r);
 

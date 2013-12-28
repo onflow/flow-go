@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -40,8 +40,8 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int bc_aes_cbc_enc(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, unsigned char *key, int key_len, unsigned char *iv) {
+int bc_aes_cbc_enc(uint8_t *out, int *out_len, uint8_t *in,
+		int in_len, uint8_t *key, int key_len, uint8_t *iv) {
 	keyInstance key_inst;
 	cipherInstance cipher_inst;
 	
@@ -63,8 +63,8 @@ int bc_aes_cbc_enc(unsigned char *out, int *out_len, unsigned char *in,
 	return STS_OK;
 }
 
-int bc_aes_cbc_dec(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, unsigned char *key, int key_len, unsigned char *iv) {
+int bc_aes_cbc_dec(uint8_t *out, int *out_len, uint8_t *in,
+		int in_len, uint8_t *key, int key_len, uint8_t *iv) {
 	keyInstance key_inst;
 	cipherInstance cipher_inst;
 	

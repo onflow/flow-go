@@ -131,7 +131,7 @@ int SHA1Input(SHA1Context *context,
 
   while (length-- && !context->Corrupted) {
     context->Message_Block[context->Message_Block_Index++] =
-      (unsigned char)(*message_array & 0xFF);
+      (uint8_t)(*message_array & 0xFF);
 
 	uint32_t addTemp;
     if (!SHA1AddLength(context, 8) &&

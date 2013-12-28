@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -40,23 +40,23 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void md_hmac(unsigned char *mac, unsigned char *in, int in_len,
-		unsigned char *key, int key_len) {
+void md_hmac(uint8_t *mac, uint8_t *in, int in_len,
+		uint8_t *key, int key_len) {
 #if MD_MAP == SHONE || MD_MAP == SH224 || MD_MAP == SH256
 	int block_size = 64;
 #elif MD_MAP == SH384 || MD_MAP == SH512
 	int block_size = 128;
 #endif
-	unsigned char opad[block_size + MD_LEN], ipad[block_size + in_len];
+	uint8_t opad[block_size + MD_LEN], ipad[block_size + in_len];
 
 	if (key_len > block_size) {
-		unsigned char _key[MD_LEN];
+		uint8_t _key[MD_LEN];
 		md_map(_key, key, key_len);
 		key = _key;
 		key_len = MD_LEN;
 	}
 	if (key_len < block_size) {
-		unsigned char _key[block_size];
+		uint8_t _key[block_size];
 		memcpy(_key, key, key_len);
 		memset(_key + key_len, 0, block_size - key_len);
 		key = _key;
