@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -66,28 +66,28 @@ int cp_ecies_gen(bn_t d, ec_t q) {
 	FINALLY {
 		bn_free(n);
 	}
-	
+
 	return result;
 }
 
-int cp_ecies_enc(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, unsigned char *iv, unsigned char *mac, ec_t r, ec_t q) {
+int cp_ecies_enc(ec_t r, uint8_t *out, int *out_len, uint8_t *mac, uint8_t *in,
+		int in_len, uint8_t *iv, ec_t q) {
 	bn_t k, n, x;
 	ec_t p;
 	int l, result = STS_OK, size = CEIL(ec_param_level(), 8);
-	unsigned char _x[EC_BYTES], key[2 * size];
-	
+	uint8_t _x[EC_BYTES], key[2 * size];
+
 	bn_null(k);
 	bn_null(n);
 	bn_null(x);
 	ec_null(p);
-	
+
 	TRY {
 		bn_new(k);
 		bn_new(n);
 		bn_new(x);
 		ec_new(p);
-		
+
 		ec_curve_get_ord(n);
 
 		do {
@@ -107,32 +107,34 @@ int cp_ecies_enc(unsigned char *out, int *out_len, unsigned char *in,
 		} else {
 			md_hmac(mac, out, *out_len, key + size, size);
 		}
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		result = STS_ERR;
-	} FINALLY {
+	}
+	FINALLY {
 		bn_free(k);
 		bn_free(n);
 		bn_free(x);
 		ec_free(p);
 	}
-	
+
 	return result;
 }
 
-int cp_ecies_dec(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, unsigned char *iv, unsigned char *mac, ec_t r, bn_t d) {
+int cp_ecies_dec(uint8_t *out, int *out_len, ec_t r, uint8_t *in, int in_len,
+		uint8_t *iv, uint8_t *mac, bn_t d) {
 	ec_t p;
 	bn_t x;
 	int l, result = STS_OK, size = CEIL(ec_param_level(), 8);
-	unsigned char _x[EC_BYTES], h[MD_LEN], key[2 * size];
-	
+	uint8_t _x[EC_BYTES], h[MD_LEN], key[2 * size];
+
 	bn_null(x);
 	ec_null(p);
-	
+
 	TRY {
 		bn_new(x);
 		ec_new(p);
-		
+
 		ec_mul(p, r, d);
 		ec_get_x(x, p);
 		bn_size_bin(&l, x);
@@ -147,12 +149,14 @@ int cp_ecies_dec(unsigned char *out, int *out_len, unsigned char *in,
 				result = STS_ERR;
 			}
 		}
-	} CATCH_ANY {
+	}
+	CATCH_ANY {
 		result = STS_ERR;
-	} FINALLY {
+	}
+	FINALLY {
 		bn_free(x);
 		ec_free(p);
 	}
-	
+
 	return result;
 }

@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -115,7 +115,7 @@ int cp_bdpe_gen(bdpe_t pub, bdpe_t prv, dig_t block, int bits) {
 	return result;
 }
 
-int cp_bdpe_enc(unsigned char *out, int *out_len, dig_t in, bdpe_t pub) {
+int cp_bdpe_enc(uint8_t *out, int *out_len, dig_t in, bdpe_t pub) {
 	bn_t m, u;
 	int size, result = STS_OK;
 
@@ -163,7 +163,7 @@ int cp_bdpe_enc(unsigned char *out, int *out_len, dig_t in, bdpe_t pub) {
 	return result;
 }
 
-int cp_bdpe_dec(dig_t *out, unsigned char *in, int in_len, bdpe_t prv) {
+int cp_bdpe_dec(dig_t *out, uint8_t *in, int in_len, bdpe_t prv) {
 	bn_t m, t, z;
 	int i, size, result = STS_OK;
 

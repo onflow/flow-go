@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -73,9 +73,9 @@ void cp_bbs_gen(bn_t d, g2_t q, gt_t z) {
 	}
 }
 
-void cp_bbs_sig(g1_t s, unsigned char *msg, int len, int hash, bn_t d) {
+void cp_bbs_sig(g1_t s, uint8_t *msg, int len, int hash, bn_t d) {
 	bn_t m, n, r;
-	unsigned char h[MD_LEN];
+	uint8_t h[MD_LEN];
 
 	bn_null(m);
 	bn_null(n);
@@ -116,11 +116,11 @@ void cp_bbs_sig(g1_t s, unsigned char *msg, int len, int hash, bn_t d) {
 	}
 }
 
-int cp_bbs_ver(g1_t s, unsigned char *msg, int len, int hash, g2_t q, gt_t z) {
+int cp_bbs_ver(g1_t s, uint8_t *msg, int len, int hash, g2_t q, gt_t z) {
 	bn_t m, n;
 	g2_t g;
 	gt_t e;
-	unsigned char h[MD_LEN];
+	uint8_t h[MD_LEN];
 	int result = 0;
 
 	bn_null(m);

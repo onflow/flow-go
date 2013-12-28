@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -102,7 +102,7 @@ int cp_rabin_gen(rabin_t pub, rabin_t prv, int bits) {
 	return result;
 }
 
-int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
+int cp_rabin_enc(uint8_t *out, int *out_len, uint8_t *in, int in_len,
 		rabin_t pub) {
 	bn_t m, t;
 	int size, result = STS_OK;
@@ -153,11 +153,11 @@ int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len
 	return result;
 }
 
-int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in,
+int cp_rabin_dec(uint8_t *out, int *out_len, uint8_t *in,
 		int in_len, rabin_t prv) {
 	bn_t m, m0, m1, t, n;
 	int size, result = STS_OK;
-	unsigned char pad;
+	uint8_t pad;
 
 	if (in_len < 0 || in_len < RABIN_PAD_LEN) {
 		return STS_ERR;
@@ -244,7 +244,7 @@ int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in,
 				do {
 					size--;
 					bn_rsh(t, m, 8 * size);
-					pad = (unsigned char)t->dp[0];
+					pad = (uint8_t)t->dp[0];
 				} while (pad == 0);
 
 				if (pad != RABIN_PAD) {

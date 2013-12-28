@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -69,17 +69,17 @@ void cp_sokaka_gen(bn_t master) {
 
 void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master) {
 	if (pc_map_is_type1()) {
-		g1_map(k->s1, (unsigned char *)id, len);
+		g1_map(k->s1, (uint8_t *)id, len);
 		g1_mul(k->s1, k->s1, master);
 	} else {
-		g1_map(k->s1, (unsigned char *)id, len);
+		g1_map(k->s1, (uint8_t *)id, len);
 		g1_mul(k->s1, k->s1, master);
-		g2_map(k->s2, (unsigned char *)id, len);
+		g2_map(k->s2, (uint8_t *)id, len);
 		g2_mul(k->s2, k->s2, master);
 	}
 }
 
-void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
+void cp_sokaka_key(uint8_t *key, unsigned int key_len, char *id1,
 		int len1, sokaka_t k, char *id2, int len2) {
 	int l, first = 0;
 	g1_t p;
@@ -119,19 +119,19 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 			}
 		}
 		if (pc_map_is_type1()) {
-			g2_map(q, (unsigned char *)id2, len2);
+			g2_map(q, (uint8_t *)id2, len2);
 			pc_map(e, k->s1, q);
 		} else {
 			if (first == 1) {
-				g2_map(q, (unsigned char *)id2, len2);
+				g2_map(q, (uint8_t *)id2, len2);
 				pc_map(e, k->s1, q);
 			} else {
-				g1_map(p, (unsigned char *)id2, len2);
+				g1_map(p, (uint8_t *)id2, len2);
 				pc_map(e, p, k->s2);
 			}
 		}
 #if FP_PRIME < 1536
-		unsigned char buf[12 * FP_BYTES], *ptr;
+		uint8_t buf[12 * FP_BYTES], *ptr;
 		ptr = buf;
 		for (int i = 0; i < 2; i++) {
 			for (int j = 0; j < 3; j++) {
@@ -144,7 +144,7 @@ void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
 			}
 		}
 #else
-		unsigned char buf[2 * FP_BYTES], *ptr;
+		uint8_t buf[2 * FP_BYTES], *ptr;
 		ptr = buf;
 		for (int i = 0; i < 2; i++) {
 			fp_prime_back(n, e[i]);

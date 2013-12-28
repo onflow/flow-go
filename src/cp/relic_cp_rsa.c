@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -127,7 +127,7 @@
  * @return STS_ERR if errors occurred, STS_OK otherwise.
  */
 static int pad_basic(bn_t m, int *p_len, int m_len, int k_len, int operation) {
-	unsigned char pad = 0;
+	uint8_t pad = 0;
 	int result = STS_OK;
 	bn_t t;
 
@@ -160,7 +160,7 @@ static int pad_basic(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 					(*p_len)++;
 					m_len--;
 					bn_rsh(t, m, 8 * m_len);
-					pad = (unsigned char)t->dp[0];
+					pad = (uint8_t)t->dp[0];
 				} while (pad == 0);
 				if (pad != RSA_PAD) {
 					result = STS_ERR;
@@ -185,32 +185,37 @@ static int pad_basic(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 /**
  * ASN.1 identifier of the hash function SHA-1.
  */
-static const unsigned char shone_id[] =
-		{ 0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e, 0x03, 0x02, 0x1a, 0x05, 0x00, 0x04, 0x14 };
+static const uint8_t shone_id[] =
+		{ 0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e, 0x03, 0x02, 0x1a,
+			0x05, 0x00, 0x04, 0x14 };
 
 /**
  * ASN.1 identifier of the hash function SHA-224.
  */
-static const unsigned char sh224_id[] =
-		{ 0x30, 0x2d, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x04, 0x05, 0x00, 0x04, 0x1c };
+static const uint8_t sh224_id[] =
+		{ 0x30, 0x2d, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65,
+			0x03, 0x04, 0x02, 0x04, 0x05, 0x00, 0x04, 0x1c };
 
 /**
  * ASN.1 identifier of the hash function SHA-256.
  */
-static const unsigned char sh256_id[] =
-		{ 0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20 };
+static const uint8_t sh256_id[] =
+		{ 0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65,
+			0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20 };
 
 /**
  * ASN.1 identifier of the hash function SHA-384.
  */
-static const unsigned char sh384_id[] =
-		{ 0x30, 0x41, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02, 0x05, 0x00, 0x04, 0x30 };
+static const uint8_t sh384_id[] =
+		{ 0x30, 0x41, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65,
+			0x03, 0x04, 0x02, 0x02, 0x05, 0x00, 0x04, 0x30 };
 
 /**
  * ASN.1 identifier of the hash function SHA-512.
  */
-static const unsigned char sh512_id[] =
-		{ 0x30, 0x51, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05, 0x00, 0x04, 0x40 };
+static const uint8_t sh512_id[] =
+		{ 0x30, 0x51, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65,
+			0x03, 0x04, 0x02, 0x03, 0x05, 0x00, 0x04, 0x40 };
 
 /**
  * Returns a pointer to the ASN.1 identifier of a hash function according to the
@@ -220,23 +225,23 @@ static const unsigned char sh512_id[] =
  * @param[in, out] len		- the length of the identifier.
  * @return The pointer to the hash function identifier.
  */
-static unsigned char *hash_id(int md, int *len) {
+static uint8_t *hash_id(int md, int *len) {
 	switch (md) {
 		case SHONE:
 			*len = sizeof(shone_id);
-			return (unsigned char *)shone_id;
+			return (uint8_t *)shone_id;
 		case SH224:
 			*len = sizeof(sh224_id);
-			return (unsigned char *)sh224_id;
+			return (uint8_t *)sh224_id;
 		case SH256:
 			*len = sizeof(sh256_id);
-			return (unsigned char *)sh256_id;
+			return (uint8_t *)sh256_id;
 		case SH384:
 			*len = sizeof(sh384_id);
-			return (unsigned char *)sh384_id;
+			return (uint8_t *)sh384_id;
 		case SH512:
 			*len = sizeof(sh512_id);
-			return (unsigned char *)sh512_id;
+			return (uint8_t *)sh512_id;
 		default:
 			THROW(ERR_NO_VALID);
 			return NULL;
@@ -254,10 +259,8 @@ static unsigned char *hash_id(int md, int *len) {
  * @return STS_ERR if errors occurred, STS_OK otherwise.
  */
 static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
-	unsigned char pad = 0;
-	unsigned char *id;
-	int result = STS_OK;
-	int len;
+	uint8_t *id, pad = 0;
+	int len, result = STS_OK;
 	bn_t t;
 
 	bn_null(t);
@@ -295,14 +298,14 @@ static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 				*p_len = m_len;
 				m_len--;
 				bn_rsh(t, m, 8 * m_len);
-				pad = (unsigned char)t->dp[0];
+				pad = (uint8_t)t->dp[0];
 				if (pad != RSA_PUB) {
 					result = STS_ERR;
 				}
 				do {
 					m_len--;
 					bn_rsh(t, m, 8 * m_len);
-					pad = (unsigned char)t->dp[0];
+					pad = (uint8_t)t->dp[0];
 				} while (pad != 0);
 				/* Remove padding and trailing zero. */
 				*p_len -= (m_len - 1);
@@ -352,14 +355,14 @@ static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 				}
 				m_len--;
 				bn_rsh(t, m, 8 * m_len);
-				pad = (unsigned char)t->dp[0];
+				pad = (uint8_t)t->dp[0];
 				if (pad != RSA_PRV) {
 					result = STS_ERR;
 				}
 				do {
 					m_len--;
 					bn_rsh(t, m, 8 * m_len);
-					pad = (unsigned char)t->dp[0];
+					pad = (uint8_t)t->dp[0];
 				} while (pad != 0 && m_len > 0);
 				if (m_len == 0) {
 					result = STS_ERR;
@@ -371,7 +374,7 @@ static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 				bn_rsh(t, m, m_len * 8);
 				int r = 0;
 				for (int i = 0; i < len; i++) {
-					pad = (unsigned char)t->dp[0];
+					pad = (uint8_t)t->dp[0];
 					r |= pad - id[len - i - 1];
 					bn_rsh(t, t, 8);
 				}
@@ -387,14 +390,14 @@ static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 				}
 				m_len--;
 				bn_rsh(t, m, 8 * m_len);
-				pad = (unsigned char)t->dp[0];
+				pad = (uint8_t)t->dp[0];
 				if (pad != RSA_PRV) {
 					result = STS_ERR;
 				}
 				do {
 					m_len--;
 					bn_rsh(t, m, 8 * m_len);
-					pad = (unsigned char)t->dp[0];
+					pad = (uint8_t)t->dp[0];
 				} while (pad != 0 && m_len > 0);
 				if (m_len == 0) {
 					result = STS_ERR;
@@ -429,12 +432,13 @@ static int pad_pkcs1(bn_t m, int *p_len, int m_len, int k_len, int operation) {
  * @return STS_ERR if errors occurred, STS_OK otherwise.
  */
 static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
-	unsigned char pad, h1[MD_LEN], h2[MD_LEN], mask[k_len];
+	uint8_t pad, h1[MD_LEN], h2[MD_LEN], mask[k_len];
 	int result = STS_OK;
 	bn_t t;
 
+	bn_null(t);
+
 	TRY {
-		bn_null(t);
 		bn_new(t);
 
 		switch (operation) {
@@ -580,7 +584,7 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 #endif
 
 /*============================================================================*/
-	/* Public definitions                                                     */
+/* Public definitions                                                         */
 /*============================================================================*/
 
 #if CP_RSA == BASIC || !defined(STRIP)
@@ -588,6 +592,10 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 int cp_rsa_gen_basic(rsa_t pub, rsa_t prv, int bits) {
 	bn_t t, r;
 	int result = STS_OK;
+
+	if (pub == NULL || prv == NULL || bits == 0) {
+		return STS_ERR;
+	}
 
 	bn_null(t);
 	bn_null(r);
@@ -647,6 +655,10 @@ int cp_rsa_gen_basic(rsa_t pub, rsa_t prv, int bits) {
 int cp_rsa_gen_quick(rsa_t pub, rsa_t prv, int bits) {
 	bn_t t, r;
 	int result = STS_OK;
+
+	if (pub == NULL || prv == NULL || bits == 0) {
+		return STS_ERR;
+	}
 
 	bn_null(t);
 	bn_null(r);
@@ -717,8 +729,7 @@ int cp_rsa_gen_quick(rsa_t pub, rsa_t prv, int bits) {
 
 #endif
 
-int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, rsa_t pub) {
+int cp_rsa_enc(uint8_t *out, int *out_len, uint8_t *in, int in_len, rsa_t pub) {
 	bn_t m, eb;
 	int size, pad_len, result = STS_OK;
 
@@ -727,7 +738,7 @@ int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in,
 
 	bn_size_bin(&size, pub->n);
 
-	if (in_len > (size - RSA_PAD_LEN)) {
+	if (pub == NULL || in_len <= 0 || in_len > (size - RSA_PAD_LEN)) {
 		return STS_ERR;
 	}
 
@@ -777,14 +788,13 @@ int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in,
 
 #if CP_RSA == BASIC || !defined(STRIP)
 
-int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, rsa_t prv) {
+int cp_rsa_dec_basic(uint8_t *out, int *out_len, uint8_t *in, int in_len, rsa_t prv) {
 	bn_t m, eb;
 	int size, pad_len, result = STS_OK;
 
 	bn_size_bin(&size, prv->n);
 
-	if (in_len < 0 || in_len != size || in_len < RSA_PAD_LEN) {
+	if (prv == NULL || in_len != size || in_len < RSA_PAD_LEN) {
 		return STS_ERR;
 	}
 
@@ -836,8 +846,7 @@ int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
 
 #if CP_RSA == QUICK || !defined(STRIP)
 
-int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, rsa_t prv) {
+int cp_rsa_dec_quick(uint8_t *out, int *out_len, uint8_t *in, int in_len, rsa_t prv) {
 	bn_t m, eb;
 	int size, pad_len, result = STS_OK;
 
@@ -846,7 +855,7 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 
 	bn_size_bin(&size, prv->n);
 
-	if (in_len < 0 || in_len != size || in_len < RSA_PAD_LEN) {
+	if (prv == NULL || in_len != size || in_len < RSA_PAD_LEN) {
 		return STS_ERR;
 	}
 
@@ -915,11 +924,14 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
 
 #if CP_RSA == BASIC || !defined(STRIP)
 
-int cp_rsa_sig_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
-		int msg_len, int hash, rsa_t prv) {
+int cp_rsa_sig_basic(uint8_t *sig, int *sig_len, uint8_t *msg, int msg_len, int hash, rsa_t prv) {
 	bn_t m, eb;
 	int size, pad_len, result = STS_OK;
-	unsigned char h[MD_LEN];
+	uint8_t h[MD_LEN];
+
+	if (prv == NULL || msg_len < 0) {
+		return STS_ERR;
+	}
 
 	pad_len = (!hash ? MD_LEN : msg_len);
 
@@ -998,11 +1010,14 @@ int cp_rsa_sig_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
 
 #if CP_RSA == QUICK || !defined(STRIP)
 
-int cp_rsa_sig_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
-		int msg_len, int hash, rsa_t prv) {
+int cp_rsa_sig_quick(uint8_t *sig, int *sig_len, uint8_t *msg, int msg_len, int hash, rsa_t prv) {
 	bn_t m, eb;
 	int pad_len, size, result = STS_OK;
-	unsigned char h[MD_LEN];
+	uint8_t h[MD_LEN];
+
+	if (prv == NULL || msg_len < 0) {
+		return STS_ERR;
+	}
 
 	pad_len = (!hash ? MD_LEN : msg_len);
 
@@ -1099,14 +1114,17 @@ int cp_rsa_sig_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
 
 #endif
 
-int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg,
-		int msg_len, int hash, rsa_t pub) {
+int cp_rsa_ver(uint8_t *sig, int sig_len, uint8_t *msg, int msg_len, int hash, rsa_t pub) {
 	bn_t m, eb;
 	int size, pad_len, result;
-	unsigned char h1[MAX(msg_len, MD_LEN) + 8], h2[MAX(msg_len, MD_LEN)];
+	uint8_t h1[MAX(msg_len, MD_LEN) + 8], h2[MAX(msg_len, MD_LEN)];
 
 	/* We suppose that the signature is invalid. */
 	result = 0;
+
+	if (pub == NULL || msg_len < 0) {
+		return 0;
+	}
 
 	pad_len = (!hash ? MD_LEN : msg_len);
 

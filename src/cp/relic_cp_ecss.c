@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -61,11 +61,11 @@ void cp_ecss_gen(bn_t d, ec_t q) {
 	}
 }
 
-void cp_ecss_sig(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
+void cp_ecss_sig(bn_t e, bn_t s, uint8_t *msg, int len, bn_t d) {
 	bn_t n, k, x, r;
 	ec_t p;
-	unsigned char hash[MD_LEN];
-	unsigned char m[len + EC_BYTES];
+	uint8_t hash[MD_LEN];
+	uint8_t m[len + EC_BYTES];
 
 	bn_null(n);
 	bn_null(k);
@@ -124,11 +124,11 @@ void cp_ecss_sig(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d) {
 	}
 }
 
-int cp_ecss_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q) {
+int cp_ecss_ver(bn_t e, bn_t s, uint8_t *msg, int len, ec_t q) {
 	bn_t n, ev, rv;
 	ec_t p;
-	unsigned char hash[MD_LEN];
-	unsigned char m[len + EC_BYTES];
+	uint8_t hash[MD_LEN];
+	uint8_t m[len + EC_BYTES];
 	int result = 0;
 
 	bn_null(n);

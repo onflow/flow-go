@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -62,12 +62,12 @@ void cp_ecmqv_gen(bn_t d, ec_t q) {
 	}
 }
 
-void cp_ecmqv_key(unsigned char *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
+void cp_ecmqv_key(uint8_t *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
 		ec_t q1v, ec_t q2v) {
 	ec_t p;
 	bn_t x, n, s;
 	int l;
-	unsigned char _x[EC_BYTES];
+	uint8_t _x[EC_BYTES];
 
 	ec_null(p);
 	bn_null(x);
