@@ -44,15 +44,11 @@
 
 void gt_rand(gt_t a) {
 	gt_rand_imp(a);
-#if PC_CUR == PRIME
-
 #if FP_PRIME < 1536
 	pp_exp_k12(a, a);
 #else
 	pp_exp_k2(a, a);
 #endif
-
-#else
 	/* Missing pb implementation; but it will be deprecated anyway. */
 #endif
 }
