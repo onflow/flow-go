@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -38,9 +38,8 @@
 
 static void rsa(void) {
 	rsa_t pub, prv;
-	unsigned char in[10], new[10], h[MD_LEN];
-	unsigned char out[BN_BITS / 8 + 1];
-	int in_len, out_len, new_len;
+	uint8_t in[10], new[10], h[MD_LEN], out[BN_BITS / 8 + 1];
+	int out_len, new_len;
 
 	rsa_null(pub);
 	rsa_null(prv);
@@ -51,19 +50,18 @@ static void rsa(void) {
 	BENCH_ONCE("cp_rsa_gen", cp_rsa_gen(pub, prv, BN_BITS));
 
 	BENCH_BEGIN("cp_rsa_enc") {
-		in_len = 1;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		BENCH_ADD(cp_rsa_enc(out, &out_len, in, in_len, pub));
+		new_len = out_len;
+		rand_bytes(in, sizeof(in));
+		BENCH_ADD(cp_rsa_enc(out, &out_len, in, sizeof(in), pub));
 		cp_rsa_dec(new, &new_len, out, out_len, prv);
 	} BENCH_END;
 
 	BENCH_BEGIN("cp_rsa_dec") {
-		in_len = 1;
-		new_len = in_len;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		cp_rsa_enc(out, &out_len, in, in_len, pub);
+		new_len = out_len;
+		rand_bytes(in, sizeof(in));
+		cp_rsa_enc(out, &out_len, in, sizeof(in), pub);
 		BENCH_ADD(cp_rsa_dec(new, &new_len, out, out_len, prv));
 	} BENCH_END;
 
@@ -71,10 +69,10 @@ static void rsa(void) {
 	BENCH_ONCE("cp_rsa_gen_basic", cp_rsa_gen_basic(pub, prv, BN_BITS));
 
 	BENCH_BEGIN("cp_rsa_dec_basic") {
-		in_len = 1;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		cp_rsa_enc(out, &out_len, in, in_len, pub);
+		new_len =out_len;
+		rand_bytes(in, sizeof(in));
+		cp_rsa_enc(out, &out_len, in, sizeof(in), pub);
 		BENCH_ADD(cp_rsa_dec_basic(new, &new_len, out, out_len, prv));
 	} BENCH_END;
 #endif
@@ -83,11 +81,10 @@ static void rsa(void) {
 	BENCH_ONCE("cp_rsa_gen_quick", cp_rsa_gen_quick(pub, prv, BN_BITS));
 
 	BENCH_BEGIN("cp_rsa_dec_quick") {
-		in_len = 1;
-		new_len = in_len;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		cp_rsa_enc(out, &out_len, in, in_len, pub);
+		new_len =out_len;
+		rand_bytes(in, sizeof(in));
+		cp_rsa_enc(out, &out_len, in, sizeof(in), pub);
 		BENCH_ADD(cp_rsa_dec_quick(new, &new_len, out, out_len, prv));
 	} BENCH_END;
 #endif
@@ -95,33 +92,33 @@ static void rsa(void) {
 	BENCH_ONCE("cp_rsa_gen", cp_rsa_gen(pub, prv, BN_BITS));
 
 	BENCH_BEGIN("cp_rsa_sig (h = 0)") {
-		in_len = 1;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		BENCH_ADD(cp_rsa_sig(out, &out_len, in, in_len, 0, prv));
+		new_len = out_len;
+		rand_bytes(in, sizeof(in));
+		BENCH_ADD(cp_rsa_sig(out, &out_len, in, sizeof(in), 0, prv));
 	} BENCH_END;
 
 	BENCH_BEGIN("cp_rsa_sig (h = 1)") {
-		in_len = 1;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		md_map(h, in, in_len);
+		new_len = out_len;
+		rand_bytes(in, sizeof(in));
+		md_map(h, in, sizeof(in));
 		BENCH_ADD(cp_rsa_sig(out, &out_len, h, MD_LEN, 1, prv));
 	} BENCH_END;
 
 	BENCH_BEGIN("cp_rsa_ver (h = 0)") {
-		in_len = 1;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		cp_rsa_sig(out, &out_len, in, in_len, 0, prv);
-		BENCH_ADD(cp_rsa_ver(out, out_len, in, in_len, 0, pub));
+		new_len = out_len;
+		rand_bytes(in, sizeof(in));
+		cp_rsa_sig(out, &out_len, in, sizeof(in), 0, prv);
+		BENCH_ADD(cp_rsa_ver(out, out_len, in, sizeof(in), 0, pub));
 	} BENCH_END;
 
 	BENCH_BEGIN("cp_rsa_ver (h = 1)") {
-		in_len = 1;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		md_map(h, in, in_len);
+		new_len = out_len;
+		rand_bytes(in, sizeof(in));
+		md_map(h, in, sizeof(in));
 		cp_rsa_sig(out, &out_len, h, MD_LEN, 1, prv);
 		BENCH_ADD(cp_rsa_ver(out, out_len, h, MD_LEN, 1, pub));
 	} BENCH_END;
@@ -130,17 +127,17 @@ static void rsa(void) {
 	BENCH_ONCE("cp_rsa_gen_basic", cp_rsa_gen_basic(pub, prv, BN_BITS));
 
 	BENCH_BEGIN("cp_rsa_sig_basic (h = 0)") {
-		in_len = 1;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		BENCH_ADD(cp_rsa_sig_basic(out, &out_len, in, in_len, 0, prv));
+		new_len = out_len;
+		rand_bytes(in, sizeof(in));
+		BENCH_ADD(cp_rsa_sig_basic(out, &out_len, in, sizeof(in), 0, prv));
 	} BENCH_END;
 
 	BENCH_BEGIN("cp_rsa_sig_basic (h = 1)") {
-		in_len = 1;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		md_map(h, in, in_len);
+		new_len = out_len;
+		rand_bytes(in, sizeof(in));
+		md_map(h, in, sizeof(in));
 		BENCH_ADD(cp_rsa_sig_basic(out, &out_len, h, MD_LEN, 1, prv));
 	} BENCH_END;
 #endif
@@ -149,18 +146,18 @@ static void rsa(void) {
 	BENCH_ONCE("cp_rsa_gen_quick", cp_rsa_gen_quick(pub, prv, BN_BITS));
 
 	BENCH_BEGIN("cp_rsa_sig_quick (h = 0)") {
-		in_len = 1;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		BENCH_ADD(cp_rsa_sig_quick(out, &out_len, in, in_len, 0, prv));
+		new_len = out_len;
+		rand_bytes(in, sizeof(in));
+		BENCH_ADD(cp_rsa_sig_quick(out, &out_len, in, sizeof(in), 0, prv));
 	} BENCH_END;
 
 	BENCH_BEGIN("cp_rsa_sig_quick (h = 1)") {
-		in_len = 1;
 		out_len = BN_BITS / 8 + 1;
-		rand_bytes(in, in_len);
-		md_map(h, in, in_len);
-		BENCH_ADD(cp_rsa_sig_quick(out, &out_len, in, in_len, 1, prv));
+		new_len = out_len;
+		rand_bytes(in, sizeof(in));
+		md_map(h, in, sizeof(in));
+		BENCH_ADD(cp_rsa_sig_quick(out, &out_len, in, sizeof(in), 1, prv));
 	} BENCH_END;
 #endif
 
@@ -170,8 +167,7 @@ static void rsa(void) {
 
 static void rabin(void) {
 	rabin_t pub, prv;
-	unsigned char in[1000], new[1000];
-	unsigned char out[BN_BITS / 8 + 1];
+	uint8_t in[1000], new[1000], out[BN_BITS / 8 + 1];
 	int in_len, out_len, new_len;
 
 	rabin_null(pub);
@@ -208,7 +204,7 @@ static void rabin(void) {
 static void bdpe(void) {
 	bdpe_t pub, prv;
 	dig_t in, new;
-	unsigned char out[BN_BITS / 8 + 1];
+	uint8_t out[BN_BITS / 8 + 1];
 	int out_len;
 
 	bdpe_null(pub);
@@ -246,7 +242,7 @@ static void bdpe(void) {
 static void ecdh(void) {
 	bn_t d;
 	ec_t p;
-	unsigned char key[MD_LEN];
+	uint8_t key[MD_LEN];
 
 	bn_null(d);
 	ec_null(p);
@@ -271,7 +267,7 @@ static void ecdh(void) {
 static void ecmqv(void) {
 	bn_t d1, d2;
 	ec_t p1, p2;
-	unsigned char key[MD_LEN];
+	uint8_t key[MD_LEN];
 
 	bn_null(d1);
 	bn_null(d2);
@@ -301,8 +297,53 @@ static void ecmqv(void) {
 	ec_free(p2);
 }
 
+static void ecies(void) {
+	ec_t q, r;
+	bn_t d;
+	uint8_t in[10], out[16], iv[BC_LEN], mac[MD_LEN];
+	int in_len, out_len;
+
+	bn_null(d);
+	ec_null(q);
+	ec_null(r);
+
+	ec_new(q);
+	ec_new(r);
+	bn_new(d);
+
+	rand_bytes(in, sizeof(in));
+	rand_bytes(iv, BC_LEN);
+
+	BENCH_BEGIN("cp_ecies_gen") {
+		BENCH_ADD(cp_ecies_gen(d, q));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("cp_ecies_enc") {
+		in_len = sizeof(in);
+		out_len = sizeof(out);
+		rand_bytes(in, sizeof(in));
+		BENCH_ADD(cp_ecies_enc(r, out, &out_len, mac, in, in_len, iv, q));
+		cp_ecies_dec(out, &out_len, r, out, out_len, iv, mac, d);
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("cp_ecies_dec") {
+		in_len = sizeof(in);
+		out_len = sizeof(out);
+		rand_bytes(in, sizeof(in));
+		cp_ecies_enc(r, out, &out_len, mac, in, in_len, iv, q);
+		BENCH_ADD(cp_ecies_dec(out, &out_len, r, out, out_len, iv, mac, d));
+	}
+	BENCH_END;
+
+	ec_free(q);
+	ec_free(r);
+	bn_free(d);
+}
+
 static void ecdsa(void) {
-	unsigned char msg[5] = { 0, 1, 2, 3, 4 }, h[MD_LEN];
+	uint8_t msg[5] = { 0, 1, 2, 3, 4 }, h[MD_LEN];
 	bn_t r, s, d;
 	ec_t p;
 
@@ -350,7 +391,7 @@ static void ecdsa(void) {
 }
 
 static void ecss(void) {
-	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+	uint8_t msg[5] = { 0, 1, 2, 3, 4 };
 	bn_t r, s, d;
 	ec_t p;
 
@@ -392,9 +433,9 @@ static void ecss(void) {
 static void sokaka(void) {
 	sokaka_t k;
 	bn_t s;
-	unsigned char key1[MD_LEN];
-	char id_a[5] = {'A', 'l', 'i', 'c', 'e'};
-	char id_b[3] = {'B', 'o', 'b'};
+	uint8_t key1[MD_LEN];
+	char id_a[5] = { 'A', 'l', 'i', 'c', 'e' };
+	char id_b[3] = { 'B', 'o', 'b' };
 
 	sokaka_null(k);
 
@@ -413,16 +454,18 @@ static void sokaka(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("cp_sokaka_key G1") {
-		BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_b, sizeof(id_b), k, id_a, sizeof(id_a)));
+	BENCH_BEGIN("cp_sokaka_key (g1)") {
+		BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_b, sizeof(id_b), k, id_a,
+						sizeof(id_a)));
 	}
 	BENCH_END;
 
 	if (pc_map_is_type3()) {
 		cp_sokaka_gen_prv(k, id_a, sizeof(id_a), s);
 
-		BENCH_BEGIN("cp_sokaka_key G2") {
-			BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_a, sizeof(id_a), k, id_b, sizeof(id_b)));
+		BENCH_BEGIN("cp_sokaka_key (g2)") {
+			BENCH_ADD(cp_sokaka_key(key1, MD_LEN, id_a, sizeof(id_a), k, id_b,
+							sizeof(id_b)));
 		}
 		BENCH_END;
 	}
@@ -432,7 +475,7 @@ static void sokaka(void) {
 }
 
 static void bls(void) {
-	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+	uint8_t msg[5] = { 0, 1, 2, 3, 4 };
 	g1_t s;
 	g2_t p;
 	bn_t d;
@@ -466,7 +509,7 @@ static void bls(void) {
 }
 
 static void bbs(void) {
-	unsigned char msg[5] = { 0, 1, 2, 3, 4 }, h[MD_LEN];
+	uint8_t msg[5] = { 0, 1, 2, 3, 4 }, h[MD_LEN];
 	g1_t s;
 	g2_t p;
 	gt_t z;
@@ -537,6 +580,7 @@ int main(void) {
 	if (ec_param_set_any() == STS_OK) {
 		ecdh();
 		ecmqv();
+		ecies();
 		ecdsa();
 		ecss();
 	} else {
