@@ -229,8 +229,9 @@ else("$ENV{COMP}" STREQUAL "")
 endif("$ENV{COMP}" STREQUAL "")
 
 # Simulator of the target platform.
-set(SIMP "$ENV{SIMP}" CACHE STRING "Path to call a simulator of the target platform.")
-set(SIMA "$ENV{SIMA}" CACHE STRING "Arguments to call a simulator of the target platform.")
+set(SIMUL "$ENV{SIMUL}" CACHE STRING "Path to call a simulator of the target platform.")
+set(SIMAR "$ENV{SIMAR}" CACHE STRING "Arguments to call a simulator of the target platform.")
+string(REPLACE " " ";" SIMAR "${SIMAR}")
 
 # Linker flags.
 string(TOLOWER ${ARITH} LFLAGS)

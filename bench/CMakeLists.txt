@@ -10,7 +10,7 @@ macro(ADD_MODULE MODULE)
 	if (STBIN)
 		set_target_properties(bench_${MODULE} PROPERTIES LINK_SEARCH_END_STATIC 1)
 	endif(STBIN)
-	add_test(bench_${MODULE} ${SIMP} ${SIMA} ${EXECUTABLE_OUTPUT_PATH}/bench_${MODULE})
+	add_test(bench_${MODULE} ${SIMUL} ${SIMAR} ${EXECUTABLE_OUTPUT_PATH}/bench_${MODULE})
 endmacro(ADD_MODULE)
 
 if (CHECK)
