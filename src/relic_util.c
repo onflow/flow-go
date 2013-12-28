@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -112,7 +112,7 @@ char util_conv_char(dig_t i) {
 
 int util_bits_dig(dig_t a) {
 #if WORD == 8 || WORD == 16
-	static const unsigned char table[16] = {
+	static const uint8_t table[16] = {
 		0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4
 	};
 #endif
@@ -146,9 +146,9 @@ int util_bits_dig(dig_t a) {
 }
 
 int util_cmp_const(const void * a, const void *b, int size) {
-	const unsigned char *_a = (const unsigned char *) a;
-	const unsigned char *_b = (const unsigned char *) b;
-	unsigned char result = 0;
+	const uint8_t *_a = (const uint8_t *) a;
+	const uint8_t *_b = (const uint8_t *) b;
+	uint8_t result = 0;
 	int i;
 
 	for (i = 0; i < size; i++) {
@@ -165,7 +165,7 @@ void util_printf(const char *format, ...) {
 	va_list list;
 	va_start(list, format);
 	vsnprintf_P((char *)print_pointer, 64, format, list);
-	print_buffer[0] = (unsigned char)2;
+	print_buffer[0] = (uint8_t)2;
 	va_end(list);
 #elif ARCH == MSP && OPSYS == NONE
 	va_list list;

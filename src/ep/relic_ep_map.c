@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -36,10 +36,10 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void ep_map(ep_t p, const unsigned char *msg, int len) {
+void ep_map(ep_t p, const uint8_t *msg, int len) {
 	bn_t k;
 	fp_t t;
-	unsigned char digest[MD_LEN];
+	uint8_t digest[MD_LEN];
 
 	bn_null(k);
 	fp_null(t);
