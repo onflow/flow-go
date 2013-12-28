@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -642,7 +642,7 @@ void bn_size_bin(int *size, const bn_t a);
  * @param[in] bin			- the byte vector.
  * @param[in] len			- the buffer capacity.
  */
-void bn_read_bin(bn_t a, const unsigned char *bin, int len);
+void bn_read_bin(bn_t a, const uint8_t *bin, int len);
 
 /**
  * Writes a positive multiple precision integer to a byte vector in big-endian
@@ -653,7 +653,7 @@ void bn_read_bin(bn_t a, const unsigned char *bin, int len);
  * @param[in] a				- the multiple integer to write.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_write_bin(unsigned char *bin, int len, const bn_t a);
+void bn_write_bin(uint8_t *bin, int len, const bn_t a);
 
 /**
  * Returns the number of digits necessary to store a multiple precision integer.
@@ -1283,7 +1283,7 @@ int bn_is_factor(bn_t c, const bn_t a);
  * @param[in] w				- the window size in bits.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_win(unsigned char *win, int *len, const bn_t k, int w);
+void bn_rec_win(uint8_t *win, int *len, const bn_t k, int w);
 
 /**
  * Recodes an integer in sliding window form.
@@ -1294,7 +1294,7 @@ void bn_rec_win(unsigned char *win, int *len, const bn_t k, int w);
  * @param[in] w				- the window size in bits.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_slw(unsigned char *win, int *len, const bn_t k, int w);
+void bn_rec_slw(uint8_t *win, int *len, const bn_t k, int w);
 
 /**
  * Recodes an integer in width-w Non-Adjacent Form.

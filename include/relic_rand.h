@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -85,7 +85,7 @@ void rand_clean(void);
  * @param[in] size			- the number of bytes.
  * @throw ERR_NO_VALID		- if the entropy length is too small or too large.
  */
-void rand_seed(unsigned char *buf, int size);
+void rand_seed(uint8_t *buf, int size);
 
 /**
  * Gathers pseudo-random bytes from the pseudo-random number generator.
@@ -96,6 +96,6 @@ void rand_seed(unsigned char *buf, int size);
  * @throw ERR_NO_READ		- it the pseudo-random number generator cannot
  * 							generate the specified number of bytes.
  */
-void rand_bytes(unsigned char *buf, int size);
+void rand_bytes(uint8_t *buf, int size);
 
 #endif /* !RELIC_RAND_H */

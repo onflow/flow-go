@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -107,7 +107,7 @@ enum {
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void md_map_shone(unsigned char *hash, const unsigned char *msg, int len);
+void md_map_shone(uint8_t *hash, const uint8_t *msg, int len);
 
 /**
  * Returns the internal state of the hash function.
@@ -116,7 +116,7 @@ void md_map_shone(unsigned char *hash, const unsigned char *msg, int len);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void md_map_shone_mid(unsigned char *state, unsigned char *msg, int len);
+void md_map_shone_mid(uint8_t *state, uint8_t *msg, int len);
 /**
  * Computes the SHA-224 hash function.
  *
@@ -124,7 +124,7 @@ void md_map_shone_mid(unsigned char *state, unsigned char *msg, int len);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void md_map_sh224(unsigned char *hash, const unsigned char *msg, int len);
+void md_map_sh224(uint8_t *hash, const uint8_t *msg, int len);
 
 /**
  * Computes the SHA-256 hash function.
@@ -133,7 +133,7 @@ void md_map_sh224(unsigned char *hash, const unsigned char *msg, int len);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void md_map_sh256(unsigned char *hash, const unsigned char *msg, int len);
+void md_map_sh256(uint8_t *hash, const uint8_t *msg, int len);
 
 /**
  * Computes the SHA-384 hash function.
@@ -142,7 +142,7 @@ void md_map_sh256(unsigned char *hash, const unsigned char *msg, int len);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void md_map_sh384(unsigned char *hash, const unsigned char *msg, int len);
+void md_map_sh384(uint8_t *hash, const uint8_t *msg, int len);
 
 /**
  * Computes the SHA-512 hash function.
@@ -151,7 +151,7 @@ void md_map_sh384(unsigned char *hash, const unsigned char *msg, int len);
  * @param[in] msg				- the message to hash.
  * @param[in] len				- the message length in bytes.
  */
-void md_map_sh512(unsigned char *hash, const unsigned char *msg, int len);
+void md_map_sh512(uint8_t *hash, const uint8_t *msg, int len);
 
 /**
  * Derives a key from shared secret material through the standardized KDF1
@@ -162,8 +162,7 @@ void md_map_sh512(unsigned char *hash, const unsigned char *msg, int len);
  * @param[in] in				- the shared secret.
  * @param[in] in_len			- the length of the shared secret in bytes.
  */
-void md_kdf1(unsigned char *key, int key_len, const unsigned char *in,
-		int in_len);
+void md_kdf1(uint8_t *key, int key_len, const uint8_t *in, int in_len);
 
 /**
  * Derives a key from shared secret material through the standardized KDF2
@@ -174,8 +173,7 @@ void md_kdf1(unsigned char *key, int key_len, const unsigned char *in,
  * @param[in] in				- the shared secret.
  * @param[in] in_len			- the length of the shared secret in bytes.
  */
-void md_kdf2(unsigned char *key, int key_len, const unsigned char *in,
-		int in_len);
+void md_kdf2(uint8_t *key, int key_len, const uint8_t *in, int in_len);
 
 /**
  * Derives a mask from shared secret material through the PKCS#1 2.0 MGF1
@@ -186,8 +184,7 @@ void md_kdf2(unsigned char *key, int key_len, const unsigned char *in,
  * @param[in] in				- the shared secret.
  * @param[in] in_len			- the length of the shared secret in bytes.
  */
-void md_mgf1(unsigned char *mask, int mask_len, const unsigned char *in,
-		int in_len);
+void md_mgf1(uint8_t *mask, int mask_len, const uint8_t *in, int in_len);
 
 /**
  * Computes a Message Authentication Code through HMAC.
@@ -198,7 +195,7 @@ void md_mgf1(unsigned char *mask, int mask_len, const unsigned char *in,
  * @param[in] key				- the cryptographic key.
  * @param[in] key_len			- the size of the key in bytes.
  */
-void md_hmac(unsigned char *mac, unsigned char *in, int in_len,
-		unsigned char *key, int key_len);
+void md_hmac(uint8_t *mac, const uint8_t *in, int in_len, const uint8_t *key,
+		int key_len);
 
 #endif /* !RELIC_MD_H */

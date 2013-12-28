@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -970,7 +970,8 @@ void ep_mul_fix_lwnaf(ep_t r, const ep_t *t, const bn_t k);
  * @param[in] q				- the second point to multiply.
  * @param[in] m				- the second integer,
  */
-void ep_mul_sim_basic(ep_t r, const ep_t p, const bn_t k, const ep_t q, const bn_t m);
+void ep_mul_sim_basic(ep_t r, const ep_t p, const bn_t k, const ep_t q,
+		const bn_t m);
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously using
@@ -995,7 +996,8 @@ void ep_mul_sim_trick(ep_t r, const ep_t p, const bn_t k, const ep_t q,
  * @param[in] q				- the second point to multiply.
  * @param[in] m				- the second integer,
  */
-void ep_mul_sim_inter(ep_t r, const ep_t p, const bn_t k, const ep_t q, const bn_t m);
+void ep_mul_sim_inter(ep_t r, const ep_t p, const bn_t k, const ep_t q,
+		const bn_t m);
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously using
@@ -1007,7 +1009,8 @@ void ep_mul_sim_inter(ep_t r, const ep_t p, const bn_t k, const ep_t q, const bn
  * @param[in] q				- the second point to multiply.
  * @param[in] m				- the second integer,
  */
-void ep_mul_sim_joint(ep_t r, const ep_t p, const bn_t k, const ep_t q, const bn_t m);
+void ep_mul_sim_joint(ep_t r, const ep_t p, const bn_t k, const ep_t q,
+		const bn_t m);
 
 /**
  * Multiplies and adds the generator and a prime elliptic curve point
@@ -1044,7 +1047,7 @@ void ep_norm_sim(ep_t *r, const ep_t *t, int n);
  * @param[in] msg			- the byte array to map.
  * @param[in] len			- the array length in bytes.
  */
-void ep_map(ep_t p, const unsigned char *msg, int len);
+void ep_map(ep_t p, const uint8_t *msg, int len);
 
 /**
  * Compresses a point.

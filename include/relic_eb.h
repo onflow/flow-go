@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -1048,7 +1048,7 @@ void eb_norm_sim(eb_t *r, const eb_t *t, int n);
  * @param[in] msg			- the byte array to map.
  * @param[in] len			- the array length in bytes.
  */
-void eb_map(eb_t p, const unsigned char *msg, int len);
+void eb_map(eb_t p, const uint8_t *msg, int len);
 
 /**
  * Compresses a point.

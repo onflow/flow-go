@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -64,8 +64,8 @@
  * @param[in] key_len		- the key size in bytes.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int bc_aes_cbc_enc(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, unsigned char *key, int key_len, unsigned char *iv);
+int bc_aes_cbc_enc(uint8_t *out, int *out_len, uint8_t *in,
+		int in_len, uint8_t *key, int key_len, uint8_t *iv);
 
 /**
  * Decrypts with AES in CBC mode.
@@ -78,7 +78,7 @@ int bc_aes_cbc_enc(unsigned char *out, int *out_len, unsigned char *in,
  * @param[in] key_len		- the key size in bytes.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int bc_aes_cbc_dec(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, unsigned char *key, int key_len, unsigned char *iv);
+int bc_aes_cbc_dec(uint8_t *out, int *out_len, uint8_t *in,
+		int in_len, uint8_t *key, int key_len, uint8_t *iv);
 
 #endif /* !RELIC_BC_H */

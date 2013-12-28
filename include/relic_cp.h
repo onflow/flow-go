@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -677,8 +677,7 @@ int cp_rsa_gen_quick(rsa_t pub, rsa_t prv, int bits);
  * @param[in] pub			- the public key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
-		rsa_t pub);
+int cp_rsa_enc(uint8_t *out, int *out_len, uint8_t *in, int in_len, rsa_t pub);
 
 /**
  * Decrypts using the basic RSA decryption method.
@@ -690,8 +689,8 @@ int cp_rsa_enc(unsigned char *out, int *out_len, unsigned char *in, int in_len,
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, rsa_t prv);
+int cp_rsa_dec_basic(uint8_t *out, int *out_len, uint8_t *in, int in_len,
+		rsa_t prv);
 
 /**
  * Decrypts using the fast RSA decryption with CRT optimization.
@@ -703,8 +702,8 @@ int cp_rsa_dec_basic(unsigned char *out, int *out_len, unsigned char *in,
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, rsa_t prv);
+int cp_rsa_dec_quick(uint8_t *out, int *out_len, uint8_t *in, int in_len,
+		rsa_t prv);
 
 /**
  * Signs using the basic RSA signature algorithm. The flag must be non-zero if
@@ -718,8 +717,8 @@ int cp_rsa_dec_quick(unsigned char *out, int *out_len, unsigned char *in,
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rsa_sig_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
-		int msg_len, int hash, rsa_t prv);
+int cp_rsa_sig_basic(uint8_t *sig, int *sig_len, uint8_t *msg, int msg_len,
+		int hash, rsa_t prv);
 
 /**
  * Signs using the fast RSA signature algorithm with CRT optimization. The flag
@@ -733,8 +732,8 @@ int cp_rsa_sig_basic(unsigned char *sig, int *sig_len, unsigned char *msg,
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rsa_sig_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
-		int msg_len, int hash, rsa_t prv);
+int cp_rsa_sig_quick(uint8_t *sig, int *sig_len, uint8_t *msg, int msg_len,
+		int hash, rsa_t prv);
 
 /**
  * Verifies an RSA signature. The flag must be non-zero if the message being
@@ -748,8 +747,8 @@ int cp_rsa_sig_quick(unsigned char *sig, int *sig_len, unsigned char *msg,
  * @param[in] pub			- the public key.
  * @return 1 if the signature is valid, 0 otherwise.
  */
-int cp_rsa_ver(unsigned char *sig, int sig_len, unsigned char *msg, int msg_len,
-		int hash, rsa_t pub);
+int cp_rsa_ver(uint8_t *sig, int sig_len, uint8_t *msg, int msg_len, int hash,
+		rsa_t pub);
 
 /**
  * Generates a new key pair for the Rabin cryptosystem.
@@ -771,7 +770,7 @@ int cp_rabin_gen(rabin_t pub, rabin_t prv, int bits);
  * @param[in] pub			- the public key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in,
+int cp_rabin_enc(uint8_t *out, int *out_len, uint8_t *in,
 		int in_len, rabin_t pub);
 
 /**
@@ -784,8 +783,8 @@ int cp_rabin_enc(unsigned char *out, int *out_len, unsigned char *in,
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rabin_dec(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, rabin_t prv);
+int cp_rabin_dec(uint8_t *out, int *out_len, uint8_t *in, int in_len,
+		rabin_t prv);
 
 /**
  * Generates a new key pair gor Benaloh's Dense Probabilistic Encryption system.
@@ -807,7 +806,7 @@ int cp_bdpe_gen(bdpe_t pub, bdpe_t prv, dig_t block, int bits);
  * @param[in] pub			- the public key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_bdpe_enc(unsigned char *out, int *out_len, dig_t in, bdpe_t pub);
+int cp_bdpe_enc(uint8_t *out, int *out_len, dig_t in, bdpe_t pub);
 
 /**
  * Decrypts using Benaloh's cryptosystem.
@@ -818,7 +817,7 @@ int cp_bdpe_enc(unsigned char *out, int *out_len, dig_t in, bdpe_t pub);
  * @param[in] prv			- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_bdpe_dec(dig_t *out, unsigned char *in, int in_len, bdpe_t prv);
+int cp_bdpe_dec(dig_t *out, uint8_t *in, int in_len, bdpe_t prv);
 
 /**
  * Generates an ECDH key pair.
@@ -836,7 +835,7 @@ void cp_ecdh_gen(bn_t d, ec_t q);
  * @param[in] d					- the private key.
  * @param[in] q					- the point received from the other party.
  */
-void cp_ecdh_key(unsigned char *key, int key_len, bn_t d, ec_t q);
+void cp_ecdh_key(uint8_t *key, int key_len, bn_t d, ec_t q);
 
 /**
  * Generate an ECMQV key pair.
@@ -859,7 +858,7 @@ void cp_ecmqv_gen(bn_t d, ec_t q);
  * @param[in] q1v				- the point received from the other party.
  * @param[in] q2v				- the ephemeral point received from the other party.
  */
-void cp_ecmqv_key(unsigned char *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
+void cp_ecmqv_key(uint8_t *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
 		ec_t q1v, ec_t q2v);
 
 /**
@@ -874,15 +873,18 @@ int cp_ecies_gen(bn_t d, ec_t q);
 /**
  * Encrypts using the ECIES cryptosystem.
  *
+ * @param[out] r 			- the resulting elliptic curve point.
  * @param[out] out			- the output buffer.
  * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[out] mac 			- the authentication tag.
  * @param[in] in			- the input buffer.
  * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] iv 			- the block cipher initialization vector.
  * @param[in] q				- the public key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_ecies_enc(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, unsigned char *iv, unsigned char *mac, ec_t r, ec_t q);
+int cp_ecies_enc(ec_t r, uint8_t *out, int *out_len, uint8_t *mac, uint8_t *in,
+		int in_len, uint8_t *iv, ec_t q);
 
 /**
  * Decrypts using the ECIES cryptosystem.
@@ -891,11 +893,13 @@ int cp_ecies_enc(unsigned char *out, int *out_len, unsigned char *in,
  * @param[out] out_len		- the number of bytes written in the output buffer.
  * @param[in] in			- the input buffer.
  * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] iv 			- the block cipher initialization vector.
+ * @param[in] mac 			- the authentication tag.
  * @param[in] d				- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_ecies_dec(unsigned char *out, int *out_len, unsigned char *in,
-		int in_len, unsigned char *iv, unsigned char *mac, ec_t r, bn_t d);
+int cp_ecies_dec(uint8_t *out, int *out_len, ec_t r, uint8_t *in, int in_len,
+		uint8_t *iv, uint8_t *mac, bn_t d);
 
 /**
  * Generates an ECDSA key pair.
@@ -915,8 +919,7 @@ void cp_ecdsa_gen(bn_t d, ec_t q);
  * @param[in] hash				- the flag to indicate the message format.
  * @param[in] d					- the private key.
  */
-void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, int hash,
-		bn_t d);
+void cp_ecdsa_sig(bn_t r, bn_t s, uint8_t *msg, int len, int hash, bn_t d);
 
 /**
  * Verifies a message signed with ECDSA using the basic method.
@@ -928,7 +931,7 @@ void cp_ecdsa_sig(bn_t r, bn_t s, unsigned char *msg, int len, int hash,
  * @param[in] hash				- the flag to indicate the message format.
  * @param[in] q					- the public key.
  */
-int cp_ecdsa_ver(bn_t r, bn_t s, unsigned char *msg, int len, int hash, ec_t q);
+int cp_ecdsa_ver(bn_t r, bn_t s, uint8_t *msg, int len, int hash, ec_t q);
 
 /**
  * Generates an Elliptic Curve Schnorr Signature key pair.
@@ -947,7 +950,7 @@ void cp_ecss_gen(bn_t d, ec_t q);
  * @param[in] len				- the message length in bytes.
  * @param[in] d					- the private key.
  */
-void cp_ecss_sig(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d);
+void cp_ecss_sig(bn_t e, bn_t s, uint8_t *msg, int len, bn_t d);
 
 /**
  * Verifies a message signed with the Elliptic Curve Schnorr Signature using the
@@ -959,7 +962,7 @@ void cp_ecss_sig(bn_t e, bn_t s, unsigned char *msg, int len, bn_t d);
  * @param[in] len				- the message length in bytes.
  * @param[in] q					- the public key.
  */
-int cp_ecss_ver(bn_t e, bn_t s, unsigned char *msg, int len, ec_t q);
+int cp_ecss_ver(bn_t e, bn_t s, uint8_t *msg, int len, ec_t q);
 
 /**
  * Generates a master key for the SOK identity-based non-interactive
@@ -990,8 +993,8 @@ void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master);
  * @param[in] id2				- the second identity.
  * @param[in] len2				- the length of the second identity in bytes.
  */
-void cp_sokaka_key(unsigned char *key, unsigned int key_len, char *id1,
-		int len1, sokaka_t k, char *id2, int len2);
+void cp_sokaka_key(uint8_t *key, unsigned int key_len, char *id1, int len1,
+		sokaka_t k, char *id2, int len2);
 
 /**
  * Generates a BLS key pair.
@@ -1009,7 +1012,7 @@ void cp_bls_gen(bn_t d, g2_t q);
  * @param[in] len				- the message length in bytes.
  * @param[in] d					- the private key.
  */
-void cp_bls_sig(g1_t s, unsigned char *msg, int len, bn_t d);
+void cp_bls_sig(g1_t s, uint8_t *msg, int len, bn_t d);
 
 /**
  * Verifies a message signed with BLS using the basic method.
@@ -1020,7 +1023,7 @@ void cp_bls_sig(g1_t s, unsigned char *msg, int len, bn_t d);
  * @param[in] q					- the public key.
  * @return a boolean value indicating the verification result.
  */
-int cp_bls_ver(g1_t s, unsigned char *msg, int len, g2_t q);
+int cp_bls_ver(g1_t s, uint8_t *msg, int len, g2_t q);
 
 /**
  * Generates a Boneh-Boyen key pair.
@@ -1040,7 +1043,7 @@ void cp_bbs_gen(bn_t d, g2_t q, gt_t z);
  * @param[in] hash				- the flag to indicate the message format.
  * @param[in] d					- the private key.
  */
-void cp_bbs_sig(g1_t s, unsigned char *msg, int len, int hash, bn_t d);
+void cp_bbs_sig(g1_t s, uint8_t *msg, int len, int hash, bn_t d);
 
 /**
  * Verifies a message signed with BLS using the basic method.
@@ -1052,6 +1055,6 @@ void cp_bbs_sig(g1_t s, unsigned char *msg, int len, int hash, bn_t d);
  * @param[in] q					- the public key.
  * @return a boolean value indicating the verification result.
  */
-int cp_bbs_ver(g1_t s, unsigned char *msg, int len, int hash, g2_t q, gt_t z);
+int cp_bbs_ver(g1_t s, uint8_t *msg, int len, int hash, g2_t q, gt_t z);
 
 #endif /* !RELIC_CP_H */
