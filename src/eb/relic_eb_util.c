@@ -358,6 +358,9 @@ void eb_tab(eb_t *t, const eb_t p, int w) {
 				break;
 #endif
 #if EB_DEPTH == 7 || EB_WIDTH ==  7
+			/**
+			 * Formulas from http://eprint.iacr.org/2012/519
+			 */
 			case 7:
 				eb_frb(t[0], t[0]);
 				eb_frb(t[0], t[0]);
@@ -461,6 +464,9 @@ void eb_tab(eb_t *t, const eb_t p, int w) {
 				break;
 #endif
 #if EB_DEPTH == 8 || EB_WIDTH ==  8
+			/**
+			 * Formulas from http://eprint.iacr.org/2012/519
+			 */
 			case 8:
 				eb_frb(t[0], t[0]);
 				eb_frb(t[0], t[0]);
