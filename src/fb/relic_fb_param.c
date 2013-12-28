@@ -229,8 +229,6 @@ void fb_param_set_any(void) {
 
 #elif FB_POLYN == 1223
 	fb_param_set(TRINO_1223);
-#endif
-
 #else
 	THROW(ERR_NO_FIELD);
 #endif
