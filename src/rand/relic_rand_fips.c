@@ -81,7 +81,7 @@ void rand_bytes(uint8_t *buf, int size) {
 		/* XKEY = (XKEY + w_1 + 1) mod 2^b */
 		rand_add_inc(ctx->rand, hash);
 
-		for (int i = MIN(size, MD_LEN_SHONE); i >= 0 ; i--) {
+		for (int i = MIN(size - 1, MD_LEN_SHONE); i >= 0 ; i--) {
 			buf[i] = hash[i];
 		}
 		buf += MD_LEN_SHONE;
