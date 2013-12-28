@@ -108,19 +108,9 @@ void conf_print(void) {
 	util_print("   Arithmetic method: " EB_METHD "\n\n");
 #endif
 
-#ifdef WITH_PB
-	util_print("** Pairing over binary curve module options:\n");
-	util_print("   Arithmetic method: " PB_METHD "\n\n");
-#endif
-
 #ifdef WITH_EC
 	util_print("** Elliptic Curve Cryptography module options:\n");
 	util_print("   Arithmetic method: " EC_METHD "\n\n");
-#endif
-
-#ifdef WITH_PC
-	util_print("** Pairing Based Cryptography module options:\n");
-	util_print("   Arithmetic method: " PC_METHD "\n\n");
 #endif
 
 #ifdef WITH_MD
