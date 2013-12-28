@@ -40,8 +40,8 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void md_hmac(uint8_t *mac, uint8_t *in, int in_len,
-		uint8_t *key, int key_len) {
+void md_hmac(uint8_t *mac, const uint8_t *in, int in_len, const uint8_t *key,
+		int key_len) {
 #if MD_MAP == SHONE || MD_MAP == SH224 || MD_MAP == SH256
 	int block_size = 64;
 #elif MD_MAP == SH384 || MD_MAP == SH512
