@@ -75,7 +75,8 @@ int cp_rabin_gen(rabin_t pub, rabin_t prv, int bits) {
 		do {
 			bn_gen_prime(prv->q, bits / 2);
 			bn_mod_2b(r, prv->q, 2);
-		} while (bn_cmp(prv->p, prv->q) == CMP_EQ || bn_cmp_dig(r, 3) != CMP_EQ);
+		} while (bn_cmp(prv->p, prv->q) == CMP_EQ ||
+				bn_cmp_dig(r, 3) != CMP_EQ);
 
 		/* Swap p and q so that p is smaller. */
 		if (bn_cmp(prv->p, prv->q) == CMP_LT) {
@@ -153,8 +154,8 @@ int cp_rabin_enc(uint8_t *out, int *out_len, uint8_t *in, int in_len,
 	return result;
 }
 
-int cp_rabin_dec(uint8_t *out, int *out_len, uint8_t *in,
-		int in_len, rabin_t prv) {
+int cp_rabin_dec(uint8_t *out, int *out_len, uint8_t *in, int in_len,
+		rabin_t prv) {
 	bn_t m, m0, m1, t, n;
 	int size, result = STS_OK;
 	uint8_t pad;

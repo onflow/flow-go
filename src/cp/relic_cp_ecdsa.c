@@ -61,8 +61,7 @@ void cp_ecdsa_gen(bn_t d, ec_t q) {
 	}
 }
 
-void cp_ecdsa_sig(bn_t r, bn_t s, uint8_t *msg, int len, int hash,
-		bn_t d) {
+void cp_ecdsa_sig(bn_t r, bn_t s, uint8_t *msg, int len, int hash, bn_t d) {
 	bn_t n, k, x, e;
 	ec_t p;
 	uint8_t h[MD_LEN];
