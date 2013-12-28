@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -62,20 +62,20 @@ static void copy(void) {
 	dv_new(b);
 
 	BENCH_BEGIN("dv_copy") {
-		rand_bytes((unsigned char *)a, DV_DIGS * sizeof(dig_t));
-		rand_bytes((unsigned char *)b, DV_DIGS * sizeof(dig_t));
+		rand_bytes((uint8_t *)a, DV_DIGS * sizeof(dig_t));
+		rand_bytes((uint8_t *)b, DV_DIGS * sizeof(dig_t));
 		BENCH_ADD(dv_copy(a, b, DV_DIGS));
 	} BENCH_END;
 
 	BENCH_BEGIN("dv_copy_cond") {
-		rand_bytes((unsigned char *)a, DV_DIGS * sizeof(dig_t));
-		rand_bytes((unsigned char *)b, DV_DIGS * sizeof(dig_t));
+		rand_bytes((uint8_t *)a, DV_DIGS * sizeof(dig_t));
+		rand_bytes((uint8_t *)b, DV_DIGS * sizeof(dig_t));
 		BENCH_ADD(dv_copy_cond(a, b, DV_DIGS, 1));
 	} BENCH_END;
 
 	BENCH_BEGIN("dv_cmp_const") {
-		rand_bytes((unsigned char *)a, DV_DIGS * sizeof(dig_t));
-		rand_bytes((unsigned char *)b, DV_DIGS * sizeof(dig_t));
+		rand_bytes((uint8_t *)a, DV_DIGS * sizeof(dig_t));
+		rand_bytes((uint8_t *)b, DV_DIGS * sizeof(dig_t));
 		BENCH_ADD(dv_cmp_const(a, b, DV_DIGS));
 	} BENCH_END;
 

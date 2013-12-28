@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -96,7 +96,7 @@ static void util(void) {
 	int d, len;
 	dig_t digit;
 	char str[BN_BYTES * 3 + 1];
-	unsigned char bin[BN_BYTES];
+	uint8_t bin[BN_BYTES];
 	dig_t raw[BN_DIGS];
 	bn_t a, b;
 
@@ -815,7 +815,7 @@ static void arith(void) {
 	BENCH_END;
 
 	BENCH_BEGIN("bn_rec_win") {
-		unsigned char win[BN_BITS + 1];
+		uint8_t win[BN_BITS + 1];
 		int len = BN_BITS + 1;
 		bn_rand(a, BN_POS, BN_BITS);
 		BENCH_ADD(bn_rec_win(win, &len, a, 4));
@@ -823,7 +823,7 @@ static void arith(void) {
 	BENCH_END;
 
 	BENCH_BEGIN("bn_rec_slw") {
-		unsigned char win[BN_BITS + 1];
+		uint8_t win[BN_BITS + 1];
 		int len = BN_BITS + 1;
 		bn_rand(a, BN_POS, BN_BITS);
 		BENCH_ADD(bn_rec_slw(win, &len, a, 4));

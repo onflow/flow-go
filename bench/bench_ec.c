@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -210,7 +210,7 @@ static void arith(void) {
 	BENCH_END;
 
 	BENCH_BEGIN("ec_map") {
-		unsigned char msg[5];
+		uint8_t msg[5];
 		rand_bytes(msg, 5);
 		BENCH_ADD(ec_map(p, msg, 5));
 	} BENCH_END;
