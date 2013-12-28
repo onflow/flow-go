@@ -32,6 +32,7 @@
 -ss	--space-special-semicolon
 -ut	--use-tabs
 -ts4	--tab-size4
+-T uint8_t
 -T bn_t
 -T dv_t
 -T dv2_t
