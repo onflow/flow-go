@@ -67,14 +67,6 @@ static void ep2_mul_sim_ordin(ep2_t r, const ep2_t p, const bn_t k,
 		/* Compute the precomputation table. */
 		ep2_tab(t1, q, EP_WIDTH);
 
-
-		/* Prepare the precomputation table. */
-		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-			ep2_new(t1[i]);
-		}
-		/* Compute the precomputation table. */
-		ep2_tab(t1, q, EP_WIDTH);
-
 		/* Compute the w-TNAF representation of k. */
 		if (gen) {
 			w = EP_DEPTH;
@@ -122,11 +114,12 @@ static void ep2_mul_sim_ordin(ep2_t r, const ep2_t p, const bn_t k,
 	FINALLY {
 		/* Free the precomputation tables. */
 		if (!gen) {
-			for (i = 0; i < 1 << (EP_WIDTH - 2); i++) {
+			for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
 				ep2_free(t0[i]);
 			}
 		}
-		for (i = 0; i < 1 << (EP_WIDTH - 2); i++) {
+		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
+			printf("liberado %d", i);
 			ep2_free(t1[i]);
 		}
 	}
@@ -262,7 +255,7 @@ void ep2_mul_sim_inter(ep2_t r, const ep2_t p, const bn_t k, const ep2_t q,
 #endif
 
 #if defined(EP_ORDIN)
-	ep2_mul_sim_ordin(r, p, k, q, l, 0);
+	ep2_mul_sim_ordin(r, p, k, q, l, NULL);
 #endif
 }
 
