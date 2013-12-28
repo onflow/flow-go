@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -49,6 +49,9 @@ int fb_param_get(void) {
 
 void fb_param_set(int param) {
 	switch (param) {
+		case PENTA_8:
+			fb_poly_set_penta(4, 3, 2);
+			break;
 		case PENTA_64:
 			fb_poly_set_penta(4, 3, 1);
 			break;
@@ -139,7 +142,10 @@ void fb_param_set(int param) {
 }
 
 void fb_param_set_any(void) {
-#if FB_POLYN == 64
+#if FB_POLYN == 8
+	fb_param_set(PENTA_8);
+
+#elif FB_POLYN == 64
 	fb_param_set(PENTA_64);
 
 #elif FB_POLYN == 113
@@ -223,6 +229,8 @@ void fb_param_set_any(void) {
 
 #elif FB_POLYN == 1223
 	fb_param_set(TRINO_1223);
+#endif
+
 #else
 	THROW(ERR_NO_FIELD);
 #endif

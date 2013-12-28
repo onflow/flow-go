@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -166,7 +166,7 @@ void fb_set_dig(fb_t c, dig_t a) {
 void fb_rand(fb_t a) {
 	int bits, digits;
 
-	rand_bytes((unsigned char *)a, FB_DIGS * sizeof(dig_t));
+	rand_bytes((uint8_t *)a, FB_DIGS * sizeof(dig_t));
 
 	SPLIT(bits, digits, FB_BITS, FB_DIG_LOG);
 	if (bits > 0) {
