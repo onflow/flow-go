@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-int ep2_is_infty(ep2_t p) {
+int ep2_is_infty(const ep2_t p) {
 	return (fp2_is_zero(p->z) == 1);
 }
 
@@ -46,14 +46,14 @@ void ep2_set_infty(ep2_t p) {
 	fp2_zero(p->z);
 }
 
-void ep2_copy(ep2_t r, ep2_t p) {
+void ep2_copy(ep2_t r, const ep2_t p) {
 	fp2_copy(r->x, p->x);
 	fp2_copy(r->y, p->y);
 	fp2_copy(r->z, p->z);
 	r->norm = p->norm;
 }
 
-int ep2_cmp(ep2_t p, ep2_t q) {
+int ep2_cmp(const ep2_t p, const ep2_t q) {
 	if (fp2_cmp(p->x, q->x) != CMP_EQ) {
 		return CMP_NE;
 	}
@@ -100,7 +100,7 @@ void ep2_rand(ep2_t p) {
 	}
 }
 
-void ep2_rhs(fp2_t rhs, ep2_t p) {
+void ep2_rhs(fp2_t rhs, const ep2_t p) {
 	fp2_t t0;
 	fp2_t t1;
 
@@ -133,7 +133,7 @@ void ep2_rhs(fp2_t rhs, ep2_t p) {
 	}
 }
 
-void ep2_tab(ep2_t * t, ep2_t p, int w) {
+void ep2_tab(ep2_t * t, const ep2_t p, int w) {
 	if (w > 2) {
 		ep2_dbl(t[0], p);
 #if defined(EP_MIXED)
@@ -152,7 +152,7 @@ void ep2_tab(ep2_t * t, ep2_t p, int w) {
 	ep2_copy(t[0], p);
 }
 
-int ep2_is_valid(ep2_t p) {
+int ep2_is_valid(const ep2_t p) {
 	ep2_t t;
 	int r = 0;
 
@@ -175,7 +175,7 @@ int ep2_is_valid(ep2_t p) {
 	return r;
 }
 
-void ep2_print(ep2_t p) {
+void ep2_print(const ep2_t p) {
 	fp2_print(p->x);
 	fp2_print(p->y);
 	fp2_print(p->z);

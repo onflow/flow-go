@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -47,7 +47,7 @@
  * @param p					- the first point to add.
  * @param q					- the second point to add.
  */
-static void ep2_add_basic_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
+static void ep2_add_basic_imp(ep2_t r, fp2_t s, const ep2_t p, const ep2_t q) {
 	fp2_t t0, t1, t2;
 
 	fp2_null(t0);
@@ -124,7 +124,7 @@ static void ep2_add_basic_imp(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
  * @param p					- the affine point.
  * @param q					- the projective point.
  */
-static void ep2_add_projc_mix(ep2_t r, ep2_t p, ep2_t q) {
+static void ep2_add_projc_mix(ep2_t r, const ep2_t p, const ep2_t q) {
 	fp2_t t0, t1, t2, t3, t4, t5, t6;
 
 	fp2_null(t0);
@@ -233,7 +233,7 @@ static void ep2_add_projc_mix(ep2_t r, ep2_t p, ep2_t q) {
  * @param p					- the first point to add.
  * @param q					- the second point to add.
  */
-static void ep2_add_projc_imp(ep2_t r, ep2_t p, ep2_t q) {
+static void ep2_add_projc_imp(ep2_t r, const ep2_t p, const ep2_t q) {
 #if defined(EP_MIXED) && defined(STRIP)
 	ep2_add_projc_mix(r, p, q);
 #else /* General addition. */
@@ -355,7 +355,7 @@ static void ep2_add_projc_imp(ep2_t r, ep2_t p, ep2_t q) {
 
 #if EP_ADD == BASIC || !defined(STRIP)
 
-void ep2_add_basic(ep2_t r, ep2_t p, ep2_t q) {
+void ep2_add_basic(ep2_t r, const ep2_t p, const ep2_t q) {
 	if (ep2_is_infty(p)) {
 		ep2_copy(r, q);
 		return;
@@ -369,7 +369,7 @@ void ep2_add_basic(ep2_t r, ep2_t p, ep2_t q) {
 	ep2_add_basic_imp(r, NULL, p, q);
 }
 
-void ep2_add_slp_basic(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
+void ep2_add_slp_basic(ep2_t r, fp2_t s, const ep2_t p, const ep2_t q) {
 	if (ep2_is_infty(p)) {
 		ep2_copy(r, q);
 		return;
@@ -383,7 +383,7 @@ void ep2_add_slp_basic(ep2_t r, fp2_t s, ep2_t p, ep2_t q) {
 	ep2_add_basic_imp(r, s, p, q);
 }
 
-void ep2_sub_basic(ep2_t r, ep2_t p, ep2_t q) {
+void ep2_sub_basic(ep2_t r, const ep2_t p, const ep2_t q) {
 	ep2_t t;
 
 	ep2_null(t);
@@ -413,7 +413,7 @@ void ep2_sub_basic(ep2_t r, ep2_t p, ep2_t q) {
 
 #if EP_ADD == PROJC || !defined(STRIP)
 
-void ep2_add_projc(ep2_t r, ep2_t p, ep2_t q) {
+void ep2_add_projc(ep2_t r, const ep2_t p, const ep2_t q) {
 	if (ep2_is_infty(p)) {
 		ep2_copy(r, q);
 		return;
@@ -433,7 +433,7 @@ void ep2_add_projc(ep2_t r, ep2_t p, ep2_t q) {
 	ep2_add_projc_imp(r, p, q);
 }
 
-void ep2_sub_projc(ep2_t r, ep2_t p, ep2_t q) {
+void ep2_sub_projc(ep2_t r, const ep2_t p, const ep2_t q) {
 	ep2_t t;
 
 	ep2_null(t);

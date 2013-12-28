@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -44,7 +44,7 @@
  * @param r			- the result.
  * @param p			- the point to normalize.
  */
-static void ep2_norm_imp(ep2_t r, ep2_t p) {
+static void ep2_norm_imp(ep2_t r, const ep2_t p) {
 	if (!p->norm) {
 		fp2_t t0, t1;
 
@@ -82,7 +82,7 @@ static void ep2_norm_imp(ep2_t r, ep2_t p) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void ep2_norm(ep2_t r, ep2_t p) {
+void ep2_norm(ep2_t r, const ep2_t p) {
 	if (ep2_is_infty(p)) {
 		ep2_set_infty(r);
 		return;

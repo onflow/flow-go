@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -233,7 +233,7 @@ void ep2_curve_get_ord(bn_t n) {
 
 #if defined(EP_PRECO)
 
-ep2_t *ep2_curve_get_tab() {
+const ep2_t *ep2_curve_get_tab() {
 #if ALLOC == AUTO
 	return (ep2_t *)*(core_get()->ep2_ptr);
 #else

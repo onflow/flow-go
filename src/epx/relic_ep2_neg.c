@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -38,7 +38,7 @@
 
 #if EP_ADD == BASIC || !defined(STRIP)
 
-void ep2_neg_basic(ep2_t r, ep2_t p) {
+void ep2_neg_basic(ep2_t r, const ep2_t p) {
 	if (ep2_is_infty(p)) {
 		ep2_set_infty(r);
 		return;
@@ -58,7 +58,7 @@ void ep2_neg_basic(ep2_t r, ep2_t p) {
 
 #if EP_ADD == PROJC || !defined(STRIP)
 
-void ep2_neg_projc(ep2_t r, ep2_t p) {
+void ep2_neg_projc(ep2_t r, const ep2_t p) {
 	if (ep2_is_infty(p)) {
 		ep2_set_infty(r);
 		return;

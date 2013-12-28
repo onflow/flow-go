@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void ep2_mul(ep2_t r, ep2_t p, bn_t k) {
+void ep2_mul(ep2_t r, const ep2_t p, const bn_t k) {
 	int i, l;
 	ep2_t t;
 
@@ -69,7 +69,7 @@ void ep2_mul(ep2_t r, ep2_t p, bn_t k) {
 	}
 }
 
-void ep2_mul_gen(ep2_t r, bn_t k) {
+void ep2_mul_gen(ep2_t r, const bn_t k) {
 #ifdef EP_PRECO
 	ep2_mul_fix(r, ep2_curve_get_tab(), k);
 #else
@@ -91,7 +91,7 @@ void ep2_mul_gen(ep2_t r, bn_t k) {
 #endif
 }
 
-void ep2_mul_dig(ep2_t r, ep2_t p, dig_t k) {
+void ep2_mul_dig(ep2_t r, const ep2_t p, dig_t k) {
 	int i, l;
 	ep2_t t;
 

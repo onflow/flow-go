@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -155,7 +155,7 @@ void ep2_mul_sim_trick(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 	ep2_t t[1 << EP_WIDTH];
 	bn_t n;
 	int l0, l1, w = EP_WIDTH / 2;
-	unsigned char w0[CEIL(FP_BITS, w)], w1[CEIL(FP_BITS, w)];
+	uint8_t w0[CEIL(FP_BITS, w)], w1[CEIL(FP_BITS, w)];
 
 	bn_null(n);
 

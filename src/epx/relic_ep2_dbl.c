@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -46,7 +46,7 @@
  * @param[out] s			- the resulting slope.
  * @param[in] p				- the point to double.
  */
-static void ep2_dbl_basic_imp(ep2_t r, fp2_t s, ep2_t p) {
+static void ep2_dbl_basic_imp(ep2_t r, fp2_t s, const ep2_t p) {
 	fp2_t t0, t1, t2;
 
 	fp2_null(t0);
@@ -140,7 +140,7 @@ static void ep2_dbl_basic_imp(ep2_t r, fp2_t s, ep2_t p) {
  * @param[out] r				- the result.
  * @param[in] p					- the point to double.
  */
-static void ep2_dbl_projc_imp(ep2_t r, ep2_t p) {
+static void ep2_dbl_projc_imp(ep2_t r, const ep2_t p) {
 	fp2_t t0, t1, t2, t3;
 
 	fp2_null(t0);
@@ -196,7 +196,7 @@ static void ep2_dbl_projc_imp(ep2_t r, ep2_t p) {
 
 #if EP_ADD == BASIC || !defined(STRIP)
 
-void ep2_dbl_basic(ep2_t r, ep2_t p) {
+void ep2_dbl_basic(ep2_t r, const ep2_t p) {
 	if (ep2_is_infty(p)) {
 		ep2_set_infty(r);
 		return;
@@ -205,7 +205,7 @@ void ep2_dbl_basic(ep2_t r, ep2_t p) {
 	ep2_dbl_basic_imp(r, NULL, p);
 }
 
-void ep2_dbl_slp_basic(ep2_t r, fp2_t s, ep2_t p) {
+void ep2_dbl_slp_basic(ep2_t r, fp2_t s, const ep2_t p) {
 	if (ep2_is_infty(p)) {
 		ep2_set_infty(r);
 		return;
@@ -218,7 +218,7 @@ void ep2_dbl_slp_basic(ep2_t r, fp2_t s, ep2_t p) {
 
 #if EP_ADD == PROJC || !defined(STRIP)
 
-void ep2_dbl_projc(ep2_t r, ep2_t p) {
+void ep2_dbl_projc(ep2_t r, const ep2_t p) {
 	if (ep2_is_infty(p)) {
 		ep2_set_infty(r);
 		return;
