@@ -68,8 +68,6 @@
 #define GT_LOWER			fp2_
 #define PC_LOWER			pp_
 #endif
-
-#endif
 /** @} */
 
 /**
