@@ -36,7 +36,7 @@
 
 static int rsa(void) {
 	int code = STS_ERR;
-	rsa_t pub, prv, _prv;
+	rsa_t pub, prv;
 	uint8_t in[10], out[BN_BITS / 8 + 1], h[MD_LEN];
 	int il, ol;
 	int result;
@@ -47,7 +47,6 @@ static int rsa(void) {
 	TRY {
 		rsa_new(pub);
 		rsa_new(prv);
-		rsa_new(_prv);
 
 		result = cp_rsa_gen(pub, prv, BN_BITS);
 
@@ -148,7 +147,6 @@ static int rsa(void) {
   end:
 	rsa_free(pub);
 	rsa_free(prv);
-	rsa_free(_prv);
 	return code;
 }
 
