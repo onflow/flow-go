@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -228,7 +228,7 @@ void eb_mul_pre_yaowi(eb_t *t, const eb_t p) {
 void eb_mul_fix_yaowi(eb_t r, const eb_t *t, const bn_t k) {
 	int i, j, l;
 	eb_t a;
-	unsigned char win[CEIL(FB_BITS, EP_DEPTH)];
+	uint8_t win[CEIL(FB_BITS, EP_DEPTH)];
 
 	eb_null(a);
 
