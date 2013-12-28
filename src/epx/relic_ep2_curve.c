@@ -306,7 +306,7 @@ void ep2_curve_set(int twist) {
 		fp_prime_calc();
 
 #if defined(EP_PRECO)
-		ep2_mul_pre(ep2_curve_get_tab(), &(ctx->ep2_g));
+		ep2_mul_pre((ep2_t *)ep2_curve_get_tab(), &(ctx->ep2_g));
 #endif
 	}
 	CATCH_ANY {
