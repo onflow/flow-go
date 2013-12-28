@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -50,7 +50,7 @@
 
 void fb_mulh_low(dig_t *c, dig_t *a) {
 	__m128i m0, m1, m2, m3, m8, m9, t0, t1;
-	unsigned char ta;
+	uint8_t ta;
 	int j;
 	align dig_t x[2];
 	dig_t *tab;
