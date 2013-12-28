@@ -1199,7 +1199,7 @@ int exponentiation(void) {
 			TEST_ASSERT(gt_is_unity(c), end);
 		} TEST_END;
 
-		TEST_BEGIN("random element has the correct order") {
+		TEST_BEGIN("random element has the right order") {
 			gt_rand(a);
 			gt_exp(c, a, n);
 			TEST_ASSERT(gt_is_unity(c), end);

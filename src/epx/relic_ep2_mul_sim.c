@@ -39,82 +39,96 @@
 #if EP_SIM == INTER || !defined(STRIP)
 
 static void ep2_mul_sim_ordin(ep2_t r, const ep2_t p, const bn_t k,
-		const ep2_t q, const bn_t l, int gen) {
-	int len, l0, l1, i, n0, n1, w;
-	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
-	ep2_t table0[1 << (EP_WIDTH - 2)];
-	ep2_t table1[1 << (EP_WIDTH - 2)];
-	ep2_t *t = NULL;
+		const ep2_t q, const bn_t l, const ep2_t *t) {
+	int len, l0, l1, i, n0, n1, w, gen;
+	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *_k, *_m;
+	ep2_t t0[1 << (EP_WIDTH - 2)];
+	ep2_t t1[1 << (EP_WIDTH - 2)];
 
 	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-		ep2_null(table0[i]);
-		ep2_null(table1[i]);
+		ep2_null(t0[i]);
+		ep2_null(t1[i]);
 	}
 
-	if (gen) {
-#if defined(EP_PRECO)
-		t = ep2_curve_get_tab();
-#endif
-	} else {
+	TRY {
+		gen = (t == NULL ? 0 : 1);
+		if (!gen) {
+			for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
+				ep2_new(t0[i]);
+			}
+			ep2_tab(t0, p, EP_WIDTH);
+			t = (const ep2_t *)t0;
+		}
+
+		/* Prepare the precomputation table. */
 		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-			ep2_new(table0[i]);
+			ep2_new(t1[i]);
 		}
-		ep2_tab(table0, p, EP_WIDTH);
-		t = table0;
+		/* Compute the precomputation table. */
+		ep2_tab(t1, q, EP_WIDTH);
+
+
+		/* Prepare the precomputation table. */
+		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
+			ep2_new(t1[i]);
+		}
+		/* Compute the precomputation table. */
+		ep2_tab(t1, q, EP_WIDTH);
+
+		/* Compute the w-TNAF representation of k. */
+		if (gen) {
+			w = EP_DEPTH;
+		} else {
+			w = EP_WIDTH;
+		}
+
+		l0 = l1 = FP_BITS + 1;
+		bn_rec_naf(naf0, &l0, k, w);
+		bn_rec_naf(naf1, &l1, l, EP_WIDTH);
+
+		len = MAX(l0, l1);
+		_k = naf0 + len - 1;
+		_m = naf1 + len - 1;
+		for (i = l0; i < len; i++)
+			naf0[i] = 0;
+		for (i = l1; i < len; i++)
+			naf1[i] = 0;
+
+		ep2_set_infty(r);
+		for (i = len - 1; i >= 0; i--, _k--, _m--) {
+			ep2_dbl(r, r);
+
+			n0 = *_k;
+			n1 = *_m;
+			if (n0 > 0) {
+				ep2_add(r, r, t[n0 / 2]);
+			}
+			if (n0 < 0) {
+				ep2_sub(r, r, t[-n0 / 2]);
+			}
+			if (n1 > 0) {
+				ep2_add(r, r, t1[n1 / 2]);
+			}
+			if (n1 < 0) {
+				ep2_sub(r, r, t1[-n1 / 2]);
+			}
+		}
+		/* Convert r to affine coordinates. */
+		ep2_norm(r, r);
 	}
-
-	/* Prepare the precomputation table. */
-	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-		ep2_new(table1[i]);
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-	/* Compute the precomputation table. */
-	ep2_tab(table1, q, EP_WIDTH);
-
-	/* Compute the w-TNAF representation of k. */
-	if (gen) {
-		w = EP_DEPTH;
-	} else {
-		w = EP_WIDTH;
-	}
-
-	l0 = l1 = FP_BITS + 1;
-	bn_rec_naf(naf0, &l0, k, w);
-	bn_rec_naf(naf1, &l1, l, EP_WIDTH);
-
-	len = MAX(l0, l1);
-	t0 = naf0 + len - 1;
-	t1 = naf1 + len - 1;
-	for (i = l0; i < len; i++)
-		naf0[i] = 0;
-	for (i = l1; i < len; i++)
-		naf1[i] = 0;
-
-	ep2_set_infty(r);
-	for (i = len - 1; i >= 0; i--, t0--, t1--) {
-		ep2_dbl(r, r);
-
-		n0 = *t0;
-		n1 = *t1;
-		if (n0 > 0) {
-			ep2_add(r, r, t[n0 / 2]);
+	FINALLY {
+		/* Free the precomputation tables. */
+		if (!gen) {
+			for (i = 0; i < 1 << (EP_WIDTH - 2); i++) {
+				ep2_free(t0[i]);
+			}
 		}
-		if (n0 < 0) {
-			ep2_sub(r, r, t[-n0 / 2]);
+		for (i = 0; i < 1 << (EP_WIDTH - 2); i++) {
+			ep2_free(t1[i]);
 		}
-		if (n1 > 0) {
-			ep2_add(r, r, table1[n1 / 2]);
-		}
-		if (n1 < 0) {
-			ep2_sub(r, r, table1[-n1 / 2]);
-		}
-	}
-	/* Convert r to affine coordinates. */
-	ep2_norm(r, r);
-
-	/* Free the precomputation table. */
-	for (i = 0; i < 1 << (EP_WIDTH - 2); i++) {
-		ep2_free(table0[i]);
-		ep2_free(table1[i]);
 	}
 }
 
@@ -329,7 +343,7 @@ void ep2_mul_sim_gen(ep2_t r, const bn_t k, const ep2_t q, const bn_t l) {
 
 		ep2_curve_get_gen(gen);
 #if EP_FIX == LWNAF && defined(EP_PRECO)
-		ep2_mul_sim_ordin(r, gen, k, q, l, 1);
+		ep2_mul_sim_ordin(r, gen, k, q, l, ep2_curve_get_tab());
 #else
 		ep2_mul_sim(r, gen, k, q, l);
 #endif
