@@ -698,7 +698,7 @@ void ep2_mul_sim_basic(ep2_t r, const ep2_t p, const bn_t k, const ep2_t q,
  * @param[in] q				- the second point to multiply.
  * @param[in] l				- the second integer,
  */
-void ep2_mul_sim_trick(ep2_t r, const ep2_t p, const bn_t k, ep2_t q,
+void ep2_mul_sim_trick(ep2_t r, const ep2_t p, const bn_t k, const ep2_t q,
 		const bn_t l);
 
 /**
