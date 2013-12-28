@@ -1166,7 +1166,7 @@
 #undef ep2_st
 #undef ep2_t
 #define ep2_st	PREFIX(ep2_st)
-#define ep2_t	PREFIX(ep2_t)
+#define ep2_t		PREFIX(ep2_t)
 
 #undef ep2_curve_init
 #undef ep2_curve_clean
@@ -1672,24 +1672,6 @@
 #define fb4_exp 	PREFIX(fb4_exp)
 #define fb4_frb 	PREFIX(fb4_frb)
 
-#undef pb_map_init
-#undef pb_map_clean
-#undef pb_map_get_tab
-#undef pb_map_get_sqr
-#undef pb_map_get_srt
-#undef pb_map_get_par
-#undef pb_map_etats
-#undef pb_map_etatn
-
-#define pb_map_init 	PREFIX(pb_map_init)
-#define pb_map_clean 	PREFIX(pb_map_clean)
-#define pb_map_get_tab 	PREFIX(pb_map_get_tab)
-#define pb_map_get_sqr 	PREFIX(pb_map_get_sqr)
-#define pb_map_get_srt 	PREFIX(pb_map_get_srt)
-#define pb_map_get_par 	PREFIX(pb_map_get_par)
-#define pb_map_etats 	PREFIX(pb_map_etats)
-#define pb_map_etatn 	PREFIX(pb_map_etatn)
-
 #undef pp_map_init
 #undef pp_map_clean
 #undef pp_add_k2_basic
@@ -1741,6 +1723,89 @@
 #define pp_map_tatep_k12 	PREFIX(pp_map_tatep_k12)
 #define pp_map_weilp_k12 	PREFIX(pp_map_weilp_k12)
 #define pp_map_oatep_k12 	PREFIX(pp_map_oatep_k12)
+
+#undef rsa_t
+#undef rabin_t
+#undef bdpe_t
+#undef sokaka_t
+#define rsa_t		PREFIX(rsa_t)
+#define rabin_t	PREFIX(rabin_t)
+#define bdpe_t	PREFIX(bdpe_t)
+#define sokaka_t	PREFIX(sokaka_t)
+
+#undef cp_rsa_gen_basic
+#undef cp_rsa_gen_quick
+#undef cp_rsa_enc
+#undef cp_rsa_dec_basic
+#undef cp_rsa_dec_quick
+#undef cp_rsa_sig_basic
+#undef cp_rsa_sig_quick
+#undef cp_rsa_ver
+#undef cp_rabin_gen
+#undef cp_rabin_enc
+#undef cp_rabin_dec
+#undef cp_bdpe_gen
+#undef cp_bdpe_enc
+#undef cp_bdpe_dec
+#undef cp_ecdh_gen
+#undef cp_ecdh_key
+#undef cp_ecmqv_gen
+#undef cp_ecmqv_key
+#undef cp_ecies_gen
+#undef cp_ecies_enc
+#undef cp_ecies_dec
+#undef cp_ecdsa_gen
+#undef cp_ecdsa_sig
+#undef cp_ecdsa_ver
+#undef cp_ecss_gen
+#undef cp_ecss_sig
+#undef cp_ecss_ver
+#undef cp_sokaka_gen
+#undef cp_sokaka_gen_prv
+#undef cp_sokaka_key
+#undef cp_bls_gen
+#undef cp_bls_sig
+#undef cp_bls_ver
+#undef cp_bbs_gen
+#undef cp_bbs_sig
+#undef cp_bbs_ver
+
+#define cp_rsa_gen_basic 	PREFIX(cp_rsa_gen_basic)
+#define cp_rsa_gen_quick 	PREFIX(cp_rsa_gen_quick)
+#define cp_rsa_enc 	PREFIX(cp_rsa_enc)
+#define cp_rsa_dec_basic 	PREFIX(cp_rsa_dec_basic)
+#define cp_rsa_dec_quick 	PREFIX(cp_rsa_dec_quick)
+#define cp_rsa_sig_basic 	PREFIX(cp_rsa_sig_basic)
+#define cp_rsa_sig_quick 	PREFIX(cp_rsa_sig_quick)
+#define cp_rsa_ver 	PREFIX(cp_rsa_ver)
+#define cp_rabin_gen 	PREFIX(cp_rabin_gen)
+#define cp_rabin_enc 	PREFIX(cp_rabin_enc)
+#define cp_rabin_dec 	PREFIX(cp_rabin_dec)
+#define cp_bdpe_gen 	PREFIX(cp_bdpe_gen)
+#define cp_bdpe_enc 	PREFIX(cp_bdpe_enc)
+#define cp_bdpe_dec 	PREFIX(cp_bdpe_dec)
+#define cp_ecdh_gen 	PREFIX(cp_ecdh_gen)
+#define cp_ecdh_key 	PREFIX(cp_ecdh_key)
+#define cp_ecmqv_gen 	PREFIX(cp_ecmqv_gen)
+#define cp_ecmqv_key 	PREFIX(cp_ecmqv_key)
+#define cp_ecies_gen 	PREFIX(cp_ecies_gen)
+#define cp_ecies_enc 	PREFIX(cp_ecies_enc)
+#define cp_ecies_dec 	PREFIX(cp_ecies_dec)
+#define cp_ecdsa_gen 	PREFIX(cp_ecdsa_gen)
+#define cp_ecdsa_sig 	PREFIX(cp_ecdsa_sig)
+#define cp_ecdsa_ver 	PREFIX(cp_ecdsa_ver)
+#define cp_ecss_gen 	PREFIX(cp_ecss_gen)
+#define cp_ecss_sig 	PREFIX(cp_ecss_sig)
+#define cp_ecss_ver 	PREFIX(cp_ecss_ver)
+#define cp_sokaka_gen 	PREFIX(cp_sokaka_gen)
+#define cp_sokaka_gen_prv 	PREFIX(cp_sokaka_gen_prv)
+#define cp_sokaka_key 	PREFIX(cp_sokaka_key)
+#define cp_bls_gen 	PREFIX(cp_bls_gen)
+#define cp_bls_sig 	PREFIX(cp_bls_sig)
+#define cp_bls_ver 	PREFIX(cp_bls_ver)
+#define cp_bbs_gen 	PREFIX(cp_bbs_gen)
+#define cp_bbs_sig 	PREFIX(cp_bbs_sig)
+#define cp_bbs_ver 	PREFIX(cp_bbs_ver)
 
 #endif /* LABEL */
 

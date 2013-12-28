@@ -3,7 +3,7 @@
 cat << PREAMBLE
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -137,7 +137,7 @@ REDEF eb
 echo "#undef ep2_st"
 echo "#undef ep2_t"
 echo "#define ep2_st	PREFIX(ep2_st)"
-echo "#define ep2_t	PREFIX(ep2_t)"
+echo "#define ep2_t		PREFIX(ep2_t)"
 echo
 REDEF2 epx ep2
 
@@ -162,12 +162,20 @@ REDEF2 fpx fp12
 REDEF2 fpx fp18
 
 REDEF2 fbx fb2
-
 REDEF2 fbx fb4
 
-REDEF pb
-
 REDEF pp
+
+echo "#undef rsa_t"
+echo "#undef rabin_t"
+echo "#undef bdpe_t"
+echo "#undef sokaka_t"
+echo "#define rsa_t		PREFIX(rsa_t)"
+echo "#define rabin_t	PREFIX(rabin_t)"
+echo "#define bdpe_t	PREFIX(bdpe_t)"
+echo "#define sokaka_t	PREFIX(sokaka_t)"
+echo
+REDEF cp
 
 echo "#endif /* LABEL */"
 echo
