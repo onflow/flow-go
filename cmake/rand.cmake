@@ -14,7 +14,7 @@ message("   SEED=LIBC      Use the libc rand()/random() functions. (insecure!)")
 message("   SEED=ZERO      Use a zero seed. (insecure!)\n")
 
 # Choose the pseudo-random number generator.
-set(RAND "UDEV" CACHE STRING "Pseudo-random number generator")
+set(RAND "HASH" CACHE STRING "Pseudo-random number generator")
 
 # Choose the pseudo-random number generator.
 set(SEED "UDEV" CACHE STRING "Random number generator seeder")

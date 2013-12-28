@@ -31,6 +31,7 @@ endif(WITH_FP)
 
 if (WITH_FB)
 	ADD_MODULE(fb)
+	ADD_MODULE(fbx)
 endif(WITH_FB)
 
 if (WITH_EP)
@@ -54,11 +55,6 @@ if (WITH_PP)
 	ADD_MODULE(epx)
 	ADD_MODULE(pp)
 endif(WITH_PP)	
-
-if (WITH_PB)
-	ADD_MODULE(fbx)
-	ADD_MODULE(pb)
-endif(WITH_PB)
 
 if (WITH_MD)
 	ADD_MODULE(md)

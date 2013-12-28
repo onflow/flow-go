@@ -52,13 +52,13 @@
 /**
  * Logarithm of the digit size in bits in base two.
  */
-#if WORD == 8
+#if DIGIT == 8
 #define DIGIT_LOG		3
-#elif WORD == 16
+#elif DIGIT == 16
 #define DIGIT_LOG		4
-#elif WORD == 32
+#elif DIGIT == 32
 #define DIGIT_LOG		5
-#elif WORD == 64
+#elif DIGIT == 64
 #define DIGIT_LOG		6
 #endif
 
@@ -74,26 +74,26 @@
  */
 #if ARITH == GMP
 typedef mp_limb_t dig_t;
-#elif WORD == 8
+#elif DIGIT == 8
 typedef uint8_t dig_t;
-#elif WORD == 16
+#elif DIGIT == 16
 typedef uint16_t dig_t;
-#elif WORD == 32
+#elif DIGIT == 32
 typedef uint32_t dig_t;
-#elif WORD == 64
+#elif DIGIT == 64
 typedef uint64_t dig_t;
 #endif
 
 /**
  * Represents a signed digit.
  */
-#if WORD == 8
+#if DIGIT == 8
 typedef int8_t dis_t;
-#elif WORD == 16
+#elif DIGIT == 16
 typedef int16_t dis_t;
-#elif WORD == 32
+#elif DIGIT == 32
 typedef int32_t dis_t;
-#elif WORD == 64
+#elif DIGIT == 64
 typedef int64_t dis_t;
 #endif
 
@@ -102,13 +102,13 @@ typedef int64_t dis_t;
  *
  * This is useful to store a result from a multiplication of two digits.
  */
-#if WORD == 8
+#if DIGIT == 8
 typedef uint16_t dbl_t;
-#elif WORD == 16
+#elif DIGIT == 16
 typedef uint32_t dbl_t;
-#elif WORD == 32
+#elif DIGIT == 32
 typedef uint64_t dbl_t;
-#elif WORD == 64
+#elif DIGIT == 64
 #if defined(__GNUC__) && !defined(__INTEL_COMPILER)
 typedef __uint128_t dbl_t;
 #elif ARITH == EASY
@@ -154,7 +154,7 @@ typedef unsigned long long ull_t;
 #define ALIGNED(A)															\
 	((unsigned int)(A) + PADDING((unsigned int)(A)));						\
 
-#elif ARCH  == X86_64
+#elif ARCH  == X64
 #define ALIGNED(A)															\
 	((unsigned long)(A) + PADDING((unsigned long)(A)));						\
 

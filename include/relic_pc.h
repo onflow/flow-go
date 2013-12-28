@@ -40,7 +40,6 @@
 #include "relic_ep.h"
 #include "relic_eb.h"
 #include "relic_pp.h"
-#include "relic_pb.h"
 #include "relic_bn.h"
 #include "relic_util.h"
 #include "relic_conf.h"
@@ -54,8 +53,6 @@
  * Prefix for function mappings.
  */
 /** @{ */
-#if PC_CUR == PRIME
-
 #if FP_PRIME < 1536
 #define G1_LOWER			ep_
 #define G1_UPPER			EP
@@ -72,33 +69,18 @@
 #define PC_LOWER			pp_
 #endif
 
-#else
-#define G1_LOWER			eb_
-#define G1_UPPER			EB
-#define G2_LOWER			eb_
-#define G2_UPPER			EB
-#define GT_LOWER			fb4_
-#define PC_LOWER			pb_
 #endif
 /** @} */
 
 /**
  * Prefix for constant mappings.
  */
-#if PC_CUR == PRIME
 #define PC_UPPER			PP_
-#elif PC_CUR == CHAR2
-#define PC_UPPER			PB_
-#endif
 
 /**
  * Represents the size in bytes of the order of G_1 and G_2.
  */
-#if PC_CUR == PRIME
 #define PC_BYTES			FP_BYTES
-#else
-#define PC_BYTES			FB_BYTES
-#endif
 
 /**
  * Represents a G_1 precomputable table.
@@ -247,28 +229,17 @@ typedef CAT(GT_LOWER, t) gt_t;
 /**
  * Configures some set of curve parameters for the current security level.
  */
-#if PC_CUR == PRIME
 #define pc_param_set_any()	ep_param_set_any_pairf()
-#elif PC_CUR == CHAR2
-#define pc_param_set_any()	eb_param_set_any_super()
-#endif
 
 /**
  * Returns the type of the configured pairing.
  *
  * @{
  */
-#if PC_CUR == PRIME
-
 #if FP_PRIME < 1536
 #define pc_map_is_type1()	(0)
 #define pc_map_is_type3()	(1)
 #else
-#define pc_map_is_type1()	(1)
-#define pc_map_is_type3()	(0)
-#endif
-
-#elif PC_CUR == CHAR2
 #define pc_map_is_type1()	(1)
 #define pc_map_is_type3()	(0)
 #endif
@@ -689,16 +660,10 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[in] P				- the first element.
  * @param[in] Q				- the second element.
  */
-#if PC_CUR == PRIME
-
 #if FP_PRIME < 1536
 #define pc_map(R, P, Q);	CAT(PC_LOWER, map_k12)(R, P, Q)
 #else
 #define pc_map(R, P, Q);	CAT(PC_LOWER, map_k2)(R, P, Q)
-#endif
-
-#else
-#define pc_map(R, P, Q);	CAT(PC_LOWER, map)(R, P, Q)
 #endif
 
 /*============================================================================*/

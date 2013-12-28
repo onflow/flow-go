@@ -75,8 +75,10 @@
  * Finite field identifiers.
  */
 enum {
+	/** AES pentaonimal. */
+	PENTA_8 = 1,
 	/** Toy pentanomial. */
-	PENTA_64 = 1,
+	PENTA_64,
 	/** Hankerson's trinomial for GLS curves. */
 	TRINO_113,
 	/** Hankerson's trinomial for GLS curves. */

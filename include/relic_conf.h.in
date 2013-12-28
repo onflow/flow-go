@@ -107,8 +107,6 @@
 #cmakedefine WITH_EC
 /** Build pairings over prime curves module. */
 #cmakedefine WITH_PP
-/** Build pairings over binary curves module. */
-#cmakedefine WITH_PB
 /** Build pairing-based cryptography module. */
 #cmakedefine WITH_PC
 /** Build hash functions. */
@@ -540,29 +538,6 @@
 #define BWEIL    4
 /** Chosen pairing method over prime elliptic curves. */
 #define PP_MAP   @PP_MAP@
-
-/** Parallel implementation. */
-#cmakedefine PB_PARAL
-
-/** Pairing computation in genus 1 curves with square roots. */ 
-#define ETATS    1
-/** Pairing computation in genus 1 curves without square roots. */
-#define ETATN    2
-/** Chosen binary elliptic curve point pairing method. */
-#define PB_MAP	 @PB_MAP@
-
-/** Bilinear pairing method. */
-#define PB_METHD "@PB_METHD@"
-
-/** Prime curves. */
-#define PRIME	 1
-/** Binary curves. */
-#define CHAR2	 2
-/** Chosen elliptic curve type. */
-#define PC_CUR	 @PC_CUR@
-
-/** Binary elliptic curve arithmetic method. */
-#define PC_METHD "@PC_METHD@"
 
 /** SHA-1 hash function. */
 #define SHONE    1

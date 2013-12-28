@@ -32,6 +32,7 @@
 #ifndef RELIC_H
 #define RELIC_H
 
+#include "relic_arch.h"
 #include "relic_conf.h"
 #include "relic_core.h"
 #include "relic_types.h"
@@ -45,12 +46,10 @@
 #include "relic_eb.h"
 #include "relic_ec.h"
 #include "relic_pp.h"
-#include "relic_pb.h"
 #include "relic_pc.h"
 #include "relic_cp.h"
 #include "relic_bc.h"
 #include "relic_md.h"
-#include "relic_arch.h"
 #include "relic_err.h"
 #include "relic_rand.h"
 #include "relic_util.h"
