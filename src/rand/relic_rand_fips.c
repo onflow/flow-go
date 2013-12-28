@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -48,7 +48,7 @@
  * @param[in,out] state		- the internal state.
  * @param[in] hash			- the hash value.
  */
-static void rand_add_inc(unsigned char *state, unsigned char *hash) {
+static void rand_add_inc(uint8_t *state, uint8_t *hash) {
 	int carry = 1;
 	for (int i = MD_LEN_SHONE - 1; i >= 0; i--) {
 		int16_t s;
@@ -62,31 +62,34 @@ static void rand_add_inc(unsigned char *state, unsigned char *hash) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void rand_bytes(unsigned char *buf, int size) {
-	unsigned char hash[MD_LEN_SHONE];
+void rand_bytes(uint8_t *buf, int size) {
+	uint8_t hash[MD_LEN_SHONE];
 	ctx_t *ctx = core_get();
 
-	int j = 0;
-	while (j < size) {
+	while (size > 0) {
 		/* w_0 = G(t, XKEY) */
-		md_map_shone_mid(hash, ctx->rand, sizeof(ctx->rand));
+		md_map_shone_mid(hash, ctx->rand, RAND_SIZE);
 		/* XKEY = (XKEY + w_0 + 1) mod 2^b */
 		rand_add_inc(ctx->rand, hash);
 
-		memcpy(buf + j, hash, MIN(size, MD_LEN_SHONE));
-		j += MIN(size, MD_LEN_SHONE);
+		memcpy(buf, hash, MIN(size, MD_LEN_SHONE));
+		buf += MD_LEN_SHONE;
+		size -= MD_LEN_SHONE;
 
 		/* w_1 = G(t, XKEY) */
-		md_map_shone_mid(hash, ctx->rand, sizeof(ctx->rand));
+		md_map_shone_mid(hash, ctx->rand, RAND_SIZE);
 		/* XKEY = (XKEY + w_1 + 1) mod 2^b */
 		rand_add_inc(ctx->rand, hash);
 
-		memcpy(buf + j, hash, MIN(size - j, MD_LEN_SHONE));
-		j += MIN(size, MD_LEN_SHONE);
+		for (int i = MIN(size, MD_LEN_SHONE); i >= 0 ; i--) {
+			buf[i] = hash[i];
+		}
+		buf += MD_LEN_SHONE;
+		size -= MD_LEN_SHONE;
 	}
 }
 
-void rand_seed(unsigned char *buf, int size) {
+void rand_seed(uint8_t *buf, int size) {
 	int i;
 	ctx_t *ctx = core_get();
 

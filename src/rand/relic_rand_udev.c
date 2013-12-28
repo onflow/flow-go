@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -49,7 +49,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void rand_bytes(unsigned char *buf, int size) {
+void rand_bytes(uint8_t *buf, int size) {
 	int c, l, *fd = (int *)&(core_get()->rand);
 
 	l = 0;
@@ -62,7 +62,7 @@ void rand_bytes(unsigned char *buf, int size) {
 	} while (l < size);
 }
 
-void rand_seed(unsigned char *buf, int size) {
+void rand_seed(uint8_t *buf, int size) {
 	/* Do nothing, only mark as seeded. */
 	core_get()->seeded = 1;
 }

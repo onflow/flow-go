@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -51,11 +51,11 @@
  * param[in] in         - the input string.
  * param[in] in_len     - the number of bytes in the input.
  */
-static void rand_hash(unsigned char *out, int out_len, unsigned char *in,
+static void rand_hash(uint8_t *out, int out_len, uint8_t *in,
 		int in_len) {
 	uint32_t j = util_conv_big(8 * out_len);
 	int len = CEIL(out_len, MD_LEN);
-	unsigned char buf[1 + sizeof(uint32_t) + in_len], hash[MD_LEN];
+	uint8_t buf[1 + sizeof(uint32_t) + in_len], hash[MD_LEN];
 
 	buf[0] = 1;
 	memcpy(buf + 1, &j, sizeof(uint32_t));
@@ -79,7 +79,7 @@ static void rand_hash(unsigned char *out, int out_len, unsigned char *in,
  * @param[in,out] state		- the internal state.
  * @param[in] digit			- the small integer.
  */
-static int rand_inc(unsigned char *data, int size, int digit) {
+static int rand_inc(uint8_t *data, int size, int digit) {
 	int carry = digit;
 	for (int i = size - 1; i >= 0; i--) {
 		int16_t s;
@@ -96,7 +96,7 @@ static int rand_inc(unsigned char *data, int size, int digit) {
  * @param[in,out] state		- the internal state.
  * @param[in] hash			- the hash value.
  */
-static int rand_add(unsigned char *state, unsigned char *hash, int size) {
+static int rand_add(uint8_t *state, uint8_t *hash, int size) {
 	int carry = 0;
 	for (int i = size - 1; i >= 0; i--) {
 		/* Make sure carries are detected. */
@@ -114,9 +114,9 @@ static int rand_add(unsigned char *state, unsigned char *hash, int size) {
  * @param[out] out 			- the buffer to write.
  * @param[in] out_len		- the number of bytes to write.
  */
-static void rand_gen(unsigned char *out, int out_len) {
+static void rand_gen(uint8_t *out, int out_len) {
 	int m = CEIL(out_len, MD_LEN);
-	unsigned char hash[MD_LEN], data[(RAND_SIZE - 1)/2];
+	uint8_t hash[MD_LEN], data[(RAND_SIZE - 1)/2];
 	ctx_t *ctx = core_get();
 
 	/* data = V */
@@ -137,8 +137,8 @@ static void rand_gen(unsigned char *out, int out_len) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void rand_bytes(unsigned char *buf, int size) {
-	unsigned char hash[MD_LEN];
+void rand_bytes(uint8_t *buf, int size) {
+	uint8_t hash[MD_LEN];
 	int carry, len  = (RAND_SIZE - 1)/2;
 	ctx_t *ctx = core_get();
 
@@ -159,7 +159,7 @@ void rand_bytes(unsigned char *buf, int size) {
 	ctx->counter = ctx->counter + 1;
 }
 
-void rand_seed(unsigned char *buf, int size) {
+void rand_seed(uint8_t *buf, int size) {
 	ctx_t *ctx = core_get();
 	int len = (RAND_SIZE - 1) / 2;
 
@@ -179,7 +179,7 @@ void rand_seed(unsigned char *buf, int size) {
 		rand_hash(ctx->rand + 1 + len, len, ctx->rand, len + 1);
 	} else {
 		/* V = hash_df(01 || V || seed). */
-		unsigned char tmp[1 + len + size];
+		uint8_t tmp[1 + len + size];
 		tmp[0] = 1;
 		memcpy(tmp + 1, ctx->rand + 1, len);
 		memcpy(tmp + 1 + len, buf, size);

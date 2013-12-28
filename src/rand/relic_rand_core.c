@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -76,7 +76,7 @@
 /*============================================================================*/
 
 void rand_init() {
-	unsigned char buf[SEED_SIZE];
+	uint8_t buf[SEED_SIZE];
 
 #if RAND == UDEV
 	int *fd = (int *)&(core_get()->rand);
@@ -116,12 +116,12 @@ void rand_init() {
 #if OPSYS == FREEBSD
 	srandom(1);
 	for (int i = 0; i < SEED_SIZE; i++) {
-		buf[i] = (unsigned char)random();
+		buf[i] = (uint8_t)random();
 	}
 #else
 	srand(1);
 	for (int i = 0; i < SEED_SIZE; i++) {
-		buf[i] = (unsigned char)rand();
+		buf[i] = (uint8_t)rand();
 	}
 #endif
 
