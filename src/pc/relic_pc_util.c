@@ -49,8 +49,6 @@ void gt_rand(gt_t a) {
 #else
 	pp_exp_k2(a, a);
 #endif
-	/* Missing pb implementation; but it will be deprecated anyway. */
-#endif
 }
 
 void gt_get_gen(gt_t a) {
