@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Tests for arithmetic on binary elliptic curves.
+ * Tests for implementation of cryptographic protocols.
  *
  * @version $Id$
  * @ingroup test
@@ -36,8 +36,8 @@
 
 static int rsa(void) {
 	int code = STS_ERR;
-	rsa_t pub, prv;
-	unsigned char in[10], out[BN_BITS / 8 + 1], h[MD_LEN];
+	rsa_t pub, prv, _prv;
+	uint8_t in[10], out[BN_BITS / 8 + 1], h[MD_LEN];
 	int il, ol;
 	int result;
 
@@ -47,6 +47,7 @@ static int rsa(void) {
 	TRY {
 		rsa_new(pub);
 		rsa_new(prv);
+		rsa_new(_prv);
 
 		result = cp_rsa_gen(pub, prv, BN_BITS);
 
@@ -139,7 +140,6 @@ static int rsa(void) {
 			TEST_ASSERT(cp_rsa_ver(out, ol, h, MD_LEN, 1, pub) == 1, end);
 		} TEST_END;
 #endif
-
 	} CATCH_ANY {
 		ERROR(end);
 	}
@@ -148,14 +148,15 @@ static int rsa(void) {
   end:
 	rsa_free(pub);
 	rsa_free(prv);
+	rsa_free(_prv);
 	return code;
 }
 
 static int rabin(void) {
 	int code = STS_ERR;
 	rabin_t pub, prv;
-	unsigned char in[10];
-	unsigned char out[BN_BITS / 8 + 1];
+	uint8_t in[10];
+	uint8_t out[BN_BITS / 8 + 1];
 	int in_len, out_len;
 	int result;
 
@@ -195,7 +196,7 @@ static int bdpe(void) {
 	bdpe_t pub, prv;
 	bn_t a, b;
 	dig_t in, out;
-	unsigned char buf[BN_BITS / 8 + 1];
+	uint8_t buf[BN_BITS / 8 + 1];
 	int len;
 	int result;
 
@@ -265,7 +266,7 @@ static int bdpe(void) {
 #define SECG_P160_B_X	"49B41E0E9C0369C2328739D90F63D56707C6E5BC"
 #define SECG_P160_B_Y	"26E008B567015ED96D232A03111C3EDC0E9C8F83"
 
-unsigned char resultp[] = {
+uint8_t resultp[] = {
 	0x74, 0x4A, 0xB7, 0x03, 0xF5, 0xBC, 0x08, 0x2E, 0x59, 0x18, 0x5F, 0x6D,
 	0x04, 0x9D, 0x2D, 0x36, 0x7D, 0xB2, 0x45, 0xC2
 };
@@ -281,7 +282,7 @@ unsigned char resultp[] = {
 #define NIST_K163_B_X	"72783FAAB9549002B4F13140B88132D1C75B3886C"
 #define NIST_K163_B_Y	"5A976794EA79A4DE26E2E19418F097942C08641C7"
 
-unsigned char resultk[] = {
+uint8_t resultk[] = {
 	0x66, 0x55, 0xA9, 0xC8, 0xF9, 0xE5, 0x93, 0x14, 0x9D, 0xB2, 0x4C, 0x91,
 	0xCE, 0x62, 0x16, 0x41, 0x03, 0x5C, 0x92, 0x82
 };
@@ -325,7 +326,7 @@ static int ecdh(void) {
 	char str[2 * EC_BYTES + 1];
 	bn_t d_a, d_b;
 	ec_t q_a, q_b;
-	unsigned char key[MD_LEN], key1[MD_LEN], key2[MD_LEN];
+	uint8_t key[MD_LEN], key1[MD_LEN], key2[MD_LEN];
 
 	bn_null(d_a);
 	bn_null(d_b);
@@ -408,7 +409,7 @@ static int ecmqv(void) {
 	bn_t d2_a, d2_b;
 	ec_t q1_a, q1_b;
 	ec_t q2_a, q2_b;
-	unsigned char key1[MD_LEN], key2[MD_LEN];
+	uint8_t key1[MD_LEN], key2[MD_LEN];
 
 	bn_null(d1_a);
 	bn_null(d1_b);
@@ -460,7 +461,7 @@ static int ecies(void) {
 	int code = STS_ERR;
 	ec_t q, r;
 	bn_t d;
-	unsigned char in[10], out[16], iv[BC_LEN], mac[MD_LEN];
+	uint8_t in[10], out[16], iv[BC_LEN], mac[MD_LEN];
 	int in_len, out_len;
 	int result;
 
@@ -481,9 +482,9 @@ static int ecies(void) {
 			out_len = 16;
 			rand_bytes(in, in_len);
 			rand_bytes(iv, BC_LEN);
-			TEST_ASSERT(cp_ecies_enc(out, &out_len, in, in_len, iv, mac, r, q)
+			TEST_ASSERT(cp_ecies_enc(r, out, &out_len, mac, in, in_len, iv, q)
 					== STS_OK, end);
-			TEST_ASSERT(cp_ecies_dec(out, &out_len, out, out_len, iv, mac, r, d)
+			TEST_ASSERT(cp_ecies_dec(out, &out_len, r, out, out_len, iv, mac, d)
 					== STS_OK, end);
 			TEST_ASSERT(memcmp(in, out, out_len) == 0, end);
 		} TEST_END;
@@ -503,7 +504,7 @@ static int ecdsa(void) {
 	int code = STS_ERR;
 	bn_t d, r, s;
 	ec_t q;
-	unsigned char msg[5] = { 0, 1, 2, 3, 4 }, h[MD_LEN];
+	uint8_t msg[5] = { 0, 1, 2, 3, 4 }, h[MD_LEN];
 
 	bn_null(d);
 	bn_null(r);
@@ -542,7 +543,7 @@ static int ecss(void) {
 	int code = STS_ERR;
 	bn_t d, r;
 	ec_t q;
-	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+	uint8_t msg[5] = { 0, 1, 2, 3, 4 };
 
 	bn_null(d);
 	bn_null(r);
@@ -578,7 +579,7 @@ static int sokaka(void) {
 	int code = STS_ERR;
 	sokaka_t s_i;
 	bn_t s;
-	unsigned char key1[MD_LEN], key2[MD_LEN];
+	uint8_t key1[MD_LEN], key2[MD_LEN];
 	char id_a[5] = { 'A', 'l', 'i', 'c', 'e' };
 	char id_b[3] = { 'B', 'o', 'b' };
 
@@ -615,7 +616,7 @@ static int bls(void) {
 	bn_t d;
 	g1_t s;
 	g2_t q;
-	unsigned char msg[5] = { 0, 1, 2, 3, 4 };
+	uint8_t msg[5] = { 0, 1, 2, 3, 4 };
 
 	bn_null(d);
 	g1_null(s);
@@ -649,7 +650,7 @@ static int bbs(void) {
 	g1_t s;
 	g2_t q;
 	gt_t z;
-	unsigned char msg[5] = { 0, 1, 2, 3, 4 }, h[MD_LEN];
+	uint8_t msg[5] = { 0, 1, 2, 3, 4 }, h[MD_LEN];
 
 	bn_null(d);
 	g1_null(s);

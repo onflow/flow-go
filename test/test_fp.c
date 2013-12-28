@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -153,7 +153,7 @@ static int util(void) {
 		TEST_END;
 
 		TEST_BEGIN("assignment to a constant and comparison are consistent") {
-			rand_bytes((unsigned char *)&e, (FP_DIGIT / 8));
+			rand_bytes((uint8_t *)&e, (FP_DIGIT / 8));
 			fp_set_dig(a, e);
 			TEST_ASSERT(fp_cmp_dig(a, e) == CMP_EQ, end);
 		}

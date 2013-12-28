@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -100,16 +100,16 @@ static int copy(void) {
 		dv_new(b);
 
 		TEST_BEGIN("copy and comparison are consistent") {
-			rand_bytes((unsigned char *)a, DV_DIGS * sizeof(dig_t));
-			rand_bytes((unsigned char *)b, DV_DIGS * sizeof(dig_t));
+			rand_bytes((uint8_t *)a, DV_DIGS * sizeof(dig_t));
+			rand_bytes((uint8_t *)b, DV_DIGS * sizeof(dig_t));
 			dv_copy(a, b, DV_DIGS);
 			TEST_ASSERT(dv_cmp_const(a, b, DV_DIGS) == CMP_EQ, end);
 		}
 		TEST_END;
 
 		TEST_BEGIN("conditional and comparison are consistent") {
-			rand_bytes((unsigned char *)a, DV_DIGS * sizeof(dig_t));
-			rand_bytes((unsigned char *)b, DV_DIGS * sizeof(dig_t));
+			rand_bytes((uint8_t *)a, DV_DIGS * sizeof(dig_t));
+			rand_bytes((uint8_t *)b, DV_DIGS * sizeof(dig_t));
 			dv_copy_cond(a, b, DV_DIGS, 0);
 			TEST_ASSERT(dv_cmp_const(a, b, DV_DIGS) == CMP_NE, end);
 			dv_copy_cond(a, b, DV_DIGS, 1);

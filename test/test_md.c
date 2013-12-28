@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -66,7 +66,7 @@ long int count[3] = { 1, 1, 10000 };
 
 #if MD_MAP == SHONE || !defined(STRIP)
 
-unsigned char result1[3][20] = {
+uint8_t result1[3][20] = {
 	{0xA9, 0x99, 0x3E, 0x36, 0x47, 0x06, 0x81, 0x6A, 0xBA, 0x3E,
 			0x25, 0x71, 0x78, 0x50, 0xC2, 0x6C, 0x9C, 0xD0, 0xD8, 0x9D},
 	{0x84, 0x98, 0x3E, 0x44, 0x1C, 0x3B, 0xD2, 0x6E, 0xBA, 0xAE,
@@ -78,7 +78,7 @@ unsigned char result1[3][20] = {
 static int sha1(void) {
 	int code = STS_ERR;
 	int i, j;
-	unsigned char message[MSG_SIZE], digest[20];
+	uint8_t message[MSG_SIZE], digest[20];
 
 	TEST_ONCE("sha1 hash function is correct") {
 		for (i = 0; i < TEST_MAX; i++) {
@@ -102,7 +102,7 @@ static int sha1(void) {
 
 #if MD_MAP == SH224 || !defined(STRIP)
 
-unsigned char result224[3][28] = {
+uint8_t result224[3][28] = {
 	{0x23, 0x09, 0x7D, 0x22, 0x34, 0x05, 0xD8, 0x22, 0x86, 0x42, 0xA4, 0x77,
 				0xBD, 0xA2, 0x55, 0xB3, 0x2A, 0xAD, 0xBC, 0xE4, 0xBD, 0xA0,
 			0xB3, 0xF7, 0xE3, 0x6C, 0x9D, 0xA7},
@@ -117,7 +117,7 @@ unsigned char result224[3][28] = {
 static int sha224(void) {
 	int code = STS_ERR;
 	int i, j;
-	unsigned char message[MSG_SIZE], digest[28];
+	uint8_t message[MSG_SIZE], digest[28];
 
 	TEST_ONCE("sha224 hash function is correct") {
 		for (i = 0; i < TEST_MAX; i++) {
@@ -141,7 +141,7 @@ static int sha224(void) {
 
 #if MD_MAP == SH256 || !defined(STRIP)
 
-unsigned char result256[3][32] = {
+uint8_t result256[3][32] = {
 	{0xBA, 0x78, 0x16, 0xBF, 0x8F, 0x01, 0xCF, 0xEA, 0x41, 0x41, 0x40, 0xDE,
 				0x5D, 0xAE, 0x22, 0x23, 0xB0, 0x03, 0x61, 0xA3, 0x96, 0x17,
 			0x7A, 0x9C, 0xB4, 0x10, 0xFF, 0x61, 0xF2, 0x00, 0x15, 0xAD},
@@ -156,7 +156,7 @@ unsigned char result256[3][32] = {
 static int sha256(void) {
 	int code = STS_ERR;
 	int i, j;
-	unsigned char message[MSG_SIZE], digest[32];
+	uint8_t message[MSG_SIZE], digest[32];
 
 	TEST_ONCE("sha256 hash function is correct") {
 		for (i = 0; i < TEST_MAX; i++) {
@@ -188,7 +188,7 @@ char *tests2[3] = {
 
 long int count2[3] = { 1, 1, 10000 };
 
-unsigned char result384[4][48] = {
+uint8_t result384[4][48] = {
 	{0xCB, 0x00, 0x75, 0x3F, 0x45, 0xA3, 0x5E, 0x8B, 0xB5, 0xA0, 0x3D, 0x69,
 				0x9A, 0xC6, 0x50, 0x07, 0x27, 0x2C, 0x32, 0xAB, 0x0E, 0xDE,
 				0xD1, 0x63, 0x1A, 0x8B, 0x60, 0x5A, 0x43, 0xFF, 0x5B, 0xED,
@@ -209,7 +209,7 @@ unsigned char result384[4][48] = {
 static int sha384(void) {
 	int code = STS_ERR;
 	int i, j;
-	unsigned char message[MSG_SIZE], digest[48];
+	uint8_t message[MSG_SIZE], digest[48];
 
 	TEST_ONCE("sha384 hash function is correct") {
 		for (i = 0; i < TEST_MAX; i++) {
@@ -233,7 +233,7 @@ static int sha384(void) {
 
 #if MD_MAP == SH512 || !defined(STRIP)
 
-unsigned char result512[4][64] = {
+uint8_t result512[4][64] = {
 	{0xDD, 0xAF, 0x35, 0xA1, 0x93, 0x61, 0x7A, 0xBA, 0xCC, 0x41, 0x73, 0x49,
 				0xAE, 0x20, 0x41, 0x31, 0x12, 0xE6, 0xFA, 0x4E, 0x89, 0xA9,
 				0x7E, 0xA2, 0x0A, 0x9E, 0xEE, 0xE6, 0x4B, 0x55, 0xD3, 0x9A,
@@ -260,7 +260,7 @@ unsigned char result512[4][64] = {
 static int sha512(void) {
 	int code = STS_ERR;
 	int i, j;
-	unsigned char message[MSG_SIZE], digest[64];
+	uint8_t message[MSG_SIZE], digest[64];
 
 	TEST_ONCE("sha512 hash function is correct") {
 		for (i = 0; i < TEST_MAX; i++) {
@@ -282,13 +282,13 @@ static int sha512(void) {
 
 #endif
 
-unsigned char key1[] = {
+uint8_t key1[] = {
 	0xB0, 0xAD, 0x56, 0x5B, 0x14, 0xB4, 0x78, 0xCA, 0xD4, 0x76, 0x38, 0x56,
 	0xFF, 0x30, 0x16, 0xB1, 0xA9, 0x3D, 0x84, 0x0F, 0x87, 0x26, 0x1B, 0xED,
 	0xE7, 0xDD, 0xF0, 0xF9, 0x30, 0x5A, 0x6E, 0x44
 };
 
-unsigned char key2[] = {
+uint8_t key2[] = {
 	0x87, 0x26, 0x1B, 0xED, 0xE7, 0xDD, 0xF0, 0xF9, 0x30, 0x5A, 0x6E, 0x44,
 	0xA7, 0x4E, 0x6A, 0x08, 0x46, 0xDE, 0xDE, 0x27, 0xF4, 0x82, 0x05, 0xC6,
 	0xB1, 0x41, 0x88, 0x87, 0x42, 0xB0, 0xCE, 0x2C
@@ -296,9 +296,9 @@ unsigned char key2[] = {
 
 static int kdf(void) {
 	int code = STS_ERR;
-	unsigned char message[] =
+	uint8_t message[] =
 			{ 0XDE, 0XAD, 0xBE, 0xEF, 0xFE, 0xEB, 0xDA, 0xED };
-	unsigned char key[32];
+	uint8_t key[32];
 
 #if MD_MAP == SHONE
 	TEST_ONCE("kdf1 key derivation function is correct") {
@@ -328,9 +328,9 @@ static int kdf(void) {
 
 static int mgf(void) {
 	int code = STS_ERR;
-	unsigned char message[] =
+	uint8_t message[] =
 			{ 0XDE, 0XAD, 0xBE, 0xEF, 0xFE, 0xEB, 0xDA, 0xED };
-	unsigned char key[32];
+	uint8_t key[32];
 
 #if MD_MAP == SHONE
 	TEST_ONCE("mgf1 mask generation function is correct") {
@@ -353,7 +353,7 @@ static int mgf(void) {
 }
 
 static int hmac(void) {
-	unsigned char mac[MD_LEN], key[131];
+	uint8_t mac[MD_LEN], key[131];
 	char *msg[] = {
 			"Hi There", "what do ya want for nothing?", "Test With Truncation",
 			"Test Using Larger Than Block-Size Key - Hash Key First",
@@ -367,7 +367,7 @@ static int hmac(void) {
 
 #define FUNCTION "sha-256"
 
-	unsigned char result[][64] = {
+	uint8_t result[][64] = {
 		{ 0xB0, 0x34, 0x4C, 0x61, 0xD8, 0xDB, 0x38, 0x53, 0x5C, 0xA8, 0xAF,
 				0xCE, 0xAF, 0x0B, 0xF1, 0x2B, 0x88, 0x1D, 0xC2, 0x00, 0xC9,
 				0x83, 0x3D, 0xA7, 0x26, 0xE9, 0x37, 0x6C, 0x2E, 0x32, 0xCF,
@@ -398,10 +398,10 @@ static int hmac(void) {
 	};
 	TEST_ONCE("hmac (" FUNCTION ") is correct") {
 		memset(key, 0x0B, 20);
-		md_hmac(mac, (unsigned char *)msg[0], strlen(msg[0]), key, 20);
+		md_hmac(mac, (uint8_t *)msg[0], strlen(msg[0]), key, 20);
 		TEST_ASSERT(memcmp(mac, result[0], MD_LEN) == 0, end);
 		strncpy((char *)key, "Jefe", 4);
-		md_hmac(mac, (unsigned char *)msg[1], strlen(msg[1]), key, 4);
+		md_hmac(mac, (uint8_t *)msg[1], strlen(msg[1]), key, 4);
 		TEST_ASSERT(memcmp(mac, result[1], MD_LEN) == 0, end);
 		memset(key, 0xAA, 20);
 		memset(key + 20, 0xDD, 50);
@@ -414,12 +414,12 @@ static int hmac(void) {
 		md_hmac(mac, key + 25, 50, key, 25);
 		TEST_ASSERT(memcmp(mac, result[3], MD_LEN) == 0, end);
 		memset(key, 0x0C, 20);
-		md_hmac(mac, (unsigned char *)msg[2], strlen(msg[2]), key, 20);
+		md_hmac(mac, (uint8_t *)msg[2], strlen(msg[2]), key, 20);
 		TEST_ASSERT(memcmp(mac, result[4], 16) == 0, end);
 		memset(key, 0xAA, 131);
-		md_hmac(mac, (unsigned char *)msg[3], strlen(msg[3]), key, 131);
+		md_hmac(mac, (uint8_t *)msg[3], strlen(msg[3]), key, 131);
 		TEST_ASSERT(memcmp(mac, result[5], MD_LEN) == 0, end);
-		md_hmac(mac, (unsigned char *)msg[4], strlen(msg[4]), key, 131);
+		md_hmac(mac, (uint8_t *)msg[4], strlen(msg[4]), key, 131);
 		TEST_ASSERT(memcmp(mac, result[6], MD_LEN) == 0, end);
 	}
 	TEST_END;
@@ -437,7 +437,7 @@ static int hmac(void) {
 			0x36, 0x37, 0x38,0x39,0x3A, 0x3B, 0x3C,0x3D, 0x3E, 0x3F, 0x40, 0x41, 0x42, 0x43,
 	};
 	char m[] = "Sample #2";
-	md_hmac(mac, (unsigned char *)m, strlen(m), k2, 20);
+	md_hmac(mac, (uint8_t *)m, strlen(m), k2, 20);
 
 #endif
 

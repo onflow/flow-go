@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2013 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -67,7 +67,7 @@ static int util(void) {
 	int bits;
 	char str[BN_BYTES * 3 + 1];
 	dig_t digit;
-	unsigned char bin[BN_BYTES];
+	uint8_t bin[BN_BYTES];
 	dig_t raw[BN_DIGS];
 	bn_t a, b, c;
 
@@ -1613,7 +1613,7 @@ static int recoding(void) {
 	int code = STS_ERR;
 	bn_t a, b, c, v1[3], v2[3];
 	int w, k, l;
-	unsigned char d[BN_BITS + 1];
+	uint8_t d[BN_BITS + 1];
 	signed char e[2 * (BN_BITS + 1)];
 
 	bn_null(a);
