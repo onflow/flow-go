@@ -51,7 +51,7 @@ void fp_invn_low(dig_t *c, const dig_t *a) {
 	fp_copy(u, a);
 #endif
 
-	fp_copy(s, fp_prime_get());
+	fp_copy(s, (const fp_t)fp_prime_get());
 
 	mpn_gcdext(t, c, &cn, u, FP_DIGS, s, FP_DIGS);
 	if (cn < 0) {

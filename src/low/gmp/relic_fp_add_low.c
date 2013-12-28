@@ -111,18 +111,18 @@ void fp_dblm_low(dig_t *c, const dig_t *a) {
 	}
 }
 
-void fp_hlvm_low(fp_t c, const fp_t a) {
-        dig_t carry = 0;
+void fp_hlvm_low(dig_t *c, const dig_t *a) {
+    dig_t carry = 0;
 
-        if (a[0] & 1) {
-                carry = mpn_add_n(c, a, fp_prime_get(), FP_DIGS);
-        } else {
-                dv_copy(c, a, FP_DIGS);
-        }
-        mpn_rshift(c, c, FP_DIGS, 1);
-        if (carry) {
-                c[FP_DIGS - 1] ^= ((dig_t)1 << (FP_DIGIT - 1));
-        }
+    if (a[0] & 1) {
+            carry = mpn_add_n(c, a, fp_prime_get(), FP_DIGS);
+    } else {
+            dv_copy(c, a, FP_DIGS);
+    }
+    mpn_rshift(c, c, FP_DIGS, 1);
+    if (carry) {
+            c[FP_DIGS - 1] ^= ((dig_t)1 << (FP_DIGIT - 1));
+    }
 }
 
 void fp_hlvd_low(dig_t *c, const dig_t *a) {

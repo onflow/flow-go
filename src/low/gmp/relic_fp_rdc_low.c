@@ -129,7 +129,7 @@ void fp_rdcn_low(dig_t *c, dig_t *a) {
 	for (i = 0; i < c1; i++) {
 		fp_subn_low(c, c, m);
 	}
-	if (fp_cmp(c, m) != CMP_LT) {
+	if (fp_cmpn_low(c, m) != CMP_LT) {
 		fp_subn_low(c, c, m);
 	}
 }
