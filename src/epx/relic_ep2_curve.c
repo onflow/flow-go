@@ -233,7 +233,7 @@ void ep2_curve_get_ord(bn_t n) {
 
 #if defined(EP_PRECO)
 
-const ep2_t *ep2_curve_get_tab() {
+ep2_t *ep2_curve_get_tab() {
 #if ALLOC == AUTO
 	return (ep2_t *)*(core_get()->ep2_ptr);
 #else

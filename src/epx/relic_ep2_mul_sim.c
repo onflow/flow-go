@@ -38,8 +38,8 @@
 
 #if EP_SIM == INTER || !defined(STRIP)
 
-static void ep2_mul_sim_ordin(ep2_t r, const ep2_t p, const bn_t k,
-		const ep2_t q, const bn_t l, const ep2_t *t) {
+static void ep2_mul_sim_ordin(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l,
+		ep2_t *t) {
 	int len, l0, l1, i, n0, n1, w, gen;
 	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *_k, *_m;
 	ep2_t t0[1 << (EP_WIDTH - 2)];
@@ -57,7 +57,7 @@ static void ep2_mul_sim_ordin(ep2_t r, const ep2_t p, const bn_t k,
 				ep2_new(t0[i]);
 			}
 			ep2_tab(t0, p, EP_WIDTH);
-			t = (const ep2_t *)t0;
+			t = (ep2_t *)t0;
 		}
 
 		/* Prepare the precomputation table. */
@@ -133,8 +133,7 @@ static void ep2_mul_sim_ordin(ep2_t r, const ep2_t p, const bn_t k,
 
 #if EP_SIM == BASIC || !defined(STRIP)
 
-void ep2_mul_sim_basic(ep2_t r, const ep2_t p, const bn_t k, const ep2_t q,
-		const bn_t l) {
+void ep2_mul_sim_basic(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 	ep2_t t;
 
 	ep2_null(t);
@@ -158,8 +157,7 @@ void ep2_mul_sim_basic(ep2_t r, const ep2_t p, const bn_t k, const ep2_t q,
 
 #if EP_SIM == TRICK || !defined(STRIP)
 
-void ep2_mul_sim_trick(ep2_t r, const ep2_t p, const bn_t k, const ep2_t q,
-		const bn_t l) {
+void ep2_mul_sim_trick(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 	ep2_t t0[1 << (EP_WIDTH / 2)];
 	ep2_t t1[1 << (EP_WIDTH / 2)];
 	ep2_t t[1 << EP_WIDTH];
@@ -244,8 +242,7 @@ void ep2_mul_sim_trick(ep2_t r, const ep2_t p, const bn_t k, const ep2_t q,
 
 #if EP_SIM == INTER || !defined(STRIP)
 
-void ep2_mul_sim_inter(ep2_t r, const ep2_t p, const bn_t k, const ep2_t q,
-		const bn_t l) {
+void ep2_mul_sim_inter(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 #if defined(EP_KBLTZ)
 	/* TODO. */
 	//  if (ep_curve_is_kbltz()) {
@@ -263,8 +260,7 @@ void ep2_mul_sim_inter(ep2_t r, const ep2_t p, const bn_t k, const ep2_t q,
 
 #if EP_SIM == JOINT || !defined(STRIP)
 
-void ep2_mul_sim_joint(ep2_t r, const ep2_t p, const bn_t k, const ep2_t q,
-		const bn_t l) {
+void ep2_mul_sim_joint(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 	ep2_t t[5];
 	int u_i, len, offset;
 	signed char jsf[2 * (FP_BITS + 1)];
@@ -326,7 +322,7 @@ void ep2_mul_sim_joint(ep2_t r, const ep2_t p, const bn_t k, const ep2_t q,
 
 #endif
 
-void ep2_mul_sim_gen(ep2_t r, const bn_t k, const ep2_t q, const bn_t l) {
+void ep2_mul_sim_gen(ep2_t r, bn_t k, ep2_t q, bn_t l) {
 	ep2_t gen;
 
 	ep2_null(gen);

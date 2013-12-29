@@ -365,7 +365,7 @@ static void arith2(void) {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		g2_mul_pre(t, p);
-		BENCH_ADD(g2_mul_fix(q, (const g2_t *)t, k));
+		BENCH_ADD(g2_mul_fix(q, t, k));
 	}
 	BENCH_END;
 

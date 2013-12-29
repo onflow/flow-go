@@ -38,7 +38,7 @@
 
 #if EP_ADD == BASIC || !defined(STRIP)
 
-void ep2_neg_basic(ep2_t r, const ep2_t p) {
+void ep2_neg_basic(ep2_t r, ep2_t p) {
 	if (ep2_is_infty(p)) {
 		ep2_set_infty(r);
 		return;
@@ -58,7 +58,7 @@ void ep2_neg_basic(ep2_t r, const ep2_t p) {
 
 #if EP_ADD == PROJC || !defined(STRIP)
 
-void ep2_neg_projc(ep2_t r, const ep2_t p) {
+void ep2_neg_projc(ep2_t r, ep2_t p) {
 	if (ep2_is_infty(p)) {
 		ep2_set_infty(r);
 		return;

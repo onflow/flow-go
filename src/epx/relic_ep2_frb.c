@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void ep2_frb(ep2_t r, const ep2_t p, int i) {
+void ep2_frb(ep2_t r, ep2_t p, int i) {
 	switch (i) {
 		case 1:
 			fp2_frb(r->x, p->x, 1);
