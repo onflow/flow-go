@@ -1089,7 +1089,7 @@ static void arith12(void) {
 			bn_set_bit(e, FP_BITS / 2, 1);
 			bn_set_bit(e, 0, 1);
 		}
-		BENCH_ADD(fp12_exp(c, a, e));
+		BENCH_ADD(fp12_exp_cyc(c, a, e));
 	}
 	BENCH_END;
 
