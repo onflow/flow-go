@@ -364,8 +364,12 @@ typedef struct _ctx_t {
 #endif
 #endif
 
+#if RAND != CALL
 	/** Internal state of the PRNG. */
 	uint8_t rand[RAND_SIZE];
+#else
+	void (*rand)(uint8_t *, int);
+#endif
 	/** Flag to indicate if PRNG is seed. */
 	int seeded;
 	/** Counter to keep track of number of calls since last seeding. */

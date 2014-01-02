@@ -3,7 +3,8 @@ message(STATUS "Available pseudo-random number generators (default = HASH):")
 message("   RAND=HASH      Use the HASH-DRBG generator. (recommended)")
 message("   RAND=HMAC      Use the HMAC-DRBG generator. (recommended)")
 message("   RAND=UDEV      Use the operating system underlying generator.")
-message("   RAND=FIPS      Use the FIPS 186-2 (CN1) SHA1-based generator.\n")
+message("   RAND=FIPS      Use the FIPS 186-2 (CN1) SHA1-based generator.")
+message("   RAND=CALL      Override the generator with a callback.\n")
 
 message(STATUS "Available random number generator seeders (default = UDEV):")
 

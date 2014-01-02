@@ -385,6 +385,54 @@ static int test(void) {
 	return STS_OK;
 }
 
+#elif RAND == CALL
+
+#include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+static void test_bytes(uint8_t *buf, int size) {
+	int c, l, fd = open("/dev/urandom", O_RDONLY);
+	
+	if (fd == -1) {
+		THROW(ERR_NO_FILE);
+	}
+
+	l = 0;
+	do {
+		c = read(fd, buf + l, size - l);
+		l += c;
+		if (c == -1) {
+			THROW(ERR_NO_READ);
+		}
+	} while (l < size);
+
+	close(fd);
+}
+
+static int test(void) {
+	uint8_t out[20], digit;
+
+	TEST_ONCE("callback to reading /dev/urandom is correct") {
+		digit = 0;
+		memset(out, 0, sizeof(out));
+		rand_bytes(out, sizeof(out));
+		for (int j = 0; j < sizeof(20); j++) {
+			digit ^= out[j];
+		}
+		TEST_ASSERT(digit != 0, end);
+		rand_seed(&test_bytes);
+		rand_bytes(out, sizeof(out));
+		for (int j = 0; j < sizeof(20); j++) {
+			digit ^= out[j];
+		}
+		TEST_ASSERT(digit != 0, end);
+	}
+	TEST_END;
+  end:
+	return STS_OK;
+}
+
 #endif
 
 int main(void) {

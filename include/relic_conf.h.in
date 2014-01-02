@@ -597,6 +597,8 @@
 #define UDEV     3
 /** FIPS 186-2 (CN1) SHA-1 based generator. */
 #define FIPS     4
+/** Override library generator with the callback. */
+#define CALL     5
 /** Chosen random generator. */
 #define RAND     @RAND@
 

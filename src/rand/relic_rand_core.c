@@ -142,8 +142,12 @@ void rand_init() {
 
 #endif /* RAND == UDEV */
 
+#if RAND != UDEV && RAND != CALL
 	core_get()->seeded = 0;
 	rand_seed(buf, SEED_SIZE);
+#else
+	rand_seed(NULL);
+#endif
 }
 
 void rand_clean() {
@@ -153,6 +157,10 @@ void rand_clean() {
 	close(*fd);
 #endif
 
+#if RAND != CALL
 	memset(core_get()->rand, 0, sizeof(core_get()->rand));
+#else
+	core_get()->rand = NULL;
+#endif
 	core_get()->seeded = 0;
 }
