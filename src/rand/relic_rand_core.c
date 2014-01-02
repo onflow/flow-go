@@ -142,7 +142,7 @@ void rand_init() {
 
 #endif /* RAND == UDEV */
 
-#if RAND != UDEV && RAND != CALL
+#if RAND != CALL
 	core_get()->seeded = 0;
 	rand_seed(buf, SEED_SIZE);
 #else
