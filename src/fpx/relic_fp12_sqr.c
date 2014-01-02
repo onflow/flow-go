@@ -64,7 +64,7 @@ static void fp4_mul_unr(dv2_t e, dv2_t f, fp2_t a, fp2_t b, fp2_t c, fp2_t d) {
 		fp2_muln_low(u1, b, d);
 		fp2_addm_low(t0, c, d);
 		fp2_addm_low(t1, a, b);
-#endif		
+#endif
 		fp2_muln_low(f, t1, t0);
 		fp2_subc_low(f, f, u0);
 		fp2_subc_low(f, f, u1);
@@ -81,10 +81,18 @@ static void fp4_mul_unr(dv2_t e, dv2_t f, fp2_t a, fp2_t b, fp2_t c, fp2_t d) {
 }
 
 void fp4_sqr_unr(dv2_t c, dv2_t d, fp2_t a, fp2_t b) {
-	dv2_t u0, u1;
 	fp2_t t;
+	dv2_t u0, u1;
+
+	fp2_null(t);
+	dv2_null(u0);
+	dv2_null(u1);
 
 	TRY {
+		fp2_new(t);
+		dv2_new(u0);
+		dv2_new(u1);
+
 		/* t0 = a^2. */
 		fp2_sqrn_low(u0, a);
 		/* t1 = b^2. */
@@ -106,6 +114,10 @@ void fp4_sqr_unr(dv2_t c, dv2_t d, fp2_t a, fp2_t b) {
 		fp2_subc_low(d, d, u1);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
+	} FINALLY {
+		fp2_free(t);
+		dv2_free(u0);
+		dv2_free(u1);
 	}
 }
 
@@ -320,12 +332,32 @@ void fp12_sqr_lazyr(fp12_t c, fp12_t a) {
 	fp2_null(t1);
 	fp2_null(t2);
 	fp2_null(t3);
+	dv2_null(u0);
+	dv2_null(u1);
+	dv2_null(u2);
+	dv2_null(u3);
+	dv2_null(u4);
+	dv2_null(u5);
+	dv2_null(u6);
+	dv2_null(u7);
+	dv2_null(u8);
+	dv2_null(u9);
 
 	TRY {
 		fp2_new(t0);
 		fp2_new(t1);
 		fp2_new(t2);
 		fp2_new(t3);
+		dv2_new(u0);
+		dv2_new(u1);
+		dv2_new(u2);
+		dv2_new(u3);
+		dv2_new(u4);
+		dv2_new(u5);
+		dv2_new(u6);
+		dv2_new(u7);
+		dv2_new(u8);
+		dv2_new(u9);
 
 		/* a0 = (a00, a11). */
 		/* a1 = (a10, a02). */
@@ -403,6 +435,16 @@ void fp12_sqr_lazyr(fp12_t c, fp12_t a) {
 		fp2_free(t1);
 		fp2_free(t2);
 		fp2_free(t3);
+		dv2_free(u0);
+		dv2_free(u1);
+		dv2_free(u2);
+		dv2_free(u3);
+		dv2_free(u4);
+		dv2_free(u5);
+		dv2_free(u6);
+		dv2_free(u7);
+		dv2_free(u8);
+		dv2_free(u9);
 	}
 }
 
