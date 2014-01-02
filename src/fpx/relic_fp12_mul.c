@@ -37,43 +37,9 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if PP_EXT == BASIC || !defined(STRIP)
-
-static void fp4_mul(fp2_t e, fp2_t f, fp2_t a, fp2_t b, fp2_t c, fp2_t d) {
-	fp2_t t0, t1, t2;
-
-	fp2_null(t0);
-	fp2_null(t1);
-	fp2_null(t2);
-
-	TRY {
-		fp2_new(t0);
-		fp2_new(t1);
-		fp2_new(t2);
-
-		fp2_mul(t0, a, c);
-		fp2_mul(t1, b, d);
-		fp2_add(t2, c, d);
-		fp2_add(f, a, b);
-		fp2_mul(f, f, t2);
-		fp2_sub(f, f, t0);
-		fp2_sub(f, f, t1);
-		fp2_mul_nor(t2, t1);
-		fp2_add(e, t0, t2);
-	} CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	} FINALLY {
-		fp2_free(t0);
-		fp2_free(t1);
-		fp2_free(t2);
-	}
-}
-
-#endif
-
 #if PP_EXT == LAZYR || !defined(STRIP)
 
-static void fp6_mul_dxs_unr_lazyr(dv6_t c, fp6_t a, fp6_t b) {
+inline static void fp6_mul_dxs_unr_lazyr(dv6_t c, fp6_t a, fp6_t b) {
 	dv2_t u0, u1, u2, u3;
 	fp2_t t0, t1;
 
@@ -92,46 +58,51 @@ static void fp6_mul_dxs_unr_lazyr(dv6_t c, fp6_t a, fp6_t b) {
 		fp2_new(t0);
 		fp2_new(t1);
 
-		/* v0 = a_0b_0, v1 = a_1b_1, v2 = a_2b_2,
-		 * t0 = a_1 + a_2, t1 = b_1 + b_2,
-		 * u4 = u1 + u2, u5 = u0 + u1, u6 = u0 + u2 */
 #ifdef FP_SPACE
 		fp2_mulc_low(u0, a[0], b[0]);
 		fp2_mulc_low(u1, a[1], b[1]);
-		fp2_addd_low(c[1], u0, u1);
-		fp2_addn_low(t0, a[1], a[2]);
+		fp2_addn_low(t0, a[0], a[1]);
+		fp2_addn_low(t1, b[0], b[1]);
+
+		/* c_1 = (a_0 + a_1)(b_0 + b_1) - a_0b_0 - a_1b_1 */
+		fp2_muln_low(u2, t0, t1);
+		fp2_subc_low(u2, u2, u0);
+		fp2_subc_low(c[1], u2, u1);
+
+		/* c_0 = a_0b_0 + E a_2b_1 */
+		fp2_mulc_low(u2, a[2], b[1]);
+		fp2_norh_low(c[0], u2);
+		fp2_addc_low(c[0], u0, c[0]);
+
+		/* c_2 = a_0b_2 + a_1b_1 */
+		fp2_mulc_low(u2, a[2], b[0]);
+		fp2_addc_low(c[2], u1, u2);
 #else
 		fp2_muln_low(u0, a[0], b[0]);
 		fp2_muln_low(u1, a[1], b[1]);
-		fp2_addc_low(c[1], u0, u1);
-		fp2_addm_low(t0, a[1], a[2]);
-#endif
-		/* t2 (c_0) = v0 + E((a_1 + a_2)(b_1 + b_2) - v1 - v2) */
-		fp2_muln_low(u3, t0, b[1]);
-		fp2_subc_low(u3, u3, u1);
-		fp2_nord_low(c[0], u3);
-		fp2_addc_low(c[0], c[0], u0);
-
-		/* c_1 = (a_0 + a_1)(b_0 + b_1) - v0 - v1 + Ev2 */
-#ifdef FP_SPACE
-		fp2_addn_low(t0, a[0], a[1]);
-		fp2_addn_low(t1, b[0], b[1]);
-#else
 		fp2_addm_low(t0, a[0], a[1]);
 		fp2_addm_low(t1, b[0], b[1]);
-#endif
-		fp2_muln_low(u3, t0, t1);
-		fp2_subc_low(c[1], u3, c[1]);
 
-		/* c_2 = (a_0 + a_2)(b_0 + b_2) - v0 + v1 - v2 */
-#ifdef FP_SPACE
-		fp2_addn_low(t0, a[0], a[2]);
-#else
-		fp2_addm_low(t0, a[0], a[2]);
+		/* c_1 = (a_0 + a_1)(b_0 + b_1) - a_0b_0 - a_1b_1 */
+		fp2_muln_low(u2, t0, t1);
+		fp2_subc_low(u2, u2, u0);
+		fp2_subc_low(c[1], u2, u1);
+
+		/* c_0 = a_0b_0 + E a_2b_1 */
+		fp2_muln_low(u2, a[2], b[1]);
+		fp2_nord_low(c[0], u2);
+		fp2_addc_low(c[0], u0, c[0]);
+
+		/* c_2 = a_0b_2 + a_1b_1 */
+		fp2_muln_low(u2, a[2], b[0]);
+		fp2_addc_low(c[2], u1, u2);
 #endif
-		fp2_muln_low(u3, t0, b[0]);
-		fp2_subc_low(u3, u3, u0);
-		fp2_addc_low(c[2], u3, u1);
+
+#ifdef FP_SPACE
+
+#else
+
+#endif
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
@@ -478,9 +449,15 @@ void fp12_mul_dxs_lazyr(fp12_t c, fp12_t a, fp12_t b) {
 			fp2_copy(t0[1], b[1][1]);
 #elif EP_ADD == PROJC
 			/* t0 = a_0 * b_0. */
+#ifdef FP_SPACE
+			fp2_mulc_low(u0[0], a[0][0], b[0][0]);
+			fp2_mulc_low(u0[1], a[0][1], b[0][0]);
+			fp2_mulc_low(u0[2], a[0][2], b[0][0]);
+#else
 			fp2_muln_low(u0[0], a[0][0], b[0][0]);
 			fp2_muln_low(u0[1], a[0][1], b[0][0]);
 			fp2_muln_low(u0[2], a[0][2], b[0][0]);
+#endif
 			/* t2 = b_0 + b_1. */
 			fp2_add(t0[0], b[0][0], b[1][0]);
 			fp2_copy(t0[1], b[1][1]);
