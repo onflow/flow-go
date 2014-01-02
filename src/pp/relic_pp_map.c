@@ -111,8 +111,15 @@ static void pp_mil_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, bn_t a) {
 		ep2_copy(t, q);
 
 		ep_neg(_p, p);
+		fp_addm_low(_p->z, _p->x, _p->x);
+		fp_addm_low(_p->z, _p->z, _p->x);
 
-		for (int i = bn_bits(a) - 2; i >= 0; i--) {
+		pp_dbl_k12(r, t, t, _p);
+		if (bn_test_bit(a, bn_bits(a) - 2)) {
+			pp_add_k12(l, t, q, p);
+			fp12_mul_dxs(r, r, l);
+		}
+		for (int i = bn_bits(a) - 3; i >= 0; i--) {
 			fp12_sqr(r, r);
 			pp_dbl_k12(l, t, t, _p);
 			fp12_mul_dxs(r, r, l);
@@ -162,9 +169,20 @@ static void pp_mil_sps_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, int *s, int len) 
 		ep2_copy(t, q);
 
 		ep_neg(_p, p);
+		fp_addm_low(_p->z, _p->x, _p->x);
+		fp_addm_low(_p->z, _p->z, _p->x);
 		ep2_neg(_q, q);
 
-		for (int i = len - 2; i >= 0; i--) {
+		pp_dbl_k12(r, t, t, _p);
+		if (s[len - 2] > 0) {
+			pp_add_k12(l, t, q, p);
+			fp12_mul_dxs(r, r, l);
+		}
+		if (s[len - 2] < 0) {
+			pp_add_k12(l, t, _q, p);
+			fp12_mul_dxs(r, r, l);
+		}
+		for (int i = len - 3; i >= 0; i--) {
 			fp12_sqr(r, r);
 			pp_dbl_k12(l, t, t, _p);
 			fp12_mul_dxs(r, r, l);
@@ -446,6 +464,8 @@ void pp_map_oatep_k12(fp12_t r, ep_t p, ep2_t q) {
 		bn_new(a);
 
 		fp_param_get_var(a);
+		bn_mul_dig(a, a, 6);
+		bn_add_dig(a, a, 2);
 		fp_param_get_map(s, &len);
 
 		switch (ep_param_get()) {
