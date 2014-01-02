@@ -2235,6 +2235,24 @@ static int squaring12(void) {
 			fp12_sqr(c, a);
 			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
 		} TEST_END;
+
+#if PP_EXT == BASIC | !defined(STRIP)
+		TEST_BEGIN("basic squaring is correct") {
+			fp12_rand(a);
+			fp12_sqr(b, a);
+			fp12_sqr_basic(c, a);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
+
+#if PP_EXT == LAZYR || !defined(STRIP)
+		TEST_BEGIN("lazy reduced squaring is correct") {
+			fp12_rand(a);
+			fp12_sqr(b, a);
+			fp12_sqr_lazyr(c, a);
+			TEST_ASSERT(fp12_cmp(b, c) == CMP_EQ, end);
+		} TEST_END;
+#endif
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
