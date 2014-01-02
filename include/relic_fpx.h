@@ -498,6 +498,18 @@ typedef fp6_t fp18_t[3];
 #endif
 
 /**
+ * Squares a dodecic extension field elements. Computes C = A * A.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the dodecic extension field element to square.
+ */
+#if PP_EXT == BASIC
+#define fp12_sqr(C, A)			fp12_sqr_basic(C, A)
+#elif PP_EXT == LAZYR
+#define fp12_sqr(C, A)			fp12_sqr_lazyr(C, A)
+#endif
+
+/**
  * Squares a dodecic extension field elements in the cyclotomic subgroup.
  * Computes C = A * B.
  *
@@ -1422,13 +1434,22 @@ void fp12_mul_dxs_basic(fp12_t c, fp12_t a, fp12_t b);
 void fp12_mul_dxs_lazyr(fp12_t c, fp12_t a, fp12_t b);
 
 /**
- * Computes the square of a dodecic extension field element. Computes
- * c = a * a.
+ * Computes the square of a dodecic extension field element using basic
+ * arithmetic.
  *
  * @param[out] c			- the result.
  * @param[in] a				- the dodecic extension field element to square.
  */
-void fp12_sqr(fp12_t c, fp12_t a);
+void fp12_sqr_basic(fp12_t c, fp12_t a);
+
+/**
+ * Computes the square of a dodecic extension field element using lazy
+ * reduction.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the dodecic extension field element to square.
+ */
+void fp12_sqr_lazyr(fp12_t c, fp12_t a);
 
 /**
  * Computes the square of a cyclotomic dodecic extension field element using
