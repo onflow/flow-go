@@ -34,6 +34,7 @@
 #include "relic_pp.h"
 #include "relic_core.h"
 #include "relic_fp_low.h"
+#include "relic_bn_low.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -159,6 +160,71 @@ void fp2_nord_low(dv2_t c, dv2_t a) {
 		dv_copy(t[0], a[1], 2 * FP_DIGS);
 		fp_addc_low(c[1], a[0], a[1]);
 		fp_subc_low(c[0], a[0], t[0]);
+#else
+		switch (fp_prime_get_mod8()) {
+			case 3:
+				/* If p = 3 mod 8, (1 + u) is a QNR, u^2 = -1. */
+				/* (a_0 + a_1 * u) * (1 + u) = (a_0 - a_1) + (a_0 + a_1) * u. */
+				dv_copy(t[0], a[1], 2 * FP_DIGS);
+				fp_addc_low(c[1], a[0], a[1]);
+				fp_subc_low(c[0], a[0], t[0]);
+				break;
+			case 1:
+			case 5:
+				/* If p = 1,5 mod 8, (u) is a QNR. */
+				dv_copy(t[0], a[0], 2 * FP_DIGS);
+				dv_zero(t[1], FP_DIGS);
+				dv_copy(t[1] + FP_DIGS, fp_prime_get(), FP_DIGS);
+				fp_subc_low(c[0], t[1], a[1]);
+				for (int i = -1; i > fp_prime_get_qnr(); i--) {
+					fp_subc_low(c[0], c[0], a[1]);
+				}
+				dv_copy(c[1], t[0], 2 * FP_DIGS);
+				break;
+			case 7:
+				/* If p = 7 mod 8, (4 + u) is a QNR/CNR.   */
+				fp2_addc_low(t, a, a);
+				fp2_addc_low(t, t, t);
+				fp_subc_low(c[0], t[0], a[1]);
+				fp_addc_low(c[1], t[1], a[0]);
+				break;
+			default:
+				THROW(ERR_NO_VALID);
+				break;
+		}
+#endif
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		dv2_free(t);
+		bn_free(b);
+	}
+}
+
+void fp2_norh_low(dv2_t c, dv2_t a) {
+	dv2_t t;
+	bn_t b;
+
+	dv2_null(t);
+	bn_null(b);
+
+	TRY {
+		dv2_new(t);
+		bn_new(b);
+
+#ifdef FP_QNRES
+		/* If p = 3 mod 8, (1 + i) is a QNR/CNR. */
+		/* (a_0 + a_1 * i) * (1 + i) = (a_0 - a_1) + (a_0 + a_1) * u. */
+		dv_copy(t[1], a[1], 2 * FP_DIGS);
+		fp_addd_low(c[1], a[0], a[1]);
+		/* c_0 = c_0 + 2^N * p/2. */
+		dv_copy(t[0], a[0], 2 * FP_DIGS);
+		bn_lshb_low(t[0] + FP_DIGS - 1, t[0] + FP_DIGS - 1, FP_DIGS + 1, 1);
+		fp_addn_low(t[0] + FP_DIGS, t[0] + FP_DIGS, fp_prime_get());
+		bn_rshb_low(t[0] + FP_DIGS - 1, t[0] + FP_DIGS - 1, FP_DIGS + 1, 1);
+		fp_subd_low(c[0], t[0], t[1]);
 #else
 		switch (fp_prime_get_mod8()) {
 			case 3:

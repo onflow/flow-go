@@ -148,6 +148,16 @@ void fp2_norm_low(fp2_t c, fp2_t a);
 
 /**
  * Multiplies a double-precision quadratic extension field element by the
+ * quadratic/cubic non-residue, reducing only half of the result. Computes
+ * c = a * E.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the field element to multiply.
+ */
+void fp2_norh_low(dv2_t c, dv2_t a);
+
+/**
+ * Multiplies a double-precision quadratic extension field element by the
  * quadratic/cubic non-residue. Computes c = a * E.
  *
  * @param[out] c			- the result.
