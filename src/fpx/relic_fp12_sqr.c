@@ -313,30 +313,19 @@ void fp12_sqr_pck_basic(fp12_t c, fp12_t a) {
 #if PP_EXT == LAZYR || !defined(STRIP)
 
 void fp12_sqr_lazyr(fp12_t c, fp12_t a) {
-	fp2_t t6, t7, t8, t9;
+	fp2_t t0, t1, t2, t3;
 	dv2_t u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
 
 	fp2_null(t0);
 	fp2_null(t1);
+	fp2_null(t2);
 	fp2_null(t3);
-	fp2_null(t4);
-	fp2_null(t5);
-	fp2_null(t6);
-	fp2_null(t7);
-	fp2_null(t8);
-	fp2_null(t9);
 
 	TRY {
 		fp2_new(t0);
 		fp2_new(t1);
 		fp2_new(t2);
 		fp2_new(t3);
-		fp2_new(t4);
-		fp2_new(t5);
-		fp2_new(t6);
-		fp2_new(t7);
-		fp2_new(t8);
-		fp2_new(t9);
 
 		/* a0 = (a00, a11). */
 		/* a1 = (a10, a02). */
@@ -354,18 +343,18 @@ void fp12_sqr_lazyr(fp12_t c, fp12_t a) {
 		fp4_sqr_unr(u4, u5, a[0][1], a[1][2]);
 
 		/* c2 = a0 + a2. */
-		fp2_addm_low(t8, a[0][0], a[0][1]);
-		fp2_addm_low(t9, a[1][1], a[1][2]);
+		fp2_addm_low(t2, a[0][0], a[0][1]);
+		fp2_addm_low(t3, a[1][1], a[1][2]);
 
 		/* (t6,t7) = (a0 + a2 + a1)^2. */
-		fp2_addm_low(t6, t8, a[1][0]);
-		fp2_addm_low(t7, t9, a[0][2]);
-		fp4_sqr_unr(u6, u7, t6, t7);
+		fp2_addm_low(t0, t2, a[1][0]);
+		fp2_addm_low(t1, t3, a[0][2]);
+		fp4_sqr_unr(u6, u7, t0, t1);
 
 		/* c2 = (a0 + a2 - a1)^2. */
-		fp2_subm_low(t8, t8, a[1][0]);
-		fp2_subm_low(t9, t9, a[0][2]);
-		fp4_sqr_unr(u8, u9, t8, t9);
+		fp2_subm_low(t2, t2, a[1][0]);
+		fp2_subm_low(t3, t3, a[0][2]);
+		fp4_sqr_unr(u8, u9, t2, t3);
 
 		/* c2 = (c2 + (t6,t7))/2. */
 #ifdef FP_SPACE
@@ -414,8 +403,6 @@ void fp12_sqr_lazyr(fp12_t c, fp12_t a) {
 		fp2_free(t1);
 		fp2_free(t2);
 		fp2_free(t3);
-		fp2_free(t4);
-		fp2_free(t5);
 	}
 }
 
