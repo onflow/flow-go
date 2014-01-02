@@ -43,6 +43,12 @@
 #define NP43 $0x6E8D136000000002
 #define NP44 $0x0948D92090000000
 
+#define NP20 $0x8000000000000000         // N*p/2
+#define NP21 $0xD380000000000009
+#define NP22 $0x3090800000000009
+#define NP23 $0xDD1A26C000000004
+#define NP24 $0x1291B24120000000
+
 .text
 .global fp_muln_low		// multiplication
 .global fp_mulm_low		// modular multiplication
@@ -92,181 +98,138 @@
 	.endif
 .endm
 
+/* Montgomery reduction, comba, optimized for BN254 */
 .macro FP_RDCN_LOW C, A
-	xorq	%r9, %r9
-//	xorq	%r10, %r10    ///
+	xorq	%r10, %r10    
 	movq	U0, %rcx
-
+// i=0
 	movq	0(\A), %r8
 	movq	%r8, %rax
-	mulq	%rcx
+	mulq	%rcx         // v*U0
 	movq	%rax, %r14
-	movq	P1, %r12
-	movq	P2, %r13
 	movq	P0, %r11
-	mulq	%r11
+	mulq	%r11          // z0*m0
 	addq	%rax,%r8
-	adcq	%rdx,%r9
-	adcq	$0,%r10       ///
-    xorq    %r10,%r10     ///
-
-//	xorq	%r8, %r8      ///
+	movq	P1, %r12
+	adcq	8(\A),%rdx
+    movq    %rdx,%r9
+    adcq    $0,%r10      
+// i=1, j=0    
 	movq	%r14, %rax
-	mulq	%r12
-
+	mulq	%r12          // z0*m1
 	addq	%rax,%r9
+	movq	%r9, %rax     
 	adcq	%rdx,%r10
-	adcq	$0,%r8        ///
 
-	addq	8(\A),%r9
-	adcq	$0,%r10
-	adcq	$0,%r8        ///
-	movq	%r9, %rax
-	mulq	%rcx
+	mulq	%rcx          // v*U0
 	movq	%rax, 8(\A)
-	movq	%r14,0(\A)
-	xorq    %r8,%r8       ///
-	mulq	%r11
-
+	xorq    %r8,%r8       
+	mulq	%r11          // z1*m0
 	addq	%rax,%r9
+	movq	P2, %r13
 	adcq	%rdx,%r10
 	adcq	$0,%r8
-
+// i=2, j=0,1 
 	movq	%r14, %rax
-	mulq	%r13
-
-	addq	%rax,%r10
-	adcq	%rdx,%r8
-	adcq	$0,%r9       ///
-    xorq    %r9,%r9      ///
-
-	movq	8(\A), %rax
-	mulq	%r12
-
-	addq	%rax,%r10
-	adcq	%rdx,%r8
-	adcq	$0,%r9
-
+	mulq	%r13         // z0*m2
 	addq	16(\A),%r10
 	adcq	$0,%r8
-	adcq	$0,%r9
-	movq	%r10, %rax
-	mulq	%rcx
-	movq	%rax, 16(\A)
-	movq	P3, %r14
-	mulq	%r11
 
 	addq	%rax,%r10
 	adcq	%rdx,%r8
+
+    xorq    %r9,%r9  
+	movq	8(\A), %rax  
+	mulq	%r12         // z1*m1
+	addq	%rax,%r10
+	adcq	%rdx,%r8
 	adcq	$0,%r9
-
-	xorq	%r10, %r10     ///
-
-	movq	0(\A), %rax
-	mulq	%r14
-
-	addq	%rax,%r8
-	adcq	%rdx,%r9
-	adcq	$0,%r10         ///
-//	xorq    %r10,%r10       ///
-
-	movq	8(\A), %rax
-	mulq	%r13
-
-	addq	%rax,%r8
-	adcq	%rdx,%r9
-	adcq	$0,%r10
-
-	movq	16(\A), %rax
-	mulq	%r12
+	movq	%r10, %rax   
+	mulq	%rcx         // v*U0
+	movq	%rax, 16(\A)
+	mulq	%r11         // z2*m0
+	addq	%rax,%r10
+	movq	%r14, %rax
+	adcq	%rdx,%r8
+	movq	P3, %r14
+	adcq	$0,%r9
+// i=3, j=0,1,2  
+	mulq	%r14           // z0*m3
+	addq    24(\A),%r8    
+	adcq	$0,%r9          
 
 	addq	%rax,%r8
 	adcq	%rdx,%r9
-	adcq	$0,%r10
+	     
+	movq	8(\A), %rax 
+	mulq	%r13           // z1*m2
+	addq	%rax,%r8
+	movq	16(\A), %rax  
+	adcq	%rdx,%r9
+ 
+	xorq	%r10, %r10  
+	mulq	%r12           // z2*m1
+	addq	%rax,%r8
+	movq	%r8, %rax 
+	adcq	%rdx,%r9
+	adcq	$0,%r10 
 
-	addq    24(\A),%r8    ///
-	adcq	$0,%r9          ///
-	adcq	$0,%r10         ///
-	movq	%r8, %rax       ///
-	mulq	%rcx
+	mulq	%rcx           // v*U0
 	movq    %rax, 24(\A)
-	mulq    %r11
-
+	mulq    %r11           // z3*m0
 	addq	%rax,%r8
 	adcq	%rdx,%r9
 	adcq	$0,%r10
-
-	xorq	%r8, %r8        ///
-
-	movq	8(\A), %rax
-	mulq	%r14
-
-	addq	%rax,%r9
-	adcq	%rdx,%r10
-	adcq	$0,%r8         ///
-
-	movq	16(\A), %rax
-	mulq	%r13
-
-	addq	%rax,%r9
-	adcq	%rdx,%r10
-	adcq	$0,%r8
-
-	movq	24(\A), %rax
-	mulq	%r12
-
-	addq	%rax,%r9
-	adcq	%rdx,%r10
-	adcq	$0,%r8
-
+// loop 2
+// i=4, j=1,2,3  
+	movq	8(\A), %rax  
+	mulq	%r14           // z1*m3
 	addq	32(\A),%r9
 	adcq	$0,%r10
+
+	addq	%rax,%r9
+	adcq	%rdx,%r10
+
+	movq	16(\A), %rax  
+	mulq	%r13           // z2*m2
+	addq	%rax,%r9
+
+	adcq	%rdx,%r10
+	xorq	%r8, %r8    
+	movq	24(\A), %rax  
+
+	mulq	%r12           // z3*m1
+	addq	%rax,%r9
+	adcq	%rdx,%r10
+	movq	%r9,%r12       // Z0
 	adcq	$0,%r8
-	movq	%r9,%r12
-//	movq	%r9, %r11
-
-	xorq	%r11, %r11     ///
-
+// i=5, j=2,3
+	xorq	%r11, %r11     
 	movq	16(\A), %rax
-	mulq	%r14
-
+	mulq	%r14           // z2*m3
 	addq	%rax,%r10
 	adcq	%rdx,%r8
-	adcq	$0,%r11        ///
 
 	movq	24(\A), %rax
-	mulq	%r13
-
+	mulq	%r13           // z3*m2
 	addq	%rax,%r10
 	adcq	%rdx,%r8
-	adcq	$0,%r11
 
 	addq	40(\A),%r10
+	movq	%r10,%r13      // Z1
 	adcq	$0,%r8
-	adcq	$0,%r11
-	movq	%r10,%r13
-//	movq	%r10, %r12
-
-//	xorq	%r12, %r12       ///
+// i=6, j=3
 	movq	24(\A), %rax
-	mulq	%r14
-
+	mulq	%r14           // z3*m3
 	addq	%rax,%r8
 	adcq	%rdx,%r11
-//	adcq	$0,%r12          ///
 
 	addq	48(\A),%r8
-	movq	%r8,%r14
+	movq	%r8,%r14       // Z2
 	adcq	$0,%r11
-//	adcq	$0,%r12          ///
-//	movq	%r8, %r13
-
-//	xorq	%r8, %r8       ///
 
 	addq	56(\A),%r11
-	movq	%r11,%rcx
-//	adcq	$0,%r10		/// Could it have a carry?
-//	adcq	$0,%r8          ///
+	movq	%r11,%rcx      // Z3 
 
 	movq	P0,%rax
 	subq	%rax,%r9
@@ -276,16 +239,17 @@
 	sbbq	%rax,%r8
 	movq	P3,%rax
 	sbbq	%rax,%r11
-	cmovnc	%r9,%r12
-	cmovnc	%r10,%r13
-	cmovnc	%r8,%r14
-	cmovnc	%r11,%rcx
+	cmovnc	%r9,%r12       
 	movq	%r12,0(\C)
+	cmovnc	%r10,%r13
 	movq	%r13,8(\C)
+	cmovnc	%r8,%r14
 	movq	%r14,16(\C)
+	cmovnc	%r11,%rcx
 	movq	%rcx,24(\C)
 .endm
 
+/* Integer multiplication, comba, optimized for BN254 */
 .macro FP_MULN_LOW C, R0, R1, R2, A0, A1, A2, A3, B0, B1, B2, B3
 	movq \A0,%rax
 	mulq \B0
@@ -326,13 +290,14 @@
 	adcq %rdx,\R2
 	adcq $0,\R0
 
-	xorq \R1,\R1
+//	xorq \R1,\R1
 	movq \A0,%rax
 	mulq \B3
 	addq %rax,\R2
 	adcq %rdx,\R0
-	adcq $0,\R1
+//	adcq $0,\R1
 
+	xorq \R1,\R1
 	movq \A1,%rax
 	mulq \B2
 	addq %rax,\R2
@@ -352,27 +317,27 @@
 	adcq %rdx,\R0
 	adcq $0,\R1
 
-	xorq \R2,\R2
 	movq \A1,%rax
 	mulq \B3
 	addq %rax,\R0
 	adcq %rdx,\R1
-	adcq $0,\R2
-
-	movq \A2,%rax
-	mulq \B2
-	addq %rax,\R0
-	adcq %rdx,\R1
-	adcq $0,\R2
+//	adcq $0,\R2
 
 	movq \A3,%rax
 	mulq \B1
+	addq %rax,\R0
+	adcq %rdx,\R1
+//	adcq $0,\R2
+
+	xorq \R2,\R2
+	movq \A2,%rax
+	mulq \B2
 	addq %rax,\R0
 	movq \R0,32(\C)
 	adcq %rdx,\R1
 	adcq $0,\R2
 
-	xorq \R0,\R0
+//	xorq \R0,\R0
 	movq \A2,%rax
 	mulq \B3
 	addq %rax,\R1
@@ -383,12 +348,13 @@
 	addq %rax,\R1
 	movq \R1,40(\C)
 	adcq %rdx,\R2
-	adcq $0,\R0
+//	adcq $0,\R0
 
 	movq \A3,%rax
 	mulq \B3
 	addq %rax,\R2
 	movq \R2,48(\C)
-	adcq %rdx,\R0
-	movq \R0,56(\C)
+//	adcq %rdx,\R0
+	adcq $0,%rdx
+	movq %rdx,56(\C)
 .endm

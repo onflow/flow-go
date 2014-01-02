@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2012 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -77,6 +77,8 @@ fp2_mulm_low:
 	subq $128, %rsp
 
 	/* rsp[24..31] = t2 = t0 + t4 = (a0 * b0) + (a1 * b1). */
+	xorq	%rdx, %rdx
+	xorq	%rsi, %rsi
 	movq	0(%rsp), %r8
 	addq	64(%rsp), %r8
 	movq	%r8, 192(%rsp)
@@ -85,35 +87,43 @@ fp2_mulm_low:
 		adcq	(64+\i)(%rsp), %r8
 		movq	%r8, (192+\i)(%rsp)
 	.endr
-
-	/* rsp[0..8] = t1 = (a0 * a1) + u^2 * (a1 * b1). */
+	xorq	%rax,%rax
+	xorq	%rcx,%rcx
 	movq	0(%rsp), %r8
 	subq	64(%rsp), %r8
 	movq	%r8, 0(%rsp)
-	.irp i, 8, 16, 24, 32, 40, 48, 56
+	.irp i, 8, 16, 24
 		movq	\i(%rsp), %r8
 		sbbq	(64+\i)(%rsp), %r8
 		movq	%r8, \i(%rsp)
 	.endr
-	movq	$0, %r12
-	movq	$0, %r13
-	movq	$0, %r14
-	movq	$0, %r15
-	movq    P0,%r8
-    movq    P1,%r9
-    movq    P2,%r10
-    movq    P3,%r11
-    cmovc   %r8, %r12
-    cmovc   %r9, %r13
-    cmovc   %r10, %r14
-    cmovc   %r11, %r15
-   	addq    %r12,32(%rsp)
-	adcq    %r13,40(%rsp)
-	adcq    %r14,48(%rsp)
-	adcq    %r15,56(%rsp)
+	movq    32(%rsp), %r8
+	sbbq    96(%rsp), %r8
+	movq    40(%rsp), %r9
+	sbbq    104(%rsp), %r9
+	movq    48(%rsp), %r10
+	sbbq    112(%rsp), %r10
+	movq    56(%rsp), %r11
+	sbbq    120(%rsp), %r11
+
+	movq	P0, %r12
+	cmovc 	%r12, %rax
+	movq	P1, %r12
+	cmovc 	%r12, %rcx
+	movq	P2, %r12
+	cmovc 	%r12, %rdx
+	movq	P3, %r12
+	cmovc 	%r12, %rsi
+    addq	%rax, %r8
+	movq	%r8, 32(%rsp)
+    adcq	%rcx, %r9
+	movq	%r9, 40(%rsp)
+    adcq	%rdx, %r10
+	movq	%r10, 48(%rsp)
+    adcq	%rsi, %r11
+	movq	%r11, 56(%rsp)
 
 	FP_RDCN_LOW %rdi, %rsp
-
 	/* rsp[0..8] = t4 = t3 - t2. */
 	movq	128(%rsp), %r8
 	subq	192(%rsp), %r8
@@ -185,6 +195,8 @@ fp2_muln_low:
 	subq $128, %rsp
 
 	/* rsp[24..31] = t2 = t0 + t4 = (a0 * b0) + (a1 * b1) */
+	xorq	%rdx, %rdx
+	xorq	%rsi, %rsi
 	movq	0(%rsp), %r8
 	addq	64(%rsp), %r8
 	movq	8(%rsp), %r9
@@ -227,29 +239,41 @@ fp2_muln_low:
 	movq	184(%rsp), %rcx
 	sbbq	%r15, %rcx
 	movq	%rcx, 8*DV_DIGS+56(%rdi)
-
-	/* rsp[0..8] = t1 = (a0 * a1) + u^2 * (a1 * b1). */
+	xorq	%rax,%rax
+	xorq	%rcx,%rcx
 	movq	0(%rsp), %r8
 	subq	64(%rsp), %r8
 	movq	%r8, 0(%rdi)
-	.irp i, 8, 16, 24, 32, 40, 48, 56
+	.irp i, 8, 16, 24
 		movq	\i(%rsp), %r8
 		sbbq	(64+\i)(%rsp), %r8
 		movq	%r8, \i(%rdi)
 	.endr
-	movq	$0, %r12
-	movq    P0,%r8
-	movq    P1,%r9
-	movq    P2,%r10
-	movq    P3,%r11
-	cmovnc  %r12, %r8
-	cmovnc  %r12, %r9
-	cmovnc  %r12, %r10
-	cmovnc  %r12, %r11
-   	addq    %r8,32(%rdi)
-	adcq    %r9,40(%rdi)
-	adcq    %r10,48(%rdi)
-	adcq    %r11,56(%rdi)
+	movq    32(%rsp), %r8
+	sbbq    96(%rsp), %r8
+	movq    40(%rsp), %r9
+	sbbq    104(%rsp), %r9
+	movq    48(%rsp), %r10
+	sbbq    112(%rsp), %r10
+	movq    56(%rsp), %r11
+	sbbq    120(%rsp), %r11
+
+	movq	P0, %r12
+	cmovc 	%r12, %rax
+	movq	P1, %r12
+	cmovc 	%r12, %rcx
+	movq	P2, %r12
+	cmovc 	%r12, %rdx
+	movq	P3, %r12
+	cmovc 	%r12, %rsi
+    addq	%rax, %r8
+	movq	%r8, 32(%rdi)
+    adcq	%rcx, %r9
+	movq	%r9, 40(%rdi)
+    adcq	%rdx, %r10
+	movq	%r10, 48(%rdi)
+    adcq	%rsi, %r11
+	movq	%r11, 56(%rdi)
 
 	addq $256, %rsp
 	pop %rbp
@@ -348,10 +372,10 @@ fp2_mulc_low:
 
 	/* rsp[0..8] = t1 = (a0 * a1) + u^2 * (a1 * b1) */
 	movq    NP40, %rax
-    movq    NP41, %r8
-    movq    NP42, %r9
-    movq    NP43, %r10
-    movq    NP44, %r11
+	movq    NP41, %r8
+	movq    NP42, %r9
+	movq    NP43, %r10
+	movq    NP44, %r11
 	movq    24(%rsp), %rcx
 	addq    %rcx, %rax
 	movq    32(%rsp), %rcx
@@ -363,25 +387,25 @@ fp2_mulc_low:
 	movq    56(%rsp), %rcx
 	adcq    %rcx, %r11
 
-    movq    0(%rsp), %rcx
-    subq    64(%rsp), %rcx
-    movq    %rcx, 0(%rdi)
-    movq    8(%rsp), %rcx
-    sbbq    72(%rsp), %rcx
-    movq    %rcx, 8(%rdi)
-    movq    16(%rsp), %rcx
-    sbbq    80(%rsp), %rcx
-    movq    %rcx, 16(%rdi)
-    sbbq    88(%rsp), %rax
-    movq    %rax, 24(%rdi)
-    sbbq    96(%rsp), %r8
-    movq    %r8, 32(%rdi)
-    sbbq    104(%rsp), %r9
-    movq    %r9, 40(%rdi)
-    sbbq    112(%rsp), %r10
-    movq    %r10, 48(%rdi)
-    sbbq    120(%rsp), %r11
-    movq    %r11, 56(%rdi)
+	movq    0(%rsp), %rcx
+	subq    64(%rsp), %rcx
+	movq    %rcx, 0(%rdi)
+	movq    8(%rsp), %rcx
+	sbbq    72(%rsp), %rcx
+	movq    %rcx, 8(%rdi)
+	movq    16(%rsp), %rcx
+	sbbq    80(%rsp), %rcx
+   	movq    %rcx, 16(%rdi)
+	sbbq    88(%rsp), %rax
+	movq    %rax, 24(%rdi)
+	sbbq    96(%rsp), %r8
+	movq    %r8, 32(%rdi)
+	sbbq    104(%rsp), %r9
+	movq    %r9, 40(%rdi)
+	sbbq    112(%rsp), %r10
+	movq    %r10, 48(%rdi)
+	sbbq    120(%rsp), %r11
+	movq    %r11, 56(%rdi)
 
 	addq $256, %rsp
 	pop %rbp

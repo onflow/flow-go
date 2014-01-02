@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2012 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -31,7 +31,7 @@
  * Inputs: rdi = c, rsi = a
  * Output: c = a * b
  */
-fp2_sqrm_low:
+ fp2_sqrm_low:
 	push %r12
 	push %r13
 	push %r14
@@ -56,17 +56,17 @@ fp2_sqrm_low:
 	/* (r15, r14, r3, r12) = t1 = a0 - a1. */
 	movq	0(%rsi), %r12
 	subq	32(%rsi), %r12
+	movq	$0, %rax            ////////try it on ib (w/o interleaving)
 	movq	8(%rsi), %r13
 	sbbq	40(%rsi), %r13
+	movq	$0, %rcx
 	movq	16(%rsi), %r14
 	sbbq	48(%rsi), %r14
+	movq	$0, %rdx
 	movq	24(%rsi), %r15
 	sbbq	56(%rsi), %r15
-
-	movq	$0, %rax
-	movq	$0, %rcx
-	movq	$0, %rdx
 	movq	$0, %r11
+
 	movq	P0,%r8
 	cmovc	%r8, %rax
 	movq	P1,%r9
@@ -76,10 +76,10 @@ fp2_sqrm_low:
 	movq	P3,%r9
 	cmovc	%r9, %r11
 
-    addq	%rax,%r12
-    adcq	%rcx,%r13
-    adcq	%rdx,%r14
-    adcq	%r11,%r15
+	addq	%rax,%r12
+	adcq	%rcx,%r13
+	adcq	%rdx,%r14
+	adcq	%r11,%r15
 
 	/* c0 = a0^2 + b_0^2 * u^2. */
 	FP_MULN_LOW %rsp, %r8, %r9, %r10, 64(%rsp), 72(%rsp), 80(%rsp), 88(%rsp), %r12, %r13, %r14, %r15
@@ -105,6 +105,7 @@ fp2_sqrm_low:
 	FP_RDCN_LOW %rdi, %rsp
 
 	addq $96, %rsp
+
 	pop %r15
 	pop %r14
 	pop %r13
@@ -163,7 +164,6 @@ fp2_sqrn_low:
 
 	/* c0 = a0^2 + b_0^2 * u^2. */
 	FP_MULN_LOW %rdi, %r8, %r9, %r10, 64(%rsp), 72(%rsp), 80(%rsp), 88(%rsp), %r12, %r13, %r14, %r15
-	//FP_RDCN_LOW %rdi, %rsp
 
 	/* (r11, r10, r9, r8) = t2 = 2 * a0. */
 	movq	0(%rsi), %r8
@@ -181,10 +181,9 @@ fp2_sqrn_low:
 
 	addq	$(8*DV_DIGS), %rdi
 	FP_MULN_LOW %rdi, %r12, %r13, %r14, 64(%rsp), 72(%rsp), 80(%rsp), 88(%rsp), 32(%rsi), 40(%rsi), 48(%rsi), 56(%rsi)
-	//addq	$32, %rdi
-	//FP_RDCN_LOW %rdi, %rsp
 
 	addq $96, %rsp
+
 	pop %r15
 	pop %r14
 	pop %r13

@@ -1,6 +1,6 @@
 /*
  * RELIC is an Efficient LIbrary for Cryptography
- * Copyright (C) 2007-2012 RELIC Authors
+ * Copyright (C) 2007-2014 RELIC Authors
  *
  * This file is part of RELIC. RELIC is legal property of its developers,
  * whose names are not listed here. Please refer to the COPYRIGHT file
@@ -356,9 +356,8 @@ fp_hlvm_low:
 	movq	P1, %r9
 	movq	P2, %r10
 	movq	P3, %r11
-  	movq 	$1,%rax
   	movq 	0(%rsi),%rcx
-  	andq 	%rcx,%rax
+  	test 	$1,%rcx
 	cmovz	%rdx,%r8
 	cmovz	%rdx,%r9
 	cmovz	%rdx,%r10
@@ -372,14 +371,14 @@ fp_hlvm_low:
 	movq	24(%rsi), %rdx
 	adcq	%rdx, %r11
 
-  	rcrq 	$1,%r11
-  	rcrq 	$1,%r10
-  	rcrq 	$1,%r9
-  	rcrq 	$1,%r8
-  	movq 	%r11,24(%rdi)
-  	movq 	%r10,16(%rdi)
-  	movq 	%r9,8(%rdi)
+    shrd    $1, %r9, %r8
   	movq 	%r8,0(%rdi)
+    shrd    $1, %r10, %r9
+  	movq 	%r9,8(%rdi)
+    shrd    $1, %r11, %r10
+  	movq 	%r10,16(%rdi)
+    shr     $1, %r11
+  	movq 	%r11,24(%rdi)
 	ret
 
 fp_hlvd_low:
@@ -388,9 +387,8 @@ fp_hlvd_low:
 	movq	P1, %r9
 	movq	P2, %r10
 	movq	P3, %r11
-  	movq 	$1,%rax
   	movq 	0(%rdi),%rcx
-  	andq 	%rcx,%rax
+  	test 	$1,%rcx
 	cmovz	%rdx,%r8
 	cmovz	%rdx,%r9
 	cmovz	%rdx,%r10
@@ -412,20 +410,20 @@ fp_hlvd_low:
 	movq	56(%rdi), %rsi
 	adcq	$0, %rsi
 
-  	rcrq 	$1,%rsi
-  	rcrq 	$1,%rdx
-  	rcrq 	$1,%rcx
-  	rcrq 	$1,%rax
-  	rcrq 	$1,%r11
-  	rcrq 	$1,%r10
-  	rcrq 	$1,%r9
-  	rcrq 	$1,%r8
-  	movq 	%rsi,56(%rdi)
-  	movq 	%rdx,48(%rdi)
-  	movq 	%rcx,40(%rdi)
-  	movq 	%rax,32(%rdi)
-  	movq 	%r11,24(%rdi)
-  	movq 	%r10,16(%rdi)
-  	movq 	%r9,8(%rdi)
+	shrd    $1, %r9, %r8
+	shrd    $1, %r10, %r9
+	shrd    $1, %r11, %r10
   	movq 	%r8,0(%rdi)
+	shrd    $1, %rax, %r11
+  	movq 	%r9,8(%rdi)
+	shrd    $1, %rcx, %rax
+  	movq 	%r10,16(%rdi)
+	shrd    $1, %rdx, %rcx
+  	movq 	%r11,24(%rdi)
+	shrd    $1, %rsi, %rdx
+  	movq 	%rax,32(%rdi)
+	shr 	$1, %rsi
+  	movq 	%rcx,40(%rdi)
+  	movq 	%rdx,48(%rdi)
+  	movq 	%rsi,56(%rdi)
 	ret

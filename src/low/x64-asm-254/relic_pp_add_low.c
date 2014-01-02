@@ -80,8 +80,3 @@ void fp3_dblm_low(fp3_t c, fp3_t a) {
 	fp_dblm_low(c[1], a[1]);
 	fp_dblm_low(c[2], a[2]);
 }
-
-void fp2_dbln_low(fp2_t c, fp2_t a) {
-	fp_dbln_low(c[0], a[0]);
-	fp_dbln_low(c[1], a[1]);
-}
