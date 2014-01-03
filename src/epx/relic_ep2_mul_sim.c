@@ -119,7 +119,6 @@ static void ep2_mul_sim_ordin(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l,
 			}
 		}
 		for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
-			printf("liberado %d", i);
 			ep2_free(t1[i]);
 		}
 	}
