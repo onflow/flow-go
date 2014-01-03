@@ -110,9 +110,15 @@ static void pp_mil_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, bn_t a) {
 		fp_set_dig(r[0][0][0], 1);
 		ep2_copy(t, q);
 
-		ep_neg(_p, p);
-		fp_addm_low(_p->z, _p->x, _p->x);
-		fp_addm_low(_p->z, _p->z, _p->x);
+		/* Precomputing. */
+#if EP_ADD == BASIC
+		fp_copy(_p->x, p->x);
+		fp_neg(_p->y, p->y);
+#else
+		fp_neg(_p->y, p->y);
+		fp_add(_p->x, p->x, p->x);
+		fp_add(_p->x, _p->x, p->x);
+#endif
 
 		pp_dbl_k12(r, t, t, _p);
 		if (bn_test_bit(a, bn_bits(a) - 2)) {
@@ -167,11 +173,16 @@ static void pp_mil_sps_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, int *s, int len) 
 		fp12_zero(r);
 		fp_set_dig(r[0][0][0], 1);
 		ep2_copy(t, q);
-
-		ep_neg(_p, p);
-		fp_addm_low(_p->z, _p->x, _p->x);
-		fp_addm_low(_p->z, _p->z, _p->x);
 		ep2_neg(_q, q);
+
+#if EP_ADD == BASIC
+		fp_copy(_p->x, p->x);
+		fp_neg(_p->y, p->y);
+#else
+		fp_neg(_p->y, p->y);
+		fp_add(_p->x, p->x, p->x);
+		fp_add(_p->x, _p->x, p->x);
+#endif
 
 		pp_dbl_k12(r, t, t, _p);
 		if (s[len - 2] > 0) {

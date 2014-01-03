@@ -539,10 +539,16 @@ static int doubling12(void) {
 			ep2_rand(r);
 			fp12_zero(e1);
 			fp12_zero(e2);
-			pp_dbl_k12(e1, r, q, p);
-			pp_exp_k12(e1, e1);
+			fp_neg(p->y, p->y);
 			pp_dbl_k12_basic(e2, r, q, p);
 			pp_exp_k12(e2, e2);
+#if EP_ADD == PROJC
+			/* Precompute. */
+			fp_dbl(p->z, p->x);
+			fp_add(p->x, p->z, p->x);
+#endif
+			pp_dbl_k12(e1, r, q, p);
+			pp_exp_k12(e1, e1);			
 			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 #endif
@@ -554,10 +560,18 @@ static int doubling12(void) {
 			ep2_rand(r);
 			fp12_zero(e1);
 			fp12_zero(e2);
-			pp_dbl_k12(e1, r, q, p);
-			pp_exp_k12(e1, e1);
+			/* Precompute. */
+			fp_neg(p->y, p->y);
+			fp_dbl(p->z, p->x);
+			fp_add(p->x, p->z, p->x);
 			pp_dbl_k12_projc(e2, r, q, p);
 			pp_exp_k12(e2, e2);
+#if EP_ADD == BASIC
+			/* Revert precomputing. */
+			fp_hlv(p->x, p->z);
+#endif
+			pp_dbl_k12(e1, r, q, p);
+			pp_exp_k12(e1, e1);
 			TEST_ASSERT(fp12_cmp(e1, e2) == CMP_EQ, end);
 		} TEST_END;
 

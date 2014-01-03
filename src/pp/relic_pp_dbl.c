@@ -260,11 +260,9 @@ void pp_dbl_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 			/* l11 = E - B. */
 			fp2_sub(l[one][one], t3, t1);
 
-			/* l10 = 3 * t0 * xp. */
-			fp_add(l[one][zero][0], p->x, p->x);
-			fp_add(l[one][zero][0], l[one][zero][0], p->x);
-			fp_mul(l[one][zero][1], l[one][zero][0], t0[1]);
-			fp_mul(l[one][zero][0], l[one][zero][0], t0[0]);
+			/* l10 = (3 * xp) * t0. */
+			fp_mul(l[one][zero][0], p->x, t0[0]);
+			fp_mul(l[one][zero][1], p->x, t0[1]);
 
 			/* l00 = H * (-yp). */
 			fp_mul(l[zero][zero][0], t2[0], p->y);
@@ -319,11 +317,9 @@ void pp_dbl_k12_projc_basic(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 			/* l11 = D - B. */
 			fp2_sub(l[one][one], t3, t1);
 
-			/* l10 = 3 * A * xp. */
-			fp_add(l[one][zero][0], p->x, p->x);
-			fp_add(l[one][zero][0], l[one][zero][0], p->x);
-			fp_mul(l[one][zero][1], l[one][zero][0], t0[1]);
-			fp_mul(l[one][zero][0], l[one][zero][0], t0[0]);
+			/* l10 = (3 * xp) * A. */
+			fp_mul(l[one][zero][0], p->x, t0[0]);
+			fp_mul(l[one][zero][1], p->x, t0[1]);
 
 			/* l00 = F * (-yp). */
 			fp_mul(l[zero][zero][0], t5[0], p->y);
@@ -515,11 +511,9 @@ void pp_dbl_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 			/* l11 = E - B. */
 			fp2_sub(l[1][1], t2, t1);
 
-			/* l10 = 3 * t0 * xp. */
-			fp_add(l[one][zero][0], p->x, p->x);
-			fp_add(l[one][zero][0], l[one][zero][0], p->x);
-			fp_mul(l[one][zero][1], l[one][zero][0], t0[1]);
-			fp_mul(l[one][zero][0], l[one][zero][0], t0[0]);
+			/* l10 = (3 * xp) * t0. */
+			fp_mul(l[one][zero][0], p->x, t0[0]);
+			fp_mul(l[one][zero][1], p->x, t0[1]);
 
 			/* l01 = F * (-yp). */
 			fp_mul(l[zero][zero][0], t3[0], p->y);
@@ -574,11 +568,9 @@ void pp_dbl_k12_projc_lazyr(fp12_t l, ep2_t r, ep2_t q, ep_t p) {
 			/* l00 = D - B. */
 			fp2_sub(l[one][one], t3, t1);
 
-			/* l10 = 3A * xp */
-			fp_add(l[one][zero][0], p->x, p->x);
-			fp_add(l[one][zero][0], l[one][zero][0], p->x);
-			fp_mul(l[one][zero][1], l[one][zero][0], t0[1]);
-			fp_mul(l[one][zero][0], l[one][zero][0], t0[0]);
+			/* l10 = (3 * xp) * A. */
+			fp_mul(l[one][zero][0], p->x, t0[0]);
+			fp_mul(l[one][zero][1], p->x, t0[1]);
 
 			/* l01 = F * (-yp). */
 			fp_mul(l[zero][zero][0], t5[0], p->y);
