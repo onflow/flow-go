@@ -102,11 +102,7 @@ void fp4_sqr_unr(dv2_t c, dv2_t d, fp2_t a, fp2_t b) {
 
 		/* c = a^2  + b^2 * E. */
 		fp2_norh_low(c, u1);
-#ifdef FP_SPACE
-		fp2_addd_low(c, c, u0);
-#else
 		fp2_addc_low(c, c, u0);
-#endif
 
 		/* d = (a + b)^2 - a^2 - b^2 = 2 * a * b. */
 		fp2_addc_low(u1, u1, u0);
@@ -585,12 +581,9 @@ void fp12_sqr_pck_lazyr(fp12_t c, fp12_t a) {
 		fp2_addm_low(c[1][0], t0, t1);
 
 		fp2_sqrn_low(u1, a[0][2]);
-#ifdef FP_SPACE
-		fp2_addd_low(u4, u0, u4);
-#else
 		fp2_addc_low(u4, u0, u4);
-#endif
 		fp2_rdcn_low(t0, u4);
+		
 		fp2_subm_low(t1, t0, a[0][2]);
 		fp2_dblm_low(t1, t1);
 		fp2_norh_low(u4, u1);

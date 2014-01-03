@@ -179,11 +179,7 @@ inline void fp6_mul_unr(dv6_t c, fp6_t a, fp6_t b) {
 #endif
 		fp2_muln_low(u3, t0, t1);
 		fp2_subc_low(u3, u3, c[2]);
-#ifdef FP_SPACE
-		fp2_addd_low(c[2], u3, u1);
-#else
 		fp2_addc_low(c[2], u3, u1);
-#endif
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
