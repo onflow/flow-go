@@ -31,7 +31,7 @@
 
 #include "relic_core.h"
 #include "relic_pp_low.h"
-#undef FP_SPACE
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
@@ -149,7 +149,7 @@ inline void fp6_mul_unr(dv6_t c, fp6_t a, fp6_t b) {
 		/* t2 (c_0) = v0 + E((a_1 + a_2)(b_1 + b_2) - v1 - v2) */
 		fp2_muln_low(u3, t0, t1);
 		fp2_subc_low(u3, u3, c[0]);
-		fp2_nord_low(c[0], u3);
+		fp2_norh_low(c[0], u3);
 		fp2_addc_low(c[0], c[0], u0);
 
 		/* c_1 = (a_0 + a_1)(b_0 + b_1) - v0 - v1 + Ev2 */
@@ -164,7 +164,7 @@ inline void fp6_mul_unr(dv6_t c, fp6_t a, fp6_t b) {
 #endif
 		fp2_muln_low(u3, t0, t1);
 		fp2_subc_low(u3, u3, c[1]);
-		fp2_nord_low(c[2], u2);
+		fp2_norh_low(c[2], u2);
 		fp2_addc_low(c[1], u3, c[2]);
 
 		/* c_2 = (a_0 + a_2)(b_0 + b_2) - v0 + v1 - v2 */
