@@ -73,6 +73,12 @@ static void copy(void) {
 		BENCH_ADD(dv_copy_cond(a, b, DV_DIGS, 1));
 	} BENCH_END;
 
+	BENCH_BEGIN("dv_swap_cond") {
+		rand_bytes((uint8_t *)a, DV_DIGS * sizeof(dig_t));
+		rand_bytes((uint8_t *)b, DV_DIGS * sizeof(dig_t));
+		BENCH_ADD(dv_swap_cond(a, b, DV_DIGS, 1));
+	} BENCH_END;
+
 	BENCH_BEGIN("dv_cmp_const") {
 		rand_bytes((uint8_t *)a, DV_DIGS * sizeof(dig_t));
 		rand_bytes((uint8_t *)b, DV_DIGS * sizeof(dig_t));

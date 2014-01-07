@@ -107,7 +107,7 @@ static int copy(void) {
 		}
 		TEST_END;
 
-		TEST_BEGIN("conditional and comparison are consistent") {
+		TEST_BEGIN("conditional copy and comparison are consistent") {
 			rand_bytes((uint8_t *)a, DV_DIGS * sizeof(dig_t));
 			rand_bytes((uint8_t *)b, DV_DIGS * sizeof(dig_t));
 			dv_copy_cond(a, b, DV_DIGS, 0);
@@ -126,6 +126,59 @@ static int copy(void) {
 	return code;
 }
 
+static int swap(void) {
+	dv_t a, b, c, d;
+	int code = STS_ERR;
+
+	dv_null(a);
+	dv_null(b);
+	dv_null(c);
+	dv_null(d);
+
+	TRY {
+		dv_new(a);
+		dv_new(b);
+		dv_new(c);
+		dv_new(d);
+
+		TEST_BEGIN("conditional swap and copy are consistent") {
+			rand_bytes((uint8_t *)a, DV_DIGS * sizeof(dig_t));
+			rand_bytes((uint8_t *)b, DV_DIGS * sizeof(dig_t));
+			dv_copy(c, a, DV_DIGS);
+			dv_swap_cond(a, b, DV_DIGS, 1);
+			TEST_ASSERT(dv_cmp_const(c, b, DV_DIGS) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("conditional swap and comparison are consistent") {
+			rand_bytes((uint8_t *)a, DV_DIGS * sizeof(dig_t));
+			rand_bytes((uint8_t *)b, DV_DIGS * sizeof(dig_t));
+			dv_copy(c, a, DV_DIGS);
+			dv_copy(d, b, DV_DIGS);
+			dv_swap_cond(a, b, DV_DIGS, 0);
+			TEST_ASSERT(dv_cmp_const(c, a, DV_DIGS) == CMP_EQ, end);
+			TEST_ASSERT(dv_cmp_const(d, b, DV_DIGS) == CMP_EQ, end);
+			TEST_ASSERT(dv_cmp_const(c, b, DV_DIGS) == CMP_NE, end);
+			TEST_ASSERT(dv_cmp_const(d, a, DV_DIGS) == CMP_NE, end);
+			dv_swap_cond(a, b, DV_DIGS, 1);
+			TEST_ASSERT(dv_cmp_const(c, b, DV_DIGS) == CMP_EQ, end);
+			TEST_ASSERT(dv_cmp_const(d, a, DV_DIGS) == CMP_EQ, end);
+			TEST_ASSERT(dv_cmp_const(c, a, DV_DIGS) == CMP_NE, end);
+			TEST_ASSERT(dv_cmp_const(d, b, DV_DIGS) == CMP_NE, end);			
+		}
+		TEST_END;
+	} CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	dv_free(a);
+	dv_free(b);
+	dv_free(c);
+	dv_free(d);
+	return code;
+}
+
 int main(void) {
 	if (core_init() != STS_OK) {
 		core_clean();
@@ -140,6 +193,11 @@ int main(void) {
 	}
 
 	if (copy() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (swap() != STS_OK) {
 		core_clean();
 		return 1;
 	}
