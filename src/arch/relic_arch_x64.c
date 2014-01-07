@@ -46,6 +46,6 @@ void arch_clean(void) {
 ull_t arch_cycles(void) {
 	unsigned int hi, lo;
 	asm("rdtsc\n\t":"=a" (lo), "=d"(hi));
-	return ((unsigned long long) lo) | (((unsigned long long) hi) << 32);
+	return ((ull_t) lo) | (((ull_t) hi) << 32);
 }
 
