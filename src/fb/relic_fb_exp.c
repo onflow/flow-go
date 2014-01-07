@@ -58,7 +58,7 @@ void fb_exp_basic(fb_t c, const fb_t a, const bn_t b) {
 
 		for (i = l - 2; i >= 0; i--) {
 			fb_sqr(r, r);
-			if (bn_test_bit(b, i)) {
+			if (bn_get_bit(b, i)) {
 				fb_mul(r, r, a);
 			}
 		}

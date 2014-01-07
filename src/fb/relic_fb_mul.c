@@ -71,7 +71,7 @@ static void fb_mul_basic_imp(dig_t *c, const dig_t *a, const dig_t *b, int size)
 		for (i = 1; i <= (FB_DIGIT * size) - 1; i++) {
 			fb_lsh1_low(s, s);
 			fb_rdc(s, s);
-			if (fb_test_bit(a, i)) {
+			if (fb_get_bit(a, i)) {
 				fb_add(c, c, s);
 			}
 		}
@@ -286,7 +286,7 @@ void fb_mul_basic(fb_t c, const fb_t a, const fb_t b) {
 			 * than calling fb_lsh(). */
 			s[FB_DIGS] = fb_lsh1_low(s, s);
 			fb_rdc(s, s);
-			if (fb_test_bit(a, i)) {
+			if (fb_get_bit(a, i)) {
 				fb_add(t, t, s);
 			}
 		}

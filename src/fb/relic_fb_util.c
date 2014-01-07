@@ -108,25 +108,12 @@ int fb_is_zero(const fb_t a) {
 	return 1;
 }
 
-int fb_test_bit(const fb_t a, int bit) {
-	int d;
-	dig_t mask;
-
-	SPLIT(bit, d, bit, FB_DIG_LOG);
-
-	mask = ((dig_t)1) << bit;
-	return (a[d] & mask) != 0;
-}
-
 int fb_get_bit(const fb_t a, int bit) {
 	int d;
-	dig_t mask;
 
 	SPLIT(bit, d, bit, FB_DIG_LOG);
 
-	mask = (dig_t)1 << bit;
-
-	return ((a[d] & mask) >> bit);
+	return (a[d] >> bit) & 1;
 }
 
 void fb_set_bit(fb_t a, int bit, int value) {
