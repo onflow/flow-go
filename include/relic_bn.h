@@ -513,16 +513,7 @@ int bn_is_even(const bn_t a);
 int bn_bits(const bn_t a);
 
 /**
- * Tests the bit in the given position on a multiple precision integer.
- *
- * @param[in] a				- the multiple precision integer to test.
- * @param[in] bit			- the bit position.
- * @return 0 is the bit is zero, not zero otherwise.
- */
-int bn_test_bit(const bn_t a, int bit);
-
-/**
- * Reads the bit stored in the given position on a multiple precision integer.
+ * Returns the bit stored in the given position on a multiple precision integer.
  *
  * @param[in] a				- the multiple precision integer.
  * @param[in] bit			- the bit position to read.

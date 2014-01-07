@@ -179,7 +179,6 @@
 #undef bn_is_zero
 #undef bn_is_even
 #undef bn_bits
-#undef bn_test_bit
 #undef bn_get_bit
 #undef bn_set_bit
 #undef bn_ham
@@ -277,7 +276,6 @@
 #define bn_is_zero 	PREFIX(bn_is_zero)
 #define bn_is_even 	PREFIX(bn_is_even)
 #define bn_bits 	PREFIX(bn_bits)
-#define bn_test_bit 	PREFIX(bn_test_bit)
 #define bn_get_bit 	PREFIX(bn_get_bit)
 #define bn_set_bit 	PREFIX(bn_set_bit)
 #define bn_ham 	PREFIX(bn_ham)
@@ -441,7 +439,6 @@
 #undef fp_zero
 #undef fp_is_zero
 #undef fp_is_even
-#undef fp_test_bit
 #undef fp_get_bit
 #undef fp_set_bit
 #undef fp_set_dig
@@ -520,7 +517,6 @@
 #define fp_zero 	PREFIX(fp_zero)
 #define fp_is_zero 	PREFIX(fp_is_zero)
 #define fp_is_even 	PREFIX(fp_is_even)
-#define fp_test_bit 	PREFIX(fp_test_bit)
 #define fp_get_bit 	PREFIX(fp_get_bit)
 #define fp_set_bit 	PREFIX(fp_set_bit)
 #define fp_set_dig 	PREFIX(fp_set_dig)
@@ -663,7 +659,6 @@
 #undef fb_neg
 #undef fb_zero
 #undef fb_is_zero
-#undef fb_test_bit
 #undef fb_get_bit
 #undef fb_set_bit
 #undef fb_set_dig
@@ -737,7 +732,6 @@
 #define fb_neg 	PREFIX(fb_neg)
 #define fb_zero 	PREFIX(fb_zero)
 #define fb_is_zero 	PREFIX(fb_is_zero)
-#define fb_test_bit 	PREFIX(fb_test_bit)
 #define fb_get_bit 	PREFIX(fb_get_bit)
 #define fb_set_bit 	PREFIX(fb_set_bit)
 #define fb_set_dig 	PREFIX(fb_set_dig)

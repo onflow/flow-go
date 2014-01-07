@@ -565,15 +565,6 @@ void fb_zero(fb_t a);
 int fb_is_zero(const fb_t a);
 
 /**
- * Tests if the bit in a given position is non-zero on a binary field element.
- *
- * @param[in] a				- the binary field element to test.
- * @param[in] bit			- the bit position.
- * @return 0 is the bit is zero, not zero otherwise.
- */
-int fb_test_bit(const fb_t a, int bit);
-
-/**
  * Reads the bit stored in the given position on a binary field element.
  *
  * @param[in] a				- the binary field element.

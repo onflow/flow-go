@@ -588,15 +588,6 @@ int fp_is_zero(const fp_t a);
 int fp_is_even(const fp_t a);
 
 /**
- * Tests the bit in the given position on a multiple precision integer.
- *
- * @param[in] a				- the prime field element to test.
- * @param[in] bit			- the bit position.
- * @return 0 is the bit is zero, not zero otherwise.
- */
-int fp_test_bit(const fp_t a, int bit);
-
-/**
  * Reads the bit stored in the given position on a prime field element.
  *
  * @param[in] a				- the prime field element.

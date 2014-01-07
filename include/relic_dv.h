@@ -181,7 +181,7 @@ void dv_copy_cond(dig_t *c, const dig_t *a, int digits, dig_t cond);
 /**
  * Conditionally swap two digit vectors.
  *
- * @param[in,out] b			- the destination.
+ * @param[in,out] c			- the destination.
  * @paraim[in,out] a		- the source.
  * @param[in] digits		- the number of digits to copy.
  * @param[in] cond			- the condition to evaluate.
