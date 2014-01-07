@@ -148,7 +148,7 @@ static void bn_exp(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 		for (i = l - 2; i >= 0; i--) {
 			bn_sqr(t, t);
 			bn_mod(t, t, m);
-			if (bn_test_bit(b, i)) {
+			if (bn_get_bit(b, i)) {
 				bn_mul(t, t, a);
 				bn_mod(t, t, m);
 			}

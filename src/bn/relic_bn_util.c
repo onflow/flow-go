@@ -112,18 +112,6 @@ int bn_bits(const bn_t a) {
 	return bits + util_bits_dig(a->dp[a->used - 1]);
 }
 
-int bn_test_bit(const bn_t a, int bit) {
-	int d;
-
-	SPLIT(bit, d, bit, BN_DIG_LOG);
-
-	if (d >= a->used) {
-		return 0;
-	} else {
-		return (a->dp[d] & ((dig_t)1 << bit)) != 0;
-	}
-}
-
 int bn_get_bit(const bn_t a, int bit) {
 	int d;
 
@@ -132,7 +120,7 @@ int bn_get_bit(const bn_t a, int bit) {
 	if (d >= a->used) {
 		return 0;
 	} else {
-		return ((a->dp[d] & ((dig_t)1 << bit)) >> bit);
+		return (a->dp[d] >> bit) & (dig_t)1;
 	}
 }
 
@@ -156,9 +144,7 @@ int bn_ham(const bn_t a) {
 	int c = 0;
 
 	for (int i = 0; i < bn_bits(a); i++) {
-		if (bn_test_bit(a, i)) {
-			c++;
-		}
+		c += bn_get_bit(a, i);
 	}
 
 	return c;

@@ -314,12 +314,12 @@ void bn_rec_slw(uint8_t *win, int *len, const bn_t k, int w) {
 	i = l - 1;
 	j = 0;
 	while (i >= 0) {
-		if (!bn_test_bit(k, i)) {
+		if (!bn_get_bit(k, i)) {
 			i--;
 			win[j++] = 0;
 		} else {
 			s = MAX(i - w + 1, 0);
-			while (!bn_test_bit(k, s)) {
+			while (!bn_get_bit(k, s)) {
 				s++;
 			}
 			win[j++] = get_bits(k, s, i);
