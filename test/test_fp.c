@@ -160,11 +160,13 @@ static int util(void) {
 		TEST_END;
 
 		bits = 0;
-		TEST_BEGIN("bit setting and testing are consistent") {
+		TEST_BEGIN("bit setting and getting are consistent") {
 			fp_zero(a);
 			fp_set_bit(a, bits, 1);
-			TEST_ASSERT(fp_test_bit(a, bits), end);
-			bits = (bits + 1) % FP_BITS;
+			TEST_ASSERT(fp_get_bit(a, bits) == 1, end);
+			fp_set_bit(a, bits, 0);
+			TEST_ASSERT(fp_get_bit(a, bits) == 0, end);
+			bits = (bits + 1) % BN_BITS;
 		}
 		TEST_END;
 
