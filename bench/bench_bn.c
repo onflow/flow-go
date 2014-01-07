@@ -156,12 +156,6 @@ static void util(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("bn_test_bit") {
-		bn_rand(a, BN_POS, BN_BITS);
-		BENCH_ADD(bn_test_bit(a, BN_BITS / 2));
-	}
-	BENCH_END;
-
 	BENCH_BEGIN("bn_get_bit") {
 		bn_rand(a, BN_POS, BN_BITS);
 		BENCH_ADD(bn_get_bit(a, BN_BITS / 2));

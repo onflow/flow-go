@@ -87,15 +87,9 @@ static void util(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fb_test_bit") {
-		fb_rand(a);
-		BENCH_ADD(fb_test_bit(a, FB_DIGIT / 2));
-	}
-	BENCH_END;
-
 	BENCH_BEGIN("fb_get_bit") {
 		fb_rand(a);
-		BENCH_ADD(fb_test_bit(a, FB_DIGIT / 2));
+		BENCH_ADD(fb_get_bit(a, FB_DIGIT / 2));
 	}
 	BENCH_END;
 

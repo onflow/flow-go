@@ -81,15 +81,9 @@ static void util(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp_test_bit") {
-		fp_rand(a);
-		BENCH_ADD(fp_test_bit(a, FP_DIGIT / 2));
-	}
-	BENCH_END;
-
 	BENCH_BEGIN("fp_get_bit") {
 		fp_rand(a);
-		BENCH_ADD(fp_test_bit(a, FP_DIGIT / 2));
+		BENCH_ADD(fp_get_bit(a, FP_DIGIT / 2));
 	}
 	BENCH_END;
 
