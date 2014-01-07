@@ -170,7 +170,7 @@ void fp_param_get_sps(int *s, int *len) {
 				}
 				*len = bn_ham(a);
 				for (int i = 0, j = 0; j < bn_bits(a); j++) {
-					if (bn_test_bit(a, j)) {
+					if (bn_get_bit(a, j)) {
 						s[i++] = j;
 					}
 				}

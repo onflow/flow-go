@@ -53,7 +53,7 @@ void fp_exp_basic(fp_t c, const fp_t a, const bn_t b) {
 
 		for (i = l - 2; i >= 0; i--) {
 			fp_sqr(r, r);
-			if (bn_test_bit(b, i)) {
+			if (bn_get_bit(b, i)) {
 				fp_mul(r, r, a);
 			}
 		}

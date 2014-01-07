@@ -65,25 +65,12 @@ int fp_is_even(const fp_t a) {
 	return 0;
 }
 
-int fp_test_bit(const fp_t a, int bit) {
-	int d;
-	dig_t mask;
-
-	SPLIT(bit, d, bit, FP_DIG_LOG);
-
-	mask = ((dig_t)1) << bit;
-	return (a[d] & mask) != 0;
-}
-
 int fp_get_bit(const fp_t a, int bit) {
 	int d;
-	dig_t mask;
 
 	SPLIT(bit, d, bit, FP_DIG_LOG);
 
-	mask = (dig_t)1 << bit;
-
-	return ((a[d] & mask) >> bit);
+	return (a[d] >> bit) & 1;
 }
 
 void fp_set_bit(fp_t a, int bit, int value) {
