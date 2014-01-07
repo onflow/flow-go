@@ -86,14 +86,14 @@ void dv_copy_cond(dig_t *c, const dig_t *a, int digits, dig_t cond) {
 	}
 }
 
-void dv_swap_cond(dig_t *b, dig_t *a, int digits, dig_t cond) {
+void dv_swap_cond(dig_t *c, dig_t *a, int digits, dig_t cond) {
 	dig_t mask, t;
 
 	mask = -cond;
 	for (int i = 0; i < digits; i++) {
-		t = (a[i] ^ b[i]) & mask;
+		t = (a[i] ^ c[i]) & mask;
 		a[i] ^= t;
-		b[i] ^= t;
+		c[i] ^= t;
 	}	
 }
 

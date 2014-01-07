@@ -79,7 +79,7 @@ void bn_mxp_basic(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 		for (i = l - 2; i >= 0; i--) {
 			bn_sqr(r, r);
 			bn_mod(r, r, m, u);
-			if (bn_test_bit(b, i)) {
+			if (bn_get_bit(b, i)) {
 				bn_mul(r, r, t);
 				bn_mod(r, r, m, u);
 			}
@@ -203,8 +203,6 @@ void bn_mxp_slide(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 
 void bn_mxp_monty(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 	bn_t tab[2], u;
-	dig_t buf;
-	int bitcnt, digidx, j;
 
 	bn_null(tab[0]);
 	bn_null(tab[1]);
@@ -226,31 +224,16 @@ void bn_mxp_monty(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 		bn_copy(tab[1], a);
 #endif
 
-		/* Set initial mode and bitcnt, */
-		bitcnt = 1;
-		buf = 0;
-		digidx = b->used - 1;
-
-		for (;;) {
-			/* Grab next digit as required. */
-			if (--bitcnt == 0) {
-				/* If digidx == -1 we are out of digits so break. */
-				if (digidx == -1) {
-					break;
-				}
-				/* Read next digit and reset bitcnt. */
-				buf = b->dp[digidx--];
-				bitcnt = (int)BN_DIGIT;
+		for (int i = b->used - 1; i >= 0; i--) {
+			for (int j = BN_DIGIT - 1; j >= 0; j--) {
+				int k = (b->dp[i] >> j) & 0x01;
+				dv_swap_cond(tab[0]->dp, tab[1]->dp, BN_DIGS, k ^ 1);
+				bn_mul(tab[0], tab[0], tab[1]);
+				bn_mod(tab[0], tab[0], m, u);
+				bn_sqr(tab[1], tab[1]);
+				bn_mod(tab[1], tab[1], m, u);
+				dv_swap_cond(tab[0]->dp, tab[1]->dp, BN_DIGS, k ^ 1);
 			}
-
-			/* Grab the next msb from the exponent. */
-			j = (buf >> (BN_DIGIT - 1)) & 0x01;
-			buf <<= (dig_t)1;
-
-			bn_mul(tab[j ^ 1], tab[0], tab[1]);
-			bn_mod(tab[j ^ 1], tab[j ^ 1], m, u);
-			bn_sqr(tab[j], tab[j]);
-			bn_mod(tab[j], tab[j], m, u);
 		}
 
 #if BN_MOD == MONTY
