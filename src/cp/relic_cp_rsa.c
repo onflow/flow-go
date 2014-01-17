@@ -544,7 +544,7 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 					result = STS_ERR;
 				} else {
 					for (int i = m_len; i < 8 * k_len; i++) {
-						if (bn_test_bit(m, i) != 0) {
+						if (bn_get_bit(m, i) != 0) {
 							result = STS_ERR;
 						}
 					}

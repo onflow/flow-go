@@ -48,7 +48,7 @@ void fp2_exp(fp2_t c, fp2_t a, bn_t b) {
 
 		for (int i = bn_bits(b) - 2; i >= 0; i--) {
 			fp2_sqr(t, t);
-			if (bn_test_bit(b, i)) {
+			if (bn_get_bit(b, i)) {
 				fp2_mul(t, t, a);
 			}
 		}
@@ -157,7 +157,7 @@ void fp3_exp(fp3_t c, fp3_t a, bn_t b) {
 
 		for (int i = bn_bits(b) - 2; i >= 0; i--) {
 			fp3_sqr(t, t);
-			if (bn_test_bit(b, i)) {
+			if (bn_get_bit(b, i)) {
 				fp3_mul(t, t, a);
 			}
 		}
@@ -183,7 +183,7 @@ void fp6_exp(fp6_t c, fp6_t a, bn_t b) {
 
 		for (int i = bn_bits(b) - 2; i >= 0; i--) {
 			fp6_sqr(t, t);
-			if (bn_test_bit(b, i)) {
+			if (bn_get_bit(b, i)) {
 				fp6_mul(t, t, a);
 			}
 		}
@@ -212,7 +212,7 @@ void fp12_exp(fp12_t c, fp12_t a, bn_t b) {
 
 			for (int i = bn_bits(b) - 2; i >= 0; i--) {
 				fp12_sqr(t, t);
-				if (bn_test_bit(b, i)) {
+				if (bn_get_bit(b, i)) {
 					fp12_mul(t, t, a);
 				}
 			}
@@ -241,7 +241,7 @@ void fp12_exp_cyc(fp12_t c, fp12_t a, bn_t b) {
 
 			for (i = bn_bits(b) - 2; i >= 0; i--) {
 				fp12_sqr_cyc(t, t);
-				if (bn_test_bit(b, i)) {
+				if (bn_get_bit(b, i)) {
 					fp12_mul(t, t, a);
 				}
 			}
@@ -267,7 +267,7 @@ void fp12_exp_cyc(fp12_t c, fp12_t a, bn_t b) {
 			fp12_copy(t, a);
 			for (i = 1; i < bn_bits(b); i++) {
 				fp12_sqr_pck(t, t);
-				if (bn_test_bit(b, i)) {
+				if (bn_get_bit(b, i)) {
 					fp12_copy(u[j++], t);
 				}
 			}
@@ -586,7 +586,7 @@ void fp18_exp(fp18_t c, fp18_t a, bn_t b) {
 
 			for (int i = bn_bits(b) - 2; i >= 0; i--) {
 				fp18_sqr(t, t);
-				if (bn_test_bit(b, i)) {
+				if (bn_get_bit(b, i)) {
 					fp18_mul(t, t, a);
 				}
 			}
@@ -615,7 +615,7 @@ void fp18_exp_cyc(fp18_t c, fp18_t a, bn_t b) {
 
 			for (i = bn_bits(b) - 2; i >= 0; i--) {
 				fp18_sqr_cyc(t, t);
-				if (bn_test_bit(b, i)) {
+				if (bn_get_bit(b, i)) {
 					fp18_mul(t, t, a);
 				}
 			}
@@ -641,7 +641,7 @@ void fp18_exp_cyc(fp18_t c, fp18_t a, bn_t b) {
 			fp18_copy(t, a);
 			for (i = 1; i < bn_bits(b); i++) {
 				fp18_sqr_pck(t, t);
-				if (bn_test_bit(b, i)) {
+				if (bn_get_bit(b, i)) {
 					fp18_copy(u[j++], t);
 				}
 			}

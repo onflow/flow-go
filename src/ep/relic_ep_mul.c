@@ -285,7 +285,7 @@ void ep_mul_basic(ep_t r, const ep_t p, const bn_t k) {
 		ep_copy(t, p);
 		for (i = l - 2; i >= 0; i--) {
 			ep_dbl(t, t);
-			if (bn_test_bit(k, i)) {
+			if (bn_get_bit(k, i)) {
 				ep_add(t, t, p);
 			}
 		}
