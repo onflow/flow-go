@@ -140,7 +140,7 @@ void ep2_mul_fix_basic(ep2_t r, ep2_t *t, bn_t k) {
 	ep2_set_infty(r);
 
 	for (i = 0; i < l; i++) {
-		if (bn_test_bit(k, i)) {
+		if (bn_get_bit(k, i)) {
 			ep2_add(r, r, t[i]);
 		}
 	}
@@ -369,7 +369,7 @@ void ep2_mul_fix_combs(ep2_t r, ep2_t *t, bn_t k) {
 		p1 = p0--;
 		for (j = EP_DEPTH - 1; j >= 0; j--, p1 -= l) {
 			w = w << 1;
-			if (p1 < n0 && bn_test_bit(k, p1)) {
+			if (p1 < n0 && bn_get_bit(k, p1)) {
 				w = w | 1;
 			}
 		}
@@ -382,7 +382,7 @@ void ep2_mul_fix_combs(ep2_t r, ep2_t *t, bn_t k) {
 			p1 = p0--;
 			for (j = EP_DEPTH - 1; j >= 0; j--, p1 -= l) {
 				w = w << 1;
-				if (p1 < n0 && bn_test_bit(k, p1)) {
+				if (p1 < n0 && bn_get_bit(k, p1)) {
 					w = w | 1;
 				}
 			}
@@ -478,7 +478,7 @@ void ep2_mul_fix_combd(ep2_t r, ep2_t *t, bn_t k) {
 			p0 = p1;
 			for (j = EP_DEPTH - 1; j >= 0; j--, p0 -= d) {
 				w0 = w0 << 1;
-				if (p0 < n0 && bn_test_bit(k, p0)) {
+				if (p0 < n0 && bn_get_bit(k, p0)) {
 					w0 = w0 | 1;
 				}
 			}
@@ -487,7 +487,7 @@ void ep2_mul_fix_combd(ep2_t r, ep2_t *t, bn_t k) {
 			p0 = p1-- + e;
 			for (j = EP_DEPTH - 1; j >= 0; j--, p0 -= d) {
 				w1 = w1 << 1;
-				if (i + e < d && p0 < n0 && bn_test_bit(k, p0)) {
+				if (i + e < d && p0 < n0 && bn_get_bit(k, p0)) {
 					w1 = w1 | 1;
 				}
 			}

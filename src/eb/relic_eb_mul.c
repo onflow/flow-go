@@ -653,7 +653,7 @@ void eb_mul_basic(eb_t r, const eb_t p, const bn_t k) {
 		eb_copy(t, p);
 		for (i = l - 2; i >= 0; i--) {
 			eb_dbl(t, t);
-			if (bn_test_bit(k, i)) {
+			if (bn_get_bit(k, i)) {
 				eb_add(t, t, p);
 			}
 		}
@@ -733,7 +733,7 @@ void eb_mul_lodah(eb_t r, const eb_t p, const bn_t k) {
 			fb_mul(r2, x2, z1);
 			fb_add(r3, r1, r2);
 			fb_muln_low(r4, r1, r2);
-			if (bn_test_bit(k, i) == 1) {
+			if (bn_get_bit(k, i) == 1) {
 				fb_sqr(z1, r3);
 				fb_muln_low(r1, z1, p->x);
 				fb_addd_low(x1, r1, r4, 2 * FB_DIGS);

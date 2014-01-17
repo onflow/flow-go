@@ -45,7 +45,7 @@ void ep2_mul(ep2_t r, ep2_t p, bn_t k) {
 		ep2_new(t);
 		l = bn_bits(k);
 
-		if (bn_test_bit(k, l - 1)) {
+		if (bn_get_bit(k, l - 1)) {
 			ep2_copy(t, p);
 		} else {
 			ep2_set_infty(t);
@@ -53,7 +53,7 @@ void ep2_mul(ep2_t r, ep2_t p, bn_t k) {
 
 		for (i = l - 2; i >= 0; i--) {
 			ep2_dbl(t, t);
-			if (bn_test_bit(k, i)) {
+			if (bn_get_bit(k, i)) {
 				ep2_add(t, t, p);
 			}
 		}

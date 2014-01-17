@@ -62,7 +62,7 @@ void fb_slvn_low(dig_t *c, const dig_t *a) {
 	dv_copy(t, a, FB_DIGS);
 
 	for (i = (FB_BITS - 1)/2; i > 0; i--) {
-		if (fb_test_bit(t, i + i)) {
+		if (fb_get_bit(t, i + i)) {
 			SPLIT(b, d, i, FB_DIG_LOG);
 			t[d] ^= ((dig_t)1 << b);
 			s[d] ^= ((dig_t)1 << b);

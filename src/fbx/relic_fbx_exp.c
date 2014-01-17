@@ -48,7 +48,7 @@ void fb4_exp(fb4_t c, fb4_t a, bn_t b) {
 
 		for (int i = bn_bits(b) - 2; i >= 0; i--) {
 			fb4_sqr(t, t);
-			if (bn_test_bit(b, i)) {
+			if (bn_get_bit(b, i)) {
 				fb4_mul(t, t, a);
 			}
 		}

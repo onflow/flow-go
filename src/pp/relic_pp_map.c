@@ -69,7 +69,7 @@ static void pp_mil_k2(fp2_t r, ep_t t, ep_t p, ep_t q, bn_t a) {
 			fp2_sqr(r, r);
 			pp_dbl_k2(l, t, t, _q);
 			fp2_mul(r, r, l);
-			if (bn_test_bit(a, i)) {
+			if (bn_get_bit(a, i)) {
 				pp_add_k2(l, t, p, q);
 				fp2_mul(r, r, l);
 			}
@@ -121,7 +121,7 @@ static void pp_mil_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, bn_t a) {
 #endif
 
 		pp_dbl_k12(r, t, t, _p);
-		if (bn_test_bit(a, bn_bits(a) - 2)) {
+		if (bn_get_bit(a, bn_bits(a) - 2)) {
 			pp_add_k12(l, t, q, p);
 			fp12_mul_dxs(r, r, l);
 		}
@@ -129,7 +129,7 @@ static void pp_mil_k12(fp12_t r, ep2_t t, ep2_t q, ep_t p, bn_t a) {
 			fp12_sqr(r, r);
 			pp_dbl_k12(l, t, t, _p);
 			fp12_mul_dxs(r, r, l);
-			if (bn_test_bit(a, i)) {
+			if (bn_get_bit(a, i)) {
 				pp_add_k12(l, t, q, p);
 				fp12_mul_dxs(r, r, l);
 			}
@@ -245,7 +245,7 @@ static void pp_mil_lit_k12(fp12_t r, ep_t t, ep_t p, ep2_t q, bn_t a) {
 			fp12_sqr(r, r);
 			pp_dbl_lit_k12(l, t, t, q);
 			fp12_mul(r, r, l);
-			if (bn_test_bit(a, i)) {
+			if (bn_get_bit(a, i)) {
 				pp_add_lit_k12(l, t, p, q);
 				fp12_mul(r, r, l);
 			}
