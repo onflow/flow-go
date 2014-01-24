@@ -49,7 +49,7 @@
 #define RABIN_PAD_LEN		8
 
 /**
- * Byte used as padding unit in signatures.
+ * Byte used as padding unit in ciphertext.
  */
 #define RABIN_PAD			(0xFF)
 
@@ -113,7 +113,7 @@ int cp_rabin_enc(uint8_t *out, int *out_len, uint8_t *in, int in_len,
 
 	bn_size_bin(&size, pub->n);
 
-	if (in_len > (size - RABIN_PAD_LEN - 2)) {
+	if (in_len <= 0 || in_len > (size - RABIN_PAD_LEN - 2)) {
 		return STS_ERR;
 	}
 
@@ -160,7 +160,7 @@ int cp_rabin_dec(uint8_t *out, int *out_len, uint8_t *in, int in_len,
 	int size, result = STS_OK;
 	uint8_t pad;
 
-	if (in_len < 0 || in_len < RABIN_PAD_LEN) {
+	if (in_len < RABIN_PAD_LEN) {
 		return STS_ERR;
 	}
 
