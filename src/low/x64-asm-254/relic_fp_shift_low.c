@@ -62,10 +62,6 @@ void fp_lshd_low(dig_t *c, const dig_t *a, int digits) {
 	}
 }
 
-dig_t fp_rsh1_low(dig_t *c, const dig_t *a) {
-	return mpn_rshift(c, a, FP_DIGS, 1);
-}
-
 dig_t fp_rshb_low(dig_t *c, const dig_t *a, int bits) {
 	return mpn_rshift(c, a, FP_DIGS, bits);
 }
