@@ -139,7 +139,6 @@ int cp_phpe_dec(uint8_t *out, int out_len, uint8_t *in, int in_len, bn_t n,
 	bn_t l) {
 	bn_t c, u, s;
 	int size, result = STS_OK;
-	uint8_t pad;
 
 	bn_size_bin(&size, n);
 
@@ -180,9 +179,9 @@ int cp_phpe_dec(uint8_t *out, int out_len, uint8_t *in, int in_len, bn_t n,
 		result = STS_ERR;
 	}
 	FINALLY {
-		bn_free(m);
-		bn_free(t);
-		bn_free(z);
+		bn_free(c);
+		bn_free(u);
+		bn_free(s);
 	}
 
 	return result;
