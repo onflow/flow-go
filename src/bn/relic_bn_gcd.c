@@ -87,14 +87,18 @@ void bn_gcd_ext_basic(bn_t c, bn_t d, bn_t e, const bn_t a, const bn_t b) {
 	if (bn_is_zero(a)) {
 		bn_abs(c, b);
 		bn_zero(d);
-		bn_set_dig(e, 1);
+		if (e != NULL) {
+			bn_set_dig(e, 1);
+		}
 		return;
 	}
 
 	if (bn_is_zero(b)) {
 		bn_abs(c, a);
 		bn_set_dig(d, 1);
-		bn_zero(e);
+		if (e != NULL) {
+			bn_zero(e);
+		}
 		return;
 	}
 
