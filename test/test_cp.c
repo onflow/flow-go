@@ -116,8 +116,8 @@ static int rsa(void) {
 					end);
 			TEST_ASSERT(cp_rsa_ver(out, ol, in, il, 0, pub) == 1, end);
 			md_map(h, in, il);
-			TEST_ASSERT(cp_rsa_sig_basic(out, &ol, h, MD_LEN, 1,
-							prv) == STS_OK, end);
+			TEST_ASSERT(cp_rsa_sig_basic(out, &ol, h, MD_LEN, 1, prv) == STS_OK,
+					end);
 			TEST_ASSERT(cp_rsa_ver(out, ol, h, MD_LEN, 1, pub) == 1, end);
 		} TEST_END;
 #endif
@@ -189,7 +189,7 @@ static int rabin(void) {
 	return code;
 }
 
-static int bdpe(void) {
+static int benaloh(void) {
 	int code = STS_ERR;
 	bdpe_t pub, prv;
 	bn_t a, b;
@@ -250,6 +250,92 @@ static int bdpe(void) {
 	bn_free(b);
 	bdpe_free(pub);
 	bdpe_free(prv);
+	return code;
+}
+
+static int paillier(void) {
+	int code = STS_ERR;
+	bn_t a, b, c, d, n, l, s;
+	uint8_t in[BN_BITS / 8 + 1], out[BN_BITS / 8 + 1];
+	int in_len, out_len;
+	int result;
+
+	bn_null(a);
+	bn_null(b);
+	bn_null(c);
+	bn_null(d);
+	bn_null(n);
+	bn_null(l);
+	bn_null(s);
+
+	TRY {
+		bn_new(a);
+		bn_new(b);
+		bn_new(c);
+		bn_new(d);
+		bn_new(n);
+		bn_new(l);
+		bn_new(s);
+
+		result = cp_phpe_gen(n, l, BN_BITS / 2);
+
+		TEST_BEGIN("paillier encryption/decryption is correct") {
+			TEST_ASSERT(result == STS_OK, end);
+			bn_size_bin(&in_len, n);
+			out_len = BN_BITS / 8 + 1;
+			memset(in, 0, sizeof(in));
+			rand_bytes(in + (in_len - 10), 10);
+			TEST_ASSERT(cp_phpe_enc(out, &out_len, in, in_len, n) == STS_OK,
+					end);
+			TEST_ASSERT(cp_phpe_dec(out, in_len, out, out_len, n, l) == STS_OK,
+					end);
+			TEST_ASSERT(memcmp(in, out, in_len) == 0, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("paillier encryption/decryption is homomorphic") {
+			TEST_ASSERT(result == STS_OK, end);
+			bn_size_bin(&in_len, n);
+			out_len = BN_BITS / 8 + 1;
+			memset(in, 0, sizeof(in));
+			rand_bytes(in + (in_len - 10), 10);
+			bn_read_bin(a, in, in_len);
+			TEST_ASSERT(cp_phpe_enc(out, &out_len, in, in_len, n) == STS_OK,
+					end);
+			bn_read_bin(b, out, out_len);
+			memset(in, 0, sizeof(in));
+			rand_bytes(in + (in_len - 10), 10);
+			bn_read_bin(c, in, in_len);
+			out_len = BN_BITS / 8 + 1;
+			TEST_ASSERT(cp_phpe_enc(out, &out_len, in, in_len, n) == STS_OK,
+					end);
+			bn_read_bin(d, out, out_len);
+			bn_mul(b, b, d);
+			bn_sqr(s, n);
+			bn_mod(b, b, s);
+			bn_write_bin(out, out_len, b);
+			TEST_ASSERT(cp_phpe_dec(out, in_len, out, out_len, n, l) == STS_OK,
+					end);
+			bn_add(a, a, c);
+			bn_write_bin(in, in_len, a);
+			bn_read_bin(a, out, in_len);
+			TEST_ASSERT(memcmp(in, out, in_len) == 0, end);
+		}
+		TEST_END;
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+
+  end:
+	bn_free(a);
+	bn_free(b);
+	bn_free(c);
+	bn_free(d);
+	bn_free(n);
+	bn_free(l);
+	bn_free(s);
 	return code;
 }
 
@@ -703,8 +789,12 @@ int main(void) {
 		core_clean();
 		return 1;
 	}
+	if (benaloh() != STS_OK) {
+		core_clean();
+		return 1;
+	}
 
-	if (bdpe() != STS_OK) {
+	if (paillier() != STS_OK) {
 		core_clean();
 		return 1;
 	}

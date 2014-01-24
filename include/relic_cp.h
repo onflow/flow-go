@@ -787,7 +787,7 @@ int cp_rabin_dec(uint8_t *out, int *out_len, uint8_t *in, int in_len,
 		rabin_t prv);
 
 /**
- * Generates a new key pair gor Benaloh's Dense Probabilistic Encryption system.
+ * Generates a new key pair for Benaloh's Dense Probabilistic Encryption.
  *
  * @param[out] pub			- the public key.
  * @param[out] prv			- the private key.
@@ -818,6 +818,43 @@ int cp_bdpe_enc(uint8_t *out, int *out_len, dig_t in, bdpe_t pub);
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 int cp_bdpe_dec(dig_t *out, uint8_t *in, int in_len, bdpe_t prv);
+
+/**
+ * Generates a new key pair for Paillier's Homomorphic Probabilistic Encryption.
+ *
+ * @param[out] n			- the public key.
+ * @param[out] l			- the private key.
+ * @param[in] bits			- the key length in bits.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_phpe_gen(bn_t n, bn_t l, int bits);
+
+/**
+ * Encrypts using the Paillier cryptosystem.
+ *
+ * @param[out] out			- the output buffer.
+ * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in] in			- the input buffer.
+ * @param[in] in_len		- the number of bytes to encrypt.
+ * @param[in] n				- the public key.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_phpe_enc(uint8_t *out, int *out_len, uint8_t *in, int in_len, bn_t n);
+
+/**
+ * Decrypts using the Paillier cryptosystem. Since this system is homomorphic,
+ * no padding can be applied and the user is responsible for specifying the
+ * resulting plaintext size.
+ *
+ * @param[out] out			- the output buffer.
+ * @param[out] out_len		- the number of bytes to write in the output buffer.
+ * @param[in] in_len		- the number of bytes to decrypt.
+ * @param[in] n				- the public key.
+ * @param[in] l				- the private key. 
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
+ */
+int cp_phpe_dec(uint8_t *out, int out_len, uint8_t *in, int in_len, bn_t n,
+		bn_t l);
 
 /**
  * Generates an ECDH key pair.

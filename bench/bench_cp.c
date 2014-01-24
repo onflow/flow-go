@@ -201,7 +201,7 @@ static void rabin(void) {
 	rabin_free(prv);
 }
 
-static void bdpe(void) {
+static void benaloh(void) {
 	bdpe_t pub, prv;
 	dig_t in, new;
 	uint8_t out[BN_BITS / 8 + 1];
@@ -233,6 +233,43 @@ static void bdpe(void) {
 
 	bdpe_free(pub);
 	bdpe_free(prv);
+}
+#include "assert.h"
+static void paillier(void) {
+	bn_t n, l;
+	uint8_t in[1000], new[1000], out[BN_BITS / 8 + 1];
+	int in_len, out_len;
+
+	bn_null(n);
+	bn_null(l);
+
+	bn_new(n);
+	bn_new(l);
+
+	BENCH_ONCE("cp_phpe_gen", cp_phpe_gen(n, l, BN_BITS / 2));
+
+	BENCH_BEGIN("cp_phpe_enc") {
+		bn_size_bin(&in_len, n);
+		out_len = BN_BITS / 8 + 1;
+		memset(in, 0, sizeof(in));
+		rand_bytes(in + 1, in_len - 1);
+		BENCH_ADD(cp_phpe_enc(out, &out_len, in, in_len, n));
+		cp_phpe_dec(new, in_len, out, out_len, n, l);
+		assert(memcmp(new, in, in_len) == 0);
+	} BENCH_END;
+
+	BENCH_BEGIN("cp_bdpe_dec") {
+		bn_size_bin(&in_len, n);
+		out_len = BN_BITS / 8 + 1;
+		memset(in, 0, sizeof(in));
+		rand_bytes(in + 1, in_len - 1);
+		cp_phpe_enc(out, &out_len, in, in_len, n);
+		BENCH_ADD(cp_phpe_dec(new, in_len, out, out_len, n, l));
+		assert(memcmp(new, in, in_len) == 0);
+	} BENCH_END;
+
+	bn_free(pub);
+	bn_free(prv);
 }
 
 #endif
@@ -572,7 +609,8 @@ int main(void) {
 	util_banner("Protocols based on integer factorization:\n", 0);
 	rsa();
 	rabin();
-	bdpe();
+	benaloh();
+	paillier();
 #endif
 
 #if defined(WITH_EC)
