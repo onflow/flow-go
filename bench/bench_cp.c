@@ -268,8 +268,8 @@ static void paillier(void) {
 		assert(memcmp(new, in, in_len) == 0);
 	} BENCH_END;
 
-	bn_free(pub);
-	bn_free(prv);
+	bn_free(n);
+	bn_free(l);
 }
 
 #endif
