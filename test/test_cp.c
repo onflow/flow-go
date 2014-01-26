@@ -764,6 +764,7 @@ static int bbs(void) {
 	bn_free(d);
 	g1_free(s);
 	g2_free(q);
+	gt_free(z);
 	return code;
 }
 
@@ -784,7 +785,6 @@ int main(void) {
 		core_clean();
 		return 1;
 	}
-
 	if (rabin() != STS_OK) {
 		core_clean();
 		return 1;
@@ -793,7 +793,6 @@ int main(void) {
 		core_clean();
 		return 1;
 	}
-
 	if (paillier() != STS_OK) {
 		core_clean();
 		return 1;

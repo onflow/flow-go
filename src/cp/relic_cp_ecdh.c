@@ -86,5 +86,6 @@ void cp_ecdh_key(uint8_t *key, int key_len, bn_t d, ec_t q) {
 	}
 	FINALLY {
 		ec_free(p);
+		bn_free(x);
 	}
 }

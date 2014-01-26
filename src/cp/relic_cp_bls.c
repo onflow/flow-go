@@ -111,8 +111,8 @@ int cp_bls_ver(g1_t s, uint8_t *msg, int len, g2_t q) {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		g1_null(p);
-		g2_null(g);
+		g1_free(p);
+		g2_free(g);
 		gt_free(e1);
 		gt_free(e2);
 	}
