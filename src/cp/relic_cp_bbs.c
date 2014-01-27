@@ -70,6 +70,7 @@ void cp_bbs_gen(bn_t d, g2_t q, gt_t z) {
 	}
 	FINALLY {
 		bn_free(n);
+		g1_free(g);
 	}
 }
 

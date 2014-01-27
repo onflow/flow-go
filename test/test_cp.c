@@ -668,6 +668,7 @@ static int sokaka(void) {
 	char id_b[3] = { 'B', 'o', 'b' };
 
 	sokaka_null(s_i);
+	bn_null(s);
 
 	TRY {
 		sokaka_new(s_i);
@@ -692,6 +693,7 @@ static int sokaka(void) {
 
   end:
 	sokaka_free(s_i);
+	bn_free(s);
 	return code;
 }
 
