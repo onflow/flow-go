@@ -559,7 +559,6 @@ typedef fp6_t fp18_t[3];
 #define fp18_free(A)														\
 		fp6_free(A[0]); fp6_free(A[1]); fp6_free(A[2]);						\
 
-
 /**
  * Multiplies two octdecic extension field elements. Computes C = A * B.
  *
@@ -594,9 +593,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the octdecic extension field element to square.
  */
 #if PP_EXT == BASIC
-#define fp18_sqr(C, A)		fp18_sqr_basic(C, A)
+#define fp18_sqr(C, A)			fp18_sqr_basic(C, A)
 #elif PP_EXT == LAZYR
-#define fp18_sqr(C, A)		fp18_sqr_lazyr(C, A)
+#define fp18_sqr(C, A)			fp18_sqr_lazyr(C, A)
 #endif
 
 /*============================================================================*/
