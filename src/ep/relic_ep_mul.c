@@ -41,7 +41,7 @@
 
 static void ep_mul_glv_imp(ep_t r, const ep_t p, const bn_t k) {
 	int l, l0, l1, i, n0, n1, s0, s1;
-	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
+	int8_t naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
 	bn_t n, k0, k1, v1[3], v2[3];
 	ep_t q, t[1 << (EP_WIDTH - 2)];
 
@@ -152,7 +152,7 @@ static void ep_mul_glv_imp(ep_t r, const ep_t p, const bn_t k) {
 
 static void ep_mul_naf_imp(ep_t r, const ep_t p, const bn_t k) {
 	int l, i, n;
-	signed char naf[FP_BITS + 1], *_k;
+	int8_t naf[FP_BITS + 1], *_k;
 	ep_t t[1 << (EP_WIDTH - 2)];
 
 	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {
@@ -208,7 +208,7 @@ static void ep_mul_naf_imp(ep_t r, const ep_t p, const bn_t k) {
 
 static void ep_mul_reg_imp(ep_t r, const ep_t p, const bn_t k) {
 	int l, i, j, n;
-	signed char reg[CEIL(FP_BITS + 1, EP_WIDTH - 1)], *_k;
+	int8_t reg[CEIL(FP_BITS + 1, EP_WIDTH - 1)], *_k;
 	ep_t t[1 << (EP_WIDTH - 2)];
 
 	for (i = 0; i < (1 << (EP_WIDTH - 2)); i++) {

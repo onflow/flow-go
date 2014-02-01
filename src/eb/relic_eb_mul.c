@@ -53,7 +53,7 @@
  */
 static void eb_mul_ltnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 	int len, i, n;
-	signed char tnaf[FB_BITS + 8], *_k, u;
+	int8_t tnaf[FB_BITS + 8], *_k, u;
 	eb_t t[1 << (EB_WIDTH - 2)];
 	bn_t vm, s0, s1;
 
@@ -131,7 +131,7 @@ static void eb_mul_ltnaf_imp(eb_t r, const eb_t p, const bn_t k) {
  */
 static void eb_mul_lnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 	int len, i, n;
-	signed char naf[FB_BITS + 1], *_k;
+	int8_t naf[FB_BITS + 1], *_k;
 	eb_t t[1 << (EB_WIDTH - 2)];
 
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
@@ -198,7 +198,7 @@ static void eb_mul_lnaf_imp(eb_t r, const eb_t p, const bn_t k) {
  */
 static void eb_mul_rtnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 	int len, i, n;
-	signed char tnaf[FB_BITS + 8], *_k, u;
+	int8_t tnaf[FB_BITS + 8], *_k, u;
 	eb_t t[1 << (EB_WIDTH - 2)];
 	bn_t vm, s0, s1;
 
@@ -511,7 +511,7 @@ static void eb_mul_rtnaf_imp(eb_t r, const eb_t p, const bn_t k) {
  */
 static void eb_mul_rnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 	int len, i, n;
-	signed char naf[FB_BITS + 1], *_k;
+	int8_t naf[FB_BITS + 1], *_k;
 	eb_t t[1 << (EB_WIDTH - 2)];
 
 	for (i = 0; i < (1 << (EB_WIDTH - 2)); i++) {
@@ -920,7 +920,7 @@ void eb_mul_rwnaf(eb_t r, const eb_t p, const bn_t k) {
 
 void eb_mul_halve(eb_t r, const eb_t p, const bn_t k) {
 	int l, i, j, trc, cof;
-	signed char naf[FB_BITS + 1] = { 0 }, *_k;
+	int8_t naf[FB_BITS + 1] = { 0 }, *_k;
 	eb_t q, s, t[1 << (EB_WIDTH - 2)];
 	bn_t n, m;
 	fb_t u, v, w, z;

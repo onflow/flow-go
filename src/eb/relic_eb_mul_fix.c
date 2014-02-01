@@ -53,7 +53,7 @@
  */
 static void eb_mul_fix_kbltz(eb_t r, const eb_t *t, const bn_t k) {
 	int l, i, n;
-	signed char u, tnaf[FB_BITS + 8], *_k;
+	int8_t u, tnaf[FB_BITS + 8], *_k;
 	bn_t vm, s0, s1;
 
 	bn_null(vm);
@@ -120,7 +120,7 @@ static void eb_mul_fix_kbltz(eb_t r, const eb_t *t, const bn_t k) {
  */
 static void eb_mul_fix_ordin(eb_t r, const eb_t *t, const bn_t k) {
 	int l, i, n;
-	signed char naf[FB_BITS + 1], *_k;
+	int8_t naf[FB_BITS + 1], *_k;
 
 	/* Compute the w-TNAF representation of k. */
 	l = FB_BITS + 1;
@@ -302,7 +302,7 @@ void eb_mul_pre_nafwi(eb_t *t, const eb_t p) {
 void eb_mul_fix_nafwi(eb_t r, const eb_t *t, const bn_t k) {
 	int i, j, l, d, m;
 	eb_t a;
-	signed char naf[FB_BITS + 1];
+	int8_t naf[FB_BITS + 1];
 	char w;
 
 	eb_null(a);

@@ -108,7 +108,6 @@ static void compute_kbltz(void) {
 			bn_copy(a, c);
 		}
 		bn_copy(&(ctx->eb_s1), b);
-
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);

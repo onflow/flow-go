@@ -47,7 +47,7 @@
  */
 static void ep_mul_fix_ordin(ep_t r, const ep_t *t, const bn_t k) {
 	int l, i, n;
-	signed char naf[FP_BITS + 1], *_k;
+	int8_t naf[FP_BITS + 1], *_k;
 
 	/* Compute the w-TNAF representation of k. */
 	l = FP_BITS + 1;
@@ -393,7 +393,7 @@ void ep_mul_pre_nafwi(ep_t *t, const ep_t p) {
 void ep_mul_fix_nafwi(ep_t r, const ep_t *t, const bn_t k) {
 	int i, j, l, d, m;
 	ep_t a;
-	signed char naf[FP_BITS + 1];
+	int8_t naf[FP_BITS + 1];
 	char w;
 
 	ep_null(a);

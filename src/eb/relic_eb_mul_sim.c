@@ -59,7 +59,7 @@
 static void eb_mul_sim_kbltz(eb_t r, const eb_t p, const bn_t k, const eb_t q,
 		const bn_t m, const eb_t *t) {
 	int l0, l1, l, i, n0, n1, w, g;
-	signed char u, tnaf0[FB_BITS + 8], tnaf1[FB_BITS + 8], *_k, *_m;
+	int8_t u, tnaf0[FB_BITS + 8], tnaf1[FB_BITS + 8], *_k, *_m;
 	eb_t t0[1 << (EB_WIDTH - 2)];
 	eb_t t1[1 << (EB_WIDTH - 2)];
 	bn_t vm, s0, s1;
@@ -190,7 +190,7 @@ static void eb_mul_sim_kbltz(eb_t r, const eb_t p, const bn_t k, const eb_t q,
 static void eb_mul_sim_ordin(eb_t r, const eb_t p, const bn_t k, const eb_t q,
 		const bn_t m, const eb_t *t) {
 	int l, l0, l1, i, n0, n1, w, g;
-	signed char naf0[FB_BITS + 1], naf1[FB_BITS + 1], *_k, *_m;
+	int8_t naf0[FB_BITS + 1], naf1[FB_BITS + 1], *_k, *_m;
 	eb_t t0[1 << (EB_WIDTH - 2)];
 	eb_t t1[1 << (EB_WIDTH - 2)];
 
@@ -420,7 +420,7 @@ void eb_mul_sim_joint(eb_t r, const eb_t p, const bn_t k, const eb_t q,
 		const bn_t m) {
 	eb_t t[5];
 	int u_i, len, offset;
-	signed char jsf[2 * (FB_BITS + 1)];
+	int8_t jsf[2 * (FB_BITS + 1)];
 	int i;
 
 	eb_null(t[0]);

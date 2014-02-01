@@ -78,7 +78,7 @@ static void ep2_mul_pre_ordin(ep2_t *t, ep2_t p) {
  */
 static void ep2_mul_fix_ordin(ep2_t r, ep2_t *table, bn_t k) {
 	int len, i, n;
-	signed char naf[FP_BITS + 1], *t;
+	int8_t naf[FP_BITS + 1], *t;
 
 	/* Compute the w-TNAF representation of k. */
 	len = FP_BITS + 1;
@@ -248,7 +248,7 @@ void ep2_mul_pre_nafwi(ep2_t *t, ep2_t p) {
 void ep2_mul_fix_nafwi(ep2_t r, ep2_t *t, bn_t k) {
 	int i, j, l, d, m;
 	ep2_t a;
-	signed char naf[FP_BITS + 1];
+	int8_t naf[FP_BITS + 1];
 	char w;
 
 	ep2_null(a);

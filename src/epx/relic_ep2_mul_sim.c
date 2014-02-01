@@ -41,7 +41,7 @@
 static void ep2_mul_sim_ordin(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l,
 		ep2_t *t) {
 	int len, l0, l1, i, n0, n1, w, gen;
-	signed char naf0[FP_BITS + 1], naf1[FP_BITS + 1], *_k, *_m;
+	int8_t naf0[FP_BITS + 1], naf1[FP_BITS + 1], *_k, *_m;
 	ep2_t t0[1 << (EP_WIDTH - 2)];
 	ep2_t t1[1 << (EP_WIDTH - 2)];
 
@@ -262,7 +262,7 @@ void ep2_mul_sim_inter(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 void ep2_mul_sim_joint(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 	ep2_t t[5];
 	int u_i, len, offset;
-	signed char jsf[2 * (FP_BITS + 1)];
+	int8_t jsf[2 * (FP_BITS + 1)];
 	int i;
 
 	ep2_null(t[0]);
