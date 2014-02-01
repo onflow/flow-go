@@ -3343,7 +3343,7 @@ int main(void) {
 	/*
 	 * Fp^18 is defined as a cubic extension of Fp^6, which in turn is defined
 	 * as a quadratic extension of Fp^3, but defined as a cubic extension of
-	 * Fp^2. Only run this there is a cubic and quadratic non-residue in Fp.
+	 * Fp^2. Only run these if there is a cubic and quadratic non-residue in Fp.
 	 */
 	if (fp_prime_get_cnr() == fp_prime_get_qnr()) {
 
