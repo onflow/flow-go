@@ -1296,10 +1296,10 @@ void bn_rec_slw(uint8_t *win, int *len, const bn_t k, int w);
  * @param[in] w				- the window size in bits.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_naf(signed char *naf, int *len, const bn_t k, int w);
+void bn_rec_naf(int8_t *naf, int *len, const bn_t k, int w);
 
 /**
- * Recodes an integer in width-w t-NAF.
+ * Recodes an integer in width-w \tau-NAF.
  *
  * @param[out] tnaf			- the recoded integer.
  * @param[out] len			- the number of bytes written.
@@ -1312,8 +1312,8 @@ void bn_rec_naf(signed char *naf, int *len, const bn_t k, int w);
  * @param[in] w				- the window size in bits.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_tnaf(signed char *tnaf, int *len, const bn_t k, const bn_t vm,
-		const bn_t s0, const bn_t s1, signed char u, int m, int w);
+void bn_rec_tnaf(int8_t *tnaf, int *len, const bn_t k, const bn_t vm,
+		const bn_t s0, const bn_t s1, int8_t u, int m, int w);
 
 /**
  * Recodes an integer in regular fixed-length width-w NAF.
@@ -1325,7 +1325,7 @@ void bn_rec_tnaf(signed char *tnaf, int *len, const bn_t k, const bn_t vm,
  * @param[in] w				- the window size in bits.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_reg(signed char *naf, int *len, const bn_t k, int n, int w);
+void bn_rec_reg(int8_t *naf, int *len, const bn_t k, int n, int w);
 
 /**
  * Recodes a pair of integers in Joint Sparse Form.
@@ -1336,7 +1336,7 @@ void bn_rec_reg(signed char *naf, int *len, const bn_t k, int n, int w);
  * @param[in] l				- the second integer to recode.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
-void bn_rec_jsf(signed char *jsf, int *len, const bn_t k, const bn_t l);
+void bn_rec_jsf(int8_t *jsf, int *len, const bn_t k, const bn_t l);
 
 /**
  * Recodes an integer in two parts such that k = k0 + phi(k1), where
