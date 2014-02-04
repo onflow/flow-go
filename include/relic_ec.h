@@ -158,6 +158,13 @@ typedef CAT(EC_LOWER, t) ec_t;
 #define ec_curve_get_ord(N)	CAT(EC_LOWER, curve_get_ord)(N)
 
 /**
+ * Returns the cofactor of the group of points in the elliptic curve.
+ *
+ * @param[out]	H			- the returned order.
+ */
+#define ec_curve_get_cof(H) CAT(EC_LOWER, curve_get_cof)(H)
+
+/**
  * Configures some set of curve parameters for the current security level.
  */
 #if EC_CUR == PRIME
@@ -291,6 +298,15 @@ typedef CAT(EC_LOWER, t) ec_t;
  * @param[in] K				- the integer.
  */
 #define ec_mul_gen(R, K)	CAT(EC_LOWER, mul_gen)(R, K)
+
+/**
+ * Multiplies an elliptic curve point by a small integer. Computes R = kP.
+ *
+ * @param[out] R			- the result.
+ * @param[in] P				- the point to multiply.
+ * @param[in] K				- the integer.
+ */
+#define ec_mul_dig(R, P, K)		CAT(EC_LOWER, mul_dig)(R, P, K)
 
 /**
  * Builds a precomputation table for multiplying a fixed elliptic curve
