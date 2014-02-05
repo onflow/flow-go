@@ -96,10 +96,12 @@
 #undef rand_init
 #undef rand_clean
 #undef rand_seed
+#undef rand_seed
 #undef rand_bytes
 
 #define rand_init 	PREFIX(rand_init)
 #define rand_clean 	PREFIX(rand_clean)
+#define rand_seed 	PREFIX(rand_seed)
 #define rand_seed 	PREFIX(rand_seed)
 #define rand_bytes 	PREFIX(rand_bytes)
 
@@ -128,6 +130,7 @@
 #undef util_bits_dig
 #undef util_cmp_const
 #undef util_printf
+#undef util_print_dig
 
 #define util_conv_endian 	PREFIX(util_conv_endian)
 #define util_conv_big 	PREFIX(util_conv_big)
@@ -136,6 +139,7 @@
 #define util_bits_dig 	PREFIX(util_bits_dig)
 #define util_cmp_const 	PREFIX(util_cmp_const)
 #define util_printf 	PREFIX(util_printf)
+#define util_print_dig 	PREFIX(util_print_dig)
 
 #undef dv_t
 #define dv_t	PREFIX(dv_t)
@@ -144,6 +148,7 @@
 #undef dv_zero
 #undef dv_copy
 #undef dv_copy_cond
+#undef dv_swap_cond
 #undef dv_cmp_const
 #undef dv_new_dynam
 #undef dv_new_statc
@@ -154,6 +159,7 @@
 #define dv_zero 	PREFIX(dv_zero)
 #define dv_copy 	PREFIX(dv_copy)
 #define dv_copy_cond 	PREFIX(dv_copy_cond)
+#define dv_swap_cond 	PREFIX(dv_swap_cond)
 #define dv_cmp_const 	PREFIX(dv_cmp_const)
 #define dv_new_dynam 	PREFIX(dv_new_dynam)
 #define dv_new_statc 	PREFIX(dv_new_statc)
@@ -445,9 +451,12 @@
 #undef fp_bits
 #undef fp_rand
 #undef fp_print
-#undef fp_size
-#undef fp_read
-#undef fp_write
+#undef fp_size_str
+#undef fp_read_str
+#undef fp_write_str
+#undef fp_size_bin
+#undef fp_read_bin
+#undef fp_write_bin
 #undef fp_cmp
 #undef fp_cmp_dig
 #undef fp_add_basic
@@ -523,9 +532,12 @@
 #define fp_bits 	PREFIX(fp_bits)
 #define fp_rand 	PREFIX(fp_rand)
 #define fp_print 	PREFIX(fp_print)
-#define fp_size 	PREFIX(fp_size)
-#define fp_read 	PREFIX(fp_read)
-#define fp_write 	PREFIX(fp_write)
+#define fp_size_str 	PREFIX(fp_size_str)
+#define fp_read_str 	PREFIX(fp_read_str)
+#define fp_write_str 	PREFIX(fp_write_str)
+#define fp_size_bin 	PREFIX(fp_size_bin)
+#define fp_read_bin 	PREFIX(fp_read_bin)
+#define fp_write_bin 	PREFIX(fp_write_bin)
 #define fp_cmp 	PREFIX(fp_cmp)
 #define fp_cmp_dig 	PREFIX(fp_cmp_dig)
 #define fp_add_basic 	PREFIX(fp_add_basic)
@@ -665,9 +677,12 @@
 #undef fb_bits
 #undef fb_rand
 #undef fb_print
-#undef fb_size
-#undef fb_read
-#undef fb_write
+#undef fb_size_str
+#undef fb_read_str
+#undef fb_write_str
+#undef fb_size_bin
+#undef fb_read_bin
+#undef fb_write_bin
 #undef fb_cmp
 #undef fb_cmp_dig
 #undef fb_add
@@ -738,9 +753,12 @@
 #define fb_bits 	PREFIX(fb_bits)
 #define fb_rand 	PREFIX(fb_rand)
 #define fb_print 	PREFIX(fb_print)
-#define fb_size 	PREFIX(fb_size)
-#define fb_read 	PREFIX(fb_read)
-#define fb_write 	PREFIX(fb_write)
+#define fb_size_str 	PREFIX(fb_size_str)
+#define fb_read_str 	PREFIX(fb_read_str)
+#define fb_write_str 	PREFIX(fb_write_str)
+#define fb_size_bin 	PREFIX(fb_size_bin)
+#define fb_read_bin 	PREFIX(fb_read_bin)
+#define fb_write_bin 	PREFIX(fb_write_bin)
 #define fb_cmp 	PREFIX(fb_cmp)
 #define fb_cmp_dig 	PREFIX(fb_cmp_dig)
 #define fb_add 	PREFIX(fb_add)
@@ -879,6 +897,9 @@
 #undef ep_is_valid
 #undef ep_tab
 #undef ep_print
+#undef ep_size_bin
+#undef ep_read_bin
+#undef ep_write_bin
 #undef ep_neg_basic
 #undef ep_neg_projc
 #undef ep_add_basic
@@ -956,6 +977,9 @@
 #define ep_is_valid 	PREFIX(ep_is_valid)
 #define ep_tab 	PREFIX(ep_tab)
 #define ep_print 	PREFIX(ep_print)
+#define ep_size_bin 	PREFIX(ep_size_bin)
+#define ep_read_bin 	PREFIX(ep_read_bin)
+#define ep_write_bin 	PREFIX(ep_write_bin)
 #define ep_neg_basic 	PREFIX(ep_neg_basic)
 #define ep_neg_projc 	PREFIX(ep_neg_projc)
 #define ep_add_basic 	PREFIX(ep_add_basic)
@@ -1038,6 +1062,9 @@
 #undef eb_is_valid
 #undef eb_tab
 #undef eb_print
+#undef eb_size_bin
+#undef eb_read_bin
+#undef eb_write_bin
 #undef eb_neg_basic
 #undef eb_neg_projc
 #undef eb_add_basic
@@ -1116,6 +1143,9 @@
 #define eb_is_valid 	PREFIX(eb_is_valid)
 #define eb_tab 	PREFIX(eb_tab)
 #define eb_print 	PREFIX(eb_print)
+#define eb_size_bin 	PREFIX(eb_size_bin)
+#define eb_read_bin 	PREFIX(eb_read_bin)
+#define eb_write_bin 	PREFIX(eb_write_bin)
 #define eb_neg_basic 	PREFIX(eb_neg_basic)
 #define eb_neg_projc 	PREFIX(eb_neg_projc)
 #define eb_add_basic 	PREFIX(eb_add_basic)
@@ -1355,6 +1385,7 @@
 #undef fp2_dbln_low
 #undef fp2_dblm_low
 #undef fp2_norm_low
+#undef fp2_norh_low
 #undef fp2_nord_low
 #undef fp2_muln_low
 #undef fp2_mulc_low
@@ -1374,6 +1405,7 @@
 #define fp2_dbln_low 	PREFIX(fp2_dbln_low)
 #define fp2_dblm_low 	PREFIX(fp2_dblm_low)
 #define fp2_norm_low 	PREFIX(fp2_norm_low)
+#define fp2_norh_low 	PREFIX(fp2_norh_low)
 #define fp2_nord_low 	PREFIX(fp2_nord_low)
 #define fp2_muln_low 	PREFIX(fp2_muln_low)
 #define fp2_mulc_low 	PREFIX(fp2_mulc_low)
@@ -1522,7 +1554,8 @@
 #undef fp12_mul_lazyr
 #undef fp12_mul_dxs_basic
 #undef fp12_mul_dxs_lazyr
-#undef fp12_sqr
+#undef fp12_sqr_basic
+#undef fp12_sqr_lazyr
 #undef fp12_sqr_cyc_basic
 #undef fp12_sqr_cyc_lazyr
 #undef fp12_sqr_pck_basic
@@ -1555,7 +1588,8 @@
 #define fp12_mul_lazyr 	PREFIX(fp12_mul_lazyr)
 #define fp12_mul_dxs_basic 	PREFIX(fp12_mul_dxs_basic)
 #define fp12_mul_dxs_lazyr 	PREFIX(fp12_mul_dxs_lazyr)
-#define fp12_sqr 	PREFIX(fp12_sqr)
+#define fp12_sqr_basic 	PREFIX(fp12_sqr_basic)
+#define fp12_sqr_lazyr 	PREFIX(fp12_sqr_lazyr)
 #define fp12_sqr_cyc_basic 	PREFIX(fp12_sqr_cyc_basic)
 #define fp12_sqr_cyc_lazyr 	PREFIX(fp12_sqr_cyc_lazyr)
 #define fp12_sqr_pck_basic 	PREFIX(fp12_sqr_pck_basic)
@@ -1741,6 +1775,9 @@
 #undef cp_bdpe_gen
 #undef cp_bdpe_enc
 #undef cp_bdpe_dec
+#undef cp_phpe_gen
+#undef cp_phpe_enc
+#undef cp_phpe_dec
 #undef cp_ecdh_gen
 #undef cp_ecdh_key
 #undef cp_ecmqv_gen
@@ -1778,6 +1815,9 @@
 #define cp_bdpe_gen 	PREFIX(cp_bdpe_gen)
 #define cp_bdpe_enc 	PREFIX(cp_bdpe_enc)
 #define cp_bdpe_dec 	PREFIX(cp_bdpe_dec)
+#define cp_phpe_gen 	PREFIX(cp_phpe_gen)
+#define cp_phpe_enc 	PREFIX(cp_phpe_enc)
+#define cp_phpe_dec 	PREFIX(cp_phpe_dec)
 #define cp_ecdh_gen 	PREFIX(cp_ecdh_gen)
 #define cp_ecdh_key 	PREFIX(cp_ecdh_key)
 #define cp_ecmqv_gen 	PREFIX(cp_ecmqv_gen)
