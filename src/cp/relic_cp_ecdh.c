@@ -23,7 +23,7 @@
 /**
  * @file
  *
- * Implementation of the ECDSA protocol.
+ * Implementation of the ECDH protocol.
  *
  * @version $Id$
  * @ingroup cp
