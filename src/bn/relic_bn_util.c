@@ -203,16 +203,14 @@ void bn_print(const bn_t a) {
 		util_print("0\n");
 	} else {
 #if WORD == 64
-		util_print("%" PRIX64, (uint64_t)a->dp[a->used - 1]);
+		util_print_dig(a->dp[a->used - 1], 0);
 		for (i = a->used - 2; i >= 0; i--) {
-			util_print("%.*" PRIX64, (int)(2 * (BN_DIGIT / 8)),
-					(uint64_t)a->dp[i]);
+			util_print_dig(a->dp[i], 1);
 		}
 #else
-		util_print("%" PRIX32, (uint32_t)a->dp[a->used - 1]);
+		util_print(a->dp[a->used - 1], 0);
 		for (i = a->used - 2; i >= 0; i--) {
-			util_print("%.*" PRIX32, (int)(2 * (BN_DIGIT / 8)),
-					(uint32_t)a->dp[i]);
+			util_print_dig(a->dp[i], 1);
 		}
 #endif
 		util_print("\n");
@@ -227,7 +225,7 @@ void bn_size_str(int *size, const bn_t a, int radix) {
 
 	*size = 0;
 
-	/* Binary case. */
+	/* Binary case requires the bits, a sign and the null terminator. */
 	if (radix == 2) {
 		*size = bn_bits(a) + (a->sign == BN_NEG ? 1 : 0) + 1;
 		return;
@@ -452,11 +450,15 @@ void bn_size_raw(int *size, const bn_t a) {
 }
 
 void bn_read_raw(bn_t a, const dig_t *raw, int len) {
-	bn_grow(a, len);
-	a->used = len;
-	a->sign = BN_POS;
-	dv_copy(a->dp, raw, len);
-	bn_trim(a);
+	TRY {
+		bn_grow(a, len);
+		a->used = len;
+		a->sign = BN_POS;
+		dv_copy(a->dp, raw, len);
+		bn_trim(a);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
 }
 
 void bn_write_raw(dig_t *raw, int len, const bn_t a) {
