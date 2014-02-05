@@ -44,11 +44,7 @@ void dv_print(dig_t *a, int digits) {
 	/* Suppress possible unused parameter warning. */
 	(void)a;
 	for (i = digits - 1; i >= 0; i--) {
-#if WORD == 64
-		util_print("%.*" PRIX64, (int)(2 * (DIGIT / 8)), (uint64_t)a[i]);
-#else
-		util_print("%.*" PRIX32, (int)(2 * (DIGIT / 8)), (uint32_t)a[i]);
-#endif
+		util_print_dig(a[i], 1);
 	}
 	util_print("\n");
 
