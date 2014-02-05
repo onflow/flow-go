@@ -669,7 +669,6 @@ void bn_read_raw(bn_t a, const dig_t *raw, int len);
  * @param[out] raw			- the digit vector.
  * @param[in] len			- the buffer capacity.
  * @param[in] a				- the multiple integer to write.
- * @param[in] sign			- the sign.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
  */
 void bn_write_raw(dig_t *raw, int len, const bn_t a);
