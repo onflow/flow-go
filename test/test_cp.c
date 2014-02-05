@@ -764,7 +764,7 @@ static int sokaka(void) {
 	code = STS_OK;
 
   end:
-	sokaka_free(s_i);
+	sokaka_free(k);
 	bn_free(s);
 	return code;
 }
