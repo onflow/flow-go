@@ -128,21 +128,21 @@
  */
 #define ASSIGN(CURVE)														\
 	FETCH(str, CURVE##_A0, sizeof(CURVE##_A0));								\
-	fp_read(a[0], str, strlen(str), 16);									\
+	fp_read_str(a[0], str, strlen(str), 16);									\
 	FETCH(str, CURVE##_A1, sizeof(CURVE##_A1));								\
-	fp_read(a[1], str, strlen(str), 16);									\
+	fp_read_str(a[1], str, strlen(str), 16);									\
 	FETCH(str, CURVE##_B0, sizeof(CURVE##_B0));								\
-	fp_read(b[0], str, strlen(str), 16);									\
+	fp_read_str(b[0], str, strlen(str), 16);									\
 	FETCH(str, CURVE##_B1, sizeof(CURVE##_B1));								\
-	fp_read(b[1], str, strlen(str), 16);									\
+	fp_read_str(b[1], str, strlen(str), 16);									\
 	FETCH(str, CURVE##_X0, sizeof(CURVE##_X0));								\
-	fp_read(g->x[0], str, strlen(str), 16);									\
+	fp_read_str(g->x[0], str, strlen(str), 16);									\
 	FETCH(str, CURVE##_X1, sizeof(CURVE##_X1));								\
-	fp_read(g->x[1], str, strlen(str), 16);									\
+	fp_read_str(g->x[1], str, strlen(str), 16);									\
 	FETCH(str, CURVE##_Y0, sizeof(CURVE##_Y0));								\
-	fp_read(g->y[0], str, strlen(str), 16);									\
+	fp_read_str(g->y[0], str, strlen(str), 16);									\
 	FETCH(str, CURVE##_Y1, sizeof(CURVE##_Y1));								\
-	fp_read(g->y[1], str, strlen(str), 16);									\
+	fp_read_str(g->y[1], str, strlen(str), 16);									\
 	FETCH(str, CURVE##_R, sizeof(CURVE##_R));								\
 	bn_read_str(r, str, strlen(str), 16);									\
 
