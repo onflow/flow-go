@@ -64,7 +64,8 @@ static int memory(void) {
 static int util(void) {
 	int bits, code = STS_ERR;
 	fb_t a, b, c;
-	char str[1000];
+	char str[FB_BITS + 1];
+	uint8_t bin[FB_BYTES];
 
 	fb_null(a);
 	fb_null(b);
@@ -193,15 +194,22 @@ static int util(void) {
 
 		TEST_BEGIN("reading and writing a binary field element are consistent") {
 			fb_rand(a);
-			fb_write(str, sizeof(str), a, 16);
-			fb_read(b, str, sizeof(str), 16);
+			for (int j = 1; j < 7; j++) {
+				fb_size_str(&bits, a, 1 << j);
+				printf("%d\n", bits);
+				fb_write_str(str, bits, a, 1 << j);
+				fb_read_str(b, str, bits, 1 << j);
+				TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);
+			}
+			fb_write_bin(bin, sizeof(bin), a);
+			fb_read_bin(b, bin, sizeof(bin));
 			TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);
 		}
 		TEST_END;
 
 		TEST_BEGIN("getting the size of a binary field element is correct") {
 			fb_rand(a);
-			fb_size(&bits, a, 2);
+			fb_size_str(&bits, a, 2);
 			bits--;
 			TEST_ASSERT(bits == fb_bits(a), end);
 		}

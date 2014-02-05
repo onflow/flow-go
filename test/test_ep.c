@@ -61,8 +61,9 @@ static int memory(void) {
 }
 
 int util(void) {
-	int code = STS_ERR;
+	int l, code = STS_ERR;
 	ep_t a, b, c;
+	uint8_t bin[2 * FP_BYTES + 1];
 
 	ep_null(a);
 	ep_null(b);
@@ -114,6 +115,29 @@ int util(void) {
 			TEST_ASSERT(ep_is_valid(a), end);
 			fp_rand(a->x);
 			TEST_ASSERT(!ep_is_valid(a), end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("reading and writing a point are consistent") {
+			for (int j = 0; j < 2; j++) {
+				ep_set_infty(a);
+				ep_size_bin(&l, a, j);
+				ep_write_bin(bin, l, a, j);
+				ep_read_bin(b, bin, l);
+				TEST_ASSERT(ep_cmp(a, b) == CMP_EQ, end);
+				ep_rand(a);
+				ep_size_bin(&l, a, j);
+				ep_write_bin(bin, l, a, j);
+				ep_read_bin(b, bin, l);
+				TEST_ASSERT(ep_cmp(a, b) == CMP_EQ, end);
+				ep_rand(a);
+				ep_dbl(a, a);
+				ep_size_bin(&l, a, j);
+				ep_norm(a, a);
+				ep_write_bin(bin, l, a, j);
+				ep_read_bin(b, bin, l);
+				TEST_ASSERT(ep_cmp(a, b) == CMP_EQ, end);						
+			}
 		}
 		TEST_END;
 	}

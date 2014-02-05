@@ -63,7 +63,8 @@ static int memory(void) {
 
 static int util(void) {
 	int bits, code = STS_ERR;
-	char str[1000];
+	char str[FP_BITS + 1];
+	uint8_t bin[FP_BYTES];
 	fp_t a, b, c;
 	bn_t d;
 	dig_t e;
@@ -181,8 +182,14 @@ static int util(void) {
 
 		TEST_BEGIN("reading and writing a prime field element are consistent") {
 			fp_rand(a);
-			fp_write(str, sizeof(str), a, 16);
-			fp_read(b, str, sizeof(str), 16);
+			for (int j = 2; j <= 64; j++) {
+				fp_size_str(&bits, a, j);
+				fp_write_str(str, bits, a, j);
+				fp_read_str(b, str, bits, j);
+				TEST_ASSERT(fp_cmp(a, b) == CMP_EQ, end);
+			}
+			fp_write_bin(bin, sizeof(bin), a);
+			fp_read_bin(b, bin, sizeof(bin));
 			TEST_ASSERT(fp_cmp(a, b) == CMP_EQ, end);
 		}
 		TEST_END;
@@ -190,7 +197,7 @@ static int util(void) {
 		TEST_BEGIN("getting the size of a prime field element is correct") {
 			fp_rand(a);
 			fp_prime_back(d, a);
-			fp_size(&bits, a, 2);
+			fp_size_str(&bits, a, 2);
 			bits--;
 			TEST_ASSERT(bits == bn_bits(d), end);
 		}
