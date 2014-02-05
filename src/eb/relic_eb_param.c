@@ -302,13 +302,13 @@
 #define ASSIGN(CURVE, FIELD)												\
 	fb_param_set(FIELD);													\
 	FETCH(str, CURVE##_A, sizeof(CURVE##_A));								\
-	fb_read(a, str, strlen(str), 16);										\
+	fb_read_str(a, str, strlen(str), 16);										\
 	FETCH(str, CURVE##_B, sizeof(CURVE##_B));								\
-	fb_read(b, str, strlen(str), 16);										\
+	fb_read_str(b, str, strlen(str), 16);										\
 	FETCH(str, CURVE##_X, sizeof(CURVE##_X));								\
-	fb_read(g->x, str, strlen(str), 16);									\
+	fb_read_str(g->x, str, strlen(str), 16);									\
 	FETCH(str, CURVE##_Y, sizeof(CURVE##_Y));								\
-	fb_read(g->y, str, strlen(str), 16);									\
+	fb_read_str(g->y, str, strlen(str), 16);									\
 	FETCH(str, CURVE##_R, sizeof(CURVE##_R));								\
 	bn_read_str(r, str, strlen(str), 16);									\
 	FETCH(str, CURVE##_H, sizeof(CURVE##_H));								\
@@ -323,7 +323,7 @@
 #define ASSIGNS(CURVE, FIELD)												\
 	ASSIGN(CURVE, FIELD);													\
 	FETCH(str, CURVE##_C, sizeof(CURVE##_C));								\
-	fb_read(c, str, strlen(str), 16);										\
+	fb_read_str(c, str, strlen(str), 16);										\
 
 /*============================================================================*/
 /* Public definitions                                                         */
