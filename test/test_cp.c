@@ -575,7 +575,7 @@ static int ecies(void) {
 	bn_t d_a, d_b;
 	ec_t q_a, q_b;
 	int l, in_len, out_len;
-	uint8_t in[BC_LEN - 1], out[BC_LEN + MD_LEN];
+	uint8_t in[BC_LEN - 1], out[BC_LEN + MD_LEN], msg[BC_LEN + MD_LEN];
 	char str[2 * FC_BYTES + 1];
 
 	ec_null(r);
@@ -612,6 +612,7 @@ static int ecies(void) {
 #if defined(EP_ORDIN) && FP_PRIME == 256
 			case NIST_P256:
 				ASSIGNP(NIST_P256);
+				memcpy(msg, result, sizeof(result));
 				break;
 #endif
 			default:
@@ -621,19 +622,21 @@ static int ecies(void) {
 
 		if (code != STS_OK) {
 			TEST_ONCE("ecies satisfies test vectors") {
-				char in[] = { 0x12, 0x34, 0x56, 0x78, 0x90, 0xab, 0xcd, 0xef };
+				uint8_t in[] = {
+					0x12, 0x34, 0x56, 0x78, 0x90, 0xAB, 0xCD, 0xEF
+				};
 				TEST_ASSERT(ec_is_valid(q_a) == 1, end);
 				TEST_ASSERT(ec_is_valid(q_b) == 1, end);
 				out_len = 16;
-				TEST_ASSERT(cp_ecies_dec(out, &out_len, q_b, result,
-								sizeof(result), d_a) == STS_OK, end);
+				TEST_ASSERT(cp_ecies_dec(out, &out_len, q_b, msg, sizeof(msg),
+								d_a) == STS_OK, end);
 				TEST_ASSERT(out_len == sizeof(in), end);
 				TEST_ASSERT(memcmp(out, in, sizeof(in)) == STS_OK, end);
 				out_len = 16;
-				TEST_ASSERT(cp_ecies_dec(out, &out_len, q_a, result,
-								sizeof(result), d_b) == STS_OK, end);
+				TEST_ASSERT(cp_ecies_dec(out, &out_len, q_a, msg, sizeof(msg),
+								d_b) == STS_OK, end);
 				TEST_ASSERT(out_len == sizeof(in), end);
-				TEST_ASSERT(memcmp(out, in, sizeof(in)) == STS_OK, end);				
+				TEST_ASSERT(memcmp(out, in, sizeof(in)) == STS_OK, end);
 			}
 			TEST_END;
 		}
