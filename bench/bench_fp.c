@@ -54,7 +54,8 @@ static void memory(void) {
 
 static void util(void) {
 	int d;
-	char str[1000];
+	char str[2 * FP_BYTES + 1];
+	uint8_t bin[FP_BYTES];
 	fp_t a, b;
 
 	fp_null(a);
@@ -116,21 +117,41 @@ static void util(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp_size") {
+	BENCH_BEGIN("fp_size_str (16)") {
 		fp_rand(a);
-		BENCH_ADD(fp_size(&d, a, 16));
+		BENCH_ADD(fp_size_str(&d, a, 16));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp_write") {
+	BENCH_BEGIN("fp_write_str (16)") {
 		fp_rand(a);
-		BENCH_ADD(fp_write(str, sizeof(str), a, 16));
+		BENCH_ADD(fp_write_str(str, sizeof(str), a, 16));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp_read") {
+	BENCH_BEGIN("fp_read_str (16)") {
 		fp_rand(a);
-		BENCH_ADD(fp_read(a, str, sizeof(str), 16));
+		fp_write_str(str, sizeof(str), a, 16);
+		BENCH_ADD(fp_read_str(a, str, sizeof(str), 16));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp_size_bin") {
+		fp_rand(a);
+		BENCH_ADD(fp_size_bin(&d, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp_write_bin") {
+		fp_rand(a);
+		BENCH_ADD(fp_write_bin(bin, sizeof(bin), a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp_read_bin") {
+		fp_rand(a);
+		fp_write_bin(bin, sizeof(bin), a);
+		BENCH_ADD(fp_read_bin(a, bin, sizeof(bin)));
 	}
 	BENCH_END;
 

@@ -337,7 +337,7 @@ static void ecmqv(void) {
 static void ecies(void) {
 	ec_t q, r;
 	bn_t d;
-	uint8_t in[10], out[16], iv[BC_LEN], mac[MD_LEN];
+	uint8_t in[10], out[16 + MD_LEN];
 	int in_len, out_len;
 
 	bn_null(d);
@@ -349,7 +349,6 @@ static void ecies(void) {
 	bn_new(d);
 
 	rand_bytes(in, sizeof(in));
-	rand_bytes(iv, BC_LEN);
 
 	BENCH_BEGIN("cp_ecies_gen") {
 		BENCH_ADD(cp_ecies_gen(d, q));
@@ -360,8 +359,8 @@ static void ecies(void) {
 		in_len = sizeof(in);
 		out_len = sizeof(out);
 		rand_bytes(in, sizeof(in));
-		BENCH_ADD(cp_ecies_enc(r, out, &out_len, mac, in, in_len, iv, q));
-		cp_ecies_dec(out, &out_len, r, out, out_len, iv, mac, d);
+		BENCH_ADD(cp_ecies_enc(r, out, &out_len, in, in_len, q));
+		cp_ecies_dec(out, &out_len, r, out, out_len, d);
 	}
 	BENCH_END;
 
@@ -369,8 +368,8 @@ static void ecies(void) {
 		in_len = sizeof(in);
 		out_len = sizeof(out);
 		rand_bytes(in, sizeof(in));
-		cp_ecies_enc(r, out, &out_len, mac, in, in_len, iv, q);
-		BENCH_ADD(cp_ecies_dec(out, &out_len, r, out, out_len, iv, mac, d));
+		cp_ecies_enc(r, out, &out_len, in, in_len, q);
+		BENCH_ADD(cp_ecies_dec(out, &out_len, r, out, out_len, d));
 	}
 	BENCH_END;
 

@@ -53,13 +53,21 @@ static void memory(void) {
 }
 
 static void util(void) {
-	ep_t p, q;
+	ep_t p, q, t[4];
+	uint8_t bin[2 * FP_BYTES + 1];
+	int l;
 
 	ep_null(p);
 	ep_null(q);
+	for (int j = 0; j < 4; j++) {
+		ep_null(t[j]);
+	}
 
 	ep_new(p);
 	ep_new(q);
+	for (int j = 0; j < 4; j++) {
+		ep_new(t[j]);
+	}
 
 	BENCH_BEGIN("ep_is_infty") {
 		ep_rand(p);
@@ -87,13 +95,44 @@ static void util(void) {
 		BENCH_ADD(ep_rand(p));
 	} BENCH_END;
 
+	BENCH_BEGIN("ep_rhs") {
+		ep_rand(p);
+		BENCH_ADD(ep_rhs(q->x, p));
+	} BENCH_END;
+
+	BENCH_BEGIN("ep_tab (4)") {
+		ep_rand(p);
+		BENCH_ADD(ep_tab(t, p, 4));
+	} BENCH_END;
+
 	BENCH_BEGIN("ep_is_valid") {
 		ep_rand(p);
 		BENCH_ADD(ep_is_valid(p));
 	} BENCH_END;
 
+	BENCH_BEGIN("ep_size_bin (0)") {
+		ep_rand(p);
+		BENCH_ADD(ep_size_bin(&l, p, 0));
+	} BENCH_END;
+
+	BENCH_BEGIN("ep_write_bin (0)") {
+		ep_rand(p);
+		ep_size_bin(&l, p, 0);
+		BENCH_ADD(ep_write_bin(bin, l, p, 0));
+	} BENCH_END;
+
+	BENCH_BEGIN("ep_read_bin (0)") {
+		ep_rand(p);
+		ep_size_bin(&l, p, 0);
+		ep_write_bin(bin, l, p, 0);
+		BENCH_ADD(ep_read_bin(p, bin, l));
+	} BENCH_END;
+
 	ep_free(p);
 	ep_free(q);
+	for (int j = 0; j < 4; j++) {
+		ep_free(t[j]);
+	}
 }
 
 static void arith(void) {

@@ -54,7 +54,8 @@ static void memory(void) {
 
 static void util(void) {
 	int d;
-	char str[1000];
+	char str[2 * FB_BYTES + 1];
+	uint8_t bin[FB_BYTES];
 	fb_t a, b;
 
 	fb_null(a);
@@ -117,21 +118,41 @@ static void util(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fb_size") {
+	BENCH_BEGIN("fb_size_str (16)") {
 		fb_rand(a);
-		BENCH_ADD(fb_size(&d, a, 16));
+		BENCH_ADD(fb_size_str(&d, a, 16));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fb_write") {
+	BENCH_BEGIN("fb_write_str (16)") {
 		fb_rand(a);
-		BENCH_ADD(fb_write(str, sizeof(str), a, 16));
+		BENCH_ADD(fb_write_str(str, sizeof(str), a, 16));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fb_read") {
+	BENCH_BEGIN("fb_read_str (16)") {
 		fb_rand(a);
-		BENCH_ADD(fb_read(a, str, sizeof(str), 16));
+		fb_write_str(str, sizeof(str), a, 16);
+		BENCH_ADD(fb_read_str(a, str, sizeof(str), 16));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb_size_bin") {
+		fb_rand(a);
+		BENCH_ADD(fb_size_bin(&d, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb_write_bin") {
+		fb_rand(a);
+		BENCH_ADD(fb_write_bin(bin, sizeof(bin), a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fb_read_bin") {
+		fb_rand(a);
+		fb_write_bin(bin, sizeof(bin), a);
+		BENCH_ADD(fb_read_bin(a, bin, sizeof(bin)));
 	}
 	BENCH_END;
 
