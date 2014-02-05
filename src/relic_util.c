@@ -31,6 +31,8 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <ctype.h>
+#include <inttypes.h>
 
 #include "relic_core.h"
 #include "relic_conf.h"
@@ -184,5 +186,21 @@ void util_printf(const char *format, ...) {
 	fflush(stdout);
 	va_end(list);
 #endif
+#endif
+}
+
+void util_print_dig(dig_t a, int pad) {
+#if DIGIT == 64
+	if (pad) {
+		util_print("%.*" PRIX64, (int)(2 * sizeof(dig_t)), (uint64_t)a);
+	} else {
+		util_print("%" PRIX64, (uint64_t)a);
+	}
+#else
+	if (pad) {
+		util_print("%.*" PRIX32, (int)(2 * sizeof(dig_t)), (uint32_t)a);
+	} else {
+		util_print("%" PRIX32, (uint32_t)a);
+	}
 #endif
 }

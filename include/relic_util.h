@@ -210,14 +210,23 @@ int util_bits_dig(dig_t a);
  * @param[in] n				- the length in bytes of the buffers.
  * @return CMP_EQ if they are equal and CMP_NE otherwise.
  */
-int util_cmp_const(const void * a, const void *b, int n);
+int util_cmp_const(const void *a, const void *b, int n);
 
 /**
  * Formats and prints data following a printf-like syntax.
  *
- * @param[in] format			- the format.
- * @param[in] ...				- the list of arguments matching the format.
+ * @param[in] format		- the format.
+ * @param[in] ...			- the list of arguments matching the format.
  */
 void util_printf(const char *format, ...);
+
+/**
+ * Prints a digit.
+ * 
+ * @param[in] a 			- the digit to print.
+ * @param[in] pad 			- the flag to indicate if the digit must be padded
+ * 							with zeroes.
+ */
+void util_print_dig(dig_t a, int pad);
 
 #endif /* !RELIC_UTIL_H */
