@@ -70,12 +70,12 @@ int cp_ecies_gen(bn_t d, ec_t q) {
 	return result;
 }
 
-int cp_ecies_enc(ec_t r, uint8_t *out, int *out_len, uint8_t *mac, uint8_t *in,
-		int in_len, uint8_t *iv, ec_t q) {
+int cp_ecies_enc(ec_t r, uint8_t *out, int *out_len, uint8_t *in, int in_len,
+		ec_t q) {
 	bn_t k, n, x;
 	ec_t p;
 	int l, result = STS_OK, size = CEIL(ec_param_level(), 8);
-	uint8_t _x[EC_BYTES], key[2 * size];
+	uint8_t _x[FC_BYTES], key[2 * size], iv[BC_LEN] = { 0 };
 
 	bn_null(k);
 	bn_null(n);
@@ -101,11 +101,13 @@ int cp_ecies_enc(ec_t r, uint8_t *out, int *out_len, uint8_t *mac, uint8_t *in,
 		bn_size_bin(&l, x);
 		bn_write_bin(_x, l, x);
 		md_kdf2(key, 2 * size, _x, l);
+		l = *out_len;
 		if (bc_aes_cbc_enc(out, out_len, in, in_len, key, 8 * size, iv)
-				!= STS_OK) {
+				!= STS_OK || (*out_len + MD_LEN) > l) {
 			result = STS_ERR;
 		} else {
-			md_hmac(mac, out, *out_len, key + size, size);
+			md_hmac(out + *out_len, out, *out_len, key + size, size);
+			*out_len += MD_LEN;
 		}
 	}
 	CATCH_ANY {
@@ -122,11 +124,11 @@ int cp_ecies_enc(ec_t r, uint8_t *out, int *out_len, uint8_t *mac, uint8_t *in,
 }
 
 int cp_ecies_dec(uint8_t *out, int *out_len, ec_t r, uint8_t *in, int in_len,
-		uint8_t *iv, uint8_t *mac, bn_t d) {
+		bn_t d) {
 	ec_t p;
 	bn_t x;
 	int l, result = STS_OK, size = CEIL(ec_param_level(), 8);
-	uint8_t _x[EC_BYTES], h[MD_LEN], key[2 * size];
+	uint8_t _x[FC_BYTES], h[MD_LEN], key[2 * size], iv[BC_LEN] = { 0 };
 
 	bn_null(x);
 	ec_null(p);
@@ -140,11 +142,11 @@ int cp_ecies_dec(uint8_t *out, int *out_len, ec_t r, uint8_t *in, int in_len,
 		bn_size_bin(&l, x);
 		bn_write_bin(_x, l, x);
 		md_kdf2(key, 2 * size, _x, l);
-		md_hmac(h, in, in_len, key + size, size);
-		if (util_cmp_const(h, mac, MD_LEN)) {
+		md_hmac(h, in, in_len - MD_LEN, key + size, size);
+		if (util_cmp_const(h, in + in_len - MD_LEN, MD_LEN)) {
 			result = STS_ERR;
 		} else {
-			if (bc_aes_cbc_dec(out, out_len, in, in_len, key, 8 * size, iv)
+			if (bc_aes_cbc_dec(out, out_len, in, in_len - MD_LEN, key, 8 * size, iv)
 					!= STS_OK) {
 				result = STS_ERR;
 			}

@@ -36,8 +36,9 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void cp_ecss_gen(bn_t d, ec_t q) {
+int cp_ecss_gen(bn_t d, ec_t q) {
 	bn_t n;
+	int result = STS_OK;
 
 	bn_null(n);
 
@@ -54,18 +55,20 @@ void cp_ecss_gen(bn_t d, ec_t q) {
 		ec_mul_gen(q, d);
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		bn_free(n);
 	}
+	return result;
 }
 
-void cp_ecss_sig(bn_t e, bn_t s, uint8_t *msg, int len, bn_t d) {
+int cp_ecss_sig(bn_t e, bn_t s, uint8_t *msg, int len, bn_t d) {
 	bn_t n, k, x, r;
 	ec_t p;
 	uint8_t hash[MD_LEN];
-	uint8_t m[len + EC_BYTES];
+	uint8_t m[len + FC_BYTES];
+	int result = STS_OK;
 
 	bn_null(n);
 	bn_null(k);
@@ -93,8 +96,8 @@ void cp_ecss_sig(bn_t e, bn_t s, uint8_t *msg, int len, bn_t d) {
 		} while (bn_is_zero(r));
 
 		memcpy(m, msg, len);
-		bn_write_bin(m + len, EC_BYTES, r);
-		md_map(hash, m, len + EC_BYTES);
+		bn_write_bin(m + len, FC_BYTES, r);
+		md_map(hash, m, len + FC_BYTES);
 
 		if (8 * MD_LEN > bn_bits(n)) {
 			len = CEIL(bn_bits(n), 8);
@@ -113,7 +116,7 @@ void cp_ecss_sig(bn_t e, bn_t s, uint8_t *msg, int len, bn_t d) {
 		bn_mod(s, s, n);
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		bn_free(n);
@@ -122,13 +125,14 @@ void cp_ecss_sig(bn_t e, bn_t s, uint8_t *msg, int len, bn_t d) {
 		bn_free(r);
 		ec_free(p);
 	}
+	return result;
 }
 
 int cp_ecss_ver(bn_t e, bn_t s, uint8_t *msg, int len, ec_t q) {
 	bn_t n, ev, rv;
 	ec_t p;
 	uint8_t hash[MD_LEN];
-	uint8_t m[len + EC_BYTES];
+	uint8_t m[len + FC_BYTES];
 	int result = 0;
 
 	bn_null(n);
@@ -152,8 +156,8 @@ int cp_ecss_ver(bn_t e, bn_t s, uint8_t *msg, int len, ec_t q) {
 				bn_mod(rv, rv, n);
 
 				memcpy(m, msg, len);
-				bn_write_bin(m + len, EC_BYTES, rv);
-				md_map(hash, m, len + EC_BYTES);
+				bn_write_bin(m + len, FC_BYTES, rv);
+				md_map(hash, m, len + FC_BYTES);
 
 				if (8 * MD_LEN > bn_bits(n)) {
 					len = CEIL(bn_bits(n), 8);

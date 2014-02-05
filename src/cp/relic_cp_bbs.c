@@ -37,9 +37,10 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void cp_bbs_gen(bn_t d, g2_t q, gt_t z) {
+int cp_bbs_gen(bn_t d, g2_t q, gt_t z) {
 	bn_t n;
 	g1_t g;
+	int result = STS_OK;
 
 	bn_null(n);
 	g1_null(g);
@@ -66,17 +67,19 @@ void cp_bbs_gen(bn_t d, g2_t q, gt_t z) {
 		g2_norm(q, q);
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		bn_free(n);
 		g1_free(g);
 	}
+	return result;
 }
 
-void cp_bbs_sig(g1_t s, uint8_t *msg, int len, int hash, bn_t d) {
+int cp_bbs_sig(g1_t s, uint8_t *msg, int len, int hash, bn_t d) {
 	bn_t m, n, r;
 	uint8_t h[MD_LEN];
+	int result = STS_OK;
 
 	bn_null(m);
 	bn_null(n);
@@ -108,13 +111,14 @@ void cp_bbs_sig(g1_t s, uint8_t *msg, int len, int hash, bn_t d) {
 		g1_mul_gen(s, m);
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		bn_free(m);
 		bn_free(n);
 		bn_free(r);
 	}
+	return result;
 }
 
 int cp_bbs_ver(g1_t s, uint8_t *msg, int len, int hash, g2_t q, gt_t z) {

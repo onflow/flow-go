@@ -44,8 +44,9 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void cp_sokaka_gen(bn_t master) {
+int cp_sokaka_gen(bn_t s) {
 	bn_t n;
+	int result = STS_OK;
 
 	bn_null(n);
 
@@ -55,48 +56,47 @@ void cp_sokaka_gen(bn_t master) {
 		g1_get_ord(n);
 
 		do {
-			bn_rand(master, BN_POS, bn_bits(n));
-			bn_mod(master, master, n);
-		} while (bn_is_zero(master));
+			bn_rand(s, BN_POS, bn_bits(n));
+			bn_mod(s, s, n);
+		} while (bn_is_zero(s));
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		bn_free(n);
 	}
+	return result;
 }
 
-void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master) {
+int cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t s) {
 	if (pc_map_is_type1()) {
 		g1_map(k->s1, (uint8_t *)id, len);
-		g1_mul(k->s1, k->s1, master);
+		g1_mul(k->s1, k->s1, s);
 	} else {
 		g1_map(k->s1, (uint8_t *)id, len);
-		g1_mul(k->s1, k->s1, master);
+		g1_mul(k->s1, k->s1, s);
 		g2_map(k->s2, (uint8_t *)id, len);
-		g2_mul(k->s2, k->s2, master);
+		g2_mul(k->s2, k->s2, s);
 	}
+	return STS_OK;
 }
 
-void cp_sokaka_key(uint8_t *key, unsigned int key_len, char *id1,
+int cp_sokaka_key(uint8_t *key, unsigned int key_len, char *id1,
 		int len1, sokaka_t k, char *id2, int len2) {
-	int l, first = 0;
+	int first = 0, result = STS_OK;
 	g1_t p;
 	g2_t q;
 	gt_t e;
-	bn_t n;
 
 	g1_null(p);
 	g2_null(q);
 	gt_null(e);
-	bn_null(n);
 
 	TRY {
 		g1_new(p);
 		g2_new(q);
 		gt_new(e);
-		bn_new(n);
 
 		if (len1 == len2) {
 			if (strncmp(id1, id2, len1) == 0) {
@@ -136,9 +136,7 @@ void cp_sokaka_key(uint8_t *key, unsigned int key_len, char *id1,
 		for (int i = 0; i < 2; i++) {
 			for (int j = 0; j < 3; j++) {
 				for (int m = 0; m < 2; m++) {
-					fp_prime_back(n, e[i][j][m]);
-					bn_size_bin(&l, n);
-					bn_write_bin(ptr, FP_BYTES, n);
+					fp_write_bin(ptr, FP_BYTES, e[i][j][m]);
 					ptr += FP_BYTES;
 				}
 			}
@@ -147,21 +145,19 @@ void cp_sokaka_key(uint8_t *key, unsigned int key_len, char *id1,
 		uint8_t buf[2 * FP_BYTES], *ptr;
 		ptr = buf;
 		for (int i = 0; i < 2; i++) {
-			fp_prime_back(n, e[i]);
-			bn_size_bin(&l, n);
-			bn_write_bin(ptr, FP_BYTES, n);
+			fp_write_bin(ptr, FP_BYTES, e[i]);
 			ptr += FP_BYTES;
 		}
 #endif
 		md_kdf1(key, key_len, buf, sizeof(buf));
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		g1_free(p);
 		g2_free(q);
 		gt_free(e);
-		bn_free(n);
 	}
+	return result;
 }

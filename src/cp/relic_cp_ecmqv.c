@@ -37,8 +37,9 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void cp_ecmqv_gen(bn_t d, ec_t q) {
+int cp_ecmqv_gen(bn_t d, ec_t q) {
 	bn_t n;
+	int result = STS_OK;
 
 	bn_null(n);
 
@@ -55,19 +56,21 @@ void cp_ecmqv_gen(bn_t d, ec_t q) {
 		ec_mul_gen(q, d);
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		bn_free(n);
 	}
+
+	return result;
 }
 
-void cp_ecmqv_key(uint8_t *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
+int cp_ecmqv_key(uint8_t *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
 		ec_t q1v, ec_t q2v) {
 	ec_t p;
 	bn_t x, n, s;
-	int l;
-	uint8_t _x[EC_BYTES];
+	int l, result = STS_OK;
+	uint8_t _x[FC_BYTES];
 
 	ec_null(p);
 	bn_null(x);
@@ -110,7 +113,7 @@ void cp_ecmqv_key(uint8_t *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
 		md_kdf2(key, key_len, _x, l);
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		ec_free(p);
@@ -118,4 +121,5 @@ void cp_ecmqv_key(uint8_t *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
 		bn_free(n);
 		bn_free(s);
 	}
+	return result;
 }

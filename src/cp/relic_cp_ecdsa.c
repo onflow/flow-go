@@ -36,8 +36,9 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void cp_ecdsa_gen(bn_t d, ec_t q) {
+int cp_ecdsa_gen(bn_t d, ec_t q) {
 	bn_t n;
+	int result = STS_OK;
 
 	bn_null(n);
 
@@ -54,17 +55,20 @@ void cp_ecdsa_gen(bn_t d, ec_t q) {
 		ec_mul_gen(q, d);
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		bn_free(n);
 	}
+
+	return result;
 }
 
-void cp_ecdsa_sig(bn_t r, bn_t s, uint8_t *msg, int len, int hash, bn_t d) {
+int cp_ecdsa_sig(bn_t r, bn_t s, uint8_t *msg, int len, int hash, bn_t d) {
 	bn_t n, k, x, e;
 	ec_t p;
 	uint8_t h[MD_LEN];
+	int result = STS_OK;
 
 	bn_null(n);
 	bn_null(k);
@@ -118,7 +122,7 @@ void cp_ecdsa_sig(bn_t r, bn_t s, uint8_t *msg, int len, int hash, bn_t d) {
 		} while (bn_is_zero(s));
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		bn_free(n);
@@ -127,6 +131,7 @@ void cp_ecdsa_sig(bn_t r, bn_t s, uint8_t *msg, int len, int hash, bn_t d) {
 		bn_free(e);
 		ec_free(p);
 	}
+	return result;
 }
 
 int cp_ecdsa_ver(bn_t r, bn_t s, uint8_t *msg, int len, int hash, ec_t q) {

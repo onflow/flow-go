@@ -37,8 +37,9 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void cp_bls_gen(bn_t d, g2_t q) {
+int cp_bls_gen(bn_t d, g2_t q) {
 	bn_t n;
+	int result = STS_OK;
 
 	bn_null(n);
 
@@ -48,22 +49,24 @@ void cp_bls_gen(bn_t d, g2_t q) {
 		g2_get_ord(n);
 
 		do {
-			bn_rand(d, BN_POS, 2 * pc_param_level());
+			bn_rand(d, BN_POS, bn_bits(n));
 			bn_mod(d, d, n);
 		} while (bn_is_zero(d));
 
 		g2_mul_gen(q, d);
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		bn_free(n);
 	}
+	return result;
 }
 
-void cp_bls_sig(g1_t s, uint8_t *msg, int len, bn_t d) {
+int cp_bls_sig(g1_t s, uint8_t *msg, int len, bn_t d) {
 	g1_t p;
+	int result = STS_OK;
 
 	g1_null(p);
 
@@ -73,11 +76,12 @@ void cp_bls_sig(g1_t s, uint8_t *msg, int len, bn_t d) {
 		g1_mul(s, p, d);
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		g1_free(p);
 	}
+	return result;
 }
 
 int cp_bls_ver(g1_t s, uint8_t *msg, int len, g2_t q) {

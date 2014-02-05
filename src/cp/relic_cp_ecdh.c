@@ -37,8 +37,9 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void cp_ecdh_gen(bn_t d, ec_t q) {
+int cp_ecdh_gen(bn_t d, ec_t q) {
 	bn_t n;
+	int result = STS_OK;
 
 	bn_null(n);
 
@@ -55,27 +56,40 @@ void cp_ecdh_gen(bn_t d, ec_t q) {
 		ec_mul_gen(q, d);
 	}
 	CATCH_ANY {
-		THROW(ERR_CAUGHT);
+		result = STS_ERR;
 	}
 	FINALLY {
 		bn_free(n);
 	}
+
+	return result;
 }
 
-void cp_ecdh_key(uint8_t *key, int key_len, bn_t d, ec_t q) {
+int cp_ecdh_key(uint8_t *key, int key_len, bn_t d, ec_t q) {
 	ec_t p;
-	bn_t x;
-	int l;
-	uint8_t _x[EC_BYTES];
+	bn_t x, h;
+	int l, result = STS_OK;
+	uint8_t _x[FC_BYTES];
 
 	ec_null(p);
 	bn_null(x);
+	bn_null(h);
 
 	TRY {
 		ec_new(p);
 		bn_new(x);
+		bn_new(h);
 
-		ec_mul(p, q, d);
+		ec_curve_get_cof(h);
+		if (bn_bits(h) < BN_DIGIT) {
+			ec_mul_dig(p, q, h->dp[0]);
+		} else {
+			ec_mul(p, q, h);
+		}
+		ec_mul(p, p, d);
+		if (ec_is_infty(p)) {
+			result = STS_ERR;
+		}
 		ec_get_x(x, p);
 		bn_size_bin(&l, x);
 		bn_write_bin(_x, l, x);
@@ -87,5 +101,7 @@ void cp_ecdh_key(uint8_t *key, int key_len, bn_t d, ec_t q) {
 	FINALLY {
 		ec_free(p);
 		bn_free(x);
+		bn_free(h);
 	}
+	return result;
 }
