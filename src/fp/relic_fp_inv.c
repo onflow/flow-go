@@ -206,21 +206,13 @@ void fp_inv_monty(fp_t c, const fp_t a) {
 		bn_zero(x2);
 
 #if FP_RDC != MONTY
-		_a->used = FP_DIGS;
-		dv_copy(_a->dp, a, FP_DIGS);
-		bn_trim(_a);
-		_p->used = FP_DIGS;
-		dv_copy(_p->dp, p, FP_DIGS);
-		bn_trim(_p);
+		bn_read_raw(_a, a, FP_DIGS);
+		bn_read_raw(_p, p, FP_DIGS);
 		bn_mod_monty_conv(u, _a, _p);
 #else
-		u->used = FP_DIGS;
-		dv_copy(u->dp, a, FP_DIGS);
-		bn_trim(u);
+		bn_read_raw(u, a, FP_DIGS);
 #endif
-		v->used = FP_DIGS;
-		dv_copy(v->dp, p, FP_DIGS);
-		bn_trim(v);
+		bn_read_raw(v, p, FP_DIGS);
 
 		while (!bn_is_zero(v)) {
 			/* If v is even then v = v/2, x1 = 2 * x1. */
