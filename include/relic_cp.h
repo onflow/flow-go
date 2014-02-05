@@ -671,7 +671,7 @@ int cp_rsa_gen_quick(rsa_t pub, rsa_t prv, int bits);
  * Encrypts using the RSA cryptosystem.
  *
  * @param[out] out			- the output buffer.
- * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in, out] out_len	- the buffer capacity and number of bytes written.
  * @param[in] in			- the input buffer.
  * @param[in] in_len		- the number of bytes to encrypt.
  * @param[in] pub			- the public key.
@@ -683,7 +683,7 @@ int cp_rsa_enc(uint8_t *out, int *out_len, uint8_t *in, int in_len, rsa_t pub);
  * Decrypts using the basic RSA decryption method.
  *
  * @param[out] out			- the output buffer.
- * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in, out] out_len	- the buffer capacity and number of bytes written.
  * @param[in] in			- the input buffer.
  * @param[in] in_len		- the number of bytes to decrypt.
  * @param[in] prv			- the private key.
@@ -696,7 +696,7 @@ int cp_rsa_dec_basic(uint8_t *out, int *out_len, uint8_t *in, int in_len,
  * Decrypts using the fast RSA decryption with CRT optimization.
  *
  * @param[out] out			- the output buffer.
- * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in, out] out_len	- the buffer capacity and number of bytes written.
  * @param[in] in			- the input buffer.
  * @param[in] in_len		- the number of bytes to decrypt.
  * @param[in] prv			- the private key.
@@ -764,20 +764,20 @@ int cp_rabin_gen(rabin_t pub, rabin_t prv, int bits);
  * Encrypts using the Rabin cryptosystem.
  *
  * @param[out] out			- the output buffer.
- * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in, out] out_len	- the buffer capacity and number of bytes written.
  * @param[in] in			- the input buffer.
  * @param[in] in_len		- the number of bytes to encrypt.
  * @param[in] pub			- the public key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_rabin_enc(uint8_t *out, int *out_len, uint8_t *in,
-		int in_len, rabin_t pub);
+int cp_rabin_enc(uint8_t *out, int *out_len, uint8_t *in, int in_len,
+		rabin_t pub);
 
 /**
  * Decrypts using the Rabin cryptosystem.
  *
  * @param[out] out			- the output buffer.
- * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in, out] out_len	- the buffer capacity and number of bytes written.
  * @param[in] in			- the input buffer.
  * @param[in] in_len		- the number of bytes to decrypt.
  * @param[in] prv			- the private key.
@@ -801,7 +801,7 @@ int cp_bdpe_gen(bdpe_t pub, bdpe_t prv, dig_t block, int bits);
  * Encrypts using Benaloh's cryptosystem.
  *
  * @param[out] out			- the output buffer.
- * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in, out] out_len	- the buffer capacity and number of bytes written.
  * @param[in] in			- the plaintext as a small integer.
  * @param[in] pub			- the public key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
@@ -833,7 +833,7 @@ int cp_phpe_gen(bn_t n, bn_t l, int bits);
  * Encrypts using the Paillier cryptosystem.
  *
  * @param[out] out			- the output buffer.
- * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in, out] out_len	- the buffer capacity and number of bytes written.
  * @param[in] in			- the input buffer.
  * @param[in] in_len		- the number of bytes to encrypt.
  * @param[in] n				- the public key.
@@ -862,7 +862,7 @@ int cp_phpe_dec(uint8_t *out, int out_len, uint8_t *in, int in_len, bn_t n,
  * @param[out] d			- the private key.
  * @param[in] q				- the public key.
  */
-void cp_ecdh_gen(bn_t d, ec_t q);
+int cp_ecdh_gen(bn_t d, ec_t q);
 
 /**
  * Derives a shared secret using ECDH.
@@ -871,8 +871,9 @@ void cp_ecdh_gen(bn_t d, ec_t q);
  * @param[int] key_len			- the intended shared key length in bytes.
  * @param[in] d					- the private key.
  * @param[in] q					- the point received from the other party.
+ * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-void cp_ecdh_key(uint8_t *key, int key_len, bn_t d, ec_t q);
+int cp_ecdh_key(uint8_t *key, int key_len, bn_t d, ec_t q);
 
 /**
  * Generate an ECMQV key pair.
@@ -882,7 +883,7 @@ void cp_ecdh_key(uint8_t *key, int key_len, bn_t d, ec_t q);
  * @param[out] d			- the private key.
  * @param[in] q				- the public key.
  */
-void cp_ecmqv_gen(bn_t d, ec_t q);
+int cp_ecmqv_gen(bn_t d, ec_t q);
 
 /**
  * Derives a shared secret using ECMQV.
@@ -895,7 +896,7 @@ void cp_ecmqv_gen(bn_t d, ec_t q);
  * @param[in] q1v				- the point received from the other party.
  * @param[in] q2v				- the ephemeral point received from the other party.
  */
-void cp_ecmqv_key(uint8_t *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
+int cp_ecmqv_key(uint8_t *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
 		ec_t q1v, ec_t q2v);
 
 /**
@@ -912,31 +913,29 @@ int cp_ecies_gen(bn_t d, ec_t q);
  *
  * @param[out] r 			- the resulting elliptic curve point.
  * @param[out] out			- the output buffer.
- * @param[out] out_len		- the number of bytes written in the output buffer.
- * @param[out] mac 			- the authentication tag.
- * @param[in] in			- the input buffer.
+ * @param[in, out] out_len	- the buffer capacity and number of bytes written.
+ * @param[in] in			- the input buffer. 
  * @param[in] in_len		- the number of bytes to encrypt.
  * @param[in] iv 			- the block cipher initialization vector.
  * @param[in] q				- the public key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
-int cp_ecies_enc(ec_t r, uint8_t *out, int *out_len, uint8_t *mac, uint8_t *in,
-		int in_len, uint8_t *iv, ec_t q);
+int cp_ecies_enc(ec_t r, uint8_t *out, int *out_len, uint8_t *in, int in_len,
+		ec_t q);
 
 /**
  * Decrypts using the ECIES cryptosystem.
  *
  * @param[out] out			- the output buffer.
- * @param[out] out_len		- the number of bytes written in the output buffer.
+ * @param[in, out] out_len	- the buffer capacity and number of bytes written.
  * @param[in] in			- the input buffer.
  * @param[in] in_len		- the number of bytes to encrypt.
  * @param[in] iv 			- the block cipher initialization vector.
- * @param[in] mac 			- the authentication tag.
  * @param[in] d				- the private key.
  * @return STS_OK if no errors occurred, STS_ERR otherwise.
  */
 int cp_ecies_dec(uint8_t *out, int *out_len, ec_t r, uint8_t *in, int in_len,
-		uint8_t *iv, uint8_t *mac, bn_t d);
+		bn_t d);
 
 /**
  * Generates an ECDSA key pair.
@@ -944,7 +943,7 @@ int cp_ecies_dec(uint8_t *out, int *out_len, ec_t r, uint8_t *in, int in_len,
  * @param[out] d			- the private key.
  * @param[in] q				- the public key.
  */
-void cp_ecdsa_gen(bn_t d, ec_t q);
+int cp_ecdsa_gen(bn_t d, ec_t q);
 
 /**
  * Signs a message using ECDSA.
@@ -956,7 +955,7 @@ void cp_ecdsa_gen(bn_t d, ec_t q);
  * @param[in] hash				- the flag to indicate the message format.
  * @param[in] d					- the private key.
  */
-void cp_ecdsa_sig(bn_t r, bn_t s, uint8_t *msg, int len, int hash, bn_t d);
+int cp_ecdsa_sig(bn_t r, bn_t s, uint8_t *msg, int len, int hash, bn_t d);
 
 /**
  * Verifies a message signed with ECDSA using the basic method.
@@ -976,7 +975,7 @@ int cp_ecdsa_ver(bn_t r, bn_t s, uint8_t *msg, int len, int hash, ec_t q);
  * @param[out] d			- the private key.
  * @param[in] q				- the public key.
  */
-void cp_ecss_gen(bn_t d, ec_t q);
+int cp_ecss_gen(bn_t d, ec_t q);
 
 /**
  * Signs a message using the Elliptic Curve Schnorr Signature.
@@ -987,7 +986,7 @@ void cp_ecss_gen(bn_t d, ec_t q);
  * @param[in] len				- the message length in bytes.
  * @param[in] d					- the private key.
  */
-void cp_ecss_sig(bn_t e, bn_t s, uint8_t *msg, int len, bn_t d);
+int cp_ecss_sig(bn_t e, bn_t s, uint8_t *msg, int len, bn_t d);
 
 /**
  * Verifies a message signed with the Elliptic Curve Schnorr Signature using the
@@ -1007,7 +1006,7 @@ int cp_ecss_ver(bn_t e, bn_t s, uint8_t *msg, int len, ec_t q);
  *
  * @param[out] master			- the master key.
  */
-void cp_sokaka_gen(bn_t master);
+int cp_sokaka_gen(bn_t master);
 
 /**
  * Generates a private key for the SOK protocol.
@@ -1017,7 +1016,7 @@ void cp_sokaka_gen(bn_t master);
  * @param[in] len				- the length of identity in bytes.
  * @param[in] master			- the master key.
  */
-void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master);
+int cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master);
 
 /**
  * Computes a shared key between two entities.
@@ -1030,7 +1029,7 @@ void cp_sokaka_gen_prv(sokaka_t k, char *id, int len, bn_t master);
  * @param[in] id2				- the second identity.
  * @param[in] len2				- the length of the second identity in bytes.
  */
-void cp_sokaka_key(uint8_t *key, unsigned int key_len, char *id1, int len1,
+int cp_sokaka_key(uint8_t *key, unsigned int key_len, char *id1, int len1,
 		sokaka_t k, char *id2, int len2);
 
 /**
@@ -1039,7 +1038,7 @@ void cp_sokaka_key(uint8_t *key, unsigned int key_len, char *id1, int len1,
  * @param[out] d			- the private key.
  * @param[in] q				- the public key.
  */
-void cp_bls_gen(bn_t d, g2_t q);
+int cp_bls_gen(bn_t d, g2_t q);
 
 /**
  * Signs a message using BLS.
@@ -1049,7 +1048,7 @@ void cp_bls_gen(bn_t d, g2_t q);
  * @param[in] len				- the message length in bytes.
  * @param[in] d					- the private key.
  */
-void cp_bls_sig(g1_t s, uint8_t *msg, int len, bn_t d);
+int cp_bls_sig(g1_t s, uint8_t *msg, int len, bn_t d);
 
 /**
  * Verifies a message signed with BLS using the basic method.
@@ -1069,7 +1068,7 @@ int cp_bls_ver(g1_t s, uint8_t *msg, int len, g2_t q);
  * @param[in] q				- the first component of the public key.
  * @param[in] q				- the second component of the public key.
  */
-void cp_bbs_gen(bn_t d, g2_t q, gt_t z);
+int cp_bbs_gen(bn_t d, g2_t q, gt_t z);
 
 /**
  * Signs a message using Boneh-Boyen Short Signature.
@@ -1080,7 +1079,7 @@ void cp_bbs_gen(bn_t d, g2_t q, gt_t z);
  * @param[in] hash				- the flag to indicate the message format.
  * @param[in] d					- the private key.
  */
-void cp_bbs_sig(g1_t s, uint8_t *msg, int len, int hash, bn_t d);
+int cp_bbs_sig(g1_t s, uint8_t *msg, int len, int hash, bn_t d);
 
 /**
  * Verifies a message signed with BLS using the basic method.
