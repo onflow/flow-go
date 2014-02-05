@@ -686,6 +686,39 @@ void eb_tab(eb_t *t, const eb_t p, int w);
 void eb_print(const eb_t p);
 
 /**
+ * Returns the number of bytes necessary to store a binary elliptic curve point
+ * with optional point compression.
+ *
+ * @param[out] size			- the result.
+ * @param[in] a				- the binary field element.
+ * @param[in] pack			- the flag to indicate point compression.
+ */
+void eb_size_bin(int *size, const eb_t a, int pack);
+
+/**
+ * Reads a binary elliptic curve point from a byte vector in big-endian format.
+ *
+ * @param[out] a			- the result.
+ * @param[in] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @throw ERR_NO_VALID		- if the encoded point is invalid.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is invalid. 
+ */
+void eb_read_bin(eb_t a, const uint8_t *bin, int len);
+
+/**
+ * Writes a binary field element to a byte vector in big-endian format with
+ * optional point compression.
+ *
+ * @param[out] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @param[in] a				- the binary elliptic curve point to write.
+ * @param[in] pack			- the flag to indicate point compression.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is invalid. 
+ */
+void eb_write_bin(uint8_t *bin, int len, const eb_t a, int pack);
+
+/**
  * Negates a binary elliptic curve point represented by affine coordinates.
  *
  * @param[out] r			- the result.

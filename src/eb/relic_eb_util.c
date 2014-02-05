@@ -682,3 +682,117 @@ void eb_print(const eb_t p) {
 	fb_print(p->y);
 	fb_print(p->z);
 }
+
+void eb_size_bin(int *size, const eb_t a, int pack) {
+	eb_t t;
+
+	eb_null(t);
+
+	if (eb_is_infty(a)) {
+		*size = 1;
+		return;
+	}
+
+	TRY {
+		eb_new(t);
+
+		eb_norm(t, a);
+
+		*size = 1 + FB_BYTES;
+		if (!pack) {
+			*size += FB_BYTES;
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		eb_free(t);	
+	}
+}
+
+void eb_read_bin(eb_t a, const uint8_t *bin, int len) {
+	if (len == 1) {
+		if (bin[0] == 0) {
+			eb_set_infty(a);
+			return;
+		} else {
+			THROW(ERR_NO_BUFFER);
+			return;
+		}
+	}
+
+	if (len != (FB_BYTES + 1) && len != (2 * FB_BYTES + 1)) {
+		THROW(ERR_NO_BUFFER);
+		return;
+	}
+
+	a->norm = 1;
+	fb_set_dig(a->z, 1);
+	fb_read_bin(a->x, bin + 1, FB_BYTES);
+	if (len == FB_BYTES + 1) {
+		switch(bin[0]) {
+			case 2:
+				fb_zero(a->y);
+				break;
+			case 3:
+				fb_zero(a->y);
+				fb_set_bit(a->y, 0, 1);
+				break;
+			default:
+				THROW(ERR_NO_VALID);
+				break;
+		}
+		eb_upk(a, a);
+	}
+
+	if (len == 2 * FB_BYTES + 1) {
+		if (bin[0] == 4) {
+			fb_read_bin(a->y, bin + FB_BYTES + 1, FB_BYTES);
+		} else {
+			THROW(ERR_NO_VALID);
+		}
+	}
+}
+
+void eb_write_bin(uint8_t *bin, int len, const eb_t a, int pack) {
+	eb_t t;
+
+	eb_null(t);
+
+	if (eb_is_infty(a)) {
+		if (len != 1) {
+			THROW(ERR_NO_BUFFER);
+		} else {
+			bin[0] = 0;
+			return;
+		}
+	}
+
+	TRY {
+		eb_new(t);
+
+		eb_norm(t, a);
+
+		if (pack) {
+			if (len != FB_BYTES + 1) {
+				THROW(ERR_NO_BUFFER);	
+			} else {
+				eb_pck(t, t);
+				bin[0] = 2 | fb_get_bit(t->y, 0);
+				fb_write_bin(bin + 1, FB_BYTES, t->x);
+			}
+		} else {
+			if (len != 2 * FB_BYTES + 1) {
+				THROW(ERR_NO_BUFFER);
+			} else {
+				bin[0] = 4;
+				fb_write_bin(bin + 1, FB_BYTES, t->x);
+				fb_write_bin(bin + FB_BYTES + 1, FB_BYTES, t->y);
+			}
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		eb_free(t);
+	}
+}

@@ -692,6 +692,39 @@ void ep_tab(ep_t *t, const ep_t p, int w);
 void ep_print(const ep_t p);
 
 /**
+ * Returns the number of bytes necessary to store a prime elliptic curve point
+ * with optional point compression.
+ *
+ * @param[out] size			- the result.
+ * @param[in] a				- the prime field element.
+ * @param[in] pack			- the flag to indicate point compression.
+ */
+void ep_size_bin(int *size, const ep_t a, int pack);
+
+/**
+ * Reads a prime elliptic curve point from a byte vector in big-endian format.
+ *
+ * @param[out] a			- the result.
+ * @param[in] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @throw ERR_NO_VALID		- if the encoded point is invalid.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is invalid. 
+ */
+void ep_read_bin(ep_t a, const uint8_t *bin, int len);
+
+/**
+ * Writes a prime field element to a byte vector in big-endian format with
+ * optional point compression.
+ *
+ * @param[out] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @param[in] a				- the prime elliptic curve point to write.
+ * @param[in] pack			- the flag to indicate point compression.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is invalid. 
+ */
+void ep_write_bin(uint8_t *bin, int len, const ep_t a, int pack);
+
+/**
  * Negates a prime elliptic curve point represented by affine coordinates.
  *
  * @param[out] r			- the result.

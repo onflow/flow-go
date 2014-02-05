@@ -623,7 +623,7 @@ void fb_print(const fb_t a);
  * @param[in] radix			- the radix.
  * @throw ERR_NO_VALID		- if the radix is invalid.
  */
-void fb_size(int *size, const fb_t a, int radix);
+void fb_size_str(int *size, const fb_t a, int radix);
 
 /**
  * Reads a binary field element from a string in a given radix. The radix must
@@ -633,10 +633,10 @@ void fb_size(int *size, const fb_t a, int radix);
  * @param[in] str			- the string.
  * @param[in] len			- the size of the string.
  * @param[in] radix			- the radix.
- * @throw ERR_NO_BUFFER		- if the string if too long.
- * @throw ERR_NO_VALID		- if the radix is invalid.
+ * @throw ERR_NO_VALID		- if the radix is invalid. 
+ * @throw ERR_NO_BUFFER		- if the string is too long.
  */
-void fb_read(fb_t a, const char *str, int len, int radix);
+void fb_read_str(fb_t a, const char *str, int len, int radix);
 
 /**
  * Writes a binary field element to a string in a given radix. The radix must
@@ -646,10 +646,38 @@ void fb_read(fb_t a, const char *str, int len, int radix);
  * @param[in] len			- the buffer capacity.
  * @param[in] a				- the binary field element to write.
  * @param[in] radix			- the radix.
+ * @throw ERR_NO_VALID		- if the radix is invalid. 
  * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
- * @throw ERR_NO_VALID		- if the radix is invalid.
  */
-void fb_write(char *str, int len, const fb_t a, int radix);
+void fb_write_str(char *str, int len, const fb_t a, int radix);
+
+/**
+ * Returns the number of bytes necessary to store a binary field element.
+ *
+ * @param[out] size			- the result.
+ * @param[in] a				- the binary field element.
+ */
+void fb_size_bin(int *size, const fb_t a);
+
+/**
+ * Reads a binary field element from a byte vector in big-endian format.
+ *
+ * @param[out] a			- the result.
+ * @param[in] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not FP_BYTES. 
+ */
+void fb_read_bin(fb_t a, const uint8_t *bin, int len);
+
+/**
+ * Writes a binary field element to a byte vector in big-endian format.
+ *
+ * @param[out] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @param[in] a				- the binary field element to write.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not FP_BYTES.
+ */
+void fb_write_bin(uint8_t *bin, int len, const fb_t a);
 
 /**
  * Returns the result of a comparison between two binary field elements.

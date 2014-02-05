@@ -29,9 +29,6 @@
  * @ingroup fb
  */
 
-#include <ctype.h>
-#include <inttypes.h>
-
 #include "relic_core.h"
 #include "relic_fb.h"
 #include "relic_fb_low.h"
@@ -167,72 +164,49 @@ void fb_print(const fb_t a) {
 
 	/* Suppress possible unused parameter warning. */
 	(void)a;
-	for (i = FB_DIGS - 1; i >= 0; i--) {
-#if WORD == 64
-		util_print("%.*" PRIX64 " ", (int)(2 * (FB_DIGIT / 8)), (uint64_t)a[i]);
-#else
-		util_print("%.*" PRIX32 " ", (int)(2 * (FB_DIGIT / 8)), (uint32_t)a[i]);
-#endif
+	for (i = FB_DIGS - 1; i > 0; i--) {
+		util_print_dig(a[i], 1);
+		util_print(" ");
 	}
+	util_print_dig(a[0], 1);
 	util_print("\n");
 }
 
-void fb_size(int *size, const fb_t a, int radix) {
-	int digits = 0, l;
-	fb_t t;
+void fb_size_str(int *size, const fb_t a, int radix) {
+	bn_t t;
 
-	fb_null(t);
+	bn_null(t);
 
-	*size = 0;
-
-	if (fb_is_zero(a)) {
-		*size = 2;
-		return;
-	}
-
-	/* Binary case. */
-	if (radix == 2) {
-		*size = fb_bits(a) + 1;
-		return;
-	}
-
-	/* Check the radix. */
 	if (!valid_radix(radix)) {
 		THROW(ERR_NO_VALID);
 	}
-	l = log_radix(radix);
 
 	TRY {
-		fb_new(t);
+		bn_new(t);
 
-		fb_copy(t, a);
-		digits = 0;
-		while (fb_is_zero(t) == 0) {
-			fb_rsh(t, t, l);
-			digits++;
-		}
+		bn_read_raw(t, a, FB_DIGS);
+
+		bn_size_str(size, t, radix);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
-		fb_free(t);
+		bn_free(t);
 	}
-
-	*size = digits + 1;
 }
 
-void fb_read(fb_t a, const char *str, int len, int radix) {
+void fb_read_str(fb_t a, const char *str, int len, int radix) {
 	int i, j, l;
 	char c;
 	dig_t carry;
 
 	fb_zero(a);
 
+	l = log_radix(radix);
 	if (!valid_radix(radix)) {
 		THROW(ERR_NO_VALID);
 	}
-	l = log_radix(radix);
 
 	j = 0;
 	while (str[j] && j < len) {
@@ -256,15 +230,15 @@ void fb_read(fb_t a, const char *str, int len, int radix) {
 	}
 }
 
-void fb_write(char *str, int len, const fb_t a, int radix) {
+void fb_write_str(char *str, int len, const fb_t a, int radix) {
 	fb_t t;
 	int d, l, i, j;
 	char c;
 
 	fb_null(t);
 
-	fb_size(&l, a, radix);
-	if (len <= l) {
+	fb_size_str(&l, a, radix);
+	if (len < l) {
 		THROW(ERR_NO_BUFFER);
 	}
 	len = l;
@@ -310,5 +284,56 @@ void fb_write(char *str, int len, const fb_t a, int radix) {
 	}
 	FINALLY {
 		fb_free(t);
+	}
+}
+
+void fb_size_bin(int *size, const fb_t a) {
+	*size = FB_BYTES;
+}
+
+void fb_read_bin(fb_t a, const uint8_t *bin, int len) {
+	bn_t t;
+
+	bn_null(t);
+
+	if (len != FB_BYTES) {
+		THROW(ERR_NO_BUFFER);
+	}
+
+	TRY {
+		bn_new(t);
+		
+		bn_read_bin(t, bin, len);
+
+		fb_copy(a, t->dp);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
+	}
+}
+
+void fb_write_bin(uint8_t *bin, int len, const fb_t a) {
+	bn_t t;
+
+	bn_null(t);
+
+	if (len != FB_BYTES) {
+		THROW(ERR_NO_BUFFER);
+	}
+
+	TRY {
+		bn_new(t);
+
+		bn_read_raw(t, a, FB_DIGS);
+
+		bn_write_bin(bin, len, t);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
 	}
 }

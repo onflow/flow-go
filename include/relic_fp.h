@@ -647,7 +647,7 @@ void fp_print(const fp_t a);
  * @param[in] radix			- the radix.
  * @throw ERR_NO_VALID		- if the radix is invalid.
  */
-void fp_size(int *size, const fp_t a, int radix);
+void fp_size_str(int *size, const fp_t a, int radix);
 
 /**
  * Reads a prime field element from a string in a given radix. The radix must
@@ -659,7 +659,7 @@ void fp_size(int *size, const fp_t a, int radix);
  * @param[in] radix			- the radix.
  * @throw ERR_NO_VALID		- if the radix is invalid.
  */
-void fp_read(fp_t a, const char *str, int len, int radix);
+void fp_read_str(fp_t a, const char *str, int len, int radix);
 
 /**
  * Writes a prime field element to a string in a given radix. The radix must
@@ -672,7 +672,35 @@ void fp_read(fp_t a, const char *str, int len, int radix);
  * @throw ERR_BUFFER		- if the buffer capacity is insufficient.
  * @throw ERR_NO_VALID		- if the radix is invalid.
  */
-void fp_write(char *str, int len, const fp_t a, int radix);
+void fp_write_str(char *str, int len, const fp_t a, int radix);
+
+/**
+ * Returns the number of bytes necessary to store a prime field element.
+ *
+ * @param[out] size			- the result.
+ * @param[in] a				- the prime field element.
+ */
+void fp_size_bin(int *size, const fp_t a);
+
+/**
+ * Reads a prime field element from a byte vector in big-endian format.
+ *
+ * @param[out] a			- the result.
+ * @param[in] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not FP_BYTES. 
+ */
+void fp_read_bin(fp_t a, const uint8_t *bin, int len);
+
+/**
+ * Writes a prime field element to a byte vector in big-endian format.
+ *
+ * @param[out] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @param[in] a				- the prime field element to write.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not FP_BYTES.
+ */
+void fp_write_bin(uint8_t *bin, int len, const fp_t a);
 
 /**
  * Returns the result of a comparison between two prime field elements.

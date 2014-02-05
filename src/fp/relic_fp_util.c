@@ -29,8 +29,6 @@
  * @ingroup fp
  */
 
-#include <inttypes.h>
-
 #include "relic_core.h"
 #include "relic_fp_low.h"
 
@@ -135,34 +133,21 @@ void fp_print(const fp_t a) {
 		if (a != fp_prime_get()) {
 			fp_prime_back(t, a);
 		} else {
-			t->used = FP_DIGS;
-			dv_copy(t->dp, fp_prime_get(), FP_DIGS);
+			bn_read_raw(t, a, FP_DIGS);
 		}
 #else
-		t->used = FP_DIGS;
-		fp_copy(t->dp, a);
+		bn_read_raw(t, a, FP_DIGS);
 #endif
 
-		for (i = FP_DIGS - 1; i >= 0; i--) {
-#if WORD == 64
+		for (i = FP_DIGS - 1; i > 0; i--) {
 			if (i >= t->used) {
-				util_print("%.*" PRIX64 " ", (int)(2 * (FP_DIGIT / 8)),
-						(uint64_t)0);
+				util_print_dig(0, 1);
 			} else {
-				util_print("%.*" PRIX64 " ", (int)(2 * (FP_DIGIT / 8)),
-						(uint64_t)t->dp[i]);
+				util_print_dig(t->dp[i], 1);
 			}
-#else
-			if (i >= t->used) {
-				util_print("%.*" PRIX32 " ", (int)(2 * (FP_DIGIT / 8)),
-						(uint32_t)0);
-			} else {
-				util_print("%.*" PRIX32 " ", (int)(2 * (FP_DIGIT / 8)),
-						(uint32_t)t->dp[i]);
-			}
-
-#endif
+			util_print(" ");
 		}
+		util_print_dig(t->dp[0], 1);
 		util_print("\n");
 
 	} CATCH_ANY {
@@ -173,7 +158,7 @@ void fp_print(const fp_t a) {
 	}
 }
 
-void fp_size(int *size, const fp_t a, int radix) {
+void fp_size_str(int *size, const fp_t a, int radix) {
 	bn_t t;
 
 	bn_null(t);
@@ -192,7 +177,7 @@ void fp_size(int *size, const fp_t a, int radix) {
 	}
 }
 
-void fp_read(fp_t a, const char *str, int len, int radix) {
+void fp_read_str(fp_t a, const char *str, int len, int radix) {
 	bn_t t;
 
 	bn_null(t);
@@ -218,7 +203,7 @@ void fp_read(fp_t a, const char *str, int len, int radix) {
 	}
 }
 
-void fp_write(char *str, int len, const fp_t a, int radix) {
+void fp_write_str(char *str, int len, const fp_t a, int radix) {
 	bn_t t;
 
 	bn_null(t);
@@ -229,6 +214,63 @@ void fp_write(char *str, int len, const fp_t a, int radix) {
 		fp_prime_back(t, a);
 
 		bn_write_str(str, len, t, radix);
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
+	}
+}
+
+void fp_size_bin(int *size, const fp_t a) {
+	*size = FP_BYTES;
+}
+
+void fp_read_bin(fp_t a, const uint8_t *bin, int len) {
+	bn_t t;
+
+	bn_null(t);
+
+	if (len != FP_BYTES) {
+		THROW(ERR_NO_BUFFER);
+	}
+
+	TRY {
+		bn_new(t);
+		bn_read_bin(t, bin, len);
+		if (bn_is_zero(t)) {
+			fp_zero(a);
+		} else {
+			if (t->used == 1) {
+				fp_prime_conv_dig(a, t->dp[0]);
+			} else {
+				fp_prime_conv(a, t);
+			}
+		}
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
+	}
+}
+
+void fp_write_bin(uint8_t *bin, int len, const fp_t a) {
+	bn_t t;
+
+	bn_null(t);
+
+	if (len != FP_BYTES) {
+		THROW(ERR_NO_BUFFER);
+	}
+
+	TRY {
+		bn_new(t);
+
+		fp_prime_back(t, a);
+
+		bn_write_bin(bin, len, t);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}

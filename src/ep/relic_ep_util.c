@@ -154,23 +154,6 @@ void ep_rhs(fp_t rhs, const ep_t p) {
 	}
 }
 
-void ep_tab(ep_t *t, const ep_t p, int w) {
-	if (w > 2) {
-		ep_dbl(t[0], p);
-#if defined(EP_MIXED)
-		ep_norm(t[0], t[0]);
-#endif
-		ep_add(t[1], t[0], p);
-		for (int i = 2; i < (1 << (w - 2)); i++) {
-			ep_add(t[i], t[i - 1], t[0]);
-		}
-#if defined(EP_MIXED)
-		ep_norm_sim(t + 1, (const ep_t *)t + 1, (1 << (w - 2)) - 1);
-#endif
-	}
-	ep_copy(t[0], p);
-}
-
 int ep_is_valid(const ep_t p) {
 	ep_t t;
 	int r = 0;
@@ -193,8 +176,139 @@ int ep_is_valid(const ep_t p) {
 	return r;
 }
 
+void ep_tab(ep_t *t, const ep_t p, int w) {
+	if (w > 2) {
+		ep_dbl(t[0], p);
+#if defined(EP_MIXED)
+		ep_norm(t[0], t[0]);
+#endif
+		ep_add(t[1], t[0], p);
+		for (int i = 2; i < (1 << (w - 2)); i++) {
+			ep_add(t[i], t[i - 1], t[0]);
+		}
+#if defined(EP_MIXED)
+		ep_norm_sim(t + 1, (const ep_t *)t + 1, (1 << (w - 2)) - 1);
+#endif
+	}
+	ep_copy(t[0], p);
+}
+
 void ep_print(const ep_t p) {
 	fp_print(p->x);
 	fp_print(p->y);
 	fp_print(p->z);
+}
+
+void ep_size_bin(int *size, const ep_t a, int pack) {
+	ep_t t;
+
+	ep_null(t);
+
+	if (ep_is_infty(a)) {
+		*size = 1;
+		return;
+	}
+
+	TRY {
+		ep_new(t);
+
+		ep_norm(t, a);
+
+		*size = 1 + FP_BYTES;
+		if (!pack) {
+			*size += FP_BYTES;
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		ep_free(t);	
+	}
+}
+
+void ep_read_bin(ep_t a, const uint8_t *bin, int len) {
+	if (len == 1) {
+		if (bin[0] == 0) {
+			ep_set_infty(a);
+			return;
+		} else {
+			THROW(ERR_NO_BUFFER);
+			return;
+		}
+	}
+
+	if (len != (FP_BYTES + 1) && len != (2 * FP_BYTES + 1)) {
+		THROW(ERR_NO_BUFFER);
+		return;
+	}
+
+	a->norm = 1;
+	fp_set_dig(a->z, 1);
+	fp_read_bin(a->x, bin + 1, FP_BYTES);
+	if (len == FP_BYTES + 1) {
+		switch(bin[0]) {
+			case 2:
+				fp_zero(a->y);
+				break;
+			case 3:
+				fp_zero(a->y);
+				fp_set_bit(a->y, 0, 1);
+				break;
+			default:
+				THROW(ERR_NO_VALID);
+				break;
+		}
+		ep_upk(a, a);
+	}
+
+	if (len == 2 * FP_BYTES + 1) {
+		if (bin[0] == 4) {
+			fp_read_bin(a->y, bin + FP_BYTES + 1, FP_BYTES);
+		} else {
+			THROW(ERR_NO_VALID);
+		}
+	}
+}
+
+void ep_write_bin(uint8_t *bin, int len, const ep_t a, int pack) {
+	ep_t t;
+
+	ep_null(t);
+
+	if (ep_is_infty(a)) {
+		if (len != 1) {
+			THROW(ERR_NO_BUFFER);
+		} else {
+			bin[0] = 0;
+			return;
+		}
+	}
+
+	TRY {
+		ep_new(t);
+
+		ep_norm(t, a);
+
+		if (pack) {
+			if (len != FP_BYTES + 1) {
+				THROW(ERR_NO_BUFFER);	
+			} else {
+				ep_pck(t, t);
+				bin[0] = 2 | fp_get_bit(t->y, 0);
+				fp_write_bin(bin + 1, FP_BYTES, t->x);
+			}
+		} else {
+			if (len != 2 * FP_BYTES + 1) {
+				THROW(ERR_NO_BUFFER);
+			} else {
+				bin[0] = 4;
+				fp_write_bin(bin + 1, FP_BYTES, t->x);
+				fp_write_bin(bin + FP_BYTES + 1, FP_BYTES, t->y);
+			}
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep_free(t);
+	}
 }

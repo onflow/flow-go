@@ -78,27 +78,27 @@
  * Size of a field element in words.
  */
 #if EC_CUR == PRIME
-#define EC_DIGS				FP_DIGS
+#define FC_DIGS				FP_DIGS
 #elif EC_CUR == CHAR2
-#define EC_DIGS				FB_DIGS
+#define FC_DIGS				FB_DIGS
 #endif
 
 /**
  * Size of a field element in bits.
  */
 #if EC_CUR == PRIME
-#define EC_BITS				FP_BITS
+#define FC_BITS				FP_BITS
 #elif EC_CUR == CHAR2
-#define EC_BITS				FB_BITS
+#define FC_BITS				FB_BITS
 #endif
 
 /**
  * Size of a field element in bytes.
  */
 #if EC_CUR == PRIME
-#define EC_BYTES			FP_BYTES
+#define FC_BYTES			FP_BYTES
 #elif EC_CUR == CHAR2
-#define EC_BYTES			FB_BYTES
+#define FC_BYTES			FB_BYTES
 #endif
 
 /*============================================================================*/
@@ -235,11 +235,41 @@ typedef CAT(EC_LOWER, t) ec_t;
  */
 #define ec_rand(P)			CAT(EC_LOWER, rand)(P)
 
- /** Tests if a point is in the curve.
-  *
-  * @param[in] P			- the point to test.
-  */
+/** Tests if a point is in the curve.
+ *
+ * @param[in] P			- the point to test.
+ */
 #define ec_is_valid(P)		CAT(EC_LOWER, is_valid)(P)
+
+/**
+ * Returns the number of bytes necessary to store an elliptic curve point with
+ * optional point compression.
+ *
+ * @param[out] L			- the result.
+ * @param[in] A				- the elliptic curve point.
+ * @param[in] P				- the flag to indicate point compression.
+ */
+#define ec_size_bin(L, A, P)	CAT(EC_LOWER, size_bin)(L, A, P)
+
+/**
+ * Reads an elliptic curve point from a byte vector in big-endian format.
+ *
+ * @param[out] A			- the result.
+ * @param[in] B				- the byte vector.
+ * @param[in] L				- the buffer capacity.
+ */
+#define ec_read_bin(A, B, L)	CAT(EC_LOWER, read_bin)(A, B, L)
+
+/**
+ * Writes an elliptic curve point to a byte vector in big-endian format with
+ * optional point compression.
+ *
+ * @param[out] B			- the byte vector.
+ * @param[in] L				- the buffer capacity.
+ * @param[in] A				- the prime elliptic curve point to write.
+ * @param[in] P				- the flag to indicate point compression.
+ */
+#define ec_write_bin(B, L, A, P)	CAT(EC_LOWER, write_bin)(B, L, A, P)
 
 /**
  * Prints a elliptic curve point.
