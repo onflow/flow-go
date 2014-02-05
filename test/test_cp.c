@@ -649,10 +649,10 @@ static int ecies(void) {
 
   end:
 	ec_free(r);
-	bn_new(d_a);
-	bn_new(d_b);
-	ec_new(q_a);
-	ec_new(q_b);
+	bn_free(d_a);
+	bn_free(d_b);
+	ec_free(q_a);
+	ec_free(q_b);
 	return code;
 }
 
