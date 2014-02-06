@@ -42,6 +42,8 @@
 /* Private definitions                                                         */
 /*============================================================================*/
 
+#if RAND == CALL
+
 static void rand_stub(uint8_t *buf, int size) {
 	int c, l, fd = open("/dev/urandom", O_RDONLY);
 	
@@ -61,9 +63,13 @@ static void rand_stub(uint8_t *buf, int size) {
 	close(fd);
 }
 
+#endif
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
+
+#if RAND == CALL
 
 void rand_bytes(uint8_t *buf, int size) {
 	((void (*)(uint8_t *, int))(core_get()->rand))(buf, size);
@@ -77,3 +83,5 @@ void rand_seed(void (*callback)(uint8_t *, int)) {
 	}
 	core_get()->seeded = 1;
 }
+
+#endif

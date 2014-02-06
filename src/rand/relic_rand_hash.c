@@ -43,6 +43,8 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
+#if RAND == HASH
+
 /*
  * Computes the hash derivation function.
  *
@@ -133,9 +135,13 @@ static void rand_gen(uint8_t *out, int out_len) {
 	}
 }
 
+#endif
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
+
+#if RAND == HASH
 
 void rand_bytes(uint8_t *buf, int size) {
 	uint8_t hash[MD_LEN];
@@ -189,3 +195,5 @@ void rand_seed(uint8_t *buf, int size) {
 	}
 	ctx->counter = ctx->seeded = 1;
 }
+
+#endif

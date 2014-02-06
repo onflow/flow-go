@@ -49,6 +49,8 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
+#if RAND == UDEV
+
 void rand_bytes(uint8_t *buf, int size) {
 	int c, l, *fd = (int *)&(core_get()->rand);
 
@@ -66,3 +68,5 @@ void rand_seed(uint8_t *buf, int size) {
 	/* Do nothing, only mark as seeded. */
 	core_get()->seeded = 1;
 }
+
+#endif

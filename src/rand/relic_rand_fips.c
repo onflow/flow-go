@@ -42,6 +42,8 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
+#if RAND == FIPS
+
 /**
  * Accumulates the hash value plus one in the internal state.
  * 
@@ -58,9 +60,13 @@ static void rand_add_inc(uint8_t *state, uint8_t *hash) {
 	}
 }
 
+#endif
+
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
+
+#if RAND == FIPS
 
 void rand_bytes(uint8_t *buf, int size) {
 	uint8_t hash[MD_LEN_SHONE];
@@ -103,3 +109,5 @@ void rand_seed(uint8_t *buf, int size) {
 	}
 	ctx->seeded = 1;
 }
+
+#endif
