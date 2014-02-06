@@ -575,8 +575,7 @@ static int ecies(void) {
 	bn_t d_a, d_b;
 	ec_t q_a, q_b;
 	int l, in_len, out_len;
-	uint8_t in[BC_LEN - 1], out[BC_LEN + MD_LEN], msg[BC_LEN + MD_LEN];
-	char str[2 * FC_BYTES + 1];
+	uint8_t in[BC_LEN - 1], out[BC_LEN + MD_LEN];
 
 	ec_null(r);
 	bn_null(d_a);
@@ -611,6 +610,7 @@ static int ecies(void) {
 
 #if defined(EP_ORDIN) && FP_PRIME == 256
 			case NIST_P256:
+				char str[2 * FC_BYTES + 1];			
 				ASSIGNP(NIST_P256);
 				memcpy(msg, result, sizeof(result));
 				break;
@@ -621,6 +621,8 @@ static int ecies(void) {
 		}
 
 		if (code != STS_OK) {
+			uint8_t msg[BC_LEN + MD_LEN];
+
 			TEST_ONCE("ecies satisfies test vectors") {
 				uint8_t in[] = {
 					0x12, 0x34, 0x56, 0x78, 0x90, 0xAB, 0xCD, 0xEF
