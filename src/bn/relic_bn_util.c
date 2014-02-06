@@ -208,7 +208,7 @@ void bn_print(const bn_t a) {
 			util_print_dig(a->dp[i], 1);
 		}
 #else
-		util_print(a->dp[a->used - 1], 0);
+		util_print_dig(a->dp[a->used - 1], 0);
 		for (i = a->used - 2; i >= 0; i--) {
 			util_print_dig(a->dp[i], 1);
 		}
