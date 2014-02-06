@@ -422,7 +422,7 @@ typedef CAT(EC_LOWER, t) ec_t;
 #if EC_CUR == PRIME
 #define ec_get_x(X, P)		fp_prime_back(X, P->x)
 #else
-#define ec_get_x(X, P)		bn_read_raw(X, P->x, EC_DIGS)
+#define ec_get_x(X, P)		bn_read_raw(X, P->x, FC_DIGS)
 #endif
 
 /**
@@ -435,7 +435,7 @@ typedef CAT(EC_LOWER, t) ec_t;
 #if EC_CUR == PRIME
 #define ec_get_y(Y, P)		fp_prime_back(Y, (P)->y)
 #else
-#define ec_get_y(Y, P)		bn_read_raw(Y, (P)->y, EC_DIGS)
+#define ec_get_y(Y, P)		bn_read_raw(Y, (P)->y, FC_DIGS)
 #endif
 
 #endif /* !RELIC_EC_H */
