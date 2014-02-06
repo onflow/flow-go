@@ -376,6 +376,22 @@ typedef struct _ctx_t {
 	int counter;
 } ctx_t;
 
+#ifdef TRACE
+
+/*
+ * The default library context. This context is only visible when tracing is
+ * enabled to avoid infinite recursion insde the trace functions.
+ */
+extern ctx_t first_ctx;
+
+/*
+ * The current library context. This context is only visible when tracing is
+ * enabled to avoid infinite recursion insde the trace functions.
+ */
+extern ctx_t *core_ctx;
+
+#endif
+
 /*============================================================================*/
 /* Function prototypes                                                        */
 /*============================================================================*/

@@ -51,7 +51,7 @@
 /**
  * Prints some spaces before the stack trace.
  */
-#define FPRINTF fprintf(stderr, "%*s", core_ctx->trace+1, " "); fprintf
+#define FPRINTF fprintf(stderr, "%*s", ctx->trace+1, " "); fprintf
 #else
 /**
  * Prints with fprintf if tracing is disabled.
@@ -66,13 +66,19 @@
 #ifdef TRACE
 
 void trace_enter(void *this, void *from) {
-	core_ctx->trace++;
+	ctx_t *ctx;
+	if (core_ctx != NULL) {
+		ctx = core_ctx;
+	} else {
+		ctx = &first_ctx;
+	}
+	ctx->trace++;
 #ifdef VERBS
 	Dl_info info;
 
 	dladdr(this, &info);
 	if (info.dli_sname != NULL) {
-		FPRINTF(stderr, "%d - running %s()\n", core_ctx->trace, info.dli_sname);
+		FPRINTF(stderr, "%d - running %s()\n", ctx->trace, info.dli_sname);
 	}
 #endif
 	(void)this;
@@ -80,12 +86,18 @@ void trace_enter(void *this, void *from) {
 }
 
 void trace_exit(void *this, void *from) {
+	ctx_t *ctx;
+	if (core_ctx != NULL) {
+		ctx = core_ctx;
+	} else {
+		ctx = &first_ctx;
+	}	
 #ifdef VERBS
 	Dl_info info;
 
 	dladdr(this, &info);
 	if (info.dli_sname != NULL) {
-		FPRINTF(stderr, "%d - exiting %s()\n", core_ctx->trace, info.dli_sname);
+		FPRINTF(stderr, "%d - exiting %s()\n", ctx->trace, info.dli_sname);
 	}
 #endif
 	if (core_ctx->trace > 0) {
