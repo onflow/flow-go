@@ -606,11 +606,13 @@ static int ecies(void) {
 			TEST_END;
 		}
 #if MD_MAP == SH256
-		switch (ec_param_get()) {
+		uint8_t msg[BC_LEN + MD_LEN];
+		char str[2 * FC_BYTES + 1];
 
+		switch (ec_param_get()) {
+			
 #if defined(EP_ORDIN) && FP_PRIME == 256
 			case NIST_P256:
-				char str[2 * FC_BYTES + 1];			
 				ASSIGNP(NIST_P256);
 				memcpy(msg, result, sizeof(result));
 				break;
@@ -621,7 +623,6 @@ static int ecies(void) {
 		}
 
 		if (code != STS_OK) {
-			uint8_t msg[BC_LEN + MD_LEN];
 
 			TEST_ONCE("ecies satisfies test vectors") {
 				uint8_t in[] = {
