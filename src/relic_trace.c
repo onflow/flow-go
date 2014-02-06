@@ -63,6 +63,8 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
+#ifdef TRACE
+
 void trace_enter(void *this, void *from) {
 	core_ctx->trace++;
 #ifdef VERBS
@@ -92,3 +94,5 @@ void trace_exit(void *this, void *from) {
 	(void)this;
 	(void)from;
 }
+
+#endif
