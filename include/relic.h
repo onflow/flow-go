@@ -21,12 +21,56 @@
  */
 
 /**
+ * @mainpage
+ * 
+ * RELIC is a modern cryptographic meta-toolkit with emphasis on efficiency and
+ * flexibility. RELIC can be used to build efficient and usable cryptographic
+ * toolkits tailored for specific security levels and algorithmic choices.
+ *
+ * @section goals_sec Goals
+ *
+ * RELIC is an ongoing project and features will be added on demand.
+ * The focus is to provide:
+ *
+ * <ul>
+ * <li> Ease of portability and inclusion of architecture-dependent code
+ * <li> Simple experimentation with alternative implementations
+ * <li> Tests and benchmarks for every implemented function
+ * <li> Flexible configuration
+ * <li> Maximum efficiency
+ * </ul>
+ *
+ * @section algo_sec Algorithms
+ * 
+ * RELIC implements to date:
+ * 
+ * <ul>
+ * <li> Multiple-precision integer arithmetic
+ * <li> Prime and Binary field arithmetic
+ * <li> Elliptic curves over prime and binary fields (NIST curves and
+ * pairing-friendly curves)
+ * <li> Bilinear maps and related extension fields
+ * <li> Cryptographic protocols
+ * </ul>
+ *
+ * @section lic_sec Licensing
+ *
+ * RELIC is released under an LGPL version 2.1-or-above license to encourage
+ * collaboration with other research groups and contributions from the industry.
+ * 
+ * @section disc_sec Disclaimer
+ *
+ * RELIC is alpha-quality software. Implementations may not be correct or secure
+ * and may include patented algorithms. Backward API compatibility with early
+ * versions may not necessarily be maintained. Use at your own risk. 
+ */
+
+/**
  * @file
  *
- * Interface of the library visible to the programmer.
+ * Library interface.
  *
  * @version $Id$
- * @ingroup relic
  */
 
 #ifndef RELIC_H
