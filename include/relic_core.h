@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup relic Core functions.
+ * @defgroup relic Core functions
  */
 
 /**

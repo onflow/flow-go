@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup arch Architecture-dependent utilities.
+ * @defgroup arch Architecture-dependent utilities
  */
 
 /**

@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup fb Binary field arithmetic.
+ * @defgroup fb Binary field arithmetic
  */
 
 /**

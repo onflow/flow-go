@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup cp Cryptographic protocols.
+ * @defgroup cp Cryptographic protocols
  */
 
 /**

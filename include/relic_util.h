@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup util Misc utilities.
+ * @defgroup util Misc utilities
  */
 
 /**

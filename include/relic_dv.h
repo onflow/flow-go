@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup dv Temporary double-precision digit vector handling.
+ * @defgroup dv Digit vector handling
  */
 
 /**

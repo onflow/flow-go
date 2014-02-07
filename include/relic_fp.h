@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup fp Prime field arithmetic.
+ * @defgroup fp Prime field arithmetic
  */
 
 /**

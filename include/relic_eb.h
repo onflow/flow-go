@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup eb Elliptic curves over binary fields.
+ * @defgroup eb Elliptic curves over binary fields
  */
 
 /**

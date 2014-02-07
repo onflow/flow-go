@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup bench Automated benchmarks.
+ * @defgroup bench Automated benchmarks
  */
 
 /**

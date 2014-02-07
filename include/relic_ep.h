@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup ep Prime elliptic curves.
+ * @defgroup ep Elliptic curves over prime fields
  */
 
 /**

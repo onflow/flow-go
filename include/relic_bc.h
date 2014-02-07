@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup bc Block ciphers.
+ * @defgroup bc Block ciphers
  */
 
 /**

@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup pc Pairing-based cryptography.
+ * @defgroup pc Pairing-based cryptography
  */
 
 /**

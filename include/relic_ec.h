@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup ec Elliptic curve cryptography.
+ * @defgroup ec Elliptic curve cryptography
  */
 
 /**

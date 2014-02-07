@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup tests Automated tests.
+ * @defgroup tests Automated tests
  */
 
 /**

@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup fpx Extensions of prime fields.
+ * @defgroup fpx Extensions of prime fields
  */
 
 /**

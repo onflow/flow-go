@@ -21,7 +21,7 @@
  */
 
 /**
- * @defgroup md Hash functions.
+ * @defgroup md Hash functions
  */
 
 /**
