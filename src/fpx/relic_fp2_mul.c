@@ -96,24 +96,24 @@ void fp2_mul_basic(fp2_t c, fp2_t a, fp2_t b) {
 
 		/* Karatsuba algorithm. */
 
-		/* t2 = a_0 + a_1, t1 = b0 + b1. */
+		/* t2 = a_0 + a_1, t1 = b_0 + b_1. */
 		fp_add(t2, a[0], a[1]);
 		fp_add(t1, b[0], b[1]);
 
-		/* t3 = (a_0 + a_1) * (b0 + b1). */
+		/* t3 = (a_0 + a_1) * (b_0 + b_1). */
 		fp_muln_low(t3, t2, t1);
 
-		/* t0 = a_0 * b0, t4 = a_1 * b1. */
+		/* t0 = a_0 * b_0, t4 = a_1 * b_1. */
 		fp_muln_low(t0, a[0], b[0]);
 		fp_muln_low(t4, a[1], b[1]);
 
-		/* t2 = (a_0 * b0) + (a_1 * b1). */
+		/* t2 = (a_0 * b_0) + (a_1 * b_1). */
 		fp_addc_low(t2, t0, t4);
 
-		/* t1 = (a_0 * b0) + u^2 * (a_1 * b1). */
+		/* t1 = (a_0 * b_0) + u^2 * (a_1 * b_1). */
 		fp_subc_low(t1, t0, t4);
 
-		/* t1 = u^2 * (a_1 * b1). */
+		/* t1 = u^2 * (a_1 * b_1). */
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
 			fp_subc_low(t1, t1, t4);
 		}
