@@ -109,7 +109,7 @@ void fp_rdcs_low(dig_t *c, const dig_t *a, const dig_t *m) {
 
 void fp_rdcn_low(dig_t *c, dig_t *a) {
 	int i;
-	dig_t r, c0, c1, u, *tmp;
+	dig_t r, c0, u, *tmp;
 	const dig_t *m;
 
 	u = *(fp_prime_get_rdc());
@@ -117,16 +117,12 @@ void fp_rdcn_low(dig_t *c, dig_t *a) {
 
 	tmp = a;
 
-	c1 = 0;
 	for (i = 0; i < FP_DIGS; i++, tmp++) {
 		r = (dig_t)(*tmp * u);
-		c0 = mpn_addmul_1(tmp, m, FP_DIGS, r);
-		c1 += mpn_add_1(tmp + FP_DIGS, tmp + FP_DIGS, FP_DIGS - i, c0);
+		*tmp = mpn_addmul_1(tmp, m, FP_DIGS, r);
 	}
-	for (i = 0; i < FP_DIGS; i++, tmp++) {
-		c[i] = *tmp;
-	}
-	for (i = 0; i < c1; i++) {
+	c0 = mpn_add_n(c, tmp, tmp - FP_DIGS, FP_DIGS);
+	for (i = 0; i < c0; i++) {
 		fp_subn_low(c, c, m);
 	}
 	if (fp_cmpn_low(c, m) != CMP_LT) {
