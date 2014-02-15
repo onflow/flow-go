@@ -76,29 +76,15 @@ void fp_rdc_basic(fp_t c, dv_t a) {
 
 void fp_rdc_monty_basic(fp_t c, dv_t a) {
 	int i;
-	dig_t r, c0, c1, *tmp, u0;
-	const dig_t *p = NULL;
-
-	tmp = a;
+	dig_t r, u0;
 
 	u0 = *(fp_prime_get_rdc());
-	p = fp_prime_get();
 
-	c1 = 0;
-	for (i = 0; i < FP_DIGS; i++, tmp++) {
-		r = (dig_t)(*tmp * u0);
-		c0 = fp_mula_low(tmp, fp_prime_get(), r);
-		/* We must use this because the size (FP_DIGS - i) is variable. */
-		c1 += bn_add1_low(tmp + FP_DIGS, tmp + FP_DIGS, c0, FP_DIGS - i);
+	for (i = 0; i < FP_DIGS; i++, a++) {
+		r = (dig_t)(*a * u0);
+		*a = fp_mula_low(a, fp_prime_get(), r);
 	}
-	fp_copy(c, a + FP_DIGS);
-
-	for (i = 0; i < c1; i++) {
-		fp_subn_low(c, c, p);
-	}
-	if (fp_cmpn_low(c, p) != CMP_LT) {
-		fp_subn_low(c, c, p);
-	}
+	fp_addm_low(c, a, a - FP_DIGS);
 }
 
 #endif
