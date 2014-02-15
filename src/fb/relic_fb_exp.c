@@ -135,48 +135,24 @@ void fb_exp_slide(fb_t c, const fb_t a, const bn_t b) {
 #if FB_EXP == MONTY || !defined(STRIP)
 
 void fb_exp_monty(fb_t c, const fb_t a, const bn_t b) {
-	fb_t t0, t1;
-	dig_t *t[2];
-	dig_t buf;
-	int bitcnt, digidx, j;
+	fb_t t[2];
 
 	fb_null(t[0]);
 	fb_null(t[1]);
 
 	TRY {
-		fb_new(t0);
-		fb_new(t1);
+		fb_new(t[0]);
+		fb_new(t[1]);
 
-		fb_set_dig(t0, 1);
-		fb_copy(t1, a);
+		fb_set_dig(t[0], 1);
+		fb_copy(t[1], a);
 
-		/* This trick avoid buggy compilers with alignment issues. */
-		t[0] = t0;
-		t[1] = t1;
-
-		/* Set initial mode and bitcnt, */
-		bitcnt = 1;
-		buf = 0;
-		digidx = b->used - 1;
-
-		for (;;) {
-			/* Grab next digit as required. */
-			if (--bitcnt == 0) {
-				/* If digidx == -1 we are out of digits so break. */
-				if (digidx == -1) {
-					break;
-				}
-				/* Read next digit and reset bitcnt. */
-				buf = b->dp[digidx--];
-				bitcnt = (int)FB_DIGIT;
-			}
-
-			/* Grab the next msb from the exponent. */
-			j = (buf >> (FB_DIGIT - 1)) & 0x01;
-			buf <<= (dig_t)1;
-
-			fb_mul(t[j ^ 1], t[0], t[1]);
-			fb_sqr(t[j], t[j]);
+		for (int i = bn_bits(b) - 1; i >= 0; i--) {
+			int j = bn_get_bit(b, i);
+			dv_swap_cond(t[0], t[1], FB_DIGS, j ^ 1);
+			fb_mul(t[0], t[0], t[1]);
+			fb_sqr(t[1], t[1]);
+			dv_swap_cond(t[0], t[1], FB_DIGS, j ^ 1);
 		}
 
 		fb_copy(c, t[0]);

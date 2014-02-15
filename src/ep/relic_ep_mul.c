@@ -316,6 +316,11 @@ void ep_mul_slide(ep_t r, const ep_t p, const bn_t k) {
 		ep_null(t[i]);
 	}
 
+	if (bn_is_zero(k)) {
+		ep_set_infty(r);
+		return;
+	}	
+
 	TRY {
 		for (i = 0; i < (1 << (EP_WIDTH - 1)); i ++) {
 			ep_new(t[i]);
@@ -372,11 +377,14 @@ void ep_mul_slide(ep_t r, const ep_t p, const bn_t k) {
 
 void ep_mul_monty(ep_t r, const ep_t p, const bn_t k) {
 	ep_t t[2];
-	dig_t buf;
-	int bitcnt, digidx, j;
 
 	ep_null(t[0]);
 	ep_null(t[1]);
+
+	if (bn_is_zero(k)) {
+		ep_set_infty(r);
+		return;
+	}
 
 	TRY {
 		ep_new(t[0]);
@@ -385,29 +393,16 @@ void ep_mul_monty(ep_t r, const ep_t p, const bn_t k) {
 		ep_set_infty(t[0]);
 		ep_copy(t[1], p);
 
-		/* Set initial mode and bitcnt, */
-		bitcnt = 1;
-		buf = 0;
-		digidx = k->used - 1;
-
-		for (;;) {
-			/* Grab next digit as required. */
-			if (--bitcnt == 0) {
-				/* If digidx == -1 we are out of digits so break. */
-				if (digidx == -1) {
-					break;
-				}
-				/* Read next digit and reset bitcnt. */
-				buf = k->dp[digidx--];
-				bitcnt = (int)BN_DIGIT;
-			}
-
-			/* Grab the next msb from the exponent. */
-			j = (buf >> (BN_DIGIT - 1)) & 0x01;
-			buf <<= (dig_t)1;
-
-			ep_add(t[j ^ 1], t[0], t[1]);
-			ep_dbl(t[j], t[j]);
+		for (int i = bn_bits(k) - 1; i >= 0; i--) {
+			int j = bn_get_bit(k, i);
+			dv_swap_cond(t[0]->x, t[1]->x, FP_DIGS, j ^ 1);
+			dv_swap_cond(t[0]->y, t[1]->y, FP_DIGS, j ^ 1);
+			dv_swap_cond(t[0]->z, t[1]->z, FP_DIGS, j ^ 1);
+			ep_add(t[0], t[0], t[1]);
+			ep_dbl(t[1], t[1]);
+			dv_swap_cond(t[0]->x, t[1]->x, FP_DIGS, j ^ 1);
+			dv_swap_cond(t[0]->y, t[1]->y, FP_DIGS, j ^ 1);
+			dv_swap_cond(t[0]->z, t[1]->z, FP_DIGS, j ^ 1);
 		}
 
 		ep_norm(r, t[0]);
@@ -426,6 +421,11 @@ void ep_mul_monty(ep_t r, const ep_t p, const bn_t k) {
 #if EP_MUL == LWNAF || !defined(STRIP)
 
 void ep_mul_lwnaf(ep_t r, const ep_t p, const bn_t k) {
+	if (bn_is_zero(k)) {
+		ep_set_infty(r);
+		return;
+	}
+
 #if defined(EP_KBLTZ)
 	if (ep_curve_is_kbltz()) {
 		ep_mul_glv_imp(r, p, k);
@@ -443,6 +443,11 @@ void ep_mul_lwnaf(ep_t r, const ep_t p, const bn_t k) {
 #if EP_MUL == LWREG || !defined(STRIP)
 
 void ep_mul_lwreg(ep_t r, const ep_t p, const bn_t k) {
+	if (bn_is_zero(k)) {
+		ep_set_infty(r);
+		return;
+	}
+
 #if defined(EP_KBLTZ)
 	if (ep_curve_is_kbltz()) {
 		ep_mul_glv_imp(r, p, k);
@@ -458,6 +463,11 @@ void ep_mul_lwreg(ep_t r, const ep_t p, const bn_t k) {
 #endif
 
 void ep_mul_gen(ep_t r, const bn_t k) {
+	if (bn_is_zero(k)) {
+		ep_set_infty(r);
+		return;
+	}
+		
 #ifdef EP_PRECO
 	ep_mul_fix(r, ep_curve_get_tab(), k);
 #else

@@ -131,8 +131,6 @@ void fp_exp_slide(fp_t c, const fp_t a, const bn_t b) {
 
 void fp_exp_monty(fp_t c, const fp_t a, const bn_t b) {
 	fp_t t[2];
-	dig_t buf;
-	int bitcnt, digidx, j;
 
 	fp_null(t[0]);
 	fp_null(t[1]);
@@ -144,29 +142,12 @@ void fp_exp_monty(fp_t c, const fp_t a, const bn_t b) {
 		fp_set_dig(t[0], 1);
 		fp_copy(t[1], a);
 
-		/* Set initial mode and bitcnt, */
-		bitcnt = 1;
-		buf = 0;
-		digidx = b->used - 1;
-
-		for (;;) {
-			/* Grab next digit as required. */
-			if (--bitcnt == 0) {
-				/* If digidx == -1 we are out of digits so break. */
-				if (digidx == -1) {
-					break;
-				}
-				/* Read next digit and reset bitcnt. */
-				buf = b->dp[digidx--];
-				bitcnt = (int)FP_DIGIT;
-			}
-
-			/* Grab the next msb from the exponent. */
-			j = (buf >> (FP_DIGIT - 1)) & 0x01;
-			buf <<= (dig_t)1;
-
-			fp_mul(t[j ^ 1], t[0], t[1]);
-			fp_sqr(t[j], t[j]);
+		for (int i = bn_bits(b) - 1; i >= 0; i--) {
+			int j = bn_get_bit(b, i);
+			dv_swap_cond(t[0], t[1], FP_DIGS, j ^ 1);
+			fp_mul(t[0], t[0], t[1]);
+			fp_sqr(t[1], t[1]);
+			dv_swap_cond(t[0], t[1], FP_DIGS, j ^ 1);
 		}
 
 		fp_copy(c, t[0]);

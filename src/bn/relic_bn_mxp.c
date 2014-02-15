@@ -224,16 +224,14 @@ void bn_mxp_monty(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 		bn_copy(tab[1], a);
 #endif
 
-		for (int i = b->used - 1; i >= 0; i--) {
-			for (int j = BN_DIGIT - 1; j >= 0; j--) {
-				int k = (b->dp[i] >> j) & 0x01;
-				dv_swap_cond(tab[0]->dp, tab[1]->dp, BN_DIGS, k ^ 1);
-				bn_mul(tab[0], tab[0], tab[1]);
-				bn_mod(tab[0], tab[0], m, u);
-				bn_sqr(tab[1], tab[1]);
-				bn_mod(tab[1], tab[1], m, u);
-				dv_swap_cond(tab[0]->dp, tab[1]->dp, BN_DIGS, k ^ 1);
-			}
+		for (int i = bn_bits(b) - 1; i >= 0; i--) {
+			int j = bn_get_bit(b, i);
+			dv_swap_cond(tab[0]->dp, tab[1]->dp, BN_DIGS, j ^ 1);
+			bn_mul(tab[0], tab[0], tab[1]);
+			bn_mod(tab[0], tab[0], m, u);
+			bn_sqr(tab[1], tab[1]);
+			bn_mod(tab[1], tab[1], m, u);
+			dv_swap_cond(tab[0]->dp, tab[1]->dp, BN_DIGS, j ^ 1);
 		}
 
 #if BN_MOD == MONTY

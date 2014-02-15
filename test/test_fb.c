@@ -66,6 +66,7 @@ static int util(void) {
 	fb_t a, b, c;
 	char str[FB_BITS + 1];
 	uint8_t bin[FB_BYTES];
+	dig_t d;
 
 	fb_null(a);
 	fb_null(b);
@@ -153,6 +154,13 @@ static int util(void) {
 		}
 		TEST_END;
 
+		TEST_BEGIN("assignment to a constant and comparison are consistent") {
+			rand_bytes((uint8_t *)&d, (FB_DIGIT / 8));
+			fb_set_dig(a, d);
+			TEST_ASSERT(fb_cmp_dig(a, d) == CMP_EQ, end);
+		}
+		TEST_END;		
+
 		bits = 0;
 		TEST_BEGIN("bit setting and getting are consistent") {
 			fb_zero(a);
@@ -161,25 +169,6 @@ static int util(void) {
 			fb_set_bit(a, bits, 0);
 			TEST_ASSERT(fb_get_bit(a, bits) == 0, end);
 			bits = (bits + 1) % FB_BITS;
-		}
-		TEST_END;
-
-		TEST_BEGIN("reading and writing the first digit are consistent") {
-			fb_rand(a);
-			fb_rand(b);
-			fb_set_dig(b, a[0]);
-			TEST_ASSERT(a[0] == b[0], end);
-		}
-		TEST_END;
-
-		bits = 0;
-		TEST_BEGIN("bit setting and getting are consistent") {
-			fb_zero(a);
-			fb_set_bit(a, bits, 1);
-			TEST_ASSERT(fb_get_bit(a, bits) == 1, end);
-			fb_set_bit(a, bits, 0);
-			TEST_ASSERT(fb_get_bit(a, bits) == 0, end);
-			bits = (bits + 1) % BN_BITS;
 		}
 		TEST_END;
 
@@ -196,7 +185,6 @@ static int util(void) {
 			fb_rand(a);
 			for (int j = 1; j < 7; j++) {
 				fb_size_str(&bits, a, 1 << j);
-				printf("%d\n", bits);
 				fb_write_str(str, bits, a, 1 << j);
 				fb_read_str(b, str, bits, 1 << j);
 				TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);

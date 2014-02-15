@@ -727,75 +727,46 @@ void eb_mul_lodah(eb_t r, const eb_t p, const bn_t k) {
 				break;
 		}
 
-		t = bn_bits(k);
-		for (i = t - 2; i >= 0; i--) {
+		for (i = bn_bits(k) - 2; i >= 0; i--) {
 			fb_mul(r1, x1, z2);
 			fb_mul(r2, x2, z1);
 			fb_add(r3, r1, r2);
 			fb_muln_low(r4, r1, r2);
-			if (bn_get_bit(k, i) == 1) {
-				fb_sqr(z1, r3);
-				fb_muln_low(r1, z1, p->x);
-				fb_addd_low(x1, r1, r4, 2 * FB_DIGS);
-				fb_rdcn_low(x1, x1);
-				fb_sqr(r1, z2);
-				fb_sqr(r2, x2);
-				fb_mul(z2, r1, r2);
-				switch (eb_curve_opt_b()) {
-					case OPT_ZERO:
-						fb_sqr(x2, r2);
-						break;
-					case OPT_ONE:
-						fb_add(r1, r1, r2);
-						fb_sqr(x2, r1);
-						break;
-					case OPT_DIGIT:
-						fb_sqr(r1, r1);
-						fb_sqrl_low(x2, r2);
-						fb_mul1_low(r5, r1, b[0]);
-						fb_addd_low(x2, x2, r5, FB_DIGS + 1);
-						fb_rdcn_low(x2, x2);
-						break;
-					default:
-						fb_sqr(r1, r1);
-						fb_sqrl_low(x2, r2);
-						fb_muln_low(r5, r1, b);
-						fb_addd_low(x2, x2, r5, 2 * FB_DIGS);
-						fb_rdcn_low(x2, x2);
-						break;
-				}
-			} else {
-				fb_sqr(z2, r3);
-				fb_muln_low(r1, z2, p->x);
-				fb_addd_low(x2, r1, r4, 2 * FB_DIGS);
-				fb_rdcn_low(x2, x2);
-				fb_sqr(r1, z1);
-				fb_sqr(r2, x1);
-				fb_mul(z1, r1, r2);
-				switch (eb_curve_opt_b()) {
-					case OPT_ZERO:
-						fb_sqr(x1, r2);
-						break;
-					case OPT_ONE:
-						fb_add(r1, r1, r2);
-						fb_sqr(x1, r1);
-						break;
-					case OPT_DIGIT:
-						fb_sqr(r1, r1);
-						fb_sqrl_low(x1, r2);
-						fb_mul1_low(r5, r1, b[0]);
-						fb_addd_low(x1, x1, r5, FB_DIGS + 1);
-						fb_rdcn_low(x1, x1);
-						break;
-					default:
-						fb_sqr(r1, r1);
-						fb_sqrl_low(x1, r2);
-						fb_muln_low(r5, r1, b);
-						fb_addd_low(x1, x1, r5, 2 * FB_DIGS);
-						fb_rdcn_low(x1, x1);
-						break;
-				}
+			t = bn_get_bit(k, i);
+			dv_swap_cond(x1, x2, FB_DIGS, t ^ 1);
+			dv_swap_cond(z1, z2, FB_DIGS, t ^ 1);
+			fb_sqr(z1, r3);
+			fb_muln_low(r1, z1, p->x);
+			fb_addd_low(x1, r1, r4, 2 * FB_DIGS);
+			fb_rdcn_low(x1, x1);
+			fb_sqr(r1, z2);
+			fb_sqr(r2, x2);
+			fb_mul(z2, r1, r2);
+			switch (eb_curve_opt_b()) {
+				case OPT_ZERO:
+					fb_sqr(x2, r2);
+					break;
+				case OPT_ONE:
+					fb_add(r1, r1, r2);
+					fb_sqr(x2, r1);
+					break;
+				case OPT_DIGIT:
+					fb_sqr(r1, r1);
+					fb_sqrl_low(x2, r2);
+					fb_mul1_low(r5, r1, b[0]);
+					fb_addd_low(x2, x2, r5, FB_DIGS + 1);
+					fb_rdcn_low(x2, x2);
+					break;
+				default:
+					fb_sqr(r1, r1);
+					fb_sqrl_low(x2, r2);
+					fb_muln_low(r5, r1, b);
+					fb_addd_low(x2, x2, r5, 2 * FB_DIGS);
+					fb_rdcn_low(x2, x2);
+					break;
 			}
+			dv_swap_cond(x1, x2, FB_DIGS, t ^ 1);
+			dv_swap_cond(z1, z2, FB_DIGS, t ^ 1);			
 		}
 
 		if (fb_is_zero(z1)) {
