@@ -44,7 +44,7 @@
 void bn_modn_low(dig_t *c, const dig_t *a, int sa, const dig_t *m, int sm,
 		dig_t u) {
 	int i;
-	dig_t r, carry, *tmpc;
+	dig_t r, *tmpc;
 
 	tmpc = c;
 
@@ -56,8 +56,9 @@ void bn_modn_low(dig_t *c, const dig_t *a, int sa, const dig_t *m, int sm,
 
 	for (i = 0; i < sm; i++, tmpc++) {
 		r = (dig_t)(*tmpc * u);
-		carry = mpn_addmul_1(tmpc, m, sm, r);
-		mpn_add_1(tmpc + sm, tmpc + sm, sm - i + 1, carry);
+		*tmpc = mpn_addmul_1(tmpc, m, sm, r);
 	}
-	bn_rshd_low(c, c, 2 * sm + 1, sm);
+	if (mpn_add_n(c, c, tmpc, sm)) {
+		mpn_sub_n(c, c, m, sm);
+	}
 }

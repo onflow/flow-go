@@ -206,26 +206,28 @@ void bn_mod_monty_back(bn_t c, const bn_t a, const bn_t m) {
 
 void bn_mod_monty_basic(bn_t c, const bn_t a, const bn_t m, const bn_t u) {
 	int digits, i;
-	dig_t r, carry, u0, *tmp;
+	dig_t r, u0, *tmp;
 	bn_t t;
 
 	bn_null(t);
-	digits = 2 * m->used + 1;
+	digits = 2 * m->used;
+
 	TRY {
 		bn_new_size(t, digits);
 		bn_zero(t);
 		bn_copy(t, a);
-		t->used = digits;
 
 		u0 = u->dp[0];
 		tmp = t->dp;
 
 		for (i = 0; i < m->used; i++, tmp++) {
 			r = (dig_t)(*tmp * u0);
-			carry = bn_mula_low(tmp, m->dp, r, m->used);
-			bn_add1_low(tmp + m->used, tmp + m->used, carry, m->used - i + 1);
+			*tmp = bn_mula_low(tmp, m->dp, r, m->used);
 		}
-		bn_rsh(t, t, m->used * BN_DIGIT);
+		if (bn_addn_low(t->dp, t->dp, tmp, m->used)) {
+			bn_subn_low(t->dp, t->dp, m->dp, m->used);
+		}
+		t->used = m->used;
 		bn_trim(t);
 
 		if (bn_cmp_abs(t, m) != CMP_LT) {
@@ -251,14 +253,14 @@ void bn_mod_monty_comba(bn_t c, const bn_t a, const bn_t m, const bn_t u) {
 	bn_t t;
 
 	bn_null(t);
-	digits = 2 * m->used + 1;
+	digits = 2 * m->used;
 
 	TRY {
 		bn_new_size(t, digits);
 		bn_zero(t);
 
 		bn_modn_low(t->dp, a->dp, a->used, m->dp, m->used, u->dp[0]);
-		t->used = m->used + 1;
+		t->used = m->used;
 
 		bn_trim(t);
 		if (bn_cmp_abs(t, m) != CMP_LT) {

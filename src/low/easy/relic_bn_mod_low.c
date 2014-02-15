@@ -116,5 +116,7 @@ void bn_modn_low(dig_t *c, const dig_t *a, int sa, const dig_t *m, int sm, dig_t
 		COMBA_ADD(r2, r1, r0, *a);
 	}
 	c[sm - 1] = r0;
-	c[sm] = r1;
+	if (r1) {
+		bn_subn_low(c, c, m, sm);
+	}
 }
