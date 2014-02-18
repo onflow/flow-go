@@ -75,7 +75,7 @@ int cp_ecies_enc(ec_t r, uint8_t *out, int *out_len, uint8_t *in, int in_len,
 	bn_t k, n, x;
 	ec_t p;
 	int l, result = STS_OK, size = CEIL(ec_param_level(), 8);
-	uint8_t _x[FC_BYTES], key[2 * size], iv[BC_LEN] = { 0 };
+	uint8_t _x[FC_BYTES + 1], key[2 * size], iv[BC_LEN] = { 0 };
 
 	bn_null(k);
 	bn_null(n);
@@ -99,6 +99,10 @@ int cp_ecies_enc(ec_t r, uint8_t *out, int *out_len, uint8_t *in, int in_len,
 		ec_mul(p, q, k);
 		ec_get_x(x, p);
 		bn_size_bin(&l, x);
+		if (bn_bits(x) % 8 == 0) {
+			/* Compatibility with BouncyCastle. */
+			l = l + 1;
+		}				
 		bn_write_bin(_x, l, x);
 		md_kdf2(key, 2 * size, _x, l);
 		l = *out_len;
@@ -128,7 +132,7 @@ int cp_ecies_dec(uint8_t *out, int *out_len, ec_t r, uint8_t *in, int in_len,
 	ec_t p;
 	bn_t x;
 	int l, result = STS_OK, size = CEIL(ec_param_level(), 8);
-	uint8_t _x[FC_BYTES], h[MD_LEN], key[2 * size], iv[BC_LEN] = { 0 };
+	uint8_t _x[FC_BYTES + 1], h[MD_LEN], key[2 * size], iv[BC_LEN] = { 0 };
 
 	bn_null(x);
 	ec_null(p);
@@ -140,6 +144,10 @@ int cp_ecies_dec(uint8_t *out, int *out_len, ec_t r, uint8_t *in, int in_len,
 		ec_mul(p, r, d);
 		ec_get_x(x, p);
 		bn_size_bin(&l, x);
+		if (bn_bits(x) % 8 == 0) {
+			/* Compatibility with BouncyCastle. */
+			l = l + 1;
+		}				
 		bn_write_bin(_x, l, x);
 		md_kdf2(key, 2 * size, _x, l);
 		md_hmac(h, in, in_len - MD_LEN, key + size, size);
