@@ -530,7 +530,7 @@ int main(void) {
 	conf_print();
 	util_banner("Benchmarks for the PC module:", 0);
 
-	if (pc_param_set_any() == STS_OK) {
+	if (pc_param_set_any() != STS_OK) {
 		THROW(ERR_NO_CURVE);
 		core_clean();
 		return 0;
