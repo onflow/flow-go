@@ -29,8 +29,6 @@
  * @ingroup eb
  */
 
-#include <string.h>
-
 #include "relic_core.h"
 #include "relic_eb.h"
 #include "relic_conf.h"
@@ -213,30 +211,8 @@ int eb_curve_opt_b() {
 	return core_get()->eb_opt_b;
 }
 
-dig_t *eb_curve_get_c() {
-#if defined(EB_SUPER)
-	if (core_get()->eb_is_super) {
-		return core_get()->eb_c;
-	}
-#endif
-	return NULL;
-}
-
-int eb_curve_opt_c() {
-#if defined(EB_SUPER)
-	if (core_get()->eb_is_super) {
-		return core_get()->eb_opt_c;
-	}
-#endif
-	return OPT_NONE;
-}
-
 int eb_curve_is_kbltz() {
 	return core_get()->eb_is_kbltz;
-}
-
-int eb_curve_is_super() {
-	return core_get()->eb_is_super;
 }
 
 void eb_curve_get_gen(eb_t g) {
@@ -293,9 +269,7 @@ const eb_t *eb_curve_get_tab() {
 #endif
 }
 
-#if defined(EB_ORDIN)
-
-void eb_curve_set_ordin(const fb_t a, const fb_t b, const eb_t g, const bn_t r,
+void eb_curve_set(const fb_t a, const fb_t b, const eb_t g, const bn_t r, 
 		const bn_t h) {
 	ctx_t *ctx = core_get();
 	fb_copy(ctx->eb_a, a);
@@ -304,7 +278,6 @@ void eb_curve_set_ordin(const fb_t a, const fb_t b, const eb_t g, const bn_t r,
 	detect_opt(&(ctx->eb_opt_a), ctx->eb_a);
 	detect_opt(&(ctx->eb_opt_b), ctx->eb_b);
 
-	ctx->eb_is_super = 0;
 	if (fb_cmp_dig(ctx->eb_b, 1) == CMP_EQ) {
 		ctx->eb_is_kbltz = 1;
 	} else {
@@ -315,7 +288,6 @@ void eb_curve_set_ordin(const fb_t a, const fb_t b, const eb_t g, const bn_t r,
 		compute_kbltz();
 	}
 #endif
-
 	eb_norm(&(ctx->eb_g), g);
 	bn_copy(&(ctx->eb_r), r);
 	bn_copy(&(ctx->eb_h), h);
@@ -323,59 +295,3 @@ void eb_curve_set_ordin(const fb_t a, const fb_t b, const eb_t g, const bn_t r,
 	eb_mul_pre((eb_t *)eb_curve_get_tab(), &(ctx->eb_g));
 #endif
 }
-
-#endif
-
-#if defined(EB_KBLTZ)
-
-void eb_curve_set_kbltz(const fb_t a, const eb_t g, const bn_t r, const bn_t h) {
-	ctx_t *ctx = core_get();
-
-	ctx->eb_is_kbltz = 1;
-	ctx->eb_is_super = 0;
-
-	fb_copy(ctx->eb_a, a);
-	fb_set_dig(ctx->eb_b, 1);
-
-	detect_opt(&(ctx->eb_opt_a), ctx->eb_a);
-	detect_opt(&(ctx->eb_opt_b), ctx->eb_b);
-
-#if EB_MUL == LWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP)
-	compute_kbltz();
-#endif
-	eb_norm(&(ctx->eb_g), g);
-	bn_copy(&(ctx->eb_r), r);
-	bn_copy(&(ctx->eb_h), h);
-#if defined(EB_PRECO)
-	eb_mul_pre((eb_t *)eb_curve_get_tab(), &(ctx->eb_g));
-#endif
-}
-
-#endif
-
-#if defined(EB_SUPER)
-
-void eb_curve_set_super(const fb_t a, const fb_t b, const fb_t c, const eb_t g,
-		const bn_t r, const bn_t h) {
-	ctx_t *ctx = core_get();
-
-	ctx->eb_is_kbltz = 0;
-	ctx->eb_is_super = 1;
-
-	fb_copy(ctx->eb_a, a);
-	fb_copy(ctx->eb_b, b);
-	fb_copy(ctx->eb_c, c);
-
-	detect_opt(&(ctx->eb_opt_a), ctx->eb_a);
-	detect_opt(&(ctx->eb_opt_b), ctx->eb_b);
-	detect_opt(&(ctx->eb_opt_c), ctx->eb_c);
-
-	eb_norm(&(ctx->eb_g), g);
-	bn_copy(&(ctx->eb_r), r);
-	bn_copy(&(ctx->eb_h), h);
-#if defined(EB_PRECO)
-	eb_mul_pre((eb_t *)eb_curve_get_tab(), &(ctx->eb_g));
-#endif
-}
-
-#endif
