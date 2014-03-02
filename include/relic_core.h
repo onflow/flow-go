@@ -212,12 +212,6 @@ typedef struct _ctx_t {
 	int eb_opt_a;
 	/** Optimization identifier for the b-coefficient. */
 	int eb_opt_b;
-#if defined(EB_SUPER)
-	/** The b-coefficient of the elliptic curve. */
-	fb_st eb_c;
-	/** Optimization identifier for the a-coefficient. */
-	int eb_opt_c;
-#endif
 	/** The generator of the elliptic curve. */
 	eb_st eb_g;
 	/** The order of the group of points in the elliptic curve. */
@@ -234,8 +228,6 @@ typedef struct _ctx_t {
 #endif /* EB_MUL */
 	/** Flag that stores if the binary curve has efficient endomorphisms. */
 	int eb_is_kbltz;
-	/** Flag that stores if the binary curve is supersingular. */
-	int eb_is_super;
 #ifdef EB_PRECO
 	/** Precomputation table for generator multiplication. */
 	eb_st eb_pre[EB_TABLE];
