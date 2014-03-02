@@ -619,17 +619,15 @@ static int multiplication(void) {
 		} TEST_END;
 #endif
 
-#if (defined(EB_ORDIN) || defined(EB_KBLTZ)) && (EB_MUL == LODAH || !defined(STRIP))
-		if (!eb_curve_is_super()) {
-			TEST_BEGIN("lopez-dahab point multiplication is correct") {
-				bn_rand(k, BN_POS, bn_bits(n));
-				bn_mod(k, k, n);
-				eb_mul(q, p, k);
-				eb_mul_lodah(r, p, k);
-				TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
-			}
-			TEST_END;
+#if EB_MUL == LODAH || !defined(STRIP)
+		TEST_BEGIN("lopez-dahab point multiplication is correct") {
+			bn_rand(k, BN_POS, bn_bits(n));
+			bn_mod(k, k, n);
+			eb_mul(q, p, k);
+			eb_mul_lodah(r, p, k);
+			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		}
+		TEST_END;
 #endif
 
 #if EB_MUL == LWNAF || !defined(STRIP)
@@ -654,18 +652,16 @@ static int multiplication(void) {
 		TEST_END;
 #endif
 
-		if (!eb_curve_is_super()) {
 #if EB_MUL == HALVE || !defined(STRIP)
-			TEST_BEGIN("point multiplication by halving is correct") {
-				bn_rand(k, BN_POS, FB_BITS);
-				bn_mod(k, k, n);
-				eb_mul(q, p, k);
-				eb_mul_halve(r, p, k);
-				TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
-			}
-			TEST_END;
-#endif
+		TEST_BEGIN("point multiplication by halving is correct") {
+			bn_rand(k, BN_POS, FB_BITS);
+			bn_mod(k, k, n);
+			eb_mul(q, p, k);
+			eb_mul_halve(r, p, k);
+			TEST_ASSERT(eb_cmp(q, r) == CMP_EQ, end);
 		}
+		TEST_END;
+#endif
 
 		TEST_BEGIN("multiplication by digit is correct") {
 			bn_rand(k, BN_POS, BN_DIGIT);
@@ -1059,10 +1055,8 @@ static int test(void) {
 		return STS_ERR;
 	}
 
-	if (!eb_curve_is_super()) {
-		if (halving() != STS_OK) {
-			return STS_ERR;
-		}
+	if (halving() != STS_OK) {
+		return STS_ERR;
 	}
 
 	if (frobenius() != STS_OK) {
@@ -1093,7 +1087,7 @@ static int test(void) {
 }
 
 int main(void) {
-	int r0 = STS_ERR, r1 = STS_ERR, r2 = STS_ERR;
+	int r0 = STS_ERR, r1 = STS_ERR;
 
 	if (core_init() != STS_OK) {
 		core_clean();
@@ -1102,7 +1096,6 @@ int main(void) {
 
 	util_banner("Tests for the EB module:", 0);
 
-#if defined(EB_ORDIN)
 	r0 = eb_param_set_any_ordin();
 	if (r0 == STS_OK) {
 		if (test() != STS_OK) {
@@ -1110,7 +1103,6 @@ int main(void) {
 			return 1;
 		}
 	}
-#endif
 
 #if defined(EB_KBLTZ)
 	r1 = eb_param_set_any_kbltz();
@@ -1122,17 +1114,7 @@ int main(void) {
 	}
 #endif
 
-#if defined(EB_SUPER)
-	r2 = eb_param_set_any_super();
-	if (r2 == STS_OK) {
-		if (test() != STS_OK) {
-			core_clean();
-			return 1;
-		}
-	}
-#endif
-
-	if (r0 == STS_ERR && r1 == STS_ERR && r2 == STS_ERR) {
+	if (r0 == STS_ERR && r1 == STS_ERR) {
 		if (eb_param_set_any() == STS_ERR) {
 			THROW(ERR_NO_CURVE);
 			core_clean();
