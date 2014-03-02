@@ -1,9 +1,8 @@
 message(STATUS "Binary elliptic curve arithmetic configuration (EB module):\n")
 
 message("   ** Options for the binary elliptic curve module (default = on, w = 4):")
-message("      EB_ORDIN=[off|on] Support for ordinary curves.")
-message("      EB_SUPER=[off|on] Support for supersingular curves.")    
-message("      EB_KBLTZ=[off|on] Special support for Koblitz curves.")
+message("      EB_PLAIN=[off|on] Support for ordinary curves without endomorphisms.")
+message("      EB_KBLTZ=[off|on] Support for Koblitz anomalous binary curves.")
 message("      EB_MIXED=[off|on] Use mixed coordinates.")
 message("      EB_PRECO=[off|on] Build precomputation table for generator.")
 message("      EB_DEPTH=w        Width w in [2,6] of precomputation table for fixed point methods.")
