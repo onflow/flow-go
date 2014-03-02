@@ -29,8 +29,6 @@
  * @ingroup eb
  */
 
-#include "string.h"
-
 #include "relic_core.h"
 #include "relic_eb.h"
 
@@ -142,6 +140,8 @@ static void eb_mul_fix_plain(eb_t r, const eb_t *t, const bn_t k) {
 	/* Convert r to affine coordinates. */
 	eb_norm(r, r);
 }
+
+#endif /* EB_PLAIN */
 
 #endif /* EB_FIX == LWNAF */
 
