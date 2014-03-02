@@ -36,6 +36,6 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fb_trcn_low(dig_t *a) {
+dig_t fb_trcn_low(const dig_t *a) {
 	return (a[0] ^(a[3] >> 55) ^(a[3] >> 57)) & 0x01;
 }

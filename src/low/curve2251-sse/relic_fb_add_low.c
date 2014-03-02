@@ -46,7 +46,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_add1_low(dig_t *c, dig_t *a, dig_t digit) {
+void fb_add1_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int i;
 
 	(*c) = (*a) ^ digit;
@@ -56,12 +56,12 @@ void fb_add1_low(dig_t *c, dig_t *a, dig_t digit) {
 		(*c) = (*a);
 }
 
-void fb_addn_low(dig_t *c, dig_t *a, dig_t *b) {
+void fb_addn_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	*(__m128i *)c = XOR(*(__m128i*)(a), *(__m128i*)(b));
 	*(__m128i *)(c + 2) = XOR(*(__m128i*)(a + 2), *(__m128i*)(b + 2));
 }
 
-void fb_addd_low(dig_t *c, dig_t *a, dig_t *b, int size) {
+void fb_addd_low(dig_t *c, const dig_t *a, const dig_t *b, int size) {
 	if (size == 2 * FB_DIGS) {
 		*(__m128i *)c = XOR(*(__m128i*)(a), *(__m128i*)(b));
 		*(__m128i *)(c + 2) = XOR(*(__m128i*)(a + 2), *(__m128i*)(b + 2));

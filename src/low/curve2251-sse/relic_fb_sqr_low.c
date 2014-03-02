@@ -42,7 +42,7 @@
 
 #include <xmmintrin.h>
 
-void fb_sqrn_low(dig_t *c, dig_t *a) {
+void fb_sqrn_low(dig_t *c, const dig_t *a) {
 	__m128i m0, t;
 	int j = 0;
 
@@ -72,7 +72,7 @@ void fb_sqrn_low(dig_t *c, dig_t *a) {
 	}
 }
 
-void fb_sqrl_low(dig_t *c, dig_t *a) {
+void fb_sqrl_low(dig_t *c, const dig_t *a) {
 	__m128i m0, m1, m2, m3, m4, m5, m6, mask;
 	__m128i t0;
 
@@ -105,7 +105,7 @@ void fb_sqrl_low(dig_t *c, dig_t *a) {
 
 #if defined(__INTEL_COMPILER)
 
-void fb_sqrm_low(dig_t *c, dig_t *a) {
+void fb_sqrm_low(dig_t *c, const dig_t *a) {
 	__m128i t0, t1, m0, m1, m2, m3, m4, m5, m6, m8, m9, mask;
 	align dig_t x[2];
 
@@ -144,7 +144,7 @@ void fb_sqrm_low(dig_t *c, dig_t *a) {
 
 #else
 
-void fb_sqrm_low(dig_t *c, dig_t *a) {
+void fb_sqrm_low(dig_t *c, const dig_t *a) {
 	__m128i t0, m0, m1, m2, m3, m4, m5, m6, mask;
 	align dig_t t[2*FB_DIGS];
 

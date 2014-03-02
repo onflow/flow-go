@@ -41,7 +41,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_itrn_low(dig_t *c, dig_t *a, dig_t *t) {
+void fb_itrn_low(dig_t *c, const dig_t *a, dig_t *t) {
 	int i, j;
 	dig_t u, *tmp, *p;
 

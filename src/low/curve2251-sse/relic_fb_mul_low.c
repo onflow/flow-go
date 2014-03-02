@@ -44,16 +44,16 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size) {
-	dv_t table[16];
-	dig_t u, *tmpa, *tmpc, r0, r1, r2, r4, r8;
+void fb_muld_low(dig_t *c, const dig_t *a, const dig_t *b, int size) {
+	align dig_t t[16][size + 1];
+	dig_t u, r0, r1, r2, r4, r8, *tmpc;
+	const dig_t *tmpa;
 	int i, j;
 
 	dv_zero(c, 2 * size);
 
 	for (i = 0; i < 16; i++) {
-		dv_new(table[i]);
-		dv_zero(table[i], size + 1);
+		dv_zero(t[i], size + 1);
 	}
 
 	u = 0;
@@ -62,22 +62,22 @@ void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size) {
 		r2 = (r0 << 1) | (u >> (FB_DIGIT - 1));
 		r4 = (r0 << 2) | (u >> (FB_DIGIT - 2));
 		r8 = (r0 << 3) | (u >> (FB_DIGIT - 3));
-		table[0][i] = 0;
-		table[1][i] = r1;
-		table[2][i] = r2;
-		table[3][i] = r1 ^ r2;
-		table[4][i] = r4;
-		table[5][i] = r1 ^ r4;
-		table[6][i] = r2 ^ r4;
-		table[7][i] = r1 ^ r2 ^ r4;
-		table[8][i] = r8;
-		table[9][i] = r1 ^ r8;
-		table[10][i] = r2 ^ r8;
-		table[11][i] = r1 ^ r2 ^ r8;
-		table[12][i] = r4 ^ r8;
-		table[13][i] = r1 ^ r4 ^ r8;
-		table[14][i] = r2 ^ r4 ^ r8;
-		table[15][i] = r1 ^ r2 ^ r4 ^ r8;
+		t[0][i] = 0;
+		t[1][i] = r1;
+		t[2][i] = r2;
+		t[3][i] = r1 ^ r2;
+		t[4][i] = r4;
+		t[5][i] = r1 ^ r4;
+		t[6][i] = r2 ^ r4;
+		t[7][i] = r1 ^ r2 ^ r4;
+		t[8][i] = r8;
+		t[9][i] = r1 ^ r8;
+		t[10][i] = r2 ^ r8;
+		t[11][i] = r1 ^ r2 ^ r8;
+		t[12][i] = r4 ^ r8;
+		t[13][i] = r1 ^ r4 ^ r8;
+		t[14][i] = r2 ^ r4 ^ r8;
+		t[15][i] = r1 ^ r2 ^ r4 ^ r8;
 		u = r1;
 	}
 
@@ -85,14 +85,14 @@ void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size) {
 		r2 = u >> (FB_DIGIT - 1);
 		r4 = u >> (FB_DIGIT - 2);
 		r8 = u >> (FB_DIGIT - 3);
-		table[0][size] = table[1][size] = 0;
-		table[2][size] = table[3][size] = r2;
-		table[4][size] = table[5][size] = r4;
-		table[6][size] = table[7][size] = r2 ^ r4;
-		table[8][size] = table[9][size] = r8;
-		table[10][size] = table[11][size] = r2 ^ r8;
-		table[12][size] = table[13][size] = r4 ^ r8;
-		table[14][size] = table[15][size] = r2 ^ r4 ^ r8;
+		t[0][size] = t[1][size] = 0;
+		t[2][size] = t[3][size] = r2;
+		t[4][size] = t[5][size] = r4;
+		t[6][size] = t[7][size] = r2 ^ r4;
+		t[8][size] = t[9][size] = r8;
+		t[10][size] = t[11][size] = r2 ^ r8;
+		t[12][size] = t[13][size] = r4 ^ r8;
+		t[14][size] = t[15][size] = r2 ^ r4 ^ r8;
 	}
 
 	for (i = FB_DIGIT - 4; i > 0; i -= 4) {
@@ -100,16 +100,14 @@ void fb_muld_low(dig_t *c, dig_t *a, dig_t *b, int size) {
 		tmpc = c;
 		for (j = 0; j < size; j++, tmpa++, tmpc++) {
 			u = (*tmpa >> i) & 0x0F;
-			fb_addd_low(tmpc, tmpc, table[u], size + 1);
+			fb_addd_low(tmpc, tmpc, t[u], size + 1);
 		}
 		bn_lshb_low(c, c, 2 * size, 4);
 	}
+
 	for (j = 0; j < size; j++, a++, c++) {
 		u = *a & 0x0F;
-		fb_addd_low(c, c, table[u], size + 1);
-	}
-	for (i = 0; i < 16; i++) {
-		dv_free(table[i]);
+		fb_addd_low(c, c, t[u], size + 1);
 	}
 }
 

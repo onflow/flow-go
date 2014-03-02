@@ -37,7 +37,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_invn_low(dig_t *c, dig_t *a) {
+void fb_invn_low(dig_t *c, const dig_t *a) {
 	int i, j, x, y;
 	int *chain, len;
 

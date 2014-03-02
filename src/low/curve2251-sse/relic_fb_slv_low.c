@@ -45,7 +45,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-void fb_slvn_low(dig_t *c, dig_t *a) {
+void fb_slvn_low(dig_t *c, const dig_t *a) {
 	int i;
 	dig_t *p, u0, u1, u2, u3;
 	void *tab = fb_poly_get_slv();

@@ -48,7 +48,7 @@
 
 #ifndef __PCLMUL__
 
-void fb_mulh_low(dig_t *c, dig_t *a) {
+void fb_mulh_low(dig_t *c, const dig_t *a) {
 	__m128i m0, m1, m2, m3, m8, m9, t0, t1;
 	uint8_t ta;
 	int j;
@@ -99,7 +99,7 @@ void fb_mulh_low(dig_t *c, dig_t *a) {
 
 #else
 
-void fb_mulh_low(dig_t *c, dig_t *a) {
+void fb_mulh_low(dig_t *c, const dig_t *a) {
 	__m128i ma0, mb0, mb1, m0, m1, m2, m4, m8, m9, t0, t1, t2, t3;
 	dig_t *b = fb_poly_get_srz();
 
@@ -143,7 +143,7 @@ void fb_mulh_low(dig_t *c, dig_t *a) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fb_srtn_low(dig_t *c, dig_t *a) {
+void fb_srtn_low(dig_t *c, const dig_t *a) {
 	__m128i m0, m1, m2, perm, mask0, mask1, sqrt0, sqrt1;
 	align dig_t x[2], d0, d1;
 	align dig_t t_e[FB_DIGS] = {0}, t_o[FB_DIGS] = {0};
