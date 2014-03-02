@@ -29,8 +29,6 @@
  * @ingroup eb
  */
 
-#include "string.h"
-
 #include "relic_core.h"
 #include "relic_md.h"
 #include "relic_eb.h"
@@ -66,45 +64,22 @@ void eb_map(eb_t p, const uint8_t *msg, int len) {
 
 			eb_rhs(t1, p);
 
-			if (eb_curve_is_super()) {
-				if (eb_curve_opt_c() != OPT_ONE) {
-					/* t0 = c^2. */
-					fb_sqr(t0, eb_curve_get_c());
-					/* t0 = 1/c^2. */
-					fb_inv(t0, t0);
-					/* t0 = t1/c^2. */
-					fb_mul(t1, t0, t1);
-				}
-				/* Solve t1^2 + t1 = t0. */
-				if (fb_trc(t1) != 0) {
-					i++;
-				} else {
-					fb_slv(t1, t1);
-					/* x3 = x1, y3 = t1 * c, z3 = 1. */
-					fb_mul(p->y, t1, eb_curve_get_c());
-					fb_set_dig(p->z, 1);
-
-					p->norm = 1;
-					break;
-				}
+			/* t0 = 1/x1^2. */
+			fb_sqr(t0, p->x);
+			fb_inv(t0, t0);
+			/* t0 = t1/x1^2. */
+			fb_mul(t0, t0, t1);
+			/* Solve t1^2 + t1 = t0. */
+			if (fb_trc(t0) != 0) {
+				i++;
 			} else {
-				/* t0 = 1/x1^2. */
-				fb_sqr(t0, p->x);
-				fb_inv(t0, t0);
-				/* t0 = t1/x1^2. */
-				fb_mul(t0, t0, t1);
-				/* Solve t1^2 + t1 = t0. */
-				if (fb_trc(t0) != 0) {
-					i++;
-				} else {
-					fb_slv(t1, t0);
-					/* x3 = x1, y3 = t1 * x1, z3 = 1. */
-					fb_mul(p->y, t1, p->x);
-					fb_set_dig(p->z, 1);
+				fb_slv(t1, t0);
+				/* x3 = x1, y3 = t1 * x1, z3 = 1. */
+				fb_mul(p->y, t1, p->x);
+				fb_set_dig(p->z, 1);
 
-					p->norm = 1;
-					break;
-				}
+				p->norm = 1;
+				break;
 			}
 		}
 		/* Now, multiply by cofactor to get the correct group. */

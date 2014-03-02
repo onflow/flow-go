@@ -110,40 +110,21 @@ void eb_rhs(fb_t rhs, const eb_t p) {
 		/* t1 = x1^3. */
 		fb_mul(t1, t0, p->x);
 
-		if (eb_curve_is_super()) {
-			/* t1 = x1^3 + a * x1 + b. */
-			switch (eb_curve_opt_a()) {
-				case OPT_ZERO:
-					break;
-				case OPT_ONE:
-					fb_add(t1, t1, p->x);
-					break;
-				case OPT_DIGIT:
-					fb_mul_dig(t0, p->x, eb_curve_get_a()[0]);
-					fb_add(t1, t1, t0);
-					break;
-				default:
-					fb_mul(t0, p->x, eb_curve_get_a());
-					fb_add(t1, t1, t0);
-					break;
-			}
-		} else {
-			/* t1 = x1^3 + a * x1^2 + b. */
-			switch (eb_curve_opt_a()) {
-				case OPT_ZERO:
-					break;
-				case OPT_ONE:
-					fb_add(t1, t1, t0);
-					break;
-				case OPT_DIGIT:
-					fb_mul_dig(t0, t0, eb_curve_get_a()[0]);
-					fb_add(t1, t1, t0);
-					break;
-				default:
-					fb_mul(t0, t0, eb_curve_get_a());
-					fb_add(t1, t1, t0);
-					break;
-			}
+		/* t1 = x1^3 + a * x1^2 + b. */
+		switch (eb_curve_opt_a()) {
+			case OPT_ZERO:
+				break;
+			case OPT_ONE:
+				fb_add(t1, t1, t0);
+				break;
+			case OPT_DIGIT:
+				fb_mul_dig(t0, t0, eb_curve_get_a()[0]);
+				fb_add(t1, t1, t0);
+				break;
+			default:
+				fb_mul(t0, t0, eb_curve_get_a());
+				fb_add(t1, t1, t0);
+				break;
 		}
 
 		switch (eb_curve_opt_b()) {
@@ -185,11 +166,7 @@ int eb_is_valid(const eb_t p) {
 
 		eb_norm(t, p);
 
-		if (eb_curve_is_super()) {
-			fb_mul(lhs, t->y, eb_curve_get_c());
-		} else {
-			fb_mul(lhs, t->x, t->y);
-		}
+		fb_mul(lhs, t->x, t->y);
 		eb_rhs(t->x, t);
 		fb_sqr(t->y, t->y);
 		fb_add(lhs, lhs, t->y);
@@ -208,7 +185,7 @@ int eb_is_valid(const eb_t p) {
 void eb_tab(eb_t *t, const eb_t p, int w) {
 	int u;
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
+#if defined(EB_PLAIN)
 	if (!eb_curve_is_kbltz()) {
 		if (w > 2) {
 			eb_dbl(t[0], p);
@@ -225,7 +202,7 @@ void eb_tab(eb_t *t, const eb_t p, int w) {
 		}
 		eb_copy(t[0], p);
 	}
-#endif /* EB_ORDIN || EB_SUPER */
+#endif /* EB_PLAIN */
 
 #if defined(EB_KBLTZ)
 	if (eb_curve_is_kbltz()) {

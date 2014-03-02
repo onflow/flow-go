@@ -40,8 +40,6 @@
 
 #if EB_ADD == BASIC || !defined(STRIP)
 
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
-
 /**
  * Adds two points represented in affine coordinates on an ordinary binary
  * elliptic curve.
@@ -50,7 +48,7 @@
  * @param[in] p					- the first point to add.
  * @param[in] q					- the second point to add.
  */
-static void eb_add_basic_ordin(eb_t r, const eb_t p, const eb_t q) {
+static void eb_add_basic_imp(eb_t r, const eb_t p, const eb_t q) {
 	fb_t t0, t1, t2;
 
 	fb_null(t0);
@@ -124,96 +122,9 @@ static void eb_add_basic_ordin(eb_t r, const eb_t p, const eb_t q) {
 	}
 }
 
-#endif /* EB_ORDIN || EB_KBLTZ */
-
-#if defined(EB_SUPER)
-/**
- * Adds two points represented in affine coordinates on a supersingular binary
- * elliptic curve.
- *
- * @param[out] r				- the result.
- * @param[in] p					- the first point to add.
- * @param[in] q					- the second point to add.
- */
-static void eb_add_basic_super(eb_t r, const eb_t p, const eb_t q) {
-	fb_t t0, t1, t2;
-
-	fb_null(t0);
-	fb_null(t1);
-	fb_null(t2);
-
-	TRY {
-		fb_new(t0);
-		fb_new(t1);
-		fb_new(t2);
-
-		/* t0 = (y1 + y2). */
-		fb_add(t0, p->y, q->y);
-		/* t1 = (x1 + x2). */
-		fb_add(t1, p->x, q->x);
-
-		if (fb_is_zero(t1)) {
-			if (fb_is_zero(t0)) {
-				/* If t1 is zero and t0 is zero, p = q, should have doubled. */
-				eb_dbl_basic(r, p);
-			} else {
-				/* If t0 is not zero and t1 is zero, q = -p and r = infinity. */
-				eb_set_infty(r);
-			}
-		} else {
-
-			/* t2 = 1/(x1 + x2). */
-			fb_inv(t2, t1);
-			/* t0 = lambda = (y1 + y2)/(x1 + x2). */
-			fb_mul(t0, t0, t2);
-			/* t2 = lambda^2. */
-			fb_sqr(t2, t0);
-
-			/* t2 = lambda^2 + x1 + x2. */
-			fb_add(t2, t2, t1);
-
-			/* y3 = lambda*(x3 + x1) + y1 + c. */
-			fb_add(t1, t2, p->x);
-			fb_mul(t1, t1, t0);
-			fb_add(r->y, t1, p->y);
-
-			switch (eb_curve_opt_c()) {
-				case OPT_ZERO:
-					break;
-				case OPT_ONE:
-					fb_add_dig(r->y, r->y, (dig_t)1);
-					break;
-				case OPT_DIGIT:
-					fb_add_dig(r->y, r->y, eb_curve_get_c()[0]);
-					break;
-				default:
-					fb_add(r->y, r->y, eb_curve_get_c());
-					break;
-			}
-
-			/* x3 = lambda^2 + x1 + x2. */
-			fb_copy(r->x, t2);
-			fb_copy(r->z, p->z);
-
-			r->norm = 1;
-		}
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb_free(t0);
-		fb_free(t1);
-		fb_free(t2);
-	}
-}
-
-#endif /* EB_SUPER */
 #endif /* EB_ADD == BASIC */
 
 #if EB_ADD == PROJC || !defined(STRIP)
-
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
 
 #if defined(EB_MIXED) || !defined(STRIP)
 
@@ -225,7 +136,7 @@ static void eb_add_basic_super(eb_t r, const eb_t p, const eb_t q) {
  * @param[in] p					- the affine point.
  * @param[in] q					- the projective point.
  */
-static void eb_add_projc_ordin_mix(eb_t r, const eb_t p, const eb_t q) {
+static void eb_add_projc_mix(eb_t r, const eb_t p, const eb_t q) {
 	fb_t t0, t1, t2, t3, t4, t5;
 
 	fb_null(t0);
@@ -361,16 +272,16 @@ static void eb_add_projc_ordin_mix(eb_t r, const eb_t p, const eb_t q) {
  * @param[in] p					- the first point to add.
  * @param[in] q					- the second point to add.
  */
-static void eb_add_projc_ordin(eb_t r, const eb_t p, const eb_t q) {
+static void eb_add_projc_imp(eb_t r, const eb_t p, const eb_t q) {
 #if defined(EB_MIXED) && defined(STRIP)
 	/* If code size is a problem, leave only the mixed version. */
-	eb_add_projc_ordin_mix(r, p, q);
+	eb_add_projc_mix(r, p, q);
 #else /* General addition. */
 
 #if defined(EB_MIXED) || !defined(STRIP)
 	/* Test if z2 = 1 only if mixed coordinates are turned on. */
 	if (q->norm) {
-		eb_add_projc_ordin_mix(r, p, q);
+		eb_add_projc_mix(r, p, q);
 		return;
 	}
 #endif
@@ -480,245 +391,6 @@ static void eb_add_projc_ordin(eb_t r, const eb_t p, const eb_t q) {
 #endif
 }
 
-#endif /* EB_ORDIN || EB_KBLTZ */
-
-#if defined(EB_SUPER)
-
-#if defined(EB_MIXED) || !defined(STRIP)
-
-/**
- * Adds two points represented in projective coordinates on a supersingular
- * binary elliptic curve.
- *
- * @param[out] r				- the result.
- * @param[in] p					- the first point to add.
- * @param[in] q					- the second point to add.
- */
-static void eb_add_projc_super_mix(eb_t r, const eb_t p, const eb_t q) {
-	fb_t t0, t1, t2, t3, t4, t5;
-
-	fb_null(t0);
-	fb_null(t1);
-	fb_null(t2);
-	fb_null(t3);
-	fb_null(t4);
-	fb_null(t5);
-
-	TRY {
-		fb_new(t0);
-		fb_new(t1);
-		fb_new(t2);
-		fb_new(t3);
-		fb_new(t4);
-		fb_new(t5);
-
-		/* Mixed addition. */
-		if (p->norm) {
-			/* A = y2, B = y1, E = y1 + y2. */
-			fb_add(t0, p->y, q->y);
-			/* C = x1, D = x2, E = x1 + x2. */
-			fb_add(t2, p->x, q->x);
-		} else {
-			/* t0 = A = y2 * z1. */
-			fb_mul(t0, q->y, p->z);
-			/* t0 = E = A + y1 */
-			fb_add(t0, t0, p->y);
-			/* t3 = D = x2 * z1. */
-			fb_mul(t3, p->z, q->x);
-			/* t1 = F = x1 + D */
-			fb_add(t2, p->x, t3);
-		}
-
-		/* If F is zero. */
-		if (fb_is_zero(t2)) {
-			if (fb_is_zero(t0)) {
-				/* If E is zero, p = q, should have doubled. */
-				eb_dbl_projc(r, p);
-			} else {
-				/* If E is not zero, q = -p, r = infinity. */
-				eb_set_infty(r);
-			}
-		} else {
-			if (p->norm) {
-				/* t3 = F^2. */
-				fb_sqr(t3, t2);
-				/* t4 = F^3. */
-				fb_mul(t4, t3, t2);
-				/* y3 = x2 * z1 * F^2. */
-				fb_mul(t1, q->x, t3);
-				/* x3 = F^4. */
-				fb_sqr(r->x, t3);
-			} else {
-				/* x3 = F^2. */
-				fb_sqr(r->x, t2);
-				/* t4 = F^3. */
-				fb_mul(t4, r->x, t2);
-				/* y3 = x2 * z1 * F^2. */
-				fb_mul(t1, t3, r->x);
-				/* x3 = F^4. */
-				fb_sqr(r->x, r->x);
-			}
-
-			/* t5 = z1 * z2 * E^2. */
-			fb_sqr(t5, t0);
-			if (!p->norm) {
-				fb_mul(t5, t5, p->z);
-				/* z3 = z1 * z2 * F^3. */
-				fb_mul(r->z, t4, p->z);
-			} else {
-				fb_copy(r->z, t4);
-			}
-
-			/* y3 = E * (x2 * z1 * F^2 + z1 * z2 * E^2). */
-			fb_add(t1, t1, t5);
-			fb_mul(t1, t1, t0);
-
-			/* t5 = F * z1 * z2 * E^2. */
-			fb_mul(t5, t2, t5);
-
-			/* x3 = F^4 * z1 * z2 * E^2. */
-			fb_add(r->x, r->x, t5);
-
-			/* t5 = y1 * z2 * F^3. */
-			fb_mul(t5, t4, p->y);
-
-			/* y3 = y1 * z2 * F^3 + z3. */
-			fb_add(r->y, t1, t5);
-			fb_add(r->y, r->y, r->z);
-		}
-		r->norm = 0;
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb_free(t0);
-		fb_free(t1);
-		fb_free(t2);
-		fb_free(t3);
-		fb_free(t4);
-		fb_free(t5);
-	}
-}
-
-#endif /* EB_MIXED */
-
-/**
- * Adds two points represented in projective coordinates on a supersingular
- * binary elliptic curve.
- *
- * @param[out] r				- the result.
- * @param[in] p					- the first point to add.
- * @param[in] q					- the second point to add.
- */
-static void eb_add_projc_super(eb_t r, const eb_t p, const eb_t q) {
-#if defined(EB_MIXED) && defined(STRIP)
-	/* If code size is a problem, leave only the mixed version. */
-	eb_add_projc_super_mix(r, p, q);
-#else /* General addition. */
-
-#if defined(EB_MIXED) || !defined(STRIP)
-	/* Test if z2 = 1 only if mixed coordinates are turned on. */
-	if (q->norm) {
-		eb_add_projc_super_mix(r, p, q);
-		return;
-	}
-#endif
-
-	fb_t t0, t1, t2, t3, t4, t5;
-
-	fb_null(t0);
-	fb_null(t1);
-	fb_null(t2);
-	fb_null(t3);
-	fb_null(t4);
-	fb_null(t5);
-
-	TRY {
-		fb_new(t0);
-		fb_new(t1);
-		fb_new(t2);
-		fb_new(t3);
-		fb_new(t4);
-		fb_new(t5);
-
-		/* t0 = A = y2 * z1. */
-		fb_mul(t0, p->z, q->y);
-		/* t1 = B = y1 * z2. */
-		fb_mul(t1, p->y, q->z);
-		/* t0 = E = A + B */
-		fb_add(t0, t0, t1);
-
-		/* t2 = C = x1 * z2. */
-		fb_mul(t2, p->x, q->z);
-		/* t3 = D = x2 * z1. */
-		fb_mul(t3, p->z, q->x);
-		/* t1 = F = C + D */
-		fb_add(t2, t2, t3);
-
-		/* If F is zero. */
-		if (fb_is_zero(t2)) {
-			if (fb_is_zero(t0)) {
-				/* If E is zero, p = q, should have doubled. */
-				eb_dbl_projc(r, p);
-			} else {
-				/* If E is not zero, q = -p, r = infinity. */
-				eb_set_infty(r);
-			}
-		} else {
-			/* t4 = z1 * z2. */
-			fb_mul(t4, p->z, q->z);
-
-			/* x3 = F^2. */
-			fb_sqr(r->x, t2);
-			/* z3 = F^3. */
-			fb_mul(r->z, r->x, t2);
-
-			/* y3 = x2 * z1 * F^2. */
-			fb_mul(r->y, t3, r->x);
-			/* t5 = z1 * z2 * E^2. */
-			fb_sqr(t5, t0);
-			fb_mul(t5, t5, t4);
-			/* y3 = E * (x2 * z1 * F^2 + z1 * z2 * E^2). */
-			fb_add(r->y, r->y, t5);
-			fb_mul(r->y, r->y, t0);
-
-			/* x3 = F^4. */
-			fb_sqr(r->x, r->x);
-
-			/* t5 = F * z1 * z2 * E^2. */
-			fb_mul(t5, t2, t5);
-
-			/* x3 = F^4 * z1 * z2 * E^2. */
-			fb_add(r->x, r->x, t5);
-
-			/* t5 = y1 * z2 * F^3. */
-			fb_mul(t5, r->z, t1);
-
-			/* z3 = z1 * z2 * F^3. */
-			fb_mul(r->z, r->z, t4);
-
-			/* y3 = y1 * z2 * F^3 + z3. */
-			fb_add(r->y, r->y, t5);
-			fb_add(r->y, r->y, r->z);
-		}
-		r->norm = 0;
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb_free(t0);
-		fb_free(t1);
-		fb_free(t2);
-		fb_free(t3);
-		fb_free(t4);
-		fb_free(t5);
-	}
-#endif
-}
-
-#endif /* EB_SUPER */
 #endif /* EB_ADD == PROJC */
 
 /*============================================================================*/
@@ -737,16 +409,8 @@ void eb_add_basic(eb_t r, const eb_t p, const eb_t q) {
 		eb_copy(r, p);
 		return;
 	}
-#if defined(EB_SUPER)
-	if (eb_curve_is_super()) {
-		eb_add_basic_super(r, p, q);
-		return;
-	}
-#endif
 
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
-	eb_add_basic_ordin(r, p, q);
-#endif
+	eb_add_basic_imp(r, p, q);
 }
 
 void eb_sub_basic(eb_t r, const eb_t p, const eb_t q) {
@@ -789,16 +453,8 @@ void eb_add_projc(eb_t r, const eb_t p, const eb_t q) {
 		eb_copy(r, p);
 		return;
 	}
-#if defined(EB_SUPER)
-	if (eb_curve_is_super()) {
-		eb_add_projc_super(r, p, q);
-		return;
-	}
-#endif
 
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
-	eb_add_projc_ordin(r, p, q);
-#endif
+	eb_add_projc_imp(r, p, q);
 }
 
 void eb_sub_projc(eb_t r, const eb_t p, const eb_t q) {

@@ -679,10 +679,6 @@ void eb_mul_lodah(eb_t r, const eb_t p, const bn_t k) {
 	dv_t x1, z1, x2, z2, r1, r2, r3, r4, r5;
 	const dig_t *b;
 
-	if (eb_curve_is_super()) {
-		THROW(ERR_NO_VALID);
-	}
-
 	dv_null(x1);
 	dv_null(z1);
 	dv_null(x2);
@@ -867,14 +863,7 @@ void eb_mul_rwnaf(eb_t r, const eb_t p, const bn_t k) {
 	}
 #endif
 
-#if defined(EB_SUPER)
-	if (eb_curve_is_super()) {
-		eb_mul_rnaf_imp(r, p, k);
-		return;
-	}
-#endif
-
-#if defined(EB_ORDIN) 
+#if defined(EB_PLAIN) 
 #if defined(EB_MIXED) && defined(STRIP)
 	/* It is impossible to run a right-to-left algorithm using ordinary curves
 	 * and only mixed additions. */

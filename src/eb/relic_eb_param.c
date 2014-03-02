@@ -29,8 +29,6 @@
  * @ingroup eb
  */
 
-#include <string.h>
-
 #include "relic_core.h"
 #include "relic_eb.h"
 #include "relic_util.h"
@@ -41,7 +39,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if defined(EB_ORDIN) && FB_POLYN == 163
+#if defined(EB_PLAIN) && FB_POLYN == 163
 /**
  * Parameters for the NIST B-163 binary elliptic curve.
  */
@@ -69,7 +67,7 @@
 /** @} */
 #endif
 
-#if defined(EB_ORDIN) && FB_POLYN == 233
+#if defined(EB_PLAIN) && FB_POLYN == 233
 /**
  * Parameters for the NIST B-233 binary elliptic curve.
  */
@@ -111,7 +109,7 @@
 /** @} */
 #endif
 
-#if defined(EB_ORDIN) && FB_POLYN == 251
+#if defined(EB_PLAIN) && FB_POLYN == 251
 /**
  * Parameters for the eBATS B-251 binary elliptic curve.
  */
@@ -125,7 +123,7 @@
 /** @} */
 #endif
 
-#if defined(EB_ORDIN) && FB_POLYN == 257
+#if defined(EB_PLAIN) && FB_POLYN == 257
 /**
  * Parameters for a curve over GF(2^257) which is really nice for halving.
  */
@@ -139,7 +137,7 @@
 /** @} */
 #endif
 
-#if defined(EB_ORDIN) && FB_POLYN == 283
+#if defined(EB_PLAIN) && FB_POLYN == 283
 /**
  * Parameters for the NIST B-283 binary elliptic curve.
  */
@@ -167,7 +165,7 @@
 /** @} */
 #endif
 
-#if defined(EB_ORDIN) && FB_POLYN == 409
+#if defined(EB_PLAIN) && FB_POLYN == 409
 /**
  * Parameters for the NIST B-409 binary elliptic curve.
  */
@@ -195,7 +193,7 @@
 /** @} */
 #endif
 
-#if defined(EB_ORDIN) && FB_POLYN == 571
+#if defined(EB_PLAIN) && FB_POLYN == 571
 /**
  * Parameters for the NIST B-571 binary elliptic curve.
  */
@@ -223,76 +221,6 @@
 /** @} */
 #endif
 
-#if defined(EB_SUPER) && FB_POLYN == 271
-/**
- * Parameters for the MIRACL supersingular pairing-friendly elliptic curve over
- * GF(2^271).
- */
-/** @{ */
-#define ETAT_P271_A		"1"
-#define ETAT_P271_B		"0"
-#define ETAT_P271_C		"1"
-#define ETAT_P271_X		"10B175C041258C778D1DD76AEF912696E510A16F0C4E5357F2F6591B401498D66271"
-#define ETAT_P271_Y		"7C026D0DB856E16E70976A84C19620F8D8B92B65C2A7BAF3B9FD80DC7F385B9C26BF"
-#define ETAT_P271_R		"000011325723001F4DA29DB638FB520315B3B99DAE4BC727E10745F086979F3D4FD5"
-#define ETAT_P271_H		"7717D"
-/** @} */
-#endif
-
-#if defined(EB_SUPER) && FB_POLYN == 271
-/**
- * Parameters for the MIRACL supersingular pairing-friendly elliptic curve over
- * GF(2^271).
- */
-/** @{ */
-#define ETAT_T271_A		"1"
-#define ETAT_T271_B		"0"
-#define ETAT_T271_C		"1"
-#define ETAT_T271_X		"33797D0E4348C31F6867373A566F85F720B6BDF204A9DB557CDE08CB249963C93D86"
-#define ETAT_T271_Y		"3B519E11ADDE45B02AD36ED5A55F3ECD8CD9517460CAC25B187224D6BB73D9C49B1C"
-#define ETAT_T271_R		"000011325723001F4DA29DB638FB520315B3B99DAE4BC727E10745F086979F3D4FD5"
-#define ETAT_T271_H		"7717D"
-/** @} */
-#endif
-
-#if defined(EB_SUPER) && FB_POLYN == 353
-/**
- * Parameters for a supersingular pairing-friendly elliptic curve over
- * GF(2^353).
- */
-/** @{ */
-#define ETAT_S353_A		"1"
-#define ETAT_S353_B		"1"
-#define ETAT_S353_C		"1"
-#if WORD == 8
-#define ETAT_S353_X		"0000000000080000000000000000000000000000000000000000000000000000000000000000000000000000"
-#define ETAT_S353_Y		"10C47D4C5BF5C9394CB2EA8DE924D6F0D9FD33973F27252DFB70964838DB7BC428F0BB9D8FC1240F392351DE"
-#else
-#define ETAT_S353_X		"0000000000000000000000000000000000000000000100000000000000000000000000000000000000000002"
-#define ETAT_S353_Y		"1195A1CDA741AD3DB75BCC11B76D96F8F79AC9E2E83C8185E29A9B2DA0DA3FE4FABB88D111B4C50D56B3E5B6"
-#endif
-#define ETAT_S353_R		"1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE00000000000000000000000000000000000000000001"
-#define ETAT_S353_H		"1"
-/** @} */
-#endif
-
-#if defined(EB_SUPER) && FB_POLYN == 1223
-/**
- * Parameters for the MIRACL supersingular pairing-friendly elliptic curve over
- * GF(2^1223).
- */
-/** @{ */
-#define ETAT_S1223_A	"1"
-#define ETAT_S1223_B	"0"
-#define ETAT_S1223_C	"1"
-#define ETAT_S1223_X	"30D8B774485EC8763A0EE8E94216EF96C7C5239853E08EB5E68E81E02C8D33154C93165EB90A336E07E9B2C1C6B1A89CBD55E673F18ABFB80BD60EAFF7368DD9296C65CF6A626A1354B63665F8F7D678FD5E31E9510A32DB291CC0BAF4C44D3D69AFBCEC6E460967591DD80D37AC0AEC950E2391A0EE43A8983E2F907B3D226A0B9CAD915096B9B4EEEB95985A0E2815B71BF7C56B079396F4"
-#define ETAT_S1223_Y	"0E6D5B0B3C21C6194FBAFD79ABB0E0738FBD1DE871D5D060055EBEA8166FACD7A18299F137B4A08746CAD8F896152D93B85951A40BBF9F03AD9E00B459430A8FD13AEB0EDB8AF0E67913BDFB047A9BBC9AAE61ACD5AE213059BCDAFE0B192BF535F3E8821B7FA64871CD6F66D547855B1312C1137FE6D11E11DE15EAA7EA17954C7A53BC107F9C279F53BC7D9DEC41F80C9DBD95D5DD7658CC"
-#define ETAT_S1223_R	"199999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccd"
-#define ETAT_S1223_H	"5"
-/** @} */
-
-#endif
-
 /**
  * Assigns a set of ordinary elliptic curve parameters.
  *
@@ -302,28 +230,17 @@
 #define ASSIGN(CURVE, FIELD)												\
 	fb_param_set(FIELD);													\
 	FETCH(str, CURVE##_A, sizeof(CURVE##_A));								\
-	fb_read_str(a, str, strlen(str), 16);										\
+	fb_read_str(a, str, strlen(str), 16);									\
 	FETCH(str, CURVE##_B, sizeof(CURVE##_B));								\
-	fb_read_str(b, str, strlen(str), 16);										\
+	fb_read_str(b, str, strlen(str), 16);									\
 	FETCH(str, CURVE##_X, sizeof(CURVE##_X));								\
-	fb_read_str(g->x, str, strlen(str), 16);									\
+	fb_read_str(g->x, str, strlen(str), 16);								\
 	FETCH(str, CURVE##_Y, sizeof(CURVE##_Y));								\
-	fb_read_str(g->y, str, strlen(str), 16);									\
+	fb_read_str(g->y, str, strlen(str), 16);								\
 	FETCH(str, CURVE##_R, sizeof(CURVE##_R));								\
 	bn_read_str(r, str, strlen(str), 16);									\
 	FETCH(str, CURVE##_H, sizeof(CURVE##_H));								\
 	bn_read_str(h, str, strlen(str), 16);									\
-
-/**
- * Assigns a set of supersingular elliptic curve parameters.
- *
- * @param[in] CURVE		- the curve parameters to assign.
- * @param[in] FIELD		- the finite field identifier.
- */
-#define ASSIGNS(CURVE, FIELD)												\
-	ASSIGN(CURVE, FIELD);													\
-	FETCH(str, CURVE##_C, sizeof(CURVE##_C));								\
-	fb_read_str(c, str, strlen(str), 16);										\
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -334,18 +251,14 @@ int eb_param_get() {
 }
 
 void eb_param_set(int param) {
-	int super = 0;
-	int ordin = 0;
-	int kbltz = 0;
 	char str[2 * FB_BYTES + 1];
-	fb_t a, b, c;
+	fb_t a, b;
 	eb_t g;
 	bn_t r;
 	bn_t h;
 
 	fb_null(a);
 	fb_null(b);
-	fb_null(c);
 	eb_null(g);
 	bn_null(r);
 	bn_null(h);
@@ -353,7 +266,6 @@ void eb_param_set(int param) {
 	TRY {
 		fb_new(a);
 		fb_new(b);
-		fb_new(c);
 		eb_new(g);
 		bn_new(r);
 		bn_new(h);
@@ -361,104 +273,69 @@ void eb_param_set(int param) {
 		core_get()->eb_id = 0;
 
 		switch (param) {
-#if defined(EB_ORDIN) && FB_POLYN == 163
+#if defined(EB_PLAIN) && FB_POLYN == 163
 			case NIST_B163:
 				ASSIGN(NIST_B163, NIST_163);
-				ordin = 1;
 				break;
 #endif
 #if defined(EB_KBLTZ) && FB_POLYN == 163
 			case NIST_K163:
 				ASSIGN(NIST_K163, NIST_163);
-				kbltz = 1;
 				break;
 #endif
-#if defined(EB_ORDIN) && FB_POLYN == 233
+#if defined(EB_PLAIN) && FB_POLYN == 233
 			case NIST_B233:
 				ASSIGN(NIST_B233, NIST_233);
-				ordin = 1;
 				break;
 #endif
 #if defined(EB_KBLTZ) && FB_POLYN == 233
 			case NIST_K233:
 				ASSIGN(NIST_K233, NIST_233);
-				kbltz = 1;
-				break;
-#endif
-#if defined(EB_ORDIN) && FB_POLYN == 251
-			case EBACS_B251:
-				ASSIGN(EBACS_B251, PENTA_251);
-				ordin = 1;
-				break;
-#endif
-#if defined(EB_ORDIN) && FB_POLYN == 257
-			case HALVE_B257:
-				ASSIGN(HALVE_B257, TRINO_257);
-				ordin = 1;
-				break;
-#endif
-#if defined(EB_ORDIN) && FB_POLYN == 283
-			case NIST_B283:
-				ASSIGN(NIST_B283, NIST_283);
-				ordin = 1;
-				break;
-#endif
-#if defined(EB_KBLTZ) && FB_POLYN == 283
-			case NIST_K283:
-				ASSIGN(NIST_K283, NIST_283);
-				kbltz = 1;
 				break;
 #endif
 #if defined(EB_KBLTZ) && FB_POLYN == 239
 			case SECG_K239:
 				ASSIGN(SECG_K239, SECG_239);
-				kbltz = 1;
 				break;
 #endif
-#if defined(EB_ORDIN) && FB_POLYN == 409
+#if defined(EB_PLAIN) && FB_POLYN == 251
+			case EBACS_B251:
+				ASSIGN(EBACS_B251, PENTA_251);
+				break;
+#endif
+#if defined(EB_PLAIN) && FB_POLYN == 257
+			case HALVE_B257:
+				ASSIGN(HALVE_B257, TRINO_257);
+				break;
+#endif
+#if defined(EB_PLAIN) && FB_POLYN == 283
+			case NIST_B283:
+				ASSIGN(NIST_B283, NIST_283);
+				break;
+#endif
+#if defined(EB_KBLTZ) && FB_POLYN == 283
+			case NIST_K283:
+				ASSIGN(NIST_K283, NIST_283);
+				break;
+#endif
+#if defined(EB_PLAIN) && FB_POLYN == 409
 			case NIST_B409:
 				ASSIGN(NIST_B409, NIST_409);
-				ordin = 1;
 				break;
 #endif
 #if defined(EB_KBLTZ) && FB_POLYN == 409
 			case NIST_K409:
 				ASSIGN(NIST_K409, NIST_409);
-				kbltz = 1;
 				break;
 #endif
-#if defined(EB_ORDIN) && FB_POLYN == 571
+#if defined(EB_PLAIN) && FB_POLYN == 571
 			case NIST_B571:
 				ASSIGN(NIST_B571, NIST_571);
-				ordin = 1;
 				break;
 #endif
 #if defined(EB_KBLTZ) && FB_POLYN == 571
 			case NIST_K571:
 				ASSIGN(NIST_K571, NIST_571);
-				kbltz = 1;
-				break;
-#endif
-#if defined(EB_SUPER) && FB_POLYN == 271
-			case ETAT_P271:
-				ASSIGNS(ETAT_P271, PENTA_271);
-				super = 1;
-				break;
-			case ETAT_T271:
-				ASSIGNS(ETAT_T271, TRINO_271);
-				super = 1;
-				break;
-#endif
-#if defined(EB_SUPER) && FB_POLYN == 353
-			case ETAT_S353:
-				ASSIGNS(ETAT_S353, TRINO_353);
-				super = 1;
-				break;
-#endif
-#if defined(EB_SUPER) && FB_POLYN == 1223
-			case ETAT_S1223:
-				ASSIGNS(ETAT_S1223, TRINO_1223);
-				super = 1;
 				break;
 #endif
 			default:
@@ -466,42 +343,12 @@ void eb_param_set(int param) {
 				THROW(ERR_NO_VALID);
 				break;
 		}
-
-		/* Do not generate warnings. */
-		(void)kbltz;
-		(void)ordin;
-		(void)super;
-		(void)c;
-
 		fb_zero(g->z);
 		fb_set_bit(g->z, 0, 1);
 		g->norm = 1;
 
-#if defined(EB_ORDIN)
-		if (ordin) {
-			eb_curve_set_ordin(a, b, g, r, h);
-			core_get()->eb_id = param;
-		}
-#endif
-
-#if defined(EB_KBLTZ)
-		if (kbltz) {
-			eb_curve_set_kbltz(a, g, r, h);
-			core_get()->eb_id = param;
-		}
-#elif defined(EB_ORDIN)
-		if (kbltz) {
-			eb_curve_set_ordin(a, b, g, r, h);
-			core_get()->eb_id = param;
-		}
-#endif
-
-#if defined(EB_SUPER)
-		if (super) {
-			eb_curve_set_super(a, b, c, g, r, h);
-			core_get()->eb_id = param;
-		}
-#endif
+		eb_curve_set(a, b, g, r, h);
+		core_get()->eb_id = param;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -509,7 +356,6 @@ void eb_param_set(int param) {
 	FINALLY {
 		fb_free(a);
 		fb_free(b);
-		fb_free(c);
 		eb_free(g);
 		bn_free(r);
 		bn_free(h);
@@ -517,24 +363,21 @@ void eb_param_set(int param) {
 }
 
 int eb_param_set_any() {
-	int r0, r1, r2;
+	int r0, r1;
 
-	r0 = eb_param_set_any_ordin();
+	r0 = eb_param_set_any_plain();
 	if (r0 == STS_ERR) {
 		r1 = eb_param_set_any_kbltz();
 		if (r1 == STS_ERR) {
-			r2 = eb_param_set_any_super();
-			if (r2 == STS_ERR) {
-				return STS_ERR;
-			}
+			return STS_ERR;
 		}
 	}
 	return STS_OK;
 }
 
-int eb_param_set_any_ordin() {
+int eb_param_set_any_plain() {
 	int r = STS_OK;
-#if defined(EB_ORDIN)
+#if defined(EB_PLAIN)
 #if FB_POLYN == 163
 	eb_param_set(NIST_B163);
 #elif FB_POLYN == 233
@@ -573,28 +416,6 @@ int eb_param_set_any_kbltz() {
 	eb_param_set(NIST_K409);
 #elif FB_POLYN == 571
 	eb_param_set(NIST_K571);
-#else
-	r = STS_ERR;
-#endif
-#else
-	r = STS_ERR;
-#endif
-	return r;
-}
-
-int eb_param_set_any_super() {
-	int r = STS_OK;
-#if defined(EB_SUPER)
-#if FB_POLYN == 271
-#ifdef FB_TRINO
-	eb_param_set(ETAT_T271);
-#else
-	eb_param_set(ETAT_P271);
-#endif
-#elif FB_POLYN == 353
-	eb_param_set(ETAT_S353);
-#elif FB_POLYN == 1223
-	eb_param_set(ETAT_S1223);
 #else
 	r = STS_ERR;
 #endif
@@ -645,18 +466,6 @@ void eb_param_print() {
 		case NIST_K571:
 			util_banner("Curve NIST-K571:", 0);
 			break;
-		case ETAT_P271:
-			util_banner("Curve ETAT-P271:", 0);
-			break;
-		case ETAT_T271:
-			util_banner("Curve ETAT-T271:", 0);
-			break;
-		case ETAT_S353:
-			util_banner("Curve ETAT-S353:", 0);
-			break;
-		case ETAT_S1223:
-			util_banner("Curve ETAT-S1223:", 0);
-			break;
 	}
 }
 
@@ -680,13 +489,6 @@ int eb_param_level() {
 		case NIST_B571:
 		case NIST_K571:
 			return 256;
-		case ETAT_P271:
-		case ETAT_T271:
-			return 64;
-		case ETAT_S353:
-			return 80;
-		case ETAT_S1223:
-			return 128;
 	}
 	return 0;
 }

@@ -40,7 +40,6 @@
 
 #if EB_ADD == BASIC || !defined(STRIP)
 
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
 /**
  * Doubles a point represented in affine coordinates on an ordinary binary
  * elliptic curve.
@@ -48,7 +47,7 @@
  * @param[out] r				- the result.
  * @param[in] p					- the point to double.
  */
-static void eb_dbl_basic_ordin(eb_t r, const eb_t p) {
+static void eb_dbl_basic_imp(eb_t r, const eb_t p) {
 	fb_t t0, t1, t2;
 
 	fb_null(t0);
@@ -110,103 +109,11 @@ static void eb_dbl_basic_ordin(eb_t r, const eb_t p) {
 		fb_free(t2);
 	}
 }
-#endif /* EB_ORDIN || EB_KBLTZ */
-
-#if defined(EB_SUPER)
-/**
- * Doubles a point represented in affine coordinates on a supersingular binary
- * elliptic curve.
- *
- * @param[out] r				- the result.
- * @param[in] p					- the point to double.
- */
-static void eb_dbl_basic_super(eb_t r, const eb_t p) {
-	fb_t t0, t1, t2;
-
-	fb_null(t0);
-	fb_null(t1);
-	fb_null(t2);
-
-	TRY {
-		fb_new(t0);
-		fb_new(t1);
-		fb_new(t2);
-
-		/* t0 = x1^2. */
-		fb_sqr(t0, p->x);
-
-		/* t0 = (x1^2 + a)/c. */
-		switch (eb_curve_opt_a()) {
-			case OPT_ZERO:
-				break;
-			case OPT_ONE:
-				fb_add_dig(t0, t0, (dig_t)1);
-				break;
-			case OPT_DIGIT:
-				fb_add_dig(t0, t0, eb_curve_get_a()[0]);
-				break;
-			default:
-				fb_add(t0, t0, eb_curve_get_a());
-				break;
-		}
-
-		switch (eb_curve_opt_c()) {
-			case OPT_ZERO:
-			case OPT_ONE:
-				break;
-			case OPT_DIGIT:
-			default:
-				fb_inv(t2, eb_curve_get_c());
-				fb_mul(t0, t0, t2);
-				fb_add(t0, t0, eb_curve_get_a());
-				break;
-		}
-
-
-		/* t2 = ((x1^2 + a)/c)^2. */
-		fb_sqr(t2, t0);
-
-		/* y3 = ((x1^2 + a)/c) * (x1 + x3) + y1 + c. */
-		fb_add(t1, t2, p->x);
-		fb_mul(t1, t1, t0);
-		fb_add(r->y, t1, p->y);
-
-		switch (eb_curve_opt_c()) {
-			case OPT_ZERO:
-				break;
-			case OPT_ONE:
-				fb_add_dig(r->y, r->y, (dig_t)1);
-				break;
-			case OPT_DIGIT:
-				fb_add_dig(r->y, r->y, eb_curve_get_c()[0]);
-				break;
-			default:
-				fb_add(r->y, r->y, eb_curve_get_c());
-				break;
-		}
-
-		/* x3 = ((x1^2 + a)/c)^2. */
-		fb_copy(r->x, t2);
-		fb_copy(r->z, p->z);
-
-		r->norm = 1;
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fb_free(t0);
-		fb_free(t1);
-		fb_free(t2);
-	}
-}
-#endif /* EB_SUPER */
 
 #endif /* EB_ADD == BASIC */
 
 #if EB_ADD == PROJC || !defined(STRIP)
 
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
 /**
  * Doubles a point represented in projective coordinates on an ordinary binary
  * elliptic curve.
@@ -214,7 +121,7 @@ static void eb_dbl_basic_super(eb_t r, const eb_t p) {
  * @param[out] r				- the result.
  * @param[in] p					- the point to double.
  */
-static void eb_dbl_projc_ordin(eb_t r, const eb_t p) {
+static void eb_dbl_projc_imp(eb_t r, const eb_t p) {
 	fb_t t0, t1;
 
 	fb_null(t0);
@@ -285,44 +192,6 @@ static void eb_dbl_projc_ordin(eb_t r, const eb_t p) {
 		fb_free(t1);
 	}
 }
-#endif /* EB_ORDIN || EB_KBLTZ */
-
-#if defined(EB_SUPER)
-/**
- * Doubles a point represented in projective coordinates on an supersingular
- * binary elliptic curve.
- *
- * @param[out] r				- the result.
- * @param[in] p					- the point to double.
- */
-static void eb_dbl_projc_super(eb_t r, const eb_t p) {
-	/* x3 = x1^4 */
-	fb_sqr(r->x, p->x);
-	fb_sqr(r->x, r->x);
-	/* y3 = y1^4. */
-	fb_sqr(r->y, p->y);
-	fb_sqr(r->y, r->y);
-
-	if (!p->norm) {
-		/* z3 = z1^4. */
-		fb_sqr(r->z, p->z);
-		fb_sqr(r->z, r->z);
-		/* y3 = x1^4 + y1^4. */
-		fb_add(r->y, r->x, r->y);
-		/* x3 = x1^4 + z1^4. */
-		fb_add(r->x, r->x, r->z);
-	} else {
-		/* y3 = x1^4 + y1^4. */
-		fb_add(r->y, r->x, r->y);
-		/* x3 = x1^4 + 1. */
-		fb_add_dig(r->x, r->x, 1);
-		/* r is still in affine coordinates. */
-		fb_copy(r->z, p->z);
-	}
-
-	r->norm = p->norm;
-}
-#endif /* EB_SUPER */
 
 #endif /* EB_ADD == PROJC */
 
@@ -337,16 +206,8 @@ void eb_dbl_basic(eb_t r, const eb_t p) {
 		eb_set_infty(r);
 		return;
 	}
-#if defined(EB_SUPER)
-	if (eb_curve_is_super()) {
-		eb_dbl_basic_super(r, p);
-		return;
-	}
-#endif
 
-#if defined(EB_ORDIN) || defined (EB_KBLTZ)
-	eb_dbl_basic_ordin(r, p);
-#endif
+	eb_dbl_basic_imp(r, p);
 }
 
 #endif
@@ -360,16 +221,7 @@ void eb_dbl_projc(eb_t r, const eb_t p) {
 		return;
 	}
 
-#if defined(EB_SUPER)
-	if (eb_curve_is_super()) {
-		eb_dbl_projc_super(r, p);
-		return;
-	}
-#endif
-
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
-	eb_dbl_projc_ordin(r, p);
-#endif
+	eb_dbl_projc_imp(r, p);
 }
 
 #endif

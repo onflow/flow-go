@@ -40,8 +40,6 @@
 
 #if EB_ADD == PROJC || !defined(STRIP)
 
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
-
 /**
  * Normalizes a point represented in projective coordinates.
  *
@@ -49,7 +47,7 @@
  * @param[in] p			- the point to normalize.
  * @param[in] flag		- if the Z coordinate is already inverted.
  */
-static void eb_norm_ordin(eb_t r, const eb_t p, int flag) {
+static void eb_norm_imp(eb_t r, const eb_t p, int flag) {
 	if (!p->norm) {
 		if (flag) {
 			fb_copy(r->z, p->z);
@@ -65,33 +63,6 @@ static void eb_norm_ordin(eb_t r, const eb_t p, int flag) {
 	r->norm = 1;
 }
 
-#endif /* EB_ORDIN || EB_KBLTZ */
-
-#if defined(EB_SUPER)
-
-/**
- * Normalizes a point represented in projective coordinates.
- *
- * @param r			- the result.
- * @param p			- the point to normalize.
- */
-static void eb_norm_super(eb_t r, const eb_t p, int flag) {
-	if (!p->norm) {
-		if (flag) {
-			fb_copy(r->z, p->z);
-		} else {
-			fb_inv(r->z, p->z);
-		}
-		fb_mul(r->x, p->x, r->z);
-		fb_mul(r->y, p->y, r->z);
-		fb_set_dig(r->z, 1);
-	}
-
-	r->norm = 1;
-}
-
-#endif /* EB_SUPER */
-
 #endif /* EB_ADD == PROJC */
 
 /**
@@ -100,7 +71,7 @@ static void eb_norm_super(eb_t r, const eb_t p, int flag) {
  * @param[out] r		- the result.
  * @param[in] p			- the point to normalize.
  */
-static void eb_norm_halve(eb_t r, const eb_t p) {
+static void eb_norm_hlv(eb_t r, const eb_t p) {
 	fb_add(r->y, p->x, p->y);
 	fb_mul(r->y, r->y, p->x);
 	fb_copy(r->x, p->x);
@@ -124,23 +95,12 @@ void eb_norm(eb_t r, const eb_t p) {
 	}
 
 	if (p->norm == 2) {
-		eb_norm_halve(r, p);
+		eb_norm_hlv(r, p);
 		return;
 	}
 
 #if EB_ADD == PROJC || !defined(STRIP)
-
-#if defined(EB_SUPER)
-	if (eb_curve_is_super()) {
-		eb_norm_super(r, p, 0);
-		return;
-	}
-#endif /* EB_SUPER */
-
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
-	eb_norm_ordin(r, p, 0);
-#endif /* EB_ORDIN || EB_KBLTZ */
-
+	eb_norm_imp(r, p, 0);
 #endif /* EB_ADD == PROJC */
 }
 
@@ -186,18 +146,7 @@ void eb_norm_sim(eb_t *r, const eb_t *t, int n) {
 		}
 	}
 
-#if defined(EB_SUPER)
-	if (eb_curve_is_super()) {
-		for (i = 0; i < n; i++) {
-			eb_norm_super(r[i], r[i], 1);
-		}
+	for (i = 0; i < n; i++) {
+		eb_norm_imp(r[i], r[i], 1);
 	}
-#endif
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
-	if (!eb_curve_is_super()) {
-		for (i = 0; i < n; i++) {
-			eb_norm_ordin(r[i], r[i], 1);
-		}
-	}
-#endif
 }
