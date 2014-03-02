@@ -41,9 +41,8 @@ endif(NOT EB_WIDTH)
 set(EB_DEPTH "${EB_DEPTH}" CACHE STRING "Width of precomputation table for fixed point methods.")
 set(EB_WIDTH "${EB_WIDTH}" CACHE STRING "Width of window processing for unknown point methods.")
 
-option(EB_ORDIN "Support for ordinary curves" on)
-option(EB_SUPER "Support for supersingular curves" on)
-option(EB_KBLTZ "Special support for Koblitz curves" on)
+option(EB_PLAIN "Support for ordinary curves without endomorphisms" on)
+option(EB_KBLTZ "Support for Koblitz anomalous binary curves" on)
 option(EB_MIXED "Use mixed coordinates" on)
 option(EB_PRECO "Build precomputation table for generator" on)
 
