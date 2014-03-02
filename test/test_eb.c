@@ -1096,7 +1096,7 @@ int main(void) {
 
 	util_banner("Tests for the EB module:", 0);
 
-	r0 = eb_param_set_any_ordin();
+	r0 = eb_param_set_any_plain();
 	if (r0 == STS_OK) {
 		if (test() != STS_OK) {
 			core_clean();

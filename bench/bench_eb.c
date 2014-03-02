@@ -364,15 +364,13 @@ static void arith(void) {
 #endif
 
 #if defined(EB_ORDIN) && (EB_MUL == LODAH || !defined(STRIP))
-	if (!eb_curve_is_super()) {
-		BENCH_BEGIN("eb_mul_lodah") {
-			bn_rand(k, BN_POS, bn_bits(n));
-			bn_mod(k, k, n);
-			eb_rand(p);
-			BENCH_ADD(eb_mul_lodah(q, p, k));
-		}
-		BENCH_END;
+	BENCH_BEGIN("eb_mul_lodah") {
+		bn_rand(k, BN_POS, bn_bits(n));
+		bn_mod(k, k, n);
+		eb_rand(p);
+		BENCH_ADD(eb_mul_lodah(q, p, k));
 	}
+	BENCH_END;
 #endif
 
 #if EB_MUL == LWNAF || !defined(STRIP)
@@ -395,7 +393,6 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
-	if (!eb_curve_is_super()) {
 #if EB_MUL == HALVE || !defined(STRIP)
 		BENCH_BEGIN("eb_mul_halve") {
 			bn_rand(k, BN_POS, bn_bits(n));
@@ -405,7 +402,6 @@ static void arith(void) {
 		}
 		BENCH_END;
 #endif
-	}
 
 	BENCH_BEGIN("eb_mul_gen") {
 		bn_rand(k, BN_POS, bn_bits(n));
@@ -679,7 +675,7 @@ int main(void) {
 	util_banner("Benchmarks for the EB module:", 0);
 
 #if defined(EB_ORDIN)
-	r0 = eb_param_set_any_ordin();
+	r0 = eb_param_set_any_plain();
 	if (r0 == STS_OK) {
 		bench();
 	}
