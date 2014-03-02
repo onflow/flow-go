@@ -108,7 +108,7 @@ static void eb_mul_fix_kbltz(eb_t r, const eb_t *t, const bn_t k) {
 
 #endif /* EB_KBLTZ */
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
+#if defined(EB_PLAIN)
 
 /**
  * Multiplies a binary elliptic curve point by an integer using the w-NAF
@@ -118,7 +118,7 @@ static void eb_mul_fix_kbltz(eb_t r, const eb_t *t, const bn_t k) {
  * @param[in] t				- the precomputed table.
  * @param[in] k					- the integer.
  */
-static void eb_mul_fix_ordin(eb_t r, const eb_t *t, const bn_t k) {
+static void eb_mul_fix_plain(eb_t r, const eb_t *t, const bn_t k) {
 	int l, i, n;
 	int8_t naf[FB_BITS + 1], *_k;
 
@@ -143,7 +143,6 @@ static void eb_mul_fix_ordin(eb_t r, const eb_t *t, const bn_t k) {
 	eb_norm(r, r);
 }
 
-#endif /* EB_ORDIN || EB_SUPER */
 #endif /* EB_FIX == LWNAF */
 
 /*============================================================================*/
@@ -558,16 +557,7 @@ void eb_mul_fix_combd(eb_t r, const eb_t *t, const bn_t k) {
 #if EB_FIX == LWNAF || !defined(STRIP)
 
 void eb_mul_pre_lwnaf(eb_t *t, const eb_t p) {
-#if defined(EB_KBLTZ)
-	if (eb_curve_is_kbltz()) {
-		eb_tab(t, p, EB_DEPTH);
-		return;
-	}
-#endif
-
-#if defined(EB_ORDIN) || defined(EB_SUPER)
 	eb_tab(t, p, EB_DEPTH);
-#endif
 }
 
 void eb_mul_fix_lwnaf(eb_t r, const eb_t *t, const bn_t k) {
@@ -578,8 +568,8 @@ void eb_mul_fix_lwnaf(eb_t r, const eb_t *t, const bn_t k) {
 	}
 #endif
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
-	eb_mul_fix_ordin(r, t, k);
+#if defined(EB_PLAIN)
+	eb_mul_fix_plain(r, t, k);
 #endif
 }
 #endif

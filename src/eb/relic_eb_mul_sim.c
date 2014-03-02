@@ -30,8 +30,6 @@
  * @ingroup eb
  */
 
-#include "string.h"
-
 #include "relic_core.h"
 #include "relic_eb.h"
 #include "relic_util.h"
@@ -173,7 +171,7 @@ static void eb_mul_sim_kbltz(eb_t r, const eb_t p, const bn_t k, const eb_t q,
 
 #endif /* EB_KBLTZ */
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
+#if defined(EB_PLAIN)
 
 /**
  * Multiplies and adds two binary elliptic curve points simultaneously,
@@ -187,7 +185,7 @@ static void eb_mul_sim_kbltz(eb_t r, const eb_t p, const bn_t k, const eb_t q,
  * @param[in] m					- the second integer.
  * @param[in] t					- the pointer to a precomputed table.
  */
-static void eb_mul_sim_ordin(eb_t r, const eb_t p, const bn_t k, const eb_t q,
+static void eb_mul_sim_plain(eb_t r, const eb_t p, const bn_t k, const eb_t q,
 		const bn_t m, const eb_t *t) {
 	int l, l0, l1, i, n0, n1, w, g;
 	int8_t naf0[FB_BITS + 1], naf1[FB_BITS + 1], *_k, *_m;
@@ -275,7 +273,7 @@ static void eb_mul_sim_ordin(eb_t r, const eb_t p, const bn_t k, const eb_t q,
 	}
 }
 
-#endif /* EB_ORDIN || EB_SUPER */
+#endif /* EB_PLAIN */
 
 #endif /* EB_SIM == INTER */
 
@@ -407,8 +405,8 @@ void eb_mul_sim_inter(eb_t r, const eb_t p, const bn_t k, const eb_t q,
 	}
 #endif
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
-	eb_mul_sim_ordin(r, p, k, q, m, NULL);
+#if defined(EB_PLAIN)
+	eb_mul_sim_plain(r, p, k, q, m, NULL);
 #endif
 }
 
@@ -503,10 +501,10 @@ void eb_mul_sim_gen(eb_t r, const bn_t k, const eb_t q, const bn_t m) {
 #endif
 #endif
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
+#if defined(EB_PLAIN)
 #if EB_SIM == INTER && EB_FIX == LWNAF && defined(EB_PRECO)
 		if (!eb_curve_is_kbltz()) {
-			eb_mul_sim_ordin(r, g, k, q, m, eb_curve_get_tab());
+			eb_mul_sim_plain(r, g, k, q, m, eb_curve_get_tab());
 		}
 #else
 		if (!eb_curve_is_kbltz()) {

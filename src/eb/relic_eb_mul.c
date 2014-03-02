@@ -119,7 +119,7 @@ static void eb_mul_ltnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 
 #endif
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
+#if defined(EB_PLAIN)
 
 /**
  * Multiplies a binary elliptic curve point by an integer using the
@@ -181,7 +181,7 @@ static void eb_mul_lnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 	}
 }
 
-#endif /* EB_ORDIN || EB_SUPER */
+#endif /* EB_PLAIN */
 #endif /* EB_MUL == LWNAF */
 
 #if EB_MUL == RWNAF || !defined(STRIP)
@@ -499,7 +499,7 @@ static void eb_mul_rtnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 
 #endif /* EB_KBLTZ */
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
+#if defined(EB_PLAIN)
 
 /**
  * Multiplies a binary elliptic curve point by an integer using the
@@ -625,7 +625,7 @@ static void eb_mul_rnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 	}
 }
 
-#endif /* EB_ORDIN || EB_SUPER */
+#endif /* EB_PLAIN */
 #endif /* EB_MUL == RWNAF */
 
 /*============================================================================*/
@@ -669,8 +669,6 @@ void eb_mul_basic(eb_t r, const eb_t p, const bn_t k) {
 }
 
 #endif
-
-#if defined(EB_ORDIN) || defined(EB_KBLTZ)
 
 #if EB_MUL == LODAH || !defined(STRIP)
 
@@ -833,7 +831,6 @@ void eb_mul_lodah(eb_t r, const eb_t p, const bn_t k) {
 	}
 }
 
-#endif /* EB_ORDIN || EB_KBLTZ */
 #endif /* EB_MUL == LODAH */
 
 #if EB_MUL == LWNAF || !defined(STRIP)
@@ -846,7 +843,7 @@ void eb_mul_lwnaf(eb_t r, const eb_t p, const bn_t k) {
 	}
 #endif
 
-#if defined(EB_ORDIN) || defined(EB_SUPER)
+#if defined(EB_PLAIN)
 	eb_mul_lnaf_imp(r, p, k);
 #endif
 }
