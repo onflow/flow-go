@@ -424,10 +424,8 @@
 /** Prime elliptic curve arithmetic method. */
 #define EP_METHD "@EP_METHD@"
 
-/** Support for ordinary curves. */
-#cmakedefine EB_ORDIN
-/** Support for supersingular curves. */
-#cmakedefine EB_SUPER
+/** Support for ordinary curves without endormorphisms. */
+#cmakedefine EB_PLAIN
 /** Support for Koblitz anomalous binary curves. */
 #cmakedefine EB_KBLTZ
 /** Use mixed coordinates. */
