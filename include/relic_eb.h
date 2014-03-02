@@ -76,14 +76,6 @@ enum {
 	NIST_B571,
 	/** NIST K-571 Koblitz curve. */
 	NIST_K571,
-	/** MIRACL low-security pairing-friendly curve. */
-	ETAT_P271,
-	/** MIRACL low-security pairing-friendly curve. */
-	ETAT_T271,
-	/** Pairing-friendly curve with 80-bit security. */
-	ETAT_S353,
-	/** MIRACL high-security pairing-friendly curve. */
-	ETAT_S1223,
 };
 
 /**
@@ -432,14 +424,6 @@ dig_t *eb_curve_get_a(void);
 dig_t *eb_curve_get_b(void);
 
 /**
- * Returns the c coefficient of the currently configured supersingular binary
- * elliptic curve.
- *
- * @return the c coefficient of the supersingular elliptic curve.
- */
-dig_t *eb_curve_get_c(void);
-
-/**
  * Returns a optimization identifier based on the coefficient a of the curve.
  *
  * @return the optimization identifier.
@@ -454,25 +438,11 @@ int eb_curve_opt_a(void);
 int eb_curve_opt_b(void);
 
 /**
- * Returns a optimization identifier based on the coefficient c of the curve.
- *
- * @return the optimization identifier.
- */
-int eb_curve_opt_c(void);
-
-/**
  * Tests if the configured binary elliptic curve is a Koblitz curve.
  *
  * @return 1 if the binary elliptic curve is a Koblitz curve, 0 otherwise.
  */
 int eb_curve_is_kbltz(void);
-
-/**
- * Tests if the configured binary elliptic curve is supersingular.
- *
- * @return 1 if the binary elliptic curve is supersingular, 0 otherwise.
- */
-int eb_curve_is_super(void);
 
 /**
  * Returns the generator of the group of points in the binary elliptic curve.
@@ -533,33 +503,8 @@ void eb_curve_get_s1(bn_t s1);
  * @param[in] n				- the order of the generator.
  * @param[in] h				- the cofactor.
  */
-void eb_curve_set_ordin(const fb_t a, const fb_t b, const eb_t g, const bn_t n,
+void eb_curve_set(const fb_t a, const fb_t b, const eb_t g, const bn_t n,
 		const bn_t h);
-
-/**
- * Configures a new Koblitz binary elliptic curve by its coefficients and
- * generator.
- *
- * @param[in] a				- the coefficient a of the curve.
- * @param[in] g				- the generator.
- * @param[in] n				- the order of the generator.
- * @param[in] h				- the cofactor.
- */
-void eb_curve_set_kbltz(const fb_t a, const eb_t g, const bn_t n, const bn_t h);
-
-/**
- * Configures a new supersingular binary elliptic curve by its coefficients and
- * generator.
- *
- * @param[in] a				- the coefficient a of the curve.
- * @param[in] b				- the coefficient b of the curve.
- * @param[in] c				- the coefficient c of the curve.
- * @param[in] g				- the generator.
- * @param[in] n				- the order of the generator.
- * @param[in] h				- the cofactor.
- */
-void eb_curve_set_super(const fb_t a, const fb_t b, const fb_t c, const eb_t g,
-		const bn_t n, const bn_t h);
 
 /**
  * Configures a new binary elliptic curve by its parameter identifier.
@@ -574,28 +519,19 @@ void eb_param_set(int param);
 int eb_param_set_any(void);
 
 /**
- * Configures some set of ordinary curve parameters for the current security
- * level.
- *
- * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
- */
-int eb_param_set_any_ordin(void);
-
-/**
- * Configures some set of Koblitz curve parameters for the current security
- * level.
- *
- * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
- */
-int eb_param_set_any_kbltz(void);
-
-/**
- * Configures some set of supersingular curve parameters for the current
+ * Configures a set of curve parameters without endormorphisms for the current
  * security level.
  *
  * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
  */
-int eb_param_set_any_super(void);
+int eb_param_set_any_plain(void);
+
+/**
+ * Configures a set of Koblitz curve parameters for the current security level.
+ *
+ * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
+ */
+int eb_param_set_any_kbltz(void);
 
 /**
  * Returns the parameter identifier of the currently configured binary elliptic
