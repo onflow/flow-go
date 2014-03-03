@@ -139,7 +139,7 @@ void fp_rdcs_low(dig_t *c, const dig_t *a, const dig_t *m) {
 }
 
 #define M 39
-void fp_rdcn_low(dig_t *c, const dig_t *a) {
+void fp_rdcn_low(dig_t *c, dig_t *a) {
 	int i, j;
 	dig_t r0, r1, r2, u, v;
 	dig_t *m, *tmp, *tmpm, *tmpc;
