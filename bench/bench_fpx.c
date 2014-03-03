@@ -783,12 +783,6 @@ static void arith6(void) {
 		BENCH_ADD(fp6_sqr_lazyr(c, a));
 	}
 	BENCH_END;
-
-	BENCH_BEGIN("fp6_sqr_lazyr2") {
-		fp6_rand(a);
-		BENCH_ADD(fp6_sqr_lazyr(c, a));
-	}
-	BENCH_END;
 #endif
 
 	BENCH_BEGIN("fp6_inv") {
