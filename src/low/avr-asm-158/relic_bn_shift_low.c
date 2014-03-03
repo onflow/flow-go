@@ -56,7 +56,8 @@ dig_t bn_lshb_low(dig_t *c, const dig_t *a, int size, int bits) {
 }
 
 void bn_lshd_low(dig_t *c, const dig_t *a, int size, int digits) {
-	dig_t *top, *bot;
+	dig_t *top;
+	const dig_t *bot;
 	int i;
 
 	top = c + size + digits - 1;
@@ -94,7 +95,8 @@ dig_t bn_rshb_low(dig_t *c, const dig_t *a, int size, int bits) {
 }
 
 void bn_rshd_low(dig_t *c, const dig_t *a, int size, int digits) {
-	dig_t *top, *bot;
+	const dig_t *top;
+	dig_t *bot;
 	int i;
 
 	top = a + digits;
