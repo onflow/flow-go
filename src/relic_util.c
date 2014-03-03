@@ -52,7 +52,7 @@
  */
 #if ARCH == AVR
 #ifndef QUIET
-volatile char util_print_buf[64 + 1];
+volatile char print_buf[64 + 1];
 volatile char *util_print_ptr;
 #endif
 #endif
@@ -163,11 +163,11 @@ int util_cmp_const(const void * a, const void *b, int size) {
 void util_printf(const char *format, ...) {
 #ifndef QUIET
 #if ARCH == AVR && OPSYS == NONE
-	util_print_ptr = util_print_buf + 1;
+	util_print_ptr = print_buf + 1;
 	va_list list;
 	va_start(list, format);
 	vsnprintf_P((char *)util_print_ptr, 64, format, list);
-	util_print_buf[0] = (uint8_t)2;
+	print_buf[0] = (uint8_t)2;
 	va_end(list);
 #elif ARCH == MSP && OPSYS == NONE
 	va_list list;
