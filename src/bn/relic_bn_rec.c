@@ -87,19 +87,382 @@ static char get_bits(const bn_t a, int from, int to) {
  */
 #define MOD_CMASK	(MOD_2TC - 1)
 
-/**
- * Computes k partmod d = r0 + r1 * t, where d = (t^m - 1)/(t - 1).
- *
- * @param[out] r0		- the first half of the result.
- * @param[out] r1		- the second half of the result.
- * @param[in] k			- the number to reduce.
- * @param[in] vm		- the V_m curve parameter.
- * @param[in] s0		- the S_0 curve parameter.
- * @param[in] s1		- the S_1 curve parameter.
- * @param[in] u			- the u curve parameter.
- * @param[in] m			- the extension degree of the binary field.
- */
-void tnaf_mod(bn_t r0, bn_t r1, const bn_t k, const bn_t vm,
+/*============================================================================*/
+/* Public definitions                                                         */
+/*============================================================================*/
+
+void bn_rec_win(uint8_t *win, int *len, const bn_t k, int w) {
+	int i, j, l;
+
+	l = bn_bits(k);
+
+	if (*len < CEIL(l, w)) {
+		THROW(ERR_NO_BUFFER);
+	}
+
+	j = 0;
+	for (i = 0; i < l - w; i += w) {
+		win[j++] = get_bits(k, i, i + w - 1);
+	}
+	win[j++] = get_bits(k, i, bn_bits(k) - 1);
+	*len = j;
+}
+
+void bn_rec_slw(uint8_t *win, int *len, const bn_t k, int w) {
+	int i, j, l, s;
+
+	l = bn_bits(k);
+
+	if (*len < CEIL(l, w)) {
+		THROW(ERR_NO_BUFFER);
+	}
+
+	i = l - 1;
+	j = 0;
+	while (i >= 0) {
+		if (!bn_get_bit(k, i)) {
+			i--;
+			win[j++] = 0;
+		} else {
+			s = MAX(i - w + 1, 0);
+			while (!bn_get_bit(k, s)) {
+				s++;
+			}
+			win[j++] = get_bits(k, s, i);
+			i = s - 1;
+		}
+	}
+	*len = j;
+}
+
+void bn_rec_naf(int8_t *naf, int *len, const bn_t k, int w) {
+	int i, l;
+	bn_t t;
+	dig_t t0, mask;
+	int8_t u_i;
+
+	bn_null(t);
+
+	mask = MASK(w);
+	l = (1 << w);
+
+	if (*len < (bn_bits(k) + 1)) {
+		THROW(ERR_NO_BUFFER);
+	}
+
+	TRY {
+		bn_new(t);
+		bn_copy(t, k);
+
+		i = 0;
+		if (w == 2) {
+			while (!bn_is_zero(t)) {
+				if (!bn_is_even(t)) {
+					bn_get_dig(&t0, t);
+					u_i = 2 - (t0 & mask);
+					if (u_i < 0) {
+						bn_add_dig(t, t, -u_i);
+					} else {
+						bn_sub_dig(t, t, u_i);
+					}
+					*naf = u_i;
+				} else {
+					*naf = 0;
+				}
+				bn_hlv(t, t);
+				i++;
+				naf++;
+			}
+		} else {
+			while (!bn_is_zero(t)) {
+				if (!bn_is_even(t)) {
+					bn_get_dig(&t0, t);
+					u_i = t0 & mask;
+					if (u_i > l / 2) {
+						u_i = (int8_t)(u_i - l);
+					}
+					if (u_i < 0) {
+						bn_add_dig(t, t, -u_i);
+					} else {
+						bn_sub_dig(t, t, u_i);
+					}
+					*naf = u_i;
+				} else {
+					*naf = 0;
+				}
+				bn_hlv(t, t);
+				i++;
+				naf++;
+			}
+		}
+		*len = i;
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(t);
+	}
+}
+
+void bn_rec_tnaf(int8_t *tnaf, int *len, const bn_t k, const bn_t vm,
+		const bn_t s0, const bn_t s1, int8_t u, int m, int w) {
+	int i, l;
+	bn_t tmp, r0, r1;
+	int8_t beta[1 << (w - 2)], gama[1 << (w - 2)], t_w;
+	dig_t t0, t1, mask;
+	int s, t, u_i;
+
+	bn_null(r0);
+	bn_null(r1);
+	bn_null(tmp);
+
+	if (*len < (bn_bits(k) + 1)) {
+		THROW(ERR_NO_BUFFER);
+	}
+
+	TRY {
+		bn_new(r0);
+		bn_new(r1);
+		bn_new(tmp);
+
+		bn_rec_tnaf_get(&t_w, beta, gama, u, w);
+		bn_rec_tnaf_mod(r0, r1, k, vm, s0, s1, u, m);
+
+		mask = MASK(w);
+		l = 1 << w;
+
+		i = 0;
+		while (!bn_is_zero(r0) || !bn_is_zero(r1)) {
+			while ((r0->dp[0] & 1) == 0) {
+				tnaf[i++] = 0;
+				/* tmp = r0. */
+				bn_hlv(tmp, r0);
+				/* r0 = r1 + mu * r0 / 2. */
+				if (u == -1) {
+					bn_sub(r0, r1, tmp);
+				} else {
+					bn_add(r0, r1, tmp);
+				}
+				/* r1 = - r0 / 2. */
+				bn_copy(r1, tmp);
+				r1->sign = tmp->sign ^ 1;
+			}
+			/* If r0 is odd. */
+			if (w == 2) {
+				t0 = r0->dp[0];
+				if (bn_sign(r0) == BN_NEG) {
+					t0 = l - t0;
+				}
+				t1 = r1->dp[0];
+				if (bn_sign(r1) == BN_NEG) {
+					t1 = l - t1;
+				}
+				u_i = 2 - ((t0 - 2 * t1) & mask);
+				tnaf[i++] = u_i;
+				if (u_i < 0) {
+					bn_add_dig(r0, r0, -u_i);
+				} else {
+					bn_sub_dig(r0, r0, u_i);
+				}
+			} else {
+				/* t0 = r0 mod_s 2^w. */
+				t0 = r0->dp[0];
+				if (bn_sign(r0) == BN_NEG) {
+					t0 = l - t0;
+				}
+				/* t1 = r1 mod_s 2^w. */
+				t1 = r1->dp[0];
+				if (bn_sign(r1) == BN_NEG) {
+					t1 = l - t1;
+				}
+				/* u = r0 + r1 * (t_w) mod_s 2^w. */
+				u_i = (t0 + t_w * t1) & mask;
+
+				if (u_i >= (l / 2)) {
+					/* If u < 0, s = -1 and u = -u. */
+					u_i = (int8_t)(u_i - l);
+					tnaf[i++] = u_i;
+					u_i = (int8_t)(-u_i >> 1);
+					t = -beta[u_i];
+					s = -gama[u_i];
+				} else {
+					/* If u > 0, s = 1. */
+					tnaf[i++] = u_i;
+					u_i = (int8_t)(u_i >> 1);
+					t = beta[u_i];
+					s = gama[u_i];
+				}
+				/* r0 = r0 - s * beta_u. */
+				if (t > 0) {
+					bn_sub_dig(r0, r0, t);
+				} else {
+					bn_add_dig(r0, r0, -t);
+				}
+				/* r1 = r1 - s * gama_u. */
+				if (s > 0) {
+					bn_sub_dig(r1, r1, s);
+				} else {
+					bn_add_dig(r1, r1, -s);
+				}
+			}
+			/* tmp = r0. */
+			bn_hlv(tmp, r0);
+			/* r0 = r1 + mu * r0 / 2. */
+			if (u == -1) {
+				bn_sub(r0, r1, tmp);
+			} else {
+				bn_add(r0, r1, tmp);
+			}
+			/* r1 = - r0 / 2. */
+			bn_copy(r1, tmp);
+			r1->sign = tmp->sign ^ 1;
+		}
+		*len = i;
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(r0);
+		bn_free(r1);
+		bn_free(tmp);
+	}
+}
+
+void bn_rec_tnaf_get(int8_t *t, int8_t *beta, int8_t *gama, int8_t u, int w) {
+	if (u == -1) {
+		switch (w) {
+			case 2:
+			case 3:
+				*t = 2;
+				break;
+			case 4:
+				*t = 10;
+				break;
+			case 5:
+			case 6:
+				*t = 26;
+				break;
+			case 7:
+			case 8:
+				*t = 90;
+				break;
+		}
+	} else {
+		switch (w) {
+			case 2:
+				*t = 2;
+				break;
+			case 3:
+			case 4:
+			case 5:
+				*t = 6;
+				break;
+			case 6:
+			case 7:
+				*t = 38;
+				break;
+			case 8:
+				*t = 166;
+				break;
+		}
+	}
+
+	beta[0] = 1;
+	gama[0] = 0;
+
+	if (w >= 3) {
+		beta[1] = 1;
+		gama[1] = (int8_t)-u;
+	}
+
+	if (w >= 4) {
+		beta[1] = -3;
+		beta[2] = -1;
+		beta[3] = 1;
+		gama[1] = gama[2] = gama[3] = (int8_t)u;
+	}
+
+	if (w >= 5) {
+		beta[4] = -3;
+		beta[5] = -1;
+		beta[6] = beta[7] = 1;
+		gama[4] = gama[5] = gama[6] = (int8_t)(2 * u);
+		gama[7] = (int8_t)(-3 * u);
+	}
+
+	if (w >= 6) {
+		beta[1] = beta[8] = beta[14] = 3;
+		beta[2] = beta[9] = beta[15] = 5;
+		beta[3] = -5;
+		beta[4] = beta[10] = beta[11] = -3;
+		beta[5] = beta[12] = -1;
+		beta[6] = beta[7] = beta[13] = 1;
+		gama[1] = gama[2] = 0;
+		gama[3] = gama[4] = gama[5] = gama[6] = (int8_t)(2 * u);
+		gama[7] = gama[8] = gama[9] = (int8_t)(-3 * u);
+		gama[10] = (int8_t)(4 * u);
+		gama[11] = gama[12] = gama[13] = (int8_t)(-u);
+		gama[14] = gama[15] = (int8_t)(-u);
+	}
+
+	if (w >= 7) {
+		beta[3] = beta[22] = beta[29] = 7;
+		beta[4] = beta[16] = beta[23] = -5;
+		beta[5] = beta[10] = beta[17] = beta[24] = -3;
+		beta[6] = beta[11] = beta[18] = beta[25] = beta[30] = -1;
+		beta[7] = beta[12] = beta[14] = beta[19] = beta[26] = beta[31] = 1;
+		beta[8] = beta[13] = beta[20] = beta[27] = 3;
+		beta[9] = beta[21] = beta[28] = 5;
+		beta[15] = -7;
+		gama[3] = 0;
+		gama[4] = gama[5] = gama[6] = (int8_t)(-3 * u);
+		gama[11] = gama[12] = gama[13] = (int8_t)(4 * u);
+		gama[14] = (int8_t)(-6 * u);
+		gama[15] = gama[16] = gama[17] = gama[18] = (int8_t)u;
+		gama[19] = gama[20] = gama[21] = gama[22] = (int8_t)u;
+		gama[23] = gama[24] = gama[25] = gama[26] = (int8_t)(-2 * u);
+		gama[27] = gama[28] = gama[29] = (int8_t)(-2 * u);
+		gama[30] = gama[31] = (int8_t)(5 * u);
+	}
+
+	if (w == 8) {
+		beta[10] = beta[17] = beta[48] = beta[55] = beta[62] = 7;
+		beta[11] = beta[18] = beta[49] = beta[56] = beta[63] = 9;
+		beta[12] = beta[22] = beta[29] = -3;
+		beta[36] = beta[43] = beta[50] = -3;
+		beta[13] = beta[23] = beta[30] = beta[37] = -1;
+		beta[44] = beta[51] = beta[58] = -1;
+		beta[14] = beta[24] = beta[31] = beta[38] = 1;
+		beta[45] = beta[52] = beta[59] = 1;
+		beta[15] = beta[32] = beta[39] = beta[46] = beta[53] = beta[60] = 3;
+		beta[16] = beta[40] = beta[47] = beta[54] = beta[61] = 5;
+		beta[19] = beta[57] = 11;
+		beta[20] = beta[27] = beta[34] = beta[41] = -7;
+		beta[21] = beta[28] = beta[35] = beta[42] = -5;
+		beta[25] = -11;
+		beta[26] = beta[33] = -9;
+		gama[10] = gama[11] = (int8_t)(-3 * u);
+		gama[12] = gama[13] = gama[14] = gama[15] = (int8_t)(-6 * u);
+		gama[16] = gama[17] = gama[18] = gama[19] = (int8_t)(-6 * u);
+		gama[20] = gama[21] = gama[22] = (int8_t)(8 * u);
+		gama[23] = gama[24] = (int8_t)(8 * u);
+		gama[25] = gama[26] = gama[27] = gama[28] = (int8_t)(5 * u);
+		gama[29] = gama[30] = gama[31] = gama[32] = (int8_t)(5 * u);
+		gama[33] = gama[34] = gama[35] = gama[36] = (int8_t)(2 * u);
+		gama[37] = gama[38] = gama[39] = gama[40] = (int8_t)(2 * u);
+		gama[41] = gama[42] = gama[43] = gama[44] = (int8_t)(-1 * u);
+		gama[45] = gama[46] = gama[47] = gama[48] = (int8_t)(-1 * u);
+		gama[49] = (int8_t)(-1 * u);
+		gama[50] = gama[51] = gama[52] = gama[53] = (int8_t)(-4 * u);
+		gama[54] = gama[55] = gama[56] = gama[57] = (int8_t)(-4 * u);
+		gama[58] = gama[59] = gama[60] = (int8_t)(-7 * u);
+		gama[61] = gama[62] = gama[63] = (int8_t)(-7 * u);
+	}
+}
+
+void bn_rec_tnaf_mod(bn_t r0, bn_t r1, const bn_t k, const bn_t vm,
 		const bn_t s0, const bn_t s1, int u, int m) {
 	bn_t t0, t1, t2, t3;
 	int a, n, n0, n1, h0, h1;
@@ -278,391 +641,6 @@ void tnaf_mod(bn_t r0, bn_t r1, const bn_t k, const bn_t vm,
 		bn_free(t3);
 		bn_free(t0);
 		bn_free(t1);
-	}
-}
-
-/**
- * Write the constants needed for \tau-NAF recoding as a set of \alpha_u = 
- * \beta_u + \gamma_u * \tau elements.
- * 
- * @param[out] t 		- the integer corresponding to \tau.
- * @param[out] beta		- the first coefficients of the constants.
- * @param[out] gama		- the second coefficients of the constants.
- * @param[in] u 		- the u curve parameter.
- * @param[in] w 		- the window size in bits.
- */
-void tnaf_cnts(int8_t *t, int8_t *beta, int8_t *gama, int8_t u, int w) {
-	if (u == -1) {
-		switch (w) {
-			case 2:
-			case 3:
-				*t = 2;
-				break;
-			case 4:
-				*t = 10;
-				break;
-			case 5:
-			case 6:
-				*t = 26;
-				break;
-			case 7:
-			case 8:
-				*t = 90;
-				break;
-		}
-	} else {
-		switch (w) {
-			case 2:
-				*t = 2;
-				break;
-			case 3:
-			case 4:
-			case 5:
-				*t = 6;
-				break;
-			case 6:
-			case 7:
-				*t = 38;
-				break;
-			case 8:
-				*t = 166;
-				break;
-		}
-	}
-
-	beta[0] = 1;
-	gama[0] = 0;
-
-	if (w >= 3) {
-		beta[1] = 1;
-		gama[1] = (int8_t)-u;
-	}
-
-	if (w >= 4) {
-		beta[1] = -3;
-		beta[2] = -1;
-		beta[3] = 1;
-		gama[1] = gama[2] = gama[3] = (int8_t)u;
-	}
-
-	if (w >= 5) {
-		beta[4] = -3;
-		beta[5] = -1;
-		beta[6] = beta[7] = 1;
-		gama[4] = gama[5] = gama[6] = (int8_t)(2 * u);
-		gama[7] = (int8_t)(-3 * u);
-	}
-
-	if (w >= 6) {
-		beta[1] = beta[8] = beta[14] = 3;
-		beta[2] = beta[9] = beta[15] = 5;
-		beta[3] = -5;
-		beta[4] = beta[10] = beta[11] = -3;
-		beta[5] = beta[12] = -1;
-		beta[6] = beta[7] = beta[13] = 1;
-		gama[1] = gama[2] = 0;
-		gama[3] = gama[4] = gama[5] = gama[6] = (int8_t)(2 * u);
-		gama[7] = gama[8] = gama[9] = (int8_t)(-3 * u);
-		gama[10] = (int8_t)(4 * u);
-		gama[11] = gama[12] = gama[13] = (int8_t)(-u);
-		gama[14] = gama[15] = (int8_t)(-u);
-	}
-
-	if (w >= 7) {
-		beta[3] = beta[22] = beta[29] = 7;
-		beta[4] = beta[16] = beta[23] = -5;
-		beta[5] = beta[10] = beta[17] = beta[24] = -3;
-		beta[6] = beta[11] = beta[18] = beta[25] = beta[30] = -1;
-		beta[7] = beta[12] = beta[14] = beta[19] = beta[26] = beta[31] = 1;
-		beta[8] = beta[13] = beta[20] = beta[27] = 3;
-		beta[9] = beta[21] = beta[28] = 5;
-		beta[15] = -7;
-		gama[3] = 0;
-		gama[4] = gama[5] = gama[6] = (int8_t)(-3 * u);
-		gama[11] = gama[12] = gama[13] = (int8_t)(4 * u);
-		gama[14] = (int8_t)(-6 * u);
-		gama[15] = gama[16] = gama[17] = gama[18] = (int8_t)u;
-		gama[19] = gama[20] = gama[21] = gama[22] = (int8_t)u;
-		gama[23] = gama[24] = gama[25] = gama[26] = (int8_t)(-2 * u);
-		gama[27] = gama[28] = gama[29] = (int8_t)(-2 * u);
-		gama[30] = gama[31] = (int8_t)(5 * u);
-	}
-
-	if (w == 8) {
-		beta[10] = beta[17] = beta[48] = beta[55] = beta[62] = 7;
-		beta[11] = beta[18] = beta[49] = beta[56] = beta[63] = 9;
-		beta[12] = beta[22] = beta[29] = -3;
-		beta[36] = beta[43] = beta[50] = -3;
-		beta[13] = beta[23] = beta[30] = beta[37] = -1;
-		beta[44] = beta[51] = beta[58] = -1;
-		beta[14] = beta[24] = beta[31] = beta[38] = 1;
-		beta[45] = beta[52] = beta[59] = 1;
-		beta[15] = beta[32] = beta[39] = beta[46] = beta[53] = beta[60] = 3;
-		beta[16] = beta[40] = beta[47] = beta[54] = beta[61] = 5;
-		beta[19] = beta[57] = 11;
-		beta[20] = beta[27] = beta[34] = beta[41] = -7;
-		beta[21] = beta[28] = beta[35] = beta[42] = -5;
-		beta[25] = -11;
-		beta[26] = beta[33] = -9;
-		gama[10] = gama[11] = (int8_t)(-3 * u);
-		gama[12] = gama[13] = gama[14] = gama[15] = (int8_t)(-6 * u);
-		gama[16] = gama[17] = gama[18] = gama[19] = (int8_t)(-6 * u);
-		gama[20] = gama[21] = gama[22] = (int8_t)(8 * u);
-		gama[23] = gama[24] = (int8_t)(8 * u);
-		gama[25] = gama[26] = gama[27] = gama[28] = (int8_t)(5 * u);
-		gama[29] = gama[30] = gama[31] = gama[32] = (int8_t)(5 * u);
-		gama[33] = gama[34] = gama[35] = gama[36] = (int8_t)(2 * u);
-		gama[37] = gama[38] = gama[39] = gama[40] = (int8_t)(2 * u);
-		gama[41] = gama[42] = gama[43] = gama[44] = (int8_t)(-1 * u);
-		gama[45] = gama[46] = gama[47] = gama[48] = (int8_t)(-1 * u);
-		gama[49] = (int8_t)(-1 * u);
-		gama[50] = gama[51] = gama[52] = gama[53] = (int8_t)(-4 * u);
-		gama[54] = gama[55] = gama[56] = gama[57] = (int8_t)(-4 * u);
-		gama[58] = gama[59] = gama[60] = (int8_t)(-7 * u);
-		gama[61] = gama[62] = gama[63] = (int8_t)(-7 * u);
-	}
-}
-
-/*============================================================================*/
-/* Public definitions                                                         */
-/*============================================================================*/
-
-void bn_rec_win(uint8_t *win, int *len, const bn_t k, int w) {
-	int i, j, l;
-
-	l = bn_bits(k);
-
-	if (*len < CEIL(l, w)) {
-		THROW(ERR_NO_BUFFER);
-	}
-
-	j = 0;
-	for (i = 0; i < l - w; i += w) {
-		win[j++] = get_bits(k, i, i + w - 1);
-	}
-	win[j++] = get_bits(k, i, bn_bits(k) - 1);
-	*len = j;
-}
-
-void bn_rec_slw(uint8_t *win, int *len, const bn_t k, int w) {
-	int i, j, l, s;
-
-	l = bn_bits(k);
-
-	if (*len < CEIL(l, w)) {
-		THROW(ERR_NO_BUFFER);
-	}
-
-	i = l - 1;
-	j = 0;
-	while (i >= 0) {
-		if (!bn_get_bit(k, i)) {
-			i--;
-			win[j++] = 0;
-		} else {
-			s = MAX(i - w + 1, 0);
-			while (!bn_get_bit(k, s)) {
-				s++;
-			}
-			win[j++] = get_bits(k, s, i);
-			i = s - 1;
-		}
-	}
-	*len = j;
-}
-
-void bn_rec_naf(int8_t *naf, int *len, const bn_t k, int w) {
-	int i, l;
-	bn_t t;
-	dig_t t0, mask;
-	int8_t u_i;
-
-	bn_null(t);
-
-	mask = MASK(w);
-	l = (1 << w);
-
-	if (*len < (bn_bits(k) + 1)) {
-		THROW(ERR_NO_BUFFER);
-	}
-
-	TRY {
-		bn_new(t);
-		bn_copy(t, k);
-
-		i = 0;
-		if (w == 2) {
-			while (!bn_is_zero(t)) {
-				if (!bn_is_even(t)) {
-					bn_get_dig(&t0, t);
-					u_i = 2 - (t0 & mask);
-					if (u_i < 0) {
-						bn_add_dig(t, t, -u_i);
-					} else {
-						bn_sub_dig(t, t, u_i);
-					}
-					*naf = u_i;
-				} else {
-					*naf = 0;
-				}
-				bn_hlv(t, t);
-				i++;
-				naf++;
-			}
-		} else {
-			while (!bn_is_zero(t)) {
-				if (!bn_is_even(t)) {
-					bn_get_dig(&t0, t);
-					u_i = t0 & mask;
-					if (u_i > l / 2) {
-						u_i = (int8_t)(u_i - l);
-					}
-					if (u_i < 0) {
-						bn_add_dig(t, t, -u_i);
-					} else {
-						bn_sub_dig(t, t, u_i);
-					}
-					*naf = u_i;
-				} else {
-					*naf = 0;
-				}
-				bn_hlv(t, t);
-				i++;
-				naf++;
-			}
-		}
-		*len = i;
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		bn_free(t);
-	}
-}
-
-void bn_rec_tnaf(int8_t *tnaf, int *len, const bn_t k, const bn_t vm,
-		const bn_t s0, const bn_t s1, int8_t u, int m, int w) {
-	int i, l;
-	bn_t tmp, r0, r1;
-	int8_t beta[1 << (w - 2)], gama[1 << (w - 2)], t_w;
-	dig_t t0, t1, mask;
-	int s, t, u_i;
-
-	bn_null(r0);
-	bn_null(r1);
-	bn_null(tmp);
-
-	if (*len < (bn_bits(k) + 1)) {
-		THROW(ERR_NO_BUFFER);
-	}
-
-	TRY {
-		bn_new(r0);
-		bn_new(r1);
-		bn_new(tmp);
-
-		tnaf_cnts(&t_w, beta, gama, u, w);
-		tnaf_mod(r0, r1, k, vm, s0, s1, u, m);
-
-		mask = MASK(w);
-		l = 1 << w;
-
-		i = 0;
-		while (!bn_is_zero(r0) || !bn_is_zero(r1)) {
-			while ((r0->dp[0] & 1) == 0) {
-				tnaf[i++] = 0;
-				/* tmp = r0. */
-				bn_hlv(tmp, r0);
-				/* r0 = r1 + mu * r0 / 2. */
-				if (u == -1) {
-					bn_sub(r0, r1, tmp);
-				} else {
-					bn_add(r0, r1, tmp);
-				}
-				/* r1 = - r0 / 2. */
-				bn_copy(r1, tmp);
-				r1->sign = tmp->sign ^ 1;
-			}
-			/* If r0 is odd. */
-			if (w == 2) {
-				t0 = r0->dp[0];
-				if (bn_sign(r0) == BN_NEG) {
-					t0 = l - t0;
-				}
-				t1 = r1->dp[0];
-				if (bn_sign(r1) == BN_NEG) {
-					t1 = l - t1;
-				}
-				u_i = 2 - ((t0 - 2 * t1) & mask);
-				tnaf[i++] = u_i;
-				if (u_i < 0) {
-					bn_add_dig(r0, r0, -u_i);
-				} else {
-					bn_sub_dig(r0, r0, u_i);
-				}
-			} else {
-				/* t0 = r0 mod_s 2^w. */
-				t0 = r0->dp[0];
-				if (bn_sign(r0) == BN_NEG) {
-					t0 = l - t0;
-				}
-				/* t1 = r1 mod_s 2^w. */
-				t1 = r1->dp[0];
-				if (bn_sign(r1) == BN_NEG) {
-					t1 = l - t1;
-				}
-				/* u = r0 + r1 * (t_w) mod_s 2^w. */
-				u_i = (t0 + t_w * t1) & mask;
-
-				if (u_i >= (l / 2)) {
-					/* If u < 0, s = -1 and u = -u. */
-					u_i = (int8_t)(u_i - l);
-					tnaf[i++] = u_i;
-					u_i = (int8_t)(-u_i >> 1);
-					t = -beta[u_i];
-					s = -gama[u_i];
-				} else {
-					/* If u > 0, s = 1. */
-					tnaf[i++] = u_i;
-					u_i = (int8_t)(u_i >> 1);
-					t = beta[u_i];
-					s = gama[u_i];
-				}
-				/* r0 = r0 - s * beta_u. */
-				if (t > 0) {
-					bn_sub_dig(r0, r0, t);
-				} else {
-					bn_add_dig(r0, r0, -t);
-				}
-				/* r1 = r1 - s * gama_u. */
-				if (s > 0) {
-					bn_sub_dig(r1, r1, s);
-				} else {
-					bn_add_dig(r1, r1, -s);
-				}
-			}
-			/* tmp = r0. */
-			bn_hlv(tmp, r0);
-			/* r0 = r1 + mu * r0 / 2. */
-			if (u == -1) {
-				bn_sub(r0, r1, tmp);
-			} else {
-				bn_add(r0, r1, tmp);
-			}
-			/* r1 = - r0 / 2. */
-			bn_copy(r1, tmp);
-			r1->sign = tmp->sign ^ 1;
-		}
-		*len = i;
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		bn_free(r0);
-		bn_free(r1);
-		bn_free(tmp);
 	}
 }
 
