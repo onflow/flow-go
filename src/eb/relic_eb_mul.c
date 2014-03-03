@@ -250,7 +250,7 @@ static void eb_mul_rtnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 		eb_copy(r, t[0]);
 
 #if defined(EB_MIXED) && defined(STRIP) && (EB_WIDTH > 2)
-		eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
+		eb_norm_sim(t + 1, (const eb_t *)t + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 
 #if EB_WIDTH == 3
@@ -468,7 +468,7 @@ static void eb_mul_rtnaf_imp(eb_t r, const eb_t p, const bn_t k) {
 #endif
 
 #if defined(EB_MIXED) && defined(STRIP) && (EB_WIDTH > 2)
-		eb_norm_sim(t + 1, t + 1, (1 << (EB_WIDTH - 2)) - 1);
+		eb_norm_sim(t + 1, (const eb_t *)t + 1, (1 << (EB_WIDTH - 2)) - 1);
 #endif
 
 		/* Add accumulators */
