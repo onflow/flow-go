@@ -1315,6 +1315,33 @@ void bn_rec_tnaf(int8_t *tnaf, int *len, const bn_t k, const bn_t vm,
 		const bn_t s0, const bn_t s1, int8_t u, int m, int w);
 
 /**
+ * Write the constants needed for \tau-NAF recoding as a set of \alpha_u = 
+ * \beta_u + \gamma_u * \tau elements.
+ * 
+ * @param[out] t 		- the integer corresponding to \tau.
+ * @param[out] beta		- the first coefficients of the constants.
+ * @param[out] gama		- the second coefficients of the constants.
+ * @param[in] u 		- the u curve parameter.
+ * @param[in] w 		- the window size in bits.
+ */
+void bn_rec_tnaf_get(int8_t *t, int8_t *beta, int8_t *gama, int8_t u, int w);
+
+/**
+ * Computes k partmod d = r0 + r1 * t, where d = (t^m - 1)/(t - 1).
+ *
+ * @param[out] r0		- the first half of the result.
+ * @param[out] r1		- the second half of the result.
+ * @param[in] k			- the number to reduce.
+ * @param[in] vm		- the V_m curve parameter.
+ * @param[in] s0		- the S_0 curve parameter.
+ * @param[in] s1		- the S_1 curve parameter.
+ * @param[in] u			- the u curve parameter.
+ * @param[in] m			- the extension degree of the binary field.
+ */
+void bn_rec_tnaf_mod(bn_t r0, bn_t r1, const bn_t k, const bn_t vm,
+		const bn_t s0, const bn_t s1, int u, int m);
+
+/**
  * Recodes an integer in regular fixed-length width-w NAF.
  *
  * @param[out] naf			- the recoded integer.
