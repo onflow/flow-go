@@ -249,7 +249,6 @@
 	movq	%rcx,24(\C)
 .endm
 
-/* Integer multiplication, comba, optimized for BN254 */
 .macro FP_MULN_LOW C, R0, R1, R2, A0, A1, A2, A3, B0, B1, B2, B3
 	movq \A0,%rax
 	mulq \B0
@@ -270,13 +269,13 @@
 	adcq %rdx,\R1
 	adcq $0,\R2
 
-	xorq \R0,\R0
 	movq \A0,%rax
 	mulq \B2
 	addq %rax,\R1
 	adcq %rdx,\R2
-	adcq $0,\R0
+	//adcq $0,\R0
 
+	xorq \R0,\R0
 	movq \A1,%rax
 	mulq \B1
 	addq %rax,\R1
@@ -290,12 +289,12 @@
 	adcq %rdx,\R2
 	adcq $0,\R0
 
-//	xorq \R1,\R1
+	//xorq \R1,\R1
 	movq \A0,%rax
 	mulq \B3
 	addq %rax,\R2
 	adcq %rdx,\R0
-//	adcq $0,\R1
+	//adcq $0,\R1
 
 	xorq \R1,\R1
 	movq \A1,%rax
@@ -321,40 +320,39 @@
 	mulq \B3
 	addq %rax,\R0
 	adcq %rdx,\R1
-//	adcq $0,\R2
-
-	movq \A3,%rax
-	mulq \B1
-	addq %rax,\R0
-	adcq %rdx,\R1
-//	adcq $0,\R2
+	//adcq $0,\R2
 
 	xorq \R2,\R2
 	movq \A2,%rax
 	mulq \B2
 	addq %rax,\R0
+	adcq %rdx,\R1
+	adcq $0,\R2
+
+	movq \A3,%rax
+	mulq \B1
+	addq %rax,\R0
 	movq \R0,32(\C)
 	adcq %rdx,\R1
 	adcq $0,\R2
 
-//	xorq \R0,\R0
 	movq \A2,%rax
 	mulq \B3
 	addq %rax,\R1
 	adcq %rdx,\R2
 
+        xorq \R0,\R0	
 	movq \A3,%rax
 	mulq \B2
 	addq %rax,\R1
 	movq \R1,40(\C)
 	adcq %rdx,\R2
-//	adcq $0,\R0
+	adcq $0,\R0
 
 	movq \A3,%rax
 	mulq \B3
 	addq %rax,\R2
 	movq \R2,48(\C)
-//	adcq %rdx,\R0
-	adcq $0,%rdx
-	movq %rdx,56(\C)
+	adcq %rdx,\R0
+	movq \R0,56(\C)
 .endm
