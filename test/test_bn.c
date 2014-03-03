@@ -63,12 +63,10 @@ static int memory(void) {
 }
 
 static int util(void) {
-	int code = STS_ERR;
-	int bits;
-	char str[BN_BYTES * 3 + 1];
-	dig_t digit;
+	int bits, code = STS_ERR;
+	char str[BN_BITS + 2];
+	dig_t digit, raw[BN_DIGS];
 	uint8_t bin[BN_BYTES];
-	dig_t raw[BN_DIGS];
 	bn_t a, b, c;
 
 	bn_null(a);
@@ -220,9 +218,12 @@ static int util(void) {
 		TEST_BEGIN("reading and writing a positive number are consistent") {
 			int len = BN_BYTES;
 			bn_rand(a, BN_POS, BN_BITS);
-			bn_write_str(str, sizeof(str), a, 10);
-			bn_read_str(b, str, sizeof(str), 10);
-			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
+			for (int j = 2; j <= 64; j++) {
+				bn_size_str(&bits, a, j);
+				bn_write_str(str, bits, a, j);
+				bn_read_str(b, str, bits, j);
+				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
+			}
 			bn_write_bin(bin, len, a);
 			bn_read_bin(b, bin, len);
 			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
@@ -251,9 +252,12 @@ static int util(void) {
 		TEST_BEGIN("reading and writing a negative number are consistent") {
 			int len = BN_BYTES;
 			bn_rand(a, BN_NEG, BN_BITS);
-			bn_write_str(str, sizeof(str), a, 10);
-			bn_read_str(b, str, sizeof(str), 10);
-			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
+			for (int j = 2; j <= 64; j++) {
+				bn_size_str(&bits, a, j);
+				bn_write_str(str, bits, a, j);
+				bn_read_str(b, str, bits, j);
+				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
+			}
 			bn_write_bin(bin, len, a);
 			bn_read_bin(b, bin, len);
 			bn_neg(b, b);
@@ -1134,10 +1138,9 @@ static int gcd(void) {
 		} TEST_END;
 #endif
 
-		bn_gen_prime(b, BN_BITS);
-
 		TEST_BEGIN("midway extended greatest common divisor is correct") {
 			bn_rand(a, BN_POS, BN_BITS);
+			bn_rand(b, BN_POS, BN_BITS);
 			bn_gcd_ext_mid(c, d, e, f, a, b);
 			bn_abs(d, d);
 			bn_abs(f, f);
@@ -1673,6 +1676,75 @@ static int recoding(void) {
 				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
 			}
 		} TEST_END;
+
+#if defined(WITH_EB) && defined(EB_KBLTZ) && (EB_MUL == LWNAF || EB_MUL == RWNAF || EB_FIX == LWNAF || EB_SIM == INTER || !defined(STRIP))
+		if (eb_param_set_any_kbltz() == STS_OK) {
+			eb_curve_get_vm(v1[0]);			
+			eb_curve_get_s0(v1[1]);
+			eb_curve_get_s1(v1[2]);
+			eb_curve_get_ord(v2[2]);
+			TEST_BEGIN("tnaf recoding is correct") {
+				for (w = 2; w <= 8; w++) {
+					int8_t t_w, beta[1 << (w - 2)], gama[1 << (w - 2)];
+					int8_t tnaf[FB_BITS + 8];
+					int8_t u = (eb_curve_opt_a() == OPT_ZERO ? -1 : 1);
+					bn_rand(a, BN_POS, BN_BITS);
+					bn_mod(a, a, v2[2]);
+					l = FB_BITS + 1;
+					tnaf_mod(v2[0], v2[1], a, v1[0], v1[1], v1[2], u, FB_BITS);
+					tnaf_cnts(&t_w, beta, gama, u, w);
+					bn_rec_tnaf(tnaf, &l, a, v1[0], v1[1], v1[2], u, FB_BITS, w);
+					bn_zero(a);
+					bn_zero(b);
+					for (k = l - 1; k >= 0; k--) {
+						bn_copy(c, b);
+						if (u == -1) {
+							bn_neg(c, c);
+						}
+						bn_add(c, c, a);
+						bn_dbl(a, b);
+						bn_neg(a, a);
+						bn_copy(b, c);
+						if (w == 2) {
+							if (tnaf[k] >= 0) {
+								bn_add_dig(a, a, tnaf[k]);
+							} else {
+								bn_sub_dig(a, a, -tnaf[k]);
+							}
+						} else {
+							if (tnaf[k] > 0) {
+								if (beta[tnaf[k] / 2] >= 0) {
+									bn_add_dig(a, a, beta[tnaf[k] / 2]);	
+								} else {
+									bn_sub_dig(a, a, -beta[tnaf[k] / 2]);
+								}
+								if (gama[tnaf[k] / 2] >= 0) {
+									bn_add_dig(b, b, gama[tnaf[k] / 2]);
+								} else {
+									bn_sub_dig(b, b, -gama[tnaf[k] / 2]);
+								}
+							}
+							if (tnaf[k] < 0) {
+								if (beta[-tnaf[k] / 2] >= 0) {
+									bn_sub_dig(a, a, beta[-tnaf[k] / 2]);
+								} else {
+									bn_add_dig(a, a, -beta[-tnaf[k] / 2]);
+								}
+								if (gama[-tnaf[k] / 2] >= 0) {
+									bn_sub_dig(b, b, gama[-tnaf[k] / 2]);
+								} else {
+									bn_add_dig(b, b, -gama[-tnaf[k] / 2]);
+								}
+							}							
+						}
+					}
+					TEST_ASSERT(bn_cmp(a, v2[0]) == CMP_EQ, end);
+					TEST_ASSERT(bn_cmp(b, v2[1]) == CMP_EQ, end);
+				}
+			}
+			TEST_END;
+		}
+#endif
 
 		TEST_BEGIN("regular recoding is correct") {
 			for (w = 2; w <= 8; w++) {
