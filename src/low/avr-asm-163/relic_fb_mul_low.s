@@ -77,25 +77,6 @@
 #define T_LINE	(POLY_M4/WORD)
 #endif
 
-#if FB_POLYN == 233
-#undef T_LINE
-#define T_LINE 24
-#undef RT
-#undef RC
-#define RT	r25
-#define RC	r24
-#endif
-
-#if FB_POLYN == 271
-#undef T_LINE
-//#define T_LINE 18
-#define T_LINE 24
-#undef RT
-#undef RC
-#define RT	r25
-#define RC	r24
-#endif
-
 /*
  * Size of the multiplication precomputation table in bytes.
  */
