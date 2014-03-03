@@ -74,7 +74,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp_rdcs_low(dig_t *c, dig_t *a, dig_t *m) {
+void fp_rdcs_low(dig_t *c, const dig_t *a, const dig_t *m) {
 	align dig_t q[2 * FP_DIGS], _q[2 * FP_DIGS];
 	align dig_t _r[2 * FP_DIGS], r[2 * FP_DIGS], t[2 * FP_DIGS];
 	int *sform, len;
