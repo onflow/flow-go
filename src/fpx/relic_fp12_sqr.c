@@ -469,7 +469,7 @@ void fp12_sqr_cyc_lazyr(fp12_t c, fp12_t a) {
 		fp2_sqrn_low(u3, a[1][1]);
 		fp2_addm_low(t1, a[0][0], a[1][1]);
 
-		fp2_nord_low(u0, u3);
+		fp2_norh_low(u0, u3);
 		fp2_addc_low(u0, u0, u2);
 		fp2_rdcn_low(t0, u0);
 
