@@ -99,11 +99,14 @@ enum errors {
 /** Error message respective to ERR_NO_CONFIG. */
 #define MSG_NO_CONFIG		"invalid library configuration"
 
-/** Truncate file name if verbosity is turned off. */
+/** File name wrapper. */
+#define STR_FILE			STRING(__FILE__)
+
+/** Truncated file name if verbosity is turned off. */
 #ifdef VERBS
-#define THIS_FILE			__FILE__
+#define ERR_FILE			STR_FILE
 #else
-#define THIS_FILE			((strrchr(__FILE__, '/') ? : __FILE__ - 1) + 1)
+#define ERR_FILE			((strrchr(STR_FILE, '/') ? : STR_FILE - 1) + 1)
 #endif
 
 /*============================================================================*/
@@ -284,7 +287,7 @@ typedef struct _sts_t {
 #else
 #define THROW(E)															\
 	core_get()->code = STS_ERR; 											\
-	util_print("FATAL ERROR in %s:%d\n", THIS_FILE, __LINE__);				\
+	util_print("FATAL ERROR in %s:%d\n", ERR_FILE, __LINE__);				\
 
 #endif
 #endif
@@ -304,7 +307,7 @@ typedef struct _sts_t {
  * @param[in] ERROR			- the error code.
  */
 #define ERR_PRINT(ERROR)													\
-	err_full_msg(__func__, __FILE__, __LINE__, ERROR)						\
+	err_full_msg(__func__, ERR_FILE, __LINE__, ERROR)						\
 
 #else
 
