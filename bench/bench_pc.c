@@ -469,15 +469,11 @@ static void util(void) {
 
 static void arith(void) {
 	gt_t a, b, c;
-	g1_t p;
-	g2_t q;
 	bn_t d;
 
 	gt_new(a);
 	gt_new(b);
 	gt_new(c);
-	g1_new(p);
-	g2_new(q);
 	bn_new(d);
 
 	BENCH_BEGIN("gt_mul") {
@@ -507,18 +503,37 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("pc_map") {
-		g1_rand(p);
-		g2_rand(q);
-		BENCH_ADD(pc_map(a, p, q));
-	}
-	BENCH_END;
-
 	gt_free(a);
 	gt_free(b);
 	gt_free(c);
+	bn_free(d);
+}
+
+static void pairing(void) {
+	g1_t p;
+	g2_t q;
+	gt_t r;
+
+	g1_new(p);
+	g2_new(q);
+	gt_new(r);
+
+	BENCH_BEGIN("pc_map") {
+		g1_rand(p);
+		g2_rand(q);
+		BENCH_ADD(pc_map(r, p, q));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("pc_exp") {
+		gt_rand(r);
+		BENCH_ADD(pc_exp(r, r));
+	}
+	BENCH_END;
+
 	g1_free(p);
-	g2_free(q);
+	g2_free(q);	
+	gt_free(r);	
 }
 
 int main(void) {
@@ -561,6 +576,10 @@ int main(void) {
 
 	util_banner("Arithmetic:", 1);
 	arith();
+
+	util_banner("Pairing:", 0);	
+	util_banner("Arithmetic:", 1);
+	pairing();
 
 	core_clean();
 	return 0;
