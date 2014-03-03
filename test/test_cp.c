@@ -418,16 +418,16 @@ uint8_t result[] = {
 	FETCH(str, CURVE##_A, sizeof(CURVE##_A));								\
 	bn_read_str(d_a, str, strlen(str), 16);									\
 	FETCH(str, CURVE##_A_X, sizeof(CURVE##_A_X));							\
-	fb_read(q_a->x, str, strlen(str), 16);									\
+	fb_read_str(q_a->x, str, strlen(str), 16);									\
 	FETCH(str, CURVE##_A_Y, sizeof(CURVE##_A_Y));							\
-	fb_read(q_a->y, str, strlen(str), 16);									\
+	fb_read_str(q_a->y, str, strlen(str), 16);									\
 	fb_set_dig(q_a->z, 1);													\
 	FETCH(str, CURVE##_B, sizeof(CURVE##_B));								\
 	bn_read_str(d_b, str, strlen(str), 16);									\
 	FETCH(str, CURVE##_B_X, sizeof(CURVE##_B_X));							\
-	fb_read(q_b->x, str, strlen(str), 16);									\
+	fb_read_str(q_b->x, str, strlen(str), 16);									\
 	FETCH(str, CURVE##_B_Y, sizeof(CURVE##_B_Y));							\
-	fb_read(q_b->y, str, strlen(str), 16);									\
+	fb_read_str(q_b->y, str, strlen(str), 16);									\
 	fb_set_dig(q_b->z, 1);													\
 	q_a->norm = q_b->norm = 1;												\
 
