@@ -664,6 +664,18 @@ typedef CAT(GT_LOWER, t) gt_t;
 #define pc_map(R, P, Q);	CAT(PC_LOWER, map_k2)(R, P, Q)
 #endif
 
+/**
+ * Computes the final exponentiation of the pairing.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the field element to exponentiate.
+ */
+#if FP_PRIME < 1536
+#define pc_exp(C, A);		CAT(PC_LOWER, exp_k12)(C, A)
+#else
+#define pc_exp(C, A);		CAT(PC_LOWER, exp_k2)(C, A)
+#endif
+
 /*============================================================================*/
 /* Function prototypes                                                        */
 /*============================================================================*/
