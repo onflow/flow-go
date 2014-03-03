@@ -1691,8 +1691,8 @@ static int recoding(void) {
 					bn_rand(a, BN_POS, BN_BITS);
 					bn_mod(a, a, v2[2]);
 					l = FB_BITS + 1;
-					tnaf_mod(v2[0], v2[1], a, v1[0], v1[1], v1[2], u, FB_BITS);
-					tnaf_cnts(&t_w, beta, gama, u, w);
+					bn_rec_tnaf_mod(v2[0], v2[1], a, v1[0], v1[1], v1[2], u, FB_BITS);
+					bn_rec_tnaf_get(&t_w, beta, gama, u, w);
 					bn_rec_tnaf(tnaf, &l, a, v1[0], v1[1], v1[2], u, FB_BITS, w);
 					bn_zero(a);
 					bn_zero(b);
