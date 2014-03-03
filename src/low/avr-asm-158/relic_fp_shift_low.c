@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fp_lshb_low(dig_t *c, dig_t *a, int bits) {
+dig_t fp_lshb_low(dig_t *c, const dig_t *a, int bits) {
 	int i;
 	dig_t r, carry, mask, shift;
 
@@ -55,7 +55,7 @@ dig_t fp_lshb_low(dig_t *c, dig_t *a, int bits) {
 	return carry;
 }
 
-void fp_lshd_low(dig_t *c, dig_t *a, int digits) {
+void fp_lshd_low(dig_t *c, const dig_t *a, int digits) {
 	dig_t *top, *bot;
 	int i;
 
@@ -70,7 +70,7 @@ void fp_lshd_low(dig_t *c, dig_t *a, int digits) {
 	}
 }
 
-dig_t fp_rshb_low(dig_t *c, dig_t *a, int bits) {
+dig_t fp_rshb_low(dig_t *c, const dig_t *a, int bits) {
 	int i;
 	dig_t r, carry, mask, shift;
 
@@ -91,7 +91,7 @@ dig_t fp_rshb_low(dig_t *c, dig_t *a, int bits) {
 	return carry;
 }
 
-void fp_rshd_low(dig_t *c, dig_t *a, int digits) {
+void fp_rshd_low(dig_t *c, const dig_t *a, int digits) {
 	dig_t *top, *bot;
 	int i;
 

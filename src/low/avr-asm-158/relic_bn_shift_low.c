@@ -35,7 +35,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t bn_lshb_low(dig_t *c, dig_t *a, int size, int bits) {
+dig_t bn_lshb_low(dig_t *c, const dig_t *a, int size, int bits) {
 	int i;
 	dig_t r, carry, shift;
 
@@ -55,7 +55,7 @@ dig_t bn_lshb_low(dig_t *c, dig_t *a, int size, int bits) {
 	return carry;
 }
 
-void bn_lshd_low(dig_t *c, dig_t *a, int size, int digits) {
+void bn_lshd_low(dig_t *c, const dig_t *a, int size, int digits) {
 	dig_t *top, *bot;
 	int i;
 
@@ -70,7 +70,7 @@ void bn_lshd_low(dig_t *c, dig_t *a, int size, int digits) {
 	}
 }
 
-dig_t bn_rshb_low(dig_t *c, dig_t *a, int size, int bits) {
+dig_t bn_rshb_low(dig_t *c, const dig_t *a, int size, int bits) {
 	int i;
 	dig_t r, carry, shift;
 
@@ -93,7 +93,7 @@ dig_t bn_rshb_low(dig_t *c, dig_t *a, int size, int bits) {
 	return carry;
 }
 
-void bn_rshd_low(dig_t *c, dig_t *a, int size, int digits) {
+void bn_rshd_low(dig_t *c, const dig_t *a, int size, int digits) {
 	dig_t *top, *bot;
 	int i;
 

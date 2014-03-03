@@ -58,7 +58,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t fp_mula_low(dig_t *c, dig_t *a, dig_t digit) {
+dig_t fp_mula_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int i;
 	dig_t carry;
 	dbl_t r;
@@ -76,14 +76,14 @@ dig_t fp_mula_low(dig_t *c, dig_t *a, dig_t digit) {
 	return carry;
 }
 
-void fp_mulm_low(dig_t *c, dig_t *a, dig_t *b) {
+void fp_mulm_low(dig_t *c, const dig_t *a, const dig_t *b) {
 	dig_t align t[2 * FP_DIGS];
 
 	fp_muln_low(t, a, b);
 	fp_rdc(c, t);
 }
 
-dig_t fp_mul1_low(dig_t *c, dig_t *a, dig_t digit) {
+dig_t fp_mul1_low(dig_t *c, const dig_t *a, dig_t digit) {
 	int i;
 	dig_t carry;
 	dbl_t r;
