@@ -203,6 +203,8 @@ void bn_mxp_slide(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 
 void bn_mxp_monty(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 	bn_t tab[2], u;
+	dig_t mask;
+	int t;
 
 	bn_null(tab[0]);
 	bn_null(tab[1]);
@@ -219,7 +221,7 @@ void bn_mxp_monty(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 		bn_set_dig(tab[0], 1);
 		bn_mod_monty_conv(tab[0], tab[0], m);
 		bn_mod_monty_conv(tab[1], a, m);
-#else /* BN_MOD == BARRT || BN_MOD == RADIX */
+#else
 		bn_set_dig(tab[0], 1);
 		bn_copy(tab[1], a);
 #endif
@@ -227,11 +229,19 @@ void bn_mxp_monty(bn_t c, const bn_t a, const bn_t b, const bn_t m) {
 		for (int i = bn_bits(b) - 1; i >= 0; i--) {
 			int j = bn_get_bit(b, i);
 			dv_swap_cond(tab[0]->dp, tab[1]->dp, BN_DIGS, j ^ 1);
+			mask = -(j ^ 1);
+			t = (tab[0]->used ^ tab[1]->used) & mask;
+			tab[0]->used ^= t;
+			tab[1]->used ^= t;
 			bn_mul(tab[0], tab[0], tab[1]);
 			bn_mod(tab[0], tab[0], m, u);
 			bn_sqr(tab[1], tab[1]);
 			bn_mod(tab[1], tab[1], m, u);
 			dv_swap_cond(tab[0]->dp, tab[1]->dp, BN_DIGS, j ^ 1);
+			mask = -(j ^ 1);
+			t = (tab[0]->used ^ tab[1]->used) & mask;
+			tab[0]->used ^= t;
+			tab[1]->used ^= t;			
 		}
 
 #if BN_MOD == MONTY
