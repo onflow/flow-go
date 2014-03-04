@@ -657,7 +657,6 @@ void ep_param_set(int param) {
 		}
 #endif
 
-
 #if defined(EP_SUPER)
 		if (super) {
 			ep_curve_set_super(a, b, g, r, h);
