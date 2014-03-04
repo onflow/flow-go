@@ -150,7 +150,7 @@ void bn_mod_barrt(bn_t c, const bn_t a, const bn_t m, const bn_t u) {
 
 #endif /* BN_MOD == BARRT || !defined(STRIP) */
 
-#if BN_MOD == MONTY || !defined(STRIP)
+#if BN_MOD == MONTY || (defined(WITH_FP) && FP_RDC == MONTY) || !defined(STRIP)
 
 void bn_mod_pre_monty(bn_t u, const bn_t m) {
 	dig_t x, b;
@@ -278,7 +278,7 @@ void bn_mod_monty_comba(bn_t c, const bn_t a, const bn_t m, const bn_t u) {
 
 #endif /* BN_MUL == COMBA || !defined(STRIP) */
 
-#endif /* BN_MOD == MONTY || !defined(STRIP) */
+#endif /* BN_MOD == MONTY || (WITH_FP && FP_RDC == MONTY) || !defined(STRIP) */
 
 #if BN_MOD == PMERS || !defined(STRIP)
 
