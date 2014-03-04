@@ -55,11 +55,7 @@ void bn_smb_leg(bn_t c, const bn_t a, const bn_t b) {
 		/* t = (b - 1)/2. */
 		bn_sub_dig(t, b, 1);
 		bn_rsh(t, t, 1);
-#if BN_MOD == MONTY
 		bn_mxp(c, a, t, b);
-#else
-		bn_mxp(c, a, t, b);
-#endif
 		bn_sub_dig(t, b, 1);
 		if (bn_cmp(c, t) == CMP_EQ) {
 			bn_set_dig(c, 1);
