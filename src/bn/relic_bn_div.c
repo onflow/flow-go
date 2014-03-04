@@ -71,8 +71,11 @@ static void bn_div_imp(bn_t c, bn_t d, const bn_t a, const bn_t b) {
 				}
 			}
 			if (d != NULL) {
-				bn_abs(d, b);
-				bn_add(d, d, a);
+				if (bn_sign(b) == BN_POS) {
+					bn_add(d, a, b);	
+				} else {
+					bn_sub(d, a, b);
+				}
 			}
 		}
 		return;
