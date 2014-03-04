@@ -21,7 +21,7 @@ message("      BN_METHD=MONTY    Montgomery modular reduction.")
 message("      BN_METHD=RADIX    Diminished radix modular reduction.\n")
 
 message("      BN_METHD=BASIC    Binary modular exponentiation.")
-message("      BN_METHD=MONTY    Constant-time Montgomery powering ladder.")
+message("      BN_METHD=MONTY    Montgomery powering ladder.")
 message("      BN_METHD=SLIDE    Sliding window modular exponentiation.\n")
 
 message("      BN_METHD=BASIC    Euclid's standard GCD algorithm.")

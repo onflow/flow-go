@@ -1003,7 +1003,7 @@ static int exponentiation(void) {
 #endif
 
 #if BN_MXP == CONST || !defined(STRIP)
-		TEST_BEGIN("constant time modular exponentiation is correct") {
+		TEST_BEGIN("powering ladder modular exponentiation is correct") {
 			bn_rand(a, BN_POS, BN_BITS);
 			bn_mod(a, a, p);
 			bn_copy(b, a);
