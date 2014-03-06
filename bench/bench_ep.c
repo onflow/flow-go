@@ -611,15 +611,15 @@ int main(void) {
 	conf_print();
 	util_banner("Benchmarks for the EP module:", 0);
 
-#if defined(EP_ORDIN)
-	r0 = ep_param_set_any_ordin();
+#if defined(EP_PLAIN)
+	r0 = ep_param_set_any_plain();
 	if (r0 == STS_OK) {
 		bench();
 	}
 #endif
 
-#if defined(EP_KBLTZ)
-	r1 = ep_param_set_any_kbltz();
+#if defined(EP_ENDOM)
+	r1 = ep_param_set_any_endom();
 	if (r1 == STS_OK) {
 		bench();
 	}

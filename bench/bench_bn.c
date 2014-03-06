@@ -870,8 +870,8 @@ static void arith(void) {
 	}
 	BENCH_END;
 
-#if defined(WITH_EP) && defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
-	if (ep_param_set_any_kbltz() == STS_OK) {
+#if defined(WITH_EP) && defined(EP_ENDOM) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
+	if (ep_param_set_any_endom() == STS_OK) {
 		bn_t v1[3], v2[3];
 
 		for (int j = 0; j < 3; j++) {
