@@ -38,7 +38,7 @@
 
 #if EP_SIM == INTER || !defined(STRIP)
 
-#if defined(EP_KBLTZ)
+#if defined(EP_ENDOM)
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously,
@@ -52,7 +52,7 @@
  * @param[in] m					- the second integer.
  * @param[in] t					- the pointer to the precomputed table.
  */
-void ep_mul_sim_kbltz(ep_t r, const ep_t p, const bn_t k, const ep_t q,
+void ep_mul_sim_endom(ep_t r, const ep_t p, const bn_t k, const ep_t q,
 		const bn_t m, const ep_t *t) {
 	int len, len0, len1, len2, len3, i, n, sk0, sk1, sl0, sl1, w, g = 0;
 	int8_t naf0[FP_BITS + 1], naf1[FP_BITS + 1], *t0, *t1;
@@ -252,9 +252,9 @@ void ep_mul_sim_kbltz(ep_t r, const ep_t p, const bn_t k, const ep_t q,
 	}
 }
 
-#endif /* EP_KBLTZ */
+#endif /* EP_ENDOM */
 
-#if defined(EP_ORDIN) || defined(EP_SUPER)
+#if defined(EP_PLAIN) || defined(EP_SUPER)
 
 /**
  * Multiplies and adds two prime elliptic curve points simultaneously,
@@ -268,7 +268,7 @@ void ep_mul_sim_kbltz(ep_t r, const ep_t p, const bn_t k, const ep_t q,
  * @param[in] m					- the second integer.
  * @param[in] t					- the pointer to the precomputed table.
  */
-static void ep_mul_sim_ordin(ep_t r, const ep_t p, const bn_t k, const ep_t q,
+static void ep_mul_sim_plain(ep_t r, const ep_t p, const bn_t k, const ep_t q,
 		const bn_t m, const ep_t *t) {
 	int len, l0, l1, i, n0, n1, w, gen;
 	int8_t naf0[FP_BITS + 1], naf1[FP_BITS + 1], *_k, *_m;
@@ -353,7 +353,7 @@ static void ep_mul_sim_ordin(ep_t r, const ep_t p, const bn_t k, const ep_t q,
 	}
 }
 
-#endif /* EP_ORDIN || EP_SUPER */
+#endif /* EP_PLAIN || EP_SUPER */
 
 #endif /* EP_SIM == INTER */
 
@@ -478,15 +478,15 @@ void ep_mul_sim_trick(ep_t r, const ep_t p, const bn_t k, const ep_t q,
 
 void ep_mul_sim_inter(ep_t r, const ep_t p, const bn_t k, const ep_t q,
 		const bn_t m) {
-#if defined(EP_KBLTZ)
-	if (ep_curve_is_kbltz()) {
-		ep_mul_sim_kbltz(r, p, k, q, m, NULL);
+#if defined(EP_ENDOM)
+	if (ep_curve_is_endom()) {
+		ep_mul_sim_endom(r, p, k, q, m, NULL);
 		return;
 	}
 #endif
 
-#if defined(EP_ORDIN) || defined(EP_SUPER)
-	ep_mul_sim_ordin(r, p, k, q, m, NULL);
+#if defined(EP_PLAIN) || defined(EP_SUPER)
+	ep_mul_sim_plain(r, p, k, q, m, NULL);
 #endif
 }
 
@@ -569,25 +569,25 @@ void ep_mul_sim_gen(ep_t r, const bn_t k, const ep_t q, const bn_t m) {
 
 		ep_curve_get_gen(g);
 
-#if defined(EP_KBLTZ)
+#if defined(EP_ENDOM)
 #if EP_SIM == INTER && EP_FIX == LWNAF && defined(EP_PRECO)
-		if (ep_curve_is_kbltz()) {
-			ep_mul_sim_kbltz(r, g, k, q, m, ep_curve_get_tab());
+		if (ep_curve_is_endom()) {
+			ep_mul_sim_endom(r, g, k, q, m, ep_curve_get_tab());
 		}
 #else
-		if (ep_curve_is_kbltz()) {
+		if (ep_curve_is_endom()) {
 			ep_mul_sim(r, g, k, q, m);
 		}
 #endif
 #endif
 
-#if defined(EP_ORDIN) || defined(EP_SUPER)
+#if defined(EP_PLAIN) || defined(EP_SUPER)
 #if EP_SIM == INTER && EP_FIX == LWNAF && defined(EP_PRECO)
-		if (!ep_curve_is_kbltz()) {
-			ep_mul_sim_ordin(r, g, k, q, m, ep_curve_get_tab());
+		if (!ep_curve_is_endom()) {
+			ep_mul_sim_plain(r, g, k, q, m, ep_curve_get_tab());
 		}
 #else
-		if (!ep_curve_is_kbltz()) {
+		if (!ep_curve_is_endom()) {
 			ep_mul_sim(r, g, k, q, m);
 		}
 #endif

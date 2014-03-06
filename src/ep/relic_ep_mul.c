@@ -37,7 +37,7 @@
 
 #if EP_MUL == LWNAF || !defined(STRIP)
 
-#if defined(EP_KBLTZ)
+#if defined(EP_ENDOM)
 
 static void ep_mul_glv_imp(ep_t r, const ep_t p, const bn_t k) {
 	int l, l0, l1, i, n0, n1, s0, s1;
@@ -146,9 +146,9 @@ static void ep_mul_glv_imp(ep_t r, const ep_t p, const bn_t k) {
 	}
 }
 
-#endif /* EP_KBLTZ */
+#endif /* EP_ENDOM */
 
-#if defined(EP_ORDIN) || defined(EP_SUPER)
+#if defined(EP_PLAIN) || defined(EP_SUPER)
 
 static void ep_mul_naf_imp(ep_t r, const ep_t p, const bn_t k) {
 	int l, i, n;
@@ -199,12 +199,12 @@ static void ep_mul_naf_imp(ep_t r, const ep_t p, const bn_t k) {
 	}
 }
 
-#endif /* EP_ORDIN || EP_SUPER */
+#endif /* EP_PLAIN || EP_SUPER */
 #endif /* EP_MUL == LWNAF */
 
 #if EP_MUL == LWREG || !defined(STRIP)
 
-#if defined(EP_ORDIN) || defined(EP_SUPER)
+#if defined(EP_PLAIN) || defined(EP_SUPER)
 
 static void ep_mul_reg_imp(ep_t r, const ep_t p, const bn_t k) {
 	int l, i, j, n;
@@ -258,7 +258,7 @@ static void ep_mul_reg_imp(ep_t r, const ep_t p, const bn_t k) {
 	}
 }
 
-#endif /* EP_ORDIN || EP_SUPER */
+#endif /* EP_PLAIN || EP_SUPER */
 #endif /* EP_MUL == LWNAF */
 
 /*============================================================================*/
@@ -426,14 +426,14 @@ void ep_mul_lwnaf(ep_t r, const ep_t p, const bn_t k) {
 		return;
 	}
 
-#if defined(EP_KBLTZ)
-	if (ep_curve_is_kbltz()) {
+#if defined(EP_ENDOM)
+	if (ep_curve_is_endom()) {
 		ep_mul_glv_imp(r, p, k);
 		return;
 	}
 #endif
 
-#if defined(EP_ORDIN) || defined(EP_SUPER)
+#if defined(EP_PLAIN) || defined(EP_SUPER)
 	ep_mul_naf_imp(r, p, k);
 #endif
 }
@@ -448,14 +448,14 @@ void ep_mul_lwreg(ep_t r, const ep_t p, const bn_t k) {
 		return;
 	}
 
-#if defined(EP_KBLTZ)
-	if (ep_curve_is_kbltz()) {
+#if defined(EP_ENDOM)
+	if (ep_curve_is_endom()) {
 		ep_mul_glv_imp(r, p, k);
 		return;
 	}
 #endif
 
-#if defined(EP_ORDIN) || defined(EP_SUPER)
+#if defined(EP_PLAIN) || defined(EP_SUPER)
 	ep_mul_reg_imp(r, p, k);
 #endif
 }

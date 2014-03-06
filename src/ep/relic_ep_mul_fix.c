@@ -45,7 +45,7 @@
  * @param[in] t					- the precomputed table.
  * @param[in] k					- the integer.
  */
-static void ep_mul_fix_ordin(ep_t r, const ep_t *t, const bn_t k) {
+static void ep_mul_fix_plain(ep_t r, const ep_t *t, const bn_t k) {
 	int l, i, n;
 	int8_t naf[FP_BITS + 1], *_k;
 
@@ -74,7 +74,7 @@ static void ep_mul_fix_ordin(ep_t r, const ep_t *t, const bn_t k) {
 
 #if EP_FIX == COMBS || !defined(STRIP)
 
-#if defined(EP_KBLTZ)
+#if defined(EP_ENDOM)
 
 /**
  * Multiplies a prime elliptic curve point by an integer using the COMBS
@@ -84,7 +84,7 @@ static void ep_mul_fix_ordin(ep_t r, const ep_t *t, const bn_t k) {
  * @param[in] t					- the precomputed table.
  * @param[in] k					- the integer.
  */
-static void ep_mul_combs_kbltz(ep_t r, const ep_t *t, const bn_t k) {
+static void ep_mul_combs_endom(ep_t r, const ep_t *t, const bn_t k) {
 	int i, j, l, w0, w1, n0, n1, p0, p1, s0, s1;
 	bn_t n, k0, k1, v1[3], v2[3];
 	ep_t u;
@@ -175,9 +175,9 @@ static void ep_mul_combs_kbltz(ep_t r, const ep_t *t, const bn_t k) {
 	}
 }
 
-#endif /* EP_KBLTZ */
+#endif /* EP_ENDOM */
 
-#if defined(EP_ORDIN) || defined(EP_SUPER)
+#if defined(EP_PLAIN) || defined(EP_SUPER)
 /**
  * Multiplies a prime elliptic curve point by an integer using the COMBS
  * method.
@@ -186,7 +186,7 @@ static void ep_mul_combs_kbltz(ep_t r, const ep_t *t, const bn_t k) {
  * @param[in] t					- the precomputed table.
  * @param[in] k					- the integer.
  */
-static void ep_mul_combs_ordin(ep_t r, const ep_t *t, const bn_t k) {
+static void ep_mul_combs_plain(ep_t r, const ep_t *t, const bn_t k) {
 	int i, j, l, w, n0, p0, p1;
 	bn_t n;
 
@@ -238,7 +238,7 @@ static void ep_mul_combs_ordin(ep_t r, const ep_t *t, const bn_t k) {
 	}
 }
 
-#endif /* EP_ORDIN || EP_SUPER */
+#endif /* EP_PLAIN || EP_SUPER */
 
 #endif /* EP_FIX == LWNAF */
 
@@ -463,8 +463,8 @@ void ep_mul_pre_combs(ep_t *t, const ep_t p) {
 		ep_curve_get_ord(n);
 		l = bn_bits(n);
 		l = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
-#if defined(EP_KBLTZ)
-		if (ep_curve_is_kbltz()) {
+#if defined(EP_ENDOM)
+		if (ep_curve_is_endom()) {
 			l = bn_bits(n);
 			l = ((l % (2 * EP_DEPTH)) ==
 					0 ? (l / (2 * EP_DEPTH)) : (l / (2 * EP_DEPTH)) + 1);
@@ -498,15 +498,15 @@ void ep_mul_pre_combs(ep_t *t, const ep_t p) {
 }
 
 void ep_mul_fix_combs(ep_t r, const ep_t *t, const bn_t k) {
-#if defined(EP_KBLTZ)
-	if (ep_curve_is_kbltz()) {
-		ep_mul_combs_kbltz(r, t, k);
+#if defined(EP_ENDOM)
+	if (ep_curve_is_endom()) {
+		ep_mul_combs_endom(r, t, k);
 		return;
 	}
 #endif
 
-#if defined(EP_ORDIN) || defined(EP_SUPER)
-	ep_mul_combs_ordin(r, t, k);
+#if defined(EP_PLAIN) || defined(EP_SUPER)
+	ep_mul_combs_plain(r, t, k);
 #endif
 }
 #endif
@@ -622,6 +622,6 @@ void ep_mul_pre_lwnaf(ep_t *t, const ep_t p) {
 }
 
 void ep_mul_fix_lwnaf(ep_t r, const ep_t *t, const bn_t k) {
-	ep_mul_fix_ordin(r, t, k);
+	ep_mul_fix_plain(r, t, k);
 }
 #endif

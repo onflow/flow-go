@@ -108,7 +108,7 @@ void ep_curve_init(void) {
 	ep_set_infty(&ctx->ep_g);
 	bn_init(&ctx->ep_r, FP_DIGS);
 	bn_init(&ctx->ep_h, FP_DIGS);
-#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || !defined(STRIP))
+#if defined(EP_ENDOM) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || !defined(STRIP))
 	for (int i = 0; i < 3; i++) {
 		bn_init(&(ctx->ep_v1[i]), FP_DIGS);
 		bn_init(&(ctx->ep_v2[i]), FP_DIGS);
@@ -132,7 +132,7 @@ void ep_curve_clean(void) {
 #endif
 	bn_clean(&ctx->ep_r);
 	bn_clean(&ctx->ep_h);
-#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == LWNAF || !defined(STRIP))
+#if defined(EP_ENDOM) && (EP_MUL == LWNAF || EP_FIX == LWNAF || !defined(STRIP))
 	for (int i = 0; i < 3; i++) {
 		bn_clean(&(ctx->ep_v1[i]));
 		bn_clean(&(ctx->ep_v2[i]));
@@ -148,7 +148,7 @@ dig_t *ep_curve_get_a() {
 	return core_get()->ep_a;
 }
 
-#if defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
+#if defined(EP_ENDOM) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
 
 dig_t *ep_curve_get_beta() {
 	return core_get()->beta;
@@ -178,8 +178,8 @@ int ep_curve_opt_b() {
 	return core_get()->ep_opt_b;
 }
 
-int ep_curve_is_kbltz() {
-	return core_get()->ep_is_kbltz;
+int ep_curve_is_endom() {
+	return core_get()->ep_is_endom;
 }
 
 int ep_curve_is_super() {
@@ -214,12 +214,12 @@ const ep_t *ep_curve_get_tab() {
 #endif
 }
 
-#if defined(EP_ORDIN)
+#if defined(EP_PLAIN)
 
-void ep_curve_set_ordin(const fp_t a, const fp_t b, const ep_t g, const bn_t r,
+void ep_curve_set_plain(const fp_t a, const fp_t b, const ep_t g, const bn_t r,
 		const bn_t h) {
 	ctx_t *ctx = core_get();
-	ctx->ep_is_kbltz = 0;
+	ctx->ep_is_endom = 0;
 	ctx->ep_is_super = 0;
 
 	fp_copy(ctx->ep_a, a);
@@ -244,7 +244,7 @@ void ep_curve_set_ordin(const fp_t a, const fp_t b, const ep_t g, const bn_t r,
 void ep_curve_set_super(const fp_t a, const fp_t b, const ep_t g, const bn_t r,
 		const bn_t h) {
 	ctx_t *ctx = core_get();
-	ctx->ep_is_kbltz = 0;
+	ctx->ep_is_endom = 0;
 	ctx->ep_is_super = 1;
 
 	fp_copy(ctx->ep_a, a);
@@ -264,13 +264,13 @@ void ep_curve_set_super(const fp_t a, const fp_t b, const ep_t g, const bn_t r,
 
 #endif
 
-#if defined(EP_KBLTZ)
+#if defined(EP_ENDOM)
 
-void ep_curve_set_kbltz(const fp_t b, const ep_t g, const bn_t r, const bn_t h,
+void ep_curve_set_endom(const fp_t b, const ep_t g, const bn_t r, const bn_t h,
 		const fp_t beta, const bn_t l) {
 	int bits = bn_bits(r);
 	ctx_t *ctx = core_get();
-	ctx->ep_is_kbltz = 1;
+	ctx->ep_is_endom = 1;
 	ctx->ep_is_super = 0;
 
 	fp_zero(ctx->ep_a);
