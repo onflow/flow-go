@@ -193,7 +193,7 @@ dont_subtract:
 
 #if FP_PRIME == 160
 
-#ifdef EP_KBLTZ
+#ifdef EP_ENDOM
 #include "relic_fp_rdc_low_160k1.s"
 #else
 #include "relic_fp_rdc_low_160p1.s"
@@ -201,7 +201,7 @@ dont_subtract:
 
 #elif FP_PRIME == 256
 
-#ifdef EP_KBLTZ
+#ifdef EP_ENDOM
 #include "relic_fp_rdc_low_256k1.s"
 #else
 #include "relic_fp_rdc_low_256p1.s"
