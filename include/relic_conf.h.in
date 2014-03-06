@@ -101,6 +101,8 @@
 #cmakedefine WITH_FB
 /** Build prime elliptic curve module. */
 #cmakedefine WITH_EP
+/** Build prime field extension elliptic curve module. */
+#cmakedefine WITH_EPX
 /** Build binary elliptic curve module. */
 #cmakedefine WITH_EB
 /** Build elliptic curve cryptography module. */
@@ -363,11 +365,11 @@
 #define FB_METHD "@FB_METHD@"
 
 /** Support for ordinary curves. */
-#cmakedefine EP_ORDIN
+#cmakedefine EP_PLAIN
 /** Support for supersingular curves. */
 #cmakedefine EP_SUPER
 /** Support for prime curves with efficient endormorphisms. */
-#cmakedefine EP_KBLTZ
+#cmakedefine EP_ENDOM
 /** Use mixed coordinates. */
 #cmakedefine EP_MIXED
 /** Build precomputation table for generator. */

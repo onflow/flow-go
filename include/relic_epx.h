@@ -319,21 +319,21 @@ void ep2_curve_init(void);
 void ep2_curve_clean(void);
 
 /**
- * Returns the a coefficient of the currently configured elliptic curve.
+ * Returns the 'a' coefficient of the currently configured elliptic curve.
  *
- * @param[out] a			- the a coefficient of the elliptic curve.
+ * @param[out] a			- the 'a' coefficient of the elliptic curve.
  */
 void ep2_curve_get_a(fp2_t a);
 
 /**
- * Returns the b coefficient of the currently configured elliptic curve.
+ * Returns the 'b' coefficient of the currently configured elliptic curve.
  *
- * @param[out] b			- the b coefficient of the elliptic curve.
+ * @param[out] b			- the 'b' coefficient of the elliptic curve.
  */
 void ep2_curve_get_b(fp2_t b);
 
 /**
- * Returns a optimization identifier based on the coefficient a of the curve.
+ * Returns a optimization identifier based on the 'a' coefficient of the curve.
  *
  * @return the optimization identifier.
  */
@@ -342,7 +342,7 @@ int ep2_curve_opt_a(void);
 /**
  * Tests if the configured elliptic curve is a twist.
  *
- * @return 1 if the elliptic curve is a twist, 0 otherwise.
+ * @return the type of the elliptic curve twist, 0 if non-twisted curve.
  */
 int ep2_curve_is_twist(void);
 
@@ -368,12 +368,29 @@ ep2_t *ep2_curve_get_tab(void);
 void ep2_curve_get_ord(bn_t n);
 
 /**
- * Configures a new elliptic curve by using the curve over the base prime field
- * as a parameter.
+ * Returns the cofactor of the group order in the elliptic curve.
  *
- *  @param				- the flag indicating that the curve is a twist.
+ * @param[out] h			- the returned cofactor.
  */
-void ep2_curve_set(int twist);
+void ep2_curve_get_cof(bn_t h);
+
+/**
+ * Configures an elliptic curve over a quadratic extension by its coefficients.
+ *
+ * @param[in] a			- the 'a' coefficient of the curve.
+ * @param[in] b			- the 'b' coefficient of the curve.
+ * @param[in] g			- the generator.
+ * @param[in] r			- the order of the group of points.
+ * @param[in] h			- the cofactor of the group order.
+ */
+void ep2_curve_set(fp2_t a, fp2_t b, ep2_t g, bn_t r, bn_t h);
+
+/**
+ * Configures an elliptic curve by twisting the curve over the base prime field.
+ *
+ *  @param				- the type of twist (multiplicative or divisive)
+ */
+void ep2_curve_set_twist(int type);
 
 /**
  * Tests if a point on a elliptic curve is at the infinity.
