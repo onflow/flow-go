@@ -467,10 +467,10 @@ void bn_gen_prime_stron(bn_t a, int bits) {
 			}
 			/* Compute t = 2 * (s^(r-2) mod r) * s - 1. */
 			bn_sub_dig(t, r, 2);
-#if BN_MOD == PMERS
-			bn_exp(t, s, t, r);
-#else
+#if BN_MOD != PMERS
 			bn_mxp(t, s, t, r);
+#else
+			bn_exp(t, s, t, r);
 #endif
 
 			bn_mul(t, t, s);
