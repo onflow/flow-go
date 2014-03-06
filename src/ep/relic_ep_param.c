@@ -817,7 +817,7 @@ int ep_param_set_any_pairf() {
 		}
 	}
 #else
-	(void)twist;
+	(void)type;
 	(void)degree;
 #endif
 	return r;
