@@ -1,9 +1,9 @@
 message(STATUS "Prime elliptic curve arithmetic configuration (EP module):\n")
 
 message("   ** Options for the binary elliptic curve module (default = all on):")
-message("      EP_ORDIN=[off|on] Support for ordinary curves.")
+message("      EP_PLAIN=[off|on] Support for ordinary curves without endomorphisms.")
 message("      EP_SUPER=[off|on] Support for supersingular curves.")
-message("      EP_KBLTZ=[off|on] Special support for Koblitz curves.")    
+message("      EP_ENDOM=[off|on] Support for ordinary curves with endomorphisms.")
 message("      EP_MIXED=[off|on] Use mixed coordinates.\n")
 message("      EP_PRECO=[off|on] Build precomputation table for generator.")
 message("      EP_DEPTH=w        Width w in [2,6] of precomputation table for fixed point methods.")
@@ -39,10 +39,10 @@ endif(NOT EP_WIDTH)
 set(EP_DEPTH "${EP_DEPTH}" CACHE STRING "Width of precomputation table for fixed point methods.")
 set(EP_WIDTH "${EP_WIDTH}" CACHE STRING "Width of window processing for unknown point methods.")
 
-option(EP_ORDIN "Support for ordinary curves" on)
+option(EP_PLAIN "Support for ordinary curves" on)
 option(EP_SUPER "Support for supersingular curves" on)
 option(EP_MIXED "Use mixed coordinates" on)
-option(EP_KBLTZ "Special support for Koblitz curves" on)
+option(EP_ENDOM "Special support for Koblitz curves" on)
 option(EP_PRECO "Build precomputation table for generator" on)
 
 # Choose the arithmetic methods.
