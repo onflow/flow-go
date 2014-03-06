@@ -38,7 +38,7 @@
 
 #if EP_SIM == INTER || !defined(STRIP)
 
-static void ep2_mul_sim_ordin(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l,
+static void ep2_mul_sim_plain(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l,
 		ep2_t *t) {
 	int len, l0, l1, i, n0, n1, w, gen;
 	int8_t naf0[FP_BITS + 1], naf1[FP_BITS + 1], *_k, *_m;
@@ -242,7 +242,7 @@ void ep2_mul_sim_trick(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 #if EP_SIM == INTER || !defined(STRIP)
 
 void ep2_mul_sim_inter(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
-#if defined(EP_KBLTZ)
+#if defined(EP_ENDOM)
 	/* TODO. */
 	//  if (ep_curve_is_kbltz()) {
 	//      ep_mul_sim_kbltz(r, p, k, q, l, 0);
@@ -250,8 +250,8 @@ void ep2_mul_sim_inter(ep2_t r, ep2_t p, bn_t k, ep2_t q, bn_t l) {
 	//  }
 #endif
 
-#if defined(EP_ORDIN)
-	ep2_mul_sim_ordin(r, p, k, q, l, NULL);
+#if defined(EP_PLAIN)
+	ep2_mul_sim_plain(r, p, k, q, l, NULL);
 #endif
 }
 
@@ -331,7 +331,7 @@ void ep2_mul_sim_gen(ep2_t r, bn_t k, ep2_t q, bn_t l) {
 
 		ep2_curve_get_gen(gen);
 #if EP_FIX == LWNAF && defined(EP_PRECO)
-		ep2_mul_sim_ordin(r, gen, k, q, l, ep2_curve_get_tab());
+		ep2_mul_sim_plain(r, gen, k, q, l, ep2_curve_get_tab());
 #else
 		ep2_mul_sim(r, gen, k, q, l);
 #endif

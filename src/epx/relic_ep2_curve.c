@@ -36,7 +36,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if defined(EP_KBLTZ) && FP_PRIME == 158
+#if defined(EP_ENDOM) && FP_PRIME == 158
 /**
  * Parameters for a pairing-friendly prime curve over a quadratic extension.
  */
@@ -53,7 +53,7 @@
 /** @} */
 #endif
 
-#if defined(EP_KBLTZ) && FP_PRIME == 254
+#if defined(EP_ENDOM) && FP_PRIME == 254
 /**
  * Parameters for a pairing-friendly prime curve over a quadratic extension.
  */
@@ -70,7 +70,7 @@
 /** @} */
 #endif
 
-#if defined(EP_KBLTZ) && FP_PRIME == 256
+#if defined(EP_ENDOM) && FP_PRIME == 256
 /**
  * Parameters for a pairing-friendly prime curve over a quadratic extension.
  */
@@ -87,7 +87,7 @@
 /** @} */
 #endif
 
-#if defined(EP_KBLTZ) && FP_PRIME == 638
+#if defined(EP_ENDOM) && FP_PRIME == 638
 /**
  * Parameters for a pairing-friendly prime curve over a quadratic extension.
  */
@@ -104,7 +104,7 @@
 /** @} */
 #endif
 
-#if defined(EP_KBLTZ) && FP_PRIME == 638
+#if defined(EP_ENDOM) && FP_PRIME == 638
 /**
  * Parameters for a pairing-friendly prime curve over a quadratic extension.
  */
@@ -188,6 +188,7 @@ void ep2_curve_init(void) {
 #endif
 	ep2_set_infty(&(ctx->ep2_g));
 	bn_init(&(ctx->ep2_r), FP_DIGS);
+	bn_init(&(ctx->ep2_h), FP_DIGS);
 }
 
 void ep2_curve_clean(void) {
@@ -200,6 +201,7 @@ void ep2_curve_clean(void) {
 	}
 #endif
 	bn_clean(&(ctx->ep2_r));
+	bn_clean(&(ctx->ep2_h));
 }
 
 int ep2_curve_is_twist() {
@@ -231,6 +233,10 @@ void ep2_curve_get_ord(bn_t n) {
 	}
 }
 
+void ep2_curve_get_cof(bn_t h) {
+	bn_copy(h, &(core_get()->ep2_h));
+}
+
 #if defined(EP_PRECO)
 
 ep2_t *ep2_curve_get_tab() {
@@ -243,7 +249,7 @@ ep2_t *ep2_curve_get_tab() {
 
 #endif
 
-void ep2_curve_set(int twist) {
+void ep2_curve_set_twist(int type) {
 	char str[2 * FP_BYTES + 1];
 	ctx_t *ctx = core_get();
 	ep2_t g;
@@ -293,7 +299,7 @@ void ep2_curve_set(int twist) {
 		fp_set_dig(g->z[0], 1);
 		g->norm = 1;
 
-		ctx->ep2_is_twist = twist;
+		ctx->ep2_is_twist = type;
 
 		ep2_copy(&(ctx->ep2_g), g);
 		fp_copy(ctx->ep2_a[0], a[0]);
@@ -318,4 +324,20 @@ void ep2_curve_set(int twist) {
 		fp2_free(b);
 		bn_free(r);
 	}
+}
+
+void ep2_curve_set(fp2_t a, fp2_t b, ep2_t g, bn_t r, bn_t h) {
+	ctx_t *ctx = core_get();
+	ctx->ep2_is_twist = 0;
+
+	fp2_copy(ctx->ep2_a, a);
+	fp2_copy(ctx->ep2_b, b);
+
+	ep2_norm(&(ctx->ep2_g), g);
+	bn_copy(&(ctx->ep2_r), r);
+	bn_copy(&(ctx->ep2_h), h);
+
+#if defined(EP_PRECO)
+	ep2_mul_pre((ep2_t *)ep2_curve_get_tab(), &(ctx->ep2_g));
+#endif
 }

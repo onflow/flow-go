@@ -201,6 +201,15 @@ void ep2_map(ep2_t p, uint8_t *msg, int len) {
 			case B12_P638:
 				ep2_mul_cof_b12(p, p);
 				break;
+			default:
+				/* Now, multiply by cofactor to get the correct group. */
+				ep2_curve_get_cof(x);
+				if (bn_bits(x) < BN_DIGIT) {
+					ep_mul_dig(p, p, x->dp[0]);
+				} else {
+					ep_mul(p, p, x);
+				}
+				break;
 		}
 	}
 	CATCH_ANY {
