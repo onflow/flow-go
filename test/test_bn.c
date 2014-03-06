@@ -1791,9 +1791,9 @@ static int recoding(void) {
 			TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
 		} TEST_END;
 
-#if defined(WITH_EP) && defined(EP_KBLTZ) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
+#if defined(WITH_EP) && defined(EP_ENDOM) && (EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP))
 		TEST_BEGIN("glv recoding is correct") {
-			if (ep_param_set_any_kbltz() == STS_OK) {
+			if (ep_param_set_any_endom() == STS_OK) {
 				bn_rand(a, BN_POS, FP_BITS);
 				ep_curve_get_ord(b);
 				bn_mod(a, a, b);

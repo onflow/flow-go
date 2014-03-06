@@ -968,7 +968,7 @@ int main(void) {
 	util_banner("Tests for the EP module:", 0);
 
 #if defined(EP_ORDIN)
-	r0 = ep_param_set_any_ordin();
+	r0 = ep_param_set_any_plain();
 	if (r0 == STS_OK) {
 		if (test() != STS_OK) {
 			core_clean();
@@ -978,7 +978,7 @@ int main(void) {
 #endif
 
 #if defined(EP_KBLTZ)
-	r1 = ep_param_set_any_kbltz();
+	r1 = ep_param_set_any_endom();
 	if (r1 == STS_OK) {
 		if (test() != STS_OK) {
 			core_clean();
