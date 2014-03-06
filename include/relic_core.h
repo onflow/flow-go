@@ -165,9 +165,9 @@ typedef struct _ctx_t {
 #endif /* ALLOC == STATIC */
 
 #ifdef WITH_FB
-	/** Currently configured binary field identifier. */
+	/** Identifier of the currently configured binary field. */
 	int fb_id;
-	/** Currently configured irreducible binary polynomial. */
+	/** Irreducible binary polynomial. */
 	fb_st fb_poly;
 	/** Non-zero coefficients of a trinomial or pentanomial. */
 	int fb_pa, fb_pb, fb_pc;
@@ -202,15 +202,15 @@ typedef struct _ctx_t {
 #endif /* WITH_FB */
 
 #ifdef WITH_EB
-	/** Currently configured binary elliptic curve identifier. */
+	/** Identifier of the currently configured binary elliptic curve. */
 	int eb_id;
-	/** The a-coefficient of the elliptic curve. */
+	/** The 'a' coefficient of the elliptic curve. */
 	fb_st eb_a;
-	/** The b-coefficient of the elliptic curve. */
+	/** The 'b' coefficient of the elliptic curve. */
 	fb_st eb_b;
-	/** Optimization identifier for the a-coefficient. */
+	/** Optimization identifier for the 'a' coefficient. */
 	int eb_opt_a;
-	/** Optimization identifier for the b-coefficient. */
+	/** Optimization identifier for the 'b' coefficient. */
 	int eb_opt_b;
 	/** The generator of the elliptic curve. */
 	eb_st eb_g;
@@ -237,9 +237,9 @@ typedef struct _ctx_t {
 #endif /* WITH_EB */
 
 #ifdef WITH_FP
-	/** Currently configured prime field identifier. */
+	/** Identifier of the currently configured prime field. */
 	int fp_id;
-	/** Currently configured prime modulus. */
+	/** Prime modulus. */
 	bn_st prime;
 #if FP_RDC == MONTY || !defined(STRIP)
 	/** Value (R^2 mod p) for converting small integers to Montgomery form. */
@@ -262,11 +262,11 @@ typedef struct _ctx_t {
 #endif /* WITH_FP */
 
 #ifdef WITH_EP
-	/** Currently configured prime elliptic curve identifier. */
+	/** Identifier of the currently configured prime elliptic curve. */
 	int ep_id;
-	/** The a-coefficient of the elliptic curve. */
+	/** The 'a' coefficient of the elliptic curve. */
 	fp_st ep_a;
-	/** The b-coefficient of the elliptic curve. */
+	/** The 'b' coefficient of the elliptic curve. */
 	fp_st ep_b;
 	/** The generator of the elliptic curve. */
 	ep_st ep_g;
@@ -274,21 +274,21 @@ typedef struct _ctx_t {
 	bn_st ep_r;
 	/** The cofactor of the group order in the elliptic curve. */
 	bn_st ep_h;
-#ifdef EP_KBLTZ
+#ifdef EP_ENDOM
 #if EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP)
 	/** Parameters required by the GLV method. @{ */
 	fp_st beta;
 	bn_st ep_v1[3];
 	bn_st ep_v2[3];
 	/** @} */
-#endif /* EP_KBLTZ */
+#endif /* EP_ENDOM */
 #endif /* EP_MUL */
 	/** Optimization identifier for the a-coefficient. */
 	int ep_opt_a;
 	/** Optimization identifier for the b-coefficient. */
 	int ep_opt_b;
 	/** Flag that stores if the prime curve has efficient endomorphisms. */
-	int ep_is_kbltz;
+	int ep_is_endom;
 	/** Flag that stores if the prime curve is supersingular. */
 	int ep_is_super;
 #ifdef EP_PRECO
@@ -299,7 +299,7 @@ typedef struct _ctx_t {
 #endif /* EP_PRECO */
 #endif /* WITH_EP */
 
-#ifdef WITH_PP
+#ifdef WITH_EPX
 	/** The generator of the elliptic curve. */
 	ep2_st ep2_g;
 #if ALLOC == STATIC || ALLOC == DYNAMIC || ALLOC == STACK
@@ -310,13 +310,15 @@ typedef struct _ctx_t {
 	/** The third coordinate of the generator. */
 	fp2_st ep2_gz;
 #endif
-	/** The a parameter of the curve. */
+	/** The 'a' coefficient of the curve. */
 	fp2_st ep2_a;
-	/** The b parameter of the curve. */
+	/** The 'b' coefficient of the curve. */
 	fp2_st ep2_b;
 	/** The order of the group of points in the elliptic curve. */
 	bn_st ep2_r;
-	/** Flag that stores if the prime curve is twisted. */
+	/** The cofactor of the group order in the elliptic curve. */
+	bn_st ep2_h;	
+	/** Flag that stores if the prime curve is a twist. */
 	int ep2_is_twist;
 #ifdef EP_PRECO
 	/** Precomputation table for generator multiplication.*/
@@ -328,6 +330,9 @@ typedef struct _ctx_t {
 /** In case of stack allocation, we need to get global memory for the table. */
 	fp2_st _ep2_pre[3 * EP_TABLE];
 #endif /* ALLOC == STACK */
+#endif /* WITH_EPX */
+
+#ifdef WITH_PP
 	/** Constants for computing Frobenius maps in higher extensions. @{ */
 	fp2_st fp2_p[5];
 	fp_st fp2_p2[4];

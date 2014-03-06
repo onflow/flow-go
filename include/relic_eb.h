@@ -410,28 +410,30 @@ void eb_curve_init(void);
 void eb_curve_clean(void);
 
 /**
- * Returns the a coefficient of the currently configured binary elliptic curve.
+ * Returns the 'a' coefficient of the currently configured binary elliptic
+ * curve.
  *
- * @return the a coefficient of the elliptic curve.
+ * @return the 'a' coefficient of the elliptic curve.
  */
 dig_t *eb_curve_get_a(void);
 
 /**
- * Returns the b coefficient of the currently configured binary elliptic curve.
+ * Returns the 'b' coefficient of the currently configured binary elliptic
+ * curve.
  *
- * @return the b coefficient of the elliptic curve.
+ * @return the 'b' coefficient of the elliptic curve.
  */
 dig_t *eb_curve_get_b(void);
 
 /**
- * Returns a optimization identifier based on the coefficient a of the curve.
+ * Returns a optimization identifier based on the 'a' coefficient of the curve.
  *
  * @return the optimization identifier.
  */
 int eb_curve_opt_a(void);
 
 /**
- * Returns a optimization identifier based on the coefficient b of the curve.
+ * Returns a optimization identifier based on the 'b' coefficient of the curve.
  *
  * @return the optimization identifier.
  */
@@ -494,14 +496,14 @@ void eb_curve_get_s0(bn_t s0);
 void eb_curve_get_s1(bn_t s1);
 
 /**
- * Configures a new ordinary binary elliptic curve by its coefficients and
+ * Configures an ordinary binary elliptic curve by its coefficients and
  * generator.
  *
- * @param[in] a				- the coefficient a of the curve.
- * @param[in] b				- the coefficient b of the curve.
+ * @param[in] a				- the 'a' coefficient of the curve.
+ * @param[in] b				- the 'b' coefficient of the curve.
  * @param[in] g				- the generator.
  * @param[in] n				- the order of the generator.
- * @param[in] h				- the cofactor.
+ * @param[in] h				- the cofactor of the group order.
  */
 void eb_curve_set(const fb_t a, const fb_t b, const eb_t g, const bn_t n,
 		const bn_t h);

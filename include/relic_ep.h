@@ -106,12 +106,12 @@ enum {
 /*============================================================================*/
 
 /**
- * Denotes a twist of type D.
+ * Denotes a divisive twist.
  */
 #define EP_DTYPE		1
 
 /**
- * Denotes a twist of type M.
+ * Denotes a multiplicative twist.
  */
 #define EP_MTYPE		2
 
@@ -432,16 +432,16 @@ void ep_curve_init(void);
 void ep_curve_clean(void);
 
 /**
- * Returns the a coefficient of the currently configured prime elliptic curve.
+ * Returns the 'a' coefficient of the currently configured prime elliptic curve.
  *
- * @return the a coefficient of the elliptic curve.
+ * @return the 'a' coefficient of the elliptic curve.
  */
 dig_t *ep_curve_get_a(void);
 
 /**
- * Returns the b coefficient of the currently configured prime elliptic curve.
+ * Returns the 'b' coefficient of the currently configured prime elliptic curve.
  *
- * @return the b coefficient of the elliptic curve.
+ * @return the 'b' coefficient of the elliptic curve.
  */
 dig_t *ep_curve_get_b(void);
 
@@ -461,14 +461,14 @@ void ep_curve_get_v1(bn_t v[]);
 void ep_curve_get_v2(bn_t v[]);
 
 /**
- * Returns a optimization identifier based on the coefficient a of the curve.
+ * Returns a optimization identifier based on the 'a' coefficient of the curve.
  *
  * @return the optimization identifier.
  */
 int ep_curve_opt_a(void);
 
 /**
- * Returns a optimization identifier based on the coefficient b of the curve.
+ * Returns a optimization identifier based on the 'b' coefficient of the curve.
  *
  * @return the optimization identifier.
  */
@@ -479,7 +479,7 @@ int ep_curve_opt_b(void);
  *
  * @return 1 if the prime elliptic curve is a Koblitz curve, 0 otherwise.
  */
-int ep_curve_is_kbltz(void);
+int ep_curve_is_endom(void);
 
 /**
  * Tests if the configured prime elliptic curve is supersingular.
@@ -517,35 +517,24 @@ void ep_curve_get_ord(bn_t n);
 void ep_curve_get_cof(bn_t h);
 
 /**
- * Configures a new ordinary prime elliptic curve by its coefficients.
+ * Configures a prime elliptic curve without endomorphisms by its coefficients
+ * and generator.
  *
- * @param[in] a			- the coefficient a of the curve.
- * @param[in] b			- the coefficient b of the curve.
+ * @param[in] a			- the 'a' coefficient of the curve.
+ * @param[in] b			- the 'b' coefficient of the curve.
  * @param[in] g			- the generator.
  * @param[in] r			- the order of the group of points.
  * @param[in] h			- the cofactor of the group order.
  */
-void ep_curve_set_ordin(const fp_t a, const fp_t b, const ep_t g, const bn_t r,
+void ep_curve_set_plain(const fp_t a, const fp_t b, const ep_t g, const bn_t r,
 		const bn_t h);
 
 /**
- * Configures a new Koblitz prime elliptic curve by its coefficients.
+ * Configures a supersingular prime elliptic curve by its coefficients and
+ * generator.
  *
- * @param[in] b			- the coefficient b of the curve.
- * @param[in] g			- the generator.
- * @param[in] r			- the order of the group of points.
- * @param[in] beta		- the constant associated with the endomorphism.
- * @param[in] l			- the exponent corresponding to the endomorphism.
- * @param[in] h			- the cofactor of the group order.
- */
-void ep_curve_set_kbltz(const fp_t b, const ep_t g, const bn_t r, const bn_t h,
-		const fp_t beta, const bn_t l);
-
-/**
- * Configures a new supersingular prime elliptic curve by its coefficients.
- *
- * @param[in] a			- the coefficient a of the curve.
- * @param[in] b			- the coefficient b of the curve.
+ * @param[in] a			- the 'a' coefficient of the curve.
+ * @param[in] b			- the 'b' coefficient of the curve.
  * @param[in] g			- the generator.
  * @param[in] r			- the order of the group of points.
  * @param[in] h			- the cofactor of the group order.
@@ -554,7 +543,21 @@ void ep_curve_set_super(const fp_t a, const fp_t b, const ep_t g, const bn_t r,
 		const bn_t h);
 
 /**
- * Configures a new prime elliptic curve by its parameter identifier.
+ * Configures a prime elliptic curve with endomorphisms by its coefficients and
+ * generator.
+ *
+ * @param[in] b			- the 'b' coefficient of the curve.
+ * @param[in] g			- the generator.
+ * @param[in] r			- the order of the group of points.
+ * @param[in] beta		- the constant associated with the endomorphism.
+ * @param[in] l			- the exponent corresponding to the endomorphism.
+ * @param[in] h			- the cofactor of the group order.
+ */
+void ep_curve_set_endom(const fp_t b, const ep_t g, const bn_t r, const bn_t h,
+		const fp_t beta, const bn_t l);
+
+/**
+ * Configures a prime elliptic curve by its parameter identifier.
  *
  * @param				- the parameter identifier.
  */
@@ -571,7 +574,7 @@ int ep_param_set_any(void);
  *
  * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
  */
-int ep_param_set_any_ordin(void);
+int ep_param_set_any_plain(void);
 
 /**
  * Configures some set of Koblitz curve parameters for the current security
@@ -579,7 +582,7 @@ int ep_param_set_any_ordin(void);
  *
  * @return STS_OK if there is a curve at this security level, STS_ERR otherwise.
  */
-int ep_param_set_any_kbltz(void);
+int ep_param_set_any_endom(void);
 
 /**
  * Configures some set of supersingular curve parameters for the current

@@ -266,6 +266,8 @@
 #undef bn_rec_slw
 #undef bn_rec_naf
 #undef bn_rec_tnaf
+#undef bn_rec_tnaf_get
+#undef bn_rec_tnaf_mod
 #undef bn_rec_reg
 #undef bn_rec_jsf
 #undef bn_rec_glv
@@ -363,6 +365,8 @@
 #define bn_rec_slw 	PREFIX(bn_rec_slw)
 #define bn_rec_naf 	PREFIX(bn_rec_naf)
 #define bn_rec_tnaf 	PREFIX(bn_rec_tnaf)
+#define bn_rec_tnaf_get 	PREFIX(bn_rec_tnaf_get)
+#define bn_rec_tnaf_mod 	PREFIX(bn_rec_tnaf_mod)
 #define bn_rec_reg 	PREFIX(bn_rec_reg)
 #define bn_rec_jsf 	PREFIX(bn_rec_jsf)
 #define bn_rec_glv 	PREFIX(bn_rec_glv)
@@ -869,19 +873,19 @@
 #undef ep_curve_get_v2
 #undef ep_curve_opt_a
 #undef ep_curve_opt_b
-#undef ep_curve_is_kbltz
+#undef ep_curve_is_endom
 #undef ep_curve_is_super
 #undef ep_curve_get_gen
 #undef ep_curve_get_tab
 #undef ep_curve_get_ord
 #undef ep_curve_get_cof
-#undef ep_curve_set_ordin
-#undef ep_curve_set_kbltz
+#undef ep_curve_set_plain
 #undef ep_curve_set_super
+#undef ep_curve_set_endom
 #undef ep_param_set
 #undef ep_param_set_any
-#undef ep_param_set_any_ordin
-#undef ep_param_set_any_kbltz
+#undef ep_param_set_any_plain
+#undef ep_param_set_any_endom
 #undef ep_param_set_any_super
 #undef ep_param_set_any_pairf
 #undef ep_param_get
@@ -949,19 +953,19 @@
 #define ep_curve_get_v2 	PREFIX(ep_curve_get_v2)
 #define ep_curve_opt_a 	PREFIX(ep_curve_opt_a)
 #define ep_curve_opt_b 	PREFIX(ep_curve_opt_b)
-#define ep_curve_is_kbltz 	PREFIX(ep_curve_is_kbltz)
+#define ep_curve_is_endom 	PREFIX(ep_curve_is_endom)
 #define ep_curve_is_super 	PREFIX(ep_curve_is_super)
 #define ep_curve_get_gen 	PREFIX(ep_curve_get_gen)
 #define ep_curve_get_tab 	PREFIX(ep_curve_get_tab)
 #define ep_curve_get_ord 	PREFIX(ep_curve_get_ord)
 #define ep_curve_get_cof 	PREFIX(ep_curve_get_cof)
-#define ep_curve_set_ordin 	PREFIX(ep_curve_set_ordin)
-#define ep_curve_set_kbltz 	PREFIX(ep_curve_set_kbltz)
+#define ep_curve_set_plain 	PREFIX(ep_curve_set_plain)
 #define ep_curve_set_super 	PREFIX(ep_curve_set_super)
+#define ep_curve_set_endom 	PREFIX(ep_curve_set_endom)
 #define ep_param_set 	PREFIX(ep_param_set)
 #define ep_param_set_any 	PREFIX(ep_param_set_any)
-#define ep_param_set_any_ordin 	PREFIX(ep_param_set_any_ordin)
-#define ep_param_set_any_kbltz 	PREFIX(ep_param_set_any_kbltz)
+#define ep_param_set_any_plain 	PREFIX(ep_param_set_any_plain)
+#define ep_param_set_any_endom 	PREFIX(ep_param_set_any_endom)
 #define ep_param_set_any_super 	PREFIX(ep_param_set_any_super)
 #define ep_param_set_any_pairf 	PREFIX(ep_param_set_any_pairf)
 #define ep_param_get 	PREFIX(ep_param_get)
@@ -1029,12 +1033,9 @@
 #undef eb_curve_clean
 #undef eb_curve_get_a
 #undef eb_curve_get_b
-#undef eb_curve_get_c
 #undef eb_curve_opt_a
 #undef eb_curve_opt_b
-#undef eb_curve_opt_c
 #undef eb_curve_is_kbltz
-#undef eb_curve_is_super
 #undef eb_curve_get_gen
 #undef eb_curve_get_tab
 #undef eb_curve_get_ord
@@ -1042,14 +1043,11 @@
 #undef eb_curve_get_vm
 #undef eb_curve_get_s0
 #undef eb_curve_get_s1
-#undef eb_curve_set_ordin
-#undef eb_curve_set_kbltz
-#undef eb_curve_set_super
+#undef eb_curve_set
 #undef eb_param_set
 #undef eb_param_set_any
-#undef eb_param_set_any_ordin
+#undef eb_param_set_any_plain
 #undef eb_param_set_any_kbltz
-#undef eb_param_set_any_super
 #undef eb_param_get
 #undef eb_param_print
 #undef eb_param_level
@@ -1110,12 +1108,9 @@
 #define eb_curve_clean 	PREFIX(eb_curve_clean)
 #define eb_curve_get_a 	PREFIX(eb_curve_get_a)
 #define eb_curve_get_b 	PREFIX(eb_curve_get_b)
-#define eb_curve_get_c 	PREFIX(eb_curve_get_c)
 #define eb_curve_opt_a 	PREFIX(eb_curve_opt_a)
 #define eb_curve_opt_b 	PREFIX(eb_curve_opt_b)
-#define eb_curve_opt_c 	PREFIX(eb_curve_opt_c)
 #define eb_curve_is_kbltz 	PREFIX(eb_curve_is_kbltz)
-#define eb_curve_is_super 	PREFIX(eb_curve_is_super)
 #define eb_curve_get_gen 	PREFIX(eb_curve_get_gen)
 #define eb_curve_get_tab 	PREFIX(eb_curve_get_tab)
 #define eb_curve_get_ord 	PREFIX(eb_curve_get_ord)
@@ -1123,14 +1118,11 @@
 #define eb_curve_get_vm 	PREFIX(eb_curve_get_vm)
 #define eb_curve_get_s0 	PREFIX(eb_curve_get_s0)
 #define eb_curve_get_s1 	PREFIX(eb_curve_get_s1)
-#define eb_curve_set_ordin 	PREFIX(eb_curve_set_ordin)
-#define eb_curve_set_kbltz 	PREFIX(eb_curve_set_kbltz)
-#define eb_curve_set_super 	PREFIX(eb_curve_set_super)
+#define eb_curve_set 	PREFIX(eb_curve_set)
 #define eb_param_set 	PREFIX(eb_param_set)
 #define eb_param_set_any 	PREFIX(eb_param_set_any)
-#define eb_param_set_any_ordin 	PREFIX(eb_param_set_any_ordin)
+#define eb_param_set_any_plain 	PREFIX(eb_param_set_any_plain)
 #define eb_param_set_any_kbltz 	PREFIX(eb_param_set_any_kbltz)
-#define eb_param_set_any_super 	PREFIX(eb_param_set_any_super)
 #define eb_param_get 	PREFIX(eb_param_get)
 #define eb_param_print 	PREFIX(eb_param_print)
 #define eb_param_level 	PREFIX(eb_param_level)
@@ -1201,7 +1193,9 @@
 #undef ep2_curve_get_gen
 #undef ep2_curve_get_tab
 #undef ep2_curve_get_ord
+#undef ep2_curve_get_cof
 #undef ep2_curve_set
+#undef ep2_curve_set_twist
 #undef ep2_is_infty
 #undef ep2_set_infty
 #undef ep2_copy
@@ -1254,7 +1248,9 @@
 #define ep2_curve_get_gen 	PREFIX(ep2_curve_get_gen)
 #define ep2_curve_get_tab 	PREFIX(ep2_curve_get_tab)
 #define ep2_curve_get_ord 	PREFIX(ep2_curve_get_ord)
+#define ep2_curve_get_cof 	PREFIX(ep2_curve_get_cof)
 #define ep2_curve_set 	PREFIX(ep2_curve_set)
+#define ep2_curve_set_twist 	PREFIX(ep2_curve_set_twist)
 #define ep2_is_infty 	PREFIX(ep2_is_infty)
 #define ep2_set_infty 	PREFIX(ep2_set_infty)
 #define ep2_copy 	PREFIX(ep2_copy)
