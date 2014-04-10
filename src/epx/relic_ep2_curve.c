@@ -288,6 +288,9 @@ void ep2_curve_set_twist(int type) {
 			case B12_P638:
 				ASSIGN(B12_P638);
 				break;
+#elif FP_PRIME == 1536
+			case SS_1536:
+				break;
 #endif
 			default:
 				(void)str;

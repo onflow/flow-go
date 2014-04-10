@@ -809,6 +809,9 @@ int ep_param_set_any_pairf() {
 #endif
 #ifdef WITH_PP
 	if (r == STS_OK) {
+		if (degree == 0) {
+			ep2_curve_set_twist(0);
+		}
 		if (degree == 2) {
 			ep2_curve_set_twist(type);
 		}

@@ -885,6 +885,12 @@ int main(void) {
 		return 0;
 	}
 
+	if (ep2_curve_is_twist() == 0) {
+		THROW(ERR_NO_CURVE);
+		core_clean();
+		return 0;		
+	}
+
 	ep_param_print();
 
 	util_banner("Sextic twist:", 0);
