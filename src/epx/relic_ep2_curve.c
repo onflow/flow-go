@@ -262,6 +262,13 @@ void ep2_curve_set_twist(int type) {
 	fp2_null(b);
 	bn_null(r);
 
+	ctx->ep2_is_twist = 0;
+	if (type == EP_MTYPE || type == EP_DTYPE) {
+		ctx->ep2_is_twist = type;
+	} else {
+		return;
+	}
+
 	TRY {
 		ep2_new(g);
 		fp2_new(a);
@@ -288,9 +295,6 @@ void ep2_curve_set_twist(int type) {
 			case B12_P638:
 				ASSIGN(B12_P638);
 				break;
-#elif FP_PRIME == 1536
-			case SS_1536:
-				break;
 #endif
 			default:
 				(void)str;
@@ -301,8 +305,6 @@ void ep2_curve_set_twist(int type) {
 		fp2_zero(g->z);
 		fp_set_dig(g->z[0], 1);
 		g->norm = 1;
-
-		ctx->ep2_is_twist = type;
 
 		ep2_copy(&(ctx->ep2_g), g);
 		fp_copy(ctx->ep2_a[0], a[0]);
