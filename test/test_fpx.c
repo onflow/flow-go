@@ -3238,7 +3238,7 @@ int main(void) {
 	}
 
 	/* Fp^6 is defined as a cubic extension of Fp^2. */
-	if (fp_prime_get_qnr()) {
+	if (fp_prime_get_qnr() && fp_prime_get_cnr()) {
 		util_banner("Sextic extension:", 0);
 		util_banner("Utilities:", 1);
 

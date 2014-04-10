@@ -68,8 +68,8 @@ static void fp_prime_set(const bn_t p) {
 			case 3:
 			case 7:
 				ctx->qnr = -1;
-				/* The current code for extensions of Fp^3 relies on prime_qnr
-				 * being also a cubic non-residue. */
+				/* The current code for extensions of Fp^3 relies on qnr being
+				 * also a cubic non-residue. */
 				ctx->cnr = 0;
 				break;
 			case 1:
