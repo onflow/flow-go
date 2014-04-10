@@ -409,7 +409,7 @@ void pp_map_weilp_k2(fp2_t r, ep_t p, ep_t q) {
 	}
 	FINALLY {
 		ep_free(t0);
-		ep2_free(t1);
+		ep_free(t1);
 		fp2_free(r0);
 		fp2_free(r1);
 		bn_free(n);
