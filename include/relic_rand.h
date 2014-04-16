@@ -95,8 +95,9 @@ void rand_seed(uint8_t *buf, int size);
  * pointer.
  * 
  * @param[in] callback		- the callback to call.
+ * @param[in] arg			- the argument for the callback.
  */
-void rand_seed(void (*callback)(uint8_t *, int));
+void rand_seed(void (*callback)(uint8_t *, int, void *), void *arg);
 #endif
 
 /**

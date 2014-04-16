@@ -146,7 +146,7 @@ void rand_init() {
 	core_get()->seeded = 0;
 	rand_seed(buf, SEED_SIZE);
 #else
-	rand_seed(NULL);
+	rand_seed(NULL, NULL);
 #endif
 }
 
@@ -160,7 +160,8 @@ void rand_clean() {
 #if RAND != CALL
 	memset(core_get()->rand, 0, sizeof(core_get()->rand));
 #else
-	core_get()->rand = NULL;
+	core_get()->rand_call = NULL;
+	core_get()->rand_args = NULL;
 #endif
 	core_get()->seeded = 0;
 }

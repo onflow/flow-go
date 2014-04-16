@@ -365,7 +365,8 @@ typedef struct _ctx_t {
 	/** Internal state of the PRNG. */
 	uint8_t rand[RAND_SIZE];
 #else
-	void (*rand)(uint8_t *, int);
+	void (*rand_call)(uint8_t *, int, void *);
+	void *rand_args;
 #endif
 	/** Flag to indicate if PRNG is seed. */
 	int seeded;
