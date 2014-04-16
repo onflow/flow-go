@@ -392,7 +392,7 @@ static int test(void) {
 #include <fcntl.h>
 
 static void test_bytes(uint8_t *buf, int size, void *args) {
-	int c, l, fd = (int)args;
+	int c, l, fd = *(int *)args;
 	
 	if (fd == -1) {
 		THROW(ERR_NO_FILE);
@@ -420,17 +420,16 @@ static int test(void) {
 			digit ^= out[j];
 		}
 		TEST_ASSERT(digit != 0, end);
-		rand_seed(&test_bytes, (void *)fd);
+		rand_seed(&test_bytes, (void *)&fd);
 		rand_bytes(out, sizeof(out));
 		for (int j = 0; j < sizeof(20); j++) {
 			digit ^= out[j];
 		}
 		TEST_ASSERT(digit != 0, end);
 	}
-
-	close(fd);
 	TEST_END;
   end:
+  	close(fd);
 	return STS_OK;
 }
 
