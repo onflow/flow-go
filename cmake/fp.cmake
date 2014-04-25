@@ -17,8 +17,8 @@ message("      FP_METHD=COMBA    Comba multiplication.\n")
 
 message("      FP_METHD=BASIC    Schoolbook squaring.")
 message("      FP_METHD=INTEG    Integrated modular squaring.")
-message("      FP_METHD=COMBA    Comba squaring.\n")
-message("      FP_METHD=MULTP    Reuse multiplication for squaring.")
+message("      FP_METHD=COMBA    Comba squaring.")
+message("      FP_METHD=MULTP    Reuse multiplication for squaring.\n")
 
 message("      FP_METHD=BASIC    Division-based reduction.")
 message("      FP_METHD=QUICK    Fast reduction modulo special form prime (2^t - c, c > 0).")
