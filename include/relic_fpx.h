@@ -640,6 +640,34 @@ void fp2_rand(fp2_t a);
 void fp2_print(fp2_t a);
 
 /**
+ * Returns the number of bytes necessary to store a quadratic extension field element.
+ *
+ * @param[out] size			- the result.
+ * @param[in] a				- the quadratic extension field element.
+ */
+void fp2_size_bin(int *size, const fp2_t a);
+
+/**
+ * Reads a quadratic extension field element from a byte vector in big-endian format.
+ *
+ * @param[out] a			- the result.
+ * @param[in] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct. 
+ */
+void fp2_read_bin(fp2_t a, const uint8_t *bin, int len);
+
+/**
+ * Writes a quadratic extension field element to a byte vector in big-endian format.
+ *
+ * @param[out] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @param[in] a				- the quadratic extension field element to write.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct.
+ */
+void fp2_write_bin(uint8_t *bin, int len, const fp2_t a);
+
+/**
  * Returns the result of a comparison between two quadratic extension field
  * elements.
  *
