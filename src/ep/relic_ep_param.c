@@ -882,6 +882,15 @@ void ep_param_print() {
 		case SS_P1536:
 			util_banner("Curve SS-P1536:", 0);
 			break;
+		case CURVE_1174:
+			util_banner("Curve Curve1174:", 0);
+			break;
+		case CURVE_25519:
+			util_banner("Curve Curve25519:", 0);
+			break;
+		case CURVE_383187:
+			util_banner("Curve Curve383187:", 0);
+			break;
 	}
 }
 
