@@ -44,7 +44,7 @@ void bn_divn_low(dig_t *c, dig_t *d, dig_t *a, int sa, dig_t *b, int sb) {
 
 	/* Normalize x and y so that the leading digit of y is bigger than
 	 * 2^(BN_DIGIT-1). */
-	norm = util_bits_dig(b[sb - 1]) & BN_DIGIT;
+	norm = util_bits_dig(b[sb - 1]) % BN_DIGIT;
 
 	if (norm < (int)(BN_DIGIT - 1)) {
 		norm = (BN_DIGIT - 1) - norm;
