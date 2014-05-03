@@ -30,6 +30,7 @@
  */
 
 #include "relic_core.h"
+#include "relic_fpx.h"
 #include "relic_bn_low.h"
 #include "relic_fp_low.h"
 
@@ -415,7 +416,7 @@ void fp_prime_set_pmers(const int *f, int len) {
 }
 
 void fp_prime_calc() {
-#ifdef WITH_PP
+#ifdef WITH_FPX
 	if (fp_prime_get_qnr() != 0) {
 		fp2_calc();
 	}
