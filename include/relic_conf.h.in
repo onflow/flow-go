@@ -97,6 +97,8 @@
 #cmakedefine WITH_BN
 /** Build prime field module. */
 #cmakedefine WITH_FP
+/** Build prime field extension module. */
+#cmakedefine WITH_FPX
 /** Build binary field module. */
 #cmakedefine WITH_FB
 /** Build prime elliptic curve module. */
@@ -111,6 +113,8 @@
 #cmakedefine WITH_PP
 /** Build pairing-based cryptography module. */
 #cmakedefine WITH_PC
+/** Build block ciphers. */
+#cmakedefine WITH_BC
 /** Build hash functions. */
 #cmakedefine WITH_MD
 /** Build cryptographic protocols. */
