@@ -64,6 +64,8 @@ endif(WITH_FP)
 
 if (WITH_FPX)
 	list(APPEND RELIC_SRCS ${FPX_SRCS})
+	file(GLOB TEMP low/easy/relic_fpx*.c)
+	list(APPEND LOW_SRCS ${TEMP})
 endif(WITH_FPX)
 
 if (WITH_FB)
@@ -89,9 +91,6 @@ if (WITH_EB)
 endif(WITH_EB)
 
 if (WITH_PP)
-	file(GLOB TEMP low/easy/relic_pp*.c)
-	list(APPEND LOW_SRCS ${TEMP})
-	# Add all the extension code.
 	list(APPEND RELIC_SRCS ${PP_SRCS})
 endif(WITH_PP)
 
