@@ -113,7 +113,7 @@ static void fp_prime_set(const bn_t p) {
 	}
 }
 
-#ifdef WITH_PP
+#ifdef WITH_FPX
 
 /**
  * Computes the constantes required for evaluating Frobenius maps.
@@ -287,7 +287,7 @@ static void fp3_calc() {
 	}
 }
 
-#endif /* WITH_PP */
+#endif /* WITH_FPX */
 
 /*============================================================================*/
 /* Public definitions                                                         */
