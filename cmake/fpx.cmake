@@ -1,6 +1,6 @@
 message(STATUS "Prime extension field arithmetic configuration (FPX module):\n")
 
-message("   ** Available bilinear pairing methods (default = BASIC;BASIC;BASIC;OATEP):")
+message("   ** Available bilinear pairing methods (default = BASIC;BASIC;BASIC):")
 
 message("      FPX_METHD=BASIC    Basic quadratic extension field arithmetic.")    
 message("      FPX_METHD=INTEG    Quadratic extension field arithmetic with embedded modular reduction.\n")
@@ -13,7 +13,7 @@ message("      FPX_METHD=LAZYR    Lazy reduced extension field arithmetic.\n")
 
 # Choose the arithmetic methods.
 if (NOT FPX_METHD)
-	set(FPX_METHD "BASIC;BASIC;BASIC;OATEP")
+	set(FPX_METHD "BASIC;BASIC;BASIC")
 endif(NOT FPX_METHD)
 list(LENGTH FPX_METHD FPX_LEN)
 if (FPX_LEN LESS 3)
