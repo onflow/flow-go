@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if PP_QDR == BASIC || !defined(STRIP)
+#if FPX_QDR == BASIC || !defined(STRIP)
 
 void fp2_add_basic(fp2_t c, fp2_t a, fp2_t b) {
   fp_add(c[0], a[0], b[0]);
@@ -56,7 +56,7 @@ void fp2_dbl_basic(fp2_t c, fp2_t a) {
 
 #endif
 
-#if PP_QDR == INTEG || !defined(STRIP)
+#if FPX_QDR == INTEG || !defined(STRIP)
 
 void fp2_add_integ(fp2_t c, fp2_t a, fp2_t b) {
 	fp2_addm_low(c, a, b);
@@ -77,7 +77,7 @@ void fp2_neg(fp2_t c, fp2_t a) {
 	fp_neg(c[1], a[1]);
 }
 
-#if PP_CBC == BASIC || !defined(STRIP)
+#if FPX_CBC == BASIC || !defined(STRIP)
 
 void fp3_add_basic(fp2_t c, fp2_t a, fp2_t b) {
   fp_add(c[0], a[0], b[0]);
@@ -106,7 +106,7 @@ void fp3_neg(fp3_t c, fp3_t a) {
 	fp_neg(c[2], a[2]);
 }
 
-#if PP_CBC == INTEG || !defined(STRIP)
+#if FPX_CBC == INTEG || !defined(STRIP)
 
 void fp3_add_integ(fp2_t c, fp2_t a, fp2_t b) {
 	fp3_addm_low(c, a, b);

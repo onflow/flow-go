@@ -36,7 +36,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if PP_QDR == BASIC || !defined(STRIP)
+#if FPX_QDR == BASIC || !defined(STRIP)
 
 void fp2_sqr_basic(fp2_t c, fp2_t a) {
 	fp_t t0, t1, t2;
@@ -93,7 +93,7 @@ void fp2_sqr_basic(fp2_t c, fp2_t a) {
 
 #endif
 
-#if PP_QDR == INTEG || !defined(STRIP)
+#if FPX_QDR == INTEG || !defined(STRIP)
 
 void fp2_sqr_integ(fp2_t c, fp2_t a) {
 	fp2_sqrm_low(c, a);

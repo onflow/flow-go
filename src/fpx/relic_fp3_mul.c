@@ -37,7 +37,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if PP_CBC == BASIC || !defined(STRIP)
+#if FPX_CBC == BASIC || !defined(STRIP)
 
 void fp3_mul_basic(fp3_t c, fp3_t a, fp3_t b) {
 	dv_t t, t0, t1, t2, t3, t4, t5, t6;
@@ -122,7 +122,7 @@ void fp3_mul_basic(fp3_t c, fp3_t a, fp3_t b) {
 
 #endif
 
-#if PP_CBC == INTEG || !defined(STRIP)
+#if FPX_CBC == INTEG || !defined(STRIP)
 
 void fp3_mul_integ(fp3_t c, fp3_t a, fp3_t b) {
 	fp3_mulm_low(c, a, b);

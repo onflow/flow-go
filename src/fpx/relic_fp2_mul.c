@@ -76,7 +76,7 @@ void fp2_mul_frb(fp2_t c, fp2_t a, int i, int j) {
 	}
 }
 
-#if PP_QDR == BASIC || !defined(STRIP)
+#if FPX_QDR == BASIC || !defined(STRIP)
 
 void fp2_mul_basic(fp2_t c, fp2_t a, fp2_t b) {
 	dv_t t0, t1, t2, t3, t4;
@@ -190,7 +190,7 @@ void fp2_mul_nor_basic(fp2_t c, fp2_t a) {
 
 #endif
 
-#if PP_QDR == INTEG || !defined(STRIP)
+#if FPX_QDR == INTEG || !defined(STRIP)
 
 void fp2_mul_integ(fp2_t c, fp2_t a, fp2_t b) {
 	fp2_mulm_low(c, a, b);

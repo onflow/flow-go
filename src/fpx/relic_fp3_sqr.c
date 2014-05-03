@@ -37,7 +37,7 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if PP_CBC == BASIC || !defined(STRIP)
+#if FPX_CBC == BASIC || !defined(STRIP)
 
 void fp3_sqr_basic(fp3_t c, fp3_t a) {
 	dv_t t0, t1, t2, t3, t4, t5;
@@ -116,7 +116,7 @@ void fp3_sqr_basic(fp3_t c, fp3_t a) {
 
 #endif
 
-#if PP_CBC == INTEG || !defined(STRIP)
+#if FPX_CBC == INTEG || !defined(STRIP)
 
 void fp3_sqr_integ(fp3_t c, fp3_t a) {
 	fp3_sqrm_low(c, a);
