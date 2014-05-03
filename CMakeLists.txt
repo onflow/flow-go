@@ -228,6 +228,12 @@ if(TEMP GREATER -1)
 	set(WITH_PC 1)
 endif(TEMP GREATER -1)
 
+# Check if support for block ciphers is required.
+LIST(FIND WITH "BC" TEMP)
+if(TEMP GREATER -1)
+	set(WITH_BC 1)
+endif(TEMP GREATER -1)
+
 # Check if support for hash functions is required.
 LIST(FIND WITH "MD" TEMP)
 if(TEMP GREATER -1)
