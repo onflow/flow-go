@@ -30,7 +30,7 @@
  */
 
 #include "relic_core.h"
-#include "relic_pp_low.h"
+#include "relic_fpx_low.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -58,6 +58,26 @@ void fp2_rand(fp2_t a) {
 void fp2_print(fp2_t a) {
 	fp_print(a[0]);
 	fp_print(a[1]);
+}
+
+void fp2_size_bin(int *size, const fp2_t a) {
+	*size = FP_BYTES * 2;
+}
+
+void fp2_read_bin(fp2_t a, const uint8_t *bin, int len) {
+	if (len != FP_BYTES * 2) {
+		THROW(ERR_NO_BUFFER);
+	}
+	fp_read_bin(a[0], bin, FP_BYTES);
+	fp_read_bin(a[1], bin + FP_BYTES, FP_BYTES);
+}
+
+void fp2_write_bin(uint8_t *bin, int len, const fp2_t a) {
+	if (len != FP_BYTES * 2) {
+		THROW(ERR_NO_BUFFER);
+	}
+	fp_write_bin(bin, FP_BYTES, a[0]);
+	fp_write_bin(bin + FP_BYTES, FP_BYTES, a[1]);
 }
 
 void fp2_set_dig(fp2_t a, dig_t b) {

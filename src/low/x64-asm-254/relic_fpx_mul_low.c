@@ -23,87 +23,85 @@
 /**
  * @file
  *
- * Implementation of the low-level quadratic extension field multiplication
- * functions.
+ * Implementation of the low-level extension field multiplication functions.
  *
  * @version $Id$
- * @ingroup pp
+ * @ingroup fpx
  */
 
 #include "relic_fp.h"
-#include "relic_pp.h"
 #include "relic_core.h"
+#include "relic_conf.h"
+#include "relic_bn_low.h"
 #include "relic_fp_low.h"
-#include "relic_pp_low.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp3_sqrn_low(dv3_t c, fp3_t a) {
-	align dig_t t0[2 * FP_DIGS], t1[2 * FP_DIGS], t2[2 * FP_DIGS];
-	align dig_t t3[2 * FP_DIGS], t4[2 * FP_DIGS], t5[2 * FP_DIGS];
+void fp3_muln_low(dv3_t c, fp3_t a, fp3_t b) {
+	align dig_t t0[2 * FP_DIGS], t1[2 * FP_DIGS], t2[2 * FP_DIGS], t3[2 * FP_DIGS];
+	align dig_t t4[2 * FP_DIGS], t5[2 * FP_DIGS], t6[2 * FP_DIGS];
 
-	/* t0 = a_0^2. */
-	fp_sqrn_low(t0, a[0]);
+	/* Karatsuba algorithm. */
 
-	/* t1 = 2 * a_1 * a_2. */
+	/* t0 = a_0 * b_0, t1 = a_1 * b_1, t2 = a_2 * b_2. */
+	fp_muln_low(t0, a[0], b[0]);
+	fp_muln_low(t1, a[1], b[1]);
+	fp_muln_low(t2, a[2], b[2]);
+
+	/* t3 = (a_1 + a_2) * (b_1 + b_2). */
 #ifdef FP_SPACE
-	fp_dbln_low(t2, a[1]);
+	fp_addn_low(t3, a[1], a[2]);
+	fp_addn_low(t4, b[1], b[2]);
 #else
-	fp_dblm_low(t2, a[1]);
+	fp_addm_low(t3, a[1], a[2]);
+	fp_addm_low(t4, b[1], b[2]);
 #endif
-
-	fp_muln_low(t1, t2, a[2]);
-
-	/* t2 = a_2^2. */
-	fp_sqrn_low(t2, a[2]);
-
-	/* t3 = (a_0 + a_2 + a_1)^2, t4 = (a_0 + a_2 - a_1)^2. */
-#ifdef FP_SPACE
-	fp_addn_low(t3, a[0], a[2]);
-	fp_addn_low(t4, t3, a[1]);
-#else
-	fp_addm_low(t3, a[0], a[2]);
-	fp_addm_low(t4, t3, a[1]);
-#endif
-	fp_subm_low(t5, t3, a[1]);
-	fp_sqrn_low(t3, t4);
-	fp_sqrn_low(t4, t5);
-
-	/* t4 = (t4 + t3)/2. */
-	fp_addd_low(t4, t4, t3);
-	fp_hlvd_low(t4, t4);
-
-	/* t3 = t3 - t4 - t1. */
-	fp_addc_low(t5, t1, t4);
-	fp_subc_low(t3, t3, t5);
-
-	/* c_2 = t4 - t0 - t2. */
-	fp_addc_low(t5, t0, t2);
-	fp_subc_low(c[2], t4, t5);
-
-	/* c_0 = t0 + t1 * B. */
-	fp_subc_low(c[0], t0, t1);
+	fp_muln_low(t5, t3, t4);
+	fp_addd_low(t6, t1, t2);
+	fp_subc_low(t4, t5, t6);
+	fp_subc_low(c[0], t0, t4);
 	for (int i = -1; i > fp_prime_get_cnr(); i--) {
-		fp_subc_low(c[0], c[0], t1);
+		fp_subc_low(c[0], c[0], t4);
 	}
 
-	/* c_1 = t3 + t2 * B. */
-	fp_subc_low(c[1], t3, t2);
+#ifdef FP_SPACE
+	fp_addn_low(t4, a[0], a[1]);
+	fp_addn_low(t5, b[0], b[1]);
+#else
+	fp_addm_low(t4, a[0], a[1]);
+	fp_addm_low(t5, b[0], b[1]);
+#endif
+	fp_muln_low(t6, t4, t5);
+	fp_addd_low(t4, t0, t1);
+	fp_subc_low(t4, t6, t4);
+	fp_subc_low(c[1], t4, t2);
 	for (int i = -1; i > fp_prime_get_cnr(); i--) {
 		fp_subc_low(c[1], c[1], t2);
 	}
+
+#ifdef FP_SPACE
+	fp_addn_low(t5, a[0], a[2]);
+	fp_addn_low(t6, b[0], b[2]);
+#else
+	fp_addm_low(t5, a[0], a[2]);
+	fp_addm_low(t6, b[0], b[2]);
+#endif
+	fp_muln_low(t4, t5, t6);
+	fp_addd_low(t6, t0, t2);
+	fp_subc_low(t5, t4, t6);
+	fp_addc_low(c[2], t5, t1);
 }
 
-void fp3_sqrm_low(fp3_t c, fp3_t a) {
-	align dv3_t t;
+void fp3_mulm_low(fp3_t c, fp3_t a, fp3_t b) {
+	dv3_t t;
 
 	dv3_null(t);
 
 	TRY {
 		dv3_new(t);
-		fp3_sqrn_low(t, a);
+		fp3_muln_low(t, a, b);
 		fp3_rdcn_low(c, t);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);

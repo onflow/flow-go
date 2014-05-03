@@ -61,6 +61,7 @@ message(STATUS "Available modules (default = ALL)")
 message("   WITH=BN       Multiple precision arithmetic.")
 message("   WITH=DV       Temporary double-precision digit vectors.")
 message("   WITH=FP       Prime field arithmetic.")
+message("   WITH=FPX      Prime extension field arithmetic.")
 message("   WITH=FB       Binary field arithmetic.")
 message("   WITH=EP       Elliptic curves over prime fields.")
 message("   WITH=EPX      Elliptic curves over quadratic extensions of prime fields.")
@@ -109,6 +110,7 @@ message("   LABEL=relic\n")
 include(cmake/arch.cmake)
 include(cmake/bn.cmake)
 include(cmake/fp.cmake)
+include(cmake/fpx.cmake)
 include(cmake/fb.cmake)
 include(cmake/ep.cmake)
 include(cmake/eb.cmake)
@@ -132,7 +134,9 @@ if(TEMP GREATER -1)
 	set(WITH_BN 1)
 	set(WITH_DV 1)
 	set(WITH_FP 1)
+	set(WITH_FPX 1)
 	set(WITH_FB 1)
+	set(WITH_FBX 1)
 	set(WITH_FT 1)
 	set(WITH_EP 1)
 	set(WITH_EPX 1)
@@ -146,79 +150,91 @@ if(TEMP GREATER -1)
 	set(WITH_CP 1)
 endif(TEMP GREATER -1)
 
-# See if multiple precision integer arithmetic is required.
+# Check if multiple precision integer arithmetic is required.
 LIST(FIND WITH "BN" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_BN 1)
 endif(TEMP GREATER -1)
 
-# See if temporary vectors are required.
+# Check if temporary vectors are required.
 LIST(FIND WITH "DV" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_DV 1)
 endif(TEMP GREATER -1)
 
-# See if prime field arithmetic is required.
+# Check if prime field arithmetic is required.
 LIST(FIND WITH "FP" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_FP 1)
 endif(TEMP GREATER -1)
 
-# See if binary field arithmetic is required.
+# Check if prime extension field arithmetic is required.
+LIST(FIND WITH "FPX" TEMP)
+if(TEMP GREATER -1)
+	set(WITH_FPX 1)
+endif(TEMP GREATER -1)
+
+# Check if binary field arithmetic is required.
 LIST(FIND WITH "FB" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_FB 1)
 endif(TEMP GREATER -1)
 
-# See if prime elliptic curve support is required.
+# Check if binary extension field arithmetic is required.
+LIST(FIND WITH "FBX" TEMP)
+if(TEMP GREATER -1)
+	set(WITH_FBX 1)
+endif(TEMP GREATER -1)
+
+# Check if prime elliptic curve support is required.
 LIST(FIND WITH "EP" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_EP 1)
 endif(TEMP GREATER -1)
 
-#See if support for elliptic curves defined over prime field extensions is required.
+#Check if support for elliptic curves defined over prime field extensions is required.
 LIST(FIND WITH "EPX" TEMP)
 if (TEMP GREATER -1)
 	set(WITH_EPX 1)
 endif(TEMP GREATER -1)
 
-# See if binary elliptic curve support is required.
+# Check if binary elliptic curve support is required.
 LIST(FIND WITH "EB" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_EB 1)
 endif(TEMP GREATER -1)
 
-# See if elliptic curve cryptography support is required.
+# Check if elliptic curve cryptography support is required.
 LIST(FIND WITH "EC" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_EC 1)
 endif(TEMP GREATER -1)
 
-# See if support for pairings over prime curves is required.
+# Check if support for pairings over prime curves is required.
 LIST(FIND WITH "PP" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_PP 1)
 endif(TEMP GREATER -1)
 
-# See if support for pairings over binary curves is required.
+# Check if support for pairings over binary curves is required.
 LIST(FIND WITH "PB" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_PB 1)
 endif(TEMP GREATER -1)
 
-# See if elliptic curve cryptography support is required.
+# Check if elliptic curve cryptography support is required.
 LIST(FIND WITH "PC" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_PC 1)
 endif(TEMP GREATER -1)
 
-# See if support for hash functions is required.
+# Check if support for hash functions is required.
 LIST(FIND WITH "MD" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_MD 1)
 endif(TEMP GREATER -1)
 
-# See if support for crptographic protocols is required.
+# Check if support for crptographic protocols is required.
 LIST(FIND WITH "CP" TEMP)
 if(TEMP GREATER -1)
 	set(WITH_CP 1)

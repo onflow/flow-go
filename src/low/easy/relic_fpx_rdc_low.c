@@ -23,60 +23,38 @@
 /**
  * @file
  *
- * Implementation of the low-level quadratic extension field multiplication
- * functions.
+ * Implementation of the low-level extension field modular reduction functions.
  *
  * @version $Id$
- * @ingroup pp
+ * @ingroup fpx
  */
 
-#include "relic_fp.h"
-#include "relic_pp.h"
 #include "relic_core.h"
+#include "relic_conf.h"
 #include "relic_fp_low.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
 
-void fp3_addn_low(fp3_t c, fp3_t a, fp3_t b) {
-	fp_addn_low(c[0], a[0], b[0]);
-	fp_addn_low(c[1], a[1], b[1]);
-	fp_addn_low(c[2], a[2], b[2]);
+void fp2_rdcn_low(fp2_t c, dv2_t a) {
+#if FP_RDC == MONTY
+	fp_rdcn_low(c[0], a[0]);
+	fp_rdcn_low(c[1], a[1]);
+#else
+	fp_rdc(c[0], a[0]);
+	fp_rdc(c[1], a[1]);
+#endif
 }
 
-void fp3_addm_low(fp3_t c, fp3_t a, fp3_t b) {
-	fp_addm_low(c[0], a[0], b[0]);
-	fp_addm_low(c[1], a[1], b[1]);
-	fp_addm_low(c[2], a[2], b[2]);
-}
-
-void fp3_subn_low(fp3_t c, fp3_t a, fp3_t b) {
-	fp_subn_low(c[0], a[0], b[0]);
-	fp_subn_low(c[1], a[1], b[1]);
-	fp_subn_low(c[2], a[2], b[2]);
-}
-
-void fp3_subm_low(fp3_t c, fp3_t a, fp3_t b) {
-	fp_subm_low(c[0], a[0], b[0]);
-	fp_subm_low(c[1], a[1], b[1]);
-	fp_subm_low(c[2], a[2], b[2]);
-}
-
-void fp3_dbln_low(fp3_t c, fp3_t a) {
-	fp_dbln_low(c[0], a[0]);
-	fp_dbln_low(c[1], a[1]);
-	fp_dbln_low(c[2], a[2]);
-}
-
-void fp3_subc_low(dv3_t c, dv3_t a, dv3_t b) {
-	fp_subc_low(c[0], a[0], b[0]);
-	fp_subc_low(c[1], a[1], b[1]);
-	fp_subc_low(c[2], a[2], b[2]);
-}
-
-void fp3_dblm_low(fp3_t c, fp3_t a) {
-	fp_dblm_low(c[0], a[0]);
-	fp_dblm_low(c[1], a[1]);
-	fp_dblm_low(c[2], a[2]);
+void fp3_rdcn_low(fp3_t c, dv3_t a) {
+#if FP_RDC == MONTY
+	fp_rdcn_low(c[0], a[0]);
+	fp_rdcn_low(c[1], a[1]);
+	fp_rdcn_low(c[2], a[2]);
+#else
+	fp_rdc(c[0], a[0]);
+	fp_rdc(c[1], a[1]);
+	fp_rdc(c[2], a[2]);
+#endif
 }

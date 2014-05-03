@@ -87,13 +87,18 @@ void conf_print(void) {
 	util_print("   Arithmetic method: " FP_METHD "\n\n");
 #endif
 
+#ifdef WITH_FPX
+	util_print("** Prime field extension module options:\n");
+	util_print("   Arithmetic method: " FPX_METHD "\n\n");
+#endif
+
 #ifdef WITH_EP
 	util_print("** Prime elliptic curve module options:\n");
 	util_print("   Arithmetic method: " EP_METHD "\n\n");
 #endif
 
 #ifdef WITH_PP
-	util_print("** Pairing over prime curve module options:\n");
+	util_print("** Bilinear pairing module options:\n");
 	util_print("   Arithmetic method: " PP_METHD "\n\n");
 #endif
 

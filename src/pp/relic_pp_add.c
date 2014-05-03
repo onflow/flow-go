@@ -31,7 +31,7 @@
 
 #include "relic_core.h"
 #include "relic_pp.h"
-#include "relic_pp_low.h"
+#include "relic_fpx_low.h"
 #include "relic_util.h"
 
 /*============================================================================*/

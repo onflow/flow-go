@@ -23,20 +23,17 @@
 /**
  * @file
  *
- * Implementation of the low-level quadratic extension field multiplication
- * functions.
+ * Implementation of the low-level extension field multiplication functions.
  *
  * @version $Id$
- * @ingroup fp
+ * @ingroup fpx
  */
 
-#include "relic_fp.h"
-#include "relic_pp.h"
 #include "relic_core.h"
 #include "relic_conf.h"
 #include "relic_bn_low.h"
 #include "relic_fp_low.h"
-#include "relic_pp_low.h"
+#include "relic_fpx_low.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */

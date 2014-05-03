@@ -23,15 +23,13 @@
 /**
  * @file
  *
- * Implementation of the low-level quadratic extension field modular reduction
- * functions.
+ * Implementation of the low-level extension field modular reduction functions.
  *
  * @version $Id$
- * @ingroup pp
+ * @ingroup fpx
  */
 
 #include "relic_fp.h"
-#include "relic_pp.h"
 #include "relic_core.h"
 #include "relic_conf.h"
 #include "relic_fp_low.h"
@@ -39,16 +37,6 @@
 /*============================================================================*/
 /* Public definitions                                                         */
 /*============================================================================*/
-
-void fp2_rdcn_low(fp2_t c, dv2_t a) {
-#if FP_RDC == MONTY
-	fp_rdcn_low(c[0], a[0]);
-	fp_rdcn_low(c[1], a[1]);
-#else
-	fp_rdc(c[0], a[0]);
-	fp_rdc(c[1], a[1]);
-#endif
-}
 
 void fp3_rdcn_low(fp3_t c, dv3_t a) {
 #if FP_RDC == MONTY

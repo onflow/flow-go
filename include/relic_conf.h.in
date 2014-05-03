@@ -265,6 +265,30 @@
 /** Prime field arithmetic method */
 #define FP_METHD "@FP_METHD@"
 
+/** Basic quadratic extension field arithmetic. */
+#define BASIC    1
+/** Integrated extension field arithmetic. */
+#define INTEG    3
+/* Chosen extension field arithmetic method. */
+#define FPX_QDR   @FPX_QDR@ 
+
+/** Basic cubic extension field arithmetic. */
+#define BASIC    1
+/** Integrated extension field arithmetic. */
+#define INTEG    3
+/* Chosen extension field arithmetic method. */
+#define FPX_CBC   @FPX_CBC@ 
+
+/** Basic quadratic extension field arithmetic. */
+#define BASIC    1
+/** Lazy-reduced extension field arithmetic. */
+#define LAZYR    2
+/* Chosen extension field arithmetic method. */
+#define FPX_RDC   @FPX_RDC@ 
+
+/** Prime extension field arithmetic method */
+#define FPX_METHD "@FPX_METHD@"
+
 /** Irreducible polynomial size in bits. */
 #define FB_POLYN @FB_POLYN@
 /** Number of Karatsuba steps. */
@@ -503,20 +527,6 @@
 
 /** Parallel implementation. */
 #cmakedefine PP_PARAL
-
-/** Basic quadratic extension field arithmetic. */
-#define BASIC    1
-/** Integrated extension field arithmetic. */
-#define INTEG    3
-/* Chosen extension field arithmetic method. */
-#define PP_QDR   @PP_QDR@ 
-
-/** Basic cubic extension field arithmetic. */
-#define BASIC    1
-/** Integrated extension field arithmetic. */
-#define INTEG    3
-/* Chosen extension field arithmetic method. */
-#define PP_CBC   @PP_CBC@ 
 
 /** Basic quadratic extension field arithmetic. */
 #define BASIC    1

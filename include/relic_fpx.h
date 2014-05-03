@@ -174,9 +174,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the first quadratic extension field element.
  * @param[in] B				- the second quadratic extension field element.
  */
-#if PP_QDR == BASIC
+#if FPX_QDR == BASIC
 #define fp2_add(C, A, B)	fp2_add_basic(C, A, B)
-#elif PP_QDR == INTEG
+#elif FPX_QDR == INTEG
 #define fp2_add(C, A, B)	fp2_add_integ(C, A, B)
 #endif
 
@@ -188,9 +188,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the first quadratic extension field element.
  * @param[in] B				- the second quadratic extension field element.
  */
-#if PP_QDR == BASIC
+#if FPX_QDR == BASIC
 #define fp2_sub(C, A, B)	fp2_sub_basic(C, A, B)
-#elif PP_QDR == INTEG
+#elif FPX_QDR == INTEG
 #define fp2_sub(C, A, B)	fp2_sub_integ(C, A, B)
 #endif
 
@@ -200,9 +200,9 @@ typedef fp6_t fp18_t[3];
  * @param[out] C			- the result.
  * @param[in] A				- the quadratic extension field element.
  */
-#if PP_QDR == BASIC
+#if FPX_QDR == BASIC
 #define fp2_dbl(C, A)		fp2_dbl_basic(C, A)
-#elif PP_QDR == INTEG
+#elif FPX_QDR == INTEG
 #define fp2_dbl(C, A)		fp2_dbl_integ(C, A)
 #endif
 
@@ -213,9 +213,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the first quadratic extension field element.
  * @param[in] B				- the second quadratic extension field element.
  */
-#if PP_QDR == BASIC
+#if FPX_QDR == BASIC
 #define fp2_mul(C, A, B)	fp2_mul_basic(C, A, B)
-#elif PP_QDR == INTEG
+#elif FPX_QDR == INTEG
 #define fp2_mul(C, A, B)	fp2_mul_integ(C, A, B)
 #endif
 
@@ -227,9 +227,9 @@ typedef fp6_t fp18_t[3];
  * @param[out] C			- the result.
  * @param[in] A				- the quadratic extension field element to multiply.
  */
-#if PP_QDR == BASIC
+#if FPX_QDR == BASIC
 #define fp2_mul_nor(C, A)	fp2_mul_nor_basic(C, A)
-#elif PP_QDR == INTEG
+#elif FPX_QDR == INTEG
 #define fp2_mul_nor(C, A)	fp2_mul_nor_integ(C, A)
 #endif
 
@@ -239,9 +239,9 @@ typedef fp6_t fp18_t[3];
  * @param[out] C			- the result.
  * @param[in] A				- the quadratic extension field element to square.
  */
-#if PP_QDR == BASIC
+#if FPX_QDR == BASIC
 #define fp2_sqr(C, A)		fp2_sqr_basic(C, A)
-#elif PP_QDR == INTEG
+#elif FPX_QDR == INTEG
 #define fp2_sqr(C, A)		fp2_sqr_integ(C, A)
 #endif
 
@@ -302,9 +302,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the first cubic extension field element.
  * @param[in] B				- the second cubic extension field element.
  */
-#if PP_CBC == BASIC
+#if FPX_CBC == BASIC
 #define fp3_add(C, A, B)	fp3_add_basic(C, A, B)
-#elif PP_CBC == INTEG
+#elif FPX_CBC == INTEG
 #define fp3_add(C, A, B)	fp3_add_integ(C, A, B)
 #endif
 
@@ -316,9 +316,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the first cubic extension field element.
  * @param[in] B				- the second cubic extension field element.
  */
-#if PP_CBC == BASIC
+#if FPX_CBC == BASIC
 #define fp3_sub(C, A, B)	fp3_sub_basic(C, A, B)
-#elif PP_CBC == INTEG
+#elif FPX_CBC == INTEG
 #define fp3_sub(C, A, B)	fp3_sub_integ(C, A, B)
 #endif
 
@@ -328,9 +328,9 @@ typedef fp6_t fp18_t[3];
  * @param[out] C			- the result.
  * @param[in] A				- the cubic extension field element.
  */
-#if PP_CBC == BASIC
+#if FPX_CBC == BASIC
 #define fp3_dbl(C, A)		fp3_dbl_basic(C, A)
-#elif PP_CBC == INTEG
+#elif FPX_CBC == INTEG
 #define fp3_dbl(C, A)		fp3_dbl_integ(C, A)
 #endif
 
@@ -341,9 +341,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the first cubic extension field element.
  * @param[in] B				- the second cubic extension field element.
  */
-#if PP_CBC == BASIC
+#if FPX_CBC == BASIC
 #define fp3_mul(C, A, B)	fp3_mul_basic(C, A, B)
-#elif PP_CBC == INTEG
+#elif FPX_CBC == INTEG
 #define fp3_mul(C, A, B)	fp3_mul_integ(C, A, B)
 #endif
 
@@ -354,9 +354,9 @@ typedef fp6_t fp18_t[3];
  * @param[out] C			- the result.
  * @param[in] A				- the cubic extension field element to multiply.
  */
-#if PP_CBC == BASIC
+#if FPX_CBC == BASIC
 #define fp3_mul_nor(C, A)	fp3_mul_nor_basic(C, A)
-#elif PP_CBC == INTEG
+#elif FPX_CBC == INTEG
 #define fp3_mul_nor(C, A)	fp3_mul_nor_integ(C, A)
 #endif
 
@@ -366,9 +366,9 @@ typedef fp6_t fp18_t[3];
  * @param[out] C			- the result.
  * @param[in] A				- the cubic extension field element to square.
  */
-#if PP_CBC == BASIC
+#if FPX_CBC == BASIC
 #define fp3_sqr(C, A)		fp3_sqr_basic(C, A)
-#elif PP_CBC == INTEG
+#elif FPX_CBC == INTEG
 #define fp3_sqr(C, A)		fp3_sqr_integ(C, A)
 #endif
 
@@ -428,9 +428,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the first sextic extension field element.
  * @param[in] B				- the second sextic extension field element.
  */
-#if PP_EXT == BASIC
+#if FPX_RDC == BASIC
 #define fp6_mul(C, A, B)	fp6_mul_basic(C, A, B)
-#elif PP_EXT == LAZYR
+#elif FPX_RDC == LAZYR
 #define fp6_mul(C, A, B)	fp6_mul_lazyr(C, A, B)
 #endif
 
@@ -440,9 +440,9 @@ typedef fp6_t fp18_t[3];
  * @param[out] C			- the result.
  * @param[in] A				- the sextic extension field element to square.
  */
-#if PP_EXT == BASIC
+#if FPX_RDC == BASIC
 #define fp6_sqr(C, A)		fp6_sqr_basic(C, A)
-#elif PP_EXT == LAZYR
+#elif FPX_RDC == LAZYR
 #define fp6_sqr(C, A)		fp6_sqr_lazyr(C, A)
 #endif
 
@@ -477,9 +477,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the first dodecic extension field element.
  * @param[in] B				- the second dodecic extension field element.
  */
-#if PP_EXT == BASIC
+#if FPX_RDC == BASIC
 #define fp12_mul(C, A, B)		fp12_mul_basic(C, A, B)
-#elif PP_EXT == LAZYR
+#elif FPX_RDC == LAZYR
 #define fp12_mul(C, A, B)		fp12_mul_lazyr(C, A, B)
 #endif
 
@@ -491,9 +491,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the dense dodecic extension field element.
  * @param[in] B				- the sparse dodecic extension field element.
  */
-#if PP_EXT == BASIC
+#if FPX_RDC == BASIC
 #define fp12_mul_dxs(C, A, B)	fp12_mul_dxs_basic(C, A, B)
-#elif PP_EXT == LAZYR
+#elif FPX_RDC == LAZYR
 #define fp12_mul_dxs(C, A, B)	fp12_mul_dxs_lazyr(C, A, B)
 #endif
 
@@ -503,9 +503,9 @@ typedef fp6_t fp18_t[3];
  * @param[out] C			- the result.
  * @param[in] A				- the dodecic extension field element to square.
  */
-#if PP_EXT == BASIC
+#if FPX_RDC == BASIC
 #define fp12_sqr(C, A)			fp12_sqr_basic(C, A)
-#elif PP_EXT == LAZYR
+#elif FPX_RDC == LAZYR
 #define fp12_sqr(C, A)			fp12_sqr_lazyr(C, A)
 #endif
 
@@ -516,9 +516,9 @@ typedef fp6_t fp18_t[3];
  * @param[out] C			- the result.
  * @param[in] A				- the dodecic extension field element to square.
  */
-#if PP_EXT == BASIC
+#if FPX_RDC == BASIC
 #define fp12_sqr_cyc(C, A)		fp12_sqr_cyc_basic(C, A)
-#elif PP_EXT == LAZYR
+#elif FPX_RDC == LAZYR
 #define fp12_sqr_cyc(C, A)		fp12_sqr_cyc_lazyr(C, A)
 #endif
 
@@ -529,9 +529,9 @@ typedef fp6_t fp18_t[3];
  * @param[out] C			- the result.
  * @param[in] A				- the dodecic extension field element to square.
  */
-#if PP_EXT == BASIC
+#if FPX_RDC == BASIC
 #define fp12_sqr_pck(C, A)		fp12_sqr_pck_basic(C, A)
-#elif PP_EXT == LAZYR
+#elif FPX_RDC == LAZYR
 #define fp12_sqr_pck(C, A)		fp12_sqr_pck_lazyr(C, A)
 #endif
 
@@ -566,9 +566,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the first octdecic extension field element.
  * @param[in] B				- the second octdecic extension field element.
  */
-#if PP_EXT == BASIC
+#if FPX_RDC == BASIC
 #define fp18_mul(C, A, B)		fp18_mul_basic(C, A, B)
-#elif PP_EXT == LAZYR
+#elif FPX_RDC == LAZYR
 #define fp18_mul(C, A, B)		fp18_mul_lazyr(C, A, B)
 #endif
 
@@ -580,9 +580,9 @@ typedef fp6_t fp18_t[3];
  * @param[in] A				- the dense octdecic extension field element.
  * @param[in] B				- the sparse octdecic extension field element.
  */
-#if PP_EXT == BASIC
+#if FPX_RDC == BASIC
 #define fp18_mul_dxs(C, A, B)	fp18_mul_dxs_basic(C, A, B)
-#elif PP_EXT == LAZYR
+#elif FPX_RDC == LAZYR
 #define fp18_mul_dxs(C, A, B)	fp18_mul_dxs_lazyr(C, A, B)
 #endif
 
@@ -592,9 +592,9 @@ typedef fp6_t fp18_t[3];
  * @param[out] C			- the result.
  * @param[in] A				- the octdecic extension field element to square.
  */
-#if PP_EXT == BASIC
+#if FPX_RDC == BASIC
 #define fp18_sqr(C, A)			fp18_sqr_basic(C, A)
-#elif PP_EXT == LAZYR
+#elif FPX_RDC == LAZYR
 #define fp18_sqr(C, A)			fp18_sqr_lazyr(C, A)
 #endif
 

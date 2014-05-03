@@ -29,14 +29,25 @@ if (WITH_FP)
 	ADD_MODULE(fp)
 endif(WITH_FP)
 
+if (WITH_FPX)
+	ADD_MODULE(fpx)
+endif(WITH_FPX)
+
 if (WITH_FB)
 	ADD_MODULE(fb)
-	ADD_MODULE(fbx)
 endif(WITH_FB)
+
+if (WITH_FBX)
+	ADD_MODULE(fbx)
+endif(WITH_FBX)
 
 if (WITH_EP)
 	ADD_MODULE(ep)
 endif(WITH_EP)
+
+if (WITH_EPX)
+	ADD_MODULE(epx)
+endif(WITH_EPX)	
 
 if (WITH_EB)
 	ADD_MODULE(eb)
@@ -51,8 +62,6 @@ if (WITH_PC)
 endif(WITH_PC)
 
 if (WITH_PP)
-	ADD_MODULE(fpx)
-	ADD_MODULE(epx)
 	ADD_MODULE(pp)
 endif(WITH_PP)	
 
