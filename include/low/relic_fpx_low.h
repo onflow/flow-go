@@ -23,16 +23,16 @@
 /**
  * @file
  *
- * Interface of the low-level prime field arithmetic module.
+ * Interface of the low-level prime extension field arithmetic module.
  *
  * @version $Id$
- * @ingroup fp
+ * @ingroup fpx
  */
 
-#ifndef RELIC_PP_LOW_H
-#define RELIC_PP_LOW_H
+#ifndef RELIC_FPX_LOW_H
+#define RELIC_FPX_LOW_H
 
-#include "relic_pp.h"
+#include "relic_fpx.h"
 
 /*============================================================================*/
 /* Function prototypes                                                        */
@@ -336,4 +336,4 @@ void fp3_sqrm_low(fp3_t c, fp3_t a);
  */
 void fp3_rdcn_low(fp3_t c, dv3_t a);
 
-#endif /* !RELIC_FP_LOW_H */
+#endif /* !RELIC_FPX_LOW_H */
