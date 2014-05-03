@@ -234,7 +234,7 @@ static void benaloh(void) {
 	bdpe_free(pub);
 	bdpe_free(prv);
 }
-#include "assert.h"
+
 static void paillier(void) {
 	bn_t n, l;
 	uint8_t in[1000], new[1000], out[BN_BITS / 8 + 1];
@@ -255,7 +255,6 @@ static void paillier(void) {
 		rand_bytes(in + 1, in_len - 1);
 		BENCH_ADD(cp_phpe_enc(out, &out_len, in, in_len, n));
 		cp_phpe_dec(new, in_len, out, out_len, n, l);
-		assert(memcmp(new, in, in_len) == 0);
 	} BENCH_END;
 
 	BENCH_BEGIN("cp_bdpe_dec") {
@@ -265,7 +264,6 @@ static void paillier(void) {
 		rand_bytes(in + 1, in_len - 1);
 		cp_phpe_enc(out, &out_len, in, in_len, n);
 		BENCH_ADD(cp_phpe_dec(new, in_len, out, out_len, n, l));
-		assert(memcmp(new, in, in_len) == 0);
 	} BENCH_END;
 
 	bn_free(n);
