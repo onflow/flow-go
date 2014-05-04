@@ -617,7 +617,8 @@ static int ecies(void) {
 				memcpy(msg, result, sizeof(result));
 				break;
 #endif
-			default:
+			default:			
+				(void)str;
 				code = STS_OK;
 				break;
 		}
