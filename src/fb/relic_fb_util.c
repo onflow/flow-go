@@ -96,13 +96,13 @@ void fb_zero(fb_t a) {
 
 int fb_is_zero(const fb_t a) {
 	int i;
+	dig_t t = 0;
 
 	for (i = 0; i < FB_DIGS; i++) {
-		if (a[i] != 0) {
-			return 0;
-		}
+		t |= a[i];
 	}
-	return 1;
+	
+	return !t;
 }
 
 int fb_get_bit(const fb_t a, int bit) {

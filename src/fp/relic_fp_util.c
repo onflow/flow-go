@@ -48,12 +48,14 @@ void fp_zero(fp_t a) {
 }
 
 int fp_is_zero(const fp_t a) {
-	for (int i = 0; i < FP_DIGS; i++) {
-		if (a[i] != 0) {
-			return 0;
-		}
+	int i;
+	dig_t t = 0;
+
+	for (i = 0; i < FP_DIGS; i++) {
+		t |= a[i];
 	}
-	return 1;
+	
+	return !t;
 }
 
 int fp_is_even(const fp_t a) {
