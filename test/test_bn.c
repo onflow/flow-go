@@ -1743,6 +1743,78 @@ static int recoding(void) {
 				}
 			}
 			TEST_END;
+
+
+			TEST_BEGIN("regular tnaf recoding is correct") {
+				for (w = 2; w <= 8; w++) {
+					int8_t t_w, beta[1 << (w - 2)], gama[1 << (w - 2)];
+					int8_t tnaf[FB_BITS + 8];
+					int8_t u = (eb_curve_opt_a() == OPT_ZERO ? -1 : 1);
+					int n;
+					do {
+						bn_rand(a, BN_POS, BN_BITS);
+						bn_mod(a, a, v2[2]);
+						l = FB_BITS + 1;
+						bn_rec_tnaf_mod(v2[0], v2[1], a, v1[0], v1[1], v1[2], u, FB_BITS);
+					} while (bn_is_even(v2[0]) || bn_is_even(v2[1]));
+					bn_rec_tnaf_get(&t_w, beta, gama, u, w);
+					bn_rec_rtnaf(tnaf, &l, a, v1[0], v1[1], v1[2], u, FB_BITS, w);
+					bn_zero(a);
+					bn_zero(b);
+					n = 0;
+					for (k = l - 1; k >= 0; k--) {
+						for (int m = 0; m < w - 1; m++) {
+							bn_copy(c, b);
+							if (u == -1) {
+								bn_neg(c, c);
+							}
+							bn_add(c, c, a);
+							bn_dbl(a, b);
+							bn_neg(a, a);
+							bn_copy(b, c);
+						}
+						printf("%d,", tnaf[k]);
+						if (tnaf[k] != 0) {
+							n++;
+						}
+						if (w == 2) {
+							if (tnaf[k] >= 0) {
+								bn_add_dig(a, a, tnaf[k]);
+							} else {
+								bn_sub_dig(a, a, -tnaf[k]);
+							}
+						} else {
+							if (tnaf[k] > 0) {
+								if (beta[tnaf[k] / 2] >= 0) {
+									bn_add_dig(a, a, beta[tnaf[k] / 2]);	
+								} else {
+									bn_sub_dig(a, a, -beta[tnaf[k] / 2]);
+								}
+								if (gama[tnaf[k] / 2] >= 0) {
+									bn_add_dig(b, b, gama[tnaf[k] / 2]);
+								} else {
+									bn_sub_dig(b, b, -gama[tnaf[k] / 2]);
+								}
+							}
+							if (tnaf[k] < 0) {
+								if (beta[-tnaf[k] / 2] >= 0) {
+									bn_sub_dig(a, a, beta[-tnaf[k] / 2]);
+								} else {
+									bn_add_dig(a, a, -beta[-tnaf[k] / 2]);
+								}
+								if (gama[-tnaf[k] / 2] >= 0) {
+									bn_sub_dig(b, b, gama[-tnaf[k] / 2]);
+								} else {
+									bn_add_dig(b, b, -gama[-tnaf[k] / 2]);
+								}
+							}				
+						}
+					}
+					printf("\nw = %d, l = %d, n = %d, ? = %d\n", w, l, n, 1 + CEIL(FB_BITS + 2, (w - 1)));
+					TEST_ASSERT(bn_cmp(a, v2[0]) == CMP_EQ, end);
+					TEST_ASSERT(bn_cmp(b, v2[1]) == CMP_EQ, end);
+				}
+			} TEST_END;			
 		}
 #endif
 

@@ -282,6 +282,7 @@ static void util(void) {
 static void arith(void) {
 	bn_t a, b, c, d, e;
 	dig_t f;
+	int len;
 
 	bn_null(a);
 	bn_null(b);
@@ -810,25 +811,23 @@ static void arith(void) {
 
 	BENCH_BEGIN("bn_rec_win") {
 		uint8_t win[BN_BITS + 1];
-		int len = BN_BITS + 1;
 		bn_rand(a, BN_POS, BN_BITS);
-		BENCH_ADD(bn_rec_win(win, &len, a, 4));
+		BENCH_ADD((len = BN_BITS + 1, bn_rec_win(win, &len, a, 4)));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("bn_rec_slw") {
 		uint8_t win[BN_BITS + 1];
-		int len = BN_BITS + 1;
 		bn_rand(a, BN_POS, BN_BITS);
-		BENCH_ADD(bn_rec_slw(win, &len, a, 4));
+		BENCH_ADD((len = BN_BITS + 1, bn_rec_slw(win, &len, a, 4)));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("bn_rec_naf") {
 		signed char naf[BN_BITS + 1];
-		int len = BN_BITS + 1;
+		int len;
 		bn_rand(a, BN_POS, BN_BITS);
-		BENCH_ADD(bn_rec_naf(naf, &len, a, 4));
+		BENCH_ADD((len = BN_BITS + 1, bn_rec_naf(naf, &len, a, 4)));
 	}
 	BENCH_END;
 
@@ -844,12 +843,25 @@ static void arith(void) {
 			eb_curve_get_ord(e);
 			bn_mod(a, a, e);
 			if (eb_curve_opt_a() == OPT_ZERO) {
-				BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, b, c, d, -1, FB_BITS, 4));
+				BENCH_ADD((len = FB_BITS + 8, bn_rec_tnaf(tnaf, &len, a, b, c, d, -1, FB_BITS, 4)));
 			} else {
-				BENCH_ADD(bn_rec_tnaf(tnaf, &len, a, b, c, d, 1, FB_BITS, 4));
+				BENCH_ADD((len = FB_BITS + 8, bn_rec_tnaf(tnaf, &len, a, b, c, d, 1, FB_BITS, 4)));
 			}
 		}
 		BENCH_END;
+
+		BENCH_BEGIN("bn_rec_rtnaf") {
+			signed char tnaf[FB_BITS + 8];
+			bn_rand(a, BN_POS, BN_BITS);
+			eb_curve_get_ord(e);
+			bn_mod(a, a, e);
+			if (eb_curve_opt_a() == OPT_ZERO) {
+				BENCH_ADD((len = FB_BITS + 8, bn_rec_rtnaf(tnaf, &len, a, b, c, d, -1, FB_BITS, 4)));
+			} else {
+				BENCH_ADD((len = FB_BITS + 8, bn_rec_rtnaf(tnaf, &len, a, b, c, d, 1, FB_BITS, 4)));
+			}
+		}
+		BENCH_END;		
 	}
 #endif
 
@@ -857,16 +869,15 @@ static void arith(void) {
 		signed char naf[BN_BITS + 1];
 		int len = BN_BITS + 1;
 		bn_rand(a, BN_POS, BN_BITS);
-		BENCH_ADD(bn_rec_reg(naf, &len, a, BN_BITS, 4));
+		BENCH_ADD((len = BN_BITS + 1, bn_rec_reg(naf, &len, a, BN_BITS, 4)));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("bn_rec_jsf") {
 		signed char jsf[2 * (BN_BITS + 1)];
-		int len = 2 * (BN_BITS + 1);
 		bn_rand(a, BN_POS, BN_BITS);
 		bn_rand(b, BN_POS, BN_BITS);
-		BENCH_ADD(bn_rec_jsf(jsf, &len, a, b));
+		BENCH_ADD((len = 2 * (BN_BITS + 1), bn_rec_jsf(jsf, &len, a, b)));
 	}
 	BENCH_END;
 

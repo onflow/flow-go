@@ -644,6 +644,144 @@ void bn_rec_tnaf_mod(bn_t r0, bn_t r1, const bn_t k, const bn_t vm,
 	}
 }
 
+void bn_rec_rtnaf(int8_t *tnaf, int *len, const bn_t k, const bn_t vm,
+		const bn_t s0, const bn_t s1, int8_t u, int m, int w) {
+	int i, l;
+	bn_t tmp, r0, r1;
+	int8_t beta[1 << (w - 2)], gama[1 << (w - 2)], t_w;
+	dig_t t0, t1, mask;
+	int s, t, u_i;
+
+	bn_null(r0);
+	bn_null(r1);
+	bn_null(tmp);
+
+	if (*len < (bn_bits(k) + 1)) {
+		THROW(ERR_NO_BUFFER);
+	}
+
+	TRY {
+		bn_new(r0);
+		bn_new(r1);
+		bn_new(tmp);
+
+		bn_rec_tnaf_get(&t_w, beta, gama, u, w);
+		bn_rec_tnaf_mod(r0, r1, k, vm, s0, s1, u, m);
+		mask = MASK(w);
+		l = CEIL(m + 2, (w - 1));
+
+		i = 0;
+		while (i < l) {
+			/* If r0 is odd. */
+			if (w == 2) {
+				t0 = r0->dp[0];
+				if (bn_sign(r0) == BN_NEG) {
+					t0 = (1 << w) - t0;
+				}
+				t1 = r1->dp[0];
+				if (bn_sign(r1) == BN_NEG) {
+					t1 = (1 << w) - t1;
+				}
+				u_i = ((t0 - 2 * t1) & mask) - 2;
+				tnaf[i++] = u_i;
+				if (u_i < 0) {
+					bn_add_dig(r0, r0, -u_i);
+				} else {
+					bn_sub_dig(r0, r0, u_i);
+				}
+			} else {
+				/* t0 = r0 mod_s 2^w. */
+				t0 = r0->dp[0];
+				if (bn_sign(r0) == BN_NEG) {
+					t0 = (1 << w) - t0;
+				}
+				/* t1 = r1 mod_s 2^w. */
+				t1 = r1->dp[0];
+				if (bn_sign(r1) == BN_NEG) {
+					t1 = (1 << w) - t1;
+				}
+				/* u = r0 + r1 * (t_w) mod_s 2^w. */
+				u_i = ((t0 + t_w * t1) & mask) - (1 << (w - 1));
+				if (u_i < 0) {
+					/* If u < 0, s = -1 and u = -u. */
+					tnaf[i++] = u_i;
+					u_i = (int8_t)(-u_i >> 1);
+					t = -beta[u_i];
+					s = -gama[u_i];
+				} else {
+					/* If u > 0, s = 1. */
+					tnaf[i++] = u_i;
+					u_i = (int8_t)(u_i >> 1);
+					t = beta[u_i];
+					s = gama[u_i];					
+				}
+				/* r0 = r0 - s * beta_u. */
+				if (t > 0) {
+					bn_sub_dig(r0, r0, t);
+				} else {
+					bn_add_dig(r0, r0, -t);
+				}
+				/* r1 = r1 - s * gama_u. */
+				if (s > 0) {
+					bn_sub_dig(r1, r1, s);
+				} else {
+					bn_add_dig(r1, r1, -s);
+				}
+			}
+			for (int j = 0; j < (w - 1); j++) {
+				/* tmp = r0. */
+				bn_hlv(tmp, r0);
+				/* r0 = r1 + mu * r0 / 2. */
+				if (u == -1) {
+					bn_sub(r0, r1, tmp);
+				} else {
+					bn_add(r0, r1, tmp);
+				}
+				/* r1 = - r0 / 2. */
+				bn_copy(r1, tmp);
+				r1->sign = tmp->sign ^ 1;
+			}			
+		}
+		s = r0->dp[0];
+		t = r1->dp[0];
+		if (bn_sign(r0) == BN_NEG) {
+			s = -s;
+		}
+		if (bn_sign(r1) == BN_NEG) {
+			t = -t;
+		}		
+		if (s != 0 && t != 0) {
+			for (int j = 0; j < (1 << (w - 2)); j++) {
+				if (beta[j] == s && gama[j] == t) {
+					tnaf[i++] = 2 * j + 1;
+					break;
+				}
+			}
+			for (int j = 0; j < (1 << (w - 2)); j++) {
+				if (beta[j] == -s && gama[j] == -t) {
+					tnaf[i++] = -(2 * j + 1);
+					break;
+				}
+			}		
+		} else {
+			if (t != 0) {
+				tnaf[i++] = t;
+			} else {
+				tnaf[i++] = s;
+			}
+		}
+		*len = i;
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(r0);
+		bn_free(r1);
+		bn_free(tmp);
+	}
+}
+
 void bn_rec_reg(int8_t *naf, int *len, const bn_t k, int n, int w) {
 	int i, l;
 	bn_t t;

@@ -1315,6 +1315,23 @@ void bn_rec_tnaf(int8_t *tnaf, int *len, const bn_t k, const bn_t vm,
 		const bn_t s0, const bn_t s1, int8_t u, int m, int w);
 
 /**
+ * Recodes an integer in regular fixed-length width-w \tau-NAF.
+ *
+ * @param[out] tnaf			- the recoded integer.
+ * @param[out] len			- the number of bytes written.
+ * @param[in] k				- the integer to recode.
+ * @param[in] vm			- the V_m curve parameter.
+ * @param[in] s0			- the S_0 curve parameter.
+ * @param[in] s1			- the S_1 curve parameter.
+ * @param[in] u				- the u curve parameter.
+ * @param[in] m				- the extension degree of the binary field.
+ * @param[in] w				- the window size in bits.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is insufficient.
+ */
+void bn_rec_rtnaf(int8_t *tnaf, int *len, const bn_t k, const bn_t vm,
+		const bn_t s0, const bn_t s1, int8_t u, int m, int w);
+
+/**
  * Write the constants needed for \tau-NAF recoding as a set of \alpha_u = 
  * \beta_u + \gamma_u * \tau elements.
  * 
