@@ -516,8 +516,8 @@
 /** Chosen binary elliptic curve simulteanous point multiplication method. */
 #define EB_SIM   @EB_SIM@ 
 
-/** Prefer Koblitz anomalous (binary or prime) curves. */
-#cmakedefine EC_KBLTZ
+/** Prefer curves with efficient endomorphisms. */
+#cmakedefine EC_ENDOM
 
 /** Prime curves. */
 #define PRIME    1
