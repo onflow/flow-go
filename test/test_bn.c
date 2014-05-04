@@ -1773,7 +1773,6 @@ static int recoding(void) {
 							bn_neg(a, a);
 							bn_copy(b, c);
 						}
-						printf("%d,", tnaf[k]);
 						if (tnaf[k] != 0) {
 							n++;
 						}
@@ -1810,7 +1809,6 @@ static int recoding(void) {
 							}				
 						}
 					}
-					printf("\nw = %d, l = %d, n = %d, ? = %d\n", w, l, n, 1 + CEIL(FB_BITS + 2, (w - 1)));
 					TEST_ASSERT(bn_cmp(a, v2[0]) == CMP_EQ, end);
 					TEST_ASSERT(bn_cmp(b, v2[1]) == CMP_EQ, end);
 				}
