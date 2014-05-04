@@ -154,9 +154,9 @@ echo "#undef fp12_t"
 echo "#undef fp18_t"
 echo
 REDEF2 fpx fp2
-REDEF2_LOW pp fp2
+REDEF2_LOW fpx fp2
 REDEF2 fpx fp3
-REDEF2_LOW pp fp3
+REDEF2_LOW fpx fp3
 REDEF2 fpx fp6
 REDEF2 fpx fp12
 REDEF2 fpx fp18

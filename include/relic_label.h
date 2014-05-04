@@ -266,6 +266,7 @@
 #undef bn_rec_slw
 #undef bn_rec_naf
 #undef bn_rec_tnaf
+#undef bn_rec_rtnaf
 #undef bn_rec_tnaf_get
 #undef bn_rec_tnaf_mod
 #undef bn_rec_reg
@@ -365,6 +366,7 @@
 #define bn_rec_slw 	PREFIX(bn_rec_slw)
 #define bn_rec_naf 	PREFIX(bn_rec_naf)
 #define bn_rec_tnaf 	PREFIX(bn_rec_tnaf)
+#define bn_rec_rtnaf 	PREFIX(bn_rec_rtnaf)
 #define bn_rec_tnaf_get 	PREFIX(bn_rec_tnaf_get)
 #define bn_rec_tnaf_mod 	PREFIX(bn_rec_tnaf_mod)
 #define bn_rec_reg 	PREFIX(bn_rec_reg)
@@ -1311,6 +1313,9 @@
 #undef fp2_is_zero
 #undef fp2_rand
 #undef fp2_print
+#undef fp2_size_bin
+#undef fp2_read_bin
+#undef fp2_write_bin
 #undef fp2_cmp
 #undef fp2_cmp_dig
 #undef fp2_set_dig
@@ -1343,6 +1348,9 @@
 #define fp2_is_zero 	PREFIX(fp2_is_zero)
 #define fp2_rand 	PREFIX(fp2_rand)
 #define fp2_print 	PREFIX(fp2_print)
+#define fp2_size_bin 	PREFIX(fp2_size_bin)
+#define fp2_read_bin 	PREFIX(fp2_read_bin)
+#define fp2_write_bin 	PREFIX(fp2_write_bin)
 #define fp2_cmp 	PREFIX(fp2_cmp)
 #define fp2_cmp_dig 	PREFIX(fp2_cmp_dig)
 #define fp2_set_dig 	PREFIX(fp2_set_dig)
