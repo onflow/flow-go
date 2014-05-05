@@ -48,4 +48,3 @@ ull_t arch_cycles(void) {
 	asm("rdtsc\n\t":"=a" (lo), "=d"(hi));
 	return ((ull_t) lo) | (((ull_t) hi) << 32);
 }
-

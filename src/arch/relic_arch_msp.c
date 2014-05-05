@@ -41,6 +41,8 @@ void arch_init(void) {
 void arch_clean(void) {
 }
 
+#if TIMER == CYCLE
+
 #ifdef __MSP430__
 /* Support for MSPGCC with custom MSPsim simulator. */
 
@@ -74,7 +76,7 @@ unsigned long long arch_cycles() {
     return cycles.cycles;
 }
 
-#endif
+#endif /* __MSP430__ */
 
 #if __ICC430__
 /* Support for IAR using simulator with custom macro. */
@@ -85,4 +87,6 @@ ull_t arch_cycles() {
 	return __cycles;
 }
 
-#endif
+#endif /* __ICC430__ */
+
+#endif /* TIMER = CYCLE */
