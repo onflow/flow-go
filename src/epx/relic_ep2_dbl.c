@@ -68,31 +68,8 @@ static void ep2_dbl_basic_imp(ep2_t r, fp2_t s, ep2_t p) {
 		fp2_dbl(t1, t1);
 		fp2_add(t1, t1, t2);
 
-		if (ep2_curve_is_twist()) {
-			switch (ep_curve_opt_a()) {
-				case OPT_ZERO:
-					break;
-				case OPT_ONE:
-					fp_set_dig(t2[0], 1);
-					fp2_mul_art(t2, t2);
-					fp2_mul_art(t2, t2);
-					fp2_add(t1, t1, t2);
-					break;
-				case OPT_DIGIT:
-					fp_set_dig(t2[0], ep_curve_get_a()[0]);
-					fp2_mul_art(t2, t2);
-					fp2_mul_art(t2, t2);
-					fp2_add(t1, t1, t2);
-					break;
-				default:
-					fp_copy(t2[0], ep_curve_get_a());
-					fp_zero(t2[1]);
-					fp2_mul_art(t2, t2);
-					fp2_mul_art(t2, t2);
-					fp2_add(t1, t1, t2);
-					break;
-			}
-		}
+		ep2_curve_get_a(t2);
+		fp2_add(t1, t1, t2);
 
 		/* t1 = (3 * x1^2 + a)/(2 * y1). */
 		fp2_mul(t1, t1, t0);
