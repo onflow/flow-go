@@ -363,7 +363,7 @@ static void arith(void) {
 	BENCH_END;
 #endif
 
-#if defined(EB_ORDIN) && (EB_MUL == LODAH || !defined(STRIP))
+#if EB_MUL == LODAH || !defined(STRIP)
 	BENCH_BEGIN("eb_mul_lodah") {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
