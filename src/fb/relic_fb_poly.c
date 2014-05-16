@@ -214,6 +214,12 @@ static void find_chain() {
 			ctx->chain[8] = (8 << 8) + 7;
 			ctx->chain_len = 10;
 			break;
+		case 283:
+			ctx->chain[4] = (4 << 8) + 0;
+			ctx->chain[6] = (6 << 8) + 0;
+			ctx->chain[9] = (9 << 8) + 0;
+			ctx->chain_len = 11;
+			break;
 		case 353:
 			ctx->chain[2] = (2 << 8) + 0;
 			ctx->chain[4] = (4 << 8) + 0;
