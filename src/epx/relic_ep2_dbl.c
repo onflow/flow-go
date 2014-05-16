@@ -36,7 +36,7 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if EP_ADD == BASIC || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP) || FP_PRIME == 80
 
 /**
  * Doubles a point represented in affine coordinates on an ordinary prime
@@ -141,39 +141,108 @@ static void ep2_dbl_basic_imp(ep2_t r, fp2_t s, ep2_t p) {
  * @param[in] p					- the point to double.
  */
 static void ep2_dbl_projc_imp(ep2_t r, ep2_t p) {
-	fp2_t t0, t1, t2, t3;
+	fp2_t t0, t1, t2, t3, t4, t5;
 
 	fp2_null(t0);
 	fp2_null(t1);
 	fp2_null(t2);
 	fp2_null(t3);
+	fp2_null(t4);
+	fp2_null(t5);
 
 	TRY {
-		fp2_new(t0);
-		fp2_new(t1);
-		fp2_new(t2);
-		fp2_new(t3);
+		if (ep_curve_opt_a() == OPT_ZERO) {
+			fp2_new(t0);
+			fp2_new(t1);
+			fp2_new(t2);
+			fp2_new(t3);
+			fp2_new(t4);
+			fp2_new(t5);
 
-		fp2_sqr(t0, p->x);
-		fp2_add(t2, t0, t0);
-		fp2_add(t0, t2, t0);
+			fp2_sqr(t0, p->x);
+			fp2_add(t2, t0, t0);
+			fp2_add(t0, t2, t0);
 
-		fp2_sqr(t3, p->y);
-		fp2_mul(t1, t3, p->x);
-		fp2_add(t1, t1, t1);
-		fp2_add(t1, t1, t1);
-		fp2_sqr(r->x, t0);
-		fp2_add(t2, t1, t1);
-		fp2_sub(r->x, r->x, t2);
-		fp2_mul(r->z, p->z, p->y);
-		fp2_add(r->z, r->z, r->z);
-		fp2_add(t3, t3, t3);
+			fp2_sqr(t3, p->y);
+			fp2_mul(t1, t3, p->x);
+			fp2_add(t1, t1, t1);
+			fp2_add(t1, t1, t1);
+			fp2_sqr(r->x, t0);
+			fp2_add(t2, t1, t1);
+			fp2_sub(r->x, r->x, t2);
+			fp2_mul(r->z, p->z, p->y);
+			fp2_add(r->z, r->z, r->z);
+			fp2_add(t3, t3, t3);
 
-		fp2_sqr(t3, t3);
-		fp2_add(t3, t3, t3);
-		fp2_sub(t1, t1, r->x);
-		fp2_mul(r->y, t0, t1);
-		fp2_sub(r->y, r->y, t3);
+			fp2_sqr(t3, t3);
+			fp2_add(t3, t3, t3);
+			fp2_sub(t1, t1, r->x);
+			fp2_mul(r->y, t0, t1);
+			fp2_sub(r->y, r->y, t3);
+		} else {
+			/* dbl-2007-bl formulas: 1M + 8S + 1*a + 10add + 1*8 + 2*2 + 1*3 */
+			/* http://www.hyperelliptic.org/EFD/g1p/auto-shortw-jacobian.html#doubling-dbl-2007-bl */
+
+			/* t0 = x1^2, t1 = y1^2, t2 = y1^4. */
+			fp2_sqr(t0, p->x);
+			fp2_sqr(t1, p->y);
+			fp2_sqr(t2, t1);
+
+			if (!p->norm) {
+				/* t3 = z1^2. */
+				fp2_sqr(t3, p->z);
+
+				if (ep_curve_get_a() == OPT_ZERO) {
+					/* z3 = 2 * y1 * z1. */
+					fp2_mul(r->z, p->y, p->z);
+					fp2_dbl(r->z, r->z);
+				} else {
+					/* z3 = (y1 + z1)^2 - y1^2 - z1^2. */
+					fp2_add(r->z, p->y, p->z);
+					fp2_sqr(r->z, r->z);
+					fp2_sub(r->z, r->z, t1);
+					fp2_sub(r->z, r->z, t3);
+				}
+			} else {
+				/* z3 = 2 * y1. */
+				fp2_dbl(r->z, p->y);
+			}
+
+			/* t4 = S = 2*((x1 + y1^2)^2 - x1^2 - y1^4). */
+			fp2_add(t4, p->x, t1);
+			fp2_sqr(t4, t4);
+			fp2_sub(t4, t4, t0);
+			fp2_sub(t4, t4, t2);
+			fp2_dbl(t4, t4);
+
+			/* t5 = M = 3 * x1^2 + a * z1^4. */
+			fp2_dbl(t5, t0);
+			fp2_add(t5, t5, t0);
+			ep2_curve_get_a(t0);
+			if (!p->norm) {
+				fp2_sqr(t3, t3);
+				fp2_mul(t1, t0, t3);
+				fp2_add(t5, t5, t1);
+			} else {
+				fp2_add(t5, t5, t0);
+			}
+
+			/* x3 = T = M^2 - 2 * S. */
+			fp2_sqr(r->x, t5);
+			fp2_dbl(t1, t4);
+			fp2_sub(r->x, r->x, t1);
+
+			/* y3 = M * (S - T) - 8 * y1^4. */
+			fp2_dbl(t2, t2);
+			fp2_dbl(t2, t2);
+			fp2_dbl(t2, t2);
+			fp2_sub(t4, t4, r->x);
+			fp2_mul(t5, t5, t4);
+			fp2_sub(r->y, t5, t2);
+		}
+
+		r->norm = 0;
+
 
 		r->norm = 0;
 	}
@@ -185,6 +254,8 @@ static void ep2_dbl_projc_imp(ep2_t r, ep2_t p) {
 		fp2_free(t1);
 		fp2_free(t2);
 		fp2_free(t3);
+		fp2_free(t4);
+		fp2_free(t5);
 	}
 }
 
