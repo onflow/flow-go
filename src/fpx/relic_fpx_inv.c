@@ -51,8 +51,12 @@ void fp2_inv(fp2_t c, fp2_t a) {
 		fp_sqr(t1, a[1]);
 
 #ifndef FP_QNRES
-		if (fp_prime_get_qnr() == -2) {
-			fp_dbl(t1, t1);
+		if (fp_prime_get_qnr() != -1) {
+			if (fp_prime_get_qnr() == -2) {
+				fp_dbl(t1, t1);
+			} else {
+				fp_mul_dig(t1, t1, -fp_prime_get_qnr());
+			}
 		}
 #endif
 
