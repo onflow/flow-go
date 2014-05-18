@@ -78,10 +78,10 @@ static void ep2_mul_pre_ordin(ep2_t *t, ep2_t p) {
  */
 static void ep2_mul_fix_ordin(ep2_t r, ep2_t *table, bn_t k) {
 	int len, i, n;
-	int8_t naf[FP_BITS + 1], *t;
+	int8_t naf[2 * FP_BITS + 1], *t;
 
 	/* Compute the w-TNAF representation of k. */
-	len = FP_BITS + 1;
+	len = 2 * FP_BITS + 1;
 	bn_rec_naf(naf, &len, k, EP_DEPTH);
 
 	t = naf + len - 1;
@@ -181,7 +181,7 @@ void ep2_mul_pre_yaowi(ep2_t *t, ep2_t p) {
 void ep2_mul_fix_yaowi(ep2_t r, ep2_t *t, bn_t k) {
 	int i, j, l;
 	ep2_t a;
-	uint8_t win[CEIL(FP_BITS, EP_DEPTH)];
+	uint8_t win[CEIL(2 * FP_BITS, EP_DEPTH)];
 
 	ep2_null(a);
 
@@ -191,7 +191,7 @@ void ep2_mul_fix_yaowi(ep2_t r, ep2_t *t, bn_t k) {
 		ep2_set_infty(r);
 		ep2_set_infty(a);
 
-		l = CEIL(FP_BITS, EP_DEPTH);
+		l = CEIL(2 * FP_BITS, EP_DEPTH);
 		bn_rec_win(win, &l, k, EP_DEPTH);
 
 		for (j = (1 << EP_DEPTH) - 1; j >= 1; j--) {
@@ -248,7 +248,7 @@ void ep2_mul_pre_nafwi(ep2_t *t, ep2_t p) {
 void ep2_mul_fix_nafwi(ep2_t r, ep2_t *t, bn_t k) {
 	int i, j, l, d, m;
 	ep2_t a;
-	int8_t naf[FP_BITS + 1];
+	int8_t naf[2 * FP_BITS + 1];
 	char w;
 
 	ep2_null(a);
@@ -259,7 +259,7 @@ void ep2_mul_fix_nafwi(ep2_t r, ep2_t *t, bn_t k) {
 		ep2_set_infty(r);
 		ep2_set_infty(a);
 
-		l = FP_BITS + 1;
+		l = 2 * FP_BITS + 1;
 		bn_rec_naf(naf, &l, k, 2);
 
 		d = ((l % EP_DEPTH) == 0 ? (l / EP_DEPTH) : (l / EP_DEPTH) + 1);
