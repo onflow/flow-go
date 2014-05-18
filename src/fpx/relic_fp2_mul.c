@@ -117,6 +117,10 @@ void fp2_mul_basic(fp2_t c, fp2_t a, fp2_t b) {
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
 			fp_subc_low(t1, t1, t4);
 		}
+		for (int i = 0; i <= fp_prime_get_qnr(); i++) {
+			fp_addc_low(t1, t1, t4);
+		}
+
 		/* c_0 = t1 mod p. */
 		fp_rdc(c[0], t1);
 
@@ -222,6 +226,9 @@ void fp2_mul_art(fp2_t c, fp2_t a) {
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
 			fp_sub(c[0], c[0], a[1]);
 		}
+		for (int i = 1; i <= fp_prime_get_qnr() + 1; i++) {
+			fp_add(c[0], c[0], a[1]);
+		}		
 		fp_copy(c[1], t);
 #endif
 	}

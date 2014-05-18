@@ -57,6 +57,9 @@ int fp2_srt(fp2_t c, fp2_t a) {
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
 			fp_add(t1, t1, t2);
 		}
+		for (int i = 0; i <= fp_prime_get_qnr(); i++) {
+			fp_sub(t1, t1, t2);
+		}		
 		fp_add(t1, t1, t2);
 
 		if (fp_srt(t2, t1)) {

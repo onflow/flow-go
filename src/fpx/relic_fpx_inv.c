@@ -50,18 +50,26 @@ void fp2_inv(fp2_t c, fp2_t a) {
 		fp_sqr(t0, a[0]);
 		fp_sqr(t1, a[1]);
 
+		/* t1 = 1/(a_0^2 + a_1^2). */
 #ifndef FP_QNRES
 		if (fp_prime_get_qnr() != -1) {
 			if (fp_prime_get_qnr() == -2) {
 				fp_dbl(t1, t1);
+				fp_add(t0, t0, t1);
 			} else {
-				fp_mul_dig(t1, t1, -fp_prime_get_qnr());
+				if (fp_prime_get_qnr() < 0) {
+					fp_mul_dig(t1, t1, -fp_prime_get_qnr());
+					fp_add(t0, t0, t1);
+				} else {
+					fp_mul_dig(t1, t1, fp_prime_get_qnr());
+					fp_sub(t0, t0, t1);
+				}
 			}
+		} else {
+			fp_add(t0, t0, t1);
 		}
 #endif
 
-		/* t1 = 1/(a_0^2 + a_1^2). */
-		fp_add(t0, t0, t1);
 		fp_inv(t1, t0);
 
 		/* c_0 = a_0/(a_0^2 + a_1^2). */

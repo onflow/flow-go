@@ -60,6 +60,10 @@ void fp2_sqr_basic(fp2_t c, fp2_t a) {
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
 			fp_sub(t1, t1, a[1]);
 		}
+		for (int i = 0; i <= fp_prime_get_qnr(); i++) {
+			fp_add(t1, t1, a[1]);
+		}
+
 
 		if (fp_prime_get_qnr() == -1) {
 			/* t2 = 2 * a_0. */
@@ -76,6 +80,9 @@ void fp2_sqr_basic(fp2_t c, fp2_t a) {
 			for (int i = -1; i > fp_prime_get_qnr(); i--) {
 				fp_add(c[0], c[0], c[1]);
 			}
+			for (int i = 0; i <= fp_prime_get_qnr(); i++) {
+				fp_sub(c[0], c[0], c[1]);
+			}			
 			/* c_1 = 2 * a_0 * a_1. */
 			fp_dbl(c[1], c[1]);
 		}

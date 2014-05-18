@@ -72,6 +72,9 @@ void fp2_muln_low(dv2_t c, fp2_t a, fp2_t b) {
 	for (int i = -1; i > fp_prime_get_qnr(); i--) {
 		fp_subc_low(c[0], c[0], c[1]);
 	}
+	for (int i = 0; i <= fp_prime_get_qnr(); i++) {
+		fp_addc_low(c[0], c[0], c[1]);
+	}	
 #endif
 
 	/* c_1 = t2 - t0. */
@@ -107,6 +110,10 @@ void fp2_mulc_low(dv2_t c, fp2_t a, fp2_t b) {
 	for (int i = -1; i > fp_prime_get_qnr(); i--) {
 		fp_subd_low(c[0], c[0], c[1]);
 	}
+	/* t1 = u^2 * (a_1 * b_1). */
+	for (int i = 0; i <= fp_prime_get_qnr(); i++) {
+		fp_addd_low(c[0], c[0], c[1]);
+	}	
 #endif
 
 	/* c_1 = (t2 - t0). */
