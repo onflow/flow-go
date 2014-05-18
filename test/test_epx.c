@@ -509,7 +509,7 @@ static int multiplication(void) {
 static int fixed(void) {
 	int code = STS_ERR;
 	bn_t n, k;
-	ep2_t p, q, r, t[EP_TABLE_MAX];
+	ep2_t p, q, r, t[EPX_TABLE_MAX];
 
 	bn_null(n);
 	bn_null(k);
@@ -517,7 +517,7 @@ static int fixed(void) {
 	ep2_null(q);
 	ep2_null(r);
 
-	for (int i = 0; i < EP_TABLE_MAX; i++) {
+	for (int i = 0; i < EPX_TABLE_MAX; i++) {
 		ep2_null(t[i]);
 	}
 
@@ -531,7 +531,7 @@ static int fixed(void) {
 		ep2_curve_get_gen(p);
 		ep2_curve_get_ord(n);
 
-		for (int i = 0; i < EP_TABLE; i++) {
+		for (int i = 0; i < EPX_TABLE; i++) {
 			ep2_new(t[i]);
 		}
 		TEST_BEGIN("fixed point multiplication is correct") {
@@ -543,12 +543,12 @@ static int fixed(void) {
 			ep2_mul(r, p, k);
 			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EP_TABLE; i++) {
+		for (int i = 0; i < EPX_TABLE; i++) {
 			ep2_free(t[i]);
 		}
 
 #if EP_FIX == BASIC || !defined(STRIP)
-		for (int i = 0; i < EP_TABLE_BASIC; i++) {
+		for (int i = 0; i < EPX_TABLE_BASIC; i++) {
 			ep2_new(t[i]);
 		}
 		TEST_BEGIN("binary fixed point multiplication is correct") {
@@ -560,13 +560,13 @@ static int fixed(void) {
 			ep2_mul(r, p, k);
 			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EP_TABLE_BASIC; i++) {
+		for (int i = 0; i < EPX_TABLE_BASIC; i++) {
 			ep2_free(t[i]);
 		}
 #endif
 
 #if EP_FIX == YAOWI || !defined(STRIP)
-		for (int i = 0; i < EP_TABLE_YAOWI; i++) {
+		for (int i = 0; i < EPX_TABLE_YAOWI; i++) {
 			ep2_new(t[i]);
 		}
 		TEST_BEGIN("yao windowing fixed point multiplication is correct") {
@@ -578,13 +578,13 @@ static int fixed(void) {
 			ep2_mul(r, p, k);
 			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EP_TABLE_YAOWI; i++) {
+		for (int i = 0; i < EPX_TABLE_YAOWI; i++) {
 			ep2_free(t[i]);
 		}
 #endif
 
 #if EP_FIX == NAFWI || !defined(STRIP)
-		for (int i = 0; i < EP_TABLE_NAFWI; i++) {
+		for (int i = 0; i < EPX_TABLE_NAFWI; i++) {
 			ep2_new(t[i]);
 		}
 		TEST_BEGIN("naf windowing fixed point multiplication is correct") {
@@ -596,13 +596,13 @@ static int fixed(void) {
 			ep2_mul(r, p, k);
 			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EP_TABLE_NAFWI; i++) {
+		for (int i = 0; i < EPX_TABLE_NAFWI; i++) {
 			ep2_free(t[i]);
 		}
 #endif
 
 #if EP_FIX == COMBS || !defined(STRIP)
-		for (int i = 0; i < EP_TABLE_COMBS; i++) {
+		for (int i = 0; i < EPX_TABLE_COMBS; i++) {
 			ep2_new(t[i]);
 		}
 		TEST_BEGIN("single-table comb fixed point multiplication is correct") {
@@ -614,13 +614,13 @@ static int fixed(void) {
 			ep2_mul(r, p, k);
 			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EP_TABLE_COMBS; i++) {
+		for (int i = 0; i < EPX_TABLE_COMBS; i++) {
 			ep2_free(t[i]);
 		}
 #endif
 
 #if EP_FIX == COMBD || !defined(STRIP)
-		for (int i = 0; i < EP_TABLE_COMBD; i++) {
+		for (int i = 0; i < EPX_TABLE_COMBD; i++) {
 			ep2_new(t[i]);
 		}
 		TEST_BEGIN("double-table comb fixed point multiplication is correct") {
@@ -632,13 +632,13 @@ static int fixed(void) {
 			ep2_mul(r, p, k);
 			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EP_TABLE_COMBD; i++) {
+		for (int i = 0; i < EPX_TABLE_COMBD; i++) {
 			ep2_free(t[i]);
 		}
 #endif
 
 #if EP_FIX == LWNAF || !defined(STRIP)
-		for (int i = 0; i < EP_TABLE_LWNAF; i++) {
+		for (int i = 0; i < EPX_TABLE_LWNAF; i++) {
 			ep2_new(t[i]);
 		}
 		TEST_BEGIN("left-to-right w-naf fixed point multiplication is correct") {
@@ -650,7 +650,7 @@ static int fixed(void) {
 			ep2_mul(r, p, k);
 			TEST_ASSERT(ep2_cmp(q, r) == CMP_EQ, end);
 		} TEST_END;
-		for (int i = 0; i < EP_TABLE_LWNAF; i++) {
+		for (int i = 0; i < EPX_TABLE_LWNAF; i++) {
 			ep2_free(t[i]);
 		}
 #endif

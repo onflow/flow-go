@@ -42,6 +42,67 @@
 #include "relic_types.h"
 
 /*============================================================================*/
+/* Constant definitions                                                       */
+/*============================================================================*/
+
+/**
+ * Size of a precomputation table using the binary method.
+ */
+#define EPX_TABLE_BASIC		(2 * FP_BITS + 1)
+
+/**
+ * Size of a precomputation table using Yao's windowing method.
+ */
+#define EPX_TABLE_YAOWI      (2 * FP_BITS / EP_DEPTH + 1)
+
+/**
+ * Size of a precomputation table using the NAF windowing method.
+ */
+#define EPX_TABLE_NAFWI      (2 * FP_BITS / EP_DEPTH + 1)
+
+/**
+ * Size of a precomputation table using the single-table comb method.
+ */
+#define EPX_TABLE_COMBS      (1 << EP_DEPTH)
+
+/**
+ * Size of a precomputation table using the double-table comb method.
+ */
+#define EPX_TABLE_COMBD		(1 << (EP_DEPTH + 1))
+
+/**
+ * Size of a precomputation table using the w-(T)NAF method.
+ */
+#define EPX_TABLE_LWNAF		(1 << (EP_DEPTH - 2))
+
+/**
+ * Size of a precomputation table using the chosen algorithm.
+ */
+#if EP_FIX == BASIC
+#define EPX_TABLE			EPX_TABLE_BASIC
+#elif EP_FIX == YAOWI
+#define EPX_TABLE			EPX_TABLE_YAOWI
+#elif EP_FIX == NAFWI
+#define EPX_TABLE			EPX_TABLE_NAFWI
+#elif EP_FIX == COMBS
+#define EPX_TABLE			EPX_TABLE_COMBS
+#elif EP_FIX == COMBD
+#define EPX_TABLE			EPX_TABLE_COMBD
+#elif EP_FIX == LWNAF
+#define EPX_TABLE			EPX_TABLE_LWNAF
+#endif
+
+/**
+ * Maximum size of a precomputation table.
+ */
+#ifdef STRIP
+#define EPX_TABLE_MAX EPX_TABLE
+#else
+#define EPX_TABLE_MAX MAX(EPX_TABLE_BASIC, EPX_TABLE_COMBD)
+#endif
+
+
+/*============================================================================*/
 /* Type definitions                                                           */
 /*============================================================================*/
 

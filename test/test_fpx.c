@@ -463,6 +463,9 @@ static int multiplication2(void) {
 					fp2_dbl(c, c);
 					fp2_add(c, c, d);
 					break;
+				default:
+					fp2_copy(c, b);
+					break;
 			}
 			TEST_ASSERT(fp2_cmp(b, c) == CMP_EQ, end);
 		}
