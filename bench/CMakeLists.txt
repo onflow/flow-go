@@ -68,3 +68,5 @@ endif(WITH_PC)
 if (WITH_CP)
 	ADD_MODULE(cp)
 endif(WITH_CP)
+
+ADD_MODULE(rand)

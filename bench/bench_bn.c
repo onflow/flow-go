@@ -193,7 +193,7 @@ static void util(void) {
 	BENCH_END;
 
 	BENCH_BEGIN("bn_rand") {
-		BENCH_ADD(bn_rand(a, BN_POS, BN_DIGS));
+		BENCH_ADD(bn_rand(a, BN_POS, BN_BITS));
 	}
 	BENCH_END;
 
