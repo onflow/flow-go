@@ -45,6 +45,12 @@ void arch_clean(void) {
 
 ull_t arch_cycles(void) {
 	unsigned int hi, lo;
-	asm("rdtsc\n\t":"=a" (lo), "=d"(hi));
+	asm (
+		"cpuid\n\t"/*serialize*/
+		"rdtsc\n\t"/*read the clock*/
+		"mov %%edx, %0\n\t"
+		"mov %%eax, %1\n\t" 
+		: "=r" (hi), "=r" (lo):: "%rax", "%rbx", "%rcx", "%rdx"
+	);
 	return ((ull_t) lo) | (((ull_t) hi) << 32);
 }
