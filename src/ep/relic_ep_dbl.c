@@ -138,7 +138,6 @@ static void ep_dbl_projc_imp(ep_t r, const ep_t p) {
 	fp_null(t5);
 
 	TRY {
-
 		fp_new(t0);
 		fp_new(t1);
 		fp_new(t2);
