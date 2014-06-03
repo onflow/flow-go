@@ -68,6 +68,8 @@ void fp2_inv(fp2_t c, fp2_t a) {
 		} else {
 			fp_add(t0, t0, t1);
 		}
+#else
+		fp_add(t0, t0, t1);
 #endif
 
 		fp_inv(t1, t0);
