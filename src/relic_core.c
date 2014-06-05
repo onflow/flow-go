@@ -50,16 +50,25 @@
 /*============================================================================*/
 
 /**
+ * If multi-threading is enabled, assigns each thread a local copy of the data.
+ */
+#if defined(MULTI) && !defined(_OPENMP)
+#define thread 	__thread
+#else
+#define thread /* */
+#endif
+
+/**
  * Default library context.
  */
-ctx_t first_ctx;
+thread ctx_t first_ctx;
 
 /**
  * Active library context.
  */
-ctx_t *core_ctx = NULL;
+thread ctx_t *core_ctx = NULL;
 
-#ifdef MULTI
+#if defined MULTI && defined(_OPENMP)
 #pragma omp threadprivate(first_ctx, core_ctx)
 #endif
 
