@@ -52,9 +52,15 @@
 #include "relic_label.h"
 
 #ifdef MULTI
-#include <omp.h>
 #include <math.h>
-#endif
+
+#ifdef _OPENMP
+#include <omp.h>
+#else
+#include <pthread.h>
+#endif /* _OPENMP */
+
+#endif /* MULTI */
 
 /*============================================================================*/
 /* Constant definitions                                                       */
