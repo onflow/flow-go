@@ -306,7 +306,7 @@ else(DEBUG)
 endif(DEBUG)
 
 if(MULTI)
-	FIND_PACKAGE( OpenMP REQUIRED)
+	FIND_PACKAGE( OpenMP QUIET)
 	if(OPENMP_FOUND)
 		set(CFLAGS "${CFLAGS} -fopenmp")
 	else(OPENMP_FOUND)
