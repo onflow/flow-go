@@ -115,16 +115,34 @@ static void util(void) {
 		BENCH_ADD(ep_size_bin(&l, p, 0));
 	} BENCH_END;
 
+	BENCH_BEGIN("ep_size_bin (1)") {
+		ep_rand(p);
+		BENCH_ADD(ep_size_bin(&l, p, 1));
+	} BENCH_END;
+
 	BENCH_BEGIN("ep_write_bin (0)") {
 		ep_rand(p);
 		ep_size_bin(&l, p, 0);
 		BENCH_ADD(ep_write_bin(bin, l, p, 0));
 	} BENCH_END;
 
+	BENCH_BEGIN("ep_write_bin (1)") {
+		ep_rand(p);
+		ep_size_bin(&l, p, 1);
+		BENCH_ADD(ep_write_bin(bin, l, p, 1));
+	} BENCH_END;
+
 	BENCH_BEGIN("ep_read_bin (0)") {
 		ep_rand(p);
 		ep_size_bin(&l, p, 0);
 		ep_write_bin(bin, l, p, 0);
+		BENCH_ADD(ep_read_bin(p, bin, l));
+	} BENCH_END;
+
+	BENCH_BEGIN("ep_read_bin (1)") {
+		ep_rand(p);
+		ep_size_bin(&l, p, 1);
+		ep_write_bin(bin, l, p, 1);
 		BENCH_ADD(ep_read_bin(p, bin, l));
 	} BENCH_END;
 

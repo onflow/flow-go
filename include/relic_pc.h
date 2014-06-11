@@ -401,12 +401,31 @@ typedef CAT(GT_LOWER, t) gt_t;
 #define gt_print(P)			CAT(GT_LOWER, print)(P)
 
 /**
+ * Returns the number of bytes necessary to store a G_1 element.
+ *
+ * @param[out] S			- the result.
+ * @param[in] P				- the element of G_1
+ * @param[in] C 			- the flag to indicate point compression
+ */
+#define g1_size_bin(R, P, C)	CAT(G1_LOWER, size_bin)(R, P, C)
+
+/**
  * Returns the number of bytes necessary to store a G_T element.
  *
  * @param[out] S			- the result.
- * @param[in] P				- the element of G_T
+ * @param[in] P				- the element of G_T.
  */
 #define gt_size_bin(S, P)	CAT(GT_LOWER, size_bin)(S, P)
+
+/**
+ * Reads a G_1 element from a byte vector in big-endian format.
+ *
+ * @param[out] P			- the result.
+ * @param[in] B				- the byte vector.
+ * @param[in] L				- the buffer capacity.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not sufficient. 
+ */
+#define g1_read_bin(P, B, L) 	CAT(G1_LOWER, read_bin)(P, B, L)
 
 /**
  * Reads a G_T element from a byte vector in big-endian format.
@@ -414,17 +433,29 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[out] P			- the result.
  * @param[in] B				- the byte vector.
  * @param[in] L				- the buffer capacity.
- * @throw ERR_NO_BUFFER		- if the buffer capacity is not FP_BYTES. 
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not sufficient. 
  */
 #define gt_read_bin(P, B, L) 	CAT(GT_LOWER, read_bin)(P, B, L)	
 
 /**
- * Writes a prime field element to a byte vector in big-endian format.
+ * Writes an optionally compressed G_1 element to a byte vector in big-endian
+ * format.
  *
  * @param[out] B			- the byte vector.
  * @param[in] L				- the buffer capacity.
  * @param[in] P				- the G_T element to write.
- * @throw ERR_NO_BUFFER		- if the buffer capacity is not FP_BYTES.
+ * @param[in] C 			- the flag to indicate point compression.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not enough.
+ */
+#define g1_write_bin(B, L, P, C)	CAT(G1_LOWER, write_bin)(B, L, P, C)
+
+/**
+ * Writes a G_T element to a byte vector in big-endian format.
+ *
+ * @param[out] B			- the byte vector.
+ * @param[in] L				- the buffer capacity.
+ * @param[in] P				- the G_T element to write.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not sufficient.
  */
 #define gt_write_bin(B, L, P)	CAT(GT_LOWER, write_bin)(B, L, P)
 
@@ -536,15 +567,6 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[in] P				- the element to normalize.
  */
 #define g2_norm(R, P)		CAT(G2_LOWER, norm)(R, P)
-
-/**
- * Returns the number of bytes necessary to store a G_1 element.
- *
- * @param[out] S			- the result.
- * @param[in] P				- the element of G_1
- * @param[in] C 			- the flag to indicate point compression
- */
-#define g1_size_bin(R, P, C)	CAT(G1_LOWER, size_bin)(R, P, C)
 
 /**
  * Multiplies an element from G_1 by an integer. Computes R = kP.

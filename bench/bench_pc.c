@@ -54,6 +54,8 @@ static void memory1(void) {
 
 static void util1(void) {
 	g1_t p, q;
+	uint8_t bin[2 * PC_BYTES + 1];
+	int l;	
 
 	g1_null(p);
 	g1_null(q);
@@ -91,6 +93,47 @@ static void util1(void) {
 		BENCH_ADD(g1_rand(p));
 	}
 	BENCH_END;
+
+	BENCH_BEGIN("g1_is_valid") {
+		g1_rand(p);
+		BENCH_ADD(g1_is_valid(p));
+	} BENCH_END;
+
+	BENCH_BEGIN("g1_size_bin (0)") {
+		g1_rand(p);
+		BENCH_ADD(g1_size_bin(&l, p, 0));
+	} BENCH_END;
+
+	BENCH_BEGIN("g1_size_bin (1)") {
+		g1_rand(p);
+		BENCH_ADD(g1_size_bin(&l, p, 1));
+	} BENCH_END;
+
+	BENCH_BEGIN("g1_write_bin (0)") {
+		g1_rand(p);
+		g1_size_bin(&l, p, 0);
+		BENCH_ADD(g1_write_bin(bin, l, p, 0));
+	} BENCH_END;
+
+	BENCH_BEGIN("g1_write_bin (1)") {
+		g1_rand(p);
+		g1_size_bin(&l, p, 1);
+		BENCH_ADD(g1_write_bin(bin, l, p, 1));
+	} BENCH_END;
+
+	BENCH_BEGIN("g1_read_bin (0)") {
+		g1_rand(p);
+		g1_size_bin(&l, p, 0);
+		g1_write_bin(bin, l, p, 0);
+		BENCH_ADD(g1_read_bin(p, bin, l));
+	} BENCH_END;
+
+	BENCH_BEGIN("g1_read_bin (1)") {
+		g1_rand(p);
+		g1_size_bin(&l, p, 1);
+		g1_write_bin(bin, l, p, 1);
+		BENCH_ADD(g1_read_bin(p, bin, l));
+	} BENCH_END;	
 }
 
 static void arith1(void) {
@@ -277,6 +320,11 @@ static void util2(void) {
 		BENCH_ADD(g2_rand(p));
 	}
 	BENCH_END;
+
+	BENCH_BEGIN("g2_is_valid") {
+		BENCH_ADD(g2_is_valid(p));
+	}
+	BENCH_END;	
 }
 
 static void arith2(void) {

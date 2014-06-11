@@ -61,8 +61,9 @@ static int memory1(void) {
 }
 
 int util1(void) {
-	int code = STS_ERR;
+	int l, code = STS_ERR;
 	g1_t a, b, c;
+	uint8_t bin[2 * PC_BYTES + 1];
 
 	g1_null(a);
 	g1_null(b);
@@ -117,6 +118,29 @@ int util1(void) {
 			TEST_ASSERT(g1_is_infty(a), end);
 		}
 		TEST_END;
+
+		TEST_BEGIN("reading and writing a point are consistent") {
+			for (int j = 0; j < 2; j++) {
+				g1_set_infty(a);
+				g1_size_bin(&l, a, j);
+				g1_write_bin(bin, l, a, j);
+				g1_read_bin(b, bin, l);
+				TEST_ASSERT(g1_cmp(a, b) == CMP_EQ, end);
+				g1_rand(a);
+				g1_size_bin(&l, a, j);
+				g1_write_bin(bin, l, a, j);
+				g1_read_bin(b, bin, l);
+				TEST_ASSERT(g1_cmp(a, b) == CMP_EQ, end);
+				g1_rand(a);
+				g1_dbl(a, a);
+				g1_size_bin(&l, a, j);
+				g1_norm(a, a);
+				g1_write_bin(bin, l, a, j);
+				g1_read_bin(b, bin, l);
+				TEST_ASSERT(g1_cmp(a, b) == CMP_EQ, end);						
+			}
+		}
+		TEST_END;		
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
