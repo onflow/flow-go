@@ -29,9 +29,12 @@
  * @ingroup arch
  */
 
-#include "relic_util.h"
-#include "relic_conf.h"
-#include "relic_label.h"
+#include "relic_types.h"
+
+/**
+ * Renames the inline assembly macro to a prettier name.
+ */
+#define asm					__asm__ volatile
 
 /*============================================================================*/
 /* Public definitions                                                         */

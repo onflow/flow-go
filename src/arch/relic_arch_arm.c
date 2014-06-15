@@ -29,12 +29,22 @@
  * @ingroup arch
  */
 
-#include "relic_util.h"
+#include "relic_types.h"
+
+/**
+ * Renames the inline assembly macro to a prettier name.
+ */
+#define asm					__asm__ volatile
 
 #ifdef __ARM_ARCH_7M__
-	volatile unsigned int *DWT_CYCCNT = (unsigned int *)0xE0001004; //address of the register
-	volatile unsigned int *DWT_CONTROL = (unsigned int *)0xE0001000; //address of the register
-	volatile unsigned int *SCB_DEMCR = (unsigned int *)0xE000EDFC; //address of the register
+	/**
+	 * Addresses of the registers.
+	 */
+ 	/** @{ */
+	volatile unsigned int *DWT_CYCCNT = (unsigned int *)0xE0001004;
+	volatile unsigned int *DWT_CONTROL = (unsigned int *)0xE0001000;
+	volatile unsigned int *SCB_DEMCR = (unsigned int *)0xE000EDFC;
+	/** @} */
 #endif
 
 /*============================================================================*/

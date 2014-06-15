@@ -29,7 +29,12 @@
  * @ingroup arch
  */
 
-#include "relic_util.h"
+#include "relic_types.h"
+
+/**
+ * Renames the inline assembly macro to a prettier name.
+ */
+#define asm					__asm__ volatile
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -42,7 +47,7 @@ void arch_clean(void) {
 }
 
 ull_t arch_cycles(void) {
-	unsigned long long int x;
-	asm(".byte 0x0f, 0x31\n\t":"=A" (x));
-	return x;
+	ull_t value;
+	asm(".byte 0x0f, 0x31\n\t":"=A" (value));
+	return value;
 }

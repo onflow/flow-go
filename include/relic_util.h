@@ -124,11 +124,6 @@
 #define TOUPPER(C)			((C) - 0x20 * (((C) >= 'a') && ((C) <= 'z')))
 
 /**
- * Renames the inline assembly macro to a prettier name.
- */
-#define asm					__asm__ volatile
-
-/**
  * Concatenates two tokens.
  */
 /** @{ */
