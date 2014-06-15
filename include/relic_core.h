@@ -54,11 +54,11 @@
 #ifdef MULTI
 #include <math.h>
 
-#ifdef _OPENMP
+#if MULTI == OPENMP
 #include <omp.h>
-#else
+#elif MULTI == PTHREAD
 #include <pthread.h>
-#endif /* _OPENMP */
+#endif /* OPENMP */
 
 #endif /* MULTI */
 

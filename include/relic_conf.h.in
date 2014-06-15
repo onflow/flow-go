@@ -45,8 +45,6 @@
 #cmakedefine VERBS
 /** Trace support. */
 #cmakedefine TRACE
-/** Build with multithreading support. */
-#cmakedefine MULTI
 /** Build with overhead estimation. */
 #cmakedefine OVERH
 /** Build documentation. */
@@ -645,6 +643,13 @@
 #define DUINO    7
 /** Detected operation system. */
 #define OPSYS    @OPSYS@
+
+/** OpenMP multithreading support. */
+#define OPENMP   1
+/** POSIX multithreading support. */
+#define PTHREAD  2
+/** Chosen multithreading API. */
+#define MULTI    @MULTI@
 
 /** No timer. */
 #define NONE     1

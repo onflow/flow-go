@@ -52,7 +52,7 @@
 /**
  * If multi-threading is enabled, assigns each thread a local copy of the data.
  */
-#if defined(MULTI) && !defined(_OPENMP)
+#if MULTI == PTHREAD
 #define thread 	__thread
 #else
 #define thread /* */
@@ -68,7 +68,7 @@ thread ctx_t first_ctx;
  */
 thread ctx_t *core_ctx = NULL;
 
-#if defined MULTI && defined(_OPENMP)
+#if MULTI == OPENMP
 #pragma omp threadprivate(first_ctx, core_ctx)
 #endif
 
