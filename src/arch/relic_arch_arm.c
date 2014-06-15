@@ -42,14 +42,16 @@
 /*============================================================================*/
 
 void arch_init(void) {
-#ifdef __ARM_ARCH_7M__
-	*SCB_DEMCR = *SCB_DEMCR | 0x01000000;
-	*DWT_CYCCNT = 0; // reset the counter
-	*DWT_CONTROL = *DWT_CONTROL | 1 ; // enable the counter
+#if __ARM_ARCH_6J__ || __ARM_ARCH_6ZK__
+	asm("mcr p15, 0, %0, c15, c12, 0" : : "r" (1));		
 #elif __ARM_ARCH_7A__
 	asm("mcr p15, 0, %0, c9, c12, 0" :: "r"(17));
 	asm("mcr p15, 0, %0, c9, c12, 1" :: "r"(0x8000000f));
 	asm("mcr p15, 0, %0, c9, c12, 3" :: "r"(0x8000000f));
+#elif __ARM_ARCH_7M__
+	*SCB_DEMCR = *SCB_DEMCR | 0x01000000;
+	*DWT_CYCCNT = 0; // reset the counter
+	*DWT_CONTROL = *DWT_CONTROL | 1 ; // enable the counter
 #endif
 }
 
@@ -59,10 +61,14 @@ void arch_clean(void) {
 
 ull_t arch_cycles(void) {
 	unsigned int value = 0;
-#ifdef __ARM_ARCH_7M__
-	value = *DWT_CYCCNT;
+#ifdef __ARM_ARCH_6J__ || __ARM_ARCH_6ZK__
+	asm("mrc p15, 0, %0, c15, c12, 1" : "=r"(value));	
 #elif __ARM_ARCH_7A__
-	asm("mcr p15, 0, %0, c9, c13, 0" : "=r"(value));  
+	asm("mcr p15, 0, %0, c9, c13, 0" : "=r"(value));
+#elif __ARM_ARCH_7M__
+	value = *DWT_CYCCNT;	
+#else
+	#error "Unsupported ARM architecture. Cycle count implementation missing for this ARM version."
 #endif
 	return value;
 }

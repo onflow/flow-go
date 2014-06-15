@@ -155,7 +155,7 @@ void bench_after() {
 	result += (ctx->after.tv_usec - ctx->before.tv_usec);
 #elif TIMER == CYCLE
 	ctx->after = arch_cycles();
-	result = (ctx->after - ctx->before);
+  	result = (ctx->after - ctx->before);
 #endif
 
 #if TIMER != NONE
@@ -190,7 +190,7 @@ void bench_print() {
 	util_print("%lld nanosec", ctx->total);
 #endif
 	if (ctx->total < 0) {
-		util_print(" (bad overhead estimation)\n");
+		util_print(" (overflow or bad overhead estimation)\n");
 	} else {
 		util_print("\n");
 	}
