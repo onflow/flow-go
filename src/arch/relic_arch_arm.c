@@ -43,8 +43,17 @@
 
 void arch_init(void) {
 #if __ARM_ARCH_6J__ || __ARM_ARCH_6ZK__
+	/* 
+	 * This relies on a Kernel module described in:
+	 * http://blog.regehr.org/archives/794
+	 */
 	asm("mcr p15, 0, %0, c15, c12, 0" : : "r" (1));		
 #elif __ARM_ARCH_7A__
+	/*
+	 * This relies on a Kernel module described in:
+	 * http://stackoverflow.com/questions/3247373/
+	 * how-to-measure-program-execution-time-in-arm-cortex-a8-processor
+	 */
 	asm("mcr p15, 0, %0, c9, c12, 0" :: "r"(17));
 	asm("mcr p15, 0, %0, c9, c12, 1" :: "r"(0x8000000f));
 	asm("mcr p15, 0, %0, c9, c12, 3" :: "r"(0x8000000f));
