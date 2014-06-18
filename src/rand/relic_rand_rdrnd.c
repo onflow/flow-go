@@ -59,6 +59,7 @@ void rand_bytes(uint8_t *buf, int size) {
 }
 
 void rand_seed(uint8_t *buf, int size) {
+	/* Do nothing, mark as seeded. */
 	core_get()->seeded = 1;
 }
 
