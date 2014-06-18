@@ -59,6 +59,8 @@
 #define RAND_SIZE	    20
 #elif RAND == CALL
 #define RAND_SIZE		(sizeof(void (*)(uint8_t *, int)))
+#elif RAND == RDRND
+#define RAND_SIZE      0
 #endif
 
 /**
@@ -81,6 +83,7 @@ void rand_init(void);
 void rand_clean(void);
 
 #if RAND != CALL
+
 /**
  * Sets the initial state of the pseudo-random number generator.
  * 
@@ -89,7 +92,9 @@ void rand_clean(void);
  * @throw ERR_NO_VALID		- if the entropy length is too small or too large.
  */
 void rand_seed(uint8_t *buf, int size);
+
 #else
+
 /**
  * Sets the initial state of the pseudo-random number generator as a function
  * pointer.
@@ -98,6 +103,7 @@ void rand_seed(uint8_t *buf, int size);
  * @param[in] arg			- the argument for the callback.
  */
 void rand_seed(void (*callback)(uint8_t *, int, void *), void *arg);
+
 #endif
 
 /**

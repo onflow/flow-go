@@ -607,10 +607,12 @@
 #define HMAC     2
 /** Operating system underlying generator. */
 #define UDEV     3
+/** Intel RdRand instruction. */
+#define RDRND    4
 /** FIPS 186-2 (CN1) SHA-1 based generator. */
-#define FIPS     4
+#define FIPS     5
 /** Override library generator with the callback. */
-#define CALL     5
+#define CALL     6
 /** Chosen random generator. */
 #define RAND     @RAND@
 
@@ -620,10 +622,12 @@
 #define DEV      2
 /** Device node generator. */
 #define UDEV     3
-/** Null seed. */
-#define	ZERO     4
+/** Intel RdRand instruction. */
+#define RDRND    4
 /** Standard C library generator. */
 #define LIBC     5
+/** Null seed. */
+#define	ZERO     6
 /** Chosen random generator seeder. */
 #define SEED     @SEED@
 
