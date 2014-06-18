@@ -56,6 +56,10 @@
 #include <windows.h>
 #include <Wincrypt.h>
 
+#elif SEED == RDRND
+
+#include <immintrin.h>
+
 #endif
 
 /*============================================================================*/
@@ -126,6 +130,7 @@ void rand_init() {
 #endif
 
 #elif SEED == WCGR
+
 	HCRYPTPROV hCryptProv;
 
 	if (!CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL,
@@ -138,6 +143,23 @@ void rand_init() {
 	if (hCryptProv && !CryptReleaseContext(hCryptProv, 0)) {
 		THROW(ERR_NO_READ);
 	}
+
+#elif SEED == RDRND
+
+	int i, j;
+	ull_t r;
+
+	while (i < SEED_SIZE) {
+#ifdef __RDRND__
+		while (_rdrand64_step(&r) == 0);
+#else
+#error "RdRand not available, check your compiler settings."
+#endif
+		for (j = 0; i < SEED_SIZE && j < sizeof(ull_t); i++, j++) {
+			buf[i] = r & 0xFF;
+		}
+	}
+
 #endif
 
 #endif /* RAND == UDEV */

@@ -385,6 +385,26 @@ static int test(void) {
 	return STS_OK;
 }
 
+#elif RAND == RDRND
+
+static int test(void) {
+	uint8_t out[64];
+	int len = sizeof(out) / 2, code = STS_ERR;
+
+	TEST_ONCE("rdrand hardware generator is non-trivial") {
+		memset(out, 0, 2 * len);
+		rand_bytes(out, len);
+		/* This fails with negligible probability. */
+		TEST_ASSERT(memcmp(out, out + len, len) != 0, end);
+	}
+	TEST_END;
+
+	code = STS_OK;
+
+  end:
+	return code;	
+}
+
 #elif RAND == CALL
 
 #include <unistd.h>
