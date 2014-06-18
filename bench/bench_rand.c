@@ -86,7 +86,7 @@ static void rng(void) {
 	} BENCH_END;
 
 	for (int k = 1; k <= sizeof(buffer); k *= 2) {
-		BENCH_BEGIN("rand_bytes (from 1 to 64)") {
+		BENCH_BEGIN("rand_bytes (from 1 to 256)") {
 			BENCH_ADD(rand_bytes(buffer, k));
 		} BENCH_END;
 	}
