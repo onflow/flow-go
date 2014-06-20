@@ -180,3 +180,119 @@ void ep2_print(ep2_t p) {
 	fp2_print(p->y);
 	fp2_print(p->z);
 }
+
+void ep2_size_bin(int *size, ep2_t a, int pack) {
+	ep2_t t;
+
+	ep2_null(t);
+
+	if (ep2_is_infty(a)) {
+		*size = 1;
+		return;
+	}
+
+	TRY {
+		ep2_new(t);
+
+		ep2_norm(t, a);
+
+		*size = 1 + 2 * FP_BYTES;
+		if (!pack) {
+			*size += 2 * FP_BYTES;
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	} FINALLY {
+		ep2_free(t);
+	}
+}
+
+void ep2_read_bin(ep2_t a, uint8_t *bin, int len) {
+	if (len == 1) {
+		if (bin[0] == 0) {
+			ep2_set_infty(a);
+			return;
+		} else {
+			THROW(ERR_NO_BUFFER);
+			return;
+		}
+	}
+
+	if (len != (2 * FP_BYTES + 1) && len != (4 * FP_BYTES + 1)) {
+		THROW(ERR_NO_BUFFER);
+		return;
+	}
+
+	a->norm = 1;
+	fp_set_dig(a->z[0], 1);
+	fp_zero(a->z[1]);
+	fp2_read_bin(a->x, bin + 1, 2 * FP_BYTES);
+	if (len == 2 * FP_BYTES + 1) {
+		switch(bin[0]) {
+			case 2:
+				fp2_zero(a->y);
+				break;
+			case 3:
+				fp2_zero(a->y);
+				fp_set_bit(a->y[0], 0, 1);
+				fp_zero(a->y[1]);
+				break;
+			default:
+				THROW(ERR_NO_VALID);
+				break;
+		}
+		ep2_upk(a, a);
+	}
+
+	if (len == 4 * FP_BYTES + 1) {
+		if (bin[0] == 4) {
+			fp2_read_bin(a->y, bin + 2 * FP_BYTES + 1, 2 * FP_BYTES);
+		} else {
+			THROW(ERR_NO_VALID);
+		}
+	}
+}
+
+void ep2_write_bin(uint8_t *bin, int len, ep2_t a, int pack) {
+	ep2_t t;
+
+	ep2_null(t);
+
+	if (ep2_is_infty(a)) {
+		if (len != 1) {
+			THROW(ERR_NO_BUFFER);
+		} else {
+			bin[0] = 0;
+			return;
+		}
+	}
+
+	TRY {
+		ep2_new(t);
+
+		ep2_norm(t, a);
+
+		if (pack) {
+			if (len != 2 * FP_BYTES + 1) {
+				THROW(ERR_NO_BUFFER);	
+			} else {
+				ep2_pck(t, t);
+				bin[0] = 2 | fp_get_bit(t->y[0], 0);
+				fp2_write_bin(bin + 1, 2 * FP_BYTES, t->x);
+			}
+		} else {
+			if (len != 4 * FP_BYTES + 1) {
+				THROW(ERR_NO_BUFFER);
+			} else {
+				bin[0] = 4;
+				fp2_write_bin(bin + 1, 2 * FP_BYTES, t->x);
+				fp2_write_bin(bin + 2 * FP_BYTES + 1, 2 * FP_BYTES, t->y);
+			}
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		ep2_free(t);
+	}
+}

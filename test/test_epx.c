@@ -62,9 +62,10 @@ static int memory(void) {
 }
 
 int util(void) {
-	int code = STS_ERR;
+	int l, code = STS_ERR;
 	ep2_t a, b, c;
 	bn_t n;
+	uint8_t bin[4 * FP_BYTES + 1];
 
 	ep2_null(a);
 	ep2_null(b);
@@ -121,6 +122,37 @@ int util(void) {
 			TEST_ASSERT(ep2_is_infty(a), end);
 		}
 		TEST_END;
+
+		TEST_BEGIN("validity test is correct") {
+			ep2_rand(a);
+			TEST_ASSERT(ep2_is_valid(a), end);
+			fp2_rand(a->x);
+			TEST_ASSERT(!ep2_is_valid(a), end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("reading and writing a point are consistent") {
+			for (int j = 0; j < 2; j++) {
+				ep2_set_infty(a);
+				ep2_size_bin(&l, a, j);
+				ep2_write_bin(bin, l, a, j);
+				ep2_read_bin(b, bin, l);
+				TEST_ASSERT(ep2_cmp(a, b) == CMP_EQ, end);
+				ep2_rand(a);
+				ep2_size_bin(&l, a, j);
+				ep2_write_bin(bin, l, a, j);
+				ep2_read_bin(b, bin, l);
+				TEST_ASSERT(ep2_cmp(a, b) == CMP_EQ, end);
+				ep2_rand(a);
+				ep2_dbl(a, a);
+				ep2_size_bin(&l, a, j);
+				ep2_norm(a, a);
+				ep2_write_bin(bin, l, a, j);
+				ep2_read_bin(b, bin, l);
+				TEST_ASSERT(ep2_cmp(a, b) == CMP_EQ, end);						
+			}
+		}
+		TEST_END;		
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");

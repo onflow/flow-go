@@ -525,6 +525,40 @@ void ep2_tab(ep2_t *t, ep2_t p, int w);
 void ep2_print(ep2_t p);
 
 /**
+ * Returns the number of bytes necessary to store a prime elliptic curve point
+ * over a quadratic extension with optional point compression.
+ *
+ * @param[out] size			- the result.
+ * @param[in] a				- the prime field element.
+ * @param[in] pack			- the flag to indicate point compression.
+ */
+void ep2_size_bin(int *size, ep2_t a, int pack);
+
+/**
+ * Reads a prime elliptic curve point over a quadratic extension from a byte
+ * vector in big-endian format.
+ *
+ * @param[out] a			- the result.
+ * @param[in] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @throw ERR_NO_VALID		- if the encoded point is invalid.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is invalid. 
+ */
+void ep2_read_bin(ep2_t a, uint8_t *bin, int len);
+
+/**
+ * Writes a prime elliptic curve pointer over a quadratic extension to a byte
+ * vector in big-endian format with optional point compression.
+ *
+ * @param[out] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @param[in] a				- the prime elliptic curve point to write.
+ * @param[in] pack			- the flag to indicate point compression.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is invalid. 
+ */
+void ep2_write_bin(uint8_t *bin, int len, ep2_t a, int pack);
+
+/**
  * Negates a point represented in affine coordinates in an elliptic curve over
  * a quadratic extension.
  *
