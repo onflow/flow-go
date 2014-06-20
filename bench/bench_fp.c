@@ -53,10 +53,10 @@ static void memory(void) {
 }
 
 static void util(void) {
-	int d;
 	char str[2 * FP_BYTES + 1];
 	uint8_t bin[FP_BYTES];
 	fp_t a, b;
+	int d;
 
 	fp_null(a);
 	fp_null(b);
