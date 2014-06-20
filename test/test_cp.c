@@ -235,7 +235,7 @@ static int benaloh(void) {
 			bn_read_bin(b, buf, len);
 			bn_mul(a, a, b);
 			bn_mod(a, a, pub->n);
-			bn_size_bin(&len, pub->n);
+			len = bn_size_bin(pub->n);
 			bn_write_bin(buf, len, a);
 			TEST_ASSERT(cp_bdpe_dec(&out, buf, len, prv) == STS_OK, end);
 			TEST_ASSERT(in == out, end);
@@ -281,7 +281,7 @@ static int paillier(void) {
 
 		TEST_BEGIN("paillier encryption/decryption is correct") {
 			TEST_ASSERT(result == STS_OK, end);
-			bn_size_bin(&in_len, n);
+			in_len = bn_size_bin(n);
 			out_len = BN_BITS / 8 + 1;
 			memset(in, 0, sizeof(in));
 			rand_bytes(in + (in_len - 10), 10);
@@ -295,7 +295,7 @@ static int paillier(void) {
 
 		TEST_BEGIN("paillier encryption/decryption is homomorphic") {
 			TEST_ASSERT(result == STS_OK, end);
-			bn_size_bin(&in_len, n);
+			in_len = bn_size_bin(n);
 			out_len = BN_BITS / 8 + 1;
 			memset(in, 0, sizeof(in));
 			rand_bytes(in + (in_len - 10), 10);
