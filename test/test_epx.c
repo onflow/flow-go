@@ -782,6 +782,38 @@ static int simultaneous(void) {
 	return code;
 }
 
+static int compression(void) {
+	int code = STS_ERR;
+	ep2_t a, b, c;
+
+	ep2_null(a);
+	ep2_null(b);
+	ep2_null(c);
+
+	TRY {
+		ep2_new(a);
+		ep2_new(b);
+		ep2_new(c);
+
+		TEST_BEGIN("point compression is correct") {
+			ep2_rand(a);
+			ep2_pck(b, a);
+			TEST_ASSERT(ep2_upk(c, b) == 1, end);
+			TEST_ASSERT(ep2_cmp(a, c) == CMP_EQ, end);
+		}
+		TEST_END;
+	}
+	CATCH_ANY {
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	ep2_free(a);
+	ep2_free(b);
+	ep2_free(c);
+	return code;
+}
+
 static int hashing(void) {
 	int code = STS_ERR;
 	bn_t n;
@@ -934,6 +966,11 @@ int main(void) {
 	}
 
 	if (simultaneous() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (compression() != STS_OK) {
 		core_clean();
 		return 1;
 	}

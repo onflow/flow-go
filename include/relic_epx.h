@@ -856,4 +856,21 @@ void ep2_map(ep2_t p, uint8_t *msg, int len);
  */
 void ep2_frb(ep2_t r, ep2_t p, int i);
 
+/**
+ * Compresses a point in an elliptic curve over a quadratic extension.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to compress.
+ */
+void ep2_pck(ep2_t r, ep2_t p);
+
+/**
+ * Decompresses a point in an elliptic curve over a quadratic extension.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to decompress.
+ * @return if the decompression was successful
+ */
+int ep2_upk(ep2_t r, ep2_t p);
+
 #endif /* !RELIC_EPX_H */

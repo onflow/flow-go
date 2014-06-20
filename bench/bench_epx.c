@@ -526,6 +526,22 @@ static void arith(void) {
 		BENCH_ADD(ep2_mul_sim_gen(r, k, q, l));
 	} BENCH_END;
 
+	BENCH_BEGIN("ep2_map") {
+		uint8_t msg[5];
+		rand_bytes(msg, 5);
+		BENCH_ADD(ep2_map(p, msg, 5));
+	} BENCH_END;
+
+	BENCH_BEGIN("ep2_pck") {
+		ep2_rand(p);
+		BENCH_ADD(ep2_pck(q, p));
+	} BENCH_END;
+
+	BENCH_BEGIN("ep2_upk") {
+		ep2_rand(p);
+		BENCH_ADD(ep2_upk(q, p));
+	} BENCH_END;	
+
 	ep2_free(p);
 	ep2_free(q);
 	ep2_free(r);
