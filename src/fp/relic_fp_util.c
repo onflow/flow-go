@@ -160,8 +160,9 @@ void fp_print(const fp_t a) {
 	}
 }
 
-void fp_size_str(int *size, const fp_t a, int radix) {
+int fp_size_str(const fp_t a, int radix) {
 	bn_t t;
+	int digits = 0;
 
 	bn_null(t);
 
@@ -170,13 +171,15 @@ void fp_size_str(int *size, const fp_t a, int radix) {
 
 		fp_prime_back(t, a);
 
-		bn_size_str(size, t, radix);
+		digits = bn_size_str(t, radix);
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	}
 	FINALLY {
 		bn_free(t);
 	}
+
+	return digits;
 }
 
 void fp_read_str(fp_t a, const char *str, int len, int radix) {
@@ -224,8 +227,8 @@ void fp_write_str(char *str, int len, const fp_t a, int radix) {
 	}
 }
 
-void fp_size_bin(int *size, const fp_t a) {
-	*size = FP_BYTES;
+int fp_size_bin(const fp_t a) {
+	return FP_BYTES;
 }
 
 void fp_read_bin(fp_t a, const uint8_t *bin, int len) {

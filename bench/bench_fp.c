@@ -56,7 +56,6 @@ static void util(void) {
 	char str[2 * FP_BYTES + 1];
 	uint8_t bin[FP_BYTES];
 	fp_t a, b;
-	int d;
 
 	fp_null(a);
 	fp_null(b);
@@ -119,7 +118,7 @@ static void util(void) {
 
 	BENCH_BEGIN("fp_size_str (16)") {
 		fp_rand(a);
-		BENCH_ADD(fp_size_str(&d, a, 16));
+		BENCH_ADD(fp_size_str(a, 16));
 	}
 	BENCH_END;
 
@@ -138,7 +137,7 @@ static void util(void) {
 
 	BENCH_BEGIN("fp_size_bin") {
 		fp_rand(a);
-		BENCH_ADD(fp_size_bin(&d, a));
+		BENCH_ADD(fp_size_bin(a));
 	}
 	BENCH_END;
 

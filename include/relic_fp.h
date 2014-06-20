@@ -642,12 +642,12 @@ void fp_print(const fp_t a);
  * Returns the number of digits in radix necessary to store a multiple precision
  * integer. The radix must be a power of 2 included in the interval [2, 64].
  *
- * @param[out] size			- the result.
  * @param[in] a				- the prime field element.
  * @param[in] radix			- the radix.
  * @throw ERR_NO_VALID		- if the radix is invalid.
+ * @return the number of digits in the given radix. 
  */
-void fp_size_str(int *size, const fp_t a, int radix);
+int fp_size_str(const fp_t a, int radix);
 
 /**
  * Reads a prime field element from a string in a given radix. The radix must
@@ -677,10 +677,10 @@ void fp_write_str(char *str, int len, const fp_t a, int radix);
 /**
  * Returns the number of bytes necessary to store a prime field element.
  *
- * @param[out] size			- the result.
  * @param[in] a				- the prime field element.
+ * @return the number of bytes.
  */
-void fp_size_bin(int *size, const fp_t a);
+int fp_size_bin(const fp_t a);
 
 /**
  * Reads a prime field element from a byte vector in big-endian format.

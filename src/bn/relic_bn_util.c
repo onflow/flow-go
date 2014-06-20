@@ -182,7 +182,7 @@ void bn_rand(bn_t a, int sign, int bits) {
 
 	bn_grow(a, digits);
 
-	rand_bytes((uint8_t *)a->dp, digits * (BN_DIGIT / 8));
+	rand_bytes((uint8_t *)a->dp, digits * sizeof(dig_t));
 
 	a->used = digits;
 	a->sign = sign;
@@ -217,18 +217,15 @@ void bn_print(const bn_t a) {
 	}
 }
 
-void bn_size_str(int *size, const bn_t a, int radix) {
-	int digits;
+int bn_size_str(const bn_t a, int radix) {
+	int digits = 0;
 	bn_t t;
 
 	bn_null(t);
 
-	*size = 0;
-
 	/* Binary case requires the bits, a sign and the null terminator. */
 	if (radix == 2) {
-		*size = bn_bits(a) + (a->sign == BN_NEG ? 1 : 0) + 1;
-		return;
+		return bn_bits(a) + (a->sign == BN_NEG ? 1 : 0) + 1;
 	}
 
 	/* Check the radix. */
@@ -237,11 +234,8 @@ void bn_size_str(int *size, const bn_t a, int radix) {
 	}
 
 	if (bn_is_zero(a)) {
-		*size = 2;
-		return;
+		return 2;
 	}
-
-	digits = 0;
 
 	if (a->sign == BN_NEG) {
 		digits++;
@@ -257,13 +251,13 @@ void bn_size_str(int *size, const bn_t a, int radix) {
 			bn_div_dig(t, t, (dig_t)radix);
 			digits++;
 		}
-		*size = digits + 1;
-
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
 		bn_free(t);
 	}
+
+	return digits + 1;
 }
 
 void bn_read_str(bn_t a, const char *str, int len, int radix) {
@@ -312,7 +306,7 @@ void bn_write_str(char *str, int len, const bn_t a, int radix) {
 
 	bn_null(t);
 
-	bn_size_str(&l, a, radix);
+	l = bn_size_str(a, radix);
 	if (len < l) {
 		THROW(ERR_NO_BUFFER);
 	}
@@ -371,7 +365,7 @@ void bn_write_str(char *str, int len, const bn_t a, int radix) {
 	}
 }
 
-void bn_size_bin(int *size, const bn_t a) {
+int bn_size_bin(const bn_t a) {
 	dig_t d;
 	int digits;
 
@@ -382,7 +376,7 @@ void bn_size_bin(int *size, const bn_t a) {
 		d = d >> 8;
 		digits++;
 	}
-	*size = digits;
+	return digits;
 }
 
 void bn_read_bin(bn_t a, const uint8_t *bin, int len) {
@@ -419,7 +413,7 @@ void bn_write_bin(uint8_t *bin, int len, const bn_t a) {
 	int size, k;
 	dig_t d;
 
-	bn_size_bin(&size, a);
+	size = bn_size_bin(a);
 
 	if (len < size) {
 		THROW(ERR_NO_BUFFER);
@@ -445,8 +439,8 @@ void bn_write_bin(uint8_t *bin, int len, const bn_t a) {
 	}
 }
 
-void bn_size_raw(int *size, const bn_t a) {
-	*size = a->used;
+int bn_size_raw(const bn_t a) {
+	return a->used;
 }
 
 void bn_read_raw(bn_t a, const dig_t *raw, int len) {

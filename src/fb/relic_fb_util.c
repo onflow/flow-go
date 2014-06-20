@@ -172,8 +172,9 @@ void fb_print(const fb_t a) {
 	util_print("\n");
 }
 
-void fb_size_str(int *size, const fb_t a, int radix) {
+int fb_size_str(const fb_t a, int radix) {
 	bn_t t;
+	int digits = 0;
 
 	bn_null(t);
 
@@ -186,7 +187,7 @@ void fb_size_str(int *size, const fb_t a, int radix) {
 
 		bn_read_raw(t, a, FB_DIGS);
 
-		bn_size_str(size, t, radix);
+		digits = bn_size_str(t, radix);
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -194,6 +195,8 @@ void fb_size_str(int *size, const fb_t a, int radix) {
 	FINALLY {
 		bn_free(t);
 	}
+
+	return digits;
 }
 
 void fb_read_str(fb_t a, const char *str, int len, int radix) {
@@ -237,7 +240,7 @@ void fb_write_str(char *str, int len, const fb_t a, int radix) {
 
 	fb_null(t);
 
-	fb_size_str(&l, a, radix);
+	l = fb_size_str(a, radix);
 	if (len < l) {
 		THROW(ERR_NO_BUFFER);
 	}
@@ -287,8 +290,8 @@ void fb_write_str(char *str, int len, const fb_t a, int radix) {
 	}
 }
 
-void fb_size_bin(int *size, const fb_t a) {
-	*size = FB_BYTES;
+int fb_size_bin(const fb_t a) {
+	return FB_BYTES;
 }
 
 void fb_read_bin(fb_t a, const uint8_t *bin, int len) {

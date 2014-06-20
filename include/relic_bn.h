@@ -585,12 +585,12 @@ void bn_print(const bn_t a);
  * Returns the number of digits in radix necessary to store a multiple precision
  * integer. The radix must be included in the interval [2, 64].
  *
- * @param[out] size			- the result.
  * @param[in] a				- the multiple precision integer.
  * @param[in] radix			- the radix.
  * @throw ERR_NO_VALID		- if the radix is invalid.
+ * @return the number of digits in the given radix.
  */
-void bn_size_str(int *size, const bn_t a, int radix);
+int bn_size_str(const bn_t a, int radix);
 
 /**
  * Reads a multiple precision integer from a string in a given radix. The radix
@@ -620,10 +620,10 @@ void bn_write_str(char *str, int len, const bn_t a, int radix);
 /**
  * Returns the number of bytes necessary to store a multiple precision integer.
  *
- * @param[out] size			- the result.
  * @param[in] a				- the multiple precision integer.
+ * @return the number of bytes.
  */
-void bn_size_bin(int *size, const bn_t a);
+int bn_size_bin(const bn_t a);
 
 /**
  * Reads a positive multiple precision integer from a byte vector in big-endian
@@ -649,10 +649,10 @@ void bn_write_bin(uint8_t *bin, int len, const bn_t a);
 /**
  * Returns the number of digits necessary to store a multiple precision integer.
  *
- * @param[out] size			- the result.
  * @param[in] a				- the multiple precision integer.
+ * @return the number of digits.
  */
-void bn_size_raw(int *size, const bn_t a);
+int bn_size_raw(const bn_t a);
 
 /**
  * Reads a positive multiple precision integer from a digit vector.

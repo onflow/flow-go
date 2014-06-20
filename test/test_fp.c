@@ -183,7 +183,7 @@ static int util(void) {
 		TEST_BEGIN("reading and writing a prime field element are consistent") {
 			fp_rand(a);
 			for (int j = 2; j <= 64; j++) {
-				fp_size_str(&bits, a, j);
+				bits = fp_size_str(a, j);
 				fp_write_str(str, bits, a, j);
 				fp_read_str(b, str, bits, j);
 				TEST_ASSERT(fp_cmp(a, b) == CMP_EQ, end);
@@ -197,9 +197,7 @@ static int util(void) {
 		TEST_BEGIN("getting the size of a prime field element is correct") {
 			fp_rand(a);
 			fp_prime_back(d, a);
-			fp_size_str(&bits, a, 2);
-			bits--;
-			TEST_ASSERT(bits == bn_bits(d), end);
+			TEST_ASSERT((fp_size_str(a, 2) - 1) == bn_bits(d), end);
 		}
 		TEST_END;
 	}

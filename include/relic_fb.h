@@ -618,12 +618,12 @@ void fb_print(const fb_t a);
  * Returns the number of digits in radix necessary to store a binary field
  * element. The radix must be a power of 2 included in the interval [2, 64].
  *
- * @param[out] size			- the result.
  * @param[in] a				- the binary field element.
  * @param[in] radix			- the radix.
  * @throw ERR_NO_VALID		- if the radix is invalid.
+ * @return the number of digits in the given radix.
  */
-void fb_size_str(int *size, const fb_t a, int radix);
+int fb_size_str(const fb_t a, int radix);
 
 /**
  * Reads a binary field element from a string in a given radix. The radix must
@@ -654,10 +654,10 @@ void fb_write_str(char *str, int len, const fb_t a, int radix);
 /**
  * Returns the number of bytes necessary to store a binary field element.
  *
- * @param[out] size			- the result.
  * @param[in] a				- the binary field element.
+ * @return the number of bytes.
  */
-void fb_size_bin(int *size, const fb_t a);
+int fb_size_bin(const fb_t a);
 
 /**
  * Reads a binary field element from a byte vector in big-endian format.

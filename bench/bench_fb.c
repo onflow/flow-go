@@ -53,7 +53,6 @@ static void memory(void) {
 }
 
 static void util(void) {
-	int d;
 	char str[2 * FB_BYTES + 1];
 	uint8_t bin[FB_BYTES];
 	fb_t a, b;
@@ -120,7 +119,7 @@ static void util(void) {
 
 	BENCH_BEGIN("fb_size_str (16)") {
 		fb_rand(a);
-		BENCH_ADD(fb_size_str(&d, a, 16));
+		BENCH_ADD(fb_size_str(a, 16));
 	}
 	BENCH_END;
 
@@ -139,7 +138,7 @@ static void util(void) {
 
 	BENCH_BEGIN("fb_size_bin") {
 		fb_rand(a);
-		BENCH_ADD(fb_size_bin(&d, a));
+		BENCH_ADD(fb_size_bin(a));
 	}
 	BENCH_END;
 

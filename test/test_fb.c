@@ -184,7 +184,7 @@ static int util(void) {
 		TEST_BEGIN("reading and writing a binary field element are consistent") {
 			fb_rand(a);
 			for (int j = 1; j < 7; j++) {
-				fb_size_str(&bits, a, 1 << j);
+				bits = fb_size_str(a, 1 << j);
 				fb_write_str(str, bits, a, 1 << j);
 				fb_read_str(b, str, bits, 1 << j);
 				TEST_ASSERT(fb_cmp(a, b) == CMP_EQ, end);
@@ -197,9 +197,7 @@ static int util(void) {
 
 		TEST_BEGIN("getting the size of a binary field element is correct") {
 			fb_rand(a);
-			fb_size_str(&bits, a, 2);
-			bits--;
-			TEST_ASSERT(bits == fb_bits(a), end);
+			TEST_ASSERT((fb_size_str(a, 2) - 1) == fb_bits(a), end);
 		}
 		TEST_END;
 	}
