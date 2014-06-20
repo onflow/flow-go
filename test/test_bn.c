@@ -219,7 +219,7 @@ static int util(void) {
 			int len = BN_BYTES;
 			bn_rand(a, BN_POS, BN_BITS);
 			for (int j = 2; j <= 64; j++) {
-				bn_size_str(&bits, a, j);
+				bits = bn_size_str(a, j);
 				bn_write_str(str, bits, a, j);
 				bn_read_str(b, str, bits, j);
 				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
@@ -235,17 +235,11 @@ static int util(void) {
 		TEST_END;
 
 		TEST_BEGIN("getting the size of a positive number is correct") {
-			int len;
 			bn_rand(a, BN_POS, BN_BITS);
-			bn_size_str(&len, a, 2);
-			len--;
-			TEST_ASSERT(len == bn_bits(a), end);
-			bn_size_bin(&len, a);
+			TEST_ASSERT((bn_size_str(a, 2) - 1) == bn_bits(a), end);
 			bits = (bn_bits(a) % 8 == 0 ? bn_bits(a) / 8 : bn_bits(a) / 8 + 1);
-			TEST_ASSERT(bits == len, end);
-			bn_size_raw(&len, a);
-			bits = a->used;
-			TEST_ASSERT(bits == len, end);
+			TEST_ASSERT(bn_size_bin(a) == bits, end);
+			TEST_ASSERT(bn_size_raw(a) == a->used, end);
 		}
 		TEST_END;
 
@@ -253,7 +247,7 @@ static int util(void) {
 			int len = BN_BYTES;
 			bn_rand(a, BN_NEG, BN_BITS);
 			for (int j = 2; j <= 64; j++) {
-				bn_size_str(&bits, a, j);
+				bits = bn_size_str(a, j);
 				bn_write_str(str, bits, a, j);
 				bn_read_str(b, str, bits, j);
 				TEST_ASSERT(bn_cmp(a, b) == CMP_EQ, end);
@@ -271,17 +265,11 @@ static int util(void) {
 		TEST_END;
 
 		TEST_BEGIN("getting the size of a negative number is correct") {
-			int len;
 			bn_rand(a, BN_NEG, BN_BITS);
-			bn_size_str(&len, a, 2);
-			len -= 2;
-			TEST_ASSERT(len == bn_bits(a), end);
-			bn_size_bin(&len, a);
+			TEST_ASSERT((bn_size_str(a, 2) - 2) == bn_bits(a), end);
 			bits = (bn_bits(a) % 8 == 0 ? bn_bits(a) / 8 : bn_bits(a) / 8 + 1);
-			TEST_ASSERT(bits == len, end);
-			bn_size_raw(&len, a);
-			bits = a->used;
-			TEST_ASSERT(bits == len, end);
+			TEST_ASSERT(bn_size_bin(a) == bits, end);
+			TEST_ASSERT(bn_size_raw(a) == a->used, end);
 		}
 		TEST_END;
 	}
@@ -1966,11 +1954,6 @@ int main(void) {
 		return 1;
 	}
 
-	if (exponentiation() != STS_OK) {
-		core_clean();
-		return 1;
-	}
-
 	if (gcd() != STS_OK) {
 		core_clean();
 		return 1;
@@ -1991,6 +1974,16 @@ int main(void) {
 		return 1;
 	}
 
+	if (recoding() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
+	if (exponentiation() != STS_OK) {
+		core_clean();
+		return 1;
+	}
+
 	if (prime() != STS_OK) {
 		core_clean();
 		return 1;
@@ -1999,12 +1992,7 @@ int main(void) {
 	if (factor() != STS_OK) {
 		core_clean();
 		return 1;
-	}
-
-	if (recoding() != STS_OK) {
-		core_clean();
-		return 1;
-	}
+	}	
 
 	util_banner("All tests have passed.\n", 0);
 
