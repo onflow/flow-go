@@ -60,11 +60,11 @@ void fp2_print(fp2_t a) {
 	fp_print(a[1]);
 }
 
-void fp2_size_bin(int *size, const fp2_t a) {
+void fp2_size_bin(int *size, fp2_t a) {
 	*size = FP_BYTES * 2;
 }
 
-void fp2_read_bin(fp2_t a, const uint8_t *bin, int len) {
+void fp2_read_bin(fp2_t a, uint8_t *bin, int len) {
 	if (len != FP_BYTES * 2) {
 		THROW(ERR_NO_BUFFER);
 	}
@@ -72,7 +72,7 @@ void fp2_read_bin(fp2_t a, const uint8_t *bin, int len) {
 	fp_read_bin(a[1], bin + FP_BYTES, FP_BYTES);
 }
 
-void fp2_write_bin(uint8_t *bin, int len, const fp2_t a) {
+void fp2_write_bin(uint8_t *bin, int len, fp2_t a) {
 	if (len != FP_BYTES * 2) {
 		THROW(ERR_NO_BUFFER);
 	}
