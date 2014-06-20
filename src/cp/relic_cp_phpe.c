@@ -86,7 +86,7 @@ int cp_phpe_enc(uint8_t *out, int *out_len, uint8_t *in, int in_len, bn_t n) {
 	bn_null(r);
 	bn_null(s);
 
-	bn_size_bin(&size, n);
+	size = bn_size_bin(n);
 
 	if (n == NULL || in_len <= 0 || in_len > size) {
 		return STS_ERR;
@@ -140,7 +140,7 @@ int cp_phpe_dec(uint8_t *out, int out_len, uint8_t *in, int in_len, bn_t n,
 	bn_t c, u, s;
 	int size, result = STS_OK;
 
-	bn_size_bin(&size, n);
+	size = bn_size_bin(n);
 
 	if (in_len < 0 || in_len != 2 * size) {
 		return STS_ERR;
@@ -168,7 +168,7 @@ int cp_phpe_dec(uint8_t *out, int out_len, uint8_t *in, int in_len, bn_t n,
 		bn_mul(c, c, u);
 		bn_mod(c, c, n);
 
-		bn_size_bin(&size, c);
+		size = bn_size_bin(c);
 		if (size <= out_len) {
 			memset(out, 0, out_len);
 			bn_write_bin(out + (out_len - size), size, c);

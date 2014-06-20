@@ -111,7 +111,7 @@ int cp_rabin_enc(uint8_t *out, int *out_len, uint8_t *in, int in_len,
 	bn_null(m);
 	bn_null(t);
 
-	bn_size_bin(&size, pub->n);
+	size = bn_size_bin(pub->n);
 
 	if (in_len <= 0 || in_len > (size - RABIN_PAD_LEN - 2)) {
 		return STS_ERR;
@@ -235,7 +235,7 @@ int cp_rabin_dec(uint8_t *out, int *out_len, uint8_t *in, int in_len,
 		}
 
 		if (result == STS_OK) {
-			bn_size_bin(&size, prv->n);
+			size = bn_size_bin(prv->n);
 			size--;
 			bn_rsh(t, m, 8 * size);
 

@@ -122,7 +122,7 @@ int cp_bdpe_enc(uint8_t *out, int *out_len, dig_t in, bdpe_t pub) {
 	bn_null(m);
 	bn_null(u);
 
-	bn_size_bin(&size, pub->n);
+	size = bn_size_bin(pub->n);
 
 	if (in > pub->t) {
 		return STS_ERR;
@@ -167,7 +167,7 @@ int cp_bdpe_dec(dig_t *out, uint8_t *in, int in_len, bdpe_t prv) {
 	bn_t m, t, z;
 	int i, size, result = STS_OK;
 
-	bn_size_bin(&size, prv->n);
+	size = bn_size_bin(prv->n);
 
 	if (in_len < 0 || in_len != size) {
 		return STS_ERR;

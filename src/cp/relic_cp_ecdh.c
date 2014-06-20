@@ -91,7 +91,7 @@ int cp_ecdh_key(uint8_t *key, int key_len, bn_t d, ec_t q) {
 			result = STS_ERR;
 		}
 		ec_get_x(x, p);
-		bn_size_bin(&l, x);
+		l = bn_size_bin(x);
 		bn_write_bin(_x, l, x);
 		md_kdf2(key, key_len, _x, l);
 	}

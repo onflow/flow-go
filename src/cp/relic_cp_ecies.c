@@ -98,7 +98,7 @@ int cp_ecies_enc(ec_t r, uint8_t *out, int *out_len, uint8_t *in, int in_len,
 		ec_mul_gen(r, k);
 		ec_mul(p, q, k);
 		ec_get_x(x, p);
-		bn_size_bin(&l, x);
+		l = bn_size_bin(x);
 		if (bn_bits(x) % 8 == 0) {
 			/* Compatibility with BouncyCastle. */
 			l = l + 1;
@@ -143,7 +143,7 @@ int cp_ecies_dec(uint8_t *out, int *out_len, ec_t r, uint8_t *in, int in_len,
 
 		ec_mul(p, r, d);
 		ec_get_x(x, p);
-		bn_size_bin(&l, x);
+		l = bn_size_bin(x);
 		if (bn_bits(x) % 8 == 0) {
 			/* Compatibility with BouncyCastle. */
 			l = l + 1;

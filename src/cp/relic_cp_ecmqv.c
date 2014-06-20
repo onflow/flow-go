@@ -108,7 +108,7 @@ int cp_ecmqv_key(uint8_t *key, int key_len, bn_t d1, bn_t d2, ec_t q2u,
 		ec_mul_sim(p, q2v, s, q1v, x);
 
 		ec_get_x(x, p);
-		bn_size_bin(&l, x);
+		l = bn_size_bin(x);
 		bn_write_bin(_x, l, x);
 		md_kdf2(key, key_len, _x, l);
 	}

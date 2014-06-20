@@ -503,7 +503,7 @@ static int pad_pkcs2(bn_t m, int *p_len, int m_len, int k_len, int operation) {
 					result = (pad ? STS_ERR : STS_OK);
 				}
 				bn_mod_2b(m, m, 8 * m_len);
-				bn_size_bin(p_len, m);
+				*p_len = bn_size_bin(m);
 				(*p_len)--;
 				bn_rsh(t, m, *p_len * 8);
 				if (bn_cmp_dig(t, 1) != CMP_EQ) {
@@ -736,7 +736,7 @@ int cp_rsa_enc(uint8_t *out, int *out_len, uint8_t *in, int in_len, rsa_t pub) {
 	bn_null(m);
 	bn_null(eb);
 
-	bn_size_bin(&size, pub->n);
+	size = bn_size_bin(pub->n);
 
 	if (pub == NULL || in_len <= 0 || in_len > (size - RSA_PAD_LEN)) {
 		return STS_ERR;
@@ -792,7 +792,7 @@ int cp_rsa_dec_basic(uint8_t *out, int *out_len, uint8_t *in, int in_len, rsa_t 
 	bn_t m, eb;
 	int size, pad_len, result = STS_OK;
 
-	bn_size_bin(&size, prv->n);
+	size = bn_size_bin(prv->n);
 
 	if (prv == NULL || in_len != size || in_len < RSA_PAD_LEN) {
 		return STS_ERR;
@@ -853,7 +853,7 @@ int cp_rsa_dec_quick(uint8_t *out, int *out_len, uint8_t *in, int in_len, rsa_t 
 	bn_null(m);
 	bn_null(eb);
 
-	bn_size_bin(&size, prv->n);
+	size = bn_size_bin(prv->n);
 
 	if (prv == NULL || in_len != size || in_len < RSA_PAD_LEN) {
 		return STS_ERR;
@@ -942,7 +942,7 @@ int cp_rsa_sig_basic(uint8_t *sig, int *sig_len, uint8_t *msg, int msg_len, int 
 		return STS_ERR;
 	}
 #else
-	bn_size_bin(&size, prv->n);
+	size = bn_size_bin(prv->n);
 	if (pad_len > (size - RSA_PAD_LEN)) {
 		return STS_ERR;
 	}
@@ -982,7 +982,7 @@ int cp_rsa_sig_basic(uint8_t *sig, int *sig_len, uint8_t *msg, int msg_len, int 
 
 			bn_mxp(eb, eb, prv->d, prv->n);
 
-			bn_size_bin(&size, prv->n);
+			size = bn_size_bin(prv->n);
 
 			if (size <= *sig_len) {
 				memset(sig, 0, size);
@@ -1028,7 +1028,7 @@ int cp_rsa_sig_quick(uint8_t *sig, int *sig_len, uint8_t *msg, int msg_len, int 
 		return STS_ERR;
 	}
 #else
-	bn_size_bin(&size, prv->n);
+	size = bn_size_bin(prv->n);
 	if (pad_len > (size - RSA_PAD_LEN)) {
 		return STS_ERR;
 	}
@@ -1088,7 +1088,7 @@ int cp_rsa_sig_quick(uint8_t *sig, int *sig_len, uint8_t *msg, int msg_len, int 
 			bn_add(eb, eb, m);
 			bn_mod(eb, eb, prv->n);
 
-			bn_size_bin(&size, prv->n);
+			size = bn_size_bin(prv->n);
 
 			if (size <= *sig_len) {
 				memset(sig, 0, size);
@@ -1133,13 +1133,13 @@ int cp_rsa_ver(uint8_t *sig, int sig_len, uint8_t *msg, int msg_len, int hash, r
 	if (size % 8 == 0) {
 		size = size / 8 - 1;
 	} else {
-		bn_size_bin(&size, pub->n);
+		size = bn_size_bin(pub->n);
 	}
 	if (pad_len > (size - 2)) {
 		return 0;
 	}
 #else
-	bn_size_bin(&size, pub->n);
+	size = bn_size_bin(pub->n);
 	if (pad_len > (size - RSA_PAD_LEN)) {
 		return 0;
 	}
