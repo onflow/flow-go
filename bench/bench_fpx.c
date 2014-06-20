@@ -53,7 +53,9 @@ static void memory2(void) {
 }
 
 static void util2(void) {
+	uint8_t bin[2 * FP_BYTES];
 	fp2_t a, b;
+	int d;
 
 	fp2_null(a);
 	fp2_null(b);
@@ -94,6 +96,25 @@ static void util2(void) {
 		fp2_rand(a);
 		fp2_rand(b);
 		BENCH_ADD(fp2_cmp(b, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp2_size_bin") {
+		fp2_rand(a);
+		BENCH_ADD(fp2_size_bin(&d, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp2_write_bin") {
+		fp2_rand(a);
+		BENCH_ADD(fp2_write_bin(bin, sizeof(bin), a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp_read_bin") {
+		fp2_rand(a);
+		fp2_write_bin(bin, sizeof(bin), a);
+		BENCH_ADD(fp2_read_bin(a, bin, sizeof(bin)));
 	}
 	BENCH_END;
 

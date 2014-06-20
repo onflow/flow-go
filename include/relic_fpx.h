@@ -645,7 +645,7 @@ void fp2_print(fp2_t a);
  * @param[out] size			- the result.
  * @param[in] a				- the quadratic extension field element.
  */
-void fp2_size_bin(int *size, const fp2_t a);
+void fp2_size_bin(int *size, fp2_t a);
 
 /**
  * Reads a quadratic extension field element from a byte vector in big-endian format.
@@ -655,7 +655,7 @@ void fp2_size_bin(int *size, const fp2_t a);
  * @param[in] len			- the buffer capacity.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct. 
  */
-void fp2_read_bin(fp2_t a, const uint8_t *bin, int len);
+void fp2_read_bin(fp2_t a, uint8_t *bin, int len);
 
 /**
  * Writes a quadratic extension field element to a byte vector in big-endian format.
@@ -665,7 +665,7 @@ void fp2_read_bin(fp2_t a, const uint8_t *bin, int len);
  * @param[in] a				- the quadratic extension field element to write.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct.
  */
-void fp2_write_bin(uint8_t *bin, int len, const fp2_t a);
+void fp2_write_bin(uint8_t *bin, int len, fp2_t a);
 
 /**
  * Returns the result of a comparison between two quadratic extension field

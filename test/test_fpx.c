@@ -64,6 +64,7 @@ static int memory2(void) {
 static int util2(void) {
 	int code = STS_ERR;
 	fp2_t a, b, c;
+	uint8_t bin[2 * FP_BYTES];
 
 	fp2_null(a);
 	fp2_null(b);
@@ -130,6 +131,13 @@ static int util2(void) {
 		}
 		TEST_END;
 
+		TEST_BEGIN("reading and writing a prime field element are consistent") {
+			fp2_rand(a);
+			fp2_write_bin(bin, sizeof(bin), a);
+			fp2_read_bin(b, bin, sizeof(bin));
+			TEST_ASSERT(fp2_cmp(a, b) == CMP_EQ, end);
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);
