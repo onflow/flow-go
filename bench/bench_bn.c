@@ -93,7 +93,6 @@ static void memory(void) {
 }
 
 static void util(void) {
-	int d, len;
 	dig_t digit;
 	char str[BN_BYTES * 3 + 1];
 	uint8_t bin[BN_BYTES];
@@ -199,7 +198,7 @@ static void util(void) {
 
 	BENCH_BEGIN("bn_size_str") {
 		bn_rand(a, BN_POS, BN_BITS);
-		BENCH_ADD(bn_size_str(&d, a, 10));
+		BENCH_ADD(bn_size_str(a, 10));
 	}
 	BENCH_END;
 
@@ -217,41 +216,37 @@ static void util(void) {
 
 	BENCH_BEGIN("bn_size_bin") {
 		bn_rand(a, BN_POS, BN_BITS);
-		BENCH_ADD(bn_size_bin(&d, a));
+		BENCH_ADD(bn_size_bin(a));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("bn_write_bin") {
 		bn_rand(a, BN_POS, BN_BITS);
-		bn_size_bin(&len, a);
-		BENCH_ADD(bn_write_bin(bin, len, a));
+		BENCH_ADD(bn_write_bin(bin, bn_size_bin(a), a));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("bn_read_bin") {
 		bn_rand(a, BN_POS, BN_BITS);
-		bn_size_bin(&len, a);
-		BENCH_ADD(bn_read_bin(a, bin, len));
+		BENCH_ADD(bn_read_bin(a, bin, bn_size_bin(a)));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("bn_size_raw") {
 		bn_rand(a, BN_POS, BN_BITS);
-		BENCH_ADD(bn_size_raw(&d, a));
+		BENCH_ADD(bn_size_raw(a));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("bn_write_raw") {
 		bn_rand(a, BN_POS, BN_BITS);
-		bn_size_raw(&len, a);
-		BENCH_ADD(bn_write_raw(raw, len, a));
+		BENCH_ADD(bn_write_raw(raw, bn_size_raw(a), a));
 	}
 	BENCH_END;
 
 	BENCH_BEGIN("bn_read_raw") {
 		bn_rand(a, BN_POS, BN_BITS);
-		bn_size_raw(&len, a);
-		BENCH_ADD(bn_read_raw(a, raw, len));
+		BENCH_ADD(bn_read_raw(a, raw, bn_size_raw(a)));
 	}
 	BENCH_END;
 

@@ -179,8 +179,7 @@ static void rabin(void) {
 	BENCH_ONCE("cp_rabin_gen", cp_rabin_gen(pub, prv, BN_BITS));
 
 	BENCH_BEGIN("cp_rabin_enc") {
-		bn_size_bin(&in_len, pub->n);
-		in_len -= 9;
+		in_len = bn_size_bin(pub->n) - 9;
 		out_len = BN_BITS / 8 + 1;
 		rand_bytes(in, in_len);
 		BENCH_ADD(cp_rabin_enc(out, &out_len, in, in_len, pub));
@@ -188,8 +187,7 @@ static void rabin(void) {
 	} BENCH_END;
 
 	BENCH_BEGIN("cp_rabin_dec") {
-		bn_size_bin(&in_len, pub->n);
-		in_len -= 9;
+		in_len = bn_size_bin(pub->n) - 9;
 		new_len = in_len;
 		out_len = BN_BITS / 8 + 1;
 		rand_bytes(in, in_len);
@@ -249,7 +247,7 @@ static void paillier(void) {
 	BENCH_ONCE("cp_phpe_gen", cp_phpe_gen(n, l, BN_BITS / 2));
 
 	BENCH_BEGIN("cp_phpe_enc") {
-		bn_size_bin(&in_len, n);
+		in_len = bn_size_bin(n);
 		out_len = BN_BITS / 8 + 1;
 		memset(in, 0, sizeof(in));
 		rand_bytes(in + 1, in_len - 1);
@@ -258,7 +256,7 @@ static void paillier(void) {
 	} BENCH_END;
 
 	BENCH_BEGIN("cp_bdpe_dec") {
-		bn_size_bin(&in_len, n);
+		in_len = bn_size_bin(n);
 		out_len = BN_BITS / 8 + 1;
 		memset(in, 0, sizeof(in));
 		rand_bytes(in + 1, in_len - 1);
