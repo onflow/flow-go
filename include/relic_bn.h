@@ -355,8 +355,8 @@ typedef bn_st *bn_t;
 #define bn_mxp(C, A, B, M)	bn_mxp_basic(C, A, B, M)
 #elif BN_MXP == SLIDE
 #define bn_mxp(C, A, B, M)	bn_mxp_slide(C, A, B, M)
-#elif BN_MXP == CONST
-#define bn_mxp(C, A, B, M)	bn_mxp_const(C, A, B, M)
+#elif BN_MXP == MONTY
+#define bn_mxp(C, A, B, M)	bn_mxp_monty(C, A, B, M)
 #endif
 
 /**

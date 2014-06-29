@@ -448,7 +448,7 @@ dig_t *ep_curve_get_b(void);
 /**
  * Returns the efficient endormorphism associated with the prime curve.
  */
-dig_t *ep_curve_get_beta();
+dig_t *ep_curve_get_beta(void);
 
 /**
  * Returns the parameter V1 of the prime curve.
@@ -716,8 +716,8 @@ void ep_size_bin(int *size, const ep_t a, int pack);
 void ep_read_bin(ep_t a, const uint8_t *bin, int len);
 
 /**
- * Writes a prime field element to a byte vector in big-endian format with
- * optional point compression.
+ * Writes a prime elliptic curve point to a byte vector in big-endian format
+ * with optional point compression.
  *
  * @param[out] bin			- the byte vector.
  * @param[in] len			- the buffer capacity.
