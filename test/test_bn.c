@@ -1732,7 +1732,6 @@ static int recoding(void) {
 			}
 			TEST_END;
 
-
 			TEST_BEGIN("regular tnaf recoding is correct") {
 				for (w = 2; w <= 8; w++) {
 					int8_t t_w, beta[1 << (w - 2)], gama[1 << (w - 2)];
