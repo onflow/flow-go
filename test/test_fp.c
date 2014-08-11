@@ -198,6 +198,7 @@ static int util(void) {
 			fp_rand(a);
 			fp_prime_back(d, a);
 			TEST_ASSERT((fp_size_str(a, 2) - 1) == bn_bits(d), end);
+			TEST_ASSERT(fp_size_bin(a) == FP_BYTES, end);
 		}
 		TEST_END;
 	}
