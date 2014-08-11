@@ -640,15 +640,17 @@ void fp2_rand(fp2_t a);
 void fp2_print(fp2_t a);
 
 /**
- * Returns the number of bytes necessary to store a quadratic extension field element.
+ * Returns the number of bytes necessary to store a quadratic extension field
+ * element.
  *
  * @param[out] size			- the result.
- * @param[in] a				- the quadratic extension field element.
+ * @param[in] a				- the extension field element.
  */
-void fp2_size_bin(int *size, fp2_t a);
+int fp2_size_bin(fp2_t a);
 
 /**
- * Reads a quadratic extension field element from a byte vector in big-endian format.
+ * Reads a quadratic extension field element from a byte vector in big-endian
+ * format.
  *
  * @param[out] a			- the result.
  * @param[in] bin			- the byte vector.
@@ -658,11 +660,12 @@ void fp2_size_bin(int *size, fp2_t a);
 void fp2_read_bin(fp2_t a, uint8_t *bin, int len);
 
 /**
- * Writes a quadratic extension field element to a byte vector in big-endian format.
+ * Writes a quadratic extension field element to a byte vector in big-endian 
+ * format.
  *
  * @param[out] bin			- the byte vector.
  * @param[in] len			- the buffer capacity.
- * @param[in] a				- the quadratic extension field element to write.
+ * @param[in] a				- the extension field element to write.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct.
  */
 void fp2_write_bin(uint8_t *bin, int len, fp2_t a);
@@ -945,6 +948,37 @@ void fp3_rand(fp3_t a);
 void fp3_print(fp3_t a);
 
 /**
+ * Returns the number of bytes necessary to store a cubic extension field
+ * element.
+ *
+ * @param[out] size			- the result.
+ * @param[in] a				- the extension field element.
+ */
+int fp3_size_bin(fp3_t a);
+
+/**
+ * Reads a cubic extension field element from a byte vector in big-endian
+ * format.
+ *
+ * @param[out] a			- the result.
+ * @param[in] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct. 
+ */
+void fp3_read_bin(fp3_t a, uint8_t *bin, int len);
+
+/**
+ * Writes a cubic extension field element to a byte vector in big-endian 
+ * format.
+ *
+ * @param[out] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @param[in] a				- the extension field element to write.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct.
+ */
+void fp3_write_bin(uint8_t *bin, int len, fp3_t a);
+
+/**
  * Returns the result of a comparison between two cubic extension field
  * elements.
  *
@@ -1176,6 +1210,37 @@ void fp6_rand(fp6_t a);
 void fp6_print(fp6_t a);
 
 /**
+ * Returns the number of bytes necessary to store a quadratic extension field
+ * element.
+ *
+ * @param[out] size			- the result.
+ * @param[in] a				- the extension field element.
+ */
+int fp6_size_bin(fp6_t a);
+
+/**
+ * Reads a quadratic extension field element from a byte vector in big-endian
+ * format.
+ *
+ * @param[out] a			- the result.
+ * @param[in] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct. 
+ */
+void fp6_read_bin(fp6_t a, uint8_t *bin, int len);
+
+/**
+ * Writes a setix extension field element to a byte vector in big-endian 
+ * format.
+ *
+ * @param[out] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @param[in] a				- the extension field element to write.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct.
+ */
+void fp6_write_bin(uint8_t *bin, int len, fp6_t a);
+
+/**
  * Returns the result of a comparison between two sextic extension field
  * elements.
  *
@@ -1356,6 +1421,38 @@ void fp12_rand(fp12_t a);
  * @param[in] A				- the dodecic extension field element to print.
  */
 void fp12_print(fp12_t a);
+
+/**
+ * Returns the number of bytes necessary to store a quadratic extension field
+ * element.
+ *
+ * @param[out] size			- the result.
+ * @param[in] a				- the extension field element.
+ */
+int fp12_size_bin(fp12_t a);
+
+/**
+ * Reads a quadratic extension field element from a byte vector in big-endian
+ * format.
+ *
+ * @param[out] a			- the result.
+ * @param[in] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct. 
+ */
+void fp12_read_bin(fp12_t a, uint8_t *bin, int len);
+
+/**
+ * Writes a setix extension field element to a byte vector in big-endian 
+ * format.
+ *
+ * @param[out] bin			- the byte vector.
+ * @param[in] len			- the buffer capacity.
+ * @param[in] a				- the extension field element to write.
+ * @param[in] pack			- the flag to indicate compression.
+ * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct.
+ */
+void fp12_write_bin(uint8_t *bin, int len, fp12_t a, int pack);
 
 /**
  * Returns the result of a comparison between two dodecic extension field
@@ -1625,6 +1722,23 @@ void fp12_exp_cyc(fp12_t c, fp12_t a, bn_t b);
  * @param[in] l				- the length of the exponent in sparse form.
  */
 void fp12_exp_cyc_sps(fp12_t c, fp12_t a, int *b, int l);
+
+/**
+ * Compresses an extension field element.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the extension field element to compress.
+ */
+void fp12_pck(fp12_t c, fp12_t a);
+
+/**
+ * Decompresses an extension field element.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the extension field element to decompress.
+ * @return if the decompression was successful
+ */
+int fp12_upk(fp12_t c, fp12_t a);
 
 /**
  * Copies the second argument to the first argument.
