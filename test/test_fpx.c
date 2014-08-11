@@ -63,8 +63,8 @@ static int memory2(void) {
 
 static int util2(void) {
 	int code = STS_ERR;
-	fp2_t a, b, c;
 	uint8_t bin[2 * FP_BYTES];
+	fp2_t a, b, c;
 
 	fp2_null(a);
 	fp2_null(b);
@@ -131,11 +131,17 @@ static int util2(void) {
 		}
 		TEST_END;
 
-		TEST_BEGIN("reading and writing a prime field element are consistent") {
+		TEST_BEGIN("reading and writing a finite field element are consistent") {
 			fp2_rand(a);
 			fp2_write_bin(bin, sizeof(bin), a);
 			fp2_read_bin(b, bin, sizeof(bin));
 			TEST_ASSERT(fp2_cmp(a, b) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("getting the size of a prime field element is correct") {
+			fp2_rand(a);
+			TEST_ASSERT(fp2_size_bin(a) == 2 * FP_BYTES, end);
 		}
 		TEST_END;
 	}
@@ -738,6 +744,7 @@ static int memory3(void) {
 
 static int util3(void) {
 	int code = STS_ERR;
+	uint8_t bin[3 * FP_BYTES];	
 	fp3_t a, b, c;
 
 	fp3_null(a);
@@ -805,6 +812,19 @@ static int util3(void) {
 		}
 		TEST_END;
 
+		TEST_BEGIN("reading and writing a finite field element are consistent") {
+			fp3_rand(a);
+			fp3_write_bin(bin, sizeof(bin), a);
+			fp3_read_bin(b, bin, sizeof(bin));
+			TEST_ASSERT(fp3_cmp(a, b) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("getting the size of a prime field element is correct") {
+			fp3_rand(a);
+			TEST_ASSERT(fp3_size_bin(a) == 3 * FP_BYTES, end);
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -1355,9 +1375,8 @@ static int square_root3(void) {
 			fp3_sqr(c, a);
 			r = fp3_srt(b, c);
 			fp3_neg(c, b);
-			TEST_ASSERT(r, end);
-			TEST_ASSERT(fp3_cmp(b, a) == CMP_EQ ||
-					fp3_cmp(c, a) == CMP_EQ, end);
+			TEST_ASSERT(r == 1, end);
+			TEST_ASSERT(fp3_cmp(b, a) == CMP_EQ || fp3_cmp(c, a) == CMP_EQ, end);
 		} TEST_END;
 	}
 	CATCH_ANY {
@@ -1400,6 +1419,7 @@ static int memory6(void) {
 
 static int util6(void) {
 	int code = STS_ERR;
+	uint8_t bin[6 * FP_BYTES];	
 	fp6_t a, b, c;
 
 	fp6_null(a);
@@ -1467,6 +1487,19 @@ static int util6(void) {
 		}
 		TEST_END;
 
+		TEST_BEGIN("reading and writing a finite field element are consistent") {
+			fp6_rand(a);
+			fp6_write_bin(bin, sizeof(bin), a);
+			fp6_read_bin(b, bin, sizeof(bin));
+			TEST_ASSERT(fp6_cmp(a, b) == CMP_EQ, end);
+		}
+		TEST_END;
+
+		TEST_BEGIN("getting the size of a prime field element is correct") {
+			fp6_rand(a);
+			TEST_ASSERT(fp6_size_bin(a) == 6 * FP_BYTES, end);
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -1893,6 +1926,7 @@ static int memory12(void) {
 
 static int util12(void) {
 	int code = STS_ERR;
+	uint8_t bin[12 * FP_BYTES];	
 	fp12_t a, b, c;
 
 	fp12_null(a);
@@ -1960,6 +1994,26 @@ static int util12(void) {
 		}
 		TEST_END;
 
+		TEST_BEGIN("reading and writing a finite field element are consistent") {
+			fp12_rand(a);
+			fp12_write_bin(bin, sizeof(bin), a, 0);
+			fp12_read_bin(b, bin, sizeof(bin));
+			TEST_ASSERT(fp12_cmp(a, b) == CMP_EQ, end);
+			fp12_conv_cyc(a, a);
+			fp12_write_bin(bin, 8 * FP_BYTES, a, 1);
+			fp12_read_bin(b, bin, 8 * FP_BYTES);
+			fp12_back_cyc(b, b);
+			TEST_ASSERT(fp12_cmp(a, b) == CMP_EQ, end);			
+		}
+		TEST_END;
+
+		TEST_BEGIN("getting the size of a finite field element is correct") {
+			fp12_rand(a);
+			TEST_ASSERT(fp12_size_bin(a) == 12 * FP_BYTES, end);
+			fp12_conv_cyc(a, a);
+			TEST_ASSERT(fp12_size_bin(a) == 8 * FP_BYTES, end);			
+		}
+		TEST_END;
 	}
 	CATCH_ANY {
 		ERROR(end);
@@ -2528,6 +2582,43 @@ static int exponentiation12(void) {
 	fp12_free(b);
 	fp12_free(c);
 	bn_free(d);
+	return code;
+}
+
+static int compression12(void) {
+	int code = STS_ERR;
+	fp12_t a, b, c;
+
+	fp12_null(a);
+	fp12_null(b);
+	fp12_null(c);
+
+	TRY {
+		fp12_new(a);
+		fp12_new(b);
+		fp12_new(c);
+
+		TEST_BEGIN("compression is consistent") {
+			fp12_rand(a);
+			fp12_pck(b, a);
+			TEST_ASSERT(fp12_upk(c, b) == 1, end);
+			TEST_ASSERT(fp12_cmp(a, c) == CMP_EQ, end);
+			fp12_rand(a);
+			fp12_conv_cyc(a, a);
+			fp12_pck(b, a);
+			TEST_ASSERT(fp12_upk(c, b) == 1, end);
+			TEST_ASSERT(fp12_cmp(a, c) == CMP_EQ, end);
+		} TEST_END;
+	}
+	CATCH_ANY {
+		util_print("FATAL ERROR!\n");
+		ERROR(end);
+	}
+	code = STS_OK;
+  end:
+	fp12_free(a);
+	fp12_free(b);
+	fp12_free(c);
 	return code;
 }
 
@@ -3249,7 +3340,7 @@ int main(void) {
 	}
 
 	/* Fp^6 is defined as a cubic extension of Fp^2. */
-	if (fp_prime_get_qnr() && fp_prime_get_cnr()) {
+	if (fp_prime_get_qnr()) {
 		util_banner("Sextic extension:", 0);
 		util_banner("Utilities:", 1);
 
@@ -3349,6 +3440,11 @@ int main(void) {
 			core_clean();
 			return 1;
 		}
+
+		if (compression12() != STS_OK) {
+			core_clean();
+			return 1;
+		}		
 	}
 
 	/*

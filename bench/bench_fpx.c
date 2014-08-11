@@ -55,7 +55,6 @@ static void memory2(void) {
 static void util2(void) {
 	uint8_t bin[2 * FP_BYTES];
 	fp2_t a, b;
-	int d;
 
 	fp2_null(a);
 	fp2_null(b);
@@ -101,7 +100,7 @@ static void util2(void) {
 
 	BENCH_BEGIN("fp2_size_bin") {
 		fp2_rand(a);
-		BENCH_ADD(fp2_size_bin(&d, a));
+		BENCH_ADD(fp2_size_bin(a));
 	}
 	BENCH_END;
 
@@ -111,7 +110,7 @@ static void util2(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp_read_bin") {
+	BENCH_BEGIN("fp2_read_bin") {
 		fp2_rand(a);
 		fp2_write_bin(bin, sizeof(bin), a);
 		BENCH_ADD(fp2_read_bin(a, bin, sizeof(bin)));
@@ -378,6 +377,7 @@ static void memory3(void) {
 }
 
 static void util3(void) {
+	uint8_t bin[3 * FP_BYTES];
 	fp3_t a, b;
 
 	fp3_null(a);
@@ -419,6 +419,25 @@ static void util3(void) {
 		fp3_rand(a);
 		fp3_rand(b);
 		BENCH_ADD(fp3_cmp(b, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp3_size_bin") {
+		fp3_rand(a);
+		BENCH_ADD(fp3_size_bin(a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp3_write_bin") {
+		fp3_rand(a);
+		BENCH_ADD(fp3_write_bin(bin, sizeof(bin), a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp3_read_bin") {
+		fp3_rand(a);
+		fp3_write_bin(bin, sizeof(bin), a);
+		BENCH_ADD(fp3_read_bin(a, bin, sizeof(bin)));
 	}
 	BENCH_END;
 
@@ -676,6 +695,7 @@ static void memory6(void) {
 }
 
 static void util6(void) {
+	uint8_t bin[6 * FP_BYTES];
 	fp6_t a, b;
 
 	fp6_null(a);
@@ -719,6 +739,25 @@ static void util6(void) {
 		BENCH_ADD(fp6_cmp(b, a));
 	}
 	BENCH_END;
+
+	BENCH_BEGIN("fp6_size_bin") {
+		fp6_rand(a);
+		BENCH_ADD(fp6_size_bin(a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp6_write_bin") {
+		fp6_rand(a);
+		BENCH_ADD(fp6_write_bin(bin, sizeof(bin), a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp6_read_bin") {
+		fp6_rand(a);
+		fp6_write_bin(bin, sizeof(bin), a);
+		BENCH_ADD(fp6_read_bin(a, bin, sizeof(bin)));
+	}
+	BENCH_END;	
 
 	fp6_free(a);
 	fp6_free(b);
@@ -856,6 +895,7 @@ static void memory12(void) {
 }
 
 static void util12(void) {
+	uint8_t bin[12 * FP_BYTES];
 	fp12_t a, b;
 
 	fp12_null(a);
@@ -899,6 +939,39 @@ static void util12(void) {
 		BENCH_ADD(fp12_cmp(b, a));
 	}
 	BENCH_END;
+
+	BENCH_BEGIN("fp12_size_bin") {
+		fp12_rand(a);
+		BENCH_ADD(fp12_size_bin(a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp12_write_bin") {
+		fp12_rand(a);
+		BENCH_ADD(fp12_write_bin(bin, sizeof(bin), a, 0));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp12_write_bin (1)") {
+		fp12_rand(a);
+		fp12_conv_cyc(a, a);
+		BENCH_ADD(fp12_write_bin(bin, 8 * FP_BYTES, a, 1));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp12_read_bin") {
+		fp12_rand(a);
+		fp12_write_bin(bin, sizeof(bin), a, 0);
+		BENCH_ADD(fp12_read_bin(a, bin, sizeof(bin)));
+	}
+	BENCH_END;	
+
+	BENCH_BEGIN("fp12_read_bin (1)") {
+		fp12_rand(a);
+		fp12_write_bin(bin, 8 * FP_BYTES, a, 1);
+		BENCH_ADD(fp12_read_bin(a, bin, sizeof(bin)));
+	}
+	BENCH_END;	
 
 	fp12_free(a);
 	fp12_free(b);
@@ -1131,6 +1204,32 @@ static void arith12(void) {
 	BENCH_BEGIN("fp12_frb (3)") {
 		fp12_rand(a);
 		BENCH_ADD(fp12_frb(c, a, 3));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp12_pck") {
+		fp12_rand(a);
+		BENCH_ADD(fp12_pck(c, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp12_pck (cyc)") {
+		fp12_rand(a);
+		fp12_conv_cyc(a, a);
+		BENCH_ADD(fp12_pck(c, a));
+	}
+	BENCH_END;	
+
+	BENCH_BEGIN("fp12_upk") {
+		fp12_rand(a);
+		BENCH_ADD(fp12_upk(c, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp12_upk (cyc)") {
+		fp12_rand(a);
+		fp12_conv_cyc(a, a);
+		BENCH_ADD(fp12_upk(c, a));
 	}
 	BENCH_END;
 
@@ -1477,7 +1576,7 @@ int main(void) {
 		arith3();
 	}
 
-	if (fp_prime_get_qnr() && fp_prime_get_cnr()) {
+	if (fp_prime_get_qnr()) {
 		util_banner("Sextic extension:", 0);
 		util_banner("Utilities:", 1);
 		memory6();
