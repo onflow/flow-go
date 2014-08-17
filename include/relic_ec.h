@@ -245,11 +245,10 @@ typedef CAT(EC_LOWER, t) ec_t;
  * Returns the number of bytes necessary to store an elliptic curve point with
  * optional point compression.
  *
- * @param[out] L			- the result.
  * @param[in] A				- the elliptic curve point.
- * @param[in] P				- the flag to indicate point compression.
+ * @param[in] P				- the flag to indicate compression.
  */
-#define ec_size_bin(L, A, P)	CAT(EC_LOWER, size_bin)(L, A, P)
+#define ec_size_bin(A, P)	CAT(EC_LOWER, size_bin)(A, P)
 
 /**
  * Reads an elliptic curve point from a byte vector in big-endian format.

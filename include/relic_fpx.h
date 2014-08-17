@@ -643,8 +643,8 @@ void fp2_print(fp2_t a);
  * Returns the number of bytes necessary to store a quadratic extension field
  * element.
  *
- * @param[out] size			- the result.
  * @param[in] a				- the extension field element.
+ * @return the number of bytes. 
  */
 int fp2_size_bin(fp2_t a);
 
@@ -1426,10 +1426,11 @@ void fp12_print(fp12_t a);
  * Returns the number of bytes necessary to store a quadratic extension field
  * element.
  *
- * @param[out] size			- the result.
  * @param[in] a				- the extension field element.
+ * @param[in] pack			- the flag to indicate compression.
+ * @return the number of bytes.
  */
-int fp12_size_bin(fp12_t a);
+int fp12_size_bin(fp12_t a, int pack);
 
 /**
  * Reads a quadratic extension field element from a byte vector in big-endian
