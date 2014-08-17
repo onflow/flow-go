@@ -209,9 +209,13 @@ void fp12_print(fp12_t a) {
 	fp6_print(a[1]);
 }
 
-int fp12_size_bin(fp12_t a) {
-	if (fp12_test_cyc(a)) {
-		return 8 * FP_BYTES;
+int fp12_size_bin(fp12_t a, int pack) {
+	if (pack) {
+		if (fp12_test_cyc(a)) {
+			return 8 * FP_BYTES;
+		} else {
+			return 12 * FP_BYTES;
+		}
 	} else {
 		return 12 * FP_BYTES;
 	}
