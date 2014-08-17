@@ -627,9 +627,8 @@ void eb_print(const eb_t p);
  * Returns the number of bytes necessary to store a binary elliptic curve point
  * with optional point compression.
  *
- * @param[out] size			- the result.
  * @param[in] a				- the binary field element.
- * @param[in] pack			- the flag to indicate point compression.
+ * @param[in] pack			- the flag to indicate compression.
  * @return the number of bytes.
  */
 int eb_size_bin(const eb_t a, int pack);

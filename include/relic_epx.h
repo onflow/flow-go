@@ -528,9 +528,8 @@ void ep2_print(ep2_t p);
  * Returns the number of bytes necessary to store a prime elliptic curve point
  * over a quadratic extension with optional point compression.
  *
- * @param[out] size			- the result.
  * @param[in] a				- the prime field element.
- * @param[in] pack			- the flag to indicate point compression.
+ * @param[in] pack			- the flag to indicate compression.
  * @return the number of bytes.
  */
 int ep2_size_bin(ep2_t a, int pack);
