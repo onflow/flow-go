@@ -54,6 +54,8 @@ static void memory(void) {
 
 static void util(void) {
 	ec_t p, q;
+	uint8_t bin[2 * FC_BYTES + 1];
+	int l;
 
 	ec_null(p);
 	ec_null(q);
@@ -96,6 +98,45 @@ static void util(void) {
 		ec_rand(p);
 		BENCH_ADD(ec_is_valid(p));
 	} BENCH_END;
+
+	BENCH_BEGIN("ec_size_bin (0)") {
+		ec_rand(p);
+		BENCH_ADD(ec_size_bin(p, 0));
+	} BENCH_END;
+
+	BENCH_BEGIN("ec_size_bin (1)") {
+		ec_rand(p);
+		BENCH_ADD(ec_size_bin(p, 1));
+	} BENCH_END;
+
+	BENCH_BEGIN("ec_write_bin (0)") {
+		ec_rand(p);
+		l = ec_size_bin(p, 0);
+		BENCH_ADD(ec_write_bin(bin, l, p, 0));
+	} BENCH_END;
+
+	BENCH_BEGIN("ec_write_bin (1)") {
+		ec_rand(p);
+		l = ec_size_bin(p, 1);
+		BENCH_ADD(ec_write_bin(bin, l, p, 1));
+	} BENCH_END;
+
+	BENCH_BEGIN("ec_read_bin (0)") {
+		ec_rand(p);
+		l = ec_size_bin(p, 0);
+		ec_write_bin(bin, l, p, 0);
+		BENCH_ADD(ec_read_bin(p, bin, l));
+	} BENCH_END;
+
+	BENCH_BEGIN("ec_read_bin (1)") {
+		ec_rand(p);
+		l = ec_size_bin(p, 1);
+		ec_write_bin(bin, l, p, 1);
+		BENCH_ADD(ec_read_bin(p, bin, l));
+	} BENCH_END;	
+
+	ec_free(p);
+	ec_free(q);
 }
 
 static void arith(void) {

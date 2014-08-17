@@ -895,8 +895,8 @@ static void memory12(void) {
 }
 
 static void util12(void) {
-	uint8_t bin[12 * FP_BYTES];
 	fp12_t a, b;
+	uint8_t bin[12 * FP_BYTES];	
 
 	fp12_null(a);
 	fp12_null(b);
@@ -940,13 +940,20 @@ static void util12(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp12_size_bin") {
+	BENCH_BEGIN("fp12_size_bin (0)") {
 		fp12_rand(a);
-		BENCH_ADD(fp12_size_bin(a));
+		BENCH_ADD(fp12_size_bin(a, 0));
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp12_write_bin") {
+	BENCH_BEGIN("fp12_size_bin (1)") {
+		fp12_rand(a);
+		fp12_conv_cyc(a, a);
+		BENCH_ADD(fp12_size_bin(a, 1));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("fp12_write_bin (0)") {
 		fp12_rand(a);
 		BENCH_ADD(fp12_write_bin(bin, sizeof(bin), a, 0));
 	}
@@ -959,7 +966,7 @@ static void util12(void) {
 	}
 	BENCH_END;
 
-	BENCH_BEGIN("fp12_read_bin") {
+	BENCH_BEGIN("fp12_read_bin (0)") {
 		fp12_rand(a);
 		fp12_write_bin(bin, sizeof(bin), a, 0);
 		BENCH_ADD(fp12_read_bin(a, bin, sizeof(bin)));
