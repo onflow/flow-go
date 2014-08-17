@@ -701,8 +701,9 @@ void ep_print(const ep_t p);
  * @param[out] size			- the result.
  * @param[in] a				- the prime field element.
  * @param[in] pack			- the flag to indicate point compression.
+ * @return the number of bytes.
  */
-void ep_size_bin(int *size, const ep_t a, int pack);
+int ep_size_bin(const ep_t a, int pack);
 
 /**
  * Reads a prime elliptic curve point from a byte vector in big-endian format.

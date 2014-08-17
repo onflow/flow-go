@@ -660,14 +660,14 @@ void eb_print(const eb_t p) {
 	fb_print(p->z);
 }
 
-void eb_size_bin(int *size, const eb_t a, int pack) {
+int eb_size_bin(const eb_t a, int pack) {
 	eb_t t;
+	int size = 0;
 
 	eb_null(t);
 
 	if (eb_is_infty(a)) {
-		*size = 1;
-		return;
+		return 1;
 	}
 
 	TRY {
@@ -675,15 +675,17 @@ void eb_size_bin(int *size, const eb_t a, int pack) {
 
 		eb_norm(t, a);
 
-		*size = 1 + FB_BYTES;
+		size = 1 + FB_BYTES;
 		if (!pack) {
-			*size += FB_BYTES;
+			size += FB_BYTES;
 		}
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
 		eb_free(t);	
 	}
+
+	return size;
 }
 
 void eb_read_bin(eb_t a, const uint8_t *bin, int len) {

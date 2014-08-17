@@ -531,8 +531,9 @@ void ep2_print(ep2_t p);
  * @param[out] size			- the result.
  * @param[in] a				- the prime field element.
  * @param[in] pack			- the flag to indicate point compression.
+ * @return the number of bytes.
  */
-void ep2_size_bin(int *size, ep2_t a, int pack);
+int ep2_size_bin(ep2_t a, int pack);
 
 /**
  * Reads a prime elliptic curve point over a quadratic extension from a byte

@@ -181,14 +181,14 @@ void ep2_print(ep2_t p) {
 	fp2_print(p->z);
 }
 
-void ep2_size_bin(int *size, ep2_t a, int pack) {
+int ep2_size_bin(ep2_t a, int pack) {
 	ep2_t t;
+	int size = 0;
 
 	ep2_null(t);
 
 	if (ep2_is_infty(a)) {
-		*size = 1;
-		return;
+		return 1;
 	}
 
 	TRY {
@@ -196,15 +196,17 @@ void ep2_size_bin(int *size, ep2_t a, int pack) {
 
 		ep2_norm(t, a);
 
-		*size = 1 + 2 * FP_BYTES;
+		size = 1 + 2 * FP_BYTES;
 		if (!pack) {
-			*size += 2 * FP_BYTES;
+			size += 2 * FP_BYTES;
 		}
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
 		ep2_free(t);
 	}
+
+	return size;
 }
 
 void ep2_read_bin(ep2_t a, uint8_t *bin, int len) {
@@ -291,8 +293,7 @@ void ep2_write_bin(uint8_t *bin, int len, ep2_t a, int pack) {
 		}
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
+	} FINALLY {
 		ep2_free(t);
 	}
 }

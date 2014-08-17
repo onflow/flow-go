@@ -199,14 +199,14 @@ void ep_print(const ep_t p) {
 	fp_print(p->z);
 }
 
-void ep_size_bin(int *size, const ep_t a, int pack) {
+int ep_size_bin(const ep_t a, int pack) {
 	ep_t t;
+	int size = 0;
 
 	ep_null(t);
 
 	if (ep_is_infty(a)) {
-		*size = 1;
-		return;
+		return 1;
 	}
 
 	TRY {
@@ -214,15 +214,17 @@ void ep_size_bin(int *size, const ep_t a, int pack) {
 
 		ep_norm(t, a);
 
-		*size = 1 + FP_BYTES;
+		size = 1 + FP_BYTES;
 		if (!pack) {
-			*size += FP_BYTES;
+			size += FP_BYTES;
 		}
 	} CATCH_ANY {
 		THROW(ERR_CAUGHT);
 	} FINALLY {
 		ep_free(t);	
 	}
+
+	return size;
 }
 
 void ep_read_bin(ep_t a, const uint8_t *bin, int len) {
