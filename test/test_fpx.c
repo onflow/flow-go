@@ -2009,9 +2009,9 @@ static int util12(void) {
 
 		TEST_BEGIN("getting the size of a finite field element is correct") {
 			fp12_rand(a);
-			TEST_ASSERT(fp12_size_bin(a) == 12 * FP_BYTES, end);
+			TEST_ASSERT(fp12_size_bin(a, 0) == 12 * FP_BYTES, end);
 			fp12_conv_cyc(a, a);
-			TEST_ASSERT(fp12_size_bin(a) == 8 * FP_BYTES, end);			
+			TEST_ASSERT(fp12_size_bin(a, 1) == 8 * FP_BYTES, end);			
 		}
 		TEST_END;
 	}

@@ -129,18 +129,18 @@ int util(void) {
 		TEST_BEGIN("reading and writing a point are consistent") {
 			for (int j = 0; j < 2; j++) {
 				ec_set_infty(a);
-				ec_size_bin(&l, a, j);
+				l = ec_size_bin(a, j);
 				ec_write_bin(bin, l, a, j);
 				ec_read_bin(b, bin, l);
 				TEST_ASSERT(ec_cmp(a, b) == CMP_EQ, end);
 				ec_rand(a);
-				ec_size_bin(&l, a, j);
+				l = ec_size_bin(a, j);
 				ec_write_bin(bin, l, a, j);
 				ec_read_bin(b, bin, l);
 				TEST_ASSERT(ec_cmp(a, b) == CMP_EQ, end);
 				ec_rand(a);
 				ec_dbl(a, a);
-				ec_size_bin(&l, a, j);
+				l = ec_size_bin(a, j);
 				ec_norm(a, a);
 				ec_write_bin(bin, l, a, j);
 				ec_read_bin(b, bin, l);

@@ -122,18 +122,18 @@ int util1(void) {
 		TEST_BEGIN("reading and writing a point are consistent") {
 			for (int j = 0; j < 2; j++) {
 				g1_set_infty(a);
-				g1_size_bin(&l, a, j);
+				l = g1_size_bin(a, j);
 				g1_write_bin(bin, l, a, j);
 				g1_read_bin(b, bin, l);
 				TEST_ASSERT(g1_cmp(a, b) == CMP_EQ, end);
 				g1_rand(a);
-				g1_size_bin(&l, a, j);
+				l = g1_size_bin(a, j);
 				g1_write_bin(bin, l, a, j);
 				g1_read_bin(b, bin, l);
 				TEST_ASSERT(g1_cmp(a, b) == CMP_EQ, end);
 				g1_rand(a);
 				g1_dbl(a, a);
-				g1_size_bin(&l, a, j);
+				l = g1_size_bin(a, j);
 				g1_norm(a, a);
 				g1_write_bin(bin, l, a, j);
 				g1_read_bin(b, bin, l);
@@ -549,8 +549,9 @@ static int memory2(void) {
 }
 
 int util2(void) {
-	int code = STS_ERR;
+	int l, code = STS_ERR;
 	g2_t a, b, c;
+	uint8_t bin[4 * PC_BYTES + 1];
 
 	g2_null(a);
 	g2_null(b);
@@ -605,6 +606,29 @@ int util2(void) {
 			TEST_ASSERT(g2_is_infty(a), end);
 		}
 		TEST_END;
+
+		TEST_BEGIN("reading and writing a point are consistent") {
+			for (int j = 0; j < 2; j++) {
+				g2_set_infty(a);
+				l = g2_size_bin(a, j);
+				g2_write_bin(bin, l, a, j);
+				g2_read_bin(b, bin, l);
+				TEST_ASSERT(g2_cmp(a, b) == CMP_EQ, end);
+				g2_rand(a);
+				l = g2_size_bin(a, j);
+				g2_write_bin(bin, l, a, j);
+				g2_read_bin(b, bin, l);
+				TEST_ASSERT(g2_cmp(a, b) == CMP_EQ, end);
+				g2_rand(a);
+				g2_dbl(a, a);
+				l = g2_size_bin(a, j);
+				g2_norm(a, a);
+				g2_write_bin(bin, l, a, j);
+				g2_read_bin(b, bin, l);
+				TEST_ASSERT(g2_cmp(a, b) == CMP_EQ, end);						
+			}
+		}
+		TEST_END;		
 	}
 	CATCH_ANY {
 		util_print("FATAL ERROR!\n");
