@@ -134,18 +134,18 @@ int util(void) {
 		TEST_BEGIN("reading and writing a point are consistent") {
 			for (int j = 0; j < 2; j++) {
 				ep2_set_infty(a);
-				ep2_size_bin(&l, a, j);
+				l = ep2_size_bin(a, j);
 				ep2_write_bin(bin, l, a, j);
 				ep2_read_bin(b, bin, l);
 				TEST_ASSERT(ep2_cmp(a, b) == CMP_EQ, end);
 				ep2_rand(a);
-				ep2_size_bin(&l, a, j);
+				l = ep2_size_bin(a, j);
 				ep2_write_bin(bin, l, a, j);
 				ep2_read_bin(b, bin, l);
 				TEST_ASSERT(ep2_cmp(a, b) == CMP_EQ, end);
 				ep2_rand(a);
 				ep2_dbl(a, a);
-				ep2_size_bin(&l, a, j);
+				l = ep2_size_bin(a, j);
 				ep2_norm(a, a);
 				ep2_write_bin(bin, l, a, j);
 				ep2_read_bin(b, bin, l);
