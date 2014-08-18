@@ -144,6 +144,31 @@ void fp2_exp_uni(fp2_t c, fp2_t a, bn_t b) {
 	}
 }
 
+int fp2_test_uni(fp2_t a) {
+	fp2_t t;
+	int result = 0;
+
+	fp2_null(t);
+
+	TRY {
+		fp2_new(t);
+
+		fp_sqr(t[0], a[0]);
+		fp_sqr(t[1], a[1]);
+		fp_add(t[0], t[0], t[1]);
+
+		result = ((fp_cmp_dig(t[0], 1) == CMP_EQ) ? 1 : 0);
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp2_free(t);
+	}
+
+	return result;
+}
+
 void fp3_exp(fp3_t c, fp3_t a, bn_t b) {
 	fp3_t t;
 

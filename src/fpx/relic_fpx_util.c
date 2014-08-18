@@ -60,24 +60,63 @@ void fp2_print(fp2_t a) {
 	fp_print(a[1]);
 }
 
-int fp2_size_bin(fp2_t a) {
-	return 2 * FP_BYTES;
+int fp2_size_bin(fp2_t a, int pack) {
+	if (pack) {
+		if (fp2_test_uni(a)) {
+			return FP_BYTES + 1;
+		} else {
+			return 2 * FP_BYTES;
+		}
+	} else {
+		return 2 * FP_BYTES;
+	}
 }
 
 void fp2_read_bin(fp2_t a, uint8_t *bin, int len) {
-	if (len != 2 * FP_BYTES) {
+	if (len != FP_BYTES + 1 && len != 2 * FP_BYTES) {
 		THROW(ERR_NO_BUFFER);
 	}
-	fp_read_bin(a[0], bin, FP_BYTES);
-	fp_read_bin(a[1], bin + FP_BYTES, FP_BYTES);
+	if (len == FP_BYTES + 1) {
+		fp_read_bin(a[0], bin, FP_BYTES);
+		fp_set_bit(a[1], 0, bin[FP_BYTES]);
+		fp2_upk(a, a);
+	}
+	if (len == 2 * FP_BYTES) {
+		fp_read_bin(a[0], bin, FP_BYTES);
+		fp_read_bin(a[1], bin + FP_BYTES, FP_BYTES);
+	}
 }
 
-void fp2_write_bin(uint8_t *bin, int len, fp2_t a) {
-	if (len != 2 * FP_BYTES) {
-		THROW(ERR_NO_BUFFER);
+void fp2_write_bin(uint8_t *bin, int len, fp2_t a, int pack) {
+	fp2_t t;
+
+	fp2_null(t);
+
+	TRY {
+		fp2_new(t);
+
+		if (pack && fp2_test_uni(a)) {
+			if (len != FP_BYTES + 1) {
+				THROW(ERR_NO_BUFFER);	
+			} else {
+				fp2_pck(t, t);
+				fp_write_bin(bin, FP_BYTES, a[0]);
+				bin[FP_BYTES] = fp_get_bit(a[1], 0);
+			}
+		} else {
+			if (len != 2 * FP_BYTES) {
+				THROW(ERR_NO_BUFFER);
+			} else {
+				fp_write_bin(bin, FP_BYTES, a[0]);
+				fp_write_bin(bin + FP_BYTES, FP_BYTES, a[1]);
+			}
+		}
+	} CATCH_ANY {
+		THROW(ERR_CAUGHT);
 	}
-	fp_write_bin(bin, FP_BYTES, a[0]);
-	fp_write_bin(bin + FP_BYTES, FP_BYTES, a[1]);
+	FINALLY {
+		fp2_free(t);
+	}
 }
 
 void fp2_set_dig(fp2_t a, dig_t b) {
@@ -180,9 +219,9 @@ void fp6_write_bin(uint8_t *bin, int len, fp6_t a) {
 	if (len != 6 * FP_BYTES) {
 		THROW(ERR_NO_BUFFER);
 	}
-	fp2_write_bin(bin, 2 * FP_BYTES, a[0]);
-	fp2_write_bin(bin + 2 * FP_BYTES, 2 * FP_BYTES, a[1]);
-	fp2_write_bin(bin + 4 * FP_BYTES, 2 * FP_BYTES, a[2]);
+	fp2_write_bin(bin, 2 * FP_BYTES, a[0], 0);
+	fp2_write_bin(bin + 2 * FP_BYTES, 2 * FP_BYTES, a[1], 0);
+	fp2_write_bin(bin + 4 * FP_BYTES, 2 * FP_BYTES, a[2], 0);
 }
 
 void fp12_copy(fp12_t c, fp12_t a) {
@@ -232,6 +271,7 @@ void fp12_read_bin(fp12_t a, uint8_t *bin, int len) {
 		fp2_read_bin(a[1][0], bin + 4 * FP_BYTES, 2 * FP_BYTES);
 		fp2_zero(a[1][1]);
 		fp2_read_bin(a[1][2], bin + 6 * FP_BYTES, 2 * FP_BYTES);
+		fp12_back_cyc(a, a);
 	}
 	if (len == 12 * FP_BYTES) {
 		fp6_read_bin(a[0], bin, 6 * FP_BYTES);
@@ -252,10 +292,10 @@ void fp12_write_bin(uint8_t *bin, int len, fp12_t a, int pack) {
 				THROW(ERR_NO_BUFFER);
 			}
 			fp12_pck(t, a);
-			fp2_write_bin(bin, 2 * FP_BYTES, a[0][1]);
-			fp2_write_bin(bin + 2 * FP_BYTES, 2 * FP_BYTES, a[0][2]);
-			fp2_write_bin(bin + 4 * FP_BYTES, 2 * FP_BYTES, a[1][0]);
-			fp2_write_bin(bin + 6 * FP_BYTES, 2 * FP_BYTES, a[1][2]);
+			fp2_write_bin(bin, 2 * FP_BYTES, a[0][1], 0);
+			fp2_write_bin(bin + 2 * FP_BYTES, 2 * FP_BYTES, a[0][2], 0);
+			fp2_write_bin(bin + 4 * FP_BYTES, 2 * FP_BYTES, a[1][0], 0);
+			fp2_write_bin(bin + 6 * FP_BYTES, 2 * FP_BYTES, a[1][2], 0);
 		} else {
 			if (len != 12 * FP_BYTES) {
 				THROW(ERR_NO_BUFFER);
