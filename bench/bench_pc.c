@@ -454,7 +454,7 @@ static void arith2(void) {
 		bn_rand(k, BN_POS, bn_bits(n));
 		bn_mod(k, k, n);
 		g2_mul_pre(t, p);
-		BENCH_ADD(g2_mul_fix(q, t, k));
+		BENCH_ADD(g2_mul_fix(q, (const g2_t *)t, k));
 	}
 	BENCH_END;
 
@@ -515,6 +515,8 @@ static void memory(void) {
 
 static void util(void) {
 	gt_t a, b;
+	uint8_t bin[12 * PC_BYTES];
+	int l;
 
 	gt_null(a);
 	gt_null(b);
@@ -525,6 +527,12 @@ static void util(void) {
 	BENCH_BEGIN("gt_copy") {
 		gt_rand(a);
 		BENCH_ADD(gt_copy(b, a));
+	}
+	BENCH_END;
+
+	BENCH_BEGIN("gt_zero") {
+		gt_rand(a);
+		BENCH_ADD(gt_zero(a));
 	}
 	BENCH_END;
 
@@ -551,6 +559,42 @@ static void util(void) {
 		BENCH_ADD(gt_cmp(b, a));
 	}
 	BENCH_END;
+
+	BENCH_BEGIN("gt_size_bin (0)") {
+		gt_rand(a);
+		BENCH_ADD(gt_size_bin(a, 0));
+	} BENCH_END;
+
+	BENCH_BEGIN("gt_size_bin (1)") {
+		gt_rand(a);
+		BENCH_ADD(gt_size_bin(a, 1));
+	} BENCH_END;
+
+	BENCH_BEGIN("gt_write_bin (0)") {
+		gt_rand(a);
+		l = gt_size_bin(a, 0);
+		BENCH_ADD(gt_write_bin(bin, l, a, 0));
+	} BENCH_END;
+
+	BENCH_BEGIN("gt_write_bin (1)") {
+		gt_rand(a);
+		l = gt_size_bin(a, 1);
+		BENCH_ADD(gt_write_bin(bin, l, a, 1));
+	} BENCH_END;
+
+	BENCH_BEGIN("gt_read_bin (0)") {
+		gt_rand(a);
+		l = gt_size_bin(a, 0);
+		gt_write_bin(bin, l, a, 0);
+		BENCH_ADD(gt_read_bin(a, bin, l));
+	} BENCH_END;
+
+	BENCH_BEGIN("gt_read_bin (1)") {
+		gt_rand(a);
+		l = gt_size_bin(a, 1);
+		gt_write_bin(bin, l, a, 1);
+		BENCH_ADD(gt_read_bin(a, bin, l));
+	} BENCH_END;	
 
 	gt_free(a);
 	gt_free(b);
