@@ -54,7 +54,7 @@ void eb_pck(eb_t r, const eb_t p) {
 
 int eb_upk(eb_t r, const eb_t p) {
 	fb_t t0, t1;
-	int res = 0;
+	int result = 0;
 
 	fb_null(t0);
 	fb_null(t1);
@@ -70,20 +70,21 @@ int eb_upk(eb_t r, const eb_t p) {
 		fb_inv(t0, t0);
 		/* t0 = t1/x1^2. */
 		fb_mul(t0, t0, t1);
-		res = (fb_trc(t0) == 0);
-		/* Solve t1^2 + t1 = t0. */
-		fb_slv(t1, t0);
-		/* If this is not the correct solution, try the other. */
-		if (fb_get_bit(t1, 0) != fb_get_bit(p->y, 0)) {
-			fb_add_dig(t1, t1, 1);
+		result = (fb_trc(t0) == 0);
+		if (result) {
+			/* Solve t1^2 + t1 = t0. */
+			fb_slv(t1, t0);
+			/* If this is not the correct solution, try the other. */
+			if (fb_get_bit(t1, 0) != fb_get_bit(p->y, 0)) {
+				fb_add_dig(t1, t1, 1);
+			}
+			/* x3 = x1, y3 = t1 * x1, z3 = 1. */
+			fb_mul(r->y, t1, p->x);
+
+			fb_copy(r->x, p->x);
+			fb_set_dig(r->z, 1);
+			r->norm = 1;
 		}
-		/* x3 = x1, y3 = t1 * x1, z3 = 1. */
-		fb_mul(r->y, t1, p->x);
-
-		fb_copy(r->x, p->x);
-		fb_set_dig(r->z, 1);
-
-		r->norm = 1;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -92,5 +93,5 @@ int eb_upk(eb_t r, const eb_t p) {
 		fb_free(t0);
 		fb_free(t1);
 	}
-	return res;
+	return result;
 }

@@ -61,17 +61,18 @@ int ep2_upk(ep2_t r, ep2_t p) {
 		/* t0 = sqrt(x1^3 + a * x1 + b). */
 		result = fp2_srt(t, t);
 
-		/* Verify if least significant bit of the result matches the
-		 * compressed y-coordinate. */
-		if (fp_get_bit(t[0], 0) != fp_get_bit(p->y[0], 0)) {
-			fp2_neg(t, t);
+		if (result) {
+			/* Verify if least significant bit of the result matches the
+			 * compressed y-coordinate. */
+			if (fp_get_bit(t[0], 0) != fp_get_bit(p->y[0], 0)) {
+				fp2_neg(t, t);
+			}
+			fp2_copy(r->x, p->x);
+			fp2_copy(r->y, t);
+			fp_set_dig(r->z[0], 1);
+			fp_zero(r->z[1]);
+			r->norm = 1;
 		}
-		fp2_copy(r->x, p->x);
-		fp2_copy(r->y, t);
-		fp_set_dig(r->z[0], 1);
-		fp_zero(r->z[1]);
-
-		r->norm = 1;
 	}
 	CATCH_ANY {
 		THROW(ERR_CAUGHT);
