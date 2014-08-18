@@ -280,15 +280,15 @@ void ep2_write_bin(uint8_t *bin, int len, ep2_t a, int pack) {
 			} else {
 				ep2_pck(t, t);
 				bin[0] = 2 | fp_get_bit(t->y[0], 0);
-				fp2_write_bin(bin + 1, 2 * FP_BYTES, t->x);
+				fp2_write_bin(bin + 1, 2 * FP_BYTES, t->x, 0);
 			}
 		} else {
 			if (len != 4 * FP_BYTES + 1) {
 				THROW(ERR_NO_BUFFER);
 			} else {
 				bin[0] = 4;
-				fp2_write_bin(bin + 1, 2 * FP_BYTES, t->x);
-				fp2_write_bin(bin + 2 * FP_BYTES + 1, 2 * FP_BYTES, t->y);
+				fp2_write_bin(bin + 1, 2 * FP_BYTES, t->x, 0);
+				fp2_write_bin(bin + 2 * FP_BYTES + 1, 2 * FP_BYTES, t->y, 0);
 			}
 		}
 	} CATCH_ANY {
