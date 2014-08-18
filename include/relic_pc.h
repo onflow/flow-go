@@ -294,6 +294,13 @@ typedef CAT(GT_LOWER, t) gt_t;
 #define g2_set_infty(P)		CAT(G2_LOWER, set_infty)(P)
 
 /**
+ * Assigns a G_T element to zero.
+ *
+ * @param[out] P			- the element to assign.
+ */
+#define gt_zero(P)			CAT(GT_LOWER, zero)(P)
+
+/**
  * Assigns a G_T element to the unity.
  *
  * @param[out] P			- the element to assign.
@@ -488,7 +495,7 @@ typedef CAT(GT_LOWER, t) gt_t;
  * @param[in] C 			- the flag to indicate point compression.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is not sufficient.
  */
-#define gt_write_bin(B, L, P)	CAT(GT_LOWER, write_bin)(B, L, P)
+#define gt_write_bin(B, L, P, C)	CAT(GT_LOWER, write_bin)(B, L, P, C)
 
 /**
  * Negates a element from G_1. Computes R = -P.
