@@ -644,9 +644,10 @@ void fp2_print(fp2_t a);
  * element.
  *
  * @param[in] a				- the extension field element.
+ * @param[in] pack			- the flag to indicate compression.
  * @return the number of bytes. 
  */
-int fp2_size_bin(fp2_t a);
+int fp2_size_bin(fp2_t a, int pack);
 
 /**
  * Reads a quadratic extension field element from a byte vector in big-endian
@@ -666,9 +667,10 @@ void fp2_read_bin(fp2_t a, uint8_t *bin, int len);
  * @param[out] bin			- the byte vector.
  * @param[in] len			- the buffer capacity.
  * @param[in] a				- the extension field element to write.
+ * @param[in] pack			- the flag to indicate compression.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct.
  */
-void fp2_write_bin(uint8_t *bin, int len, fp2_t a);
+void fp2_write_bin(uint8_t *bin, int len, fp2_t a, int pack);
 
 /**
  * Returns the result of a comparison between two quadratic extension field
@@ -863,6 +865,14 @@ void fp2_inv_uni(fp2_t c, fp2_t a);
 void fp2_inv_sim(fp2_t *c, fp2_t *a, int n);
 
 /**
+ * Tests if a quadratic extension field element is unitary.
+ *
+ * @param[in] a				- the quadratic extension field element to test.
+ * @return 1 if the extension field element is unitary, 0 otherwise.
+ */
+int fp2_test_uni(fp2_t a);
+
+/**
  * Converts a quadratic extension field element to a unitary element. Computes
  * c = a^(p - 1).
  *
@@ -909,6 +919,23 @@ void fp2_frb(fp2_t c, fp2_t a, int i);
  * @return					- 1 if there is a square root, 0 otherwise.
  */
 int fp2_srt(fp2_t c, fp2_t a);
+
+/**
+ * Compresses an extension field element.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the extension field element to compress.
+ */
+void fp2_pck(fp2_t c, fp2_t a);
+
+/**
+ * Decompresses an extension field element.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the extension field element to decompress.
+ * @return if the decompression was successful
+ */
+int fp2_upk(fp2_t c, fp2_t a);
 
 /**
  * Copies the second argument to the first argument.
@@ -1624,7 +1651,7 @@ void fp12_sqr_pck_lazyr(fp12_t c, fp12_t a);
  * subgroup.
  *
  * @param[in] a				- the dodecic extension field element to test.
- * @return 1 if the extension field element is in the subgroup. 0 otherwise.
+ * @return 1 if the extension field element is in the subgroup, 0 otherwise.
  */
 int fp12_test_cyc(fp12_t a);
 
