@@ -133,15 +133,22 @@ static int util2(void) {
 
 		TEST_BEGIN("reading and writing a finite field element are consistent") {
 			fp2_rand(a);
-			fp2_write_bin(bin, sizeof(bin), a);
+			fp2_write_bin(bin, sizeof(bin), a, 0);
 			fp2_read_bin(b, bin, sizeof(bin));
 			TEST_ASSERT(fp2_cmp(a, b) == CMP_EQ, end);
+			fp2_conv_uni(a, a);
+			fp2_write_bin(bin, FP_BYTES + 1, a, 1);
+			fp2_read_bin(b, bin, FP_BYTES + 1);
+			TEST_ASSERT(fp2_cmp(a, b) == CMP_EQ, end);						
 		}
 		TEST_END;
 
 		TEST_BEGIN("getting the size of a prime field element is correct") {
 			fp2_rand(a);
-			TEST_ASSERT(fp2_size_bin(a) == 2 * FP_BYTES, end);
+			TEST_ASSERT(fp2_size_bin(a, 0) == 2 * FP_BYTES, end);
+			fp2_conv_uni(a, a);
+			TEST_ASSERT(fp2_size_bin(a, 0) == 2 * FP_BYTES, end);
+			TEST_ASSERT(fp2_size_bin(a, 1) == FP_BYTES + 1, end);
 		}
 		TEST_END;
 	}
@@ -2002,7 +2009,6 @@ static int util12(void) {
 			fp12_conv_cyc(a, a);
 			fp12_write_bin(bin, 8 * FP_BYTES, a, 1);
 			fp12_read_bin(b, bin, 8 * FP_BYTES);
-			fp12_back_cyc(b, b);
 			TEST_ASSERT(fp12_cmp(a, b) == CMP_EQ, end);			
 		}
 		TEST_END;
