@@ -1207,6 +1207,9 @@
 #undef ep2_is_valid
 #undef ep2_tab
 #undef ep2_print
+#undef ep2_size_bin
+#undef ep2_read_bin
+#undef ep2_write_bin
 #undef ep2_neg_basic
 #undef ep2_neg_projc
 #undef ep2_add_basic
@@ -1240,6 +1243,8 @@
 #undef ep2_norm
 #undef ep2_map
 #undef ep2_frb
+#undef ep2_pck
+#undef ep2_upk
 
 #define ep2_curve_init 	PREFIX(ep2_curve_init)
 #define ep2_curve_clean 	PREFIX(ep2_curve_clean)
@@ -1262,6 +1267,9 @@
 #define ep2_is_valid 	PREFIX(ep2_is_valid)
 #define ep2_tab 	PREFIX(ep2_tab)
 #define ep2_print 	PREFIX(ep2_print)
+#define ep2_size_bin 	PREFIX(ep2_size_bin)
+#define ep2_read_bin 	PREFIX(ep2_read_bin)
+#define ep2_write_bin 	PREFIX(ep2_write_bin)
 #define ep2_neg_basic 	PREFIX(ep2_neg_basic)
 #define ep2_neg_projc 	PREFIX(ep2_neg_projc)
 #define ep2_add_basic 	PREFIX(ep2_add_basic)
@@ -1295,6 +1303,8 @@
 #define ep2_norm 	PREFIX(ep2_norm)
 #define ep2_map 	PREFIX(ep2_map)
 #define ep2_frb 	PREFIX(ep2_frb)
+#define ep2_pck 	PREFIX(ep2_pck)
+#define ep2_upk 	PREFIX(ep2_upk)
 
 #undef fp2_st
 #undef fp2_t
@@ -1337,11 +1347,14 @@
 #undef fp2_inv
 #undef fp2_inv_uni
 #undef fp2_inv_sim
+#undef fp2_test_uni
 #undef fp2_conv_uni
 #undef fp2_exp
 #undef fp2_exp_uni
 #undef fp2_frb
 #undef fp2_srt
+#undef fp2_pck
+#undef fp2_upk
 
 #define fp2_copy 	PREFIX(fp2_copy)
 #define fp2_zero 	PREFIX(fp2_zero)
@@ -1372,11 +1385,14 @@
 #define fp2_inv 	PREFIX(fp2_inv)
 #define fp2_inv_uni 	PREFIX(fp2_inv_uni)
 #define fp2_inv_sim 	PREFIX(fp2_inv_sim)
+#define fp2_test_uni 	PREFIX(fp2_test_uni)
 #define fp2_conv_uni 	PREFIX(fp2_conv_uni)
 #define fp2_exp 	PREFIX(fp2_exp)
 #define fp2_exp_uni 	PREFIX(fp2_exp_uni)
 #define fp2_frb 	PREFIX(fp2_frb)
 #define fp2_srt 	PREFIX(fp2_srt)
+#define fp2_pck 	PREFIX(fp2_pck)
+#define fp2_upk 	PREFIX(fp2_upk)
 
 #undef fp2_addn_low
 #undef fp2_addm_low
@@ -1423,6 +1439,9 @@
 #undef fp3_is_zero
 #undef fp3_rand
 #undef fp3_print
+#undef fp3_size_bin
+#undef fp3_read_bin
+#undef fp3_write_bin
 #undef fp3_cmp
 #undef fp3_add_basic
 #undef fp3_add_integ
@@ -1450,6 +1469,9 @@
 #define fp3_is_zero 	PREFIX(fp3_is_zero)
 #define fp3_rand 	PREFIX(fp3_rand)
 #define fp3_print 	PREFIX(fp3_print)
+#define fp3_size_bin 	PREFIX(fp3_size_bin)
+#define fp3_read_bin 	PREFIX(fp3_read_bin)
+#define fp3_write_bin 	PREFIX(fp3_write_bin)
 #define fp3_cmp 	PREFIX(fp3_cmp)
 #define fp3_add_basic 	PREFIX(fp3_add_basic)
 #define fp3_add_integ 	PREFIX(fp3_add_integ)
@@ -1503,6 +1525,9 @@
 #undef fp6_is_zero
 #undef fp6_rand
 #undef fp6_print
+#undef fp6_size_bin
+#undef fp6_read_bin
+#undef fp6_write_bin
 #undef fp6_cmp
 #undef fp6_add
 #undef fp6_sub
@@ -1525,6 +1550,9 @@
 #define fp6_is_zero 	PREFIX(fp6_is_zero)
 #define fp6_rand 	PREFIX(fp6_rand)
 #define fp6_print 	PREFIX(fp6_print)
+#define fp6_size_bin 	PREFIX(fp6_size_bin)
+#define fp6_read_bin 	PREFIX(fp6_read_bin)
+#define fp6_write_bin 	PREFIX(fp6_write_bin)
 #define fp6_cmp 	PREFIX(fp6_cmp)
 #define fp6_add 	PREFIX(fp6_add)
 #define fp6_sub 	PREFIX(fp6_sub)
@@ -1547,6 +1575,9 @@
 #undef fp12_is_zero
 #undef fp12_rand
 #undef fp12_print
+#undef fp12_size_bin
+#undef fp12_read_bin
+#undef fp12_write_bin
 #undef fp12_cmp
 #undef fp12_cmp_dig
 #undef fp12_set_dig
@@ -1575,12 +1606,17 @@
 #undef fp12_exp
 #undef fp12_exp_cyc
 #undef fp12_exp_cyc_sps
+#undef fp12_pck
+#undef fp12_upk
 
 #define fp12_copy 	PREFIX(fp12_copy)
 #define fp12_zero 	PREFIX(fp12_zero)
 #define fp12_is_zero 	PREFIX(fp12_is_zero)
 #define fp12_rand 	PREFIX(fp12_rand)
 #define fp12_print 	PREFIX(fp12_print)
+#define fp12_size_bin 	PREFIX(fp12_size_bin)
+#define fp12_read_bin 	PREFIX(fp12_read_bin)
+#define fp12_write_bin 	PREFIX(fp12_write_bin)
 #define fp12_cmp 	PREFIX(fp12_cmp)
 #define fp12_cmp_dig 	PREFIX(fp12_cmp_dig)
 #define fp12_set_dig 	PREFIX(fp12_set_dig)
@@ -1609,6 +1645,8 @@
 #define fp12_exp 	PREFIX(fp12_exp)
 #define fp12_exp_cyc 	PREFIX(fp12_exp_cyc)
 #define fp12_exp_cyc_sps 	PREFIX(fp12_exp_cyc_sps)
+#define fp12_pck 	PREFIX(fp12_pck)
+#define fp12_upk 	PREFIX(fp12_upk)
 
 #undef fp18_copy
 #undef fp18_zero
