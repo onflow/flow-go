@@ -7,3 +7,7 @@ type Function struct {
 	ReturnType Type
 	Block      Block
 }
+
+func (f Function) Accept(visitor Visitor) Repr {
+	return visitor.VisitFunction(f)
+}
