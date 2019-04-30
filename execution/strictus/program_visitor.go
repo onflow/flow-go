@@ -1,0 +1,529 @@
+package strictus
+
+import (
+	"bamboo-emulator/execution/strictus/ast"
+	"fmt"
+	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"strconv"
+)
+
+type ProgramVisitor struct {
+	*BaseStrictusVisitor
+}
+
+func (v *ProgramVisitor) VisitProgram(ctx *ProgramContext) interface{} {
+	var functions []ast.Function
+	for _, declaration := range ctx.AllDeclaration() {
+		functions = append(
+			functions,
+			declaration.Accept(v).(ast.Function),
+		)
+	}
+
+	return ast.Program{
+		Functions: functions,
+	}
+}
+
+func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
+	isPublic := ctx.Pub() != nil
+	identifier := ctx.Identifier().GetText()
+	returnType := ctx.TypeName().Accept(v).(ast.Type)
+	parameters := ctx.ParameterList().Accept(v).([]ast.Parameter)
+	statements := ctx.Block().Accept(v).([]ast.Statement)
+
+	return ast.Function{
+		IsPublic:   isPublic,
+		Identifier: identifier,
+		Parameters: parameters,
+		ReturnType: returnType,
+		Statements: statements,
+	}
+}
+
+func (v *ProgramVisitor) VisitParameterList(ctx *ParameterListContext) interface{} {
+	var parameters []ast.Parameter
+	for _, parameter := range ctx.AllParameter() {
+		parameters = append(
+			parameters,
+			parameter.Accept(v).(ast.Parameter),
+		)
+	}
+	return parameters
+}
+
+func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
+	identifier := ctx.Identifier().GetText()
+	typeName := ctx.TypeName().Accept(v).(ast.Type)
+	return ast.Parameter{
+		Identifier: identifier,
+		Type:       typeName,
+	}
+}
+
+func (v *ProgramVisitor) VisitInt32Type(ctx *Int32TypeContext) interface{} {
+	return ast.Int32Type{}
+}
+
+func (v *ProgramVisitor) VisitInt64Type(ctx *Int64TypeContext) interface{} {
+	return ast.Int64Type{}
+}
+
+func (v *ProgramVisitor) VisitTypeName(ctx *TypeNameContext) interface{} {
+	result := ctx.BaseType().Accept(v).(ast.Type)
+
+	// reduce in reverse
+	dimensions := ctx.AllTypeDimension()
+	lastDimensionIndex := len(dimensions) - 1
+	for i := range dimensions {
+		dimension := dimensions[lastDimensionIndex-i].Accept(v).(*int)
+		if dimension == nil {
+			result = ast.DynamicType{
+				Type: result,
+			}
+		} else {
+			result = ast.FixedType{
+				Type: result,
+				Size: *dimension,
+			}
+		}
+	}
+
+	return result
+}
+
+func (v *ProgramVisitor) VisitTypeDimension(ctx *TypeDimensionContext) interface{} {
+	var result *int
+
+	literalContext := ctx.DecimalLiteral()
+	if literalContext == nil {
+		return result
+	}
+
+	value, err := strconv.Atoi(literalContext.GetText())
+	if err != nil {
+		return result
+	}
+
+	result = &value
+
+	return result
+}
+
+func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {
+	var statements []ast.Statement
+	for _, statement := range ctx.AllStatement() {
+		statements = append(
+			statements,
+			statement.Accept(v).(ast.Statement),
+		)
+	}
+	return statements
+}
+
+// TODO: rename to VisitChildren?
+// NOTE: manually go over all child rules and find a match
+func (v *ProgramVisitor) visitChildren(ctx *antlr.BaseParserRuleContext) interface{} {
+	for _, child := range ctx.GetChildren() {
+		ruleChild, ok := child.(antlr.RuleNode)
+		if !ok {
+			continue
+		}
+
+		result := ruleChild.Accept(v)
+		if result != nil {
+			return result
+		}
+	}
+
+	return nil
+}
+
+func (v *ProgramVisitor) VisitStatement(ctx *StatementContext) interface{} {
+	result := v.visitChildren(ctx.BaseParserRuleContext)
+	if expression, ok := result.(ast.Expression); ok {
+		return ast.ExpressionStatement{
+			Expression: expression,
+		}
+	}
+
+	return result
+}
+
+func (v *ProgramVisitor) VisitReturnStatement(ctx *ReturnStatementContext) interface{} {
+	expression := ctx.Expression().Accept(v).(ast.Expression)
+
+	return ast.ReturnStatement{
+		Expression: expression,
+	}
+}
+
+func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{} {
+	isConst := ctx.Const() != nil
+	identifier := ctx.Identifier().GetText()
+	expression := ctx.Expression().Accept(v).(ast.Expression)
+	var typeName *ast.Type
+
+	typeNameContext := ctx.TypeName()
+	if typeNameContext != nil {
+		if x, ok := typeNameContext.Accept(v).(ast.Type); ok {
+			typeName = &x
+		}
+	}
+
+	return ast.VariableDeclaration{
+		IsConst:    isConst,
+		Identifier: identifier,
+		Value:      expression,
+		Type:       typeName,
+	}
+}
+
+func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
+	test := ctx.test.Accept(v).(ast.Expression)
+	then := ctx.then.Accept(v).([]ast.Statement)
+
+	var elseStatements []ast.Statement
+	if ctx.alt != nil {
+		elseStatements = ctx.alt.Accept(v).([]ast.Statement)
+	} else if ifStatement, ok := ctx.IfStatement().Accept(v).(ast.IfStatement); ok {
+		elseStatements = []ast.Statement{ifStatement}
+	} else {
+		elseStatements = []ast.Statement{}
+	}
+
+	return ast.IfStatement{
+		Test: test,
+		Then: then,
+		Else: elseStatements,
+	}
+}
+
+func (v *ProgramVisitor) VisitWhileStatement(ctx *WhileStatementContext) interface{} {
+	test := ctx.Expression().Accept(v).(ast.Expression)
+	statements := ctx.Block().Accept(v).([]ast.Statement)
+
+	return ast.WhileStatement{
+		Test:       test,
+		Statements: statements,
+	}
+}
+
+func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
+	identifier := ctx.Identifier().GetText()
+	value := ctx.Expression().Accept(v).(ast.Expression)
+
+	return ast.Assignment{
+		Identifier: identifier,
+		Value:      value,
+	}
+}
+
+// NOTE: manually go over all child rules and find a match
+func (v *ProgramVisitor) VisitExpression(ctx *ExpressionContext) interface{} {
+	return v.visitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitConditionalExpression(ctx *ConditionalExpressionContext) interface{} {
+	expression := ctx.OrExpression().Accept(v).(ast.Expression)
+
+	if ctx.then != nil && ctx.alt != nil {
+		then := ctx.then.Accept(v).(ast.Expression)
+		alt := ctx.alt.Accept(v).(ast.Expression)
+		return ast.ConditionalExpression{
+			Test: expression,
+			Then: then,
+			Else: alt,
+		}
+	}
+
+	return expression
+}
+
+func (v *ProgramVisitor) VisitOrExpression(ctx *OrExpressionContext) interface{} {
+	first := ctx.AndExpression(0).Accept(v).(ast.Expression)
+
+	secondContext := ctx.AndExpression(1)
+	if secondContext != nil {
+		second := secondContext.Accept(v).(ast.Expression)
+		return ast.BinaryExpression{
+			Operation: ast.OperationOr,
+			Left:      first,
+			Right:     second,
+		}
+	}
+
+	return first
+}
+
+func (v *ProgramVisitor) VisitAndExpression(ctx *AndExpressionContext) interface{} {
+	first := ctx.EqualityExpression(0).Accept(v).(ast.Expression)
+
+	secondContext := ctx.EqualityExpression(1)
+	if secondContext != nil {
+		second := secondContext.Accept(v).(ast.Expression)
+		return ast.BinaryExpression{
+			Operation: ast.OperationAnd,
+			Left:      first,
+			Right:     second,
+		}
+	}
+
+	return first
+}
+
+func (v *ProgramVisitor) VisitEqualityExpression(ctx *EqualityExpressionContext) interface{} {
+	first := ctx.RelationalExpression(0).Accept(v).(ast.Expression)
+
+	secondContext := ctx.RelationalExpression(1)
+	if secondContext != nil {
+		second := secondContext.Accept(v).(ast.Expression)
+		operation := ctx.EqualityOp().Accept(v).(ast.Operation)
+
+		return ast.BinaryExpression{
+			Operation: operation,
+			Left:      first,
+			Right:     second,
+		}
+	}
+
+	return first
+}
+
+func (v *ProgramVisitor) VisitRelationalExpression(ctx *RelationalExpressionContext) interface{} {
+	first := ctx.AdditiveExpression(0).Accept(v).(ast.Expression)
+
+	secondContext := ctx.AdditiveExpression(1)
+	if secondContext != nil {
+		second := secondContext.Accept(v).(ast.Expression)
+		operation := ctx.RelationalOp().Accept(v).(ast.Operation)
+
+		return ast.BinaryExpression{
+			Operation: operation,
+			Left:      first,
+			Right:     second,
+		}
+	}
+
+	return first
+}
+
+func (v *ProgramVisitor) VisitAdditiveExpression(ctx *AdditiveExpressionContext) interface{} {
+	first := ctx.MultiplicativeExpression(0).Accept(v).(ast.Expression)
+
+	secondContext := ctx.MultiplicativeExpression(1)
+	if secondContext != nil {
+		second := secondContext.Accept(v).(ast.Expression)
+		operation := ctx.AdditiveOp().Accept(v).(ast.Operation)
+
+		return ast.BinaryExpression{
+			Operation: operation,
+			Left:      first,
+			Right:     second,
+		}
+	}
+
+	return first
+}
+
+func (v *ProgramVisitor) VisitMultiplicativeExpression(ctx *MultiplicativeExpressionContext) interface{} {
+	first := ctx.PrimaryExpression(0).Accept(v).(ast.Expression)
+
+	secondContext := ctx.PrimaryExpression(1)
+	if secondContext != nil {
+		second := secondContext.Accept(v).(ast.Expression)
+		operation := ctx.MultiplicativeOp().Accept(v).(ast.Operation)
+
+		return ast.BinaryExpression{
+			Operation: operation,
+			Left:      first,
+			Right:     second,
+		}
+	}
+
+	return first
+}
+
+func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
+	result := ctx.PrimaryExpressionStart().Accept(v).(ast.Expression)
+
+	for _, access := range ctx.AllExpressionAccess() {
+		switch access := access.Accept(v).(type) {
+		case ast.Expression:
+			result = ast.IndexExpression{
+				Expression: result,
+				Index:      access,
+			}
+		case string:
+			result = ast.MemberExpression{
+				Expression: result,
+				Identifier: access,
+			}
+		}
+	}
+
+	return result
+}
+
+func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) interface{} {
+	return v.visitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{} {
+	return ctx.Identifier().GetText()
+}
+
+func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) interface{} {
+	return ctx.Expression().Accept(v)
+}
+
+func (v *ProgramVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) interface{} {
+	return ctx.Literal().Accept(v)
+}
+
+// NOTE: manually go over all child rules and find a match
+func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
+	return v.visitChildren(ctx.BaseParserRuleContext)
+}
+
+func parseIntExpression(text string, kind string, base int) ast.IntExpression {
+	value, err := strconv.ParseInt(text, base, 64)
+	if err != nil {
+		panic(fmt.Sprintf("invalid %s literal: %s", kind, text))
+	}
+	return ast.IntExpression{Value: value}
+}
+
+func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {
+	return parseIntExpression(ctx.GetText(), "decimal", 10)
+}
+
+func (v *ProgramVisitor) VisitBinaryLiteral(ctx *BinaryLiteralContext) interface{} {
+	return parseIntExpression(ctx.GetText()[2:], "binary", 2)
+}
+
+func (v *ProgramVisitor) VisitOctalLiteral(ctx *OctalLiteralContext) interface{} {
+	return parseIntExpression(ctx.GetText()[2:], "octal", 8)
+}
+
+func (v *ProgramVisitor) VisitHexadecimalLiteral(ctx *HexadecimalLiteralContext) interface{} {
+	return parseIntExpression(ctx.GetText()[2:], "hexadecimal", 16)
+}
+
+func (v *ProgramVisitor) VisitNestedExpression(ctx *NestedExpressionContext) interface{} {
+	return ctx.Expression().Accept(v)
+}
+
+func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interface{} {
+	text := ctx.GetText()
+	value, err := strconv.ParseBool(text)
+	if err != nil {
+		panic(fmt.Sprintf("invalid boolean literal: %s", text))
+	}
+	return ast.BoolExpression{
+		Value: value,
+	}
+}
+
+func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {
+	var expressions []ast.Expression
+	for _, expression := range ctx.AllExpression() {
+		expressions = append(
+			expressions,
+			expression.Accept(v).(ast.Expression),
+		)
+	}
+
+	return ast.ArrayExpression{
+		Values: expressions,
+	}
+}
+
+func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{} {
+	identifier := ctx.Identifier().GetText()
+	return ast.IdentifierExpression{
+		Identifier: identifier,
+	}
+}
+
+// NOTE: manually go over all child rules and find a match
+func (v *ProgramVisitor) VisitInvocationExpression(ctx *InvocationExpressionContext) interface{} {
+	return v.visitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
+	identifier := ctx.Identifier().GetText()
+
+	var expressions []ast.Expression
+	for _, expression := range ctx.AllExpression() {
+		expressions = append(
+			expressions,
+			expression.Accept(v).(ast.Expression),
+		)
+	}
+
+	return ast.InvocationExpression{
+		Identifier: identifier,
+		Arguments:  expressions,
+	}
+}
+
+func (v *ProgramVisitor) VisitEqualityOp(ctx *EqualityOpContext) interface{} {
+	if ctx.Equal() != nil {
+		return ast.OperationEqual
+	}
+
+	if ctx.Unequal() != nil {
+		return ast.OperationUnequal
+	}
+
+	return nil
+}
+
+func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{} {
+	if ctx.Less() != nil {
+		return ast.OperationLess
+	}
+
+	if ctx.Greater() != nil {
+		return ast.OperationGreater
+	}
+
+	if ctx.LessEqual() != nil {
+		return ast.OperationLessEqual
+	}
+
+	if ctx.GreaterEqual() != nil {
+		return ast.OperationGreaterEqual
+	}
+
+	return nil
+}
+
+func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
+	if ctx.Plus() != nil {
+		return ast.OperationPlus
+	}
+
+	if ctx.Minus() != nil {
+		return ast.OperationMinus
+	}
+
+	return nil
+}
+
+func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) interface{} {
+	if ctx.Mul() != nil {
+		return ast.OperationMul
+	}
+
+	if ctx.Div() != nil {
+		return ast.OperationDiv
+	}
+
+	if ctx.Mod() != nil {
+		return ast.OperationMod
+	}
+
+	return nil
+}
