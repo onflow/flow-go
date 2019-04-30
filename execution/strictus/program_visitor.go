@@ -30,14 +30,14 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 	identifier := ctx.Identifier().GetText()
 	returnType := ctx.TypeName().Accept(v).(ast.Type)
 	parameters := ctx.ParameterList().Accept(v).([]ast.Parameter)
-	statements := ctx.Block().Accept(v).([]ast.Statement)
+	block := ctx.Block().Accept(v).(ast.Block)
 
 	return ast.Function{
 		IsPublic:   isPublic,
 		Identifier: identifier,
 		Parameters: parameters,
 		ReturnType: returnType,
-		Statements: statements,
+		Block:      block,
 	}
 }
 
@@ -118,7 +118,9 @@ func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {
 			statement.Accept(v).(ast.Statement),
 		)
 	}
-	return statements
+	return ast.Block{
+		Statements: statements,
+	}
 }
 
 func (v *ProgramVisitor) VisitChildren(node antlr.RuleNode) interface{} {
@@ -179,31 +181,29 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 
 func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 	test := ctx.test.Accept(v).(ast.Expression)
-	then := ctx.then.Accept(v).([]ast.Statement)
+	then := ctx.then.Accept(v).(ast.Block)
 
-	var elseStatements []ast.Statement
+	var elseBlock ast.Block
 	if ctx.alt != nil {
-		elseStatements = ctx.alt.Accept(v).([]ast.Statement)
+		elseBlock = ctx.alt.Accept(v).(ast.Block)
 	} else if ifStatement, ok := ctx.IfStatement().Accept(v).(ast.IfStatement); ok {
-		elseStatements = []ast.Statement{ifStatement}
-	} else {
-		elseStatements = []ast.Statement{}
+		elseBlock = ast.Block{Statements: []ast.Statement{ifStatement}}
 	}
 
 	return ast.IfStatement{
 		Test: test,
 		Then: then,
-		Else: elseStatements,
+		Else: elseBlock,
 	}
 }
 
 func (v *ProgramVisitor) VisitWhileStatement(ctx *WhileStatementContext) interface{} {
 	test := ctx.Expression().Accept(v).(ast.Expression)
-	statements := ctx.Block().Accept(v).([]ast.Statement)
+	block := ctx.Block().Accept(v).(ast.Block)
 
 	return ast.WhileStatement{
-		Test:       test,
-		Statements: statements,
+		Test:  test,
+		Block: block,
 	}
 }
 

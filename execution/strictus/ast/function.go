@@ -5,5 +5,5 @@ type Function struct {
 	Identifier string
 	Parameters []Parameter
 	ReturnType Type
-	Statements []Statement
+	Block      Block
 }

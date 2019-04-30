@@ -12,15 +12,15 @@ func (ReturnStatement) isStatement() {}
 
 type IfStatement struct {
 	Test Expression
-	Then []Statement
-	Else []Statement
+	Then Block
+	Else Block
 }
 
 func (IfStatement) isStatement() {}
 
 type WhileStatement struct {
-	Test       Expression
-	Statements []Statement
+	Test  Expression
+	Block Block
 }
 
 func (WhileStatement) isStatement() {}
