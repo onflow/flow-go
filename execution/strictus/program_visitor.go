@@ -121,10 +121,8 @@ func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {
 	return statements
 }
 
-// TODO: rename to VisitChildren?
-// NOTE: manually go over all child rules and find a match
-func (v *ProgramVisitor) visitChildren(ctx *antlr.BaseParserRuleContext) interface{} {
-	for _, child := range ctx.GetChildren() {
+func (v *ProgramVisitor) VisitChildren(node antlr.RuleNode) interface{} {
+	for _, child := range node.GetChildren() {
 		ruleChild, ok := child.(antlr.RuleNode)
 		if !ok {
 			continue
@@ -140,7 +138,7 @@ func (v *ProgramVisitor) visitChildren(ctx *antlr.BaseParserRuleContext) interfa
 }
 
 func (v *ProgramVisitor) VisitStatement(ctx *StatementContext) interface{} {
-	result := v.visitChildren(ctx.BaseParserRuleContext)
+	result := v.VisitChildren(ctx.BaseParserRuleContext)
 	if expression, ok := result.(ast.Expression); ok {
 		return ast.ExpressionStatement{
 			Expression: expression,
@@ -221,7 +219,7 @@ func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
 
 // NOTE: manually go over all child rules and find a match
 func (v *ProgramVisitor) VisitExpression(ctx *ExpressionContext) interface{} {
-	return v.visitChildren(ctx.BaseParserRuleContext)
+	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
 func (v *ProgramVisitor) VisitConditionalExpression(ctx *ConditionalExpressionContext) interface{} {
@@ -366,7 +364,7 @@ func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) i
 }
 
 func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) interface{} {
-	return v.visitChildren(ctx.BaseParserRuleContext)
+	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
 func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{} {
@@ -383,7 +381,7 @@ func (v *ProgramVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) i
 
 // NOTE: manually go over all child rules and find a match
 func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
-	return v.visitChildren(ctx.BaseParserRuleContext)
+	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
 func parseIntExpression(text string, kind string, base int) ast.IntExpression {
@@ -448,7 +446,7 @@ func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionCont
 
 // NOTE: manually go over all child rules and find a match
 func (v *ProgramVisitor) VisitInvocationExpression(ctx *InvocationExpressionContext) interface{} {
-	return v.visitChildren(ctx.BaseParserRuleContext)
+	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
 func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
