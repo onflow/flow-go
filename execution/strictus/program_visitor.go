@@ -12,12 +12,10 @@ type ProgramVisitor struct {
 }
 
 func (v *ProgramVisitor) VisitProgram(ctx *ProgramContext) interface{} {
-	var functions []ast.Function
+	functions := map[string]ast.Function{}
 	for _, declaration := range ctx.AllDeclaration() {
-		functions = append(
-			functions,
-			declaration.Accept(v).(ast.Function),
-		)
+		function := declaration.Accept(v).(ast.Function)
+		functions[function.Identifier] = function
 	}
 
 	return ast.Program{
@@ -43,12 +41,14 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 
 func (v *ProgramVisitor) VisitParameterList(ctx *ParameterListContext) interface{} {
 	var parameters []ast.Parameter
+
 	for _, parameter := range ctx.AllParameter() {
 		parameters = append(
 			parameters,
 			parameter.Accept(v).(ast.Parameter),
 		)
 	}
+
 	return parameters
 }
 

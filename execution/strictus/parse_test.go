@@ -41,8 +41,8 @@ func TestParse(t *testing.T) {
 	var int32Type Type = Int32Type{}
 
 	expected := Program{
-		Functions: []Function{
-			{
+		Functions: map[string]Function{
+			"sum": {
 				IsPublic:   true,
 				Identifier: "sum",
 				Parameters: []Parameter{
