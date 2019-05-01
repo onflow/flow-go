@@ -119,3 +119,19 @@ func (BinaryExpression) isExpression() {}
 func (e BinaryExpression) Accept(v Visitor) Repr {
 	return v.VisitBinaryExpression(e)
 }
+
+/// ToExpression
+
+func ToExpression(value interface{}) Expression {
+	// TODO: support more types
+	switch value := value.(type) {
+	case int:
+		return IntExpression{Value: int64(value)}
+	case int64:
+		return IntExpression{Value: value}
+	case bool:
+		return BoolExpression{Value: value}
+	}
+
+	return nil
+}
