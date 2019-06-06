@@ -13,7 +13,6 @@ message SendTransactionRequest {
     uint64 nonce = 2;
     bytes payerSignature = 3;
   }
-
   Transaction transaction = 1;
 }
 
@@ -39,7 +38,6 @@ message GetBlockByHashResponse {
     uint64 number = 2;
     repeated bytes transactionHashes = 3;
   }
-
   Block block = 1;
 }
 ```
@@ -61,7 +59,6 @@ message GetBlockByNumberResponse {
     uint64 number = 2;
     repeated bytes transactionHashes = 3;
   }
-
   Block block = 1;
 }
 ```
@@ -83,7 +80,6 @@ message GetLatestBlockResponse {
     uint64 number = 2;
     repeated bytes transactionHashes = 3;
   }
-
   Block block = 1;
 }
 ```
@@ -105,14 +101,12 @@ message GetTransactionResponse {
     IN_BLOCK = 1;
     SEALED = 2;
   }
-
   message Transaction {
     bytes data = 1;
     uint64 nonce = 2;
     bytes payerSignature = 3;
     Status status = 4;
   }
-  
   Transaction transaction = 1;
 }
 ```
