@@ -144,6 +144,6 @@ message CallContractRequest {
 }
 
 message CallContractResponse {
-  bytes data = 2;
+  bytes data = 1;
 }
 ```
