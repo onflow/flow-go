@@ -23,16 +23,22 @@ message SendTransactionResponse {
   bytes hash = 1;
 }
 
+message Block {
+  enum Status {
+    PENDING = 0;
+    SEALED = 1;
+  }
+  bytes hash = 1;
+  uint64 number = 2;
+  repeated bytes transactionHashes = 3;
+  Status status = 4;
+}
+
 message GetBlockByHashRequest {
   bytes hash = 1;
 }
 
 message GetBlockByHashResponse {
-  message Block {
-    bytes hash = 1;
-    uint64 number = 2;
-    repeated bytes transactionHashes = 3;
-  }
   Block block = 1;
 }
 
@@ -41,11 +47,6 @@ message GetBlockByNumberRequest {
 }
 
 message GetBlockByNumberResponse {
-  message Block {
-    bytes hash = 1;
-    uint64 number = 2;
-    repeated bytes transactionHashes = 3;
-  }
   Block block = 1;
 }
 
@@ -54,11 +55,6 @@ message GetLatestBlockRequest {
 }
 
 message GetLatestBlockResponse {
-  message Block {
-    bytes hash = 1;
-    uint64 number = 2;
-    repeated bytes transactionHashes = 3;
-  }
   Block block = 1;
 }
 
@@ -67,12 +63,12 @@ message GetTransactionRequest {
 }
 
 message GetTransactionResponse {
-  enum Status {
-    PENDING = 0;
-    IN_BLOCK = 1;
-    SEALED = 2;
-  }
   message Transaction {
+    enum Status {
+      PENDING = 0;
+      IN_BLOCK = 1;
+      SEALED = 2;
+    }
     bytes data = 1;
     uint64 nonce = 2;
     bytes payerSignature = 3;
