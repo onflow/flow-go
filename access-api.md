@@ -72,7 +72,7 @@ message Block {
 }
 
 message GetBlockByNumberRequest {
-  bytes hash = 1;
+  bytes number = 1;
 }
 
 message GetBlockByNumberResponse {
@@ -162,6 +162,6 @@ message CallContractRequest {
 }
 
 message CallContractResponse {
-  bytes data = 2;
+  bytes data = 1;
 }
 ```
