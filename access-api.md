@@ -55,7 +55,7 @@ Get a block by its number (height).
 rpc GetBlockByNumber(GetBlockByNumberRequest) returns (GetBlockByNumberResponse);
 
 message GetBlockByNumberRequest {
-  bytes hash = 1;
+  bytes number = 1;
 }
 
 message GetBlockByNumberResponse {
