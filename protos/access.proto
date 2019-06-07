@@ -12,9 +12,11 @@ service BambooAccessAPI {
 
 message SendTransactionRequest {
   message Transaction {
-    bytes data = 1;
-    uint64 nonce = 2;
-    bytes payerSignature = 3;
+    bytes to = 1;
+    bytes data = 2;
+    uint64 nonce = 3;
+    uint64 compute = 4;
+    bytes payerSignature = 5;
   }
   Transaction transaction = 1;
 }
@@ -66,13 +68,16 @@ message GetTransactionResponse {
   message Transaction {
     enum Status {
       PENDING = 0;
-      IN_BLOCK = 1;
-      SEALED = 2;
+      FINALIZED = 1;
+      REVERTED = 2;
+      SEALED = 3;
     }
-    bytes data = 1;
-    uint64 nonce = 2;
-    bytes payerSignature = 3;
-    Status status = 4;
+    bytes to = 1;
+    bytes data = 2;
+    uint64 nonce = 3;
+    uint64 compute = 4;
+    bytes payerSignature = 5;
+    Status status = 6;
   }
   Transaction transaction = 1;
 }
