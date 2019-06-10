@@ -1,14 +1,14 @@
 syntax = "proto3";
 
-package bamboo.access.api.v1;
+package bamboo.services.access.v1;
 
-option csharp_namespace = "Bamboo.Access.Api.V1";
-option go_package = "apiv1";
+option csharp_namespace = "Bamboo.Services.Access.V1";
+option go_package = "accessv1";
 option java_multiple_files = true;
 option java_outer_classname = "BambooAccessApiProto";
-option java_package = "com.bamboo.access.api.v1";
-option objc_class_prefix = "BAA";
-option php_namespace = "Bamboo\\Access\\Api\\V1";
+option java_package = "com.bamboo.services.access.v1";
+option objc_class_prefix = "BSA";
+option php_namespace = "Bamboo\\Services\\Access\\V1";
 
 // BambooAccessAPI is the user-facing API provided by Bamboo access nodes.
 service BambooAccessAPI {
