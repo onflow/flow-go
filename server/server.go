@@ -48,6 +48,7 @@ func (s *bambooAccessAPIServer) CallContract(context.Context, *apiv1.CallContrac
 	return nil, nil
 }
 
+// Start runs the Bamboo Access API gRPC server.
 func Start(port int) {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
