@@ -15,10 +15,10 @@ rpc SendTransaction(SendTransactionRequest) returns (SendTransactionResponse);
 message SendTransactionRequest {
   message Transaction {
     bytes to = 1;
-    bytes data = 2;
+    bytes script = 2;
     uint64 nonce = 3;
     uint64 compute = 4;
-    bytes payerSignature = 5;
+    bytes payer_signature = 5;
   }
   Transaction transaction = 1;
 }
@@ -37,12 +37,12 @@ rpc GetBlockByHash(GetBlockByHashRequest) returns (GetBlockByHashResponse);
 
 message Block {
   enum Status {
-    PENDING = 0;
-    SEALED = 1;
+    STATUS_PENDING = 0;
+    STATUS_SEALED = 1;
   }
   bytes hash = 1;
   uint64 number = 2;
-  repeated bytes transactionHashes = 3;
+  repeated bytes transaction_hashes = 3;
   Status status = 4;
 }
 
@@ -64,12 +64,12 @@ rpc GetBlockByNumber(GetBlockByNumberRequest) returns (GetBlockByNumberResponse)
 
 message Block {
   enum Status {
-    PENDING = 0;
-    SEALED = 1;
+    STATUS_PENDING = 0;
+    STATUS_SEALED = 1;
   }
   bytes hash = 1;
   uint64 number = 2;
-  repeated bytes transactionHashes = 3;
+  repeated bytes transaction_hashes = 3;
   Status status = 4;
 }
 
@@ -91,17 +91,17 @@ rpc GetLatestBlock(GetLatestBlockRequest) returns (GetLatestBlockResponse);
 
 message Block {
   enum Status {
-    PENDING = 0;
-    SEALED = 1;
+    STATUS_PENDING = 0;
+    STATUS_SEALED = 1;
   }
   bytes hash = 1;
   uint64 number = 2;
-  repeated bytes transactionHashes = 3;
+  repeated bytes transaction_hashes = 3;
   Status status = 4;
 }
 
 message GetLatestBlockRequest {
-    bool isSealed = 1;
+    bool is_sealed = 1;
 }
 
 message GetLatestBlockResponse {
@@ -123,16 +123,16 @@ message GetTransactionRequest {
 message GetTransactionResponse {
   message Transaction {
     enum Status {
-      PENDING = 0;
-      FINALIZED = 1;
-      REVERTED = 2;
-      SEALED = 3;
+      STATUS_PENDING = 0;
+      STATUS_FINALIZED = 1;
+      STATUS_REVERTED = 2;
+      STATUS_SEALED = 3;
     }
     bytes to = 1;
-    bytes data = 2;
+    bytes script = 2;
     uint64 nonce = 3;
     uint64 compute = 4;
-    bytes payerSignature = 5;
+    bytes payer_signature = 5;
     Status status = 6;
   }
   Transaction transaction = 1;
@@ -163,10 +163,10 @@ Perform a contract call.
 rpc CallContract(CallContractRequest) returns (CallContractResponse);
 
 message CallContractRequest {
-  bytes data = 1;
+  bytes script = 1;
 }
 
 message CallContractResponse {
-  bytes data = 1;
+  bytes script = 1;
 }
 ```
