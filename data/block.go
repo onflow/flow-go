@@ -3,7 +3,7 @@ package data
 import (
 	"time"
 )
-
+// Block represents a series of Collections (collection of Transactions) denoted with a current Status.
 type Block struct {
 	Id					uint64
 	BlockHash			Hash

@@ -1,5 +1,6 @@
 package data
 
+// WorldState represents the current state of the blockchain.
 type WorldState struct {
 	Blocks			map[Hash]Block
 	Collections		map[Hash]Collection

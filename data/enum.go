@@ -1,5 +1,6 @@
 package data
 
+// Status represents the current status of a Transaction or Block.
 type Status int
 
 const (
