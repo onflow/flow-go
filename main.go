@@ -7,10 +7,10 @@ import (
 )
 
 func main() {
-	fmt.Println("Starting server ...")
-	fmt.Println("Listening for transactions ...")
-
 	port := 5000
+
+	fmt.Printf("Starting server on port %d...\n", port)
+	fmt.Println("Listening for transactions ...")
 
 	server.Start(port)
 }
