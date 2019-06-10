@@ -1,16 +1,27 @@
 package data
 
-// Status represents the current status of a Transaction or Block.
-type Status int
+// BlockStatus represents the current status of a Block.
+type BlockStatus int
 
 const (
-	PENDING Status = iota
-	FINALIZED
-    REVERTED
-	SEALED
+	BlockPending BlockStatus = iota
+	BlockSealed
 )
 
-func (s Status) String() string {
-    return [...]string{"PENDING", "FINALIZED", "REVERTED", "SEALED"}[s]
+// TxStatus represents the current status of a Transaction.
+type TxStatus int
+
+const (
+	TxPending TxStatus = iota
+	TxFinalized
+	TxReverted
+	TxSealed
+)
+
+func (s BlockStatus) String() string {
+	return [...]string{"PENDING", "SEALED"}[s]
 }
 
+func (s TxStatus) String() string {
+	return [...]string{"PENDING", "FINALIZED", "REVERTED", "SEALED"}[s]
+}
