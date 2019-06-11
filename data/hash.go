@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	// HashLength is the 32 byte size of a Keccak256 hash.
 	HashLength = 32
 )
 
@@ -39,7 +40,7 @@ func NewHash(data []byte) Hash {
 	return BytesToHash(crypto.ComputeHash(data))
 }
 
-// ToString encodes Hash as a readable string for logging purposes.
-func (h Hash) ToString() string {
+// String encodes Hash as a readable string for logging purposes.
+func (h Hash) String() string {
 	return hex.EncodeToString(h.Bytes())
 }

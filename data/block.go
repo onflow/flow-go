@@ -10,6 +10,18 @@ type Block struct {
 	Timestamp         time.Time
 	PrevBlockHash     Hash
 	Status            BlockStatus
-	CollectionHashes  []Collection
-	TransactionHashes []Transaction
+	CollectionHashes  []Hash
+	TransactionHashes []Hash
+}
+
+// Hash computes the hash over the necessary Block data.
+func (b Block) Hash() Hash {
+	bytes := EncodeAsBytes(
+		b.Number,
+		b.Timestamp,
+		b.PrevBlockHash,
+		b.CollectionHashes,
+		b.TransactionHashes,
+	)
+	return NewHash(bytes)
 }
