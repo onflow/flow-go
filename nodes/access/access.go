@@ -19,11 +19,10 @@ type node struct {
 }
 
 // NewNode creates a new mock Access Node.
-func NewNode() Node {
+func NewNode(collectionsOut chan *data.Collection) Node {
 	transactions := make(chan *data.Transaction, 16)
-	collections := make(chan *data.Collection, 16)
 
-	collectionBuilder := NewCollectionBuilder(collections, transactions)
+	collectionBuilder := NewCollectionBuilder(transactions, collectionsOut)
 
 	return &node{
 		transactions:      transactions,

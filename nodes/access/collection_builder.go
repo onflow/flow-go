@@ -10,16 +10,19 @@ import (
 
 // CollectionBuilder produces collections from incoming transactions.
 type CollectionBuilder struct {
-	collections         chan *data.Collection
-	transactions        chan *data.Transaction
+	transactionsIn      chan *data.Transaction
+	collectionsOut      chan *data.Collection
 	pendingTransactions []*data.Transaction
 }
 
 // NewCollectionBuilder initializes a new CollectionBuilder with the provided channels.
-func NewCollectionBuilder(collections chan *data.Collection, transactions chan *data.Transaction) *CollectionBuilder {
+//
+// The collection builder pulls transactions from the transactionsIn channel and pushes
+// collections to the collectionsOut channel.
+func NewCollectionBuilder(transactionsIn chan *data.Transaction, collectionsOut chan *data.Collection) *CollectionBuilder {
 	return &CollectionBuilder{
-		collections:         collections,
-		transactions:        transactions,
+		transactionsIn:      transactionsIn,
+		collectionsOut:      collectionsOut,
 		pendingTransactions: make([]*data.Transaction, 0),
 	}
 }
@@ -31,7 +34,7 @@ func (c *CollectionBuilder) Start(ctx context.Context) {
 		select {
 		case <-tick:
 			c.buildCollection()
-		case tx := <-c.transactions:
+		case tx := <-c.transactionsIn:
 			c.enqueueTransaction(tx)
 		case <-ctx.Done():
 			return
@@ -54,5 +57,5 @@ func (c *CollectionBuilder) buildCollection() {
 	collection := &data.Collection{}
 	c.pendingTransactions = make([]*data.Transaction, 0)
 
-	c.collections <- collection
+	c.collectionsOut <- collection
 }
