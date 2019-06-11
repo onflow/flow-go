@@ -45,19 +45,19 @@ func (n *node) SendTransaction(tx *data.Transaction) error {
 }
 
 func (n *node) GetBlockByHash(hash data.Hash) (*data.Block, error) {
-	return nil, nil
+	return nil, &BlockNotFoundError{blockHash: &hash}
 }
 
 func (n *node) GetBlockByNumber(number uint64) (*data.Block, error) {
-	return nil, nil
+	return nil, &BlockNotFoundError{blockNumber: number}
 }
 
 func (n *node) GetLatestBlock() (*data.Block, error) {
-	return nil, nil
+	return nil, &BlockNotFoundError{}
 }
 
 func (n *node) GetTransaction(hash data.Hash) (*data.Transaction, error) {
-	return nil, nil
+	return nil, &TransactionNotFoundError{txHash: hash}
 }
 
 func (n *node) GetBalance(address data.Address) (*big.Int, error) {
