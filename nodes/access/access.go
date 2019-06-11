@@ -7,7 +7,7 @@ import (
 	"github.com/dapperlabs/bamboo-emulator/data"
 )
 
-// Node is a mock implementation of a Bamboo Access Node.
+// Node simulates the behaviour of a Bamboo access node.
 type Node interface {
 	Start(context.Context)
 	SubmitTransaction(*data.Transaction) error
@@ -18,7 +18,7 @@ type node struct {
 	collectionBuilder *CollectionBuilder
 }
 
-// NewNode creates a new mock Access Node.
+// NewNode returns a new simulated access node.
 func NewNode(collectionsOut chan *data.Collection) Node {
 	transactions := make(chan *data.Transaction, 16)
 
