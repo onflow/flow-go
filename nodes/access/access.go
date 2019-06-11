@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 
 	"github.com/dapperlabs/bamboo-emulator/data"
@@ -37,7 +36,6 @@ func NewNode(collectionsOut chan *data.Collection) Node {
 }
 
 func (n *node) Start(ctx context.Context) {
-	fmt.Println("Starting access node...")
 	n.collectionBuilder.Start(ctx)
 }
 
@@ -63,5 +61,9 @@ func (n *node) GetTransaction(hash data.Hash) (*data.Transaction, error) {
 }
 
 func (n *node) GetBalance(address data.Address) (*big.Int, error) {
+	return nil, nil
+}
+
+func (n *node) CallContract(script []byte) (interface{}, error) {
 	return nil, nil
 }

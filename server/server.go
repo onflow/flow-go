@@ -49,27 +49,45 @@ func (s *server) SendTransaction(ctx context.Context, req *accessv1.SendTransact
 }
 
 // GetBlockByHash gets a block by hash.
-func (s *server) GetBlockByHash(context.Context, *accessv1.GetBlockByHashRequest) (*accessv1.GetBlockByHashResponse, error) {
+func (s *server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHashRequest) (*accessv1.GetBlockByHashResponse, error) {
+	var hash data.Hash
+
+	s.accessNode.GetBlockByHash(hash)
+
 	return nil, nil
 }
 
 // GetBlockByNumber gets a block by number.
-func (s *server) GetBlockByNumber(context.Context, *accessv1.GetBlockByNumberRequest) (*accessv1.GetBlockByNumberResponse, error) {
+func (s *server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByNumberRequest) (*accessv1.GetBlockByNumberResponse, error) {
+	number := req.GetNumber()
+
+	s.accessNode.GetBlockByNumber(number)
+
 	return nil, nil
 }
 
 // GetLatestBlock gets the latest sealed block.
 func (s *server) GetLatestBlock(context.Context, *accessv1.GetLatestBlockRequest) (*accessv1.GetLatestBlockResponse, error) {
+	s.accessNode.GetLatestBlock()
+
 	return nil, nil
 }
 
 // GetTransactions gets a transaction by hash.
 func (s *server) GetTransaction(context.Context, *accessv1.GetTransactionRequest) (*accessv1.GetTransactionResponse, error) {
+	var hash data.Hash
+
+	s.accessNode.GetTransaction(hash)
+
 	return nil, nil
 }
 
 // GetBalance returns the balance of an agddress.
 func (s *server) GetBalance(context.Context, *accessv1.GetBalanceRequest) (*accessv1.GetBalanceResponse, error) {
+	var address data.Address
+
+	s.accessNode.GetBalance(address)
+
 	return nil, nil
 }
 

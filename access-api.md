@@ -74,7 +74,7 @@ message Block {
 }
 
 message GetBlockByNumberRequest {
-  bytes number = 1;
+  uint64 number = 1;
 }
 
 message GetBlockByNumberResponse {
