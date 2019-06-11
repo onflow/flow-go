@@ -13,10 +13,12 @@ import (
 	"github.com/dapperlabs/bamboo-emulator/nodes/access"
 )
 
+// Server is a gRPC server that implements the Bamboo Access API.
 type Server interface {
 	Start(port int)
 }
 
+// NewServer returns a new Bamboo emulator server.
 func NewServer(accessNode access.Node) Server {
 	return &server{
 		accessNode: accessNode,
