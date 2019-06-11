@@ -2,7 +2,6 @@ package data
 
 // Transaction represents a normal transaction.
 type Transaction struct {
-	TxHash         Hash
 	ToAddress      Address
 	Script         []byte
 	Nonce          uint64
@@ -10,4 +9,15 @@ type Transaction struct {
 	ComputeUsed    uint64
 	PayerSignature []byte
 	Status         TxStatus
+}
+
+// Hash computes the hash over the necessary Transaction data.
+func (tx Transaction) Hash() Hash {
+	bytes := EncodeAsBytes(
+		tx.ToAddress.Bytes(),
+		tx.TxData,
+		tx.Nonce,
+		tx.PayerSignature,
+	)
+	return NewHash(bytes)
 }
