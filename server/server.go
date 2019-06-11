@@ -18,15 +18,15 @@ type Server interface {
 	Start(port int)
 }
 
+type server struct {
+	accessNode access.Node
+}
+
 // NewServer returns a new Bamboo emulator server.
 func NewServer(accessNode access.Node) Server {
 	return &server{
 		accessNode: accessNode,
 	}
-}
-
-type server struct {
-	accessNode access.Node
 }
 
 // SendTransaction submits a transaction to the network.
