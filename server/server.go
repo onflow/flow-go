@@ -34,12 +34,13 @@ func (s *server) SendTransaction(ctx context.Context, req *accessv1.SendTransact
 	txMsg := req.GetTransaction()
 
 	tx := &data.Transaction{
-		Status: data.TxPending,
 		// TODO: convert address from bytes
 		// ToAddress:      txMsg.GetTo(),
-		TxData:         txMsg.GetScript(),
+		Script:         txMsg.GetScript(),
 		Nonce:          txMsg.GetNonce(),
+		ComputeLimit:   txMsg.GetCompute(),
 		PayerSignature: txMsg.GetPayerSignature(),
+		Status:         data.TxPending,
 	}
 
 	s.accessNode.SubmitTransaction(tx)

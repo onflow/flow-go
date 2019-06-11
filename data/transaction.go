@@ -3,10 +3,11 @@ package data
 // Transaction represents a normal transaction.
 type Transaction struct {
 	TxHash         Hash
-	Status         TxStatus
 	ToAddress      Address
-	TxData         []byte
+	Script         []byte
 	Nonce          uint64
+	ComputeLimit   uint64
 	ComputeUsed    uint64
 	PayerSignature []byte
+	Status         TxStatus
 }
