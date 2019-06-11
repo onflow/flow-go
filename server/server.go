@@ -43,7 +43,7 @@ func (s *server) SendTransaction(ctx context.Context, req *accessv1.SendTransact
 		Status:         data.TxPending,
 	}
 
-	s.accessNode.SubmitTransaction(tx)
+	s.accessNode.SendTransaction(tx)
 
 	return &accessv1.SendTransactionResponse{}, nil
 }
