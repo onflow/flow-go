@@ -6,20 +6,22 @@ import (
 
 // Transaction represents a normal transaction.
 type Transaction struct {
-	Status         TxStatus
 	ToAddress      crypto.Address
-	TxData         []byte
+	Script         []byte
 	Nonce          uint64
+	ComputeLimit   uint64
 	ComputeUsed    uint64
 	PayerSignature []byte
+	Status         TxStatus
 }
 
 // Hash computes the hash over the necessary Transaction data.
 func (tx Transaction) Hash() crypto.Hash {
 	bytes := EncodeAsBytes(
 		tx.ToAddress,
-		tx.TxData,
+		tx.Script,
 		tx.Nonce,
+		tx.ComputeLimit,
 		tx.PayerSignature,
 	)
 	return crypto.NewHash(bytes)

@@ -1,90 +1,86 @@
 package data
 
 import (
-	"errors"
-
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 )
 
-// state represents the current state of the blockchain.
-type state struct {
+// WorldState represents the current state of the blockchain.
+type WorldState struct {
 	Blocks       map[crypto.Hash]Block
 	Collections  map[crypto.Hash]Collection
 	Transactions map[crypto.Hash]Transaction
 	Blockchain   []Block
 }
 
-// WorldState exposes an interface to access the state struct.
-type WorldState interface {
-	GetLatestBlock() (Block)
-
-	GetBlockByNumber(uint64) (Block, error)
-	GetBlockByHash(crypto.Hash) (Block, error)
-	GetCollection(crypto.Hash) (Collection, error)
-	GetTransaction(crypto.Hash) (Transaction, error)
-
-	AddBlock(Block) (error)
-	AddCollection(Collection) (error)
-	AddTransaction(Transaction) (error)
-
-	SealBlock(crypto.Hash) (error)
+// NewWorldState returns a new empty world state.
+func NewWorldState() *WorldState {
+	return &WorldState{
+		Blocks:       make(map[crypto.Hash]Block),
+		Collections:  make(map[crypto.Hash]Collection),
+		Transactions: make(map[crypto.Hash]Transaction),
+		Blockchain:   make([]Block, 0),
+	}
 }
 
-func (s state) GetLatestBlock() (Block) {
+func (s *WorldState) GetLatestBlock() *Block {
 	currHeight := len(s.Blockchain)
-	return s.Blockchain[currHeight - 1]
+	return &s.Blockchain[currHeight-1]
 }
 
-func (s state) GetBlockByNumber(n uint64) (Block, error) {
+func (s *WorldState) GetBlockByNumber(n uint64) (*Block, error) {
 	currHeight := len(s.Blockchain)
-	if (int(n) < currHeight) {
-		return s.Blockchain[n], nil
+	if int(n) < currHeight {
+		return &s.Blockchain[n], nil
 	}
 
-	return Block{}, errors.New("invalid Block number: Block number exceeds blockchain length")
+	return nil, &InvalidBlockNumberError{blockNumber: n}
 }
 
-func (s state) GetBlockByHash(h crypto.Hash) (Block, error) {
+func (s *WorldState) GetBlockByHash(h crypto.Hash) (*Block, error) {
 	if block, ok := s.Blocks[h]; ok {
-		return block, nil
-	} 
+		return &block, nil
+	}
 
-	return Block{}, errors.New("invalid Block hash: Block doesn't exist")
-
+	return nil, &ItemNotFoundError{hash: h}
 }
 
-func (s state) GetCollection(h crypto.Hash) (Collection, error) {
+func (s *WorldState) GetCollection(h crypto.Hash) (*Collection, error) {
 	if collection, ok := s.Collections[h]; ok {
-		return collection, nil
+		return &collection, nil
 	}
-		
-	return Collection{}, errors.New("invalid Collection hash: Collection doesn't exist")
+
+	return nil, &ItemNotFoundError{hash: h}
 }
 
-func (s state) GetTransaction(h crypto.Hash) (Transaction, error) {
+func (s *WorldState) GetTransaction(h crypto.Hash) (*Transaction, error) {
 	if tx, ok := s.Transactions[h]; ok {
-		return tx, nil
+		return &tx, nil
 	}
 
-	return Transaction{}, errors.New("invalid Transaction hash: Transaction doesn't exist")
+	return nil, &ItemNotFoundError{hash: h}
 }
 
-func (s state) AddBlock(block Block) (error) {
+func (s *WorldState) AddBlock(block *Block) error {
 	// TODO: add to block map and chain
 	return nil
 }
 
-func (s state) AddCollection(col Collection) (error) {
+func (s *WorldState) InsertCollection(col *Collection) error {
 	// TODO: add to collection map
 	return nil
 }
 
-func (s state) AddTransaction(tx Transaction) (error) {
-	// TODO: add to transaction map
+func (s *WorldState) InsertTransaction(tx *Transaction) error {
+	if _, exists := s.Transactions[tx.Hash()]; exists {
+		return &DuplicateItemError{hash: tx.Hash()}
+	}
+
+	s.Transactions[tx.Hash()] = *tx
+
 	return nil
 }
 
-func (s state) SealBlock(h crypto.Hash) (error) {
+func (s *WorldState) SealBlock(h crypto.Hash) error {
 	// TODO: seal the block
 	return nil
 }
