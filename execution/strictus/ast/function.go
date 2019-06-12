@@ -5,5 +5,9 @@ type Function struct {
 	Identifier string
 	Parameters []Parameter
 	ReturnType Type
-	Statements []Statement
+	Block      Block
+}
+
+func (f Function) Accept(visitor Visitor) Repr {
+	return visitor.VisitFunction(f)
 }
