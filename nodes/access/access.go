@@ -20,13 +20,13 @@ type Node interface {
 }
 
 type node struct {
-	state             data.WorldState
+	state             *data.WorldState
 	transactionsIn    chan *data.Transaction
 	collectionBuilder *CollectionBuilder
 }
 
 // NewNode returns a new simulated access node.
-func NewNode(state data.WorldState, collectionsOut chan *data.Collection) Node {
+func NewNode(state *data.WorldState, collectionsOut chan *data.Collection) Node {
 	transactionsIn := make(chan *data.Transaction, 16)
 
 	collectionBuilder := NewCollectionBuilder(state, transactionsIn, collectionsOut)
