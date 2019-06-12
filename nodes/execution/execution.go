@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/dapperlabs/bamboo-emulator/data"
+	"github.com/dapperlabs/bamboo-emulator/runtime"
 )
 
 // Node simulates the behaviour of a Bamboo execution node.
@@ -16,7 +17,8 @@ type node struct {
 
 // NewNode returns a new simulated execution node.
 func NewNode(state data.WorldState) Node {
-	computer := NewComputer(state.GetTransaction, state.GetRegister)
+	runtime := runtime.NewMockRuntime()
+	computer := NewComputer(runtime, state.GetTransaction, state.GetRegister)
 
 	return &node{
 		state:    state,

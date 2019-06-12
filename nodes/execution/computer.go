@@ -3,26 +3,27 @@ package execution
 import (
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
+	"github.com/dapperlabs/bamboo-emulator/runtime"
 )
 
+// Computer executes blocks and saves results to the world state.
 type Computer interface {
 	ExecuteBlock(block *data.Block) (data.Registers, TransactionResults)
 }
 
-type Runtime interface {
-	ExecuteTransaction(tx *data.Transaction, readRegister func(string) []byte, writeRegister func(string, []byte)) bool
-}
-
+// TransactionResults stores the result statuses of multiple transactions.
 type TransactionResults map[crypto.Hash]bool
 
 type computer struct {
+	runtime        runtime.Runtime
 	getTransaction func(crypto.Hash) (*data.Transaction, error)
 	readRegister   func(string) []byte
-	runtime        Runtime
 }
 
-func NewComputer(getTransaction func(crypto.Hash) (*data.Transaction, error), readRegister func(string) []byte) Computer {
+// NewComputer returns a new computer connected to the world state.
+func NewComputer(runtime runtime.Runtime, getTransaction func(crypto.Hash) (*data.Transaction, error), readRegister func(string) []byte) Computer {
 	return &computer{
+		runtime:        runtime,
 		getTransaction: getTransaction,
 		readRegister:   readRegister,
 	}
@@ -71,8 +72,8 @@ func (c *computer) executeTransaction(tx *data.Transaction, initialRegisters dat
 		registers[id] = value
 	}
 
-	succeeded := c.runtime.ExecuteTransaction(
-		tx,
+	succeeded := c.runtime.ExecuteScript(
+		tx.Script,
 		readRegister,
 		writeRegister,
 	)
