@@ -12,13 +12,22 @@ type WorldState struct {
 	Blockchain   []Block
 }
 
-// NewWorldState returns a new empty world state.
+// NewWorldState instantiates a new state object with a genesis block.
 func NewWorldState() *WorldState {
+	blocks := make(map[crypto.Hash]Block)
+	collections := make(map[crypto.Hash]Collection)
+	txs := make(map[crypto.Hash]Transaction)
+	
+	genesis := MintGenesisBlock()
+
+	chain := []Block{*genesis}
+	blocks[genesis.Hash()] = *genesis
+
 	return &WorldState{
-		Blocks:       make(map[crypto.Hash]Block),
-		Collections:  make(map[crypto.Hash]Collection),
-		Transactions: make(map[crypto.Hash]Transaction),
-		Blockchain:   make([]Block, 0),
+		Blocks: blocks,
+		Collections: collections,
+		Transactions: txs,
+		Blockchain: chain,
 	}
 }
 
@@ -81,6 +90,13 @@ func (s *WorldState) InsertTransaction(tx *Transaction) error {
 }
 
 func (s *WorldState) SealBlock(h crypto.Hash) error {
-	// TODO: seal the block
+	block, err := s.GetBlockByHash(h)
+
+	if err != nil {
+		return err
+	}
+
+	(*block).Status = BlockSealed
+
 	return nil
 }
