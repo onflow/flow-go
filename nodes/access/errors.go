@@ -6,22 +6,22 @@ import (
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 )
 
-// BlockNotFoundError indicates that a block could not be found.
-type BlockNotFoundError struct {
-	blockHash   *crypto.Hash
+// BlockNotFoundByHashError indicates that a block could not be found.
+type BlockNotFoundByHashError struct {
+	blockHash crypto.Hash
+}
+
+func (e *BlockNotFoundByHashError) Error() string {
+	return fmt.Sprintf("Block with hash %v does not exist", e.blockHash)
+}
+
+// BlockNotFoundByNumberError indicates that a block could not be found.
+type BlockNotFoundByNumberError struct {
 	blockNumber uint64
 }
 
-func (e *BlockNotFoundError) Error() string {
-	if e.blockHash != nil {
-		return fmt.Sprintf("Block with hash %v does not exist", e.blockHash)
-	}
-
-	if e.blockNumber != 0 {
-		return fmt.Sprintf("Block with number %d does not exist", e.blockNumber)
-	}
-
-	return "Block does not exist"
+func (e *BlockNotFoundByNumberError) Error() string {
+	return fmt.Sprintf("Block with number %d does not exist", e.blockNumber)
 }
 
 // TransactionNotFoundError indicates that a transaction could not be found.
@@ -49,4 +49,13 @@ type AccountNotFoundError struct {
 
 func (e *AccountNotFoundError) Error() string {
 	return fmt.Sprintf("Account with address %s does not exist", e.accountAddress)
+}
+
+// TransactionQueueFullError indicates that the pending transaction queue is full.
+type TransactionQueueFullError struct {
+	txHash crypto.Hash
+}
+
+func (e *TransactionQueueFullError) Error() string {
+	return fmt.Sprintf("Transaction with hash %s could not be submitted; pending queue is full", e.txHash)
 }

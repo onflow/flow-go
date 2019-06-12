@@ -17,24 +17,19 @@ import (
 )
 
 // Server is a gRPC server that implements the Bamboo Access API.
-type Server interface {
-	// Start runs the server at the provided port.
-	Start(port int)
-}
-
-type server struct {
-	accessNode access.Node
+type Server struct {
+	accessNode *access.Node
 }
 
 // NewServer returns a new Bamboo emulator server.
-func NewServer(accessNode access.Node) Server {
-	return &server{
+func NewServer(accessNode *access.Node) *Server {
+	return &Server{
 		accessNode: accessNode,
 	}
 }
 
 // SendTransaction submits a transaction to the network.
-func (s *server) SendTransaction(ctx context.Context, req *accessv1.SendTransactionRequest) (*accessv1.SendTransactionResponse, error) {
+func (s *Server) SendTransaction(ctx context.Context, req *accessv1.SendTransactionRequest) (*accessv1.SendTransactionResponse, error) {
 	txMsg := req.GetTransaction()
 
 	tx := &data.Transaction{
@@ -62,13 +57,13 @@ func (s *server) SendTransaction(ctx context.Context, req *accessv1.SendTransact
 }
 
 // GetBlockByHash gets a block by hash.
-func (s *server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHashRequest) (*accessv1.GetBlockByHashResponse, error) {
+func (s *Server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHashRequest) (*accessv1.GetBlockByHashResponse, error) {
 	hash := crypto.BytesToHash(req.GetHash())
 
 	block, err := s.accessNode.GetBlockByHash(hash)
 	if err != nil {
 		switch err.(type) {
-		case *access.BlockNotFoundError:
+		case *access.BlockNotFoundByHashError:
 			return nil, status.Error(codes.NotFound, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
@@ -86,13 +81,13 @@ func (s *server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHas
 }
 
 // GetBlockByNumber gets a block by number.
-func (s *server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByNumberRequest) (*accessv1.GetBlockByNumberResponse, error) {
+func (s *Server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByNumberRequest) (*accessv1.GetBlockByNumberResponse, error) {
 	number := req.GetNumber()
 
 	block, err := s.accessNode.GetBlockByNumber(number)
 	if err != nil {
 		switch err.(type) {
-		case *access.BlockNotFoundError:
+		case *access.BlockNotFoundByNumberError:
 			return nil, status.Error(codes.NotFound, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
@@ -110,7 +105,7 @@ func (s *server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByN
 }
 
 // GetLatestBlock gets the latest sealed block.
-func (s *server) GetLatestBlock(ctx context.Context, req *accessv1.GetLatestBlockRequest) (*accessv1.GetLatestBlockResponse, error) {
+func (s *Server) GetLatestBlock(ctx context.Context, req *accessv1.GetLatestBlockRequest) (*accessv1.GetLatestBlockResponse, error) {
 	block := s.accessNode.GetLatestBlock()
 
 	return &accessv1.GetLatestBlockResponse{
@@ -124,7 +119,7 @@ func (s *server) GetLatestBlock(ctx context.Context, req *accessv1.GetLatestBloc
 }
 
 // GetTransactions gets a transaction by hash.
-func (s *server) GetTransaction(ctx context.Context, req *accessv1.GetTransactionRequest) (*accessv1.GetTransactionResponse, error) {
+func (s *Server) GetTransaction(ctx context.Context, req *accessv1.GetTransactionRequest) (*accessv1.GetTransactionResponse, error) {
 	hash := crypto.BytesToHash(req.GetHash())
 
 	tx, err := s.accessNode.GetTransaction(hash)
@@ -151,7 +146,7 @@ func (s *server) GetTransaction(ctx context.Context, req *accessv1.GetTransactio
 }
 
 // GetBalance returns the balance of an address.
-func (s *server) GetBalance(ctx context.Context, req *accessv1.GetBalanceRequest) (*accessv1.GetBalanceResponse, error) {
+func (s *Server) GetBalance(ctx context.Context, req *accessv1.GetBalanceRequest) (*accessv1.GetBalanceResponse, error) {
 	address := crypto.BytesToAddress(req.GetAddress())
 
 	balance, err := s.accessNode.GetBalance(address)
@@ -170,12 +165,12 @@ func (s *server) GetBalance(ctx context.Context, req *accessv1.GetBalanceRequest
 }
 
 // CallContract performs a contract call.
-func (s *server) CallContract(context.Context, *accessv1.CallContractRequest) (*accessv1.CallContractResponse, error) {
+func (s *Server) CallContract(context.Context, *accessv1.CallContractRequest) (*accessv1.CallContractResponse, error) {
 	// TODO: implement CallContract
 	return nil, nil
 }
 
-func (s *server) Start(port int) {
+func (s *Server) Start(port int) {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
