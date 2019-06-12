@@ -10,6 +10,7 @@ import (
 
 // CollectionBuilder produces collections from incoming transactions.
 type CollectionBuilder struct {
+	state               data.WorldState
 	transactionsIn      chan *data.Transaction
 	collectionsOut      chan *data.Collection
 	pendingTransactions []*data.Transaction
@@ -19,8 +20,9 @@ type CollectionBuilder struct {
 //
 // The collection builder pulls transactions from the transactionsIn channel and pushes
 // collections to the collectionsOut channel.
-func NewCollectionBuilder(transactionsIn chan *data.Transaction, collectionsOut chan *data.Collection) *CollectionBuilder {
+func NewCollectionBuilder(state data.WorldState, transactionsIn chan *data.Transaction, collectionsOut chan *data.Collection) *CollectionBuilder {
 	return &CollectionBuilder{
+		state:               state,
 		transactionsIn:      transactionsIn,
 		collectionsOut:      collectionsOut,
 		pendingTransactions: make([]*data.Transaction, 0),
@@ -53,9 +55,22 @@ func (c *CollectionBuilder) buildCollection() {
 
 	fmt.Printf("Building collection with %d transactions... \n", len(c.pendingTransactions))
 
-	// TODO: form collection once data type is finished
-	collection := &data.Collection{}
-	c.pendingTransactions = make([]*data.Transaction, 0)
+	transactionHashes := make([]data.Hash, len(c.pendingTransactions))
+
+	for i, tx := range c.pendingTransactions {
+		transactionHashes[i] = tx.Hash()
+	}
+
+	collection := &data.Collection{
+		TransactionHashes: transactionHashes,
+	}
+
+	err := c.state.InsertCollection(collection)
+	if err != nil {
+		return
+	}
 
 	c.collectionsOut <- collection
+
+	c.pendingTransactions = make([]*data.Transaction, 0)
 }

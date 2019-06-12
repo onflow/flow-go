@@ -28,7 +28,7 @@ type node struct {
 func NewNode(state data.WorldState, collectionsOut chan *data.Collection) Node {
 	transactionsIn := make(chan *data.Transaction, 16)
 
-	collectionBuilder := NewCollectionBuilder(transactionsIn, collectionsOut)
+	collectionBuilder := NewCollectionBuilder(state, transactionsIn, collectionsOut)
 
 	return &node{
 		state:             state,
