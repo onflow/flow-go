@@ -23,11 +23,11 @@ type Server interface {
 }
 
 type server struct {
-	accessNode access.Node
+	accessNode *access.Node
 }
 
 // NewServer returns a new Bamboo emulator server.
-func NewServer(accessNode access.Node) Server {
+func NewServer(accessNode *access.Node) Server {
 	return &server{
 		accessNode: accessNode,
 	}

@@ -9,40 +9,30 @@ import (
 )
 
 // Node simulates the behaviour of a Bamboo access node.
-type Node interface {
-	Start(context.Context)
-	SendTransaction(*data.Transaction) error
-	GetBlockByHash(hash crypto.Hash) (*data.Block, error)
-	GetBlockByNumber(number uint64) (*data.Block, error)
-	GetLatestBlock() *data.Block
-	GetTransaction(hash crypto.Hash) (*data.Transaction, error)
-	GetBalance(address crypto.Address) (*big.Int, error)
-}
-
-type node struct {
+type Node struct {
 	state             *data.WorldState
 	transactionsIn    chan *data.Transaction
 	collectionBuilder *CollectionBuilder
 }
 
 // NewNode returns a new simulated access node.
-func NewNode(state *data.WorldState, collectionsOut chan *data.Collection) Node {
+func NewNode(state *data.WorldState, collectionsOut chan *data.Collection) *Node {
 	transactionsIn := make(chan *data.Transaction, 16)
 
 	collectionBuilder := NewCollectionBuilder(state, transactionsIn, collectionsOut)
 
-	return &node{
+	return &Node{
 		state:             state,
 		transactionsIn:    transactionsIn,
 		collectionBuilder: collectionBuilder,
 	}
 }
 
-func (n *node) Start(ctx context.Context) {
+func (n *Node) Start(ctx context.Context) {
 	n.collectionBuilder.Start(ctx)
 }
 
-func (n *node) SendTransaction(tx *data.Transaction) error {
+func (n *Node) SendTransaction(tx *data.Transaction) error {
 	err := n.state.InsertTransaction(tx)
 	if err != nil {
 		return &DuplicateTransactionError{txHash: tx.Hash()}
@@ -53,7 +43,7 @@ func (n *node) SendTransaction(tx *data.Transaction) error {
 	return nil
 }
 
-func (n *node) GetBlockByHash(hash crypto.Hash) (*data.Block, error) {
+func (n *Node) GetBlockByHash(hash crypto.Hash) (*data.Block, error) {
 	block, err := n.state.GetBlockByHash(hash)
 	if err != nil {
 		return nil, &BlockNotFoundError{blockHash: &hash}
@@ -62,7 +52,7 @@ func (n *node) GetBlockByHash(hash crypto.Hash) (*data.Block, error) {
 	return block, nil
 }
 
-func (n *node) GetBlockByNumber(number uint64) (*data.Block, error) {
+func (n *Node) GetBlockByNumber(number uint64) (*data.Block, error) {
 	block, err := n.state.GetBlockByNumber(number)
 	if err != nil {
 		return nil, &BlockNotFoundError{blockNumber: number}
@@ -71,11 +61,11 @@ func (n *node) GetBlockByNumber(number uint64) (*data.Block, error) {
 	return block, nil
 }
 
-func (n *node) GetLatestBlock() *data.Block {
+func (n *Node) GetLatestBlock() *data.Block {
 	return n.state.GetLatestBlock()
 }
 
-func (n *node) GetTransaction(hash crypto.Hash) (*data.Transaction, error) {
+func (n *Node) GetTransaction(hash crypto.Hash) (*data.Transaction, error) {
 	tx, err := n.state.GetTransaction(hash)
 	if err != nil {
 		return nil, &TransactionNotFoundError{txHash: hash}
@@ -84,12 +74,12 @@ func (n *node) GetTransaction(hash crypto.Hash) (*data.Transaction, error) {
 	return tx, nil
 }
 
-func (n *node) GetBalance(address crypto.Address) (*big.Int, error) {
+func (n *Node) GetBalance(address crypto.Address) (*big.Int, error) {
 	// TODO: implement GetBalance
 	return nil, nil
 }
 
-func (n *node) CallContract(script []byte) (interface{}, error) {
+func (n *Node) CallContract(script []byte) (interface{}, error) {
 	// TODO: implement CallContract
 	return nil, nil
 }
