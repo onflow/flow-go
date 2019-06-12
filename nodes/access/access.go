@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
 )
 
@@ -11,11 +12,11 @@ import (
 type Node interface {
 	Start(context.Context)
 	SendTransaction(*data.Transaction) error
-	GetBlockByHash(hash data.Hash) (*data.Block, error)
+	GetBlockByHash(hash crypto.Hash) (*data.Block, error)
 	GetBlockByNumber(number uint64) (*data.Block, error)
 	GetLatestBlock() *data.Block
-	GetTransaction(hash data.Hash) (*data.Transaction, error)
-	GetBalance(address data.Address) (*big.Int, error)
+	GetTransaction(hash crypto.Hash) (*data.Transaction, error)
+	GetBalance(address crypto.Address) (*big.Int, error)
 }
 
 type node struct {
@@ -52,7 +53,7 @@ func (n *node) SendTransaction(tx *data.Transaction) error {
 	return nil
 }
 
-func (n *node) GetBlockByHash(hash data.Hash) (*data.Block, error) {
+func (n *node) GetBlockByHash(hash crypto.Hash) (*data.Block, error) {
 	block, err := n.state.GetBlockByHash(hash)
 	if err != nil {
 		return nil, &BlockNotFoundError{blockHash: &hash}
@@ -74,7 +75,7 @@ func (n *node) GetLatestBlock() *data.Block {
 	return n.state.GetLatestBlock()
 }
 
-func (n *node) GetTransaction(hash data.Hash) (*data.Transaction, error) {
+func (n *node) GetTransaction(hash crypto.Hash) (*data.Transaction, error) {
 	tx, err := n.state.GetTransaction(hash)
 	if err != nil {
 		return nil, &TransactionNotFoundError{txHash: hash}
@@ -83,7 +84,7 @@ func (n *node) GetTransaction(hash data.Hash) (*data.Transaction, error) {
 	return tx, nil
 }
 
-func (n *node) GetBalance(address data.Address) (*big.Int, error) {
+func (n *node) GetBalance(address crypto.Address) (*big.Int, error) {
 	return nil, nil
 }
 

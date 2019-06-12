@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
 	"github.com/dapperlabs/bamboo-emulator/gen/grpc/services/accessv1"
 	"github.com/dapperlabs/bamboo-emulator/nodes/access"
@@ -37,7 +38,7 @@ func (s *server) SendTransaction(ctx context.Context, req *accessv1.SendTransact
 	txMsg := req.GetTransaction()
 
 	tx := &data.Transaction{
-		ToAddress:      data.BytesToAddress(txMsg.GetTo()),
+		ToAddress:      crypto.BytesToAddress(txMsg.GetTo()),
 		Script:         txMsg.GetScript(),
 		Nonce:          txMsg.GetNonce(),
 		ComputeLimit:   txMsg.GetCompute(),
@@ -62,7 +63,7 @@ func (s *server) SendTransaction(ctx context.Context, req *accessv1.SendTransact
 
 // GetBlockByHash gets a block by hash.
 func (s *server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHashRequest) (*accessv1.GetBlockByHashResponse, error) {
-	hash := data.BytesToHash(req.GetHash())
+	hash := crypto.BytesToHash(req.GetHash())
 
 	block, err := s.accessNode.GetBlockByHash(hash)
 	if err != nil {
@@ -78,7 +79,7 @@ func (s *server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHas
 		Block: &accessv1.Block{
 			Hash:              block.Hash().Bytes(),
 			Number:            block.Number,
-			TransactionHashes: data.HashesToBytes(block.TransactionHashes),
+			TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
 			Status:            accessv1.Block_Status(block.Status),
 		},
 	}, nil
@@ -102,7 +103,7 @@ func (s *server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByN
 		Block: &accessv1.Block{
 			Hash:              block.Hash().Bytes(),
 			Number:            block.Number,
-			TransactionHashes: data.HashesToBytes(block.TransactionHashes),
+			TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
 			Status:            accessv1.Block_Status(block.Status),
 		},
 	}, nil
@@ -116,7 +117,7 @@ func (s *server) GetLatestBlock(ctx context.Context, req *accessv1.GetLatestBloc
 		Block: &accessv1.Block{
 			Hash:              block.Hash().Bytes(),
 			Number:            block.Number,
-			TransactionHashes: data.HashesToBytes(block.TransactionHashes),
+			TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
 			Status:            accessv1.Block_Status(block.Status),
 		},
 	}, nil
@@ -124,7 +125,7 @@ func (s *server) GetLatestBlock(ctx context.Context, req *accessv1.GetLatestBloc
 
 // GetTransactions gets a transaction by hash.
 func (s *server) GetTransaction(ctx context.Context, req *accessv1.GetTransactionRequest) (*accessv1.GetTransactionResponse, error) {
-	hash := data.BytesToHash(req.GetHash())
+	hash := crypto.BytesToHash(req.GetHash())
 
 	tx, err := s.accessNode.GetTransaction(hash)
 	if err != nil {
@@ -150,7 +151,7 @@ func (s *server) GetTransaction(ctx context.Context, req *accessv1.GetTransactio
 
 // GetBalance returns the balance of an address.
 func (s *server) GetBalance(context.Context, *accessv1.GetBalanceRequest) (*accessv1.GetBalanceResponse, error) {
-	var address data.Address
+	var address crypto.Address
 
 	s.accessNode.GetBalance(address)
 

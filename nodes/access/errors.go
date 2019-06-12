@@ -3,12 +3,12 @@ package access
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-emulator/data"
+	"github.com/dapperlabs/bamboo-emulator/crypto"
 )
 
 // BlockNotFoundError indicates that a block could not be found.
 type BlockNotFoundError struct {
-	blockHash   *data.Hash
+	blockHash   *crypto.Hash
 	blockNumber uint64
 }
 
@@ -26,7 +26,7 @@ func (e *BlockNotFoundError) Error() string {
 
 // TransactionNotFoundError indicates that a transaction could not be found.
 type TransactionNotFoundError struct {
-	txHash data.Hash
+	txHash crypto.Hash
 }
 
 func (e *TransactionNotFoundError) Error() string {
@@ -35,7 +35,7 @@ func (e *TransactionNotFoundError) Error() string {
 
 // DuplicateTransactionError indicates that a transaction has already been submitted.
 type DuplicateTransactionError struct {
-	txHash data.Hash
+	txHash crypto.Hash
 }
 
 func (e *DuplicateTransactionError) Error() string {

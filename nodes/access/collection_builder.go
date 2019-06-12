@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
 )
 
@@ -55,7 +56,7 @@ func (c *CollectionBuilder) buildCollection() {
 
 	fmt.Printf("Building collection with %d transactions... \n", len(c.pendingTransactions))
 
-	transactionHashes := make([]data.Hash, len(c.pendingTransactions))
+	transactionHashes := make([]crypto.Hash, len(c.pendingTransactions))
 
 	for i, tx := range c.pendingTransactions {
 		transactionHashes[i] = tx.Hash()
