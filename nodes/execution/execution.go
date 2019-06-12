@@ -16,7 +16,7 @@ type node struct {
 
 // NewNode returns a new simulated execution node.
 func NewNode(state data.WorldState) Node {
-	computer := NewComputer(state.GetRegister)
+	computer := NewComputer(state.GetTransaction, state.GetRegister)
 
 	return &node{
 		state:    state,
@@ -33,9 +33,9 @@ func (n *node) ExecuteBlock(block *data.Block) {
 
 	for hash, succeeded := range results {
 		if succeeded {
-			n.state.UpdateTransactionStatus(hash, data.TxSucceeded)
-		} else {
 			n.state.UpdateTransactionStatus(hash, data.TxSealed)
+		} else {
+			n.state.UpdateTransactionStatus(hash, data.TxReverted)
 		}
 	}
 }
