@@ -24,11 +24,13 @@ func NewWorldState() *WorldState {
 	}
 }
 
+// GetLatestBlock returns the latest block in the blockchain.
 func (s *WorldState) GetLatestBlock() *Block {
 	currHeight := len(s.Blockchain)
 	return &s.Blockchain[currHeight-1]
 }
 
+// GetBlockByNumber gets a block by number.
 func (s *WorldState) GetBlockByNumber(n uint64) (*Block, error) {
 	currHeight := len(s.Blockchain)
 	if int(n) < currHeight {
@@ -38,6 +40,7 @@ func (s *WorldState) GetBlockByNumber(n uint64) (*Block, error) {
 	return nil, &InvalidBlockNumberError{blockNumber: n}
 }
 
+// GetBlockByHash gets a block by hash.
 func (s *WorldState) GetBlockByHash(h crypto.Hash) (*Block, error) {
 	if block, ok := s.Blocks[h]; ok {
 		return &block, nil
@@ -46,6 +49,7 @@ func (s *WorldState) GetBlockByHash(h crypto.Hash) (*Block, error) {
 	return nil, &ItemNotFoundError{hash: h}
 }
 
+// GetCollection gets a collection by hash.
 func (s *WorldState) GetCollection(h crypto.Hash) (*Collection, error) {
 	if collection, ok := s.Collections[h]; ok {
 		return &collection, nil
@@ -54,6 +58,7 @@ func (s *WorldState) GetCollection(h crypto.Hash) (*Collection, error) {
 	return nil, &ItemNotFoundError{hash: h}
 }
 
+// GetTransaction gets a transaction by hash.
 func (s *WorldState) GetTransaction(h crypto.Hash) (*Transaction, error) {
 	if tx, ok := s.Transactions[h]; ok {
 		return &tx, nil
@@ -62,20 +67,24 @@ func (s *WorldState) GetTransaction(h crypto.Hash) (*Transaction, error) {
 	return nil, &ItemNotFoundError{hash: h}
 }
 
+// GetRegister gets a register by ID.
 func (s *WorldState) GetRegister(id string) []byte {
 	return s.Registers[id]
 }
 
+// AddBlock adds a new block to the blockchain.
 func (s *WorldState) AddBlock(block *Block) error {
 	// TODO: add to block map and chain
 	return nil
 }
 
+// InsertCollection inserts a new collection into the state.
 func (s *WorldState) InsertCollection(col *Collection) error {
 	// TODO: add to collection map
 	return nil
 }
 
+// InsertTransaction inserts a new transaction into the state.
 func (s *WorldState) InsertTransaction(tx *Transaction) error {
 	if _, exists := s.Transactions[tx.Hash()]; exists {
 		return &DuplicateItemError{hash: tx.Hash()}
@@ -86,18 +95,21 @@ func (s *WorldState) InsertTransaction(tx *Transaction) error {
 	return nil
 }
 
+// CommitRegisters updates the register state with the values of a register map.
 func (s *WorldState) CommitRegisters(registers Registers) {
 	for id, value := range registers {
 		s.Registers[id] = value
 	}
 }
 
+// UpdateTransactionStatus updates the status of a single transaction.
 func (s *WorldState) UpdateTransactionStatus(h crypto.Hash, status TxStatus) {
 	tx := s.Transactions[h]
 	tx.Status = status
 	s.Transactions[h] = tx
 }
 
+// SealBlock seals a block on the blockchain.
 func (s *WorldState) SealBlock(h crypto.Hash) error {
 	// TODO: seal the block
 	return nil
