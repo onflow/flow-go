@@ -41,7 +41,7 @@ func (s *server) SendTransaction(ctx context.Context, req *accessv1.SendTransact
 		ToAddress:      crypto.BytesToAddress(txMsg.GetTo()),
 		Script:         txMsg.GetScript(),
 		Nonce:          txMsg.GetNonce(),
-		ComputeLimit:   txMsg.GetCompute(),
+		ComputeLimit:   txMsg.GetComputeLimit(),
 		PayerSignature: txMsg.GetPayerSignature(),
 		Status:         data.TxPending,
 	}
@@ -142,7 +142,8 @@ func (s *server) GetTransaction(ctx context.Context, req *accessv1.GetTransactio
 			To:             tx.ToAddress.Bytes(),
 			Script:         tx.Script,
 			Nonce:          tx.Nonce,
-			Compute:        tx.ComputeLimit,
+			ComputeLimit:   tx.ComputeLimit,
+			ComputeUsed:    tx.ComputeUsed,
 			PayerSignature: tx.PayerSignature,
 			Status:         accessv1.GetTransactionResponse_Transaction_Status(tx.Status),
 		},

@@ -33,7 +33,7 @@ message SendTransactionRequest {
     bytes to = 1;
     bytes script = 2;
     uint64 nonce = 3;
-    uint64 compute = 4;
+    uint64 compute_limit = 4;
     bytes payer_signature = 5;
   }
   Transaction transaction = 1;
@@ -93,9 +93,10 @@ message GetTransactionResponse {
     bytes to = 1;
     bytes script = 2;
     uint64 nonce = 3;
-    uint64 compute = 4;
-    bytes payer_signature = 5;
-    Status status = 6;
+    uint64 compute_limit = 4;
+    uint64 compute_used = 5;
+    bytes payer_signature = 6;
+    Status status = 7;
   }
   Transaction transaction = 1;
 }
