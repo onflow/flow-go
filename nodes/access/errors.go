@@ -41,3 +41,12 @@ type DuplicateTransactionError struct {
 func (e *DuplicateTransactionError) Error() string {
 	return fmt.Sprintf("Transaction with hash %s has already been submitted", e.txHash)
 }
+
+// AccountNotFoundError indicates that an account could not be found.
+type AccountNotFoundError struct {
+	accountAddress crypto.Address
+}
+
+func (e *AccountNotFoundError) Error() string {
+	return fmt.Sprintf("Account with address %s does not exist", e.accountAddress)
+}

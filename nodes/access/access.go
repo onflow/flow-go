@@ -85,9 +85,11 @@ func (n *node) GetTransaction(hash crypto.Hash) (*data.Transaction, error) {
 }
 
 func (n *node) GetBalance(address crypto.Address) (*big.Int, error) {
+	// TODO: implement GetBalance
 	return nil, nil
 }
 
 func (n *node) CallContract(script []byte) (interface{}, error) {
+	// TODO: implement CallContract
 	return nil, nil
 }
