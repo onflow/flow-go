@@ -48,7 +48,7 @@ func (n *Node) GetBlockByHash(hash crypto.Hash) (*data.Block, error) {
 	if err != nil {
 		switch err.(type) {
 		case *data.ItemNotFoundError:
-			return nil, &BlockNotFoundError{blockHash: &hash}
+			return nil, &BlockNotFoundByHashError{blockHash: hash}
 		default:
 			return nil, err
 		}
@@ -62,7 +62,7 @@ func (n *Node) GetBlockByNumber(number uint64) (*data.Block, error) {
 	if err != nil {
 		switch err.(type) {
 		case *data.InvalidBlockNumberError:
-			return nil, &BlockNotFoundError{blockNumber: number}
+			return nil, &BlockNotFoundByNumberError{blockNumber: number}
 		default:
 			return nil, err
 		}

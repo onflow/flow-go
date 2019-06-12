@@ -63,7 +63,7 @@ func (s *Server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHas
 	block, err := s.accessNode.GetBlockByHash(hash)
 	if err != nil {
 		switch err.(type) {
-		case *access.BlockNotFoundError:
+		case *access.BlockNotFoundByHashError:
 			return nil, status.Error(codes.NotFound, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
@@ -87,7 +87,7 @@ func (s *Server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByN
 	block, err := s.accessNode.GetBlockByNumber(number)
 	if err != nil {
 		switch err.(type) {
-		case *access.BlockNotFoundError:
+		case *access.BlockNotFoundByNumberError:
 			return nil, status.Error(codes.NotFound, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
