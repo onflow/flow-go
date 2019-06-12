@@ -7,29 +7,25 @@ import (
 )
 
 // Computer executes blocks and saves results to the world state.
-type Computer interface {
-	ExecuteBlock(block *data.Block) (data.Registers, TransactionResults)
-}
-
-// TransactionResults stores the result statuses of multiple transactions.
-type TransactionResults map[crypto.Hash]bool
-
-type computer struct {
+type Computer struct {
 	runtime        runtime.Runtime
 	getTransaction func(crypto.Hash) (*data.Transaction, error)
 	readRegister   func(string) []byte
 }
 
+// TransactionResults stores the result statuses of multiple transactions.
+type TransactionResults map[crypto.Hash]bool
+
 // NewComputer returns a new computer connected to the world state.
-func NewComputer(runtime runtime.Runtime, getTransaction func(crypto.Hash) (*data.Transaction, error), readRegister func(string) []byte) Computer {
-	return &computer{
+func NewComputer(runtime runtime.Runtime, getTransaction func(crypto.Hash) (*data.Transaction, error), readRegister func(string) []byte) *Computer {
+	return &Computer{
 		runtime:        runtime,
 		getTransaction: getTransaction,
 		readRegister:   readRegister,
 	}
 }
 
-func (c *computer) ExecuteBlock(block *data.Block) (data.Registers, TransactionResults) {
+func (c *Computer) ExecuteBlock(block *data.Block) (data.Registers, TransactionResults) {
 	registers := make(data.Registers)
 	results := make(TransactionResults)
 
@@ -53,7 +49,7 @@ func (c *computer) ExecuteBlock(block *data.Block) (data.Registers, TransactionR
 	return registers, results
 }
 
-func (c *computer) executeTransaction(tx *data.Transaction, initialRegisters data.Registers) (data.Registers, bool) {
+func (c *Computer) executeTransaction(tx *data.Transaction, initialRegisters data.Registers) (data.Registers, bool) {
 	registers := make(data.Registers)
 
 	var readRegister = func(id string) []byte {
