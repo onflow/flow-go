@@ -1,11 +1,11 @@
-package data
+package crypto
 
 import (
 	"encoding/hex"
 )
 
 const (
-	// AddressLength is the 20 byte size an account address.
+	// AddressLength is the size of an account address.
 	AddressLength = 20
 )
 

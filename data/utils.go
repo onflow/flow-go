@@ -5,14 +5,16 @@ import (
 	"encoding/gob"
 	"log"
 	"time"
+
+	"github.com/dapperlabs/bamboo-emulator/crypto"
 )
 
 // EncodeAsBytes encodes a series of arbitrary data into bytes.
 func EncodeAsBytes(data ...interface{}) []byte {
 	gob.Register(time.Time{})
-	gob.Register(Hash{})
-	gob.Register([]Hash{})
-	gob.Register(Address{})
+	gob.Register(crypto.Hash{})
+	gob.Register([]crypto.Hash{})
+	gob.Register(crypto.Address{})
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf) // Will write to buf.

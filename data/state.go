@@ -2,37 +2,39 @@ package data
 
 import (
 	"errors"
+
+	"github.com/dapperlabs/bamboo-emulator/crypto"
 )
 
 // state represents the current state of the blockchain.
 type state struct {
-	Blocks       map[Hash]Block
-	Collections  map[Hash]Collection
-	Transactions map[Hash]Transaction
+	Blocks       map[crypto.Hash]Block
+	Collections  map[crypto.Hash]Collection
+	Transactions map[crypto.Hash]Transaction
 	Blockchain   []Block
 }
 
 // WorldState exposes an interface to access the state struct.
 type WorldState interface {
 	GetBlockByNumber(uint64) (*Block, error)
-	GetBlockByHash(Hash) (*Block, error)
+	GetBlockByHash(crypto.Hash) (*Block, error)
 	GetLatestBlock() *Block
-	GetCollection(Hash) (*Collection, error)
-	GetTransaction(Hash) (*Transaction, error)
+	GetCollection(crypto.Hash) (*Collection, error)
+	GetTransaction(crypto.Hash) (*Transaction, error)
 
 	AddBlock(*Block) error
 	InsertCollection(*Collection) error
 	InsertTransaction(*Transaction) error
 
-	SealBlock(Hash) error
+	SealBlock(crypto.Hash) error
 }
 
 // NewWorldState returns a new empty world state.
 func NewWorldState() WorldState {
 	return &state{
-		Blocks:       make(map[Hash]Block),
-		Collections:  make(map[Hash]Collection),
-		Transactions: make(map[Hash]Transaction),
+		Blocks:       make(map[crypto.Hash]Block),
+		Collections:  make(map[crypto.Hash]Collection),
+		Transactions: make(map[crypto.Hash]Transaction),
 		Blockchain:   make([]Block, 0),
 	}
 }
@@ -51,7 +53,7 @@ func (s state) GetBlockByNumber(n uint64) (*Block, error) {
 	return &Block{}, errors.New("invalid Block number: Block number exceeds blockchain length")
 }
 
-func (s state) GetBlockByHash(h Hash) (*Block, error) {
+func (s state) GetBlockByHash(h crypto.Hash) (*Block, error) {
 	if block, ok := s.Blocks[h]; ok {
 		return &block, nil
 	}
@@ -60,7 +62,7 @@ func (s state) GetBlockByHash(h Hash) (*Block, error) {
 
 }
 
-func (s state) GetCollection(h Hash) (*Collection, error) {
+func (s state) GetCollection(h crypto.Hash) (*Collection, error) {
 	if collection, ok := s.Collections[h]; ok {
 		return &collection, nil
 	}
@@ -68,7 +70,7 @@ func (s state) GetCollection(h Hash) (*Collection, error) {
 	return &Collection{}, errors.New("invalid Collection hash: Collection doesn't exist")
 }
 
-func (s state) GetTransaction(h Hash) (*Transaction, error) {
+func (s state) GetTransaction(h crypto.Hash) (*Transaction, error) {
 	if tx, ok := s.Transactions[h]; ok {
 		return &tx, nil
 	}
@@ -96,7 +98,7 @@ func (s state) InsertTransaction(tx *Transaction) error {
 	return nil
 }
 
-func (s state) SealBlock(h Hash) error {
+func (s state) SealBlock(h crypto.Hash) error {
 	// TODO: seal the block
 	return nil
 }

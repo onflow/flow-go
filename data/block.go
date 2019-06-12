@@ -2,20 +2,22 @@ package data
 
 import (
 	"time"
+
+	"github.com/dapperlabs/bamboo-emulator/crypto"
 )
 
 // Block represents a series of Collections (collection of Transactions) denoted with a current Status.
 type Block struct {
 	Number            uint64
 	Timestamp         time.Time
-	PrevBlockHash     Hash
+	PrevBlockHash     crypto.Hash
 	Status            BlockStatus
-	CollectionHashes  []Hash
-	TransactionHashes []Hash
+	CollectionHashes  []crypto.Hash
+	TransactionHashes []crypto.Hash
 }
 
 // Hash computes the hash over the necessary Block data.
-func (b Block) Hash() Hash {
+func (b Block) Hash() crypto.Hash {
 	bytes := EncodeAsBytes(
 		b.Number,
 		b.Timestamp,
@@ -23,5 +25,5 @@ func (b Block) Hash() Hash {
 		b.CollectionHashes,
 		b.TransactionHashes,
 	)
-	return NewHash(bytes)
+	return crypto.NewHash(bytes)
 }
