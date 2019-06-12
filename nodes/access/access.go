@@ -46,7 +46,12 @@ func (n *Node) SendTransaction(tx *data.Transaction) error {
 func (n *Node) GetBlockByHash(hash crypto.Hash) (*data.Block, error) {
 	block, err := n.state.GetBlockByHash(hash)
 	if err != nil {
-		return nil, &BlockNotFoundError{blockHash: &hash}
+		switch err.(type) {
+		case *data.ItemNotFoundError:
+			return nil, &BlockNotFoundError{blockHash: &hash}
+		default:
+			return nil, err
+		}
 	}
 
 	return block, nil
@@ -55,7 +60,12 @@ func (n *Node) GetBlockByHash(hash crypto.Hash) (*data.Block, error) {
 func (n *Node) GetBlockByNumber(number uint64) (*data.Block, error) {
 	block, err := n.state.GetBlockByNumber(number)
 	if err != nil {
-		return nil, &BlockNotFoundError{blockNumber: number}
+		switch err.(type) {
+		case *data.InvalidBlockNumberError:
+			return nil, &BlockNotFoundError{blockNumber: number}
+		default:
+			return nil, err
+		}
 	}
 
 	return block, nil
@@ -68,7 +78,12 @@ func (n *Node) GetLatestBlock() *data.Block {
 func (n *Node) GetTransaction(hash crypto.Hash) (*data.Transaction, error) {
 	tx, err := n.state.GetTransaction(hash)
 	if err != nil {
-		return nil, &TransactionNotFoundError{txHash: hash}
+		switch err.(type) {
+		case *data.ItemNotFoundError:
+			return nil, &TransactionNotFoundError{txHash: hash}
+		default:
+			return nil, err
+		}
 	}
 
 	return tx, nil

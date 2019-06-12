@@ -1,8 +1,6 @@
 package data
 
 import (
-	"errors"
-
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 )
 
@@ -35,7 +33,7 @@ func (s *WorldState) GetBlockByNumber(n uint64) (*Block, error) {
 		return &s.Blockchain[n], nil
 	}
 
-	return &Block{}, errors.New("invalid Block number: Block number exceeds blockchain length")
+	return nil, &InvalidBlockNumberError{blockNumber: n}
 }
 
 func (s *WorldState) GetBlockByHash(h crypto.Hash) (*Block, error) {
@@ -43,8 +41,7 @@ func (s *WorldState) GetBlockByHash(h crypto.Hash) (*Block, error) {
 		return &block, nil
 	}
 
-	return &Block{}, errors.New("invalid Block hash: Block doesn't exist")
-
+	return nil, &ItemNotFoundError{hash: h}
 }
 
 func (s *WorldState) GetCollection(h crypto.Hash) (*Collection, error) {
@@ -52,7 +49,7 @@ func (s *WorldState) GetCollection(h crypto.Hash) (*Collection, error) {
 		return &collection, nil
 	}
 
-	return &Collection{}, errors.New("invalid Collection hash: Collection doesn't exist")
+	return nil, &ItemNotFoundError{hash: h}
 }
 
 func (s *WorldState) GetTransaction(h crypto.Hash) (*Transaction, error) {
@@ -60,7 +57,7 @@ func (s *WorldState) GetTransaction(h crypto.Hash) (*Transaction, error) {
 		return &tx, nil
 	}
 
-	return &Transaction{}, errors.New("invalid Transaction hash: Transaction doesn't exist")
+	return nil, &ItemNotFoundError{hash: h}
 }
 
 func (s *WorldState) AddBlock(block *Block) error {
@@ -75,7 +72,7 @@ func (s *WorldState) InsertCollection(col *Collection) error {
 
 func (s *WorldState) InsertTransaction(tx *Transaction) error {
 	if _, exists := s.Transactions[tx.Hash()]; exists {
-		return errors.New("transaction exists")
+		return &DuplicateItemError{hash: tx.Hash()}
 	}
 
 	s.Transactions[tx.Hash()] = *tx
