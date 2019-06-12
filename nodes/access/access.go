@@ -38,9 +38,14 @@ func (n *Node) SendTransaction(tx *data.Transaction) error {
 		return &DuplicateTransactionError{txHash: tx.Hash()}
 	}
 
-	n.transactionsIn <- tx
-
-	return nil
+	for {
+		select {
+		case n.transactionsIn <- tx:
+			return nil
+		default:
+			return &TransactionQueueFullError{txHash: tx.Hash()}
+		}
+	}
 }
 
 func (n *Node) GetBlockByHash(hash crypto.Hash) (*data.Block, error) {

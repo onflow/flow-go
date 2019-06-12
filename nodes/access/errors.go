@@ -50,3 +50,12 @@ type AccountNotFoundError struct {
 func (e *AccountNotFoundError) Error() string {
 	return fmt.Sprintf("Account with address %s does not exist", e.accountAddress)
 }
+
+// TransactionQueueFullError indicates that the pending transaction queue is full.
+type TransactionQueueFullError struct {
+	txHash crypto.Hash
+}
+
+func (e *TransactionQueueFullError) Error() string {
+	return fmt.Sprintf("Transaction with hash %s could not be submitted; pending queue is full", e.txHash)
+}
