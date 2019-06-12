@@ -16,7 +16,9 @@ func main() {
 
 	collections := make(chan *data.Collection, 16)
 
-	accessNode := access.NewNode(collections)
+	state := data.NewWorldState()
+
+	accessNode := access.NewNode(state, collections)
 
 	emulatorServer := server.NewServer(accessNode)
 

@@ -32,3 +32,12 @@ type TransactionNotFoundError struct {
 func (e *TransactionNotFoundError) Error() string {
 	return fmt.Sprintf("Transaction with hash %s does not exist", e.txHash)
 }
+
+// DuplicateTransactionError indicates that a transaction has already been submitted.
+type DuplicateTransactionError struct {
+	txHash data.Hash
+}
+
+func (e *DuplicateTransactionError) Error() string {
+	return fmt.Sprintf("Transaction with hash %s has already been submitted", e.txHash)
+}

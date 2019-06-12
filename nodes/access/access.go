@@ -13,24 +13,26 @@ type Node interface {
 	SendTransaction(*data.Transaction) error
 	GetBlockByHash(hash data.Hash) (*data.Block, error)
 	GetBlockByNumber(number uint64) (*data.Block, error)
-	GetLatestBlock() (*data.Block, error)
+	GetLatestBlock() *data.Block
 	GetTransaction(hash data.Hash) (*data.Transaction, error)
 	GetBalance(address data.Address) (*big.Int, error)
 }
 
 type node struct {
-	transactions      chan *data.Transaction
+	state             data.WorldState
+	transactionsIn    chan *data.Transaction
 	collectionBuilder *CollectionBuilder
 }
 
 // NewNode returns a new simulated access node.
-func NewNode(collectionsOut chan *data.Collection) Node {
-	transactions := make(chan *data.Transaction, 16)
+func NewNode(state data.WorldState, collectionsOut chan *data.Collection) Node {
+	transactionsIn := make(chan *data.Transaction, 16)
 
-	collectionBuilder := NewCollectionBuilder(transactions, collectionsOut)
+	collectionBuilder := NewCollectionBuilder(transactionsIn, collectionsOut)
 
 	return &node{
-		transactions:      transactions,
+		state:             state,
+		transactionsIn:    transactionsIn,
 		collectionBuilder: collectionBuilder,
 	}
 }
@@ -40,24 +42,45 @@ func (n *node) Start(ctx context.Context) {
 }
 
 func (n *node) SendTransaction(tx *data.Transaction) error {
-	n.transactions <- tx
+	err := n.state.InsertTransaction(tx)
+	if err != nil {
+		return &DuplicateTransactionError{txHash: tx.Hash()}
+	}
+
+	n.transactionsIn <- tx
+
 	return nil
 }
 
 func (n *node) GetBlockByHash(hash data.Hash) (*data.Block, error) {
-	return nil, &BlockNotFoundError{blockHash: &hash}
+	block, err := n.state.GetBlockByHash(hash)
+	if err != nil {
+		return nil, &BlockNotFoundError{blockHash: &hash}
+	}
+
+	return block, nil
 }
 
 func (n *node) GetBlockByNumber(number uint64) (*data.Block, error) {
-	return nil, &BlockNotFoundError{blockNumber: number}
+	block, err := n.state.GetBlockByNumber(number)
+	if err != nil {
+		return nil, &BlockNotFoundError{blockNumber: number}
+	}
+
+	return block, nil
 }
 
-func (n *node) GetLatestBlock() (*data.Block, error) {
-	return nil, &BlockNotFoundError{}
+func (n *node) GetLatestBlock() *data.Block {
+	return n.state.GetLatestBlock()
 }
 
 func (n *node) GetTransaction(hash data.Hash) (*data.Transaction, error) {
-	return nil, &TransactionNotFoundError{txHash: hash}
+	tx, err := n.state.GetTransaction(hash)
+	if err != nil {
+		return nil, &TransactionNotFoundError{txHash: hash}
+	}
+
+	return tx, nil
 }
 
 func (n *node) GetBalance(address data.Address) (*big.Int, error) {

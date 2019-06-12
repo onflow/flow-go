@@ -15,8 +15,9 @@ type Transaction struct {
 func (tx Transaction) Hash() Hash {
 	bytes := EncodeAsBytes(
 		tx.ToAddress.Bytes(),
-		tx.TxData,
+		tx.Script,
 		tx.Nonce,
+		tx.ComputeLimit,
 		tx.PayerSignature,
 	)
 	return NewHash(bytes)

@@ -37,8 +37,7 @@ func (s *server) SendTransaction(ctx context.Context, req *accessv1.SendTransact
 	txMsg := req.GetTransaction()
 
 	tx := &data.Transaction{
-		// TODO: convert address from bytes
-		// ToAddress:      txMsg.GetTo(),
+		ToAddress:      data.BytesToAddress(txMsg.GetTo()),
 		Script:         txMsg.GetScript(),
 		Nonce:          txMsg.GetNonce(),
 		ComputeLimit:   txMsg.GetCompute(),
@@ -46,17 +45,26 @@ func (s *server) SendTransaction(ctx context.Context, req *accessv1.SendTransact
 		Status:         data.TxPending,
 	}
 
-	s.accessNode.SendTransaction(tx)
+	err := s.accessNode.SendTransaction(tx)
+	if err != nil {
+		switch err.(type) {
+		case *access.DuplicateTransactionError:
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 
-	return &accessv1.SendTransactionResponse{}, nil
+	return &accessv1.SendTransactionResponse{
+		Hash: tx.Hash().Bytes(),
+	}, nil
 }
 
 // GetBlockByHash gets a block by hash.
 func (s *server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHashRequest) (*accessv1.GetBlockByHashResponse, error) {
-	var hash data.Hash
+	hash := data.BytesToHash(req.GetHash())
 
 	block, err := s.accessNode.GetBlockByHash(hash)
-
 	if err != nil {
 		switch err.(type) {
 		case *access.BlockNotFoundError:
@@ -68,9 +76,9 @@ func (s *server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHas
 
 	return &accessv1.GetBlockByHashResponse{
 		Block: &accessv1.Block{
-			Hash:              []byte{},
+			Hash:              block.Hash().Bytes(),
 			Number:            block.Number,
-			TransactionHashes: [][]byte{},
+			TransactionHashes: data.HashesToBytes(block.TransactionHashes),
 			Status:            accessv1.Block_Status(block.Status),
 		},
 	}, nil
@@ -80,8 +88,7 @@ func (s *server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHas
 func (s *server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByNumberRequest) (*accessv1.GetBlockByNumberResponse, error) {
 	number := req.GetNumber()
 
-	_, err := s.accessNode.GetBlockByNumber(number)
-
+	block, err := s.accessNode.GetBlockByNumber(number)
 	if err != nil {
 		switch err.(type) {
 		case *access.BlockNotFoundError:
@@ -91,31 +98,35 @@ func (s *server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByN
 		}
 	}
 
-	return nil, nil
+	return &accessv1.GetBlockByNumberResponse{
+		Block: &accessv1.Block{
+			Hash:              block.Hash().Bytes(),
+			Number:            block.Number,
+			TransactionHashes: data.HashesToBytes(block.TransactionHashes),
+			Status:            accessv1.Block_Status(block.Status),
+		},
+	}, nil
 }
 
 // GetLatestBlock gets the latest sealed block.
-func (s *server) GetLatestBlock(context.Context, *accessv1.GetLatestBlockRequest) (*accessv1.GetLatestBlockResponse, error) {
-	_, err := s.accessNode.GetLatestBlock()
+func (s *server) GetLatestBlock(ctx context.Context, req *accessv1.GetLatestBlockRequest) (*accessv1.GetLatestBlockResponse, error) {
+	block := s.accessNode.GetLatestBlock()
 
-	if err != nil {
-		switch err.(type) {
-		case *access.BlockNotFoundError:
-			return nil, status.Error(codes.NotFound, err.Error())
-		default:
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	}
-
-	return nil, nil
+	return &accessv1.GetLatestBlockResponse{
+		Block: &accessv1.Block{
+			Hash:              block.Hash().Bytes(),
+			Number:            block.Number,
+			TransactionHashes: data.HashesToBytes(block.TransactionHashes),
+			Status:            accessv1.Block_Status(block.Status),
+		},
+	}, nil
 }
 
 // GetTransactions gets a transaction by hash.
-func (s *server) GetTransaction(context.Context, *accessv1.GetTransactionRequest) (*accessv1.GetTransactionResponse, error) {
-	var hash data.Hash
+func (s *server) GetTransaction(ctx context.Context, req *accessv1.GetTransactionRequest) (*accessv1.GetTransactionResponse, error) {
+	hash := data.BytesToHash(req.GetHash())
 
-	_, err := s.accessNode.GetTransaction(hash)
-
+	tx, err := s.accessNode.GetTransaction(hash)
 	if err != nil {
 		switch err.(type) {
 		case *access.TransactionNotFoundError:
@@ -125,7 +136,16 @@ func (s *server) GetTransaction(context.Context, *accessv1.GetTransactionRequest
 		}
 	}
 
-	return nil, nil
+	return &accessv1.GetTransactionResponse{
+		Transaction: &accessv1.GetTransactionResponse_Transaction{
+			To:             tx.ToAddress.Bytes(),
+			Script:         tx.Script,
+			Nonce:          tx.Nonce,
+			Compute:        tx.ComputeLimit,
+			PayerSignature: tx.PayerSignature,
+			Status:         accessv1.GetTransactionResponse_Transaction_Status(tx.Status),
+		},
+	}, nil
 }
 
 // GetBalance returns the balance of an address.
