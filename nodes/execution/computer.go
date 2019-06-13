@@ -25,37 +25,38 @@ func NewComputer(runtime runtime.Runtime, getTransaction func(crypto.Hash) (*dat
 	}
 }
 
+// ExecuteBlock executes the transactions in a block and returns the updated register values.
 func (c *Computer) ExecuteBlock(block *data.Block) (data.Registers, TransactionResults, error) {
-	registers := make(data.Registers)
+	blockRegisters := make(data.Registers)
 	results := make(TransactionResults)
 
 	for _, txHash := range block.TransactionHashes {
 		tx, err := c.getTransaction(txHash)
 		if err != nil {
-			return registers, results, err
+			return blockRegisters, results, err
 		}
 
-		updatedRegisters, succeeded := c.executeTransaction(tx, registers)
+		updatedRegisters, succeeded := c.executeTransaction(tx, blockRegisters)
 
 		results[tx.Hash()] = succeeded
 
 		if succeeded {
-			registers.Update(updatedRegisters)
+			blockRegisters.Update(updatedRegisters)
 		}
 	}
 
-	return registers, results, nil
+	return blockRegisters, results, nil
 }
 
-func (c *Computer) executeTransaction(tx *data.Transaction, initialRegisters data.Registers) (data.Registers, bool) {
-	registers := make(data.Registers)
+func (c *Computer) executeTransaction(tx *data.Transaction, blockRegisters data.Registers) (data.Registers, bool) {
+	txRegisters := make(data.Registers)
 
 	var readRegister = func(id string) []byte {
-		if value, ok := registers[id]; ok {
+		if value, ok := txRegisters[id]; ok {
 			return value
 		}
 
-		if value, ok := initialRegisters[id]; ok {
+		if value, ok := blockRegisters[id]; ok {
 			return value
 		}
 
@@ -63,7 +64,7 @@ func (c *Computer) executeTransaction(tx *data.Transaction, initialRegisters dat
 	}
 
 	var writeRegister = func(id string, value []byte) {
-		registers[id] = value
+		txRegisters[id] = value
 	}
 
 	succeeded := c.runtime.ExecuteScript(
@@ -72,5 +73,5 @@ func (c *Computer) executeTransaction(tx *data.Transaction, initialRegisters dat
 		writeRegister,
 	)
 
-	return registers, succeeded
+	return txRegisters, succeeded
 }
