@@ -1,4 +1,4 @@
-package access
+package collection_builder
 
 import (
 	"context"

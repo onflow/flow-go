@@ -1,15 +1,19 @@
-package access
+package collection_builder
 
 import (
 	"context"
 	"testing"
 	"time"
 
+	. "github.com/onsi/gomega"
+
 	"github.com/dapperlabs/bamboo-emulator/data"
 	"github.com/dapperlabs/bamboo-emulator/tests"
 )
 
 func TestCollectionBuilder(t *testing.T) {
+	gomega := NewWithT(t)
+
 	state := data.NewWorldState()
 
 	transactionsIn := make(chan *data.Transaction)
@@ -32,7 +36,8 @@ func TestCollectionBuilder(t *testing.T) {
 
 	collection := <-collectionsOut
 
-	if len(collection.TransactionHashes) != 3 {
-		t.Fatal("Collection does not contain all submitted transactions")
-	}
+	gomega.Expect(collection.TransactionHashes).To(HaveLen(3))
+	gomega.Expect(collection.TransactionHashes).To(ContainElement(txA.Hash()))
+	gomega.Expect(collection.TransactionHashes).To(ContainElement(txB.Hash()))
+	gomega.Expect(collection.TransactionHashes).To(ContainElement(txC.Hash()))
 }

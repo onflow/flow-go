@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/dapperlabs/bamboo-emulator/data"
 	"github.com/dapperlabs/bamboo-emulator/nodes/access"
@@ -18,7 +19,13 @@ func main() {
 
 	state := data.NewWorldState()
 
-	accessNode := access.NewNode(state, collections)
+	accessNode := access.NewNode(
+		&access.Config{
+			CollectionInterval: time.Second,
+		},
+		state,
+		collections,
+	)
 
 	emulatorServer := server.NewServer(accessNode)
 
