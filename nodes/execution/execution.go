@@ -23,18 +23,28 @@ func NewNode(state *data.WorldState) *Node {
 }
 
 // ExecuteBlock executes a block and saves the results to the world state.
-func (n *Node) ExecuteBlock(block *data.Block) {
+func (n *Node) ExecuteBlock(block *data.Block) error {
 	registers, results := n.computer.ExecuteBlock(block)
 
 	n.state.CommitRegisters(registers)
-
-	n.state.SealBlock(block.Hash())
+	err := n.state.SealBlock(block.Hash())
+	if err != nil {
+		return err
+	}
 
 	for hash, succeeded := range results {
 		if succeeded {
-			n.state.UpdateTransactionStatus(hash, data.TxSealed)
+			err = n.state.UpdateTransactionStatus(hash, data.TxSealed)
+			if err != nil {
+				return err
+			}
 		} else {
-			n.state.UpdateTransactionStatus(hash, data.TxReverted)
+			err = n.state.UpdateTransactionStatus(hash, data.TxReverted)
+			if err != nil {
+				return err
+			}
 		}
 	}
+
+	return nil
 }

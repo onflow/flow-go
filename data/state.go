@@ -103,10 +103,17 @@ func (s *WorldState) CommitRegisters(registers Registers) {
 }
 
 // UpdateTransactionStatus updates the status of a single transaction.
-func (s *WorldState) UpdateTransactionStatus(h crypto.Hash, status TxStatus) {
-	tx := s.Transactions[h]
+func (s *WorldState) UpdateTransactionStatus(h crypto.Hash, status TxStatus) error {
+	tx, err := s.GetTransaction(h)
+	if err != nil {
+		return err
+	}
+
 	tx.Status = status
-	s.Transactions[h] = tx
+
+	s.Transactions[h] = *tx
+
+	return nil
 }
 
 // SealBlock seals a block on the blockchain.
