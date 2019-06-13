@@ -24,10 +24,13 @@ func NewNode(state *data.WorldState) *Node {
 
 // ExecuteBlock executes a block and saves the results to the world state.
 func (n *Node) ExecuteBlock(block *data.Block) error {
-	registers, results := n.computer.ExecuteBlock(block)
+	registers, results, err := n.computer.ExecuteBlock(block)
+	if err != nil {
+		return err
+	}
 
 	n.state.CommitRegisters(registers)
-	err := n.state.SealBlock(block.Hash())
+	err = n.state.SealBlock(block.Hash())
 	if err != nil {
 		return err
 	}

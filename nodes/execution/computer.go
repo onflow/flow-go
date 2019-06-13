@@ -25,16 +25,14 @@ func NewComputer(runtime runtime.Runtime, getTransaction func(crypto.Hash) (*dat
 	}
 }
 
-func (c *Computer) ExecuteBlock(block *data.Block) (data.Registers, TransactionResults) {
+func (c *Computer) ExecuteBlock(block *data.Block) (data.Registers, TransactionResults, error) {
 	registers := make(data.Registers)
 	results := make(TransactionResults)
 
 	for _, txHash := range block.TransactionHashes {
 		tx, err := c.getTransaction(txHash)
-
 		if err != nil {
-			results[tx.Hash()] = false
-			continue
+			return registers, results, err
 		}
 
 		updatedRegisters, succeeded := c.executeTransaction(tx, registers)
@@ -46,7 +44,7 @@ func (c *Computer) ExecuteBlock(block *data.Block) (data.Registers, TransactionR
 		}
 	}
 
-	return registers, results
+	return registers, results, nil
 }
 
 func (c *Computer) executeTransaction(tx *data.Transaction, initialRegisters data.Registers) (data.Registers, bool) {
