@@ -19,9 +19,7 @@ func main() {
 	log.Formatter = new(logrus.TextFormatter)
 	log.Out = os.Stdout
 
-	log.WithFields(logrus.Fields{
-		"port": port,
-	}).Info("Starting emulator server...")
+	log.WithField("port", port).Info("Starting emulator server...")
 
 	collections := make(chan *data.Collection, 16)
 
