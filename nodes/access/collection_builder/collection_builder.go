@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
-	"github.com/sirupsen/logrus"
 )
 
 // CollectionBuilder produces collections from incoming transactions.
