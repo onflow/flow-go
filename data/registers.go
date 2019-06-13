@@ -1,5 +1,7 @@
 package data
 
+// TODO: define format for register keys and values
+
 // Registers is a map of register values.
 type Registers map[string][]byte
 
