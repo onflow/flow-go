@@ -5,10 +5,11 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
 	"github.com/dapperlabs/bamboo-emulator/nodes/access/collection_builder"
-	"github.com/sirupsen/logrus"
 )
 
 // Node simulates the behaviour of a Bamboo access node.
@@ -45,10 +46,7 @@ func (n *Node) Start(ctx context.Context) {
 }
 
 func (n *Node) SendTransaction(tx *data.Transaction) error {
-	txEntry := n.log.WithFields(logrus.Fields{
-		"transactionHash": tx.Hash(),
-	})
-
+	txEntry := n.log.WithField("transactionHash", tx.Hash())
 	txEntry.Info("Transaction submitted to network")
 
 	err := n.state.InsertTransaction(tx)
@@ -70,10 +68,7 @@ func (n *Node) SendTransaction(tx *data.Transaction) error {
 }
 
 func (n *Node) GetBlockByHash(hash crypto.Hash) (*data.Block, error) {
-	blockEntry := n.log.WithFields(logrus.Fields{
-		"blockHash": hash,
-	})
-
+	blockEntry := n.log.WithField("blockHash", hash)
 	blockEntry.Info("Fetching block by hash")
 
 	block, err := n.state.GetBlockByHash(hash)
@@ -91,10 +86,7 @@ func (n *Node) GetBlockByHash(hash crypto.Hash) (*data.Block, error) {
 }
 
 func (n *Node) GetBlockByNumber(number uint64) (*data.Block, error) {
-	blockEntry := n.log.WithFields(logrus.Fields{
-		"blockNumber": number,
-	})
-
+	blockEntry := n.log.WithField("blockNumber", number)
 	blockEntry.Info("Fetching block by number")
 
 	block, err := n.state.GetBlockByNumber(number)
@@ -117,17 +109,14 @@ func (n *Node) GetLatestBlock() *data.Block {
 }
 
 func (n *Node) GetTransaction(hash crypto.Hash) (*data.Transaction, error) {
-	transactionEntry := n.log.WithFields(logrus.Fields{
-		"transactionHash": hash,
-	})
-
-	transactionEntry.Info("Fetching transaction by hash")
+	txEntry := n.log.WithField("transactionHash", hash)
+	txEntry.Info("Fetching transaction by hash")
 
 	tx, err := n.state.GetTransaction(hash)
 	if err != nil {
 		switch err.(type) {
 		case *data.ItemNotFoundError:
-			transactionEntry.Error("Transaction not found")
+			txEntry.Error("Transaction not found")
 			return nil, &TransactionNotFoundError{txHash: hash}
 		default:
 			return nil, err
