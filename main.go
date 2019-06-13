@@ -13,6 +13,8 @@ import (
 )
 
 func main() {
+	// TODO: create CLI app to run the emulator
+	// TODO: add configuration options: env vars and CLI flags
 	port := 5000
 
 	log := logrus.New()
