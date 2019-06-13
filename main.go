@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"os"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/dapperlabs/bamboo-emulator/data"
 	"github.com/dapperlabs/bamboo-emulator/nodes/access"
@@ -13,7 +15,13 @@ import (
 func main() {
 	port := 5000
 
-	fmt.Printf("Starting server on port %d...\n", port)
+	log := logrus.New()
+	log.Formatter = new(logrus.TextFormatter)
+	log.Out = os.Stdout
+
+	log.WithFields(logrus.Fields{
+		"port": port,
+	}).Info("Starting emulator server...")
 
 	collections := make(chan *data.Collection, 16)
 
@@ -25,6 +33,7 @@ func main() {
 		},
 		state,
 		collections,
+		log,
 	)
 
 	emulatorServer := server.NewServer(accessNode)

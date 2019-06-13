@@ -2,11 +2,11 @@ package collection_builder
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
+	"github.com/sirupsen/logrus"
 )
 
 // CollectionBuilder produces collections from incoming transactions.
@@ -15,18 +15,25 @@ type CollectionBuilder struct {
 	transactionsIn      <-chan *data.Transaction
 	collectionsOut      chan<- *data.Collection
 	pendingTransactions []*data.Transaction
+	log                 *logrus.Logger
 }
 
 // NewCollectionBuilder initializes a new CollectionBuilder with the provided channels.
 //
 // The collection builder pulls transactions from the transactionsIn channel and pushes
 // collections to the collectionsOut channel.
-func NewCollectionBuilder(state *data.WorldState, transactionsIn <-chan *data.Transaction, collectionsOut chan<- *data.Collection) *CollectionBuilder {
+func NewCollectionBuilder(
+	state *data.WorldState,
+	transactionsIn <-chan *data.Transaction,
+	collectionsOut chan<- *data.Collection,
+	log *logrus.Logger,
+) *CollectionBuilder {
 	return &CollectionBuilder{
 		state:               state,
 		transactionsIn:      transactionsIn,
 		collectionsOut:      collectionsOut,
 		pendingTransactions: make([]*data.Transaction, 0),
+		log:                 log,
 	}
 }
 
@@ -54,8 +61,6 @@ func (c *CollectionBuilder) buildCollection() {
 		return
 	}
 
-	fmt.Printf("Building collection with %d transactions... \n", len(c.pendingTransactions))
-
 	transactionHashes := make([]crypto.Hash, len(c.pendingTransactions))
 
 	for i, tx := range c.pendingTransactions {
@@ -70,6 +75,16 @@ func (c *CollectionBuilder) buildCollection() {
 	if err != nil {
 		return
 	}
+
+	c.log.
+		WithFields(logrus.Fields{
+			"collectionHash": collection.Hash(),
+			"collectionSize": len(c.pendingTransactions),
+		}).
+		Infof(
+			"Publishing collection with %d transaction(s)",
+			len(c.pendingTransactions),
+		)
 
 	c.collectionsOut <- collection
 
