@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
@@ -29,7 +30,7 @@ func NewNode(state *data.WorldState, collectionsOut chan *data.Collection) *Node
 }
 
 func (n *Node) Start(ctx context.Context) {
-	n.collectionBuilder.Start(ctx)
+	n.collectionBuilder.Start(ctx, time.Second)
 }
 
 func (n *Node) SendTransaction(tx *data.Transaction) error {

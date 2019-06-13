@@ -31,8 +31,8 @@ func NewCollectionBuilder(state *data.WorldState, transactionsIn <-chan *data.Tr
 }
 
 // Start starts the collection builder worker loop.
-func (c *CollectionBuilder) Start(ctx context.Context) {
-	tick := time.Tick(time.Second)
+func (c *CollectionBuilder) Start(ctx context.Context, interval time.Duration) {
+	tick := time.Tick(interval)
 	for {
 		select {
 		case <-tick:
