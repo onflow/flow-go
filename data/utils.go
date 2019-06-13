@@ -17,14 +17,14 @@ func EncodeAsBytes(data ...interface{}) []byte {
 	gob.Register(crypto.Address{})
 
 	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf) // Will write to buf.
-	
-	// Encode the data.
+	enc := gob.NewEncoder(&buf)
+
+	// Encode the data
 	err := enc.Encode(data)
-	
-    if err != nil {
-        log.Fatal("encode error:", err)
+
+	if err != nil {
+		log.Fatal("encode error:", err)
 	}
-	
+
 	return buf.Bytes()
 }

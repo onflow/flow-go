@@ -4,12 +4,12 @@ import (
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 )
 
-// Collection represents a "collection" of Transactions.
+// Collection is a set of transactions.
 type Collection struct {
 	TransactionHashes []crypto.Hash
 }
 
-// Hash computes the hash over the necessary Collection data.
+// Hash computes the hash over the necessary collection data.
 func (c Collection) Hash() crypto.Hash {
 	bytes := EncodeAsBytes(c.TransactionHashes)
 	return crypto.NewHash(bytes)
