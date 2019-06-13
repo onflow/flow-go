@@ -31,11 +31,11 @@ func (b Block) Hash() crypto.Hash {
 // MintGenesisBlock creates the genesis block of the blockchain.
 func MintGenesisBlock() *Block {
 	genesis := Block{
-		Number: 0,
-		Timestamp: time.Now(),
-		PrevBlockHash: crypto.ZeroBlockHash(),
-		Status: BlockSealed, 
-		CollectionHashes: []crypto.Hash{},
+		Number:            0,
+		Timestamp:         time.Now(),
+		PrevBlockHash:     crypto.ZeroBlockHash(),
+		Status:            BlockSealed,
+		CollectionHashes:  []crypto.Hash{},
 		TransactionHashes: []crypto.Hash{},
 	}
 	return &genesis
