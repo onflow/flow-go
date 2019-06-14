@@ -4,25 +4,24 @@ import (
 	"context"
 
 	"github.com/dapperlabs/bamboo-emulator/data"
+	"github.com/dapperlabs/bamboo-emulator/nodes/security/block_builder"
 )
 
 // Node simulates the behaviour of a Bamboo security node.
 type Node struct {
-	state           *data.WorldState
-	collectionsIn   chan *data.Collection
-	pendingBlocksIn chan *data.Block
-	blockBuilder    *BlockBuilder
+	state         *data.WorldState
+	collectionsIn chan *data.Collection
+	blockBuilder  *block_builder.BlockBuilder
 }
 
 // NewNode returns a new simulated security node.
-func NewNode(state *data.WorldState, collectionsIn chan *data.Collection, pendingBlocksIn chan *data.Block) *Node {
-	blockBuilder := NewBlockBuilder(state, collectionsIn, pendingBlocksIn)
+func NewNode(state *data.WorldState, collectionsIn chan *data.Collection) *Node {
+	blockBuilder := block_builder.NewBlockBuilder(state, collectionsIn)
 
 	return &Node{
-		state:           state,
-		collectionsIn:   collectionsIn,
-		pendingBlocksIn: pendingBlocksIn,
-		blockBuilder:    blockBuilder,
+		state:         state,
+		collectionsIn: collectionsIn,
+		blockBuilder:  blockBuilder,
 	}
 }
 
