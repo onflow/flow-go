@@ -1,4 +1,4 @@
-package security
+package block_builder
 
 import (
 	"context"
@@ -21,11 +21,10 @@ type BlockBuilder struct {
 //
 // The BlockBuilder pulls collections from the collectionsIn channel and writes new blocks to the shared world state.
 // The BlockBuilder also pulls blocks from the pendingBlocksIn channel and seals them.
-func NewBlockBuilder(state *data.WorldState, collectionsIn <-chan *data.Collection, pendingBlocksIn <-chan *data.Block) *BlockBuilder {
+func NewBlockBuilder(state *data.WorldState, collectionsIn <-chan *data.Collection) *BlockBuilder {
 	return &BlockBuilder{
 		state:              state,
 		collectionsIn:      collectionsIn,
-		pendingBlocksIn:    pendingBlocksIn,
 		pendingCollections: []*data.Collection{},
 		pendingBlocks:      []crypto.Hash{},
 	}
