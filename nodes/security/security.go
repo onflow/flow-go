@@ -1,39 +1,31 @@
 package security
 
 import (
-	"time"
+	"context"
 
-	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
 )
 
-// Node simulates the behaviour of a Bamboo access node.
+// Node simulates the behaviour of a Bamboo security node.
 type Node struct {
-	state *data.WorldState
+	state           *data.WorldState
+	collectionsIn   chan *data.Collection
+	pendingBlocksIn chan *data.Block
+	blockBuilder    *BlockBuilder
 }
 
 // NewNode returns a new simulated security node.
-func NewNode(state *data.WorldState) *Node {
+func NewNode(state *data.WorldState, collectionsIn chan *data.Collection, pendingBlocksIn chan *data.Block) *Node {
+	blockBuilder := NewBlockBuilder(state, collectionsIn, pendingBlocksIn)
+
 	return &Node{
-		state: state,
+		state:           state,
+		collectionsIn:   collectionsIn,
+		pendingBlocksIn: pendingBlocksIn,
+		blockBuilder:    blockBuilder,
 	}
 }
 
-func (n *Node) MintNoOpBlock() *data.Block {
-	latestBlock := n.state.GetLatestBlock()
-
-	newBlock := data.Block{
-		Number:            latestBlock.Number,
-		Timestamp:         time.Now(),
-		PrevBlockHash:     latestBlock.Hash(),
-		Status:            data.BlockPending,
-		CollectionHashes:  []crypto.Hash{},
-		TransactionHashes: []crypto.Hash{},
-	}
-
-	return &newBlock
-}
-
-func (n *Node) SealBlock(hash crypto.Hash) error {
-	return n.state.SealBlock(hash)
+func (n *Node) Start(ctx context.Context) {
+	n.blockBuilder.Start(ctx)
 }

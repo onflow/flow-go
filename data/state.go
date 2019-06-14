@@ -9,7 +9,7 @@ type WorldState struct {
 	Blocks       map[crypto.Hash]Block
 	Collections  map[crypto.Hash]Collection
 	Transactions map[crypto.Hash]Transaction
-	Blockchain   []Block
+	Blockchain   []crypto.Hash
 }
 
 // NewWorldState instantiates a new state object with a genesis block.
@@ -17,29 +17,31 @@ func NewWorldState() *WorldState {
 	blocks := make(map[crypto.Hash]Block)
 	collections := make(map[crypto.Hash]Collection)
 	txs := make(map[crypto.Hash]Transaction)
-	
+
 	genesis := MintGenesisBlock()
 
-	chain := []Block{*genesis}
+	chain := []crypto.Hash{genesis.Hash()}
 	blocks[genesis.Hash()] = *genesis
 
 	return &WorldState{
-		Blocks: blocks,
-		Collections: collections,
+		Blocks:       blocks,
+		Collections:  collections,
 		Transactions: txs,
-		Blockchain: chain,
+		Blockchain:   chain,
 	}
 }
 
-func (s *WorldState) GetLatestBlock() *Block {
+func (s *WorldState) GetLatestBlock() (*Block, error) {
 	currHeight := len(s.Blockchain)
-	return &s.Blockchain[currHeight-1]
+	blockHash := s.Blockchain[currHeight-1]
+	return s.GetBlockByHash(blockHash)
 }
 
 func (s *WorldState) GetBlockByNumber(n uint64) (*Block, error) {
 	currHeight := len(s.Blockchain)
 	if int(n) < currHeight {
-		return &s.Blockchain[n], nil
+		blockHash := s.Blockchain[n]
+		return s.GetBlockByHash(blockHash)
 	}
 
 	return nil, &InvalidBlockNumberError{blockNumber: n}
@@ -70,7 +72,13 @@ func (s *WorldState) GetTransaction(h crypto.Hash) (*Transaction, error) {
 }
 
 func (s *WorldState) AddBlock(block *Block) error {
-	// TODO: add to block map and chain
+	if _, exists := s.Blocks[block.Hash()]; exists {
+		return &DuplicateItemError{hash: block.Hash()}
+	}
+
+	s.Blocks[block.Hash()] = *block
+	s.Blockchain = append(s.Blockchain, block.Hash())
+
 	return nil
 }
 
