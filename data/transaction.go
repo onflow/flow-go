@@ -15,7 +15,7 @@ type Transaction struct {
 	Status         TxStatus
 }
 
-// Hash computes the hash over the necessary Transaction data.
+// Hash computes the hash over the necessary transaction data.
 func (tx Transaction) Hash() crypto.Hash {
 	bytes := EncodeAsBytes(
 		tx.ToAddress,
