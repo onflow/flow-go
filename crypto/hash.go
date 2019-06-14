@@ -53,3 +53,8 @@ func NewHash(data []byte) Hash {
 func (h Hash) String() string {
 	return hex.EncodeToString(h.Bytes())
 }
+
+// ZeroBlockHash represents the parent hash of the genesis block.
+func ZeroBlockHash() Hash {
+	return Hash{}
+}
