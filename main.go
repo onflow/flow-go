@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"os"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/dapperlabs/bamboo-emulator/data"
 	"github.com/dapperlabs/bamboo-emulator/nodes/access"
@@ -12,9 +14,15 @@ import (
 )
 
 func main() {
+	// TODO: create CLI app to run the emulator
+	// TODO: add configuration options: env vars and CLI flags
 	port := 5000
 
-	fmt.Printf("Starting server on port %d...\n", port)
+	log := logrus.New()
+	log.Formatter = new(logrus.TextFormatter)
+	log.Out = os.Stdout
+
+	log.WithField("port", port).Info("Starting emulator server...")
 
 	collections := make(chan *data.Collection, 16)
 
@@ -26,6 +34,7 @@ func main() {
 		},
 		state,
 		collections,
+		log,
 	)
 	securityNode := security.NewNode(state, collections)
 
