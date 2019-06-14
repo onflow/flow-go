@@ -36,7 +36,14 @@ func main() {
 		collections,
 		log,
 	)
-	securityNode := security.NewNode(state, collections)
+	securityNode := security.NewNode(
+		&security.Config{
+			BlockInterval: time.Second,
+		},
+		state,
+		collections,
+		log,
+	)
 
 	emulatorServer := server.NewServer(accessNode)
 
