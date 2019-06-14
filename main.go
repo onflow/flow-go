@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/bamboo-emulator/data"
 	"github.com/dapperlabs/bamboo-emulator/nodes/access"
+	"github.com/dapperlabs/bamboo-emulator/nodes/security"
 	"github.com/dapperlabs/bamboo-emulator/server"
 )
 
@@ -26,6 +27,7 @@ func main() {
 		state,
 		collections,
 	)
+	securityNode := security.NewNode(state, collections)
 
 	emulatorServer := server.NewServer(accessNode)
 
@@ -33,6 +35,7 @@ func main() {
 	defer cancel()
 
 	go accessNode.Start(ctx)
+	go securityNode.Start(ctx)
 
 	emulatorServer.Start(port)
 }

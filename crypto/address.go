@@ -36,3 +36,8 @@ func (a Address) Bytes() []byte { return a[:] }
 func (a Address) String() string {
 	return "0x" + hex.EncodeToString(a.Bytes())
 }
+
+// ZeroAddress represents the "zero address" (account that no one owns).
+func ZeroAddress() Address {
+	return Address{}
+}

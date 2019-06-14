@@ -10,31 +10,44 @@ type WorldState struct {
 	Collections  map[crypto.Hash]Collection
 	Transactions map[crypto.Hash]Transaction
 	Registers    map[string][]byte
-	Blockchain   []Block
+	Blockchain   []crypto.Hash
 }
 
-// NewWorldState returns a new empty world state.
+// NewWorldState instantiates a new state object with a genesis block.
 func NewWorldState() *WorldState {
+	blocks := make(map[crypto.Hash]Block)
+	collections := make(map[crypto.Hash]Collection)
+	txs := make(map[crypto.Hash]Transaction)
+	registers := make(map[string][]byte)
+
+	genesis := MintGenesisBlock()
+
+	chain := []crypto.Hash{genesis.Hash()}
+	blocks[genesis.Hash()] = *genesis
+
 	return &WorldState{
-		Blocks:       make(map[crypto.Hash]Block),
-		Collections:  make(map[crypto.Hash]Collection),
-		Transactions: make(map[crypto.Hash]Transaction),
-		Registers:    make(map[string][]byte),
-		Blockchain:   make([]Block, 0),
+		Blocks:       blocks,
+		Collections:  collections,
+		Transactions: txs,
+		Registers:    registers,
+		Blockchain:   chain,
 	}
 }
 
-// GetLatestBlock returns the latest block in the blockchain.
+// GetLatestBlock gets the most recent block in the blockchain.
 func (s *WorldState) GetLatestBlock() *Block {
 	currHeight := len(s.Blockchain)
-	return &s.Blockchain[currHeight-1]
+	blockHash := s.Blockchain[currHeight-1]
+	block, _ := s.GetBlockByHash(blockHash)
+	return block
 }
 
 // GetBlockByNumber gets a block by number.
 func (s *WorldState) GetBlockByNumber(n uint64) (*Block, error) {
 	currHeight := len(s.Blockchain)
 	if int(n) < currHeight {
-		return &s.Blockchain[n], nil
+		blockHash := s.Blockchain[n]
+		return s.GetBlockByHash(blockHash)
 	}
 
 	return nil, &InvalidBlockNumberError{blockNumber: n}
@@ -74,7 +87,13 @@ func (s *WorldState) GetRegister(id string) []byte {
 
 // AddBlock adds a new block to the blockchain.
 func (s *WorldState) AddBlock(block *Block) error {
-	// TODO: add to block map and chain
+	if _, exists := s.Blocks[block.Hash()]; exists {
+		return &DuplicateItemError{hash: block.Hash()}
+	}
+
+	s.Blocks[block.Hash()] = *block
+	s.Blockchain = append(s.Blockchain, block.Hash())
+
 	return nil
 }
 
@@ -118,6 +137,13 @@ func (s *WorldState) UpdateTransactionStatus(h crypto.Hash, status TxStatus) err
 
 // SealBlock seals a block on the blockchain.
 func (s *WorldState) SealBlock(h crypto.Hash) error {
-	// TODO: seal the block
+	block, err := s.GetBlockByHash(h)
+
+	if err != nil {
+		return err
+	}
+
+	block.Status = BlockSealed
+
 	return nil
 }
