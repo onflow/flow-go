@@ -37,7 +37,7 @@ func (b *BlockBuilder) Start(ctx context.Context) {
 	for {
 		select {
 		case <-tick:
-			b.buildBlock()
+			b.mintNewBlock()
 			b.sealBlocks()
 		case col := <-b.collectionsIn:
 			b.enqueueCollection(col)
@@ -67,43 +67,10 @@ func (b *BlockBuilder) sealBlocks() {
 	}
 }
 
-func (b *BlockBuilder) buildBlock() {
+func (b *BlockBuilder) bundleCollections() ([]crypto.Hash, []crypto.Hash) {
 	if len(b.pendingCollections) == 0 {
-		b.mintNoOpBlock()
-	} else {
-		b.mintNewBlock()
-		b.pendingCollections = []*data.Collection{}
+		return []crypto.Hash{}, []crypto.Hash{}
 	}
-}
-
-func (b *BlockBuilder) mintNoOpBlock() error {
-	latestBlock, _ := b.state.GetLatestBlock()
-
-	newBlock := &data.Block{
-		Number:            latestBlock.Number,
-		Timestamp:         time.Now(),
-		PrevBlockHash:     latestBlock.Hash(),
-		Status:            data.BlockPending,
-		CollectionHashes:  []crypto.Hash{},
-		TransactionHashes: []crypto.Hash{},
-	}
-
-	err := b.state.AddBlock(newBlock)
-
-	if err != nil {
-		switch err.(type) {
-		case *data.DuplicateItemError:
-			return &DuplicateBlockError{blockHash: newBlock.Hash()}
-		default:
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (b *BlockBuilder) mintNewBlock() error {
-	latestBlock, _ := b.state.GetLatestBlock()
 
 	collectionHashes := make([]crypto.Hash, len(b.pendingCollections))
 	transactionHashes := []crypto.Hash{}
@@ -113,6 +80,16 @@ func (b *BlockBuilder) mintNewBlock() error {
 		collectionTxHashes := col.TransactionHashes
 		transactionHashes = append(transactionHashes, collectionTxHashes...)
 	}
+
+	b.pendingCollections = []*data.Collection{}
+
+	return collectionHashes, transactionHashes
+}
+
+func (b *BlockBuilder) mintNewBlock() error {
+	latestBlock := b.state.GetLatestBlock()
+
+	collectionHashes, transactionHashes := b.bundleCollections()
 
 	newBlock := &data.Block{
 		Number:            latestBlock.Number,
