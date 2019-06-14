@@ -28,7 +28,7 @@ func TestCollectionBuilder(t *testing.T) {
 
 	txA := tests.MockTransaction(1)
 	txB := tests.MockTransaction(2)
-	txC := tests.MockTransaction(2)
+	txC := tests.MockTransaction(3)
 
 	transactionsIn <- txA
 	transactionsIn <- txB
