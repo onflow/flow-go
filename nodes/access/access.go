@@ -77,7 +77,8 @@ func (n *Node) GetBlockByNumber(number uint64) (*data.Block, error) {
 }
 
 func (n *Node) GetLatestBlock() *data.Block {
-	return n.state.GetLatestBlock()
+	block, _ := n.state.GetLatestBlock()
+	return block
 }
 
 func (n *Node) GetTransaction(hash crypto.Hash) (*data.Transaction, error) {
