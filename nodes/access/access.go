@@ -3,25 +3,34 @@ package access
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
+	"github.com/dapperlabs/bamboo-emulator/nodes/access/collection_builder"
 )
 
 // Node simulates the behaviour of a Bamboo access node.
 type Node struct {
+	conf              *Config
 	state             *data.WorldState
 	transactionsIn    chan *data.Transaction
-	collectionBuilder *CollectionBuilder
+	collectionBuilder *collection_builder.CollectionBuilder
+}
+
+// Config hold the configuration options for an access node.
+type Config struct {
+	CollectionInterval time.Duration
 }
 
 // NewNode returns a new simulated access node.
-func NewNode(state *data.WorldState, collectionsOut chan *data.Collection) *Node {
+func NewNode(conf *Config, state *data.WorldState, collectionsOut chan *data.Collection) *Node {
 	transactionsIn := make(chan *data.Transaction, 16)
 
-	collectionBuilder := NewCollectionBuilder(state, transactionsIn, collectionsOut)
+	collectionBuilder := collection_builder.NewCollectionBuilder(state, transactionsIn, collectionsOut)
 
 	return &Node{
+		conf:              conf,
 		state:             state,
 		transactionsIn:    transactionsIn,
 		collectionBuilder: collectionBuilder,
@@ -29,7 +38,7 @@ func NewNode(state *data.WorldState, collectionsOut chan *data.Collection) *Node
 }
 
 func (n *Node) Start(ctx context.Context) {
-	n.collectionBuilder.Start(ctx)
+	n.collectionBuilder.Start(ctx, n.conf.CollectionInterval)
 }
 
 func (n *Node) SendTransaction(tx *data.Transaction) error {
