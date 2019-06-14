@@ -8,25 +8,21 @@ import (
 	"github.com/dapperlabs/bamboo-emulator/data"
 )
 
-// BlockBuilder produces blocks from incoming collections and seals incoming blocks.
+// BlockBuilder produces blocks from incoming collections.
 type BlockBuilder struct {
 	state              *data.WorldState
 	collectionsIn      <-chan *data.Collection
-	pendingBlocksIn    <-chan *data.Block
 	pendingCollections []*data.Collection
-	pendingBlocks      []crypto.Hash
 }
 
 // NewBlockBuilder initializes a new BlockBuilder with the incoming collectionsIn channel.
 //
 // The BlockBuilder pulls collections from the collectionsIn channel and writes new blocks to the shared world state.
-// The BlockBuilder also pulls blocks from the pendingBlocksIn channel and seals them.
 func NewBlockBuilder(state *data.WorldState, collectionsIn <-chan *data.Collection) *BlockBuilder {
 	return &BlockBuilder{
 		state:              state,
 		collectionsIn:      collectionsIn,
 		pendingCollections: []*data.Collection{},
-		pendingBlocks:      []crypto.Hash{},
 	}
 }
 
@@ -37,11 +33,8 @@ func (b *BlockBuilder) Start(ctx context.Context) {
 		select {
 		case <-tick:
 			b.mintNewBlock()
-			b.sealBlocks()
 		case col := <-b.collectionsIn:
 			b.enqueueCollection(col)
-		case block := <-b.pendingBlocksIn:
-			b.enqueueBlock(block)
 		case <-ctx.Done():
 			return
 		}
@@ -50,20 +43,6 @@ func (b *BlockBuilder) Start(ctx context.Context) {
 
 func (b *BlockBuilder) enqueueCollection(col *data.Collection) {
 	b.pendingCollections = append(b.pendingCollections, col)
-}
-
-func (b *BlockBuilder) enqueueBlock(block *data.Block) {
-	b.pendingBlocks = append(b.pendingBlocks, block.Hash())
-}
-
-func (b *BlockBuilder) sealBlocks() {
-	if len(b.pendingBlocks) > 0 {
-		for _, blockHash := range b.pendingBlocks {
-			b.state.SealBlock(blockHash)
-		}
-
-		b.pendingBlocks = []crypto.Hash{}
-	}
 }
 
 func (b *BlockBuilder) bundleCollections() ([]crypto.Hash, []crypto.Hash) {
