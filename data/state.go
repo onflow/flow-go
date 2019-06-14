@@ -99,7 +99,12 @@ func (s *WorldState) AddBlock(block *Block) error {
 
 // InsertCollection inserts a new collection into the state.
 func (s *WorldState) InsertCollection(col *Collection) error {
-	// TODO: add to collection map
+	if _, exists := s.Collections[col.Hash()]; exists {
+		return &DuplicateItemError{hash: col.Hash()}
+	}
+
+	s.Collections[col.Hash()] = *col
+
 	return nil
 }
 
