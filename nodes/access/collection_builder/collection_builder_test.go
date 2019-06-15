@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	. "github.com/onsi/gomega"
 
 	"github.com/dapperlabs/bamboo-emulator/data"
@@ -13,8 +14,9 @@ import (
 
 func TestCollectionBuilder(t *testing.T) {
 	gomega := NewWithT(t)
+	log := logrus.New()
 
-	state := data.NewWorldState()
+	state := data.NewWorldState(log)
 
 	transactionsIn := make(chan *data.Transaction)
 	collectionsOut := make(chan *data.Collection)

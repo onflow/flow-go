@@ -1,6 +1,8 @@
 package data
 
 import (
+	"github.com/sirupsen/logrus"
+
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 )
 
@@ -11,10 +13,11 @@ type WorldState struct {
 	Transactions map[crypto.Hash]Transaction
 	Registers    map[string][]byte
 	Blockchain   []crypto.Hash
+	Log          *logrus.Logger
 }
 
 // NewWorldState instantiates a new state object with a genesis block.
-func NewWorldState() *WorldState {
+func NewWorldState(log *logrus.Logger) *WorldState {
 	blocks := make(map[crypto.Hash]Block)
 	collections := make(map[crypto.Hash]Collection)
 	txs := make(map[crypto.Hash]Transaction)
@@ -31,6 +34,7 @@ func NewWorldState() *WorldState {
 		Transactions: txs,
 		Registers:    registers,
 		Blockchain:   chain,
+		Log:          log,
 	}
 }
 

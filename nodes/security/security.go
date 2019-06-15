@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/dapperlabs/bamboo-emulator/data"
 	"github.com/dapperlabs/bamboo-emulator/nodes/security/block_builder"
 )
@@ -16,7 +14,6 @@ type Node struct {
 	state         *data.WorldState
 	collectionsIn chan *data.Collection
 	blockBuilder  *block_builder.BlockBuilder
-	log           *logrus.Logger
 }
 
 // Config hold the configuration options for an security node.
@@ -25,15 +22,14 @@ type Config struct {
 }
 
 // NewNode returns a new simulated security node.
-func NewNode(conf *Config, state *data.WorldState, collectionsIn chan *data.Collection, log *logrus.Logger) *Node {
-	blockBuilder := block_builder.NewBlockBuilder(state, collectionsIn, log)
+func NewNode(conf *Config, state *data.WorldState, collectionsIn chan *data.Collection) *Node {
+	blockBuilder := block_builder.NewBlockBuilder(state, collectionsIn)
 
 	return &Node{
 		conf:          conf,
 		state:         state,
 		collectionsIn: collectionsIn,
 		blockBuilder:  blockBuilder,
-		log:           log,
 	}
 }
 
