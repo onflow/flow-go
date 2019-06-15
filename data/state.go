@@ -28,6 +28,17 @@ func NewWorldState(log *logrus.Logger) *WorldState {
 	chain := []crypto.Hash{genesis.Hash()}
 	blocks[genesis.Hash()] = *genesis
 
+	log.WithFields(logrus.Fields{
+			"blockNum": genesis.Number,
+			"blockHash": genesis.Hash(),
+			"numCollections": 0,
+			"numTransactions": 0,
+		}).
+		Infof(
+			"Minting genesis block (0x%v)",
+			genesis.Hash(),
+		)
+
 	return &WorldState{
 		Blocks:       blocks,
 		Collections:  collections,
