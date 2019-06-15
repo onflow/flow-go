@@ -38,7 +38,7 @@ func main() {
 	)
 	securityNode := security.NewNode(
 		&security.Config{
-			BlockInterval: time.Second,
+			BlockInterval: time.Duration(5) * time.Second,	// set block time to 5 sec
 		},
 		state,
 		collections,
