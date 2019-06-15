@@ -74,7 +74,7 @@ func (b *BlockBuilder) mintNewBlock() error {
 	collectionHashes, transactionHashes := b.bundleCollections()
 
 	newBlock := &data.Block{
-		Number:            latestBlock.Number,
+		Number:            latestBlock.Number + 1,
 		Timestamp:         time.Now(),
 		PrevBlockHash:     latestBlock.Hash(),
 		Status:            data.BlockPending,
