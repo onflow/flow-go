@@ -5,20 +5,25 @@ import (
 	"fmt"
 )
 
-type variable struct {
-	isConst bool
-	value   interface{}
-}
-
 type Interpreter struct {
 	Program     ast.Program
 	activations *Activations
+	Globals     map[string]*Variable
 }
 
 func NewInterpreter(program ast.Program) *Interpreter {
 	return &Interpreter{
 		Program:     program,
 		activations: &Activations{},
+		Globals:     map[string]*Variable{},
+	}
+}
+
+func (interpreter *Interpreter) Interpret() {
+	for _, declaration := range interpreter.Program.AllDeclarations {
+		declaration.Accept(interpreter)
+		name := declaration.DeclarationName()
+		interpreter.Globals[name] = interpreter.activations.Find(name)
 	}
 }
 
@@ -33,24 +38,47 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 	}
 
 	invocation := ast.InvocationExpression{
-		Identifier: functionName,
-		Arguments:  argumentExpressions,
+		Expression: ast.IdentifierExpression{
+			Identifier: functionName,
+		},
+		Arguments: argumentExpressions,
 	}
 
-	return interpreter.VisitInvocationExpression(invocation)
+	return invocation.Accept(interpreter)
 }
 
-func (interpreter *Interpreter) VisitProgram(ast.Program) ast.Repr {
+func (interpreter *Interpreter) VisitProgram(program ast.Program) ast.Repr {
 	return nil
 }
 
-func (interpreter *Interpreter) VisitFunction(ast.Function) ast.Repr {
+func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.FunctionDeclaration) ast.Repr {
+	expression := ast.FunctionExpression{
+		Parameters: declaration.Parameters,
+		ReturnType: declaration.ReturnType,
+		Block:      declaration.Block,
+	}
+
+	// lexical scope: variables in functions are bound to what is visible at declaration time
+	function := newFunction(expression, interpreter.activations.CurrentOrNew())
+
+	// function declarations are de-sugared to constant variables
+	interpreter.declareVariable(
+		ast.VariableDeclaration{
+			Value:      expression,
+			Identifier: declaration.Identifier,
+			IsConst:    true,
+			// TODO: specify parameter types and return type
+			Type: ast.FunctionType{},
+		},
+		function,
+	)
+
 	return nil
 }
 
 func (interpreter *Interpreter) VisitBlock(block ast.Block) ast.Repr {
 	// block scope: each block gets an activation record
-	interpreter.activations.Push()
+	interpreter.activations.PushCurrent()
 
 	for _, statement := range block.Statements {
 		result := statement.Accept(interpreter)
@@ -88,40 +116,42 @@ func (interpreter *Interpreter) VisitWhileStatement(statement ast.WhileStatement
 }
 
 func (interpreter *Interpreter) VisitVariableDeclaration(declaration ast.VariableDeclaration) ast.Repr {
-	if _, exists := interpreter.activations.Find(declaration.Identifier).(variable); exists {
+	value := declaration.Value.Accept(interpreter)
+	interpreter.declareVariable(declaration, value)
+	return nil
+}
+
+func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclaration, value ast.Repr) ast.Repr {
+	variable := interpreter.activations.Find(declaration.Identifier)
+	depth := interpreter.activations.Depth()
+	if variable != nil && variable.Depth == depth {
 		panic(fmt.Sprintf("invalid redefinition of identifier: %s", declaration.Identifier))
 	}
 
-	value := declaration.Value.Accept(interpreter)
-	interpreter.activations.Set(
-		declaration.Identifier,
-		variable{
-			isConst: declaration.IsConst,
-			value:   value,
-		})
+	variable = newVariable(declaration, depth, value)
+
+	interpreter.activations.Set(declaration.Identifier, variable)
 
 	return nil
 }
 
 func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.Repr {
-	variable, ok := interpreter.activations.Find(assignment.Identifier).(variable)
-	if !ok {
+	variable := interpreter.activations.Find(assignment.Identifier)
+	if variable == nil {
 		panic(fmt.Sprintf("reference to unbound identifier: %s", assignment.Identifier))
 	}
-	if variable.isConst {
-		panic(fmt.Sprintf("invalid assignment to constant: %s", assignment.Identifier))
-	}
-	variable.value = assignment.Value.Accept(interpreter)
+	newValue := assignment.Value.Accept(interpreter)
+	variable.Set(newValue)
 	interpreter.activations.Set(assignment.Identifier, variable)
 	return nil
 }
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression ast.IdentifierExpression) ast.Repr {
-	variable, ok := interpreter.activations.Find(expression.Identifier).(variable)
-	if !ok {
+	variable := interpreter.activations.Find(expression.Identifier)
+	if variable == nil {
 		panic(fmt.Sprintf("reference to unbound identifier: %s", expression.Identifier))
 	}
-	return variable.value
+	return variable.Value
 }
 
 func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpression) ast.Repr {
@@ -167,6 +197,13 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 			return leftBool != rightBool
 		}
 	}
+
+	panic(fmt.Sprintf(
+		"invalid operands for binary expression: %s: %#+v, %#+v",
+		expression.Operation.String(),
+		expression.Left,
+		expression.Right,
+	))
 
 	return nil
 }
@@ -219,41 +256,54 @@ func (interpreter *Interpreter) VisitConditionalExpression(expression ast.Condit
 	}
 }
 
-func (interpreter *Interpreter) VisitInvocationExpression(expression ast.InvocationExpression) ast.Repr {
-	var arguments []ast.Repr
+func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression ast.InvocationExpression) ast.Repr {
 
-	for _, argument := range expression.Arguments {
-		arguments = append(
-			arguments,
-			argument.Accept(interpreter),
-		)
-	}
-
-	functionName := expression.Identifier
-	function, ok := interpreter.Program.Functions[functionName]
+	// evaluate the invoked expression
+	value := invocationExpression.Expression.Accept(interpreter)
+	function, ok := value.(*Function)
 	if !ok {
-		panic(fmt.Sprintf("unknown function: %s", functionName))
+		panic(fmt.Sprintf("can't invoke value: %#+v", value))
 	}
 
-	argumentCount := len(arguments)
-	parameterCount := len(function.Parameters)
+	// ensure invocation's argument count matches function's parameter count
+	argumentCount := len(invocationExpression.Arguments)
+	parameterCount := len(function.Expression.Parameters)
 	if argumentCount != parameterCount {
 		panic(fmt.Sprintf("invalid number of arguments: got %d, need %d", argumentCount, parameterCount))
 	}
 
-	interpreter.activations.Push()
+	// start a new activation record
+	// lexical scope: use the function declaration's activation record,
+	// not the current one (which would be dynamic scope)
+	interpreter.activations.Push(function.Activation)
 
-	for parameterIndex, parameter := range function.Parameters {
-		argument := arguments[parameterIndex]
+	// evaluate all argument expressions and bind the resulting values to the parameters
+	for parameterIndex, parameter := range function.Expression.Parameters {
+		argumentExpression := invocationExpression.Arguments[parameterIndex]
+		argument := argumentExpression.Accept(interpreter)
+
 		interpreter.activations.Set(
 			parameter.Identifier,
-			variable{isConst: true, value: argument},
+			&Variable{
+				Declaration: ast.VariableDeclaration{
+					IsConst:    true,
+					Identifier: parameter.Identifier,
+					Type:       parameter.Type,
+					Value:      argumentExpression,
+				},
+				Value: argument,
+			},
 		)
 	}
 
-	result := interpreter.VisitBlock(function.Block)
+	result := function.Expression.Block.Accept(interpreter)
 
 	interpreter.activations.Pop()
 
 	return result
+}
+
+func (interpreter *Interpreter) VisitFunctionExpression(expression ast.FunctionExpression) ast.Repr {
+	// lexical scope: variables in functions are bound to what is visible at declaration time
+	return newFunction(expression, interpreter.activations.CurrentOrNew())
 }

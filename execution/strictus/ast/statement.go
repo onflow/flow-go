@@ -5,7 +5,7 @@ type Statement interface {
 	isStatement()
 }
 
-/// ReturnStatement
+// ReturnStatement
 
 type ReturnStatement struct {
 	Expression Expression
@@ -17,7 +17,7 @@ func (s ReturnStatement) Accept(visitor Visitor) Repr {
 	return visitor.VisitReturnStatement(s)
 }
 
-/// IfStatement
+// IfStatement
 
 type IfStatement struct {
 	Test Expression
@@ -31,7 +31,7 @@ func (s IfStatement) Accept(visitor Visitor) Repr {
 	return visitor.VisitIfStatement(s)
 }
 
-/// WhileStatement
+// WhileStatement
 
 type WhileStatement struct {
 	Test  Expression
@@ -44,22 +44,7 @@ func (s WhileStatement) Accept(visitor Visitor) Repr {
 	return visitor.VisitWhileStatement(s)
 }
 
-/// VariableDeclaration
-
-type VariableDeclaration struct {
-	IsConst    bool
-	Identifier string
-	Type       *Type
-	Value      Expression
-}
-
-func (VariableDeclaration) isStatement() {}
-
-func (s VariableDeclaration) Accept(visitor Visitor) Repr {
-	return visitor.VisitVariableDeclaration(s)
-}
-
-/// Assignment
+// Assignment
 
 type Assignment struct {
 	Identifier string
@@ -72,7 +57,7 @@ func (s Assignment) Accept(visitor Visitor) Repr {
 	return visitor.VisitAssignment(s)
 }
 
-/// ExpressionStatement
+// ExpressionStatement
 
 type ExpressionStatement struct {
 	Expression Expression

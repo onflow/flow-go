@@ -11,6 +11,10 @@ func (v *BaseStrictusVisitor) VisitProgram(ctx *ProgramContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -103,6 +107,10 @@ func (v *BaseStrictusVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionConte
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitEqualityOp(ctx *EqualityOpContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -123,11 +131,11 @@ func (v *BaseStrictusVisitor) VisitIdentifierExpression(ctx *IdentifierExpressio
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitInvocationExpression(ctx *InvocationExpressionContext) interface{} {
+func (v *BaseStrictusVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) interface{} {
+func (v *BaseStrictusVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

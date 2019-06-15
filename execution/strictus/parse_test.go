@@ -41,8 +41,8 @@ func TestParse(t *testing.T) {
 	var int32Type Type = Int32Type{}
 
 	expected := Program{
-		Functions: map[string]Function{
-			"sum": {
+		Declarations: map[string]Declaration{
+			"sum": FunctionDeclaration{
 				IsPublic:   true,
 				Identifier: "sum",
 				Parameters: []Parameter{
@@ -56,13 +56,13 @@ func TestParse(t *testing.T) {
 						VariableDeclaration{
 							IsConst:    true,
 							Identifier: "x",
-							Type:       (*Type)(nil),
+							Type:       nil,
 							Value:      IntExpression{Value: 1},
 						},
 						VariableDeclaration{
 							IsConst:    false,
 							Identifier: "y",
-							Type:       &int32Type,
+							Type:       int32Type,
 							Value:      IntExpression{Value: 2},
 						},
 						Assignment{Identifier: "y", Value: IntExpression{Value: 3}},
@@ -89,7 +89,7 @@ func TestParse(t *testing.T) {
 							Value: BinaryExpression{
 								Operation: OperationMod,
 								Left: InvocationExpression{
-									Identifier: "sum",
+									Expression: IdentifierExpression{Identifier: "sum"},
 									Arguments: []Expression{
 										IntExpression{Value: 3},
 										IntExpression{Value: 2},

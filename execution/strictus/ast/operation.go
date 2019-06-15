@@ -1,5 +1,7 @@
 package ast
 
+//go:generate stringer -type=Operation
+
 type Operation int
 
 const (
