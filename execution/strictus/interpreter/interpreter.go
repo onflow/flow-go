@@ -223,10 +223,10 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 	}
 
 	panic(fmt.Sprintf(
-		"invalid operands for binary expression: %s: %#+v, %#+v",
+		"invalid operands for binary expression: %s: %v, %v",
 		expression.Operation.String(),
-		expression.Left,
-		expression.Right,
+		left,
+		right,
 	))
 
 	return nil
@@ -263,10 +263,12 @@ func (interpreter *Interpreter) VisitMemberExpression(ast.MemberExpression) ast.
 func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpression) ast.Repr {
 	value, ok := expression.Expression.Accept(interpreter).([]interface{})
 	if !ok {
+		// TODO: error
 		return nil
 	}
 	index, ok := expression.Index.Accept(interpreter).(int64)
 	if !ok {
+		// TODO: error
 		return nil
 	}
 	return value[index]
