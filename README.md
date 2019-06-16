@@ -1,4 +1,4 @@
-# Bamboo Emulator
+# Bamboo Runtime
 
 ## Development
 
