@@ -109,9 +109,8 @@ variableDeclaration
     : (Const | Var) Identifier (':' typeName)? '=' expression
     ;
 
-// TODO: add expressionAccess to left-hand side
 assignment
-	: Identifier '=' expression
+	: Identifier expressionAccess* '=' expression
 	;
 
 expression

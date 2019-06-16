@@ -47,8 +47,8 @@ func (s WhileStatement) Accept(visitor Visitor) Repr {
 // Assignment
 
 type Assignment struct {
-	Identifier string
-	Value      Expression
+	Target Expression
+	Value  Expression
 }
 
 func (Assignment) isStatement() {}
