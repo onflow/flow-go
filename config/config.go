@@ -3,16 +3,17 @@ package config
 import (
 	"reflect"
 
-	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
-func ParseConfig(envPrefix string, conf interface{}, cmd *cobra.Command) error {
+func ParseConfig(envPrefix string, conf interface{}, flags *pflag.FlagSet) error {
 	v := viper.New()
 
 	v.SetEnvPrefix(envPrefix)
 
-	bindPFlags(v, cmd, conf)
+	bindEnv(v, conf)
+	bindFlags(v, conf, flags)
 	setDefaults(v, conf)
 
 	v.AutomaticEnv()
@@ -20,22 +21,32 @@ func ParseConfig(envPrefix string, conf interface{}, cmd *cobra.Command) error {
 	return v.Unmarshal(conf)
 }
 
+func bindEnv(v *viper.Viper, conf interface{}) {
+	forEachStructField(conf, func(field reflect.StructField) {
+		v.BindEnv(field.Name)
+	})
+}
+
+func bindFlags(v *viper.Viper, conf interface{}, flags *pflag.FlagSet) {
+	forEachStructField(conf, func(field reflect.StructField) {
+		if flag, ok := field.Tag.Lookup("flag"); ok {
+			v.BindPFlag(flag, flags.Lookup(flag))
+		}
+	})
+}
+
 func setDefaults(v *viper.Viper, conf interface{}) {
-	t := reflect.TypeOf(conf).Elem()
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
+	forEachStructField(conf, func(field reflect.StructField) {
 		if defaultValue, ok := field.Tag.Lookup("default"); ok {
 			v.SetDefault(field.Name, defaultValue)
 		}
-	}
+	})
 }
 
-func bindPFlags(v *viper.Viper, cmd *cobra.Command, conf interface{}) {
-	t := reflect.TypeOf(conf).Elem()
+func forEachStructField(s interface{}, f func(reflect.StructField)) {
+	t := reflect.TypeOf(s).Elem()
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		if flag, ok := field.Tag.Lookup("flag"); ok {
-			v.BindPFlag(flag, cmd.PersistentFlags().Lookup(flag))
-		}
+		f(field)
 	}
 }

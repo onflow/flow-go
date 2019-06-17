@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -14,6 +15,12 @@ import (
 	"github.com/dapperlabs/bamboo-emulator/nodes/security"
 	"github.com/dapperlabs/bamboo-emulator/server"
 )
+
+type Config struct {
+	Port               int           `default:"5000" flag:"port"`
+	CollectionInterval time.Duration `default:"1s"`
+	BlockInterval      time.Duration `default:"5s"`
+}
 
 var (
 	conf Config
@@ -59,7 +66,7 @@ func init() {
 }
 
 func initConfig() {
-	config.ParseConfig("BE", &conf, rootCmd)
+	config.ParseConfig("BE", &conf, rootCmd.PersistentFlags())
 }
 
 func initLogger() {
