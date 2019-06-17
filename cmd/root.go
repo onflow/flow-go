@@ -30,32 +30,36 @@ var (
 var rootCmd = &cobra.Command{
 	Use: "bamboo-emulator",
 	Run: func(cmd *cobra.Command, args []string) {
-		log.WithField("port", conf.Port).Info("Starting emulator server...")
-
-		collections := make(chan *data.Collection, 16)
-
-		state := data.NewWorldState()
-
-		accessNode := access.NewNode(
-			&access.Config{
-				CollectionInterval: conf.CollectionInterval,
-			},
-			state,
-			collections,
-			log,
-		)
-		securityNode := security.NewNode(state, collections)
-
-		emulatorServer := server.NewServer(accessNode)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		go accessNode.Start(ctx)
-		go securityNode.Start(ctx)
-
-		emulatorServer.Start(conf.Port)
+		startServer()
 	},
+}
+
+func startServer() {
+	log.WithField("port", conf.Port).Info("Starting emulator server...")
+
+	collections := make(chan *data.Collection, 16)
+
+	state := data.NewWorldState()
+
+	accessNode := access.NewNode(
+		&access.Config{
+			CollectionInterval: conf.CollectionInterval,
+		},
+		state,
+		collections,
+		log,
+	)
+	securityNode := security.NewNode(state, collections)
+
+	emulatorServer := server.NewServer(accessNode)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go accessNode.Start(ctx)
+	go securityNode.Start(ctx)
+
+	emulatorServer.Start(conf.Port)
 }
 
 func init() {
