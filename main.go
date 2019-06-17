@@ -34,6 +34,7 @@ func main() {
 		},
 		state,
 		collections,
+		log,
 	)
 	securityNode := security.NewNode(
 		&security.Config{
@@ -41,6 +42,7 @@ func main() {
 		},
 		state,
 		collections,
+		log,
 	)
 
 	emulatorServer := server.NewServer(accessNode)

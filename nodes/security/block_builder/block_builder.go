@@ -15,16 +15,18 @@ type BlockBuilder struct {
 	state              *data.WorldState
 	collectionsIn      <-chan *data.Collection
 	pendingCollections []*data.Collection
+	log                *logrus.Logger
 }
 
 // NewBlockBuilder initializes a new BlockBuilder with the incoming collectionsIn channel.
 //
 // The BlockBuilder pulls collections from the collectionsIn channel and writes new blocks to the shared world state.
-func NewBlockBuilder(state *data.WorldState, collectionsIn <-chan *data.Collection) *BlockBuilder {
+func NewBlockBuilder(state *data.WorldState, collectionsIn <-chan *data.Collection, log *logrus.Logger) *BlockBuilder {
 	return &BlockBuilder{
 		state:              state,
 		collectionsIn:      collectionsIn,
 		pendingCollections: []*data.Collection{},
+		log:                log,
 	}
 }
 
@@ -91,11 +93,11 @@ func (b *BlockBuilder) mintNewBlock() error {
 		}
 	}
 
-	b.state.Log.
+	b.log.
 		WithFields(logrus.Fields{
-			"blockNum": newBlock.Number,
-			"blockHash": newBlock.Hash(),
-			"numCollections": len(collectionHashes),
+			"blockNum":        newBlock.Number,
+			"blockHash":       newBlock.Hash(),
+			"numCollections":  len(collectionHashes),
 			"numTransactions": len(transactionHashes),
 		}).
 		Infof(

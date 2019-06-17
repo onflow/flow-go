@@ -4,10 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
+	"github.com/sirupsen/logrus"
 )
 
 // CollectionBuilder produces collections from incoming transactions.
@@ -16,18 +15,20 @@ type CollectionBuilder struct {
 	transactionsIn      <-chan *data.Transaction
 	collectionsOut      chan<- *data.Collection
 	pendingTransactions []*data.Transaction
+	log                 *logrus.Logger
 }
 
 // NewCollectionBuilder initializes a new CollectionBuilder with the provided channels.
 //
 // The collection builder pulls transactions from the transactionsIn channel and pushes
 // collections to the collectionsOut channel.
-func NewCollectionBuilder(state *data.WorldState, transactionsIn <-chan *data.Transaction, collectionsOut chan<- *data.Collection) *CollectionBuilder {
+func NewCollectionBuilder(state *data.WorldState, transactionsIn <-chan *data.Transaction, collectionsOut chan<- *data.Collection, log *logrus.Logger) *CollectionBuilder {
 	return &CollectionBuilder{
 		state:               state,
 		transactionsIn:      transactionsIn,
 		collectionsOut:      collectionsOut,
 		pendingTransactions: make([]*data.Transaction, 0),
+		log:                 log,
 	}
 }
 
@@ -70,7 +71,7 @@ func (c *CollectionBuilder) buildCollection() {
 		return
 	}
 
-	c.state.Log.
+	c.log.
 		WithFields(logrus.Fields{
 			"collectionHash": collection.Hash(),
 			"collectionSize": len(c.pendingTransactions),

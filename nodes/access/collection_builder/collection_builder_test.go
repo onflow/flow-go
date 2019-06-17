@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	. "github.com/onsi/gomega"
+	"github.com/sirupsen/logrus"
 
 	"github.com/dapperlabs/bamboo-emulator/data"
 	"github.com/dapperlabs/bamboo-emulator/tests"
@@ -21,7 +21,7 @@ func TestCollectionBuilder(t *testing.T) {
 	transactionsIn := make(chan *data.Transaction)
 	collectionsOut := make(chan *data.Collection)
 
-	collectionBuilder := NewCollectionBuilder(state, transactionsIn, collectionsOut)
+	collectionBuilder := NewCollectionBuilder(state, transactionsIn, collectionsOut, log)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
