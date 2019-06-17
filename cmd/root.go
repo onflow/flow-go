@@ -39,7 +39,7 @@ func startServer() {
 
 	collections := make(chan *data.Collection, 16)
 
-	state := data.NewWorldState()
+	state := data.NewWorldState(log)
 
 	accessNode := access.NewNode(
 		&access.Config{
@@ -49,7 +49,14 @@ func startServer() {
 		collections,
 		log,
 	)
-	securityNode := security.NewNode(state, collections)
+	securityNode := security.NewNode(
+		&security.Config{
+			BlockInterval: conf.BlockInterval,
+		},
+		state,
+		collections,
+		log,
+	)
 
 	emulatorServer := server.NewServer(accessNode)
 
