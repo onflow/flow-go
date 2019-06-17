@@ -70,10 +70,10 @@ func startServer() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-	cobra.OnInitialize(initLogger)
+	rootCmd.PersistentFlags().IntVar(&conf.Port, "port", 0, "port to run emulator server on")
 
-	rootCmd.PersistentFlags().IntVar(&conf.Port, "port", 0, "Port to run emulator server on")
+	initConfig()
+	initLogger()
 }
 
 func initConfig() {
