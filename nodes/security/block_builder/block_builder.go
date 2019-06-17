@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
 )
@@ -13,22 +15,24 @@ type BlockBuilder struct {
 	state              *data.WorldState
 	collectionsIn      <-chan *data.Collection
 	pendingCollections []*data.Collection
+	log                *logrus.Logger
 }
 
 // NewBlockBuilder initializes a new BlockBuilder with the incoming collectionsIn channel.
 //
 // The BlockBuilder pulls collections from the collectionsIn channel and writes new blocks to the shared world state.
-func NewBlockBuilder(state *data.WorldState, collectionsIn <-chan *data.Collection) *BlockBuilder {
+func NewBlockBuilder(state *data.WorldState, collectionsIn <-chan *data.Collection, log *logrus.Logger) *BlockBuilder {
 	return &BlockBuilder{
 		state:              state,
 		collectionsIn:      collectionsIn,
 		pendingCollections: []*data.Collection{},
+		log:                log,
 	}
 }
 
 // Start starts the block builder worker loop.
-func (b *BlockBuilder) Start(ctx context.Context) {
-	tick := time.Tick(time.Second)
+func (b *BlockBuilder) Start(ctx context.Context, interval time.Duration) {
+	tick := time.Tick(interval)
 	for {
 		select {
 		case <-tick:
@@ -70,7 +74,7 @@ func (b *BlockBuilder) mintNewBlock() error {
 	collectionHashes, transactionHashes := b.bundleCollections()
 
 	newBlock := &data.Block{
-		Number:            latestBlock.Number,
+		Number:            latestBlock.Number + 1,
 		Timestamp:         time.Now(),
 		PrevBlockHash:     latestBlock.Hash(),
 		Status:            data.BlockPending,
@@ -88,6 +92,20 @@ func (b *BlockBuilder) mintNewBlock() error {
 			return err
 		}
 	}
+
+	b.log.
+		WithFields(logrus.Fields{
+			"blockNum":        newBlock.Number,
+			"blockHash":       newBlock.Hash(),
+			"numCollections":  len(collectionHashes),
+			"numTransactions": len(transactionHashes),
+		}).
+		Infof(
+			"Publishing block %d (0x%v) with %d transaction(s)",
+			newBlock.Number,
+			newBlock.Hash(),
+			len(transactionHashes),
+		)
 
 	return nil
 }

@@ -1,6 +1,8 @@
 package data
 
 import (
+	"github.com/sirupsen/logrus"
+
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 )
 
@@ -14,7 +16,7 @@ type WorldState struct {
 }
 
 // NewWorldState instantiates a new state object with a genesis block.
-func NewWorldState() *WorldState {
+func NewWorldState(log *logrus.Logger) *WorldState {
 	blocks := make(map[crypto.Hash]Block)
 	collections := make(map[crypto.Hash]Collection)
 	txs := make(map[crypto.Hash]Transaction)
@@ -24,6 +26,17 @@ func NewWorldState() *WorldState {
 
 	chain := []crypto.Hash{genesis.Hash()}
 	blocks[genesis.Hash()] = *genesis
+
+	log.WithFields(logrus.Fields{
+			"blockNum": genesis.Number,
+			"blockHash": genesis.Hash(),
+			"numCollections": 0,
+			"numTransactions": 0,
+		}).
+		Infof(
+			"Minting genesis block (0x%v)",
+			genesis.Hash(),
+		)
 
 	return &WorldState{
 		Blocks:       blocks,
@@ -99,7 +112,12 @@ func (s *WorldState) AddBlock(block *Block) error {
 
 // InsertCollection inserts a new collection into the state.
 func (s *WorldState) InsertCollection(col *Collection) error {
-	// TODO: add to collection map
+	if _, exists := s.Collections[col.Hash()]; exists {
+		return &DuplicateItemError{hash: col.Hash()}
+	}
+
+	s.Collections[col.Hash()] = *col
+
 	return nil
 }
 
