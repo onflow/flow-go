@@ -187,6 +187,7 @@ func (s *WorldState) UpdateTransactionStatus(h crypto.Hash, status TxStatus) err
 
 	s.transactionsMutex.Lock()
 	tx.Status = status
+	s.Transactions[tx.Hash()] = *tx
 	s.transactionsMutex.Unlock()
 
 	return nil
@@ -201,6 +202,7 @@ func (s *WorldState) SealBlock(h crypto.Hash) error {
 
 	s.blocksMutex.Lock()
 	block.Status = BlockSealed
+	s.Blocks[block.Hash()] = *block
 	s.blocksMutex.Unlock()
 
 	return nil
