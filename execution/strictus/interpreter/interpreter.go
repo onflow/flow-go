@@ -136,13 +136,37 @@ func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclarat
 }
 
 func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.Repr {
-	variable := interpreter.activations.Find(assignment.Identifier)
-	if variable == nil {
-		panic(fmt.Sprintf("reference to unbound identifier: %s", assignment.Identifier))
+	value := assignment.Value.Accept(interpreter)
+
+	switch target := assignment.Target.(type) {
+	case ast.IdentifierExpression:
+		identifier := target.Identifier
+		variable := interpreter.activations.Find(identifier)
+		if variable == nil {
+			panic(fmt.Sprintf("reference to unbound identifier: %s", identifier))
+		}
+		variable.Set(value)
+		interpreter.activations.Set(identifier, variable)
+
+	case ast.IndexExpression:
+		array, ok := target.Expression.Accept(interpreter).([]interface{})
+		if !ok {
+			// TODO: error
+			return nil
+		}
+		index, ok := target.Index.Accept(interpreter).(int64)
+		if !ok {
+			// TODO: error
+			return nil
+		}
+		array[index] = value
+
+	case ast.MemberExpression:
+		// TODO:
+
+	default:
+		panic(fmt.Sprintf("assignment to unknown target expression: %#+v", target))
 	}
-	newValue := assignment.Value.Accept(interpreter)
-	variable.Set(newValue)
-	interpreter.activations.Set(assignment.Identifier, variable)
 	return nil
 }
 
@@ -199,10 +223,10 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 	}
 
 	panic(fmt.Sprintf(
-		"invalid operands for binary expression: %s: %#+v, %#+v",
+		"invalid operands for binary expression: %s: %v, %v",
 		expression.Operation.String(),
-		expression.Left,
-		expression.Right,
+		left,
+		right,
 	))
 
 	return nil
@@ -239,10 +263,12 @@ func (interpreter *Interpreter) VisitMemberExpression(ast.MemberExpression) ast.
 func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpression) ast.Repr {
 	value, ok := expression.Expression.Accept(interpreter).([]interface{})
 	if !ok {
+		// TODO: error
 		return nil
 	}
 	index, ok := expression.Index.Accept(interpreter).(int64)
 	if !ok {
+		// TODO: error
 		return nil
 	}
 	return value[index]

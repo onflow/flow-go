@@ -31,7 +31,8 @@ func TestInterpret(t *testing.T) {
         pub fun foo(a: i32, b: i32): i64 {
             var c = 2
             c = 3
-            const z = [0, 2]
+            const z = [0, 3]
+            z[1] = 2
             return ((a + b) * c) / z[1]
         }
 	`)

@@ -40,120 +40,119 @@ func TestParse(t *testing.T) {
 
 	var int32Type Type = Int32Type{}
 
-	expected := Program{
-		Declarations: map[string]Declaration{
-			"sum": FunctionDeclaration{
-				IsPublic:   true,
-				Identifier: "sum",
-				Parameters: []Parameter{
-					{Identifier: "a", Type: Int32Type{}},
-					{Identifier: "b", Type: FixedType{Type: Int32Type{}, Size: 2}},
-					{Identifier: "c", Type: DynamicType{Type: FixedType{Type: Int32Type{}, Size: 3}}},
+	sum := FunctionDeclaration{
+		IsPublic:   true,
+		Identifier: "sum",
+		Parameters: []Parameter{
+			{Identifier: "a", Type: Int32Type{}},
+			{Identifier: "b", Type: FixedType{Type: Int32Type{}, Size: 2}},
+			{Identifier: "c", Type: DynamicType{Type: FixedType{Type: Int32Type{}, Size: 3}}},
+		},
+		ReturnType: Int64Type{},
+		Block: Block{
+			Statements: []Statement{
+				VariableDeclaration{
+					IsConst:    true,
+					Identifier: "x",
+					Type:       nil,
+					Value:      IntExpression{Value: 1},
 				},
-				ReturnType: Int64Type{},
-				Block: Block{
-					Statements: []Statement{
-						VariableDeclaration{
-							IsConst:    true,
-							Identifier: "x",
-							Type:       nil,
-							Value:      IntExpression{Value: 1},
-						},
-						VariableDeclaration{
-							IsConst:    false,
-							Identifier: "y",
-							Type:       int32Type,
-							Value:      IntExpression{Value: 2},
-						},
-						Assignment{Identifier: "y", Value: IntExpression{Value: 3}},
-						ExpressionStatement{
-							Expression: MemberExpression{
-								Expression: IndexExpression{
-									Expression: IndexExpression{
-										Expression: MemberExpression{
-											Expression: MemberExpression{
-												Expression: IdentifierExpression{Identifier: "x"},
-												Identifier: "foo",
-											},
-											Identifier: "bar",
-										},
-										Index: IntExpression{Value: 0},
+				VariableDeclaration{
+					IsConst:    false,
+					Identifier: "y",
+					Type:       int32Type,
+					Value:      IntExpression{Value: 2},
+				},
+				Assignment{
+					Target: IdentifierExpression{Identifier: "y"},
+					Value:  IntExpression{Value: 3},
+				},
+				ExpressionStatement{
+					Expression: MemberExpression{
+						Expression: IndexExpression{
+							Expression: IndexExpression{
+								Expression: MemberExpression{
+									Expression: MemberExpression{
+										Expression: IdentifierExpression{Identifier: "x"},
+										Identifier: "foo",
 									},
-									Index: IntExpression{Value: 1},
+									Identifier: "bar",
 								},
-								Identifier: "baz",
+								Index: IntExpression{Value: 0},
+							},
+							Index: IntExpression{Value: 1},
+						},
+						Identifier: "baz",
+					},
+				},
+				Assignment{
+					Target: IdentifierExpression{Identifier: "z"},
+					Value: BinaryExpression{
+						Operation: OperationMod,
+						Left: InvocationExpression{
+							Expression: IdentifierExpression{Identifier: "sum"},
+							Arguments: []Expression{
+								IntExpression{Value: 3},
+								IntExpression{Value: 2},
+								IntExpression{Value: 1},
 							},
 						},
-						Assignment{
-							Identifier: "z",
-							Value: BinaryExpression{
-								Operation: OperationMod,
-								Left: InvocationExpression{
-									Expression: IdentifierExpression{Identifier: "sum"},
-									Arguments: []Expression{
-										IntExpression{Value: 3},
-										IntExpression{Value: 2},
-										IntExpression{Value: 1},
-									},
-								},
-								Right: IntExpression{Value: 42},
-							},
-						},
-						ReturnStatement{Expression: IdentifierExpression{Identifier: "a"}},
-						WhileStatement{
-							Test: BinaryExpression{
-								Operation: OperationLess,
-								Left:      IdentifierExpression{Identifier: "x"},
-								Right:     IntExpression{Value: 2},
-							},
-							Block: Block{
-								Statements: []Statement{
-									Assignment{
-										Identifier: "x",
-										Value: BinaryExpression{
-											Operation: OperationPlus,
-											Left:      IdentifierExpression{Identifier: "x"},
-											Right:     IntExpression{Value: 1},
-										},
-									},
+						Right: IntExpression{Value: 42},
+					},
+				},
+				ReturnStatement{Expression: IdentifierExpression{Identifier: "a"}},
+				WhileStatement{
+					Test: BinaryExpression{
+						Operation: OperationLess,
+						Left:      IdentifierExpression{Identifier: "x"},
+						Right:     IntExpression{Value: 2},
+					},
+					Block: Block{
+						Statements: []Statement{
+							Assignment{
+								Target: IdentifierExpression{Identifier: "x"},
+								Value: BinaryExpression{
+									Operation: OperationPlus,
+									Left:      IdentifierExpression{Identifier: "x"},
+									Right:     IntExpression{Value: 1},
 								},
 							},
 						},
-						IfStatement{
-							Test: BoolExpression{Value: true},
-							Then: Block{
-								Statements: []Statement{
-									ReturnStatement{Expression: IntExpression{Value: 1}},
-								},
-							},
-							Else: Block{
-								Statements: []Statement{
-									IfStatement{
-										Test: BoolExpression{Value: false},
-										Then: Block{
-											Statements: []Statement{
-												ReturnStatement{
-													Expression: ConditionalExpression{
-														Test: BinaryExpression{
-															Operation: OperationGreater,
-															Left:      IntExpression{Value: 2},
-															Right:     IntExpression{Value: 3},
-														},
-														Then: IntExpression{Value: 4},
-														Else: IntExpression{Value: 5},
-													},
+					},
+				},
+				IfStatement{
+					Test: BoolExpression{Value: true},
+					Then: Block{
+						Statements: []Statement{
+							ReturnStatement{Expression: IntExpression{Value: 1}},
+						},
+					},
+					Else: Block{
+						Statements: []Statement{
+							IfStatement{
+								Test: BoolExpression{Value: false},
+								Then: Block{
+									Statements: []Statement{
+										ReturnStatement{
+											Expression: ConditionalExpression{
+												Test: BinaryExpression{
+													Operation: OperationGreater,
+													Left:      IntExpression{Value: 2},
+													Right:     IntExpression{Value: 3},
 												},
+												Then: IntExpression{Value: 4},
+												Else: IntExpression{Value: 5},
 											},
 										},
-										Else: Block{
-											Statements: []Statement{
-												ReturnStatement{
-													Expression: ArrayExpression{
-														Values: []Expression{
-															IntExpression{Value: 2},
-															BoolExpression{Value: true},
-														},
-													},
+									},
+								},
+								Else: Block{
+									Statements: []Statement{
+										ReturnStatement{
+											Expression: ArrayExpression{
+												Values: []Expression{
+													IntExpression{Value: 2},
+													BoolExpression{Value: true},
 												},
 											},
 										},
@@ -165,6 +164,11 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{sum},
+		Declarations:    map[string]Declaration{"sum": sum},
 	}
 
 	NewWithT(t).Expect(actual).Should(Equal(expected))

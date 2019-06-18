@@ -68,6 +68,12 @@ func (e InvocationExpression) Accept(v Visitor) Repr {
 	return v.VisitInvocationExpression(e)
 }
 
+// AccessExpression
+
+type AccessExpression interface {
+	isAccessExpression()
+}
+
 // MemberExpression
 
 type MemberExpression struct {
@@ -75,7 +81,8 @@ type MemberExpression struct {
 	Identifier string
 }
 
-func (MemberExpression) isExpression() {}
+func (MemberExpression) isExpression()       {}
+func (MemberExpression) isAccessExpression() {}
 
 func (e MemberExpression) Accept(v Visitor) Repr {
 	return v.VisitMemberExpression(e)
@@ -88,7 +95,8 @@ type IndexExpression struct {
 	Index      Expression
 }
 
-func (IndexExpression) isExpression() {}
+func (IndexExpression) isExpression()       {}
+func (IndexExpression) isAccessExpression() {}
 
 func (e IndexExpression) Accept(v Visitor) Repr {
 	return v.VisitIndexExpression(e)

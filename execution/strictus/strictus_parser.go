@@ -19,7 +19,7 @@ var _ = reflect.Copy
 var _ = strconv.Itoa
 
 var parserATN = []uint16{
-	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 50, 330,
+	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 50, 336,
 	4, 2, 9, 2, 4, 3, 9, 3, 4, 4, 9, 4, 4, 5, 9, 5, 4, 6, 9, 6, 4, 7, 9, 7,
 	4, 8, 9, 8, 4, 9, 9, 9, 4, 10, 9, 10, 4, 11, 9, 11, 4, 12, 9, 12, 4, 13,
 	9, 13, 4, 14, 9, 14, 4, 15, 9, 15, 4, 16, 9, 16, 4, 17, 9, 17, 4, 18, 9,
@@ -38,58 +38,59 @@ var parserATN = []uint16{
 	12, 3, 13, 3, 13, 3, 13, 3, 13, 3, 13, 3, 13, 3, 13, 3, 13, 3, 13, 3, 13,
 	3, 13, 5, 13, 168, 10, 13, 5, 13, 170, 10, 13, 3, 14, 3, 14, 3, 14, 3,
 	14, 3, 14, 3, 14, 3, 15, 3, 15, 3, 15, 3, 15, 5, 15, 182, 10, 15, 3, 15,
-	3, 15, 3, 15, 3, 16, 3, 16, 3, 16, 3, 16, 3, 17, 3, 17, 3, 18, 3, 18, 3,
-	18, 3, 18, 3, 18, 3, 18, 5, 18, 199, 10, 18, 3, 19, 3, 19, 3, 19, 5, 19,
-	204, 10, 19, 3, 20, 3, 20, 3, 20, 5, 20, 209, 10, 20, 3, 21, 3, 21, 3,
-	21, 3, 21, 5, 21, 215, 10, 21, 3, 22, 3, 22, 3, 22, 3, 22, 5, 22, 221,
-	10, 22, 3, 23, 3, 23, 3, 23, 3, 23, 5, 23, 227, 10, 23, 3, 24, 3, 24, 3,
-	24, 3, 24, 5, 24, 233, 10, 24, 3, 25, 3, 25, 7, 25, 237, 10, 25, 12, 25,
-	14, 25, 240, 11, 25, 3, 26, 3, 26, 5, 26, 244, 10, 26, 3, 27, 3, 27, 3,
-	28, 3, 28, 3, 29, 3, 29, 3, 30, 3, 30, 3, 31, 3, 31, 3, 31, 3, 31, 3, 31,
-	5, 31, 259, 10, 31, 3, 31, 3, 31, 3, 31, 3, 31, 3, 31, 3, 31, 3, 31, 3,
-	31, 3, 31, 3, 31, 3, 31, 5, 31, 272, 10, 31, 3, 32, 3, 32, 5, 32, 276,
-	10, 32, 3, 33, 3, 33, 3, 33, 3, 34, 3, 34, 3, 34, 3, 34, 3, 35, 3, 35,
-	3, 35, 3, 35, 7, 35, 289, 10, 35, 12, 35, 14, 35, 292, 11, 35, 5, 35, 294,
-	10, 35, 3, 35, 3, 35, 3, 36, 3, 36, 3, 36, 5, 36, 301, 10, 36, 3, 37, 3,
-	37, 3, 38, 3, 38, 3, 38, 3, 38, 5, 38, 309, 10, 38, 3, 39, 3, 39, 3, 39,
-	3, 39, 7, 39, 315, 10, 39, 12, 39, 14, 39, 318, 11, 39, 5, 39, 320, 10,
-	39, 3, 39, 3, 39, 3, 40, 3, 40, 3, 40, 3, 40, 5, 40, 328, 10, 40, 3, 40,
-	2, 2, 41, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34,
-	36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70,
-	72, 74, 76, 78, 2, 8, 3, 2, 31, 32, 3, 2, 17, 18, 3, 2, 19, 22, 3, 2, 23,
-	24, 3, 2, 25, 27, 3, 2, 36, 37, 2, 333, 2, 83, 3, 2, 2, 2, 4, 90, 3, 2,
-	2, 2, 6, 93, 3, 2, 2, 2, 8, 108, 3, 2, 2, 2, 10, 116, 3, 2, 2, 2, 12, 120,
-	3, 2, 2, 2, 14, 127, 3, 2, 2, 2, 16, 135, 3, 2, 2, 2, 18, 142, 3, 2, 2,
-	2, 20, 151, 3, 2, 2, 2, 22, 153, 3, 2, 2, 2, 24, 156, 3, 2, 2, 2, 26, 171,
-	3, 2, 2, 2, 28, 177, 3, 2, 2, 2, 30, 186, 3, 2, 2, 2, 32, 190, 3, 2, 2,
-	2, 34, 192, 3, 2, 2, 2, 36, 200, 3, 2, 2, 2, 38, 205, 3, 2, 2, 2, 40, 210,
-	3, 2, 2, 2, 42, 216, 3, 2, 2, 2, 44, 222, 3, 2, 2, 2, 46, 228, 3, 2, 2,
-	2, 48, 234, 3, 2, 2, 2, 50, 243, 3, 2, 2, 2, 52, 245, 3, 2, 2, 2, 54, 247,
-	3, 2, 2, 2, 56, 249, 3, 2, 2, 2, 58, 251, 3, 2, 2, 2, 60, 271, 3, 2, 2,
-	2, 62, 275, 3, 2, 2, 2, 64, 277, 3, 2, 2, 2, 66, 280, 3, 2, 2, 2, 68, 284,
-	3, 2, 2, 2, 70, 300, 3, 2, 2, 2, 72, 302, 3, 2, 2, 2, 74, 308, 3, 2, 2,
-	2, 76, 310, 3, 2, 2, 2, 78, 327, 3, 2, 2, 2, 80, 82, 5, 4, 3, 2, 81, 80,
-	3, 2, 2, 2, 82, 85, 3, 2, 2, 2, 83, 81, 3, 2, 2, 2, 83, 84, 3, 2, 2, 2,
-	84, 86, 3, 2, 2, 2, 85, 83, 3, 2, 2, 2, 86, 87, 7, 2, 2, 3, 87, 3, 3, 2,
-	2, 2, 88, 91, 5, 6, 4, 2, 89, 91, 5, 28, 15, 2, 90, 88, 3, 2, 2, 2, 90,
-	89, 3, 2, 2, 2, 91, 5, 3, 2, 2, 2, 92, 94, 7, 29, 2, 2, 93, 92, 3, 2, 2,
-	2, 93, 94, 3, 2, 2, 2, 94, 95, 3, 2, 2, 2, 95, 96, 7, 28, 2, 2, 96, 97,
-	7, 42, 2, 2, 97, 99, 7, 3, 2, 2, 98, 100, 5, 8, 5, 2, 99, 98, 3, 2, 2,
-	2, 99, 100, 3, 2, 2, 2, 100, 101, 3, 2, 2, 2, 101, 102, 7, 4, 2, 2, 102,
-	103, 7, 5, 2, 2, 103, 104, 5, 12, 7, 2, 104, 105, 7, 6, 2, 2, 105, 106,
-	5, 18, 10, 2, 106, 107, 7, 7, 2, 2, 107, 7, 3, 2, 2, 2, 108, 113, 5, 10,
-	6, 2, 109, 110, 7, 8, 2, 2, 110, 112, 5, 10, 6, 2, 111, 109, 3, 2, 2, 2,
-	112, 115, 3, 2, 2, 2, 113, 111, 3, 2, 2, 2, 113, 114, 3, 2, 2, 2, 114,
-	9, 3, 2, 2, 2, 115, 113, 3, 2, 2, 2, 116, 117, 7, 42, 2, 2, 117, 118, 7,
-	5, 2, 2, 118, 119, 5, 12, 7, 2, 119, 11, 3, 2, 2, 2, 120, 124, 5, 16, 9,
-	2, 121, 123, 5, 14, 8, 2, 122, 121, 3, 2, 2, 2, 123, 126, 3, 2, 2, 2, 124,
-	122, 3, 2, 2, 2, 124, 125, 3, 2, 2, 2, 125, 13, 3, 2, 2, 2, 126, 124, 3,
-	2, 2, 2, 127, 129, 7, 9, 2, 2, 128, 130, 7, 43, 2, 2, 129, 128, 3, 2, 2,
-	2, 129, 130, 3, 2, 2, 2, 130, 131, 3, 2, 2, 2, 131, 132, 7, 10, 2, 2, 132,
-	15, 3, 2, 2, 2, 133, 136, 7, 38, 2, 2, 134, 136, 7, 39, 2, 2, 135, 133,
-	3, 2, 2, 2, 135, 134, 3, 2, 2, 2, 136, 17, 3, 2, 2, 2, 137, 138, 5, 20,
-	11, 2, 138, 139, 5, 78, 40, 2, 139, 141, 3, 2, 2, 2, 140, 137, 3, 2, 2,
-	2, 141, 144, 3, 2, 2, 2, 142, 140, 3, 2, 2, 2, 142, 143, 3, 2, 2, 2, 143,
+	3, 15, 3, 15, 3, 16, 3, 16, 7, 16, 189, 10, 16, 12, 16, 14, 16, 192, 11,
+	16, 3, 16, 3, 16, 3, 16, 3, 17, 3, 17, 3, 18, 3, 18, 3, 18, 3, 18, 3, 18,
+	3, 18, 5, 18, 205, 10, 18, 3, 19, 3, 19, 3, 19, 5, 19, 210, 10, 19, 3,
+	20, 3, 20, 3, 20, 5, 20, 215, 10, 20, 3, 21, 3, 21, 3, 21, 3, 21, 5, 21,
+	221, 10, 21, 3, 22, 3, 22, 3, 22, 3, 22, 5, 22, 227, 10, 22, 3, 23, 3,
+	23, 3, 23, 3, 23, 5, 23, 233, 10, 23, 3, 24, 3, 24, 3, 24, 3, 24, 5, 24,
+	239, 10, 24, 3, 25, 3, 25, 7, 25, 243, 10, 25, 12, 25, 14, 25, 246, 11,
+	25, 3, 26, 3, 26, 5, 26, 250, 10, 26, 3, 27, 3, 27, 3, 28, 3, 28, 3, 29,
+	3, 29, 3, 30, 3, 30, 3, 31, 3, 31, 3, 31, 3, 31, 3, 31, 5, 31, 265, 10,
+	31, 3, 31, 3, 31, 3, 31, 3, 31, 3, 31, 3, 31, 3, 31, 3, 31, 3, 31, 3, 31,
+	3, 31, 5, 31, 278, 10, 31, 3, 32, 3, 32, 5, 32, 282, 10, 32, 3, 33, 3,
+	33, 3, 33, 3, 34, 3, 34, 3, 34, 3, 34, 3, 35, 3, 35, 3, 35, 3, 35, 7, 35,
+	295, 10, 35, 12, 35, 14, 35, 298, 11, 35, 5, 35, 300, 10, 35, 3, 35, 3,
+	35, 3, 36, 3, 36, 3, 36, 5, 36, 307, 10, 36, 3, 37, 3, 37, 3, 38, 3, 38,
+	3, 38, 3, 38, 5, 38, 315, 10, 38, 3, 39, 3, 39, 3, 39, 3, 39, 7, 39, 321,
+	10, 39, 12, 39, 14, 39, 324, 11, 39, 5, 39, 326, 10, 39, 3, 39, 3, 39,
+	3, 40, 3, 40, 3, 40, 3, 40, 5, 40, 334, 10, 40, 3, 40, 2, 2, 41, 2, 4,
+	6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42,
+	44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78,
+	2, 8, 3, 2, 31, 32, 3, 2, 17, 18, 3, 2, 19, 22, 3, 2, 23, 24, 3, 2, 25,
+	27, 3, 2, 36, 37, 2, 340, 2, 83, 3, 2, 2, 2, 4, 90, 3, 2, 2, 2, 6, 93,
+	3, 2, 2, 2, 8, 108, 3, 2, 2, 2, 10, 116, 3, 2, 2, 2, 12, 120, 3, 2, 2,
+	2, 14, 127, 3, 2, 2, 2, 16, 135, 3, 2, 2, 2, 18, 142, 3, 2, 2, 2, 20, 151,
+	3, 2, 2, 2, 22, 153, 3, 2, 2, 2, 24, 156, 3, 2, 2, 2, 26, 171, 3, 2, 2,
+	2, 28, 177, 3, 2, 2, 2, 30, 186, 3, 2, 2, 2, 32, 196, 3, 2, 2, 2, 34, 198,
+	3, 2, 2, 2, 36, 206, 3, 2, 2, 2, 38, 211, 3, 2, 2, 2, 40, 216, 3, 2, 2,
+	2, 42, 222, 3, 2, 2, 2, 44, 228, 3, 2, 2, 2, 46, 234, 3, 2, 2, 2, 48, 240,
+	3, 2, 2, 2, 50, 249, 3, 2, 2, 2, 52, 251, 3, 2, 2, 2, 54, 253, 3, 2, 2,
+	2, 56, 255, 3, 2, 2, 2, 58, 257, 3, 2, 2, 2, 60, 277, 3, 2, 2, 2, 62, 281,
+	3, 2, 2, 2, 64, 283, 3, 2, 2, 2, 66, 286, 3, 2, 2, 2, 68, 290, 3, 2, 2,
+	2, 70, 306, 3, 2, 2, 2, 72, 308, 3, 2, 2, 2, 74, 314, 3, 2, 2, 2, 76, 316,
+	3, 2, 2, 2, 78, 333, 3, 2, 2, 2, 80, 82, 5, 4, 3, 2, 81, 80, 3, 2, 2, 2,
+	82, 85, 3, 2, 2, 2, 83, 81, 3, 2, 2, 2, 83, 84, 3, 2, 2, 2, 84, 86, 3,
+	2, 2, 2, 85, 83, 3, 2, 2, 2, 86, 87, 7, 2, 2, 3, 87, 3, 3, 2, 2, 2, 88,
+	91, 5, 6, 4, 2, 89, 91, 5, 28, 15, 2, 90, 88, 3, 2, 2, 2, 90, 89, 3, 2,
+	2, 2, 91, 5, 3, 2, 2, 2, 92, 94, 7, 29, 2, 2, 93, 92, 3, 2, 2, 2, 93, 94,
+	3, 2, 2, 2, 94, 95, 3, 2, 2, 2, 95, 96, 7, 28, 2, 2, 96, 97, 7, 42, 2,
+	2, 97, 99, 7, 3, 2, 2, 98, 100, 5, 8, 5, 2, 99, 98, 3, 2, 2, 2, 99, 100,
+	3, 2, 2, 2, 100, 101, 3, 2, 2, 2, 101, 102, 7, 4, 2, 2, 102, 103, 7, 5,
+	2, 2, 103, 104, 5, 12, 7, 2, 104, 105, 7, 6, 2, 2, 105, 106, 5, 18, 10,
+	2, 106, 107, 7, 7, 2, 2, 107, 7, 3, 2, 2, 2, 108, 113, 5, 10, 6, 2, 109,
+	110, 7, 8, 2, 2, 110, 112, 5, 10, 6, 2, 111, 109, 3, 2, 2, 2, 112, 115,
+	3, 2, 2, 2, 113, 111, 3, 2, 2, 2, 113, 114, 3, 2, 2, 2, 114, 9, 3, 2, 2,
+	2, 115, 113, 3, 2, 2, 2, 116, 117, 7, 42, 2, 2, 117, 118, 7, 5, 2, 2, 118,
+	119, 5, 12, 7, 2, 119, 11, 3, 2, 2, 2, 120, 124, 5, 16, 9, 2, 121, 123,
+	5, 14, 8, 2, 122, 121, 3, 2, 2, 2, 123, 126, 3, 2, 2, 2, 124, 122, 3, 2,
+	2, 2, 124, 125, 3, 2, 2, 2, 125, 13, 3, 2, 2, 2, 126, 124, 3, 2, 2, 2,
+	127, 129, 7, 9, 2, 2, 128, 130, 7, 43, 2, 2, 129, 128, 3, 2, 2, 2, 129,
+	130, 3, 2, 2, 2, 130, 131, 3, 2, 2, 2, 131, 132, 7, 10, 2, 2, 132, 15,
+	3, 2, 2, 2, 133, 136, 7, 38, 2, 2, 134, 136, 7, 39, 2, 2, 135, 133, 3,
+	2, 2, 2, 135, 134, 3, 2, 2, 2, 136, 17, 3, 2, 2, 2, 137, 138, 5, 20, 11,
+	2, 138, 139, 5, 78, 40, 2, 139, 141, 3, 2, 2, 2, 140, 137, 3, 2, 2, 2,
+	141, 144, 3, 2, 2, 2, 142, 140, 3, 2, 2, 2, 142, 143, 3, 2, 2, 2, 143,
 	19, 3, 2, 2, 2, 144, 142, 3, 2, 2, 2, 145, 152, 5, 22, 12, 2, 146, 152,
 	5, 24, 13, 2, 147, 152, 5, 26, 14, 2, 148, 152, 5, 4, 3, 2, 149, 152, 5,
 	30, 16, 2, 150, 152, 5, 32, 17, 2, 151, 145, 3, 2, 2, 2, 151, 146, 3, 2,
@@ -105,62 +106,64 @@ var parserATN = []uint16{
 	10, 2, 175, 176, 7, 7, 2, 2, 176, 27, 3, 2, 2, 2, 177, 178, 9, 2, 2, 2,
 	178, 181, 7, 42, 2, 2, 179, 180, 7, 5, 2, 2, 180, 182, 5, 12, 7, 2, 181,
 	179, 3, 2, 2, 2, 181, 182, 3, 2, 2, 2, 182, 183, 3, 2, 2, 2, 183, 184,
-	7, 11, 2, 2, 184, 185, 5, 32, 17, 2, 185, 29, 3, 2, 2, 2, 186, 187, 7,
-	42, 2, 2, 187, 188, 7, 11, 2, 2, 188, 189, 5, 32, 17, 2, 189, 31, 3, 2,
-	2, 2, 190, 191, 5, 34, 18, 2, 191, 33, 3, 2, 2, 2, 192, 198, 5, 36, 19,
-	2, 193, 194, 7, 12, 2, 2, 194, 195, 5, 32, 17, 2, 195, 196, 7, 5, 2, 2,
-	196, 197, 5, 32, 17, 2, 197, 199, 3, 2, 2, 2, 198, 193, 3, 2, 2, 2, 198,
-	199, 3, 2, 2, 2, 199, 35, 3, 2, 2, 2, 200, 203, 5, 38, 20, 2, 201, 202,
-	7, 13, 2, 2, 202, 204, 5, 38, 20, 2, 203, 201, 3, 2, 2, 2, 203, 204, 3,
-	2, 2, 2, 204, 37, 3, 2, 2, 2, 205, 208, 5, 40, 21, 2, 206, 207, 7, 14,
-	2, 2, 207, 209, 5, 40, 21, 2, 208, 206, 3, 2, 2, 2, 208, 209, 3, 2, 2,
-	2, 209, 39, 3, 2, 2, 2, 210, 214, 5, 42, 22, 2, 211, 212, 5, 52, 27, 2,
-	212, 213, 5, 42, 22, 2, 213, 215, 3, 2, 2, 2, 214, 211, 3, 2, 2, 2, 214,
-	215, 3, 2, 2, 2, 215, 41, 3, 2, 2, 2, 216, 220, 5, 44, 23, 2, 217, 218,
-	5, 54, 28, 2, 218, 219, 5, 44, 23, 2, 219, 221, 3, 2, 2, 2, 220, 217, 3,
-	2, 2, 2, 220, 221, 3, 2, 2, 2, 221, 43, 3, 2, 2, 2, 222, 226, 5, 46, 24,
-	2, 223, 224, 5, 56, 29, 2, 224, 225, 5, 46, 24, 2, 225, 227, 3, 2, 2, 2,
-	226, 223, 3, 2, 2, 2, 226, 227, 3, 2, 2, 2, 227, 45, 3, 2, 2, 2, 228, 232,
-	5, 48, 25, 2, 229, 230, 5, 58, 30, 2, 230, 231, 5, 48, 25, 2, 231, 233,
-	3, 2, 2, 2, 232, 229, 3, 2, 2, 2, 232, 233, 3, 2, 2, 2, 233, 47, 3, 2,
-	2, 2, 234, 238, 5, 60, 31, 2, 235, 237, 5, 50, 26, 2, 236, 235, 3, 2, 2,
-	2, 237, 240, 3, 2, 2, 2, 238, 236, 3, 2, 2, 2, 238, 239, 3, 2, 2, 2, 239,
-	49, 3, 2, 2, 2, 240, 238, 3, 2, 2, 2, 241, 244, 5, 62, 32, 2, 242, 244,
-	5, 68, 35, 2, 243, 241, 3, 2, 2, 2, 243, 242, 3, 2, 2, 2, 244, 51, 3, 2,
-	2, 2, 245, 246, 9, 3, 2, 2, 246, 53, 3, 2, 2, 2, 247, 248, 9, 4, 2, 2,
-	248, 55, 3, 2, 2, 2, 249, 250, 9, 5, 2, 2, 250, 57, 3, 2, 2, 2, 251, 252,
-	9, 6, 2, 2, 252, 59, 3, 2, 2, 2, 253, 272, 7, 42, 2, 2, 254, 272, 5, 70,
-	36, 2, 255, 256, 7, 28, 2, 2, 256, 258, 7, 3, 2, 2, 257, 259, 5, 8, 5,
-	2, 258, 257, 3, 2, 2, 2, 258, 259, 3, 2, 2, 2, 259, 260, 3, 2, 2, 2, 260,
-	261, 7, 4, 2, 2, 261, 262, 7, 5, 2, 2, 262, 263, 5, 12, 7, 2, 263, 264,
-	7, 6, 2, 2, 264, 265, 5, 18, 10, 2, 265, 266, 7, 7, 2, 2, 266, 272, 3,
-	2, 2, 2, 267, 268, 7, 3, 2, 2, 268, 269, 5, 32, 17, 2, 269, 270, 7, 4,
-	2, 2, 270, 272, 3, 2, 2, 2, 271, 253, 3, 2, 2, 2, 271, 254, 3, 2, 2, 2,
-	271, 255, 3, 2, 2, 2, 271, 267, 3, 2, 2, 2, 272, 61, 3, 2, 2, 2, 273, 276,
-	5, 64, 33, 2, 274, 276, 5, 66, 34, 2, 275, 273, 3, 2, 2, 2, 275, 274, 3,
-	2, 2, 2, 276, 63, 3, 2, 2, 2, 277, 278, 7, 15, 2, 2, 278, 279, 7, 42, 2,
-	2, 279, 65, 3, 2, 2, 2, 280, 281, 7, 9, 2, 2, 281, 282, 5, 32, 17, 2, 282,
-	283, 7, 10, 2, 2, 283, 67, 3, 2, 2, 2, 284, 293, 7, 3, 2, 2, 285, 290,
-	5, 32, 17, 2, 286, 287, 7, 8, 2, 2, 287, 289, 5, 32, 17, 2, 288, 286, 3,
-	2, 2, 2, 289, 292, 3, 2, 2, 2, 290, 288, 3, 2, 2, 2, 290, 291, 3, 2, 2,
-	2, 291, 294, 3, 2, 2, 2, 292, 290, 3, 2, 2, 2, 293, 285, 3, 2, 2, 2, 293,
-	294, 3, 2, 2, 2, 294, 295, 3, 2, 2, 2, 295, 296, 7, 4, 2, 2, 296, 69, 3,
-	2, 2, 2, 297, 301, 5, 74, 38, 2, 298, 301, 5, 72, 37, 2, 299, 301, 5, 76,
-	39, 2, 300, 297, 3, 2, 2, 2, 300, 298, 3, 2, 2, 2, 300, 299, 3, 2, 2, 2,
-	301, 71, 3, 2, 2, 2, 302, 303, 9, 7, 2, 2, 303, 73, 3, 2, 2, 2, 304, 309,
-	7, 43, 2, 2, 305, 309, 7, 44, 2, 2, 306, 309, 7, 45, 2, 2, 307, 309, 7,
-	46, 2, 2, 308, 304, 3, 2, 2, 2, 308, 305, 3, 2, 2, 2, 308, 306, 3, 2, 2,
-	2, 308, 307, 3, 2, 2, 2, 309, 75, 3, 2, 2, 2, 310, 319, 7, 9, 2, 2, 311,
-	316, 5, 32, 17, 2, 312, 313, 7, 8, 2, 2, 313, 315, 5, 32, 17, 2, 314, 312,
-	3, 2, 2, 2, 315, 318, 3, 2, 2, 2, 316, 314, 3, 2, 2, 2, 316, 317, 3, 2,
-	2, 2, 317, 320, 3, 2, 2, 2, 318, 316, 3, 2, 2, 2, 319, 311, 3, 2, 2, 2,
-	319, 320, 3, 2, 2, 2, 320, 321, 3, 2, 2, 2, 321, 322, 7, 10, 2, 2, 322,
-	77, 3, 2, 2, 2, 323, 328, 7, 16, 2, 2, 324, 328, 7, 2, 2, 3, 325, 328,
-	6, 40, 2, 2, 326, 328, 6, 40, 3, 2, 327, 323, 3, 2, 2, 2, 327, 324, 3,
-	2, 2, 2, 327, 325, 3, 2, 2, 2, 327, 326, 3, 2, 2, 2, 328, 79, 3, 2, 2,
-	2, 34, 83, 90, 93, 99, 113, 124, 129, 135, 142, 151, 167, 169, 181, 198,
-	203, 208, 214, 220, 226, 232, 238, 243, 258, 271, 275, 290, 293, 300, 308,
-	316, 319, 327,
+	7, 11, 2, 2, 184, 185, 5, 32, 17, 2, 185, 29, 3, 2, 2, 2, 186, 190, 7,
+	42, 2, 2, 187, 189, 5, 62, 32, 2, 188, 187, 3, 2, 2, 2, 189, 192, 3, 2,
+	2, 2, 190, 188, 3, 2, 2, 2, 190, 191, 3, 2, 2, 2, 191, 193, 3, 2, 2, 2,
+	192, 190, 3, 2, 2, 2, 193, 194, 7, 11, 2, 2, 194, 195, 5, 32, 17, 2, 195,
+	31, 3, 2, 2, 2, 196, 197, 5, 34, 18, 2, 197, 33, 3, 2, 2, 2, 198, 204,
+	5, 36, 19, 2, 199, 200, 7, 12, 2, 2, 200, 201, 5, 32, 17, 2, 201, 202,
+	7, 5, 2, 2, 202, 203, 5, 32, 17, 2, 203, 205, 3, 2, 2, 2, 204, 199, 3,
+	2, 2, 2, 204, 205, 3, 2, 2, 2, 205, 35, 3, 2, 2, 2, 206, 209, 5, 38, 20,
+	2, 207, 208, 7, 13, 2, 2, 208, 210, 5, 38, 20, 2, 209, 207, 3, 2, 2, 2,
+	209, 210, 3, 2, 2, 2, 210, 37, 3, 2, 2, 2, 211, 214, 5, 40, 21, 2, 212,
+	213, 7, 14, 2, 2, 213, 215, 5, 40, 21, 2, 214, 212, 3, 2, 2, 2, 214, 215,
+	3, 2, 2, 2, 215, 39, 3, 2, 2, 2, 216, 220, 5, 42, 22, 2, 217, 218, 5, 52,
+	27, 2, 218, 219, 5, 42, 22, 2, 219, 221, 3, 2, 2, 2, 220, 217, 3, 2, 2,
+	2, 220, 221, 3, 2, 2, 2, 221, 41, 3, 2, 2, 2, 222, 226, 5, 44, 23, 2, 223,
+	224, 5, 54, 28, 2, 224, 225, 5, 44, 23, 2, 225, 227, 3, 2, 2, 2, 226, 223,
+	3, 2, 2, 2, 226, 227, 3, 2, 2, 2, 227, 43, 3, 2, 2, 2, 228, 232, 5, 46,
+	24, 2, 229, 230, 5, 56, 29, 2, 230, 231, 5, 46, 24, 2, 231, 233, 3, 2,
+	2, 2, 232, 229, 3, 2, 2, 2, 232, 233, 3, 2, 2, 2, 233, 45, 3, 2, 2, 2,
+	234, 238, 5, 48, 25, 2, 235, 236, 5, 58, 30, 2, 236, 237, 5, 48, 25, 2,
+	237, 239, 3, 2, 2, 2, 238, 235, 3, 2, 2, 2, 238, 239, 3, 2, 2, 2, 239,
+	47, 3, 2, 2, 2, 240, 244, 5, 60, 31, 2, 241, 243, 5, 50, 26, 2, 242, 241,
+	3, 2, 2, 2, 243, 246, 3, 2, 2, 2, 244, 242, 3, 2, 2, 2, 244, 245, 3, 2,
+	2, 2, 245, 49, 3, 2, 2, 2, 246, 244, 3, 2, 2, 2, 247, 250, 5, 62, 32, 2,
+	248, 250, 5, 68, 35, 2, 249, 247, 3, 2, 2, 2, 249, 248, 3, 2, 2, 2, 250,
+	51, 3, 2, 2, 2, 251, 252, 9, 3, 2, 2, 252, 53, 3, 2, 2, 2, 253, 254, 9,
+	4, 2, 2, 254, 55, 3, 2, 2, 2, 255, 256, 9, 5, 2, 2, 256, 57, 3, 2, 2, 2,
+	257, 258, 9, 6, 2, 2, 258, 59, 3, 2, 2, 2, 259, 278, 7, 42, 2, 2, 260,
+	278, 5, 70, 36, 2, 261, 262, 7, 28, 2, 2, 262, 264, 7, 3, 2, 2, 263, 265,
+	5, 8, 5, 2, 264, 263, 3, 2, 2, 2, 264, 265, 3, 2, 2, 2, 265, 266, 3, 2,
+	2, 2, 266, 267, 7, 4, 2, 2, 267, 268, 7, 5, 2, 2, 268, 269, 5, 12, 7, 2,
+	269, 270, 7, 6, 2, 2, 270, 271, 5, 18, 10, 2, 271, 272, 7, 7, 2, 2, 272,
+	278, 3, 2, 2, 2, 273, 274, 7, 3, 2, 2, 274, 275, 5, 32, 17, 2, 275, 276,
+	7, 4, 2, 2, 276, 278, 3, 2, 2, 2, 277, 259, 3, 2, 2, 2, 277, 260, 3, 2,
+	2, 2, 277, 261, 3, 2, 2, 2, 277, 273, 3, 2, 2, 2, 278, 61, 3, 2, 2, 2,
+	279, 282, 5, 64, 33, 2, 280, 282, 5, 66, 34, 2, 281, 279, 3, 2, 2, 2, 281,
+	280, 3, 2, 2, 2, 282, 63, 3, 2, 2, 2, 283, 284, 7, 15, 2, 2, 284, 285,
+	7, 42, 2, 2, 285, 65, 3, 2, 2, 2, 286, 287, 7, 9, 2, 2, 287, 288, 5, 32,
+	17, 2, 288, 289, 7, 10, 2, 2, 289, 67, 3, 2, 2, 2, 290, 299, 7, 3, 2, 2,
+	291, 296, 5, 32, 17, 2, 292, 293, 7, 8, 2, 2, 293, 295, 5, 32, 17, 2, 294,
+	292, 3, 2, 2, 2, 295, 298, 3, 2, 2, 2, 296, 294, 3, 2, 2, 2, 296, 297,
+	3, 2, 2, 2, 297, 300, 3, 2, 2, 2, 298, 296, 3, 2, 2, 2, 299, 291, 3, 2,
+	2, 2, 299, 300, 3, 2, 2, 2, 300, 301, 3, 2, 2, 2, 301, 302, 7, 4, 2, 2,
+	302, 69, 3, 2, 2, 2, 303, 307, 5, 74, 38, 2, 304, 307, 5, 72, 37, 2, 305,
+	307, 5, 76, 39, 2, 306, 303, 3, 2, 2, 2, 306, 304, 3, 2, 2, 2, 306, 305,
+	3, 2, 2, 2, 307, 71, 3, 2, 2, 2, 308, 309, 9, 7, 2, 2, 309, 73, 3, 2, 2,
+	2, 310, 315, 7, 43, 2, 2, 311, 315, 7, 44, 2, 2, 312, 315, 7, 45, 2, 2,
+	313, 315, 7, 46, 2, 2, 314, 310, 3, 2, 2, 2, 314, 311, 3, 2, 2, 2, 314,
+	312, 3, 2, 2, 2, 314, 313, 3, 2, 2, 2, 315, 75, 3, 2, 2, 2, 316, 325, 7,
+	9, 2, 2, 317, 322, 5, 32, 17, 2, 318, 319, 7, 8, 2, 2, 319, 321, 5, 32,
+	17, 2, 320, 318, 3, 2, 2, 2, 321, 324, 3, 2, 2, 2, 322, 320, 3, 2, 2, 2,
+	322, 323, 3, 2, 2, 2, 323, 326, 3, 2, 2, 2, 324, 322, 3, 2, 2, 2, 325,
+	317, 3, 2, 2, 2, 325, 326, 3, 2, 2, 2, 326, 327, 3, 2, 2, 2, 327, 328,
+	7, 10, 2, 2, 328, 77, 3, 2, 2, 2, 329, 334, 7, 16, 2, 2, 330, 334, 7, 2,
+	2, 3, 331, 334, 6, 40, 2, 2, 332, 334, 6, 40, 3, 2, 333, 329, 3, 2, 2,
+	2, 333, 330, 3, 2, 2, 2, 333, 331, 3, 2, 2, 2, 333, 332, 3, 2, 2, 2, 334,
+	79, 3, 2, 2, 2, 35, 83, 90, 93, 99, 113, 124, 129, 135, 142, 151, 167,
+	169, 181, 190, 204, 209, 214, 220, 226, 232, 238, 244, 249, 264, 277, 281,
+	296, 299, 306, 314, 322, 325, 333,
 }
 var deserializer = antlr.NewATNDeserializer(nil)
 var deserializedATN = deserializer.DeserializeFromUInt16(parserATN)
@@ -2586,6 +2589,29 @@ func (s *AssignmentContext) Expression() IExpressionContext {
 	return t.(IExpressionContext)
 }
 
+func (s *AssignmentContext) AllExpressionAccess() []IExpressionAccessContext {
+	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpressionAccessContext)(nil)).Elem())
+	var tst = make([]IExpressionAccessContext, len(ts))
+
+	for i, t := range ts {
+		if t != nil {
+			tst[i] = t.(IExpressionAccessContext)
+		}
+	}
+
+	return tst
+}
+
+func (s *AssignmentContext) ExpressionAccess(i int) IExpressionAccessContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpressionAccessContext)(nil)).Elem(), i)
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IExpressionAccessContext)
+}
+
 func (s *AssignmentContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -2619,6 +2645,7 @@ func (s *AssignmentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 func (p *StrictusParser) Assignment() (localctx IAssignmentContext) {
 	localctx = NewAssignmentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, StrictusParserRULE_assignment)
+	var _la int
 
 	defer func() {
 		p.ExitRule()
@@ -2641,12 +2668,26 @@ func (p *StrictusParser) Assignment() (localctx IAssignmentContext) {
 		p.SetState(184)
 		p.Match(StrictusParserIdentifier)
 	}
+	p.SetState(188)
+	p.GetErrorHandler().Sync(p)
+	_la = p.GetTokenStream().LA(1)
+
+	for _la == StrictusParserT__6 || _la == StrictusParserT__12 {
+		{
+			p.SetState(185)
+			p.ExpressionAccess()
+		}
+
+		p.SetState(190)
+		p.GetErrorHandler().Sync(p)
+		_la = p.GetTokenStream().LA(1)
+	}
 	{
-		p.SetState(185)
+		p.SetState(191)
 		p.Match(StrictusParserT__8)
 	}
 	{
-		p.SetState(186)
+		p.SetState(192)
 		p.Expression()
 	}
 
@@ -2753,7 +2794,7 @@ func (p *StrictusParser) Expression() (localctx IExpressionContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(188)
+		p.SetState(194)
 		p.ConditionalExpression()
 	}
 
@@ -2905,30 +2946,30 @@ func (p *StrictusParser) ConditionalExpression() (localctx IConditionalExpressio
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(190)
+		p.SetState(196)
 		p.OrExpression()
 	}
-	p.SetState(196)
+	p.SetState(202)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 13, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 14, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(191)
+			p.SetState(197)
 			p.Match(StrictusParserT__9)
 		}
 		{
-			p.SetState(192)
+			p.SetState(198)
 
 			var _x = p.Expression()
 
 			localctx.(*ConditionalExpressionContext).then = _x
 		}
 		{
-			p.SetState(193)
+			p.SetState(199)
 			p.Match(StrictusParserT__2)
 		}
 		{
-			p.SetState(194)
+			p.SetState(200)
 
 			var _x = p.Expression()
 
@@ -3053,19 +3094,19 @@ func (p *StrictusParser) OrExpression() (localctx IOrExpressionContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(198)
+		p.SetState(204)
 		p.AndExpression()
 	}
-	p.SetState(201)
+	p.SetState(207)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 14, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 15, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(199)
+			p.SetState(205)
 			p.Match(StrictusParserT__10)
 		}
 		{
-			p.SetState(200)
+			p.SetState(206)
 			p.AndExpression()
 		}
 
@@ -3187,19 +3228,19 @@ func (p *StrictusParser) AndExpression() (localctx IAndExpressionContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(203)
+		p.SetState(209)
 		p.EqualityExpression()
 	}
-	p.SetState(206)
+	p.SetState(212)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 15, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 16, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(204)
+			p.SetState(210)
 			p.Match(StrictusParserT__11)
 		}
 		{
-			p.SetState(205)
+			p.SetState(211)
 			p.EqualityExpression()
 		}
 
@@ -3331,19 +3372,19 @@ func (p *StrictusParser) EqualityExpression() (localctx IEqualityExpressionConte
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(208)
+		p.SetState(214)
 		p.RelationalExpression()
 	}
-	p.SetState(212)
+	p.SetState(218)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 16, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 17, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(209)
+			p.SetState(215)
 			p.EqualityOp()
 		}
 		{
-			p.SetState(210)
+			p.SetState(216)
 			p.RelationalExpression()
 		}
 
@@ -3475,19 +3516,19 @@ func (p *StrictusParser) RelationalExpression() (localctx IRelationalExpressionC
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(214)
+		p.SetState(220)
 		p.AdditiveExpression()
 	}
-	p.SetState(218)
+	p.SetState(224)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 17, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 18, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(215)
+			p.SetState(221)
 			p.RelationalOp()
 		}
 		{
-			p.SetState(216)
+			p.SetState(222)
 			p.AdditiveExpression()
 		}
 
@@ -3619,19 +3660,19 @@ func (p *StrictusParser) AdditiveExpression() (localctx IAdditiveExpressionConte
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(220)
+		p.SetState(226)
 		p.MultiplicativeExpression()
 	}
-	p.SetState(224)
+	p.SetState(230)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 18, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 19, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(221)
+			p.SetState(227)
 			p.AdditiveOp()
 		}
 		{
-			p.SetState(222)
+			p.SetState(228)
 			p.MultiplicativeExpression()
 		}
 
@@ -3763,19 +3804,19 @@ func (p *StrictusParser) MultiplicativeExpression() (localctx IMultiplicativeExp
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(226)
+		p.SetState(232)
 		p.PrimaryExpression()
 	}
-	p.SetState(230)
+	p.SetState(236)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 19, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 20, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(227)
+			p.SetState(233)
 			p.MultiplicativeOp()
 		}
 		{
-			p.SetState(228)
+			p.SetState(234)
 			p.PrimaryExpression()
 		}
 
@@ -3909,24 +3950,24 @@ func (p *StrictusParser) PrimaryExpression() (localctx IPrimaryExpressionContext
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(232)
+		p.SetState(238)
 		p.PrimaryExpressionStart()
 	}
-	p.SetState(236)
+	p.SetState(242)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 20, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 21, p.GetParserRuleContext())
 
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(233)
+				p.SetState(239)
 				p.PrimaryExpressionSuffix()
 			}
 
 		}
-		p.SetState(238)
+		p.SetState(244)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 20, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 21, p.GetParserRuleContext())
 	}
 
 	return localctx
@@ -4040,21 +4081,21 @@ func (p *StrictusParser) PrimaryExpressionSuffix() (localctx IPrimaryExpressionS
 		}
 	}()
 
-	p.SetState(241)
+	p.SetState(247)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case StrictusParserT__6, StrictusParserT__12:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(239)
+			p.SetState(245)
 			p.ExpressionAccess()
 		}
 
 	case StrictusParserT__0:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(240)
+			p.SetState(246)
 			p.Invocation()
 		}
 
@@ -4164,7 +4205,7 @@ func (p *StrictusParser) EqualityOp() (localctx IEqualityOpContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(243)
+		p.SetState(249)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == StrictusParserEqual || _la == StrictusParserUnequal) {
@@ -4285,7 +4326,7 @@ func (p *StrictusParser) RelationalOp() (localctx IRelationalOpContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(245)
+		p.SetState(251)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserLess)|(1<<StrictusParserGreater)|(1<<StrictusParserLessEqual)|(1<<StrictusParserGreaterEqual))) != 0) {
@@ -4398,7 +4439,7 @@ func (p *StrictusParser) AdditiveOp() (localctx IAdditiveOpContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(247)
+		p.SetState(253)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == StrictusParserPlus || _la == StrictusParserMinus) {
@@ -4515,7 +4556,7 @@ func (p *StrictusParser) MultiplicativeOp() (localctx IMultiplicativeOpContext) 
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(249)
+		p.SetState(255)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserMul)|(1<<StrictusParserDiv)|(1<<StrictusParserMod))) != 0) {
@@ -4818,7 +4859,7 @@ func (p *StrictusParser) PrimaryExpressionStart() (localctx IPrimaryExpressionSt
 		}
 	}()
 
-	p.SetState(269)
+	p.SetState(275)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
@@ -4826,7 +4867,7 @@ func (p *StrictusParser) PrimaryExpressionStart() (localctx IPrimaryExpressionSt
 		localctx = NewIdentifierExpressionContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(251)
+			p.SetState(257)
 			p.Match(StrictusParserIdentifier)
 		}
 
@@ -4834,7 +4875,7 @@ func (p *StrictusParser) PrimaryExpressionStart() (localctx IPrimaryExpressionSt
 		localctx = NewLiteralExpressionContext(p, localctx)
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(252)
+			p.SetState(258)
 			p.Literal()
 		}
 
@@ -4842,46 +4883,46 @@ func (p *StrictusParser) PrimaryExpressionStart() (localctx IPrimaryExpressionSt
 		localctx = NewFunctionExpressionContext(p, localctx)
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(253)
+			p.SetState(259)
 			p.Match(StrictusParserFun)
 		}
 		{
-			p.SetState(254)
+			p.SetState(260)
 			p.Match(StrictusParserT__0)
 		}
-		p.SetState(256)
+		p.SetState(262)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == StrictusParserIdentifier {
 			{
-				p.SetState(255)
+				p.SetState(261)
 				p.ParameterList()
 			}
 
 		}
 		{
-			p.SetState(258)
+			p.SetState(264)
 			p.Match(StrictusParserT__1)
 		}
 		{
-			p.SetState(259)
+			p.SetState(265)
 			p.Match(StrictusParserT__2)
 		}
 		{
-			p.SetState(260)
+			p.SetState(266)
 			p.TypeName()
 		}
 		{
-			p.SetState(261)
+			p.SetState(267)
 			p.Match(StrictusParserT__3)
 		}
 		{
-			p.SetState(262)
+			p.SetState(268)
 			p.Block()
 		}
 		{
-			p.SetState(263)
+			p.SetState(269)
 			p.Match(StrictusParserT__4)
 		}
 
@@ -4889,15 +4930,15 @@ func (p *StrictusParser) PrimaryExpressionStart() (localctx IPrimaryExpressionSt
 		localctx = NewNestedExpressionContext(p, localctx)
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(265)
+			p.SetState(271)
 			p.Match(StrictusParserT__0)
 		}
 		{
-			p.SetState(266)
+			p.SetState(272)
 			p.Expression()
 		}
 		{
-			p.SetState(267)
+			p.SetState(273)
 			p.Match(StrictusParserT__1)
 		}
 
@@ -5016,21 +5057,21 @@ func (p *StrictusParser) ExpressionAccess() (localctx IExpressionAccessContext) 
 		}
 	}()
 
-	p.SetState(273)
+	p.SetState(279)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case StrictusParserT__12:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(271)
+			p.SetState(277)
 			p.MemberAccess()
 		}
 
 	case StrictusParserT__6:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(272)
+			p.SetState(278)
 			p.BracketExpression()
 		}
 
@@ -5135,11 +5176,11 @@ func (p *StrictusParser) MemberAccess() (localctx IMemberAccessContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(275)
+		p.SetState(281)
 		p.Match(StrictusParserT__12)
 	}
 	{
-		p.SetState(276)
+		p.SetState(282)
 		p.Match(StrictusParserIdentifier)
 	}
 
@@ -5246,15 +5287,15 @@ func (p *StrictusParser) BracketExpression() (localctx IBracketExpressionContext
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(278)
+		p.SetState(284)
 		p.Match(StrictusParserT__6)
 	}
 	{
-		p.SetState(279)
+		p.SetState(285)
 		p.Expression()
 	}
 	{
-		p.SetState(280)
+		p.SetState(286)
 		p.Match(StrictusParserT__7)
 	}
 
@@ -5375,40 +5416,40 @@ func (p *StrictusParser) Invocation() (localctx IInvocationContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(282)
+		p.SetState(288)
 		p.Match(StrictusParserT__0)
 	}
-	p.SetState(291)
+	p.SetState(297)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__0)|(1<<StrictusParserT__6)|(1<<StrictusParserFun))) != 0) || (((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(StrictusParserTrue-34))|(1<<(StrictusParserFalse-34))|(1<<(StrictusParserIdentifier-34))|(1<<(StrictusParserDecimalLiteral-34))|(1<<(StrictusParserBinaryLiteral-34))|(1<<(StrictusParserOctalLiteral-34))|(1<<(StrictusParserHexadecimalLiteral-34)))) != 0) {
 		{
-			p.SetState(283)
+			p.SetState(289)
 			p.Expression()
 		}
-		p.SetState(288)
+		p.SetState(294)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == StrictusParserT__5 {
 			{
-				p.SetState(284)
+				p.SetState(290)
 				p.Match(StrictusParserT__5)
 			}
 			{
-				p.SetState(285)
+				p.SetState(291)
 				p.Expression()
 			}
 
-			p.SetState(290)
+			p.SetState(296)
 			p.GetErrorHandler().Sync(p)
 			_la = p.GetTokenStream().LA(1)
 		}
 
 	}
 	{
-		p.SetState(293)
+		p.SetState(299)
 		p.Match(StrictusParserT__1)
 	}
 
@@ -5533,28 +5574,28 @@ func (p *StrictusParser) Literal() (localctx ILiteralContext) {
 		}
 	}()
 
-	p.SetState(298)
+	p.SetState(304)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case StrictusParserDecimalLiteral, StrictusParserBinaryLiteral, StrictusParserOctalLiteral, StrictusParserHexadecimalLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(295)
+			p.SetState(301)
 			p.IntegerLiteral()
 		}
 
 	case StrictusParserTrue, StrictusParserFalse:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(296)
+			p.SetState(302)
 			p.BooleanLiteral()
 		}
 
 	case StrictusParserT__6:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(297)
+			p.SetState(303)
 			p.ArrayLiteral()
 		}
 
@@ -5664,7 +5705,7 @@ func (p *StrictusParser) BooleanLiteral() (localctx IBooleanLiteralContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(300)
+		p.SetState(306)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == StrictusParserTrue || _la == StrictusParserFalse) {
@@ -5924,7 +5965,7 @@ func (p *StrictusParser) IntegerLiteral() (localctx IIntegerLiteralContext) {
 		}
 	}()
 
-	p.SetState(306)
+	p.SetState(312)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
@@ -5932,7 +5973,7 @@ func (p *StrictusParser) IntegerLiteral() (localctx IIntegerLiteralContext) {
 		localctx = NewDecimalLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(302)
+			p.SetState(308)
 			p.Match(StrictusParserDecimalLiteral)
 		}
 
@@ -5940,7 +5981,7 @@ func (p *StrictusParser) IntegerLiteral() (localctx IIntegerLiteralContext) {
 		localctx = NewBinaryLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(303)
+			p.SetState(309)
 			p.Match(StrictusParserBinaryLiteral)
 		}
 
@@ -5948,7 +5989,7 @@ func (p *StrictusParser) IntegerLiteral() (localctx IIntegerLiteralContext) {
 		localctx = NewOctalLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(304)
+			p.SetState(310)
 			p.Match(StrictusParserOctalLiteral)
 		}
 
@@ -5956,7 +5997,7 @@ func (p *StrictusParser) IntegerLiteral() (localctx IIntegerLiteralContext) {
 		localctx = NewHexadecimalLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(305)
+			p.SetState(311)
 			p.Match(StrictusParserHexadecimalLiteral)
 		}
 
@@ -6081,40 +6122,40 @@ func (p *StrictusParser) ArrayLiteral() (localctx IArrayLiteralContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(308)
+		p.SetState(314)
 		p.Match(StrictusParserT__6)
 	}
-	p.SetState(317)
+	p.SetState(323)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__0)|(1<<StrictusParserT__6)|(1<<StrictusParserFun))) != 0) || (((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(StrictusParserTrue-34))|(1<<(StrictusParserFalse-34))|(1<<(StrictusParserIdentifier-34))|(1<<(StrictusParserDecimalLiteral-34))|(1<<(StrictusParserBinaryLiteral-34))|(1<<(StrictusParserOctalLiteral-34))|(1<<(StrictusParserHexadecimalLiteral-34)))) != 0) {
 		{
-			p.SetState(309)
+			p.SetState(315)
 			p.Expression()
 		}
-		p.SetState(314)
+		p.SetState(320)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == StrictusParserT__5 {
 			{
-				p.SetState(310)
+				p.SetState(316)
 				p.Match(StrictusParserT__5)
 			}
 			{
-				p.SetState(311)
+				p.SetState(317)
 				p.Expression()
 			}
 
-			p.SetState(316)
+			p.SetState(322)
 			p.GetErrorHandler().Sync(p)
 			_la = p.GetTokenStream().LA(1)
 		}
 
 	}
 	{
-		p.SetState(319)
+		p.SetState(325)
 		p.Match(StrictusParserT__7)
 	}
 
@@ -6213,26 +6254,26 @@ func (p *StrictusParser) Eos() (localctx IEosContext) {
 		}
 	}()
 
-	p.SetState(325)
+	p.SetState(331)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 31, p.GetParserRuleContext()) {
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 32, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(321)
+			p.SetState(327)
 			p.Match(StrictusParserT__13)
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(322)
+			p.SetState(328)
 			p.Match(StrictusParserEOF)
 		}
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
-		p.SetState(323)
+		p.SetState(329)
 
 		if !(p.lineTerminatorAhead()) {
 			panic(antlr.NewFailedPredicateException(p, "p.lineTerminatorAhead()", ""))
@@ -6240,7 +6281,7 @@ func (p *StrictusParser) Eos() (localctx IEosContext) {
 
 	case 4:
 		p.EnterOuterAlt(localctx, 4)
-		p.SetState(324)
+		p.SetState(330)
 
 		if !(p.GetTokenStream().LT(1).GetText() == "}") {
 			panic(antlr.NewFailedPredicateException(p, "p.GetTokenStream().LT(1).GetText() == \"}\"", ""))

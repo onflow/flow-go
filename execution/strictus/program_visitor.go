@@ -243,9 +243,20 @@ func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
 	identifier := ctx.Identifier().GetText()
 	value := ctx.Expression().Accept(v).(ast.Expression)
 
+	var target ast.Expression = ast.IdentifierExpression{Identifier: identifier}
+
+	for _, accessExpressionContext := range ctx.AllExpressionAccess() {
+		expression := accessExpressionContext.Accept(v)
+		accessExpression, ok := expression.(ast.AccessExpression)
+		if !ok {
+			panic(fmt.Sprintf("assignment to unknown access expression: %#+v", expression))
+		}
+		target = v.wrapPartialAccessExpression(target, accessExpression)
+	}
+
 	return ast.Assignment{
-		Identifier: identifier,
-		Value:      value,
+		Target: target,
+		Value:  value,
 	}
 }
 
@@ -379,25 +390,39 @@ func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) i
 
 	for _, suffix := range ctx.AllPrimaryExpressionSuffix() {
 		switch partialExpression := suffix.Accept(v).(type) {
-		case ast.IndexExpression:
-			result = ast.IndexExpression{
-				Expression: result,
-				Index:      partialExpression.Index,
-			}
-		case ast.MemberExpression:
-			result = ast.MemberExpression{
-				Expression: result,
-				Identifier: partialExpression.Identifier,
-			}
 		case ast.InvocationExpression:
 			result = ast.InvocationExpression{
 				Expression: result,
 				Arguments:  partialExpression.Arguments,
 			}
+		case ast.AccessExpression:
+			result = v.wrapPartialAccessExpression(result, partialExpression)
+		default:
+			panic(fmt.Sprintf("unknown primary expression suffix: %#+v", suffix))
 		}
 	}
 
 	return result
+}
+
+func (v *ProgramVisitor) wrapPartialAccessExpression(
+	wrapped ast.Expression,
+	partialAccessExpression ast.AccessExpression,
+) ast.Expression {
+
+	switch partialAccessExpression := partialAccessExpression.(type) {
+	case ast.IndexExpression:
+		return ast.IndexExpression{
+			Expression: wrapped,
+			Index:      partialAccessExpression.Index,
+		}
+	case ast.MemberExpression:
+		return ast.MemberExpression{
+			Expression: wrapped,
+			Identifier: partialAccessExpression.Identifier,
+		}
+	}
+	panic(fmt.Sprintf("invalid primary expression suffix: %#+v", partialAccessExpression))
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{} {
