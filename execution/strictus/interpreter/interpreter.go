@@ -61,14 +61,21 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	function := newFunction(expression, interpreter.activations.CurrentOrNew())
 
+	var parameterTypes []ast.Type
+	for _, parameter := range declaration.Parameters {
+		parameterTypes = append(parameterTypes, parameter.Type)
+	}
+
 	// function declarations are de-sugared to constant variables
 	interpreter.declareVariable(
 		ast.VariableDeclaration{
 			Value:      expression,
 			Identifier: declaration.Identifier,
 			IsConst:    true,
-			// TODO: specify parameter types and return type
-			Type: ast.FunctionType{},
+			Type: ast.FunctionType{
+				ParameterTypes: parameterTypes,
+				ReturnType:     declaration.ReturnType,
+			},
 		},
 		function,
 	)
