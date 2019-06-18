@@ -1,0 +1,32 @@
+package interpreter
+
+import (
+	"bamboo-emulator/execution/strictus/ast"
+	"fmt"
+)
+
+type Variable struct {
+	Declaration ast.VariableDeclaration
+	Depth       int
+	// TODO: type
+	Value Value
+}
+
+func newVariable(declaration ast.VariableDeclaration, depth int, value Value) *Variable {
+	return &Variable{
+		Declaration: declaration,
+		Depth:       depth,
+		Value:       value,
+	}
+}
+
+func (v *Variable) Set(newValue Value) {
+	if v.Declaration.IsConst {
+		// TODO: improve errors
+		panic(fmt.Sprintf("can't assign to constant variable: %s", v.Declaration.Identifier))
+	}
+
+	// TODO: check type
+
+	v.Value = newValue
+}

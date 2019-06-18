@@ -1,11 +1,13 @@
 package ast
 
+import "fmt"
+
 type Expression interface {
 	Element
 	isExpression()
 }
 
-/// BoolExpression
+// BoolExpression
 
 type BoolExpression struct {
 	Value bool
@@ -17,7 +19,7 @@ func (e BoolExpression) Accept(v Visitor) Repr {
 
 func (BoolExpression) isExpression() {}
 
-/// IntExpression
+// IntExpression
 
 type IntExpression struct {
 	Value int64
@@ -29,7 +31,7 @@ func (e IntExpression) Accept(v Visitor) Repr {
 	return v.VisitIntExpression(e)
 }
 
-/// ArrayExpression
+// ArrayExpression
 
 type ArrayExpression struct {
 	Values []Expression
@@ -41,7 +43,7 @@ func (e ArrayExpression) Accept(v Visitor) Repr {
 	return v.VisitArrayExpression(e)
 }
 
-/// IdentifierExpression
+// IdentifierExpression
 
 type IdentifierExpression struct {
 	Identifier string
@@ -53,10 +55,10 @@ func (e IdentifierExpression) Accept(v Visitor) Repr {
 	return v.VisitIdentifierExpression(e)
 }
 
-/// InvocationExpression
+// InvocationExpression
 
 type InvocationExpression struct {
-	Identifier string
+	Expression Expression
 	Arguments  []Expression
 }
 
@@ -66,7 +68,7 @@ func (e InvocationExpression) Accept(v Visitor) Repr {
 	return v.VisitInvocationExpression(e)
 }
 
-/// MemberExpression
+// MemberExpression
 
 type MemberExpression struct {
 	Expression Expression
@@ -79,7 +81,7 @@ func (e MemberExpression) Accept(v Visitor) Repr {
 	return v.VisitMemberExpression(e)
 }
 
-/// IndexExpression
+// IndexExpression
 
 type IndexExpression struct {
 	Expression Expression
@@ -92,7 +94,7 @@ func (e IndexExpression) Accept(v Visitor) Repr {
 	return v.VisitIndexExpression(e)
 }
 
-/// ConditionalExpression
+// ConditionalExpression
 
 type ConditionalExpression struct {
 	Test Expression
@@ -106,7 +108,7 @@ func (e ConditionalExpression) Accept(v Visitor) Repr {
 	return v.VisitConditionalExpression(e)
 }
 
-/// BinaryExpression
+// BinaryExpression
 
 type BinaryExpression struct {
 	Operation Operation
@@ -120,8 +122,23 @@ func (e BinaryExpression) Accept(v Visitor) Repr {
 	return v.VisitBinaryExpression(e)
 }
 
-/// ToExpression
+// FunctionExpression
 
+type FunctionExpression struct {
+	Parameters []Parameter
+	ReturnType Type
+	Block      Block
+}
+
+func (FunctionExpression) isExpression() {}
+
+func (f FunctionExpression) Accept(visitor Visitor) Repr {
+	return visitor.VisitFunctionExpression(f)
+}
+
+// ToExpression
+
+// ToExpression converts a Go value into an expression
 func ToExpression(value interface{}) Expression {
 	// TODO: support more types
 	switch value := value.(type) {
@@ -133,5 +150,5 @@ func ToExpression(value interface{}) Expression {
 		return BoolExpression{Value: value}
 	}
 
-	return nil
+	panic(fmt.Sprintf("can't convert Go value to expression: %#+v", value))
 }

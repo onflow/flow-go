@@ -14,7 +14,10 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#program.
 	VisitProgram(ctx *ProgramContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#FunctionDeclaration.
+	// Visit a parse tree produced by StrictusParser#declaration.
+	VisitDeclaration(ctx *DeclarationContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#functionDeclaration.
 	VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#parameterList.
@@ -83,6 +86,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#primaryExpression.
 	VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#primaryExpressionSuffix.
+	VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#equalityOp.
 	VisitEqualityOp(ctx *EqualityOpContext) interface{}
 
@@ -98,11 +104,11 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#IdentifierExpression.
 	VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#InvocationExpression.
-	VisitInvocationExpression(ctx *InvocationExpressionContext) interface{}
-
 	// Visit a parse tree produced by StrictusParser#LiteralExpression.
 	VisitLiteralExpression(ctx *LiteralExpressionContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#FunctionExpression.
+	VisitFunctionExpression(ctx *FunctionExpressionContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#NestedExpression.
 	VisitNestedExpression(ctx *NestedExpressionContext) interface{}

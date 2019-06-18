@@ -8,7 +8,7 @@ type Element interface {
 
 type Visitor interface {
 	VisitProgram(Program) Repr
-	VisitFunction(Function) Repr
+	VisitFunctionDeclaration(FunctionDeclaration) Repr
 	VisitBlock(Block) Repr
 	// statements
 	VisitReturnStatement(ReturnStatement) Repr
@@ -27,4 +27,5 @@ type Visitor interface {
 	VisitIndexExpression(IndexExpression) Repr
 	VisitConditionalExpression(ConditionalExpression) Repr
 	VisitBinaryExpression(BinaryExpression) Repr
+	VisitFunctionExpression(FunctionExpression) Repr
 }

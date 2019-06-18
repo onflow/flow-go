@@ -12,27 +12,59 @@ type ProgramVisitor struct {
 }
 
 func (v *ProgramVisitor) VisitProgram(ctx *ProgramContext) interface{} {
-	functions := map[string]ast.Function{}
-	for _, declaration := range ctx.AllDeclaration() {
-		function := declaration.Accept(v).(ast.Function)
-		functions[function.Identifier] = function
+	declarations := map[string]ast.Declaration{}
+	var allDeclarations []ast.Declaration
+
+	for _, declarationContext := range ctx.AllDeclaration() {
+		declaration := declarationContext.Accept(v).(ast.Declaration)
+		name := declaration.DeclarationName()
+		if _, exists := declarations[name]; exists {
+			panic(fmt.Sprintf("can't redeclare %s", name))
+		}
+		declarations[name] = declaration
+		allDeclarations = append(allDeclarations, declaration)
 	}
 
 	return ast.Program{
-		Functions: functions,
+		Declarations:    declarations,
+		AllDeclarations: allDeclarations,
 	}
+}
+
+func (v *ProgramVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
 func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
 	isPublic := ctx.Pub() != nil
 	identifier := ctx.Identifier().GetText()
 	returnType := ctx.TypeName().Accept(v).(ast.Type)
-	parameters := ctx.ParameterList().Accept(v).([]ast.Parameter)
+	var parameters []ast.Parameter
+	parameterList := ctx.ParameterList()
+	if parameterList != nil {
+		parameters = parameterList.Accept(v).([]ast.Parameter)
+	}
 	block := ctx.Block().Accept(v).(ast.Block)
 
-	return ast.Function{
+	return ast.FunctionDeclaration{
 		IsPublic:   isPublic,
 		Identifier: identifier,
+		Parameters: parameters,
+		ReturnType: returnType,
+		Block:      block,
+	}
+}
+
+func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
+	returnType := ctx.TypeName().Accept(v).(ast.Type)
+	var parameters []ast.Parameter
+	parameterList := ctx.ParameterList()
+	if parameterList != nil {
+		parameters = parameterList.Accept(v).([]ast.Parameter)
+	}
+	block := ctx.Block().Accept(v).(ast.Block)
+
+	return ast.FunctionExpression{
 		Parameters: parameters,
 		ReturnType: returnType,
 		Block:      block,
@@ -162,12 +194,12 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 	isConst := ctx.Const() != nil
 	identifier := ctx.Identifier().GetText()
 	expression := ctx.Expression().Accept(v).(ast.Expression)
-	var typeName *ast.Type
+	var typeName ast.Type
 
 	typeNameContext := ctx.TypeName()
 	if typeNameContext != nil {
 		if x, ok := typeNameContext.Accept(v).(ast.Type); ok {
-			typeName = &x
+			typeName = x
 		}
 	}
 
@@ -345,17 +377,22 @@ func (v *ProgramVisitor) VisitMultiplicativeExpression(ctx *MultiplicativeExpres
 func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
 	result := ctx.PrimaryExpressionStart().Accept(v).(ast.Expression)
 
-	for _, access := range ctx.AllExpressionAccess() {
-		switch access := access.Accept(v).(type) {
-		case ast.Expression:
+	for _, suffix := range ctx.AllPrimaryExpressionSuffix() {
+		switch partialExpression := suffix.Accept(v).(type) {
+		case ast.IndexExpression:
 			result = ast.IndexExpression{
 				Expression: result,
-				Index:      access,
+				Index:      partialExpression.Index,
 			}
-		case string:
+		case ast.MemberExpression:
 			result = ast.MemberExpression{
 				Expression: result,
-				Identifier: access,
+				Identifier: partialExpression.Identifier,
+			}
+		case ast.InvocationExpression:
+			result = ast.InvocationExpression{
+				Expression: result,
+				Arguments:  partialExpression.Arguments,
 			}
 		}
 	}
@@ -363,16 +400,24 @@ func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) i
 	return result
 }
 
+func (v *ProgramVisitor) VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
 func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
 func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{} {
-	return ctx.Identifier().GetText()
+	access := ctx.Identifier().GetText()
+	// NOTE: partial, expression is filled later
+	return ast.MemberExpression{Identifier: access}
 }
 
 func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) interface{} {
-	return ctx.Expression().Accept(v)
+	access := ctx.Expression().Accept(v).(ast.Expression)
+	// NOTE: partial, expression is filled later
+	return ast.IndexExpression{Index: access}
 }
 
 func (v *ProgramVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) interface{} {
@@ -444,14 +489,7 @@ func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionCont
 	}
 }
 
-// NOTE: manually go over all child rules and find a match
-func (v *ProgramVisitor) VisitInvocationExpression(ctx *InvocationExpressionContext) interface{} {
-	return v.VisitChildren(ctx.BaseParserRuleContext)
-}
-
 func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
-	identifier := ctx.Identifier().GetText()
-
 	var expressions []ast.Expression
 	for _, expression := range ctx.AllExpression() {
 		expressions = append(
@@ -460,9 +498,9 @@ func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
 		)
 	}
 
+	// NOTE: partial, expression is filled later
 	return ast.InvocationExpression{
-		Identifier: identifier,
-		Arguments:  expressions,
+		Arguments: expressions,
 	}
 }
 

@@ -50,7 +50,12 @@ program
     ;
 
 declaration
-    : Pub? Fun Identifier '(' parameterList? ')' ':' typeName '{' block '}'  # FunctionDeclaration
+    : functionDeclaration
+    | variableDeclaration
+    ;
+
+functionDeclaration
+    : Pub? Fun Identifier '(' parameterList? ')' ':' typeName '{' block '}'
     ;
 
 parameterList
@@ -83,7 +88,7 @@ statement
     : returnStatement
     | ifStatement
     | whileStatement
-    | variableDeclaration
+    | declaration
     | assignment
     | expression
     ;
@@ -104,6 +109,7 @@ variableDeclaration
     : (Const | Var) Identifier (':' typeName)? '=' expression
     ;
 
+// TODO: add expressionAccess to left-hand side
 assignment
 	: Identifier '=' expression
 	;
@@ -141,7 +147,12 @@ multiplicativeExpression
 	;
 
 primaryExpression
-    : primaryExpressionStart expressionAccess*
+    : primaryExpressionStart primaryExpressionSuffix*
+    ;
+
+primaryExpressionSuffix
+    : expressionAccess
+    | invocation
     ;
 
 equalityOp
@@ -184,10 +195,10 @@ Mod : '%' ;
 
 
 primaryExpressionStart
-    : Identifier             # IdentifierExpression
-    | invocation             # InvocationExpression
-    | literal                # LiteralExpression
-    | '(' expression ')'     # NestedExpression
+    : Identifier                                             # IdentifierExpression
+    | literal                                                # LiteralExpression
+    | Fun '(' parameterList? ')' ':' typeName '{' block '}'  # FunctionExpression
+    | '(' expression ')'                                     # NestedExpression
     ;
 
 expressionAccess
@@ -204,7 +215,7 @@ bracketExpression
 	;
 
 invocation
-	: Identifier '(' (expression (',' expression)*)? ')'
+	: '(' (expression (',' expression)*)? ')'
 	;
 
 literal

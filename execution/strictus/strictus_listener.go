@@ -10,7 +10,10 @@ type StrictusListener interface {
 	// EnterProgram is called when entering the program production.
 	EnterProgram(c *ProgramContext)
 
-	// EnterFunctionDeclaration is called when entering the FunctionDeclaration production.
+	// EnterDeclaration is called when entering the declaration production.
+	EnterDeclaration(c *DeclarationContext)
+
+	// EnterFunctionDeclaration is called when entering the functionDeclaration production.
 	EnterFunctionDeclaration(c *FunctionDeclarationContext)
 
 	// EnterParameterList is called when entering the parameterList production.
@@ -79,6 +82,9 @@ type StrictusListener interface {
 	// EnterPrimaryExpression is called when entering the primaryExpression production.
 	EnterPrimaryExpression(c *PrimaryExpressionContext)
 
+	// EnterPrimaryExpressionSuffix is called when entering the primaryExpressionSuffix production.
+	EnterPrimaryExpressionSuffix(c *PrimaryExpressionSuffixContext)
+
 	// EnterEqualityOp is called when entering the equalityOp production.
 	EnterEqualityOp(c *EqualityOpContext)
 
@@ -94,11 +100,11 @@ type StrictusListener interface {
 	// EnterIdentifierExpression is called when entering the IdentifierExpression production.
 	EnterIdentifierExpression(c *IdentifierExpressionContext)
 
-	// EnterInvocationExpression is called when entering the InvocationExpression production.
-	EnterInvocationExpression(c *InvocationExpressionContext)
-
 	// EnterLiteralExpression is called when entering the LiteralExpression production.
 	EnterLiteralExpression(c *LiteralExpressionContext)
+
+	// EnterFunctionExpression is called when entering the FunctionExpression production.
+	EnterFunctionExpression(c *FunctionExpressionContext)
 
 	// EnterNestedExpression is called when entering the NestedExpression production.
 	EnterNestedExpression(c *NestedExpressionContext)
@@ -142,7 +148,10 @@ type StrictusListener interface {
 	// ExitProgram is called when exiting the program production.
 	ExitProgram(c *ProgramContext)
 
-	// ExitFunctionDeclaration is called when exiting the FunctionDeclaration production.
+	// ExitDeclaration is called when exiting the declaration production.
+	ExitDeclaration(c *DeclarationContext)
+
+	// ExitFunctionDeclaration is called when exiting the functionDeclaration production.
 	ExitFunctionDeclaration(c *FunctionDeclarationContext)
 
 	// ExitParameterList is called when exiting the parameterList production.
@@ -211,6 +220,9 @@ type StrictusListener interface {
 	// ExitPrimaryExpression is called when exiting the primaryExpression production.
 	ExitPrimaryExpression(c *PrimaryExpressionContext)
 
+	// ExitPrimaryExpressionSuffix is called when exiting the primaryExpressionSuffix production.
+	ExitPrimaryExpressionSuffix(c *PrimaryExpressionSuffixContext)
+
 	// ExitEqualityOp is called when exiting the equalityOp production.
 	ExitEqualityOp(c *EqualityOpContext)
 
@@ -226,11 +238,11 @@ type StrictusListener interface {
 	// ExitIdentifierExpression is called when exiting the IdentifierExpression production.
 	ExitIdentifierExpression(c *IdentifierExpressionContext)
 
-	// ExitInvocationExpression is called when exiting the InvocationExpression production.
-	ExitInvocationExpression(c *InvocationExpressionContext)
-
 	// ExitLiteralExpression is called when exiting the LiteralExpression production.
 	ExitLiteralExpression(c *LiteralExpressionContext)
+
+	// ExitFunctionExpression is called when exiting the FunctionExpression production.
+	ExitFunctionExpression(c *FunctionExpressionContext)
 
 	// ExitNestedExpression is called when exiting the NestedExpression production.
 	ExitNestedExpression(c *NestedExpressionContext)
