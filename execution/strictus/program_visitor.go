@@ -38,7 +38,7 @@ func (v *ProgramVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
 func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
 	isPublic := ctx.Pub() != nil
 	identifier := ctx.Identifier().GetText()
-	returnType := ctx.TypeName().Accept(v).(ast.Type)
+	returnType := v.visitReturnType(ctx.GetReturnType())
 	var parameters []ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
@@ -55,8 +55,15 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 	}
 }
 
+func (v *ProgramVisitor) visitReturnType(ctx ITypeNameContext) ast.Type {
+	if ctx == nil {
+		return ast.VoidType{}
+	}
+	return ctx.Accept(v).(ast.Type)
+}
+
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
-	returnType := ctx.TypeName().Accept(v).(ast.Type)
+	returnType := v.visitReturnType(ctx.GetReturnType())
 	var parameters []ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
@@ -115,6 +122,8 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 			return ast.UInt32Type{}
 		case "u64":
 			return ast.UInt64Type{}
+		case "void":
+			return ast.VoidType{}
 		default:
 			panic(fmt.Sprintf("unknown type: %s", identifier))
 		}
@@ -219,7 +228,11 @@ func (v *ProgramVisitor) VisitStatement(ctx *StatementContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitReturnStatement(ctx *ReturnStatementContext) interface{} {
-	expression := ctx.Expression().Accept(v).(ast.Expression)
+	expressionNode := ctx.Expression()
+	var expression ast.Expression
+	if expressionNode != nil {
+		expression = expressionNode.Accept(v).(ast.Expression)
+	}
 
 	return ast.ReturnStatement{
 		Expression: expression,
