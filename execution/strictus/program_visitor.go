@@ -1,7 +1,7 @@
 package strictus
 
 import (
-	"bamboo-emulator/execution/strictus/ast"
+	"bamboo-runtime/execution/strictus/ast"
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	"strconv"
