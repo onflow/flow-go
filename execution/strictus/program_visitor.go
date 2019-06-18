@@ -94,26 +94,46 @@ func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
-	identifier := ctx.Identifier().GetText()
-	switch identifier {
-	case "i8":
-		return ast.Int8Type{}
-	case "i16":
-		return ast.Int16Type{}
-	case "i32":
-		return ast.Int32Type{}
-	case "i64":
-		return ast.Int64Type{}
-	case "u8":
-		return ast.UInt8Type{}
-	case "u16":
-		return ast.UInt16Type{}
-	case "u32":
-		return ast.UInt32Type{}
-	case "u64":
-		return ast.UInt64Type{}
-	default:
-		panic(fmt.Sprintf("unknown type: %s", identifier))
+	identifierNode := ctx.Identifier()
+	// identifier?
+	if identifierNode != nil {
+		identifier := identifierNode.GetText()
+		switch identifier {
+		case "i8":
+			return ast.Int8Type{}
+		case "i16":
+			return ast.Int16Type{}
+		case "i32":
+			return ast.Int32Type{}
+		case "i64":
+			return ast.Int64Type{}
+		case "u8":
+			return ast.UInt8Type{}
+		case "u16":
+			return ast.UInt16Type{}
+		case "u32":
+			return ast.UInt32Type{}
+		case "u64":
+			return ast.UInt64Type{}
+		default:
+			panic(fmt.Sprintf("unknown type: %s", identifier))
+		}
+	}
+
+	// alternative: function type
+	var parameterTypes []ast.Type
+	for _, typeName := range ctx.GetParameterType() {
+		parameterTypes = append(
+			parameterTypes,
+			typeName.Accept(v).(ast.Type),
+		)
+	}
+
+	returnType := ctx.GetReturnType().Accept(v).(ast.Type)
+
+	return ast.FunctionType{
+		ParameterTypes: parameterTypes,
+		ReturnType:     returnType,
 	}
 }
 
