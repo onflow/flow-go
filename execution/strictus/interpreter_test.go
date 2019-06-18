@@ -1,8 +1,8 @@
 package strictus
 
 import (
-	. "bamboo-emulator/execution/strictus/ast"
-	"bamboo-emulator/execution/strictus/interpreter"
+	. "bamboo-runtime/execution/strictus/ast"
+	"bamboo-runtime/execution/strictus/interpreter"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	. "github.com/onsi/gomega"
 	"testing"
