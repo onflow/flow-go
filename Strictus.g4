@@ -76,7 +76,7 @@ typeDimension
 
 baseType
     : Identifier
-    | '(' parameterTypes+=typeName (',' parameterTypes+=typeName)* ')' '=>' returnType=typeName
+    | '(' (parameterTypes+=typeName (',' parameterTypes+=typeName)*)? ')' '=>' returnType=typeName
     ;
 
 block
