@@ -4,6 +4,12 @@ type Type interface {
 	isType()
 }
 
+// VoidType
+
+type VoidType struct{}
+
+func (VoidType) isType() {}
+
 // Int8Type represents the i8 8-byte signed integer type
 
 type Int8Type struct{}
