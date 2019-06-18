@@ -149,15 +149,16 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.R
 		interpreter.activations.Set(identifier, variable)
 
 	case ast.IndexExpression:
-		array, ok := target.Expression.Accept(interpreter).([]interface{})
+		indexedValue := target.Expression.Accept(interpreter)
+		array, ok := indexedValue.([]interface{})
 		if !ok {
-			// TODO: error
-			return nil
+			panic(fmt.Sprintf("can't index into non-array value: %#+v", indexedValue))
 		}
-		index, ok := target.Index.Accept(interpreter).(int64)
+
+		indexValue := target.Index.Accept(interpreter)
+		index, ok := indexValue.(ast.UInt64Expression)
 		if !ok {
-			// TODO: error
-			return nil
+			panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 		}
 		array[index] = value
 
@@ -289,17 +290,18 @@ func (interpreter *Interpreter) VisitMemberExpression(ast.MemberExpression) ast.
 }
 
 func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpression) ast.Repr {
-	value, ok := expression.Expression.Accept(interpreter).([]interface{})
+	indexedValue := expression.Expression.Accept(interpreter)
+	array, ok := indexedValue.([]interface{})
 	if !ok {
-		// TODO: error
-		return nil
+		panic(fmt.Sprintf("can't index into non-array value: %#+v", indexedValue))
 	}
-	index, ok := expression.Index.Accept(interpreter).(int64)
+
+	indexValue := expression.Index.Accept(interpreter)
+	index, ok := indexValue.(ast.UInt64Expression)
 	if !ok {
-		// TODO: error
-		return nil
+		panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 	}
-	return value[index]
+	return array[index]
 }
 
 func (interpreter *Interpreter) VisitConditionalExpression(expression ast.ConditionalExpression) ast.Repr {
