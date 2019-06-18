@@ -144,6 +144,9 @@ func (s *WorldState) AddBlock(block *Block) error {
 
 // InsertCollection inserts a new collection into the state.
 func (s *WorldState) InsertCollection(col *Collection) error {
+	s.collectionsMutex.Lock()
+	defer s.collectionsMutex.Unlock()
+
 	if _, exists := s.collections[col.Hash()]; exists {
 		return &DuplicateItemError{hash: col.Hash()}
 	}
