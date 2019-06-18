@@ -3,7 +3,6 @@ package strictus
 import (
 	. "bamboo-runtime/execution/strictus/ast"
 	"bamboo-runtime/execution/strictus/interpreter"
-	"github.com/antlr/antlr4/runtime/Go/antlr"
 	. "github.com/onsi/gomega"
 	"testing"
 )
@@ -11,7 +10,7 @@ import (
 func TestInterpret(t *testing.T) {
 	gomega := NewWithT(t)
 
-	input := antlr.NewInputStream(`
+	program := parse(`
         const x = 10
 
         // check first-class functions and scope inside them
@@ -37,14 +36,6 @@ func TestInterpret(t *testing.T) {
         }
 	`)
 
-	lexer := NewStrictusLexer(input)
-	stream := antlr.NewCommonTokenStream(lexer, 0)
-	parser := NewStrictusParser(stream)
-	// diagnostics, for debugging only:
-	// parser.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
-	parser.AddErrorListener(antlr.NewConsoleErrorListener())
-	program := parser.Program().Accept(&ProgramVisitor{}).(Program)
-
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
 	gomega.Expect(inter.Globals["x"].Value).To(Equal(UInt64Expression(10)))
@@ -52,4 +43,19 @@ func TestInterpret(t *testing.T) {
 	gomega.Expect(inter.Invoke("f")).To(Equal(UInt64Expression(10)))
 	gomega.Expect(inter.Invoke("g")).To(Equal(UInt64Expression(10)))
 	gomega.Expect(inter.Invoke("foo", uint64(24), uint64(42))).To(Equal(UInt64Expression(99)))
+}
+
+func TestReturnWithoutExpression(t *testing.T) {
+	gomega := NewWithT(t)
+
+	program := parse(`
+        fun returnEarly() {
+            return
+            return 1
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	gomega.Expect(inter.Invoke("returnEarly")).To(Equal(interpreter.Void{}))
 }
