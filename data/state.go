@@ -10,15 +10,15 @@ import (
 
 // WorldState represents the current state of the blockchain.
 type WorldState struct {
-	Blocks            map[crypto.Hash]Block
+	blocks            map[crypto.Hash]Block
 	blocksMutex       sync.RWMutex
-	Collections       map[crypto.Hash]Collection
+	collections       map[crypto.Hash]Collection
 	collectionsMutex  sync.RWMutex
-	Transactions      map[crypto.Hash]Transaction
+	transactions      map[crypto.Hash]Transaction
 	transactionsMutex sync.RWMutex
-	Registers         map[string][]byte
+	registers         map[string][]byte
 	registersMutex    sync.RWMutex
-	Blockchain        []crypto.Hash
+	blockchain        []crypto.Hash
 	blockchainMutex   sync.RWMutex
 }
 
@@ -46,19 +46,19 @@ func NewWorldState(log *logrus.Logger) *WorldState {
 		)
 
 	return &WorldState{
-		Blocks:       blocks,
-		Collections:  collections,
-		Transactions: txs,
-		Registers:    registers,
-		Blockchain:   chain,
+		blocks:       blocks,
+		collections:  collections,
+		transactions: txs,
+		registers:    registers,
+		blockchain:   chain,
 	}
 }
 
 // GetLatestBlock gets the most recent block in the blockchain.
 func (s *WorldState) GetLatestBlock() *Block {
 	s.blockchainMutex.RLock()
-	currHeight := len(s.Blockchain)
-	blockHash := s.Blockchain[currHeight-1]
+	currHeight := len(s.blockchain)
+	blockHash := s.blockchain[currHeight-1]
 	s.blockchainMutex.RUnlock()
 
 	block, _ := s.GetBlockByHash(blockHash)
@@ -68,10 +68,10 @@ func (s *WorldState) GetLatestBlock() *Block {
 // GetBlockByNumber gets a block by number.
 func (s *WorldState) GetBlockByNumber(n uint64) (*Block, error) {
 	s.blockchainMutex.RLock()
-	currHeight := len(s.Blockchain)
+	currHeight := len(s.blockchain)
 
 	if int(n) < currHeight {
-		blockHash := s.Blockchain[n]
+		blockHash := s.blockchain[n]
 		s.blockchainMutex.RUnlock()
 		return s.GetBlockByHash(blockHash)
 	}
@@ -86,7 +86,7 @@ func (s *WorldState) GetBlockByHash(h crypto.Hash) (*Block, error) {
 	s.blocksMutex.RLock()
 	defer s.blocksMutex.RUnlock()
 
-	if block, ok := s.Blocks[h]; ok {
+	if block, ok := s.blocks[h]; ok {
 		return &block, nil
 	}
 
@@ -98,7 +98,7 @@ func (s *WorldState) GetCollection(h crypto.Hash) (*Collection, error) {
 	s.collectionsMutex.RLock()
 	defer s.collectionsMutex.RUnlock()
 
-	if collection, ok := s.Collections[h]; ok {
+	if collection, ok := s.collections[h]; ok {
 		return &collection, nil
 	}
 
@@ -110,7 +110,7 @@ func (s *WorldState) GetTransaction(h crypto.Hash) (*Transaction, error) {
 	s.transactionsMutex.RLock()
 	defer s.transactionsMutex.RUnlock()
 
-	if tx, ok := s.Transactions[h]; ok {
+	if tx, ok := s.transactions[h]; ok {
 		return &tx, nil
 	}
 
@@ -122,21 +122,21 @@ func (s *WorldState) GetRegister(id string) []byte {
 	s.registersMutex.RLock()
 	defer s.registersMutex.RUnlock()
 
-	return s.Registers[id]
+	return s.registers[id]
 }
 
 // AddBlock adds a new block to the blockchain.
 func (s *WorldState) AddBlock(block *Block) error {
 	s.blocksMutex.Lock()
 	defer s.blocksMutex.Unlock()
-	if _, exists := s.Blocks[block.Hash()]; exists {
+	if _, exists := s.blocks[block.Hash()]; exists {
 		return &DuplicateItemError{hash: block.Hash()}
 	}
 
-	s.Blocks[block.Hash()] = *block
+	s.blocks[block.Hash()] = *block
 
 	s.blockchainMutex.Lock()
-	s.Blockchain = append(s.Blockchain, block.Hash())
+	s.blockchain = append(s.blockchain, block.Hash())
 	s.blockchainMutex.Unlock()
 
 	return nil
@@ -144,11 +144,11 @@ func (s *WorldState) AddBlock(block *Block) error {
 
 // InsertCollection inserts a new collection into the state.
 func (s *WorldState) InsertCollection(col *Collection) error {
-	if _, exists := s.Collections[col.Hash()]; exists {
+	if _, exists := s.collections[col.Hash()]; exists {
 		return &DuplicateItemError{hash: col.Hash()}
 	}
 
-	s.Collections[col.Hash()] = *col
+	s.collections[col.Hash()] = *col
 
 	return nil
 }
@@ -158,11 +158,11 @@ func (s *WorldState) InsertTransaction(tx *Transaction) error {
 	s.transactionsMutex.Lock()
 	defer s.transactionsMutex.Unlock()
 
-	if _, exists := s.Transactions[tx.Hash()]; exists {
+	if _, exists := s.transactions[tx.Hash()]; exists {
 		return &DuplicateItemError{hash: tx.Hash()}
 	}
 
-	s.Transactions[tx.Hash()] = *tx
+	s.transactions[tx.Hash()] = *tx
 
 	return nil
 }
@@ -172,7 +172,7 @@ func (s *WorldState) CommitRegisters(registers Registers) {
 	s.registersMutex.Lock()
 
 	for id, value := range registers {
-		s.Registers[id] = value
+		s.registers[id] = value
 	}
 
 	s.registersMutex.Unlock()
@@ -187,7 +187,7 @@ func (s *WorldState) UpdateTransactionStatus(h crypto.Hash, status TxStatus) err
 
 	s.transactionsMutex.Lock()
 	tx.Status = status
-	s.Transactions[tx.Hash()] = *tx
+	s.transactions[tx.Hash()] = *tx
 	s.transactionsMutex.Unlock()
 
 	return nil
@@ -202,7 +202,7 @@ func (s *WorldState) SealBlock(h crypto.Hash) error {
 
 	s.blocksMutex.Lock()
 	block.Status = BlockSealed
-	s.Blocks[block.Hash()] = *block
+	s.blocks[block.Hash()] = *block
 	s.blocksMutex.Unlock()
 
 	return nil
