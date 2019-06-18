@@ -251,3 +251,36 @@ func TestParseFunctionType(t *testing.T) {
 
 	NewWithT(t).Expect(actual).Should(Equal(expected))
 }
+
+func TestParseMissingReturnType(t *testing.T) {
+
+	actual := parse(`
+		const noop: () => void =
+            fun () { return }
+	`)
+
+	noop := VariableDeclaration{
+		Identifier: "noop",
+		IsConst:    true,
+		Type: FunctionType{
+			ParameterTypes: []Type{},
+			ReturnType:     VoidType{},
+		},
+		Value: FunctionExpression{
+			Parameters: []Parameter{},
+			ReturnType: VoidType{},
+			Block: Block{
+				Statements: []Statement{
+					ReturnStatement{},
+				},
+			},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{noop},
+		Declarations:    map[string]Declaration{"noop": noop},
+	}
+
+	NewWithT(t).Expect(actual).Should(Equal(expected))
+}
