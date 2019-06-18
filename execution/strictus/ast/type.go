@@ -71,7 +71,9 @@ func (FixedType) isType() {}
 
 // FunctionType
 
-// TODO: add parameter types and return type
-type FunctionType struct{}
+type FunctionType struct {
+	ParameterTypes []Type
+	ReturnType     Type
+}
 
 func (FunctionType) isType() {}

@@ -209,3 +209,58 @@ func TestParseIntegerTypes(t *testing.T) {
 
 	NewWithT(t).Expect(actual).Should(Equal(expected))
 }
+
+func TestParseFunctionType(t *testing.T) {
+
+	input := antlr.NewInputStream(`
+		const add: (i8, i8) => i16 =
+            fun (a: i8, b: i8): i16 {
+                return a + b
+            }
+	`)
+
+	lexer := NewStrictusLexer(input)
+	stream := antlr.NewCommonTokenStream(lexer, 0)
+	parser := NewStrictusParser(stream)
+	// diagnostics, for debugging only:
+	// parser.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
+	parser.AddErrorListener(antlr.NewConsoleErrorListener())
+	actual := parser.Program().Accept(&ProgramVisitor{}).(Program)
+
+	add := VariableDeclaration{
+		Identifier: "add",
+		IsConst:    true,
+		Type: FunctionType{
+			ParameterTypes: []Type{
+				Int8Type{},
+				Int8Type{},
+			},
+			ReturnType: Int16Type{},
+		},
+		Value: FunctionExpression{
+			Parameters: []Parameter{
+				{Identifier: "a", Type: Int8Type{}},
+				{Identifier: "b", Type: Int8Type{}},
+			},
+			ReturnType: Int16Type{},
+			Block: Block{
+				Statements: []Statement{
+					ReturnStatement{
+						Expression: BinaryExpression{
+							Operation: OperationPlus,
+							Left:      IdentifierExpression{Identifier: "a"},
+							Right:     IdentifierExpression{Identifier: "b"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{add},
+		Declarations:    map[string]Declaration{"add": add},
+	}
+
+	NewWithT(t).Expect(actual).Should(Equal(expected))
+}
