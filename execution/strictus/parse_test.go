@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestParse(t *testing.T) {
+func TestParseComplexFunction(t *testing.T) {
 
 	input := antlr.NewInputStream(`
 		pub fun sum(a: i32, b: i32[2], c: i32[][3]): i64 {
@@ -38,8 +38,6 @@ func TestParse(t *testing.T) {
 	parser.AddErrorListener(antlr.NewConsoleErrorListener())
 	actual := parser.Program().Accept(&ProgramVisitor{}).(Program)
 
-	var int32Type Type = Int32Type{}
-
 	sum := FunctionDeclaration{
 		IsPublic:   true,
 		Identifier: "sum",
@@ -60,7 +58,7 @@ func TestParse(t *testing.T) {
 				VariableDeclaration{
 					IsConst:    false,
 					Identifier: "y",
-					Type:       int32Type,
+					Type:       Int32Type{},
 					Value:      IntExpression{Value: 2},
 				},
 				Assignment{
@@ -169,6 +167,44 @@ func TestParse(t *testing.T) {
 	expected := Program{
 		AllDeclarations: []Declaration{sum},
 		Declarations:    map[string]Declaration{"sum": sum},
+	}
+
+	NewWithT(t).Expect(actual).Should(Equal(expected))
+}
+
+func TestParseIntegerTypes(t *testing.T) {
+
+	input := antlr.NewInputStream(`
+		const a: i8 = 1
+		const b: i16 = 2
+		const c: i32 = 3
+		const d: i64 = 4
+		const e: u8 = 5
+		const f: u16 = 6
+		const g: u32 = 7
+		const h: u64 = 8
+	`)
+
+	lexer := NewStrictusLexer(input)
+	stream := antlr.NewCommonTokenStream(lexer, 0)
+	parser := NewStrictusParser(stream)
+	// diagnostics, for debugging only:
+	// parser.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
+	parser.AddErrorListener(antlr.NewConsoleErrorListener())
+	actual := parser.Program().Accept(&ProgramVisitor{}).(Program)
+
+	a := VariableDeclaration{Identifier: "a", IsConst: true, Type: Int8Type{}, Value: IntExpression{Value: 1}}
+	b := VariableDeclaration{Identifier: "b", IsConst: true, Type: Int16Type{}, Value: IntExpression{Value: 2}}
+	c := VariableDeclaration{Identifier: "c", IsConst: true, Type: Int32Type{}, Value: IntExpression{Value: 3}}
+	d := VariableDeclaration{Identifier: "d", IsConst: true, Type: Int64Type{}, Value: IntExpression{Value: 4}}
+	e := VariableDeclaration{Identifier: "e", IsConst: true, Type: UInt8Type{}, Value: IntExpression{Value: 5}}
+	f := VariableDeclaration{Identifier: "f", IsConst: true, Type: UInt16Type{}, Value: IntExpression{Value: 6}}
+	g := VariableDeclaration{Identifier: "g", IsConst: true, Type: UInt32Type{}, Value: IntExpression{Value: 7}}
+	h := VariableDeclaration{Identifier: "h", IsConst: true, Type: UInt64Type{}, Value: IntExpression{Value: 8}}
+
+	expected := Program{
+		AllDeclarations: []Declaration{a, b, c, d, e, f, g, h},
+		Declarations:    map[string]Declaration{"a": a, "b": b, "c": c, "d": d, "e": e, "f": f, "g": g, "h": h},
 	}
 
 	NewWithT(t).Expect(actual).Should(Equal(expected))

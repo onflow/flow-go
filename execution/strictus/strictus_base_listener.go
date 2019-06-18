@@ -62,17 +62,11 @@ func (s *BaseStrictusListener) EnterTypeDimension(ctx *TypeDimensionContext) {}
 // ExitTypeDimension is called when production typeDimension is exited.
 func (s *BaseStrictusListener) ExitTypeDimension(ctx *TypeDimensionContext) {}
 
-// EnterInt32Type is called when production Int32Type is entered.
-func (s *BaseStrictusListener) EnterInt32Type(ctx *Int32TypeContext) {}
+// EnterBaseType is called when production baseType is entered.
+func (s *BaseStrictusListener) EnterBaseType(ctx *BaseTypeContext) {}
 
-// ExitInt32Type is called when production Int32Type is exited.
-func (s *BaseStrictusListener) ExitInt32Type(ctx *Int32TypeContext) {}
-
-// EnterInt64Type is called when production Int64Type is entered.
-func (s *BaseStrictusListener) EnterInt64Type(ctx *Int64TypeContext) {}
-
-// ExitInt64Type is called when production Int64Type is exited.
-func (s *BaseStrictusListener) ExitInt64Type(ctx *Int64TypeContext) {}
+// ExitBaseType is called when production baseType is exited.
+func (s *BaseStrictusListener) ExitBaseType(ctx *BaseTypeContext) {}
 
 // EnterBlock is called when production block is entered.
 func (s *BaseStrictusListener) EnterBlock(ctx *BlockContext) {}

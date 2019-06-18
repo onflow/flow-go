@@ -32,11 +32,8 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#typeDimension.
 	VisitTypeDimension(ctx *TypeDimensionContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#Int32Type.
-	VisitInt32Type(ctx *Int32TypeContext) interface{}
-
-	// Visit a parse tree produced by StrictusParser#Int64Type.
-	VisitInt64Type(ctx *Int64TypeContext) interface{}
+	// Visit a parse tree produced by StrictusParser#baseType.
+	VisitBaseType(ctx *BaseTypeContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#block.
 	VisitBlock(ctx *BlockContext) interface{}

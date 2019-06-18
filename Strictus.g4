@@ -75,10 +75,10 @@ typeDimension
     ;
 
 baseType
-    : Int32    # Int32Type
-    | Int64    # Int64Type
+    : Identifier
+    // TODO: function types
+    //   | '(' baseType (',' baseType)* ')' '=>' return=baseType
     ;
-
 
 block
     : (statement eos)*
@@ -254,12 +254,6 @@ While : 'while' ;
 
 True : 'true' ;
 False : 'false' ;
-
-Int32 : 'i32' ;
-Int64 : 'i64' ;
-UInt32 : 'u32' ;
-UInt64 : 'u64' ;
-
 
 Identifier
     : IdentifierHead IdentifierCharacter*
