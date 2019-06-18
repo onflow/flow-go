@@ -149,15 +149,16 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.R
 		interpreter.activations.Set(identifier, variable)
 
 	case ast.IndexExpression:
-		array, ok := target.Expression.Accept(interpreter).([]interface{})
+		indexedValue := target.Expression.Accept(interpreter)
+		array, ok := indexedValue.([]interface{})
 		if !ok {
-			// TODO: error
-			return nil
+			panic(fmt.Sprintf("can't index into non-array value: %#+v", indexedValue))
 		}
-		index, ok := target.Index.Accept(interpreter).(int64)
+
+		indexValue := target.Index.Accept(interpreter)
+		index, ok := indexValue.(ast.UInt64Expression)
 		if !ok {
-			// TODO: error
-			return nil
+			panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 		}
 		array[index] = value
 
@@ -182,28 +183,28 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 	left := expression.Left.Accept(interpreter)
 	right := expression.Right.Accept(interpreter)
 
-	leftInt, leftIsInt := left.(int64)
-	rightInt, rightIsInt := right.(int64)
+	leftInt, leftIsInt := left.(ast.IntExpression)
+	rightInt, rightIsInt := right.(ast.IntExpression)
 	if leftIsInt && rightIsInt {
 		switch expression.Operation {
 		case ast.OperationPlus:
-			return leftInt + rightInt
+			return leftInt.Plus(rightInt)
 		case ast.OperationMinus:
-			return leftInt - rightInt
+			return leftInt.Minus(rightInt)
 		case ast.OperationMod:
-			return leftInt % rightInt
+			return leftInt.Mod(rightInt)
 		case ast.OperationMul:
-			return leftInt * rightInt
+			return leftInt.Mul(rightInt)
 		case ast.OperationDiv:
-			return leftInt / rightInt
+			return leftInt.Div(rightInt)
 		case ast.OperationLess:
-			return leftInt < rightInt
+			return leftInt.Less(rightInt)
 		case ast.OperationLessEqual:
-			return leftInt <= rightInt
+			return leftInt.LessEqual(rightInt)
 		case ast.OperationGreater:
-			return leftInt > rightInt
+			return leftInt.Greater(rightInt)
 		case ast.OperationGreaterEqual:
-			return leftInt >= rightInt
+			return leftInt.GreaterEqual(rightInt)
 		case ast.OperationEqual:
 			return leftInt == rightInt
 		case ast.OperationUnequal:
@@ -211,8 +212,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 		}
 	}
 
-	leftBool, leftIsBool := left.(bool)
-	rightBool, rightIsBool := right.(bool)
+	leftBool, leftIsBool := left.(ast.BoolExpression)
+	rightBool, rightIsBool := right.(ast.BoolExpression)
 	if leftIsBool && rightIsBool {
 		switch expression.Operation {
 		case ast.OperationEqual:
@@ -238,11 +239,39 @@ func (interpreter *Interpreter) VisitExpressionStatement(statement ast.Expressio
 }
 
 func (interpreter *Interpreter) VisitBoolExpression(expression ast.BoolExpression) ast.Repr {
-	return expression.Value
+	return expression
 }
 
-func (interpreter *Interpreter) VisitIntExpression(expression ast.IntExpression) ast.Repr {
-	return expression.Value
+func (interpreter *Interpreter) VisitInt8Expression(expression ast.Int8Expression) ast.Repr {
+	return expression
+}
+
+func (interpreter *Interpreter) VisitInt16Expression(expression ast.Int16Expression) ast.Repr {
+	return expression
+}
+
+func (interpreter *Interpreter) VisitInt32Expression(expression ast.Int32Expression) ast.Repr {
+	return expression
+}
+
+func (interpreter *Interpreter) VisitInt64Expression(expression ast.Int64Expression) ast.Repr {
+	return expression
+}
+
+func (interpreter *Interpreter) VisitUInt8Expression(expression ast.UInt8Expression) ast.Repr {
+	return expression
+}
+
+func (interpreter *Interpreter) VisitUInt16Expression(expression ast.UInt16Expression) ast.Repr {
+	return expression
+}
+
+func (interpreter *Interpreter) VisitUInt32Expression(expression ast.UInt32Expression) ast.Repr {
+	return expression
+}
+
+func (interpreter *Interpreter) VisitUInt64Expression(expression ast.UInt64Expression) ast.Repr {
+	return expression
 }
 
 func (interpreter *Interpreter) VisitArrayExpression(expression ast.ArrayExpression) ast.Repr {
@@ -261,17 +290,18 @@ func (interpreter *Interpreter) VisitMemberExpression(ast.MemberExpression) ast.
 }
 
 func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpression) ast.Repr {
-	value, ok := expression.Expression.Accept(interpreter).([]interface{})
+	indexedValue := expression.Expression.Accept(interpreter)
+	array, ok := indexedValue.([]interface{})
 	if !ok {
-		// TODO: error
-		return nil
+		panic(fmt.Sprintf("can't index into non-array value: %#+v", indexedValue))
 	}
-	index, ok := expression.Index.Accept(interpreter).(int64)
+
+	indexValue := expression.Index.Accept(interpreter)
+	index, ok := indexValue.(ast.UInt64Expression)
 	if !ok {
-		// TODO: error
-		return nil
+		panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 	}
-	return value[index]
+	return array[index]
 }
 
 func (interpreter *Interpreter) VisitConditionalExpression(expression ast.ConditionalExpression) ast.Repr {

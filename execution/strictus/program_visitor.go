@@ -93,12 +93,28 @@ func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
 	}
 }
 
-func (v *ProgramVisitor) VisitInt32Type(ctx *Int32TypeContext) interface{} {
-	return ast.Int32Type{}
-}
-
-func (v *ProgramVisitor) VisitInt64Type(ctx *Int64TypeContext) interface{} {
-	return ast.Int64Type{}
+func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
+	identifier := ctx.Identifier().GetText()
+	switch identifier {
+	case "i8":
+		return ast.Int8Type{}
+	case "i16":
+		return ast.Int16Type{}
+	case "i32":
+		return ast.Int32Type{}
+	case "i64":
+		return ast.Int64Type{}
+	case "u8":
+		return ast.UInt8Type{}
+	case "u16":
+		return ast.UInt16Type{}
+	case "u32":
+		return ast.UInt32Type{}
+	case "u64":
+		return ast.UInt64Type{}
+	default:
+		panic(fmt.Sprintf("unknown type: %s", identifier))
+	}
 }
 
 func (v *ProgramVisitor) VisitTypeName(ctx *TypeNameContext) interface{} {
@@ -454,12 +470,12 @@ func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
-func parseIntExpression(text string, kind string, base int) ast.IntExpression {
+func parseIntExpression(text string, kind string, base int) ast.UInt64Expression {
 	value, err := strconv.ParseInt(text, base, 64)
 	if err != nil {
 		panic(fmt.Sprintf("invalid %s literal: %s", kind, text))
 	}
-	return ast.IntExpression{Value: value}
+	return ast.UInt64Expression(value)
 }
 
 func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {
@@ -488,9 +504,7 @@ func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interfa
 	if err != nil {
 		panic(fmt.Sprintf("invalid boolean literal: %s", text))
 	}
-	return ast.BoolExpression{
-		Value: value,
-	}
+	return ast.BoolExpression(value)
 }
 
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {

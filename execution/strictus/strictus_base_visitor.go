@@ -35,11 +35,7 @@ func (v *BaseStrictusVisitor) VisitTypeDimension(ctx *TypeDimensionContext) inte
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitInt32Type(ctx *Int32TypeContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseStrictusVisitor) VisitInt64Type(ctx *Int64TypeContext) interface{} {
+func (v *BaseStrictusVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

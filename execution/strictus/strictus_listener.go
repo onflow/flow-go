@@ -28,11 +28,8 @@ type StrictusListener interface {
 	// EnterTypeDimension is called when entering the typeDimension production.
 	EnterTypeDimension(c *TypeDimensionContext)
 
-	// EnterInt32Type is called when entering the Int32Type production.
-	EnterInt32Type(c *Int32TypeContext)
-
-	// EnterInt64Type is called when entering the Int64Type production.
-	EnterInt64Type(c *Int64TypeContext)
+	// EnterBaseType is called when entering the baseType production.
+	EnterBaseType(c *BaseTypeContext)
 
 	// EnterBlock is called when entering the block production.
 	EnterBlock(c *BlockContext)
@@ -166,11 +163,8 @@ type StrictusListener interface {
 	// ExitTypeDimension is called when exiting the typeDimension production.
 	ExitTypeDimension(c *TypeDimensionContext)
 
-	// ExitInt32Type is called when exiting the Int32Type production.
-	ExitInt32Type(c *Int32TypeContext)
-
-	// ExitInt64Type is called when exiting the Int64Type production.
-	ExitInt64Type(c *Int64TypeContext)
+	// ExitBaseType is called when exiting the baseType production.
+	ExitBaseType(c *BaseTypeContext)
 
 	// ExitBlock is called when exiting the block production.
 	ExitBlock(c *BlockContext)

@@ -19,7 +19,14 @@ type Visitor interface {
 	VisitExpressionStatement(ExpressionStatement) Repr
 	/// expressions
 	VisitBoolExpression(BoolExpression) Repr
-	VisitIntExpression(IntExpression) Repr
+	VisitInt8Expression(Int8Expression) Repr
+	VisitInt16Expression(Int16Expression) Repr
+	VisitInt32Expression(Int32Expression) Repr
+	VisitInt64Expression(Int64Expression) Repr
+	VisitUInt8Expression(UInt8Expression) Repr
+	VisitUInt16Expression(UInt16Expression) Repr
+	VisitUInt32Expression(UInt32Expression) Repr
+	VisitUInt64Expression(UInt64Expression) Repr
 	VisitArrayExpression(ArrayExpression) Repr
 	VisitIdentifierExpression(IdentifierExpression) Repr
 	VisitInvocationExpression(InvocationExpression) Repr
