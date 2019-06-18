@@ -76,8 +76,7 @@ typeDimension
 
 baseType
     : Identifier
-    // TODO: function types
-    //   | '(' baseType (',' baseType)* ')' '=>' return=baseType
+    | '(' parameterType+=typeName (',' parameterType+=typeName)* ')' '=>' returnType=typeName
     ;
 
 block
