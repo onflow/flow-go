@@ -55,7 +55,7 @@ declaration
     ;
 
 functionDeclaration
-    : Pub? Fun Identifier '(' parameterList? ')' ':' typeName '{' block '}'
+    : Pub? Fun Identifier '(' parameterList? ')' (':' returnType=typeName)? '{' block '}'
     ;
 
 parameterList
@@ -93,7 +93,7 @@ statement
     ;
 
 returnStatement
-    : Return expression
+    : Return expression?
     ;
 
 ifStatement
@@ -193,10 +193,10 @@ Mod : '%' ;
 
 
 primaryExpressionStart
-    : Identifier                                             # IdentifierExpression
-    | literal                                                # LiteralExpression
-    | Fun '(' parameterList? ')' ':' typeName '{' block '}'  # FunctionExpression
-    | '(' expression ')'                                     # NestedExpression
+    : Identifier                                                           # IdentifierExpression
+    | literal                                                              # LiteralExpression
+    | Fun '(' parameterList? ')' (':' returnType=typeName)? '{' block '}'  # FunctionExpression
+    | '(' expression ')'                                                   # NestedExpression
     ;
 
 expressionAccess
