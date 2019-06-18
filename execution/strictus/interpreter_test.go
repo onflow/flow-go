@@ -47,9 +47,9 @@ func TestInterpret(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	gomega.Expect(inter.Globals["x"].Value).To(Equal(int64(10)))
-	gomega.Expect(inter.Globals["y"].Value).To(Equal(int64(42)))
-	gomega.Expect(inter.Invoke("f")).To(Equal(int64(10)))
-	gomega.Expect(inter.Invoke("g")).To(Equal(int64(10)))
-	gomega.Expect(inter.Invoke("foo", 24, 42)).To(Equal(int64(99)))
+	gomega.Expect(inter.Globals["x"].Value).To(Equal(UInt64Expression(10)))
+	gomega.Expect(inter.Globals["y"].Value).To(Equal(UInt64Expression(42)))
+	gomega.Expect(inter.Invoke("f")).To(Equal(UInt64Expression(10)))
+	gomega.Expect(inter.Invoke("g")).To(Equal(UInt64Expression(10)))
+	gomega.Expect(inter.Invoke("foo", uint64(24), uint64(42))).To(Equal(UInt64Expression(99)))
 }

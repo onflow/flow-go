@@ -53,17 +53,17 @@ func TestParseComplexFunction(t *testing.T) {
 					IsConst:    true,
 					Identifier: "x",
 					Type:       nil,
-					Value:      IntExpression{Value: 1},
+					Value:      UInt64Expression(1),
 				},
 				VariableDeclaration{
 					IsConst:    false,
 					Identifier: "y",
 					Type:       Int32Type{},
-					Value:      IntExpression{Value: 2},
+					Value:      UInt64Expression(2),
 				},
 				Assignment{
 					Target: IdentifierExpression{Identifier: "y"},
-					Value:  IntExpression{Value: 3},
+					Value:  UInt64Expression(3),
 				},
 				ExpressionStatement{
 					Expression: MemberExpression{
@@ -76,9 +76,9 @@ func TestParseComplexFunction(t *testing.T) {
 									},
 									Identifier: "bar",
 								},
-								Index: IntExpression{Value: 0},
+								Index: UInt64Expression(0),
 							},
-							Index: IntExpression{Value: 1},
+							Index: UInt64Expression(1),
 						},
 						Identifier: "baz",
 					},
@@ -90,12 +90,12 @@ func TestParseComplexFunction(t *testing.T) {
 						Left: InvocationExpression{
 							Expression: IdentifierExpression{Identifier: "sum"},
 							Arguments: []Expression{
-								IntExpression{Value: 3},
-								IntExpression{Value: 2},
-								IntExpression{Value: 1},
+								UInt64Expression(3),
+								UInt64Expression(2),
+								UInt64Expression(1),
 							},
 						},
-						Right: IntExpression{Value: 42},
+						Right: UInt64Expression(42),
 					},
 				},
 				ReturnStatement{Expression: IdentifierExpression{Identifier: "a"}},
@@ -103,7 +103,7 @@ func TestParseComplexFunction(t *testing.T) {
 					Test: BinaryExpression{
 						Operation: OperationLess,
 						Left:      IdentifierExpression{Identifier: "x"},
-						Right:     IntExpression{Value: 2},
+						Right:     UInt64Expression(2),
 					},
 					Block: Block{
 						Statements: []Statement{
@@ -112,34 +112,34 @@ func TestParseComplexFunction(t *testing.T) {
 								Value: BinaryExpression{
 									Operation: OperationPlus,
 									Left:      IdentifierExpression{Identifier: "x"},
-									Right:     IntExpression{Value: 1},
+									Right:     UInt64Expression(1),
 								},
 							},
 						},
 					},
 				},
 				IfStatement{
-					Test: BoolExpression{Value: true},
+					Test: BoolExpression(true),
 					Then: Block{
 						Statements: []Statement{
-							ReturnStatement{Expression: IntExpression{Value: 1}},
+							ReturnStatement{Expression: UInt64Expression(1)},
 						},
 					},
 					Else: Block{
 						Statements: []Statement{
 							IfStatement{
-								Test: BoolExpression{Value: false},
+								Test: BoolExpression(false),
 								Then: Block{
 									Statements: []Statement{
 										ReturnStatement{
 											Expression: ConditionalExpression{
 												Test: BinaryExpression{
 													Operation: OperationGreater,
-													Left:      IntExpression{Value: 2},
-													Right:     IntExpression{Value: 3},
+													Left:      UInt64Expression(2),
+													Right:     UInt64Expression(3),
 												},
-												Then: IntExpression{Value: 4},
-												Else: IntExpression{Value: 5},
+												Then: UInt64Expression(4),
+												Else: UInt64Expression(5),
 											},
 										},
 									},
@@ -149,8 +149,8 @@ func TestParseComplexFunction(t *testing.T) {
 										ReturnStatement{
 											Expression: ArrayExpression{
 												Values: []Expression{
-													IntExpression{Value: 2},
-													BoolExpression{Value: true},
+													UInt64Expression(2),
+													BoolExpression(true),
 												},
 											},
 										},
@@ -193,14 +193,14 @@ func TestParseIntegerTypes(t *testing.T) {
 	parser.AddErrorListener(antlr.NewConsoleErrorListener())
 	actual := parser.Program().Accept(&ProgramVisitor{}).(Program)
 
-	a := VariableDeclaration{Identifier: "a", IsConst: true, Type: Int8Type{}, Value: IntExpression{Value: 1}}
-	b := VariableDeclaration{Identifier: "b", IsConst: true, Type: Int16Type{}, Value: IntExpression{Value: 2}}
-	c := VariableDeclaration{Identifier: "c", IsConst: true, Type: Int32Type{}, Value: IntExpression{Value: 3}}
-	d := VariableDeclaration{Identifier: "d", IsConst: true, Type: Int64Type{}, Value: IntExpression{Value: 4}}
-	e := VariableDeclaration{Identifier: "e", IsConst: true, Type: UInt8Type{}, Value: IntExpression{Value: 5}}
-	f := VariableDeclaration{Identifier: "f", IsConst: true, Type: UInt16Type{}, Value: IntExpression{Value: 6}}
-	g := VariableDeclaration{Identifier: "g", IsConst: true, Type: UInt32Type{}, Value: IntExpression{Value: 7}}
-	h := VariableDeclaration{Identifier: "h", IsConst: true, Type: UInt64Type{}, Value: IntExpression{Value: 8}}
+	a := VariableDeclaration{Identifier: "a", IsConst: true, Type: Int8Type{}, Value: UInt64Expression(1)}
+	b := VariableDeclaration{Identifier: "b", IsConst: true, Type: Int16Type{}, Value: UInt64Expression(2)}
+	c := VariableDeclaration{Identifier: "c", IsConst: true, Type: Int32Type{}, Value: UInt64Expression(3)}
+	d := VariableDeclaration{Identifier: "d", IsConst: true, Type: Int64Type{}, Value: UInt64Expression(4)}
+	e := VariableDeclaration{Identifier: "e", IsConst: true, Type: UInt8Type{}, Value: UInt64Expression(5)}
+	f := VariableDeclaration{Identifier: "f", IsConst: true, Type: UInt16Type{}, Value: UInt64Expression(6)}
+	g := VariableDeclaration{Identifier: "g", IsConst: true, Type: UInt32Type{}, Value: UInt64Expression(7)}
+	h := VariableDeclaration{Identifier: "h", IsConst: true, Type: UInt64Type{}, Value: UInt64Expression(8)}
 
 	expected := Program{
 		AllDeclarations: []Declaration{a, b, c, d, e, f, g, h},
