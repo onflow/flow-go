@@ -122,7 +122,7 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 
 	// alternative: function type
 	var parameterTypes []ast.Type
-	for _, typeName := range ctx.GetParameterType() {
+	for _, typeName := range ctx.GetParameterTypes() {
 		parameterTypes = append(
 			parameterTypes,
 			typeName.Accept(v).(ast.Type),

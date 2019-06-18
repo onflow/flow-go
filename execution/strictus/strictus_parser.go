@@ -1360,11 +1360,11 @@ type IBaseTypeContext interface {
 	// SetReturnType sets the returnType rule contexts.
 	SetReturnType(ITypeNameContext)
 
-	// GetParameterType returns the parameterType rule context list.
-	GetParameterType() []ITypeNameContext
+	// GetParameterTypes returns the parameterTypes rule context list.
+	GetParameterTypes() []ITypeNameContext
 
-	// SetParameterType sets the parameterType rule context list.
-	SetParameterType([]ITypeNameContext)
+	// SetParameterTypes sets the parameterTypes rule context list.
+	SetParameterTypes([]ITypeNameContext)
 
 	// IsBaseTypeContext differentiates from other interfaces.
 	IsBaseTypeContext()
@@ -1372,10 +1372,10 @@ type IBaseTypeContext interface {
 
 type BaseTypeContext struct {
 	*antlr.BaseParserRuleContext
-	parser        antlr.Parser
-	_typeName     ITypeNameContext
-	parameterType []ITypeNameContext
-	returnType    ITypeNameContext
+	parser         antlr.Parser
+	_typeName      ITypeNameContext
+	parameterTypes []ITypeNameContext
+	returnType     ITypeNameContext
 }
 
 func NewEmptyBaseTypeContext() *BaseTypeContext {
@@ -1408,9 +1408,9 @@ func (s *BaseTypeContext) Set_typeName(v ITypeNameContext) { s._typeName = v }
 
 func (s *BaseTypeContext) SetReturnType(v ITypeNameContext) { s.returnType = v }
 
-func (s *BaseTypeContext) GetParameterType() []ITypeNameContext { return s.parameterType }
+func (s *BaseTypeContext) GetParameterTypes() []ITypeNameContext { return s.parameterTypes }
 
-func (s *BaseTypeContext) SetParameterType(v []ITypeNameContext) { s.parameterType = v }
+func (s *BaseTypeContext) SetParameterTypes(v []ITypeNameContext) { s.parameterTypes = v }
 
 func (s *BaseTypeContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(StrictusParserIdentifier, 0)
@@ -1514,7 +1514,7 @@ func (p *StrictusParser) BaseType() (localctx IBaseTypeContext) {
 
 			localctx.(*BaseTypeContext)._typeName = _x
 		}
-		localctx.(*BaseTypeContext).parameterType = append(localctx.(*BaseTypeContext).parameterType, localctx.(*BaseTypeContext)._typeName)
+		localctx.(*BaseTypeContext).parameterTypes = append(localctx.(*BaseTypeContext).parameterTypes, localctx.(*BaseTypeContext)._typeName)
 		p.SetState(138)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
@@ -1531,7 +1531,7 @@ func (p *StrictusParser) BaseType() (localctx IBaseTypeContext) {
 
 				localctx.(*BaseTypeContext)._typeName = _x
 			}
-			localctx.(*BaseTypeContext).parameterType = append(localctx.(*BaseTypeContext).parameterType, localctx.(*BaseTypeContext)._typeName)
+			localctx.(*BaseTypeContext).parameterTypes = append(localctx.(*BaseTypeContext).parameterTypes, localctx.(*BaseTypeContext)._typeName)
 
 			p.SetState(140)
 			p.GetErrorHandler().Sync(p)
