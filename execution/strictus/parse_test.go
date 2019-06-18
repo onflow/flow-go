@@ -263,11 +263,9 @@ func TestParseMissingReturnType(t *testing.T) {
 		Identifier: "noop",
 		IsConst:    true,
 		Type: FunctionType{
-			ParameterTypes: []Type{},
-			ReturnType:     VoidType{},
+			ReturnType: VoidType{},
 		},
 		Value: FunctionExpression{
-			Parameters: []Parameter{},
 			ReturnType: VoidType{},
 			Block: Block{
 				Statements: []Statement{
