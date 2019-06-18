@@ -155,11 +155,11 @@ func (v *ProgramVisitor) VisitTypeName(ctx *TypeNameContext) interface{} {
 	for i := range dimensions {
 		dimension := dimensions[lastDimensionIndex-i].Accept(v).(*int)
 		if dimension == nil {
-			result = ast.DynamicType{
+			result = ast.VariableSizedType{
 				Type: result,
 			}
 		} else {
-			result = ast.FixedType{
+			result = ast.ConstantSizedType{
 				Type: result,
 				Size: *dimension,
 			}
