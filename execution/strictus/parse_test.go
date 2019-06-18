@@ -43,8 +43,8 @@ func TestParseComplexFunction(t *testing.T) {
 		Identifier: "sum",
 		Parameters: []Parameter{
 			{Identifier: "a", Type: Int32Type{}},
-			{Identifier: "b", Type: FixedType{Type: Int32Type{}, Size: 2}},
-			{Identifier: "c", Type: DynamicType{Type: FixedType{Type: Int32Type{}, Size: 3}}},
+			{Identifier: "b", Type: ConstantSizedType{Type: Int32Type{}, Size: 2}},
+			{Identifier: "c", Type: VariableSizedType{Type: ConstantSizedType{Type: Int32Type{}, Size: 3}}},
 		},
 		ReturnType: Int64Type{},
 		Block: Block{

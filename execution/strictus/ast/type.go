@@ -52,22 +52,22 @@ type UInt64Type struct{}
 
 func (UInt64Type) isType() {}
 
-// DynamicType is a variable sized array type
+// VariableSizedType is a variable sized array type
 
-type DynamicType struct {
+type VariableSizedType struct {
 	Type
 }
 
-func (DynamicType) isType() {}
+func (VariableSizedType) isType() {}
 
-// FixedType is a constant sized array type
+// ConstantSizedType is a constant sized array type
 
-type FixedType struct {
+type ConstantSizedType struct {
 	Type
 	Size int
 }
 
-func (FixedType) isType() {}
+func (ConstantSizedType) isType() {}
 
 // FunctionType
 
