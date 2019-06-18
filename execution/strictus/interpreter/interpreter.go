@@ -1,7 +1,7 @@
 package interpreter
 
 import (
-	"bamboo-emulator/execution/strictus/ast"
+	"bamboo-runtime/execution/strictus/ast"
 	"fmt"
 )
 

@@ -1,4 +1,4 @@
-module bamboo-emulator
+module bamboo-runtime
 
 go 1.12
 
