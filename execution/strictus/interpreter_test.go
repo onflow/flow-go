@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-func TestInterpret(t *testing.T) {
-	gomega := NewWithT(t)
+func TestInterpretLexicalScope(t *testing.T) {
+	RegisterTestingT(t)
 
 	program := parse(`
         const x = 10
@@ -38,15 +38,15 @@ func TestInterpret(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	gomega.Expect(inter.Globals["x"].Value).To(Equal(UInt64Expression(10)))
-	gomega.Expect(inter.Globals["y"].Value).To(Equal(UInt64Expression(42)))
-	gomega.Expect(inter.Invoke("f")).To(Equal(UInt64Expression(10)))
-	gomega.Expect(inter.Invoke("g")).To(Equal(UInt64Expression(10)))
-	gomega.Expect(inter.Invoke("foo", uint64(24), uint64(42))).To(Equal(UInt64Expression(99)))
+	Expect(inter.Globals["x"].Value).To(Equal(UInt64Expression(10)))
+	Expect(inter.Globals["y"].Value).To(Equal(UInt64Expression(42)))
+	Expect(inter.Invoke("f")).To(Equal(UInt64Expression(10)))
+	Expect(inter.Invoke("g")).To(Equal(UInt64Expression(10)))
+	Expect(inter.Invoke("foo", uint64(24), uint64(42))).To(Equal(UInt64Expression(99)))
 }
 
 func TestReturnWithoutExpression(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	program := parse(`
         fun returnEarly() {
@@ -57,5 +57,5 @@ func TestReturnWithoutExpression(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	gomega.Expect(inter.Invoke("returnEarly")).To(Equal(interpreter.Void{}))
+	Expect(inter.Invoke("returnEarly")).To(Equal(interpreter.Void{}))
 }

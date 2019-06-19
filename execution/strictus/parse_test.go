@@ -19,6 +19,7 @@ func parse(code string) Program {
 }
 
 func TestParseComplexFunction(t *testing.T) {
+	RegisterTestingT(t)
 
 	actual := parse(`
 		pub fun sum(a: Int32, b: Int32[2], c: Int32[][3]): Int64 {
@@ -172,10 +173,11 @@ func TestParseComplexFunction(t *testing.T) {
 		Declarations:    map[string]Declaration{"sum": sum},
 	}
 
-	NewWithT(t).Expect(actual).Should(Equal(expected))
+	Expect(actual).Should(Equal(expected))
 }
 
 func TestParseIntegerTypes(t *testing.T) {
+	RegisterTestingT(t)
 
 	actual := parse(`
 		const a: Int8 = 1
@@ -203,10 +205,11 @@ func TestParseIntegerTypes(t *testing.T) {
 		Declarations:    map[string]Declaration{"a": a, "b": b, "c": c, "d": d, "e": e, "f": f, "g": g, "h": h},
 	}
 
-	NewWithT(t).Expect(actual).Should(Equal(expected))
+	Expect(actual).Should(Equal(expected))
 }
 
 func TestParseFunctionType(t *testing.T) {
+	RegisterTestingT(t)
 
 	actual := parse(`
 		const add: (Int8, Int8) => Int16 =
@@ -250,10 +253,11 @@ func TestParseFunctionType(t *testing.T) {
 		Declarations:    map[string]Declaration{"add": add},
 	}
 
-	NewWithT(t).Expect(actual).Should(Equal(expected))
+	Expect(actual).Should(Equal(expected))
 }
 
 func TestParseMissingReturnType(t *testing.T) {
+	RegisterTestingT(t)
 
 	actual := parse(`
 		const noop: () => void =
@@ -281,5 +285,5 @@ func TestParseMissingReturnType(t *testing.T) {
 		Declarations:    map[string]Declaration{"noop": noop},
 	}
 
-	NewWithT(t).Expect(actual).Should(Equal(expected))
+	Expect(actual).Should(Equal(expected))
 }

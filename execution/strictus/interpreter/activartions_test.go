@@ -7,7 +7,7 @@ import (
 )
 
 func TestActivations(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	activations := &Activations{}
 
@@ -23,8 +23,8 @@ func TestActivations(t *testing.T) {
 		},
 	)
 
-	gomega.Expect(activations.Find("a").Value).To(Equal(1))
-	gomega.Expect(activations.Find("b")).To(BeNil())
+	Expect(activations.Find("a").Value).To(Equal(1))
+	Expect(activations.Find("b")).To(BeNil())
 
 	activations.PushCurrent()
 
@@ -51,9 +51,9 @@ func TestActivations(t *testing.T) {
 		},
 	)
 
-	gomega.Expect(activations.Find("a").Value).To(Equal(2))
-	gomega.Expect(activations.Find("b").Value).To(Equal(3))
-	gomega.Expect(activations.Find("c")).To(BeNil())
+	Expect(activations.Find("a").Value).To(Equal(2))
+	Expect(activations.Find("b").Value).To(Equal(3))
+	Expect(activations.Find("c")).To(BeNil())
 
 	activations.PushCurrent()
 
@@ -80,26 +80,26 @@ func TestActivations(t *testing.T) {
 		},
 	)
 
-	gomega.Expect(activations.Find("a").Value).To(Equal(5))
-	gomega.Expect(activations.Find("b").Value).To(Equal(3))
-	gomega.Expect(activations.Find("c").Value).To(Equal(4))
+	Expect(activations.Find("a").Value).To(Equal(5))
+	Expect(activations.Find("b").Value).To(Equal(3))
+	Expect(activations.Find("c").Value).To(Equal(4))
 
 	activations.Pop()
 
-	gomega.Expect(activations.Find("a").Value).To(Equal(2))
-	gomega.Expect(activations.Find("b").Value).To(Equal(3))
-	gomega.Expect(activations.Find("c")).To(BeNil())
+	Expect(activations.Find("a").Value).To(Equal(2))
+	Expect(activations.Find("b").Value).To(Equal(3))
+	Expect(activations.Find("c")).To(BeNil())
 
 	activations.Pop()
 
-	gomega.Expect(activations.Find("a").Value).To(Equal(1))
-	gomega.Expect(activations.Find("b")).To(BeNil())
-	gomega.Expect(activations.Find("c")).To(BeNil())
+	Expect(activations.Find("a").Value).To(Equal(1))
+	Expect(activations.Find("b")).To(BeNil())
+	Expect(activations.Find("c")).To(BeNil())
 
 	activations.Pop()
 
-	gomega.Expect(activations.Find("a")).To(BeNil())
-	gomega.Expect(activations.Find("b")).To(BeNil())
-	gomega.Expect(activations.Find("c")).To(BeNil())
+	Expect(activations.Find("a")).To(BeNil())
+	Expect(activations.Find("b")).To(BeNil())
+	Expect(activations.Find("c")).To(BeNil())
 
 }
