@@ -124,6 +124,8 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 			return ast.UInt64Type{}
 		case "void":
 			return ast.VoidType{}
+		case "Bool":
+			return ast.BoolType{}
 		default:
 			panic(fmt.Sprintf("unknown type: %s", identifier))
 		}
