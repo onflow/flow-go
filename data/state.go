@@ -172,6 +172,20 @@ func (s *WorldState) InsertTransaction(tx *Transaction) error {
 	return nil
 }
 
+// InsertAccount adds a newly created account into the world state.
+func (s *WorldState) InsertAccount(account *crypto.Account) error {
+	s.accountsMutex.Lock()
+	defer s.accountsMutex.Unlock()
+
+	if _, exists := s.accounts[account.Address]; exists {
+		return &DuplicateAccountError{address: account.Address}
+	}
+
+	s.accounts[account.Address] = *account
+
+	return nil
+}
+
 // CommitRegisters updates the register state with the values of a register map.
 func (s *WorldState) CommitRegisters(registers Registers) {
 	s.registersMutex.Lock()
@@ -209,20 +223,6 @@ func (s *WorldState) SealBlock(h crypto.Hash) error {
 	block.Status = BlockSealed
 	s.blocks[block.Hash()] = *block
 	s.blocksMutex.Unlock()
-
-	return nil
-}
-
-// AddAccount adds a newly created account into the world state.
-func (s *WorldState) AddAccount(account *crypto.Account) error {
-	s.accountsMutex.Lock()
-	defer s.accountsMutex.Unlock()
-
-	if _, exists := s.accounts[account.Address]; exists {
-		return &DuplicateAccountError{address: account.Address}
-	}
-
-	s.accounts[account.Address] = *account
 
 	return nil
 }
