@@ -332,7 +332,7 @@ func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
 
 	program := parse(`
         fun test(): Int64 {
-            return bool[0]
+            return true[0]
         }
 	`)
 
@@ -379,34 +379,6 @@ func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
             const z = [0, 3]
             z[true] = 2
             return z[1]
-        }
-	`)
-
-	inter := interpreter.NewInterpreter(program)
-	inter.Interpret()
-	Expect(func() { inter.Invoke("test") }).Should(Panic())
-}
-
-func TestInterpretInvalidArrayIndexingAssignmentToBool(t *testing.T) {
-	RegisterTestingT(t)
-
-	program := parse(`
-        fun test() {
-            bool[0] = 2
-        }
-	`)
-
-	inter := interpreter.NewInterpreter(program)
-	inter.Interpret()
-	Expect(func() { inter.Invoke("test") }).Should(Panic())
-}
-
-func TestInterpretInvalidArrayIndexingAssignmentToInteger(t *testing.T) {
-	RegisterTestingT(t)
-
-	program := parse(`
-        fun test() {
-            3[0] = 2
         }
 	`)
 
