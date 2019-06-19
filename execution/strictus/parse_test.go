@@ -186,7 +186,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		const f: UInt16 = 6
 		const g: UInt32 = 7
 		const h: UInt64 = 8
-		const h: u64 = 8
+		const h: UInt64 = 8
 	`)
 
 	a := VariableDeclaration{Identifier: "a", IsConst: true, Type: Int8Type{}, Value: UInt64Expression(1)}
