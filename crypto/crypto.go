@@ -2,7 +2,7 @@ package crypto
 
 import (
 	"log"
-	
+
 	"golang.org/x/crypto/sha3"
 
 	"github.com/tyler-smith/go-bip32"
@@ -11,8 +11,8 @@ import (
 
 // KeyPair represents a BIP32 public key and private key pair (and the seed phrase used to derive it).
 type KeyPair struct {
-	PublicKey string
-	secretKey string
+	PublicKey []byte
+	secretKey []byte
 	mnemonic  string
 }
 
@@ -34,8 +34,8 @@ func genKeyPair(passphrase string) *KeyPair {
 	publicKey := masterKey.PublicKey()
 
 	newKeyPair := &KeyPair{
-		PublicKey: publicKey.String(),
-		secretKey: masterKey.String(),
+		PublicKey: []byte(publicKey.String()),
+		secretKey: []byte(masterKey.String()),
 		mnemonic:  mnemonic,
 	}
 
