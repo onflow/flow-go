@@ -38,7 +38,7 @@ func (v *ProgramVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
 func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
 	isPublic := ctx.Pub() != nil
 	identifier := ctx.Identifier().GetText()
-	returnType := v.visitReturnType(ctx.GetReturnType())
+	returnType := v.visitReturnType(ctx.returnType)
 	var parameters []ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
@@ -63,7 +63,7 @@ func (v *ProgramVisitor) visitReturnType(ctx ITypeNameContext) ast.Type {
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
-	returnType := v.visitReturnType(ctx.GetReturnType())
+	returnType := v.visitReturnType(ctx.returnType)
 	var parameters []ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
@@ -133,14 +133,14 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 
 	// alternative: function type
 	var parameterTypes []ast.Type
-	for _, typeName := range ctx.GetParameterTypes() {
+	for _, typeName := range ctx.parameterTypes {
 		parameterTypes = append(
 			parameterTypes,
 			typeName.Accept(v).(ast.Type),
 		)
 	}
 
-	returnType := ctx.GetReturnType().Accept(v).(ast.Type)
+	returnType := ctx.returnType.Accept(v).(ast.Type)
 
 	return ast.FunctionType{
 		ParameterTypes: parameterTypes,
@@ -269,8 +269,13 @@ func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 	var elseBlock ast.Block
 	if ctx.alt != nil {
 		elseBlock = ctx.alt.Accept(v).(ast.Block)
-	} else if ifStatement, ok := ctx.IfStatement().Accept(v).(ast.IfStatement); ok {
-		elseBlock = ast.Block{Statements: []ast.Statement{ifStatement}}
+	} else {
+		ifStatementContext := ctx.IfStatement()
+		if ifStatementContext != nil {
+			if ifStatement, ok := ifStatementContext.Accept(v).(ast.IfStatement); ok {
+				elseBlock = ast.Block{Statements: []ast.Statement{ifStatement}}
+			}
+		}
 	}
 
 	return ast.IfStatement{
