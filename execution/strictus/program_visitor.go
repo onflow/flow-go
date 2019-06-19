@@ -505,12 +505,12 @@ func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
-func parseIntExpression(text string, kind string, base int) ast.UInt64Expression {
+func parseIntExpression(text string, kind string, base int) ast.Int64Expression {
 	value, err := strconv.ParseInt(text, base, 64)
 	if err != nil {
 		panic(fmt.Sprintf("invalid %s literal: %s", kind, text))
 	}
-	return ast.UInt64Expression(value)
+	return ast.Int64Expression(value)
 }
 
 func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {
