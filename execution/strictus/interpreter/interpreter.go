@@ -171,11 +171,11 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.R
 		}
 
 		indexValue := target.Index.Accept(interpreter)
-		index, ok := indexValue.(ast.UInt64Expression)
+		index, ok := indexValue.(ast.IntExpression)
 		if !ok {
 			panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 		}
-		array[index] = value
+		array[index.IntValue()] = value
 
 	case ast.MemberExpression:
 		// TODO:
@@ -312,11 +312,11 @@ func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpress
 	}
 
 	indexValue := expression.Index.Accept(interpreter)
-	index, ok := indexValue.(ast.UInt64Expression)
+	index, ok := indexValue.(ast.IntExpression)
 	if !ok {
 		panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 	}
-	return array[index]
+	return array[index.IntValue()]
 }
 
 func (interpreter *Interpreter) VisitConditionalExpression(expression ast.ConditionalExpression) ast.Repr {
