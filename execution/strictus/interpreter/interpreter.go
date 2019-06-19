@@ -89,16 +89,15 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 func (interpreter *Interpreter) VisitBlock(block ast.Block) ast.Repr {
 	// block scope: each block gets an activation record
 	interpreter.activations.PushCurrent()
+	defer interpreter.activations.Pop()
 
 	for _, statement := range block.Statements {
 		result := statement.Accept(interpreter)
 		if result != nil {
-			interpreter.activations.Pop()
 			return result
 		}
 	}
 
-	interpreter.activations.Pop()
 	return nil
 }
 
@@ -347,6 +346,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression a
 	// lexical scope: use the function declaration's activation record,
 	// not the current one (which would be dynamic scope)
 	interpreter.activations.Push(function.Activation)
+	defer interpreter.activations.Pop()
 
 	// evaluate all argument expressions and bind the resulting values to the parameters
 	for parameterIndex, parameter := range function.Expression.Parameters {
@@ -368,8 +368,6 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression a
 	}
 
 	result := function.Expression.Block.Accept(interpreter)
-
-	interpreter.activations.Pop()
 
 	return result
 }
