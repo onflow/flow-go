@@ -122,7 +122,7 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 			return ast.UInt32Type{}
 		case "UInt64":
 			return ast.UInt64Type{}
-		case "void":
+		case "Void":
 			return ast.VoidType{}
 		case "Bool":
 			return ast.BoolType{}

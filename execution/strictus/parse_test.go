@@ -260,7 +260,7 @@ func TestParseMissingReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual := parse(`
-		const noop: () => void =
+		const noop: () => Void =
             fun () { return }
 	`)
 
