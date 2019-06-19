@@ -104,6 +104,70 @@ func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 	Expect(inter.Globals["y"].Value).To(Equal(Int64Expression(42)))
 }
 
+func TestInterpretInvalidFunctionCallWithTooFewArguments(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun f(x: Int32): Int32 {
+            return x
+        }
+
+        fun test(): Int32 {
+            return f()
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
+
+func TestInterpretInvalidFunctionCallWithTooManyArguments(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun f(x: Int32): Int32 {
+            return x
+        }
+
+        fun test(): Int32 {
+            return f(2, 3)
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
+
+func TestInterpretInvalidFunctionCallOfBool(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun test(): Int32 {
+            return true()
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
+
+func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun test(): Int32 {
+            return 2()
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
+
 func TestInterpretInvalidConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -263,6 +327,34 @@ func TestInterpretInvalidArrayIndexingWithBool(t *testing.T) {
 	Expect(func() { inter.Invoke("test") }).Should(Panic())
 }
 
+func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun test(): Int64 {
+            return bool[0]
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
+
+func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun test(): Int64 {
+            return 2[0]
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
+
 func TestInterpretArrayIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -287,6 +379,34 @@ func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
             const z = [0, 3]
             z[true] = 2
             return z[1]
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
+
+func TestInterpretInvalidArrayIndexingAssignmentToBool(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun test() {
+            bool[0] = 2
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
+
+func TestInterpretInvalidArrayIndexingAssignmentToInteger(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun test() {
+            3[0] = 2
         }
 	`)
 
@@ -336,6 +456,35 @@ func TestInterpretPlusOperator(t *testing.T) {
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
 	Expect(inter.Invoke("testIntegers")).To(Equal(Int64Expression(6)))
+	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
+	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
+	Expect(func() { inter.Invoke("testBools") }).Should(Panic())
+}
+
+func TestInterpretMinusOperator(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun testIntegers(): Int64 {
+            return 2 - 4
+        }
+
+        fun testIntegerAndBool(): Int64 {
+            return 2 - true
+        }
+
+        fun testBoolAndInteger(): Int64 {
+            return true - 2
+        }
+
+        fun testBools(): Int64 {
+            return true - true
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(inter.Invoke("testIntegers")).To(Equal(Int64Expression(-2)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBools") }).Should(Panic())
@@ -851,12 +1000,30 @@ func TestInterpretIfStatement(t *testing.T) {
             }
             return 4
         }
+
+        fun testNoElse(): Int64 {
+            if true {
+                return 2
+            }
+            return 3
+        }
+
+        fun testElseIf(): Int64 {
+            if false {
+                return 2
+            } else if true {
+                return 3
+            }
+            return 4
+        }
 	`)
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
 	Expect(inter.Invoke("testTrue")).To(Equal(Int64Expression(2)))
 	Expect(inter.Invoke("testFalse")).To(Equal(Int64Expression(3)))
+	Expect(inter.Invoke("testNoElse")).To(Equal(Int64Expression(2)))
+	Expect(inter.Invoke("testElseIf")).To(Equal(Int64Expression(3)))
 }
 
 func TestInterpretWhileStatement(t *testing.T) {
@@ -867,6 +1034,28 @@ func TestInterpretWhileStatement(t *testing.T) {
             var x = 0
             while x < 5 {
                 x = x + 2
+            }
+            return x
+        }
+
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(inter.Invoke("test")).To(Equal(Int64Expression(6)))
+}
+
+func TestInterpretWhileStatementWithReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun test(): Int64 {
+            var x = 0
+            while x < 10 {
+                x = x + 2
+                if x > 5 {
+                    return x
+                }
             }
             return x
         }
