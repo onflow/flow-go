@@ -106,21 +106,21 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	if identifierNode != nil {
 		identifier := identifierNode.GetText()
 		switch identifier {
-		case "i8":
+		case "Int8":
 			return ast.Int8Type{}
-		case "i16":
+		case "Int16":
 			return ast.Int16Type{}
-		case "i32":
+		case "Int32":
 			return ast.Int32Type{}
-		case "i64":
+		case "Int64":
 			return ast.Int64Type{}
-		case "u8":
+		case "UInt8":
 			return ast.UInt8Type{}
-		case "u16":
+		case "UInt16":
 			return ast.UInt16Type{}
-		case "u32":
+		case "UInt32":
 			return ast.UInt32Type{}
-		case "u64":
+		case "UInt64":
 			return ast.UInt64Type{}
 		case "void":
 			return ast.VoidType{}
