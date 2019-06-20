@@ -24,6 +24,15 @@ func (e *DuplicateItemError) Error() string {
 	return fmt.Sprintf("Item with hash %s already exists", e.hash)
 }
 
+// DuplicateAccountError indicates that an account already exists.
+type DuplicateAccountError struct {
+	address crypto.Address
+}
+
+func (e *DuplicateAccountError) Error() string {
+	return fmt.Sprintf("Account with address %s already exists", e.address)
+}
+
 // InvalidBlockNumberError indicates that a block number is invalid.
 type InvalidBlockNumberError struct {
 	blockNumber uint64

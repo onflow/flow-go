@@ -10,6 +10,8 @@ import (
 
 // WorldState represents the current state of the blockchain.
 type WorldState struct {
+	accounts          map[crypto.Address]crypto.Account
+	accountsMutex     sync.RWMutex
 	blocks            map[crypto.Hash]Block
 	blocksMutex       sync.RWMutex
 	collections       map[crypto.Hash]Collection
@@ -166,6 +168,20 @@ func (s *WorldState) InsertTransaction(tx *Transaction) error {
 	}
 
 	s.transactions[tx.Hash()] = *tx
+
+	return nil
+}
+
+// InsertAccount adds a newly created account into the world state.
+func (s *WorldState) InsertAccount(account *crypto.Account) error {
+	s.accountsMutex.Lock()
+	defer s.accountsMutex.Unlock()
+
+	if _, exists := s.accounts[account.Address]; exists {
+		return &DuplicateAccountError{address: account.Address}
+	}
+
+	s.accounts[account.Address] = *account
 
 	return nil
 }
