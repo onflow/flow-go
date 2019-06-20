@@ -1,8 +1,6 @@
 package crypto
 
 import (
-	"log"
-
 	"golang.org/x/crypto/sha3"
 
 	"github.com/tyler-smith/go-bip32"
@@ -17,7 +15,7 @@ type KeyPair struct {
 }
 
 // genKeyPair generates a new HD wallet keypair to be used for account creation.
-func genKeyPair(passphrase string) *KeyPair {
+func genKeyPair(passphrase string) (*KeyPair, error) {
 	// Generate a mnemonic for memorization or user-friendly seeds
 	entropy, _ := bip39.NewEntropy(256)
 	mnemonic, _ := bip39.NewMnemonic(entropy)
@@ -26,20 +24,17 @@ func genKeyPair(passphrase string) *KeyPair {
 	seed := bip39.NewSeed(mnemonic, passphrase)
 
 	masterKey, err := bip32.NewMasterKey(seed)
-
 	if err != nil {
-		log.Fatal(err)
+		return nil, &InvalidSeed{seed: string(seed)}
 	}
 
 	publicKey := masterKey.PublicKey()
 
-	newKeyPair := &KeyPair{
+	return &KeyPair{
 		PublicKey: []byte(publicKey.String()),
 		secretKey: []byte(masterKey.String()),
 		mnemonic:  mnemonic,
-	}
-
-	return newKeyPair
+	}, nil
 }
 
 // ComputeHash computes the SHA3-256 hash of some arbitrary set of data.
