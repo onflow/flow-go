@@ -347,16 +347,24 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression a
 		panic(fmt.Sprintf("invalid number of arguments: got %d, need %d", argumentCount, parameterCount))
 	}
 
+	// NOTE: evaluate all argument expressions in call-site scope, not in function body
+	var arguments []ast.Repr
+	for parameterIndex := range function.Expression.Parameters {
+		argumentExpression := invocationExpression.Arguments[parameterIndex]
+		argument := argumentExpression.Accept(interpreter)
+		arguments = append(arguments, argument)
+	}
+
 	// start a new activation record
 	// lexical scope: use the function declaration's activation record,
 	// not the current one (which would be dynamic scope)
 	interpreter.activations.Push(function.Activation)
 	defer interpreter.activations.Pop()
 
-	// evaluate all argument expressions and bind the resulting values to the parameters
+	// bind the argument values to the parameters in the function
 	for parameterIndex, parameter := range function.Expression.Parameters {
 		argumentExpression := invocationExpression.Arguments[parameterIndex]
-		argument := argumentExpression.Accept(interpreter)
+		argument := arguments[parameterIndex]
 
 		interpreter.activations.Set(
 			parameter.Identifier,
