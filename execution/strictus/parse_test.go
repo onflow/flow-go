@@ -7,9 +7,20 @@ import (
 	"testing"
 )
 
+func parse(code string) Program {
+	input := antlr.NewInputStream(code)
+	lexer := NewStrictusLexer(input)
+	stream := antlr.NewCommonTokenStream(lexer, 0)
+	parser := NewStrictusParser(stream)
+	// diagnostics, for debugging only:
+	// parser.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
+	parser.AddErrorListener(antlr.NewConsoleErrorListener())
+	return parser.Program().Accept(&ProgramVisitor{}).(Program)
+}
+
 func TestParseComplexFunction(t *testing.T) {
 
-	input := antlr.NewInputStream(`
+	actual := parse(`
 		pub fun sum(a: i32, b: i32[2], c: i32[][3]): i64 {
             const x = 1
             var y: i32 = 2
@@ -29,14 +40,6 @@ func TestParseComplexFunction(t *testing.T) {
             }
         }
 	`)
-
-	lexer := NewStrictusLexer(input)
-	stream := antlr.NewCommonTokenStream(lexer, 0)
-	parser := NewStrictusParser(stream)
-	// diagnostics, for debugging only:
-	// parser.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
-	parser.AddErrorListener(antlr.NewConsoleErrorListener())
-	actual := parser.Program().Accept(&ProgramVisitor{}).(Program)
 
 	sum := FunctionDeclaration{
 		IsPublic:   true,
@@ -174,7 +177,7 @@ func TestParseComplexFunction(t *testing.T) {
 
 func TestParseIntegerTypes(t *testing.T) {
 
-	input := antlr.NewInputStream(`
+	actual := parse(`
 		const a: i8 = 1
 		const b: i16 = 2
 		const c: i32 = 3
@@ -184,14 +187,6 @@ func TestParseIntegerTypes(t *testing.T) {
 		const g: u32 = 7
 		const h: u64 = 8
 	`)
-
-	lexer := NewStrictusLexer(input)
-	stream := antlr.NewCommonTokenStream(lexer, 0)
-	parser := NewStrictusParser(stream)
-	// diagnostics, for debugging only:
-	// parser.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
-	parser.AddErrorListener(antlr.NewConsoleErrorListener())
-	actual := parser.Program().Accept(&ProgramVisitor{}).(Program)
 
 	a := VariableDeclaration{Identifier: "a", IsConst: true, Type: Int8Type{}, Value: UInt64Expression(1)}
 	b := VariableDeclaration{Identifier: "b", IsConst: true, Type: Int16Type{}, Value: UInt64Expression(2)}
@@ -212,20 +207,12 @@ func TestParseIntegerTypes(t *testing.T) {
 
 func TestParseFunctionType(t *testing.T) {
 
-	input := antlr.NewInputStream(`
+	actual := parse(`
 		const add: (i8, i8) => i16 =
             fun (a: i8, b: i8): i16 {
                 return a + b
             }
 	`)
-
-	lexer := NewStrictusLexer(input)
-	stream := antlr.NewCommonTokenStream(lexer, 0)
-	parser := NewStrictusParser(stream)
-	// diagnostics, for debugging only:
-	// parser.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
-	parser.AddErrorListener(antlr.NewConsoleErrorListener())
-	actual := parser.Program().Accept(&ProgramVisitor{}).(Program)
 
 	add := VariableDeclaration{
 		Identifier: "add",
@@ -260,6 +247,37 @@ func TestParseFunctionType(t *testing.T) {
 	expected := Program{
 		AllDeclarations: []Declaration{add},
 		Declarations:    map[string]Declaration{"add": add},
+	}
+
+	NewWithT(t).Expect(actual).Should(Equal(expected))
+}
+
+func TestParseMissingReturnType(t *testing.T) {
+
+	actual := parse(`
+		const noop: () => void =
+            fun () { return }
+	`)
+
+	noop := VariableDeclaration{
+		Identifier: "noop",
+		IsConst:    true,
+		Type: FunctionType{
+			ReturnType: VoidType{},
+		},
+		Value: FunctionExpression{
+			ReturnType: VoidType{},
+			Block: Block{
+				Statements: []Statement{
+					ReturnStatement{},
+				},
+			},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{noop},
+		Declarations:    map[string]Declaration{"noop": noop},
 	}
 
 	NewWithT(t).Expect(actual).Should(Equal(expected))

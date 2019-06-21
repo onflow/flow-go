@@ -5,6 +5,9 @@ import (
 	"fmt"
 )
 
+// Visit-methods for statement which return a non-nil value
+// are treated like they are returning a value.
+
 type Interpreter struct {
 	Program     ast.Program
 	activations *Activations
@@ -101,6 +104,11 @@ func (interpreter *Interpreter) VisitBlock(block ast.Block) ast.Repr {
 
 func (interpreter *Interpreter) VisitReturnStatement(statement ast.ReturnStatement) ast.Repr {
 	// NOTE: returning result
+
+	if statement.Expression == nil {
+		return Void{}
+	}
+
 	return statement.Expression.Accept(interpreter)
 }
 
