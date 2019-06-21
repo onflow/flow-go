@@ -1081,3 +1081,18 @@ func TestInterpretConditionalOperator(t *testing.T) {
 	Expect(inter.Invoke("testTrue")).To(Equal(Int64Expression(2)))
 	Expect(inter.Invoke("testFalse")).To(Equal(Int64Expression(3)))
 }
+
+func TestInterpreterInvalidAssignmentToParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun test(x: Int8) {
+             x = 2
+        }
+    `)
+
+	inter := interpreter.NewInterpreter(program)
+
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
