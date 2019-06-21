@@ -21,9 +21,9 @@ func parse(code string) Program {
 func TestParseComplexFunction(t *testing.T) {
 
 	actual := parse(`
-		pub fun sum(a: i32, b: i32[2], c: i32[][3]): i64 {
+		pub fun sum(a: Int32, b: Int32[2], c: Int32[][3]): Int64 {
             const x = 1
-            var y: i32 = 2
+            var y: Int32 = 2
             y = (3)
             x.foo.bar[0][1].baz
             z = sum(0o3, 0x2, 0b1) % 42
@@ -178,14 +178,14 @@ func TestParseComplexFunction(t *testing.T) {
 func TestParseIntegerTypes(t *testing.T) {
 
 	actual := parse(`
-		const a: i8 = 1
-		const b: i16 = 2
-		const c: i32 = 3
-		const d: i64 = 4
-		const e: u8 = 5
-		const f: u16 = 6
-		const g: u32 = 7
-		const h: u64 = 8
+		const a: Int8 = 1
+		const b: Int16 = 2
+		const c: Int32 = 3
+		const d: Int64 = 4
+		const e: UInt8 = 5
+		const f: UInt16 = 6
+		const g: UInt32 = 7
+		const h: UInt64 = 8
 	`)
 
 	a := VariableDeclaration{Identifier: "a", IsConst: true, Type: Int8Type{}, Value: UInt64Expression(1)}
@@ -208,8 +208,8 @@ func TestParseIntegerTypes(t *testing.T) {
 func TestParseFunctionType(t *testing.T) {
 
 	actual := parse(`
-		const add: (i8, i8) => i16 =
-            fun (a: i8, b: i8): i16 {
+		const add: (Int8, Int8) => Int16 =
+            fun (a: Int8, b: Int8): Int16 {
                 return a + b
             }
 	`)

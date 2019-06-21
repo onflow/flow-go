@@ -14,20 +14,20 @@ func TestInterpret(t *testing.T) {
         const x = 10
 
         // check first-class functions and scope inside them
-        const y = (fun (x: i32): i32 { return x })(42)
+        const y = (fun (x: Int32): Int32 { return x })(42)
 
-        fun f(): i32 {
+        fun f(): Int32 {
            // check resolution
            return x
         }
 
-        fun g(): i32 {
+        fun g(): Int32 {
            // check scope is lexical, not dynamic
            const x = 20
            return f()
         }
 
-        pub fun foo(a: i32, b: i32): i64 {
+        pub fun foo(a: Int32, b: Int32): Int64 {
             var c = 2
             c = 3
             const z = [0, 3]
