@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package bamboo.proto;
+
+import "shared/messages.proto";
+import "google/protobuf/empty.proto";
+
+
+service SecurityNode {
+  rpc Ping (PingRequest) returns (PingResponse);
+
+  // Receive a signed collection from an access node.
+  rpc AccessSubmitCollection (AccessCollectionRequest) returns (AccessCollectionResponse);
+
+  // Notify the security node that another has proposed a block.
+  rpc ProposeBlock (ProposeBlockRequest) returns (ProposeBlockResponse);
+  
+  // Update a block proposal to add new signatures.
+  rpc UpdateProposedBlock (ProposeBlockUpdateRequest) returns (ProposeBlockUpdateResponse);
+
+  // Returns a block by hash
+  rpc GetBlockByHash (GetBlockByHashRequest) returns (GetBlockResponse);
+
+  // Returns a block by height
+  rpc GetBlockByHeight (GetBlockByHeightRequest) returns (GetBlockResponse);
+
+  // Process result approval from access nodes.
+  rpc ProcessResultApproval(ProcessResultApprovalRequest) returns (ProcessResultApprovalResponse);
+
+  // Returns the finalized state transitions at the requested heights.
+  rpc GetFinalizedStateTransitions(FinalizedStateTransitionsRequest)
+      returns (FinalizedStateTransitionsResponse);
+
+  // Process state transition proposal from other security node.
+  rpc ProcessStateTransitionProposal(SignedStateTransition) returns (google.protobuf.Empty);
+
+  // Process state transition prepare vote from other security node.
+  rpc ProcessStateTransitionPrepareVote(SignedStateTransitionPrepareVote) returns (google.protobuf.Empty);
+
+  // Process state transition commit vote from other security node.
+  rpc ProcessStateTransitionCommitVote(SignedStateTransitionCommitVote) returns (google.protobuf.Empty);
+
+  // Process execution result from execute nodes to propose block seals
+  rpc ProcessExecutionReceipt(ProcessExecutionReceiptRequest) returns (ProcessExecutionReceiptResponse);
+
+  // Receive an execution receipt challenge.
+  rpc SubmitInvalidExecutionReceiptChallenge(InvalidExecutionReceiptChallengeRequest) returns (InvalidExecutionReceiptChallengeResponse);
+}
