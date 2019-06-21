@@ -1,3 +1,4 @@
+/* NOTE: this is a placeholder for grouping related db queries */
 package data
 
 // Book data struct
