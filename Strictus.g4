@@ -117,7 +117,7 @@ expression
     ;
 
 conditionalExpression
-	: orExpression ('?' then=expression ':' alt=expression)?
+	: <assoc=right> orExpression ('?' then=expression ':' alt=expression)?
 	;
 
 orExpression
