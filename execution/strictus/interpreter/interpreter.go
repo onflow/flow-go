@@ -69,19 +69,24 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 		parameterTypes = append(parameterTypes, parameter.Type)
 	}
 
-	// function declarations are de-sugared to constant variables
-	interpreter.declareVariable(
-		ast.VariableDeclaration{
-			Value:      expression,
-			Identifier: declaration.Identifier,
-			IsConst:    true,
-			Type: ast.FunctionType{
-				ParameterTypes: parameterTypes,
-				ReturnType:     declaration.ReturnType,
-			},
+	variableDeclaration := ast.VariableDeclaration{
+		Value:      expression,
+		Identifier: declaration.Identifier,
+		IsConst:    true,
+		Type: ast.FunctionType{
+			ParameterTypes: parameterTypes,
+			ReturnType:     declaration.ReturnType,
 		},
-		function,
-	)
+	}
+
+	// make the function itself available inside the function
+	depth := interpreter.activations.Depth()
+	variable := newVariable(variableDeclaration, depth, function)
+	function.Activation = function.Activation.
+		Insert(ActivationKey(declaration.Identifier), variable)
+
+	// function declarations are de-sugared to constant variables
+	interpreter.declareVariable(variableDeclaration, function)
 
 	return nil
 }
