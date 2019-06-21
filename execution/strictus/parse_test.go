@@ -19,6 +19,7 @@ func parse(code string) Program {
 }
 
 func TestParseComplexFunction(t *testing.T) {
+	RegisterTestingT(t)
 
 	actual := parse(`
 		pub fun sum(a: Int32, b: Int32[2], c: Int32[][3]): Int64 {
@@ -56,17 +57,17 @@ func TestParseComplexFunction(t *testing.T) {
 					IsConst:    true,
 					Identifier: "x",
 					Type:       nil,
-					Value:      UInt64Expression(1),
+					Value:      Int64Expression(1),
 				},
 				VariableDeclaration{
 					IsConst:    false,
 					Identifier: "y",
 					Type:       Int32Type{},
-					Value:      UInt64Expression(2),
+					Value:      Int64Expression(2),
 				},
 				Assignment{
 					Target: IdentifierExpression{Identifier: "y"},
-					Value:  UInt64Expression(3),
+					Value:  Int64Expression(3),
 				},
 				ExpressionStatement{
 					Expression: MemberExpression{
@@ -79,9 +80,9 @@ func TestParseComplexFunction(t *testing.T) {
 									},
 									Identifier: "bar",
 								},
-								Index: UInt64Expression(0),
+								Index: Int64Expression(0),
 							},
-							Index: UInt64Expression(1),
+							Index: Int64Expression(1),
 						},
 						Identifier: "baz",
 					},
@@ -93,12 +94,12 @@ func TestParseComplexFunction(t *testing.T) {
 						Left: InvocationExpression{
 							Expression: IdentifierExpression{Identifier: "sum"},
 							Arguments: []Expression{
-								UInt64Expression(3),
-								UInt64Expression(2),
-								UInt64Expression(1),
+								Int64Expression(3),
+								Int64Expression(2),
+								Int64Expression(1),
 							},
 						},
-						Right: UInt64Expression(42),
+						Right: Int64Expression(42),
 					},
 				},
 				ReturnStatement{Expression: IdentifierExpression{Identifier: "a"}},
@@ -106,7 +107,7 @@ func TestParseComplexFunction(t *testing.T) {
 					Test: BinaryExpression{
 						Operation: OperationLess,
 						Left:      IdentifierExpression{Identifier: "x"},
-						Right:     UInt64Expression(2),
+						Right:     Int64Expression(2),
 					},
 					Block: Block{
 						Statements: []Statement{
@@ -115,7 +116,7 @@ func TestParseComplexFunction(t *testing.T) {
 								Value: BinaryExpression{
 									Operation: OperationPlus,
 									Left:      IdentifierExpression{Identifier: "x"},
-									Right:     UInt64Expression(1),
+									Right:     Int64Expression(1),
 								},
 							},
 						},
@@ -125,7 +126,7 @@ func TestParseComplexFunction(t *testing.T) {
 					Test: BoolExpression(true),
 					Then: Block{
 						Statements: []Statement{
-							ReturnStatement{Expression: UInt64Expression(1)},
+							ReturnStatement{Expression: Int64Expression(1)},
 						},
 					},
 					Else: Block{
@@ -138,11 +139,11 @@ func TestParseComplexFunction(t *testing.T) {
 											Expression: ConditionalExpression{
 												Test: BinaryExpression{
 													Operation: OperationGreater,
-													Left:      UInt64Expression(2),
-													Right:     UInt64Expression(3),
+													Left:      Int64Expression(2),
+													Right:     Int64Expression(3),
 												},
-												Then: UInt64Expression(4),
-												Else: UInt64Expression(5),
+												Then: Int64Expression(4),
+												Else: Int64Expression(5),
 											},
 										},
 									},
@@ -152,7 +153,7 @@ func TestParseComplexFunction(t *testing.T) {
 										ReturnStatement{
 											Expression: ArrayExpression{
 												Values: []Expression{
-													UInt64Expression(2),
+													Int64Expression(2),
 													BoolExpression(true),
 												},
 											},
@@ -172,10 +173,11 @@ func TestParseComplexFunction(t *testing.T) {
 		Declarations:    map[string]Declaration{"sum": sum},
 	}
 
-	NewWithT(t).Expect(actual).Should(Equal(expected))
+	Expect(actual).Should(Equal(expected))
 }
 
 func TestParseIntegerTypes(t *testing.T) {
+	RegisterTestingT(t)
 
 	actual := parse(`
 		const a: Int8 = 1
@@ -188,24 +190,25 @@ func TestParseIntegerTypes(t *testing.T) {
 		const h: UInt64 = 8
 	`)
 
-	a := VariableDeclaration{Identifier: "a", IsConst: true, Type: Int8Type{}, Value: UInt64Expression(1)}
-	b := VariableDeclaration{Identifier: "b", IsConst: true, Type: Int16Type{}, Value: UInt64Expression(2)}
-	c := VariableDeclaration{Identifier: "c", IsConst: true, Type: Int32Type{}, Value: UInt64Expression(3)}
-	d := VariableDeclaration{Identifier: "d", IsConst: true, Type: Int64Type{}, Value: UInt64Expression(4)}
-	e := VariableDeclaration{Identifier: "e", IsConst: true, Type: UInt8Type{}, Value: UInt64Expression(5)}
-	f := VariableDeclaration{Identifier: "f", IsConst: true, Type: UInt16Type{}, Value: UInt64Expression(6)}
-	g := VariableDeclaration{Identifier: "g", IsConst: true, Type: UInt32Type{}, Value: UInt64Expression(7)}
-	h := VariableDeclaration{Identifier: "h", IsConst: true, Type: UInt64Type{}, Value: UInt64Expression(8)}
+	a := VariableDeclaration{Identifier: "a", IsConst: true, Type: Int8Type{}, Value: Int64Expression(1)}
+	b := VariableDeclaration{Identifier: "b", IsConst: true, Type: Int16Type{}, Value: Int64Expression(2)}
+	c := VariableDeclaration{Identifier: "c", IsConst: true, Type: Int32Type{}, Value: Int64Expression(3)}
+	d := VariableDeclaration{Identifier: "d", IsConst: true, Type: Int64Type{}, Value: Int64Expression(4)}
+	e := VariableDeclaration{Identifier: "e", IsConst: true, Type: UInt8Type{}, Value: Int64Expression(5)}
+	f := VariableDeclaration{Identifier: "f", IsConst: true, Type: UInt16Type{}, Value: Int64Expression(6)}
+	g := VariableDeclaration{Identifier: "g", IsConst: true, Type: UInt32Type{}, Value: Int64Expression(7)}
+	h := VariableDeclaration{Identifier: "h", IsConst: true, Type: UInt64Type{}, Value: Int64Expression(8)}
 
 	expected := Program{
 		AllDeclarations: []Declaration{a, b, c, d, e, f, g, h},
 		Declarations:    map[string]Declaration{"a": a, "b": b, "c": c, "d": d, "e": e, "f": f, "g": g, "h": h},
 	}
 
-	NewWithT(t).Expect(actual).Should(Equal(expected))
+	Expect(actual).Should(Equal(expected))
 }
 
 func TestParseFunctionType(t *testing.T) {
+	RegisterTestingT(t)
 
 	actual := parse(`
 		const add: (Int8, Int8) => Int16 =
@@ -249,13 +252,14 @@ func TestParseFunctionType(t *testing.T) {
 		Declarations:    map[string]Declaration{"add": add},
 	}
 
-	NewWithT(t).Expect(actual).Should(Equal(expected))
+	Expect(actual).Should(Equal(expected))
 }
 
 func TestParseMissingReturnType(t *testing.T) {
+	RegisterTestingT(t)
 
 	actual := parse(`
-		const noop: () => void =
+		const noop: () => Void =
             fun () { return }
 	`)
 
@@ -280,5 +284,5 @@ func TestParseMissingReturnType(t *testing.T) {
 		Declarations:    map[string]Declaration{"noop": noop},
 	}
 
-	NewWithT(t).Expect(actual).Should(Equal(expected))
+	Expect(actual).Should(Equal(expected))
 }

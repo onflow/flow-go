@@ -10,6 +10,12 @@ type VoidType struct{}
 
 func (VoidType) isType() {}
 
+// BoolType represents the boolean type
+
+type BoolType struct{}
+
+func (BoolType) isType() {}
+
 // Int8Type represents the 8-bit signed integer type `Int8`
 
 type Int8Type struct{}

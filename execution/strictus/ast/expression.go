@@ -22,6 +22,7 @@ func (e BoolExpression) Accept(v Visitor) Repr {
 type IntExpression interface {
 	Expression
 	isIntExpression()
+	IntValue() int
 	Plus(other IntExpression) IntExpression
 	Minus(other IntExpression) IntExpression
 	Mod(other IntExpression) IntExpression
@@ -37,8 +38,17 @@ type IntExpression interface {
 
 type Int8Expression int8
 
-func (Int8Expression) isExpression()    {}
+func (Int8Expression) isExpression() {}
+
+func (e Int8Expression) Accept(v Visitor) Repr {
+	return v.VisitInt8Expression(e)
+}
+
 func (Int8Expression) isIntExpression() {}
+
+func (e Int8Expression) IntValue() int {
+	return int(e)
+}
 
 func (e Int8Expression) Plus(other IntExpression) IntExpression {
 	return e + other.(Int8Expression)
@@ -76,10 +86,6 @@ func (e Int8Expression) GreaterEqual(other IntExpression) BoolExpression {
 	return e >= other.(Int8Expression)
 }
 
-func (e Int8Expression) Accept(v Visitor) Repr {
-	return v.VisitInt8Expression(e)
-}
-
 // Int16Expression
 
 type Int16Expression int16
@@ -91,6 +97,10 @@ func (e Int16Expression) Accept(v Visitor) Repr {
 }
 
 func (Int16Expression) isIntExpression() {}
+
+func (e Int16Expression) IntValue() int {
+	return int(e)
+}
 
 func (e Int16Expression) Plus(other IntExpression) IntExpression {
 	return e + other.(Int16Expression)
@@ -140,6 +150,10 @@ func (e Int32Expression) Accept(v Visitor) Repr {
 
 func (Int32Expression) isIntExpression() {}
 
+func (e Int32Expression) IntValue() int {
+	return int(e)
+}
+
 func (e Int32Expression) Plus(other IntExpression) IntExpression {
 	return e + other.(Int32Expression)
 }
@@ -187,6 +201,10 @@ func (e Int64Expression) Accept(v Visitor) Repr {
 }
 
 func (Int64Expression) isIntExpression() {}
+
+func (e Int64Expression) IntValue() int {
+	return int(e)
+}
 
 func (e Int64Expression) Plus(other IntExpression) IntExpression {
 	return e + other.(Int64Expression)
@@ -236,6 +254,10 @@ func (e UInt8Expression) Accept(v Visitor) Repr {
 
 func (UInt8Expression) isIntExpression() {}
 
+func (e UInt8Expression) IntValue() int {
+	return int(e)
+}
+
 func (e UInt8Expression) Plus(other IntExpression) IntExpression {
 	return e + other.(UInt8Expression)
 }
@@ -283,6 +305,10 @@ func (e UInt16Expression) Accept(v Visitor) Repr {
 }
 
 func (UInt16Expression) isIntExpression() {}
+
+func (e UInt16Expression) IntValue() int {
+	return int(e)
+}
 
 func (e UInt16Expression) Plus(other IntExpression) IntExpression {
 	return e + other.(UInt16Expression)
@@ -332,6 +358,10 @@ func (e UInt32Expression) Accept(v Visitor) Repr {
 
 func (UInt32Expression) isIntExpression() {}
 
+func (e UInt32Expression) IntValue() int {
+	return int(e)
+}
+
 func (e UInt32Expression) Plus(other IntExpression) IntExpression {
 	return e + other.(UInt32Expression)
 }
@@ -379,6 +409,10 @@ func (e UInt64Expression) Accept(v Visitor) Repr {
 }
 
 func (UInt64Expression) isIntExpression() {}
+
+func (e UInt64Expression) IntValue() int {
+	return int(e)
+}
 
 func (e UInt64Expression) Plus(other IntExpression) IntExpression {
 	return e + other.(UInt64Expression)

@@ -122,8 +122,10 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 			return ast.UInt32Type{}
 		case "UInt64":
 			return ast.UInt64Type{}
-		case "void":
+		case "Void":
 			return ast.VoidType{}
+		case "Bool":
+			return ast.BoolType{}
 		default:
 			panic(fmt.Sprintf("unknown type: %s", identifier))
 		}
@@ -503,12 +505,12 @@ func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
-func parseIntExpression(text string, kind string, base int) ast.UInt64Expression {
+func parseIntExpression(text string, kind string, base int) ast.Int64Expression {
 	value, err := strconv.ParseInt(text, base, 64)
 	if err != nil {
 		panic(fmt.Sprintf("invalid %s literal: %s", kind, text))
 	}
-	return ast.UInt64Expression(value)
+	return ast.Int64Expression(value)
 }
 
 func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {
