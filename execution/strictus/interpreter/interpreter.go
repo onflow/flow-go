@@ -69,19 +69,24 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 		parameterTypes = append(parameterTypes, parameter.Type)
 	}
 
-	// function declarations are de-sugared to constant variables
-	interpreter.declareVariable(
-		ast.VariableDeclaration{
-			Value:      expression,
-			Identifier: declaration.Identifier,
-			IsConst:    true,
-			Type: ast.FunctionType{
-				ParameterTypes: parameterTypes,
-				ReturnType:     declaration.ReturnType,
-			},
+	variableDeclaration := ast.VariableDeclaration{
+		Value:      expression,
+		Identifier: declaration.Identifier,
+		IsConst:    true,
+		Type: ast.FunctionType{
+			ParameterTypes: parameterTypes,
+			ReturnType:     declaration.ReturnType,
 		},
-		function,
-	)
+	}
+
+	// make the function itself available inside the function
+	depth := interpreter.activations.Depth()
+	variable := newVariable(variableDeclaration, depth, function)
+	function.Activation = function.Activation.
+		Insert(ActivationKey(declaration.Identifier), variable)
+
+	// function declarations are de-sugared to constant variables
+	interpreter.declareVariable(variableDeclaration, function)
 
 	return nil
 }
@@ -340,12 +345,10 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression a
 		panic(fmt.Sprintf("can't invoke value: %#+v", value))
 	}
 
-	// ensure invocation's argument count matches function's parameter count
-	argumentCount := len(invocationExpression.Arguments)
-	parameterCount := len(function.Expression.Parameters)
-	if argumentCount != parameterCount {
-		panic(fmt.Sprintf("invalid number of arguments: got %d, need %d", argumentCount, parameterCount))
-	}
+	interpreter.checkInvocationArgumentCount(invocationExpression, function)
+
+	// NOTE: evaluate all argument expressions in call-site scope, not in function body
+	arguments := interpreter.evaluateFunctionInvocationArguments(invocationExpression, function)
 
 	// start a new activation record
 	// lexical scope: use the function declaration's activation record,
@@ -353,10 +356,22 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression a
 	interpreter.activations.Push(function.Activation)
 	defer interpreter.activations.Pop()
 
-	// evaluate all argument expressions and bind the resulting values to the parameters
+	interpreter.bindFunctionInvocationParameters(invocationExpression, function, arguments)
+
+	result := function.Expression.Block.Accept(interpreter)
+
+	return result
+}
+
+// bindFunctionInvocationParameters binds the argument values to the parameters in the function
+func (interpreter *Interpreter) bindFunctionInvocationParameters(
+	invocationExpression ast.InvocationExpression,
+	function *Function,
+	arguments []ast.Repr,
+) {
 	for parameterIndex, parameter := range function.Expression.Parameters {
 		argumentExpression := invocationExpression.Arguments[parameterIndex]
-		argument := argumentExpression.Accept(interpreter)
+		argument := arguments[parameterIndex]
 
 		interpreter.activations.Set(
 			parameter.Identifier,
@@ -371,10 +386,37 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression a
 			},
 		)
 	}
+}
 
-	result := function.Expression.Block.Accept(interpreter)
+// evaluateFunctionInvocationArguments evaluates all function invocation argument expressions
+func (interpreter *Interpreter) evaluateFunctionInvocationArguments(
+	invocationExpression ast.InvocationExpression,
+	function *Function,
+) []ast.Repr {
+	var arguments []ast.Repr
+	for parameterIndex := range function.Expression.Parameters {
+		argumentExpression := invocationExpression.Arguments[parameterIndex]
+		argument := argumentExpression.Accept(interpreter)
+		arguments = append(arguments, argument)
+	}
+	return arguments
+}
 
-	return result
+// checkInvocationArgumentCount ensures the invocation's argument count
+// matches the function's parameter count
+func (interpreter *Interpreter) checkInvocationArgumentCount(
+	invocationExpression ast.InvocationExpression,
+	function *Function,
+) {
+	argumentCount := len(invocationExpression.Arguments)
+	parameterCount := len(function.Expression.Parameters)
+	if argumentCount != parameterCount {
+		panic(fmt.Sprintf(
+			"invalid number of arguments: got %d, need %d",
+			argumentCount,
+			parameterCount,
+		))
+	}
 }
 
 func (interpreter *Interpreter) VisitFunctionExpression(expression ast.FunctionExpression) ast.Repr {
