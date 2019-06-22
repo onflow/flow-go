@@ -1081,3 +1081,52 @@ func TestInterpretConditionalOperator(t *testing.T) {
 	Expect(inter.Invoke("testTrue")).To(Equal(Int64Expression(2)))
 	Expect(inter.Invoke("testFalse")).To(Equal(Int64Expression(3)))
 }
+
+func TestInterpreterInvalidAssignmentToParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun test(x: Int8) {
+             x = 2
+        }
+    `)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
+
+func TestInterpreterFunctionBindingInFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun foo() {
+            return foo
+        }
+    `)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	inter.Invoke("foo")
+}
+
+func TestInterpreterRecursion(t *testing.T) {
+	// mainly tests that the function declaration identifier is bound
+	// to the function inside the function and that the arguments
+	// of the function calls are evaluated in the call-site scope
+
+	RegisterTestingT(t)
+
+	program := parse(`
+        fun fib(n: Int64): Int64 {
+            if n < 2 {
+               return n
+            }
+            return fib(n - 1) + fib(n - 2)
+        }
+    `)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(inter.Invoke("fib", int64(23))).To(Equal(Int64Expression(28657)))
+}
