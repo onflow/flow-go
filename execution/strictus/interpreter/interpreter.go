@@ -285,7 +285,7 @@ func (interpreter *Interpreter) VisitExpressionStatement(statement ast.Expressio
 }
 
 func (interpreter *Interpreter) VisitBoolExpression(expression ast.BoolExpression) ast.Repr {
-	return BoolValue(expression)
+	return BoolValue(expression.Value)
 }
 
 func (interpreter *Interpreter) VisitInt8Expression(expression ast.Int8Expression) ast.Repr {
