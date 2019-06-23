@@ -46,13 +46,16 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 		parameters = parameterList.Accept(v).([]ast.Parameter)
 	}
 	block := ctx.Block().Accept(v).(ast.Block)
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
 
 	return ast.FunctionDeclaration{
-		IsPublic:   isPublic,
-		Identifier: identifier,
-		Parameters: parameters,
-		ReturnType: returnType,
-		Block:      block,
+		IsPublic:      isPublic,
+		Identifier:    identifier,
+		Parameters:    parameters,
+		ReturnType:    returnType,
+		Block:         block,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
 	}
 }
 
@@ -71,11 +74,14 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 		parameters = parameterList.Accept(v).([]ast.Parameter)
 	}
 	block := ctx.Block().Accept(v).(ast.Block)
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
 
 	return ast.FunctionExpression{
-		Parameters: parameters,
-		ReturnType: returnType,
-		Block:      block,
+		Parameters:    parameters,
+		ReturnType:    returnType,
+		Block:         block,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
 	}
 }
 

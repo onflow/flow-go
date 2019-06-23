@@ -163,9 +163,11 @@ func (e BinaryExpression) Accept(v Visitor) Repr {
 // FunctionExpression
 
 type FunctionExpression struct {
-	Parameters []Parameter
-	ReturnType Type
-	Block      Block
+	Parameters    []Parameter
+	ReturnType    Type
+	Block         Block
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (FunctionExpression) isExpression() {}
