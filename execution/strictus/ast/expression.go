@@ -84,8 +84,10 @@ type AccessExpression interface {
 // MemberExpression
 
 type MemberExpression struct {
-	Expression Expression
-	Identifier string
+	Expression    Expression
+	Identifier    string
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (MemberExpression) isExpression()       {}

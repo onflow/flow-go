@@ -139,6 +139,35 @@ func TestParseInvocationExpression(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
+func TestParseMemberExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    const a = b.c
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Value: MemberExpression{
+			Expression: IdentifierExpression{
+				Identifier: "b",
+				Position:   Position{Offset: 16, Line: 2, Column: 15},
+			},
+			Identifier:    "c",
+			StartPosition: Position{Offset: 17, Line: 2, Column: 16},
+			EndPosition:   Position{Offset: 18, Line: 2, Column: 17},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{a},
+		Declarations:    map[string]Declaration{"a": a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
 func TestParseBlock(t *testing.T) {
 	RegisterTestingT(t)
 

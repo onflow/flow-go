@@ -518,8 +518,10 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 		}
 	case ast.MemberExpression:
 		return ast.MemberExpression{
-			Expression: wrapped,
-			Identifier: partialAccessExpression.Identifier,
+			Expression:    wrapped,
+			Identifier:    partialAccessExpression.Identifier,
+			StartPosition: partialAccessExpression.StartPosition,
+			EndPosition:   partialAccessExpression.EndPosition,
 		}
 	}
 	panic(fmt.Sprintf("invalid primary expression suffix: %#+v", partialAccessExpression))
@@ -534,9 +536,16 @@ func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) int
 }
 
 func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{} {
-	access := ctx.Identifier().GetText()
+	identifier := ctx.Identifier().GetText()
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.PositionFromToken(ctx.GetStop())
+
 	// NOTE: partial, expression is filled later
-	return ast.MemberExpression{Identifier: access}
+	return ast.MemberExpression{
+		Identifier:    identifier,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
+	}
 }
 
 func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) interface{} {
