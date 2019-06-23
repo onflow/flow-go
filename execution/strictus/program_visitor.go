@@ -466,10 +466,13 @@ func (v *ProgramVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) inter
 
 	expression := unaryContext.Accept(v).(ast.Expression)
 	operation := ctx.UnaryOp(0).Accept(v).(ast.Operation)
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
 
 	return ast.UnaryExpression{
-		Operation:  operation,
-		Expression: expression,
+		Operation:     operation,
+		Expression:    expression,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
 	}
 }
 

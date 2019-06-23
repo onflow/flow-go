@@ -200,6 +200,35 @@ func TestParseIndexExpression(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
+func TestParseUnaryExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    const a = -b
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Value: UnaryExpression{
+			Operation: OperationMinus,
+			Expression: IdentifierExpression{
+				Identifier: "b",
+				Position:   Position{Offset: 17, Line: 2, Column: 16},
+			},
+			StartPosition: Position{Offset: 16, Line: 2, Column: 15},
+			EndPosition:   Position{Offset: 17, Line: 2, Column: 16},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{a},
+		Declarations:    map[string]Declaration{"a": a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
 func TestParseBlock(t *testing.T) {
 	RegisterTestingT(t)
 

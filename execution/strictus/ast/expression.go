@@ -132,8 +132,10 @@ func (e ConditionalExpression) Accept(v Visitor) Repr {
 // UnaryExpression
 
 type UnaryExpression struct {
-	Operation  Operation
-	Expression Expression
+	Operation     Operation
+	Expression    Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (UnaryExpression) isExpression() {}
