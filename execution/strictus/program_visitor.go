@@ -513,8 +513,10 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 	switch partialAccessExpression := partialAccessExpression.(type) {
 	case ast.IndexExpression:
 		return ast.IndexExpression{
-			Expression: wrapped,
-			Index:      partialAccessExpression.Index,
+			Expression:    wrapped,
+			Index:         partialAccessExpression.Index,
+			StartPosition: partialAccessExpression.StartPosition,
+			EndPosition:   partialAccessExpression.EndPosition,
 		}
 	case ast.MemberExpression:
 		return ast.MemberExpression{
@@ -549,9 +551,16 @@ func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{}
 }
 
 func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) interface{} {
-	access := ctx.Expression().Accept(v).(ast.Expression)
+	index := ctx.Expression().Accept(v).(ast.Expression)
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.PositionFromToken(ctx.GetStop())
+
 	// NOTE: partial, expression is filled later
-	return ast.IndexExpression{Index: access}
+	return ast.IndexExpression{
+		Index:         index,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
+	}
 }
 
 func (v *ProgramVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) interface{} {

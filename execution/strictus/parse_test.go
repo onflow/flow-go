@@ -168,6 +168,38 @@ func TestParseMemberExpression(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
+func TestParseIndexExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    const a = b[1]
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Value: IndexExpression{
+			Expression: IdentifierExpression{
+				Identifier: "b",
+				Position:   Position{Offset: 16, Line: 2, Column: 15},
+			},
+			Index: IntExpression{
+				Value:    big.NewInt(1),
+				Position: Position{Offset: 18, Line: 2, Column: 17},
+			},
+			StartPosition: Position{Offset: 17, Line: 2, Column: 16},
+			EndPosition:   Position{Offset: 19, Line: 2, Column: 18},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{a},
+		Declarations:    map[string]Declaration{"a": a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
 func TestParseBlock(t *testing.T) {
 	RegisterTestingT(t)
 

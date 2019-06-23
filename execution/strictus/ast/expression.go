@@ -100,8 +100,10 @@ func (e MemberExpression) Accept(v Visitor) Repr {
 // IndexExpression
 
 type IndexExpression struct {
-	Expression Expression
-	Index      Expression
+	Expression    Expression
+	Index         Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (IndexExpression) isExpression()       {}
