@@ -33,6 +33,8 @@ func TestParseBoolExpression(t *testing.T) {
 			Value:    true,
 			Position: Position{Offset: 16, Line: 2, Column: 15},
 		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 16, Line: 2, Column: 15},
 	}
 
 	expected := Program{
@@ -57,6 +59,8 @@ func TestParseIdentifierExpression(t *testing.T) {
 			Identifier: "a",
 			Position:   Position{Offset: 16, Line: 2, Column: 15},
 		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 16, Line: 2, Column: 15},
 	}
 
 	expected := Program{
@@ -91,6 +95,8 @@ func TestParseArrayExpression(t *testing.T) {
 			StartPosition: Position{Offset: 16, Line: 2, Column: 15},
 			EndPosition:   Position{Offset: 21, Line: 2, Column: 20},
 		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 21, Line: 2, Column: 20},
 	}
 
 	expected := Program{
@@ -129,6 +135,8 @@ func TestParseInvocationExpression(t *testing.T) {
 			StartPosition: Position{Offset: 17, Line: 2, Column: 16},
 			EndPosition:   Position{Offset: 22, Line: 2, Column: 21},
 		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 22, Line: 2, Column: 21},
 	}
 
 	expected := Program{
@@ -158,6 +166,8 @@ func TestParseMemberExpression(t *testing.T) {
 			StartPosition: Position{Offset: 17, Line: 2, Column: 16},
 			EndPosition:   Position{Offset: 18, Line: 2, Column: 17},
 		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 18, Line: 2, Column: 17},
 	}
 
 	expected := Program{
@@ -190,6 +200,8 @@ func TestParseIndexExpression(t *testing.T) {
 			StartPosition: Position{Offset: 17, Line: 2, Column: 16},
 			EndPosition:   Position{Offset: 19, Line: 2, Column: 18},
 		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 19, Line: 2, Column: 18},
 	}
 
 	expected := Program{
@@ -219,6 +231,8 @@ func TestParseUnaryExpression(t *testing.T) {
 			StartPosition: Position{Offset: 16, Line: 2, Column: 15},
 			EndPosition:   Position{Offset: 17, Line: 2, Column: 16},
 		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 17, Line: 2, Column: 16},
 	}
 
 	expected := Program{
@@ -253,6 +267,8 @@ func TestParseOrExpression(t *testing.T) {
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
 			EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
 		},
+		StartPosition: Position{Offset: 9, Line: 2, Column: 8},
+		EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
 	}
 
 	expected := Program{
@@ -287,6 +303,8 @@ func TestParseAndExpression(t *testing.T) {
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
 			EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
 		},
+		StartPosition: Position{Offset: 9, Line: 2, Column: 8},
+		EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
 	}
 
 	expected := Program{
@@ -321,6 +339,8 @@ func TestParseEqualityExpression(t *testing.T) {
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
 			EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
 		},
+		StartPosition: Position{Offset: 9, Line: 2, Column: 8},
+		EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
 	}
 
 	expected := Program{
@@ -355,6 +375,8 @@ func TestParseRelationalExpression(t *testing.T) {
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
 			EndPosition:   Position{Offset: 23, Line: 2, Column: 22},
 		},
+		StartPosition: Position{Offset: 9, Line: 2, Column: 8},
+		EndPosition:   Position{Offset: 23, Line: 2, Column: 22},
 	}
 
 	expected := Program{
@@ -389,6 +411,8 @@ func TestParseAdditiveExpression(t *testing.T) {
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
 			EndPosition:   Position{Offset: 23, Line: 2, Column: 22},
 		},
+		StartPosition: Position{Offset: 9, Line: 2, Column: 8},
+		EndPosition:   Position{Offset: 23, Line: 2, Column: 22},
 	}
 
 	expected := Program{
@@ -423,6 +447,8 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
 			EndPosition:   Position{Offset: 23, Line: 2, Column: 22},
 		},
+		StartPosition: Position{Offset: 9, Line: 2, Column: 8},
+		EndPosition:   Position{Offset: 23, Line: 2, Column: 22},
 	}
 
 	expected := Program{
@@ -456,6 +482,8 @@ func TestParseFunctionExpression(t *testing.T) {
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
 			EndPosition:   Position{Offset: 35, Line: 2, Column: 34},
 		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 35, Line: 2, Column: 34},
 	}
 
 	expected := Program{
@@ -677,6 +705,8 @@ func TestParseIntegerTypes(t *testing.T) {
 			Value:    big.NewInt(1),
 			Position: Position{Offset: 19, Line: 2, Column: 18},
 		},
+		StartPosition: Position{Offset: 3, Line: 2, Column: 2},
+		EndPosition:   Position{Offset: 19, Line: 2, Column: 18},
 	}
 	b := VariableDeclaration{
 		Identifier: "b",
@@ -686,6 +716,8 @@ func TestParseIntegerTypes(t *testing.T) {
 			Value:    big.NewInt(2),
 			Position: Position{Offset: 40, Line: 3, Column: 19},
 		},
+		StartPosition: Position{Offset: 23, Line: 3, Column: 2},
+		EndPosition:   Position{Offset: 40, Line: 3, Column: 19},
 	}
 	c := VariableDeclaration{
 		Identifier: "c",
@@ -695,6 +727,8 @@ func TestParseIntegerTypes(t *testing.T) {
 			Value:    big.NewInt(3),
 			Position: Position{Offset: 61, Line: 4, Column: 19},
 		},
+		StartPosition: Position{Offset: 44, Line: 4, Column: 2},
+		EndPosition:   Position{Offset: 61, Line: 4, Column: 19},
 	}
 	d := VariableDeclaration{
 		Identifier: "d",
@@ -704,6 +738,8 @@ func TestParseIntegerTypes(t *testing.T) {
 			Value:    big.NewInt(4),
 			Position: Position{Offset: 82, Line: 5, Column: 19},
 		},
+		StartPosition: Position{Offset: 65, Line: 5, Column: 2},
+		EndPosition:   Position{Offset: 82, Line: 5, Column: 19},
 	}
 	e := VariableDeclaration{
 		Identifier: "e",
@@ -713,6 +749,8 @@ func TestParseIntegerTypes(t *testing.T) {
 			Value:    big.NewInt(5),
 			Position: Position{Offset: 103, Line: 6, Column: 19},
 		},
+		StartPosition: Position{Offset: 86, Line: 6, Column: 2},
+		EndPosition:   Position{Offset: 103, Line: 6, Column: 19},
 	}
 	f := VariableDeclaration{
 		Identifier: "f",
@@ -722,6 +760,8 @@ func TestParseIntegerTypes(t *testing.T) {
 			Value:    big.NewInt(6),
 			Position: Position{Offset: 125, Line: 7, Column: 20},
 		},
+		StartPosition: Position{Offset: 107, Line: 7, Column: 2},
+		EndPosition:   Position{Offset: 125, Line: 7, Column: 20},
 	}
 	g := VariableDeclaration{
 		Identifier: "g",
@@ -731,6 +771,8 @@ func TestParseIntegerTypes(t *testing.T) {
 			Value:    big.NewInt(7),
 			Position: Position{Offset: 147, Line: 8, Column: 20},
 		},
+		StartPosition: Position{Offset: 129, Line: 8, Column: 2},
+		EndPosition:   Position{Offset: 147, Line: 8, Column: 20},
 	}
 	h := VariableDeclaration{
 		Identifier: "h",
@@ -740,6 +782,8 @@ func TestParseIntegerTypes(t *testing.T) {
 			Value:    big.NewInt(8),
 			Position: Position{Offset: 169, Line: 9, Column: 20},
 		},
+		StartPosition: Position{Offset: 151, Line: 9, Column: 2},
+		EndPosition:   Position{Offset: 169, Line: 9, Column: 20},
 	}
 
 	expected := Program{
@@ -771,6 +815,8 @@ func TestParseFunctionType(t *testing.T) {
 			Identifier: "nothing",
 			Position:   Position{Offset: 39, Line: 2, Column: 38},
 		},
+		StartPosition: Position{Offset: 3, Line: 2, Column: 2},
+		EndPosition:   Position{Offset: 39, Line: 2, Column: 38},
 	}
 
 	expected := Program{
@@ -808,6 +854,8 @@ func TestParseMissingReturnType(t *testing.T) {
 			StartPosition: Position{Offset: 40, Line: 3, Column: 12},
 			EndPosition:   Position{Offset: 56, Line: 3, Column: 28},
 		},
+		StartPosition: Position{Offset: 3, Line: 2, Column: 2},
+		EndPosition:   Position{Offset: 56, Line: 3, Column: 28},
 	}
 
 	expected := Program{
@@ -851,6 +899,8 @@ func TestParseLeftAssociativity(t *testing.T) {
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
 			EndPosition:   Position{Offset: 27, Line: 2, Column: 26},
 		},
+		StartPosition: Position{Offset: 9, Line: 2, Column: 8},
+		EndPosition:   Position{Offset: 27, Line: 2, Column: 26},
 	}
 
 	expected := Program{
@@ -941,6 +991,8 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
 			EndPosition:   Position{Offset: 63, Line: 4, Column: 24},
 		},
+		StartPosition: Position{Offset: 9, Line: 2, Column: 8},
+		EndPosition:   Position{Offset: 63, Line: 4, Column: 24},
 	}
 
 	expected := Program{

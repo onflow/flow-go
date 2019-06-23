@@ -75,6 +75,8 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 			ParameterTypes: parameterTypes,
 			ReturnType:     declaration.ReturnType,
 		},
+		StartPosition: declaration.StartPosition,
+		EndPosition:   declaration.EndPosition,
 	}
 
 	// make the function itself available inside the function
@@ -376,6 +378,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 					IsConst:    true,
 					Identifier: parameter.Identifier,
 					Type:       parameter.Type,
+					// TODO: StartPosition, EndPosition = parameter.Position
 				},
 				Value: argument,
 			},

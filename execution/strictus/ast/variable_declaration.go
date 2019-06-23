@@ -1,10 +1,12 @@
 package ast
 
 type VariableDeclaration struct {
-	IsConst    bool
-	Identifier string
-	Type       Type
-	Value      Expression
+	IsConst       bool
+	Identifier    string
+	Type          Type
+	Value         Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (VariableDeclaration) isDeclaration() {}

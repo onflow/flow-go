@@ -268,11 +268,16 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		}
 	}
 
+	// TODO: get end position from expression
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
 	return ast.VariableDeclaration{
-		IsConst:    isConst,
-		Identifier: identifier,
-		Value:      expression,
-		Type:       typeName,
+		IsConst:       isConst,
+		Identifier:    identifier,
+		Value:         expression,
+		Type:          typeName,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
 	}
 }
 
