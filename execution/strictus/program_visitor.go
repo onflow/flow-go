@@ -340,10 +340,15 @@ func (v *ProgramVisitor) VisitConditionalExpression(ctx *ConditionalExpressionCo
 	if ctx.then != nil && ctx.alt != nil {
 		then := ctx.then.Accept(v).(ast.Expression)
 		alt := ctx.alt.Accept(v).(ast.Expression)
+		startPosition := ast.PositionFromToken(ctx.GetStart())
+		endPosition := ast.PositionFromToken(ctx.GetStop())
+
 		return ast.ConditionalExpression{
-			Test: expression,
-			Then: then,
-			Else: alt,
+			Test:          expression,
+			Then:          then,
+			Else:          alt,
+			StartPosition: startPosition,
+			EndPosition:   endPosition,
 		}
 	}
 

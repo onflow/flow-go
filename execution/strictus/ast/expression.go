@@ -116,9 +116,11 @@ func (e IndexExpression) Accept(v Visitor) Repr {
 // ConditionalExpression
 
 type ConditionalExpression struct {
-	Test Expression
-	Then Expression
-	Else Expression
+	Test          Expression
+	Then          Expression
+	Else          Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (ConditionalExpression) isExpression() {}

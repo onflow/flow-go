@@ -657,7 +657,11 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 					Value:    big.NewInt(2),
 					Position: Position{Offset: 63, Line: 4, Column: 24},
 				},
+				StartPosition: Position{Offset: 51, Line: 4, Column: 12},
+				EndPosition:   Position{Offset: 63, Line: 4, Column: 24},
 			},
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 63, Line: 4, Column: 24},
 		},
 	}
 
