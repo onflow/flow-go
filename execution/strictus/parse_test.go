@@ -111,17 +111,17 @@ func TestParseComplexFunction(t *testing.T) {
 					IsConst:    true,
 					Identifier: "x",
 					Type:       nil,
-					Value:      Int64Expression(1),
+					Value:      IntExpression{Value: big.NewInt(1)},
 				},
 				VariableDeclaration{
 					IsConst:    false,
 					Identifier: "y",
 					Type:       Int32Type{},
-					Value:      Int64Expression(2),
+					Value:      IntExpression{Value: big.NewInt(2)},
 				},
 				Assignment{
 					Target: IdentifierExpression{Identifier: "y"},
-					Value:  Int64Expression(3),
+					Value:  IntExpression{Value: big.NewInt(3)},
 				},
 				ExpressionStatement{
 					Expression: MemberExpression{
@@ -134,9 +134,9 @@ func TestParseComplexFunction(t *testing.T) {
 									},
 									Identifier: "bar",
 								},
-								Index: Int64Expression(0),
+								Index: IntExpression{Value: big.NewInt(0)},
 							},
-							Index: Int64Expression(1),
+							Index: IntExpression{Value: big.NewInt(1)},
 						},
 						Identifier: "baz",
 					},
@@ -148,12 +148,12 @@ func TestParseComplexFunction(t *testing.T) {
 						Left: InvocationExpression{
 							Expression: IdentifierExpression{Identifier: "sum"},
 							Arguments: []Expression{
-								Int64Expression(3),
-								Int64Expression(2),
-								Int64Expression(1),
+								IntExpression{Value: big.NewInt(3)},
+								IntExpression{Value: big.NewInt(2)},
+								IntExpression{Value: big.NewInt(1)},
 							},
 						},
-						Right: Int64Expression(42),
+						Right: IntExpression{Value: big.NewInt(42)},
 					},
 				},
 				ReturnStatement{Expression: IdentifierExpression{Identifier: "a"}},
@@ -161,7 +161,7 @@ func TestParseComplexFunction(t *testing.T) {
 					Test: BinaryExpression{
 						Operation: OperationLess,
 						Left:      IdentifierExpression{Identifier: "x"},
-						Right:     Int64Expression(2),
+						Right:     IntExpression{Value: big.NewInt(2)},
 					},
 					Block: Block{
 						Statements: []Statement{
@@ -170,34 +170,34 @@ func TestParseComplexFunction(t *testing.T) {
 								Value: BinaryExpression{
 									Operation: OperationPlus,
 									Left:      IdentifierExpression{Identifier: "x"},
-									Right:     Int64Expression(1),
+									Right:     IntExpression{Value: big.NewInt(1)},
 								},
 							},
 						},
 					},
 				},
 				IfStatement{
-					Test: BoolExpression(true),
+					Test: BoolExpression{Value: true},
 					Then: Block{
 						Statements: []Statement{
-							ReturnStatement{Expression: Int64Expression(1)},
+							ReturnStatement{Expression: IntExpression{Value: big.NewInt(1)}},
 						},
 					},
 					Else: Block{
 						Statements: []Statement{
 							IfStatement{
-								Test: BoolExpression(false),
+								Test: BoolExpression{Value: false},
 								Then: Block{
 									Statements: []Statement{
 										ReturnStatement{
 											Expression: ConditionalExpression{
 												Test: BinaryExpression{
 													Operation: OperationGreater,
-													Left:      Int64Expression(2),
-													Right:     Int64Expression(3),
+													Left:      IntExpression{Value: big.NewInt(2)},
+													Right:     IntExpression{Value: big.NewInt(3)},
 												},
-												Then: Int64Expression(4),
-												Else: Int64Expression(5),
+												Then: IntExpression{Value: big.NewInt(4)},
+												Else: IntExpression{Value: big.NewInt(5)},
 											},
 										},
 									},
@@ -207,8 +207,8 @@ func TestParseComplexFunction(t *testing.T) {
 										ReturnStatement{
 											Expression: ArrayExpression{
 												Values: []Expression{
-													Int64Expression(2),
-													BoolExpression(true),
+													IntExpression{Value: big.NewInt(2)},
+													BoolExpression{Value: false},
 												},
 											},
 										},
