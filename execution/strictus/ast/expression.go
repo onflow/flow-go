@@ -147,9 +147,11 @@ func (e UnaryExpression) Accept(v Visitor) Repr {
 // BinaryExpression
 
 type BinaryExpression struct {
-	Operation Operation
-	Left      Expression
-	Right     Expression
+	Operation     Operation
+	Left          Expression
+	Right         Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (BinaryExpression) isExpression() {}
