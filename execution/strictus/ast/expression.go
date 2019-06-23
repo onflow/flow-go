@@ -1,7 +1,5 @@
 package ast
 
-import "fmt"
-
 type Expression interface {
 	Element
 	isExpression()
@@ -561,33 +559,4 @@ func (FunctionExpression) isExpression() {}
 
 func (f FunctionExpression) Accept(visitor Visitor) Repr {
 	return visitor.VisitFunctionExpression(f)
-}
-
-// ToExpression
-
-// ToExpression converts a Go value into an expression
-func ToExpression(value interface{}) Expression {
-	// TODO: support more types
-	switch value := value.(type) {
-	case int8:
-		return Int8Expression(value)
-	case int16:
-		return Int16Expression(value)
-	case int32:
-		return Int32Expression(value)
-	case int64:
-		return Int64Expression(value)
-	case uint8:
-		return UInt8Expression(value)
-	case uint16:
-		return UInt16Expression(value)
-	case uint32:
-		return UInt32Expression(value)
-	case uint64:
-		return UInt64Expression(value)
-	case bool:
-		return BoolExpression(value)
-	}
-
-	panic(fmt.Sprintf("can't convert Go value to expression: %#+v", value))
 }

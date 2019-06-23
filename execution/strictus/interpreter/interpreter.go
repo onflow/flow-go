@@ -30,24 +30,20 @@ func (interpreter *Interpreter) Interpret() {
 	}
 }
 
-func (interpreter *Interpreter) Invoke(functionName string, arguments ...interface{}) ast.Repr {
-	var argumentExpressions []ast.Expression
-
-	for _, argument := range arguments {
-		argumentExpressions = append(
-			argumentExpressions,
-			ast.ToExpression(argument),
-		)
+func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) ast.Repr {
+	variable, ok := interpreter.Globals[functionName]
+	if !ok {
+		panic(fmt.Sprintf("undefined function: %s", functionName))
 	}
 
-	invocation := ast.InvocationExpression{
-		Expression: ast.IdentifierExpression{
-			Identifier: functionName,
-		},
-		Arguments: argumentExpressions,
+	function, ok := variable.Value.(*FunctionValue)
+	if !ok {
+		panic(fmt.Sprintf("declaration is not a function: %#+v", variable.Value))
 	}
 
-	return invocation.Accept(interpreter)
+	arguments := ToValues(inputs)
+
+	return interpreter.invokeFunction(function, arguments)
 }
 
 func (interpreter *Interpreter) VisitProgram(program ast.Program) ast.Repr {
@@ -110,14 +106,14 @@ func (interpreter *Interpreter) VisitReturnStatement(statement ast.ReturnStateme
 	// NOTE: returning result
 
 	if statement.Expression == nil {
-		return Void{}
+		return VoidValue{}
 	}
 
 	return statement.Expression.Accept(interpreter)
 }
 
 func (interpreter *Interpreter) VisitIfStatement(statement ast.IfStatement) ast.Repr {
-	if statement.Test.Accept(interpreter).(ast.BoolExpression) {
+	if statement.Test.Accept(interpreter).(BoolValue) {
 		return statement.Then.Accept(interpreter)
 	} else {
 		return statement.Else.Accept(interpreter)
@@ -125,7 +121,7 @@ func (interpreter *Interpreter) VisitIfStatement(statement ast.IfStatement) ast.
 }
 
 func (interpreter *Interpreter) VisitWhileStatement(statement ast.WhileStatement) ast.Repr {
-	for statement.Test.Accept(interpreter).(ast.BoolExpression) {
+	for statement.Test.Accept(interpreter).(BoolValue) {
 		result := statement.Block.Accept(interpreter)
 		if result != nil {
 			return result
@@ -135,12 +131,12 @@ func (interpreter *Interpreter) VisitWhileStatement(statement ast.WhileStatement
 }
 
 func (interpreter *Interpreter) VisitVariableDeclaration(declaration ast.VariableDeclaration) ast.Repr {
-	value := declaration.Value.Accept(interpreter)
+	value := declaration.Value.Accept(interpreter).(Value)
 	interpreter.declareVariable(declaration, value)
 	return nil
 }
 
-func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclaration, value ast.Repr) ast.Repr {
+func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclaration, value Value) ast.Repr {
 	variable := interpreter.activations.Find(declaration.Identifier)
 	depth := interpreter.activations.Depth()
 	if variable != nil && variable.Depth == depth {
@@ -155,7 +151,7 @@ func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclarat
 }
 
 func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.Repr {
-	value := assignment.Value.Accept(interpreter)
+	value := assignment.Value.Accept(interpreter).(Value)
 
 	switch target := assignment.Target.(type) {
 	case ast.IdentifierExpression:
@@ -170,13 +166,13 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.R
 
 	case ast.IndexExpression:
 		indexedValue := target.Expression.Accept(interpreter)
-		array, ok := indexedValue.([]interface{})
+		array, ok := indexedValue.(ArrayValue)
 		if !ok {
 			panic(fmt.Sprintf("can't index into non-array value: %#+v", indexedValue))
 		}
 
 		indexValue := target.Index.Accept(interpreter)
-		index, ok := indexValue.(ast.IntExpression)
+		index, ok := indexValue.(IntValue)
 		if !ok {
 			panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 		}
@@ -203,8 +199,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 	left := expression.Left.Accept(interpreter)
 	right := expression.Right.Accept(interpreter)
 
-	leftInt, leftIsInt := left.(ast.IntExpression)
-	rightInt, rightIsInt := right.(ast.IntExpression)
+	leftInt, leftIsInt := left.(IntValue)
+	rightInt, rightIsInt := right.(IntValue)
 	if leftIsInt && rightIsInt {
 		switch expression.Operation {
 		case ast.OperationPlus:
@@ -226,24 +222,24 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 		case ast.OperationGreaterEqual:
 			return leftInt.GreaterEqual(rightInt)
 		case ast.OperationEqual:
-			return ast.BoolExpression(leftInt == rightInt)
+			return BoolValue(leftInt == rightInt)
 		case ast.OperationUnequal:
-			return ast.BoolExpression(leftInt != rightInt)
+			return BoolValue(leftInt != rightInt)
 		}
 	}
 
-	leftBool, leftIsBool := left.(ast.BoolExpression)
-	rightBool, rightIsBool := right.(ast.BoolExpression)
+	leftBool, leftIsBool := left.(BoolValue)
+	rightBool, rightIsBool := right.(BoolValue)
 	if leftIsBool && rightIsBool {
 		switch expression.Operation {
 		case ast.OperationEqual:
-			return ast.BoolExpression(leftBool == rightBool)
+			return BoolValue(leftBool == rightBool)
 		case ast.OperationUnequal:
-			return ast.BoolExpression(leftBool != rightBool)
+			return BoolValue(leftBool != rightBool)
 		case ast.OperationOr:
-			return ast.BoolExpression(leftBool || rightBool)
+			return BoolValue(leftBool || rightBool)
 		case ast.OperationAnd:
-			return ast.BoolExpression(leftBool && rightBool)
+			return BoolValue(leftBool && rightBool)
 		}
 	}
 
@@ -263,39 +259,39 @@ func (interpreter *Interpreter) VisitExpressionStatement(statement ast.Expressio
 }
 
 func (interpreter *Interpreter) VisitBoolExpression(expression ast.BoolExpression) ast.Repr {
-	return expression
+	return BoolValue(expression)
 }
 
 func (interpreter *Interpreter) VisitInt8Expression(expression ast.Int8Expression) ast.Repr {
-	return expression
+	return Int8Value(expression)
 }
 
 func (interpreter *Interpreter) VisitInt16Expression(expression ast.Int16Expression) ast.Repr {
-	return expression
+	return Int16Value(expression)
 }
 
 func (interpreter *Interpreter) VisitInt32Expression(expression ast.Int32Expression) ast.Repr {
-	return expression
+	return Int32Value(expression)
 }
 
 func (interpreter *Interpreter) VisitInt64Expression(expression ast.Int64Expression) ast.Repr {
-	return expression
+	return Int64Value(expression)
 }
 
 func (interpreter *Interpreter) VisitUInt8Expression(expression ast.UInt8Expression) ast.Repr {
-	return expression
+	return UInt8Value(expression)
 }
 
 func (interpreter *Interpreter) VisitUInt16Expression(expression ast.UInt16Expression) ast.Repr {
-	return expression
+	return UInt16Value(expression)
 }
 
 func (interpreter *Interpreter) VisitUInt32Expression(expression ast.UInt32Expression) ast.Repr {
-	return expression
+	return UInt32Value(expression)
 }
 
 func (interpreter *Interpreter) VisitUInt64Expression(expression ast.UInt64Expression) ast.Repr {
-	return expression
+	return UInt64Value(expression)
 }
 
 func (interpreter *Interpreter) VisitArrayExpression(expression ast.ArrayExpression) ast.Repr {
@@ -305,7 +301,7 @@ func (interpreter *Interpreter) VisitArrayExpression(expression ast.ArrayExpress
 		values = append(values, value.Accept(interpreter))
 	}
 
-	return values
+	return ArrayValue(values)
 }
 
 func (interpreter *Interpreter) VisitMemberExpression(ast.MemberExpression) ast.Repr {
@@ -315,13 +311,13 @@ func (interpreter *Interpreter) VisitMemberExpression(ast.MemberExpression) ast.
 
 func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpression) ast.Repr {
 	indexedValue := expression.Expression.Accept(interpreter)
-	array, ok := indexedValue.([]interface{})
+	array, ok := indexedValue.(ArrayValue)
 	if !ok {
 		panic(fmt.Sprintf("can't index into non-array value: %#+v", indexedValue))
 	}
 
 	indexValue := expression.Index.Accept(interpreter)
-	index, ok := indexValue.(ast.IntExpression)
+	index, ok := indexValue.(IntValue)
 	if !ok {
 		panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 	}
@@ -329,7 +325,7 @@ func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpress
 }
 
 func (interpreter *Interpreter) VisitConditionalExpression(expression ast.ConditionalExpression) ast.Repr {
-	if expression.Test.Accept(interpreter).(ast.BoolExpression) {
+	if expression.Test.Accept(interpreter).(BoolValue) {
 		return expression.Then.Accept(interpreter)
 	} else {
 		return expression.Else.Accept(interpreter)
@@ -340,15 +336,19 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression a
 
 	// evaluate the invoked expression
 	value := invocationExpression.Expression.Accept(interpreter)
-	function, ok := value.(*Function)
+	function, ok := value.(*FunctionValue)
 	if !ok {
 		panic(fmt.Sprintf("can't invoke value: %#+v", value))
 	}
 
-	interpreter.checkInvocationArgumentCount(invocationExpression, function)
-
 	// NOTE: evaluate all argument expressions in call-site scope, not in function body
 	arguments := interpreter.evaluateFunctionInvocationArguments(invocationExpression, function)
+
+	return interpreter.invokeFunction(function, arguments)
+}
+
+func (interpreter *Interpreter) invokeFunction(function *FunctionValue, arguments []Value) ast.Repr {
+	interpreter.checkInvocationArgumentCount(len(arguments), function)
 
 	// start a new activation record
 	// lexical scope: use the function declaration's activation record,
@@ -356,21 +356,17 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression a
 	interpreter.activations.Push(function.Activation)
 	defer interpreter.activations.Pop()
 
-	interpreter.bindFunctionInvocationParameters(invocationExpression, function, arguments)
+	interpreter.bindFunctionInvocationParameters(function, arguments)
 
-	result := function.Expression.Block.Accept(interpreter)
-
-	return result
+	return function.Expression.Block.Accept(interpreter)
 }
 
 // bindFunctionInvocationParameters binds the argument values to the parameters in the function
 func (interpreter *Interpreter) bindFunctionInvocationParameters(
-	invocationExpression ast.InvocationExpression,
-	function *Function,
-	arguments []ast.Repr,
+	function *FunctionValue,
+	arguments []Value,
 ) {
 	for parameterIndex, parameter := range function.Expression.Parameters {
-		argumentExpression := invocationExpression.Arguments[parameterIndex]
 		argument := arguments[parameterIndex]
 
 		interpreter.activations.Set(
@@ -380,7 +376,6 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 					IsConst:    true,
 					Identifier: parameter.Identifier,
 					Type:       parameter.Type,
-					Value:      argumentExpression,
 				},
 				Value: argument,
 			},
@@ -391,12 +386,11 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 // evaluateFunctionInvocationArguments evaluates all function invocation argument expressions
 func (interpreter *Interpreter) evaluateFunctionInvocationArguments(
 	invocationExpression ast.InvocationExpression,
-	function *Function,
-) []ast.Repr {
-	var arguments []ast.Repr
-	for parameterIndex := range function.Expression.Parameters {
-		argumentExpression := invocationExpression.Arguments[parameterIndex]
-		argument := argumentExpression.Accept(interpreter)
+	function *FunctionValue,
+) []Value {
+	var arguments []Value
+	for _, argumentExpression := range invocationExpression.Arguments {
+		argument := argumentExpression.Accept(interpreter).(Value)
 		arguments = append(arguments, argument)
 	}
 	return arguments
@@ -405,10 +399,9 @@ func (interpreter *Interpreter) evaluateFunctionInvocationArguments(
 // checkInvocationArgumentCount ensures the invocation's argument count
 // matches the function's parameter count
 func (interpreter *Interpreter) checkInvocationArgumentCount(
-	invocationExpression ast.InvocationExpression,
-	function *Function,
+	argumentCount int,
+	function *FunctionValue,
 ) {
-	argumentCount := len(invocationExpression.Arguments)
 	parameterCount := len(function.Expression.Parameters)
 	if argumentCount != parameterCount {
 		panic(fmt.Sprintf(
