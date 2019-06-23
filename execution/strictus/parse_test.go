@@ -18,6 +18,35 @@ func parse(code string) Program {
 	return parser.Program().Accept(&ProgramVisitor{}).(Program)
 }
 
+func TestParseBlock(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    fun test() { return }
+	`)
+
+	test := FunctionDeclaration{
+		IsPublic:   false,
+		Identifier: "test",
+		ReturnType: VoidType{},
+		Block: Block{
+			Statements: []Statement{
+				ReturnStatement{},
+			},
+			// NOTE: block is statements *inside* curly braces
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 19, Line: 2, Column: 18},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{test},
+		Declarations:    map[string]Declaration{"test": test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
 func TestParseComplexFunction(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -243,6 +272,8 @@ func TestParseFunctionType(t *testing.T) {
 						},
 					},
 				},
+				StartPosition: Position{Offset: 98, Line: 4, Column: 16},
+				EndPosition:   Position{Offset: 109, Line: 4, Column: 27},
 			},
 		},
 	}
@@ -275,6 +306,9 @@ func TestParseMissingReturnType(t *testing.T) {
 				Statements: []Statement{
 					ReturnStatement{},
 				},
+				// NOTE: block is statements *inside* curly braces
+				StartPosition: Position{Offset: 49, Line: 3, Column: 21},
+				EndPosition:   Position{Offset: 49, Line: 3, Column: 21},
 			},
 		},
 	}
