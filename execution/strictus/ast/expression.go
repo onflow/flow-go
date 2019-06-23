@@ -8,7 +8,8 @@ type Expression interface {
 // BoolExpression
 
 type BoolExpression struct {
-	Value bool
+	Value    bool
+	Position Position
 }
 
 func (BoolExpression) isExpression() {}

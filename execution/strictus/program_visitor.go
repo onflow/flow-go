@@ -583,7 +583,11 @@ func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interfa
 	if err != nil {
 		panic(fmt.Sprintf("invalid boolean literal: %s", text))
 	}
-	return ast.BoolExpression{Value: value}
+
+	return ast.BoolExpression{
+		Value:    value,
+		Position: ast.PositionFromToken(ctx.GetStart()),
+	}
 }
 
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {

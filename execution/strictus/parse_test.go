@@ -18,6 +18,30 @@ func parse(code string) Program {
 	return parser.Program().Accept(&ProgramVisitor{}).(Program)
 }
 
+func TestParseBoolExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    const a = true
+	`)
+
+	test := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Value: BoolExpression{
+			Value:    true,
+			Position: Position{Offset: 16, Line: 2, Column: 15},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{test},
+		Declarations:    map[string]Declaration{"a": test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
 func TestParseBlock(t *testing.T) {
 	RegisterTestingT(t)
 
