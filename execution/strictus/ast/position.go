@@ -18,3 +18,9 @@ func PositionFromToken(token antlr.Token) Position {
 		Column: token.GetColumn(),
 	}
 }
+
+func PositionRangeFromContext(ctx *antlr.BaseParserRuleContext) (start, end Position) {
+	start = PositionFromToken(ctx.GetStart())
+	end = PositionFromToken(ctx.GetStop())
+	return start, end
+}
