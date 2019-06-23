@@ -1,5 +1,7 @@
 package ast
 
+import "math/big"
+
 type Expression interface {
 	Element
 	isExpression()
@@ -20,138 +22,15 @@ func (e BoolExpression) Accept(v Visitor) Repr {
 
 // IntExpression
 
-type IntExpression interface {
-	Expression
-	isIntExpression()
-	IntValue() int
+type IntExpression struct {
+	Value    *big.Int
+	Position Position
 }
 
-// Int8Expression
+func (IntExpression) isExpression() {}
 
-type Int8Expression int8
-
-func (Int8Expression) isExpression() {}
-
-func (e Int8Expression) Accept(v Visitor) Repr {
-	return v.VisitInt8Expression(e)
-}
-
-func (Int8Expression) isIntExpression() {}
-
-func (e Int8Expression) IntValue() int {
-	return int(e)
-}
-
-// Int16Expression
-
-type Int16Expression int16
-
-func (Int16Expression) isExpression() {}
-
-func (e Int16Expression) Accept(v Visitor) Repr {
-	return v.VisitInt16Expression(e)
-}
-
-func (Int16Expression) isIntExpression() {}
-
-func (e Int16Expression) IntValue() int {
-	return int(e)
-}
-
-// Int32Expression
-
-type Int32Expression int32
-
-func (Int32Expression) isExpression() {}
-
-func (e Int32Expression) Accept(v Visitor) Repr {
-	return v.VisitInt32Expression(e)
-}
-
-func (Int32Expression) isIntExpression() {}
-
-func (e Int32Expression) IntValue() int {
-	return int(e)
-}
-
-// Int64Expression
-
-type Int64Expression int64
-
-func (Int64Expression) isExpression() {}
-
-func (e Int64Expression) Accept(v Visitor) Repr {
-	return v.VisitInt64Expression(e)
-}
-
-func (Int64Expression) isIntExpression() {}
-
-func (e Int64Expression) IntValue() int {
-	return int(e)
-}
-
-// UInt8Expression
-
-type UInt8Expression uint8
-
-func (UInt8Expression) isExpression() {}
-
-func (e UInt8Expression) Accept(v Visitor) Repr {
-	return v.VisitUInt8Expression(e)
-}
-
-func (UInt8Expression) isIntExpression() {}
-
-func (e UInt8Expression) IntValue() int {
-	return int(e)
-}
-
-// UInt16Expression
-
-type UInt16Expression uint16
-
-func (UInt16Expression) isExpression() {}
-
-func (e UInt16Expression) Accept(v Visitor) Repr {
-	return v.VisitUInt16Expression(e)
-}
-
-func (UInt16Expression) isIntExpression() {}
-
-func (e UInt16Expression) IntValue() int {
-	return int(e)
-}
-
-// UInt32Expression
-
-type UInt32Expression uint32
-
-func (UInt32Expression) isExpression() {}
-
-func (e UInt32Expression) Accept(v Visitor) Repr {
-	return v.VisitUInt32Expression(e)
-}
-
-func (UInt32Expression) isIntExpression() {}
-
-func (e UInt32Expression) IntValue() int {
-	return int(e)
-}
-
-// UInt64Expression
-
-type UInt64Expression uint64
-
-func (UInt64Expression) isExpression() {}
-
-func (e UInt64Expression) Accept(v Visitor) Repr {
-	return v.VisitUInt64Expression(e)
-}
-
-func (UInt64Expression) isIntExpression() {}
-
-func (e UInt64Expression) IntValue() int {
-	return int(e)
+func (e IntExpression) Accept(v Visitor) Repr {
+	return v.VisitIntExpression(e)
 }
 
 // ArrayExpression
