@@ -33,6 +33,7 @@ type Visitor interface {
 	VisitMemberExpression(MemberExpression) Repr
 	VisitIndexExpression(IndexExpression) Repr
 	VisitConditionalExpression(ConditionalExpression) Repr
+	VisitUnaryExpression(UnaryExpression) Repr
 	VisitBinaryExpression(BinaryExpression) Repr
 	VisitFunctionExpression(FunctionExpression) Repr
 }

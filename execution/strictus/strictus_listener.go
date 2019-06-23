@@ -76,6 +76,9 @@ type StrictusListener interface {
 	// EnterMultiplicativeExpression is called when entering the multiplicativeExpression production.
 	EnterMultiplicativeExpression(c *MultiplicativeExpressionContext)
 
+	// EnterUnaryExpression is called when entering the unaryExpression production.
+	EnterUnaryExpression(c *UnaryExpressionContext)
+
 	// EnterPrimaryExpression is called when entering the primaryExpression production.
 	EnterPrimaryExpression(c *PrimaryExpressionContext)
 
@@ -93,6 +96,9 @@ type StrictusListener interface {
 
 	// EnterMultiplicativeOp is called when entering the multiplicativeOp production.
 	EnterMultiplicativeOp(c *MultiplicativeOpContext)
+
+	// EnterUnaryOp is called when entering the unaryOp production.
+	EnterUnaryOp(c *UnaryOpContext)
 
 	// EnterIdentifierExpression is called when entering the IdentifierExpression production.
 	EnterIdentifierExpression(c *IdentifierExpressionContext)
@@ -211,6 +217,9 @@ type StrictusListener interface {
 	// ExitMultiplicativeExpression is called when exiting the multiplicativeExpression production.
 	ExitMultiplicativeExpression(c *MultiplicativeExpressionContext)
 
+	// ExitUnaryExpression is called when exiting the unaryExpression production.
+	ExitUnaryExpression(c *UnaryExpressionContext)
+
 	// ExitPrimaryExpression is called when exiting the primaryExpression production.
 	ExitPrimaryExpression(c *PrimaryExpressionContext)
 
@@ -228,6 +237,9 @@ type StrictusListener interface {
 
 	// ExitMultiplicativeOp is called when exiting the multiplicativeOp production.
 	ExitMultiplicativeOp(c *MultiplicativeOpContext)
+
+	// ExitUnaryOp is called when exiting the unaryOp production.
+	ExitUnaryOp(c *UnaryOpContext)
 
 	// ExitIdentifierExpression is called when exiting the IdentifierExpression production.
 	ExitIdentifierExpression(c *IdentifierExpressionContext)

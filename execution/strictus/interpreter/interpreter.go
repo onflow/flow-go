@@ -253,6 +253,32 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 	return nil
 }
 
+func (interpreter *Interpreter) VisitUnaryExpression(expression ast.UnaryExpression) ast.Repr {
+	value := expression.Expression.Accept(interpreter)
+
+	if intValue, ok := value.(IntValue); ok {
+		switch expression.Operation {
+		case ast.OperationMinus:
+			return intValue.Negate()
+		}
+	}
+
+	if boolValue, ok := value.(BoolValue); ok {
+		switch expression.Operation {
+		case ast.OperationNegate:
+			return boolValue.Negate()
+		}
+	}
+
+	panic(fmt.Sprintf(
+		"invalid operand for unary expression: %s: %v",
+		expression.Operation.String(),
+		value,
+	))
+
+	return nil
+}
+
 func (interpreter *Interpreter) VisitExpressionStatement(statement ast.ExpressionStatement) ast.Repr {
 	statement.Expression.Accept(interpreter)
 	return nil

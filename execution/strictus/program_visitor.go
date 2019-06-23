@@ -422,7 +422,7 @@ func (v *ProgramVisitor) VisitAdditiveExpression(ctx *AdditiveExpressionContext)
 }
 
 func (v *ProgramVisitor) VisitMultiplicativeExpression(ctx *MultiplicativeExpressionContext) interface{} {
-	right := ctx.PrimaryExpression().Accept(v).(ast.Expression)
+	right := ctx.UnaryExpression().Accept(v).(ast.Expression)
 
 	leftContext := ctx.MultiplicativeExpression()
 	if leftContext == nil {
@@ -437,6 +437,37 @@ func (v *ProgramVisitor) VisitMultiplicativeExpression(ctx *MultiplicativeExpres
 		Left:      left,
 		Right:     right,
 	}
+}
+func (v *ProgramVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) interface{} {
+	unaryContext := ctx.UnaryExpression()
+	if unaryContext == nil {
+		return ctx.PrimaryExpression().Accept(v)
+	}
+
+	if ctx.GetChildCount() > 2 {
+		panic(fmt.Sprintf("unary operators must not be juxtaposed; parenthesize inner expression"))
+	}
+
+	expression := unaryContext.Accept(v).(ast.Expression)
+	operation := ctx.UnaryOp(0).Accept(v).(ast.Operation)
+
+	return ast.UnaryExpression{
+		Operation:  operation,
+		Expression: expression,
+	}
+}
+
+func (v *ProgramVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
+
+	if ctx.Negate() != nil {
+		return ast.OperationNegate
+	}
+
+	if ctx.Minus() != nil {
+		return ast.OperationMinus
+	}
+
+	panic("unreachable")
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
@@ -590,7 +621,7 @@ func (v *ProgramVisitor) VisitEqualityOp(ctx *EqualityOpContext) interface{} {
 		return ast.OperationUnequal
 	}
 
-	return nil
+	panic("unreachable")
 }
 
 func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{} {
@@ -610,7 +641,7 @@ func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{}
 		return ast.OperationGreaterEqual
 	}
 
-	return nil
+	panic("unreachable")
 }
 
 func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
@@ -622,7 +653,7 @@ func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
 		return ast.OperationMinus
 	}
 
-	return nil
+	panic("unreachable")
 }
 
 func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) interface{} {
@@ -638,5 +669,5 @@ func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) int
 		return ast.OperationMod
 	}
 
-	return nil
+	panic("unreachable")
 }

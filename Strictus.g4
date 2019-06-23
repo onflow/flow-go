@@ -146,9 +146,14 @@ additiveExpression
 	;
 
 multiplicativeExpression
-	: primaryExpression
-	| multiplicativeExpression multiplicativeOp primaryExpression
+	: unaryExpression
+	| multiplicativeExpression multiplicativeOp unaryExpression
 	;
+
+unaryExpression
+    : primaryExpression
+    | unaryOp+ unaryExpression
+    ;
 
 primaryExpression
     : primaryExpressionStart primaryExpressionSuffix*
@@ -196,6 +201,14 @@ multiplicativeOp
 Mul : '*' ;
 Div : '/' ;
 Mod : '%' ;
+
+
+unaryOp
+    : Minus
+    | Negate
+    ;
+
+Negate : '!' ;
 
 
 primaryExpressionStart

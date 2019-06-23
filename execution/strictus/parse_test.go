@@ -317,6 +317,27 @@ func TestParseLeftAssociativity(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
+func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
+	RegisterTestingT(t)
+
+	Expect(func() {
+		parse(`
+            var a = 1
+            const b = --a
+	    `)
+	}).To(Panic())
+}
+
+func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
+	RegisterTestingT(t)
+
+	Expect(func() {
+		parse(`
+            const b = !!true
+	    `)
+	}).To(Panic())
+}
+
 func TestParseTernaryRightAssociativity(t *testing.T) {
 	RegisterTestingT(t)
 

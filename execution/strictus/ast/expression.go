@@ -533,6 +533,19 @@ func (e ConditionalExpression) Accept(v Visitor) Repr {
 	return v.VisitConditionalExpression(e)
 }
 
+// UnaryExpression
+
+type UnaryExpression struct {
+	Operation  Operation
+	Expression Expression
+}
+
+func (UnaryExpression) isExpression() {}
+
+func (e UnaryExpression) Accept(v Visitor) Repr {
+	return v.VisitUnaryExpression(e)
+}
+
 // BinaryExpression
 
 type BinaryExpression struct {
