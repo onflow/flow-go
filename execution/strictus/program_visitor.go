@@ -625,8 +625,13 @@ func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{}
 		)
 	}
 
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.PositionFromToken(ctx.GetStop())
+
 	return ast.ArrayExpression{
-		Values: expressions,
+		Values:        expressions,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
 	}
 }
 

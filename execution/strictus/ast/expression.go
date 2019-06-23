@@ -36,7 +36,9 @@ func (e IntExpression) Accept(v Visitor) Repr {
 // ArrayExpression
 
 type ArrayExpression struct {
-	Values []Expression
+	Values        []Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (ArrayExpression) isExpression() {}

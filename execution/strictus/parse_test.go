@@ -43,6 +43,40 @@ func TestParseBoolExpression(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
+func TestParseArrayExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    const a = [1, 2]
+	`)
+
+	test := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Value: ArrayExpression{
+			Values: []Expression{
+				IntExpression{
+					Value:    big.NewInt(1),
+					Position: Position{Offset: 17, Line: 2, Column: 16},
+				},
+				IntExpression{
+					Value:    big.NewInt(2),
+					Position: Position{Offset: 20, Line: 2, Column: 19},
+				},
+			},
+			StartPosition: Position{Offset: 16, Line: 2, Column: 15},
+			EndPosition:   Position{Offset: 21, Line: 2, Column: 20},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{test},
+		Declarations:    map[string]Declaration{"a": test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
 func TestParseBlock(t *testing.T) {
 	RegisterTestingT(t)
 
