@@ -552,29 +552,51 @@ func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
-func parseIntExpression(text string, kind string, base int) ast.IntExpression {
-
+func parseIntExpression(token antlr.Token, text string, kind string, base int) ast.IntExpression {
 	value, ok := big.NewInt(0).SetString(text, base)
 	if !ok {
 		panic(fmt.Sprintf("invalid %s literal: %s", kind, text))
 	}
-	return ast.IntExpression{Value: value}
+	return ast.IntExpression{
+		Value:    value,
+		Position: ast.PositionFromToken(token),
+	}
 }
 
 func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {
-	return parseIntExpression(ctx.GetText(), "decimal", 10)
+	return parseIntExpression(
+		ctx.GetStart(),
+		ctx.GetText(),
+		"decimal",
+		10,
+	)
 }
 
 func (v *ProgramVisitor) VisitBinaryLiteral(ctx *BinaryLiteralContext) interface{} {
-	return parseIntExpression(ctx.GetText()[2:], "binary", 2)
+	return parseIntExpression(
+		ctx.GetStart(),
+		ctx.GetText()[2:],
+		"binary",
+		2,
+	)
 }
 
 func (v *ProgramVisitor) VisitOctalLiteral(ctx *OctalLiteralContext) interface{} {
-	return parseIntExpression(ctx.GetText()[2:], "octal", 8)
+	return parseIntExpression(
+		ctx.GetStart(),
+		ctx.GetText()[2:],
+		"octal",
+		8,
+	)
 }
 
 func (v *ProgramVisitor) VisitHexadecimalLiteral(ctx *HexadecimalLiteralContext) interface{} {
-	return parseIntExpression(ctx.GetText()[2:], "hexadecimal", 16)
+	return parseIntExpression(
+		ctx.GetStart(),
+		ctx.GetText()[2:],
+		"hexadecimal",
+		16,
+	)
 }
 
 func (v *ProgramVisitor) VisitNestedExpression(ctx *NestedExpressionContext) interface{} {

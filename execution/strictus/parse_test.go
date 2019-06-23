@@ -244,14 +244,78 @@ func TestParseIntegerTypes(t *testing.T) {
 		const h: UInt64 = 8
 	`)
 
-	a := VariableDeclaration{Identifier: "a", IsConst: true, Type: Int8Type{}, Value: IntExpression{Value: big.NewInt(1)}}
-	b := VariableDeclaration{Identifier: "b", IsConst: true, Type: Int16Type{}, Value: IntExpression{Value: big.NewInt(2)}}
-	c := VariableDeclaration{Identifier: "c", IsConst: true, Type: Int32Type{}, Value: IntExpression{Value: big.NewInt(3)}}
-	d := VariableDeclaration{Identifier: "d", IsConst: true, Type: Int64Type{}, Value: IntExpression{Value: big.NewInt(4)}}
-	e := VariableDeclaration{Identifier: "e", IsConst: true, Type: UInt8Type{}, Value: IntExpression{Value: big.NewInt(5)}}
-	f := VariableDeclaration{Identifier: "f", IsConst: true, Type: UInt16Type{}, Value: IntExpression{Value: big.NewInt(6)}}
-	g := VariableDeclaration{Identifier: "g", IsConst: true, Type: UInt32Type{}, Value: IntExpression{Value: big.NewInt(7)}}
-	h := VariableDeclaration{Identifier: "h", IsConst: true, Type: UInt64Type{}, Value: IntExpression{Value: big.NewInt(8)}}
+	a := VariableDeclaration{
+		Identifier: "a",
+		IsConst:    true,
+		Type:       Int8Type{},
+		Value: IntExpression{
+			Value:    big.NewInt(1),
+			Position: Position{Offset: 19, Line: 2, Column: 18},
+		},
+	}
+	b := VariableDeclaration{
+		Identifier: "b",
+		IsConst:    true,
+		Type:       Int16Type{},
+		Value: IntExpression{
+			Value:    big.NewInt(2),
+			Position: Position{Offset: 40, Line: 3, Column: 19},
+		},
+	}
+	c := VariableDeclaration{
+		Identifier: "c",
+		IsConst:    true,
+		Type:       Int32Type{},
+		Value: IntExpression{
+			Value:    big.NewInt(3),
+			Position: Position{Offset: 61, Line: 4, Column: 19},
+		},
+	}
+	d := VariableDeclaration{
+		Identifier: "d",
+		IsConst:    true,
+		Type:       Int64Type{},
+		Value: IntExpression{
+			Value:    big.NewInt(4),
+			Position: Position{Offset: 82, Line: 5, Column: 19},
+		},
+	}
+	e := VariableDeclaration{
+		Identifier: "e",
+		IsConst:    true,
+		Type:       UInt8Type{},
+		Value: IntExpression{
+			Value:    big.NewInt(5),
+			Position: Position{Offset: 103, Line: 6, Column: 19},
+		},
+	}
+	f := VariableDeclaration{
+		Identifier: "f",
+		IsConst:    true,
+		Type:       UInt16Type{},
+		Value: IntExpression{
+			Value:    big.NewInt(6),
+			Position: Position{Offset: 125, Line: 7, Column: 20},
+		},
+	}
+	g := VariableDeclaration{
+		Identifier: "g",
+		IsConst:    true,
+		Type:       UInt32Type{},
+		Value: IntExpression{
+			Value:    big.NewInt(7),
+			Position: Position{Offset: 147, Line: 8, Column: 20},
+		},
+	}
+	h := VariableDeclaration{
+		Identifier: "h",
+		IsConst:    true,
+		Type:       UInt64Type{},
+		Value: IntExpression{
+			Value:    big.NewInt(8),
+			Position: Position{Offset: 169, Line: 9, Column: 20},
+		},
+	}
 
 	expected := Program{
 		AllDeclarations: []Declaration{a, b, c, d, e, f, g, h},
@@ -361,10 +425,19 @@ func TestParseLeftAssociativity(t *testing.T) {
 			Operation: OperationPlus,
 			Left: BinaryExpression{
 				Operation: OperationPlus,
-				Left:      IntExpression{Value: big.NewInt(1)},
-				Right:     IntExpression{Value: big.NewInt(2)},
+				Left: IntExpression{
+					Value:    big.NewInt(1),
+					Position: Position{Offset: 19, Line: 2, Column: 18},
+				},
+				Right: IntExpression{
+					Value:    big.NewInt(2),
+					Position: Position{Offset: 23, Line: 2, Column: 22},
+				},
 			},
-			Right: IntExpression{Value: big.NewInt(3)},
+			Right: IntExpression{
+				Value:    big.NewInt(3),
+				Position: Position{Offset: 27, Line: 2, Column: 26},
+			},
 		},
 	}
 
@@ -413,18 +486,39 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 		Value: ConditionalExpression{
 			Test: BinaryExpression{
 				Operation: OperationGreater,
-				Left:      IntExpression{Value: big.NewInt(2)},
-				Right:     IntExpression{Value: big.NewInt(1)},
+				Left: IntExpression{
+					Value:    big.NewInt(2),
+					Position: Position{Offset: 19, Line: 2, Column: 18},
+				},
+				Right: IntExpression{
+					Value:    big.NewInt(1),
+					Position: Position{Offset: 23, Line: 2, Column: 22},
+				},
 			},
-			Then: IntExpression{Value: big.NewInt(0)},
+			Then: IntExpression{
+				Value:    big.NewInt(0),
+				Position: Position{Offset: 37, Line: 3, Column: 12},
+			},
 			Else: ConditionalExpression{
 				Test: BinaryExpression{
 					Operation: OperationGreater,
-					Left:      IntExpression{Value: big.NewInt(3)},
-					Right:     IntExpression{Value: big.NewInt(2)},
+					Left: IntExpression{
+						Value:    big.NewInt(3),
+						Position: Position{Offset: 51, Line: 4, Column: 12},
+					},
+					Right: IntExpression{
+						Value:    big.NewInt(2),
+						Position: Position{Offset: 55, Line: 4, Column: 16},
+					},
 				},
-				Then: IntExpression{Value: big.NewInt(1)},
-				Else: IntExpression{Value: big.NewInt(2)},
+				Then: IntExpression{
+					Value:    big.NewInt(1),
+					Position: Position{Offset: 59, Line: 4, Column: 20},
+				},
+				Else: IntExpression{
+					Value:    big.NewInt(2),
+					Position: Position{Offset: 63, Line: 4, Column: 24},
+				},
 			},
 		},
 	}
