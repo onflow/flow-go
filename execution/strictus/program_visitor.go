@@ -490,8 +490,10 @@ func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) i
 		switch partialExpression := suffix.Accept(v).(type) {
 		case ast.InvocationExpression:
 			result = ast.InvocationExpression{
-				Expression: result,
-				Arguments:  partialExpression.Arguments,
+				Expression:    result,
+				Arguments:     partialExpression.Arguments,
+				StartPosition: partialExpression.StartPosition,
+				EndPosition:   partialExpression.EndPosition,
 			}
 		case ast.AccessExpression:
 			result = v.wrapPartialAccessExpression(result, partialExpression)
@@ -656,9 +658,14 @@ func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
 		)
 	}
 
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.PositionFromToken(ctx.GetStop())
+
 	// NOTE: partial, expression is filled later
 	return ast.InvocationExpression{
-		Arguments: expressions,
+		Arguments:     expressions,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
 	}
 }
 

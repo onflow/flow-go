@@ -63,8 +63,10 @@ func (e IdentifierExpression) Accept(v Visitor) Repr {
 // InvocationExpression
 
 type InvocationExpression struct {
-	Expression Expression
-	Arguments  []Expression
+	Expression    Expression
+	Arguments     []Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (InvocationExpression) isExpression() {}
