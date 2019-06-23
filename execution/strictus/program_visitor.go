@@ -4,6 +4,7 @@ import (
 	"bamboo-runtime/execution/strictus/ast"
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"math/big"
 	"strconv"
 )
 
@@ -106,6 +107,8 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	if identifierNode != nil {
 		identifier := identifierNode.GetText()
 		switch identifier {
+		case "Int":
+			return ast.IntType{}
 		case "Int8":
 			return ast.Int8Type{}
 		case "Int16":
@@ -539,12 +542,13 @@ func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
-func parseIntExpression(text string, kind string, base int) ast.Int64Expression {
-	value, err := strconv.ParseInt(text, base, 64)
-	if err != nil {
+func parseIntExpression(text string, kind string, base int) ast.IntExpression {
+
+	value, ok := big.NewInt(0).SetString(text, base)
+	if !ok {
 		panic(fmt.Sprintf("invalid %s literal: %s", kind, text))
 	}
-	return ast.Int64Expression(value)
+	return ast.IntExpression{Value: value}
 }
 
 func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {

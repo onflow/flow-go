@@ -4,6 +4,7 @@ import (
 	. "bamboo-runtime/execution/strictus/ast"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	. "github.com/onsi/gomega"
+	"math/big"
 	"testing"
 )
 
@@ -57,17 +58,17 @@ func TestParseComplexFunction(t *testing.T) {
 					IsConst:    true,
 					Identifier: "x",
 					Type:       nil,
-					Value:      Int64Expression(1),
+					Value:      IntExpression{Value: big.NewInt(1)},
 				},
 				VariableDeclaration{
 					IsConst:    false,
 					Identifier: "y",
 					Type:       Int32Type{},
-					Value:      Int64Expression(2),
+					Value:      IntExpression{Value: big.NewInt(2)},
 				},
 				Assignment{
 					Target: IdentifierExpression{Identifier: "y"},
-					Value:  Int64Expression(3),
+					Value:  IntExpression{Value: big.NewInt(3)},
 				},
 				ExpressionStatement{
 					Expression: MemberExpression{
@@ -80,9 +81,9 @@ func TestParseComplexFunction(t *testing.T) {
 									},
 									Identifier: "bar",
 								},
-								Index: Int64Expression(0),
+								Index: IntExpression{Value: big.NewInt(0)},
 							},
-							Index: Int64Expression(1),
+							Index: IntExpression{Value: big.NewInt(1)},
 						},
 						Identifier: "baz",
 					},
@@ -94,12 +95,12 @@ func TestParseComplexFunction(t *testing.T) {
 						Left: InvocationExpression{
 							Expression: IdentifierExpression{Identifier: "sum"},
 							Arguments: []Expression{
-								Int64Expression(3),
-								Int64Expression(2),
-								Int64Expression(1),
+								IntExpression{Value: big.NewInt(3)},
+								IntExpression{Value: big.NewInt(2)},
+								IntExpression{Value: big.NewInt(1)},
 							},
 						},
-						Right: Int64Expression(42),
+						Right: IntExpression{Value: big.NewInt(42)},
 					},
 				},
 				ReturnStatement{Expression: IdentifierExpression{Identifier: "a"}},
@@ -107,7 +108,7 @@ func TestParseComplexFunction(t *testing.T) {
 					Test: BinaryExpression{
 						Operation: OperationLess,
 						Left:      IdentifierExpression{Identifier: "x"},
-						Right:     Int64Expression(2),
+						Right:     IntExpression{Value: big.NewInt(2)},
 					},
 					Block: Block{
 						Statements: []Statement{
@@ -116,7 +117,7 @@ func TestParseComplexFunction(t *testing.T) {
 								Value: BinaryExpression{
 									Operation: OperationPlus,
 									Left:      IdentifierExpression{Identifier: "x"},
-									Right:     Int64Expression(1),
+									Right:     IntExpression{Value: big.NewInt(1)},
 								},
 							},
 						},
@@ -126,7 +127,7 @@ func TestParseComplexFunction(t *testing.T) {
 					Test: BoolExpression(true),
 					Then: Block{
 						Statements: []Statement{
-							ReturnStatement{Expression: Int64Expression(1)},
+							ReturnStatement{Expression: IntExpression{Value: big.NewInt(1)}},
 						},
 					},
 					Else: Block{
@@ -139,11 +140,11 @@ func TestParseComplexFunction(t *testing.T) {
 											Expression: ConditionalExpression{
 												Test: BinaryExpression{
 													Operation: OperationGreater,
-													Left:      Int64Expression(2),
-													Right:     Int64Expression(3),
+													Left:      IntExpression{Value: big.NewInt(2)},
+													Right:     IntExpression{Value: big.NewInt(3)},
 												},
-												Then: Int64Expression(4),
-												Else: Int64Expression(5),
+												Then: IntExpression{Value: big.NewInt(4)},
+												Else: IntExpression{Value: big.NewInt(5)},
 											},
 										},
 									},
@@ -153,7 +154,7 @@ func TestParseComplexFunction(t *testing.T) {
 										ReturnStatement{
 											Expression: ArrayExpression{
 												Values: []Expression{
-													Int64Expression(2),
+													IntExpression{Value: big.NewInt(2)},
 													BoolExpression(true),
 												},
 											},
@@ -190,14 +191,14 @@ func TestParseIntegerTypes(t *testing.T) {
 		const h: UInt64 = 8
 	`)
 
-	a := VariableDeclaration{Identifier: "a", IsConst: true, Type: Int8Type{}, Value: Int64Expression(1)}
-	b := VariableDeclaration{Identifier: "b", IsConst: true, Type: Int16Type{}, Value: Int64Expression(2)}
-	c := VariableDeclaration{Identifier: "c", IsConst: true, Type: Int32Type{}, Value: Int64Expression(3)}
-	d := VariableDeclaration{Identifier: "d", IsConst: true, Type: Int64Type{}, Value: Int64Expression(4)}
-	e := VariableDeclaration{Identifier: "e", IsConst: true, Type: UInt8Type{}, Value: Int64Expression(5)}
-	f := VariableDeclaration{Identifier: "f", IsConst: true, Type: UInt16Type{}, Value: Int64Expression(6)}
-	g := VariableDeclaration{Identifier: "g", IsConst: true, Type: UInt32Type{}, Value: Int64Expression(7)}
-	h := VariableDeclaration{Identifier: "h", IsConst: true, Type: UInt64Type{}, Value: Int64Expression(8)}
+	a := VariableDeclaration{Identifier: "a", IsConst: true, Type: Int8Type{}, Value: IntExpression{Value: big.NewInt(1)}}
+	b := VariableDeclaration{Identifier: "b", IsConst: true, Type: Int16Type{}, Value: IntExpression{Value: big.NewInt(2)}}
+	c := VariableDeclaration{Identifier: "c", IsConst: true, Type: Int32Type{}, Value: IntExpression{Value: big.NewInt(3)}}
+	d := VariableDeclaration{Identifier: "d", IsConst: true, Type: Int64Type{}, Value: IntExpression{Value: big.NewInt(4)}}
+	e := VariableDeclaration{Identifier: "e", IsConst: true, Type: UInt8Type{}, Value: IntExpression{Value: big.NewInt(5)}}
+	f := VariableDeclaration{Identifier: "f", IsConst: true, Type: UInt16Type{}, Value: IntExpression{Value: big.NewInt(6)}}
+	g := VariableDeclaration{Identifier: "g", IsConst: true, Type: UInt32Type{}, Value: IntExpression{Value: big.NewInt(7)}}
+	h := VariableDeclaration{Identifier: "h", IsConst: true, Type: UInt64Type{}, Value: IntExpression{Value: big.NewInt(8)}}
 
 	expected := Program{
 		AllDeclarations: []Declaration{a, b, c, d, e, f, g, h},
@@ -302,10 +303,10 @@ func TestParseLeftAssociativity(t *testing.T) {
 			Operation: OperationPlus,
 			Left: BinaryExpression{
 				Operation: OperationPlus,
-				Left:      Int64Expression(1),
-				Right:     Int64Expression(2),
+				Left:      IntExpression{Value: big.NewInt(1)},
+				Right:     IntExpression{Value: big.NewInt(2)},
 			},
-			Right: Int64Expression(3),
+			Right: IntExpression{Value: big.NewInt(3)},
 		},
 	}
 
@@ -354,18 +355,18 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 		Value: ConditionalExpression{
 			Test: BinaryExpression{
 				Operation: OperationGreater,
-				Left:      Int64Expression(2),
-				Right:     Int64Expression(1),
+				Left:      IntExpression{Value: big.NewInt(2)},
+				Right:     IntExpression{Value: big.NewInt(1)},
 			},
-			Then: Int64Expression(0),
+			Then: IntExpression{Value: big.NewInt(0)},
 			Else: ConditionalExpression{
 				Test: BinaryExpression{
 					Operation: OperationGreater,
-					Left:      Int64Expression(3),
-					Right:     Int64Expression(2),
+					Left:      IntExpression{Value: big.NewInt(3)},
+					Right:     IntExpression{Value: big.NewInt(2)},
 				},
-				Then: Int64Expression(1),
-				Else: Int64Expression(2),
+				Then: IntExpression{Value: big.NewInt(1)},
+				Else: IntExpression{Value: big.NewInt(2)},
 			},
 		},
 	}

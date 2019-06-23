@@ -16,6 +16,12 @@ type BoolType struct{}
 
 func (BoolType) isType() {}
 
+// IntType represents the arbitrary-precision integer type `Int`
+
+type IntType struct{}
+
+func (IntType) isType() {}
+
 // Int8Type represents the 8-bit signed integer type `Int8`
 
 type Int8Type struct{}
