@@ -26,7 +26,7 @@ func TestParseBoolExpression(t *testing.T) {
 	    const a = true
 	`)
 
-	test := VariableDeclaration{
+	a := VariableDeclaration{
 		IsConst:    true,
 		Identifier: "a",
 		Value: BoolExpression{
@@ -36,8 +36,32 @@ func TestParseBoolExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{test},
-		Declarations:    map[string]Declaration{"a": test},
+		AllDeclarations: []Declaration{a},
+		Declarations:    map[string]Declaration{"a": a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseIdentifierExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    const b = a
+	`)
+
+	b := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "b",
+		Value: IdentifierExpression{
+			Identifier: "a",
+			Position:   Position{Offset: 16, Line: 2, Column: 15},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{b},
+		Declarations:    map[string]Declaration{"b": b},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -50,7 +74,7 @@ func TestParseArrayExpression(t *testing.T) {
 	    const a = [1, 2]
 	`)
 
-	test := VariableDeclaration{
+	a := VariableDeclaration{
 		IsConst:    true,
 		Identifier: "a",
 		Value: ArrayExpression{
@@ -70,8 +94,8 @@ func TestParseArrayExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{test},
-		Declarations:    map[string]Declaration{"a": test},
+		AllDeclarations: []Declaration{a},
+		Declarations:    map[string]Declaration{"a": a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -363,10 +387,7 @@ func TestParseFunctionType(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual := parse(`
-		const add: (Int8, Int8) => Int16 =
-            fun (a: Int8, b: Int8): Int16 {
-                return a + b
-            }
+		const add: (Int8, Int16) => Int32 = nothing
 	`)
 
 	add := VariableDeclaration{
@@ -375,29 +396,13 @@ func TestParseFunctionType(t *testing.T) {
 		Type: FunctionType{
 			ParameterTypes: []Type{
 				Int8Type{},
-				Int8Type{},
+				Int16Type{},
 			},
-			ReturnType: Int16Type{},
+			ReturnType: Int32Type{},
 		},
-		Value: FunctionExpression{
-			Parameters: []Parameter{
-				{Identifier: "a", Type: Int8Type{}},
-				{Identifier: "b", Type: Int8Type{}},
-			},
-			ReturnType: Int16Type{},
-			Block: Block{
-				Statements: []Statement{
-					ReturnStatement{
-						Expression: BinaryExpression{
-							Operation: OperationPlus,
-							Left:      IdentifierExpression{Identifier: "a"},
-							Right:     IdentifierExpression{Identifier: "b"},
-						},
-					},
-				},
-				StartPosition: Position{Offset: 98, Line: 4, Column: 16},
-				EndPosition:   Position{Offset: 109, Line: 4, Column: 27},
-			},
+		Value: IdentifierExpression{
+			Identifier: "nothing",
+			Position:   Position{Offset: 39, Line: 2, Column: 38},
 		},
 	}
 

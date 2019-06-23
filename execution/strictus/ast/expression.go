@@ -51,6 +51,7 @@ func (e ArrayExpression) Accept(v Visitor) Repr {
 
 type IdentifierExpression struct {
 	Identifier string
+	Position   Position
 }
 
 func (IdentifierExpression) isExpression() {}

@@ -636,9 +636,14 @@ func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{}
 }
 
 func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{} {
-	identifier := ctx.Identifier().GetText()
+	identifierNode := ctx.Identifier()
+
+	identifier := identifierNode.GetText()
+	position := ast.PositionFromToken(identifierNode.GetSymbol())
+
 	return ast.IdentifierExpression{
 		Identifier: identifier,
+		Position:   position,
 	}
 }
 
