@@ -121,27 +121,33 @@ conditionalExpression
 	;
 
 orExpression
-	: andExpression ('||' andExpression)?
+	: andExpression
+	| orExpression '||' andExpression
 	;
 
 andExpression
-	: equalityExpression ('&&' equalityExpression)?
+	: equalityExpression
+	| andExpression '&&' equalityExpression
 	;
 
 equalityExpression
-	: relationalExpression (equalityOp relationalExpression)?
+	: relationalExpression
+	| equalityExpression equalityOp relationalExpression
 	;
 
 relationalExpression
-	: additiveExpression (relationalOp additiveExpression)?
+	: additiveExpression
+	| relationalExpression relationalOp additiveExpression
 	;
 
 additiveExpression
-	: multiplicativeExpression (additiveOp multiplicativeExpression)?
+	: multiplicativeExpression
+	| additiveExpression additiveOp multiplicativeExpression
 	;
 
 multiplicativeExpression
-	: primaryExpression (multiplicativeOp primaryExpression)?
+	: primaryExpression
+	| multiplicativeExpression multiplicativeOp primaryExpression
 	;
 
 primaryExpression
