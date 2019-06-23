@@ -459,7 +459,7 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
-func TestParseFunctionExpression(t *testing.T) {
+func TestParseFunctionExpressionAndReturn(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual := parse(`
@@ -473,7 +473,10 @@ func TestParseFunctionExpression(t *testing.T) {
 			ReturnType: VoidType{},
 			Block: Block{
 				Statements: []Statement{
-					ReturnStatement{},
+					ReturnStatement{
+						StartPosition: Position{Offset: 28, Line: 2, Column: 27},
+						EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
+					},
 				},
 				// NOTE: block is statements *inside* curly braces
 				StartPosition: Position{Offset: 28, Line: 2, Column: 27},
@@ -507,7 +510,10 @@ func TestParseFunctionAndBlock(t *testing.T) {
 		ReturnType: VoidType{},
 		Block: Block{
 			Statements: []Statement{
-				ReturnStatement{},
+				ReturnStatement{
+					StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+					EndPosition:   Position{Offset: 19, Line: 2, Column: 18},
+				},
 			},
 			// NOTE: block is statements *inside* curly braces
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
@@ -845,7 +851,10 @@ func TestParseMissingReturnType(t *testing.T) {
 			ReturnType: VoidType{},
 			Block: Block{
 				Statements: []Statement{
-					ReturnStatement{},
+					ReturnStatement{
+						StartPosition: Position{Offset: 49, Line: 3, Column: 21},
+						EndPosition:   Position{Offset: 49, Line: 3, Column: 21},
+					},
 				},
 				// NOTE: block is statements *inside* curly braces
 				StartPosition: Position{Offset: 49, Line: 3, Column: 21},

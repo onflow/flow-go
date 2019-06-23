@@ -8,7 +8,9 @@ type Statement interface {
 // ReturnStatement
 
 type ReturnStatement struct {
-	Expression Expression
+	Expression    Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (ReturnStatement) isStatement() {}

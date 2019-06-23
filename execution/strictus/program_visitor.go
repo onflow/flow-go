@@ -250,8 +250,13 @@ func (v *ProgramVisitor) VisitReturnStatement(ctx *ReturnStatementContext) inter
 		expression = expressionNode.Accept(v).(ast.Expression)
 	}
 
+	// TODO: get end position from expression
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
 	return ast.ReturnStatement{
-		Expression: expression,
+		Expression:    expression,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
 	}
 }
 
