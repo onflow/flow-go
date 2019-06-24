@@ -25,14 +25,17 @@ type WorldState struct {
 }
 
 // NewWorldState instantiates a new state object with a genesis block and root account.
-func NewWorldState(log *logrus.Logger) *WorldState {
+func NewWorldState(log *logrus.Logger) (*WorldState, error) {
 	accounts := make(map[crypto.Address]crypto.Account)
 	blocks := make(map[crypto.Hash]Block)
 	collections := make(map[crypto.Hash]Collection)
 	txs := make(map[crypto.Hash]Transaction)
 	registers := make(map[string][]byte)
 
-	wallet, _ := crypto.CreateWallet("BAMBOO")
+	wallet, err := crypto.CreateWallet("BAMBOO")
+	if err != nil {
+		return nil, err
+	}
 
 	log.WithFields(logrus.Fields{
 		"mnemonic": wallet.Mnemonic,
@@ -41,7 +44,11 @@ func NewWorldState(log *logrus.Logger) *WorldState {
 		wallet.Mnemonic,
 	)
 
-	root, _ := wallet.CreateRootAccount()
+	root, err := wallet.CreateRootAccount()
+	if err != nil {
+		return nil, err
+	}
+
 	accounts[root.Address] = *root
 
 	log.WithFields(logrus.Fields{
@@ -76,7 +83,7 @@ func NewWorldState(log *logrus.Logger) *WorldState {
 		transactions: txs,
 		registers:    registers,
 		blockchain:   chain,
-	}
+	}, nil
 }
 
 // GetLatestBlock gets the most recent block in the blockchain.

@@ -39,7 +39,11 @@ func startServer() {
 
 	collections := make(chan *data.Collection, 16)
 
-	state := data.NewWorldState(log)
+	state, err := data.NewWorldState(log)
+	if err != nil {
+		log.Fatal("Could not start emulator server")
+	}
+
 
 	accessNode := access.NewNode(
 		&access.Config{
