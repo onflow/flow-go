@@ -1,0 +1,111 @@
+version: "3.3"
+services:
+  execute_db:
+    image: postgres:9.6-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=foo
+
+  execute:
+    build:
+      context: .
+      dockerfile: cmd/execute/Dockerfile
+    depends_on:
+      - execute_db
+    ports:
+      - "3001:3001"
+    restart: on-failure:5
+    environment:
+      - APP_ENV=LOCAL
+      - PORT=3001
+      - POSTGRES_GCP_CONNECTION_NAME=foo
+      - POSTGRES_ADDR=execute_db:5432
+      - POSTGRES_DATABASE=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=foo
+
+  security_db:
+    image: postgres:9.6-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=foo
+
+  security:
+    build:
+      context: .
+      dockerfile: cmd/security/Dockerfile
+    depends_on:
+      - security_db
+    ports:
+      - "3002:3002"
+    restart: on-failure:5
+    environment:
+      - APP_ENV=LOCAL
+      - PORT=3002
+      - POSTGRES_GCP_CONNECTION_NAME=foo
+      - POSTGRES_ADDR=security_db:5432
+      - POSTGRES_DATABASE=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=foo
+
+  testhelpers:
+    build:
+      context: .
+      dockerfile: cmd/testhelpers/Dockerfile
+    depends_on:
+      - execute_db
+      - security_db
+    ports:
+      - "3009:3009"
+    restart: on-failure:5
+    environment:
+      - APP_ENV=LOCAL
+      - PORT=3009
+      - POSTGRES_GCP_CONNECTION_NAME=foo
+      - POSTGRES_ADDR=db:5432 #TODO: this won't work because we need to setup configs to connect to 2 different dbs.
+      - POSTGRES_DATABASE=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=foo
+
+  test:
+    build: ./integration-tests
+    depends_on:
+      - execute
+      - security
+      - testhelpers
+    environment:
+      - EXECUTE_ADDR=execute:3001
+      - SECURITY_ADDR=security:3002
+      - HELPERS_ADDR=testhelpers:3009
+
+  # See https://github.com/dadarek/docker-wait-for-dependencies
+  # Run this as a separate "docker-compose" up command
+  start_execute_dependencies:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - execute_db
+    command: execute_db:5432
+
+  # See https://github.com/dadarek/docker-wait-for-dependencies
+  # Run this as a separate "docker-compose" up command
+  start_security_dependencies:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - security_db
+    command: security_db:5432
+
+  # See https://github.com/dadarek/docker-wait-for-dependencies
+  # Run this as a separate "docker-compose" up command
+  start_test_dependencies:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - execute
+      - security
+      - testhelpers
+    command: execute:3001 security:3002 testhelpers:3009

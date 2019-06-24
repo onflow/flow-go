@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package bamboo.proto;
+
+import "shared/messages.proto";
+
+service ExecuteNode {
+  rpc Ping (PingRequest) returns (PingResponse);
+
+  rpc ExecuteBlock (ExecuteBlockRequest) returns (ExecuteBlockResponse);
+
+  rpc NotifyBlockExecuted (NotifyBlockExecutedRequest) returns (NotifyBlockExecutedResponse);
+
+  // Providing register values and metadata.
+  rpc GetRegisters (RegistersRequest) returns (RegistersResponse);
+
+  rpc GetRegistersAtBlockHeight (RegistersAtBlockHeightRequest) returns (RegistersResponse);
+}
