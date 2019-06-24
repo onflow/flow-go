@@ -9,7 +9,7 @@ The language's goals are, in order of importance:
 - *Simplicity*: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
 
 
-## Syntax
+## Syntax and Behavior
 
 The programming language's syntax and behavior is inspired by Kotlin, Swift, Rust, TypeScript, and Solidity.
 
@@ -252,6 +252,8 @@ TODO
 
 
 ## Dictionaries
+
+> Status: Dictionaries are not implemented yet.
 
 Dictionaries are mutable, unordered collections of key-value associations. In a dictionary, all keys must have the same type, and all values must have the same type. Dictionaries may contain a key only once and may contain a value multiple times.
 
@@ -659,6 +661,8 @@ fun test(x: Int) {
 
 ### Function Preconditions and Postconditions
 
+> Status: Function Preconditions and Postconditions are not implemented yet.
+
 Functions may have preconditions and may have postconditions.
 
 Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the `require` keyword, followed by the condition block. 
@@ -860,6 +864,8 @@ f() // returns 2
 
 ## Type Safety 
 
+> Status: Type checking is not implemented yet.
+
 The Bamboo programming language is a _type-safe_ language. 
 
 When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable is of type `Bool`, it can _only_ be assigned a `Bool`, and not for example an `Int`. 
@@ -902,6 +908,8 @@ add(a, b)
 
 
 ## Type Inference
+
+> Status: Type inference is not implemented yet.
 
 If a variable or constant is not annotated explicitly with a type, it is inferred from the value.
 
