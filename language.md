@@ -209,7 +209,7 @@ const integers = [1, 2, 3]
 const invalidMixed = [1, true, 2, false]
 ```
 
-#### Indexing
+#### Array Indexing
 
 To get the element of an array at a specific index, the indexing syntax can be used.
 
@@ -226,7 +226,7 @@ arrays[1][0] // is 3
 
 TODO
 
-#### Functions
+#### Array Functions
 
 -->
 
