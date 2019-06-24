@@ -812,6 +812,15 @@ const a = [1, 2]
 // a has type Int[]
 ```
 
+Functions are inferred based on the parameter types and the return type.
+
+```typescript
+const add = (a: Int8, b: Int8): Int {
+    return a + b
+}
+// add has type (Int8, Int8) => Int
+```
+
 <!--
 
 TODO: dictionaries
