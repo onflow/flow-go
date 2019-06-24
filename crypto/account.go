@@ -21,7 +21,7 @@ type Account struct {
 }
 
 // createAccountFromHDWallet uses a specified HD wallet to create a new Bamboo user account.
-func createAccountFromHDWallet(w *hdwallet.Wallet, publicKeys [][]byte, code []byte) (*Account, error) {
+func createAccountFromHDWallet(w *hdwallet.Wallet, publicKeys [][]byte, code []byte, balance uint64) (*Account, error) {
 	index := len(w.Accounts())
 	path := rootPath + strconv.Itoa(index)
 	derivationPath := hdwallet.MustParseDerivationPath(path)
@@ -40,7 +40,7 @@ func createAccountFromHDWallet(w *hdwallet.Wallet, publicKeys [][]byte, code []b
 
 	return &Account{
 		Address:    BytesToAddress(account.Address.Bytes()),
-		Balance:    0,
+		Balance:    balance,
 		Code:       code,
 		PublicKeys: publicKeys,
 		Path:       path,
