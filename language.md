@@ -294,13 +294,13 @@ const a = 1 + 2
 // a is 3
 ```
 
-Arithmetic operators don't allow values to overflow.
+Arithmetic operators don't cause values to overflow.
 
 ```typescript
 const a: Int8 = 100
 const b: Int8 = 100
-// abort: 10000 does not fit into Int8
-a * b
+const c = a * b
+// c is 10000, and of type `Int`.
 ```
 
 If overflow behavior is intended, overflowing operators are available, which are prefixed with an `&`:
