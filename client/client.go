@@ -103,7 +103,7 @@ func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*data.Trans
 	tx := res.GetTransaction()
 
 	return &data.Transaction{
-		ToAddress:      crypto.BytesToAddress(tx.GetTo()),
+		ToAddress:      crypto.BytesToAddress(tx.GetToAddress()),
 		Script:         tx.GetScript(),
 		Nonce:          tx.GetNonce(),
 		ComputeLimit:   tx.GetComputeLimit(),

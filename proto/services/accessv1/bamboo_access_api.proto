@@ -32,7 +32,7 @@ service BambooAccessAPI {
 
 message SendTransactionRequest {
   message Transaction {
-    bytes to = 1;
+    bytes to_address = 1;
     bytes script = 2;
     uint64 nonce = 3;
     uint64 compute_limit = 4;
@@ -94,7 +94,7 @@ message GetTransactionResponse {
       STATUS_REVERTED = 2;
       STATUS_SEALED = 3;
     }
-    bytes to = 1;
+    bytes to_address = 1;
     bytes script = 2;
     uint64 nonce = 3;
     uint64 compute_limit = 4;
