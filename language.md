@@ -222,11 +222,23 @@ To get the element of an array at a specific index, the indexing syntax can be u
 
 ```typescript
 const numbers = [42, 23]
+// get the first number
 numbers[0] // is 42
+// get the second number
 numbers[1] // is 23
 
 const arrays = [[1, 2], [3, 4]]
+// get the first number of the second array
 arrays[1][0] // is 3
+```
+
+To set an element of an array at a specific index, the indexing syntax can be used as well.
+
+```typescript
+const numbers = [42, 23]
+// change the second number
+numbers[1] = 2
+// numbers is [42, 2]
 ```
 
 #### Array Types
@@ -296,6 +308,19 @@ integers[true] // is 1
 integers[false] // is 0
 ```
 
+To set the value for a key of a dictionary, the access syntax can be used as well.
+
+```typescript
+const booleans = {
+    1: true,
+    0: false
+}
+booleans[1] = false
+booleans[0] = true
+// booleans is {1: false, 0: true}
+```
+
+
 #### Dictionary Types
 
 Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
@@ -359,7 +384,7 @@ a = 2
 // a is 2
 ```
 
-The left-hand side of the assignment must be an identifier, followed by one or more indices.
+The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.
 
 ```typescript
 const numbers = [1, 2]
@@ -370,6 +395,10 @@ const arrays = [[1, 2], [3, 4]]
 // change the first number in the second array
 arrays[1][0] = 5
 // arrays is [[1, 2], [5, 4]]
+
+const dictionaries = {true: {1: 2}, false: {3: 4}}
+dictionaries[false][3] = 0
+// dictionaries is {true: {1: 2}, false: {3: 0}}
 ```
 
 ### Arithmetic
