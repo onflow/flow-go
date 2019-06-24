@@ -38,8 +38,10 @@ func (s IfStatement) Accept(visitor Visitor) Repr {
 // WhileStatement
 
 type WhileStatement struct {
-	Test  Expression
-	Block Block
+	Test          Expression
+	Block         Block
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (WhileStatement) isStatement() {}

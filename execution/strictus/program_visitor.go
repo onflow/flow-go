@@ -306,10 +306,14 @@ func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 		}
 	}
 
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
 	return ast.IfStatement{
-		Test: test,
-		Then: then,
-		Else: elseBlock,
+		Test:          test,
+		Then:          then,
+		Else:          elseBlock,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
 	}
 }
 
@@ -317,9 +321,13 @@ func (v *ProgramVisitor) VisitWhileStatement(ctx *WhileStatementContext) interfa
 	test := ctx.Expression().Accept(v).(ast.Expression)
 	block := ctx.Block().Accept(v).(ast.Block)
 
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
 	return ast.WhileStatement{
-		Test:  test,
-		Block: block,
+		Test:          test,
+		Block:         block,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
 	}
 }
 

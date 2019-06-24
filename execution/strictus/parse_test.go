@@ -531,6 +531,120 @@ func TestParseFunctionAndBlock(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
+func TestParseIfStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    fun test() {
+            if true {
+              return
+            }
+        }
+	`)
+
+	test := FunctionDeclaration{
+		IsPublic:   false,
+		Identifier: "test",
+		ReturnType: VoidType{},
+		Block: Block{
+			Statements: []Statement{
+				IfStatement{
+					Test: BoolExpression{
+						Value:    true,
+						Position: Position{Offset: 34, Line: 3, Column: 15},
+					},
+					Then: Block{
+						Statements: []Statement{
+							ReturnStatement{
+								Expression:    nil,
+								StartPosition: Position{Offset: 55, Line: 4, Column: 14},
+								EndPosition:   Position{Offset: 55, Line: 4, Column: 14},
+							},
+						},
+						// NOTE: block is statements *inside* curly braces
+						StartPosition: Position{Offset: 55, Line: 4, Column: 14},
+						EndPosition:   Position{Offset: 55, Line: 4, Column: 14},
+					},
+					Else: Block{
+						Statements: nil,
+						// NOTE: block is statements *inside* curly braces
+						StartPosition: Position{Offset: 0, Line: 0, Column: 0},
+						EndPosition:   Position{Offset: 0, Line: 0, Column: 0},
+					},
+					StartPosition: Position{Offset: 31, Line: 3, Column: 12},
+					EndPosition:   Position{Offset: 74, Line: 5, Column: 12},
+				},
+			},
+			// NOTE: block is statements *inside* curly braces
+			StartPosition: Position{Offset: 31, Line: 3, Column: 12},
+			EndPosition:   Position{Offset: 74, Line: 5, Column: 12},
+		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 84, Line: 6, Column: 8},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{test},
+		Declarations:    map[string]Declaration{"test": test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseWhileStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    fun test() {
+            while true {
+              return
+            }
+        }
+	`)
+
+	test := FunctionDeclaration{
+		IsPublic:   false,
+		Identifier: "test",
+		ReturnType: VoidType{},
+		Block: Block{
+			Statements: []Statement{
+				WhileStatement{
+					Test: BoolExpression{
+						Value:    true,
+						Position: Position{Offset: 37, Line: 3, Column: 18},
+					},
+					Block: Block{
+						Statements: []Statement{
+							ReturnStatement{
+								Expression:    nil,
+								StartPosition: Position{Offset: 58, Line: 4, Column: 14},
+								EndPosition:   Position{Offset: 58, Line: 4, Column: 14},
+							},
+						},
+						// NOTE: block is statements *inside* curly braces
+						StartPosition: Position{Offset: 58, Line: 4, Column: 14},
+						EndPosition:   Position{Offset: 58, Line: 4, Column: 14},
+					},
+					StartPosition: Position{Offset: 31, Line: 3, Column: 12},
+					EndPosition:   Position{Offset: 77, Line: 5, Column: 12},
+				},
+			},
+			// NOTE: block is statements *inside* curly braces
+			StartPosition: Position{Offset: 31, Line: 3, Column: 12},
+			EndPosition:   Position{Offset: 77, Line: 5, Column: 12},
+		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 87, Line: 6, Column: 8},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{test},
+		Declarations:    map[string]Declaration{"test": test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
 func TestParseComplexFunction(t *testing.T) {
 	// TODO: skipped, until replaced by smaller tests
 	return
