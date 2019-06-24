@@ -126,8 +126,21 @@ func (n *Node) GetTransaction(hash crypto.Hash) (*data.Transaction, error) {
 }
 
 func (n *Node) GetAccount(address crypto.Address) (*crypto.Account, error) {
-	// TODO: implement GetAccount
-	return nil, nil
+	accountEntry := n.log.WithField("accountAddress", address)
+	accountEntry.Info("Fetching account by address")
+
+	account, err := n.state.GetAccount(address)
+	if err != nil {
+		switch err.(type) {
+		case *data.ItemNotFoundError:
+			accountEntry.Error("Account not found")
+			return nil, &AccountNotFoundError{accountAddress: address}
+		default:
+			return nil, err
+		}
+	}
+
+	return account, nil
 }
 
 func (n *Node) CallContract(script []byte) (interface{}, error) {
