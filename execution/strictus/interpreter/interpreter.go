@@ -36,14 +36,14 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 		panic(fmt.Sprintf("undefined function: %s", functionName))
 	}
 
-	function, ok := variable.Value.(*FunctionValue)
+	function, ok := variable.Value.(FunctionValue)
 	if !ok {
 		panic(fmt.Sprintf("declaration is not a function: %#+v", variable.Value))
 	}
 
 	arguments := ToValues(inputs)
 
-	return interpreter.invokeFunction(function, arguments)
+	return function.invoke(interpreter, arguments)
 }
 
 func (interpreter *Interpreter) VisitProgram(program ast.Program) ast.Repr {
@@ -60,7 +60,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 	}
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
-	function := newFunction(expression, interpreter.activations.CurrentOrNew())
+	function := newInterpretedFunction(expression, interpreter.activations.CurrentOrNew())
 
 	var parameterTypes []ast.Type
 	for _, parameter := range declaration.Parameters {
@@ -339,7 +339,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression a
 
 	// evaluate the invoked expression
 	value := invocationExpression.Expression.Accept(interpreter)
-	function, ok := value.(*FunctionValue)
+	function, ok := value.(*InterpretedFunctionValue)
 	if !ok {
 		panic(fmt.Sprintf("can't invoke value: %#+v", value))
 	}
@@ -350,7 +350,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression a
 	return interpreter.invokeFunction(function, arguments)
 }
 
-func (interpreter *Interpreter) invokeFunction(function *FunctionValue, arguments []Value) ast.Repr {
+func (interpreter *Interpreter) invokeFunction(function *InterpretedFunctionValue, arguments []Value) Value {
 	interpreter.checkInvocationArgumentCount(len(arguments), function)
 
 	// start a new activation record
@@ -361,12 +361,16 @@ func (interpreter *Interpreter) invokeFunction(function *FunctionValue, argument
 
 	interpreter.bindFunctionInvocationParameters(function, arguments)
 
-	return function.Expression.Block.Accept(interpreter)
+	blockResult := function.Expression.Block.Accept(interpreter)
+	if blockResult == nil {
+		return VoidValue{}
+	}
+	return blockResult.(Value)
 }
 
 // bindFunctionInvocationParameters binds the argument values to the parameters in the function
 func (interpreter *Interpreter) bindFunctionInvocationParameters(
-	function *FunctionValue,
+	function *InterpretedFunctionValue,
 	arguments []Value,
 ) {
 	for parameterIndex, parameter := range function.Expression.Parameters {
@@ -391,7 +395,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 // evaluateFunctionInvocationArguments evaluates all function invocation argument expressions
 func (interpreter *Interpreter) evaluateFunctionInvocationArguments(
 	invocationExpression ast.InvocationExpression,
-	function *FunctionValue,
+	function *InterpretedFunctionValue,
 ) []Value {
 	var arguments []Value
 	for _, argumentExpression := range invocationExpression.Arguments {
@@ -405,7 +409,7 @@ func (interpreter *Interpreter) evaluateFunctionInvocationArguments(
 // matches the function's parameter count
 func (interpreter *Interpreter) checkInvocationArgumentCount(
 	argumentCount int,
-	function *FunctionValue,
+	function *InterpretedFunctionValue,
 ) {
 	parameterCount := len(function.Expression.Parameters)
 	if argumentCount != parameterCount {
@@ -419,5 +423,5 @@ func (interpreter *Interpreter) checkInvocationArgumentCount(
 
 func (interpreter *Interpreter) VisitFunctionExpression(expression ast.FunctionExpression) ast.Repr {
 	// lexical scope: variables in functions are bound to what is visible at declaration time
-	return newFunction(expression, interpreter.activations.CurrentOrNew())
+	return newInterpretedFunction(expression, interpreter.activations.CurrentOrNew())
 }
