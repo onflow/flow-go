@@ -61,7 +61,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 
 func (v *ProgramVisitor) visitReturnType(ctx ITypeNameContext) ast.Type {
 	if ctx == nil {
-		return ast.VoidType{}
+		return ast.BaseType{}
 	}
 	return ctx.Accept(v).(ast.Type)
 }
@@ -117,31 +117,9 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	// identifier?
 	if identifierNode != nil {
 		identifier := identifierNode.GetText()
-		switch identifier {
-		case "Int":
-			return ast.IntType{}
-		case "Int8":
-			return ast.Int8Type{}
-		case "Int16":
-			return ast.Int16Type{}
-		case "Int32":
-			return ast.Int32Type{}
-		case "Int64":
-			return ast.Int64Type{}
-		case "UInt8":
-			return ast.UInt8Type{}
-		case "UInt16":
-			return ast.UInt16Type{}
-		case "UInt32":
-			return ast.UInt32Type{}
-		case "UInt64":
-			return ast.UInt64Type{}
-		case "Void":
-			return ast.VoidType{}
-		case "Bool":
-			return ast.BoolType{}
-		default:
-			panic(fmt.Sprintf("unknown type: %s", identifier))
+
+		return ast.BaseType{
+			Identifier: identifier,
 		}
 	}
 

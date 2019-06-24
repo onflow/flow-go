@@ -8,15 +8,21 @@ import (
 type Variable struct {
 	Declaration ast.VariableDeclaration
 	Depth       int
-	// TODO: type
-	Value Value
+	Type        Type
+	Value       Value
 }
 
 func newVariable(declaration ast.VariableDeclaration, depth int, value Value) *Variable {
+	var variableType Type
+	if declaration.Type != nil {
+		variableType = ConvertType(declaration.Type)
+	}
+
 	return &Variable{
 		Declaration: declaration,
 		Depth:       depth,
 		Value:       value,
+		Type:        variableType,
 	}
 }
 
