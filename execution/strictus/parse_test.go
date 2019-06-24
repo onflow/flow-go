@@ -4,9 +4,15 @@ import (
 	. "bamboo-runtime/execution/strictus/ast"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	"math/big"
 	"testing"
 )
+
+func init() {
+	format.TruncatedDiff = false
+	format.MaxDepth = 100
+}
 
 func parse(code string) Program {
 	input := antlr.NewInputStream(code)
@@ -463,30 +469,34 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual := parse(`
-	    const test = fun () { return }
+	    const test = fun (): Int { return 1 }
 	`)
 
 	test := VariableDeclaration{
 		IsConst:    true,
 		Identifier: "test",
 		Value: FunctionExpression{
-			ReturnType: VoidType{},
+			ReturnType: IntType{},
 			Block: Block{
 				Statements: []Statement{
 					ReturnStatement{
-						StartPosition: Position{Offset: 28, Line: 2, Column: 27},
-						EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
+						Expression: IntExpression{
+							Value:    big.NewInt(1),
+							Position: Position{Offset: 40, Line: 2, Column: 39},
+						},
+						StartPosition: Position{Offset: 33, Line: 2, Column: 32},
+						EndPosition:   Position{Offset: 40, Line: 2, Column: 39},
 					},
 				},
 				// NOTE: block is statements *inside* curly braces
-				StartPosition: Position{Offset: 28, Line: 2, Column: 27},
-				EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
+				StartPosition: Position{Offset: 33, Line: 2, Column: 32},
+				EndPosition:   Position{Offset: 40, Line: 2, Column: 39},
 			},
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
-			EndPosition:   Position{Offset: 35, Line: 2, Column: 34},
+			EndPosition:   Position{Offset: 42, Line: 2, Column: 41},
 		},
 		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
-		EndPosition:   Position{Offset: 35, Line: 2, Column: 34},
+		EndPosition:   Position{Offset: 42, Line: 2, Column: 41},
 	}
 
 	expected := Program{
@@ -537,7 +547,12 @@ func TestParseIfStatement(t *testing.T) {
 	actual := parse(`
 	    fun test() {
             if true {
-              return
+                return
+            } else if false {
+                false
+                1
+            } else {
+                2
             }
         }
 	`)
@@ -557,30 +572,66 @@ func TestParseIfStatement(t *testing.T) {
 						Statements: []Statement{
 							ReturnStatement{
 								Expression:    nil,
-								StartPosition: Position{Offset: 55, Line: 4, Column: 14},
-								EndPosition:   Position{Offset: 55, Line: 4, Column: 14},
+								StartPosition: Position{Offset: 57, Line: 4, Column: 16},
+								EndPosition:   Position{Offset: 57, Line: 4, Column: 16},
 							},
 						},
-						// NOTE: block is statements *inside* curly braces
-						StartPosition: Position{Offset: 55, Line: 4, Column: 14},
-						EndPosition:   Position{Offset: 55, Line: 4, Column: 14},
+						StartPosition: Position{Offset: 57, Line: 4, Column: 16},
+						EndPosition:   Position{Offset: 57, Line: 4, Column: 16},
 					},
 					Else: Block{
-						Statements: nil,
-						// NOTE: block is statements *inside* curly braces
-						StartPosition: Position{Offset: 0, Line: 0, Column: 0},
-						EndPosition:   Position{Offset: 0, Line: 0, Column: 0},
+						Statements: []Statement{
+							IfStatement{
+								Test: BoolExpression{
+									Value:    false,
+									Position: Position{Offset: 86, Line: 5, Column: 22},
+								},
+								Then: Block{
+									Statements: []Statement{
+										ExpressionStatement{
+											Expression: BoolExpression{
+												Value:    false,
+												Position: Position{Offset: 110, Line: 6, Column: 16},
+											},
+										},
+										ExpressionStatement{
+											Expression: IntExpression{
+												Value:    big.NewInt(1),
+												Position: Position{Offset: 132, Line: 7, Column: 16},
+											},
+										},
+									},
+									StartPosition: Position{Offset: 110, Line: 6, Column: 16},
+									EndPosition:   Position{Offset: 132, Line: 7, Column: 16},
+								},
+								Else: Block{
+									Statements: []Statement{
+										ExpressionStatement{
+											Expression: IntExpression{
+												Value:    big.NewInt(2),
+												Position: Position{Offset: 171, Line: 9, Column: 16},
+											},
+										},
+									},
+									StartPosition: Position{Offset: 171, Line: 9, Column: 16},
+									EndPosition:   Position{Offset: 171, Line: 9, Column: 16},
+								},
+								StartPosition: Position{Offset: 83, Line: 5, Column: 19},
+								EndPosition:   Position{Offset: 185, Line: 10, Column: 12},
+							},
+						},
+						StartPosition: Position{Offset: 83, Line: 5, Column: 19},
+						EndPosition:   Position{Offset: 185, Line: 10, Column: 12},
 					},
 					StartPosition: Position{Offset: 31, Line: 3, Column: 12},
-					EndPosition:   Position{Offset: 74, Line: 5, Column: 12},
+					EndPosition:   Position{Offset: 185, Line: 10, Column: 12},
 				},
 			},
-			// NOTE: block is statements *inside* curly braces
 			StartPosition: Position{Offset: 31, Line: 3, Column: 12},
-			EndPosition:   Position{Offset: 74, Line: 5, Column: 12},
+			EndPosition:   Position{Offset: 185, Line: 10, Column: 12},
 		},
 		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
-		EndPosition:   Position{Offset: 84, Line: 6, Column: 8},
+		EndPosition:   Position{Offset: 195, Line: 11, Column: 8},
 	}
 
 	expected := Program{
@@ -689,162 +740,225 @@ func TestParseAssignment(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
-func TestParseComplexFunction(t *testing.T) {
-	// TODO: skipped, until replaced by smaller tests
-	return
-
+func TestParseAccessAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual := parse(`
-		pub fun sum(a: Int32, b: Int32[2], c: Int32[][3]): Int64 {
-            const x = 1
-            var y: Int32 = 2
-            y = (3)
-            x.foo.bar[0][1].baz
-            z = sum(0o3, 0x2, 0b1) % 42
-            return a
-            while x < 2 {
-                x = x + 1
-            }
-            if true {
-                return 1
-            } else if false {
-                return 2 > 3 ? 4 : 5
-            } else {
-                return [2, true]
-            }
+	    fun test() {
+            x.foo.bar[0][1].baz = 1
         }
 	`)
 
-	sum := FunctionDeclaration{
-		IsPublic:   true,
-		Identifier: "sum",
-		Parameters: []Parameter{
-			{Identifier: "a", Type: Int32Type{}},
-			{Identifier: "b", Type: ConstantSizedType{Type: Int32Type{}, Size: 2}},
-			{Identifier: "c", Type: VariableSizedType{Type: ConstantSizedType{Type: Int32Type{}, Size: 3}}},
-		},
-		ReturnType: Int64Type{},
+	test := FunctionDeclaration{
+		IsPublic:   false,
+		Identifier: "test",
+		ReturnType: VoidType{},
 		Block: Block{
 			Statements: []Statement{
-				VariableDeclaration{
-					IsConst:    true,
-					Identifier: "x",
-					Type:       nil,
-					Value:      IntExpression{Value: big.NewInt(1)},
-				},
-				VariableDeclaration{
-					IsConst:    false,
-					Identifier: "y",
-					Type:       Int32Type{},
-					Value:      IntExpression{Value: big.NewInt(2)},
-				},
 				AssignmentStatement{
-					Target: IdentifierExpression{Identifier: "y"},
-					Value:  IntExpression{Value: big.NewInt(3)},
+					Target: MemberExpression{
+						Expression: IndexExpression{
+							Expression: IndexExpression{
+								Expression: MemberExpression{
+									Expression: MemberExpression{
+										Expression: IdentifierExpression{
+											Identifier: "x",
+											Position:   Position{Offset: 31, Line: 3, Column: 12},
+										},
+										Identifier:    "foo",
+										StartPosition: Position{Offset: 32, Line: 3, Column: 13},
+										EndPosition:   Position{Offset: 33, Line: 3, Column: 14},
+									},
+									Identifier:    "bar",
+									StartPosition: Position{Offset: 36, Line: 3, Column: 17},
+									EndPosition:   Position{Offset: 37, Line: 3, Column: 18},
+								},
+								Index: IntExpression{
+									Value:    big.NewInt(0),
+									Position: Position{Offset: 41, Line: 3, Column: 22},
+								},
+								StartPosition: Position{Offset: 40, Line: 3, Column: 21},
+								EndPosition:   Position{Offset: 42, Line: 3, Column: 23},
+							},
+							Index: IntExpression{
+								Value:    big.NewInt(1),
+								Position: Position{Offset: 44, Line: 3, Column: 25},
+							},
+							StartPosition: Position{Offset: 43, Line: 3, Column: 24},
+							EndPosition:   Position{Offset: 45, Line: 3, Column: 26},
+						},
+						Identifier:    "baz",
+						StartPosition: Position{Offset: 46, Line: 3, Column: 27},
+						EndPosition:   Position{Offset: 47, Line: 3, Column: 28},
+					},
+					Value: IntExpression{
+						Value:    big.NewInt(1),
+						Position: Position{Offset: 53, Line: 3, Column: 34},
+					},
+					StartPosition: Position{Offset: 31, Line: 3, Column: 12},
+					EndPosition:   Position{Offset: 53, Line: 3, Column: 34},
 				},
+			},
+			// NOTE: block is statements *inside* curly braces
+			StartPosition: Position{Offset: 31, Line: 3, Column: 12},
+			EndPosition:   Position{Offset: 53, Line: 3, Column: 34},
+		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 63, Line: 4, Column: 8},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{test},
+		Declarations:    map[string]Declaration{"test": test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseExpressionStatementWithAccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    fun test() { x.foo.bar[0][1].baz }
+	`)
+
+	test := FunctionDeclaration{
+		IsPublic:   false,
+		Identifier: "test",
+		ReturnType: VoidType{},
+		Block: Block{
+			Statements: []Statement{
 				ExpressionStatement{
 					Expression: MemberExpression{
 						Expression: IndexExpression{
 							Expression: IndexExpression{
 								Expression: MemberExpression{
 									Expression: MemberExpression{
-										Expression: IdentifierExpression{Identifier: "x"},
-										Identifier: "foo",
-									},
-									Identifier: "bar",
-								},
-								Index: IntExpression{Value: big.NewInt(0)},
-							},
-							Index: IntExpression{Value: big.NewInt(1)},
-						},
-						Identifier: "baz",
-					},
-				},
-				AssignmentStatement{
-					Target: IdentifierExpression{Identifier: "z"},
-					Value: BinaryExpression{
-						Operation: OperationMod,
-						Left: InvocationExpression{
-							Expression: IdentifierExpression{Identifier: "sum"},
-							Arguments: []Expression{
-								IntExpression{Value: big.NewInt(3)},
-								IntExpression{Value: big.NewInt(2)},
-								IntExpression{Value: big.NewInt(1)},
-							},
-						},
-						Right: IntExpression{Value: big.NewInt(42)},
-					},
-				},
-				ReturnStatement{Expression: IdentifierExpression{Identifier: "a"}},
-				WhileStatement{
-					Test: BinaryExpression{
-						Operation: OperationLess,
-						Left:      IdentifierExpression{Identifier: "x"},
-						Right:     IntExpression{Value: big.NewInt(2)},
-					},
-					Block: Block{
-						Statements: []Statement{
-							AssignmentStatement{
-								Target: IdentifierExpression{Identifier: "x"},
-								Value: BinaryExpression{
-									Operation: OperationPlus,
-									Left:      IdentifierExpression{Identifier: "x"},
-									Right:     IntExpression{Value: big.NewInt(1)},
-								},
-							},
-						},
-					},
-				},
-				IfStatement{
-					Test: BoolExpression{Value: true},
-					Then: Block{
-						Statements: []Statement{
-							ReturnStatement{Expression: IntExpression{Value: big.NewInt(1)}},
-						},
-					},
-					Else: Block{
-						Statements: []Statement{
-							IfStatement{
-								Test: BoolExpression{Value: false},
-								Then: Block{
-									Statements: []Statement{
-										ReturnStatement{
-											Expression: ConditionalExpression{
-												Test: BinaryExpression{
-													Operation: OperationGreater,
-													Left:      IntExpression{Value: big.NewInt(2)},
-													Right:     IntExpression{Value: big.NewInt(3)},
-												},
-												Then: IntExpression{Value: big.NewInt(4)},
-												Else: IntExpression{Value: big.NewInt(5)},
-											},
+										Expression: IdentifierExpression{
+											Identifier: "x",
+											Position:   Position{Offset: 19, Line: 2, Column: 18},
 										},
+										Identifier:    "foo",
+										StartPosition: Position{Offset: 20, Line: 2, Column: 19},
+										EndPosition:   Position{Offset: 21, Line: 2, Column: 20},
 									},
+									Identifier:    "bar",
+									StartPosition: Position{Offset: 24, Line: 2, Column: 23},
+									EndPosition:   Position{Offset: 25, Line: 2, Column: 24},
 								},
-								Else: Block{
-									Statements: []Statement{
-										ReturnStatement{
-											Expression: ArrayExpression{
-												Values: []Expression{
-													IntExpression{Value: big.NewInt(2)},
-													BoolExpression{Value: false},
-												},
-											},
-										},
-									},
+								Index: IntExpression{
+									Value:    big.NewInt(0),
+									Position: Position{Offset: 29, Line: 2, Column: 28},
 								},
+								StartPosition: Position{Offset: 28, Line: 2, Column: 27},
+								EndPosition:   Position{Offset: 30, Line: 2, Column: 29},
 							},
+							Index: IntExpression{
+								Value:    big.NewInt(1),
+								Position: Position{Offset: 32, Line: 2, Column: 31},
+							},
+							StartPosition: Position{Offset: 31, Line: 2, Column: 30},
+							EndPosition:   Position{Offset: 33, Line: 2, Column: 32},
 						},
+						Identifier:    "baz",
+						StartPosition: Position{Offset: 34, Line: 2, Column: 33},
+						EndPosition:   Position{Offset: 35, Line: 2, Column: 34},
 					},
 				},
 			},
+			// NOTE: block is statements *inside* curly braces
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 35, Line: 2, Column: 34},
 		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 39, Line: 2, Column: 38},
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{sum},
-		Declarations:    map[string]Declaration{"sum": sum},
+		AllDeclarations: []Declaration{test},
+		Declarations:    map[string]Declaration{"test": test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseParametersAndArrayTypes(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+		pub fun test(a: Int32, b: Int32[2], c: Int32[][3]) {}
+	`)
+
+	test := FunctionDeclaration{
+		IsPublic:   true,
+		Identifier: "test",
+		Parameters: []Parameter{
+			{Identifier: "a", Type: Int32Type{}},
+			{Identifier: "b", Type: ConstantSizedType{Type: Int32Type{}, Size: 2}},
+			{Identifier: "c", Type: VariableSizedType{Type: ConstantSizedType{Type: Int32Type{}, Size: 3}}},
+		},
+		ReturnType: VoidType{},
+		Block: Block{
+			StartPosition: Position{Offset: 55, Line: 2, Column: 54},
+			EndPosition:   Position{Offset: 54, Line: 2, Column: 53},
+		},
+		StartPosition: Position{Offset: 3, Line: 2, Column: 2},
+		EndPosition:   Position{Offset: 55, Line: 2, Column: 54},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{test},
+		Declarations:    map[string]Declaration{"test": test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseIntegerLiterals(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+		const octal = 0o32
+        const hex = 0xf2
+        const binary = 0b101010
+	`)
+
+	octal := VariableDeclaration{
+		Identifier: "octal",
+		IsConst:    true,
+		Value: IntExpression{
+			Value:    big.NewInt(26),
+			Position: Position{Offset: 17, Line: 2, Column: 16},
+		},
+		StartPosition: Position{Offset: 3, Line: 2, Column: 2},
+		EndPosition:   Position{Offset: 17, Line: 2, Column: 16},
+	}
+
+	hex := VariableDeclaration{
+		Identifier: "hex",
+		IsConst:    true,
+		Value: IntExpression{
+			Value:    big.NewInt(242),
+			Position: Position{Offset: 42, Line: 3, Column: 20},
+		},
+		StartPosition: Position{Offset: 30, Line: 3, Column: 8},
+		EndPosition:   Position{Offset: 42, Line: 3, Column: 20},
+	}
+
+	binary := VariableDeclaration{
+		Identifier: "binary",
+		IsConst:    true,
+		Value: IntExpression{
+			Value:    big.NewInt(42),
+			Position: Position{Offset: 70, Line: 4, Column: 23},
+		},
+		StartPosition: Position{Offset: 55, Line: 4, Column: 8},
+		EndPosition:   Position{Offset: 70, Line: 4, Column: 23},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{octal, hex, binary},
+		Declarations:    map[string]Declaration{"octal": octal, "hex": hex, "binary": binary},
 	}
 
 	Expect(actual).Should(Equal(expected))
