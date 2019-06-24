@@ -38,6 +38,23 @@ func (c *Client) Close() {
 	c.conn.Close()
 }
 
+// SendTransaction submits a transaction to an access node.
+func (c *Client) SendTransaction(ctx context.Context, tx *data.Transaction) error {
+	txMsg := &accessv1.SendTransactionRequest_Transaction{
+		ToAddress:      tx.ToAddress.Bytes(),
+		Script:         tx.Script,
+		Nonce:          tx.Nonce,
+		ComputeLimit:   tx.ComputeLimit,
+		PayerSignature: tx.PayerSignature,
+	}
+
+	_, err := c.grpcClient.SendTransaction(
+		ctx,
+		&accessv1.SendTransactionRequest{Transaction: txMsg},
+	)
+	return err
+}
+
 // GetBlockByHash fetches a block by hash.
 func (c *Client) GetBlockByHash(ctx context.Context, h crypto.Hash) (*data.Block, error) {
 	res, err := c.grpcClient.GetBlockByHash(
