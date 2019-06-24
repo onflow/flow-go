@@ -92,6 +92,16 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 	return nil
 }
 
+func (interpreter *Interpreter) ImportFunction(name string, functionType FunctionType, function HostFunctionValue) {
+	variableDeclaration := ast.VariableDeclaration{
+		Identifier: name,
+		IsConst:    true,
+		// TODO: Type
+	}
+
+	interpreter.declareVariable(variableDeclaration, function)
+}
+
 func (interpreter *Interpreter) VisitBlock(block ast.Block) ast.Repr {
 	// block scope: each block gets an activation record
 	interpreter.activations.PushCurrent()
@@ -339,15 +349,15 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression a
 
 	// evaluate the invoked expression
 	value := invocationExpression.Expression.Accept(interpreter)
-	function, ok := value.(*InterpretedFunctionValue)
+	function, ok := value.(FunctionValue)
 	if !ok {
 		panic(fmt.Sprintf("can't invoke value: %#+v", value))
 	}
 
 	// NOTE: evaluate all argument expressions in call-site scope, not in function body
-	arguments := interpreter.evaluateFunctionInvocationArguments(invocationExpression, function)
+	arguments := interpreter.evaluateExpressions(invocationExpression.Arguments)
 
-	return interpreter.invokeFunction(function, arguments)
+	return function.invoke(interpreter, arguments)
 }
 
 func (interpreter *Interpreter) invokeFunction(function *InterpretedFunctionValue, arguments []Value) Value {
@@ -392,17 +402,13 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 	}
 }
 
-// evaluateFunctionInvocationArguments evaluates all function invocation argument expressions
-func (interpreter *Interpreter) evaluateFunctionInvocationArguments(
-	invocationExpression ast.InvocationExpression,
-	function *InterpretedFunctionValue,
-) []Value {
-	var arguments []Value
-	for _, argumentExpression := range invocationExpression.Arguments {
-		argument := argumentExpression.Accept(interpreter).(Value)
-		arguments = append(arguments, argument)
+func (interpreter *Interpreter) evaluateExpressions(expressions []ast.Expression) []Value {
+	var values []Value
+	for _, expression := range expressions {
+		argument := expression.Accept(interpreter).(Value)
+		values = append(values, argument)
 	}
-	return arguments
+	return values
 }
 
 // checkInvocationArgumentCount ensures the invocation's argument count

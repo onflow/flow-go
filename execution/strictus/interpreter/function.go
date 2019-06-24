@@ -5,11 +5,15 @@ import (
 	"github.com/raviqqe/hamt"
 )
 
+// FunctionValue
+
 type FunctionValue interface {
 	Value
 	isFunctionValue()
 	invoke(interpreter *Interpreter, arguments []Value) Value
 }
+
+// InterpretedFunctionValue
 
 type InterpretedFunctionValue struct {
 	Expression ast.FunctionExpression
@@ -27,4 +31,15 @@ func newInterpretedFunction(expression ast.FunctionExpression, activation hamt.M
 }
 func (f *InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Value {
 	return interpreter.invokeFunction(f, arguments)
+}
+
+// HostFunctionValue
+
+type HostFunctionValue func(*Interpreter, []Value) Value
+
+func (HostFunctionValue) isValue()           {}
+func (f HostFunctionValue) isFunctionValue() {}
+
+func (f HostFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Value {
+	return f(interpreter, arguments)
 }

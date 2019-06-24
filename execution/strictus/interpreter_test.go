@@ -1075,7 +1075,6 @@ func TestInterpretExpressionStatement(t *testing.T) {
             incX()
             return x
         }
-
 	`)
 
 	inter := interpreter.NewInterpreter(program)
@@ -1206,4 +1205,32 @@ func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	Expect(func() { inter.Interpret() }).Should(Panic())
+}
+
+func TestInterpretHostFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+       const a = test(1, 2)
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.ImportFunction(
+		"test",
+		interpreter.FunctionType{
+			ParameterTypes: []interpreter.Type{
+				interpreter.IntType{},
+				interpreter.IntType{},
+			},
+			ReturnType: interpreter.IntType{},
+		},
+		func(inter *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
+			a := arguments[0].(interpreter.IntValue).Int
+			b := arguments[1].(interpreter.IntValue).Int
+			result := big.NewInt(0).Add(a, b)
+			return interpreter.IntValue{Int: result}
+		},
+	)
+	inter.Interpret()
+	Expect(inter.Globals["a"].Value).To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
