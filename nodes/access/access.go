@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"math/big"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -126,8 +125,8 @@ func (n *Node) GetTransaction(hash crypto.Hash) (*data.Transaction, error) {
 	return tx, nil
 }
 
-func (n *Node) GetBalance(address crypto.Address) (*big.Int, error) {
-	// TODO: implement GetBalance
+func (n *Node) GetAccount(address crypto.Address) (*crypto.Account, error) {
+	// TODO: implement GetAccount
 	return nil, nil
 }
 

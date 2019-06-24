@@ -167,22 +167,27 @@ func (s *Server) GetTransaction(ctx context.Context, req *accessv1.GetTransactio
 	}, nil
 }
 
-// GetBalance returns the balance of an address.
-func (s *Server) GetBalance(ctx context.Context, req *accessv1.GetBalanceRequest) (*accessv1.GetBalanceResponse, error) {
+// GetAccount returns the balance of an address.
+func (s *Server) GetAccount(ctx context.Context, req *accessv1.GetAccountRequest) (*accessv1.GetAccountResponse, error) {
 	address := crypto.BytesToAddress(req.GetAddress())
 
-	balance, err := s.accessNode.GetBalance(address)
+	account, err := s.accessNode.GetAccount(address)
 	if err != nil {
 		switch err.(type) {
 		case *access.AccountNotFoundError:
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, status.Error(codes.NotFound, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
 
-	return &accessv1.GetBalanceResponse{
-		Value: balance.Bytes(),
+	return &accessv1.GetAccountResponse{
+		Account: &accessv1.GetAccountResponse_Account{
+			Address:    account.Address.Bytes(),
+			Balance:    account.Balance,
+			Code:       account.Code,
+			PublicKeys: account.PublicKeys,
+		},
 	}, nil
 }
 
