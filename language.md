@@ -618,6 +618,11 @@ fun factorial(n: Int): Int {
 
     return result
 }
+
+factorial(5) // is 120
+
+// error: argument does not satisfy precondition n >= 0
+factorial(-2)
 ```
 
 ## Control flow
