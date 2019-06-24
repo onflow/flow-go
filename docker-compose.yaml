@@ -3,7 +3,7 @@ services:
   execute_db:
     image: postgres:9.6-alpine
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
@@ -30,7 +30,7 @@ services:
   security_db:
     image: postgres:9.6-alpine
     ports:
-      - "5433:5432"
+      - "5434:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
