@@ -149,14 +149,3 @@ func (c *Client) GetAccount(ctx context.Context, a crypto.Address) (*crypto.Acco
 		PublicKeys: account.GetPublicKeys(),
 	}, nil
 }
-
-// LogCommands displays all the usable commands to a client.
-func LogCommands() {
-	// TODO: log all help commands available to Client
-	fmt.Println("here are all the commands you can use!")
-}
-
-// CreateAccount creates an account for the client.
-func CreateAccount() {
-	// TODO: create a new account in the client's wallet
-}
