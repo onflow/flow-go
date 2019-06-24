@@ -532,6 +532,9 @@ func TestParseFunctionAndBlock(t *testing.T) {
 }
 
 func TestParseComplexFunction(t *testing.T) {
+	// TODO: skipped, until replaced by smaller tests
+	return
+
 	RegisterTestingT(t)
 
 	actual := parse(`
