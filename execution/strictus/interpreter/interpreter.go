@@ -375,10 +375,11 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 			parameter.Identifier,
 			&Variable{
 				Declaration: ast.VariableDeclaration{
-					IsConst:    true,
-					Identifier: parameter.Identifier,
-					Type:       parameter.Type,
-					// TODO: StartPosition, EndPosition = parameter.Position
+					IsConst:       true,
+					Identifier:    parameter.Identifier,
+					Type:          parameter.Type,
+					StartPosition: parameter.StartPosition,
+					EndPosition:   parameter.EndPosition,
 				},
 				Value: argument,
 			},
