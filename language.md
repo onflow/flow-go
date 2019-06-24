@@ -789,9 +789,27 @@ add(a, b)
 
 ## Type Inference
 
-<!-- TODO 
+If a variable or constant is not annotated explicitly with a type, it is inferred from the value.
 
-- for variables and constants: integer literal is inferred to a big int
+Integer literals are inferred to type `Int`.
+
+```typescript
+const a = 1
+// a has type Int
+```
+
+Array literals are inferred based on the elements of the literal, and to be variable-size.
+
+```typescript
+const a = [1, 2]
+// a has type Int[]
+```
+
+<!--
+
+TODO: dictionaries
+
+- the key and value type is inferred from dictionaries literals
 
 -->
 
