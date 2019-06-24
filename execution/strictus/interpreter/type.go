@@ -134,34 +134,28 @@ func ConvertType(t ast.Type) Type {
 	default:
 		panic(fmt.Sprintf("can't convert unsupported type: %#+v", t))
 	}
+}
 
+var baseTypes = map[string]Type{
+	"":       VoidType{},
+	"Void":   VoidType{},
+	"Bool":   BoolType{},
+	"Int":    IntType{},
+	"Int8":   Int8Type{},
+	"Int16":  Int16Type{},
+	"Int32":  Int32Type{},
+	"Int64":  Int64Type{},
+	"UInt8":  UInt8Type{},
+	"UInt16": UInt16Type{},
+	"UInt32": UInt32Type{},
+	"UInt64": UInt64Type{},
 }
 
 func ParseBaseType(name string) Type {
-	switch name {
-	case "Int":
-		return IntType{}
-	case "Int8":
-		return Int8Type{}
-	case "Int16":
-		return Int16Type{}
-	case "Int32":
-		return Int32Type{}
-	case "Int64":
-		return Int64Type{}
-	case "UInt8":
-		return UInt8Type{}
-	case "UInt16":
-		return UInt16Type{}
-	case "UInt32":
-		return UInt32Type{}
-	case "UInt64":
-		return UInt64Type{}
-	case "", "Void":
-		return VoidType{}
-	case "Bool":
-		return BoolType{}
-	default:
+	baseType, ok := baseTypes[name]
+	if !ok {
 		panic(fmt.Sprintf("unknown type: %s", name))
 	}
+
+	return baseType
 }
