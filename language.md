@@ -40,31 +40,50 @@ Comments may be nested.
 
 ## Constants and Variable Declarations
 
-Constants and variables are declarations that bind a value to a name. Constants can only be initialized with a value and cannot be reassigned afterwards. Variables can be initialized with a value and can be reassigned later. Declarations are valid in any scope, including the global scope. The `const` keyword is used to define a constant and the `var` keyword is used to define a variable. Once a constant or variable is declared, it can't be redeclared with the same name, with a different type, or changed into the corresponding other kind.
+Constants and variables are declarations that bind a value to a name. Constants can only be initialized with a value and cannot be reassigned afterwards. Variables can be initialized with a value and can be reassigned later. Declarations are valid in any scope, including the global scope. 
 
+The `const` keyword is used to define a constant and the `var` keyword is used to define a variable.
+The keywords is followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
 ```typescript
 // declaring a constant
-const a = 1 
+const a = 1
 
 // error: re-assigning to a constant
 a = 2
 
-// error: re-declaring with the same name
+// declaring a variable
+var b = 3
 
-const a = 3
+// assigning a new value to a variable
+b = 4
+```
+
+Variables and constants must be initialized.
+
+```typescript
+// invalid: constant has no initial value
+const a
+```
+
+Once a constant or variable is declared, it can't be redeclared with the same name, with a different type, or changed into the corresponding other kind.
+
+
+```typescript
+// declaring a constant
+const a = 1
+
+// invalid: re-declaring a constant with a name that is already used
+const a = 2
 
 // declaring a variable
+var b = 3
 
+// invalid: re-declaring a variable with a name that is already used
 var b = 4
 
-// re-assigning
-
-b = 5
-
-// error: re-declaring
-
-var b = 6
+// invalid: declaring a variable with a name that was used for a constant
+var a = 5
 ```
 
 ## Type Annotations
