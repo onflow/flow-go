@@ -10,6 +10,8 @@ option java_package = "com.bamboo.services.access.v1";
 option objc_class_prefix = "BSA";
 option php_namespace = "Bamboo\\Services\\Access\\V1";
 
+import "google/protobuf/timestamp.proto";
+
 // BambooAccessAPI is the user-facing API provided by Bamboo access nodes.
 service BambooAccessAPI {
   // SendTransaction submits a transaction to the network.
@@ -50,8 +52,10 @@ message Block {
   }
   bytes hash = 1;
   uint64 number = 2;
-  repeated bytes transaction_hashes = 3;
-  Status status = 4;
+  bytes prev_block_hash = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  repeated bytes transaction_hashes = 5;
+  Status status = 6;
 }
 
 message GetBlockByHashRequest {
