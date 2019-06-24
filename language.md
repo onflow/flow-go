@@ -775,7 +775,7 @@ nand(0, 0)
 Types are *not* automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`. 
 
 ```typescript
-fun add(a: Int8, b: Int8): Int16 {
+fun add(a: Int8, b: Int8): Int {
     return a + b
 }
 
