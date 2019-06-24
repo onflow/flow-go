@@ -34,7 +34,7 @@ func (s *Server) SendTransaction(ctx context.Context, req *accessv1.SendTransact
 	txMsg := req.GetTransaction()
 
 	tx := &data.Transaction{
-		ToAddress:      crypto.BytesToAddress(txMsg.GetTo()),
+		ToAddress:      crypto.BytesToAddress(txMsg.GetToAddress()),
 		Script:         txMsg.GetScript(),
 		Nonce:          txMsg.GetNonce(),
 		ComputeLimit:   txMsg.GetComputeLimit(),
@@ -156,7 +156,7 @@ func (s *Server) GetTransaction(ctx context.Context, req *accessv1.GetTransactio
 
 	return &accessv1.GetTransactionResponse{
 		Transaction: &accessv1.GetTransactionResponse_Transaction{
-			To:             tx.ToAddress.Bytes(),
+			ToAddress:      tx.ToAddress.Bytes(),
 			Script:         tx.Script,
 			Nonce:          tx.Nonce,
 			ComputeLimit:   tx.ComputeLimit,

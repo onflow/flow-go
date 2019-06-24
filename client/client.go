@@ -90,6 +90,29 @@ func (c *Client) GetBlockByNumber(ctx context.Context, n uint64) (*data.Block, e
 	}, nil
 }
 
+// GetTransaction fetches a transaction by hash.
+func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*data.Transaction, error) {
+	res, err := c.grpcClient.GetTransaction(
+		ctx,
+		&accessv1.GetTransactionRequest{Hash: h.Bytes()},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := res.GetTransaction()
+
+	return &data.Transaction{
+		ToAddress:      crypto.BytesToAddress(tx.GetToAddress()),
+		Script:         tx.GetScript(),
+		Nonce:          tx.GetNonce(),
+		ComputeLimit:   tx.GetComputeLimit(),
+		ComputeUsed:    tx.GetComputeUsed(),
+		PayerSignature: tx.GetPayerSignature(),
+		Status:         data.TxStatus(tx.GetStatus()),
+	}, nil
+}
+
 // LogCommands displays all the usable commands to a client.
 func LogCommands() {
 	// TODO: log all help commands available to Client
