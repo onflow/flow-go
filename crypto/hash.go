@@ -31,6 +31,17 @@ func HashesToBytes(hashes []Hash) [][]byte {
 	return b
 }
 
+// BytesToHashes converts a slice of bytes to a slice of hashes.
+func BytesToHashes(b [][]byte) []Hash {
+	hashes := make([]Hash, len(b))
+
+	for i, v := range b {
+		hashes[i] = BytesToHash(v)
+	}
+
+	return hashes
+}
+
 // SetBytes sets the hash to the value of b.
 // If b is larger than len(h), b will be cropped from the left.
 func (h *Hash) SetBytes(b []byte) {

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -70,10 +71,17 @@ func (s *Server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHas
 		}
 	}
 
+	timestamp, err := ptypes.TimestampProto(block.Timestamp)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
 	return &accessv1.GetBlockByHashResponse{
 		Block: &accessv1.Block{
 			Hash:              block.Hash().Bytes(),
+			PrevBlockHash:     block.PrevBlockHash.Bytes(),
 			Number:            block.Number,
+			Timestamp:         timestamp,
 			TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
 			Status:            accessv1.Block_Status(block.Status),
 		},
@@ -94,10 +102,17 @@ func (s *Server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByN
 		}
 	}
 
+	timestamp, err := ptypes.TimestampProto(block.Timestamp)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
 	return &accessv1.GetBlockByNumberResponse{
 		Block: &accessv1.Block{
 			Hash:              block.Hash().Bytes(),
+			PrevBlockHash:     block.PrevBlockHash.Bytes(),
 			Number:            block.Number,
+			Timestamp:         timestamp,
 			TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
 			Status:            accessv1.Block_Status(block.Status),
 		},
@@ -108,10 +123,17 @@ func (s *Server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByN
 func (s *Server) GetLatestBlock(ctx context.Context, req *accessv1.GetLatestBlockRequest) (*accessv1.GetLatestBlockResponse, error) {
 	block := s.accessNode.GetLatestBlock()
 
+	timestamp, err := ptypes.TimestampProto(block.Timestamp)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
 	return &accessv1.GetLatestBlockResponse{
 		Block: &accessv1.Block{
 			Hash:              block.Hash().Bytes(),
+			PrevBlockHash:     block.PrevBlockHash.Bytes(),
 			Number:            block.Number,
+			Timestamp:         timestamp,
 			TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
 			Status:            accessv1.Block_Status(block.Status),
 		},
