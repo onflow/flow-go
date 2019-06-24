@@ -222,11 +222,24 @@ const arrays = [[1, 2], [3, 4]]
 arrays[1][0] // is 3
 ```
 
+#### Array Types
+
+Arrays either have a fixed size or are variably sized, i.e., elements can be added an removed.
+
+Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array. For example, a fixed-size array of 3 `Int8` elements has the type `Int8[3]`.
+
+Variable-size arrays have the type suffix `[]`. For example, a variable-size array of `Int16` elements has the type `Int16[]`.
+
+
 <!--
 
 TODO
 
 #### Array Functions
+
+- Length, concatenate, filter, etc. for all array types
+- Append, remove, etc. for variable-size arrays
+- Document and link to array concatenation operator `+` in operators section
 
 -->
 
