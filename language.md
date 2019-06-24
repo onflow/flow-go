@@ -59,7 +59,7 @@ var b = 3
 b = 4
 ```
 
-Variables and constants must be initialized.
+Variables and constants **must** be initialized.
 
 ```typescript
 // invalid: constant has no initial value
@@ -890,7 +890,6 @@ fun f(): Int {
 f() // returns 2
 ```
 
-
 ## Type Safety 
 
 > Status: Type checking is not implemented yet.
@@ -983,5 +982,122 @@ const add = (a: Int8, b: Int8): Int {
 }
 // add has type (Int8, Int8) => Int
 ```
+
+## Structures and Classes
+
+> Status: Structures and classes are not implemented yet.
+
+Structures and classes are composite types. Structures and classes consist of one or more values, which are stored in named fields. Each field may have a different type.
+
+Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword. The keyword is followed by the name. 
+
+```typescript
+struct SomeStruct {
+    // ...
+}
+
+class SomeClass {
+    // ...
+}
+```
+
+Fields are defined like variables and constants, however, they have no initial value.The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initialier is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
+
+```typescript
+// define a token struct, which has a constant field
+// named id and a variable field named balance.
+// both fields are initialized through the initializer.
+struct Token {
+    const id: Int
+    var balance: Int
+
+    init(id: Int, balance: Int) {
+        this.id = id
+        this.balance = balance
+    }
+}
+```
+
+In initializers, the special constant `this` refers to the structure or class that is to be initialized.
+
+Structures and classes are created (instantiated) by calling them like functions.
+
+```typescript
+const token = Token(42, 1_000_00)
+```
+
+Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the structure or class instance is followed by a dot (`.`) and the name of the field.
+
+```typescript
+token.id // is 42
+token.balance // is 1_000_000
+
+token.balance = 1
+// token.balance is 1
+
+// invalid: assignment to constant field
+token.id = 23
+```
+
+Structures and classes may contain functions. Just like in the initializer, the special constant `this` refers to the structure or class that the function is called on.
+
+```typescript
+struct Token {
+    const id: Int
+    var balance: Int
+
+    init(id: Int, balance: Int) {
+        this.id = id
+        this.balance = balance
+    }
+
+    fun mint(value: Int) {
+        this.balance = this.balance + value
+    }
+}
+
+const token = Token(32, 0)
+token.mint(1_000_000)
+// token.balance is 1_000_000
+```
+
+The only difference between structures and classes is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types.
+
+```typescript
+// define a struct with an integer field
+struct SomeStruct {
+    const value: Int
+
+    init(value: Int) {
+        this.value = value
+    }
+
+}
+
+const structA = SomeStruct(0)
+// structure is copied
+const structB = structA
+structB.value = 1
+// structA.value is 0
+```
+
+```typescript
+// define a class with an integer field
+class SomeClass {
+    const value: Int
+
+    init(value: Int) {
+        this.value = value
+    }
+}
+
+const classA = SomeClass(0)
+// class is referenced
+const classB = classA
+classB.value = 1
+// classA.value is 1
+```
+
+Note the different values in the last line of each example.
 
 
