@@ -8,6 +8,12 @@ The language's goals are, in order of importance:
 - *Auditability*: Focus on readability: make it easy to verify what the code is doing.
 - *Simplicity*: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
 
+
+## Syntax
+
+The programming language's syntax and behavior is inspired by Kotlin, Swift, Rust, TypeScript, and Solidity.
+
+
 ## Comments
 
 Comments can be used to document code. A comment is text that is not executed.
