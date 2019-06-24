@@ -915,8 +915,27 @@ const a = 1
 Array literals are inferred based on the elements of the literal, and to be variable-size.
 
 ```typescript
-const a = [1, 2]
-// a has type Int[]
+const integers = [1, 2]
+// integers has type Int[]
+
+// invalid: mixed types
+const invalidMixed = [1, true, 2, false]
+```
+
+Dictionary literals are inferred based on the keys and values of the literal.
+
+```typescript
+const booleans = {
+    1: true,
+    2: false
+}
+// booleans has type Bool[Int]
+
+// invalid: mixed types
+const invalidMixed = {
+    1: true,
+    false: 2
+}
 ```
 
 Functions are inferred based on the parameter types and the return type.
@@ -928,11 +947,4 @@ const add = (a: Int8, b: Int8): Int {
 // add has type (Int8, Int8) => Int
 ```
 
-<!--
-
-TODO: dictionaries
-
-- the key and value type is inferred from dictionaries literals
-
--->
 
