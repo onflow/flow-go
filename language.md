@@ -122,6 +122,11 @@ account2
 1something
 ```
 
+### Conventions
+
+By convention, variables, constants, and functions have lowercase names; and types have title-case names.
+
+
 ## Semicolons
 
 Semicolons may be used to separate statements, but are optional. They can be used to separate multiple statements on a single line.
@@ -816,8 +821,3 @@ TODO: dictionaries
 -->
 
 
-## Conventions
-
-- Naming: 
-  - Values and functions have lowercase names
-  - Types have title-case names
