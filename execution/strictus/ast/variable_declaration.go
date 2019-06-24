@@ -9,6 +9,14 @@ type VariableDeclaration struct {
 	EndPosition   Position
 }
 
+func (v VariableDeclaration) GetStartPosition() Position {
+	return v.StartPosition
+}
+
+func (v VariableDeclaration) GetEndPosition() Position {
+	return v.EndPosition
+}
+
 func (VariableDeclaration) isDeclaration() {}
 func (VariableDeclaration) isStatement()   {}
 

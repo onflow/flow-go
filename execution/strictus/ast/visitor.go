@@ -4,6 +4,8 @@ type Repr interface{}
 
 type Element interface {
 	Accept(Visitor) Repr
+	GetStartPosition() Position
+	GetEndPosition() Position
 }
 
 type Visitor interface {

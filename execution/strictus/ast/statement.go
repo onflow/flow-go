@@ -13,6 +13,14 @@ type ReturnStatement struct {
 	EndPosition   Position
 }
 
+func (s ReturnStatement) GetStartPosition() Position {
+	return s.StartPosition
+}
+
+func (s ReturnStatement) GetEndPosition() Position {
+	return s.EndPosition
+}
+
 func (ReturnStatement) isStatement() {}
 
 func (s ReturnStatement) Accept(visitor Visitor) Repr {
@@ -27,6 +35,14 @@ type IfStatement struct {
 	Else          Block
 	StartPosition Position
 	EndPosition   Position
+}
+
+func (s IfStatement) GetStartPosition() Position {
+	return s.StartPosition
+}
+
+func (s IfStatement) GetEndPosition() Position {
+	return s.EndPosition
 }
 
 func (IfStatement) isStatement() {}
@@ -44,6 +60,14 @@ type WhileStatement struct {
 	EndPosition   Position
 }
 
+func (s WhileStatement) GetStartPosition() Position {
+	return s.StartPosition
+}
+
+func (s WhileStatement) GetEndPosition() Position {
+	return s.EndPosition
+}
+
 func (WhileStatement) isStatement() {}
 
 func (s WhileStatement) Accept(visitor Visitor) Repr {
@@ -59,6 +83,14 @@ type AssignmentStatement struct {
 	EndPosition   Position
 }
 
+func (s AssignmentStatement) GetStartPosition() Position {
+	return s.StartPosition
+}
+
+func (s AssignmentStatement) GetEndPosition() Position {
+	return s.EndPosition
+}
+
 func (AssignmentStatement) isStatement() {}
 
 func (s AssignmentStatement) Accept(visitor Visitor) Repr {
@@ -69,6 +101,14 @@ func (s AssignmentStatement) Accept(visitor Visitor) Repr {
 
 type ExpressionStatement struct {
 	Expression Expression
+}
+
+func (s ExpressionStatement) GetStartPosition() Position {
+	return s.Expression.GetStartPosition()
+}
+
+func (s ExpressionStatement) GetEndPosition() Position {
+	return s.Expression.GetEndPosition()
 }
 
 func (ExpressionStatement) isStatement() {}

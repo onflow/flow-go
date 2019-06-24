@@ -10,6 +10,14 @@ type FunctionDeclaration struct {
 	EndPosition   Position
 }
 
+func (f FunctionDeclaration) GetStartPosition() Position {
+	return f.StartPosition
+}
+
+func (f FunctionDeclaration) GetEndPosition() Position {
+	return f.EndPosition
+}
+
 func (f FunctionDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitFunctionDeclaration(f)
 }
