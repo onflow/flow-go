@@ -73,13 +73,13 @@ Once a constant or variable is declared, it can't be redeclared with the same na
 // declaring a constant
 const a = 1
 
-// invalid: re-declaring a constant with a name that is already used
+// invalid: re-declaring a constant with a name that is already used in this scope
 const a = 2
 
 // declaring a variable
 var b = 3
 
-// invalid: re-declaring a variable with a name that is already used
+// invalid: re-declaring a variable with a name that is already used in this scope
 var b = 4
 
 // invalid: declaring a variable with a name that was used for a constant
