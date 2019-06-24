@@ -24,12 +24,42 @@ type WorldState struct {
 	blockchainMutex   sync.RWMutex
 }
 
-// NewWorldState instantiates a new state object with a genesis block.
-func NewWorldState(log *logrus.Logger) *WorldState {
+// NewWorldState instantiates a new state object with a genesis block and root account.
+func NewWorldState(log *logrus.Logger) (*WorldState, error) {
+	accounts := make(map[crypto.Address]crypto.Account)
 	blocks := make(map[crypto.Hash]Block)
 	collections := make(map[crypto.Hash]Collection)
 	txs := make(map[crypto.Hash]Transaction)
 	registers := make(map[string][]byte)
+
+	wallet, err := crypto.CreateWallet("BAMBOO")
+	if err != nil {
+		return nil, err
+	}
+
+	log.WithFields(logrus.Fields{
+		"mnemonic": wallet.Mnemonic,
+	}).Infof(
+		"Generating wallet from mneumonic: %s",
+		wallet.Mnemonic,
+	)
+
+	root, err := wallet.CreateRootAccount()
+	if err != nil {
+		return nil, err
+	}
+
+	accounts[root.Address] = *root
+
+	log.WithFields(logrus.Fields{
+		"address": root.Address,
+		"balance": root.Balance,
+		"path":    root.Path,
+	}).Infof(
+		"Creating root account %v from derivation path %s",
+		root.Address,
+		root.Path,
+	)
 
 	genesis := MintGenesisBlock()
 
@@ -41,19 +71,19 @@ func NewWorldState(log *logrus.Logger) *WorldState {
 		"blockHash":       genesis.Hash(),
 		"numCollections":  0,
 		"numTransactions": 0,
-	}).
-		Infof(
-			"Minting genesis block (0x%v)",
-			genesis.Hash(),
-		)
+	}).Infof(
+		"Minting genesis block (0x%v)",
+		genesis.Hash(),
+	)
 
 	return &WorldState{
+		accounts:     accounts,
 		blocks:       blocks,
 		collections:  collections,
 		transactions: txs,
 		registers:    registers,
 		blockchain:   chain,
-	}
+	}, nil
 }
 
 // GetLatestBlock gets the most recent block in the blockchain.
