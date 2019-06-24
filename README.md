@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/dapperlabs/bamboo-node.svg?token=MYJ5scBoBxhZRGvDecen&branch=master)](https://travis-ci.com/dapperlabs/bamboo-node)
+
 ## Test
 ```
 $ ./test.sh
