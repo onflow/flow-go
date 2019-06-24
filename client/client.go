@@ -113,6 +113,26 @@ func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*data.Trans
 	}, nil
 }
 
+// GetAccount fetches an account by address.
+func (c *Client) GetAccount(ctx context.Context, a crypto.Address) (*crypto.Account, error) {
+	res, err := c.grpcClient.GetAccount(
+		ctx,
+		&accessv1.GetAccountRequest{Address: a.Bytes()},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	account := res.GetAccount()
+
+	return &crypto.Account{
+		Address:    crypto.BytesToAddress(account.GetAddress()),
+		Balance:    account.GetBalance(),
+		Code:       account.GetCode(),
+		PublicKeys: account.GetPublicKeys(),
+	}, nil
+}
+
 // LogCommands displays all the usable commands to a client.
 func LogCommands() {
 	// TODO: log all help commands available to Client
