@@ -165,6 +165,8 @@ In addition, the arbitrary precision integer type `Int` is provided.
 
 There is no support for floating point numbers.
 
+Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here. Fixed point numbers should be simulated using integers and a scale factor for now.
+
 ### Numeric Literals
 
 Numbers can be written in various bases. Numbers are assumed to be decimal by default. Non-decimal literals have a specific prefix.
