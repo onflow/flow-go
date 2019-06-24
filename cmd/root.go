@@ -41,7 +41,7 @@ func startServer() {
 
 	state, err := data.NewWorldState(log)
 	if err != nil {
-		log.Fatal("Could not start emulator server")
+		log.WithError(err).Fatal("Failed to initialize world state")
 	}
 
 
