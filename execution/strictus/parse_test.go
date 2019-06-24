@@ -645,6 +645,50 @@ func TestParseWhileStatement(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
+func TestParseAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    fun test() {
+            a = 1
+        }
+	`)
+
+	test := FunctionDeclaration{
+		IsPublic:   false,
+		Identifier: "test",
+		ReturnType: VoidType{},
+		Block: Block{
+			Statements: []Statement{
+				AssignmentStatement{
+					Target: IdentifierExpression{
+						Identifier: "a",
+						Position:   Position{Offset: 31, Line: 3, Column: 12},
+					},
+					Value: IntExpression{
+						Value:    big.NewInt(1),
+						Position: Position{Offset: 35, Line: 3, Column: 16},
+					},
+					StartPosition: Position{Offset: 31, Line: 3, Column: 12},
+					EndPosition:   Position{Offset: 35, Line: 3, Column: 16},
+				},
+			},
+			// NOTE: block is statements *inside* curly braces
+			StartPosition: Position{Offset: 31, Line: 3, Column: 12},
+			EndPosition:   Position{Offset: 35, Line: 3, Column: 16},
+		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 45, Line: 4, Column: 8},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{test},
+		Declarations:    map[string]Declaration{"test": test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
 func TestParseComplexFunction(t *testing.T) {
 	// TODO: skipped, until replaced by smaller tests
 	return
@@ -695,7 +739,7 @@ func TestParseComplexFunction(t *testing.T) {
 					Type:       Int32Type{},
 					Value:      IntExpression{Value: big.NewInt(2)},
 				},
-				Assignment{
+				AssignmentStatement{
 					Target: IdentifierExpression{Identifier: "y"},
 					Value:  IntExpression{Value: big.NewInt(3)},
 				},
@@ -717,7 +761,7 @@ func TestParseComplexFunction(t *testing.T) {
 						Identifier: "baz",
 					},
 				},
-				Assignment{
+				AssignmentStatement{
 					Target: IdentifierExpression{Identifier: "z"},
 					Value: BinaryExpression{
 						Operation: OperationMod,
@@ -741,7 +785,7 @@ func TestParseComplexFunction(t *testing.T) {
 					},
 					Block: Block{
 						Statements: []Statement{
-							Assignment{
+							AssignmentStatement{
 								Target: IdentifierExpression{Identifier: "x"},
 								Value: BinaryExpression{
 									Operation: OperationPlus,

@@ -15,7 +15,7 @@ type Visitor interface {
 	VisitIfStatement(IfStatement) Repr
 	VisitWhileStatement(WhileStatement) Repr
 	VisitVariableDeclaration(VariableDeclaration) Repr
-	VisitAssignment(Assignment) Repr
+	VisitAssignment(AssignmentStatement) Repr
 	VisitExpressionStatement(ExpressionStatement) Repr
 	/// expressions
 	VisitBoolExpression(BoolExpression) Repr

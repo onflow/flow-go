@@ -50,16 +50,18 @@ func (s WhileStatement) Accept(visitor Visitor) Repr {
 	return visitor.VisitWhileStatement(s)
 }
 
-// Assignment
+// AssignmentStatement
 
-type Assignment struct {
-	Target Expression
-	Value  Expression
+type AssignmentStatement struct {
+	Target        Expression
+	Value         Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
-func (Assignment) isStatement() {}
+func (AssignmentStatement) isStatement() {}
 
-func (s Assignment) Accept(visitor Visitor) Repr {
+func (s AssignmentStatement) Accept(visitor Visitor) Repr {
 	return visitor.VisitAssignment(s)
 }
 

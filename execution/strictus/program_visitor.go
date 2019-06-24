@@ -335,7 +335,12 @@ func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
 	identifier := ctx.Identifier().GetText()
 	value := ctx.Expression().Accept(v).(ast.Expression)
 
-	var target ast.Expression = ast.IdentifierExpression{Identifier: identifier}
+	targetPosition := ast.PositionFromToken(ctx.Identifier().GetSymbol())
+
+	var target ast.Expression = ast.IdentifierExpression{
+		Identifier: identifier,
+		Position:   targetPosition,
+	}
 
 	for _, accessExpressionContext := range ctx.AllExpressionAccess() {
 		expression := accessExpressionContext.Accept(v)
@@ -346,9 +351,14 @@ func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
 		target = v.wrapPartialAccessExpression(target, accessExpression)
 	}
 
-	return ast.Assignment{
-		Target: target,
-		Value:  value,
+	// TODO: get end position from expression
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
+	return ast.AssignmentStatement{
+		Target:        target,
+		Value:         value,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
 	}
 }
 

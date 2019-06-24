@@ -154,7 +154,7 @@ func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclarat
 	return nil
 }
 
-func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.Repr {
+func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStatement) ast.Repr {
 	value := assignment.Value.Accept(interpreter).(Value)
 
 	switch target := assignment.Target.(type) {
