@@ -24,8 +24,8 @@ service BambooAccessAPI {
   rpc GetLatestBlock(GetLatestBlockRequest) returns (GetLatestBlockResponse);
   // GetTransactions gets a transaction by hash.
   rpc GetTransaction(GetTransactionRequest) returns (GetTransactionResponse);
-  // GetBalance returns the balance of an address.
-  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+  // GetAccount gets an account by address.
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
   // CallContract performs a contract call.
   rpc CallContract(CallContractRequest) returns (CallContractResponse);
 }
@@ -105,12 +105,18 @@ message GetTransactionResponse {
   Transaction transaction = 1;
 }
 
-message GetBalanceRequest {
+message GetAccountRequest {
   bytes address = 1;
 }
 
-message GetBalanceResponse {
-  bytes value = 1;
+message GetAccountResponse {
+  message Account {
+    bytes address = 1;
+    uint64 balance = 2;
+    bytes code = 3;
+    repeated bytes public_keys = 4;
+  }
+  Account account = 1;
 }
 
 message CallContractRequest {

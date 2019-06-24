@@ -149,6 +149,18 @@ func (s *WorldState) GetTransaction(h crypto.Hash) (*Transaction, error) {
 	return nil, &ItemNotFoundError{hash: h}
 }
 
+// GetAccount gets an account by address.
+func (s *WorldState) GetAccount(a crypto.Address) (*crypto.Account, error) {
+	s.accountsMutex.RLock()
+	defer s.accountsMutex.RUnlock()
+
+	if account, ok := s.accounts[a]; ok {
+		return &account, nil
+	}
+
+	return nil, &ItemNotFoundError{}
+}
+
 // GetRegister gets a register by ID.
 func (s *WorldState) GetRegister(id string) []byte {
 	s.registersMutex.RLock()
