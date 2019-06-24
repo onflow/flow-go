@@ -587,6 +587,38 @@ fun test(x: Int) {
 }
 ```
 
+### Function Preconditions and Postconditions
+
+Functions may have preconditions and may have postconditions.
+
+Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the `require` keyword, followed by the condition block. 
+
+Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `ensure` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
+
+A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for [statements](#semicolons).
+
+```typescript
+fun factorial(n: Int): Int {
+    require {
+        // factorial is only defined for integers greater than or equal to zero
+        n >= 0
+    }
+    ensure {
+        // the result will always be greater than or equal to 1
+        result >= 1
+    }
+
+    var i = n
+    var result = 1
+
+    while i > 1 {
+        result = result * i
+        i = i - 1
+    }
+
+    return result
+}
+```
 
 ## Control flow
 
@@ -828,5 +860,4 @@ TODO: dictionaries
 - the key and value type is inferred from dictionaries literals
 
 -->
-
 
