@@ -893,9 +893,24 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		IsPublic:   true,
 		Identifier: "test",
 		Parameters: []Parameter{
-			{Identifier: "a", Type: Int32Type{}},
-			{Identifier: "b", Type: ConstantSizedType{Type: Int32Type{}, Size: 2}},
-			{Identifier: "c", Type: VariableSizedType{Type: ConstantSizedType{Type: Int32Type{}, Size: 3}}},
+			{
+				Identifier:    "a",
+				Type:          Int32Type{},
+				StartPosition: Position{Offset: 16, Line: 2, Column: 15},
+				EndPosition:   Position{Offset: 19, Line: 2, Column: 18},
+			},
+			{
+				Identifier:    "b",
+				Type:          ConstantSizedType{Type: Int32Type{}, Size: 2},
+				StartPosition: Position{Offset: 26, Line: 2, Column: 25},
+				EndPosition:   Position{Offset: 36, Line: 2, Column: 35},
+			},
+			{
+				Identifier:    "c",
+				Type:          VariableSizedType{Type: ConstantSizedType{Type: Int32Type{}, Size: 3}},
+				StartPosition: Position{Offset: 39, Line: 2, Column: 38},
+				EndPosition:   Position{Offset: 51, Line: 2, Column: 50},
+			},
 		},
 		ReturnType: VoidType{},
 		Block: Block{
