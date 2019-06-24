@@ -433,11 +433,20 @@ There is only one ternary conditional operator, the ternary conditional operator
 It behaves like an if-statement, but is an expression: If the first operator value is true, 
 the second operator value is returned. If the first operator value is false, the third value is returned.
 
-```
+```typescript
 const x = 1 > 2 ? 3 : 4
 x // is 4
 ```
 
+
+### Parentheses
+
+Expressions can be wrapped in parentheses to avoid ambiguity.
+
+```typescript
+const a = (1 + 2) * 3
+// a is 9
+```
 
 ### Precedence and Associativity
 
