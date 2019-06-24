@@ -203,7 +203,7 @@ const aLargeNumber = 1_000_000
 
 ### Arrays
 
-Arrays are mutable, ordered collections of values. All values in the array must have the same type. Arrays may contain a value multiple times. Array literals start with an opening square bracket `[` and end with a closing square bracket `]`. 
+Arrays are mutable, ordered collections of values. All values in an array must have the same type. Arrays may contain a value multiple times. Array literals start with an opening square bracket `[` and end with a closing square bracket `]`. 
 
 ```typescript
 // an empty array
@@ -218,7 +218,7 @@ const invalidMixed = [1, true, 2, false]
 
 #### Array Indexing
 
-To get the element of an array at a specific index, the indexing syntax can be used.
+To get the element of an array at a specific index, the indexing syntax can be used: The array is followed by an opening square bracket `[`, the indexing value, and ends with a closing square bracket `]`.
 
 ```typescript
 const numbers = [42, 23]
@@ -247,6 +247,76 @@ TODO
 - Length, concatenate, filter, etc. for all array types
 - Append, remove, etc. for variable-size arrays
 - Document and link to array concatenation operator `+` in operators section
+
+-->
+
+
+## Dictionaries
+
+Dictionaries are mutable, unordered collections of key-value associations. In a dictionary, all keys must have the same type, and all values must have the same type. Dictionaries may contain a key only once and may contain a value multiple times.
+
+Dictionary literals start with an opening brace `{` and end with a closing brace `}`. Keys are separated from values by a colon, and key-value associations are separated by commas.
+
+```typescript
+// an empty dictionary
+const empty = {}
+
+// a dictionary mapping integers to booleans
+const dictionary = {
+    1: true,
+    2: false
+}
+
+// invalid: mixed types
+const invalidMixed = {
+    1: true,
+    false: 2
+}
+```
+
+#### Dictionary Access
+
+To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
+
+```typescript
+const booleans = {
+    1: true,
+    0: false
+}
+booleans[1] // is true
+booleans[0] // is false
+
+const integers = {
+    true: 1,
+    false: 0
+}
+integers[true] // is 1
+integers[false] // is 0
+```
+
+#### Dictionary Types
+
+Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
+
+```typescript
+const booleans = {
+    1: true,
+    0: false
+}
+// booleans has type Bool[Int]
+
+const integers = {
+    true: 1,
+    false: 0
+}
+// integers has type Int[Bool]
+```
+
+<!--
+
+TODO
+
+#### Dictionary Functions
 
 -->
 
