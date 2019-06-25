@@ -2,9 +2,6 @@ package crypto
 
 import (
 	"golang.org/x/crypto/sha3"
-
-	"github.com/tyler-smith/go-bip32"
-	"github.com/tyler-smith/go-bip39"
 )
 
 // KeyPair represents a BIP32 public key and private key pair (and the seed phrase used to derive it).
@@ -42,4 +39,10 @@ func ComputeHash(data []byte) []byte {
 	hash := sha3.New256()
 	hash.Write(data)
 	return hash.Sum(nil)
+}
+
+// Sign signs a digest with the provided key pair.
+func Sign(digest []byte, keyPair *KeyPair) []byte {
+	// TODO: implement real signatures
+	return nil
 }
