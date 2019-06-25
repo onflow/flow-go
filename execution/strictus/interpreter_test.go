@@ -126,8 +126,8 @@ func TestInterpretNoHoisting(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("test")).To(Equal(Int64Expression(2)))
-	Expect(inter.Globals["x"].Value).To(Equal(Int64Expression(2)))
+	Expect(inter.Invoke("test")).To(Equal(interpreter.Int64Value(2)))
+	Expect(inter.Globals["x"].Value).To(Equal(interpreter.Int64Value(2)))
 }
 
 func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
