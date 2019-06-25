@@ -1,11 +1,32 @@
 package strictus
 
 import (
-	. "bamboo-runtime/execution/strictus/ast"
 	"bamboo-runtime/execution/strictus/interpreter"
 	. "github.com/onsi/gomega"
 	"testing"
 )
+
+func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(``)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
+
+func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        const test = 1
+    `)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(func() { inter.Invoke("test") }).Should(Panic())
+}
 
 func TestInterpretInvalidUnknownDeclaration(t *testing.T) {
 	RegisterTestingT(t)
@@ -83,9 +104,30 @@ func TestInterpretLexicalScope(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Globals["x"].Value).To(Equal(Int64Expression(10)))
-	Expect(inter.Invoke("f")).To(Equal(Int64Expression(10)))
-	Expect(inter.Invoke("g")).To(Equal(Int64Expression(10)))
+	Expect(inter.Globals["x"].Value).To(Equal(interpreter.Int64Value(10)))
+	Expect(inter.Invoke("f")).To(Equal(interpreter.Int64Value(10)))
+	Expect(inter.Invoke("g")).To(Equal(interpreter.Int64Value(10)))
+}
+
+func TestInterpretNoHoisting(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        const x = 2
+
+        fun test(): Int64 {
+           if x == 0 {
+               const x = 3
+               return x
+           }
+           return x
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(inter.Invoke("test")).To(Equal(interpreter.Int64Value(2)))
+	Expect(inter.Globals["x"].Value).To(Equal(interpreter.Int64Value(2)))
 }
 
 func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
@@ -100,8 +142,8 @@ func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Globals["x"].Value).To(Equal(Int64Expression(10)))
-	Expect(inter.Globals["y"].Value).To(Equal(Int64Expression(42)))
+	Expect(inter.Globals["x"].Value).To(Equal(interpreter.Int64Value(10)))
+	Expect(inter.Globals["y"].Value).To(Equal(interpreter.Int64Value(42)))
 }
 
 func TestInterpretInvalidFunctionCallWithTooFewArguments(t *testing.T) {
@@ -196,7 +238,7 @@ func TestInterpretVariableAssignment(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("test")).To(Equal(Int64Expression(3)))
+	Expect(inter.Invoke("test")).To(Equal(interpreter.Int64Value(3)))
 }
 
 func TestInterpretInvalidGlobalConstantAssignment(t *testing.T) {
@@ -229,9 +271,9 @@ func TestInterpretGlobalVariableAssignment(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Globals["x"].Value).To(Equal(Int64Expression(2)))
-	Expect(inter.Invoke("test")).To(Equal(Int64Expression(3)))
-	Expect(inter.Globals["x"].Value).To(Equal(Int64Expression(3)))
+	Expect(inter.Globals["x"].Value).To(Equal(interpreter.Int64Value(2)))
+	Expect(inter.Invoke("test")).To(Equal(interpreter.Int64Value(3)))
+	Expect(inter.Globals["x"].Value).To(Equal(interpreter.Int64Value(3)))
 }
 
 func TestInterpretInvalidConstantRedeclaration(t *testing.T) {
@@ -274,8 +316,8 @@ func TestInterpretConstantRedeclaration(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Globals["x"].Value).To(Equal(Int64Expression(2)))
-	Expect(inter.Invoke("test")).To(Equal(Int64Expression(3)))
+	Expect(inter.Globals["x"].Value).To(Equal(interpreter.Int64Value(2)))
+	Expect(inter.Invoke("test")).To(Equal(interpreter.Int64Value(3)))
 }
 
 func TestInterpretParameters(t *testing.T) {
@@ -293,8 +335,8 @@ func TestInterpretParameters(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("returnA", int64(24), int64(42))).To(Equal(Int64Expression(24)))
-	Expect(inter.Invoke("returnB", int64(24), int64(42))).To(Equal(Int64Expression(42)))
+	Expect(inter.Invoke("returnA", int64(24), int64(42))).To(Equal(interpreter.Int64Value(24)))
+	Expect(inter.Invoke("returnB", int64(24), int64(42))).To(Equal(interpreter.Int64Value(42)))
 }
 
 func TestInterpretArrayIndexing(t *testing.T) {
@@ -309,7 +351,7 @@ func TestInterpretArrayIndexing(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("test")).To(Equal(Int64Expression(3)))
+	Expect(inter.Invoke("test")).To(Equal(interpreter.Int64Value(3)))
 }
 
 func TestInterpretInvalidArrayIndexingWithBool(t *testing.T) {
@@ -368,7 +410,7 @@ func TestInterpretArrayIndexingAssignment(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("test")).To(Equal(Int64Expression(2)))
+	Expect(inter.Invoke("test")).To(Equal(interpreter.Int64Value(2)))
 }
 
 func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
@@ -399,7 +441,7 @@ func TestInterpretReturnWithoutExpression(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("returnEarly")).To(Equal(interpreter.Void{}))
+	Expect(inter.Invoke("returnEarly")).To(Equal(interpreter.VoidValue{}))
 }
 
 // TODO: perform each operator test for each integer type
@@ -427,7 +469,7 @@ func TestInterpretPlusOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testIntegers")).To(Equal(Int64Expression(6)))
+	Expect(inter.Invoke("testIntegers")).To(Equal(interpreter.Int64Value(6)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBools") }).Should(Panic())
@@ -456,7 +498,7 @@ func TestInterpretMinusOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testIntegers")).To(Equal(Int64Expression(-2)))
+	Expect(inter.Invoke("testIntegers")).To(Equal(interpreter.Int64Value(-2)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBools") }).Should(Panic())
@@ -485,7 +527,7 @@ func TestInterpretMulOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testIntegers")).To(Equal(Int64Expression(8)))
+	Expect(inter.Invoke("testIntegers")).To(Equal(interpreter.Int64Value(8)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBools") }).Should(Panic())
@@ -514,7 +556,7 @@ func TestInterpretDivOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testIntegers")).To(Equal(Int64Expression(2)))
+	Expect(inter.Invoke("testIntegers")).To(Equal(interpreter.Int64Value(2)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBools") }).Should(Panic())
@@ -543,7 +585,7 @@ func TestInterpretModOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testIntegers")).To(Equal(Int64Expression(2)))
+	Expect(inter.Invoke("testIntegers")).To(Equal(interpreter.Int64Value(2)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBools") }).Should(Panic())
@@ -588,14 +630,14 @@ func TestInterpretEqualOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testIntegersUnequal")).To(Equal(BoolExpression(false)))
-	Expect(inter.Invoke("testIntegersEqual")).To(Equal(BoolExpression(true)))
+	Expect(inter.Invoke("testIntegersUnequal")).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Invoke("testIntegersEqual")).To(Equal(interpreter.BoolValue(true)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
-	Expect(inter.Invoke("testTrueAndTrue")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testTrueAndFalse")).To(Equal(BoolExpression(false)))
-	Expect(inter.Invoke("testFalseAndTrue")).To(Equal(BoolExpression(false)))
-	Expect(inter.Invoke("testFalseAndFalse")).To(Equal(BoolExpression(true)))
+	Expect(inter.Invoke("testTrueAndTrue")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testTrueAndFalse")).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Invoke("testFalseAndTrue")).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Invoke("testFalseAndFalse")).To(Equal(interpreter.BoolValue(true)))
 }
 
 func TestInterpretUnequalOperator(t *testing.T) {
@@ -637,14 +679,14 @@ func TestInterpretUnequalOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testIntegersUnequal")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testIntegersEqual")).To(Equal(BoolExpression(false)))
+	Expect(inter.Invoke("testIntegersUnequal")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testIntegersEqual")).To(Equal(interpreter.BoolValue(false)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
-	Expect(inter.Invoke("testTrueAndTrue")).To(Equal(BoolExpression(false)))
-	Expect(inter.Invoke("testTrueAndFalse")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testFalseAndTrue")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testFalseAndFalse")).To(Equal(BoolExpression(false)))
+	Expect(inter.Invoke("testTrueAndTrue")).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Invoke("testTrueAndFalse")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testFalseAndTrue")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testFalseAndFalse")).To(Equal(interpreter.BoolValue(false)))
 }
 
 func TestInterpretLessOperator(t *testing.T) {
@@ -690,9 +732,9 @@ func TestInterpretLessOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testIntegersGreater")).To(Equal(BoolExpression(false)))
-	Expect(inter.Invoke("testIntegersEqual")).To(Equal(BoolExpression(false)))
-	Expect(inter.Invoke("testIntegersLess")).To(Equal(BoolExpression(true)))
+	Expect(inter.Invoke("testIntegersGreater")).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Invoke("testIntegersEqual")).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Invoke("testIntegersLess")).To(Equal(interpreter.BoolValue(true)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testTrueAndTrue") }).Should(Panic())
@@ -744,9 +786,9 @@ func TestInterpretLessEqualOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testIntegersGreater")).To(Equal(BoolExpression(false)))
-	Expect(inter.Invoke("testIntegersEqual")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testIntegersLess")).To(Equal(BoolExpression(true)))
+	Expect(inter.Invoke("testIntegersGreater")).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Invoke("testIntegersEqual")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testIntegersLess")).To(Equal(interpreter.BoolValue(true)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testTrueAndTrue") }).Should(Panic())
@@ -798,9 +840,9 @@ func TestInterpretGreaterOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testIntegersGreater")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testIntegersEqual")).To(Equal(BoolExpression(false)))
-	Expect(inter.Invoke("testIntegersLess")).To(Equal(BoolExpression(false)))
+	Expect(inter.Invoke("testIntegersGreater")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testIntegersEqual")).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Invoke("testIntegersLess")).To(Equal(interpreter.BoolValue(false)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testTrueAndTrue") }).Should(Panic())
@@ -852,9 +894,9 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testIntegersGreater")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testIntegersEqual")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testIntegersLess")).To(Equal(BoolExpression(false)))
+	Expect(inter.Invoke("testIntegersGreater")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testIntegersEqual")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testIntegersLess")).To(Equal(interpreter.BoolValue(false)))
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testTrueAndTrue") }).Should(Panic())
@@ -898,10 +940,10 @@ func TestInterpretOrOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testTrueTrue")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testTrueFalse")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testFalseTrue")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testFalseFalse")).To(Equal(BoolExpression(false)))
+	Expect(inter.Invoke("testTrueTrue")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testTrueFalse")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testFalseTrue")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testFalseFalse")).To(Equal(interpreter.BoolValue(false)))
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testIntegers") }).Should(Panic())
@@ -942,10 +984,10 @@ func TestInterpretAndOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testTrueTrue")).To(Equal(BoolExpression(true)))
-	Expect(inter.Invoke("testTrueFalse")).To(Equal(BoolExpression(false)))
-	Expect(inter.Invoke("testFalseTrue")).To(Equal(BoolExpression(false)))
-	Expect(inter.Invoke("testFalseFalse")).To(Equal(BoolExpression(false)))
+	Expect(inter.Invoke("testTrueTrue")).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testTrueFalse")).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Invoke("testFalseTrue")).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Invoke("testFalseFalse")).To(Equal(interpreter.BoolValue(false)))
 	Expect(func() { inter.Invoke("testBoolAndInteger") }).Should(Panic())
 	Expect(func() { inter.Invoke("testIntegerAndBool") }).Should(Panic())
 	Expect(func() { inter.Invoke("testIntegers") }).Should(Panic())
@@ -992,10 +1034,10 @@ func TestInterpretIfStatement(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testTrue")).To(Equal(Int64Expression(2)))
-	Expect(inter.Invoke("testFalse")).To(Equal(Int64Expression(3)))
-	Expect(inter.Invoke("testNoElse")).To(Equal(Int64Expression(2)))
-	Expect(inter.Invoke("testElseIf")).To(Equal(Int64Expression(3)))
+	Expect(inter.Invoke("testTrue")).To(Equal(interpreter.Int64Value(2)))
+	Expect(inter.Invoke("testFalse")).To(Equal(interpreter.Int64Value(3)))
+	Expect(inter.Invoke("testNoElse")).To(Equal(interpreter.Int64Value(2)))
+	Expect(inter.Invoke("testElseIf")).To(Equal(interpreter.Int64Value(3)))
 }
 
 func TestInterpretWhileStatement(t *testing.T) {
@@ -1014,7 +1056,7 @@ func TestInterpretWhileStatement(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("test")).To(Equal(Int64Expression(6)))
+	Expect(inter.Invoke("test")).To(Equal(interpreter.Int64Value(6)))
 }
 
 func TestInterpretWhileStatementWithReturn(t *testing.T) {
@@ -1036,7 +1078,7 @@ func TestInterpretWhileStatementWithReturn(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("test")).To(Equal(Int64Expression(6)))
+	Expect(inter.Invoke("test")).To(Equal(interpreter.Int64Value(6)))
 }
 
 func TestInterpretExpressionStatement(t *testing.T) {
@@ -1058,9 +1100,9 @@ func TestInterpretExpressionStatement(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Globals["x"].Value).To(Equal(Int64Expression(0)))
-	Expect(inter.Invoke("test")).To(Equal(Int64Expression(2)))
-	Expect(inter.Globals["x"].Value).To(Equal(Int64Expression(2)))
+	Expect(inter.Globals["x"].Value).To(Equal(interpreter.Int64Value(0)))
+	Expect(inter.Invoke("test")).To(Equal(interpreter.Int64Value(2)))
+	Expect(inter.Globals["x"].Value).To(Equal(interpreter.Int64Value(2)))
 }
 
 func TestInterpretConditionalOperator(t *testing.T) {
@@ -1078,8 +1120,8 @@ func TestInterpretConditionalOperator(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("testTrue")).To(Equal(Int64Expression(2)))
-	Expect(inter.Invoke("testFalse")).To(Equal(Int64Expression(3)))
+	Expect(inter.Invoke("testTrue")).To(Equal(interpreter.Int64Value(2)))
+	Expect(inter.Invoke("testFalse")).To(Equal(interpreter.Int64Value(3)))
 }
 
 func TestInterpreterInvalidAssignmentToParameter(t *testing.T) {
@@ -1128,5 +1170,5 @@ func TestInterpreterRecursion(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
-	Expect(inter.Invoke("fib", int64(23))).To(Equal(Int64Expression(28657)))
+	Expect(inter.Invoke("fib", int64(23))).To(Equal(interpreter.Int64Value(28657)))
 }
