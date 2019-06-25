@@ -1,42 +1,19 @@
+# Bamboo
+
 [![Build Status](https://travis-ci.com/dapperlabs/bamboo-node.svg?token=MYJ5scBoBxhZRGvDecen&branch=master)](https://travis-ci.com/dapperlabs/bamboo-node)
 
-## Test
-```
-$ ./test.sh
-```
-If iterating just on failed test, then we can do so without rebuilding the system:
-```
-$ docker-compose up --build --no-deps test
-```
-TODO: move to Makefile (remove also shell script)
+Bamboo is a highly-performant blockchain designed to power the next generation of decentralized applications.
 
+## Documentation
 
-## Build (updates go modules)
-```
-$ GO111MODULE=on go build -o donotcommit ./cmd/execute/
-$ GO111MODULE=on go build -o donotcommit ./cmd/security/
-$ GO111MODULE=on go build -o donotcommit ./cmd/testhelpers/
-```
-TODO: move to Makefile
+### Architecture Documentation
 
+You can find a high-level overview of the Bamboo architecture on the [documentation website](https://bamboo-docs.herokuapp.com/).
 
-## Generate dependency injection
-### Prerequisite 
-Install wire: `$ GO111MODULE=on go get -u github.com/google/wire/cmd/wire`
-### Command
-```
-$ GO111MODULE=on wire ./internal/execute/
-$ GO111MODULE=on wire ./internal/security/
-$ GO111MODULE=on wire ./internal/access/
-```
-TODO: move to Makefile
+### Code Documentation
 
-## Generate protobufs 
-### Prerequisite 
-1. Install prototools https://github.com/uber/prototool#installation  
-2. $ go get -u github.com/golang/protobuf/protoc-gen-go
-### Command
-```
-$ prototool generate proto/
-```
-TODO: move to Makefile
+The application-level documentation for Bamboo lives inside each of the sub-packages of this repository. To get started, take a look at the [documentation folder](/docs).
+
+## Contributing
+
+Read our [contributing guide](/CONTRIBUTING.md) to learn about our development process and start contributing.
