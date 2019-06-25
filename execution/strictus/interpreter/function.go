@@ -5,13 +5,15 @@ import (
 	"github.com/raviqqe/hamt"
 )
 
-type Function struct {
+type FunctionValue struct {
 	Expression ast.FunctionExpression
 	Activation hamt.Map
 }
 
-func newFunction(expression ast.FunctionExpression, activation hamt.Map) *Function {
-	return &Function{
+func (FunctionValue) isValue() {}
+
+func newFunction(expression ast.FunctionExpression, activation hamt.Map) *FunctionValue {
+	return &FunctionValue{
 		Expression: expression,
 		Activation: activation,
 	}

@@ -19,11 +19,11 @@ func TestActivations(t *testing.T) {
 				Identifier: "a",
 				Type:       &ast.Int64Type{},
 			},
-			Value: 1,
+			Value: Int8Value(1),
 		},
 	)
 
-	Expect(activations.Find("a").Value).To(Equal(1))
+	Expect(activations.Find("a").Value).To(Equal(Int8Value(1)))
 	Expect(activations.Find("b")).To(BeNil())
 
 	activations.PushCurrent()
@@ -36,7 +36,7 @@ func TestActivations(t *testing.T) {
 				Identifier: "a",
 				Type:       &ast.Int64Type{},
 			},
-			Value: 2,
+			Value: Int8Value(2),
 		},
 	)
 	activations.Set(
@@ -47,12 +47,12 @@ func TestActivations(t *testing.T) {
 				Identifier: "b",
 				Type:       &ast.Int64Type{},
 			},
-			Value: 3,
+			Value: Int8Value(3),
 		},
 	)
 
-	Expect(activations.Find("a").Value).To(Equal(2))
-	Expect(activations.Find("b").Value).To(Equal(3))
+	Expect(activations.Find("a").Value).To(Equal(Int8Value(2)))
+	Expect(activations.Find("b").Value).To(Equal(Int8Value(3)))
 	Expect(activations.Find("c")).To(BeNil())
 
 	activations.PushCurrent()
@@ -65,7 +65,7 @@ func TestActivations(t *testing.T) {
 				Identifier: "a",
 				Type:       &ast.Int64Type{},
 			},
-			Value: 5,
+			Value: Int8Value(5),
 		},
 	)
 	activations.Set(
@@ -76,23 +76,23 @@ func TestActivations(t *testing.T) {
 				Identifier: "c",
 				Type:       &ast.Int64Type{},
 			},
-			Value: 4,
+			Value: Int8Value(4),
 		},
 	)
 
-	Expect(activations.Find("a").Value).To(Equal(5))
-	Expect(activations.Find("b").Value).To(Equal(3))
-	Expect(activations.Find("c").Value).To(Equal(4))
+	Expect(activations.Find("a").Value).To(Equal(Int8Value(5)))
+	Expect(activations.Find("b").Value).To(Equal(Int8Value(3)))
+	Expect(activations.Find("c").Value).To(Equal(Int8Value(4)))
 
 	activations.Pop()
 
-	Expect(activations.Find("a").Value).To(Equal(2))
-	Expect(activations.Find("b").Value).To(Equal(3))
+	Expect(activations.Find("a").Value).To(Equal(Int8Value(2)))
+	Expect(activations.Find("b").Value).To(Equal(Int8Value(3)))
 	Expect(activations.Find("c")).To(BeNil())
 
 	activations.Pop()
 
-	Expect(activations.Find("a").Value).To(Equal(1))
+	Expect(activations.Find("a").Value).To(Equal(Int8Value(1)))
 	Expect(activations.Find("b")).To(BeNil())
 	Expect(activations.Find("c")).To(BeNil())
 
