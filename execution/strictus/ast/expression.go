@@ -1,7 +1,5 @@
 package ast
 
-import "fmt"
-
 type Expression interface {
 	Element
 	isExpression()
@@ -23,15 +21,6 @@ type IntExpression interface {
 	Expression
 	isIntExpression()
 	IntValue() int
-	Plus(other IntExpression) IntExpression
-	Minus(other IntExpression) IntExpression
-	Mod(other IntExpression) IntExpression
-	Mul(other IntExpression) IntExpression
-	Div(other IntExpression) IntExpression
-	Less(other IntExpression) BoolExpression
-	LessEqual(other IntExpression) BoolExpression
-	Greater(other IntExpression) BoolExpression
-	GreaterEqual(other IntExpression) BoolExpression
 }
 
 // Int8Expression
@@ -50,42 +39,6 @@ func (e Int8Expression) IntValue() int {
 	return int(e)
 }
 
-func (e Int8Expression) Plus(other IntExpression) IntExpression {
-	return e + other.(Int8Expression)
-}
-
-func (e Int8Expression) Minus(other IntExpression) IntExpression {
-	return e - other.(Int8Expression)
-}
-
-func (e Int8Expression) Mod(other IntExpression) IntExpression {
-	return e % other.(Int8Expression)
-}
-
-func (e Int8Expression) Mul(other IntExpression) IntExpression {
-	return e * other.(Int8Expression)
-}
-
-func (e Int8Expression) Div(other IntExpression) IntExpression {
-	return e / other.(Int8Expression)
-}
-
-func (e Int8Expression) Less(other IntExpression) BoolExpression {
-	return e < other.(Int8Expression)
-}
-
-func (e Int8Expression) LessEqual(other IntExpression) BoolExpression {
-	return e <= other.(Int8Expression)
-}
-
-func (e Int8Expression) Greater(other IntExpression) BoolExpression {
-	return e > other.(Int8Expression)
-}
-
-func (e Int8Expression) GreaterEqual(other IntExpression) BoolExpression {
-	return e >= other.(Int8Expression)
-}
-
 // Int16Expression
 
 type Int16Expression int16
@@ -100,42 +53,6 @@ func (Int16Expression) isIntExpression() {}
 
 func (e Int16Expression) IntValue() int {
 	return int(e)
-}
-
-func (e Int16Expression) Plus(other IntExpression) IntExpression {
-	return e + other.(Int16Expression)
-}
-
-func (e Int16Expression) Minus(other IntExpression) IntExpression {
-	return e - other.(Int16Expression)
-}
-
-func (e Int16Expression) Mod(other IntExpression) IntExpression {
-	return e % other.(Int16Expression)
-}
-
-func (e Int16Expression) Mul(other IntExpression) IntExpression {
-	return e * other.(Int16Expression)
-}
-
-func (e Int16Expression) Div(other IntExpression) IntExpression {
-	return e / other.(Int16Expression)
-}
-
-func (e Int16Expression) Less(other IntExpression) BoolExpression {
-	return e < other.(Int16Expression)
-}
-
-func (e Int16Expression) LessEqual(other IntExpression) BoolExpression {
-	return e <= other.(Int16Expression)
-}
-
-func (e Int16Expression) Greater(other IntExpression) BoolExpression {
-	return e > other.(Int16Expression)
-}
-
-func (e Int16Expression) GreaterEqual(other IntExpression) BoolExpression {
-	return e >= other.(Int16Expression)
 }
 
 // Int32Expression
@@ -154,42 +71,6 @@ func (e Int32Expression) IntValue() int {
 	return int(e)
 }
 
-func (e Int32Expression) Plus(other IntExpression) IntExpression {
-	return e + other.(Int32Expression)
-}
-
-func (e Int32Expression) Minus(other IntExpression) IntExpression {
-	return e - other.(Int32Expression)
-}
-
-func (e Int32Expression) Mod(other IntExpression) IntExpression {
-	return e % other.(Int32Expression)
-}
-
-func (e Int32Expression) Mul(other IntExpression) IntExpression {
-	return e * other.(Int32Expression)
-}
-
-func (e Int32Expression) Div(other IntExpression) IntExpression {
-	return e / other.(Int32Expression)
-}
-
-func (e Int32Expression) Less(other IntExpression) BoolExpression {
-	return e < other.(Int32Expression)
-}
-
-func (e Int32Expression) LessEqual(other IntExpression) BoolExpression {
-	return e <= other.(Int32Expression)
-}
-
-func (e Int32Expression) Greater(other IntExpression) BoolExpression {
-	return e > other.(Int32Expression)
-}
-
-func (e Int32Expression) GreaterEqual(other IntExpression) BoolExpression {
-	return e >= other.(Int32Expression)
-}
-
 // Int64Expression
 
 type Int64Expression int64
@@ -204,42 +85,6 @@ func (Int64Expression) isIntExpression() {}
 
 func (e Int64Expression) IntValue() int {
 	return int(e)
-}
-
-func (e Int64Expression) Plus(other IntExpression) IntExpression {
-	return e + other.(Int64Expression)
-}
-
-func (e Int64Expression) Minus(other IntExpression) IntExpression {
-	return e - other.(Int64Expression)
-}
-
-func (e Int64Expression) Mod(other IntExpression) IntExpression {
-	return e % other.(Int64Expression)
-}
-
-func (e Int64Expression) Mul(other IntExpression) IntExpression {
-	return e * other.(Int64Expression)
-}
-
-func (e Int64Expression) Div(other IntExpression) IntExpression {
-	return e / other.(Int64Expression)
-}
-
-func (e Int64Expression) Less(other IntExpression) BoolExpression {
-	return e < other.(Int64Expression)
-}
-
-func (e Int64Expression) LessEqual(other IntExpression) BoolExpression {
-	return e <= other.(Int64Expression)
-}
-
-func (e Int64Expression) Greater(other IntExpression) BoolExpression {
-	return e > other.(Int64Expression)
-}
-
-func (e Int64Expression) GreaterEqual(other IntExpression) BoolExpression {
-	return e >= other.(Int64Expression)
 }
 
 // UInt8Expression
@@ -258,42 +103,6 @@ func (e UInt8Expression) IntValue() int {
 	return int(e)
 }
 
-func (e UInt8Expression) Plus(other IntExpression) IntExpression {
-	return e + other.(UInt8Expression)
-}
-
-func (e UInt8Expression) Minus(other IntExpression) IntExpression {
-	return e - other.(UInt8Expression)
-}
-
-func (e UInt8Expression) Mod(other IntExpression) IntExpression {
-	return e % other.(UInt8Expression)
-}
-
-func (e UInt8Expression) Mul(other IntExpression) IntExpression {
-	return e * other.(UInt8Expression)
-}
-
-func (e UInt8Expression) Div(other IntExpression) IntExpression {
-	return e / other.(UInt8Expression)
-}
-
-func (e UInt8Expression) Less(other IntExpression) BoolExpression {
-	return e < other.(UInt8Expression)
-}
-
-func (e UInt8Expression) LessEqual(other IntExpression) BoolExpression {
-	return e <= other.(UInt8Expression)
-}
-
-func (e UInt8Expression) Greater(other IntExpression) BoolExpression {
-	return e > other.(UInt8Expression)
-}
-
-func (e UInt8Expression) GreaterEqual(other IntExpression) BoolExpression {
-	return e >= other.(UInt8Expression)
-}
-
 // UInt16Expression
 
 type UInt16Expression uint16
@@ -308,42 +117,6 @@ func (UInt16Expression) isIntExpression() {}
 
 func (e UInt16Expression) IntValue() int {
 	return int(e)
-}
-
-func (e UInt16Expression) Plus(other IntExpression) IntExpression {
-	return e + other.(UInt16Expression)
-}
-
-func (e UInt16Expression) Minus(other IntExpression) IntExpression {
-	return e - other.(UInt16Expression)
-}
-
-func (e UInt16Expression) Mod(other IntExpression) IntExpression {
-	return e % other.(UInt16Expression)
-}
-
-func (e UInt16Expression) Mul(other IntExpression) IntExpression {
-	return e * other.(UInt16Expression)
-}
-
-func (e UInt16Expression) Div(other IntExpression) IntExpression {
-	return e / other.(UInt16Expression)
-}
-
-func (e UInt16Expression) Less(other IntExpression) BoolExpression {
-	return e < other.(UInt16Expression)
-}
-
-func (e UInt16Expression) LessEqual(other IntExpression) BoolExpression {
-	return e <= other.(UInt16Expression)
-}
-
-func (e UInt16Expression) Greater(other IntExpression) BoolExpression {
-	return e > other.(UInt16Expression)
-}
-
-func (e UInt16Expression) GreaterEqual(other IntExpression) BoolExpression {
-	return e >= other.(UInt16Expression)
 }
 
 // UInt32Expression
@@ -362,42 +135,6 @@ func (e UInt32Expression) IntValue() int {
 	return int(e)
 }
 
-func (e UInt32Expression) Plus(other IntExpression) IntExpression {
-	return e + other.(UInt32Expression)
-}
-
-func (e UInt32Expression) Minus(other IntExpression) IntExpression {
-	return e - other.(UInt32Expression)
-}
-
-func (e UInt32Expression) Mod(other IntExpression) IntExpression {
-	return e % other.(UInt32Expression)
-}
-
-func (e UInt32Expression) Mul(other IntExpression) IntExpression {
-	return e * other.(UInt32Expression)
-}
-
-func (e UInt32Expression) Div(other IntExpression) IntExpression {
-	return e / other.(UInt32Expression)
-}
-
-func (e UInt32Expression) Less(other IntExpression) BoolExpression {
-	return e < other.(UInt32Expression)
-}
-
-func (e UInt32Expression) LessEqual(other IntExpression) BoolExpression {
-	return e <= other.(UInt32Expression)
-}
-
-func (e UInt32Expression) Greater(other IntExpression) BoolExpression {
-	return e > other.(UInt32Expression)
-}
-
-func (e UInt32Expression) GreaterEqual(other IntExpression) BoolExpression {
-	return e >= other.(UInt32Expression)
-}
-
 // UInt64Expression
 
 type UInt64Expression uint64
@@ -412,42 +149,6 @@ func (UInt64Expression) isIntExpression() {}
 
 func (e UInt64Expression) IntValue() int {
 	return int(e)
-}
-
-func (e UInt64Expression) Plus(other IntExpression) IntExpression {
-	return e + other.(UInt64Expression)
-}
-
-func (e UInt64Expression) Minus(other IntExpression) IntExpression {
-	return e - other.(UInt64Expression)
-}
-
-func (e UInt64Expression) Mod(other IntExpression) IntExpression {
-	return e % other.(UInt64Expression)
-}
-
-func (e UInt64Expression) Mul(other IntExpression) IntExpression {
-	return e * other.(UInt64Expression)
-}
-
-func (e UInt64Expression) Div(other IntExpression) IntExpression {
-	return e / other.(UInt64Expression)
-}
-
-func (e UInt64Expression) Less(other IntExpression) BoolExpression {
-	return e < other.(UInt64Expression)
-}
-
-func (e UInt64Expression) LessEqual(other IntExpression) BoolExpression {
-	return e <= other.(UInt64Expression)
-}
-
-func (e UInt64Expression) Greater(other IntExpression) BoolExpression {
-	return e > other.(UInt64Expression)
-}
-
-func (e UInt64Expression) GreaterEqual(other IntExpression) BoolExpression {
-	return e >= other.(UInt64Expression)
 }
 
 // ArrayExpression
@@ -561,33 +262,4 @@ func (FunctionExpression) isExpression() {}
 
 func (f FunctionExpression) Accept(visitor Visitor) Repr {
 	return visitor.VisitFunctionExpression(f)
-}
-
-// ToExpression
-
-// ToExpression converts a Go value into an expression
-func ToExpression(value interface{}) Expression {
-	// TODO: support more types
-	switch value := value.(type) {
-	case int8:
-		return Int8Expression(value)
-	case int16:
-		return Int16Expression(value)
-	case int32:
-		return Int32Expression(value)
-	case int64:
-		return Int64Expression(value)
-	case uint8:
-		return UInt8Expression(value)
-	case uint16:
-		return UInt16Expression(value)
-	case uint32:
-		return UInt32Expression(value)
-	case uint64:
-		return UInt64Expression(value)
-	case bool:
-		return BoolExpression(value)
-	}
-
-	panic(fmt.Sprintf("can't convert Go value to expression: %#+v", value))
 }
