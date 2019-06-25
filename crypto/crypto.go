@@ -2,6 +2,9 @@ package crypto
 
 import (
 	"golang.org/x/crypto/sha3"
+
+	bip32 "github.com/tyler-smith/go-bip32"
+	bip39 "github.com/tyler-smith/go-bip39"
 )
 
 // KeyPair represents a BIP32 public key and private key pair (and the seed phrase used to derive it).
@@ -9,6 +12,12 @@ type KeyPair struct {
 	PublicKey []byte
 	secretKey []byte
 	mnemonic  string
+}
+
+// Signature is a compound type combining a signature with an account address.
+type Signature struct {
+	Account Address
+	Sig     []byte
 }
 
 // genKeyPair generates a new HD wallet keypair to be used for account creation.
@@ -42,7 +51,10 @@ func ComputeHash(data []byte) []byte {
 }
 
 // Sign signs a digest with the provided key pair.
-func Sign(digest []byte, keyPair *KeyPair) []byte {
+func Sign(digest Hash, account Address, keyPair *KeyPair) *Signature {
 	// TODO: implement real signatures
-	return nil
+	return &Signature{
+		Account: account,
+		Sig:     nil,
+	}
 }

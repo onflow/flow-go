@@ -42,11 +42,14 @@ func (c *Client) Close() {
 // SendTransaction submits a transaction to an access node.
 func (c *Client) SendTransaction(ctx context.Context, tx *types.SignedTransaction) error {
 	txMsg := &accessv1.SendTransactionRequest_Transaction{
-		ToAddress:      tx.ToAddress.Bytes(),
-		Script:         tx.Script,
-		Nonce:          tx.Nonce,
-		ComputeLimit:   tx.ComputeLimit,
-		PayerSignature: tx.PayerSignature,
+		ToAddress:    tx.ToAddress.Bytes(),
+		Script:       tx.Script,
+		Nonce:        tx.Nonce,
+		ComputeLimit: tx.ComputeLimit,
+		PayerSignature: &accessv1.Signature{
+			AccountAddress: tx.PayerSignature.Account.Bytes(),
+			Signature:      tx.PayerSignature.Sig,
+		},
 	}
 
 	_, err := c.grpcClient.SendTransaction(
@@ -119,15 +122,19 @@ func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.Sign
 	}
 
 	tx := res.GetTransaction()
+	payerSig := tx.GetPayerSignature()
 
 	return &types.SignedTransaction{
-		ToAddress:      crypto.BytesToAddress(tx.GetToAddress()),
-		Script:         tx.GetScript(),
-		Nonce:          tx.GetNonce(),
-		ComputeLimit:   tx.GetComputeLimit(),
-		ComputeUsed:    tx.GetComputeUsed(),
-		PayerSignature: tx.GetPayerSignature(),
-		Status:         data.TxStatus(tx.GetStatus()),
+		ToAddress:    crypto.BytesToAddress(tx.GetToAddress()),
+		Script:       tx.GetScript(),
+		Nonce:        tx.GetNonce(),
+		ComputeLimit: tx.GetComputeLimit(),
+		ComputeUsed:  tx.GetComputeUsed(),
+		PayerSignature: &crypto.Signature{
+			Account: crypto.BytesToAddress(payerSig.GetAccountAddress()),
+			Sig:     payerSig.GetSignature(),
+		},
+		Status: data.TxStatus(tx.GetStatus()),
 	}, nil
 }
 

@@ -30,13 +30,18 @@ service BambooAccessAPI {
   rpc CallContract(CallContractRequest) returns (CallContractResponse);
 }
 
+message Signature {
+  bytes account_address = 1;
+  bytes signature = 2;
+}
+
 message SendTransactionRequest {
   message Transaction {
     bytes to_address = 1;
     bytes script = 2;
     uint64 nonce = 3;
     uint64 compute_limit = 4;
-    bytes payer_signature = 5;
+    Signature payer_signature = 5;
   }
   Transaction transaction = 1;
 }
@@ -99,7 +104,7 @@ message GetTransactionResponse {
     uint64 nonce = 3;
     uint64 compute_limit = 4;
     uint64 compute_used = 5;
-    bytes payer_signature = 6;
+    Signature payer_signature = 6;
     Status status = 7;
   }
   Transaction transaction = 1;

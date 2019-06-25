@@ -13,14 +13,14 @@ type RawTransaction struct {
 	ComputeLimit uint64
 }
 
-func (tx *RawTransaction) ToAddress() crypto.Address { return tx.ToAddress }
-func (tx *RawTransaction) Script() []byte            { return tx.Script }
-func (tx *RawTransaction) Nonce() uint64             { return tx.Nonce }
-func (tx *RawTransaction) ComputeLimit() uint64      { return tx.ComputeLimit }
+func (tx *RawTransaction) GetToAddress() crypto.Address { return tx.ToAddress }
+func (tx *RawTransaction) GetScript() []byte            { return tx.Script }
+func (tx *RawTransaction) GetNonce() uint64             { return tx.Nonce }
+func (tx *RawTransaction) GetComputeLimit() uint64      { return tx.ComputeLimit }
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *RawTransaction) Hash() crypto.Hash {
-	bytes := EncodeAsBytes(
+	bytes := data.EncodeAsBytes(
 		tx.ToAddress,
 		tx.Script,
 		tx.Nonce,
@@ -29,9 +29,9 @@ func (tx *RawTransaction) Hash() crypto.Hash {
 	return crypto.NewHash(bytes)
 }
 
-func (tx *RawTransaction) Sign(keyPair *crypto.KeyPair) *SignedTransaction {
+func (tx *RawTransaction) Sign(account crypto.Address, keyPair *crypto.KeyPair) *SignedTransaction {
 	hash := tx.Hash()
-	sig := crypto.Sign(hash, keyPair)
+	sig := crypto.Sign(hash, account, keyPair)
 
 	return &SignedTransaction{
 		ToAddress:      tx.ToAddress,
@@ -49,21 +49,21 @@ type SignedTransaction struct {
 	Nonce          uint64
 	ComputeLimit   uint64
 	ComputeUsed    uint64
-	PayerSignature []byte
+	PayerSignature *crypto.Signature
 	Status         data.TxStatus
 }
 
-func (tx *SignedTransaction) ToAddress() crypto.Address { return tx.ToAddress }
-func (tx *SignedTransaction) Script() []byte            { return tx.Script }
-func (tx *SignedTransaction) Nonce() uint64             { return tx.Nonce }
-func (tx *SignedTransaction) ComputeLimit() uint64      { return tx.ComputeLimit }
-func (tx *SignedTransaction) ComputeUsed() uint64       { return tx.ComputeUsed }
-func (tx *SignedTransaction) PayerSignature() []byte    { return tx.PayerSignature }
-func (tx *SignedTransaction) Status() data.TxStatus     { return tx.Status }
+func (tx *SignedTransaction) GetToAddress() crypto.Address         { return tx.ToAddress }
+func (tx *SignedTransaction) GetScript() []byte                    { return tx.Script }
+func (tx *SignedTransaction) GetNonce() uint64                     { return tx.Nonce }
+func (tx *SignedTransaction) GetComputeLimit() uint64              { return tx.ComputeLimit }
+func (tx *SignedTransaction) GetComputeUsed() uint64               { return tx.ComputeUsed }
+func (tx *SignedTransaction) GetPayerSignature() *crypto.Signature { return tx.PayerSignature }
+func (tx *SignedTransaction) GetStatus() data.TxStatus             { return tx.Status }
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *SignedTransaction) Hash() crypto.Hash {
-	bytes := EncodeAsBytes(
+	bytes := data.EncodeAsBytes(
 		tx.ToAddress,
 		tx.Script,
 		tx.Nonce,

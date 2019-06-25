@@ -33,13 +33,18 @@ func NewServer(accessNode *access.Node) *Server {
 func (s *Server) SendTransaction(ctx context.Context, req *accessv1.SendTransactionRequest) (*accessv1.SendTransactionResponse, error) {
 	txMsg := req.GetTransaction()
 
+	payerSig := txMsg.GetPayerSignature()
+
 	tx := &data.Transaction{
-		ToAddress:      crypto.BytesToAddress(txMsg.GetToAddress()),
-		Script:         txMsg.GetScript(),
-		Nonce:          txMsg.GetNonce(),
-		ComputeLimit:   txMsg.GetComputeLimit(),
-		PayerSignature: txMsg.GetPayerSignature(),
-		Status:         data.TxPending,
+		ToAddress:    crypto.BytesToAddress(txMsg.GetToAddress()),
+		Script:       txMsg.GetScript(),
+		Nonce:        txMsg.GetNonce(),
+		ComputeLimit: txMsg.GetComputeLimit(),
+		PayerSignature: &crypto.Signature{
+			Account: crypto.BytesToAddress(payerSig.GetAccountAddress()),
+			Sig:     payerSig.GetSignature(),
+		},
+		Status: data.TxPending,
 	}
 
 	err := s.accessNode.SendTransaction(tx)
@@ -156,13 +161,16 @@ func (s *Server) GetTransaction(ctx context.Context, req *accessv1.GetTransactio
 
 	return &accessv1.GetTransactionResponse{
 		Transaction: &accessv1.GetTransactionResponse_Transaction{
-			ToAddress:      tx.ToAddress.Bytes(),
-			Script:         tx.Script,
-			Nonce:          tx.Nonce,
-			ComputeLimit:   tx.ComputeLimit,
-			ComputeUsed:    tx.ComputeUsed,
-			PayerSignature: tx.PayerSignature,
-			Status:         accessv1.GetTransactionResponse_Transaction_Status(tx.Status),
+			ToAddress:    tx.ToAddress.Bytes(),
+			Script:       tx.Script,
+			Nonce:        tx.Nonce,
+			ComputeLimit: tx.ComputeLimit,
+			ComputeUsed:  tx.ComputeUsed,
+			PayerSignature: &accessv1.Signature{
+				AccountAddress: tx.PayerSignature.Account.Bytes(),
+				Signature:      tx.PayerSignature.Sig,
+			},
+			Status: accessv1.GetTransactionResponse_Transaction_Status(tx.Status),
 		},
 	}, nil
 }
