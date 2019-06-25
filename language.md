@@ -1100,6 +1100,63 @@ classB.value = 1
 
 Note the different values in the last line of each example.
 
+### Access control
+
+> Status: Access control is not implemented yet.
+
+Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, classes) and fields (in structures, classes) are either private or public.
+
+**Private** means the declaration is only accessible/visible in the currrent and inner scopes. For example, a private field in a class can only be accessed by functions of the class, not by code that useses an instance of the class in an outer scope.
+
+**Public** means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a class can be accessed using the access syntax on an instance of the class in an outer scope.
+
+The `private` keyword is used to make declarations private, and the `public` keyword is used to make declarations public.
+
+The `(set)` suffix can be used to make variables also publicly writeable.
+
+To summarize the behavior for variable and constant declarations and fields:
+
+| Declaration kind | Access modifier    | Read scope        | Write scope       |
+|------------------|--------------------|-------------------|-------------------|
+| `const`          |                    | Current and inner | *None*            |
+| `const`          | `public`           | **All**           | *None*            |
+| `var`            |                    | Current and inner | Current and inner |
+| `var`            | `public`           | **All**           | Current and inner |
+| `var`            | `public(set)`      | **All**           | **All**           |
+
+
+```typescript
+// private constant, inaccessible/invisible
+private const a = 1
+
+// public constant, accessible/visible
+public const b = 2
+
+public class SomeClass {
+    // private constant field,
+    // only readable in class functions
+    private const a = 1
+
+    // public constant field,
+    // readable in all scopes
+    public const b: Int
+
+    // private variable field,
+    // only readable and writeable in class functions
+    private var c: Int
+
+    // public variable field, not settable,
+    // only writeable in class functions,
+    // readable in all scopes
+    public var d: Int
+
+    // public variable field, settable,
+    // readable and writeable in all scopes
+    public(set) var e: Int
+
+    // initializer implementation skipped
+}
+```
 
 ## Authorizations
 
