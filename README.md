@@ -8,7 +8,7 @@
 
 ### Docker
 - Download and install docker https://docs.docker.com/docker-for-mac/install/
-- Test docker by running integration tests `$ ./test.sh`. First time run should take a while because some base layers will be downloaded and built for the first time. See https://github.com/dapperlabs/bamboo-node#test for me details.
+- Test docker by running integration tests `$ ./test.sh`. First time run should take a while because some base layers will be downloaded and built for the first time. See https://github.com/dapperlabs/bamboo-node#test for more details.
 
 ## Test
 Run:
