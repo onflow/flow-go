@@ -7,7 +7,7 @@
 - Clone in this repo under your `$GOPATH`: `$GOPATH/src/github.com/dapperlabs/bamboo-node/`. Technically since we are using go modules and we prepend every `go` command with `GO111MODULE=on`, you can also try to clone this repo anywhere you want.
 
 ### Docker
-- Download and install docker https://docs.docker.com/docker-for-mac/install/
+- Download and install Docker https://docs.docker.com/docker-for-mac/install/
 - Test docker by running integration tests `$ ./test.sh`. First time run should take a while because some base layers will be downloaded and built for the first time. See https://github.com/dapperlabs/bamboo-node#test for more details.
 
 ## Test
