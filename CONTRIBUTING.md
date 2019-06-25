@@ -19,5 +19,6 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 | Networking | Yahya Hassanzadeh (@yhassanzadeh)     | [/network](/network) |
 | Keystone | Tarak Ben Youssef (@tarakby)     | [/pkg/crypto](/pkg/crypto) |
 | Emulator | Brian Ho (@mrbrianhobo)     | [/emulator](/emulator), [/sdk](/sdk)|
+| Engineer Performance | Timofey Smirnov (@tsmirnov) | |
 
 ## Workflow
