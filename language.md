@@ -1101,3 +1101,26 @@ classB.value = 1
 Note the different values in the last line of each example.
 
 
+## Authorizations
+
+> Status: Authorizations are not implemented yet.
+
+Authorizations represent access rights/privileges to resources. An authorization is similar to a class in that it is a composite reference type, i.e., it consists of values and is referenced, that is has an initializer, and that it can have functions associated with it.
+
+Authorizations differ from classes in that they can only be created (instantiated) from existing authorizations. To make this explicit, initializers of authorizations must be declared, they must have at least one parameter, and the type of the first parameter must be an authorization.
+
+Furthermore, authorizations are unforgeable.
+
+There is a global authorization `rootAuth` of type `RootAuth`. It represents the access rights/privileges to all resources.
+
+Authorizations are declared using the `auth` keyword.
+
+```typescript
+auth SendTokens {
+    const limit: Int
+
+    init(auth: RootAuth, limit: Int) {
+        this.limit = limit
+    }
+}
+```
