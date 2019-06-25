@@ -1100,6 +1100,9 @@ classB.value = 1
 
 Note the different values in the last line of each example.
 
+There is **no** support for nulls, i.e., a constant or variable of a reference type must always be bound to an instance of the type. There is *no* `null`.
+
+
 ### Access control
 
 > Status: Access control is not implemented yet.
