@@ -11,7 +11,7 @@ type Transaction struct {
 	Nonce          uint64
 	ComputeLimit   uint64
 	ComputeUsed    uint64
-	PayerSignature []byte
+	PayerSignature *crypto.Signature
 	Status         TxStatus
 }
 

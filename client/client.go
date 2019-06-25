@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 	"github.com/dapperlabs/bamboo-emulator/data"
 	"github.com/dapperlabs/bamboo-emulator/gen/grpc/services/accessv1"
+	"github.com/dapperlabs/bamboo-emulator/types"
 )
 
 type Client struct {
@@ -39,13 +40,16 @@ func (c *Client) Close() {
 }
 
 // SendTransaction submits a transaction to an access node.
-func (c *Client) SendTransaction(ctx context.Context, tx *data.Transaction) error {
+func (c *Client) SendTransaction(ctx context.Context, tx *types.SignedTransaction) error {
 	txMsg := &accessv1.SendTransactionRequest_Transaction{
-		ToAddress:      tx.ToAddress.Bytes(),
-		Script:         tx.Script,
-		Nonce:          tx.Nonce,
-		ComputeLimit:   tx.ComputeLimit,
-		PayerSignature: tx.PayerSignature,
+		ToAddress:    tx.ToAddress.Bytes(),
+		Script:       tx.Script,
+		Nonce:        tx.Nonce,
+		ComputeLimit: tx.ComputeLimit,
+		PayerSignature: &accessv1.Signature{
+			AccountAddress: tx.PayerSignature.Account.Bytes(),
+			Signature:      tx.PayerSignature.Sig,
+		},
 	}
 
 	_, err := c.grpcClient.SendTransaction(
@@ -108,7 +112,7 @@ func (c *Client) GetBlockByNumber(ctx context.Context, n uint64) (*data.Block, e
 }
 
 // GetTransaction fetches a transaction by hash.
-func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*data.Transaction, error) {
+func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.SignedTransaction, error) {
 	res, err := c.grpcClient.GetTransaction(
 		ctx,
 		&accessv1.GetTransactionRequest{Hash: h.Bytes()},
@@ -118,15 +122,19 @@ func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*data.Trans
 	}
 
 	tx := res.GetTransaction()
+	payerSig := tx.GetPayerSignature()
 
-	return &data.Transaction{
-		ToAddress:      crypto.BytesToAddress(tx.GetToAddress()),
-		Script:         tx.GetScript(),
-		Nonce:          tx.GetNonce(),
-		ComputeLimit:   tx.GetComputeLimit(),
-		ComputeUsed:    tx.GetComputeUsed(),
-		PayerSignature: tx.GetPayerSignature(),
-		Status:         data.TxStatus(tx.GetStatus()),
+	return &types.SignedTransaction{
+		ToAddress:    crypto.BytesToAddress(tx.GetToAddress()),
+		Script:       tx.GetScript(),
+		Nonce:        tx.GetNonce(),
+		ComputeLimit: tx.GetComputeLimit(),
+		ComputeUsed:  tx.GetComputeUsed(),
+		PayerSignature: &crypto.Signature{
+			Account: crypto.BytesToAddress(payerSig.GetAccountAddress()),
+			Sig:     payerSig.GetSignature(),
+		},
+		Status: data.TxStatus(tx.GetStatus()),
 	}, nil
 }
 
