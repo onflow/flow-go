@@ -201,10 +201,12 @@ Contracts are not intended to work with values with error margins and therefore 
 
 Numbers can be written in various bases. Numbers are assumed to be decimal by default. Non-decimal literals have a specific prefix.
 
-- **Decimal**: no prefix, one or more numbers (`0` to `9`)
-- **Binary**: `0b` prefix, followed by one or more zeros or ones (`0` or `1`)
-- **Octal**: `0o` prefix, followed by one or more numbers in the range `0` to `7`
-- **Hexadecimal**: `0x` prefix, followed by one or more numbers or characters `a` to `f`, lowercase or uppercase
+| Numeral system  | Prefix | Characters                                                            |
+|:----------------|:-------|:----------------------------------------------------------------------|
+| **Decimal**     | *None* | one or more numbers (`0` to `9`)                                      |
+| **Binary**      | `0b`   | one or more zeros or ones (`0` or `1`)                                |
+| **Octal**       | `0o`   | one or more numbers in the range `0` to `7`                           |
+| **Hexadecimal** | `0x`   | one or more numbers, or characters `a` to `f`, lowercase or uppercase |
 
 ```typescript
 // a decimal number
