@@ -1423,7 +1423,10 @@ An interface is an abstract type that specifies the behavior of types that *impl
 <!-- TODO also contracts, once documented -->
 Interfaces can be implemented by classes and structures. Types may implement multiple interfaces.
 
-Interfaces consist of the functions and fields, as well as their access, that an implementation must provide. Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions. Field requirements consist of the name and the type of the field.
+Interfaces consist of the functions and fields, as well as their access, that an implementation must provide. Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions. 
+
+Field requirements consist of the name and the type of the field. Field requirements may optionaly declare a getter requirement and a setter requirement, each with preconditions and postconditions.
+
 
 ### Inferface Declaration
 
@@ -1437,12 +1440,18 @@ The special type `This` can be used to refer to the type implementing the interf
 interface Vault {
 
     // require the implementation to provide a field for the balance
-    // that is readable in outer scopes.
+    // that is readable in outer scopes. the read balance must always be positive.
     //
     // NOTE: no requirement is made for the kind of field,
     // it can be either variable or constant in the implementation
     //
-    pub balance: Int
+    pub balance: Int {
+        get {
+            ensure {
+                result >= 0
+            }
+        }
+    }
 
     // require the implementation to provide an initializer that
     // given the initial balance, must initialize the balance field
@@ -1455,8 +1464,8 @@ interface Vault {
         // NOTE: no code
     }
 
-    // require the implementation to provide a function that adds an amount to the balance.
-    // the given amount must be positive
+    // require the implementation to provide a function that adds
+    // an amount to the balance. the given amount must be positive
     //
     fun add(amount: Int) {
         require {
