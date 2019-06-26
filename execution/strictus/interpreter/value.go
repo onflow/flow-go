@@ -18,6 +18,10 @@ type BoolValue bool
 
 func (BoolValue) isValue() {}
 
+func (v BoolValue) Negate() BoolValue {
+	return !v
+}
+
 // ArrayValue
 
 type ArrayValue []interface{}
@@ -29,6 +33,7 @@ func (ArrayValue) isValue() {}
 type IntValue interface {
 	Value
 	IntValue() int
+	Negate() IntValue
 	Plus(other IntValue) IntValue
 	Minus(other IntValue) IntValue
 	Mod(other IntValue) IntValue
@@ -48,6 +53,10 @@ func (Int8Value) isValue() {}
 
 func (e Int8Value) IntValue() int {
 	return int(e)
+}
+
+func (e Int8Value) Negate() IntValue {
+	return -e
 }
 
 func (e Int8Value) Plus(other IntValue) IntValue {
@@ -96,6 +105,10 @@ func (e Int16Value) IntValue() int {
 	return int(e)
 }
 
+func (e Int32Value) Negate() IntValue {
+	return -e
+}
+
 func (e Int16Value) Plus(other IntValue) IntValue {
 	return e + other.(Int16Value)
 }
@@ -140,6 +153,10 @@ func (Int32Value) isValue() {}
 
 func (e Int32Value) IntValue() int {
 	return int(e)
+}
+
+func (e Int16Value) Negate() IntValue {
+	return -e
 }
 
 func (e Int32Value) Plus(other IntValue) IntValue {
@@ -188,6 +205,10 @@ func (e Int64Value) IntValue() int {
 	return int(e)
 }
 
+func (e Int64Value) Negate() IntValue {
+	return -e
+}
+
 func (e Int64Value) Plus(other IntValue) IntValue {
 	return e + other.(Int64Value)
 }
@@ -234,6 +255,10 @@ func (e UInt8Value) IntValue() int {
 	return int(e)
 }
 
+func (e UInt8Value) Negate() IntValue {
+	return -e
+}
+
 func (e UInt8Value) Plus(other IntValue) IntValue {
 	return e + other.(UInt8Value)
 }
@@ -278,6 +303,9 @@ func (UInt16Value) isValue() {}
 
 func (e UInt16Value) IntValue() int {
 	return int(e)
+}
+func (e UInt16Value) Negate() IntValue {
+	return -e
 }
 
 func (e UInt16Value) Plus(other IntValue) IntValue {
@@ -326,6 +354,10 @@ func (e UInt32Value) IntValue() int {
 	return int(e)
 }
 
+func (e UInt32Value) Negate() IntValue {
+	return -e
+}
+
 func (e UInt32Value) Plus(other IntValue) IntValue {
 	return e + other.(UInt32Value)
 }
@@ -370,6 +402,10 @@ func (UInt64Value) isValue() {}
 
 func (e UInt64Value) IntValue() int {
 	return int(e)
+}
+
+func (e UInt64Value) Negate() IntValue {
+	return -e
 }
 
 func (e UInt64Value) Plus(other IntValue) IntValue {

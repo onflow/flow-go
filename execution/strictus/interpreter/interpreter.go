@@ -225,6 +225,11 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 			return BoolValue(leftInt == rightInt)
 		case ast.OperationUnequal:
 			return BoolValue(leftInt != rightInt)
+		default:
+			panic(fmt.Sprintf(
+				"unsupported operation in integer binary expression: %s",
+				expression.Operation.String(),
+			))
 		}
 	}
 
@@ -240,6 +245,11 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 			return BoolValue(leftBool || rightBool)
 		case ast.OperationAnd:
 			return BoolValue(leftBool && rightBool)
+		default:
+			panic(fmt.Sprintf(
+				"unsupported operation in boolean binary expression: %s",
+				expression.Operation.String(),
+			))
 		}
 	}
 
@@ -249,6 +259,43 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 		left,
 		right,
 	))
+
+	return nil
+}
+
+func (interpreter *Interpreter) VisitUnaryExpression(expression ast.UnaryExpression) ast.Repr {
+	value := expression.Expression.Accept(interpreter)
+
+	switch expression.Operation {
+	case ast.OperationNegate:
+		boolValue, ok := value.(BoolValue)
+		if !ok {
+			panic(fmt.Sprintf(
+				"non-boolean value for unary negate: %s: %v",
+				expression.Operation.String(),
+				value,
+			))
+		}
+
+		return boolValue.Negate()
+
+	case ast.OperationMinus:
+		intValue, ok := value.(IntValue)
+		if !ok {
+			panic(fmt.Sprintf(
+				"non-integer value for unary minus: %s: %v",
+				expression.Operation.String(),
+				value,
+			))
+		}
+		return intValue.Negate()
+
+	default:
+		panic(fmt.Sprintf(
+			"unsupported operation in unary expression: %s",
+			expression.Operation.String(),
+		))
+	}
 
 	return nil
 }

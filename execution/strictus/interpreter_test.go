@@ -1124,7 +1124,7 @@ func TestInterpretConditionalOperator(t *testing.T) {
 	Expect(inter.Invoke("testFalse")).To(Equal(interpreter.Int64Value(3)))
 }
 
-func TestInterpreterInvalidAssignmentToParameter(t *testing.T) {
+func TestInterpretInvalidAssignmentToParameter(t *testing.T) {
 	RegisterTestingT(t)
 
 	program := parse(`
@@ -1138,7 +1138,7 @@ func TestInterpreterInvalidAssignmentToParameter(t *testing.T) {
 	Expect(func() { inter.Invoke("test") }).Should(Panic())
 }
 
-func TestInterpreterFunctionBindingInFunction(t *testing.T) {
+func TestInterpretFunctionBindingInFunction(t *testing.T) {
 	RegisterTestingT(t)
 
 	program := parse(`
@@ -1152,7 +1152,7 @@ func TestInterpreterFunctionBindingInFunction(t *testing.T) {
 	inter.Invoke("foo")
 }
 
-func TestInterpreterRecursion(t *testing.T) {
+func TestInterpretRecursion(t *testing.T) {
 	// mainly tests that the function declaration identifier is bound
 	// to the function inside the function and that the arguments
 	// of the function calls are evaluated in the call-site scope
@@ -1171,4 +1171,58 @@ func TestInterpreterRecursion(t *testing.T) {
 	inter := interpreter.NewInterpreter(program)
 	inter.Interpret()
 	Expect(inter.Invoke("fib", int64(23))).To(Equal(interpreter.Int64Value(28657)))
+}
+
+func TestInterpretUnaryIntegerNegation(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+       const x = -2
+       const y = -(-2)
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(inter.Globals["x"].Value).To(Equal(interpreter.Int64Value(-2)))
+	Expect(inter.Globals["y"].Value).To(Equal(interpreter.Int64Value(2)))
+}
+
+func TestInterpretUnaryBooleanNegation(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+       const a = !true
+       const b = !(!true)
+       const c = !false
+       const d = !(!false)
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(inter.Globals["a"].Value).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Globals["b"].Value).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Globals["c"].Value).To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Globals["d"].Value).To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+       const a = !1
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	Expect(func() { inter.Interpret() }).Should(Panic())
+}
+
+func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+       const a = -true
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	Expect(func() { inter.Interpret() }).Should(Panic())
 }

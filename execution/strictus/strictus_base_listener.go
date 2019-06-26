@@ -158,6 +158,12 @@ func (s *BaseStrictusListener) EnterMultiplicativeExpression(ctx *Multiplicative
 // ExitMultiplicativeExpression is called when production multiplicativeExpression is exited.
 func (s *BaseStrictusListener) ExitMultiplicativeExpression(ctx *MultiplicativeExpressionContext) {}
 
+// EnterUnaryExpression is called when production unaryExpression is entered.
+func (s *BaseStrictusListener) EnterUnaryExpression(ctx *UnaryExpressionContext) {}
+
+// ExitUnaryExpression is called when production unaryExpression is exited.
+func (s *BaseStrictusListener) ExitUnaryExpression(ctx *UnaryExpressionContext) {}
+
 // EnterPrimaryExpression is called when production primaryExpression is entered.
 func (s *BaseStrictusListener) EnterPrimaryExpression(ctx *PrimaryExpressionContext) {}
 
@@ -193,6 +199,12 @@ func (s *BaseStrictusListener) EnterMultiplicativeOp(ctx *MultiplicativeOpContex
 
 // ExitMultiplicativeOp is called when production multiplicativeOp is exited.
 func (s *BaseStrictusListener) ExitMultiplicativeOp(ctx *MultiplicativeOpContext) {}
+
+// EnterUnaryOp is called when production unaryOp is entered.
+func (s *BaseStrictusListener) EnterUnaryOp(ctx *UnaryOpContext) {}
+
+// ExitUnaryOp is called when production unaryOp is exited.
+func (s *BaseStrictusListener) ExitUnaryOp(ctx *UnaryOpContext) {}
 
 // EnterIdentifierExpression is called when production IdentifierExpression is entered.
 func (s *BaseStrictusListener) EnterIdentifierExpression(ctx *IdentifierExpressionContext) {}

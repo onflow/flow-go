@@ -80,6 +80,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#multiplicativeExpression.
 	VisitMultiplicativeExpression(ctx *MultiplicativeExpressionContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#unaryExpression.
+	VisitUnaryExpression(ctx *UnaryExpressionContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#primaryExpression.
 	VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{}
 
@@ -97,6 +100,9 @@ type StrictusVisitor interface {
 
 	// Visit a parse tree produced by StrictusParser#multiplicativeOp.
 	VisitMultiplicativeOp(ctx *MultiplicativeOpContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#unaryOp.
+	VisitUnaryOp(ctx *UnaryOpContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#IdentifierExpression.
 	VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{}

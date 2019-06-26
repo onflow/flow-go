@@ -287,6 +287,57 @@ func TestParseMissingReturnType(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
+func TestParseLeftAssociativity(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+        const a = 1 + 2 + 3
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Type:       Type(nil),
+		Value: BinaryExpression{
+			Operation: OperationPlus,
+			Left: BinaryExpression{
+				Operation: OperationPlus,
+				Left:      Int64Expression(1),
+				Right:     Int64Expression(2),
+			},
+			Right: Int64Expression(3),
+		},
+	}
+
+	expected := Program{
+		Declarations:    map[string]Declaration{"a": a},
+		AllDeclarations: []Declaration{a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
+	RegisterTestingT(t)
+
+	Expect(func() {
+		parse(`
+            var a = 1
+            const b = --a
+	    `)
+	}).To(Panic())
+}
+
+func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
+	RegisterTestingT(t)
+
+	Expect(func() {
+		parse(`
+            const b = !!true
+	    `)
+	}).To(Panic())
+}
+
 func TestParseTernaryRightAssociativity(t *testing.T) {
 	RegisterTestingT(t)
 
