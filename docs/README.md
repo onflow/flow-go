@@ -6,14 +6,14 @@ Specfic documentation for different components lives within the other packages o
 
 ## Contents
 
-- [Project setup](/setup.md)
-- [Testing](/testing.md)
-- [Code Style](/code-style.md)
-- [Concurrency Patterns](/concurrency.md)
+- [Project setup](setup.md)
+- [Testing](testing.md)
+- [Code Style](code-style.md)
+- [Concurrency Patterns](concurrency.md)
 - Streams
-  - [Pre-execution](/streams/pre-execution.md)
-  - [Execution](/streams/execution.md)
-  - [Post-execution](/streams/post-execution.md)
-  - [Consensus](/streams/consensus.md)
-  - [Networking](/streams/networking.md)
-  - [Keystone](/streams/keystone.md)
+  - [Pre-execution](streams/pre-execution.md)
+  - [Execution](streams/execution.md)
+  - [Post-execution](streams/post-execution.md)
+  - [Consensus](streams/consensus.md)
+  - [Networking](streams/networking.md)
+  - [Keystone](streams/keystone.md)

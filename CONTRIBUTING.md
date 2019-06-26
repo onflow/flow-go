@@ -67,4 +67,4 @@ Each PR that you open should include necessary tests to ensure the correctness a
 
 ## Code Standards
 
-The Bamboo project has a high standard for code quality and expects all submitted PRs to meet the guidelines outlined in our [code style guide](/docs/code-style.md).
+The Bamboo project has a high standard for code quality and expects all submitted PRs to meet the guidelines outlined in our [code style guide](docs/code-style.md).

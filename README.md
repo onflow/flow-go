@@ -12,8 +12,8 @@ You can find a high-level overview of the Bamboo architecture on the [documentat
 
 ### Code Documentation
 
-The application-level documentation for Bamboo lives inside each of the sub-packages of this repository. To get started, take a look at the [documentation folder](/docs).
+The application-level documentation for Bamboo lives inside each of the sub-packages of this repository. To get started, take a look at the [documentation folder](docs).
 
 ## Contributing
 
-Read our [contributing guide](/CONTRIBUTING.md) to learn about our development process and start contributing.
+Read our [contributing guide](CONTRIBUTING.md) to learn about our development process and start contributing.
