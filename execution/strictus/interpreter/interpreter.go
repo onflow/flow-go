@@ -67,14 +67,15 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 		parameterTypes = append(parameterTypes, parameter.Type)
 	}
 
+	functionType := ast.FunctionType{
+		ParameterTypes: parameterTypes,
+		ReturnType:     declaration.ReturnType,
+	}
 	variableDeclaration := ast.VariableDeclaration{
-		Value:      expression,
-		Identifier: declaration.Identifier,
-		IsConst:    true,
-		Type: ast.FunctionType{
-			ParameterTypes: parameterTypes,
-			ReturnType:     declaration.ReturnType,
-		},
+		Value:         expression,
+		Identifier:    declaration.Identifier,
+		IsConst:       true,
+		Type:          functionType,
 		StartPosition: declaration.StartPosition,
 		EndPosition:   declaration.EndPosition,
 	}
