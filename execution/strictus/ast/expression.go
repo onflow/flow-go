@@ -36,7 +36,9 @@ func (e IntExpression) Accept(v Visitor) Repr {
 // ArrayExpression
 
 type ArrayExpression struct {
-	Values []Expression
+	Values        []Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (ArrayExpression) isExpression() {}
@@ -49,6 +51,7 @@ func (e ArrayExpression) Accept(v Visitor) Repr {
 
 type IdentifierExpression struct {
 	Identifier string
+	Position   Position
 }
 
 func (IdentifierExpression) isExpression() {}
@@ -60,8 +63,10 @@ func (e IdentifierExpression) Accept(v Visitor) Repr {
 // InvocationExpression
 
 type InvocationExpression struct {
-	Expression Expression
-	Arguments  []Expression
+	Expression    Expression
+	Arguments     []Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (InvocationExpression) isExpression() {}
@@ -79,8 +84,10 @@ type AccessExpression interface {
 // MemberExpression
 
 type MemberExpression struct {
-	Expression Expression
-	Identifier string
+	Expression    Expression
+	Identifier    string
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (MemberExpression) isExpression()       {}
