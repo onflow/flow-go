@@ -37,7 +37,7 @@ func NewWorldState(log *logrus.Logger) (*WorldState, error) {
 		return nil, err
 	}
 
-	log.WithFields({
+	log.WithFields(logrus.Fields{
 		"filename": crypto.MnemonicFile,
 	}).Infof(
 		"Loading mnemonic file from: %s",
