@@ -1139,7 +1139,7 @@ public const b = 2
 public class SomeClass {
     // private constant field,
     // only readable in class functions
-    private const a = 1
+    private const a: Int
 
     // public constant field,
     // readable in all scopes
