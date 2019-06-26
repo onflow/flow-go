@@ -1307,6 +1307,208 @@ public class SomeClass {
 }
 ```
 
+## Interfaces
+
+> Status: Interfaces are not implemented yet.
+
+An interface is an abstract type that specifies the behavior of types that *implement* the interface. Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
+<!-- TODO also contracts, once documented -->
+Interfaces can be implemented by classes and structures. Types may implement multiple interfaces.
+
+Interfaces consist of the functions and fields, as well as their access, that an implementation must provide. Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions. Field requirements consist of the name and the type of the field.
+
+### Inferface Declaration
+
+Interfaces are declared using the `interface` keyword, followed by the name of the interface, and the requirements enclosed in opening and closing braces. Fields can be annotated to be variable or constant, and how they can be accessed, but do not have to be annotated.
+
+The special type `This` can be used to refer to the type implementing the interface.
+
+```typescript
+// declare an interface for a vault: a container for a balance
+//
+interface Vault {
+
+    // require the implementation to provide a field for the balance
+    // that is readable in outer scopes.
+    //
+    // NOTE: no requirement is made for the kind of field,
+    // it can be either variable or constant in the implementation
+    //
+    pub balance: Int
+
+    // require the implementation to provide an initializer that
+    // given the initial balance, must initialize the balance field
+    //
+    init(initialBalance: Int) {
+        ensure {
+            this.balance == initialBalance
+        }
+
+        // NOTE: no code
+    }
+
+    // require the implementation to provide a function that adds an amount to the balance.
+    // the given amount must be positive
+    //
+    fun add(amount: Int) {
+        require {
+            amount > 0
+        }
+        ensure {
+            this.balance == before(this.balance) + amount
+        }
+
+        // NOTE: no code
+    }
+
+    // require the implementation to provide a function that transfers an amount
+    // from this vaults balance to another vault's balance. The receiving balance
+    // must be of the same type – a transfer to a vault of another type is not possible
+    // as the balance of it would only be readable
+    //
+    fun transfer(receivingVault: This, amount: Int) {
+        require {
+            amount > 0
+            amount <= this.balance
+        }
+        ensure {
+            this.balance == before(this.balance) - amount
+            receivingVault.balance == before(receivingVault.balance) + amount
+        }
+
+        // NOTE: no code
+    }
+}
+```
+
+Note that the required initializer and function do not have any executable code.
+
+### Interface Implementation
+
+Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the class or structure that should provide the functionality.
+
+```typescript
+// declare a class called ExampleVault with a variable balance field,
+// that can be written by functions of the class, but only read in outer scopes
+//
+class ExampleVault {
+
+    // implement the required variable field balance for the Vault interface,
+    // that the ExampleVault type can write to, and that is only readable
+    // in outer scopes
+    //
+    pub var balance: Int
+
+    // implement the required initializer for the Vault interface:
+    // accept an initial balance and initialize the balance field.
+    // this implementation satisfies the required postcondition
+    //
+    // NOTE: the postcondition does not have to be repeated
+    //
+    init(initialBalance: Int) {
+        this.balance = initialBalance
+    }
+}
+
+
+// declare the implementation of the Vault interface for the ExampleVault class
+//
+impl Vault for ExampleVault {
+
+    // implement the required function add for the Vault interface,
+    // that adds an amount to the vault's balance.
+    //
+    // this implementation satisfies the required postcondition
+    //
+    // NOTE: neither the precondition, nor the postcondition have to be repeated
+    //
+    fun add(amount: Int) {
+        this.balance = this.balance + amount
+    }
+
+    // implement the required function transfer for the Vault interface,
+    // that subtracts the amount from the this vault's balance,
+    // and adds the amount to the receiving vault's balance.
+    //
+    // NOTE: the type of the receiving vault parameter is ExampleVault,
+    // i.e., an amount can only be transfered to a vault of the same type
+    //
+    // this implementation satisfies the required postconditions
+    //
+    // NOTE: neither the precondition, nor the postcondition have to be repeated
+    //
+    fun transfer(receivingVault: ExampleVault, amount: Int) {
+        this.balance -= amount
+        receivingVault.amount += amount
+    }
+}
+
+// declare and create two example vaults
+//
+const vault = ExampleVault(100)
+const otherVault = ExampleVault(0)
+
+// transfer 10 units from the first vault to the second vault.
+// the amount satisifes the precondition of the Vault interface's transfer function
+//
+vault.transfer(otherVault, 10)
+
+// the postcondition of the Vault interface's transfer function ensured
+// the balances of the vaults were updated properly
+//
+// vault.balance is 90
+// otherVault.balance is 10
+
+// error: precondition not satisfied: amount is larger than balance (100 > 90)
+//
+vault.transfer(otherVault, 100)
+```
+
+### Interface Type
+
+Interfaces are types. Values implementing an interface can be used as initial values for constants that have the interface as their type.
+
+```typescript
+// declare a constant that has type Vault, which has a value of type ExampleVault
+//
+const vault: Vault = ExampleVault(100)
+```
+
+Values implementing an interface are assignable to variables that have the interface as their type.
+
+```typescript
+// assume there is a declaration for another implementation
+// of the Vault interface called CoolVault
+
+// declare a variable that has type Vault, which has an initial value of type CoolVault
+//
+var someVault: Vault = CoolVault(100)
+
+// assign a different type of vault
+//
+someVault = ExampleVault(50)
+
+
+// invalid: type mismatch
+//
+const exampleVault: ExampleVault = CoolVault(100)
+```
+
+Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type implementing the interface.
+
+```typescript
+const someVault: Vault = ExampleVault(100)
+
+// access the balance field of the Vault interface type
+//
+someVault.balance // is 100
+
+// call the add function of Vault interface type
+someVault.add(50)
+
+// someVault.balance is 150
+```
+
 ## Authorizations
 
 > Status: Authorizations are not implemented yet.
