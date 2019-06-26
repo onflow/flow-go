@@ -100,8 +100,10 @@ func (e MemberExpression) Accept(v Visitor) Repr {
 // IndexExpression
 
 type IndexExpression struct {
-	Expression Expression
-	Index      Expression
+	Expression    Expression
+	Index         Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (IndexExpression) isExpression()       {}
@@ -114,9 +116,11 @@ func (e IndexExpression) Accept(v Visitor) Repr {
 // ConditionalExpression
 
 type ConditionalExpression struct {
-	Test Expression
-	Then Expression
-	Else Expression
+	Test          Expression
+	Then          Expression
+	Else          Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (ConditionalExpression) isExpression() {}
@@ -128,8 +132,10 @@ func (e ConditionalExpression) Accept(v Visitor) Repr {
 // UnaryExpression
 
 type UnaryExpression struct {
-	Operation  Operation
-	Expression Expression
+	Operation     Operation
+	Expression    Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (UnaryExpression) isExpression() {}
@@ -141,9 +147,11 @@ func (e UnaryExpression) Accept(v Visitor) Repr {
 // BinaryExpression
 
 type BinaryExpression struct {
-	Operation Operation
-	Left      Expression
-	Right     Expression
+	Operation     Operation
+	Left          Expression
+	Right         Expression
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (BinaryExpression) isExpression() {}
@@ -155,9 +163,11 @@ func (e BinaryExpression) Accept(v Visitor) Repr {
 // FunctionExpression
 
 type FunctionExpression struct {
-	Parameters []Parameter
-	ReturnType Type
-	Block      Block
+	Parameters    []Parameter
+	ReturnType    Type
+	Block         Block
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (FunctionExpression) isExpression() {}

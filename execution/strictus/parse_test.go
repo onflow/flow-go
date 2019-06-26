@@ -168,7 +168,305 @@ func TestParseMemberExpression(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
-func TestParseBlock(t *testing.T) {
+func TestParseIndexExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    const a = b[1]
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Value: IndexExpression{
+			Expression: IdentifierExpression{
+				Identifier: "b",
+				Position:   Position{Offset: 16, Line: 2, Column: 15},
+			},
+			Index: IntExpression{
+				Value:    big.NewInt(1),
+				Position: Position{Offset: 18, Line: 2, Column: 17},
+			},
+			StartPosition: Position{Offset: 17, Line: 2, Column: 16},
+			EndPosition:   Position{Offset: 19, Line: 2, Column: 18},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{a},
+		Declarations:    map[string]Declaration{"a": a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseUnaryExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    const a = -b
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Value: UnaryExpression{
+			Operation: OperationMinus,
+			Expression: IdentifierExpression{
+				Identifier: "b",
+				Position:   Position{Offset: 17, Line: 2, Column: 16},
+			},
+			StartPosition: Position{Offset: 16, Line: 2, Column: 15},
+			EndPosition:   Position{Offset: 17, Line: 2, Column: 16},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{a},
+		Declarations:    map[string]Declaration{"a": a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseOrExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+        const a = false || true
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Type:       Type(nil),
+		Value: BinaryExpression{
+			Operation: OperationOr,
+			Left: BoolExpression{
+				Value:    false,
+				Position: Position{Offset: 19, Line: 2, Column: 18},
+			},
+			Right: BoolExpression{
+				Value:    true,
+				Position: Position{Offset: 28, Line: 2, Column: 27},
+			},
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
+		},
+	}
+
+	expected := Program{
+		Declarations:    map[string]Declaration{"a": a},
+		AllDeclarations: []Declaration{a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseAndExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+        const a = false && true
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Type:       Type(nil),
+		Value: BinaryExpression{
+			Operation: OperationAnd,
+			Left: BoolExpression{
+				Value:    false,
+				Position: Position{Offset: 19, Line: 2, Column: 18},
+			},
+			Right: BoolExpression{
+				Value:    true,
+				Position: Position{Offset: 28, Line: 2, Column: 27},
+			},
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
+		},
+	}
+
+	expected := Program{
+		Declarations:    map[string]Declaration{"a": a},
+		AllDeclarations: []Declaration{a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseEqualityExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+        const a = false == true
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Type:       Type(nil),
+		Value: BinaryExpression{
+			Operation: OperationEqual,
+			Left: BoolExpression{
+				Value:    false,
+				Position: Position{Offset: 19, Line: 2, Column: 18},
+			},
+			Right: BoolExpression{
+				Value:    true,
+				Position: Position{Offset: 28, Line: 2, Column: 27},
+			},
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
+		},
+	}
+
+	expected := Program{
+		Declarations:    map[string]Declaration{"a": a},
+		AllDeclarations: []Declaration{a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseRelationalExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+        const a = 1 < 2
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Type:       Type(nil),
+		Value: BinaryExpression{
+			Operation: OperationLess,
+			Left: IntExpression{
+				Value:    big.NewInt(1),
+				Position: Position{Offset: 19, Line: 2, Column: 18},
+			},
+			Right: IntExpression{
+				Value:    big.NewInt(2),
+				Position: Position{Offset: 23, Line: 2, Column: 22},
+			},
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 23, Line: 2, Column: 22},
+		},
+	}
+
+	expected := Program{
+		Declarations:    map[string]Declaration{"a": a},
+		AllDeclarations: []Declaration{a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseAdditiveExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+        const a = 1 + 2
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Type:       Type(nil),
+		Value: BinaryExpression{
+			Operation: OperationPlus,
+			Left: IntExpression{
+				Value:    big.NewInt(1),
+				Position: Position{Offset: 19, Line: 2, Column: 18},
+			},
+			Right: IntExpression{
+				Value:    big.NewInt(2),
+				Position: Position{Offset: 23, Line: 2, Column: 22},
+			},
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 23, Line: 2, Column: 22},
+		},
+	}
+
+	expected := Program{
+		Declarations:    map[string]Declaration{"a": a},
+		AllDeclarations: []Declaration{a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseMultiplicativeExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+        const a = 1 * 2
+	`)
+
+	a := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "a",
+		Type:       Type(nil),
+		Value: BinaryExpression{
+			Operation: OperationMul,
+			Left: IntExpression{
+				Value:    big.NewInt(1),
+				Position: Position{Offset: 19, Line: 2, Column: 18},
+			},
+			Right: IntExpression{
+				Value:    big.NewInt(2),
+				Position: Position{Offset: 23, Line: 2, Column: 22},
+			},
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 23, Line: 2, Column: 22},
+		},
+	}
+
+	expected := Program{
+		Declarations:    map[string]Declaration{"a": a},
+		AllDeclarations: []Declaration{a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseFunctionExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual := parse(`
+	    const test = fun () { return }
+	`)
+
+	test := VariableDeclaration{
+		IsConst:    true,
+		Identifier: "test",
+		Value: FunctionExpression{
+			ReturnType: VoidType{},
+			Block: Block{
+				Statements: []Statement{
+					ReturnStatement{},
+				},
+				// NOTE: block is statements *inside* curly braces
+				StartPosition: Position{Offset: 28, Line: 2, Column: 27},
+				EndPosition:   Position{Offset: 28, Line: 2, Column: 27},
+			},
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 35, Line: 2, Column: 34},
+		},
+	}
+
+	expected := Program{
+		AllDeclarations: []Declaration{test},
+		Declarations:    map[string]Declaration{"test": test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseFunctionAndBlock(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual := parse(`
@@ -187,6 +485,8 @@ func TestParseBlock(t *testing.T) {
 			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
 			EndPosition:   Position{Offset: 19, Line: 2, Column: 18},
 		},
+		StartPosition: Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:   Position{Offset: 26, Line: 2, Column: 25},
 	}
 
 	expected := Program{
@@ -508,6 +808,8 @@ func TestParseMissingReturnType(t *testing.T) {
 				StartPosition: Position{Offset: 49, Line: 3, Column: 21},
 				EndPosition:   Position{Offset: 49, Line: 3, Column: 21},
 			},
+			StartPosition: Position{Offset: 40, Line: 3, Column: 12},
+			EndPosition:   Position{Offset: 56, Line: 3, Column: 28},
 		},
 	}
 
@@ -542,11 +844,15 @@ func TestParseLeftAssociativity(t *testing.T) {
 					Value:    big.NewInt(2),
 					Position: Position{Offset: 23, Line: 2, Column: 22},
 				},
+				StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+				EndPosition:   Position{Offset: 23, Line: 2, Column: 22},
 			},
 			Right: IntExpression{
 				Value:    big.NewInt(3),
 				Position: Position{Offset: 27, Line: 2, Column: 26},
 			},
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 27, Line: 2, Column: 26},
 		},
 	}
 
@@ -603,6 +909,8 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 					Value:    big.NewInt(1),
 					Position: Position{Offset: 23, Line: 2, Column: 22},
 				},
+				StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+				EndPosition:   Position{Offset: 23, Line: 2, Column: 22},
 			},
 			Then: IntExpression{
 				Value:    big.NewInt(0),
@@ -619,6 +927,8 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 						Value:    big.NewInt(2),
 						Position: Position{Offset: 55, Line: 4, Column: 16},
 					},
+					StartPosition: Position{Offset: 51, Line: 4, Column: 12},
+					EndPosition:   Position{Offset: 55, Line: 4, Column: 16},
 				},
 				Then: IntExpression{
 					Value:    big.NewInt(1),
@@ -628,7 +938,11 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 					Value:    big.NewInt(2),
 					Position: Position{Offset: 63, Line: 4, Column: 24},
 				},
+				StartPosition: Position{Offset: 51, Line: 4, Column: 12},
+				EndPosition:   Position{Offset: 63, Line: 4, Column: 24},
 			},
+			StartPosition: Position{Offset: 19, Line: 2, Column: 18},
+			EndPosition:   Position{Offset: 63, Line: 4, Column: 24},
 		},
 	}
 

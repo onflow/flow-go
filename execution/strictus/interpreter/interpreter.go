@@ -52,9 +52,11 @@ func (interpreter *Interpreter) VisitProgram(program ast.Program) ast.Repr {
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.FunctionDeclaration) ast.Repr {
 	expression := ast.FunctionExpression{
-		Parameters: declaration.Parameters,
-		ReturnType: declaration.ReturnType,
-		Block:      declaration.Block,
+		Parameters:    declaration.Parameters,
+		ReturnType:    declaration.ReturnType,
+		Block:         declaration.Block,
+		StartPosition: declaration.StartPosition,
+		EndPosition:   declaration.EndPosition,
 	}
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
