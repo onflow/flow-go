@@ -1165,7 +1165,108 @@ token.balance = 1
 token.id = 23
 ```
 
-Structures and classes may contain functions. Just like in the initializer, the special constant `this` refers to the structure or class that the function is called on.
+### Structure and Class Field Getters and Setters
+
+Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are function that are called when a field is written.
+
+Getters and setters are enclosed in opening and closing braces, after the field's type.
+
+Getters are declared using the `get` keyword. Getters have no parameters and their return type is implicitly the type of the field.
+
+```typescript
+struct GetterExample {
+
+    // declare a variable field with a getter
+    // which ensures the read value is always positive
+    //
+    var balance: Int {
+        get {
+           ensure {
+               result >= 0
+           }
+
+           if this.balance < 0 {
+               return 0
+           }
+
+           return this.balance
+        }
+    }
+
+    init(balance: Int) {
+        balance = balance
+    }
+}
+
+const example = GetterExample(10)
+// example. balance is 10
+
+example. balance = -50
+// example.balance is 0
+```
+
+Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parantheses. The parameter has implicitly the type of the field. Another type can not be specified. Setters have no return type.
+
+```typescript
+struct SetterExample {
+
+    // declare a variable field with a setter
+    // which ensures the written value is always positive
+    //
+    var balance: Int {
+       set(newBalance) {
+           require {
+               newBalance >= 0
+           }
+           this.balance = newBalance
+       }
+    }
+}
+```
+
+If a field has both a getter and a setter, and neither of them read from/write to the field, the field is *synthetic*. Synthetic fields **must** be declared as such using the `synthetic` keyword. Synthetic fields are neither variable nor constant.
+
+```typescript
+struct GoalTracker {
+
+    var goal: Int
+    var completed: Int
+
+    pub synthetic left: Double {
+        get {
+            return this.goal - this.completed
+        }
+
+        set(newLeft) {
+            this.completed = this.goal - newLeft
+        }
+    }
+
+    init(goal: Int, completed: Int) {
+        this.goal = goal
+        this.completed = completed
+    }
+}
+
+const tracker = GoalTracker(10, 0)
+// tracker.goal is 10
+// tracker.completed is 0
+// tracker.left is 10
+
+tracker.completed = 1
+// tracker.left is 9
+
+tracker.left = 8
+// tracker.completed is 2
+
+// NOTE: the tracker only implementats some functionality to demonstrate
+// synthesized fields, it is incomplete (e.g. assignments to goal are not handled)
+```
+
+
+### Structure and Class Functions
+
+Structures and classes may contain functions. Just like in the initializer, the special constant `this` refers to the structure or class value that the function is called on.
 
 ```typescript
 struct Token {
@@ -1186,6 +1287,8 @@ const token = Token(32, 0)
 token.mint(1_000_000)
 // token.balance is 1_000_000
 ```
+
+### Structure and Class Behaviour
 
 The only difference between structures and classes is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types.
 
@@ -1241,6 +1344,7 @@ classB.value = 1
 Note the different values in the last line of each example.
 
 There is **no** support for nulls, i.e., a constant or variable of a reference type must always be bound to an instance of the type. There is *no* `null`.
+
 
 ## Access control
 
