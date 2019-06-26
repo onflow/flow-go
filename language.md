@@ -729,6 +729,22 @@ factorial(5) // is 120
 factorial(-2)
 ```
 
+In postconditions, the special function `before` can be used to get the value of an expression just before the function is called.
+
+```typescript
+var n = 0
+
+fun incrementN() {
+    ensure {
+        // require the new value of n to be the old value of n, plus one
+        n == before(n) + 1
+    }
+    n = n + 1
+}
+```
+
+
+
 ## Control flow
 
 Control flow statements control the flow of execution in a function.
