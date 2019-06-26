@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/dapperlabs/bamboo-emulator/server"
 )
 
 // emulatorCmd represents the emulator command
@@ -16,7 +18,7 @@ var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Starts the Bamboo Emulator Server",
 	Run: func(cmd *cobra.Command, args []string) {
-		StartServer()
+		server.StartServer(log, conf)
 	},
 }
 

@@ -1,13 +1,14 @@
-package cmd
+package server
 
 import (
 	"context"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/dapperlabs/bamboo-emulator/data"
 	"github.com/dapperlabs/bamboo-emulator/nodes/access"
 	"github.com/dapperlabs/bamboo-emulator/nodes/security"
-	"github.com/dapperlabs/bamboo-emulator/server"
 )
 
 type Config struct {
@@ -16,7 +17,8 @@ type Config struct {
 	BlockInterval      time.Duration `default:"5s"`
 }
 
-func StartServer() {
+// StartServer starts up an instance of a Bamboo Emulator server.
+func StartServer(log *logrus.Logger, conf Config) {
 	log.WithField("port", conf.Port).Info("Starting emulator server...")
 
 	collections := make(chan *data.Collection, 16)
@@ -43,7 +45,7 @@ func StartServer() {
 		log,
 	)
 
-	emulatorServer := server.NewServer(accessNode)
+	emulatorServer := NewServer(accessNode)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

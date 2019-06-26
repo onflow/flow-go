@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dapperlabs/bamboo-emulator/config"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/dapperlabs/bamboo-emulator/config"
+	"github.com/dapperlabs/bamboo-emulator/server"
 )
 
 var (
-	conf Config
+	conf server.Config
 	log  *logrus.Logger
 )
 
