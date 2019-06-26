@@ -200,8 +200,14 @@ func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {
 			statement.Accept(v).(ast.Statement),
 		)
 	}
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.PositionFromToken(ctx.GetStop())
+
 	return ast.Block{
-		Statements: statements,
+		Statements:    statements,
+		StartPosition: startPosition,
+		EndPosition:   endPosition,
 	}
 }
 
@@ -276,7 +282,11 @@ func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 		ifStatementContext := ctx.IfStatement()
 		if ifStatementContext != nil {
 			if ifStatement, ok := ifStatementContext.Accept(v).(ast.IfStatement); ok {
-				elseBlock = ast.Block{Statements: []ast.Statement{ifStatement}}
+				elseBlock = ast.Block{
+					Statements:    []ast.Statement{ifStatement},
+					StartPosition: ifStatement.StartPosition,
+					EndPosition:   ifStatement.EndPosition,
+				}
 			}
 		}
 	}
@@ -577,7 +587,11 @@ func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interfa
 	if err != nil {
 		panic(fmt.Sprintf("invalid boolean literal: %s", text))
 	}
-	return ast.BoolExpression(value)
+
+	return ast.BoolExpression{
+		Value:    value,
+		Position: ast.PositionFromToken(ctx.GetStart()),
+	}
 }
 
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {

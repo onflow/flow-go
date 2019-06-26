@@ -1,7 +1,9 @@
 package ast
 
 type Block struct {
-	Statements []Statement
+	Statements    []Statement
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (b Block) Accept(visitor Visitor) Repr {

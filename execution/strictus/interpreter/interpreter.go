@@ -306,7 +306,7 @@ func (interpreter *Interpreter) VisitExpressionStatement(statement ast.Expressio
 }
 
 func (interpreter *Interpreter) VisitBoolExpression(expression ast.BoolExpression) ast.Repr {
-	return BoolValue(expression)
+	return BoolValue(expression.Value)
 }
 
 func (interpreter *Interpreter) VisitIntExpression(expression ast.IntExpression) ast.Repr {

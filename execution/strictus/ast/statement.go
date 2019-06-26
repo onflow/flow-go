@@ -20,9 +20,11 @@ func (s ReturnStatement) Accept(visitor Visitor) Repr {
 // IfStatement
 
 type IfStatement struct {
-	Test Expression
-	Then Block
-	Else Block
+	Test          Expression
+	Then          Block
+	Else          Block
+	StartPosition Position
+	EndPosition   Position
 }
 
 func (IfStatement) isStatement() {}

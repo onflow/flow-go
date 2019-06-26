@@ -9,7 +9,10 @@ type Expression interface {
 
 // BoolExpression
 
-type BoolExpression bool
+type BoolExpression struct {
+	Value    bool
+	Position Position
+}
 
 func (BoolExpression) isExpression() {}
 
@@ -20,7 +23,8 @@ func (e BoolExpression) Accept(v Visitor) Repr {
 // IntExpression
 
 type IntExpression struct {
-	Value *big.Int
+	Value    *big.Int
+	Position Position
 }
 
 func (IntExpression) isExpression() {}
