@@ -26,5 +26,5 @@ func init() {
 	rootCmd.AddCommand(emulatorCmd)
 	emulatorCmd.AddCommand(startCmd)
 
-	emulatorCmd.PersistentFlags().IntVar(&conf.Port, "port", 0, "port to run emulator server on")
+	emulatorCmd.PersistentFlags().IntVarP(&conf.Port, "port", "p", 0, "port to run emulator server on")
 }

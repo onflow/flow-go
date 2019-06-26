@@ -9,8 +9,8 @@ import (
 )
 
 // InitClient sets up a mnemonic file for the user to start the Bamboo Emulator.
-func InitClient(log *logrus.Logger) {
-	if !fileExists(crypto.MnemonicFile) {
+func InitClient(log *logrus.Logger, reset bool) {
+	if !fileExists(crypto.MnemonicFile) || reset {
 		file, err := os.Create(crypto.MnemonicFile)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to create mnemonic file")
