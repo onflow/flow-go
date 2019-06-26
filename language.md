@@ -1131,9 +1131,11 @@ Fields are declared like variables and constants, however, they have no initial 
 // both fields are initialized through the initializer.
 //
 struct Token {
+    const id: Int
     var balance: Int
 
-    init(balance: Int) {
+    init(id: Int, balance: Int) {
+        this.id = id
         this.balance = balance
     }
 }
@@ -1141,7 +1143,7 @@ struct Token {
 
 In initializers, the special constant `this` refers to the structure or class that is to be initialized.
 
-Structures and classes are created (instantiated) by calling them like functions.
+Values of a structure or class type are created (instantiated) by calling the type like functions.
 
 ```typescript
 const token = Token(42, 1_000_00)
@@ -1255,7 +1257,7 @@ The `(set)` suffix can be used to make variables also publicly writeable.
 To summarize the behavior for variable and constant declarations and fields:
 
 | Declaration kind | Access modifier    | Read scope        | Write scope       |
-|------------------|--------------------|-------------------|-------------------|
+|:-----------------|:-------------------|:------------------|:------------------|
 | `const`          |                    | Current and inner | *None*            |
 | `const`          | `public`           | **All**           | *None*            |
 | `var`            |                    | Current and inner | Current and inner |
