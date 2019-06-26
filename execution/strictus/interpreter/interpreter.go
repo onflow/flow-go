@@ -172,7 +172,7 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.R
 		}
 
 		indexValue := target.Index.Accept(interpreter)
-		index, ok := indexValue.(IntValue)
+		index, ok := indexValue.(IntegerValue)
 		if !ok {
 			panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 		}
@@ -199,8 +199,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 	left := expression.Left.Accept(interpreter)
 	right := expression.Right.Accept(interpreter)
 
-	leftInt, leftIsInt := left.(IntValue)
-	rightInt, rightIsInt := right.(IntValue)
+	leftInt, leftIsInt := left.(IntegerValue)
+	rightInt, rightIsInt := right.(IntegerValue)
 	if leftIsInt && rightIsInt {
 		switch expression.Operation {
 		case ast.OperationPlus:
@@ -222,9 +222,9 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 		case ast.OperationGreaterEqual:
 			return leftInt.GreaterEqual(rightInt)
 		case ast.OperationEqual:
-			return BoolValue(leftInt == rightInt)
+			return BoolValue(leftInt.Equal(rightInt))
 		case ast.OperationUnequal:
-			return BoolValue(leftInt != rightInt)
+			return BoolValue(!leftInt.Equal(rightInt))
 		default:
 			panic(fmt.Sprintf(
 				"unsupported operation in integer binary expression: %s",
@@ -280,7 +280,7 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression ast.UnaryExpress
 		return boolValue.Negate()
 
 	case ast.OperationMinus:
-		intValue, ok := value.(IntValue)
+		intValue, ok := value.(IntegerValue)
 		if !ok {
 			panic(fmt.Sprintf(
 				"non-integer value for unary minus: %s: %v",
@@ -309,36 +309,8 @@ func (interpreter *Interpreter) VisitBoolExpression(expression ast.BoolExpressio
 	return BoolValue(expression)
 }
 
-func (interpreter *Interpreter) VisitInt8Expression(expression ast.Int8Expression) ast.Repr {
-	return Int8Value(expression)
-}
-
-func (interpreter *Interpreter) VisitInt16Expression(expression ast.Int16Expression) ast.Repr {
-	return Int16Value(expression)
-}
-
-func (interpreter *Interpreter) VisitInt32Expression(expression ast.Int32Expression) ast.Repr {
-	return Int32Value(expression)
-}
-
-func (interpreter *Interpreter) VisitInt64Expression(expression ast.Int64Expression) ast.Repr {
-	return Int64Value(expression)
-}
-
-func (interpreter *Interpreter) VisitUInt8Expression(expression ast.UInt8Expression) ast.Repr {
-	return UInt8Value(expression)
-}
-
-func (interpreter *Interpreter) VisitUInt16Expression(expression ast.UInt16Expression) ast.Repr {
-	return UInt16Value(expression)
-}
-
-func (interpreter *Interpreter) VisitUInt32Expression(expression ast.UInt32Expression) ast.Repr {
-	return UInt32Value(expression)
-}
-
-func (interpreter *Interpreter) VisitUInt64Expression(expression ast.UInt64Expression) ast.Repr {
-	return UInt64Value(expression)
+func (interpreter *Interpreter) VisitIntExpression(expression ast.IntExpression) ast.Repr {
+	return IntValue{expression.Value}
 }
 
 func (interpreter *Interpreter) VisitArrayExpression(expression ast.ArrayExpression) ast.Repr {
@@ -364,7 +336,7 @@ func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpress
 	}
 
 	indexValue := expression.Index.Accept(interpreter)
-	index, ok := indexValue.(IntValue)
+	index, ok := indexValue.(IntegerValue)
 	if !ok {
 		panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 	}
