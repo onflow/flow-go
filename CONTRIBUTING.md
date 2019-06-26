@@ -2,6 +2,10 @@
 
 This guide provides a comprehensive overview of our development process, guidelines, and steps required to contribute to the project.
 
+## Getting Started
+
+By the time you are reading this you should 
+
 ## Work Streams
 
 Bamboo development is divided across several streams of work with the goal of separating concerns and facilitating rapid development. 
@@ -63,4 +67,4 @@ Each PR that you open should include necessary tests to ensure the correctness a
 
 ## Code Standards
 
-The Bamboo project has a high standard for code quality and expects all submitted PRs to meet the guidelines outlined in our [code style guide](/docs/style.md).
+The Bamboo project has a high standard for code quality and expects all submitted PRs to meet the guidelines outlined in our [code style guide](/docs/code-style.md).
