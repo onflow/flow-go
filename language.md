@@ -42,20 +42,26 @@ Comments may be nested.
 
 Constants and variables are declarations that bind a value to a name. Constants can only be initialized with a value and cannot be reassigned afterwards. Variables can be initialized with a value and can be reassigned later. Declarations are valid in any scope, including the global scope.
 
+Constant means that the *name* is constant, not the *value*, i.e., the value may still be changed if it allows it.
+
 The `const` keyword is used to declare a constant and the `var` keyword is used to declare a variable.
 The keywords is followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
 ```typescript
 // declaring a constant
+//
 const a = 1
 
 // error: re-assigning to a constant
+//
 a = 2
 
 // declaring a variable
+//
 var b = 3
 
 // assigning a new value to a variable
+//
 b = 4
 ```
 
@@ -63,6 +69,7 @@ Variables and constants **must** be initialized.
 
 ```typescript
 // invalid: constant has no initial value
+//
 const a
 ```
 
@@ -71,18 +78,23 @@ Once a constant or variable is declared, it can't be redeclared with the same na
 
 ```typescript
 // declaring a constant
+//
 const a = 1
 
 // invalid: re-declaring a constant with a name that is already used in this scope
+//
 const a = 2
 
 // declaring a variable
+//
 var b = 3
 
 // invalid: re-declaring a variable with a name that is already used in this scope
+//
 var b = 4
 
 // invalid: declaring a variable with a name that was used for a constant
+//
 var a = 5
 ```
 
@@ -93,9 +105,11 @@ If no type annotation is provided, the type of the declaration is [inferred from
 
 ```typescript
 // declaring a variable with an explicit type
+//
 var initialized: bool = false
 
 // declaring a constant with an inferred type
+//
 const a = 1
 ```
 
@@ -106,21 +120,27 @@ Names may not begin with a number.
 
 ```typescript
 // valid
+//
 PersonID
 
 // valid
+//
 token_name
 
 // valid
+//
 _balance
 
 // valid
+//
 account2
 
 // invalid
+//
 !@#$%^&*
 
 // invalid
+//
 1something
 ```
 
@@ -135,12 +155,15 @@ Semicolons may be used to separate statements, but are optional. They can be use
 
 ```typescript
 // constant declaration statement without a semicolon
+//
 const a = 1
 
 // variable declarations statement with a semicolon
+//
 var b = 2;
 
 // multiple statements on a single line
+//
 const d = 1; var e = 2
 ```
 
