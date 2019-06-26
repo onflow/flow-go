@@ -792,6 +792,8 @@ Postconditions must be true right after the execution of the function. Postcondi
 
 A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for [statements](#semicolons).
 
+In postconditions, the special constant `result` refers to the result of the function.
+
 ```typescript
 fun factorial(n: Int): Int {
     require {
