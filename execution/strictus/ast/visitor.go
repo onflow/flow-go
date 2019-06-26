@@ -4,6 +4,8 @@ type Repr interface{}
 
 type Element interface {
 	Accept(Visitor) Repr
+	GetStartPosition() Position
+	GetEndPosition() Position
 }
 
 type Visitor interface {
@@ -15,7 +17,7 @@ type Visitor interface {
 	VisitIfStatement(IfStatement) Repr
 	VisitWhileStatement(WhileStatement) Repr
 	VisitVariableDeclaration(VariableDeclaration) Repr
-	VisitAssignment(Assignment) Repr
+	VisitAssignment(AssignmentStatement) Repr
 	VisitExpressionStatement(ExpressionStatement) Repr
 	/// expressions
 	VisitBoolExpression(BoolExpression) Repr

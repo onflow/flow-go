@@ -75,6 +75,8 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 			ParameterTypes: parameterTypes,
 			ReturnType:     declaration.ReturnType,
 		},
+		StartPosition: declaration.StartPosition,
+		EndPosition:   declaration.EndPosition,
 	}
 
 	// make the function itself available inside the function
@@ -152,7 +154,7 @@ func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclarat
 	return nil
 }
 
-func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.Repr {
+func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStatement) ast.Repr {
 	value := assignment.Value.Accept(interpreter).(Value)
 
 	switch target := assignment.Target.(type) {
@@ -394,9 +396,11 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 			parameter.Identifier,
 			&Variable{
 				Declaration: ast.VariableDeclaration{
-					IsConst:    true,
-					Identifier: parameter.Identifier,
-					Type:       parameter.Type,
+					IsConst:       true,
+					Identifier:    parameter.Identifier,
+					Type:          parameter.Type,
+					StartPosition: parameter.StartPosition,
+					EndPosition:   parameter.EndPosition,
 				},
 				Value: argument,
 			},
