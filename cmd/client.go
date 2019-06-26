@@ -9,7 +9,7 @@ import (
 // clientCmd represents the emulator command
 var clientCmd = &cobra.Command{
 	Use:   "client",
-	Short: "A brief description of your command",
+	Short: "Bamboo Client operations",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("client called")
 	},

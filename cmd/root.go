@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dapperlabs/bamboo-emulator/config"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-
-	"github.com/dapperlabs/bamboo-emulator/config"
 )
 
 var (
@@ -16,21 +15,17 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use: "bamboo-emulator",
-	Run: func(cmd *cobra.Command, args []string) {
-		StartServer()
-	},
+	Use:              "bamboo",
+	TraverseChildren: true,
 }
 
 func init() {
-	rootCmd.PersistentFlags().IntVar(&conf.Port, "port", 0, "port to run emulator server on")
-
 	initConfig()
 	initLogger()
 }
 
 func initConfig() {
-	config.ParseConfig("BE", &conf, rootCmd.PersistentFlags())
+	config.ParseConfig("BAMBOO", &conf, emulatorCmd.PersistentFlags())
 }
 
 func initLogger() {
