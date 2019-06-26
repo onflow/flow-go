@@ -110,6 +110,27 @@ func TestInterpretLexicalScope(t *testing.T) {
 	Expect(inter.Invoke("g")).To(Equal(interpreter.IntValue{Int: big.NewInt(10)}))
 }
 
+func TestInterpretNoHoisting(t *testing.T) {
+	RegisterTestingT(t)
+
+	program := parse(`
+        const x = 2
+
+        fun test(): Int64 {
+           if x == 0 {
+               const x = 3
+               return x
+           }
+           return x
+        }
+	`)
+
+	inter := interpreter.NewInterpreter(program)
+	inter.Interpret()
+	Expect(inter.Invoke("test")).To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+	Expect(inter.Globals["x"].Value).To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+}
+
 func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 	RegisterTestingT(t)
 
