@@ -42,7 +42,7 @@ Comments may be nested.
 
 Constants and variables are declarations that bind a value to a name. Constants can only be initialized with a value and cannot be reassigned afterwards. Variables can be initialized with a value and can be reassigned later. Declarations are valid in any scope, including the global scope.
 
-The `const` keyword is used to define a constant and the `var` keyword is used to define a variable.
+The `const` keyword is used to declare a constant and the `var` keyword is used to declare a variable.
 The keywords is followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
 ```typescript
@@ -835,7 +835,7 @@ TODO: examples
 
 ## Scope
 
-Every function and block (`{` ... `}`) introduces a new scope for declarations. Each function and block can refer to declarations defined in its or any of the outer scopes.
+Every function and block (`{` ... `}`) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.
 
 ```typescript
 const x = 10
@@ -1018,18 +1018,16 @@ class SomeClass {
 }
 ```
 
-Fields are defined like variables and constants, however, they have no initial value.The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initialier is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
+Fields are declared like variables and constants, however, they have no initial value.The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initialier is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
 
 ```typescript
-// define a token struct, which has a constant field
+// declare a token struct, which has a constant field
 // named id and a variable field named balance.
 // both fields are initialized through the initializer.
 struct Token {
-    const id: Int
     var balance: Int
 
-    init(id: Int, balance: Int) {
-        this.id = id
+    init(balance: Int) {
         this.balance = balance
     }
 }
@@ -1081,7 +1079,7 @@ token.mint(1_000_000)
 The only difference between structures and classes is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types.
 
 ```typescript
-// define a struct with an integer field
+// declare a struct with an integer field
 struct SomeStruct {
     const value: Int
 
@@ -1099,7 +1097,7 @@ structB.value = 1
 ```
 
 ```typescript
-// define a class with an integer field
+// declare a class with an integer field
 class SomeClass {
     const value: Int
 
@@ -1118,7 +1116,6 @@ classB.value = 1
 Note the different values in the last line of each example.
 
 There is **no** support for nulls, i.e., a constant or variable of a reference type must always be bound to an instance of the type. There is *no* `null`.
-
 
 ## Access control
 
