@@ -208,15 +208,19 @@ Numbers can be written in various bases. Numbers are assumed to be decimal by de
 
 ```typescript
 // a decimal number
+//
 const dec = 1234567890
 
 // a binary number
+//
 const bin = 0b101010
 
 // an octal number
+//
 const oct = 0o12345670
 
 // a hexadecimal number
+//
 const hex = 0x1234567890ABCDEFabcdef
 ```
 
@@ -232,12 +236,15 @@ Arrays are mutable, ordered collections of values. All values in an array must h
 
 ```typescript
 // an empty array
+//
 const empty = []
 
 // an array with integers
+//
 const integers = [1, 2, 3]
 
 // invalid: mixed types
+//
 const invalidMixed = [1, true, 2, false]
 ```
 
@@ -247,13 +254,21 @@ To get the element of an array at a specific index, the indexing syntax can be u
 
 ```typescript
 const numbers = [42, 23]
-// get the first number
-numbers[0] // is 42
-// get the second number
-numbers[1] // is 23
 
+// get the first number
+//
+numbers[0] // is 42
+
+// get the second number
+//
+numbers[1] // is 23
+```
+
+```typescript
 const arrays = [[1, 2], [3, 4]]
+
 // get the first number of the second array
+//
 arrays[1][0] // is 3
 ```
 
@@ -261,8 +276,11 @@ To set an element of an array at a specific index, the indexing syntax can be us
 
 ```typescript
 const numbers = [42, 23]
+
 // change the second number
+//
 numbers[1] = 2
+
 // numbers is [42, 2]
 ```
 
@@ -298,15 +316,18 @@ Dictionary literals start with an opening brace `{` and end with a closing brace
 
 ```typescript
 // an empty dictionary
+//
 const empty = {}
 
 // a dictionary mapping integers to booleans
+//
 const dictionary = {
     1: true,
     2: false
 }
 
 // invalid: mixed types
+//
 const invalidMixed = {
     1: true,
     false: 2
@@ -413,17 +434,36 @@ The left-hand side of the assignment must be an identifier, followed by one or m
 
 ```typescript
 const numbers = [1, 2]
+
+// change the first number
+//
 numbers[0] = 3
+
 // numbers is [3, 2]
+```
 
+```typescript
 const arrays = [[1, 2], [3, 4]]
-// change the first number in the second array
-arrays[1][0] = 5
-// arrays is [[1, 2], [5, 4]]
 
-const dictionaries = {true: {1: 2}, false: {3: 4}}
+// change the first number in the second array
+//
+arrays[1][0] = 5
+
+// arrays is [[1, 2], [5, 4]]
+```
+
+```typescript
+const dictionaries = {
+  true: {1: 2},
+  false: {3: 4}
+}
+
 dictionaries[false][3] = 0
-// dictionaries is {true: {1: 2}, false: {3: 0}}
+
+// dictionaries is {
+//   true: {1: 2},
+//   false: {3: 0}
+//}
 ```
 
 ### Arithmetic
@@ -623,6 +663,7 @@ The parameters need to be enclosed in parentheses. Each parameter needs to have 
 
 ```typescript
 // declare a function called double, which multiples a number by two
+//
 fun double(x: Int): Int {
     return x * 2
 }
@@ -631,21 +672,28 @@ fun double(x: Int): Int {
 Functions can be nested, i.e., the code of a function may declare further functions.
 
 ```typescript
+// declare a function which multiple a number by, and adds one
+//
 fun doubleAndAddOne(n: Int): Int {
+
+    // declare a nested function which doubles, which multiples a number by two
+    //
     fun double(x: Int) {
         return x * 2
     }
+
     return double(n) + 1
 }
 ```
-
 
 ### Function Expressions
 
 Functions can be also used as expressions. The syntax is the same as for function declarations, except that function expressions have no name, i.e., it is anonymous.
 
 ```typescript
-// declare a constant called double, which has a function as its value, which multiples a number by two
+// declare a constant called double, which has a function as its value,
+// which multiples a number by two
+//
 const double = fun (x: Int): Int {
      return x * 2
 }
@@ -663,9 +711,11 @@ fun double(x: Int): Int {
 double(2) // is 4
 
 // invalid: too many arguments
+//
 double(2, 3)
 
 // invalid: too few arguments
+//
 double()
 ```
 
@@ -675,6 +725,16 @@ Function types consist of the function's parameter types and the function's retu
 The parameter types need to be enclosed in parentheses, followed by the `=>` keyword, and end with the return type.
 
 ```typescript
+// declare a function called add, with the type (Int, Int) => Int
+//
+fun add(a: Int, b: Int): Int {
+    return a + b
+}
+```
+
+```typescript
+// declare a constant called add, with the type (Int, Int) => Int
+//
 const add: (Int, Int) => Int =
     fun (a: Int, b: Int): Int {
         return a + b
@@ -684,7 +744,11 @@ const add: (Int, Int) => Int =
 If the function has no return type, it implicitly has the return type `Void`.
 
 ```typescript
-const doNothing: () => Void = fun () {}
+// declare a constant called doNothing, which is a function
+// that takes no parameters and returns nothing
+//
+const doNothing: () => Void =
+    fun () {}
 ```
 
 #### Argument Passing Behavior
@@ -699,6 +763,7 @@ fun change(numbers: Int[]) {
 }
 
 const numbers = [0, 1]
+
 change(numbers)
 // numbers is [1, 2]
 ```
@@ -708,6 +773,7 @@ Parameters are constant, i.e., it is not allowed to assign to them.
 ```typescript
 fun test(x: Int) {
      // invalid: assignment to parameter (constant)
+     //
      x = 2
 }
 ```
@@ -728,10 +794,12 @@ A conditions block consists of one or more conditions. Conditions are expression
 fun factorial(n: Int): Int {
     require {
         // factorial is only defined for integers greater than or equal to zero
+        //
         n >= 0
     }
     ensure {
         // the result will always be greater than or equal to 1
+        //
         result >= 1
     }
 
@@ -749,6 +817,7 @@ fun factorial(n: Int): Int {
 factorial(5) // is 120
 
 // error: argument does not satisfy precondition n >= 0
+//
 factorial(-2)
 ```
 
@@ -760,13 +829,13 @@ var n = 0
 fun incrementN() {
     ensure {
         // require the new value of n to be the old value of n, plus one
+        //
         n == before(n) + 1
     }
+
     n = n + 1
 }
 ```
-
-
 
 ## Control flow
 
@@ -841,6 +910,7 @@ var a = 0
 while a < 5 {
     a = a + 1
 }
+
 // a is 5
 ```
 
@@ -869,7 +939,9 @@ fun f(): Int {
 }
 
 f() // is 20
+
 // invalid: y is not in scope
+//
 y
 ```
 
@@ -882,6 +954,7 @@ fun doubleAndAddOne(n: Int): Int {
 }
 
 // invalid: `double` is not in scope
+//
 double(1)
 ```
 
@@ -942,6 +1015,7 @@ When assigning a new value to a variable, the value must be the same type as the
 var a = true
 
 // invalid: integer is not a boolean
+//
 a = 0
 ```
 
@@ -955,6 +1029,7 @@ fun nand(a: Bool, b: Bool): Bool {
 nand(false, false) // is true
 
 // invalid: integers are not booleans
+//
 nand(0, 0)
 ```
 
@@ -971,6 +1046,7 @@ const a: Int32 = 3_000_000_000
 const b: Int32 = 3_000_000_000
 
 // invalid: Int32 is not Int8
+//
 add(a, b)
 ```
 
@@ -985,6 +1061,7 @@ Integer literals are inferred to type `Int`.
 
 ```typescript
 const a = 1
+
 // a has type Int
 ```
 
@@ -995,6 +1072,7 @@ const integers = [1, 2]
 // integers has type Int[]
 
 // invalid: mixed types
+//
 const invalidMixed = [1, true, 2, false]
 ```
 
@@ -1008,6 +1086,7 @@ const booleans = {
 // booleans has type Bool[Int]
 
 // invalid: mixed types
+//
 const invalidMixed = {
     1: true,
     false: 2
@@ -1020,6 +1099,7 @@ Functions are inferred based on the parameter types and the return type.
 const add = (a: Int8, b: Int8): Int {
     return a + b
 }
+
 // add has type (Int8, Int8) => Int
 ```
 
@@ -1047,6 +1127,7 @@ Fields are declared like variables and constants, however, they have no initial 
 // declare a token struct, which has a constant field
 // named id and a variable field named balance.
 // both fields are initialized through the initializer.
+//
 struct Token {
     var balance: Int
 
@@ -1074,6 +1155,7 @@ token.balance = 1
 // token.balance is 1
 
 // invalid: assignment to constant field
+//
 token.id = 23
 ```
 
@@ -1102,9 +1184,10 @@ token.mint(1_000_000)
 The only difference between structures and classes is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types.
 
 ```typescript
-// declare a struct with an integer field
+// declare a structure with a variable integer field
+//
 struct SomeStruct {
-    const value: Int
+    var value: Int
 
     init(value: Int) {
         this.value = value
@@ -1112,28 +1195,41 @@ struct SomeStruct {
 
 }
 
+// create a value of structure type SomeStruct
+//
 const structA = SomeStruct(0)
-// structure is copied
+
+// *copy* the structure value into a new constant
+//
 const structB = structA
+
 structB.value = 1
-// structA.value is 0
+
+// structA.value is *0*
 ```
 
 ```typescript
-// declare a class with an integer field
+// declare a class with a variable integer field
+//
 class SomeClass {
-    const value: Int
+    var value: Int
 
     init(value: Int) {
         this.value = value
     }
 }
 
+// create a value of class type SomeClass
+//
 const classA = SomeClass(0)
-// class is referenced
+
+// *reference* the class value with a new constant
+//
 const classB = classA
+
 classB.value = 1
-// classA.value is 1
+
+// classA.value is *1*
 ```
 
 Note the different values in the last line of each example.
@@ -1167,31 +1263,40 @@ To summarize the behavior for variable and constant declarations and fields:
 
 ```typescript
 // private constant, inaccessible/invisible
+//
 private const a = 1
 
 // public constant, accessible/visible
+//
 public const b = 2
 
+
 public class SomeClass {
+
     // private constant field,
     // only readable in class functions
+    //
     private const a: Int
 
     // public constant field,
     // readable in all scopes
+    //
     public const b: Int
 
     // private variable field,
     // only readable and writeable in class functions
+    //
     private var c: Int
 
     // public variable field, not settable,
     // only writeable in class functions,
     // readable in all scopes
+    //
     public var d: Int
 
     // public variable field, settable,
     // readable and writeable in all scopes
+    //
     public(set) var e: Int
 
     // initializer implementation skipped
