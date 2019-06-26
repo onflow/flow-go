@@ -1,4 +1,4 @@
-# Pre-Execution Stream
+# Pre-Execution
 
 The pre-execution stream concerns all aspects of the transaction flow from the moment a transaction is submitted to the network until it enters the consensus flow. 
 
