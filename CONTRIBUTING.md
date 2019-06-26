@@ -4,7 +4,13 @@ This guide provides a comprehensive overview of our development process, guideli
 
 ## Getting Started
 
-By the time you are reading this you should 
+By the time you are reading this you should have already been assigned a work stream. Here's how to get started:
+
+* Familiarize yourself with the workflow below
+* Read through the [project setup](/docs/setup.md) instructions to install required tools
+* Read the documentation pertaining to [your stream](/docs/streams)
+* Browse the [remaining documentation](/docs) to get up to speed on things like testing, code style, and common patterns
+* Contact your stream lead to receive your first task
 
 ## Work Streams
 
