@@ -694,7 +694,7 @@ Functions can be also used as expressions. The syntax is the same as for functio
 
 ```typescript
 // declare a constant called double, which has a function as its value,
-// which multiples a number by two
+// which multiplies a number by two when called
 //
 const double = fun (x: Int): Int {
      return x * 2
