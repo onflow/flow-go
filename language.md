@@ -678,7 +678,7 @@ Functions can be nested, i.e., the code of a function may declare further functi
 //
 fun doubleAndAddOne(n: Int): Int {
 
-    // declare a nested function which doubles, which multiples a number by two
+    // declare a nested function which doubles, which multiplies a number by two
     //
     fun double(x: Int) {
         return x * 2
