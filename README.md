@@ -3,7 +3,7 @@
 
 ### Go
 - Download and install Go 1.12 https://golang.org/dl/
-- Create your worksapce `$GOPATH` directory and update your bash_profile file: export `$GOPATH=$HOME/directory/`. The path `$PATH` also needs to be updated `$export PATH="$PATH:$GOPATH/bin" `
+- Create your worksapce `$GOPATH` directory and update your bash_profile file: export `$GOPATH=$HOME/directory/`. It is also suggested to update the path `$PATH` to use third party GO binaries: `$export PATH="$PATH:$GOPATH/bin" `
 - Test a first go program https://golang.org/doc/install#testing
 - Clone in this repo under your `$GOPATH`: `$GOPATH/src/github.com/dapperlabs/bamboo-node/`. Technically since we are using go modules and we prepend every `go` command with `GO111MODULE=on`, you can also try to clone this repo anywhere you want.
 
