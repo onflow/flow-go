@@ -18,4 +18,5 @@ const (
 	OperationMul
 	OperationDiv
 	OperationMod
+	OperationNegate
 )

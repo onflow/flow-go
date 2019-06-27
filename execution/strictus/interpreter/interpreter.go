@@ -52,9 +52,11 @@ func (interpreter *Interpreter) VisitProgram(program ast.Program) ast.Repr {
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.FunctionDeclaration) ast.Repr {
 	expression := ast.FunctionExpression{
-		Parameters: declaration.Parameters,
-		ReturnType: declaration.ReturnType,
-		Block:      declaration.Block,
+		Parameters:    declaration.Parameters,
+		ReturnType:    declaration.ReturnType,
+		Block:         declaration.Block,
+		StartPosition: declaration.StartPosition,
+		EndPosition:   declaration.EndPosition,
 	}
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
@@ -65,14 +67,17 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 		parameterTypes = append(parameterTypes, parameter.Type)
 	}
 
+	functionType := ast.FunctionType{
+		ParameterTypes: parameterTypes,
+		ReturnType:     declaration.ReturnType,
+	}
 	variableDeclaration := ast.VariableDeclaration{
-		Value:      expression,
-		Identifier: declaration.Identifier,
-		IsConst:    true,
-		Type: ast.FunctionType{
-			ParameterTypes: parameterTypes,
-			ReturnType:     declaration.ReturnType,
-		},
+		Value:         expression,
+		Identifier:    declaration.Identifier,
+		IsConst:       true,
+		Type:          functionType,
+		StartPosition: declaration.StartPosition,
+		EndPosition:   declaration.EndPosition,
 	}
 
 	// make the function itself available inside the function
@@ -150,7 +155,7 @@ func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclarat
 	return nil
 }
 
-func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.Repr {
+func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStatement) ast.Repr {
 	value := assignment.Value.Accept(interpreter).(Value)
 
 	switch target := assignment.Target.(type) {
@@ -172,7 +177,7 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.Assignment) ast.R
 		}
 
 		indexValue := target.Index.Accept(interpreter)
-		index, ok := indexValue.(IntValue)
+		index, ok := indexValue.(IntegerValue)
 		if !ok {
 			panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 		}
@@ -199,8 +204,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 	left := expression.Left.Accept(interpreter)
 	right := expression.Right.Accept(interpreter)
 
-	leftInt, leftIsInt := left.(IntValue)
-	rightInt, rightIsInt := right.(IntValue)
+	leftInt, leftIsInt := left.(IntegerValue)
+	rightInt, rightIsInt := right.(IntegerValue)
 	if leftIsInt && rightIsInt {
 		switch expression.Operation {
 		case ast.OperationPlus:
@@ -222,9 +227,14 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 		case ast.OperationGreaterEqual:
 			return leftInt.GreaterEqual(rightInt)
 		case ast.OperationEqual:
-			return BoolValue(leftInt == rightInt)
+			return BoolValue(leftInt.Equal(rightInt))
 		case ast.OperationUnequal:
-			return BoolValue(leftInt != rightInt)
+			return BoolValue(!leftInt.Equal(rightInt))
+		default:
+			panic(fmt.Sprintf(
+				"unsupported operation in integer binary expression: %s",
+				expression.Operation.String(),
+			))
 		}
 	}
 
@@ -240,6 +250,11 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 			return BoolValue(leftBool || rightBool)
 		case ast.OperationAnd:
 			return BoolValue(leftBool && rightBool)
+		default:
+			panic(fmt.Sprintf(
+				"unsupported operation in boolean binary expression: %s",
+				expression.Operation.String(),
+			))
 		}
 	}
 
@@ -253,45 +268,54 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 	return nil
 }
 
+func (interpreter *Interpreter) VisitUnaryExpression(expression ast.UnaryExpression) ast.Repr {
+	value := expression.Expression.Accept(interpreter)
+
+	switch expression.Operation {
+	case ast.OperationNegate:
+		boolValue, ok := value.(BoolValue)
+		if !ok {
+			panic(fmt.Sprintf(
+				"non-boolean value for unary negate: %s: %v",
+				expression.Operation.String(),
+				value,
+			))
+		}
+
+		return boolValue.Negate()
+
+	case ast.OperationMinus:
+		intValue, ok := value.(IntegerValue)
+		if !ok {
+			panic(fmt.Sprintf(
+				"non-integer value for unary minus: %s: %v",
+				expression.Operation.String(),
+				value,
+			))
+		}
+		return intValue.Negate()
+
+	default:
+		panic(fmt.Sprintf(
+			"unsupported operation in unary expression: %s",
+			expression.Operation.String(),
+		))
+	}
+
+	return nil
+}
+
 func (interpreter *Interpreter) VisitExpressionStatement(statement ast.ExpressionStatement) ast.Repr {
 	statement.Expression.Accept(interpreter)
 	return nil
 }
 
 func (interpreter *Interpreter) VisitBoolExpression(expression ast.BoolExpression) ast.Repr {
-	return BoolValue(expression)
+	return BoolValue(expression.Value)
 }
 
-func (interpreter *Interpreter) VisitInt8Expression(expression ast.Int8Expression) ast.Repr {
-	return Int8Value(expression)
-}
-
-func (interpreter *Interpreter) VisitInt16Expression(expression ast.Int16Expression) ast.Repr {
-	return Int16Value(expression)
-}
-
-func (interpreter *Interpreter) VisitInt32Expression(expression ast.Int32Expression) ast.Repr {
-	return Int32Value(expression)
-}
-
-func (interpreter *Interpreter) VisitInt64Expression(expression ast.Int64Expression) ast.Repr {
-	return Int64Value(expression)
-}
-
-func (interpreter *Interpreter) VisitUInt8Expression(expression ast.UInt8Expression) ast.Repr {
-	return UInt8Value(expression)
-}
-
-func (interpreter *Interpreter) VisitUInt16Expression(expression ast.UInt16Expression) ast.Repr {
-	return UInt16Value(expression)
-}
-
-func (interpreter *Interpreter) VisitUInt32Expression(expression ast.UInt32Expression) ast.Repr {
-	return UInt32Value(expression)
-}
-
-func (interpreter *Interpreter) VisitUInt64Expression(expression ast.UInt64Expression) ast.Repr {
-	return UInt64Value(expression)
+func (interpreter *Interpreter) VisitIntExpression(expression ast.IntExpression) ast.Repr {
+	return IntValue{expression.Value}
 }
 
 func (interpreter *Interpreter) VisitArrayExpression(expression ast.ArrayExpression) ast.Repr {
@@ -317,7 +341,7 @@ func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpress
 	}
 
 	indexValue := expression.Index.Accept(interpreter)
-	index, ok := indexValue.(IntValue)
+	index, ok := indexValue.(IntegerValue)
 	if !ok {
 		panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
 	}
@@ -373,9 +397,11 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 			parameter.Identifier,
 			&Variable{
 				Declaration: ast.VariableDeclaration{
-					IsConst:    true,
-					Identifier: parameter.Identifier,
-					Type:       parameter.Type,
+					IsConst:       true,
+					Identifier:    parameter.Identifier,
+					Type:          parameter.Type,
+					StartPosition: parameter.StartPosition,
+					EndPosition:   parameter.EndPosition,
 				},
 				Value: argument,
 			},
