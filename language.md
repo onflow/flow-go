@@ -735,7 +735,7 @@ fun add(a: Int, b: Int): Int {
 ```
 
 ```typescript
-// declare a constant called add, with the type (Int, Int) => Int
+// declare a constant called add, with the function type (Int, Int) => Int
 //
 const add: (Int, Int) => Int =
     fun (a: Int, b: Int): Int {
