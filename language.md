@@ -1143,7 +1143,7 @@ struct Token {
 
 In initializers, the special constant `this` refers to the structure or class that is to be initialized.
 
-Values of a structure or class type are created (instantiated) by calling the type like functions.
+Values of a structure or class type are created (instantiated) by calling the type like a function.
 
 ```typescript
 const token = Token(42, 1_000_00)
