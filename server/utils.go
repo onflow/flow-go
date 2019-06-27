@@ -32,7 +32,7 @@ func StartServer(log *logrus.Logger, conf Config) {
 	accessNode := access.NewNode(
 		&access.Config{
 			CollectionInterval: conf.CollectionInterval,
-			// Verbose: conf.Verbose,
+			Verbose: conf.Verbose,
 		},
 		state,
 		collections,

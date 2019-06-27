@@ -23,13 +23,14 @@ type Node struct {
 // Config hold the configuration options for an access node.
 type Config struct {
 	CollectionInterval time.Duration
+	Verbose            bool
 }
 
 // NewNode returns a new simulated access node.
 func NewNode(conf *Config, state *data.WorldState, collectionsOut chan *data.Collection, log *logrus.Logger) *Node {
 	transactionsIn := make(chan *data.Transaction, 16)
 
-	collectionBuilder := collection_builder.NewCollectionBuilder(state, transactionsIn, collectionsOut, log)
+	collectionBuilder := collection_builder.NewCollectionBuilder(state, transactionsIn, collectionsOut, log, conf.Verbose)
 
 	return &Node{
 		conf:              conf,
