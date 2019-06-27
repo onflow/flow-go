@@ -76,7 +76,7 @@ func (c *CollectionBuilder) buildCollection() {
 			"collectionHash": collection.Hash(),
 			"collectionSize": len(c.pendingTransactions),
 		}).
-		Infof(
+		Debugf(
 			"Publishing collection with %d transaction(s)",
 			len(c.pendingTransactions),
 		)

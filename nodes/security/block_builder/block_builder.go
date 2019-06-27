@@ -93,19 +93,35 @@ func (b *BlockBuilder) mintNewBlock() error {
 		}
 	}
 
-	b.log.
-		WithFields(logrus.Fields{
-			"blockNum":        newBlock.Number,
-			"blockHash":       newBlock.Hash(),
-			"numCollections":  len(collectionHashes),
-			"numTransactions": len(transactionHashes),
-		}).
-		Infof(
-			"Publishing block %d (0x%v) with %d transaction(s)",
-			newBlock.Number,
-			newBlock.Hash(),
-			len(transactionHashes),
-		)
+	if len(transactionHashes) > 0 {
+		b.log.
+			WithFields(logrus.Fields{
+				"blockNum":        newBlock.Number,
+				"blockHash":       newBlock.Hash(),
+				"numCollections":  len(collectionHashes),
+				"numTransactions": len(transactionHashes),
+			}).
+			Infof(
+				"Publishing block %d (0x%v) with %d transaction(s)",
+				newBlock.Number,
+				newBlock.Hash(),
+				len(transactionHashes),
+			)
+	} else {
+		b.log.
+			WithFields(logrus.Fields{
+				"blockNum":        newBlock.Number,
+				"blockHash":       newBlock.Hash(),
+				"numCollections":  len(collectionHashes),
+				"numTransactions": len(transactionHashes),
+			}).
+			Debugf(
+				"Publishing block %d (0x%v) with %d transaction(s)",
+				newBlock.Number,
+				newBlock.Hash(),
+				len(transactionHashes),
+			)
+	}
 
 	return nil
 }
