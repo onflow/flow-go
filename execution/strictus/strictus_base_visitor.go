@@ -99,6 +99,10 @@ func (v *BaseStrictusVisitor) VisitMultiplicativeExpression(ctx *MultiplicativeE
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -120,6 +124,10 @@ func (v *BaseStrictusVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{
 }
 
 func (v *BaseStrictusVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

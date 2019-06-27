@@ -45,7 +45,7 @@ Constants and variables are declarations that bind a value to a name. Constants 
 Constant means that the *name* is constant, not the *value*, i.e., the value may still be changed if it allows it.
 
 The `const` keyword is used to declare a constant and the `var` keyword is used to declare a variable.
-The keywords is followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
+The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
 ```typescript
 // declaring a constant
