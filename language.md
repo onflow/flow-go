@@ -43,7 +43,7 @@ Comments may be nested.
 Constants and variables are declarations that bind a value to a name. Constants can only be initialized with a value and cannot be reassigned afterwards. Variables can be initialized with a value and can be reassigned later. Declarations are valid in any scope, including the global scope.
 
 The `const` keyword is used to define a constant and the `var` keyword is used to define a variable.
-The keywords is followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
+The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
 ```typescript
 // declaring a constant
