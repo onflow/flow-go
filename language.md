@@ -1203,7 +1203,7 @@ struct GetterExample {
 const example = GetterExample(10)
 // example.balance is 10
 
-example. balance = -50
+example.balance = -50
 // example.balance is 0
 ```
 
