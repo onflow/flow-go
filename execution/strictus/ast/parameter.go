@@ -6,3 +6,11 @@ type Parameter struct {
 	StartPosition Position
 	EndPosition   Position
 }
+
+func (p Parameter) GetStartPosition() Position {
+	return p.StartPosition
+}
+
+func (p Parameter) GetEndPosition() Position {
+	return p.EndPosition
+}

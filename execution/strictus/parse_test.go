@@ -476,7 +476,10 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 		IsConst:    true,
 		Identifier: "test",
 		Value: FunctionExpression{
-			ReturnType: BaseType{Identifier: "Int"},
+			ReturnType: BaseType{
+				Identifier: "Int",
+				Position:   Position{Offset: 27, Line: 2, Column: 26},
+			},
 			Block: Block{
 				Statements: []Statement{
 					ReturnStatement{
@@ -517,7 +520,9 @@ func TestParseFunctionAndBlock(t *testing.T) {
 	test := FunctionDeclaration{
 		IsPublic:   false,
 		Identifier: "test",
-		ReturnType: BaseType{},
+		ReturnType: BaseType{
+			Position: Position{Offset: 15, Line: 2, Column: 14},
+		},
 		Block: Block{
 			Statements: []Statement{
 				ReturnStatement{
@@ -560,7 +565,9 @@ func TestParseIfStatement(t *testing.T) {
 	test := FunctionDeclaration{
 		IsPublic:   false,
 		Identifier: "test",
-		ReturnType: BaseType{},
+		ReturnType: BaseType{
+			Position: Position{Offset: 15, Line: 2, Column: 14},
+		},
 		Block: Block{
 			Statements: []Statement{
 				IfStatement{
@@ -656,7 +663,9 @@ func TestParseWhileStatement(t *testing.T) {
 	test := FunctionDeclaration{
 		IsPublic:   false,
 		Identifier: "test",
-		ReturnType: BaseType{},
+		ReturnType: BaseType{
+			Position: Position{Offset: 15, Line: 2, Column: 14},
+		},
 		Block: Block{
 			Statements: []Statement{
 				WhileStatement{
@@ -708,7 +717,9 @@ func TestParseAssignment(t *testing.T) {
 	test := FunctionDeclaration{
 		IsPublic:   false,
 		Identifier: "test",
-		ReturnType: BaseType{},
+		ReturnType: BaseType{
+			Position: Position{Offset: 15, Line: 2, Column: 14},
+		},
 		Block: Block{
 			Statements: []Statement{
 				AssignmentStatement{
@@ -752,7 +763,9 @@ func TestParseAccessAssignment(t *testing.T) {
 	test := FunctionDeclaration{
 		IsPublic:   false,
 		Identifier: "test",
-		ReturnType: BaseType{},
+		ReturnType: BaseType{
+			Position: Position{Offset: 15, Line: 2, Column: 14},
+		},
 		Block: Block{
 			Statements: []Statement{
 				AssignmentStatement{
@@ -825,7 +838,9 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 	test := FunctionDeclaration{
 		IsPublic:   false,
 		Identifier: "test",
-		ReturnType: BaseType{},
+		ReturnType: BaseType{
+			Position: Position{Offset: 15, Line: 2, Column: 14},
+		},
 		Block: Block{
 			Statements: []Statement{
 				ExpressionStatement{
@@ -886,7 +901,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual := parse(`
-		pub fun test(a: Int32, b: Int32[2], c: Int32[][3]) {}
+		pub fun test(a: Int32, b: Int32[2], c: Int32[][3]): Int64[][] {}
 	`)
 
 	test := FunctionDeclaration{
@@ -894,31 +909,65 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		Identifier: "test",
 		Parameters: []Parameter{
 			{
-				Identifier:    "a",
-				Type:          BaseType{Identifier: "Int32"},
+				Identifier: "a",
+				Type: BaseType{
+					Identifier: "Int32",
+					Position:   Position{Offset: 19, Line: 2, Column: 18},
+				},
 				StartPosition: Position{Offset: 16, Line: 2, Column: 15},
 				EndPosition:   Position{Offset: 19, Line: 2, Column: 18},
 			},
 			{
-				Identifier:    "b",
-				Type:          ConstantSizedType{Type: BaseType{Identifier: "Int32"}, Size: 2},
+				Identifier: "b",
+				Type: ConstantSizedType{
+					Type: BaseType{
+						Identifier: "Int32",
+						Position:   Position{Offset: 29, Line: 2, Column: 28},
+					},
+					Size:          2,
+					StartPosition: Position{Offset: 34, Line: 2, Column: 33},
+					EndPosition:   Position{Offset: 36, Line: 2, Column: 35},
+				},
 				StartPosition: Position{Offset: 26, Line: 2, Column: 25},
 				EndPosition:   Position{Offset: 36, Line: 2, Column: 35},
 			},
 			{
-				Identifier:    "c",
-				Type:          VariableSizedType{Type: ConstantSizedType{Type: BaseType{Identifier: "Int32"}, Size: 3}},
+				Identifier: "c",
+				Type: VariableSizedType{
+					Type: ConstantSizedType{
+						Type: BaseType{
+							Identifier: "Int32",
+							Position:   Position{Offset: 42, Line: 2, Column: 41},
+						},
+						Size:          3,
+						StartPosition: Position{Offset: 49, Line: 2, Column: 48},
+						EndPosition:   Position{Offset: 51, Line: 2, Column: 50},
+					},
+					StartPosition: Position{Offset: 47, Line: 2, Column: 46},
+					EndPosition:   Position{Offset: 48, Line: 2, Column: 47},
+				},
 				StartPosition: Position{Offset: 39, Line: 2, Column: 38},
 				EndPosition:   Position{Offset: 51, Line: 2, Column: 50},
 			},
 		},
-		ReturnType: BaseType{},
+		ReturnType: VariableSizedType{
+			Type: VariableSizedType{
+				Type: BaseType{
+					Identifier: "Int64",
+					Position:   Position{Offset: 55, Line: 2, Column: 54},
+				},
+				StartPosition: Position{Offset: 62, Line: 2, Column: 61},
+				EndPosition:   Position{Offset: 63, Line: 2, Column: 62},
+			},
+			StartPosition: Position{Offset: 60, Line: 2, Column: 59},
+			EndPosition:   Position{Offset: 61, Line: 2, Column: 60},
+		},
 		Block: Block{
-			StartPosition: Position{Offset: 55, Line: 2, Column: 54},
-			EndPosition:   Position{Offset: 54, Line: 2, Column: 53},
+			StartPosition: Position{Offset: 66, Line: 2, Column: 65},
+			EndPosition:   Position{Offset: 65, Line: 2, Column: 64},
 		},
 		StartPosition: Position{Offset: 3, Line: 2, Column: 2},
-		EndPosition:   Position{Offset: 55, Line: 2, Column: 54},
+		EndPosition:   Position{Offset: 66, Line: 2, Column: 65},
 	}
 
 	expected := Program{
@@ -996,7 +1045,10 @@ func TestParseIntegerTypes(t *testing.T) {
 	a := VariableDeclaration{
 		Identifier: "a",
 		IsConst:    true,
-		Type:       BaseType{Identifier: "Int8"},
+		Type: BaseType{
+			Identifier: "Int8",
+			Position:   Position{Offset: 12, Line: 2, Column: 11},
+		},
 		Value: IntExpression{
 			Value:    big.NewInt(1),
 			Position: Position{Offset: 19, Line: 2, Column: 18},
@@ -1007,7 +1059,10 @@ func TestParseIntegerTypes(t *testing.T) {
 	b := VariableDeclaration{
 		Identifier: "b",
 		IsConst:    true,
-		Type:       BaseType{Identifier: "Int16"},
+		Type: BaseType{
+			Identifier: "Int16",
+			Position:   Position{Offset: 32, Line: 3, Column: 11},
+		},
 		Value: IntExpression{
 			Value:    big.NewInt(2),
 			Position: Position{Offset: 40, Line: 3, Column: 19},
@@ -1018,7 +1073,10 @@ func TestParseIntegerTypes(t *testing.T) {
 	c := VariableDeclaration{
 		Identifier: "c",
 		IsConst:    true,
-		Type:       BaseType{Identifier: "Int32"},
+		Type: BaseType{
+			Identifier: "Int32",
+			Position:   Position{Offset: 53, Line: 4, Column: 11},
+		},
 		Value: IntExpression{
 			Value:    big.NewInt(3),
 			Position: Position{Offset: 61, Line: 4, Column: 19},
@@ -1029,7 +1087,10 @@ func TestParseIntegerTypes(t *testing.T) {
 	d := VariableDeclaration{
 		Identifier: "d",
 		IsConst:    true,
-		Type:       BaseType{Identifier: "Int64"},
+		Type: BaseType{
+			Identifier: "Int64",
+			Position:   Position{Offset: 74, Line: 5, Column: 11},
+		},
 		Value: IntExpression{
 			Value:    big.NewInt(4),
 			Position: Position{Offset: 82, Line: 5, Column: 19},
@@ -1040,7 +1101,10 @@ func TestParseIntegerTypes(t *testing.T) {
 	e := VariableDeclaration{
 		Identifier: "e",
 		IsConst:    true,
-		Type:       BaseType{Identifier: "UInt8"},
+		Type: BaseType{
+			Identifier: "UInt8",
+			Position:   Position{Offset: 95, Line: 6, Column: 11},
+		},
 		Value: IntExpression{
 			Value:    big.NewInt(5),
 			Position: Position{Offset: 103, Line: 6, Column: 19},
@@ -1051,7 +1115,10 @@ func TestParseIntegerTypes(t *testing.T) {
 	f := VariableDeclaration{
 		Identifier: "f",
 		IsConst:    true,
-		Type:       BaseType{Identifier: "UInt16"},
+		Type: BaseType{
+			Identifier: "UInt16",
+			Position:   Position{Offset: 116, Line: 7, Column: 11},
+		},
 		Value: IntExpression{
 			Value:    big.NewInt(6),
 			Position: Position{Offset: 125, Line: 7, Column: 20},
@@ -1062,7 +1129,10 @@ func TestParseIntegerTypes(t *testing.T) {
 	g := VariableDeclaration{
 		Identifier: "g",
 		IsConst:    true,
-		Type:       BaseType{Identifier: "UInt32"},
+		Type: BaseType{
+			Identifier: "UInt32",
+			Position:   Position{Offset: 138, Line: 8, Column: 11},
+		},
 		Value: IntExpression{
 			Value:    big.NewInt(7),
 			Position: Position{Offset: 147, Line: 8, Column: 20},
@@ -1073,7 +1143,10 @@ func TestParseIntegerTypes(t *testing.T) {
 	h := VariableDeclaration{
 		Identifier: "h",
 		IsConst:    true,
-		Type:       BaseType{Identifier: "UInt64"},
+		Type: BaseType{
+			Identifier: "UInt64",
+			Position:   Position{Offset: 160, Line: 9, Column: 11},
+		},
 		Value: IntExpression{
 			Value:    big.NewInt(8),
 			Position: Position{Offset: 169, Line: 9, Column: 20},
@@ -1102,10 +1175,21 @@ func TestParseFunctionType(t *testing.T) {
 		IsConst:    true,
 		Type: FunctionType{
 			ParameterTypes: []Type{
-				BaseType{Identifier: "Int8"},
-				BaseType{Identifier: "Int16"},
+				BaseType{
+					Identifier: "Int8",
+					Position:   Position{Offset: 15, Line: 2, Column: 14},
+				},
+				BaseType{
+					Identifier: "Int16",
+					Position:   Position{Offset: 21, Line: 2, Column: 20},
+				},
 			},
-			ReturnType: BaseType{Identifier: "Int32"},
+			ReturnType: BaseType{
+				Identifier: "Int32",
+				Position:   Position{Offset: 31, Line: 2, Column: 30},
+			},
+			StartPosition: Position{Offset: 14, Line: 2, Column: 13},
+			EndPosition:   Position{Offset: 31, Line: 2, Column: 30},
 		},
 		Value: IdentifierExpression{
 			Identifier: "nothing",
@@ -1135,10 +1219,17 @@ func TestParseMissingReturnType(t *testing.T) {
 		Identifier: "noop",
 		IsConst:    true,
 		Type: FunctionType{
-			ReturnType: BaseType{Identifier: "Void"},
+			ReturnType: BaseType{
+				Identifier: "Void",
+				Position:   Position{Offset: 21, Line: 2, Column: 20},
+			},
+			StartPosition: Position{Offset: 15, Line: 2, Column: 14},
+			EndPosition:   Position{Offset: 21, Line: 2, Column: 20},
 		},
 		Value: FunctionExpression{
-			ReturnType: BaseType{},
+			ReturnType: BaseType{
+				Position: Position{Offset: 45, Line: 3, Column: 17},
+			},
 			Block: Block{
 				Statements: []Statement{
 					ReturnStatement{

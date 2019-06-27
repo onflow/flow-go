@@ -2,6 +2,7 @@ package strictus
 
 import (
 	"bamboo-runtime/execution/strictus/ast"
+	"bamboo-runtime/execution/strictus/errors"
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	"math/big"
@@ -39,7 +40,8 @@ func (v *ProgramVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
 func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
 	isPublic := ctx.Pub() != nil
 	identifier := ctx.Identifier().GetText()
-	returnType := v.visitReturnType(ctx.returnType)
+	closeParen := ctx.CloseParen().GetSymbol()
+	returnType := v.visitReturnType(ctx.returnType, closeParen)
 	var parameters []ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
@@ -59,15 +61,21 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 	}
 }
 
-func (v *ProgramVisitor) visitReturnType(ctx ITypeNameContext) ast.Type {
+// visitReturnType returns the return type.
+// if none was given in the program, return an empty type with the position of tokenBefore
+func (v *ProgramVisitor) visitReturnType(ctx ITypeNameContext, tokenBefore antlr.Token) ast.Type {
 	if ctx == nil {
-		return ast.BaseType{}
+		positionBeforeMissingReturnType := ast.PositionFromToken(tokenBefore)
+		return ast.BaseType{
+			Position: positionBeforeMissingReturnType,
+		}
 	}
 	return ctx.Accept(v).(ast.Type)
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
-	returnType := v.visitReturnType(ctx.returnType)
+	closeParen := ctx.CloseParen().GetSymbol()
+	returnType := v.visitReturnType(ctx.returnType, closeParen)
 	var parameters []ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
@@ -117,9 +125,10 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	// identifier?
 	if identifierNode != nil {
 		identifier := identifierNode.GetText()
-
+		position := ast.PositionFromToken(identifierNode.GetSymbol())
 		return ast.BaseType{
 			Identifier: identifier,
+			Position:   position,
 		}
 	}
 
@@ -134,9 +143,14 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 
 	returnType := ctx.returnType.Accept(v).(ast.Type)
 
+	startPosition := ast.PositionFromToken(ctx.OpenParen().GetSymbol())
+	endPosition := returnType.GetEndPosition()
+
 	return ast.FunctionType{
 		ParameterTypes: parameterTypes,
 		ReturnType:     returnType,
+		StartPosition:  startPosition,
+		EndPosition:    endPosition,
 	}
 }
 
@@ -147,15 +161,21 @@ func (v *ProgramVisitor) VisitTypeName(ctx *TypeNameContext) interface{} {
 	dimensions := ctx.AllTypeDimension()
 	lastDimensionIndex := len(dimensions) - 1
 	for i := range dimensions {
-		dimension := dimensions[lastDimensionIndex-i].Accept(v).(*int)
+		dimensionContext := dimensions[lastDimensionIndex-i]
+		dimension := dimensionContext.Accept(v).(*int)
+		startPosition, endPosition := ast.PositionRangeFromContext(dimensionContext)
 		if dimension == nil {
 			result = ast.VariableSizedType{
-				Type: result,
+				Type:          result,
+				StartPosition: startPosition,
+				EndPosition:   endPosition,
 			}
 		} else {
 			result = ast.ConstantSizedType{
-				Type: result,
-				Size: *dimension,
+				Type:          result,
+				Size:          *dimension,
+				StartPosition: startPosition,
+				EndPosition:   endPosition,
 			}
 		}
 	}
@@ -523,7 +543,7 @@ func (v *ProgramVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
 		return ast.OperationMinus
 	}
 
-	panic("unreachable")
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
@@ -735,7 +755,7 @@ func (v *ProgramVisitor) VisitEqualityOp(ctx *EqualityOpContext) interface{} {
 		return ast.OperationUnequal
 	}
 
-	panic("unreachable")
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{} {
@@ -755,7 +775,7 @@ func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{}
 		return ast.OperationGreaterEqual
 	}
 
-	panic("unreachable")
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
@@ -767,7 +787,7 @@ func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
 		return ast.OperationMinus
 	}
 
-	panic("unreachable")
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) interface{} {
@@ -783,5 +803,5 @@ func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) int
 		return ast.OperationMod
 	}
 
-	panic("unreachable")
+	panic(&errors.UnreachableError{})
 }
