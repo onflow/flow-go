@@ -121,28 +121,39 @@ conditionalExpression
 	;
 
 orExpression
-	: andExpression ('||' andExpression)?
+	: andExpression
+	| orExpression '||' andExpression
 	;
 
 andExpression
-	: equalityExpression ('&&' equalityExpression)?
+	: equalityExpression
+	| andExpression '&&' equalityExpression
 	;
 
 equalityExpression
-	: relationalExpression (equalityOp relationalExpression)?
+	: relationalExpression
+	| equalityExpression equalityOp relationalExpression
 	;
 
 relationalExpression
-	: additiveExpression (relationalOp additiveExpression)?
+	: additiveExpression
+	| relationalExpression relationalOp additiveExpression
 	;
 
 additiveExpression
-	: multiplicativeExpression (additiveOp multiplicativeExpression)?
+	: multiplicativeExpression
+	| additiveExpression additiveOp multiplicativeExpression
 	;
 
 multiplicativeExpression
-	: primaryExpression (multiplicativeOp primaryExpression)?
+	: unaryExpression
+	| multiplicativeExpression multiplicativeOp unaryExpression
 	;
+
+unaryExpression
+    : primaryExpression
+    | unaryOp+ unaryExpression
+    ;
 
 primaryExpression
     : primaryExpressionStart primaryExpressionSuffix*
@@ -190,6 +201,14 @@ multiplicativeOp
 Mul : '*' ;
 Div : '/' ;
 Mod : '%' ;
+
+
+unaryOp
+    : Minus
+    | Negate
+    ;
+
+Negate : '!' ;
 
 
 primaryExpressionStart

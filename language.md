@@ -45,7 +45,7 @@ Constants and variables are declarations that bind a value to a name. Constants 
 Constant means that the *name* is constant, not the *value*, i.e., the value may still be changed if it allows it.
 
 The `const` keyword is used to declare a constant and the `var` keyword is used to declare a variable.
-The keywords is followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
+The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
 ```typescript
 // declaring a constant
@@ -674,11 +674,11 @@ fun double(x: Int): Int {
 Functions can be nested, i.e., the code of a function may declare further functions.
 
 ```typescript
-// declare a function which multiple a number by, and adds one
+// declare a function which multiplies a number by two, and adds one
 //
 fun doubleAndAddOne(n: Int): Int {
 
-    // declare a nested function which doubles, which multiples a number by two
+    // declare a nested function which doubles, which multiplies a number by two
     //
     fun double(x: Int) {
         return x * 2
@@ -694,7 +694,7 @@ Functions can be also used as expressions. The syntax is the same as for functio
 
 ```typescript
 // declare a constant called double, which has a function as its value,
-// which multiples a number by two
+// which multiplies a number by two when called
 //
 const double = fun (x: Int): Int {
      return x * 2
@@ -727,7 +727,7 @@ Function types consist of the function's parameter types and the function's retu
 The parameter types need to be enclosed in parentheses, followed by the `=>` keyword, and end with the return type.
 
 ```typescript
-// declare a function called add, with the type (Int, Int) => Int
+// declare a function called add, with the function type (Int, Int) => Int
 //
 fun add(a: Int, b: Int): Int {
     return a + b
@@ -735,7 +735,7 @@ fun add(a: Int, b: Int): Int {
 ```
 
 ```typescript
-// declare a constant called add, with the type (Int, Int) => Int
+// declare a constant called add, with the function type (Int, Int) => Int
 //
 const add: (Int, Int) => Int =
     fun (a: Int, b: Int): Int {
@@ -1127,7 +1127,7 @@ class SomeClass {
 
 ### Structure and Class Fields
 
-Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initialier is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
+Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initializer is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
 
 ```typescript
 // declare a token struct, which has a constant field
@@ -1147,7 +1147,7 @@ struct Token {
 
 In initializers, the special constant `this` refers to the structure or class value that is to be initialized.
 
-Values of a structure or class type are created (instantiated) by calling the type like functions.
+Values of a structure or class type are created (instantiated) by calling the type like a function.
 
 ```typescript
 const token = Token(42, 1_000_00)
@@ -1306,7 +1306,7 @@ struct SomeStruct {
 
 }
 
-// create a value of structure type SomeStruct
+// declare a constant with value of structure type SomeStruct
 //
 const structA = SomeStruct(0)
 
@@ -1330,7 +1330,7 @@ class SomeClass {
     }
 }
 
-// create a value of class type SomeClass
+// declare a constant with value of class type SomeClass
 //
 const classA = SomeClass(0)
 
