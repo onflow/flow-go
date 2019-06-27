@@ -14,6 +14,3 @@ generate:
       type: go
       flags: plugins=grpc
       output: ../grpc
-
-
-https://godoc.org/sourcegraph.com/sourcegraph/prototools/cmd/protoc-gen-json
