@@ -1199,7 +1199,7 @@ struct SomeStruct {
 
 }
 
-// create a value of structure type SomeStruct
+// declare a constant with value of structure type SomeStruct
 //
 const structA = SomeStruct(0)
 
