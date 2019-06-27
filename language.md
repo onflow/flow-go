@@ -1223,7 +1223,7 @@ class SomeClass {
     }
 }
 
-// create a value of class type SomeClass
+// declare a constant with value of class type SomeClass
 //
 const classA = SomeClass(0)
 
