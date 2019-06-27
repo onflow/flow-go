@@ -8,6 +8,10 @@ import (
 	"github.com/dapperlabs/bamboo-emulator/crypto"
 )
 
+const (
+	passphrase = "BAMBOO"
+)
+
 // InitClient sets up a mnemonic file for the user to start the Bamboo Emulator.
 func InitClient(log *logrus.Logger, reset bool) {
 	if !fileExists(crypto.MnemonicFile) || reset {
@@ -17,7 +21,8 @@ func InitClient(log *logrus.Logger, reset bool) {
 		}
 		defer file.Close()
 
-		wallet, err := crypto.CreateWallet("BAMBOO")
+		// passphrase is needed to generate/unlock BIP 32 HD wallet
+		wallet, err := crypto.CreateWallet(passphrase)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to generate HD wallet")
 		}
