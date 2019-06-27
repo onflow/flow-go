@@ -1123,7 +1123,7 @@ class SomeClass {
 }
 ```
 
-Fields are declared like variables and constants, however, they have no initial value.The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initialier is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
+Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initializer is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
 
 ```typescript
 // declare a token struct, which has a constant field
