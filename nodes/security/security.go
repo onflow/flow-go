@@ -22,11 +22,12 @@ type Node struct {
 // Config hold the configuration options for an security node.
 type Config struct {
 	BlockInterval time.Duration
+	Verbose       bool
 }
 
 // NewNode returns a new simulated security node.
 func NewNode(conf *Config, state *data.WorldState, collectionsIn chan *data.Collection, log *logrus.Logger) *Node {
-	blockBuilder := block_builder.NewBlockBuilder(state, collectionsIn, log)
+	blockBuilder := block_builder.NewBlockBuilder(state, collectionsIn, log, conf.Verbose)
 
 	return &Node{
 		conf:          conf,

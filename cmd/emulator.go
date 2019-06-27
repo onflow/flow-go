@@ -27,4 +27,5 @@ func init() {
 	emulatorCmd.AddCommand(startCmd)
 
 	emulatorCmd.PersistentFlags().IntVarP(&conf.Port, "port", "p", 0, "port to run emulator server on")
+	emulatorCmd.PersistentFlags().BoolVarP(&conf.Verbose, "verbose", "v", false, "verbose output")
 }

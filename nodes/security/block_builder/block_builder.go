@@ -16,17 +16,19 @@ type BlockBuilder struct {
 	collectionsIn      <-chan *data.Collection
 	pendingCollections []*data.Collection
 	log                *logrus.Logger
+	verbose            bool
 }
 
 // NewBlockBuilder initializes a new BlockBuilder with the incoming collectionsIn channel.
 //
 // The BlockBuilder pulls collections from the collectionsIn channel and writes new blocks to the shared world state.
-func NewBlockBuilder(state *data.WorldState, collectionsIn <-chan *data.Collection, log *logrus.Logger) *BlockBuilder {
+func NewBlockBuilder(state *data.WorldState, collectionsIn <-chan *data.Collection, log *logrus.Logger, verbose bool) *BlockBuilder {
 	return &BlockBuilder{
 		state:              state,
 		collectionsIn:      collectionsIn,
 		pendingCollections: []*data.Collection{},
 		log:                log,
+		verbose:            verbose,
 	}
 }
 
@@ -93,19 +95,21 @@ func (b *BlockBuilder) mintNewBlock() error {
 		}
 	}
 
-	b.log.
-		WithFields(logrus.Fields{
-			"blockNum":        newBlock.Number,
-			"blockHash":       newBlock.Hash(),
-			"numCollections":  len(collectionHashes),
-			"numTransactions": len(transactionHashes),
-		}).
-		Infof(
-			"Publishing block %d (0x%v) with %d transaction(s)",
-			newBlock.Number,
-			newBlock.Hash(),
-			len(transactionHashes),
-		)
+	if b.verbose || len(transactionHashes) > 0 {
+		b.log.
+			WithFields(logrus.Fields{
+				"blockNum":        newBlock.Number,
+				"blockHash":       newBlock.Hash(),
+				"numCollections":  len(collectionHashes),
+				"numTransactions": len(transactionHashes),
+			}).
+			Infof(
+				"Publishing block %d (0x%v) with %d transaction(s)",
+				newBlock.Number,
+				newBlock.Hash(),
+				len(transactionHashes),
+			)
+	}
 
 	return nil
 }
