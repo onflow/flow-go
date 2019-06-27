@@ -4,9 +4,15 @@ The Bamboo Programming Language is a new high-level programming language intende
 
 The language's goals are, in order of importance:
 
-- *Safety and security*: Focus on safe code: provide a strong static type system, design by contract, a capability system, and linear types. 
+- *Safety and security*: Focus on safe code: provide a strong static type system, design by contract, a capability system, and linear types.
 - *Auditability*: Focus on readability: make it easy to verify what the code is doing.
 - *Simplicity*: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
+
+
+## Syntax and Behavior
+
+The programming language's syntax and behavior is inspired by Kotlin, Swift, Rust, TypeScript, and Solidity.
+
 
 ## Comments
 
@@ -34,36 +40,56 @@ Comments may be nested.
 
 ## Constants and Variable Declarations
 
-Constants and variables are declarations that bind a value to a name. Constants can only be initialized with a value and cannot be reassigned afterwards. Variables can be initialized with a value and can be reassigned later. Declarations are valid in any scope, including the global scope. The `const` keyword is used to define a constant and the `var` keyword is used to define a variable. Once a constant or variable is declared, it can't be redeclared with the same name, with a different type, or changed into the corresponding other kind.
+Constants and variables are declarations that bind a value to a name. Constants can only be initialized with a value and cannot be reassigned afterwards. Variables can be initialized with a value and can be reassigned later. Declarations are valid in any scope, including the global scope.
 
+The `const` keyword is used to define a constant and the `var` keyword is used to define a variable.
+The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
 ```typescript
 // declaring a constant
-const a = 1 
+const a = 1
 
 // error: re-assigning to a constant
 a = 2
 
-// error: re-declaring with the same name
+// declaring a variable
+var b = 3
 
-const a = 3
+// assigning a new value to a variable
+b = 4
+```
+
+Variables and constants **must** be initialized.
+
+```typescript
+// invalid: constant has no initial value
+const a
+```
+
+Once a constant or variable is declared, it can't be redeclared with the same name, with a different type, or changed into the corresponding other kind.
+
+
+```typescript
+// declaring a constant
+const a = 1
+
+// invalid: re-declaring a constant with a name that is already used in this scope
+const a = 2
 
 // declaring a variable
+var b = 3
 
+// invalid: re-declaring a variable with a name that is already used in this scope
 var b = 4
 
-// re-assigning
-
-b = 5
-
-// error: re-declaring
-
-var b = 6
+// invalid: declaring a variable with a name that was used for a constant
+var a = 5
 ```
 
 ## Type Annotations
 
-When declaring a constant or variable, an optional *type annotation* can be provided, to make it explicit what type the declaration has. If no type annotation is provided, the type of the declaration is [inferred from the initial value](#type-inference). 
+When declaring a constant or variable, an optional *type annotation* can be provided, to make it explicit what type the declaration has.
+If no type annotation is provided, the type of the declaration is [inferred from the initial value](#type-inference).
 
 ```typescript
 // declaring a variable with an explicit type
@@ -75,7 +101,8 @@ const a = 1
 
 ## Naming
 
-Names may start with any upper and lowercase letter or an underscore. This may be followed by zero or more upper and lower case letters, underscores, and numbers. Names may not begin with a number.
+Names may start with any upper and lowercase letter or an underscore. This may be followed by zero or more upper and lower case letters, underscores, and numbers.
+Names may not begin with a number.
 
 ```typescript
 // valid
@@ -87,7 +114,7 @@ token_name
 // valid
 _balance
 
-// valid 
+// valid
 account2
 
 // invalid
@@ -96,6 +123,11 @@ account2
 // invalid
 1something
 ```
+
+### Conventions
+
+By convention, variables, constants, and functions have lowercase names; and types have title-case names.
+
 
 ## Semicolons
 
@@ -114,7 +146,7 @@ const d = 1; var e = 2
 
 ## Values and Types
 
-Values are objects like booleans and integers. Values are typed. 
+Values are objects like booleans and integers. Values are typed.
 
 ### Booleans
 
@@ -124,7 +156,7 @@ The two boolean values `true` and `false` are of type `Bool`.
 
 Integers are whole numbers without a fractional part. They are either *signed* (positive, zero, or negative) or *unsigned* (positive or zero) and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
 
-The names for the integer types follow this naming convention: Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix, i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`. 
+The names for the integer types follow this naming convention: Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix, i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
 
  - **`Int8`**: -128 through 127
  - **`Int16`**: -32768 through 32767
@@ -139,6 +171,8 @@ In addition, the arbitrary precision integer type `Int` is provided.
 ### Floating-Point Numbers
 
 There is no support for floating point numbers.
+
+Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here. Fixed point numbers should be simulated using integers and a scale factor for now.
 
 ### Numeric Literals
 
@@ -171,7 +205,7 @@ const aLargeNumber = 1_000_000
 
 ### Arrays
 
-Arrays are mutable, ordered collections of values. All values in the array must have the same type. Arrays may contain a value multiple times. Array literals start with an opening square bracket `[` and end with a closing square bracket `]`. 
+Arrays are mutable, ordered collections of values. All values in an array must have the same type. Arrays may contain a value multiple times. Array literals start with an opening square bracket `[` and end with a closing square bracket `]`.
 
 ```typescript
 // an empty array
@@ -184,24 +218,134 @@ const integers = [1, 2, 3]
 const invalidMixed = [1, true, 2, false]
 ```
 
-#### Indexing
+#### Array Indexing
 
-To get the element of an array at a specific index, the indexing syntax can be used.
+To get the element of an array at a specific index, the indexing syntax can be used: The array is followed by an opening square bracket `[`, the indexing value, and ends with a closing square bracket `]`.
 
 ```typescript
 const numbers = [42, 23]
+// get the first number
 numbers[0] // is 42
+// get the second number
 numbers[1] // is 23
 
 const arrays = [[1, 2], [3, 4]]
+// get the first number of the second array
 arrays[1][0] // is 3
+```
+
+To set an element of an array at a specific index, the indexing syntax can be used as well.
+
+```typescript
+const numbers = [42, 23]
+// change the second number
+numbers[1] = 2
+// numbers is [42, 2]
+```
+
+#### Array Types
+
+Arrays either have a fixed size or are variably sized, i.e., elements can be added an removed.
+
+Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array. For example, a fixed-size array of 3 `Int8` elements has the type `Int8[3]`.
+
+Variable-size arrays have the type suffix `[]`. For example, a variable-size array of `Int16` elements has the type `Int16[]`.
+
+
+<!--
+
+TODO
+
+#### Array Functions
+
+- Length, concatenate, filter, etc. for all array types
+- Append, remove, etc. for variable-size arrays
+- Document and link to array concatenation operator `+` in operators section
+
+-->
+
+
+## Dictionaries
+
+> Status: Dictionaries are not implemented yet.
+
+Dictionaries are mutable, unordered collections of key-value associations. In a dictionary, all keys must have the same type, and all values must have the same type. Dictionaries may contain a key only once and may contain a value multiple times.
+
+Dictionary literals start with an opening brace `{` and end with a closing brace `}`. Keys are separated from values by a colon, and key-value associations are separated by commas.
+
+```typescript
+// an empty dictionary
+const empty = {}
+
+// a dictionary mapping integers to booleans
+const dictionary = {
+    1: true,
+    2: false
+}
+
+// invalid: mixed types
+const invalidMixed = {
+    1: true,
+    false: 2
+}
+```
+
+#### Dictionary Access
+
+To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
+
+```typescript
+const booleans = {
+    1: true,
+    0: false
+}
+booleans[1] // is true
+booleans[0] // is false
+
+const integers = {
+    true: 1,
+    false: 0
+}
+integers[true] // is 1
+integers[false] // is 0
+```
+
+To set the value for a key of a dictionary, the access syntax can be used as well.
+
+```typescript
+const booleans = {
+    1: true,
+    0: false
+}
+booleans[1] = false
+booleans[0] = true
+// booleans is {1: false, 0: true}
+```
+
+
+#### Dictionary Types
+
+Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
+
+```typescript
+const booleans = {
+    1: true,
+    0: false
+}
+// booleans has type Bool[Int]
+
+const integers = {
+    true: 1,
+    false: 0
+}
+// integers has type Int[Bool]
 ```
 
 <!--
 
 TODO
 
-#### Functions
+#### Dictionary Functions
 
 -->
 
@@ -209,7 +353,7 @@ TODO
 
 Operators are special symbols that perform a computation for one or more values. They are either unary, binary, or ternary.
 
-- Unary operators perform an operation for a single value. The unary operator symbol appears before the value. 
+- Unary operators perform an operation for a single value. The unary operator symbol appears before the value.
 
 - Binary operators operate on two values. The binary operator symbol appears between the two values (infix).
 
@@ -242,7 +386,7 @@ a = 2
 // a is 2
 ```
 
-The left-hand side of the assignment must be an identifier, followed by one or more indices.
+The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.
 
 ```typescript
 const numbers = [1, 2]
@@ -253,6 +397,10 @@ const arrays = [[1, 2], [3, 4]]
 // change the first number in the second array
 arrays[1][0] = 5
 // arrays is [[1, 2], [5, 4]]
+
+const dictionaries = {true: {1: 2}, false: {3: 4}}
+dictionaries[false][3] = 0
+// dictionaries is {true: {1: 2}, false: {3: 0}}
 ```
 
 ### Arithmetic
@@ -269,13 +417,13 @@ const a = 1 + 2
 // a is 3
 ```
 
-Arithmetic operators don't allow values to overflow.
+Arithmetic operators don't cause values to overflow.
 
 ```typescript
 const a: Int8 = 100
 const b: Int8 = 100
-// abort: 10000 does not fit into Int8
-a * b
+const c = a * b
+// c is 10000, and of type `Int`.
 ```
 
 If overflow behavior is intended, overflowing operators are available, which are prefixed with an `&`:
@@ -358,7 +506,7 @@ Comparison operators work with boolean and integer values.
   true == true // is true
   true == false // is false
   ```
-  
+
 - Inequality: `!=`, for booleans and integers
 
   ```typescript
@@ -367,7 +515,7 @@ Comparison operators work with boolean and integer values.
   true != true // is false
   true != false // is true
   ```
-  
+
 - Less than: `<`, for integers
 
   ```typescript
@@ -383,7 +531,7 @@ Comparison operators work with boolean and integer values.
   1 <= 2 // is true
   2 <= 1 // is false
   ```
-  
+
 - Greater than: `>`, for integers
 
   ```typescript
@@ -405,14 +553,23 @@ Comparison operators work with boolean and integer values.
 ### Ternary Conditional Operator
 
 There is only one ternary conditional operator, the ternary conditional operator (`a ? b : c`).
-It behaves like an if-statement, but is an expression: If the first operator value is true, 
-the second operator value is returned. If the first operator value is false, the third value is returned.
 
-```
+It behaves like an if-statement, but is an expression: If the first operator value is true, the second operator value is returned. If the first operator value is false, the third value is returned.
+
+```typescript
 const x = 1 > 2 ? 3 : 4
 x // is 4
 ```
 
+
+### Parentheses
+
+Expressions can be wrapped in parentheses to avoid ambiguity.
+
+```typescript
+const a = (1 + 2) * 3
+// a is 9
+```
 
 ### Precedence and Associativity
 
@@ -437,7 +594,7 @@ Functions are values, i.e., they can be assigned to constants and variables, and
 
 ### Function Declarations
 
-Functions can be declared by using the `fun` keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called. 
+Functions can be declared by using the `fun` keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called.
 
 The parameters need to be enclosed in parentheses. Each parameter needs to have a type annotation, which follows the parameter name after a colon. The return type is also separated from the parameters with a colon. The function code needs to be enclosed in opening and closing braces.
 
@@ -453,14 +610,14 @@ Functions can be nested, i.e., the code of a function may declare further functi
 ```typescript
 fun doubleAndAddOne(n: Int): Int {
     fun double(x: Int) {
-        return x * 2    
+        return x * 2
     }
     return double(n) + 1
 }
 ```
 
 
-### Function Expressions 
+### Function Expressions
 
 Functions can be also used as expressions. The syntax is the same as for function declarations, except that function expressions have no name, i.e., it is anonymous.
 
@@ -473,7 +630,7 @@ const double = fun (x: Int): Int {
 
 ### Function Calls
 
-Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters. 
+Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.
 
 ```typescript
 fun double(x: Int): Int {
@@ -491,12 +648,11 @@ double()
 
 ### Function Types
 
-Function types consist of the function's parameter types and the function's return type. 
-The parameter types need to be enclosed in parentheses, followed by the `=>` keyword, 
-and end with the return type. 
+Function types consist of the function's parameter types and the function's return type.
+The parameter types need to be enclosed in parentheses, followed by the `=>` keyword, and end with the return type.
 
 ```typescript
-const add: (Int, Int) => Int = 
+const add: (Int, Int) => Int =
     fun (a: Int, b: Int): Int {
         return a + b
     }
@@ -510,11 +666,11 @@ const doNothing: () => Void = fun () {}
 
 #### Argument Passing Behavior
 
-When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as [call-by-sharing](https://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_sharing).
+When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as [call-by-sharing](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_sharing).
 
 
 ```typescript
-fun change(numbers: Int[]) {     
+fun change(numbers: Int[]) {
      numbers[0] = 1
      numbers[1] = 2
 }
@@ -533,6 +689,45 @@ fun test(x: Int) {
 }
 ```
 
+### Function Preconditions and Postconditions
+
+> Status: Function Preconditions and Postconditions are not implemented yet.
+
+Functions may have preconditions and may have postconditions.
+
+Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the `require` keyword, followed by the condition block.
+
+Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `ensure` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
+
+A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for [statements](#semicolons).
+
+```typescript
+fun factorial(n: Int): Int {
+    require {
+        // factorial is only defined for integers greater than or equal to zero
+        n >= 0
+    }
+    ensure {
+        // the result will always be greater than or equal to 1
+        result >= 1
+    }
+
+    var i = n
+    var result = 1
+
+    while i > 1 {
+        result = result * i
+        i = i - 1
+    }
+
+    return result
+}
+
+factorial(5) // is 120
+
+// error: argument does not satisfy precondition n >= 0
+factorial(-2)
+```
 
 ## Control flow
 
@@ -540,7 +735,7 @@ Control flow statements control the flow of execution in a function.
 
 ### Conditional branching: if-statement
 
-If-statements allow a certain piece of code to be executed only when a given condition is true. 
+If-statements allow a certain piece of code to be executed only when a given condition is true.
 
 The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces. The condition must be boolean and the braces are required.
 
@@ -550,7 +745,7 @@ const a = 0
 var b = 0
 
 if a == 0 {
-   b = 1 
+   b = 1
 }
 
 if a != 0 {
@@ -605,7 +800,7 @@ If it is true, the piece of code is executed and the evaluation of the condition
 ```typescript
 var a = 0
 while a < 5 {
-    a = a + 1 
+    a = a + 1
 }
 // a is 5
 ```
@@ -614,7 +809,7 @@ while a < 5 {
 
 The return-statement causes a function to return immediately, i.e., any code after the return-statement is not executed. The return-statement starts with the `return` keyword and is followed by an optional expression that should be the return value of the function call.
 
-<!-- 
+<!--
 TODO: examples
 
 - in function
@@ -642,7 +837,7 @@ y
 ```typescript
 fun doubleAndAddOne(n: Int): Int {
     fun double(x: Int) {
-        return x * 2    
+        return x * 2
     }
     return double(n) + 1
 }
@@ -696,12 +891,13 @@ fun f(): Int {
 f() // returns 2
 ```
 
+## Type Safety
 
-## Type Safety 
+> Status: Type checking is not implemented yet.
 
-The Bamboo programming language is a _type-safe_ language. 
+The Bamboo programming language is a _type-safe_ language.
 
-When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable is of type `Bool`, it can _only_ be assigned a `Bool`, and not for example an `Int`. 
+When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable is of type `Bool`, it can _only_ be assigned a `Bool`, and not for example an `Int`.
 
 ```typescript
 var a = true
@@ -723,10 +919,10 @@ nand(false, false) // is true
 nand(0, 0)
 ```
 
-Types are *not* automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`. 
+Types are *not* automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`.
 
 ```typescript
-fun add(a: Int8, b: Int8): Int16 {
+fun add(a: Int8, b: Int8): Int {
     return a + b
 }
 
@@ -742,15 +938,259 @@ add(a, b)
 
 ## Type Inference
 
-<!-- TODO 
+> Status: Type inference is not implemented yet.
 
-- for variables and constants: integer literal is inferred to a big int
+If a variable or constant is not annotated explicitly with a type, it is inferred from the value.
+
+Integer literals are inferred to type `Int`.
+
+```typescript
+const a = 1
+// a has type Int
+```
+
+Array literals are inferred based on the elements of the literal, and to be variable-size.
+
+```typescript
+const integers = [1, 2]
+// integers has type Int[]
+
+// invalid: mixed types
+const invalidMixed = [1, true, 2, false]
+```
+
+Dictionary literals are inferred based on the keys and values of the literal.
+
+```typescript
+const booleans = {
+    1: true,
+    2: false
+}
+// booleans has type Bool[Int]
+
+// invalid: mixed types
+const invalidMixed = {
+    1: true,
+    false: 2
+}
+```
+
+Functions are inferred based on the parameter types and the return type.
+
+```typescript
+const add = (a: Int8, b: Int8): Int {
+    return a + b
+}
+// add has type (Int8, Int8) => Int
+```
+
+## Structures and Classes
+
+> Status: Structures and classes are not implemented yet.
+
+Structures and classes are composite types. Structures and classes consist of one or more values, which are stored in named fields. Each field may have a different type.
+
+Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword. The keyword is followed by the name.
+
+```typescript
+struct SomeStruct {
+    // ...
+}
+
+class SomeClass {
+    // ...
+}
+```
+
+Fields are defined like variables and constants, however, they have no initial value.The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initialier is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
+
+```typescript
+// define a token struct, which has a constant field
+// named id and a variable field named balance.
+// both fields are initialized through the initializer.
+struct Token {
+    const id: Int
+    var balance: Int
+
+    init(id: Int, balance: Int) {
+        this.id = id
+        this.balance = balance
+    }
+}
+```
+
+In initializers, the special constant `this` refers to the structure or class that is to be initialized.
+
+Structures and classes are created (instantiated) by calling them like functions.
+
+```typescript
+const token = Token(42, 1_000_00)
+```
+
+Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the structure or class instance is followed by a dot (`.`) and the name of the field.
+
+```typescript
+token.id // is 42
+token.balance // is 1_000_000
+
+token.balance = 1
+// token.balance is 1
+
+// invalid: assignment to constant field
+token.id = 23
+```
+
+Structures and classes may contain functions. Just like in the initializer, the special constant `this` refers to the structure or class that the function is called on.
+
+```typescript
+struct Token {
+    const id: Int
+    var balance: Int
+
+    init(id: Int, balance: Int) {
+        this.id = id
+        this.balance = balance
+    }
+
+    fun mint(value: Int) {
+        this.balance = this.balance + value
+    }
+}
+
+const token = Token(32, 0)
+token.mint(1_000_000)
+// token.balance is 1_000_000
+```
+
+The only difference between structures and classes is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types.
+
+```typescript
+// define a struct with an integer field
+struct SomeStruct {
+    const value: Int
+
+    init(value: Int) {
+        this.value = value
+    }
+
+}
+
+const structA = SomeStruct(0)
+// structure is copied
+const structB = structA
+structB.value = 1
+// structA.value is 0
+```
+
+```typescript
+// define a class with an integer field
+class SomeClass {
+    const value: Int
+
+    init(value: Int) {
+        this.value = value
+    }
+}
+
+const classA = SomeClass(0)
+// class is referenced
+const classB = classA
+classB.value = 1
+// classA.value is 1
+```
+
+Note the different values in the last line of each example.
+
+There is **no** support for nulls, i.e., a constant or variable of a reference type must always be bound to an instance of the type. There is *no* `null`.
+
+
+## Access control
+
+> Status: Access control is not implemented yet.
+
+Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, classes) and fields (in structures, classes) are either private or public.
+
+**Private** means the declaration is only accessible/visible in the currrent and inner scopes. For example, a private field in a class can only be accessed by functions of the class, not by code that useses an instance of the class in an outer scope.
+
+**Public** means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a class can be accessed using the access syntax on an instance of the class in an outer scope.
+
+The `private` keyword is used to make declarations private, and the `public` keyword is used to make declarations public.
+
+The `(set)` suffix can be used to make variables also publicly writeable.
+
+To summarize the behavior for variable and constant declarations and fields:
+
+| Declaration kind | Access modifier    | Read scope        | Write scope       |
+|------------------|--------------------|-------------------|-------------------|
+| `const`          |                    | Current and inner | *None*            |
+| `const`          | `public`           | **All**           | *None*            |
+| `var`            |                    | Current and inner | Current and inner |
+| `var`            | `public`           | **All**           | Current and inner |
+| `var`            | `public(set)`      | **All**           | **All**           |
+
+
+```typescript
+// private constant, inaccessible/invisible
+private const a = 1
+
+// public constant, accessible/visible
+public const b = 2
+
+public class SomeClass {
+    // private constant field,
+    // only readable in class functions
+    private const a: Int
+
+    // public constant field,
+    // readable in all scopes
+    public const b: Int
+
+    // private variable field,
+    // only readable and writeable in class functions
+    private var c: Int
+
+    // public variable field, not settable,
+    // only writeable in class functions,
+    // readable in all scopes
+    public var d: Int
+
+    // public variable field, settable,
+    // readable and writeable in all scopes
+    public(set) var e: Int
+
+    // initializer implementation skipped
+}
+```
+
+## Authorizations
+
+> Status: Authorizations are not implemented yet.
+
+Authorizations represent access rights/privileges to resources. An authorization is similar to a class in that it is a composite reference type, i.e., it consists of values and is referenced, that is has an initializer, and that it can have functions associated with it.
+
+Authorizations differ from classes in that they can only be created (instantiated) from existing authorizations. To make this explicit, the initializer of an authorization *must* be declared, the initializer must have at least one parameter, and the type of the first parameter must be an authorization.
+
+Furthermore, authorizations are unforgeable.
+
+There is a global authorization `rootAuth` of type `RootAuth`. It represents the access rights/privileges to all resources.
+
+Authorizations are declared using the `auth` keyword.
+
+```typescript
+auth SendTokens {
+    const limit: Int
+
+    init(auth: RootAuth, limit: Int) {
+        this.limit = limit
+    }
+}
+```
+
+<!--
+
+TODO:
+- access control
 
 -->
 
 
-## Conventions
-
-- Naming: 
-  - Values and functions have lowercase names
-  - Types have title-case names
