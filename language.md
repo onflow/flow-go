@@ -674,7 +674,7 @@ fun double(x: Int): Int {
 Functions can be nested, i.e., the code of a function may declare further functions.
 
 ```typescript
-// declare a function which multiple a number by, and adds one
+// declare a function which multiplies a number by two, and adds one
 //
 fun doubleAndAddOne(n: Int): Int {
 
