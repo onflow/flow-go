@@ -32,7 +32,19 @@ func NewWorldState(log *logrus.Logger) (*WorldState, error) {
 	txs := make(map[crypto.Hash]Transaction)
 	registers := make(map[string][]byte)
 
-	wallet, err := crypto.CreateWallet("BAMBOO")
+	mnemonic, err := crypto.LoadMnemonic()
+	if err != nil {
+		return nil, err
+	}
+
+	log.WithFields(logrus.Fields{
+		"filename": crypto.MnemonicFile,
+	}).Infof(
+		"Loading mnemonic file from: %s",
+		crypto.MnemonicFile,
+	)
+
+	wallet, err := crypto.GenWalletFromMnemonic(mnemonic)
 	if err != nil {
 		return nil, err
 	}

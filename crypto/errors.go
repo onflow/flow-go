@@ -30,3 +30,12 @@ type InvalidDerivationPath struct {
 func (e *InvalidDerivationPath) Error() string {
 	return fmt.Sprintf("Invalid derivation path: %s", e.path)
 }
+
+// FileDoesNotExistError indicates that the file does not exist.
+type FileDoesNotExistError struct {
+	filename string
+}
+
+func (e *FileDoesNotExistError) Error() string {
+	return fmt.Sprintf("%s does not exist", e.filename)
+}

@@ -86,6 +86,7 @@ github.com/mattn/go-runewidth v0.0.4 h1:2BvfKmzob6Bmd4YsL0zygOqfdFnK7GR4QL06Do4/
 github.com/mattn/go-runewidth v0.0.4/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
 github.com/miguelmota/go-ethereum-hdwallet v0.0.0-20190601230056-2da794f11e15 h1:fH1StgHigLC3CHx8XIUNzi6DCIcpExXUVHGzS70RY9I=
 github.com/miguelmota/go-ethereum-hdwallet v0.0.0-20190601230056-2da794f11e15/go.mod h1:VVt+rn/itmf+9eZq9CAabVlsfsHveUNUQ0bRv3ChqxY=
+github.com/mitchellh/go-homedir v1.1.0 h1:lukF9ziXFxDFPkA1vsr5zpc1XuPDn/wFntq5mG+4E0Y=
 github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrkLzIz1N1q0pr0=
 github.com/mitchellh/mapstructure v1.1.2 h1:fmNYVwqnSfB9mZU6OS2O6GsXM+wcskZDuKQzvN1EDeE=
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
