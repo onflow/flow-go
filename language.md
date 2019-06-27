@@ -727,7 +727,7 @@ Function types consist of the function's parameter types and the function's retu
 The parameter types need to be enclosed in parentheses, followed by the `=>` keyword, and end with the return type.
 
 ```typescript
-// declare a function called add, with the type (Int, Int) => Int
+// declare a function called add, with the function type (Int, Int) => Int
 //
 fun add(a: Int, b: Int): Int {
     return a + b
