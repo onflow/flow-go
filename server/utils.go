@@ -20,6 +20,10 @@ type Config struct {
 
 // StartServer starts up an instance of a Bamboo Emulator server.
 func StartServer(log *logrus.Logger, conf Config) {
+	if conf.Verbose {
+		log.Level = logrus.DebugLevel
+	}
+
 	log.WithField("port", conf.Port).Info("Starting emulator server...")
 
 	collections := make(chan *data.Collection, 16)
@@ -32,7 +36,6 @@ func StartServer(log *logrus.Logger, conf Config) {
 	accessNode := access.NewNode(
 		&access.Config{
 			CollectionInterval: conf.CollectionInterval,
-			Verbose: conf.Verbose,
 		},
 		state,
 		collections,
@@ -41,7 +44,6 @@ func StartServer(log *logrus.Logger, conf Config) {
 	securityNode := security.NewNode(
 		&security.Config{
 			BlockInterval: conf.BlockInterval,
-			Verbose: conf.Verbose,
 		},
 		state,
 		collections,

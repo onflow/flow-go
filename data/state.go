@@ -39,7 +39,7 @@ func NewWorldState(log *logrus.Logger) (*WorldState, error) {
 
 	log.WithFields(logrus.Fields{
 		"filename": crypto.MnemonicFile,
-	}).Infof(
+	}).Debugf(
 		"Loading mnemonic file from: %s",
 		crypto.MnemonicFile,
 	)
@@ -67,7 +67,7 @@ func NewWorldState(log *logrus.Logger) (*WorldState, error) {
 		"address": root.Address,
 		"balance": root.Balance,
 		"path":    root.Path,
-	}).Infof(
+	}).Debugf(
 		"Creating root account %v from derivation path %s",
 		root.Address,
 		root.Path,
