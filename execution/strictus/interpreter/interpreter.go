@@ -117,12 +117,13 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 		ReturnType:     declaration.ReturnType,
 	}
 	variableDeclaration := ast.VariableDeclaration{
-		Value:         expression,
-		Identifier:    declaration.Identifier,
-		IsConst:       true,
-		Type:          functionType,
-		StartPosition: declaration.StartPosition,
-		EndPosition:   declaration.EndPosition,
+		Value:              expression,
+		Identifier:         declaration.Identifier,
+		IsConst:            true,
+		Type:               functionType,
+		StartPosition:      declaration.StartPosition,
+		EndPosition:        declaration.EndPosition,
+		IdentifierPosition: declaration.IdentifierPosition,
 	}
 
 	// make the function itself available inside the function

@@ -1,13 +1,14 @@
 package ast
 
 type FunctionDeclaration struct {
-	IsPublic      bool
-	Identifier    string
-	Parameters    []Parameter
-	ReturnType    Type
-	Block         Block
-	StartPosition Position
-	EndPosition   Position
+	IsPublic           bool
+	Identifier         string
+	Parameters         []Parameter
+	ReturnType         Type
+	Block              Block
+	StartPosition      Position
+	EndPosition        Position
+	IdentifierPosition Position
 }
 
 func (f FunctionDeclaration) GetStartPosition() Position {
@@ -16,6 +17,10 @@ func (f FunctionDeclaration) GetStartPosition() Position {
 
 func (f FunctionDeclaration) GetEndPosition() Position {
 	return f.EndPosition
+}
+
+func (f FunctionDeclaration) GetIdentifierPosition() Position {
+	return f.IdentifierPosition
 }
 
 func (f FunctionDeclaration) Accept(visitor Visitor) Repr {

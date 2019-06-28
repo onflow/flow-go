@@ -48,16 +48,19 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 		parameters = parameterList.Accept(v).([]ast.Parameter)
 	}
 	block := ctx.Block().Accept(v).(ast.Block)
+
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+	identifierPosition := ast.PositionFromToken(ctx.Identifier().GetSymbol())
 
 	return ast.FunctionDeclaration{
-		IsPublic:      isPublic,
-		Identifier:    identifier,
-		Parameters:    parameters,
-		ReturnType:    returnType,
-		Block:         block,
-		StartPosition: startPosition,
-		EndPosition:   endPosition,
+		IsPublic:           isPublic,
+		Identifier:         identifier,
+		Parameters:         parameters,
+		ReturnType:         returnType,
+		Block:              block,
+		StartPosition:      startPosition,
+		EndPosition:        endPosition,
+		IdentifierPosition: identifierPosition,
 	}
 }
 
@@ -278,14 +281,16 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 
 	// TODO: get end position from expression
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+	identifierPosition := ast.PositionFromToken(ctx.Identifier().GetSymbol())
 
 	return ast.VariableDeclaration{
-		IsConst:       isConst,
-		Identifier:    identifier,
-		Value:         expression,
-		Type:          typeName,
-		StartPosition: startPosition,
-		EndPosition:   endPosition,
+		IsConst:            isConst,
+		Identifier:         identifier,
+		Value:              expression,
+		Type:               typeName,
+		StartPosition:      startPosition,
+		EndPosition:        endPosition,
+		IdentifierPosition: identifierPosition,
 	}
 }
 
