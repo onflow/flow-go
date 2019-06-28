@@ -144,3 +144,14 @@ type RedeclarationError struct {
 func (e *RedeclarationError) Error() string {
 	return fmt.Sprintf("can't redeclare already declared identifier: %s", e.Name)
 }
+
+// AssignmentToConstantError
+
+type AssignmentToConstantError struct {
+	Name     string
+	Position ast.Position
+}
+
+func (e *AssignmentToConstantError) Error() string {
+	return fmt.Sprintf("can't assign to constant: %s", e.Name)
+}

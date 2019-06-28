@@ -153,7 +153,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 	function.Activation = function.Activation.
 		Insert(ActivationKey(declaration.Identifier), variable)
 
-	// function declarations are de-sugared to constant variables
+	// function declarations are de-sugared to constants
 	interpreter.declareVariable(variableDeclaration, function)
 
 	return nil
@@ -250,7 +250,13 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStateme
 			})
 		}
 
-		variable.Set(value)
+		if !variable.Set(value) {
+			panic(&AssignmentToConstantError{
+				Name:     identifier,
+				Position: target.Position,
+			})
+		}
+
 		interpreter.activations.Set(identifier, variable)
 
 	case ast.IndexExpression:

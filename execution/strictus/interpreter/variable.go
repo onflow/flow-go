@@ -2,7 +2,6 @@ package interpreter
 
 import (
 	"bamboo-runtime/execution/strictus/ast"
-	"fmt"
 )
 
 type Variable struct {
@@ -26,13 +25,14 @@ func newVariable(declaration ast.VariableDeclaration, depth int, value Value) *V
 	}
 }
 
-func (v *Variable) Set(newValue Value) {
+func (v *Variable) Set(newValue Value) bool {
 	if v.Declaration.IsConst {
-		// TODO: improve errors
-		panic(fmt.Sprintf("can't assign to constant variable: %s", v.Declaration.Identifier))
+		return false
 	}
 
 	// TODO: check type
 
 	v.Value = newValue
+
+	return true
 }
