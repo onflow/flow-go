@@ -1148,6 +1148,20 @@ class SomeClass {
 
 Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initializer is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
 
+There are three kinds of fields.
+
+Variable fields are stored in the structure or class value, can have new values assigned to them. They are declared using the `var` keyword.
+
+Constant fields are also stored in the structure or class value, but they can **not** have new values assigned to them. They are declared using the `const` keyword.
+
+Synthetic fields are **not** stored in the structure or class value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#structure-and-class-field-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-structure-and-class-fields).
+
+| Field Kind           | Stored in memory | Assignable         | Keyword     |
+|----------------------|------------------|--------------------|-------------|
+| **Variable field**   | Yes              | Yes                | `var`       |
+| **Constant field**   | Yes              | **No**             | `const`     |
+| **Synthetic field**  | **No**           | Yes                | `synthetic` |
+
 ```typescript
 // declare a token struct, which has a constant field
 // named id and a variable field named balance.
@@ -1245,7 +1259,9 @@ struct SetterExample {
 }
 ```
 
-If a field has both a getter and a setter, and neither of them read from/write to the field, the field is *synthetic*. Synthetic fields **must** be declared as such using the `synthetic` keyword. Synthetic fields are neither variable nor constant.
+### Synthetic Structure and Class Fields
+
+If a field has both a getter and a setter, and neither of them read from/write to the field, the field is *synthetic*. Synthetic fields **must** be declared as such using the `synthetic` keyword. Synthetic fields are neither variable nor constant, and they are not actually stored in the structure or class value.
 
 ```typescript
 struct GoalTracker {
