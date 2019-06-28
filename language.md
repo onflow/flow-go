@@ -1195,15 +1195,11 @@ struct Token {
 
 In initializers, the special constant `self` refers to the structure or class value that is to be initialized.
 
-Values of a structure or class type are created (instantiated) by calling the type like a function.
-
-```typescript
-const token = Token(42, 1_000_00)
-```
-
 Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the structure or class instance is followed by a dot (`.`) and the name of the field.
 
 ```typescript
+const token = Token(42, 1_000_00)
+
 token.id // is 42
 token.balance // is 1_000_000
 
