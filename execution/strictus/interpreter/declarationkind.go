@@ -26,7 +26,7 @@ func (k DeclarationKind) Name() string {
 		return "constant"
 	case DeclarationKindType:
 		return "type"
-	default:
-		panic(&errors.UnreachableError{})
 	}
+
+	panic(&errors.UnreachableError{})
 }

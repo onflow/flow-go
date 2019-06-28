@@ -246,9 +246,9 @@ func convertType(t ast.Type) Type {
 			ParameterTypes: parameterTypes,
 			ReturnType:     returnType,
 		}
-	default:
-		panic(&astTypeConversionError{invalidASTType: t})
 	}
+
+	panic(&astTypeConversionError{invalidASTType: t})
 }
 
 var baseTypes = map[string]Type{

@@ -20,7 +20,7 @@ func (k OperationKind) Name() string {
 		return "binary"
 	case OperationKindTernary:
 		return "ternary"
-	default:
-		panic(&errors.UnreachableError{})
 	}
+
+	panic(&errors.UnreachableError{})
 }

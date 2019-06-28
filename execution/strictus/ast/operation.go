@@ -53,7 +53,7 @@ func (s Operation) Symbol() string {
 		return "%"
 	case OperationNegate:
 		return "!"
-	default:
-		panic(&errors.UnreachableError{})
 	}
+
+	panic(&errors.UnreachableError{})
 }

@@ -17,7 +17,7 @@ func (s OperandSide) Name() string {
 		return "left"
 	case OperandSideRight:
 		return "right"
-	default:
-		panic(&errors.UnreachableError{})
 	}
+
+	panic(&errors.UnreachableError{})
 }
