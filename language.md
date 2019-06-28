@@ -645,7 +645,7 @@ Experessions can be wrapped in parentheses to override precedence conventions, i
 
 ## Functions
 
-Functions are sequences of statements that perform a specific task. Functions have parameters and an optional return value. Functions are typed: the function type consists of the parameter types and the return type.
+Functions are sequences of statements that perform a specific task. Functions have parameters (inputs) and an optional return value (output). Functions are typed: the function type consists of the parameter types and the return type.
 
 Functions are values, i.e., they can be assigned to constants and variables, and can be passed as arguments to other functions. This behavior is often called "first-class functions".
 
@@ -653,7 +653,7 @@ Functions are values, i.e., they can be assigned to constants and variables, and
 
 Functions can be declared by using the `fun` keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called.
 
-The parameters need to be enclosed in parentheses. Each parameter needs to have a type annotation, which follows the parameter name after a colon. The return type, if any, is separated from the parameters using the `->` keyword. The function code needs to be enclosed in opening and closing braces.
+The parameters need to be enclosed in parentheses. Each parameter needs to have a type annotation, which follows the parameter name after a colon. The return type, if any, is separated from the parameters using the `->` keyword (a hyphen followed by a right angle bracket). The function code needs to be enclosed in opening and closing braces.
 
 ```typescript
 // declare a function called double, which multiples a number by two
