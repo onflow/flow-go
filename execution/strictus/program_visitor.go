@@ -515,8 +515,12 @@ func (v *ProgramVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) inter
 		return ctx.PrimaryExpression().Accept(v)
 	}
 
+	// ensure unary operators are not juxtaposed
 	if ctx.GetChildCount() > 2 {
-		panic(fmt.Sprintf("unary operators must not be juxtaposed; parenthesize inner expression"))
+		position := ast.PositionFromToken(ctx.UnaryOp(0).GetStart())
+		panic(&JuxtaposedUnaryOperatorsError{
+			Position: position,
+		})
 	}
 
 	expression := unaryContext.Accept(v).(ast.Expression)
