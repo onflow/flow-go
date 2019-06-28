@@ -14,7 +14,7 @@ type Variable struct {
 func newVariable(declaration ast.VariableDeclaration, depth int, value Value) *Variable {
 	var variableType Type
 	if declaration.Type != nil {
-		variableType = convertType(declaration.Type)
+		variableType = mustConvertType(declaration.Type)
 	}
 
 	return &Variable{

@@ -207,8 +207,8 @@ func (t FunctionType) String() string {
 	return fmt.Sprintf("(%s) => %s", parameters.String(), t.ReturnType.String())
 }
 
-// convertType converts an AST type representation to an interpreter type representation
-func convertType(t ast.Type) Type {
+// mustConvertType converts an AST type representation to an interpreter type representation
+func mustConvertType(t ast.Type) Type {
 	switch t := t.(type) {
 	case ast.BaseType:
 		result := ParseBaseType(t.Identifier)
@@ -223,12 +223,12 @@ func convertType(t ast.Type) Type {
 
 	case ast.VariableSizedType:
 		return VariableSizedType{
-			Type: convertType(t.Type),
+			Type: mustConvertType(t.Type),
 		}
 
 	case ast.ConstantSizedType:
 		return ConstantSizedType{
-			Type: convertType(t.Type),
+			Type: mustConvertType(t.Type),
 			Size: t.Size,
 		}
 
@@ -236,11 +236,11 @@ func convertType(t ast.Type) Type {
 		var parameterTypes []Type
 		for _, parameterType := range t.ParameterTypes {
 			parameterTypes = append(parameterTypes,
-				convertType(parameterType),
+				mustConvertType(parameterType),
 			)
 		}
 
-		returnType := convertType(t.ReturnType)
+		returnType := mustConvertType(t.ReturnType)
 
 		return FunctionType{
 			ParameterTypes: parameterTypes,
