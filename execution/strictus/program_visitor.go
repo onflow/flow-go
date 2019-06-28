@@ -345,10 +345,7 @@ func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
 
 	for _, accessExpressionContext := range ctx.AllExpressionAccess() {
 		expression := accessExpressionContext.Accept(v)
-		accessExpression, ok := expression.(ast.AccessExpression)
-		if !ok {
-			panic(fmt.Sprintf("assignment to unknown access expression: %#+v", expression))
-		}
+		accessExpression := expression.(ast.AccessExpression)
 		target = v.wrapPartialAccessExpression(target, accessExpression)
 	}
 
@@ -509,6 +506,7 @@ func (v *ProgramVisitor) VisitMultiplicativeExpression(ctx *MultiplicativeExpres
 		EndPosition:   endPosition,
 	}
 }
+
 func (v *ProgramVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) interface{} {
 	unaryContext := ctx.UnaryExpression()
 	if unaryContext == nil {
@@ -563,7 +561,7 @@ func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) i
 		case ast.AccessExpression:
 			result = v.wrapPartialAccessExpression(result, partialExpression)
 		default:
-			panic(fmt.Sprintf("unknown primary expression suffix: %#+v", suffix))
+			panic(&errors.UnreachableError{})
 		}
 	}
 
@@ -591,7 +589,8 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 			EndPosition:   partialAccessExpression.EndPosition,
 		}
 	}
-	panic(fmt.Sprintf("invalid primary expression suffix: %#+v", partialAccessExpression))
+
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{} {
@@ -687,16 +686,23 @@ func (v *ProgramVisitor) VisitNestedExpression(ctx *NestedExpressionContext) int
 }
 
 func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interface{} {
-	text := ctx.GetText()
-	value, err := strconv.ParseBool(text)
-	if err != nil {
-		panic(fmt.Sprintf("invalid boolean literal: %s", text))
+	position := ast.PositionFromToken(ctx.GetStart())
+
+	if ctx.True() != nil {
+		return ast.BoolExpression{
+			Value:    true,
+			Position: position,
+		}
 	}
 
-	return ast.BoolExpression{
-		Value:    value,
-		Position: ast.PositionFromToken(ctx.GetStart()),
+	if ctx.False() != nil {
+		return ast.BoolExpression{
+			Value:    false,
+			Position: position,
+		}
 	}
+
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {
