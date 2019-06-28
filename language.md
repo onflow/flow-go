@@ -1185,13 +1185,13 @@ struct Token {
     var balance: Int
 
     init(id: Int, balance: Int) {
-        this.id = id
-        this.balance = balance
+        self.id = id
+        self.balance = balance
     }
 }
 ```
 
-In initializers, the special constant `this` refers to the structure or class value that is to be initialized.
+In initializers, the special constant `self` refers to the structure or class value that is to be initialized.
 
 Values of a structure or class type are created (instantiated) by calling the type like a function.
 
@@ -1233,11 +1233,11 @@ struct GetterExample {
                result >= 0
            }
 
-           if this.balance < 0 {
+           if self.balance < 0 {
                return 0
            }
 
-           return this.balance
+           return self.balance
         }
     }
 
@@ -1266,7 +1266,7 @@ struct SetterExample {
            require {
                newBalance >= 0
            }
-           this.balance = newBalance
+           self.balance = newBalance
        }
     }
 }
@@ -1284,17 +1284,17 @@ struct GoalTracker {
 
     pub synthetic left: Double {
         get {
-            return this.goal - this.completed
+            return self.goal - self.completed
         }
 
         set(newLeft) {
-            this.completed = this.goal - newLeft
+            self.completed = self.goal - newLeft
         }
     }
 
     init(goal: Int, completed: Int) {
-        this.goal = goal
-        this.completed = completed
+        self.goal = goal
+        self.completed = completed
     }
 }
 
@@ -1315,7 +1315,7 @@ tracker.left = 8
 
 ### Structure and Class Functions
 
-Structures and classes may contain functions. Just like in the initializer, the special constant `this` refers to the structure or class value that the function is called on.
+Structures and classes may contain functions. Just like in the initializer, the special constant `self` refers to the structure or class value that the function is called on.
 
 ```typescript
 struct Token {
@@ -1323,12 +1323,12 @@ struct Token {
     var balance: Int
 
     init(id: Int, balance: Int) {
-        this.id = id
-        this.balance = balance
+        self.id = id
+        self.balance = balance
     }
 
     fun mint(value: Int) {
-        this.balance = this.balance + value
+        self.balance = self.balance + value
     }
 }
 
@@ -1348,7 +1348,7 @@ struct SomeStruct {
     var value: Int
 
     init(value: Int) {
-        this.value = value
+        self.value = value
     }
 
 }
@@ -1373,7 +1373,7 @@ class SomeClass {
     var value: Int
 
     init(value: Int) {
-        this.value = value
+        self.value = value
     }
 }
 
@@ -1479,7 +1479,7 @@ Field requirements consist of the name and the type of the field. Field requirem
 
 Interfaces are declared using the `interface` keyword, followed by the name of the interface, and the requirements enclosed in opening and closing braces. Fields can be annotated to be variable or constant, and how they can be accessed, but do not have to be annotated.
 
-The special type `This` can be used to refer to the type implementing the interface.
+The special type `Self` can be used to refer to the type implementing the interface. This can be seen in the following example, where the first parameter of the `transfer` function has the `Self` type.
 
 ```typescript
 // declare an interface for a vault: a container for a balance
@@ -1505,7 +1505,7 @@ interface Vault {
     //
     init(initialBalance: Int) {
         ensure {
-            this.balance == initialBalance
+            self.balance == initialBalance
         }
 
         // NOTE: no code
@@ -1519,7 +1519,7 @@ interface Vault {
             amount > 0
         }
         ensure {
-            this.balance == before(this.balance) + amount
+            self.balance == before(self.balance) + amount
         }
 
         // NOTE: no code
@@ -1530,13 +1530,15 @@ interface Vault {
     // must be of the same type – a transfer to a vault of another type is not possible
     // as the balance of it would only be readable
     //
-    fun transfer(receivingVault: This, amount: Int) {
+    // NOTE: the first parameter has the Self type, i.e. the type implementing this interface
+    //
+    fun transfer(receivingVault: Self, amount: Int) {
         require {
             amount > 0
-            amount <= this.balance
+            amount <= self.balance
         }
         ensure {
-            this.balance == before(this.balance) - amount
+            self.balance == before(self.balance) - amount
             receivingVault.balance == before(receivingVault.balance) + amount
         }
 
@@ -1570,7 +1572,7 @@ class ExampleVault {
     // NOTE: the postcondition does not have to be repeated
     //
     init(initialBalance: Int) {
-        this.balance = initialBalance
+        self.balance = initialBalance
     }
 }
 
@@ -1587,7 +1589,7 @@ impl Vault for ExampleVault {
     // NOTE: neither the precondition, nor the postcondition have to be repeated
     //
     fun add(amount: Int) {
-        this.balance = this.balance + amount
+        self.balance = self.balance + amount
     }
 
     // implement the required function transfer for the Vault interface,
@@ -1602,7 +1604,7 @@ impl Vault for ExampleVault {
     // NOTE: neither the precondition, nor the postcondition have to be repeated
     //
     fun transfer(receivingVault: ExampleVault, amount: Int) {
-        this.balance -= amount
+        self.balance -= amount
         receivingVault.amount += amount
     }
 }
@@ -1692,7 +1694,7 @@ auth SendTokens {
     const limit: Int
 
     init(auth: RootAuth, limit: Int) {
-        this.limit = limit
+        self.limit = limit
     }
 }
 ```
