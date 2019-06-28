@@ -1261,10 +1261,12 @@ const example = GetterExample(10)
 // example.balance is 10
 
 example.balance = -50
-// example.balance is 0
+// example.balance is 0. without the getter it would be -50
 ```
 
 Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parantheses. The parameter has implicitly the type of the field. Another type can not be specified. Setters have no return type.
+
+The types of values assigned to setters must always match the field's type.
 
 ```typescript
 struct SetterExample {
@@ -1280,7 +1282,17 @@ struct SetterExample {
            self.balance = newBalance
        }
     }
+
+    init(balance: Int) {
+        balance = balance
+    }
 }
+
+const example = SetterExample(10)
+// example.balance is 10
+
+// error: precondition of setter for field balance failed
+example.balance = -50
 ```
 
 ### Synthetic Structure and Class Fields
@@ -1481,7 +1493,7 @@ An interface is an abstract type that specifies the behavior of types that *impl
 <!-- TODO also contracts, once documented -->
 Interfaces can be implemented by classes and structures. Types may implement multiple interfaces.
 
-Interfaces consist of the functions and fields, as well as their access, that an implementation must provide. Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions. 
+Interfaces consist of the functions and fields, as well as their access, that an implementation must provide. Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions.
 
 Field requirements consist of the name and the type of the field. Field requirements may optionaly declare a getter requirement and a setter requirement, each with preconditions and postconditions.
 
