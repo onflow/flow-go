@@ -8,7 +8,8 @@ import (
 func TestToExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	Expect(func() { ToValue(1) }).Should(Panic())
+	_, err := ToValue(1)
+	Expect(err).Should(HaveOccurred())
 	Expect(ToValue(int8(1))).To(Equal(Int8Value(1)))
 	Expect(ToValue(int16(2))).To(Equal(Int16Value(2)))
 	Expect(ToValue(int32(3))).To(Equal(Int32Value(3)))

@@ -30,18 +30,63 @@ func (interpreter *Interpreter) Interpret() {
 	}
 }
 
-func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) ast.Repr {
+func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value Value, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
-		panic(fmt.Sprintf("undefined function: %s", functionName))
+		return nil, &NotDeclaredError{
+			ExpectedKind: DeclarationKindFunction,
+			Name:         functionName,
+		}
 	}
 
-	function, ok := variable.Value.(FunctionValue)
+	variableValue := variable.Value
+
+	function, ok := variableValue.(FunctionValue)
 	if !ok {
-		panic(fmt.Sprintf("declaration is not a function: %#+v", variable.Value))
+		return nil, &NotCallableError{
+			Value: variableValue,
+		}
 	}
 
-	arguments := ToValues(inputs)
+	arguments, err := ToValues(inputs)
+	if err != nil {
+		return nil, err
+	}
+
+	// recover internal panics and return them as an error
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("%v", r)
+			}
+		}
+	}()
+
+	return interpreter.invokeFunction(function, arguments, ast.Position{}, ast.Position{}), nil
+}
+
+func (interpreter *Interpreter) invokeFunction(
+	function FunctionValue,
+	arguments []Value,
+	startPosition ast.Position,
+	endPosition ast.Position,
+) Value {
+
+	// ensures the invocation's argument count matches the function's parameter count
+
+	parameterCount := function.parameterCount()
+	argumentCount := len(arguments)
+
+	if argumentCount != parameterCount {
+		panic(&ArgumentCountError{
+			ParameterCount: parameterCount,
+			ArgumentCount:  argumentCount,
+			StartPosition:  startPosition,
+			EndPosition:    endPosition,
+		})
+	}
 
 	return function.invoke(interpreter, arguments)
 }
@@ -92,7 +137,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 	return nil
 }
 
-func (interpreter *Interpreter) ImportFunction(name string, functionType FunctionType, function HostFunctionValue) {
+func (interpreter *Interpreter) ImportFunction(name string, function *HostFunctionValue) {
 	variableDeclaration := ast.VariableDeclaration{
 		Identifier: name,
 		IsConst:    true,
@@ -369,21 +414,28 @@ func (interpreter *Interpreter) VisitConditionalExpression(expression ast.Condit
 func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression ast.InvocationExpression) ast.Repr {
 
 	// evaluate the invoked expression
-	value := invocationExpression.Expression.Accept(interpreter)
+	value := invocationExpression.Expression.Accept(interpreter).(Value)
 	function, ok := value.(FunctionValue)
 	if !ok {
-		panic(fmt.Sprintf("can't invoke value: %#+v", value))
+		panic(&NotCallableError{
+			Value:         value,
+			StartPosition: invocationExpression.Expression.GetStartPosition(),
+			EndPosition:   invocationExpression.Expression.GetEndPosition(),
+		})
 	}
 
 	// NOTE: evaluate all argument expressions in call-site scope, not in function body
 	arguments := interpreter.evaluateExpressions(invocationExpression.Arguments)
 
-	return function.invoke(interpreter, arguments)
+	return interpreter.invokeFunction(
+		function,
+		arguments,
+		invocationExpression.StartPosition,
+		invocationExpression.EndPosition,
+	)
 }
 
-func (interpreter *Interpreter) invokeFunction(function *InterpretedFunctionValue, arguments []Value) Value {
-	interpreter.checkInvocationArgumentCount(len(arguments), function)
-
+func (interpreter *Interpreter) invokeInterpretedFunction(function *InterpretedFunctionValue, arguments []Value) Value {
 	// start a new activation record
 	// lexical scope: use the function declaration's activation record,
 	// not the current one (which would be dynamic scope)
@@ -430,22 +482,6 @@ func (interpreter *Interpreter) evaluateExpressions(expressions []ast.Expression
 		values = append(values, argument)
 	}
 	return values
-}
-
-// checkInvocationArgumentCount ensures the invocation's argument count
-// matches the function's parameter count
-func (interpreter *Interpreter) checkInvocationArgumentCount(
-	argumentCount int,
-	function *InterpretedFunctionValue,
-) {
-	parameterCount := len(function.Expression.Parameters)
-	if argumentCount != parameterCount {
-		panic(fmt.Sprintf(
-			"invalid number of arguments: got %d, need %d",
-			argumentCount,
-			parameterCount,
-		))
-	}
 }
 
 func (interpreter *Interpreter) VisitFunctionExpression(expression ast.FunctionExpression) ast.Repr {
