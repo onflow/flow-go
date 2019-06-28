@@ -803,13 +803,24 @@ fun test(x: Int) {
 
 > Status: Function Preconditions and Postconditions are not implemented yet.
 
-Functions may have preconditions and may have postconditions.
+Functions may have preconditions and may have postconditions. Preconditions and postconditions can be used to restrict the inputs (values for parameters) and output (return value) of a function.
 
 Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the `require` keyword, followed by the condition block.
 
 Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `ensure` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
 
-A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for [statements](#semicolons).
+A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they can't have side-effects and must be pure expressions. 
+
+<!--
+
+TODO:
+
+For now, function calls are not allowed in preconditions and postconditions.
+See https://github.com/dapperlabs/bamboo-runtime/issues/84
+
+-->
+
+Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for [statements](#semicolons).
 
 In postconditions, the special constant `result` refers to the result of the function.
 
