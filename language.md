@@ -753,6 +753,25 @@ const doNothing: () -> Void =
     fun () {}
 ```
 
+Types can be enclosed in parentheses to change precedence.
+
+```typescript
+// declare a constant called functions, with the array type (Int) -> Int)[2],
+// i.e., an array of two functions, which accept one integer and return one integer
+//
+const functions: ((Int) -> Int)[2] = [
+    fun (n: Int) -> Int {
+        return n * 2
+    },
+    fun (n: Int) -> Int {
+        return n * 3
+    }
+]
+```
+
+For example, a function type `(Int) -> (() -> Int)` is the type for a function which accepts one argument of type `Int`, and which returns another function, that takes no arguments and returns an `Int`.
+
+
 #### Argument Passing Behavior
 
 When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as [call-by-sharing](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_sharing).
