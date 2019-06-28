@@ -2,6 +2,7 @@ package strictus
 
 import (
 	"bamboo-runtime/execution/strictus/ast"
+	"bamboo-runtime/execution/strictus/errors"
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	"math/big"
@@ -13,22 +14,15 @@ type ProgramVisitor struct {
 }
 
 func (v *ProgramVisitor) VisitProgram(ctx *ProgramContext) interface{} {
-	declarations := map[string]ast.Declaration{}
 	var allDeclarations []ast.Declaration
 
 	for _, declarationContext := range ctx.AllDeclaration() {
 		declaration := declarationContext.Accept(v).(ast.Declaration)
-		name := declaration.DeclarationName()
-		if _, exists := declarations[name]; exists {
-			panic(fmt.Sprintf("can't redeclare %s", name))
-		}
-		declarations[name] = declaration
 		allDeclarations = append(allDeclarations, declaration)
 	}
 
 	return ast.Program{
-		Declarations:    declarations,
-		AllDeclarations: allDeclarations,
+		Declarations: allDeclarations,
 	}
 }
 
@@ -39,35 +33,45 @@ func (v *ProgramVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
 func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
 	isPublic := ctx.Pub() != nil
 	identifier := ctx.Identifier().GetText()
-	returnType := v.visitReturnType(ctx.returnType)
+	closeParen := ctx.CloseParen().GetSymbol()
+	returnType := v.visitReturnType(ctx.returnType, closeParen)
 	var parameters []ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
 		parameters = parameterList.Accept(v).([]ast.Parameter)
 	}
 	block := ctx.Block().Accept(v).(ast.Block)
+
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+	identifierPosition := ast.PositionFromToken(ctx.Identifier().GetSymbol())
 
 	return ast.FunctionDeclaration{
-		IsPublic:      isPublic,
-		Identifier:    identifier,
-		Parameters:    parameters,
-		ReturnType:    returnType,
-		Block:         block,
-		StartPosition: startPosition,
-		EndPosition:   endPosition,
+		IsPublic:           isPublic,
+		Identifier:         identifier,
+		Parameters:         parameters,
+		ReturnType:         returnType,
+		Block:              block,
+		StartPosition:      startPosition,
+		EndPosition:        endPosition,
+		IdentifierPosition: identifierPosition,
 	}
 }
 
-func (v *ProgramVisitor) visitReturnType(ctx ITypeNameContext) ast.Type {
+// visitReturnType returns the return type.
+// if none was given in the program, return an empty type with the position of tokenBefore
+func (v *ProgramVisitor) visitReturnType(ctx ITypeNameContext, tokenBefore antlr.Token) ast.Type {
 	if ctx == nil {
-		return ast.BaseType{}
+		positionBeforeMissingReturnType := ast.PositionFromToken(tokenBefore)
+		return ast.BaseType{
+			Position: positionBeforeMissingReturnType,
+		}
 	}
 	return ctx.Accept(v).(ast.Type)
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
-	returnType := v.visitReturnType(ctx.returnType)
+	closeParen := ctx.CloseParen().GetSymbol()
+	returnType := v.visitReturnType(ctx.returnType, closeParen)
 	var parameters []ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
@@ -117,9 +121,10 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	// identifier?
 	if identifierNode != nil {
 		identifier := identifierNode.GetText()
-
+		position := ast.PositionFromToken(identifierNode.GetSymbol())
 		return ast.BaseType{
 			Identifier: identifier,
+			Position:   position,
 		}
 	}
 
@@ -134,9 +139,14 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 
 	returnType := ctx.returnType.Accept(v).(ast.Type)
 
+	startPosition := ast.PositionFromToken(ctx.OpenParen().GetSymbol())
+	endPosition := returnType.GetEndPosition()
+
 	return ast.FunctionType{
 		ParameterTypes: parameterTypes,
 		ReturnType:     returnType,
+		StartPosition:  startPosition,
+		EndPosition:    endPosition,
 	}
 }
 
@@ -147,15 +157,21 @@ func (v *ProgramVisitor) VisitTypeName(ctx *TypeNameContext) interface{} {
 	dimensions := ctx.AllTypeDimension()
 	lastDimensionIndex := len(dimensions) - 1
 	for i := range dimensions {
-		dimension := dimensions[lastDimensionIndex-i].Accept(v).(*int)
+		dimensionContext := dimensions[lastDimensionIndex-i]
+		dimension := dimensionContext.Accept(v).(*int)
+		startPosition, endPosition := ast.PositionRangeFromContext(dimensionContext)
 		if dimension == nil {
 			result = ast.VariableSizedType{
-				Type: result,
+				Type:          result,
+				StartPosition: startPosition,
+				EndPosition:   endPosition,
 			}
 		} else {
 			result = ast.ConstantSizedType{
-				Type: result,
-				Size: *dimension,
+				Type:          result,
+				Size:          *dimension,
+				StartPosition: startPosition,
+				EndPosition:   endPosition,
 			}
 		}
 	}
@@ -258,14 +274,16 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 
 	// TODO: get end position from expression
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+	identifierPosition := ast.PositionFromToken(ctx.Identifier().GetSymbol())
 
 	return ast.VariableDeclaration{
-		IsConst:       isConst,
-		Identifier:    identifier,
-		Value:         expression,
-		Type:          typeName,
-		StartPosition: startPosition,
-		EndPosition:   endPosition,
+		IsConst:            isConst,
+		Identifier:         identifier,
+		Value:              expression,
+		Type:               typeName,
+		StartPosition:      startPosition,
+		EndPosition:        endPosition,
+		IdentifierPosition: identifierPosition,
 	}
 }
 
@@ -327,10 +345,7 @@ func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
 
 	for _, accessExpressionContext := range ctx.AllExpressionAccess() {
 		expression := accessExpressionContext.Accept(v)
-		accessExpression, ok := expression.(ast.AccessExpression)
-		if !ok {
-			panic(fmt.Sprintf("assignment to unknown access expression: %#+v", expression))
-		}
+		accessExpression := expression.(ast.AccessExpression)
 		target = v.wrapPartialAccessExpression(target, accessExpression)
 	}
 
@@ -491,14 +506,19 @@ func (v *ProgramVisitor) VisitMultiplicativeExpression(ctx *MultiplicativeExpres
 		EndPosition:   endPosition,
 	}
 }
+
 func (v *ProgramVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) interface{} {
 	unaryContext := ctx.UnaryExpression()
 	if unaryContext == nil {
 		return ctx.PrimaryExpression().Accept(v)
 	}
 
+	// ensure unary operators are not juxtaposed
 	if ctx.GetChildCount() > 2 {
-		panic(fmt.Sprintf("unary operators must not be juxtaposed; parenthesize inner expression"))
+		position := ast.PositionFromToken(ctx.UnaryOp(0).GetStart())
+		panic(&JuxtaposedUnaryOperatorsError{
+			Position: position,
+		})
 	}
 
 	expression := unaryContext.Accept(v).(ast.Expression)
@@ -523,7 +543,7 @@ func (v *ProgramVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
 		return ast.OperationMinus
 	}
 
-	panic("unreachable")
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
@@ -541,7 +561,7 @@ func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) i
 		case ast.AccessExpression:
 			result = v.wrapPartialAccessExpression(result, partialExpression)
 		default:
-			panic(fmt.Sprintf("unknown primary expression suffix: %#+v", suffix))
+			panic(&errors.UnreachableError{})
 		}
 	}
 
@@ -569,7 +589,8 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 			EndPosition:   partialAccessExpression.EndPosition,
 		}
 	}
-	panic(fmt.Sprintf("invalid primary expression suffix: %#+v", partialAccessExpression))
+
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{} {
@@ -665,16 +686,23 @@ func (v *ProgramVisitor) VisitNestedExpression(ctx *NestedExpressionContext) int
 }
 
 func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interface{} {
-	text := ctx.GetText()
-	value, err := strconv.ParseBool(text)
-	if err != nil {
-		panic(fmt.Sprintf("invalid boolean literal: %s", text))
+	position := ast.PositionFromToken(ctx.GetStart())
+
+	if ctx.True() != nil {
+		return ast.BoolExpression{
+			Value:    true,
+			Position: position,
+		}
 	}
 
-	return ast.BoolExpression{
-		Value:    value,
-		Position: ast.PositionFromToken(ctx.GetStart()),
+	if ctx.False() != nil {
+		return ast.BoolExpression{
+			Value:    false,
+			Position: position,
+		}
 	}
+
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {
@@ -735,7 +763,7 @@ func (v *ProgramVisitor) VisitEqualityOp(ctx *EqualityOpContext) interface{} {
 		return ast.OperationUnequal
 	}
 
-	panic("unreachable")
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{} {
@@ -755,7 +783,7 @@ func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{}
 		return ast.OperationGreaterEqual
 	}
 
-	panic("unreachable")
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
@@ -767,7 +795,7 @@ func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
 		return ast.OperationMinus
 	}
 
-	panic("unreachable")
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) interface{} {
@@ -783,5 +811,5 @@ func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) int
 		return ast.OperationMod
 	}
 
-	panic("unreachable")
+	panic(&errors.UnreachableError{})
 }

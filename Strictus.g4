@@ -257,6 +257,9 @@ arrayLiteral
     : '[' ( expression (',' expression)* )? ']'
     ;
 
+OpenParen: '(' ;
+CloseParen: ')' ;
+
 Fun : 'fun' ;
 
 Pub : 'pub' ;

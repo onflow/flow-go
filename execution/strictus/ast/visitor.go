@@ -3,9 +3,8 @@ package ast
 type Repr interface{}
 
 type Element interface {
+	HasPosition
 	Accept(Visitor) Repr
-	GetStartPosition() Position
-	GetEndPosition() Position
 }
 
 type Visitor interface {

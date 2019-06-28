@@ -19,8 +19,13 @@ func PositionFromToken(token antlr.Token) Position {
 	}
 }
 
-func PositionRangeFromContext(ctx *antlr.BaseParserRuleContext) (start, end Position) {
+func PositionRangeFromContext(ctx antlr.ParserRuleContext) (start, end Position) {
 	start = PositionFromToken(ctx.GetStart())
 	end = PositionFromToken(ctx.GetStop())
 	return start, end
+}
+
+type HasPosition interface {
+	GetStartPosition() Position
+	GetEndPosition() Position
 }

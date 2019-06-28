@@ -1,5 +1,7 @@
 package ast
 
+import "bamboo-runtime/execution/strictus/errors"
+
 //go:generate stringer -type=Operation
 
 type Operation int
@@ -20,3 +22,38 @@ const (
 	OperationMod
 	OperationNegate
 )
+
+func (s Operation) Symbol() string {
+	switch s {
+	case OperationOr:
+		return "||"
+	case OperationAnd:
+		return "&&"
+	case OperationEqual:
+		return "=="
+	case OperationUnequal:
+		return "!="
+	case OperationLess:
+		return "<"
+	case OperationGreater:
+		return ">"
+	case OperationLessEqual:
+		return "<="
+	case OperationGreaterEqual:
+		return ">="
+	case OperationPlus:
+		return "+"
+	case OperationMinus:
+		return "-"
+	case OperationMul:
+		return "*"
+	case OperationDiv:
+		return "/"
+	case OperationMod:
+		return "%"
+	case OperationNegate:
+		return "!"
+	}
+
+	panic(&errors.UnreachableError{})
+}
