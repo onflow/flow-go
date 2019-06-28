@@ -270,10 +270,14 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStateme
 			})
 		}
 
-		indexValue := target.Index.Accept(interpreter)
+		indexValue := target.Index.Accept(interpreter).(Value)
 		index, ok := indexValue.(IntegerValue)
 		if !ok {
-			panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
+			panic(&InvalidIndexValueError{
+				Value:         indexValue,
+				StartPosition: target.Index.GetStartPosition(),
+				EndPosition:   target.Index.GetEndPosition(),
+			})
 		}
 		array[index.IntValue()] = value
 
@@ -630,10 +634,14 @@ func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpress
 		})
 	}
 
-	indexValue := expression.Index.Accept(interpreter)
+	indexValue := expression.Index.Accept(interpreter).(Value)
 	index, ok := indexValue.(IntegerValue)
 	if !ok {
-		panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
+		panic(&InvalidIndexValueError{
+			Value:         indexValue,
+			StartPosition: expression.Index.GetStartPosition(),
+			EndPosition:   expression.Index.GetEndPosition(),
+		})
 	}
 	return array[index.IntValue()]
 }

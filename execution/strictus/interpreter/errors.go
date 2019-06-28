@@ -155,3 +155,15 @@ type AssignmentToConstantError struct {
 func (e *AssignmentToConstantError) Error() string {
 	return fmt.Sprintf("can't assign to constant: %s", e.Name)
 }
+
+// InvalidIndexValueError
+
+type InvalidIndexValueError struct {
+	Value         Value
+	StartPosition ast.Position
+	EndPosition   ast.Position
+}
+
+func (e *InvalidIndexValueError) Error() string {
+	return fmt.Sprintf("can't index with value: %#+v", e.Value)
+}
