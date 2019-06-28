@@ -73,7 +73,7 @@ Variables and constants **must** be initialized.
 const a
 ```
 
-Once a constant or variable is declared, it can't be redeclared with the same name, with a different type, or changed into the corresponding other kind.
+Once a constant or variable is declared, it can't be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
 
 
 ```typescript
