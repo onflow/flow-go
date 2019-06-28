@@ -48,7 +48,7 @@ The `const` keyword is used to declare a constant and the `var` keyword is used 
 The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
 ```typescript
-// declaring a constant
+// declare a constant
 //
 const a = 1
 
@@ -56,7 +56,7 @@ const a = 1
 //
 a = 2
 
-// declaring a variable
+// declare a variable
 //
 var b = 3
 
@@ -77,23 +77,23 @@ Once a constant or variable is declared, it can't be redeclared with the same na
 
 
 ```typescript
-// declaring a constant
+// declare a constant
 //
 const a = 1
 
-// invalid: re-declaring a constant with a name that is already used in this scope
+// invalid: re-declare a constant with a name that is already used in this scope
 //
 const a = 2
 
-// declaring a variable
+// declare a variable
 //
 var b = 3
 
-// invalid: re-declaring a variable with a name that is already used in this scope
+// invalid: re-declare a variable with a name that is already used in this scope
 //
 var b = 4
 
-// invalid: declaring a variable with a name that was used for a constant
+// invalid: declare a variable with a name that was used for a constant
 //
 var a = 5
 ```
@@ -101,16 +101,38 @@ var a = 5
 ## Type Annotations
 
 When declaring a constant or variable, an optional *type annotation* can be provided, to make it explicit what type the declaration has.
+
 If no type annotation is provided, the type of the declaration is [inferred from the initial value](#type-inference).
 
 ```typescript
-// declaring a variable with an explicit type
+// declare a variable with an explicit type.
 //
-var initialized: bool = false
+// Bool is the type of booleans.
+//
+var initialized: Bool = false
 
-// declaring a constant with an inferred type
+// declare a constant with an inferred type
 //
 const a = 1
+```
+
+If a type annotation is provided, the initial value must be of this type, and new values assigned to variables must match the declaration's type. This type safety is explained in more detail in a [separate section](#type-safety).
+
+```typescript
+// invalid: declare a variable with an explicit type Bool,
+// but initial value is of type Int.
+//
+// Int is the type of arbitray-precision integers.
+//
+const booleanConstant: Bool = 1
+
+// declare a variable with an explicit type
+//
+var booleanVariable: Bool = false
+
+// invalid: assign a value of of type Int to a variable of type Bool
+//
+booleanVariable = 1
 ```
 
 ## Naming
