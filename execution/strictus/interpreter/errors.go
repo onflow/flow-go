@@ -133,3 +133,14 @@ func (e *ArgumentCountError) Error() string {
 		e.ParameterCount,
 	)
 }
+
+// RedeclarationError
+
+type RedeclarationError struct {
+	Name     string
+	Position ast.Position
+}
+
+func (e *RedeclarationError) Error() string {
+	return fmt.Sprintf("can't redeclare already declared identifier: %s", e.Name)
+}

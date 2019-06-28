@@ -22,12 +22,33 @@ func NewInterpreter(program ast.Program) *Interpreter {
 	}
 }
 
-func (interpreter *Interpreter) Interpret() {
-	for _, declaration := range interpreter.Program.AllDeclarations {
+func (interpreter *Interpreter) Interpret() (err error) {
+	// recover internal panics and return them as an error
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("%v", r)
+			}
+		}
+	}()
+
+	for _, declaration := range interpreter.Program.Declarations {
 		declaration.Accept(interpreter)
 		name := declaration.DeclarationName()
+
+		if _, exists := interpreter.Globals[name]; exists {
+			return &RedeclarationError{
+				Name:     name,
+				Position: declaration.GetIdentifierPosition(),
+			}
+		}
+
 		interpreter.Globals[name] = interpreter.activations.Find(name)
 	}
+
+	return nil
 }
 
 func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value Value, err error) {
@@ -201,7 +222,10 @@ func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclarat
 	variable := interpreter.activations.Find(declaration.Identifier)
 	depth := interpreter.activations.Depth()
 	if variable != nil && variable.Depth == depth {
-		panic(fmt.Sprintf("invalid redefinition of identifier: %s", declaration.Identifier))
+		panic(&RedeclarationError{
+			Name:     declaration.Identifier,
+			Position: declaration.GetIdentifierPosition(),
+		})
 	}
 
 	variable = newVariable(declaration, depth, value)

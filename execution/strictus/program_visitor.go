@@ -14,22 +14,15 @@ type ProgramVisitor struct {
 }
 
 func (v *ProgramVisitor) VisitProgram(ctx *ProgramContext) interface{} {
-	declarations := map[string]ast.Declaration{}
 	var allDeclarations []ast.Declaration
 
 	for _, declarationContext := range ctx.AllDeclaration() {
 		declaration := declarationContext.Accept(v).(ast.Declaration)
-		name := declaration.DeclarationName()
-		if _, exists := declarations[name]; exists {
-			panic(fmt.Sprintf("can't redeclare %s", name))
-		}
-		declarations[name] = declaration
 		allDeclarations = append(allDeclarations, declaration)
 	}
 
 	return ast.Program{
-		Declarations:    declarations,
-		AllDeclarations: allDeclarations,
+		Declarations: allDeclarations,
 	}
 }
 

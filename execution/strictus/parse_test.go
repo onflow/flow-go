@@ -45,8 +45,7 @@ func TestParseBoolExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{a},
-		Declarations:    map[string]Declaration{"a": a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -72,8 +71,7 @@ func TestParseIdentifierExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{b},
-		Declarations:    map[string]Declaration{"b": b},
+		Declarations: []Declaration{b},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -109,8 +107,7 @@ func TestParseArrayExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{a},
-		Declarations:    map[string]Declaration{"a": a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -150,8 +147,7 @@ func TestParseInvocationExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{a},
-		Declarations:    map[string]Declaration{"a": a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -182,8 +178,7 @@ func TestParseMemberExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{a},
-		Declarations:    map[string]Declaration{"a": a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -217,8 +212,7 @@ func TestParseIndexExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{a},
-		Declarations:    map[string]Declaration{"a": a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -249,8 +243,7 @@ func TestParseUnaryExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{a},
-		Declarations:    map[string]Declaration{"a": a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -286,8 +279,7 @@ func TestParseOrExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		Declarations:    map[string]Declaration{"a": a},
-		AllDeclarations: []Declaration{a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -323,8 +315,7 @@ func TestParseAndExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		Declarations:    map[string]Declaration{"a": a},
-		AllDeclarations: []Declaration{a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -360,8 +351,7 @@ func TestParseEqualityExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		Declarations:    map[string]Declaration{"a": a},
-		AllDeclarations: []Declaration{a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -397,8 +387,7 @@ func TestParseRelationalExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		Declarations:    map[string]Declaration{"a": a},
-		AllDeclarations: []Declaration{a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -434,8 +423,7 @@ func TestParseAdditiveExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		Declarations:    map[string]Declaration{"a": a},
-		AllDeclarations: []Declaration{a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -471,8 +459,7 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 	}
 
 	expected := Program{
-		Declarations:    map[string]Declaration{"a": a},
-		AllDeclarations: []Declaration{a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -517,8 +504,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{test},
-		Declarations:    map[string]Declaration{"test": test},
+		Declarations: []Declaration{test},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -554,8 +540,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{test},
-		Declarations:    map[string]Declaration{"test": test},
+		Declarations: []Declaration{test},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -658,8 +643,7 @@ func TestParseIfStatement(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{test},
-		Declarations:    map[string]Declaration{"test": test},
+		Declarations: []Declaration{test},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -715,8 +699,7 @@ func TestParseWhileStatement(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{test},
-		Declarations:    map[string]Declaration{"test": test},
+		Declarations: []Declaration{test},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -762,8 +745,7 @@ func TestParseAssignment(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{test},
-		Declarations:    map[string]Declaration{"test": test},
+		Declarations: []Declaration{test},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -840,8 +822,7 @@ func TestParseAccessAssignment(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{test},
-		Declarations:    map[string]Declaration{"test": test},
+		Declarations: []Declaration{test},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -910,8 +891,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{test},
-		Declarations:    map[string]Declaration{"test": test},
+		Declarations: []Declaration{test},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -992,8 +972,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{test},
-		Declarations:    map[string]Declaration{"test": test},
+		Declarations: []Declaration{test},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -1045,8 +1024,7 @@ func TestParseIntegerLiterals(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{octal, hex, binary},
-		Declarations:    map[string]Declaration{"octal": octal, "hex": hex, "binary": binary},
+		Declarations: []Declaration{octal, hex, binary},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -1188,8 +1166,7 @@ func TestParseIntegerTypes(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{a, b, c, d, e, f, g, h},
-		Declarations:    map[string]Declaration{"a": a, "b": b, "c": c, "d": d, "e": e, "f": f, "g": g, "h": h},
+		Declarations: []Declaration{a, b, c, d, e, f, g, h},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -1233,8 +1210,7 @@ func TestParseFunctionType(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{add},
-		Declarations:    map[string]Declaration{"add": add},
+		Declarations: []Declaration{add},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -1283,8 +1259,7 @@ func TestParseMissingReturnType(t *testing.T) {
 	}
 
 	expected := Program{
-		AllDeclarations: []Declaration{noop},
-		Declarations:    map[string]Declaration{"noop": noop},
+		Declarations: []Declaration{noop},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -1329,8 +1304,7 @@ func TestParseLeftAssociativity(t *testing.T) {
 	}
 
 	expected := Program{
-		Declarations:    map[string]Declaration{"a": a},
-		AllDeclarations: []Declaration{a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
@@ -1422,8 +1396,7 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 	}
 
 	expected := Program{
-		Declarations:    map[string]Declaration{"a": a},
-		AllDeclarations: []Declaration{a},
+		Declarations: []Declaration{a},
 	}
 
 	Expect(actual).Should(Equal(expected))
