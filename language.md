@@ -770,7 +770,7 @@ const doNothing: () -> Void =
 Types can be enclosed in parentheses to change precedence.
 
 ```typescript
-// declare a constant called functions, with the array type (Int) -> Int)[2],
+// declare a constant called functions, with the array type ((Int) -> Int)[2],
 // i.e., an array of two functions, which accept one integer and return one integer
 //
 const functions: ((Int) -> Int)[2] = [
