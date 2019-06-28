@@ -169,7 +169,7 @@ const d = 1; var e = 2
 
 ## Values and Types
 
-Values are objects like booleans and integers. Values are typed.
+Values are objects, like for example booleans, integers, or arrays. Values are typed.
 
 ### Booleans
 
@@ -1144,6 +1144,19 @@ class SomeClass {
 }
 ```
 
+Structures and classes are types.
+
+Values of a structure or class type are created (instantiated) by calling the type like a function.
+
+```typescript
+const someStruct: SomeStruct = SomeStruct()
+
+const someClass: SomeClass = SomeClass()
+```
+
+Structures and classes mainly differ in their behaviour: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types. This is explained in detail in a [separate section](#structure-and-class-behaviour).
+
+
 ### Structure and Class Fields
 
 Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initializer is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
@@ -1299,7 +1312,6 @@ tracker.left = 8
 // NOTE: the tracker only implementats some functionality to demonstrate
 // synthesized fields, it is incomplete (e.g. assignments to goal are not handled)
 ```
-
 
 ### Structure and Class Functions
 
