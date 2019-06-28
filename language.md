@@ -626,16 +626,6 @@ const x = 1 > 2 ? 3 : 4
 x // is 4
 ```
 
-
-### Parentheses
-
-Expressions can be wrapped in parentheses to avoid ambiguity.
-
-```typescript
-const a = (1 + 2) * 3
-// a is 9
-```
-
 ### Precedence and Associativity
 
 Operators have the following precedences, highest to lowest:
@@ -649,6 +639,8 @@ Operators have the following precedences, highest to lowest:
 - Ternary precedence: `? :`
 
 All operators are left-associative, except for the ternary operator, which is right-associative.
+
+Experessions can be wrapped in parentheses to override precedence conventions, i.e. an alternate order should be indicated, or when the default order should be emphasized, e.g. to avoid confusion. For example, `(2 + 3) * 4` forces addition to precede multiplication, and `5 + (6 * 7)` reinforces the default order.
 
 
 ## Functions
@@ -775,7 +767,6 @@ For example, a function type `(Int) -> (() -> Int)` is the type for a function w
 #### Argument Passing Behavior
 
 When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as [call-by-sharing](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_sharing).
-
 
 ```typescript
 fun change(numbers: Int[]) {
