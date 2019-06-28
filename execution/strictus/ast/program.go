@@ -1,10 +1,8 @@
 package ast
 
 type Program struct {
-	// all declarations, indexed by name
-	Declarations map[string]Declaration
 	// all declarations, in the order they are defined
-	AllDeclarations []Declaration
+	Declarations []Declaration
 }
 
 func (p Program) Accept(visitor Visitor) Repr {

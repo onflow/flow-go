@@ -11,6 +11,7 @@ type FunctionValue interface {
 	Value
 	isFunctionValue()
 	invoke(interpreter *Interpreter, arguments []Value) Value
+	parameterCount() int
 }
 
 // InterpretedFunctionValue
@@ -29,17 +30,39 @@ func newInterpretedFunction(expression ast.FunctionExpression, activation hamt.M
 		Activation: activation,
 	}
 }
+
 func (f *InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Value {
-	return interpreter.invokeFunction(f, arguments)
+	return interpreter.invokeInterpretedFunction(f, arguments)
+}
+
+func (f *InterpretedFunctionValue) parameterCount() int {
+	return len(f.Expression.Parameters)
 }
 
 // HostFunctionValue
 
-type HostFunctionValue func(*Interpreter, []Value) Value
+type HostFunctionValue struct {
+	functionType FunctionType
+	function     func(*Interpreter, []Value) Value
+}
 
 func (HostFunctionValue) isValue()           {}
 func (f HostFunctionValue) isFunctionValue() {}
 
 func (f HostFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Value {
-	return f(interpreter, arguments)
+	return f.function(interpreter, arguments)
+}
+
+func (f *HostFunctionValue) parameterCount() int {
+	return len(f.functionType.ParameterTypes)
+}
+
+func NewHostFunction(
+	functionType FunctionType,
+	function func(*Interpreter, []Value) Value,
+) *HostFunctionValue {
+	return &HostFunctionValue{
+		functionType: functionType,
+		function:     function,
+	}
 }

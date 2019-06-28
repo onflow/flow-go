@@ -550,41 +550,45 @@ func (v UInt64Value) Equal(other IntegerValue) BoolValue {
 // ToValue
 
 // ToValue converts a Go value into an interpreter value
-func ToValue(value interface{}) Value {
+func ToValue(value interface{}) (Value, error) {
 	// TODO: support more types
 	switch value := value.(type) {
 	case *big.Int:
-		return IntValue{value}
+		return IntValue{value}, nil
 	case int8:
-		return Int8Value(value)
+		return Int8Value(value), nil
 	case int16:
-		return Int16Value(value)
+		return Int16Value(value), nil
 	case int32:
-		return Int32Value(value)
+		return Int32Value(value), nil
 	case int64:
-		return Int64Value(value)
+		return Int64Value(value), nil
 	case uint8:
-		return UInt8Value(value)
+		return UInt8Value(value), nil
 	case uint16:
-		return UInt16Value(value)
+		return UInt16Value(value), nil
 	case uint32:
-		return UInt32Value(value)
+		return UInt32Value(value), nil
 	case uint64:
-		return UInt64Value(value)
+		return UInt64Value(value), nil
 	case bool:
-		return BoolValue(value)
+		return BoolValue(value), nil
 	}
 
-	panic(fmt.Sprintf("can't convert Go value to value: %#+v", value))
+	return nil, fmt.Errorf("can't convert Go value to value: %#+v", value)
 }
 
-func ToValues(inputs []interface{}) []Value {
+func ToValues(inputs []interface{}) ([]Value, error) {
 	var values []Value
 	for _, argument := range inputs {
+		value, err := ToValue(argument)
+		if err != nil {
+			return nil, err
+		}
 		values = append(
 			values,
-			ToValue(argument),
+			value,
 		)
 	}
-	return values
+	return values, nil
 }

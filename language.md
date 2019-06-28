@@ -122,7 +122,7 @@ If a type annotation is provided, the initial value must be of this type, and ne
 // invalid: declare a variable with an explicit type Bool,
 // but initial value is of type Int.
 //
-// Int is the type of arbitray-precision integers.
+// Int is the type of arbitrary-precision integers.
 //
 const booleanConstant: Bool = 1
 
