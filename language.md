@@ -661,12 +661,12 @@ Functions are values, i.e., they can be assigned to constants and variables, and
 
 Functions can be declared by using the `fun` keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called.
 
-The parameters need to be enclosed in parentheses. Each parameter needs to have a type annotation, which follows the parameter name after a colon. The return type is also separated from the parameters with a colon. The function code needs to be enclosed in opening and closing braces.
+The parameters need to be enclosed in parentheses. Each parameter needs to have a type annotation, which follows the parameter name after a colon. The return type, if any, is separated from the parameters using the `->` keyword. The function code needs to be enclosed in opening and closing braces.
 
 ```typescript
 // declare a function called double, which multiples a number by two
 //
-fun double(x: Int): Int {
+fun double(x: Int) -> Int {
     return x * 2
 }
 ```
@@ -676,7 +676,7 @@ Functions can be nested, i.e., the code of a function may declare further functi
 ```typescript
 // declare a function which multiplies a number by two, and adds one
 //
-fun doubleAndAddOne(n: Int): Int {
+fun doubleAndAddOne(n: Int) -> Int {
 
     // declare a nested function which doubles, which multiplies a number by two
     //
@@ -696,7 +696,7 @@ Functions can be also used as expressions. The syntax is the same as for functio
 // declare a constant called double, which has a function as its value,
 // which multiplies a number by two when called
 //
-const double = fun (x: Int): Int {
+const double = fun (x: Int) -> Int {
      return x * 2
 }
 ```
@@ -706,7 +706,7 @@ const double = fun (x: Int): Int {
 Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.
 
 ```typescript
-fun double(x: Int): Int {
+fun double(x: Int) -> Int {
      return x * 2
 }
 
@@ -724,21 +724,21 @@ double()
 ### Function Types
 
 Function types consist of the function's parameter types and the function's return type.
-The parameter types need to be enclosed in parentheses, followed by the `=>` keyword, and end with the return type.
+The parameter types need to be enclosed in parentheses, followed by the `->` keyword, and end with the return type.
 
 ```typescript
-// declare a function called add, with the function type (Int, Int) => Int
+// declare a function called add, with the function type (Int, Int) -> Int
 //
-fun add(a: Int, b: Int): Int {
+fun add(a: Int, b: Int) -> Int {
     return a + b
 }
 ```
 
 ```typescript
-// declare a constant called add, with the function type (Int, Int) => Int
+// declare a constant called add, with the function type (Int, Int) -> Int
 //
-const add: (Int, Int) => Int =
-    fun (a: Int, b: Int): Int {
+const add: (Int, Int) -> Int =
+    fun (a: Int, b: Int) -> Int {
         return a + b
     }
 ```
@@ -749,7 +749,7 @@ If the function has no return type, it implicitly has the return type `Void`.
 // declare a constant called doNothing, which is a function
 // that takes no parameters and returns nothing
 //
-const doNothing: () => Void =
+const doNothing: () -> Void =
     fun () {}
 ```
 
@@ -795,7 +795,7 @@ A conditions block consists of one or more conditions. Conditions are expression
 In postconditions, the special constant `result` refers to the result of the function.
 
 ```typescript
-fun factorial(n: Int): Int {
+fun factorial(n: Int) -> Int {
     require {
         // factorial is only defined for integers greater than or equal to zero
         //
@@ -937,7 +937,7 @@ Every function and block (`{` ... `}`) introduces a new scope for declarations. 
 ```typescript
 const x = 10
 
-fun f(): Int {
+fun f() -> Int {
     const y = 10
     return x + y
 }
@@ -950,7 +950,7 @@ y
 ```
 
 ```typescript
-fun doubleAndAddOne(n: Int): Int {
+fun doubleAndAddOne(n: Int) -> Int {
     fun double(x: Int) {
         return x * 2
     }
@@ -967,7 +967,7 @@ Each scope can introduce new declarations, i.e., the outer declaration is shadow
 ```typescript
 const x = 2
 
-fun test(): Int {
+fun test() -> Int {
     const x = 3
     return x
 }
@@ -980,11 +980,11 @@ Scope is lexical, not dynamic.
 ```typescript
 const x = 10
 
-fun f(): Int {
+fun f() -> Int {
    return x
 }
 
-fun g(): Int {
+fun g() -> Int {
    const x = 20
    return f()
 }
@@ -997,7 +997,7 @@ Declarations are **not** moved to the top of the enclosing function (hoisted).
 ```typescript
 const x = 2
 
-fun f(): Int {
+fun f() -> Int {
     if x == 0 {
         const x = 3
         return x
@@ -1026,7 +1026,7 @@ a = 0
 When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument of type `Bool`, _only_ a `Bool` can be provided, and not for example an `Int`.
 
 ```typescript
-fun nand(a: Bool, b: Bool): Bool {
+fun nand(a: Bool, b: Bool) -> Bool {
     return !(a && b)
 }
 
@@ -1040,7 +1040,7 @@ nand(0, 0)
 Types are *not* automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`.
 
 ```typescript
-fun add(a: Int8, b: Int8): Int {
+fun add(a: Int8, b: Int8) -> Int {
     return a + b
 }
 
@@ -1100,11 +1100,11 @@ const invalidMixed = {
 Functions are inferred based on the parameter types and the return type.
 
 ```typescript
-const add = (a: Int8, b: Int8): Int {
+const add = (a: Int8, b: Int8) -> Int {
     return a + b
 }
 
-// add has type (Int8, Int8) => Int
+// add has type (Int8, Int8) -> Int
 ```
 
 ## Structures and Classes
