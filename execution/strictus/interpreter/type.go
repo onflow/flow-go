@@ -207,19 +207,28 @@ func (t FunctionType) String() string {
 	return fmt.Sprintf("(%s) => %s", parameters.String(), t.ReturnType.String())
 }
 
-func ConvertType(t ast.Type) Type {
+// convertType converts an AST type representation to an interpreter type representation
+func convertType(t ast.Type) Type {
 	switch t := t.(type) {
 	case ast.BaseType:
-		return ParseBaseType(t.Identifier)
+		result := ParseBaseType(t.Identifier)
+		if result == nil {
+			panic(&NotDeclaredError{
+				ExpectedKind: DeclarationKindType,
+				Name:         t.Identifier,
+				Position:     t.Position,
+			})
+		}
+		return result
 
 	case ast.VariableSizedType:
 		return VariableSizedType{
-			Type: ConvertType(t.Type),
+			Type: convertType(t.Type),
 		}
 
 	case ast.ConstantSizedType:
 		return ConstantSizedType{
-			Type: ConvertType(t.Type),
+			Type: convertType(t.Type),
 			Size: t.Size,
 		}
 
@@ -227,18 +236,18 @@ func ConvertType(t ast.Type) Type {
 		var parameterTypes []Type
 		for _, parameterType := range t.ParameterTypes {
 			parameterTypes = append(parameterTypes,
-				ConvertType(parameterType),
+				convertType(parameterType),
 			)
 		}
 
-		returnType := ConvertType(t.ReturnType)
+		returnType := convertType(t.ReturnType)
 
 		return FunctionType{
 			ParameterTypes: parameterTypes,
 			ReturnType:     returnType,
 		}
 	default:
-		panic(fmt.Sprintf("can't convert unsupported type: %#+v", t))
+		panic(&astTypeConversionError{invalidASTType: t})
 	}
 }
 
@@ -260,7 +269,7 @@ var baseTypes = map[string]Type{
 func ParseBaseType(name string) Type {
 	baseType, ok := baseTypes[name]
 	if !ok {
-		panic(fmt.Sprintf("unknown type: %s", name))
+		return nil
 	}
 
 	return baseType

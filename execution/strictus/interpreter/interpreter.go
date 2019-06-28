@@ -218,17 +218,25 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStateme
 		identifier := target.Identifier
 		variable := interpreter.activations.Find(identifier)
 		if variable == nil {
-			panic(fmt.Sprintf("reference to unbound identifier: %s", identifier))
+			panic(&NotDeclaredError{
+				ExpectedKind: DeclarationKindVariable,
+				Name:         identifier,
+				Position:     target.Position,
+			})
 		}
 
 		variable.Set(value)
 		interpreter.activations.Set(identifier, variable)
 
 	case ast.IndexExpression:
-		indexedValue := target.Expression.Accept(interpreter)
+		indexedValue := target.Expression.Accept(interpreter).(Value)
 		array, ok := indexedValue.(ArrayValue)
 		if !ok {
-			panic(fmt.Sprintf("can't index into non-array value: %#+v", indexedValue))
+			panic(&NotIndexableError{
+				Value:         indexedValue,
+				StartPosition: target.Expression.GetStartPosition(),
+				EndPosition:   target.Expression.GetEndPosition(),
+			})
 		}
 
 		indexValue := target.Index.Accept(interpreter)
@@ -242,7 +250,9 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStateme
 		// TODO:
 
 	default:
-		panic(fmt.Sprintf("assignment to unknown target expression: %#+v", target))
+		panic(&unsupportedAssignmentTargetExpression{
+			target: target,
+		})
 	}
 	return nil
 }
@@ -250,112 +260,302 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStateme
 func (interpreter *Interpreter) VisitIdentifierExpression(expression ast.IdentifierExpression) ast.Repr {
 	variable := interpreter.activations.Find(expression.Identifier)
 	if variable == nil {
-		panic(fmt.Sprintf("reference to unbound identifier: %s", expression.Identifier))
+		panic(&NotDeclaredError{
+			ExpectedKind: DeclarationKindAny,
+			Name:         expression.Identifier,
+			Position:     expression.Position,
+		})
 	}
 	return variable.Value
 }
 
+func (interpreter *Interpreter) visitBinaryIntegerOperand(
+	value Value,
+	operation ast.Operation,
+	side OperandSide,
+	startPosition ast.Position,
+	endPosition ast.Position,
+) IntegerValue {
+	integerValue, isInteger := value.(IntegerValue)
+	if !isInteger {
+		panic(&InvalidBinaryOperandError{
+			Operation:     operation,
+			Side:          side,
+			ExpectedType:  IntegerType{},
+			Value:         value,
+			StartPosition: startPosition,
+			EndPosition:   endPosition,
+		})
+	}
+	return integerValue
+}
+
+func (interpreter *Interpreter) visitBinaryBoolOperand(
+	value Value,
+	operation ast.Operation,
+	side OperandSide,
+	startPosition ast.Position,
+	endPosition ast.Position,
+) BoolValue {
+	boolValue, isBool := value.(BoolValue)
+	if !isBool {
+		panic(&InvalidBinaryOperandError{
+			Operation:     operation,
+			Side:          side,
+			ExpectedType:  BoolType{},
+			Value:         value,
+			StartPosition: startPosition,
+			EndPosition:   endPosition,
+		})
+	}
+	return boolValue
+}
+
+func (interpreter *Interpreter) visitUnaryBoolOperand(
+	value Value,
+	operation ast.Operation,
+	startPosition ast.Position,
+	endPosition ast.Position,
+) BoolValue {
+	boolValue, isBool := value.(BoolValue)
+	if !isBool {
+		panic(&InvalidUnaryOperandError{
+			Operation:     operation,
+			ExpectedType:  BoolType{},
+			Value:         value,
+			StartPosition: startPosition,
+			EndPosition:   endPosition,
+		})
+	}
+	return boolValue
+}
+
+func (interpreter *Interpreter) visitUnaryIntegerOperand(
+	value Value,
+	operation ast.Operation,
+	startPosition ast.Position,
+	endPosition ast.Position,
+
+) IntegerValue {
+	integerValue, isInteger := value.(IntegerValue)
+	if !isInteger {
+		panic(&InvalidUnaryOperandError{
+			Operation:     operation,
+			ExpectedType:  IntegerType{},
+			Value:         value,
+			StartPosition: startPosition,
+			EndPosition:   endPosition,
+		})
+	}
+	return integerValue
+}
+
+func (interpreter *Interpreter) visitBinaryIntegerOperation(expr ast.BinaryExpression) (left, right IntegerValue) {
+	leftValue := expr.Left.Accept(interpreter).(Value)
+	left = interpreter.visitBinaryIntegerOperand(
+		leftValue,
+		expr.Operation,
+		OperandSideLeft,
+		expr.Left.GetStartPosition(),
+		expr.Left.GetEndPosition(),
+	)
+
+	rightValue := expr.Right.Accept(interpreter).(Value)
+	right = interpreter.visitBinaryIntegerOperand(
+		rightValue,
+		expr.Operation,
+		OperandSideRight,
+		expr.Right.GetStartPosition(),
+		expr.Right.GetEndPosition(),
+	)
+
+	return left, right
+}
+
+func (interpreter *Interpreter) visitBinaryBoolOperation(expr ast.BinaryExpression) (left, right BoolValue) {
+	leftValue := expr.Left.Accept(interpreter).(Value)
+	left = interpreter.visitBinaryBoolOperand(
+		leftValue,
+		expr.Operation,
+		OperandSideLeft,
+		expr.Left.GetStartPosition(),
+		expr.Left.GetEndPosition(),
+	)
+
+	rightValue := expr.Right.Accept(interpreter).(Value)
+	right = interpreter.visitBinaryBoolOperand(
+		rightValue,
+		expr.Operation,
+		OperandSideRight,
+		expr.Right.GetStartPosition(),
+		expr.Right.GetEndPosition(),
+	)
+
+	return left, right
+}
+
 func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpression) ast.Repr {
-	left := expression.Left.Accept(interpreter)
-	right := expression.Right.Accept(interpreter)
+	switch expression.Operation {
+	case ast.OperationPlus:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Plus(right)
 
-	leftInt, leftIsInt := left.(IntegerValue)
-	rightInt, rightIsInt := right.(IntegerValue)
-	if leftIsInt && rightIsInt {
-		switch expression.Operation {
-		case ast.OperationPlus:
-			return leftInt.Plus(rightInt)
-		case ast.OperationMinus:
-			return leftInt.Minus(rightInt)
-		case ast.OperationMod:
-			return leftInt.Mod(rightInt)
-		case ast.OperationMul:
-			return leftInt.Mul(rightInt)
-		case ast.OperationDiv:
-			return leftInt.Div(rightInt)
-		case ast.OperationLess:
-			return leftInt.Less(rightInt)
-		case ast.OperationLessEqual:
-			return leftInt.LessEqual(rightInt)
-		case ast.OperationGreater:
-			return leftInt.Greater(rightInt)
-		case ast.OperationGreaterEqual:
-			return leftInt.GreaterEqual(rightInt)
-		case ast.OperationEqual:
-			return BoolValue(leftInt.Equal(rightInt))
-		case ast.OperationUnequal:
-			return BoolValue(!leftInt.Equal(rightInt))
-		default:
-			panic(fmt.Sprintf(
-				"unsupported operation in integer binary expression: %s",
-				expression.Operation.String(),
-			))
+	case ast.OperationMinus:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Minus(right)
+
+	case ast.OperationMod:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Mod(right)
+
+	case ast.OperationMul:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Mul(right)
+
+	case ast.OperationDiv:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Div(right)
+
+	case ast.OperationLess:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Less(right)
+
+	case ast.OperationLessEqual:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.LessEqual(right)
+
+	case ast.OperationGreater:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Greater(right)
+
+	case ast.OperationGreaterEqual:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.GreaterEqual(right)
+
+	case ast.OperationEqual:
+		leftValue := expression.Left.Accept(interpreter).(Value)
+		rightValue := expression.Right.Accept(interpreter).(Value)
+
+		switch leftValue.(type) {
+		case IntegerValue:
+			left := interpreter.visitBinaryIntegerOperand(
+				leftValue,
+				expression.Operation,
+				OperandSideLeft,
+				expression.Left.GetStartPosition(),
+				expression.Left.GetEndPosition(),
+			)
+			right := interpreter.visitBinaryIntegerOperand(
+				rightValue,
+				expression.Operation,
+				OperandSideRight,
+				expression.Right.GetStartPosition(),
+				expression.Right.GetEndPosition(),
+			)
+			return BoolValue(left.Equal(right))
+
+		case BoolValue:
+			left := interpreter.visitBinaryBoolOperand(
+				leftValue,
+				expression.Operation,
+				OperandSideLeft,
+				expression.Left.GetStartPosition(),
+				expression.Left.GetEndPosition(),
+			)
+			right := interpreter.visitBinaryBoolOperand(
+				rightValue,
+				expression.Operation,
+				OperandSideRight,
+				expression.Right.GetStartPosition(),
+				expression.Right.GetEndPosition(),
+			)
+			return BoolValue(left == right)
 		}
+
+	case ast.OperationUnequal:
+		leftValue := expression.Left.Accept(interpreter).(Value)
+		rightValue := expression.Right.Accept(interpreter).(Value)
+
+		switch leftValue.(type) {
+		case IntegerValue:
+			left := interpreter.visitBinaryIntegerOperand(
+				leftValue,
+				expression.Operation,
+				OperandSideLeft,
+				expression.Left.GetStartPosition(),
+				expression.Left.GetEndPosition(),
+			)
+			right := interpreter.visitBinaryIntegerOperand(
+				rightValue,
+				expression.Operation,
+				OperandSideRight,
+				expression.Right.GetStartPosition(),
+				expression.Right.GetEndPosition(),
+			)
+			return BoolValue(!left.Equal(right))
+
+		case BoolValue:
+			left := interpreter.visitBinaryBoolOperand(
+				leftValue,
+				expression.Operation,
+				OperandSideLeft,
+				expression.Left.GetStartPosition(),
+				expression.Left.GetEndPosition(),
+			)
+			right := interpreter.visitBinaryBoolOperand(
+				rightValue,
+				expression.Operation,
+				OperandSideRight,
+				expression.Right.GetStartPosition(),
+				expression.Right.GetEndPosition(),
+			)
+			return BoolValue(left != right)
+		}
+
+	case ast.OperationOr:
+		left, right := interpreter.visitBinaryBoolOperation(expression)
+		return BoolValue(left || right)
+
+	case ast.OperationAnd:
+		left, right := interpreter.visitBinaryBoolOperation(expression)
+		return BoolValue(left && right)
 	}
 
-	leftBool, leftIsBool := left.(BoolValue)
-	rightBool, rightIsBool := right.(BoolValue)
-	if leftIsBool && rightIsBool {
-		switch expression.Operation {
-		case ast.OperationEqual:
-			return BoolValue(leftBool == rightBool)
-		case ast.OperationUnequal:
-			return BoolValue(leftBool != rightBool)
-		case ast.OperationOr:
-			return BoolValue(leftBool || rightBool)
-		case ast.OperationAnd:
-			return BoolValue(leftBool && rightBool)
-		default:
-			panic(fmt.Sprintf(
-				"unsupported operation in boolean binary expression: %s",
-				expression.Operation.String(),
-			))
-		}
-	}
-
-	panic(fmt.Sprintf(
-		"invalid operands for binary expression: %s: %v, %v",
-		expression.Operation.String(),
-		left,
-		right,
-	))
+	panic(&unsupportedOperation{
+		kind:      OperationKindBinary,
+		operation: expression.Operation,
+	})
 
 	return nil
 }
 
 func (interpreter *Interpreter) VisitUnaryExpression(expression ast.UnaryExpression) ast.Repr {
-	value := expression.Expression.Accept(interpreter)
+	value := expression.Expression.Accept(interpreter).(Value)
 
 	switch expression.Operation {
 	case ast.OperationNegate:
-		boolValue, ok := value.(BoolValue)
-		if !ok {
-			panic(fmt.Sprintf(
-				"non-boolean value for unary negate: %s: %v",
-				expression.Operation.String(),
-				value,
-			))
-		}
-
+		boolValue := interpreter.visitUnaryBoolOperand(
+			value,
+			expression.Operation,
+			expression.StartPosition,
+			expression.EndPosition,
+		)
 		return boolValue.Negate()
 
 	case ast.OperationMinus:
-		intValue, ok := value.(IntegerValue)
-		if !ok {
-			panic(fmt.Sprintf(
-				"non-integer value for unary minus: %s: %v",
-				expression.Operation.String(),
-				value,
-			))
-		}
-		return intValue.Negate()
-
-	default:
-		panic(fmt.Sprintf(
-			"unsupported operation in unary expression: %s",
-			expression.Operation.String(),
-		))
+		integerValue := interpreter.visitUnaryIntegerOperand(
+			value,
+			expression.Operation,
+			expression.StartPosition,
+			expression.EndPosition,
+		)
+		return integerValue.Negate()
 	}
+
+	panic(&unsupportedOperation{
+		kind:      OperationKindUnary,
+		operation: expression.Operation,
+	})
 
 	return nil
 }
@@ -389,10 +589,14 @@ func (interpreter *Interpreter) VisitMemberExpression(ast.MemberExpression) ast.
 }
 
 func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpression) ast.Repr {
-	indexedValue := expression.Expression.Accept(interpreter)
+	indexedValue := expression.Expression.Accept(interpreter).(Value)
 	array, ok := indexedValue.(ArrayValue)
 	if !ok {
-		panic(fmt.Sprintf("can't index into non-array value: %#+v", indexedValue))
+		panic(&NotIndexableError{
+			Value:         indexedValue,
+			StartPosition: expression.Expression.GetStartPosition(),
+			EndPosition:   expression.Expression.GetEndPosition(),
+		})
 	}
 
 	indexValue := expression.Index.Accept(interpreter)
