@@ -22,26 +22,92 @@ func NewInterpreter(program ast.Program) *Interpreter {
 	}
 }
 
-func (interpreter *Interpreter) Interpret() {
-	for _, declaration := range interpreter.Program.AllDeclarations {
+func (interpreter *Interpreter) Interpret() (err error) {
+	// recover internal panics and return them as an error
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("%v", r)
+			}
+		}
+	}()
+
+	for _, declaration := range interpreter.Program.Declarations {
 		declaration.Accept(interpreter)
 		name := declaration.DeclarationName()
+
+		if _, exists := interpreter.Globals[name]; exists {
+			return &RedeclarationError{
+				Name:     name,
+				Position: declaration.GetIdentifierPosition(),
+			}
+		}
+
 		interpreter.Globals[name] = interpreter.activations.Find(name)
 	}
+
+	return nil
 }
 
-func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) ast.Repr {
+func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value Value, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
-		panic(fmt.Sprintf("undefined function: %s", functionName))
+		return nil, &NotDeclaredError{
+			ExpectedKind: DeclarationKindFunction,
+			Name:         functionName,
+		}
 	}
 
-	function, ok := variable.Value.(FunctionValue)
+	variableValue := variable.Value
+
+	function, ok := variableValue.(FunctionValue)
 	if !ok {
-		panic(fmt.Sprintf("declaration is not a function: %#+v", variable.Value))
+		return nil, &NotCallableError{
+			Value: variableValue,
+		}
 	}
 
-	arguments := ToValues(inputs)
+	arguments, err := ToValues(inputs)
+	if err != nil {
+		return nil, err
+	}
+
+	// recover internal panics and return them as an error
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("%v", r)
+			}
+		}
+	}()
+
+	return interpreter.invokeFunction(function, arguments, ast.Position{}, ast.Position{}), nil
+}
+
+func (interpreter *Interpreter) invokeFunction(
+	function FunctionValue,
+	arguments []Value,
+	startPosition ast.Position,
+	endPosition ast.Position,
+) Value {
+
+	// ensures the invocation's argument count matches the function's parameter count
+
+	parameterCount := function.parameterCount()
+	argumentCount := len(arguments)
+
+	if argumentCount != parameterCount {
+		panic(&ArgumentCountError{
+			ParameterCount: parameterCount,
+			ArgumentCount:  argumentCount,
+			StartPosition:  startPosition,
+			EndPosition:    endPosition,
+		})
+	}
 
 	return function.invoke(interpreter, arguments)
 }
@@ -72,12 +138,13 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 		ReturnType:     declaration.ReturnType,
 	}
 	variableDeclaration := ast.VariableDeclaration{
-		Value:         expression,
-		Identifier:    declaration.Identifier,
-		IsConst:       true,
-		Type:          functionType,
-		StartPosition: declaration.StartPosition,
-		EndPosition:   declaration.EndPosition,
+		Value:              expression,
+		Identifier:         declaration.Identifier,
+		IsConst:            true,
+		Type:               functionType,
+		StartPosition:      declaration.StartPosition,
+		EndPosition:        declaration.EndPosition,
+		IdentifierPosition: declaration.IdentifierPosition,
 	}
 
 	// make the function itself available inside the function
@@ -86,13 +153,13 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 	function.Activation = function.Activation.
 		Insert(ActivationKey(declaration.Identifier), variable)
 
-	// function declarations are de-sugared to constant variables
+	// function declarations are de-sugared to constants
 	interpreter.declareVariable(variableDeclaration, function)
 
 	return nil
 }
 
-func (interpreter *Interpreter) ImportFunction(name string, functionType FunctionType, function HostFunctionValue) {
+func (interpreter *Interpreter) ImportFunction(name string, function *HostFunctionValue) {
 	variableDeclaration := ast.VariableDeclaration{
 		Identifier: name,
 		IsConst:    true,
@@ -155,7 +222,10 @@ func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclarat
 	variable := interpreter.activations.Find(declaration.Identifier)
 	depth := interpreter.activations.Depth()
 	if variable != nil && variable.Depth == depth {
-		panic(fmt.Sprintf("invalid redefinition of identifier: %s", declaration.Identifier))
+		panic(&RedeclarationError{
+			Name:     declaration.Identifier,
+			Position: declaration.GetIdentifierPosition(),
+		})
 	}
 
 	variable = newVariable(declaration, depth, value)
@@ -173,23 +243,41 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStateme
 		identifier := target.Identifier
 		variable := interpreter.activations.Find(identifier)
 		if variable == nil {
-			panic(fmt.Sprintf("reference to unbound identifier: %s", identifier))
+			panic(&NotDeclaredError{
+				ExpectedKind: DeclarationKindVariable,
+				Name:         identifier,
+				Position:     target.Position,
+			})
 		}
 
-		variable.Set(value)
+		if !variable.Set(value) {
+			panic(&AssignmentToConstantError{
+				Name:     identifier,
+				Position: target.Position,
+			})
+		}
+
 		interpreter.activations.Set(identifier, variable)
 
 	case ast.IndexExpression:
-		indexedValue := target.Expression.Accept(interpreter)
+		indexedValue := target.Expression.Accept(interpreter).(Value)
 		array, ok := indexedValue.(ArrayValue)
 		if !ok {
-			panic(fmt.Sprintf("can't index into non-array value: %#+v", indexedValue))
+			panic(&NotIndexableError{
+				Value:         indexedValue,
+				StartPosition: target.Expression.GetStartPosition(),
+				EndPosition:   target.Expression.GetEndPosition(),
+			})
 		}
 
-		indexValue := target.Index.Accept(interpreter)
+		indexValue := target.Index.Accept(interpreter).(Value)
 		index, ok := indexValue.(IntegerValue)
 		if !ok {
-			panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
+			panic(&InvalidIndexValueError{
+				Value:         indexValue,
+				StartPosition: target.Index.GetStartPosition(),
+				EndPosition:   target.Index.GetEndPosition(),
+			})
 		}
 		array[index.IntValue()] = value
 
@@ -197,7 +285,9 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStateme
 		// TODO:
 
 	default:
-		panic(fmt.Sprintf("assignment to unknown target expression: %#+v", target))
+		panic(&unsupportedAssignmentTargetExpression{
+			target: target,
+		})
 	}
 	return nil
 }
@@ -205,112 +295,302 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStateme
 func (interpreter *Interpreter) VisitIdentifierExpression(expression ast.IdentifierExpression) ast.Repr {
 	variable := interpreter.activations.Find(expression.Identifier)
 	if variable == nil {
-		panic(fmt.Sprintf("reference to unbound identifier: %s", expression.Identifier))
+		panic(&NotDeclaredError{
+			ExpectedKind: DeclarationKindAny,
+			Name:         expression.Identifier,
+			Position:     expression.Position,
+		})
 	}
 	return variable.Value
 }
 
+func (interpreter *Interpreter) visitBinaryIntegerOperand(
+	value Value,
+	operation ast.Operation,
+	side OperandSide,
+	startPosition ast.Position,
+	endPosition ast.Position,
+) IntegerValue {
+	integerValue, isInteger := value.(IntegerValue)
+	if !isInteger {
+		panic(&InvalidBinaryOperandError{
+			Operation:     operation,
+			Side:          side,
+			ExpectedType:  IntegerType{},
+			Value:         value,
+			StartPosition: startPosition,
+			EndPosition:   endPosition,
+		})
+	}
+	return integerValue
+}
+
+func (interpreter *Interpreter) visitBinaryBoolOperand(
+	value Value,
+	operation ast.Operation,
+	side OperandSide,
+	startPosition ast.Position,
+	endPosition ast.Position,
+) BoolValue {
+	boolValue, isBool := value.(BoolValue)
+	if !isBool {
+		panic(&InvalidBinaryOperandError{
+			Operation:     operation,
+			Side:          side,
+			ExpectedType:  BoolType{},
+			Value:         value,
+			StartPosition: startPosition,
+			EndPosition:   endPosition,
+		})
+	}
+	return boolValue
+}
+
+func (interpreter *Interpreter) visitUnaryBoolOperand(
+	value Value,
+	operation ast.Operation,
+	startPosition ast.Position,
+	endPosition ast.Position,
+) BoolValue {
+	boolValue, isBool := value.(BoolValue)
+	if !isBool {
+		panic(&InvalidUnaryOperandError{
+			Operation:     operation,
+			ExpectedType:  BoolType{},
+			Value:         value,
+			StartPosition: startPosition,
+			EndPosition:   endPosition,
+		})
+	}
+	return boolValue
+}
+
+func (interpreter *Interpreter) visitUnaryIntegerOperand(
+	value Value,
+	operation ast.Operation,
+	startPosition ast.Position,
+	endPosition ast.Position,
+
+) IntegerValue {
+	integerValue, isInteger := value.(IntegerValue)
+	if !isInteger {
+		panic(&InvalidUnaryOperandError{
+			Operation:     operation,
+			ExpectedType:  IntegerType{},
+			Value:         value,
+			StartPosition: startPosition,
+			EndPosition:   endPosition,
+		})
+	}
+	return integerValue
+}
+
+func (interpreter *Interpreter) visitBinaryIntegerOperation(expr ast.BinaryExpression) (left, right IntegerValue) {
+	leftValue := expr.Left.Accept(interpreter).(Value)
+	left = interpreter.visitBinaryIntegerOperand(
+		leftValue,
+		expr.Operation,
+		OperandSideLeft,
+		expr.Left.GetStartPosition(),
+		expr.Left.GetEndPosition(),
+	)
+
+	rightValue := expr.Right.Accept(interpreter).(Value)
+	right = interpreter.visitBinaryIntegerOperand(
+		rightValue,
+		expr.Operation,
+		OperandSideRight,
+		expr.Right.GetStartPosition(),
+		expr.Right.GetEndPosition(),
+	)
+
+	return left, right
+}
+
+func (interpreter *Interpreter) visitBinaryBoolOperation(expr ast.BinaryExpression) (left, right BoolValue) {
+	leftValue := expr.Left.Accept(interpreter).(Value)
+	left = interpreter.visitBinaryBoolOperand(
+		leftValue,
+		expr.Operation,
+		OperandSideLeft,
+		expr.Left.GetStartPosition(),
+		expr.Left.GetEndPosition(),
+	)
+
+	rightValue := expr.Right.Accept(interpreter).(Value)
+	right = interpreter.visitBinaryBoolOperand(
+		rightValue,
+		expr.Operation,
+		OperandSideRight,
+		expr.Right.GetStartPosition(),
+		expr.Right.GetEndPosition(),
+	)
+
+	return left, right
+}
+
 func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpression) ast.Repr {
-	left := expression.Left.Accept(interpreter)
-	right := expression.Right.Accept(interpreter)
+	switch expression.Operation {
+	case ast.OperationPlus:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Plus(right)
 
-	leftInt, leftIsInt := left.(IntegerValue)
-	rightInt, rightIsInt := right.(IntegerValue)
-	if leftIsInt && rightIsInt {
-		switch expression.Operation {
-		case ast.OperationPlus:
-			return leftInt.Plus(rightInt)
-		case ast.OperationMinus:
-			return leftInt.Minus(rightInt)
-		case ast.OperationMod:
-			return leftInt.Mod(rightInt)
-		case ast.OperationMul:
-			return leftInt.Mul(rightInt)
-		case ast.OperationDiv:
-			return leftInt.Div(rightInt)
-		case ast.OperationLess:
-			return leftInt.Less(rightInt)
-		case ast.OperationLessEqual:
-			return leftInt.LessEqual(rightInt)
-		case ast.OperationGreater:
-			return leftInt.Greater(rightInt)
-		case ast.OperationGreaterEqual:
-			return leftInt.GreaterEqual(rightInt)
-		case ast.OperationEqual:
-			return BoolValue(leftInt.Equal(rightInt))
-		case ast.OperationUnequal:
-			return BoolValue(!leftInt.Equal(rightInt))
-		default:
-			panic(fmt.Sprintf(
-				"unsupported operation in integer binary expression: %s",
-				expression.Operation.String(),
-			))
+	case ast.OperationMinus:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Minus(right)
+
+	case ast.OperationMod:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Mod(right)
+
+	case ast.OperationMul:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Mul(right)
+
+	case ast.OperationDiv:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Div(right)
+
+	case ast.OperationLess:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Less(right)
+
+	case ast.OperationLessEqual:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.LessEqual(right)
+
+	case ast.OperationGreater:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.Greater(right)
+
+	case ast.OperationGreaterEqual:
+		left, right := interpreter.visitBinaryIntegerOperation(expression)
+		return left.GreaterEqual(right)
+
+	case ast.OperationEqual:
+		leftValue := expression.Left.Accept(interpreter).(Value)
+		rightValue := expression.Right.Accept(interpreter).(Value)
+
+		switch leftValue.(type) {
+		case IntegerValue:
+			left := interpreter.visitBinaryIntegerOperand(
+				leftValue,
+				expression.Operation,
+				OperandSideLeft,
+				expression.Left.GetStartPosition(),
+				expression.Left.GetEndPosition(),
+			)
+			right := interpreter.visitBinaryIntegerOperand(
+				rightValue,
+				expression.Operation,
+				OperandSideRight,
+				expression.Right.GetStartPosition(),
+				expression.Right.GetEndPosition(),
+			)
+			return BoolValue(left.Equal(right))
+
+		case BoolValue:
+			left := interpreter.visitBinaryBoolOperand(
+				leftValue,
+				expression.Operation,
+				OperandSideLeft,
+				expression.Left.GetStartPosition(),
+				expression.Left.GetEndPosition(),
+			)
+			right := interpreter.visitBinaryBoolOperand(
+				rightValue,
+				expression.Operation,
+				OperandSideRight,
+				expression.Right.GetStartPosition(),
+				expression.Right.GetEndPosition(),
+			)
+			return BoolValue(left == right)
 		}
+
+	case ast.OperationUnequal:
+		leftValue := expression.Left.Accept(interpreter).(Value)
+		rightValue := expression.Right.Accept(interpreter).(Value)
+
+		switch leftValue.(type) {
+		case IntegerValue:
+			left := interpreter.visitBinaryIntegerOperand(
+				leftValue,
+				expression.Operation,
+				OperandSideLeft,
+				expression.Left.GetStartPosition(),
+				expression.Left.GetEndPosition(),
+			)
+			right := interpreter.visitBinaryIntegerOperand(
+				rightValue,
+				expression.Operation,
+				OperandSideRight,
+				expression.Right.GetStartPosition(),
+				expression.Right.GetEndPosition(),
+			)
+			return BoolValue(!left.Equal(right))
+
+		case BoolValue:
+			left := interpreter.visitBinaryBoolOperand(
+				leftValue,
+				expression.Operation,
+				OperandSideLeft,
+				expression.Left.GetStartPosition(),
+				expression.Left.GetEndPosition(),
+			)
+			right := interpreter.visitBinaryBoolOperand(
+				rightValue,
+				expression.Operation,
+				OperandSideRight,
+				expression.Right.GetStartPosition(),
+				expression.Right.GetEndPosition(),
+			)
+			return BoolValue(left != right)
+		}
+
+	case ast.OperationOr:
+		left, right := interpreter.visitBinaryBoolOperation(expression)
+		return BoolValue(left || right)
+
+	case ast.OperationAnd:
+		left, right := interpreter.visitBinaryBoolOperation(expression)
+		return BoolValue(left && right)
 	}
 
-	leftBool, leftIsBool := left.(BoolValue)
-	rightBool, rightIsBool := right.(BoolValue)
-	if leftIsBool && rightIsBool {
-		switch expression.Operation {
-		case ast.OperationEqual:
-			return BoolValue(leftBool == rightBool)
-		case ast.OperationUnequal:
-			return BoolValue(leftBool != rightBool)
-		case ast.OperationOr:
-			return BoolValue(leftBool || rightBool)
-		case ast.OperationAnd:
-			return BoolValue(leftBool && rightBool)
-		default:
-			panic(fmt.Sprintf(
-				"unsupported operation in boolean binary expression: %s",
-				expression.Operation.String(),
-			))
-		}
-	}
-
-	panic(fmt.Sprintf(
-		"invalid operands for binary expression: %s: %v, %v",
-		expression.Operation.String(),
-		left,
-		right,
-	))
+	panic(&unsupportedOperation{
+		kind:      OperationKindBinary,
+		operation: expression.Operation,
+	})
 
 	return nil
 }
 
 func (interpreter *Interpreter) VisitUnaryExpression(expression ast.UnaryExpression) ast.Repr {
-	value := expression.Expression.Accept(interpreter)
+	value := expression.Expression.Accept(interpreter).(Value)
 
 	switch expression.Operation {
 	case ast.OperationNegate:
-		boolValue, ok := value.(BoolValue)
-		if !ok {
-			panic(fmt.Sprintf(
-				"non-boolean value for unary negate: %s: %v",
-				expression.Operation.String(),
-				value,
-			))
-		}
-
+		boolValue := interpreter.visitUnaryBoolOperand(
+			value,
+			expression.Operation,
+			expression.StartPosition,
+			expression.EndPosition,
+		)
 		return boolValue.Negate()
 
 	case ast.OperationMinus:
-		intValue, ok := value.(IntegerValue)
-		if !ok {
-			panic(fmt.Sprintf(
-				"non-integer value for unary minus: %s: %v",
-				expression.Operation.String(),
-				value,
-			))
-		}
-		return intValue.Negate()
-
-	default:
-		panic(fmt.Sprintf(
-			"unsupported operation in unary expression: %s",
-			expression.Operation.String(),
-		))
+		integerValue := interpreter.visitUnaryIntegerOperand(
+			value,
+			expression.Operation,
+			expression.StartPosition,
+			expression.EndPosition,
+		)
+		return integerValue.Negate()
 	}
+
+	panic(&unsupportedOperation{
+		kind:      OperationKindUnary,
+		operation: expression.Operation,
+	})
 
 	return nil
 }
@@ -344,16 +624,24 @@ func (interpreter *Interpreter) VisitMemberExpression(ast.MemberExpression) ast.
 }
 
 func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpression) ast.Repr {
-	indexedValue := expression.Expression.Accept(interpreter)
+	indexedValue := expression.Expression.Accept(interpreter).(Value)
 	array, ok := indexedValue.(ArrayValue)
 	if !ok {
-		panic(fmt.Sprintf("can't index into non-array value: %#+v", indexedValue))
+		panic(&NotIndexableError{
+			Value:         indexedValue,
+			StartPosition: expression.Expression.GetStartPosition(),
+			EndPosition:   expression.Expression.GetEndPosition(),
+		})
 	}
 
-	indexValue := expression.Index.Accept(interpreter)
+	indexValue := expression.Index.Accept(interpreter).(Value)
 	index, ok := indexValue.(IntegerValue)
 	if !ok {
-		panic(fmt.Sprintf("can't index with value: %#+v", indexValue))
+		panic(&InvalidIndexValueError{
+			Value:         indexValue,
+			StartPosition: expression.Index.GetStartPosition(),
+			EndPosition:   expression.Index.GetEndPosition(),
+		})
 	}
 	return array[index.IntValue()]
 }
@@ -369,21 +657,28 @@ func (interpreter *Interpreter) VisitConditionalExpression(expression ast.Condit
 func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression ast.InvocationExpression) ast.Repr {
 
 	// evaluate the invoked expression
-	value := invocationExpression.Expression.Accept(interpreter)
+	value := invocationExpression.Expression.Accept(interpreter).(Value)
 	function, ok := value.(FunctionValue)
 	if !ok {
-		panic(fmt.Sprintf("can't invoke value: %#+v", value))
+		panic(&NotCallableError{
+			Value:         value,
+			StartPosition: invocationExpression.Expression.GetStartPosition(),
+			EndPosition:   invocationExpression.Expression.GetEndPosition(),
+		})
 	}
 
 	// NOTE: evaluate all argument expressions in call-site scope, not in function body
 	arguments := interpreter.evaluateExpressions(invocationExpression.Arguments)
 
-	return function.invoke(interpreter, arguments)
+	return interpreter.invokeFunction(
+		function,
+		arguments,
+		invocationExpression.StartPosition,
+		invocationExpression.EndPosition,
+	)
 }
 
-func (interpreter *Interpreter) invokeFunction(function *InterpretedFunctionValue, arguments []Value) Value {
-	interpreter.checkInvocationArgumentCount(len(arguments), function)
-
+func (interpreter *Interpreter) invokeInterpretedFunction(function *InterpretedFunctionValue, arguments []Value) Value {
 	// start a new activation record
 	// lexical scope: use the function declaration's activation record,
 	// not the current one (which would be dynamic scope)
@@ -430,22 +725,6 @@ func (interpreter *Interpreter) evaluateExpressions(expressions []ast.Expression
 		values = append(values, argument)
 	}
 	return values
-}
-
-// checkInvocationArgumentCount ensures the invocation's argument count
-// matches the function's parameter count
-func (interpreter *Interpreter) checkInvocationArgumentCount(
-	argumentCount int,
-	function *InterpretedFunctionValue,
-) {
-	parameterCount := len(function.Expression.Parameters)
-	if argumentCount != parameterCount {
-		panic(fmt.Sprintf(
-			"invalid number of arguments: got %d, need %d",
-			argumentCount,
-			parameterCount,
-		))
-	}
 }
 
 func (interpreter *Interpreter) VisitFunctionExpression(expression ast.FunctionExpression) ast.Repr {
