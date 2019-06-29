@@ -14,9 +14,10 @@ type Interpreter struct {
 	Globals     map[string]*Variable
 }
 
-func NewInterpreter(program ast.Program) *Interpreter {
+func NewInterpreter(program *ast.Program) *Interpreter {
 	return &Interpreter{
-		Program:     program,
+		// TODO: store pointer
+		Program:     *program,
 		activations: &Activations{},
 		Globals:     map[string]*Variable{},
 	}
