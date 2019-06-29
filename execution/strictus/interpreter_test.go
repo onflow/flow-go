@@ -1655,12 +1655,12 @@ func TestInterpretHostFunction(t *testing.T) {
 	inter := interpreter.NewInterpreter(program)
 
 	testFunction := interpreter.NewHostFunction(
-		interpreter.FunctionType{
+		&interpreter.FunctionType{
 			ParameterTypes: []interpreter.Type{
-				interpreter.IntType{},
-				interpreter.IntType{},
+				&interpreter.IntType{},
+				&interpreter.IntType{},
 			},
-			ReturnType: interpreter.IntType{},
+			ReturnType: &interpreter.IntType{},
 		},
 		func(inter *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
 			a := arguments[0].(interpreter.IntValue).Int

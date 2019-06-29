@@ -54,7 +54,7 @@ func Parse(code string) (program *ast.Program, errors []error) {
 		}
 	}()
 
-	result := parser.Program().Accept(&ProgramVisitor{}).(ast.Program)
+	result := parser.Program().Accept(&ProgramVisitor{}).(*ast.Program)
 
 	appendSyntaxErrors()
 
@@ -62,5 +62,5 @@ func Parse(code string) (program *ast.Program, errors []error) {
 		return nil, errors
 	}
 
-	return &result, errors
+	return result, errors
 }

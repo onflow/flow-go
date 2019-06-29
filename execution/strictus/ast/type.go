@@ -9,16 +9,16 @@ type Type interface {
 
 type BaseType struct {
 	Identifier string
-	Position   Position
+	Position   *Position
 }
 
-func (BaseType) isType() {}
+func (*BaseType) isType() {}
 
-func (t BaseType) GetStartPosition() Position {
+func (t *BaseType) GetStartPosition() *Position {
 	return t.Position
 }
 
-func (t BaseType) GetEndPosition() Position {
+func (t *BaseType) GetEndPosition() *Position {
 	return t.Position
 }
 
@@ -26,17 +26,17 @@ func (t BaseType) GetEndPosition() Position {
 
 type VariableSizedType struct {
 	Type
-	StartPosition Position
-	EndPosition   Position
+	StartPosition *Position
+	EndPosition   *Position
 }
 
-func (VariableSizedType) isType() {}
+func (*VariableSizedType) isType() {}
 
-func (t VariableSizedType) GetStartPosition() Position {
+func (t *VariableSizedType) GetStartPosition() *Position {
 	return t.StartPosition
 }
 
-func (t VariableSizedType) GetEndPosition() Position {
+func (t *VariableSizedType) GetEndPosition() *Position {
 	return t.EndPosition
 }
 
@@ -45,17 +45,17 @@ func (t VariableSizedType) GetEndPosition() Position {
 type ConstantSizedType struct {
 	Type
 	Size          int
-	StartPosition Position
-	EndPosition   Position
+	StartPosition *Position
+	EndPosition   *Position
 }
 
-func (ConstantSizedType) isType() {}
+func (*ConstantSizedType) isType() {}
 
-func (t ConstantSizedType) GetStartPosition() Position {
+func (t *ConstantSizedType) GetStartPosition() *Position {
 	return t.StartPosition
 }
 
-func (t ConstantSizedType) GetEndPosition() Position {
+func (t *ConstantSizedType) GetEndPosition() *Position {
 	return t.EndPosition
 }
 
@@ -64,16 +64,16 @@ func (t ConstantSizedType) GetEndPosition() Position {
 type FunctionType struct {
 	ParameterTypes []Type
 	ReturnType     Type
-	StartPosition  Position
-	EndPosition    Position
+	StartPosition  *Position
+	EndPosition    *Position
 }
 
-func (FunctionType) isType() {}
+func (*FunctionType) isType() {}
 
-func (t FunctionType) GetStartPosition() Position {
+func (t *FunctionType) GetStartPosition() *Position {
 	return t.StartPosition
 }
 
-func (t FunctionType) GetEndPosition() Position {
+func (t *FunctionType) GetEndPosition() *Position {
 	return t.EndPosition
 }

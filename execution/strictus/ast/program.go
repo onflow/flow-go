@@ -5,6 +5,6 @@ type Program struct {
 	Declarations []Declaration
 }
 
-func (p Program) Accept(visitor Visitor) Repr {
+func (p *Program) Accept(visitor Visitor) Repr {
 	return visitor.VisitProgram(p)
 }

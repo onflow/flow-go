@@ -20,7 +20,7 @@ func (e *SyntaxError) Error() string {
 // JuxtaposedUnaryOperatorsError
 
 type JuxtaposedUnaryOperatorsError struct {
-	Position ast.Position
+	Position *ast.Position
 }
 
 func (e *JuxtaposedUnaryOperatorsError) Error() string {
