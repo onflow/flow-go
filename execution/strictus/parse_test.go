@@ -688,6 +688,62 @@ func TestParseIfStatement(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
+func TestParseIfStatementNoElse(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := Parse(`
+	    fun test() {
+            if true {
+                return
+            }
+        }
+	`)
+
+	Expect(errors).Should(BeEmpty())
+
+	test := &FunctionDeclaration{
+		IsPublic:   false,
+		Identifier: "test",
+		ReturnType: &BaseType{
+			Position: &Position{Offset: 15, Line: 2, Column: 14},
+		},
+		Block: &Block{
+			Statements: []Statement{
+				&IfStatement{
+					Test: &BoolExpression{
+						Value:    true,
+						Position: &Position{Offset: 34, Line: 3, Column: 15},
+					},
+					Then: &Block{
+						Statements: []Statement{
+							&ReturnStatement{
+								Expression:    nil,
+								StartPosition: &Position{Offset: 57, Line: 4, Column: 16},
+								EndPosition:   &Position{Offset: 57, Line: 4, Column: 16},
+							},
+						},
+						StartPosition: &Position{Offset: 57, Line: 4, Column: 16},
+						EndPosition:   &Position{Offset: 57, Line: 4, Column: 16},
+					},
+					StartPosition: &Position{Offset: 31, Line: 3, Column: 12},
+					EndPosition:   &Position{Offset: 76, Line: 5, Column: 12},
+				},
+			},
+			StartPosition: &Position{Offset: 31, Line: 3, Column: 12},
+			EndPosition:   &Position{Offset: 76, Line: 5, Column: 12},
+		},
+		StartPosition:      &Position{Offset: 6, Line: 2, Column: 5},
+		EndPosition:        &Position{Offset: 86, Line: 6, Column: 8},
+		IdentifierPosition: &Position{Offset: 10, Line: 2, Column: 9},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
 func TestParseWhileStatement(t *testing.T) {
 	RegisterTestingT(t)
 
