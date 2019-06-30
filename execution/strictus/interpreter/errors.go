@@ -50,7 +50,8 @@ type ProgramError interface {
 type NotDeclaredError struct {
 	ExpectedKind DeclarationKind
 	Name         string
-	Pos          *ast.Position
+	StartPos     *ast.Position
+	EndPos       *ast.Position
 }
 
 func (e *NotDeclaredError) Error() string {
@@ -62,11 +63,11 @@ func (e *NotDeclaredError) Error() string {
 }
 
 func (e *NotDeclaredError) StartPosition() *ast.Position {
-	return e.Pos
+	return e.StartPos
 }
 
 func (e *NotDeclaredError) EndPosition() *ast.Position {
-	return e.Pos
+	return e.EndPos
 }
 
 // NotCallableError
@@ -212,8 +213,9 @@ func (e *RedeclarationError) EndPosition() *ast.Position {
 // AssignmentToConstantError
 
 type AssignmentToConstantError struct {
-	Name string
-	Pos  *ast.Position
+	Name     string
+	StartPos *ast.Position
+	EndPos   *ast.Position
 }
 
 func (e *AssignmentToConstantError) Error() string {
@@ -221,11 +223,11 @@ func (e *AssignmentToConstantError) Error() string {
 }
 
 func (e *AssignmentToConstantError) StartPosition() *ast.Position {
-	return e.Pos
+	return e.StartPos
 }
 
 func (e *AssignmentToConstantError) EndPosition() *ast.Position {
-	return e.Pos
+	return e.EndPos
 }
 
 // InvalidIndexValueError

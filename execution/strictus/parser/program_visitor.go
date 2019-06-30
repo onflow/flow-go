@@ -341,15 +341,20 @@ func (v *ProgramVisitor) VisitWhileStatement(ctx *WhileStatementContext) interfa
 }
 
 func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
-	identifier := ctx.Identifier().GetText()
-	value := ctx.Expression().Accept(v).(ast.Expression)
+	identifierNode := ctx.Identifier()
+	identifier := identifierNode.GetText()
+	identifierSymbol := identifierNode.GetSymbol()
 
-	targetPosition := ast.PositionFromToken(ctx.Identifier().GetSymbol())
+	targetStartPosition := ast.PositionFromToken(identifierSymbol)
+	targetEndPosition := ast.EndPosition(targetStartPosition, identifierSymbol.GetStop())
 
 	var target ast.Expression = &ast.IdentifierExpression{
 		Identifier: identifier,
-		Pos:        targetPosition,
+		StartPos:   targetStartPosition,
+		EndPos:     targetEndPosition,
 	}
+
+	value := ctx.Expression().Accept(v).(ast.Expression)
 
 	for _, accessExpressionContext := range ctx.AllExpressionAccess() {
 		expression := accessExpressionContext.Accept(v)
@@ -769,11 +774,14 @@ func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionCont
 	identifierNode := ctx.Identifier()
 
 	identifier := identifierNode.GetText()
-	position := ast.PositionFromToken(identifierNode.GetSymbol())
+	identifierSymbol := identifierNode.GetSymbol()
+	startPosition := ast.PositionFromToken(identifierSymbol)
+	endPosition := ast.EndPosition(startPosition, identifierSymbol.GetStop())
 
 	return &ast.IdentifierExpression{
 		Identifier: identifier,
-		Pos:        position,
+		StartPos:   startPosition,
+		EndPos:     endPosition,
 	}
 }
 

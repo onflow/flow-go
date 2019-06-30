@@ -25,6 +25,15 @@ func PositionRangeFromContext(ctx antlr.ParserRuleContext) (start, end *Position
 	return start, end
 }
 
+func EndPosition(startPosition *Position, end int) *Position {
+	length := end - startPosition.Offset
+	return &Position{
+		Line:   startPosition.Line,
+		Column: startPosition.Column + length,
+		Offset: startPosition.Offset + length,
+	}
+}
+
 type HasPosition interface {
 	StartPosition() *Position
 	EndPosition() *Position

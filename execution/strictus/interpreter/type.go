@@ -216,7 +216,9 @@ func mustConvertType(t ast.Type) Type {
 			panic(&NotDeclaredError{
 				ExpectedKind: DeclarationKindType,
 				Name:         t.Identifier,
-				Pos:          t.Pos,
+				// TODO: add start and end position to ast.Type
+				StartPos: t.Pos,
+				EndPos:   t.Pos,
 			})
 		}
 		return result
