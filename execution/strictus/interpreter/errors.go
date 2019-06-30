@@ -30,11 +30,19 @@ func (e *unsupportedAssignmentTargetExpression) Error() string {
 type unsupportedOperation struct {
 	kind      OperationKind
 	operation ast.Operation
-	position  *ast.Position
+	pos       *ast.Position
 }
 
 func (e *unsupportedOperation) Error() string {
 	return fmt.Sprintf("can't evaluate unsupported %s operation: %s", e.kind.Name(), e.operation.String())
+}
+
+// ProgramError
+
+type ProgramError interface {
+	error
+	ast.HasPosition
+	isProgramError()
 }
 
 // NotDeclaredError
@@ -42,7 +50,7 @@ func (e *unsupportedOperation) Error() string {
 type NotDeclaredError struct {
 	ExpectedKind DeclarationKind
 	Name         string
-	Position     *ast.Position
+	Pos          *ast.Position
 }
 
 func (e *NotDeclaredError) Error() string {
@@ -53,38 +61,62 @@ func (e *NotDeclaredError) Error() string {
 	return fmt.Sprintf("can't refer to undeclared %s: %s", kind, e.Name)
 }
 
+func (e *NotDeclaredError) StartPosition() *ast.Position {
+	return e.Pos
+}
+
+func (e *NotDeclaredError) EndPosition() *ast.Position {
+	return e.Pos
+}
+
 // NotCallableError
 
 type NotCallableError struct {
-	Value         Value
-	StartPosition *ast.Position
-	EndPosition   *ast.Position
+	Value    Value
+	StartPos *ast.Position
+	EndPos   *ast.Position
 }
 
 func (e *NotCallableError) Error() string {
 	return fmt.Sprintf("can't call value: %#+v", e.Value)
 }
 
+func (e *NotCallableError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *NotCallableError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
 // NotIndexableError
 
 type NotIndexableError struct {
-	Value         Value
-	StartPosition *ast.Position
-	EndPosition   *ast.Position
+	Value    Value
+	StartPos *ast.Position
+	EndPos   *ast.Position
 }
 
 func (e *NotIndexableError) Error() string {
 	return fmt.Sprintf("can't index into value: %#+v", e.Value)
 }
 
+func (e *NotIndexableError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *NotIndexableError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
 // InvalidUnaryOperandError
 
 type InvalidUnaryOperandError struct {
-	Operation     ast.Operation
-	ExpectedType  Type
-	Value         Value
-	StartPosition *ast.Position
-	EndPosition   *ast.Position
+	Operation    ast.Operation
+	ExpectedType Type
+	Value        Value
+	StartPos     *ast.Position
+	EndPos       *ast.Position
 }
 
 func (e *InvalidUnaryOperandError) Error() string {
@@ -96,15 +128,23 @@ func (e *InvalidUnaryOperandError) Error() string {
 	)
 }
 
+func (e *InvalidUnaryOperandError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidUnaryOperandError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
 // InvalidBinaryOperandError
 
 type InvalidBinaryOperandError struct {
-	Operation     ast.Operation
-	Side          OperandSide
-	ExpectedType  Type
-	Value         Value
-	StartPosition *ast.Position
-	EndPosition   *ast.Position
+	Operation    ast.Operation
+	Side         OperandSide
+	ExpectedType Type
+	Value        Value
+	StartPos     *ast.Position
+	EndPos       *ast.Position
 }
 
 func (e *InvalidBinaryOperandError) Error() string {
@@ -117,13 +157,21 @@ func (e *InvalidBinaryOperandError) Error() string {
 	)
 }
 
+func (e *InvalidBinaryOperandError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidBinaryOperandError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
 // ArgumentCountError
 
 type ArgumentCountError struct {
 	ParameterCount int
 	ArgumentCount  int
-	StartPosition  *ast.Position
-	EndPosition    *ast.Position
+	StartPos       *ast.Position
+	EndPos         *ast.Position
 }
 
 func (e *ArgumentCountError) Error() string {
@@ -134,36 +182,68 @@ func (e *ArgumentCountError) Error() string {
 	)
 }
 
+func (e *ArgumentCountError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *ArgumentCountError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
 // RedeclarationError
 
 type RedeclarationError struct {
-	Name     string
-	Position *ast.Position
+	Name string
+	Pos  *ast.Position
 }
 
 func (e *RedeclarationError) Error() string {
 	return fmt.Sprintf("can't redeclare already declared identifier: %s", e.Name)
 }
 
+func (e *RedeclarationError) StartPosition() *ast.Position {
+	return e.Pos
+}
+
+func (e *RedeclarationError) EndPosition() *ast.Position {
+	return e.Pos
+}
+
 // AssignmentToConstantError
 
 type AssignmentToConstantError struct {
-	Name     string
-	Position *ast.Position
+	Name string
+	Pos  *ast.Position
 }
 
 func (e *AssignmentToConstantError) Error() string {
 	return fmt.Sprintf("can't assign to constant: %s", e.Name)
 }
 
+func (e *AssignmentToConstantError) StartPosition() *ast.Position {
+	return e.Pos
+}
+
+func (e *AssignmentToConstantError) EndPosition() *ast.Position {
+	return e.Pos
+}
+
 // InvalidIndexValueError
 
 type InvalidIndexValueError struct {
-	Value         Value
-	StartPosition *ast.Position
-	EndPosition   *ast.Position
+	Value    Value
+	StartPos *ast.Position
+	EndPos   *ast.Position
 }
 
 func (e *InvalidIndexValueError) Error() string {
 	return fmt.Sprintf("can't index with value: %#+v", e.Value)
+}
+
+func (e *InvalidIndexValueError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidIndexValueError) EndPosition() *ast.Position {
+	return e.EndPos
 }

@@ -1,16 +1,16 @@
 package ast
 
 type Parameter struct {
-	Identifier    string
-	Type          Type
-	StartPosition *Position
-	EndPosition   *Position
+	Identifier string
+	Type       Type
+	StartPos   *Position
+	EndPos     *Position
 }
 
-func (p *Parameter) GetStartPosition() *Position {
-	return p.StartPosition
+func (p *Parameter) StartPosition() *Position {
+	return p.StartPos
 }
 
-func (p *Parameter) GetEndPosition() *Position {
-	return p.EndPosition
+func (p *Parameter) EndPosition() *Position {
+	return p.EndPos
 }
