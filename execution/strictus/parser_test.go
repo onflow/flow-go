@@ -527,7 +527,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, errors := parser.Parse(`
-	    const test = fun (): Int { return 1 }
+	    const test = fun () -> Int { return 1 }
 	`)
 
 	Expect(errors).Should(BeEmpty())
@@ -538,28 +538,28 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 		Value: &FunctionExpression{
 			ReturnType: &BaseType{
 				Identifier: "Int",
-				Pos:        &Position{Offset: 27, Line: 2, Column: 26},
+				Pos:        &Position{Offset: 29, Line: 2, Column: 28},
 			},
 			Block: &Block{
 				Statements: []Statement{
 					&ReturnStatement{
 						Expression: &IntExpression{
 							Value: big.NewInt(1),
-							Pos:   &Position{Offset: 40, Line: 2, Column: 39},
+							Pos:   &Position{Offset: 42, Line: 2, Column: 41},
 						},
-						StartPos: &Position{Offset: 33, Line: 2, Column: 32},
-						EndPos:   &Position{Offset: 40, Line: 2, Column: 39},
+						StartPos: &Position{Offset: 35, Line: 2, Column: 34},
+						EndPos:   &Position{Offset: 42, Line: 2, Column: 41},
 					},
 				},
 				// NOTE: block is statements *inside* curly braces
-				StartPos: &Position{Offset: 33, Line: 2, Column: 32},
-				EndPos:   &Position{Offset: 40, Line: 2, Column: 39},
+				StartPos: &Position{Offset: 35, Line: 2, Column: 34},
+				EndPos:   &Position{Offset: 42, Line: 2, Column: 41},
 			},
 			StartPos: &Position{Offset: 19, Line: 2, Column: 18},
-			EndPos:   &Position{Offset: 42, Line: 2, Column: 41},
+			EndPos:   &Position{Offset: 44, Line: 2, Column: 43},
 		},
 		StartPos:      &Position{Offset: 6, Line: 2, Column: 5},
-		EndPos:        &Position{Offset: 42, Line: 2, Column: 41},
+		EndPos:        &Position{Offset: 44, Line: 2, Column: 43},
 		IdentifierPos: &Position{Offset: 12, Line: 2, Column: 11},
 	}
 
@@ -1032,7 +1032,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, errors := parser.Parse(`
-		pub fun test(a: Int32, b: Int32[2], c: Int32[][3]): Int64[][] {}
+		pub fun test(a: Int32, b: Int32[2], c: Int32[][3]) -> Int64[][] {}
 	`)
 
 	Expect(errors).Should(BeEmpty())
@@ -1087,20 +1087,20 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 			Type: &VariableSizedType{
 				Type: &BaseType{
 					Identifier: "Int64",
-					Pos:        &Position{Offset: 55, Line: 2, Column: 54},
+					Pos:        &Position{Offset: 57, Line: 2, Column: 56},
 				},
-				StartPos: &Position{Offset: 62, Line: 2, Column: 61},
-				EndPos:   &Position{Offset: 63, Line: 2, Column: 62},
+				StartPos: &Position{Offset: 64, Line: 2, Column: 63},
+				EndPos:   &Position{Offset: 65, Line: 2, Column: 64},
 			},
-			StartPos: &Position{Offset: 60, Line: 2, Column: 59},
-			EndPos:   &Position{Offset: 61, Line: 2, Column: 60},
+			StartPos: &Position{Offset: 62, Line: 2, Column: 61},
+			EndPos:   &Position{Offset: 63, Line: 2, Column: 62},
 		},
 		Block: &Block{
-			StartPos: &Position{Offset: 66, Line: 2, Column: 65},
-			EndPos:   &Position{Offset: 65, Line: 2, Column: 64},
+			StartPos: &Position{Offset: 68, Line: 2, Column: 67},
+			EndPos:   &Position{Offset: 67, Line: 2, Column: 66},
 		},
 		StartPos:      &Position{Offset: 3, Line: 2, Column: 2},
-		EndPos:        &Position{Offset: 66, Line: 2, Column: 65},
+		EndPos:        &Position{Offset: 68, Line: 2, Column: 67},
 		IdentifierPos: &Position{Offset: 11, Line: 2, Column: 10},
 	}
 
@@ -1313,7 +1313,7 @@ func TestParseFunctionType(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, errors := parser.Parse(`
-		const add: (Int8, Int16) => Int32 = nothing
+		const add: (Int8, Int16) -> Int32 = nothing
 	`)
 
 	Expect(errors).Should(BeEmpty())
@@ -1360,7 +1360,7 @@ func TestParseMissingReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, errors := parser.Parse(`
-		const noop: () => Void =
+		const noop: () -> Void =
             fun () { return }
 	`)
 

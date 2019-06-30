@@ -55,7 +55,7 @@ declaration
     ;
 
 functionDeclaration
-    : Pub? Fun Identifier '(' parameterList? ')' (':' returnType=typeName)? '{' block '}'
+    : Pub? Fun Identifier '(' parameterList? ')' ('->' returnType=typeName)? '{' block '}'
     ;
 
 parameterList
@@ -76,7 +76,7 @@ typeDimension
 
 baseType
     : Identifier
-    | '(' (parameterTypes+=typeName (',' parameterTypes+=typeName)*)? ')' '=>' returnType=typeName
+    | '(' (parameterTypes+=typeName (',' parameterTypes+=typeName)*)? ')' '->' returnType=typeName
     ;
 
 block
@@ -214,7 +214,7 @@ Negate : '!' ;
 primaryExpressionStart
     : Identifier                                                           # IdentifierExpression
     | literal                                                              # LiteralExpression
-    | Fun '(' parameterList? ')' (':' returnType=typeName)? '{' block '}'  # FunctionExpression
+    | Fun '(' parameterList? ')' ('->' returnType=typeName)? '{' block '}'  # FunctionExpression
     | '(' expression ')'                                                   # NestedExpression
     ;
 
