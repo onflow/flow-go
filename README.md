@@ -1,5 +1,9 @@
 # Bamboo Runtime
 
+## Usage
+
+- `go run main.go <filename>`
+
 ## Development
 
 ### Update the parser
