@@ -55,7 +55,7 @@ declaration
     ;
 
 functionDeclaration
-    : Pub? Fun Identifier '(' parameterList? ')' ('->' returnType=typeName)? '{' block '}'
+    : Pub? Fun Identifier '(' parameterList? ')' ('->' returnType=typeName)? block
     ;
 
 parameterList
@@ -80,6 +80,10 @@ baseType
     ;
 
 block
+    : '{' statements '}'
+    ;
+
+statements
     : (statement eos)*
     ;
 
@@ -97,11 +101,11 @@ returnStatement
     ;
 
 ifStatement
-    : If test=expression '{' then=block '}' (Else (ifStatement | '{' alt=block '}'))?
+    : If test=expression then=block (Else (ifStatement | alt=block))?
     ;
 
 whileStatement
-    : While expression '{' block '}'
+    : While expression block
     ;
 
 variableDeclaration
@@ -214,7 +218,7 @@ Negate : '!' ;
 primaryExpressionStart
     : Identifier                                                           # IdentifierExpression
     | literal                                                              # LiteralExpression
-    | Fun '(' parameterList? ')' ('->' returnType=typeName)? '{' block '}'  # FunctionExpression
+    | Fun '(' parameterList? ')' ('->' returnType=typeName)? block         # FunctionExpression
     | '(' expression ')'                                                   # NestedExpression
     ;
 
