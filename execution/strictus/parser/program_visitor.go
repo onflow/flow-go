@@ -70,7 +70,11 @@ func (v *ProgramVisitor) visitReturnType(ctx ITypeNameContext, tokenBefore antlr
 			Pos: positionBeforeMissingReturnType,
 		}
 	}
-	return ctx.Accept(v).(ast.Type)
+	result := ctx.Accept(v)
+	if result == nil {
+		return nil
+	}
+	return result.(ast.Type)
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
@@ -141,6 +145,9 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 		)
 	}
 
+	if ctx.returnType == nil {
+		return nil
+	}
 	returnType := ctx.returnType.Accept(v).(ast.Type)
 
 	startPosition := ast.PositionFromToken(ctx.OpenParen().GetSymbol())
@@ -155,7 +162,11 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitTypeName(ctx *TypeNameContext) interface{} {
-	result := ctx.BaseType().Accept(v).(ast.Type)
+	baseTypeResult := ctx.BaseType().Accept(v)
+	if baseTypeResult == nil {
+		return nil
+	}
+	result := baseTypeResult.(ast.Type)
 
 	// reduce in reverse
 	dimensions := ctx.AllTypeDimension()
