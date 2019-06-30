@@ -5,6 +5,14 @@ import (
 	"fmt"
 )
 
+// SecondaryError
+
+// SecondaryError is an interface for errors that provide a secondary error message
+//
+type SecondaryError interface {
+	SecondaryError() string
+}
+
 // astTypeConversionError
 
 type astTypeConversionError struct {
@@ -12,7 +20,7 @@ type astTypeConversionError struct {
 }
 
 func (e *astTypeConversionError) Error() string {
-	return fmt.Sprintf("can't convert unsupported AST type: %#+v", e.invalidASTType)
+	return fmt.Sprintf("cannot convert unsupported AST type: %#+v", e.invalidASTType)
 }
 
 // unsupportedAssignmentTargetExpression
@@ -22,7 +30,7 @@ type unsupportedAssignmentTargetExpression struct {
 }
 
 func (e *unsupportedAssignmentTargetExpression) Error() string {
-	return fmt.Sprintf("can't assign to unsupported target expression: %#+v", e.target)
+	return fmt.Sprintf("cannot assign to unsupported target expression: %#+v", e.target)
 }
 
 // unsupportedOperation
@@ -34,7 +42,7 @@ type unsupportedOperation struct {
 }
 
 func (e *unsupportedOperation) Error() string {
-	return fmt.Sprintf("can't evaluate unsupported %s operation: %s", e.kind.Name(), e.operation.String())
+	return fmt.Sprintf("cannot evaluate unsupported %s operation: %s", e.kind.Name(), e.operation.String())
 }
 
 // ProgramError
@@ -55,11 +63,11 @@ type NotDeclaredError struct {
 }
 
 func (e *NotDeclaredError) Error() string {
-	kind := "identifier"
-	if e.ExpectedKind != DeclarationKindAny {
-		kind = e.ExpectedKind.Name()
-	}
-	return fmt.Sprintf("can't refer to undeclared %s: %s", kind, e.Name)
+	return fmt.Sprintf("cannot find %s `%s` in this scope", e.ExpectedKind.Name(), e.Name)
+}
+
+func (e *NotDeclaredError) SecondaryError() string {
+	return "not found in this scope"
 }
 
 func (e *NotDeclaredError) StartPosition() *ast.Position {
@@ -79,7 +87,7 @@ type NotCallableError struct {
 }
 
 func (e *NotCallableError) Error() string {
-	return fmt.Sprintf("can't call value: %#+v", e.Value)
+	return fmt.Sprintf("cannot call value: %#+v", e.Value)
 }
 
 func (e *NotCallableError) StartPosition() *ast.Position {
@@ -99,7 +107,7 @@ type NotIndexableError struct {
 }
 
 func (e *NotIndexableError) Error() string {
-	return fmt.Sprintf("can't index into value: %#+v", e.Value)
+	return fmt.Sprintf("cannot index into value: %#+v", e.Value)
 }
 
 func (e *NotIndexableError) StartPosition() *ast.Position {
@@ -122,7 +130,7 @@ type InvalidUnaryOperandError struct {
 
 func (e *InvalidUnaryOperandError) Error() string {
 	return fmt.Sprintf(
-		"can't apply unary operation %s to value: %#+v. Expected type %s",
+		"cannot apply unary operation %s to value: %#+v. Expected type %s",
 		e.Operation.Symbol(),
 		e.Value,
 		e.ExpectedType.String(),
@@ -150,7 +158,7 @@ type InvalidBinaryOperandError struct {
 
 func (e *InvalidBinaryOperandError) Error() string {
 	return fmt.Sprintf(
-		"can't apply binary operation %s to %s-hand value: %s. Expected type %s",
+		"cannot apply binary operation %s to %s-hand value: %s. Expected type %s",
 		e.Operation.Symbol(),
 		e.Side.Name(),
 		e.Value,
@@ -199,7 +207,7 @@ type RedeclarationError struct {
 }
 
 func (e *RedeclarationError) Error() string {
-	return fmt.Sprintf("can't redeclare already declared identifier: %s", e.Name)
+	return fmt.Sprintf("cannot redeclare already declared identifier: %s", e.Name)
 }
 
 func (e *RedeclarationError) StartPosition() *ast.Position {
@@ -219,7 +227,7 @@ type AssignmentToConstantError struct {
 }
 
 func (e *AssignmentToConstantError) Error() string {
-	return fmt.Sprintf("can't assign to constant: %s", e.Name)
+	return fmt.Sprintf("cannot assign to constant: %s", e.Name)
 }
 
 func (e *AssignmentToConstantError) StartPosition() *ast.Position {
@@ -239,7 +247,7 @@ type InvalidIndexValueError struct {
 }
 
 func (e *InvalidIndexValueError) Error() string {
-	return fmt.Sprintf("can't index with value: %#+v", e.Value)
+	return fmt.Sprintf("cannot index with value: %#+v", e.Value)
 }
 
 func (e *InvalidIndexValueError) StartPosition() *ast.Position {

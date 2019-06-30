@@ -11,6 +11,16 @@ type Type interface {
 	String() string
 }
 
+// AnyType represents the top type
+
+type AnyType struct{}
+
+func (*AnyType) isType() {}
+
+func (*AnyType) String() string {
+	return "Any"
+}
+
 // VoidType represents the void type
 
 type VoidType struct{}
