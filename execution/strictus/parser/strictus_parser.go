@@ -1,6 +1,6 @@
 // Code generated from Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
 
-package strictus // Strictus
+package parser // Strictus
 import (
 	"fmt"
 	"reflect"

@@ -1,4 +1,4 @@
-package strictus
+package parser
 
 import (
 	"bamboo-runtime/execution/strictus/ast"
