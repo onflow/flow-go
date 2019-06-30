@@ -4,4 +4,4 @@
 
 ### Update the parser
 
-- `antlr -o execution/strictus -listener -visitor -Dlanguage=Go -package strictus Strictus.g4`
+- `antlr -listener -visitor -Dlanguage=Go -package parser execution/strictus/parser/Strictus.g4`
