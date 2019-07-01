@@ -1563,6 +1563,159 @@ func TestParseFunctionType(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
+func TestParseFunctionArrayType(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const test: ((Int8) -> Int16)[2] = []
+	`)
+
+	Expect(errors).Should(BeEmpty())
+
+	test := &VariableDeclaration{
+		Identifier: "test",
+		IsConst:    true,
+		Type: &ConstantSizedType{
+			Type: &FunctionType{
+				ParameterTypes: []Type{
+					&BaseType{
+						Identifier: "Int8",
+						Pos:        &Position{Offset: 17, Line: 2, Column: 16},
+					},
+				},
+				ReturnType: &BaseType{
+					Identifier: "Int16",
+					Pos:        &Position{Offset: 26, Line: 2, Column: 25},
+				},
+				StartPos: &Position{Offset: 16, Line: 2, Column: 15},
+				EndPos:   &Position{Offset: 26, Line: 2, Column: 25},
+			},
+			Size:     2,
+			StartPos: &Position{Offset: 32, Line: 2, Column: 31},
+			EndPos:   &Position{Offset: 34, Line: 2, Column: 33},
+		},
+		Value: &ArrayExpression{
+			StartPos: &Position{Offset: 38, Line: 2, Column: 37},
+			EndPos:   &Position{Offset: 39, Line: 2, Column: 38},
+		},
+		StartPos:      &Position{Offset: 3, Line: 2, Column: 2},
+		EndPos:        &Position{Offset: 39, Line: 2, Column: 38},
+		IdentifierPos: &Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const test: (Int8) -> ((Int16) -> Int32) = nothing
+	`)
+
+	Expect(errors).Should(BeEmpty())
+
+	test := &VariableDeclaration{
+		Identifier: "test",
+		IsConst:    true,
+		Type: &FunctionType{
+			ParameterTypes: []Type{
+				&BaseType{
+					Identifier: "Int8",
+					Pos:        &Position{Offset: 16, Line: 2, Column: 15},
+				},
+			},
+			ReturnType: &FunctionType{
+				ParameterTypes: []Type{
+					&BaseType{
+						Identifier: "Int16",
+						Pos:        &Position{Offset: 27, Line: 2, Column: 26},
+					},
+				},
+				ReturnType: &BaseType{
+					Identifier: "Int32",
+					Pos:        &Position{Offset: 37, Line: 2, Column: 36},
+				},
+				StartPos: &Position{Offset: 26, Line: 2, Column: 25},
+				EndPos:   &Position{Offset: 37, Line: 2, Column: 36},
+			},
+			StartPos: &Position{Offset: 15, Line: 2, Column: 14},
+			EndPos:   &Position{Offset: 37, Line: 2, Column: 36},
+		},
+		Value: &IdentifierExpression{
+			Identifier: "nothing",
+			StartPos:   &Position{Offset: 46, Line: 2, Column: 45},
+			EndPos:     &Position{Offset: 52, Line: 2, Column: 51},
+		},
+		StartPos:      &Position{Offset: 3, Line: 2, Column: 2},
+		EndPos:        &Position{Offset: 46, Line: 2, Column: 45},
+		IdentifierPos: &Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const test: (Int8) -> (Int16) -> Int32 = nothing
+	`)
+
+	Expect(errors).Should(BeEmpty())
+
+	test := &VariableDeclaration{
+		Identifier: "test",
+		IsConst:    true,
+		Type: &FunctionType{
+			ParameterTypes: []Type{
+				&BaseType{
+					Identifier: "Int8",
+					Pos:        &Position{Offset: 16, Line: 2, Column: 15},
+				},
+			},
+			ReturnType: &FunctionType{
+				ParameterTypes: []Type{
+					&BaseType{
+						Identifier: "Int16",
+						Pos:        &Position{Offset: 26, Line: 2, Column: 25},
+					},
+				},
+				ReturnType: &BaseType{
+					Identifier: "Int32",
+					Pos:        &Position{Offset: 36, Line: 2, Column: 35},
+				},
+				StartPos: &Position{Offset: 25, Line: 2, Column: 24},
+				EndPos:   &Position{Offset: 36, Line: 2, Column: 35},
+			},
+			StartPos: &Position{Offset: 15, Line: 2, Column: 14},
+			EndPos:   &Position{Offset: 36, Line: 2, Column: 35},
+		},
+		Value: &IdentifierExpression{
+			Identifier: "nothing",
+			StartPos:   &Position{Offset: 44, Line: 2, Column: 43},
+			EndPos:     &Position{Offset: 50, Line: 2, Column: 49},
+		},
+		StartPos:      &Position{Offset: 3, Line: 2, Column: 2},
+		EndPos:        &Position{Offset: 44, Line: 2, Column: 43},
+		IdentifierPos: &Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
 func TestParseMissingReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
