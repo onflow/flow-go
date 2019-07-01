@@ -1249,11 +1249,10 @@ func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 
 	Expect(errors).Should(HaveLen(1))
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
-	Expect(*syntaxError).To(MatchFields(IgnoreExtras, Fields{
-		"Pos":                       Equal(&Position{Offset: 17, Line: 2, Column: 16}),
-		"IntegerLiteralKind":        Equal(parser.IntegerLiteralKindOctal),
-		"InvalidIntegerLiteralKind": Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore),
-	}))
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 17, Line: 2, Column: 16}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 24, Line: 2, Column: 23}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindOctal))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore))
 }
 
 func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
@@ -1267,11 +1266,10 @@ func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 
 	Expect(errors).Should(HaveLen(1))
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
-	Expect(*syntaxError).To(MatchFields(IgnoreExtras, Fields{
-		"Pos":                       Equal(&Position{Offset: 17, Line: 2, Column: 16}),
-		"IntegerLiteralKind":        Equal(parser.IntegerLiteralKindOctal),
-		"InvalidIntegerLiteralKind": Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore),
-	}))
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 17, Line: 2, Column: 16}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 24, Line: 2, Column: 23}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindOctal))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
 }
 
 func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
@@ -1285,11 +1283,10 @@ func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 
 	Expect(errors).Should(HaveLen(1))
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
-	Expect(*syntaxError).To(MatchFields(IgnoreExtras, Fields{
-		"Pos":                       Equal(&Position{Offset: 18, Line: 2, Column: 17}),
-		"IntegerLiteralKind":        Equal(parser.IntegerLiteralKindBinary),
-		"InvalidIntegerLiteralKind": Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore),
-	}))
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 18, Line: 2, Column: 17}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 33, Line: 2, Column: 32}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindBinary))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore))
 }
 
 func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
@@ -1303,11 +1300,10 @@ func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 
 	Expect(errors).Should(HaveLen(1))
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
-	Expect(*syntaxError).To(MatchFields(IgnoreExtras, Fields{
-		"Pos":                       Equal(&Position{Offset: 18, Line: 2, Column: 17}),
-		"IntegerLiteralKind":        Equal(parser.IntegerLiteralKindBinary),
-		"InvalidIntegerLiteralKind": Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore),
-	}))
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 18, Line: 2, Column: 17}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 33, Line: 2, Column: 32}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindBinary))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
 }
 
 func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
@@ -1321,11 +1317,10 @@ func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 
 	Expect(errors).Should(HaveLen(1))
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
-	Expect(*syntaxError).To(MatchFields(IgnoreExtras, Fields{
-		"Pos":                       Equal(&Position{Offset: 19, Line: 2, Column: 18}),
-		"IntegerLiteralKind":        Equal(parser.IntegerLiteralKindDecimal),
-		"InvalidIntegerLiteralKind": Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore),
-	}))
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 19, Line: 2, Column: 18}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 32, Line: 2, Column: 31}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindDecimal))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
 }
 
 func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
@@ -1339,11 +1334,10 @@ func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T
 
 	Expect(errors).Should(HaveLen(1))
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
-	Expect(*syntaxError).To(MatchFields(IgnoreExtras, Fields{
-		"Pos":                       Equal(&Position{Offset: 15, Line: 2, Column: 14}),
-		"IntegerLiteralKind":        Equal(parser.IntegerLiteralKindHexadecimal),
-		"InvalidIntegerLiteralKind": Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore),
-	}))
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 15, Line: 2, Column: 14}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 22, Line: 2, Column: 21}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindHexadecimal))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore))
 }
 
 func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
@@ -1357,11 +1351,11 @@ func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.
 
 	Expect(errors).Should(HaveLen(1))
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
-	Expect(*syntaxError).To(MatchFields(IgnoreExtras, Fields{
-		"Pos":                       Equal(&Position{Offset: 15, Line: 2, Column: 14}),
-		"IntegerLiteralKind":        Equal(parser.IntegerLiteralKindHexadecimal),
-		"InvalidIntegerLiteralKind": Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore),
-	}))
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 15, Line: 2, Column: 14}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 22, Line: 2, Column: 21}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindHexadecimal))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
+
 }
 
 func TestParseInvalidIntegerLiteral(t *testing.T) {
@@ -1375,11 +1369,10 @@ func TestParseInvalidIntegerLiteral(t *testing.T) {
 
 	Expect(errors).Should(HaveLen(1))
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
-	Expect(*syntaxError).To(MatchFields(IgnoreExtras, Fields{
-		"Pos":                       Equal(&Position{Offset: 15, Line: 2, Column: 14}),
-		"IntegerLiteralKind":        Equal(parser.IntegerLiteralKindUnknown),
-		"InvalidIntegerLiteralKind": Equal(parser.InvalidIntegerLiteralKindUnknownPrefix),
-	}))
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 15, Line: 2, Column: 14}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 19, Line: 2, Column: 18}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindUnknown))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindUnknownPrefix))
 }
 
 func TestParseIntegerTypes(t *testing.T) {
