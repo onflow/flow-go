@@ -19,7 +19,7 @@ var _ = reflect.Copy
 var _ = strconv.Itoa
 
 var parserATN = []uint16{
-	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 48, 400,
+	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 49, 401,
 	4, 2, 9, 2, 4, 3, 9, 3, 4, 4, 9, 4, 4, 5, 9, 5, 4, 6, 9, 6, 4, 7, 9, 7,
 	4, 8, 9, 8, 4, 9, 9, 9, 4, 10, 9, 10, 4, 11, 9, 11, 4, 12, 9, 12, 4, 13,
 	9, 13, 4, 14, 9, 14, 4, 15, 9, 15, 4, 16, 9, 16, 4, 17, 9, 17, 4, 18, 9,
@@ -59,26 +59,26 @@ var parserATN = []uint16{
 	5, 35, 346, 10, 35, 3, 36, 3, 36, 3, 36, 3, 37, 3, 37, 3, 37, 3, 37, 3,
 	38, 3, 38, 3, 38, 3, 38, 7, 38, 359, 10, 38, 12, 38, 14, 38, 362, 11, 38,
 	5, 38, 364, 10, 38, 3, 38, 3, 38, 3, 39, 3, 39, 3, 39, 5, 39, 371, 10,
-	39, 3, 40, 3, 40, 3, 41, 3, 41, 3, 41, 3, 41, 5, 41, 379, 10, 41, 3, 42,
-	3, 42, 3, 42, 3, 42, 7, 42, 385, 10, 42, 12, 42, 14, 42, 388, 11, 42, 5,
-	42, 390, 10, 42, 3, 42, 3, 42, 3, 43, 3, 43, 3, 43, 3, 43, 5, 43, 398,
-	10, 43, 3, 43, 2, 8, 38, 40, 42, 44, 46, 48, 44, 2, 4, 6, 8, 10, 12, 14,
-	16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50,
-	52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 2,
-	9, 3, 2, 33, 34, 3, 2, 16, 17, 3, 2, 18, 21, 3, 2, 22, 23, 3, 2, 24, 26,
-	4, 2, 23, 23, 27, 27, 3, 2, 38, 39, 2, 408, 2, 89, 3, 2, 2, 2, 4, 96, 3,
-	2, 2, 2, 6, 99, 3, 2, 2, 2, 8, 114, 3, 2, 2, 2, 10, 122, 3, 2, 2, 2, 12,
-	126, 3, 2, 2, 2, 14, 133, 3, 2, 2, 2, 16, 154, 3, 2, 2, 2, 18, 156, 3,
-	2, 2, 2, 20, 165, 3, 2, 2, 2, 22, 174, 3, 2, 2, 2, 24, 176, 3, 2, 2, 2,
-	26, 180, 3, 2, 2, 2, 28, 190, 3, 2, 2, 2, 30, 194, 3, 2, 2, 2, 32, 203,
+	39, 3, 40, 3, 40, 3, 41, 3, 41, 3, 41, 3, 41, 3, 41, 5, 41, 380, 10, 41,
+	3, 42, 3, 42, 3, 42, 3, 42, 7, 42, 386, 10, 42, 12, 42, 14, 42, 389, 11,
+	42, 5, 42, 391, 10, 42, 3, 42, 3, 42, 3, 43, 3, 43, 3, 43, 3, 43, 5, 43,
+	399, 10, 43, 3, 43, 2, 8, 38, 40, 42, 44, 46, 48, 44, 2, 4, 6, 8, 10, 12,
+	14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48,
+	50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82, 84,
+	2, 9, 3, 2, 33, 34, 3, 2, 16, 17, 3, 2, 18, 21, 3, 2, 22, 23, 3, 2, 24,
+	26, 4, 2, 23, 23, 27, 27, 3, 2, 38, 39, 2, 410, 2, 89, 3, 2, 2, 2, 4, 96,
+	3, 2, 2, 2, 6, 99, 3, 2, 2, 2, 8, 114, 3, 2, 2, 2, 10, 122, 3, 2, 2, 2,
+	12, 126, 3, 2, 2, 2, 14, 133, 3, 2, 2, 2, 16, 154, 3, 2, 2, 2, 18, 156,
+	3, 2, 2, 2, 20, 165, 3, 2, 2, 2, 22, 174, 3, 2, 2, 2, 24, 176, 3, 2, 2,
+	2, 26, 180, 3, 2, 2, 2, 28, 190, 3, 2, 2, 2, 30, 194, 3, 2, 2, 2, 32, 203,
 	3, 2, 2, 2, 34, 213, 3, 2, 2, 2, 36, 215, 3, 2, 2, 2, 38, 223, 3, 2, 2,
 	2, 40, 234, 3, 2, 2, 2, 42, 245, 3, 2, 2, 2, 44, 257, 3, 2, 2, 2, 46, 269,
 	3, 2, 2, 2, 48, 281, 3, 2, 2, 2, 50, 301, 3, 2, 2, 2, 52, 303, 3, 2, 2,
 	2, 54, 312, 3, 2, 2, 2, 56, 314, 3, 2, 2, 2, 58, 316, 3, 2, 2, 2, 60, 318,
 	3, 2, 2, 2, 62, 320, 3, 2, 2, 2, 64, 322, 3, 2, 2, 2, 66, 341, 3, 2, 2,
 	2, 68, 345, 3, 2, 2, 2, 70, 347, 3, 2, 2, 2, 72, 350, 3, 2, 2, 2, 74, 354,
-	3, 2, 2, 2, 76, 370, 3, 2, 2, 2, 78, 372, 3, 2, 2, 2, 80, 378, 3, 2, 2,
-	2, 82, 380, 3, 2, 2, 2, 84, 397, 3, 2, 2, 2, 86, 88, 5, 4, 3, 2, 87, 86,
+	3, 2, 2, 2, 76, 370, 3, 2, 2, 2, 78, 372, 3, 2, 2, 2, 80, 379, 3, 2, 2,
+	2, 82, 381, 3, 2, 2, 2, 84, 398, 3, 2, 2, 2, 86, 88, 5, 4, 3, 2, 87, 86,
 	3, 2, 2, 2, 88, 91, 3, 2, 2, 2, 89, 87, 3, 2, 2, 2, 89, 90, 3, 2, 2, 2,
 	90, 92, 3, 2, 2, 2, 91, 89, 3, 2, 2, 2, 92, 93, 7, 2, 2, 3, 93, 3, 3, 2,
 	2, 2, 94, 97, 5, 6, 4, 2, 95, 97, 5, 30, 16, 2, 96, 94, 3, 2, 2, 2, 96,
@@ -180,20 +180,20 @@ var parserATN = []uint16{
 	366, 7, 29, 2, 2, 366, 75, 3, 2, 2, 2, 367, 371, 5, 80, 41, 2, 368, 371,
 	5, 78, 40, 2, 369, 371, 5, 82, 42, 2, 370, 367, 3, 2, 2, 2, 370, 368, 3,
 	2, 2, 2, 370, 369, 3, 2, 2, 2, 371, 77, 3, 2, 2, 2, 372, 373, 9, 8, 2,
-	2, 373, 79, 3, 2, 2, 2, 374, 379, 7, 41, 2, 2, 375, 379, 7, 42, 2, 2, 376,
-	379, 7, 43, 2, 2, 377, 379, 7, 44, 2, 2, 378, 374, 3, 2, 2, 2, 378, 375,
-	3, 2, 2, 2, 378, 376, 3, 2, 2, 2, 378, 377, 3, 2, 2, 2, 379, 81, 3, 2,
-	2, 2, 380, 389, 7, 6, 2, 2, 381, 386, 5, 34, 18, 2, 382, 383, 7, 4, 2,
-	2, 383, 385, 5, 34, 18, 2, 384, 382, 3, 2, 2, 2, 385, 388, 3, 2, 2, 2,
-	386, 384, 3, 2, 2, 2, 386, 387, 3, 2, 2, 2, 387, 390, 3, 2, 2, 2, 388,
-	386, 3, 2, 2, 2, 389, 381, 3, 2, 2, 2, 389, 390, 3, 2, 2, 2, 390, 391,
-	3, 2, 2, 2, 391, 392, 7, 7, 2, 2, 392, 83, 3, 2, 2, 2, 393, 398, 7, 15,
-	2, 2, 394, 398, 7, 2, 2, 3, 395, 398, 6, 43, 8, 2, 396, 398, 6, 43, 9,
-	2, 397, 393, 3, 2, 2, 2, 397, 394, 3, 2, 2, 2, 397, 395, 3, 2, 2, 2, 397,
-	396, 3, 2, 2, 2, 398, 85, 3, 2, 2, 2, 42, 89, 96, 99, 105, 110, 119, 130,
-	135, 146, 149, 154, 165, 174, 178, 186, 188, 198, 207, 221, 231, 242, 254,
-	266, 278, 290, 297, 301, 307, 312, 329, 334, 341, 345, 360, 363, 370, 378,
-	386, 389, 397,
+	2, 373, 79, 3, 2, 2, 2, 374, 380, 7, 41, 2, 2, 375, 380, 7, 42, 2, 2, 376,
+	380, 7, 43, 2, 2, 377, 380, 7, 44, 2, 2, 378, 380, 7, 45, 2, 2, 379, 374,
+	3, 2, 2, 2, 379, 375, 3, 2, 2, 2, 379, 376, 3, 2, 2, 2, 379, 377, 3, 2,
+	2, 2, 379, 378, 3, 2, 2, 2, 380, 81, 3, 2, 2, 2, 381, 390, 7, 6, 2, 2,
+	382, 387, 5, 34, 18, 2, 383, 384, 7, 4, 2, 2, 384, 386, 5, 34, 18, 2, 385,
+	383, 3, 2, 2, 2, 386, 389, 3, 2, 2, 2, 387, 385, 3, 2, 2, 2, 387, 388,
+	3, 2, 2, 2, 388, 391, 3, 2, 2, 2, 389, 387, 3, 2, 2, 2, 390, 382, 3, 2,
+	2, 2, 390, 391, 3, 2, 2, 2, 391, 392, 3, 2, 2, 2, 392, 393, 7, 7, 2, 2,
+	393, 83, 3, 2, 2, 2, 394, 399, 7, 15, 2, 2, 395, 399, 7, 2, 2, 3, 396,
+	399, 6, 43, 8, 2, 397, 399, 6, 43, 9, 2, 398, 394, 3, 2, 2, 2, 398, 395,
+	3, 2, 2, 2, 398, 396, 3, 2, 2, 2, 398, 397, 3, 2, 2, 2, 399, 85, 3, 2,
+	2, 2, 42, 89, 96, 99, 105, 110, 119, 130, 135, 146, 149, 154, 165, 174,
+	178, 186, 188, 198, 207, 221, 231, 242, 254, 266, 278, 290, 297, 301, 307,
+	312, 329, 334, 341, 345, 360, 363, 370, 379, 387, 390, 398,
 }
 var deserializer = antlr.NewATNDeserializer(nil)
 var deserializedATN = deserializer.DeserializeFromUInt16(parserATN)
@@ -209,8 +209,8 @@ var symbolicNames = []string{
 	"Less", "Greater", "LessEqual", "GreaterEqual", "Plus", "Minus", "Mul",
 	"Div", "Mod", "Negate", "OpenParen", "CloseParen", "Fun", "Pub", "Return",
 	"Const", "Var", "If", "Else", "While", "True", "False", "Identifier", "DecimalLiteral",
-	"BinaryLiteral", "OctalLiteral", "HexadecimalLiteral", "WS", "Terminator",
-	"BlockComment", "LineComment",
+	"BinaryLiteral", "OctalLiteral", "HexadecimalLiteral", "InvalidNumberLiteral",
+	"WS", "Terminator", "BlockComment", "LineComment",
 }
 
 var ruleNames = []string{
@@ -286,53 +286,54 @@ func (p *StrictusParser) lineTerminatorAhead() bool {
 
 // StrictusParser tokens.
 const (
-	StrictusParserEOF                = antlr.TokenEOF
-	StrictusParserT__0               = 1
-	StrictusParserT__1               = 2
-	StrictusParserT__2               = 3
-	StrictusParserT__3               = 4
-	StrictusParserT__4               = 5
-	StrictusParserT__5               = 6
-	StrictusParserT__6               = 7
-	StrictusParserT__7               = 8
-	StrictusParserT__8               = 9
-	StrictusParserT__9               = 10
-	StrictusParserT__10              = 11
-	StrictusParserT__11              = 12
-	StrictusParserT__12              = 13
-	StrictusParserEqual              = 14
-	StrictusParserUnequal            = 15
-	StrictusParserLess               = 16
-	StrictusParserGreater            = 17
-	StrictusParserLessEqual          = 18
-	StrictusParserGreaterEqual       = 19
-	StrictusParserPlus               = 20
-	StrictusParserMinus              = 21
-	StrictusParserMul                = 22
-	StrictusParserDiv                = 23
-	StrictusParserMod                = 24
-	StrictusParserNegate             = 25
-	StrictusParserOpenParen          = 26
-	StrictusParserCloseParen         = 27
-	StrictusParserFun                = 28
-	StrictusParserPub                = 29
-	StrictusParserReturn             = 30
-	StrictusParserConst              = 31
-	StrictusParserVar                = 32
-	StrictusParserIf                 = 33
-	StrictusParserElse               = 34
-	StrictusParserWhile              = 35
-	StrictusParserTrue               = 36
-	StrictusParserFalse              = 37
-	StrictusParserIdentifier         = 38
-	StrictusParserDecimalLiteral     = 39
-	StrictusParserBinaryLiteral      = 40
-	StrictusParserOctalLiteral       = 41
-	StrictusParserHexadecimalLiteral = 42
-	StrictusParserWS                 = 43
-	StrictusParserTerminator         = 44
-	StrictusParserBlockComment       = 45
-	StrictusParserLineComment        = 46
+	StrictusParserEOF                  = antlr.TokenEOF
+	StrictusParserT__0                 = 1
+	StrictusParserT__1                 = 2
+	StrictusParserT__2                 = 3
+	StrictusParserT__3                 = 4
+	StrictusParserT__4                 = 5
+	StrictusParserT__5                 = 6
+	StrictusParserT__6                 = 7
+	StrictusParserT__7                 = 8
+	StrictusParserT__8                 = 9
+	StrictusParserT__9                 = 10
+	StrictusParserT__10                = 11
+	StrictusParserT__11                = 12
+	StrictusParserT__12                = 13
+	StrictusParserEqual                = 14
+	StrictusParserUnequal              = 15
+	StrictusParserLess                 = 16
+	StrictusParserGreater              = 17
+	StrictusParserLessEqual            = 18
+	StrictusParserGreaterEqual         = 19
+	StrictusParserPlus                 = 20
+	StrictusParserMinus                = 21
+	StrictusParserMul                  = 22
+	StrictusParserDiv                  = 23
+	StrictusParserMod                  = 24
+	StrictusParserNegate               = 25
+	StrictusParserOpenParen            = 26
+	StrictusParserCloseParen           = 27
+	StrictusParserFun                  = 28
+	StrictusParserPub                  = 29
+	StrictusParserReturn               = 30
+	StrictusParserConst                = 31
+	StrictusParserVar                  = 32
+	StrictusParserIf                   = 33
+	StrictusParserElse                 = 34
+	StrictusParserWhile                = 35
+	StrictusParserTrue                 = 36
+	StrictusParserFalse                = 37
+	StrictusParserIdentifier           = 38
+	StrictusParserDecimalLiteral       = 39
+	StrictusParserBinaryLiteral        = 40
+	StrictusParserOctalLiteral         = 41
+	StrictusParserHexadecimalLiteral   = 42
+	StrictusParserInvalidNumberLiteral = 43
+	StrictusParserWS                   = 44
+	StrictusParserTerminator           = 45
+	StrictusParserBlockComment         = 46
+	StrictusParserLineComment          = 47
 )
 
 // StrictusParser rules.
@@ -1880,7 +1881,7 @@ func (p *StrictusParser) Statements() (localctx IStatementsContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__3)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserOpenParen)|(1<<StrictusParserFun)|(1<<StrictusParserPub)|(1<<StrictusParserReturn)|(1<<StrictusParserConst))) != 0) || (((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(StrictusParserVar-32))|(1<<(StrictusParserIf-32))|(1<<(StrictusParserWhile-32))|(1<<(StrictusParserTrue-32))|(1<<(StrictusParserFalse-32))|(1<<(StrictusParserIdentifier-32))|(1<<(StrictusParserDecimalLiteral-32))|(1<<(StrictusParserBinaryLiteral-32))|(1<<(StrictusParserOctalLiteral-32))|(1<<(StrictusParserHexadecimalLiteral-32)))) != 0) {
+	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__3)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserOpenParen)|(1<<StrictusParserFun)|(1<<StrictusParserPub)|(1<<StrictusParserReturn)|(1<<StrictusParserConst))) != 0) || (((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(StrictusParserVar-32))|(1<<(StrictusParserIf-32))|(1<<(StrictusParserWhile-32))|(1<<(StrictusParserTrue-32))|(1<<(StrictusParserFalse-32))|(1<<(StrictusParserIdentifier-32))|(1<<(StrictusParserDecimalLiteral-32))|(1<<(StrictusParserBinaryLiteral-32))|(1<<(StrictusParserOctalLiteral-32))|(1<<(StrictusParserHexadecimalLiteral-32))|(1<<(StrictusParserInvalidNumberLiteral-32)))) != 0) {
 		{
 			p.SetState(158)
 			p.Statement()
@@ -4324,7 +4325,7 @@ func (p *StrictusParser) UnaryExpression() (localctx IUnaryExpressionContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserT__3, StrictusParserOpenParen, StrictusParserFun, StrictusParserTrue, StrictusParserFalse, StrictusParserIdentifier, StrictusParserDecimalLiteral, StrictusParserBinaryLiteral, StrictusParserOctalLiteral, StrictusParserHexadecimalLiteral:
+	case StrictusParserT__3, StrictusParserOpenParen, StrictusParserFun, StrictusParserTrue, StrictusParserFalse, StrictusParserIdentifier, StrictusParserDecimalLiteral, StrictusParserBinaryLiteral, StrictusParserOctalLiteral, StrictusParserHexadecimalLiteral, StrictusParserInvalidNumberLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(291)
@@ -5544,7 +5545,7 @@ func (p *StrictusParser) PrimaryExpressionStart() (localctx IPrimaryExpressionSt
 			p.Match(StrictusParserIdentifier)
 		}
 
-	case StrictusParserT__3, StrictusParserTrue, StrictusParserFalse, StrictusParserDecimalLiteral, StrictusParserBinaryLiteral, StrictusParserOctalLiteral, StrictusParserHexadecimalLiteral:
+	case StrictusParserT__3, StrictusParserTrue, StrictusParserFalse, StrictusParserDecimalLiteral, StrictusParserBinaryLiteral, StrictusParserOctalLiteral, StrictusParserHexadecimalLiteral, StrictusParserInvalidNumberLiteral:
 		localctx = NewLiteralExpressionContext(p, localctx)
 		p.EnterOuterAlt(localctx, 2)
 		{
@@ -6106,7 +6107,7 @@ func (p *StrictusParser) Invocation() (localctx IInvocationContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__3)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserOpenParen)|(1<<StrictusParserFun))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(StrictusParserTrue-36))|(1<<(StrictusParserFalse-36))|(1<<(StrictusParserIdentifier-36))|(1<<(StrictusParserDecimalLiteral-36))|(1<<(StrictusParserBinaryLiteral-36))|(1<<(StrictusParserOctalLiteral-36))|(1<<(StrictusParserHexadecimalLiteral-36)))) != 0) {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__3)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserOpenParen)|(1<<StrictusParserFun))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(StrictusParserTrue-36))|(1<<(StrictusParserFalse-36))|(1<<(StrictusParserIdentifier-36))|(1<<(StrictusParserDecimalLiteral-36))|(1<<(StrictusParserBinaryLiteral-36))|(1<<(StrictusParserOctalLiteral-36))|(1<<(StrictusParserHexadecimalLiteral-36))|(1<<(StrictusParserInvalidNumberLiteral-36)))) != 0) {
 		{
 			p.SetState(353)
 			p.Expression()
@@ -6261,7 +6262,7 @@ func (p *StrictusParser) Literal() (localctx ILiteralContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserDecimalLiteral, StrictusParserBinaryLiteral, StrictusParserOctalLiteral, StrictusParserHexadecimalLiteral:
+	case StrictusParserDecimalLiteral, StrictusParserBinaryLiteral, StrictusParserOctalLiteral, StrictusParserHexadecimalLiteral, StrictusParserInvalidNumberLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(365)
@@ -6540,6 +6541,50 @@ func (s *OctalLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
+type InvalidNumberLiteralContext struct {
+	*IntegerLiteralContext
+}
+
+func NewInvalidNumberLiteralContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *InvalidNumberLiteralContext {
+	var p = new(InvalidNumberLiteralContext)
+
+	p.IntegerLiteralContext = NewEmptyIntegerLiteralContext()
+	p.parser = parser
+	p.CopyFrom(ctx.(*IntegerLiteralContext))
+
+	return p
+}
+
+func (s *InvalidNumberLiteralContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *InvalidNumberLiteralContext) InvalidNumberLiteral() antlr.TerminalNode {
+	return s.GetToken(StrictusParserInvalidNumberLiteral, 0)
+}
+
+func (s *InvalidNumberLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(StrictusListener); ok {
+		listenerT.EnterInvalidNumberLiteral(s)
+	}
+}
+
+func (s *InvalidNumberLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(StrictusListener); ok {
+		listenerT.ExitInvalidNumberLiteral(s)
+	}
+}
+
+func (s *InvalidNumberLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case StrictusVisitor:
+		return t.VisitInvalidNumberLiteral(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
 type DecimalLiteralContext struct {
 	*IntegerLiteralContext
 }
@@ -6648,7 +6693,7 @@ func (p *StrictusParser) IntegerLiteral() (localctx IIntegerLiteralContext) {
 		}
 	}()
 
-	p.SetState(376)
+	p.SetState(377)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
@@ -6682,6 +6727,14 @@ func (p *StrictusParser) IntegerLiteral() (localctx IIntegerLiteralContext) {
 		{
 			p.SetState(375)
 			p.Match(StrictusParserHexadecimalLiteral)
+		}
+
+	case StrictusParserInvalidNumberLiteral:
+		localctx = NewInvalidNumberLiteralContext(p, localctx)
+		p.EnterOuterAlt(localctx, 5)
+		{
+			p.SetState(376)
+			p.Match(StrictusParserInvalidNumberLiteral)
 		}
 
 	default:
@@ -6805,40 +6858,40 @@ func (p *StrictusParser) ArrayLiteral() (localctx IArrayLiteralContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(378)
+		p.SetState(379)
 		p.Match(StrictusParserT__3)
 	}
-	p.SetState(387)
+	p.SetState(388)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__3)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserOpenParen)|(1<<StrictusParserFun))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(StrictusParserTrue-36))|(1<<(StrictusParserFalse-36))|(1<<(StrictusParserIdentifier-36))|(1<<(StrictusParserDecimalLiteral-36))|(1<<(StrictusParserBinaryLiteral-36))|(1<<(StrictusParserOctalLiteral-36))|(1<<(StrictusParserHexadecimalLiteral-36)))) != 0) {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__3)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserOpenParen)|(1<<StrictusParserFun))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(StrictusParserTrue-36))|(1<<(StrictusParserFalse-36))|(1<<(StrictusParserIdentifier-36))|(1<<(StrictusParserDecimalLiteral-36))|(1<<(StrictusParserBinaryLiteral-36))|(1<<(StrictusParserOctalLiteral-36))|(1<<(StrictusParserHexadecimalLiteral-36))|(1<<(StrictusParserInvalidNumberLiteral-36)))) != 0) {
 		{
-			p.SetState(379)
+			p.SetState(380)
 			p.Expression()
 		}
-		p.SetState(384)
+		p.SetState(385)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == StrictusParserT__1 {
 			{
-				p.SetState(380)
+				p.SetState(381)
 				p.Match(StrictusParserT__1)
 			}
 			{
-				p.SetState(381)
+				p.SetState(382)
 				p.Expression()
 			}
 
-			p.SetState(386)
+			p.SetState(387)
 			p.GetErrorHandler().Sync(p)
 			_la = p.GetTokenStream().LA(1)
 		}
 
 	}
 	{
-		p.SetState(389)
+		p.SetState(390)
 		p.Match(StrictusParserT__4)
 	}
 
@@ -6937,26 +6990,26 @@ func (p *StrictusParser) Eos() (localctx IEosContext) {
 		}
 	}()
 
-	p.SetState(395)
+	p.SetState(396)
 	p.GetErrorHandler().Sync(p)
 	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 39, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(391)
+			p.SetState(392)
 			p.Match(StrictusParserT__12)
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(392)
+			p.SetState(393)
 			p.Match(StrictusParserEOF)
 		}
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
-		p.SetState(393)
+		p.SetState(394)
 
 		if !(p.lineTerminatorAhead()) {
 			panic(antlr.NewFailedPredicateException(p, "p.lineTerminatorAhead()", ""))
@@ -6964,7 +7017,7 @@ func (p *StrictusParser) Eos() (localctx IEosContext) {
 
 	case 4:
 		p.EnterOuterAlt(localctx, 4)
-		p.SetState(394)
+		p.SetState(395)
 
 		if !(p.GetTokenStream().LT(1).GetText() == "}") {
 			panic(antlr.NewFailedPredicateException(p, "p.GetTokenStream().LT(1).GetText() == \"}\"", ""))

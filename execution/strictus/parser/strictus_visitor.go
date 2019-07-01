@@ -149,6 +149,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#HexadecimalLiteral.
 	VisitHexadecimalLiteral(ctx *HexadecimalLiteralContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#InvalidNumberLiteral.
+	VisitInvalidNumberLiteral(ctx *InvalidNumberLiteralContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#arrayLiteral.
 	VisitArrayLiteral(ctx *ArrayLiteralContext) interface{}
 

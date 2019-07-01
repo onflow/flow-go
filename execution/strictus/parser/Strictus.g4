@@ -251,10 +251,11 @@ booleanLiteral
     ;
 
 integerLiteral
-    : DecimalLiteral       # DecimalLiteral
-    | BinaryLiteral        # BinaryLiteral
-    | OctalLiteral         # OctalLiteral
-    | HexadecimalLiteral   # HexadecimalLiteral
+    : DecimalLiteral        # DecimalLiteral
+    | BinaryLiteral         # BinaryLiteral
+    | OctalLiteral          # OctalLiteral
+    | HexadecimalLiteral    # HexadecimalLiteral
+    | InvalidNumberLiteral  # InvalidNumberLiteral
     ;
 
 arrayLiteral
@@ -294,19 +295,36 @@ fragment IdentifierCharacter
     | IdentifierHead
     ;
 
+
 DecimalLiteral
+    // NOTE: allows trailing underscores, but the parser checks underscores
+    // only occur inside, to provide better syntax errors
     : [0-9] [0-9_]*
     ;
+
+
 BinaryLiteral
-    : '0b' [01]*
+    // NOTE: allows underscores anywhere after prefix, but the parser checks underscores
+    // only occur inside, to provide better syntax errors
+    : '0b' [01_]+
     ;
 
+
 OctalLiteral
-    : '0o' [0-7]*
+    // NOTE: allows underscores anywhere after prefix, but the parser checks underscores
+    // only occur inside, to provide better syntax errors
+    : '0o' [0-7_]+
     ;
 
 HexadecimalLiteral
-    : '0x' [0-9a-fA-F]*
+    // NOTE: allows underscores anywhere after prefix, but the parser checks underscores
+    // only occur inside, to provide better syntax errors
+    : '0x' [0-9a-fA-F_]+
+    ;
+
+// NOTE: invalid literal, to provide better syntax errors
+InvalidNumberLiteral
+    : '0' [a-zA-Z] [0-9a-zA-Z_]*
     ;
 
 WS

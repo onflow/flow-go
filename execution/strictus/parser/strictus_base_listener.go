@@ -296,6 +296,12 @@ func (s *BaseStrictusListener) EnterHexadecimalLiteral(ctx *HexadecimalLiteralCo
 // ExitHexadecimalLiteral is called when production HexadecimalLiteral is exited.
 func (s *BaseStrictusListener) ExitHexadecimalLiteral(ctx *HexadecimalLiteralContext) {}
 
+// EnterInvalidNumberLiteral is called when production InvalidNumberLiteral is entered.
+func (s *BaseStrictusListener) EnterInvalidNumberLiteral(ctx *InvalidNumberLiteralContext) {}
+
+// ExitInvalidNumberLiteral is called when production InvalidNumberLiteral is exited.
+func (s *BaseStrictusListener) ExitInvalidNumberLiteral(ctx *InvalidNumberLiteralContext) {}
+
 // EnterArrayLiteral is called when production arrayLiteral is entered.
 func (s *BaseStrictusListener) EnterArrayLiteral(ctx *ArrayLiteralContext) {}
 

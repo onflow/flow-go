@@ -145,6 +145,9 @@ type StrictusListener interface {
 	// EnterHexadecimalLiteral is called when entering the HexadecimalLiteral production.
 	EnterHexadecimalLiteral(c *HexadecimalLiteralContext)
 
+	// EnterInvalidNumberLiteral is called when entering the InvalidNumberLiteral production.
+	EnterInvalidNumberLiteral(c *InvalidNumberLiteralContext)
+
 	// EnterArrayLiteral is called when entering the arrayLiteral production.
 	EnterArrayLiteral(c *ArrayLiteralContext)
 
@@ -288,6 +291,9 @@ type StrictusListener interface {
 
 	// ExitHexadecimalLiteral is called when exiting the HexadecimalLiteral production.
 	ExitHexadecimalLiteral(c *HexadecimalLiteralContext)
+
+	// ExitInvalidNumberLiteral is called when exiting the InvalidNumberLiteral production.
+	ExitInvalidNumberLiteral(c *InvalidNumberLiteralContext)
 
 	// ExitArrayLiteral is called when exiting the arrayLiteral production.
 	ExitArrayLiteral(c *ArrayLiteralContext)
