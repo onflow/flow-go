@@ -27,7 +27,7 @@ func (v *BaseStrictusVisitor) VisitParameter(ctx *ParameterContext) interface{} 
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitTypeName(ctx *TypeNameContext) interface{} {
+func (v *BaseStrictusVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -36,6 +36,10 @@ func (v *BaseStrictusVisitor) VisitTypeDimension(ctx *TypeDimensionContext) inte
 }
 
 func (v *BaseStrictusVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

@@ -50,11 +50,11 @@ func (s *BaseStrictusListener) EnterParameter(ctx *ParameterContext) {}
 // ExitParameter is called when production parameter is exited.
 func (s *BaseStrictusListener) ExitParameter(ctx *ParameterContext) {}
 
-// EnterTypeName is called when production typeName is entered.
-func (s *BaseStrictusListener) EnterTypeName(ctx *TypeNameContext) {}
+// EnterFullType is called when production fullType is entered.
+func (s *BaseStrictusListener) EnterFullType(ctx *FullTypeContext) {}
 
-// ExitTypeName is called when production typeName is exited.
-func (s *BaseStrictusListener) ExitTypeName(ctx *TypeNameContext) {}
+// ExitFullType is called when production fullType is exited.
+func (s *BaseStrictusListener) ExitFullType(ctx *FullTypeContext) {}
 
 // EnterTypeDimension is called when production typeDimension is entered.
 func (s *BaseStrictusListener) EnterTypeDimension(ctx *TypeDimensionContext) {}
@@ -67,6 +67,12 @@ func (s *BaseStrictusListener) EnterBaseType(ctx *BaseTypeContext) {}
 
 // ExitBaseType is called when production baseType is exited.
 func (s *BaseStrictusListener) ExitBaseType(ctx *BaseTypeContext) {}
+
+// EnterFunctionType is called when production functionType is entered.
+func (s *BaseStrictusListener) EnterFunctionType(ctx *FunctionTypeContext) {}
+
+// ExitFunctionType is called when production functionType is exited.
+func (s *BaseStrictusListener) ExitFunctionType(ctx *FunctionTypeContext) {}
 
 // EnterBlock is called when production block is entered.
 func (s *BaseStrictusListener) EnterBlock(ctx *BlockContext) {}

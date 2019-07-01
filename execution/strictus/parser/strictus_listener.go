@@ -22,14 +22,17 @@ type StrictusListener interface {
 	// EnterParameter is called when entering the parameter production.
 	EnterParameter(c *ParameterContext)
 
-	// EnterTypeName is called when entering the typeName production.
-	EnterTypeName(c *TypeNameContext)
+	// EnterFullType is called when entering the fullType production.
+	EnterFullType(c *FullTypeContext)
 
 	// EnterTypeDimension is called when entering the typeDimension production.
 	EnterTypeDimension(c *TypeDimensionContext)
 
 	// EnterBaseType is called when entering the baseType production.
 	EnterBaseType(c *BaseTypeContext)
+
+	// EnterFunctionType is called when entering the functionType production.
+	EnterFunctionType(c *FunctionTypeContext)
 
 	// EnterBlock is called when entering the block production.
 	EnterBlock(c *BlockContext)
@@ -169,14 +172,17 @@ type StrictusListener interface {
 	// ExitParameter is called when exiting the parameter production.
 	ExitParameter(c *ParameterContext)
 
-	// ExitTypeName is called when exiting the typeName production.
-	ExitTypeName(c *TypeNameContext)
+	// ExitFullType is called when exiting the fullType production.
+	ExitFullType(c *FullTypeContext)
 
 	// ExitTypeDimension is called when exiting the typeDimension production.
 	ExitTypeDimension(c *TypeDimensionContext)
 
 	// ExitBaseType is called when exiting the baseType production.
 	ExitBaseType(c *BaseTypeContext)
+
+	// ExitFunctionType is called when exiting the functionType production.
+	ExitFunctionType(c *FunctionTypeContext)
 
 	// ExitBlock is called when exiting the block production.
 	ExitBlock(c *BlockContext)

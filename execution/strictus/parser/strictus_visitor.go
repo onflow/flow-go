@@ -26,14 +26,17 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#parameter.
 	VisitParameter(ctx *ParameterContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#typeName.
-	VisitTypeName(ctx *TypeNameContext) interface{}
+	// Visit a parse tree produced by StrictusParser#fullType.
+	VisitFullType(ctx *FullTypeContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#typeDimension.
 	VisitTypeDimension(ctx *TypeDimensionContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#baseType.
 	VisitBaseType(ctx *BaseTypeContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#functionType.
+	VisitFunctionType(ctx *FunctionTypeContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#block.
 	VisitBlock(ctx *BlockContext) interface{}

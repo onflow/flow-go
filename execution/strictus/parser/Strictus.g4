@@ -55,7 +55,7 @@ declaration
     ;
 
 functionDeclaration
-    : Pub? Fun Identifier '(' parameterList? ')' ('->' returnType=typeName)? block
+    : Pub? Fun Identifier '(' parameterList? ')' ('->' returnType=fullType)? block
     ;
 
 parameterList
@@ -63,10 +63,10 @@ parameterList
     ;
 
 parameter
-    : Identifier ':' typeName
+    : Identifier ':' fullType
     ;
 
-typeName
+fullType
     : baseType typeDimension*
     ;
 
@@ -76,7 +76,12 @@ typeDimension
 
 baseType
     : Identifier
-    | '(' (parameterTypes+=typeName (',' parameterTypes+=typeName)*)? ')' '->' returnType=typeName
+    | functionType
+    ;
+
+functionType
+    : '(' (parameterTypes+=fullType (',' parameterTypes+=fullType)*)? ')' '->' returnType=fullType
+    | '(' functionType ')'
     ;
 
 block
@@ -109,7 +114,7 @@ whileStatement
     ;
 
 variableDeclaration
-    : (Const | Var) Identifier (':' typeName)? '=' expression
+    : (Const | Var) Identifier (':' fullType)? '=' expression
     ;
 
 assignment
@@ -218,7 +223,7 @@ Negate : '!' ;
 primaryExpressionStart
     : Identifier                                                           # IdentifierExpression
     | literal                                                              # LiteralExpression
-    | Fun '(' parameterList? ')' ('->' returnType=typeName)? block         # FunctionExpression
+    | Fun '(' parameterList? ')' ('->' returnType=fullType)? block         # FunctionExpression
     | '(' expression ')'                                                   # NestedExpression
     ;
 
