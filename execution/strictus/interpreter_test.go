@@ -10,7 +10,9 @@ import (
 func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(``)
+	program, errors := Parse(``)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -23,9 +25,11 @@ func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
 func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        const test = 1
-    `)
+	program, errors := Parse(`
+       const test = 1
+   `)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -38,11 +42,13 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 func TestInterpretInvalidUnknownDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test() {
-            return x
-        }
+	program, errors := Parse(`
+       fun test() {
+           return x
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -55,11 +61,13 @@ func TestInterpretInvalidUnknownDeclaration(t *testing.T) {
 func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test() {
-            x = 2
-        }
+	program, errors := Parse(`
+       fun test() {
+           x = 2
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -72,11 +80,13 @@ func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
 func TestInterpretInvalidUnknownDeclarationIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test() {
-            x[0]
-        }
+	program, errors := Parse(`
+       fun test() {
+           x[0]
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -89,11 +99,13 @@ func TestInterpretInvalidUnknownDeclarationIndexing(t *testing.T) {
 func TestInterpretInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test() {
-            x[0] = 2
-        }
+	program, errors := Parse(`
+       fun test() {
+           x[0] = 2
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -106,20 +118,22 @@ func TestInterpretInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 func TestInterpretLexicalScope(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        const x = 10
+	program, errors := Parse(`
+       const x = 10
 
-        fun f(): Int32 {
-           // check resolution
-           return x
-        }
+       fun f(): Int32 {
+          // check resolution
+          return x
+       }
 
-        fun g(): Int32 {
-           // check scope is lexical, not dynamic
-           const x = 20
-           return f()
-        }
+       fun g(): Int32 {
+          // check scope is lexical, not dynamic
+          const x = 20
+          return f()
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -138,17 +152,19 @@ func TestInterpretLexicalScope(t *testing.T) {
 func TestInterpretNoHoisting(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        const x = 2
+	program, errors := Parse(`
+       const x = 2
 
-        fun test(): Int64 {
-           if x == 0 {
-               const x = 3
-               return x
-           }
-           return x
-        }
+       fun test(): Int64 {
+          if x == 0 {
+              const x = 3
+              return x
+          }
+          return x
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -164,12 +180,14 @@ func TestInterpretNoHoisting(t *testing.T) {
 func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        const x = 10
+	program, errors := Parse(`
+       const x = 10
 
-        // check first-class functions and scope inside them
-        const y = (fun (x: Int32): Int32 { return x })(42)
+       // check first-class functions and scope inside them
+       const y = (fun (x: Int32): Int32 { return x })(42)
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -185,15 +203,17 @@ func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 func TestInterpretInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun f(x: Int32): Int32 {
-            return x
-        }
+	program, errors := Parse(`
+       fun f(x: Int32): Int32 {
+           return x
+       }
 
-        fun test(): Int32 {
-            return f()
-        }
+       fun test(): Int32 {
+           return f()
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -206,15 +226,17 @@ func TestInterpretInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 func TestInterpretInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun f(x: Int32): Int32 {
-            return x
-        }
+	program, errors := Parse(`
+       fun f(x: Int32): Int32 {
+           return x
+       }
 
-        fun test(): Int32 {
-            return f(2, 3)
-        }
+       fun test(): Int32 {
+           return f(2, 3)
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -227,11 +249,13 @@ func TestInterpretInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 func TestInterpretInvalidFunctionCallOfBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(): Int32 {
-            return true()
-        }
+	program, errors := Parse(`
+       fun test(): Int32 {
+           return true()
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -244,11 +268,13 @@ func TestInterpretInvalidFunctionCallOfBool(t *testing.T) {
 func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(): Int32 {
-            return 2()
-        }
+	program, errors := Parse(`
+       fun test(): Int32 {
+           return 2()
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -261,12 +287,14 @@ func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
 func TestInterpretInvalidConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test() {
-            const x = 2
-            x = 3
-        }
+	program, errors := Parse(`
+       fun test() {
+           const x = 2
+           x = 3
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -279,13 +307,15 @@ func TestInterpretInvalidConstantAssignment(t *testing.T) {
 func TestInterpretVariableAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(): Int64 {
-            var x = 2
-            x = 3
-            return x
-        }
+	program, errors := Parse(`
+       fun test(): Int64 {
+           var x = 2
+           x = 3
+           return x
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -298,13 +328,15 @@ func TestInterpretVariableAssignment(t *testing.T) {
 func TestInterpretInvalidGlobalConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        const x = 2
+	program, errors := Parse(`
+       const x = 2
 
-        fun test() {
-            x = 3
-        }
+       fun test() {
+           x = 3
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -317,14 +349,16 @@ func TestInterpretInvalidGlobalConstantAssignment(t *testing.T) {
 func TestInterpretGlobalVariableAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        var x = 2
+	program, errors := Parse(`
+       var x = 2
 
-        fun test(): Int64 {
-            x = 3
-            return x
-        }
+       fun test(): Int64 {
+           x = 3
+           return x
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -343,12 +377,14 @@ func TestInterpretGlobalVariableAssignment(t *testing.T) {
 func TestInterpretInvalidConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test() {
-            const x = 2
-            const x = 3
-        }
+	program, errors := Parse(`
+       fun test() {
+           const x = 2
+           const x = 3
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -361,10 +397,12 @@ func TestInterpretInvalidConstantRedeclaration(t *testing.T) {
 func TestInterpretInvalidGlobalConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
+	program, errors := Parse(`
 		const x = 2
 		const x = 3
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -375,14 +413,16 @@ func TestInterpretInvalidGlobalConstantRedeclaration(t *testing.T) {
 func TestInterpretConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
+	program, errors := Parse(`
 	    const x = 2
 
-        fun test(): Int64 {
-            const x = 3
-            return x
-        }
+       fun test(): Int64 {
+           const x = 3
+           return x
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -398,15 +438,17 @@ func TestInterpretConstantRedeclaration(t *testing.T) {
 func TestInterpretParameters(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun returnA(a: Int32, b: Int32): Int64 {
-            return a
-        }
+	program, errors := Parse(`
+       fun returnA(a: Int32, b: Int32): Int64 {
+           return a
+       }
 
-        fun returnB(a: Int32, b: Int32): Int64 {
-            return b
-        }
+       fun returnB(a: Int32, b: Int32): Int64 {
+           return b
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -422,12 +464,14 @@ func TestInterpretParameters(t *testing.T) {
 func TestInterpretArrayIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(): Int64 {
-            const z = [0, 3]
-            return z[1]
-        }
+	program, errors := Parse(`
+       fun test(): Int64 {
+           const z = [0, 3]
+           return z[1]
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -440,12 +484,14 @@ func TestInterpretArrayIndexing(t *testing.T) {
 func TestInterpretInvalidArrayIndexingWithBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(): Int64 {
-            const z = [0, 3]
-            return z[true]
-        }
+	program, errors := Parse(`
+       fun test(): Int64 {
+           const z = [0, 3]
+           return z[true]
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -458,11 +504,13 @@ func TestInterpretInvalidArrayIndexingWithBool(t *testing.T) {
 func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(): Int64 {
-            return true[0]
-        }
+	program, errors := Parse(`
+       fun test(): Int64 {
+           return true[0]
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -475,11 +523,13 @@ func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
 func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(): Int64 {
-            return 2[0]
-        }
+	program, errors := Parse(`
+       fun test(): Int64 {
+           return 2[0]
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -492,13 +542,15 @@ func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
 func TestInterpretArrayIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(): Int64 {
-            const z = [0, 3]
-            z[1] = 2
-            return z[1]
-        }
+	program, errors := Parse(`
+       fun test(): Int64 {
+           const z = [0, 3]
+           z[1] = 2
+           return z[1]
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -511,13 +563,15 @@ func TestInterpretArrayIndexingAssignment(t *testing.T) {
 func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(): Int64 {
-            const z = [0, 3]
-            z[true] = 2
-            return z[1]
-        }
+	program, errors := Parse(`
+       fun test(): Int64 {
+           const z = [0, 3]
+           z[true] = 2
+           return z[1]
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -530,12 +584,14 @@ func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
 func TestInterpretReturnWithoutExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun returnEarly() {
-            return
-            return 1
-        }
+	program, errors := Parse(`
+       fun returnEarly() {
+           return
+           return 1
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -550,23 +606,25 @@ func TestInterpretReturnWithoutExpression(t *testing.T) {
 func TestInterpretPlusOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testIntegers(): Int64 {
-            return 2 + 4
-        }
+	program, errors := Parse(`
+       fun testIntegers(): Int64 {
+           return 2 + 4
+       }
 
-        fun testIntegerAndBool(): Int64 {
-            return 2 + true
-        }
+       fun testIntegerAndBool(): Int64 {
+           return 2 + true
+       }
 
-        fun testBoolAndInteger(): Int64 {
-            return true + 2
-        }
+       fun testBoolAndInteger(): Int64 {
+           return true + 2
+       }
 
-        fun testBools(): Int64 {
-            return true + true
-        }
+       fun testBools(): Int64 {
+           return true + true
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -588,23 +646,25 @@ func TestInterpretPlusOperator(t *testing.T) {
 func TestInterpretMinusOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testIntegers(): Int64 {
-            return 2 - 4
-        }
+	program, errors := Parse(`
+       fun testIntegers(): Int64 {
+           return 2 - 4
+       }
 
-        fun testIntegerAndBool(): Int64 {
-            return 2 - true
-        }
+       fun testIntegerAndBool(): Int64 {
+           return 2 - true
+       }
 
-        fun testBoolAndInteger(): Int64 {
-            return true - 2
-        }
+       fun testBoolAndInteger(): Int64 {
+           return true - 2
+       }
 
-        fun testBools(): Int64 {
-            return true - true
-        }
+       fun testBools(): Int64 {
+           return true - true
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -626,23 +686,25 @@ func TestInterpretMinusOperator(t *testing.T) {
 func TestInterpretMulOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testIntegers(): Int64 {
-            return 2 * 4
-        }
+	program, errors := Parse(`
+       fun testIntegers(): Int64 {
+           return 2 * 4
+       }
 
-        fun testIntegerAndBool(): Int64 {
-            return 2 * true
-        }
+       fun testIntegerAndBool(): Int64 {
+           return 2 * true
+       }
 
-        fun testBoolAndInteger(): Int64 {
-            return true * 2
-        }
+       fun testBoolAndInteger(): Int64 {
+           return true * 2
+       }
 
-        fun testBools(): Int64 {
-            return true * true
-        }
+       fun testBools(): Int64 {
+           return true * true
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -664,23 +726,25 @@ func TestInterpretMulOperator(t *testing.T) {
 func TestInterpretDivOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testIntegers(): Int64 {
-            return 7 / 3
-        }
+	program, errors := Parse(`
+       fun testIntegers(): Int64 {
+           return 7 / 3
+       }
 
-        fun testIntegerAndBool(): Int64 {
-            return 7 / true
-        }
+       fun testIntegerAndBool(): Int64 {
+           return 7 / true
+       }
 
-        fun testBoolAndInteger(): Int64 {
-            return true / 2
-        }
+       fun testBoolAndInteger(): Int64 {
+           return true / 2
+       }
 
-        fun testBools(): Int64 {
-            return true / true
-        }
+       fun testBools(): Int64 {
+           return true / true
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -702,23 +766,25 @@ func TestInterpretDivOperator(t *testing.T) {
 func TestInterpretModOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testIntegers(): Int64 {
-            return 5 % 3
-        }
+	program, errors := Parse(`
+       fun testIntegers(): Int64 {
+           return 5 % 3
+       }
 
-        fun testIntegerAndBool(): Int64 {
-            return 5 % true
-        }
+       fun testIntegerAndBool(): Int64 {
+           return 5 % true
+       }
 
-        fun testBoolAndInteger(): Int64 {
-            return true % 2
-        }
+       fun testBoolAndInteger(): Int64 {
+           return true % 2
+       }
 
-        fun testBools(): Int64 {
-            return true % true
-        }
+       fun testBools(): Int64 {
+           return true % true
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -740,39 +806,41 @@ func TestInterpretModOperator(t *testing.T) {
 func TestInterpretEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testIntegersUnequal(): Bool {
-            return 5 == 3
-        }
+	program, errors := Parse(`
+       fun testIntegersUnequal(): Bool {
+           return 5 == 3
+       }
 
-        fun testIntegersEqual(): Bool {
-            return 3 == 3
-        }
+       fun testIntegersEqual(): Bool {
+           return 3 == 3
+       }
 
-        fun testIntegerAndBool(): Bool {
-            return 5 == true
-        }
+       fun testIntegerAndBool(): Bool {
+           return 5 == true
+       }
 
-        fun testBoolAndInteger(): Bool {
-            return true == 5
-        }
+       fun testBoolAndInteger(): Bool {
+           return true == 5
+       }
 
-        fun testTrueAndTrue(): Bool {
-            return true == true
-        }
+       fun testTrueAndTrue(): Bool {
+           return true == true
+       }
 
-        fun testTrueAndFalse(): Bool {
-            return true == false
-        }
+       fun testTrueAndFalse(): Bool {
+           return true == false
+       }
 
-        fun testFalseAndTrue(): Bool {
-            return false == true
-        }
+       fun testFalseAndTrue(): Bool {
+           return false == true
+       }
 
-        fun testFalseAndFalse(): Bool {
-            return false == false
-        }
+       fun testFalseAndFalse(): Bool {
+           return false == false
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -806,39 +874,41 @@ func TestInterpretEqualOperator(t *testing.T) {
 func TestInterpretUnequalOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testIntegersUnequal(): Bool {
-            return 5 != 3
-        }
+	program, errors := Parse(`
+       fun testIntegersUnequal(): Bool {
+           return 5 != 3
+       }
 
-        fun testIntegersEqual(): Bool {
-            return 3 != 3
-        }
+       fun testIntegersEqual(): Bool {
+           return 3 != 3
+       }
 
-        fun testIntegerAndBool(): Bool {
-            return 5 != true
-        }
+       fun testIntegerAndBool(): Bool {
+           return 5 != true
+       }
 
-        fun testBoolAndInteger(): Bool {
-            return true != 5
-        }
+       fun testBoolAndInteger(): Bool {
+           return true != 5
+       }
 
-        fun testTrueAndTrue(): Bool {
-            return true != true
-        }
+       fun testTrueAndTrue(): Bool {
+           return true != true
+       }
 
-        fun testTrueAndFalse(): Bool {
-            return true != false
-        }
+       fun testTrueAndFalse(): Bool {
+           return true != false
+       }
 
-        fun testFalseAndTrue(): Bool {
-            return false != true
-        }
+       fun testFalseAndTrue(): Bool {
+           return false != true
+       }
 
-        fun testFalseAndFalse(): Bool {
-            return false != false
-        }
+       fun testFalseAndFalse(): Bool {
+           return false != false
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -872,43 +942,45 @@ func TestInterpretUnequalOperator(t *testing.T) {
 func TestInterpretLessOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testIntegersGreater(): Bool {
-            return 5 < 3
-        }
+	program, errors := Parse(`
+       fun testIntegersGreater(): Bool {
+           return 5 < 3
+       }
 
-        fun testIntegersEqual(): Bool {
-            return 3 < 3
-        }
+       fun testIntegersEqual(): Bool {
+           return 3 < 3
+       }
 
-        fun testIntegersLess(): Bool {
-            return 3 < 5
-        }
+       fun testIntegersLess(): Bool {
+           return 3 < 5
+       }
 
-        fun testIntegerAndBool(): Bool {
-            return 5 < true
-        }
+       fun testIntegerAndBool(): Bool {
+           return 5 < true
+       }
 
-        fun testBoolAndInteger(): Bool {
-            return true < 5
-        }
+       fun testBoolAndInteger(): Bool {
+           return true < 5
+       }
 
-        fun testTrueAndTrue(): Bool {
-            return true < true
-        }
+       fun testTrueAndTrue(): Bool {
+           return true < true
+       }
 
-        fun testTrueAndFalse(): Bool {
-            return true < false
-        }
+       fun testTrueAndFalse(): Bool {
+           return true < false
+       }
 
-        fun testFalseAndTrue(): Bool {
-            return false < true
-        }
+       fun testFalseAndTrue(): Bool {
+           return false < true
+       }
 
-        fun testFalseAndFalse(): Bool {
-            return false < false
-        }
+       fun testFalseAndFalse(): Bool {
+           return false < false
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -945,43 +1017,45 @@ func TestInterpretLessOperator(t *testing.T) {
 func TestInterpretLessEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testIntegersGreater(): Bool {
-            return 5 <= 3
-        }
+	program, errors := Parse(`
+       fun testIntegersGreater(): Bool {
+           return 5 <= 3
+       }
 
-        fun testIntegersEqual(): Bool {
-            return 3 <= 3
-        }
+       fun testIntegersEqual(): Bool {
+           return 3 <= 3
+       }
 
-        fun testIntegersLess(): Bool {
-            return 3 <= 5
-        }
+       fun testIntegersLess(): Bool {
+           return 3 <= 5
+       }
 
-        fun testIntegerAndBool(): Bool {
-            return 5 <= true
-        }
+       fun testIntegerAndBool(): Bool {
+           return 5 <= true
+       }
 
-        fun testBoolAndInteger(): Bool {
-            return true <= 5
-        }
+       fun testBoolAndInteger(): Bool {
+           return true <= 5
+       }
 
-        fun testTrueAndTrue(): Bool {
-            return true <= true
-        }
+       fun testTrueAndTrue(): Bool {
+           return true <= true
+       }
 
-        fun testTrueAndFalse(): Bool {
-            return true <= false
-        }
+       fun testTrueAndFalse(): Bool {
+           return true <= false
+       }
 
-        fun testFalseAndTrue(): Bool {
-            return false <= true
-        }
+       fun testFalseAndTrue(): Bool {
+           return false <= true
+       }
 
-        fun testFalseAndFalse(): Bool {
-            return false <= false
-        }
+       fun testFalseAndFalse(): Bool {
+           return false <= false
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1018,43 +1092,45 @@ func TestInterpretLessEqualOperator(t *testing.T) {
 func TestInterpretGreaterOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testIntegersGreater(): Bool {
-            return 5 > 3
-        }
+	program, errors := Parse(`
+       fun testIntegersGreater(): Bool {
+           return 5 > 3
+       }
 
-        fun testIntegersEqual(): Bool {
-            return 3 > 3
-        }
+       fun testIntegersEqual(): Bool {
+           return 3 > 3
+       }
 
-        fun testIntegersLess(): Bool {
-            return 3 > 5
-        }
+       fun testIntegersLess(): Bool {
+           return 3 > 5
+       }
 
-        fun testIntegerAndBool(): Bool {
-            return 5 > true
-        }
+       fun testIntegerAndBool(): Bool {
+           return 5 > true
+       }
 
-        fun testBoolAndInteger(): Bool {
-            return true > 5
-        }
+       fun testBoolAndInteger(): Bool {
+           return true > 5
+       }
 
-        fun testTrueAndTrue(): Bool {
-            return true > true
-        }
+       fun testTrueAndTrue(): Bool {
+           return true > true
+       }
 
-        fun testTrueAndFalse(): Bool {
-            return true > false
-        }
+       fun testTrueAndFalse(): Bool {
+           return true > false
+       }
 
-        fun testFalseAndTrue(): Bool {
-            return false > true
-        }
+       fun testFalseAndTrue(): Bool {
+           return false > true
+       }
 
-        fun testFalseAndFalse(): Bool {
-            return false > false
-        }
+       fun testFalseAndFalse(): Bool {
+           return false > false
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1091,43 +1167,45 @@ func TestInterpretGreaterOperator(t *testing.T) {
 func TestInterpretGreaterEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testIntegersGreater(): Bool {
-            return 5 >= 3
-        }
+	program, errors := Parse(`
+       fun testIntegersGreater(): Bool {
+           return 5 >= 3
+       }
 
-        fun testIntegersEqual(): Bool {
-            return 3 >= 3
-        }
+       fun testIntegersEqual(): Bool {
+           return 3 >= 3
+       }
 
-        fun testIntegersLess(): Bool {
-            return 3 >= 5
-        }
+       fun testIntegersLess(): Bool {
+           return 3 >= 5
+       }
 
-        fun testIntegerAndBool(): Bool {
-            return 5 >= true
-        }
+       fun testIntegerAndBool(): Bool {
+           return 5 >= true
+       }
 
-        fun testBoolAndInteger(): Bool {
-            return true >= 5
-        }
+       fun testBoolAndInteger(): Bool {
+           return true >= 5
+       }
 
-        fun testTrueAndTrue(): Bool {
-            return true >= true
-        }
+       fun testTrueAndTrue(): Bool {
+           return true >= true
+       }
 
-        fun testTrueAndFalse(): Bool {
-            return true >= false
-        }
+       fun testTrueAndFalse(): Bool {
+           return true >= false
+       }
 
-        fun testFalseAndTrue(): Bool {
-            return false >= true
-        }
+       fun testFalseAndTrue(): Bool {
+           return false >= true
+       }
 
-        fun testFalseAndFalse(): Bool {
-            return false >= false
-        }
+       fun testFalseAndFalse(): Bool {
+           return false >= false
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1164,35 +1242,37 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
 func TestInterpretOrOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testTrueTrue(): Bool {
-            return true || true
-        }
+	program, errors := Parse(`
+       fun testTrueTrue(): Bool {
+           return true || true
+       }
 
-        fun testTrueFalse(): Bool {
-            return true || false
-        }
+       fun testTrueFalse(): Bool {
+           return true || false
+       }
 
-        fun testFalseTrue(): Bool {
-            return false || true
-        }
+       fun testFalseTrue(): Bool {
+           return false || true
+       }
 
-        fun testFalseFalse(): Bool {
-            return false || false
-        }
+       fun testFalseFalse(): Bool {
+           return false || false
+       }
 
-        fun testBoolAndInteger(): Bool {
-            return false || 2
-        }
+       fun testBoolAndInteger(): Bool {
+           return false || 2
+       }
 
-        fun testIntegerAndBool(): Bool {
-            return 2 || false
-        }
+       fun testIntegerAndBool(): Bool {
+           return 2 || false
+       }
 
-        fun testIntegers(): Bool {
-            return 2 || 3
-        }
+       fun testIntegers(): Bool {
+           return 2 || 3
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1223,35 +1303,37 @@ func TestInterpretOrOperator(t *testing.T) {
 func TestInterpretAndOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testTrueTrue(): Bool {
-            return true && true
-        }
+	program, errors := Parse(`
+       fun testTrueTrue(): Bool {
+           return true && true
+       }
 
-        fun testTrueFalse(): Bool {
-            return true && false
-        }
+       fun testTrueFalse(): Bool {
+           return true && false
+       }
 
-        fun testFalseTrue(): Bool {
-            return false && true
-        }
+       fun testFalseTrue(): Bool {
+           return false && true
+       }
 
-        fun testFalseFalse(): Bool {
-            return false && false
-        }
+       fun testFalseFalse(): Bool {
+           return false && false
+       }
 
-        fun testBoolAndInteger(): Bool {
-            return false && 2
-        }
+       fun testBoolAndInteger(): Bool {
+           return false && 2
+       }
 
-        fun testIntegerAndBool(): Bool {
-            return 2 && false
-        }
+       fun testIntegerAndBool(): Bool {
+           return 2 && false
+       }
 
-        fun testIntegers(): Bool {
-            return 2 && 3
-        }
+       fun testIntegers(): Bool {
+           return 2 && 3
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1282,41 +1364,43 @@ func TestInterpretAndOperator(t *testing.T) {
 func TestInterpretIfStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testTrue(): Int64 {
-            if true {
-                return 2
-            } else {
-                return 3
-            }
-            return 4
-        }
+	program, errors := Parse(`
+       fun testTrue(): Int64 {
+           if true {
+               return 2
+           } else {
+               return 3
+           }
+           return 4
+       }
 
-        fun testFalse(): Int64 {
-            if false {
-                return 2
-            } else {
-                return 3
-            }
-            return 4
-        }
+       fun testFalse(): Int64 {
+           if false {
+               return 2
+           } else {
+               return 3
+           }
+           return 4
+       }
 
-        fun testNoElse(): Int64 {
-            if true {
-                return 2
-            }
-            return 3
-        }
+       fun testNoElse(): Int64 {
+           if true {
+               return 2
+           }
+           return 3
+       }
 
-        fun testElseIf(): Int64 {
-            if false {
-                return 2
-            } else if true {
-                return 3
-            }
-            return 4
-        }
+       fun testElseIf(): Int64 {
+           if false {
+               return 2
+           } else if true {
+               return 3
+           }
+           return 4
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1331,16 +1415,18 @@ func TestInterpretIfStatement(t *testing.T) {
 func TestInterpretWhileStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(): Int64 {
-            var x = 0
-            while x < 5 {
-                x = x + 2
-            }
-            return x
-        }
+	program, errors := Parse(`
+       fun test(): Int64 {
+           var x = 0
+           while x < 5 {
+               x = x + 2
+           }
+           return x
+       }
 
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1352,19 +1438,21 @@ func TestInterpretWhileStatement(t *testing.T) {
 func TestInterpretWhileStatementWithReturn(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(): Int64 {
-            var x = 0
-            while x < 10 {
-                x = x + 2
-                if x > 5 {
-                    return x
-                }
-            }
-            return x
-        }
+	program, errors := Parse(`
+       fun test(): Int64 {
+           var x = 0
+           while x < 10 {
+               x = x + 2
+               if x > 5 {
+                   return x
+               }
+           }
+           return x
+       }
 
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1376,18 +1464,20 @@ func TestInterpretWhileStatementWithReturn(t *testing.T) {
 func TestInterpretExpressionStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        var x = 0
+	program, errors := Parse(`
+       var x = 0
 
-        fun incX() {
-            x = x + 2
-        }
+       fun incX() {
+           x = x + 2
+       }
 
-        fun test(): Int64 {
-            incX()
-            return x
-        }
+       fun test(): Int64 {
+           incX()
+           return x
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1401,15 +1491,17 @@ func TestInterpretExpressionStatement(t *testing.T) {
 func TestInterpretConditionalOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun testTrue(): Int64 {
-            return true ? 2 : 3
-        }
+	program, errors := Parse(`
+       fun testTrue(): Int64 {
+           return true ? 2 : 3
+       }
 
-        fun testFalse(): Int64 {
+       fun testFalse(): Int64 {
 			return false ? 2 : 3
-        }
+       }
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1422,11 +1514,13 @@ func TestInterpretConditionalOperator(t *testing.T) {
 func TestInterpretInvalidAssignmentToParameter(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun test(x: Int8) {
-             x = 2
-        }
-    `)
+	program, errors := Parse(`
+       fun test(x: Int8) {
+            x = 2
+       }
+   `)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1439,11 +1533,13 @@ func TestInterpretInvalidAssignmentToParameter(t *testing.T) {
 func TestInterpretFunctionBindingInFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun foo() {
-            return foo
-        }
-    `)
+	program, errors := Parse(`
+       fun foo() {
+           return foo
+       }
+   `)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1460,14 +1556,16 @@ func TestInterpretRecursion(t *testing.T) {
 
 	RegisterTestingT(t)
 
-	program := parse(`
-        fun fib(n: Int): Int {
-            if n < 2 {
-               return n
-            }
-            return fib(n - 1) + fib(n - 2)
-        }
-    `)
+	program, errors := Parse(`
+       fun fib(n: Int): Int {
+           if n < 2 {
+              return n
+           }
+           return fib(n - 1) + fib(n - 2)
+       }
+   `)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1480,10 +1578,12 @@ func TestInterpretRecursion(t *testing.T) {
 func TestInterpretUnaryIntegerNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-       const x = -2
-       const y = -(-2)
+	program, errors := Parse(`
+      const x = -2
+      const y = -(-2)
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1496,12 +1596,14 @@ func TestInterpretUnaryIntegerNegation(t *testing.T) {
 func TestInterpretUnaryBooleanNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-       const a = !true
-       const b = !(!true)
-       const c = !false
-       const d = !(!false)
+	program, errors := Parse(`
+      const a = !true
+      const b = !(!true)
+      const c = !false
+      const d = !(!false)
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1516,9 +1618,11 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-       const a = !1
+	program, errors := Parse(`
+      const a = !1
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1528,9 +1632,11 @@ func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
 func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-       const a = -true
+	program, errors := Parse(`
+      const a = -true
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -1540,19 +1646,21 @@ func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
-       const a = test(1, 2)
+	program, errors := Parse(`
+      const a = test(1, 2)
 	`)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 
 	testFunction := interpreter.NewHostFunction(
-		interpreter.FunctionType{
+		&interpreter.FunctionType{
 			ParameterTypes: []interpreter.Type{
-				interpreter.IntType{},
-				interpreter.IntType{},
+				&interpreter.IntType{},
+				&interpreter.IntType{},
 			},
-			ReturnType: interpreter.IntType{},
+			ReturnType: &interpreter.IntType{},
 		},
 		func(inter *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
 			a := arguments[0].(interpreter.IntValue).Int

@@ -15,9 +15,9 @@ type Type interface {
 
 type VoidType struct{}
 
-func (VoidType) isType() {}
+func (*VoidType) isType() {}
 
-func (VoidType) String() string {
+func (*VoidType) String() string {
 	return "Void"
 }
 
@@ -25,9 +25,9 @@ func (VoidType) String() string {
 
 type BoolType struct{}
 
-func (BoolType) isType() {}
+func (*BoolType) isType() {}
 
-func (BoolType) String() string {
+func (*BoolType) String() string {
 	return "Bool"
 }
 
@@ -35,9 +35,9 @@ func (BoolType) String() string {
 
 type IntegerType struct{}
 
-func (IntegerType) isType() {}
+func (*IntegerType) isType() {}
 
-func (IntegerType) String() string {
+func (*IntegerType) String() string {
 	return "integer"
 }
 
@@ -45,9 +45,9 @@ func (IntegerType) String() string {
 
 type IntType struct{}
 
-func (IntType) isType() {}
+func (*IntType) isType() {}
 
-func (IntType) String() string {
+func (*IntType) String() string {
 	return "Int"
 }
 
@@ -55,9 +55,9 @@ func (IntType) String() string {
 
 type Int8Type struct{}
 
-func (Int8Type) isType() {}
+func (*Int8Type) isType() {}
 
-func (Int8Type) String() string {
+func (*Int8Type) String() string {
 	return "Int8"
 }
 
@@ -65,9 +65,9 @@ func (Int8Type) String() string {
 
 type Int16Type struct{}
 
-func (Int16Type) isType() {}
+func (*Int16Type) isType() {}
 
-func (Int16Type) String() string {
+func (*Int16Type) String() string {
 	return "Int16"
 }
 
@@ -75,9 +75,9 @@ func (Int16Type) String() string {
 
 type Int32Type struct{}
 
-func (Int32Type) isType() {}
+func (*Int32Type) isType() {}
 
-func (Int32Type) String() string {
+func (*Int32Type) String() string {
 	return "Int32"
 }
 
@@ -85,9 +85,9 @@ func (Int32Type) String() string {
 
 type Int64Type struct{}
 
-func (Int64Type) isType() {}
+func (*Int64Type) isType() {}
 
-func (Int64Type) String() string {
+func (*Int64Type) String() string {
 	return "Int64"
 }
 
@@ -95,9 +95,9 @@ func (Int64Type) String() string {
 
 type UInt8Type struct{}
 
-func (UInt8Type) isType() {}
+func (*UInt8Type) isType() {}
 
-func (UInt8Type) String() string {
+func (*UInt8Type) String() string {
 	return "UInt8"
 }
 
@@ -105,9 +105,9 @@ func (UInt8Type) String() string {
 
 type UInt16Type struct{}
 
-func (UInt16Type) isType() {}
+func (*UInt16Type) isType() {}
 
-func (UInt16Type) String() string {
+func (*UInt16Type) String() string {
 	return "UInt16"
 }
 
@@ -115,9 +115,9 @@ func (UInt16Type) String() string {
 
 type UInt32Type struct{}
 
-func (UInt32Type) isType() {}
+func (*UInt32Type) isType() {}
 
-func (UInt32Type) String() string {
+func (*UInt32Type) String() string {
 	return "UInt32"
 }
 
@@ -125,9 +125,9 @@ func (UInt32Type) String() string {
 
 type UInt64Type struct{}
 
-func (UInt64Type) isType() {}
+func (*UInt64Type) isType() {}
 
-func (UInt64Type) String() string {
+func (*UInt64Type) String() string {
 	return "UInt64"
 }
 
@@ -144,10 +144,10 @@ type VariableSizedType struct {
 	Type
 }
 
-func (VariableSizedType) isType()      {}
-func (VariableSizedType) isArrayType() {}
+func (*VariableSizedType) isType()      {}
+func (*VariableSizedType) isArrayType() {}
 
-func (t VariableSizedType) String() string {
+func (t *VariableSizedType) String() string {
 	return ArrayTypeToString(t)
 }
 
@@ -158,10 +158,10 @@ type ConstantSizedType struct {
 	Size int
 }
 
-func (ConstantSizedType) isType()      {}
-func (ConstantSizedType) isArrayType() {}
+func (*ConstantSizedType) isType()      {}
+func (*ConstantSizedType) isArrayType() {}
 
-func (t ConstantSizedType) String() string {
+func (t *ConstantSizedType) String() string {
 	return ArrayTypeToString(t)
 }
 
@@ -173,10 +173,10 @@ func ArrayTypeToString(arrayType ArrayType) string {
 	currentTypeIsArrayType := true
 	for currentTypeIsArrayType {
 		switch arrayType := currentType.(type) {
-		case ConstantSizedType:
+		case *ConstantSizedType:
 			fmt.Fprintf(&arraySuffixes, "[%d]", arrayType.Size)
 			currentType = arrayType.Type
-		case VariableSizedType:
+		case *VariableSizedType:
 			arraySuffixes.WriteString("[]")
 			currentType = arrayType.Type
 		default:
@@ -210,7 +210,7 @@ func (t FunctionType) String() string {
 // mustConvertType converts an AST type representation to an interpreter type representation
 func mustConvertType(t ast.Type) Type {
 	switch t := t.(type) {
-	case ast.BaseType:
+	case *ast.BaseType:
 		result := ParseBaseType(t.Identifier)
 		if result == nil {
 			panic(&NotDeclaredError{
@@ -221,18 +221,18 @@ func mustConvertType(t ast.Type) Type {
 		}
 		return result
 
-	case ast.VariableSizedType:
-		return VariableSizedType{
+	case *ast.VariableSizedType:
+		return &VariableSizedType{
 			Type: mustConvertType(t.Type),
 		}
 
-	case ast.ConstantSizedType:
-		return ConstantSizedType{
+	case *ast.ConstantSizedType:
+		return &ConstantSizedType{
 			Type: mustConvertType(t.Type),
 			Size: t.Size,
 		}
 
-	case ast.FunctionType:
+	case *ast.FunctionType:
 		var parameterTypes []Type
 		for _, parameterType := range t.ParameterTypes {
 			parameterTypes = append(parameterTypes,
@@ -252,18 +252,18 @@ func mustConvertType(t ast.Type) Type {
 }
 
 var baseTypes = map[string]Type{
-	"":       VoidType{},
-	"Void":   VoidType{},
-	"Bool":   BoolType{},
-	"Int":    IntType{},
-	"Int8":   Int8Type{},
-	"Int16":  Int16Type{},
-	"Int32":  Int32Type{},
-	"Int64":  Int64Type{},
-	"UInt8":  UInt8Type{},
-	"UInt16": UInt16Type{},
-	"UInt32": UInt32Type{},
-	"UInt64": UInt64Type{},
+	"":       &VoidType{},
+	"Void":   &VoidType{},
+	"Bool":   &BoolType{},
+	"Int":    &IntType{},
+	"Int8":   &Int8Type{},
+	"Int16":  &Int16Type{},
+	"Int32":  &Int32Type{},
+	"Int64":  &Int64Type{},
+	"UInt8":  &UInt8Type{},
+	"UInt16": &UInt16Type{},
+	"UInt32": &UInt32Type{},
+	"UInt64": &UInt64Type{},
 }
 
 func ParseBaseType(name string) Type {
