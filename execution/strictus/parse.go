@@ -33,7 +33,10 @@ func Parse(code string) (program *ast.Program, errors []error) {
 	// diagnostics, for debugging only:
 	// parser.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
 	listener := new(errorListener)
+	// remove the default console error listener
+	parser.RemoveErrorListeners()
 	parser.AddErrorListener(listener)
+
 	appendSyntaxErrors := func() {
 		for _, syntaxError := range listener.syntaxErrors {
 			errors = append(errors, syntaxError)
@@ -54,7 +57,7 @@ func Parse(code string) (program *ast.Program, errors []error) {
 		}
 	}()
 
-	result := parser.Program().Accept(&ProgramVisitor{}).(*ast.Program)
+	result := parser.Program().Accept(&ProgramVisitor{})
 
 	appendSyntaxErrors()
 
@@ -62,5 +65,10 @@ func Parse(code string) (program *ast.Program, errors []error) {
 		return nil, errors
 	}
 
-	return result, errors
+	program, ok := result.(*ast.Program)
+	if !ok {
+		return nil, errors
+	}
+
+	return program, errors
 }

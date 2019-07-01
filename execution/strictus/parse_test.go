@@ -14,7 +14,7 @@ func init() {
 	format.MaxDepth = 100
 }
 
-func TestParseInvalid(t *testing.T) {
+func TestParseIncompleteConstKeyword(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, errors := Parse(`
@@ -29,6 +29,28 @@ func TestParseInvalid(t *testing.T) {
 		"Line":    Equal(2),
 		"Column":  Equal(5),
 		"Message": ContainSubstring("extraneous input"),
+	}))
+}
+
+func TestParseIncompleteConstantDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := Parse(`
+	    const = 
+	`)
+
+	Expect(actual).Should(BeNil())
+
+	Expect(errors).Should(HaveLen(2))
+	Expect(*errors[0].(*SyntaxError)).To(MatchAllFields(Fields{
+		"Line":    Equal(2),
+		"Column":  Equal(11),
+		"Message": ContainSubstring("missing Identifier"),
+	}))
+	Expect(*errors[1].(*SyntaxError)).To(MatchAllFields(Fields{
+		"Line":    Equal(3),
+		"Column":  Equal(1),
+		"Message": ContainSubstring("mismatched input"),
 	}))
 }
 
