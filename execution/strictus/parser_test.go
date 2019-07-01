@@ -5,7 +5,6 @@ import (
 	"bamboo-runtime/execution/strictus/parser"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
-	. "github.com/onsi/gomega/gstruct"
 	"math/big"
 	"testing"
 )
@@ -26,10 +25,8 @@ func TestParseIncompleteConstKeyword(t *testing.T) {
 
 	Expect(errors).Should(HaveLen(1))
 	syntaxError := errors[0].(*parser.SyntaxError)
-	Expect(*syntaxError).To(MatchAllFields(Fields{
-		"Pos":     Equal(&Position{Offset: 6, Line: 2, Column: 5}),
-		"Message": ContainSubstring("extraneous input"),
-	}))
+	Expect(syntaxError.Pos).To(Equal(&Position{Offset: 6, Line: 2, Column: 5}))
+	Expect(syntaxError.Message).To(ContainSubstring("extraneous input"))
 }
 
 func TestParseIncompleteConstantDeclaration(t *testing.T) {
@@ -42,14 +39,14 @@ func TestParseIncompleteConstantDeclaration(t *testing.T) {
 	Expect(actual).Should(BeNil())
 
 	Expect(errors).Should(HaveLen(2))
-	Expect(*errors[0].(*parser.SyntaxError)).To(MatchAllFields(Fields{
-		"Pos":     Equal(&Position{Offset: 12, Line: 2, Column: 11}),
-		"Message": ContainSubstring("missing Identifier"),
-	}))
-	Expect(*errors[1].(*parser.SyntaxError)).To(MatchAllFields(Fields{
-		"Pos":     Equal(&Position{Offset: 16, Line: 3, Column: 1}),
-		"Message": ContainSubstring("mismatched input"),
-	}))
+
+	syntaxError1 := errors[0].(*parser.SyntaxError)
+	Expect(syntaxError1.Pos).To(Equal(&Position{Offset: 12, Line: 2, Column: 11}))
+	Expect(syntaxError1.Message).To(ContainSubstring("missing Identifier"))
+
+	syntaxError2 := errors[1].(*parser.SyntaxError)
+	Expect(syntaxError2.Pos).To(Equal(&Position{Offset: 16, Line: 3, Column: 1}))
+	Expect(syntaxError2.Message).To(ContainSubstring("mismatched input"))
 }
 
 func TestParseBoolExpression(t *testing.T) {
