@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"bamboo-runtime/execution/strictus/ast"
+	"bamboo-runtime/execution/strictus/errors"
 	"fmt"
 	"strings"
 )
@@ -184,7 +185,10 @@ func ArrayTypeToString(arrayType ArrayType) string {
 	for currentTypeIsArrayType {
 		switch arrayType := currentType.(type) {
 		case *ConstantSizedType:
-			fmt.Fprintf(&arraySuffixes, "[%d]", arrayType.Size)
+			_, err := fmt.Fprintf(&arraySuffixes, "[%d]", arrayType.Size)
+			if err != nil {
+				panic(&errors.UnreachableError{})
+			}
 			currentType = arrayType.Type
 		case *VariableSizedType:
 			arraySuffixes.WriteString("[]")
@@ -193,7 +197,13 @@ func ArrayTypeToString(arrayType ArrayType) string {
 			currentTypeIsArrayType = false
 		}
 	}
-	return currentType.String() + arraySuffixes.String()
+
+	baseType := currentType.String()
+	if _, isFunctionType := currentType.(*FunctionType); isFunctionType {
+		baseType = fmt.Sprintf("(%s)", baseType)
+	}
+
+	return baseType + arraySuffixes.String()
 }
 
 // FunctionType
