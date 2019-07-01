@@ -5,13 +5,13 @@ import (
 )
 
 type Variable struct {
-	Declaration ast.VariableDeclaration
+	Declaration *ast.VariableDeclaration
 	Depth       int
 	Type        Type
 	Value       Value
 }
 
-func newVariable(declaration ast.VariableDeclaration, depth int, value Value) *Variable {
+func newVariable(declaration *ast.VariableDeclaration, depth int, value Value) *Variable {
 	var variableType Type
 	if declaration.Type != nil {
 		variableType = mustConvertType(declaration.Type)

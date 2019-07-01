@@ -30,7 +30,7 @@ func (e *unsupportedAssignmentTargetExpression) Error() string {
 type unsupportedOperation struct {
 	kind      OperationKind
 	operation ast.Operation
-	position  ast.Position
+	position  *ast.Position
 }
 
 func (e *unsupportedOperation) Error() string {
@@ -42,7 +42,7 @@ func (e *unsupportedOperation) Error() string {
 type NotDeclaredError struct {
 	ExpectedKind DeclarationKind
 	Name         string
-	Position     ast.Position
+	Position     *ast.Position
 }
 
 func (e *NotDeclaredError) Error() string {
@@ -57,8 +57,8 @@ func (e *NotDeclaredError) Error() string {
 
 type NotCallableError struct {
 	Value         Value
-	StartPosition ast.Position
-	EndPosition   ast.Position
+	StartPosition *ast.Position
+	EndPosition   *ast.Position
 }
 
 func (e *NotCallableError) Error() string {
@@ -69,8 +69,8 @@ func (e *NotCallableError) Error() string {
 
 type NotIndexableError struct {
 	Value         Value
-	StartPosition ast.Position
-	EndPosition   ast.Position
+	StartPosition *ast.Position
+	EndPosition   *ast.Position
 }
 
 func (e *NotIndexableError) Error() string {
@@ -83,13 +83,13 @@ type InvalidUnaryOperandError struct {
 	Operation     ast.Operation
 	ExpectedType  Type
 	Value         Value
-	StartPosition ast.Position
-	EndPosition   ast.Position
+	StartPosition *ast.Position
+	EndPosition   *ast.Position
 }
 
 func (e *InvalidUnaryOperandError) Error() string {
 	return fmt.Sprintf(
-		"can't apply unary operation %s to value: %s. Expected type %s",
+		"can't apply unary operation %s to value: %#+v. Expected type %s",
 		e.Operation.Symbol(),
 		e.Value,
 		e.ExpectedType.String(),
@@ -103,8 +103,8 @@ type InvalidBinaryOperandError struct {
 	Side          OperandSide
 	ExpectedType  Type
 	Value         Value
-	StartPosition ast.Position
-	EndPosition   ast.Position
+	StartPosition *ast.Position
+	EndPosition   *ast.Position
 }
 
 func (e *InvalidBinaryOperandError) Error() string {
@@ -122,8 +122,8 @@ func (e *InvalidBinaryOperandError) Error() string {
 type ArgumentCountError struct {
 	ParameterCount int
 	ArgumentCount  int
-	StartPosition  ast.Position
-	EndPosition    ast.Position
+	StartPosition  *ast.Position
+	EndPosition    *ast.Position
 }
 
 func (e *ArgumentCountError) Error() string {
@@ -138,7 +138,7 @@ func (e *ArgumentCountError) Error() string {
 
 type RedeclarationError struct {
 	Name     string
-	Position ast.Position
+	Position *ast.Position
 }
 
 func (e *RedeclarationError) Error() string {
@@ -149,7 +149,7 @@ func (e *RedeclarationError) Error() string {
 
 type AssignmentToConstantError struct {
 	Name     string
-	Position ast.Position
+	Position *ast.Position
 }
 
 func (e *AssignmentToConstantError) Error() string {
@@ -160,8 +160,8 @@ func (e *AssignmentToConstantError) Error() string {
 
 type InvalidIndexValueError struct {
 	Value         Value
-	StartPosition ast.Position
-	EndPosition   ast.Position
+	StartPosition *ast.Position
+	EndPosition   *ast.Position
 }
 
 func (e *InvalidIndexValueError) Error() string {
