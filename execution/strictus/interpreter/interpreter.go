@@ -9,15 +9,14 @@ import (
 // are treated like they are returning a value.
 
 type Interpreter struct {
-	Program     ast.Program
+	Program     *ast.Program
 	activations *Activations
 	Globals     map[string]*Variable
 }
 
 func NewInterpreter(program *ast.Program) *Interpreter {
 	return &Interpreter{
-		// TODO: store pointer
-		Program:     *program,
+		Program:     program,
 		activations: &Activations{},
 		Globals:     map[string]*Variable{},
 	}
