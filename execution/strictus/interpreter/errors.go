@@ -124,8 +124,8 @@ type InvalidBinaryOperandTypesError struct {
 	ExpectedType  Type
 	LeftValue     Value
 	RightValue    Value
-	StartPosition ast.Position
-	EndPosition   ast.Position
+	StartPosition *ast.Position
+	EndPosition   *ast.Position
 }
 
 func (e *InvalidBinaryOperandTypesError) Error() string {

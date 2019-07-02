@@ -10,13 +10,15 @@ import (
 func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
+	program, errors := Parse(`
         const x = 1
         const y = true
         const z = 1 + 2
         var a = 3 == 3
         var b = [1, 2]
     `)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
@@ -44,11 +46,13 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 func TestInterpretDeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
-	program := parse(`
+	program, errors := Parse(`
         fun test(): Int {
             return 42
         }
     `)
+
+	Expect(errors).Should(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
