@@ -16,9 +16,10 @@ type Interpreter struct {
 	Globals     map[string]*Variable
 }
 
-func NewInterpreter(program ast.Program) *Interpreter {
+func NewInterpreter(program *ast.Program) *Interpreter {
 	return &Interpreter{
-		Program:     program,
+		// TODO: store pointer
+		Program:     *program,
 		activations: &Activations{},
 		Globals:     map[string]*Variable{},
 	}
@@ -117,7 +118,7 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 		}
 	}()
 
-	result := Run(interpreter.invokeFunction(function, arguments, ast.Position{}, ast.Position{}))
+	result := Run(interpreter.invokeFunction(function, arguments, nil, nil))
 	if result == nil {
 		return nil, nil
 	}
@@ -127,8 +128,8 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 func (interpreter *Interpreter) invokeFunction(
 	function FunctionValue,
 	arguments []Value,
-	startPosition ast.Position,
-	endPosition ast.Position,
+	startPosition *ast.Position,
+	endPosition *ast.Position,
 ) Trampoline {
 
 	// ensures the invocation's argument count matches the function's parameter count
@@ -148,12 +149,12 @@ func (interpreter *Interpreter) invokeFunction(
 	return function.invoke(interpreter, arguments)
 }
 
-func (interpreter *Interpreter) VisitProgram(program ast.Program) ast.Repr {
+func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 	panic(errors.UnreachableError{})
 }
 
-func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.FunctionDeclaration) ast.Repr {
-	expression := ast.FunctionExpression{
+func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
+	expression := &ast.FunctionExpression{
 		Parameters:    declaration.Parameters,
 		ReturnType:    declaration.ReturnType,
 		Block:         declaration.Block,
@@ -169,11 +170,11 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 		parameterTypes = append(parameterTypes, parameter.Type)
 	}
 
-	functionType := ast.FunctionType{
+	functionType := &ast.FunctionType{
 		ParameterTypes: parameterTypes,
 		ReturnType:     declaration.ReturnType,
 	}
-	variableDeclaration := ast.VariableDeclaration{
+	variableDeclaration := &ast.VariableDeclaration{
 		Value:              expression,
 		Identifier:         declaration.Identifier,
 		IsConst:            true,
@@ -197,7 +198,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration ast.Functio
 }
 
 func (interpreter *Interpreter) ImportFunction(name string, function *HostFunctionValue) {
-	variableDeclaration := ast.VariableDeclaration{
+	variableDeclaration := &ast.VariableDeclaration{
 		Identifier: name,
 		IsConst:    true,
 		// TODO: Type
@@ -206,8 +207,7 @@ func (interpreter *Interpreter) ImportFunction(name string, function *HostFuncti
 	interpreter.declareVariable(variableDeclaration, function)
 }
 
-func (interpreter *Interpreter) VisitBlock(block ast.Block) ast.Repr {
-
+func (interpreter *Interpreter) VisitBlock(block *ast.Block) ast.Repr {
 	// block scope: each block gets an activation record
 	interpreter.activations.PushCurrent()
 
@@ -249,7 +249,7 @@ func (interpreter *Interpreter) visitStatement(statement ast.Statement) Trampoli
 	return statement.Accept(interpreter).(Trampoline)
 }
 
-func (interpreter *Interpreter) VisitReturnStatement(statement ast.ReturnStatement) ast.Repr {
+func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
 	// NOTE: returning result
 
 	if statement.Expression == nil {
@@ -259,19 +259,22 @@ func (interpreter *Interpreter) VisitReturnStatement(statement ast.ReturnStateme
 	return statement.Expression.Accept(interpreter).(Trampoline)
 }
 
-func (interpreter *Interpreter) VisitIfStatement(statement ast.IfStatement) ast.Repr {
+func (interpreter *Interpreter) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 	return statement.Test.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(BoolValue)
 			if value {
 				return statement.Then.Accept(interpreter).(Trampoline)
-			} else {
+			} else if statement.Else != nil {
 				return statement.Else.Accept(interpreter).(Trampoline)
 			}
+
+			// NOTE: no result, so it does *not* act like a return-statement
+			return Done{}
 		})
 }
 
-func (interpreter *Interpreter) VisitWhileStatement(statement ast.WhileStatement) ast.Repr {
+func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatement) ast.Repr {
 	return statement.Test.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(BoolValue)
@@ -293,7 +296,7 @@ func (interpreter *Interpreter) VisitWhileStatement(statement ast.WhileStatement
 
 // VisitVariableDeclaration first visits the declaration's value,
 // then declares the variable with the name bound to the value
-func (interpreter *Interpreter) VisitVariableDeclaration(declaration ast.VariableDeclaration) ast.Repr {
+func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.VariableDeclaration) ast.Repr {
 	return declaration.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(Value)
@@ -305,7 +308,7 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration ast.Variabl
 		})
 }
 
-func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclaration, value Value) {
+func (interpreter *Interpreter) declareVariable(declaration *ast.VariableDeclaration, value Value) {
 	variable := interpreter.activations.Find(declaration.Identifier)
 	depth := interpreter.activations.Depth()
 	if variable != nil && variable.Depth == depth {
@@ -320,7 +323,7 @@ func (interpreter *Interpreter) declareVariable(declaration ast.VariableDeclarat
 	interpreter.activations.Set(declaration.Identifier, variable)
 }
 
-func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStatement) ast.Repr {
+func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
 	return assignment.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(Value)
@@ -328,17 +331,17 @@ func (interpreter *Interpreter) VisitAssignment(assignment ast.AssignmentStateme
 		})
 }
 
-func (interpreter *Interpreter) visitAssignmentValue(assignment ast.AssignmentStatement, value Value) Trampoline {
+func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentStatement, value Value) Trampoline {
 	switch target := assignment.Target.(type) {
-	case ast.IdentifierExpression:
+	case *ast.IdentifierExpression:
 		interpreter.visitIdentifierExpressionAssignment(target, value)
 		// NOTE: no result, so it does *not* act like a return-statement
 		return Done{}
 
-	case ast.IndexExpression:
+	case *ast.IndexExpression:
 		return interpreter.visitIndexExpressionAssignment(target, value)
 
-	case ast.MemberExpression:
+	case *ast.MemberExpression:
 	// TODO:
 
 	default:
@@ -350,7 +353,7 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment ast.AssignmentSt
 	panic(errors.UnreachableError{})
 }
 
-func (interpreter *Interpreter) visitIndexExpressionAssignment(target ast.IndexExpression, value Value) Trampoline {
+func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			indexedValue := result.(Value)
@@ -383,7 +386,7 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target ast.IndexE
 		})
 }
 
-func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target ast.IdentifierExpression, value Value) {
+func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
 	identifier := target.Identifier
 	variable := interpreter.activations.Find(identifier)
 	if variable == nil {
@@ -402,7 +405,7 @@ func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target ast.I
 	interpreter.activations.Set(identifier, variable)
 }
 
-func (interpreter *Interpreter) VisitIdentifierExpression(expression ast.IdentifierExpression) ast.Repr {
+func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
 	variable := interpreter.activations.Find(expression.Identifier)
 	if variable == nil {
 		panic(&NotDeclaredError{
@@ -418,15 +421,15 @@ func (interpreter *Interpreter) visitBinaryIntegerOperand(
 	value Value,
 	operation ast.Operation,
 	side OperandSide,
-	startPosition ast.Position,
-	endPosition ast.Position,
+	startPosition *ast.Position,
+	endPosition *ast.Position,
 ) IntegerValue {
 	integerValue, isInteger := value.(IntegerValue)
 	if !isInteger {
 		panic(&InvalidBinaryOperandError{
 			Operation:     operation,
 			Side:          side,
-			ExpectedType:  IntegerType{},
+			ExpectedType:  &IntegerType{},
 			Value:         value,
 			StartPosition: startPosition,
 			EndPosition:   endPosition,
@@ -439,15 +442,15 @@ func (interpreter *Interpreter) visitBinaryBoolOperand(
 	value Value,
 	operation ast.Operation,
 	side OperandSide,
-	startPosition ast.Position,
-	endPosition ast.Position,
+	startPosition *ast.Position,
+	endPosition *ast.Position,
 ) BoolValue {
 	boolValue, isBool := value.(BoolValue)
 	if !isBool {
 		panic(&InvalidBinaryOperandError{
 			Operation:     operation,
 			Side:          side,
-			ExpectedType:  BoolType{},
+			ExpectedType:  &BoolType{},
 			Value:         value,
 			StartPosition: startPosition,
 			EndPosition:   endPosition,
@@ -459,14 +462,14 @@ func (interpreter *Interpreter) visitBinaryBoolOperand(
 func (interpreter *Interpreter) visitUnaryBoolOperand(
 	value Value,
 	operation ast.Operation,
-	startPosition ast.Position,
-	endPosition ast.Position,
+	startPosition *ast.Position,
+	endPosition *ast.Position,
 ) BoolValue {
 	boolValue, isBool := value.(BoolValue)
 	if !isBool {
 		panic(&InvalidUnaryOperandError{
 			Operation:     operation,
-			ExpectedType:  BoolType{},
+			ExpectedType:  &BoolType{},
 			Value:         value,
 			StartPosition: startPosition,
 			EndPosition:   endPosition,
@@ -478,14 +481,14 @@ func (interpreter *Interpreter) visitUnaryBoolOperand(
 func (interpreter *Interpreter) visitUnaryIntegerOperand(
 	value Value,
 	operation ast.Operation,
-	startPosition ast.Position,
-	endPosition ast.Position,
+	startPosition *ast.Position,
+	endPosition *ast.Position,
 ) IntegerValue {
 	integerValue, isInteger := value.(IntegerValue)
 	if !isInteger {
 		panic(&InvalidUnaryOperandError{
 			Operation:     operation,
-			ExpectedType:  IntegerType{},
+			ExpectedType:  &IntegerType{},
 			Value:         value,
 			StartPosition: startPosition,
 			EndPosition:   endPosition,
@@ -496,7 +499,7 @@ func (interpreter *Interpreter) visitUnaryIntegerOperand(
 
 // visitBinaryOperation interprets the left-hand side and the right-hand side and returns
 // the result in a integerTuple or booleanTuple
-func (interpreter *Interpreter) visitBinaryOperation(expr ast.BinaryExpression) Trampoline {
+func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression) Trampoline {
 	// interpret the left-hand side
 	return expr.Left.Accept(interpreter).(Trampoline).
 		FlatMap(func(left interface{}) Trampoline {
@@ -553,7 +556,7 @@ func (interpreter *Interpreter) visitBinaryOperation(expr ast.BinaryExpression) 
 // visitBinaryIntegerOperation interprets the left-hand side and right-hand side
 // of the binary expression, and applies both integer values to the given binary function
 func (interpreter *Interpreter) visitBinaryIntegerOperation(
-	expression ast.BinaryExpression,
+	expression *ast.BinaryExpression,
 	binaryFunction func(IntegerValue, IntegerValue) Value,
 ) Trampoline {
 	return interpreter.visitBinaryOperation(expression).
@@ -579,7 +582,7 @@ func (interpreter *Interpreter) visitBinaryIntegerOperation(
 // visitBinaryBoolOperation interprets the left-hand side and right-hand side
 // of the binary expression, and applies both boolean values to the given binary function
 func (interpreter *Interpreter) visitBinaryBoolOperation(
-	expression ast.BinaryExpression,
+	expression *ast.BinaryExpression,
 	binaryFunction func(BoolValue, BoolValue) Value,
 ) Trampoline {
 	return interpreter.visitBinaryOperation(expression).
@@ -602,7 +605,7 @@ func (interpreter *Interpreter) visitBinaryBoolOperation(
 		})
 }
 
-func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpression) ast.Repr {
+func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpression) ast.Repr {
 	switch expression.Operation {
 	case ast.OperationPlus:
 		return interpreter.visitBinaryIntegerOperation(
@@ -720,7 +723,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression ast.BinaryExpre
 	})
 }
 
-func (interpreter *Interpreter) VisitUnaryExpression(expression ast.UnaryExpression) ast.Repr {
+func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
 			value := result.(Value)
@@ -752,7 +755,7 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression ast.UnaryExpress
 		})
 }
 
-func (interpreter *Interpreter) VisitExpressionStatement(statement ast.ExpressionStatement) ast.Repr {
+func (interpreter *Interpreter) VisitExpressionStatement(statement *ast.ExpressionStatement) ast.Repr {
 	return statement.Expression.Accept(interpreter).(Trampoline).
 		Map(func(_ interface{}) interface{} {
 			// NOTE: ignore result, so it does *not* act like a return-statement
@@ -760,28 +763,28 @@ func (interpreter *Interpreter) VisitExpressionStatement(statement ast.Expressio
 		})
 }
 
-func (interpreter *Interpreter) VisitBoolExpression(expression ast.BoolExpression) ast.Repr {
+func (interpreter *Interpreter) VisitBoolExpression(expression *ast.BoolExpression) ast.Repr {
 	value := BoolValue(expression.Value)
 
 	return Done{Result: value}
 }
 
-func (interpreter *Interpreter) VisitIntExpression(expression ast.IntExpression) ast.Repr {
+func (interpreter *Interpreter) VisitIntExpression(expression *ast.IntExpression) ast.Repr {
 	value := IntValue{expression.Value}
 
 	return Done{Result: value}
 }
 
-func (interpreter *Interpreter) VisitArrayExpression(expression ast.ArrayExpression) ast.Repr {
+func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpression) ast.Repr {
 	return interpreter.visitExpressions(expression.Values, nil)
 }
 
-func (interpreter *Interpreter) VisitMemberExpression(ast.MemberExpression) ast.Repr {
+func (interpreter *Interpreter) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
 	// TODO: no dictionaries yet
 	panic(&errors.UnreachableError{})
 }
 
-func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpression) ast.Repr {
+func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			indexedValue := result.(Value)
@@ -813,7 +816,7 @@ func (interpreter *Interpreter) VisitIndexExpression(expression ast.IndexExpress
 		})
 }
 
-func (interpreter *Interpreter) VisitConditionalExpression(expression ast.ConditionalExpression) ast.Repr {
+func (interpreter *Interpreter) VisitConditionalExpression(expression *ast.ConditionalExpression) ast.Repr {
 	return expression.Test.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(BoolValue)
@@ -826,7 +829,7 @@ func (interpreter *Interpreter) VisitConditionalExpression(expression ast.Condit
 		})
 }
 
-func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression ast.InvocationExpression) ast.Repr {
+func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
 	// interpret the invoked expression
 	return invocationExpression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
@@ -889,7 +892,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 		interpreter.activations.Set(
 			parameter.Identifier,
 			&Variable{
-				Declaration: ast.VariableDeclaration{
+				Declaration: &ast.VariableDeclaration{
 					IsConst:       true,
 					Identifier:    parameter.Identifier,
 					Type:          parameter.Type,
@@ -920,7 +923,7 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression, v
 		})
 }
 
-func (interpreter *Interpreter) VisitFunctionExpression(expression ast.FunctionExpression) ast.Repr {
+func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	function := newInterpretedFunction(expression, interpreter.activations.CurrentOrNew())
 

@@ -18,14 +18,14 @@ type FunctionValue interface {
 // InterpretedFunctionValue
 
 type InterpretedFunctionValue struct {
-	Expression ast.FunctionExpression
+	Expression *ast.FunctionExpression
 	Activation hamt.Map
 }
 
 func (InterpretedFunctionValue) isValue()         {}
 func (InterpretedFunctionValue) isFunctionValue() {}
 
-func newInterpretedFunction(expression ast.FunctionExpression, activation hamt.Map) *InterpretedFunctionValue {
+func newInterpretedFunction(expression *ast.FunctionExpression, activation hamt.Map) *InterpretedFunctionValue {
 	return &InterpretedFunctionValue{
 		Expression: expression,
 		Activation: activation,
@@ -43,7 +43,7 @@ func (f *InterpretedFunctionValue) parameterCount() int {
 // HostFunctionValue
 
 type HostFunctionValue struct {
-	functionType FunctionType
+	functionType *FunctionType
 	function     func(*Interpreter, []Value) Value
 }
 
@@ -60,7 +60,7 @@ func (f *HostFunctionValue) parameterCount() int {
 }
 
 func NewHostFunction(
-	functionType FunctionType,
+	functionType *FunctionType,
 	function func(*Interpreter, []Value) Value,
 ) *HostFunctionValue {
 	return &HostFunctionValue{
