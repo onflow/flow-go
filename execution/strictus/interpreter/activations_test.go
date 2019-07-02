@@ -14,7 +14,7 @@ func TestActivations(t *testing.T) {
 	activations.Set(
 		"a",
 		&Variable{
-			Declaration: ast.VariableDeclaration{
+			Declaration: &ast.VariableDeclaration{
 				IsConst:    false,
 				Identifier: "a",
 				Type:       &ast.BaseType{Identifier: "Int64"},
@@ -31,7 +31,7 @@ func TestActivations(t *testing.T) {
 	activations.Set(
 		"a",
 		&Variable{
-			Declaration: ast.VariableDeclaration{
+			Declaration: &ast.VariableDeclaration{
 				IsConst:    false,
 				Identifier: "a",
 				Type:       &ast.BaseType{Identifier: "Int64"},
@@ -42,7 +42,7 @@ func TestActivations(t *testing.T) {
 	activations.Set(
 		"b",
 		&Variable{
-			Declaration: ast.VariableDeclaration{
+			Declaration: &ast.VariableDeclaration{
 				IsConst:    false,
 				Identifier: "b",
 				Type:       &ast.BaseType{Identifier: "Int64"},
@@ -60,7 +60,7 @@ func TestActivations(t *testing.T) {
 	activations.Set(
 		"a",
 		&Variable{
-			Declaration: ast.VariableDeclaration{
+			Declaration: &ast.VariableDeclaration{
 				IsConst:    false,
 				Identifier: "a",
 				Type:       &ast.BaseType{Identifier: "Int64"},
@@ -71,7 +71,7 @@ func TestActivations(t *testing.T) {
 	activations.Set(
 		"c",
 		&Variable{
-			Declaration: ast.VariableDeclaration{
+			Declaration: &ast.VariableDeclaration{
 				IsConst:    false,
 				Identifier: "c",
 				Type:       &ast.BaseType{Identifier: "Int64"},
