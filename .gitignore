@@ -9,3 +9,5 @@ donotcommit
 
 # Since we have integration_tests that uses node
 node_modules
+
+.DS_Store
