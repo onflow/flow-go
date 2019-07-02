@@ -68,12 +68,10 @@ func (d Done) Map(f func(interface{}) interface{}) Trampoline {
 
 // More
 
-type More struct {
-	Next func() Trampoline
-}
+type More func() Trampoline
 
 func (m More) resume() interface{} {
-	return m.Next
+	return (func() Trampoline)(m)
 }
 
 func (m More) FlatMap(f func(interface{}) Trampoline) Trampoline {
@@ -111,7 +109,7 @@ func (m FlatMap) resume() interface{} {
 		}
 	case More:
 		return func() Trampoline {
-			return sub.Next().FlatMap(continuation)
+			return sub().FlatMap(continuation)
 		}
 	case FlatMap:
 		panic("FlatMap is not a valid subroutine. Use the FlatMap function to construct proper FlatMap structures.")

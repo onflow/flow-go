@@ -10,7 +10,7 @@ func TestFlatMap(t *testing.T) {
 	RegisterTestingT(t)
 
 	trampoline :=
-		More{func() Trampoline { return Done{23} }}.
+		More(func() Trampoline { return Done{23} }).
 			FlatMap(func(value interface{}) Trampoline {
 				number := value.(int)
 				return Done{number * 42}
@@ -23,12 +23,12 @@ func TestFlatMap2(t *testing.T) {
 	RegisterTestingT(t)
 
 	trampoline :=
-		More{func() Trampoline { return Done{23} }}.
+		More(func() Trampoline { return Done{23} }).
 			FlatMap(func(value interface{}) Trampoline {
 				n := value.(int)
-				return More{func() Trampoline {
+				return More(func() Trampoline {
 					return Done{strconv.Itoa(n)}
-				}}
+				})
 			}).
 			FlatMap(func(value interface{}) Trampoline {
 				str := value.(string)
@@ -42,13 +42,13 @@ func TestFlatMap3(t *testing.T) {
 	RegisterTestingT(t)
 
 	trampoline :=
-		More{func() Trampoline {
+		More(func() Trampoline {
 			return Done{23}.
 				FlatMap(func(value interface{}) Trampoline {
 					n := value.(int)
 					return Done{n * 42}
 				})
-		}}.
+		}).
 			FlatMap(func(value interface{}) Trampoline {
 				n := value.(int)
 				return Done{strconv.Itoa(n)}
@@ -61,7 +61,7 @@ func TestMap(t *testing.T) {
 	RegisterTestingT(t)
 
 	trampoline :=
-		More{func() Trampoline { return Done{23} }}.
+		More(func() Trampoline { return Done{23} }).
 			Map(func(value interface{}) interface{} {
 				n := value.(int)
 				return n * 42
@@ -94,9 +94,9 @@ func TestEvenOdd(t *testing.T) {
 			return Done{true}
 		}
 
-		return More{func() Trampoline {
+		return More(func() Trampoline {
 			return odd(n - 1)
-		}}
+		})
 	}
 
 	odd = func(value interface{}) Trampoline {
@@ -105,9 +105,9 @@ func TestEvenOdd(t *testing.T) {
 			return Done{false}
 		}
 
-		return More{func() Trampoline {
+		return More(func() Trampoline {
 			return even(n - 1)
-		}}
+		})
 	}
 
 	Expect(Run(odd(99999))).To(BeTrue())
@@ -145,18 +145,18 @@ func TestAckermann(t *testing.T) {
 			return Done{n + 1}
 		}
 		if n <= 0 {
-			return More{func() Trampoline {
+			return More(func() Trampoline {
 				return ackermann(m-1, 1)
-			}}
+			})
 		}
-		first := More{func() Trampoline {
+		first := More(func() Trampoline {
 			return ackermann(m, n-1)
-		}}
+		})
 		second := func(value interface{}) Trampoline {
 			x := value.(int)
-			return More{func() Trampoline {
+			return More(func() Trampoline {
 				return ackermann(m-1, x)
-			}}
+			})
 		}
 		return first.FlatMap(second)
 	}
