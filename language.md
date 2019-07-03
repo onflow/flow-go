@@ -818,7 +818,7 @@ send(from: sender, to: receiver, amount: 100)
 The order of the arguments in a function call must match the order of the parameters in the function declaration.
 
 ```typescript
-// Declare a function named `test`, which accepts to parameters, named `first` and `second`
+// Declare a function named `test`, which accepts two parameters, named `first` and `second`
 //
 fun test(first: Int, second: Int) {
     // ...
