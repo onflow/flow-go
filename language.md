@@ -48,19 +48,19 @@ The `const` keyword is used to declare a constant and the `var` keyword is used 
 The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
 ```typescript
-// declare a constant
+// Declare a constant named `a`
 //
 const a = 1
 
-// error: re-assigning to a constant
+// Error: re-assigning to a constant
 //
 a = 2
 
-// declare a variable
+// Declare a variable named `b`
 //
 var b = 3
 
-// assigning a new value to a variable
+// Assign a new value to the variable named `b`
 //
 b = 4
 ```
@@ -68,7 +68,7 @@ b = 4
 Variables and constants **must** be initialized.
 
 ```typescript
-// invalid: constant has no initial value
+// Invalid: the constant has no initial value
 //
 const a
 ```
@@ -77,23 +77,27 @@ Once a constant or variable is declared, it can't be redeclared with the same na
 
 
 ```typescript
-// declare a constant
+// Declare a constant named `a`
 //
 const a = 1
 
-// invalid: re-declare a constant with a name that is already used in this scope
+// Invalid: can't re-declare a constant with name `a`,
+// as it is already used in this scope
 //
 const a = 2
 
-// declare a variable
+// Declare a variable named `b`
 //
 var b = 3
 
-// invalid: re-declare a variable with a name that is already used in this scope
+// Invalid: can't re-declare a variable with name `b`,
+// as it is already used in this scope
 //
 var b = 4
 
-// invalid: declare a variable with a name that was used for a constant
+// Invalid: can't declare a variable with the name `a`,
+// as it is already used in this scope,
+// and it was declared as a constant
 //
 var a = 5
 ```
@@ -105,32 +109,34 @@ When declaring a constant or variable, an optional *type annotation* can be prov
 If no type annotation is provided, the type of the declaration is [inferred from the initial value](#type-inference).
 
 ```typescript
-// declare a variable with an explicit type.
+// Declare a variable named `initialized` which has an explicit type annotation.
 //
-// Bool is the type of booleans.
+// `Bool` is the type of booleans
 //
 var initialized: Bool = false
 
-// declare a constant with an inferred type
+// Declare a constant named `inferred`, which has no type annotation
+// and for which the type is inferred to be `Int`,
+// based on the initial value
 //
-const a = 1
+const inferred = 1
 ```
 
 If a type annotation is provided, the initial value must be of this type, and new values assigned to variables must match the declaration's type. This type safety is explained in more detail in a [separate section](#type-safety).
 
 ```typescript
-// invalid: declare a variable with an explicit type Bool,
-// but initial value is of type Int.
+// Invalid: declare a variable with an explicit type `Bool`,
+// but the initial value has type `Int`.
 //
-// Int is the type of arbitrary-precision integers.
+// `Int` is the type of arbitrary-precision integers
 //
 const booleanConstant: Bool = 1
 
-// declare a variable with an explicit type
+// Declare a variable that has type `Bool`
 //
-var booleanVariable: Bool = false
+var booleanVariable = false
 
-// invalid: assign a value of of type Int to a variable of type Bool
+// Invalid: assign a value with type `Int` to a variable which has type `Bool`
 //
 booleanVariable = 1
 ```
@@ -141,29 +147,29 @@ Names may start with any upper and lowercase letter or an underscore. This may b
 Names may not begin with a number.
 
 ```typescript
-// valid
+// Valid, title-case
 //
 PersonID
 
-// valid
+// Valid, with underscore
 //
 token_name
 
-// valid
+// Valid, leading underscore
 //
 _balance
 
-// valid
+// Valid, with number
 //
 account2
 
-// invalid
-//
-!@#$%^&*
-
-// invalid
+// Invalid, leading number
 //
 1something
+
+// Invalid, various invalid characters
+//
+!@#$%^&*
 ```
 
 ### Conventions
@@ -176,15 +182,15 @@ By convention, variables, constants, and functions have lowercase names; and typ
 Semicolons may be used to separate statements, but are optional. They can be used to separate multiple statements on a single line.
 
 ```typescript
-// constant declaration statement without a semicolon
+// Declare a constant, without a semicolon
 //
 const a = 1
 
-// variable declarations statement with a semicolon
+// Declare a variable, with a semicolon
 //
 var b = 2;
 
-// multiple statements on a single line
+// Declare a constant and a variable on a single line, separated by semicolons
 //
 const d = 1; var e = 2
 ```
@@ -195,7 +201,7 @@ Values are objects, like for example booleans, integers, or arrays. Values are t
 
 ### Booleans
 
-The two boolean values `true` and `false` are of type `Bool`.
+The two boolean values `true` and `false` have the type `Bool`.
 
 ### Integers
 
@@ -231,27 +237,37 @@ Numbers can be written in various bases. Numbers are assumed to be decimal by de
 | **Hexadecimal** | `0x`   | one or more numbers, or characters `a` to `f`, lowercase or uppercase |
 
 ```typescript
-// a decimal number
+// A decimal number
 //
-const dec = 1234567890
+1234567890
 
-// a binary number
+// A binary number
 //
-const bin = 0b101010
+0b101010
 
-// an octal number
+// An octal number
 //
-const oct = 0o12345670
+0o12345670
 
-// a hexadecimal number
+// A hexadecimal number
 //
-const hex = 0x1234567890ABCDEFabcdef
+0x1234567890ABCDEFabcdef
+
+// Invalid: unsupported prefix 0z
+//
+0z0
 ```
 
 Decimal numbers may contain underscores (`_`) to logically separate components.
 
 ```typescript
-const aLargeNumber = 1_000_000
+const largeNumber = 1_000_000
+```
+
+Underscores are allowed for all numeral systems.
+
+```typescript
+const binaryNumber = 0b10_11_01
 ```
 
 ### Arrays
@@ -259,17 +275,17 @@ const aLargeNumber = 1_000_000
 Arrays are mutable, ordered collections of values. All values in an array must have the same type. Arrays may contain a value multiple times. Array literals start with an opening square bracket `[` and end with a closing square bracket `]`.
 
 ```typescript
-// an empty array
+// An empty array
 //
-const empty = []
+[]
 
-// an array with integers
+// An array with integers
 //
-const integers = [1, 2, 3]
+[1, 2, 3]
 
-// invalid: mixed types
+// Invalid: mixed types
 //
-const invalidMixed = [1, true, 2, false]
+[1, true, 2, false]
 ```
 
 #### Array Indexing
@@ -279,11 +295,11 @@ To get the element of an array at a specific index, the indexing syntax can be u
 ```typescript
 const numbers = [42, 23]
 
-// get the first number
+// Get the first number
 //
 numbers[0] // is 42
 
-// get the second number
+// Get the second number
 //
 numbers[1] // is 23
 ```
@@ -291,7 +307,7 @@ numbers[1] // is 23
 ```typescript
 const arrays = [[1, 2], [3, 4]]
 
-// get the first number of the second array
+// Get the first number of the second array
 //
 arrays[1][0] // is 3
 ```
@@ -301,11 +317,11 @@ To set an element of an array at a specific index, the indexing syntax can be us
 ```typescript
 const numbers = [42, 23]
 
-// change the second number
+// Change the second number
 //
 numbers[1] = 2
 
-// numbers is [42, 2]
+// `numbers` is [42, 2]
 ```
 
 #### Array Types
@@ -314,7 +330,7 @@ Arrays either have a fixed size or are variably sized, i.e., elements can be add
 
 Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array. For example, a fixed-size array of 3 `Int8` elements has the type `Int8[3]`.
 
-Variable-size arrays have the type suffix `[]`. For example, a variable-size array of `Int16` elements has the type `Int16[]`.
+Variable-size arrays have the type suffix `[]`. For example, the type `Int16[]` specifies a variable-size array of elements that have type `Int16`.
 
 
 <!--
@@ -339,20 +355,20 @@ Dictionaries are mutable, unordered collections of key-value associations. In a 
 Dictionary literals start with an opening brace `{` and end with a closing brace `}`. Keys are separated from values by a colon, and key-value associations are separated by commas.
 
 ```typescript
-// an empty dictionary
+// An empty dictionary
 //
-const empty = {}
+{}
 
-// a dictionary mapping integers to booleans
+// A dictionary which associates integers with booleans
 //
-const dictionary = {
+{
     1: true,
     2: false
 }
 
-// invalid: mixed types
+// Invalid: mixed types
 //
-const invalidMixed = {
+{
     1: true,
     false: 2
 }
@@ -387,7 +403,7 @@ const booleans = {
 }
 booleans[1] = false
 booleans[0] = true
-// booleans is {1: false, 0: true}
+// `booleans` is {1: false, 0: true}
 ```
 
 
@@ -400,13 +416,13 @@ const booleans = {
     1: true,
     0: false
 }
-// booleans has type Bool[Int]
+// `booleans` has type `Bool[Int]`
 
 const integers = {
     true: 1,
     false: 0
 }
-// integers has type Int[Bool]
+// `integers` has type `Int[Bool]`
 ```
 
 <!--
@@ -459,21 +475,21 @@ The left-hand side of the assignment must be an identifier, followed by one or m
 ```typescript
 const numbers = [1, 2]
 
-// change the first number
+// Change the first number
 //
 numbers[0] = 3
 
-// numbers is [3, 2]
+// `numbers` is [3, 2]
 ```
 
 ```typescript
 const arrays = [[1, 2], [3, 4]]
 
-// change the first number in the second array
+// Change the first number in the second array
 //
 arrays[1][0] = 5
 
-// arrays is [[1, 2], [5, 4]]
+// `arrays` is [[1, 2], [5, 4]]
 ```
 
 ```typescript
@@ -484,7 +500,7 @@ const dictionaries = {
 
 dictionaries[false][3] = 0
 
-// dictionaries is {
+// `dictionaries` is {
 //   true: {1: 2},
 //   false: {3: 0}
 //}
@@ -501,7 +517,7 @@ There are four arithmetic operators:
 
 ```typescript
 const a = 1 + 2
-// a is 3
+// `a` is 3
 ```
 
 Arithmetic operators don't cause values to overflow.
@@ -510,7 +526,7 @@ Arithmetic operators don't cause values to overflow.
 const a: Int8 = 100
 const b: Int8 = 100
 const c = a * b
-// c is 10000, and of type `Int`.
+// `c` is 10000, and has type `Int`
 ```
 
 If overflow behavior is intended, overflowing operators are available, which are prefixed with an `&`:
@@ -645,7 +661,7 @@ It behaves like an if-statement, but is an expression: If the first operator val
 
 ```typescript
 const x = 1 > 2 ? 3 : 4
-x // is 4
+// `x` is 4
 ```
 
 ### Precedence and Associativity
@@ -677,7 +693,7 @@ Functions can be declared by using the `fun` keyword, followed by the name of th
 
 The parameters need to be enclosed in parentheses. The return type, if any, is separated from the parameters using the `->` keyword (a hyphen followed by a right angle bracket). The function code needs to be enclosed in opening and closing braces.
 
-Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter. Argument labels preceed the parameter name. The special argument label `_` indicates that a function call can omit the argument label. If no argument label is provided, the function call must use the parameter name. 
+Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter. Argument labels preceed the parameter name. The special argument label `_` indicates that a function call can omit the argument label. If no argument label is provided, the function call must use the parameter name.
 
 Each parameter needs to have a type annotation, which follows the parameter name after a colon.
 
@@ -734,11 +750,11 @@ send(from: sender, to: receiver, amount: 100)
 Functions can be nested, i.e., the code of a function may declare further functions.
 
 ```typescript
-// declare a function which multiplies a number by two, and adds one
+// Declare a function which multiplies a number by two, and adds one
 //
 fun doubleAndAddOne(_ x: Int) -> Int {
 
-    // declare a nested function which doubles, which multiplies a number by two
+    // Declare a nested function which multiplies a number by two
     //
     fun double(_ x: Int) {
         return x * 2
@@ -755,8 +771,9 @@ doubleAndAddOne(2) // is 5
 Functions can be also used as expressions. The syntax is the same as for function declarations, except that function expressions have no name, i.e., it is anonymous.
 
 ```typescript
-// declare a constant called double, which has a function as its value,
-// which multiplies a number by two when called
+// Declare a constant named `double`, which has a function as its value.
+//
+// The function multiplies a number by two when it is called
 //
 const double =
     fun (_ x: Int) -> Int {
@@ -773,13 +790,15 @@ fun double(_ x: Int) -> Int {
      return x * 2
 }
 
+// Valid: the correct amount of arguments is provided
+//
 double(2) // is 4
 
-// invalid: too many arguments
+// Invalid: too many arguments are provided
 //
 double(2, 3)
 
-// invalid: too few arguments
+// Invalid: too few arguments are provided
 //
 double()
 ```
@@ -790,7 +809,7 @@ Function types consist of the function's parameter types and the function's retu
 The parameter types need to be enclosed in parentheses, followed by the `->` keyword, and end with the return type.
 
 ```typescript
-// declare a function called add, with the function type (Int, Int) -> Int
+// Declare a function named `add`, with the function type `(Int, Int) -> Int`
 //
 fun add(a: Int, b: Int) -> Int {
     return a + b
@@ -798,7 +817,7 @@ fun add(a: Int, b: Int) -> Int {
 ```
 
 ```typescript
-// declare a constant called add, with the function type (Int, Int) -> Int
+// Declare a constant named `add`, with the function type `(Int, Int) -> Int`
 //
 const add: (Int, Int) -> Int =
     fun (a: Int, b: Int) -> Int {
@@ -809,7 +828,7 @@ const add: (Int, Int) -> Int =
 If the function has no return type, it implicitly has the return type `Void`.
 
 ```typescript
-// declare a constant called doNothing, which is a function
+// Declare a constant named `doNothing`, which is a function
 // that takes no parameters and returns nothing
 //
 const doNothing: () -> Void =
@@ -818,7 +837,7 @@ const doNothing: () -> Void =
 
 Types can be enclosed in parentheses to change precedence.
 
-For example, a function type `(Int) -> (() -> Int)` is the type for a function which accepts one argument of type `Int`, and which returns another function, that takes no arguments and returns an `Int`. 
+For example, a function type `(Int) -> (() -> Int)` is the type for a function which accepts one argument with type `Int`, and which returns another function, that takes no arguments and returns an `Int`.
 
 The type `((Int) -> Int)[2]` specifies an array type of two functions, which accept one integer and return one integer.
 
@@ -842,7 +861,7 @@ Parameters are constant, i.e., it is not allowed to assign to them.
 
 ```typescript
 fun test(x: Int) {
-     // invalid: assignment to parameter (constant)
+     // Invalid: cannot assign to a parameter (constant)
      //
      x = 2
 }
@@ -858,7 +877,7 @@ Preconditions must be true right before the execution of the function. Precondit
 
 Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `ensure` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
 
-A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they can't have side-effects and must be pure expressions. 
+A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they can't have side-effects and must be pure expressions.
 
 <!--
 
@@ -876,12 +895,12 @@ In postconditions, the special constant `result` refers to the result of the fun
 ```typescript
 fun factorial(_ n: Int) -> Int {
     require {
-        // factorial is only defined for integers greater than or equal to zero
+        // Factorial is only defined for integers greater than or equal to zero
         //
         n >= 0
     }
     ensure {
-        // the result will always be greater than or equal to 1
+        // The result will always be greater than or equal to 1
         //
         result >= 1
     }
@@ -897,9 +916,9 @@ fun factorial(_ n: Int) -> Int {
     return result
 }
 
-factorial(5) // is 120
+factorial(5) // returns 120
 
-// error: argument does not satisfy precondition n >= 0
+// Error: the given argument does not satisfy the precondition `n >= 0` of the function
 //
 factorial(-2)
 ```
@@ -911,7 +930,7 @@ var n = 0
 
 fun incrementN() {
     ensure {
-        // require the new value of n to be the old value of n, plus one
+        // Require the new value of `n` to be the old value of `n`, plus one
         //
         n == before(n) + 1
     }
@@ -1021,9 +1040,9 @@ fun f() -> Int {
     return x + y
 }
 
-f() // is 20
+f() // returns 20
 
-// invalid: y is not in scope
+// Invalid: the identifier `y` is not in scope
 //
 y
 ```
@@ -1036,7 +1055,7 @@ fun doubleAndAddOne(_ n: Int) -> Int {
     return double(n) + 1
 }
 
-// invalid: `double` is not in scope
+// Invalid: the identifier `double` is not in scope
 //
 double(1)
 ```
@@ -1051,7 +1070,7 @@ fun test() -> Int {
     return x
 }
 
-test() // is 3
+test() // returns 3
 ```
 
 Scope is lexical, not dynamic.
@@ -1068,7 +1087,7 @@ fun g() -> Int {
    return f()
 }
 
-g() // is 10, not 20
+g() // returns 10, not 20
 ```
 
 Declarations are **not** moved to the top of the enclosing function (hoisted).
@@ -1092,26 +1111,27 @@ f() // returns 2
 
 The Bamboo programming language is a _type-safe_ language.
 
-When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable is of type `Bool`, it can _only_ be assigned a `Bool`, and not for example an `Int`.
+When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type `Bool`, it can _only_ be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
 
 ```typescript
+// Declare a variable that has type `Bool`
 var a = true
 
-// invalid: integer is not a boolean
+// Invalid: cannot assign a value that has type `Int` to a variable which has type `Bool`
 //
 a = 0
 ```
 
-When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument of type `Bool`, _only_ a `Bool` can be provided, and not for example an `Int`.
+When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type `Bool`, _only_ a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
 
 ```typescript
 fun nand(_ a: Bool, _ b: Bool) -> Bool {
     return !(a && b)
 }
 
-nand(false, false) // is true
+nand(false, false) // returns true
 
-// invalid: integers are not booleans
+// Invalid: integers are not booleans
 //
 nand(0, 0)
 ```
@@ -1123,12 +1143,14 @@ fun add(_ a: Int8, _ b: Int8) -> Int {
     return a + b
 }
 
-add(1, 2) // is 3
+add(1, 2) // returns 3
 
+// Declare two constants which have type `Int32`
+//
 const a: Int32 = 3_000_000_000
 const b: Int32 = 3_000_000_000
 
-// invalid: Int32 is not Int8
+// Invalid: cannot pass arguments which have type `Int32` to parameters which have type `Int8`
 //
 add(a, b)
 ```
@@ -1145,16 +1167,16 @@ Integer literals are inferred to type `Int`.
 ```typescript
 const a = 1
 
-// a has type Int
+// `a` has type `Int`
 ```
 
 Array literals are inferred based on the elements of the literal, and to be variable-size.
 
 ```typescript
 const integers = [1, 2]
-// integers has type Int[]
+// `integers` has type `Int[]`
 
-// invalid: mixed types
+// Invalid: mixed types
 //
 const invalidMixed = [1, true, 2, false]
 ```
@@ -1166,9 +1188,9 @@ const booleans = {
     1: true,
     2: false
 }
-// booleans has type Bool[Int]
+// `booleans` has type `Bool[Int]`
 
-// invalid: mixed types
+// Invalid: mixed types
 //
 const invalidMixed = {
     1: true,
@@ -1183,7 +1205,7 @@ const add = (a: Int8, b: Int8) -> Int {
     return a + b
 }
 
-// add has type (Int8, Int8) -> Int
+// `add` has type `(Int8, Int8) -> Int`
 ```
 
 ## Structures and Classes
@@ -1236,9 +1258,10 @@ Synthetic fields are **not** stored in the structure or class value, i.e. they a
 | **Synthetic field**  | **No**           | Yes                | `synthetic` |
 
 ```typescript
-// declare a token struct, which has a constant field
-// named id and a variable field named balance.
-// both fields are initialized through the initializer.
+// Declare a structure named `Token`, which has a constant field
+// named `id` and a variable field named `balance`.
+//
+// Both fields are initialized through the initializer
 //
 struct Token {
     const id: Int
@@ -1264,7 +1287,7 @@ token.balance // is 1_000_000
 token.balance = 1
 // token.balance is 1
 
-// invalid: assignment to constant field
+// Invalid: assignment to constant field
 //
 token.id = 23
 ```
@@ -1280,7 +1303,7 @@ Getters are declared using the `get` keyword. Getters have no parameters and the
 ```typescript
 struct GetterExample {
 
-    // declare a variable field with a getter
+    // Declare a variable field named `balance` with a getter
     // which ensures the read value is always positive
     //
     var balance: Int {
@@ -1316,8 +1339,8 @@ The types of values assigned to setters must always match the field's type.
 ```typescript
 struct SetterExample {
 
-    // declare a variable field with a setter
-    // which ensures the written value is always positive
+    // Declare a variable field named `balance` with a setter
+    // which requires written values to be positive
     //
     var balance: Int {
        set(newBalance) {
@@ -1378,7 +1401,7 @@ tracker.left = 8
 // tracker.completed is 2
 
 // NOTE: the tracker only implementats some functionality to demonstrate
-// synthesized fields, it is incomplete (e.g. assignments to goal are not handled)
+// synthesized fields, it is incomplete (e.g. assignments to `goal` are not handled properly)
 ```
 
 ### Structure and Class Functions
@@ -1410,7 +1433,7 @@ token.mint(amount: 1_000_000)
 The only difference between structures and classes is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types.
 
 ```typescript
-// declare a structure with a variable integer field
+// Declare a structure named `SomeStruct`, with a variable integer field
 //
 struct SomeStruct {
     var value: Int
@@ -1421,11 +1444,11 @@ struct SomeStruct {
 
 }
 
-// declare a constant with value of structure type SomeStruct
+// Declare a constant with value of structure type `SomeStruct`
 //
 const structA = SomeStruct(value: 0)
 
-// *copy* the structure value into a new constant
+// *Copy* the structure value into a new constant
 //
 const structB = structA
 
@@ -1435,7 +1458,7 @@ structB.value = 1
 ```
 
 ```typescript
-// declare a class with a variable integer field
+// Declare a class named `SomeClass`, with a variable integer field
 //
 class SomeClass {
     var value: Int
@@ -1445,11 +1468,11 @@ class SomeClass {
     }
 }
 
-// declare a constant with value of class type SomeClass
+// Declare a constant with value of class type `SomeClass`
 //
 const classA = SomeClass(value: 0)
 
-// *reference* the class value with a new constant
+// *Reference* the class value with a new constant
 //
 const classB = classA
 
@@ -1497,60 +1520,60 @@ To summarize the behavior for functions, structures, classes, and interfaces:
 
 
 ```typescript
-// declare a private constant, inaccessible/invisible in outer scope
+// Declare a private constant, inaccessible/invisible in outer scope
 //
 const a = 1
 
-// declare a public constant, accessible/visible in all scopes
+// Declare a public constant, accessible/visible in all scopes
 //
 pub const b = 2
 
-// declare a public class, accessible/visible in all scopes
+// Declare a public class, accessible/visible in all scopes
 //
 pub class SomeClass {
 
-    // declare a private constant field,
+    // Declare a private constant field,
     // only readable in the current and inner scopes
     //
     const a: Int
 
-    // declare a public constant field, readable in all scopes
+    // Declare a public constant field, readable in all scopes
     //
     pub const b: Int
 
-    // declare a private variable field,
+    // Declare a private variable field,
     // only readable and writeable in the current and inner scopes
     //
     var c: Int
 
-    // declare a public variable field, not settable,
+    // Declare a public variable field, not settable,
     // only writeable in the current and inner scopes,
     // readable in all scopes
     //
     pub var d: Int
 
-    // declare a public variable field, settable,
+    // Declare a public variable field, settable,
     // readable and writeable in all scopes
     //
     pub(set) var e: Int
 
     // NOTE: initializer implementation skipped
 
-    // declare a private function,
+    // Declare a private function,
     // only callable in the current and inner scopes
     //
     fun privateTest() {
         // ...
     }
 
-    // declare a public function,
+    // Declare a public function,
     // callable in all scopes
     //
     pub fun privateTest() {
         // ...
     }
 
-    // declare an inner, private struct,
+    // Declare an inner, private struct,
     // only accessible in the current and inner scopes
     //
     struct InnerStruct {}
@@ -1577,12 +1600,14 @@ Interfaces are declared using the `interface` keyword, followed by the name of t
 The special type `Self` can be used to refer to the type implementing the interface. This can be seen in the following example, where the first parameter of the `transfer` function has the `Self` type.
 
 ```typescript
-// declare an interface for a vault: a container for a balance
+// Declare an interface for a vault (a container for a balance)
 //
 interface Vault {
 
-    // require the implementation to provide a field for the balance that is
-    // readable in all scopes. the read balance must always be positive.
+    // Require the implementation to provide a field for the balance that is
+    // readable in all scopes.
+    //
+    // The read balance must always be positive.
     //
     // NOTE: no requirement is made for the kind of field,
     // it can be either variable or constant in the implementation
@@ -1595,7 +1620,7 @@ interface Vault {
         }
     }
 
-    // require the implementation to provide an initializer that
+    // Require the implementation to provide an initializer that
     // given the initial balance, must initialize the balance field
     //
     init(initialBalance: Int) {
@@ -1606,9 +1631,11 @@ interface Vault {
         // NOTE: no code
     }
 
-    // require the implementation to provide a function that is
-    // callable in all scopes, and which adds an amount to the balance.
-    // the given amount must be positive
+    // Require the implementation to provide a function that is
+    // callable in all scopes.
+    //
+    // The given amount must be positive and the function implementation
+    // must add the amount to the balance
     //
     pub fun add(amount: Int) {
         require {
@@ -1621,12 +1648,18 @@ interface Vault {
         // NOTE: no code
     }
 
-    // require the implementation to provide a function that is callable in all scopes,
-    // and which transfers an amount from this vaults balance to another vault's balance.
-    // The receiving balance must be of the same type – a transfer to a vault of another
-    // type is not possible as the balance of it would only be readable
+    // Require the implementation to provide a function that is
+    // callable in all scopes.
     //
-    // NOTE: the first parameter has the Self type, i.e. the type implementing this interface
+    // The function must transfer an amount from this vault's balance
+    // to another vault's balance.
+    //
+    // The receiving vault must be of the same type – a transfer to a vault
+    // of another type is not possible, as the `balance` field of it is only
+    // readable.
+    //
+    // NOTE: the first parameter has the type `Self`,
+    // i.e. the type implementing this interface
     //
     pub fun transfer(to receivingVault: Self, amount: Int) {
         require {
@@ -1650,22 +1683,24 @@ Note that the required initializer and function do not have any executable code.
 Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the class or structure that should provide the functionality.
 
 ```typescript
-// declare a class called ExampleVault with a variable balance field,
-// that can be written by functions of the class, but only read in outer scopes
+// Declare a class named `ExampleVault` with a variable field named `balance`,
+// that can be written by functions of the class, but outer scopes can only read it
 //
 class ExampleVault {
 
-    // implement the required variable field balance for the Vault interface,
-    // that the ExampleVault type can write to, and that is only readable
-    // in outer scopes
+    // Implement the required variable field `balance` for the `Vault` interface,
+    // that this type (`ExampleVault`) can write to, but outer scopes can only
+    // read from
     //
     pub var balance: Int
 
-    // implement the required initializer for the Vault interface:
-    // accept an initial balance and initialize the balance field.
-    // this implementation satisfies the required postcondition
+    // Implement the required initializer for the `Vault` interface:
+    // accept an initial balance and initialize the `balance` field.
     //
-    // NOTE: the postcondition does not have to be repeated
+    // This implementation satisfies the required postcondition
+    //
+    // NOTE: the postcondition declared in the interface
+    // does not have to be repeated here in the implementation
     //
     init(initialBalance: Int) {
         self.balance = initialBalance
@@ -1673,31 +1708,33 @@ class ExampleVault {
 }
 
 
-// declare the implementation of the Vault interface for the ExampleVault class
+// Declare the implementation of the interface `Vault` for the class `ExampleVault`
 //
 impl Vault for ExampleVault {
 
-    // implement the required function add for the Vault interface,
+    // Implement the required function named `add` of the interface `Vault`,
     // that adds an amount to the vault's balance.
     //
-    // this implementation satisfies the required postcondition
+    // This implementation satisfies the required postcondition.
     //
-    // NOTE: neither the precondition, nor the postcondition have to be repeated
+    // NOTE: neither the precondition nor the postcondition declared
+    // in the interface have to be repeated here in the implementation
     //
     pub fun add(amount: Int) {
         self.balance = self.balance + amount
     }
 
-    // implement the required function transfer for the Vault interface,
+    // Implement the required function named `transfer` of the interface `Vault`,
     // that subtracts the amount from the this vault's balance,
     // and adds the amount to the receiving vault's balance.
     //
-    // NOTE: the type of the receiving vault parameter is ExampleVault,
-    // i.e., an amount can only be transfered to a vault of the same type
+    // NOTE: the type of the receiving vault parameter is `ExampleVault`,
+    // i.e., an amount can only be transfered to a vault of the same type.
     //
-    // this implementation satisfies the required postconditions
+    // This implementation satisfies the required postconditions.
     //
-    // NOTE: neither the precondition, nor the postcondition have to be repeated
+    // NOTE: neither the precondition nor the postcondition declared
+    // in the interface have to be repeated here in the implementation
     //
     pub fun transfer(to receivingVault: ExampleVault, amount: Int) {
         self.balance -= amount
@@ -1705,23 +1742,27 @@ impl Vault for ExampleVault {
     }
 }
 
-// declare and create two example vaults
+// Declare two constants which have type `ExampleVault`,
+// and are initialized to two different example vaults
 //
 const vault = ExampleVault(initialBalance: 100)
 const otherVault = ExampleVault(initialBalance: 0)
 
-// transfer 10 units from the first vault to the second vault.
-// the amount satisifes the precondition of the Vault interface's transfer function
+// Transfer 10 units from the first vault to the second vault.
+//
+// The amount satisifes the precondition of the `transfer` function
+// in the `Vault` interface
 //
 vault.transfer(to: otherVault, amount: 10)
 
-// the postcondition of the Vault interface's transfer function ensured
-// the balances of the vaults were updated properly
+// The postcondition of the `transfer` function in the `Vault` interface
+// ensured the balances fields of the vaults were updated properly
 //
 // vault.balance is 90
 // otherVault.balance is 10
 
-// error: precondition not satisfied: amount is larger than balance (100 > 90)
+// Error: precondition not satisfied: the parameter `amount` is larger than
+// the field `balance` (100 > 90)
 //
 vault.transfer(to: otherVault, amount: 100)
 ```
@@ -1731,7 +1772,7 @@ vault.transfer(to: otherVault, amount: 100)
 Interfaces are types. Values implementing an interface can be used as initial values for constants that have the interface as their type.
 
 ```typescript
-// declare a constant that has type Vault, which has a value of type ExampleVault
+// Declare a constant that has type `Vault`, which has a value that has type `ExampleVault`
 //
 const vault: Vault = ExampleVault(initialBalance: 100)
 ```
@@ -1739,33 +1780,38 @@ const vault: Vault = ExampleVault(initialBalance: 100)
 Values implementing an interface are assignable to variables that have the interface as their type.
 
 ```typescript
-// assume there is a declaration for another implementation
-// of the Vault interface called CoolVault
+// Assume there is a declaration for another implementation
+// of the interface  `Vault` which is named `CoolVault`
 
-// declare a variable that has type Vault, which has an initial value of type CoolVault
+// Declare a variable that has type `Vault`,
+// which has an initial value that has type `CoolVault`
 //
 var someVault: Vault = CoolVault(initialBalance: 100)
 
-// assign a different type of vault
+// Assign a different type of vault to the variable `someVault`,
+// which has type `Vault`
 //
 someVault = ExampleVault(initialBalance: 50)
 
 
-// invalid: type mismatch
+// Invalid: cannot assign a value that has type `CoolVault`
+// to a constant that has type `ExampleVault`
 //
 const exampleVault: ExampleVault = CoolVault(initialBalance: 100)
 ```
 
-Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type implementing the interface.
+Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.
 
 ```typescript
+// Declare a constant which has the type `Vault`, and a value that has type `ExampleVault`
+//
 const someVault: Vault = ExampleVault(initialBalance: 100)
 
-// access the balance field of the Vault interface type
+// Access the field `balance` declared in the interface `Vault`
 //
 someVault.balance // is 100
 
-// call the add function of the Vault interface type
+// Call the function named `add` declared in the interface `Vault`
 someVault.add(amount: 50)
 
 // someVault.balance is 150
@@ -1781,7 +1827,7 @@ Authorizations differ from classes in that they can only be created (instantiate
 
 Furthermore, authorizations are unforgeable.
 
-There is a global authorization `rootAuth` of type `RootAuth`. It represents the access rights/privileges to all resources.
+There is a global authorization `rootAuth` that has type `RootAuth`. It represents the access rights/privileges to all resources.
 
 Authorizations are declared using the `auth` keyword.
 
