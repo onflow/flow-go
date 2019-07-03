@@ -4,10 +4,10 @@
 package bamboo_proto
 
 import (
-	context "context"
 	fmt "fmt"
 	shared "github.com/dapperlabs/bamboo-node/grpc/shared"
 	proto "github.com/golang/protobuf/proto"
+	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
 	math "math"
 )
@@ -21,7 +21,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 func init() { proto.RegisterFile("inter/execute.proto", fileDescriptor_0d73587ec8f364c7) }
 

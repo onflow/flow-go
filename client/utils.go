@@ -5,7 +5,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/dapperlabs/bamboo-emulator/crypto"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
 const (

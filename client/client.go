@@ -8,10 +8,10 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/bamboo-emulator/crypto"
-	"github.com/dapperlabs/bamboo-emulator/data"
-	"github.com/dapperlabs/bamboo-emulator/gen/grpc/services/accessv1"
-	"github.com/dapperlabs/bamboo-emulator/types"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/internal/emulator/data"
+	"github.com/dapperlabs/bamboo-node/grpc/services/accessv1"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 type Client struct {
