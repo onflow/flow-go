@@ -4,6 +4,7 @@ const protoLoader = require('@grpc/proto-loader');
 
 const EXECUTE_PROTO_PATH = 'inter/execute.proto';
 const SECURITY_PROTO_PATH = 'inter/security.proto';
+const ACCESS_PROTO_PATH = 'inter/access.proto';
 const options = {
   keepCase: true,
   longs: String,
@@ -14,6 +15,7 @@ const options = {
 }
 const executeProtoDescriptor = grpc.loadPackageDefinition(protoLoader.loadSync(EXECUTE_PROTO_PATH, options));
 const securityProtoDescriptor = grpc.loadPackageDefinition(protoLoader.loadSync(SECURITY_PROTO_PATH, options));
+const accessProtoDescriptor = grpc.loadPackageDefinition(protoLoader.loadSync(ACCESS_PROTO_PATH, options));
 
 
 function createNewExecutionStub(address) {
@@ -23,6 +25,11 @@ function createNewExecutionStub(address) {
 
 function createNewSecurityStub(address) {
   const stub = new securityProtoDescriptor.bamboo.proto.SecurityNode(address, grpc.credentials.createInsecure());
+  return promisifyStub(stub);
+}
+
+function createNewAccessStub(address) {
+  const stub = new accessProtoDescriptor.bamboo.proto.AccessNode(address, grpc.credentials.createInsecure());
   return promisifyStub(stub);
 }
 
@@ -36,4 +43,5 @@ function promisifyStub(stub){
 module.exports = {
   createNewExecutionStub,
   createNewSecurityStub,
+  createNewAccessStub,
 }
