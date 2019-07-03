@@ -2,9 +2,9 @@ const promisify = require('util').promisify;
 const grpc = require('grpc');
 const protoLoader = require('@grpc/proto-loader');
 
-const EXECUTE_PROTO_PATH = 'inter/execute.proto';
-const SECURITY_PROTO_PATH = 'inter/security.proto';
-const ACCESS_PROTO_PATH = 'inter/access.proto';
+const EXECUTE_PROTO_PATH = 'internals/execute.proto';
+const SECURITY_PROTO_PATH = 'internals/security.proto';
+const ACCESS_PROTO_PATH = 'internals/access.proto';
 const options = {
   keepCase: true,
   longs: String,

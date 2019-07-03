@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	bambooProto "github.com/dapperlabs/bamboo-node/grpc/inter"
+	bambooProto "github.com/dapperlabs/bamboo-node/grpc/internals"
 	"github.com/dapperlabs/bamboo-node/internal/security/config"
 	"github.com/dapperlabs/bamboo-node/internal/security/controllers"
 	"github.com/dapperlabs/bamboo-node/internal/security/data"
