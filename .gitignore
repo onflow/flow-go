@@ -11,3 +11,6 @@ donotcommit
 node_modules
 
 .DS_Store
+
+bamboo
+bamboo.mnemonic
