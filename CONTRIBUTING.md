@@ -22,7 +22,7 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 
 | Stream         | Owner(s)                    | Packages  |
 | -------------- | --------------------------- | --------- |
-| Pre-execution  | [Peter Siemens](https://github.com/psiemens])   | [/internal/access](/internal/access), [/cmd/access](/cmd/access) |
+| Pre-execution  | [Peter Siemens](https://github.com/psiemens])   | [/internal/access](/internal/access), [/internal/clusters](/internal/clusters), [/internal/routing](/internal/routing), [/cmd/access](/cmd/access) |
 | Execution      | [Bastian Müller](https://github.com/@turbolent) | [/runtime](/runtime), [/language](/language), [/internal/execute](/internal/execute), [/cmd/execute](/cmd/execute) |
 | Post-execution | [Moar Zamski](https://github.com/@pazams)     | [/internal/access](/internal/access), [/cmd/access](/cmd/access) |
 | Consensus | [Alexander Hentschel](https://github.com/@AlexHentschel)     | [/consensus](/consensus), [/internal/security](/internal/security) |
