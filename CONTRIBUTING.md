@@ -16,7 +16,7 @@ By the time you read this you should be assigned to a work stream. Here's how to
 
 Bamboo development is divided across several streams of work with the goal of separating concerns and facilitating rapid development. 
 
-Each stream is owned by a Bamboo core team member who oversees and directs all development within that stream. As a contributor, you will communicate primarly with your stream owner.
+Each stream is owned by a Bamboo core team member who oversees and directs all development within that stream. As a contributor, you will communicate primarily with your stream owner.
 
 Stream owners will assign tasks to contributors and ensure that all TODOs are tracked.
 
