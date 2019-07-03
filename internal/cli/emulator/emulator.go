@@ -1,10 +1,10 @@
 package emulator
 
 import (
+	"github.com/psiemens/sconfig"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/bamboo-node/internal/cli/config"
 	"github.com/dapperlabs/bamboo-node/internal/emulator"
 )
 
@@ -27,10 +27,13 @@ func Command(log *logrus.Logger) *cobra.Command {
 
 	cmd.AddCommand(startCmd)
 
-	cmd.PersistentFlags().IntVarP(&conf.Port, "port", "p", 0, "port to run emulator server on")
-	cmd.PersistentFlags().BoolVarP(&conf.Verbose, "verbose", "v", false, "verbose output")
-
-	config.ParseConfig("BAM", &conf, cmd.PersistentFlags())
+	err := sconfig.New(&conf).
+		FromEnvironment("BAM").
+		BindFlags(cmd.PersistentFlags()).
+		Parse()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return cmd
 }

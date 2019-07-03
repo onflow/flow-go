@@ -13,10 +13,10 @@ import (
 )
 
 type Config struct {
-	Port               int           `default:"5000" flag:"port"`
+	Port               int           `default:"5000" flag:"port,p"`
 	CollectionInterval time.Duration `default:"1s"`
 	BlockInterval      time.Duration `default:"5s"`
-	Verbose            bool          `default:"false" flag:"verbose"`
+	Verbose            bool          `default:"false" flag:"verbose,v"`
 }
 
 // StartServer starts up an instance of a Bamboo Emulator server.

@@ -18,6 +18,7 @@ require (
 	github.com/miguelmota/go-ethereum-hdwallet v0.0.0-20190601230056-2da794f11e15
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0
+	github.com/psiemens/sconfig v0.0.0-20190623041652-6e01eb1354fc
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
