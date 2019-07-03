@@ -79,7 +79,7 @@ After a collection is formed, the collection owner will send the collection to o
 
 ## Transaction and Collection Storage
 
-ANs are responsible for keeping all transactions and collections that they commit to storing.
+ANs are responsible for saving all transactions and collections that they commit to storing.
 
 **Relevant packages:** [/internal/access/data](/internal/access/data)
 
