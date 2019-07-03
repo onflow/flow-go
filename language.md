@@ -1684,7 +1684,7 @@ impl Vault for ExampleVault {
     //
     // NOTE: neither the precondition, nor the postcondition have to be repeated
     //
-    fun add(amount: Int) {
+    pub fun add(amount: Int) {
         self.balance = self.balance + amount
     }
 
@@ -1699,7 +1699,7 @@ impl Vault for ExampleVault {
     //
     // NOTE: neither the precondition, nor the postcondition have to be repeated
     //
-    fun transfer(to receivingVault: ExampleVault, amount: Int) {
+    pub fun transfer(to receivingVault: ExampleVault, amount: Int) {
         self.balance -= amount
         receivingVault.amount += amount
     }
