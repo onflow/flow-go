@@ -1569,6 +1569,18 @@ Note the different values in the last line of each example.
 There is **no** support for nulls, i.e., a constant or variable of a reference type must always be bound to an instance of the type. There is *no* `null`.
 
 
+### Class Inheritance and Abstract Classes
+
+There is **no** support for class inheritance. Class inheritance is a feature common in other programming languages, that allows including the fields and functions of a class (known as the superclass) in another class (known as the subclass).
+
+Instead, follow "Composition over inheritance", the idea of composing functionality from multiple individual parts, rather than building an inheritance tree.
+
+Furthermore, there is also **no** support for abstract classes. An abstract class is a feature common in other programming languages, that prevents creating values of a superclass and only allows the creation of values of a subclass.
+
+In addition, abstract classes may declare functions, but omit the implementation of them and require   subclasses to implement them.
+
+Instead, use [interfaces](#interfaces).
+
 ## Access control
 
 > Status: Access control is not implemented yet.
