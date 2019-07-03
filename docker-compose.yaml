@@ -53,6 +53,33 @@ services:
       - POSTGRES_DATABASE=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=foo
+  
+  access_db:
+    image: postgres:9.6-alpine
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=foo
+
+  access:
+    build:
+      context: .
+      dockerfile: cmd/access/Dockerfile
+    depends_on:
+      - access_db
+    ports:
+      - "3003:3003"
+    restart: on-failure:5
+    environment:
+      - APP_ENV=LOCAL
+      - PORT=3003
+      - POSTGRES_GCP_CONNECTION_NAME=foo
+      - POSTGRES_ADDR=access_db:5432
+      - POSTGRES_DATABASE=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=foo
 
   testhelpers:
     build:
@@ -61,6 +88,7 @@ services:
     depends_on:
       - execute_db
       - security_db
+      - access_db
     ports:
       - "3009:3009"
     restart: on-failure:5
@@ -78,10 +106,12 @@ services:
     depends_on:
       - execute
       - security
+      - access
       - testhelpers
     environment:
       - EXECUTE_ADDR=execute:3001
       - SECURITY_ADDR=security:3002
+      - ACCESS_ADDR=access:3003
       - HELPERS_ADDR=testhelpers:3009
 
   # See https://github.com/dadarek/docker-wait-for-dependencies
@@ -102,10 +132,19 @@ services:
 
   # See https://github.com/dadarek/docker-wait-for-dependencies
   # Run this as a separate "docker-compose" up command
+  start_access_dependencies:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - access_db
+    command: access_db:5432
+
+  # See https://github.com/dadarek/docker-wait-for-dependencies
+  # Run this as a separate "docker-compose" up command
   start_test_dependencies:
     image: dadarek/wait-for-dependencies
     depends_on:
       - execute
       - security
+      - access
       - testhelpers
-    command: execute:3001 security:3002 testhelpers:3009
+    command: execute:3001 security:3002 access:3003 testhelpers:3009

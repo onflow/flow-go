@@ -3,9 +3,6 @@ package controllers
 import (
 	"context"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	bambooProto "github.com/dapperlabs/bamboo-node/grpc/shared"
 	"github.com/dapperlabs/bamboo-node/internal/access/data"
 )
