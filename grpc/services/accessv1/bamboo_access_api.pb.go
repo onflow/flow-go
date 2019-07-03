@@ -4,11 +4,13 @@
 package accessv1
 
 import (
+	context "context"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
-	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -21,7 +23,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type Block_Status int32
 
@@ -1181,6 +1183,32 @@ type BambooAccessAPIServer interface {
 	GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error)
 	// CallContract performs a contract call.
 	CallContract(context.Context, *CallContractRequest) (*CallContractResponse, error)
+}
+
+// UnimplementedBambooAccessAPIServer can be embedded to have forward compatible implementations.
+type UnimplementedBambooAccessAPIServer struct {
+}
+
+func (*UnimplementedBambooAccessAPIServer) SendTransaction(ctx context.Context, req *SendTransactionRequest) (*SendTransactionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendTransaction not implemented")
+}
+func (*UnimplementedBambooAccessAPIServer) GetBlockByHash(ctx context.Context, req *GetBlockByHashRequest) (*GetBlockByHashResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByHash not implemented")
+}
+func (*UnimplementedBambooAccessAPIServer) GetBlockByNumber(ctx context.Context, req *GetBlockByNumberRequest) (*GetBlockByNumberResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByNumber not implemented")
+}
+func (*UnimplementedBambooAccessAPIServer) GetLatestBlock(ctx context.Context, req *GetLatestBlockRequest) (*GetLatestBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLatestBlock not implemented")
+}
+func (*UnimplementedBambooAccessAPIServer) GetTransaction(ctx context.Context, req *GetTransactionRequest) (*GetTransactionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTransaction not implemented")
+}
+func (*UnimplementedBambooAccessAPIServer) GetAccount(ctx context.Context, req *GetAccountRequest) (*GetAccountResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAccount not implemented")
+}
+func (*UnimplementedBambooAccessAPIServer) CallContract(ctx context.Context, req *CallContractRequest) (*CallContractResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CallContract not implemented")
 }
 
 func RegisterBambooAccessAPIServer(s *grpc.Server, srv BambooAccessAPIServer) {
