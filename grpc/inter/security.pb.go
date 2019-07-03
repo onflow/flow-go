@@ -10,6 +10,8 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -251,6 +253,50 @@ type SecurityNodeServer interface {
 	ProcessExecutionReceipt(context.Context, *shared.ProcessExecutionReceiptRequest) (*shared.ProcessExecutionReceiptResponse, error)
 	// Receive an execution receipt challenge.
 	SubmitInvalidExecutionReceiptChallenge(context.Context, *shared.InvalidExecutionReceiptChallengeRequest) (*shared.InvalidExecutionReceiptChallengeResponse, error)
+}
+
+// UnimplementedSecurityNodeServer can be embedded to have forward compatible implementations.
+type UnimplementedSecurityNodeServer struct {
+}
+
+func (*UnimplementedSecurityNodeServer) Ping(ctx context.Context, req *shared.PingRequest) (*shared.PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
+func (*UnimplementedSecurityNodeServer) AccessSubmitCollection(ctx context.Context, req *shared.AccessCollectionRequest) (*shared.AccessCollectionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AccessSubmitCollection not implemented")
+}
+func (*UnimplementedSecurityNodeServer) ProposeBlock(ctx context.Context, req *shared.ProposeBlockRequest) (*shared.ProposeBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProposeBlock not implemented")
+}
+func (*UnimplementedSecurityNodeServer) UpdateProposedBlock(ctx context.Context, req *shared.ProposeBlockUpdateRequest) (*shared.ProposeBlockUpdateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateProposedBlock not implemented")
+}
+func (*UnimplementedSecurityNodeServer) GetBlockByHash(ctx context.Context, req *shared.GetBlockByHashRequest) (*shared.GetBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByHash not implemented")
+}
+func (*UnimplementedSecurityNodeServer) GetBlockByHeight(ctx context.Context, req *shared.GetBlockByHeightRequest) (*shared.GetBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByHeight not implemented")
+}
+func (*UnimplementedSecurityNodeServer) ProcessResultApproval(ctx context.Context, req *shared.ProcessResultApprovalRequest) (*shared.ProcessResultApprovalResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessResultApproval not implemented")
+}
+func (*UnimplementedSecurityNodeServer) GetFinalizedStateTransitions(ctx context.Context, req *shared.FinalizedStateTransitionsRequest) (*shared.FinalizedStateTransitionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFinalizedStateTransitions not implemented")
+}
+func (*UnimplementedSecurityNodeServer) ProcessStateTransitionProposal(ctx context.Context, req *shared.SignedStateTransition) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessStateTransitionProposal not implemented")
+}
+func (*UnimplementedSecurityNodeServer) ProcessStateTransitionPrepareVote(ctx context.Context, req *shared.SignedStateTransitionPrepareVote) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessStateTransitionPrepareVote not implemented")
+}
+func (*UnimplementedSecurityNodeServer) ProcessStateTransitionCommitVote(ctx context.Context, req *shared.SignedStateTransitionCommitVote) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessStateTransitionCommitVote not implemented")
+}
+func (*UnimplementedSecurityNodeServer) ProcessExecutionReceipt(ctx context.Context, req *shared.ProcessExecutionReceiptRequest) (*shared.ProcessExecutionReceiptResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessExecutionReceipt not implemented")
+}
+func (*UnimplementedSecurityNodeServer) SubmitInvalidExecutionReceiptChallenge(ctx context.Context, req *shared.InvalidExecutionReceiptChallengeRequest) (*shared.InvalidExecutionReceiptChallengeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitInvalidExecutionReceiptChallenge not implemented")
 }
 
 func RegisterSecurityNodeServer(s *grpc.Server, srv SecurityNodeServer) {

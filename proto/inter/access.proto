@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package bamboo.proto;
+
+import "shared/messages.proto";
+
+service AccessNode {
+    rpc Ping (PingRequest) returns (PingResponse);
+}
