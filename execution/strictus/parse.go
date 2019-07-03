@@ -18,9 +18,10 @@ func (l *errorListener) SyntaxError(
 	message string,
 	e antlr.RecognitionException,
 ) {
+	position := ast.PositionFromToken(offendingSymbol.(antlr.Token))
+
 	l.syntaxErrors = append(l.syntaxErrors, &SyntaxError{
-		Line:    line,
-		Column:  column,
+		Pos:     position,
 		Message: message,
 	})
 }

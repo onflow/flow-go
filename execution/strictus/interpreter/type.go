@@ -216,7 +216,7 @@ func mustConvertType(t ast.Type) Type {
 			panic(&NotDeclaredError{
 				ExpectedKind: DeclarationKindType,
 				Name:         t.Identifier,
-				Position:     t.Position,
+				Pos:          t.Pos,
 			})
 		}
 		return result

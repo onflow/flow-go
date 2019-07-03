@@ -41,8 +41,8 @@ func (interpreter *Interpreter) Interpret() (err error) {
 
 		if _, exists := interpreter.Globals[name]; exists {
 			return &RedeclarationError{
-				Name:     name,
-				Position: declaration.GetIdentifierPosition(),
+				Name: name,
+				Pos:  declaration.GetIdentifierPosition(),
 			}
 		}
 
@@ -105,8 +105,8 @@ func (interpreter *Interpreter) invokeFunction(
 		panic(&ArgumentCountError{
 			ParameterCount: parameterCount,
 			ArgumentCount:  argumentCount,
-			StartPosition:  startPosition,
-			EndPosition:    endPosition,
+			StartPos:       startPosition,
+			EndPos:         endPosition,
 		})
 	}
 
@@ -119,11 +119,11 @@ func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 	expression := &ast.FunctionExpression{
-		Parameters:    declaration.Parameters,
-		ReturnType:    declaration.ReturnType,
-		Block:         declaration.Block,
-		StartPosition: declaration.StartPosition,
-		EndPosition:   declaration.EndPosition,
+		Parameters: declaration.Parameters,
+		ReturnType: declaration.ReturnType,
+		Block:      declaration.Block,
+		StartPos:   declaration.StartPos,
+		EndPos:     declaration.EndPos,
 	}
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
@@ -139,13 +139,13 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 		ReturnType:     declaration.ReturnType,
 	}
 	variableDeclaration := &ast.VariableDeclaration{
-		Value:              expression,
-		Identifier:         declaration.Identifier,
-		IsConst:            true,
-		Type:               functionType,
-		StartPosition:      declaration.StartPosition,
-		EndPosition:        declaration.EndPosition,
-		IdentifierPosition: declaration.IdentifierPosition,
+		Value:         expression,
+		Identifier:    declaration.Identifier,
+		IsConst:       true,
+		Type:          functionType,
+		StartPos:      declaration.StartPos,
+		EndPos:        declaration.EndPos,
+		IdentifierPos: declaration.IdentifierPos,
 	}
 
 	// make the function itself available inside the function
@@ -226,8 +226,8 @@ func (interpreter *Interpreter) declareVariable(declaration *ast.VariableDeclara
 	depth := interpreter.activations.Depth()
 	if variable != nil && variable.Depth == depth {
 		panic(&RedeclarationError{
-			Name:     declaration.Identifier,
-			Position: declaration.GetIdentifierPosition(),
+			Name: declaration.Identifier,
+			Pos:  declaration.GetIdentifierPosition(),
 		})
 	}
 
@@ -249,14 +249,14 @@ func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatem
 			panic(&NotDeclaredError{
 				ExpectedKind: DeclarationKindVariable,
 				Name:         identifier,
-				Position:     target.Position,
+				Pos:          target.Pos,
 			})
 		}
 
 		if !variable.Set(value) {
 			panic(&AssignmentToConstantError{
-				Name:     identifier,
-				Position: target.Position,
+				Name: identifier,
+				Pos:  target.Pos,
 			})
 		}
 
@@ -267,9 +267,9 @@ func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatem
 		array, ok := indexedValue.(ArrayValue)
 		if !ok {
 			panic(&NotIndexableError{
-				Value:         indexedValue,
-				StartPosition: target.Expression.GetStartPosition(),
-				EndPosition:   target.Expression.GetEndPosition(),
+				Value:    indexedValue,
+				StartPos: target.Expression.StartPosition(),
+				EndPos:   target.Expression.EndPosition(),
 			})
 		}
 
@@ -277,9 +277,9 @@ func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatem
 		index, ok := indexValue.(IntegerValue)
 		if !ok {
 			panic(&InvalidIndexValueError{
-				Value:         indexValue,
-				StartPosition: target.Index.GetStartPosition(),
-				EndPosition:   target.Index.GetEndPosition(),
+				Value:    indexValue,
+				StartPos: target.Index.StartPosition(),
+				EndPos:   target.Index.EndPosition(),
 			})
 		}
 		array[index.IntValue()] = value
@@ -301,7 +301,7 @@ func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.Identi
 		panic(&NotDeclaredError{
 			ExpectedKind: DeclarationKindAny,
 			Name:         expression.Identifier,
-			Position:     expression.Position,
+			Pos:          expression.Pos,
 		})
 	}
 	return variable.Value
@@ -311,18 +311,18 @@ func (interpreter *Interpreter) visitBinaryIntegerOperand(
 	value Value,
 	operation ast.Operation,
 	side OperandSide,
-	startPosition *ast.Position,
-	endPosition *ast.Position,
+	startPos *ast.Position,
+	endPos *ast.Position,
 ) IntegerValue {
 	integerValue, isInteger := value.(IntegerValue)
 	if !isInteger {
 		panic(&InvalidBinaryOperandError{
-			Operation:     operation,
-			Side:          side,
-			ExpectedType:  &IntegerType{},
-			Value:         value,
-			StartPosition: startPosition,
-			EndPosition:   endPosition,
+			Operation:    operation,
+			Side:         side,
+			ExpectedType: &IntegerType{},
+			Value:        value,
+			StartPos:     startPos,
+			EndPos:       endPos,
 		})
 	}
 	return integerValue
@@ -332,18 +332,18 @@ func (interpreter *Interpreter) visitBinaryBoolOperand(
 	value Value,
 	operation ast.Operation,
 	side OperandSide,
-	startPosition *ast.Position,
-	endPosition *ast.Position,
+	startPos *ast.Position,
+	endPos *ast.Position,
 ) BoolValue {
 	boolValue, isBool := value.(BoolValue)
 	if !isBool {
 		panic(&InvalidBinaryOperandError{
-			Operation:     operation,
-			Side:          side,
-			ExpectedType:  &BoolType{},
-			Value:         value,
-			StartPosition: startPosition,
-			EndPosition:   endPosition,
+			Operation:    operation,
+			Side:         side,
+			ExpectedType: &BoolType{},
+			Value:        value,
+			StartPos:     startPos,
+			EndPos:       endPos,
 		})
 	}
 	return boolValue
@@ -352,17 +352,17 @@ func (interpreter *Interpreter) visitBinaryBoolOperand(
 func (interpreter *Interpreter) visitUnaryBoolOperand(
 	value Value,
 	operation ast.Operation,
-	startPosition *ast.Position,
-	endPosition *ast.Position,
+	startPos *ast.Position,
+	endPos *ast.Position,
 ) BoolValue {
 	boolValue, isBool := value.(BoolValue)
 	if !isBool {
 		panic(&InvalidUnaryOperandError{
-			Operation:     operation,
-			ExpectedType:  &BoolType{},
-			Value:         value,
-			StartPosition: startPosition,
-			EndPosition:   endPosition,
+			Operation:    operation,
+			ExpectedType: &BoolType{},
+			Value:        value,
+			StartPos:     startPos,
+			EndPos:       endPos,
 		})
 	}
 	return boolValue
@@ -371,18 +371,18 @@ func (interpreter *Interpreter) visitUnaryBoolOperand(
 func (interpreter *Interpreter) visitUnaryIntegerOperand(
 	value Value,
 	operation ast.Operation,
-	startPosition *ast.Position,
-	endPosition *ast.Position,
+	startPos *ast.Position,
+	endPos *ast.Position,
 
 ) IntegerValue {
 	integerValue, isInteger := value.(IntegerValue)
 	if !isInteger {
 		panic(&InvalidUnaryOperandError{
-			Operation:     operation,
-			ExpectedType:  &IntegerType{},
-			Value:         value,
-			StartPosition: startPosition,
-			EndPosition:   endPosition,
+			Operation:    operation,
+			ExpectedType: &IntegerType{},
+			Value:        value,
+			StartPos:     startPos,
+			EndPos:       endPos,
 		})
 	}
 	return integerValue
@@ -394,8 +394,8 @@ func (interpreter *Interpreter) visitBinaryIntegerOperation(expr *ast.BinaryExpr
 		leftValue,
 		expr.Operation,
 		OperandSideLeft,
-		expr.Left.GetStartPosition(),
-		expr.Left.GetEndPosition(),
+		expr.Left.StartPosition(),
+		expr.Left.EndPosition(),
 	)
 
 	rightValue := expr.Right.Accept(interpreter).(Value)
@@ -403,8 +403,8 @@ func (interpreter *Interpreter) visitBinaryIntegerOperation(expr *ast.BinaryExpr
 		rightValue,
 		expr.Operation,
 		OperandSideRight,
-		expr.Right.GetStartPosition(),
-		expr.Right.GetEndPosition(),
+		expr.Right.StartPosition(),
+		expr.Right.EndPosition(),
 	)
 
 	return left, right
@@ -416,8 +416,8 @@ func (interpreter *Interpreter) visitBinaryBoolOperation(expr *ast.BinaryExpress
 		leftValue,
 		expr.Operation,
 		OperandSideLeft,
-		expr.Left.GetStartPosition(),
-		expr.Left.GetEndPosition(),
+		expr.Left.StartPosition(),
+		expr.Left.EndPosition(),
 	)
 
 	rightValue := expr.Right.Accept(interpreter).(Value)
@@ -425,8 +425,8 @@ func (interpreter *Interpreter) visitBinaryBoolOperation(expr *ast.BinaryExpress
 		rightValue,
 		expr.Operation,
 		OperandSideRight,
-		expr.Right.GetStartPosition(),
-		expr.Right.GetEndPosition(),
+		expr.Right.StartPosition(),
+		expr.Right.EndPosition(),
 	)
 
 	return left, right
@@ -480,15 +480,15 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 				leftValue,
 				expression.Operation,
 				OperandSideLeft,
-				expression.Left.GetStartPosition(),
-				expression.Left.GetEndPosition(),
+				expression.Left.StartPosition(),
+				expression.Left.EndPosition(),
 			)
 			right := interpreter.visitBinaryIntegerOperand(
 				rightValue,
 				expression.Operation,
 				OperandSideRight,
-				expression.Right.GetStartPosition(),
-				expression.Right.GetEndPosition(),
+				expression.Right.StartPosition(),
+				expression.Right.EndPosition(),
 			)
 			return BoolValue(left.Equal(right))
 
@@ -497,15 +497,15 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 				leftValue,
 				expression.Operation,
 				OperandSideLeft,
-				expression.Left.GetStartPosition(),
-				expression.Left.GetEndPosition(),
+				expression.Left.StartPosition(),
+				expression.Left.EndPosition(),
 			)
 			right := interpreter.visitBinaryBoolOperand(
 				rightValue,
 				expression.Operation,
 				OperandSideRight,
-				expression.Right.GetStartPosition(),
-				expression.Right.GetEndPosition(),
+				expression.Right.StartPosition(),
+				expression.Right.EndPosition(),
 			)
 			return BoolValue(left == right)
 		}
@@ -520,15 +520,15 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 				leftValue,
 				expression.Operation,
 				OperandSideLeft,
-				expression.Left.GetStartPosition(),
-				expression.Left.GetEndPosition(),
+				expression.Left.StartPosition(),
+				expression.Left.EndPosition(),
 			)
 			right := interpreter.visitBinaryIntegerOperand(
 				rightValue,
 				expression.Operation,
 				OperandSideRight,
-				expression.Right.GetStartPosition(),
-				expression.Right.GetEndPosition(),
+				expression.Right.StartPosition(),
+				expression.Right.EndPosition(),
 			)
 			return BoolValue(!left.Equal(right))
 
@@ -537,15 +537,15 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 				leftValue,
 				expression.Operation,
 				OperandSideLeft,
-				expression.Left.GetStartPosition(),
-				expression.Left.GetEndPosition(),
+				expression.Left.StartPosition(),
+				expression.Left.EndPosition(),
 			)
 			right := interpreter.visitBinaryBoolOperand(
 				rightValue,
 				expression.Operation,
 				OperandSideRight,
-				expression.Right.GetStartPosition(),
-				expression.Right.GetEndPosition(),
+				expression.Right.StartPosition(),
+				expression.Right.EndPosition(),
 			)
 			return BoolValue(left != right)
 		}
@@ -575,8 +575,8 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 		boolValue := interpreter.visitUnaryBoolOperand(
 			value,
 			expression.Operation,
-			expression.StartPosition,
-			expression.EndPosition,
+			expression.StartPos,
+			expression.EndPos,
 		)
 		return boolValue.Negate()
 
@@ -584,8 +584,8 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 		integerValue := interpreter.visitUnaryIntegerOperand(
 			value,
 			expression.Operation,
-			expression.StartPosition,
-			expression.EndPosition,
+			expression.StartPos,
+			expression.EndPos,
 		)
 		return integerValue.Negate()
 	}
@@ -631,9 +631,9 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 	array, ok := indexedValue.(ArrayValue)
 	if !ok {
 		panic(&NotIndexableError{
-			Value:         indexedValue,
-			StartPosition: expression.Expression.GetStartPosition(),
-			EndPosition:   expression.Expression.GetEndPosition(),
+			Value:    indexedValue,
+			StartPos: expression.Expression.StartPosition(),
+			EndPos:   expression.Expression.EndPosition(),
 		})
 	}
 
@@ -641,9 +641,9 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 	index, ok := indexValue.(IntegerValue)
 	if !ok {
 		panic(&InvalidIndexValueError{
-			Value:         indexValue,
-			StartPosition: expression.Index.GetStartPosition(),
-			EndPosition:   expression.Index.GetEndPosition(),
+			Value:    indexValue,
+			StartPos: expression.Index.StartPosition(),
+			EndPos:   expression.Index.EndPosition(),
 		})
 	}
 	return array[index.IntValue()]
@@ -664,9 +664,9 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 	function, ok := value.(FunctionValue)
 	if !ok {
 		panic(&NotCallableError{
-			Value:         value,
-			StartPosition: invocationExpression.Expression.GetStartPosition(),
-			EndPosition:   invocationExpression.Expression.GetEndPosition(),
+			Value:    value,
+			StartPos: invocationExpression.Expression.StartPosition(),
+			EndPos:   invocationExpression.Expression.EndPosition(),
 		})
 	}
 
@@ -676,8 +676,8 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 	return interpreter.invokeFunction(
 		function,
 		arguments,
-		invocationExpression.StartPosition,
-		invocationExpression.EndPosition,
+		invocationExpression.StartPos,
+		invocationExpression.EndPos,
 	)
 }
 
@@ -709,11 +709,11 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 			parameter.Identifier,
 			&Variable{
 				Declaration: &ast.VariableDeclaration{
-					IsConst:       true,
-					Identifier:    parameter.Identifier,
-					Type:          parameter.Type,
-					StartPosition: parameter.StartPosition,
-					EndPosition:   parameter.EndPosition,
+					IsConst:    true,
+					Identifier: parameter.Identifier,
+					Type:       parameter.Type,
+					StartPos:   parameter.StartPos,
+					EndPos:     parameter.EndPos,
 				},
 				Value: argument,
 			},
