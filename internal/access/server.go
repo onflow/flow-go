@@ -1,4 +1,4 @@
-package security
+package access
 
 import (
 	"fmt"
@@ -8,9 +8,9 @@ import (
 	"google.golang.org/grpc"
 
 	bambooProto "github.com/dapperlabs/bamboo-node/grpc/internals"
-	"github.com/dapperlabs/bamboo-node/internal/security/config"
-	"github.com/dapperlabs/bamboo-node/internal/security/controllers"
-	"github.com/dapperlabs/bamboo-node/internal/security/data"
+	"github.com/dapperlabs/bamboo-node/internal/access/config"
+	"github.com/dapperlabs/bamboo-node/internal/access/controllers"
+	"github.com/dapperlabs/bamboo-node/internal/access/data"
 )
 
 // Server ..
@@ -32,7 +32,7 @@ func NewServer(
 	}
 
 	gsrv := grpc.NewServer()
-	bambooProto.RegisterSecurityNodeServer(gsrv, ctrl)
+	bambooProto.RegisterAccessNodeServer(gsrv, ctrl)
 
 	return &Server{
 		gsrv: gsrv,
