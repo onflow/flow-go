@@ -818,22 +818,9 @@ const doNothing: () -> Void =
 
 Types can be enclosed in parentheses to change precedence.
 
-```typescript
-// declare a constant called functions, with the array type ((Int) -> Int)[2],
-// i.e., an array of two functions, which accept one integer and return one integer
-//
-const functions: ((Int) -> Int)[2] = [
-    fun (n: Int) -> Int {
-        return n * 2
-    },
-    fun (n: Int) -> Int {
-        return n * 3
-    }
-]
-```
+For example, a function type `(Int) -> (() -> Int)` is the type for a function which accepts one argument of type `Int`, and which returns another function, that takes no arguments and returns an `Int`. 
 
-For example, a function type `(Int) -> (() -> Int)` is the type for a function which accepts one argument of type `Int`, and which returns another function, that takes no arguments and returns an `Int`.
-
+The type `((Int) -> Int)[2]` specifies an array type of two functions, which accept one integer and return one integer.
 
 #### Argument Passing Behavior
 
