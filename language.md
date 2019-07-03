@@ -1350,7 +1350,7 @@ struct GoalTracker {
     var goal: Int
     var completed: Int
 
-    pub synthetic left: Double {
+    synthetic left: Double {
         get {
             return self.goal - self.completed
         }
