@@ -9,6 +9,8 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -125,6 +127,26 @@ type ExecuteNodeServer interface {
 	// Providing register values and metadata.
 	GetRegisters(context.Context, *shared.RegistersRequest) (*shared.RegistersResponse, error)
 	GetRegistersAtBlockHeight(context.Context, *shared.RegistersAtBlockHeightRequest) (*shared.RegistersResponse, error)
+}
+
+// UnimplementedExecuteNodeServer can be embedded to have forward compatible implementations.
+type UnimplementedExecuteNodeServer struct {
+}
+
+func (*UnimplementedExecuteNodeServer) Ping(ctx context.Context, req *shared.PingRequest) (*shared.PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
+func (*UnimplementedExecuteNodeServer) ExecuteBlock(ctx context.Context, req *shared.ExecuteBlockRequest) (*shared.ExecuteBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ExecuteBlock not implemented")
+}
+func (*UnimplementedExecuteNodeServer) NotifyBlockExecuted(ctx context.Context, req *shared.NotifyBlockExecutedRequest) (*shared.NotifyBlockExecutedResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NotifyBlockExecuted not implemented")
+}
+func (*UnimplementedExecuteNodeServer) GetRegisters(ctx context.Context, req *shared.RegistersRequest) (*shared.RegistersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRegisters not implemented")
+}
+func (*UnimplementedExecuteNodeServer) GetRegistersAtBlockHeight(ctx context.Context, req *shared.RegistersAtBlockHeightRequest) (*shared.RegistersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRegistersAtBlockHeight not implemented")
 }
 
 func RegisterExecuteNodeServer(s *grpc.Server, srv ExecuteNodeServer) {
