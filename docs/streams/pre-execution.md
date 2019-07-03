@@ -23,30 +23,68 @@ All pre-execution duties are performed by access nodes.
 * **AN Cluster** - A grouping of ANs that work together to form collections
 * **Collection** - A set of transactions bundled together for execution
 
+## Cluster Formation
+
+AN clusters are formed at the beginning of each epoch using a deterministic clustering algorithm. 
+
+The algorithm returns a clustering arrangement that places roughly equal stake in each cluster. Higher-staked ANs may belong to multiple clusters.
+
+The algorithm uses the block hash of the last block in the previous epoch as a source of entropy.
+
+Details about the algorithm can be found in the package below:
+
+**Relevant packages:** [/internal/access/clusters](/internal/access/clusters)
+
 ## Transaction Submission
 
-TODO
+Transactions are submitted to an access node via the `SendTransaction` gRPC method.
+
+The access node validates the transaction and will return an error to the user in the following cases:
+
+- Transaction is malformed
+- Transaction is a duplicate
+- Transaction has a missing/invalid signature
+- Transaction is signed by an account that does not exist
+
+**Relevant packages:** [/internal/access/controllers](/internal/access/controllers)
 
 ## Transaction Routing
 
-TODO
+Each transaction is routed to a cluster using a deterministic routing algorithm. This means that routing is verifiable; in other words, the same transaction will always be routed to the same cluster.
 
-## Cluster Formation
+After a transaction is validated, it is forwarded to a node in the correct cluster. If the access node that received the transaction is already in the correct cluster, no forwarding is needed.
 
-TODO
+Once a transaction reaches a node in the correct cluster, that node will store the transaction and begin sharing it with other cluster peers.
+
+**Relevant packages:** [/internal/access/routing](/internal/access/routing)
 
 ## Collection Building
 
-TODO
+The primary function of a cluster is to produce collections. Collections are formed through a simple consensus protocol that emphasizes speed and fairness, but does not gaurantee byzantine fault tolerance.
+
+Each AN shares transactions within their cluster to create a shared pool of pending transactions. Eventually this pool is used to create a collection, which is organized by a collection owner.
+
+The collection building process requires a sufficient number of ANs to sign each collection.
+
+Details about the collection building algorithm can be found in the package below:
+
+**Relevant packages:** [/internal/access/collections](/internal/access/collections)
 
 ## Collection Publishing
 
-TODO
+After a collection is formed, the collection owner will send the collection to one or more security nodes to be included in a block.
+
+**Relevant packages:** [/internal/access/collections](/internal/access/collections), [/internal/security/controllers](/internal/security/controllers)
+
 
 ## Transaction and Collection Storage
 
-TODO
+ANs are responsible for keeping all transactions and collections that they commit to storing.
+
+**Relevant packages:** [/internal/access/data](/internal/access/data)
 
 ## User Queries
 
-TODO
+In addition to the main transaction flow, ANs also respond to user queries about the blockchain state.
+
+**Relevant packages:** [/internal/access/controllers](/internal/access/controllers)
