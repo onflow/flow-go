@@ -1,4 +1,4 @@
-package server
+package emulator
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/internal/emulator/data"
 	"github.com/dapperlabs/bamboo-node/internal/emulator/nodes/access"
 	"github.com/dapperlabs/bamboo-node/internal/emulator/nodes/security"
+	"github.com/dapperlabs/bamboo-node/internal/emulator/server"
 )
 
 type Config struct {
@@ -50,7 +51,7 @@ func StartServer(log *logrus.Logger, conf Config) {
 		log,
 	)
 
-	emulatorServer := NewServer(accessNode)
+	emulatorServer := server.NewServer(accessNode)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
