@@ -698,53 +698,136 @@ Each parameter can have a label, the name that a function call needs to use to p
 Each parameter needs to have a type annotation, which follows the parameter name after a colon.
 
 ```typescript
-// declare a function called double, which multiples a number by two.
-// the special argument label _ is used, so no label has to be given in a function call.
+// Declare a function named `double`, which multiples a number by two.
+//
+// The special argument label _ is specified for the parameter,
+// so no argument label has to be provided in a function call
 //
 fun double(_ x: Int) -> Int {
     return x * 2
 }
 
-// call the function double with the value 4 for the number parameter.
-// as the declaration uses the special _ argument label,
-// the label can be omitted in the function call.
+// Call the function named `double` with the value 4 for the first parameter.
 //
-double(2) // is 4
+// The argument label can be omitted in the function call as the declaration
+// specifies the special argument label _ for the parameter
+//
+double(2) // returns 4
+```
+
+It is possible to require an argument label for some parameters, and require an argument label for other parameters.
+
+```typescript
+// Declare a function named `clamp`. The function takes an integer value,
+// the lower limit, and the uppper limit. It returns an integer between
+// the lower and upper limit.
+//
+// For the first parameter the special argument label _ is used,
+// so no argument label has to be given for it in a function call.
+//
+// For the second and third parameter no argument label is given,
+// so the parameter names are the argument labels, i.e., the parameter names
+// have to be given as argument labels in a function call.
+//
+fun clamp(_ value: Int, min: Int, max: Int) -> Int {
+    if value > max {
+        return max
+    }
+
+    if value < min {
+        return min
+    }
+
+    return value
+}
+
+// Declare a constant which has the result of a call to the function
+// named `clamp` as its initial value.
+//
+// For the first argument no label is given, as it is not required by
+// the function declaration (the special argument label `_` is specified).
+//
+// For the second and this argument the labels must be provided,
+// as the function declaration does not specify the special argument label `_`
+// for these two parameters.
+//
+// As the function declaration also does not specify argument labels
+// for these parameters, the parameter names must be used as argument labels.
+//
+const clamped = clamp(123, min: 0, max: 100)
+// clamped is 100
 ```
 
 Argument labels make code more explicit and readable. For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
 
+Argument labels should be named so they make sense from the persective of the function call.
+
 ```typescript
-// declare a function send, which transfers an amount from one account to another.
-// the implementation is ommitted for brevity
+// Declare a function named `send`, which transfers an amount
+// from one account to another.
 //
-// the first two arguments are of the same type, so argument labels are provided
-// to so function calls are explicit.
+// The implementation is ommitted for brevity.
 //
-// the third parameter does not have an argument label, so it is implicitly the parameter name.
+// The first two parameters of the function have the same type, so there is
+// a potential that a function call accidentally provides arguments in
+// the wrong order.
+//
+// While the parameter names `sendingAccount` and `receivingAccount`
+// are descriptive inside the function, they might be too verbose
+// to require them as argument labels in function calls.
+//
+// For this reason the shorter argument labels `from` and `to` are specified,
+// which still convey the meaning of the two parameters without being overly
+// verbose.
+//
+// The name of the third parameter, `amount`, is both meaningful inside
+// the function and also in a function call, so no argument label is given,
+// and the parameter name is required as the argument label in a function call.
 //
 fun send(from sendingAccount: Account, to receivingAccount: Account, amount: Int) {
     // ...
 }
 
-// declare a constant refering to the sending account.
-// the initial value is ommitted for brevity
+// Declare a constant which refers to the sending account.
+//
+// The initial value is ommitted for brevity
 //
 const sender: Account = ...
 
-// declare a constant refering to the receiving account.
-// the initial value is ommitted for brevity
+// Declare a constant refering to the receiving account.
+//
+// The initial value is ommitted for brevity
 //
 const receiver: Account = ...
 
-// call the function send. the function declaration requires argument labels
-// for all parameters, so they need to be provided in the function call.
+// Call the function named `send`.
 //
-// NOTE: the order is clear – send from and account to an account.
-// this avoids ambiguity. for example, in some languages (like C)
-// it is a convention to mention the receiver first, and then the sender
+// The function declaration requires argument labels for all parameters,
+// so they need to be provided in the function call.
+//
+// This avoids ambiguity. For example, in some languages (like C) it is
+// a convention to order the parameters so that the receiver occurs first,
+// followed by the sender. In other languages, it is common to have
+// the sender be the first parameter, followed by the receiver.
+//
+// Here, the order is clear – send an amount from an account to another account.
 //
 send(from: sender, to: receiver, amount: 100)
+```
+
+The order of the arguments in a function call must match the order of the parameters in the function declaration.
+
+```typescript
+// Declare a function named `test`, which accepts to parameters, named `first` and `second`
+//
+fun test(first: Int, second: Int) {
+    // ...
+}
+
+// Invalid: the arguments are provided in the wrong order,
+// even though the argument labels are provided correctly
+//
+test(second: 1, first: 2)
 ```
 
 Functions can be nested, i.e., the code of a function may declare further functions.
