@@ -33,7 +33,7 @@ The algorithm uses the block hash of the last block in the previous epoch as a s
 
 Details about the algorithm can be found in the package below:
 
-**Relevant packages:** [/internal/access/clusters](/internal/access/clusters)
+**Relevant packages:** [/internal/clusters](/internal/clusters)
 
 ## Transaction Submission
 
@@ -56,7 +56,7 @@ After a transaction is validated, it is forwarded to a node in the correct clust
 
 Once a transaction reaches a node in the correct cluster, that node will store the transaction and begin sharing it with other cluster peers.
 
-**Relevant packages:** [/internal/access/routing](/internal/access/routing)
+**Relevant packages:** [/internal/routing](/internal/routing)
 
 ## Collection Building
 
