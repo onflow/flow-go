@@ -326,7 +326,7 @@ numbers[1] = 2
 
 #### Array Types
 
-Arrays either have a fixed size or are variably sized, i.e., elements can be added an removed.
+Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.
 
 Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array. For example, a fixed-size array of 3 `Int8` elements has the type `Int8[3]`.
 
@@ -678,7 +678,7 @@ Operators have the following precedences, highest to lowest:
 
 All operators are left-associative, except for the ternary operator, which is right-associative.
 
-Experessions can be wrapped in parentheses to override precedence conventions, i.e. an alternate order should be indicated, or when the default order should be emphasized, e.g. to avoid confusion. For example, `(2 + 3) * 4` forces addition to precede multiplication, and `5 + (6 * 7)` reinforces the default order.
+Expressions can be wrapped in parentheses to override precedence conventions, i.e. an alternate order should be indicated, or when the default order should be emphasized, e.g. to avoid confusion. For example, `(2 + 3) * 4` forces addition to precede multiplication, and `5 + (6 * 7)` reinforces the default order.
 
 
 ## Functions
@@ -693,7 +693,7 @@ Functions can be declared by using the `fun` keyword, followed by the name of th
 
 The parameters need to be enclosed in parentheses. The return type, if any, is separated from the parameters using the `->` keyword (a hyphen followed by a right angle bracket). The function code needs to be enclosed in opening and closing braces.
 
-Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter. Argument labels preceed the parameter name. The special argument label `_` indicates that a function call can omit the argument label. If no argument label is provided, the function call must use the parameter name.
+Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter. Argument labels precede the parameter name. The special argument label `_` indicates that a function call can omit the argument label. If no argument label is provided, the function call must use the parameter name.
 
 Each parameter needs to have a type annotation, which follows the parameter name after a colon.
 
@@ -719,7 +719,7 @@ It is possible to require an argument label for some parameters, and require an 
 
 ```typescript
 // Declare a function named `clamp`. The function takes an integer value,
-// the lower limit, and the uppper limit. It returns an integer between
+// the lower limit, and the upper limit. It returns an integer between
 // the lower and upper limit.
 //
 // For the first parameter the special argument label _ is used,
@@ -760,13 +760,13 @@ const clamped = clamp(123, min: 0, max: 100)
 
 Argument labels make code more explicit and readable. For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
 
-Argument labels should be named so they make sense from the persective of the function call.
+Argument labels should be named so they make sense from the perspective of the function call.
 
 ```typescript
 // Declare a function named `send`, which transfers an amount
 // from one account to another.
 //
-// The implementation is ommitted for brevity.
+// The implementation is omitted for brevity.
 //
 // The first two parameters of the function have the same type, so there is
 // a potential that a function call accidentally provides arguments in
@@ -790,13 +790,13 @@ fun send(from sendingAccount: Account, to receivingAccount: Account, amount: Int
 
 // Declare a constant which refers to the sending account.
 //
-// The initial value is ommitted for brevity
+// The initial value is omitted for brevity
 //
 const sender: Account = ...
 
-// Declare a constant refering to the receiving account.
+// Declare a constant which refers to the receiving account.
 //
-// The initial value is ommitted for brevity
+// The initial value is omitted for brevity
 //
 const receiver: Account = ...
 
@@ -1377,7 +1377,7 @@ token.id = 23
 
 ### Structure and Class Field Getters and Setters
 
-Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are function that are called when a field is written.
+Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.
 
 Getters and setters are enclosed in opening and closing braces, after the field's type.
 
@@ -1415,7 +1415,7 @@ example.balance = -50
 // example.balance is 0. without the getter it would be -50
 ```
 
-Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parantheses. The parameter has implicitly the type of the field. Another type can not be specified. Setters have no return type.
+Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses. The parameter has implicitly the type of the field. Another type can not be specified. Setters have no return type.
 
 The types of values assigned to setters must always match the field's type.
 
@@ -1483,7 +1483,7 @@ tracker.completed = 1
 tracker.left = 8
 // tracker.completed is 2
 
-// NOTE: the tracker only implementats some functionality to demonstrate
+// NOTE: the tracker only implements some functionality to demonstrate
 // synthesized fields, it is incomplete (e.g. assignments to `goal` are not handled properly)
 ```
 
@@ -1587,13 +1587,13 @@ Instead, use [interfaces](#interfaces).
 
 Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, classes, interfaces) and fields (in structures, classes) are either private or public.
 
-**Private** means the declaration is only accessible/visible in the currrent and inner scopes. For example, a private field in a class can only be accessed by functions of the class, not by code that uses an instance of the class in an outer scope.
+**Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field in a class can only be accessed by functions of the class, not by code that uses an instance of the class in an outer scope.
 
 **Public** means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a class can be accessed using the access syntax on an instance of the class in an outer scope.
 
 By default, everything is private. The `pub` keyword is used to make declarations public.
 
-The `(set)` suffix can be used to make variables also publicly writeable.
+The `(set)` suffix can be used to make variables also publicly writable.
 
 To summarize the behavior for variable declarations, constant declarations, and fields:
 
@@ -1637,18 +1637,18 @@ pub class SomeClass {
     pub const b: Int
 
     // Declare a private variable field,
-    // only readable and writeable in the current and inner scopes
+    // only readable and writable in the current and inner scopes
     //
     var c: Int
 
     // Declare a public variable field, not settable,
-    // only writeable in the current and inner scopes,
+    // only writable in the current and inner scopes,
     // readable in all scopes
     //
     pub var d: Int
 
     // Declare a public variable field, settable,
-    // readable and writeable in all scopes
+    // readable and writable in all scopes
     //
     pub(set) var e: Int
 
@@ -1685,10 +1685,10 @@ Interfaces can be implemented by classes and structures. Types may implement mul
 
 Interfaces consist of the functions and fields, as well as their access, that an implementation must provide. Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions.
 
-Field requirements consist of the name and the type of the field. Field requirements may optionaly declare a getter requirement and a setter requirement, each with preconditions and postconditions.
+Field requirements consist of the name and the type of the field. Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
 
 
-### Inferface Declaration
+### Interface Declaration
 
 Interfaces are declared using the `interface` keyword, followed by the name of the interface, and the requirements enclosed in opening and closing braces. Fields can be annotated to be variable or constant, and how they can be accessed, but do not have to be annotated.
 
@@ -1820,11 +1820,11 @@ impl Vault for ExampleVault {
     }
 
     // Implement the required function named `transfer` of the interface `Vault`,
-    // that subtracts the amount from the this vault's balance,
+    // that subtracts the amount from this vault's balance,
     // and adds the amount to the receiving vault's balance.
     //
     // NOTE: the type of the receiving vault parameter is `ExampleVault`,
-    // i.e., an amount can only be transfered to a vault of the same type.
+    // i.e., an amount can only be transferred to a vault of the same type.
     //
     // This implementation satisfies the required postconditions.
     //
@@ -1845,7 +1845,7 @@ const otherVault = ExampleVault(initialBalance: 0)
 
 // Transfer 10 units from the first vault to the second vault.
 //
-// The amount satisifes the precondition of the `transfer` function
+// The amount satisfies the precondition of the `transfer` function
 // in the `Vault` interface
 //
 vault.transfer(to: otherVault, amount: 10)
