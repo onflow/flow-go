@@ -1,8 +1,8 @@
 package interpreter
 
 import (
-	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
 )
 
 // SecondaryError

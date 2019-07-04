@@ -1,10 +1,10 @@
 package parser
 
 import (
-	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/language/runtime/errors"
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/language/runtime/errors"
 	"math/big"
 	"strconv"
 	"strings"

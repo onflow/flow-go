@@ -1,9 +1,9 @@
 package runtime
 
 import (
+	"fmt"
 	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/language/runtime/interpreter"
-	"fmt"
 	"github.com/logrusorgru/aurora"
 	"strconv"
 	"strings"

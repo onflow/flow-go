@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
 )
 
 type errorListener struct {

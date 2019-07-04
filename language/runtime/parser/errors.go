@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"fmt"
 	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/language/runtime/errors"
-	"fmt"
 )
 
 // ParserError
