@@ -11,7 +11,7 @@ type TransactionRouter struct {
 	clusterManager *clusters.ClusterManager
 }
 
-// Route returns the routed clusters for a transaction in the given epoch.
+// Route returns the routed cluster for a transaction in the given epoch.
 func (tr *TransactionRouter) Route(transaction *types.SignedTransaction, epoch uint64) *clusters.Cluster {
 	return nil
 }
