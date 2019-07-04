@@ -973,19 +973,23 @@ See https://github.com/dapperlabs/bamboo-runtime/issues/84
 
 Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for [statements](#semicolons).
 
+Following each condition, an optional description can be provided after a colon.
+
 In postconditions, the special constant `result` refers to the result of the function.
 
 ```typescript
 fun factorial(_ n: Int) -> Int {
     require {
-        // Factorial is only defined for integers greater than or equal to zero
+        // Require the parameter `n` to be greater than or equal to zero
         //
-        n >= 0
+        n >= 0:
+            "factorial is only defined for integers greater than or equal to zero"
     }
     ensure {
-        // The result will always be greater than or equal to 1
+        // Ensure the result will be greater than or equal to 1
         //
-        result >= 1
+        result >= 1:
+            "the result must be greater than or equal to 1"
     }
 
     var i = n
@@ -1015,7 +1019,8 @@ fun incrementN() {
     ensure {
         // Require the new value of `n` to be the old value of `n`, plus one
         //
-        n == before(n) + 1
+        n == before(n) + 1:
+            "n must be incremented by 1"
     }
 
     n = n + 1
@@ -1792,7 +1797,8 @@ interface Vault {
     //
     init(initialBalance: Int) {
         ensure {
-            self.balance == initialBalance
+            self.balance == initialBalance:
+                "the balance must be initialized to the initial balance"
         }
 
         // NOTE: no code
@@ -1806,10 +1812,13 @@ interface Vault {
     //
     pub fun add(amount: Int) {
         require {
-            amount > 0
+            amount > 0:
+                "the amount must be positive"
         }
+
         ensure {
-            self.balance == before(self.balance) + amount
+            self.balance == before(self.balance) + amount:
+                "the amount must be added to the balance"
         }
 
         // NOTE: no code
@@ -1830,12 +1839,19 @@ interface Vault {
     //
     pub fun transfer(to receivingVault: Self, amount: Int) {
         require {
-            amount > 0
-            amount <= self.balance
+            amount > 0:
+                "the amount must be positive"
+
+            amount <= self.balance:
+                "the amount must be smaller or equal to the balance"
         }
+
         ensure {
-            self.balance == before(self.balance) - amount
-            receivingVault.balance == before(receivingVault.balance) + amount
+            self.balance == before(self.balance) - amount:
+                "the amount must be deducted from the balance"
+
+            receivingVault.balance == before(receivingVault.balance) + amount:
+                "the amount must be added to the receiving balance"
         }
 
         // NOTE: no code
