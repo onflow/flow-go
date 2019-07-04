@@ -1695,8 +1695,8 @@ pub class SomeClass {
 > 🚧 Status: Interfaces are not implemented yet.
 
 An interface is an abstract type that specifies the behavior of types that *implement* the interface. Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
-<!-- TODO also contracts, once documented -->
-Interfaces can be implemented by classes and structures. Types may implement multiple interfaces.
+
+Interfaces can be implemented by [classes](#structures-and-classes), [structures](#structures-and-classes), [contracts](#contracts), and [authorizations](#authorizations). These types may implement multiple interfaces.
 
 Interfaces consist of the functions and fields, as well as their access, that an implementation must provide. Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions.
 
@@ -1801,7 +1801,7 @@ Note that the required initializer and function do not have any executable code.
 
 ### Interface Implementation
 
-Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the class or structure that should provide the functionality.
+Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the type (class, structure, contract, or authorization) that should provide the functionality.
 
 ```typescript,file=interface-implementation.bpl
 
@@ -1937,6 +1937,99 @@ someVault.balance // is 100
 someVault.add(amount: 50)
 
 // someVault.balance is 150
+```
+
+## Contracts
+
+> 🚧 Status: Contracts are not implemented yet.
+
+A contract is similar to a class in that it is a composite data structure and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
+
+Contracts differ from classes in that all fields are stored, i.e., persisted. To make this explicit, all fields must be annotated with the `stored` keyword.
+
+```typescript,file=contract-counter.bpl
+// Declare a contract named `Counter`.
+//
+// The counter has an initial, positive value that
+// can be incremented using the function `increment`.
+//
+// The count is stored, i.e. persisted.
+//
+contract Counter {
+
+    // Declare a public variable field for the count.
+    // It is stored, i.e. persisted.
+    // The field is written to by the contract, and can be read
+    // in outer scopes.
+    //
+    pub stored var count: Int
+
+    // Declare an initializer which accepts the initial count,
+    // and intialized the stored field `count` with it.
+    //
+    init(initialCount: Int) {
+        require {
+            initialCount >= 0:
+                "initial count must be positive"
+        }
+
+        self.count = initialCount
+    }
+
+    // Declare a public function named `increment`
+    //
+    pub fun increment(_ count: Int) {
+        require {
+            count >= 0:
+                "number must be positive"
+        }
+
+        self.count = self.count + count
+    }
+}
+```
+
+Stored fields may be of any type. For example, it could be an array, a dictionary, or a class.
+
+```typescript,file=contract-funigble-token.bpl
+// Declare a contract named `FungibleToken`.
+//
+// This is a very simple fungible token contract.
+// The contract keeps track of balances for IDs.
+// Units can be sent from one account to another.
+//
+contract FungibleToken {
+
+    // Declare a private variable field for the balances.
+    // It is stored, i.e. persisted
+    //
+    stored var balances: Int[Int]
+
+    // Declare an initializer which initializes the balances
+    //
+    init(initialBalances: Int[Int]) {
+        self.balances = initialBalances
+    }
+
+    // Declare a public function named `balance`,
+    // which returns the balance for an ID
+    //
+    pub fun balance(of id: Int) -> Int? {
+        return balances[id]
+    }
+
+    // Declare a public function named `transfer` which
+    // sends units from one ID to another ID
+    //
+    pub fun transfer(from: Int, to: Int, amount: Int) {
+        require {
+            amount >= 0: "the amount must be positive"
+        }
+
+        self.balances[from] = self.balances[from] - amount
+        self.balances[to] = self.balances[to] + amount
+    }
+}
 ```
 
 ## Accounts
