@@ -980,13 +980,13 @@ In postconditions, the special constant `result` refers to the result of the fun
 ```typescript
 fun factorial(_ n: Int) -> Int {
     require {
-        // require the parameter `n` to be greater than or equal to zero
+        // Require the parameter `n` to be greater than or equal to zero
         //
         n >= 0:
             "factorial is only defined for integers greater than or equal to zero"
     }
     ensure {
-        // ensure the result will be greater than or equal to 1
+        // Ensure the result will be greater than or equal to 1
         //
         result >= 1:
             "the result must be greater than or equal to 1"
