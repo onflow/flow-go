@@ -1,4 +1,4 @@
 *.interp linguist-generated=true
 *.tokens linguist-generated=true
-execution/strictus/strictus_parser.go linguist-generated=true
-execution/strictus/strictus_lexer.go linguist-generated=true
+execution/strictus/parser/strictus_parser.go linguist-generated=true
+execution/strictus/parser/strictus_lexer.go linguist-generated=true

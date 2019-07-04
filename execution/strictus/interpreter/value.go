@@ -575,7 +575,7 @@ func ToValue(value interface{}) (Value, error) {
 		return BoolValue(value), nil
 	}
 
-	return nil, fmt.Errorf("can't convert Go value to value: %#+v", value)
+	return nil, fmt.Errorf("cannot convert Go value to value: %#+v", value)
 }
 
 func ToValues(inputs []interface{}) ([]Value, error) {

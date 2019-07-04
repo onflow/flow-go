@@ -1,6 +1,6 @@
-// Code generated from Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
+// Code generated from execution/strictus/parser/Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
 
-package strictus // Strictus
+package parser // Strictus
 import "github.com/antlr/antlr4/runtime/Go/antlr"
 
 // StrictusListener is a complete listener for a parse tree produced by StrictusParser.
@@ -22,8 +22,8 @@ type StrictusListener interface {
 	// EnterParameter is called when entering the parameter production.
 	EnterParameter(c *ParameterContext)
 
-	// EnterTypeName is called when entering the typeName production.
-	EnterTypeName(c *TypeNameContext)
+	// EnterFullType is called when entering the fullType production.
+	EnterFullType(c *FullTypeContext)
 
 	// EnterTypeDimension is called when entering the typeDimension production.
 	EnterTypeDimension(c *TypeDimensionContext)
@@ -31,8 +31,14 @@ type StrictusListener interface {
 	// EnterBaseType is called when entering the baseType production.
 	EnterBaseType(c *BaseTypeContext)
 
+	// EnterFunctionType is called when entering the functionType production.
+	EnterFunctionType(c *FunctionTypeContext)
+
 	// EnterBlock is called when entering the block production.
 	EnterBlock(c *BlockContext)
+
+	// EnterStatements is called when entering the statements production.
+	EnterStatements(c *StatementsContext)
 
 	// EnterStatement is called when entering the statement production.
 	EnterStatement(c *StatementContext)
@@ -142,6 +148,9 @@ type StrictusListener interface {
 	// EnterHexadecimalLiteral is called when entering the HexadecimalLiteral production.
 	EnterHexadecimalLiteral(c *HexadecimalLiteralContext)
 
+	// EnterInvalidNumberLiteral is called when entering the InvalidNumberLiteral production.
+	EnterInvalidNumberLiteral(c *InvalidNumberLiteralContext)
+
 	// EnterArrayLiteral is called when entering the arrayLiteral production.
 	EnterArrayLiteral(c *ArrayLiteralContext)
 
@@ -163,8 +172,8 @@ type StrictusListener interface {
 	// ExitParameter is called when exiting the parameter production.
 	ExitParameter(c *ParameterContext)
 
-	// ExitTypeName is called when exiting the typeName production.
-	ExitTypeName(c *TypeNameContext)
+	// ExitFullType is called when exiting the fullType production.
+	ExitFullType(c *FullTypeContext)
 
 	// ExitTypeDimension is called when exiting the typeDimension production.
 	ExitTypeDimension(c *TypeDimensionContext)
@@ -172,8 +181,14 @@ type StrictusListener interface {
 	// ExitBaseType is called when exiting the baseType production.
 	ExitBaseType(c *BaseTypeContext)
 
+	// ExitFunctionType is called when exiting the functionType production.
+	ExitFunctionType(c *FunctionTypeContext)
+
 	// ExitBlock is called when exiting the block production.
 	ExitBlock(c *BlockContext)
+
+	// ExitStatements is called when exiting the statements production.
+	ExitStatements(c *StatementsContext)
 
 	// ExitStatement is called when exiting the statement production.
 	ExitStatement(c *StatementContext)
@@ -282,6 +297,9 @@ type StrictusListener interface {
 
 	// ExitHexadecimalLiteral is called when exiting the HexadecimalLiteral production.
 	ExitHexadecimalLiteral(c *HexadecimalLiteralContext)
+
+	// ExitInvalidNumberLiteral is called when exiting the InvalidNumberLiteral production.
+	ExitInvalidNumberLiteral(c *InvalidNumberLiteralContext)
 
 	// ExitArrayLiteral is called when exiting the arrayLiteral production.
 	ExitArrayLiteral(c *ArrayLiteralContext)

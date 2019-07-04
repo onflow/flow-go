@@ -7,7 +7,7 @@ import "bamboo-runtime/execution/strictus/errors"
 type DeclarationKind int
 
 const (
-	DeclarationKindAny DeclarationKind = iota
+	DeclarationKindValue DeclarationKind = iota
 	DeclarationKindFunction
 	DeclarationKindVariable
 	DeclarationKindConstant
@@ -16,8 +16,8 @@ const (
 
 func (k DeclarationKind) Name() string {
 	switch k {
-	case DeclarationKindAny:
-		return "any"
+	case DeclarationKindValue:
+		return "value"
 	case DeclarationKindFunction:
 		return "function"
 	case DeclarationKindVariable:
