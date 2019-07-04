@@ -20,21 +20,21 @@ Comments can be used to document code. A comment is text that is not executed.
 
 *Single-line comments* start with two slashes (`//`):
 
-```
+```typescript,file=single-line-comment.bpl
 // This is a comment on a single line.
 // Another comment line that is not executed.
 ```
 
 *Multi-line comments* start with a slash and an asterisk (`/*`) and end with an asterisk and a slash (`*/`):
 
-```
+```typescript,file=multi-line-comment.bpl
 /* This is a comment which
 spans multiple lines. */
 ```
 
 Comments may be nested.
 
-```
+```text,file=nested-comment.bpl
 /* /* this */ is a valid comment */
 ```
 
@@ -47,12 +47,12 @@ Constant means that the *name* is constant, not the *value*, i.e., the value may
 The `const` keyword is used to declare a constant and the `var` keyword is used to declare a variable.
 The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
-```typescript
+```typescript,file=constants-and-variables.bpl
 // Declare a constant named `a`
 //
 const a = 1
 
-// Error: re-assigning to a constant
+// Invalid: re-assigning to a constant
 //
 a = 2
 
@@ -89,7 +89,9 @@ const a = 2
 // Declare a variable named `b`
 //
 var b = 3
+```
 
+```typescript
 // Invalid: can't re-declare a variable with name `b`,
 // as it is already used in this scope
 //
@@ -108,7 +110,7 @@ When declaring a constant or variable, an optional *type annotation* can be prov
 
 If no type annotation is provided, the type of the declaration is [inferred from the initial value](#type-inference).
 
-```typescript
+```typescript,file=type-annotations.bpl
 // Declare a variable named `initialized` which has an explicit type annotation.
 //
 // `Bool` is the type of booleans
@@ -181,7 +183,7 @@ By convention, variables, constants, and functions have lowercase names; and typ
 
 Semicolons may be used to separate statements, but are optional. They can be used to separate multiple statements on a single line.
 
-```typescript
+```typescript,file=semicolons.bpl
 // Declare a constant, without a semicolon
 //
 const a = 1
@@ -236,7 +238,7 @@ Numbers can be written in various bases. Numbers are assumed to be decimal by de
 | **Octal**       | `0o`   | one or more numbers in the range `0` to `7`                           |
 | **Hexadecimal** | `0x`   | one or more numbers, or characters `a` to `f`, lowercase or uppercase |
 
-```typescript
+```typescript,file=numbers.bpl
 // A decimal number
 //
 1234567890
@@ -260,13 +262,13 @@ Numbers can be written in various bases. Numbers are assumed to be decimal by de
 
 Decimal numbers may contain underscores (`_`) to logically separate components.
 
-```typescript
+```typescript,file=number-underscores-decimal.bpl
 const largeNumber = 1_000_000
 ```
 
 Underscores are allowed for all numeral systems.
 
-```typescript
+```typescript,file=number-underscores-binary.bpl
 const binaryNumber = 0b10_11_01
 ```
 
@@ -274,7 +276,7 @@ const binaryNumber = 0b10_11_01
 
 Arrays are mutable, ordered collections of values. All values in an array must have the same type. Arrays may contain a value multiple times. Array literals start with an opening square bracket `[` and end with a closing square bracket `]`.
 
-```typescript
+```typescript,file=arrays.bpl
 // An empty array
 //
 []
@@ -292,7 +294,7 @@ Arrays are mutable, ordered collections of values. All values in an array must h
 
 To get the element of an array at a specific index, the indexing syntax can be used: The array is followed by an opening square bracket `[`, the indexing value, and ends with a closing square bracket `]`.
 
-```typescript
+```typescript,file=arrays-indexing.bpl
 const numbers = [42, 23]
 
 // Get the first number
@@ -304,7 +306,7 @@ numbers[0] // is 42
 numbers[1] // is 23
 ```
 
-```typescript
+```typescript,file=arrays-nested-indexing.bpl
 const arrays = [[1, 2], [3, 4]]
 
 // Get the first number of the second array
@@ -314,7 +316,7 @@ arrays[1][0] // is 3
 
 To set an element of an array at a specific index, the indexing syntax can be used as well.
 
-```typescript
+```typescript,file=array-indexing-assignment.bpl
 const numbers = [42, 23]
 
 // Change the second number
@@ -332,6 +334,14 @@ Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array
 
 Variable-size arrays have the type suffix `[]`. For example, the type `Int16[]` specifies a variable-size array of elements that have type `Int16`.
 
+```typescript,file=array-types.bpl
+const array: Int8[2] = [1, 2]
+
+const arrays: Int16[2][3] = [
+    [1, 2, 3],
+    [4, 5, 6]
+]
+```
 
 <!--
 
@@ -348,13 +358,13 @@ TODO
 
 ### Dictionaries
 
-> Status: Dictionaries are not implemented yet.
+> 🚧 Status: Dictionaries are not implemented yet.
 
 Dictionaries are mutable, unordered collections of key-value associations. In a dictionary, all keys must have the same type, and all values must have the same type. Dictionaries may contain a key only once and may contain a value multiple times.
 
 Dictionary literals start with an opening brace `{` and end with a closing brace `}`. Keys are separated from values by a colon, and key-value associations are separated by commas.
 
-```typescript
+```typescript,file=dictionaries.bpl
 // An empty dictionary
 //
 {}
@@ -378,7 +388,7 @@ Dictionary literals start with an opening brace `{` and end with a closing brace
 
 To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
 
-```typescript
+```typescript,file=dictionary-access.bpl
 const booleans = {
     1: true,
     0: false
@@ -396,7 +406,7 @@ integers[false] // is 0
 
 To set the value for a key of a dictionary, the access syntax can be used as well.
 
-```typescript
+```typescript,file=dictionary-assignment.bpl
 const booleans = {
     1: true,
     0: false
@@ -411,7 +421,7 @@ booleans[0] = true
 
 Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
 
-```typescript
+```typescript,file=dictionary-types.bpl
 const booleans = {
     1: true,
     0: false
@@ -448,14 +458,14 @@ Operators are special symbols that perform a computation for one or more values.
 
 The `-` unary operator negates an integer:
 
-```typescript
+```typescript,file=integer-negation.bpl
 const a = 1
 -a // is -1
 ```
 
 The `!` unary operator logically negates a boolean:
 
-```typescript
+```typescript,file=boolean-negation.bpl
 const a = true
 !a // is false
 ```
@@ -464,7 +474,7 @@ const a = true
 
 The binary assignment operator `=` can be used to assign a new value to a variable. It is only allowed in a statement and is not allowed in expressions.
 
-```typescript
+```typescript,file=assignment.bpl
 var a = 1
 a = 2
 // a is 2
@@ -472,7 +482,7 @@ a = 2
 
 The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.
 
-```typescript
+```typescript,file=assignment-numbers.bpl
 const numbers = [1, 2]
 
 // Change the first number
@@ -482,7 +492,7 @@ numbers[0] = 3
 // `numbers` is [3, 2]
 ```
 
-```typescript
+```typescript,file=assignment-arrays.bpl
 const arrays = [[1, 2], [3, 4]]
 
 // Change the first number in the second array
@@ -492,7 +502,7 @@ arrays[1][0] = 5
 // `arrays` is [[1, 2], [5, 4]]
 ```
 
-```typescript
+```typescript,file=assignment-dictionaries.bpl
 const dictionaries = {
   true: {1: 2},
   false: {3: 4}
@@ -515,14 +525,14 @@ There are four arithmetic operators:
 - Multiplication: `*`
 - Division: `/`
 
-```typescript
+```typescript,file=operator-plus.bpl
 const a = 1 + 2
 // `a` is 3
 ```
 
 Arithmetic operators don't cause values to overflow.
 
-```typescript
+```typescript,file=operator-times.bpl
 const a: Int8 = 100
 const b: Int8 = 100
 const c = a * b
@@ -543,14 +553,14 @@ For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111
 //  = 100000000 = 0
 ```
 
-```typescript
+```typescript,file=operator-overflow-plus.bpl
 const a: UInt8 = 255
 a &+ 1 // is 0
 ```
 
 Similarly, for the minimum value 0, subtracting 1 wraps around and results in the maximum value 255.
 
-```typescript
+```typescript,file=operator-minus.bpl
 //     00000000
 // &-         1
 //  =  11111111 = 255
@@ -580,7 +590,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 - Logical AND: `a && b`
 
-  ```typescript
+  ```typescript,file=operator-and.bpl
   true && true // is true
   true && false // is false
   false && false // is false
@@ -589,7 +599,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 - Logical OR: `a || b`
 
-  ```typescript
+  ```typescript,file=operator-or.bpl
   true || true // is true
   true || false // is true
   false || false // is true
@@ -603,7 +613,7 @@ Comparison operators work with boolean and integer values.
 
 - Equality: `==`, for booleans and integers
 
-  ```typescript
+  ```typescript,file=operator-equal.bpl
   1 == 1 // is true
   1 == 2 // is false
   true == true // is true
@@ -612,7 +622,7 @@ Comparison operators work with boolean and integer values.
 
 - Inequality: `!=`, for booleans and integers
 
-  ```typescript
+  ```typescript,file=operator-not-equal.bpl
   1 != 1 // is false
   1 != 2 // is true
   true != true // is false
@@ -621,7 +631,7 @@ Comparison operators work with boolean and integer values.
 
 - Less than: `<`, for integers
 
-  ```typescript
+  ```typescript,file=operator-less.bpl
   1 < 1 // is false
   1 < 2 // is true
   2 < 1 // is false
@@ -629,7 +639,7 @@ Comparison operators work with boolean and integer values.
 
 - Less or equal than: `<=`, for integers
 
-  ```typescript
+  ```typescript,file=operator-less-equals.bpl
   1 <= 1 // is true
   1 <= 2 // is true
   2 <= 1 // is false
@@ -637,7 +647,7 @@ Comparison operators work with boolean and integer values.
 
 - Greater than: `>`, for integers
 
-  ```typescript
+  ```typescript,file=operator-greater.bpl
   1 > 1 // is false
   1 > 2 // is false
   2 > 1 // is true
@@ -646,7 +656,7 @@ Comparison operators work with boolean and integer values.
 
 - Greater or equal than: `>=`, for integers
 
-  ```typescript
+  ```typescript,file=operator-greater-equals.bpl
   1 >= 1 // is true
   1 >= 2 // is false
   2 >= 1 // is true
@@ -659,7 +669,7 @@ There is only one ternary conditional operator, the ternary conditional operator
 
 It behaves like an if-statement, but is an expression: If the first operator value is true, the second operator value is returned. If the first operator value is false, the third value is returned.
 
-```typescript
+```typescript,file=operator-ternary-conditional.bpl
 const x = 1 > 2 ? 3 : 4
 // `x` is 4
 ```
@@ -697,7 +707,7 @@ Each parameter can have a label, the name that a function call needs to use to p
 
 Each parameter needs to have a type annotation, which follows the parameter name after a colon.
 
-```typescript
+```typescript,file=function-double.bpl
 // Declare a function named `double`, which multiples a number by two.
 //
 // The special argument label _ is specified for the parameter,
@@ -717,7 +727,7 @@ double(2) // returns 4
 
 It is possible to require an argument label for some parameters, and require an argument label for other parameters.
 
-```typescript
+```typescript,file=function-clamp.bpl
 // Declare a function named `clamp`. The function takes an integer value,
 // the lower limit, and the upper limit. It returns an integer between
 // the lower and upper limit.
@@ -762,7 +772,7 @@ Argument labels make code more explicit and readable. For example, they avoid co
 
 Argument labels should be named so they make sense from the perspective of the function call.
 
-```typescript
+```typescript,file=function-send.bpl
 // Declare a function named `send`, which transfers an amount
 // from one account to another.
 //
@@ -792,13 +802,13 @@ fun send(from sendingAccount: Account, to receivingAccount: Account, amount: Int
 //
 // The initial value is omitted for brevity
 //
-const sender: Account = ...
+const sender: Account = // ...
 
 // Declare a constant which refers to the receiving account.
 //
 // The initial value is omitted for brevity
 //
-const receiver: Account = ...
+const receiver: Account = // ...
 
 // Call the function named `send`.
 //
@@ -817,7 +827,7 @@ send(from: sender, to: receiver, amount: 100)
 
 The order of the arguments in a function call must match the order of the parameters in the function declaration.
 
-```typescript
+```typescript,file=function-test.bpl
 // Declare a function named `test`, which accepts two parameters, named `first` and `second`
 //
 fun test(first: Int, second: Int) {
@@ -832,7 +842,7 @@ test(second: 1, first: 2)
 
 Functions can be nested, i.e., the code of a function may declare further functions.
 
-```typescript
+```typescript,file=function-doubleAndAddOne.bpl
 // Declare a function which multiplies a number by two, and adds one
 //
 fun doubleAndAddOne(_ x: Int) -> Int {
@@ -853,7 +863,7 @@ doubleAndAddOne(2) // is 5
 
 Functions can be also used as expressions. The syntax is the same as for function declarations, except that function expressions have no name, i.e., it is anonymous.
 
-```typescript
+```typescript,file=function-expression.bpl
 // Declare a constant named `double`, which has a function as its value.
 //
 // The function multiplies a number by two when it is called
@@ -868,7 +878,7 @@ const double =
 
 Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.
 
-```typescript
+```typescript,file=function-call.bpl
 fun double(_ x: Int) -> Int {
      return x * 2
 }
@@ -891,7 +901,7 @@ double()
 Function types consist of the function's parameter types and the function's return type.
 The parameter types need to be enclosed in parentheses, followed by the `->` keyword, and end with the return type.
 
-```typescript
+```typescript,file=function-type.bpl
 // Declare a function named `add`, with the function type `(Int, Int) -> Int`
 //
 fun add(a: Int, b: Int) -> Int {
@@ -899,7 +909,7 @@ fun add(a: Int, b: Int) -> Int {
 }
 ```
 
-```typescript
+```typescript,file=function-type-expression.bpl
 // Declare a constant named `add`, with the function type `(Int, Int) -> Int`
 //
 const add: (Int, Int) -> Int =
@@ -910,7 +920,7 @@ const add: (Int, Int) -> Int =
 
 If the function has no return type, it implicitly has the return type `Void`.
 
-```typescript
+```typescript,file=function-doNothing.bpl
 // Declare a constant named `doNothing`, which is a function
 // that takes no parameters and returns nothing
 //
@@ -928,7 +938,7 @@ The type `((Int) -> Int)[2]` specifies an array type of two functions, which acc
 
 When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as [call-by-sharing](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_sharing).
 
-```typescript
+```typescript,file=function-change.bpl
 fun change(_ numbers: Int[]) {
      numbers[0] = 1
      numbers[1] = 2
@@ -942,7 +952,7 @@ change(numbers)
 
 Parameters are constant, i.e., it is not allowed to assign to them.
 
-```typescript
+```typescript,file=function-parameter-assignment.bpl
 fun test(x: Int) {
      // Invalid: cannot assign to a parameter (constant)
      //
@@ -952,7 +962,7 @@ fun test(x: Int) {
 
 ### Function Preconditions and Postconditions
 
-> Status: Function Preconditions and Postconditions are not implemented yet.
+> 🚧 Status: Function Preconditions and Postconditions are not implemented yet.
 
 Functions may have preconditions and may have postconditions. Preconditions and postconditions can be used to restrict the inputs (values for parameters) and output (return value) of a function.
 
@@ -977,7 +987,7 @@ Following each condition, an optional description can be provided after a colon.
 
 In postconditions, the special constant `result` refers to the result of the function.
 
-```typescript
+```typescript,file=function-factorial.bpl
 fun factorial(_ n: Int) -> Int {
     require {
         // require the parameter `n` to be greater than or equal to zero
@@ -1012,7 +1022,7 @@ factorial(-2)
 
 In postconditions, the special function `before` can be used to get the value of an expression just before the function is called.
 
-```typescript
+```typescript,file=function-increment.bpl
 var n = 0
 
 fun incrementN() {
@@ -1038,7 +1048,7 @@ If-statements allow a certain piece of code to be executed only when a given con
 The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces. The condition must be boolean and the braces are required.
 
 
-```typescript
+```typescript,file=control-flow-if.bpl
 const a = 0
 var b = 0
 
@@ -1056,7 +1066,7 @@ if a != 0 {
 An additional else-clause can be added to execute another piece of code when the condition is false.
 The else-clause is introduced by the `else` keyword.
 
-```typescript
+```typescript,file=control-flow-if-else.bpl
 const a = 0
 var b = 0
 
@@ -1071,7 +1081,7 @@ if a == 1 {
 
 The else-clause can contain another if-statement, i.e., if-statements can be chained together.
 
-```typescript
+```typescript,file=control-flow-if-else-if.bpl
 const a = 0
 var b = 0
 
@@ -1095,7 +1105,7 @@ The while-statement starts with the `while` keyword, followed by the condition, 
 The while-statement will first evaluate the condition. If the condition is false, the execution is done.
 If it is true, the piece of code is executed and the evaluation of the condition is repeated. Thus, the piece of code is executed zero or more times.
 
-```typescript
+```typescript,file=control-flow-while.bpl
 var a = 0
 while a < 5 {
     a = a + 1
@@ -1120,7 +1130,7 @@ TODO: examples
 
 Every function and block (`{` ... `}`) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.
 
-```typescript
+```typescript,file=scope.bpl
 const x = 10
 
 fun f() -> Int {
@@ -1135,7 +1145,7 @@ f() // returns 20
 y
 ```
 
-```typescript
+```typescript,file=scope-doubleAndAddOne.bpl
 fun doubleAndAddOne(_ n: Int) -> Int {
     fun double(_ x: Int) {
         return x * 2
@@ -1150,7 +1160,7 @@ double(1)
 
 Each scope can introduce new declarations, i.e., the outer declaration is shadowed.
 
-```typescript
+```typescript,file=scope-test.bpl
 const x = 2
 
 fun test() -> Int {
@@ -1163,7 +1173,7 @@ test() // returns 3
 
 Scope is lexical, not dynamic.
 
-```typescript
+```typescript,file=scope-lexical.bpl
 const x = 10
 
 fun f() -> Int {
@@ -1180,7 +1190,7 @@ g() // returns 10, not 20
 
 Declarations are **not** moved to the top of the enclosing function (hoisted).
 
-```typescript
+```typescript,file=scope-no-hoisting.bpl
 const x = 2
 
 fun f() -> Int {
@@ -1195,13 +1205,13 @@ f() // returns 2
 
 ## Type Safety
 
-> Status: Type checking is not implemented yet.
+> 🚧 Status: Type checking is not implemented yet.
 
 The Bamboo programming language is a _type-safe_ language.
 
 When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type `Bool`, it can _only_ be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
 
-```typescript
+```typescript,file=type-safety-assign-int-to-bool.bpl
 // Declare a variable that has type `Bool`
 var a = true
 
@@ -1212,7 +1222,7 @@ a = 0
 
 When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type `Bool`, _only_ a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
 
-```typescript
+```typescript,file=type-safety-nand.bpl
 fun nand(_ a: Bool, _ b: Bool) -> Bool {
     return !(a && b)
 }
@@ -1226,7 +1236,7 @@ nand(0, 0)
 
 Types are *not* automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`.
 
-```typescript
+```typescript,file=type-safety-add.bpl
 fun add(_ a: Int8, _ b: Int8) -> Int {
     return a + b
 }
@@ -1246,13 +1256,13 @@ add(a, b)
 
 ## Type Inference
 
-> Status: Type inference is not implemented yet.
+> 🚧 Status: Type inference is not implemented yet.
 
 If a variable or constant is not annotated explicitly with a type, it is inferred from the value.
 
 Integer literals are inferred to type `Int`.
 
-```typescript
+```typescript,file=type-inference-int.bpl
 const a = 1
 
 // `a` has type `Int`
@@ -1260,7 +1270,7 @@ const a = 1
 
 Array literals are inferred based on the elements of the literal, and to be variable-size.
 
-```typescript
+```typescript,file=type-inference-intergers.bpl
 const integers = [1, 2]
 // `integers` has type `Int[]`
 
@@ -1271,7 +1281,7 @@ const invalidMixed = [1, true, 2, false]
 
 Dictionary literals are inferred based on the keys and values of the literal.
 
-```typescript
+```typescript,file=type-inference-dictionary.bpl
 const booleans = {
     1: true,
     2: false
@@ -1288,7 +1298,7 @@ const invalidMixed = {
 
 Functions are inferred based on the parameter types and the return type.
 
-```typescript
+```typescript,file=type-inference-function.bpl
 const add = (a: Int8, b: Int8) -> Int {
     return a + b
 }
@@ -1298,13 +1308,13 @@ const add = (a: Int8, b: Int8) -> Int {
 
 ## Structures and Classes
 
-> Status: Structures and classes are not implemented yet.
+> 🚧 Status: Structures and classes are not implemented yet.
 
 Structures and classes are composite types. Structures and classes consist of one or more values, which are stored in named fields. Each field may have a different type.
 
 Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword. The keyword is followed by the name.
 
-```typescript
+```typescript,file=struct-and-class.bpl
 struct SomeStruct {
     // ...
 }
@@ -1318,7 +1328,7 @@ Structures and classes are types.
 
 Values of a structure or class type are created (instantiated) by calling the type like a function.
 
-```typescript
+```typescript,file=struct-and-class-instantiation.bpl
 const someStruct: SomeStruct = SomeStruct()
 
 const someClass: SomeClass = SomeClass()
@@ -1345,7 +1355,7 @@ Synthetic fields are **not** stored in the structure or class value, i.e. they a
 | **Constant field**   | Yes              | **No**             | `const`     |
 | **Synthetic field**  | **No**           | Yes                | `synthetic` |
 
-```typescript
+```typescript,file=struct-and-class-fields-and-init.bpl
 // Declare a structure named `Token`, which has a constant field
 // named `id` and a variable field named `balance`.
 //
@@ -1366,7 +1376,7 @@ In initializers, the special constant `self` refers to the structure or class va
 
 Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the structure or class instance is followed by a dot (`.`) and the name of the field.
 
-```typescript
+```typescript,file=struct-and-class-fields-assignment.bpl
 const token = Token(id: 42, balance: 1_000_00)
 
 token.id // is 42
@@ -1388,7 +1398,7 @@ Getters and setters are enclosed in opening and closing braces, after the field'
 
 Getters are declared using the `get` keyword. Getters have no parameters and their return type is implicitly the type of the field.
 
-```typescript
+```typescript,file=struct-and-class-field-getter.bpl
 struct GetterExample {
 
     // Declare a variable field named `balance` with a getter
@@ -1424,7 +1434,7 @@ Setters are declared using the `set` keyword, followed by the name for the new v
 
 The types of values assigned to setters must always match the field's type.
 
-```typescript
+```typescript,file=struct-and-class-field-setter.bpl
 struct SetterExample {
 
     // Declare a variable field named `balance` with a setter
@@ -1455,7 +1465,7 @@ example.balance = -50
 
 If a field has both a getter and a setter, and neither of them read from/write to the field, the field is *synthetic*. Synthetic fields **must** be declared as such using the `synthetic` keyword. Synthetic fields are neither variable nor constant, and they are not actually stored in the structure or class value.
 
-```typescript
+```typescript,file=struct-and-class-synthetic-field.bpl
 struct GoalTracker {
 
     var goal: Int
@@ -1496,7 +1506,7 @@ tracker.left = 8
 
 Structures and classes may contain functions. Just like in the initializer, the special constant `self` refers to the structure or class value that the function is called on.
 
-```typescript
+```typescript,file=struct-and-class-function.bpl
 struct Token {
     const id: Int
     var balance: Int
@@ -1520,7 +1530,7 @@ token.mint(amount: 1_000_000)
 
 The only difference between structures and classes is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types.
 
-```typescript
+```typescript,file=struct-behavior.bpl
 // Declare a structure named `SomeStruct`, with a variable integer field
 //
 struct SomeStruct {
@@ -1545,7 +1555,7 @@ structB.value = 1
 // structA.value is *0*
 ```
 
-```typescript
+```typescript,file=class-behavior.bpl
 // Declare a class named `SomeClass`, with a variable integer field
 //
 class SomeClass {
@@ -1588,7 +1598,7 @@ Instead, use [interfaces](#interfaces).
 
 ## Access control
 
-> Status: Access control is not implemented yet.
+> 🚧 Status: Access control is not implemented yet.
 
 Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, classes, interfaces) and fields (in structures, classes) are either private or public.
 
@@ -1619,7 +1629,7 @@ To summarize the behavior for functions, structures, classes, and interfaces:
 
 
 
-```typescript
+```typescript,file=access-control.bpl
 // Declare a private constant, inaccessible/invisible in outer scope
 //
 const a = 1
@@ -1682,7 +1692,7 @@ pub class SomeClass {
 
 ## Interfaces
 
-> Status: Interfaces are not implemented yet.
+> 🚧 Status: Interfaces are not implemented yet.
 
 An interface is an abstract type that specifies the behavior of types that *implement* the interface. Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
 <!-- TODO also contracts, once documented -->
@@ -1699,7 +1709,7 @@ Interfaces are declared using the `interface` keyword, followed by the name of t
 
 The special type `Self` can be used to refer to the type implementing the interface. This can be seen in the following example, where the first parameter of the `transfer` function has the `Self` type.
 
-```typescript
+```typescript,file=interface-declaration.bpl
 // Declare an interface for a vault (a container for a balance)
 //
 interface Vault {
@@ -1793,7 +1803,8 @@ Note that the required initializer and function do not have any executable code.
 
 Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the class or structure that should provide the functionality.
 
-```typescript
+```typescript,file=interface-implementation.bpl
+
 // Declare a class named `ExampleVault` with a variable field named `balance`,
 // that can be written by functions of the class, but outer scopes can only read it
 //
@@ -1882,7 +1893,7 @@ vault.transfer(to: otherVault, amount: 100)
 
 Interfaces are types. Values implementing an interface can be used as initial values for constants that have the interface as their type.
 
-```typescript
+```typescript,file=interface-type.bpl
 // Declare a constant that has type `Vault`, which has a value that has type `ExampleVault`
 //
 const vault: Vault = ExampleVault(initialBalance: 100)
@@ -1890,7 +1901,7 @@ const vault: Vault = ExampleVault(initialBalance: 100)
 
 Values implementing an interface are assignable to variables that have the interface as their type.
 
-```typescript
+```typescript,file=interface-type-assignment.bpl
 // Assume there is a declaration for another implementation
 // of the interface  `Vault` which is named `CoolVault`
 
@@ -1913,7 +1924,7 @@ const exampleVault: ExampleVault = CoolVault(initialBalance: 100)
 
 Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.
 
-```typescript
+```typescript,file=interface-type-fields-and-functions.bpl
 // Declare a constant which has the type `Vault`, and a value that has type `ExampleVault`
 //
 const someVault: Vault = ExampleVault(initialBalance: 100)
@@ -1928,11 +1939,16 @@ someVault.add(amount: 50)
 // someVault.balance is 150
 ```
 
+## Accounts
+
+> 🚧 Status: Authorizations are not implemented yet.
+
+
 ## Authorizations
 
-> Status: Authorizations are not implemented yet.
+> 🚧 Status: Authorizations are not implemented yet.
 
-Authorizations represent access rights/privileges to resources. An authorization is similar to a class in that it is a composite reference type, i.e., it consists of values and is referenced, that is has an initializer, and that it can have functions associated with it.
+Authorizations represent access rights/privileges to resources. An authorization is similar to a class in that it is a composite data structure and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
 
 Authorizations differ from classes in that they can only be created (instantiated) from existing authorizations. To make this explicit, the initializer of an authorization *must* be declared, the initializer must have at least one parameter, and the type of the first parameter must be an authorization.
 
@@ -1942,11 +1958,13 @@ There is a global authorization `rootAuth` that has type `RootAuth`. It represen
 
 Authorizations are declared using the `auth` keyword.
 
-```typescript
+```typescript,file=auth.bpl
+// Declare an authorization named `SendTokens`
+
 auth SendTokens {
     const limit: Int
 
-    init(auth: RootAuth, limit: Int) {
+    init(_ auth: RootAuth, limit: Int) {
         self.limit = limit
     }
 }
