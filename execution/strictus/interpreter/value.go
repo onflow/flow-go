@@ -27,7 +27,7 @@ func (v BoolValue) Negate() BoolValue {
 
 // ArrayValue
 
-type ArrayValue []interface{}
+type ArrayValue []Value
 
 func (ArrayValue) isValue() {}
 
@@ -591,4 +591,38 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 		)
 	}
 	return values, nil
+}
+
+// valueTuple
+
+type valueTuple interface {
+	values() (left, right Value)
+}
+
+// integerTuple
+
+type integerTuple struct {
+	left, right IntegerValue
+}
+
+func (tuple integerTuple) destructure() (left, right IntegerValue) {
+	return tuple.left, tuple.right
+}
+
+func (tuple integerTuple) values() (left, right Value) {
+	return tuple.destructure()
+}
+
+// boolTuple
+
+type boolTuple struct {
+	left, right BoolValue
+}
+
+func (tuple boolTuple) destructure() (left, right BoolValue) {
+	return tuple.left, tuple.right
+}
+
+func (tuple boolTuple) values() (left, right Value) {
+	return tuple.destructure()
 }

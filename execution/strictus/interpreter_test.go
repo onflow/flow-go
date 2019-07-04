@@ -8,6 +8,61 @@ import (
 	"testing"
 )
 
+func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+        const x = 1
+        const y = true
+        const z = 1 + 2
+        var a = 3 == 3
+        var b = [1, 2]
+    `)
+
+	Expect(errors).Should(BeEmpty())
+
+	inter := interpreter.NewInterpreter(program)
+	err := inter.Interpret()
+	Expect(err).ShouldNot(HaveOccurred())
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+
+	Expect(inter.Globals["a"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["b"].Value).
+		To(Equal(interpreter.ArrayValue([]interpreter.Value{
+			interpreter.IntValue{Int: big.NewInt(1)},
+			interpreter.IntValue{Int: big.NewInt(2)},
+		})))
+}
+
+func TestInterpretDeclarations(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+        fun test() -> Int {
+            return 42
+        }
+    `)
+
+	Expect(errors).Should(BeEmpty())
+
+	inter := interpreter.NewInterpreter(program)
+	err := inter.Interpret()
+	Expect(err).ShouldNot(HaveOccurred())
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+}
+
 func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1572,8 +1627,8 @@ func TestInterpretRecursion(t *testing.T) {
 	err := inter.Interpret()
 	Expect(err).ShouldNot(HaveOccurred())
 
-	Expect(inter.Invoke("fib", big.NewInt(23))).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(28657)}))
+	Expect(inter.Invoke("fib", big.NewInt(14))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(377)}))
 }
 
 func TestInterpretUnaryIntegerNegation(t *testing.T) {

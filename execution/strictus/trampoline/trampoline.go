@@ -27,6 +27,7 @@ type Trampoline interface {
 	resume() interface{}
 	FlatMap(f func(interface{}) Trampoline) Trampoline
 	Map(f func(interface{}) interface{}) Trampoline
+	Then(f func(interface{})) Trampoline
 }
 
 func Run(t Trampoline) interface{} {
@@ -48,6 +49,13 @@ func mapTrampoline(t Trampoline, f func(interface{}) interface{}) Trampoline {
 	})
 }
 
+func thenTrampoline(t Trampoline, f func(interface{})) Trampoline {
+	return t.Map(func(value interface{}) interface{} {
+		f(value)
+		return value
+	})
+}
+
 // Done
 
 type Done struct {
@@ -66,14 +74,16 @@ func (d Done) Map(f func(interface{}) interface{}) Trampoline {
 	return mapTrampoline(d, f)
 }
 
-// More
-
-type More struct {
-	Next func() Trampoline
+func (d Done) Then(f func(interface{})) Trampoline {
+	return thenTrampoline(d, f)
 }
 
+// More
+
+type More func() Trampoline
+
 func (m More) resume() interface{} {
-	return m.Next
+	return (func() Trampoline)(m)
 }
 
 func (m More) FlatMap(f func(interface{}) Trampoline) Trampoline {
@@ -82,6 +92,10 @@ func (m More) FlatMap(f func(interface{}) Trampoline) Trampoline {
 
 func (m More) Map(f func(interface{}) interface{}) Trampoline {
 	return mapTrampoline(m, f)
+}
+
+func (m More) Then(f func(interface{})) Trampoline {
+	return thenTrampoline(m, f)
 }
 
 // FlatMap
@@ -111,7 +125,7 @@ func (m FlatMap) resume() interface{} {
 		}
 	case More:
 		return func() Trampoline {
-			return sub.Next().FlatMap(continuation)
+			return sub().FlatMap(continuation)
 		}
 	case FlatMap:
 		panic("FlatMap is not a valid subroutine. Use the FlatMap function to construct proper FlatMap structures.")
@@ -122,4 +136,8 @@ func (m FlatMap) resume() interface{} {
 
 func (m FlatMap) Map(f func(interface{}) interface{}) Trampoline {
 	return mapTrampoline(m, f)
+}
+
+func (m FlatMap) Then(f func(interface{})) Trampoline {
+	return thenTrampoline(m, f)
 }

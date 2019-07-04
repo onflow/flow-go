@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"bamboo-runtime/execution/strictus/ast"
+	. "bamboo-runtime/execution/strictus/trampoline"
 	"github.com/raviqqe/hamt"
 )
 
@@ -10,7 +11,7 @@ import (
 type FunctionValue interface {
 	Value
 	isFunctionValue()
-	invoke(interpreter *Interpreter, arguments []Value) Value
+	invoke(interpreter *Interpreter, arguments []Value) Trampoline
 	parameterCount() int
 }
 
@@ -31,7 +32,7 @@ func newInterpretedFunction(expression *ast.FunctionExpression, activation hamt.
 	}
 }
 
-func (f *InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Value {
+func (f *InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
 	return interpreter.invokeInterpretedFunction(f, arguments)
 }
 
@@ -49,8 +50,9 @@ type HostFunctionValue struct {
 func (HostFunctionValue) isValue()           {}
 func (f HostFunctionValue) isFunctionValue() {}
 
-func (f HostFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Value {
-	return f.function(interpreter, arguments)
+func (f HostFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
+	result := f.function(interpreter, arguments)
+	return Done{Result: result}
 }
 
 func (f *HostFunctionValue) parameterCount() int {

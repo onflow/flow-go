@@ -42,7 +42,7 @@ type unsupportedOperation struct {
 }
 
 func (e *unsupportedOperation) Error() string {
-	return fmt.Sprintf("cannot evaluate unsupported %s operation: %s", e.kind.Name(), e.operation.String())
+	return fmt.Sprintf("cannot evaluate unsupported %s operation: %s", e.kind.Name(), e.operation.Symbol())
 }
 
 // ProgramError
@@ -171,6 +171,34 @@ func (e *InvalidBinaryOperandError) StartPosition() *ast.Position {
 }
 
 func (e *InvalidBinaryOperandError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
+// InvalidBinaryOperandTypesError
+
+type InvalidBinaryOperandTypesError struct {
+	Operation    ast.Operation
+	ExpectedType Type
+	LeftValue    Value
+	RightValue   Value
+	StartPos     *ast.Position
+	EndPos       *ast.Position
+}
+
+func (e *InvalidBinaryOperandTypesError) Error() string {
+	return fmt.Sprintf(
+		"can't apply binary operation %s to values: %s, %s. Expected type %s",
+		e.Operation.Symbol(),
+		e.LeftValue, e.RightValue,
+		e.ExpectedType.String(),
+	)
+}
+
+func (e *InvalidBinaryOperandTypesError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidBinaryOperandTypesError) EndPosition() *ast.Position {
 	return e.EndPos
 }
 
