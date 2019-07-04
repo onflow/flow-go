@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	bambooProto "github.com/dapperlabs/bamboo-node/grpc/shared"
-	"github.com/dapperlabs/bamboo-node/internal/access/data"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/access/data"
 )
 
 // Controller implements AccessNodeServer interface

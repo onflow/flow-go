@@ -6,9 +6,9 @@
 package security
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/security/config"
-	"github.com/dapperlabs/bamboo-node/internal/security/controllers"
-	"github.com/dapperlabs/bamboo-node/internal/security/data"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/security/config"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/security/controllers"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/security/data"
 )
 
 // Injectors from wire.go:

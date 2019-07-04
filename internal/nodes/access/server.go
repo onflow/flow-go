@@ -8,9 +8,9 @@ import (
 	"google.golang.org/grpc"
 
 	bambooProto "github.com/dapperlabs/bamboo-node/grpc/internals"
-	"github.com/dapperlabs/bamboo-node/internal/access/config"
-	"github.com/dapperlabs/bamboo-node/internal/access/controllers"
-	"github.com/dapperlabs/bamboo-node/internal/access/data"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/access/config"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/access/controllers"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/access/data"
 )
 
 // Server ..

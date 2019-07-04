@@ -6,9 +6,9 @@
 package execute
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/execute/config"
-	"github.com/dapperlabs/bamboo-node/internal/execute/controllers"
-	"github.com/dapperlabs/bamboo-node/internal/execute/data"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/execute/config"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/execute/controllers"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/execute/data"
 )
 
 // Injectors from wire.go:

@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	bambooProto "github.com/dapperlabs/bamboo-node/grpc/shared"
-	"github.com/dapperlabs/bamboo-node/internal/security/data"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/security/data"
 )
 
 // Controller implements SecurityNodeServer interface

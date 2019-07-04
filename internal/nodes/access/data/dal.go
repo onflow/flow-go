@@ -6,7 +6,7 @@ import (
 	"github.com/go-pg/migrations"
 	"github.com/go-pg/pg"
 
-	"github.com/dapperlabs/bamboo-node/internal/access/config"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/access/config"
 )
 
 // DAL Data Access Layer
