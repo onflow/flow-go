@@ -1901,7 +1901,7 @@ vault.transfer(to: otherVault, amount: 10)
 vault.transfer(to: otherVault, amount: 100)
 ```
 
-The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified), and an implemenation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
+The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified), and an implementation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
 
 ```typescript
 interface AnInterface {
@@ -1914,7 +1914,7 @@ interface AnInterface {
 
 struct AnImplementation {
     // Declare a publicly settable variable field named `a`that has type `Int`.
-    // This implementation satisifes the requirement for interface `AnInterface`:
+    // This implementation satisfies the requirement for interface `AnInterface`:
     // The field is at least publicly readable, but this implementation also
     // allows the field to be written to in all scopes
     //
@@ -2008,8 +2008,8 @@ contract Counter {
     //
     pub stored var count: Int
 
-    // Declare an initializer which accepts the initial count,
-    // and intialized the stored field `count` with it.
+    // Declare an initializer which accepts the initial count
+    // and initializes the stored field `count` with it.
     //
     init(initialCount: Int) {
         require {
