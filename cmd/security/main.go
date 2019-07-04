@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/security"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/security"
 )
 
 func main() {
