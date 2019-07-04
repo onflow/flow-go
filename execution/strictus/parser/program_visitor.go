@@ -64,7 +64,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 
 // visitReturnType returns the return type.
 // if none was given in the program, return an empty type with the position of tokenBefore
-func (v *ProgramVisitor) visitReturnType(ctx ITypeNameContext, tokenBefore antlr.Token) ast.Type {
+func (v *ProgramVisitor) visitReturnType(ctx IFullTypeContext, tokenBefore antlr.Token) ast.Type {
 	if ctx == nil {
 		positionBeforeMissingReturnType := ast.PositionFromToken(tokenBefore)
 		return &ast.BaseType{
@@ -113,13 +113,13 @@ func (v *ProgramVisitor) VisitParameterList(ctx *ParameterListContext) interface
 
 func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
 	identifier := ctx.Identifier().GetText()
-	typeName := ctx.TypeName().Accept(v).(ast.Type)
+	fullType := ctx.FullType().Accept(v).(ast.Type)
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
 
 	return &ast.Parameter{
 		Identifier: identifier,
-		Type:       typeName,
+		Type:       fullType,
 		StartPos:   startPosition,
 		EndPos:     endPosition,
 	}
@@ -138,11 +138,29 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	}
 
 	// alternative: function type
+	functionTypeContext := ctx.FunctionType()
+	if functionTypeContext != nil {
+		return functionTypeContext.Accept(v)
+	}
+
+	panic(errors.UnreachableError{})
+}
+
+func (v *ProgramVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{} {
+
+	// nested?
+	nestedFunctionTypeContext := ctx.FunctionType()
+	if nestedFunctionTypeContext != nil {
+		return nestedFunctionTypeContext.Accept(v)
+	}
+
+	//
+
 	var parameterTypes []ast.Type
-	for _, typeName := range ctx.parameterTypes {
+	for _, fullType := range ctx.parameterTypes {
 		parameterTypes = append(
 			parameterTypes,
-			typeName.Accept(v).(ast.Type),
+			fullType.Accept(v).(ast.Type),
 		)
 	}
 
@@ -162,7 +180,7 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	}
 }
 
-func (v *ProgramVisitor) VisitTypeName(ctx *TypeNameContext) interface{} {
+func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	baseTypeResult := ctx.BaseType().Accept(v)
 	if baseTypeResult == nil {
 		return nil
@@ -288,12 +306,12 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		return nil
 	}
 	expression := expressionResult.(ast.Expression)
-	var typeName ast.Type
+	var fullType ast.Type
 
-	typeNameContext := ctx.TypeName()
-	if typeNameContext != nil {
-		if x, ok := typeNameContext.Accept(v).(ast.Type); ok {
-			typeName = x
+	fullTypeContext := ctx.FullType()
+	if fullTypeContext != nil {
+		if x, ok := fullTypeContext.Accept(v).(ast.Type); ok {
+			fullType = x
 		}
 	}
 
@@ -305,7 +323,7 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		IsConst:       isConst,
 		Identifier:    identifier,
 		Value:         expression,
-		Type:          typeName,
+		Type:          fullType,
 		StartPos:      startPosition,
 		EndPos:        endPosition,
 		IdentifierPos: identifierPosition,
