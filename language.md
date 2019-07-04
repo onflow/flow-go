@@ -818,22 +818,9 @@ const doNothing: () -> Void =
 
 Types can be enclosed in parentheses to change precedence.
 
-```typescript
-// declare a constant called functions, with the array type ((Int) -> Int)[2],
-// i.e., an array of two functions, which accept one integer and return one integer
-//
-const functions: ((Int) -> Int)[2] = [
-    fun (n: Int) -> Int {
-        return n * 2
-    },
-    fun (n: Int) -> Int {
-        return n * 3
-    }
-]
-```
+For example, a function type `(Int) -> (() -> Int)` is the type for a function which accepts one argument of type `Int`, and which returns another function, that takes no arguments and returns an `Int`. 
 
-For example, a function type `(Int) -> (() -> Int)` is the type for a function which accepts one argument of type `Int`, and which returns another function, that takes no arguments and returns an `Int`.
-
+The type `((Int) -> Int)[2]` specifies an array type of two functions, which accept one integer and return one integer.
 
 #### Argument Passing Behavior
 
@@ -1363,7 +1350,7 @@ struct GoalTracker {
     var goal: Int
     var completed: Int
 
-    pub synthetic left: Double {
+    synthetic left: Double {
         get {
             return self.goal - self.completed
         }
@@ -1480,66 +1467,93 @@ There is **no** support for nulls, i.e., a constant or variable of a reference t
 
 > Status: Access control is not implemented yet.
 
-Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, classes) and fields (in structures, classes) are either private or public.
+Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, classes, interfaces) and fields (in structures, classes) are either private or public.
 
-**Private** means the declaration is only accessible/visible in the currrent and inner scopes. For example, a private field in a class can only be accessed by functions of the class, not by code that useses an instance of the class in an outer scope.
+**Private** means the declaration is only accessible/visible in the currrent and inner scopes. For example, a private field in a class can only be accessed by functions of the class, not by code that uses an instance of the class in an outer scope.
 
 **Public** means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a class can be accessed using the access syntax on an instance of the class in an outer scope.
 
-The `private` keyword is used to make declarations private, and the `public` keyword is used to make declarations public.
+By default, everything is private. The `pub` keyword is used to make declarations public.
 
 The `(set)` suffix can be used to make variables also publicly writeable.
 
-To summarize the behavior for variable and constant declarations and fields:
+To summarize the behavior for variable declarations, constant declarations, and fields:
 
 | Declaration kind | Access modifier    | Read scope        | Write scope       |
 |:-----------------|:-------------------|:------------------|:------------------|
 | `const`          |                    | Current and inner | *None*            |
-| `const`          | `public`           | **All**           | *None*            |
+| `const`          | `pub`              | **All**           | *None*            |
 | `var`            |                    | Current and inner | Current and inner |
-| `var`            | `public`           | **All**           | Current and inner |
-| `var`            | `public(set)`      | **All**           | **All**           |
+| `var`            | `pub`              | **All**           | Current and inner |
+| `var`            | `pub(set)`         | **All**           | **All**           |
+
+To summarize the behavior for functions, structures, classes, and interfaces:
+
+| Declaration kind                         | Access modifier       | Access scope      |
+|:-----------------------------------------|:----------------------|:------------------|
+| `fun`, `struct`, `class`, `interface`    |                       | Current and inner |
+| `fun`, `struct`, `class`, `interface`    | `pub`                 | **All**           |
+
 
 
 ```typescript
-// private constant, inaccessible/invisible
+// declare a private constant, inaccessible/invisible in outer scope
 //
-private const a = 1
+const a = 1
 
-// public constant, accessible/visible
+// declare a public constant, accessible/visible in all scopes
 //
-public const b = 2
+pub const b = 2
 
+// declare a public class, accessible/visible in all scopes
+//
+pub class SomeClass {
 
-public class SomeClass {
-
-    // private constant field,
-    // only readable in class functions
+    // declare a private constant field,
+    // only readable in the current and inner scopes
     //
-    private const a: Int
+    const a: Int
 
-    // public constant field,
+    // declare a public constant field, readable in all scopes
+    //
+    pub const b: Int
+
+    // declare a private variable field,
+    // only readable and writeable in the current and inner scopes
+    //
+    var c: Int
+
+    // declare a public variable field, not settable,
+    // only writeable in the current and inner scopes,
     // readable in all scopes
     //
-    public const b: Int
+    pub var d: Int
 
-    // private variable field,
-    // only readable and writeable in class functions
-    //
-    private var c: Int
-
-    // public variable field, not settable,
-    // only writeable in class functions,
-    // readable in all scopes
-    //
-    public var d: Int
-
-    // public variable field, settable,
+    // declare a public variable field, settable,
     // readable and writeable in all scopes
     //
-    public(set) var e: Int
+    pub(set) var e: Int
 
-    // initializer implementation skipped
+    // NOTE: initializer implementation skipped
+
+    // declare a private function,
+    // only callable in the current and inner scopes
+    //
+    fun privateTest() {
+        // ...
+    }
+
+    // declare a public function,
+    // callable in all scopes
+    //
+    pub fun privateTest() {
+        // ...
+    }
+
+    // declare an inner, private struct,
+    // only accessible in the current and inner scopes
+    //
+    struct InnerStruct {}
 }
 ```
 
@@ -1567,8 +1581,8 @@ The special type `Self` can be used to refer to the type implementing the interf
 //
 interface Vault {
 
-    // require the implementation to provide a field for the balance
-    // that is readable in outer scopes. the read balance must always be positive.
+    // require the implementation to provide a field for the balance that is
+    // readable in all scopes. the read balance must always be positive.
     //
     // NOTE: no requirement is made for the kind of field,
     // it can be either variable or constant in the implementation
@@ -1592,10 +1606,11 @@ interface Vault {
         // NOTE: no code
     }
 
-    // require the implementation to provide a function that adds
-    // an amount to the balance. the given amount must be positive
+    // require the implementation to provide a function that is
+    // callable in all scopes, and which adds an amount to the balance.
+    // the given amount must be positive
     //
-    fun add(amount: Int) {
+    pub fun add(amount: Int) {
         require {
             amount > 0
         }
@@ -1606,14 +1621,14 @@ interface Vault {
         // NOTE: no code
     }
 
-    // require the implementation to provide a function that transfers an amount
-    // from this vaults balance to another vault's balance. The receiving balance
-    // must be of the same type – a transfer to a vault of another type is not possible
-    // as the balance of it would only be readable
+    // require the implementation to provide a function that is callable in all scopes,
+    // and which transfers an amount from this vaults balance to another vault's balance.
+    // The receiving balance must be of the same type – a transfer to a vault of another
+    // type is not possible as the balance of it would only be readable
     //
     // NOTE: the first parameter has the Self type, i.e. the type implementing this interface
     //
-    fun transfer(to receivingVault: Self, amount: Int) {
+    pub fun transfer(to receivingVault: Self, amount: Int) {
         require {
             amount > 0
             amount <= self.balance
@@ -1669,7 +1684,7 @@ impl Vault for ExampleVault {
     //
     // NOTE: neither the precondition, nor the postcondition have to be repeated
     //
-    fun add(amount: Int) {
+    pub fun add(amount: Int) {
         self.balance = self.balance + amount
     }
 
@@ -1684,7 +1699,7 @@ impl Vault for ExampleVault {
     //
     // NOTE: neither the precondition, nor the postcondition have to be repeated
     //
-    fun transfer(to receivingVault: ExampleVault, amount: Int) {
+    pub fun transfer(to receivingVault: ExampleVault, amount: Int) {
         self.balance -= amount
         receivingVault.amount += amount
     }
