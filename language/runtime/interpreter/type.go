@@ -1,8 +1,8 @@
 package interpreter
 
 import (
-	"bamboo-runtime/execution/strictus/ast"
-	"bamboo-runtime/execution/strictus/errors"
+	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/language/runtime/errors"
 	"fmt"
 	"strings"
 )

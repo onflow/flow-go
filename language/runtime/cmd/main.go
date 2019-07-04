@@ -1,9 +1,9 @@
-package main
+package cmd
 
 import (
-	"bamboo-runtime/execution/strictus"
-	. "bamboo-runtime/execution/strictus/interpreter"
-	"bamboo-runtime/execution/strictus/parser"
+	"github.com/dapperlabs/bamboo-node/language/runtime"
+	. "github.com/dapperlabs/bamboo-node/language/runtime/interpreter"
+	"github.com/dapperlabs/bamboo-node/language/runtime/parser"
 	"fmt"
 	"io/ioutil"
 	"os"

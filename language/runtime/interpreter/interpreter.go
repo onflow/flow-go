@@ -1,9 +1,9 @@
 package interpreter
 
 import (
-	"bamboo-runtime/execution/strictus/ast"
-	"bamboo-runtime/execution/strictus/errors"
-	. "bamboo-runtime/execution/strictus/trampoline"
+	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/language/runtime/errors"
+	. "github.com/dapperlabs/bamboo-node/language/runtime/trampoline"
 	"fmt"
 )
 

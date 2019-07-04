@@ -1,7 +1,7 @@
 package interpreter
 
 import (
-	"bamboo-runtime/execution/strictus/ast"
+	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
 )
 
 type Variable struct {

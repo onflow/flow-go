@@ -1,8 +1,8 @@
-package strictus
+package runtime
 
 import (
-	"bamboo-runtime/execution/strictus/ast"
-	"bamboo-runtime/execution/strictus/interpreter"
+	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/language/runtime/interpreter"
 	"fmt"
 	"github.com/logrusorgru/aurora"
 	"strconv"

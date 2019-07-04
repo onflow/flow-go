@@ -1,8 +1,8 @@
-package strictus
+package runtime
 
 import (
-	. "bamboo-runtime/execution/strictus/ast"
-	"bamboo-runtime/execution/strictus/parser"
+	. "github.com/dapperlabs/bamboo-node/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/language/runtime/parser"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	"math/big"

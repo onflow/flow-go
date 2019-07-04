@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"bamboo-runtime/execution/strictus/ast"
+	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 )
