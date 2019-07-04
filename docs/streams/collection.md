@@ -1,8 +1,8 @@
-# Pre-Execution
+# Collection
 
-The pre-execution stream concerns all aspects of the transaction flow from the moment a transaction is submitted to the network until it enters the consensus flow. 
+The collection stream concerns all aspects of the transaction flow from the moment a transaction is submitted to the network until it enters the consensus flow. 
 
-More specifically, pre-execution covers the following:
+More specifically, collection covers the following:
 
 - Transaction submissions from user agents
 - Transaction routing
@@ -10,9 +10,8 @@ More specifically, pre-execution covers the following:
 - Collection building, consensus and signing
 - Publishing collections to security nodes
 - Transaction and collection storage
-- Responding to user agent queries
 
-All pre-execution duties are performed by access nodes.
+All collection duties are performed by access nodes.
 
 ## Terminology
 
@@ -82,9 +81,3 @@ After a collection is formed, the collection owner will send the collection to o
 ANs are responsible for saving all transactions and collections that they commit to storing.
 
 **Relevant packages:** [/internal/access/data](/internal/access/data)
-
-## User Queries
-
-In addition to the main transaction flow, ANs also respond to user queries about the blockchain state.
-
-**Relevant packages:** [/internal/access/controllers](/internal/access/controllers)

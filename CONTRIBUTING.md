@@ -22,11 +22,11 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 
 | Stream         | Owner(s)                    | Packages  |
 | -------------- | --------------------------- | --------- |
-| Collect  | [Peter Siemens](https://github.com/psiemens])   | [/internal/protocol/collect](/internal/protocol/collect), [/internal/nodes/access](/internal/nodes/access), [/cmd/access](/cmd/access) |
+| Collection  | [Peter Siemens](https://github.com/psiemens])   | [/internal/protocol/collect](/internal/protocol/collect), [/internal/nodes/access](/internal/nodes/access), [/cmd/access](/cmd/access) |
 | Consensus | [Alexander Hentschel](https://github.com/@AlexHentschel)     | [/internal/protocol/consensus](/internal/protocol/consensus), [/internal/security](/internal/security), [/cmd/security](/cmd/security) |
-| Execute      | [Bastian Müller](https://github.com/@turbolent) | [/internal/protocol/execute](/internal/protocol/execute), [/internal/nodes/execute](/internal/nodes/execute) [/cmd/execute](/cmd/execute) |
-| Verify | [Moar Zamski](https://github.com/@pazams)     | [/internal/protocol/verify](/internal/protocol/verify), [/internal/access](/internal/access), [/cmd/access](/cmd/access) |
-| Seal | [Moar Zamski](https://github.com/@pazams)     | [/internal/protocol/seal](/internal/protocol/seal), [/internal/security](/internal/security), [/cmd/security](/cmd/security) |
+| Execution      | [Bastian Müller](https://github.com/@turbolent) | [/internal/protocol/execute](/internal/protocol/execute), [/internal/nodes/execute](/internal/nodes/execute) [/cmd/execute](/cmd/execute) |
+| Verifcation | [Moar Zamski](https://github.com/@pazams)     | [/internal/protocol/verify](/internal/protocol/verify), [/internal/access](/internal/access), [/cmd/access](/cmd/access) |
+| Sealing | [Moar Zamski](https://github.com/@pazams)     | [/internal/protocol/seal](/internal/protocol/seal), [/internal/security](/internal/security), [/cmd/security](/cmd/security) |
 | Networking | [Yahya Hassanzadeh](https://github.com/@yhassanzadeh)     | [/internal/network](/internal/network) |
 | Cryptography | [Tarak Ben Youssef](https://github.com/@tarakby)     | [/pkg/crypto](/pkg/crypto) |
 | Emulator | [Brian Ho](https://github.com/@mrbrianhobo), [Peter Siemens](https://github.com/@psiemens)     | [/internal/emulator](/internal/emulator) |
