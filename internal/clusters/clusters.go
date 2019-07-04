@@ -15,6 +15,11 @@ func (c *Cluster) Hash() crypto.Hash {
 }
 
 // ClusterManager is a utility to compute cluster arrangements.
+//
+// Clusters are computed using the following algorithm:
+// 1. For each staked node, compute the bitwise XOR between the node address and the epoch root hash.
+// 2. Sort all nodes by the result of the XOR.
+// 3. Split the list into N equal sized chunks, where N is the target number of clusters.
 type ClusterManager struct{}
 
 // GetCluster returns the cluster that the given node belongs to.

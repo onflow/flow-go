@@ -56,13 +56,17 @@ Hash returns the unique hash of a cluster.
 
 
 
-## <a name="ClusterManager">type</a> [ClusterManager](https://github.com/dapperlabs/bamboo-node/tree/master/internal/clusters/clusters.go?s=452:480#L18)
+## <a name="ClusterManager">type</a> [ClusterManager](https://github.com/dapperlabs/bamboo-node/tree/master/internal/clusters/clusters.go?s=750:778#L23)
 ``` go
 type ClusterManager struct{}
 
 ```
 ClusterManager is a utility to compute cluster arrangements.
 
+Clusters are computed using the following algorithm:
+1. For each staked node, compute the bitwise XOR between the node address and the epoch root hash.
+2. Sort all nodes by the result of the XOR.
+3. Split the list into N equal sized chunks, where N is the target number of clusters.
 
 
 
@@ -72,7 +76,8 @@ ClusterManager is a utility to compute cluster arrangements.
 
 
 
-### <a name="ClusterManager.GetCluster">func</a> (\*ClusterManager) [GetCluster](https://github.com/dapperlabs/bamboo-node/tree/master/internal/clusters/clusters.go?s=548:639#L21)
+
+### <a name="ClusterManager.GetCluster">func</a> (\*ClusterManager) [GetCluster](https://github.com/dapperlabs/bamboo-node/tree/master/internal/clusters/clusters.go?s=846:937#L26)
 ``` go
 func (c *ClusterManager) GetCluster(address crypto.Address, epoch uint64) (*Cluster, error)
 ```
@@ -81,7 +86,7 @@ GetCluster returns the cluster that the given node belongs to.
 
 
 
-### <a name="ClusterManager.GetClusters">func</a> (\*ClusterManager) [GetClusters](https://github.com/dapperlabs/bamboo-node/tree/master/internal/clusters/clusters.go?s=717:787#L26)
+### <a name="ClusterManager.GetClusters">func</a> (\*ClusterManager) [GetClusters](https://github.com/dapperlabs/bamboo-node/tree/master/internal/clusters/clusters.go?s=1015:1085#L31)
 ``` go
 func (c *ClusterManager) GetClusters(epoch uint64) ([]*Cluster, error)
 ```
