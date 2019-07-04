@@ -1,4 +1,7 @@
 #!/bin/bash
-godoc2md github.com/dapperlabs/bamboo-node/internal/clusters > internal/clusters/README.md
-godoc2md github.com/dapperlabs/bamboo-node/internal/routing > internal/routing/README.md
-godoc2md github.com/dapperlabs/bamboo-node/internal/access/collections > internal/access/collections/README.md
+
+godoc2md="go run github.com/lanre-ade/godoc2md"
+
+$godoc2md github.com/dapperlabs/bamboo-node/internal/protocol/collect/clusters > internal/protocol/collect/clusters/README.md
+$godoc2md github.com/dapperlabs/bamboo-node/internal/protocol/collect/routing > internal/protocol/collect/routing/README.md
+$godoc2md github.com/dapperlabs/bamboo-node/internal/protocol/collect/collections > internal/protocol/collect/collections/README.md
