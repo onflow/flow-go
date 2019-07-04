@@ -1,10 +1,10 @@
-package main
+package cmd
 
 import (
-	"bamboo-runtime/execution/strictus"
-	. "bamboo-runtime/execution/strictus/interpreter"
-	"bamboo-runtime/execution/strictus/parser"
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/language/runtime"
+	. "github.com/dapperlabs/bamboo-node/language/runtime/interpreter"
+	"github.com/dapperlabs/bamboo-node/language/runtime/parser"
 	"io/ioutil"
 	"os"
 )
@@ -68,10 +68,10 @@ func main() {
 }
 
 func prettyPrintError(err error, filename string, code string) {
-	print(strictus.PrettyPrintError(err, filename, code, true))
+	print(runtime.PrettyPrintError(err, filename, code, true))
 }
 
 func exitWithError(message string) {
-	print(strictus.FormatErrorMessage(message, true))
+	print(runtime.FormatErrorMessage(message, true))
 	os.Exit(1)
 }

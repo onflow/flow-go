@@ -1,6 +1,6 @@
 package trampoline
 
-import "bamboo-runtime/execution/strictus/errors"
+import "github.com/dapperlabs/bamboo-node/language/runtime/errors"
 
 // Based on "Stackless Scala With Free" by Rúnar Óli Bjarnason:
 // http://blog.higher-order.com/assets/trampolines.pdf

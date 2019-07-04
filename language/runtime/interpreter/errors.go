@@ -1,8 +1,8 @@
 package interpreter
 
 import (
-	"bamboo-runtime/execution/strictus/ast"
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
 )
 
 // SecondaryError

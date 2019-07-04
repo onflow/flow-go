@@ -1,6 +1,6 @@
 package parser
 
-import "bamboo-runtime/execution/strictus/errors"
+import "github.com/dapperlabs/bamboo-node/language/runtime/errors"
 
 //go:generate stringer -type=IntegerLiteralKind
 
