@@ -675,14 +675,60 @@ Functions are values, i.e., they can be assigned to constants and variables, and
 
 Functions can be declared by using the `fun` keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called.
 
-The parameters need to be enclosed in parentheses. Each parameter needs to have a type annotation, which follows the parameter name after a colon. The return type, if any, is separated from the parameters using the `->` keyword (a hyphen followed by a right angle bracket). The function code needs to be enclosed in opening and closing braces.
+The parameters need to be enclosed in parentheses. The return type, if any, is separated from the parameters using the `->` keyword (a hyphen followed by a right angle bracket). The function code needs to be enclosed in opening and closing braces.
+
+Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter. Argument labels preceed the parameter name. The special argument label `_` indicates that a function call can omit the argument label. If no argument label is provided, the function call must use the parameter name. 
+
+Each parameter needs to have a type annotation, which follows the parameter name after a colon.
 
 ```typescript
-// declare a function called double, which multiples a number by two
+// declare a function called double, which multiples a number by two.
+// the special argument label _ is used, so no label has to be given in a function call.
 //
-fun double(x: Int) -> Int {
+fun double(_ x: Int) -> Int {
     return x * 2
 }
+
+// call the function double with the value 4 for the number parameter.
+// as the declaration uses the special _ argument label,
+// the label can be omitted in the function call.
+//
+double(2) // is 4
+```
+
+Argument labels make code more explicit and readable. For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
+
+```typescript
+// declare a function send, which transfers an amount from one account to another.
+// the implementation is ommitted for brevity
+//
+// the first two arguments are of the same type, so argument labels are provided
+// to so function calls are explicit.
+//
+// the third parameter does not have an argument label, so it is implicitly the parameter name.
+//
+fun send(from sendingAccount: Account, to receivingAccount: Account, amount: Int) {
+    // ...
+}
+
+// declare a constant refering to the sending account.
+// the initial value is ommitted for brevity
+//
+const sender: Account = ...
+
+// declare a constant refering to the receiving account.
+// the initial value is ommitted for brevity
+//
+const receiver: Account = ...
+
+// call the function send. the function declaration requires argument labels
+// for all parameters, so they need to be provided in the function call.
+//
+// NOTE: the order is clear – send from and account to an account.
+// this avoids ambiguity. for example, in some languages (like C)
+// it is a convention to mention the receiver first, and then the sender
+//
+send(from: sender, to: receiver, amount: 100)
 ```
 
 Functions can be nested, i.e., the code of a function may declare further functions.
@@ -690,16 +736,18 @@ Functions can be nested, i.e., the code of a function may declare further functi
 ```typescript
 // declare a function which multiplies a number by two, and adds one
 //
-fun doubleAndAddOne(n: Int) -> Int {
+fun doubleAndAddOne(_ x: Int) -> Int {
 
     // declare a nested function which doubles, which multiplies a number by two
     //
-    fun double(x: Int) {
+    fun double(_ x: Int) {
         return x * 2
     }
 
-    return double(n) + 1
+    return double(x) + 1
 }
+
+doubleAndAddOne(2) // is 5
 ```
 
 ### Function Expressions
@@ -710,9 +758,10 @@ Functions can be also used as expressions. The syntax is the same as for functio
 // declare a constant called double, which has a function as its value,
 // which multiplies a number by two when called
 //
-const double = fun (x: Int) -> Int {
-     return x * 2
-}
+const double =
+    fun (_ x: Int) -> Int {
+        return x * 2
+    }
 ```
 
 ### Function Calls
@@ -720,7 +769,7 @@ const double = fun (x: Int) -> Int {
 Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.
 
 ```typescript
-fun double(x: Int) -> Int {
+fun double(_ x: Int) -> Int {
      return x * 2
 }
 
@@ -791,7 +840,7 @@ For example, a function type `(Int) -> (() -> Int)` is the type for a function w
 When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as [call-by-sharing](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_sharing).
 
 ```typescript
-fun change(numbers: Int[]) {
+fun change(_ numbers: Int[]) {
      numbers[0] = 1
      numbers[1] = 2
 }
@@ -838,7 +887,7 @@ Conditions may be written on separate lines, or multiple conditions can be writt
 In postconditions, the special constant `result` refers to the result of the function.
 
 ```typescript
-fun factorial(n: Int) -> Int {
+fun factorial(_ n: Int) -> Int {
     require {
         // factorial is only defined for integers greater than or equal to zero
         //
@@ -993,8 +1042,8 @@ y
 ```
 
 ```typescript
-fun doubleAndAddOne(n: Int) -> Int {
-    fun double(x: Int) {
+fun doubleAndAddOne(_ n: Int) -> Int {
+    fun double(_ x: Int) {
         return x * 2
     }
     return double(n) + 1
@@ -1069,7 +1118,7 @@ a = 0
 When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument of type `Bool`, _only_ a `Bool` can be provided, and not for example an `Int`.
 
 ```typescript
-fun nand(a: Bool, b: Bool) -> Bool {
+fun nand(_ a: Bool, _ b: Bool) -> Bool {
     return !(a && b)
 }
 
@@ -1083,7 +1132,7 @@ nand(0, 0)
 Types are *not* automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`.
 
 ```typescript
-fun add(a: Int8, b: Int8) -> Int {
+fun add(_ a: Int8, _ b: Int8) -> Int {
     return a + b
 }
 
@@ -1220,7 +1269,7 @@ In initializers, the special constant `self` refers to the structure or class va
 Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the structure or class instance is followed by a dot (`.`) and the name of the field.
 
 ```typescript
-const token = Token(42, 1_000_00)
+const token = Token(id: 42, balance: 1_000_00)
 
 token.id // is 42
 token.balance // is 1_000_000
@@ -1262,11 +1311,11 @@ struct GetterExample {
     }
 
     init(balance: Int) {
-        balance = balance
+        self.balance = balance
     }
 }
 
-const example = GetterExample(10)
+const example = GetterExample(balance: 10)
 // example.balance is 10
 
 example.balance = -50
@@ -1293,11 +1342,11 @@ struct SetterExample {
     }
 
     init(balance: Int) {
-        balance = balance
+        self.balance = balance
     }
 }
 
-const example = SetterExample(10)
+const example = SetterExample(balance: 10)
 // example.balance is 10
 
 // error: precondition of setter for field balance failed
@@ -1330,7 +1379,7 @@ struct GoalTracker {
     }
 }
 
-const tracker = GoalTracker(10, 0)
+const tracker = GoalTracker(goal: 10, completed: 0)
 // tracker.goal is 10
 // tracker.completed is 0
 // tracker.left is 10
@@ -1354,18 +1403,18 @@ struct Token {
     const id: Int
     var balance: Int
 
-    init(id: Int, balance: Int) {
+    init(id: Int, initialBalance balance: Int) {
         self.id = id
         self.balance = balance
     }
 
-    fun mint(value: Int) {
-        self.balance = self.balance + value
+    fun mint(amount: Int) {
+        self.balance = self.balance + amount
     }
 }
 
-const token = Token(32, 0)
-token.mint(1_000_000)
+const token = Token(id: 32, initialBalance: 0)
+token.mint(amount: 1_000_000)
 // token.balance is 1_000_000
 ```
 
@@ -1387,7 +1436,7 @@ struct SomeStruct {
 
 // declare a constant with value of structure type SomeStruct
 //
-const structA = SomeStruct(0)
+const structA = SomeStruct(value: 0)
 
 // *copy* the structure value into a new constant
 //
@@ -1411,7 +1460,7 @@ class SomeClass {
 
 // declare a constant with value of class type SomeClass
 //
-const classA = SomeClass(0)
+const classA = SomeClass(value: 0)
 
 // *reference* the class value with a new constant
 //
@@ -1564,7 +1613,7 @@ interface Vault {
     //
     // NOTE: the first parameter has the Self type, i.e. the type implementing this interface
     //
-    fun transfer(receivingVault: Self, amount: Int) {
+    fun transfer(to receivingVault: Self, amount: Int) {
         require {
             amount > 0
             amount <= self.balance
@@ -1635,7 +1684,7 @@ impl Vault for ExampleVault {
     //
     // NOTE: neither the precondition, nor the postcondition have to be repeated
     //
-    fun transfer(receivingVault: ExampleVault, amount: Int) {
+    fun transfer(to receivingVault: ExampleVault, amount: Int) {
         self.balance -= amount
         receivingVault.amount += amount
     }
@@ -1643,13 +1692,13 @@ impl Vault for ExampleVault {
 
 // declare and create two example vaults
 //
-const vault = ExampleVault(100)
-const otherVault = ExampleVault(0)
+const vault = ExampleVault(initialBalance: 100)
+const otherVault = ExampleVault(initialBalance: 0)
 
 // transfer 10 units from the first vault to the second vault.
 // the amount satisifes the precondition of the Vault interface's transfer function
 //
-vault.transfer(otherVault, 10)
+vault.transfer(to: otherVault, amount: 10)
 
 // the postcondition of the Vault interface's transfer function ensured
 // the balances of the vaults were updated properly
@@ -1659,7 +1708,7 @@ vault.transfer(otherVault, 10)
 
 // error: precondition not satisfied: amount is larger than balance (100 > 90)
 //
-vault.transfer(otherVault, 100)
+vault.transfer(to: otherVault, amount: 100)
 ```
 
 ### Interface Type
@@ -1669,7 +1718,7 @@ Interfaces are types. Values implementing an interface can be used as initial va
 ```typescript
 // declare a constant that has type Vault, which has a value of type ExampleVault
 //
-const vault: Vault = ExampleVault(100)
+const vault: Vault = ExampleVault(initialBalance: 100)
 ```
 
 Values implementing an interface are assignable to variables that have the interface as their type.
@@ -1680,29 +1729,29 @@ Values implementing an interface are assignable to variables that have the inter
 
 // declare a variable that has type Vault, which has an initial value of type CoolVault
 //
-var someVault: Vault = CoolVault(100)
+var someVault: Vault = CoolVault(initialBalance: 100)
 
 // assign a different type of vault
 //
-someVault = ExampleVault(50)
+someVault = ExampleVault(initialBalance: 50)
 
 
 // invalid: type mismatch
 //
-const exampleVault: ExampleVault = CoolVault(100)
+const exampleVault: ExampleVault = CoolVault(initialBalance: 100)
 ```
 
 Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type implementing the interface.
 
 ```typescript
-const someVault: Vault = ExampleVault(100)
+const someVault: Vault = ExampleVault(initialBalance: 100)
 
 // access the balance field of the Vault interface type
 //
 someVault.balance // is 100
 
-// call the add function of Vault interface type
-someVault.add(50)
+// call the add function of the Vault interface type
+someVault.add(amount: 50)
 
 // someVault.balance is 150
 ```
