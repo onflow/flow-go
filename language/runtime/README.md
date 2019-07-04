@@ -2,7 +2,7 @@
 
 ## Usage
 
-- `go run main.go <filename>`
+- `go run ./cmd <filename>`
 
 ## Development
 
