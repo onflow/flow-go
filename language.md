@@ -1086,6 +1086,77 @@ fun f() -> Int {
 f() // returns 2
 ```
 
+## Optionals
+
+> Status: Optionals are not implemented yet.
+
+Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.
+
+An optional type is declared using the `?` suffix for another type. For example, `Int` is a non-optional integer, and `Int?` is an optional integer, i.e. either nothing, or an integer.
+
+The value representing nothing is `nil`.
+
+```typescript
+// declare a constant which has an optional integer type,
+// with nil as its initial value
+//
+const a: Int? = nil
+
+// declare a constant which has an optional integer type,
+// with 42 as its initial value
+//
+const b: Int? = 42
+```
+
+### Nil-Coalescing Operator
+
+The nil-coalescing operator `??` returns the value inside an optional if it contains a value, or returns an alternative value if the optional has no value, i.e., the optional value is `nil`. 
+
+```typescript
+// declare a constant which has an optional integer type
+//
+const a: Int? = nil
+
+// declare a constant with a non-optional integer type,
+// which is initialized to b if it is non-nil, or 42 otherwise
+//
+const b: Int = a ?? 42
+// integer is 42, as a is nil
+```
+
+The nil-coalescing operator can only be applied to values which have an optional type.
+
+```typescript
+// declare a constant with a non-optional integer type
+//
+const a = 1
+
+// invalid: nil-coalescing operator is applied to a value which has a non-optional type
+// (a has the non-optional type Int)
+//
+const b = a ?? 2
+```
+
+```typescript
+// invalid: nil-coalescing operator is applied to a value which has a non-optional type
+// (the integer literal is of type Int)
+//
+const c = 1 ?? 2
+```
+
+The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.
+
+```typescript
+// declare a constant with a non-optional integer type
+const a = 1
+
+// invalid: nil-coalescing operator is applied to a value of type Int,
+// but alternative is of type Bool
+//
+const b = a ?? false
+```
+
+
 ## Type Safety
 
 > Status: Type checking is not implemented yet.
@@ -1116,7 +1187,8 @@ nand(false, false) // is true
 nand(0, 0)
 ```
 
-Types are *not* automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`.
+Types are **not** automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`, nor is an optional integer `Int?`  automatically converted to a non-optional integer `Int`.
+
 
 ```typescript
 fun add(_ a: Int8, _ b: Int8) -> Int {
