@@ -1,4 +1,4 @@
-package strictus
+package parser
 
 import (
 	"bamboo-runtime/execution/strictus/ast"
@@ -70,7 +70,11 @@ func (v *ProgramVisitor) visitReturnType(ctx ITypeNameContext, tokenBefore antlr
 			Pos: positionBeforeMissingReturnType,
 		}
 	}
-	return ctx.Accept(v).(ast.Type)
+	result := ctx.Accept(v)
+	if result == nil {
+		return nil
+	}
+	return result.(ast.Type)
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
@@ -141,6 +145,9 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 		)
 	}
 
+	if ctx.returnType == nil {
+		return nil
+	}
 	returnType := ctx.returnType.Accept(v).(ast.Type)
 
 	startPosition := ast.PositionFromToken(ctx.OpenParen().GetSymbol())
@@ -155,7 +162,11 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitTypeName(ctx *TypeNameContext) interface{} {
-	result := ctx.BaseType().Accept(v).(ast.Type)
+	baseTypeResult := ctx.BaseType().Accept(v)
+	if baseTypeResult == nil {
+		return nil
+	}
+	result := baseTypeResult.(ast.Type)
 
 	// reduce in reverse
 	dimensions := ctx.AllTypeDimension()
@@ -341,15 +352,20 @@ func (v *ProgramVisitor) VisitWhileStatement(ctx *WhileStatementContext) interfa
 }
 
 func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
-	identifier := ctx.Identifier().GetText()
-	value := ctx.Expression().Accept(v).(ast.Expression)
+	identifierNode := ctx.Identifier()
+	identifier := identifierNode.GetText()
+	identifierSymbol := identifierNode.GetSymbol()
 
-	targetPosition := ast.PositionFromToken(ctx.Identifier().GetSymbol())
+	targetStartPosition := ast.PositionFromToken(identifierSymbol)
+	targetEndPosition := ast.EndPosition(targetStartPosition, identifierSymbol.GetStop())
 
 	var target ast.Expression = &ast.IdentifierExpression{
 		Identifier: identifier,
-		Pos:        targetPosition,
+		StartPos:   targetStartPosition,
+		EndPos:     targetEndPosition,
 	}
+
+	value := ctx.Expression().Accept(v).(ast.Expression)
 
 	for _, accessExpressionContext := range ctx.AllExpressionAccess() {
 		expression := accessExpressionContext.Accept(v)
@@ -769,11 +785,14 @@ func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionCont
 	identifierNode := ctx.Identifier()
 
 	identifier := identifierNode.GetText()
-	position := ast.PositionFromToken(identifierNode.GetSymbol())
+	identifierSymbol := identifierNode.GetSymbol()
+	startPosition := ast.PositionFromToken(identifierSymbol)
+	endPosition := ast.EndPosition(startPosition, identifierSymbol.GetStop())
 
 	return &ast.IdentifierExpression{
 		Identifier: identifier,
-		Pos:        position,
+		StartPos:   startPosition,
+		EndPos:     endPosition,
 	}
 }
 

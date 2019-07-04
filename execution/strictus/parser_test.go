@@ -2,6 +2,7 @@ package strictus
 
 import (
 	. "bamboo-runtime/execution/strictus/ast"
+	"bamboo-runtime/execution/strictus/parser"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	. "github.com/onsi/gomega/gstruct"
@@ -17,14 +18,14 @@ func init() {
 func TestParseIncompleteConstKeyword(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    cons
 	`)
 
 	Expect(actual).Should(BeNil())
 
 	Expect(errors).Should(HaveLen(1))
-	syntaxError := errors[0].(*SyntaxError)
+	syntaxError := errors[0].(*parser.SyntaxError)
 	Expect(*syntaxError).To(MatchAllFields(Fields{
 		"Pos":     Equal(&Position{Offset: 6, Line: 2, Column: 5}),
 		"Message": ContainSubstring("extraneous input"),
@@ -34,18 +35,18 @@ func TestParseIncompleteConstKeyword(t *testing.T) {
 func TestParseIncompleteConstantDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    const = 
 	`)
 
 	Expect(actual).Should(BeNil())
 
 	Expect(errors).Should(HaveLen(2))
-	Expect(*errors[0].(*SyntaxError)).To(MatchAllFields(Fields{
+	Expect(*errors[0].(*parser.SyntaxError)).To(MatchAllFields(Fields{
 		"Pos":     Equal(&Position{Offset: 12, Line: 2, Column: 11}),
 		"Message": ContainSubstring("missing Identifier"),
 	}))
-	Expect(*errors[1].(*SyntaxError)).To(MatchAllFields(Fields{
+	Expect(*errors[1].(*parser.SyntaxError)).To(MatchAllFields(Fields{
 		"Pos":     Equal(&Position{Offset: 16, Line: 3, Column: 1}),
 		"Message": ContainSubstring("mismatched input"),
 	}))
@@ -54,7 +55,7 @@ func TestParseIncompleteConstantDeclaration(t *testing.T) {
 func TestParseBoolExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    const a = true
 	`)
 
@@ -82,7 +83,7 @@ func TestParseBoolExpression(t *testing.T) {
 func TestParseIdentifierExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    const b = a
 	`)
 
@@ -93,7 +94,8 @@ func TestParseIdentifierExpression(t *testing.T) {
 		Identifier: "b",
 		Value: &IdentifierExpression{
 			Identifier: "a",
-			Pos:        &Position{Offset: 16, Line: 2, Column: 15},
+			StartPos:   &Position{Offset: 16, Line: 2, Column: 15},
+			EndPos:     &Position{Offset: 16, Line: 2, Column: 15},
 		},
 		StartPos:      &Position{Offset: 6, Line: 2, Column: 5},
 		EndPos:        &Position{Offset: 16, Line: 2, Column: 15},
@@ -110,7 +112,7 @@ func TestParseIdentifierExpression(t *testing.T) {
 func TestParseArrayExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    const a = [1, 2]
 	`)
 
@@ -148,7 +150,7 @@ func TestParseArrayExpression(t *testing.T) {
 func TestParseInvocationExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    const a = b(1, 2)
 	`)
 
@@ -160,7 +162,8 @@ func TestParseInvocationExpression(t *testing.T) {
 		Value: &InvocationExpression{
 			Expression: &IdentifierExpression{
 				Identifier: "b",
-				Pos:        &Position{Offset: 16, Line: 2, Column: 15},
+				StartPos:   &Position{Offset: 16, Line: 2, Column: 15},
+				EndPos:     &Position{Offset: 16, Line: 2, Column: 15},
 			},
 			Arguments: []Expression{
 				&IntExpression{
@@ -190,7 +193,7 @@ func TestParseInvocationExpression(t *testing.T) {
 func TestParseMemberExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    const a = b.c
 	`)
 
@@ -202,7 +205,8 @@ func TestParseMemberExpression(t *testing.T) {
 		Value: &MemberExpression{
 			Expression: &IdentifierExpression{
 				Identifier: "b",
-				Pos:        &Position{Offset: 16, Line: 2, Column: 15},
+				StartPos:   &Position{Offset: 16, Line: 2, Column: 15},
+				EndPos:     &Position{Offset: 16, Line: 2, Column: 15},
 			},
 			Identifier: "c",
 			StartPos:   &Position{Offset: 17, Line: 2, Column: 16},
@@ -223,7 +227,7 @@ func TestParseMemberExpression(t *testing.T) {
 func TestParseIndexExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    const a = b[1]
 	`)
 
@@ -235,7 +239,8 @@ func TestParseIndexExpression(t *testing.T) {
 		Value: &IndexExpression{
 			Expression: &IdentifierExpression{
 				Identifier: "b",
-				Pos:        &Position{Offset: 16, Line: 2, Column: 15},
+				StartPos:   &Position{Offset: 16, Line: 2, Column: 15},
+				EndPos:     &Position{Offset: 16, Line: 2, Column: 15},
 			},
 			Index: &IntExpression{
 				Value: big.NewInt(1),
@@ -259,7 +264,7 @@ func TestParseIndexExpression(t *testing.T) {
 func TestParseUnaryExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    const a = -b
 	`)
 
@@ -272,7 +277,8 @@ func TestParseUnaryExpression(t *testing.T) {
 			Operation: OperationMinus,
 			Expression: &IdentifierExpression{
 				Identifier: "b",
-				Pos:        &Position{Offset: 17, Line: 2, Column: 16},
+				StartPos:   &Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:     &Position{Offset: 17, Line: 2, Column: 16},
 			},
 			StartPos: &Position{Offset: 16, Line: 2, Column: 15},
 			EndPos:   &Position{Offset: 17, Line: 2, Column: 16},
@@ -292,7 +298,7 @@ func TestParseUnaryExpression(t *testing.T) {
 func TestParseOrExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
         const a = false || true
 	`)
 
@@ -330,7 +336,7 @@ func TestParseOrExpression(t *testing.T) {
 func TestParseAndExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
         const a = false && true
 	`)
 
@@ -368,7 +374,7 @@ func TestParseAndExpression(t *testing.T) {
 func TestParseEqualityExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
         const a = false == true
 	`)
 
@@ -406,7 +412,7 @@ func TestParseEqualityExpression(t *testing.T) {
 func TestParseRelationalExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
         const a = 1 < 2
 	`)
 
@@ -444,7 +450,7 @@ func TestParseRelationalExpression(t *testing.T) {
 func TestParseAdditiveExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
         const a = 1 + 2
 	`)
 
@@ -482,7 +488,7 @@ func TestParseAdditiveExpression(t *testing.T) {
 func TestParseMultiplicativeExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
         const a = 1 * 2
 	`)
 
@@ -520,7 +526,7 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 func TestParseFunctionExpressionAndReturn(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    const test = fun (): Int { return 1 }
 	`)
 
@@ -567,7 +573,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 func TestParseFunctionAndBlock(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    fun test() { return }
 	`)
 
@@ -605,7 +611,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 func TestParseIfStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    fun test() {
             if true {
                 return
@@ -710,7 +716,7 @@ func TestParseIfStatement(t *testing.T) {
 func TestParseIfStatementNoElse(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    fun test() {
             if true {
                 return
@@ -766,7 +772,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 func TestParseWhileStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    fun test() {
             while true {
               return
@@ -824,7 +830,7 @@ func TestParseWhileStatement(t *testing.T) {
 func TestParseAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    fun test() {
             a = 1
         }
@@ -843,7 +849,8 @@ func TestParseAssignment(t *testing.T) {
 				&AssignmentStatement{
 					Target: &IdentifierExpression{
 						Identifier: "a",
-						Pos:        &Position{Offset: 31, Line: 3, Column: 12},
+						StartPos:   &Position{Offset: 31, Line: 3, Column: 12},
+						EndPos:     &Position{Offset: 31, Line: 3, Column: 12},
 					},
 					Value: &IntExpression{
 						Value: big.NewInt(1),
@@ -872,7 +879,7 @@ func TestParseAssignment(t *testing.T) {
 func TestParseAccessAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    fun test() {
             x.foo.bar[0][1].baz = 1
         }
@@ -896,7 +903,8 @@ func TestParseAccessAssignment(t *testing.T) {
 									Expression: &MemberExpression{
 										Expression: &IdentifierExpression{
 											Identifier: "x",
-											Pos:        &Position{Offset: 31, Line: 3, Column: 12},
+											StartPos:   &Position{Offset: 31, Line: 3, Column: 12},
+											EndPos:     &Position{Offset: 31, Line: 3, Column: 12},
 										},
 										Identifier: "foo",
 										StartPos:   &Position{Offset: 32, Line: 3, Column: 13},
@@ -951,7 +959,7 @@ func TestParseAccessAssignment(t *testing.T) {
 func TestParseExpressionStatementWithAccess(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 	    fun test() { x.foo.bar[0][1].baz }
 	`)
 
@@ -973,7 +981,8 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 									Expression: &MemberExpression{
 										Expression: &IdentifierExpression{
 											Identifier: "x",
-											Pos:        &Position{Offset: 19, Line: 2, Column: 18},
+											StartPos:   &Position{Offset: 19, Line: 2, Column: 18},
+											EndPos:     &Position{Offset: 19, Line: 2, Column: 18},
 										},
 										Identifier: "foo",
 										StartPos:   &Position{Offset: 20, Line: 2, Column: 19},
@@ -1022,7 +1031,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 func TestParseParametersAndArrayTypes(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 		pub fun test(a: Int32, b: Int32[2], c: Int32[][3]): Int64[][] {}
 	`)
 
@@ -1105,7 +1114,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 func TestParseIntegerLiterals(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 		const octal = 0o32
         const hex = 0xf2
         const binary = 0b101010
@@ -1159,7 +1168,7 @@ func TestParseIntegerLiterals(t *testing.T) {
 func TestParseIntegerTypes(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 		const a: Int8 = 1
 		const b: Int16 = 2
 		const c: Int32 = 3
@@ -1303,7 +1312,7 @@ func TestParseIntegerTypes(t *testing.T) {
 func TestParseFunctionType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 		const add: (Int8, Int16) => Int32 = nothing
 	`)
 
@@ -1332,7 +1341,8 @@ func TestParseFunctionType(t *testing.T) {
 		},
 		Value: &IdentifierExpression{
 			Identifier: "nothing",
-			Pos:        &Position{Offset: 39, Line: 2, Column: 38},
+			StartPos:   &Position{Offset: 39, Line: 2, Column: 38},
+			EndPos:     &Position{Offset: 45, Line: 2, Column: 44},
 		},
 		StartPos:      &Position{Offset: 3, Line: 2, Column: 2},
 		EndPos:        &Position{Offset: 39, Line: 2, Column: 38},
@@ -1349,7 +1359,7 @@ func TestParseFunctionType(t *testing.T) {
 func TestParseMissingReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
 		const noop: () => Void =
             fun () { return }
 	`)
@@ -1400,7 +1410,7 @@ func TestParseMissingReturnType(t *testing.T) {
 func TestParseLeftAssociativity(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
         const a = 1 + 2 + 3
 	`)
 
@@ -1447,14 +1457,14 @@ func TestParseLeftAssociativity(t *testing.T) {
 func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
 	   var a = 1
 	   const b = --a
 	`)
 
 	Expect(program).To(BeNil())
 	Expect(errors).To(Equal([]error{
-		&JuxtaposedUnaryOperatorsError{
+		&parser.JuxtaposedUnaryOperatorsError{
 			Pos: &Position{Offset: 29, Line: 3, Column: 14},
 		},
 	}))
@@ -1463,13 +1473,13 @@ func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
 func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
 	   const b = !!true
 	`)
 
 	Expect(program).To(BeNil())
 	Expect(errors).To(Equal([]error{
-		&JuxtaposedUnaryOperatorsError{
+		&parser.JuxtaposedUnaryOperatorsError{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
 		},
 	}))
@@ -1478,7 +1488,7 @@ func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
 func TestParseTernaryRightAssociativity(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := Parse(`
+	actual, errors := parser.Parse(`
         const a = 2 > 1
           ? 0
           : 3 > 2 ? 1 : 2

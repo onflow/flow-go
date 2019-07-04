@@ -75,15 +75,16 @@ func (e *ArrayExpression) Accept(v Visitor) Repr {
 
 type IdentifierExpression struct {
 	Identifier string
-	Pos        *Position
+	StartPos   *Position
+	EndPos     *Position
 }
 
 func (e *IdentifierExpression) StartPosition() *Position {
-	return e.Pos
+	return e.StartPos
 }
 
 func (e *IdentifierExpression) EndPosition() *Position {
-	return e.Pos
+	return e.EndPos
 }
 
 func (*IdentifierExpression) isExpression() {}

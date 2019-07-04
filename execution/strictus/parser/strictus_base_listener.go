@@ -1,6 +1,6 @@
-// Code generated from Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
+// Code generated from execution/strictus/parser/Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
 
-package strictus // Strictus
+package parser // Strictus
 import "github.com/antlr/antlr4/runtime/Go/antlr"
 
 // BaseStrictusListener is a complete listener for a parse tree produced by StrictusParser.

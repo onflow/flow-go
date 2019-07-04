@@ -2,6 +2,7 @@ package strictus
 
 import (
 	"bamboo-runtime/execution/strictus/interpreter"
+	"bamboo-runtime/execution/strictus/parser"
 	. "github.com/onsi/gomega"
 	"math/big"
 	"testing"
@@ -10,7 +11,7 @@ import (
 func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(``)
+	program, errors := parser.Parse(``)
 
 	Expect(errors).Should(BeEmpty())
 
@@ -25,7 +26,7 @@ func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
 func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        const test = 1
    `)
 
@@ -42,7 +43,7 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 func TestInterpretInvalidUnknownDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            return x
        }
@@ -61,7 +62,7 @@ func TestInterpretInvalidUnknownDeclaration(t *testing.T) {
 func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            x = 2
        }
@@ -80,7 +81,7 @@ func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
 func TestInterpretInvalidUnknownDeclarationIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            x[0]
        }
@@ -99,7 +100,7 @@ func TestInterpretInvalidUnknownDeclarationIndexing(t *testing.T) {
 func TestInterpretInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            x[0] = 2
        }
@@ -118,7 +119,7 @@ func TestInterpretInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 func TestInterpretLexicalScope(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        const x = 10
 
        fun f(): Int32 {
@@ -152,7 +153,7 @@ func TestInterpretLexicalScope(t *testing.T) {
 func TestInterpretNoHoisting(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        const x = 2
 
        fun test(): Int64 {
@@ -180,7 +181,7 @@ func TestInterpretNoHoisting(t *testing.T) {
 func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        const x = 10
 
        // check first-class functions and scope inside them
@@ -203,7 +204,7 @@ func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 func TestInterpretInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun f(x: Int32): Int32 {
            return x
        }
@@ -226,7 +227,7 @@ func TestInterpretInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 func TestInterpretInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun f(x: Int32): Int32 {
            return x
        }
@@ -249,7 +250,7 @@ func TestInterpretInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 func TestInterpretInvalidFunctionCallOfBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(): Int32 {
            return true()
        }
@@ -268,7 +269,7 @@ func TestInterpretInvalidFunctionCallOfBool(t *testing.T) {
 func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(): Int32 {
            return 2()
        }
@@ -287,7 +288,7 @@ func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
 func TestInterpretInvalidConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            const x = 2
            x = 3
@@ -307,7 +308,7 @@ func TestInterpretInvalidConstantAssignment(t *testing.T) {
 func TestInterpretVariableAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(): Int64 {
            var x = 2
            x = 3
@@ -328,7 +329,7 @@ func TestInterpretVariableAssignment(t *testing.T) {
 func TestInterpretInvalidGlobalConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        const x = 2
 
        fun test() {
@@ -349,7 +350,7 @@ func TestInterpretInvalidGlobalConstantAssignment(t *testing.T) {
 func TestInterpretGlobalVariableAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        var x = 2
 
        fun test(): Int64 {
@@ -377,7 +378,7 @@ func TestInterpretGlobalVariableAssignment(t *testing.T) {
 func TestInterpretInvalidConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            const x = 2
            const x = 3
@@ -397,7 +398,7 @@ func TestInterpretInvalidConstantRedeclaration(t *testing.T) {
 func TestInterpretInvalidGlobalConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
 		const x = 2
 		const x = 3
 	`)
@@ -413,7 +414,7 @@ func TestInterpretInvalidGlobalConstantRedeclaration(t *testing.T) {
 func TestInterpretConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
 	    const x = 2
 
        fun test(): Int64 {
@@ -438,7 +439,7 @@ func TestInterpretConstantRedeclaration(t *testing.T) {
 func TestInterpretParameters(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun returnA(a: Int32, b: Int32): Int64 {
            return a
        }
@@ -464,7 +465,7 @@ func TestInterpretParameters(t *testing.T) {
 func TestInterpretArrayIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(): Int64 {
            const z = [0, 3]
            return z[1]
@@ -484,7 +485,7 @@ func TestInterpretArrayIndexing(t *testing.T) {
 func TestInterpretInvalidArrayIndexingWithBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(): Int64 {
            const z = [0, 3]
            return z[true]
@@ -504,7 +505,7 @@ func TestInterpretInvalidArrayIndexingWithBool(t *testing.T) {
 func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(): Int64 {
            return true[0]
        }
@@ -523,7 +524,7 @@ func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
 func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(): Int64 {
            return 2[0]
        }
@@ -542,7 +543,7 @@ func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
 func TestInterpretArrayIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(): Int64 {
            const z = [0, 3]
            z[1] = 2
@@ -563,7 +564,7 @@ func TestInterpretArrayIndexingAssignment(t *testing.T) {
 func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(): Int64 {
            const z = [0, 3]
            z[true] = 2
@@ -584,7 +585,7 @@ func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
 func TestInterpretReturnWithoutExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun returnEarly() {
            return
            return 1
@@ -606,7 +607,7 @@ func TestInterpretReturnWithoutExpression(t *testing.T) {
 func TestInterpretPlusOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testIntegers(): Int64 {
            return 2 + 4
        }
@@ -646,7 +647,7 @@ func TestInterpretPlusOperator(t *testing.T) {
 func TestInterpretMinusOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testIntegers(): Int64 {
            return 2 - 4
        }
@@ -686,7 +687,7 @@ func TestInterpretMinusOperator(t *testing.T) {
 func TestInterpretMulOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testIntegers(): Int64 {
            return 2 * 4
        }
@@ -726,7 +727,7 @@ func TestInterpretMulOperator(t *testing.T) {
 func TestInterpretDivOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testIntegers(): Int64 {
            return 7 / 3
        }
@@ -766,7 +767,7 @@ func TestInterpretDivOperator(t *testing.T) {
 func TestInterpretModOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testIntegers(): Int64 {
            return 5 % 3
        }
@@ -806,7 +807,7 @@ func TestInterpretModOperator(t *testing.T) {
 func TestInterpretEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testIntegersUnequal(): Bool {
            return 5 == 3
        }
@@ -874,7 +875,7 @@ func TestInterpretEqualOperator(t *testing.T) {
 func TestInterpretUnequalOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testIntegersUnequal(): Bool {
            return 5 != 3
        }
@@ -942,7 +943,7 @@ func TestInterpretUnequalOperator(t *testing.T) {
 func TestInterpretLessOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testIntegersGreater(): Bool {
            return 5 < 3
        }
@@ -1017,7 +1018,7 @@ func TestInterpretLessOperator(t *testing.T) {
 func TestInterpretLessEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testIntegersGreater(): Bool {
            return 5 <= 3
        }
@@ -1092,7 +1093,7 @@ func TestInterpretLessEqualOperator(t *testing.T) {
 func TestInterpretGreaterOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testIntegersGreater(): Bool {
            return 5 > 3
        }
@@ -1167,7 +1168,7 @@ func TestInterpretGreaterOperator(t *testing.T) {
 func TestInterpretGreaterEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testIntegersGreater(): Bool {
            return 5 >= 3
        }
@@ -1242,7 +1243,7 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
 func TestInterpretOrOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testTrueTrue(): Bool {
            return true || true
        }
@@ -1303,7 +1304,7 @@ func TestInterpretOrOperator(t *testing.T) {
 func TestInterpretAndOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testTrueTrue(): Bool {
            return true && true
        }
@@ -1364,7 +1365,7 @@ func TestInterpretAndOperator(t *testing.T) {
 func TestInterpretIfStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testTrue(): Int64 {
            if true {
                return 2
@@ -1415,7 +1416,7 @@ func TestInterpretIfStatement(t *testing.T) {
 func TestInterpretWhileStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(): Int64 {
            var x = 0
            while x < 5 {
@@ -1438,7 +1439,7 @@ func TestInterpretWhileStatement(t *testing.T) {
 func TestInterpretWhileStatementWithReturn(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(): Int64 {
            var x = 0
            while x < 10 {
@@ -1464,7 +1465,7 @@ func TestInterpretWhileStatementWithReturn(t *testing.T) {
 func TestInterpretExpressionStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        var x = 0
 
        fun incX() {
@@ -1491,7 +1492,7 @@ func TestInterpretExpressionStatement(t *testing.T) {
 func TestInterpretConditionalOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun testTrue(): Int64 {
            return true ? 2 : 3
        }
@@ -1514,7 +1515,7 @@ func TestInterpretConditionalOperator(t *testing.T) {
 func TestInterpretInvalidAssignmentToParameter(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(x: Int8) {
             x = 2
        }
@@ -1533,7 +1534,7 @@ func TestInterpretInvalidAssignmentToParameter(t *testing.T) {
 func TestInterpretFunctionBindingInFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun foo() {
            return foo
        }
@@ -1556,7 +1557,7 @@ func TestInterpretRecursion(t *testing.T) {
 
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun fib(n: Int): Int {
            if n < 2 {
               return n
@@ -1578,7 +1579,7 @@ func TestInterpretRecursion(t *testing.T) {
 func TestInterpretUnaryIntegerNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
       const x = -2
       const y = -(-2)
 	`)
@@ -1596,7 +1597,7 @@ func TestInterpretUnaryIntegerNegation(t *testing.T) {
 func TestInterpretUnaryBooleanNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
       const a = !true
       const b = !(!true)
       const c = !false
@@ -1618,7 +1619,7 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
       const a = !1
 	`)
 
@@ -1632,7 +1633,7 @@ func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
 func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
       const a = -true
 	`)
 
@@ -1646,7 +1647,7 @@ func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
       const a = test(1, 2)
 	`)
 

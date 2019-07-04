@@ -11,6 +11,16 @@ type Type interface {
 	String() string
 }
 
+// AnyType represents the top type
+
+type AnyType struct{}
+
+func (*AnyType) isType() {}
+
+func (*AnyType) String() string {
+	return "Any"
+}
+
 // VoidType represents the void type
 
 type VoidType struct{}
@@ -216,7 +226,9 @@ func mustConvertType(t ast.Type) Type {
 			panic(&NotDeclaredError{
 				ExpectedKind: DeclarationKindType,
 				Name:         t.Identifier,
-				Pos:          t.Pos,
+				// TODO: add start and end position to ast.Type
+				StartPos: t.Pos,
+				EndPos:   t.Pos,
 			})
 		}
 		return result

@@ -249,14 +249,16 @@ func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatem
 			panic(&NotDeclaredError{
 				ExpectedKind: DeclarationKindVariable,
 				Name:         identifier,
-				Pos:          target.Pos,
+				StartPos:     target.StartPosition(),
+				EndPos:       target.EndPosition(),
 			})
 		}
 
 		if !variable.Set(value) {
 			panic(&AssignmentToConstantError{
-				Name: identifier,
-				Pos:  target.Pos,
+				Name:     identifier,
+				StartPos: target.StartPosition(),
+				EndPos:   target.EndPosition(),
 			})
 		}
 
@@ -299,9 +301,10 @@ func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.Identi
 	variable := interpreter.activations.Find(expression.Identifier)
 	if variable == nil {
 		panic(&NotDeclaredError{
-			ExpectedKind: DeclarationKindAny,
+			ExpectedKind: DeclarationKindValue,
 			Name:         expression.Identifier,
-			Pos:          expression.Pos,
+			StartPos:     expression.StartPosition(),
+			EndPos:       expression.EndPosition(),
 		})
 	}
 	return variable.Value
