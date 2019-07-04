@@ -1,7 +1,7 @@
 
 
 # collections
-`import "github.com/dapperlabs/bamboo-node/internal/access/collections"`
+`import "github.com/dapperlabs/bamboo-node/internal/protocol/collect/collections"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
@@ -16,7 +16,7 @@ Package collections implements functionality to build collections within a clust
 
 
 #### <a name="pkg-files">Package files</a>
-[collections.go](https://github.com/dapperlabs/bamboo-node/tree/master/internal/access/collections/collections.go)
+[collections.go](https://github.com/dapperlabs/bamboo-node/tree/master/internal/protocol/collect/collections/collections.go)
 
 
 
