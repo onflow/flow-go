@@ -34,6 +34,9 @@ type StrictusListener interface {
 	// EnterBlock is called when entering the block production.
 	EnterBlock(c *BlockContext)
 
+	// EnterStatements is called when entering the statements production.
+	EnterStatements(c *StatementsContext)
+
 	// EnterStatement is called when entering the statement production.
 	EnterStatement(c *StatementContext)
 
@@ -174,6 +177,9 @@ type StrictusListener interface {
 
 	// ExitBlock is called when exiting the block production.
 	ExitBlock(c *BlockContext)
+
+	// ExitStatements is called when exiting the statements production.
+	ExitStatements(c *StatementsContext)
 
 	// ExitStatement is called when exiting the statement production.
 	ExitStatement(c *StatementContext)

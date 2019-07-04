@@ -38,6 +38,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#block.
 	VisitBlock(ctx *BlockContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#statements.
+	VisitStatements(ctx *StatementsContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#statement.
 	VisitStatement(ctx *StatementContext) interface{}
 

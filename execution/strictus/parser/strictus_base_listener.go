@@ -74,6 +74,12 @@ func (s *BaseStrictusListener) EnterBlock(ctx *BlockContext) {}
 // ExitBlock is called when production block is exited.
 func (s *BaseStrictusListener) ExitBlock(ctx *BlockContext) {}
 
+// EnterStatements is called when production statements is entered.
+func (s *BaseStrictusListener) EnterStatements(ctx *StatementsContext) {}
+
+// ExitStatements is called when production statements is exited.
+func (s *BaseStrictusListener) ExitStatements(ctx *StatementsContext) {}
+
 // EnterStatement is called when production statement is entered.
 func (s *BaseStrictusListener) EnterStatement(ctx *StatementContext) {}
 

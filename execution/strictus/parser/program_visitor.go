@@ -213,13 +213,7 @@ func (v *ProgramVisitor) VisitTypeDimension(ctx *TypeDimensionContext) interface
 }
 
 func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {
-	var statements []ast.Statement
-	for _, statement := range ctx.AllStatement() {
-		statements = append(
-			statements,
-			statement.Accept(v).(ast.Statement),
-		)
-	}
+	statements := ctx.Statements().Accept(v).([]ast.Statement)
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
 
@@ -228,6 +222,17 @@ func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {
 		StartPos:   startPosition,
 		EndPos:     endPosition,
 	}
+}
+
+func (v *ProgramVisitor) VisitStatements(ctx *StatementsContext) interface{} {
+	var statements []ast.Statement
+	for _, statement := range ctx.AllStatement() {
+		statements = append(
+			statements,
+			statement.Accept(v).(ast.Statement),
+		)
+	}
+	return statements
 }
 
 func (v *ProgramVisitor) VisitChildren(node antlr.RuleNode) interface{} {
