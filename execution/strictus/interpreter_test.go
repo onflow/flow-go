@@ -11,7 +11,7 @@ import (
 func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
         const x = 1
         const y = true
         const z = 1 + 2
@@ -47,8 +47,8 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 func TestInterpretDeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-        fun test(): Int {
+	program, errors := parser.Parse(`
+        fun test() -> Int {
             return 42
         }
     `)
