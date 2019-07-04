@@ -7,6 +7,7 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	"math/big"
 	"strconv"
+	"strings"
 )
 
 type ProgramVisitor struct {
@@ -697,23 +698,64 @@ func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
-func parseIntExpression(token antlr.Token, text string, kind string, base int) *ast.IntExpression {
-	value, ok := big.NewInt(0).SetString(text, base)
+func parseIntExpression(token antlr.Token, text string, kind IntegerLiteralKind) *ast.IntExpression {
+	startPosition := ast.PositionFromToken(token)
+	endPosition := ast.EndPosition(startPosition, token.GetStop())
+
+	// check literal has no leading underscore
+	if strings.HasPrefix(text, "_") {
+		panic(&InvalidIntegerLiteralError{
+			IntegerLiteralKind:        kind,
+			InvalidIntegerLiteralKind: InvalidIntegerLiteralKindLeadingUnderscore,
+			// NOTE: not using text, because it has the base-prefix stripped
+			Literal:  token.GetText(),
+			StartPos: startPosition,
+			EndPos:   endPosition,
+		})
+	}
+
+	// check literal has no trailing underscore
+	if strings.HasSuffix(text, "_") {
+		panic(&InvalidIntegerLiteralError{
+			IntegerLiteralKind:        kind,
+			InvalidIntegerLiteralKind: InvalidIntegerLiteralKindTrailingUnderscore,
+			// NOTE: not using text, because it has the base-prefix stripped
+			Literal:  token.GetText(),
+			StartPos: startPosition,
+			EndPos:   endPosition,
+		})
+	}
+
+	withoutUnderscores := strings.Replace(text, "_", "", -1)
+
+	value, ok := big.NewInt(0).SetString(withoutUnderscores, kind.Base())
 	if !ok {
 		panic(fmt.Sprintf("invalid %s literal: %s", kind, text))
 	}
 	return &ast.IntExpression{
 		Value: value,
-		Pos:   ast.PositionFromToken(token),
+		Pos:   startPosition,
 	}
+}
+
+func (v *ProgramVisitor) VisitInvalidNumberLiteral(ctx *InvalidNumberLiteralContext) interface{} {
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.EndPosition(startPosition, ctx.GetStop().GetStop())
+
+	panic(&InvalidIntegerLiteralError{
+		IntegerLiteralKind:        IntegerLiteralKindUnknown,
+		InvalidIntegerLiteralKind: InvalidIntegerLiteralKindUnknownPrefix,
+		Literal:                   ctx.GetText(),
+		StartPos:                  startPosition,
+		EndPos:                    endPosition,
+	})
 }
 
 func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {
 	return parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText(),
-		"decimal",
-		10,
+		IntegerLiteralKindDecimal,
 	)
 }
 
@@ -721,8 +763,7 @@ func (v *ProgramVisitor) VisitBinaryLiteral(ctx *BinaryLiteralContext) interface
 	return parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
-		"binary",
-		2,
+		IntegerLiteralKindBinary,
 	)
 }
 
@@ -730,8 +771,7 @@ func (v *ProgramVisitor) VisitOctalLiteral(ctx *OctalLiteralContext) interface{}
 	return parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
-		"octal",
-		8,
+		IntegerLiteralKindOctal,
 	)
 }
 
@@ -739,8 +779,7 @@ func (v *ProgramVisitor) VisitHexadecimalLiteral(ctx *HexadecimalLiteralContext)
 	return parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
-		"hexadecimal",
-		16,
+		IntegerLiteralKindHexadecimal,
 	)
 }
 

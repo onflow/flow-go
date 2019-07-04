@@ -5,7 +5,6 @@ import (
 	"bamboo-runtime/execution/strictus/parser"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
-	. "github.com/onsi/gomega/gstruct"
 	"math/big"
 	"testing"
 )
@@ -26,10 +25,8 @@ func TestParseIncompleteConstKeyword(t *testing.T) {
 
 	Expect(errors).Should(HaveLen(1))
 	syntaxError := errors[0].(*parser.SyntaxError)
-	Expect(*syntaxError).To(MatchAllFields(Fields{
-		"Pos":     Equal(&Position{Offset: 6, Line: 2, Column: 5}),
-		"Message": ContainSubstring("extraneous input"),
-	}))
+	Expect(syntaxError.Pos).To(Equal(&Position{Offset: 6, Line: 2, Column: 5}))
+	Expect(syntaxError.Message).To(ContainSubstring("extraneous input"))
 }
 
 func TestParseIncompleteConstantDeclaration(t *testing.T) {
@@ -42,14 +39,14 @@ func TestParseIncompleteConstantDeclaration(t *testing.T) {
 	Expect(actual).Should(BeNil())
 
 	Expect(errors).Should(HaveLen(2))
-	Expect(*errors[0].(*parser.SyntaxError)).To(MatchAllFields(Fields{
-		"Pos":     Equal(&Position{Offset: 12, Line: 2, Column: 11}),
-		"Message": ContainSubstring("missing Identifier"),
-	}))
-	Expect(*errors[1].(*parser.SyntaxError)).To(MatchAllFields(Fields{
-		"Pos":     Equal(&Position{Offset: 16, Line: 3, Column: 1}),
-		"Message": ContainSubstring("mismatched input"),
-	}))
+
+	syntaxError1 := errors[0].(*parser.SyntaxError)
+	Expect(syntaxError1.Pos).To(Equal(&Position{Offset: 12, Line: 2, Column: 11}))
+	Expect(syntaxError1.Message).To(ContainSubstring("missing Identifier"))
+
+	syntaxError2 := errors[1].(*parser.SyntaxError)
+	Expect(syntaxError2.Pos).To(Equal(&Position{Offset: 16, Line: 3, Column: 1}))
+	Expect(syntaxError2.Message).To(ContainSubstring("mismatched input"))
 }
 
 func TestParseBoolExpression(t *testing.T) {
@@ -1111,6 +1108,7 @@ func TestParseIntegerLiterals(t *testing.T) {
 		const octal = 0o32
         const hex = 0xf2
         const binary = 0b101010
+        const decimal = 1234567890
 	`)
 
 	Expect(errors).Should(BeEmpty())
@@ -1151,11 +1149,227 @@ func TestParseIntegerLiterals(t *testing.T) {
 		IdentifierPos: &Position{Offset: 61, Line: 4, Column: 14},
 	}
 
+	decimal := &VariableDeclaration{
+		Identifier: "decimal",
+		IsConst:    true,
+		Value: &IntExpression{
+			Value: big.NewInt(1234567890),
+			Pos:   &Position{Offset: 103, Line: 5, Column: 24},
+		},
+		StartPos:      &Position{Offset: 87, Line: 5, Column: 8},
+		EndPos:        &Position{Offset: 103, Line: 5, Column: 24},
+		IdentifierPos: &Position{Offset: 93, Line: 5, Column: 14},
+	}
+
 	expected := &Program{
-		Declarations: []Declaration{octal, hex, binary},
+		Declarations: []Declaration{octal, hex, binary, decimal},
 	}
 
 	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const octal = 0o32_45
+        const hex = 0xf2_09
+        const binary = 0b101010_101010
+        const decimal = 1_234_567_890
+	`)
+
+	Expect(errors).Should(BeEmpty())
+
+	octal := &VariableDeclaration{
+		Identifier: "octal",
+		IsConst:    true,
+		Value: &IntExpression{
+			Value: big.NewInt(1701),
+			Pos:   &Position{Offset: 17, Line: 2, Column: 16},
+		},
+		StartPos:      &Position{Offset: 3, Line: 2, Column: 2},
+		EndPos:        &Position{Offset: 17, Line: 2, Column: 16},
+		IdentifierPos: &Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	hex := &VariableDeclaration{
+		Identifier: "hex",
+		IsConst:    true,
+		Value: &IntExpression{
+			Value: big.NewInt(61961),
+			Pos:   &Position{Offset: 45, Line: 3, Column: 20},
+		},
+		StartPos:      &Position{Offset: 33, Line: 3, Column: 8},
+		EndPos:        &Position{Offset: 45, Line: 3, Column: 20},
+		IdentifierPos: &Position{Offset: 39, Line: 3, Column: 14},
+	}
+
+	binary := &VariableDeclaration{
+		Identifier: "binary",
+		IsConst:    true,
+		Value: &IntExpression{
+			Value: big.NewInt(2730),
+			Pos:   &Position{Offset: 76, Line: 4, Column: 23},
+		},
+		StartPos:      &Position{Offset: 61, Line: 4, Column: 8},
+		EndPos:        &Position{Offset: 76, Line: 4, Column: 23},
+		IdentifierPos: &Position{Offset: 67, Line: 4, Column: 14},
+	}
+
+	decimal := &VariableDeclaration{
+		Identifier: "decimal",
+		IsConst:    true,
+		Value: &IntExpression{
+			Value: big.NewInt(1234567890),
+			Pos:   &Position{Offset: 116, Line: 5, Column: 24},
+		},
+		StartPos:      &Position{Offset: 100, Line: 5, Column: 8},
+		EndPos:        &Position{Offset: 116, Line: 5, Column: 24},
+		IdentifierPos: &Position{Offset: 106, Line: 5, Column: 14},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{octal, hex, binary, decimal},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const octal = 0o_32_45
+	`)
+
+	Expect(actual).Should(BeNil())
+
+	Expect(errors).Should(HaveLen(1))
+	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 17, Line: 2, Column: 16}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 24, Line: 2, Column: 23}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindOctal))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore))
+}
+
+func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const octal = 0o32_45_
+	`)
+
+	Expect(actual).Should(BeNil())
+
+	Expect(errors).Should(HaveLen(1))
+	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 17, Line: 2, Column: 16}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 24, Line: 2, Column: 23}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindOctal))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
+}
+
+func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const binary = 0b_101010_101010
+	`)
+
+	Expect(actual).Should(BeNil())
+
+	Expect(errors).Should(HaveLen(1))
+	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 18, Line: 2, Column: 17}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 33, Line: 2, Column: 32}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindBinary))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore))
+}
+
+func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const binary = 0b101010_101010_
+	`)
+
+	Expect(actual).Should(BeNil())
+
+	Expect(errors).Should(HaveLen(1))
+	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 18, Line: 2, Column: 17}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 33, Line: 2, Column: 32}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindBinary))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
+}
+
+func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const decimal = 1_234_567_890_
+	`)
+
+	Expect(actual).Should(BeNil())
+
+	Expect(errors).Should(HaveLen(1))
+	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 19, Line: 2, Column: 18}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 32, Line: 2, Column: 31}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindDecimal))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
+}
+
+func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const hex = 0x_f2_09
+	`)
+
+	Expect(actual).Should(BeNil())
+
+	Expect(errors).Should(HaveLen(1))
+	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 15, Line: 2, Column: 14}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 22, Line: 2, Column: 21}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindHexadecimal))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore))
+}
+
+func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const hex = 0xf2_09_
+	`)
+
+	Expect(actual).Should(BeNil())
+
+	Expect(errors).Should(HaveLen(1))
+	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 15, Line: 2, Column: 14}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 22, Line: 2, Column: 21}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindHexadecimal))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
+
+}
+
+func TestParseInvalidIntegerLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+		const hex = 0z123
+	`)
+
+	Expect(actual).Should(BeNil())
+
+	Expect(errors).Should(HaveLen(1))
+	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
+	Expect(syntaxError.StartPos).To(Equal(&Position{Offset: 15, Line: 2, Column: 14}))
+	Expect(syntaxError.EndPos).To(Equal(&Position{Offset: 19, Line: 2, Column: 18}))
+	Expect(syntaxError.IntegerLiteralKind).To(Equal(parser.IntegerLiteralKindUnknown))
+	Expect(syntaxError.InvalidIntegerLiteralKind).To(Equal(parser.InvalidIntegerLiteralKindUnknownPrefix))
 }
 
 func TestParseIntegerTypes(t *testing.T) {

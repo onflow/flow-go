@@ -191,6 +191,10 @@ func (v *BaseStrictusVisitor) VisitHexadecimalLiteral(ctx *HexadecimalLiteralCon
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitInvalidNumberLiteral(ctx *InvalidNumberLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }
