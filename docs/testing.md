@@ -1,6 +1,5 @@
 # Testing
 
-## Test
 Run:
 ```
 $ ./test.sh

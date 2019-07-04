@@ -1,41 +1,41 @@
 # Contribution Guide
 
-This guide provides a comprehensive overview of our development process, guidelines, and steps required to contribute to the project.
+This guide provides a comprehensive overview of our development processes, guidelines, and steps required to contribute to the project.
 
 ## Getting Started
 
-By the time you are reading this you should have already been assigned a work stream. Here's how to get started:
+By the time you read this you should be assigned to a work stream. Here's how to get started:
 
 * Familiarize yourself with the workflow below
 * Read through the [project setup](/docs/setup.md) instructions to install required tools
 * Read the documentation pertaining to [your stream](/docs/streams)
-* Browse the [remaining documentation](/docs) to get up to speed on things like testing, code style, and common patterns
+* Browse the [remaining documentation](/docs) to get up to speed on concepts like testing, code style, and common code patterns
 * Contact your stream lead to receive your first task
 
 ## Work Streams
 
 Bamboo development is divided across several streams of work with the goal of separating concerns and facilitating rapid development. 
 
-Each stream is owned by a Bamboo core team member who oversees and directs all development within that stream. As a contributor, you will be communicate with the owner of the stream in which you were assigned.
+Each stream is owned by a Bamboo core team member who oversees and directs all development within that stream. As a contributor, you will communicate primarily with your stream owner.
 
 Stream owners will assign tasks to contributors and ensure that all TODOs are tracked.
 
 | Stream         | Owner(s)                    | Packages  |
 | -------------- | --------------------------- | --------- |
-| Pre-execution  | Peter Siemens (@psiemens), Ross Nicoll (@rnicoll)   | [/internal/access](/internal/access), [/cmd/access](/cmd/access) |
-| Execution      | Bastian Müller (@turbolent) | [/runtime](/runtime), [/language](/language), [/internal/execute](/internal/execute), [/cmd/execute](/cmd/execute) |
-| Post-execution | Moar Zamski (@pazams)     | [/internal/access](/internal/access), [/cmd/access](/cmd/access) |
-| Consensus | Alexander Hentschel (@AlexHentschel)     | [/consensus](/consensus), [/internal/security](/internal/security) |
-| Networking | Yahya Hassanzadeh (@yhassanzadeh)     | [/network](/network) |
-| Keystone | Tarak Ben Youssef (@tarakby)     | [/pkg/crypto](/pkg/crypto) |
-| Emulator | Brian Ho (@mrbrianhobo), Peter Siemens (@psiemens)     | [/emulator](/emulator), [/sdk](/sdk)|
-| Engineer Performance | Timofey Smirnov (@tsmirnov) | |
+| Pre-execution  | [Peter Siemens](https://github.com/psiemens])   | [/internal/access](/internal/access), [/internal/clusters](/internal/clusters), [/internal/routing](/internal/routing), [/cmd/access](/cmd/access) |
+| Execution      | [Bastian Müller](https://github.com/@turbolent) | [/runtime](/runtime), [/language](/language), [/internal/execute](/internal/execute), [/cmd/execute](/cmd/execute) |
+| Post-execution | [Moar Zamski](https://github.com/@pazams)     | [/internal/access](/internal/access), [/cmd/access](/cmd/access) |
+| Consensus | [Alexander Hentschel](https://github.com/@AlexHentschel)     | [/consensus](/consensus), [/internal/security](/internal/security) |
+| Networking | [Yahya Hassanzadeh](https://github.com/@yhassanzadeh)     | [/network](/network) |
+| Keystone | [Tarak Ben Youssef](https://github.com/@tarakby)     | [/pkg/crypto](/pkg/crypto) |
+| Emulator | [Brian Ho](https://github.com/@mrbrianhobo), [Peter Siemens](https://github.com/@psiemens)     | [/internal/emulator](/internal/emulator), [/client](/client), [/cmd/bamboo](/cmd/bamboo)|
+| Engineer Performance | [Timofey Smirnov](https://github.com/@tsmirnov) | |
 
 ## Workflow
 
 ### Issues
 
-Development tasks are assigned using GitHub issues. Each issue will contain a breakdown of the required task and any necessary background information, as well as an esitmate of the required work. You are expected to track the progress of issues assigned to you and provide updates if need be (in the form of issue comments).
+Development tasks are assigned using GitHub issues. Each issue will contain a breakdown of the required task and any necessary background information, as well as an esitmate of the required work. You are expected to track the progress of issues assigned to you and provide updates if needed, in the form of issue comments.
 
 If you need to create a new issue, please use the provided issue templates to ensure that all necessary information is included.
 
