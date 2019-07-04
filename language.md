@@ -99,7 +99,7 @@ var b = 4
 
 // Invalid: can't declare a variable with the name `a`,
 // as it is already used in this scope,
-// and it was declared as a constant
+// and it is declared as a constant
 //
 var a = 5
 ```
@@ -1698,14 +1698,20 @@ An interface is an abstract type that specifies the behavior of types that *impl
 
 Interfaces can be implemented by [classes](#structures-and-classes), [structures](#structures-and-classes), [contracts](#contracts), and [authorizations](#authorizations). These types may implement multiple interfaces.
 
-Interfaces consist of the functions and fields, as well as their access, that an implementation must provide. Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions.
+Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Implementations of interface requirements must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.
+
+Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions.
 
 Field requirements consist of the name and the type of the field. Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
 
 
 ### Interface Declaration
 
-Interfaces are declared using the `interface` keyword, followed by the name of the interface, and the requirements enclosed in opening and closing braces. Fields can be annotated to be variable or constant, and how they can be accessed, but do not have to be annotated.
+Interfaces are declared using the `interface` keyword, followed by the name of the interface, and the requirements enclosed in opening and closing braces.
+
+Field requirements can be annotated to require the implementation to be a variable field, by using the `var` keyword; require the implementation to be a constant field, by using the `const` keyword; or the field requirement may specify nothing, in which case the implementation may either be a variable field, a constant field, or a synthetic field.
+
+Field requirements and function requirements must specify the required level of access. The access must be at least be public, so the `pub` keyword must be provided. Variable field requirements can be specified to also be publicly settable by using the `pub(set)` keyword.
 
 The special type `Self` can be used to refer to the type implementing the interface. This can be seen in the following example, where the first parameter of the `transfer` function has the `Self` type.
 
@@ -1715,7 +1721,11 @@ The special type `Self` can be used to refer to the type implementing the interf
 interface Vault {
 
     // Require the implementation to provide a field for the balance that is
-    // readable in all scopes.
+    // readable in all scopes (`pub`).
+    //
+    // Neither the `var` keyword, nor the `const` keyword is used,
+    // so the field may be implemented as either a variable field,
+    // a constant field, or a synthetic field.
     //
     // The read balance must always be positive.
     //
@@ -1801,7 +1811,7 @@ Note that the required initializer and function do not have any executable code.
 
 ### Interface Implementation
 
-Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the type (class, structure, contract, or authorization) that should provide the functionality.
+Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the type (class, structure, contract, or authorization) that provides the functionality required in the interface.
 
 ```typescript,file=interface-implementation.bpl
 
@@ -1810,9 +1820,11 @@ Implementations are declared using the `impl` keyword, followed by the name of i
 //
 class ExampleVault {
 
-    // Implement the required variable field `balance` for the `Vault` interface,
-    // that this type (`ExampleVault`) can write to, but outer scopes can only
-    // read from
+    // Implement the required field `balance` for the `Vault` interface.
+    // The interface does not specify if the field must be variable, constant,
+    // so in order for this type (`ExampleVault`) to be able to write to the field,
+    // but limit outer scopes to only read from the field, it is declared variable,
+    // and only has public access (non-settable).
     //
     pub var balance: Int
 
@@ -1835,7 +1847,7 @@ class ExampleVault {
 impl Vault for ExampleVault {
 
     // Implement the required function named `add` of the interface `Vault`,
-    // that adds an amount to the vault's balance.
+    // that adds an amount to the vault's balance. It must be public.
     //
     // This implementation satisfies the required postcondition.
     //
@@ -1847,8 +1859,8 @@ impl Vault for ExampleVault {
     }
 
     // Implement the required function named `transfer` of the interface `Vault`,
-    // that subtracts the amount from this vault's balance,
-    // and adds the amount to the receiving vault's balance.
+    // that subtracts the amount from this vault's balance, and adds the amount
+    // to the receiving vault's balance. It must be public.
     //
     // NOTE: the type of the receiving vault parameter is `ExampleVault`,
     // i.e., an amount can only be transferred to a vault of the same type.
@@ -1887,6 +1899,38 @@ vault.transfer(to: otherVault, amount: 10)
 // the field `balance` (100 > 90)
 //
 vault.transfer(to: otherVault, amount: 100)
+```
+
+The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified), and an implemenation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
+
+```typescript
+interface AnInterface {
+    // Require the implementation to provide a publicly readable
+    // field named `a` that has type `Int`. It may be a constant field,
+    // a variable field, or a synthetic field.
+    //
+    pub a: Int
+}
+
+struct AnImplementation {
+    // Declare a publicly settable variable field named `a`that has type `Int`.
+    // This implementation satisifes the requirement for interface `AnInterface`:
+    // The field is at least publicly readable, but this implementation also
+    // allows the field to be written to in all scopes
+    //
+    pub(set) var a: Int
+
+    init(a: Int) {
+        self.a = a
+    }
+}
+
+impl AnInterface for AnImplementation {
+    // This implementation is empty, as the declaration
+    // of the structure `AnImplementation` already fully satisfies
+    // the requirements of the interface `AnInterface`,
+    // i.e. a field named `a` that has type `Int` must be provided
+}
 ```
 
 ### Interface Type
