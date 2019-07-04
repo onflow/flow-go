@@ -320,8 +320,8 @@ message FinalizedStateTransition {
 }
 
 enum Vote {
-  APPROVE = 0;
-  REJECT = 1;
+  REJECT = 0;
+  APPROVE = 1;
 }
 
 message StateTransitionVote {
