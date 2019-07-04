@@ -715,7 +715,7 @@ fun double(_ x: Int) -> Int {
 double(2) // returns 4
 ```
 
-It is possible to require an argument label for some parameters, and require an argument label for other parameters.
+It is possible to require argument labels for some parameters, and not require argument labels for other parameters.
 
 ```typescript
 // Declare a function named `clamp`. The function takes an integer value,
