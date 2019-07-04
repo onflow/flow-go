@@ -306,12 +306,12 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		return nil
 	}
 	expression := expressionResult.(ast.Expression)
-	var fullTYpe ast.Type
+	var fullType ast.Type
 
 	fullTypeContext := ctx.FullType()
 	if fullTypeContext != nil {
 		if x, ok := fullTypeContext.Accept(v).(ast.Type); ok {
-			fullTYpe = x
+			fullType = x
 		}
 	}
 
@@ -323,7 +323,7 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		IsConst:       isConst,
 		Identifier:    identifier,
 		Value:         expression,
-		Type:          fullTYpe,
+		Type:          fullType,
 		StartPos:      startPosition,
 		EndPos:        endPosition,
 		IdentifierPos: identifierPosition,
