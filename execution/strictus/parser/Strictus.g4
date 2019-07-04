@@ -55,7 +55,7 @@ declaration
     ;
 
 functionDeclaration
-    : Pub? Fun Identifier '(' parameterList? ')' (':' returnType=typeName)? '{' block '}'
+    : Pub? Fun Identifier '(' parameterList? ')' ('->' returnType=fullType)? block
     ;
 
 parameterList
@@ -63,10 +63,10 @@ parameterList
     ;
 
 parameter
-    : Identifier ':' typeName
+    : Identifier ':' fullType
     ;
 
-typeName
+fullType
     : baseType typeDimension*
     ;
 
@@ -76,10 +76,19 @@ typeDimension
 
 baseType
     : Identifier
-    | '(' (parameterTypes+=typeName (',' parameterTypes+=typeName)*)? ')' '=>' returnType=typeName
+    | functionType
+    ;
+
+functionType
+    : '(' (parameterTypes+=fullType (',' parameterTypes+=fullType)*)? ')' '->' returnType=fullType
+    | '(' functionType ')'
     ;
 
 block
+    : '{' statements '}'
+    ;
+
+statements
     : (statement eos)*
     ;
 
@@ -97,15 +106,15 @@ returnStatement
     ;
 
 ifStatement
-    : If test=expression '{' then=block '}' (Else (ifStatement | '{' alt=block '}'))?
+    : If test=expression then=block (Else (ifStatement | alt=block))?
     ;
 
 whileStatement
-    : While expression '{' block '}'
+    : While expression block
     ;
 
 variableDeclaration
-    : (Const | Var) Identifier (':' typeName)? '=' expression
+    : (Const | Var) Identifier (':' fullType)? '=' expression
     ;
 
 assignment
@@ -214,7 +223,7 @@ Negate : '!' ;
 primaryExpressionStart
     : Identifier                                                           # IdentifierExpression
     | literal                                                              # LiteralExpression
-    | Fun '(' parameterList? ')' (':' returnType=typeName)? '{' block '}'  # FunctionExpression
+    | Fun '(' parameterList? ')' ('->' returnType=fullType)? block         # FunctionExpression
     | '(' expression ')'                                                   # NestedExpression
     ;
 
@@ -247,10 +256,11 @@ booleanLiteral
     ;
 
 integerLiteral
-    : DecimalLiteral       # DecimalLiteral
-    | BinaryLiteral        # BinaryLiteral
-    | OctalLiteral         # OctalLiteral
-    | HexadecimalLiteral   # HexadecimalLiteral
+    : DecimalLiteral        # DecimalLiteral
+    | BinaryLiteral         # BinaryLiteral
+    | OctalLiteral          # OctalLiteral
+    | HexadecimalLiteral    # HexadecimalLiteral
+    | InvalidNumberLiteral  # InvalidNumberLiteral
     ;
 
 arrayLiteral
@@ -290,19 +300,36 @@ fragment IdentifierCharacter
     | IdentifierHead
     ;
 
+
 DecimalLiteral
+    // NOTE: allows trailing underscores, but the parser checks underscores
+    // only occur inside, to provide better syntax errors
     : [0-9] [0-9_]*
     ;
+
+
 BinaryLiteral
-    : '0b' [01]*
+    // NOTE: allows underscores anywhere after prefix, but the parser checks underscores
+    // only occur inside, to provide better syntax errors
+    : '0b' [01_]+
     ;
 
+
 OctalLiteral
-    : '0o' [0-7]*
+    // NOTE: allows underscores anywhere after prefix, but the parser checks underscores
+    // only occur inside, to provide better syntax errors
+    : '0o' [0-7_]+
     ;
 
 HexadecimalLiteral
-    : '0x' [0-9a-fA-F]*
+    // NOTE: allows underscores anywhere after prefix, but the parser checks underscores
+    // only occur inside, to provide better syntax errors
+    : '0x' [0-9a-fA-F_]+
+    ;
+
+// NOTE: invalid literal, to provide better syntax errors
+InvalidNumberLiteral
+    : '0' [a-zA-Z] [0-9a-zA-Z_]*
     ;
 
 WS

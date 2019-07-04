@@ -8,16 +8,16 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[DeclarationKindAny-0]
+	_ = x[DeclarationKindValue-0]
 	_ = x[DeclarationKindFunction-1]
 	_ = x[DeclarationKindVariable-2]
 	_ = x[DeclarationKindConstant-3]
 	_ = x[DeclarationKindType-4]
 }
 
-const _DeclarationKind_name = "DeclarationKindAnyDeclarationKindFunctionDeclarationKindVariableDeclarationKindConstantDeclarationKindType"
+const _DeclarationKind_name = "DeclarationKindValueDeclarationKindFunctionDeclarationKindVariableDeclarationKindConstantDeclarationKindType"
 
-var _DeclarationKind_index = [...]uint8{0, 18, 41, 64, 87, 106}
+var _DeclarationKind_index = [...]uint8{0, 20, 43, 66, 89, 108}
 
 func (i DeclarationKind) String() string {
 	if i < 0 || i >= DeclarationKind(len(_DeclarationKind_index)-1) {

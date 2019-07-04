@@ -1,26 +1,26 @@
 package ast
 
 type FunctionDeclaration struct {
-	IsPublic           bool
-	Identifier         string
-	Parameters         []*Parameter
-	ReturnType         Type
-	Block              *Block
-	StartPosition      *Position
-	EndPosition        *Position
-	IdentifierPosition *Position
+	IsPublic      bool
+	Identifier    string
+	Parameters    []*Parameter
+	ReturnType    Type
+	Block         *Block
+	StartPos      *Position
+	EndPos        *Position
+	IdentifierPos *Position
 }
 
-func (f *FunctionDeclaration) GetStartPosition() *Position {
-	return f.StartPosition
+func (f *FunctionDeclaration) StartPosition() *Position {
+	return f.StartPos
 }
 
-func (f *FunctionDeclaration) GetEndPosition() *Position {
-	return f.EndPosition
+func (f *FunctionDeclaration) EndPosition() *Position {
+	return f.EndPos
 }
 
 func (f *FunctionDeclaration) GetIdentifierPosition() *Position {
-	return f.IdentifierPosition
+	return f.IdentifierPos
 }
 
 func (f *FunctionDeclaration) Accept(visitor Visitor) Repr {

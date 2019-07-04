@@ -1,6 +1,6 @@
-// Code generated from Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
+// Code generated from execution/strictus/parser/Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
 
-package strictus // Strictus
+package parser // Strictus
 import "github.com/antlr/antlr4/runtime/Go/antlr"
 
 import "strings"
@@ -26,8 +26,8 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#parameter.
 	VisitParameter(ctx *ParameterContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#typeName.
-	VisitTypeName(ctx *TypeNameContext) interface{}
+	// Visit a parse tree produced by StrictusParser#fullType.
+	VisitFullType(ctx *FullTypeContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#typeDimension.
 	VisitTypeDimension(ctx *TypeDimensionContext) interface{}
@@ -35,8 +35,14 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#baseType.
 	VisitBaseType(ctx *BaseTypeContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#functionType.
+	VisitFunctionType(ctx *FunctionTypeContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#block.
 	VisitBlock(ctx *BlockContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#statements.
+	VisitStatements(ctx *StatementsContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#statement.
 	VisitStatement(ctx *StatementContext) interface{}
@@ -145,6 +151,9 @@ type StrictusVisitor interface {
 
 	// Visit a parse tree produced by StrictusParser#HexadecimalLiteral.
 	VisitHexadecimalLiteral(ctx *HexadecimalLiteralContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#InvalidNumberLiteral.
+	VisitInvalidNumberLiteral(ctx *InvalidNumberLiteralContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#arrayLiteral.
 	VisitArrayLiteral(ctx *ArrayLiteralContext) interface{}

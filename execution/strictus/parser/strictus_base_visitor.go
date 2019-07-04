@@ -1,6 +1,6 @@
-// Code generated from Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
+// Code generated from execution/strictus/parser/Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
 
-package strictus // Strictus
+package parser // Strictus
 import "github.com/antlr/antlr4/runtime/Go/antlr"
 
 type BaseStrictusVisitor struct {
@@ -27,7 +27,7 @@ func (v *BaseStrictusVisitor) VisitParameter(ctx *ParameterContext) interface{} 
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitTypeName(ctx *TypeNameContext) interface{} {
+func (v *BaseStrictusVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -39,7 +39,15 @@ func (v *BaseStrictusVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitBlock(ctx *BlockContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitStatements(ctx *StatementsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -184,6 +192,10 @@ func (v *BaseStrictusVisitor) VisitOctalLiteral(ctx *OctalLiteralContext) interf
 }
 
 func (v *BaseStrictusVisitor) VisitHexadecimalLiteral(ctx *HexadecimalLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitInvalidNumberLiteral(ctx *InvalidNumberLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

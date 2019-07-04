@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"bamboo-runtime/execution/strictus/ast"
+	"bamboo-runtime/execution/strictus/errors"
 	"fmt"
 	"strings"
 )
@@ -9,6 +10,16 @@ import (
 type Type interface {
 	isType()
 	String() string
+}
+
+// AnyType represents the top type
+
+type AnyType struct{}
+
+func (*AnyType) isType() {}
+
+func (*AnyType) String() string {
+	return "Any"
 }
 
 // VoidType represents the void type
@@ -174,7 +185,10 @@ func ArrayTypeToString(arrayType ArrayType) string {
 	for currentTypeIsArrayType {
 		switch arrayType := currentType.(type) {
 		case *ConstantSizedType:
-			fmt.Fprintf(&arraySuffixes, "[%d]", arrayType.Size)
+			_, err := fmt.Fprintf(&arraySuffixes, "[%d]", arrayType.Size)
+			if err != nil {
+				panic(&errors.UnreachableError{})
+			}
 			currentType = arrayType.Type
 		case *VariableSizedType:
 			arraySuffixes.WriteString("[]")
@@ -183,7 +197,13 @@ func ArrayTypeToString(arrayType ArrayType) string {
 			currentTypeIsArrayType = false
 		}
 	}
-	return currentType.String() + arraySuffixes.String()
+
+	baseType := currentType.String()
+	if _, isFunctionType := currentType.(*FunctionType); isFunctionType {
+		baseType = fmt.Sprintf("(%s)", baseType)
+	}
+
+	return baseType + arraySuffixes.String()
 }
 
 // FunctionType
@@ -204,7 +224,7 @@ func (t FunctionType) String() string {
 		parameters.WriteString(parameter.String())
 	}
 
-	return fmt.Sprintf("(%s) => %s", parameters.String(), t.ReturnType.String())
+	return fmt.Sprintf("(%s) -> %s", parameters.String(), t.ReturnType.String())
 }
 
 // mustConvertType converts an AST type representation to an interpreter type representation
@@ -216,7 +236,9 @@ func mustConvertType(t ast.Type) Type {
 			panic(&NotDeclaredError{
 				ExpectedKind: DeclarationKindType,
 				Name:         t.Identifier,
-				Position:     t.Position,
+				// TODO: add start and end position to ast.Type
+				StartPos: t.Pos,
+				EndPos:   t.Pos,
 			})
 		}
 		return result

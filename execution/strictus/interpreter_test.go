@@ -2,6 +2,7 @@ package strictus
 
 import (
 	"bamboo-runtime/execution/strictus/interpreter"
+	"bamboo-runtime/execution/strictus/parser"
 	. "github.com/onsi/gomega"
 	"math/big"
 	"testing"
@@ -10,7 +11,7 @@ import (
 func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(``)
+	program, errors := parser.Parse(``)
 
 	Expect(errors).Should(BeEmpty())
 
@@ -25,7 +26,7 @@ func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
 func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        const test = 1
    `)
 
@@ -42,7 +43,7 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 func TestInterpretInvalidUnknownDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            return x
        }
@@ -61,7 +62,7 @@ func TestInterpretInvalidUnknownDeclaration(t *testing.T) {
 func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            x = 2
        }
@@ -80,7 +81,7 @@ func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
 func TestInterpretInvalidUnknownDeclarationIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            x[0]
        }
@@ -99,7 +100,7 @@ func TestInterpretInvalidUnknownDeclarationIndexing(t *testing.T) {
 func TestInterpretInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            x[0] = 2
        }
@@ -118,15 +119,15 @@ func TestInterpretInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 func TestInterpretLexicalScope(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        const x = 10
 
-       fun f(): Int32 {
+       fun f() -> Int32 {
           // check resolution
           return x
        }
 
-       fun g(): Int32 {
+       fun g() -> Int32 {
           // check scope is lexical, not dynamic
           const x = 20
           return f()
@@ -152,10 +153,10 @@ func TestInterpretLexicalScope(t *testing.T) {
 func TestInterpretNoHoisting(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        const x = 2
 
-       fun test(): Int64 {
+       fun test() -> Int64 {
           if x == 0 {
               const x = 3
               return x
@@ -180,11 +181,11 @@ func TestInterpretNoHoisting(t *testing.T) {
 func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        const x = 10
 
        // check first-class functions and scope inside them
-       const y = (fun (x: Int32): Int32 { return x })(42)
+       const y = (fun (x: Int32) -> Int32 { return x })(42)
 	`)
 
 	Expect(errors).Should(BeEmpty())
@@ -203,12 +204,12 @@ func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 func TestInterpretInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun f(x: Int32): Int32 {
+	program, errors := parser.Parse(`
+       fun f(x: Int32) -> Int32 {
            return x
        }
 
-       fun test(): Int32 {
+       fun test() -> Int32 {
            return f()
        }
 	`)
@@ -226,12 +227,12 @@ func TestInterpretInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 func TestInterpretInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun f(x: Int32): Int32 {
+	program, errors := parser.Parse(`
+       fun f(x: Int32) -> Int32 {
            return x
        }
 
-       fun test(): Int32 {
+       fun test() -> Int32 {
            return f(2, 3)
        }
 	`)
@@ -249,8 +250,8 @@ func TestInterpretInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 func TestInterpretInvalidFunctionCallOfBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun test(): Int32 {
+	program, errors := parser.Parse(`
+       fun test() -> Int32 {
            return true()
        }
 	`)
@@ -268,8 +269,8 @@ func TestInterpretInvalidFunctionCallOfBool(t *testing.T) {
 func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun test(): Int32 {
+	program, errors := parser.Parse(`
+       fun test() -> Int32 {
            return 2()
        }
 	`)
@@ -287,7 +288,7 @@ func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
 func TestInterpretInvalidConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            const x = 2
            x = 3
@@ -307,8 +308,8 @@ func TestInterpretInvalidConstantAssignment(t *testing.T) {
 func TestInterpretVariableAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun test(): Int64 {
+	program, errors := parser.Parse(`
+       fun test() -> Int64 {
            var x = 2
            x = 3
            return x
@@ -328,7 +329,7 @@ func TestInterpretVariableAssignment(t *testing.T) {
 func TestInterpretInvalidGlobalConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        const x = 2
 
        fun test() {
@@ -349,10 +350,10 @@ func TestInterpretInvalidGlobalConstantAssignment(t *testing.T) {
 func TestInterpretGlobalVariableAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        var x = 2
 
-       fun test(): Int64 {
+       fun test() -> Int64 {
            x = 3
            return x
        }
@@ -377,7 +378,7 @@ func TestInterpretGlobalVariableAssignment(t *testing.T) {
 func TestInterpretInvalidConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test() {
            const x = 2
            const x = 3
@@ -397,7 +398,7 @@ func TestInterpretInvalidConstantRedeclaration(t *testing.T) {
 func TestInterpretInvalidGlobalConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
 		const x = 2
 		const x = 3
 	`)
@@ -413,10 +414,10 @@ func TestInterpretInvalidGlobalConstantRedeclaration(t *testing.T) {
 func TestInterpretConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
 	    const x = 2
 
-       fun test(): Int64 {
+       fun test() -> Int64 {
            const x = 3
            return x
        }
@@ -438,12 +439,12 @@ func TestInterpretConstantRedeclaration(t *testing.T) {
 func TestInterpretParameters(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun returnA(a: Int32, b: Int32): Int64 {
+	program, errors := parser.Parse(`
+       fun returnA(a: Int32, b: Int32) -> Int64 {
            return a
        }
 
-       fun returnB(a: Int32, b: Int32): Int64 {
+       fun returnB(a: Int32, b: Int32) -> Int64 {
            return b
        }
 	`)
@@ -464,8 +465,8 @@ func TestInterpretParameters(t *testing.T) {
 func TestInterpretArrayIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun test(): Int64 {
+	program, errors := parser.Parse(`
+       fun test() -> Int64 {
            const z = [0, 3]
            return z[1]
        }
@@ -484,8 +485,8 @@ func TestInterpretArrayIndexing(t *testing.T) {
 func TestInterpretInvalidArrayIndexingWithBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun test(): Int64 {
+	program, errors := parser.Parse(`
+       fun test() -> Int64 {
            const z = [0, 3]
            return z[true]
        }
@@ -504,8 +505,8 @@ func TestInterpretInvalidArrayIndexingWithBool(t *testing.T) {
 func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun test(): Int64 {
+	program, errors := parser.Parse(`
+       fun test() -> Int64 {
            return true[0]
        }
 	`)
@@ -523,8 +524,8 @@ func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
 func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun test(): Int64 {
+	program, errors := parser.Parse(`
+       fun test() -> Int64 {
            return 2[0]
        }
 	`)
@@ -542,8 +543,8 @@ func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
 func TestInterpretArrayIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun test(): Int64 {
+	program, errors := parser.Parse(`
+       fun test() -> Int64 {
            const z = [0, 3]
            z[1] = 2
            return z[1]
@@ -563,8 +564,8 @@ func TestInterpretArrayIndexingAssignment(t *testing.T) {
 func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun test(): Int64 {
+	program, errors := parser.Parse(`
+       fun test() -> Int64 {
            const z = [0, 3]
            z[true] = 2
            return z[1]
@@ -584,7 +585,7 @@ func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
 func TestInterpretReturnWithoutExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun returnEarly() {
            return
            return 1
@@ -606,20 +607,20 @@ func TestInterpretReturnWithoutExpression(t *testing.T) {
 func TestInterpretPlusOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testIntegers(): Int64 {
+	program, errors := parser.Parse(`
+       fun testIntegers() -> Int64 {
            return 2 + 4
        }
 
-       fun testIntegerAndBool(): Int64 {
+       fun testIntegerAndBool() -> Int64 {
            return 2 + true
        }
 
-       fun testBoolAndInteger(): Int64 {
+       fun testBoolAndInteger() -> Int64 {
            return true + 2
        }
 
-       fun testBools(): Int64 {
+       fun testBools() -> Int64 {
            return true + true
        }
 	`)
@@ -646,20 +647,20 @@ func TestInterpretPlusOperator(t *testing.T) {
 func TestInterpretMinusOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testIntegers(): Int64 {
+	program, errors := parser.Parse(`
+       fun testIntegers() -> Int64 {
            return 2 - 4
        }
 
-       fun testIntegerAndBool(): Int64 {
+       fun testIntegerAndBool() -> Int64 {
            return 2 - true
        }
 
-       fun testBoolAndInteger(): Int64 {
+       fun testBoolAndInteger() -> Int64 {
            return true - 2
        }
 
-       fun testBools(): Int64 {
+       fun testBools() -> Int64 {
            return true - true
        }
 	`)
@@ -686,20 +687,20 @@ func TestInterpretMinusOperator(t *testing.T) {
 func TestInterpretMulOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testIntegers(): Int64 {
+	program, errors := parser.Parse(`
+       fun testIntegers() -> Int64 {
            return 2 * 4
        }
 
-       fun testIntegerAndBool(): Int64 {
+       fun testIntegerAndBool() -> Int64 {
            return 2 * true
        }
 
-       fun testBoolAndInteger(): Int64 {
+       fun testBoolAndInteger() -> Int64 {
            return true * 2
        }
 
-       fun testBools(): Int64 {
+       fun testBools() -> Int64 {
            return true * true
        }
 	`)
@@ -726,20 +727,20 @@ func TestInterpretMulOperator(t *testing.T) {
 func TestInterpretDivOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testIntegers(): Int64 {
+	program, errors := parser.Parse(`
+       fun testIntegers() -> Int64 {
            return 7 / 3
        }
 
-       fun testIntegerAndBool(): Int64 {
+       fun testIntegerAndBool() -> Int64 {
            return 7 / true
        }
 
-       fun testBoolAndInteger(): Int64 {
+       fun testBoolAndInteger() -> Int64 {
            return true / 2
        }
 
-       fun testBools(): Int64 {
+       fun testBools() -> Int64 {
            return true / true
        }
 	`)
@@ -766,20 +767,20 @@ func TestInterpretDivOperator(t *testing.T) {
 func TestInterpretModOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testIntegers(): Int64 {
+	program, errors := parser.Parse(`
+       fun testIntegers() -> Int64 {
            return 5 % 3
        }
 
-       fun testIntegerAndBool(): Int64 {
+       fun testIntegerAndBool() -> Int64 {
            return 5 % true
        }
 
-       fun testBoolAndInteger(): Int64 {
+       fun testBoolAndInteger() -> Int64 {
            return true % 2
        }
 
-       fun testBools(): Int64 {
+       fun testBools() -> Int64 {
            return true % true
        }
 	`)
@@ -806,36 +807,36 @@ func TestInterpretModOperator(t *testing.T) {
 func TestInterpretEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testIntegersUnequal(): Bool {
+	program, errors := parser.Parse(`
+       fun testIntegersUnequal() -> Bool {
            return 5 == 3
        }
 
-       fun testIntegersEqual(): Bool {
+       fun testIntegersEqual() -> Bool {
            return 3 == 3
        }
 
-       fun testIntegerAndBool(): Bool {
+       fun testIntegerAndBool() -> Bool {
            return 5 == true
        }
 
-       fun testBoolAndInteger(): Bool {
+       fun testBoolAndInteger() -> Bool {
            return true == 5
        }
 
-       fun testTrueAndTrue(): Bool {
+       fun testTrueAndTrue() -> Bool {
            return true == true
        }
 
-       fun testTrueAndFalse(): Bool {
+       fun testTrueAndFalse() -> Bool {
            return true == false
        }
 
-       fun testFalseAndTrue(): Bool {
+       fun testFalseAndTrue() -> Bool {
            return false == true
        }
 
-       fun testFalseAndFalse(): Bool {
+       fun testFalseAndFalse() -> Bool {
            return false == false
        }
 	`)
@@ -874,36 +875,36 @@ func TestInterpretEqualOperator(t *testing.T) {
 func TestInterpretUnequalOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testIntegersUnequal(): Bool {
+	program, errors := parser.Parse(`
+       fun testIntegersUnequal() -> Bool {
            return 5 != 3
        }
 
-       fun testIntegersEqual(): Bool {
+       fun testIntegersEqual() -> Bool {
            return 3 != 3
        }
 
-       fun testIntegerAndBool(): Bool {
+       fun testIntegerAndBool() -> Bool {
            return 5 != true
        }
 
-       fun testBoolAndInteger(): Bool {
+       fun testBoolAndInteger() -> Bool {
            return true != 5
        }
 
-       fun testTrueAndTrue(): Bool {
+       fun testTrueAndTrue() -> Bool {
            return true != true
        }
 
-       fun testTrueAndFalse(): Bool {
+       fun testTrueAndFalse() -> Bool {
            return true != false
        }
 
-       fun testFalseAndTrue(): Bool {
+       fun testFalseAndTrue() -> Bool {
            return false != true
        }
 
-       fun testFalseAndFalse(): Bool {
+       fun testFalseAndFalse() -> Bool {
            return false != false
        }
 	`)
@@ -942,40 +943,40 @@ func TestInterpretUnequalOperator(t *testing.T) {
 func TestInterpretLessOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testIntegersGreater(): Bool {
+	program, errors := parser.Parse(`
+       fun testIntegersGreater() -> Bool {
            return 5 < 3
        }
 
-       fun testIntegersEqual(): Bool {
+       fun testIntegersEqual() -> Bool {
            return 3 < 3
        }
 
-       fun testIntegersLess(): Bool {
+       fun testIntegersLess() -> Bool {
            return 3 < 5
        }
 
-       fun testIntegerAndBool(): Bool {
+       fun testIntegerAndBool() -> Bool {
            return 5 < true
        }
 
-       fun testBoolAndInteger(): Bool {
+       fun testBoolAndInteger() -> Bool {
            return true < 5
        }
 
-       fun testTrueAndTrue(): Bool {
+       fun testTrueAndTrue() -> Bool {
            return true < true
        }
 
-       fun testTrueAndFalse(): Bool {
+       fun testTrueAndFalse() -> Bool {
            return true < false
        }
 
-       fun testFalseAndTrue(): Bool {
+       fun testFalseAndTrue() -> Bool {
            return false < true
        }
 
-       fun testFalseAndFalse(): Bool {
+       fun testFalseAndFalse() -> Bool {
            return false < false
        }
 	`)
@@ -1017,40 +1018,40 @@ func TestInterpretLessOperator(t *testing.T) {
 func TestInterpretLessEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testIntegersGreater(): Bool {
+	program, errors := parser.Parse(`
+       fun testIntegersGreater() -> Bool {
            return 5 <= 3
        }
 
-       fun testIntegersEqual(): Bool {
+       fun testIntegersEqual() -> Bool {
            return 3 <= 3
        }
 
-       fun testIntegersLess(): Bool {
+       fun testIntegersLess() -> Bool {
            return 3 <= 5
        }
 
-       fun testIntegerAndBool(): Bool {
+       fun testIntegerAndBool() -> Bool {
            return 5 <= true
        }
 
-       fun testBoolAndInteger(): Bool {
+       fun testBoolAndInteger() -> Bool {
            return true <= 5
        }
 
-       fun testTrueAndTrue(): Bool {
+       fun testTrueAndTrue() -> Bool {
            return true <= true
        }
 
-       fun testTrueAndFalse(): Bool {
+       fun testTrueAndFalse() -> Bool {
            return true <= false
        }
 
-       fun testFalseAndTrue(): Bool {
+       fun testFalseAndTrue() -> Bool {
            return false <= true
        }
 
-       fun testFalseAndFalse(): Bool {
+       fun testFalseAndFalse() -> Bool {
            return false <= false
        }
 	`)
@@ -1092,40 +1093,40 @@ func TestInterpretLessEqualOperator(t *testing.T) {
 func TestInterpretGreaterOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testIntegersGreater(): Bool {
+	program, errors := parser.Parse(`
+       fun testIntegersGreater() -> Bool {
            return 5 > 3
        }
 
-       fun testIntegersEqual(): Bool {
+       fun testIntegersEqual() -> Bool {
            return 3 > 3
        }
 
-       fun testIntegersLess(): Bool {
+       fun testIntegersLess() -> Bool {
            return 3 > 5
        }
 
-       fun testIntegerAndBool(): Bool {
+       fun testIntegerAndBool() -> Bool {
            return 5 > true
        }
 
-       fun testBoolAndInteger(): Bool {
+       fun testBoolAndInteger() -> Bool {
            return true > 5
        }
 
-       fun testTrueAndTrue(): Bool {
+       fun testTrueAndTrue() -> Bool {
            return true > true
        }
 
-       fun testTrueAndFalse(): Bool {
+       fun testTrueAndFalse() -> Bool {
            return true > false
        }
 
-       fun testFalseAndTrue(): Bool {
+       fun testFalseAndTrue() -> Bool {
            return false > true
        }
 
-       fun testFalseAndFalse(): Bool {
+       fun testFalseAndFalse() -> Bool {
            return false > false
        }
 	`)
@@ -1167,40 +1168,40 @@ func TestInterpretGreaterOperator(t *testing.T) {
 func TestInterpretGreaterEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testIntegersGreater(): Bool {
+	program, errors := parser.Parse(`
+       fun testIntegersGreater() -> Bool {
            return 5 >= 3
        }
 
-       fun testIntegersEqual(): Bool {
+       fun testIntegersEqual() -> Bool {
            return 3 >= 3
        }
 
-       fun testIntegersLess(): Bool {
+       fun testIntegersLess() -> Bool {
            return 3 >= 5
        }
 
-       fun testIntegerAndBool(): Bool {
+       fun testIntegerAndBool() -> Bool {
            return 5 >= true
        }
 
-       fun testBoolAndInteger(): Bool {
+       fun testBoolAndInteger() -> Bool {
            return true >= 5
        }
 
-       fun testTrueAndTrue(): Bool {
+       fun testTrueAndTrue() -> Bool {
            return true >= true
        }
 
-       fun testTrueAndFalse(): Bool {
+       fun testTrueAndFalse() -> Bool {
            return true >= false
        }
 
-       fun testFalseAndTrue(): Bool {
+       fun testFalseAndTrue() -> Bool {
            return false >= true
        }
 
-       fun testFalseAndFalse(): Bool {
+       fun testFalseAndFalse() -> Bool {
            return false >= false
        }
 	`)
@@ -1242,32 +1243,32 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
 func TestInterpretOrOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testTrueTrue(): Bool {
+	program, errors := parser.Parse(`
+       fun testTrueTrue() -> Bool {
            return true || true
        }
 
-       fun testTrueFalse(): Bool {
+       fun testTrueFalse() -> Bool {
            return true || false
        }
 
-       fun testFalseTrue(): Bool {
+       fun testFalseTrue() -> Bool {
            return false || true
        }
 
-       fun testFalseFalse(): Bool {
+       fun testFalseFalse() -> Bool {
            return false || false
        }
 
-       fun testBoolAndInteger(): Bool {
+       fun testBoolAndInteger() -> Bool {
            return false || 2
        }
 
-       fun testIntegerAndBool(): Bool {
+       fun testIntegerAndBool() -> Bool {
            return 2 || false
        }
 
-       fun testIntegers(): Bool {
+       fun testIntegers() -> Bool {
            return 2 || 3
        }
 	`)
@@ -1303,32 +1304,32 @@ func TestInterpretOrOperator(t *testing.T) {
 func TestInterpretAndOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testTrueTrue(): Bool {
+	program, errors := parser.Parse(`
+       fun testTrueTrue() -> Bool {
            return true && true
        }
 
-       fun testTrueFalse(): Bool {
+       fun testTrueFalse() -> Bool {
            return true && false
        }
 
-       fun testFalseTrue(): Bool {
+       fun testFalseTrue() -> Bool {
            return false && true
        }
 
-       fun testFalseFalse(): Bool {
+       fun testFalseFalse() -> Bool {
            return false && false
        }
 
-       fun testBoolAndInteger(): Bool {
+       fun testBoolAndInteger() -> Bool {
            return false && 2
        }
 
-       fun testIntegerAndBool(): Bool {
+       fun testIntegerAndBool() -> Bool {
            return 2 && false
        }
 
-       fun testIntegers(): Bool {
+       fun testIntegers() -> Bool {
            return 2 && 3
        }
 	`)
@@ -1364,8 +1365,8 @@ func TestInterpretAndOperator(t *testing.T) {
 func TestInterpretIfStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testTrue(): Int64 {
+	program, errors := parser.Parse(`
+       fun testTrue() -> Int64 {
            if true {
                return 2
            } else {
@@ -1374,7 +1375,7 @@ func TestInterpretIfStatement(t *testing.T) {
            return 4
        }
 
-       fun testFalse(): Int64 {
+       fun testFalse() -> Int64 {
            if false {
                return 2
            } else {
@@ -1383,14 +1384,14 @@ func TestInterpretIfStatement(t *testing.T) {
            return 4
        }
 
-       fun testNoElse(): Int64 {
+       fun testNoElse() -> Int64 {
            if true {
                return 2
            }
            return 3
        }
 
-       fun testElseIf(): Int64 {
+       fun testElseIf() -> Int64 {
            if false {
                return 2
            } else if true {
@@ -1415,8 +1416,8 @@ func TestInterpretIfStatement(t *testing.T) {
 func TestInterpretWhileStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun test(): Int64 {
+	program, errors := parser.Parse(`
+       fun test() -> Int64 {
            var x = 0
            while x < 5 {
                x = x + 2
@@ -1438,8 +1439,8 @@ func TestInterpretWhileStatement(t *testing.T) {
 func TestInterpretWhileStatementWithReturn(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun test(): Int64 {
+	program, errors := parser.Parse(`
+       fun test() -> Int64 {
            var x = 0
            while x < 10 {
                x = x + 2
@@ -1464,14 +1465,14 @@ func TestInterpretWhileStatementWithReturn(t *testing.T) {
 func TestInterpretExpressionStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        var x = 0
 
        fun incX() {
            x = x + 2
        }
 
-       fun test(): Int64 {
+       fun test() -> Int64 {
            incX()
            return x
        }
@@ -1491,12 +1492,12 @@ func TestInterpretExpressionStatement(t *testing.T) {
 func TestInterpretConditionalOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun testTrue(): Int64 {
+	program, errors := parser.Parse(`
+       fun testTrue() -> Int64 {
            return true ? 2 : 3
        }
 
-       fun testFalse(): Int64 {
+       fun testFalse() -> Int64 {
 			return false ? 2 : 3
        }
 	`)
@@ -1514,7 +1515,7 @@ func TestInterpretConditionalOperator(t *testing.T) {
 func TestInterpretInvalidAssignmentToParameter(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun test(x: Int8) {
             x = 2
        }
@@ -1533,7 +1534,7 @@ func TestInterpretInvalidAssignmentToParameter(t *testing.T) {
 func TestInterpretFunctionBindingInFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
        fun foo() {
            return foo
        }
@@ -1556,8 +1557,8 @@ func TestInterpretRecursion(t *testing.T) {
 
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
-       fun fib(n: Int): Int {
+	program, errors := parser.Parse(`
+       fun fib(n: Int) -> Int {
            if n < 2 {
               return n
            }
@@ -1578,7 +1579,7 @@ func TestInterpretRecursion(t *testing.T) {
 func TestInterpretUnaryIntegerNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
       const x = -2
       const y = -(-2)
 	`)
@@ -1596,7 +1597,7 @@ func TestInterpretUnaryIntegerNegation(t *testing.T) {
 func TestInterpretUnaryBooleanNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
       const a = !true
       const b = !(!true)
       const c = !false
@@ -1618,7 +1619,7 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
       const a = !1
 	`)
 
@@ -1632,7 +1633,7 @@ func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
 func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
       const a = -true
 	`)
 
@@ -1646,7 +1647,7 @@ func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := Parse(`
+	program, errors := parser.Parse(`
       const a = test(1, 2)
 	`)
 

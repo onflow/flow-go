@@ -1,6 +1,6 @@
-// Code generated from Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
+// Code generated from execution/strictus/parser/Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
 
-package strictus // Strictus
+package parser // Strictus
 import "github.com/antlr/antlr4/runtime/Go/antlr"
 
 // BaseStrictusListener is a complete listener for a parse tree produced by StrictusParser.
@@ -50,11 +50,11 @@ func (s *BaseStrictusListener) EnterParameter(ctx *ParameterContext) {}
 // ExitParameter is called when production parameter is exited.
 func (s *BaseStrictusListener) ExitParameter(ctx *ParameterContext) {}
 
-// EnterTypeName is called when production typeName is entered.
-func (s *BaseStrictusListener) EnterTypeName(ctx *TypeNameContext) {}
+// EnterFullType is called when production fullType is entered.
+func (s *BaseStrictusListener) EnterFullType(ctx *FullTypeContext) {}
 
-// ExitTypeName is called when production typeName is exited.
-func (s *BaseStrictusListener) ExitTypeName(ctx *TypeNameContext) {}
+// ExitFullType is called when production fullType is exited.
+func (s *BaseStrictusListener) ExitFullType(ctx *FullTypeContext) {}
 
 // EnterTypeDimension is called when production typeDimension is entered.
 func (s *BaseStrictusListener) EnterTypeDimension(ctx *TypeDimensionContext) {}
@@ -68,11 +68,23 @@ func (s *BaseStrictusListener) EnterBaseType(ctx *BaseTypeContext) {}
 // ExitBaseType is called when production baseType is exited.
 func (s *BaseStrictusListener) ExitBaseType(ctx *BaseTypeContext) {}
 
+// EnterFunctionType is called when production functionType is entered.
+func (s *BaseStrictusListener) EnterFunctionType(ctx *FunctionTypeContext) {}
+
+// ExitFunctionType is called when production functionType is exited.
+func (s *BaseStrictusListener) ExitFunctionType(ctx *FunctionTypeContext) {}
+
 // EnterBlock is called when production block is entered.
 func (s *BaseStrictusListener) EnterBlock(ctx *BlockContext) {}
 
 // ExitBlock is called when production block is exited.
 func (s *BaseStrictusListener) ExitBlock(ctx *BlockContext) {}
+
+// EnterStatements is called when production statements is entered.
+func (s *BaseStrictusListener) EnterStatements(ctx *StatementsContext) {}
+
+// ExitStatements is called when production statements is exited.
+func (s *BaseStrictusListener) ExitStatements(ctx *StatementsContext) {}
 
 // EnterStatement is called when production statement is entered.
 func (s *BaseStrictusListener) EnterStatement(ctx *StatementContext) {}
@@ -289,6 +301,12 @@ func (s *BaseStrictusListener) EnterHexadecimalLiteral(ctx *HexadecimalLiteralCo
 
 // ExitHexadecimalLiteral is called when production HexadecimalLiteral is exited.
 func (s *BaseStrictusListener) ExitHexadecimalLiteral(ctx *HexadecimalLiteralContext) {}
+
+// EnterInvalidNumberLiteral is called when production InvalidNumberLiteral is entered.
+func (s *BaseStrictusListener) EnterInvalidNumberLiteral(ctx *InvalidNumberLiteralContext) {}
+
+// ExitInvalidNumberLiteral is called when production InvalidNumberLiteral is exited.
+func (s *BaseStrictusListener) ExitInvalidNumberLiteral(ctx *InvalidNumberLiteralContext) {}
 
 // EnterArrayLiteral is called when production arrayLiteral is entered.
 func (s *BaseStrictusListener) EnterArrayLiteral(ctx *ArrayLiteralContext) {}
