@@ -9,6 +9,6 @@ At the block formation phase, a block proposer may include one or more "Block Se
 A valid "Block Seal" does not guarantee it can be included in any block. For inclusion, a valid "Block Seal" must also be chainable with respect the chain's state.
 
 A chainable "Block Seal" is defined by the following requirements in respect to its "Execution Receipt":
-  - It's "Previous Execution Receipt" matches the latest sealed block's "Execution Receipt".
+  - Its "Previous Execution Receipt" matches the latest sealed block's "Execution Receipt".
   - It's block's "Previous Block Hash" matches the latest sealed block's "Block Hash".
   - It's "Start state" matches the latest sealed block's "End state".
