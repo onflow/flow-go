@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"github.com/golang/protobuf/ptypes"
+
 	bambooProto "github.com/dapperlabs/bamboo-node/grpc/shared"
 	"github.com/dapperlabs/bamboo-node/internal/types"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
@@ -71,19 +73,99 @@ func (t *types.SignedCollectionHash) ToMessage() *bambooProto.SignedCollectionHa
 }
 
 func (m *bambooProto.Block) FromMessage() *types.Block {
-	return &types.Block{}
+	ts, _ := ptypes.Timestamp(m.GetTimestamp())
+
+	collectionHashes := make([]types.SignedCollectionHash, 0)
+	for _, hash := range m.GetSignedCollectionHashes() {
+		collectionHashes = append(collectionHashes, *hash.FromMessage())
+	}
+
+	blockSeals := make([]types.BlockSeal, 0)
+	for _, seal := range m.GetBlockSeals() {
+		blockSeals = append(blockSeals, *seal.FromMessage())
+	}
+
+	sigs := make([]crypto.Signature, 0)
+	for _, sig := range m.GetSignatures() {
+		sigs = append(sigs, crypto.BytesToSig(sig))
+	}
+
+	return &types.Block{
+		ChainID:                m.GetChainID(),
+		Height:                 m.GetHeight(),
+		PreviousBlockHash:      crypto.BytesToHash(m.GetPreviousBlockHash()),
+		Timestamp:              ts,
+		SignedCollectionHashes: collectionHashes,
+		BlockSeals:             blockSeals,
+		Signatures:             sigs,
+	}
 }
 
 func (t *types.Block) ToMessage() *bambooProto.Block {
-	return &bambooProto.Block{}
+	ts, _ := ptypes.TimestampProto(t.Timestamp)
+
+	collectionHashes := make([]*bambooProto.SignedCollectionHash, 0)
+	for _, hash := range t.SignedCollectionHashes {
+		collectionHashes = append(collectionHashes, hash.ToMessage())
+	}
+
+	blockSeals := make([]*bambooProto.BlockSeal, 0)
+	for _, seal := range t.BlockSeals {
+		blockSeals = append(blockSeals, seal.ToMessage())
+	}
+
+	sigs := make([][]byte, 0)
+	for _, sig := range t.Signatures {
+		sigs = append(sigs, sig.Bytes())
+	}
+
+	return &bambooProto.Block{
+		ChainID:                t.ChainID,
+		Height:                 t.Height,
+		PreviousBlockHash:      t.PreviousBlockHash.Bytes(),
+		Timestamp:              ts,
+		SignedCollectionHashes: collectionHashes,
+		BlockSeals:             blockSeals,
+		Signatures:             sigs,
+	}
 }
 
 func (m *bambooProto.BlockSeal) FromMessage() *types.BlockSeal {
-	return &types.BlockSeal{}
+	erSigs := make([]crypto.Signature, 0)
+	for _, sig := range m.GetExecutionReceiptSignatures() {
+		erSigs = append(erSigs, crypto.BytesToSig(sig))
+	}
+
+	raSigs := make([]crypto.Signature, 0)
+	for _, sig := range m.GetResultApprovalSignatures() {
+		sigs = append(sigs, crypto.BytesToSig(sig))
+	}
+
+	return &types.BlockSeal{
+		BlockHash:                  crypto.BytesToHash(m.GetBlockHash()),
+		ExecutionReceiptHash:       crypto.BytesToHash(m.GetExecutionReceiptHash()),
+		ExecutionReceiptSignatures: erSigs,
+		ResultApprovalSignatures:   raSigs,
+	}
 }
 
 func (t *types.BlockSeal) ToMessage() *bambooProto.BlockSeal {
-	return &bambooProto.BlockSeal{}
+	erSigs := make([][]byte, 0)
+	for _, sig := range t.ExecutionReceiptSignatures {
+		erSigs = append(erSigs, sig.Bytes())
+	}
+
+	raSigs := make([][]byte, 0)
+	for _, sig := range t.ResultApprovalSignatures {
+		sigs = append(sigs, sig.Bytes())
+	}
+
+	return &bambooProto.BlockSeal{
+		BlockHash:                  crypto.BlockHash.Bytes(),
+		ExecutionReceiptHash:       crypto.ExecutionReceiptHash.Bytes(),
+		ExecutionReceiptSignatures: erSigs,
+		ResultApprovalSignatures:   raSigs,
+	}
 }
 
 func (m *bambooProto.Transaction) FromMessage() *types.Transaction {
