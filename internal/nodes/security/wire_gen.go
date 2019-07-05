@@ -6,18 +6,20 @@
 package security
 
 import (
+	"github.com/dapperlabs/bamboo-node/internal/nodes/ping"
 	"github.com/dapperlabs/bamboo-node/internal/nodes/security/config"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/security/controllers"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/security/data"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/consensus"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/seal"
 )
 
 // Injectors from wire.go:
 
 func InitializeServer() (*Server, error) {
 	configConfig := config.New()
-	dal := data.New(configConfig)
-	controller := controllers.NewController(dal)
-	server, err := NewServer(dal, configConfig, controller)
+	controller := ping.NewController()
+	consensusController := consensus.NewController()
+	sealController := seal.NewController()
+	server, err := NewServer(configConfig, controller, consensusController, sealController)
 	if err != nil {
 		return nil, err
 	}

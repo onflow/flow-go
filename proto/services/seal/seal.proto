@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package bamboo.services.seal;
+
+option go_package = "seal";
+
+import "shared/messages.proto";
+import "google/protobuf/empty.proto";
+
+
+service SealService {
+  rpc SubmitResultApproval(SubmitResultApprovalRequest) returns (google.protobuf.Empty);
+}
+
+
+message SubmitResultApprovalRequest {
+  bamboo.shared.ResultApproval resultApproval = 1;
+}

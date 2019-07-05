@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package bamboo.services.verify;
+
+option go_package = "verify";
+
+import "shared/messages.proto";
+import "google/protobuf/empty.proto";
+
+
+service VerifyService {
+  rpc SubmitExecutionReceipt(SubmitExecutionReceiptRequest) returns (google.protobuf.Empty);
+}
+
+
+message SubmitExecutionReceiptRequest {
+  bamboo.shared.ExecutionReceipt executionReceipt = 1;
+}

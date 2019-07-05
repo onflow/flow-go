@@ -7,17 +7,17 @@ package execute
 
 import (
 	"github.com/dapperlabs/bamboo-node/internal/nodes/execute/config"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/execute/controllers"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/execute/data"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/ping"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/execute"
 )
 
 // Injectors from wire.go:
 
 func InitializeServer() (*Server, error) {
 	configConfig := config.New()
-	dal := data.New(configConfig)
-	controller := controllers.NewController(dal)
-	server, err := NewServer(dal, configConfig, controller)
+	controller := ping.NewController()
+	executeController := execute.NewController()
+	server, err := NewServer(configConfig, controller, executeController)
 	if err != nil {
 		return nil, err
 	}

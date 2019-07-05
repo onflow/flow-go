@@ -7,10 +7,14 @@ import (
 
 	"google.golang.org/grpc"
 
-	bambooProto "github.com/dapperlabs/bamboo-node/grpc/internals"
+	consensusSvc "github.com/dapperlabs/bamboo-node/grpc/services/consensus"
+	pingSvc "github.com/dapperlabs/bamboo-node/grpc/services/ping"
+	sealSvc "github.com/dapperlabs/bamboo-node/grpc/services/seal"
+
+	"github.com/dapperlabs/bamboo-node/internal/nodes/ping"
 	"github.com/dapperlabs/bamboo-node/internal/nodes/security/config"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/security/controllers"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/security/data"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/consensus"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/seal"
 )
 
 // Server ..
@@ -21,18 +25,16 @@ type Server struct {
 
 // NewServer ..
 func NewServer(
-	dal *data.DAL,
 	conf *config.Config,
-	ctrl *controllers.Controller,
+	pingCtrl *ping.Controller,
+	consensusCtrl *consensus.Controller,
+	sealCtrl *seal.Controller,
 ) (*Server, error) {
-
-	err := dal.MigrateUp()
-	if err != nil {
-		return nil, err
-	}
-
 	gsrv := grpc.NewServer()
-	bambooProto.RegisterSecurityNodeServer(gsrv, ctrl)
+
+	pingSvc.RegisterPingServiceServer(gsrv, pingCtrl)
+	consensusSvc.RegisterConsensusServiceServer(gsrv, consensusCtrl)
+	sealSvc.RegisterSealServiceServer(gsrv, sealCtrl)
 
 	return &Server{
 		gsrv: gsrv,
@@ -42,7 +44,7 @@ func NewServer(
 
 // Start starts the server
 func (s *Server) Start() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", s.conf.AppPort))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.conf.Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

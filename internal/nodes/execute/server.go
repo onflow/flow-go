@@ -7,10 +7,11 @@ import (
 
 	"google.golang.org/grpc"
 
-	bambooProto "github.com/dapperlabs/bamboo-node/grpc/internals"
+	executeSvc "github.com/dapperlabs/bamboo-node/grpc/services/execute"
+	pingSvc "github.com/dapperlabs/bamboo-node/grpc/services/ping"
 	"github.com/dapperlabs/bamboo-node/internal/nodes/execute/config"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/execute/controllers"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/execute/data"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/ping"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/execute"
 )
 
 // Server ..
@@ -21,18 +22,14 @@ type Server struct {
 
 // NewServer ..
 func NewServer(
-	dal *data.DAL,
 	conf *config.Config,
-	ctrl *controllers.Controller,
+	pingCtrl *ping.Controller,
+	executeCtrl *execute.Controller,
 ) (*Server, error) {
-
-	err := dal.MigrateUp()
-	if err != nil {
-		return nil, err
-	}
-
 	gsrv := grpc.NewServer()
-	bambooProto.RegisterExecuteNodeServer(gsrv, ctrl)
+
+	pingSvc.RegisterPingServiceServer(gsrv, pingCtrl)
+	executeSvc.RegisterExecuteServiceServer(gsrv, executeCtrl)
 
 	return &Server{
 		gsrv: gsrv,
@@ -42,7 +39,7 @@ func NewServer(
 
 // Start starts the server
 func (s *Server) Start() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", s.conf.AppPort))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.conf.Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

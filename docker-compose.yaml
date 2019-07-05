@@ -19,8 +19,7 @@ services:
       - "3001:3001"
     restart: on-failure:5
     environment:
-      - APP_ENV=LOCAL
-      - PORT=3001
+      - BAM_PORT=3001
       - POSTGRES_GCP_CONNECTION_NAME=foo
       - POSTGRES_ADDR=execute_db:5432
       - POSTGRES_DATABASE=postgres
@@ -46,8 +45,7 @@ services:
       - "3002:3002"
     restart: on-failure:5
     environment:
-      - APP_ENV=LOCAL
-      - PORT=3002
+      - BAM_PORT=3002
       - POSTGRES_GCP_CONNECTION_NAME=foo
       - POSTGRES_ADDR=security_db:5432
       - POSTGRES_DATABASE=postgres
@@ -73,8 +71,7 @@ services:
       - "3003:3003"
     restart: on-failure:5
     environment:
-      - APP_ENV=LOCAL
-      - PORT=3003
+      - BAM_PORT=3003
       - POSTGRES_GCP_CONNECTION_NAME=foo
       - POSTGRES_ADDR=access_db:5432
       - POSTGRES_DATABASE=postgres
@@ -102,7 +99,9 @@ services:
       - POSTGRES_PASSWORD=foo
 
   test:
-    build: ./integration-tests
+    build:
+      context: .
+      dockerfile: integration-tests/Dockerfile
     depends_on:
       - execute
       - security
