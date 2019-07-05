@@ -6,8 +6,8 @@ option go_package = "access";
 
 import "google/protobuf/timestamp.proto";
 
-// BambooAccessAPI is the user-facing API provided by Bamboo access nodes.
-service BambooAccessAPI {
+// ObservactionService is the user-facing API provided by access nodes.
+service ObservationService {
   // SendTransaction submits a transaction to the network.
   rpc SendTransaction(SendTransactionRequest) returns (SendTransactionResponse);
   // GetBlockByHash gets a block by hash.

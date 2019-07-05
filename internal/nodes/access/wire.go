@@ -7,8 +7,8 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/internal/nodes/access/config"
 	"github.com/dapperlabs/bamboo-node/internal/nodes/ping"
-	"github.com/dapperlabs/bamboo-node/internal/protocol/access"
 	"github.com/dapperlabs/bamboo-node/internal/protocol/collect"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/observation"
 	"github.com/dapperlabs/bamboo-node/internal/protocol/verify"
 )
 
@@ -18,7 +18,7 @@ func InitializeServer() (*Server, error) {
 		NewServer,
 		config.New,
 		ping.NewController,
-		access.NewController,
+		observation.NewController,
 		collect.NewController,
 		verify.NewController,
 	)
