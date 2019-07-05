@@ -7,9 +7,9 @@ import (
 
 	"google.golang.org/grpc"
 
+	consensusSvc "github.com/dapperlabs/bamboo-node/grpc/services/consensus"
 	pingSvc "github.com/dapperlabs/bamboo-node/grpc/services/ping"
 	sealSvc "github.com/dapperlabs/bamboo-node/grpc/services/seal"
-	consensusSvc "github.com/dapperlabs/bamboo-node/grpc/services/security"
 
 	"github.com/dapperlabs/bamboo-node/internal/nodes/ping"
 	"github.com/dapperlabs/bamboo-node/internal/nodes/security/config"
@@ -33,7 +33,7 @@ func NewServer(
 	gsrv := grpc.NewServer()
 
 	pingSvc.RegisterPingServiceServer(gsrv, pingCtrl)
-	consensusSvc.RegisterSecurityServiceServer(gsrv, consensusCtrl)
+	consensusSvc.RegisterConsensusServiceServer(gsrv, consensusCtrl)
 	sealSvc.RegisterSealServiceServer(gsrv, sealCtrl)
 
 	return &Server{

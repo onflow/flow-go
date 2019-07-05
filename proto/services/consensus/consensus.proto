@@ -1,14 +1,14 @@
 syntax = "proto3";
 
-package bamboo.services.security;
+package bamboo.services.consensus;
 
-option go_package = "security";
+option go_package = "consensus";
 
 import "shared/messages.proto";
 import "google/protobuf/empty.proto";
 
 
-service SecurityService {
+service ConsensusService {
   // Receive a signed collection from an access node.
   rpc SubmitCollection (SubmitCollectionRequest) returns (google.protobuf.Empty);
 

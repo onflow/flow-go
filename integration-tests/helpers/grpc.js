@@ -4,7 +4,7 @@ const protoLoader = require('@grpc/proto-loader');
 
 const PING_PROTO_PATH = 'services/ping/ping.proto';
 const COLLECT_PROTO_PATH = 'services/collect/collect.proto';
-const CONSENSUS_PROTO_PATH = 'services/security/security.proto';
+const CONSENSUS_PROTO_PATH = 'services/consensus/consensus.proto';
 const EXECUTE_PROTO_PATH = 'services/execute/execute.proto';
 const VERIFY_PROTO_PATH = 'services/verify/verify.proto';
 const SEAL_PROTO_PATH = 'services/seal/seal.proto';
@@ -36,7 +36,7 @@ function createNewCollectStub(address) {
 }
 
 function createNewConsensusStub(address) {
-  const stub = new consensusProtoDescriptor.bamboo.services.security.SecurityService(address, grpc.credentials.createInsecure());
+  const stub = new consensusProtoDescriptor.bamboo.services.consensus.ConsensusService(address, grpc.credentials.createInsecure());
   return promisifyStub(stub);
 }
 
