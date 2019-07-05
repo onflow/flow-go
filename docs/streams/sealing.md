@@ -1,6 +1,6 @@
 # Sealing
 
-A "Block Seal" is a structure that hold an execution result alongside proofs of verification by nodes who attest to the correctness of the result. 
+A "Block Seal" is a structure that holds an execution result alongside proofs of verification by nodes who attest to the correctness of the result. 
 
 A valid "Block Seal" is defined to require that it's verification proofs meet a minimum threshold for stake by the nodes they represent.
 
