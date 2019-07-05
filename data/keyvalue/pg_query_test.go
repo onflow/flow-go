@@ -6,7 +6,7 @@ import (
 
 func TestGet(t *testing.T) {
 	table := "tableA"
-	key := "key"
+	key := "keyA"
 
 	q := pgSQLQuery{}
 	q.Get(table, key)
@@ -15,6 +15,20 @@ func TestGet(t *testing.T) {
 
 	expectString(query, "SELECT value FROM ?0 WHERE key=?1 ; ", t)
 	expectStrings(params, []string{table, key}, t)
+}
+
+func TestSet(t *testing.T) {
+	table := "tableA"
+	key := "keyA"
+	value := "valueA"
+
+	q := pgSQLQuery{}
+	q.Set(table, key, value)
+	q.MustBuild()
+	query, params := q.debug()
+
+	expectString(query, "INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?3 ; ", t)
+	expectStrings(params, []string{table, key, value, value}, t)
 }
 
 func checkError(err error, t *testing.T) {
