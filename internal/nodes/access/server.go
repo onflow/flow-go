@@ -8,13 +8,13 @@ import (
 	"google.golang.org/grpc"
 
 	collectSvc "github.com/dapperlabs/bamboo-node/grpc/services/collect"
-	observationSvc "github.com/dapperlabs/bamboo-node/grpc/services/observation"
+	observeSvc "github.com/dapperlabs/bamboo-node/grpc/services/observe"
 	pingSvc "github.com/dapperlabs/bamboo-node/grpc/services/ping"
 	verifySvc "github.com/dapperlabs/bamboo-node/grpc/services/verify"
 	"github.com/dapperlabs/bamboo-node/internal/nodes/access/config"
 	"github.com/dapperlabs/bamboo-node/internal/nodes/ping"
 	"github.com/dapperlabs/bamboo-node/internal/protocol/collect"
-	"github.com/dapperlabs/bamboo-node/internal/protocol/observation"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/observe"
 	"github.com/dapperlabs/bamboo-node/internal/protocol/verify"
 )
 
@@ -28,14 +28,14 @@ type Server struct {
 func NewServer(
 	conf *config.Config,
 	pingCtrl *ping.Controller,
-	observationCtrl *observation.Controller,
+	observeCtrl *observe.Controller,
 	collectCtrl *collect.Controller,
 	verifyCtrl *verify.Controller,
 ) (*Server, error) {
 	gsrv := grpc.NewServer()
 
 	pingSvc.RegisterPingServiceServer(gsrv, pingCtrl)
-	observationSvc.RegisterObservationServiceServer(gsrv, observationCtrl)
+	observeSvc.RegisterObserveServiceServer(gsrv, observeCtrl)
 	collectSvc.RegisterCollectServiceServer(gsrv, collectCtrl)
 	verifySvc.RegisterVerifyServiceServer(gsrv, verifyCtrl)
 

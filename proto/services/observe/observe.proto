@@ -1,13 +1,13 @@
 syntax = "proto3";
 
-package bamboo.services.access;
+package bamboo.services.observe;
 
-option go_package = "access";
+option go_package = "observe";
 
 import "google/protobuf/timestamp.proto";
 
-// ObservactionService is the user-facing API provided by access nodes.
-service ObservationService {
+// ObserveService is the user-facing API provided by access nodes.
+service ObserveService {
   // SendTransaction submits a transaction to the network.
   rpc SendTransaction(SendTransactionRequest) returns (SendTransactionResponse);
   // GetBlockByHash gets a block by hash.

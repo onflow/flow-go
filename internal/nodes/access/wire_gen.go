@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/internal/nodes/access/config"
 	"github.com/dapperlabs/bamboo-node/internal/nodes/ping"
 	"github.com/dapperlabs/bamboo-node/internal/protocol/collect"
-	"github.com/dapperlabs/bamboo-node/internal/protocol/observation"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/observe"
 	"github.com/dapperlabs/bamboo-node/internal/protocol/verify"
 )
 
@@ -18,10 +18,10 @@ import (
 func InitializeServer() (*Server, error) {
 	configConfig := config.New()
 	controller := ping.NewController()
-	observationController := observation.NewController()
+	observeController := observe.NewController()
 	collectController := collect.NewController()
 	verifyController := verify.NewController()
-	server, err := NewServer(configConfig, controller, observationController, collectController, verifyController)
+	server, err := NewServer(configConfig, controller, observeController, collectController, verifyController)
 	if err != nil {
 		return nil, err
 	}
