@@ -10,7 +10,9 @@ import (
 	sealSvc "github.com/dapperlabs/bamboo-node/grpc/services/seal"
 )
 
-type Controller struct{}
+type Controller struct {
+	dal *DAL
+}
 
 func NewController() *Controller {
 	return &Controller{}

@@ -9,7 +9,9 @@ import (
 	observeSvc "github.com/dapperlabs/bamboo-node/grpc/services/observe"
 )
 
-type Controller struct{}
+type Controller struct {
+	dal *DAL
+}
 
 func NewController() *Controller {
 	return &Controller{}

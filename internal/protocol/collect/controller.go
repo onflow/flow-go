@@ -9,7 +9,9 @@ import (
 	collectSvc "github.com/dapperlabs/bamboo-node/grpc/services/collect"
 )
 
-type Controller struct{}
+type Controller struct {
+	dal *DAL
+}
 
 func NewController() *Controller {
 	return &Controller{}

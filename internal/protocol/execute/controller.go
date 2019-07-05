@@ -10,7 +10,9 @@ import (
 	executeSvc "github.com/dapperlabs/bamboo-node/grpc/services/execute"
 )
 
-type Controller struct{}
+type Controller struct {
+	dal *DAL
+}
 
 func NewController() *Controller {
 	return &Controller{}
