@@ -7,17 +7,21 @@ package access
 
 import (
 	"github.com/dapperlabs/bamboo-node/internal/nodes/access/config"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/access/controllers"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/access/data"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/ping"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/access"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/collect"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/verify"
 )
 
 // Injectors from wire.go:
 
 func InitializeServer() (*Server, error) {
 	configConfig := config.New()
-	dal := data.New(configConfig)
-	controller := controllers.NewController(dal)
-	server, err := NewServer(dal, configConfig, controller)
+	controller := ping.NewController()
+	accessController := access.NewController()
+	collectController := collect.NewController()
+	verifyController := verify.NewController()
+	server, err := NewServer(configConfig, controller, accessController, collectController, verifyController)
 	if err != nil {
 		return nil, err
 	}

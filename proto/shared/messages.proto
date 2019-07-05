@@ -2,7 +2,9 @@ syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
 
-package bamboo.proto;
+package bamboo.shared;
+
+option go_package = "shared";
 
 message SignedCollectionHash {
   bytes collectionHash = 1;
@@ -138,170 +140,6 @@ message InvalidExecutionReceiptChallenge {
   bytes signature = 5;
 }
 
-message PingRequest {  
-}
-
-message PingResponse {
-  bytes address = 1;
-}
-
-message UserTransactionRequest {
-  SignedTransaction transaction = 1;
-}
-
-message UserTransactionResponse {
-  SignedTransaction transaction = 1;
-  bytes ownerAddress = 2;
-  uint64 cluster = 3;
-}
-
-message ClusterTransactionRequest {
-  SignedTransaction transaction = 1;
-}
-
-message ClusterTransactionResponse {
-}
-
-message TransactionRequest {
-  bytes transactionHash = 1;
-}
-
-message TransactionResponse {
-  enum State {
-    OPEN = 0;
-    FINALIZED = 1;
-    GUARANTEED = 2;
-    IN_BLOCK = 3;
-  }
-
-  SignedTransaction transaction = 1;
-  State state = 2;
-}
-
-message CollectionRequest {
-  bytes collectionHash = 1;
-}
-
-message CollectionResponse {
-  enum State {
-    OPEN = 0;
-    FINALIZED = 1;
-    GUARANTEED = 2;
-    IN_BLOCK = 3;
-  }
- 
-  Collection collection = 1;
-  State state = 2;
-}
-
-message TransactionUpdateRequest {
-  SignedTransaction transaction = 1;
-  bytes accessSignature = 2;
-}
-
-message TransactionUpdateResponse {
-  bytes accessSignature = 1;
-}
-
-message CollectionUpdateRequest {
-  Collection collection = 1;
-  bytes accessSignature = 2;
-}
-
-message CollectionUpdateResponse {
-  bytes accessSignature = 1;
-}
-
-message AccessCollectionRequest {
-  Collection collection = 1;
-  repeated bytes accessSignatures = 2;
-}
-
-message AccessCollectionResponse {
-}
-
-message ProposeBlockRequest {
-}
-
-message ProposeBlockResponse {
-}
-
-message ProposeBlockUpdateRequest {
-}
-
-message ProposeBlockUpdateResponse {
-}
-
-message ExecuteBlockRequest {
-  Block block = 1;
-}
-
-message ExecuteBlockResponse {
-}
-
-message NotifyBlockExecutedRequest {
-  Block block = 1;
-}
-
-message NotifyBlockExecutedResponse {
-}
-
-message ProcessExecutionReceiptRequest {
-  ExecutionReceipt executionReceipt = 1;
-}
-
-message ProcessExecutionReceiptResponse {
-}
-
-message ReceiptsByBlockHeightRequest {
-  uint64 blockHeight = 1;
-}
-
-message ReceiptsByBlockHeightResponse {
-  repeated ExecutionReceipt executionReceipts = 1;
-}
-
-message RegistersRequest {
-  repeated bytes ids = 1;
-}
-
-message RegistersResponse {
-  repeated Register registers = 1;
-}
-
-message BalanceRequest {
-  bytes address = 1;
-}
-
-message BalanceResponse {
-  bytes address = 1;
-  bytes balance = 2;
-}
-
-message RegistersAtBlockHeightRequest {
-  repeated bytes ids = 1;
-  uint64 blockHeight = 2;
-}
-
-message GetBlockByHashRequest {
-  bytes blockHash = 1;
-}
-
-message GetBlockByHeightRequest {
-  uint64 blockHeight = 1;
-}
-
-message GetBlockResponse {
-  Block block = 1;
-}
-
-message ProcessResultApprovalRequest {
-  ResultApproval resultApproval = 1;
-}
-
-message ProcessResultApprovalResponse {
-}
-
 message StateTransition {
   bytes previousStateTransitionHash = 1;
   repeated bytes previousCommitApprovalSignatures = 2;
@@ -328,29 +166,4 @@ message StateTransitionVote {
   bytes stateTransitionHash = 1;
   Vote vote = 2;
   uint64 height = 3;
-}
-
-message SignedStateTransitionPrepareVote {
-  StateTransitionVote stateTransitionVote = 1;
-  bytes signature = 2;
-}
-
-message SignedStateTransitionCommitVote {
-  StateTransitionVote stateTransitionVote = 1;
-  bytes signature = 2;
-}
-
-message FinalizedStateTransitionsRequest {
-    repeated uint64 stateTransitionHeights = 1;
-}
-
-message FinalizedStateTransitionsResponse {
-  repeated FinalizedStateTransition finalizedStateTransitions = 1;
-}
-
-message InvalidExecutionReceiptChallengeRequest {
-  InvalidExecutionReceiptChallenge challenge = 1;
-}
-
-message InvalidExecutionReceiptChallengeResponse {
 }

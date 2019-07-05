@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package bamboo.services.ping;
+
+option go_package = "ping";
+
+
+service PingService {
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+message PingRequest {}
+
+message PingResponse {
+  bytes address = 1;
+}

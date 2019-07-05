@@ -13,6 +13,7 @@ require (
 	github.com/go-pg/migrations v6.7.3+incompatible
 	github.com/go-pg/pg v8.0.4+incompatible
 	github.com/golang/protobuf v1.3.1
+	github.com/google/go-cmp v0.3.0 // indirect
 	github.com/google/wire v0.3.0
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/miguelmota/go-ethereum-hdwallet v0.0.0-20190601230056-2da794f11e15
@@ -26,9 +27,10 @@ require (
 	github.com/tyler-smith/go-bip32 v0.0.0-20170922074101-2c9cfd177564
 	github.com/tyler-smith/go-bip39 v1.0.0
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
-	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
+	golang.org/x/net v0.0.0-20190628185345-da137c7871d7
 	golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb // indirect
 	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/tools v0.0.0-20190703212419-2214986f1668 // indirect
 	google.golang.org/grpc v1.21.1
 	mellium.im/sasl v0.2.1 // indirect
 )

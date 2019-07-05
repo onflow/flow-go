@@ -7,10 +7,15 @@ import (
 
 	"google.golang.org/grpc"
 
-	bambooProto "github.com/dapperlabs/bamboo-node/grpc/internals"
+	accessSvc "github.com/dapperlabs/bamboo-node/grpc/services/access"
+	collectSvc "github.com/dapperlabs/bamboo-node/grpc/services/collect"
+	pingSvc "github.com/dapperlabs/bamboo-node/grpc/services/ping"
+	verifySvc "github.com/dapperlabs/bamboo-node/grpc/services/verify"
 	"github.com/dapperlabs/bamboo-node/internal/nodes/access/config"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/access/controllers"
-	"github.com/dapperlabs/bamboo-node/internal/nodes/access/data"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/ping"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/access"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/collect"
+	"github.com/dapperlabs/bamboo-node/internal/protocol/verify"
 )
 
 // Server ..
@@ -21,18 +26,18 @@ type Server struct {
 
 // NewServer ..
 func NewServer(
-	dal *data.DAL,
 	conf *config.Config,
-	ctrl *controllers.Controller,
+	pingCtrl *ping.Controller,
+	accessCtrl *access.Controller,
+	collectCtrl *collect.Controller,
+	verifyCtrl *verify.Controller,
 ) (*Server, error) {
-
-	err := dal.MigrateUp()
-	if err != nil {
-		return nil, err
-	}
-
 	gsrv := grpc.NewServer()
-	bambooProto.RegisterAccessNodeServer(gsrv, ctrl)
+
+	pingSvc.RegisterPingServiceServer(gsrv, pingCtrl)
+	accessSvc.RegisterBambooAccessAPIServer(gsrv, accessCtrl)
+	collectSvc.RegisterCollectServiceServer(gsrv, collectCtrl)
+	verifySvc.RegisterVerifyServiceServer(gsrv, verifyCtrl)
 
 	return &Server{
 		gsrv: gsrv,
@@ -42,7 +47,7 @@ func NewServer(
 
 // Start starts the server
 func (s *Server) Start() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", s.conf.AppPort))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.conf.Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
