@@ -5,7 +5,7 @@ The execution of a block follows after a block is finalised. The security gained
 We construct a verification process to attain security over the execution process. This process is a form of "Independent Verification" (See IEEE Standard 1012). The verification process is also given enforcement power, as we enable it to request an execution node slashing.
 
 "Independent verification" in our context is re-computing the block.
-The block computation is done by a computed-optimised node, furthermore, by the fastest within the set of these nodes. We therefore assume that a block re-computation by any other node, as part of the independent verification process, will always be slower. If not addressed, this bottleneck will hinder the speed gain in the execution step.
+The block computation is done by a compute-optimised node, furthermore, by the fastest within the set of these nodes. We therefore assume that a block re-computation by any other node, as part of the independent verification process, will always be slower. If not addressed, this bottleneck will hinder the speed gain in the execution step.
 To address the bottleneck concern, we take an approach of split parallel verification. We define the "Execution Receipt" to be composed by separate chunks, constructed to be independently verifiable. A verification process is defined to be on a subset of these chunks.
 
 Since we expect to verify multiple identical "Execution Receipt"s by different Execution nodes, we want the implementation to be efficient and reuse previously cached verification results. The following algorithm details this:
