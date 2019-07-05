@@ -57,19 +57,51 @@ func (t *types.TransactionRegister) ToMessage() *bambooProto.TransactionRegister
 }
 
 func (m *bambooProto.Collection) FromMessage() *types.Collection {
-	return &types.Collection{}
+	transactions := make([]types.SignedTransaction, 0)
+	for _, tx := range m.GetTransactions() {
+		transactions = append(transactions, *tx.FromMessage())
+	}
+
+	return &types.Collection{
+		Transactions:        transactions,
+		FoundationBlockHash: crypto.BytesToHash(m.GetFoundationBlockHash()),
+	}
 }
 
 func (t *types.Collection) ToMessage() *bambooProto.Collection {
-	return &bambooProto.Collection{}
+	transactions := make([]*bambooProto.SignedTransaction, 0)
+	for _, tx := range t.Transactions {
+		transactions = append(transactions, tx.ToMessage())
+	}
+
+	return &bambooProto.Collection{
+		Transactions:        transactions,
+		FoundationBlockHash: t.FoundationBlockHash.Bytes(),
+	}
 }
 
 func (m *bambooProto.SignedCollectionHash) FromMessage() *types.SignedCollectionHash {
-	return &types.SignedCollectionHash{}
+	sigs := make([]crypto.Signature, 0)
+	for _, sig := range m.GetSignatures() {
+		sigs = append(sigs, crypto.BytesToSig(sig))
+	}
+
+	return &types.SignedCollectionHash{
+		CollectionHash: crypto.BytesToHash(m.GetCollectionHash()),
+		Signatures:     sigs,
+	}
 }
 
 func (t *types.SignedCollectionHash) ToMessage() *bambooProto.SignedCollectionHash {
-	return &bambooProto.SignedCollectionHash{}
+	sigs := make([][]byte, 0)
+	for _, sig := range t.Signatures {
+		sigs = append(sigs, sig.Bytes())
+	}
+
+	return &bambooProto.SignedCollectionHash{
+		CollectionHash: t.CollectionHash.Bytes(),
+		Signatures:     sigs,
+	}
 }
 
 func (m *bambooProto.Block) FromMessage() *types.Block {
