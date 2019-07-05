@@ -10,5 +10,5 @@ A valid "Block Seal" does not guarantee it can be included in any block. For inc
 
 A chainable "Block Seal" is defined by the following requirements in respect to its "Execution Receipt":
   - Its "Previous Execution Receipt" matches the latest sealed block's "Execution Receipt".
-  - It's block's "Previous Block Hash" matches the latest sealed block's "Block Hash".
+  - Its block's "Previous Block Hash" matches the latest sealed block's "Block Hash".
   - It's "Start state" matches the latest sealed block's "End state".
