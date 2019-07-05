@@ -113,7 +113,7 @@ func (m *bambooProto.ExecutionReceipt) FromMessage() *types.ExecutionReceipt {
 		irList = append(partTransactions, *ir.FromMessage())
 	}
 
-	sigs := make([][]byte, 0)
+	sigs := make([]crypto.Signature, 0)
 	for _, sig := range m.GetSignatures() {
 		sigs = append(sigs, crypto.BytesToSig(sig))
 	}
