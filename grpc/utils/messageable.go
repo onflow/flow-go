@@ -103,17 +103,59 @@ func (t *types.SignedTransaction) ToMessage() *bambooProto.SignedTransaction {
 }
 
 func (m *bambooProto.ExecutionReceipt) FromMessage() *types.ExecutionReceipt {
-	return &types.ExecutionReceipt{}
+	registers := make([]types.Register, 0)
+	for _, r := range m.GetInitialRegisters() {
+		registers = append(registers, *r.FromMessage())
+	}
+	
+	irList := make([]types.IntermediateRegisters, 0)
+	for _, ir := range m.GetIntermediateRegistersList() {
+		irList = append(partTransactions, *ir.FromMessage())
+	}
+
+	sigs := make([][]byte, 0)
+	for _, sig := range m.GetSignatures() {
+		sigs = append(sigs, crypto.BytesToSig(sig))
+	}
+
+	return &types.ExecutionReceipt{
+		PreviousReceiptHash:       crypto.BytesToHash(m.GetPreviousReceiptHash()),
+		BlockHash:                 crypto.BytesToHash(m.GetBlockHash()),
+		InitialRegisters:          registers,
+		IntermediateRegistersList: irList,
+		Signatures:                sigs,
+	}
 }
 
 func (t *types.ExecutionReceipt) ToMessage() *bambooProto.ExecutionReceipt {
-	return &bambooProto.ExecutionReceipt{}
+	registers := make([]*bambooProto.Register, 0)
+	for _, r := range t.InitialRegisters {
+		registers = append(registers, r.ToMessage())
+	}
+	
+	irList := make([]*bambooProto.IntermediateRegisters, 0)
+	for _, ir := range t.IntermediateRegistersList {
+		irList = append(partTransactions, ir.ToMessage())
+	}
+
+	sigs := make([][]byte, 0)
+	for _, sig := range t.Signatures {
+		sigs = append(sigs, sig.Bytes())
+	}
+
+	return &bambooProto.ExecutionReceipt{
+		PreviousReceiptHash:       t.PreviousReceiptHash.Bytes(),
+		BlockHash:                 t.BlockHash.Bytes(),
+		InitialRegisters:          registers,
+		IntermediateRegistersList: irList,
+		Signatures:                sigs,
+	}
 }
 
 func (m *bambooProto.InvalidExecutionReceiptChallenge) FromMessage() *types.InvalidExecutionReceiptChallenge {
 	partTransactions := make([]types.IntermediateRegisters, 0)
-	for _, r := range m.GetPartTransactions() {
-		partTransactions = append(partTransactions, *r.FromMessage())
+	for _, ir := range m.GetPartTransactions() {
+		partTransactions = append(partTransactions, *ir.FromMessage())
 	}
 
 	return &types.InvalidExecutionReceiptChallenge{
@@ -127,8 +169,8 @@ func (m *bambooProto.InvalidExecutionReceiptChallenge) FromMessage() *types.Inva
 
 func (t *types.InvalidExecutionReceiptChallenge) ToMessage() *bambooProto.InvalidExecutionReceiptChallenge {
 	partTransactions := make([]*bambooProto.IntermediateRegisters, 0)
-	for _, r := range t.PartTransactions {
-		partTransactions = append(partTransactions, r.ToMessage())
+	for _, ir := range t.PartTransactions {
+		partTransactions = append(partTransactions, ir.ToMessage())
 	}
 
 	return &bambooProto.InvalidExecutionReceiptChallenge{
