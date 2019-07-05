@@ -1,0 +1,66 @@
+# Default Owners
+* @psiemens @tsmirnov @pazams @turbolent @mrbrianhobo @AlexHentschel @yhassanzadeh @tarakby
+
+# Streams
+
+# Collection Stream
+/internal/protocol/collect @psiemens
+/proto/services/collect @psiemens
+/grpc/services/collect @psiemens
+
+# Consensus Stream
+/internal/protocol/consensus @AlexHentschel
+/proto/services/consensus @AlexHentschel
+/grpc/services/consensus @AlexHentschel
+
+# Execution Stream
+/internal/protocol/execute @turbolent
+/proto/services/execute @turbolent
+/grpc/services/execute @turbolent
+
+# Verification Stream
+/internal/protocol/verify @pazams
+/proto/services/verify @pazams
+/grpc/services/verify @pazams
+
+# Sealing Stream
+/internal/protocol/seal @pazams
+/proto/services/seal @pazams
+/grpc/services/seal @pazams
+
+# Observation Stream
+/internal/protocol/observe @psiemens
+/proto/services/observe @psiemens
+/grpc/services/observe @psiemens
+
+# Networking Stream
+/internal/network @yhassanzadeh
+
+# Cryptography Stream
+/pkg/crypto @tarakby
+
+# Emulator Stream
+/internal/emulator @mrbrianhobo @psiemens
+
+# Client Library Stream
+/client @mrbrianhobo @psiemens
+/internal/cli @mrbrianhobo @psiemens
+/cmd/bamboo @mrbrianhobo @psiemens
+
+# Language Stream
+/language @turbolent
+
+
+# Nodes
+
+# Access Node
+/internal/nodes/access @psiemens @pazams
+/cmd/access @psiemens @pazams
+
+# Security Node
+/internal/nodes/security @AlexHentschel @pazams
+/cmd/security @AlexHentschel @pazams
+
+# Execute Node
+/internal/nodes/execute @turbolent
+/cmd/execute @turbolent
