@@ -1,3 +1,14 @@
 # Sealing
 
-TODO
+A "Block Seal" is a structure that hold an execution result alongside proofs of verification by nodes who attest to the correctness of the result. 
+
+A valid "Block Seal" is defined to require that it's verification proofs meet a minimum threshold for stake by the nodes they represent.
+
+At the block formation phase, a block proposer may include one or more "Block Seal" inside the block. To do so, a security node needs to aggregate "Execution Receipt" messages and matching "Results Approval"s in a "Execution Receipt - Results Approvals" pool (or "ERRA" pool for short).
+
+A valid "Block Seal" does not guarantee it can be included in any block. For inclusion, a valid "Block Seal" must also be chainable with respect the chain's state.
+
+A chainable "Block Seal" is defined with following requirements in respect to it's "Execution Receipt":
+  - It's "Previous Execution Receipt" matches the latest sealed block's "Execution Receipt".
+  - It's block's "Previous Block Hash" matches the latest sealed block's "Block Hash".
+  - It's "Start state" matches the latest sealed block's "End state".
