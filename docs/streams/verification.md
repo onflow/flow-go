@@ -6,7 +6,7 @@ We construct a verification process to attain security over the execution proces
 
 "Independent verification" in our context is re-computing the block.
 The block computation is done by a compute-optimised node, furthermore, by the fastest within the set of these nodes. We therefore assume that a block re-computation by any other node, as part of the independent verification process, will always be slower. If not addressed, this bottleneck will hinder the speed gain in the execution step.
-To address the bottleneck concern, we take an approach of split parallel verification. We define the "Execution Receipt" to be composed by separate chunks, constructed to be independently verifiable. A verification process is defined to be on a subset of these chunks.
+To address the bottleneck concern, we take an approach of split parallel verification. We define the "Execution Receipt" to be composed of separate chunks, constructed to be independently verifiable. A verification process is defined to be on a subset of these chunks.
 
 Since we expect to verify multiple identical "Execution Receipt"s by different Execution nodes, we want the implementation to be efficient and reuse previously cached verification results. The following algorithm details this:
 ![verification-flow](https://github.com/dapperlabs/shoot/blob/master/designs/algorithms/post-computation/receipt-verification.png?raw=true)
