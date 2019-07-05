@@ -17,4 +17,4 @@ Combining independent verification with split parallel verification, results in 
 <TODO: explain Z or link to Z reademe file here >
 
 A successful verification process results in a "Result Approval" message sent from the verifier to the security node.
-We construct the verification process to be self contained. Any "Execution Receipt" can be verified, in isolation, without further knowledge about the chain. While some of the data is only linked to the "Execution Receipt" and needs to be fetched, each fetched piece can be checked to match the expected data via hashing. Therefore, errors found in the verification process can be attributed to the "Execution Receipt" publisher, with a public proof.
+We construct the verification process to be self-contained. Any "Execution Receipt" can be verified, in isolation, without further knowledge about the chain. While some of the data is only linked to the "Execution Receipt" and needs to be fetched, each fetched piece can be checked to match the expected data via hashing. Therefore, errors found in the verification process can be attributed to the "Execution Receipt" publisher, with a public proof.
