@@ -17,10 +17,10 @@ describe('Access node integration tests', function() {
 
   describe('ping', function() {
     it('should be a able to ping access', async function() {
-      const accessStub = grpcHelpers.createNewAccessStub(ACCESS_ADDR) 
+      const accessStub = grpcHelpers.createNewAccessNodeStub(ACCESS_ADDR) 
       const PingRequest = {};
-      const PingResponse = await accessStub("Ping")(PingRequest)
-      assert.deepStrictEqual(PingResponse, {address: Buffer.from('ping pong!')})
+      const PingResponse = await accessStub.ping("Ping")(PingRequest)
+      assert.deepStrictEqual(PingResponse, {address: Buffer.from('pong!')})
     });
   });
 

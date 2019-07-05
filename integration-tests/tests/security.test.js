@@ -17,12 +17,11 @@ describe('Security node integration tests', function() {
 
   describe('ping', function() {
     it('should be a able to ping security', async function() {
-      const securityStub = grpcHelpers.createNewSecurityStub(SECURITY_ADDR) 
+      const securityStub = grpcHelpers.createNewSecurityNodeStub(SECURITY_ADDR) 
       const PingRequest = {};
-      const PingResponse = await securityStub("Ping")(PingRequest)
-      assert.deepStrictEqual(PingResponse, {address: Buffer.from('ping pong!')})
+      const PingResponse = await securityStub.ping("Ping")(PingRequest)
+      assert.deepStrictEqual(PingResponse, {address: Buffer.from('pong!')})
     });
-
   });
 
 
