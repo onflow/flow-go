@@ -2,6 +2,8 @@ package keyvalue
 
 import (
 	"testing"
+
+	"github.com/dapperlabs/bamboo-node/utils/unittest"
 )
 
 func TestGet(t *testing.T) {
@@ -13,8 +15,8 @@ func TestGet(t *testing.T) {
 	q.MustBuild()
 	query, params := q.debug()
 
-	expectString(query, "SELECT value FROM ?0 WHERE key=?1 ; ", t)
-	expectStrings(params, []string{table, key}, t)
+	unittest.ExpectString(query, "SELECT value FROM ?0 WHERE key=?1 ; ", t)
+	unittest.ExpectStrings(params, []string{table, key}, t)
 }
 
 func TestSet(t *testing.T) {
@@ -27,13 +29,13 @@ func TestSet(t *testing.T) {
 	q.MustBuild()
 	query, params := q.debug()
 
-	expectString(query, "INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; ", t)
-	expectStrings(params, []string{table, key, value}, t)
+	unittest.ExpectString(query, "INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; ", t)
+	unittest.ExpectStrings(params, []string{table, key, value}, t)
 }
 
 func TestMultiSetNoTx(t *testing.T) {
 
-	defer expectPanic("Must use a transaction when changing more than one key", t)
+	defer unittest.ExpectPanic("Must use a transaction when changing more than one key", t)
 
 	table1 := "tableA"
 	key1 := "keyA"
@@ -67,50 +69,6 @@ func TestMultiSetWithTx(t *testing.T) {
 	q.MustBuild()
 	query, params := q.debug()
 
-	expectString(query, "BEGIN; INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; INSERT INTO ?3 (key, value) VALUES ('?4', '?5') ON CONFLICT (key) DO UPDATE SET value = ?5 ;  COMMIT;", t)
-	expectStrings(params, []string{table1, key1, value1, table2, key2, value2}, t)
-}
-
-// -----
-// Utils
-// -----
-
-func checkError(err error, t *testing.T) {
-	if err != nil {
-		t.Error(err)
-	}
-}
-
-func expectBool(actual, expected bool, t *testing.T) {
-	if actual != expected {
-		t.Errorf("expected %v to be %v", actual, expected)
-	}
-}
-
-func expectInt(actual, expected int, t *testing.T) {
-	if actual != expected {
-		t.Errorf("expected %v to be %v", actual, expected)
-	}
-}
-
-func expectString(actual, expected string, t *testing.T) {
-	if actual != expected {
-		t.Errorf("expected %v to be %v", actual, expected)
-	}
-}
-
-func expectStrings(actual, expected []string, t *testing.T) {
-	expectInt(len(actual), len(expected), t)
-	for i := range actual {
-		expectString(actual[i], expected[i], t)
-	}
-}
-
-func expectPanic(expectedMsg string, t *testing.T) {
-	if r := recover(); r != nil {
-		err := r.(error)
-		expectString(err.Error(), expectedMsg, t)
-		return
-	}
-	t.Errorf("Expected to panic with `%s`, but did not panic", expectedMsg)
+	unittest.ExpectString(query, "BEGIN; INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; INSERT INTO ?3 (key, value) VALUES ('?4', '?5') ON CONFLICT (key) DO UPDATE SET value = ?5 ;  COMMIT;", t)
+	unittest.ExpectStrings(params, []string{table1, key1, value1, table2, key2, value2}, t)
 }
