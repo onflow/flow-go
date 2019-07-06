@@ -4,9 +4,15 @@ import (
 	"testing"
 )
 
-func CheckError(err error, t *testing.T) {
+func ExpectNoError(err error, t *testing.T) {
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func ExpectError(err error, t *testing.T) {
+	if err == nil {
+		t.Error("Expected error but got err=nil")
 	}
 }
 

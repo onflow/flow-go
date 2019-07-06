@@ -72,3 +72,15 @@ func TestMultiSetWithTx(t *testing.T) {
 	unittest.ExpectString(query, "BEGIN; INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; INSERT INTO ?3 (key, value) VALUES ('?4', '?5') ON CONFLICT (key) DO UPDATE SET value = ?5 ;  COMMIT;", t)
 	unittest.ExpectStrings(params, []string{table1, key1, value1, table2, key2, value2}, t)
 }
+
+func TestMustBuildBeforeExecute(t *testing.T) {
+
+	table := "tableA"
+	key := "keyA"
+
+	q := pgSQLQuery{}
+	q.Get(table, key)
+	_, err := q.Execute()
+	unittest.ExpectError(err, t)
+
+}
