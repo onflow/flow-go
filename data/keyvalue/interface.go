@@ -1,10 +1,10 @@
 package keyvalue
 
-// DBConnection abstracts a db connection
-type DBConnection interface {
+// DBConnecter abstracts a db connection
+type DBConnecter interface {
 	NewQuery() QueryBuilder
-	// migrateup
-	// migratedowne
+	MigrateUp() error
+	MigrateDown() error
 }
 
 // QueryBuilder builds a key value query

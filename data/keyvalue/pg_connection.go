@@ -13,7 +13,7 @@ type PostgresDB struct {
 }
 
 // NewPostgresDB ..
-func NewPostgresDB(addr, user, password, dbname string) *PostgresDB {
+func NewPostgresDB(addr, user, password, dbname string) DBConnecter {
 
 	options := &pg.Options{
 		Addr:     addr,
