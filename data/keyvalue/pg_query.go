@@ -77,13 +77,12 @@ func (q *pgSQLQuery) MustBuild() {
 			setKeyValue.keyTable.table,
 			setKeyValue.keyTable.key,
 			setKeyValue.value,
-			setKeyValue.value,
 		)
 		query += fmt.Sprintf("INSERT INTO %s (key, value) VALUES ('%s', '%s') ON CONFLICT (key) DO UPDATE SET value = %s ; ",
 			pos[0],
 			pos[1],
 			pos[2],
-			pos[3],
+			pos[2],
 		)
 	}
 

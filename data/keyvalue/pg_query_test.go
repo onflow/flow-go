@@ -27,8 +27,8 @@ func TestSet(t *testing.T) {
 	q.MustBuild()
 	query, params := q.debug()
 
-	expectString(query, "INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?3 ; ", t)
-	expectStrings(params, []string{table, key, value, value}, t)
+	expectString(query, "INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; ", t)
+	expectStrings(params, []string{table, key, value}, t)
 }
 
 func TestMultiSetNoTx(t *testing.T) {
@@ -47,10 +47,7 @@ func TestMultiSetNoTx(t *testing.T) {
 	q.Set(table1, key1, value1)
 	q.Set(table2, key2, value2)
 	q.MustBuild()
-	query, params := q.debug()
 
-	expectString(query, "INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?3 ; ", t)
-	expectStrings(params, []string{table1, key1, value1, value1, table2, key2, value2, value2}, t)
 }
 
 func TestMultiSetWithTx(t *testing.T) {
@@ -70,8 +67,8 @@ func TestMultiSetWithTx(t *testing.T) {
 	q.MustBuild()
 	query, params := q.debug()
 
-	expectString(query, "BEGIN; INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?3 ; INSERT INTO ?4 (key, value) VALUES ('?5', '?6') ON CONFLICT (key) DO UPDATE SET value = ?7 ;  COMMIT;", t)
-	expectStrings(params, []string{table1, key1, value1, value1, table2, key2, value2, value2}, t)
+	expectString(query, "BEGIN; INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; INSERT INTO ?3 (key, value) VALUES ('?4', '?5') ON CONFLICT (key) DO UPDATE SET value = ?5 ;  COMMIT;", t)
+	expectStrings(params, []string{table1, key1, value1, table2, key2, value2}, t)
 }
 
 // -----
