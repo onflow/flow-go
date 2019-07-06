@@ -84,3 +84,12 @@ func TestMustBuildBeforeExecute(t *testing.T) {
 	unittest.ExpectError(err, t)
 
 }
+
+func TestMustBuildWithInvalidQuery(t *testing.T) {
+
+	defer unittest.ExpectPanic("Empty query. must have at least one get/set/delete", t)
+
+	q := pgSQLQuery{}
+	q.MustBuild()
+
+}
