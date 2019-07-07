@@ -17,10 +17,10 @@ describe('Execute node integration tests', function() {
 
   describe('ping', function() {
     it('should be a able to ping execute', async function() {
-      const executeStub = grpcHelpers.createNewExecutionStub(EXECUTE_ADDR) 
+      const executeStub = grpcHelpers.createNewExecuteNodeStub(EXECUTE_ADDR)
       const PingRequest = {};
-      const PingResponse = await executeStub("Ping")(PingRequest)
-      assert.deepStrictEqual(PingResponse, {address: Buffer.from('ping pong!')})
+      const PingResponse = await executeStub.ping("Ping")(PingRequest)
+      assert.deepStrictEqual(PingResponse, {address: Buffer.from('pong!')})
     });
   });
 

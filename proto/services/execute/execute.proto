@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package bamboo.services.execute;
+
+option go_package = "execute";
+
+import "shared/messages.proto";
+import "google/protobuf/empty.proto";
+
+
+service ExecuteService {
+  rpc ExecuteBlock (ExecuteBlockRequest) returns (google.protobuf.Empty);
+
+  rpc NotifyBlockExecuted (NotifyBlockExecutedRequest) returns (google.protobuf.Empty);
+
+  rpc GetRegisters (GetRegistersRequest) returns (GetRegistersResponse);
+
+  rpc GetRegistersAtBlockHeight (GetRegistersAtBlockHeightRequest) returns (GetRegistersResponse);
+}
+
+
+message ExecuteBlockRequest {
+  bamboo.shared.Block block = 1;
+}
+
+message NotifyBlockExecutedRequest {
+  bamboo.shared.Block block = 1;
+}
+
+message ReceiptsByBlockHeightRequest {
+  uint64 blockHeight = 1;
+}
+
+message ReceiptsByBlockHeightResponse {
+  repeated bamboo.shared.ExecutionReceipt executionReceipts = 1;
+}
+
+message GetRegistersRequest {
+  repeated bytes ids = 1;
+}
+
+message GetRegistersAtBlockHeightRequest {
+  repeated bytes ids = 1;
+  uint64 blockHeight = 2;
+}
+
+message GetRegistersResponse {
+  repeated bamboo.shared.Register registers = 1;
+}
