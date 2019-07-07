@@ -1965,12 +1965,13 @@ An interface is an abstract type that specifies the behavior of types that *impl
 
 Interfaces can be implemented by [classes](#structures-and-classes), [structures](#structures-and-classes), [contracts](#contracts), and [authorizations](#authorizations). These types may implement multiple interfaces.
 
-Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Implementations of interface requirements must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.
+Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Interface requirements, and therefore also their implementations, must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.
 
 Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions.
 
 Field requirements consist of the name and the type of the field. Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
 
+Calling functions with pre-conditions and post-conditions on interfaces instead of implementations can improve the security of a program, as it ensures that even if implementations change, some aspects of them will always hold.
 
 ### Interface Declaration
 
@@ -2556,6 +2557,7 @@ contract FungibleToken {
     }
 }
 ```
+
 
 ## Accounts
 
