@@ -2224,15 +2224,106 @@ impl Hashable for Point {
 }
 ```
 
+## Storage
+
+> 🚧 Status: Storage is not implemented yet.
+
+Values can be stored, i.e. persisted across multiple executions of the program, if they are storable. Values are storable if they have a type that implements the interface `Storable`.
+
+All built-in types are storable: booleans, integers, arrays with storable elements, and dictionaries with storable keys and values.
+
+[Structures and classes](#structures-and-classes) can be stored by implementing the [interface](#interfaces) `Storable`. The only requirement is that all field types of the implementing type need to be storable.
+
+```swift,file=storable-class.bpl
+// The declaration for interface `Storable` has no explicit requirements.
+interface Storable {}
+
+
+// Declare a structure named `Point`.
+//
+struct Point {
+    pub const x: Int
+    pub const y: Int
+
+    // The initializer is omitted for brevity.
+}
+
+// Implement the `Storable` interface for structure `Point`.
+//
+// The structure has two fields which have the type `Int`, which implements
+// the `Storable` interface. As all fields implement the `Storable` interface,
+// this structure can implement the `Storable` interface.
+//
+// There are no further requirements to satisfy, so the declaration is empty.
+//
+impl Storable for Point {}
+```
+
+Storable values can be stored for an [account](#accounts) by using the `storeIfNotExists` function. The function requires a [storage authorization](#storage-authorization) (`StorageAuth`) for the account.
+
+```swift
+fun storeIfNotExists(_ value: Storable, auth: StorageAuth)
+```
+
+It is only possible to store **one** value of a type.
+
+```swift,file=storage-storeIfNotExists.bpl
+// Store the integer value `42` for an account, given a storage authorization for it
+//
+const value = 42
+const storageAuth: StorageAuth = // ...
+storeIfNotExists(value, auth: storageAuth)
+```
+
+Storable values can be retrieved for an account (`Account`) using the account's `getStored` function.
+
+```swift,file=storage-getStored.bpl
+// Retrieve a stored integer value, if any, for an account
+//
+const account: Account = // ...
+const value: Int? = account.getStored(Int)
+```
+
+Just like storing primitive values, like integers or booleans, but more practical, is storing composite data structures, like structures and classes.
+
+```swift,file=storage-simplevault.bpl
+// Declare a class named `SimpleVault`.
+// It is a container for a balance.
+//
+class SimpleVault {
+    pub var balance: Int
+
+    init(balance: Int) {
+        self.balance = balance
+    }
+}
+
+// Implement the `Storable` interface for the class `SimpleVault`.
+//
+impl Storable for SimpleVault {}
+
+// Create a new vault with an initial zero balance.
+// Store it for an account, unless there already exists one
+//
+const vaultToBeStored = SimpleVault(balance: 0)
+const storageAuth: StorageAuth = // ...
+storeIfNotExists(vaultToBeStored, auth: storageAuth)
+
+// Retrieve a vault for an account, if any
+//
+const account: Account = // ...
+const storedVault: SimpleVault? = account.getStored(SimpleVault)
+```
+
 ## Contracts
 
 > 🚧 Status: Contracts are not implemented yet.
 
-A contract is similar to a class in that it is a composite data structure and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
+A contract is similar to a [class](#structures-and-classes) in that it is a composite data structure and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
 
-Contracts differ from classes in that all fields are stored, i.e., persisted. To make this explicit, all fields must be annotated with the `stored` keyword.
+Contracts differ from classes in that all fields are [stored](#storage). To make this explicit, all fields must be annotated with the `stored` keyword.
 
-```typescript,file=contract-counter.bpl
+```swift,file=contract-counter.bpl
 // Declare a contract named `Counter`.
 //
 // The counter has an initial, positive value that
@@ -2274,9 +2365,12 @@ contract Counter {
 }
 ```
 
-Stored fields may be of any type. For example, it could be an array, a dictionary, or a class.
+<!-- TODO list storable types again? -->
+The type of a stored field must be [storable](#storage). Many built-in types can be stored, even complex ones, like arrays and dictionaries.
 
-```typescript,file=contract-funigble-token.bpl
+Stored fields are implicitly stored in the [storage](#storage) of the [account](#accounts) the contract is associated with.
+
+```swift,file=contract-funigble-token.bpl
 // Declare a contract named `FungibleToken`.
 //
 // This is a very simple fungible token contract.
