@@ -1,11 +1,14 @@
 # Bamboo Programming Language
 
+
+## Introduction
+
 The Bamboo Programming Language is a new high-level programming language intended for smart contract development.
 
 The language's goals are, in order of importance:
 
-- *Safety and security*: Focus on safe code: provide a strong static type system, design by contract, a capability system, and linear types.
-- *Auditability*: Focus on readability: make it easy to verify what the code is doing.
+- *Safety and security*: Focus on safety, e.g. by providing a strong static type system, design by contract, and linear types; and security, by providing a capability system, and design by contract.
+- *Auditability*: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.
 - *Simplicity*: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
 
 
