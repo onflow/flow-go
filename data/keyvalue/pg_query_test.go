@@ -27,11 +27,42 @@ func TestSet(t *testing.T) {
 	q := pgSQLQuery{}
 	q.Set(table, key)
 	q.MustBuild()
-	q.mergeSetParams([]string{value})
+	err := q.mergeSetParams([]string{value})
 	query, params := q.debug()
 
+	unittest.ExpectNoError(err, t)
 	unittest.ExpectString(query, "INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; ", t)
 	unittest.ExpectStrings(params, []string{table, key, value}, t)
+}
+
+func TestSetWithExtraSetParams(t *testing.T) {
+	table := "tableA"
+	key := "keyA"
+	value := "valueA"
+
+	q := pgSQLQuery{}
+	q.Set(table, key)
+	q.MustBuild()
+	err := q.mergeSetParams([]string{value, "extra"})
+	q.debug()
+
+	unittest.ExpectError(err, t)
+	unittest.ExpectString(err.Error(), "Expected to substituted 1 set params, but received 2", t)
+}
+
+func TestSetWithMissingSetParams(t *testing.T) {
+	table := "tableA"
+	key := "keyA"
+	//value := "valueA"
+
+	q := pgSQLQuery{}
+	q.Set(table, key)
+	q.MustBuild()
+	err := q.mergeSetParams([]string{})
+	q.debug()
+
+	unittest.ExpectError(err, t)
+	unittest.ExpectString(err.Error(), "Expected to substituted 1 set params, but received 0", t)
 }
 
 func TestMultiSetNoTx(t *testing.T) {
@@ -50,7 +81,8 @@ func TestMultiSetNoTx(t *testing.T) {
 	q.Set(table1, key1)
 	q.Set(table2, key2)
 	q.MustBuild()
-	q.mergeSetParams([]string{value1, value2})
+	err := q.mergeSetParams([]string{value1, value2})
+	unittest.ExpectNoError(err, t)
 
 }
 
@@ -69,9 +101,10 @@ func TestMultiSetWithTx(t *testing.T) {
 	q.Set(table2, key2)
 	q.InTransaction()
 	q.MustBuild()
-	q.mergeSetParams([]string{value1, value2})
+	err := q.mergeSetParams([]string{value1, value2})
 	query, params := q.debug()
 
+	unittest.ExpectNoError(err, t)
 	unittest.ExpectString(query, "BEGIN; INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; INSERT INTO ?3 (key, value) VALUES ('?4', '?5') ON CONFLICT (key) DO UPDATE SET value = ?5 ;  COMMIT;", t)
 	unittest.ExpectStrings(params, []string{table1, key1, value1, table2, key2, value2}, t)
 }
