@@ -137,7 +137,7 @@ func (q *pgSQLQuery) addParams(params ...string) []int {
 	return pos
 }
 
-// merges q.params that we're best before build with setParams passed later
+// merges q.params that were set at build time with setParams passed at execution time.
 func (q *pgSQLQuery) mergeSetParams(setParams []string) error {
 
 	if len(q.setKeys) != len(setParams) {
