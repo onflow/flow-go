@@ -443,6 +443,13 @@ TODO
 
 -->
 
+
+#### Dictionary Keys
+
+Dictionary keys must be hashable and equatable, i.e., must implement the [`Hashable`](#hashable-interface) and [`Equatable`](#equatable-interface) [interfaces](#interfaces).
+
+Most of the built-in types, like booleans, integers, are hashable and equatable, so can be used as keys in dictionaries.
+
 ## Operators
 
 Operators are special symbols that perform a computation for one or more values. They are either unary, binary, or ternary.
@@ -2095,6 +2102,126 @@ someVault.balance // is 100
 someVault.add(amount: 50)
 
 // someVault.balance is 150
+```
+
+### `Equatable` Interface
+
+> 🚧 Status: The `Equatable` interface is not implemented yet.
+
+An equatable type is a type that can be compared for equality. Types are equatable when they  implement the `Equatable` interface.
+
+Equatable types can be compared for equality using the equals operator (`==`) or inequality using the unequals operator (`!=`).
+
+Most of the built-in types are equatable, like booleans and integers. Arrays are equatable when their elements are equatable. Dictionaries are equatable when their values are equatable.
+
+To make a type equatable the `Equatable` interface must be implemented, which requires the implementation of the function `equals`, which accepts another value that the given value should be compared for equality. Note that the parameter type is `Self`, i.e., the other value must have the same type as the implementing type.
+
+```swift,file=equatable.bpl
+interface Equatable {
+    pub fun equals(_ other: Self) -> Bool
+}
+```
+
+```swift,file=equatable-impl.bpl
+// Declare a class named `Cat`, which has one field named `id`
+// that has type `Int`, i.e., the identifier of the cat.
+//
+class Cat {
+    pub const id: Int
+
+    init(id: Int) {
+        self.id = id
+    }
+}
+
+// Implement the interface `Equatable` for the type `Cat`,
+// to allow cats to be compared for equality.
+//
+impl Equatable for Cat {
+
+    pub fun equals(_ other: Self) -> Bool {
+        // Cats are equal if their identifier matches.
+        //
+        return other.id == self.id
+    }
+}
+
+Cat(1) == Cat(2) // is false
+Cat(3) == Cat(3) // is true
+```
+
+
+### `Hashable` Interface
+
+> 🚧 Status: The `Hashable` interface is not implemented yet.
+
+A hashable type is a type that can be hashed to an integer hash value. Types are hashable when they implement the `Hashable` interface.
+
+Hashable types must also be equatable, i.e., they must also implement the `Equatable` interface.
+
+<!-- TODO: once interface inheritance is defined, describe how Hashable inherits from Equatable -->
+
+Hashable types can e.g. be used as keys in dictionaries.
+
+Most of the built-in types are hashable, like booleans and integers. Arrays are hashable when their elements are hashable. Dictionaries are hashable when their values are equatable.
+
+Hashing a value means passing its essential components into a hash function. Essential components are those that are used in the type's implementation of `Equatable`.
+
+If two values are equal because their `equals` function returns true, then the implementation must return the same integer hash value for each of the two values.
+
+The implementation must also consistently return the same integer hash value during the execution of the program when the essential components have not changed. The integer hash value must not necessarily be the same across multiple executions.
+
+```swift,file=hashable.bpl
+interface Hashable {
+    pub hashValue: Int
+}
+```
+
+```swift,file=hashable-impl.bpl
+// Declare a structure named `Point` with two fields
+// named `x` and `y` that have type `Int`.
+//
+struct Point {
+
+    pub(set) var x: Int
+    pub(set) var y: Int
+
+    init(x: Int, y: Int) {
+        self.x = x
+        self.y = y
+    }
+}
+
+// Implement the interface `Equatable` for the type `Point`,
+// to allow points to be compared for equality.
+//
+impl Equatable for Point {
+
+    pub fun equals(_ other: Self) -> Bool {
+        // Points are equal if their coordinates match.
+        //
+        // The essential components are therefore the fields
+        // `x` and `y`, which must be used in the `Hashable`
+        // implementation.
+        //
+        return other.x == self.x
+            && other.y == self.y
+    }
+}
+
+// Implement the interface `Equatable` for the type `Point`.
+//
+impl Hashable for Point {
+
+    pub synthetic hashValue: Int {
+        get {
+            var hash = 7
+            hash = 31 * hash + self.x
+            hash = 31 * hash + self.y
+            return hash
+        }
+    }
+}
 ```
 
 ## Contracts
