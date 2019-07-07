@@ -2613,11 +2613,28 @@ interface StorageAuth {
 }
 ```
 
-<!--
+## Built-in Functions
 
-TODO:
-- access control
+### FatalError
 
--->
+```swift
+fun fatalError(_ message: String) -> Never
+```
 
+Terminates the program unconditionally and reports a message which explains why the unrecoverable error occurred.
+
+#### Example
+
+```swift
+let optionalAccount: Account? = // ...
+let account = optionalAccount ?? fatalError("missing account")
+```
+
+### Assert
+
+```swift
+fun assert(_ condition: Bool, message: String)
+```
+
+Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.
 
