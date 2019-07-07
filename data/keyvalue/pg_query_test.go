@@ -25,8 +25,9 @@ func TestSet(t *testing.T) {
 	value := "valueA"
 
 	q := pgSQLQuery{}
-	q.Set(table, key, value)
+	q.Set(table, key)
 	q.MustBuild()
+	q.mergeSetParams([]string{value})
 	query, params := q.debug()
 
 	unittest.ExpectString(query, "INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; ", t)
@@ -46,9 +47,10 @@ func TestMultiSetNoTx(t *testing.T) {
 	value2 := "valueB"
 
 	q := pgSQLQuery{}
-	q.Set(table1, key1, value1)
-	q.Set(table2, key2, value2)
+	q.Set(table1, key1)
+	q.Set(table2, key2)
 	q.MustBuild()
+	q.mergeSetParams([]string{value1, value2})
 
 }
 
@@ -63,10 +65,11 @@ func TestMultiSetWithTx(t *testing.T) {
 	value2 := "valueB"
 
 	q := pgSQLQuery{}
-	q.Set(table1, key1, value1)
-	q.Set(table2, key2, value2)
+	q.Set(table1, key1)
+	q.Set(table2, key2)
 	q.InTransaction()
 	q.MustBuild()
+	q.mergeSetParams([]string{value1, value2})
 	query, params := q.debug()
 
 	unittest.ExpectString(query, "BEGIN; INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; INSERT INTO ?3 (key, value) VALUES ('?4', '?5') ON CONFLICT (key) DO UPDATE SET value = ?5 ;  COMMIT;", t)

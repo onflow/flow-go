@@ -11,8 +11,8 @@ type DBConnecter interface {
 type QueryBuilder interface {
 	InTransaction()
 	Get(namespace string, key string)
-	Set(namespace string, key string, value string)
+	Set(namespace string, key string)
 	Delete(namespace string, key string)
 	MustBuild() // MustBuild is intended to be called once per query on server startup for performance considerations of some providers.
-	Execute() (result string, err error)
+	Execute(setParams ...string) (result string, err error)
 }

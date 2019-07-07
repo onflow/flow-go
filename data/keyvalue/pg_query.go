@@ -8,14 +8,11 @@ import (
 	"github.com/go-pg/pg"
 )
 
+const setParamHolder = ""
+
 type keyTable struct {
 	key   string
 	table string
-}
-
-type keyValue struct {
-	keyTable keyTable
-	value    string
 }
 
 // pgSQLQuery ..
@@ -25,7 +22,8 @@ type pgSQLQuery struct {
 	builtQuery    string
 	params        []string
 	getKey        keyTable
-	setKeyValues  []keyValue
+	setKeys       []keyTable
+	setValuePos   []int
 	deleteKeys    []keyTable
 }
 
@@ -40,12 +38,8 @@ func (q *pgSQLQuery) Get(table string, key string) {
 }
 
 // Set ..
-func (q *pgSQLQuery) Set(table string, key string, value string) {
-	kv := keyValue{
-		keyTable: keyTable{key: key, table: table},
-		value:    value,
-	}
-	q.setKeyValues = append(q.setKeyValues, kv)
+func (q *pgSQLQuery) Set(table string, key string) {
+	q.setKeys = append(q.setKeys, keyTable{key: key, table: table})
 }
 
 // Delete ..
@@ -61,7 +55,7 @@ func (q *pgSQLQuery) MustBuild() {
 		errorMessages = append(errorMessages, "Empty query. must have at least one get/set/delete")
 	}
 
-	if len(q.setKeyValues)+len(q.deleteKeys) > 1 && !q.isTransaction {
+	if len(q.setKeys)+len(q.deleteKeys) > 1 && !q.isTransaction {
 		errorMessages = append(errorMessages, "Must use a transaction when changing more than one key")
 	}
 
@@ -72,13 +66,14 @@ func (q *pgSQLQuery) MustBuild() {
 	query := ""
 
 	// set
-	for _, setKeyValue := range q.setKeyValues {
+	for _, setKey := range q.setKeys {
 		pos := q.addParams(
-			setKeyValue.keyTable.table,
-			setKeyValue.keyTable.key,
-			setKeyValue.value,
+			setKey.table,
+			setKey.key,
+			setParamHolder,
 		)
-		query += fmt.Sprintf("INSERT INTO %s (key, value) VALUES ('%s', '%s') ON CONFLICT (key) DO UPDATE SET value = %s ; ",
+		q.setValuePos = append(q.setValuePos, pos[2])
+		query += fmt.Sprintf("INSERT INTO ?%d (key, value) VALUES ('?%d', '?%d') ON CONFLICT (key) DO UPDATE SET value = ?%d ; ",
 			pos[0],
 			pos[1],
 			pos[2],
@@ -89,13 +84,13 @@ func (q *pgSQLQuery) MustBuild() {
 	// delete
 	for _, deleteKey := range q.deleteKeys {
 		pos := q.addParams(deleteKey.table, deleteKey.key)
-		query += fmt.Sprintf(" DELETE FROM %s WHERE key=%s ; ", pos[0], pos[1])
+		query += fmt.Sprintf(" DELETE FROM ?%d WHERE key=?%d ; ", pos[0], pos[1])
 	}
 
 	// get
 	if q.hasGet() {
 		pos := q.addParams(q.getKey.table, q.getKey.key)
-		query += fmt.Sprintf("SELECT value FROM %s WHERE key=%s ; ", pos[0], pos[1])
+		query += fmt.Sprintf("SELECT value FROM ?%d WHERE key=?%d ; ", pos[0], pos[1])
 	}
 
 	if q.isTransaction {
@@ -107,9 +102,14 @@ func (q *pgSQLQuery) MustBuild() {
 }
 
 // Execute ..
-func (q *pgSQLQuery) Execute() (string, error) {
+func (q *pgSQLQuery) Execute(setParams ...string) (string, error) {
 	if q.builtQuery == "" {
 		return "", errors.New("Cannot execute unbuilt query, call MustBuild() first")
+	}
+
+	err := q.mergeSetParams(setParams)
+	if err != nil {
+		return "", err
 	}
 
 	if q.hasGet() {
@@ -118,23 +118,39 @@ func (q *pgSQLQuery) Execute() (string, error) {
 		return value, err
 	}
 
-	_, err := q.db.Exec(q.builtQuery, q.params)
-	return "", err
+	_, execErr := q.db.Exec(q.builtQuery, q.params)
+	return "", execErr
 }
 
 func (q *pgSQLQuery) debug() (string, []string) {
 	return q.builtQuery, q.params
 }
 
-// returns the relative position of the new added params
-func (q *pgSQLQuery) addParams(params ...string) []string {
-	pos := make([]string, 0)
+// and params to query list and returns their relative position
+func (q *pgSQLQuery) addParams(params ...string) []int {
+	pos := make([]int, 0, len(params))
 	startPos := len(q.params)
 	for i := range params {
-		pos = append(pos, fmt.Sprintf("?%d", startPos+i))
+		pos = append(pos, startPos+i)
 	}
 	q.params = append(q.params, params...)
 	return pos
+}
+
+// merges q.params that we're best before build with setParams passed later
+func (q *pgSQLQuery) mergeSetParams(setParams []string) error {
+
+	if len(q.setKeys) != len(setParams) {
+		return fmt.Errorf("Expected to substituted %d set params, but received %d", len(q.setKeys), len(setParams))
+	}
+
+	subs := 0
+	for _, pos := range q.setValuePos {
+		q.params[pos] = setParams[subs]
+		subs++
+	}
+
+	return nil
 }
 
 func (q *pgSQLQuery) hasGet() bool {
@@ -142,7 +158,7 @@ func (q *pgSQLQuery) hasGet() bool {
 }
 
 func (q *pgSQLQuery) hasSet() bool {
-	return len(q.setKeyValues) > 0
+	return len(q.setKeys) > 0
 }
 
 func (q *pgSQLQuery) hasDelete() bool {
