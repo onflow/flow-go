@@ -2139,8 +2139,8 @@ impl Vault for ExampleVault {
     // in the interface have to be repeated here in the implementation
     //
     pub fun transfer(to receivingVault: ExampleVault, amount: Int) {
-        self.balance -= amount
-        receivingVault.amount += amount
+        self.balance = self.balance - amount
+        receivingVault.amount = receivingVault.amount + amount
     }
 }
 
