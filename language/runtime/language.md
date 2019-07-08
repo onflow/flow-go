@@ -2284,7 +2284,11 @@ const account: Account = // ...
 const value: Int? = account.getStored(Int)
 ```
 
-Just like storing primitive values, like integers or booleans, but more practical, is storing composite data structures, like structures and classes.
+To store more complex data than just a single value, structures and classes have to be defined.
+
+The requirement to declare and use composite data structures to store more complex data is intentional, and not a "workaround". Types declaratively specify what data is stored, specify what names are used, and specify what types the values have. This approach also enables static checking that the code is correct. Storage is declarative and explicit.
+
+The storage API is intentionally not a key-value store with arbitrary strings as keys and values. Even though such an approach would be more flexible, it would require the developer to perform ad-hoc type casting, which is error-prone and has the potential for type confusion. Also, such an approach has the potential for bugs, like accidentally naming keys that are written and keys that are read in different places in different ways. 
 
 ```swift,file=storage-simplevault.bpl
 // Declare a class named `SimpleVault`.
