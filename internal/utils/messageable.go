@@ -48,12 +48,46 @@ func IntermediateRegistersToMessage(t *types.IntermediateRegisters) *bambooProto
 	}
 }
 
+func MessageToKeyWeight(m *bambooProto.TransactionRegister_KeyWeight) *types.KeyWeight {
+	return &types.KeyWeight{
+		Key:    m.GetKey(),
+		Weight: m.GetWeight(),
+	}
+}
+
+func KeyWeightToMessage(t *types.KeyWeight) *bambooProto.TransactionRegister_KeyWeight {
+	return &bambooProto.TransactionRegister_KeyWeight{
+		Key:    t.Key,
+		Weight: t.Weight,
+	}
+}
+
 func MessageToTransactionRegister(m *bambooProto.TransactionRegister) *types.TransactionRegister {
-	return &types.TransactionRegister{}
+	keys := make([]types.KeyWeight, 0)
+	for _, key := range m.GetKeys() {
+		keys = append(keys, *MessageToKeyWeight(key))
+	}
+
+	return &types.TransactionRegister{
+		Type:       types.Type(m.GetType()),
+		AccessMode: types.AccessMode(m.GetAccessMode()),
+		ID:         m.GetId(),
+		Keys:       keys,
+	}
 }
 
 func TransactionRegisterToMessage(t *types.TransactionRegister) *bambooProto.TransactionRegister {
-	return &bambooProto.TransactionRegister{}
+	keys := make([]*bambooProto.TransactionRegister_KeyWeight, 0)
+	for _, key := range t.Keys {
+		keys = append(keys, KeyWeightToMessage(&key))
+	}
+
+	return &bambooProto.TransactionRegister{
+		Type:       bambooProto.TransactionRegister_Type(t.Type),
+		AccessMode: bambooProto.TransactionRegister_AccessMode(t.AccessMode),
+		Id:         t.ID,
+		Keys:       keys,
+	}
 }
 
 func MessageToCollection(m *bambooProto.Collection) *types.Collection {

@@ -24,7 +24,7 @@ const (
 
 type KeyWeight struct {
 	Key    []byte
-	Weight float64
+	Weight float32
 }
 
 type Register struct {
