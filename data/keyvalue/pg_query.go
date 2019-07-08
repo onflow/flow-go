@@ -28,27 +28,31 @@ type pgSQLQuery struct {
 }
 
 // InTransaction ..
-func (q *pgSQLQuery) InTransaction() {
+func (q *pgSQLQuery) InTransaction() QueryBuilder {
 	q.isTransaction = true
+	return q
 }
 
 // Get ..
-func (q *pgSQLQuery) Get(table string, key string) {
+func (q *pgSQLQuery) Get(table string, key string) QueryBuilder {
 	q.getKey = keyTable{key: key, table: table}
+	return q
 }
 
 // Set ..
-func (q *pgSQLQuery) Set(table string, key string) {
+func (q *pgSQLQuery) Set(table string, key string) QueryBuilder {
 	q.setKeys = append(q.setKeys, keyTable{key: key, table: table})
+	return q
 }
 
 // Delete ..
-func (q *pgSQLQuery) Delete(table string, key string) {
+func (q *pgSQLQuery) Delete(table string, key string) QueryBuilder {
 	q.deleteKeys = append(q.deleteKeys, keyTable{key: key, table: table})
+	return q
 }
 
 // MustBuild generates the SQL query. Intended to be called once on server initialisation for performance. This method panics if the Query is not supported.
-func (q *pgSQLQuery) MustBuild() {
+func (q *pgSQLQuery) MustBuild() QueryBuilder {
 	errorMessages := []string{}
 
 	if !q.hasGet() && !q.hasSet() && !q.hasDelete() {
@@ -98,6 +102,7 @@ func (q *pgSQLQuery) MustBuild() {
 	}
 
 	q.builtQuery = query
+	return q
 
 }
 
