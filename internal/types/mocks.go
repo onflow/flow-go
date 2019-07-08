@@ -43,7 +43,7 @@ func MockRegisterMessage() *bambooProto.Register {
 
 func MockIntermediateRegisters() *IntermediateRegisters {
 	registers := make([]Register, 0)
-	for i := 1; i < 5; i++ {
+	for i := 0; i < 5; i++ {
 		registers = append(registers, *MockRegister())
 	}
 
@@ -56,7 +56,7 @@ func MockIntermediateRegisters() *IntermediateRegisters {
 
 func MockIntermediateRegistersMessage() *bambooProto.IntermediateRegisters {
 	registers := make([]*bambooProto.Register, 0)
-	for i := 1; i < 5; i++ {
+	for i := 0; i < 5; i++ {
 		registers = append(registers, MockRegisterMessage())
 	}
 
@@ -69,7 +69,7 @@ func MockIntermediateRegistersMessage() *bambooProto.IntermediateRegisters {
 
 func MockTransactionRegister() *TransactionRegister {
 	keys := make([]KeyWeight, 0)
-	for i := 1; i < 5; i++ {
+	for i := 0; i < 5; i++ {
 		keys = append(keys, MockKeyWeight())
 	}
 
@@ -83,7 +83,7 @@ func MockTransactionRegister() *TransactionRegister {
 
 func MockTransactionRegisterMessage() *bambooProto.TransactionRegister {
 	keys := make([]*bambooProto.TransactionRegister_KeyWeight, 0)
-	for i := 1; i < 5; i++ {
+	for i := 0; i < 5; i++ {
 		keys = append(keys, MockKeyWeightMessage())
 	}
 
@@ -92,5 +92,59 @@ func MockTransactionRegisterMessage() *bambooProto.TransactionRegister {
 		AccessMode: bambooProto.TransactionRegister_CREATE,
 		Id:         []byte("TEST"),
 		Keys:       keys,
+	}
+}
+
+func MockTransaction() *Transaction {
+	registers := make([]TransactionRegister, 0)
+	for i := 0; i < 5; i++ {
+		registers = append(registers, *MockTransactionRegister())
+	}
+
+	return &Transaction{
+		Script:    []byte("TEST"),
+		Nonce:     0,
+		Registers: registers,
+		Chunks:    make([][]byte, 0),
+	}
+}
+
+func MockTransactionMessage() *bambooProto.Transaction {
+	registers := make([]*bambooProto.TransactionRegister, 0)
+	for i := 0; i < 5; i++ {
+		registers = append(registers, MockTransactionRegisterMessage())
+	}
+
+	return &bambooProto.Transaction{
+		Script:    []byte("TEST"),
+		Nonce:     0,
+		Registers: registers,
+		Chunks:    make([][]byte, 0),
+	}
+}
+
+func MockSignedTransaction() *SignedTransaction {
+	sigs := make([]crypto.Signature, 0)
+	for i := 0; i < 5; i++ {
+		sigs = append(sigs, MockSignature())
+	}
+
+	return &SignedTransaction{
+		Transaction:      *MockTransaction(),
+		ScriptSignatures: sigs,
+		PayerSignature:   MockSignature(),
+	}
+}
+
+func MockSignedTransactionMessage() *bambooProto.SignedTransaction {
+	sigs := make([][]byte, 0)
+	for i := 0; i < 5; i++ {
+		sigs = append(sigs, MockSignature().Bytes())
+	}
+
+	return &bambooProto.SignedTransaction{
+		Transaction:      MockTransactionMessage(),
+		ScriptSignatures: sigs,
+		PayerSignature:   MockSignature().Bytes(),
 	}
 }

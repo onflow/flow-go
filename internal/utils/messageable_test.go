@@ -52,3 +52,18 @@ func TestTransactionRegister(t *testing.T) {
 	gomega.Expect(TransactionRegisterToMessage(actualTransactionRegister)).To(Equal(message))
 	gomega.Expect(MessageToTransactionRegister(actualMessage)).To(Equal(transactionRegister))
 }
+
+func TestTransaction(t *testing.T) {
+	gomega := NewWithT(t)
+
+	message := types.MockTransactionMessage()
+	txn := types.MockTransaction()
+
+	actualMessage := TransactionToMessage(txn)
+	actualTxn := MessageToTransaction(message)
+
+	gomega.Expect(actualMessage).To(Equal(message))
+	gomega.Expect(actualTxn).To(Equal(txn))
+	gomega.Expect(TransactionToMessage(actualTxn)).To(Equal(message))
+	gomega.Expect(MessageToTransaction(actualMessage)).To(Equal(txn))
+}
