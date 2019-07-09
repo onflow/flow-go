@@ -78,7 +78,7 @@ func TestSignedTransaction(t *testing.T) {
 	actualSignedTxn := MessageToSignedTransaction(message)
 
 	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualSignedTxn).To(Equal(actualSignedTxn))
+	gomega.Expect(actualSignedTxn).To(Equal(signedTxn))
 	gomega.Expect(SignedTransactionToMessage(actualSignedTxn)).To(Equal(message))
-	gomega.Expect(MessageToSignedTransaction(actualMessage)).To(Equal(actualSignedTxn))
+	gomega.Expect(MessageToSignedTransaction(actualMessage)).To(Equal(signedTxn))
 }
