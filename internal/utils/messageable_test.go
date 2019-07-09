@@ -98,3 +98,16 @@ func TestSignedCollectionHash(t *testing.T) {
 	gomega.Expect(actualMessage).To(Equal(message))
 	gomega.Expect(actualSignedCollectionHash).To(Equal(signedCollectionHash))
 }
+
+func TestExecutionReceipt(t *testing.T) {
+	gomega := NewWithT(t)
+
+	message := types.MockExecutionReceiptMessage()
+	executionReceipt := types.MockExecutionReceipt()
+
+	actualMessage := ExecutionReceiptToMessage(executionReceipt)
+	actualExecutionReceipt := MessageToExecutionReceipt(message)
+
+	gomega.Expect(actualMessage).To(Equal(message))
+	gomega.Expect(actualExecutionReceipt).To(Equal(executionReceipt))
+}

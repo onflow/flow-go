@@ -173,26 +173,64 @@ func MockCollectionMessage() *bambooProto.Collection {
 	}
 }
 
-func MockSignedCollectionHash()  *SignedCollectionHash {
+func MockSignedCollectionHash() *SignedCollectionHash {
 	sigs := make([]crypto.Signature, 0)
 	for i := 0; i < 5; i++ {
 		sigs = append(sigs, MockSignature())
 	}
-	
+
 	return &SignedCollectionHash{
-		CollectionHash:	MockHash(),
-		Signatures:	sigs,
+		CollectionHash: MockHash(),
+		Signatures:     sigs,
 	}
 }
 
-func MockSignedCollectionHashMessage()  *bambooProto.SignedCollectionHash {
+func MockSignedCollectionHashMessage() *bambooProto.SignedCollectionHash {
 	sigs := make([][]byte, 0)
 	for i := 0; i < 5; i++ {
 		sigs = append(sigs, MockSignature().Bytes())
 	}
 
 	return &bambooProto.SignedCollectionHash{
-		CollectionHash:	MockHash().Bytes(),
-		Signatures:	sigs,
+		CollectionHash: MockHash().Bytes(),
+		Signatures:     sigs,
+	}
+}
+
+func MockExecutionReceipt() *ExecutionReceipt {
+	registers := make([]Register, 0)
+	irList := make([]IntermediateRegisters, 0)
+	sigs := make([]crypto.Signature, 0)
+	for i := 0; i < 5; i++ {
+		registers = append(registers, *MockRegister())
+		irList = append(irList, *MockIntermediateRegisters())
+		sigs = append(sigs, MockSignature())
+	}
+
+	return &ExecutionReceipt{
+		PreviousReceiptHash:       MockHash(),
+		BlockHash:                 MockHash(),
+		InitialRegisters:          registers,
+		IntermediateRegistersList: irList,
+		Signatures:                sigs,
+	}
+}
+
+func MockExecutionReceiptMessage() *bambooProto.ExecutionReceipt {
+	registers := make([]*bambooProto.Register, 0)
+	irList := make([]*bambooProto.IntermediateRegisters, 0)
+	sigs := make([][]byte, 0)
+	for i := 0; i < 5; i++ {
+		registers = append(registers, MockRegisterMessage())
+		irList = append(irList, MockIntermediateRegistersMessage())
+		sigs = append(sigs, MockSignature().Bytes())
+	}
+
+	return &bambooProto.ExecutionReceipt{
+		PreviousReceiptHash:       MockHash().Bytes(),
+		BlockHash:                 MockHash().Bytes(),
+		InitialRegisters:          registers,
+		IntermediateRegistersList: irList,
+		Signatures:                sigs,
 	}
 }
