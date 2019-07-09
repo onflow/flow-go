@@ -25,6 +25,8 @@
     - [Dictionary Access](#dictionary-access)
     - [Dictionary Types](#dictionary-types)
     - [Dictionary Keys](#dictionary-keys)
+  - [Any](#any)
+  - [Never](#never)
 - [Operators](#operators)
   - [Negation](#negation)
   - [Assignment](#assignment)
@@ -575,6 +577,34 @@ TODO
 Dictionary keys must be hashable and equatable, i.e., must implement the [`Hashable`](#hashable-interface) and [`Equatable`](#equatable-interface) [interfaces](#interfaces).
 
 Most of the built-in types, like booleans, integers, are hashable and equatable, so can be used as keys in dictionaries.
+
+
+### Any
+
+`Any` is the top type, i.e., all types are a subtype of it.
+
+```swift
+// Declare a variable that has the type `Any`.
+// Any value can be assigned to it, for example an integer.
+//
+var someValue: Any = 1
+
+// Assign a value with a different type, `Bool`
+someValue = true
+```
+
+### Never
+
+`Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
+
+```swift
+// Declare a function named `crashAndBurn` which will never return,
+// because it calls the function named `fatalError`, which never returns
+//
+fun crashAndBurn() -> Never {
+    fatalError("An unrecoverable error occurred")
+}
+```
 
 ## Operators
 
