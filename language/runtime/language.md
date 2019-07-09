@@ -2155,13 +2155,13 @@ Cat(3) == Cat(3) // is true
 
 > 🚧 Status: The `Hashable` interface is not implemented yet.
 
-A hashable type is a type that can be hashed to an integer hash value. Types are hashable when they implement the `Hashable` interface.
-
-Hashable types must also be equatable, i.e., they must also implement the `Equatable` interface.
-
-<!-- TODO: once interface inheritance is defined, describe how Hashable inherits from Equatable -->
+A hashable type is a type that can be hashed to an integer hash value, i.e., it is distilled into a value that is used as evidence of inequality. Types are hashable when they implement the `Hashable` interface.
 
 Hashable types can e.g. be used as keys in dictionaries.
+
+Hashable types must also be equatable, i.e., they must also implement the `Equatable` interface. This is because the hash value is only evidence for inequality: two values that have different hash values are guaranteed to be unequal. However, if the hash value of two values is the same, then the two values could still be unequal and just happen to hash to the same hash value. In that case equality still needs to be determined through an equality check. Without `Equatable`, values could be added to a dictionary, but it would not be possible to retrieve them.
+
+<!-- TODO: once interface inheritance is defined, describe how Hashable inherits from Equatable -->
 
 Most of the built-in types are hashable, like booleans and integers. Arrays are hashable when their elements are hashable. Dictionaries are hashable when their values are equatable.
 
