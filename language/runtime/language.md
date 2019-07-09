@@ -153,7 +153,7 @@ Variables and constants **must** be initialized.
 const a
 ```
 
-Once a constant or variable is declared, it can't be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
+Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
 
 
 ```swift
@@ -161,7 +161,7 @@ Once a constant or variable is declared, it can't be redeclared with the same na
 //
 const a = 1
 
-// Invalid: can't re-declare a constant with name `a`,
+// Invalid: cannot re-declare a constant with name `a`,
 // as it is already used in this scope
 //
 const a = 2
@@ -172,12 +172,12 @@ var b = 3
 ```
 
 ```swift
-// Invalid: can't re-declare a variable with name `b`,
+// Invalid: cannot re-declare a variable with name `b`,
 // as it is already used in this scope
 //
 var b = 4
 
-// Invalid: can't declare a variable with the name `a`,
+// Invalid: cannot declare a variable with the name `a`,
 // as it is already used in this scope,
 // and it is declared as a constant
 //
@@ -1057,7 +1057,7 @@ Preconditions must be true right before the execution of the function. Precondit
 
 Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `ensure` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
 
-A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they can't have side-effects and must be pure expressions.
+A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions.
 
 <!--
 
