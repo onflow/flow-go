@@ -15,7 +15,7 @@ type ExecutionReceipt struct {
 type InvalidExecutionReceiptChallenge struct {
 	ExecutionReceiptHash      crypto.Hash
 	ExecutionReceiptSignature crypto.Signature
-	PartIndex                 int64
+	PartIndex                 uint64
 	PartTransactions          []IntermediateRegisters
 	Signature                 crypto.Signature
 }

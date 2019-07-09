@@ -110,7 +110,7 @@ message TransactionRegister {
   }
   message KeyWeight {
     bytes key = 1;
-    float weight = 2;
+    double weight = 2;
   }
   Type type = 1;
   AccessMode accessMode = 2;
@@ -133,7 +133,7 @@ message Inventory {
 message InvalidExecutionReceiptChallenge {
   bytes executionReceiptHash = 1;
   bytes executionReceiptSignature = 2;
-  int64 partIndex = 3;
+  uint64 partIndex = 3;
   repeated IntermediateRegisters partTransactions = 4;
   bytes signature = 5;
 }
