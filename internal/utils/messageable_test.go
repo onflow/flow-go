@@ -111,3 +111,16 @@ func TestExecutionReceipt(t *testing.T) {
 	gomega.Expect(actualMessage).To(Equal(message))
 	gomega.Expect(actualExecutionReceipt).To(Equal(executionReceipt))
 }
+
+func TestInvalidExecutionReceiptChallenge(t *testing.T) {
+	gomega := NewWithT(t)
+
+	message := types.MockInvalidExecutionReceiptChallengeMessage()
+	invalidExecutionReceiptChallenge := types.MockInvalidExecutionReceiptChallenge()
+
+	actualMessage := InvalidExecutionReceiptChallengeToMessage(invalidExecutionReceiptChallenge)
+	actualIERC := MessageToInvalidExecutionReceiptChallenge(message)
+
+	gomega.Expect(actualMessage).To(Equal(message))
+	gomega.Expect(actualIERC).To(Equal(invalidExecutionReceiptChallenge))
+}

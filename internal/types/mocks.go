@@ -234,3 +234,33 @@ func MockExecutionReceiptMessage() *bambooProto.ExecutionReceipt {
 		Signatures:                sigs,
 	}
 }
+
+func MockInvalidExecutionReceiptChallenge() *InvalidExecutionReceiptChallenge {
+	partTransactions := make([]IntermediateRegisters, 0)
+	for i := 0; i < 5; i++ {
+		partTransactions = append(partTransactions, *MockIntermediateRegisters())
+	}
+
+	return &InvalidExecutionReceiptChallenge{
+		ExecutionReceiptHash:      MockHash(),
+		ExecutionReceiptSignature: MockSignature(),
+		PartIndex:                 0,
+		PartTransactions:          partTransactions,
+		Signature:                 MockSignature(),
+	}
+}
+
+func MockInvalidExecutionReceiptChallengeMessage() *bambooProto.InvalidExecutionReceiptChallenge {
+	partTransactions := make([]*bambooProto.IntermediateRegisters, 0)
+	for i := 0; i < 5; i++ {
+		partTransactions = append(partTransactions, MockIntermediateRegistersMessage())
+	}
+
+	return &bambooProto.InvalidExecutionReceiptChallenge{
+		ExecutionReceiptHash:      MockHash().Bytes(),
+		ExecutionReceiptSignature: MockSignature().Bytes(),
+		PartIndex:                 0,
+		PartTransactions:          partTransactions,
+		Signature:                 MockSignature().Bytes(),
+	}
+}
