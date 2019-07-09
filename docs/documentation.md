@@ -10,13 +10,12 @@ Stream owners are responsible for ensuring that all code owned by their stream i
 
 Each stream has a top-level documentation page in the [/docs/streams](streams) folder. This page, which acts as a jumping-off point for new contributors, should list each function of the stream along with a short description and links to its relevant packages.
 
-Here's an example: [docs/streams/pre-execution.md](streams/pre-execution.md)
-
+Here's an example: [docs/streams/collection.md](streams/collection.md)
 ### Stream package documentation 
 
 All packages owned by a stream should be documented using `godoc`.
 
-Here's an example: [internal/clusters](/internal/clusters)
+Here's an example: [internal/protocol/collect/clusters](/internal/protocol/collect/clusters)
 
 **Auto-generated READMEs**
 
