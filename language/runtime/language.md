@@ -66,14 +66,15 @@
 - [Storage](#storage)
 - [Contracts](#contracts)
 - [Accounts](#accounts)
-- [Built-in Types](#built-in-types)
-  - [Never](#never)
-  - [Root Authorization](#root-authorization)
-  - [Storage Authorization](#storage-authorization)
+  - [Account Storage](#account-storage)
+- [External Contracts and Interfaces](#external-contracts-and-interfaces)
+- [Built-in Authorization Types](#built-in-authorization-types)
+  - [`RootAuth`](#rootauth)
+  - [`StorageAuth`](#storageauth)
 - [Built-in Functions](#built-in-functions)
-  - [FatalError](#fatalerror)
+  - [`fatalError`](#fatalerror)
     - [Example](#example)
-  - [Assert](#assert)
+  - [`assert`](#assert)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2635,16 +2636,21 @@ contract FungibleToken {
 }
 ```
 
-
 ## Accounts
 
 > 🚧 Status: Accounts are not implemented yet.
 
-<!-- TODO: explain accounts -->
+```swift
+interface Account {
+    pub init(at address: Address)
+}
+```
 
-<!-- TODO: can't express the signature for getStored yet -->
+### Account Storage
 
 Accounts have a `getStored` function, which retrieves a value from [storage](#storage). The function takes a type that implements the `Storable` interface, and returns an optional value that has the type.
+
+<!-- TODO: cannot express the signature for getStored yet. would require. generics -->
 
 ```swift
 // Get the stored integer value for an account
@@ -2653,23 +2659,38 @@ const account: Account = // ...
 const value: Int? = account.getStored(Int)
 ```
 
+## External Contracts and Interfaces
 
-## Built-in Types
+> 🚧 Status: External contracts and interfaces are not implemented yet.
 
-### Never
-
-`Never` is the return type for functions which never return normally.
+External contracts and interfaces can be instantiated by calling the `at` function on the contract or interface type and passing the address where the code is deployed.
 
 ```swift
-// Declare a function named `crashAndBurn` which will never return,
-// because it calls the function named `fatalError`, which never returns
+// Declaration for an interface named `Counter`.
+// It is assumed to be available at address 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
 //
-fun crashAndBurn() -> Never {
-    fatalError("An unrecoverable error occurred")
+interface Counter {
+    pub count: Int
+    pub fun increment(_ count: Int)
 }
+
+// Instantiate the interface `Counter` for address 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
+// The result is a value which has type `Counter`.
+//
+const counter: Counter = Counter.at(0x06012c8cf97BEaD5deAe237070F9587f8E7A266d)
+
+// Access the field `count`
+counter.count
+
+// Call the function `increment` on the counter
+counter.increment(42)
 ```
 
-### Root Authorization
+## Built-in Authorization Types
+
+### `RootAuth`
+
+> 🚧 Status: `RootAuth` is not implemented yet.
 
 The authorization type `RootAuth` represents access rights/privileges to all resources.
 
@@ -2680,7 +2701,9 @@ interface RootAuth {
 }
 ```
 
-### Storage Authorization
+### `StorageAuth`
+
+> 🚧 Status: `StorageAuth` is not implemented yet.
 
 The authorization type `StorageAuth` represents storage rights for an account. It is created from a [root authorization](#root-authorization). The storage authorization's account is the root authorization's account.
 
@@ -2694,7 +2717,9 @@ interface StorageAuth {
 
 ## Built-in Functions
 
-### FatalError
+### `fatalError`
+
+> 🚧 Status: `fatalError` is not implemented yet.
 
 ```swift
 fun fatalError(_ message: String) -> Never
@@ -2705,11 +2730,13 @@ Terminates the program unconditionally and reports a message which explains why 
 #### Example
 
 ```swift
-let optionalAccount: Account? = // ...
-let account = optionalAccount ?? fatalError("missing account")
+const optionalAccount: Account? = // ...
+const account = optionalAccount ?? fatalError("missing account")
 ```
 
-### Assert
+### `assert`
+
+> 🚧 Status: `assert` is not implemented yet.
 
 ```swift
 fun assert(_ condition: Bool, message: String)
