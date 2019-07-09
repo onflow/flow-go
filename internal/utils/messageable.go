@@ -23,9 +23,9 @@ func RegisterToMessage(t *types.Register) *bambooProto.Register {
 }
 
 func MessageToIntermediateRegisters(m *bambooProto.IntermediateRegisters) *types.IntermediateRegisters {
-	registers := make([]types.Register, 0)
-	for _, r := range m.GetRegisters() {
-		registers = append(registers, *MessageToRegister(r))
+	registers := make([]types.Register, len(m.GetRegisters()))
+	for i, r := range m.GetRegisters() {
+		registers[i] = *MessageToRegister(r)
 	}
 
 	return &types.IntermediateRegisters{
@@ -36,9 +36,9 @@ func MessageToIntermediateRegisters(m *bambooProto.IntermediateRegisters) *types
 }
 
 func IntermediateRegistersToMessage(t *types.IntermediateRegisters) *bambooProto.IntermediateRegisters {
-	registers := make([]*bambooProto.Register, 0)
-	for _, r := range t.Registers {
-		registers = append(registers, RegisterToMessage(&r))
+	registers := make([]*bambooProto.Register, len(t.Registers))
+	for i, r := range t.Registers {
+		registers[i] = RegisterToMessage(&r)
 	}
 
 	return &bambooProto.IntermediateRegisters{
@@ -63,9 +63,9 @@ func KeyWeightToMessage(t *types.KeyWeight) *bambooProto.TransactionRegister_Key
 }
 
 func MessageToTransactionRegister(m *bambooProto.TransactionRegister) *types.TransactionRegister {
-	keys := make([]types.KeyWeight, 0)
-	for _, key := range m.GetKeys() {
-		keys = append(keys, *MessageToKeyWeight(key))
+	keys := make([]types.KeyWeight, len(m.GetKeys()))
+	for i, key := range m.GetKeys() {
+		keys[i] = *MessageToKeyWeight(key)
 	}
 
 	return &types.TransactionRegister{
@@ -77,9 +77,9 @@ func MessageToTransactionRegister(m *bambooProto.TransactionRegister) *types.Tra
 }
 
 func TransactionRegisterToMessage(t *types.TransactionRegister) *bambooProto.TransactionRegister {
-	keys := make([]*bambooProto.TransactionRegister_KeyWeight, 0)
-	for _, key := range t.Keys {
-		keys = append(keys, KeyWeightToMessage(&key))
+	keys := make([]*bambooProto.TransactionRegister_KeyWeight, len(t.Keys))
+	for i, key := range t.Keys {
+		keys[i] = KeyWeightToMessage(&key)
 	}
 
 	return &bambooProto.TransactionRegister{
@@ -91,9 +91,9 @@ func TransactionRegisterToMessage(t *types.TransactionRegister) *bambooProto.Tra
 }
 
 func MessageToCollection(m *bambooProto.Collection) *types.Collection {
-	transactions := make([]types.SignedTransaction, 0)
-	for _, tx := range m.GetTransactions() {
-		transactions = append(transactions, *MessageToSignedTransaction(tx))
+	transactions := make([]types.SignedTransaction, len(m.GetTransactions()))
+	for i, tx := range m.GetTransactions() {
+		transactions[i] = *MessageToSignedTransaction(tx)
 	}
 
 	return &types.Collection{
@@ -103,9 +103,9 @@ func MessageToCollection(m *bambooProto.Collection) *types.Collection {
 }
 
 func CollectionToMessage(t *types.Collection) *bambooProto.Collection {
-	transactions := make([]*bambooProto.SignedTransaction, 0)
-	for _, tx := range t.Transactions {
-		transactions = append(transactions, SignedTransactionToMessage(&tx))
+	transactions := make([]*bambooProto.SignedTransaction, len(t.Transactions))
+	for i, tx := range t.Transactions {
+		transactions[i] = SignedTransactionToMessage(&tx)
 	}
 
 	return &bambooProto.Collection{
@@ -115,9 +115,9 @@ func CollectionToMessage(t *types.Collection) *bambooProto.Collection {
 }
 
 func MessageToSignedCollectionHash(m *bambooProto.SignedCollectionHash) *types.SignedCollectionHash {
-	sigs := make([]crypto.Signature, 0)
-	for _, sig := range m.GetSignatures() {
-		sigs = append(sigs, crypto.BytesToSig(sig))
+	sigs := make([]crypto.Signature, len(m.GetSignatures()))
+	for i, sig := range m.GetSignatures() {
+		sigs[i] = crypto.BytesToSig(sig)
 	}
 
 	return &types.SignedCollectionHash{
@@ -127,9 +127,9 @@ func MessageToSignedCollectionHash(m *bambooProto.SignedCollectionHash) *types.S
 }
 
 func SignedCollectionHashToMessage(t *types.SignedCollectionHash) *bambooProto.SignedCollectionHash {
-	sigs := make([][]byte, 0)
-	for _, sig := range t.Signatures {
-		sigs = append(sigs, sig.Bytes())
+	sigs := make([][]byte, len(t.Signatures))
+	for i, sig := range t.Signatures {
+		sigs[i] = sig.Bytes()
 	}
 
 	return &bambooProto.SignedCollectionHash{
@@ -141,19 +141,19 @@ func SignedCollectionHashToMessage(t *types.SignedCollectionHash) *bambooProto.S
 func MessageToBlock(m *bambooProto.Block) *types.Block {
 	timestamp, _ := ptypes.Timestamp(m.GetTimestamp())
 
-	collectionHashes := make([]types.SignedCollectionHash, 0)
-	for _, hash := range m.GetSignedCollectionHashes() {
-		collectionHashes = append(collectionHashes, *MessageToSignedCollectionHash(hash))
+	collectionHashes := make([]types.SignedCollectionHash, len(m.GetSignedCollectionHashes()))
+	for i, hash := range m.GetSignedCollectionHashes() {
+		collectionHashes[i] = *MessageToSignedCollectionHash(hash)
 	}
 
-	blockSeals := make([]types.BlockSeal, 0)
-	for _, seal := range m.GetBlockSeals() {
-		blockSeals = append(blockSeals, *MessageToBlockSeal(seal))
+	blockSeals := make([]types.BlockSeal, len(m.GetBlockSeals()))
+	for i, seal := range m.GetBlockSeals() {
+		blockSeals[i] = *MessageToBlockSeal(seal)
 	}
 
-	sigs := make([]crypto.Signature, 0)
-	for _, sig := range m.GetSignatures() {
-		sigs = append(sigs, crypto.BytesToSig(sig))
+	sigs := make([]crypto.Signature, len(m.GetSignatures()))
+	for i, sig := range m.GetSignatures() {
+		sigs[i] = crypto.BytesToSig(sig)
 	}
 
 	return &types.Block{
@@ -170,19 +170,19 @@ func MessageToBlock(m *bambooProto.Block) *types.Block {
 func BlockToMessage(t *types.Block) *bambooProto.Block {
 	timestamp, _ := ptypes.TimestampProto(t.Timestamp)
 
-	collectionHashes := make([]*bambooProto.SignedCollectionHash, 0)
-	for _, hash := range t.SignedCollectionHashes {
-		collectionHashes = append(collectionHashes, SignedCollectionHashToMessage(&hash))
+	collectionHashes := make([]*bambooProto.SignedCollectionHash, len(t.SignedCollectionHashes))
+	for i, hash := range t.SignedCollectionHashes {
+		collectionHashes[i] = SignedCollectionHashToMessage(&hash)
 	}
 
-	blockSeals := make([]*bambooProto.BlockSeal, 0)
-	for _, seal := range t.BlockSeals {
-		blockSeals = append(blockSeals, BlockSealToMessage(&seal))
+	blockSeals := make([]*bambooProto.BlockSeal, len(t.BlockSeals))
+	for i, seal := range t.BlockSeals {
+		blockSeals[i] = BlockSealToMessage(&seal)
 	}
 
-	sigs := make([][]byte, 0)
-	for _, sig := range t.Signatures {
-		sigs = append(sigs, sig.Bytes())
+	sigs := make([][]byte, len(t.Signatures))
+	for i, sig := range t.Signatures {
+		sigs[i] = sig.Bytes()
 	}
 
 	return &bambooProto.Block{
@@ -197,14 +197,14 @@ func BlockToMessage(t *types.Block) *bambooProto.Block {
 }
 
 func MessageToBlockSeal(m *bambooProto.BlockSeal) *types.BlockSeal {
-	erSigs := make([]crypto.Signature, 0)
-	for _, sig := range m.GetExecutionReceiptSignatures() {
-		erSigs = append(erSigs, crypto.BytesToSig(sig))
+	erSigs := make([]crypto.Signature, len(m.GetExecutionReceiptSignatures()))
+	for i, sig := range m.GetExecutionReceiptSignatures() {
+		erSigs[i] = crypto.BytesToSig(sig)
 	}
 
-	raSigs := make([]crypto.Signature, 0)
-	for _, sig := range m.GetResultApprovalSignatures() {
-		raSigs = append(raSigs, crypto.BytesToSig(sig))
+	raSigs := make([]crypto.Signature, len(m.GetResultApprovalSignatures()))
+	for i, sig := range m.GetResultApprovalSignatures() {
+		raSigs[i] = crypto.BytesToSig(sig)
 	}
 
 	return &types.BlockSeal{
@@ -216,14 +216,14 @@ func MessageToBlockSeal(m *bambooProto.BlockSeal) *types.BlockSeal {
 }
 
 func BlockSealToMessage(t *types.BlockSeal) *bambooProto.BlockSeal {
-	erSigs := make([][]byte, 0)
-	for _, sig := range t.ExecutionReceiptSignatures {
-		erSigs = append(erSigs, sig.Bytes())
+	erSigs := make([][]byte, len(t.ExecutionReceiptSignatures))
+	for i, sig := range t.ExecutionReceiptSignatures {
+		erSigs[i] = sig.Bytes()
 	}
 
-	raSigs := make([][]byte, 0)
-	for _, sig := range t.ResultApprovalSignatures {
-		raSigs = append(raSigs, sig.Bytes())
+	raSigs := make([][]byte, len(t.ResultApprovalSignatures))
+	for i, sig := range t.ResultApprovalSignatures {
+		raSigs[i] = sig.Bytes()
 	}
 
 	return &bambooProto.BlockSeal{
@@ -235,9 +235,9 @@ func BlockSealToMessage(t *types.BlockSeal) *bambooProto.BlockSeal {
 }
 
 func MessageToTransaction(m *bambooProto.Transaction) *types.Transaction {
-	registers := make([]types.TransactionRegister, 0)
-	for _, r := range m.GetRegisters() {
-		registers = append(registers, *MessageToTransactionRegister(r))
+	registers := make([]types.TransactionRegister, len(m.GetRegisters()))
+	for i, r := range m.GetRegisters() {
+		registers[i] = *MessageToTransactionRegister(r)
 	}
 
 	return &types.Transaction{
@@ -249,9 +249,9 @@ func MessageToTransaction(m *bambooProto.Transaction) *types.Transaction {
 }
 
 func TransactionToMessage(t *types.Transaction) *bambooProto.Transaction {
-	registers := make([]*bambooProto.TransactionRegister, 0)
-	for _, r := range t.Registers {
-		registers = append(registers, TransactionRegisterToMessage(&r))
+	registers := make([]*bambooProto.TransactionRegister, len(t.Registers))
+	for i, r := range t.Registers {
+		registers[i] = TransactionRegisterToMessage(&r)
 	}
 
 	return &bambooProto.Transaction{
@@ -263,9 +263,9 @@ func TransactionToMessage(t *types.Transaction) *bambooProto.Transaction {
 }
 
 func MessageToSignedTransaction(m *bambooProto.SignedTransaction) *types.SignedTransaction {
-	sigs := make([]crypto.Signature, 0)
-	for _, sig := range m.GetScriptSignatures() {
-		sigs = append(sigs, crypto.BytesToSig(sig))
+	sigs := make([]crypto.Signature, len(m.GetScriptSignatures()))
+	for i, sig := range m.GetScriptSignatures() {
+		sigs[i] = crypto.BytesToSig(sig)
 	}
 
 	return &types.SignedTransaction{
@@ -276,9 +276,9 @@ func MessageToSignedTransaction(m *bambooProto.SignedTransaction) *types.SignedT
 }
 
 func SignedTransactionToMessage(t *types.SignedTransaction) *bambooProto.SignedTransaction {
-	sigs := make([][]byte, 0)
-	for _, sig := range t.ScriptSignatures {
-		sigs = append(sigs, sig.Bytes())
+	sigs := make([][]byte, len(t.ScriptSignatures))
+	for i, sig := range t.ScriptSignatures {
+		sigs[i] = sig.Bytes()
 	}
 
 	return &bambooProto.SignedTransaction{
@@ -289,19 +289,19 @@ func SignedTransactionToMessage(t *types.SignedTransaction) *bambooProto.SignedT
 }
 
 func MessageToExecutionReceipt(m *bambooProto.ExecutionReceipt) *types.ExecutionReceipt {
-	registers := make([]types.Register, 0)
-	for _, r := range m.GetInitialRegisters() {
-		registers = append(registers, *MessageToRegister(r))
+	registers := make([]types.Register, len(m.GetInitialRegisters()))
+	for i, r := range m.GetInitialRegisters() {
+		registers[i] = *MessageToRegister(r)
 	}
 
-	irList := make([]types.IntermediateRegisters, 0)
-	for _, ir := range m.GetIntermediateRegistersList() {
-		irList = append(irList, *MessageToIntermediateRegisters(ir))
+	irList := make([]types.IntermediateRegisters, len(m.GetIntermediateRegistersList()))
+	for i, ir := range m.GetIntermediateRegistersList() {
+		irList[i] = *MessageToIntermediateRegisters(ir)
 	}
 
-	sigs := make([]crypto.Signature, 0)
-	for _, sig := range m.GetSignatures() {
-		sigs = append(sigs, crypto.BytesToSig(sig))
+	sigs := make([]crypto.Signature, len(m.GetSignatures()))
+	for i, sig := range m.GetSignatures() {
+		sigs[i] = crypto.BytesToSig(sig)
 	}
 
 	return &types.ExecutionReceipt{
@@ -314,19 +314,19 @@ func MessageToExecutionReceipt(m *bambooProto.ExecutionReceipt) *types.Execution
 }
 
 func ExecutionReceiptToMessage(t *types.ExecutionReceipt) *bambooProto.ExecutionReceipt {
-	registers := make([]*bambooProto.Register, 0)
-	for _, r := range t.InitialRegisters {
-		registers = append(registers, RegisterToMessage(&r))
+	registers := make([]*bambooProto.Register, len(t.InitialRegisters))
+	for i, r := range t.InitialRegisters {
+		registers[i] = RegisterToMessage(&r)
 	}
 
-	irList := make([]*bambooProto.IntermediateRegisters, 0)
-	for _, ir := range t.IntermediateRegistersList {
-		irList = append(irList, IntermediateRegistersToMessage(&ir))
+	irList := make([]*bambooProto.IntermediateRegisters, len(t.IntermediateRegistersList))
+	for i, ir := range t.IntermediateRegistersList {
+		irList[i] = IntermediateRegistersToMessage(&ir)
 	}
 
-	sigs := make([][]byte, 0)
-	for _, sig := range t.Signatures {
-		sigs = append(sigs, sig.Bytes())
+	sigs := make([][]byte, len(t.Signatures))
+	for i, sig := range t.Signatures {
+		sigs[i] = sig.Bytes()
 	}
 
 	return &bambooProto.ExecutionReceipt{
@@ -339,9 +339,9 @@ func ExecutionReceiptToMessage(t *types.ExecutionReceipt) *bambooProto.Execution
 }
 
 func MessageToInvalidExecutionReceiptChallenge(m *bambooProto.InvalidExecutionReceiptChallenge) *types.InvalidExecutionReceiptChallenge {
-	partTransactions := make([]types.IntermediateRegisters, 0)
-	for _, ir := range m.GetPartTransactions() {
-		partTransactions = append(partTransactions, *MessageToIntermediateRegisters(ir))
+	partTransactions := make([]types.IntermediateRegisters, len(m.GetPartTransactions()))
+	for i, ir := range m.GetPartTransactions() {
+		partTransactions[i] = *MessageToIntermediateRegisters(ir)
 	}
 
 	return &types.InvalidExecutionReceiptChallenge{
@@ -354,9 +354,9 @@ func MessageToInvalidExecutionReceiptChallenge(m *bambooProto.InvalidExecutionRe
 }
 
 func InvalidExecutionReceiptChallengeToMessage(t *types.InvalidExecutionReceiptChallenge) *bambooProto.InvalidExecutionReceiptChallenge {
-	partTransactions := make([]*bambooProto.IntermediateRegisters, 0)
-	for _, ir := range t.PartTransactions {
-		partTransactions = append(partTransactions, IntermediateRegistersToMessage(&ir))
+	partTransactions := make([]*bambooProto.IntermediateRegisters, len(t.PartTransactions))
+	for i, ir := range t.PartTransactions {
+		partTransactions[i] = IntermediateRegistersToMessage(&ir)
 	}
 
 	return &bambooProto.InvalidExecutionReceiptChallenge{

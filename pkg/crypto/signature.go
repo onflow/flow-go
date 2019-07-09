@@ -22,6 +22,7 @@ func (s Signature) Bytes() []byte {
 }
 
 // BytesToSig returns Signature with value sig.
+//
 // If sig is larger than SignatureLength, sig will be cropped from the left.
 func BytesToSig(sig []byte) Signature {
 	var s Sig
