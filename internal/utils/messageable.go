@@ -139,7 +139,7 @@ func SignedCollectionHashToMessage(t *types.SignedCollectionHash) *bambooProto.S
 }
 
 func MessageToBlock(m *bambooProto.Block) *types.Block {
-	ts, _ := ptypes.Timestamp(m.GetTimestamp())
+	timestamp, _ := ptypes.Timestamp(m.GetTimestamp())
 
 	collectionHashes := make([]types.SignedCollectionHash, 0)
 	for _, hash := range m.GetSignedCollectionHashes() {
@@ -160,7 +160,7 @@ func MessageToBlock(m *bambooProto.Block) *types.Block {
 		ChainID:                m.GetChainID(),
 		Height:                 m.GetHeight(),
 		PreviousBlockHash:      crypto.BytesToHash(m.GetPreviousBlockHash()),
-		Timestamp:              ts,
+		Timestamp:              timestamp,
 		SignedCollectionHashes: collectionHashes,
 		BlockSeals:             blockSeals,
 		Signatures:             sigs,
@@ -168,7 +168,7 @@ func MessageToBlock(m *bambooProto.Block) *types.Block {
 }
 
 func BlockToMessage(t *types.Block) *bambooProto.Block {
-	ts, _ := ptypes.TimestampProto(t.Timestamp)
+	timestamp, _ := ptypes.TimestampProto(t.Timestamp)
 
 	collectionHashes := make([]*bambooProto.SignedCollectionHash, 0)
 	for _, hash := range t.SignedCollectionHashes {
@@ -189,7 +189,7 @@ func BlockToMessage(t *types.Block) *bambooProto.Block {
 		ChainID:                t.ChainID,
 		Height:                 t.Height,
 		PreviousBlockHash:      t.PreviousBlockHash.Bytes(),
-		Timestamp:              ts,
+		Timestamp:              timestamp,
 		SignedCollectionHashes: collectionHashes,
 		BlockSeals:             blockSeals,
 		Signatures:             sigs,

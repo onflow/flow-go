@@ -137,3 +137,29 @@ func TestResultApproval(t *testing.T) {
 	gomega.Expect(actualMessage).To(Equal(message))
 	gomega.Expect(actualResultApproval).To(Equal(resultApproval))
 }
+
+func TestBlockSeal(t *testing.T) {
+	gomega := NewWithT(t)
+
+	message := types.MockBlockSealMessage()
+	blockSeal := types.MockBlockSeal()
+
+	actualMessage := BlockSealToMessage(blockSeal)
+	actualBlockSeal := MessageToBlockSeal(message)
+
+	gomega.Expect(actualMessage).To(Equal(message))
+	gomega.Expect(actualBlockSeal).To(Equal(blockSeal))
+}
+
+func TestBlock(t *testing.T) {
+	gomega := NewWithT(t)
+
+	message := types.MockBlockMessage()
+	block := types.MockBlock()
+
+	actualMessage := BlockToMessage(block)
+	actualBlock := MessageToBlock(message)
+
+	gomega.Expect(actualMessage).To(Equal(message))
+	gomega.Expect(actualBlock).To(Equal(block))
+}

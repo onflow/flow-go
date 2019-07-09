@@ -1,9 +1,15 @@
 package types
 
 import (
+	"time"
+
+	"github.com/golang/protobuf/ptypes"
+
 	bambooProto "github.com/dapperlabs/bamboo-node/grpc/shared"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
+
+var currentTime = time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC)
 
 func MockHash() crypto.Hash {
 	return crypto.Hash{}
@@ -282,5 +288,80 @@ func MockResultApprovalMessage() *bambooProto.ResultApproval {
 		ResultApprovalSignature: MockSignature().Bytes(),
 		Proof:                   0,
 		Signature:               MockSignature().Bytes(),
+	}
+}
+
+func MockBlockSeal() *BlockSeal {
+	erSigs := make([]crypto.Signature, 0)
+	raSigs := make([]crypto.Signature, 0)
+	for i := 0; i < 5; i++ {
+		erSigs = append(erSigs, MockSignature())
+		raSigs = append(raSigs, MockSignature())
+	}
+
+	return &BlockSeal{
+		BlockHash:                  MockHash(),
+		ExecutionReceiptHash:       MockHash(),
+		ExecutionReceiptSignatures: erSigs,
+		ResultApprovalSignatures:   raSigs,
+	}
+}
+
+func MockBlockSealMessage() *bambooProto.BlockSeal {
+	erSigs := make([][]byte, 0)
+	raSigs := make([][]byte, 0)
+	for i := 0; i < 5; i++ {
+		erSigs = append(erSigs, MockSignature().Bytes())
+		raSigs = append(raSigs, MockSignature().Bytes())
+	}
+
+	return &bambooProto.BlockSeal{
+		BlockHash:                  MockHash().Bytes(),
+		ExecutionReceiptHash:       MockHash().Bytes(),
+		ExecutionReceiptSignatures: erSigs,
+		ResultApprovalSignatures:   raSigs,
+	}
+}
+
+func MockBlock() *Block {
+	signedCollectionHashes := make([]SignedCollectionHash, 0)
+	blockSeals := make([]BlockSeal, 0)
+	sigs := make([]crypto.Signature, 0)
+	for i := 0; i < 5; i++ {
+		signedCollectionHashes = append(signedCollectionHashes, *MockSignedCollectionHash())
+		blockSeals = append(blockSeals, *MockBlockSeal())
+		sigs = append(sigs, MockSignature())
+	}
+
+	return &Block{
+		ChainID:                "BAMBOO",
+		Height:                 0,
+		PreviousBlockHash:      MockHash(),
+		Timestamp:              currentTime,
+		SignedCollectionHashes: signedCollectionHashes,
+		BlockSeals:             blockSeals,
+		Signatures:             sigs,
+	}
+}
+
+func MockBlockMessage() *bambooProto.Block {
+	timestamp, _ := ptypes.TimestampProto(currentTime)
+	signedCollectionHashes := make([]*bambooProto.SignedCollectionHash, 0)
+	blockSeals := make([]*bambooProto.BlockSeal, 0)
+	sigs := make([][]byte, 0)
+	for i := 0; i < 5; i++ {
+		signedCollectionHashes = append(signedCollectionHashes, MockSignedCollectionHashMessage())
+		blockSeals = append(blockSeals, MockBlockSealMessage())
+		sigs = append(sigs, MockSignature().Bytes())
+	}
+
+	return &bambooProto.Block{
+		ChainID:                "BAMBOO",
+		Height:                 0,
+		PreviousBlockHash:      MockHash().Bytes(),
+		Timestamp:              timestamp,
+		SignedCollectionHashes: signedCollectionHashes,
+		BlockSeals:             blockSeals,
+		Signatures:             sigs,
 	}
 }
