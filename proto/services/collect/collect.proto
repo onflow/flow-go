@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package bamboo.services.collect;
+
+option go_package = "collect";
+
+import "shared/messages.proto";
+
+
+service CollectService {
+  rpc SubmitTransaction (SubmitTransactionRequest) returns (SubmitTransactionResponse);
+
+  rpc SubmitCollection (SubmitCollectionRequest) returns (SubmitCollectionResponse);
+
+  rpc GetTransaction (GetTransactionRequest) returns (GetTransactionResponse);
+
+  rpc GetCollection (GetCollectionRequest) returns (GetCollectionResponse);
+}
+
+
+message SubmitTransactionRequest {
+  bamboo.shared.SignedTransaction transaction = 1;
+}
+  
+message SubmitTransactionResponse {}
+
+message SubmitCollectionRequest {
+  bamboo.shared.Collection collection = 1;
+  bytes accessSignature = 2;
+}
+  
+message SubmitCollectionResponse {
+  bytes accessSignature = 1;
+}
+
+message GetTransactionRequest {
+  bytes transactionHash = 1;
+}
+
+message GetTransactionResponse {
+  bamboo.shared.SignedTransaction transaction = 1;
+}
+
+message GetCollectionRequest {
+  bytes collectionHash = 1;
+}
+
+message GetCollectionResponse {
+  bamboo.shared.Collection collection = 1;
+}

@@ -22,14 +22,18 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 
 | Stream         | Owner(s)                    | Packages  |
 | -------------- | --------------------------- | --------- |
-| Pre-execution  | [Peter Siemens](https://github.com/psiemens])   | [/internal/access](/internal/access), [/internal/clusters](/internal/clusters), [/internal/routing](/internal/routing), [/cmd/access](/cmd/access) |
-| Execution      | [Bastian Müller](https://github.com/@turbolent) | [/runtime](/runtime), [/language](/language), [/internal/execute](/internal/execute), [/cmd/execute](/cmd/execute) |
-| Post-execution | [Moar Zamski](https://github.com/@pazams)     | [/internal/access](/internal/access), [/cmd/access](/cmd/access) |
-| Consensus | [Alexander Hentschel](https://github.com/@AlexHentschel)     | [/consensus](/consensus), [/internal/security](/internal/security) |
-| Networking | [Yahya Hassanzadeh](https://github.com/@yhassanzadeh)     | [/network](/network) |
-| Keystone | [Tarak Ben Youssef](https://github.com/@tarakby)     | [/pkg/crypto](/pkg/crypto) |
-| Emulator | [Brian Ho](https://github.com/@mrbrianhobo), [Peter Siemens](https://github.com/@psiemens)     | [/internal/emulator](/internal/emulator), [/client](/client), [/cmd/bamboo](/cmd/bamboo)|
-| Engineer Performance | [Timofey Smirnov](https://github.com/@tsmirnov) | |
+| Collection  | [Peter Siemens](https://github.com/psiemens])   | [/internal/protocol/collect](/internal/protocol/collect), [/internal/nodes/access](/internal/nodes/access), [/cmd/access](/cmd/access) |
+| Consensus | [Alexander Hentschel](https://github.com/@AlexHentschel)     | [/internal/protocol/consensus](/internal/protocol/consensus), [/internal/security](/internal/security), [/cmd/security](/cmd/security) |
+| Execution      | [Bastian Müller](https://github.com/@turbolent) | [/internal/protocol/execute](/internal/protocol/execute), [/internal/nodes/execute](/internal/nodes/execute) [/cmd/execute](/cmd/execute) |
+| Verifcation | [Moar Zamski](https://github.com/@pazams)     | [/internal/protocol/verify](/internal/protocol/verify), [/internal/access](/internal/access), [/cmd/access](/cmd/access) |
+| Sealing | [Moar Zamski](https://github.com/@pazams)     | [/internal/protocol/seal](/internal/protocol/seal), [/internal/security](/internal/security), [/cmd/security](/cmd/security) |
+| Networking | [Yahya Hassanzadeh](https://github.com/@yhassanzadeh)     | [/internal/network](/internal/network) |
+| Cryptography | [Tarak Ben Youssef](https://github.com/@tarakby)     | [/pkg/crypto](/pkg/crypto) |
+| Emulator | [Brian Ho](https://github.com/@mrbrianhobo), [Peter Siemens](https://github.com/@psiemens)     | [/internal/emulator](/internal/emulator) |
+| Client Library | [Brian Ho](https://github.com/@mrbrianhobo), [Peter Siemens](https://github.com/@psiemens)     | [/client](/client), [/internal/cli](/internal/cli), [/cmd/bamboo](/cmd/bamboo) |
+| Observation | [Peter Siemens](https://github.com/@psiemens)     | [/internal/protocol/observe](/internal/protocol/observe), [/internal/access](/internal/access), [/cmd/access](/cmd/access) |
+| Ops & Performance | [Timofey Smirnov](https://github.com/@tsmirnov) | |
+| Language & Runtime | [Bastian Müller](https://github.com/@turbolent) | [/language](/language) |
 
 ## Workflow
 

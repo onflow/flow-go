@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/execute"
+	"github.com/dapperlabs/bamboo-node/internal/nodes/execute"
 )
 
 func main() {
