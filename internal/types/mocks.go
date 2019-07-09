@@ -148,3 +148,51 @@ func MockSignedTransactionMessage() *bambooProto.SignedTransaction {
 		PayerSignature:   MockSignature().Bytes(),
 	}
 }
+
+func MockCollection() *Collection {
+	transactions := make([]SignedTransaction, 0)
+	for i := 0; i < 5; i++ {
+		transactions = append(transactions, *MockSignedTransaction())
+	}
+
+	return &Collection{
+		Transactions:        transactions,
+		FoundationBlockHash: MockHash(),
+	}
+}
+
+func MockCollectionMessage() *bambooProto.Collection {
+	transactions := make([]*bambooProto.SignedTransaction, 0)
+	for i := 0; i < 5; i++ {
+		transactions = append(transactions, MockSignedTransactionMessage())
+	}
+
+	return &bambooProto.Collection{
+		Transactions:        transactions,
+		FoundationBlockHash: MockHash().Bytes(),
+	}
+}
+
+func MockSignedCollectionHash()  *SignedCollectionHash {
+	sigs := make([]crypto.Signature, 0)
+	for i := 0; i < 5; i++ {
+		sigs = append(sigs, MockSignature())
+	}
+	
+	return &SignedCollectionHash{
+		CollectionHash:	MockHash(),
+		Signatures:	sigs,
+	}
+}
+
+func MockSignedCollectionHashMessage()  *bambooProto.SignedCollectionHash {
+	sigs := make([][]byte, 0)
+	for i := 0; i < 5; i++ {
+		sigs = append(sigs, MockSignature().Bytes())
+	}
+
+	return &bambooProto.SignedCollectionHash{
+		CollectionHash:	MockHash().Bytes(),
+		Signatures:	sigs,
+	}
+}

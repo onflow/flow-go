@@ -82,3 +82,33 @@ func TestSignedTransaction(t *testing.T) {
 	gomega.Expect(SignedTransactionToMessage(actualSignedTxn)).To(Equal(message))
 	gomega.Expect(MessageToSignedTransaction(actualMessage)).To(Equal(signedTxn))
 }
+
+func TestCollection(t *testing.T) {
+	gomega := NewWithT(t)
+
+	message := types.MockCollectionMessage()
+	collection := types.MockCollection()
+
+	actualMessage := CollectionToMessage(collection)
+	actualCollection := MessageToCollection(message)
+
+	gomega.Expect(actualMessage).To(Equal(message))
+	gomega.Expect(actualCollection).To(Equal(collection))
+	gomega.Expect(CollectionToMessage(actualCollection)).To(Equal(message))
+	gomega.Expect(MessageToCollection(actualMessage)).To(Equal(collection))
+}
+
+func TestSignedCollectionHash(t *testing.T) {
+	gomega := NewWithT(t)
+
+	message := types.MockSignedCollectionHashMessage()
+	signedCollectionHash := types.MockSignedCollectionHash()
+
+	actualMessage := SignedCollectionHashToMessage(signedCollectionHash)
+	actualSignedCollectionHash := MessageToSignedCollectionHash(message)
+
+	gomega.Expect(actualMessage).To(Equal(message))
+	gomega.Expect(actualSignedCollectionHash).To(Equal(signedCollectionHash))
+	gomega.Expect(SignedCollectionHashToMessage(actualSignedCollectionHash)).To(Equal(message))
+	gomega.Expect(MessageToSignedCollectionHash(actualMessage)).To(Equal(signedCollectionHash))
+}
