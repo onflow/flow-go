@@ -2228,7 +2228,7 @@ impl Hashable for Point {
 
 > 🚧 Status: Storage is not implemented yet.
 
-Values can be stored, i.e. persisted across multiple executions of the program, if they are storable. Values are storable if they have a type that implements the interface `Storable`.
+Storable types can be persisted across multiple executions of the program. Values are storable if they have a type that implements the interface `Storable`.
 
 All built-in types are storable: booleans, integers, arrays with storable elements, and dictionaries with storable keys and values.
 
