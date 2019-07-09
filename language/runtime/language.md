@@ -14,9 +14,10 @@
 - [Semicolons](#semicolons)
 - [Values and Types](#values-and-types)
   - [Booleans](#booleans)
+  - [Numeric Literals](#numeric-literals)
   - [Integers](#integers)
   - [Floating-Point Numbers](#floating-point-numbers)
-  - [Numeric Literals](#numeric-literals)
+  - [Addresses](#addresses)
   - [Arrays](#arrays)
     - [Array Indexing](#array-indexing)
     - [Array Types](#array-types)
@@ -285,28 +286,6 @@ Values are objects, like for example booleans, integers, or arrays. Values are t
 
 The two boolean values `true` and `false` have the type `Bool`.
 
-### Integers
-
-Integers are whole numbers without a fractional part. They are either *signed* (positive, zero, or negative) or *unsigned* (positive or zero) and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
-
-The names for the integer types follow this naming convention: Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix, i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
-
- - **`Int8`**: -128 through 127
- - **`Int16`**: -32768 through 32767
- - **`Int32`**: -2147483648 through 2147483647
- - **`Int64`**: -9223372036854775808 through 9223372036854775807
- - **`UInt16`**: 0 through 65535
- - **`UInt32`**: 0 through 4294967295
- - **`UInt64`**: 0 through 18446744073709551615
-
-In addition, the arbitrary precision integer type `Int` is provided.
-
-### Floating-Point Numbers
-
-There is no support for floating point numbers.
-
-Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here. Fixed point numbers should be simulated using integers and a scale factor for now.
-
 ### Numeric Literals
 
 Numbers can be written in various bases. Numbers are assumed to be decimal by default. Non-decimal literals have a specific prefix.
@@ -350,6 +329,73 @@ Underscores are allowed for all numeral systems.
 
 ```swift,file=number-underscores-binary.bpl
 const binaryNumber = 0b10_11_01
+```
+
+### Integers
+
+Integers are whole numbers without a fractional part. They are either *signed* (positive, zero, or negative) or *unsigned* (positive or zero) and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
+
+The names for the integer types follow this naming convention: Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix, i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
+
+ - **`Int8`**: -128 through 127
+ - **`Int16`**: -32768 through 32767
+ - **`Int32`**: -2147483648 through 2147483647
+ - **`Int64`**: -9223372036854775808 through 9223372036854775807
+ - **`UInt16`**: 0 through 65535
+ - **`UInt32`**: 0 through 4294967295
+ - **`UInt64`**: 0 through 18446744073709551615
+
+```swift
+// Declare a constant that has type `UInt8` and the value 10
+const smallNumber: UInt8 = 10
+```
+
+```swift
+// Invalid: negative literal cannot be used as an unsigned integer
+//
+const invalidNumber: UInt8 = -10
+```
+
+In addition, the arbitrary precision integer type `Int` is provided.
+
+```swift
+const veryLargeNumber: Int = 10000000000000000000000000000000
+```
+
+### Floating-Point Numbers
+
+There is no support for floating point numbers.
+
+Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here. Fixed point numbers should be simulated using integers and a scale factor for now.
+
+### Addresses
+
+The type `Address` represents an address. Addresses are unsigned integers with a size of 160 bits.  Hexadecimal integer literals can be used to create address values.
+
+```swift
+// Declare a constant that has type `Address`
+//
+const someAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d
+
+// Invalid: Initial value is not compatible with type `Address`,
+// it is not a number
+//
+const notAnAddress: Address = ""
+
+// Invalid: Initial value is not compatible with type `Address`,
+// it is a number, but larger than 160 bits
+//
+const alsoNotAnAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d123456789
+```
+
+Integer literals are not inferred to be an address.
+
+```swift
+// Declare a number. Even though it happens to be a valid address,
+// it is not inferred as it.
+//
+const aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
+// `aNumber` has type `Int`
 ```
 
 ### Arrays
