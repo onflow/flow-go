@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
-var currentTime = time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC)
+var mockedCurrentTime = time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC)
 
 func MockHash() crypto.Hash {
 	return crypto.Hash{}
@@ -337,7 +337,7 @@ func MockBlock() *Block {
 		ChainID:                "BAMBOO",
 		Height:                 0,
 		PreviousBlockHash:      MockHash(),
-		Timestamp:              currentTime,
+		Timestamp:              mockedCurrentTime,
 		SignedCollectionHashes: signedCollectionHashes,
 		BlockSeals:             blockSeals,
 		Signatures:             sigs,
@@ -345,7 +345,7 @@ func MockBlock() *Block {
 }
 
 func MockBlockMessage() *bambooProto.Block {
-	timestamp, _ := ptypes.TimestampProto(currentTime)
+	timestamp, _ := ptypes.TimestampProto(mockedCurrentTime)
 	signedCollectionHashes := make([]*bambooProto.SignedCollectionHash, 0)
 	blockSeals := make([]*bambooProto.BlockSeal, 0)
 	sigs := make([][]byte, 0)
