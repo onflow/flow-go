@@ -124,3 +124,16 @@ func TestInvalidExecutionReceiptChallenge(t *testing.T) {
 	gomega.Expect(actualMessage).To(Equal(message))
 	gomega.Expect(actualIERC).To(Equal(invalidExecutionReceiptChallenge))
 }
+
+func TestResultApproval(t *testing.T) {
+	gomega := NewWithT(t)
+
+	message := types.MockResultApprovalMessage()
+	resultApproval := types.MockResultApproval()
+
+	actualMessage := ResultApprovalToMessage(resultApproval)
+	actualResultApproval := MessageToResultApproval(message)
+
+	gomega.Expect(actualMessage).To(Equal(message))
+	gomega.Expect(actualResultApproval).To(Equal(resultApproval))
+}

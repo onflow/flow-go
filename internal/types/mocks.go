@@ -264,3 +264,23 @@ func MockInvalidExecutionReceiptChallengeMessage() *bambooProto.InvalidExecution
 		Signature:                 MockSignature().Bytes(),
 	}
 }
+
+func MockResultApproval() *ResultApproval {
+	return &ResultApproval{
+		BlockHeight:             0,
+		ExecutionReceiptHash:    MockHash(),
+		ResultApprovalSignature: MockSignature(),
+		Proof:                   0,
+		Signature:               MockSignature(),
+	}
+}
+
+func MockResultApprovalMessage() *bambooProto.ResultApproval {
+	return &bambooProto.ResultApproval{
+		BlockHeight:             0,
+		ExecutionReceiptHash:    MockHash().Bytes(),
+		ResultApprovalSignature: MockSignature().Bytes(),
+		Proof:                   0,
+		Signature:               MockSignature().Bytes(),
+	}
+}
