@@ -18,6 +18,7 @@
   - [Integers](#integers)
   - [Floating-Point Numbers](#floating-point-numbers)
   - [Addresses](#addresses)
+  - [Strings and Characters](#strings-and-characters)
   - [Arrays](#arrays)
     - [Array Indexing](#array-indexing)
     - [Array Types](#array-types)
@@ -399,6 +400,73 @@ Integer literals are not inferred to be an address.
 const aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 // `aNumber` has type `Int`
 ```
+
+### Strings and Characters
+
+Strings are collections of characters. Strings have the type `String`, and characters have the type `Character`. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.
+
+String and character literals are enclosed in double quotation marks (`"`).
+
+```swift
+const someString = "Hello, world!"
+```
+
+String literals may contain escape sequences. An escape sequence starts with a backslash (`\`):
+
+- `\0`: Null character
+- `\\`: Backslash
+- `\t`: Horizontal tab
+- `\n`: Line feed
+- `\r`: Carriage return
+- `\"`: Double quotation mark
+- `\'`: Single quotation mark
+- `\u`: A Unicode scalar value, written as `\u{x}`, where `x` is a 1–8 digit hexadecimal number which needs to be a valid Unicode scalar value, i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive
+
+```swift
+// Declare a constant which contains two lines of text
+// (separated by the line feed character `\n`), and ends
+// with a thumbs up emoji, which has code point U+1F44D (0x1F44D)
+//
+const thumbsUpText =
+    "This is the first line.\nThis is the second line with an emoji: \u{1F44D}"
+```
+
+The type `Character` represents a single, human-readable character. Characters are extended grapheme clusters, which consist of one or more Unicode scalars.
+
+For example, the single character `ü` can be represented in several ways in Unicode. First, it can be represented by a single Unicode scalar value `ü` ("LATIN SMALL LETTER U WITH DIAERESIS", code point U+00FC). Second, the same single character can be represented by two Unicode scalar values: `u` ("LATIN SMALL LETTER U", code point U+0075), and "COMBINING DIAERESIS" (code point U+0308). The combining Unicode scalar value is applied to the scalar before it, which turns a `u` into a `ü`.
+
+Still, both variants represent the same human-readable character `ü`.
+
+```swift
+const singleScalar: Character = "\u{FC}"
+// `singleScalar` is `ü`
+const twoScalars: Character = "\u{75}\u{308}"
+// `twoScalars` is `ü`
+```
+
+Another example where multiple Unicode scalar values are rendered as a single, human-readable character is a flag emoji. These emojis consist of two "REGIONAL INDICATOR SYMBOL LETTER" Unicode scalar values.
+
+```swift
+// Declare a constant for a string with a single character, the emoji
+// for the Canadian flag, which consists of two Unicode scalar values:
+// - REGIONAL INDICATOR SYMBOL LETTER C (U+1F1E8)
+// - REGIONAL INDICATOR SYMBOL LETTER A (U+1F1E6)
+//
+const canadianFlag: Character = "\u{1F1E8}\u{1F1E6}"
+// `canadianFlag` is `🇨🇦`
+```
+
+<!--
+
+TODO
+
+#### String Functions
+
+- Length, concatenate
+- Append, remove, etc. for variable-size arrays
+- Document and link to string concatenation operator `&` in operators section
+
+-->
 
 ### Arrays
 
