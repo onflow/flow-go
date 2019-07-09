@@ -19,8 +19,6 @@ func TestRegister(t *testing.T) {
 
 	gomega.Expect(actualMessage).To(Equal(message))
 	gomega.Expect(actualRegister).To(Equal(register))
-	gomega.Expect(RegisterToMessage(actualRegister)).To(Equal(message))
-	gomega.Expect(MessageToRegister(actualMessage)).To(Equal(register))
 }
 
 func TestIntermediateRegisters(t *testing.T) {
@@ -34,8 +32,6 @@ func TestIntermediateRegisters(t *testing.T) {
 
 	gomega.Expect(actualMessage).To(Equal(message))
 	gomega.Expect(actualIntermediateRegisters).To(Equal(intermediateRegisters))
-	gomega.Expect(IntermediateRegistersToMessage(actualIntermediateRegisters)).To(Equal(message))
-	gomega.Expect(MessageToIntermediateRegisters(actualMessage)).To(Equal(intermediateRegisters))
 }
 
 func TestTransactionRegister(t *testing.T) {
@@ -49,8 +45,6 @@ func TestTransactionRegister(t *testing.T) {
 
 	gomega.Expect(actualMessage).To(Equal(message))
 	gomega.Expect(actualTransactionRegister).To(Equal(transactionRegister))
-	gomega.Expect(TransactionRegisterToMessage(actualTransactionRegister)).To(Equal(message))
-	gomega.Expect(MessageToTransactionRegister(actualMessage)).To(Equal(transactionRegister))
 }
 
 func TestTransaction(t *testing.T) {
@@ -64,8 +58,6 @@ func TestTransaction(t *testing.T) {
 
 	gomega.Expect(actualMessage).To(Equal(message))
 	gomega.Expect(actualTxn).To(Equal(txn))
-	gomega.Expect(TransactionToMessage(actualTxn)).To(Equal(message))
-	gomega.Expect(MessageToTransaction(actualMessage)).To(Equal(txn))
 }
 
 func TestSignedTransaction(t *testing.T) {
@@ -79,8 +71,6 @@ func TestSignedTransaction(t *testing.T) {
 
 	gomega.Expect(actualMessage).To(Equal(message))
 	gomega.Expect(actualSignedTxn).To(Equal(signedTxn))
-	gomega.Expect(SignedTransactionToMessage(actualSignedTxn)).To(Equal(message))
-	gomega.Expect(MessageToSignedTransaction(actualMessage)).To(Equal(signedTxn))
 }
 
 func TestCollection(t *testing.T) {
@@ -94,8 +84,6 @@ func TestCollection(t *testing.T) {
 
 	gomega.Expect(actualMessage).To(Equal(message))
 	gomega.Expect(actualCollection).To(Equal(collection))
-	gomega.Expect(CollectionToMessage(actualCollection)).To(Equal(message))
-	gomega.Expect(MessageToCollection(actualMessage)).To(Equal(collection))
 }
 
 func TestSignedCollectionHash(t *testing.T) {
@@ -109,6 +97,4 @@ func TestSignedCollectionHash(t *testing.T) {
 
 	gomega.Expect(actualMessage).To(Equal(message))
 	gomega.Expect(actualSignedCollectionHash).To(Equal(signedCollectionHash))
-	gomega.Expect(SignedCollectionHashToMessage(actualSignedCollectionHash)).To(Equal(message))
-	gomega.Expect(MessageToSignedCollectionHash(actualMessage)).To(Equal(signedCollectionHash))
 }
