@@ -1535,14 +1535,56 @@ example.balance = -50
 
 ### Synthetic Structure and Class Fields
 
-If a field has both a getter and a setter, and neither of them read from/write to the field, the field is *synthetic*. Synthetic fields **must** be declared as such using the `synthetic` keyword. Synthetic fields are neither variable nor constant, and they are not actually stored in the structure or class value.
+Fields which are not stored in the structure or class value are *synthetic*, i.e., the field value is computed. Synthetic can be either read-only, or readable and writable.
 
-```typescript,file=struct-and-class-synthetic-field.bpl
+Synthetic fields are declared using the `synthetic` keyword.
+
+Synthetic fields are read-only when only a getter is provided.
+
+```swift,file=struct-and-class-synthetic-field-getter-only.bpl
+struct Rectangle {
+    var width: Int
+    var height: Int
+
+    // Declare a synthetic field named `area`,
+    // which computes the area based on the width and height
+    //
+    synthetic area: Int {
+        get {
+            return width * height
+        }
+    }
+}
+```
+
+Synthetic fields are readable and writable when both a getter and a setter is declared.
+
+```swift,file=struct-and-class-synthetic-field-setter-getter.bpl
+// Declare a struct named `GoalTracker` which stores a number
+// of target goals, a number of completed goals,
+// and has a synthetic field to provide the left number of goals
+//
+// NOTE: the tracker only implements some functionality to demonstrate
+// synthetic fields, it is incomplete (e.g. assignments to `goal` are not handled properly)
+//
 struct GoalTracker {
 
     var goal: Int
     var completed: Int
 
+    // Declare a synthetic field which is both readable
+    // and writable.
+    //
+    // When the field is read from (in the getter),
+    // the number of left goals is computed from
+    // the target number of goals and
+    // the completed number of goals.
+    //
+    // When the field is written to (in the setter),
+    // the number of completed goals is updated,
+    // based on the number of target goals
+    // and the new remaining number of goals
+    //
     synthetic left: Double {
         get {
             return self.goal - self.completed
@@ -1569,10 +1611,10 @@ tracker.completed = 1
 
 tracker.left = 8
 // tracker.completed is 2
-
-// NOTE: the tracker only implements some functionality to demonstrate
-// synthesized fields, it is incomplete (e.g. assignments to `goal` are not handled properly)
 ```
+
+It is invalid to declare a synthetic field with only a setter.
+
 
 ### Structure and Class Functions
 
