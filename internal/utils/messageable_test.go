@@ -9,7 +9,7 @@ import (
 )
 
 func TestRegister(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockRegisterMessage()
 	register := types.MockRegister()
@@ -17,12 +17,12 @@ func TestRegister(t *testing.T) {
 	actualMessage := RegisterToMessage(register)
 	actualRegister := MessageToRegister(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualRegister).To(Equal(register))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualRegister).To(Equal(register))
 }
 
 func TestIntermediateRegisters(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockIntermediateRegistersMessage()
 	intermediateRegisters := types.MockIntermediateRegisters()
@@ -30,12 +30,12 @@ func TestIntermediateRegisters(t *testing.T) {
 	actualMessage := IntermediateRegistersToMessage(intermediateRegisters)
 	actualIntermediateRegisters := MessageToIntermediateRegisters(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualIntermediateRegisters).To(Equal(intermediateRegisters))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualIntermediateRegisters).To(Equal(intermediateRegisters))
 }
 
 func TestTransactionRegister(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockTransactionRegisterMessage()
 	transactionRegister := types.MockTransactionRegister()
@@ -43,12 +43,12 @@ func TestTransactionRegister(t *testing.T) {
 	actualMessage := TransactionRegisterToMessage(transactionRegister)
 	actualTransactionRegister := MessageToTransactionRegister(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualTransactionRegister).To(Equal(transactionRegister))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualTransactionRegister).To(Equal(transactionRegister))
 }
 
 func TestTransaction(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockTransactionMessage()
 	txn := types.MockTransaction()
@@ -56,12 +56,12 @@ func TestTransaction(t *testing.T) {
 	actualMessage := TransactionToMessage(txn)
 	actualTxn := MessageToTransaction(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualTxn).To(Equal(txn))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualTxn).To(Equal(txn))
 }
 
 func TestSignedTransaction(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockSignedTransactionMessage()
 	signedTxn := types.MockSignedTransaction()
@@ -69,12 +69,12 @@ func TestSignedTransaction(t *testing.T) {
 	actualMessage := SignedTransactionToMessage(signedTxn)
 	actualSignedTxn := MessageToSignedTransaction(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualSignedTxn).To(Equal(signedTxn))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualSignedTxn).To(Equal(signedTxn))
 }
 
 func TestCollection(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockCollectionMessage()
 	collection := types.MockCollection()
@@ -82,12 +82,12 @@ func TestCollection(t *testing.T) {
 	actualMessage := CollectionToMessage(collection)
 	actualCollection := MessageToCollection(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualCollection).To(Equal(collection))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualCollection).To(Equal(collection))
 }
 
 func TestSignedCollectionHash(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockSignedCollectionHashMessage()
 	signedCollectionHash := types.MockSignedCollectionHash()
@@ -95,12 +95,12 @@ func TestSignedCollectionHash(t *testing.T) {
 	actualMessage := SignedCollectionHashToMessage(signedCollectionHash)
 	actualSignedCollectionHash := MessageToSignedCollectionHash(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualSignedCollectionHash).To(Equal(signedCollectionHash))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualSignedCollectionHash).To(Equal(signedCollectionHash))
 }
 
 func TestExecutionReceipt(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockExecutionReceiptMessage()
 	executionReceipt := types.MockExecutionReceipt()
@@ -108,12 +108,12 @@ func TestExecutionReceipt(t *testing.T) {
 	actualMessage := ExecutionReceiptToMessage(executionReceipt)
 	actualExecutionReceipt := MessageToExecutionReceipt(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualExecutionReceipt).To(Equal(executionReceipt))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualExecutionReceipt).To(Equal(executionReceipt))
 }
 
 func TestInvalidExecutionReceiptChallenge(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockInvalidExecutionReceiptChallengeMessage()
 	invalidExecutionReceiptChallenge := types.MockInvalidExecutionReceiptChallenge()
@@ -121,12 +121,12 @@ func TestInvalidExecutionReceiptChallenge(t *testing.T) {
 	actualMessage := InvalidExecutionReceiptChallengeToMessage(invalidExecutionReceiptChallenge)
 	actualIERC := MessageToInvalidExecutionReceiptChallenge(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualIERC).To(Equal(invalidExecutionReceiptChallenge))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualIERC).To(Equal(invalidExecutionReceiptChallenge))
 }
 
 func TestResultApproval(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockResultApprovalMessage()
 	resultApproval := types.MockResultApproval()
@@ -134,12 +134,12 @@ func TestResultApproval(t *testing.T) {
 	actualMessage := ResultApprovalToMessage(resultApproval)
 	actualResultApproval := MessageToResultApproval(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualResultApproval).To(Equal(resultApproval))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualResultApproval).To(Equal(resultApproval))
 }
 
 func TestBlockSeal(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockBlockSealMessage()
 	blockSeal := types.MockBlockSeal()
@@ -147,12 +147,12 @@ func TestBlockSeal(t *testing.T) {
 	actualMessage := BlockSealToMessage(blockSeal)
 	actualBlockSeal := MessageToBlockSeal(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualBlockSeal).To(Equal(blockSeal))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualBlockSeal).To(Equal(blockSeal))
 }
 
 func TestBlock(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	message := types.MockBlockMessage()
 	block := types.MockBlock()
@@ -160,6 +160,6 @@ func TestBlock(t *testing.T) {
 	actualMessage := BlockToMessage(block)
 	actualBlock := MessageToBlock(message)
 
-	gomega.Expect(actualMessage).To(Equal(message))
-	gomega.Expect(actualBlock).To(Equal(block))
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualBlock).To(Equal(block))
 }
