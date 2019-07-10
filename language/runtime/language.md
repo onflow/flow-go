@@ -2634,8 +2634,6 @@ Storable values can be stored for an [account](#accounts) by using the `storeIfN
 fun storeIfNotExists(_ value: Storable, auth: StorageAuth)
 ```
 
-It is only possible to store **one** value of a type.
-
 ```swift,file=storage-storeIfNotExists.bpl
 // Store the integer value `42` for an account, given a storage authorization for it
 //
@@ -2653,7 +2651,13 @@ const account: Account = // ...
 const value: Int? = account.getStored(Int)
 ```
 
-Just like storing primitive values, like integers or booleans, but more practical, is storing composite data structures, like structures and classes.
+It is only possible to store **one** value per type at the root of an account. Storing primitive values (e.g., integers, booleans) at the root of an account is possible, but not very practical – it is unclear what the value means. 
+
+If a single primitive value, multiple values of the same type, or even more complex data should be stored, consider declaring a composite data structure, like a class. This makes it explicit what data is stored (through the name of the type), what values are stored (the names of the fields), and what types the values have (the type annotations of the fields).
+
+Enforcing the use of types might seem unnecessary work, but it provides several safety guarantees. For example, the API could allow using arbitrary string keys to differentiate several values (of possibly the same type). However, that would introduce a possibility for accidentally using different keys and/or different types for reading and writing – the two string literals have no relation. When the key and/or type in the part of the code that reads a value is changed, the key and/or type in the part of the code that reads the value need to be manually kept in sync. If they are not, a bug is introduced.
+
+If a composite type with fields is used, accidentally using different names or types to read or write a value is impossible, as the type checking will detect it. Leveraging the type system is the key to avoiding bugs. 
 
 ```swift,file=storage-simplevault.bpl
 // Declare a class named `SimpleVault`.
