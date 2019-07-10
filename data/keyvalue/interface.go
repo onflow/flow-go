@@ -1,7 +1,8 @@
+// Package keyvalue provides an abstract interface for connecting to DBs and building/executing key-value queries on them.
 package keyvalue
 
-// DBConnecter abstracts a db connection
-type DBConnecter interface {
+// DBConnector abstracts a db connection
+type DBConnector interface {
 	NewQuery() QueryBuilder
 	MigrateUp() error
 	MigrateDown() error
