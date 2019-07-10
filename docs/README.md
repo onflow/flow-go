@@ -13,7 +13,7 @@ Specfic documentation for smaller components lives within the other packages of 
    3. [Execution](/internal/protocol/execute/README.md)
    4. [Verifcation](/internal/protocol/verify/README.md)
    5. [Sealing](/internal/protocol/seal/README.md)
-   6. [Networking](/internal/network/README.md)
+   6. [Networking](/pkg/network/README.md)
    7. [Cryptography](/pkg/crypto/README.md)
    8. [Language & Runtime](/language/README.md)
    9. [Observation](/internal/protocol/observe/README.md)
