@@ -2817,28 +2817,43 @@ const value: Int? = account.getStored(Int)
 
 > 🚧 Status: External contracts and interfaces are not implemented yet.
 
-External contracts and interfaces can be instantiated by calling the `at` function on the contract or interface type and passing the address where the code is deployed.
+External contracts and interfaces can be instantiated by calling the `at` function on the contract or interface type and passing the address where the code is deployed. It returns an optional, as the code at the given address might not be of the given type.
 
 ```swift
 // Declaration for an interface named `Counter`.
-// It is assumed to be available at address 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
 //
 interface Counter {
     pub count: Int
     pub fun increment(_ count: Int)
 }
 
-// Instantiate the interface `Counter` for address 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
+// Try to instantiate the interface `Counter` for the code
+// at address 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
+//
 // The result is a value which has type `Counter`.
 //
-const counter: Counter = Counter.at(0x06012c8cf97BEaD5deAe237070F9587f8E7A266d)
+const counter: Counter =
+    Counter.at(0x06012c8cf97BEaD5deAe237070F9587f8E7A266d)
+       ?? fatalError("contract at address is not a counter")
 
 // Access the field `count`
+//
 counter.count
 
 // Call the function `increment` on the counter
+//
 counter.increment(42)
 ```
+
+In addition it is also possible to just check if an address has code with a given type.
+
+```swift
+// Check if the interface `Counter` is available
+// at address 0x2F4Bdafb22bd92AA7b7552d270376dE8eDccbc1E
+//
+const exists: Bool = Counter.exists(at: 0x2F4Bdafb22bd92AA7b7552d270376dE8eDccbc1E)
+```
+
 
 ## Built-in Authorization Types
 
