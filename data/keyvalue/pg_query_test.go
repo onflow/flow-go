@@ -8,7 +8,7 @@ import (
 )
 
 func TestGet(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	table := "tableA"
 	key := "keyA"
@@ -18,12 +18,12 @@ func TestGet(t *testing.T) {
 		MustBuild()
 	query, params := q.(*pgSQLQuery).debug()
 
-	gomega.Expect(query).To(Equal("SELECT value FROM ?0 WHERE key=?1 ; "))
-	gomega.Expect(params).To(Equal([]string{table, key}))
+	Expect(query).To(Equal("SELECT value FROM ?0 WHERE key=?1 ; "))
+	Expect(params).To(Equal([]string{table, key}))
 }
 
 func TestSet(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	table := "tableA"
 	key := "keyA"
@@ -33,15 +33,15 @@ func TestSet(t *testing.T) {
 		Set(table, key).
 		MustBuild()
 	err := q.(*pgSQLQuery).mergeSetParams([]string{value})
-	gomega.Expect(err).ToNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 	query, params := q.(*pgSQLQuery).debug()
 
-	gomega.Expect(query).To(Equal("INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; "))
-	gomega.Expect(params).To(Equal([]string{table, key, value}))
+	Expect(query).To(Equal("INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; "))
+	Expect(params).To(Equal([]string{table, key, value}))
 }
 
 func TestSetWithExtraSetParams(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	table := "tableA"
 	key := "keyA"
@@ -51,12 +51,12 @@ func TestSetWithExtraSetParams(t *testing.T) {
 		Set(table, key).
 		MustBuild()
 	err := q.(*pgSQLQuery).mergeSetParams([]string{value, "extra"})
-	gomega.Expect(err).To(HaveOccurred())
-	gomega.Expect(err.Error()).To(Equal("Expected to substituted 1 set params, but received 2"))
+	Expect(err).To(HaveOccurred())
+	Expect(err.Error()).To(Equal("Expected to substituted 1 set params, but received 2"))
 }
 
 func TestSetWithMissingSetParams(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	table := "tableA"
 	key := "keyA"
@@ -66,8 +66,8 @@ func TestSetWithMissingSetParams(t *testing.T) {
 		Set(table, key).
 		MustBuild()
 	err := q.(*pgSQLQuery).mergeSetParams([]string{})
-	gomega.Expect(err).To(HaveOccurred())
-	gomega.Expect(err.Error()).To(Equal("Expected to substituted 1 set params, but received 0"))
+	Expect(err).To(HaveOccurred())
+	Expect(err.Error()).To(Equal("Expected to substituted 1 set params, but received 0"))
 }
 
 func TestMultiSetNoTx(t *testing.T) {
@@ -89,7 +89,7 @@ func TestMultiSetNoTx(t *testing.T) {
 }
 
 func TestMultiSetWithTx(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	table1 := "tableA"
 	key1 := "keyA"
@@ -105,15 +105,15 @@ func TestMultiSetWithTx(t *testing.T) {
 		InTransaction().
 		MustBuild()
 	err := q.(*pgSQLQuery).mergeSetParams([]string{value1, value2})
-	gomega.Expect(err).ToNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 	query, params := q.(*pgSQLQuery).debug()
 
-	gomega.Expect(query).To(Equal("BEGIN; INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; INSERT INTO ?3 (key, value) VALUES ('?4', '?5') ON CONFLICT (key) DO UPDATE SET value = ?5 ;  COMMIT;"))
-	gomega.Expect(params).To(Equal([]string{table1, key1, value1, table2, key2, value2}))
+	Expect(query).To(Equal("BEGIN; INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ; INSERT INTO ?3 (key, value) VALUES ('?4', '?5') ON CONFLICT (key) DO UPDATE SET value = ?5 ;  COMMIT;"))
+	Expect(params).To(Equal([]string{table1, key1, value1, table2, key2, value2}))
 }
 
 func TestMustBuildBeforeExecute(t *testing.T) {
-	gomega := NewWithT(t)
+	RegisterTestingT(t)
 
 	table := "tableA"
 	key := "keyA"
@@ -121,7 +121,7 @@ func TestMustBuildBeforeExecute(t *testing.T) {
 	q := (&pgSQLQuery{}).
 		Get(table, key)
 	_, err := q.Execute()
-	gomega.Expect(err).To(HaveOccurred())
+	Expect(err).To(HaveOccurred())
 
 }
 
