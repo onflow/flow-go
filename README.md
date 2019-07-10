@@ -8,16 +8,6 @@ Bamboo is a highly-performant blockchain designed to power the next generation o
 
 Read our [contributing guide](CONTRIBUTING.md) to learn about our development process and start contributing.
 
-## Documentation
-
-### Architecture Documentation
-
-You can find a high-level overview of the Bamboo architecture on the [documentation website](https://bamboo-docs.herokuapp.com/).
-
-### Code Documentation
-
-The application-level documentation for Bamboo lives inside each of the sub-packages of this repository. To get started, take a look at the [documentation folder](docs).
-
 ## Development
 
 ### Setting up your environment
@@ -65,6 +55,7 @@ TODO: move to Makefile
 ### Generating code
 
 #### Dependency injection using Wire
+
 Install wire:
 
 ```bash
@@ -91,18 +82,23 @@ TODO: move to Makefile
 ## Testing
 
 Run:
+
 ```bash
 ./test.sh
 ```
+
 If iterating just on failed test, then we can do so without rebuilding the system:
+
 ```bash
 docker-compose up --build --no-deps test
 ```
 
 Cleanup:
+
 ```bash
 docker-compose down
 ```
+
 TODO: move to Makefile (remove also shell script)
 
 
@@ -110,7 +106,17 @@ TODO: move to Makefile (remove also shell script)
 
 TODO: write style guide
 
-## Documentation instructions for stream owners
+## Documentation
+
+### Architecture documentation
+
+You can find a high-level overview of the Bamboo architecture on the [documentation website](https://bamboo-docs.herokuapp.com/).
+
+### Code documentation
+
+The application-level documentation for Bamboo lives inside each of the sub-packages of this repository.
+
+### Documentation instructions for stream owners
 
 Stream owners are responsible for ensuring that all code owned by their stream is well-documented. Documentation for a stream should accomplish the following:
 
@@ -138,6 +144,6 @@ godoc2md github.com/dapperlabs/bamboo-node/internal/clusters > internal/clusters
 
 Once your package is added to that file, running `go generate` in the root of this repo will generate a new `README.md`.
 
-## Documentation instructions for contributors
+### Documentation instructions for contributors
 
 TODO: describe documentation standards for all code
