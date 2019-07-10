@@ -4,12 +4,14 @@
 package verify
 
 import (
+	context "context"
 	fmt "fmt"
 	shared "github.com/dapperlabs/bamboo-node/grpc/shared"
 	proto "github.com/golang/protobuf/proto"
 	empty "github.com/golang/protobuf/ptypes/empty"
-	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -22,7 +24,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type SubmitExecutionReceiptRequest struct {
 	ExecutionReceipt     *shared.ExecutionReceipt `protobuf:"bytes,1,opt,name=executionReceipt,proto3" json:"executionReceipt,omitempty"`
@@ -122,6 +124,14 @@ func (c *verifyServiceClient) SubmitExecutionReceipt(ctx context.Context, in *Su
 // VerifyServiceServer is the server API for VerifyService service.
 type VerifyServiceServer interface {
 	SubmitExecutionReceipt(context.Context, *SubmitExecutionReceiptRequest) (*empty.Empty, error)
+}
+
+// UnimplementedVerifyServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedVerifyServiceServer struct {
+}
+
+func (*UnimplementedVerifyServiceServer) SubmitExecutionReceipt(ctx context.Context, req *SubmitExecutionReceiptRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitExecutionReceipt not implemented")
 }
 
 func RegisterVerifyServiceServer(s *grpc.Server, srv VerifyServiceServer) {

@@ -60,7 +60,7 @@
   - [Structure and Class Behaviour](#structure-and-class-behaviour)
   - [Class Inheritance and Abstract Classes](#class-inheritance-and-abstract-classes)
 - [Access control](#access-control)
-  - [Permissions](#permissions)
+- [Permissions](#permissions)
 - [Interfaces](#interfaces)
   - [Interface Declaration](#interface-declaration)
   - [Interface Implementation](#interface-implementation)
@@ -1613,7 +1613,7 @@ const add = (a: Int8, b: Int8) -> Int {
 
 > 🚧 Status: Structures and classes are not implemented yet.
 
-Structures and classes are composite types. Structures and classes consist of one or more values, which are stored in named fields. Each field may have a different type.
+Structures and classes are composite data types. Structures and classes consist of one or more values, which are stored in named fields. Each field may have a different type.
 
 Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword. The keyword is followed by the name.
 
@@ -2524,13 +2524,13 @@ Cat(3) == Cat(3) // is true
 
 > 🚧 Status: The `Hashable` interface is not implemented yet.
 
-A hashable type is a type that can be hashed to an integer hash value. Types are hashable when they implement the `Hashable` interface.
+A hashable type is a type that can be hashed to an integer hash value, i.e., it is distilled into a value that is used as evidence of inequality. Types are hashable when they implement the `Hashable` interface.
 
-Hashable types must also be equatable, i.e., they must also implement the `Equatable` interface.
+Hashable types can be used as keys in dictionaries.
+
+Hashable types must also be equatable, i.e., they must also implement the `Equatable` interface. This is because the hash value is only evidence for inequality: two values that have different hash values are guaranteed to be unequal. However, if the hash value of two values is the same, then the two values could still be unequal and just happen to hash to the same hash value. In that case equality still needs to be determined through an equality check. Without `Equatable`, values could be added to a dictionary, but it would not be possible to retrieve them.
 
 <!-- TODO: once interface inheritance is defined, describe how Hashable inherits from Equatable -->
-
-Hashable types can e.g. be used as keys in dictionaries.
 
 Most of the built-in types are hashable, like booleans and integers. Arrays are hashable when their elements are hashable. Dictionaries are hashable when their values are equatable.
 
@@ -2597,7 +2597,7 @@ impl Hashable for Point {
 
 > 🚧 Status: Storage is not implemented yet.
 
-Values can be stored, i.e. persisted across multiple executions of the program, if they are storable. Values are storable if they have a type that implements the interface `Storable`.
+Storable types can be persisted across multiple executions of the program. Values are storable if they have a type that implements the interface `Storable`.
 
 All built-in types are storable: booleans, integers, arrays with storable elements, and dictionaries with storable keys and values.
 
@@ -2653,11 +2653,17 @@ const value: Int? = account.getStored(Int)
 
 It is only possible to store **one** value per type at the root of an account. Storing primitive values (e.g., integers, booleans) at the root of an account is possible, but not very practical – it is unclear what the value means. 
 
-If a single primitive value, multiple values of the same type, or even more complex data should be stored, consider declaring a composite data structure, like a class. This makes it explicit what data is stored (through the name of the type), what values are stored (the names of the fields), and what types the values have (the type annotations of the fields).
+If a single primitive value, multiple values of the same type, or even more complex data should be stored, composite data types (like structures and classes) have to be used.
 
-Enforcing the use of types might seem unnecessary work, but it provides several safety guarantees. For example, the API could allow using arbitrary string keys to differentiate several values (of possibly the same type). However, that would introduce a possibility for accidentally using different keys and/or different types for reading and writing – the two string literals have no relation. When the key and/or type in the part of the code that reads a value is changed, the key and/or type in the part of the code that reads the value need to be manually kept in sync. If they are not, a bug is introduced.
+This requirement to declare and use composite data types is intentional, and not a "workaround". It makes storage declarative and explicit. Types declaratively describe what data is stored (through the name of the type), describe and specify what values are stored (through the names of the fields), and specify what types the values have (through the type annotations of the fields). 
 
-If a composite type with fields is used, accidentally using different names or types to read or write a value is impossible, as the type checking will detect it. Leveraging the type system is the key to avoiding bugs. 
+This approach provides several safety guarantees, which can be checked statically.
+
+Storage is intentionally not a key-value store with arbitrary strings as keys and values. Even though such an approach would be more flexible, it would require the developer to perform ad-hoc type casting, which is error-prone and has the potential for type confusion. Also, it would introduce the possibility for accidentally using different keys and/or different types for reading and writing a stored value – the string literals for the keys have no relation and have to be kept in sync manually.
+
+If a composite data type with fields is used, accidentally using different names or types to read or write a value is impossible, as type checking will detect and reject the program. 
+
+Leveraging the type system is the key to avoiding bugs. 
 
 ```swift,file=storage-simplevault.bpl
 // Declare a class named `SimpleVault`.
@@ -2692,7 +2698,7 @@ const storedVault: SimpleVault? = account.getStored(SimpleVault)
 
 > 🚧 Status: Contracts are not implemented yet.
 
-A contract is similar to a [class](#structures-and-classes) in that it is a composite data structure and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
+A contract is similar to a [class](#structures-and-classes) in that it is a composite data type and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
 
 Contracts differ from classes in that all fields are [stored](#storage). To make this explicit, all fields must be annotated with the `stored` keyword.
 

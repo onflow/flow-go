@@ -4,11 +4,13 @@
 package collect
 
 import (
+	context "context"
 	fmt "fmt"
 	shared "github.com/dapperlabs/bamboo-node/grpc/shared"
 	proto "github.com/golang/protobuf/proto"
-	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -21,7 +23,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type SubmitTransactionRequest struct {
 	Transaction          *shared.SignedTransaction `protobuf:"bytes,1,opt,name=transaction,proto3" json:"transaction,omitempty"`
@@ -444,6 +446,23 @@ type CollectServiceServer interface {
 	SubmitCollection(context.Context, *SubmitCollectionRequest) (*SubmitCollectionResponse, error)
 	GetTransaction(context.Context, *GetTransactionRequest) (*GetTransactionResponse, error)
 	GetCollection(context.Context, *GetCollectionRequest) (*GetCollectionResponse, error)
+}
+
+// UnimplementedCollectServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedCollectServiceServer struct {
+}
+
+func (*UnimplementedCollectServiceServer) SubmitTransaction(ctx context.Context, req *SubmitTransactionRequest) (*SubmitTransactionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitTransaction not implemented")
+}
+func (*UnimplementedCollectServiceServer) SubmitCollection(ctx context.Context, req *SubmitCollectionRequest) (*SubmitCollectionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitCollection not implemented")
+}
+func (*UnimplementedCollectServiceServer) GetTransaction(ctx context.Context, req *GetTransactionRequest) (*GetTransactionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTransaction not implemented")
+}
+func (*UnimplementedCollectServiceServer) GetCollection(ctx context.Context, req *GetCollectionRequest) (*GetCollectionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCollection not implemented")
 }
 
 func RegisterCollectServiceServer(s *grpc.Server, srv CollectServiceServer) {
