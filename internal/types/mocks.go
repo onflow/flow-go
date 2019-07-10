@@ -365,3 +365,85 @@ func MockBlockMessage() *bambooProto.Block {
 		Signatures:             sigs,
 	}
 }
+
+func MockStateTransition() *StateTransition {
+	sigs := make([]crypto.Signature, 0)
+	for i := 0; i < 5; i++ {
+		sigs = append(sigs, MockSignature())
+	}
+
+	return &StateTransition{
+		PreviousStateTransitionHash:      MockHash(),
+		PreviousCommitApprovalSignatures: sigs,
+		Height:                           0,
+		Value:                            []byte("MOCK"),
+	}
+}
+
+func MockStateTransitionMessage() *bambooProto.StateTransition {
+	sigs := make([][]byte, 0)
+	for i := 0; i < 5; i++ {
+		sigs = append(sigs, MockSignature().Bytes())
+	}
+
+	return &bambooProto.StateTransition{
+		PreviousStateTransitionHash:      MockHash().Bytes(),
+		PreviousCommitApprovalSignatures: sigs,
+		Height:                           0,
+		Value:                            []byte("MOCK"),
+	}
+}
+
+func MockSignedStateTransition() *SignedStateTransition {
+	return &SignedStateTransition{
+		StateTransition: *MockStateTransition(),
+		Signature:       MockSignature(),
+	}
+}
+
+func MockSignedStateTransitionMessage() *bambooProto.SignedStateTransition {
+	return &bambooProto.SignedStateTransition{
+		StateTransition: MockStateTransitionMessage(),
+		Signature:       MockSignature().Bytes(),
+	}
+}
+
+func MockFinalizedStateTransition() *FinalizedStateTransition {
+	sigs := make([]crypto.Signature, 0)
+	for i := 0; i < 5; i++ {
+		sigs = append(sigs, MockSignature())
+	}
+
+	return &FinalizedStateTransition{
+		SignedStateTransition: *MockSignedStateTransition(),
+		Signatures:            sigs,
+	}
+}
+
+func MockFinalizedStateTransitionMessage() *bambooProto.FinalizedStateTransition {
+	sigs := make([][]byte, 0)
+	for i := 0; i < 5; i++ {
+		sigs = append(sigs, MockSignature().Bytes())
+	}
+
+	return &bambooProto.FinalizedStateTransition{
+		SignedStateTransition: MockSignedStateTransitionMessage(),
+		Signatures:            sigs,
+	}
+}
+
+func MockStateTransitionVote() *StateTransitionVote {
+	return &StateTransitionVote{
+		StateTransitionHash: MockHash(),
+		Vote:                APPROVE,
+		Height:              0,
+	}
+}
+
+func MockStateTransitionVoteMessage() *bambooProto.StateTransitionVote {
+	return &bambooProto.StateTransitionVote{
+		StateTransitionHash: MockHash().Bytes(),
+		Vote:                bambooProto.Vote_APPROVE,
+		Height:              0,
+	}
+}
