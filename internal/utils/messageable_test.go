@@ -163,3 +163,42 @@ func TestBlock(t *testing.T) {
 	Expect(actualMessage).To(Equal(message))
 	Expect(actualBlock).To(Equal(block))
 }
+
+func TestStateTransition(t *testing.T) {
+	RegisterTestingT(t)
+
+	message := types.MockStateTransitionMessage()
+	stateTransition := types.MockStateTransition()
+
+	actualMessage := StateTransitionToMessage(stateTransition)
+	actualStateTransition := MessageToStateTransition(message)
+
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualStateTransition).To(Equal(stateTransition))
+}
+
+func TestSignedStateTransition(t *testing.T) {
+	RegisterTestingT(t)
+
+	message := types.MockSignedStateTransitionMessage()
+	signedStateTransition := types.MockSignedStateTransition()
+
+	actualMessage := SignedStateTransitionToMessage(signedStateTransition)
+	actualSignedStateTransition := MessageToSignedStateTransition(message)
+
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualSignedStateTransition).To(Equal(signedStateTransition))
+}
+
+func TestFinalizedStateTransition(t *testing.T) {
+	RegisterTestingT(t)
+
+	message := types.MockFinalizedStateTransitionMessage()
+	finalizedStateTransition := types.MockFinalizedStateTransition()
+
+	actualMessage := FinalizedStateTransitionToMessage(finalizedStateTransition)
+	actualFinalizedStateTransition := MessageToFinalizedStateTransition(message)
+
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualFinalizedStateTransition).To(Equal(finalizedStateTransition))
+}

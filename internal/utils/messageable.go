@@ -387,3 +387,69 @@ func ResultApprovalToMessage(t *types.ResultApproval) *bambooProto.ResultApprova
 		Signature:               t.Signature.Bytes(),
 	}
 }
+
+func MessageToStateTransition(m *bambooProto.StateTransition) *types.StateTransition {
+	sigs := make([]crypto.Signature, len(m.GetPreviousCommitApprovalSignatures()))
+	for i, sig := range m.GetPreviousCommitApprovalSignatures() {
+		sigs[i] = crypto.BytesToSig(sig)
+	}
+
+	return &types.StateTransition{
+		PreviousStateTransitionHash:      crypto.BytesToHash(m.GetPreviousStateTransitionHash()),
+		PreviousCommitApprovalSignatures: sigs,
+		Height:                           m.GetHeight(),
+		Value:                            m.GetValue(),
+	}
+}
+
+func StateTransitionToMessage(t *types.StateTransition) *bambooProto.StateTransition {
+	sigs := make([][]byte, len(t.PreviousCommitApprovalSignatures))
+	for i, sig := range t.PreviousCommitApprovalSignatures {
+		sigs[i] = sig.Bytes()
+	}
+
+	return &bambooProto.StateTransition{
+		PreviousStateTransitionHash:      t.PreviousStateTransitionHash.Bytes(),
+		PreviousCommitApprovalSignatures: sigs,
+		Height:                           t.Height,
+		Value:                            t.Value,
+	}
+}
+
+func MessageToSignedStateTransition(m *bambooProto.SignedStateTransition) *types.SignedStateTransition {
+	return &types.SignedStateTransition{
+		StateTransition: *MessageToStateTransition(m.GetStateTransition()),
+		Signature:       crypto.BytesToSig(m.GetSignature()),
+	}
+}
+
+func SignedStateTransitionToMessage(t *types.SignedStateTransition) *bambooProto.SignedStateTransition {
+	return &bambooProto.SignedStateTransition{
+		StateTransition: StateTransitionToMessage(&t.StateTransition),
+		Signature:       t.Signature.Bytes(),
+	}
+}
+
+func MessageToFinalizedStateTransition(m *bambooProto.FinalizedStateTransition) *types.FinalizedStateTransition {
+	sigs := make([]crypto.Signature, len(m.GetSignatures()))
+	for i, sig := range m.GetSignatures() {
+		sigs[i] = crypto.BytesToSig(sig)
+	}
+
+	return &types.FinalizedStateTransition{
+		SignedStateTransition: *MessageToSignedStateTransition(m.GetSignedStateTransition()),
+		Signatures:            sigs,
+	}
+}
+
+func FinalizedStateTransitionToMessage(t *types.FinalizedStateTransition) *bambooProto.FinalizedStateTransition {
+	sigs := make([][]byte, len(t.Signatures))
+	for i, sig := range t.Signatures {
+		sigs[i] = sig.Bytes()
+	}
+
+	return &bambooProto.FinalizedStateTransition{
+		SignedStateTransition: SignedStateTransitionToMessage(&t.SignedStateTransition),
+		Signatures:            sigs,
+	}
+}
