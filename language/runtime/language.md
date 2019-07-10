@@ -2029,7 +2029,7 @@ pub class SomeClass {
 }
 ```
 
-### Permissions
+## Permissions
 
 > 🚧 Status: Permissions are not implemented yet.
 
