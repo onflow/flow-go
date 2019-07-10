@@ -1803,12 +1803,158 @@ pub class SomeClass {
     pub fun privateTest() {
         // ...
     }
-
-    // Declare an inner, private struct,
-    // only accessible in the current and inner scopes
-    //
-    struct InnerStruct {}
 }
+```
+
+### Permissions
+
+> 🚧 Status: Permissions are not implemented yet.
+
+Initializers, fields, and functions of classes can be made accessible in other types by *permitting* them to do so.
+
+<!-- TODO this is in basically adding additional scopes aside from the class in which the initialzer, field, or function is defined in -->
+
+Permissions for classes are declared using the `permit` keyword, followed by the type that should be permitted access, the `to` keyword, and the type that should be accessible by the permitted type.
+
+<!-- TODO: can be used e.g. for authorizations, values that represent access rights/privileges to resources. -->
+
+```swift,file=permissions-purse.bpl
+// Declare a class named `purse`, which holds a balance and
+// allows amounts to be deposited from a purse to another.
+//
+// Purses are associated with an account.
+// Deposits require an authorization.
+//
+class Purse {
+
+    pub const account: Account
+    pub var balance: Int
+
+    init(initialBalance: Int) {
+        self.balance = initialBalance
+    }
+
+    // Declare a function named `deposit`, which transfers an amount
+    // from this purses's balance to another purses's balance,
+    // but only if given a deposit authorization for this purse.
+    //
+    pub fun deposit(to: Purse, amount: Int, auth: DepositAuth) {
+        require {
+            amount > 0:
+                "the amount must be positive"
+
+            amount <= self.balance:
+                "the amount must be smaller or equal to the balance"
+
+            auth.purse == self:
+                "the given authorization must be for this purse"
+
+            amount <= auth.limit:
+                "the amount must be smaller or equal to the authorization's limit"
+        }
+
+        ensure {
+            self.balance == before(self.balance) - amount:
+                "the amount must be deducted from this purse's balance"
+
+            to.balance == before(to.balance) + amount:
+                "the amount must be added to the receiving purse's balance"
+
+            auth.limit == before(auth.limit) - amount:
+                "the amount must be deducted from the authorization's limit"
+        }
+
+        self.balance = self.balance - amount
+        to.amount = to.amount + amount
+
+        // NOTE: as the class `Purse` is granted access to private fields
+        // of class `DepoitAuth`, and the field `limit` is private and variable,
+        // it can be written to by this class (`Purse`).
+        //
+        auth.limit = auth.limit - amount
+    }
+
+    // Declare a function named `makeDepositAuth` which creates a deposit
+    // authorization with a given limit.
+    //
+    // NOTE: To illustrate that a deposit authorization can only be created
+    // by an authorized account, the function requires passing
+    // a storage authorization (`StorageAuth`; the declaration is omitted here).
+    //
+    // This ensures that just having a reference to this purse is not enough
+    // to create a deposit authorization for it.
+    //
+    pub fun makeDepositAuth(limit: Int, auth: StorageAuth) -> DepositAuth {
+        require {
+            limit > 0:
+                "the limit must be positive"
+
+            auth.account == self.account:
+                "the given authorization's account must be the account this purse belongs to"
+        }
+
+        ensure {
+            result.purse == self:
+                "the deposit authorization's purse must be this purse"
+
+            result.limit == limit:
+                "the deposit authorization's limit must be the given limit"
+        }
+
+        return DepositAuth(purse: self, limit: limit)
+    }
+}
+
+// Declare a class named `DepositAuth`.
+//
+// The type represents the authorization to transfer
+// a limited amount from one purse to another purse.
+//
+class DepositAuth {
+
+    // Declare a publicly readable field named `purse` that has type `Purse`.
+    // The deposit authorization is for a specific account, which is checked
+    // in the `transfer` function of `Purse`
+    //
+    pub const purse: Purse
+
+    // Declare a private field named `limit` that has type `Int`.
+    //
+    // As the field is private, it can normally only be accessed
+    // it can only be accessed in the scope of this class.
+    //
+    // However, the class `Purse` is given permission to access this class,
+    // so it can also read and write to this field. See the `transfer` function
+    // of the `Purse` class.
+    //
+    private var limit: Int
+
+    // Declare a private initializer.
+    //
+    // As the initializer is private, it can normally only be accessed
+    // used in the scope of this class, which makes it impossible to create.
+    //
+    // However, the class `Purse` is given permission to access this class,
+    // so it can call this private initializer. See the `makeDepositAuth`
+    // function of the `Purse` class.
+    //
+    private init(purse: Purse, limit: Int) {
+        self.purse = purse
+        self.limit = limit
+    }
+}
+
+// Permit the class `Purse` access to the class `DepositAuth`.
+//
+// This allows class `Purse` to create values of class `DepositAuth`
+// by calling its private initializer, i.e., purses are allowed
+// to create deposit authorizations.
+//
+// Furthermore it allows the class `Purse` to access the private field
+// `limit` of class `Deposit`, i.e., purses are allowed to adjust the
+// remaining limit of deposit authorizations.
+//
+permit Purse to DepositAuth
 ```
 
 ## Interfaces
@@ -2417,32 +2563,57 @@ contract FungibleToken {
 
 ## Accounts
 
-> 🚧 Status: Authorizations are not implemented yet.
+> 🚧 Status: Accounts are not implemented yet.
+
+<!-- TODO: explain accounts -->
+
+<!-- TODO: can't express the signature for getStored yet -->
+
+Accounts have a `getStored` function, which retrieves a value from [storage](#storage). The function takes a type that implements the `Storable` interface, and returns an optional value that has the type.
+
+```swift
+// Get the stored integer value for an account
+//
+const account: Account = // ...
+const value: Int? = account.getStored(Int)
+```
 
 
-## Authorizations
+## Built-in Types
 
-> 🚧 Status: Authorizations are not implemented yet.
+### Never
 
-Authorizations represent access rights/privileges to resources. An authorization is similar to a class in that it is a composite data structure and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
+`Never` is the return type for functions which never return normally.
 
-Authorizations differ from classes in that they can only be created (instantiated) from existing authorizations. To make this explicit, the initializer of an authorization *must* be declared, the initializer must have at least one parameter, and the type of the first parameter must be an authorization.
+```swift
+// Declare a function named `crashAndBurn` which will never return,
+// because it calls the function named `fatalError`, which never returns
+//
+fun crashAndBurn() -> Never {
+    fatalError("An unrecoverable error occurred")
+}
+```
 
-Furthermore, authorizations are unforgeable.
+### Root Authorization
 
-There is a global authorization `rootAuth` that has type `RootAuth`. It represents the access rights/privileges to all resources.
+The authorization type `RootAuth` represents access rights/privileges to all resources.
 
-Authorizations are declared using the `auth` keyword.
+```swift
+interface RootAuth {
+    pub account: Account
+    pub storageAuth: StorageAuth
+}
+```
 
-```typescript,file=auth.bpl
-// Declare an authorization named `SendTokens`
+### Storage Authorization
 
-auth SendTokens {
-    const limit: Int
+The authorization type `StorageAuth` represents storage rights for an account. It is created from a [root authorization](#root-authorization). The storage authorization's account is the root authorization's account.
 
-    init(_ auth: RootAuth, limit: Int) {
-        self.limit = limit
-    }
+```swift
+interface StorageAuth {
+    pub account: Account
+
+    init(_ rootAuth: RootAuth)
 }
 ```
 
