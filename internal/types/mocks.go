@@ -431,3 +431,19 @@ func MockFinalizedStateTransitionMessage() *bambooProto.FinalizedStateTransition
 		Signatures:            sigs,
 	}
 }
+
+func MockStateTransitionVote() *StateTransitionVote {
+	return &StateTransitionVote{
+		StateTransitionHash: MockHash(),
+		Vote:                APPROVE,
+		Height:              0,
+	}
+}
+
+func MockStateTransitionVoteMessage() *bambooProto.StateTransitionVote {
+	return &bambooProto.StateTransitionVote{
+		StateTransitionHash: MockHash().Bytes(),
+		Vote:                bambooProto.Vote_APPROVE,
+		Height:              0,
+	}
+}

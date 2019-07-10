@@ -453,3 +453,19 @@ func FinalizedStateTransitionToMessage(t *types.FinalizedStateTransition) *bambo
 		Signatures:            sigs,
 	}
 }
+
+func MessageToStateTransitionVote(m *bambooProto.StateTransitionVote) *types.StateTransitionVote {
+	return &types.StateTransitionVote{
+		StateTransitionHash: crypto.BytesToHash(m.GetStateTransitionHash()),
+		Vote:                types.Vote(m.GetVote()),
+		Height:              m.GetHeight(),
+	}
+}
+
+func StateTransitionVoteToMessage(t *types.StateTransitionVote) *bambooProto.StateTransitionVote {
+	return &bambooProto.StateTransitionVote{
+		StateTransitionHash: t.StateTransitionHash.Bytes(),
+		Vote:                bambooProto.Vote(t.Vote),
+		Height:              t.Height,
+	}
+}

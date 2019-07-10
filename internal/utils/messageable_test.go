@@ -202,3 +202,16 @@ func TestFinalizedStateTransition(t *testing.T) {
 	Expect(actualMessage).To(Equal(message))
 	Expect(actualFinalizedStateTransition).To(Equal(finalizedStateTransition))
 }
+
+func TestStateTransitionVote(t *testing.T) {
+	RegisterTestingT(t)
+
+	message := types.MockStateTransitionVoteMessage()
+	stateTransitionVote := types.MockStateTransitionVote()
+
+	actualMessage := StateTransitionVoteToMessage(stateTransitionVote)
+	actualStateTransitionVote := MessageToStateTransitionVote(message)
+
+	Expect(actualMessage).To(Equal(message))
+	Expect(actualStateTransitionVote).To(Equal(stateTransitionVote))
+}
