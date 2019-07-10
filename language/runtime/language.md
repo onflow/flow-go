@@ -14,9 +14,11 @@
 - [Semicolons](#semicolons)
 - [Values and Types](#values-and-types)
   - [Booleans](#booleans)
+  - [Numeric Literals](#numeric-literals)
   - [Integers](#integers)
   - [Floating-Point Numbers](#floating-point-numbers)
-  - [Numeric Literals](#numeric-literals)
+  - [Addresses](#addresses)
+  - [Strings and Characters](#strings-and-characters)
   - [Arrays](#arrays)
     - [Array Indexing](#array-indexing)
     - [Array Types](#array-types)
@@ -24,6 +26,8 @@
     - [Dictionary Access](#dictionary-access)
     - [Dictionary Types](#dictionary-types)
     - [Dictionary Keys](#dictionary-keys)
+  - [Any](#any)
+  - [Never](#never)
 - [Operators](#operators)
   - [Negation](#negation)
   - [Assignment](#assignment)
@@ -56,7 +60,7 @@
   - [Structure and Class Behaviour](#structure-and-class-behaviour)
   - [Class Inheritance and Abstract Classes](#class-inheritance-and-abstract-classes)
 - [Access control](#access-control)
-  - [Permissions](#permissions)
+- [Permissions](#permissions)
 - [Interfaces](#interfaces)
   - [Interface Declaration](#interface-declaration)
   - [Interface Implementation](#interface-implementation)
@@ -66,14 +70,15 @@
 - [Storage](#storage)
 - [Contracts](#contracts)
 - [Accounts](#accounts)
-- [Built-in Types](#built-in-types)
-  - [Never](#never)
-  - [Root Authorization](#root-authorization)
-  - [Storage Authorization](#storage-authorization)
+  - [Account Storage](#account-storage)
+- [External Contracts and Interfaces](#external-contracts-and-interfaces)
+- [Built-in Authorization Types](#built-in-authorization-types)
+  - [`RootAuth`](#rootauth)
+  - [`StorageAuth`](#storageauth)
 - [Built-in Functions](#built-in-functions)
-  - [FatalError](#fatalerror)
+  - [`fatalError`](#fatalerror)
     - [Example](#example)
-  - [Assert](#assert)
+  - [`assert`](#assert)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -152,7 +157,7 @@ Variables and constants **must** be initialized.
 const a
 ```
 
-Once a constant or variable is declared, it can't be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
+Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
 
 
 ```swift
@@ -160,7 +165,7 @@ Once a constant or variable is declared, it can't be redeclared with the same na
 //
 const a = 1
 
-// Invalid: can't re-declare a constant with name `a`,
+// Invalid: cannot re-declare a constant with name `a`,
 // as it is already used in this scope
 //
 const a = 2
@@ -171,12 +176,12 @@ var b = 3
 ```
 
 ```swift
-// Invalid: can't re-declare a variable with name `b`,
+// Invalid: cannot re-declare a variable with name `b`,
 // as it is already used in this scope
 //
 var b = 4
 
-// Invalid: can't declare a variable with the name `a`,
+// Invalid: cannot declare a variable with the name `a`,
 // as it is already used in this scope,
 // and it is declared as a constant
 //
@@ -284,28 +289,6 @@ Values are objects, like for example booleans, integers, or arrays. Values are t
 
 The two boolean values `true` and `false` have the type `Bool`.
 
-### Integers
-
-Integers are whole numbers without a fractional part. They are either *signed* (positive, zero, or negative) or *unsigned* (positive or zero) and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
-
-The names for the integer types follow this naming convention: Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix, i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
-
- - **`Int8`**: -128 through 127
- - **`Int16`**: -32768 through 32767
- - **`Int32`**: -2147483648 through 2147483647
- - **`Int64`**: -9223372036854775808 through 9223372036854775807
- - **`UInt16`**: 0 through 65535
- - **`UInt32`**: 0 through 4294967295
- - **`UInt64`**: 0 through 18446744073709551615
-
-In addition, the arbitrary precision integer type `Int` is provided.
-
-### Floating-Point Numbers
-
-There is no support for floating point numbers.
-
-Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here. Fixed point numbers should be simulated using integers and a scale factor for now.
-
 ### Numeric Literals
 
 Numbers can be written in various bases. Numbers are assumed to be decimal by default. Non-decimal literals have a specific prefix.
@@ -350,6 +333,140 @@ Underscores are allowed for all numeral systems.
 ```swift,file=number-underscores-binary.bpl
 const binaryNumber = 0b10_11_01
 ```
+
+### Integers
+
+Integers are whole numbers without a fractional part. They are either *signed* (positive, zero, or negative) or *unsigned* (positive or zero) and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
+
+The names for the integer types follow this naming convention: Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix, i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
+
+ - **`Int8`**: -128 through 127
+ - **`Int16`**: -32768 through 32767
+ - **`Int32`**: -2147483648 through 2147483647
+ - **`Int64`**: -9223372036854775808 through 9223372036854775807
+ - **`UInt16`**: 0 through 65535
+ - **`UInt32`**: 0 through 4294967295
+ - **`UInt64`**: 0 through 18446744073709551615
+
+```swift
+// Declare a constant that has type `UInt8` and the value 10
+const smallNumber: UInt8 = 10
+```
+
+```swift
+// Invalid: negative literal cannot be used as an unsigned integer
+//
+const invalidNumber: UInt8 = -10
+```
+
+In addition, the arbitrary precision integer type `Int` is provided.
+
+```swift
+const veryLargeNumber: Int = 10000000000000000000000000000000
+```
+
+### Floating-Point Numbers
+
+There is no support for floating point numbers.
+
+Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here. Fixed point numbers should be simulated using integers and a scale factor for now.
+
+### Addresses
+
+The type `Address` represents an address. Addresses are unsigned integers with a size of 160 bits.  Hexadecimal integer literals can be used to create address values.
+
+```swift
+// Declare a constant that has type `Address`
+//
+const someAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d
+
+// Invalid: Initial value is not compatible with type `Address`,
+// it is not a number
+//
+const notAnAddress: Address = ""
+
+// Invalid: Initial value is not compatible with type `Address`,
+// it is a number, but larger than 160 bits
+//
+const alsoNotAnAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d123456789
+```
+
+Integer literals are not inferred to be an address.
+
+```swift
+// Declare a number. Even though it happens to be a valid address,
+// it is not inferred as it.
+//
+const aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
+// `aNumber` has type `Int`
+```
+
+### Strings and Characters
+
+Strings are collections of characters. Strings have the type `String`, and characters have the type `Character`. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.
+
+String and character literals are enclosed in double quotation marks (`"`).
+
+```swift
+const someString = "Hello, world!"
+```
+
+String literals may contain escape sequences. An escape sequence starts with a backslash (`\`):
+
+- `\0`: Null character
+- `\\`: Backslash
+- `\t`: Horizontal tab
+- `\n`: Line feed
+- `\r`: Carriage return
+- `\"`: Double quotation mark
+- `\'`: Single quotation mark
+- `\u`: A Unicode scalar value, written as `\u{x}`, where `x` is a 1–8 digit hexadecimal number which needs to be a valid Unicode scalar value, i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive
+
+```swift
+// Declare a constant which contains two lines of text
+// (separated by the line feed character `\n`), and ends
+// with a thumbs up emoji, which has code point U+1F44D (0x1F44D)
+//
+const thumbsUpText =
+    "This is the first line.\nThis is the second line with an emoji: \u{1F44D}"
+```
+
+The type `Character` represents a single, human-readable character. Characters are extended grapheme clusters, which consist of one or more Unicode scalars.
+
+For example, the single character `ü` can be represented in several ways in Unicode. First, it can be represented by a single Unicode scalar value `ü` ("LATIN SMALL LETTER U WITH DIAERESIS", code point U+00FC). Second, the same single character can be represented by two Unicode scalar values: `u` ("LATIN SMALL LETTER U", code point U+0075), and "COMBINING DIAERESIS" (code point U+0308). The combining Unicode scalar value is applied to the scalar before it, which turns a `u` into a `ü`.
+
+Still, both variants represent the same human-readable character `ü`.
+
+```swift
+const singleScalar: Character = "\u{FC}"
+// `singleScalar` is `ü`
+const twoScalars: Character = "\u{75}\u{308}"
+// `twoScalars` is `ü`
+```
+
+Another example where multiple Unicode scalar values are rendered as a single, human-readable character is a flag emoji. These emojis consist of two "REGIONAL INDICATOR SYMBOL LETTER" Unicode scalar values.
+
+```swift
+// Declare a constant for a string with a single character, the emoji
+// for the Canadian flag, which consists of two Unicode scalar values:
+// - REGIONAL INDICATOR SYMBOL LETTER C (U+1F1E8)
+// - REGIONAL INDICATOR SYMBOL LETTER A (U+1F1E6)
+//
+const canadianFlag: Character = "\u{1F1E8}\u{1F1E6}"
+// `canadianFlag` is `🇨🇦`
+```
+
+<!--
+
+TODO
+
+#### String Functions
+
+- Length, concatenate
+- Append, remove, etc. for variable-size arrays
+- Document and link to string concatenation operator `&` in operators section
+
+-->
 
 ### Arrays
 
@@ -528,6 +645,34 @@ TODO
 Dictionary keys must be hashable and equatable, i.e., must implement the [`Hashable`](#hashable-interface) and [`Equatable`](#equatable-interface) [interfaces](#interfaces).
 
 Most of the built-in types, like booleans, integers, are hashable and equatable, so can be used as keys in dictionaries.
+
+
+### Any
+
+`Any` is the top type, i.e., all types are a subtype of it.
+
+```swift
+// Declare a variable that has the type `Any`.
+// Any value can be assigned to it, for example an integer.
+//
+var someValue: Any = 1
+
+// Assign a value with a different type, `Bool`
+someValue = true
+```
+
+### Never
+
+`Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
+
+```swift
+// Declare a function named `crashAndBurn` which will never return,
+// because it calls the function named `fatalError`, which never returns
+//
+fun crashAndBurn() -> Never {
+    fatalError("An unrecoverable error occurred")
+}
+```
 
 ## Operators
 
@@ -1056,7 +1201,7 @@ Preconditions must be true right before the execution of the function. Precondit
 
 Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `ensure` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
 
-A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they can't have side-effects and must be pure expressions.
+A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions.
 
 <!--
 
@@ -1468,7 +1613,7 @@ const add = (a: Int8, b: Int8) -> Int {
 
 > 🚧 Status: Structures and classes are not implemented yet.
 
-Structures and classes are composite types. Structures and classes consist of one or more values, which are stored in named fields. Each field may have a different type.
+Structures and classes are composite data types. Structures and classes consist of one or more values, which are stored in named fields. Each field may have a different type.
 
 Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword. The keyword is followed by the name.
 
@@ -1884,7 +2029,7 @@ pub class SomeClass {
 }
 ```
 
-### Permissions
+## Permissions
 
 > 🚧 Status: Permissions are not implemented yet.
 
@@ -2489,8 +2634,6 @@ Storable values can be stored for an [account](#accounts) by using the `storeIfN
 fun storeIfNotExists(_ value: Storable, auth: StorageAuth)
 ```
 
-It is only possible to store **one** value of a type.
-
 ```swift,file=storage-storeIfNotExists.bpl
 // Store the integer value `42` for an account, given a storage authorization for it
 //
@@ -2508,11 +2651,19 @@ const account: Account = // ...
 const value: Int? = account.getStored(Int)
 ```
 
-To store more complex data than just a single value, structures and classes have to be defined.
+It is only possible to store **one** value per type at the root of an account. Storing primitive values (e.g., integers, booleans) at the root of an account is possible, but not very practical – it is unclear what the value means. 
 
-The requirement to declare and use composite data structures to store more complex data is intentional, and not a "workaround". Types declaratively specify what data is stored, specify what names are used, and specify what types the values have. This approach also enables static checking that the code is correct. Storage is declarative and explicit.
+If a single primitive value, multiple values of the same type, or even more complex data should be stored, composite data types (like structures and classes) have to be used.
 
-The storage API is intentionally not a key-value store with arbitrary strings as keys and values. Even though such an approach would be more flexible, it would require the developer to perform ad-hoc type casting, which is error-prone and has the potential for type confusion. Also, such an approach has the potential for bugs, like accidentally naming keys that are written and keys that are read in different places in different ways. 
+This requirement to declare and use composite data types is intentional, and not a "workaround". It makes storage declarative and explicit. Types declaratively describe what data is stored (through the name of the type), describe and specify what values are stored (through the names of the fields), and specify what types the values have (through the type annotations of the fields). 
+
+This approach provides several safety guarantees, which can be checked statically.
+
+Storage is intentionally not a key-value store with arbitrary strings as keys and values. Even though such an approach would be more flexible, it would require the developer to perform ad-hoc type casting, which is error-prone and has the potential for type confusion. Also, it would introduce the possibility for accidentally using different keys and/or different types for reading and writing a stored value – the string literals for the keys have no relation and have to be kept in sync manually.
+
+If a composite data type with fields is used, accidentally using different names or types to read or write a value is impossible, as type checking will detect and reject the program. 
+
+Leveraging the type system is the key to avoiding bugs. 
 
 ```swift,file=storage-simplevault.bpl
 // Declare a class named `SimpleVault`.
@@ -2547,7 +2698,7 @@ const storedVault: SimpleVault? = account.getStored(SimpleVault)
 
 > 🚧 Status: Contracts are not implemented yet.
 
-A contract is similar to a [class](#structures-and-classes) in that it is a composite data structure and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
+A contract is similar to a [class](#structures-and-classes) in that it is a composite data type and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
 
 Contracts differ from classes in that all fields are [stored](#storage). To make this explicit, all fields must be annotated with the `stored` keyword.
 
@@ -2639,16 +2790,21 @@ contract FungibleToken {
 }
 ```
 
-
 ## Accounts
 
 > 🚧 Status: Accounts are not implemented yet.
 
-<!-- TODO: explain accounts -->
+```swift
+interface Account {
+    pub init(at address: Address)
+}
+```
 
-<!-- TODO: can't express the signature for getStored yet -->
+### Account Storage
 
 Accounts have a `getStored` function, which retrieves a value from [storage](#storage). The function takes a type that implements the `Storable` interface, and returns an optional value that has the type.
+
+<!-- TODO: cannot express the signature for getStored yet. would require. generics -->
 
 ```swift
 // Get the stored integer value for an account
@@ -2657,23 +2813,53 @@ const account: Account = // ...
 const value: Int? = account.getStored(Int)
 ```
 
+## External Contracts and Interfaces
 
-## Built-in Types
+> 🚧 Status: External contracts and interfaces are not implemented yet.
 
-### Never
-
-`Never` is the return type for functions which never return normally.
+External contracts and interfaces can be instantiated by calling the `at` function on the contract or interface type and passing the address where the code is deployed. It returns an optional, as the code at the given address might not be of the given type.
 
 ```swift
-// Declare a function named `crashAndBurn` which will never return,
-// because it calls the function named `fatalError`, which never returns
+// Declaration for an interface named `Counter`.
 //
-fun crashAndBurn() -> Never {
-    fatalError("An unrecoverable error occurred")
+interface Counter {
+    pub count: Int
+    pub fun increment(_ count: Int)
 }
+
+// Try to instantiate the interface `Counter` for the code
+// at address 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
+//
+// The result is a value which has type `Counter`.
+//
+const counter: Counter =
+    Counter.at(0x06012c8cf97BEaD5deAe237070F9587f8E7A266d)
+       ?? fatalError("contract at address is not a counter")
+
+// Access the field `count`
+//
+counter.count
+
+// Call the function `increment` on the counter
+//
+counter.increment(42)
 ```
 
-### Root Authorization
+In addition it is also possible to just check if an address has code with a given type.
+
+```swift
+// Check if the interface `Counter` is available
+// at address 0x2F4Bdafb22bd92AA7b7552d270376dE8eDccbc1E
+//
+const exists: Bool = Counter.exists(at: 0x2F4Bdafb22bd92AA7b7552d270376dE8eDccbc1E)
+```
+
+
+## Built-in Authorization Types
+
+### `RootAuth`
+
+> 🚧 Status: `RootAuth` is not implemented yet.
 
 The authorization type `RootAuth` represents access rights/privileges to all resources.
 
@@ -2684,7 +2870,9 @@ interface RootAuth {
 }
 ```
 
-### Storage Authorization
+### `StorageAuth`
+
+> 🚧 Status: `StorageAuth` is not implemented yet.
 
 The authorization type `StorageAuth` represents storage rights for an account. It is created from a [root authorization](#root-authorization). The storage authorization's account is the root authorization's account.
 
@@ -2698,7 +2886,9 @@ interface StorageAuth {
 
 ## Built-in Functions
 
-### FatalError
+### `fatalError`
+
+> 🚧 Status: `fatalError` is not implemented yet.
 
 ```swift
 fun fatalError(_ message: String) -> Never
@@ -2709,11 +2899,13 @@ Terminates the program unconditionally and reports a message which explains why 
 #### Example
 
 ```swift
-let optionalAccount: Account? = // ...
-let account = optionalAccount ?? fatalError("missing account")
+const optionalAccount: Account? = // ...
+const account = optionalAccount ?? fatalError("missing account")
 ```
 
-### Assert
+### `assert`
+
+> 🚧 Status: `assert` is not implemented yet.
 
 ```swift
 fun assert(_ condition: Bool, message: String)
