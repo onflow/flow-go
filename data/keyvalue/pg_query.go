@@ -131,7 +131,7 @@ func (q *pgSQLQuery) debug() (string, []string) {
 	return q.builtQuery, q.params
 }
 
-// and params to query list and returns their relative position
+// add params to query list and returns their relative position
 func (q *pgSQLQuery) addParams(params ...string) []int {
 	pos := make([]int, 0, len(params))
 	startPos := len(q.params)
