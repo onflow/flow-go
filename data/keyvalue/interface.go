@@ -8,8 +8,21 @@ type DBConnector interface {
 	MigrateDown() error
 }
 
-// QueryBuilder builds a key value query
+/*
+QueryBuilder builds a key value query and allow
+For exmaple:
+	dbConn := NewPostgresDB(options...)
+
+	setFooAndBar := dbConn.NewQuery().
+		Set("foo", "keyA").
+		Set("bar", "keyB").
+		InTransaction().
+		MustBuild()
+
+	setFooAndBar.Execute("value1", "value2")
+*/
 type QueryBuilder interface {
+	// InTransaction sets a query to run in a multi statement transaction
 	InTransaction() QueryBuilder
 	Get(namespace string, key string) QueryBuilder
 	Set(namespace string, key string) QueryBuilder
