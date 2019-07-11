@@ -11,15 +11,17 @@ type DBConnector interface {
 /*
 QueryBuilder builds a key value query and allow
 For exmaple:
-	dbConn := NewPostgresDB(options...)
+```go
+  dbConn := NewPostgresDB(options...)
 
-	setFooAndBar := dbConn.NewQuery().
-		AddSet("foo_collection").
-		AddSet("bar_collection").
-		InTransaction().
-		MustBuild()
+  setFooAndBar := dbConn.NewQuery().
+	  AddSet("foo_collection").
+	  AddSet("bar_collection").
+	  InTransaction().
+	  MustBuild()
 
-	setFooAndBar.Execute("key1", "value1", "key2", "value2")
+  setFooAndBar.Execute("key1", "value1", "key2", "value2")
+```
 */
 type QueryBuilder interface {
 	// InTransaction sets a query to run in a multi statement transaction
