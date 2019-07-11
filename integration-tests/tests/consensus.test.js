@@ -2,9 +2,9 @@ const assert = require('assert');
 const promisify = require('util').promisify;
 const grpcHelpers = require('../helpers/grpc');
 
-const { ACCESS_ADDR, HELPERS_ADDR} = process.env;
+const { CONSENSUS_ADDR, HELPERS_ADDR} = process.env;
 
-describe('Access node integration tests', function() {
+describe('Consensus role integration tests', function() {
 
   beforeEach(function() {
     /* TODO
@@ -12,14 +12,13 @@ describe('Access node integration tests', function() {
       .post('/reset-db')
       .expect(200)
     */
-
   });
 
   describe('ping', function() {
-    it('should be a able to ping access', async function() {
-      const accessStub = grpcHelpers.createNewAccessNodeStub(ACCESS_ADDR) 
+    it('should be a able to ping', async function() {
+      const consensusStub = grpcHelpers.createNewConsensusStub(CONSENSUS_ADDR) 
       const PingRequest = {};
-      const PingResponse = await accessStub.ping("Ping")(PingRequest)
+      const PingResponse = await consensusStub("Ping")(PingRequest)
       assert.deepStrictEqual(PingResponse, {address: Buffer.from('pong!')})
     });
   });

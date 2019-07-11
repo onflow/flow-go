@@ -18,6 +18,12 @@ func NewController() *Controller {
 	return &Controller{}
 }
 
+func (c *Controller) Ping(context.Context, *executeSvc.PingRequest) (*executeSvc.PingResponse, error) {
+	return &executeSvc.PingResponse{
+		Address: []byte("pong!"),
+	}, nil
+}
+
 func (c *Controller) ExecuteBlock(context.Context, *executeSvc.ExecuteBlockRequest) (*empty.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }

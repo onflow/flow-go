@@ -18,6 +18,12 @@ func NewController() *Controller {
 	return &Controller{}
 }
 
+func (c *Controller) Ping(context.Context, *verifySvc.PingRequest) (*verifySvc.PingResponse, error) {
+	return &verifySvc.PingResponse{
+		Address: []byte("pong!"),
+	}, nil
+}
+
 func (c *Controller) SubmitExecutionReceipt(context.Context, *verifySvc.SubmitExecutionReceiptRequest) (*empty.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }

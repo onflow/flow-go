@@ -9,9 +9,17 @@ import "google/protobuf/empty.proto";
 
 
 service SealService {
+  rpc Ping(PingRequest) returns (PingResponse);
+
   rpc SubmitResultApproval(SubmitResultApprovalRequest) returns (google.protobuf.Empty);
 }
 
+
+message PingRequest {}
+
+message PingResponse {
+  bytes address = 1;
+}
 
 message SubmitResultApprovalRequest {
   bamboo.shared.ResultApproval resultApproval = 1;

@@ -17,6 +17,12 @@ func NewController() *Controller {
 	return &Controller{}
 }
 
+func (c *Controller) Ping(context.Context, *collectSvc.PingRequest) (*collectSvc.PingResponse, error) {
+	return &collectSvc.PingResponse{
+		Address: []byte("pong!"),
+	}, nil
+}
+
 func (c *Controller) SubmitTransaction(context.Context, *collectSvc.SubmitTransactionRequest) (*collectSvc.SubmitTransactionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }

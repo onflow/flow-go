@@ -2,9 +2,9 @@ const assert = require('assert');
 const promisify = require('util').promisify;
 const grpcHelpers = require('../helpers/grpc');
 
-const { EXECUTE_ADDR, HELPERS_ADDR} = process.env;
+const { SEAL_ADDR, HELPERS_ADDR} = process.env;
 
-describe('Execute role integration tests', function() {
+describe('Seal role integration tests', function() {
 
   beforeEach(function() {
     /* TODO
@@ -16,9 +16,9 @@ describe('Execute role integration tests', function() {
 
   describe('ping', function() {
     it('should be a able to ping', async function() {
-      const executeStub = grpcHelpers.createNewExecuteStub(EXECUTE_ADDR) 
+      const sealStub = grpcHelpers.createNewSealStub(SEAL_ADDR) 
       const PingRequest = {};
-      const PingResponse = await executeStub("Ping")(PingRequest)
+      const PingResponse = await sealStub("Ping")(PingRequest)
       assert.deepStrictEqual(PingResponse, {address: Buffer.from('pong!')})
     });
   });

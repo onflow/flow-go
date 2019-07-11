@@ -2,8 +2,6 @@ version: "3.3"
 services:
   collect_db:
     image: postgres:9.6-alpine
-    ports:
-      - "5433:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
@@ -28,8 +26,6 @@ services:
 
   consensus_db:
     image: postgres:9.6-alpine
-    ports:
-      - "5433:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
@@ -54,8 +50,6 @@ services:
 
   execute_db:
     image: postgres:9.6-alpine
-    ports:
-      - "5433:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
@@ -80,8 +74,6 @@ services:
 
   verify_db:
     image: postgres:9.6-alpine
-    ports:
-      - "5433:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
@@ -106,8 +98,6 @@ services:
 
   seal_db:
     image: postgres:9.6-alpine
-    ports:
-      - "5433:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
@@ -135,9 +125,11 @@ services:
       context: .
       dockerfile: cmd/testhelpers/Dockerfile
     depends_on:
+      - collect_db
+      - consensus_db
       - execute_db
-      - security_db
-      - access_db
+      - verify_db
+      - seal_db    
     ports:
       - "3009:3009"
     restart: on-failure:5
