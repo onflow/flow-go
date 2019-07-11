@@ -4,6 +4,40 @@
 
 Bamboo is a highly-performant blockchain designed to power the next generation of decentralized applications.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
+
+- [Getting started](#getting-started)
+- [Documentation](#documentation)
+- [Installation](#installation)
+  - [Setting up your environment](#setting-up-your-environment)
+    - [Install Go](#install-go)
+    - [Install Docker](#install-docker)
+  - [Building binaries](#building-binaries)
+  - [Generating code](#generating-code)
+    - [Dependency injection using Wire](#dependency-injection-using-wire)
+    - [Generate gRPC stubs from protobuf files](#generate-grpc-stubs-from-protobuf-files)
+- [Testing](#testing)
+- [Contributing](#contributing)
+  - [Work streams](#work-streams)
+  - [Workflow](#workflow)
+  - [Issues](#issues)
+    - [Branches](#branches)
+      - [Feature Branches](#feature-branches)
+    - [Pull Requests](#pull-requests)
+      - [Reviews](#reviews)
+      - [Work-In-Progress PRs](#work-in-progress-prs)
+    - [Testing](#testing-1)
+  - [Code standards](#code-standards)
+  - [Code documentation](#code-documentation)
+    - [Documentation instructions for stream owners](#documentation-instructions-for-stream-owners)
+    - [Stream package documentation](#stream-package-documentation)
+      - [Auto-generated READMEs](#auto-generated-readmes)
+    - [Documentation instructions for contributors](#documentation-instructions-for-contributors)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Getting started
 
 * Read through the [project setup](/docs/setup.md) instructions to install required tools
