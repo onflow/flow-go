@@ -1,6 +1,6 @@
-# Bamboo Access API
+# Bamboo Observation API
 
-The Bamboo Access API is the user-facing RPC API provided by Bamboo access nodes.
+The Bamboo Observation API is the user-facing RPC API provided by Bamboo access nodes.
 
 The spec for this API is defined using [Protocol Buffers](https://developers.google.com/protocol-buffers), and aims to be language agnostic 
 in order to support a variety of server and client implementations.
