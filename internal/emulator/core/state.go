@@ -12,6 +12,6 @@ type WorldState struct {
 	accountsMutex     sync.RWMutex
 	blocks            map[crypto.Hash]*types.Block
 	blocksMutex       sync.RWMutex
-	transactions      map[crypto.Hash]*types.Transaction
+	transactions      map[crypto.Hash]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
 }

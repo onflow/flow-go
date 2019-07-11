@@ -11,3 +11,12 @@ type EmulatedBlockchain struct {
 	blockchain      []*types.Block
 	txPool          map[crypto.Hash]*types.Transaction
 }
+
+func NewEmulatedBlockchain() *EmulatedBlockchain {
+	return &EmulatedBlockchain{
+		worldStateStore: make(map[crypto.Hash]WorldState),
+		worldState:      WorldState{},
+		blockchain:      make([]*types.Block, 0),
+		txPool:          make(map[crypto.Hash]*types.SignedTransaction),
+	}
+}
