@@ -7,13 +7,12 @@ import (
 	"github.com/go-pg/pg"
 )
 
-// PostgresDB ..
-type PostgresDB struct {
+type postgresDB struct {
 	db *pg.DB
 }
 
-// NewPostgresDB ..
-func NewPostgresDB(addr, user, password, dbname string) DBConnector {
+// NewpostgresDB returns a DBConnector interface backed by a postgres DB
+func NewpostgresDB(addr, user, password, dbname string) DBConnector {
 
 	options := &pg.Options{
 		Addr:     addr,
@@ -24,27 +23,27 @@ func NewPostgresDB(addr, user, password, dbname string) DBConnector {
 
 	db := pg.Connect(options)
 
-	return &PostgresDB{
+	return &postgresDB{
 		db: db,
 	}
 }
 
-// NewQuery ..
-func (d *PostgresDB) NewQuery() QueryBuilder {
+// NewQuery returns an instance of a new QueryBuilder
+func (d *postgresDB) NewQuery() QueryBuilder {
 	return &pgSQLQuery{db: d.db}
 }
 
-// MigrateUp ..
-func (d *PostgresDB) MigrateUp() error {
+// MigrateUp performs all the steps required to bring the backing DB into an initialised state
+func (d *postgresDB) MigrateUp() error {
 	return d.migrate("up")
 }
 
-// MigrateDown ..
-func (d *PostgresDB) MigrateDown() error {
+// MigrateDown is the inverse of MigrateUp and intended to be used in testing environment to achieve a "clean slate".
+func (d *postgresDB) MigrateDown() error {
 	return d.migrate("reset")
 }
 
-func (d *PostgresDB) migrate(cmd string) error {
+func (d *postgresDB) migrate(cmd string) error {
 
 	// Migrations
 	migrations.DefaultCollection.DiscoverSQLMigrations("migrations/")

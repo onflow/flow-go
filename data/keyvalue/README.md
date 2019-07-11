@@ -14,11 +14,7 @@ Package keyvalue provides an abstract interface for connecting to DBs and buildi
 
 ## <a name="pkg-index">Index</a>
 * [type DBConnector](#DBConnector)
-  * [func NewPostgresDB(addr, user, password, dbname string) DBConnector](#NewPostgresDB)
-* [type PostgresDB](#PostgresDB)
-  * [func (d *PostgresDB) MigrateDown() error](#PostgresDB.MigrateDown)
-  * [func (d *PostgresDB) MigrateUp() error](#PostgresDB.MigrateUp)
-  * [func (d *PostgresDB) NewQuery() QueryBuilder](#PostgresDB.NewQuery)
+  * [func NewpostgresDB(addr, user, password, dbname string) DBConnector](#NewpostgresDB)
 * [type QueryBuilder](#QueryBuilder)
 
 
@@ -30,11 +26,14 @@ Package keyvalue provides an abstract interface for connecting to DBs and buildi
 
 
 
-## <a name="DBConnector">type</a> [DBConnector](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=182:277#L5)
+## <a name="DBConnector">type</a> [DBConnector](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=182:547#L5)
 ``` go
 type DBConnector interface {
+    // NewQuery returns an instance of a new QueryBuilder
     NewQuery() QueryBuilder
+    // MigrateUp performs all the steps required to bring the backing DB into an initialised state
     MigrateUp() error
+    // MigrateDown is the inverse of MigrateUp and intended to be used in testing environment to achieve a "clean slate".
     MigrateDown() error
 }
 ```
@@ -46,62 +45,17 @@ DBConnector abstracts a db connection
 
 
 
-### <a name="NewPostgresDB">func</a> [NewPostgresDB](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_connection.go?s=168:235#L16)
+### <a name="NewpostgresDB">func</a> [NewpostgresDB](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_connection.go?s=204:271#L15)
 ``` go
-func NewPostgresDB(addr, user, password, dbname string) DBConnector
+func NewpostgresDB(addr, user, password, dbname string) DBConnector
 ```
-NewPostgresDB ..
+NewpostgresDB returns a DBConnector interface backed by a postgres DB
 
 
 
 
 
-## <a name="PostgresDB">type</a> [PostgresDB](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_connection.go?s=109:146#L11)
-``` go
-type PostgresDB struct {
-    // contains filtered or unexported fields
-}
-
-```
-PostgresDB ..
-
-
-
-
-
-
-
-
-
-
-### <a name="PostgresDB.MigrateDown">func</a> (\*PostgresDB) [MigrateDown](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_connection.go?s=608:648#L43)
-``` go
-func (d *PostgresDB) MigrateDown() error
-```
-MigrateDown ..
-
-
-
-
-### <a name="PostgresDB.MigrateUp">func</a> (\*PostgresDB) [MigrateUp](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_connection.go?s=522:560#L38)
-``` go
-func (d *PostgresDB) MigrateUp() error
-```
-MigrateUp ..
-
-
-
-
-### <a name="PostgresDB.NewQuery">func</a> (\*PostgresDB) [NewQuery](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_connection.go?s=426:470#L33)
-``` go
-func (d *PostgresDB) NewQuery() QueryBuilder
-```
-NewQuery ..
-
-
-
-
-## <a name="QueryBuilder">type</a> [QueryBuilder](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=585:1191#L26)
+## <a name="QueryBuilder">type</a> [QueryBuilder](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=855:1461#L29)
 ``` go
 type QueryBuilder interface {
     // InTransaction sets a query to run in a multi statement transaction

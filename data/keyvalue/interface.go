@@ -3,8 +3,11 @@ package keyvalue
 
 // DBConnector abstracts a db connection
 type DBConnector interface {
+	// NewQuery returns an instance of a new QueryBuilder
 	NewQuery() QueryBuilder
+	// MigrateUp performs all the steps required to bring the backing DB into an initialised state
 	MigrateUp() error
+	// MigrateDown is the inverse of MigrateUp and intended to be used in testing environment to achieve a "clean slate".
 	MigrateDown() error
 }
 
