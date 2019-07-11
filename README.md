@@ -55,6 +55,7 @@ You can find a high-level overview of the Bamboo architecture on the [documentat
 ### Setting up your environment
 
 #### Install Go
+
 - Download and install [Go 1.12](https://golang.org/doc/install)
 - Create your workspace `$GOPATH` directory and update your bash_profile to contain the following:
 
@@ -74,8 +75,10 @@ export PATH="$PATH:$GOPATH/bin"
 _Note: since we are using go modules and we prepend every `go` command with `GO111MODULE=on`, you can also clone this repo anywhere you want._
 
 #### Install Docker
+
 - Download and install [Docker CE](https://docs.docker.com/install/)
 - Test Docker by running the integration tests for this repository:
+
 ```bash
 ./test.sh
 ```
@@ -86,10 +89,13 @@ The first run will take a while because some base layers will be downloaded and 
 
 This project includes several binaries defined in the `/cmd` directory:
 
-```
-$ GO111MODULE=on go build -o donotcommit ./cmd/execute/
-$ GO111MODULE=on go build -o donotcommit ./cmd/security/
-$ GO111MODULE=on go build -o donotcommit ./cmd/testhelpers/
+```bash
+GO111MODULE=on go build -o donotcommit ./cmd/collect/
+GO111MODULE=on go build -o donotcommit ./cmd/consensus/
+GO111MODULE=on go build -o donotcommit ./cmd/execute/
+GO111MODULE=on go build -o donotcommit ./cmd/verify/
+GO111MODULE=on go build -o donotcommit ./cmd/seal/
+GO111MODULE=on go build -o donotcommit ./cmd/testhelpers/
 ```
 
 TODO: move to Makefile
@@ -104,10 +110,12 @@ Install wire:
 GO111MODULE=on go get -u github.com/google/wire/cmd/wire
 ```
 
-```
-$ GO111MODULE=on wire ./internal/execute/
-$ GO111MODULE=on wire ./internal/security/
-$ GO111MODULE=on wire ./internal/access/
+```bash
+GO111MODULE=on wire ./internal/roles/collect/
+GO111MODULE=on wire ./internal/roles/consensus/
+GO111MODULE=on wire ./internal/roles/execute/
+GO111MODULE=on wire ./internal/roles/verify/
+GO111MODULE=on wire ./internal/roles/seal/
 ```
 TODO: move to Makefile
 
@@ -116,8 +124,8 @@ TODO: move to Makefile
 1. Install prototool https://github.com/uber/prototool#installation  
 2. `go get -u github.com/golang/protobuf/protoc-gen-go`
 
-```
-$ prototool generate proto/
+```bash
+prototool generate proto/
 ```
 TODO: move to Makefile
 
