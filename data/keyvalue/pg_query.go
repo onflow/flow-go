@@ -10,7 +10,6 @@ import (
 
 const paramHolder = ""
 
-// pgSQLQuery ..
 type pgSQLQuery struct {
 	db              *pg.DB
 	isTransaction   bool
@@ -41,25 +40,25 @@ func (s deleteStatement) getTable() string {
 	return string(s)
 }
 
-// InTransaction ..
+// InTransaction sets a query to run in a multi statement transaction
 func (q *pgSQLQuery) InTransaction() QueryBuilder {
 	q.isTransaction = true
 	return q
 }
 
-// Get ..
+// AddGet adds a get statement
 func (q *pgSQLQuery) AddGet(table string) QueryBuilder {
 	q.statements = append(q.statements, getStatement(table))
 	return q
 }
 
-// Set ..
+// AddSet adds a set statement
 func (q *pgSQLQuery) AddSet(table string) QueryBuilder {
 	q.statements = append(q.statements, setStatement(table))
 	return q
 }
 
-// Delete ..
+// AddDelete adds a delete statement
 func (q *pgSQLQuery) AddDelete(table string) QueryBuilder {
 	q.statements = append(q.statements, deleteStatement(table))
 	return q
@@ -121,7 +120,7 @@ func (q *pgSQLQuery) MustBuild() QueryBuilder {
 	return q
 }
 
-// Execute ..
+// Execute runs the query and returns its result
 func (q *pgSQLQuery) Execute(params ...string) (string, error) {
 	if q.builtQuery == "" {
 		return "", errors.New("Cannot execute unbuilt query, call MustBuild() first")
