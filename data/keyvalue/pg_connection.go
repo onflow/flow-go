@@ -30,7 +30,7 @@ func NewpostgresDB(addr, user, password, dbname string) DBConnector {
 
 // NewQuery returns an instance of a new QueryBuilder
 func (d *postgresDB) NewQuery() QueryBuilder {
-	return &pgSQLQuery{db: d.db}
+	return &pgQueryBuilder{db: d.db}
 }
 
 // MigrateUp performs all the steps required to bring the backing DB into an initialised state

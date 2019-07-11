@@ -11,7 +11,7 @@ import (
 const paramHolder = ""
 
 // Implements the QueryBuilder and Query interface
-type pgSQLQuery struct {
+type pgQueryBuilder struct {
 	db              *pg.DB
 	isTransaction   bool
 	builtQuery      string
@@ -42,31 +42,31 @@ func (s deleteStatement) getTable() string {
 }
 
 // InTransaction sets a query to run in a multi statement transaction
-func (q *pgSQLQuery) InTransaction() QueryBuilder {
+func (q *pgQueryBuilder) InTransaction() QueryBuilder {
 	q.isTransaction = true
 	return q
 }
 
 // AddGet adds a get statement
-func (q *pgSQLQuery) AddGet(table string) QueryBuilder {
+func (q *pgQueryBuilder) AddGet(table string) QueryBuilder {
 	q.statements = append(q.statements, getStatement(table))
 	return q
 }
 
 // AddSet adds a set statement
-func (q *pgSQLQuery) AddSet(table string) QueryBuilder {
+func (q *pgQueryBuilder) AddSet(table string) QueryBuilder {
 	q.statements = append(q.statements, setStatement(table))
 	return q
 }
 
 // AddDelete adds a delete statement
-func (q *pgSQLQuery) AddDelete(table string) QueryBuilder {
+func (q *pgQueryBuilder) AddDelete(table string) QueryBuilder {
 	q.statements = append(q.statements, deleteStatement(table))
 	return q
 }
 
 // MustBuild generates the SQL query. Intended to be called once on server initialisation for performance. This method panics if the Query is not supported.
-func (q *pgSQLQuery) MustBuild() Query {
+func (q *pgQueryBuilder) MustBuild() Query {
 	errorMessages := []string{}
 
 	getCount := q.getStatementsCount()
@@ -122,7 +122,7 @@ func (q *pgSQLQuery) MustBuild() Query {
 }
 
 // Execute runs the query and returns its result
-func (q *pgSQLQuery) Execute(params ...string) (string, error) {
+func (q *pgQueryBuilder) Execute(params ...string) (string, error) {
 	if q.builtQuery == "" {
 		return "", errors.New("Cannot execute unbuilt query, call MustBuild() first")
 	}
@@ -142,12 +142,12 @@ func (q *pgSQLQuery) Execute(params ...string) (string, error) {
 	return "", execErr
 }
 
-func (q *pgSQLQuery) debug() (string, []string) {
+func (q *pgQueryBuilder) debug() (string, []string) {
 	return q.builtQuery, q.params
 }
 
 // and params to query list and returns their relative position
-func (q *pgSQLQuery) addParams(params ...string) []int {
+func (q *pgQueryBuilder) addParams(params ...string) []int {
 	pos := make([]int, 0, len(params))
 	startPos := len(q.params)
 	for i := range params {
@@ -158,7 +158,7 @@ func (q *pgSQLQuery) addParams(params ...string) []int {
 }
 
 // merges params passed at execution time with q.params that were set at build time with .
-func (q *pgSQLQuery) mergeParams(params []string) error {
+func (q *pgQueryBuilder) mergeParams(params []string) error {
 
 	if len(q.paramsHolderPos) != len(params) {
 		return fmt.Errorf("Expected to substituted %d params, but received %d", len(q.paramsHolderPos), len(params))
@@ -173,7 +173,7 @@ func (q *pgSQLQuery) mergeParams(params []string) error {
 	return nil
 }
 
-func (q *pgSQLQuery) getStatementsCount() int {
+func (q *pgQueryBuilder) getStatementsCount() int {
 	count := 0
 	for _, s := range q.statements {
 		if _, ok := s.(getStatement); ok {
@@ -183,7 +183,7 @@ func (q *pgSQLQuery) getStatementsCount() int {
 	return count
 }
 
-func (q *pgSQLQuery) setStatementsCount() int {
+func (q *pgQueryBuilder) setStatementsCount() int {
 	count := 0
 	for _, s := range q.statements {
 		if _, ok := s.(setStatement); ok {
@@ -193,7 +193,7 @@ func (q *pgSQLQuery) setStatementsCount() int {
 	return count
 }
 
-func (q *pgSQLQuery) deleteStatementsCount() int {
+func (q *pgQueryBuilder) deleteStatementsCount() int {
 	count := 0
 	for _, s := range q.statements {
 		if _, ok := s.(deleteStatement); ok {
