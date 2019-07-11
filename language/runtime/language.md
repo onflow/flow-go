@@ -661,6 +661,20 @@ var someValue: Any = 1
 someValue = true
 ```
 
+However, using `Any` does not opt-out of type checking. It is invalid to access fields and call functions on `Any` typed values, as it has no fields and functions.
+
+```swift
+// Declare a variable that has the type `Any`. The initial value is an integer,
+// but the variable  still has the explict type `Any`.
+//
+const a: Any = 1
+
+// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)
+// and an `Int` value (`2`, right-hand side)
+//
+a + 2
+```
+
 ### Never
 
 `Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
