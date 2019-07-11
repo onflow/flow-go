@@ -1,71 +1,48 @@
 package crypto
 
 import (
-	"encoding/hex"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/crypto/sha3"
 )
 
-const (
-	// HashLength is the size of a SHA3-256 hash.
-	HashLength = 32
-)
+// HashCompute calculates and returns the SHA3-256 output of input data
+func HashCompute(data []byte) Hash {
+	return sha3.Sum256(data)
+}
 
-// Hash represents the 32 byte SHA3-256 hash of arbitrary data.
-type Hash [HashLength]byte
-
-// BytesToHash returns a Hash with value b.
-// If b is larger than len(h), b will be cropped from the left.
+// BytesToHash sets b to hash.
+// If b is larger than HashLength, b will be cropped from the right.
 func BytesToHash(b []byte) Hash {
+	if HashLength < len(b) {
+		log.Warn("the array is cropped from the right")
+	}
 	var h Hash
-	h.SetBytes(b)
+	// number of copied bytes is min(len(b), HashLength)
+	copy(h[0:], b)
+	// clear the remaining bytes of h
+	for i := len(b); i < HashLength; i++ {
+		h[i] = 0
+	}
 	return h
 }
 
-// HashesToBytes converts a slice of hashes to a slice of bytes.
-func HashesToBytes(hashes []Hash) [][]byte {
-	b := make([][]byte, len(hashes))
-
-	for i, h := range hashes {
-		b[i] = h.Bytes()
-	}
-
-	return b
+// HashToBytes sets a hash to b
+// HashToBytes gets the byte representation of the underlying hash.
+func (h Hash) HashToBytes() []byte {
+	return h[:]
 }
 
-// BytesToHashes converts a slice of bytes to a slice of hashes.
-func BytesToHashes(b [][]byte) []Hash {
-	hashes := make([]Hash, len(b))
+// Hex converts a hash to a hex string.
+func (h Hash) Hex() string { return hexutil.Encode(h[:]) }
 
-	for i, v := range b {
-		hashes[i] = BytesToHash(v)
-	}
-
-	return hashes
-}
-
-// SetBytes sets the hash to the value of b.
-// If b is larger than len(h), b will be cropped from the left.
-func (h *Hash) SetBytes(b []byte) {
-	if len(b) > len(h) {
-		b = b[len(b)-HashLength:]
-	}
-
-	copy(h[HashLength-len(b):], b)
-}
-
-// Bytes gets the byte representation of the underlying hash.
-func (h Hash) Bytes() []byte { return h[:] }
-
-// NewHash computes the SHA3-256 hash of some arbitrary set of data.
-func NewHash(data []byte) Hash {
-	return BytesToHash(ComputeHash(data))
-}
-
-// String encodes Hash as a readable string for logging purposes.
+// String implements the stringer interface and is used also by the logger when
+// doing full logging into a file.
 func (h Hash) String() string {
-	return hex.EncodeToString(h.Bytes())
+	return h.Hex()
 }
 
-// ZeroBlockHash represents the parent hash of the genesis block.
-func ZeroBlockHash() Hash {
-	return Hash{}
+// IsEqual checks if a hash is equal to an input hash
+func (h Hash) IsEqual(input *Hash) bool {
+	return h.IsEqual(input)
 }
