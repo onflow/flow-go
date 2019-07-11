@@ -14,8 +14,10 @@ func TestGet(t *testing.T) {
 	key := "keyA"
 
 	q := (&pgSQLQuery{}).
-		Get(table, key).
+		AddGet(table).
 		MustBuild()
+	err := q.(*pgSQLQuery).mergeParams([]string{key})
+	Expect(err).ToNot(HaveOccurred())
 	query, params := q.(*pgSQLQuery).debug()
 
 	Expect(query).To(Equal("SELECT value FROM ?0 WHERE key=?1 ; "))
@@ -30,9 +32,9 @@ func TestSet(t *testing.T) {
 	value := "valueA"
 
 	q := (&pgSQLQuery{}).
-		Set(table, key).
+		AddSet(table).
 		MustBuild()
-	err := q.(*pgSQLQuery).mergeSetParams([]string{value})
+	err := q.(*pgSQLQuery).mergeParams([]string{key, value})
 	Expect(err).ToNot(HaveOccurred())
 	query, params := q.(*pgSQLQuery).debug()
 
@@ -48,11 +50,11 @@ func TestSetWithExtraSetParams(t *testing.T) {
 	value := "valueA"
 
 	q := (&pgSQLQuery{}).
-		Set(table, key).
+		AddSet(table).
 		MustBuild()
-	err := q.(*pgSQLQuery).mergeSetParams([]string{value, "extra"})
+	err := q.(*pgSQLQuery).mergeParams([]string{key, value, "extra"})
 	Expect(err).To(HaveOccurred())
-	Expect(err.Error()).To(Equal("Expected to substituted 1 set params, but received 2"))
+	Expect(err.Error()).To(Equal("Expected to substituted 2 params, but received 3"))
 }
 
 func TestSetWithMissingSetParams(t *testing.T) {
@@ -63,27 +65,27 @@ func TestSetWithMissingSetParams(t *testing.T) {
 	//value := "valueA"
 
 	q := (&pgSQLQuery{}).
-		Set(table, key).
+		AddSet(table).
 		MustBuild()
-	err := q.(*pgSQLQuery).mergeSetParams([]string{})
+	err := q.(*pgSQLQuery).mergeParams([]string{key})
 	Expect(err).To(HaveOccurred())
-	Expect(err.Error()).To(Equal("Expected to substituted 1 set params, but received 0"))
+	Expect(err.Error()).To(Equal("Expected to substituted 2 params, but received 1"))
 }
 
 func TestMultiSetNoTx(t *testing.T) {
 
 	table1 := "tableA"
-	key1 := "keyA"
+	// key1 := "keyA"
 	// value1 := "valueA"
 
 	table2 := "tableB"
-	key2 := "keyB"
+	// key2 := "keyB"
 	// value2 := "valueB"
 
 	defer unittest.ExpectPanic("Must use a transaction when changing more than one key", t)
 	(&pgSQLQuery{}).
-		Set(table1, key1).
-		Set(table2, key2).
+		AddSet(table1).
+		AddSet(table2).
 		MustBuild()
 
 }
@@ -100,11 +102,11 @@ func TestMultiSetWithTx(t *testing.T) {
 	value2 := "valueB"
 
 	q := (&pgSQLQuery{}).
-		Set(table1, key1).
-		Set(table2, key2).
+		AddSet(table1).
+		AddSet(table2).
 		InTransaction().
 		MustBuild()
-	err := q.(*pgSQLQuery).mergeSetParams([]string{value1, value2})
+	err := q.(*pgSQLQuery).mergeParams([]string{key1, value1, key2, value2})
 	Expect(err).ToNot(HaveOccurred())
 	query, params := q.(*pgSQLQuery).debug()
 
@@ -116,12 +118,13 @@ func TestMustBuildBeforeExecute(t *testing.T) {
 	RegisterTestingT(t)
 
 	table := "tableA"
-	key := "keyA"
+	// key := "keyA"
 
 	q := (&pgSQLQuery{}).
-		Get(table, key)
+		AddGet(table)
 	_, err := q.Execute()
 	Expect(err).To(HaveOccurred())
+	Expect(err.Error()).To(Equal("Cannot execute unbuilt query, call MustBuild() first"))
 
 }
 
