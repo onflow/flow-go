@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc"
 
 	svc "github.com/dapperlabs/bamboo-node/grpc/services/seal"
-	"github.com/dapperlabs/bamboo-node/internal/services/seal/config"
+	"github.com/dapperlabs/bamboo-node/internal/roles/seal/config"
 )
 
 type Server struct {

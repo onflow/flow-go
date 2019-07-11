@@ -6,7 +6,7 @@
 package collect
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/services/collect/config"
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/config"
 )
 
 // Injectors from wire.go:

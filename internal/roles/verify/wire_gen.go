@@ -6,7 +6,7 @@
 package verify
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/services/verify/config"
+	"github.com/dapperlabs/bamboo-node/internal/roles/verify/config"
 )
 
 // Injectors from wire.go:

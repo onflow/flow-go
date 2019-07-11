@@ -1,5 +1,57 @@
 version: "3.3"
 services:
+  collect_db:
+    image: postgres:9.6-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=foo
+
+  collect:
+    build:
+      context: .
+      dockerfile: cmd/collect/Dockerfile
+    depends_on:
+      - collect_db
+    ports:
+      - "3001:3001"
+    restart: on-failure:5
+    environment:
+      - BAM_PORT=3001
+      - POSTGRES_GCP_CONNECTION_NAME=foo
+      - POSTGRES_ADDR=execute_db:5432
+      - POSTGRES_DATABASE=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=foo
+
+  consensus_db:
+    image: postgres:9.6-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=foo
+
+  consensus:
+    build:
+      context: .
+      dockerfile: cmd/consensus/Dockerfile
+    depends_on:
+      - consensus_db
+    ports:
+      - "3002:3001"
+    restart: on-failure:5
+    environment:
+      - BAM_PORT=3001
+      - POSTGRES_GCP_CONNECTION_NAME=foo
+      - POSTGRES_ADDR=execute_db:5432
+      - POSTGRES_DATABASE=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=foo
+
   execute_db:
     image: postgres:9.6-alpine
     ports:
@@ -16,7 +68,7 @@ services:
     depends_on:
       - execute_db
     ports:
-      - "3001:3001"
+      - "3003:3001"
     restart: on-failure:5
     environment:
       - BAM_PORT=3001
@@ -26,57 +78,57 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=foo
 
-  security_db:
+  verify_db:
     image: postgres:9.6-alpine
     ports:
-      - "5434:5432"
+      - "5433:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
       - POSTGRES_PASSWORD=foo
 
-  security:
+  verify:
     build:
       context: .
-      dockerfile: cmd/security/Dockerfile
+      dockerfile: cmd/verify/Dockerfile
     depends_on:
-      - security_db
+      - verify_db
     ports:
-      - "3002:3002"
+      - "3004:3001"
     restart: on-failure:5
     environment:
-      - BAM_PORT=3002
+      - BAM_PORT=3001
       - POSTGRES_GCP_CONNECTION_NAME=foo
-      - POSTGRES_ADDR=security_db:5432
+      - POSTGRES_ADDR=execute_db:5432
       - POSTGRES_DATABASE=postgres
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=foo
-  
-  access_db:
+      - POSTGRES_PASSWORD=foo    
+
+  seal_db:
     image: postgres:9.6-alpine
     ports:
-      - "5435:5432"
+      - "5433:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
       - POSTGRES_PASSWORD=foo
 
-  access:
+  seal:
     build:
       context: .
-      dockerfile: cmd/access/Dockerfile
+      dockerfile: cmd/seal/Dockerfile
     depends_on:
-      - access_db
+      - seal_db
     ports:
-      - "3003:3003"
+      - "3005:3001"
     restart: on-failure:5
     environment:
-      - BAM_PORT=3003
+      - BAM_PORT=3001
       - POSTGRES_GCP_CONNECTION_NAME=foo
-      - POSTGRES_ADDR=access_db:5432
+      - POSTGRES_ADDR=execute_db:5432
       - POSTGRES_DATABASE=postgres
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=foo
+      - POSTGRES_PASSWORD=foo    
 
   testhelpers:
     build:
@@ -103,15 +155,35 @@ services:
       context: .
       dockerfile: integration-tests/Dockerfile
     depends_on:
+      - collect
+      - consensus
       - execute
-      - security
-      - access
+      - verify
+      - seal
       - testhelpers
     environment:
+      - COLLECT_ADDR=collect:3001
+      - CONSENSUS_ADDR=consensus:3001
       - EXECUTE_ADDR=execute:3001
-      - SECURITY_ADDR=security:3002
-      - ACCESS_ADDR=access:3003
+      - VERIFY_ADDR=verify:3001
+      - SEAL_ADDR=seal:3001
       - HELPERS_ADDR=testhelpers:3009
+
+  # See https://github.com/dadarek/docker-wait-for-dependencies
+  # Run this as a separate "docker-compose" up command
+  start_collect_dependencies:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - collect_db
+    command: collect_db:5432
+
+  # See https://github.com/dadarek/docker-wait-for-dependencies
+  # Run this as a separate "docker-compose" up command
+  start_consensus_dependencies:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - consensus_db
+    command: consensus_db:5432
 
   # See https://github.com/dadarek/docker-wait-for-dependencies
   # Run this as a separate "docker-compose" up command
@@ -123,27 +195,29 @@ services:
 
   # See https://github.com/dadarek/docker-wait-for-dependencies
   # Run this as a separate "docker-compose" up command
-  start_security_dependencies:
+  start_verify_dependencies:
     image: dadarek/wait-for-dependencies
     depends_on:
-      - security_db
-    command: security_db:5432
+      - verify_db
+    command: verify_db:5432
 
   # See https://github.com/dadarek/docker-wait-for-dependencies
   # Run this as a separate "docker-compose" up command
-  start_access_dependencies:
+  start_seal_dependencies:
     image: dadarek/wait-for-dependencies
     depends_on:
-      - access_db
-    command: access_db:5432
+      - seal_db
+    command: seal_db:5432
 
   # See https://github.com/dadarek/docker-wait-for-dependencies
   # Run this as a separate "docker-compose" up command
   start_test_dependencies:
     image: dadarek/wait-for-dependencies
     depends_on:
+      - collect
+      - consensus
       - execute
-      - security
-      - access
+      - verify
+      - seal
       - testhelpers
-    command: execute:3001 security:3002 access:3003 testhelpers:3009
+    command: collect:3001 consensus:3001 execute:3001 verify:3001 seal:3001 testhelpers:3009

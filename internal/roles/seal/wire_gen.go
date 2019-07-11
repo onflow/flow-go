@@ -6,7 +6,7 @@
 package seal
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/services/seal/config"
+	"github.com/dapperlabs/bamboo-node/internal/roles/seal/config"
 )
 
 // Injectors from wire.go:

@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc"
 
 	svc "github.com/dapperlabs/bamboo-node/grpc/services/observe"
-	"github.com/dapperlabs/bamboo-node/internal/services/observe/config"
+	"github.com/dapperlabs/bamboo-node/internal/roles/observe/config"
 )
 
 type Server struct {

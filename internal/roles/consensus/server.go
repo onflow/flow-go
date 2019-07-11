@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc"
 
 	svc "github.com/dapperlabs/bamboo-node/grpc/services/consensus"
-	"github.com/dapperlabs/bamboo-node/internal/services/consensus/config"
+	"github.com/dapperlabs/bamboo-node/internal/roles/consensus/config"
 )
 
 type Server struct {
