@@ -15,3 +15,14 @@ type WorldState struct {
 	transactions      map[crypto.Hash]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
 }
+
+func NewWorldState(genesis *types.Block) *WorldState {
+	blocks := make(map[crypto.Hash]*types.Block)
+	blocks[genesis.Hash()] = genesis
+
+	return &WorldState{
+		accounts:     make(map[crypto.Address]crypto.Account),
+		blocks:       blocks,
+		transactions: make(map[crypto.Hash]*types.SignedTransaction),
+	}
+}

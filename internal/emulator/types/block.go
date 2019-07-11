@@ -3,6 +3,7 @@ package types
 import (
 	"time"
 
+	"github.com/dapperlabs/bamboo-node/internal/emulator/utils"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
@@ -13,7 +14,7 @@ type Block struct {
 	TransactionHashes []crypto.Hash
 }
 
-func (b *Block) Hash() {
+func (b *Block) Hash() crypto.Hash {
 	bytes := utils.EncodeAsBytes(
 		b.Height,
 		b.Timestamp,
@@ -21,4 +22,13 @@ func (b *Block) Hash() {
 		b.TransactionHashes,
 	)
 	return crypto.NewHash(bytes)
+}
+
+func GenesisBlock() *Block {
+	return &Block{
+		Height:            0,
+		Timestamp:         time.Now(),
+		PreviousBlockHash: crypto.Hash{},
+		TransactionHashes: make([]crypto.Hash, 0),
+	}
 }
