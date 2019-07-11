@@ -24,9 +24,9 @@ For exmaple:
 type QueryBuilder interface {
 	// InTransaction sets a query to run in a multi statement transaction
 	InTransaction() QueryBuilder
-	Get(namespace string, key string) QueryBuilder
-	Set(namespace string, key string) QueryBuilder
-	Delete(namespace string, key string) QueryBuilder
+	AddGet(namespace string) QueryBuilder
+	AddSet(namespace string) QueryBuilder
+	AddDelete(namespace string) QueryBuilder
 	MustBuild() QueryBuilder // MustBuild is intended to be called once per query on server startup for performance considerations of some providers.
-	Execute(setParams ...string) (result string, err error)
+	Execute(params ...string) (result string, err error)
 }

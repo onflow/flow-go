@@ -8,23 +8,37 @@ import (
 	"github.com/go-pg/pg"
 )
 
-const setParamHolder = ""
-
-type keyTable struct {
-	key   string
-	table string
-}
+const paramHolder = ""
 
 // pgSQLQuery ..
 type pgSQLQuery struct {
-	db            *pg.DB
-	isTransaction bool
-	builtQuery    string
-	params        []string
-	getKey        keyTable
-	setKeys       []keyTable
-	setValuePos   []int
-	deleteKeys    []keyTable
+	db              *pg.DB
+	isTransaction   bool
+	builtQuery      string
+	params          []string
+	statements      []statement
+	paramsHolderPos []int
+	hasGet          bool // could be derived with getStatementsCount(), but stored for Execute() optimisation
+}
+
+type statement interface {
+	getTable() string
+}
+
+type getStatement string
+type setStatement string
+type deleteStatement string
+
+func (s getStatement) getTable() string {
+	return string(s)
+}
+
+func (s setStatement) getTable() string {
+	return string(s)
+}
+
+func (s deleteStatement) getTable() string {
+	return string(s)
 }
 
 // InTransaction ..
@@ -34,20 +48,20 @@ func (q *pgSQLQuery) InTransaction() QueryBuilder {
 }
 
 // Get ..
-func (q *pgSQLQuery) Get(table string, key string) QueryBuilder {
-	q.getKey = keyTable{key: key, table: table}
+func (q *pgSQLQuery) AddGet(table string) QueryBuilder {
+	q.statements = append(q.statements, getStatement(table))
 	return q
 }
 
 // Set ..
-func (q *pgSQLQuery) Set(table string, key string) QueryBuilder {
-	q.setKeys = append(q.setKeys, keyTable{key: key, table: table})
+func (q *pgSQLQuery) AddSet(table string) QueryBuilder {
+	q.statements = append(q.statements, setStatement(table))
 	return q
 }
 
 // Delete ..
-func (q *pgSQLQuery) Delete(table string, key string) QueryBuilder {
-	q.deleteKeys = append(q.deleteKeys, keyTable{key: key, table: table})
+func (q *pgSQLQuery) AddDelete(table string) QueryBuilder {
+	q.statements = append(q.statements, deleteStatement(table))
 	return q
 }
 
@@ -55,11 +69,16 @@ func (q *pgSQLQuery) Delete(table string, key string) QueryBuilder {
 func (q *pgSQLQuery) MustBuild() QueryBuilder {
 	errorMessages := []string{}
 
-	if !q.hasGet() && !q.hasSet() && !q.hasDelete() {
+	getCount := q.getStatementsCount()
+	setCount := q.setStatementsCount()
+	deleteCount := q.deleteStatementsCount()
+
+	// check if query is supported
+	if getCount == 0 && setCount == 0 && deleteCount == 0 {
 		errorMessages = append(errorMessages, "Empty query. must have at least one get/set/delete")
 	}
 
-	if len(q.setKeys)+len(q.deleteKeys) > 1 && !q.isTransaction {
+	if setCount+deleteCount > 1 && !q.isTransaction {
 		errorMessages = append(errorMessages, "Must use a transaction when changing more than one key")
 	}
 
@@ -67,57 +86,53 @@ func (q *pgSQLQuery) MustBuild() QueryBuilder {
 		panic(errors.New(strings.Join(errorMessages, " ; ")))
 	}
 
+	// query is supported- begin building
 	query := ""
 
-	// set
-	for _, setKey := range q.setKeys {
-		pos := q.addParams(
-			setKey.table,
-			setKey.key,
-			setParamHolder,
-		)
-		q.setValuePos = append(q.setValuePos, pos[2])
-		query += fmt.Sprintf("INSERT INTO ?%d (key, value) VALUES ('?%d', '?%d') ON CONFLICT (key) DO UPDATE SET value = ?%d ; ",
-			pos[0],
-			pos[1],
-			pos[2],
-			pos[2],
-		)
-	}
+	for _, statement := range q.statements {
+		switch v := statement.(type) {
 
-	// delete
-	for _, deleteKey := range q.deleteKeys {
-		pos := q.addParams(deleteKey.table, deleteKey.key)
-		query += fmt.Sprintf(" DELETE FROM ?%d WHERE key=?%d ; ", pos[0], pos[1])
-	}
+		case getStatement:
+			pos := q.addParams(v.getTable(), paramHolder)
+			q.paramsHolderPos = append(q.paramsHolderPos, pos[1])
+			query += fmt.Sprintf("SELECT value FROM ?%d WHERE key=?%d ; ", pos[0], pos[1])
 
-	// get
-	if q.hasGet() {
-		pos := q.addParams(q.getKey.table, q.getKey.key)
-		query += fmt.Sprintf("SELECT value FROM ?%d WHERE key=?%d ; ", pos[0], pos[1])
+		case setStatement:
+			pos := q.addParams(v.getTable(), paramHolder, paramHolder)
+			q.paramsHolderPos = append(q.paramsHolderPos, pos[1], pos[2])
+			query += fmt.Sprintf("INSERT INTO ?%d (key, value) VALUES ('?%d', '?%d') ON CONFLICT (key) DO UPDATE SET value = ?%d ; ", pos[0], pos[1], pos[2], pos[2])
+
+		case deleteStatement:
+			pos := q.addParams(v.getTable(), paramHolder)
+			q.paramsHolderPos = append(q.paramsHolderPos, pos[1])
+			query += fmt.Sprintf(" DELETE FROM ?%d WHERE key=?%d ; ", pos[0], pos[1])
+
+		default:
+			panic(errors.New("Not a known get/set/delete statement"))
+		}
 	}
 
 	if q.isTransaction {
 		query = fmt.Sprintf("BEGIN; %s COMMIT;", query)
 	}
 
+	q.hasGet = getCount != 0
 	q.builtQuery = query
 	return q
-
 }
 
 // Execute ..
-func (q *pgSQLQuery) Execute(setParams ...string) (string, error) {
+func (q *pgSQLQuery) Execute(params ...string) (string, error) {
 	if q.builtQuery == "" {
 		return "", errors.New("Cannot execute unbuilt query, call MustBuild() first")
 	}
 
-	err := q.mergeSetParams(setParams)
+	err := q.mergeParams(params)
 	if err != nil {
 		return "", err
 	}
 
-	if q.hasGet() {
+	if q.hasGet {
 		var value string
 		_, err := q.db.QueryOne(&value, q.builtQuery, q.params)
 		return value, err
@@ -142,30 +157,48 @@ func (q *pgSQLQuery) addParams(params ...string) []int {
 	return pos
 }
 
-// merges q.params that were set at build time with setParams passed at execution time.
-func (q *pgSQLQuery) mergeSetParams(setParams []string) error {
+// merges params passed at execution time with q.params that were set at build time with .
+func (q *pgSQLQuery) mergeParams(params []string) error {
 
-	if len(q.setKeys) != len(setParams) {
-		return fmt.Errorf("Expected to substituted %d set params, but received %d", len(q.setKeys), len(setParams))
+	if len(q.paramsHolderPos) != len(params) {
+		return fmt.Errorf("Expected to substituted %d params, but received %d", len(q.paramsHolderPos), len(params))
 	}
 
 	subs := 0
-	for _, pos := range q.setValuePos {
-		q.params[pos] = setParams[subs]
+	for _, pos := range q.paramsHolderPos {
+		q.params[pos] = params[subs]
 		subs++
 	}
 
 	return nil
 }
 
-func (q *pgSQLQuery) hasGet() bool {
-	return q.getKey.key != ""
+func (q *pgSQLQuery) getStatementsCount() int {
+	count := 0
+	for _, s := range q.statements {
+		if _, ok := s.(getStatement); ok {
+			count++
+		}
+	}
+	return count
 }
 
-func (q *pgSQLQuery) hasSet() bool {
-	return len(q.setKeys) > 0
+func (q *pgSQLQuery) setStatementsCount() int {
+	count := 0
+	for _, s := range q.statements {
+		if _, ok := s.(setStatement); ok {
+			count++
+		}
+	}
+	return count
 }
 
-func (q *pgSQLQuery) hasDelete() bool {
-	return len(q.deleteKeys) > 0
+func (q *pgSQLQuery) deleteStatementsCount() int {
+	count := 0
+	for _, s := range q.statements {
+		if _, ok := s.(deleteStatement); ok {
+			count++
+		}
+	}
+	return count
 }
