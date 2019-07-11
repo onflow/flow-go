@@ -40,7 +40,7 @@ Bamboo is a highly-performant blockchain designed to power the next generation o
 
 ## Getting started
 
-* Read through the [project setup](/docs/setup.md) instructions to install required tools
+* Read through the [project setup](#installation) instructions to install required tools
 * Read the documentation pertaining to [your stream](#work-streams)
 * Familiarize yourself with the [workflow](#workflow) below
 * Browse the rest of this README to get up to speed on concepts like testing, code style, and common code patterns
