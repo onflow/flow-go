@@ -60,5 +60,4 @@ func (d *PostgresDB) migrate(cmd string) error {
 	}
 
 	return nil
-
 }
