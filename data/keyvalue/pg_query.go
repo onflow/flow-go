@@ -10,6 +10,7 @@ import (
 
 const paramHolder = ""
 
+// Implements the QueryBuilder and Query interface
 type pgSQLQuery struct {
 	db              *pg.DB
 	isTransaction   bool
@@ -65,7 +66,7 @@ func (q *pgSQLQuery) AddDelete(table string) QueryBuilder {
 }
 
 // MustBuild generates the SQL query. Intended to be called once on server initialisation for performance. This method panics if the Query is not supported.
-func (q *pgSQLQuery) MustBuild() QueryBuilder {
+func (q *pgSQLQuery) MustBuild() Query {
 	errorMessages := []string{}
 
 	getCount := q.getStatementsCount()
@@ -145,7 +146,7 @@ func (q *pgSQLQuery) debug() (string, []string) {
 	return q.builtQuery, q.params
 }
 
-// add params to query list and returns their relative position
+// and params to query list and returns their relative position
 func (q *pgSQLQuery) addParams(params ...string) []int {
 	pos := make([]int, 0, len(params))
 	startPos := len(q.params)

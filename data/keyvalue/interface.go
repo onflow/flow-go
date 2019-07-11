@@ -3,7 +3,7 @@ package keyvalue
 
 // DBConnector abstracts a db connection
 type DBConnector interface {
-	// NewQuery returns an instance of a new QueryBuilder
+	// NewQuery returns an instance of a new QueryBuilder. Intended to be used when building a custom multi statement query
 	NewQuery() QueryBuilder
 	// MigrateUp performs all the steps required to bring the backing DB into an initialised state
 	MigrateUp() error
@@ -36,7 +36,11 @@ type QueryBuilder interface {
 	// AddDelete adds a delete statement
 	AddDelete(namespace string) QueryBuilder
 	// MustBuild is intended to be called once per query on server startup for performance considerations of some providers.
-	MustBuild() QueryBuilder
+	MustBuild() Query
+}
+
+// Query provides a way to execute a query
+type Query interface {
 	// Execute runs the query and returns its result
 	Execute(params ...string) (result string, err error)
 }

@@ -114,20 +114,6 @@ func TestMultiSetWithTx(t *testing.T) {
 	Expect(params).To(Equal([]string{table1, key1, value1, table2, key2, value2}))
 }
 
-func TestMustBuildBeforeExecute(t *testing.T) {
-	RegisterTestingT(t)
-
-	table := "tableA"
-	// key := "keyA"
-
-	q := (&pgSQLQuery{}).
-		AddGet(table)
-	_, err := q.Execute()
-	Expect(err).To(HaveOccurred())
-	Expect(err.Error()).To(Equal("Cannot execute unbuilt query, call MustBuild() first"))
-
-}
-
 func TestMustBuildWithInvalidQuery(t *testing.T) {
 
 	defer unittest.ExpectPanic("Empty query. must have at least one get/set/delete", t)
