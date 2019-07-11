@@ -4,37 +4,43 @@
 # Streams
 
 # Collection Stream
-/internal/protocol/collect @psiemens
+/internal/roles/collect @psiemens
 /proto/services/collect @psiemens
 /grpc/services/collect @psiemens
+/cmd/collect @psiemens
 
 # Consensus Stream
-/internal/protocol/consensus @AlexHentschel
+/internal/roles/consensus @AlexHentschel
 /proto/services/consensus @AlexHentschel
 /grpc/services/consensus @AlexHentschel
+/cmd/consensus @AlexHentschel
 
 # Execution Stream
-/internal/protocol/execute @turbolent
+/internal/roles/execute @turbolent
 /proto/services/execute @turbolent
 /grpc/services/execute @turbolent
+/cmd/execute @turbolent
 
 # Verification Stream
-/internal/protocol/verify @pazams
+/internal/roles/verify @pazams
 /proto/services/verify @pazams
 /grpc/services/verify @pazams
+/cmd/verify @pazams
 
 # Sealing Stream
-/internal/protocol/seal @pazams
+/internal/roles/seal @pazams
 /proto/services/seal @pazams
 /grpc/services/seal @pazams
+/cmd/seal @pazams
 
 # Observation Stream
-/internal/protocol/observe @psiemens
+/internal/roles/observe @psiemens
 /proto/services/observe @psiemens
 /grpc/services/observe @psiemens
+/cmd/observe @psiemens
 
 # Networking Stream
-/internal/network @yhassanzadeh
+/pkg/network @yhassanzadeh
 
 # Cryptography Stream
 /pkg/crypto @tarakby
@@ -49,18 +55,3 @@
 
 # Language Stream
 /language @turbolent
-
-
-# Nodes
-
-# Access Node
-/internal/nodes/access @psiemens @pazams
-/cmd/access @psiemens @pazams
-
-# Security Node
-/internal/nodes/security @AlexHentschel @pazams
-/cmd/security @AlexHentschel @pazams
-
-# Execute Node
-/internal/nodes/execute @turbolent
-/cmd/execute @turbolent
