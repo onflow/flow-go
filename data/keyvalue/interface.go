@@ -3,8 +3,8 @@ package keyvalue
 
 // DBConnector abstracts a db connection
 type DBConnector interface {
-	// NewQuery returns an instance of a new QueryBuilder. Intended to be used when building a custom multi statement query
-	NewQuery() QueryBuilder
+	// NewQueryBuilder returns an instance of a new QueryBuilder. Intended to be used when building a custom multi statement query
+	NewQueryBuilder() QueryBuilder
 	// MigrateUp performs all the steps required to bring the backing DB into an initialised state
 	MigrateUp() error
 	// MigrateDown is the inverse of MigrateUp and intended to be used in testing environment to achieve a "clean slate".
@@ -17,7 +17,7 @@ For exmaple:
 ```go
   dbConn := NewPostgresDB(options...)
 
-  setFooAndBar := dbConn.NewQuery().
+  setFooAndBar := dbConn.NewQueryBuilder().
 	  AddSet("foo_collection").
 	  AddSet("bar_collection").
 	  InTransaction().

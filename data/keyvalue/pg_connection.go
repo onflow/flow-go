@@ -28,8 +28,8 @@ func NewpostgresDB(addr, user, password, dbname string) DBConnector {
 	}
 }
 
-// NewQuery returns an instance of a new QueryBuilder
-func (d *postgresDB) NewQuery() QueryBuilder {
+// NewQueryBuilder returns an instance of a new QueryBuilder
+func (d *postgresDB) NewQueryBuilder() QueryBuilder {
 	return &pgQueryBuilder{db: d.db}
 }
 
