@@ -2186,7 +2186,7 @@ permit Purse to DepositAuth
 
 An interface is an abstract type that specifies the behavior of types that *implement* the interface. Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
 
-Interfaces can be implemented by [classes](#structures-and-classes), [structures](#structures-and-classes), [contracts](#contracts), and [authorizations](#authorizations). These types may implement multiple interfaces.
+Interfaces can be implemented by [classes](#structures-and-classes), [structures](#structures-and-classes), [contracts](#contracts). These types may implement multiple interfaces.
 
 Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Interface requirements, and therefore also their implementations, must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.
 
@@ -2302,7 +2302,7 @@ Note that the required initializer and function do not have any executable code.
 
 ### Interface Implementation
 
-Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the type (class, structure, contract, or authorization) that provides the functionality required in the interface.
+Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the type (class, structure, or contract) that provides the functionality required in the interface.
 
 ```swift,file=interface-implementation.bpl
 // Declare a class named `ExampleVault` with a variable field named `balance`,
