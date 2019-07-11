@@ -14,7 +14,7 @@ type Block struct {
 }
 
 func (b *Block) Hash() {
-	bytes := EncodeAsBytes(
+	bytes := utils.EncodeAsBytes(
 		b.Height,
 		b.Timestamp,
 		b.PreviousBlockHash,
