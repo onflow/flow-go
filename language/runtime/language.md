@@ -1651,8 +1651,7 @@ const someStruct: SomeStruct = SomeStruct()
 const someClass: SomeClass = SomeClass()
 ```
 
-Structures and classes mainly differ in their behaviour: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types. This is explained in detail in a [separate section](#structure-and-class-behaviour).
-
+Structures and classes mainly differ in their behaviour: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types. This is explained in detail in a [separate section](#structure-and-class-behaviour). Value types should be used when copies with independent state is desired, and reference types should be used when shared, mutable state is desired.
 
 ### Structure and Class Fields
 
