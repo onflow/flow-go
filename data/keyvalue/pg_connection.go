@@ -19,7 +19,6 @@ const (
 
 // NewpostgresDB returns a DBConnector interface backed by a postgres DB
 func NewpostgresDB(addr, user, password, dbname string) DBConnector {
-
 	options := &pg.Options{
 		Addr:     addr,
 		User:     user,
