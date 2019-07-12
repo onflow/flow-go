@@ -159,7 +159,7 @@ func (q *pgQueryBuilder) addParams(params ...string) []int {
 	return pos
 }
 
-// merges params passed at execution time with q.params that were set at build time with .
+// mergesParams merges the execution-time and build-time parameters.
 func (q *pgQueryBuilder) mergeParams(params []string) error {
 
 	if len(q.paramsHolderPos) != len(params) {
