@@ -1,19 +1,7 @@
 // Package keyvalue provides an abstract interface for connecting to DBs and building/executing key-value queries on them.
-package keyvalue
-
-// DBConnector abstracts a db connection
-type DBConnector interface {
-	// NewQueryBuilder returns an instance of a new QueryBuilder. Intended to be used when building a custom multi statement query
-	NewQueryBuilder() QueryBuilder
-	// MigrateUp performs all the steps required to bring the backing DB into an initialised state
-	MigrateUp() error
-	// MigrateDown is the inverse of MigrateUp and intended to be used in testing environment to achieve a "clean slate".
-	MigrateDown() error
-}
-
 /*
-QueryBuilder builds a key value query and allow
-For exmaple:
+Some examples:
+
 ```go
   dbConn := NewPostgresDB(options...)
 
@@ -23,9 +11,36 @@ For exmaple:
 	  InTransaction().
 	  MustBuild()
 
-  setFooAndBar.Execute("key1", "value1", "key2", "value2")
+  _, err := setFooAndBar.Execute("key1", "value1", "key2", "value2")
+```
+
+```go
+  dbConn := NewPostgresDB(options...)
+
+  result, err := dbConn.NewQueryBuilder().GetQuery.Execute("foo_collection", "key1")
+  _, err := dbConn.NewQueryBuilder().SetQuery.Execute("foo_collection", "key1", "value1")
+  _, err := dbConn.NewQueryBuilder().DeleteQuery.Execute("foo_collection", "key1")
 ```
 */
+package keyvalue
+
+// DBConnector abstracts a db connection
+type DBConnector interface {
+	// NewQueryBuilder returns an instance of a new QueryBuilder. Intended to be used when building a custom multi statement query
+	NewQueryBuilder() QueryBuilder
+	// GetQuery returns a pre-built QueryBuilder instance ready to be executed as a get statement
+	GetQuery() Query
+	// SetQuery returns a pre-built QueryBuilder instance ready to be executed as a get statement
+	SetQuery() Query
+	// DeleteQuery returns a pre-built QueryBuilder instance ready to be executed as a delete statement
+	DeleteQuery() Query
+	// MigrateUp performs all the steps required to bring the backing DB into an initialised state
+	MigrateUp() error
+	// MigrateDown is the inverse of MigrateUp and intended to be used in testing environment to achieve a "clean slate".
+	MigrateDown() error
+}
+
+// QueryBuilder builds a key value query and allow
 type QueryBuilder interface {
 	// InTransaction sets a query to run in a multi statement transaction
 	InTransaction() QueryBuilder
