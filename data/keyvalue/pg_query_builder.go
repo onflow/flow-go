@@ -59,7 +59,7 @@ func (q *pgQueryBuilder) AddSet(table string) QueryBuilder {
 	return q
 }
 
-// AddDelete adds a delete statement
+// AddDelete adds a delete statement to the query.
 func (q *pgQueryBuilder) AddDelete(table string) QueryBuilder {
 	q.statements = append(q.statements, deleteStatement(table))
 	return q
