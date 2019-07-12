@@ -64,7 +64,6 @@ func (d *postgresDB) MigrateDown() error {
 }
 
 func (d *postgresDB) migrate(cmd string) error {
-
 	// Migrations
 	migrations.DefaultCollection.DiscoverSQLMigrations("migrations/")
 	_, _, _ = migrations.Run(d.db, "init")
