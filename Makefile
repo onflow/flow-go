@@ -1,4 +1,5 @@
 GODOC2MD = GO111MODULE=on go run github.com/lanre-ade/godoc2md
+WIRE = GO111MODULE=on go run github.com/google/wire/cmd/wire
 
 .PHONY: test-setup
 test-setup:
@@ -29,6 +30,14 @@ generate-godoc:
 .PHONY: generate-proto
 generate-proto:
 	GO111MODULE=on go run github.com/uber/prototool/cmd/prototool generate proto/
+
+.PHONY: generate-wire
+generate-wire:
+	$(WIRE) ./internal/roles/collect/
+	$(WIRE) ./internal/roles/consensus/
+	$(WIRE) ./internal/roles/execute/
+	$(WIRE) ./internal/roles/verify/
+	$(WIRE) ./internal/roles/seal/
 
 .PHONY: generate
 generate: generate-godoc generate-proto
