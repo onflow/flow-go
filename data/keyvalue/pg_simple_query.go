@@ -4,7 +4,7 @@ import (
 	"github.com/go-pg/pg"
 )
 
-// simpleQuery implemente the Query interface
+// simpleQuery implements the Query interface.
 type simpleQuery struct {
 	db    *pg.DB
 	query string
