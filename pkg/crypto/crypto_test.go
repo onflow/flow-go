@@ -9,28 +9,37 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// These tests are sanity checks.
-// They should ensure that we don't e.g. use Sha3-224 instead of Sha3-256
-// and that the sha3 library uses keccak-f permutation.
-func TestSha3_256(t *testing.T) {
-	fmt.Println("testing Sha3_256:")
-	msg := []byte("test")
-	exp, _ := hex.DecodeString("36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80")
-
-	checkhash(t, HashCompute, msg, exp)
+type testStruct struct {
+	x string
+	y string
 }
 
-func checkhash(t *testing.T, f func([]byte) Hash, msg, exp []byte) {
-	sum := f(msg)
-	if !bytes.Equal(exp, sum.HashToBytes()) {
-		t.Fatalf("hash mismatch: want: %x have: %x, message is %x", exp, sum.HashToBytes(), msg)
+func (struc *testStruct) Encode() []byte {
+	return []byte(struc.x + struc.y)
+}
+
+// These tests are sanity checks.
+func TestSha3_256(t *testing.T) {
+	fmt.Println("testing Sha3_256:")
+	input := []byte("test")
+	expected, _ := hex.DecodeString("36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80")
+	hash := ComputeBytesHash(input).ToBytes()
+	checkBytes(t, input, expected, hash)
+
+	hash = ComputeStructHash(&testStruct{"te", "st"}).ToBytes()
+	checkBytes(t, input, expected, hash)
+}
+
+func checkBytes(t *testing.T, input, expected, result []byte) {
+	if !bytes.Equal(expected, result) {
+		t.Fatalf("hash mismatch: expect: %x have: %x, input is %x", expected, result, input)
 	}
 }
 
 func BenchmarkSha3_256(b *testing.B) {
 	a := []byte("Bench me!")
 	for i := 0; i < b.N; i++ {
-		HashCompute(a)
+		ComputeBytesHash(a)
 	}
 	return
 }

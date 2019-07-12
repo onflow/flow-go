@@ -6,9 +6,19 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// HashCompute calculates and returns the SHA3-256 output of input data
-func HashCompute(data []byte) Hash {
+// ComputeBytesHash calculates and returns the SHA3-256 output of input byte array
+func ComputeBytesHash(data []byte) Hash {
 	return sha3.Sum256(data)
+}
+
+// ComputeStructHash calculates and returns the SHA3-256 output of any input structure
+func ComputeStructHash(struc Encoder) Hash {
+	return sha3.Sum256(struc.Encode())
+}
+
+// Encoder is an interface of a generic structure
+type Encoder interface {
+	Encode() []byte
 }
 
 // BytesToHash sets b to hash.
@@ -27,9 +37,9 @@ func BytesToHash(b []byte) Hash {
 	return h
 }
 
-// HashToBytes sets a hash to b
-// HashToBytes gets the byte representation of the underlying hash.
-func (h Hash) HashToBytes() []byte {
+// ToBytes sets a hash to b
+// ToBytes gets the byte representation of the underlying hash.
+func (h Hash) ToBytes() []byte {
 	return h[:]
 }
 
