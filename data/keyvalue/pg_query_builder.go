@@ -53,7 +53,7 @@ func (q *pgQueryBuilder) AddGet(table string) QueryBuilder {
 	return q
 }
 
-// AddSet adds a set statement
+// AddSet adds a set statement to the query.
 func (q *pgQueryBuilder) AddSet(table string) QueryBuilder {
 	q.statements = append(q.statements, setStatement(table))
 	return q
