@@ -148,7 +148,7 @@ func (q *pgQueryBuilder) debug() (string, []string) {
 	return q.builtQuery, q.params
 }
 
-// and params to query list and returns their relative position
+// addParams adds parameters to the query list and returns their relative position.
 func (q *pgQueryBuilder) addParams(params ...string) []int {
 	pos := make([]int, 0, len(params))
 	startPos := len(q.params)
