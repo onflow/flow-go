@@ -42,7 +42,7 @@ type DBConnector interface {
 	MigrateDown() error
 }
 
-// QueryBuilder builds a key value query and allow
+// QueryBuilder builds a key value query.
 type QueryBuilder interface {
 	// InTransaction sets a query to run in a multi statement transaction
 	InTransaction() QueryBuilder

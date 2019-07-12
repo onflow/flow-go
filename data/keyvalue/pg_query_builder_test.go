@@ -62,7 +62,6 @@ func TestSetWithMissingSetParams(t *testing.T) {
 
 	table := "tableA"
 	key := "keyA"
-	//value := "valueA"
 
 	q := (&pgQueryBuilder{}).
 		AddSet(table).
@@ -75,12 +74,7 @@ func TestSetWithMissingSetParams(t *testing.T) {
 func TestMultiSetNoTx(t *testing.T) {
 
 	table1 := "tableA"
-	// key1 := "keyA"
-	// value1 := "valueA"
-
 	table2 := "tableB"
-	// key2 := "keyB"
-	// value2 := "valueB"
 
 	defer unittest.ExpectPanic("Must use a transaction when changing more than one key", t)
 	(&pgQueryBuilder{}).
