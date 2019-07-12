@@ -2193,6 +2193,25 @@ class DepositAuth {
 permit Purse to DepositAuth
 ```
 
+```swift,file=permissions-purse-usage.bpl
+// Create a purse with an initial balance of 100 units for an account
+//
+const account: Account = // ...
+const purse = Purse(initialBalance: 100, account: account)
+
+// Create a deposit authorization for the purse, limited to 50 units.
+// Access to the authorization allows depositing up to 50 units
+// from the purse to any other purse
+//
+const storageAuth: StorageAuth = // ...
+const depositAuth = purse.makeDepositAuth(limit: 50, auth: storageAuth)
+
+// Use the deposit authorization to deposit 25 units into another purse
+//
+const receiver: Purse = // ...
+purse.deposit(to: receiver, amount: 25, auth: depositAuth)
+```
+
 ## Interfaces
 
 > 🚧 Status: Interfaces are not implemented yet.
