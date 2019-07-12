@@ -19,15 +19,20 @@ type WorldState struct {
 }
 
 func NewWorldState() *WorldState {
-	genesis := types.GenesisBlock()
+	accounts := make(map[crypto.Address]crypto.Account)
 	blocks := make(map[crypto.Hash]*types.Block)
+	blockchain := make([]crypto.Hash, 0)
+	transactions := make(map[crypto.Hash]*types.SignedTransaction)
+
+	genesis := types.GenesisBlock()
 	blocks[genesis.Hash()] = genesis
+	blockchain = append(blockchain, genesis.Hash())
 
 	return &WorldState{
-		accounts:     make(map[crypto.Address]crypto.Account),
+		accounts:     accounts,
 		blocks:       blocks,
-		blockchain:   []crypto.Hash{genesis.Hash()},
-		transactions: make(map[crypto.Hash]*types.SignedTransaction),
+		blockchain:   blockchain,
+		transactions: transactions,
 	}
 }
 
@@ -76,4 +81,29 @@ func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction 
 	}
 
 	return nil
+}
+
+func (ws *WorldState) InsertBlock(block *types.Block) {
+	ws.blocksMutex.Lock()
+	defer ws.blocksMutex.Unlock()
+	if _, exists := ws.blocks[block.Hash()]; exists {
+		return
+	}
+
+	ws.blocks[block.Hash()] = block
+
+	ws.blockchainMutex.Lock()
+	ws.blockchain = append(ws.blockchain, block.Hash())
+	ws.blockchainMutex.Unlock()
+}
+
+func (ws *WorldState) InsertTransaction(tx *types.SignedTransaction) {
+	ws.transactionsMutex.Lock()
+	defer ws.transactionsMutex.Unlock()
+
+	if _, exists := ws.transactions[tx.Hash()]; exists {
+		return
+	}
+
+	ws.transactions[tx.Hash()] = tx
 }
