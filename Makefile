@@ -40,7 +40,7 @@ generate-wire:
 	$(WIRE) ./internal/roles/seal/
 
 .PHONY: generate
-generate: generate-godoc generate-proto
+generate: generate-godoc generate-proto generate-wire
 
 .PHONY: check-generated-code
 check-generated-code: generate
