@@ -121,7 +121,7 @@ func (q *pgQueryBuilder) MustBuild() Query {
 	return q
 }
 
-// Execute runs the query and returns its result
+// Execute runs the query and returns its result.
 func (q *pgQueryBuilder) Execute(params ...string) (string, error) {
 	if q.builtQuery == "" {
 		return "", errors.New("Cannot execute unbuilt query, call MustBuild() first")
