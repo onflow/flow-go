@@ -65,7 +65,9 @@ func (q *pgQueryBuilder) AddDelete(table string) QueryBuilder {
 	return q
 }
 
-// MustBuild generates the SQL query. Intended to be called once on server initialisation for performance. This method panics if the Query is not supported.
+// MustBuild generates the SQL query and panics if the query is invalid.
+//
+// For performance reasons, this function is intended to be called once on server initialization.
 func (q *pgQueryBuilder) MustBuild() Query {
 	errorMessages := []string{}
 
