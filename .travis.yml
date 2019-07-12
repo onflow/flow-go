@@ -20,4 +20,4 @@ cache:
     - $HOME/docker
 
 script:
-  - "./test.sh"
+  - make ci
