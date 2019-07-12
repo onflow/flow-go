@@ -47,7 +47,7 @@ func (q *pgQueryBuilder) InTransaction() QueryBuilder {
 	return q
 }
 
-// AddGet adds a get statement
+// AddGet adds a get statement to the query.
 func (q *pgQueryBuilder) AddGet(table string) QueryBuilder {
 	q.statements = append(q.statements, getStatement(table))
 	return q
