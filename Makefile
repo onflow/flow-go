@@ -41,3 +41,7 @@ generate-wire:
 
 .PHONY: generate
 generate: generate-godoc generate-proto
+
+.PHONY: build-bamboo
+build-bamboo:
+	GO111MODULE=on go build -o bamboo ./cmd/bamboo/
