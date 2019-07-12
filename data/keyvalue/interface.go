@@ -5,6 +5,16 @@ Some examples:
 ```go
   dbConn := NewPostgresDB(options...)
 
+  // Get Query
+  result, err := dbConn.GetQuery.Execute("foo_collection", "key1")
+
+  // Set Query
+  _, err := dbConn.SetQuery.Execute("foo_collection", "key1", "value1")
+
+  // Delete Query
+  _, err := dbConn.DeleteQuery.Execute("foo_collection", "key1")
+
+  // Custom query with transaction
   setFooAndBar := dbConn.NewQueryBuilder().
 	  AddSet("foo_collection").
 	  AddSet("bar_collection").
@@ -12,14 +22,6 @@ Some examples:
 	  MustBuild()
 
   _, err := setFooAndBar.Execute("key1", "value1", "key2", "value2")
-```
-
-```go
-  dbConn := NewPostgresDB(options...)
-
-  result, err := dbConn.NewQueryBuilder().GetQuery.Execute("foo_collection", "key1")
-  _, err := dbConn.NewQueryBuilder().SetQuery.Execute("foo_collection", "key1", "value1")
-  _, err := dbConn.NewQueryBuilder().DeleteQuery.Execute("foo_collection", "key1")
 ```
 */
 package keyvalue

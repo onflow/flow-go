@@ -9,28 +9,62 @@
 ## <a name="pkg-overview">Overview</a>
 Package keyvalue provides an abstract interface for connecting to DBs and building/executing key-value queries on them.
 
+Some examples:
+
+```go
+
+
+	  dbConn := NewPostgresDB(options...)
+	
+	  // Get Query
+	  result, err := dbConn.GetQuery.Execute("foo_collection", "key1")
+	
+	  // Set Query
+	  _, err := dbConn.SetQuery.Execute("foo_collection", "key1", "value1")
+	
+	  // Delete Query
+	  _, err := dbConn.DeleteQuery.Execute("foo_collection", "key1")
+	
+	  // Custom query with transaction
+	  setFooAndBar := dbConn.NewQueryBuilder().
+		  AddSet("foo_collection").
+		  AddSet("bar_collection").
+		  InTransaction().
+		  MustBuild()
+	
+	  _, err := setFooAndBar.Execute("key1", "value1", "key2", "value2")
+
+```
+
 
 
 
 ## <a name="pkg-index">Index</a>
 * [type DBConnector](#DBConnector)
   * [func NewpostgresDB(addr, user, password, dbname string) DBConnector](#NewpostgresDB)
+* [type Query](#Query)
 * [type QueryBuilder](#QueryBuilder)
 
 
 #### <a name="pkg-files">Package files</a>
-[interface.go](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go) [pg_connection.go](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_connection.go) [pg_query.go](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_query.go)
+[interface.go](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go) [pg_connection.go](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_connection.go) [pg_query_builder.go](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_query_builder.go) [pg_simple_query.go](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_simple_query.go)
 
 
 
 
 
 
-## <a name="DBConnector">type</a> [DBConnector](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=182:547#L5)
+## <a name="DBConnector">type</a> [DBConnector](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=750:1543#L30)
 ``` go
 type DBConnector interface {
-    // NewQuery returns an instance of a new QueryBuilder
-    NewQuery() QueryBuilder
+    // NewQueryBuilder returns an instance of a new QueryBuilder. Intended to be used when building a custom multi statement query
+    NewQueryBuilder() QueryBuilder
+    // GetQuery returns a pre-built QueryBuilder instance ready to be executed as a get statement
+    GetQuery() Query
+    // SetQuery returns a pre-built QueryBuilder instance ready to be executed as a get statement
+    SetQuery() Query
+    // DeleteQuery returns a pre-built QueryBuilder instance ready to be executed as a delete statement
+    DeleteQuery() Query
     // MigrateUp performs all the steps required to bring the backing DB into an initialised state
     MigrateUp() error
     // MigrateDown is the inverse of MigrateUp and intended to be used in testing environment to achieve a "clean slate".
@@ -45,7 +79,7 @@ DBConnector abstracts a db connection
 
 
 
-### <a name="NewpostgresDB">func</a> [NewpostgresDB](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_connection.go?s=204:271#L15)
+### <a name="NewpostgresDB">func</a> [NewpostgresDB](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/pg_connection.go?s=425:492#L21)
 ``` go
 func NewpostgresDB(addr, user, password, dbname string) DBConnector
 ```
@@ -55,7 +89,25 @@ NewpostgresDB returns a DBConnector interface backed by a postgres DB
 
 
 
-## <a name="QueryBuilder">type</a> [QueryBuilder](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=855:1461#L29)
+## <a name="Query">type</a> [Query](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=2136:2264#L60)
+``` go
+type Query interface {
+    // Execute runs the query and returns its result
+    Execute(params ...string) (result string, err error)
+}
+```
+Query provides a way to execute a query
+
+
+
+
+
+
+
+
+
+
+## <a name="QueryBuilder">type</a> [QueryBuilder](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=1596:2091#L46)
 ``` go
 type QueryBuilder interface {
     // InTransaction sets a query to run in a multi statement transaction
@@ -67,27 +119,10 @@ type QueryBuilder interface {
     // AddDelete adds a delete statement
     AddDelete(namespace string) QueryBuilder
     // MustBuild is intended to be called once per query on server startup for performance considerations of some providers.
-    MustBuild() QueryBuilder
-    // Execute runs the query and returns its result
-    Execute(params ...string) (result string, err error)
+    MustBuild() Query
 }
 ```
 QueryBuilder builds a key value query and allow
-For exmaple:
-```go
-
-
-	  dbConn := NewPostgresDB(options...)
-	
-	  setFooAndBar := dbConn.NewQuery().
-		  AddSet("foo_collection").
-		  AddSet("bar_collection").
-		  InTransaction().
-		  MustBuild()
-	
-	  setFooAndBar.Execute("key1", "value1", "key2", "value2")
-
-```
 
 
 
