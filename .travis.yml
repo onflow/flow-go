@@ -1,5 +1,6 @@
 # For caching docker layers, we're trying out https://github.com/travis-ci/travis-ci/issues/5358#issuecomment-248915326
-language: generic
+language: go
+go_import_path: github.com/dapperlabs/bamboo-node
 
 services:
   - docker
