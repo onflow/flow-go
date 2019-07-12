@@ -2055,7 +2055,7 @@ Permissions for classes are declared using the `permit` keyword, followed by the
 <!-- TODO: can be used e.g. for authorizations, values that represent access rights/privileges to resources. -->
 
 ```swift,file=permissions-purse.bpl
-// Declare a class named `purse`, which holds a balance and
+// Declare a class named `Purse`, which holds a balance and
 // allows amounts to be deposited from a purse to another.
 //
 // Purses are associated with an account.
@@ -2066,8 +2066,9 @@ class Purse {
     pub const account: Account
     pub var balance: Int
 
-    init(initialBalance: Int) {
+    init(initialBalance: Int, account: Account) {
         self.balance = initialBalance
+        self.account = account
     }
 
     // Declare a function named `deposit`, which transfers an amount
