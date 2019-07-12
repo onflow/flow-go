@@ -41,7 +41,7 @@ func (s deleteStatement) getTable() string {
 	return string(s)
 }
 
-// InTransaction sets a query to run in a multi statement transaction
+// InTransaction sets a query to run in a multi-statement transaction.
 func (q *pgQueryBuilder) InTransaction() QueryBuilder {
 	q.isTransaction = true
 	return q
