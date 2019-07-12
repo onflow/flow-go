@@ -26,6 +26,76 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
+type PingRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *PingRequest) Reset()         { *m = PingRequest{} }
+func (m *PingRequest) String() string { return proto.CompactTextString(m) }
+func (*PingRequest) ProtoMessage()    {}
+func (*PingRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_409e272a8bbe9ae0, []int{0}
+}
+
+func (m *PingRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_PingRequest.Unmarshal(m, b)
+}
+func (m *PingRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_PingRequest.Marshal(b, m, deterministic)
+}
+func (m *PingRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PingRequest.Merge(m, src)
+}
+func (m *PingRequest) XXX_Size() int {
+	return xxx_messageInfo_PingRequest.Size(m)
+}
+func (m *PingRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_PingRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PingRequest proto.InternalMessageInfo
+
+type PingResponse struct {
+	Address              []byte   `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *PingResponse) Reset()         { *m = PingResponse{} }
+func (m *PingResponse) String() string { return proto.CompactTextString(m) }
+func (*PingResponse) ProtoMessage()    {}
+func (*PingResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_409e272a8bbe9ae0, []int{1}
+}
+
+func (m *PingResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_PingResponse.Unmarshal(m, b)
+}
+func (m *PingResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_PingResponse.Marshal(b, m, deterministic)
+}
+func (m *PingResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PingResponse.Merge(m, src)
+}
+func (m *PingResponse) XXX_Size() int {
+	return xxx_messageInfo_PingResponse.Size(m)
+}
+func (m *PingResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_PingResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PingResponse proto.InternalMessageInfo
+
+func (m *PingResponse) GetAddress() []byte {
+	if m != nil {
+		return m.Address
+	}
+	return nil
+}
+
 type SubmitResultApprovalRequest struct {
 	ResultApproval       *shared.ResultApproval `protobuf:"bytes,1,opt,name=resultApproval,proto3" json:"resultApproval,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
@@ -37,7 +107,7 @@ func (m *SubmitResultApprovalRequest) Reset()         { *m = SubmitResultApprova
 func (m *SubmitResultApprovalRequest) String() string { return proto.CompactTextString(m) }
 func (*SubmitResultApprovalRequest) ProtoMessage()    {}
 func (*SubmitResultApprovalRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_409e272a8bbe9ae0, []int{0}
+	return fileDescriptor_409e272a8bbe9ae0, []int{2}
 }
 
 func (m *SubmitResultApprovalRequest) XXX_Unmarshal(b []byte) error {
@@ -66,26 +136,32 @@ func (m *SubmitResultApprovalRequest) GetResultApproval() *shared.ResultApproval
 }
 
 func init() {
+	proto.RegisterType((*PingRequest)(nil), "bamboo.services.seal.PingRequest")
+	proto.RegisterType((*PingResponse)(nil), "bamboo.services.seal.PingResponse")
 	proto.RegisterType((*SubmitResultApprovalRequest)(nil), "bamboo.services.seal.SubmitResultApprovalRequest")
 }
 
 func init() { proto.RegisterFile("services/seal/seal.proto", fileDescriptor_409e272a8bbe9ae0) }
 
 var fileDescriptor_409e272a8bbe9ae0 = []byte{
-	// 205 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0x8f, 0xc1, 0x4a, 0xc6, 0x30,
-	0x10, 0x84, 0xf9, 0x41, 0x7a, 0x48, 0xc1, 0x43, 0xa8, 0x52, 0x5a, 0x04, 0xf1, 0xe4, 0x69, 0x83,
-	0xf5, 0x09, 0x14, 0xfa, 0x02, 0xed, 0xcd, 0x5b, 0x62, 0xd7, 0x5a, 0x48, 0x48, 0xcc, 0x26, 0x05,
-	0xdf, 0x5e, 0x9a, 0xd0, 0x83, 0xa5, 0xfc, 0x97, 0x40, 0x76, 0x66, 0x98, 0xf9, 0x58, 0x4d, 0xe8,
-	0xd7, 0xe5, 0x13, 0x49, 0x10, 0x4a, 0x9d, 0x1e, 0x70, 0xde, 0x06, 0xcb, 0x2b, 0x25, 0x8d, 0xb2,
-	0x16, 0x76, 0x03, 0x6c, 0x5a, 0x73, 0x47, 0xdf, 0xd2, 0xe3, 0x24, 0x0c, 0x12, 0xc9, 0x19, 0x29,
-	0x9b, 0x9b, 0x76, 0xb6, 0x76, 0xd6, 0x28, 0xd2, 0x4f, 0xc5, 0x2f, 0x81, 0xc6, 0x85, 0xdf, 0x2c,
-	0x3e, 0x4d, 0xac, 0x1d, 0xa3, 0x32, 0x4b, 0x18, 0x90, 0xa2, 0x0e, 0x6f, 0xce, 0x79, 0xbb, 0x4a,
-	0x3d, 0xe0, 0x4f, 0x44, 0x0a, 0xbc, 0x67, 0xb7, 0xfe, 0x9f, 0x50, 0x5f, 0x1e, 0x2f, 0xcf, 0x65,
-	0xf7, 0x00, 0xfb, 0x82, 0x54, 0x09, 0x87, 0xf4, 0x21, 0xd4, 0x39, 0x56, 0x8e, 0x28, 0xf5, 0x98,
-	0xe7, 0x72, 0xc9, 0xaa, 0xb3, 0x52, 0xfe, 0x02, 0x67, 0x5c, 0x70, 0x65, 0x60, 0x73, 0x0f, 0x99,
-	0x0e, 0x76, 0x3a, 0xe8, 0x37, 0xba, 0xf7, 0xe2, 0xe3, 0x66, 0xcb, 0xaa, 0x22, 0xdd, 0x5f, 0xff,
-	0x02, 0x00, 0x00, 0xff, 0xff, 0x28, 0x83, 0xc0, 0xb8, 0x4c, 0x01, 0x00, 0x00,
+	// 257 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0x50, 0xc1, 0x4a, 0xc3, 0x40,
+	0x14, 0xa4, 0x50, 0x2a, 0xbc, 0x54, 0x0f, 0x4b, 0x95, 0x90, 0x22, 0x68, 0x4e, 0x3d, 0xbd, 0x60,
+	0xfd, 0x02, 0x85, 0x1e, 0x05, 0x49, 0x6e, 0xde, 0x76, 0xcd, 0x33, 0x06, 0x36, 0xdd, 0x75, 0xdf,
+	0xa6, 0xe0, 0xd7, 0xf9, 0x6b, 0x92, 0xdd, 0x06, 0xb4, 0x84, 0x5e, 0x16, 0x66, 0x67, 0xe6, 0x31,
+	0x33, 0x90, 0x32, 0xb9, 0x43, 0xfb, 0x4e, 0x5c, 0x30, 0x49, 0x1d, 0x1e, 0xb4, 0xce, 0x78, 0x23,
+	0x56, 0x4a, 0x76, 0xca, 0x18, 0x1c, 0x05, 0x38, 0x70, 0xd9, 0x35, 0x7f, 0x4a, 0x47, 0x75, 0xd1,
+	0x11, 0xb3, 0x6c, 0x88, 0xa3, 0x38, 0x5b, 0x37, 0xc6, 0x34, 0x9a, 0x8a, 0x80, 0x54, 0xff, 0x51,
+	0x50, 0x67, 0xfd, 0x77, 0x24, 0xf3, 0x4b, 0x48, 0x5e, 0xdb, 0x7d, 0x53, 0xd2, 0x57, 0x4f, 0xec,
+	0xf3, 0x0d, 0x2c, 0x23, 0x64, 0x6b, 0xf6, 0x4c, 0x22, 0x85, 0x0b, 0x59, 0xd7, 0x8e, 0x98, 0xd3,
+	0xd9, 0xdd, 0x6c, 0xb3, 0x2c, 0x47, 0x98, 0xd7, 0xb0, 0xae, 0x7a, 0xd5, 0xb5, 0xbe, 0x24, 0xee,
+	0xb5, 0x7f, 0xb2, 0xd6, 0x99, 0x83, 0xd4, 0xc7, 0x43, 0x62, 0x07, 0x57, 0xee, 0x1f, 0x11, 0xfc,
+	0xc9, 0xf6, 0x16, 0xc7, 0xe8, 0x21, 0x2b, 0x9e, 0xb8, 0x4f, 0x4c, 0xdb, 0x9f, 0x19, 0x24, 0x15,
+	0x49, 0x5d, 0xc5, 0xa2, 0xe2, 0x05, 0xe6, 0x43, 0x3e, 0x71, 0x8f, 0x53, 0x0b, 0xe0, 0x9f, 0x2a,
+	0x59, 0x7e, 0x4e, 0x72, 0xac, 0x27, 0x61, 0x35, 0x55, 0x42, 0x3c, 0x4c, 0x7b, 0xcf, 0x14, 0xce,
+	0x6e, 0x30, 0xce, 0x8c, 0xe3, 0xcc, 0xb8, 0x1b, 0x66, 0x7e, 0x5e, 0xbc, 0xcd, 0x07, 0xaf, 0x5a,
+	0x84, 0xff, 0xc7, 0xdf, 0x00, 0x00, 0x00, 0xff, 0xff, 0xca, 0xbc, 0x07, 0x50, 0xd5, 0x01, 0x00,
+	0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -100,6 +176,7 @@ const _ = grpc.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type SealServiceClient interface {
+	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 	SubmitResultApproval(ctx context.Context, in *SubmitResultApprovalRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 }
 
@@ -109,6 +186,15 @@ type sealServiceClient struct {
 
 func NewSealServiceClient(cc *grpc.ClientConn) SealServiceClient {
 	return &sealServiceClient{cc}
+}
+
+func (c *sealServiceClient) Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
+	out := new(PingResponse)
+	err := c.cc.Invoke(ctx, "/bamboo.services.seal.SealService/Ping", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *sealServiceClient) SubmitResultApproval(ctx context.Context, in *SubmitResultApprovalRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
@@ -122,6 +208,7 @@ func (c *sealServiceClient) SubmitResultApproval(ctx context.Context, in *Submit
 
 // SealServiceServer is the server API for SealService service.
 type SealServiceServer interface {
+	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	SubmitResultApproval(context.Context, *SubmitResultApprovalRequest) (*empty.Empty, error)
 }
 
@@ -135,6 +222,24 @@ func (*UnimplementedSealServiceServer) SubmitResultApproval(ctx context.Context,
 
 func RegisterSealServiceServer(s *grpc.Server, srv SealServiceServer) {
 	s.RegisterService(&_SealService_serviceDesc, srv)
+}
+
+func _SealService_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SealServiceServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/bamboo.services.seal.SealService/Ping",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SealServiceServer).Ping(ctx, req.(*PingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _SealService_SubmitResultApproval_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -159,6 +264,10 @@ var _SealService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "bamboo.services.seal.SealService",
 	HandlerType: (*SealServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Ping",
+			Handler:    _SealService_Ping_Handler,
+		},
 		{
 			MethodName: "SubmitResultApproval",
 			Handler:    _SealService_SubmitResultApproval_Handler,

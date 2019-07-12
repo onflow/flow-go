@@ -9,6 +9,8 @@ import "google/protobuf/empty.proto";
 
 
 service ConsensusService {
+  rpc Ping(PingRequest) returns (PingResponse);
+
   // Receive a signed collection from an access node.
   rpc SubmitCollection (SubmitCollectionRequest) returns (google.protobuf.Empty);
 
@@ -37,6 +39,12 @@ service ConsensusService {
   rpc ProcessStateTransitionCommitVote(ProcessSignedStateTransitionCommitVoteRequest) returns (google.protobuf.Empty);
 }
 
+
+message PingRequest {}
+
+message PingResponse {
+  bytes address = 1;
+}
 
 message SubmitCollectionRequest {
   bamboo.shared.Collection collection = 1;

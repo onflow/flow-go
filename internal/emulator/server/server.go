@@ -11,10 +11,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
 	"github.com/dapperlabs/bamboo-node/internal/emulator/data"
-	"github.com/dapperlabs/bamboo-node/grpc/services/accessv1"
 	"github.com/dapperlabs/bamboo-node/internal/emulator/nodes/access"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
 // Server is a gRPC server that implements the Bamboo Access API.
@@ -30,7 +30,7 @@ func NewServer(accessNode *access.Node) *Server {
 }
 
 // SendTransaction submits a transaction to the network.
-func (s *Server) SendTransaction(ctx context.Context, req *accessv1.SendTransactionRequest) (*accessv1.SendTransactionResponse, error) {
+func (s *Server) SendTransaction(ctx context.Context, req *observe.SendTransactionRequest) (*observe.SendTransactionResponse, error) {
 	txMsg := req.GetTransaction()
 
 	payerSig := txMsg.GetPayerSignature()
@@ -57,13 +57,13 @@ func (s *Server) SendTransaction(ctx context.Context, req *accessv1.SendTransact
 		}
 	}
 
-	return &accessv1.SendTransactionResponse{
+	return &observe.SendTransactionResponse{
 		Hash: tx.Hash().Bytes(),
 	}, nil
 }
 
 // GetBlockByHash gets a block by hash.
-func (s *Server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHashRequest) (*accessv1.GetBlockByHashResponse, error) {
+func (s *Server) GetBlockByHash(ctx context.Context, req *observe.GetBlockByHashRequest) (*observe.GetBlockByHashResponse, error) {
 	hash := crypto.BytesToHash(req.GetHash())
 
 	block, err := s.accessNode.GetBlockByHash(hash)
@@ -81,20 +81,20 @@ func (s *Server) GetBlockByHash(ctx context.Context, req *accessv1.GetBlockByHas
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return &accessv1.GetBlockByHashResponse{
-		Block: &accessv1.Block{
+	return &observe.GetBlockByHashResponse{
+		Block: &observe.Block{
 			Hash:              block.Hash().Bytes(),
 			PrevBlockHash:     block.PrevBlockHash.Bytes(),
 			Number:            block.Number,
 			Timestamp:         timestamp,
 			TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
-			Status:            accessv1.Block_Status(block.Status),
+			Status:            observe.Block_Status(block.Status),
 		},
 	}, nil
 }
 
 // GetBlockByNumber gets a block by number.
-func (s *Server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByNumberRequest) (*accessv1.GetBlockByNumberResponse, error) {
+func (s *Server) GetBlockByNumber(ctx context.Context, req *observe.GetBlockByNumberRequest) (*observe.GetBlockByNumberResponse, error) {
 	number := req.GetNumber()
 
 	block, err := s.accessNode.GetBlockByNumber(number)
@@ -112,20 +112,20 @@ func (s *Server) GetBlockByNumber(ctx context.Context, req *accessv1.GetBlockByN
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return &accessv1.GetBlockByNumberResponse{
-		Block: &accessv1.Block{
+	return &observe.GetBlockByNumberResponse{
+		Block: &observe.Block{
 			Hash:              block.Hash().Bytes(),
 			PrevBlockHash:     block.PrevBlockHash.Bytes(),
 			Number:            block.Number,
 			Timestamp:         timestamp,
 			TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
-			Status:            accessv1.Block_Status(block.Status),
+			Status:            observe.Block_Status(block.Status),
 		},
 	}, nil
 }
 
 // GetLatestBlock gets the latest sealed block.
-func (s *Server) GetLatestBlock(ctx context.Context, req *accessv1.GetLatestBlockRequest) (*accessv1.GetLatestBlockResponse, error) {
+func (s *Server) GetLatestBlock(ctx context.Context, req *observe.GetLatestBlockRequest) (*observe.GetLatestBlockResponse, error) {
 	block := s.accessNode.GetLatestBlock()
 
 	timestamp, err := ptypes.TimestampProto(block.Timestamp)
@@ -133,20 +133,20 @@ func (s *Server) GetLatestBlock(ctx context.Context, req *accessv1.GetLatestBloc
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return &accessv1.GetLatestBlockResponse{
-		Block: &accessv1.Block{
+	return &observe.GetLatestBlockResponse{
+		Block: &observe.Block{
 			Hash:              block.Hash().Bytes(),
 			PrevBlockHash:     block.PrevBlockHash.Bytes(),
 			Number:            block.Number,
 			Timestamp:         timestamp,
 			TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
-			Status:            accessv1.Block_Status(block.Status),
+			Status:            observe.Block_Status(block.Status),
 		},
 	}, nil
 }
 
 // GetTransactions gets a transaction by hash.
-func (s *Server) GetTransaction(ctx context.Context, req *accessv1.GetTransactionRequest) (*accessv1.GetTransactionResponse, error) {
+func (s *Server) GetTransaction(ctx context.Context, req *observe.GetTransactionRequest) (*observe.GetTransactionResponse, error) {
 	hash := crypto.BytesToHash(req.GetHash())
 
 	tx, err := s.accessNode.GetTransaction(hash)
@@ -159,24 +159,24 @@ func (s *Server) GetTransaction(ctx context.Context, req *accessv1.GetTransactio
 		}
 	}
 
-	return &accessv1.GetTransactionResponse{
-		Transaction: &accessv1.GetTransactionResponse_Transaction{
+	return &observe.GetTransactionResponse{
+		Transaction: &observe.GetTransactionResponse_Transaction{
 			ToAddress:    tx.ToAddress.Bytes(),
 			Script:       tx.Script,
 			Nonce:        tx.Nonce,
 			ComputeLimit: tx.ComputeLimit,
 			ComputeUsed:  tx.ComputeUsed,
-			PayerSignature: &accessv1.Signature{
+			PayerSignature: &observe.Signature{
 				AccountAddress: tx.PayerSignature.Account.Bytes(),
 				Signature:      tx.PayerSignature.Sig,
 			},
-			Status: accessv1.GetTransactionResponse_Transaction_Status(tx.Status),
+			Status: observe.GetTransactionResponse_Transaction_Status(tx.Status),
 		},
 	}, nil
 }
 
 // GetAccount returns the balance of an address.
-func (s *Server) GetAccount(ctx context.Context, req *accessv1.GetAccountRequest) (*accessv1.GetAccountResponse, error) {
+func (s *Server) GetAccount(ctx context.Context, req *observe.GetAccountRequest) (*observe.GetAccountResponse, error) {
 	address := crypto.BytesToAddress(req.GetAddress())
 
 	account, err := s.accessNode.GetAccount(address)
@@ -189,8 +189,8 @@ func (s *Server) GetAccount(ctx context.Context, req *accessv1.GetAccountRequest
 		}
 	}
 
-	return &accessv1.GetAccountResponse{
-		Account: &accessv1.GetAccountResponse_Account{
+	return &observe.GetAccountResponse{
+		Account: &observe.GetAccountResponse_Account{
 			Address:    account.Address.Bytes(),
 			Balance:    account.Balance,
 			Code:       account.Code,
@@ -200,7 +200,7 @@ func (s *Server) GetAccount(ctx context.Context, req *accessv1.GetAccountRequest
 }
 
 // CallContract performs a contract call.
-func (s *Server) CallContract(context.Context, *accessv1.CallContractRequest) (*accessv1.CallContractResponse, error) {
+func (s *Server) CallContract(context.Context, *observe.CallContractRequest) (*observe.CallContractResponse, error) {
 	// TODO: implement CallContract
 	return nil, nil
 }
@@ -213,7 +213,7 @@ func (s *Server) Start(port int) {
 
 	grpcServer := grpc.NewServer()
 
-	accessv1.RegisterBambooAccessAPIServer(grpcServer, s)
+	observe.RegisterObserveServiceServer(grpcServer, s)
 
 	grpcServer.Serve(lis)
 }

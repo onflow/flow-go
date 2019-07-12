@@ -8,6 +8,8 @@ import "google/protobuf/timestamp.proto";
 
 // ObserveService is the user-facing API provided by access nodes.
 service ObserveService {
+  rpc Ping(PingRequest) returns (PingResponse);
+
   // SendTransaction submits a transaction to the network.
   rpc SendTransaction(SendTransactionRequest) returns (SendTransactionResponse);
   // GetBlockByHash gets a block by hash.
@@ -22,6 +24,13 @@ service ObserveService {
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
   // CallContract performs a contract call.
   rpc CallContract(CallContractRequest) returns (CallContractResponse);
+}
+
+
+message PingRequest {}
+
+message PingResponse {
+  bytes address = 1;
 }
 
 message Signature {
