@@ -43,7 +43,7 @@ generate-wire:
 generate: generate-godoc generate-proto
 
 .PHONY: check-generated-code
-check-generated-code:
+check-generated-code: generate
 	./scripts/check-generated-code.sh
 
 .PHONY: build-bamboo
