@@ -26,7 +26,7 @@ Some examples:
 */
 package keyvalue
 
-// DBConnector abstracts a db connection
+// DBConnector abstracts a database connection.
 type DBConnector interface {
 	// NewQueryBuilder returns an instance of a new QueryBuilder. Intended to be used when building a custom multi statement query
 	NewQueryBuilder() QueryBuilder
