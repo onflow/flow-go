@@ -4,12 +4,14 @@
 package execute
 
 import (
+	context "context"
 	fmt "fmt"
 	shared "github.com/dapperlabs/bamboo-node/grpc/shared"
 	proto "github.com/golang/protobuf/proto"
 	empty "github.com/golang/protobuf/ptypes/empty"
-	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -22,7 +24,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type PingRequest struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -500,6 +502,23 @@ type ExecuteServiceServer interface {
 	NotifyBlockExecuted(context.Context, *NotifyBlockExecutedRequest) (*empty.Empty, error)
 	GetRegisters(context.Context, *GetRegistersRequest) (*GetRegistersResponse, error)
 	GetRegistersAtBlockHeight(context.Context, *GetRegistersAtBlockHeightRequest) (*GetRegistersResponse, error)
+}
+
+// UnimplementedExecuteServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedExecuteServiceServer struct {
+}
+
+func (*UnimplementedExecuteServiceServer) ExecuteBlock(ctx context.Context, req *ExecuteBlockRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ExecuteBlock not implemented")
+}
+func (*UnimplementedExecuteServiceServer) NotifyBlockExecuted(ctx context.Context, req *NotifyBlockExecutedRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NotifyBlockExecuted not implemented")
+}
+func (*UnimplementedExecuteServiceServer) GetRegisters(ctx context.Context, req *GetRegistersRequest) (*GetRegistersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRegisters not implemented")
+}
+func (*UnimplementedExecuteServiceServer) GetRegistersAtBlockHeight(ctx context.Context, req *GetRegistersAtBlockHeightRequest) (*GetRegistersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRegistersAtBlockHeight not implemented")
 }
 
 func RegisterExecuteServiceServer(s *grpc.Server, srv ExecuteServiceServer) {

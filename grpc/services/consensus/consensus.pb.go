@@ -4,12 +4,14 @@
 package consensus
 
 import (
+	context "context"
 	fmt "fmt"
 	shared "github.com/dapperlabs/bamboo-node/grpc/shared"
 	proto "github.com/golang/protobuf/proto"
 	empty "github.com/golang/protobuf/ptypes/empty"
-	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -22,7 +24,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type PingRequest struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -780,6 +782,38 @@ type ConsensusServiceServer interface {
 	ProcessStateTransitionPrepareVote(context.Context, *ProcessSignedStateTransitionPrepareVoteRequest) (*empty.Empty, error)
 	// Process state transition commit vote from other security node.
 	ProcessStateTransitionCommitVote(context.Context, *ProcessSignedStateTransitionCommitVoteRequest) (*empty.Empty, error)
+}
+
+// UnimplementedConsensusServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedConsensusServiceServer struct {
+}
+
+func (*UnimplementedConsensusServiceServer) SubmitCollection(ctx context.Context, req *SubmitCollectionRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitCollection not implemented")
+}
+func (*UnimplementedConsensusServiceServer) ProposeBlock(ctx context.Context, req *ProposeBlockRequest) (*ProposeBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProposeBlock not implemented")
+}
+func (*UnimplementedConsensusServiceServer) UpdateProposedBlock(ctx context.Context, req *UpdateProposedBlockRequest) (*UpdateProposedBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateProposedBlock not implemented")
+}
+func (*UnimplementedConsensusServiceServer) GetBlockByHash(ctx context.Context, req *GetBlockByHashRequest) (*GetBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByHash not implemented")
+}
+func (*UnimplementedConsensusServiceServer) GetBlockByHeight(ctx context.Context, req *GetBlockByHeightRequest) (*GetBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByHeight not implemented")
+}
+func (*UnimplementedConsensusServiceServer) GetFinalizedStateTransitions(ctx context.Context, req *GetFinalizedStateTransitionsRequest) (*GetFinalizedStateTransitionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFinalizedStateTransitions not implemented")
+}
+func (*UnimplementedConsensusServiceServer) ProcessStateTransitionProposal(ctx context.Context, req *shared.SignedStateTransition) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessStateTransitionProposal not implemented")
+}
+func (*UnimplementedConsensusServiceServer) ProcessStateTransitionPrepareVote(ctx context.Context, req *ProcessSignedStateTransitionPrepareVoteRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessStateTransitionPrepareVote not implemented")
+}
+func (*UnimplementedConsensusServiceServer) ProcessStateTransitionCommitVote(ctx context.Context, req *ProcessSignedStateTransitionCommitVoteRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessStateTransitionCommitVote not implemented")
 }
 
 func RegisterConsensusServiceServer(s *grpc.Server, srv ConsensusServiceServer) {

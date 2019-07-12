@@ -14,12 +14,6 @@ type KeyPair struct {
 	mnemonic  string
 }
 
-// Signature is a compound type combining a signature with an account address.
-type Signature struct {
-	Account Address
-	Sig     []byte
-}
-
 // genKeyPair generates a new HD wallet keypair to be used for account creation.
 func genKeyPair(passphrase string) (*KeyPair, error) {
 	// Generate a mnemonic for memorization or user-friendly seeds
@@ -48,13 +42,4 @@ func ComputeHash(data []byte) []byte {
 	hash := sha3.New256()
 	hash.Write(data)
 	return hash.Sum(nil)
-}
-
-// Sign signs a digest with the provided key pair.
-func Sign(digest Hash, account Address, keyPair *KeyPair) *Signature {
-	// TODO: implement real signatures
-	return &Signature{
-		Account: account,
-		Sig:     nil,
-	}
 }

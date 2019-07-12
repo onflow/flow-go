@@ -1,11 +1,95 @@
 # Bamboo Programming Language
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
+
+- [Introduction](#introduction)
+- [Syntax and Behavior](#syntax-and-behavior)
+- [Comments](#comments)
+- [Constants and Variable Declarations](#constants-and-variable-declarations)
+- [Type Annotations](#type-annotations)
+- [Naming](#naming)
+  - [Conventions](#conventions)
+- [Semicolons](#semicolons)
+- [Values and Types](#values-and-types)
+  - [Booleans](#booleans)
+  - [Numeric Literals](#numeric-literals)
+  - [Integers](#integers)
+  - [Floating-Point Numbers](#floating-point-numbers)
+  - [Addresses](#addresses)
+  - [Strings and Characters](#strings-and-characters)
+  - [Arrays](#arrays)
+    - [Array Indexing](#array-indexing)
+    - [Array Types](#array-types)
+  - [Dictionaries](#dictionaries)
+    - [Dictionary Access](#dictionary-access)
+    - [Dictionary Types](#dictionary-types)
+    - [Dictionary Keys](#dictionary-keys)
+  - [Any](#any)
+  - [Never](#never)
+- [Operators](#operators)
+  - [Negation](#negation)
+  - [Assignment](#assignment)
+  - [Arithmetic](#arithmetic)
+  - [Logical Operators](#logical-operators)
+  - [Comparison operators](#comparison-operators)
+  - [Ternary Conditional Operator](#ternary-conditional-operator)
+  - [Precedence and Associativity](#precedence-and-associativity)
+- [Functions](#functions)
+  - [Function Declarations](#function-declarations)
+  - [Function Expressions](#function-expressions)
+  - [Function Calls](#function-calls)
+  - [Function Types](#function-types)
+    - [Argument Passing Behavior](#argument-passing-behavior)
+  - [Function Preconditions and Postconditions](#function-preconditions-and-postconditions)
+- [Control flow](#control-flow)
+  - [Conditional branching: if-statement](#conditional-branching-if-statement)
+  - [Looping: while-statement](#looping-while-statement)
+  - [Immediate function return: return-statement](#immediate-function-return-return-statement)
+- [Scope](#scope)
+- [Optionals](#optionals)
+  - [Nil-Coalescing Operator](#nil-coalescing-operator)
+- [Type Safety](#type-safety)
+- [Type Inference](#type-inference)
+- [Structures and Classes](#structures-and-classes)
+  - [Structure and Class Fields](#structure-and-class-fields)
+  - [Structure and Class Field Getters and Setters](#structure-and-class-field-getters-and-setters)
+  - [Synthetic Structure and Class Fields](#synthetic-structure-and-class-fields)
+  - [Structure and Class Functions](#structure-and-class-functions)
+  - [Structure and Class Behaviour](#structure-and-class-behaviour)
+  - [Class Inheritance and Abstract Classes](#class-inheritance-and-abstract-classes)
+- [Access control](#access-control)
+- [Permissions](#permissions)
+- [Interfaces](#interfaces)
+  - [Interface Declaration](#interface-declaration)
+  - [Interface Implementation](#interface-implementation)
+  - [Interface Type](#interface-type)
+  - [`Equatable` Interface](#equatable-interface)
+  - [`Hashable` Interface](#hashable-interface)
+- [Storage](#storage)
+- [Contracts](#contracts)
+- [Accounts](#accounts)
+  - [Account Storage](#account-storage)
+- [External Contracts and Interfaces](#external-contracts-and-interfaces)
+- [Built-in Authorization Types](#built-in-authorization-types)
+  - [`RootAuth`](#rootauth)
+  - [`StorageAuth`](#storageauth)
+- [Built-in Functions](#built-in-functions)
+  - [`fatalError`](#fatalerror)
+    - [Example](#example)
+  - [`assert`](#assert)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## Introduction
+
 The Bamboo Programming Language is a new high-level programming language intended for smart contract development.
 
 The language's goals are, in order of importance:
 
-- *Safety and security*: Focus on safe code: provide a strong static type system, design by contract, a capability system, and linear types.
-- *Auditability*: Focus on readability: make it easy to verify what the code is doing.
+- *Safety and security*: Focus on safety, e.g. by providing a strong static type system, design by contract, and linear types; and security, by providing a capability system, and design by contract.
+- *Auditability*: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.
 - *Simplicity*: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
 
 
@@ -20,14 +104,14 @@ Comments can be used to document code. A comment is text that is not executed.
 
 *Single-line comments* start with two slashes (`//`):
 
-```typescript,file=single-line-comment.bpl
+```swift,file=single-line-comment.bpl
 // This is a comment on a single line.
 // Another comment line that is not executed.
 ```
 
 *Multi-line comments* start with a slash and an asterisk (`/*`) and end with an asterisk and a slash (`*/`):
 
-```typescript,file=multi-line-comment.bpl
+```swift,file=multi-line-comment.bpl
 /* This is a comment which
 spans multiple lines. */
 ```
@@ -47,7 +131,7 @@ Constant means that the *name* is constant, not the *value*, i.e., the value may
 The `const` keyword is used to declare a constant and the `var` keyword is used to declare a variable.
 The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
-```typescript,file=constants-and-variables.bpl
+```swift,file=constants-and-variables.bpl
 // Declare a constant named `a`
 //
 const a = 1
@@ -67,21 +151,21 @@ b = 4
 
 Variables and constants **must** be initialized.
 
-```typescript
+```swift
 // Invalid: the constant has no initial value
 //
 const a
 ```
 
-Once a constant or variable is declared, it can't be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
+Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
 
 
-```typescript
+```swift
 // Declare a constant named `a`
 //
 const a = 1
 
-// Invalid: can't re-declare a constant with name `a`,
+// Invalid: cannot re-declare a constant with name `a`,
 // as it is already used in this scope
 //
 const a = 2
@@ -91,13 +175,13 @@ const a = 2
 var b = 3
 ```
 
-```typescript
-// Invalid: can't re-declare a variable with name `b`,
+```swift
+// Invalid: cannot re-declare a variable with name `b`,
 // as it is already used in this scope
 //
 var b = 4
 
-// Invalid: can't declare a variable with the name `a`,
+// Invalid: cannot declare a variable with the name `a`,
 // as it is already used in this scope,
 // and it is declared as a constant
 //
@@ -110,7 +194,7 @@ When declaring a constant or variable, an optional *type annotation* can be prov
 
 If no type annotation is provided, the type of the declaration is [inferred from the initial value](#type-inference).
 
-```typescript,file=type-annotations.bpl
+```swift,file=type-annotations.bpl
 // Declare a variable named `initialized` which has an explicit type annotation.
 //
 // `Bool` is the type of booleans
@@ -126,7 +210,7 @@ const inferred = 1
 
 If a type annotation is provided, the initial value must be of this type, and new values assigned to variables must match the declaration's type. This type safety is explained in more detail in a [separate section](#type-safety).
 
-```typescript
+```swift
 // Invalid: declare a variable with an explicit type `Bool`,
 // but the initial value has type `Int`.
 //
@@ -148,7 +232,7 @@ booleanVariable = 1
 Names may start with any upper and lowercase letter or an underscore. This may be followed by zero or more upper and lower case letters, underscores, and numbers.
 Names may not begin with a number.
 
-```typescript
+```swift
 // Valid, title-case
 //
 PersonID
@@ -183,7 +267,7 @@ By convention, variables, constants, and functions have lowercase names; and typ
 
 Semicolons may be used to separate statements, but are optional. They can be used to separate multiple statements on a single line.
 
-```typescript,file=semicolons.bpl
+```swift,file=semicolons.bpl
 // Declare a constant, without a semicolon
 //
 const a = 1
@@ -205,28 +289,6 @@ Values are objects, like for example booleans, integers, or arrays. Values are t
 
 The two boolean values `true` and `false` have the type `Bool`.
 
-### Integers
-
-Integers are whole numbers without a fractional part. They are either *signed* (positive, zero, or negative) or *unsigned* (positive or zero) and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
-
-The names for the integer types follow this naming convention: Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix, i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
-
- - **`Int8`**: -128 through 127
- - **`Int16`**: -32768 through 32767
- - **`Int32`**: -2147483648 through 2147483647
- - **`Int64`**: -9223372036854775808 through 9223372036854775807
- - **`UInt16`**: 0 through 65535
- - **`UInt32`**: 0 through 4294967295
- - **`UInt64`**: 0 through 18446744073709551615
-
-In addition, the arbitrary precision integer type `Int` is provided.
-
-### Floating-Point Numbers
-
-There is no support for floating point numbers.
-
-Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here. Fixed point numbers should be simulated using integers and a scale factor for now.
-
 ### Numeric Literals
 
 Numbers can be written in various bases. Numbers are assumed to be decimal by default. Non-decimal literals have a specific prefix.
@@ -238,7 +300,7 @@ Numbers can be written in various bases. Numbers are assumed to be decimal by de
 | **Octal**       | `0o`   | one or more numbers in the range `0` to `7`                           |
 | **Hexadecimal** | `0x`   | one or more numbers, or characters `a` to `f`, lowercase or uppercase |
 
-```typescript,file=numbers.bpl
+```swift,file=numbers.bpl
 // A decimal number
 //
 1234567890
@@ -262,21 +324,155 @@ Numbers can be written in various bases. Numbers are assumed to be decimal by de
 
 Decimal numbers may contain underscores (`_`) to logically separate components.
 
-```typescript,file=number-underscores-decimal.bpl
+```swift,file=number-underscores-decimal.bpl
 const largeNumber = 1_000_000
 ```
 
 Underscores are allowed for all numeral systems.
 
-```typescript,file=number-underscores-binary.bpl
+```swift,file=number-underscores-binary.bpl
 const binaryNumber = 0b10_11_01
 ```
+
+### Integers
+
+Integers are whole numbers without a fractional part. They are either *signed* (positive, zero, or negative) or *unsigned* (positive or zero) and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
+
+The names for the integer types follow this naming convention: Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix, i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
+
+ - **`Int8`**: -128 through 127
+ - **`Int16`**: -32768 through 32767
+ - **`Int32`**: -2147483648 through 2147483647
+ - **`Int64`**: -9223372036854775808 through 9223372036854775807
+ - **`UInt16`**: 0 through 65535
+ - **`UInt32`**: 0 through 4294967295
+ - **`UInt64`**: 0 through 18446744073709551615
+
+```swift
+// Declare a constant that has type `UInt8` and the value 10
+const smallNumber: UInt8 = 10
+```
+
+```swift
+// Invalid: negative literal cannot be used as an unsigned integer
+//
+const invalidNumber: UInt8 = -10
+```
+
+In addition, the arbitrary precision integer type `Int` is provided.
+
+```swift
+const veryLargeNumber: Int = 10000000000000000000000000000000
+```
+
+### Floating-Point Numbers
+
+There is no support for floating point numbers.
+
+Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here. Fixed point numbers should be simulated using integers and a scale factor for now.
+
+### Addresses
+
+The type `Address` represents an address. Addresses are unsigned integers with a size of 160 bits.  Hexadecimal integer literals can be used to create address values.
+
+```swift
+// Declare a constant that has type `Address`
+//
+const someAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d
+
+// Invalid: Initial value is not compatible with type `Address`,
+// it is not a number
+//
+const notAnAddress: Address = ""
+
+// Invalid: Initial value is not compatible with type `Address`,
+// it is a number, but larger than 160 bits
+//
+const alsoNotAnAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d123456789
+```
+
+Integer literals are not inferred to be an address.
+
+```swift
+// Declare a number. Even though it happens to be a valid address,
+// it is not inferred as it.
+//
+const aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
+// `aNumber` has type `Int`
+```
+
+### Strings and Characters
+
+Strings are collections of characters. Strings have the type `String`, and characters have the type `Character`. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.
+
+String and character literals are enclosed in double quotation marks (`"`).
+
+```swift
+const someString = "Hello, world!"
+```
+
+String literals may contain escape sequences. An escape sequence starts with a backslash (`\`):
+
+- `\0`: Null character
+- `\\`: Backslash
+- `\t`: Horizontal tab
+- `\n`: Line feed
+- `\r`: Carriage return
+- `\"`: Double quotation mark
+- `\'`: Single quotation mark
+- `\u`: A Unicode scalar value, written as `\u{x}`, where `x` is a 1–8 digit hexadecimal number which needs to be a valid Unicode scalar value, i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive
+
+```swift
+// Declare a constant which contains two lines of text
+// (separated by the line feed character `\n`), and ends
+// with a thumbs up emoji, which has code point U+1F44D (0x1F44D)
+//
+const thumbsUpText =
+    "This is the first line.\nThis is the second line with an emoji: \u{1F44D}"
+```
+
+The type `Character` represents a single, human-readable character. Characters are extended grapheme clusters, which consist of one or more Unicode scalars.
+
+For example, the single character `ü` can be represented in several ways in Unicode. First, it can be represented by a single Unicode scalar value `ü` ("LATIN SMALL LETTER U WITH DIAERESIS", code point U+00FC). Second, the same single character can be represented by two Unicode scalar values: `u` ("LATIN SMALL LETTER U", code point U+0075), and "COMBINING DIAERESIS" (code point U+0308). The combining Unicode scalar value is applied to the scalar before it, which turns a `u` into a `ü`.
+
+Still, both variants represent the same human-readable character `ü`.
+
+```swift
+const singleScalar: Character = "\u{FC}"
+// `singleScalar` is `ü`
+const twoScalars: Character = "\u{75}\u{308}"
+// `twoScalars` is `ü`
+```
+
+Another example where multiple Unicode scalar values are rendered as a single, human-readable character is a flag emoji. These emojis consist of two "REGIONAL INDICATOR SYMBOL LETTER" Unicode scalar values.
+
+```swift
+// Declare a constant for a string with a single character, the emoji
+// for the Canadian flag, which consists of two Unicode scalar values:
+// - REGIONAL INDICATOR SYMBOL LETTER C (U+1F1E8)
+// - REGIONAL INDICATOR SYMBOL LETTER A (U+1F1E6)
+//
+const canadianFlag: Character = "\u{1F1E8}\u{1F1E6}"
+// `canadianFlag` is `🇨🇦`
+```
+
+<!--
+
+TODO
+
+#### String Functions
+
+- Length, concatenate
+- Append, remove, etc. for variable-size arrays
+- Document and link to string concatenation operator `&` in operators section
+
+-->
 
 ### Arrays
 
 Arrays are mutable, ordered collections of values. All values in an array must have the same type. Arrays may contain a value multiple times. Array literals start with an opening square bracket `[` and end with a closing square bracket `]`.
 
-```typescript,file=arrays.bpl
+```swift,file=arrays.bpl
 // An empty array
 //
 []
@@ -294,7 +490,7 @@ Arrays are mutable, ordered collections of values. All values in an array must h
 
 To get the element of an array at a specific index, the indexing syntax can be used: The array is followed by an opening square bracket `[`, the indexing value, and ends with a closing square bracket `]`.
 
-```typescript,file=arrays-indexing.bpl
+```swift,file=arrays-indexing.bpl
 const numbers = [42, 23]
 
 // Get the first number
@@ -306,7 +502,7 @@ numbers[0] // is 42
 numbers[1] // is 23
 ```
 
-```typescript,file=arrays-nested-indexing.bpl
+```swift,file=arrays-nested-indexing.bpl
 const arrays = [[1, 2], [3, 4]]
 
 // Get the first number of the second array
@@ -316,7 +512,7 @@ arrays[1][0] // is 3
 
 To set an element of an array at a specific index, the indexing syntax can be used as well.
 
-```typescript,file=array-indexing-assignment.bpl
+```swift,file=array-indexing-assignment.bpl
 const numbers = [42, 23]
 
 // Change the second number
@@ -334,7 +530,7 @@ Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array
 
 Variable-size arrays have the type suffix `[]`. For example, the type `Int16[]` specifies a variable-size array of elements that have type `Int16`.
 
-```typescript,file=array-types.bpl
+```swift,file=array-types.bpl
 const array: Int8[2] = [1, 2]
 
 const arrays: Int16[2][3] = [
@@ -364,7 +560,7 @@ Dictionaries are mutable, unordered collections of key-value associations. In a 
 
 Dictionary literals start with an opening brace `{` and end with a closing brace `}`. Keys are separated from values by a colon, and key-value associations are separated by commas.
 
-```typescript,file=dictionaries.bpl
+```swift,file=dictionaries.bpl
 // An empty dictionary
 //
 {}
@@ -388,7 +584,7 @@ Dictionary literals start with an opening brace `{` and end with a closing brace
 
 To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
 
-```typescript,file=dictionary-access.bpl
+```swift,file=dictionary-access.bpl
 const booleans = {
     1: true,
     0: false
@@ -406,7 +602,7 @@ integers[false] // is 0
 
 To set the value for a key of a dictionary, the access syntax can be used as well.
 
-```typescript,file=dictionary-assignment.bpl
+```swift,file=dictionary-assignment.bpl
 const booleans = {
     1: true,
     0: false
@@ -421,7 +617,7 @@ booleans[0] = true
 
 Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
 
-```typescript,file=dictionary-types.bpl
+```swift,file=dictionary-types.bpl
 const booleans = {
     1: true,
     0: false
@@ -443,6 +639,41 @@ TODO
 
 -->
 
+
+#### Dictionary Keys
+
+Dictionary keys must be hashable and equatable, i.e., must implement the [`Hashable`](#hashable-interface) and [`Equatable`](#equatable-interface) [interfaces](#interfaces).
+
+Most of the built-in types, like booleans, integers, are hashable and equatable, so can be used as keys in dictionaries.
+
+
+### Any
+
+`Any` is the top type, i.e., all types are a subtype of it.
+
+```swift
+// Declare a variable that has the type `Any`.
+// Any value can be assigned to it, for example an integer.
+//
+var someValue: Any = 1
+
+// Assign a value with a different type, `Bool`
+someValue = true
+```
+
+### Never
+
+`Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
+
+```swift
+// Declare a function named `crashAndBurn` which will never return,
+// because it calls the function named `fatalError`, which never returns
+//
+fun crashAndBurn() -> Never {
+    fatalError("An unrecoverable error occurred")
+}
+```
+
 ## Operators
 
 Operators are special symbols that perform a computation for one or more values. They are either unary, binary, or ternary.
@@ -458,14 +689,14 @@ Operators are special symbols that perform a computation for one or more values.
 
 The `-` unary operator negates an integer:
 
-```typescript,file=integer-negation.bpl
+```swift,file=integer-negation.bpl
 const a = 1
 -a // is -1
 ```
 
 The `!` unary operator logically negates a boolean:
 
-```typescript,file=boolean-negation.bpl
+```swift,file=boolean-negation.bpl
 const a = true
 !a // is false
 ```
@@ -474,7 +705,7 @@ const a = true
 
 The binary assignment operator `=` can be used to assign a new value to a variable. It is only allowed in a statement and is not allowed in expressions.
 
-```typescript,file=assignment.bpl
+```swift,file=assignment.bpl
 var a = 1
 a = 2
 // a is 2
@@ -482,7 +713,7 @@ a = 2
 
 The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.
 
-```typescript,file=assignment-numbers.bpl
+```swift,file=assignment-numbers.bpl
 const numbers = [1, 2]
 
 // Change the first number
@@ -492,7 +723,7 @@ numbers[0] = 3
 // `numbers` is [3, 2]
 ```
 
-```typescript,file=assignment-arrays.bpl
+```swift,file=assignment-arrays.bpl
 const arrays = [[1, 2], [3, 4]]
 
 // Change the first number in the second array
@@ -502,7 +733,7 @@ arrays[1][0] = 5
 // `arrays` is [[1, 2], [5, 4]]
 ```
 
-```typescript,file=assignment-dictionaries.bpl
+```swift,file=assignment-dictionaries.bpl
 const dictionaries = {
   true: {1: 2},
   false: {3: 4}
@@ -525,14 +756,14 @@ There are four arithmetic operators:
 - Multiplication: `*`
 - Division: `/`
 
-```typescript,file=operator-plus.bpl
+```swift,file=operator-plus.bpl
 const a = 1 + 2
 // `a` is 3
 ```
 
 Arithmetic operators don't cause values to overflow.
 
-```typescript,file=operator-times.bpl
+```swift,file=operator-times.bpl
 const a: Int8 = 100
 const b: Int8 = 100
 const c = a * b
@@ -547,39 +778,39 @@ If overflow behavior is intended, overflowing operators are available, which are
 
 For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111). Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
 
-```typescript
+```swift
 //     11111111 = 255
 // &+         1
 //  = 100000000 = 0
 ```
 
-```typescript,file=operator-overflow-plus.bpl
+```swift,file=operator-overflow-plus.bpl
 const a: UInt8 = 255
 a &+ 1 // is 0
 ```
 
 Similarly, for the minimum value 0, subtracting 1 wraps around and results in the maximum value 255.
 
-```typescript,file=operator-minus.bpl
+```swift,file=operator-minus.bpl
 //     00000000
 // &-         1
 //  =  11111111 = 255
 ```
 
-```typescript
+```swift
 const b: UInt8 = 0
 b &- 1 // is 255
 ```
 
 Signed integers are also affected by overflow. In a signed integer, the first bit is used for the sign. This leaves 7 bits for the actual value for an 8-bit signed integer, i.e., the range of values is -128 (binary 10000000) to 127 (01111111). Subtracting 1 from -128 results in 127.
 
-```typescript
+```swift
 //    10000000 = -128
 // &-        1
 //  = 01111111 = 127
 ```
 
-```typescript
+```swift
 const c: Int8 = -128
 c &- 1 // is 127
 ```
@@ -590,7 +821,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 - Logical AND: `a && b`
 
-  ```typescript,file=operator-and.bpl
+  ```swift,file=operator-and.bpl
   true && true // is true
   true && false // is false
   false && false // is false
@@ -599,7 +830,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 - Logical OR: `a || b`
 
-  ```typescript,file=operator-or.bpl
+  ```swift,file=operator-or.bpl
   true || true // is true
   true || false // is true
   false || false // is true
@@ -613,7 +844,7 @@ Comparison operators work with boolean and integer values.
 
 - Equality: `==`, for booleans and integers
 
-  ```typescript,file=operator-equal.bpl
+  ```swift,file=operator-equal.bpl
   1 == 1 // is true
   1 == 2 // is false
   true == true // is true
@@ -622,7 +853,7 @@ Comparison operators work with boolean and integer values.
 
 - Inequality: `!=`, for booleans and integers
 
-  ```typescript,file=operator-not-equal.bpl
+  ```swift,file=operator-not-equal.bpl
   1 != 1 // is false
   1 != 2 // is true
   true != true // is false
@@ -631,7 +862,7 @@ Comparison operators work with boolean and integer values.
 
 - Less than: `<`, for integers
 
-  ```typescript,file=operator-less.bpl
+  ```swift,file=operator-less.bpl
   1 < 1 // is false
   1 < 2 // is true
   2 < 1 // is false
@@ -639,7 +870,7 @@ Comparison operators work with boolean and integer values.
 
 - Less or equal than: `<=`, for integers
 
-  ```typescript,file=operator-less-equals.bpl
+  ```swift,file=operator-less-equals.bpl
   1 <= 1 // is true
   1 <= 2 // is true
   2 <= 1 // is false
@@ -647,7 +878,7 @@ Comparison operators work with boolean and integer values.
 
 - Greater than: `>`, for integers
 
-  ```typescript,file=operator-greater.bpl
+  ```swift,file=operator-greater.bpl
   1 > 1 // is false
   1 > 2 // is false
   2 > 1 // is true
@@ -656,7 +887,7 @@ Comparison operators work with boolean and integer values.
 
 - Greater or equal than: `>=`, for integers
 
-  ```typescript,file=operator-greater-equals.bpl
+  ```swift,file=operator-greater-equals.bpl
   1 >= 1 // is true
   1 >= 2 // is false
   2 >= 1 // is true
@@ -669,7 +900,7 @@ There is only one ternary conditional operator, the ternary conditional operator
 
 It behaves like an if-statement, but is an expression: If the first operator value is true, the second operator value is returned. If the first operator value is false, the third value is returned.
 
-```typescript,file=operator-ternary-conditional.bpl
+```swift,file=operator-ternary-conditional.bpl
 const x = 1 > 2 ? 3 : 4
 // `x` is 4
 ```
@@ -707,7 +938,7 @@ Each parameter can have a label, the name that a function call needs to use to p
 
 Each parameter needs to have a type annotation, which follows the parameter name after a colon.
 
-```typescript,file=function-double.bpl
+```swift,file=function-double.bpl
 // Declare a function named `double`, which multiples a number by two.
 //
 // The special argument label _ is specified for the parameter,
@@ -727,7 +958,7 @@ double(2) // returns 4
 
 It is possible to require argument labels for some parameters, and not require argument labels for other parameters.
 
-```typescript,file=function-clamp.bpl
+```swift,file=function-clamp.bpl
 // Declare a function named `clamp`. The function takes an integer value,
 // the lower limit, and the upper limit. It returns an integer between
 // the lower and upper limit.
@@ -772,7 +1003,7 @@ Argument labels make code more explicit and readable. For example, they avoid co
 
 Argument labels should be named so they make sense from the perspective of the function call.
 
-```typescript,file=function-send.bpl
+```swift,file=function-send.bpl
 // Declare a function named `send`, which transfers an amount
 // from one account to another.
 //
@@ -827,7 +1058,7 @@ send(from: sender, to: receiver, amount: 100)
 
 The order of the arguments in a function call must match the order of the parameters in the function declaration.
 
-```typescript,file=function-test.bpl
+```swift,file=function-test.bpl
 // Declare a function named `test`, which accepts two parameters, named `first` and `second`
 //
 fun test(first: Int, second: Int) {
@@ -842,7 +1073,7 @@ test(second: 1, first: 2)
 
 Functions can be nested, i.e., the code of a function may declare further functions.
 
-```typescript,file=function-doubleAndAddOne.bpl
+```swift,file=function-doubleAndAddOne.bpl
 // Declare a function which multiplies a number by two, and adds one
 //
 fun doubleAndAddOne(_ x: Int) -> Int {
@@ -863,7 +1094,7 @@ doubleAndAddOne(2) // is 5
 
 Functions can be also used as expressions. The syntax is the same as for function declarations, except that function expressions have no name, i.e., it is anonymous.
 
-```typescript,file=function-expression.bpl
+```swift,file=function-expression.bpl
 // Declare a constant named `double`, which has a function as its value.
 //
 // The function multiplies a number by two when it is called
@@ -878,7 +1109,7 @@ const double =
 
 Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.
 
-```typescript,file=function-call.bpl
+```swift,file=function-call.bpl
 fun double(_ x: Int) -> Int {
      return x * 2
 }
@@ -901,7 +1132,7 @@ double()
 Function types consist of the function's parameter types and the function's return type.
 The parameter types need to be enclosed in parentheses, followed by the `->` keyword, and end with the return type.
 
-```typescript,file=function-type.bpl
+```swift,file=function-type.bpl
 // Declare a function named `add`, with the function type `(Int, Int) -> Int`
 //
 fun add(a: Int, b: Int) -> Int {
@@ -909,7 +1140,7 @@ fun add(a: Int, b: Int) -> Int {
 }
 ```
 
-```typescript,file=function-type-expression.bpl
+```swift,file=function-type-expression.bpl
 // Declare a constant named `add`, with the function type `(Int, Int) -> Int`
 //
 const add: (Int, Int) -> Int =
@@ -920,7 +1151,7 @@ const add: (Int, Int) -> Int =
 
 If the function has no return type, it implicitly has the return type `Void`.
 
-```typescript,file=function-doNothing.bpl
+```swift,file=function-doNothing.bpl
 // Declare a constant named `doNothing`, which is a function
 // that takes no parameters and returns nothing
 //
@@ -938,7 +1169,7 @@ The type `((Int) -> Int)[2]` specifies an array type of two functions, which acc
 
 When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as [call-by-sharing](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_sharing).
 
-```typescript,file=function-change.bpl
+```swift,file=function-change.bpl
 fun change(_ numbers: Int[]) {
      numbers[0] = 1
      numbers[1] = 2
@@ -952,7 +1183,7 @@ change(numbers)
 
 Parameters are constant, i.e., it is not allowed to assign to them.
 
-```typescript,file=function-parameter-assignment.bpl
+```swift,file=function-parameter-assignment.bpl
 fun test(x: Int) {
      // Invalid: cannot assign to a parameter (constant)
      //
@@ -970,7 +1201,7 @@ Preconditions must be true right before the execution of the function. Precondit
 
 Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `ensure` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
 
-A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they can't have side-effects and must be pure expressions.
+A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions.
 
 <!--
 
@@ -987,7 +1218,7 @@ Following each condition, an optional description can be provided after a colon.
 
 In postconditions, the special constant `result` refers to the result of the function.
 
-```typescript,file=function-factorial.bpl
+```swift,file=function-factorial.bpl
 fun factorial(_ n: Int) -> Int {
     require {
         // Require the parameter `n` to be greater than or equal to zero
@@ -1022,7 +1253,7 @@ factorial(-2)
 
 In postconditions, the special function `before` can be used to get the value of an expression just before the function is called.
 
-```typescript,file=function-increment.bpl
+```swift,file=function-increment.bpl
 var n = 0
 
 fun incrementN() {
@@ -1048,7 +1279,7 @@ If-statements allow a certain piece of code to be executed only when a given con
 The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces. The condition must be boolean and the braces are required.
 
 
-```typescript,file=control-flow-if.bpl
+```swift,file=control-flow-if.bpl
 const a = 0
 var b = 0
 
@@ -1066,7 +1297,7 @@ if a != 0 {
 An additional else-clause can be added to execute another piece of code when the condition is false.
 The else-clause is introduced by the `else` keyword.
 
-```typescript,file=control-flow-if-else.bpl
+```swift,file=control-flow-if-else.bpl
 const a = 0
 var b = 0
 
@@ -1081,7 +1312,7 @@ if a == 1 {
 
 The else-clause can contain another if-statement, i.e., if-statements can be chained together.
 
-```typescript,file=control-flow-if-else-if.bpl
+```swift,file=control-flow-if-else-if.bpl
 const a = 0
 var b = 0
 
@@ -1105,7 +1336,7 @@ The while-statement starts with the `while` keyword, followed by the condition, 
 The while-statement will first evaluate the condition. If the condition is false, the execution is done.
 If it is true, the piece of code is executed and the evaluation of the condition is repeated. Thus, the piece of code is executed zero or more times.
 
-```typescript,file=control-flow-while.bpl
+```swift,file=control-flow-while.bpl
 var a = 0
 while a < 5 {
     a = a + 1
@@ -1130,7 +1361,7 @@ TODO: examples
 
 Every function and block (`{` ... `}`) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.
 
-```typescript,file=scope.bpl
+```swift,file=scope.bpl
 const x = 10
 
 fun f() -> Int {
@@ -1145,7 +1376,7 @@ f() // returns 20
 y
 ```
 
-```typescript,file=scope-doubleAndAddOne.bpl
+```swift,file=scope-doubleAndAddOne.bpl
 fun doubleAndAddOne(_ n: Int) -> Int {
     fun double(_ x: Int) {
         return x * 2
@@ -1160,7 +1391,7 @@ double(1)
 
 Each scope can introduce new declarations, i.e., the outer declaration is shadowed.
 
-```typescript,file=scope-test.bpl
+```swift,file=scope-test.bpl
 const x = 2
 
 fun test() -> Int {
@@ -1173,7 +1404,7 @@ test() // returns 3
 
 Scope is lexical, not dynamic.
 
-```typescript,file=scope-lexical.bpl
+```swift,file=scope-lexical.bpl
 const x = 10
 
 fun f() -> Int {
@@ -1190,7 +1421,7 @@ g() // returns 10, not 20
 
 Declarations are **not** moved to the top of the enclosing function (hoisted).
 
-```typescript,file=scope-no-hoisting.bpl
+```swift,file=scope-no-hoisting.bpl
 const x = 2
 
 fun f() -> Int {
@@ -1213,7 +1444,7 @@ An optional type is declared using the `?` suffix for another type. For example,
 
 The value representing nothing is `nil`.
 
-```typescript
+```swift
 // declare a constant which has an optional integer type,
 // with nil as its initial value
 //
@@ -1227,9 +1458,9 @@ const b: Int? = 42
 
 ### Nil-Coalescing Operator
 
-The nil-coalescing operator `??` returns the value inside an optional if it contains a value, or returns an alternative value if the optional has no value, i.e., the optional value is `nil`. 
+The nil-coalescing operator `??` returns the value inside an optional if it contains a value, or returns an alternative value if the optional has no value, i.e., the optional value is `nil`.
 
-```typescript
+```swift
 // declare a constant which has an optional integer type
 //
 const a: Int? = nil
@@ -1243,7 +1474,7 @@ const b: Int = a ?? 42
 
 The nil-coalescing operator can only be applied to values which have an optional type.
 
-```typescript
+```swift
 // declare a constant with a non-optional integer type
 //
 const a = 1
@@ -1254,7 +1485,7 @@ const a = 1
 const b = a ?? 2
 ```
 
-```typescript
+```swift
 // invalid: nil-coalescing operator is applied to a value which has a non-optional type
 // (the integer literal is of type Int)
 //
@@ -1263,7 +1494,7 @@ const c = 1 ?? 2
 
 The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.
 
-```typescript
+```swift
 // declare a constant with a non-optional integer type
 const a = 1
 
@@ -1282,7 +1513,7 @@ The Bamboo programming language is a _type-safe_ language.
 
 When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type `Bool`, it can _only_ be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
 
-```typescript,file=type-safety-assign-int-to-bool.bpl
+```swift,file=type-safety-assign-int-to-bool.bpl
 // Declare a variable that has type `Bool`
 var a = true
 
@@ -1293,7 +1524,7 @@ a = 0
 
 When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type `Bool`, _only_ a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
 
-```typescript,file=type-safety-nand.bpl
+```swift,file=type-safety-nand.bpl
 fun nand(_ a: Bool, _ b: Bool) -> Bool {
     return !(a && b)
 }
@@ -1308,7 +1539,7 @@ nand(0, 0)
 Types are **not** automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`, nor is an optional integer `Int?`  automatically converted to a non-optional integer `Int`.
 
 
-```typescript,file=type-safety-add.bpl
+```swift,file=type-safety-add.bpl
 fun add(_ a: Int8, _ b: Int8) -> Int {
     return a + b
 }
@@ -1334,7 +1565,7 @@ If a variable or constant is not annotated explicitly with a type, it is inferre
 
 Integer literals are inferred to type `Int`.
 
-```typescript,file=type-inference-int.bpl
+```swift,file=type-inference-int.bpl
 const a = 1
 
 // `a` has type `Int`
@@ -1342,7 +1573,7 @@ const a = 1
 
 Array literals are inferred based on the elements of the literal, and to be variable-size.
 
-```typescript,file=type-inference-intergers.bpl
+```swift,file=type-inference-intergers.bpl
 const integers = [1, 2]
 // `integers` has type `Int[]`
 
@@ -1353,7 +1584,7 @@ const invalidMixed = [1, true, 2, false]
 
 Dictionary literals are inferred based on the keys and values of the literal.
 
-```typescript,file=type-inference-dictionary.bpl
+```swift,file=type-inference-dictionary.bpl
 const booleans = {
     1: true,
     2: false
@@ -1370,7 +1601,7 @@ const invalidMixed = {
 
 Functions are inferred based on the parameter types and the return type.
 
-```typescript,file=type-inference-function.bpl
+```swift,file=type-inference-function.bpl
 const add = (a: Int8, b: Int8) -> Int {
     return a + b
 }
@@ -1382,11 +1613,11 @@ const add = (a: Int8, b: Int8) -> Int {
 
 > 🚧 Status: Structures and classes are not implemented yet.
 
-Structures and classes are composite types. Structures and classes consist of one or more values, which are stored in named fields. Each field may have a different type.
+Structures and classes are composite data types. Structures and classes consist of one or more values, which are stored in named fields. Each field may have a different type.
 
 Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword. The keyword is followed by the name.
 
-```typescript,file=struct-and-class.bpl
+```swift,file=struct-and-class.bpl
 struct SomeStruct {
     // ...
 }
@@ -1400,7 +1631,7 @@ Structures and classes are types.
 
 Values of a structure or class type are created (instantiated) by calling the type like a function.
 
-```typescript,file=struct-and-class-instantiation.bpl
+```swift,file=struct-and-class-instantiation.bpl
 const someStruct: SomeStruct = SomeStruct()
 
 const someClass: SomeClass = SomeClass()
@@ -1427,7 +1658,7 @@ Synthetic fields are **not** stored in the structure or class value, i.e. they a
 | **Constant field**   | Yes              | **No**             | `const`     |
 | **Synthetic field**  | **No**           | Yes                | `synthetic` |
 
-```typescript,file=struct-and-class-fields-and-init.bpl
+```swift,file=struct-and-class-fields-and-init.bpl
 // Declare a structure named `Token`, which has a constant field
 // named `id` and a variable field named `balance`.
 //
@@ -1448,7 +1679,7 @@ In initializers, the special constant `self` refers to the structure or class va
 
 Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the structure or class instance is followed by a dot (`.`) and the name of the field.
 
-```typescript,file=struct-and-class-fields-assignment.bpl
+```swift,file=struct-and-class-fields-assignment.bpl
 const token = Token(id: 42, balance: 1_000_00)
 
 token.id // is 42
@@ -1470,7 +1701,7 @@ Getters and setters are enclosed in opening and closing braces, after the field'
 
 Getters are declared using the `get` keyword. Getters have no parameters and their return type is implicitly the type of the field.
 
-```typescript,file=struct-and-class-field-getter.bpl
+```swift,file=struct-and-class-field-getter.bpl
 struct GetterExample {
 
     // Declare a variable field named `balance` with a getter
@@ -1506,7 +1737,7 @@ Setters are declared using the `set` keyword, followed by the name for the new v
 
 The types of values assigned to setters must always match the field's type.
 
-```typescript,file=struct-and-class-field-setter.bpl
+```swift,file=struct-and-class-field-setter.bpl
 struct SetterExample {
 
     // Declare a variable field named `balance` with a setter
@@ -1535,14 +1766,56 @@ example.balance = -50
 
 ### Synthetic Structure and Class Fields
 
-If a field has both a getter and a setter, and neither of them read from/write to the field, the field is *synthetic*. Synthetic fields **must** be declared as such using the `synthetic` keyword. Synthetic fields are neither variable nor constant, and they are not actually stored in the structure or class value.
+Fields which are not stored in the structure or class value are *synthetic*, i.e., the field value is computed. Synthetic can be either read-only, or readable and writable.
 
-```typescript,file=struct-and-class-synthetic-field.bpl
+Synthetic fields are declared using the `synthetic` keyword.
+
+Synthetic fields are read-only when only a getter is provided.
+
+```swift,file=struct-and-class-synthetic-field-getter-only.bpl
+struct Rectangle {
+    var width: Int
+    var height: Int
+
+    // Declare a synthetic field named `area`,
+    // which computes the area based on the width and height
+    //
+    synthetic area: Int {
+        get {
+            return width * height
+        }
+    }
+}
+```
+
+Synthetic fields are readable and writable when both a getter and a setter is declared.
+
+```swift,file=struct-and-class-synthetic-field-setter-getter.bpl
+// Declare a struct named `GoalTracker` which stores a number
+// of target goals, a number of completed goals,
+// and has a synthetic field to provide the left number of goals
+//
+// NOTE: the tracker only implements some functionality to demonstrate
+// synthetic fields, it is incomplete (e.g. assignments to `goal` are not handled properly)
+//
 struct GoalTracker {
 
     var goal: Int
     var completed: Int
 
+    // Declare a synthetic field which is both readable
+    // and writable.
+    //
+    // When the field is read from (in the getter),
+    // the number of left goals is computed from
+    // the target number of goals and
+    // the completed number of goals.
+    //
+    // When the field is written to (in the setter),
+    // the number of completed goals is updated,
+    // based on the number of target goals
+    // and the new remaining number of goals
+    //
     synthetic left: Double {
         get {
             return self.goal - self.completed
@@ -1569,16 +1842,16 @@ tracker.completed = 1
 
 tracker.left = 8
 // tracker.completed is 2
-
-// NOTE: the tracker only implements some functionality to demonstrate
-// synthesized fields, it is incomplete (e.g. assignments to `goal` are not handled properly)
 ```
+
+It is invalid to declare a synthetic field with only a setter.
+
 
 ### Structure and Class Functions
 
 Structures and classes may contain functions. Just like in the initializer, the special constant `self` refers to the structure or class value that the function is called on.
 
-```typescript,file=struct-and-class-function.bpl
+```swift,file=struct-and-class-function.bpl
 struct Token {
     const id: Int
     var balance: Int
@@ -1602,7 +1875,7 @@ token.mint(amount: 1_000_000)
 
 The only difference between structures and classes is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types.
 
-```typescript,file=struct-behavior.bpl
+```swift,file=struct-behavior.bpl
 // Declare a structure named `SomeStruct`, with a variable integer field
 //
 struct SomeStruct {
@@ -1627,7 +1900,7 @@ structB.value = 1
 // structA.value is *0*
 ```
 
-```typescript,file=class-behavior.bpl
+```swift,file=class-behavior.bpl
 // Declare a class named `SomeClass`, with a variable integer field
 //
 class SomeClass {
@@ -1700,8 +1973,7 @@ To summarize the behavior for functions, structures, classes, and interfaces:
 | `fun`, `struct`, `class`, `interface`    | `pub`                 | **All**           |
 
 
-
-```typescript,file=access-control.bpl
+```swift,file=access-control.bpl
 // Declare a private constant, inaccessible/invisible in outer scope
 //
 const a = 1
@@ -1754,12 +2026,158 @@ pub class SomeClass {
     pub fun privateTest() {
         // ...
     }
-
-    // Declare an inner, private struct,
-    // only accessible in the current and inner scopes
-    //
-    struct InnerStruct {}
 }
+```
+
+## Permissions
+
+> 🚧 Status: Permissions are not implemented yet.
+
+Initializers, fields, and functions of classes can be made accessible in other types by *permitting* them to do so.
+
+<!-- TODO this is in basically adding additional scopes aside from the class in which the initialzer, field, or function is defined in -->
+
+Permissions for classes are declared using the `permit` keyword, followed by the type that should be permitted access, the `to` keyword, and the type that should be accessible by the permitted type.
+
+<!-- TODO: can be used e.g. for authorizations, values that represent access rights/privileges to resources. -->
+
+```swift,file=permissions-purse.bpl
+// Declare a class named `purse`, which holds a balance and
+// allows amounts to be deposited from a purse to another.
+//
+// Purses are associated with an account.
+// Deposits require an authorization.
+//
+class Purse {
+
+    pub const account: Account
+    pub var balance: Int
+
+    init(initialBalance: Int) {
+        self.balance = initialBalance
+    }
+
+    // Declare a function named `deposit`, which transfers an amount
+    // from this purses's balance to another purses's balance,
+    // but only if given a deposit authorization for this purse.
+    //
+    pub fun deposit(to: Purse, amount: Int, auth: DepositAuth) {
+        require {
+            amount > 0:
+                "the amount must be positive"
+
+            amount <= self.balance:
+                "the amount must be smaller or equal to the balance"
+
+            auth.purse == self:
+                "the given authorization must be for this purse"
+
+            amount <= auth.limit:
+                "the amount must be smaller or equal to the authorization's limit"
+        }
+
+        ensure {
+            self.balance == before(self.balance) - amount:
+                "the amount must be deducted from this purse's balance"
+
+            to.balance == before(to.balance) + amount:
+                "the amount must be added to the receiving purse's balance"
+
+            auth.limit == before(auth.limit) - amount:
+                "the amount must be deducted from the authorization's limit"
+        }
+
+        self.balance = self.balance - amount
+        to.amount = to.amount + amount
+
+        // NOTE: as the class `Purse` is granted access to private fields
+        // of class `DepoitAuth`, and the field `limit` is private and variable,
+        // it can be written to by this class (`Purse`).
+        //
+        auth.limit = auth.limit - amount
+    }
+
+    // Declare a function named `makeDepositAuth` which creates a deposit
+    // authorization with a given limit.
+    //
+    // NOTE: To illustrate that a deposit authorization can only be created
+    // by an authorized account, the function requires passing
+    // a storage authorization (`StorageAuth`; the declaration is omitted here).
+    //
+    // This ensures that just having a reference to this purse is not enough
+    // to create a deposit authorization for it.
+    //
+    pub fun makeDepositAuth(limit: Int, auth: StorageAuth) -> DepositAuth {
+        require {
+            limit > 0:
+                "the limit must be positive"
+
+            auth.account == self.account:
+                "the given authorization's account must be the account this purse belongs to"
+        }
+
+        ensure {
+            result.purse == self:
+                "the deposit authorization's purse must be this purse"
+
+            result.limit == limit:
+                "the deposit authorization's limit must be the given limit"
+        }
+
+        return DepositAuth(purse: self, limit: limit)
+    }
+}
+
+// Declare a class named `DepositAuth`.
+//
+// The type represents the authorization to transfer
+// a limited amount from one purse to another purse.
+//
+class DepositAuth {
+
+    // Declare a publicly readable field named `purse` that has type `Purse`.
+    // The deposit authorization is for a specific account, which is checked
+    // in the `transfer` function of `Purse`
+    //
+    pub const purse: Purse
+
+    // Declare a private field named `limit` that has type `Int`.
+    //
+    // As the field is private, it can normally only be accessed
+    // it can only be accessed in the scope of this class.
+    //
+    // However, the class `Purse` is given permission to access this class,
+    // so it can also read and write to this field. See the `transfer` function
+    // of the `Purse` class.
+    //
+    private var limit: Int
+
+    // Declare a private initializer.
+    //
+    // As the initializer is private, it can normally only be accessed
+    // used in the scope of this class, which makes it impossible to create.
+    //
+    // However, the class `Purse` is given permission to access this class,
+    // so it can call this private initializer. See the `makeDepositAuth`
+    // function of the `Purse` class.
+    //
+    private init(purse: Purse, limit: Int) {
+        self.purse = purse
+        self.limit = limit
+    }
+}
+
+// Permit the class `Purse` access to the class `DepositAuth`.
+//
+// This allows class `Purse` to create values of class `DepositAuth`
+// by calling its private initializer, i.e., purses are allowed
+// to create deposit authorizations.
+//
+// Furthermore it allows the class `Purse` to access the private field
+// `limit` of class `Deposit`, i.e., purses are allowed to adjust the
+// remaining limit of deposit authorizations.
+//
+permit Purse to DepositAuth
 ```
 
 ## Interfaces
@@ -1770,12 +2188,13 @@ An interface is an abstract type that specifies the behavior of types that *impl
 
 Interfaces can be implemented by [classes](#structures-and-classes), [structures](#structures-and-classes), [contracts](#contracts), and [authorizations](#authorizations). These types may implement multiple interfaces.
 
-Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Implementations of interface requirements must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.
+Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Interface requirements, and therefore also their implementations, must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.
 
 Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions.
 
 Field requirements consist of the name and the type of the field. Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
 
+Calling functions with pre-conditions and post-conditions on interfaces instead of implementations can improve the security of a program, as it ensures that even if implementations change, some aspects of them will always hold.
 
 ### Interface Declaration
 
@@ -1787,7 +2206,7 @@ Field requirements and function requirements must specify the required level of 
 
 The special type `Self` can be used to refer to the type implementing the interface. This can be seen in the following example, where the first parameter of the `transfer` function has the `Self` type.
 
-```typescript,file=interface-declaration.bpl
+```swift,file=interface-declaration.bpl
 // Declare an interface for a vault (a container for a balance)
 //
 interface Vault {
@@ -1885,8 +2304,7 @@ Note that the required initializer and function do not have any executable code.
 
 Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the type (class, structure, contract, or authorization) that provides the functionality required in the interface.
 
-```typescript,file=interface-implementation.bpl
-
+```swift,file=interface-implementation.bpl
 // Declare a class named `ExampleVault` with a variable field named `balance`,
 // that can be written by functions of the class, but outer scopes can only read it
 //
@@ -1943,8 +2361,8 @@ impl Vault for ExampleVault {
     // in the interface have to be repeated here in the implementation
     //
     pub fun transfer(to receivingVault: ExampleVault, amount: Int) {
-        self.balance -= amount
-        receivingVault.amount += amount
+        self.balance = self.balance - amount
+        receivingVault.amount = receivingVault.amount + amount
     }
 }
 
@@ -1975,7 +2393,7 @@ vault.transfer(to: otherVault, amount: 100)
 
 The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified), and an implementation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
 
-```typescript
+```swift
 interface AnInterface {
     // Require the implementation to provide a publicly readable
     // field named `a` that has type `Int`. It may be a constant field,
@@ -2009,7 +2427,7 @@ impl AnInterface for AnImplementation {
 
 Interfaces are types. Values implementing an interface can be used as initial values for constants that have the interface as their type.
 
-```typescript,file=interface-type.bpl
+```swift,file=interface-type.bpl
 // Declare a constant that has type `Vault`, which has a value that has type `ExampleVault`
 //
 const vault: Vault = ExampleVault(initialBalance: 100)
@@ -2017,7 +2435,7 @@ const vault: Vault = ExampleVault(initialBalance: 100)
 
 Values implementing an interface are assignable to variables that have the interface as their type.
 
-```typescript,file=interface-type-assignment.bpl
+```swift,file=interface-type-assignment.bpl
 // Assume there is a declaration for another implementation
 // of the interface  `Vault` which is named `CoolVault`
 
@@ -2040,7 +2458,7 @@ const exampleVault: ExampleVault = CoolVault(initialBalance: 100)
 
 Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.
 
-```typescript,file=interface-type-fields-and-functions.bpl
+```swift,file=interface-type-fields-and-functions.bpl
 // Declare a constant which has the type `Vault`, and a value that has type `ExampleVault`
 //
 const someVault: Vault = ExampleVault(initialBalance: 100)
@@ -2055,15 +2473,236 @@ someVault.add(amount: 50)
 // someVault.balance is 150
 ```
 
+### `Equatable` Interface
+
+> 🚧 Status: The `Equatable` interface is not implemented yet.
+
+An equatable type is a type that can be compared for equality. Types are equatable when they  implement the `Equatable` interface.
+
+Equatable types can be compared for equality using the equals operator (`==`) or inequality using the unequals operator (`!=`).
+
+Most of the built-in types are equatable, like booleans and integers. Arrays are equatable when their elements are equatable. Dictionaries are equatable when their values are equatable.
+
+To make a type equatable the `Equatable` interface must be implemented, which requires the implementation of the function `equals`, which accepts another value that the given value should be compared for equality. Note that the parameter type is `Self`, i.e., the other value must have the same type as the implementing type.
+
+```swift,file=equatable.bpl
+interface Equatable {
+    pub fun equals(_ other: Self) -> Bool
+}
+```
+
+```swift,file=equatable-impl.bpl
+// Declare a class named `Cat`, which has one field named `id`
+// that has type `Int`, i.e., the identifier of the cat.
+//
+class Cat {
+    pub const id: Int
+
+    init(id: Int) {
+        self.id = id
+    }
+}
+
+// Implement the interface `Equatable` for the type `Cat`,
+// to allow cats to be compared for equality.
+//
+impl Equatable for Cat {
+
+    pub fun equals(_ other: Self) -> Bool {
+        // Cats are equal if their identifier matches.
+        //
+        return other.id == self.id
+    }
+}
+
+Cat(1) == Cat(2) // is false
+Cat(3) == Cat(3) // is true
+```
+
+
+### `Hashable` Interface
+
+> 🚧 Status: The `Hashable` interface is not implemented yet.
+
+A hashable type is a type that can be hashed to an integer hash value, i.e., it is distilled into a value that is used as evidence of inequality. Types are hashable when they implement the `Hashable` interface.
+
+Hashable types can be used as keys in dictionaries.
+
+Hashable types must also be equatable, i.e., they must also implement the `Equatable` interface. This is because the hash value is only evidence for inequality: two values that have different hash values are guaranteed to be unequal. However, if the hash value of two values is the same, then the two values could still be unequal and just happen to hash to the same hash value. In that case equality still needs to be determined through an equality check. Without `Equatable`, values could be added to a dictionary, but it would not be possible to retrieve them.
+
+<!-- TODO: once interface inheritance is defined, describe how Hashable inherits from Equatable -->
+
+Most of the built-in types are hashable, like booleans and integers. Arrays are hashable when their elements are hashable. Dictionaries are hashable when their values are equatable.
+
+Hashing a value means passing its essential components into a hash function. Essential components are those that are used in the type's implementation of `Equatable`.
+
+If two values are equal because their `equals` function returns true, then the implementation must return the same integer hash value for each of the two values.
+
+The implementation must also consistently return the same integer hash value during the execution of the program when the essential components have not changed. The integer hash value must not necessarily be the same across multiple executions.
+
+```swift,file=hashable.bpl
+interface Hashable {
+    pub hashValue: Int
+}
+```
+
+```swift,file=hashable-impl.bpl
+// Declare a structure named `Point` with two fields
+// named `x` and `y` that have type `Int`.
+//
+struct Point {
+
+    pub(set) var x: Int
+    pub(set) var y: Int
+
+    init(x: Int, y: Int) {
+        self.x = x
+        self.y = y
+    }
+}
+
+// Implement the interface `Equatable` for the type `Point`,
+// to allow points to be compared for equality.
+//
+impl Equatable for Point {
+
+    pub fun equals(_ other: Self) -> Bool {
+        // Points are equal if their coordinates match.
+        //
+        // The essential components are therefore the fields
+        // `x` and `y`, which must be used in the `Hashable`
+        // implementation.
+        //
+        return other.x == self.x
+            && other.y == self.y
+    }
+}
+
+// Implement the interface `Equatable` for the type `Point`.
+//
+impl Hashable for Point {
+
+    pub synthetic hashValue: Int {
+        get {
+            var hash = 7
+            hash = 31 * hash + self.x
+            hash = 31 * hash + self.y
+            return hash
+        }
+    }
+}
+```
+
+## Storage
+
+> 🚧 Status: Storage is not implemented yet.
+
+Storable types can be persisted across multiple executions of the program. Values are storable if they have a type that implements the interface `Storable`.
+
+All built-in types are storable: booleans, integers, arrays with storable elements, and dictionaries with storable keys and values.
+
+[Structures and classes](#structures-and-classes) can be stored by implementing the [interface](#interfaces) `Storable`. The only requirement is that all field types of the implementing type need to be storable.
+
+```swift,file=storable-class.bpl
+// The declaration for interface `Storable` has no explicit requirements.
+interface Storable {}
+
+
+// Declare a structure named `Point`.
+//
+struct Point {
+    pub const x: Int
+    pub const y: Int
+
+    // The initializer is omitted for brevity.
+}
+
+// Implement the `Storable` interface for structure `Point`.
+//
+// The structure has two fields which have the type `Int`, which implements
+// the `Storable` interface. As all fields implement the `Storable` interface,
+// this structure can implement the `Storable` interface.
+//
+// There are no further requirements to satisfy, so the declaration is empty.
+//
+impl Storable for Point {}
+```
+
+Storable values can be stored for an [account](#accounts) by using the `storeIfNotExists` function. The function requires a [storage authorization](#storage-authorization) (`StorageAuth`) for the account.
+
+```swift
+fun storeIfNotExists(_ value: Storable, auth: StorageAuth)
+```
+
+```swift,file=storage-storeIfNotExists.bpl
+// Store the integer value `42` for an account, given a storage authorization for it
+//
+const value = 42
+const storageAuth: StorageAuth = // ...
+storeIfNotExists(value, auth: storageAuth)
+```
+
+Storable values can be retrieved for an account (`Account`) using the account's `getStored` function.
+
+```swift,file=storage-getStored.bpl
+// Retrieve a stored integer value, if any, for an account
+//
+const account: Account = // ...
+const value: Int? = account.getStored(Int)
+```
+
+It is only possible to store **one** value per type at the root of an account. Storing primitive values (e.g., integers, booleans) at the root of an account is possible, but not very practical – it is unclear what the value means. 
+
+If a single primitive value, multiple values of the same type, or even more complex data should be stored, composite data types (like structures and classes) have to be used.
+
+This requirement to declare and use composite data types is intentional, and not a "workaround". It makes storage declarative and explicit. Types declaratively describe what data is stored (through the name of the type), describe and specify what values are stored (through the names of the fields), and specify what types the values have (through the type annotations of the fields). 
+
+This approach provides several safety guarantees, which can be checked statically.
+
+Storage is intentionally not a key-value store with arbitrary strings as keys and values. Even though such an approach would be more flexible, it would require the developer to perform ad-hoc type casting, which is error-prone and has the potential for type confusion. Also, it would introduce the possibility for accidentally using different keys and/or different types for reading and writing a stored value – the string literals for the keys have no relation and have to be kept in sync manually.
+
+If a composite data type with fields is used, accidentally using different names or types to read or write a value is impossible, as type checking will detect and reject the program. 
+
+Leveraging the type system is the key to avoiding bugs. 
+
+```swift,file=storage-simplevault.bpl
+// Declare a class named `SimpleVault`.
+// It is a container for a balance.
+//
+class SimpleVault {
+    pub var balance: Int
+
+    init(balance: Int) {
+        self.balance = balance
+    }
+}
+
+// Implement the `Storable` interface for the class `SimpleVault`.
+//
+impl Storable for SimpleVault {}
+
+// Create a new vault with an initial zero balance.
+// Store it for an account, unless there already exists one
+//
+const vaultToBeStored = SimpleVault(balance: 0)
+const storageAuth: StorageAuth = // ...
+storeIfNotExists(vaultToBeStored, auth: storageAuth)
+
+// Retrieve a vault for an account, if any
+//
+const account: Account = // ...
+const storedVault: SimpleVault? = account.getStored(SimpleVault)
+```
+
 ## Contracts
 
 > 🚧 Status: Contracts are not implemented yet.
 
-A contract is similar to a class in that it is a composite data structure and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
+A contract is similar to a [class](#structures-and-classes) in that it is a composite data type and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
 
-Contracts differ from classes in that all fields are stored, i.e., persisted. To make this explicit, all fields must be annotated with the `stored` keyword.
+Contracts differ from classes in that all fields are [stored](#storage). To make this explicit, all fields must be annotated with the `stored` keyword.
 
-```typescript,file=contract-counter.bpl
+```swift,file=contract-counter.bpl
 // Declare a contract named `Counter`.
 //
 // The counter has an initial, positive value that
@@ -2105,9 +2744,12 @@ contract Counter {
 }
 ```
 
-Stored fields may be of any type. For example, it could be an array, a dictionary, or a class.
+<!-- TODO list storable types again? -->
+The type of a stored field must be [storable](#storage). Many built-in types can be stored, even complex ones, like arrays and dictionaries.
 
-```typescript,file=contract-funigble-token.bpl
+Stored fields are implicitly stored in the [storage](#storage) of the [account](#accounts) the contract is associated with.
+
+```swift,file=contract-funigble-token.bpl
 // Declare a contract named `FungibleToken`.
 //
 // This is a very simple fungible token contract.
@@ -2150,40 +2792,124 @@ contract FungibleToken {
 
 ## Accounts
 
-> 🚧 Status: Authorizations are not implemented yet.
+> 🚧 Status: Accounts are not implemented yet.
 
-
-## Authorizations
-
-> 🚧 Status: Authorizations are not implemented yet.
-
-Authorizations represent access rights/privileges to resources. An authorization is similar to a class in that it is a composite data structure and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
-
-Authorizations differ from classes in that they can only be created (instantiated) from existing authorizations. To make this explicit, the initializer of an authorization *must* be declared, the initializer must have at least one parameter, and the type of the first parameter must be an authorization.
-
-Furthermore, authorizations are unforgeable.
-
-There is a global authorization `rootAuth` that has type `RootAuth`. It represents the access rights/privileges to all resources.
-
-Authorizations are declared using the `auth` keyword.
-
-```typescript,file=auth.bpl
-// Declare an authorization named `SendTokens`
-
-auth SendTokens {
-    const limit: Int
-
-    init(_ auth: RootAuth, limit: Int) {
-        self.limit = limit
-    }
+```swift
+interface Account {
+    pub init(at address: Address)
 }
 ```
 
-<!--
+### Account Storage
 
-TODO:
-- access control
+Accounts have a `getStored` function, which retrieves a value from [storage](#storage). The function takes a type that implements the `Storable` interface, and returns an optional value that has the type.
 
--->
+<!-- TODO: cannot express the signature for getStored yet. would require. generics -->
 
+```swift
+// Get the stored integer value for an account
+//
+const account: Account = // ...
+const value: Int? = account.getStored(Int)
+```
+
+## External Contracts and Interfaces
+
+> 🚧 Status: External contracts and interfaces are not implemented yet.
+
+External contracts and interfaces can be instantiated by calling the `at` function on the contract or interface type and passing the address where the code is deployed. It returns an optional, as the code at the given address might not be of the given type.
+
+```swift
+// Declaration for an interface named `Counter`.
+//
+interface Counter {
+    pub count: Int
+    pub fun increment(_ count: Int)
+}
+
+// Try to instantiate the interface `Counter` for the code
+// at address 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
+//
+// The result is a value which has type `Counter`.
+//
+const counter: Counter =
+    Counter.at(0x06012c8cf97BEaD5deAe237070F9587f8E7A266d)
+       ?? fatalError("contract at address is not a counter")
+
+// Access the field `count`
+//
+counter.count
+
+// Call the function `increment` on the counter
+//
+counter.increment(42)
+```
+
+In addition it is also possible to just check if an address has code with a given type.
+
+```swift
+// Check if the interface `Counter` is available
+// at address 0x2F4Bdafb22bd92AA7b7552d270376dE8eDccbc1E
+//
+const exists: Bool = Counter.exists(at: 0x2F4Bdafb22bd92AA7b7552d270376dE8eDccbc1E)
+```
+
+
+## Built-in Authorization Types
+
+### `RootAuth`
+
+> 🚧 Status: `RootAuth` is not implemented yet.
+
+The authorization type `RootAuth` represents access rights/privileges to all resources.
+
+```swift
+interface RootAuth {
+    pub account: Account
+    pub storageAuth: StorageAuth
+}
+```
+
+### `StorageAuth`
+
+> 🚧 Status: `StorageAuth` is not implemented yet.
+
+The authorization type `StorageAuth` represents storage rights for an account. It is created from a [root authorization](#root-authorization). The storage authorization's account is the root authorization's account.
+
+```swift
+interface StorageAuth {
+    pub account: Account
+
+    init(_ rootAuth: RootAuth)
+}
+```
+
+## Built-in Functions
+
+### `fatalError`
+
+> 🚧 Status: `fatalError` is not implemented yet.
+
+```swift
+fun fatalError(_ message: String) -> Never
+```
+
+Terminates the program unconditionally and reports a message which explains why the unrecoverable error occurred.
+
+#### Example
+
+```swift
+const optionalAccount: Account? = // ...
+const account = optionalAccount ?? fatalError("missing account")
+```
+
+### `assert`
+
+> 🚧 Status: `assert` is not implemented yet.
+
+```swift
+fun assert(_ condition: Bool, message: String)
+```
+
+Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.
 
