@@ -10,7 +10,7 @@ import (
 
 const paramHolder = ""
 
-// Implements the QueryBuilder and Query interface
+// pgQueryBuilder implements the QueryBuilder and Query interfaces.
 type pgQueryBuilder struct {
 	db              *pg.DB
 	isTransaction   bool
