@@ -54,7 +54,7 @@ Some examples:
 
 
 
-## <a name="DBConnector">type</a> [DBConnector](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=750:1543#L30)
+## <a name="DBConnector">type</a> [DBConnector](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=757:1550#L30)
 ``` go
 type DBConnector interface {
     // NewQueryBuilder returns an instance of a new QueryBuilder. Intended to be used when building a custom multi statement query
@@ -71,7 +71,7 @@ type DBConnector interface {
     MigrateDown() error
 }
 ```
-DBConnector abstracts a db connection
+DBConnector abstracts a database connection.
 
 
 
@@ -89,7 +89,7 @@ NewpostgresDB returns a DBConnector interface backed by a postgres DB
 
 
 
-## <a name="Query">type</a> [Query](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=2136:2264#L60)
+## <a name="Query">type</a> [Query](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=2134:2262#L60)
 ``` go
 type Query interface {
     // Execute runs the query and returns its result
@@ -107,7 +107,7 @@ Query provides a way to execute a query
 
 
 
-## <a name="QueryBuilder">type</a> [QueryBuilder](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=1596:2091#L46)
+## <a name="QueryBuilder">type</a> [QueryBuilder](https://github.com/dapperlabs/bamboo-node/tree/master/data/keyvalue/interface.go?s=1594:2089#L46)
 ``` go
 type QueryBuilder interface {
     // InTransaction sets a query to run in a multi statement transaction
@@ -122,7 +122,7 @@ type QueryBuilder interface {
     MustBuild() Query
 }
 ```
-QueryBuilder builds a key value query and allow
+QueryBuilder builds a key value query.
 
 
 
