@@ -1,11 +1,28 @@
 package crypto
 
-// Lengths of hashes in bytes.
+// Lengths of hash outputs in bytes.
 const (
+	HashLengthSha2_256 = 32
 	HashLengthSha3_256 = 32
-	HashLength         = HashLengthSha3_256
+	HashLengthSha3_512 = 64
+
+	HashLength = 32
 )
 
-// Hash represents the 32 byte SHA3-256 output of arbitrary data.
-// Eventually, this will change to dynamic arrays to support multiple hash algorithms and crypto agility
-type Hash [HashLength]byte
+// Hash represents the hash algorithms output types
+/*type Hash interface {
+	ToBytes() []byte
+	//Len() int
+}*/
+type Hash [32]byte
+
+// These types should implement Hash
+
+// Hash16 is 128-bits digest
+type Hash16 [16]byte
+
+// Hash32 is 256-bits digest
+type Hash32 [32]byte
+
+// Hash64 is 512-bits digest
+type Hash64 [64]byte
