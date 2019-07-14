@@ -14,14 +14,6 @@ type postgresDB struct {
 	deleteQuery Query
 }
 
-/*
-const (
-	getQuery    = "SELECT value FROM ?0 WHERE key=?1 ;"
-	setQuery    = "INSERT INTO ?0 (key, value) VALUES ('?1', '?2') ON CONFLICT (key) DO UPDATE SET value = ?2 ;"
-	deleteQuery = "DELETE FROM ?0 WHERE key=?1 ;"
-)
-*/
-
 // NewpostgresDB returns a DBConnector interface backed by a postgres DB
 func NewpostgresDB(addr, user, password, dbname string) DBConnector {
 	options := &pg.Options{

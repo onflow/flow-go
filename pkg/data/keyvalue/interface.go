@@ -15,13 +15,13 @@ Some examples:
   _, err := dbConn.DeleteQuery.Execute("foo_collection", "key1")
 
   // Custom query with transaction
-  setFooAndBar := dbConn.NewQueryBuilder().
-	  AddSet("foo_collection").
-	  AddSet("bar_collection").
+  set2Keys := dbConn.NewQueryBuilder().
+	  AddSet().
+	  AddSet().
 	  InTransaction().
 	  MustBuild()
 
-  _, err := setFooAndBar.Execute("key1", "value1", "key2", "value2")
+  _, err := set2Keys.Execute("foo_collection", "key1", "value1", "bar_collection", "key2", "value2")
 ```
 */
 package keyvalue
