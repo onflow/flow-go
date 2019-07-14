@@ -47,11 +47,11 @@ type QueryBuilder interface {
 	// InTransaction sets a query to run in a multi statement transaction
 	InTransaction() QueryBuilder
 	// AddGet adds a get statement
-	AddGet(namespace string) QueryBuilder
+	AddGet() QueryBuilder
 	// AddSet adds a set statement
-	AddSet(namespace string) QueryBuilder
+	AddSet() QueryBuilder
 	// AddDelete adds a delete statement
-	AddDelete(namespace string) QueryBuilder
+	AddDelete() QueryBuilder
 	// MustBuild is intended to be called once per query on server startup for performance considerations of some providers.
 	MustBuild() Query
 }
