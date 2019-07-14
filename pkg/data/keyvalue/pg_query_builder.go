@@ -16,13 +16,12 @@ const (
 	deleteStatement
 )
 
-// pgQueryBuilder implements the QueryBuilder and Query interfaces.
+// pgQueryBuilder implements the QueryBuilder interface.
 type pgQueryBuilder struct {
 	db            *pg.DB
 	isTransaction bool
 	paramCount    int
 	statements    []statement
-	hasGet        bool // could be derived with getStatementsCount(), but stored for Execute() optimisation
 }
 
 // InTransaction sets a query to run in a multi-statement transaction.
