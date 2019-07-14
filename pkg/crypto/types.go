@@ -5,16 +5,7 @@ const (
 	HashLengthSha2_256 = 32
 	HashLengthSha3_256 = 32
 	HashLengthSha3_512 = 64
-
-	HashLength = 32
 )
-
-// Hash represents the hash algorithms output types
-/*type Hash interface {
-	ToBytes() []byte
-	//Len() int
-}*/
-type Hash [32]byte
 
 // These types should implement Hash
 

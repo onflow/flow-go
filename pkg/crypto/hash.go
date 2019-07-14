@@ -12,15 +12,18 @@ import (
 //-----------------------------------------------
 func InitHashAlgo(name string) Hasher {
 	if name == "SHA3_256" {
-		s := sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}}
+		s := &(sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}})
 		// Output length sanity check
 		if s.outputLength != s.Size() {
-			log.Error("the hashing algorithm requested is not supported")
+			log.Errorf("%x requires an output length %d", name, s.Size())
+			return nil
+		} else {
+			return s
 		}
-		return &s
+	} else {
+		log.Errorf("the hashing algorithm %x is not supported", name)
+		return nil
 	}
-	log.Error("the hashing algorithm requested is not supported")
-	return nil
 }
 
 // Hasher interface
@@ -46,7 +49,6 @@ type Hasher interface {
 type HashAlgo struct {
 	name         string
 	outputLength int
-	//h            hash.Hash
 	hash.Hash
 }
 
@@ -54,11 +56,6 @@ type HashAlgo struct {
 func (s *HashAlgo) GetName() string {
 	return s.name
 }
-
-// GetOutputLength returns the hash output length of the algorithm
-/*func (s *HashAlgo) GetOutputLength() int {
-	return s.outputLength
-}*/
 
 // ComputeBytesHash is an obsolete function that gets overritten
 func (s *HashAlgo) ComputeBytesHash([]byte) Hash {
@@ -96,38 +93,28 @@ type sha3_256Algo struct {
 
 // ComputeBytesHash calculates and returns the SHA3-256 output of input byte array
 func (s *sha3_256Algo) ComputeBytesHash(data []byte) Hash {
-	/*s.h.Reset()
-	s.h.Write(data)
-	var digest Hash // 32
-	s.h.Sum(digest[:0])
-	return digest*/
 	s.Reset()
 	s.Write(data)
-	var digest Hash // 32
+	var digest Hash32
 	s.Sum(digest[:0])
-	return digest
+	return &digest
 }
 
 // ComputeStructHash calculates and returns the SHA3-256 output of any input structure
 func (s *sha3_256Algo) ComputeStructHash(struc Encoder) Hash {
-	/*s.h.Reset()
-	s.h.Write(struc.Encode())
-	var digest Hash // 32
-	s.h.Sum(digest[:0])
-	return digest*/
 	s.Reset()
 	s.Write(struc.Encode())
-	var digest Hash // 32
+	var digest Hash32
 	s.Sum(digest[:0])
-	return digest
+	return &digest
 }
 
 // SumHash returns the SHA3-256 output and resets the hash state
 func (s *sha3_256Algo) SumHash() Hash {
-	var digest Hash // 32
+	var digest Hash32
 	s.Sum(digest[:0])
 	s.Reset()
-	return digest
+	return &digest
 }
 
 // Encoder should be implemented by structures to be hashed
@@ -139,39 +126,36 @@ type Encoder interface {
 
 // Hash type tools
 //----------------------
-
-// BytesToHash sets b to hash.
-// If b is larger than HashLength, b will be cropped from the right.
-func BytesToHash(b []byte) Hash {
-	if HashLength < len(b) {
-		log.Warn("the array is cropped from the right")
-	}
-	var h Hash
-	// number of copied bytes is min(len(b), HashLength)
-	copy(h[0:], b)
-	// clear the remaining bytes of h
-	for i := len(b); i < HashLength; i++ {
-		h[i] = 0
-	}
-	return h
+// Hash is the hash algorithms output types
+type Hash interface {
+	ToBytes() []byte
+	String() string
+	IsEqual(Hash) bool
 }
 
-// ToBytes sets a hash to b
-// ToBytes gets the byte representation of the underlying hash.
-func (h Hash) ToBytes() []byte {
+// Hash32 implements Hash
+//----------------------
+
+// ToBytes returns the byte representation of a hash.
+func (h *Hash32) ToBytes() []byte {
 	return h[:]
 }
 
-// Hex converts a hash to a hex string.
-func (h Hash) Hex() string { return hexutil.Encode(h[:]) }
-
-// String implements the stringer interface and is used also by the logger when
-// doing full logging into a file.
-func (h Hash) String() string {
-	return h.Hex()
+// String implements the stringer interface
+func (h *Hash32) String() string {
+	return hexutil.Encode(h[:])
 }
 
 // IsEqual checks if a hash is equal to an input hash
-func (h Hash) IsEqual(input *Hash) bool {
-	return h.IsEqual(input)
+func (h *Hash32) IsEqual(input Hash) bool {
+	inputBytes := input.ToBytes()
+	if len(h) != len(inputBytes) {
+		return false
+	}
+	for i := 0; i < len(h); i++ {
+		if h[i] != inputBytes[i] {
+			return false
+		}
+	}
+	return true
 }
