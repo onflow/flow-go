@@ -1,8 +1,6 @@
 package main
 
-import (
-	"github.com/dapperlabs/bamboo-node/internal/nodes/execute"
-)
+import "github.com/dapperlabs/bamboo-node/internal/roles/execute"
 
 func main() {
 	server, err := execute.InitializeServer()

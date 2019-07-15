@@ -8,6 +8,8 @@ import "shared/messages.proto";
 
 
 service CollectService {
+  rpc Ping(PingRequest) returns (PingResponse);
+
   rpc SubmitTransaction (SubmitTransactionRequest) returns (SubmitTransactionResponse);
 
   rpc SubmitCollection (SubmitCollectionRequest) returns (SubmitCollectionResponse);
@@ -17,6 +19,12 @@ service CollectService {
   rpc GetCollection (GetCollectionRequest) returns (GetCollectionResponse);
 }
 
+
+message PingRequest {}
+
+message PingResponse {
+  bytes address = 1;
+}
 
 message SubmitTransactionRequest {
   bamboo.shared.SignedTransaction transaction = 1;
