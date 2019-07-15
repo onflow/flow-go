@@ -14,10 +14,9 @@ func InitSignatureAlgo(name string) Signer {
 			PubKeyLengthBLS_BLS12381,
 			SignatureLengthBLS_BLS12381}})
 		return s
-	} else {
-		log.Errorf("the signature algorithm %x is not supported", name)
-		return nil
 	}
+	log.Errorf("the signature algorithm %x is not supported", name)
+	return nil
 }
 
 // Signer interface
