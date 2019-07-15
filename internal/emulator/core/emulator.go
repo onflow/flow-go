@@ -26,14 +26,15 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) {
 		return
 	}
 	b.txPool[tx.Hash()] = tx
+	b.worldState.InsertTransaction(tx)
 }
 
 func (b *EmulatedBlockchain) CommitBlock() {
 	txHashes := make([]crypto.Hash, 0)
-	for hash, tx := range b.txPool {
+	for hash := range b.txPool {
 		txHashes = append(txHashes, hash)
-		b.worldState.InsertTransaction(tx)
 	}
+	b.txPool = make(map[crypto.Hash]*types.SignedTransaction)
 
 	prevBlock := b.worldState.GetLatestBlock()
 	block := &types.Block{
