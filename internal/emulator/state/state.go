@@ -36,6 +36,11 @@ func NewWorldState() *WorldState {
 	}
 }
 
+func (ws *WorldState) Hash() crypto.Hash {
+	bytes := ws.Encode()
+	return crypto.NewHash(bytes)
+}
+
 func (ws *WorldState) GetLatestBlock() *types.Block {
 	ws.blockchainMutex.RLock()
 	currHeight := len(ws.Blockchain)

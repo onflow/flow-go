@@ -72,3 +72,11 @@ func (b *EmulatedBlockchain) updateWorldStateStore() {
 
 	b.worldStateStore[worldStateHash] = bytes
 }
+
+func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
+	if bytes, ok := b.worldStateStore[hash]; ok {
+		ws := state.Decode(bytes)
+		b.worldState = ws
+		b.txPool = make(map[crypto.Hash]*types.SignedTransaction)
+	}
+}
