@@ -3,20 +3,21 @@ package core
 import (
 	"time"
 
+	"github.com/dapperlabs/bamboo-node/internal/emulator/state"
 	"github.com/dapperlabs/bamboo-node/internal/emulator/types"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
 type EmulatedBlockchain struct {
-	worldStateStore map[crypto.Hash]*WorldState
-	worldState      *WorldState
+	worldStateStore map[crypto.Hash][]byte
+	worldState      *state.WorldState
 	txPool          map[crypto.Hash]*types.SignedTransaction
 }
 
 func NewEmulatedBlockchain() *EmulatedBlockchain {
 	return &EmulatedBlockchain{
-		worldStateStore: make(map[crypto.Hash]*WorldState),
-		worldState:      NewWorldState(),
+		worldStateStore: make(map[crypto.Hash][]byte),
+		worldState:      state.NewWorldState(),
 		txPool:          make(map[crypto.Hash]*types.SignedTransaction),
 	}
 }
@@ -27,6 +28,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) {
 	}
 	b.txPool[tx.Hash()] = tx
 	b.worldState.InsertTransaction(tx)
+	b.updateWorldStateStore()
 }
 
 func (b *EmulatedBlockchain) CommitBlock() {
@@ -45,6 +47,7 @@ func (b *EmulatedBlockchain) CommitBlock() {
 	}
 
 	b.worldState.InsertBlock(block)
+	b.updateWorldStateStore()
 }
 
 func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTransaction {
@@ -57,4 +60,15 @@ func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTrans
 
 func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account {
 	return b.worldState.GetAccount(address)
+}
+
+func (b *EmulatedBlockchain) updateWorldStateStore() {
+	bytes := b.worldState.Encode()
+	worldStateHash := crypto.NewHash(bytes)
+
+	if _, exists := b.worldStateStore[worldStateHash]; exists {
+		return
+	}
+
+	b.worldStateStore[worldStateHash] = bytes
 }
