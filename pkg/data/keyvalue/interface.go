@@ -15,13 +15,13 @@ Some examples:
   _, err := dbConn.DeleteQuery.Execute("foo_collection", "key1")
 
   // Custom query with transaction
-  setFooAndBar := dbConn.NewQueryBuilder().
-	  AddSet("foo_collection").
-	  AddSet("bar_collection").
+  set2Keys := dbConn.NewQueryBuilder().
+	  AddSet().
+	  AddSet().
 	  InTransaction().
 	  MustBuild()
 
-  _, err := setFooAndBar.Execute("key1", "value1", "key2", "value2")
+  _, err := set2Keys.Execute("foo_collection", "key1", "value1", "bar_collection", "key2", "value2")
 ```
 */
 package keyvalue
@@ -47,11 +47,11 @@ type QueryBuilder interface {
 	// InTransaction sets a query to run in a multi statement transaction
 	InTransaction() QueryBuilder
 	// AddGet adds a get statement
-	AddGet(namespace string) QueryBuilder
+	AddGet() QueryBuilder
 	// AddSet adds a set statement
-	AddSet(namespace string) QueryBuilder
+	AddSet() QueryBuilder
 	// AddDelete adds a delete statement
-	AddDelete(namespace string) QueryBuilder
+	AddDelete() QueryBuilder
 	// MustBuild is intended to be called once per query on server startup for performance considerations of some providers.
 	MustBuild() Query
 }
