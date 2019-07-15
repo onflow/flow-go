@@ -9,17 +9,17 @@ import (
 
 // InitHashAlgo initializes and chooses a hashing algorithm
 //-----------------------------------------------
-func InitHashAlgo(name string) Hasher {
-	if name == "SHA3_256" {
-		s := &(sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}})
+func InitHashAlgo(i AlgoIndex) Hasher {
+	if i == SHA3_256 {
+		s := &(sha3_256Algo{&HashAlgo{i.String(), HashLengthSha3_256, sha3.New256()}})
 		// Output length sanity check
 		if s.outputLength != s.Size() {
-			log.Errorf("%x requires an output length %d", name, s.Size())
+			log.Errorf("%s requires an output length %d", i.String(), s.Size())
 			return nil
 		}
 		return s
 	}
-	log.Errorf("the hashing algorithm %x is not supported", name)
+	log.Errorf("the hashing algorithm requested is not supported.")
 	return nil
 }
 

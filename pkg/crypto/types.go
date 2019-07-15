@@ -1,5 +1,24 @@
 package crypto
 
+// AlgoIndex is the supported algos type
+type AlgoIndex int
+
+const (
+	// Hashing supported algorithms
+	SHA3_256 AlgoIndex = iota
+
+	// Signing supported algorithms
+	BLS_BLS12381
+)
+
+func (i AlgoIndex) String() string {
+	return []string{
+		// Hashing supported algorithms
+		"SHA3_256",
+		// Signing supported algorithms
+		"BLS_BLS12381"}[i]
+}
+
 const (
 	// Lengths of hash outputs in bytes
 	HashLengthSha2_256 = 32

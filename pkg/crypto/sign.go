@@ -6,16 +6,16 @@ import (
 
 // InitSignatureAlgo initializes and chooses a signature scheme
 //-----------------------------------------------
-func InitSignatureAlgo(name string) Signer {
-	if name == "BLS_BLS12381" {
+func InitSignatureAlgo(i AlgoIndex) Signer {
+	if i == BLS_BLS12381 {
 		s := &(BLS_BLS12381Algo{&SignAlgo{
-			name,
+			i.String(),
 			PrKeyLengthBLS_BLS12381,
 			PubKeyLengthBLS_BLS12381,
 			SignatureLengthBLS_BLS12381}})
 		return s
 	}
-	log.Errorf("the signature algorithm %x is not supported", name)
+	log.Errorf("the requested signature scheme is not supported.")
 	return nil
 }
 

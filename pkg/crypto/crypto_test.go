@@ -25,7 +25,7 @@ func TestSha3_256(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80")
 
-	alg := InitHashAlgo("SHA3_256")
+	alg := InitHashAlgo(SHA3_256)
 	hash := alg.ComputeBytesHash(input).ToBytes()
 	checkBytes(t, input, expected, hash)
 
@@ -52,7 +52,7 @@ func checkBytes(t *testing.T, input, expected, result []byte) {
 // ------------------------------------------------
 func BenchmarkSha3_256(b *testing.B) {
 	a := []byte("Bench me!")
-	alg := InitHashAlgo("SHA3_256")
+	alg := InitHashAlgo(SHA3_256)
 	for i := 0; i < b.N; i++ {
 		alg.ComputeBytesHash(a)
 	}
@@ -64,10 +64,10 @@ func BenchmarkSha3_256(b *testing.B) {
 func TestBLS_BLS12381(t *testing.T) {
 	fmt.Println("testing BLS on bls12_381:")
 	input := []byte("test")
-	halg := InitHashAlgo("SHA3_256")
+	halg := InitHashAlgo(SHA3_256)
 	h := halg.ComputeBytesHash(input)
 
-	salg := InitSignatureAlgo("BLS_BLS12381")
+	salg := InitSignatureAlgo(BLS_BLS12381)
 	sk := salg.GeneratePrKey()
 	pk := sk.GetPubkey()
 
