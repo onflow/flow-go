@@ -128,25 +128,24 @@ type Encoder interface {
 //----------------------
 // Hash is the hash algorithms output types
 type Hash interface {
+	// ToBytes returns the bytes representation of a hash
 	ToBytes() []byte
+	// String returns a Hex string representation of the hash bytes
 	String() string
+	// IsEqual tests an equality with a given hash
 	IsEqual(Hash) bool
 }
 
 // Hash32 implements Hash
 //----------------------
-
-// ToBytes returns the byte representation of a hash.
 func (h *Hash32) ToBytes() []byte {
 	return h[:]
 }
 
-// String implements the stringer interface
 func (h *Hash32) String() string {
 	return hexutil.Encode(h[:])
 }
 
-// IsEqual checks if a hash is equal to an input hash
 func (h *Hash32) IsEqual(input Hash) bool {
 	inputBytes := input.ToBytes()
 	if len(h) != len(inputBytes) {

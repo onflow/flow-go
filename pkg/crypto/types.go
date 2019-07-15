@@ -1,19 +1,26 @@
 package crypto
 
-// Lengths of hash outputs in bytes.
 const (
+	// Lengths of hash outputs in bytes
 	HashLengthSha2_256 = 32
 	HashLengthSha3_256 = 32
 	HashLengthSha3_512 = 64
+
+	// BLS signature scheme lengths
+
+	// BLS12-381
+	SignatureLengthBLS_BLS12381 = 48
+	PrKeyLengthBLS_BLS12381     = 32
+	PubKeyLengthBLS_BLS12381    = 96
 )
 
 // These types should implement Hash
-
-// Hash16 is 128-bits digest
-type Hash16 [16]byte
 
 // Hash32 is 256-bits digest
 type Hash32 [32]byte
 
 // Hash64 is 512-bits digest
 type Hash64 [64]byte
+
+// Signature48 is 384-bits signature
+type Signature48 [48]byte
