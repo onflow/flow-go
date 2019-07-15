@@ -8,7 +8,7 @@ import (
 )
 
 type WorldState struct {
-	accounts          map[crypto.Address]crypto.Account
+	accounts          map[crypto.Address]*crypto.Account
 	accountsMutex     sync.RWMutex
 	blocks            map[crypto.Hash]*types.Block
 	blocksMutex       sync.RWMutex
@@ -19,7 +19,7 @@ type WorldState struct {
 }
 
 func NewWorldState() *WorldState {
-	accounts := make(map[crypto.Address]crypto.Account)
+	accounts := make(map[crypto.Address]*crypto.Account)
 	blocks := make(map[crypto.Hash]*types.Block)
 	blockchain := make([]crypto.Hash, 0)
 	transactions := make(map[crypto.Hash]*types.SignedTransaction)
@@ -83,6 +83,17 @@ func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction 
 	return nil
 }
 
+func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
+	ws.accountsMutex.RLock()
+	defer ws.accountsMutex.RUnlock()
+
+	if account, ok := ws.accounts[address]; ok {
+		return account
+	}
+
+	return nil
+}
+
 func (ws *WorldState) InsertBlock(block *types.Block) {
 	ws.blocksMutex.Lock()
 	defer ws.blocksMutex.Unlock()
@@ -106,4 +117,15 @@ func (ws *WorldState) InsertTransaction(tx *types.SignedTransaction) {
 	}
 
 	ws.transactions[tx.Hash()] = tx
+}
+
+func (ws *WorldState) InsertAccount(account *crypto.Account) {
+	ws.accountsMutex.Lock()
+	defer ws.accountsMutex.Unlock()
+
+	if _, exists := ws.accounts[account.Address]; exists {
+		return
+	}
+
+	ws.accounts[account.Address] = account
 }

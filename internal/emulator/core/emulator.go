@@ -46,3 +46,15 @@ func (b *EmulatedBlockchain) CommitBlock() {
 
 	b.worldState.InsertBlock(block)
 }
+
+func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTransaction {
+	if tx, ok := b.txPool[hash]; ok {
+		return tx
+	}
+
+	return b.worldState.GetTransaction(hash)
+}
+
+func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account {
+	return b.worldState.GetAccount(address)
+}
