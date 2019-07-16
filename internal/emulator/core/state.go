@@ -3,14 +3,15 @@ package core
 import (
 	"sync"
 
-	"github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 type WorldState struct {
 	accounts          map[crypto.Address]*crypto.Account
 	accountsMutex     sync.RWMutex
-	blocks            map[crypto.Hash]*types.Block
+	blocks            map[crypto.Hash]*etypes.Block
 	blocksMutex       sync.RWMutex
 	blockchain        []crypto.Hash
 	blockchainMutex   sync.RWMutex
@@ -22,12 +23,12 @@ type WorldState struct {
 
 func NewWorldState() *WorldState {
 	accounts := make(map[crypto.Address]*crypto.Account)
-	blocks := make(map[crypto.Hash]*types.Block)
+	blocks := make(map[crypto.Hash]*etypes.Block)
 	blockchain := make([]crypto.Hash, 0)
 	transactions := make(map[crypto.Hash]*types.SignedTransaction)
 	registers := make(map[crypto.Hash][]byte)
 
-	genesis := types.GenesisBlock()
+	genesis := etypes.GenesisBlock()
 	blocks[genesis.Hash()] = genesis
 	blockchain = append(blockchain, genesis.Hash())
 
@@ -40,7 +41,7 @@ func NewWorldState() *WorldState {
 	}
 }
 
-func (ws *WorldState) GetLatestBlock() *types.Block {
+func (ws *WorldState) GetLatestBlock() *etypes.Block {
 	ws.blockchainMutex.RLock()
 	currHeight := len(ws.blockchain)
 	blockHash := ws.blockchain[currHeight-1]
@@ -50,7 +51,7 @@ func (ws *WorldState) GetLatestBlock() *types.Block {
 	return block
 }
 
-func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *types.Block {
+func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 	ws.blocksMutex.RLock()
 	defer ws.blocksMutex.RUnlock()
 
@@ -61,7 +62,7 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *types.Block {
 	return nil
 }
 
-func (ws *WorldState) GetBlockByHeight(height uint64) *types.Block {
+func (ws *WorldState) GetBlockByHeight(height uint64) *etypes.Block {
 	ws.blockchainMutex.RLock()
 	currHeight := len(ws.blockchain)
 
@@ -112,7 +113,7 @@ func (ws *WorldState) SetRegister(hash crypto.Hash, value []byte) {
 	ws.registers[hash] = value
 }
 
-func (ws *WorldState) CommitRegisters(registers types.Registers) {
+func (ws *WorldState) CommitRegisters(registers etypes.Registers) {
 	ws.registersMutex.Lock()
 
 	for hash, value := range registers {
@@ -122,7 +123,7 @@ func (ws *WorldState) CommitRegisters(registers types.Registers) {
 	ws.registersMutex.Unlock()
 }
 
-func (ws *WorldState) InsertBlock(block *types.Block) {
+func (ws *WorldState) InsertBlock(block *etypes.Block) {
 	ws.blocksMutex.Lock()
 	defer ws.blocksMutex.Unlock()
 	if _, exists := ws.blocks[block.Hash()]; exists {

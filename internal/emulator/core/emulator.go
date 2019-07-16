@@ -3,9 +3,10 @@ package core
 import (
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 	"github.com/dapperlabs/bamboo-node/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 type EmulatedBlockchain struct {
@@ -50,7 +51,7 @@ func (b *EmulatedBlockchain) CommitBlock() {
 	b.txPool = make(map[crypto.Hash]*types.SignedTransaction)
 
 	prevBlock := b.worldState.GetLatestBlock()
-	block := &types.Block{
+	block := &etypes.Block{
 		Height:            prevBlock.Height + 1,
 		Timestamp:         time.Now(),
 		PreviousBlockHash: prevBlock.Hash(),

@@ -1,11 +1,10 @@
 package core
 
 import (
-	"fmt"
-
-	"github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 	"github.com/dapperlabs/bamboo-node/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 // Computer executes blocks and saves results to the world state.
@@ -40,13 +39,16 @@ func getFullKey(controller, owner, key []byte) crypto.Hash {
 	return crypto.NewHash(fullKey)
 }
 
-func (c *Computer) ExecuteTransaction(tx *types.SignedTransaction, readBlockRegister func(crypto.Hash) []byte) (types.Registers, bool) {
-	txRegisters := make(types.Registers)
+func (c *Computer) ExecuteTransaction(
+	tx *types.SignedTransaction,
+	readRegister func(crypto.Hash) []byte,
+) (etypes.Registers, bool) {
+	txRegisters := make(etypes.Registers)
 
 	runtimeInterface := &runtimeInterface{
 		getValue: func(controller, owner, key []byte) ([]byte, error) {
 			fullKey := getFullKey(controller, owner, key)
-			return readBlockRegister(fullKey), nil
+			return readRegister(fullKey), nil
 		},
 		setValue: func(controller, owner, key, value []byte) error {
 			fullKey := getFullKey(controller, owner, key)
@@ -55,9 +57,7 @@ func (c *Computer) ExecuteTransaction(tx *types.SignedTransaction, readBlockRegi
 		},
 	}
 
-	err := c.runtime.ExecuteScript(tx.Transaction.Script, runtimeInterface)
-
-	fmt.Println("REGISTERS", txRegisters)
+	err := c.runtime.ExecuteScript(tx.Script, runtimeInterface)
 
 	return txRegisters, err == nil
 }
