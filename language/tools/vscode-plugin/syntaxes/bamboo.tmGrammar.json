@@ -2,7 +2,8 @@
     "scopeName": "source.bamboo",
     "patterns": [
       { "include": "#comments" },
-      { "include": "#literals" }
+      { "include": "#literals" },
+      { "include": "#operators" }
     ],
     "repository": {
       "comments": {
@@ -236,6 +237,46 @@
             }
           }
         }
+      },
+      "operators": {
+        "patterns": [
+          {
+            "match": "\\-",
+            "name": "keyword.operator.arithmetic.unary.bamboo"
+          },
+          {
+            "match": "!",
+            "name": "keyword.operator.logical.not.bamboo"
+          },
+          {
+            "match": "=",
+            "name": "keyword.operator.assignment.bamboo"
+          },
+          {
+            "match": "\\+|\\-|\\*|/",
+            "name": "keyword.operator.arithmetic.bamboo"
+          },
+          {
+            "match": "&(\\+|\\-|\\*)",
+            "name": "keyword.operator.arithmetic.overflow.bamboo"
+          },
+          {
+            "match": "%",
+            "name": "keyword.operator.arithmetic.remainder.bamboo"
+          },
+          {
+            "match": "==|!=|>|<|>=|<=",
+            "name": "keyword.operator.comparison.bamboo"
+          },
+          {
+            "match": "\\?\\?",
+            "name": "keyword.operator.coalescing.bamboo"
+          },
+          {
+            "match": "&&|\\|\\|",
+            "name": "keyword.operator.logical.bamboo"
+          }
+        ]
       }
     }
   }
