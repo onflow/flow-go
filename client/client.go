@@ -8,15 +8,15 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
 	"github.com/dapperlabs/bamboo-node/internal/emulator/data"
-	"github.com/dapperlabs/bamboo-node/grpc/services/accessv1"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 type Client struct {
 	conn       *grpc.ClientConn
-	grpcClient accessv1.BambooAccessAPIClient
+	grpcClient observe.ObserveServiceClient
 }
 
 func New(host string, port int) (*Client, error) {
@@ -27,7 +27,7 @@ func New(host string, port int) (*Client, error) {
 		return nil, err
 	}
 
-	grpcClient := accessv1.NewBambooAccessAPIClient(conn)
+	grpcClient := observe.NewObserveServiceClient(conn)
 
 	return &Client{
 		conn:       conn,
@@ -41,12 +41,12 @@ func (c *Client) Close() {
 
 // SendTransaction submits a transaction to an access node.
 func (c *Client) SendTransaction(ctx context.Context, tx *types.SignedTransaction) error {
-	txMsg := &accessv1.SendTransactionRequest_Transaction{
+	txMsg := &observe.SendTransactionRequest_Transaction{
 		ToAddress:    tx.ToAddress.Bytes(),
 		Script:       tx.Script,
 		Nonce:        tx.Nonce,
 		ComputeLimit: tx.ComputeLimit,
-		PayerSignature: &accessv1.Signature{
+		PayerSignature: &observe.Signature{
 			AccountAddress: tx.PayerSignature.Account.Bytes(),
 			Signature:      tx.PayerSignature.Sig,
 		},
@@ -54,7 +54,7 @@ func (c *Client) SendTransaction(ctx context.Context, tx *types.SignedTransactio
 
 	_, err := c.grpcClient.SendTransaction(
 		ctx,
-		&accessv1.SendTransactionRequest{Transaction: txMsg},
+		&observe.SendTransactionRequest{Transaction: txMsg},
 	)
 	return err
 }
@@ -63,7 +63,7 @@ func (c *Client) SendTransaction(ctx context.Context, tx *types.SignedTransactio
 func (c *Client) GetBlockByHash(ctx context.Context, h crypto.Hash) (*data.Block, error) {
 	res, err := c.grpcClient.GetBlockByHash(
 		ctx,
-		&accessv1.GetBlockByHashRequest{Hash: h.Bytes()},
+		&observe.GetBlockByHashRequest{Hash: h.Bytes()},
 	)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (c *Client) GetBlockByHash(ctx context.Context, h crypto.Hash) (*data.Block
 func (c *Client) GetBlockByNumber(ctx context.Context, n uint64) (*data.Block, error) {
 	res, err := c.grpcClient.GetBlockByNumber(
 		ctx,
-		&accessv1.GetBlockByNumberRequest{Number: n},
+		&observe.GetBlockByNumberRequest{Number: n},
 	)
 	if err != nil {
 		return nil, err
@@ -115,7 +115,7 @@ func (c *Client) GetBlockByNumber(ctx context.Context, n uint64) (*data.Block, e
 func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.SignedTransaction, error) {
 	res, err := c.grpcClient.GetTransaction(
 		ctx,
-		&accessv1.GetTransactionRequest{Hash: h.Bytes()},
+		&observe.GetTransactionRequest{Hash: h.Bytes()},
 	)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.Sign
 func (c *Client) GetAccount(ctx context.Context, a crypto.Address) (*crypto.Account, error) {
 	res, err := c.grpcClient.GetAccount(
 		ctx,
-		&accessv1.GetAccountRequest{Address: a.Bytes()},
+		&observe.GetAccountRequest{Address: a.Bytes()},
 	)
 	if err != nil {
 		return nil, err

@@ -661,6 +661,20 @@ var someValue: Any = 1
 someValue = true
 ```
 
+However, using `Any` does not opt-out of type checking. It is invalid to access fields and call functions on `Any` typed values, as it has no fields and functions.
+
+```swift
+// Declare a variable that has the type `Any`. The initial value is an integer,
+// but the variable  still has the explict type `Any`.
+//
+const a: Any = 1
+
+// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)
+// and an `Int` value (`2`, right-hand side)
+//
+a + 2
+```
+
 ### Never
 
 `Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
@@ -1637,8 +1651,7 @@ const someStruct: SomeStruct = SomeStruct()
 const someClass: SomeClass = SomeClass()
 ```
 
-Structures and classes mainly differ in their behaviour: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types. This is explained in detail in a [separate section](#structure-and-class-behaviour).
-
+Structures and classes mainly differ in their behaviour: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types. This is explained in detail in a [separate section](#structure-and-class-behaviour). Value types should be used when copies with independent state is desired, and reference types should be used when shared, mutable state is desired.
 
 ### Structure and Class Fields
 
@@ -2042,7 +2055,7 @@ Permissions for classes are declared using the `permit` keyword, followed by the
 <!-- TODO: can be used e.g. for authorizations, values that represent access rights/privileges to resources. -->
 
 ```swift,file=permissions-purse.bpl
-// Declare a class named `purse`, which holds a balance and
+// Declare a class named `Purse`, which holds a balance and
 // allows amounts to be deposited from a purse to another.
 //
 // Purses are associated with an account.
@@ -2053,8 +2066,9 @@ class Purse {
     pub const account: Account
     pub var balance: Int
 
-    init(initialBalance: Int) {
+    init(initialBalance: Int, account: Account) {
         self.balance = initialBalance
+        self.account = account
     }
 
     // Declare a function named `deposit`, which transfers an amount
@@ -2180,13 +2194,32 @@ class DepositAuth {
 permit Purse to DepositAuth
 ```
 
+```swift,file=permissions-purse-usage.bpl
+// Create a purse with an initial balance of 100 units for an account
+//
+const account: Account = // ...
+const purse = Purse(initialBalance: 100, account: account)
+
+// Create a deposit authorization for the purse, limited to 50 units.
+// Access to the authorization allows depositing up to 50 units
+// from the purse to any other purse
+//
+const storageAuth: StorageAuth = // ...
+const depositAuth = purse.makeDepositAuth(limit: 50, auth: storageAuth)
+
+// Use the deposit authorization to deposit 25 units into another purse
+//
+const receiver: Purse = // ...
+purse.deposit(to: receiver, amount: 25, auth: depositAuth)
+```
+
 ## Interfaces
 
 > 🚧 Status: Interfaces are not implemented yet.
 
 An interface is an abstract type that specifies the behavior of types that *implement* the interface. Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
 
-Interfaces can be implemented by [classes](#structures-and-classes), [structures](#structures-and-classes), [contracts](#contracts), and [authorizations](#authorizations). These types may implement multiple interfaces.
+Interfaces can be implemented by [classes](#structures-and-classes), [structures](#structures-and-classes), [contracts](#contracts). These types may implement multiple interfaces.
 
 Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Interface requirements, and therefore also their implementations, must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.
 
@@ -2302,7 +2335,7 @@ Note that the required initializer and function do not have any executable code.
 
 ### Interface Implementation
 
-Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the type (class, structure, contract, or authorization) that provides the functionality required in the interface.
+Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the type (class, structure, or contract) that provides the functionality required in the interface.
 
 ```swift,file=interface-implementation.bpl
 // Declare a class named `ExampleVault` with a variable field named `balance`,

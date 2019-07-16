@@ -4,9 +4,6 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# The result of running our build scripts
-donotcommit 
-
 # Since we have integration_tests that uses node
 node_modules
 
@@ -14,3 +11,5 @@ node_modules
 
 bamboo
 bamboo.mnemonic
+
+.idea
