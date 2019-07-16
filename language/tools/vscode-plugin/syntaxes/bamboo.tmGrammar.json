@@ -1,0 +1,137 @@
+{
+    "scopeName": "source.bamboo",
+    "patterns": [
+      { "include": "#comments" }
+    ],
+    "repository": {
+      "comments": {
+        "patterns": [
+          {
+            "captures": {
+              "1": {
+                "name": "punctuation.definition.comment.bamboo"
+              }
+            },
+            "match": "\\A^(#!).*$\\n?",
+            "name": "comment.line.number-sign.bamboo"
+          },
+          {
+            "begin": "/\\*\\*(?!/)",
+            "beginCaptures": {
+              "0": {
+                "name": "punctuation.definition.comment.begin.bamboo"
+              }
+            },
+            "end": "\\*/",
+            "endCaptures": {
+              "0": {
+                "name": "punctuation.definition.comment.end.bamboo"
+              }
+            },
+            "name": "comment.block.documentation.bamboo",
+            "patterns": [
+              {
+                "include": "#nested"
+              }
+            ]
+          },
+          {
+            "begin": "/\\*:",
+            "beginCaptures": {
+              "0": {
+                "name": "punctuation.definition.comment.begin.bamboo"
+              }
+            },
+            "end": "\\*/",
+            "endCaptures": {
+              "0": {
+                "name": "punctuation.definition.comment.end.bamboo"
+              }
+            },
+            "name": "comment.block.documentation.playground.bamboo",
+            "patterns": [
+              {
+                "include": "#nested"
+              }
+            ]
+          },
+          {
+            "begin": "/\\*",
+            "beginCaptures": {
+              "0": {
+                "name": "punctuation.definition.comment.begin.bamboo"
+              }
+            },
+            "end": "\\*/",
+            "endCaptures": {
+              "0": {
+                "name": "punctuation.definition.comment.end.bamboo"
+              }
+            },
+            "name": "comment.block.bamboo",
+            "patterns": [
+              {
+                "include": "#nested"
+              }
+            ]
+          },
+          {
+            "match": "\\*/",
+            "name": "invalid.illegal.unexpected-end-of-block-comment.bamboo"
+          },
+          {
+            "begin": "(^[ \\t]+)?(?=//)",
+            "beginCaptures": {
+              "1": {
+                "name": "punctuation.whitespace.comment.leading.bamboo"
+              }
+            },
+            "end": "(?!\\G)",
+            "patterns": [
+              {
+                "begin": "///",
+                "beginCaptures": {
+                  "0": {
+                    "name": "punctuation.definition.comment.bamboo"
+                  }
+                },
+                "end": "^",
+                "name": "comment.line.triple-slash.documentation.bamboo"
+              },
+              {
+                "begin": "//:",
+                "beginCaptures": {
+                  "0": {
+                    "name": "punctuation.definition.comment.bamboo"
+                  }
+                },
+                "end": "^",
+                "name": "comment.line.double-slash.documentation.bamboo"
+              },
+              {
+                "begin": "//",
+                "beginCaptures": {
+                  "0": {
+                    "name": "punctuation.definition.comment.bamboo"
+                  }
+                },
+                "end": "^",
+                "name": "comment.line.double-slash.bamboo"
+              }
+            ]
+          }
+        ],
+        "repository": {
+          "nested": {
+            "begin": "/\\*",
+            "end": "\\*/",
+            "patterns": [
+              {
+                "include": "#nested"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
