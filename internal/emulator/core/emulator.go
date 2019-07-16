@@ -8,17 +8,22 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
+// EmulatedBlockchain simulates a blockchain in the background to enable easy smart contract testing.
+// Contains a versioned World State store for granular state update tests.
 type EmulatedBlockchain struct {
-	worldStateStore map[crypto.Hash][]byte
-	worldState      *state.WorldState
-	txPool          map[crypto.Hash]*types.SignedTransaction
+	worldStates             map[crypto.Hash][]byte
+	intermediateWorldStates map[crypto.Hash][]byte
+	pendingWorldState       *state.WorldState
+	txPool                  map[crypto.Hash]*types.SignedTransaction
 }
 
+// NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
 func NewEmulatedBlockchain() *EmulatedBlockchain {
 	return &EmulatedBlockchain{
-		worldStateStore: make(map[crypto.Hash][]byte),
-		worldState:      state.NewWorldState(),
-		txPool:          make(map[crypto.Hash]*types.SignedTransaction),
+		worldStates:             make(map[crypto.Hash][]byte),
+		intermediateWorldStates: make(map[crypto.Hash][]byte),
+		pendingWorldState:       state.NewWorldState(),
+		txPool:                  make(map[crypto.Hash]*types.SignedTransaction),
 	}
 }
 
@@ -27,8 +32,8 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) {
 		return
 	}
 	b.txPool[tx.Hash()] = tx
-	b.worldState.InsertTransaction(tx)
-	b.updateWorldStateStore()
+	b.pendingWorldState.InsertTransaction(tx)
+	b.updatePendingWorldStates()
 }
 
 func (b *EmulatedBlockchain) CommitBlock() {
@@ -38,7 +43,7 @@ func (b *EmulatedBlockchain) CommitBlock() {
 	}
 	b.txPool = make(map[crypto.Hash]*types.SignedTransaction)
 
-	prevBlock := b.worldState.GetLatestBlock()
+	prevBlock := b.pendingWorldState.GetLatestBlock()
 	block := &types.Block{
 		Height:            prevBlock.Height + 1,
 		Timestamp:         time.Now(),
@@ -46,8 +51,8 @@ func (b *EmulatedBlockchain) CommitBlock() {
 		TransactionHashes: txHashes,
 	}
 
-	b.worldState.InsertBlock(block)
-	b.updateWorldStateStore()
+	b.pendingWorldState.InsertBlock(block)
+	b.commitWorldState()
 }
 
 func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTransaction {
@@ -55,28 +60,43 @@ func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTrans
 		return tx
 	}
 
-	return b.worldState.GetTransaction(hash)
+	return b.pendingWorldState.GetTransaction(hash)
 }
 
 func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account {
-	return b.worldState.GetAccount(address)
+	return b.pendingWorldState.GetAccount(address)
 }
 
-func (b *EmulatedBlockchain) updateWorldStateStore() {
-	bytes := b.worldState.Encode()
+func (b *EmulatedBlockchain) updatePendingWorldStates() {
+	bytes := b.pendingWorldState.Encode()
 	worldStateHash := crypto.NewHash(bytes)
 
-	if _, exists := b.worldStateStore[worldStateHash]; exists {
+	if _, exists := b.intermediateWorldStates[worldStateHash]; exists {
 		return
 	}
 
-	b.worldStateStore[worldStateHash] = bytes
+	if _, exists := b.worldStates[worldStateHash]; exists {
+		return
+	}
+
+	b.intermediateWorldStates[worldStateHash] = bytes
+}
+
+func (b *EmulatedBlockchain) commitWorldState() {
+	bytes := b.pendingWorldState.Encode()
+	worldStateHash := crypto.NewHash(bytes)
+
+	if _, exists := b.worldStates[worldStateHash]; exists {
+		return
+	}
+
+	b.worldStates[worldStateHash] = bytes
 }
 
 func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
-	if bytes, ok := b.worldStateStore[hash]; ok {
+	if bytes, ok := b.worldStates[hash]; ok {
 		ws := state.Decode(bytes)
-		b.worldState = ws
+		b.pendingWorldState = ws
 		b.txPool = make(map[crypto.Hash]*types.SignedTransaction)
 	}
 }
