@@ -23,7 +23,8 @@
 		"languages": [
 			{
 			  "id": "bamboo",
-			  "extensions": [".bpl"]
+			  "extensions": [".bpl"],
+			  "configuration": "./language-configuration.json"
 			}
 		],
 		"grammars": [
