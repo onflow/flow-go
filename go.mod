@@ -14,23 +14,19 @@ require (
 	github.com/go-pg/migrations v6.7.3+incompatible
 	github.com/go-pg/pg v8.0.4+incompatible
 	github.com/golang/protobuf v1.3.2
-	github.com/google/go-cmp v0.3.0 // indirect
 	github.com/google/wire v0.3.0
 	github.com/jinzhu/inflection v1.0.0 // indirect
-	github.com/lanre-ade/godoc2md v0.0.0-20190608225654-ce238be16ce1 // indirect
 	github.com/miguelmota/go-ethereum-hdwallet v0.0.0-20190601230056-2da794f11e15
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0
 	github.com/psiemens/sconfig v0.0.0-20190623041652-6e01eb1354fc
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
-	github.com/spf13/viper v1.4.0
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/tyler-smith/go-bip32 v0.0.0-20170922074101-2c9cfd177564
 	github.com/tyler-smith/go-bip39 v1.0.0
-	github.com/uber/prototool v1.8.1 // indirect
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
-	golang.org/x/net v0.0.0-20190628185345-da137c7871d7
+	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
 	golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb // indirect
 	golang.org/x/text v0.3.2 // indirect
 	google.golang.org/grpc v1.21.1
