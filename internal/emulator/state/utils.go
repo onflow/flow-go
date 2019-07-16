@@ -6,11 +6,11 @@ import (
 	"log"
 )
 
+// Encode serializes a World State object into bytes.
 func (ws *WorldState) Encode() []byte {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 
-	// Encode the data
 	err := enc.Encode(*ws)
 
 	if err != nil {
@@ -20,6 +20,8 @@ func (ws *WorldState) Encode() []byte {
 	return buf.Bytes()
 }
 
+// Decode takes a series of bytes that represents a World State
+// object and decodes it into the respective struct type.
 func Decode(b []byte) *WorldState {
 	var buf bytes.Buffer
 	buf.Write(b)

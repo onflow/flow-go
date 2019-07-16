@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
+// WorldState represents the current state of the blockchain.
 type WorldState struct {
 	Accounts          map[crypto.Address]*crypto.Account
 	accountsMutex     sync.RWMutex
@@ -18,6 +19,7 @@ type WorldState struct {
 	transactionsMutex sync.RWMutex
 }
 
+// NewWorldState instantiates a new state object with a genesis block.
 func NewWorldState() *WorldState {
 	accounts := make(map[crypto.Address]*crypto.Account)
 	blocks := make(map[crypto.Hash]*types.Block)
@@ -36,11 +38,13 @@ func NewWorldState() *WorldState {
 	}
 }
 
+// Hash computes the hash over the contents of World State.
 func (ws *WorldState) Hash() crypto.Hash {
 	bytes := ws.Encode()
 	return crypto.NewHash(bytes)
 }
 
+// GetLatestBlock gets the most recent block in the blockchain.
 func (ws *WorldState) GetLatestBlock() *types.Block {
 	ws.blockchainMutex.RLock()
 	currHeight := len(ws.Blockchain)
@@ -51,6 +55,7 @@ func (ws *WorldState) GetLatestBlock() *types.Block {
 	return block
 }
 
+// GetBlockByHash gets a block by hash.
 func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *types.Block {
 	ws.blocksMutex.RLock()
 	defer ws.blocksMutex.RUnlock()
@@ -62,6 +67,7 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *types.Block {
 	return nil
 }
 
+// GetBlockByHeight gets a block by number.
 func (ws *WorldState) GetBlockByHeight(height uint64) *types.Block {
 	ws.blockchainMutex.RLock()
 	currHeight := len(ws.Blockchain)
@@ -77,6 +83,7 @@ func (ws *WorldState) GetBlockByHeight(height uint64) *types.Block {
 	return nil
 }
 
+// GetTransaction gets a transaction by hash.
 func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction {
 	ws.transactionsMutex.RLock()
 	defer ws.transactionsMutex.RUnlock()
@@ -88,6 +95,7 @@ func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction 
 	return nil
 }
 
+// GetAccount gets an account by address.
 func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
 	ws.accountsMutex.RLock()
 	defer ws.accountsMutex.RUnlock()
@@ -99,6 +107,7 @@ func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
 	return nil
 }
 
+// InsertBlock adds a new block to the blockchain.
 func (ws *WorldState) InsertBlock(block *types.Block) {
 	ws.blocksMutex.Lock()
 	defer ws.blocksMutex.Unlock()
@@ -113,6 +122,7 @@ func (ws *WorldState) InsertBlock(block *types.Block) {
 	ws.blockchainMutex.Unlock()
 }
 
+// InsertTransaction inserts a new transaction into the state.
 func (ws *WorldState) InsertTransaction(tx *types.SignedTransaction) {
 	ws.transactionsMutex.Lock()
 	defer ws.transactionsMutex.Unlock()
@@ -124,6 +134,7 @@ func (ws *WorldState) InsertTransaction(tx *types.SignedTransaction) {
 	ws.Transactions[tx.Hash()] = tx
 }
 
+// InsertAccount adds a newly created account into the world state.
 func (ws *WorldState) InsertAccount(account *crypto.Account) {
 	ws.accountsMutex.Lock()
 	defer ws.accountsMutex.Unlock()
