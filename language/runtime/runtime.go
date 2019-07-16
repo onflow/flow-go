@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/language/runtime/parser"
 	"math/big"
+	"strings"
 )
 
 type RuntimeInterface interface {
@@ -15,12 +16,26 @@ type RuntimeInterface interface {
 	SetValue(controller []byte, owner []byte, key []byte, value []byte) (err error)
 }
 
+type RuntimeError struct {
+	Errors []error
+}
+
+func (e RuntimeError) Error() string {
+	var sb strings.Builder
+	sb.WriteString("Execution failed:\n")
+	for _, err := range e.Errors {
+		sb.WriteString(err.Error())
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
 // Runtime is a runtime capable of executing the Bamboo programming language.
 type Runtime interface {
 	// ExecuteScript executes the given script.
 	// It returns errors if the program has errors (e.g syntax errors, type errors),
 	// and if the execution fails.
-	ExecuteScript(script []byte, runtimeInterface RuntimeInterface) []error
+	ExecuteScript(script []byte, runtimeInterface RuntimeInterface) error
 }
 
 // mockRuntime is a mocked version of the Bamboo runtime
@@ -32,7 +47,7 @@ func NewMockRuntime() Runtime {
 	return &mockRuntime{}
 }
 
-func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) []error {
+func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) error {
 	return nil
 }
 
@@ -45,12 +60,12 @@ func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }
 
-func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) []error {
+func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) error {
 	code := string(script)
 
 	program, errs := parser.Parse(code)
 	if len(errs) > 0 {
-		return errs
+		return RuntimeError{errs}
 	}
 
 	inter := interpreter.NewInterpreter(program)
@@ -59,7 +74,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 
 	err := inter.Interpret()
 	if err != nil {
-		return []error{err}
+		return RuntimeError{[]error{err}}
 	}
 
 	if _, hasMain := inter.Globals["main"]; !hasMain {
@@ -68,7 +83,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 
 	_, err = inter.Invoke("main")
 	if err != nil {
-		return []error{err}
+		return RuntimeError{[]error{err}}
 	}
 
 	return nil
