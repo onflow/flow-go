@@ -29,6 +29,7 @@ generate-godoc:
 
 .PHONY: generate-proto
 generate-proto:
+	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go
 	GO111MODULE=on go run github.com/uber/prototool/cmd/prototool generate proto/
 
 .PHONY: generate-wire

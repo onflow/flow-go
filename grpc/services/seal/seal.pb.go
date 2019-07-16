@@ -4,12 +4,14 @@
 package seal
 
 import (
+	context "context"
 	fmt "fmt"
 	shared "github.com/dapperlabs/bamboo-node/grpc/shared"
 	proto "github.com/golang/protobuf/proto"
 	empty "github.com/golang/protobuf/ptypes/empty"
-	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -22,7 +24,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type PingRequest struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -208,6 +210,17 @@ func (c *sealServiceClient) SubmitResultApproval(ctx context.Context, in *Submit
 type SealServiceServer interface {
 	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	SubmitResultApproval(context.Context, *SubmitResultApprovalRequest) (*empty.Empty, error)
+}
+
+// UnimplementedSealServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedSealServiceServer struct {
+}
+
+func (*UnimplementedSealServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
+func (*UnimplementedSealServiceServer) SubmitResultApproval(ctx context.Context, req *SubmitResultApprovalRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitResultApproval not implemented")
 }
 
 func RegisterSealServiceServer(s *grpc.Server, srv SealServiceServer) {
