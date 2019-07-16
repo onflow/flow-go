@@ -75,7 +75,7 @@ func TestSubmitRevertedTransaction(t *testing.T) {
 	}
 
 	err := b.SubmitTransaction(txA)
-	Expect(err).To(MatchError(&core.ErrTransactionReverted{TxHash: txA.Hash()}))
+	Expect(err).To(HaveOccurred())
 
 	txB := b.GetTransaction(txA.Hash())
 	Expect(txB.Status).To(Equal(types.TransactionReverted))
