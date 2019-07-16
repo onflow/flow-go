@@ -3,9 +3,10 @@ package core
 import (
 	"sync"
 
-	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
+
+	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 )
 
 type WorldState struct {
