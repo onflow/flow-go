@@ -14,10 +14,10 @@ Bamboo is a highly-performant blockchain designed to power the next generation o
   - [Setting up your environment](#setting-up-your-environment)
     - [Install Go](#install-go)
     - [Install Docker](#install-docker)
-  - [Building binaries](#building-binaries)
   - [Generating code](#generating-code)
     - [Dependency injection using Wire](#dependency-injection-using-wire)
     - [Generate gRPC stubs from protobuf files](#generate-grpc-stubs-from-protobuf-files)
+    - [Generate all code](#generate-all-code)
 - [Testing](#testing)
 - [Contributing](#contributing)
   - [Work streams](#work-streams)
@@ -80,77 +80,60 @@ _Note: since we are using go modules and we prepend every `go` command with `GO1
 - Test Docker by running the integration tests for this repository:
 
 ```bash
-./test.sh
+make test
 ```
 
 The first run will take a while because some base layers will be downloaded and built for the first time. See our [testing instructions](#testing) for more details.
-
-### Building binaries
-
-This project includes several binaries defined in the `/cmd` directory:
-
-```bash
-GO111MODULE=on go build -o donotcommit ./cmd/collect/
-GO111MODULE=on go build -o donotcommit ./cmd/consensus/
-GO111MODULE=on go build -o donotcommit ./cmd/execute/
-GO111MODULE=on go build -o donotcommit ./cmd/verify/
-GO111MODULE=on go build -o donotcommit ./cmd/seal/
-GO111MODULE=on go build -o donotcommit ./cmd/testhelpers/
-```
-
-TODO: move to Makefile
 
 ### Generating code
 
 #### Dependency injection using Wire
 
-Install wire:
+This project uses [Wire](https://github.com/google/wire) for compile-time dependency injection. Edit the `Makefile` to update the list of packages that use Wire.
 
 ```bash
-GO111MODULE=on go get -u github.com/google/wire/cmd/wire
+make generate-wire
 ```
-
-```bash
-GO111MODULE=on wire ./internal/roles/collect/
-GO111MODULE=on wire ./internal/roles/consensus/
-GO111MODULE=on wire ./internal/roles/execute/
-GO111MODULE=on wire ./internal/roles/verify/
-GO111MODULE=on wire ./internal/roles/seal/
-```
-TODO: move to Makefile
 
 #### Generate gRPC stubs from protobuf files
 
-1. Install prototool https://github.com/uber/prototool#installation  
-2. `go get -u github.com/golang/protobuf/protoc-gen-go`
+```bash
+make generate-proto
+```
+
+#### Generate all code
+
+You can run all code generators with a single command:
 
 ```bash
-prototool generate proto/
+make generate
 ```
-TODO: move to Makefile
 
 ## Testing
 
-Run:
+Initialize all containers:
 
 ```bash
-./test.sh
+make test-setup
 ```
 
-If iterating just on failed test, then we can do so without rebuilding the system:
+Run the test suite:
 
 ```bash
-docker-compose up --build --no-deps test
+make test-run
 ```
 
 Cleanup:
 
 ```bash
-docker-compose down
+make test-teardown
 ```
 
-TODO: move to Makefile (remove also shell script)
+The following command will run the three steps above:
 
+```bash
+make test
+```
 
 ## Contributing
 

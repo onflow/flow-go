@@ -216,6 +216,9 @@ type VerifyServiceServer interface {
 type UnimplementedVerifyServiceServer struct {
 }
 
+func (*UnimplementedVerifyServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
 func (*UnimplementedVerifyServiceServer) SubmitExecutionReceipt(ctx context.Context, req *SubmitExecutionReceiptRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SubmitExecutionReceipt not implemented")
 }

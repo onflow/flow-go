@@ -788,6 +788,9 @@ type ConsensusServiceServer interface {
 type UnimplementedConsensusServiceServer struct {
 }
 
+func (*UnimplementedConsensusServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
 func (*UnimplementedConsensusServiceServer) SubmitCollection(ctx context.Context, req *SubmitCollectionRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SubmitCollection not implemented")
 }

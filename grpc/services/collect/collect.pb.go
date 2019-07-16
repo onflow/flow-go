@@ -538,6 +538,9 @@ type CollectServiceServer interface {
 type UnimplementedCollectServiceServer struct {
 }
 
+func (*UnimplementedCollectServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
 func (*UnimplementedCollectServiceServer) SubmitTransaction(ctx context.Context, req *SubmitTransactionRequest) (*SubmitTransactionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SubmitTransaction not implemented")
 }
