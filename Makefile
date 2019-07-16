@@ -12,7 +12,7 @@ test-setup:
 
 .PHONY: test-run
 test-run:
-	docker-compose up --build test
+	docker-compose up --build --exit-code-from test test
 
 .PHONY: test-teardown
 test-teardown:
