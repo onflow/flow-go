@@ -26,9 +26,13 @@ func NewEmulatedBlockchain() *EmulatedBlockchain {
 	}
 }
 
-func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) {
+func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) error {
 	if _, exists := b.txPool[tx.Hash()]; exists {
-		return
+		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
+	}
+
+	if err := b.validateSignature(tx.PayerSignature); err != nil {
+		return &ErrInvalidTransactionSignature{TxHash: tx.Hash()}
 	}
 
 	b.worldState.InsertTransaction(tx)
@@ -39,9 +43,11 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) {
 	if succeeded {
 		b.worldState.CommitRegisters(registers)
 		b.worldState.UpdateTransactionStatus(tx.Hash(), types.TransactionSealed)
-	} else {
-		b.worldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
+		return nil
 	}
+
+	b.worldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
+	return &ErrTransactionReverted{TxHash: tx.Hash()}
 }
 
 func (b *EmulatedBlockchain) CommitBlock() {
@@ -72,4 +78,9 @@ func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTrans
 
 func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account {
 	return b.worldState.GetAccount(address)
+}
+
+func (b *EmulatedBlockchain) validateSignature(sig crypto.Signature) error {
+	// TODO: validate signatures
+	return nil
 }

@@ -60,7 +60,7 @@ func (tx *RawTransaction) Sign(account crypto.Address, keyPair *crypto.KeyPair) 
 		Nonce:          tx.Nonce,
 		ComputeLimit:   tx.ComputeLimit,
 		Timestamp:      tx.Timestamp,
-		PayerSignature: sig,
+		PayerSignature: *sig,
 	}
 }
 
@@ -72,7 +72,7 @@ type SignedTransaction struct {
 	ComputeLimit   uint64
 	ComputeUsed    uint64
 	Timestamp      time.Time
-	PayerSignature *crypto.Signature
+	PayerSignature crypto.Signature
 	Status         TransactionStatus
 }
 
