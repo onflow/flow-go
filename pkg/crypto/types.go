@@ -5,7 +5,7 @@ type AlgoIndex int
 
 const (
 	// Hashing supported algorithms
-	SHA3_256 AlgoIndex = iota
+	SHA3_256 AlgoIndex = iota << 4
 
 	// Signing supported algorithms
 	BLS_BLS12381
@@ -16,7 +16,8 @@ func (i AlgoIndex) String() string {
 		// Hashing supported algorithms
 		"SHA3_256",
 		// Signing supported algorithms
-		"BLS_BLS12381"}[i]
+		"BLS_BLS12381",
+		}[i >> 4]
 }
 
 const (
