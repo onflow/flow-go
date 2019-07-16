@@ -36,7 +36,7 @@ type Runtime interface {
 	// ExecuteScript executes the given script.
 	// It returns errors if the program has errors (e.g syntax errors, type errors),
 	// and if the execution fails.
-	ExecuteScript(script []byte, runtimeInterface RuntimeInterface) error
+	ExecuteScript(script []byte, runtimeInterface RuntimeInterface) (interface{}, error)
 }
 
 // mockRuntime is a mocked version of the Bamboo runtime
@@ -47,8 +47,8 @@ func NewMockRuntime() Runtime {
 	return &mockRuntime{}
 }
 
-func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) error {
-	return nil
+func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) (interface{}, error) {
+	return nil, nil
 }
 
 // interpreterRuntime is a interpreter-based version of the Bamboo runtime.
@@ -60,12 +60,12 @@ func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }
 
-func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) error {
+func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) (interface{}, error) {
 	code := string(script)
 
 	program, errs := parser.Parse(code)
 	if len(errs) > 0 {
-		return RuntimeError{errs}
+		return nil, RuntimeError{errs}
 	}
 
 	inter := interpreter.NewInterpreter(program)
@@ -74,19 +74,19 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 
 	err := inter.Interpret()
 	if err != nil {
-		return RuntimeError{[]error{err}}
+		return nil, RuntimeError{[]error{err}}
 	}
 
 	if _, hasMain := inter.Globals["main"]; !hasMain {
-		return nil
+		return nil, nil
 	}
 
-	_, err = inter.Invoke("main")
+	value, err := inter.Invoke("main")
 	if err != nil {
-		return RuntimeError{[]error{err}}
+		return nil, RuntimeError{[]error{err}}
 	}
 
-	return nil
+	return value.ToGoValue(), nil
 }
 
 // TODO: improve types
