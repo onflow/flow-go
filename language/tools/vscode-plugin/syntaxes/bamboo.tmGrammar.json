@@ -1,7 +1,8 @@
 {
     "scopeName": "source.bamboo",
     "patterns": [
-      { "include": "#comments" }
+      { "include": "#comments" },
+      { "include": "#literals" }
     ],
     "repository": {
       "comments": {
@@ -130,6 +131,109 @@
                 "include": "#nested"
               }
             ]
+          }
+        }
+      },
+      "literals": {
+        "patterns": [
+          {
+            "include": "#boolean"
+          },
+          {
+            "include": "#numeric"
+          },
+          {
+            "include": "#string"
+          },
+          {
+            "match": "\\bnil\\b",
+            "name": "constant.language.nil.bamboo"
+          }
+        ],
+        "repository": {
+          "boolean": {
+            "match": "\\b(true|false)\\b",
+            "name": "constant.language.boolean.bamboo"
+          },
+          "numeric": {
+            "patterns": [
+              {
+                "include": "#binary"
+              },
+              {
+                "include": "#octal"
+              },
+              {
+                "include": "#decimal"
+              },
+              {
+                "include": "#hexadecimal"
+              }
+            ],
+            "repository": {
+              "binary":  {
+                "comment": "",
+                "match": "(\\B\\-|\\b)0b[01]([_01]*[01])?\\b",
+                "name": "constant.numeric.integer.binary"
+              },
+              "octal":  {
+                "comment": "",
+                "match": "(\\B\\-|\\b)0o[0-7]([_0-7]*[0-7])?\\b",
+                "name": "constant.numeric.integer.octal"
+              },
+              "decimal":  {
+                "comment": "",
+                "match": "(\\B\\-|\\b)[0-9]([_0-9]*[0-9])?\\b",
+                "name": "constant.numeric.integer.decimal"
+              },
+              "hexadecimal":  {
+                "comment": "",
+                "match": "(\\B\\-|\\b)0x[0-9A-Fa-f]([_0-9A-Fa-f]*[0-9A-Fa-f])?\\b",
+                "name": "constant.numeric.integer.hexadecimal"
+              }
+            }
+          },
+          "string": {
+            "patterns": [
+              {
+                "begin": "\"",
+                "beginCaptures": {
+                  "0": {
+                    "name": "punctuation.definition.string.begin.bamboo"
+                  }
+                },
+                "end": "\"",
+                "endCaptures": {
+                  "0": {
+                    "name": "punctuation.definition.string.end.bamboo"
+                  }
+                },
+                "name": "string.quoted.double.single-line.bamboo",
+                "patterns": [
+                  {
+                    "match": "\\r|\\n",
+                    "name": "invalid.illegal.returns-not-allowed.bamboo"
+                  },
+                  {
+                    "include": "#string-guts"
+                  }
+                ]
+              }
+            ],
+            "repository": {
+              "string-guts": {
+                "patterns": [
+                  {
+                    "match": "\\\\[0\\\\tnr\"']",
+                    "name": "constant.character.escape.bamboo"
+                  },
+                  {
+                    "match": "\\\\u\\{[0-9a-fA-F]{1,8}\\}",
+                    "name": "constant.character.escape.unicode.bamboo"
+                  }
+                ]
+              }
+            }
           }
         }
       }
