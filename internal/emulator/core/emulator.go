@@ -4,12 +4,14 @@ import (
 	"time"
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	"github.com/dapperlabs/bamboo-node/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
 type EmulatedBlockchain struct {
 	worldStateStore map[crypto.Hash]*WorldState
 	worldState      *WorldState
+	computer        *Computer
 	txPool          map[crypto.Hash]*types.SignedTransaction
 }
 
@@ -18,6 +20,7 @@ func NewEmulatedBlockchain() *EmulatedBlockchain {
 		worldStateStore: make(map[crypto.Hash]*WorldState),
 		worldState:      NewWorldState(),
 		txPool:          make(map[crypto.Hash]*types.SignedTransaction),
+		computer:        NewComputer(runtime.NewMockRuntime()),
 	}
 }
 
@@ -25,8 +28,18 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) {
 	if _, exists := b.txPool[tx.Hash()]; exists {
 		return
 	}
-	b.txPool[tx.Hash()] = tx
+
 	b.worldState.InsertTransaction(tx)
+	b.txPool[tx.Hash()] = tx
+
+	registers, succeeded := b.computer.ExecuteTransaction(tx, b.worldState.GetRegister)
+
+	if succeeded {
+		b.worldState.CommitRegisters(registers)
+		b.worldState.UpdateTransactionStatus(tx.Hash(), types.TransactionSealed)
+	} else {
+		b.worldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
+	}
 }
 
 func (b *EmulatedBlockchain) CommitBlock() {

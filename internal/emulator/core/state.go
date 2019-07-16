@@ -16,6 +16,8 @@ type WorldState struct {
 	blockchainMutex   sync.RWMutex
 	transactions      map[crypto.Hash]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
+	registers         map[string][]byte
+	registersMutex    sync.RWMutex
 }
 
 func NewWorldState() *WorldState {
@@ -94,6 +96,30 @@ func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
 	return nil
 }
 
+func (ws *WorldState) GetRegister(id string) []byte {
+	ws.registersMutex.RLock()
+	defer ws.registersMutex.RUnlock()
+
+	return ws.registers[id]
+}
+
+func (ws *WorldState) SetRegister(id string, value []byte) {
+	ws.registersMutex.Lock()
+	defer ws.registersMutex.Unlock()
+
+	ws.registers[id] = value
+}
+
+func (ws *WorldState) CommitRegisters(registers types.Registers) {
+	ws.registersMutex.Lock()
+
+	for id, value := range registers {
+		ws.registers[id] = value
+	}
+
+	ws.registersMutex.Unlock()
+}
+
 func (ws *WorldState) InsertBlock(block *types.Block) {
 	ws.blocksMutex.Lock()
 	defer ws.blocksMutex.Unlock()
@@ -128,4 +154,16 @@ func (ws *WorldState) InsertAccount(account *crypto.Account) {
 	}
 
 	ws.accounts[account.Address] = account
+}
+
+func (ws *WorldState) UpdateTransactionStatus(h crypto.Hash, status types.TransactionStatus) {
+	tx := ws.GetTransaction(h)
+	if tx == nil {
+		return
+	}
+
+	ws.transactionsMutex.Lock()
+	tx.Status = status
+	ws.transactions[tx.Hash()] = tx
+	ws.transactionsMutex.Unlock()
 }

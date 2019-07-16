@@ -9,6 +9,7 @@ require (
 	github.com/aristanetworks/goarista v0.0.0-20190628180533-8e7d5b18fe7a // indirect
 	github.com/btcsuite/btcd v0.0.0-20190629003639-c26ffa870fd8 // indirect
 	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
+	github.com/dapperlabs/bamboo-node/language/runtime v0.0.0-20190715230807-97dc8d59094f
 	github.com/ethereum/go-ethereum v1.8.27 // indirect
 	github.com/go-pg/migrations v6.7.3+incompatible
 	github.com/go-pg/pg v8.0.4+incompatible
@@ -30,7 +31,6 @@ require (
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7
 	golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb // indirect
 	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/tools v0.0.0-20190703212419-2214986f1668 // indirect
 	google.golang.org/grpc v1.21.1
 	mellium.im/sasl v0.2.1 // indirect
 )
