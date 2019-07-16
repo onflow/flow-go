@@ -1,6 +1,8 @@
 package types
 
 import (
+	"time"
+
 	"github.com/dapperlabs/bamboo-node/internal/emulator/data"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
@@ -30,6 +32,7 @@ type RawTransaction struct {
 	Script       []byte
 	Nonce        uint64
 	ComputeLimit uint64
+	Timestamp    time.Time
 }
 
 // Hash computes the hash over the necessary transaction data.
@@ -39,6 +42,7 @@ func (tx *RawTransaction) Hash() crypto.Hash {
 		tx.Script,
 		tx.Nonce,
 		tx.ComputeLimit,
+		tx.Timestamp,
 	)
 	return crypto.NewHash(bytes)
 }
@@ -55,6 +59,7 @@ func (tx *RawTransaction) Sign(account crypto.Address, keyPair *crypto.KeyPair) 
 		Script:         tx.Script,
 		Nonce:          tx.Nonce,
 		ComputeLimit:   tx.ComputeLimit,
+		Timestamp:      tx.Timestamp,
 		PayerSignature: sig,
 	}
 }
@@ -66,6 +71,7 @@ type SignedTransaction struct {
 	Nonce          uint64
 	ComputeLimit   uint64
 	ComputeUsed    uint64
+	Timestamp      time.Time
 	PayerSignature *crypto.Signature
 	Status         TransactionStatus
 }
@@ -77,6 +83,7 @@ func (tx *SignedTransaction) Hash() crypto.Hash {
 		tx.Script,
 		tx.Nonce,
 		tx.ComputeLimit,
+		tx.Timestamp,
 		tx.PayerSignature,
 	)
 	return crypto.NewHash(bytes)
