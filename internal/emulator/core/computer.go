@@ -43,7 +43,7 @@ func getFullKey(controller, owner, key []byte) crypto.Hash {
 func (c *Computer) ExecuteTransaction(
 	tx *types.SignedTransaction,
 	readRegister func(crypto.Hash) []byte,
-) (etypes.Registers, bool) {
+) (etypes.Registers, error) {
 	txRegisters := make(etypes.Registers)
 
 	runtimeInterface := &runtimeInterface{
@@ -58,7 +58,7 @@ func (c *Computer) ExecuteTransaction(
 		},
 	}
 
-	err := c.runtime.ExecuteScript(tx.Script, runtimeInterface)
+	_, err := c.runtime.ExecuteScript(tx.Script, runtimeInterface)
 
-	return txRegisters, err == nil
+	return txRegisters, err
 }

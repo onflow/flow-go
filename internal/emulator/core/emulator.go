@@ -38,16 +38,15 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 	b.worldState.InsertTransaction(tx)
 	b.txPool[tx.Hash()] = tx
 
-	registers, succeeded := b.computer.ExecuteTransaction(tx, b.worldState.GetRegister)
-
-	if succeeded {
-		b.worldState.CommitRegisters(registers)
-		b.worldState.UpdateTransactionStatus(tx.Hash(), types.TransactionSealed)
-		return nil
+	registers, err := b.computer.ExecuteTransaction(tx, b.worldState.GetRegister)
+	if err != nil {
+		b.worldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
+		return &ErrTransactionReverted{TxHash: tx.Hash(), Err: err}
 	}
 
-	b.worldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
-	return &ErrTransactionReverted{TxHash: tx.Hash()}
+	b.worldState.CommitRegisters(registers)
+	b.worldState.UpdateTransactionStatus(tx.Hash(), types.TransactionSealed)
+	return nil
 }
 
 func (b *EmulatedBlockchain) CommitBlock() {
