@@ -16,7 +16,7 @@ type WorldState struct {
 	blockchainMutex   sync.RWMutex
 	transactions      map[crypto.Hash]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
-	registers         map[string][]byte
+	registers         map[crypto.Hash][]byte
 	registersMutex    sync.RWMutex
 }
 
@@ -25,6 +25,7 @@ func NewWorldState() *WorldState {
 	blocks := make(map[crypto.Hash]*types.Block)
 	blockchain := make([]crypto.Hash, 0)
 	transactions := make(map[crypto.Hash]*types.SignedTransaction)
+	registers := make(map[crypto.Hash][]byte)
 
 	genesis := types.GenesisBlock()
 	blocks[genesis.Hash()] = genesis
@@ -35,6 +36,7 @@ func NewWorldState() *WorldState {
 		blocks:       blocks,
 		blockchain:   blockchain,
 		transactions: transactions,
+		registers:    registers,
 	}
 }
 
@@ -96,25 +98,25 @@ func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
 	return nil
 }
 
-func (ws *WorldState) GetRegister(id string) []byte {
+func (ws *WorldState) GetRegister(hash crypto.Hash) []byte {
 	ws.registersMutex.RLock()
 	defer ws.registersMutex.RUnlock()
 
-	return ws.registers[id]
+	return ws.registers[hash]
 }
 
-func (ws *WorldState) SetRegister(id string, value []byte) {
+func (ws *WorldState) SetRegister(hash crypto.Hash, value []byte) {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 
-	ws.registers[id] = value
+	ws.registers[hash] = value
 }
 
 func (ws *WorldState) CommitRegisters(registers types.Registers) {
 	ws.registersMutex.Lock()
 
-	for id, value := range registers {
-		ws.registers[id] = value
+	for hash, value := range registers {
+		ws.registers[hash] = value
 	}
 
 	ws.registersMutex.Unlock()

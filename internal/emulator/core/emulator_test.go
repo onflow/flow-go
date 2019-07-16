@@ -14,8 +14,16 @@ func TestSimulatedChain(t *testing.T) {
 
 	txA := &types.SignedTransaction{
 		Transaction: &types.RawTransaction{
-			Nonce:        16,
-			Script:       []byte{},
+			Nonce: 16,
+			Script: []byte(`
+				fun main() {
+					const controller = [1]
+					const owner = [2]
+					const key = [3]
+					const value = getValue(controller, owner, key)
+					setValue(controller, owner, key, value + 2)
+				}
+			`),
 			ComputeLimit: 10,
 			Timestamp:    time.Now(),
 		},

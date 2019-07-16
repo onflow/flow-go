@@ -20,7 +20,7 @@ func NewEmulatedBlockchain() *EmulatedBlockchain {
 		worldStateStore: make(map[crypto.Hash]*WorldState),
 		worldState:      NewWorldState(),
 		txPool:          make(map[crypto.Hash]*types.SignedTransaction),
-		computer:        NewComputer(runtime.NewMockRuntime()),
+		computer:        NewComputer(runtime.NewInterpreterRuntime()),
 	}
 }
 

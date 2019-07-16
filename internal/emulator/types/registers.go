@@ -1,9 +1,11 @@
 package types
 
+import "github.com/dapperlabs/bamboo-node/pkg/crypto"
+
 // TODO: define format for register keys and values
 
 // Registers is a map of register values.
-type Registers map[string][]byte
+type Registers map[crypto.Hash][]byte
 
 // Update merges this register map with the values of another register map.
 //
