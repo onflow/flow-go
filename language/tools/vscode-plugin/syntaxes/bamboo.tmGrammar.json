@@ -293,6 +293,18 @@
           {
             "match": "(?<!\\.)\\b(?:while)\\b",
             "name": "keyword.control.loop.bamboo"
+          },
+          {
+            "match": "(?<!\\.)\\b(?:require|ensure)\\b",
+            "name": "keyword.other"
+          },
+          {
+            "match": "(?<!\\.)\\b(?:private|pub(?:\\(set\\))?)\\b",
+            "name": "keyword.other.declaration-specifier.accessibility.bamboo"
+          },
+          {
+            "match": "\\binit\\b|(?<!\\.)\\b(?:get|set)\\b",
+            "name": "storage.type.function.swift"
           }
         ]
       },
@@ -383,7 +395,7 @@
       "language-variables": {
         "patterns": [
           {
-            "match": "\\b(this|super)\\b",
+            "match": "\\b(self)\\b",
             "name": "variable.language.bamboo"
           }
         ]
@@ -391,7 +403,7 @@
       "function-call-expression": {
         "patterns": [
           {
-            "begin": "([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)\\s*(\\()",
+            "begin": "(?!(?:set|init))([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)\\s*(\\()",
             "beginCaptures": {
               "1": {
                 "name": "support.function.any-method.bamboo"
@@ -467,7 +479,7 @@
             "name": "entity.name.type.$1.bamboo"
           }
         },
-        "end": "=",
+        "end": "=|$",
         "patterns": [
           { "include": "#type" }
         ]
