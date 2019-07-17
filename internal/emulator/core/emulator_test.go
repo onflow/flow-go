@@ -21,6 +21,12 @@ const sampleScript = `
 	}
 `
 
+const sampleCall = `
+	fun main() -> Int {
+		return getValue([1], [2], [3])
+	}
+`
+
 func TestSubmitTransaction(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -61,7 +67,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	Expect(err).To(MatchError(&core.ErrDuplicateTransaction{TxHash: txA.Hash()}))
 }
 
-func TestSubmitRevertedTransaction(t *testing.T) {
+func TestSubmitTransactionReverted(t *testing.T) {
 	RegisterTestingT(t)
 
 	b := core.NewEmulatedBlockchain()
@@ -79,4 +85,29 @@ func TestSubmitRevertedTransaction(t *testing.T) {
 
 	txB := b.GetTransaction(txA.Hash())
 	Expect(txB.Status).To(Equal(types.TransactionReverted))
+}
+
+func TestCallScript(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := core.NewEmulatedBlockchain()
+
+	txA := &types.SignedTransaction{
+		Script:         []byte(sampleScript),
+		Nonce:          1,
+		ComputeLimit:   10,
+		Timestamp:      time.Now(),
+		PayerSignature: crypto.Signature{},
+	}
+
+	value, err := b.CallScript([]byte(sampleCall))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(value).To(Equal(0))
+
+	err = b.SubmitTransaction(txA)
+	Expect(err).ToNot(HaveOccurred())
+
+	value, err = b.CallScript([]byte(sampleCall))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(value).To(Equal(2))
 }

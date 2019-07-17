@@ -61,4 +61,30 @@ func (c *Computer) ExecuteTransaction(
 	_, err := c.runtime.ExecuteScript(tx.Script, runtimeInterface)
 
 	return txRegisters, err
+
+// ExecuteCall executes a read-only script against the current world state.
+func (c *Computer) ExecuteCall(
+	script []byte,
+	readRegister func(crypto.Hash) []byte,
+) (interface{}, error) {
+	registers := make(etypes.Registers)
+
+	runtimeInterface := &runtimeInterface{
+		getValue: func(controller, owner, key []byte) ([]byte, error) {
+			fullKey := getFullKey(controller, owner, key)
+
+			if v, ok := registers[fullKey]; ok {
+				return v, nil
+			}
+
+			return readRegister(fullKey), nil
+		},
+		setValue: func(controller, owner, key, value []byte) error {
+			fullKey := getFullKey(controller, owner, key)
+			registers[fullKey] = value
+			return nil
+		},
+	}
+
+	return c.runtime.ExecuteScript(script, runtimeInterface)
 }

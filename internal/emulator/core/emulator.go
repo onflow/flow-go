@@ -49,6 +49,11 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 	return nil
 }
 
+// CallScript executes a read-only script against the world state and returns the result.
+func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
+	return b.computer.ExecuteCall(script, b.worldState.GetRegister)
+}
+
 func (b *EmulatedBlockchain) CommitBlock() {
 	txHashes := make([]crypto.Hash, 0)
 	for hash := range b.txPool {
