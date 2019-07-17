@@ -3,7 +3,8 @@
     "patterns": [
       { "include": "#comments" },
       { "include": "#expressions" },
-      { "include": "#declarations" }
+      { "include": "#declarations" },
+      { "include": "#keywords" }
     ],
     "repository": {
       "comments": {
@@ -275,6 +276,22 @@
           {
             "match": "&&|\\|\\|",
             "name": "keyword.operator.logical.bamboo"
+          }
+        ]
+      },
+      "keywords": {
+        "patterns": [
+          {
+            "match": "(?<!\\.)\\b(?:if|else)\\b",
+            "name": "keyword.control.branch.bamboo"
+          },
+          {
+            "match": "(?<!\\.)\\b(?:return)\\b",
+            "name": "keyword.control.transfer.bamboo"
+          },
+          {
+            "match": "(?<!\\.)\\b(?:while)\\b",
+            "name": "keyword.control.loop.bamboo"
           }
         ]
       },
