@@ -53,41 +53,6 @@ func (a *SignAlgo) SignatureSize() int {
 	return a.SignatureLength
 }
 
-// SignHash is an obsolete function that gets overritten
-func (a *SignAlgo) SignHash(sk PrKey, h Hash) Signature {
-	var s Signature
-	return s
-}
-
-// SignBytes signs an array of bytes
-func (a *SignAlgo) SignBytes(sk PrKey, data []byte, alg Hasher) Signature {
-	h := alg.ComputeBytesHash(data)
-	return a.SignHash(sk, h)
-}
-
-// SignStruct signs a structure
-func (a *SignAlgo) SignStruct(sk PrKey, data Encoder, alg Hasher) Signature {
-	h := alg.ComputeStructHash(data)
-	return a.SignHash(sk, h)
-}
-
-// VerifyHash is an obsolete function that gets overritten
-func (a *SignAlgo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
-	return true
-}
-
-// VerifyBytes verifies a signature of a byte array
-func (a *SignAlgo) VerifyBytes(pk PubKey, s Signature, data []byte, alg Hasher) bool {
-	h := alg.ComputeBytesHash(data)
-	return a.VerifyHash(pk, s, h)
-}
-
-// VerifyStruct verifies a signature of a structure
-func (a *SignAlgo) VerifyStruct(pk PubKey, s Signature, data Encoder, alg Hasher) bool {
-	h := alg.ComputeStructHash(data)
-	return a.VerifyHash(pk, s, h)
-}
-
 // Signature type tools
 
 // Signature is unspecified signature scheme signature

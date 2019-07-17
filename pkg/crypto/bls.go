@@ -45,6 +45,30 @@ func (a *BLS_BLS12381Algo) GeneratePrKey() PrKey {
 	return &sk
 }
 
+// SignBytes signs an array of bytes
+func (a *BLS_BLS12381Algo) SignBytes(sk PrKey, data []byte, alg Hasher) Signature {
+	h := alg.ComputeBytesHash(data)
+	return a.SignHash(sk, h)
+}
+
+// SignStruct signs a structure
+func (a *BLS_BLS12381Algo) SignStruct(sk PrKey, data Encoder, alg Hasher) Signature {
+	h := alg.ComputeStructHash(data)
+	return a.SignHash(sk, h)
+}
+
+// VerifyBytes verifies a signature of a byte array
+func (a *BLS_BLS12381Algo) VerifyBytes(pk PubKey, s Signature, data []byte, alg Hasher) bool {
+	h := alg.ComputeBytesHash(data)
+	return a.VerifyHash(pk, s, h)
+}
+
+// VerifyStruct verifies a signature of a structure
+func (a *BLS_BLS12381Algo) VerifyStruct(pk PubKey, s Signature, data Encoder, alg Hasher) bool {
+	h := alg.ComputeStructHash(data)
+	return a.VerifyHash(pk, s, h)
+}
+
 // PrKeyBLS_BLS12381 is the private key of BLS using BLS12_381, it implements PrKey
 type PrKeyBLS_BLS12381 struct {
 	// the signature algo
