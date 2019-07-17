@@ -74,8 +74,8 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 		return &ErrTransactionReverted{TxHash: tx.Hash(), Err: err}
 	}
 
-	b.pendingWorldState.CommitRegisters(registers)
-	b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionSealed)
+	b.pendingWorldState.SetRegisters(registers)
+	b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionFinalized)
 
 	b.updatePendingWorldStates(tx.Hash())
 
