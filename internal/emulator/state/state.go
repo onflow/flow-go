@@ -1,4 +1,4 @@
-package core
+package state
 
 import (
 	"sync"
@@ -9,19 +9,23 @@ import (
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 )
 
+// WorldState represents the current state of the blockchain.
 type WorldState struct {
-	accounts          map[crypto.Address]*crypto.Account
+	Accounts          map[crypto.Address]*crypto.Account
 	accountsMutex     sync.RWMutex
-	blocks            map[crypto.Hash]*etypes.Block
+	Blocks            map[crypto.Hash]*etypes.Block
 	blocksMutex       sync.RWMutex
-	blockchain        []crypto.Hash
+	Blockchain        []crypto.Hash
 	blockchainMutex   sync.RWMutex
-	transactions      map[crypto.Hash]*types.SignedTransaction
+	Transactions      map[crypto.Hash]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
-	registers         map[crypto.Hash][]byte
+	Registers         map[crypto.Hash][]byte
 	registersMutex    sync.RWMutex
+	LatestState       crypto.Hash
+	latestStateMutex  sync.RWMutex
 }
 
+// NewWorldState instantiates a new state object with a genesis block.
 func NewWorldState() *WorldState {
 	accounts := make(map[crypto.Address]*crypto.Account)
 	blocks := make(map[crypto.Hash]*etypes.Block)
@@ -34,18 +38,25 @@ func NewWorldState() *WorldState {
 	blockchain = append(blockchain, genesis.Hash())
 
 	return &WorldState{
-		accounts:     accounts,
-		blocks:       blocks,
-		blockchain:   blockchain,
-		transactions: transactions,
-		registers:    registers,
+		Accounts:     accounts,
+		Blocks:       blocks,
+		Blockchain:   blockchain,
+		Transactions: transactions,
+		Registers:    registers,
+		LatestState:  genesis.Hash(),
 	}
 }
 
+// Hash computes the hash over the contents of World State.
+func (ws *WorldState) Hash() crypto.Hash {
+	return ws.LatestState
+}
+
+// GetLatestBlock gets the most recent block in the blockchain.
 func (ws *WorldState) GetLatestBlock() *etypes.Block {
 	ws.blockchainMutex.RLock()
-	currHeight := len(ws.blockchain)
-	blockHash := ws.blockchain[currHeight-1]
+	currHeight := len(ws.Blockchain)
+	blockHash := ws.Blockchain[currHeight-1]
 	ws.blockchainMutex.RUnlock()
 
 	block := ws.GetBlockByHash(blockHash)
@@ -56,7 +67,7 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 	ws.blocksMutex.RLock()
 	defer ws.blocksMutex.RUnlock()
 
-	if block, ok := ws.blocks[hash]; ok {
+	if block, ok := ws.Blocks[hash]; ok {
 		return block
 	}
 
@@ -65,10 +76,10 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 
 func (ws *WorldState) GetBlockByHeight(height uint64) *etypes.Block {
 	ws.blockchainMutex.RLock()
-	currHeight := len(ws.blockchain)
+	currHeight := len(ws.Blockchain)
 
 	if int(height) < currHeight {
-		blockHash := ws.blockchain[height]
+		blockHash := ws.Blockchain[height]
 		ws.blockchainMutex.RUnlock()
 		return ws.GetBlockByHash(blockHash)
 	}
@@ -78,22 +89,24 @@ func (ws *WorldState) GetBlockByHeight(height uint64) *etypes.Block {
 	return nil
 }
 
+// GetTransaction gets a transaction by hash.
 func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction {
 	ws.transactionsMutex.RLock()
 	defer ws.transactionsMutex.RUnlock()
 
-	if tx, ok := ws.transactions[hash]; ok {
+	if tx, ok := ws.Transactions[hash]; ok {
 		return tx
 	}
 
 	return nil
 }
 
+// GetAccount gets an account by address.
 func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
 	ws.accountsMutex.RLock()
 	defer ws.accountsMutex.RUnlock()
 
-	if account, ok := ws.accounts[address]; ok {
+	if account, ok := ws.Accounts[address]; ok {
 		return account
 	}
 
@@ -104,21 +117,21 @@ func (ws *WorldState) GetRegister(hash crypto.Hash) []byte {
 	ws.registersMutex.RLock()
 	defer ws.registersMutex.RUnlock()
 
-	return ws.registers[hash]
+	return ws.Registers[hash]
 }
 
 func (ws *WorldState) SetRegister(hash crypto.Hash, value []byte) {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 
-	ws.registers[hash] = value
+	ws.Registers[hash] = value
 }
 
 func (ws *WorldState) CommitRegisters(registers etypes.Registers) {
 	ws.registersMutex.Lock()
 
 	for hash, value := range registers {
-		ws.registers[hash] = value
+		ws.Registers[hash] = value
 	}
 
 	ws.registersMutex.Unlock()
@@ -127,37 +140,47 @@ func (ws *WorldState) CommitRegisters(registers etypes.Registers) {
 func (ws *WorldState) InsertBlock(block *etypes.Block) {
 	ws.blocksMutex.Lock()
 	defer ws.blocksMutex.Unlock()
-	if _, exists := ws.blocks[block.Hash()]; exists {
+	if _, exists := ws.Blocks[block.Hash()]; exists {
 		return
 	}
 
-	ws.blocks[block.Hash()] = block
+	ws.Blocks[block.Hash()] = block
 
 	ws.blockchainMutex.Lock()
-	ws.blockchain = append(ws.blockchain, block.Hash())
+	ws.Blockchain = append(ws.Blockchain, block.Hash())
 	ws.blockchainMutex.Unlock()
+
+	ws.latestStateMutex.Lock()
+	ws.LatestState = block.Hash()
+	ws.latestStateMutex.Unlock()
 }
 
+// InsertTransaction inserts a new transaction into the state.
 func (ws *WorldState) InsertTransaction(tx *types.SignedTransaction) {
 	ws.transactionsMutex.Lock()
 	defer ws.transactionsMutex.Unlock()
 
-	if _, exists := ws.transactions[tx.Hash()]; exists {
+	if _, exists := ws.Transactions[tx.Hash()]; exists {
 		return
 	}
 
-	ws.transactions[tx.Hash()] = tx
+	ws.Transactions[tx.Hash()] = tx
+
+	ws.latestStateMutex.Lock()
+	ws.LatestState = tx.Hash()
+	ws.latestStateMutex.Unlock()
 }
 
+// InsertAccount adds a newly created account into the world state.
 func (ws *WorldState) InsertAccount(account *crypto.Account) {
 	ws.accountsMutex.Lock()
 	defer ws.accountsMutex.Unlock()
 
-	if _, exists := ws.accounts[account.Address]; exists {
+	if _, exists := ws.Accounts[account.Address]; exists {
 		return
 	}
 
-	ws.accounts[account.Address] = account
+	ws.Accounts[account.Address] = account
 }
 
 func (ws *WorldState) UpdateTransactionStatus(h crypto.Hash, status types.TransactionStatus) {
@@ -168,6 +191,6 @@ func (ws *WorldState) UpdateTransactionStatus(h crypto.Hash, status types.Transa
 
 	ws.transactionsMutex.Lock()
 	tx.Status = status
-	ws.transactions[tx.Hash()] = tx
+	ws.Transactions[tx.Hash()] = tx
 	ws.transactionsMutex.Unlock()
 }

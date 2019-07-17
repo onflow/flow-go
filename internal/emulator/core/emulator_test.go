@@ -1,4 +1,4 @@
-package core_test
+package core
 
 import (
 	"testing"
@@ -6,7 +6,6 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
@@ -27,12 +26,13 @@ const sampleCall = `
 	}
 `
 
-func TestSubmitTransaction(t *testing.T) {
+func TestWorldStates(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := core.NewEmulatedBlockchain()
+	// Create new emulated blockchain
+	b := NewEmulatedBlockchain()
 
-	txA := &types.SignedTransaction{
+	tx1 := &types.SignedTransaction{
 		Script:         []byte(sampleScript),
 		Nonce:          1,
 		ComputeLimit:   10,
@@ -40,19 +40,110 @@ func TestSubmitTransaction(t *testing.T) {
 		PayerSignature: crypto.Signature{},
 	}
 
-	err := b.SubmitTransaction(txA)
+	tx2 := &types.SignedTransaction{
+		Script:         []byte(sampleScript),
+		Nonce:          2,
+		ComputeLimit:   10,
+		Timestamp:      time.Now(),
+		PayerSignature: crypto.Signature{},
+	}
+
+	tx3 := &types.SignedTransaction{
+		Script:         []byte(sampleScript),
+		Nonce:          3,
+		ComputeLimit:   10,
+		Timestamp:      time.Now(),
+		PayerSignature: crypto.Signature{},
+	}
+
+	ws1 := b.pendingWorldState.Hash()
+	t.Logf("initial world state: \t%s\n", ws1)
+
+	Expect(b.txPool).To(HaveLen(0))
+
+	// Submit tx1
+	b.SubmitTransaction(tx1)
+	ws2 := b.pendingWorldState.Hash()
+	t.Logf("world state after tx1: \t%s\n", ws2)
+
+	Expect(b.txPool).To(HaveLen(1))
+	Expect(ws2).NotTo(Equal(ws1))
+
+	// Submit tx1 again
+	b.SubmitTransaction(tx1)
+	ws3 := b.pendingWorldState.Hash()
+	t.Logf("world state after dup tx1: \t%s\n", ws3)
+
+	Expect(b.txPool).To(HaveLen(1))
+	Expect(ws3).To(Equal(ws2))
+
+	// Submit tx2
+	b.SubmitTransaction(tx2)
+	ws4 := b.pendingWorldState.Hash()
+	t.Logf("world state after tx2: \t%s\n", ws4)
+
+	Expect(b.txPool).To(HaveLen(2))
+	Expect(ws4).NotTo(Equal(ws3))
+
+	// Commit new block
+	b.CommitBlock()
+	ws5 := b.pendingWorldState.Hash()
+	t.Logf("world state after commit: \t%s\n", ws5)
+
+	Expect(b.txPool).To(HaveLen(0))
+	Expect(ws5).NotTo(Equal(ws4))
+	Expect(b.worldStates).To(HaveKey(ws5))
+
+	// Submit tx3
+	b.SubmitTransaction(tx3)
+	ws6 := b.pendingWorldState.Hash()
+	t.Logf("world state after tx3: \t%s\n", ws6)
+
+	Expect(b.txPool).To(HaveLen(1))
+	Expect(ws6).NotTo(Equal(ws5))
+
+	// Seek to committed block/world state
+	b.SeekToState(ws5)
+	ws7 := b.pendingWorldState.Hash()
+	t.Logf("world state after seek: \t%s\n", ws7)
+
+	Expect(b.txPool).To(HaveLen(0))
+	Expect(ws7).To(Equal(ws5))
+
+	// Seek to non-committed world state
+	b.SeekToState(ws4)
+	ws8 := b.pendingWorldState.Hash()
+	t.Logf("world state after failed seek: \t%s\n", ws8)
+
+	Expect(ws8).ToNot(Equal(ws4))
+}
+
+func TestSubmitTransaction(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain()
+
+	tx1 := &types.SignedTransaction{
+		Script:         []byte(sampleScript),
+		Nonce:          1,
+		ComputeLimit:   10,
+		Timestamp:      time.Now(),
+		PayerSignature: crypto.Signature{},
+	}
+
+	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
-	txB := b.GetTransaction(txA.Hash())
+	txB := b.GetTransaction(tx1.Hash())
 	Expect(txB.Status).To(Equal(types.TransactionSealed))
 }
 
 func TestSubmitDuplicateTransaction(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := core.NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain()
 
-	txA := &types.SignedTransaction{
+	tx1 := &types.SignedTransaction{
 		Script:         []byte(sampleScript),
 		Nonce:          1,
 		ComputeLimit:   10,
@@ -60,19 +151,19 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 		PayerSignature: crypto.Signature{},
 	}
 
-	err := b.SubmitTransaction(txA)
+	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = b.SubmitTransaction(txA)
-	Expect(err).To(MatchError(&core.ErrDuplicateTransaction{TxHash: txA.Hash()}))
+	err = b.SubmitTransaction(tx1)
+	Expect(err).To(MatchError(&ErrDuplicateTransaction{TxHash: tx1.Hash()}))
 }
 
 func TestSubmitTransactionReverted(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := core.NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain()
 
-	txA := &types.SignedTransaction{
+	tx1 := &types.SignedTransaction{
 		Script:         []byte("invalid script"),
 		Nonce:          1,
 		ComputeLimit:   10,
@@ -80,19 +171,19 @@ func TestSubmitTransactionReverted(t *testing.T) {
 		PayerSignature: crypto.Signature{},
 	}
 
-	err := b.SubmitTransaction(txA)
+	err := b.SubmitTransaction(tx1)
 	Expect(err).To(HaveOccurred())
 
-	txB := b.GetTransaction(txA.Hash())
-	Expect(txB.Status).To(Equal(types.TransactionReverted))
+	tx2 := b.GetTransaction(tx1.Hash())
+	Expect(tx2.Status).To(Equal(types.TransactionReverted))
 }
 
 func TestCallScript(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := core.NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain()
 
-	txA := &types.SignedTransaction{
+	tx1 := &types.SignedTransaction{
 		Script:         []byte(sampleScript),
 		Nonce:          1,
 		ComputeLimit:   10,
@@ -104,7 +195,7 @@ func TestCallScript(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(value).To(Equal(0))
 
-	err = b.SubmitTransaction(txA)
+	err = b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
 	value, err = b.CallScript([]byte(sampleCall))
