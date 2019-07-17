@@ -283,7 +283,16 @@
           { "include": "#comments" },
           { "include": "#function-call-expression" },
           { "include": "#literals" },
-          { "include": "#operators" }
+          { "include": "#operators" },
+          { "include": "#language-variables" }
+        ]
+      },
+      "language-variables": {
+        "patterns": [
+          {
+            "match": "\\b(this|super)\\b",
+            "name": "variable.language.bamboo"
+          }
         ]
       },
       "function-call-expression": {
@@ -355,10 +364,10 @@
             "begin": "\\b(const|var)\\b\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
             "beginCaptures": {
               "1": {
-                "name": "storage.type.$1.swift"
+                "name": "storage.type.$1.bamboo"
               },
               "2": {
-                "name": "entity.name.type.$1.swift"
+                "name": "entity.name.type.$1.bamboo"
               }
             },
             "end": "=",
@@ -375,6 +384,10 @@
           },
           {
             "include": "#builtin-type"
+          },
+          {
+            "match": "([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
+            "name": "storage.type.bamboo"
           }
         ]
       },
@@ -383,19 +396,19 @@
         "patterns": [
           {
             "match": "\\bAny\\b",
-            "name": "support.type.any.swift"
+            "name": "support.type.any.bamboo"
           },
           {
             "match": "\\bNever\\b",
-            "name": "support.type.never.swift"
+            "name": "support.type.never.bamboo"
           },
           {
             "match": "\\bSelf\\b",
-            "name": "support.type.self.swift"
+            "name": "support.type.self.bamboo"
           },
           {
             "match": "\\bU?Int(?:16|8|32|64)?\\b",
-            "name": "support.type.integer.swift"
+            "name": "support.type.integer.bamboo"
           }
         ]
       }
