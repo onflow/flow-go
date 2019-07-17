@@ -2,7 +2,8 @@
     "scopeName": "source.bamboo",
     "patterns": [
       { "include": "#comments" },
-      { "include": "#expressions" }
+      { "include": "#expressions" },
+      { "include": "#declarations" }
     ],
     "repository": {
       "comments": {
@@ -345,6 +346,56 @@
                 "include": "#expressions"
               }
             ]
+          }
+        ]
+      },
+      "declarations": {
+        "patterns": [
+          {
+            "begin": "\\b(const|var)\\b\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
+            "beginCaptures": {
+              "1": {
+                "name": "storage.type.$1.swift"
+              },
+              "2": {
+                "name": "entity.name.type.$1.swift"
+              }
+            },
+            "end": "=",
+            "patterns": [
+              { "include": "#type" }
+            ]
+          }
+        ]
+      },
+      "type": {
+        "patterns": [
+          {
+            "include": "#comments"
+          },
+          {
+            "include": "#builtin-type"
+          }
+        ]
+      },
+      "builtin-type": {
+        "comment": "Types provided in the standard library",
+        "patterns": [
+          {
+            "match": "\\bAny\\b",
+            "name": "support.type.any.swift"
+          },
+          {
+            "match": "\\bNever\\b",
+            "name": "support.type.never.swift"
+          },
+          {
+            "match": "\\bSelf\\b",
+            "name": "support.type.self.swift"
+          },
+          {
+            "match": "\\bU?Int(?:16|8|32|64)?\\b",
+            "name": "support.type.integer.swift"
           }
         ]
       }
