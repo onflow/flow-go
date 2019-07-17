@@ -22,6 +22,17 @@ func NewHashAlgo(name AlgoName) Hasher {
 	return nil
 }
 
+// Hash is the hash algorithms output types
+
+type Hash interface {
+	// ToBytes returns the bytes representation of a hash
+	ToBytes() []byte
+	// String returns a Hex string representation of the hash bytes in little endian
+	String() string
+	// IsEqual tests an equality with a given hash
+	IsEqual(Hash) bool
+}
+
 // Hasher interface
 
 type Hasher interface {
@@ -40,7 +51,7 @@ type Hasher interface {
 	Reset()
 }
 
-// HashAlgo implements Hasher
+// HashAlgo
 type HashAlgo struct {
 	name         AlgoName
 	outputLength int
@@ -52,18 +63,6 @@ func (a *HashAlgo) Name() AlgoName {
 	return a.name
 }
 
-// ComputeBytesHash is an obsolete function that gets overritten
-func (a *HashAlgo) ComputeBytesHash([]byte) Hash {
-	var h Hash
-	return h
-}
-
-// ComputeStructHash is an obsolete function that gets overritten
-func (a *HashAlgo) ComputeStructHash(struc Encoder) Hash {
-	var h Hash
-	return h
-}
-
 // AddBytes adds bytes to the current hash state
 func (a *HashAlgo) AddBytes(data []byte) {
 	a.Write(data)
@@ -72,10 +71,4 @@ func (a *HashAlgo) AddBytes(data []byte) {
 // AddStruct adds a structure to the current hash state
 func (a *HashAlgo) AddStruct(struc Encoder) {
 	a.Write(struc.Encode())
-}
-
-// SumHash is an obsolete function that gets overritten
-func SumHash() Hash {
-	var h Hash
-	return h
 }

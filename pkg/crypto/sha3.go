@@ -3,7 +3,6 @@ package crypto
 import "strconv"
 
 // sha3_256Algo, embeds HashAlgo
-//-----------------------------------------------
 type sha3_256Algo struct {
 	*HashAlgo
 }
@@ -34,27 +33,7 @@ func (s *sha3_256Algo) SumHash() Hash {
 	return &digest
 }
 
-// Encoder should be implemented by structures to be hashed
-//----------------------
-// Encoder is an interface of a generic structure
-type Encoder interface {
-	Encode() []byte
-}
-
-// Hash type tools
-//----------------------
-// Hash is the hash algorithms output types
-type Hash interface {
-	// ToBytes returns the bytes representation of a hash
-	ToBytes() []byte
-	// String returns a Hex string representation of the hash bytes in little endian
-	String() string
-	// IsEqual tests an equality with a given hash
-	IsEqual(Hash) bool
-}
-
 // Hash32 implements Hash
-//----------------------
 func (h *Hash32) ToBytes() []byte {
 	return h[:]
 }

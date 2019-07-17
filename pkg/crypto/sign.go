@@ -5,7 +5,6 @@ import (
 )
 
 // NewSignatureAlgo initializes and chooses a signature scheme
-
 func NewSignatureAlgo(name AlgoName) Signer {
 	if name == BLS_BLS12381 {
 		a := &(BLS_BLS12381Algo{&SignAlgo{
@@ -20,7 +19,6 @@ func NewSignatureAlgo(name AlgoName) Signer {
 }
 
 // Signer interface
-
 type Signer interface {
 	Name() AlgoName
 	// Size return the signature output length
@@ -37,8 +35,7 @@ type Signer interface {
 	GeneratePrKey() PrKey // to be changed to accept a randomness source as an input
 }
 
-// SignAlgo implements Signer
-
+// SignAlgo
 type SignAlgo struct {
 	name            AlgoName
 	PrKeyLength     int
@@ -74,7 +71,7 @@ func (a *SignAlgo) SignStruct(sk PrKey, data Encoder, alg Hasher) Signature {
 	return a.SignHash(sk, h)
 }
 
-// SignHash is an obsolete function that gets overritten
+// VerifyHash is an obsolete function that gets overritten
 func (a *SignAlgo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
 	return true
 }
@@ -89,12 +86,6 @@ func (a *SignAlgo) VerifyBytes(pk PubKey, s Signature, data []byte, alg Hasher) 
 func (a *SignAlgo) VerifyStruct(pk PubKey, s Signature, data Encoder, alg Hasher) bool {
 	h := alg.ComputeStructHash(data)
 	return a.VerifyHash(pk, s, h)
-}
-
-// GeneratePrKey is an obsolete function that gets overritten
-func (a *SignAlgo) GeneratePrKey() PrKey {
-	var sk PrKey
-	return sk
 }
 
 // Signature type tools

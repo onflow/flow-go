@@ -5,7 +5,7 @@ import (
 )
 
 // Signature48 implements Signature
-//----------------------
+
 func (s *Signature48) ToBytes() []byte {
 	return s[:]
 }
@@ -19,7 +19,6 @@ func (s *Signature48) String() string {
 }
 
 // BLS_BLS12381Algo, embeds SignAlgo
-//-----------------------------------------------
 type BLS_BLS12381Algo struct {
 	// G1 and G2 curves will be added here
 	//...
@@ -47,7 +46,6 @@ func (a *BLS_BLS12381Algo) GeneratePrKey() PrKey {
 }
 
 // PrKeyBLS_BLS12381 is the private key of BLS using BLS12_381, it implements PrKey
-//----------------------
 type PrKeyBLS_BLS12381 struct {
 	// the signature algo
 	alg *BLS_BLS12381Algo
@@ -79,7 +77,6 @@ func (sk *PrKeyBLS_BLS12381) Pubkey() PubKey {
 }
 
 // PubKey_BLS_BLS12381 is the public key of BLS using BLS12_381, it implements PubKey
-//----------------------
 type PubKey_BLS_BLS12381 struct {
 	// public key data  will be entered here
 	dummy int
