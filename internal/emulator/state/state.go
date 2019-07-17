@@ -63,6 +63,7 @@ func (ws *WorldState) GetLatestBlock() *etypes.Block {
 	return block
 }
 
+// GetBlockByHash gets a block by hash.
 func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 	ws.blocksMutex.RLock()
 	defer ws.blocksMutex.RUnlock()
@@ -74,6 +75,7 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 	return nil
 }
 
+// GetBlockByHeight gets a block by height.
 func (ws *WorldState) GetBlockByHeight(height uint64) *etypes.Block {
 	ws.blockchainMutex.RLock()
 	currHeight := len(ws.Blockchain)
@@ -113,6 +115,9 @@ func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
 	return nil
 }
 
+// GetRegister gets a register by hash.
+//
+// If the register does not exist, an empty byte slice is returned.
 func (ws *WorldState) GetRegister(hash crypto.Hash) []byte {
 	ws.registersMutex.RLock()
 	defer ws.registersMutex.RUnlock()
@@ -120,6 +125,7 @@ func (ws *WorldState) GetRegister(hash crypto.Hash) []byte {
 	return ws.Registers[hash]
 }
 
+// SetRegister sets a register to the given value.
 func (ws *WorldState) SetRegister(hash crypto.Hash, value []byte) {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
@@ -127,7 +133,8 @@ func (ws *WorldState) SetRegister(hash crypto.Hash, value []byte) {
 	ws.Registers[hash] = value
 }
 
-func (ws *WorldState) CommitRegisters(registers etypes.Registers) {
+// SetRegisters commmits a set of registers to the state.
+func (ws *WorldState) SetRegisters(registers etypes.Registers) {
 	ws.registersMutex.Lock()
 
 	for hash, value := range registers {

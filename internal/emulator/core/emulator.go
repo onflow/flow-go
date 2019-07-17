@@ -68,7 +68,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 	registers, succeeded := b.computer.ExecuteTransaction(tx, b.pendingWorldState.GetRegister)
 
 	if succeeded {
-		b.pendingWorldState.CommitRegisters(registers)
+		b.pendingWorldState.SetRegisters(registers)
 		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionSealed)
 
 		b.updatePendingWorldStates(tx.Hash())
