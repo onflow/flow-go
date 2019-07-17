@@ -32,3 +32,5 @@ require (
 	google.golang.org/grpc v1.21.1
 	mellium.im/sasl v0.2.1 // indirect
 )
+
+replace github.com/dapperlabs/bamboo-node/language/runtime => ./language/runtime
