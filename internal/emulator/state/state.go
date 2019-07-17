@@ -17,6 +17,8 @@ type WorldState struct {
 	blockchainMutex   sync.RWMutex
 	Transactions      map[crypto.Hash]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
+	StateLog          []crypto.Hash
+	stateLogMutex     sync.RWMutex
 }
 
 // NewWorldState instantiates a new state object with a genesis block.
@@ -25,23 +27,25 @@ func NewWorldState() *WorldState {
 	blocks := make(map[crypto.Hash]*types.Block)
 	blockchain := make([]crypto.Hash, 0)
 	transactions := make(map[crypto.Hash]*types.SignedTransaction)
+	stateLog := make([]crypto.Hash, 0)
 
 	genesis := types.GenesisBlock()
 	blocks[genesis.Hash()] = genesis
 	blockchain = append(blockchain, genesis.Hash())
+	stateLog = append(stateLog, genesis.Hash())
 
 	return &WorldState{
 		Accounts:     accounts,
 		Blocks:       blocks,
 		Blockchain:   blockchain,
 		Transactions: transactions,
+		StateLog:     stateLog,
 	}
 }
 
 // Hash computes the hash over the contents of World State.
 func (ws *WorldState) Hash() crypto.Hash {
-	bytes := ws.Encode()
-	return crypto.NewHash(bytes)
+	return ws.StateLog[len(ws.StateLog)-1]
 }
 
 // GetLatestBlock gets the most recent block in the blockchain.
@@ -120,6 +124,10 @@ func (ws *WorldState) InsertBlock(block *types.Block) {
 	ws.blockchainMutex.Lock()
 	ws.Blockchain = append(ws.Blockchain, block.Hash())
 	ws.blockchainMutex.Unlock()
+
+	ws.stateLogMutex.Lock()
+	ws.StateLog = append(ws.StateLog, block.Hash())
+	ws.stateLogMutex.Unlock()
 }
 
 // InsertTransaction inserts a new transaction into the state.
@@ -132,6 +140,10 @@ func (ws *WorldState) InsertTransaction(tx *types.SignedTransaction) {
 	}
 
 	ws.Transactions[tx.Hash()] = tx
+
+	ws.stateLogMutex.Lock()
+	ws.StateLog = append(ws.StateLog, tx.Hash())
+	ws.stateLogMutex.Unlock()
 }
 
 // InsertAccount adds a newly created account into the world state.

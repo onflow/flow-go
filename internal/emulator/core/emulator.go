@@ -53,22 +53,16 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) {
 	}
 	b.txPool[tx.Hash()] = tx
 	b.pendingWorldState.InsertTransaction(tx)
-	b.updatePendingWorldStates()
+	b.updatePendingWorldStates(tx.Hash())
 }
 
-func (b *EmulatedBlockchain) updatePendingWorldStates() {
+func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
+	if _, exists := b.intermediateWorldStates[txHash]; exists {
+		return
+	}
+
 	bytes := b.pendingWorldState.Encode()
-	worldStateHash := crypto.NewHash(bytes)
-
-	if _, exists := b.intermediateWorldStates[worldStateHash]; exists {
-		return
-	}
-
-	if _, exists := b.worldStates[worldStateHash]; exists {
-		return
-	}
-
-	b.intermediateWorldStates[worldStateHash] = bytes
+	b.intermediateWorldStates[txHash] = bytes
 }
 
 // CommitBlock takes all pending transactions and commits them into a block. Note that
@@ -90,18 +84,16 @@ func (b *EmulatedBlockchain) CommitBlock() {
 	}
 
 	b.pendingWorldState.InsertBlock(block)
-	b.commitWorldState()
+	b.commitWorldState(block.Hash())
 }
 
-func (b *EmulatedBlockchain) commitWorldState() {
-	bytes := b.pendingWorldState.Encode()
-	worldStateHash := crypto.NewHash(bytes)
-
-	if _, exists := b.worldStates[worldStateHash]; exists {
+func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
+	if _, exists := b.worldStates[blockHash]; exists {
 		return
 	}
 
-	b.worldStates[worldStateHash] = bytes
+	bytes := b.pendingWorldState.Encode()
+	b.worldStates[blockHash] = bytes
 }
 
 // SeekToState rewinds the blockchain state to a previously committed history.
