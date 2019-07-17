@@ -72,4 +72,11 @@ func TestEmulatedBlockchain(t *testing.T) {
 
 	Expect(b.txPool).To(HaveLen(0))
 	Expect(ws7).To(Equal(ws5))
+
+	// Seek to non-committed world state
+	b.SeekToState(ws4)
+	ws8 := b.pendingWorldState.Hash()
+	fmt.Printf("world state after failed seek: \t%s\n", ws8)
+
+	Expect(ws8).ToNot(Equal(ws4))
 }
