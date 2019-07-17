@@ -1,7 +1,7 @@
 package crypto
 
 import (
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"strconv"
 )
 
 // Signature48 implements Signature
@@ -11,7 +11,11 @@ func (s *Signature48) ToBytes() []byte {
 }
 
 func (s *Signature48) String() string {
-	return hexutil.Encode(s[:])
+	var res string
+	for i := 0; i < len(s); i++ {
+		res = strconv.FormatUint(uint64(s[i]), 16) + res
+	}
+	return "0x" + res
 }
 
 // BLS_BLS12381Algo, embeds SignAlgo
