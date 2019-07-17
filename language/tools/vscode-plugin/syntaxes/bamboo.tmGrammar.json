@@ -2,8 +2,7 @@
     "scopeName": "source.bamboo",
     "patterns": [
       { "include": "#comments" },
-      { "include": "#literals" },
-      { "include": "#operators" }
+      { "include": "#expressions" }
     ],
     "repository": {
       "comments": {
@@ -275,6 +274,77 @@
           {
             "match": "&&|\\|\\|",
             "name": "keyword.operator.logical.bamboo"
+          }
+        ]
+      },
+      "expressions": {
+        "patterns": [
+          { "include": "#comments" },
+          { "include": "#function-call-expression" },
+          { "include": "#literals" },
+          { "include": "#operators" }
+        ]
+      },
+      "function-call-expression": {
+        "patterns": [
+          {
+            "begin": "([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)\\s*(\\()",
+            "beginCaptures": {
+              "1": {
+                "name": "support.function.any-method.bamboo"
+              },
+              "4": {
+                "name": "punctuation.definition.arguments.begin.bamboo"
+              }
+            },
+            "comment": "foo(args) -- a call whose callee is a highlightable name",
+            "end": "\\)",
+            "endCaptures": {
+              "0": {
+                "name": "punctuation.definition.arguments.end.bamboo"
+              }
+            },
+            "name": "meta.function-call.bamboo",
+            "patterns": [
+              {
+                "include": "#expression-element-list"
+              }
+            ]
+          }
+        ]
+      },
+      "expression-element-list": {
+        "patterns": [
+          {
+            "include": "#comments"
+          },
+          {
+            "begin": "([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)\\s*(:)",
+            "beginCaptures": {
+              "1": {
+                "name": "support.function.any-method.bamboo"
+              },
+              "2": {
+                "name": "punctuation.separator.argument-label.bamboo"
+              }
+            },
+            "comment": "an element with a label",
+            "end": "(?=[,)\\]])",
+            "patterns": [
+              {
+                "include": "#expressions"
+              }
+            ]
+          },
+          {
+            "begin": "(?![,)\\]])(?=\\S)",
+            "comment": "an element without a label (i.e. anything else)",
+            "end": "(?=[,)\\]])",
+            "patterns": [
+              {
+                "include": "#expressions"
+              }
+            ]
           }
         ]
       }
