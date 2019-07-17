@@ -4,7 +4,8 @@
       { "include": "#comments" },
       { "include": "#expressions" },
       { "include": "#declarations" },
-      { "include": "#keywords" }
+      { "include": "#keywords" },
+      { "include": "#code-block" }
     ],
     "repository": {
       "comments": {
@@ -295,6 +296,81 @@
           }
         ]
       },
+      "code-block": {
+        "begin": "\\{",
+        "beginCaptures": {
+          "0": {
+            "name": "punctuation.section.scope.begin.bamboo"
+          }
+        },
+        "end": "\\}",
+        "endCaptures": {
+          "0": {
+            "name": "punctuation.section.scope.end.bamboo"
+          }
+        },
+        "patterns": [
+          {
+            "include": "$self"
+          }
+        ]
+      },
+      "function": {
+        "begin": "\\b(fun)\\b\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)\\s*",
+        "beginCaptures": {
+          "1": {
+            "name": "storage.type.function.bamboo"
+          },
+          "2": {
+            "name": "entity.name.function.bamboo"
+          }
+        },
+        "end": "(?<=\\})|$",
+        "name": "meta.definition.function.bamboo",
+        "patterns": [
+          {
+            "include": "#comments"
+          },
+          {
+            "include": "#function-result"
+          },
+          {
+            "begin": "(\\{)",
+            "beginCaptures": {
+              "1": {
+                "name": "punctuation.section.function.begin.bamboo"
+              }
+            },
+            "end": "(\\})",
+            "endCaptures": {
+              "1": {
+                "name": "punctuation.section.function.end.bamboo"
+              }
+            },
+            "name": "meta.definition.function.body.bamboo",
+            "patterns": [
+              {
+                "include": "$self"
+              }
+            ]
+          }
+        ]
+      },
+      "function-result": {
+        "begin": "(?<![/=\\-+!*%<>&|\\^~.])(->)(?![/=\\-+!*%<>&|\\^~.])\\s*",
+        "beginCaptures": {
+          "1": {
+            "name": "keyword.operator.function-result.bamboo"
+          }
+        },
+        "end": "(?!\\G)(?=\\{|;)|$",
+        "name": "meta.function-result.bamboo",
+        "patterns": [
+          {
+            "include": "#type"
+          }
+        ]
+      },
       "expressions": {
         "patterns": [
           { "include": "#comments" },
@@ -377,21 +453,23 @@
       },
       "declarations": {
         "patterns": [
-          {
-            "begin": "\\b(const|var)\\b\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
-            "beginCaptures": {
-              "1": {
-                "name": "storage.type.$1.bamboo"
-              },
-              "2": {
-                "name": "entity.name.type.$1.bamboo"
-              }
-            },
-            "end": "=",
-            "patterns": [
-              { "include": "#type" }
-            ]
+          { "include": "#var-const-declaration" },
+          { "include": "#function" }
+        ]
+      },
+      "var-const-declaration": {
+        "begin": "\\b(const|var)\\b\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
+        "beginCaptures": {
+          "1": {
+            "name": "storage.type.$1.bamboo"
+          },
+          "2": {
+            "name": "entity.name.type.$1.bamboo"
           }
+        },
+        "end": "=",
+        "patterns": [
+          { "include": "#type" }
         ]
       },
       "type": {
