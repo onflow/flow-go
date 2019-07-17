@@ -9,7 +9,8 @@ import (
 )
 
 // EmulatedBlockchain simulates a blockchain in the background to enable easy smart contract testing.
-// Contains a versioned World State store for granular state update tests.
+//
+// Contains a versioned World State store and a pending transaction pool for granular state update tests.
 type EmulatedBlockchain struct {
 	worldStates             map[crypto.Hash][]byte
 	intermediateWorldStates map[crypto.Hash][]byte
@@ -27,8 +28,9 @@ func NewEmulatedBlockchain() *EmulatedBlockchain {
 	}
 }
 
-// GetTransaction gets an existing transaction by hash. First looks in pending txPool,
-// then looks in current blockchain state.
+// GetTransaction gets an existing transaction by hash.
+//
+// First looks in pending txPool, then looks in current blockchain state.
 func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTransaction {
 	if tx, ok := b.txPool[hash]; ok {
 		return tx
@@ -42,9 +44,10 @@ func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account 
 	return b.pendingWorldState.GetAccount(address)
 }
 
-// SubmitTransaction sends a transaction to the network that is immediately executed,
-// updating the current blockchain state. Note that the resulting state is not finalized until
-// CommitBlock() is called. However, the pending blockchain state is indexed for testing purposes.
+// SubmitTransaction sends a transaction to the network that is immediately executed (updates blockchain state).
+//
+// Note that the resulting state is not finalized until CommitBlock() is called.
+// However, the pending blockchain state is indexed for testing purposes.
 //
 // TODO: pass transaction into runtime to be executed
 func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) {
@@ -65,9 +68,10 @@ func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
 	b.intermediateWorldStates[txHash] = bytes
 }
 
-// CommitBlock takes all pending transactions and commits them into a block. Note that
-// this clears the pending transaction pool and indexes the committed blockchain state
-// for testing purposes.
+// CommitBlock takes all pending transactions and commits them into a block.
+//
+// Note that this clears the pending transaction pool and indexes the committed
+// blockchain state for testing purposes.
 func (b *EmulatedBlockchain) CommitBlock() {
 	txHashes := make([]crypto.Hash, 0)
 	for hash := range b.txPool {
@@ -97,6 +101,7 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 }
 
 // SeekToState rewinds the blockchain state to a previously committed history.
+//
 // Note this clears all pending transactions in txPool.
 func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
 	if bytes, ok := b.worldStates[hash]; ok {
