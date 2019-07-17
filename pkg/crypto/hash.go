@@ -10,13 +10,13 @@ import (
 // NewHashAlgo initializes and chooses a hashing algorithm
 func NewHashAlgo(name AlgoName) Hasher {
 	if name == SHA3_256 {
-		s := &(sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}})
+		a := &(sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}})
 		// Output length sanity check
-		if s.outputLength != s.Size() {
-			log.Errorf("%s requires an output length %d", SHA3_256, s.Size())
+		if a.outputLength != a.Size() {
+			log.Errorf("%s requires an output length %d", SHA3_256, a.Size())
 			return nil
 		}
-		return s
+		return a
 	}
 	log.Errorf("the hashing algorithm %s is not supported.", name)
 	return nil
@@ -48,30 +48,30 @@ type HashAlgo struct {
 }
 
 // Name returns the name of the algorithm
-func (s *HashAlgo) Name() AlgoName {
-	return s.name
+func (a *HashAlgo) Name() AlgoName {
+	return a.name
 }
 
 // ComputeBytesHash is an obsolete function that gets overritten
-func (s *HashAlgo) ComputeBytesHash([]byte) Hash {
+func (a *HashAlgo) ComputeBytesHash([]byte) Hash {
 	var h Hash
 	return h
 }
 
 // ComputeStructHash is an obsolete function that gets overritten
-func (s *HashAlgo) ComputeStructHash(struc Encoder) Hash {
+func (a *HashAlgo) ComputeStructHash(struc Encoder) Hash {
 	var h Hash
 	return h
 }
 
 // AddBytes adds bytes to the current hash state
-func (s *HashAlgo) AddBytes(data []byte) {
-	s.Write(data)
+func (a *HashAlgo) AddBytes(data []byte) {
+	a.Write(data)
 }
 
 // AddStruct adds a structure to the current hash state
-func (s *HashAlgo) AddStruct(struc Encoder) {
-	s.Write(struc.Encode())
+func (a *HashAlgo) AddStruct(struc Encoder) {
+	a.Write(struc.Encode())
 }
 
 // SumHash is an obsolete function that gets overritten

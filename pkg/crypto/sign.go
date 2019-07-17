@@ -8,12 +8,12 @@ import (
 
 func NewSignatureAlgo(name AlgoName) Signer {
 	if name == BLS_BLS12381 {
-		s := &(BLS_BLS12381Algo{&SignAlgo{
+		a := &(BLS_BLS12381Algo{&SignAlgo{
 			name,
 			PrKeyLengthBLS_BLS12381,
 			PubKeyLengthBLS_BLS12381,
 			SignatureLengthBLS_BLS12381}})
-		return s
+		return a
 	}
 	log.Errorf("the signature scheme %s is not supported.", name)
 	return nil
