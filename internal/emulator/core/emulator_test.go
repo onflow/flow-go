@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -20,14 +19,14 @@ func TestEmulatedBlockchain(t *testing.T) {
 	signedTx1, signedTx2, signedTx3 := &types.SignedTransaction{Transaction: tx1}, &types.SignedTransaction{Transaction: tx2}, &types.SignedTransaction{Transaction: tx3}
 
 	ws1 := b.pendingWorldState.Hash()
-	fmt.Printf("initial world state: \t%s\n", ws1)
+	t.Logf("initial world state: \t%s\n", ws1)
 
 	Expect(b.txPool).To(HaveLen(0))
 
 	// Submit tx1
 	b.SubmitTransaction(signedTx1)
 	ws2 := b.pendingWorldState.Hash()
-	fmt.Printf("world state after tx1: \t%s\n", ws2)
+	t.Logf("world state after tx1: \t%s\n", ws2)
 
 	Expect(b.txPool).To(HaveLen(1))
 	Expect(ws2).NotTo(Equal(ws1))
@@ -35,7 +34,7 @@ func TestEmulatedBlockchain(t *testing.T) {
 	// Submit tx1 again
 	b.SubmitTransaction(signedTx1)
 	ws3 := b.pendingWorldState.Hash()
-	fmt.Printf("world state after dup tx1: \t%s\n", ws3)
+	t.Logf("world state after dup tx1: \t%s\n", ws3)
 
 	Expect(b.txPool).To(HaveLen(1))
 	Expect(ws3).To(Equal(ws2))
@@ -43,7 +42,7 @@ func TestEmulatedBlockchain(t *testing.T) {
 	// Submit tx2
 	b.SubmitTransaction(signedTx2)
 	ws4 := b.pendingWorldState.Hash()
-	fmt.Printf("world state after tx2: \t%s\n", ws4)
+	t.Logf("world state after tx2: \t%s\n", ws4)
 
 	Expect(b.txPool).To(HaveLen(2))
 	Expect(ws4).NotTo(Equal(ws3))
@@ -51,7 +50,7 @@ func TestEmulatedBlockchain(t *testing.T) {
 	// Commit new block
 	b.CommitBlock()
 	ws5 := b.pendingWorldState.Hash()
-	fmt.Printf("world state after commit: \t%s\n", ws5)
+	t.Logf("world state after commit: \t%s\n", ws5)
 
 	Expect(b.txPool).To(HaveLen(0))
 	Expect(ws5).NotTo(Equal(ws4))
@@ -60,7 +59,7 @@ func TestEmulatedBlockchain(t *testing.T) {
 	// Submit tx3
 	b.SubmitTransaction(signedTx3)
 	ws6 := b.pendingWorldState.Hash()
-	fmt.Printf("world state after tx3: \t%s\n", ws6)
+	t.Logf("world state after tx3: \t%s\n", ws6)
 
 	Expect(b.txPool).To(HaveLen(1))
 	Expect(ws6).NotTo(Equal(ws5))
@@ -68,7 +67,7 @@ func TestEmulatedBlockchain(t *testing.T) {
 	// Seek to committed block/world state
 	b.SeekToState(ws5)
 	ws7 := b.pendingWorldState.Hash()
-	fmt.Printf("world state after seek: \t%s\n", ws7)
+	t.Logf("world state after seek: \t%s\n", ws7)
 
 	Expect(b.txPool).To(HaveLen(0))
 	Expect(ws7).To(Equal(ws5))
@@ -76,7 +75,7 @@ func TestEmulatedBlockchain(t *testing.T) {
 	// Seek to non-committed world state
 	b.SeekToState(ws4)
 	ws8 := b.pendingWorldState.Hash()
-	fmt.Printf("world state after failed seek: \t%s\n", ws8)
+	t.Logf("world state after failed seek: \t%s\n", ws8)
 
 	Expect(ws8).ToNot(Equal(ws4))
 }
