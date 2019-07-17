@@ -4,25 +4,25 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// InitSignatureAlgo initializes and chooses a signature scheme
-//-----------------------------------------------
-func InitSignatureAlgo(i AlgoIndex) Signer {
-	if i == BLS_BLS12381 {
+// NewSignatureAlgo initializes and chooses a signature scheme
+
+func NewSignatureAlgo(name AlgoName) Signer {
+	if name == BLS_BLS12381 {
 		s := &(BLS_BLS12381Algo{&SignAlgo{
-			i.String(),
+			name,
 			PrKeyLengthBLS_BLS12381,
 			PubKeyLengthBLS_BLS12381,
 			SignatureLengthBLS_BLS12381}})
 		return s
 	}
-	log.Errorf("the requested signature scheme is not supported.")
+	log.Errorf("the signature scheme %s is not supported.", name)
 	return nil
 }
 
 // Signer interface
-//-----------------------------------------------
+
 type Signer interface {
-	GetName() string
+	Name() AlgoName
 	// Size return the signature output length
 	SignatureSize() int
 	// Signature functions
@@ -38,16 +38,16 @@ type Signer interface {
 }
 
 // SignAlgo implements Signer
-//-----------------------------------------------
+
 type SignAlgo struct {
-	name            string
+	name            AlgoName
 	PrKeyLength     int
 	PubKeyLength    int
 	SignatureLength int
 }
 
-// GetName returns the name of the algorithm
-func (a *SignAlgo) GetName() string {
+// Name returns the name of the algorithm
+func (a *SignAlgo) Name() AlgoName {
 	return a.name
 }
 
@@ -98,7 +98,7 @@ func (a *SignAlgo) GeneratePrKey() PrKey {
 }
 
 // Signature type tools
-//----------------------
+
 // Signature is unspecified signature scheme signature
 type Signature interface {
 	// ToBytes returns the bytes representation of a signature
@@ -108,21 +108,21 @@ type Signature interface {
 }
 
 // Key Pair
-//----------------------
+
 // PrKey is an unspecified signature scheme private key
 type PrKey interface {
 	// returns the name of the algorithm related to the private key
-	GetAlgoName() string
+	AlgoName() AlgoName
 	// return the size in bytes
-	GetKeySize() int
+	KeySize() int
 	// computes the pub key associated with the private key
 	ComputePubKey()
 	// returns the public key
-	GetPubkey() PubKey
+	Pubkey() PubKey
 }
 
 // PubKey is an unspecified signature scheme public key
 type PubKey interface {
 	// return the size in bytes
-	GetKeySize() int
+	KeySize() int
 }

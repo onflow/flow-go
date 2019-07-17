@@ -53,11 +53,11 @@ type PrKeyBLS_BLS12381 struct {
 	//...
 }
 
-func (sk *PrKeyBLS_BLS12381) GetAlgoName() string {
-	return sk.alg.GetName()
+func (sk *PrKeyBLS_BLS12381) AlgoName() AlgoName {
+	return sk.alg.Name()
 }
 
-func (sk *PrKeyBLS_BLS12381) GetKeySize() int {
+func (sk *PrKeyBLS_BLS12381) KeySize() int {
 	return PrKeyLengthBLS_BLS12381
 }
 
@@ -66,7 +66,7 @@ func (sk *PrKeyBLS_BLS12381) ComputePubKey() {
 	sk.pk = nil
 }
 
-func (sk *PrKeyBLS_BLS12381) GetPubkey() PubKey {
+func (sk *PrKeyBLS_BLS12381) Pubkey() PubKey {
 	if sk.pk != nil {
 		return sk.pk
 	}
@@ -81,6 +81,6 @@ type PubKey_BLS_BLS12381 struct {
 	dummy int
 }
 
-func (pk *PubKey_BLS_BLS12381) GetKeySize() int {
+func (pk *PubKey_BLS_BLS12381) KeySize() int {
 	return PubKeyLengthBLS_BLS12381
 }

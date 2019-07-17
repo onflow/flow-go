@@ -7,26 +7,25 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// InitHashAlgo initializes and chooses a hashing algorithm
-//-----------------------------------------------
-func InitHashAlgo(i AlgoIndex) Hasher {
-	if i == SHA3_256 {
-		s := &(sha3_256Algo{&HashAlgo{i.String(), HashLengthSha3_256, sha3.New256()}})
+// NewHashAlgo initializes and chooses a hashing algorithm
+func NewHashAlgo(name AlgoName) Hasher {
+	if name == SHA3_256 {
+		s := &(sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}})
 		// Output length sanity check
 		if s.outputLength != s.Size() {
-			log.Errorf("%s requires an output length %d", i.String(), s.Size())
+			log.Errorf("%s requires an output length %d", SHA3_256, s.Size())
 			return nil
 		}
 		return s
 	}
-	log.Errorf("the hashing algorithm requested is not supported.")
+	log.Errorf("the hashing algorithm %s is not supported.", name)
 	return nil
 }
 
 // Hasher interface
-//-----------------------------------------------
+
 type Hasher interface {
-	GetName() string
+	Name() AlgoName
 	// Size return the hash output length (a Hash.hash method)
 	Size() int
 	// Compute hash
@@ -42,15 +41,14 @@ type Hasher interface {
 }
 
 // HashAlgo implements Hasher
-//-----------------------------------------------
 type HashAlgo struct {
-	name         string
+	name         AlgoName
 	outputLength int
 	hash.Hash
 }
 
-// GetName returns the name of the algorithm
-func (s *HashAlgo) GetName() string {
+// Name returns the name of the algorithm
+func (s *HashAlgo) Name() AlgoName {
 	return s.name
 }
 

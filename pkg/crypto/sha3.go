@@ -1,6 +1,6 @@
 package crypto
 
-import "github.com/ethereum/go-ethereum/common/hexutil"
+import "strconv"
 
 // sha3_256Algo, embeds HashAlgo
 //-----------------------------------------------
@@ -47,7 +47,7 @@ type Encoder interface {
 type Hash interface {
 	// ToBytes returns the bytes representation of a hash
 	ToBytes() []byte
-	// String returns a Hex string representation of the hash bytes
+	// String returns a Hex string representation of the hash bytes in little endian
 	String() string
 	// IsEqual tests an equality with a given hash
 	IsEqual(Hash) bool
@@ -60,7 +60,11 @@ func (h *Hash32) ToBytes() []byte {
 }
 
 func (h *Hash32) String() string {
-	return hexutil.Encode(h[:])
+	var s string
+	for i := 0; i < len(h); i++ {
+		s = strconv.FormatUint(uint64(h[i]), 16) + s
+	}
+	return "0x" + s
 }
 
 func (h *Hash32) IsEqual(input Hash) bool {

@@ -1,24 +1,15 @@
 package crypto
 
-// AlgoIndex is the supported algos type
-type AlgoIndex int
+// AlgoName is the supported algos type
+type AlgoName string
 
 const (
 	// Hashing supported algorithms
-	SHA3_256 AlgoIndex = iota << 4
+	SHA3_256 AlgoName = "SHA3_256"
 
 	// Signing supported algorithms
-	BLS_BLS12381
+	BLS_BLS12381 = "BLS_BLS12381"
 )
-
-func (i AlgoIndex) String() string {
-	return []string{
-		// Hashing supported algorithms
-		"SHA3_256",
-		// Signing supported algorithms
-		"BLS_BLS12381",
-		}[i >> 4]
-}
 
 const (
 	// Lengths of hash outputs in bytes
