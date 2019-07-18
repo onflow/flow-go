@@ -3,10 +3,11 @@ package runtime
 import (
 	"errors"
 	"fmt"
-	"github.com/dapperlabs/bamboo-node/language/runtime/interpreter"
-	"github.com/dapperlabs/bamboo-node/language/runtime/parser"
 	"math/big"
 	"strings"
+
+	"github.com/dapperlabs/bamboo-node/language/runtime/interpreter"
+	"github.com/dapperlabs/bamboo-node/language/runtime/parser"
 )
 
 type RuntimeInterface interface {
@@ -39,8 +40,7 @@ type Runtime interface {
 }
 
 // mockRuntime is a mocked version of the Bamboo runtime
-type mockRuntime struct {
-}
+type mockRuntime struct{}
 
 // NewMockRuntime returns a mocked version of the Bamboo runtime.
 func NewMockRuntime() Runtime {
@@ -51,11 +51,11 @@ func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInter
 	return nil
 }
 
-// interpreterRuntime is a interpreter-based version of the Bamboo runtime
+// interpreterRuntime is a interpreter-based version of the Bamboo runtime.
 type interpreterRuntime struct {
 }
 
-// NewInterpreterRuntime returns a interpreter-based version of the Bamboo runtime
+// NewInterpreterRuntime returns a interpreter-based version of the Bamboo runtime.
 func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }
