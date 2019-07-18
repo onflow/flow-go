@@ -344,7 +344,48 @@
             "include": "#comments"
           },
           {
+            "include": "#parameter-clause"
+          },
+          {
             "include": "#function-result"
+          },
+          {
+            "begin": "(\\{)",
+            "beginCaptures": {
+              "1": {
+                "name": "punctuation.section.function.begin.bamboo"
+              }
+            },
+            "end": "(\\})",
+            "endCaptures": {
+              "1": {
+                "name": "punctuation.section.function.end.bamboo"
+              }
+            },
+            "name": "meta.definition.function.body.bamboo",
+            "patterns": [
+              {
+                "include": "$self"
+              }
+            ]
+          }
+        ]
+      },
+      "initializer": {
+        "begin": "(?<!\\.)\\b(init)\\s*(?=\\(|<)",
+        "beginCaptures": {
+          "1": {
+            "name": "storage.type.function.bamboo"
+          }
+        },
+        "end": "(?<=\\})|$",
+        "name": "meta.definition.function.initializer.bamboo",
+        "patterns": [
+          {
+            "include": "#comments"
+          },
+          {
+            "include": "#parameter-clause"
           },
           {
             "begin": "(\\{)",
@@ -466,7 +507,8 @@
       "declarations": {
         "patterns": [
           { "include": "#var-const-declaration" },
-          { "include": "#function" }
+          { "include": "#function" },
+          { "include": "#initializer" }
         ]
       },
       "var-const-declaration": {
@@ -516,6 +558,67 @@
           {
             "match": "\\bU?Int(?:16|8|32|64)?\\b",
             "name": "support.type.integer.bamboo"
+          }
+        ]
+      },
+      "parameter-clause": {
+        "begin": "(\\()",
+        "beginCaptures": {
+          "1": {
+            "name": "punctuation.definition.parameters.begin.bamboo"
+          }
+        },
+        "end": "(\\))",
+        "endCaptures": {
+          "1": {
+            "name": "punctuation.definition.parameters.end.bamboo"
+          }
+        },
+        "name": "meta.parameter-clause.bamboo",
+        "patterns": [
+          {
+            "include": "#parameter-list"
+          }
+        ]
+      },
+      "parameter-list": {
+        "patterns": [
+          {
+            "match": "([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)(?=\\s*:)",
+            "captures": {
+              "1": {
+                "name": "entity.name.function.bamboo"
+              },
+              "2": {
+                "name": "variable.parameter.function.bamboo"
+              }
+            },
+            "comment": "External parameter labels are considered part of the function name"
+          },
+          {
+            "match": "(([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*))(?=\\s*:)",
+            "captures": {
+              "1": {
+                "name": "variable.parameter.function.bamboo"
+              },
+              "2": {
+                "name": "entity.name.function.bamboo"
+              }
+            },
+            "comment": "If no external label is given, the name is both the external label and the internal variable name"
+          },
+          {
+            "begin": ":\\s*(?!\\s)",
+            "end": "(?=[,)])",
+            "patterns": [
+              {
+                "include": "#type"
+              },
+              {
+                "match": ":",
+                "name": "invalid.illegal.extra-colon-in-parameter-list.bamboo"
+              }
+            ]
           }
         ]
       }
