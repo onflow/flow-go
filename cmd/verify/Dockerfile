@@ -3,8 +3,13 @@ FROM golang:1.12 as build-env
 RUN mkdir /app
 WORKDIR /app
 
-COPY . .
+COPY go.mod .	
+COPY go.sum .
+COPY language/runtime/ .
+
 RUN go mod download
+
+COPY . .
 
 RUN GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /go/bin/app ./cmd/verify/
 
