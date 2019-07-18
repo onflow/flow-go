@@ -147,6 +147,7 @@ func (ws *WorldState) SetRegisters(registers etypes.Registers) {
 	}
 }
 
+// InsertBlock adds a new block to the blockchain.
 func (ws *WorldState) InsertBlock(block *etypes.Block) {
 	ws.blocksMutex.Lock()
 	defer ws.blocksMutex.Unlock()
@@ -197,6 +198,7 @@ func (ws *WorldState) InsertAccount(account *crypto.Account) {
 	ws.Accounts[account.Address] = account
 }
 
+// UpdateTransactionStatus updates the transaction status of an existing transaction.
 func (ws *WorldState) UpdateTransactionStatus(h crypto.Hash, status types.TransactionStatus) {
 	tx := ws.GetTransaction(h)
 	if tx == nil {
