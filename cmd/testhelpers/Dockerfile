@@ -1,11 +1,8 @@
-# NOTE: this docker file needs to be run from the context of the top level repo folder
+# NOTE: this Dockerfile must be run in the context of the top level repo folder
 FROM golang:1.12 as build-env
 RUN mkdir /app
 WORKDIR /app
-COPY go.mod . 
-COPY go.sum .
 
-RUN go mod download 
 COPY . .
 
 RUN GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /go/bin/app ./cmd/testhelpers/
