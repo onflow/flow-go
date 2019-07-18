@@ -52,13 +52,14 @@
   - [Nil-Coalescing Operator](#nil-coalescing-operator)
 - [Type Safety](#type-safety)
 - [Type Inference](#type-inference)
-- [Structures and Classes](#structures-and-classes)
-  - [Structure and Class Fields](#structure-and-class-fields)
-  - [Structure and Class Field Getters and Setters](#structure-and-class-field-getters-and-setters)
-  - [Synthetic Structure and Class Fields](#synthetic-structure-and-class-fields)
-  - [Structure and Class Functions](#structure-and-class-functions)
-  - [Structure and Class Behaviour](#structure-and-class-behaviour)
-  - [Class Inheritance and Abstract Classes](#class-inheritance-and-abstract-classes)
+- [Composite Data Types](#composite-data-types)
+  - [Composite Data Type Declaration](#composite-data-type-declaration)
+  - [Composite Data Type Fields](#composite-data-type-fields)
+  - [Composite Data Type Field Getters and Setters](#composite-data-type-field-getters-and-setters)
+  - [Synthetic Composite Data Type Fields](#synthetic-composite-data-type-fields)
+  - [Composite Data Type Functions](#composite-data-type-functions)
+  - [Composite Data Type Behaviour](#composite-data-type-behaviour)
+  - [Inheritance and Abstract Types](#inheritance-and-abstract-types)
 - [Access control](#access-control)
 - [Permissions](#permissions)
 - [Interfaces](#interfaces)
@@ -1627,15 +1628,23 @@ const add = (a: Int8, b: Int8) -> Int {
 // `add` has type `(Int8, Int8) -> Int`
 ```
 
-## Structures and Classes
+## Composite Data Types
 
-> 🚧 Status: Structures and classes are not implemented yet.
+> 🚧 Status: Composite Data Types are not implemented yet.
 
-Structures and classes are composite data types. Structures and classes consist of one or more values, which are stored in named fields. Each field may have a different type.
+Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of one or more named fields, and one or more functions that opperate on the data. Each field may have a different type.
 
-Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword. The keyword is followed by the name.
+There are three kinds of composite data types: structures, classes, and resources. They differ in their behaviour: Structures are *copied*, i.e. they are value types, classes are *referenced*, i.e., they are reference types, and resources are *moved*, they are linear types.
 
-```swift,file=struct-and-class.bpl
+This is explained in detail in a [separate section](#composite-data-type-behaviour).
+
+### Composite Data Type Declaration
+
+Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword. Resources are declared using the `resource` keyword.
+
+The keyword that specifies the kind of composite data type is followed by the name of the type.
+
+```bamboo,file=composite-data-type-declaration.bpl
 struct SomeStruct {
     // ...
 }
@@ -1643,31 +1652,35 @@ struct SomeStruct {
 class SomeClass {
     // ...
 }
+
+resource SomeResource {
+    // ...
+}
 ```
 
-Structures and classes are types.
+Structures, classes, and resources are types.
 
-Values of a structure or class type are created (instantiated) by calling the type like a function.
+Values of a structure, class, or resource type are created (instantiated) by calling the type like a function.
 
-```swift,file=struct-and-class-instantiation.bpl
+```bamboo,file=composite-data-type-instantiation.bpl
 const someStruct: SomeStruct = SomeStruct()
 
 const someClass: SomeClass = SomeClass()
+
+const someResource: SomeResource = SomeResource()
 ```
 
-Structures and classes mainly differ in their behaviour: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types. This is explained in detail in a [separate section](#structure-and-class-behaviour). Value types should be used when copies with independent state is desired, and reference types should be used when shared, mutable state is desired.
-
-### Structure and Class Fields
+### Composite Data Type Fields
 
 Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initializer is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
 
 There are three kinds of fields.
 
-Variable fields are stored in the structure or class value, can have new values assigned to them. They are declared using the `var` keyword.
+Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the `var` keyword.
 
-Constant fields are also stored in the structure or class value, but they can **not** have new values assigned to them. They are declared using the `const` keyword.
+Constant fields are also stored in the composite value, but they can **not** have new values assigned to them. They are declared using the `const` keyword.
 
-Synthetic fields are **not** stored in the structure or class value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#structure-and-class-field-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-structure-and-class-fields).
+Synthetic fields are **not** stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#composite-data-type-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
 
 | Field Kind           | Stored in memory | Assignable         | Keyword     |
 |----------------------|------------------|--------------------|-------------|
@@ -1692,9 +1705,9 @@ struct Token {
 }
 ```
 
-In initializers, the special constant `self` refers to the structure or class value that is to be initialized.
+In initializers, the special constant `self` refers to the composite value that is to be initialized.
 
-Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the structure or class instance is followed by a dot (`.`) and the name of the field.
+Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (`.`) and the name of the field.
 
 ```bamboo,file=composite-data-type-fields-assignment.bpl
 const token = Token(id: 42, balance: 1_000_00)
@@ -1710,7 +1723,7 @@ token.balance = 1
 token.id = 23
 ```
 
-### Structure and Class Field Getters and Setters
+### Composite Data Type Field Getters and Setters
 
 Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.
 
@@ -1781,9 +1794,9 @@ const example = SetterExample(balance: 10)
 example.balance = -50
 ```
 
-### Synthetic Structure and Class Fields
+### Synthetic Composite Data Type Fields
 
-Fields which are not stored in the structure or class value are *synthetic*, i.e., the field value is computed. Synthetic can be either read-only, or readable and writable.
+Fields which are not stored in the composite value are *synthetic*, i.e., the field value is computed. Synthetic can be either read-only, or readable and writable.
 
 Synthetic fields are declared using the `synthetic` keyword.
 
@@ -1864,9 +1877,9 @@ tracker.left = 8
 It is invalid to declare a synthetic field with only a setter.
 
 
-### Structure and Class Functions
+### Composite Data Type Functions
 
-Structures and classes may contain functions. Just like in the initializer, the special constant `self` refers to the structure or class value that the function is called on.
+Composite data types may contain functions. Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
 
 ```bamboo,file=struct-and-class-function.bpl
 struct Token {
@@ -1888,9 +1901,14 @@ token.mint(amount: 1_000_000)
 // token.balance is 1_000_000
 ```
 
-### Structure and Class Behaviour
+### Composite Data Type Behaviour
 
-The only difference between structures and classes is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types.
+The only difference between structures, classes, and resources is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are **copied**, i.e. they are value types, classes are **referenced**, i.e., they are reference types, and resources are **moved**, they are linear types.
+
+When a resources which is referred to by a constant or variable is assigned to another constant or variable, or is passed as an argument to a function, the resource is **moved**, and the constant or variable refererring to the resource becomes **invalid**. Resources **must** be used **exactly once**.
+
+Value types should be used when copies with independent state is desired, reference types should be used when shared, mutable state is desired, and linear types should be used when a value must be used exactly once.
+
 Structures are **copied**.
 
 ```bamboo,file=struct-behavior.bpl
@@ -1907,15 +1925,15 @@ struct SomeStruct {
 
 // Declare a constant with value of structure type `SomeStruct`
 //
-const structA = SomeStruct(value: 0)
+const a = SomeStruct(value: 0)
 
 // *Copy* the structure value into a new constant
 //
-const structB = structA
+const b = a
 
-structB.value = 1
+b.value = 1
 
-// structA.value is *0*
+a.value // is *0*
 ```
 
 Classes are **referenced**.
@@ -1933,39 +1951,76 @@ class SomeClass {
 
 // Declare a constant with value of class type `SomeClass`
 //
-const classA = SomeClass(value: 0)
+const a = SomeClass(value: 0)
 
 // *Reference* the class value with a new constant
 //
-const classB = classA
+const b = A
 
-classB.value = 1
+b.value = 1
 
-// classA.value is *1*
+a.value // is *1*
 ```
 
-Note the different values in the last line of each example.
+Resources are **moved** and existing references become **invalid**.
 
-There is **no** support for nulls, i.e., a constant or variable of a reference type must always be bound to an instance of the type. There is *no* `null`.
+```bamboo,file=resource-behavior.bpl
+// Declare a resource named `SomeResource`, with a variable integer field
+//
+resource SomeResource {
+    var value: Int
 
+    init(value: Int) {
+        self.value = value
+    }
+}
 
-### Class Inheritance and Abstract Classes
+// Declare a constant with value of resource type `SomeResource`
+//
+const a = SomeResource(value: 0)
 
-There is **no** support for class inheritance. Class inheritance is a feature common in other programming languages, that allows including the fields and functions of a class (known as the superclass) in another class (known as the subclass).
+// *Move* the resource value to a new constant
+//
+const b = a
 
-Instead, follow "Composition over inheritance", the idea of composing functionality from multiple individual parts, rather than building an inheritance tree.
+// Invalid: Cannot use constant `a` anymore, as the value
+// it referred to was moved to constant `b`
+//
+a.value
 
-Furthermore, there is also **no** support for abstract classes. An abstract class is a feature common in other programming languages, that prevents creating values of a superclass and only allows the creation of values of a subclass.
+// Variable `resourceB` is the only reference to the value
+// and can be used freely
+//
+b.value = 1
 
-In addition, abstract classes may declare functions, but omit the implementation of them and require   subclasses to implement them.
+// Declare another, unrelated value of resource type `SomeResource`
+//
+const c = SomeResource(value: 10)
 
-Instead, use [interfaces](#interfaces).
+// Invalid: `c` is not used, but must be! `c` is lost
+```
+
+Note the outcomes in the last lines of the first two examples. Also especially note the behaviour in the last example.
+
+### Unbound References / Nulls
+
+There is **no** support for nulls, i.e., a constant or variable of a reference type must always be bound to an instance of the type. There is **no** `null`.
+
+### Inheritance and Abstract Types
+
+There is **no** support for inheritance. Inheritance is a feature common in other programming languages, that allows including the fields and functions of a type (e.g. for a classes, known as the superclass) in another type (e.g. for classes, known as the subclass).
+
+Instead, follow the "composition over inheritance" principle, the idea of composing functionality from multiple individual parts, rather than building an inheritance tree.
+
+Furthermore, there is also **no** support for abstract types (e.g. abstract class). An abstract type is a feature common in other programming languages, that prevents creating values of the type and only allows the creation of values of a subtype (e.g. subclass). In addition, abstract types may declare functions, but omit the implementation of them and instead require subtypes to implement them.
+
+Instead, consider using [interfaces](#interfaces).
 
 ## Access control
 
 > 🚧 Status: Access control is not implemented yet.
 
-Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, classes, interfaces) and fields (in structures, classes) are either private or public.
+Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, classes, resources, interfaces) and fields (in structures, classes, and resources) are either private or public.
 
 **Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field in a class can only be accessed by functions of the class, not by code that uses an instance of the class in an outer scope.
 
@@ -1985,12 +2040,12 @@ To summarize the behavior for variable declarations, constant declarations, and 
 | `var`            | `pub`              | **All**           | Current and inner |
 | `var`            | `pub(set)`         | **All**           | **All**           |
 
-To summarize the behavior for functions, structures, classes, and interfaces:
+To summarize the behavior for functions, structures, classes, resources, and interfaces:
 
-| Declaration kind                         | Access modifier       | Access scope      |
-|:-----------------------------------------|:----------------------|:------------------|
-| `fun`, `struct`, `class`, `interface`    |                       | Current and inner |
-| `fun`, `struct`, `class`, `interface`    | `pub`                 | **All**           |
+| Declaration kind                                  | Access modifier       | Access scope      |
+|:--------------------------------------------------|:----------------------|:------------------|
+| `fun`, `struct`, `class`, `resource`, `interface` |                       | Current and inner |
+| `fun`, `struct`, `class`, `resource`, `interface` | `pub`                 | **All**           |
 
 
 ```bamboo,file=access-control.bpl
@@ -2053,11 +2108,11 @@ pub class SomeClass {
 
 > 🚧 Status: Permissions are not implemented yet.
 
-Initializers, fields, and functions of classes can be made accessible in other types by *permitting* them to do so.
+Initializers, fields, and functions of classes and resources can be made accessible in other types by *permitting* them to do so.
 
 <!-- TODO this is in basically adding additional scopes aside from the class in which the initialzer, field, or function is defined in -->
 
-Permissions for classes are declared using the `permit` keyword, followed by the type that should be permitted access, the `to` keyword, and the type that should be accessible by the permitted type.
+Permissions are declared using the `permit` keyword, followed by the type that should be permitted access, the `to` keyword, and the type that should be accessible by the permitted type.
 
 <!-- TODO: can be used e.g. for authorizations, values that represent access rights/privileges to resources. -->
 
@@ -2226,7 +2281,7 @@ purse.deposit(to: receiver, amount: 25, auth: depositAuth)
 
 An interface is an abstract type that specifies the behavior of types that *implement* the interface. Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
 
-Interfaces can be implemented by [classes](#structures-and-classes), [structures](#structures-and-classes), [contracts](#contracts). These types may implement multiple interfaces.
+Interfaces can be implemented by [composite data types](#composite-data-types) (classes, structures, and resources), and by [contracts](#contracts). These types may implement multiple interfaces.
 
 Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Interface requirements, and therefore also their implementations, must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.
 
@@ -2342,7 +2397,7 @@ Note that the required initializer and function do not have any executable code.
 
 ### Interface Implementation
 
-Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the type (class, structure, or contract) that provides the functionality required in the interface.
+Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the type (class, structure, resource, or contract) that provides the functionality required in the interface.
 
 ```bamboo,file=interface-implementation.bpl
 // Declare a class named `ExampleVault` with a variable field named `balance`,
@@ -2641,7 +2696,7 @@ Storable types can be persisted across multiple executions of the program. Value
 
 All built-in types are storable: booleans, integers, arrays with storable elements, and dictionaries with storable keys and values.
 
-[Structures and classes](#structures-and-classes) can be stored by implementing the [interface](#interfaces) `Storable`. The only requirement is that all field types of the implementing type need to be storable.
+[Composite data types](#composite-data-types) (structures, classes, and resources) can be stored by implementing the [interface](#interfaces) `Storable`. The only requirement is that all field types of the implementing type need to be storable.
 
 ```bamboo,file=storable-class.bpl
 // The declaration for interface `Storable` has no explicit requirements.
@@ -2691,9 +2746,9 @@ const account: Account = // ...
 const value: Int? = account.getStored(Int)
 ```
 
-It is only possible to store **one** value per type at the root of an account. Storing primitive values (e.g., integers, booleans) at the root of an account is possible, but not very practical – it is unclear what the value means. 
+It is only possible to store **one** value per type at the root of an account. Storing primitive values (e.g., integers, booleans) at the root of an account is possible, but not very practical – it is unclear what the value means.
 
-If a single primitive value, multiple values of the same type, or even more complex data should be stored, composite data types (like structures and classes) have to be used.
+If a single primitive value, multiple values of the same type, or even more complex data should be stored, composite data types (structures, classes, and resources) have to be used.
 
 This requirement to declare and use composite data types is intentional, and not a "workaround". It makes storage declarative and explicit. Types declaratively describe what data is stored (through the name of the type), describe and specify what values are stored (through the names of the fields), and specify what types the values have (through the type annotations of the fields).
 
@@ -2738,7 +2793,7 @@ const storedVault: SimpleVault? = account.getStored(SimpleVault)
 
 > 🚧 Status: Contracts are not implemented yet.
 
-A contract is similar to a [class](#structures-and-classes) in that it is a composite data type and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
+A contract is similar to a [class](#composite-data-types) in that it is a composite data type and a reference type, i.e., it consists of values, is referenced, has an initializer, and can have functions associated with it.
 
 Contracts differ from classes in that all fields are [stored](#storage). To make this explicit, all fields must be annotated with the `stored` keyword.
 
