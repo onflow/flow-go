@@ -55,10 +55,10 @@ func (ws *WorldState) Hash() crypto.Hash {
 // GetLatestBlock gets the most recent block in the blockchain.
 func (ws *WorldState) GetLatestBlock() *etypes.Block {
 	ws.blockchainMutex.RLock()
+	defer ws.blockchainMutex.RUnlock()
+
 	currHeight := len(ws.Blockchain)
 	blockHash := ws.Blockchain[currHeight-1]
-	ws.blockchainMutex.RUnlock()
-
 	block := ws.GetBlockByHash(blockHash)
 	return block
 }
@@ -78,15 +78,13 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 // GetBlockByHeight gets a block by height.
 func (ws *WorldState) GetBlockByHeight(height uint64) *etypes.Block {
 	ws.blockchainMutex.RLock()
-	currHeight := len(ws.Blockchain)
+	defer ws.blockchainMutex.RUnlock()
 
+	currHeight := len(ws.Blockchain)
 	if int(height) < currHeight {
 		blockHash := ws.Blockchain[height]
-		ws.blockchainMutex.RUnlock()
 		return ws.GetBlockByHash(blockHash)
 	}
-
-	ws.blockchainMutex.RUnlock()
 
 	return nil
 }
@@ -152,6 +150,7 @@ func (ws *WorldState) SetRegisters(registers etypes.Registers) {
 func (ws *WorldState) InsertBlock(block *etypes.Block) {
 	ws.blocksMutex.Lock()
 	defer ws.blocksMutex.Unlock()
+
 	if _, exists := ws.Blocks[block.Hash()]; exists {
 		return
 	}
@@ -159,12 +158,14 @@ func (ws *WorldState) InsertBlock(block *etypes.Block) {
 	ws.Blocks[block.Hash()] = block
 
 	ws.blockchainMutex.Lock()
+	defer ws.blockchainMutex.Unlock()
+
 	ws.Blockchain = append(ws.Blockchain, block.Hash())
-	ws.blockchainMutex.Unlock()
 
 	ws.latestStateMutex.Lock()
+	defer ws.latestStateMutex.Unlock()
+
 	ws.LatestState = block.Hash()
-	ws.latestStateMutex.Unlock()
 }
 
 // InsertTransaction inserts a new transaction into the state.
