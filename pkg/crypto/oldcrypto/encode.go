@@ -1,21 +1,19 @@
-package utils
+package oldcrypto
 
 import (
 	"bytes"
 	"encoding/gob"
 	"log"
 	"time"
-
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 )
 
 // EncodeAsBytes encodes a series of arbitrary data into bytes.
 func EncodeAsBytes(data ...interface{}) []byte {
 	gob.Register(time.Time{})
-	gob.Register(crypto.Hash{})
-	gob.Register([]crypto.Hash{})
-	gob.Register(crypto.Address{})
-	gob.Register(crypto.Signature{})
+	gob.Register(Hash{})
+	gob.Register([]Hash{})
+	gob.Register(Address{})
+	gob.Register(Signature{})
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
