@@ -1,6 +1,7 @@
 {
     "name": "bamboo",
     "displayName": "Bamboo",
+    "publisher": "dapperlabs",
     "description": "",
     "version": "0.0.1",
     "engines": {
