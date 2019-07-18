@@ -126,7 +126,7 @@ Comments may be nested.
 
 Constants and variables are declarations that bind a value to a name. Constants can only be initialized with a value and cannot be reassigned afterwards. Variables can be initialized with a value and can be reassigned later. Declarations are valid in any scope, including the global scope.
 
-Constant means that the *name* is constant, not the *value*, i.e., the value may still be changed if it allows it.
+Constant means that the *name* is constant, not the *value* – the value may still be changed if it allows it, i.e. is mutable.
 
 The `const` keyword is used to declare a constant and the `var` keyword is used to declare a variable.
 The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
@@ -516,6 +516,10 @@ To set an element of an array at a specific index, the indexing syntax can be us
 const numbers = [42, 23]
 
 // Change the second number
+//
+// NOTE: The declaration `numbers` is constant, which means that
+// the *name* is constant, not the *value* – the value, i.e. the array,
+// is mutable and can be changed
 //
 numbers[1] = 2
 
