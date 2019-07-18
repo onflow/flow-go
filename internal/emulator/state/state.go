@@ -103,6 +103,12 @@ func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction 
 	return nil
 }
 
+// ContainsTransaction returns true if the transaction exists in the state, false otherwise.
+func (ws *WorldState) ContainsTransaction(hash crypto.Hash) bool {
+	_, exists := ws.Transactions[hash]
+	return exists
+}
+
 // GetAccount gets an account by address.
 func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
 	ws.accountsMutex.RLock()

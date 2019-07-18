@@ -58,6 +58,10 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
+	if b.pendingWorldState.ContainsTransaction(tx.Hash()) {
+		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
+	}
+
 	if err := b.validateSignature(tx.PayerSignature); err != nil {
 		return &ErrInvalidTransactionSignature{TxHash: tx.Hash()}
 	}
