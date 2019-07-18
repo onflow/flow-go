@@ -1,5 +1,11 @@
-GODOC2MD = GO111MODULE=on go run github.com/lanre-ade/godoc2md
-WIRE = GO111MODULE=on go run github.com/google/wire/cmd/wire
+export GO111MODULE := on
+
+.PHONY: install-tools
+install-tools:
+	go get github.com/psiemens/godoc2md@v1.0.1
+	go get github.com/google/wire/cmd/wire@v0.3.0
+	go get github.com/golang/protobuf/protoc-gen-go@v1.3.2
+	go get github.com/uber/prototool/cmd/prototool@v1.8.0
 
 .PHONY: test-setup
 test-setup:
@@ -23,33 +29,32 @@ test: test-setup test-run test-teardown
 
 .PHONY: generate-godoc
 generate-godoc:
-	$(GODOC2MD) github.com/dapperlabs/bamboo-node/internal/roles/collect/clusters > internal/roles/collect/clusters/README.md
-	$(GODOC2MD) github.com/dapperlabs/bamboo-node/internal/roles/collect/routing > internal/roles/collect/routing/README.md
-	$(GODOC2MD) github.com/dapperlabs/bamboo-node/internal/roles/collect/collections > internal/roles/collect/collections/README.md
+	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/clusters > internal/roles/collect/clusters/README.md
+	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/routing > internal/roles/collect/routing/README.md
+	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/collections > internal/roles/collect/collections/README.md
 
 .PHONY: generate-proto
 generate-proto:
-	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go
-	GO111MODULE=on go run github.com/uber/prototool/cmd/prototool generate proto/
+	prototool generate proto/
 
 .PHONY: generate-wire
 generate-wire:
-	$(WIRE) ./internal/roles/collect/
-	$(WIRE) ./internal/roles/consensus/
-	$(WIRE) ./internal/roles/execute/
-	$(WIRE) ./internal/roles/verify/
-	$(WIRE) ./internal/roles/seal/
+	wire ./internal/roles/collect/
+	wire ./internal/roles/consensus/
+	wire ./internal/roles/execute/
+	wire ./internal/roles/verify/
+	wire ./internal/roles/seal/
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-wire
 
 .PHONY: check-generated-code
-check-generated-code: generate
+check-generated-code:
 	./scripts/check-generated-code.sh
 
 .PHONY: build-bamboo
 build-bamboo:
-	GO111MODULE=on go build -o bamboo ./cmd/bamboo/
+	go build -o bamboo ./cmd/bamboo/
 
 .PHONY: ci
-ci: check-generated-code test
+ci: install-tools generate check-generated-code test
