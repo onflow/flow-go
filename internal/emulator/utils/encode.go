@@ -1,4 +1,4 @@
-package data
+package utils
 
 import (
 	"bytes"
@@ -15,7 +15,6 @@ func EncodeAsBytes(data ...interface{}) []byte {
 	gob.Register(crypto.Hash{})
 	gob.Register([]crypto.Hash{})
 	gob.Register(crypto.Address{})
-	gob.Register(crypto.Signature{})
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)

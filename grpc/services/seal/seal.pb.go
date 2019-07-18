@@ -216,6 +216,9 @@ type SealServiceServer interface {
 type UnimplementedSealServiceServer struct {
 }
 
+func (*UnimplementedSealServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
 func (*UnimplementedSealServiceServer) SubmitResultApproval(ctx context.Context, req *SubmitResultApprovalRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SubmitResultApproval not implemented")
 }
