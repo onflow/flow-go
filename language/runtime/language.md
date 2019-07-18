@@ -104,21 +104,21 @@ Comments can be used to document code. A comment is text that is not executed.
 
 *Single-line comments* start with two slashes (`//`):
 
-```swift,file=single-line-comment.bpl
+```bamboo,file=single-line-comment.bpl
 // This is a comment on a single line.
 // Another comment line that is not executed.
 ```
 
 *Multi-line comments* start with a slash and an asterisk (`/*`) and end with an asterisk and a slash (`*/`):
 
-```swift,file=multi-line-comment.bpl
+```bamboo,file=multi-line-comment.bpl
 /* This is a comment which
 spans multiple lines. */
 ```
 
 Comments may be nested.
 
-```text,file=nested-comment.bpl
+```bamboo,file=nested-comment.bpl
 /* /* this */ is a valid comment */
 ```
 
@@ -131,7 +131,7 @@ Constant means that the *name* is constant, not the *value*, i.e., the value may
 The `const` keyword is used to declare a constant and the `var` keyword is used to declare a variable.
 The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
 
-```swift,file=constants-and-variables.bpl
+```bamboo,file=constants-and-variables.bpl
 // Declare a constant named `a`
 //
 const a = 1
@@ -151,7 +151,7 @@ b = 4
 
 Variables and constants **must** be initialized.
 
-```swift
+```bamboo
 // Invalid: the constant has no initial value
 //
 const a
@@ -160,7 +160,7 @@ const a
 Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
 
 
-```swift
+```bamboo
 // Declare a constant named `a`
 //
 const a = 1
@@ -175,7 +175,7 @@ const a = 2
 var b = 3
 ```
 
-```swift
+```bamboo
 // Invalid: cannot re-declare a variable with name `b`,
 // as it is already used in this scope
 //
@@ -194,7 +194,7 @@ When declaring a constant or variable, an optional *type annotation* can be prov
 
 If no type annotation is provided, the type of the declaration is [inferred from the initial value](#type-inference).
 
-```swift,file=type-annotations.bpl
+```bamboo,file=type-annotations.bpl
 // Declare a variable named `initialized` which has an explicit type annotation.
 //
 // `Bool` is the type of booleans
@@ -210,7 +210,7 @@ const inferred = 1
 
 If a type annotation is provided, the initial value must be of this type, and new values assigned to variables must match the declaration's type. This type safety is explained in more detail in a [separate section](#type-safety).
 
-```swift
+```bamboo
 // Invalid: declare a variable with an explicit type `Bool`,
 // but the initial value has type `Int`.
 //
@@ -232,7 +232,7 @@ booleanVariable = 1
 Names may start with any upper and lowercase letter or an underscore. This may be followed by zero or more upper and lower case letters, underscores, and numbers.
 Names may not begin with a number.
 
-```swift
+```bamboo
 // Valid, title-case
 //
 PersonID
@@ -267,7 +267,7 @@ By convention, variables, constants, and functions have lowercase names; and typ
 
 Semicolons may be used to separate statements, but are optional. They can be used to separate multiple statements on a single line.
 
-```swift,file=semicolons.bpl
+```bamboo,file=semicolons.bpl
 // Declare a constant, without a semicolon
 //
 const a = 1
@@ -300,7 +300,7 @@ Numbers can be written in various bases. Numbers are assumed to be decimal by de
 | **Octal**       | `0o`   | one or more numbers in the range `0` to `7`                           |
 | **Hexadecimal** | `0x`   | one or more numbers, or characters `a` to `f`, lowercase or uppercase |
 
-```swift,file=numbers.bpl
+```bamboo,file=numbers.bpl
 // A decimal number
 //
 1234567890
@@ -324,13 +324,13 @@ Numbers can be written in various bases. Numbers are assumed to be decimal by de
 
 Decimal numbers may contain underscores (`_`) to logically separate components.
 
-```swift,file=number-underscores-decimal.bpl
+```bamboo,file=number-underscores-decimal.bpl
 const largeNumber = 1_000_000
 ```
 
 Underscores are allowed for all numeral systems.
 
-```swift,file=number-underscores-binary.bpl
+```bamboo,file=number-underscores-binary.bpl
 const binaryNumber = 0b10_11_01
 ```
 
@@ -348,12 +348,12 @@ The names for the integer types follow this naming convention: Signed integer ty
  - **`UInt32`**: 0 through 4294967295
  - **`UInt64`**: 0 through 18446744073709551615
 
-```swift
+```bamboo
 // Declare a constant that has type `UInt8` and the value 10
 const smallNumber: UInt8 = 10
 ```
 
-```swift
+```bamboo
 // Invalid: negative literal cannot be used as an unsigned integer
 //
 const invalidNumber: UInt8 = -10
@@ -361,7 +361,7 @@ const invalidNumber: UInt8 = -10
 
 In addition, the arbitrary precision integer type `Int` is provided.
 
-```swift
+```bamboo
 const veryLargeNumber: Int = 10000000000000000000000000000000
 ```
 
@@ -375,7 +375,7 @@ Contracts are not intended to work with values with error margins and therefore 
 
 The type `Address` represents an address. Addresses are unsigned integers with a size of 160 bits.  Hexadecimal integer literals can be used to create address values.
 
-```swift
+```bamboo
 // Declare a constant that has type `Address`
 //
 const someAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d
@@ -393,7 +393,7 @@ const alsoNotAnAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d1234
 
 Integer literals are not inferred to be an address.
 
-```swift
+```bamboo
 // Declare a number. Even though it happens to be a valid address,
 // it is not inferred as it.
 //
@@ -407,7 +407,7 @@ Strings are collections of characters. Strings have the type `String`, and chara
 
 String and character literals are enclosed in double quotation marks (`"`).
 
-```swift
+```bamboo
 const someString = "Hello, world!"
 ```
 
@@ -422,7 +422,7 @@ String literals may contain escape sequences. An escape sequence starts with a b
 - `\'`: Single quotation mark
 - `\u`: A Unicode scalar value, written as `\u{x}`, where `x` is a 1–8 digit hexadecimal number which needs to be a valid Unicode scalar value, i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive
 
-```swift
+```bamboo
 // Declare a constant which contains two lines of text
 // (separated by the line feed character `\n`), and ends
 // with a thumbs up emoji, which has code point U+1F44D (0x1F44D)
@@ -437,7 +437,7 @@ For example, the single character `ü` can be represented in several ways in Uni
 
 Still, both variants represent the same human-readable character `ü`.
 
-```swift
+```bamboo
 const singleScalar: Character = "\u{FC}"
 // `singleScalar` is `ü`
 const twoScalars: Character = "\u{75}\u{308}"
@@ -446,7 +446,7 @@ const twoScalars: Character = "\u{75}\u{308}"
 
 Another example where multiple Unicode scalar values are rendered as a single, human-readable character is a flag emoji. These emojis consist of two "REGIONAL INDICATOR SYMBOL LETTER" Unicode scalar values.
 
-```swift
+```bamboo
 // Declare a constant for a string with a single character, the emoji
 // for the Canadian flag, which consists of two Unicode scalar values:
 // - REGIONAL INDICATOR SYMBOL LETTER C (U+1F1E8)
@@ -472,7 +472,7 @@ TODO
 
 Arrays are mutable, ordered collections of values. All values in an array must have the same type. Arrays may contain a value multiple times. Array literals start with an opening square bracket `[` and end with a closing square bracket `]`.
 
-```swift,file=arrays.bpl
+```bamboo,file=arrays.bpl
 // An empty array
 //
 []
@@ -490,7 +490,7 @@ Arrays are mutable, ordered collections of values. All values in an array must h
 
 To get the element of an array at a specific index, the indexing syntax can be used: The array is followed by an opening square bracket `[`, the indexing value, and ends with a closing square bracket `]`.
 
-```swift,file=arrays-indexing.bpl
+```bamboo,file=arrays-indexing.bpl
 const numbers = [42, 23]
 
 // Get the first number
@@ -502,7 +502,7 @@ numbers[0] // is 42
 numbers[1] // is 23
 ```
 
-```swift,file=arrays-nested-indexing.bpl
+```bamboo,file=arrays-nested-indexing.bpl
 const arrays = [[1, 2], [3, 4]]
 
 // Get the first number of the second array
@@ -512,7 +512,7 @@ arrays[1][0] // is 3
 
 To set an element of an array at a specific index, the indexing syntax can be used as well.
 
-```swift,file=array-indexing-assignment.bpl
+```bamboo,file=array-indexing-assignment.bpl
 const numbers = [42, 23]
 
 // Change the second number
@@ -530,7 +530,7 @@ Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array
 
 Variable-size arrays have the type suffix `[]`. For example, the type `Int16[]` specifies a variable-size array of elements that have type `Int16`.
 
-```swift,file=array-types.bpl
+```bamboo,file=array-types.bpl
 const array: Int8[2] = [1, 2]
 
 const arrays: Int16[2][3] = [
@@ -560,7 +560,7 @@ Dictionaries are mutable, unordered collections of key-value associations. In a 
 
 Dictionary literals start with an opening brace `{` and end with a closing brace `}`. Keys are separated from values by a colon, and key-value associations are separated by commas.
 
-```swift,file=dictionaries.bpl
+```bamboo,file=dictionaries.bpl
 // An empty dictionary
 //
 {}
@@ -584,7 +584,7 @@ Dictionary literals start with an opening brace `{` and end with a closing brace
 
 To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
 
-```swift,file=dictionary-access.bpl
+```bamboo,file=dictionary-access.bpl
 const booleans = {
     1: true,
     0: false
@@ -602,7 +602,7 @@ integers[false] // is 0
 
 To set the value for a key of a dictionary, the access syntax can be used as well.
 
-```swift,file=dictionary-assignment.bpl
+```bamboo,file=dictionary-assignment.bpl
 const booleans = {
     1: true,
     0: false
@@ -617,7 +617,7 @@ booleans[0] = true
 
 Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
 
-```swift,file=dictionary-types.bpl
+```bamboo,file=dictionary-types.bpl
 const booleans = {
     1: true,
     0: false
@@ -651,7 +651,7 @@ Most of the built-in types, like booleans, integers, are hashable and equatable,
 
 `Any` is the top type, i.e., all types are a subtype of it.
 
-```swift
+```bamboo
 // Declare a variable that has the type `Any`.
 // Any value can be assigned to it, for example an integer.
 //
@@ -663,7 +663,7 @@ someValue = true
 
 However, using `Any` does not opt-out of type checking. It is invalid to access fields and call functions on `Any` typed values, as it has no fields and functions.
 
-```swift
+```bamboo
 // Declare a variable that has the type `Any`. The initial value is an integer,
 // but the variable  still has the explict type `Any`.
 //
@@ -679,7 +679,7 @@ a + 2
 
 `Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
 
-```swift
+```bamboo
 // Declare a function named `crashAndBurn` which will never return,
 // because it calls the function named `fatalError`, which never returns
 //
@@ -703,14 +703,14 @@ Operators are special symbols that perform a computation for one or more values.
 
 The `-` unary operator negates an integer:
 
-```swift,file=integer-negation.bpl
+```bamboo,file=integer-negation.bpl
 const a = 1
 -a // is -1
 ```
 
 The `!` unary operator logically negates a boolean:
 
-```swift,file=boolean-negation.bpl
+```bamboo,file=boolean-negation.bpl
 const a = true
 !a // is false
 ```
@@ -719,7 +719,7 @@ const a = true
 
 The binary assignment operator `=` can be used to assign a new value to a variable. It is only allowed in a statement and is not allowed in expressions.
 
-```swift,file=assignment.bpl
+```bamboo,file=assignment.bpl
 var a = 1
 a = 2
 // a is 2
@@ -727,7 +727,7 @@ a = 2
 
 The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.
 
-```swift,file=assignment-numbers.bpl
+```bamboo,file=assignment-numbers.bpl
 const numbers = [1, 2]
 
 // Change the first number
@@ -737,7 +737,7 @@ numbers[0] = 3
 // `numbers` is [3, 2]
 ```
 
-```swift,file=assignment-arrays.bpl
+```bamboo,file=assignment-arrays.bpl
 const arrays = [[1, 2], [3, 4]]
 
 // Change the first number in the second array
@@ -747,7 +747,7 @@ arrays[1][0] = 5
 // `arrays` is [[1, 2], [5, 4]]
 ```
 
-```swift,file=assignment-dictionaries.bpl
+```bamboo,file=assignment-dictionaries.bpl
 const dictionaries = {
   true: {1: 2},
   false: {3: 4}
@@ -770,14 +770,14 @@ There are four arithmetic operators:
 - Multiplication: `*`
 - Division: `/`
 
-```swift,file=operator-plus.bpl
+```bamboo,file=operator-plus.bpl
 const a = 1 + 2
 // `a` is 3
 ```
 
 Arithmetic operators don't cause values to overflow.
 
-```swift,file=operator-times.bpl
+```bamboo,file=operator-times.bpl
 const a: Int8 = 100
 const b: Int8 = 100
 const c = a * b
@@ -792,39 +792,39 @@ If overflow behavior is intended, overflowing operators are available, which are
 
 For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111). Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
 
-```swift
+```bamboo
 //     11111111 = 255
 // &+         1
 //  = 100000000 = 0
 ```
 
-```swift,file=operator-overflow-plus.bpl
+```bamboo,file=operator-overflow-plus.bpl
 const a: UInt8 = 255
 a &+ 1 // is 0
 ```
 
 Similarly, for the minimum value 0, subtracting 1 wraps around and results in the maximum value 255.
 
-```swift,file=operator-minus.bpl
+```bamboo,file=operator-minus.bpl
 //     00000000
 // &-         1
 //  =  11111111 = 255
 ```
 
-```swift
+```bamboo
 const b: UInt8 = 0
 b &- 1 // is 255
 ```
 
 Signed integers are also affected by overflow. In a signed integer, the first bit is used for the sign. This leaves 7 bits for the actual value for an 8-bit signed integer, i.e., the range of values is -128 (binary 10000000) to 127 (01111111). Subtracting 1 from -128 results in 127.
 
-```swift
+```bamboo
 //    10000000 = -128
 // &-        1
 //  = 01111111 = 127
 ```
 
-```swift
+```bamboo
 const c: Int8 = -128
 c &- 1 // is 127
 ```
@@ -835,7 +835,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 - Logical AND: `a && b`
 
-  ```swift,file=operator-and.bpl
+  ```bamboo,file=operator-and.bpl
   true && true // is true
   true && false // is false
   false && false // is false
@@ -844,7 +844,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 - Logical OR: `a || b`
 
-  ```swift,file=operator-or.bpl
+  ```bamboo,file=operator-or.bpl
   true || true // is true
   true || false // is true
   false || false // is true
@@ -858,7 +858,7 @@ Comparison operators work with boolean and integer values.
 
 - Equality: `==`, for booleans and integers
 
-  ```swift,file=operator-equal.bpl
+  ```bamboo,file=operator-equal.bpl
   1 == 1 // is true
   1 == 2 // is false
   true == true // is true
@@ -867,7 +867,7 @@ Comparison operators work with boolean and integer values.
 
 - Inequality: `!=`, for booleans and integers
 
-  ```swift,file=operator-not-equal.bpl
+  ```bamboo,file=operator-not-equal.bpl
   1 != 1 // is false
   1 != 2 // is true
   true != true // is false
@@ -876,7 +876,7 @@ Comparison operators work with boolean and integer values.
 
 - Less than: `<`, for integers
 
-  ```swift,file=operator-less.bpl
+  ```bamboo,file=operator-less.bpl
   1 < 1 // is false
   1 < 2 // is true
   2 < 1 // is false
@@ -884,7 +884,7 @@ Comparison operators work with boolean and integer values.
 
 - Less or equal than: `<=`, for integers
 
-  ```swift,file=operator-less-equals.bpl
+  ```bamboo,file=operator-less-equals.bpl
   1 <= 1 // is true
   1 <= 2 // is true
   2 <= 1 // is false
@@ -892,7 +892,7 @@ Comparison operators work with boolean and integer values.
 
 - Greater than: `>`, for integers
 
-  ```swift,file=operator-greater.bpl
+  ```bamboo,file=operator-greater.bpl
   1 > 1 // is false
   1 > 2 // is false
   2 > 1 // is true
@@ -901,7 +901,7 @@ Comparison operators work with boolean and integer values.
 
 - Greater or equal than: `>=`, for integers
 
-  ```swift,file=operator-greater-equals.bpl
+  ```bamboo,file=operator-greater-equals.bpl
   1 >= 1 // is true
   1 >= 2 // is false
   2 >= 1 // is true
@@ -914,7 +914,7 @@ There is only one ternary conditional operator, the ternary conditional operator
 
 It behaves like an if-statement, but is an expression: If the first operator value is true, the second operator value is returned. If the first operator value is false, the third value is returned.
 
-```swift,file=operator-ternary-conditional.bpl
+```bamboo,file=operator-ternary-conditional.bpl
 const x = 1 > 2 ? 3 : 4
 // `x` is 4
 ```
@@ -952,7 +952,7 @@ Each parameter can have a label, the name that a function call needs to use to p
 
 Each parameter needs to have a type annotation, which follows the parameter name after a colon.
 
-```swift,file=function-double.bpl
+```bamboo,file=function-double.bpl
 // Declare a function named `double`, which multiples a number by two.
 //
 // The special argument label _ is specified for the parameter,
@@ -972,7 +972,7 @@ double(2) // returns 4
 
 It is possible to require argument labels for some parameters, and not require argument labels for other parameters.
 
-```swift,file=function-clamp.bpl
+```bamboo,file=function-clamp.bpl
 // Declare a function named `clamp`. The function takes an integer value,
 // the lower limit, and the upper limit. It returns an integer between
 // the lower and upper limit.
@@ -1017,7 +1017,7 @@ Argument labels make code more explicit and readable. For example, they avoid co
 
 Argument labels should be named so they make sense from the perspective of the function call.
 
-```swift,file=function-send.bpl
+```bamboo,file=function-send.bpl
 // Declare a function named `send`, which transfers an amount
 // from one account to another.
 //
@@ -1072,7 +1072,7 @@ send(from: sender, to: receiver, amount: 100)
 
 The order of the arguments in a function call must match the order of the parameters in the function declaration.
 
-```swift,file=function-test.bpl
+```bamboo,file=function-test.bpl
 // Declare a function named `test`, which accepts two parameters, named `first` and `second`
 //
 fun test(first: Int, second: Int) {
@@ -1087,7 +1087,7 @@ test(second: 1, first: 2)
 
 Functions can be nested, i.e., the code of a function may declare further functions.
 
-```swift,file=function-doubleAndAddOne.bpl
+```bamboo,file=function-doubleAndAddOne.bpl
 // Declare a function which multiplies a number by two, and adds one
 //
 fun doubleAndAddOne(_ x: Int) -> Int {
@@ -1108,7 +1108,7 @@ doubleAndAddOne(2) // is 5
 
 Functions can be also used as expressions. The syntax is the same as for function declarations, except that function expressions have no name, i.e., it is anonymous.
 
-```swift,file=function-expression.bpl
+```bamboo,file=function-expression.bpl
 // Declare a constant named `double`, which has a function as its value.
 //
 // The function multiplies a number by two when it is called
@@ -1123,7 +1123,7 @@ const double =
 
 Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.
 
-```swift,file=function-call.bpl
+```bamboo,file=function-call.bpl
 fun double(_ x: Int) -> Int {
      return x * 2
 }
@@ -1146,7 +1146,7 @@ double()
 Function types consist of the function's parameter types and the function's return type.
 The parameter types need to be enclosed in parentheses, followed by the `->` keyword, and end with the return type.
 
-```swift,file=function-type.bpl
+```bamboo,file=function-type.bpl
 // Declare a function named `add`, with the function type `(Int, Int) -> Int`
 //
 fun add(a: Int, b: Int) -> Int {
@@ -1154,7 +1154,7 @@ fun add(a: Int, b: Int) -> Int {
 }
 ```
 
-```swift,file=function-type-expression.bpl
+```bamboo,file=function-type-expression.bpl
 // Declare a constant named `add`, with the function type `(Int, Int) -> Int`
 //
 const add: (Int, Int) -> Int =
@@ -1165,7 +1165,7 @@ const add: (Int, Int) -> Int =
 
 If the function has no return type, it implicitly has the return type `Void`.
 
-```swift,file=function-doNothing.bpl
+```bamboo,file=function-doNothing.bpl
 // Declare a constant named `doNothing`, which is a function
 // that takes no parameters and returns nothing
 //
@@ -1183,7 +1183,7 @@ The type `((Int) -> Int)[2]` specifies an array type of two functions, which acc
 
 When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as [call-by-sharing](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_sharing).
 
-```swift,file=function-change.bpl
+```bamboo,file=function-change.bpl
 fun change(_ numbers: Int[]) {
      numbers[0] = 1
      numbers[1] = 2
@@ -1197,7 +1197,7 @@ change(numbers)
 
 Parameters are constant, i.e., it is not allowed to assign to them.
 
-```swift,file=function-parameter-assignment.bpl
+```bamboo,file=function-parameter-assignment.bpl
 fun test(x: Int) {
      // Invalid: cannot assign to a parameter (constant)
      //
@@ -1232,7 +1232,7 @@ Following each condition, an optional description can be provided after a colon.
 
 In postconditions, the special constant `result` refers to the result of the function.
 
-```swift,file=function-factorial.bpl
+```bamboo,file=function-factorial.bpl
 fun factorial(_ n: Int) -> Int {
     require {
         // Require the parameter `n` to be greater than or equal to zero
@@ -1267,7 +1267,7 @@ factorial(-2)
 
 In postconditions, the special function `before` can be used to get the value of an expression just before the function is called.
 
-```swift,file=function-increment.bpl
+```bamboo,file=function-increment.bpl
 var n = 0
 
 fun incrementN() {
@@ -1293,7 +1293,7 @@ If-statements allow a certain piece of code to be executed only when a given con
 The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces. The condition must be boolean and the braces are required.
 
 
-```swift,file=control-flow-if.bpl
+```bamboo,file=control-flow-if.bpl
 const a = 0
 var b = 0
 
@@ -1311,7 +1311,7 @@ if a != 0 {
 An additional else-clause can be added to execute another piece of code when the condition is false.
 The else-clause is introduced by the `else` keyword.
 
-```swift,file=control-flow-if-else.bpl
+```bamboo,file=control-flow-if-else.bpl
 const a = 0
 var b = 0
 
@@ -1326,7 +1326,7 @@ if a == 1 {
 
 The else-clause can contain another if-statement, i.e., if-statements can be chained together.
 
-```swift,file=control-flow-if-else-if.bpl
+```bamboo,file=control-flow-if-else-if.bpl
 const a = 0
 var b = 0
 
@@ -1350,7 +1350,7 @@ The while-statement starts with the `while` keyword, followed by the condition, 
 The while-statement will first evaluate the condition. If the condition is false, the execution is done.
 If it is true, the piece of code is executed and the evaluation of the condition is repeated. Thus, the piece of code is executed zero or more times.
 
-```swift,file=control-flow-while.bpl
+```bamboo,file=control-flow-while.bpl
 var a = 0
 while a < 5 {
     a = a + 1
@@ -1375,7 +1375,7 @@ TODO: examples
 
 Every function and block (`{` ... `}`) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.
 
-```swift,file=scope.bpl
+```bamboo,file=scope.bpl
 const x = 10
 
 fun f() -> Int {
@@ -1390,7 +1390,7 @@ f() // returns 20
 y
 ```
 
-```swift,file=scope-doubleAndAddOne.bpl
+```bamboo,file=scope-doubleAndAddOne.bpl
 fun doubleAndAddOne(_ n: Int) -> Int {
     fun double(_ x: Int) {
         return x * 2
@@ -1405,7 +1405,7 @@ double(1)
 
 Each scope can introduce new declarations, i.e., the outer declaration is shadowed.
 
-```swift,file=scope-test.bpl
+```bamboo,file=scope-test.bpl
 const x = 2
 
 fun test() -> Int {
@@ -1418,7 +1418,7 @@ test() // returns 3
 
 Scope is lexical, not dynamic.
 
-```swift,file=scope-lexical.bpl
+```bamboo,file=scope-lexical.bpl
 const x = 10
 
 fun f() -> Int {
@@ -1435,7 +1435,7 @@ g() // returns 10, not 20
 
 Declarations are **not** moved to the top of the enclosing function (hoisted).
 
-```swift,file=scope-no-hoisting.bpl
+```bamboo,file=scope-no-hoisting.bpl
 const x = 2
 
 fun f() -> Int {
@@ -1458,7 +1458,7 @@ An optional type is declared using the `?` suffix for another type. For example,
 
 The value representing nothing is `nil`.
 
-```swift
+```bamboo
 // declare a constant which has an optional integer type,
 // with nil as its initial value
 //
@@ -1474,7 +1474,7 @@ const b: Int? = 42
 
 The nil-coalescing operator `??` returns the value inside an optional if it contains a value, or returns an alternative value if the optional has no value, i.e., the optional value is `nil`.
 
-```swift
+```bamboo
 // declare a constant which has an optional integer type
 //
 const a: Int? = nil
@@ -1488,7 +1488,7 @@ const b: Int = a ?? 42
 
 The nil-coalescing operator can only be applied to values which have an optional type.
 
-```swift
+```bamboo
 // declare a constant with a non-optional integer type
 //
 const a = 1
@@ -1499,7 +1499,7 @@ const a = 1
 const b = a ?? 2
 ```
 
-```swift
+```bamboo
 // invalid: nil-coalescing operator is applied to a value which has a non-optional type
 // (the integer literal is of type Int)
 //
@@ -1508,7 +1508,7 @@ const c = 1 ?? 2
 
 The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.
 
-```swift
+```bamboo
 // declare a constant with a non-optional integer type
 const a = 1
 
@@ -1527,7 +1527,7 @@ The Bamboo programming language is a _type-safe_ language.
 
 When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type `Bool`, it can _only_ be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
 
-```swift,file=type-safety-assign-int-to-bool.bpl
+```bamboo,file=type-safety-assign-int-to-bool.bpl
 // Declare a variable that has type `Bool`
 var a = true
 
@@ -1538,7 +1538,7 @@ a = 0
 
 When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type `Bool`, _only_ a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
 
-```swift,file=type-safety-nand.bpl
+```bamboo,file=type-safety-nand.bpl
 fun nand(_ a: Bool, _ b: Bool) -> Bool {
     return !(a && b)
 }
@@ -1553,7 +1553,7 @@ nand(0, 0)
 Types are **not** automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`, nor is an optional integer `Int?`  automatically converted to a non-optional integer `Int`.
 
 
-```swift,file=type-safety-add.bpl
+```bamboo,file=type-safety-add.bpl
 fun add(_ a: Int8, _ b: Int8) -> Int {
     return a + b
 }
@@ -1579,7 +1579,7 @@ If a variable or constant is not annotated explicitly with a type, it is inferre
 
 Integer literals are inferred to type `Int`.
 
-```swift,file=type-inference-int.bpl
+```bamboo,file=type-inference-int.bpl
 const a = 1
 
 // `a` has type `Int`
@@ -1587,7 +1587,7 @@ const a = 1
 
 Array literals are inferred based on the elements of the literal, and to be variable-size.
 
-```swift,file=type-inference-intergers.bpl
+```bamboo,file=type-inference-intergers.bpl
 const integers = [1, 2]
 // `integers` has type `Int[]`
 
@@ -1598,7 +1598,7 @@ const invalidMixed = [1, true, 2, false]
 
 Dictionary literals are inferred based on the keys and values of the literal.
 
-```swift,file=type-inference-dictionary.bpl
+```bamboo,file=type-inference-dictionary.bpl
 const booleans = {
     1: true,
     2: false
@@ -1615,7 +1615,7 @@ const invalidMixed = {
 
 Functions are inferred based on the parameter types and the return type.
 
-```swift,file=type-inference-function.bpl
+```bamboo,file=type-inference-function.bpl
 const add = (a: Int8, b: Int8) -> Int {
     return a + b
 }
@@ -1671,7 +1671,7 @@ Synthetic fields are **not** stored in the structure or class value, i.e. they a
 | **Constant field**   | Yes              | **No**             | `const`     |
 | **Synthetic field**  | **No**           | Yes                | `synthetic` |
 
-```swift,file=struct-and-class-fields-and-init.bpl
+```bamboo,file=composite-data-type-fields-and-init.bpl
 // Declare a structure named `Token`, which has a constant field
 // named `id` and a variable field named `balance`.
 //
@@ -1692,7 +1692,7 @@ In initializers, the special constant `self` refers to the structure or class va
 
 Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the structure or class instance is followed by a dot (`.`) and the name of the field.
 
-```swift,file=struct-and-class-fields-assignment.bpl
+```bamboo,file=composite-data-type-fields-assignment.bpl
 const token = Token(id: 42, balance: 1_000_00)
 
 token.id // is 42
@@ -1714,7 +1714,7 @@ Getters and setters are enclosed in opening and closing braces, after the field'
 
 Getters are declared using the `get` keyword. Getters have no parameters and their return type is implicitly the type of the field.
 
-```swift,file=struct-and-class-field-getter.bpl
+```bamboo,file=composite-data-type-field-getter.bpl
 struct GetterExample {
 
     // Declare a variable field named `balance` with a getter
@@ -1750,7 +1750,7 @@ Setters are declared using the `set` keyword, followed by the name for the new v
 
 The types of values assigned to setters must always match the field's type.
 
-```swift,file=struct-and-class-field-setter.bpl
+```bamboo,file=composite-data-type-field-setter.bpl
 struct SetterExample {
 
     // Declare a variable field named `balance` with a setter
@@ -1785,7 +1785,7 @@ Synthetic fields are declared using the `synthetic` keyword.
 
 Synthetic fields are read-only when only a getter is provided.
 
-```swift,file=struct-and-class-synthetic-field-getter-only.bpl
+```bamboo,file=composite-type-synthetic-field-getter-only.bpl
 struct Rectangle {
     var width: Int
     var height: Int
@@ -1803,7 +1803,7 @@ struct Rectangle {
 
 Synthetic fields are readable and writable when both a getter and a setter is declared.
 
-```swift,file=struct-and-class-synthetic-field-setter-getter.bpl
+```bamboo,file=composite-type-synthetic-field-setter-getter.bpl
 // Declare a struct named `GoalTracker` which stores a number
 // of target goals, a number of completed goals,
 // and has a synthetic field to provide the left number of goals
@@ -1864,7 +1864,7 @@ It is invalid to declare a synthetic field with only a setter.
 
 Structures and classes may contain functions. Just like in the initializer, the special constant `self` refers to the structure or class value that the function is called on.
 
-```swift,file=struct-and-class-function.bpl
+```bamboo,file=struct-and-class-function.bpl
 struct Token {
     const id: Int
     var balance: Int
@@ -1887,8 +1887,9 @@ token.mint(amount: 1_000_000)
 ### Structure and Class Behaviour
 
 The only difference between structures and classes is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are *copied*, i.e. they are value types, whereas classes are *referenced*, i.e., they are reference types.
+Structures are **copied**.
 
-```swift,file=struct-behavior.bpl
+```bamboo,file=struct-behavior.bpl
 // Declare a structure named `SomeStruct`, with a variable integer field
 //
 struct SomeStruct {
@@ -1913,7 +1914,9 @@ structB.value = 1
 // structA.value is *0*
 ```
 
-```swift,file=class-behavior.bpl
+Classes are **referenced**.
+
+```bamboo,file=class-behavior.bpl
 // Declare a class named `SomeClass`, with a variable integer field
 //
 class SomeClass {
@@ -1986,7 +1989,7 @@ To summarize the behavior for functions, structures, classes, and interfaces:
 | `fun`, `struct`, `class`, `interface`    | `pub`                 | **All**           |
 
 
-```swift,file=access-control.bpl
+```bamboo,file=access-control.bpl
 // Declare a private constant, inaccessible/invisible in outer scope
 //
 const a = 1
@@ -2054,7 +2057,7 @@ Permissions for classes are declared using the `permit` keyword, followed by the
 
 <!-- TODO: can be used e.g. for authorizations, values that represent access rights/privileges to resources. -->
 
-```swift,file=permissions-purse.bpl
+```bamboo,file=permissions-purse.bpl
 // Declare a class named `Purse`, which holds a balance and
 // allows amounts to be deposited from a purse to another.
 //
@@ -2194,7 +2197,7 @@ class DepositAuth {
 permit Purse to DepositAuth
 ```
 
-```swift,file=permissions-purse-usage.bpl
+```bamboo,file=permissions-purse-usage.bpl
 // Create a purse with an initial balance of 100 units for an account
 //
 const account: Account = // ...
@@ -2239,7 +2242,7 @@ Field requirements and function requirements must specify the required level of 
 
 The special type `Self` can be used to refer to the type implementing the interface. This can be seen in the following example, where the first parameter of the `transfer` function has the `Self` type.
 
-```swift,file=interface-declaration.bpl
+```bamboo,file=interface-declaration.bpl
 // Declare an interface for a vault (a container for a balance)
 //
 interface Vault {
@@ -2337,7 +2340,7 @@ Note that the required initializer and function do not have any executable code.
 
 Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the type (class, structure, or contract) that provides the functionality required in the interface.
 
-```swift,file=interface-implementation.bpl
+```bamboo,file=interface-implementation.bpl
 // Declare a class named `ExampleVault` with a variable field named `balance`,
 // that can be written by functions of the class, but outer scopes can only read it
 //
@@ -2426,7 +2429,7 @@ vault.transfer(to: otherVault, amount: 100)
 
 The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified), and an implementation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
 
-```swift
+```bamboo
 interface AnInterface {
     // Require the implementation to provide a publicly readable
     // field named `a` that has type `Int`. It may be a constant field,
@@ -2460,7 +2463,7 @@ impl AnInterface for AnImplementation {
 
 Interfaces are types. Values implementing an interface can be used as initial values for constants that have the interface as their type.
 
-```swift,file=interface-type.bpl
+```bamboo,file=interface-type.bpl
 // Declare a constant that has type `Vault`, which has a value that has type `ExampleVault`
 //
 const vault: Vault = ExampleVault(initialBalance: 100)
@@ -2468,7 +2471,7 @@ const vault: Vault = ExampleVault(initialBalance: 100)
 
 Values implementing an interface are assignable to variables that have the interface as their type.
 
-```swift,file=interface-type-assignment.bpl
+```bamboo,file=interface-type-assignment.bpl
 // Assume there is a declaration for another implementation
 // of the interface  `Vault` which is named `CoolVault`
 
@@ -2491,7 +2494,7 @@ const exampleVault: ExampleVault = CoolVault(initialBalance: 100)
 
 Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.
 
-```swift,file=interface-type-fields-and-functions.bpl
+```bamboo,file=interface-type-fields-and-functions.bpl
 // Declare a constant which has the type `Vault`, and a value that has type `ExampleVault`
 //
 const someVault: Vault = ExampleVault(initialBalance: 100)
@@ -2518,13 +2521,13 @@ Most of the built-in types are equatable, like booleans and integers. Arrays are
 
 To make a type equatable the `Equatable` interface must be implemented, which requires the implementation of the function `equals`, which accepts another value that the given value should be compared for equality. Note that the parameter type is `Self`, i.e., the other value must have the same type as the implementing type.
 
-```swift,file=equatable.bpl
+```bamboo,file=equatable.bpl
 interface Equatable {
     pub fun equals(_ other: Self) -> Bool
 }
 ```
 
-```swift,file=equatable-impl.bpl
+```bamboo,file=equatable-impl.bpl
 // Declare a class named `Cat`, which has one field named `id`
 // that has type `Int`, i.e., the identifier of the cat.
 //
@@ -2573,13 +2576,13 @@ If two values are equal because their `equals` function returns true, then the i
 
 The implementation must also consistently return the same integer hash value during the execution of the program when the essential components have not changed. The integer hash value must not necessarily be the same across multiple executions.
 
-```swift,file=hashable.bpl
+```bamboo,file=hashable.bpl
 interface Hashable {
     pub hashValue: Int
 }
 ```
 
-```swift,file=hashable-impl.bpl
+```bamboo,file=hashable-impl.bpl
 // Declare a structure named `Point` with two fields
 // named `x` and `y` that have type `Int`.
 //
@@ -2636,7 +2639,7 @@ All built-in types are storable: booleans, integers, arrays with storable elemen
 
 [Structures and classes](#structures-and-classes) can be stored by implementing the [interface](#interfaces) `Storable`. The only requirement is that all field types of the implementing type need to be storable.
 
-```swift,file=storable-class.bpl
+```bamboo,file=storable-class.bpl
 // The declaration for interface `Storable` has no explicit requirements.
 interface Storable {}
 
@@ -2663,11 +2666,11 @@ impl Storable for Point {}
 
 Storable values can be stored for an [account](#accounts) by using the `storeIfNotExists` function. The function requires a [storage authorization](#storage-authorization) (`StorageAuth`) for the account.
 
-```swift
+```bamboo
 fun storeIfNotExists(_ value: Storable, auth: StorageAuth)
 ```
 
-```swift,file=storage-storeIfNotExists.bpl
+```bamboo,file=storage-storeIfNotExists.bpl
 // Store the integer value `42` for an account, given a storage authorization for it
 //
 const value = 42
@@ -2677,7 +2680,7 @@ storeIfNotExists(value, auth: storageAuth)
 
 Storable values can be retrieved for an account (`Account`) using the account's `getStored` function.
 
-```swift,file=storage-getStored.bpl
+```bamboo,file=storage-getStored.bpl
 // Retrieve a stored integer value, if any, for an account
 //
 const account: Account = // ...
@@ -2688,17 +2691,17 @@ It is only possible to store **one** value per type at the root of an account. S
 
 If a single primitive value, multiple values of the same type, or even more complex data should be stored, composite data types (like structures and classes) have to be used.
 
-This requirement to declare and use composite data types is intentional, and not a "workaround". It makes storage declarative and explicit. Types declaratively describe what data is stored (through the name of the type), describe and specify what values are stored (through the names of the fields), and specify what types the values have (through the type annotations of the fields). 
+This requirement to declare and use composite data types is intentional, and not a "workaround". It makes storage declarative and explicit. Types declaratively describe what data is stored (through the name of the type), describe and specify what values are stored (through the names of the fields), and specify what types the values have (through the type annotations of the fields).
 
 This approach provides several safety guarantees, which can be checked statically.
 
 Storage is intentionally not a key-value store with arbitrary strings as keys and values. Even though such an approach would be more flexible, it would require the developer to perform ad-hoc type casting, which is error-prone and has the potential for type confusion. Also, it would introduce the possibility for accidentally using different keys and/or different types for reading and writing a stored value – the string literals for the keys have no relation and have to be kept in sync manually.
 
-If a composite data type with fields is used, accidentally using different names or types to read or write a value is impossible, as type checking will detect and reject the program. 
+If a composite data type with fields is used, accidentally using different names or types to read or write a value is impossible, as type checking will detect and reject the program.
 
-Leveraging the type system is the key to avoiding bugs. 
+Leveraging the type system is the key to avoiding bugs.
 
-```swift,file=storage-simplevault.bpl
+```bamboo,file=storage-simplevault.bpl
 // Declare a class named `SimpleVault`.
 // It is a container for a balance.
 //
@@ -2735,7 +2738,7 @@ A contract is similar to a [class](#structures-and-classes) in that it is a comp
 
 Contracts differ from classes in that all fields are [stored](#storage). To make this explicit, all fields must be annotated with the `stored` keyword.
 
-```swift,file=contract-counter.bpl
+```bamboo,file=contract-counter.bpl
 // Declare a contract named `Counter`.
 //
 // The counter has an initial, positive value that
@@ -2782,7 +2785,7 @@ The type of a stored field must be [storable](#storage). Many built-in types can
 
 Stored fields are implicitly stored in the [storage](#storage) of the [account](#accounts) the contract is associated with.
 
-```swift,file=contract-funigble-token.bpl
+```bamboo,file=contract-funigble-token.bpl
 // Declare a contract named `FungibleToken`.
 //
 // This is a very simple fungible token contract.
@@ -2827,7 +2830,7 @@ contract FungibleToken {
 
 > 🚧 Status: Accounts are not implemented yet.
 
-```swift
+```bamboo
 interface Account {
     pub init(at address: Address)
 }
@@ -2839,7 +2842,7 @@ Accounts have a `getStored` function, which retrieves a value from [storage](#st
 
 <!-- TODO: cannot express the signature for getStored yet. would require. generics -->
 
-```swift
+```bamboo
 // Get the stored integer value for an account
 //
 const account: Account = // ...
@@ -2852,7 +2855,7 @@ const value: Int? = account.getStored(Int)
 
 External contracts and interfaces can be instantiated by calling the `at` function on the contract or interface type and passing the address where the code is deployed. It returns an optional, as the code at the given address might not be of the given type.
 
-```swift
+```bamboo
 // Declaration for an interface named `Counter`.
 //
 interface Counter {
@@ -2880,7 +2883,7 @@ counter.increment(42)
 
 In addition it is also possible to just check if an address has code with a given type.
 
-```swift
+```bamboo
 // Check if the interface `Counter` is available
 // at address 0x2F4Bdafb22bd92AA7b7552d270376dE8eDccbc1E
 //
@@ -2896,7 +2899,7 @@ const exists: Bool = Counter.exists(at: 0x2F4Bdafb22bd92AA7b7552d270376dE8eDccbc
 
 The authorization type `RootAuth` represents access rights/privileges to all resources.
 
-```swift
+```bamboo
 interface RootAuth {
     pub account: Account
     pub storageAuth: StorageAuth
@@ -2909,7 +2912,7 @@ interface RootAuth {
 
 The authorization type `StorageAuth` represents storage rights for an account. It is created from a [root authorization](#root-authorization). The storage authorization's account is the root authorization's account.
 
-```swift
+```bamboo
 interface StorageAuth {
     pub account: Account
 
@@ -2923,7 +2926,7 @@ interface StorageAuth {
 
 > 🚧 Status: `fatalError` is not implemented yet.
 
-```swift
+```bamboo
 fun fatalError(_ message: String) -> Never
 ```
 
@@ -2931,7 +2934,7 @@ Terminates the program unconditionally and reports a message which explains why 
 
 #### Example
 
-```swift
+```bamboo
 const optionalAccount: Account? = // ...
 const account = optionalAccount ?? fatalError("missing account")
 ```
@@ -2940,7 +2943,7 @@ const account = optionalAccount ?? fatalError("missing account")
 
 > 🚧 Status: `assert` is not implemented yet.
 
-```swift
+```bamboo
 fun assert(_ condition: Bool, message: String)
 ```
 
