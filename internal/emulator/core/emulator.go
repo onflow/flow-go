@@ -108,6 +108,9 @@ func (b *EmulatedBlockchain) CommitBlock() {
 	txHashes := make([]crypto.Hash, 0)
 	for hash := range b.txPool {
 		txHashes = append(txHashes, hash)
+		if b.pendingWorldState.GetTransaction(hash).Status != types.TransactionReverted {
+			b.pendingWorldState.UpdateTransactionStatus(hash, types.TransactionSealed)
+		}
 	}
 	b.txPool = make(map[crypto.Hash]*types.SignedTransaction)
 

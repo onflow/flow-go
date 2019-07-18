@@ -134,8 +134,8 @@ func TestSubmitTransaction(t *testing.T) {
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
-	txB := b.GetTransaction(tx1.Hash())
-	Expect(txB.Status).To(Equal(types.TransactionSealed))
+	tx2 := b.GetTransaction(tx1.Hash())
+	Expect(tx2.Status).To(Equal(types.TransactionFinalized))
 }
 
 func TestSubmitDuplicateTransaction(t *testing.T) {
