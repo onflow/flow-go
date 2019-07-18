@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"github.com/dapperlabs/bamboo-node/language/runtime"
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/state"
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 )
 
 // EmulatedBlockchain simulates a blockchain in the background to enable easy smart contract testing.

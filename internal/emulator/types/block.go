@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/utils"
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 )
 
 type Block struct {
