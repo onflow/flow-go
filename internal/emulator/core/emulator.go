@@ -33,6 +33,18 @@ func NewEmulatedBlockchain() *EmulatedBlockchain {
 	}
 }
 
+func (b *EmulatedBlockchain) getWorldStateAtVersion(wsHash crypto.Hash) *state.WorldState {
+	if wsBytes, ok := b.worldStates[wsHash]; ok {
+		return state.Decode(wsBytes)
+	}
+
+	if wsBytes, ok := b.intermediateWorldStates[wsHash]; ok {
+		return state.Decode(wsBytes)
+	}
+
+	return nil
+}
+
 // GetTransaction gets an existing transaction by hash.
 //
 // First looks in pending txPool, then looks in current blockchain state.
@@ -44,9 +56,21 @@ func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTrans
 	return b.pendingWorldState.GetTransaction(hash)
 }
 
+func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash) *types.SignedTransaction {
+	ws := getWorldStateAtVersion(version)
+
+	return ws.GetTransaction(txHash)
+}
+
 // GetAccount gets account information associated with an address identifier.
 func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account {
 	return b.pendingWorldState.GetAccount(address)
+}
+
+func (b *EmulatedBlockchain) GetAccountAtVersion(address crypto.Address, version crypto.Hash) *crypto.Account {
+	ws := getWorldStateAtVersion(version)
+
+	return ws.GetAccount(address)
 }
 
 // SubmitTransaction sends a transaction to the network that is immediately executed (updates blockchain state).
