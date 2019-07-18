@@ -3,9 +3,12 @@ package core
 import (
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/internal/emulator/state"
-	"github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	"github.com/dapperlabs/bamboo-node/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
+
+	"github.com/dapperlabs/bamboo-node/internal/emulator/state"
+	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 )
 
 // EmulatedBlockchain simulates a blockchain in the background to enable easy smart contract testing.
@@ -16,6 +19,7 @@ type EmulatedBlockchain struct {
 	intermediateWorldStates map[crypto.Hash][]byte
 	pendingWorldState       *state.WorldState
 	txPool                  map[crypto.Hash]*types.SignedTransaction
+	computer                *Computer
 }
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
@@ -25,6 +29,7 @@ func NewEmulatedBlockchain() *EmulatedBlockchain {
 		intermediateWorldStates: make(map[crypto.Hash][]byte),
 		pendingWorldState:       state.NewWorldState(),
 		txPool:                  make(map[crypto.Hash]*types.SignedTransaction),
+		computer:                NewComputer(runtime.NewInterpreterRuntime()),
 	}
 }
 
@@ -48,15 +53,42 @@ func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account 
 //
 // Note that the resulting state is not finalized until CommitBlock() is called.
 // However, the pending blockchain state is indexed for testing purposes.
-//
-// TODO: pass transaction into runtime to be executed
-func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) {
+func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) error {
 	if _, exists := b.txPool[tx.Hash()]; exists {
-		return
+		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
+
+	if b.pendingWorldState.ContainsTransaction(tx.Hash()) {
+		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
+	}
+
+	if err := b.validateSignature(tx.PayerSignature); err != nil {
+		return &ErrInvalidTransactionSignature{TxHash: tx.Hash()}
+	}
+
 	b.txPool[tx.Hash()] = tx
 	b.pendingWorldState.InsertTransaction(tx)
+
+	registers, err := b.computer.ExecuteTransaction(tx, b.pendingWorldState.GetRegister)
+	if err != nil {
+		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
+
+		b.updatePendingWorldStates(tx.Hash())
+
+		return &ErrTransactionReverted{TxHash: tx.Hash(), Err: err}
+	}
+
+	b.pendingWorldState.SetRegisters(registers)
+	b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionFinalized)
+
 	b.updatePendingWorldStates(tx.Hash())
+
+	return nil
+}
+
+// CallScript executes a read-only script against the world state and returns the result.
+func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
+	return b.computer.ExecuteCall(script, b.pendingWorldState.GetRegister)
 }
 
 func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
@@ -80,7 +112,7 @@ func (b *EmulatedBlockchain) CommitBlock() {
 	b.txPool = make(map[crypto.Hash]*types.SignedTransaction)
 
 	prevBlock := b.pendingWorldState.GetLatestBlock()
-	block := &types.Block{
+	block := &etypes.Block{
 		Height:            prevBlock.Height + 1,
 		Timestamp:         time.Now(),
 		PreviousBlockHash: prevBlock.Hash(),
@@ -109,4 +141,9 @@ func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
 		b.pendingWorldState = ws
 		b.txPool = make(map[crypto.Hash]*types.SignedTransaction)
 	}
+}
+
+func (b *EmulatedBlockchain) validateSignature(sig crypto.Signature) error {
+	// TODO: validate signatures
+	return nil
 }

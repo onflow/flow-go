@@ -9,17 +9,29 @@ type Value interface {
 	isValue()
 }
 
+type ExportableValue interface {
+	ToGoValue() interface{}
+}
+
 // VoidValue
 
 type VoidValue struct{}
 
 func (VoidValue) isValue() {}
 
+func (v VoidValue) ToGoValue() interface{} {
+	return nil
+}
+
 // BoolValue
 
 type BoolValue bool
 
 func (BoolValue) isValue() {}
+
+func (v BoolValue) ToGoValue() interface{} {
+	return bool(v)
+}
 
 func (v BoolValue) Negate() BoolValue {
 	return !v
@@ -30,6 +42,16 @@ func (v BoolValue) Negate() BoolValue {
 type ArrayValue []Value
 
 func (ArrayValue) isValue() {}
+
+func (v ArrayValue) ToGoValue() interface{} {
+	values := make([]interface{}, len(v))
+
+	for i, value := range v {
+		values[i] = value.(ExportableValue).ToGoValue()
+	}
+
+	return values
+}
 
 // IntegerValue
 
@@ -56,6 +78,10 @@ type IntValue struct {
 }
 
 func (v IntValue) isValue() {}
+
+func (v IntValue) ToGoValue() interface{} {
+	return v.IntValue()
+}
 
 func (v IntValue) IntValue() int {
 	// TODO: handle overflow
@@ -122,6 +148,10 @@ type Int8Value int8
 
 func (Int8Value) isValue() {}
 
+func (v Int8Value) ToGoValue() interface{} {
+	return int8(v)
+}
+
 func (v Int8Value) IntValue() int {
 	return int(v)
 }
@@ -175,6 +205,10 @@ func (v Int8Value) Equal(other IntegerValue) BoolValue {
 type Int16Value int16
 
 func (Int16Value) isValue() {}
+
+func (v Int16Value) ToGoValue() interface{} {
+	return int16(v)
+}
 
 func (v Int16Value) IntValue() int {
 	return int(v)
@@ -230,6 +264,10 @@ type Int32Value int32
 
 func (Int32Value) isValue() {}
 
+func (v Int32Value) ToGoValue() interface{} {
+	return int32(v)
+}
+
 func (v Int32Value) IntValue() int {
 	return int(v)
 }
@@ -283,6 +321,10 @@ func (v Int32Value) Equal(other IntegerValue) BoolValue {
 type Int64Value int64
 
 func (Int64Value) isValue() {}
+
+func (v Int64Value) ToGoValue() interface{} {
+	return int64(v)
+}
 
 func (v Int64Value) IntValue() int {
 	return int(v)
@@ -338,6 +380,10 @@ type UInt8Value uint8
 
 func (UInt8Value) isValue() {}
 
+func (v UInt8Value) ToGoValue() interface{} {
+	return uint8(v)
+}
+
 func (v UInt8Value) IntValue() int {
 	return int(v)
 }
@@ -392,6 +438,10 @@ type UInt16Value uint16
 
 func (UInt16Value) isValue() {}
 
+func (v UInt16Value) ToGoValue() interface{} {
+	return uint16(v)
+}
+
 func (v UInt16Value) IntValue() int {
 	return int(v)
 }
@@ -444,6 +494,10 @@ func (v UInt16Value) Equal(other IntegerValue) BoolValue {
 type UInt32Value uint32
 
 func (UInt32Value) isValue() {}
+
+func (v UInt32Value) ToGoValue() interface{} {
+	return uint32(v)
+}
 
 func (v UInt32Value) IntValue() int {
 	return int(v)
@@ -498,6 +552,10 @@ func (v UInt32Value) Equal(other IntegerValue) BoolValue {
 type UInt64Value uint64
 
 func (UInt64Value) isValue() {}
+
+func (v UInt64Value) ToGoValue() interface{} {
+	return uint64(v)
+}
 
 func (v UInt64Value) IntValue() int {
 	return int(v)
