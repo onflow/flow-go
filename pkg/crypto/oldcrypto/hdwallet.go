@@ -1,4 +1,4 @@
-package crypto
+package oldcrypto
 
 import (
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
