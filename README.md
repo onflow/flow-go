@@ -85,6 +85,14 @@ make test
 
 The first run will take a while because some base layers will be downloaded and built for the first time. See our [testing instructions](#testing) for more details.
 
+#### Install tooling dependencies
+
+Additional development tools required for code generation can be installed with this command:
+
+```bash
+make install-tools
+```
+
 ### Generating code
 
 #### Dependency injection using Wire
