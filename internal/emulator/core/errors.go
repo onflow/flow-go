@@ -27,8 +27,13 @@ func (e *ErrInvalidTransactionSignature) Error() string {
 // ErrTransactionReverted indicates that a transaction reverted.
 type ErrTransactionReverted struct {
 	TxHash crypto.Hash
+	Err    error
 }
 
 func (e *ErrTransactionReverted) Error() string {
-	return fmt.Sprintf("Transaction with hash %s reverted during execution", e.TxHash)
+	return fmt.Sprintf(
+		"Transaction with hash %s reverted during execution: %s",
+		e.TxHash,
+		e.Err.Error(),
+	)
 }

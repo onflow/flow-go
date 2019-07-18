@@ -8,12 +8,12 @@ import (
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 )
 
-// Computer executes blocks and saves results to the world state.
+// Computer provides an interface to execute scripts against the world state.
 type Computer struct {
 	runtime runtime.Runtime
 }
 
-// NewComputer returns a new computer connected to the world state.
+// NewComputer returns a new computer instance.
 func NewComputer(runtime runtime.Runtime) *Computer {
 	return &Computer{
 		runtime: runtime,
@@ -40,10 +40,11 @@ func getFullKey(controller, owner, key []byte) crypto.Hash {
 	return crypto.NewHash(fullKey)
 }
 
+// ExecuteTransaction executes a transaction script against the current world state.
 func (c *Computer) ExecuteTransaction(
 	tx *types.SignedTransaction,
 	readRegister func(crypto.Hash) []byte,
-) (etypes.Registers, bool) {
+) (etypes.Registers, error) {
 	registers := make(etypes.Registers)
 
 	runtimeInterface := &runtimeInterface{
@@ -63,7 +64,34 @@ func (c *Computer) ExecuteTransaction(
 		},
 	}
 
-	err := c.runtime.ExecuteScript(tx.Script, runtimeInterface)
+	_, err := c.runtime.ExecuteScript(tx.Script, runtimeInterface)
 
-	return registers, err == nil
+	return registers, err
+}
+
+// ExecuteCall executes a read-only script against the current world state.
+func (c *Computer) ExecuteCall(
+	script []byte,
+	readRegister func(crypto.Hash) []byte,
+) (interface{}, error) {
+	registers := make(etypes.Registers)
+
+	runtimeInterface := &runtimeInterface{
+		getValue: func(controller, owner, key []byte) ([]byte, error) {
+			fullKey := getFullKey(controller, owner, key)
+
+			if v, ok := registers[fullKey]; ok {
+				return v, nil
+			}
+
+			return readRegister(fullKey), nil
+		},
+		setValue: func(controller, owner, key, value []byte) error {
+			fullKey := getFullKey(controller, owner, key)
+			registers[fullKey] = value
+			return nil
+		},
+	}
+
+	return c.runtime.ExecuteScript(script, runtimeInterface)
 }
