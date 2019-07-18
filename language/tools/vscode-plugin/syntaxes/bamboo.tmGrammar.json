@@ -5,7 +5,8 @@
       { "include": "#expressions" },
       { "include": "#declarations" },
       { "include": "#keywords" },
-      { "include": "#code-block" }
+      { "include": "#code-block" },
+      { "include": "#composite" }
     ],
     "repository": {
       "comments": {
@@ -304,7 +305,7 @@
           },
           {
             "match": "\\binit\\b|(?<!\\.)\\b(?:get|set)\\b",
-            "name": "storage.type.function.swift"
+            "name": "storage.type.function.bamboo"
           }
         ]
       },
@@ -617,6 +618,44 @@
               {
                 "match": ":",
                 "name": "invalid.illegal.extra-colon-in-parameter-list.bamboo"
+              }
+            ]
+          }
+        ]
+      },
+      "composite": {
+        "begin": "\\b(class|struct|resource|contract|transaction)\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
+        "beginCaptures": {
+          "1": {
+            "name": "storage.type.$1.bamboo"
+          },
+          "2": {
+            "name": "entity.name.type.$1.bamboo"
+          }
+        },
+        "end": "(?<=\\})",
+        "name": "meta.definition.type.protocol.bamboo",
+        "patterns": [
+          {
+            "include": "#comments"
+          },
+          {
+            "begin": "\\{",
+            "beginCaptures": {
+              "0": {
+                "name": "punctuation.definition.type.begin.bamboo"
+              }
+            },
+            "end": "\\}",
+            "endCaptures": {
+              "0": {
+                "name": "punctuation.definition.type.end.bamboo"
+              }
+            },
+            "name": "meta.definition.type.body.bamboo",
+            "patterns": [
+              {
+                "include": "$self"
               }
             ]
           }
