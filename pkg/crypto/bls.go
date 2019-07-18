@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"strconv"
+	"strings"
 )
 
 // Signature48 implements Signature
@@ -11,11 +12,12 @@ func (s *Signature48) ToBytes() []byte {
 }
 
 func (s *Signature48) String() string {
-	var res string
-	for i := 0; i < len(s); i++ {
-		res = strconv.FormatUint(uint64(s[i]), 16) + res
+	var sb strings.Builder
+	sb.WriteString("0x")
+	for _, i := range s {
+		sb.WriteString(strconv.FormatUint(uint64(i), 16))
 	}
-	return "0x" + res
+	return sb.String()
 }
 
 // BLS_BLS12381Algo, embeds SignAlgo

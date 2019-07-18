@@ -1,6 +1,9 @@
 package crypto
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+)
 
 // sha3_256Algo, embeds HashAlgo
 type sha3_256Algo struct {
@@ -39,11 +42,12 @@ func (h *Hash32) ToBytes() []byte {
 }
 
 func (h *Hash32) String() string {
-	var s string
-	for i := 0; i < len(h); i++ {
-		s = strconv.FormatUint(uint64(h[i]), 16) + s
+	var sb strings.Builder
+	sb.WriteString("0x")
+	for _, i := range h {
+		sb.WriteString(strconv.FormatUint(uint64(i), 16))
 	}
-	return "0x" + s
+	return sb.String()
 }
 
 func (h *Hash32) IsEqual(input Hash) bool {

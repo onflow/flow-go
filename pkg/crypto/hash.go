@@ -27,7 +27,7 @@ func NewHashAlgo(name AlgoName) Hasher {
 type Hash interface {
 	// ToBytes returns the bytes representation of a hash
 	ToBytes() []byte
-	// String returns a Hex string representation of the hash bytes in little endian
+	// String returns a Hex string representation of the hash bytes in big endian
 	String() string
 	// IsEqual tests an equality with a given hash
 	IsEqual(Hash) bool
