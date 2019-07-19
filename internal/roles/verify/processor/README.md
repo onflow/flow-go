@@ -11,7 +11,7 @@
 Package processor is in charge of the ExecutionReceipt processing flow.
 It decides whether a receipt gets discarded/slashed/approved/cached, while relying on external side effects functions to trigger these actions (template pattern).
 The package holds a queue of receipts and processes them in FIFO to utilise caching result and not re-validate a validated receipt submitted by another node.
-Note a some concurrency optimisation is possible by having a queue-per-block-height without sacrificing any caching potential.
+Note that some concurrency optimisation is possible by having a queue-per-block-height without sacrificing any caching potential.
 
 
 
@@ -29,7 +29,7 @@ Note a some concurrency optimisation is possible by having a queue-per-block-hei
 
 
 
-## <a name="NewReceiptProcessor">func</a> [NewReceiptProcessor](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/processor.go?s=1177:1286#L32)
+## <a name="NewReceiptProcessor">func</a> [NewReceiptProcessor](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/processor.go?s=1180:1289#L32)
 ``` go
 func NewReceiptProcessor(effects Effects, rc *receiptProcessorConfig, hasher crypto.Hasher) *receiptProcessor
 ```
@@ -38,7 +38,7 @@ A go routine is initialised and waiting to process new items.
 
 
 
-## <a name="NewReceiptProcessorConfig">func</a> [NewReceiptProcessorConfig](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/processor.go?s=4173:4245#L130)
+## <a name="NewReceiptProcessorConfig">func</a> [NewReceiptProcessorConfig](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/processor.go?s=4176:4248#L130)
 ``` go
 func NewReceiptProcessorConfig(c *config.Config) *receiptProcessorConfig
 ```

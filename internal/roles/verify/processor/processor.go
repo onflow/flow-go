@@ -1,7 +1,7 @@
 // Package processor is in charge of the ExecutionReceipt processing flow.
 // It decides whether a receipt gets discarded/slashed/approved/cached, while relying on external side effects functions to trigger these actions (template pattern).
 // The package holds a queue of receipts and processes them in FIFO to utilise caching result and not re-validate a validated receipt submitted by another node.
-// Note a some concurrency optimisation is possible by having a queue-per-block-height without sacrificing any caching potential.
+// Note that some concurrency optimisation is possible by having a queue-per-block-height without sacrificing any caching potential.
 package processor
 
 import (
