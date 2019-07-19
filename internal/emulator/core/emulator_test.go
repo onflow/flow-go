@@ -251,3 +251,65 @@ func TestCallScript(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(value).To(Equal(2))
 }
+
+func TestQueryByVersion(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain()
+
+	tx1 := &types.SignedTransaction{
+		Script:         []byte(sampleScript),
+		Nonce:          1,
+		ComputeLimit:   10,
+		Timestamp:      time.Now(),
+		PayerSignature: crypto.Signature{},
+	}
+
+	tx2 := &types.SignedTransaction{
+		Script:         []byte(sampleScript),
+		Nonce:          2,
+		ComputeLimit:   10,
+		Timestamp:      time.Now(),
+		PayerSignature: crypto.Signature{},
+	}
+
+	ws1 := b.pendingWorldState.Hash()
+	b.SubmitTransaction(tx1)
+	ws2 := b.pendingWorldState.Hash()
+	b.SubmitTransaction(tx2)
+	ws3 := b.pendingWorldState.Hash()
+
+	tx, err := b.GetTransactionAtVersion(tx1.Hash(), ws1)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(tx).To(BeNil())
+
+	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws1)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(tx).To(BeNil())
+
+	tx, err = b.GetTransactionAtVersion(tx1.Hash(), ws2)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(tx).ToNot(BeNil())
+
+	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws2)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(tx).To(BeNil())
+
+	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws3)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(tx).ToNot(BeNil())
+
+	value, err := b.CallScriptAtVersion([]byte(sampleCall), ws1)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(value).To(Equal(0))
+
+	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws2)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(value).To(Equal(2))
+
+	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws3)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(value).To(Equal(4))
+
+	Expect(b.pendingWorldState.Hash()).To(Equal(ws3))
+}
