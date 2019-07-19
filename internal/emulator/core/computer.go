@@ -1,8 +1,6 @@
 package core
 
 import (
-	"math/big"
-
 	"github.com/dapperlabs/bamboo-node/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
@@ -24,7 +22,7 @@ func NewComputer(runtime runtime.Runtime) *Computer {
 type runtimeInterface struct {
 	getValue      func(controller, owner, key []byte) (value []byte, err error)
 	setValue      func(controller, owner, key, value []byte) (err error)
-	createAccount func(key, code []byte) (id []byte, err error)
+	createAccount func(publicKey, code []byte) (id []byte, err error)
 }
 
 func (i *runtimeInterface) GetValue(controller, owner, key []byte) ([]byte, error) {
@@ -35,8 +33,8 @@ func (i *runtimeInterface) SetValue(controller, owner, key, value []byte) error 
 	return i.setValue(controller, owner, key, value)
 }
 
-func (i *runtimeInterface) CreateAccount(key, code []byte) (id []byte, err error) {
-	return i.createAccount(key, code)
+func (i *runtimeInterface) CreateAccount(publicKey, code []byte) (id []byte, err error) {
+	return i.createAccount(publicKey, code)
 }
 
 // ExecuteTransaction executes a transaction against the current world state.
@@ -69,18 +67,9 @@ func (c *Computer) ExecuteScript(
 			registers.Set(controller, owner, key, value)
 			return nil
 		},
-		createAccount: func(key, code []byte) (id []byte, err error) {
-			latestAccountID, _ := registers.Get([]byte{}, []byte{}, []byte("latestAccount"))
-			accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
-			accountID := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
-
-			registers.Set(accountID, accountID, []byte("balance"), big.NewInt(0).Bytes())
-			registers.Set(accountID, accountID, []byte("key"), key)
-			registers.Set(accountID, accountID, []byte("code"), code)
-
-			registers.Set([]byte{}, []byte{}, []byte("latestAccount"), accountID)
-
-			return accountID, nil
+		createAccount: func(publicKey, code []byte) (id []byte, err error) {
+			accountID := registers.CreateAccount(publicKey, code)
+			return accountID.Bytes(), nil
 		},
 	}
 

@@ -178,6 +178,37 @@ func TestSubmitTransactionReverted(t *testing.T) {
 	Expect(tx2.Status).To(Equal(types.TransactionReverted))
 }
 
+func TestCreateAccount(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain()
+
+	tx1 := &types.SignedTransaction{
+		Script: []byte(`
+			fun main() {
+				const publicKey = [1,2,3]
+				const code = [4,5,6]
+				createAccount(publicKey, code)
+			}
+		`),
+		Nonce:          1,
+		ComputeLimit:   10,
+		Timestamp:      time.Now(),
+		PayerSignature: crypto.Signature{},
+	}
+
+	err := b.SubmitTransaction(tx1)
+	Expect(err).ToNot(HaveOccurred())
+
+	address := crypto.HexToAddress("0000000000000000000000000000000000000001")
+
+	account := b.GetAccount(address)
+
+	Expect(account.Balance).To(Equal(uint64(0)))
+	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
+	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
+}
+
 func TestCallScript(t *testing.T) {
 	RegisterTestingT(t)
 
