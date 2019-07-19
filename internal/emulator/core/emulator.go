@@ -46,7 +46,7 @@ func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTrans
 
 // GetAccount gets account information associated with an address identifier.
 func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account {
-	return b.pendingWorldState.Registers.GetAccount(address)
+	return b.pendingWorldState.GetAccount(address)
 }
 
 // SubmitTransaction sends a transaction to the network that is immediately executed (updates blockchain state).
