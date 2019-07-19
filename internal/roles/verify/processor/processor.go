@@ -21,11 +21,12 @@ type ReceiptProcessorConfig struct {
 	CacheBuffer int
 }
 
-// todo: use config values
+//NewReceiptProcessorConfig returns a new  ReceiptProcessorConfig  process.
 func NewReceiptProcessorConfig(c *config.Config) *ReceiptProcessorConfig {
+
 	return &ReceiptProcessorConfig{
-		QueueBuffer: 3,
-		CacheBuffer: 4,
+		QueueBuffer: c.ProcessorQueueBuffer,
+		CacheBuffer: c.ProcessorCacheBuffer,
 	}
 }
 
