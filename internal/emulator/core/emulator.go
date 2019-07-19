@@ -69,7 +69,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 	b.txPool[tx.Hash()] = tx
 	b.pendingWorldState.InsertTransaction(tx)
 
-	registers, err := b.computer.ExecuteTransaction(tx, b.pendingWorldState.GetRegister)
+	registers, err := b.computer.ExecuteTransaction(tx, b.pendingWorldState.Registers)
 	if err != nil {
 		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
 
@@ -88,7 +88,8 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 
 // CallScript executes a read-only script against the world state and returns the result.
 func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
-	return b.computer.ExecuteCall(script, b.pendingWorldState.GetRegister)
+	result, _, err := b.computer.ExecuteScript(script, b.pendingWorldState.Registers)
+	return result, err
 }
 
 func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {

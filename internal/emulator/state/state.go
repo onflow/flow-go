@@ -19,7 +19,7 @@ type WorldState struct {
 	blockchainMutex   sync.RWMutex
 	Transactions      map[crypto.Hash]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
-	Registers         map[crypto.Hash][]byte
+	Registers         Registers
 	registersMutex    sync.RWMutex
 	LatestState       crypto.Hash
 	latestStateMutex  sync.RWMutex
@@ -31,7 +31,7 @@ func NewWorldState() *WorldState {
 	blocks := make(map[crypto.Hash]*etypes.Block)
 	blockchain := make([]crypto.Hash, 0)
 	transactions := make(map[crypto.Hash]*types.SignedTransaction)
-	registers := make(map[crypto.Hash][]byte)
+	registers := make(Registers)
 
 	genesis := etypes.GenesisBlock()
 	blocks[genesis.Hash()] = genesis
@@ -119,26 +119,8 @@ func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
 	return nil
 }
 
-// GetRegister gets a register by hash.
-//
-// If the register does not exist, an empty byte slice is returned.
-func (ws *WorldState) GetRegister(hash crypto.Hash) []byte {
-	ws.registersMutex.RLock()
-	defer ws.registersMutex.RUnlock()
-
-	return ws.Registers[hash]
-}
-
-// SetRegister sets a register to the given value.
-func (ws *WorldState) SetRegister(hash crypto.Hash, value []byte) {
-	ws.registersMutex.Lock()
-	defer ws.registersMutex.Unlock()
-
-	ws.Registers[hash] = value
-}
-
 // SetRegisters commmits a set of registers to the state.
-func (ws *WorldState) SetRegisters(registers etypes.Registers) {
+func (ws *WorldState) SetRegisters(registers Registers) {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 

@@ -1,11 +1,12 @@
 package core
 
 import (
+	"math/big"
+
 	"github.com/dapperlabs/bamboo-node/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
-	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/internal/emulator/state"
 )
 
 // Computer provides an interface to execute scripts against the world state.
@@ -21,8 +22,9 @@ func NewComputer(runtime runtime.Runtime) *Computer {
 }
 
 type runtimeInterface struct {
-	getValue func(controller, owner, key []byte) (value []byte, err error)
-	setValue func(controller, owner, key, value []byte) (err error)
+	getValue      func(controller, owner, key []byte) (value []byte, err error)
+	setValue      func(controller, owner, key, value []byte) (err error)
+	createAccount func(key, code []byte) (id []byte, err error)
 }
 
 func (i *runtimeInterface) GetValue(controller, owner, key []byte) ([]byte, error) {
@@ -33,65 +35,56 @@ func (i *runtimeInterface) SetValue(controller, owner, key, value []byte) error 
 	return i.setValue(controller, owner, key, value)
 }
 
-func getFullKey(controller, owner, key []byte) crypto.Hash {
-	fullKey := append(controller, owner...)
-	fullKey = append(fullKey, key...)
-
-	return crypto.NewHash(fullKey)
+func (i *runtimeInterface) CreateAccount(key, code []byte) (id []byte, err error) {
+	return i.createAccount(key, code)
 }
 
-// ExecuteTransaction executes a transaction script against the current world state.
+// ExecuteTransaction executes a transaction against the current world state.
 func (c *Computer) ExecuteTransaction(
 	tx *types.SignedTransaction,
-	readRegister func(crypto.Hash) []byte,
-) (etypes.Registers, error) {
-	registers := make(etypes.Registers)
-
-	runtimeInterface := &runtimeInterface{
-		getValue: func(controller, owner, key []byte) ([]byte, error) {
-			fullKey := getFullKey(controller, owner, key)
-
-			if v, ok := registers[fullKey]; ok {
-				return v, nil
-			}
-
-			return readRegister(fullKey), nil
-		},
-		setValue: func(controller, owner, key, value []byte) error {
-			fullKey := getFullKey(controller, owner, key)
-			registers[fullKey] = value
-			return nil
-		},
-	}
-
-	_, err := c.runtime.ExecuteScript(tx.Script, runtimeInterface)
-
+	stateRegisters state.Registers,
+) (registers state.Registers, err error) {
+	// TODO: deduct gas cost from transaction signer's account
+	_, registers, err = c.ExecuteScript(tx.Script, stateRegisters)
 	return registers, err
 }
 
-// ExecuteCall executes a read-only script against the current world state.
-func (c *Computer) ExecuteCall(
+// ExecuteScript executes a script against the current world state.
+func (c *Computer) ExecuteScript(
 	script []byte,
-	readRegister func(crypto.Hash) []byte,
-) (interface{}, error) {
-	registers := make(etypes.Registers)
+	stateRegisters state.Registers,
+) (result interface{}, registers state.Registers, err error) {
+	registers = make(state.Registers)
 
 	runtimeInterface := &runtimeInterface{
 		getValue: func(controller, owner, key []byte) ([]byte, error) {
-			fullKey := getFullKey(controller, owner, key)
-
-			if v, ok := registers[fullKey]; ok {
+			if v, ok := registers.Get(controller, owner, key); ok {
 				return v, nil
 			}
 
-			return readRegister(fullKey), nil
+			v, _ := stateRegisters.Get(controller, owner, key)
+			return v, nil
 		},
 		setValue: func(controller, owner, key, value []byte) error {
-			fullKey := getFullKey(controller, owner, key)
-			registers[fullKey] = value
+			registers.Set(controller, owner, key, value)
 			return nil
+		},
+		createAccount: func(key, code []byte) (id []byte, err error) {
+			latestAccountID, _ := registers.Get([]byte{}, []byte{}, []byte("latestAccount"))
+			accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
+			accountID := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
+
+			registers.Set(accountID, accountID, []byte("balance"), big.NewInt(0).Bytes())
+			registers.Set(accountID, accountID, []byte("key"), key)
+			registers.Set(accountID, accountID, []byte("code"), code)
+
+			registers.Set([]byte{}, []byte{}, []byte("latestAccount"), accountID)
+
+			return accountID, nil
 		},
 	}
 
-	return c.runtime.ExecuteScript(script, runtimeInterface)
+	result, err = c.runtime.ExecuteScript(script, runtimeInterface)
+
+	return result, registers, err
 }
