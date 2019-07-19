@@ -6,7 +6,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 

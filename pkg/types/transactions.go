@@ -3,8 +3,7 @@ package types
 import (
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/internal/emulator/data"
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 )
 
 // TransactionStatus represents the status of a Transaction.
@@ -37,7 +36,7 @@ type RawTransaction struct {
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *RawTransaction) Hash() crypto.Hash {
-	bytes := data.EncodeAsBytes(
+	bytes := crypto.EncodeAsBytes(
 		tx.ToAddress,
 		tx.Script,
 		tx.Nonce,
@@ -78,7 +77,7 @@ type SignedTransaction struct {
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *SignedTransaction) Hash() crypto.Hash {
-	bytes := data.EncodeAsBytes(
+	bytes := crypto.EncodeAsBytes(
 		tx.ToAddress,
 		tx.Script,
 		tx.Nonce,

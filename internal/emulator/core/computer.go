@@ -2,10 +2,10 @@ package core
 
 import (
 	"github.com/dapperlabs/bamboo-node/language/runtime"
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 )
 
 // Computer provides an interface to execute scripts against the world state.

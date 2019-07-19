@@ -3,7 +3,7 @@ package core
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 )
 
 // ErrDuplicateTransaction indicates that a transaction has already been submitted.

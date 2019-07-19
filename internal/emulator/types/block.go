@@ -3,8 +3,7 @@ package types
 import (
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/internal/emulator/utils"
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 )
 
 type Block struct {
@@ -15,7 +14,7 @@ type Block struct {
 }
 
 func (b *Block) Hash() crypto.Hash {
-	bytes := utils.EncodeAsBytes(
+	bytes := crypto.EncodeAsBytes(
 		b.Height,
 		b.Timestamp,
 		b.PreviousBlockHash,

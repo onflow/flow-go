@@ -1,4 +1,4 @@
-package crypto
+package oldcrypto
 
 const (
 	SignatureLength = 72
