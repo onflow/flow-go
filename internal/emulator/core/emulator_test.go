@@ -193,6 +193,40 @@ func TestSubmitTransactionReverted(t *testing.T) {
 	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionReverted))
 }
 
+func TestCommitBlock(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain()
+
+	tx1 := &types.SignedTransaction{
+		Script:         []byte(sampleScript),
+		Nonce:          1,
+		ComputeLimit:   10,
+		Timestamp:      time.Now(),
+		PayerSignature: crypto.Signature{},
+	}
+
+	err := b.SubmitTransaction(tx1)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionFinalized))
+
+	tx2 := &types.SignedTransaction{
+		Script:         []byte("invalid script"),
+		Nonce:          1,
+		ComputeLimit:   10,
+		Timestamp:      time.Now(),
+		PayerSignature: crypto.Signature{},
+	}
+
+	err = b.SubmitTransaction(tx2)
+	Expect(err).To(HaveOccurred())
+	Expect(b.GetTransaction(tx2.Hash()).Status).To(Equal(types.TransactionReverted))
+
+	b.CommitBlock()
+	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionSealed))
+	Expect(b.GetTransaction(tx2.Hash()).Status).To(Equal(types.TransactionReverted))
+}
+
 func TestCallScript(t *testing.T) {
 	RegisterTestingT(t)
 
