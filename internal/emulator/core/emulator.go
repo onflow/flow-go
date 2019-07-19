@@ -57,7 +57,10 @@ func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTrans
 }
 
 func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash) *types.SignedTransaction {
-	ws := getWorldStateAtVersion(version)
+	ws := b.getWorldStateAtVersion(version)
+	if ws == nil {
+		return nil
+	}
 
 	return ws.GetTransaction(txHash)
 }
@@ -68,7 +71,10 @@ func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account 
 }
 
 func (b *EmulatedBlockchain) GetAccountAtVersion(address crypto.Address, version crypto.Hash) *crypto.Account {
-	ws := getWorldStateAtVersion(version)
+	ws := b.getWorldStateAtVersion(version)
+	if ws == nil {
+		return nil
+	}
 
 	return ws.GetAccount(address)
 }
@@ -113,6 +119,15 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 // CallScript executes a read-only script against the world state and returns the result.
 func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
 	return b.computer.ExecuteCall(script, b.pendingWorldState.GetRegister)
+}
+
+func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error) {
+	ws := b.getWorldStateAtVersion(version)
+	if ws == nil {
+		return nil, nil
+	}
+
+	return b.computer.ExecuteCall(script, ws.GetRegister)
 }
 
 func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
