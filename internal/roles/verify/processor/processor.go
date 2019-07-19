@@ -1,7 +1,7 @@
 // Package processor is in charge of the ExecutionReceipt processing flow.
-// It decides whether an receipt gets discarded/slashed/approved/cached, while relying on external side effects functions to trigger these actions.
-// The package holds a queue of receipts and processes them in FIFO to utilise caching.
-// Note a sun currency optimisation is possible by having a queue-per-block-height without losing on any caching potential.
+// It decides whether a receipt gets discarded/slashed/approved/cached, while relying on external side effects functions to trigger these actions (template pattern).
+// The package holds a queue of receipts and processes them in FIFO to utilise caching result and not re-validate a validated receipt submitted by another node.
+// Note a some concurrency optimisation is possible by having a queue-per-block-height without sacrificing any caching potential.
 package processor
 
 import (
@@ -42,7 +42,7 @@ func NewReceiptProcessor(effects Effects, rc *receiptProcessorConfig, hasher cry
 }
 
 // Submit takes in an ExecutionReceipt to be process async.
-// The done chan is optional. If caller is not interested to be notified when processing has been completed, nil should be passed.
+// The done chan is optional. If caller is not interested to be notified when processing has been completed, nil value should be used for it.
 func (p *receiptProcessor) Submit(receipt *types.ExecutionReceipt, done chan bool) {
 	// TODO: if ER does not have a valid signature, then this needs to be discard. Deal with it here are at upper layer before submit?
 
