@@ -1,71 +1,74 @@
 package crypto
 
 import (
-	"encoding/hex"
+	"hash"
+
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/crypto/sha3"
 )
 
-const (
-	// HashLength is the size of a SHA3-256 hash.
-	HashLength = 32
-)
-
-// Hash represents the 32 byte SHA3-256 hash of arbitrary data.
-type Hash [HashLength]byte
-
-// BytesToHash returns a Hash with value b.
-// If b is larger than len(h), b will be cropped from the left.
-func BytesToHash(b []byte) Hash {
-	var h Hash
-	h.SetBytes(b)
-	return h
-}
-
-// HashesToBytes converts a slice of hashes to a slice of bytes.
-func HashesToBytes(hashes []Hash) [][]byte {
-	b := make([][]byte, len(hashes))
-
-	for i, h := range hashes {
-		b[i] = h.Bytes()
+// NewHashAlgo initializes and chooses a hashing algorithm
+func NewHashAlgo(name AlgoName) Hasher {
+	if name == SHA3_256 {
+		a := &(sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}})
+		// Output length sanity check
+		if a.outputLength != a.Size() {
+			log.Errorf("%s requires an output length %d", SHA3_256, a.Size())
+			return nil
+		}
+		return a
 	}
-
-	return b
+	log.Errorf("the hashing algorithm %s is not supported.", name)
+	return nil
 }
 
-// BytesToHashes converts a slice of bytes to a slice of hashes.
-func BytesToHashes(b [][]byte) []Hash {
-	hashes := make([]Hash, len(b))
+// Hash is the hash algorithms output types
 
-	for i, v := range b {
-		hashes[i] = BytesToHash(v)
-	}
-
-	return hashes
+type Hash interface {
+	// ToBytes returns the bytes representation of a hash
+	ToBytes() []byte
+	// String returns a Hex string representation of the hash bytes in big endian
+	String() string
+	// IsEqual tests an equality with a given hash
+	IsEqual(Hash) bool
 }
 
-// SetBytes sets the hash to the value of b.
-// If b is larger than len(h), b will be cropped from the left.
-func (h *Hash) SetBytes(b []byte) {
-	if len(b) > len(h) {
-		b = b[len(b)-HashLength:]
-	}
+// Hasher interface
 
-	copy(h[HashLength-len(b):], b)
+type Hasher interface {
+	Name() AlgoName
+	// Size return the hash output length (a Hash.hash method)
+	Size() int
+	// Compute hash
+	ComputeBytesHash([]byte) Hash
+	ComputeStructHash(Encoder) Hash
+	// Write adds more bytes to the current hash state (a Hash.hash method)
+	AddBytes([]byte)
+	AddStruct(Encoder)
+	// SumHash returns the hash output and resets the hash state a
+	SumHash() Hash
+	// Reset resets the hash state
+	Reset()
 }
 
-// Bytes gets the byte representation of the underlying hash.
-func (h Hash) Bytes() []byte { return h[:] }
-
-// NewHash computes the SHA3-256 hash of some arbitrary set of data.
-func NewHash(data []byte) Hash {
-	return BytesToHash(ComputeHash(data))
+// HashAlgo
+type HashAlgo struct {
+	name         AlgoName
+	outputLength int
+	hash.Hash
 }
 
-// String encodes Hash as a readable string for logging purposes.
-func (h Hash) String() string {
-	return hex.EncodeToString(h.Bytes())
+// Name returns the name of the algorithm
+func (a *HashAlgo) Name() AlgoName {
+	return a.name
 }
 
-// ZeroBlockHash represents the parent hash of the genesis block.
-func ZeroBlockHash() Hash {
-	return Hash{}
+// AddBytes adds bytes to the current hash state
+func (a *HashAlgo) AddBytes(data []byte) {
+	a.Write(data)
+}
+
+// AddStruct adds a structure to the current hash state
+func (a *HashAlgo) AddStruct(struc Encoder) {
+	a.Write(struc.Encode())
 }

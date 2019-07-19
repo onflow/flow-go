@@ -10,10 +10,11 @@ require (
 	github.com/bluele/gcache v0.0.0-20190518031135-bc40bd653833
 	github.com/btcsuite/btcd v0.0.0-20190629003639-c26ffa870fd8 // indirect
 	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
+	github.com/dapperlabs/bamboo-node/language/runtime v0.0.0-00010101000000-000000000000
 	github.com/ethereum/go-ethereum v1.8.27 // indirect
 	github.com/go-pg/migrations v6.7.3+incompatible
 	github.com/go-pg/pg v8.0.4+incompatible
-	github.com/golang/protobuf v1.3.1
+	github.com/golang/protobuf v1.3.2
 	github.com/google/wire v0.3.0
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/miguelmota/go-ethereum-hdwallet v0.0.0-20190601230056-2da794f11e15
@@ -32,3 +33,5 @@ require (
 	google.golang.org/grpc v1.21.1
 	mellium.im/sasl v0.2.1 // indirect
 )
+
+replace github.com/dapperlabs/bamboo-node/language/runtime => ./language/runtime

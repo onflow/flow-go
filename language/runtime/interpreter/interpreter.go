@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"fmt"
+
 	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/language/runtime/errors"
 	. "github.com/dapperlabs/bamboo-node/language/runtime/trampoline"
@@ -83,7 +84,7 @@ func (interpreter *Interpreter) defineGlobal(declaration ast.Declaration) {
 	interpreter.Globals[name] = interpreter.activations.Find(name)
 }
 
-func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value Value, err error) {
+func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value ExportableValue, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
 		return nil, &NotDeclaredError{
@@ -121,7 +122,7 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 	if result == nil {
 		return nil, nil
 	}
-	return result.(Value), nil
+	return result.(ExportableValue), nil
 }
 
 func (interpreter *Interpreter) invokeFunction(

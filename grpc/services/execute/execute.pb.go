@@ -508,6 +508,9 @@ type ExecuteServiceServer interface {
 type UnimplementedExecuteServiceServer struct {
 }
 
+func (*UnimplementedExecuteServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
 func (*UnimplementedExecuteServiceServer) ExecuteBlock(ctx context.Context, req *ExecuteBlockRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExecuteBlock not implemented")
 }
