@@ -1630,21 +1630,24 @@ const add = (a: Int8, b: Int8) -> Int {
 
 ## Composite Data Types
 
-> 🚧 Status: Composite Data Types are not implemented yet.
+> 🚧 Status: Composite data types are not implemented yet.
 
 Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of one or more named fields, and one or more functions that opperate on the data. Each field may have a different type.
 
-There are three kinds of composite data types: structures, classes, and resources. They differ in their behaviour: Structures are *copied*, i.e. they are value types, classes are *referenced*, i.e., they are reference types, and resources are *moved*, they are linear types.
+There are three kinds of composite data types. The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable, when the value is assignend to a variable, and when the value is passed as an argument to a function:
 
-This is explained in detail in a [separate section](#composite-data-type-behaviour).
+- [**Structures**](#structures-and-classes) are **copied**, i.e. they are value types
+- [**Classes**](#structures-and-classes) are **referenced**, i.e., they are reference types
+- [**Resources**](#resources) are **moved**, they are linear types. Resources **must** be used **exactly once**
 
-### Composite Data Type Declaration
+Value types should be used when copies with independent state is desired, reference types should be used when shared, mutable state is desired, and linear types should be used when a value must be used exactly once, i.e. when it should not be used multiple times and when it should not be lost.
 
-Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword. Resources are declared using the `resource` keyword.
+### Structures and Classes
 
-The keyword that specifies the kind of composite data type is followed by the name of the type.
+Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword.
+The keyword is followed by the name of the type.
 
-```bamboo,file=composite-data-type-declaration.bpl
+```bamboo,file=structure-and-class-declaration.bpl
 struct SomeStruct {
     // ...
 }
@@ -1652,22 +1655,159 @@ struct SomeStruct {
 class SomeClass {
     // ...
 }
+```
 
+Structures, classes are types. Structure and class values are created (instantiated) by calling the type like a function.
+
+```bamboo,file=structure-and-class-instantiation.bpl
+SomeStruct()
+
+SomeClass()
+```
+
+The only difference between structures and classes is their behavior when used as an initial value for constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are **copied**, i.e. they are value types, classes are **referenced**, i.e., they are reference types.
+
+Structures are **copied**.
+
+```bamboo,file=struct-behavior.bpl
+// Declare a structure named `SomeStruct`, with a variable integer field
+//
+struct SomeStruct {
+    var value: Int
+
+    init(value: Int) {
+        self.value = value
+    }
+}
+
+// Declare a constant with value of structure type `SomeStruct`
+//
+const a = SomeStruct(value: 0)
+
+// *Copy* the structure value into a new constant
+//
+const b = a
+
+b.value = 1
+
+a.value // is *0*
+```
+
+Classes are **referenced**.
+
+```bamboo,file=class-behavior.bpl
+// Declare a class named `SomeClass`, with a variable integer field
+//
+class SomeClass {
+    var value: Int
+
+    init(value: Int) {
+        self.value = value
+    }
+}
+
+// Declare a constant with value of class type `SomeClass`
+//
+const a = SomeClass(value: 0)
+
+// *Reference* the class value with a new constant
+//
+const b = A
+
+b.value = 1
+
+a.value // is *1*
+```
+
+Note the outcomes in the last lines of the examples.
+
+### Resources
+
+Resources are declared using the `resource` keyword, followed by the name of the resource.
+
+```bamboo,file=resource-declaration.bpl
 resource SomeResource {
     // ...
 }
 ```
 
-Structures, classes, and resources are types.
+Resources are types. Resource values are created (instantiated) by using the `create` keyword and calling the type like a function.
 
-Values of a structure, class, or resource type are created (instantiated) by calling the type like a function.
+```bamboo,file=resource-instantiation.bpl
+create SomeResource()
+```
 
-```bamboo,file=composite-data-type-instantiation.bpl
-const someStruct: SomeStruct = SomeStruct()
+Resource are **moved** when used as an initial value for a constant or variable, when assigned to a different variable, or passed as an argument to a function. When the resource was moved, the constant or variable that referered to the resource before the move becomes **invalid**.
 
-const someClass: SomeClass = SomeClass()
+To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it moved to a different variable, or when it moved to a function.
 
-const someResource: SomeResource = SomeResource()
+```bamboo,file=resource-behavior.bpl
+// Declare a resource named `SomeResource`, with a variable integer field
+//
+resource SomeResource {
+    var value: Int
+
+    init(value: Int) {
+        self.value = value
+    }
+}
+
+// Declare a constant with value of resource type `SomeResource`
+//
+const a <- SomeResource(value: 0)
+
+// *Move* the resource value to a new constant
+//
+const b <- a
+
+// Invalid: Cannot use constant `a` anymore as the resource
+// it referred to was moved to constant `b`
+//
+a.value
+
+// Constant `b` is the only valid reference to the resource
+//
+b.value = 1
+
+// Declare a function which accepts a resource
+//
+fun use(resource: SomeResource) {
+    // ...
+}
+
+// Call function `use` and move the resource into it
+//
+use(<-b)
+
+// Invalid: Cannot use constant `b` anymore as the resource
+// it referred to was moved into function `foo`
+//
+b.value
+```
+
+Resources **must** be used **exactly once**. To destroy a resource, the `destroy` keyword must be used.
+
+```bamboo,file=resource-loss.bpl
+// Declare another, unrelated value of resource type `SomeResource`
+//
+const c = SomeResource(value: 10)
+
+// Invalid: `c` is not used, but must be! `c` cannot be lost
+```
+
+```bamboo,file=resource-destruction.bpl
+// Declare another, unrelated value of resource type `SomeResource`
+//
+const d = SomeResource(value: 20)
+
+// Destroy the resource referred to by constant `d`
+//
+destroy d
+
+// Invalid: Cannot use constant `d` anymore as the resource
+// it referred to was destroyed
+//
+d.value
 ```
 
 ### Composite Data Type Fields
@@ -1763,7 +1903,7 @@ example.balance = -50
 // example.balance is 0. without the getter it would be -50
 ```
 
-Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses. The parameter has implicitly the type of the field. Another type can not be specified. Setters have no return type.
+Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses. The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.
 
 The types of values assigned to setters must always match the field's type.
 
@@ -1900,107 +2040,6 @@ const token = Token(id: 32, initialBalance: 0)
 token.mint(amount: 1_000_000)
 // token.balance is 1_000_000
 ```
-
-### Composite Data Type Behaviour
-
-The only difference between structures, classes, and resources is their behavior when used as an initial value for another constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are **copied**, i.e. they are value types, classes are **referenced**, i.e., they are reference types, and resources are **moved**, they are linear types.
-
-When a resources which is referred to by a constant or variable is assigned to another constant or variable, or is passed as an argument to a function, the resource is **moved**, and the constant or variable refererring to the resource becomes **invalid**. Resources **must** be used **exactly once**.
-
-Value types should be used when copies with independent state is desired, reference types should be used when shared, mutable state is desired, and linear types should be used when a value must be used exactly once.
-
-Structures are **copied**.
-
-```bamboo,file=struct-behavior.bpl
-// Declare a structure named `SomeStruct`, with a variable integer field
-//
-struct SomeStruct {
-    var value: Int
-
-    init(value: Int) {
-        self.value = value
-    }
-
-}
-
-// Declare a constant with value of structure type `SomeStruct`
-//
-const a = SomeStruct(value: 0)
-
-// *Copy* the structure value into a new constant
-//
-const b = a
-
-b.value = 1
-
-a.value // is *0*
-```
-
-Classes are **referenced**.
-
-```bamboo,file=class-behavior.bpl
-// Declare a class named `SomeClass`, with a variable integer field
-//
-class SomeClass {
-    var value: Int
-
-    init(value: Int) {
-        self.value = value
-    }
-}
-
-// Declare a constant with value of class type `SomeClass`
-//
-const a = SomeClass(value: 0)
-
-// *Reference* the class value with a new constant
-//
-const b = A
-
-b.value = 1
-
-a.value // is *1*
-```
-
-Resources are **moved** and existing references become **invalid**.
-
-```bamboo,file=resource-behavior.bpl
-// Declare a resource named `SomeResource`, with a variable integer field
-//
-resource SomeResource {
-    var value: Int
-
-    init(value: Int) {
-        self.value = value
-    }
-}
-
-// Declare a constant with value of resource type `SomeResource`
-//
-const a = SomeResource(value: 0)
-
-// *Move* the resource value to a new constant
-//
-const b = a
-
-// Invalid: Cannot use constant `a` anymore, as the value
-// it referred to was moved to constant `b`
-//
-a.value
-
-// Variable `resourceB` is the only reference to the value
-// and can be used freely
-//
-b.value = 1
-
-// Declare another, unrelated value of resource type `SomeResource`
-//
-const c = SomeResource(value: 10)
-
-// Invalid: `c` is not used, but must be! `c` is lost
-```
-
-Note the outcomes in the last lines of the first two examples. Also especially note the behaviour in the last example.
 
 ### Unbound References / Nulls
 
