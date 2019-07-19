@@ -10,8 +10,6 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -210,17 +208,6 @@ func (c *verifyServiceClient) SubmitExecutionReceipt(ctx context.Context, in *Su
 type VerifyServiceServer interface {
 	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	SubmitExecutionReceipt(context.Context, *SubmitExecutionReceiptRequest) (*empty.Empty, error)
-}
-
-// UnimplementedVerifyServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedVerifyServiceServer struct {
-}
-
-func (*UnimplementedVerifyServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
-}
-func (*UnimplementedVerifyServiceServer) SubmitExecutionReceipt(ctx context.Context, req *SubmitExecutionReceiptRequest) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SubmitExecutionReceipt not implemented")
 }
 
 func RegisterVerifyServiceServer(s *grpc.Server, srv VerifyServiceServer) {

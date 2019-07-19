@@ -9,8 +9,6 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -1262,35 +1260,6 @@ type ObserveServiceServer interface {
 	GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error)
 	// CallContract performs a contract call.
 	CallContract(context.Context, *CallContractRequest) (*CallContractResponse, error)
-}
-
-// UnimplementedObserveServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedObserveServiceServer struct {
-}
-
-func (*UnimplementedObserveServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
-}
-func (*UnimplementedObserveServiceServer) SendTransaction(ctx context.Context, req *SendTransactionRequest) (*SendTransactionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendTransaction not implemented")
-}
-func (*UnimplementedObserveServiceServer) GetBlockByHash(ctx context.Context, req *GetBlockByHashRequest) (*GetBlockByHashResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByHash not implemented")
-}
-func (*UnimplementedObserveServiceServer) GetBlockByNumber(ctx context.Context, req *GetBlockByNumberRequest) (*GetBlockByNumberResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByNumber not implemented")
-}
-func (*UnimplementedObserveServiceServer) GetLatestBlock(ctx context.Context, req *GetLatestBlockRequest) (*GetLatestBlockResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetLatestBlock not implemented")
-}
-func (*UnimplementedObserveServiceServer) GetTransaction(ctx context.Context, req *GetTransactionRequest) (*GetTransactionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetTransaction not implemented")
-}
-func (*UnimplementedObserveServiceServer) GetAccount(ctx context.Context, req *GetAccountRequest) (*GetAccountResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetAccount not implemented")
-}
-func (*UnimplementedObserveServiceServer) CallContract(ctx context.Context, req *CallContractRequest) (*CallContractResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CallContract not implemented")
 }
 
 func RegisterObserveServiceServer(s *grpc.Server, srv ObserveServiceServer) {

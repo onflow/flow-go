@@ -9,8 +9,6 @@ import (
 	shared "github.com/dapperlabs/bamboo-node/grpc/shared"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -532,26 +530,6 @@ type CollectServiceServer interface {
 	SubmitCollection(context.Context, *SubmitCollectionRequest) (*SubmitCollectionResponse, error)
 	GetTransaction(context.Context, *GetTransactionRequest) (*GetTransactionResponse, error)
 	GetCollection(context.Context, *GetCollectionRequest) (*GetCollectionResponse, error)
-}
-
-// UnimplementedCollectServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedCollectServiceServer struct {
-}
-
-func (*UnimplementedCollectServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
-}
-func (*UnimplementedCollectServiceServer) SubmitTransaction(ctx context.Context, req *SubmitTransactionRequest) (*SubmitTransactionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SubmitTransaction not implemented")
-}
-func (*UnimplementedCollectServiceServer) SubmitCollection(ctx context.Context, req *SubmitCollectionRequest) (*SubmitCollectionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SubmitCollection not implemented")
-}
-func (*UnimplementedCollectServiceServer) GetTransaction(ctx context.Context, req *GetTransactionRequest) (*GetTransactionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetTransaction not implemented")
-}
-func (*UnimplementedCollectServiceServer) GetCollection(ctx context.Context, req *GetCollectionRequest) (*GetCollectionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetCollection not implemented")
 }
 
 func RegisterCollectServiceServer(s *grpc.Server, srv CollectServiceServer) {
