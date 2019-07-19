@@ -2606,17 +2606,37 @@ interface Account {
 }
 ```
 
-### Account Storage
+## Account Storage
 
-Accounts have a `getStored` function, which retrieves a value from [storage](#storage). The function takes a type that implements the `Storable` interface, and returns an optional value that has the type.
+Accounts have a `storage` object which contains the stored values of the account.
 
-<!-- TODO: cannot express the signature for getStored yet. would require. generics -->
+Only **resources** can be stored.
+
+Stored values are keyed by a **type**, i.e., the access operator `[]` is used for both reading and writing stored values.
 
 ```bamboo
-// Get the stored integer value for an account
+// Declare a resource named `Counter`
 //
+resource Counter {
+    pub var count: Int
+
+    pub init(count: Int) {
+        self.count = count
+    }
+
+    pub fun increment(_ count: Int) {
+        self.count = self.count + count
+    }
+}
+
 const account: Account = // ...
-const value: Int? = account.getStored(Int)
+
+// Create a new instance of the resource type `Counter` and move it
+// into the storage of the account.
+//
+// The type `Counter` is used as the key to refer to the stored value
+//
+account.storage[Counter] <- create Counter(count: 0)
 ```
 
 ## Importing External Types
