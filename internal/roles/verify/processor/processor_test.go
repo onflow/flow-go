@@ -34,7 +34,7 @@ func Test(t *testing.T) {
 			},
 		},
 		test{
-			title: "No min stake should fail early",
+			title: "It should fail early if No min stake",
 			m:     NewMockEffectsNoMinStake(&MockEffectsHappyPath{}),
 			expectFunc: func(m Mock, t *testing.T) {
 				RegisterTestingT(t)
@@ -48,7 +48,7 @@ func Test(t *testing.T) {
 			},
 		},
 		test{
-			title: "sealed with different Receipt",
+			title: "It should slash if sealed with different receipt",
 			m:     NewMockEffectsSealWithDifferentReceipt(&MockEffectsHappyPath{}),
 			expectFunc: func(m Mock, t *testing.T) {
 				RegisterTestingT(t)
@@ -58,6 +58,20 @@ func Test(t *testing.T) {
 				Expect(m.CallCountSend()).To(Equal(0))
 				Expect(m.CallCountSlashExpiredReceipt()).To(Equal(1))
 				Expect(m.CallCountSlashInvalidReceipt()).To(Equal(0))
+				Expect(m.CallCountHandleError()).To(Equal(0))
+			},
+		},
+		test{
+			title: "It should slash if invalid receipt",
+			m:     NewMockEffectsInvalidReceipt(&MockEffectsHappyPath{}),
+			expectFunc: func(m Mock, t *testing.T) {
+				RegisterTestingT(t)
+				Expect(m.CallCountIsValidExecutionReceipt()).To(Equal(1))
+				Expect(m.CallCountHasMinStake()).To(Equal(1))
+				Expect(m.CallCountIsSealedWithDifferentReceipt()).To(Equal(1))
+				Expect(m.CallCountSend()).To(Equal(0))
+				Expect(m.CallCountSlashExpiredReceipt()).To(Equal(0))
+				Expect(m.CallCountSlashInvalidReceipt()).To(Equal(1))
 				Expect(m.CallCountHandleError()).To(Equal(0))
 			},
 		},
