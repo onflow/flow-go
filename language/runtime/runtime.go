@@ -15,8 +15,8 @@ type RuntimeInterface interface {
 	GetValue(controller, owner, key []byte) (value []byte, err error)
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
 	SetValue(controller, owner, key, value []byte) (err error)
-	// CreateAccount creates a new account with the given key and code.
-	CreateAccount(key []byte, code []byte) (id []byte, err error)
+	// CreateAccount creates a new account with the given public key and code.
+	CreateAccount(publicKey []byte, code []byte) (accountID []byte, err error)
 }
 
 type RuntimeError struct {
@@ -207,7 +207,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeIn
 				panic(fmt.Sprintf("createAccount requires 2 parameters"))
 			}
 
-			key, err := toByteArray(arguments[0])
+			publicKey, err := toByteArray(arguments[0])
 			if err != nil {
 				panic(fmt.Sprintf("createAccount requires the first parameter to be an array"))
 			}
@@ -217,7 +217,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeIn
 				panic(fmt.Sprintf("createAccount requires the second parameter to be an array"))
 			}
 
-			value, err := runtimeInterface.CreateAccount(key, code)
+			value, err := runtimeInterface.CreateAccount(publicKey, code)
 			if err != nil {
 				panic(err)
 			}
