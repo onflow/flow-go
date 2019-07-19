@@ -1645,6 +1645,8 @@ Value types should be used when copies with independent state is desired, refere
 
 ### Structures and Classes
 
+#### Structure and Classe Declaration
+
 Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword.
 The keyword is followed by the name of the type.
 
@@ -1665,6 +1667,8 @@ SomeStruct()
 
 SomeClass()
 ```
+
+#### Structure and Classe Behaviour
 
 The only difference between structures and classes is their behavior when used as an initial value for constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are **copied**, i.e. they are value types, classes are **referenced**, i.e., they are reference types.
 
@@ -1724,6 +1728,8 @@ Note the outcomes in the last lines of the examples.
 
 ### Resources
 
+#### Resource Declaration
+
 Resources are declared using the `resource` keyword, followed by the name of the resource.
 
 ```bamboo,file=resource-declaration.bpl
@@ -1737,6 +1743,8 @@ Resources are types. Resource values are created (instantiated) by using the `cr
 ```bamboo,file=resource-instantiation.bpl
 create SomeResource()
 ```
+
+#### Resource Behaviour
 
 Resources are **moved** when used as an initial value for a constant or variable, when assigned to a different variable, or passed as an argument to a function. When the resource was moved, the constant or variable that referred to the resource before the move becomes **invalid**.
 
@@ -1810,6 +1818,37 @@ destroy d
 //
 d.value
 ```
+
+#### Resources in Arrays and Dictionaries
+
+Arrays and dictionaries behave differently when they contain resources: When a resource is **read** from the array at a certain index, or it is **read** from a dictionary by accessing a certain key, the resource is **moved** out of the array or dictionary.
+
+```bamboo,file=resource-in-array.bpl
+const resources = [
+    SomeResource(value: 1),
+    SomeResource(value: 2),
+    SomeResource(value: 3)
+]
+
+// **Move** the first resource into a new constant
+//
+const firstResource <- resources[0]
+
+// **Move** the second resource into a new constant
+//
+const secondResource <- resources[1]
+
+// `resources` only contains one element,
+// the initial third resource!
+//
+// The first two resources were moved out of the array when
+// they were read, i.e., the were removed from the array
+//
+// Accessing a field of a resource does not move the resource
+//
+resource[0].value // is 3
+```
+
 
 ### Composite Data Type Fields
 
