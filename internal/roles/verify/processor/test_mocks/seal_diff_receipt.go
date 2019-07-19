@@ -11,14 +11,14 @@ func NewMockEffectsSealWithDifferentReceipt(m *MockEffectsHappyPath) *MockEffect
 // MockEffectsSealWithDifferentReceipt implements the processor.Effects & Mock interfaces
 type MockEffectsSealWithDifferentReceipt struct {
 	*MockEffectsHappyPath
-	_callCountIsSealedWithDifferentReceipt int
+	_callCount int
 }
 
 func (m *MockEffectsSealWithDifferentReceipt) IsSealedWithDifferentReceipt(*types.ExecutionReceipt) (bool, error) {
-	m._callCountIsSealedWithDifferentReceipt++
+	m._callCount++
 	return true, nil
 }
 
 func (m *MockEffectsSealWithDifferentReceipt) CallCountIsSealedWithDifferentReceipt() int {
-	return m._callCountIsSealedWithDifferentReceipt
+	return m._callCount
 }

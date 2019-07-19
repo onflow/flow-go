@@ -11,14 +11,14 @@ func NewMockEffectsNoMinStake(m *MockEffectsHappyPath) *MockEffectsNoMinStake {
 // MockEffectsNoMinStake  implements the processor.Effects & Mock interfaces
 type MockEffectsNoMinStake struct {
 	*MockEffectsHappyPath
-	_callCountHasMinStake int
+	_callCount int
 }
 
 func (m *MockEffectsNoMinStake) HasMinStake(*types.ExecutionReceipt) (bool, error) {
-	m._callCountHasMinStake++
+	m._callCount++
 	return false, nil
 }
 
 func (m *MockEffectsNoMinStake) CallCountHasMinStake() int {
-	return m._callCountHasMinStake
+	return m._callCount
 }

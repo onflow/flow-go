@@ -34,8 +34,22 @@ func Test(t *testing.T) {
 			},
 		},
 		test{
-			title: "It should fail early if No min stake",
+			title: "It should discard if receipt does not meet min stake",
 			m:     NewMockEffectsNoMinStake(&MockEffectsHappyPath{}),
+			expectFunc: func(m Mock, t *testing.T) {
+				RegisterTestingT(t)
+				Expect(m.CallCountIsValidExecutionReceipt()).To(Equal(0))
+				Expect(m.CallCountHasMinStake()).To(Equal(1))
+				Expect(m.CallCountIsSealedWithDifferentReceipt()).To(Equal(0))
+				Expect(m.CallCountSend()).To(Equal(0))
+				Expect(m.CallCountSlashExpiredReceipt()).To(Equal(0))
+				Expect(m.CallCountSlashInvalidReceipt()).To(Equal(0))
+				Expect(m.CallCountHandleError()).To(Equal(1))
+			},
+		},
+		test{
+			title: "It should discard an errored min stake",
+			m:     NewMockEffectsErrorMinStake(&MockEffectsHappyPath{}),
 			expectFunc: func(m Mock, t *testing.T) {
 				RegisterTestingT(t)
 				Expect(m.CallCountIsValidExecutionReceipt()).To(Equal(0))
@@ -73,6 +87,20 @@ func Test(t *testing.T) {
 				Expect(m.CallCountSlashExpiredReceipt()).To(Equal(0))
 				Expect(m.CallCountSlashInvalidReceipt()).To(Equal(1))
 				Expect(m.CallCountHandleError()).To(Equal(0))
+			},
+		},
+		test{
+			title: "It should discard an errored validation",
+			m:     NewMockEffectsErrorReceiptValidation(&MockEffectsHappyPath{}),
+			expectFunc: func(m Mock, t *testing.T) {
+				RegisterTestingT(t)
+				Expect(m.CallCountIsValidExecutionReceipt()).To(Equal(1))
+				Expect(m.CallCountHasMinStake()).To(Equal(1))
+				Expect(m.CallCountIsSealedWithDifferentReceipt()).To(Equal(1))
+				Expect(m.CallCountSend()).To(Equal(0))
+				Expect(m.CallCountSlashExpiredReceipt()).To(Equal(0))
+				Expect(m.CallCountSlashInvalidReceipt()).To(Equal(0))
+				Expect(m.CallCountHandleError()).To(Equal(1))
 			},
 		},
 	}
