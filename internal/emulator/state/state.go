@@ -108,7 +108,7 @@ func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 
-	return ws.Registers.GetAccount(address)
+	return ws.Registers.NewView().GetAccount(address)
 }
 
 // SetRegisters commmits a set of registers to the state.

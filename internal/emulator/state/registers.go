@@ -6,24 +6,45 @@ import (
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 )
 
-const (
-	keyLatestAccount = "latestAccount"
-)
-
 // Registers is a map of register values.
 type Registers map[crypto.Hash][]byte
 
-func (r Registers) Set(controller, owner, key, value []byte) {
-	r[fullKey(controller, owner, key)] = value
+func (r Registers) MergeWith(registers Registers) {
+	for key, value := range registers {
+		r[key] = value
+	}
 }
 
-func (r Registers) Get(controller, owner, key []byte) (value []byte, exists bool) {
-	value, exists = r[fullKey(controller, owner, key)]
-	return value, exists
+func (r Registers) NewView() *RegistersView {
+	return &RegistersView{
+		new: make(Registers),
+		old: r,
+	}
 }
 
-func (r Registers) CreateAccount(publicKey, code []byte) crypto.Address {
-	latestAccountID := r[r.keyLatestAccount()]
+// RegistersView provides a read-only view into an existing registers state.
+//
+// Values are written to a temporary register cache that can later be
+// committed to the world state.
+type RegistersView struct {
+	new Registers
+	old Registers
+}
+
+func (r *RegistersView) UpdatedRegisters() Registers {
+	return r.new
+}
+
+func (r *RegistersView) Set(controller, owner, key, value []byte) {
+	r.set(getFullKey(controller, owner, key), value)
+}
+
+func (r *RegistersView) Get(controller, owner, key []byte) (value []byte, exists bool) {
+	return r.get(getFullKey(controller, owner, key))
+}
+
+func (r *RegistersView) CreateAccount(publicKey, code []byte) crypto.Address {
+	latestAccountID, _ := r.get(keyLatestAccount())
 
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
 	accountIDBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
@@ -36,14 +57,14 @@ func (r Registers) CreateAccount(publicKey, code []byte) crypto.Address {
 	r.Set(accountID, accountID, []byte("public_key"), publicKey)
 	r.Set(accountID, accountID, []byte("code"), code)
 
-	r[r.keyLatestAccount()] = accountID
+	r.set(keyLatestAccount(), accountID)
 
 	address := crypto.BytesToAddress(accountID)
 
 	return address
 }
 
-func (r Registers) GetAccount(address crypto.Address) *crypto.Account {
+func (r *RegistersView) GetAccount(address crypto.Address) *crypto.Account {
 	accountID := address.Bytes()
 
 	balanceBytes, exists := r.Get(accountID, accountID, []byte("balance"))
@@ -64,17 +85,25 @@ func (r Registers) GetAccount(address crypto.Address) *crypto.Account {
 	}
 }
 
-func (r Registers) MergeWith(registers Registers) {
-	for key, value := range registers {
-		r[key] = value
+func (r *RegistersView) get(key crypto.Hash) (value []byte, exists bool) {
+	value, exists = r.new[key]
+	if exists {
+		return value, exists
 	}
+
+	value, exists = r.old[key]
+	return value, exists
 }
 
-func (r Registers) keyLatestAccount() crypto.Hash {
-	return crypto.NewHash([]byte(keyLatestAccount))
+func (r *RegistersView) set(key crypto.Hash, value []byte) {
+	r.new[key] = value
 }
 
-func fullKey(controller, owner, key []byte) crypto.Hash {
+func keyLatestAccount() crypto.Hash {
+	return crypto.NewHash([]byte("latestAccount"))
+}
+
+func getFullKey(controller, owner, key []byte) crypto.Hash {
 	fullKey := append(controller, owner...)
 	fullKey = append(fullKey, key...)
 

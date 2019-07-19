@@ -207,6 +207,31 @@ func TestCreateAccount(t *testing.T) {
 	Expect(account.Balance).To(Equal(uint64(0)))
 	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
+
+	tx2 := &types.SignedTransaction{
+		Script: []byte(`
+			fun main() {
+				const publicKey = [7,8,9]
+				const code = [10,11,12]
+				createAccount(publicKey, code)
+			}
+		`),
+		Nonce:          2,
+		ComputeLimit:   10,
+		Timestamp:      time.Now(),
+		PayerSignature: crypto.Signature{},
+	}
+
+	err = b.SubmitTransaction(tx2)
+	Expect(err).ToNot(HaveOccurred())
+
+	address = crypto.HexToAddress("0000000000000000000000000000000000000002")
+
+	account = b.GetAccount(address)
+
+	Expect(account.Balance).To(Equal(uint64(0)))
+	Expect(account.PublicKeys).To(ContainElement([]byte{7, 8, 9}))
+	Expect(account.Code).To(Equal([]byte{10, 11, 12}))
 }
 
 func TestCallScript(t *testing.T) {

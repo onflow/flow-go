@@ -40,27 +40,21 @@ func (i *runtimeInterface) CreateAccount(publicKey, code []byte) (id []byte, err
 // ExecuteTransaction executes a transaction against the current world state.
 func (c *Computer) ExecuteTransaction(
 	tx *types.SignedTransaction,
-	stateRegisters state.Registers,
-) (registers state.Registers, err error) {
+	registers *state.RegistersView,
+) (err error) {
 	// TODO: deduct gas cost from transaction signer's account
-	_, registers, err = c.ExecuteScript(tx.Script, stateRegisters)
-	return registers, err
+	_, err = c.ExecuteScript(tx.Script, registers)
+	return err
 }
 
 // ExecuteScript executes a script against the current world state.
 func (c *Computer) ExecuteScript(
 	script []byte,
-	stateRegisters state.Registers,
-) (result interface{}, registers state.Registers, err error) {
-	registers = make(state.Registers)
-
+	registers *state.RegistersView,
+) (result interface{}, err error) {
 	runtimeInterface := &runtimeInterface{
 		getValue: func(controller, owner, key []byte) ([]byte, error) {
-			if v, ok := registers.Get(controller, owner, key); ok {
-				return v, nil
-			}
-
-			v, _ := stateRegisters.Get(controller, owner, key)
+			v, _ := registers.Get(controller, owner, key)
 			return v, nil
 		},
 		setValue: func(controller, owner, key, value []byte) error {
@@ -73,7 +67,5 @@ func (c *Computer) ExecuteScript(
 		},
 	}
 
-	result, err = c.runtime.ExecuteScript(script, runtimeInterface)
-
-	return result, registers, err
+	return c.runtime.ExecuteScript(script, runtimeInterface)
 }
