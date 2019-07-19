@@ -9,31 +9,17 @@ import (
 
 	"github.com/bluele/gcache"
 
-	// "github.com/dapperlabs/bamboo-node/internal/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/config"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
-
-// ReceiptProcessorConfig holds the configuration for receipt processor.
-type ReceiptProcessorConfig struct {
-	QueueBuffer int
-	CacheBuffer int
-}
-
-//NewReceiptProcessorConfig returns a new  ReceiptProcessorConfig  process.
-func NewReceiptProcessorConfig(c *config.Config) *ReceiptProcessorConfig {
-
-	return &ReceiptProcessorConfig{
-		QueueBuffer: c.ProcessorQueueBuffer,
-		CacheBuffer: c.ProcessorCacheBuffer,
-	}
-}
 
 type receiptProcessor struct {
 	q       chan *receiptAndDoneChan
 	effects Effects
 	cache   gcache.Cache
+	hasher  crypto.Hasher
 }
 
 type receiptAndDoneChan struct {
@@ -43,11 +29,12 @@ type receiptAndDoneChan struct {
 
 // NewReceiptProcessor returns a new processor instance.
 // A go routine is initialised and waiting to process new items.
-func NewReceiptProcessor(effects Effects, rc *ReceiptProcessorConfig) *receiptProcessor {
+func NewReceiptProcessor(effects Effects, rc *ReceiptProcessorConfig, hasher crypto.Hasher) *receiptProcessor {
 	p := &receiptProcessor{
 		q:       make(chan *receiptAndDoneChan, rc.QueueBuffer),
 		effects: effects,
 		cache:   gcache.New(rc.CacheBuffer).LRU().Build(),
+		hasher:  hasher,
 	}
 
 	go p.run()
@@ -57,7 +44,7 @@ func NewReceiptProcessor(effects Effects, rc *ReceiptProcessorConfig) *receiptPr
 // Submit takes in an ExecutionReceipt to be process async.
 // The done chan is optional. If caller is not interested to be notified when processing has been completed, nil should be passed.
 func (p *receiptProcessor) Submit(receipt *types.ExecutionReceipt, done chan bool) {
-	// todo: if not a valid signature, then discard
+	// TODO: if ER does not have a valid signature, then this needs to be discard. Deal with it here are at upper layer before submit?
 
 	if ok, err := p.effects.HasMinStake(receipt); err != nil {
 		p.effects.HandleError(err)
@@ -82,8 +69,7 @@ func (p *receiptProcessor) run() {
 		receipt := rdc.receipt
 		done := rdc.done
 
-		// receiptHash := crypto.NewHash(receipt)
-		receiptHash := "TODO"
+		receiptHash := p.hasher.ComputeStructHash(receipt)
 
 		// If cached result exists (err == nil), reuse it
 		if v, err := p.cache.Get(receiptHash); err == nil {
@@ -123,7 +109,6 @@ func (p *receiptProcessor) run() {
 	}
 }
 
-// dd success
 func (p *receiptProcessor) sendApprovalOrSlash(receipt *types.ExecutionReceipt, validationResult compute.ValidationResult) {
 	switch vr := validationResult.(type) {
 	case *compute.ValidationResultSuccess:
@@ -132,6 +117,21 @@ func (p *receiptProcessor) sendApprovalOrSlash(receipt *types.ExecutionReceipt, 
 		p.effects.SlashInvalidReceipt(receipt, vr.BlockPartResult)
 	default:
 		panic(fmt.Sprintf("unreachable code with unexpected type %T", vr))
+	}
+}
+
+// ReceiptProcessorConfig holds the configuration for receipt processor.
+type ReceiptProcessorConfig struct {
+	QueueBuffer int
+	CacheBuffer int
+}
+
+//NewReceiptProcessorConfig returns a new  ReceiptProcessorConfig  process.
+func NewReceiptProcessorConfig(c *config.Config) *ReceiptProcessorConfig {
+
+	return &ReceiptProcessorConfig{
+		QueueBuffer: c.ProcessorQueueBuffer,
+		CacheBuffer: c.ProcessorCacheBuffer,
 	}
 }
 

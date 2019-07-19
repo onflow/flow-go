@@ -1,8 +1,10 @@
 package types
 
 import (
+	"bytes"
+	"encoding/gob"
+
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/utils/slices"
 )
 
 type ExecutionReceipt struct {
@@ -13,15 +15,14 @@ type ExecutionReceipt struct {
 	Signatures                []crypto.Signature
 }
 
-// Encode is defined to match crypto.Encoder interface
+// Encode matches crypto.Encoder interface
 func (m *ExecutionReceipt) Encode() []byte {
-	var b [][]byte
-	// todo: fix once crypto package is merged
-	b = [][]byte{
-		m.PreviousReceiptHash[:],
+	var b bytes.Buffer
+	e := gob.NewEncoder(&b)
+	if err := e.Encode(m); err != nil {
+		panic(err)
 	}
-	return slices.Concat(b)
-
+	return b.Bytes()
 }
 
 type InvalidExecutionReceiptChallenge struct {

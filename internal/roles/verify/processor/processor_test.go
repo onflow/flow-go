@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	. "github.com/dapperlabs/bamboo-node/internal/roles/verify/processor/test_mocks"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
 type test struct {
@@ -127,7 +128,8 @@ func Test(t *testing.T) {
 				QueueBuffer: 100,
 				CacheBuffer: 100,
 			}
-			p := NewReceiptProcessor(test.m, c)
+			hasher := crypto.NewHashAlgo(crypto.SHA3_256)
+			p := NewReceiptProcessor(test.m, c, hasher)
 
 			receipt := &types.ExecutionReceipt{}
 			done := make(chan bool, 1)
