@@ -7,7 +7,6 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
-	"github.com/dapperlabs/bamboo-node/internal/emulator/vm"
 )
 
 // WorldState represents the current state of the blockchain.
@@ -102,17 +101,6 @@ func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction 
 func (ws *WorldState) ContainsTransaction(hash crypto.Hash) bool {
 	_, exists := ws.Transactions[hash]
 	return exists
-}
-
-// GetAccount gets an account by address.
-func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
-	ws.registersMutex.Lock()
-	defer ws.registersMutex.Unlock()
-
-	registers := ws.Registers.NewView()
-	vm := vm.NewBambooVM(registers)
-
-	return vm.GetAccount(address)
 }
 
 // SetRegisters commmits a set of registers to the state.

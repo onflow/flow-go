@@ -35,6 +35,5 @@ func (c *Computer) ExecuteScript(
 	script []byte,
 	registers *etypes.RegistersView,
 ) (result interface{}, err error) {
-	vm := vm.NewBambooVM(registers)
-	return c.runtime.ExecuteScript(script, vm)
+	return c.runtime.ExecuteScript(script, vm.NewBambooVM(registers))
 }

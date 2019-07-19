@@ -4,11 +4,12 @@ import (
 	"time"
 
 	"github.com/dapperlabs/bamboo-node/language/runtime"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/state"
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/internal/emulator/vm"
 )
 
 // EmulatedBlockchain simulates a blockchain in the background to enable easy smart contract testing.
@@ -46,7 +47,9 @@ func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTrans
 
 // GetAccount gets account information associated with an address identifier.
 func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account {
-	return b.pendingWorldState.GetAccount(address)
+	registers := b.pendingWorldState.Registers.NewView()
+	vm := vm.NewBambooVM(registers)
+	return vm.GetAccount(address)
 }
 
 // SubmitTransaction sends a transaction to the network that is immediately executed (updates blockchain state).
