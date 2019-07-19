@@ -33,16 +33,16 @@ func NewEmulatedBlockchain() *EmulatedBlockchain {
 	}
 }
 
-func (b *EmulatedBlockchain) getWorldStateAtVersion(wsHash crypto.Hash) *state.WorldState {
+func (b *EmulatedBlockchain) getWorldStateAtVersion(wsHash crypto.Hash) (*state.WorldState, error) {
 	if wsBytes, ok := b.worldStates[wsHash]; ok {
-		return state.Decode(wsBytes)
+		return state.Decode(wsBytes), nil
 	}
 
 	if wsBytes, ok := b.intermediateWorldStates[wsHash]; ok {
-		return state.Decode(wsBytes)
+		return state.Decode(wsBytes), nil
 	}
 
-	return nil
+	return nil, &ErrInvalidStateVersion{Version: wsHash}
 }
 
 // GetTransaction gets an existing transaction by hash.
@@ -56,13 +56,13 @@ func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTrans
 	return b.pendingWorldState.GetTransaction(hash)
 }
 
-func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash) *types.SignedTransaction {
-	ws := b.getWorldStateAtVersion(version)
-	if ws == nil {
-		return nil
+func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash) (*types.SignedTransaction, error) {
+	ws, err := b.getWorldStateAtVersion(version)
+	if err != nil {
+		return nil, err
 	}
 
-	return ws.GetTransaction(txHash)
+	return ws.GetTransaction(txHash), nil
 }
 
 // GetAccount gets account information associated with an address identifier.
@@ -70,13 +70,13 @@ func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account 
 	return b.pendingWorldState.GetAccount(address)
 }
 
-func (b *EmulatedBlockchain) GetAccountAtVersion(address crypto.Address, version crypto.Hash) *crypto.Account {
-	ws := b.getWorldStateAtVersion(version)
-	if ws == nil {
-		return nil
+func (b *EmulatedBlockchain) GetAccountAtVersion(address crypto.Address, version crypto.Hash) (*crypto.Account, error) {
+	ws, err := b.getWorldStateAtVersion(version)
+	if err != nil {
+		return nil, err
 	}
 
-	return ws.GetAccount(address)
+	return ws.GetAccount(address), nil
 }
 
 // SubmitTransaction sends a transaction to the network that is immediately executed (updates blockchain state).
@@ -122,9 +122,9 @@ func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
 }
 
 func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error) {
-	ws := b.getWorldStateAtVersion(version)
-	if ws == nil {
-		return nil, nil
+	ws, err := b.getWorldStateAtVersion(version)
+	if err != nil {
+		return nil, err
 	}
 
 	return b.computer.ExecuteCall(script, ws.GetRegister)
