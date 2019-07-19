@@ -22,3 +22,9 @@ func (r Registers) Get(controller, owner, key []byte) (value []byte, exists bool
 	value, exists = r[fullKey(controller, owner, key)]
 	return value, exists
 }
+
+func (r Registers) MergeWith(registers Registers) {
+	for key, value := range registers {
+		r[key] = value
+	}
+}

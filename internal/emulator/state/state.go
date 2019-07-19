@@ -124,9 +124,7 @@ func (ws *WorldState) SetRegisters(registers Registers) {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 
-	for hash, value := range registers {
-		ws.Registers[hash] = value
-	}
+	ws.Registers.MergeWith(registers)
 }
 
 // InsertBlock adds a new block to the blockchain.
