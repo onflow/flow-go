@@ -84,7 +84,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 		return nil, nil
 	}
 
-	value, err := inter.Invoke("main")
+	value, err := inter.InvokeExportable("main")
 	if err != nil {
 		return nil, RuntimeError{[]error{err}}
 	}

@@ -56,7 +56,7 @@ func TestNewInterpreterRuntime(t *testing.T) {
 		},
 	}
 
-	errs := runtime.ExecuteScript(script, runtimeInterface)
-	Expect(errs).To(BeEmpty())
+	_, err := runtime.ExecuteScript(script, runtimeInterface)
+	Expect(err).ToNot(HaveOccurred())
 	Expect(state.Int64()).To(Equal(int64(5)))
 }
