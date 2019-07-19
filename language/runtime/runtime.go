@@ -11,10 +11,12 @@ import (
 )
 
 type RuntimeInterface interface {
-	// GetValue gets a value for the given key in the storage, controlled and owned by the given accounts
-	GetValue(controller []byte, owner []byte, key []byte) (value []byte, err error)
-	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts
-	SetValue(controller []byte, owner []byte, key []byte, value []byte) (err error)
+	// GetValue gets a value for the given key in the storage, controlled and owned by the given accounts.
+	GetValue(controller, owner, key []byte) (value []byte, err error)
+	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
+	SetValue(controller, owner, key, value []byte) (err error)
+	// CreateAccount creates a new account with the given key and code.
+	CreateAccount(key []byte, code []byte) (id []byte, err error)
 }
 
 type RuntimeError struct {
@@ -71,6 +73,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 	inter := interpreter.NewInterpreter(program)
 	inter.ImportFunction("getValue", r.newGetValueFunction(runtimeInterface))
 	inter.ImportFunction("setValue", r.newSetValueFunction(runtimeInterface))
+	inter.ImportFunction("createAccount", r.newCreateAccountFunction(runtimeInterface))
 
 	err := inter.Interpret()
 	if err != nil {
@@ -133,6 +136,23 @@ var getValueFunctionType = interpreter.FunctionType{
 	ReturnType: &interpreter.IntType{},
 }
 
+// TODO: improve types
+var createAccountFunctionType = interpreter.FunctionType{
+	ParameterTypes: []interpreter.Type{
+		// key
+		&interpreter.VariableSizedType{
+			Type: &interpreter.UInt8Type{},
+		},
+		// code
+		&interpreter.VariableSizedType{
+			Type: &interpreter.UInt8Type{},
+		},
+	},
+	// value
+	// TODO: add proper type
+	ReturnType: &interpreter.IntType{},
+}
+
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunction(
 		&setValueFunctionType,
@@ -159,29 +179,6 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterfa
 	)
 }
 
-func toByteArray(value interpreter.Value) ([]byte, error) {
-	array, ok := value.(interpreter.ArrayValue)
-	if !ok {
-		return nil, errors.New("value is not an array")
-	}
-
-	result := make([]byte, len(array))
-	for i, arrayValue := range array {
-		intValue, ok := arrayValue.(interpreter.IntValue)
-		if !ok {
-			return nil, errors.New("array value is not an Int")
-		}
-		// check 0 <= value < 256
-		if intValue.Cmp(big.NewInt(-1)) != 1 || intValue.Cmp(big.NewInt(256)) != -1 {
-			return nil, errors.New("array value is not in byte range (0-255)")
-		}
-
-		result[i] = byte(intValue.IntValue())
-	}
-
-	return result, nil
-}
-
 func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunction(
 		&getValueFunctionType,
@@ -193,6 +190,34 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterfa
 			controller, owner, key := r.getControllerOwnerKey(arguments)
 
 			value, err := runtimeInterface.GetValue(controller, owner, key)
+			if err != nil {
+				panic(err)
+			}
+
+			return interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+		},
+	)
+}
+
+func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunction(
+		&createAccountFunctionType,
+		func(_ *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
+			if len(arguments) != 2 {
+				panic(fmt.Sprintf("createAccount requires 2 parameters"))
+			}
+
+			key, err := toByteArray(arguments[0])
+			if err != nil {
+				panic(fmt.Sprintf("createAccount requires the first parameter to be an array"))
+			}
+
+			code, err := toByteArray(arguments[1])
+			if err != nil {
+				panic(fmt.Sprintf("createAccount requires the second parameter to be an array"))
+			}
+
+			value, err := runtimeInterface.CreateAccount(key, code)
 			if err != nil {
 				panic(err)
 			}
@@ -221,4 +246,27 @@ func (r *interpreterRuntime) getControllerOwnerKey(
 		panic(fmt.Sprintf("setValue requires the third parameter to be an array"))
 	}
 	return
+}
+
+func toByteArray(value interpreter.Value) ([]byte, error) {
+	array, ok := value.(interpreter.ArrayValue)
+	if !ok {
+		return nil, errors.New("value is not an array")
+	}
+
+	result := make([]byte, len(array))
+	for i, arrayValue := range array {
+		intValue, ok := arrayValue.(interpreter.IntValue)
+		if !ok {
+			return nil, errors.New("array value is not an Int")
+		}
+		// check 0 <= value < 256
+		if intValue.Cmp(big.NewInt(-1)) != 1 || intValue.Cmp(big.NewInt(256)) != -1 {
+			return nil, errors.New("array value is not in byte range (0-255)")
+		}
+
+		result[i] = byte(intValue.IntValue())
+	}
+
+	return result, nil
 }
