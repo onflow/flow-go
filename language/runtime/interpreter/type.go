@@ -2,9 +2,10 @@ package interpreter
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/language/runtime/errors"
-	"strings"
 )
 
 type Type interface {
@@ -13,7 +14,6 @@ type Type interface {
 }
 
 // AnyType represents the top type
-
 type AnyType struct{}
 
 func (*AnyType) isType() {}
@@ -23,7 +23,6 @@ func (*AnyType) String() string {
 }
 
 // VoidType represents the void type
-
 type VoidType struct{}
 
 func (*VoidType) isType() {}
@@ -33,7 +32,6 @@ func (*VoidType) String() string {
 }
 
 // BoolType represents the boolean type
-
 type BoolType struct{}
 
 func (*BoolType) isType() {}
@@ -43,7 +41,6 @@ func (*BoolType) String() string {
 }
 
 // IntegerType represents the super-type of all integer types
-
 type IntegerType struct{}
 
 func (*IntegerType) isType() {}
@@ -53,7 +50,6 @@ func (*IntegerType) String() string {
 }
 
 // IntType represents the arbitrary-precision integer type `Int`
-
 type IntType struct{}
 
 func (*IntType) isType() {}
@@ -73,7 +69,6 @@ func (*Int8Type) String() string {
 }
 
 // Int16Type represents the 16-bit signed integer type `Int16`
-
 type Int16Type struct{}
 
 func (*Int16Type) isType() {}
@@ -83,7 +78,6 @@ func (*Int16Type) String() string {
 }
 
 // Int32Type represents the 32-bit signed integer type `Int32`
-
 type Int32Type struct{}
 
 func (*Int32Type) isType() {}
@@ -93,7 +87,6 @@ func (*Int32Type) String() string {
 }
 
 // Int64Type represents the 64-bit signed integer type `Int64`
-
 type Int64Type struct{}
 
 func (*Int64Type) isType() {}
@@ -103,7 +96,6 @@ func (*Int64Type) String() string {
 }
 
 // UInt8Type represents the 8-bit unsigned integer type `UInt8`
-
 type UInt8Type struct{}
 
 func (*UInt8Type) isType() {}
@@ -113,7 +105,6 @@ func (*UInt8Type) String() string {
 }
 
 // UInt16Type represents the 16-bit unsigned integer type `UInt16`
-
 type UInt16Type struct{}
 
 func (*UInt16Type) isType() {}
@@ -123,7 +114,6 @@ func (*UInt16Type) String() string {
 }
 
 // UInt32Type represents the 32-bit unsigned integer type `UInt32`
-
 type UInt32Type struct{}
 
 func (*UInt32Type) isType() {}
@@ -133,7 +123,6 @@ func (*UInt32Type) String() string {
 }
 
 // UInt64Type represents the 64-bit unsigned integer type `UInt64`
-
 type UInt64Type struct{}
 
 func (*UInt64Type) isType() {}
@@ -150,7 +139,6 @@ type ArrayType interface {
 }
 
 // VariableSizedType is a variable sized array type
-
 type VariableSizedType struct {
 	Type
 }
@@ -163,7 +151,6 @@ func (t *VariableSizedType) String() string {
 }
 
 // ConstantSizedType is a constant sized array type
-
 type ConstantSizedType struct {
 	Type
 	Size int
