@@ -29,7 +29,7 @@ type receiptAndDoneChan struct {
 
 // NewReceiptProcessor returns a new processor instance.
 // A go routine is initialised and waiting to process new items.
-func NewReceiptProcessor(effects Effects, rc *ReceiptProcessorConfig, hasher crypto.Hasher) *receiptProcessor {
+func NewReceiptProcessor(effects Effects, rc *receiptProcessorConfig, hasher crypto.Hasher) *receiptProcessor {
 	p := &receiptProcessor{
 		q:       make(chan *receiptAndDoneChan, rc.QueueBuffer),
 		effects: effects,
@@ -120,16 +120,16 @@ func (p *receiptProcessor) sendApprovalOrSlash(receipt *types.ExecutionReceipt, 
 	}
 }
 
-// ReceiptProcessorConfig holds the configuration for receipt processor.
-type ReceiptProcessorConfig struct {
+// receiptProcessorConfig holds the configuration for receipt processor.
+type receiptProcessorConfig struct {
 	QueueBuffer int
 	CacheBuffer int
 }
 
-//NewReceiptProcessorConfig returns a new  ReceiptProcessorConfig  process.
-func NewReceiptProcessorConfig(c *config.Config) *ReceiptProcessorConfig {
+//NewReceiptProcessorConfig returns a new  receiptProcessorConfig  process.
+func NewReceiptProcessorConfig(c *config.Config) *receiptProcessorConfig {
 
-	return &ReceiptProcessorConfig{
+	return &receiptProcessorConfig{
 		QueueBuffer: c.ProcessorQueueBuffer,
 		CacheBuffer: c.ProcessorCacheBuffer,
 	}
