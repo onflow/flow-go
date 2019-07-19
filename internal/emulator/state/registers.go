@@ -13,13 +13,6 @@ const (
 // Registers is a map of register values.
 type Registers map[crypto.Hash][]byte
 
-func fullKey(controller, owner, key []byte) crypto.Hash {
-	fullKey := append(controller, owner...)
-	fullKey = append(fullKey, key...)
-
-	return crypto.NewHash(fullKey)
-}
-
 func (r Registers) Set(controller, owner, key, value []byte) {
 	r[fullKey(controller, owner, key)] = value
 }
@@ -79,4 +72,11 @@ func (r Registers) MergeWith(registers Registers) {
 
 func (r Registers) keyLatestAccount() crypto.Hash {
 	return crypto.NewHash([]byte(keyLatestAccount))
+}
+
+func fullKey(controller, owner, key []byte) crypto.Hash {
+	fullKey := append(controller, owner...)
+	fullKey = append(fullKey, key...)
+
+	return crypto.NewHash(fullKey)
 }
