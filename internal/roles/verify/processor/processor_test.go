@@ -48,7 +48,7 @@ func Test(t *testing.T) {
 			},
 		},
 		test{
-			title: "It should discard an errored min stake",
+			title: "It should discard an errored call of min stake",
 			m:     NewMockEffectsErrorMinStake(&MockEffectsHappyPath{}),
 			expectFunc: func(m Mock, t *testing.T) {
 				RegisterTestingT(t)
@@ -76,6 +76,20 @@ func Test(t *testing.T) {
 			},
 		},
 		test{
+			title: "It should discard if errored call of sealed with different receipt",
+			m:     NewMockEffectsErrorSealWithDifferentReceipt(&MockEffectsHappyPath{}),
+			expectFunc: func(m Mock, t *testing.T) {
+				RegisterTestingT(t)
+				Expect(m.CallCountIsValidExecutionReceipt()).To(Equal(0))
+				Expect(m.CallCountHasMinStake()).To(Equal(1))
+				Expect(m.CallCountIsSealedWithDifferentReceipt()).To(Equal(1))
+				Expect(m.CallCountSend()).To(Equal(0))
+				Expect(m.CallCountSlashExpiredReceipt()).To(Equal(0))
+				Expect(m.CallCountSlashInvalidReceipt()).To(Equal(0))
+				Expect(m.CallCountHandleError()).To(Equal(1))
+			},
+		},
+		test{
 			title: "It should slash if invalid receipt",
 			m:     NewMockEffectsInvalidReceipt(&MockEffectsHappyPath{}),
 			expectFunc: func(m Mock, t *testing.T) {
@@ -90,7 +104,7 @@ func Test(t *testing.T) {
 			},
 		},
 		test{
-			title: "It should discard an errored validation",
+			title: "It should discard an errored call of validation",
 			m:     NewMockEffectsErrorReceiptValidation(&MockEffectsHappyPath{}),
 			expectFunc: func(m Mock, t *testing.T) {
 				RegisterTestingT(t)
