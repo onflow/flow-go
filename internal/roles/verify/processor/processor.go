@@ -136,8 +136,10 @@ func NewReceiptProcessorConfig(c *config.Config) *receiptProcessorConfig {
 }
 
 func notifyDone(c chan bool) {
-	if c != nil {
-		c <- true
-		close(c)
+	if c == nil {
+		return
 	}
+
+	c <- true
+	close(c)
 }
