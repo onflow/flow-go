@@ -1,18 +1,19 @@
 package processor
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	. "github.com/onsi/gomega"
+
+	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
+	. "github.com/dapperlabs/bamboo-node/internal/roles/verify/processor/test_mocks"
 )
 
-func TestProcessorHappyPath(t *testing.T) {
+func TestHappyPath(t *testing.T) {
 	RegisterTestingT(t)
 
-	m := &mockEffects{}
+	m := &MockEffectsHappyPath{}
 	c := &ReceiptProcessorConfig{
 		QueueBuffer: 100,
 		CacheBuffer: 100,
@@ -20,69 +21,50 @@ func TestProcessorHappyPath(t *testing.T) {
 	p := NewReceiptProcessor(m, c)
 
 	receipt := &types.ExecutionReceipt{}
-	done := make(chan bool, 0)
+	done := make(chan bool, 1)
 	p.Submit(receipt, done)
 
 	select {
 	case _ = <-done:
-		Expect(m).To(Equal(&mockEffects{
-			callCountIsValidExecutionReceipt:      1,
-			callCountHasMinStake:                  1,
-			callCountIsSealedWithDifferentReceipt: 1,
-			callCountSend:                         1,
-			callCountSlashExpiredReceipt:          0,
-			callCountSlashInvalidReceipt:          0,
-			callCountHandleError:                  0,
-		}))
+		Expect(m.CallCountIsValidExecutionReceipt()).To(Equal(1))
+		Expect(m.CallCountHasMinStake()).To(Equal(1))
+		Expect(m.CallCountIsSealedWithDifferentReceipt()).To(Equal(1))
+		Expect(m.CallCountSend()).To(Equal(1))
+		Expect(m.CallCountSlashExpiredReceipt()).To(Equal(0))
+		Expect(m.CallCountSlashInvalidReceipt()).To(Equal(0))
+		Expect(m.CallCountHandleError()).To(Equal(0))
 	case <-time.After(1 * time.Second):
 		t.Error("waited for receipt to be processed for me than 1 sec")
 	}
 
 }
 
-// mockEffects implements the processorEffects interface
-type mockEffects struct {
-	callCountIsValidExecutionReceipt      int
-	callCountHasMinStake                  int
-	callCountIsSealedWithDifferentReceipt int
-	callCountSend                         int
-	callCountSlashExpiredReceipt          int
-	callCountSlashInvalidReceipt          int
-	callCountHandleError                  int
-}
+func TestNoMinStake(t *testing.T) {
 
-func (m *mockEffects) isValidExecutionReceipt(*types.ExecutionReceipt) (ValidationResult, error) {
-	m.callCountIsValidExecutionReceipt++
-	return &ValidationResultSuccess{}, nil
-}
+	RegisterTestingT(t)
 
-func (m *mockEffects) hasMinStake(*types.ExecutionReceipt) (bool, error) {
-	m.callCountHasMinStake++
-	return true, nil
-}
+	m := NewMockEffectsNoMinStake(&MockEffectsHappyPath{})
+	c := &ReceiptProcessorConfig{
+		QueueBuffer: 100,
+		CacheBuffer: 100,
+	}
+	p := NewReceiptProcessor(m, c)
 
-func (m *mockEffects) isSealedWithDifferentReceipt(*types.ExecutionReceipt) (bool, error) {
-	m.callCountIsSealedWithDifferentReceipt++
-	return false, nil
-}
+	receipt := &types.ExecutionReceipt{}
+	done := make(chan bool, 1)
+	p.Submit(receipt, done)
 
-func (m *mockEffects) send(*types.ExecutionReceipt, []byte) error {
-	m.callCountSend++
-	return nil
-}
+	select {
+	case _ = <-done:
+		Expect(m.CallCountIsValidExecutionReceipt()).To(Equal(0))
+		Expect(m.CallCountHasMinStake()).To(Equal(1))
+		Expect(m.CallCountIsSealedWithDifferentReceipt()).To(Equal(0))
+		Expect(m.CallCountSend()).To(Equal(0))
+		Expect(m.CallCountSlashExpiredReceipt()).To(Equal(0))
+		Expect(m.CallCountSlashInvalidReceipt()).To(Equal(0))
+		Expect(m.CallCountHandleError()).To(Equal(1))
+	case <-time.After(1 * time.Second):
+		t.Error("waited for receipt to be processed for me than 1 sec")
+	}
 
-func (m *mockEffects) slashExpiredReceipt(*types.ExecutionReceipt) error {
-	m.callCountSlashExpiredReceipt++
-	return nil
-}
-
-func (m *mockEffects) slashInvalidReceipt(*types.ExecutionReceipt, *types.BlockPartExecutionResult) error {
-	m.callCountSlashInvalidReceipt++
-	return nil
-}
-
-func (m *mockEffects) handleError(err error) {
-	fmt.Println(err)
-	m.callCountHandleError++
-	return
 }

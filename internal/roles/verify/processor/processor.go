@@ -11,6 +11,7 @@ import (
 
 	// "github.com/dapperlabs/bamboo-node/internal/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
+	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/config"
 )
 
@@ -30,7 +31,7 @@ func NewReceiptProcessorConfig(c *config.Config) *ReceiptProcessorConfig {
 
 type receiptProcessor struct {
 	q       chan *receiptAndDoneChan
-	effects processorEffects
+	effects Effects
 	cache   gcache.Cache
 }
 
@@ -41,7 +42,7 @@ type receiptAndDoneChan struct {
 
 // NewReceiptProcessor returns a new processor instance.
 // A go routine is initialised and waiting to process new items.
-func NewReceiptProcessor(effects processorEffects, rc *ReceiptProcessorConfig) *receiptProcessor {
+func NewReceiptProcessor(effects Effects, rc *ReceiptProcessorConfig) *receiptProcessor {
 	p := &receiptProcessor{
 		q:       make(chan *receiptAndDoneChan, rc.QueueBuffer),
 		effects: effects,
@@ -57,10 +58,13 @@ func NewReceiptProcessor(effects processorEffects, rc *ReceiptProcessorConfig) *
 func (p *receiptProcessor) Submit(receipt *types.ExecutionReceipt, done chan bool) {
 	// todo: if not a valid signature, then discard
 
-	if ok, err := p.effects.hasMinStake(receipt); err != nil {
-		p.effects.handleError(err)
+	if ok, err := p.effects.HasMinStake(receipt); err != nil {
+		p.effects.HandleError(err)
+		notifyDone(done)
+		return
 	} else if !ok {
-		p.effects.handleError(fmt.Errorf("receipt does not have minimum stake: %v", receipt))
+		p.effects.HandleError(fmt.Errorf("receipt does not have minimum stake: %v", receipt))
+		notifyDone(done)
 		return
 	}
 
@@ -82,7 +86,7 @@ func (p *receiptProcessor) run() {
 
 		// If cached result exists (err == nil), reuse it
 		if v, err := p.cache.Get(receiptHash); err == nil {
-			validationResult := v.(ValidationResult)
+			validationResult := v.(compute.ValidationResult)
 			p.sendApprovalOrSlash(receipt, validationResult)
 			notifyDone(done)
 			return
@@ -91,20 +95,20 @@ func (p *receiptProcessor) run() {
 		// Else, err!=nil, meaning not in cache, continue processing.
 		// If block is already sealed with different receipt, slash it
 		// TODO: discuss the feasibility of slashing request without proof?
-		if shouldSlash, err := p.effects.isSealedWithDifferentReceipt(receipt); err != nil {
-			p.effects.handleError(err)
+		if shouldSlash, err := p.effects.IsSealedWithDifferentReceipt(receipt); err != nil {
+			p.effects.HandleError(err)
 			notifyDone(done)
 			return
 		} else if shouldSlash {
-			p.effects.slashExpiredReceipt(receipt)
+			p.effects.SlashExpiredReceipt(receipt)
 			notifyDone(done)
 			return
 		}
 
 		// Validate receipt (chunk assignment logic is encapsulated away).
-		validationResult, err := p.effects.isValidExecutionReceipt(receipt)
+		validationResult, err := p.effects.IsValidExecutionReceipt(receipt)
 		if err != nil {
-			p.effects.handleError(err)
+			p.effects.HandleError(err)
 			notifyDone(done)
 			return
 		}
@@ -112,19 +116,19 @@ func (p *receiptProcessor) run() {
 
 		// Cache the result.
 		if err := p.cache.Set(receiptHash, validationResult); err != nil {
-			p.effects.handleError(err)
+			p.effects.HandleError(err)
 		}
 		notifyDone(done)
 	}
 }
 
 // dd success
-func (p *receiptProcessor) sendApprovalOrSlash(receipt *types.ExecutionReceipt, validationResult ValidationResult) {
+func (p *receiptProcessor) sendApprovalOrSlash(receipt *types.ExecutionReceipt, validationResult compute.ValidationResult) {
 	switch vr := validationResult.(type) {
-	case *ValidationResultSuccess:
-		p.effects.send(receipt, vr.proof)
-	case *ValidationResultFail:
-		p.effects.slashInvalidReceipt(receipt, vr.blockPartResult)
+	case *compute.ValidationResultSuccess:
+		p.effects.Send(receipt, vr.Proof)
+	case *compute.ValidationResultFail:
+		p.effects.SlashInvalidReceipt(receipt, vr.BlockPartResult)
 	default:
 		panic(fmt.Sprintf("unreachable code with unexpected type %T", vr))
 	}

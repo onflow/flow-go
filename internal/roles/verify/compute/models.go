@@ -1,4 +1,4 @@
-package processor
+package compute
 
 import (
 	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
@@ -9,11 +9,11 @@ type ValidationResult interface {
 }
 
 type ValidationResultSuccess struct {
-	proof []byte
+	Proof []byte
 	ValidationResult
 }
 
 type ValidationResultFail struct {
-	blockPartResult *types.BlockPartExecutionResult
+	BlockPartResult *types.BlockPartExecutionResult
 	ValidationResult
 }

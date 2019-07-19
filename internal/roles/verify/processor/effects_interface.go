@@ -2,15 +2,16 @@ package processor
 
 import (
 	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
+	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
 )
 
-// processorEffects is an interface for external encapuslated funcs with side-effects to be used in the receipt processor. Follows the GoF template pattern.
-type processorEffects interface {
-	isValidExecutionReceipt(*types.ExecutionReceipt) (ValidationResult, error)
-	hasMinStake(*types.ExecutionReceipt) (bool, error)
-	isSealedWithDifferentReceipt(*types.ExecutionReceipt) (bool, error)
-	send(*types.ExecutionReceipt, []byte) error
-	slashExpiredReceipt(*types.ExecutionReceipt) error
-	slashInvalidReceipt(*types.ExecutionReceipt, *types.BlockPartExecutionResult) error
-	handleError(error)
+// Effects is an interface for external encapuslated funcs with side-effects to be used in the receipt processor. Follows the GoF template pattern.
+type Effects interface {
+	IsValidExecutionReceipt(*types.ExecutionReceipt) (compute.ValidationResult, error)
+	HasMinStake(*types.ExecutionReceipt) (bool, error)
+	IsSealedWithDifferentReceipt(*types.ExecutionReceipt) (bool, error)
+	Send(*types.ExecutionReceipt, []byte) error
+	SlashExpiredReceipt(*types.ExecutionReceipt) error
+	SlashInvalidReceipt(*types.ExecutionReceipt, *types.BlockPartExecutionResult) error
+	HandleError(error)
 }
