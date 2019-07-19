@@ -36,6 +36,7 @@ func (i *BambooVM) CreateAccount(publicKey, code []byte) (id []byte, err error) 
 
 	accountID := accountAddress.Bytes()
 
+	// TODO: determine better key for account balance
 	i.registers.Set(fullKey(accountID, accountID, []byte("balance")), big.NewInt(0).Bytes())
 	i.registers.Set(fullKey(accountID, accountID, []byte("public_key")), publicKey)
 	i.registers.Set(fullKey(accountID, accountID, []byte("code")), code)
