@@ -3,10 +3,11 @@ package state
 import (
 	"sync"
 
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/internal/emulator/vm"
 )
 
 // WorldState represents the current state of the blockchain.
@@ -17,7 +18,7 @@ type WorldState struct {
 	blockchainMutex   sync.RWMutex
 	Transactions      map[crypto.Hash]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
-	Registers         Registers
+	Registers         etypes.Registers
 	registersMutex    sync.RWMutex
 	LatestState       crypto.Hash
 	latestStateMutex  sync.RWMutex
@@ -28,7 +29,7 @@ func NewWorldState() *WorldState {
 	blocks := make(map[crypto.Hash]*etypes.Block)
 	blockchain := make([]crypto.Hash, 0)
 	transactions := make(map[crypto.Hash]*types.SignedTransaction)
-	registers := make(Registers)
+	registers := make(etypes.Registers)
 
 	genesis := etypes.GenesisBlock()
 	blocks[genesis.Hash()] = genesis
@@ -108,11 +109,14 @@ func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 
-	return ws.Registers.NewView().GetAccount(address)
+	registers := ws.Registers.NewView()
+	vm := vm.NewBambooVM(registers)
+
+	return vm.GetAccount(address)
 }
 
 // SetRegisters commmits a set of registers to the state.
-func (ws *WorldState) SetRegisters(registers Registers) {
+func (ws *WorldState) SetRegisters(registers etypes.Registers) {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 
