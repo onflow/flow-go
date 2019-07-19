@@ -670,7 +670,7 @@ However, using `Any` does not opt-out of type checking. It is invalid to access 
 
 ```bamboo
 // Declare a variable that has the type `Any`. The initial value is an integer,
-// but the variable  still has the explict type `Any`.
+// but the variable  still has the explicit type `Any`.
 //
 const a: Any = 1
 
@@ -1632,9 +1632,9 @@ const add = (a: Int8, b: Int8) -> Int {
 
 > 🚧 Status: Composite data types are not implemented yet.
 
-Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of one or more named fields, and one or more functions that opperate on the data. Each field may have a different type.
+Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of one or more named fields, and one or more functions that operate on the data. Each field may have a different type.
 
-There are three kinds of composite data types. The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable, when the value is assignend to a variable, and when the value is passed as an argument to a function:
+There are three kinds of composite data types. The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable, when the value is assigned to a variable, and when the value is passed as an argument to a function:
 
 - [**Structures**](#structures-and-classes) are **copied**, i.e. they are value types
 - [**Classes**](#structures-and-classes) are **referenced**, i.e., they are reference types
@@ -1737,7 +1737,7 @@ Resources are types. Resource values are created (instantiated) by using the `cr
 create SomeResource()
 ```
 
-Resource are **moved** when used as an initial value for a constant or variable, when assigned to a different variable, or passed as an argument to a function. When the resource was moved, the constant or variable that referered to the resource before the move becomes **invalid**.
+Resources are **moved** when used as an initial value for a constant or variable, when assigned to a different variable, or passed as an argument to a function. When the resource was moved, the constant or variable that referred to the resource before the move becomes **invalid**.
 
 To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it moved to a different variable, or when it moved to a function.
 
@@ -2047,7 +2047,7 @@ There is **no** support for nulls, i.e., a constant or variable of a reference t
 
 ### Inheritance and Abstract Types
 
-There is **no** support for inheritance. Inheritance is a feature common in other programming languages, that allows including the fields and functions of a type (e.g. for a classes, known as the superclass) in another type (e.g. for classes, known as the subclass).
+There is **no** support for inheritance. Inheritance is a feature common in other programming languages, that allows including the fields and functions of a type (e.g. for classes this is known as the superclass) in another type (e.g. for classes this is known as the subclass).
 
 Instead, follow the "composition over inheritance" principle, the idea of composing functionality from multiple individual parts, rather than building an inheritance tree.
 
@@ -2662,7 +2662,7 @@ A hashable type is a type that can be hashed to an integer hash value, i.e., it 
 
 Hashable types can be used as keys in dictionaries.
 
-Hashable types must also be equatable, i.e., they must also implement the `Equatable` interface. This is because the hash value is only evidence for inequality: two values that have different hash values are guaranteed to be unequal. However, if the hash value of two values is the same, then the two values could still be unequal and just happen to hash to the same hash value. In that case equality still needs to be determined through an equality check. Without `Equatable`, values could be added to a dictionary, but it would not be possible to retrieve them.
+Hashable types must also be equatable, i.e., they must also implement the `Equatable` interface. This is because the hash value is only evidence for inequality: two values that have different hash values are guaranteed to be unequal. However, if the hash values of two values are the same, then the two values could still be unequal and just happen to hash to the same hash value. In that case equality still needs to be determined through an equality check. Without `Equatable`, values could be added to a dictionary, but it would not be possible to retrieve them.
 
 <!-- TODO: once interface inheritance is defined, describe how Hashable inherits from Equatable -->
 
