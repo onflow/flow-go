@@ -1,13 +1,11 @@
 package testmocks
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
 )
 
-// MockEffectsHappyPath implements the Effects interface
+// MockEffectsHappyPath implements the processor.Effects & Mock interfaces
 type MockEffectsHappyPath struct {
 	_callCountIsValidExecutionReceipt      int
 	_callCountHasMinStake                  int
@@ -49,7 +47,6 @@ func (m *MockEffectsHappyPath) SlashInvalidReceipt(*types.ExecutionReceipt, *typ
 }
 
 func (m *MockEffectsHappyPath) HandleError(err error) {
-	fmt.Println(err)
 	m._callCountHandleError++
 	return
 }

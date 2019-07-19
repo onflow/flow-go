@@ -8,6 +8,7 @@ func NewMockEffectsNoMinStake(m *MockEffectsHappyPath) *MockEffectsNoMinStake {
 	return &MockEffectsNoMinStake{m, 0}
 }
 
+// MockEffectsNoMinStake  implements the processor.Effects & Mock interfaces
 type MockEffectsNoMinStake struct {
 	*MockEffectsHappyPath
 	_callCountHasMinStake int
