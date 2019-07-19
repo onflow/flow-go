@@ -56,6 +56,7 @@ func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTrans
 	return b.pendingWorldState.GetTransaction(hash)
 }
 
+// GetTransactionAtVersion gets an existing transaction by hash at a specified state.
 func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash) (*types.SignedTransaction, error) {
 	ws, err := b.getWorldStateAtVersion(version)
 	if err != nil {
@@ -70,6 +71,7 @@ func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account 
 	return b.pendingWorldState.GetAccount(address)
 }
 
+// GetAccountAtVersion gets account information associated with an address identifier at a specified state.
 func (b *EmulatedBlockchain) GetAccountAtVersion(address crypto.Address, version crypto.Hash) (*crypto.Account, error) {
 	ws, err := b.getWorldStateAtVersion(version)
 	if err != nil {
@@ -116,20 +118,6 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 	return nil
 }
 
-// CallScript executes a read-only script against the world state and returns the result.
-func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
-	return b.computer.ExecuteCall(script, b.pendingWorldState.GetRegister)
-}
-
-func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error) {
-	ws, err := b.getWorldStateAtVersion(version)
-	if err != nil {
-		return nil, err
-	}
-
-	return b.computer.ExecuteCall(script, ws.GetRegister)
-}
-
 func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
 	if _, exists := b.intermediateWorldStates[txHash]; exists {
 		return
@@ -137,6 +125,21 @@ func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
 
 	bytes := b.pendingWorldState.Encode()
 	b.intermediateWorldStates[txHash] = bytes
+}
+
+// CallScript executes a read-only script against the world state and returns the result.
+func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
+	return b.computer.ExecuteCall(script, b.pendingWorldState.GetRegister)
+}
+
+// CallScriptAtVersion executes a read-only script against a specified world state and returns the result.
+func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error) {
+	ws, err := b.getWorldStateAtVersion(version)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.computer.ExecuteCall(script, ws.GetRegister)
 }
 
 // CommitBlock takes all pending transactions and commits them into a block.
