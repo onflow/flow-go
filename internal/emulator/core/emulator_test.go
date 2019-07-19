@@ -59,6 +59,7 @@ func TestWorldStates(t *testing.T) {
 	ws1 := b.pendingWorldState.Hash()
 	t.Logf("initial world state: \t%s\n", ws1)
 
+	// tx pool contains nothing
 	Expect(b.txPool).To(HaveLen(0))
 
 	// Submit tx1
@@ -66,7 +67,9 @@ func TestWorldStates(t *testing.T) {
 	ws2 := b.pendingWorldState.Hash()
 	t.Logf("world state after tx1: \t%s\n", ws2)
 
+	// tx1 included in tx pool
 	Expect(b.txPool).To(HaveLen(1))
+	// world state updates
 	Expect(ws2).NotTo(Equal(ws1))
 
 	// Submit tx1 again
@@ -74,7 +77,9 @@ func TestWorldStates(t *testing.T) {
 	ws3 := b.pendingWorldState.Hash()
 	t.Logf("world state after dup tx1: \t%s\n", ws3)
 
+	// tx1 not included in tx pool
 	Expect(b.txPool).To(HaveLen(1))
+	// world state does not update
 	Expect(ws3).To(Equal(ws2))
 
 	// Submit tx2
@@ -82,7 +87,9 @@ func TestWorldStates(t *testing.T) {
 	ws4 := b.pendingWorldState.Hash()
 	t.Logf("world state after tx2: \t%s\n", ws4)
 
+	// tx2 included in tx pool
 	Expect(b.txPool).To(HaveLen(2))
+	// world state updates
 	Expect(ws4).NotTo(Equal(ws3))
 
 	// Commit new block
@@ -90,8 +97,11 @@ func TestWorldStates(t *testing.T) {
 	ws5 := b.pendingWorldState.Hash()
 	t.Logf("world state after commit: \t%s\n", ws5)
 
+	// tx pool cleared
 	Expect(b.txPool).To(HaveLen(0))
+	// world state updates
 	Expect(ws5).NotTo(Equal(ws4))
+	// world state is indexed
 	Expect(b.worldStates).To(HaveKey(ws5))
 
 	// Submit tx3
@@ -99,7 +109,9 @@ func TestWorldStates(t *testing.T) {
 	ws6 := b.pendingWorldState.Hash()
 	t.Logf("world state after tx3: \t%s\n", ws6)
 
+	// tx3 included in tx pool
 	Expect(b.txPool).To(HaveLen(1))
+	// world state updates
 	Expect(ws6).NotTo(Equal(ws5))
 
 	// Seek to committed block/world state
@@ -107,14 +119,19 @@ func TestWorldStates(t *testing.T) {
 	ws7 := b.pendingWorldState.Hash()
 	t.Logf("world state after seek: \t%s\n", ws7)
 
+	// tx pool cleared
 	Expect(b.txPool).To(HaveLen(0))
+	// world state rollback to ws5 (before tx3)
 	Expect(ws7).To(Equal(ws5))
+	// world state does not include tx3
+	Expect(b.pendingWorldState.ContainsTransaction(tx3.Hash())).To(BeFalse())
 
 	// Seek to non-committed world state
 	b.SeekToState(ws4)
 	ws8 := b.pendingWorldState.Hash()
 	t.Logf("world state after failed seek: \t%s\n", ws8)
 
+	// world state does not rollback to ws4 (before commit block)
 	Expect(ws8).ToNot(Equal(ws4))
 }
 
@@ -134,8 +151,7 @@ func TestSubmitTransaction(t *testing.T) {
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
-	tx2 := b.GetTransaction(tx1.Hash())
-	Expect(tx2.Status).To(Equal(types.TransactionFinalized))
+	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionFinalized))
 }
 
 func TestSubmitDuplicateTransaction(t *testing.T) {
@@ -174,8 +190,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 	err := b.SubmitTransaction(tx1)
 	Expect(err).To(HaveOccurred())
 
-	tx2 := b.GetTransaction(tx1.Hash())
-	Expect(tx2.Status).To(Equal(types.TransactionReverted))
+	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionReverted))
 }
 
 func TestCallScript(t *testing.T) {
