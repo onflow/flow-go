@@ -47,6 +47,20 @@ func Test(t *testing.T) {
 				Expect(m.CallCountHandleError()).To(Equal(1))
 			},
 		},
+		test{
+			title: "sealed with different Receipt",
+			m:     NewMockEffectsSealWithDifferentReceipt(&MockEffectsHappyPath{}),
+			expectFunc: func(m Mock, t *testing.T) {
+				RegisterTestingT(t)
+				Expect(m.CallCountIsValidExecutionReceipt()).To(Equal(0))
+				Expect(m.CallCountHasMinStake()).To(Equal(1))
+				Expect(m.CallCountIsSealedWithDifferentReceipt()).To(Equal(1))
+				Expect(m.CallCountSend()).To(Equal(0))
+				Expect(m.CallCountSlashExpiredReceipt()).To(Equal(1))
+				Expect(m.CallCountSlashInvalidReceipt()).To(Equal(0))
+				Expect(m.CallCountHandleError()).To(Equal(0))
+			},
+		},
 	}
 
 	for _, test := range tests {
