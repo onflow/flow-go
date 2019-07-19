@@ -2619,48 +2619,26 @@ const account: Account = // ...
 const value: Int? = account.getStored(Int)
 ```
 
-## External Contracts and Interfaces
+## Importing External Types
 
-> 🚧 Status: External contracts and interfaces are not implemented yet.
+> 🚧 Status: The import of external types is not implemented yet.
 
-External contracts and interfaces can be instantiated by calling the `at` function on the contract or interface type and passing the address where the code is deployed. It returns an optional, as the code at the given address might not be of the given type.
+It is possible to import external types into programs by using the `import` keyword, followed by the type name, the `from` keyword, and the address literal where the declaration is deployed.
 
 ```bamboo
-// Declaration for an interface named `Counter`.
+// Declaration for an interface named `Counter`,
+// declared and deployed externally
 //
 interface Counter {
     pub count: Int
     pub fun increment(_ count: Int)
 }
 
-// Try to instantiate the interface `Counter` for the code
-// at address 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
+// Import the type `Counter` from address
+// 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
 //
-// The result is a value which has type `Counter`.
-//
-const counter: Counter =
-    Counter.at(0x06012c8cf97BEaD5deAe237070F9587f8E7A266d)
-       ?? fatalError("contract at address is not a counter")
-
-// Access the field `count`
-//
-counter.count
-
-// Call the function `increment` on the counter
-//
-counter.increment(42)
+import Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
 ```
-
-In addition it is also possible to just check if an address has code with a given type.
-
-```bamboo
-// Check if the interface `Counter` is available
-// at address 0x2F4Bdafb22bd92AA7b7552d270376dE8eDccbc1E
-//
-const exists: Bool = Counter.exists(at: 0x2F4Bdafb22bd92AA7b7552d270376dE8eDccbc1E)
-```
-
-
 
 ## Built-in Functions
 
