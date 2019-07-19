@@ -1,3 +1,6 @@
+// Package compute holds validation result models.
+// It is currently a temporary place holder.
+// Once the validation flow is hooked up with the actual compute module, this package will likely be removed or changed.
 package compute
 
 import (

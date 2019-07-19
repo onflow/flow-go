@@ -47,7 +47,7 @@ NewReceiptProcessorConfig returns a new  receiptProcessorConfig  process.
 
 
 
-## <a name="Effects">type</a> [Effects](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_interface.go?s=302:735#L9)
+## <a name="Effects">type</a> [Effects](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_interface.go?s=301:734#L9)
 ``` go
 type Effects interface {
     IsValidExecutionReceipt(*types.ExecutionReceipt) (compute.ValidationResult, error)
@@ -59,7 +59,7 @@ type Effects interface {
     HandleError(error)
 }
 ```
-Effects is an interface for external encapuslated funcs with side-effects to be used in the receipt processor. Follows the GoF template pattern.
+Effects is an interface for external encapuslated funcs with side-effects to be used in the receipt processor. It follows the template pattern.
 
 
 
