@@ -10,6 +10,8 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -208,6 +210,17 @@ func (c *sealServiceClient) SubmitResultApproval(ctx context.Context, in *Submit
 type SealServiceServer interface {
 	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	SubmitResultApproval(context.Context, *SubmitResultApprovalRequest) (*empty.Empty, error)
+}
+
+// UnimplementedSealServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedSealServiceServer struct {
+}
+
+func (*UnimplementedSealServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
+func (*UnimplementedSealServiceServer) SubmitResultApproval(ctx context.Context, req *SubmitResultApprovalRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitResultApproval not implemented")
 }
 
 func RegisterSealServiceServer(s *grpc.Server, srv SealServiceServer) {
