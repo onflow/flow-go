@@ -2640,6 +2640,38 @@ interface Counter {
 import Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
 ```
 
+## Transactions
+
+Transactions are objects that are signed by one or more accounts and are sent to the chain to interact with it.
+
+Transactions have three phases: Preparation, execution, and post-conditions.
+
+The preparer acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
+
+Transactions are declared using the `transaction` keyword. The preparer is declared using the `prepare` keyword and the execution phase is declared using the `execute` keyword. The `ensure` section can be used to declare post-conditions.
+
+```bamboo,file=transaction-declaration.bpl
+transaction {
+
+    // Optional: fields, which must be initialized in `prepare`
+
+    // The preparer needs to have as many account parameters
+    // as there are signers for the transaction
+    //
+    prepare(signer1: Account) {
+        // ...
+    }
+
+    execute {
+        // ...
+    }
+
+    ensure {
+        // ...
+    }
+}
+```
+
 ## Built-in Functions
 
 ### `fatalError`
