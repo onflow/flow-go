@@ -10,7 +10,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/dapperlabs/603-Making-nodes-talk-via-gossip/bamboo-node/pkg/network/gossip"
+	"github.com/dapperlabs/bamboo-node/pkg/network/gossip"
 	proto "github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
