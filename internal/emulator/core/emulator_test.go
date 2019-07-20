@@ -279,37 +279,41 @@ func TestQueryByVersion(t *testing.T) {
 	b.SubmitTransaction(tx2)
 	ws3 := b.pendingWorldState.Hash()
 
+	// tx1 does not exist at ws1
 	tx, err := b.GetTransactionAtVersion(tx1.Hash(), ws1)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(tx).To(BeNil())
 
-	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws1)
-	Expect(err).ToNot(HaveOccurred())
-	Expect(tx).To(BeNil())
-
+	// tx1 does exist at ws2
 	tx, err = b.GetTransactionAtVersion(tx1.Hash(), ws2)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(tx).ToNot(BeNil())
 
+	// tx2 does not exist at ws2
 	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws2)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(tx).To(BeNil())
 
+	// tx2 does exist at ws3
 	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws3)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(tx).ToNot(BeNil())
 
+	// value at ws1 is 0
 	value, err := b.CallScriptAtVersion([]byte(sampleCall), ws1)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(value).To(Equal(0))
 
+	// value at ws2 is 2 (after script executed)
 	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws2)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(value).To(Equal(2))
 
+	// value at ws3 is 4 (after script executed)
 	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws3)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(value).To(Equal(4))
 
+	// pending state does not change after call scripts/get transactions
 	Expect(b.pendingWorldState.Hash()).To(Equal(ws3))
 }
