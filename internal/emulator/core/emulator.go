@@ -24,12 +24,21 @@ type EmulatedBlockchain struct {
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
 func NewEmulatedBlockchain() *EmulatedBlockchain {
+	worldStates := make(map[crypto.Hash][]byte)
+	intermediateWorldStates := make(map[crypto.Hash][]byte)
+	txPool := make(map[crypto.Hash]*types.SignedTransaction)
+	computer := NewComputer(runtime.NewInterpreterRuntime())
+	ws := state.NewWorldState()
+
+	bytes := ws.Encode()
+	worldStates[ws.Hash()] = bytes
+
 	return &EmulatedBlockchain{
-		worldStates:             make(map[crypto.Hash][]byte),
-		intermediateWorldStates: make(map[crypto.Hash][]byte),
-		pendingWorldState:       state.NewWorldState(),
-		txPool:                  make(map[crypto.Hash]*types.SignedTransaction),
-		computer:                NewComputer(runtime.NewInterpreterRuntime()),
+		worldStates:             worldStates,
+		intermediateWorldStates: intermediateWorldStates,
+		pendingWorldState:       ws,
+		txPool:                  txPool,
+		computer:                computer,
 	}
 }
 
