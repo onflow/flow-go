@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
+// sampleScript runs a script that adds 2 to a value.
 const sampleScript = `
 	fun main() {
 		const controller = [1]
@@ -32,6 +33,7 @@ func TestWorldStates(t *testing.T) {
 	// Create new emulated blockchain
 	b := NewEmulatedBlockchain()
 
+	// Create 3 signed transactions (tx1, tx2. tx3)
 	tx1 := &types.SignedTransaction{
 		Script:         []byte(sampleScript),
 		Nonce:          1,
@@ -59,7 +61,7 @@ func TestWorldStates(t *testing.T) {
 	ws1 := b.pendingWorldState.Hash()
 	t.Logf("initial world state: \t%s\n", ws1)
 
-	// tx pool contains nothing
+	// Tx pool contains nothing
 	Expect(b.txPool).To(HaveLen(0))
 
 	// Submit tx1
@@ -69,7 +71,7 @@ func TestWorldStates(t *testing.T) {
 
 	// tx1 included in tx pool
 	Expect(b.txPool).To(HaveLen(1))
-	// world state updates
+	// World state updates
 	Expect(ws2).NotTo(Equal(ws1))
 
 	// Submit tx1 again
@@ -79,7 +81,7 @@ func TestWorldStates(t *testing.T) {
 
 	// tx1 not included in tx pool
 	Expect(b.txPool).To(HaveLen(1))
-	// world state does not update
+	// World state does not update
 	Expect(ws3).To(Equal(ws2))
 
 	// Submit tx2
@@ -89,7 +91,7 @@ func TestWorldStates(t *testing.T) {
 
 	// tx2 included in tx pool
 	Expect(b.txPool).To(HaveLen(2))
-	// world state updates
+	// World state updates
 	Expect(ws4).NotTo(Equal(ws3))
 
 	// Commit new block
@@ -97,11 +99,11 @@ func TestWorldStates(t *testing.T) {
 	ws5 := b.pendingWorldState.Hash()
 	t.Logf("world state after commit: \t%s\n", ws5)
 
-	// tx pool cleared
+	// Tx pool cleared
 	Expect(b.txPool).To(HaveLen(0))
-	// world state updates
+	// World state updates
 	Expect(ws5).NotTo(Equal(ws4))
-	// world state is indexed
+	// World state is indexed
 	Expect(b.worldStates).To(HaveKey(ws5))
 
 	// Submit tx3
@@ -111,7 +113,7 @@ func TestWorldStates(t *testing.T) {
 
 	// tx3 included in tx pool
 	Expect(b.txPool).To(HaveLen(1))
-	// world state updates
+	// World state updates
 	Expect(ws6).NotTo(Equal(ws5))
 
 	// Seek to committed block/world state
@@ -119,11 +121,11 @@ func TestWorldStates(t *testing.T) {
 	ws7 := b.pendingWorldState.Hash()
 	t.Logf("world state after seek: \t%s\n", ws7)
 
-	// tx pool cleared
+	// Tx pool cleared
 	Expect(b.txPool).To(HaveLen(0))
-	// world state rollback to ws5 (before tx3)
+	// World state rollback to ws5 (before tx3)
 	Expect(ws7).To(Equal(ws5))
-	// world state does not include tx3
+	// World state does not include tx3
 	Expect(b.pendingWorldState.ContainsTransaction(tx3.Hash())).To(BeFalse())
 
 	// Seek to non-committed world state
@@ -131,7 +133,7 @@ func TestWorldStates(t *testing.T) {
 	ws8 := b.pendingWorldState.Hash()
 	t.Logf("world state after failed seek: \t%s\n", ws8)
 
-	// world state does not rollback to ws4 (before commit block)
+	// World state does not rollback to ws4 (before commit block)
 	Expect(ws8).ToNot(Equal(ws4))
 }
 
@@ -148,9 +150,11 @@ func TestSubmitTransaction(t *testing.T) {
 		PayerSignature: crypto.Signature{},
 	}
 
+	// Submit tx1
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
+	// tx1 status becomes TransactionFinalized
 	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionFinalized))
 }
 
@@ -167,9 +171,11 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 		PayerSignature: crypto.Signature{},
 	}
 
+	// Submit tx1
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
+	// Submit tx1 again (errors)
 	err = b.SubmitTransaction(tx1)
 	Expect(err).To(MatchError(&ErrDuplicateTransaction{TxHash: tx1.Hash()}))
 }
@@ -187,9 +193,11 @@ func TestSubmitTransactionReverted(t *testing.T) {
 		PayerSignature: crypto.Signature{},
 	}
 
+	// Submit invalid tx1 (errors)
 	err := b.SubmitTransaction(tx1)
 	Expect(err).To(HaveOccurred())
 
+	// tx1 status becomes TransactionReverted
 	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionReverted))
 }
 
@@ -206,6 +214,7 @@ func TestCommitBlock(t *testing.T) {
 		PayerSignature: crypto.Signature{},
 	}
 
+	// Submit tx1
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionFinalized))
@@ -218,12 +227,17 @@ func TestCommitBlock(t *testing.T) {
 		PayerSignature: crypto.Signature{},
 	}
 
+	// Submit invalid tx2
 	err = b.SubmitTransaction(tx2)
 	Expect(err).To(HaveOccurred())
 	Expect(b.GetTransaction(tx2.Hash()).Status).To(Equal(types.TransactionReverted))
 
+	// Commit tx1 and tx2 into new block
 	b.CommitBlock()
+
+	// tx1 status becomes TransactionSealed
 	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionSealed))
+	// tx2 status stays TransactionReverted
 	Expect(b.GetTransaction(tx2.Hash()).Status).To(Equal(types.TransactionReverted))
 }
 
@@ -240,13 +254,16 @@ func TestCallScript(t *testing.T) {
 		PayerSignature: crypto.Signature{},
 	}
 
+	// Sample call (value is 0)
 	value, err := b.CallScript([]byte(sampleCall))
 	Expect(err).ToNot(HaveOccurred())
 	Expect(value).To(Equal(0))
 
+	// Submit tx1 (script adds 2)
 	err = b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
+	// Sample call (value is 2)
 	value, err = b.CallScript([]byte(sampleCall))
 	Expect(err).ToNot(HaveOccurred())
 	Expect(value).To(Equal(2))
@@ -273,6 +290,7 @@ func TestQueryByVersion(t *testing.T) {
 		PayerSignature: crypto.Signature{},
 	}
 
+	// Submit tx1 and tx2 (logging state versions before and after)
 	ws1 := b.pendingWorldState.Hash()
 	b.SubmitTransaction(tx1)
 	ws2 := b.pendingWorldState.Hash()
@@ -299,21 +317,21 @@ func TestQueryByVersion(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(tx).ToNot(BeNil())
 
-	// value at ws1 is 0
+	// Value at ws1 is 0
 	value, err := b.CallScriptAtVersion([]byte(sampleCall), ws1)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(value).To(Equal(0))
 
-	// value at ws2 is 2 (after script executed)
+	// Value at ws2 is 2 (after script executed)
 	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws2)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(value).To(Equal(2))
 
-	// value at ws3 is 4 (after script executed)
+	// Value at ws3 is 4 (after script executed)
 	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws3)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(value).To(Equal(4))
 
-	// pending state does not change after call scripts/get transactions
+	// Pending state does not change after call scripts/get transactions
 	Expect(b.pendingWorldState.Hash()).To(Equal(ws3))
 }
