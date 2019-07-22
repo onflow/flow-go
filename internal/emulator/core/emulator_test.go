@@ -290,6 +290,8 @@ func TestQueryByVersion(t *testing.T) {
 		PayerSignature: crypto.Signature{},
 	}
 
+	invalidWorldState := crypto.NewHash([]byte("invalid state"))
+
 	// Submit tx1 and tx2 (logging state versions before and after)
 	ws1 := b.pendingWorldState.Hash()
 	b.SubmitTransaction(tx1)
@@ -297,8 +299,13 @@ func TestQueryByVersion(t *testing.T) {
 	b.SubmitTransaction(tx2)
 	ws3 := b.pendingWorldState.Hash()
 
+	// Get transaction at invalid world state version (errors)
+	tx, err := b.GetTransactionAtVersion(tx1.Hash(), invalidWorldState)
+	Expect(err).To(MatchError(&ErrInvalidStateVersion{Version: invalidWorldState}))
+	Expect(tx).To(BeNil())
+
 	// tx1 does not exist at ws1
-	tx, err := b.GetTransactionAtVersion(tx1.Hash(), ws1)
+	tx, err = b.GetTransactionAtVersion(tx1.Hash(), ws1)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(tx).To(BeNil())
 
@@ -317,8 +324,13 @@ func TestQueryByVersion(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(tx).ToNot(BeNil())
 
+	// Call script at invalid world state version (errors)
+	value, err := b.CallScriptAtVersion([]byte(sampleCall), invalidWorldState)
+	Expect(err).To(MatchError(&ErrInvalidStateVersion{Version: invalidWorldState}))
+	Expect(value).To(BeNil())
+
 	// Value at ws1 is 0
-	value, err := b.CallScriptAtVersion([]byte(sampleCall), ws1)
+	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws1)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(value).To(Equal(0))
 
