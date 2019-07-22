@@ -14,12 +14,18 @@ import (
 // EmulatedBlockchain simulates a blockchain in the background to enable easy smart contract testing.
 //
 // Contains a versioned World State store and a pending transaction pool for granular state update tests.
+// Both "committed" and "intermediate" world states are logged for query by version (state hash) utilities,
+// but only "committed" world states are enabled for the SeekToState feature.
 type EmulatedBlockchain struct {
-	worldStates             map[crypto.Hash][]byte
+	// mapping of committed world states (updated after CommitBlock)
+	worldStates map[crypto.Hash][]byte
+	// mapping of intermediate world states (updated after SubmitTransaction)
 	intermediateWorldStates map[crypto.Hash][]byte
-	pendingWorldState       *state.WorldState
-	txPool                  map[crypto.Hash]*types.SignedTransaction
-	computer                *Computer
+	// current world state
+	pendingWorldState *state.WorldState
+	// pool of pending transactions waiting to be commmitted (already executed)
+	txPool   map[crypto.Hash]*types.SignedTransaction
+	computer *Computer
 }
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
@@ -188,7 +194,8 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 
 // SeekToState rewinds the blockchain state to a previously committed history.
 //
-// Note this clears all pending transactions in txPool.
+// Note that this only seeks to a committed world state (not intermediate world state)
+// and this clears all pending transactions in txPool.
 func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
 	if bytes, ok := b.worldStates[hash]; ok {
 		ws := state.Decode(bytes)
