@@ -21,6 +21,8 @@ type MockCounters interface {
 	CallCountHandleError() int
 }
 
+// ProcessorEffects matches processor.Effects interface.
+// The latter cannot be reused here due to circular import.
 type ProcessorEffects interface {
 	IsValidExecutionReceipt(*types.ExecutionReceipt) (compute.ValidationResult, error)
 	HasMinStake(*types.ExecutionReceipt) (bool, error)
