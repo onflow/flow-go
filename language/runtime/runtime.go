@@ -12,9 +12,9 @@ import (
 
 type RuntimeInterface interface {
 	// GetValue gets a value for the given key in the storage, controlled and owned by the given accounts.
-	GetValue(controller, owner, key []byte) (value []byte, err error)
+	GetValue(owner, controller, key []byte) (value []byte, err error)
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
-	SetValue(controller, owner, key, value []byte) (err error)
+	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public key and code.
 	CreateAccount(publicKey []byte, code []byte) (accountID []byte, err error)
 }
@@ -95,11 +95,11 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 // TODO: improve types
 var setValueFunctionType = interpreter.FunctionType{
 	ParameterTypes: []interpreter.Type{
-		// controller
+		// owner
 		&interpreter.VariableSizedType{
 			Type: &interpreter.UInt8Type{},
 		},
-		// owner
+		// controller
 		&interpreter.VariableSizedType{
 			Type: &interpreter.UInt8Type{},
 		},
@@ -118,11 +118,11 @@ var setValueFunctionType = interpreter.FunctionType{
 // TODO: improve types
 var getValueFunctionType = interpreter.FunctionType{
 	ParameterTypes: []interpreter.Type{
-		// controller
+		// owner
 		&interpreter.VariableSizedType{
 			Type: &interpreter.UInt8Type{},
 		},
-		// owner
+		// controller
 		&interpreter.VariableSizedType{
 			Type: &interpreter.UInt8Type{},
 		},
@@ -161,7 +161,7 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterfa
 				panic(fmt.Sprintf("setValue requires 4 parameters"))
 			}
 
-			controller, owner, key := r.getControllerOwnerKey(arguments)
+			owner, controller, key := r.getOwnerControllerKey(arguments)
 
 			// TODO: only integer values supported for now. written in internal byte representation
 			intValue, ok := arguments[3].(interpreter.IntValue)
@@ -170,7 +170,7 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterfa
 			}
 			value := intValue.Bytes()
 
-			if err := runtimeInterface.SetValue(controller, owner, key, value); err != nil {
+			if err := runtimeInterface.SetValue(owner, controller, key, value); err != nil {
 				panic(err)
 			}
 
@@ -187,9 +187,9 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterfa
 				panic(fmt.Sprintf("getValue requires 3 parameters"))
 			}
 
-			controller, owner, key := r.getControllerOwnerKey(arguments)
+			owner, controller, key := r.getOwnerControllerKey(arguments)
 
-			value, err := runtimeInterface.GetValue(controller, owner, key)
+			value, err := runtimeInterface.GetValue(owner, controller, key)
 			if err != nil {
 				panic(err)
 			}
@@ -227,17 +227,17 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeIn
 	)
 }
 
-func (r *interpreterRuntime) getControllerOwnerKey(
+func (r *interpreterRuntime) getOwnerControllerKey(
 	arguments []interpreter.Value,
 ) (
 	controller []byte, owner []byte, key []byte,
 ) {
 	var err error
-	controller, err = toByteArray(arguments[0])
+	owner, err = toByteArray(arguments[0])
 	if err != nil {
 		panic(fmt.Sprintf("setValue requires the first parameter to be an array"))
 	}
-	owner, err = toByteArray(arguments[1])
+	controller, err = toByteArray(arguments[1])
 	if err != nil {
 		panic(fmt.Sprintf("setValue requires the second parameter to be an array"))
 	}

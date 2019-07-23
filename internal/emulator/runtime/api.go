@@ -16,13 +16,13 @@ func NewEmulatorRuntimeAPI(registers *etypes.RegistersView) *EmulatorRuntimeAPI 
 	return &EmulatorRuntimeAPI{registers}
 }
 
-func (i *EmulatorRuntimeAPI) GetValue(controller, owner, key []byte) ([]byte, error) {
-	v, _ := i.registers.Get(fullKey(controller, owner, key))
+func (i *EmulatorRuntimeAPI) GetValue(owner, controller, key []byte) ([]byte, error) {
+	v, _ := i.registers.Get(fullKey(owner, controller, key))
 	return v, nil
 }
 
-func (i *EmulatorRuntimeAPI) SetValue(controller, owner, key, value []byte) error {
-	i.registers.Set(fullKey(controller, owner, key), value)
+func (i *EmulatorRuntimeAPI) SetValue(owner, controller, key, value []byte) error {
+	i.registers.Set(fullKey(owner, controller, key), value)
 	return nil
 }
 
@@ -36,10 +36,9 @@ func (i *EmulatorRuntimeAPI) CreateAccount(publicKey, code []byte) (id []byte, e
 
 	accountID := accountAddress.Bytes()
 
-	// TODO: determine better key for account balance
-	i.registers.Set(fullKey(accountID, accountID, []byte("balance")), big.NewInt(0).Bytes())
-	i.registers.Set(fullKey(accountID, accountID, []byte("public_key")), publicKey)
-	i.registers.Set(fullKey(accountID, accountID, []byte("code")), code)
+	i.registers.Set(fullKey(accountID, []byte{}, keyBalance()), big.NewInt(0).Bytes())
+	i.registers.Set(fullKey(accountID, accountID, keyPublicKey()), publicKey)
+	i.registers.Set(fullKey(accountID, accountID, keyCode()), code)
 
 	i.registers.Set(keyLatestAccount(), accountID)
 
@@ -51,7 +50,7 @@ func (i *EmulatorRuntimeAPI) CreateAccount(publicKey, code []byte) (id []byte, e
 func (i *EmulatorRuntimeAPI) GetAccount(address crypto.Address) *crypto.Account {
 	accountID := address.Bytes()
 
-	balanceBytes, exists := i.registers.Get(fullKey(accountID, accountID, []byte("balance")))
+	balanceBytes, exists := i.registers.Get(fullKey(accountID, []byte{}, []byte("balance")))
 	if !exists {
 		return nil
 	}
@@ -73,9 +72,20 @@ func keyLatestAccount() crypto.Hash {
 	return crypto.NewHash([]byte("latestAccount"))
 }
 
-func fullKey(controller, owner, key []byte) crypto.Hash {
-	fullKey := append(controller, owner...)
-	fullKey = append(fullKey, key...)
+func keyBalance() []byte {
+	return []byte("balance")
+}
 
+func keyPublicKey() []byte {
+	return []byte("public_key")
+}
+
+func keyCode() []byte {
+	return []byte("code")
+}
+
+func fullKey(owner, controller, key []byte) crypto.Hash {
+	fullKey := append(owner, controller...)
+	fullKey = append(fullKey, key...)
 	return crypto.NewHash(fullKey)
 }
