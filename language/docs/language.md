@@ -1556,46 +1556,32 @@ let add = (a: Int8, b: Int8): Int {
 
 > 🚧 Status: Composite data types are not implemented yet.
 
-Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of one or more named fields, and one or more functions that operate on the data. Each field may have a different type.
+Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.
 
-There are three kinds of composite data types. The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable, when the value is assigned to a variable, and when the value is passed as an argument to a function:
+There are two kinds of composite data types. The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable, when the value is assigned to a variable, and when the value is passed as an argument to a function:
 
-- [**Structures**](#structures-and-classes) are **copied**, i.e. they are value types
-- [**Classes**](#structures-and-classes) are **referenced**, i.e., they are reference types
+- [**Structures**](#structures) are **copied**, i.e. they are value types
 - [**Resources**](#resources) are **moved**, they are linear types. Resources **must** be used **exactly once**
 
-Value types should be used when copies with independent state is desired, reference types should be used when shared, mutable state is desired, and linear types should be used when a value must be used exactly once, i.e. when it should not be used multiple times and when it should not be lost.
+Value types should be used when copies with independent state is desired, and linear types should be used when a value must be used exactly once, i.e. when it should not be used multiple times and when it should not be lost.
 
-### Structures and Classes
+### Structures
 
-#### Structure and Class Declaration
+Structures are declared using the `struct` keyword, followed by the name of the type.
 
-Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword.
-The keyword is followed by the name of the type.
-
-```bamboo,file=structure-and-class-declaration.bpl
+```bamboo,file=structure-declaration.bpl
 struct SomeStruct {
     // ...
 }
-
-class SomeClass {
-    // ...
-}
 ```
 
-Structures, classes are types. Structure and class values are created (instantiated) by calling the type like a function.
+Structures are types. Structures are created (instantiated) by calling the type like a function.
 
-```bamboo,file=structure-and-class-instantiation.bpl
+```bamboo,file=structure-instantiation.bpl
 SomeStruct()
-
-SomeClass()
 ```
 
-#### Structure and Class Behaviour
-
-The only difference between structures and classes is their behavior when used as an initial value for constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are **copied**, i.e. they are value types, classes are **referenced**, i.e., they are reference types.
-
-Structures are **copied**.
+Structures are **copied** when used as an initial value for constant or variable, when assigned to a different variable, or passed as an argument to a function.
 
 ```bamboo,file=struct-behavior.bpl
 // Declare a structure named `SomeStruct`, with a variable integer field
@@ -1620,34 +1606,6 @@ b.value = 1
 
 a.value // is *0*
 ```
-
-Classes are **referenced**.
-
-```bamboo,file=class-behavior.bpl
-// Declare a class named `SomeClass`, with a variable integer field
-//
-class SomeClass {
-    var value: Int
-
-    init(value: Int) {
-        self.value = value
-    }
-}
-
-// Declare a constant with value of class type `SomeClass`
-//
-let a = SomeClass(value: 0)
-
-// *Reference* the class value with a new constant
-//
-let b = A
-
-b.value = 1
-
-a.value // is *1*
-```
-
-Note the outcomes in the last lines of the examples.
 
 ### Resources
 
@@ -1984,7 +1942,7 @@ It is invalid to declare a synthetic field with only a setter.
 
 Composite data types may contain functions. Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
 
-```bamboo,file=struct-and-class-function.bpl
+```bamboo,file=composite-data-type-function.bpl
 struct Token {
     let id: Int
     var balance: Int
@@ -2010,11 +1968,11 @@ There is **no** support for nulls, i.e., a constant or variable of a reference t
 
 ### Inheritance and Abstract Types
 
-There is **no** support for inheritance. Inheritance is a feature common in other programming languages, that allows including the fields and functions of a type (e.g. for classes this is known as the superclass) in another type (e.g. for classes this is known as the subclass).
+There is **no** support for inheritance. Inheritance is a feature common in other programming languages, that allows including the fields and functions of one type in another type.
 
 Instead, follow the "composition over inheritance" principle, the idea of composing functionality from multiple individual parts, rather than building an inheritance tree.
 
-Furthermore, there is also **no** support for abstract types (e.g. abstract class). An abstract type is a feature common in other programming languages, that prevents creating values of the type and only allows the creation of values of a subtype (e.g. subclass). In addition, abstract types may declare functions, but omit the implementation of them and instead require subtypes to implement them.
+Furthermore, there is also **no** support for abstract types. An abstract type is a feature common in other programming languages, that prevents creating values of the type and only allows the creation of values of a subtype. In addition, abstract types may declare functions, but omit the implementation of them and instead require subtypes to implement them.
 
 Instead, consider using [interfaces](#interfaces).
 
@@ -2022,11 +1980,11 @@ Instead, consider using [interfaces](#interfaces).
 
 > 🚧 Status: Access control is not implemented yet.
 
-Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, classes, resources, interfaces) and fields (in structures, classes, and resources) are either private or public.
+Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.
 
-**Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field in a class can only be accessed by functions of the class, not by code that uses an instance of the class in an outer scope.
+**Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
 
-**Public** means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a class can be accessed using the access syntax on an instance of the class in an outer scope.
+**Public** means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a type can be accessed using the access syntax on an instance of the type in an outer scope.
 
 By default, everything is private. The `pub` keyword is used to make declarations public.
 
@@ -2042,12 +2000,12 @@ To summarize the behavior for variable declarations, constant declarations, and 
 | `var`            | `pub`              | **All**           | Current and inner |
 | `var`            | `pub(set)`         | **All**           | **All**           |
 
-To summarize the behavior for functions, structures, classes, resources, and interfaces:
+To summarize the behavior for functions, structures, resources, and interfaces:
 
 | Declaration kind                                  | Access modifier       | Access scope      |
 |:--------------------------------------------------|:----------------------|:------------------|
-| `fun`, `struct`, `class`, `resource`, `interface` |                       | Current and inner |
-| `fun`, `struct`, `class`, `resource`, `interface` | `pub`                 | **All**           |
+| `fun`, `struct`, `resource`, `interface`          |                       | Current and inner |
+| `fun`, `struct`, `resource`, `interface`          | `pub`                 | **All**           |
 
 
 ```bamboo,file=access-control.bpl
@@ -2059,9 +2017,9 @@ let a = 1
 //
 pub let b = 2
 
-// Declare a public class, accessible/visible in all scopes
+// Declare a public struct, accessible/visible in all scopes
 //
-pub class SomeClass {
+pub struct SomeStruct {
 
     // Declare a private constant field,
     // only readable in the current and inner scopes
@@ -2112,7 +2070,7 @@ pub class SomeClass {
 
 An interface is an abstract type that specifies the behavior of types that *implement* the interface. Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
 
-Interfaces can be implemented by [composite data types](#composite-data-types) (classes, structures, and resources). Composite data types may implement multiple interfaces.
+Interfaces can be implemented by [composite data types](#composite-data-types) (structures and resources). Composite data types may implement multiple interfaces.
 
 Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Interface requirements, and therefore also their implementations, must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.
 
@@ -2228,13 +2186,13 @@ Note that the required initializer and function do not have any executable code.
 
 ### Interface Implementation
 
-Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the composite data type (class, structure, or resource) that provides the functionality required in the interface.
+Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the composite data type (structure or resource) that provides the functionality required in the interface.
 
 ```bamboo,file=interface-implementation.bpl
-// Declare a class named `ExampleVault` with a variable field named `balance`,
-// that can be written by functions of the class, but outer scopes can only read it
+// Declare a struct named `ExampleVault` with a variable field named `balance`,
+// that can be written by functions of the type, but outer scopes can only read it
 //
-class ExampleVault {
+struct ExampleVault {
 
     // Implement the required field `balance` for the `Vault` interface.
     // The interface does not specify if the field must be variable, constant,
@@ -2258,7 +2216,7 @@ class ExampleVault {
 }
 
 
-// Declare the implementation of the interface `Vault` for the class `ExampleVault`
+// Declare the implementation of the interface `Vault` for the struct `ExampleVault`
 //
 impl Vault for ExampleVault {
 
@@ -2418,10 +2376,10 @@ interface Equatable {
 ```
 
 ```bamboo,file=equatable-impl.bpl
-// Declare a class named `Cat`, which has one field named `id`
+// Declare a struct named `Cat`, which has one field named `id`
 // that has type `Int`, i.e., the identifier of the cat.
 //
-class Cat {
+struct Cat {
     pub let id: Int
 
     init(id: Int) {

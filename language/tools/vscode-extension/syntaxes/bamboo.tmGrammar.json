@@ -624,7 +624,7 @@
         ]
       },
       "composite": {
-        "begin": "\\b(class|struct|resource|interface|contract|transaction)\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
+        "begin": "\\b(struct|resource|interface|contract|transaction)\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
         "beginCaptures": {
           "1": {
             "name": "storage.type.$1.bamboo"

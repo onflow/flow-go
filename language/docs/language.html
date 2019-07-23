@@ -143,11 +143,7 @@
             <p><a href="#composite-data-types">Composite Data Types</a></p>
             <ul>
               <li>
-                <p><a href="#structures-and-classes">Structures and Classes</a></p>
-                <ul>
-                  <li><a href="#structure-and-class-declaration">Structure and Class Declaration</a></li>
-                  <li><a href="#structure-and-class-behaviour">Structure and Class Behaviour</a></li>
-                </ul>
+                <p><a href="#structures">Structures</a></p>
               </li>
               <li>
                 <p><a href="#resources">Resources</a></p>
@@ -1510,41 +1506,25 @@
         <blockquote>
           <p>🚧 Status: Composite data types are not implemented yet.</p>
         </blockquote>
-        <p>Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of one or more named fields, and one or more functions that operate on the data. Each field may have a different type.</p>
-        <p>There are three kinds of composite data types. The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable, when the value is assigned to a variable, and when the value is passed as an argument to a function:</p>
+        <p>Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.</p>
+        <p>There are two kinds of composite data types. The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable, when the value is assigned to a variable, and when the value is passed as an argument to a function:</p>
         <ul>
-          <li><a href="#structures-and-classes"><strong>Structures</strong></a> are <strong>copied</strong>, i.e. they are value types</li>
-          <li><a href="#structures-and-classes"><strong>Classes</strong></a> are <strong>referenced</strong>, i.e., they are reference types</li>
+          <li><a href="#structures"><strong>Structures</strong></a> are <strong>copied</strong>, i.e. they are value types</li>
           <li><a href="#resources"><strong>Resources</strong></a> are <strong>moved</strong>, they are linear types. Resources <strong>must</strong> be used <strong>exactly once</strong></li>
         </ul>
-        <p>Value types should be used when copies with independent state is desired, reference types should be used when shared, mutable state is desired, and linear types should be used when a value must be used exactly once, i.e. when it should not be used multiple times and when it should not be lost.</p>
+        <p>Value types should be used when copies with independent state is desired, and linear types should be used when a value must be used exactly once, i.e. when it should not be used multiple times and when it should not be lost.</p>
         <section>
-          <h3 id="structures-and-classes"><a href="#structures-and-classes" aria-hidden="true"><span class="icon icon-link"></span></a>Structures and Classes</h3>
-          <section>
-            <h4 id="structure-and-class-declaration"><a href="#structure-and-class-declaration" aria-hidden="true"><span class="icon icon-link"></span></a>Structure and Class Declaration</h4>
-            <p>
-              Structures are declared using the <code>struct</code> keyword. Classes are declared using the <code>class</code> keyword.
-              The keyword is followed by the name of the type.
-            </p>
-            <pre><code class="language-bamboo,file=structure-and-class-declaration.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span style="color: #0000FF">class</span><span style="color: #000000"> SomeClass {</span><span>
+          <h3 id="structures"><a href="#structures" aria-hidden="true"><span class="icon icon-link"></span></a>Structures</h3>
+          <p>Structures are declared using the <code>struct</code> keyword, followed by the name of the type.</p>
+          <pre><code class="language-bamboo,file=structure-declaration.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-            <p>Structures, classes are types. Structure and class values are created (instantiated) by calling the type like a function.</p>
-            <pre><code class="language-bamboo,file=structure-and-class-instantiation.bpl"><span style="color: #000000">SomeStruct()</span><span>
-</span><span>
-</span><span style="color: #000000">SomeClass()</span><span>
+          <p>Structures are types. Structures are created (instantiated) by calling the type like a function.</p>
+          <pre><code class="language-bamboo,file=structure-instantiation.bpl"><span style="color: #000000">SomeStruct()</span><span>
 </span></code></pre>
-          </section>
-          <section>
-            <h4 id="structure-and-class-behaviour"><a href="#structure-and-class-behaviour" aria-hidden="true"><span class="icon icon-link"></span></a>Structure and Class Behaviour</h4>
-            <p>The only difference between structures and classes is their behavior when used as an initial value for constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are <strong>copied</strong>, i.e. they are value types, classes are <strong>referenced</strong>, i.e., they are reference types.</p>
-            <p>Structures are <strong>copied</strong>.</p>
-            <pre><code class="language-bamboo,file=struct-behavior.bpl"><span style="color: #008000">// Declare a structure named `SomeStruct`, with a variable integer field</span><span>
+          <p>Structures are <strong>copied</strong> when used as an initial value for constant or variable, when assigned to a different variable, or passed as an argument to a function.</p>
+          <pre><code class="language-bamboo,file=struct-behavior.bpl"><span style="color: #008000">// Declare a structure named `SomeStruct`, with a variable integer field</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: Int</span><span>
@@ -1566,31 +1546,6 @@
 </span><span>
 </span><span style="color: #000000">a.value </span><span style="color: #008000">// is *0*</span><span>
 </span></code></pre>
-            <p>Classes are <strong>referenced</strong>.</p>
-            <pre><code class="language-bamboo,file=class-behavior.bpl"><span style="color: #008000">// Declare a class named `SomeClass`, with a variable integer field</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">class</span><span style="color: #000000"> SomeClass {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: Int</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(value: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.value = value</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span style="color: #008000">// Declare a constant with value of class type `SomeClass`</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = SomeClass(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
-</span><span>
-</span><span style="color: #008000">// *Reference* the class value with a new constant</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = A</span><span>
-</span><span>
-</span><span style="color: #000000">b.value = </span><span style="color: #09885A">1</span><span>
-</span><span>
-</span><span style="color: #000000">a.value </span><span style="color: #008000">// is *1*</span><span>
-</span></code></pre>
-            <p>Note the outcomes in the last lines of the examples.</p>
-          </section>
         </section>
         <section>
           <h3 id="resources"><a href="#resources" aria-hidden="true"><span class="icon icon-link"></span></a>Resources</h3>
@@ -1908,7 +1863,7 @@
         <section>
           <h3 id="composite-data-type-functions"><a href="#composite-data-type-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Functions</h3>
           <p>Composite data types may contain functions. Just like in the initializer, the special constant <code>self</code> refers to the composite value that the function is called on.</p>
-          <pre><code class="language-bamboo,file=struct-and-class-function.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
+          <pre><code class="language-bamboo,file=composite-data-type-function.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
 </span><span>
@@ -1933,9 +1888,9 @@
         </section>
         <section>
           <h3 id="inheritance-and-abstract-types"><a href="#inheritance-and-abstract-types" aria-hidden="true"><span class="icon icon-link"></span></a>Inheritance and Abstract Types</h3>
-          <p>There is <strong>no</strong> support for inheritance. Inheritance is a feature common in other programming languages, that allows including the fields and functions of a type (e.g. for classes this is known as the superclass) in another type (e.g. for classes this is known as the subclass).</p>
+          <p>There is <strong>no</strong> support for inheritance. Inheritance is a feature common in other programming languages, that allows including the fields and functions of one type in another type.</p>
           <p>Instead, follow the "composition over inheritance" principle, the idea of composing functionality from multiple individual parts, rather than building an inheritance tree.</p>
-          <p>Furthermore, there is also <strong>no</strong> support for abstract types (e.g. abstract class). An abstract type is a feature common in other programming languages, that prevents creating values of the type and only allows the creation of values of a subtype (e.g. subclass). In addition, abstract types may declare functions, but omit the implementation of them and instead require subtypes to implement them.</p>
+          <p>Furthermore, there is also <strong>no</strong> support for abstract types. An abstract type is a feature common in other programming languages, that prevents creating values of the type and only allows the creation of values of a subtype. In addition, abstract types may declare functions, but omit the implementation of them and instead require subtypes to implement them.</p>
           <p>Instead, consider using <a href="#interfaces">interfaces</a>.</p>
         </section>
       </section>
@@ -1944,9 +1899,9 @@
         <blockquote>
           <p>🚧 Status: Access control is not implemented yet.</p>
         </blockquote>
-        <p>Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, classes, resources, interfaces) and fields (in structures, classes, and resources) are either private or public.</p>
-        <p><strong>Private</strong> means the declaration is only accessible/visible in the current and inner scopes. For example, a private field in a class can only be accessed by functions of the class, not by code that uses an instance of the class in an outer scope.</p>
-        <p><strong>Public</strong> means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a class can be accessed using the access syntax on an instance of the class in an outer scope.</p>
+        <p>Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.</p>
+        <p><strong>Private</strong> means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.</p>
+        <p><strong>Public</strong> means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a type can be accessed using the access syntax on an instance of the type in an outer scope.</p>
         <p>By default, everything is private. The <code>pub</code> keyword is used to make declarations public.</p>
         <p>The <code>(set)</code> suffix can be used to make variables also publicly writable.</p>
         <p>To summarize the behavior for variable declarations, constant declarations, and fields:</p>
@@ -1992,7 +1947,7 @@
             </tr>
           </tbody>
         </table>
-        <p>To summarize the behavior for functions, structures, classes, resources, and interfaces:</p>
+        <p>To summarize the behavior for functions, structures, resources, and interfaces:</p>
         <table>
           <thead>
             <tr>
@@ -2003,12 +1958,12 @@
           </thead>
           <tbody>
             <tr>
-              <td align="left"><code>fun</code>, <code>struct</code>, <code>class</code>, <code>resource</code>, <code>interface</code></td>
+              <td align="left"><code>fun</code>, <code>struct</code>, <code>resource</code>, <code>interface</code></td>
               <td align="left"></td>
               <td align="left">Current and inner</td>
             </tr>
             <tr>
-              <td align="left"><code>fun</code>, <code>struct</code>, <code>class</code>, <code>resource</code>, <code>interface</code></td>
+              <td align="left"><code>fun</code>, <code>struct</code>, <code>resource</code>, <code>interface</code></td>
               <td align="left"><code>pub</code></td>
               <td align="left"><strong>All</strong></td>
             </tr>
@@ -2022,9 +1977,9 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a public class, accessible/visible in all scopes</span><span>
+</span><span style="color: #008000">// Declare a public struct, accessible/visible in all scopes</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">class</span><span style="color: #000000"> SomeClass {</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a private constant field,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// only readable in the current and inner scopes</span><span>
@@ -2075,7 +2030,7 @@
           <p>🚧 Status: Interfaces are not implemented yet.</p>
         </blockquote>
         <p>An interface is an abstract type that specifies the behavior of types that <em>implement</em> the interface. Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.</p>
-        <p>Interfaces can be implemented by <a href="#composite-data-types">composite data types</a> (classes, structures, and resources). Composite data types may implement multiple interfaces.</p>
+        <p>Interfaces can be implemented by <a href="#composite-data-types">composite data types</a> (structures and resources). Composite data types may implement multiple interfaces.</p>
         <p>Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Interface requirements, and therefore also their implementations, must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.</p>
         <p>Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions.</p>
         <p>Field requirements consist of the name and the type of the field. Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.</p>
@@ -2180,11 +2135,11 @@
         </section>
         <section>
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
-          <p>Implementations are declared using the <code>impl</code> keyword, followed by the name of interface, the <code>for</code> keyword, and the name of the composite data type (class, structure, or resource) that provides the functionality required in the interface.</p>
-          <pre><code class="language-bamboo,file=interface-implementation.bpl"><span style="color: #008000">// Declare a class named `ExampleVault` with a variable field named `balance`,</span><span>
-</span><span style="color: #008000">// that can be written by functions of the class, but outer scopes can only read it</span><span>
+          <p>Implementations are declared using the <code>impl</code> keyword, followed by the name of interface, the <code>for</code> keyword, and the name of the composite data type (structure or resource) that provides the functionality required in the interface.</p>
+          <pre><code class="language-bamboo,file=interface-implementation.bpl"><span style="color: #008000">// Declare a struct named `ExampleVault` with a variable field named `balance`,</span><span>
+</span><span style="color: #008000">// that can be written by functions of the type, but outer scopes can only read it</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">class</span><span style="color: #000000"> ExampleVault {</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> ExampleVault {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required field `balance` for the `Vault` interface.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The interface does not specify if the field must be variable, constant,</span><span>
@@ -2208,7 +2163,7 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span>
-</span><span style="color: #008000">// Declare the implementation of the interface `Vault` for the class `ExampleVault`</span><span>
+</span><span style="color: #008000">// Declare the implementation of the interface `Vault` for the struct `ExampleVault`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">impl Vault for ExampleVault {</span><span>
 </span><span>
@@ -2351,10 +2306,10 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <pre><code class="language-bamboo,file=equatable-impl.bpl"><span style="color: #008000">// Declare a class named `Cat`, which has one field named `id`</span><span>
+          <pre><code class="language-bamboo,file=equatable-impl.bpl"><span style="color: #008000">// Declare a struct named `Cat`, which has one field named `id`</span><span>
 </span><span style="color: #008000">// that has type `Int`, i.e., the identifier of the cat.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">class</span><span style="color: #000000"> Cat {</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Cat {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int) {</span><span>
