@@ -1558,7 +1558,11 @@ let add = (a: Int8, b: Int8): Int {
 
 Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.
 
-There are two kinds of composite data types. The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable, when the value is assigned to a variable, and when the value is passed as an argument to a function:
+There are two kinds of composite data types.
+The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable,
+when the value is assigned to a variable,
+when the value is passed as an argument to a function,
+and when the value is returned from a function:
 
 - [**Structures**](#structures) are **copied**, i.e. they are value types
 - [**Resources**](#resources) are **moved**, they are linear types. Resources **must** be used **exactly once**
@@ -1581,7 +1585,10 @@ Structures are types. Structures are created (instantiated) by calling the type 
 SomeStruct()
 ```
 
-Structures are **copied** when used as an initial value for constant or variable, when assigned to a different variable, or passed as an argument to a function.
+Structures are **copied** when used as an initial value for constant or variable,
+when assigned to a different variable,
+when passed as an argument to a function,
+and when returned from a function:
 
 ```bamboo,file=struct-behavior.bpl
 // Declare a structure named `SomeStruct`, with a variable integer field
@@ -1627,7 +1634,12 @@ create SomeResource()
 
 #### Resource Behaviour
 
-Resources are **moved** when used as an initial value for a constant or variable, when assigned to a different variable, or passed as an argument to a function. When the resource was moved, the constant or variable that referred to the resource before the move becomes **invalid**.
+Resources are **moved** when used as an initial value for a constant or variable,
+when assigned to a different variable,
+when passed as an argument to a function,
+and when returned from a function.
+
+When the resource was moved, the constant or variable that referred to the resource before the move becomes **invalid**.
 
 To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it moved to a different variable, or when it moved to a function.
 

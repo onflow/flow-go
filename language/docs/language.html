@@ -1507,7 +1507,13 @@
           <p>🚧 Status: Composite data types are not implemented yet.</p>
         </blockquote>
         <p>Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.</p>
-        <p>There are two kinds of composite data types. The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable, when the value is assigned to a variable, and when the value is passed as an argument to a function:</p>
+        <p>
+          There are two kinds of composite data types.
+          The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable,
+          when the value is assigned to a variable,
+          when the value is passed as an argument to a function,
+          and when the value is returned from a function:
+        </p>
         <ul>
           <li><a href="#structures"><strong>Structures</strong></a> are <strong>copied</strong>, i.e. they are value types</li>
           <li><a href="#resources"><strong>Resources</strong></a> are <strong>moved</strong>, they are linear types. Resources <strong>must</strong> be used <strong>exactly once</strong></li>
@@ -1523,7 +1529,12 @@
           <p>Structures are types. Structures are created (instantiated) by calling the type like a function.</p>
           <pre><code class="language-bamboo,file=structure-instantiation.bpl"><span style="color: #000000">SomeStruct()</span><span>
 </span></code></pre>
-          <p>Structures are <strong>copied</strong> when used as an initial value for constant or variable, when assigned to a different variable, or passed as an argument to a function.</p>
+          <p>
+            Structures are <strong>copied</strong> when used as an initial value for constant or variable,
+            when assigned to a different variable,
+            when passed as an argument to a function,
+            and when returned from a function:
+          </p>
           <pre><code class="language-bamboo,file=struct-behavior.bpl"><span style="color: #008000">// Declare a structure named `SomeStruct`, with a variable integer field</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
@@ -1562,7 +1573,13 @@
           </section>
           <section>
             <h4 id="resource-behaviour"><a href="#resource-behaviour" aria-hidden="true"><span class="icon icon-link"></span></a>Resource Behaviour</h4>
-            <p>Resources are <strong>moved</strong> when used as an initial value for a constant or variable, when assigned to a different variable, or passed as an argument to a function. When the resource was moved, the constant or variable that referred to the resource before the move becomes <strong>invalid</strong>.</p>
+            <p>
+              Resources are <strong>moved</strong> when used as an initial value for a constant or variable,
+              when assigned to a different variable,
+              when passed as an argument to a function,
+              and when returned from a function.
+            </p>
+            <p>When the resource was moved, the constant or variable that referred to the resource before the move becomes <strong>invalid</strong>.</p>
             <p>To make the move explicit, the move operator <code>&#x3C;-</code> must be used when the resource is the initial value of a constant or variable, when it moved to a different variable, or when it moved to a function.</p>
             <pre><code class="language-bamboo,file=resource-behavior.bpl"><span style="color: #008000">// Declare a resource named `SomeResource`, with a variable integer field</span><span>
 </span><span style="color: #008000">//</span><span>
