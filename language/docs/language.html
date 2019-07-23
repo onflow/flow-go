@@ -143,11 +143,7 @@
             <p><a href="#composite-data-types">Composite Data Types</a></p>
             <ul>
               <li>
-                <p><a href="#structures-and-classes">Structures and Classes</a></p>
-                <ul>
-                  <li><a href="#structure-and-class-declaration">Structure and Class Declaration</a></li>
-                  <li><a href="#structure-and-class-behaviour">Structure and Class Behaviour</a></li>
-                </ul>
+                <p><a href="#structures">Structures</a></p>
               </li>
               <li>
                 <p><a href="#resources">Resources</a></p>
@@ -251,13 +247,10 @@
         <h2 id="constants-and-variable-declarations"><a href="#constants-and-variable-declarations" aria-hidden="true"><span class="icon icon-link"></span></a>Constants and Variable Declarations</h2>
         <p>Constants and variables are declarations that bind a value to a name. Constants can only be initialized with a value and cannot be reassigned afterwards. Variables can be initialized with a value and can be reassigned later. Declarations are valid in any scope, including the global scope.</p>
         <p>Constant means that the <em>name</em> is constant, not the <em>value</em> – the value may still be changed if it allows it, i.e. is mutable.</p>
-        <p>
-          The <code>const</code> keyword is used to declare a constant and the <code>var</code> keyword is used to declare a variable.
-          The keywords are followed by the name, an optional <a href="#type-annotations">type annotation</a>, an equals sign <code>=</code>, and the initial value.
-        </p>
+        <p>Constants are declared using the <code>let</code> keyword. Variables are declared using the <code>var</code> keyword. The keywords are followed by the name, an optional <a href="#type-annotations">type annotation</a>, an equals sign <code>=</code>, and the initial value.</p>
         <pre><code class="language-bamboo,file=constants-and-variables.bpl"><span style="color: #008000">// Declare a constant named `a`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: re-assigning to a constant</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -274,17 +267,17 @@
         <p>Variables and constants <strong>must</strong> be initialized.</p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Invalid: the constant has no initial value</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a</span><span>
 </span></code></pre>
         <p>Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).</p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant named `a`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: cannot re-declare a constant with name `a`,</span><span>
 </span><span style="color: #008000">// as it is already used in this scope</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">2</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a variable named `b`</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -316,7 +309,7 @@
 </span><span style="color: #008000">// and for which the type is inferred to be `Int`,</span><span>
 </span><span style="color: #008000">// based on the initial value</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> inferred = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> inferred = </span><span style="color: #09885A">1</span><span>
 </span></code></pre>
         <p>If a type annotation is provided, the initial value must be of this type, and new values assigned to variables must match the declaration's type. This type safety is explained in more detail in a <a href="#type-safety">separate section</a>.</p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Invalid: declare a variable with an explicit type `Bool`,</span><span>
@@ -324,7 +317,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// `Int` is the type of arbitrary-precision integers</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> booleanConstant: </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> booleanConstant: </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a variable that has type `Bool`</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -375,7 +368,7 @@
         <p>Semicolons may be used to separate statements, but are optional. They can be used to separate multiple statements on a single line.</p>
         <pre><code class="language-bamboo,file=semicolons.bpl"><span style="color: #008000">// Declare a constant, without a semicolon</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a variable, with a semicolon</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -383,7 +376,7 @@
 </span><span>
 </span><span style="color: #008000">// Declare a constant and a variable on a single line, separated by semicolons</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> d = </span><span style="color: #09885A">1</span><span style="color: #000000">; </span><span style="color: #0000FF">var</span><span style="color: #000000"> e = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> d = </span><span style="color: #09885A">1</span><span style="color: #000000">; </span><span style="color: #0000FF">var</span><span style="color: #000000"> e = </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
       </section>
       <section>
@@ -448,10 +441,10 @@
 </span><span style="color: #000000">0z0</span><span>
 </span></code></pre>
           <p>Decimal numbers may contain underscores (<code>_</code>) to logically separate components.</p>
-          <pre><code class="language-bamboo,file=number-underscores-decimal.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> largeNumber = </span><span style="color: #09885A">1_000_000</span><span>
+          <pre><code class="language-bamboo,file=number-underscores-decimal.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> largeNumber = </span><span style="color: #09885A">1_000_000</span><span>
 </span></code></pre>
           <p>Underscores are allowed for all numeral systems.</p>
-          <pre><code class="language-bamboo,file=number-underscores-binary.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> binaryNumber = </span><span style="color: #09885A">0b10_11_01</span><span>
+          <pre><code class="language-bamboo,file=number-underscores-binary.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> binaryNumber = </span><span style="color: #09885A">0b10_11_01</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -468,14 +461,14 @@
             <li><strong><code>UInt64</code></strong>: 0 through 18446744073709551615</li>
           </ul>
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant that has type `UInt8` and the value 10</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> smallNumber: UInt8 = </span><span style="color: #09885A">10</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> smallNumber: UInt8 = </span><span style="color: #09885A">10</span><span>
 </span></code></pre>
           <pre><code class="language-bamboo"><span style="color: #008000">// Invalid: negative literal cannot be used as an unsigned integer</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> invalidNumber: UInt8 = </span><span style="color: #09885A">-10</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> invalidNumber: UInt8 = </span><span style="color: #09885A">-10</span><span>
 </span></code></pre>
           <p>In addition, the arbitrary precision integer type <code>Int</code> is provided.</p>
-          <pre><code class="language-bamboo"><span style="color: #0000FF">const</span><span style="color: #000000"> veryLargeNumber: Int = </span><span style="color: #09885A">10000000000000000000000000000000</span><span>
+          <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> veryLargeNumber: Int = </span><span style="color: #09885A">10000000000000000000000000000000</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -488,23 +481,23 @@
           <p>The type <code>Address</code> represents an address. Addresses are unsigned integers with a size of 160 bits. Hexadecimal integer literals can be used to create address values.</p>
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant that has type `Address`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> someAddress: </span><span style="color: #0000FF">Address</span><span style="color: #000000"> = </span><span style="color: #09885A">0x06012c8cf97bead5deae237070f9587f8e7a266d</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> someAddress: </span><span style="color: #0000FF">Address</span><span style="color: #000000"> = </span><span style="color: #09885A">0x06012c8cf97bead5deae237070f9587f8e7a266d</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Initial value is not compatible with type `Address`,</span><span>
 </span><span style="color: #008000">// it is not a number</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> notAnAddress: </span><span style="color: #0000FF">Address</span><span style="color: #000000"> = </span><span style="color: #A31515">""</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> notAnAddress: </span><span style="color: #0000FF">Address</span><span style="color: #000000"> = </span><span style="color: #A31515">""</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Initial value is not compatible with type `Address`,</span><span>
 </span><span style="color: #008000">// it is a number, but larger than 160 bits</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> alsoNotAnAddress: </span><span style="color: #0000FF">Address</span><span style="color: #000000"> = </span><span style="color: #09885A">0x06012c8cf97bead5deae237070f9587f8e7a266d123456789</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> alsoNotAnAddress: </span><span style="color: #0000FF">Address</span><span style="color: #000000"> = </span><span style="color: #09885A">0x06012c8cf97bead5deae237070f9587f8e7a266d123456789</span><span>
 </span></code></pre>
           <p>Integer literals are not inferred to be an address.</p>
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a number. Even though it happens to be a valid address,</span><span>
 </span><span style="color: #008000">// it is not inferred as it.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> aNumber = </span><span style="color: #09885A">0x06012c8cf97bead5deae237070f9587f8e7a266d</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> aNumber = </span><span style="color: #09885A">0x06012c8cf97bead5deae237070f9587f8e7a266d</span><span>
 </span><span style="color: #008000">// `aNumber` has type `Int`</span><span>
 </span></code></pre>
         </section>
@@ -512,7 +505,7 @@
           <h3 id="strings-and-characters"><a href="#strings-and-characters" aria-hidden="true"><span class="icon icon-link"></span></a>Strings and Characters</h3>
           <p>Strings are collections of characters. Strings have the type <code>String</code>, and characters have the type <code>Character</code>. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.</p>
           <p>String and character literals are enclosed in double quotation marks (<code>"</code>).</p>
-          <pre><code class="language-bamboo"><span style="color: #0000FF">const</span><span style="color: #000000"> someString = </span><span style="color: #A31515">"Hello, world!"</span><span>
+          <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> someString = </span><span style="color: #A31515">"Hello, world!"</span><span>
 </span></code></pre>
           <p>String literals may contain escape sequences. An escape sequence starts with a backslash (<code>\</code>):</p>
           <ul>
@@ -529,15 +522,15 @@
 </span><span style="color: #008000">// (separated by the line feed character `\n`), and ends</span><span>
 </span><span style="color: #008000">// with a thumbs up emoji, which has code point U+1F44D (0x1F44D)</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> thumbsUpText =</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> thumbsUpText =</span><span>
 </span><span style="color: #000000">    </span><span style="color: #A31515">"This is the first line.\nThis is the second line with an emoji: \u{1F44D}"</span><span>
 </span></code></pre>
           <p>The type <code>Character</code> represents a single, human-readable character. Characters are extended grapheme clusters, which consist of one or more Unicode scalars.</p>
           <p>For example, the single character <code>ü</code> can be represented in several ways in Unicode. First, it can be represented by a single Unicode scalar value <code>ü</code> ("LATIN SMALL LETTER U WITH DIAERESIS", code point U+00FC). Second, the same single character can be represented by two Unicode scalar values: <code>u</code> ("LATIN SMALL LETTER U", code point U+0075), and "COMBINING DIAERESIS" (code point U+0308). The combining Unicode scalar value is applied to the scalar before it, which turns a <code>u</code> into a <code>ü</code>.</p>
           <p>Still, both variants represent the same human-readable character <code>ü</code>.</p>
-          <pre><code class="language-bamboo"><span style="color: #0000FF">const</span><span style="color: #000000"> singleScalar: </span><span style="color: #0000FF">Character</span><span style="color: #000000"> = </span><span style="color: #A31515">"\u{FC}"</span><span>
+          <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> singleScalar: </span><span style="color: #0000FF">Character</span><span style="color: #000000"> = </span><span style="color: #A31515">"\u{FC}"</span><span>
 </span><span style="color: #008000">// `singleScalar` is `ü`</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> twoScalars: </span><span style="color: #0000FF">Character</span><span style="color: #000000"> = </span><span style="color: #A31515">"\u{75}\u{308}"</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> twoScalars: </span><span style="color: #0000FF">Character</span><span style="color: #000000"> = </span><span style="color: #A31515">"\u{75}\u{308}"</span><span>
 </span><span style="color: #008000">// `twoScalars` is `ü`</span><span>
 </span></code></pre>
           <p>Another example where multiple Unicode scalar values are rendered as a single, human-readable character is a flag emoji. These emojis consist of two "REGIONAL INDICATOR SYMBOL LETTER" Unicode scalar values.</p>
@@ -546,7 +539,7 @@
 </span><span style="color: #008000">// - REGIONAL INDICATOR SYMBOL LETTER C (U+1F1E8)</span><span>
 </span><span style="color: #008000">// - REGIONAL INDICATOR SYMBOL LETTER A (U+1F1E6)</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> canadianFlag: </span><span style="color: #0000FF">Character</span><span style="color: #000000"> = </span><span style="color: #A31515">"\u{1F1E8}\u{1F1E6}"</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> canadianFlag: </span><span style="color: #0000FF">Character</span><span style="color: #000000"> = </span><span style="color: #A31515">"\u{1F1E8}\u{1F1E6}"</span><span>
 </span><span style="color: #008000">// `canadianFlag` is `🇨🇦`</span><span>
 </span></code></pre>
         </section>
@@ -568,7 +561,7 @@
           <section>
             <h4 id="array-indexing"><a href="#array-indexing" aria-hidden="true"><span class="icon icon-link"></span></a>Array Indexing</h4>
             <p>To get the element of an array at a specific index, the indexing syntax can be used: The array is followed by an opening square bracket <code>[</code>, the indexing value, and ends with a closing square bracket <code>]</code>.</p>
-            <pre><code class="language-bamboo,file=arrays-indexing.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
+            <pre><code class="language-bamboo,file=arrays-indexing.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Get the first number</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -578,14 +571,14 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">numbers[</span><span style="color: #09885A">1</span><span style="color: #000000">] </span><span style="color: #008000">// is 23</span><span>
 </span></code></pre>
-            <pre><code class="language-bamboo,file=arrays-nested-indexing.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> arrays = [[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">], [</span><span style="color: #09885A">3</span><span style="color: #000000">, </span><span style="color: #09885A">4</span><span style="color: #000000">]]</span><span>
+            <pre><code class="language-bamboo,file=arrays-nested-indexing.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> arrays = [[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">], [</span><span style="color: #09885A">3</span><span style="color: #000000">, </span><span style="color: #09885A">4</span><span style="color: #000000">]]</span><span>
 </span><span>
 </span><span style="color: #008000">// Get the first number of the second array</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">arrays[</span><span style="color: #09885A">1</span><span style="color: #000000">][</span><span style="color: #09885A">0</span><span style="color: #000000">] </span><span style="color: #008000">// is 3</span><span>
 </span></code></pre>
             <p>To set an element of an array at a specific index, the indexing syntax can be used as well.</p>
-            <pre><code class="language-bamboo,file=array-indexing-assignment.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
+            <pre><code class="language-bamboo,file=array-indexing-assignment.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Change the second number</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -603,9 +596,9 @@
             <p>Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.</p>
             <p>Fixed-size arrays have the type suffix <code>[N]</code>, where <code>N</code> is the size of the array. For example, a fixed-size array of 3 <code>Int8</code> elements has the type <code>Int8[3]</code>.</p>
             <p>Variable-size arrays have the type suffix <code>[]</code>. For example, the type <code>Int16[]</code> specifies a variable-size array of elements that have type <code>Int16</code>.</p>
-            <pre><code class="language-bamboo,file=array-types.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> array: Int8[2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
+            <pre><code class="language-bamboo,file=array-types.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> array: Int8[2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
 </span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> arrays: Int16[2][3] = [</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays: Int16[2][3] = [</span><span>
 </span><span style="color: #000000">    [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #09885A">3</span><span style="color: #000000">],</span><span>
 </span><span style="color: #000000">    [</span><span style="color: #09885A">4</span><span style="color: #000000">, </span><span style="color: #09885A">5</span><span style="color: #000000">, </span><span style="color: #09885A">6</span><span style="color: #000000">]</span><span>
 </span><span style="color: #000000">]</span><span>
@@ -640,14 +633,14 @@
           <section>
             <h4 id="dictionary-access"><a href="#dictionary-access" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Access</h4>
             <p>To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket <code>[</code>, the key, and ends with a closing square bracket <code>]</code>.</p>
-            <pre><code class="language-bamboo,file=dictionary-access.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> booleans = {</span><span>
+            <pre><code class="language-bamboo,file=dictionary-access.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">0</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span style="color: #000000">booleans[</span><span style="color: #09885A">1</span><span style="color: #000000">] </span><span style="color: #008000">// is true</span><span>
 </span><span style="color: #000000">booleans[</span><span style="color: #09885A">0</span><span style="color: #000000">] </span><span style="color: #008000">// is false</span><span>
 </span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> integers = {</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> integers = {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">true</span><span style="color: #000000">: </span><span style="color: #09885A">1</span><span style="color: #000000">,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">false</span><span style="color: #000000">: </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -655,7 +648,7 @@
 </span><span style="color: #000000">integers[</span><span style="color: #0000FF">false</span><span style="color: #000000">] </span><span style="color: #008000">// is 0</span><span>
 </span></code></pre>
             <p>To set the value for a key of a dictionary, the access syntax can be used as well.</p>
-            <pre><code class="language-bamboo,file=dictionary-assignment.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> booleans = {</span><span>
+            <pre><code class="language-bamboo,file=dictionary-assignment.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">0</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -667,13 +660,13 @@
           <section>
             <h4 id="dictionary-types"><a href="#dictionary-types" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Types</h4>
             <p>Dictionaries have the type suffix <code>[T]</code>, where <code>T</code> is the type of the key. For example, a dictionary with <code>Int</code> keys and <code>Bool</code> values has type <code>Bool[Int]</code>.</p>
-            <pre><code class="language-bamboo,file=dictionary-types.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> booleans = {</span><span>
+            <pre><code class="language-bamboo,file=dictionary-types.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">0</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span style="color: #008000">// `booleans` has type `Bool[Int]`</span><span>
 </span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> integers = {</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> integers = {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">true</span><span style="color: #000000">: </span><span style="color: #09885A">1</span><span style="color: #000000">,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">false</span><span style="color: #000000">: </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -701,7 +694,7 @@
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a variable that has the type `Any`. The initial value is an integer,</span><span>
 </span><span style="color: #008000">// but the variable  still has the explicit type `Any`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a: Any = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Any = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)</span><span>
 </span><span style="color: #008000">// and an `Int` value (`2`, right-hand side)</span><span>
@@ -715,7 +708,7 @@
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a function named `crashAndBurn` which will never return,</span><span>
 </span><span style="color: #008000">// because it calls the function named `fatalError`, which never returns</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> crashAndBurn() -> Never {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> crashAndBurn(): Never {</span><span>
 </span><span style="color: #000000">    fatalError(</span><span style="color: #A31515">"An unrecoverable error occurred"</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -738,11 +731,11 @@
         <section>
           <h3 id="negation"><a href="#negation" aria-hidden="true"><span class="icon icon-link"></span></a>Negation</h3>
           <p>The <code>-</code> unary operator negates an integer:</p>
-          <pre><code class="language-bamboo,file=integer-negation.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+          <pre><code class="language-bamboo,file=integer-negation.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">-a </span><span style="color: #008000">// is -1</span><span>
 </span></code></pre>
           <p>The <code>!</code> unary operator logically negates a boolean:</p>
-          <pre><code class="language-bamboo,file=boolean-negation.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #0000FF">true</span><span>
+          <pre><code class="language-bamboo,file=boolean-negation.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #0000FF">true</span><span>
 </span><span style="color: #000000">!a </span><span style="color: #008000">// is false</span><span>
 </span></code></pre>
         </section>
@@ -754,7 +747,7 @@
 </span><span style="color: #008000">// a is 2</span><span>
 </span></code></pre>
           <p>The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.</p>
-          <pre><code class="language-bamboo,file=assignment-numbers.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
+          <pre><code class="language-bamboo,file=assignment-numbers.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Change the first number</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -762,7 +755,7 @@
 </span><span>
 </span><span style="color: #008000">// `numbers` is [3, 2]</span><span>
 </span></code></pre>
-          <pre><code class="language-bamboo,file=assignment-arrays.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> arrays = [[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">], [</span><span style="color: #09885A">3</span><span style="color: #000000">, </span><span style="color: #09885A">4</span><span style="color: #000000">]]</span><span>
+          <pre><code class="language-bamboo,file=assignment-arrays.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> arrays = [[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">], [</span><span style="color: #09885A">3</span><span style="color: #000000">, </span><span style="color: #09885A">4</span><span style="color: #000000">]]</span><span>
 </span><span>
 </span><span style="color: #008000">// Change the first number in the second array</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -770,7 +763,7 @@
 </span><span>
 </span><span style="color: #008000">// `arrays` is [[1, 2], [5, 4]]</span><span>
 </span></code></pre>
-          <pre><code class="language-bamboo,file=assignment-dictionaries.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> dictionaries = {</span><span>
+          <pre><code class="language-bamboo,file=assignment-dictionaries.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> dictionaries = {</span><span>
 </span><span style="color: #000000">  </span><span style="color: #0000FF">true</span><span style="color: #000000">: {</span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #09885A">2</span><span style="color: #000000">},</span><span>
 </span><span style="color: #000000">  </span><span style="color: #0000FF">false</span><span style="color: #000000">: {</span><span style="color: #09885A">3</span><span style="color: #000000">: </span><span style="color: #09885A">4</span><span style="color: #000000">}</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -792,13 +785,13 @@
             <li>Multiplication: <code>*</code></li>
             <li>Division: <code>/</code></li>
           </ul>
-          <pre><code class="language-bamboo,file=operator-plus.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span style="color: #000000"> + </span><span style="color: #09885A">2</span><span>
+          <pre><code class="language-bamboo,file=operator-plus.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span style="color: #000000"> + </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #008000">// `a` is 3</span><span>
 </span></code></pre>
           <p>Arithmetic operators don't cause values to overflow.</p>
-          <pre><code class="language-bamboo,file=operator-times.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">100</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> b: Int8 = </span><span style="color: #09885A">100</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> c = a * b</span><span>
+          <pre><code class="language-bamboo,file=operator-times.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">100</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int8 = </span><span style="color: #09885A">100</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> c = a * b</span><span>
 </span><span style="color: #008000">// `c` is 10000, and has type `Int`</span><span>
 </span></code></pre>
           <p>If overflow behavior is intended, overflowing operators are available, which are prefixed with an <code>&#x26;</code>:</p>
@@ -812,7 +805,7 @@
 </span><span style="color: #008000">// &#x26;+         1</span><span>
 </span><span style="color: #008000">//  = 100000000 = 0</span><span>
 </span></code></pre>
-          <pre><code class="language-bamboo,file=operator-overflow-plus.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> a: UInt8 = </span><span style="color: #09885A">255</span><span>
+          <pre><code class="language-bamboo,file=operator-overflow-plus.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a: UInt8 = </span><span style="color: #09885A">255</span><span>
 </span><span style="color: #000000">a &#x26;+ </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is 0</span><span>
 </span></code></pre>
           <p>Similarly, for the minimum value 0, subtracting 1 wraps around and results in the maximum value 255.</p>
@@ -820,7 +813,7 @@
 </span><span style="color: #008000">// &#x26;-         1</span><span>
 </span><span style="color: #008000">//  =  11111111 = 255</span><span>
 </span></code></pre>
-          <pre><code class="language-bamboo"><span style="color: #0000FF">const</span><span style="color: #000000"> b: UInt8 = </span><span style="color: #09885A">0</span><span>
+          <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> b: UInt8 = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #000000">b &#x26;- </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is 255</span><span>
 </span></code></pre>
           <p>Signed integers are also affected by overflow. In a signed integer, the first bit is used for the sign. This leaves 7 bits for the actual value for an 8-bit signed integer, i.e., the range of values is -128 (binary 10000000) to 127 (01111111). Subtracting 1 from -128 results in 127.</p>
@@ -828,7 +821,7 @@
 </span><span style="color: #008000">// &#x26;-        1</span><span>
 </span><span style="color: #008000">//  = 01111111 = 127</span><span>
 </span></code></pre>
-          <pre><code class="language-bamboo"><span style="color: #0000FF">const</span><span style="color: #000000"> c: Int8 = </span><span style="color: #09885A">-128</span><span>
+          <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> c: Int8 = </span><span style="color: #09885A">-128</span><span>
 </span><span style="color: #000000">c &#x26;- </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is 127</span><span>
 </span></code></pre>
         </section>
@@ -910,7 +903,7 @@
           <h3 id="ternary-conditional-operator"><a href="#ternary-conditional-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Ternary Conditional Operator</h3>
           <p>There is only one ternary conditional operator, the ternary conditional operator (<code>a ? b : c</code>).</p>
           <p>It behaves like an if-statement, but is an expression: If the first operator value is true, the second operator value is returned. If the first operator value is false, the third value is returned.</p>
-          <pre><code class="language-bamboo,file=operator-ternary-conditional.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span style="color: #000000"> ? </span><span style="color: #09885A">3</span><span style="color: #000000"> : </span><span style="color: #09885A">4</span><span>
+          <pre><code class="language-bamboo,file=operator-ternary-conditional.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span style="color: #000000"> ? </span><span style="color: #09885A">3</span><span style="color: #000000"> : </span><span style="color: #09885A">4</span><span>
 </span><span style="color: #008000">// `x` is 4</span><span>
 </span></code></pre>
         </section>
@@ -937,15 +930,23 @@
         <section>
           <h3 id="function-declarations"><a href="#function-declarations" aria-hidden="true"><span class="icon icon-link"></span></a>Function Declarations</h3>
           <p>Functions can be declared by using the <code>fun</code> keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called.</p>
-          <p>The parameters need to be enclosed in parentheses. The return type, if any, is separated from the parameters using the <code>-></code> keyword (a hyphen followed by a right angle bracket). The function code needs to be enclosed in opening and closing braces.</p>
-          <p>Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter. Argument labels precede the parameter name. The special argument label <code>_</code> indicates that a function call can omit the argument label. If no argument label is provided, the function call must use the parameter name.</p>
+          <p>
+            The parameters need to be enclosed in parentheses.
+            The return type, if any, is separated from the parameters by a colon (<code>:</code>).
+            The function code needs to be enclosed in opening and closing braces.
+          </p>
+          <p>
+            Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter.
+            Argument labels precede the parameter name. The special argument label <code>_</code> indicates that a function call can omit the argument label.
+            If no argument label is provided, the function call must use the parameter name.
+          </p>
           <p>Each parameter needs to have a type annotation, which follows the parameter name after a colon.</p>
           <pre><code class="language-bamboo,file=function-double.bpl"><span style="color: #008000">// Declare a function named `double`, which multiples a number by two.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The special argument label _ is specified for the parameter,</span><span>
 </span><span style="color: #008000">// so no argument label has to be provided in a function call</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int) -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -968,7 +969,7 @@
 </span><span style="color: #008000">// so the parameter names are the argument labels, i.e., the parameter names</span><span>
 </span><span style="color: #008000">// have to be given as argument labels in a function call.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> clamp(_ value: Int, min: Int, max: Int) -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> clamp(_ value: Int, min: Int, max: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> value > max {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> max</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -993,7 +994,7 @@
 </span><span style="color: #008000">// As the function declaration also does not specify argument labels</span><span>
 </span><span style="color: #008000">// for these parameters, the parameter names must be used as argument labels.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> clamped = clamp(</span><span style="color: #09885A">123</span><span style="color: #000000">, min: </span><span style="color: #09885A">0</span><span style="color: #000000">, max: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> clamped = clamp(</span><span style="color: #09885A">123</span><span style="color: #000000">, min: </span><span style="color: #09885A">0</span><span style="color: #000000">, max: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
 </span><span style="color: #008000">// clamped is 100</span><span>
 </span></code></pre>
           <p>Argument labels make code more explicit and readable. For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.</p>
@@ -1027,13 +1028,13 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The initial value is omitted for brevity</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> sender: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> sender: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = </span><span style="color: #008000">// ...</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a constant which refers to the receiving account.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The initial value is omitted for brevity</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> receiver: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> receiver: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = </span><span style="color: #008000">// ...</span><span>
 </span><span>
 </span><span style="color: #008000">// Call the function named `send`.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -1064,7 +1065,7 @@
           <p>Functions can be nested, i.e., the code of a function may declare further functions.</p>
           <pre><code class="language-bamboo,file=function-doubleAndAddOne.bpl"><span style="color: #008000">// Declare a function which multiplies a number by two, and adds one</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ x: Int) -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ x: Int): Int {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a nested function which multiplies a number by two</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
@@ -1085,8 +1086,8 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The function multiplies a number by two when it is called</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> double =</span><span>
-</span><span style="color: #000000">    fun (_ x: Int) -> Int {</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> double =</span><span>
+</span><span style="color: #000000">    fun (_ x: Int): Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span></code></pre>
@@ -1094,7 +1095,7 @@
         <section>
           <h3 id="function-calls"><a href="#function-calls" aria-hidden="true"><span class="icon icon-link"></span></a>Function Calls</h3>
           <p>Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.</p>
-          <pre><code class="language-bamboo,file=function-call.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int) -> Int {</span><span>
+          <pre><code class="language-bamboo,file=function-call.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
 </span><span style="color: #000000">     </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -1113,20 +1114,21 @@
         </section>
         <section>
           <h3 id="function-types"><a href="#function-types" aria-hidden="true"><span class="icon icon-link"></span></a>Function Types</h3>
+          <p>Function types consist of the function's parameter types and the function's return type.</p>
           <p>
-            Function types consist of the function's parameter types and the function's return type.
-            The parameter types need to be enclosed in parentheses, followed by the <code>-></code> keyword, and end with the return type.
+            The parameter types need to be enclosed in parentheses, followed by a colon (<code>:</code>), and end with the return type.
+            The whole function type needs to be enclosed in parentheses.
           </p>
-          <pre><code class="language-bamboo,file=function-type.bpl"><span style="color: #008000">// Declare a function named `add`, with the function type `(Int, Int) -> Int`</span><span>
+          <pre><code class="language-bamboo,file=function-type.bpl"><span style="color: #008000">// Declare a function named `add`, with the function type `((Int, Int): Int)`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> add(a: Int, b: Int) -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> add(a: Int, b: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <pre><code class="language-bamboo,file=function-type-expression.bpl"><span style="color: #008000">// Declare a constant named `add`, with the function type `(Int, Int) -> Int`</span><span>
+          <pre><code class="language-bamboo,file=function-type-expression.bpl"><span style="color: #008000">// Declare a constant named `add`, with the function type `((Int, Int): Int)`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> add: (Int, Int) -> Int =</span><span>
-</span><span style="color: #000000">    fun (a: Int, b: Int) -> Int {</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> add: ((Int, Int): Int) =</span><span>
+</span><span style="color: #000000">    fun (a: Int, b: Int): Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span></code></pre>
@@ -1134,12 +1136,15 @@
           <pre><code class="language-bamboo,file=function-doNothing.bpl"><span style="color: #008000">// Declare a constant named `doNothing`, which is a function</span><span>
 </span><span style="color: #008000">// that takes no parameters and returns nothing</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> doNothing: () -> </span><span style="color: #0000FF">Void</span><span style="color: #000000"> =</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> doNothing: ((): </span><span style="color: #0000FF">Void</span><span style="color: #000000">) =</span><span>
 </span><span style="color: #000000">    fun () {}</span><span>
 </span></code></pre>
-          <p>Types can be enclosed in parentheses to change precedence.</p>
-          <p>For example, a function type <code>(Int) -> (() -> Int)</code> is the type for a function which accepts one argument with type <code>Int</code>, and which returns another function, that takes no arguments and returns an <code>Int</code>.</p>
-          <p>The type <code>((Int) -> Int)[2]</code> specifies an array type of two functions, which accept one integer and return one integer.</p>
+          <p>
+            Parantheses also control precedence.
+            For example, a function type <code>((Int): ((): Int))</code> is the type for a function which accepts one argument with type <code>Int</code>,
+            and which returns another function, that takes no arguments and returns an <code>Int</code>.
+          </p>
+          <p>The type <code>((Int): Int)[2]</code> specifies an array type of two functions, which accept one integer and return one integer.</p>
           <section>
             <h4 id="argument-passing-behavior"><a href="#argument-passing-behavior" aria-hidden="true"><span class="icon icon-link"></span></a>Argument Passing Behavior</h4>
             <p>When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as <a href="https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&#x26;oldid=896280571#Call_by_sharing">call-by-sharing</a>.</p>
@@ -1148,7 +1153,7 @@
 </span><span style="color: #000000">     numbers[</span><span style="color: #09885A">1</span><span style="color: #000000">] = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">0</span><span style="color: #000000">, </span><span style="color: #09885A">1</span><span style="color: #000000">]</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">0</span><span style="color: #000000">, </span><span style="color: #09885A">1</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #000000">change(numbers)</span><span>
 </span><span style="color: #008000">// numbers is [1, 2]</span><span>
@@ -1174,7 +1179,7 @@
           <p>Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for <a href="#semicolons">statements</a>.</p>
           <p>Following each condition, an optional description can be provided after a colon.</p>
           <p>In postconditions, the special constant <code>result</code> refers to the result of the function.</p>
-          <pre><code class="language-bamboo,file=function-factorial.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: Int) -> Int {</span><span>
+          <pre><code class="language-bamboo,file=function-factorial.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Require the parameter `n` to be greater than or equal to zero</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
@@ -1228,7 +1233,7 @@
           <h3 id="conditional-branching-if-statement"><a href="#conditional-branching-if-statement" aria-hidden="true"><span class="icon icon-link"></span></a>Conditional branching: if-statement</h3>
           <p>If-statements allow a certain piece of code to be executed only when a given condition is true.</p>
           <p>The if-statement starts with the <code>if</code> keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces. The condition must be boolean and the braces are required.</p>
-          <pre><code class="language-bamboo,file=control-flow-if.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
+          <pre><code class="language-bamboo,file=control-flow-if.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
 </span><span>
 </span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
@@ -1245,7 +1250,7 @@
             An additional else-clause can be added to execute another piece of code when the condition is false.
             The else-clause is introduced by the <code>else</code> keyword.
           </p>
-          <pre><code class="language-bamboo,file=control-flow-if-else.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
+          <pre><code class="language-bamboo,file=control-flow-if-else.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
 </span><span>
 </span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
@@ -1257,7 +1262,7 @@
 </span><span style="color: #008000">// b is 2</span><span>
 </span></code></pre>
           <p>The else-clause can contain another if-statement, i.e., if-statements can be chained together.</p>
-          <pre><code class="language-bamboo,file=control-flow-if-else-if.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
+          <pre><code class="language-bamboo,file=control-flow-if-else-if.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
 </span><span>
 </span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
@@ -1295,10 +1300,10 @@
       <section>
         <h2 id="scope"><a href="#scope" aria-hidden="true"><span class="icon icon-link"></span></a>Scope</h2>
         <p>Every function and block (<code>{</code> ... <code>}</code>) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.</p>
-        <pre><code class="language-bamboo,file=scope.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
+        <pre><code class="language-bamboo,file=scope.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f() -> Int {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">const</span><span style="color: #000000"> y = </span><span style="color: #09885A">10</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> y = </span><span style="color: #09885A">10</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x + y</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -1308,7 +1313,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">y</span><span>
 </span></code></pre>
-        <pre><code class="language-bamboo,file=scope-doubleAndAddOne.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ n: Int) -> Int {</span><span>
+        <pre><code class="language-bamboo,file=scope-doubleAndAddOne.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ n: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -1320,35 +1325,35 @@
 </span><span style="color: #000000">double(</span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
 </span></code></pre>
         <p>Each scope can introduce new declarations, i.e., the outer declaration is shadowed.</p>
-        <pre><code class="language-bamboo,file=scope-test.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
+        <pre><code class="language-bamboo,file=scope-test.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> test() -> Int {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">const</span><span style="color: #000000"> x = </span><span style="color: #09885A">3</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> test(): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">3</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #000000">test() </span><span style="color: #008000">// returns 3</span><span>
 </span></code></pre>
         <p>Scope is lexical, not dynamic.</p>
-        <pre><code class="language-bamboo,file=scope-lexical.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
+        <pre><code class="language-bamboo,file=scope-lexical.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f() -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
 </span><span style="color: #000000">   </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> g() -> Int {</span><span>
-</span><span style="color: #000000">   </span><span style="color: #0000FF">const</span><span style="color: #000000"> x = </span><span style="color: #09885A">20</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> g(): Int {</span><span>
+</span><span style="color: #000000">   </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">20</span><span>
 </span><span style="color: #000000">   </span><span style="color: #0000FF">return</span><span style="color: #000000"> f()</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #000000">g() </span><span style="color: #008000">// returns 10, not 20</span><span>
 </span></code></pre>
         <p>Declarations are <strong>not</strong> moved to the top of the enclosing function (hoisted).</p>
-        <pre><code class="language-bamboo,file=scope-no-hoisting.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
+        <pre><code class="language-bamboo,file=scope-no-hoisting.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f() -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> x == </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">const</span><span style="color: #000000"> x = </span><span style="color: #09885A">3</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">3</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
@@ -1367,49 +1372,49 @@
         <pre><code class="language-bamboo"><span style="color: #008000">// declare a constant which has an optional integer type,</span><span>
 </span><span style="color: #008000">// with nil as its initial value</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
 </span><span>
 </span><span style="color: #008000">// declare a constant which has an optional integer type,</span><span>
 </span><span style="color: #008000">// with 42 as its initial value</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> b: Int? = </span><span style="color: #09885A">42</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int? = </span><span style="color: #09885A">42</span><span>
 </span></code></pre>
         <section>
           <h3 id="nil-coalescing-operator"><a href="#nil-coalescing-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Nil-Coalescing Operator</h3>
           <p>The nil-coalescing operator <code>??</code> returns the value inside an optional if it contains a value, or returns an alternative value if the optional has no value, i.e., the optional value is <code>nil</code>.</p>
           <pre><code class="language-bamboo"><span style="color: #008000">// declare a constant which has an optional integer type</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
 </span><span>
 </span><span style="color: #008000">// declare a constant with a non-optional integer type,</span><span>
 </span><span style="color: #008000">// which is initialized to b if it is non-nil, or 42 otherwise</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> b: Int = a ?? </span><span style="color: #09885A">42</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int = a ?? </span><span style="color: #09885A">42</span><span>
 </span><span style="color: #008000">// integer is 42, as a is nil</span><span>
 </span></code></pre>
           <p>The nil-coalescing operator can only be applied to values which have an optional type.</p>
           <pre><code class="language-bamboo"><span style="color: #008000">// declare a constant with a non-optional integer type</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// invalid: nil-coalescing operator is applied to a value which has a non-optional type</span><span>
 </span><span style="color: #008000">// (a has the non-optional type Int)</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> b = a ?? </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a ?? </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
           <pre><code class="language-bamboo"><span style="color: #008000">// invalid: nil-coalescing operator is applied to a value which has a non-optional type</span><span>
 </span><span style="color: #008000">// (the integer literal is of type Int)</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> c = </span><span style="color: #09885A">1</span><span style="color: #000000"> ?? </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> c = </span><span style="color: #09885A">1</span><span style="color: #000000"> ?? </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
           <p>The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.</p>
           <pre><code class="language-bamboo"><span style="color: #008000">// declare a constant with a non-optional integer type</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// invalid: nil-coalescing operator is applied to a value of type Int,</span><span>
 </span><span style="color: #008000">// but alternative is of type Bool</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> b = a ?? </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a ?? </span><span style="color: #0000FF">false</span><span>
 </span></code></pre>
         </section>
       </section>
@@ -1428,7 +1433,7 @@
 </span><span style="color: #000000">a = </span><span style="color: #09885A">0</span><span>
 </span></code></pre>
         <p>When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type <code>Bool</code>, <em>only</em> a value that has type <code>Bool</code> can be provided, and not for example a value which has type <code>Int</code>.</p>
-        <pre><code class="language-bamboo,file=type-safety-nand.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> nand(_ a: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, _ b: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) -> </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+        <pre><code class="language-bamboo,file=type-safety-nand.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> nand(_ a: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, _ b: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> !(a &#x26;&#x26; b)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -1439,7 +1444,7 @@
 </span><span style="color: #000000">nand(</span><span style="color: #09885A">0</span><span style="color: #000000">, </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span></code></pre>
         <p>Types are <strong>not</strong> automatically converted. For example, an integer is not automatically converted to a boolean, nor is an <code>Int32</code> automatically converted to an <code>Int8</code>, nor is an optional integer <code>Int?</code> automatically converted to a non-optional integer <code>Int</code>.</p>
-        <pre><code class="language-bamboo,file=type-safety-add.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> add(_ a: Int8, _ b: Int8) -> Int {</span><span>
+        <pre><code class="language-bamboo,file=type-safety-add.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> add(_ a: Int8, _ b: Int8): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -1447,8 +1452,8 @@
 </span><span>
 </span><span style="color: #008000">// Declare two constants which have type `Int32`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a: Int32 = </span><span style="color: #09885A">3_000_000_000</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> b: Int32 = </span><span style="color: #09885A">3_000_000_000</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int32 = </span><span style="color: #09885A">3_000_000_000</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int32 = </span><span style="color: #09885A">3_000_000_000</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: cannot pass arguments which have type `Int32` to parameters which have type `Int8`</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -1462,20 +1467,20 @@
         </blockquote>
         <p>If a variable or constant is not annotated explicitly with a type, it is inferred from the value.</p>
         <p>Integer literals are inferred to type <code>Int</code>.</p>
-        <pre><code class="language-bamboo,file=type-inference-int.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+        <pre><code class="language-bamboo,file=type-inference-int.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// `a` has type `Int`</span><span>
 </span></code></pre>
         <p>Array literals are inferred based on the elements of the literal, and to be variable-size.</p>
-        <pre><code class="language-bamboo,file=type-inference-intergers.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> integers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
+        <pre><code class="language-bamboo,file=type-inference-intergers.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> integers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
 </span><span style="color: #008000">// `integers` has type `Int[]`</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: mixed types</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> invalidMixed = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #0000FF">false</span><span style="color: #000000">]</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> invalidMixed = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #0000FF">false</span><span style="color: #000000">]</span><span>
 </span></code></pre>
         <p>Dictionary literals are inferred based on the keys and values of the literal.</p>
-        <pre><code class="language-bamboo,file=type-inference-dictionary.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> booleans = {</span><span>
+        <pre><code class="language-bamboo,file=type-inference-dictionary.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">2</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -1483,17 +1488,17 @@
 </span><span>
 </span><span style="color: #008000">// Invalid: mixed types</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> invalidMixed = {</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> invalidMixed = {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">false</span><span style="color: #000000">: </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
         <p>Functions are inferred based on the parameter types and the return type.</p>
-        <pre><code class="language-bamboo,file=type-inference-function.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> add = (a: Int8, b: Int8) -> Int {</span><span>
+        <pre><code class="language-bamboo,file=type-inference-function.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> add = (a: Int8, b: Int8): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// `add` has type `(Int8, Int8) -> Int`</span><span>
+</span><span style="color: #008000">// `add` has type `((Int8, Int8): Int)`</span><span>
 </span></code></pre>
       </section>
       <section>
@@ -1501,41 +1506,36 @@
         <blockquote>
           <p>🚧 Status: Composite data types are not implemented yet.</p>
         </blockquote>
-        <p>Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of one or more named fields, and one or more functions that operate on the data. Each field may have a different type.</p>
-        <p>There are three kinds of composite data types. The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable, when the value is assigned to a variable, and when the value is passed as an argument to a function:</p>
+        <p>Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.</p>
+        <p>
+          There are two kinds of composite data types.
+          The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable,
+          when the value is assigned to a variable,
+          when the value is passed as an argument to a function,
+          and when the value is returned from a function:
+        </p>
         <ul>
-          <li><a href="#structures-and-classes"><strong>Structures</strong></a> are <strong>copied</strong>, i.e. they are value types</li>
-          <li><a href="#structures-and-classes"><strong>Classes</strong></a> are <strong>referenced</strong>, i.e., they are reference types</li>
+          <li><a href="#structures"><strong>Structures</strong></a> are <strong>copied</strong>, i.e. they are value types</li>
           <li><a href="#resources"><strong>Resources</strong></a> are <strong>moved</strong>, they are linear types. Resources <strong>must</strong> be used <strong>exactly once</strong></li>
         </ul>
-        <p>Value types should be used when copies with independent state is desired, reference types should be used when shared, mutable state is desired, and linear types should be used when a value must be used exactly once, i.e. when it should not be used multiple times and when it should not be lost.</p>
+        <p>Value types should be used when copies with independent state is desired, and linear types should be used when a value must be used exactly once, i.e. when it should not be used multiple times and when it should not be lost.</p>
         <section>
-          <h3 id="structures-and-classes"><a href="#structures-and-classes" aria-hidden="true"><span class="icon icon-link"></span></a>Structures and Classes</h3>
-          <section>
-            <h4 id="structure-and-class-declaration"><a href="#structure-and-class-declaration" aria-hidden="true"><span class="icon icon-link"></span></a>Structure and Class Declaration</h4>
-            <p>
-              Structures are declared using the <code>struct</code> keyword. Classes are declared using the <code>class</code> keyword.
-              The keyword is followed by the name of the type.
-            </p>
-            <pre><code class="language-bamboo,file=structure-and-class-declaration.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span style="color: #0000FF">class</span><span style="color: #000000"> SomeClass {</span><span>
+          <h3 id="structures"><a href="#structures" aria-hidden="true"><span class="icon icon-link"></span></a>Structures</h3>
+          <p>Structures are declared using the <code>struct</code> keyword, followed by the name of the type.</p>
+          <pre><code class="language-bamboo,file=structure-declaration.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-            <p>Structures, classes are types. Structure and class values are created (instantiated) by calling the type like a function.</p>
-            <pre><code class="language-bamboo,file=structure-and-class-instantiation.bpl"><span style="color: #000000">SomeStruct()</span><span>
-</span><span>
-</span><span style="color: #000000">SomeClass()</span><span>
+          <p>Structures are types. Structures are created (instantiated) by calling the type like a function.</p>
+          <pre><code class="language-bamboo,file=structure-instantiation.bpl"><span style="color: #000000">SomeStruct()</span><span>
 </span></code></pre>
-          </section>
-          <section>
-            <h4 id="structure-and-class-behaviour"><a href="#structure-and-class-behaviour" aria-hidden="true"><span class="icon icon-link"></span></a>Structure and Class Behaviour</h4>
-            <p>The only difference between structures and classes is their behavior when used as an initial value for constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are <strong>copied</strong>, i.e. they are value types, classes are <strong>referenced</strong>, i.e., they are reference types.</p>
-            <p>Structures are <strong>copied</strong>.</p>
-            <pre><code class="language-bamboo,file=struct-behavior.bpl"><span style="color: #008000">// Declare a structure named `SomeStruct`, with a variable integer field</span><span>
+          <p>
+            Structures are <strong>copied</strong> when used as an initial value for constant or variable,
+            when assigned to a different variable,
+            when passed as an argument to a function,
+            and when returned from a function:
+          </p>
+          <pre><code class="language-bamboo,file=struct-behavior.bpl"><span style="color: #008000">// Declare a structure named `SomeStruct`, with a variable integer field</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: Int</span><span>
@@ -1547,41 +1547,16 @@
 </span><span>
 </span><span style="color: #008000">// Declare a constant with value of structure type `SomeStruct`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a = SomeStruct(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = SomeStruct(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// *Copy* the structure value into a new constant</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> b = a</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a</span><span>
 </span><span>
 </span><span style="color: #000000">b.value = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #000000">a.value </span><span style="color: #008000">// is *0*</span><span>
 </span></code></pre>
-            <p>Classes are <strong>referenced</strong>.</p>
-            <pre><code class="language-bamboo,file=class-behavior.bpl"><span style="color: #008000">// Declare a class named `SomeClass`, with a variable integer field</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">class</span><span style="color: #000000"> SomeClass {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: Int</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(value: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.value = value</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span style="color: #008000">// Declare a constant with value of class type `SomeClass`</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a = SomeClass(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
-</span><span>
-</span><span style="color: #008000">// *Reference* the class value with a new constant</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> b = A</span><span>
-</span><span>
-</span><span style="color: #000000">b.value = </span><span style="color: #09885A">1</span><span>
-</span><span>
-</span><span style="color: #000000">a.value </span><span style="color: #008000">// is *1*</span><span>
-</span></code></pre>
-            <p>Note the outcomes in the last lines of the examples.</p>
-          </section>
         </section>
         <section>
           <h3 id="resources"><a href="#resources" aria-hidden="true"><span class="icon icon-link"></span></a>Resources</h3>
@@ -1598,7 +1573,13 @@
           </section>
           <section>
             <h4 id="resource-behaviour"><a href="#resource-behaviour" aria-hidden="true"><span class="icon icon-link"></span></a>Resource Behaviour</h4>
-            <p>Resources are <strong>moved</strong> when used as an initial value for a constant or variable, when assigned to a different variable, or passed as an argument to a function. When the resource was moved, the constant or variable that referred to the resource before the move becomes <strong>invalid</strong>.</p>
+            <p>
+              Resources are <strong>moved</strong> when used as an initial value for a constant or variable,
+              when assigned to a different variable,
+              when passed as an argument to a function,
+              and when returned from a function.
+            </p>
+            <p>When the resource was moved, the constant or variable that referred to the resource before the move becomes <strong>invalid</strong>.</p>
             <p>To make the move explicit, the move operator <code>&#x3C;-</code> must be used when the resource is the initial value of a constant or variable, when it moved to a different variable, or when it moved to a function.</p>
             <pre><code class="language-bamboo,file=resource-behavior.bpl"><span style="color: #008000">// Declare a resource named `SomeResource`, with a variable integer field</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -1612,24 +1593,26 @@
 </span><span>
 </span><span style="color: #008000">// Declare a constant with value of resource type `SomeResource`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a &#x3C;- </span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">(</span><span style="color: #0000FF">value</span><span style="color: #000000">: 0)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a &#x3C;- </span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">(</span><span style="color: #0000FF">value</span><span style="color: #000000">: 0)</span><span>
 </span><span>
 </span><span style="color: #008000">// *Move* the resource value to a new constant</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> b &#x3C;- </span><span style="color: #0000FF">a</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b &#x3C;- </span><span style="color: #0000FF">a</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Cannot use constant `a` anymore as the resource</span><span>
 </span><span style="color: #008000">// it referred to was moved to constant `b`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">a.value</span><span>
 </span><span>
-</span><span style="color: #008000">// Constant `b` is the only valid reference to the resource</span><span>
+</span><span style="color: #008000">// Constant `b` owns the resource</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">b.value = </span><span style="color: #09885A">1</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a function which accepts a resource</span><span>
+</span><span style="color: #008000">// Declare a function which accepts a resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: </span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `&#x3C;-`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -1645,13 +1628,13 @@
             <p>Resources <strong>must</strong> be used <strong>exactly once</strong>. To destroy a resource, the <code>destroy</code> keyword must be used.</p>
             <pre><code class="language-bamboo,file=resource-loss.bpl"><span style="color: #008000">// Declare another, unrelated value of resource type `SomeResource`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> c = SomeResource(value: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> c = SomeResource(value: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: `c` is not used, but must be! `c` cannot be lost</span><span>
 </span></code></pre>
             <pre><code class="language-bamboo,file=resource-destruction.bpl"><span style="color: #008000">// Declare another, unrelated value of resource type `SomeResource`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> d = SomeResource(value: </span><span style="color: #09885A">20</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> d = SomeResource(value: </span><span style="color: #09885A">20</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// Destroy the resource referred to by constant `d`</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -1662,11 +1645,34 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">d.value</span><span>
 </span></code></pre>
+            <p>To make it explicit that the type is moved, it must be prefixed with <code>&#x3C;-</code> in type annotations.</p>
+            <pre><code class="language-bamboo,file=resource-type-annotation.bpl"><span style="color: #008000">// Declare a constant with an explicit type annotation.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The constant has a resource type, so the type name must be prefixed with `&#x3C;-`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">const someResource: &#x3C;-SomeResource = create SomeResource()</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a function which consumes a resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `&#x3C;-`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    destroy resource</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a function which returns a resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The return type is a resource type, so the type name must be prefixed with `&#x3C;-`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> get(): &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> create SomeResource()</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
           </section>
           <section>
             <h4 id="resources-in-arrays-and-dictionaries"><a href="#resources-in-arrays-and-dictionaries" aria-hidden="true"><span class="icon icon-link"></span></a>Resources in Arrays and Dictionaries</h4>
             <p>Arrays and dictionaries behave differently when they contain resources: When a resource is <strong>read</strong> from the array at a certain index, or it is <strong>read</strong> from a dictionary by accessing a certain key, the resource is <strong>moved</strong> out of the array or dictionary.</p>
-            <pre><code class="language-bamboo,file=resource-in-array.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> resources = [</span><span>
+            <pre><code class="language-bamboo,file=resource-in-array.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resources = [</span><span>
 </span><span style="color: #000000">    SomeResource(value: </span><span style="color: #09885A">1</span><span style="color: #000000">),</span><span>
 </span><span style="color: #000000">    SomeResource(value: </span><span style="color: #09885A">2</span><span style="color: #000000">),</span><span>
 </span><span style="color: #000000">    SomeResource(value: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
@@ -1674,11 +1680,11 @@
 </span><span>
 </span><span style="color: #008000">// **Move** the first resource into a new constant</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> firstResource &#x3C;- </span><span style="color: #0000FF">resources</span><span style="color: #000000">[0]</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> firstResource &#x3C;- </span><span style="color: #0000FF">resources</span><span style="color: #000000">[0]</span><span>
 </span><span>
 </span><span style="color: #008000">// **Move** the second resource into a new constant</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> secondResource &#x3C;- </span><span style="color: #0000FF">resources</span><span style="color: #000000">[1]</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> secondResource &#x3C;- </span><span style="color: #0000FF">resources</span><span style="color: #000000">[1]</span><span>
 </span><span>
 </span><span style="color: #008000">// `resources` only contains one element,</span><span>
 </span><span style="color: #008000">// the initial third resource!</span><span>
@@ -1697,7 +1703,7 @@
           <p>Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields <strong>must</strong> be initialized in the initializer. The initializer is declared using the <code>init</code> keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always <code>Void</code>. The initializer always follows any fields.</p>
           <p>There are three kinds of fields.</p>
           <p>Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the <code>var</code> keyword.</p>
-          <p>Constant fields are also stored in the composite value, but they can <strong>not</strong> have new values assigned to them. They are declared using the <code>const</code> keyword.</p>
+          <p>Constant fields are also stored in the composite value, but they can <strong>not</strong> have new values assigned to them. They are declared using the <code>let</code> keyword.</p>
           <p>Synthetic fields are <strong>not</strong> stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the <code>synthetic</code> keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the <a href="#composite-data-type-field-getters-and-setters">next section</a>. Synthetic fields are explained in a <a href="#synthetic-composite-data-type-fields">separate section</a>.</p>
           <table>
             <thead>
@@ -1719,7 +1725,7 @@
                 <td><strong>Constant field</strong></td>
                 <td>Yes</td>
                 <td><strong>No</strong></td>
-                <td><code>const</code></td>
+                <td><code>let</code></td>
               </tr>
               <tr>
                 <td><strong>Synthetic field</strong></td>
@@ -1735,7 +1741,7 @@
 </span><span style="color: #008000">// Both fields are initialized through the initializer</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">const</span><span style="color: #000000"> id: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int, balance: Int) {</span><span>
@@ -1746,7 +1752,7 @@
 </span></code></pre>
           <p>In initializers, the special constant <code>self</code> refers to the composite value that is to be initialized.</p>
           <p>Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (<code>.</code>) and the name of the field.</p>
-          <pre><code class="language-bamboo,file=composite-data-type-fields-assignment.bpl"><span style="color: #0000FF">const</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">42</span><span style="color: #000000">, balance: </span><span style="color: #09885A">1_000_00</span><span style="color: #000000">)</span><span>
+          <pre><code class="language-bamboo,file=composite-data-type-fields-assignment.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">42</span><span style="color: #000000">, balance: </span><span style="color: #09885A">1_000_00</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #000000">token.id </span><span style="color: #008000">// is 42</span><span>
 </span><span style="color: #000000">token.balance </span><span style="color: #008000">// is 1_000_000</span><span>
@@ -1788,7 +1794,7 @@
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> example = GetterExample(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> example = GetterExample(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
 </span><span style="color: #008000">// example.balance is 10</span><span>
 </span><span>
 </span><span style="color: #000000">example.balance = </span><span style="color: #09885A">-50</span><span>
@@ -1815,7 +1821,7 @@
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> example = SetterExample(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> example = SetterExample(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
 </span><span style="color: #008000">// example.balance is 10</span><span>
 </span><span>
 </span><span style="color: #008000">// error: precondition of setter for field balance failed</span><span>
@@ -1883,7 +1889,7 @@
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> tracker = GoalTracker(goal: </span><span style="color: #09885A">10</span><span style="color: #000000">, completed: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> tracker = GoalTracker(goal: </span><span style="color: #09885A">10</span><span style="color: #000000">, completed: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span style="color: #008000">// tracker.goal is 10</span><span>
 </span><span style="color: #008000">// tracker.completed is 0</span><span>
 </span><span style="color: #008000">// tracker.left is 10</span><span>
@@ -1899,8 +1905,8 @@
         <section>
           <h3 id="composite-data-type-functions"><a href="#composite-data-type-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Functions</h3>
           <p>Composite data types may contain functions. Just like in the initializer, the special constant <code>self</code> refers to the composite value that the function is called on.</p>
-          <pre><code class="language-bamboo,file=struct-and-class-function.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">const</span><span style="color: #000000"> id: Int</span><span>
+          <pre><code class="language-bamboo,file=composite-data-type-function.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int, initialBalance balance: Int) {</span><span>
@@ -1913,20 +1919,20 @@
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">32</span><span style="color: #000000">, initialBalance: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">32</span><span style="color: #000000">, initialBalance: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">token.mint(amount: </span><span style="color: #09885A">1_000_000</span><span style="color: #000000">)</span><span>
 </span><span style="color: #008000">// token.balance is 1_000_000</span><span>
 </span></code></pre>
         </section>
         <section>
           <h3 id="unbound-references--nulls"><a href="#unbound-references--nulls" aria-hidden="true"><span class="icon icon-link"></span></a>Unbound References / Nulls</h3>
-          <p>There is <strong>no</strong> support for nulls, i.e., a constant or variable of a reference type must always be bound to an instance of the type. There is <strong>no</strong> <code>null</code>.</p>
+          <p>There is <strong>no</strong> support for nulls`.</p>
         </section>
         <section>
           <h3 id="inheritance-and-abstract-types"><a href="#inheritance-and-abstract-types" aria-hidden="true"><span class="icon icon-link"></span></a>Inheritance and Abstract Types</h3>
-          <p>There is <strong>no</strong> support for inheritance. Inheritance is a feature common in other programming languages, that allows including the fields and functions of a type (e.g. for classes this is known as the superclass) in another type (e.g. for classes this is known as the subclass).</p>
+          <p>There is <strong>no</strong> support for inheritance. Inheritance is a feature common in other programming languages, that allows including the fields and functions of one type in another type.</p>
           <p>Instead, follow the "composition over inheritance" principle, the idea of composing functionality from multiple individual parts, rather than building an inheritance tree.</p>
-          <p>Furthermore, there is also <strong>no</strong> support for abstract types (e.g. abstract class). An abstract type is a feature common in other programming languages, that prevents creating values of the type and only allows the creation of values of a subtype (e.g. subclass). In addition, abstract types may declare functions, but omit the implementation of them and instead require subtypes to implement them.</p>
+          <p>Furthermore, there is also <strong>no</strong> support for abstract types. An abstract type is a feature common in other programming languages, that prevents creating values of the type and only allows the creation of values of a subtype. In addition, abstract types may declare functions, but omit the implementation of them and instead require subtypes to implement them.</p>
           <p>Instead, consider using <a href="#interfaces">interfaces</a>.</p>
         </section>
       </section>
@@ -1935,9 +1941,9 @@
         <blockquote>
           <p>🚧 Status: Access control is not implemented yet.</p>
         </blockquote>
-        <p>Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, classes, resources, interfaces) and fields (in structures, classes, and resources) are either private or public.</p>
-        <p><strong>Private</strong> means the declaration is only accessible/visible in the current and inner scopes. For example, a private field in a class can only be accessed by functions of the class, not by code that uses an instance of the class in an outer scope.</p>
-        <p><strong>Public</strong> means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a class can be accessed using the access syntax on an instance of the class in an outer scope.</p>
+        <p>Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.</p>
+        <p><strong>Private</strong> means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.</p>
+        <p><strong>Public</strong> means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a type can be accessed using the access syntax on an instance of the type in an outer scope.</p>
         <p>By default, everything is private. The <code>pub</code> keyword is used to make declarations public.</p>
         <p>The <code>(set)</code> suffix can be used to make variables also publicly writable.</p>
         <p>To summarize the behavior for variable declarations, constant declarations, and fields:</p>
@@ -1952,13 +1958,13 @@
           </thead>
           <tbody>
             <tr>
-              <td align="left"><code>const</code></td>
+              <td align="left"><code>let</code></td>
               <td align="left"></td>
               <td align="left">Current and inner</td>
               <td align="left"><em>None</em></td>
             </tr>
             <tr>
-              <td align="left"><code>const</code></td>
+              <td align="left"><code>let</code></td>
               <td align="left"><code>pub</code></td>
               <td align="left"><strong>All</strong></td>
               <td align="left"><em>None</em></td>
@@ -1983,7 +1989,7 @@
             </tr>
           </tbody>
         </table>
-        <p>To summarize the behavior for functions, structures, classes, resources, and interfaces:</p>
+        <p>To summarize the behavior for functions, structures, resources, and interfaces:</p>
         <table>
           <thead>
             <tr>
@@ -1994,12 +2000,12 @@
           </thead>
           <tbody>
             <tr>
-              <td align="left"><code>fun</code>, <code>struct</code>, <code>class</code>, <code>resource</code>, <code>interface</code></td>
+              <td align="left"><code>fun</code>, <code>struct</code>, <code>resource</code>, <code>interface</code></td>
               <td align="left"></td>
               <td align="left">Current and inner</td>
             </tr>
             <tr>
-              <td align="left"><code>fun</code>, <code>struct</code>, <code>class</code>, <code>resource</code>, <code>interface</code></td>
+              <td align="left"><code>fun</code>, <code>struct</code>, <code>resource</code>, <code>interface</code></td>
               <td align="left"><code>pub</code></td>
               <td align="left"><strong>All</strong></td>
             </tr>
@@ -2007,24 +2013,24 @@
         </table>
         <pre><code class="language-bamboo,file=access-control.bpl"><span style="color: #008000">// Declare a private constant, inaccessible/invisible in outer scope</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a public constant, accessible/visible in all scopes</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">const</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a public class, accessible/visible in all scopes</span><span>
+</span><span style="color: #008000">// Declare a public struct, accessible/visible in all scopes</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">class</span><span style="color: #000000"> SomeClass {</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a private constant field,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// only readable in the current and inner scopes</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">const</span><span style="color: #000000"> a: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a public constant field, readable in all scopes</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">const</span><span style="color: #000000"> b: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a private variable field,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// only readable and writable in the current and inner scopes</span><span>
@@ -2066,7 +2072,7 @@
           <p>🚧 Status: Interfaces are not implemented yet.</p>
         </blockquote>
         <p>An interface is an abstract type that specifies the behavior of types that <em>implement</em> the interface. Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.</p>
-        <p>Interfaces can be implemented by <a href="#composite-data-types">composite data types</a> (classes, structures, and resources). Composite data types may implement multiple interfaces.</p>
+        <p>Interfaces can be implemented by <a href="#composite-data-types">composite data types</a> (structures and resources). Composite data types may implement multiple interfaces.</p>
         <p>Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Interface requirements, and therefore also their implementations, must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.</p>
         <p>Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions.</p>
         <p>Field requirements consist of the name and the type of the field. Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.</p>
@@ -2074,7 +2080,7 @@
         <section>
           <h3 id="interface-declaration"><a href="#interface-declaration" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Declaration</h3>
           <p>Interfaces are declared using the <code>interface</code> keyword, followed by the name of the interface, and the requirements enclosed in opening and closing braces.</p>
-          <p>Field requirements can be annotated to require the implementation to be a variable field, by using the <code>var</code> keyword; require the implementation to be a constant field, by using the <code>const</code> keyword; or the field requirement may specify nothing, in which case the implementation may either be a variable field, a constant field, or a synthetic field.</p>
+          <p>Field requirements can be annotated to require the implementation to be a variable field, by using the <code>var</code> keyword; require the implementation to be a constant field, by using the <code>let</code> keyword; or the field requirement may specify nothing, in which case the implementation may either be a variable field, a constant field, or a synthetic field.</p>
           <p>Field requirements and function requirements must specify the required level of access. The access must be at least be public, so the <code>pub</code> keyword must be provided. Variable field requirements can be specified to also be publicly settable by using the <code>pub(set)</code> keyword.</p>
           <p>The special type <code>Self</code> can be used to refer to the type implementing the interface. This can be seen in the following example, where the first parameter of the <code>transfer</code> function has the <code>Self</code> type.</p>
           <pre><code class="language-bamboo,file=interface-declaration.bpl"><span style="color: #008000">// Declare an interface for a vault (a container for a balance)</span><span>
@@ -2084,7 +2090,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide a field for the balance that is</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// readable in all scopes (`pub`).</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Neither the `var` keyword, nor the `const` keyword is used,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Neither the `var` keyword, nor the `let` keyword is used,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// so the field may be implemented as either a variable field,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// a constant field, or a synthetic field.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
@@ -2171,11 +2177,11 @@
         </section>
         <section>
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
-          <p>Implementations are declared using the <code>impl</code> keyword, followed by the name of interface, the <code>for</code> keyword, and the name of the composite data type (class, structure, or resource) that provides the functionality required in the interface.</p>
-          <pre><code class="language-bamboo,file=interface-implementation.bpl"><span style="color: #008000">// Declare a class named `ExampleVault` with a variable field named `balance`,</span><span>
-</span><span style="color: #008000">// that can be written by functions of the class, but outer scopes can only read it</span><span>
+          <p>Implementations are declared using the <code>impl</code> keyword, followed by the name of interface, the <code>for</code> keyword, and the name of the composite data type (structure or resource) that provides the functionality required in the interface.</p>
+          <pre><code class="language-bamboo,file=interface-implementation.bpl"><span style="color: #008000">// Declare a struct named `ExampleVault` with a variable field named `balance`,</span><span>
+</span><span style="color: #008000">// that can be written by functions of the type, but outer scopes can only read it</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">class</span><span style="color: #000000"> ExampleVault {</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> ExampleVault {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required field `balance` for the `Vault` interface.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The interface does not specify if the field must be variable, constant,</span><span>
@@ -2199,7 +2205,7 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span>
-</span><span style="color: #008000">// Declare the implementation of the interface `Vault` for the class `ExampleVault`</span><span>
+</span><span style="color: #008000">// Declare the implementation of the interface `Vault` for the struct `ExampleVault`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">impl Vault for ExampleVault {</span><span>
 </span><span>
@@ -2236,8 +2242,8 @@
 </span><span style="color: #008000">// Declare two constants which have type `ExampleVault`,</span><span>
 </span><span style="color: #008000">// and are initialized to two different example vaults</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> vault = ExampleVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> otherVault = ExampleVault(initialBalance: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> vault = ExampleVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> otherVault = ExampleVault(initialBalance: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// Transfer 10 units from the first vault to the second vault.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2292,7 +2298,7 @@
           <p>Interfaces are types. Values implementing an interface can be used as initial values for constants that have the interface as their type.</p>
           <pre><code class="language-bamboo,file=interface-type.bpl"><span style="color: #008000">// Declare a constant that has type `Vault`, which has a value that has type `ExampleVault`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> vault: </span><span style="color: #0000FF">Vault</span><span style="color: #000000"> = ExampleVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> vault: </span><span style="color: #0000FF">Vault</span><span style="color: #000000"> = ExampleVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>Values implementing an interface are assignable to variables that have the interface as their type.</p>
           <pre><code class="language-bamboo,file=interface-type-assignment.bpl"><span style="color: #008000">// Assume there is a declaration for another implementation</span><span>
@@ -2312,12 +2318,12 @@
 </span><span style="color: #008000">// Invalid: cannot assign a value that has type `CoolVault`</span><span>
 </span><span style="color: #008000">// to a constant that has type `ExampleVault`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> exampleVault: </span><span style="color: #0000FF">ExampleVault</span><span style="color: #000000"> = CoolVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> exampleVault: </span><span style="color: #0000FF">ExampleVault</span><span style="color: #000000"> = CoolVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.</p>
           <pre><code class="language-bamboo,file=interface-type-fields-and-functions.bpl"><span style="color: #008000">// Declare a constant which has the type `Vault`, and a value that has type `ExampleVault`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> someVault: </span><span style="color: #0000FF">Vault</span><span style="color: #000000"> = ExampleVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> someVault: </span><span style="color: #0000FF">Vault</span><span style="color: #000000"> = ExampleVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// Access the field `balance` declared in the interface `Vault`</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2339,14 +2345,14 @@
           <p>Most of the built-in types are equatable, like booleans and integers. Arrays are equatable when their elements are equatable. Dictionaries are equatable when their values are equatable.</p>
           <p>To make a type equatable the <code>Equatable</code> interface must be implemented, which requires the implementation of the function <code>equals</code>, which accepts another value that the given value should be compared for equality. Note that the parameter type is <code>Self</code>, i.e., the other value must have the same type as the implementing type.</p>
           <pre><code class="language-bamboo,file=equatable.bpl"><span style="color: #0000FF">interface</span><span style="color: #000000"> Equatable {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self) -> </span><span style="color: #0000FF">Bool</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <pre><code class="language-bamboo,file=equatable-impl.bpl"><span style="color: #008000">// Declare a class named `Cat`, which has one field named `id`</span><span>
+          <pre><code class="language-bamboo,file=equatable-impl.bpl"><span style="color: #008000">// Declare a struct named `Cat`, which has one field named `id`</span><span>
 </span><span style="color: #008000">// that has type `Int`, i.e., the identifier of the cat.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">class</span><span style="color: #000000"> Cat {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">const</span><span style="color: #000000"> id: Int</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Cat {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
@@ -2358,7 +2364,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">impl Equatable for Cat {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self) -> </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Cats are equal if their identifier matches.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> other.id == </span><span style="color: #0000FF">self</span><span style="color: #000000">.id</span><span>
@@ -2404,7 +2410,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">impl Equatable for Point {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self) -> </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Points are equal if their coordinates match.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// The essential components are therefore the fields</span><span>
@@ -2455,13 +2461,9 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(count: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.count = count</span><span>
 </span><span style="color: #000000">    }</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> increment(_ count: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.count = </span><span style="color: #0000FF">self</span><span style="color: #000000">.count + count</span><span>
-</span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> account: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> account: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = </span><span style="color: #008000">// ...</span><span>
 </span><span>
 </span><span style="color: #008000">// Create a new instance of the resource type `Counter` and move it</span><span>
 </span><span style="color: #008000">// into the storage of the account.</span><span>
@@ -2525,13 +2527,13 @@
           <blockquote>
             <p>🚧 Status: <code>fatalError</code> is not implemented yet.</p>
           </blockquote>
-          <pre><code class="language-bamboo"><span style="color: #0000FF">fun</span><span style="color: #000000"> fatalError(_ message: </span><span style="color: #0000FF">String</span><span style="color: #000000">) -> Never</span><span>
+          <pre><code class="language-bamboo"><span style="color: #0000FF">fun</span><span style="color: #000000"> fatalError(_ message: </span><span style="color: #0000FF">String</span><span style="color: #000000">): Never</span><span>
 </span></code></pre>
           <p>Terminates the program unconditionally and reports a message which explains why the unrecoverable error occurred.</p>
           <section>
             <h4 id="example"><a href="#example" aria-hidden="true"><span class="icon icon-link"></span></a>Example</h4>
-            <pre><code class="language-bamboo"><span style="color: #0000FF">const</span><span style="color: #000000"> optionalAccount: </span><span style="color: #0000FF">Account</span><span style="color: #000000">? = </span><span style="color: #008000">// ...</span><span>
-</span><span style="color: #0000FF">const</span><span style="color: #000000"> account = optionalAccount ?? fatalError(</span><span style="color: #A31515">"missing account"</span><span style="color: #000000">)</span><span>
+            <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> optionalAccount: </span><span style="color: #0000FF">Account</span><span style="color: #000000">? = </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> account = optionalAccount ?? fatalError(</span><span style="color: #A31515">"missing account"</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           </section>
         </section>

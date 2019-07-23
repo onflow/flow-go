@@ -411,7 +411,7 @@
         ]
       },
       "function-result": {
-        "begin": "(?<![/=\\-+!*%<>&|\\^~.])(->)(?![/=\\-+!*%<>&|\\^~.])\\s*",
+        "begin": "(?<![/=\\-+!*%<>&|\\^~.])(:)(?![/=\\-+!*%<>&|\\^~.])\\s*",
         "beginCaptures": {
           "1": {
             "name": "keyword.operator.function-result.bamboo"
@@ -507,13 +507,13 @@
       },
       "declarations": {
         "patterns": [
-          { "include": "#var-const-declaration" },
+          { "include": "#var-let-declaration" },
           { "include": "#function" },
           { "include": "#initializer" }
         ]
       },
-      "var-const-declaration": {
-        "begin": "\\b(const|var)\\b\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
+      "var-let-declaration": {
+        "begin": "\\b(var|let)\\b\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
         "beginCaptures": {
           "1": {
             "name": "storage.type.$1.bamboo"
@@ -624,7 +624,7 @@
         ]
       },
       "composite": {
-        "begin": "\\b(class|struct|resource|interface|contract|transaction)\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
+        "begin": "\\b(struct|resource|interface|contract|transaction)\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
         "beginCaptures": {
           "1": {
             "name": "storage.type.$1.bamboo"
