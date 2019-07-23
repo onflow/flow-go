@@ -1563,7 +1563,7 @@ Value types should be used when copies with independent state is desired, refere
 
 ### Structures and Classes
 
-#### Structure and Classe Declaration
+#### Structure and Class Declaration
 
 Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword.
 The keyword is followed by the name of the type.
@@ -1586,7 +1586,7 @@ SomeStruct()
 SomeClass()
 ```
 
-#### Structure and Classe Behaviour
+#### Structure and Class Behaviour
 
 The only difference between structures and classes is their behavior when used as an initial value for constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are **copied**, i.e. they are value types, classes are **referenced**, i.e., they are reference types.
 
