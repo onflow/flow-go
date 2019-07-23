@@ -1564,10 +1564,10 @@ when the value is assigned to a variable,
 when the value is passed as an argument to a function,
 and when the value is returned from a function:
 
-- [**Structures**](#structures) are **copied**, i.e. they are value types
-- [**Resources**](#resources) are **moved**, they are linear types. Resources **must** be used **exactly once**
-
-Value types should be used when copies with independent state is desired, and linear types should be used when a value must be used exactly once, i.e. when it should not be used multiple times and when it should not be lost.
+  - [**Structures**](#structures) are **copied**, i.e. they are value types.
+    Structures are useful when copies with independent state are desired.
+  - [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
+    Resources are useful when it is desired to model ownership (a value exists exactly in one location and it should not be lost).
 
 ### Structures
 
