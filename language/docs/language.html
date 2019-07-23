@@ -1608,9 +1608,11 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">b.value = </span><span style="color: #09885A">1</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a function which accepts a resource</span><span>
+</span><span style="color: #008000">// Declare a function which accepts a resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: </span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `&#x3C;-`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -1642,6 +1644,29 @@
 </span><span style="color: #008000">// it referred to was destroyed</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">d.value</span><span>
+</span></code></pre>
+            <p>To make it explicit that the type is moved, it must be prefixed with <code>&#x3C;-</code> in type annotations.</p>
+            <pre><code class="language-bamboo,file=resource-type-annotation.bpl"><span style="color: #008000">// Declare a constant with an explicit type annotation.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The constant has a resource type, so the type name must be prefixed with `&#x3C;-`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">const someResource: &#x3C;-SomeResource = create SomeResource()</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a function which consumes a resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `&#x3C;-`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    destroy resource</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a function which returns a resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The return type is a resource type, so the type name must be prefixed with `&#x3C;-`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> get(): &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> create SomeResource()</span><span>
+</span><span style="color: #000000">}</span><span>
 </span></code></pre>
           </section>
           <section>

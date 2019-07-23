@@ -1671,9 +1671,11 @@ a.value
 //
 b.value = 1
 
-// Declare a function which accepts a resource
+// Declare a function which accepts a resource.
 //
-fun use(resource: SomeResource) {
+// The parameter has a resource type, so the type name must be prefixed with `<-`
+//
+fun use(resource: <-SomeResource) {
     // ...
 }
 
@@ -1710,6 +1712,32 @@ destroy d
 // it referred to was destroyed
 //
 d.value
+```
+
+To make it explicit that the type is moved, it must be prefixed with `<-` in type annotations.
+
+```bamboo,file=resource-type-annotation.bpl
+// Declare a constant with an explicit type annotation.
+//
+// The constant has a resource type, so the type name must be prefixed with `<-`
+//
+const someResource: <-SomeResource = create SomeResource()
+
+// Declare a function which consumes a resource.
+//
+// The parameter has a resource type, so the type name must be prefixed with `<-`
+//
+fun use(resource: <-SomeResource) {
+    destroy resource
+}
+
+// Declare a function which returns a resource.
+//
+// The return type is a resource type, so the type name must be prefixed with `<-`
+//
+fun get(): <-SomeResource {
+    return create SomeResource()
+}
 ```
 
 #### Resources in Arrays and Dictionaries
