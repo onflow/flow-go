@@ -1667,7 +1667,7 @@ let b <- a
 //
 a.value
 
-// Constant `b` is the only valid reference to the resource
+// Constant `b` owns the resource
 //
 b.value = 1
 
@@ -2004,7 +2004,7 @@ token.mint(amount: 1_000_000)
 
 ### Unbound References / Nulls
 
-There is **no** support for nulls, i.e., a constant or variable of a reference type must always be bound to an instance of the type. There is **no** `null`.
+There is **no** support for nulls`.
 
 ### Inheritance and Abstract Types
 
