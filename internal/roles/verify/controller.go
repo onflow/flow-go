@@ -28,7 +28,7 @@ func (c *Controller) Ping(context.Context, *verifySvc.PingRequest) (*verifySvc.P
 }
 
 func (c *Controller) SubmitExecutionReceipt(ctx context.Context, req *verifySvc.SubmitExecutionReceiptRequest) (*empty.Empty, error) {
-	// TODO: utils currently doesn't build, uncomment when it does
+	// TODO: utils package currently doesn't build, uncomment the lines below when it does. See https://github.com/dapperlabs/bamboo-node/issues/241
 	// er := utils.MessageToExecutionReceipt(req.ExecutionReceipt)
 	// c.rp.Submit(er, nil)
 	return &empty.Empty{}, nil
