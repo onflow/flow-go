@@ -86,7 +86,21 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 
 // GetAccount returns the info associated with an address.
 func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccountRequest) (*observe.GetAccountResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	address := crypto.BytesToAddress(req.GetAddress())
+	account := s.blockchain.GetAccount(address)
+
+	accMsg := &observe.GetAccountResponse_Account{
+		Address:    account.Address.Bytes(),
+		Balance:    account.Balance,
+		Code:       account.Code,
+		PublicKeys: account.PublicKeys,
+	}
+
+	response := &observe.GetAccountResponse{
+		Account: accMsg,
+	}
+
+	return response, nil
 }
 
 // CallContract performs a contract call.
