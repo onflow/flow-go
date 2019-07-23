@@ -1655,7 +1655,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The constant has a resource type, so the type name must be prefixed with `&#x3C;-`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">const someResource: &#x3C;-SomeResource = create SomeResource()</span><span>
+</span><span style="color: #000000">const someResource: &#x3C;-SomeResource &#x3C;- create SomeResource()</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a function which consumes a resource.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -1850,6 +1850,11 @@
 </span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> width * height</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
+</span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>Synthetic fields are readable and writable when both a getter and a setter is declared.</p>
@@ -1909,24 +1914,29 @@
         </section>
         <section>
           <h3 id="composite-data-type-functions"><a href="#composite-data-type-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Functions</h3>
-          <p>Composite data types may contain functions. Just like in the initializer, the special constant <code>self</code> refers to the composite value that the function is called on.</p>
-          <pre><code class="language-bamboo,file=composite-data-type-function.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+          <p>
+            Composite data types may contain functions.
+            Just like in the initializer, the special constant <code>self</code> refers to the composite value that the function is called on.
+          </p>
+          <pre><code class="language-bamboo,file=composite-data-type-function.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int, initialBalance balance: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> mint(amount: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + amount</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * factor</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * factor</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">32</span><span style="color: #000000">, initialBalance: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
-</span><span style="color: #000000">token.mint(amount: </span><span style="color: #09885A">1_000_000</span><span style="color: #000000">)</span><span>
-</span><span style="color: #008000">// token.balance is 1_000_000</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> rectangle = Rectangle(width: </span><span style="color: #09885A">2</span><span style="color: #000000">, height: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">rectangle.scale(factor: </span><span style="color: #09885A">4</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// rectangle.width is 8</span><span>
+</span><span style="color: #008000">// rectangle.height is 12</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -2005,12 +2015,12 @@
           </thead>
           <tbody>
             <tr>
-              <td align="left"><code>fun</code>, <code>struct</code>, <code>resource</code>, <code>interface</code></td>
+              <td align="left"><code>fun</code>, <code>struct</code>, <code>resource</code>, <code>struct interface</code>, <code>resource interface</code></td>
               <td align="left"></td>
               <td align="left">Current and inner</td>
             </tr>
             <tr>
-              <td align="left"><code>fun</code>, <code>struct</code>, <code>resource</code>, <code>interface</code></td>
+              <td align="left"><code>fun</code>, <code>struct</code>, <code>resource</code>, <code>struct interface</code>, <code>resource interface</code></td>
               <td align="left"><code>pub</code></td>
               <td align="left"><strong>All</strong></td>
             </tr>
@@ -2076,24 +2086,60 @@
         <blockquote>
           <p>🚧 Status: Interfaces are not implemented yet.</p>
         </blockquote>
-        <p>An interface is an abstract type that specifies the behavior of types that <em>implement</em> the interface. Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.</p>
-        <p>Interfaces can be implemented by <a href="#composite-data-types">composite data types</a> (structures and resources). Composite data types may implement multiple interfaces.</p>
-        <p>Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Interface requirements, and therefore also their implementations, must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.</p>
-        <p>Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions.</p>
-        <p>Field requirements consist of the name and the type of the field. Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.</p>
-        <p>Calling functions with pre-conditions and post-conditions on interfaces instead of implementations can improve the security of a program, as it ensures that even if implementations change, some aspects of them will always hold.</p>
+        <p>
+          An interface is an abstract type that specifies the behavior of types that <em>implement</em> the interface.
+          Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
+        </p>
+        <p>There are two kinds of interfaces:</p>
+        <ul>
+          <li><strong>Structure interfaces</strong>: implemented by <a href="#structures">structures</a></li>
+          <li><strong>Resource interfaces</strong>: implemented by <a href="#resources">resources</a></li>
+        </ul>
+        <p>Structure and resource types may implement multiple interfaces.</p>
+        <p>
+          Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for.
+          Interface requirements, and therefore also their implementations, must always be at least public.
+          Variable field requirements may be annotated to require them to be publicly settable.
+        </p>
+        <p>
+          Function requirements consist of the name of the function, parameter types, an optional return type,
+          and optional preconditions and postconditions.
+        </p>
+        <p>
+          Field requirements consist of the name and the type of the field.
+          Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
+        </p>
+        <p>
+          Calling functions with pre-conditions and post-conditions on interfaces instead of implementations can improve the security of a program,
+          as it ensures that even if implementations change, some aspects of them will always hold.
+        </p>
         <section>
           <h3 id="interface-declaration"><a href="#interface-declaration" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Declaration</h3>
-          <p>Interfaces are declared using the <code>interface</code> keyword, followed by the name of the interface, and the requirements enclosed in opening and closing braces.</p>
-          <p>Field requirements can be annotated to require the implementation to be a variable field, by using the <code>var</code> keyword; require the implementation to be a constant field, by using the <code>let</code> keyword; or the field requirement may specify nothing, in which case the implementation may either be a variable field, a constant field, or a synthetic field.</p>
-          <p>Field requirements and function requirements must specify the required level of access. The access must be at least be public, so the <code>pub</code> keyword must be provided. Variable field requirements can be specified to also be publicly settable by using the <code>pub(set)</code> keyword.</p>
-          <p>The special type <code>Self</code> can be used to refer to the type implementing the interface. This can be seen in the following example, where the first parameter of the <code>transfer</code> function has the <code>Self</code> type.</p>
-          <pre><code class="language-bamboo,file=interface-declaration.bpl"><span style="color: #008000">// Declare an interface for a vault (a container for a balance)</span><span>
+          <p>
+            Interfaces are declared using the <code>struct</code> or <code>resource</code> keyword,
+            followed by the <code>interface</code> keyword,
+            the name of the interface,
+            and the requirements, which must be enclosed in opening and closing braces.
+          </p>
+          <p>
+            Field requirements can be annotated to require the implementation to be a variable field, by using the <code>var</code> keyword;
+            require the implementation to be a constant field, by using the <code>let</code> keyword;
+            or the field requirement may specify nothing,
+            in which case the implementation may either be a variable field, a constant field, or a synthetic field.
+          </p>
+          <p>
+            Field requirements and function requirements must specify the required level of access.
+            The access must be at least be public, so the <code>pub</code> keyword must be provided.
+            Variable field requirements can be specified to also be publicly settable by using the <code>pub(set)</code> keyword.
+          </p>
+          <p>The special type <code>Self</code> can be used to refer to the type implementing the interface.</p>
+          <pre><code class="language-bamboo,file=interface-declaration.bpl"><span style="color: #008000">// Declare a resource interface for a fungible token.</span><span>
+</span><span style="color: #008000">// Only resources can implement this resource interface</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">interface</span><span style="color: #000000"> Vault {</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> interface FungibleToken {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide a field for the balance that is</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// readable in all scopes (`pub`).</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide a field for the balance</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// that is readable in all scopes (`pub`).</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Neither the `var` keyword, nor the `let` keyword is used,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// so the field may be implemented as either a variable field,</span><span>
@@ -2107,7 +2153,8 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">                result >= </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">                result >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
 </span><span style="color: #000000">            }</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -2115,9 +2162,9 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide an initializer that</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// given the initial balance, must initialize the balance field</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(initialBalance: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == initialBalance:</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the balance must be initialized to the initial balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span>
@@ -2125,78 +2172,79 @@
 </span><span style="color: #000000">    }</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide a function that is</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// callable in all scopes.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// callable in all scopes, which withdraws an amount from</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// this fungible token and returns the withdrawn amount as</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// a new fungible token.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The given amount must be positive and the function implementation</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// must add the amount to the balance</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// must add the amount to the balance.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> add(amount: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function must return a new fungible token.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: `&#x3C;-Self` is the resource type implementing this interface</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be positive"</span><span>
+</span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"insufficient funds: the amount must be smaller or equal to the balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
-</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + amount:</span><span>
-</span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) - amount:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be deducted from the balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: no code</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide a function that is</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// callable in all scopes.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// callable in all scopes, which deposits a fungible token</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// into this fungible token.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// The function must transfer an amount from this vault's balance</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// to another vault's balance.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The given token must be of the same type – a deposit of another</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// type is not possible.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// The receiving vault must be of the same type – a transfer to a vault</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// of another type is not possible, as the `balance` field of it is only</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// readable.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// No pre-condition is required to check the given token's balance</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// is positive, as this condition is already ensured by</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the field requirement.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the first parameter has the type `Self`,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// i.e. the type implementing this interface</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the first parameter has the type `&#x3C;-Self`,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// i.e. the resource type implementing this interface</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to receivingVault: Self, amount: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
-</span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be positive"</span><span>
-</span><span>
-</span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
-</span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be smaller or equal to the balance"</span><span>
-</span><span style="color: #000000">        }</span><span>
-</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-Self) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) - amount:</span><span>
-</span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be deducted from the balance"</span><span>
-</span><span>
-</span><span style="color: #000000">            receivingVault.balance == before(receivingVault.balance) + amount:</span><span>
-</span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the receiving balance"</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + token.balance:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: no code</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <p>Note that the required initializer and function do not have any executable code.</p>
+          <p>Note that the required initializer and functions do not have any executable code.</p>
         </section>
         <section>
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
-          <p>Implementations are declared using the <code>impl</code> keyword, followed by the name of interface, the <code>for</code> keyword, and the name of the composite data type (structure or resource) that provides the functionality required in the interface.</p>
-          <pre><code class="language-bamboo,file=interface-implementation.bpl"><span style="color: #008000">// Declare a struct named `ExampleVault` with a variable field named `balance`,</span><span>
+          <p>
+            Implementations are declared using the <code>impl</code> keyword,
+            followed by the name of interface, the <code>for</code> keyword,
+            and the name of the composite data type (structure or resource) that provides the functionality required in the interface.
+          </p>
+          <pre><code class="language-bamboo,file=interface-implementation.bpl"><span style="color: #008000">// Declare a resource named `ExampleToken` with a variable field named `balance`,</span><span>
 </span><span style="color: #008000">// that can be written by functions of the type, but outer scopes can only read it</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">struct</span><span style="color: #000000"> ExampleVault {</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required field `balance` for the `Vault` interface.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required field `balance` for the `FungibleToken` interface.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The interface does not specify if the field must be variable, constant,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// so in order for this type (`ExampleVault`) to be able to write to the field,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// so in order for this type (`ExampleToken`) to be able to write to the field,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// but limit outer scopes to only read from the field, it is declared variable,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// and only has public access (non-settable).</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required initializer for the `Vault` interface:</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required initializer for the `FungibleToken` interface:</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// accept an initial balance and initialize the `balance` field.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// This implementation satisfies the required postcondition</span><span>
@@ -2204,72 +2252,82 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the postcondition declared in the interface</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// does not have to be repeated here in the implementation</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(initialBalance: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = initialBalance</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span>
-</span><span style="color: #008000">// Declare the implementation of the interface `Vault` for the struct `ExampleVault`</span><span>
+</span><span style="color: #008000">// Declare the implementation of the interface `FungibleToken`</span><span>
+</span><span style="color: #008000">// for the resource `ExampleToken`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl Vault for ExampleVault {</span><span>
+</span><span style="color: #000000">impl FungibleToken for ExampleToken {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required function named `add` of the interface `Vault`,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// that adds an amount to the vault's balance. It must be public.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required function named `withdraw` of the interface</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// `FungibleToken`, that withdraws an amount from the token's balance.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function must be public.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// This implementation satisfies the required postcondition.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: neither the precondition nor the postcondition declared</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// in the interface have to be repeated here in the implementation</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> add(amount: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + amount</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> create ExampleToken(balance: amount)</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required function named `transfer` of the interface `Vault`,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// that subtracts the amount from this vault's balance, and adds the amount</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// to the receiving vault's balance. It must be public.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required function named `deposit` of the interface</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// `FungibleToken`, that deposits the amount from the given token</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// to this token.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the type of the receiving vault parameter is `ExampleVault`,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// i.e., an amount can only be transferred to a vault of the same type.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function must be public.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the type of the parameter is `&#x3C;-ExampleToken`,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// i.e., only a token of the same type can be deposited.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// This implementation satisfies the required postconditions.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: neither the precondition nor the postcondition declared</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// in the interface have to be repeated here in the implementation</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to receivingVault: </span><span style="color: #0000FF">ExampleVault</span><span style="color: #000000">, amount: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
-</span><span style="color: #000000">        receivingVault.amount = receivingVault.amount + amount</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> desposit(_ token: &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + amount</span><span>
+</span><span style="color: #000000">        destroy token</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare two constants which have type `ExampleVault`,</span><span>
-</span><span style="color: #008000">// and are initialized to two different example vaults</span><span>
+</span><span style="color: #008000">// Declare a constant which has type `ExampleToken`,</span><span>
+</span><span style="color: #008000">// and is initialized with such an example token</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> vault = ExampleVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> otherVault = ExampleVault(initialBalance: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> token &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> </span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">(</span><span style="color: #0000FF">balance</span><span style="color: #000000">: 100)</span><span>
 </span><span>
-</span><span style="color: #008000">// Transfer 10 units from the first vault to the second vault.</span><span>
+</span><span style="color: #008000">// Withdraw 10 units from the token.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// The amount satisfies the precondition of the `transfer` function</span><span>
-</span><span style="color: #008000">// in the `Vault` interface</span><span>
+</span><span style="color: #008000">// The amount satisfies the precondition of the `withdraw` function</span><span>
+</span><span style="color: #008000">// in the `FungibleToken` interface</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">vault.transfer(to: otherVault, amount: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> withdrawn &#x3C;- </span><span style="color: #0000FF">token</span><span style="color: #000000">.</span><span style="color: #0000FF">withdraw</span><span style="color: #000000">(</span><span style="color: #0000FF">amount</span><span style="color: #000000">: 10)</span><span>
 </span><span>
-</span><span style="color: #008000">// The postcondition of the `transfer` function in the `Vault` interface</span><span>
-</span><span style="color: #008000">// ensured the balances fields of the vaults were updated properly</span><span>
+</span><span style="color: #008000">// The postcondition of the `withdraw` function in the `FungibleToken`</span><span>
+</span><span style="color: #008000">// interface ensured the balance field of the token was updated properly</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// vault.balance is 90</span><span>
-</span><span style="color: #008000">// otherVault.balance is 10</span><span>
+</span><span style="color: #008000">// token.balance is 90</span><span>
+</span><span style="color: #008000">// withdrawn.balance is 10</span><span>
 </span><span>
-</span><span style="color: #008000">// Error: precondition not satisfied: the parameter `amount` is larger than</span><span>
-</span><span style="color: #008000">// the field `balance` (100 > 90)</span><span>
+</span><span style="color: #008000">// Deposit the withdrawn token into another one.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> receiver: </span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> &#x3C;- </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #0000FF">receiver</span><span style="color: #000000">.</span><span style="color: #0000FF">deposit</span><span style="color: #000000">(&#x3C;-</span><span style="color: #0000FF">withdrawn</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Error: precondition of function `withdraw` in interface</span><span>
+</span><span style="color: #008000">// `FungibleToken` is not satisfied: the parameter `amount`</span><span>
+</span><span style="color: #008000">// is larger than the field `balance` (100 > 90)</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">vault.transfer(to: otherVault, amount: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">token.withdraw(amount: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the <code>pub</code> keyword is specified), and an implementation may provide a variable field which is public, but also publicly settable (the <code>pub(set)</code> keyword is specified).</p>
-          <pre><code class="language-bamboo"><span style="color: #0000FF">interface</span><span style="color: #000000"> AnInterface {</span><span>
+          <pre><code class="language-bamboo"><span style="color: #0000FF">struct</span><span style="color: #000000"> interface AnInterface {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide a publicly readable</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// field named `a` that has type `Int`. It may be a constant field,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// a variable field, or a synthetic field.</span><span>
@@ -2300,44 +2358,97 @@
         </section>
         <section>
           <h3 id="interface-type"><a href="#interface-type" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Type</h3>
-          <p>Interfaces are types. Values implementing an interface can be used as initial values for constants that have the interface as their type.</p>
-          <pre><code class="language-bamboo,file=interface-type.bpl"><span style="color: #008000">// Declare a constant that has type `Vault`, which has a value that has type `ExampleVault`</span><span>
+          <p>Interfaces are types. Values implementing an interface can be used as initial values for constants and variables that have the interface as their type.</p>
+          <pre><code class="language-bamboo,file=interface-type.bpl"><span style="color: #008000">// Declare an interface named `Shape`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> vault: </span><span style="color: #0000FF">Vault</span><span style="color: #000000"> = ExampleVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// Implementations must provide a field which returns the area,</span><span>
+</span><span style="color: #008000">// and a function which scales the shape by a given factor.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">interface</span><span style="color: #000000"> Shape {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> area: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure named `Square`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Square {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> length: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> synthetic area: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.length * </span><span style="color: #0000FF">self</span><span style="color: #000000">.length</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(length: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.length = length</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Implement the interface `Shape` for the structure `Square`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">impl Shape for Square {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.length = </span><span style="color: #0000FF">self</span><span style="color: #000000">.length * factor</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure named `Rectangle`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> synthetic area: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * </span><span style="color: #0000FF">self</span><span style="color: #000000">.height</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Implement the interface `Rectangle` for the structure `Square`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">impl Shape for Rectangle {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * factor</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * factor</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant that has type `Shape`, which has a value that has type `Rectangle`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> shape: </span><span style="color: #0000FF">Shape</span><span style="color: #000000"> = Rectangle(width: </span><span style="color: #09885A">10</span><span style="color: #000000">, height: </span><span style="color: #09885A">20</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>Values implementing an interface are assignable to variables that have the interface as their type.</p>
-          <pre><code class="language-bamboo,file=interface-type-assignment.bpl"><span style="color: #008000">// Assume there is a declaration for another implementation</span><span>
-</span><span style="color: #008000">// of the interface  `Vault` which is named `CoolVault`</span><span>
-</span><span>
-</span><span style="color: #008000">// Declare a variable that has type `Vault`,</span><span>
-</span><span style="color: #008000">// which has an initial value that has type `CoolVault`</span><span>
+          <pre><code class="language-bamboo,file=interface-type-assignment.bpl"><span style="color: #008000">// Assign a value of type `Square` to the variable `shape` that has type `Shape`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">var</span><span style="color: #000000"> someVault: </span><span style="color: #0000FF">Vault</span><span style="color: #000000"> = CoolVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">shape = Square(length: </span><span style="color: #09885A">30</span><span style="color: #000000">)</span><span>
 </span><span>
-</span><span style="color: #008000">// Assign a different type of vault to the variable `someVault`,</span><span>
-</span><span style="color: #008000">// which has type `Vault`</span><span>
+</span><span style="color: #008000">// Invalid: cannot initialize a constant that has type `Rectangle`</span><span>
+</span><span style="color: #008000">// with a value that has type `Square`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">someVault = ExampleVault(initialBalance: </span><span style="color: #09885A">50</span><span style="color: #000000">)</span><span>
-</span><span>
-</span><span>
-</span><span style="color: #008000">// Invalid: cannot assign a value that has type `CoolVault`</span><span>
-</span><span style="color: #008000">// to a constant that has type `ExampleVault`</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> exampleVault: </span><span style="color: #0000FF">ExampleVault</span><span style="color: #000000"> = CoolVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> rectangle: </span><span style="color: #0000FF">Rectangle</span><span style="color: #000000"> = Square(length: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.</p>
-          <pre><code class="language-bamboo,file=interface-type-fields-and-functions.bpl"><span style="color: #008000">// Declare a constant which has the type `Vault`, and a value that has type `ExampleVault`</span><span>
+          <pre><code class="language-bamboo,file=interface-type-fields-and-functions.bpl"><span style="color: #008000">// Declare a constant which has the type `Shape`</span><span>
+</span><span style="color: #008000">// and is initialized with a value that has type `Rectangle`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> someVault: </span><span style="color: #0000FF">Vault</span><span style="color: #000000"> = ExampleVault(initialBalance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> shape: </span><span style="color: #0000FF">Shape</span><span style="color: #000000"> = Rectangle(width: </span><span style="color: #09885A">2</span><span style="color: #000000">, height: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
 </span><span>
-</span><span style="color: #008000">// Access the field `balance` declared in the interface `Vault`</span><span>
+</span><span style="color: #008000">// Access the field `area` declared in the interface `Shape`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">someVault.balance </span><span style="color: #008000">// is 100</span><span>
+</span><span style="color: #000000">shape.area </span><span style="color: #008000">// is 6</span><span>
 </span><span>
-</span><span style="color: #008000">// Call the function named `add` declared in the interface `Vault`</span><span>
-</span><span style="color: #000000">someVault.add(amount: </span><span style="color: #09885A">50</span><span style="color: #000000">)</span><span>
-</span><span>
-</span><span style="color: #008000">// someVault.balance is 150</span><span>
+</span><span style="color: #008000">// Call the function `scale` declared in the interface `Shape`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">shape.scale(factor: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
 </span></code></pre>
         </section>
         <section>
