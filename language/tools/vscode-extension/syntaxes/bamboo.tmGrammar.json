@@ -507,13 +507,13 @@
       },
       "declarations": {
         "patterns": [
-          { "include": "#var-const-declaration" },
+          { "include": "#var-let-declaration" },
           { "include": "#function" },
           { "include": "#initializer" }
         ]
       },
-      "var-const-declaration": {
-        "begin": "\\b(const|var)\\b\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
+      "var-let-declaration": {
+        "begin": "\\b(var|let)\\b\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
         "beginCaptures": {
           "1": {
             "name": "storage.type.$1.bamboo"

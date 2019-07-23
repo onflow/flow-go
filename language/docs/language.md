@@ -48,13 +48,12 @@ Constants and variables are declarations that bind a value to a name. Constants 
 
 Constant means that the *name* is constant, not the *value* – the value may still be changed if it allows it, i.e. is mutable.
 
-The `const` keyword is used to declare a constant and the `var` keyword is used to declare a variable.
-The keywords are followed by the name, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
+Constants are declared using the `let` keyword. Variables are declared using the `var` keyword. The keywords are followed by the name, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
 
 ```bamboo,file=constants-and-variables.bpl
 // Declare a constant named `a`
 //
-const a = 1
+let a = 1
 
 // Invalid: re-assigning to a constant
 //
@@ -74,7 +73,7 @@ Variables and constants **must** be initialized.
 ```bamboo
 // Invalid: the constant has no initial value
 //
-const a
+let a
 ```
 
 Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
@@ -83,12 +82,12 @@ Once a constant or variable is declared, it cannot be redeclared with the same n
 ```bamboo
 // Declare a constant named `a`
 //
-const a = 1
+let a = 1
 
 // Invalid: cannot re-declare a constant with name `a`,
 // as it is already used in this scope
 //
-const a = 2
+let a = 2
 
 // Declare a variable named `b`
 //
@@ -125,7 +124,7 @@ var initialized: Bool = false
 // and for which the type is inferred to be `Int`,
 // based on the initial value
 //
-const inferred = 1
+let inferred = 1
 ```
 
 If a type annotation is provided, the initial value must be of this type, and new values assigned to variables must match the declaration's type. This type safety is explained in more detail in a [separate section](#type-safety).
@@ -136,7 +135,7 @@ If a type annotation is provided, the initial value must be of this type, and ne
 //
 // `Int` is the type of arbitrary-precision integers
 //
-const booleanConstant: Bool = 1
+let booleanConstant: Bool = 1
 
 // Declare a variable that has type `Bool`
 //
@@ -190,7 +189,7 @@ Semicolons may be used to separate statements, but are optional. They can be use
 ```bamboo,file=semicolons.bpl
 // Declare a constant, without a semicolon
 //
-const a = 1
+let a = 1
 
 // Declare a variable, with a semicolon
 //
@@ -198,7 +197,7 @@ var b = 2;
 
 // Declare a constant and a variable on a single line, separated by semicolons
 //
-const d = 1; var e = 2
+let d = 1; var e = 2
 ```
 
 ## Values and Types
@@ -245,13 +244,13 @@ Numbers can be written in various bases. Numbers are assumed to be decimal by de
 Decimal numbers may contain underscores (`_`) to logically separate components.
 
 ```bamboo,file=number-underscores-decimal.bpl
-const largeNumber = 1_000_000
+let largeNumber = 1_000_000
 ```
 
 Underscores are allowed for all numeral systems.
 
 ```bamboo,file=number-underscores-binary.bpl
-const binaryNumber = 0b10_11_01
+let binaryNumber = 0b10_11_01
 ```
 
 ### Integers
@@ -270,19 +269,19 @@ The names for the integer types follow this naming convention: Signed integer ty
 
 ```bamboo
 // Declare a constant that has type `UInt8` and the value 10
-const smallNumber: UInt8 = 10
+let smallNumber: UInt8 = 10
 ```
 
 ```bamboo
 // Invalid: negative literal cannot be used as an unsigned integer
 //
-const invalidNumber: UInt8 = -10
+let invalidNumber: UInt8 = -10
 ```
 
 In addition, the arbitrary precision integer type `Int` is provided.
 
 ```bamboo
-const veryLargeNumber: Int = 10000000000000000000000000000000
+let veryLargeNumber: Int = 10000000000000000000000000000000
 ```
 
 ### Floating-Point Numbers
@@ -298,17 +297,17 @@ The type `Address` represents an address. Addresses are unsigned integers with a
 ```bamboo
 // Declare a constant that has type `Address`
 //
-const someAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d
+let someAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 
 // Invalid: Initial value is not compatible with type `Address`,
 // it is not a number
 //
-const notAnAddress: Address = ""
+let notAnAddress: Address = ""
 
 // Invalid: Initial value is not compatible with type `Address`,
 // it is a number, but larger than 160 bits
 //
-const alsoNotAnAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d123456789
+let alsoNotAnAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d123456789
 ```
 
 Integer literals are not inferred to be an address.
@@ -317,7 +316,7 @@ Integer literals are not inferred to be an address.
 // Declare a number. Even though it happens to be a valid address,
 // it is not inferred as it.
 //
-const aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
+let aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 // `aNumber` has type `Int`
 ```
 
@@ -328,7 +327,7 @@ Strings are collections of characters. Strings have the type `String`, and chara
 String and character literals are enclosed in double quotation marks (`"`).
 
 ```bamboo
-const someString = "Hello, world!"
+let someString = "Hello, world!"
 ```
 
 String literals may contain escape sequences. An escape sequence starts with a backslash (`\`):
@@ -347,7 +346,7 @@ String literals may contain escape sequences. An escape sequence starts with a b
 // (separated by the line feed character `\n`), and ends
 // with a thumbs up emoji, which has code point U+1F44D (0x1F44D)
 //
-const thumbsUpText =
+let thumbsUpText =
     "This is the first line.\nThis is the second line with an emoji: \u{1F44D}"
 ```
 
@@ -358,9 +357,9 @@ For example, the single character `ü` can be represented in several ways in Uni
 Still, both variants represent the same human-readable character `ü`.
 
 ```bamboo
-const singleScalar: Character = "\u{FC}"
+let singleScalar: Character = "\u{FC}"
 // `singleScalar` is `ü`
-const twoScalars: Character = "\u{75}\u{308}"
+let twoScalars: Character = "\u{75}\u{308}"
 // `twoScalars` is `ü`
 ```
 
@@ -372,7 +371,7 @@ Another example where multiple Unicode scalar values are rendered as a single, h
 // - REGIONAL INDICATOR SYMBOL LETTER C (U+1F1E8)
 // - REGIONAL INDICATOR SYMBOL LETTER A (U+1F1E6)
 //
-const canadianFlag: Character = "\u{1F1E8}\u{1F1E6}"
+let canadianFlag: Character = "\u{1F1E8}\u{1F1E6}"
 // `canadianFlag` is `🇨🇦`
 ```
 
@@ -411,7 +410,7 @@ Arrays are mutable, ordered collections of values. All values in an array must h
 To get the element of an array at a specific index, the indexing syntax can be used: The array is followed by an opening square bracket `[`, the indexing value, and ends with a closing square bracket `]`.
 
 ```bamboo,file=arrays-indexing.bpl
-const numbers = [42, 23]
+let numbers = [42, 23]
 
 // Get the first number
 //
@@ -423,7 +422,7 @@ numbers[1] // is 23
 ```
 
 ```bamboo,file=arrays-nested-indexing.bpl
-const arrays = [[1, 2], [3, 4]]
+let arrays = [[1, 2], [3, 4]]
 
 // Get the first number of the second array
 //
@@ -433,7 +432,7 @@ arrays[1][0] // is 3
 To set an element of an array at a specific index, the indexing syntax can be used as well.
 
 ```bamboo,file=array-indexing-assignment.bpl
-const numbers = [42, 23]
+let numbers = [42, 23]
 
 // Change the second number
 //
@@ -455,9 +454,9 @@ Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array
 Variable-size arrays have the type suffix `[]`. For example, the type `Int16[]` specifies a variable-size array of elements that have type `Int16`.
 
 ```bamboo,file=array-types.bpl
-const array: Int8[2] = [1, 2]
+let array: Int8[2] = [1, 2]
 
-const arrays: Int16[2][3] = [
+let arrays: Int16[2][3] = [
     [1, 2, 3],
     [4, 5, 6]
 ]
@@ -509,14 +508,14 @@ Dictionary literals start with an opening brace `{` and end with a closing brace
 To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
 
 ```bamboo,file=dictionary-access.bpl
-const booleans = {
+let booleans = {
     1: true,
     0: false
 }
 booleans[1] // is true
 booleans[0] // is false
 
-const integers = {
+let integers = {
     true: 1,
     false: 0
 }
@@ -527,7 +526,7 @@ integers[false] // is 0
 To set the value for a key of a dictionary, the access syntax can be used as well.
 
 ```bamboo,file=dictionary-assignment.bpl
-const booleans = {
+let booleans = {
     1: true,
     0: false
 }
@@ -542,13 +541,13 @@ booleans[0] = true
 Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
 
 ```bamboo,file=dictionary-types.bpl
-const booleans = {
+let booleans = {
     1: true,
     0: false
 }
 // `booleans` has type `Bool[Int]`
 
-const integers = {
+let integers = {
     true: 1,
     false: 0
 }
@@ -591,7 +590,7 @@ However, using `Any` does not opt-out of type checking. It is invalid to access 
 // Declare a variable that has the type `Any`. The initial value is an integer,
 // but the variable  still has the explicit type `Any`.
 //
-const a: Any = 1
+let a: Any = 1
 
 // Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)
 // and an `Int` value (`2`, right-hand side)
@@ -628,14 +627,14 @@ Operators are special symbols that perform a computation for one or more values.
 The `-` unary operator negates an integer:
 
 ```bamboo,file=integer-negation.bpl
-const a = 1
+let a = 1
 -a // is -1
 ```
 
 The `!` unary operator logically negates a boolean:
 
 ```bamboo,file=boolean-negation.bpl
-const a = true
+let a = true
 !a // is false
 ```
 
@@ -652,7 +651,7 @@ a = 2
 The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.
 
 ```bamboo,file=assignment-numbers.bpl
-const numbers = [1, 2]
+let numbers = [1, 2]
 
 // Change the first number
 //
@@ -662,7 +661,7 @@ numbers[0] = 3
 ```
 
 ```bamboo,file=assignment-arrays.bpl
-const arrays = [[1, 2], [3, 4]]
+let arrays = [[1, 2], [3, 4]]
 
 // Change the first number in the second array
 //
@@ -672,7 +671,7 @@ arrays[1][0] = 5
 ```
 
 ```bamboo,file=assignment-dictionaries.bpl
-const dictionaries = {
+let dictionaries = {
   true: {1: 2},
   false: {3: 4}
 }
@@ -695,16 +694,16 @@ There are four arithmetic operators:
 - Division: `/`
 
 ```bamboo,file=operator-plus.bpl
-const a = 1 + 2
+let a = 1 + 2
 // `a` is 3
 ```
 
 Arithmetic operators don't cause values to overflow.
 
 ```bamboo,file=operator-times.bpl
-const a: Int8 = 100
-const b: Int8 = 100
-const c = a * b
+let a: Int8 = 100
+let b: Int8 = 100
+let c = a * b
 // `c` is 10000, and has type `Int`
 ```
 
@@ -723,7 +722,7 @@ For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111
 ```
 
 ```bamboo,file=operator-overflow-plus.bpl
-const a: UInt8 = 255
+let a: UInt8 = 255
 a &+ 1 // is 0
 ```
 
@@ -736,7 +735,7 @@ Similarly, for the minimum value 0, subtracting 1 wraps around and results in th
 ```
 
 ```bamboo
-const b: UInt8 = 0
+let b: UInt8 = 0
 b &- 1 // is 255
 ```
 
@@ -749,7 +748,7 @@ Signed integers are also affected by overflow. In a signed integer, the first bi
 ```
 
 ```bamboo
-const c: Int8 = -128
+let c: Int8 = -128
 c &- 1 // is 127
 ```
 
@@ -839,7 +838,7 @@ There is only one ternary conditional operator, the ternary conditional operator
 It behaves like an if-statement, but is an expression: If the first operator value is true, the second operator value is returned. If the first operator value is false, the third value is returned.
 
 ```bamboo,file=operator-ternary-conditional.bpl
-const x = 1 > 2 ? 3 : 4
+let x = 1 > 2 ? 3 : 4
 // `x` is 4
 ```
 
@@ -933,7 +932,7 @@ fun clamp(_ value: Int, min: Int, max: Int) -> Int {
 // As the function declaration also does not specify argument labels
 // for these parameters, the parameter names must be used as argument labels.
 //
-const clamped = clamp(123, min: 0, max: 100)
+let clamped = clamp(123, min: 0, max: 100)
 // clamped is 100
 ```
 
@@ -971,13 +970,13 @@ fun send(from sendingAccount: Account, to receivingAccount: Account, amount: Int
 //
 // The initial value is omitted for brevity
 //
-const sender: Account = // ...
+let sender: Account = // ...
 
 // Declare a constant which refers to the receiving account.
 //
 // The initial value is omitted for brevity
 //
-const receiver: Account = // ...
+let receiver: Account = // ...
 
 // Call the function named `send`.
 //
@@ -1037,7 +1036,7 @@ Functions can be also used as expressions. The syntax is the same as for functio
 //
 // The function multiplies a number by two when it is called
 //
-const double =
+let double =
     fun (_ x: Int) -> Int {
         return x * 2
     }
@@ -1081,7 +1080,7 @@ fun add(a: Int, b: Int) -> Int {
 ```bamboo,file=function-type-expression.bpl
 // Declare a constant named `add`, with the function type `(Int, Int) -> Int`
 //
-const add: (Int, Int) -> Int =
+let add: (Int, Int) -> Int =
     fun (a: Int, b: Int) -> Int {
         return a + b
     }
@@ -1093,7 +1092,7 @@ If the function has no return type, it implicitly has the return type `Void`.
 // Declare a constant named `doNothing`, which is a function
 // that takes no parameters and returns nothing
 //
-const doNothing: () -> Void =
+let doNothing: () -> Void =
     fun () {}
 ```
 
@@ -1113,7 +1112,7 @@ fun change(_ numbers: Int[]) {
      numbers[1] = 2
 }
 
-const numbers = [0, 1]
+let numbers = [0, 1]
 
 change(numbers)
 // numbers is [1, 2]
@@ -1218,7 +1217,7 @@ The if-statement starts with the `if` keyword, followed by the condition, and th
 
 
 ```bamboo,file=control-flow-if.bpl
-const a = 0
+let a = 0
 var b = 0
 
 if a == 0 {
@@ -1236,7 +1235,7 @@ An additional else-clause can be added to execute another piece of code when the
 The else-clause is introduced by the `else` keyword.
 
 ```bamboo,file=control-flow-if-else.bpl
-const a = 0
+let a = 0
 var b = 0
 
 if a == 1 {
@@ -1251,7 +1250,7 @@ if a == 1 {
 The else-clause can contain another if-statement, i.e., if-statements can be chained together.
 
 ```bamboo,file=control-flow-if-else-if.bpl
-const a = 0
+let a = 0
 var b = 0
 
 if a == 1 {
@@ -1300,10 +1299,10 @@ TODO: examples
 Every function and block (`{` ... `}`) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.
 
 ```bamboo,file=scope.bpl
-const x = 10
+let x = 10
 
 fun f() -> Int {
-    const y = 10
+    let y = 10
     return x + y
 }
 
@@ -1330,10 +1329,10 @@ double(1)
 Each scope can introduce new declarations, i.e., the outer declaration is shadowed.
 
 ```bamboo,file=scope-test.bpl
-const x = 2
+let x = 2
 
 fun test() -> Int {
-    const x = 3
+    let x = 3
     return x
 }
 
@@ -1343,14 +1342,14 @@ test() // returns 3
 Scope is lexical, not dynamic.
 
 ```bamboo,file=scope-lexical.bpl
-const x = 10
+let x = 10
 
 fun f() -> Int {
    return x
 }
 
 fun g() -> Int {
-   const x = 20
+   let x = 20
    return f()
 }
 
@@ -1360,11 +1359,11 @@ g() // returns 10, not 20
 Declarations are **not** moved to the top of the enclosing function (hoisted).
 
 ```bamboo,file=scope-no-hoisting.bpl
-const x = 2
+let x = 2
 
 fun f() -> Int {
     if x == 0 {
-        const x = 3
+        let x = 3
         return x
     }
     return x
@@ -1386,12 +1385,12 @@ The value representing nothing is `nil`.
 // declare a constant which has an optional integer type,
 // with nil as its initial value
 //
-const a: Int? = nil
+let a: Int? = nil
 
 // declare a constant which has an optional integer type,
 // with 42 as its initial value
 //
-const b: Int? = 42
+let b: Int? = 42
 ```
 
 ### Nil-Coalescing Operator
@@ -1401,12 +1400,12 @@ The nil-coalescing operator `??` returns the value inside an optional if it cont
 ```bamboo
 // declare a constant which has an optional integer type
 //
-const a: Int? = nil
+let a: Int? = nil
 
 // declare a constant with a non-optional integer type,
 // which is initialized to b if it is non-nil, or 42 otherwise
 //
-const b: Int = a ?? 42
+let b: Int = a ?? 42
 // integer is 42, as a is nil
 ```
 
@@ -1415,31 +1414,31 @@ The nil-coalescing operator can only be applied to values which have an optional
 ```bamboo
 // declare a constant with a non-optional integer type
 //
-const a = 1
+let a = 1
 
 // invalid: nil-coalescing operator is applied to a value which has a non-optional type
 // (a has the non-optional type Int)
 //
-const b = a ?? 2
+let b = a ?? 2
 ```
 
 ```bamboo
 // invalid: nil-coalescing operator is applied to a value which has a non-optional type
 // (the integer literal is of type Int)
 //
-const c = 1 ?? 2
+let c = 1 ?? 2
 ```
 
 The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.
 
 ```bamboo
 // declare a constant with a non-optional integer type
-const a = 1
+let a = 1
 
 // invalid: nil-coalescing operator is applied to a value of type Int,
 // but alternative is of type Bool
 //
-const b = a ?? false
+let b = a ?? false
 ```
 
 
@@ -1486,8 +1485,8 @@ add(1, 2) // returns 3
 
 // Declare two constants which have type `Int32`
 //
-const a: Int32 = 3_000_000_000
-const b: Int32 = 3_000_000_000
+let a: Int32 = 3_000_000_000
+let b: Int32 = 3_000_000_000
 
 // Invalid: cannot pass arguments which have type `Int32` to parameters which have type `Int8`
 //
@@ -1504,7 +1503,7 @@ If a variable or constant is not annotated explicitly with a type, it is inferre
 Integer literals are inferred to type `Int`.
 
 ```bamboo,file=type-inference-int.bpl
-const a = 1
+let a = 1
 
 // `a` has type `Int`
 ```
@@ -1512,18 +1511,18 @@ const a = 1
 Array literals are inferred based on the elements of the literal, and to be variable-size.
 
 ```bamboo,file=type-inference-intergers.bpl
-const integers = [1, 2]
+let integers = [1, 2]
 // `integers` has type `Int[]`
 
 // Invalid: mixed types
 //
-const invalidMixed = [1, true, 2, false]
+let invalidMixed = [1, true, 2, false]
 ```
 
 Dictionary literals are inferred based on the keys and values of the literal.
 
 ```bamboo,file=type-inference-dictionary.bpl
-const booleans = {
+let booleans = {
     1: true,
     2: false
 }
@@ -1531,7 +1530,7 @@ const booleans = {
 
 // Invalid: mixed types
 //
-const invalidMixed = {
+let invalidMixed = {
     1: true,
     false: 2
 }
@@ -1540,7 +1539,7 @@ const invalidMixed = {
 Functions are inferred based on the parameter types and the return type.
 
 ```bamboo,file=type-inference-function.bpl
-const add = (a: Int8, b: Int8) -> Int {
+let add = (a: Int8, b: Int8) -> Int {
     return a + b
 }
 
@@ -1605,11 +1604,11 @@ struct SomeStruct {
 
 // Declare a constant with value of structure type `SomeStruct`
 //
-const a = SomeStruct(value: 0)
+let a = SomeStruct(value: 0)
 
 // *Copy* the structure value into a new constant
 //
-const b = a
+let b = a
 
 b.value = 1
 
@@ -1631,11 +1630,11 @@ class SomeClass {
 
 // Declare a constant with value of class type `SomeClass`
 //
-const a = SomeClass(value: 0)
+let a = SomeClass(value: 0)
 
 // *Reference* the class value with a new constant
 //
-const b = A
+let b = A
 
 b.value = 1
 
@@ -1681,11 +1680,11 @@ resource SomeResource {
 
 // Declare a constant with value of resource type `SomeResource`
 //
-const a <- SomeResource(value: 0)
+let a <- SomeResource(value: 0)
 
 // *Move* the resource value to a new constant
 //
-const b <- a
+let b <- a
 
 // Invalid: Cannot use constant `a` anymore as the resource
 // it referred to was moved to constant `b`
@@ -1717,7 +1716,7 @@ Resources **must** be used **exactly once**. To destroy a resource, the `destroy
 ```bamboo,file=resource-loss.bpl
 // Declare another, unrelated value of resource type `SomeResource`
 //
-const c = SomeResource(value: 10)
+let c = SomeResource(value: 10)
 
 // Invalid: `c` is not used, but must be! `c` cannot be lost
 ```
@@ -1725,7 +1724,7 @@ const c = SomeResource(value: 10)
 ```bamboo,file=resource-destruction.bpl
 // Declare another, unrelated value of resource type `SomeResource`
 //
-const d = SomeResource(value: 20)
+let d = SomeResource(value: 20)
 
 // Destroy the resource referred to by constant `d`
 //
@@ -1742,7 +1741,7 @@ d.value
 Arrays and dictionaries behave differently when they contain resources: When a resource is **read** from the array at a certain index, or it is **read** from a dictionary by accessing a certain key, the resource is **moved** out of the array or dictionary.
 
 ```bamboo,file=resource-in-array.bpl
-const resources = [
+let resources = [
     SomeResource(value: 1),
     SomeResource(value: 2),
     SomeResource(value: 3)
@@ -1750,11 +1749,11 @@ const resources = [
 
 // **Move** the first resource into a new constant
 //
-const firstResource <- resources[0]
+let firstResource <- resources[0]
 
 // **Move** the second resource into a new constant
 //
-const secondResource <- resources[1]
+let secondResource <- resources[1]
 
 // `resources` only contains one element,
 // the initial third resource!
@@ -1776,14 +1775,14 @@ There are three kinds of fields.
 
 Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the `var` keyword.
 
-Constant fields are also stored in the composite value, but they can **not** have new values assigned to them. They are declared using the `const` keyword.
+Constant fields are also stored in the composite value, but they can **not** have new values assigned to them. They are declared using the `let` keyword.
 
 Synthetic fields are **not** stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#composite-data-type-field-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
 
 | Field Kind           | Stored in memory | Assignable         | Keyword     |
 |----------------------|------------------|--------------------|-------------|
 | **Variable field**   | Yes              | Yes                | `var`       |
-| **Constant field**   | Yes              | **No**             | `const`     |
+| **Constant field**   | Yes              | **No**             | `let`       |
 | **Synthetic field**  | **No**           | Yes                | `synthetic` |
 
 ```bamboo,file=composite-data-type-fields-and-init.bpl
@@ -1793,7 +1792,7 @@ Synthetic fields are **not** stored in the composite value, i.e. they are derive
 // Both fields are initialized through the initializer
 //
 struct Token {
-    const id: Int
+    let id: Int
     var balance: Int
 
     init(id: Int, balance: Int) {
@@ -1808,7 +1807,7 @@ In initializers, the special constant `self` refers to the composite value that 
 Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (`.`) and the name of the field.
 
 ```bamboo,file=composite-data-type-fields-assignment.bpl
-const token = Token(id: 42, balance: 1_000_00)
+let token = Token(id: 42, balance: 1_000_00)
 
 token.id // is 42
 token.balance // is 1_000_000
@@ -1854,7 +1853,7 @@ struct GetterExample {
     }
 }
 
-const example = GetterExample(balance: 10)
+let example = GetterExample(balance: 10)
 // example.balance is 10
 
 example.balance = -50
@@ -1885,7 +1884,7 @@ struct SetterExample {
     }
 }
 
-const example = SetterExample(balance: 10)
+let example = SetterExample(balance: 10)
 // example.balance is 10
 
 // error: precondition of setter for field balance failed
@@ -1960,7 +1959,7 @@ struct GoalTracker {
     }
 }
 
-const tracker = GoalTracker(goal: 10, completed: 0)
+let tracker = GoalTracker(goal: 10, completed: 0)
 // tracker.goal is 10
 // tracker.completed is 0
 // tracker.left is 10
@@ -1981,7 +1980,7 @@ Composite data types may contain functions. Just like in the initializer, the sp
 
 ```bamboo,file=struct-and-class-function.bpl
 struct Token {
-    const id: Int
+    let id: Int
     var balance: Int
 
     init(id: Int, initialBalance balance: Int) {
@@ -1994,7 +1993,7 @@ struct Token {
     }
 }
 
-const token = Token(id: 32, initialBalance: 0)
+let token = Token(id: 32, initialBalance: 0)
 token.mint(amount: 1_000_000)
 // token.balance is 1_000_000
 ```
@@ -2031,8 +2030,8 @@ To summarize the behavior for variable declarations, constant declarations, and 
 
 | Declaration kind | Access modifier    | Read scope        | Write scope       |
 |:-----------------|:-------------------|:------------------|:------------------|
-| `const`          |                    | Current and inner | *None*            |
-| `const`          | `pub`              | **All**           | *None*            |
+| `let`            |                    | Current and inner | *None*            |
+| `let`            | `pub`              | **All**           | *None*            |
 | `var`            |                    | Current and inner | Current and inner |
 | `var`            | `pub`              | **All**           | Current and inner |
 | `var`            | `pub(set)`         | **All**           | **All**           |
@@ -2048,11 +2047,11 @@ To summarize the behavior for functions, structures, classes, resources, and int
 ```bamboo,file=access-control.bpl
 // Declare a private constant, inaccessible/invisible in outer scope
 //
-const a = 1
+let a = 1
 
 // Declare a public constant, accessible/visible in all scopes
 //
-pub const b = 2
+pub let b = 2
 
 // Declare a public class, accessible/visible in all scopes
 //
@@ -2061,11 +2060,11 @@ pub class SomeClass {
     // Declare a private constant field,
     // only readable in the current and inner scopes
     //
-    const a: Int
+    let a: Int
 
     // Declare a public constant field, readable in all scopes
     //
-    pub const b: Int
+    pub let b: Int
 
     // Declare a private variable field,
     // only readable and writable in the current and inner scopes
@@ -2121,7 +2120,7 @@ Calling functions with pre-conditions and post-conditions on interfaces instead 
 
 Interfaces are declared using the `interface` keyword, followed by the name of the interface, and the requirements enclosed in opening and closing braces.
 
-Field requirements can be annotated to require the implementation to be a variable field, by using the `var` keyword; require the implementation to be a constant field, by using the `const` keyword; or the field requirement may specify nothing, in which case the implementation may either be a variable field, a constant field, or a synthetic field.
+Field requirements can be annotated to require the implementation to be a variable field, by using the `var` keyword; require the implementation to be a constant field, by using the `let` keyword; or the field requirement may specify nothing, in which case the implementation may either be a variable field, a constant field, or a synthetic field.
 
 Field requirements and function requirements must specify the required level of access. The access must be at least be public, so the `pub` keyword must be provided. Variable field requirements can be specified to also be publicly settable by using the `pub(set)` keyword.
 
@@ -2135,7 +2134,7 @@ interface Vault {
     // Require the implementation to provide a field for the balance that is
     // readable in all scopes (`pub`).
     //
-    // Neither the `var` keyword, nor the `const` keyword is used,
+    // Neither the `var` keyword, nor the `let` keyword is used,
     // so the field may be implemented as either a variable field,
     // a constant field, or a synthetic field.
     //
@@ -2290,8 +2289,8 @@ impl Vault for ExampleVault {
 // Declare two constants which have type `ExampleVault`,
 // and are initialized to two different example vaults
 //
-const vault = ExampleVault(initialBalance: 100)
-const otherVault = ExampleVault(initialBalance: 0)
+let vault = ExampleVault(initialBalance: 100)
+let otherVault = ExampleVault(initialBalance: 0)
 
 // Transfer 10 units from the first vault to the second vault.
 //
@@ -2351,7 +2350,7 @@ Interfaces are types. Values implementing an interface can be used as initial va
 ```bamboo,file=interface-type.bpl
 // Declare a constant that has type `Vault`, which has a value that has type `ExampleVault`
 //
-const vault: Vault = ExampleVault(initialBalance: 100)
+let vault: Vault = ExampleVault(initialBalance: 100)
 ```
 
 Values implementing an interface are assignable to variables that have the interface as their type.
@@ -2374,7 +2373,7 @@ someVault = ExampleVault(initialBalance: 50)
 // Invalid: cannot assign a value that has type `CoolVault`
 // to a constant that has type `ExampleVault`
 //
-const exampleVault: ExampleVault = CoolVault(initialBalance: 100)
+let exampleVault: ExampleVault = CoolVault(initialBalance: 100)
 ```
 
 Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.
@@ -2382,7 +2381,7 @@ Fields declared in an interface can be accessed and functions declared in an int
 ```bamboo,file=interface-type-fields-and-functions.bpl
 // Declare a constant which has the type `Vault`, and a value that has type `ExampleVault`
 //
-const someVault: Vault = ExampleVault(initialBalance: 100)
+let someVault: Vault = ExampleVault(initialBalance: 100)
 
 // Access the field `balance` declared in the interface `Vault`
 //
@@ -2417,7 +2416,7 @@ interface Equatable {
 // that has type `Int`, i.e., the identifier of the cat.
 //
 class Cat {
-    pub const id: Int
+    pub let id: Int
 
     init(id: Int) {
         self.id = id
@@ -2541,13 +2540,9 @@ resource Counter {
     pub init(count: Int) {
         self.count = count
     }
-
-    pub fun increment(_ count: Int) {
-        self.count = self.count + count
-    }
 }
 
-const account: Account = // ...
+let account: Account = // ...
 
 // Create a new instance of the resource type `Counter` and move it
 // into the storage of the account.
@@ -2625,8 +2620,8 @@ Terminates the program unconditionally and reports a message which explains why 
 #### Example
 
 ```bamboo
-const optionalAccount: Account? = // ...
-const account = optionalAccount ?? fatalError("missing account")
+let optionalAccount: Account? = // ...
+let account = optionalAccount ?? fatalError("missing account")
 ```
 
 ### `assert`
