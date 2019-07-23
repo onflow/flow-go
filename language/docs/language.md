@@ -1,88 +1,6 @@
 # Bamboo Programming Language
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**
-
-- [Introduction](#introduction)
-- [Syntax and Behavior](#syntax-and-behavior)
-- [Comments](#comments)
-- [Constants and Variable Declarations](#constants-and-variable-declarations)
-- [Type Annotations](#type-annotations)
-- [Naming](#naming)
-  - [Conventions](#conventions)
-- [Semicolons](#semicolons)
-- [Values and Types](#values-and-types)
-  - [Booleans](#booleans)
-  - [Numeric Literals](#numeric-literals)
-  - [Integers](#integers)
-  - [Floating-Point Numbers](#floating-point-numbers)
-  - [Addresses](#addresses)
-  - [Strings and Characters](#strings-and-characters)
-  - [Arrays](#arrays)
-    - [Array Indexing](#array-indexing)
-    - [Array Types](#array-types)
-  - [Dictionaries](#dictionaries)
-    - [Dictionary Access](#dictionary-access)
-    - [Dictionary Types](#dictionary-types)
-    - [Dictionary Keys](#dictionary-keys)
-  - [Any](#any)
-  - [Never](#never)
-- [Operators](#operators)
-  - [Negation](#negation)
-  - [Assignment](#assignment)
-  - [Arithmetic](#arithmetic)
-  - [Logical Operators](#logical-operators)
-  - [Comparison operators](#comparison-operators)
-  - [Ternary Conditional Operator](#ternary-conditional-operator)
-  - [Precedence and Associativity](#precedence-and-associativity)
-- [Functions](#functions)
-  - [Function Declarations](#function-declarations)
-  - [Function Expressions](#function-expressions)
-  - [Function Calls](#function-calls)
-  - [Function Types](#function-types)
-    - [Argument Passing Behavior](#argument-passing-behavior)
-  - [Function Preconditions and Postconditions](#function-preconditions-and-postconditions)
-- [Control flow](#control-flow)
-  - [Conditional branching: if-statement](#conditional-branching-if-statement)
-  - [Looping: while-statement](#looping-while-statement)
-  - [Immediate function return: return-statement](#immediate-function-return-return-statement)
-- [Scope](#scope)
-- [Optionals](#optionals)
-  - [Nil-Coalescing Operator](#nil-coalescing-operator)
-- [Type Safety](#type-safety)
-- [Type Inference](#type-inference)
-- [Composite Data Types](#composite-data-types)
-  - [Structures and Classes](#structures-and-classes)
-    - [Structure and Classe Declaration](#structure-and-classe-declaration)
-    - [Structure and Classe Behaviour](#structure-and-classe-behaviour)
-  - [Resources](#resources)
-    - [Resource Declaration](#resource-declaration)
-    - [Resource Behaviour](#resource-behaviour)
-    - [Resources in Arrays and Dictionaries](#resources-in-arrays-and-dictionaries)
-  - [Composite Data Type Fields](#composite-data-type-fields)
-  - [Composite Data Type Field Getters and Setters](#composite-data-type-field-getters-and-setters)
-  - [Synthetic Composite Data Type Fields](#synthetic-composite-data-type-fields)
-  - [Composite Data Type Functions](#composite-data-type-functions)
-  - [Unbound References / Nulls](#unbound-references--nulls)
-  - [Inheritance and Abstract Types](#inheritance-and-abstract-types)
-- [Access control](#access-control)
-- [Interfaces](#interfaces)
-  - [Interface Declaration](#interface-declaration)
-  - [Interface Implementation](#interface-implementation)
-  - [Interface Type](#interface-type)
-  - [`Equatable` Interface](#equatable-interface)
-  - [`Hashable` Interface](#hashable-interface)
-- [Accounts](#accounts)
-  - [Account Storage](#account-storage)
-- [Importing External Types](#importing-external-types)
-- [Transactions](#transactions)
-- [Built-in Functions](#built-in-functions)
-  - [`fatalError`](#fatalerror)
-    - [Example](#example)
-  - [`assert`](#assert)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+## Table of Contents
 
 ## Introduction
 
@@ -131,7 +49,7 @@ Constants and variables are declarations that bind a value to a name. Constants 
 Constant means that the *name* is constant, not the *value* – the value may still be changed if it allows it, i.e. is mutable.
 
 The `const` keyword is used to declare a constant and the `var` keyword is used to declare a variable.
-The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
+The keywords are followed by the name, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
 
 ```bamboo,file=constants-and-variables.bpl
 // Declare a constant named `a`
@@ -698,11 +616,11 @@ fun crashAndBurn() -> Never {
 
 Operators are special symbols that perform a computation for one or more values. They are either unary, binary, or ternary.
 
-- Unary operators perform an operation for a single value. The unary operator symbol appears before the value.
+  - Unary operators perform an operation for a single value. The unary operator symbol appears before the value.
 
-- Binary operators operate on two values. The binary operator symbol appears between the two values (infix).
+  - Binary operators operate on two values. The binary operator symbol appears between the two values (infix).
 
-- Ternary operators operate on three values. The operator symbols appear between the three values (infix).
+  - Ternary operators operate on three values. The operator symbols appear between the three values (infix).
 
 
 ### Negation
@@ -792,9 +710,9 @@ const c = a * b
 
 If overflow behavior is intended, overflowing operators are available, which are prefixed with an `&`:
 
-- Overflow addition: `&+`
-- Overflow subtraction: `&-`
-- Overflow multiplication: `&*`
+  - Overflow addition: `&+`
+  - Overflow subtraction: `&-`
+  - Overflow multiplication: `&*`
 
 For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111). Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
 
@@ -839,79 +757,79 @@ c &- 1 // is 127
 
 Logical operators work with the boolean values `true` and `false`.
 
-- Logical AND: `a && b`
+  - Logical AND: `a && b`
 
-  ```bamboo,file=operator-and.bpl
-  true && true // is true
-  true && false // is false
-  false && false // is false
-  false && false // is false
-  ```
+    ```bamboo,file=operator-and.bpl
+    true && true // is true
+    true && false // is false
+    false && false // is false
+    false && false // is false
+    ```
 
-- Logical OR: `a || b`
+  - Logical OR: `a || b`
 
-  ```bamboo,file=operator-or.bpl
-  true || true // is true
-  true || false // is true
-  false || false // is true
-  false || false // is false
-  ```
+    ```bamboo,file=operator-or.bpl
+    true || true // is true
+    true || false // is true
+    false || false // is true
+    false || false // is false
+    ```
 
 ### Comparison operators
 
 Comparison operators work with boolean and integer values.
 
 
-- Equality: `==`, for booleans and integers
+  - Equality: `==`, for booleans and integers
 
-  ```bamboo,file=operator-equal.bpl
-  1 == 1 // is true
-  1 == 2 // is false
-  true == true // is true
-  true == false // is false
-  ```
+    ```bamboo,file=operator-equal.bpl
+    1 == 1 // is true
+    1 == 2 // is false
+    true == true // is true
+    true == false // is false
+    ```
 
-- Inequality: `!=`, for booleans and integers
+  - Inequality: `!=`, for booleans and integers
 
-  ```bamboo,file=operator-not-equal.bpl
-  1 != 1 // is false
-  1 != 2 // is true
-  true != true // is false
-  true != false // is true
-  ```
+    ```bamboo,file=operator-not-equal.bpl
+    1 != 1 // is false
+    1 != 2 // is true
+    true != true // is false
+    true != false // is true
+    ```
 
-- Less than: `<`, for integers
+  - Less than: `<`, for integers
 
-  ```bamboo,file=operator-less.bpl
-  1 < 1 // is false
-  1 < 2 // is true
-  2 < 1 // is false
-  ```
+    ```bamboo,file=operator-less.bpl
+    1 < 1 // is false
+    1 < 2 // is true
+    2 < 1 // is false
+    ```
 
-- Less or equal than: `<=`, for integers
+  - Less or equal than: `<=`, for integers
 
-  ```bamboo,file=operator-less-equals.bpl
-  1 <= 1 // is true
-  1 <= 2 // is true
-  2 <= 1 // is false
-  ```
+    ```bamboo,file=operator-less-equals.bpl
+    1 <= 1 // is true
+    1 <= 2 // is true
+    2 <= 1 // is false
+    ```
 
-- Greater than: `>`, for integers
+  - Greater than: `>`, for integers
 
-  ```bamboo,file=operator-greater.bpl
-  1 > 1 // is false
-  1 > 2 // is false
-  2 > 1 // is true
-  ```
+    ```bamboo,file=operator-greater.bpl
+    1 > 1 // is false
+    1 > 2 // is false
+    2 > 1 // is true
+    ```
 
 
-- Greater or equal than: `>=`, for integers
+  - Greater or equal than: `>=`, for integers
 
-  ```bamboo,file=operator-greater-equals.bpl
-  1 >= 1 // is true
-  1 >= 2 // is false
-  2 >= 1 // is true
-  ```
+    ```bamboo,file=operator-greater-equals.bpl
+    1 >= 1 // is true
+    1 >= 2 // is false
+    2 >= 1 // is true
+    ```
 
 
 ### Ternary Conditional Operator
@@ -1529,9 +1447,9 @@ const b = a ?? false
 
 > 🚧 Status: Type checking is not implemented yet.
 
-The Bamboo programming language is a _type-safe_ language.
+The Bamboo programming language is a *type-safe* language.
 
-When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type `Bool`, it can _only_ be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
+When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type `Bool`, it can *only* be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
 
 ```bamboo,file=type-safety-assign-int-to-bool.bpl
 // Declare a variable that has type `Bool`
@@ -1542,7 +1460,7 @@ var a = true
 a = 0
 ```
 
-When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type `Bool`, _only_ a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
+When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type `Bool`, *only* a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
 
 ```bamboo,file=type-safety-nand.bpl
 fun nand(_ a: Bool, _ b: Bool) -> Bool {
@@ -1645,7 +1563,7 @@ Value types should be used when copies with independent state is desired, refere
 
 ### Structures and Classes
 
-#### Structure and Classe Declaration
+#### Structure and Class Declaration
 
 Structures are declared using the `struct` keyword. Classes are declared using the `class` keyword.
 The keyword is followed by the name of the type.
@@ -1668,7 +1586,7 @@ SomeStruct()
 SomeClass()
 ```
 
-#### Structure and Classe Behaviour
+#### Structure and Class Behaviour
 
 The only difference between structures and classes is their behavior when used as an initial value for constant or variable, when assigned to a different variable, or passed as an argument to a function: Structures are **copied**, i.e. they are value types, classes are **referenced**, i.e., they are reference types.
 
@@ -1860,7 +1778,7 @@ Variable fields are stored in the composite value and can have new values assign
 
 Constant fields are also stored in the composite value, but they can **not** have new values assigned to them. They are declared using the `const` keyword.
 
-Synthetic fields are **not** stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#composite-data-type-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
+Synthetic fields are **not** stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#composite-data-type-field-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
 
 | Field Kind           | Stored in memory | Assignable         | Keyword     |
 |----------------------|------------------|--------------------|-------------|
@@ -2720,4 +2638,3 @@ fun assert(_ condition: Bool, message: String)
 ```
 
 Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.
-
