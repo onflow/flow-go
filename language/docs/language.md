@@ -49,7 +49,7 @@ Constants and variables are declarations that bind a value to a name. Constants 
 Constant means that the *name* is constant, not the *value* – the value may still be changed if it allows it, i.e. is mutable.
 
 The `const` keyword is used to declare a constant and the `var` keyword is used to declare a variable.
-The keywords are followed by the name, an optional [type annotation](#Type Annotations), an equals sign `=`, and the initial value.
+The keywords are followed by the name, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
 
 ```bamboo,file=constants-and-variables.bpl
 // Declare a constant named `a`
@@ -616,11 +616,11 @@ fun crashAndBurn() -> Never {
 
 Operators are special symbols that perform a computation for one or more values. They are either unary, binary, or ternary.
 
-- Unary operators perform an operation for a single value. The unary operator symbol appears before the value.
+  - Unary operators perform an operation for a single value. The unary operator symbol appears before the value.
 
-- Binary operators operate on two values. The binary operator symbol appears between the two values (infix).
+  - Binary operators operate on two values. The binary operator symbol appears between the two values (infix).
 
-- Ternary operators operate on three values. The operator symbols appear between the three values (infix).
+  - Ternary operators operate on three values. The operator symbols appear between the three values (infix).
 
 
 ### Negation
@@ -710,9 +710,9 @@ const c = a * b
 
 If overflow behavior is intended, overflowing operators are available, which are prefixed with an `&`:
 
-- Overflow addition: `&+`
-- Overflow subtraction: `&-`
-- Overflow multiplication: `&*`
+  - Overflow addition: `&+`
+  - Overflow subtraction: `&-`
+  - Overflow multiplication: `&*`
 
 For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111). Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
 
@@ -757,79 +757,79 @@ c &- 1 // is 127
 
 Logical operators work with the boolean values `true` and `false`.
 
-- Logical AND: `a && b`
+  - Logical AND: `a && b`
 
-  ```bamboo,file=operator-and.bpl
-  true && true // is true
-  true && false // is false
-  false && false // is false
-  false && false // is false
-  ```
+    ```bamboo,file=operator-and.bpl
+    true && true // is true
+    true && false // is false
+    false && false // is false
+    false && false // is false
+    ```
 
-- Logical OR: `a || b`
+  - Logical OR: `a || b`
 
-  ```bamboo,file=operator-or.bpl
-  true || true // is true
-  true || false // is true
-  false || false // is true
-  false || false // is false
-  ```
+    ```bamboo,file=operator-or.bpl
+    true || true // is true
+    true || false // is true
+    false || false // is true
+    false || false // is false
+    ```
 
 ### Comparison operators
 
 Comparison operators work with boolean and integer values.
 
 
-- Equality: `==`, for booleans and integers
+  - Equality: `==`, for booleans and integers
 
-  ```bamboo,file=operator-equal.bpl
-  1 == 1 // is true
-  1 == 2 // is false
-  true == true // is true
-  true == false // is false
-  ```
+    ```bamboo,file=operator-equal.bpl
+    1 == 1 // is true
+    1 == 2 // is false
+    true == true // is true
+    true == false // is false
+    ```
 
-- Inequality: `!=`, for booleans and integers
+  - Inequality: `!=`, for booleans and integers
 
-  ```bamboo,file=operator-not-equal.bpl
-  1 != 1 // is false
-  1 != 2 // is true
-  true != true // is false
-  true != false // is true
-  ```
+    ```bamboo,file=operator-not-equal.bpl
+    1 != 1 // is false
+    1 != 2 // is true
+    true != true // is false
+    true != false // is true
+    ```
 
-- Less than: `<`, for integers
+  - Less than: `<`, for integers
 
-  ```bamboo,file=operator-less.bpl
-  1 < 1 // is false
-  1 < 2 // is true
-  2 < 1 // is false
-  ```
+    ```bamboo,file=operator-less.bpl
+    1 < 1 // is false
+    1 < 2 // is true
+    2 < 1 // is false
+    ```
 
-- Less or equal than: `<=`, for integers
+  - Less or equal than: `<=`, for integers
 
-  ```bamboo,file=operator-less-equals.bpl
-  1 <= 1 // is true
-  1 <= 2 // is true
-  2 <= 1 // is false
-  ```
+    ```bamboo,file=operator-less-equals.bpl
+    1 <= 1 // is true
+    1 <= 2 // is true
+    2 <= 1 // is false
+    ```
 
-- Greater than: `>`, for integers
+  - Greater than: `>`, for integers
 
-  ```bamboo,file=operator-greater.bpl
-  1 > 1 // is false
-  1 > 2 // is false
-  2 > 1 // is true
-  ```
+    ```bamboo,file=operator-greater.bpl
+    1 > 1 // is false
+    1 > 2 // is false
+    2 > 1 // is true
+    ```
 
 
-- Greater or equal than: `>=`, for integers
+  - Greater or equal than: `>=`, for integers
 
-  ```bamboo,file=operator-greater-equals.bpl
-  1 >= 1 // is true
-  1 >= 2 // is false
-  2 >= 1 // is true
-  ```
+    ```bamboo,file=operator-greater-equals.bpl
+    1 >= 1 // is true
+    1 >= 2 // is false
+    2 >= 1 // is true
+    ```
 
 
 ### Ternary Conditional Operator
@@ -1447,9 +1447,9 @@ const b = a ?? false
 
 > 🚧 Status: Type checking is not implemented yet.
 
-The Bamboo programming language is a _type-safe_ language.
+The Bamboo programming language is a *type-safe* language.
 
-When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type `Bool`, it can _only_ be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
+When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type `Bool`, it can *only* be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
 
 ```bamboo,file=type-safety-assign-int-to-bool.bpl
 // Declare a variable that has type `Bool`
@@ -1460,7 +1460,7 @@ var a = true
 a = 0
 ```
 
-When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type `Bool`, _only_ a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
+When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type `Bool`, *only* a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
 
 ```bamboo,file=type-safety-nand.bpl
 fun nand(_ a: Bool, _ b: Bool) -> Bool {
@@ -1778,7 +1778,7 @@ Variable fields are stored in the composite value and can have new values assign
 
 Constant fields are also stored in the composite value, but they can **not** have new values assigned to them. They are declared using the `const` keyword.
 
-Synthetic fields are **not** stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#composite-data-type-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
+Synthetic fields are **not** stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#composite-data-type-field-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
 
 | Field Kind           | Stored in memory | Assignable         | Keyword     |
 |----------------------|------------------|--------------------|-------------|
@@ -2638,4 +2638,3 @@ fun assert(_ condition: Bool, message: String)
 ```
 
 Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.
-
