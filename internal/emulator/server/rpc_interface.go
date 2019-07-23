@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -105,5 +106,19 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 
 // CallContract performs a contract call.
 func (s *EmulatorServer) CallContract(ctx context.Context, req *observe.CallContractRequest) (*observe.CallContractResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	script := req.GetScript()
+	value, _ := s.blockchain.CallScript(script)
+	// TODO: add error handling besides just this
+	if value == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid script")
+	}
+
+	// TODO: change this to whatever interface -> byte encoding decide on
+	valueMsg := []byte(fmt.Sprintf("%v", value.(interface{})))
+
+	response := &observe.CallContractResponse{
+		Script: valueMsg,
+	}
+
+	return response, nil
 }
