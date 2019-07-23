@@ -1,4 +1,4 @@
-package vm
+package runtime
 
 import (
 	"math/big"
@@ -8,25 +8,25 @@ import (
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 )
 
-type BambooVM struct {
+type EmulatorRuntimeAPI struct {
 	registers *etypes.RegistersView
 }
 
-func NewBambooVM(registers *etypes.RegistersView) *BambooVM {
-	return &BambooVM{registers}
+func NewEmulatorRuntimeAPI(registers *etypes.RegistersView) *EmulatorRuntimeAPI {
+	return &EmulatorRuntimeAPI{registers}
 }
 
-func (i *BambooVM) GetValue(controller, owner, key []byte) ([]byte, error) {
+func (i *EmulatorRuntimeAPI) GetValue(controller, owner, key []byte) ([]byte, error) {
 	v, _ := i.registers.Get(fullKey(controller, owner, key))
 	return v, nil
 }
 
-func (i *BambooVM) SetValue(controller, owner, key, value []byte) error {
+func (i *EmulatorRuntimeAPI) SetValue(controller, owner, key, value []byte) error {
 	i.registers.Set(fullKey(controller, owner, key), value)
 	return nil
 }
 
-func (i *BambooVM) CreateAccount(publicKey, code []byte) (id []byte, err error) {
+func (i *EmulatorRuntimeAPI) CreateAccount(publicKey, code []byte) (id []byte, err error) {
 	latestAccountID, _ := i.registers.Get(keyLatestAccount())
 
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
@@ -48,7 +48,7 @@ func (i *BambooVM) CreateAccount(publicKey, code []byte) (id []byte, err error) 
 	return address.Bytes(), nil
 }
 
-func (i *BambooVM) GetAccount(address crypto.Address) *crypto.Account {
+func (i *EmulatorRuntimeAPI) GetAccount(address crypto.Address) *crypto.Account {
 	accountID := address.Bytes()
 
 	balanceBytes, exists := i.registers.Get(fullKey(accountID, accountID, []byte("balance")))

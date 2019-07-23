@@ -4,8 +4,8 @@ import (
 	"github.com/dapperlabs/bamboo-node/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
+	eruntime "github.com/dapperlabs/bamboo-node/internal/emulator/runtime"
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
-	"github.com/dapperlabs/bamboo-node/internal/emulator/vm"
 )
 
 // Computer provides an interface to execute scripts against the world state.
@@ -35,5 +35,8 @@ func (c *Computer) ExecuteScript(
 	script []byte,
 	registers *etypes.RegistersView,
 ) (result interface{}, err error) {
-	return c.runtime.ExecuteScript(script, vm.NewBambooVM(registers))
+	return c.runtime.ExecuteScript(
+		script,
+		eruntime.NewEmulatorRuntimeAPI(registers),
+	)
 }
