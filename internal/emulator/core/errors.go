@@ -37,3 +37,12 @@ func (e *ErrTransactionReverted) Error() string {
 		e.Err.Error(),
 	)
 }
+
+// ErrInvalidStateVersion indicates that a state version hash provided is invalid.
+type ErrInvalidStateVersion struct {
+	Version crypto.Hash
+}
+
+func (e *ErrInvalidStateVersion) Error() string {
+	return fmt.Sprintf("World State with version hash %s is invalid", e.Version)
+}
