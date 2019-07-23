@@ -606,7 +606,7 @@ a + 2
 // Declare a function named `crashAndBurn` which will never return,
 // because it calls the function named `fatalError`, which never returns
 //
-fun crashAndBurn() -> Never {
+fun crashAndBurn(): Never {
     fatalError("An unrecoverable error occurred")
 }
 ```
@@ -869,9 +869,13 @@ Functions are values, i.e., they can be assigned to constants and variables, and
 
 Functions can be declared by using the `fun` keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called.
 
-The parameters need to be enclosed in parentheses. The return type, if any, is separated from the parameters using the `->` keyword (a hyphen followed by a right angle bracket). The function code needs to be enclosed in opening and closing braces.
+The parameters need to be enclosed in parentheses.
+The return type, if any, is separated from the parameters by a colon (`:`).
+The function code needs to be enclosed in opening and closing braces.
 
-Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter. Argument labels precede the parameter name. The special argument label `_` indicates that a function call can omit the argument label. If no argument label is provided, the function call must use the parameter name.
+Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter.
+Argument labels precede the parameter name. The special argument label `_` indicates that a function call can omit the argument label.
+If no argument label is provided, the function call must use the parameter name.
 
 Each parameter needs to have a type annotation, which follows the parameter name after a colon.
 
@@ -881,7 +885,7 @@ Each parameter needs to have a type annotation, which follows the parameter name
 // The special argument label _ is specified for the parameter,
 // so no argument label has to be provided in a function call
 //
-fun double(_ x: Int) -> Int {
+fun double(_ x: Int): Int {
     return x * 2
 }
 
@@ -907,7 +911,7 @@ It is possible to require argument labels for some parameters, and not require a
 // so the parameter names are the argument labels, i.e., the parameter names
 // have to be given as argument labels in a function call.
 //
-fun clamp(_ value: Int, min: Int, max: Int) -> Int {
+fun clamp(_ value: Int, min: Int, max: Int): Int {
     if value > max {
         return max
     }
@@ -1013,7 +1017,7 @@ Functions can be nested, i.e., the code of a function may declare further functi
 ```bamboo,file=function-doubleAndAddOne.bpl
 // Declare a function which multiplies a number by two, and adds one
 //
-fun doubleAndAddOne(_ x: Int) -> Int {
+fun doubleAndAddOne(_ x: Int): Int {
 
     // Declare a nested function which multiplies a number by two
     //
@@ -1037,7 +1041,7 @@ Functions can be also used as expressions. The syntax is the same as for functio
 // The function multiplies a number by two when it is called
 //
 let double =
-    fun (_ x: Int) -> Int {
+    fun (_ x: Int): Int {
         return x * 2
     }
 ```
@@ -1047,7 +1051,7 @@ let double =
 Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.
 
 ```bamboo,file=function-call.bpl
-fun double(_ x: Int) -> Int {
+fun double(_ x: Int): Int {
      return x * 2
 }
 
@@ -1067,21 +1071,23 @@ double()
 ### Function Types
 
 Function types consist of the function's parameter types and the function's return type.
-The parameter types need to be enclosed in parentheses, followed by the `->` keyword, and end with the return type.
+
+The parameter types need to be enclosed in parentheses, followed by a colon (`:`), and end with the return type.
+The whole function type needs to be enclosed in parentheses.
 
 ```bamboo,file=function-type.bpl
-// Declare a function named `add`, with the function type `(Int, Int) -> Int`
+// Declare a function named `add`, with the function type `((Int, Int): Int)`
 //
-fun add(a: Int, b: Int) -> Int {
+fun add(a: Int, b: Int): Int {
     return a + b
 }
 ```
 
 ```bamboo,file=function-type-expression.bpl
-// Declare a constant named `add`, with the function type `(Int, Int) -> Int`
+// Declare a constant named `add`, with the function type `((Int, Int): Int)`
 //
-let add: (Int, Int) -> Int =
-    fun (a: Int, b: Int) -> Int {
+let add: ((Int, Int): Int) =
+    fun (a: Int, b: Int): Int {
         return a + b
     }
 ```
@@ -1092,15 +1098,15 @@ If the function has no return type, it implicitly has the return type `Void`.
 // Declare a constant named `doNothing`, which is a function
 // that takes no parameters and returns nothing
 //
-let doNothing: () -> Void =
+let doNothing: ((): Void) =
     fun () {}
 ```
 
-Types can be enclosed in parentheses to change precedence.
+Parantheses also control precedence.
+For example, a function type `((Int): ((): Int))` is the type for a function which accepts one argument with type `Int`,
+and which returns another function, that takes no arguments and returns an `Int`.
 
-For example, a function type `(Int) -> (() -> Int)` is the type for a function which accepts one argument with type `Int`, and which returns another function, that takes no arguments and returns an `Int`.
-
-The type `((Int) -> Int)[2]` specifies an array type of two functions, which accept one integer and return one integer.
+The type `((Int): Int)[2]` specifies an array type of two functions, which accept one integer and return one integer.
 
 #### Argument Passing Behavior
 
@@ -1156,7 +1162,7 @@ Following each condition, an optional description can be provided after a colon.
 In postconditions, the special constant `result` refers to the result of the function.
 
 ```bamboo,file=function-factorial.bpl
-fun factorial(_ n: Int) -> Int {
+fun factorial(_ n: Int): Int {
     require {
         // Require the parameter `n` to be greater than or equal to zero
         //
@@ -1301,7 +1307,7 @@ Every function and block (`{` ... `}`) introduces a new scope for declarations. 
 ```bamboo,file=scope.bpl
 let x = 10
 
-fun f() -> Int {
+fun f(): Int {
     let y = 10
     return x + y
 }
@@ -1314,7 +1320,7 @@ y
 ```
 
 ```bamboo,file=scope-doubleAndAddOne.bpl
-fun doubleAndAddOne(_ n: Int) -> Int {
+fun doubleAndAddOne(_ n: Int): Int {
     fun double(_ x: Int) {
         return x * 2
     }
@@ -1331,7 +1337,7 @@ Each scope can introduce new declarations, i.e., the outer declaration is shadow
 ```bamboo,file=scope-test.bpl
 let x = 2
 
-fun test() -> Int {
+fun test(): Int {
     let x = 3
     return x
 }
@@ -1344,11 +1350,11 @@ Scope is lexical, not dynamic.
 ```bamboo,file=scope-lexical.bpl
 let x = 10
 
-fun f() -> Int {
+fun f(): Int {
    return x
 }
 
-fun g() -> Int {
+fun g(): Int {
    let x = 20
    return f()
 }
@@ -1361,7 +1367,7 @@ Declarations are **not** moved to the top of the enclosing function (hoisted).
 ```bamboo,file=scope-no-hoisting.bpl
 let x = 2
 
-fun f() -> Int {
+fun f(): Int {
     if x == 0 {
         let x = 3
         return x
@@ -1462,7 +1468,7 @@ a = 0
 When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type `Bool`, *only* a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
 
 ```bamboo,file=type-safety-nand.bpl
-fun nand(_ a: Bool, _ b: Bool) -> Bool {
+fun nand(_ a: Bool, _ b: Bool): Bool {
     return !(a && b)
 }
 
@@ -1477,7 +1483,7 @@ Types are **not** automatically converted. For example, an integer is not automa
 
 
 ```bamboo,file=type-safety-add.bpl
-fun add(_ a: Int8, _ b: Int8) -> Int {
+fun add(_ a: Int8, _ b: Int8): Int {
     return a + b
 }
 
@@ -1539,11 +1545,11 @@ let invalidMixed = {
 Functions are inferred based on the parameter types and the return type.
 
 ```bamboo,file=type-inference-function.bpl
-let add = (a: Int8, b: Int8) -> Int {
+let add = (a: Int8, b: Int8): Int {
     return a + b
 }
 
-// `add` has type `(Int8, Int8) -> Int`
+// `add` has type `((Int8, Int8): Int)`
 ```
 
 ## Composite Data Types
@@ -2407,7 +2413,7 @@ To make a type equatable the `Equatable` interface must be implemented, which re
 
 ```bamboo,file=equatable.bpl
 interface Equatable {
-    pub fun equals(_ other: Self) -> Bool
+    pub fun equals(_ other: Self): Bool
 }
 ```
 
@@ -2428,7 +2434,7 @@ class Cat {
 //
 impl Equatable for Cat {
 
-    pub fun equals(_ other: Self) -> Bool {
+    pub fun equals(_ other: Self): Bool {
         // Cats are equal if their identifier matches.
         //
         return other.id == self.id
@@ -2486,7 +2492,7 @@ struct Point {
 //
 impl Equatable for Point {
 
-    pub fun equals(_ other: Self) -> Bool {
+    pub fun equals(_ other: Self): Bool {
         // Points are equal if their coordinates match.
         //
         // The essential components are therefore the fields
@@ -2612,7 +2618,7 @@ transaction {
 > 🚧 Status: `fatalError` is not implemented yet.
 
 ```bamboo
-fun fatalError(_ message: String) -> Never
+fun fatalError(_ message: String): Never
 ```
 
 Terminates the program unconditionally and reports a message which explains why the unrecoverable error occurred.

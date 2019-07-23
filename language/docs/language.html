@@ -712,7 +712,7 @@
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a function named `crashAndBurn` which will never return,</span><span>
 </span><span style="color: #008000">// because it calls the function named `fatalError`, which never returns</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> crashAndBurn() -> Never {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> crashAndBurn(): Never {</span><span>
 </span><span style="color: #000000">    fatalError(</span><span style="color: #A31515">"An unrecoverable error occurred"</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -934,15 +934,23 @@
         <section>
           <h3 id="function-declarations"><a href="#function-declarations" aria-hidden="true"><span class="icon icon-link"></span></a>Function Declarations</h3>
           <p>Functions can be declared by using the <code>fun</code> keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called.</p>
-          <p>The parameters need to be enclosed in parentheses. The return type, if any, is separated from the parameters using the <code>-></code> keyword (a hyphen followed by a right angle bracket). The function code needs to be enclosed in opening and closing braces.</p>
-          <p>Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter. Argument labels precede the parameter name. The special argument label <code>_</code> indicates that a function call can omit the argument label. If no argument label is provided, the function call must use the parameter name.</p>
+          <p>
+            The parameters need to be enclosed in parentheses.
+            The return type, if any, is separated from the parameters by a colon (<code>:</code>).
+            The function code needs to be enclosed in opening and closing braces.
+          </p>
+          <p>
+            Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter.
+            Argument labels precede the parameter name. The special argument label <code>_</code> indicates that a function call can omit the argument label.
+            If no argument label is provided, the function call must use the parameter name.
+          </p>
           <p>Each parameter needs to have a type annotation, which follows the parameter name after a colon.</p>
           <pre><code class="language-bamboo,file=function-double.bpl"><span style="color: #008000">// Declare a function named `double`, which multiples a number by two.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The special argument label _ is specified for the parameter,</span><span>
 </span><span style="color: #008000">// so no argument label has to be provided in a function call</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int) -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -965,7 +973,7 @@
 </span><span style="color: #008000">// so the parameter names are the argument labels, i.e., the parameter names</span><span>
 </span><span style="color: #008000">// have to be given as argument labels in a function call.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> clamp(_ value: Int, min: Int, max: Int) -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> clamp(_ value: Int, min: Int, max: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> value > max {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> max</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -1061,7 +1069,7 @@
           <p>Functions can be nested, i.e., the code of a function may declare further functions.</p>
           <pre><code class="language-bamboo,file=function-doubleAndAddOne.bpl"><span style="color: #008000">// Declare a function which multiplies a number by two, and adds one</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ x: Int) -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ x: Int): Int {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a nested function which multiplies a number by two</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
@@ -1083,7 +1091,7 @@
 </span><span style="color: #008000">// The function multiplies a number by two when it is called</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> double =</span><span>
-</span><span style="color: #000000">    fun (_ x: Int) -> Int {</span><span>
+</span><span style="color: #000000">    fun (_ x: Int): Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span></code></pre>
@@ -1091,7 +1099,7 @@
         <section>
           <h3 id="function-calls"><a href="#function-calls" aria-hidden="true"><span class="icon icon-link"></span></a>Function Calls</h3>
           <p>Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.</p>
-          <pre><code class="language-bamboo,file=function-call.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int) -> Int {</span><span>
+          <pre><code class="language-bamboo,file=function-call.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
 </span><span style="color: #000000">     </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -1110,20 +1118,21 @@
         </section>
         <section>
           <h3 id="function-types"><a href="#function-types" aria-hidden="true"><span class="icon icon-link"></span></a>Function Types</h3>
+          <p>Function types consist of the function's parameter types and the function's return type.</p>
           <p>
-            Function types consist of the function's parameter types and the function's return type.
-            The parameter types need to be enclosed in parentheses, followed by the <code>-></code> keyword, and end with the return type.
+            The parameter types need to be enclosed in parentheses, followed by a colon (<code>:</code>), and end with the return type.
+            The whole function type needs to be enclosed in parentheses.
           </p>
-          <pre><code class="language-bamboo,file=function-type.bpl"><span style="color: #008000">// Declare a function named `add`, with the function type `(Int, Int) -> Int`</span><span>
+          <pre><code class="language-bamboo,file=function-type.bpl"><span style="color: #008000">// Declare a function named `add`, with the function type `((Int, Int): Int)`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> add(a: Int, b: Int) -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> add(a: Int, b: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <pre><code class="language-bamboo,file=function-type-expression.bpl"><span style="color: #008000">// Declare a constant named `add`, with the function type `(Int, Int) -> Int`</span><span>
+          <pre><code class="language-bamboo,file=function-type-expression.bpl"><span style="color: #008000">// Declare a constant named `add`, with the function type `((Int, Int): Int)`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> add: (Int, Int) -> Int =</span><span>
-</span><span style="color: #000000">    fun (a: Int, b: Int) -> Int {</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> add: ((Int, Int): Int) =</span><span>
+</span><span style="color: #000000">    fun (a: Int, b: Int): Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span></code></pre>
@@ -1131,12 +1140,15 @@
           <pre><code class="language-bamboo,file=function-doNothing.bpl"><span style="color: #008000">// Declare a constant named `doNothing`, which is a function</span><span>
 </span><span style="color: #008000">// that takes no parameters and returns nothing</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> doNothing: () -> </span><span style="color: #0000FF">Void</span><span style="color: #000000"> =</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> doNothing: ((): </span><span style="color: #0000FF">Void</span><span style="color: #000000">) =</span><span>
 </span><span style="color: #000000">    fun () {}</span><span>
 </span></code></pre>
-          <p>Types can be enclosed in parentheses to change precedence.</p>
-          <p>For example, a function type <code>(Int) -> (() -> Int)</code> is the type for a function which accepts one argument with type <code>Int</code>, and which returns another function, that takes no arguments and returns an <code>Int</code>.</p>
-          <p>The type <code>((Int) -> Int)[2]</code> specifies an array type of two functions, which accept one integer and return one integer.</p>
+          <p>
+            Parantheses also control precedence.
+            For example, a function type <code>((Int): ((): Int))</code> is the type for a function which accepts one argument with type <code>Int</code>,
+            and which returns another function, that takes no arguments and returns an <code>Int</code>.
+          </p>
+          <p>The type <code>((Int): Int)[2]</code> specifies an array type of two functions, which accept one integer and return one integer.</p>
           <section>
             <h4 id="argument-passing-behavior"><a href="#argument-passing-behavior" aria-hidden="true"><span class="icon icon-link"></span></a>Argument Passing Behavior</h4>
             <p>When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as <a href="https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&#x26;oldid=896280571#Call_by_sharing">call-by-sharing</a>.</p>
@@ -1171,7 +1183,7 @@
           <p>Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for <a href="#semicolons">statements</a>.</p>
           <p>Following each condition, an optional description can be provided after a colon.</p>
           <p>In postconditions, the special constant <code>result</code> refers to the result of the function.</p>
-          <pre><code class="language-bamboo,file=function-factorial.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: Int) -> Int {</span><span>
+          <pre><code class="language-bamboo,file=function-factorial.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Require the parameter `n` to be greater than or equal to zero</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
@@ -1294,7 +1306,7 @@
         <p>Every function and block (<code>{</code> ... <code>}</code>) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.</p>
         <pre><code class="language-bamboo,file=scope.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f() -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> y = </span><span style="color: #09885A">10</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x + y</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -1305,7 +1317,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">y</span><span>
 </span></code></pre>
-        <pre><code class="language-bamboo,file=scope-doubleAndAddOne.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ n: Int) -> Int {</span><span>
+        <pre><code class="language-bamboo,file=scope-doubleAndAddOne.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ n: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -1319,7 +1331,7 @@
         <p>Each scope can introduce new declarations, i.e., the outer declaration is shadowed.</p>
         <pre><code class="language-bamboo,file=scope-test.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> test() -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> test(): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">3</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -1329,11 +1341,11 @@
         <p>Scope is lexical, not dynamic.</p>
         <pre><code class="language-bamboo,file=scope-lexical.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f() -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
 </span><span style="color: #000000">   </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> g() -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> g(): Int {</span><span>
 </span><span style="color: #000000">   </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">20</span><span>
 </span><span style="color: #000000">   </span><span style="color: #0000FF">return</span><span style="color: #000000"> f()</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -1343,7 +1355,7 @@
         <p>Declarations are <strong>not</strong> moved to the top of the enclosing function (hoisted).</p>
         <pre><code class="language-bamboo,file=scope-no-hoisting.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f() -> Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> x == </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">3</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
@@ -1425,7 +1437,7 @@
 </span><span style="color: #000000">a = </span><span style="color: #09885A">0</span><span>
 </span></code></pre>
         <p>When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type <code>Bool</code>, <em>only</em> a value that has type <code>Bool</code> can be provided, and not for example a value which has type <code>Int</code>.</p>
-        <pre><code class="language-bamboo,file=type-safety-nand.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> nand(_ a: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, _ b: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) -> </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+        <pre><code class="language-bamboo,file=type-safety-nand.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> nand(_ a: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, _ b: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> !(a &#x26;&#x26; b)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -1436,7 +1448,7 @@
 </span><span style="color: #000000">nand(</span><span style="color: #09885A">0</span><span style="color: #000000">, </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span></code></pre>
         <p>Types are <strong>not</strong> automatically converted. For example, an integer is not automatically converted to a boolean, nor is an <code>Int32</code> automatically converted to an <code>Int8</code>, nor is an optional integer <code>Int?</code> automatically converted to a non-optional integer <code>Int</code>.</p>
-        <pre><code class="language-bamboo,file=type-safety-add.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> add(_ a: Int8, _ b: Int8) -> Int {</span><span>
+        <pre><code class="language-bamboo,file=type-safety-add.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> add(_ a: Int8, _ b: Int8): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -1486,11 +1498,11 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
         <p>Functions are inferred based on the parameter types and the return type.</p>
-        <pre><code class="language-bamboo,file=type-inference-function.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> add = (a: Int8, b: Int8) -> Int {</span><span>
+        <pre><code class="language-bamboo,file=type-inference-function.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> add = (a: Int8, b: Int8): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// `add` has type `(Int8, Int8) -> Int`</span><span>
+</span><span style="color: #008000">// `add` has type `((Int8, Int8): Int)`</span><span>
 </span></code></pre>
       </section>
       <section>
@@ -2336,7 +2348,7 @@
           <p>Most of the built-in types are equatable, like booleans and integers. Arrays are equatable when their elements are equatable. Dictionaries are equatable when their values are equatable.</p>
           <p>To make a type equatable the <code>Equatable</code> interface must be implemented, which requires the implementation of the function <code>equals</code>, which accepts another value that the given value should be compared for equality. Note that the parameter type is <code>Self</code>, i.e., the other value must have the same type as the implementing type.</p>
           <pre><code class="language-bamboo,file=equatable.bpl"><span style="color: #0000FF">interface</span><span style="color: #000000"> Equatable {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self) -> </span><span style="color: #0000FF">Bool</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <pre><code class="language-bamboo,file=equatable-impl.bpl"><span style="color: #008000">// Declare a class named `Cat`, which has one field named `id`</span><span>
@@ -2355,7 +2367,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">impl Equatable for Cat {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self) -> </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Cats are equal if their identifier matches.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> other.id == </span><span style="color: #0000FF">self</span><span style="color: #000000">.id</span><span>
@@ -2401,7 +2413,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">impl Equatable for Point {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self) -> </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Points are equal if their coordinates match.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// The essential components are therefore the fields</span><span>
@@ -2518,7 +2530,7 @@
           <blockquote>
             <p>🚧 Status: <code>fatalError</code> is not implemented yet.</p>
           </blockquote>
-          <pre><code class="language-bamboo"><span style="color: #0000FF">fun</span><span style="color: #000000"> fatalError(_ message: </span><span style="color: #0000FF">String</span><span style="color: #000000">) -> Never</span><span>
+          <pre><code class="language-bamboo"><span style="color: #0000FF">fun</span><span style="color: #000000"> fatalError(_ message: </span><span style="color: #0000FF">String</span><span style="color: #000000">): Never</span><span>
 </span></code></pre>
           <p>Terminates the program unconditionally and reports a message which explains why the unrecoverable error occurred.</p>
           <section>

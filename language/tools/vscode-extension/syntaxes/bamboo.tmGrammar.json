@@ -411,7 +411,7 @@
         ]
       },
       "function-result": {
-        "begin": "(?<![/=\\-+!*%<>&|\\^~.])(->)(?![/=\\-+!*%<>&|\\^~.])\\s*",
+        "begin": "(?<![/=\\-+!*%<>&|\\^~.])(:)(?![/=\\-+!*%<>&|\\^~.])\\s*",
         "beginCaptures": {
           "1": {
             "name": "keyword.operator.function-result.bamboo"
