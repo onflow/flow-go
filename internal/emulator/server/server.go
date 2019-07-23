@@ -2,12 +2,17 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+
+	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 type EmulatorServer struct {
@@ -33,6 +38,7 @@ func NewEmulatorServer(log *logrus.Logger, config *Config) *EmulatorServer {
 
 func (s *EmulatorServer) Start(ctx context.Context) {
 	// TODO: connect gRPC interface to server
+	go s.startGrpcServer()
 
 	tick := time.Tick(s.config.BlockInterval)
 	for {
@@ -46,6 +52,17 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func (s *EmulatorServer) startGrpcServer() {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.Port))
+	if err != nil {
+		s.log.WithError(err).Fatal("Failed to listen")
+	}
+
+	grpcServer := grpc.NewServer()
+	observe.RegisterObserveServiceServer(grpcServer, s)
+	grpcServer.Serve(lis)
 }
 
 func StartServer(log *logrus.Logger, config *Config) {
