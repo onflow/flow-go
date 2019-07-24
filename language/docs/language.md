@@ -2563,6 +2563,46 @@ struct SomeInner {}
 impl OuterInterface.InnerInterface for SomeInner {}
 ```
 
+### Nested Type Requirements
+
+Interfaces can require implementing types to provide concrete nested types.
+For example, a resource interface may require an implementing type to provide a resource type.
+
+```bamboo,file=interface-nested-type-requirement.bpl
+// Declare a resource interface named `FungibleToken`.
+//
+// Require implementing types to provide a resource type named `Vault`
+// which must have a field named `balance`
+//
+resource interface FungibleToken {
+
+    pub resource Vault {
+        pub balance: Int
+    }
+}
+
+// Declare a resource named `ExampleToken`
+//
+resource ExampleToken {}
+
+// Implement the resource interface `FungibleToken`
+// for resource type `ExampleToken`.
+//
+// The nested type `Vault` must be provided
+// to conform to the interface.
+//
+impl FungibleToken for ExampleToken {
+
+    pub resource Vault {
+        pub var balance: Int
+
+        init(balance: Int) {
+            self.balance = balance
+        }
+    }
+}
+```
+
 ### `Equatable` Interface
 
 > 🚧 Status: The `Equatable` interface is not implemented yet.
