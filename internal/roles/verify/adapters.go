@@ -6,7 +6,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
-//NewReceiptProcessorConfig returns a new ReceiptProcessorConfig.
+// NewReceiptProcessorConfig returns a new ReceiptProcessorConfig.
 func NewReceiptProcessorConfig(c *config.Config) *processor.ReceiptProcessorConfig {
 	return &processor.ReceiptProcessorConfig{
 		QueueBuffer: c.ProcessorQueueBuffer,
