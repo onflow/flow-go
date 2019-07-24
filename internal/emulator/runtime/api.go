@@ -69,7 +69,7 @@ func (i *EmulatorRuntimeAPI) GetAccount(address crypto.Address) *crypto.Account 
 }
 
 func keyLatestAccount() crypto.Hash {
-	return crypto.NewHash([]byte("latestAccount"))
+	return crypto.NewHash([]byte("latest_account"))
 }
 
 func keyBalance() []byte {
