@@ -2522,6 +2522,46 @@ impl Polygon for Hexagon {}
 impl Shape for Hexagon {}
 ```
 
+### Interface Nesting
+
+Interfaces can be arbitrarily nested.
+Declaring an interface inside another does not require an implementation of the outer interface to provide implementations of the inner interfaces.
+
+```bamboo,file=interface-nesting.bpl
+// Declare a resource interface `OuterInterface`, which declares
+// a nested structure interface named `InnerInterface`.
+//
+// Resources implementing `OuterInterface` do not need to provide
+// an implementation of `InnerInterface`.
+//
+// Structures may just implement `InnerInterface`
+//
+resource interface OuterInterface {
+
+    struct interface InnerInterface {}
+}
+
+// Declare a resource named `SomeOuter`
+//
+resource SomeOuter {}
+
+// Implement the interface `OuterInterface` for the resource  `SomeOuter`.
+//
+// The resource is not required to implement `OuterInterface.InnerInterface`
+//
+impl OuterInterface for SomeOuter {}
+
+
+// Declare a structure named `SomeInner`
+//
+struct SomeInner {}
+
+// Implement the interface `InnerInterface` which is nested in
+// interface `OuterInterface` for the structure `SomeInner`.
+//
+impl OuterInterface.InnerInterface for SomeInner {}
+```
+
 ### `Equatable` Interface
 
 > 🚧 Status: The `Equatable` interface is not implemented yet.
