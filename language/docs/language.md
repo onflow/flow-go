@@ -2117,7 +2117,7 @@ pub struct SomeStruct {
 > 🚧 Status: Interfaces are not implemented yet.
 
 An interface is an abstract type that specifies the behavior of types that *implement* the interface.
-Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
+Interfaces declare the required functions and fields, as well as the access for those declarations, that implementing types need to provide.
 
 There are two kinds of interfaces:
 
@@ -2136,7 +2136,7 @@ and optional preconditions and postconditions.
 Field requirements consist of the name and the type of the field.
 Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
 
-Calling functions with pre-conditions and post-conditions on interfaces instead of implementations can improve the security of a program,
+Calling functions with pre-conditions and post-conditions on interfaces instead of concrete implementations can improve the security of a program,
 as it ensures that even if implementations change, some aspects of them will always hold.
 
 ### Interface Declaration
@@ -2163,7 +2163,7 @@ The special type `Self` can be used to refer to the type implementing the interf
 //
 resource interface FungibleToken {
 
-    // Require the implementation to provide a field for the balance
+    // Require the implementing type to provide a field for the balance
     // that is readable in all scopes (`pub`).
     //
     // Neither the `var` keyword, nor the `let` keyword is used,
@@ -2184,7 +2184,7 @@ resource interface FungibleToken {
         }
     }
 
-    // Require the implementation to provide an initializer that
+    // Require the implementing type to provide an initializer that
     // given the initial balance, must initialize the balance field
     //
     init(balance: Int) {
@@ -2196,7 +2196,7 @@ resource interface FungibleToken {
         // NOTE: no code
     }
 
-    // Require the implementation to provide a function that is
+    // Require the implementing type to provide a function that is
     // callable in all scopes, which withdraws an amount from
     // this fungible token and returns the withdrawn amount as
     // a new fungible token.
@@ -2223,7 +2223,7 @@ resource interface FungibleToken {
         // NOTE: no code
     }
 
-    // Require the implementation to provide a function that is
+    // Require the implementing type to provide a function that is
     // callable in all scopes, which deposits a fungible token
     // into this fungible token.
     //
@@ -2252,7 +2252,7 @@ Note that the required initializer and functions do not have any executable code
 
 ### Interface Implementation
 
-Implementations are declared using the `impl` keyword,
+Implementations for interfaces are declared using the `impl` keyword,
 followed by the name of interface, the `for` keyword,
 and the name of the composite data type (structure or resource) that provides the functionality required in the interface.
 
@@ -2357,7 +2357,7 @@ The access level for variable fields in an implementation may be less restrictiv
 
 ```bamboo
 struct interface AnInterface {
-    // Require the implementation to provide a publicly readable
+    // Require the implementing type to provide a publicly readable
     // field named `a` that has type `Int`. It may be a constant field,
     // a variable field, or a synthetic field.
     //
@@ -2392,7 +2392,7 @@ Interfaces are types. Values implementing an interface can be used as initial va
 ```bamboo,file=interface-type.bpl
 // Declare an interface named `Shape`.
 //
-// Implementations must provide a field which returns the area,
+// Require implementing types to provide a field which returns the area,
 // and a function which scales the shape by a given factor.
 //
 struct interface Shape {
@@ -2490,7 +2490,7 @@ shape.scale(factor: 3)
 
 ### Interface Implementation Requirements
 
-Interfaces can require implementations to implement other interfaces of the same kind.
+Interfaces can require implementing types to also implement other interfaces of the same kind.
 Interface implementation requirements can be declared by following the interface name with a colon (`:`)
 and one or more names of interfaces of the same kind, separated by commas.
 
@@ -2500,7 +2500,8 @@ and one or more names of interfaces of the same kind, separated by commas.
 struct interface Shape {}
 
 // Declare a structure interface named `Polygon`.
-// Require implementations to also implement `Shape`
+// Require implementing types to also implement
+// the structure interface `Shape`
 //
 struct interface Polygon: Shape {}
 
@@ -2514,7 +2515,7 @@ struct Hexagon {}
 impl Polygon for Hexagon {}
 
 // Implement the structure interface `Shape`
-// fro the structure `Hexagon`.
+// for the structure `Hexagon`.
 //
 // This is required, as the interface `Polygon`
 // specified this implementation requirement.
@@ -2525,7 +2526,7 @@ impl Shape for Hexagon {}
 ### Interface Nesting
 
 Interfaces can be arbitrarily nested.
-Declaring an interface inside another does not require an implementation of the outer interface to provide implementations of the inner interfaces.
+Declaring an interface inside another does not require implementing types of the outer interface to provide an implementation of the inner interfaces.
 
 ```bamboo,file=interface-nesting.bpl
 // Declare a resource interface `OuterInterface`, which declares
@@ -2757,7 +2758,7 @@ It is possible to import external types into programs by using the `import` keyw
 // Declaration for an interface named `Counter`,
 // declared and deployed externally
 //
-interface Counter {
+resource interface Counter {
     pub count: Int
     pub fun increment(_ count: Int)
 }
