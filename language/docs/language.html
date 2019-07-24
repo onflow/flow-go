@@ -199,7 +199,7 @@
             <p><a href="#account-storage">Account Storage</a></p>
           </li>
           <li>
-            <p><a href="#importing-external-types">Importing External Types</a></p>
+            <p><a href="#usage-of-external-types">Usage of External Types</a></p>
           </li>
           <li>
             <p><a href="#transactions">Transactions</a></p>
@@ -2745,11 +2745,11 @@
 </span></code></pre>
       </section>
       <section>
-        <h2 id="importing-external-types"><a href="#importing-external-types" aria-hidden="true"><span class="icon icon-link"></span></a>Importing External Types</h2>
+        <h2 id="usage-of-external-types"><a href="#usage-of-external-types" aria-hidden="true"><span class="icon icon-link"></span></a>Usage of External Types</h2>
         <blockquote>
-          <p>🚧 Status: The import of external types is not implemented yet.</p>
+          <p>🚧 Status: The usage of external types is not implemented yet.</p>
         </blockquote>
-        <p>It is possible to import external types into programs by using the <code>import</code> keyword, followed by the type name, the <code>from</code> keyword, and the address literal where the declaration is deployed.</p>
+        <p>It is possible to use external types through the <code>using</code> keyword, followed by the type name, the <code>from</code> keyword, and the address literal where the declaration is deployed.</p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Declaration for an interface named `Counter`,</span><span>
 </span><span style="color: #008000">// declared and deployed externally</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2758,10 +2758,10 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> increment(_ count: Int)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Import the type `Counter` from address</span><span>
+</span><span style="color: #008000">// Use the type `Counter` from address</span><span>
 </span><span style="color: #008000">// 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">import Counter from </span><span style="color: #09885A">0x06012c8cf97BEaD5deAe237070F9587f8E7A266d</span><span>
+</span><span style="color: #000000">using Counter from </span><span style="color: #09885A">0x06012c8cf97BEaD5deAe237070F9587f8E7A266d</span><span>
 </span></code></pre>
       </section>
       <section>

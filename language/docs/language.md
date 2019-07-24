@@ -2790,11 +2790,11 @@ let account: Account = // ...
 account.storage[Counter] <- create Counter(count: 0)
 ```
 
-## Importing External Types
+## Usage of External Types
 
-> 🚧 Status: The import of external types is not implemented yet.
+> 🚧 Status: The usage of external types is not implemented yet.
 
-It is possible to import external types into programs by using the `import` keyword, followed by the type name, the `from` keyword, and the address literal where the declaration is deployed.
+It is possible to use external types through the `using` keyword, followed by the type name, the `from` keyword, and the address literal where the declaration is deployed.
 
 ```bamboo
 // Declaration for an interface named `Counter`,
@@ -2805,10 +2805,10 @@ resource interface Counter {
     pub fun increment(_ count: Int)
 }
 
-// Import the type `Counter` from address
+// Use the type `Counter` from address
 // 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
 //
-import Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
+using Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
 ```
 
 ## Transactions
