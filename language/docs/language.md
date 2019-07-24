@@ -1564,10 +1564,10 @@ when the value is assigned to a variable,
 when the value is passed as an argument to a function,
 and when the value is returned from a function:
 
-- [**Structures**](#structures) are **copied**, i.e. they are value types
-- [**Resources**](#resources) are **moved**, they are linear types. Resources **must** be used **exactly once**
-
-Value types should be used when copies with independent state is desired, and linear types should be used when a value must be used exactly once, i.e. when it should not be used multiple times and when it should not be lost.
+  - [**Structures**](#structures) are **copied**, i.e. they are value types.
+    Structures are useful when copies with independent state are desired.
+  - [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
+    Resources are useful when it is desired to model ownership (a value exists exactly in one location and it should not be lost).
 
 ### Structures
 
@@ -1721,7 +1721,7 @@ To make it explicit that the type is moved, it must be prefixed with `<-` in typ
 //
 // The constant has a resource type, so the type name must be prefixed with `<-`
 //
-const someResource: <-SomeResource = create SomeResource()
+const someResource: <-SomeResource <- create SomeResource()
 
 // Declare a function which consumes a resource.
 //
@@ -1916,6 +1916,11 @@ struct Rectangle {
             return width * height
         }
     }
+
+    init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
+    }
 }
 ```
 
@@ -1980,26 +1985,29 @@ It is invalid to declare a synthetic field with only a setter.
 
 ### Composite Data Type Functions
 
-Composite data types may contain functions. Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
+Composite data types may contain functions.
+Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
 
 ```bamboo,file=composite-data-type-function.bpl
-struct Token {
-    let id: Int
-    var balance: Int
+struct Rectangle {
+    var width: Int
+    var height: Int
 
-    init(id: Int, initialBalance balance: Int) {
-        self.id = id
-        self.balance = balance
+    init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
     }
 
-    fun mint(amount: Int) {
-        self.balance = self.balance + amount
+    fun scale(factor: Int) {
+        self.width = self.width * factor
+        self.height = self.height * factor
     }
 }
 
-let token = Token(id: 32, initialBalance: 0)
-token.mint(amount: 1_000_000)
-// token.balance is 1_000_000
+let rectangle = Rectangle(width: 2, height: 3)
+rectangle.scale(factor: 4)
+// rectangle.width is 8
+// rectangle.height is 12
 ```
 
 ### Unbound References / Nulls
@@ -2042,10 +2050,10 @@ To summarize the behavior for variable declarations, constant declarations, and 
 
 To summarize the behavior for functions, structures, resources, and interfaces:
 
-| Declaration kind                                  | Access modifier       | Access scope      |
-|:--------------------------------------------------|:----------------------|:------------------|
-| `fun`, `struct`, `resource`, `interface`          |                       | Current and inner |
-| `fun`, `struct`, `resource`, `interface`          | `pub`                 | **All**           |
+| Declaration kind                                                        | Access modifier       | Access scope      |
+|:------------------------------------------------------------------------|:----------------------|:------------------|
+| `fun`, `struct`, `resource`, `struct interface`, `resource interface`   |                       | Current and inner |
+| `fun`, `struct`, `resource`, `struct interface`, `resource interface`   | `pub`                 | **All**           |
 
 
 ```bamboo,file=access-control.bpl
@@ -2108,35 +2116,55 @@ pub struct SomeStruct {
 
 > 🚧 Status: Interfaces are not implemented yet.
 
-An interface is an abstract type that specifies the behavior of types that *implement* the interface. Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
+An interface is an abstract type that specifies the behavior of types that *implement* the interface.
+Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
 
-Interfaces can be implemented by [composite data types](#composite-data-types) (structures and resources). Composite data types may implement multiple interfaces.
+There are two kinds of interfaces:
 
-Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for. Interface requirements, and therefore also their implementations, must always be at least public. Variable field requirements may be annotated to require them to be publicly settable.
+- **Structure interfaces**: implemented by [structures](#structures)
+- **Resource interfaces**: implemented by [resources](#resources)
 
-Function requirements consist of the name of the function, parameter types, an optional return type, and optional preconditions and postconditions.
+Structure and resource types may implement multiple interfaces.
 
-Field requirements consist of the name and the type of the field. Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
+Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for.
+Interface requirements, and therefore also their implementations, must always be at least public.
+Variable field requirements may be annotated to require them to be publicly settable.
 
-Calling functions with pre-conditions and post-conditions on interfaces instead of implementations can improve the security of a program, as it ensures that even if implementations change, some aspects of them will always hold.
+Function requirements consist of the name of the function, parameter types, an optional return type,
+and optional preconditions and postconditions.
+
+Field requirements consist of the name and the type of the field.
+Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
+
+Calling functions with pre-conditions and post-conditions on interfaces instead of implementations can improve the security of a program,
+as it ensures that even if implementations change, some aspects of them will always hold.
 
 ### Interface Declaration
 
-Interfaces are declared using the `interface` keyword, followed by the name of the interface, and the requirements enclosed in opening and closing braces.
+Interfaces are declared using the `struct` or `resource` keyword,
+followed by the `interface` keyword,
+the name of the interface,
+and the requirements, which must be enclosed in opening and closing braces.
 
-Field requirements can be annotated to require the implementation to be a variable field, by using the `var` keyword; require the implementation to be a constant field, by using the `let` keyword; or the field requirement may specify nothing, in which case the implementation may either be a variable field, a constant field, or a synthetic field.
+Field requirements can be annotated to require the implementation to be a variable field, by using the `var` keyword;
+require the implementation to be a constant field, by using the `let` keyword;
+or the field requirement may specify nothing,
+in which case the implementation may either be a variable field, a constant field, or a synthetic field.
 
-Field requirements and function requirements must specify the required level of access. The access must be at least be public, so the `pub` keyword must be provided. Variable field requirements can be specified to also be publicly settable by using the `pub(set)` keyword.
+Field requirements and function requirements must specify the required level of access.
+The access must be at least be public, so the `pub` keyword must be provided.
+Variable field requirements can be specified to also be publicly settable by using the `pub(set)` keyword.
 
-The special type `Self` can be used to refer to the type implementing the interface. This can be seen in the following example, where the first parameter of the `transfer` function has the `Self` type.
+The special type `Self` can be used to refer to the type implementing the interface.
 
 ```bamboo,file=interface-declaration.bpl
-// Declare an interface for a vault (a container for a balance)
+// Declare a resource interface for a fungible token.
+// Only resources can implement this resource interface
 //
-interface Vault {
+resource interface FungibleToken {
 
-    // Require the implementation to provide a field for the balance that is
-    // readable in all scopes (`pub`).
+    // Require the implementation to provide a field for the balance
+    // that is readable in all scopes (`pub`).
     //
     // Neither the `var` keyword, nor the `let` keyword is used,
     // so the field may be implemented as either a variable field,
@@ -2150,7 +2178,8 @@ interface Vault {
     pub balance: Int {
         get {
             ensure {
-                result >= 0
+                result >= 0:
+                    "Balances are always non-negative"
             }
         }
     }
@@ -2158,9 +2187,9 @@ interface Vault {
     // Require the implementation to provide an initializer that
     // given the initial balance, must initialize the balance field
     //
-    init(initialBalance: Int) {
+    init(balance: Int) {
         ensure {
-            self.balance == initialBalance:
+            self.balance == balance:
                 "the balance must be initialized to the initial balance"
         }
 
@@ -2168,53 +2197,50 @@ interface Vault {
     }
 
     // Require the implementation to provide a function that is
-    // callable in all scopes.
+    // callable in all scopes, which withdraws an amount from
+    // this fungible token and returns the withdrawn amount as
+    // a new fungible token.
     //
     // The given amount must be positive and the function implementation
-    // must add the amount to the balance
+    // must add the amount to the balance.
     //
-    pub fun add(amount: Int) {
+    // The function must return a new fungible token.
+    //
+    // NOTE: `<-Self` is the resource type implementing this interface
+    //
+    pub fun withdraw(amount: Int): <-Self {
         require {
             amount > 0:
                 "the amount must be positive"
+            amount <= self.balance:
+                "insufficient funds: the amount must be smaller or equal to the balance"
         }
-
         ensure {
-            self.balance == before(self.balance) + amount:
-                "the amount must be added to the balance"
+            self.balance == before(self.balance) - amount:
+                "the amount must be deducted from the balance"
         }
 
         // NOTE: no code
     }
 
     // Require the implementation to provide a function that is
-    // callable in all scopes.
+    // callable in all scopes, which deposits a fungible token
+    // into this fungible token.
     //
-    // The function must transfer an amount from this vault's balance
-    // to another vault's balance.
+    // The given token must be of the same type – a deposit of another
+    // type is not possible.
     //
-    // The receiving vault must be of the same type – a transfer to a vault
-    // of another type is not possible, as the `balance` field of it is only
-    // readable.
+    // No pre-condition is required to check the given token's balance
+    // is positive, as this condition is already ensured by
+    // the field requirement.
     //
-    // NOTE: the first parameter has the type `Self`,
-    // i.e. the type implementing this interface
+    // NOTE: the first parameter has the type `<-Self`,
+    // i.e. the resource type implementing this interface
     //
-    pub fun transfer(to receivingVault: Self, amount: Int) {
-        require {
-            amount > 0:
-                "the amount must be positive"
-
-            amount <= self.balance:
-                "the amount must be smaller or equal to the balance"
-        }
-
+    pub fun deposit(_ token: <-Self) {
         ensure {
-            self.balance == before(self.balance) - amount:
-                "the amount must be deducted from the balance"
-
-            receivingVault.balance == before(receivingVault.balance) + amount:
-                "the amount must be added to the receiving balance"
+            self.balance == before(self.balance) + token.balance:
+                "the amount must be added to the balance"
         }
 
         // NOTE: no code
@@ -2222,27 +2248,29 @@ interface Vault {
 }
 ```
 
-Note that the required initializer and function do not have any executable code.
+Note that the required initializer and functions do not have any executable code.
 
 ### Interface Implementation
 
-Implementations are declared using the `impl` keyword, followed by the name of interface, the `for` keyword, and the name of the composite data type (structure or resource) that provides the functionality required in the interface.
+Implementations are declared using the `impl` keyword,
+followed by the name of interface, the `for` keyword,
+and the name of the composite data type (structure or resource) that provides the functionality required in the interface.
 
 ```bamboo,file=interface-implementation.bpl
-// Declare a struct named `ExampleVault` with a variable field named `balance`,
+// Declare a resource named `ExampleToken` with a variable field named `balance`,
 // that can be written by functions of the type, but outer scopes can only read it
 //
-struct ExampleVault {
+resource ExampleToken {
 
-    // Implement the required field `balance` for the `Vault` interface.
+    // Implement the required field `balance` for the `FungibleToken` interface.
     // The interface does not specify if the field must be variable, constant,
-    // so in order for this type (`ExampleVault`) to be able to write to the field,
+    // so in order for this type (`ExampleToken`) to be able to write to the field,
     // but limit outer scopes to only read from the field, it is declared variable,
     // and only has public access (non-settable).
     //
     pub var balance: Int
 
-    // Implement the required initializer for the `Vault` interface:
+    // Implement the required initializer for the `FungibleToken` interface:
     // accept an initial balance and initialize the `balance` field.
     //
     // This implementation satisfies the required postcondition
@@ -2250,75 +2278,85 @@ struct ExampleVault {
     // NOTE: the postcondition declared in the interface
     // does not have to be repeated here in the implementation
     //
-    init(initialBalance: Int) {
-        self.balance = initialBalance
+    init(balance: Int) {
+        self.balance = balance
     }
 }
 
 
-// Declare the implementation of the interface `Vault` for the struct `ExampleVault`
+// Declare the implementation of the interface `FungibleToken`
+// for the resource `ExampleToken`
 //
-impl Vault for ExampleVault {
+impl FungibleToken for ExampleToken {
 
-    // Implement the required function named `add` of the interface `Vault`,
-    // that adds an amount to the vault's balance. It must be public.
+    // Implement the required function named `withdraw` of the interface
+    // `FungibleToken`, that withdraws an amount from the token's balance.
+    //
+    // The function must be public.
     //
     // This implementation satisfies the required postcondition.
     //
     // NOTE: neither the precondition nor the postcondition declared
     // in the interface have to be repeated here in the implementation
     //
-    pub fun add(amount: Int) {
-        self.balance = self.balance + amount
+    pub fun withdraw(amount: Int): <-ExampleToken {
+        self.balance = self.balance - amount
+        return create ExampleToken(balance: amount)
     }
 
-    // Implement the required function named `transfer` of the interface `Vault`,
-    // that subtracts the amount from this vault's balance, and adds the amount
-    // to the receiving vault's balance. It must be public.
+    // Implement the required function named `deposit` of the interface
+    // `FungibleToken`, that deposits the amount from the given token
+    // to this token.
     //
-    // NOTE: the type of the receiving vault parameter is `ExampleVault`,
-    // i.e., an amount can only be transferred to a vault of the same type.
+    // The function must be public.
+    //
+    // NOTE: the type of the parameter is `<-ExampleToken`,
+    // i.e., only a token of the same type can be deposited.
     //
     // This implementation satisfies the required postconditions.
     //
     // NOTE: neither the precondition nor the postcondition declared
     // in the interface have to be repeated here in the implementation
     //
-    pub fun transfer(to receivingVault: ExampleVault, amount: Int) {
-        self.balance = self.balance - amount
-        receivingVault.amount = receivingVault.amount + amount
+    pub fun desposit(_ token: <-ExampleToken) {
+        self.balance = self.balance + amount
+        destroy token
     }
 }
 
-// Declare two constants which have type `ExampleVault`,
-// and are initialized to two different example vaults
+// Declare a constant which has type `ExampleToken`,
+// and is initialized with such an example token
 //
-let vault = ExampleVault(initialBalance: 100)
-let otherVault = ExampleVault(initialBalance: 0)
+let token <- create ExampleToken(balance: 100)
 
-// Transfer 10 units from the first vault to the second vault.
+// Withdraw 10 units from the token.
 //
-// The amount satisfies the precondition of the `transfer` function
-// in the `Vault` interface
+// The amount satisfies the precondition of the `withdraw` function
+// in the `FungibleToken` interface
 //
-vault.transfer(to: otherVault, amount: 10)
+let withdrawn <- token.withdraw(amount: 10)
 
-// The postcondition of the `transfer` function in the `Vault` interface
-// ensured the balances fields of the vaults were updated properly
+// The postcondition of the `withdraw` function in the `FungibleToken`
+// interface ensured the balance field of the token was updated properly
 //
-// vault.balance is 90
-// otherVault.balance is 10
+// token.balance is 90
+// withdrawn.balance is 10
 
-// Error: precondition not satisfied: the parameter `amount` is larger than
-// the field `balance` (100 > 90)
+// Deposit the withdrawn token into another one.
+let receiver: ExampleToken <- // ...
+receiver.deposit(<-withdrawn)
+
+// Error: precondition of function `withdraw` in interface
+// `FungibleToken` is not satisfied: the parameter `amount`
+// is larger than the field `balance` (100 > 90)
 //
-vault.transfer(to: otherVault, amount: 100)
+token.withdraw(amount: 100)
 ```
 
 The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified), and an implementation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
 
 ```bamboo
-interface AnInterface {
+struct interface AnInterface {
     // Require the implementation to provide a publicly readable
     // field named `a` that has type `Int`. It may be a constant field,
     // a variable field, or a synthetic field.
@@ -2349,52 +2387,105 @@ impl AnInterface for AnImplementation {
 
 ### Interface Type
 
-Interfaces are types. Values implementing an interface can be used as initial values for constants that have the interface as their type.
+Interfaces are types. Values implementing an interface can be used as initial values for constants and variables that have the interface as their type.
 
 ```bamboo,file=interface-type.bpl
-// Declare a constant that has type `Vault`, which has a value that has type `ExampleVault`
+// Declare an interface named `Shape`.
 //
-let vault: Vault = ExampleVault(initialBalance: 100)
+// Implementations must provide a field which returns the area,
+// and a function which scales the shape by a given factor.
+//
+interface Shape {
+    pub area: Int
+    pub fun scale(factor: Int)
+}
+
+// Declare a structure named `Square`
+//
+struct Square {
+    pub var length: Int
+
+    pub synthetic area: Int {
+        get {
+            return self.length * self.length
+        }
+    }
+
+    pub init(length: Int) {
+        self.length = length
+    }
+}
+
+// Implement the interface `Shape` for the structure `Square`
+//
+impl Shape for Square {
+
+    pub fun scale(factor: Int) {
+        self.length = self.length * factor
+    }
+}
+
+// Declare a structure named `Rectangle`
+//
+struct Rectangle {
+    pub var width: Int
+    pub var height: Int
+
+    pub synthetic area: Int {
+        get {
+            return self.width * self.height
+        }
+    }
+
+    pub init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
+    }
+}
+
+// Implement the interface `Rectangle` for the structure `Square`
+//
+impl Shape for Rectangle {
+
+    pub fun scale(factor: Int) {
+        self.width = self.width * factor
+        self.height = self.height * factor
+    }
+}
+
+// Declare a constant that has type `Shape`, which has a value that has type `Rectangle`
+//
+var shape: Shape = Rectangle(width: 10, height: 20)
 ```
 
 Values implementing an interface are assignable to variables that have the interface as their type.
 
 ```bamboo,file=interface-type-assignment.bpl
-// Assume there is a declaration for another implementation
-// of the interface  `Vault` which is named `CoolVault`
-
-// Declare a variable that has type `Vault`,
-// which has an initial value that has type `CoolVault`
+// Assign a value of type `Square` to the variable `shape` that has type `Shape`
 //
-var someVault: Vault = CoolVault(initialBalance: 100)
+shape = Square(length: 30)
 
-// Assign a different type of vault to the variable `someVault`,
-// which has type `Vault`
+// Invalid: cannot initialize a constant that has type `Rectangle`
+// with a value that has type `Square`
 //
-someVault = ExampleVault(initialBalance: 50)
-
-
-// Invalid: cannot assign a value that has type `CoolVault`
-// to a constant that has type `ExampleVault`
-//
-let exampleVault: ExampleVault = CoolVault(initialBalance: 100)
+let rectangle: Rectangle = Square(length: 10)
 ```
 
 Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.
 
 ```bamboo,file=interface-type-fields-and-functions.bpl
-// Declare a constant which has the type `Vault`, and a value that has type `ExampleVault`
+// Declare a constant which has the type `Shape`
+// and is initialized with a value that has type `Rectangle`
 //
-let someVault: Vault = ExampleVault(initialBalance: 100)
+let shape: Shape = Rectangle(width: 2, height: 3)
 
-// Access the field `balance` declared in the interface `Vault`
+// Access the field `area` declared in the interface `Shape`
 //
-someVault.balance // is 100
+shape.area // is 6
 
-// Call the function named `add` declared in the interface `Vault`
-someVault.add(amount: 50)
-
-// someVault.balance is 150
+// Call the function `scale` declared in the interface `Shape`
+//
+shape.scale(factor: 3)
 ```
 
 ### `Equatable` Interface
