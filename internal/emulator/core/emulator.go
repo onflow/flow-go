@@ -70,9 +70,9 @@ func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 	return b.pendingWorldState.GetBlockByHash(hash)
 }
 
-// GetBlockByHeight gets a block by height.
-func (b *EmulatedBlockchain) GetBlockByHeight(height uint64) *etypes.Block {
-	return b.pendingWorldState.GetBlockByHeight(height)
+// GetBlockByNumber gets a block by number.
+func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) *etypes.Block {
+	return b.pendingWorldState.GetBlockByNumber(number)
 }
 
 // GetTransaction gets an existing transaction by hash.
@@ -188,7 +188,7 @@ func (b *EmulatedBlockchain) CommitBlock() {
 
 	prevBlock := b.pendingWorldState.GetLatestBlock()
 	block := &etypes.Block{
-		Height:            prevBlock.Height + 1,
+		Number:            prevBlock.Number + 1,
 		Timestamp:         time.Now(),
 		PreviousBlockHash: prevBlock.Hash(),
 		TransactionHashes: txHashes,

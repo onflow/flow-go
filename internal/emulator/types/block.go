@@ -10,7 +10,7 @@ import (
 )
 
 type Block struct {
-	Height            uint64
+	Number            uint64
 	Timestamp         time.Time
 	PreviousBlockHash crypto.Hash
 	TransactionHashes []crypto.Hash
@@ -18,7 +18,7 @@ type Block struct {
 
 func (b *Block) Hash() crypto.Hash {
 	bytes := crypto.EncodeAsBytes(
-		b.Height,
+		b.Number,
 		b.Timestamp,
 		b.PreviousBlockHash,
 		b.TransactionHashes,
@@ -31,7 +31,7 @@ func (b *Block) ToMessage() *observe.Block {
 
 	blockMsg := &observe.Block{
 		Hash:              b.Hash().Bytes(),
-		Number:            b.Height,
+		Number:            b.Number,
 		PrevBlockHash:     b.PreviousBlockHash.Bytes(),
 		Timestamp:         timestamp,
 		TransactionHashes: crypto.HashesToBytes(b.TransactionHashes),
@@ -42,7 +42,7 @@ func (b *Block) ToMessage() *observe.Block {
 
 func GenesisBlock() *Block {
 	return &Block{
-		Height:            0,
+		Number:            0,
 		Timestamp:         time.Now(),
 		PreviousBlockHash: crypto.Hash{},
 		TransactionHashes: make([]crypto.Hash, 0),

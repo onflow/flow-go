@@ -59,8 +59,8 @@ func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlo
 
 // GetBlockByNumber gets a block by number.
 func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetBlockByNumberRequest) (*observe.GetBlockByNumberResponse, error) {
-	height := req.GetNumber()
-	block := s.blockchain.GetBlockByHeight(height)
+	number := req.GetNumber()
+	block := s.blockchain.GetBlockByNumber(number)
 
 	response := &observe.GetBlockByNumberResponse{
 		Block: block.ToMessage(),

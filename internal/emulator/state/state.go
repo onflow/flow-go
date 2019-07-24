@@ -75,14 +75,14 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 	return nil
 }
 
-// GetBlockByHeight gets a block by height.
-func (ws *WorldState) GetBlockByHeight(height uint64) *etypes.Block {
+// GetBlockByNumber gets a block by number.
+func (ws *WorldState) GetBlockByNumber(number uint64) *etypes.Block {
 	ws.blockchainMutex.RLock()
 	defer ws.blockchainMutex.RUnlock()
 
 	currHeight := len(ws.Blockchain)
-	if int(height) < currHeight {
-		blockHash := ws.Blockchain[height]
+	if int(number) < currHeight {
+		blockHash := ws.Blockchain[number]
 		return ws.GetBlockByHash(blockHash)
 	}
 
