@@ -96,6 +96,30 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=foo    
 
+  observe_db:
+    image: postgres:9.6-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=foo
+
+  observe:
+    build:
+      context: .
+      dockerfile: cmd/observe/Dockerfile
+    depends_on:
+      - observe_db
+    ports:
+      - "3005:3001"
+    restart: on-failure:5
+    environment:
+      - BAM_PORT=3001
+      - POSTGRES_GCP_CONNECTION_NAME=foo
+      - POSTGRES_ADDR=execute_db:5432
+      - POSTGRES_DATABASE=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=foo    
+      
   testhelpers:
     build:
       context: .
@@ -132,6 +156,7 @@ services:
       - CONSENSUS_ADDR=consensus:3001
       - EXECUTE_ADDR=execute:3001
       - VERIFY_ADDR=verify:3001
+      - OBSERVE_ADDR=observe:3001    
       - HELPERS_ADDR=testhelpers:3009
 
   # See https://github.com/dadarek/docker-wait-for-dependencies
@@ -168,6 +193,14 @@ services:
 
   # See https://github.com/dadarek/docker-wait-for-dependencies
   # Run this as a separate "docker-compose" up command
+  start_observe_dependencies:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - observe_db
+    command: observe_db:5432
+
+  # See https://github.com/dadarek/docker-wait-for-dependencies
+  # Run this as a separate "docker-compose" up command
   start_test_dependencies:
     image: dadarek/wait-for-dependencies
     depends_on:
@@ -175,5 +208,6 @@ services:
       - consensus
       - execute
       - verify
+      - observe
       - testhelpers
-    command: collect:3001 consensus:3001 execute:3001 verify:3001 testhelpers:3009
+    command: collect:3001 consensus:3001 execute:3001 verify:3001 observe:3001 testhelpers:3009
