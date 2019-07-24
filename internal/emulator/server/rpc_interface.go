@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -50,18 +49,9 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlockByHashRequest) (*observe.GetBlockByHashResponse, error) {
 	hash := crypto.BytesToHash(req.GetHash())
 	block := s.blockchain.GetBlockByHash(hash)
-	timestamp, _ := ptypes.TimestampProto(block.Timestamp)
-
-	blockMsg := &observe.Block{
-		Hash:              block.Hash().Bytes(),
-		Number:            block.Height,
-		PrevBlockHash:     block.PreviousBlockHash.Bytes(),
-		Timestamp:         timestamp,
-		TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
-	}
 
 	response := &observe.GetBlockByHashResponse{
-		Block: blockMsg,
+		Block: block.ToMessage(),
 	}
 
 	return response, nil
@@ -71,18 +61,9 @@ func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlo
 func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetBlockByNumberRequest) (*observe.GetBlockByNumberResponse, error) {
 	height := req.GetNumber()
 	block := s.blockchain.GetBlockByHeight(height)
-	timestamp, _ := ptypes.TimestampProto(block.Timestamp)
-
-	blockMsg := &observe.Block{
-		Hash:              block.Hash().Bytes(),
-		Number:            block.Height,
-		PrevBlockHash:     block.PreviousBlockHash.Bytes(),
-		Timestamp:         timestamp,
-		TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
-	}
 
 	response := &observe.GetBlockByNumberResponse{
-		Block: blockMsg,
+		Block: block.ToMessage(),
 	}
 
 	return response, nil
@@ -92,18 +73,9 @@ func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetB
 // GetLatestBlock gets the latest sealed block.
 func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLatestBlockRequest) (*observe.GetLatestBlockResponse, error) {
 	block := s.blockchain.GetLatestBlock()
-	timestamp, _ := ptypes.TimestampProto(block.Timestamp)
-
-	blockMsg := &observe.Block{
-		Hash:              block.Hash().Bytes(),
-		Number:            block.Height,
-		PrevBlockHash:     block.PreviousBlockHash.Bytes(),
-		Timestamp:         timestamp,
-		TransactionHashes: crypto.HashesToBytes(block.TransactionHashes),
-	}
 
 	response := &observe.GetLatestBlockResponse{
-		Block: blockMsg,
+		Block: block.ToMessage(),
 	}
 
 	return response, nil
