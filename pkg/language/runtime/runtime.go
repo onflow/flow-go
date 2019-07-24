@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/bamboo-node/language/runtime/interpreter"
-	"github.com/dapperlabs/bamboo-node/language/runtime/parser"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 )
 
 type RuntimeInterface interface {

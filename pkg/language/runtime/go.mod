@@ -1,4 +1,4 @@
-module github.com/dapperlabs/bamboo-node/language/runtime
+module github.com/dapperlabs/bamboo-node/pkg/language/runtime
 
 go 1.12
 

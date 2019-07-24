@@ -3,7 +3,7 @@ package core
 import (
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/language/runtime"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 

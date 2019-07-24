@@ -1,8 +1,8 @@
 package interpreter
 
 import (
-	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
-	. "github.com/dapperlabs/bamboo-node/language/runtime/trampoline"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 	"github.com/raviqqe/hamt"
 )
 

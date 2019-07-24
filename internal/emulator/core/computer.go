@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/dapperlabs/bamboo-node/language/runtime"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	eruntime "github.com/dapperlabs/bamboo-node/internal/emulator/runtime"

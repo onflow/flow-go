@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	sealSvc "github.com/dapperlabs/bamboo-node/grpc/services/seal"
+	sealSvc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/seal"
 )
 
 type Controller struct {

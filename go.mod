@@ -10,7 +10,7 @@ require (
 	github.com/bluele/gcache v0.0.0-20190518031135-bc40bd653833
 	github.com/btcsuite/btcd v0.0.0-20190629003639-c26ffa870fd8 // indirect
 	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
-	github.com/dapperlabs/bamboo-node/language/runtime v0.0.0-00010101000000-000000000000
+	github.com/dapperlabs/bamboo-node/pkg/language/runtime v0.0.0-00010101000000-000000000000
 	github.com/ethereum/go-ethereum v1.8.27 // indirect
 	github.com/go-pg/migrations v6.7.3+incompatible
 	github.com/go-pg/pg v8.0.4+incompatible
@@ -36,4 +36,4 @@ require (
 	mellium.im/sasl v0.2.1 // indirect
 )
 
-replace github.com/dapperlabs/bamboo-node/language/runtime => ./language/runtime
+replace github.com/dapperlabs/bamboo-node/pkg/language/runtime => ./pkg/language/runtime

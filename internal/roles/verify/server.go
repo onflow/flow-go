@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	svc "github.com/dapperlabs/bamboo-node/grpc/services/verify"
+	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/verify"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/config"
 )
 

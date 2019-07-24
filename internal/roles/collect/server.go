@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	svc "github.com/dapperlabs/bamboo-node/grpc/services/collect"
+	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/config"
 )
 

@@ -1,8 +1,8 @@
 package runtime
 
 import (
-	. "github.com/dapperlabs/bamboo-node/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/language/runtime/parser"
+	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	"math/big"

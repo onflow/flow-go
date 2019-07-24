@@ -8,7 +8,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
+	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 	"github.com/dapperlabs/bamboo-node/internal/emulator/data"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"

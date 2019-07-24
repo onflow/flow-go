@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	verifySvc "github.com/dapperlabs/bamboo-node/grpc/services/verify"
+	verifySvc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/verify"
 )
 
 type Controller struct {

@@ -3,9 +3,9 @@ package interpreter
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-node/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/language/runtime/errors"
-	. "github.com/dapperlabs/bamboo-node/language/runtime/trampoline"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 )
 
 // Visit-methods for statement which return a non-nil value

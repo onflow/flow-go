@@ -6,7 +6,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	collectSvc "github.com/dapperlabs/bamboo-node/grpc/services/collect"
+	collectSvc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 )
 
 type Controller struct {

@@ -1,6 +1,6 @@
 package interpreter
 
-import "github.com/dapperlabs/bamboo-node/language/runtime/errors"
+import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 
 //go:generate stringer -type=DeclarationKind
 
