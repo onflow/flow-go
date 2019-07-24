@@ -47,17 +47,38 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 
 // GetBlockByHash gets a block by hash.
 func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlockByHashRequest) (*observe.GetBlockByHashResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	hash := crypto.BytesToHash(req.GetHash())
+	block := s.blockchain.GetBlockByHash(hash)
+
+	response := &observe.GetBlockByHashResponse{
+		Block: block.ToMessage(),
+	}
+
+	return response, nil
 }
 
 // GetBlockByNumber gets a block by number.
 func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetBlockByNumberRequest) (*observe.GetBlockByNumberResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	number := req.GetNumber()
+	block := s.blockchain.GetBlockByNumber(number)
+
+	response := &observe.GetBlockByNumberResponse{
+		Block: block.ToMessage(),
+	}
+
+	return response, nil
+
 }
 
 // GetLatestBlock gets the latest sealed block.
 func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLatestBlockRequest) (*observe.GetLatestBlockResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	block := s.blockchain.GetLatestBlock()
+
+	response := &observe.GetLatestBlockResponse{
+		Block: block.ToMessage(),
+	}
+
+	return response, nil
 }
 
 // GetTransaction gets a transaction by hash.

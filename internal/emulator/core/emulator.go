@@ -60,6 +60,21 @@ func (b *EmulatedBlockchain) getWorldStateAtVersion(wsHash crypto.Hash) (*state.
 	return nil, &ErrInvalidStateVersion{Version: wsHash}
 }
 
+// GetLatestBlock gets the latest sealed block.
+func (b *EmulatedBlockchain) GetLatestBlock() *etypes.Block {
+	return b.pendingWorldState.GetLatestBlock()
+}
+
+// GetBlockByHash gets a block by hash.
+func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) *etypes.Block {
+	return b.pendingWorldState.GetBlockByHash(hash)
+}
+
+// GetBlockByNumber gets a block by number.
+func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) *etypes.Block {
+	return b.pendingWorldState.GetBlockByNumber(number)
+}
+
 // GetTransaction gets an existing transaction by hash.
 //
 // First looks in pending txPool, then looks in current blockchain state.
@@ -173,7 +188,7 @@ func (b *EmulatedBlockchain) CommitBlock() crypto.Hash {
 
 	prevBlock := b.pendingWorldState.GetLatestBlock()
 	block := &etypes.Block{
-		Height:            prevBlock.Height + 1,
+		Number:            prevBlock.Number + 1,
 		Timestamp:         time.Now(),
 		PreviousBlockHash: prevBlock.Hash(),
 		TransactionHashes: txHashes,
