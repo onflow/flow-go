@@ -2612,7 +2612,7 @@ impl Hashable for Point {
 
 > 🚧 Status: Attestations are not implemented yet.
 
-Attestations are values that proof of ownership.
+Attestations are values that proof ownership.
 Attestations can be created for resources and reflect their current state, which is read-only.
 They cannot be stored.
 
@@ -2620,10 +2620,17 @@ Attestations of resources are created using the `@` operator.
 Attestation types have the name of the resource type, prefixed with the `@` symbol.
 
 ```bamboo,file=attestations.bpl
+// Declare a resource named `Token`
+//
 resource Token {}
 
+// Create a new resource value that has type `Token`.
+//
 let token <- create Token()
 
+// Declare a constant named `attestation` that has the attestation type `@Token`,
+// and has an attestation for the token value as its initial value
+//
 let attestation: @Token = @token
 ```
 
