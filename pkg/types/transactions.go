@@ -53,12 +53,17 @@ func (tx *RawTransaction) Sign(account Address, keyPair *crypto.KeyPair) *Signed
 	// TODO: include account in signature
 	sig := crypto.Sign(hash, keyPair)
 
+	accountSig := AccountSignature{
+		Account:   account,
+		Signature: sig.ToBytes(),
+	}
+
 	return &SignedTransaction{
 		Script:         tx.Script,
 		Nonce:          tx.Nonce,
 		ComputeLimit:   tx.ComputeLimit,
 		Timestamp:      tx.Timestamp,
-		PayerSignature: sig,
+		PayerSignature: accountSig,
 	}
 }
 
@@ -69,7 +74,7 @@ type SignedTransaction struct {
 	ComputeLimit   uint64
 	ComputeUsed    uint64
 	Timestamp      time.Time
-	PayerSignature crypto.Signature
+	PayerSignature AccountSignature
 	Status         TransactionStatus
 }
 
@@ -80,7 +85,7 @@ func (tx *SignedTransaction) Hash() crypto.Hash {
 		tx.Nonce,
 		tx.ComputeLimit,
 		tx.Timestamp,
-		tx.PayerSignature,
+		tx.PayerSignature.Bytes(),
 	)
 	return crypto.NewHash(bytes)
 }
