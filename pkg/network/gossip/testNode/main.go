@@ -10,7 +10,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/dapperlabs/603-Making-nodes-talk-via-gossip/bamboo-node/pkg/network/gossip"
+	"github.com/dapperlabs/bamboo-node/grpc/shared"
+
 	proto "github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
@@ -18,32 +19,34 @@ import (
 type naiveGossip struct{}
 
 // Take in the protobuff messages and call the grpc of recipients
-func (n naiveGossip) Gossip(ctx context.Context, request *gossip.Message, reply proto.Message) (err error) {
+func (n naiveGossip) Gossip(ctx context.Context, gossipMsg *shared.GossipMessage) (reply proto.Message, err error) {
+	reply = new(shared.MessageReply)
 	// Loop through recipients
-	for _, addr := range request.Recipients {
+	for _, addr := range gossipMsg.Recipients {
 		// Set up a connection to the other node
 		conn, err := grpc.Dial(addr, grpc.WithInsecure())
 		if err != nil {
 			log.Fatalf("did not connect to %s: %v", addr, err)
-			return err
+			return reply, err
 		}
 		defer conn.Close()
 		// Call the grpc manually so that the method can easily be switched out
-		err = conn.Invoke(ctx, request.Method, request.Payload, reply)
+		err = conn.Invoke(ctx, gossipMsg.Method, gossipMsg, reply)
 		if err != nil {
 			log.Fatalf("could not greet: %v", err)
-			return err
+			return reply, err
 		}
 	}
-	return err
+	return reply, err
 }
 
 type server struct{}
 
-func (s *server) SendMessage(ctx context.Context, in *MessageRequest) (*MessageReply, error) {
-	log.Printf("Received: %v", in.Text)
+func (s *server) SendMessage(ctx context.Context, in *shared.GossipMessage) (*shared.MessageReply, error) {
+	txt := in.GetMessageRequest().GetText()
+	log.Printf("Received: %v", txt)
 	fmt.Println("Enter your text:")
-	return &MessageReply{TextResponse: "Hello " + in.Text}, nil
+	return &shared.MessageReply{TextResponse: "Hello " + txt}, nil
 }
 
 func startServer(addrOfSelf string) {
@@ -53,7 +56,7 @@ func startServer(addrOfSelf string) {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
-	RegisterMessagesServer(s, &server{})
+	shared.RegisterMessagesServer(s, &server{})
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
@@ -91,18 +94,27 @@ func main() {
 		text = scanner.Text()
 		if text != "q" {
 			// Generate the protobuff messages needed to send through gossip
-			msgeRequest := MessageRequest{Text: text}
-			gossipMessage := gossip.Message{
-				Payload:    &msgeRequest,
-				Method:     "/main.Messages/SendMessage",
+			msgRequest := shared.MessageRequest{Text: text}
+
+			gossipMsg := shared.GossipMessage{
+				Payload:    &shared.GossipMessage_MessageRequest{&msgRequest},
+				Method:     "/bamboo.shared.Messages/SendMessage",
 				Recipients: peers,
 			}
+
 			gossipInstance := naiveGossip{}
 			ctx := context.Background()
-			// Nothing is currently done with result
-			result := new(MessageReply)
+			// Nothing is currently done with result, but this is how to retrieve it
+			result := new(shared.MessageReply)
 			// Send the message
-			gossipInstance.Gossip(ctx, &gossipMessage, result)
+			msgReply, err := gossipInstance.Gossip(ctx, &gossipMsg)
+			result = msgReply.(*shared.MessageReply)
+
+			// Just to show the generality of receiving the return value,
+			// have to use the var somewhere, kind of annoying that it prints twice
+			log.Printf("Received: %v", result)
+			log.Printf("Received: %v", msgReply)
+			log.Printf("Received: %v", err)
 		}
 	}
 }
