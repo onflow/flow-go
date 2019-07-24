@@ -2250,38 +2250,6 @@ resource interface FungibleToken {
 
 Note that the required initializer and functions do not have any executable code.
 
-Interfaces can require implementations to implement other interfaces of the same kind.
-Interface implementation requirements can be declared by following the interface name with a colon (`:`),
-followed by one or more interfaces of the same kind, separated by commas.
-
-```bamboo,file=interface-requirement.
-// Declare a structure interface named `Shape`
-//
-struct interface Shape {}
-
-// Declare a structure interface named `Polygon`.
-// Require implementations to also implement `Shape`
-//
-struct interface Polygon: Shape {}
-
-// Declare a structure named `Hexagon`
-//
-struct Hexagon {}
-
-// Implement the structure interface `Polygon`
-// for the structure `Hexagon`
-//
-impl Polygon for Hexagon {}
-
-// Implement the structure interface `Shape`
-// fro the structure `Hexagon`.
-//
-// This is required, as the interface `Polygon`
-// specified this implementation requirement.
-//
-impl Shape for Hexagon {}
-```
-
 ### Interface Implementation
 
 Implementations are declared using the `impl` keyword,
@@ -2518,6 +2486,40 @@ shape.area // is 6
 // Call the function `scale` declared in the interface `Shape`
 //
 shape.scale(factor: 3)
+```
+
+### Interface Implementation Requirements
+
+Interfaces can require implementations to implement other interfaces of the same kind.
+Interface implementation requirements can be declared by following the interface name with a colon (`:`)
+and one or more names of interfaces of the same kind, separated by commas.
+
+```bamboo,file=interface-implementation-requirement.bpl
+// Declare a structure interface named `Shape`
+//
+struct interface Shape {}
+
+// Declare a structure interface named `Polygon`.
+// Require implementations to also implement `Shape`
+//
+struct interface Polygon: Shape {}
+
+// Declare a structure named `Hexagon`
+//
+struct Hexagon {}
+
+// Implement the structure interface `Polygon`
+// for the structure `Hexagon`
+//
+impl Polygon for Hexagon {}
+
+// Implement the structure interface `Shape`
+// fro the structure `Hexagon`.
+//
+// This is required, as the interface `Polygon`
+// specified this implementation requirement.
+//
+impl Shape for Hexagon {}
 ```
 
 ### `Equatable` Interface
