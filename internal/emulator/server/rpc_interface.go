@@ -65,6 +65,10 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 	hash := crypto.BytesToHash(req.GetHash())
 	tx := s.blockchain.GetTransaction(hash)
 
+	s.logger.
+		WithField("txHash", hash).
+		Debugf("💵  GetTransaction called: %s", hash)
+
 	txMsg := &observe.GetTransactionResponse_Transaction{
 		Script:       tx.Script,
 		Nonce:        tx.Nonce,
@@ -90,6 +94,10 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 	address := crypto.BytesToAddress(req.GetAddress())
 	account := s.blockchain.GetAccount(address)
 
+	s.logger.
+		WithField("address", address).
+		Debugf("👤  GetAccount called: %s", address)
+
 	accMsg := &observe.GetAccountResponse_Account{
 		Address:    account.Address.Bytes(),
 		Balance:    account.Balance,
@@ -106,6 +114,8 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 
 // CallContract performs a contract call.
 func (s *EmulatorServer) CallContract(ctx context.Context, req *observe.CallContractRequest) (*observe.CallContractResponse, error) {
+	s.logger.Debug("📞  Contract script called")
+
 	script := req.GetScript()
 	value, _ := s.blockchain.CallScript(script)
 	// TODO: add error handling besides just this
