@@ -31,15 +31,23 @@ type EmulatedBlockchain struct {
 	rootAccountKeyPair *crypto.KeyPair
 }
 
+// EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
+type EmulatedBlockchainOptions struct {
+	RootAccountKeyPair *crypto.KeyPair
+}
+
+// DefaultOptions is the default configuration for an emulated blockchain.
+var DefaultOptions = &EmulatedBlockchainOptions{}
+
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
-func NewEmulatedBlockchain() *EmulatedBlockchain {
+func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	worldStates := make(map[crypto.Hash][]byte)
 	intermediateWorldStates := make(map[crypto.Hash][]byte)
 	txPool := make(map[crypto.Hash]*types.SignedTransaction)
 	computer := NewComputer(runtime.NewInterpreterRuntime())
 	ws := state.NewWorldState()
 
-	rootAccountAddress, rootAccountKeyPair := createRootAccount(ws)
+	rootAccountAddress, rootAccountKeyPair := createRootAccount(ws, opt.RootAccountKeyPair)
 
 	bytes := ws.Encode()
 	worldStates[ws.Hash()] = bytes
@@ -232,10 +240,12 @@ func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature)
 }
 
 // createRootAccount creates a new root account and commits it to the world state.
-func createRootAccount(ws *state.WorldState) (types.Address, *crypto.KeyPair) {
+func createRootAccount(ws *state.WorldState, keyPair *crypto.KeyPair) (types.Address, *crypto.KeyPair) {
 	registers := ws.Registers.NewView()
 
-	keyPair, _ := crypto.GenKeyPair("root")
+	if keyPair == nil {
+		keyPair, _ = crypto.GenKeyPair("root")
+	}
 
 	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
 	accountID, _ := runtimeAPI.CreateAccount(keyPair.PublicKey, []byte{})

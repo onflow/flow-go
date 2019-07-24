@@ -31,7 +31,7 @@ func TestWorldStates(t *testing.T) {
 	RegisterTestingT(t)
 
 	// Create new emulated blockchain
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
 	// Create 3 signed transactions (tx1, tx2. tx3)
 	tx1 := (&types.RawTransaction{
@@ -137,7 +137,7 @@ func TestWorldStates(t *testing.T) {
 func TestSubmitTransaction(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
 		Script:       []byte(sampleScript),
@@ -157,7 +157,7 @@ func TestSubmitTransaction(t *testing.T) {
 func TestSubmitDuplicateTransaction(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
 		Script:       []byte(sampleScript),
@@ -178,7 +178,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 func TestSubmitTransactionReverted(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
 		Script:       []byte("invalid script"),
@@ -198,7 +198,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 func TestCommitBlock(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
 		Script:       []byte(sampleScript),
@@ -236,7 +236,7 @@ func TestCommitBlock(t *testing.T) {
 func TestCreateAccount(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
 		Script: []byte(`
@@ -291,7 +291,7 @@ func TestCreateAccount(t *testing.T) {
 func TestCallScript(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
 		Script:       []byte(sampleScript),
@@ -318,7 +318,7 @@ func TestCallScript(t *testing.T) {
 func TestQueryByVersion(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
 		Script:       []byte(sampleScript),
