@@ -2250,6 +2250,38 @@ resource interface FungibleToken {
 
 Note that the required initializer and functions do not have any executable code.
 
+Interfaces can require implementations to implement other interfaces of the same kind.
+Interface implementation requirements can be declared by following the interface name with a colon (`:`),
+followed by one or more interfaces of the same kind, separated by commas.
+
+```bamboo,file=interface-requirement.
+// Declare a structure interface named `Shape`
+//
+struct interface Shape {}
+
+// Declare a structure interface named `Polygon`.
+// Require implementations to also implement `Shape`
+//
+struct interface Polygon: Shape {}
+
+// Declare a structure named `Hexagon`
+//
+struct Hexagon {}
+
+// Implement the structure interface `Polygon`
+// for the structure `Hexagon`
+//
+impl Polygon for Hexagon {}
+
+// Implement the structure interface `Shape`
+// fro the structure `Hexagon`.
+//
+// This is required, as the interface `Polygon`
+// specified this implementation requirement.
+//
+impl Shape for Hexagon {}
+```
+
 ### Interface Implementation
 
 Implementations are declared using the `impl` keyword,
@@ -2395,7 +2427,7 @@ Interfaces are types. Values implementing an interface can be used as initial va
 // Implementations must provide a field which returns the area,
 // and a function which scales the shape by a given factor.
 //
-interface Shape {
+struct interface Shape {
     pub area: Int
     pub fun scale(factor: Int)
 }
@@ -2501,7 +2533,7 @@ Most of the built-in types are equatable, like booleans and integers. Arrays are
 To make a type equatable the `Equatable` interface must be implemented, which requires the implementation of the function `equals`, which accepts another value that the given value should be compared for equality. Note that the parameter type is `Self`, i.e., the other value must have the same type as the implementing type.
 
 ```bamboo,file=equatable.bpl
-interface Equatable {
+struct interface Equatable {
     pub fun equals(_ other: Self): Bool
 }
 ```
@@ -2545,8 +2577,6 @@ Hashable types can be used as keys in dictionaries.
 
 Hashable types must also be equatable, i.e., they must also implement the `Equatable` interface. This is because the hash value is only evidence for inequality: two values that have different hash values are guaranteed to be unequal. However, if the hash values of two values are the same, then the two values could still be unequal and just happen to hash to the same hash value. In that case equality still needs to be determined through an equality check. Without `Equatable`, values could be added to a dictionary, but it would not be possible to retrieve them.
 
-<!-- TODO: once interface inheritance is defined, describe how Hashable inherits from Equatable -->
-
 Most of the built-in types are hashable, like booleans and integers. Arrays are hashable when their elements are hashable. Dictionaries are hashable when their values are equatable.
 
 Hashing a value means passing its essential components into a hash function. Essential components are those that are used in the type's implementation of `Equatable`.
@@ -2556,7 +2586,7 @@ If two values are equal because their `equals` function returns true, then the i
 The implementation must also consistently return the same integer hash value during the execution of the program when the essential components have not changed. The integer hash value must not necessarily be the same across multiple executions.
 
 ```bamboo,file=hashable.bpl
-interface Hashable {
+struct interface Hashable: Equatable {
     pub hashValue: Int
 }
 ```
@@ -2624,7 +2654,7 @@ Attestation types have the name of the resource type, prefixed with the `@` symb
 //
 resource Token {}
 
-// Create a new resource value that has type `Token`.
+// Create a new instance of the resource type `Token`.
 //
 let token <- create Token()
 
@@ -2641,7 +2671,7 @@ Like resources, attestations are associated with an [account](#account).
 > 🚧 Status: Accounts are not implemented yet.
 
 ```bamboo
-interface Account {
+struct interface Account {
     pub init(at address: Address)
 }
 ```
