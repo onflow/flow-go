@@ -124,7 +124,7 @@ func Test(t *testing.T) {
 		t.Run(test.title, func(t *testing.T) {
 			RegisterTestingT(t)
 
-			c := &receiptProcessorConfig{
+			c := &ReceiptProcessorConfig{
 				QueueBuffer: 100,
 				CacheBuffer: 100,
 			}

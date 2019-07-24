@@ -11,11 +11,10 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/config"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
-type receiptProcessor struct {
+type ReceiptProcessor struct {
 	q       chan *receiptAndDoneChan
 	effects Effects
 	cache   gcache.Cache
@@ -29,8 +28,8 @@ type receiptAndDoneChan struct {
 
 // NewReceiptProcessor returns a new processor instance.
 // A go routine is initialised and waiting to process new items.
-func NewReceiptProcessor(effects Effects, rc *receiptProcessorConfig, hasher crypto.Hasher) *receiptProcessor {
-	p := &receiptProcessor{
+func NewReceiptProcessor(effects Effects, rc *ReceiptProcessorConfig, hasher crypto.Hasher) *ReceiptProcessor {
+	p := &ReceiptProcessor{
 		q:       make(chan *receiptAndDoneChan, rc.QueueBuffer),
 		effects: effects,
 		cache:   gcache.New(rc.CacheBuffer).LRU().Build(),
@@ -43,7 +42,7 @@ func NewReceiptProcessor(effects Effects, rc *receiptProcessorConfig, hasher cry
 
 // Submit takes in an ExecutionReceipt to be process async.
 // The done chan is optional. If caller is not interested to be notified when processing has been completed, nil value should be used for it.
-func (p *receiptProcessor) Submit(receipt *types.ExecutionReceipt, done chan bool) {
+func (p *ReceiptProcessor) Submit(receipt *types.ExecutionReceipt, done chan bool) {
 	// TODO: if ER does not have a valid signature, then this needs to be discard. Deal with it here are at upper layer before submit?
 
 	if ok, err := p.effects.HasMinStake(receipt); err != nil {
@@ -63,7 +62,7 @@ func (p *receiptProcessor) Submit(receipt *types.ExecutionReceipt, done chan boo
 	p.q <- rdc
 }
 
-func (p *receiptProcessor) run() {
+func (p *ReceiptProcessor) run() {
 	for {
 		rdc := <-p.q
 		receipt := rdc.receipt
@@ -109,7 +108,7 @@ func (p *receiptProcessor) run() {
 	}
 }
 
-func (p *receiptProcessor) sendApprovalOrSlash(receipt *types.ExecutionReceipt, validationResult compute.ValidationResult) {
+func (p *ReceiptProcessor) sendApprovalOrSlash(receipt *types.ExecutionReceipt, validationResult compute.ValidationResult) {
 	switch vr := validationResult.(type) {
 	case *compute.ValidationResultSuccess:
 		p.effects.Send(receipt, vr.Proof)
@@ -120,19 +119,10 @@ func (p *receiptProcessor) sendApprovalOrSlash(receipt *types.ExecutionReceipt, 
 	}
 }
 
-// receiptProcessorConfig holds the configuration for receipt processor.
-type receiptProcessorConfig struct {
+// ReceiptProcessorConfig holds the configuration for receipt processor.
+type ReceiptProcessorConfig struct {
 	QueueBuffer int
 	CacheBuffer int
-}
-
-//NewReceiptProcessorConfig returns a new  receiptProcessorConfig  process.
-func NewReceiptProcessorConfig(c *config.Config) *receiptProcessorConfig {
-
-	return &receiptProcessorConfig{
-		QueueBuffer: c.ProcessorQueueBuffer,
-		CacheBuffer: c.ProcessorCacheBuffer,
-	}
 }
 
 func notifyDone(c chan bool) {
