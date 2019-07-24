@@ -3,8 +3,8 @@ package core
 import (
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	eruntime "github.com/dapperlabs/bamboo-node/internal/emulator/runtime"
@@ -47,18 +47,6 @@ func NewEmulatedBlockchain() *EmulatedBlockchain {
 		txPool:                  txPool,
 		computer:                computer,
 	}
-}
-
-func (b *EmulatedBlockchain) getWorldStateAtVersion(wsHash crypto.Hash) (*state.WorldState, error) {
-	if wsBytes, ok := b.worldStates[wsHash]; ok {
-		return state.Decode(wsBytes), nil
-	}
-
-	if wsBytes, ok := b.intermediateWorldStates[wsHash]; ok {
-		return state.Decode(wsBytes), nil
-	}
-
-	return nil, &ErrInvalidStateVersion{Version: wsHash}
 }
 
 // GetTransaction gets an existing transaction by hash.
@@ -191,15 +179,6 @@ func (b *EmulatedBlockchain) CommitBlock() {
 	b.commitWorldState(block.Hash())
 }
 
-func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
-	if _, exists := b.worldStates[blockHash]; exists {
-		return
-	}
-
-	bytes := b.pendingWorldState.Encode()
-	b.worldStates[blockHash] = bytes
-}
-
 // SeekToState rewinds the blockchain state to a previously committed history.
 //
 // Note that this only seeks to a committed world state (not intermediate world state)
@@ -210,6 +189,27 @@ func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
 		b.pendingWorldState = ws
 		b.txPool = make(map[crypto.Hash]*types.SignedTransaction)
 	}
+}
+
+func (b *EmulatedBlockchain) getWorldStateAtVersion(wsHash crypto.Hash) (*state.WorldState, error) {
+	if wsBytes, ok := b.worldStates[wsHash]; ok {
+		return state.Decode(wsBytes), nil
+	}
+
+	if wsBytes, ok := b.intermediateWorldStates[wsHash]; ok {
+		return state.Decode(wsBytes), nil
+	}
+
+	return nil, &ErrInvalidStateVersion{Version: wsHash}
+}
+
+func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
+	if _, exists := b.worldStates[blockHash]; exists {
+		return
+	}
+
+	bytes := b.pendingWorldState.Encode()
+	b.worldStates[blockHash] = bytes
 }
 
 func (b *EmulatedBlockchain) validateSignature(sig crypto.Signature) error {
