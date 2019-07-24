@@ -37,7 +37,10 @@ func NewEmulatorServer(log *logrus.Logger, config *Config) *EmulatorServer {
 }
 
 func (s *EmulatorServer) Start(ctx context.Context) {
-	// TODO: connect gRPC interface to server
+	s.log.WithFields(logrus.Fields{
+		"port": s.config.Port,
+	}).Infof("🌱  Starting Emulator Server on port %d...", s.config.Port)
+
 	go s.startGrpcServer()
 
 	tick := time.Tick(s.config.BlockInterval)
@@ -45,9 +48,22 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 		select {
 		case tx := <-s.transactionsIn:
 			s.blockchain.SubmitTransaction(tx)
-			s.blockchain.CommitBlock()
+
+			s.log.WithFields(logrus.Fields{
+				"txHash": tx.Hash(),
+			}).Infof("💸  Transaction %s submitted to network", tx.Hash())
+
+			hash := s.blockchain.CommitBlock()
+
+			s.log.WithFields(logrus.Fields{
+				"stateHash": hash,
+			}).Infof("️⛏  Block %s mined", hash)
 		case <-tick:
-			s.blockchain.CommitBlock()
+			hash := s.blockchain.CommitBlock()
+
+			s.log.WithFields(logrus.Fields{
+				"stateHash": hash,
+			}).Tracef("️⛏  Block %s mined", hash)
 		case <-ctx.Done():
 			return
 		}
