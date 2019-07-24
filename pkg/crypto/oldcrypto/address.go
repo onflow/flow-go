@@ -20,6 +20,12 @@ func BytesToAddress(b []byte) Address {
 	return a
 }
 
+// HexToAddress converts a hex string to an Address.
+func HexToAddress(h string) Address {
+	b, _ := hex.DecodeString(h)
+	return BytesToAddress(b)
+}
+
 // SetBytes sets the address to the value of b.
 // If b is larger than len(a) it will panic.
 func (a *Address) SetBytes(b []byte) {

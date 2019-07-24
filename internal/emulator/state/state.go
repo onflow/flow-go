@@ -3,23 +3,21 @@ package state
 import (
 	"sync"
 
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 )
 
 // WorldState represents the current state of the blockchain.
 type WorldState struct {
-	Accounts          map[crypto.Address]*crypto.Account
-	accountsMutex     sync.RWMutex
 	Blocks            map[crypto.Hash]*etypes.Block
 	blocksMutex       sync.RWMutex
 	Blockchain        []crypto.Hash
 	blockchainMutex   sync.RWMutex
 	Transactions      map[crypto.Hash]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
-	Registers         map[crypto.Hash][]byte
+	Registers         etypes.Registers
 	registersMutex    sync.RWMutex
 	LatestState       crypto.Hash
 	latestStateMutex  sync.RWMutex
@@ -27,18 +25,16 @@ type WorldState struct {
 
 // NewWorldState instantiates a new state object with a genesis block.
 func NewWorldState() *WorldState {
-	accounts := make(map[crypto.Address]*crypto.Account)
 	blocks := make(map[crypto.Hash]*etypes.Block)
 	blockchain := make([]crypto.Hash, 0)
 	transactions := make(map[crypto.Hash]*types.SignedTransaction)
-	registers := make(map[crypto.Hash][]byte)
+	registers := make(etypes.Registers)
 
 	genesis := etypes.GenesisBlock()
 	blocks[genesis.Hash()] = genesis
 	blockchain = append(blockchain, genesis.Hash())
 
 	return &WorldState{
-		Accounts:     accounts,
 		Blocks:       blocks,
 		Blockchain:   blockchain,
 		Transactions: transactions,
@@ -107,44 +103,12 @@ func (ws *WorldState) ContainsTransaction(hash crypto.Hash) bool {
 	return exists
 }
 
-// GetAccount gets an account by address.
-func (ws *WorldState) GetAccount(address crypto.Address) *crypto.Account {
-	ws.accountsMutex.RLock()
-	defer ws.accountsMutex.RUnlock()
-
-	if account, ok := ws.Accounts[address]; ok {
-		return account
-	}
-
-	return nil
-}
-
-// GetRegister gets a register by hash.
-//
-// If the register does not exist, an empty byte slice is returned.
-func (ws *WorldState) GetRegister(hash crypto.Hash) []byte {
-	ws.registersMutex.RLock()
-	defer ws.registersMutex.RUnlock()
-
-	return ws.Registers[hash]
-}
-
-// SetRegister sets a register to the given value.
-func (ws *WorldState) SetRegister(hash crypto.Hash, value []byte) {
-	ws.registersMutex.Lock()
-	defer ws.registersMutex.Unlock()
-
-	ws.Registers[hash] = value
-}
-
 // SetRegisters commmits a set of registers to the state.
 func (ws *WorldState) SetRegisters(registers etypes.Registers) {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 
-	for hash, value := range registers {
-		ws.Registers[hash] = value
-	}
+	ws.Registers.MergeWith(registers)
 }
 
 // InsertBlock adds a new block to the blockchain.
@@ -184,18 +148,6 @@ func (ws *WorldState) InsertTransaction(tx *types.SignedTransaction) {
 	defer ws.latestStateMutex.Unlock()
 
 	ws.LatestState = tx.Hash()
-}
-
-// InsertAccount adds a newly created account into the world state.
-func (ws *WorldState) InsertAccount(account *crypto.Account) {
-	ws.accountsMutex.Lock()
-	defer ws.accountsMutex.Unlock()
-
-	if _, exists := ws.Accounts[account.Address]; exists {
-		return
-	}
-
-	ws.Accounts[account.Address] = account
 }
 
 // UpdateTransactionStatus updates the transaction status of an existing transaction.

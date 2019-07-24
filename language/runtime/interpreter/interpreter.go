@@ -84,7 +84,7 @@ func (interpreter *Interpreter) defineGlobal(declaration ast.Declaration) {
 	interpreter.Globals[name] = interpreter.activations.Find(name)
 }
 
-func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value ExportableValue, err error) {
+func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value Value, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
 		return nil, &NotDeclaredError{
@@ -122,6 +122,19 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 	if result == nil {
 		return nil, nil
 	}
+	return result.(Value), nil
+}
+
+func (interpreter *Interpreter) InvokeExportable(functionName string, inputs ...interface{}) (value ExportableValue, err error) {
+	result, err := interpreter.Invoke(functionName, inputs...)
+	if err != nil {
+		return nil, err
+	}
+
+	if result == nil {
+		return nil, nil
+	}
+
 	return result.(ExportableValue), nil
 }
 
