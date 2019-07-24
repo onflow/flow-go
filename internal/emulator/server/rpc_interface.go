@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -66,9 +65,9 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 	hash := crypto.BytesToHash(req.GetHash())
 	tx := s.blockchain.GetTransaction(hash)
 
-	s.logger.WithFields(log.Fields{
-		"txHash": hash,
-	}).Debugf("💵  GetTransaction called: %s", hash)
+	s.logger.
+		WithField("txHash", hash).
+		Debugf("💵  GetTransaction called: %s", hash)
 
 	txMsg := &observe.GetTransactionResponse_Transaction{
 		Script:       tx.Script,
@@ -95,9 +94,9 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 	address := crypto.BytesToAddress(req.GetAddress())
 	account := s.blockchain.GetAccount(address)
 
-	s.logger.WithFields(log.Fields{
-		"address": address,
-	}).Debugf("👤  GetAccount called: %s", address)
+	s.logger.
+		WithField("address", address).
+		Debugf("👤  GetAccount called: %s", address)
 
 	accMsg := &observe.GetAccountResponse_Account{
 		Address:    account.Address.Bytes(),
