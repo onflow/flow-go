@@ -58,7 +58,7 @@ func (i *EmulatorRuntimeAPI) GetAccount(address crypto.Address) *crypto.Account 
 	balanceInt := big.NewInt(0).SetBytes(balanceBytes)
 
 	publicKey, _ := i.registers.Get(fullKey(accountID, accountID, []byte("public_key")))
-	code, _ := i.registers.Get(fullKey(accountID, accountID, []byte("code")))
+	code, _ := i.registers.Get(fullKey(accountID, accountID, keyCode()))
 
 	return &crypto.Account{
 		Address:    address,
