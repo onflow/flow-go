@@ -1102,7 +1102,7 @@ let doNothing: ((): Void) =
     fun () {}
 ```
 
-Parantheses also control precedence.
+Parentheses also control precedence.
 For example, a function type `((Int): ((): Int))` is the type for a function which accepts one argument with type `Int`,
 and which returns another function, that takes no arguments and returns an `Int`.
 
@@ -2318,7 +2318,7 @@ impl FungibleToken for ExampleToken {
     // NOTE: neither the precondition nor the postcondition declared
     // in the interface have to be repeated here in the implementation
     //
-    pub fun desposit(_ token: <-ExampleToken) {
+    pub fun deposit(_ token: <-ExampleToken) {
         self.balance = self.balance + amount
         destroy token
     }
@@ -2747,7 +2747,7 @@ let token <- create Token()
 let attestation: @Token = @token
 ```
 
-Like resources, attestations are associated with an [account](#account).
+Like resources, attestations are associated with an [account](#accounts).
 
 ## Accounts
 
@@ -2813,7 +2813,7 @@ import Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
 
 ## Transactions
 
-Transactions are objects that are signed by one or more accounts and are sent to the chain to interact with it.
+Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.
 
 Transactions have three phases: Preparation, execution, and post-conditions.
 
@@ -2842,6 +2842,268 @@ transaction {
 
     ensure {
         // ...
+    }
+}
+```
+
+### Deployment
+
+Transactions can deploy resources and resource interfaces.
+
+```bamboo,file=fungible-token-interface.bpl
+// Declare a resource interface for a fungible token.
+//
+// It requires implementing types to provide a resource named `Vault`,
+// which needs to implement the interfaces `Provider` and `Receiver`
+//
+resource interface FungibleToken {
+
+    pub resource interface Provider {
+
+        pub fun withdraw(amount: Int): <-Vault {
+            require {
+                amount > 0:
+                    "withdrawal amount must be positive"
+            }
+            ensure {
+                result.balance == amount:
+                    "incorrect amount returned"
+            }
+        }
+    }
+
+    pub resource interface Receiver {
+        pub fun deposit(vault: <-Vault)
+    }
+
+    pub resource Vault: Provider, Receiver {
+
+        pub balance: Int {
+            get {
+                ensure {
+                    result >= 0:
+                        "Balances are always non-negative"
+                }
+            }
+        }
+
+        init(balance: Int) {
+            ensure {
+                self.balance == balance:
+                    "the balance must be initialized to the initial balance"
+            }
+        }
+
+        pub fun withdraw(amount: Int): <-Self {
+            require {
+                amount <= self.balance:
+                    "insufficient funds: the amount must be smaller or equal to the balance"
+            }
+            ensure {
+                self.balance == before(self.balance) - amount:
+                    "Incorrect amount removed"
+            }
+        }
+
+        pub fun deposit(vault: <-Self) {
+            ensure {
+                self.balance == before(self.balance) + vault.balance:
+                    "the amount must be added to the balance"
+            }
+        }
+    }
+}
+```
+
+Transactions can refer to local code with the `using` keyword,
+followed by the name of the type, the `from` keyword,
+and the string literal for the path of the file which contains the code of the type.
+
+<!-- TODO:
+     move explanation for using statement into separate section?
+     also see below for version referring to deployed code with an address
+-->
+
+The preparer can use the signing account's `deploy` function to deploy
+the resource interface.
+
+Once deployed, the resource interfaces is available in the account's `types` object.
+
+The `publish` operator is used to make the resource interface type publicly available.
+
+```bamboo,file=deploy-resource-interface.bpl
+// Execute a transaction which deploys the code for
+// the resource interface `FungibleToken`, and makes
+// the deployed type publicly available
+//
+transaction {
+
+    // Refer to the resource interface type `FungibleToken`
+    // in the local file "FungibleToken.bpl"
+    //
+    using FungibleToken from "FungibleToken.bpl"
+
+    prepare(signer: Account) {
+        // Deploy the  resource interface type `FungibleToken`
+        // in the signing account
+        signer.deploy(FungibleToken)
+
+        // Make the deployed type publicly available
+        //
+        publish signer.types[FungibleToken]
+    }
+}
+```
+
+Just like resource interfaces it is possible to deploy resources.
+
+```bamboo,file=example-token.bpl
+// Declare a resource named `ExampleToken` which implements
+// the resource interface `FungibleToken`
+//
+resource ExampleToken {}
+
+impl FungibleToken for ExampleToken {
+
+    resource Vault {
+        pub var balance: Int
+
+        init(balance: Int) {
+            self.balance = balance
+        }
+
+        pub fun withdraw(amount: Int): <-Vault {
+            self.balance = self.balance - amount
+            return create Vault(balance: amount)
+        }
+
+        pub fun deposit(_ token: <-Vault) {
+            self.balance = self.balance + amount
+            destroy token
+        }
+    }
+
+    impl Receiver for Vault {}
+    impl Provider for Vault {}
+}
+```
+
+```bamboo,file=deploy-resource.bpl
+// Execute a transaction which deploys the code for
+// the resource `ExampleToken`, and makes the deployed
+// type publicly available
+//
+transaction {
+
+    using ExampleToken from "ExampleToken.bpl"
+
+    prepare(signer: Account) {
+        signer.deploy(ExampleToken)
+        publish signer.types[ExampleToken]
+    }
+}
+```
+
+### Interacting with Deployed Resources
+
+Transactions can also refer to deployed code with the `using` keyword
+and the address of the account which contains the publicly available type.
+
+<!-- TODO:
+     move explanation for using statement into separate section?
+     also see above for version referring to local code with a path
+-->
+
+In addition to storing resources it is also possible to store references to **stored** resources or even other references.
+References can only be keyed by (and therefore accessed through) **resource interfaces**.
+
+References are created by using the `&` operator, followed by the stored resource or reference,
+the `as` operator, and the resource interface type.
+
+```bamboo,file=setup-transaction.bpl
+// Execute a transaction which creates a new example token vault
+// for the signing account
+//
+transaction {
+    // Refer to the resource type `ExampleToken` deployed
+    // at example address 0x42
+    //
+    using ExampleToken from 0x42
+
+    prepare(signer: Account) {
+        // Create a new example token vault for the signing account.
+        //
+        // NOTE: the vault is not publicly accessible
+        //
+        signer.storage[ExampleToken.Vault] <- create ExampleToken.Vault()
+
+        // Store two storage references in the signing account:
+        // One reference to the stored vault, keyed by the resource
+        // interface `Provider`, and another reference to the stored vault,
+        // keyed by the resource interface `Provider`
+        //
+        signer.storage[ExampleToken.Provider] =
+            &signer.storage[ExampleToken.Vault] as ExampleToken.Provider
+
+        signer.storage[ExampleToken.Receiver] =
+            &signer.storage[ExampleToken.Vault] as ExampleToken.Receiver
+
+        // Publish only the receiver so it can be accessed publicly.
+        //
+        // NOTE: neither the vault nor the publisher are published
+        //
+        publish signer.storage[ExampleToken.Receiver]
+    }
+}
+```
+
+```bamboo,file=send-transaction.bpl
+// Execute a transaction which sends five coins from one account to another.
+//
+// The transaction fails unless there is a `ExampleToken.Provider` available
+// for the sending account and there is a public `ExampleToken.Receiver`
+// available for the recipient account.
+//
+// Only a signature from the sender is required.
+// No signature from the recipient is required, as the receiver
+// is published/publicly available (if it exists for the recipient)
+//
+transaction {
+    // Refer to the resource type `ExampleToken` deployed
+    // at example address 0x42
+    //
+    using ExampleToken from 0x42
+
+    let sentFunds: ExampleToken.Vault
+
+    prepare(signer: Account) {
+        // Get the stored provider for the signing account.
+        //
+        // As the access is performed in the preparer,
+        // the unpublished reference `ExampleToken.Provider`
+        // can be accessed (if it exists)
+        //
+        let provider <- signer.storage[ExampleToken.Provider]
+
+        // Withdraw five coins (as a vault) from the provider
+        // and move it into the field `sentFunds`
+        //
+        self.sentFunds <- provider.withdraw(amount: 5)
+    }
+
+    execute {
+        // The recipient account
+        //
+        let recipient: Account = // ...
+
+        // Get the stored receiver for the recipient account
+        //
+        let receiver <- recipient.storage[ExampleToken.Receiver]
+
+        // Deposit the amount withdrawn from the signer
+        // in the recipient's vault through the receiver
+        //
+        receiver.deposit(vault: <-self.sentFunds)
     }
 }
 ```
