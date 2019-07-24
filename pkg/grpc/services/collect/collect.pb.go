@@ -6,7 +6,7 @@ package collect
 import (
 	context "context"
 	fmt "fmt"
-	shared "github.com/dapperlabs/bamboo-node/grpc/shared"
+	shared "github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
