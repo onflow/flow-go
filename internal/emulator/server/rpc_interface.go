@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -66,7 +66,7 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 	hash := crypto.BytesToHash(req.GetHash())
 	tx := s.blockchain.GetTransaction(hash)
 
-	s.log.WithFields(logrus.Fields{
+	s.logger.WithFields(log.Fields{
 		"txHash": hash,
 	}).Debugf("💵  GetTransaction called: %s", hash)
 
@@ -95,7 +95,7 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 	address := crypto.BytesToAddress(req.GetAddress())
 	account := s.blockchain.GetAccount(address)
 
-	s.log.WithFields(logrus.Fields{
+	s.logger.WithFields(log.Fields{
 		"address": address,
 	}).Debugf("👤  GetAccount called: %s", address)
 
@@ -115,7 +115,7 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 
 // CallContract performs a contract call.
 func (s *EmulatorServer) CallContract(ctx context.Context, req *observe.CallContractRequest) (*observe.CallContractResponse, error) {
-	s.log.Debug("📞  Contract script called")
+	s.logger.Debug("📞  Contract script called")
 
 	script := req.GetScript()
 	value, _ := s.blockchain.CallScript(script)

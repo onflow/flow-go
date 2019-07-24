@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
@@ -19,7 +19,7 @@ type EmulatorServer struct {
 	blockchain     *core.EmulatedBlockchain
 	transactionsIn chan *types.SignedTransaction
 	config         *Config
-	log            *logrus.Logger
+	logger         *log.Logger
 }
 
 type Config struct {
@@ -27,17 +27,17 @@ type Config struct {
 	BlockInterval time.Duration `default:"5s"`
 }
 
-func NewEmulatorServer(log *logrus.Logger, config *Config) *EmulatorServer {
+func NewEmulatorServer(logger *log.Logger, config *Config) *EmulatorServer {
 	return &EmulatorServer{
 		blockchain:     core.NewEmulatedBlockchain(),
 		transactionsIn: make(chan *types.SignedTransaction, 16),
 		config:         config,
-		log:            log,
+		logger:         logger,
 	}
 }
 
 func (s *EmulatorServer) Start(ctx context.Context) {
-	s.log.WithFields(logrus.Fields{
+	s.logger.WithFields(log.Fields{
 		"port": s.config.Port,
 	}).Infof("🌱  Starting Emulator Server on port %d...", s.config.Port)
 
@@ -49,19 +49,19 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 		case tx := <-s.transactionsIn:
 			s.blockchain.SubmitTransaction(tx)
 
-			s.log.WithFields(logrus.Fields{
+			s.logger.WithFields(log.Fields{
 				"txHash": tx.Hash(),
 			}).Infof("💸  Transaction %s submitted to network", tx.Hash())
 
 			hash := s.blockchain.CommitBlock()
 
-			s.log.WithFields(logrus.Fields{
+			s.logger.WithFields(log.Fields{
 				"stateHash": hash,
 			}).Infof("️⛏  Block %s mined", hash)
 		case <-tick:
 			hash := s.blockchain.CommitBlock()
 
-			s.log.WithFields(logrus.Fields{
+			s.logger.WithFields(log.Fields{
 				"stateHash": hash,
 			}).Tracef("️⛏  Block %s mined", hash)
 		case <-ctx.Done():
@@ -73,7 +73,7 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 func (s *EmulatorServer) startGrpcServer() {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.Port))
 	if err != nil {
-		s.log.WithError(err).Fatal("Failed to listen")
+		s.logger.WithError(err).Fatal("Failed to listen")
 	}
 
 	grpcServer := grpc.NewServer()
@@ -81,10 +81,10 @@ func (s *EmulatorServer) startGrpcServer() {
 	grpcServer.Serve(lis)
 }
 
-func StartServer(log *logrus.Logger, config *Config) {
+func StartServer(logger *log.Logger, config *Config) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	emulatorServer := NewEmulatorServer(log, config)
+	emulatorServer := NewEmulatorServer(logger, config)
 	emulatorServer.Start(ctx)
 }
