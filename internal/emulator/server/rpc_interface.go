@@ -14,6 +14,7 @@ import (
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 )
 
+// Ping pings the Observation API server for a response.
 func (s *EmulatorServer) Ping(ctx context.Context, req *observe.PingRequest) (*observe.PingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
@@ -65,7 +66,6 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 	tx := s.blockchain.GetTransaction(hash)
 
 	txMsg := &observe.GetTransactionResponse_Transaction{
-		ToAddress:    tx.ToAddress.Bytes(),
 		Script:       tx.Script,
 		Nonce:        tx.Nonce,
 		ComputeLimit: tx.ComputeLimit,
@@ -113,7 +113,7 @@ func (s *EmulatorServer) CallContract(ctx context.Context, req *observe.CallCont
 		return nil, status.Error(codes.InvalidArgument, "invalid script")
 	}
 
-	// TODO: change this to whatever interface -> byte encoding decide on
+	// TODO: change this to whatever interface -> byte encoding decided on
 	valueMsg := []byte(fmt.Sprintf("%v", value.(interface{})))
 
 	response := &observe.CallContractResponse{
