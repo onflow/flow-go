@@ -4,18 +4,21 @@ import (
 	"context"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	verifySvc "github.com/dapperlabs/bamboo-node/grpc/services/verify"
+	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
+	// "github.com/dapperlabs/bamboo-node/internal/utils"
 )
 
 type Controller struct {
 	dal *DAL
+	rp  *processor.ReceiptProcessor
 }
 
-func NewController() *Controller {
-	return &Controller{}
+func NewController(rp *processor.ReceiptProcessor) *Controller {
+	return &Controller{
+		rp: rp,
+	}
 }
 
 func (c *Controller) Ping(context.Context, *verifySvc.PingRequest) (*verifySvc.PingResponse, error) {
@@ -24,6 +27,9 @@ func (c *Controller) Ping(context.Context, *verifySvc.PingRequest) (*verifySvc.P
 	}, nil
 }
 
-func (c *Controller) SubmitExecutionReceipt(context.Context, *verifySvc.SubmitExecutionReceiptRequest) (*empty.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+func (c *Controller) SubmitExecutionReceipt(ctx context.Context, req *verifySvc.SubmitExecutionReceiptRequest) (*empty.Empty, error) {
+	// TODO: utils package currently doesn't build, uncomment the lines below when it does. See https://github.com/dapperlabs/bamboo-node/issues/241
+	// er := utils.MessageToExecutionReceipt(req.ExecutionReceipt)
+	// c.rp.Submit(er, nil)
+	return &empty.Empty{}, nil
 }
