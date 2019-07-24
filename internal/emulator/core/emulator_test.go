@@ -34,29 +34,26 @@ func TestWorldStates(t *testing.T) {
 	b := NewEmulatedBlockchain()
 
 	// Create 3 signed transactions (tx1, tx2. tx3)
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(sampleScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
-	tx2 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          2,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+	tx2 := (&types.RawTransaction{
+		Script:       []byte(sampleScript),
+		Nonce:        2,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
-	tx3 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          3,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+	tx3 := (&types.RawTransaction{
+		Script:       []byte(sampleScript),
+		Nonce:        3,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	ws1 := b.pendingWorldState.Hash()
 	t.Logf("initial world state: \t%s\n", ws1)
@@ -142,13 +139,12 @@ func TestSubmitTransaction(t *testing.T) {
 
 	b := NewEmulatedBlockchain()
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(sampleScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
@@ -163,13 +159,12 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 
 	b := NewEmulatedBlockchain()
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(sampleScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
@@ -185,13 +180,12 @@ func TestSubmitTransactionReverted(t *testing.T) {
 
 	b := NewEmulatedBlockchain()
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte("invalid script"),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte("invalid script"),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Submit invalid tx1 (errors)
 	err := b.SubmitTransaction(tx1)
@@ -206,26 +200,24 @@ func TestCommitBlock(t *testing.T) {
 
 	b := NewEmulatedBlockchain()
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(sampleScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionFinalized))
 
-	tx2 := &types.SignedTransaction{
-		Script:         []byte("invalid script"),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+	tx2 := (&types.RawTransaction{
+		Script:       []byte("invalid script"),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Submit invalid tx2
 	err = b.SubmitTransaction(tx2)
@@ -246,7 +238,7 @@ func TestCreateAccount(t *testing.T) {
 
 	b := NewEmulatedBlockchain()
 
-	tx1 := &types.SignedTransaction{
+	tx1 := (&types.RawTransaction{
 		Script: []byte(`
 			fun main() {
 				const publicKey = [1,2,3]
@@ -254,16 +246,16 @@ func TestCreateAccount(t *testing.T) {
 				createAccount(publicKey, code)
 			}
 		`),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
-	address := types.HexToAddress("0000000000000000000000000000000000000001")
+	// root account has ID 1, so expect this account to have ID 2
+	address := types.HexToAddress("0000000000000000000000000000000000000002")
 
 	account := b.GetAccount(address)
 
@@ -271,7 +263,7 @@ func TestCreateAccount(t *testing.T) {
 	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
-	tx2 := &types.SignedTransaction{
+	tx2 := (&types.RawTransaction{
 		Script: []byte(`
 			fun main() {
 				const publicKey = [7,8,9]
@@ -279,16 +271,15 @@ func TestCreateAccount(t *testing.T) {
 				createAccount(publicKey, code)
 			}
 		`),
-		Nonce:          2,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+		Nonce:        2,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	err = b.SubmitTransaction(tx2)
 	Expect(err).ToNot(HaveOccurred())
 
-	address = types.HexToAddress("0000000000000000000000000000000000000002")
+	address = types.HexToAddress("0000000000000000000000000000000000000003")
 
 	account = b.GetAccount(address)
 
@@ -302,13 +293,12 @@ func TestCallScript(t *testing.T) {
 
 	b := NewEmulatedBlockchain()
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(sampleScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Sample call (value is 0)
 	value, err := b.CallScript([]byte(sampleCall))
@@ -330,21 +320,19 @@ func TestQueryByVersion(t *testing.T) {
 
 	b := NewEmulatedBlockchain()
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(sampleScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
-	tx2 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          2,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.MockSignature(nil),
-	}
+	tx2 := (&types.RawTransaction{
+		Script:       []byte(sampleScript),
+		Nonce:        2,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	invalidWorldState := crypto.NewHash([]byte("invalid state"))
 

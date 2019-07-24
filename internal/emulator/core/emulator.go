@@ -25,8 +25,10 @@ type EmulatedBlockchain struct {
 	// current world state
 	pendingWorldState *state.WorldState
 	// pool of pending transactions waiting to be commmitted (already executed)
-	txPool   map[crypto.Hash]*types.SignedTransaction
-	computer *Computer
+	txPool             map[crypto.Hash]*types.SignedTransaction
+	computer           *Computer
+	rootAccountAddress types.Address
+	rootAccountKeyPair *crypto.KeyPair
 }
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
@@ -37,6 +39,8 @@ func NewEmulatedBlockchain() *EmulatedBlockchain {
 	computer := NewComputer(runtime.NewInterpreterRuntime())
 	ws := state.NewWorldState()
 
+	rootAccountAddress, rootAccountKeyPair := createRootAccount(ws)
+
 	bytes := ws.Encode()
 	worldStates[ws.Hash()] = bytes
 
@@ -46,7 +50,17 @@ func NewEmulatedBlockchain() *EmulatedBlockchain {
 		pendingWorldState:       ws,
 		txPool:                  txPool,
 		computer:                computer,
+		rootAccountAddress:      rootAccountAddress,
+		rootAccountKeyPair:      rootAccountKeyPair,
 	}
+}
+
+func (b *EmulatedBlockchain) RootAccount() types.Address {
+	return b.rootAccountAddress
+}
+
+func (b *EmulatedBlockchain) RootKeyPair() *crypto.KeyPair {
+	return b.rootAccountKeyPair
 }
 
 // GetTransaction gets an existing transaction by hash.
@@ -212,7 +226,21 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 	b.worldStates[blockHash] = bytes
 }
 
-func (b *EmulatedBlockchain) validateSignature(sig crypto.Signature) error {
+func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature) error {
 	// TODO: validate signatures
 	return nil
+}
+
+// createRootAccount creates a new root account and commits it to the world state.
+func createRootAccount(ws *state.WorldState) (types.Address, *crypto.KeyPair) {
+	registers := ws.Registers.NewView()
+
+	keyPair, _ := crypto.GenKeyPair("root")
+
+	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
+	accountID, _ := runtimeAPI.CreateAccount(keyPair.PublicKey, []byte{})
+
+	ws.SetRegisters(registers.UpdatedRegisters())
+
+	return types.BytesToAddress(accountID), keyPair
 }

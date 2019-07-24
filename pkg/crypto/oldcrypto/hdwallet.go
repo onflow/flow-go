@@ -12,7 +12,7 @@ type Wallet struct {
 
 // CreateWallet creates a new HD wallet using a user-specified passphrase.
 func CreateWallet(passphrase string) (*Wallet, error) {
-	keypair, err := genKeyPair(passphrase)
+	keypair, err := GenKeyPair(passphrase)
 	if err != nil {
 		return nil, err
 	}
