@@ -50,7 +50,7 @@ func (i *EmulatorRuntimeAPI) CreateAccount(publicKey, code []byte) (id []byte, e
 func (i *EmulatorRuntimeAPI) GetAccount(address crypto.Address) *crypto.Account {
 	accountID := address.Bytes()
 
-	balanceBytes, exists := i.registers.Get(fullKey(accountID, []byte{}, []byte("balance")))
+	balanceBytes, exists := i.registers.Get(fullKey(accountID, []byte{}, keyBalance()))
 	if !exists {
 		return nil
 	}
