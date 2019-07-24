@@ -2767,6 +2767,8 @@ Only **resources** can be stored.
 
 Stored values are keyed by a **type**, i.e., the access operator `[]` is used for both reading and writing stored values.
 
+The stored value must be a subtype of the type it is keyed by.
+
 ```bamboo
 // Declare a resource named `Counter`
 //
@@ -2816,8 +2818,11 @@ Transactions are objects that are signed by one or more accounts and are sent to
 Transactions have three phases: Preparation, execution, and post-conditions.
 
 The preparer acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
+The preparer has the permissions to read and write to storage of all signer accounts.
 
-Transactions are declared using the `transaction` keyword. The preparer is declared using the `prepare` keyword and the execution phase is declared using the `execute` keyword. The `ensure` section can be used to declare post-conditions.
+Transactions are declared using the `transaction` keyword.
+The preparer is declared using the `prepare` keyword and the execution phase is declared using the `execute` keyword.
+The `ensure` section can be used to declare post-conditions.
 
 ```bamboo,file=transaction-declaration.bpl
 transaction {
