@@ -27,7 +27,6 @@ func (s TransactionStatus) String() string {
 
 // RawTransaction is an unsigned transaction.
 type RawTransaction struct {
-	ToAddress    crypto.Address
 	Script       []byte
 	Nonce        uint64
 	ComputeLimit uint64
@@ -37,7 +36,6 @@ type RawTransaction struct {
 // Hash computes the hash over the necessary transaction data.
 func (tx *RawTransaction) Hash() crypto.Hash {
 	bytes := crypto.EncodeAsBytes(
-		tx.ToAddress,
 		tx.Script,
 		tx.Nonce,
 		tx.ComputeLimit,
@@ -49,23 +47,23 @@ func (tx *RawTransaction) Hash() crypto.Hash {
 // Sign signs a transaction with the given account and keypair.
 //
 // The function returns a new SignedTransaction that includes the generated signature.
-func (tx *RawTransaction) Sign(account crypto.Address, keyPair *crypto.KeyPair) *SignedTransaction {
+func (tx *RawTransaction) Sign(account Address, keyPair *crypto.KeyPair) *SignedTransaction {
 	hash := tx.Hash()
-	sig := crypto.Sign(hash, account, keyPair)
+
+	// TODO: include account in signature
+	sig := crypto.Sign(hash, keyPair)
 
 	return &SignedTransaction{
-		ToAddress:      tx.ToAddress,
 		Script:         tx.Script,
 		Nonce:          tx.Nonce,
 		ComputeLimit:   tx.ComputeLimit,
 		Timestamp:      tx.Timestamp,
-		PayerSignature: *sig,
+		PayerSignature: sig,
 	}
 }
 
 // SignedTransaction is a transaction that has been signed by at least one account.
 type SignedTransaction struct {
-	ToAddress      crypto.Address
 	Script         []byte
 	Nonce          uint64
 	ComputeLimit   uint64
@@ -78,7 +76,6 @@ type SignedTransaction struct {
 // Hash computes the hash over the necessary transaction data.
 func (tx *SignedTransaction) Hash() crypto.Hash {
 	bytes := crypto.EncodeAsBytes(
-		tx.ToAddress,
 		tx.Script,
 		tx.Nonce,
 		tx.ComputeLimit,

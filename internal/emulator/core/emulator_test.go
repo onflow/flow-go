@@ -39,7 +39,7 @@ func TestWorldStates(t *testing.T) {
 		Nonce:          1,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	tx2 := &types.SignedTransaction{
@@ -47,7 +47,7 @@ func TestWorldStates(t *testing.T) {
 		Nonce:          2,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	tx3 := &types.SignedTransaction{
@@ -55,7 +55,7 @@ func TestWorldStates(t *testing.T) {
 		Nonce:          3,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	ws1 := b.pendingWorldState.Hash()
@@ -147,7 +147,7 @@ func TestSubmitTransaction(t *testing.T) {
 		Nonce:          1,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	// Submit tx1
@@ -168,7 +168,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 		Nonce:          1,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	// Submit tx1
@@ -190,7 +190,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 		Nonce:          1,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	// Submit invalid tx1 (errors)
@@ -211,7 +211,7 @@ func TestCommitBlock(t *testing.T) {
 		Nonce:          1,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	// Submit tx1
@@ -224,7 +224,7 @@ func TestCommitBlock(t *testing.T) {
 		Nonce:          1,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	// Submit invalid tx2
@@ -257,13 +257,13 @@ func TestCreateAccount(t *testing.T) {
 		Nonce:          1,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
-	address := crypto.HexToAddress("0000000000000000000000000000000000000001")
+	address := types.HexToAddress("0000000000000000000000000000000000000001")
 
 	account := b.GetAccount(address)
 
@@ -282,13 +282,13 @@ func TestCreateAccount(t *testing.T) {
 		Nonce:          2,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	err = b.SubmitTransaction(tx2)
 	Expect(err).ToNot(HaveOccurred())
 
-	address = crypto.HexToAddress("0000000000000000000000000000000000000002")
+	address = types.HexToAddress("0000000000000000000000000000000000000002")
 
 	account = b.GetAccount(address)
 
@@ -307,7 +307,7 @@ func TestCallScript(t *testing.T) {
 		Nonce:          1,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	// Sample call (value is 0)
@@ -335,7 +335,7 @@ func TestQueryByVersion(t *testing.T) {
 		Nonce:          1,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	tx2 := &types.SignedTransaction{
@@ -343,7 +343,7 @@ func TestQueryByVersion(t *testing.T) {
 		Nonce:          2,
 		ComputeLimit:   10,
 		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
+		PayerSignature: crypto.MockSignature(nil),
 	}
 
 	invalidWorldState := crypto.NewHash([]byte("invalid state"))

@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 )
@@ -32,7 +33,7 @@ func (i *EmulatorRuntimeAPI) CreateAccount(publicKey, code []byte) (id []byte, e
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
 	accountIDBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
 
-	accountAddress := crypto.BytesToAddress(accountIDBytes)
+	accountAddress := types.BytesToAddress(accountIDBytes)
 
 	accountID := accountAddress.Bytes()
 
@@ -42,12 +43,12 @@ func (i *EmulatorRuntimeAPI) CreateAccount(publicKey, code []byte) (id []byte, e
 
 	i.registers.Set(keyLatestAccount(), accountID)
 
-	address := crypto.BytesToAddress(accountID)
+	address := types.BytesToAddress(accountID)
 
 	return address.Bytes(), nil
 }
 
-func (i *EmulatorRuntimeAPI) GetAccount(address crypto.Address) *crypto.Account {
+func (i *EmulatorRuntimeAPI) GetAccount(address types.Address) *types.Account {
 	accountID := address.Bytes()
 
 	balanceBytes, exists := i.registers.Get(fullKey(accountID, []byte{}, keyBalance()))
@@ -60,7 +61,7 @@ func (i *EmulatorRuntimeAPI) GetAccount(address crypto.Address) *crypto.Account 
 	publicKey, _ := i.registers.Get(fullKey(accountID, accountID, keyPublicKey()))
 	code, _ := i.registers.Get(fullKey(accountID, accountID, keyCode()))
 
-	return &crypto.Account{
+	return &types.Account{
 		Address:    address,
 		Balance:    balanceInt.Uint64(),
 		Code:       code,

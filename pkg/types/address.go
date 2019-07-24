@@ -1,4 +1,4 @@
-package oldcrypto
+package types
 
 import (
 	"encoding/hex"
@@ -13,6 +13,7 @@ const (
 type Address [AddressLength]byte
 
 // BytesToAddress returns Address with value b.
+//
 // If b is larger than len(h), b will be cropped from the left.
 func BytesToAddress(b []byte) Address {
 	var a Address
@@ -27,6 +28,7 @@ func HexToAddress(h string) Address {
 }
 
 // SetBytes sets the address to the value of b.
+//
 // If b is larger than len(a) it will panic.
 func (a *Address) SetBytes(b []byte) {
 	if len(b) > len(a) {
@@ -35,10 +37,10 @@ func (a *Address) SetBytes(b []byte) {
 	copy(a[AddressLength-len(b):], b)
 }
 
-// Bytes gets the byte representation of the underlying address.
+// Bytes returns the byte representation of the address.
 func (a Address) Bytes() []byte { return a[:] }
 
-// String returns the string encoding of the address.
+// String returns the hex string representation of the address.
 func (a Address) String() string {
 	return "0x" + hex.EncodeToString(a.Bytes())
 }

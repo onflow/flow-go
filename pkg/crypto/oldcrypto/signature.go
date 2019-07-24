@@ -1,52 +1,28 @@
 package oldcrypto
 
-const (
-	SignatureLength = 72
+import (
+	"encoding/hex"
 )
 
-// Sig represents a 72 byte signature.
-type Sig [SignatureLength]byte
-
-// Signature is a compound type combining a signature with an account address.
-type Signature struct {
-	Account Address
-	Sig     Sig
+type Signature interface {
+	// ToBytes returns the bytes representation of a signature
+	ToBytes() []byte
+	// String returns a hex string representation of signature bytes
+	String() string
 }
 
-// Bytes gets the byte representation of the underlying signature.
-func (s Signature) Bytes() []byte {
-	out := make([]byte, 0)
-	out = append(out, s.Account.Bytes()...)
-	out = append(out, s.Sig[:]...)
-	return out
+type MockSignature []byte
+
+func (s MockSignature) ToBytes() []byte {
+	return s
 }
 
-// BytesToSig returns Signature with value sig.
-//
-// If sig is larger than SignatureLength, sig will be cropped from the left.
-func BytesToSig(sig []byte) Signature {
-	var s Sig
-	s.SetBytes(sig[AddressLength:len(sig)])
-	return Signature{
-		Account: BytesToAddress(sig[0:AddressLength]),
-		Sig:     s,
-	}
-}
-
-// SetBytes sets the signature to the value of b.
-// If b is larger than len(a) it will panic.
-func (a *Sig) SetBytes(b []byte) {
-	if len(b) > len(a) {
-		b = b[len(b)-SignatureLength:]
-	}
-	copy(a[SignatureLength-len(b):], b)
+func (s MockSignature) String() string {
+	return "0x" + hex.EncodeToString(s.ToBytes())
 }
 
 // Sign signs a digest with the provided key pair.
-func Sign(digest Hash, account Address, keyPair *KeyPair) *Signature {
+func Sign(digest Hash, keyPair *KeyPair) Signature {
 	// TODO: implement real signatures
-	return &Signature{
-		Account: account,
-		Sig:     Sig{},
-	}
+	return MockSignature(keyPair.PublicKey)
 }

@@ -32,13 +32,3 @@ func GenWalletFromMnemonic(mnemonic string) (*Wallet, error) {
 		Mnemonic: mnemonic,
 	}, nil
 }
-
-// CreateAccount creates a new Bamboo user account.
-func (w *Wallet) CreateAccount(publicKeys [][]byte, code []byte) (*Account, error) {
-	return createAccountFromHDWallet(w.HDWallet, publicKeys, code, 0)
-}
-
-// CreateRootAccount creates a new Bamboo root user account when the state is initialized.
-func (w *Wallet) CreateRootAccount() (*Account, error) {
-	return createAccountFromHDWallet(w.HDWallet, [][]byte{}, []byte{}, 100)
-}

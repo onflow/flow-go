@@ -71,14 +71,14 @@ func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash
 }
 
 // GetAccount gets account information associated with an address identifier.
-func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account {
+func (b *EmulatedBlockchain) GetAccount(address types.Address) *types.Account {
 	registers := b.pendingWorldState.Registers.NewView()
 	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
 	return runtimeAPI.GetAccount(address)
 }
 
 // GetAccountAtVersion gets account information associated with an address identifier at a specified state.
-func (b *EmulatedBlockchain) GetAccountAtVersion(address crypto.Address, version crypto.Hash) (*crypto.Account, error) {
+func (b *EmulatedBlockchain) GetAccountAtVersion(address types.Address, version crypto.Hash) (*types.Account, error) {
 	ws, err := b.getWorldStateAtVersion(version)
 	if err != nil {
 		return nil, err
