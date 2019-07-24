@@ -1721,7 +1721,7 @@ To make it explicit that the type is moved, it must be prefixed with `<-` in typ
 //
 // The constant has a resource type, so the type name must be prefixed with `<-`
 //
-const someResource: <-SomeResource <- create SomeResource()
+let someResource: <-SomeResource <- create SomeResource()
 
 // Declare a function which consumes a resource.
 //
