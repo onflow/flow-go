@@ -182,9 +182,15 @@
               <li><a href="#interface-declaration">Interface Declaration</a></li>
               <li><a href="#interface-implementation">Interface Implementation</a></li>
               <li><a href="#interface-type">Interface Type</a></li>
+              <li><a href="#interface-implementation-requirements">Interface Implementation Requirements</a></li>
+              <li><a href="#interface-nesting">Interface Nesting</a></li>
+              <li><a href="#nested-type-requirements">Nested Type Requirements</a></li>
               <li><a href="#equatable-interface"><code>Equatable</code> Interface</a></li>
               <li><a href="#hashable-interface"><code>Hashable</code> Interface</a></li>
             </ul>
+          </li>
+          <li>
+            <p><a href="#attestations">Attestations</a></p>
           </li>
           <li>
             <p><a href="#accounts">Accounts</a></p>
@@ -193,10 +199,14 @@
             <p><a href="#account-storage">Account Storage</a></p>
           </li>
           <li>
-            <p><a href="#importing-external-types">Importing External Types</a></p>
+            <p><a href="#usage-of-external-types">Usage of External Types</a></p>
           </li>
           <li>
             <p><a href="#transactions">Transactions</a></p>
+            <ul>
+              <li><a href="#deployment">Deployment</a></li>
+              <li><a href="#interacting-with-deployed-resources">Interacting with Deployed Resources</a></li>
+            </ul>
           </li>
           <li>
             <p><a href="#built-in-functions">Built-in Functions</a></p>
@@ -1140,7 +1150,7 @@
 </span><span style="color: #000000">    fun () {}</span><span>
 </span></code></pre>
           <p>
-            Parantheses also control precedence.
+            Parentheses also control precedence.
             For example, a function type <code>((Int): ((): Int))</code> is the type for a function which accepts one argument with type <code>Int</code>,
             and which returns another function, that takes no arguments and returns an <code>Int</code>.
           </p>
@@ -1655,7 +1665,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The constant has a resource type, so the type name must be prefixed with `&#x3C;-`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">const someResource: &#x3C;-SomeResource &#x3C;- create SomeResource()</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> someResource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> </span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">()</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a function which consumes a resource.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2088,7 +2098,7 @@
         </blockquote>
         <p>
           An interface is an abstract type that specifies the behavior of types that <em>implement</em> the interface.
-          Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
+          Interfaces declare the required functions and fields, as well as the access for those declarations, that implementing types need to provide.
         </p>
         <p>There are two kinds of interfaces:</p>
         <ul>
@@ -2110,7 +2120,7 @@
           Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
         </p>
         <p>
-          Calling functions with pre-conditions and post-conditions on interfaces instead of implementations can improve the security of a program,
+          Calling functions with pre-conditions and post-conditions on interfaces instead of concrete implementations can improve the security of a program,
           as it ensures that even if implementations change, some aspects of them will always hold.
         </p>
         <section>
@@ -2136,9 +2146,9 @@
           <pre><code class="language-bamboo,file=interface-declaration.bpl"><span style="color: #008000">// Declare a resource interface for a fungible token.</span><span>
 </span><span style="color: #008000">// Only resources can implement this resource interface</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">resource</span><span style="color: #000000"> interface FungibleToken {</span><span>
+</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> FungibleToken {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide a field for the balance</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide a field for the balance</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// that is readable in all scopes (`pub`).</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Neither the `var` keyword, nor the `let` keyword is used,</span><span>
@@ -2159,7 +2169,7 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide an initializer that</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide an initializer that</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// given the initial balance, must initialize the balance field</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
@@ -2171,7 +2181,7 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: no code</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide a function that is</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide a function that is</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// callable in all scopes, which withdraws an amount from</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// this fungible token and returns the withdrawn amount as</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// a new fungible token.</span><span>
@@ -2198,7 +2208,7 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: no code</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide a function that is</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide a function that is</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// callable in all scopes, which deposits a fungible token</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// into this fungible token.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
@@ -2227,7 +2237,7 @@
         <section>
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
           <p>
-            Implementations are declared using the <code>impl</code> keyword,
+            Implementations for interfaces are declared using the <code>impl</code> keyword,
             followed by the name of interface, the <code>for</code> keyword,
             and the name of the composite data type (structure or resource) that provides the functionality required in the interface.
           </p>
@@ -2292,7 +2302,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: neither the precondition nor the postcondition declared</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// in the interface have to be repeated here in the implementation</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> desposit(_ token: &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + amount</span><span>
 </span><span style="color: #000000">        destroy token</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -2327,8 +2337,8 @@
 </span><span style="color: #000000">token.withdraw(amount: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the <code>pub</code> keyword is specified), and an implementation may provide a variable field which is public, but also publicly settable (the <code>pub(set)</code> keyword is specified).</p>
-          <pre><code class="language-bamboo"><span style="color: #0000FF">struct</span><span style="color: #000000"> interface AnInterface {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementation to provide a publicly readable</span><span>
+          <pre><code class="language-bamboo"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> AnInterface {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide a publicly readable</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// field named `a` that has type `Int`. It may be a constant field,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// a variable field, or a synthetic field.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
@@ -2361,10 +2371,10 @@
           <p>Interfaces are types. Values implementing an interface can be used as initial values for constants and variables that have the interface as their type.</p>
           <pre><code class="language-bamboo,file=interface-type.bpl"><span style="color: #008000">// Declare an interface named `Shape`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// Implementations must provide a field which returns the area,</span><span>
+</span><span style="color: #008000">// Require implementing types to provide a field which returns the area,</span><span>
 </span><span style="color: #008000">// and a function which scales the shape by a given factor.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">interface</span><span style="color: #000000"> Shape {</span><span>
+</span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Shape {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> area: Int</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int)</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -2452,6 +2462,121 @@
 </span></code></pre>
         </section>
         <section>
+          <h3 id="interface-implementation-requirements"><a href="#interface-implementation-requirements" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation Requirements</h3>
+          <p>
+            Interfaces can require implementing types to also implement other interfaces of the same kind.
+            Interface implementation requirements can be declared by following the interface name with a colon (<code>:</code>)
+            and one or more names of interfaces of the same kind, separated by commas.
+          </p>
+          <pre><code class="language-bamboo,file=interface-implementation-requirement.bpl"><span style="color: #008000">// Declare a structure interface named `Shape`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Shape {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure interface named `Polygon`.</span><span>
+</span><span style="color: #008000">// Require implementing types to also implement</span><span>
+</span><span style="color: #008000">// the structure interface `Shape`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Polygon: Shape {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure named `Hexagon`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Hexagon {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Implement the structure interface `Polygon`</span><span>
+</span><span style="color: #008000">// for the structure `Hexagon`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">impl Polygon for Hexagon {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Implement the structure interface `Shape`</span><span>
+</span><span style="color: #008000">// for the structure `Hexagon`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// This is required, as the interface `Polygon`</span><span>
+</span><span style="color: #008000">// specified this implementation requirement.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">impl Shape for Hexagon {}</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="interface-nesting"><a href="#interface-nesting" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Nesting</h3>
+          <p>
+            Interfaces can be arbitrarily nested.
+            Declaring an interface inside another does not require implementing types of the outer interface to provide an implementation of the inner interfaces.
+          </p>
+          <pre><code class="language-bamboo,file=interface-nesting.bpl"><span style="color: #008000">// Declare a resource interface `OuterInterface`, which declares</span><span>
+</span><span style="color: #008000">// a nested structure interface named `InnerInterface`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Resources implementing `OuterInterface` do not need to provide</span><span>
+</span><span style="color: #008000">// an implementation of `InnerInterface`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Structures may just implement `InnerInterface`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> OuterInterface {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> InnerInterface {}</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a resource named `SomeOuter`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> SomeOuter {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Implement the interface `OuterInterface` for the resource  `SomeOuter`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The resource is not required to implement `OuterInterface.InnerInterface`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">impl OuterInterface for SomeOuter {}</span><span>
+</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure named `SomeInner`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeInner {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Implement the interface `InnerInterface` which is nested in</span><span>
+</span><span style="color: #008000">// interface `OuterInterface` for the structure `SomeInner`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">impl OuterInterface.InnerInterface for SomeInner {}</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="nested-type-requirements"><a href="#nested-type-requirements" aria-hidden="true"><span class="icon icon-link"></span></a>Nested Type Requirements</h3>
+          <p>
+            Interfaces can require implementing types to provide concrete nested types.
+            For example, a resource interface may require an implementing type to provide a resource type.
+          </p>
+          <pre><code class="language-bamboo,file=interface-nested-type-requirement.bpl"><span style="color: #008000">// Declare a resource interface named `FungibleToken`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Require implementing types to provide a resource type named `Vault`</span><span>
+</span><span style="color: #008000">// which must have a field named `balance`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> FungibleToken {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a resource named `ExampleToken`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Implement the resource interface `FungibleToken`</span><span>
+</span><span style="color: #008000">// for resource type `ExampleToken`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The nested type `Vault` must be provided</span><span>
+</span><span style="color: #008000">// to conform to the interface.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">impl FungibleToken for ExampleToken {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+        </section>
+        <section>
           <h3 id="equatable-interface"><a href="#equatable-interface" aria-hidden="true"><span class="icon icon-link"></span></a><code>Equatable</code> Interface</h3>
           <blockquote>
             <p>🚧 Status: The <code>Equatable</code> interface is not implemented yet.</p>
@@ -2460,7 +2585,7 @@
           <p>Equatable types can be compared for equality using the equals operator (<code>==</code>) or inequality using the unequals operator (<code>!=</code>).</p>
           <p>Most of the built-in types are equatable, like booleans and integers. Arrays are equatable when their elements are equatable. Dictionaries are equatable when their values are equatable.</p>
           <p>To make a type equatable the <code>Equatable</code> interface must be implemented, which requires the implementation of the function <code>equals</code>, which accepts another value that the given value should be compared for equality. Note that the parameter type is <code>Self</code>, i.e., the other value must have the same type as the implementing type.</p>
-          <pre><code class="language-bamboo,file=equatable.bpl"><span style="color: #0000FF">interface</span><span style="color: #000000"> Equatable {</span><span>
+          <pre><code class="language-bamboo,file=equatable.bpl"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Equatable {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -2503,7 +2628,7 @@
           <p>Hashing a value means passing its essential components into a hash function. Essential components are those that are used in the type's implementation of <code>Equatable</code>.</p>
           <p>If two values are equal because their <code>equals</code> function returns true, then the implementation must return the same integer hash value for each of the two values.</p>
           <p>The implementation must also consistently return the same integer hash value during the execution of the program when the essential components have not changed. The integer hash value must not necessarily be the same across multiple executions.</p>
-          <pre><code class="language-bamboo,file=hashable.bpl"><span style="color: #0000FF">interface</span><span style="color: #000000"> Hashable {</span><span>
+          <pre><code class="language-bamboo,file=hashable.bpl"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Hashable: Equatable {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> hashValue: Int</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -2555,11 +2680,40 @@
         </section>
       </section>
       <section>
+        <h2 id="attestations"><a href="#attestations" aria-hidden="true"><span class="icon icon-link"></span></a>Attestations</h2>
+        <blockquote>
+          <p>🚧 Status: Attestations are not implemented yet.</p>
+        </blockquote>
+        <p>
+          Attestations are values that proof ownership.
+          Attestations can be created for resources and reflect their current state, which is read-only.
+          They cannot be stored.
+        </p>
+        <p>
+          Attestations of resources are created using the <code>@</code> operator.
+          Attestation types have the name of the resource type, prefixed with the <code>@</code> symbol.
+        </p>
+        <pre><code class="language-bamboo,file=attestations.bpl"><span style="color: #008000">// Declare a resource named `Token`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Token {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Create a new instance of the resource type `Token`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> token &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> </span><span style="color: #0000FF">Token</span><span style="color: #000000">()</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant named `attestation` that has the attestation type `@Token`,</span><span>
+</span><span style="color: #008000">// and has an attestation for the token value as its initial value</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> attestation: @</span><span style="color: #0000FF">Token</span><span style="color: #000000"> = @token</span><span>
+</span></code></pre>
+        <p>Like resources, attestations are associated with an <a href="#accounts">account</a>.</p>
+      </section>
+      <section>
         <h2 id="accounts"><a href="#accounts" aria-hidden="true"><span class="icon icon-link"></span></a>Accounts</h2>
         <blockquote>
           <p>🚧 Status: Accounts are not implemented yet.</p>
         </blockquote>
-        <pre><code class="language-bamboo"><span style="color: #0000FF">interface</span><span style="color: #000000"> Account {</span><span>
+        <pre><code class="language-bamboo"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Account {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(at address: </span><span style="color: #0000FF">Address</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -2569,6 +2723,7 @@
         <p>Accounts have a <code>storage</code> object which contains the stored values of the account.</p>
         <p>Only <strong>resources</strong> can be stored.</p>
         <p>Stored values are keyed by a <strong>type</strong>, i.e., the access operator <code>[]</code> is used for both reading and writing stored values.</p>
+        <p>The stored value must be a subtype of the type it is keyed by.</p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Declare a resource named `Counter`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Counter {</span><span>
@@ -2590,31 +2745,38 @@
 </span></code></pre>
       </section>
       <section>
-        <h2 id="importing-external-types"><a href="#importing-external-types" aria-hidden="true"><span class="icon icon-link"></span></a>Importing External Types</h2>
+        <h2 id="usage-of-external-types"><a href="#usage-of-external-types" aria-hidden="true"><span class="icon icon-link"></span></a>Usage of External Types</h2>
         <blockquote>
-          <p>🚧 Status: The import of external types is not implemented yet.</p>
+          <p>🚧 Status: The usage of external types is not implemented yet.</p>
         </blockquote>
-        <p>It is possible to import external types into programs by using the <code>import</code> keyword, followed by the type name, the <code>from</code> keyword, and the address literal where the declaration is deployed.</p>
+        <p>It is possible to use external types through the <code>using</code> keyword, followed by the type name, the <code>from</code> keyword, and the address literal where the declaration is deployed.</p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Declaration for an interface named `Counter`,</span><span>
 </span><span style="color: #008000">// declared and deployed externally</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">interface</span><span style="color: #000000"> Counter {</span><span>
+</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Counter {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> count: Int</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> increment(_ count: Int)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Import the type `Counter` from address</span><span>
+</span><span style="color: #008000">// Use the type `Counter` from address</span><span>
 </span><span style="color: #008000">// 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">import Counter from </span><span style="color: #09885A">0x06012c8cf97BEaD5deAe237070F9587f8E7A266d</span><span>
+</span><span style="color: #000000">using Counter from </span><span style="color: #09885A">0x06012c8cf97BEaD5deAe237070F9587f8E7A266d</span><span>
 </span></code></pre>
       </section>
       <section>
         <h2 id="transactions"><a href="#transactions" aria-hidden="true"><span class="icon icon-link"></span></a>Transactions</h2>
-        <p>Transactions are objects that are signed by one or more accounts and are sent to the chain to interact with it.</p>
+        <p>Transactions are objects that are signed by one or more <a href="#accounts">accounts</a> and are sent to the chain to interact with it.</p>
         <p>Transactions have three phases: Preparation, execution, and post-conditions.</p>
-        <p>The preparer acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.</p>
-        <p>Transactions are declared using the <code>transaction</code> keyword. The preparer is declared using the <code>prepare</code> keyword and the execution phase is declared using the <code>execute</code> keyword. The <code>ensure</code> section can be used to declare post-conditions.</p>
+        <p>
+          The preparer acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
+          The preparer has the permissions to read and write to storage of all signer accounts.
+        </p>
+        <p>
+          Transactions are declared using the <code>transaction</code> keyword.
+          The preparer is declared using the <code>prepare</code> keyword and the execution phase is declared using the <code>execute</code> keyword.
+          The <code>ensure</code> section can be used to declare post-conditions.
+        </p>
         <pre><code class="language-bamboo,file=transaction-declaration.bpl"><span style="color: #000000">transaction {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Optional: fields, which must be initialized in `prepare`</span><span>
@@ -2626,7 +2788,7 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    execute {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">execute</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
@@ -2635,6 +2797,249 @@
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
+        <section>
+          <h3 id="deployment"><a href="#deployment" aria-hidden="true"><span class="icon icon-link"></span></a>Deployment</h3>
+          <p>Transactions can deploy resources and resource interfaces.</p>
+          <pre><code class="language-bamboo,file=fungible-token-interface.bpl"><span style="color: #008000">// Declare a resource interface for a fungible token.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// It requires implementing types to provide a resource named `Vault`,</span><span>
+</span><span style="color: #008000">// which needs to implement the interfaces `Provider` and `Receiver`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> FungibleToken {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Provider {</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"withdrawal amount must be positive"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                result.balance == amount:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"incorrect amount returned"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Receiver {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(vault: &#x3C;-</span><span style="color: #0000FF">Vault</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault: Provider, Receiver {</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                    result >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">                        </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
+</span><span style="color: #000000">                }</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == balance:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"the balance must be initialized to the initial balance"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"insufficient funds: the amount must be smaller or equal to the balance"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) - amount:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"Incorrect amount removed"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(vault: &#x3C;-Self) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + vault.balance:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          <p>
+            Transactions can refer to local code with the <code>using</code> keyword,
+            followed by the name of the type, the <code>from</code> keyword,
+            and the string literal for the path of the file which contains the code of the type.
+          </p>
+          <p>
+            The preparer can use the signing account's <code>deploy</code> function to deploy
+            the resource interface.
+          </p>
+          <p>Once deployed, the resource interfaces is available in the account's <code>types</code> object.</p>
+          <p>The <code>publish</code> operator is used to make the resource interface type publicly available.</p>
+          <pre><code class="language-bamboo,file=deploy-resource-interface.bpl"><span style="color: #008000">// Execute a transaction which deploys the code for</span><span>
+</span><span style="color: #008000">// the resource interface `FungibleToken`, and makes</span><span>
+</span><span style="color: #008000">// the deployed type publicly available</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">transaction {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Refer to the resource interface type `FungibleToken`</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// in the local file "FungibleToken.bpl"</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    using FungibleToken from </span><span style="color: #A31515">"FungibleToken.bpl"</span><span>
+</span><span>
+</span><span style="color: #000000">    prepare(signer: Account) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Deploy the  resource interface type `FungibleToken`</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// in the signing account</span><span>
+</span><span style="color: #000000">        signer.deploy(FungibleToken)</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Make the deployed type publicly available</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        publish signer.types[FungibleToken]</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          <p>Just like resource interfaces it is possible to deploy resources.</p>
+          <pre><code class="language-bamboo,file=example-token.bpl"><span style="color: #008000">// Declare a resource named `ExampleToken` which implements</span><span>
+</span><span style="color: #008000">// the resource interface `FungibleToken`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken {}</span><span>
+</span><span>
+</span><span style="color: #000000">impl FungibleToken for ExampleToken {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> create Vault(balance: amount)</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-</span><span style="color: #0000FF">Vault</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + amount</span><span>
+</span><span style="color: #000000">            destroy token</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    impl Receiver for Vault {}</span><span>
+</span><span style="color: #000000">    impl Provider for Vault {}</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          <pre><code class="language-bamboo,file=deploy-resource.bpl"><span style="color: #008000">// Execute a transaction which deploys the code for</span><span>
+</span><span style="color: #008000">// the resource `ExampleToken`, and makes the deployed</span><span>
+</span><span style="color: #008000">// type publicly available</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">transaction {</span><span>
+</span><span>
+</span><span style="color: #000000">    using ExampleToken from </span><span style="color: #A31515">"ExampleToken.bpl"</span><span>
+</span><span>
+</span><span style="color: #000000">    prepare(signer: Account) {</span><span>
+</span><span style="color: #000000">        signer.deploy(ExampleToken)</span><span>
+</span><span style="color: #000000">        publish signer.types[ExampleToken]</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="interacting-with-deployed-resources"><a href="#interacting-with-deployed-resources" aria-hidden="true"><span class="icon icon-link"></span></a>Interacting with Deployed Resources</h3>
+          <p>
+            Transactions can also refer to deployed code with the <code>using</code> keyword
+            and the address of the account which contains the publicly available type.
+          </p>
+          <p>
+            In addition to storing resources it is also possible to store references to <strong>stored</strong> resources or even other references.
+            References can only be keyed by (and therefore accessed through) <strong>resource interfaces</strong>.
+          </p>
+          <p>
+            References are created by using the <code>&#x26;</code> operator, followed by the stored resource or reference,
+            the <code>as</code> operator, and the resource interface type.
+          </p>
+          <pre><code class="language-bamboo,file=setup-transaction.bpl"><span style="color: #008000">// Execute a transaction which creates a new example token vault</span><span>
+</span><span style="color: #008000">// for the signing account</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">transaction {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Refer to the resource type `ExampleToken` deployed</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// at example address 0x42</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    using ExampleToken from </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #000000">    prepare(signer: Account) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Create a new example token vault for the signing account.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: the vault is not publicly accessible</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        signer.storage[ExampleToken.Vault] &#x3C;- create ExampleToken.Vault()</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Store two storage references in the signing account:</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// One reference to the stored vault, keyed by the resource</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// interface `Provider`, and another reference to the stored vault,</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// keyed by the resource interface `Provider`</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        signer.storage[ExampleToken.Provider] =</span><span>
+</span><span style="color: #000000">            &#x26;signer.storage[ExampleToken.Vault] as ExampleToken.Provider</span><span>
+</span><span>
+</span><span style="color: #000000">        signer.storage[ExampleToken.Receiver] =</span><span>
+</span><span style="color: #000000">            &#x26;signer.storage[ExampleToken.Vault] as ExampleToken.Receiver</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Publish only the receiver so it can be accessed publicly.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: neither the vault nor the publisher are published</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        publish signer.storage[ExampleToken.Receiver]</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          <pre><code class="language-bamboo,file=send-transaction.bpl"><span style="color: #008000">// Execute a transaction which sends five coins from one account to another.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The transaction fails unless there is a `ExampleToken.Provider` available</span><span>
+</span><span style="color: #008000">// for the sending account and there is a public `ExampleToken.Receiver`</span><span>
+</span><span style="color: #008000">// available for the recipient account.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Only a signature from the sender is required.</span><span>
+</span><span style="color: #008000">// No signature from the recipient is required, as the receiver</span><span>
+</span><span style="color: #008000">// is published/publicly available (if it exists for the recipient)</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">transaction {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Refer to the resource type `ExampleToken` deployed</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// at example address 0x42</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    using ExampleToken from </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> sentFunds: </span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">.</span><span style="color: #0000FF">Vault</span><span>
+</span><span>
+</span><span style="color: #000000">    prepare(signer: Account) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Get the stored provider for the signing account.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// As the access is performed in the preparer,</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// the unpublished reference `ExampleToken.Provider`</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// can be accessed (if it exists)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> provider &#x3C;- </span><span style="color: #0000FF">signer</span><span style="color: #000000">.</span><span style="color: #0000FF">storage</span><span style="color: #000000">[</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">.</span><span style="color: #0000FF">Provider</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Withdraw five coins (as a vault) from the provider</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// and move it into the field `sentFunds`</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.sentFunds &#x3C;- provider.withdraw(amount: </span><span style="color: #09885A">5</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">execute</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// The recipient account</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> recipient: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = </span><span style="color: #008000">// ...</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Get the stored receiver for the recipient account</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> receiver &#x3C;- </span><span style="color: #0000FF">recipient</span><span style="color: #000000">.</span><span style="color: #0000FF">storage</span><span style="color: #000000">[</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">.</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Deposit the amount withdrawn from the signer</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// in the recipient's vault through the receiver</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        receiver.deposit(vault: &#x3C;-</span><span style="color: #0000FF">self</span><span style="color: #000000">.sentFunds)</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+        </section>
       </section>
       <section>
         <h2 id="built-in-functions"><a href="#built-in-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Built-in Functions</h2>

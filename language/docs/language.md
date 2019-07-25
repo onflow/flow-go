@@ -1102,7 +1102,7 @@ let doNothing: ((): Void) =
     fun () {}
 ```
 
-Parantheses also control precedence.
+Parentheses also control precedence.
 For example, a function type `((Int): ((): Int))` is the type for a function which accepts one argument with type `Int`,
 and which returns another function, that takes no arguments and returns an `Int`.
 
@@ -1721,7 +1721,7 @@ To make it explicit that the type is moved, it must be prefixed with `<-` in typ
 //
 // The constant has a resource type, so the type name must be prefixed with `<-`
 //
-const someResource: <-SomeResource <- create SomeResource()
+let someResource: <-SomeResource <- create SomeResource()
 
 // Declare a function which consumes a resource.
 //
@@ -2117,7 +2117,7 @@ pub struct SomeStruct {
 > 🚧 Status: Interfaces are not implemented yet.
 
 An interface is an abstract type that specifies the behavior of types that *implement* the interface.
-Interfaces declare the required functions and fields, as well as the access for those declarations, that implementations need to provide.
+Interfaces declare the required functions and fields, as well as the access for those declarations, that implementing types need to provide.
 
 There are two kinds of interfaces:
 
@@ -2136,7 +2136,7 @@ and optional preconditions and postconditions.
 Field requirements consist of the name and the type of the field.
 Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
 
-Calling functions with pre-conditions and post-conditions on interfaces instead of implementations can improve the security of a program,
+Calling functions with pre-conditions and post-conditions on interfaces instead of concrete implementations can improve the security of a program,
 as it ensures that even if implementations change, some aspects of them will always hold.
 
 ### Interface Declaration
@@ -2163,7 +2163,7 @@ The special type `Self` can be used to refer to the type implementing the interf
 //
 resource interface FungibleToken {
 
-    // Require the implementation to provide a field for the balance
+    // Require the implementing type to provide a field for the balance
     // that is readable in all scopes (`pub`).
     //
     // Neither the `var` keyword, nor the `let` keyword is used,
@@ -2184,7 +2184,7 @@ resource interface FungibleToken {
         }
     }
 
-    // Require the implementation to provide an initializer that
+    // Require the implementing type to provide an initializer that
     // given the initial balance, must initialize the balance field
     //
     init(balance: Int) {
@@ -2196,7 +2196,7 @@ resource interface FungibleToken {
         // NOTE: no code
     }
 
-    // Require the implementation to provide a function that is
+    // Require the implementing type to provide a function that is
     // callable in all scopes, which withdraws an amount from
     // this fungible token and returns the withdrawn amount as
     // a new fungible token.
@@ -2223,7 +2223,7 @@ resource interface FungibleToken {
         // NOTE: no code
     }
 
-    // Require the implementation to provide a function that is
+    // Require the implementing type to provide a function that is
     // callable in all scopes, which deposits a fungible token
     // into this fungible token.
     //
@@ -2252,7 +2252,7 @@ Note that the required initializer and functions do not have any executable code
 
 ### Interface Implementation
 
-Implementations are declared using the `impl` keyword,
+Implementations for interfaces are declared using the `impl` keyword,
 followed by the name of interface, the `for` keyword,
 and the name of the composite data type (structure or resource) that provides the functionality required in the interface.
 
@@ -2318,7 +2318,7 @@ impl FungibleToken for ExampleToken {
     // NOTE: neither the precondition nor the postcondition declared
     // in the interface have to be repeated here in the implementation
     //
-    pub fun desposit(_ token: <-ExampleToken) {
+    pub fun deposit(_ token: <-ExampleToken) {
         self.balance = self.balance + amount
         destroy token
     }
@@ -2357,7 +2357,7 @@ The access level for variable fields in an implementation may be less restrictiv
 
 ```bamboo
 struct interface AnInterface {
-    // Require the implementation to provide a publicly readable
+    // Require the implementing type to provide a publicly readable
     // field named `a` that has type `Int`. It may be a constant field,
     // a variable field, or a synthetic field.
     //
@@ -2392,10 +2392,10 @@ Interfaces are types. Values implementing an interface can be used as initial va
 ```bamboo,file=interface-type.bpl
 // Declare an interface named `Shape`.
 //
-// Implementations must provide a field which returns the area,
+// Require implementing types to provide a field which returns the area,
 // and a function which scales the shape by a given factor.
 //
-interface Shape {
+struct interface Shape {
     pub area: Int
     pub fun scale(factor: Int)
 }
@@ -2488,6 +2488,121 @@ shape.area // is 6
 shape.scale(factor: 3)
 ```
 
+### Interface Implementation Requirements
+
+Interfaces can require implementing types to also implement other interfaces of the same kind.
+Interface implementation requirements can be declared by following the interface name with a colon (`:`)
+and one or more names of interfaces of the same kind, separated by commas.
+
+```bamboo,file=interface-implementation-requirement.bpl
+// Declare a structure interface named `Shape`
+//
+struct interface Shape {}
+
+// Declare a structure interface named `Polygon`.
+// Require implementing types to also implement
+// the structure interface `Shape`
+//
+struct interface Polygon: Shape {}
+
+// Declare a structure named `Hexagon`
+//
+struct Hexagon {}
+
+// Implement the structure interface `Polygon`
+// for the structure `Hexagon`
+//
+impl Polygon for Hexagon {}
+
+// Implement the structure interface `Shape`
+// for the structure `Hexagon`.
+//
+// This is required, as the interface `Polygon`
+// specified this implementation requirement.
+//
+impl Shape for Hexagon {}
+```
+
+### Interface Nesting
+
+Interfaces can be arbitrarily nested.
+Declaring an interface inside another does not require implementing types of the outer interface to provide an implementation of the inner interfaces.
+
+```bamboo,file=interface-nesting.bpl
+// Declare a resource interface `OuterInterface`, which declares
+// a nested structure interface named `InnerInterface`.
+//
+// Resources implementing `OuterInterface` do not need to provide
+// an implementation of `InnerInterface`.
+//
+// Structures may just implement `InnerInterface`
+//
+resource interface OuterInterface {
+
+    struct interface InnerInterface {}
+}
+
+// Declare a resource named `SomeOuter`
+//
+resource SomeOuter {}
+
+// Implement the interface `OuterInterface` for the resource  `SomeOuter`.
+//
+// The resource is not required to implement `OuterInterface.InnerInterface`
+//
+impl OuterInterface for SomeOuter {}
+
+
+// Declare a structure named `SomeInner`
+//
+struct SomeInner {}
+
+// Implement the interface `InnerInterface` which is nested in
+// interface `OuterInterface` for the structure `SomeInner`.
+//
+impl OuterInterface.InnerInterface for SomeInner {}
+```
+
+### Nested Type Requirements
+
+Interfaces can require implementing types to provide concrete nested types.
+For example, a resource interface may require an implementing type to provide a resource type.
+
+```bamboo,file=interface-nested-type-requirement.bpl
+// Declare a resource interface named `FungibleToken`.
+//
+// Require implementing types to provide a resource type named `Vault`
+// which must have a field named `balance`
+//
+resource interface FungibleToken {
+
+    pub resource Vault {
+        pub balance: Int
+    }
+}
+
+// Declare a resource named `ExampleToken`
+//
+resource ExampleToken {}
+
+// Implement the resource interface `FungibleToken`
+// for resource type `ExampleToken`.
+//
+// The nested type `Vault` must be provided
+// to conform to the interface.
+//
+impl FungibleToken for ExampleToken {
+
+    pub resource Vault {
+        pub var balance: Int
+
+        init(balance: Int) {
+            self.balance = balance
+        }
+    }
+}
+```
+
 ### `Equatable` Interface
 
 > 🚧 Status: The `Equatable` interface is not implemented yet.
@@ -2501,7 +2616,7 @@ Most of the built-in types are equatable, like booleans and integers. Arrays are
 To make a type equatable the `Equatable` interface must be implemented, which requires the implementation of the function `equals`, which accepts another value that the given value should be compared for equality. Note that the parameter type is `Self`, i.e., the other value must have the same type as the implementing type.
 
 ```bamboo,file=equatable.bpl
-interface Equatable {
+struct interface Equatable {
     pub fun equals(_ other: Self): Bool
 }
 ```
@@ -2545,8 +2660,6 @@ Hashable types can be used as keys in dictionaries.
 
 Hashable types must also be equatable, i.e., they must also implement the `Equatable` interface. This is because the hash value is only evidence for inequality: two values that have different hash values are guaranteed to be unequal. However, if the hash values of two values are the same, then the two values could still be unequal and just happen to hash to the same hash value. In that case equality still needs to be determined through an equality check. Without `Equatable`, values could be added to a dictionary, but it would not be possible to retrieve them.
 
-<!-- TODO: once interface inheritance is defined, describe how Hashable inherits from Equatable -->
-
 Most of the built-in types are hashable, like booleans and integers. Arrays are hashable when their elements are hashable. Dictionaries are hashable when their values are equatable.
 
 Hashing a value means passing its essential components into a hash function. Essential components are those that are used in the type's implementation of `Equatable`.
@@ -2556,7 +2669,7 @@ If two values are equal because their `equals` function returns true, then the i
 The implementation must also consistently return the same integer hash value during the execution of the program when the essential components have not changed. The integer hash value must not necessarily be the same across multiple executions.
 
 ```bamboo,file=hashable.bpl
-interface Hashable {
+struct interface Hashable: Equatable {
     pub hashValue: Int
 }
 ```
@@ -2608,12 +2721,40 @@ impl Hashable for Point {
 }
 ```
 
+## Attestations
+
+> 🚧 Status: Attestations are not implemented yet.
+
+Attestations are values that proof ownership.
+Attestations can be created for resources and reflect their current state, which is read-only.
+They cannot be stored.
+
+Attestations of resources are created using the `@` operator.
+Attestation types have the name of the resource type, prefixed with the `@` symbol.
+
+```bamboo,file=attestations.bpl
+// Declare a resource named `Token`
+//
+resource Token {}
+
+// Create a new instance of the resource type `Token`.
+//
+let token <- create Token()
+
+// Declare a constant named `attestation` that has the attestation type `@Token`,
+// and has an attestation for the token value as its initial value
+//
+let attestation: @Token = @token
+```
+
+Like resources, attestations are associated with an [account](#accounts).
+
 ## Accounts
 
 > 🚧 Status: Accounts are not implemented yet.
 
 ```bamboo
-interface Account {
+struct interface Account {
     pub init(at address: Address)
 }
 ```
@@ -2625,6 +2766,8 @@ Accounts have a `storage` object which contains the stored values of the account
 Only **resources** can be stored.
 
 Stored values are keyed by a **type**, i.e., the access operator `[]` is used for both reading and writing stored values.
+
+The stored value must be a subtype of the type it is keyed by.
 
 ```bamboo
 // Declare a resource named `Counter`
@@ -2647,36 +2790,39 @@ let account: Account = // ...
 account.storage[Counter] <- create Counter(count: 0)
 ```
 
-## Importing External Types
+## Usage of External Types
 
-> 🚧 Status: The import of external types is not implemented yet.
+> 🚧 Status: The usage of external types is not implemented yet.
 
-It is possible to import external types into programs by using the `import` keyword, followed by the type name, the `from` keyword, and the address literal where the declaration is deployed.
+It is possible to use external types through the `using` keyword, followed by the type name, the `from` keyword, and the address literal where the declaration is deployed.
 
 ```bamboo
 // Declaration for an interface named `Counter`,
 // declared and deployed externally
 //
-interface Counter {
+resource interface Counter {
     pub count: Int
     pub fun increment(_ count: Int)
 }
 
-// Import the type `Counter` from address
+// Use the type `Counter` from address
 // 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
 //
-import Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
+using Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
 ```
 
 ## Transactions
 
-Transactions are objects that are signed by one or more accounts and are sent to the chain to interact with it.
+Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.
 
 Transactions have three phases: Preparation, execution, and post-conditions.
 
 The preparer acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
+The preparer has the permissions to read and write to storage of all signer accounts.
 
-Transactions are declared using the `transaction` keyword. The preparer is declared using the `prepare` keyword and the execution phase is declared using the `execute` keyword. The `ensure` section can be used to declare post-conditions.
+Transactions are declared using the `transaction` keyword.
+The preparer is declared using the `prepare` keyword and the execution phase is declared using the `execute` keyword.
+The `ensure` section can be used to declare post-conditions.
 
 ```bamboo,file=transaction-declaration.bpl
 transaction {
@@ -2696,6 +2842,268 @@ transaction {
 
     ensure {
         // ...
+    }
+}
+```
+
+### Deployment
+
+Transactions can deploy resources and resource interfaces.
+
+```bamboo,file=fungible-token-interface.bpl
+// Declare a resource interface for a fungible token.
+//
+// It requires implementing types to provide a resource named `Vault`,
+// which needs to implement the interfaces `Provider` and `Receiver`
+//
+resource interface FungibleToken {
+
+    pub resource interface Provider {
+
+        pub fun withdraw(amount: Int): <-Vault {
+            require {
+                amount > 0:
+                    "withdrawal amount must be positive"
+            }
+            ensure {
+                result.balance == amount:
+                    "incorrect amount returned"
+            }
+        }
+    }
+
+    pub resource interface Receiver {
+        pub fun deposit(vault: <-Vault)
+    }
+
+    pub resource Vault: Provider, Receiver {
+
+        pub balance: Int {
+            get {
+                ensure {
+                    result >= 0:
+                        "Balances are always non-negative"
+                }
+            }
+        }
+
+        init(balance: Int) {
+            ensure {
+                self.balance == balance:
+                    "the balance must be initialized to the initial balance"
+            }
+        }
+
+        pub fun withdraw(amount: Int): <-Self {
+            require {
+                amount <= self.balance:
+                    "insufficient funds: the amount must be smaller or equal to the balance"
+            }
+            ensure {
+                self.balance == before(self.balance) - amount:
+                    "Incorrect amount removed"
+            }
+        }
+
+        pub fun deposit(vault: <-Self) {
+            ensure {
+                self.balance == before(self.balance) + vault.balance:
+                    "the amount must be added to the balance"
+            }
+        }
+    }
+}
+```
+
+Transactions can refer to local code with the `using` keyword,
+followed by the name of the type, the `from` keyword,
+and the string literal for the path of the file which contains the code of the type.
+
+<!-- TODO:
+     move explanation for using statement into separate section?
+     also see below for version referring to deployed code with an address
+-->
+
+The preparer can use the signing account's `deploy` function to deploy
+the resource interface.
+
+Once deployed, the resource interfaces is available in the account's `types` object.
+
+The `publish` operator is used to make the resource interface type publicly available.
+
+```bamboo,file=deploy-resource-interface.bpl
+// Execute a transaction which deploys the code for
+// the resource interface `FungibleToken`, and makes
+// the deployed type publicly available
+//
+transaction {
+
+    // Refer to the resource interface type `FungibleToken`
+    // in the local file "FungibleToken.bpl"
+    //
+    using FungibleToken from "FungibleToken.bpl"
+
+    prepare(signer: Account) {
+        // Deploy the  resource interface type `FungibleToken`
+        // in the signing account
+        signer.deploy(FungibleToken)
+
+        // Make the deployed type publicly available
+        //
+        publish signer.types[FungibleToken]
+    }
+}
+```
+
+Just like resource interfaces it is possible to deploy resources.
+
+```bamboo,file=example-token.bpl
+// Declare a resource named `ExampleToken` which implements
+// the resource interface `FungibleToken`
+//
+resource ExampleToken {}
+
+impl FungibleToken for ExampleToken {
+
+    resource Vault {
+        pub var balance: Int
+
+        init(balance: Int) {
+            self.balance = balance
+        }
+
+        pub fun withdraw(amount: Int): <-Vault {
+            self.balance = self.balance - amount
+            return create Vault(balance: amount)
+        }
+
+        pub fun deposit(_ token: <-Vault) {
+            self.balance = self.balance + amount
+            destroy token
+        }
+    }
+
+    impl Receiver for Vault {}
+    impl Provider for Vault {}
+}
+```
+
+```bamboo,file=deploy-resource.bpl
+// Execute a transaction which deploys the code for
+// the resource `ExampleToken`, and makes the deployed
+// type publicly available
+//
+transaction {
+
+    using ExampleToken from "ExampleToken.bpl"
+
+    prepare(signer: Account) {
+        signer.deploy(ExampleToken)
+        publish signer.types[ExampleToken]
+    }
+}
+```
+
+### Interacting with Deployed Resources
+
+Transactions can also refer to deployed code with the `using` keyword
+and the address of the account which contains the publicly available type.
+
+<!-- TODO:
+     move explanation for using statement into separate section?
+     also see above for version referring to local code with a path
+-->
+
+In addition to storing resources it is also possible to store references to **stored** resources or even other references.
+References can only be keyed by (and therefore accessed through) **resource interfaces**.
+
+References are created by using the `&` operator, followed by the stored resource or reference,
+the `as` operator, and the resource interface type.
+
+```bamboo,file=setup-transaction.bpl
+// Execute a transaction which creates a new example token vault
+// for the signing account
+//
+transaction {
+    // Refer to the resource type `ExampleToken` deployed
+    // at example address 0x42
+    //
+    using ExampleToken from 0x42
+
+    prepare(signer: Account) {
+        // Create a new example token vault for the signing account.
+        //
+        // NOTE: the vault is not publicly accessible
+        //
+        signer.storage[ExampleToken.Vault] <- create ExampleToken.Vault()
+
+        // Store two storage references in the signing account:
+        // One reference to the stored vault, keyed by the resource
+        // interface `Provider`, and another reference to the stored vault,
+        // keyed by the resource interface `Provider`
+        //
+        signer.storage[ExampleToken.Provider] =
+            &signer.storage[ExampleToken.Vault] as ExampleToken.Provider
+
+        signer.storage[ExampleToken.Receiver] =
+            &signer.storage[ExampleToken.Vault] as ExampleToken.Receiver
+
+        // Publish only the receiver so it can be accessed publicly.
+        //
+        // NOTE: neither the vault nor the publisher are published
+        //
+        publish signer.storage[ExampleToken.Receiver]
+    }
+}
+```
+
+```bamboo,file=send-transaction.bpl
+// Execute a transaction which sends five coins from one account to another.
+//
+// The transaction fails unless there is a `ExampleToken.Provider` available
+// for the sending account and there is a public `ExampleToken.Receiver`
+// available for the recipient account.
+//
+// Only a signature from the sender is required.
+// No signature from the recipient is required, as the receiver
+// is published/publicly available (if it exists for the recipient)
+//
+transaction {
+    // Refer to the resource type `ExampleToken` deployed
+    // at example address 0x42
+    //
+    using ExampleToken from 0x42
+
+    let sentFunds: ExampleToken.Vault
+
+    prepare(signer: Account) {
+        // Get the stored provider for the signing account.
+        //
+        // As the access is performed in the preparer,
+        // the unpublished reference `ExampleToken.Provider`
+        // can be accessed (if it exists)
+        //
+        let provider <- signer.storage[ExampleToken.Provider]
+
+        // Withdraw five coins (as a vault) from the provider
+        // and move it into the field `sentFunds`
+        //
+        self.sentFunds <- provider.withdraw(amount: 5)
+    }
+
+    execute {
+        // The recipient account
+        //
+        let recipient: Account = // ...
+
+        // Get the stored receiver for the recipient account
+        //
+        let receiver <- recipient.storage[ExampleToken.Receiver]
+
+        // Deposit the amount withdrawn from the signer
+        // in the recipient's vault through the receiver
+        //
+        receiver.deposit(vault: <-self.sentFunds)
     }
 }
 ```
