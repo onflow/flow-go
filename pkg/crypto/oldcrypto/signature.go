@@ -14,7 +14,7 @@ type Signature interface {
 type MockSignature []byte
 
 func (s MockSignature) ToBytes() []byte {
-	return s
+	return s[:]
 }
 
 func (s MockSignature) String() string {
