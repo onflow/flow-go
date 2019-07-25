@@ -5,7 +5,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 
-	verifySvc "github.com/dapperlabs/bamboo-node/grpc/services/verify"
+	verifySvc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/verify"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
 	// "github.com/dapperlabs/bamboo-node/internal/utils"
 )

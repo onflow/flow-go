@@ -10,9 +10,10 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/dapperlabs/bamboo-node/grpc/shared"
 	proto "github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
+
+	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 )
 
 type naiveGossip struct{}

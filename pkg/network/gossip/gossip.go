@@ -4,8 +4,9 @@ package gossip
 import (
 	"context"
 
-	"github.com/dapperlabs/bamboo-node/grpc/shared"
 	"github.com/golang/protobuf/proto"
+
+	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 )
 
 // Defines mode of the gossip based on the set of recipients

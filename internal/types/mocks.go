@@ -5,7 +5,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 
-	bambooProto "github.com/dapperlabs/bamboo-node/grpc/shared"
+	bambooProto "github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
