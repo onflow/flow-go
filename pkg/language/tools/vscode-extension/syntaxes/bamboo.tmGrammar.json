@@ -296,7 +296,7 @@
             "name": "keyword.control.loop.bamboo"
           },
           {
-            "match": "(?<!\\.)\\b(?:require|ensure)\\b",
+            "match": "(?<!\\.)\\b(?:require|ensure|prepare|execute)\\b",
             "name": "keyword.other"
           },
           {
@@ -624,7 +624,7 @@
         ]
       },
       "composite": {
-        "begin": "\\b(struct|resource|interface|contract|transaction)\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
+        "begin": "\\b((?:(?:struct|resource)(?:\\s+interface)?)|contract|transaction)\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
         "beginCaptures": {
           "1": {
             "name": "storage.type.$1.bamboo"
