@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -50,6 +51,12 @@ func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlo
 	hash := crypto.BytesToHash(req.GetHash())
 	block := s.blockchain.GetBlockByHash(hash)
 
+	s.logger.WithFields(log.Fields{
+		"blockNum":  block.Number,
+		"blockHash": hash,
+		"blockSize": len(block.TransactionHashes),
+	}).Debugf("🎁  GetBlockByHash called")
+
 	response := &observe.GetBlockByHashResponse{
 		Block: block.ToMessage(),
 	}
@@ -62,6 +69,12 @@ func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetB
 	number := req.GetNumber()
 	block := s.blockchain.GetBlockByNumber(number)
 
+	s.logger.WithFields(log.Fields{
+		"blockNum":  number,
+		"blockHash": block.Hash(),
+		"blockSize": len(block.TransactionHashes),
+	}).Debugf("🎁  GetBlockByNumber called")
+
 	response := &observe.GetBlockByNumberResponse{
 		Block: block.ToMessage(),
 	}
@@ -73,6 +86,12 @@ func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetB
 // GetLatestBlock gets the latest sealed block.
 func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLatestBlockRequest) (*observe.GetLatestBlockResponse, error) {
 	block := s.blockchain.GetLatestBlock()
+
+	s.logger.WithFields(log.Fields{
+		"blockNum":  block.Number,
+		"blockHash": block.Hash(),
+		"blockSize": len(block.TransactionHashes),
+	}).Debugf("🎁  GetLatestBlock called")
 
 	response := &observe.GetLatestBlockResponse{
 		Block: block.ToMessage(),
@@ -88,7 +107,7 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 
 	s.logger.
 		WithField("txHash", hash).
-		Debugf("💵  GetTransaction called: %s", hash)
+		Debugf("💵  GetTransaction called")
 
 	txMsg := &observe.GetTransactionResponse_Transaction{
 		Script:       tx.Script,
@@ -117,7 +136,7 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 
 	s.logger.
 		WithField("address", address).
-		Debugf("👤  GetAccount called: %s", address)
+		Debugf("👤  GetAccount called")
 
 	accMsg := &observe.GetAccountResponse_Account{
 		Address:    account.Address.Bytes(),
@@ -135,7 +154,7 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 
 // CallContract performs a contract call.
 func (s *EmulatorServer) CallContract(ctx context.Context, req *observe.CallContractRequest) (*observe.CallContractResponse, error) {
-	s.logger.Debug("📞  Contract script called")
+	s.logger.Debugf("📞  Contract script called")
 
 	script := req.GetScript()
 	value, _ := s.blockchain.CallScript(script)

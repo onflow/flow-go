@@ -51,20 +51,26 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 
 			s.logger.
 				WithField("txHash", tx.Hash()).
-				Infof("💸  Transaction %s submitted to network", tx.Hash())
+				Infof("💸  Transaction #%d submitted to network", tx.Nonce)
 
 			hash := s.blockchain.CommitBlock()
+			block := s.blockchain.GetBlockByHash(hash)
 
-			s.logger.
-				WithField("stateHash", hash).
-				Infof("️⛏  Block %s mined", hash)
+			s.logger.WithFields(log.Fields{
+				"blockNum":  block.Number,
+				"blockHash": block.Hash(),
+				"blockSize": len(block.TransactionHashes),
+			}).Infof("️⛏  Block #%d mined", block.Number)
 
 		case <-tick:
 			hash := s.blockchain.CommitBlock()
+			block := s.blockchain.GetBlockByHash(hash)
 
-			s.logger.
-				WithField("stateHash", hash).
-				Tracef("️⛏  Block %s mined", hash)
+			s.logger.WithFields(log.Fields{
+				"blockNum":  block.Number,
+				"blockHash": block.Hash(),
+				"blockSize": len(block.TransactionHashes),
+			}).Tracef("️⛏  Block #%d mined", block.Number)
 
 		case <-ctx.Done():
 			return
