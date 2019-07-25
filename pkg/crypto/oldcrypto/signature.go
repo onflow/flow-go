@@ -5,20 +5,20 @@ import (
 )
 
 type Signature interface {
-	// ToBytes returns the bytes representation of a signature
-	ToBytes() []byte
+	// Bytes returns the bytes representation of a signature
+	Bytes() []byte
 	// String returns a hex string representation of signature bytes
 	String() string
 }
 
 type MockSignature []byte
 
-func (s MockSignature) ToBytes() []byte {
-	return s
+func (s MockSignature) Bytes() []byte {
+	return s[:]
 }
 
 func (s MockSignature) String() string {
-	return "0x" + hex.EncodeToString(s.ToBytes())
+	return "0x" + hex.EncodeToString(s.Bytes())
 }
 
 // Sign signs a digest with the provided key pair.
