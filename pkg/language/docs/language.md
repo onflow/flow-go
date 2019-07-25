@@ -1567,7 +1567,14 @@ and when the value is returned from a function:
   - [**Structures**](#structures) are **copied**, i.e. they are value types.
     Structures are useful when copies with independent state are desired.
   - [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
+
     Resources are useful when it is desired to model ownership (a value exists exactly in one location and it should not be lost).
+
+    Certain constructs in a blockchain represent assets of real, tangible value, as much as a house or car or bank account.
+    We have to worry about literal loss and theft, perhaps even on the scale of millions of dollars.
+
+    We think resources are a great way to represent such assets.
+
 
 ### Structures
 

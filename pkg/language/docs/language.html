@@ -1543,12 +1543,19 @@
         </p>
         <ul>
           <li>
-            <a href="#structures"><strong>Structures</strong></a> are <strong>copied</strong>, i.e. they are value types.
-            Structures are useful when copies with independent state are desired.
+            <p>
+              <a href="#structures"><strong>Structures</strong></a> are <strong>copied</strong>, i.e. they are value types.
+              Structures are useful when copies with independent state are desired.
+            </p>
           </li>
           <li>
-            <a href="#resources"><strong>Resources</strong></a> are <strong>moved</strong>, they are linear types and <strong>must</strong> be used <strong>exactly once</strong>.
-            Resources are useful when it is desired to model ownership (a value exists exactly in one location and it should not be lost).
+            <p><a href="#resources"><strong>Resources</strong></a> are <strong>moved</strong>, they are linear types and <strong>must</strong> be used <strong>exactly once</strong>.</p>
+            <p>Resources are useful when it is desired to model ownership (a value exists exactly in one location and it should not be lost).</p>
+            <p>
+              Certain constructs in a blockchain represent assets of real, tangible value, as much as a house or car or bank account.
+              We have to worry about literal loss and theft, perhaps even on the scale of millions of dollars.
+            </p>
+            <p>We think resources are a great way to represent such assets.</p>
           </li>
         </ul>
         <section>
