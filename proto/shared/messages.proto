@@ -2,58 +2,9 @@ syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
 
-package bamboo.shared;
+package bamboo.shared.messages;
 
 option go_package = "shared";
-
-// Message models a single message that is supposed to get exchanged by the gossip network
-message GossipMessage {
-  oneof Payload {                   // The payload of the message, i.e., the data to be exchanged
-    SignedCollectionHash signedCollectionHash = 1;
-    Collection collection = 2;
-    Block block = 3;
-    BlockSeal blockSeal = 4;
-    IntermediateRegisters intermediateRegisters = 5;
-    ExecutionReceipt executionReceipt = 6;
-    ResultApproval resultApproval = 7;
-    Transaction transaction = 8;
-    SignedTransaction signedTransaction = 9;
-    Register register = 10;
-    TransactionRegister transactionRegister = 11;
-    Inventory inventory = 12;
-    InvalidExecutionReceiptChallenge invalidExecutionReceiptChallenge = 13;
-    StateTransition stateTransition = 14;
-    SignedStateTransition signedStateTransition = 15;
-    FinalizedStateTransition finalizedStateTransition = 16;
-    Vote vote = 17;
-    StateTransitionVote stateTransitionVote = 18;
-    MessageRequest messageRequest = 19;
-    MessageReply messageReply = 20;
-  }  
-  string Method = 21;                // Name of RPC method to be invoked on the message
-  repeated string Recipients = 22;   // Address of the recipients to which the message should be delivered
-  string Sender = 23;                // Address of the sender of this message
-  repeated string Path = 24;         // Address of the nodes that this message visited so far
-  uint64 TTL = 25;                   // The time to live of the message, i.e., maximum number of hops it should be gossiped
-}
-
-////////////////////////////////////////////////////////////////////////////
-// 2 testing messages + rpc service to be deleted later
-
-service Messages {
-  rpc SendMessage (GossipMessage) returns (MessageReply) {}
-}
-
-message MessageRequest {
-  string Text = 1;
-}
-
-message MessageReply {
-  string TextResponse = 1;
-}
-
-////////////////////////////////////////////////////////////////////////////
-
 
 message SignedCollectionHash {
   bytes collectionHash = 1;
