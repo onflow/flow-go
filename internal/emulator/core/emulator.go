@@ -1,6 +1,7 @@
 package core
 
 import (
+	"reflect"
 	"time"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
@@ -125,7 +126,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 	}
 
 	if err := b.validateSignature(tx.PayerSignature); err != nil {
-		return &ErrInvalidTransactionSignature{TxHash: tx.Hash()}
+		return err
 	}
 
 	b.txPool[tx.Hash()] = tx
@@ -235,8 +236,22 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 }
 
 func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature) error {
-	// TODO: validate signatures
-	return nil
+	account := b.GetAccount(signature.Account)
+	if account == nil {
+		return &ErrInvalidSignatureAccount{Account: signature.Account}
+	}
+
+	for _, publicKey := range account.PublicKeys {
+		// TODO: perform real signature verification
+		if reflect.DeepEqual(publicKey, signature.Signature) {
+			return nil
+		}
+	}
+
+	return &ErrInvalidSignaturePublicKey{
+		Account:   signature.Account,
+		PublicKey: signature.Signature,
+	}
 }
 
 // createRootAccount creates a new root account and commits it to the world state.
