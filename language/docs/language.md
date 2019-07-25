@@ -3136,3 +3136,89 @@ fun assert(_ condition: Bool, message: String)
 ```
 
 Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.
+
+
+## Open questions
+
+### Shared Mutable State
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/264>
+
+Do we need a means to model shared mutable state, i.e. reference types?
+
+### Error Handling
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/65>
+
+How should errors be handled?
+Should we make the distinction between exceptional and unexceptional errors?
+Should we provide means to handle errors (exception handlers)? Should exceptions be values and typed?
+Would a value-less throw-catch/panic-recover be suitable for a first version?
+
+### On-chain Storage
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/101>
+
+How do we store programs on-chain?
+
+### Fixed-Point Numbers and Arithmetic
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/67>
+
+We don't allow floating-point numbers.
+Should we add fixed-point arithmetic to support fractional numbers?
+
+### Enums with Exhaustiveness Check
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/59>
+
+Should we allow the definition of enumerations?
+Is an exhaustiveness check in switch statements useful and feasible?
+
+### Switch-Case Statement
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/60>
+
+Should we add a switch-case statement?
+What kind of pattern matching should it support?
+
+### Distinct/New Types
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/45>
+
+Should we add support for distinct types, i.e., types that are derived from an existing type, but are not compatible with them?
+
+### Set Data Structure
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/266>
+
+Should the standard library provide a set data structure?
+
+### Generics
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/44>
+
+Should we add generics? In what form? Is it OK to add them in a later version?
+
+### Calls of Pure Functions in Pre-Conditions and Post-Conditions
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/70>
+
+It might be useful to call pure functions pre-conditions and post-conditons.
+How do we ensure preconditions and postconditions are side-effect free?
+
+### Late Initialization of Variables and Constants
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/71>
+
+Currently we don't allow variables and constants to be initialized after they are declared. This improves readability, as the reader of the code can always be sure the initial value can be found where the variable or constant was declared, not somewhere else in the code following the declaration.
+
+Should we allow the late initialization of variables and constants?
+
+Are there good examples for cases where late initialization would be useful or even essential?
+
+### Arbitrary Argument Order Based on Argument Labels
+
+> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/76>
+
+Should arbitrary argument order be supported in function calls as long as the argument labels match?
