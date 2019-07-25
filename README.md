@@ -161,7 +161,6 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 | Consensus | [Alexander Hentschel](https://github.com/AlexHentschel) | [/internal/roles/consensus](/internal/roles/consensus) |
 | Execution      | [Bastian Müller](https://github.com/turbolent) | [/internal/roles/execute](/internal/roles/execute) |
 | Verifcation | [Moar Zamski](https://github.com/pazams) | [/internal/roles/verify](/internal/roles/verify) |
-| Sealing | [Moar Zamski](https://github.com/pazams) | [/internal/roles/seal](/internal/roles/seal) |
 | Networking | [Yahya Hassanzadeh](https://github.com/yhassanzadeh)     | [/pkg/network](/pkg/network) |
 | Cryptography | [Tarak Ben Youssef](https://github.com/tarakby)     | [/pkg/crypto](/pkg/crypto) |
 | Emulator | [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens)     | [/internal/emulator](/internal/emulator) |

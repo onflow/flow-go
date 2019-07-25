@@ -13,7 +13,6 @@ test-setup:
 	docker-compose up --build start_consensus_dependencies
 	docker-compose up --build start_execute_dependencies
 	docker-compose up --build start_verify_dependencies
-	docker-compose up --build start_seal_dependencies
 	docker-compose up --build start_test_dependencies
 
 .PHONY: test-run
@@ -45,7 +44,6 @@ generate-wire:
 	wire ./internal/roles/consensus/
 	wire ./internal/roles/execute/
 	wire ./internal/roles/verify/
-	wire ./internal/roles/seal/
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-wire
