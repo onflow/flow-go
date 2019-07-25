@@ -5,7 +5,6 @@ WORKDIR /app
 
 COPY go.mod .	
 COPY go.sum .
-COPY pkg/language/runtime/ pkg/language/runtime/
 
 RUN go mod download
 
