@@ -15,6 +15,9 @@ import (
 	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 )
 
+// EmulatorServer is a local server that runs a Bamboo Emulator instance.
+//
+// Wraps the Emulator Core Library with the Observation gRPC interface.
 type EmulatorServer struct {
 	blockchain     *core.EmulatedBlockchain
 	transactionsIn chan *types.SignedTransaction
@@ -22,11 +25,13 @@ type EmulatorServer struct {
 	logger         *log.Logger
 }
 
+// Config is EmulatorServer configuration settings.
 type Config struct {
 	Port          int           `default:"5000"`
 	BlockInterval time.Duration `default:"5s"`
 }
 
+// NewEmulatorServer creates a new instance of a Bamboo Emulator server.
 func NewEmulatorServer(logger *log.Logger, config *Config) *EmulatorServer {
 	return &EmulatorServer{
 		blockchain:     core.NewEmulatedBlockchain(),
@@ -36,11 +41,16 @@ func NewEmulatorServer(logger *log.Logger, config *Config) *EmulatorServer {
 	}
 }
 
+// Start spins up the Bamboo Emulator server instance.
+//
+// Starts a gRPC server to listen for incoming requests and process incoming transactions.
+// By defualt, the Bamboo Emulator server automatically mines a block every BlockInteval.
 func (s *EmulatorServer) Start(ctx context.Context) {
 	s.logger.WithFields(log.Fields{
 		"port": s.config.Port,
 	}).Infof("🌱  Starting Emulator Server on port %d...", s.config.Port)
 
+	// Start gRPC server in a separate goroutine to continually listen for requests
 	go s.startGrpcServer()
 
 	tick := time.Tick(s.config.BlockInterval)
@@ -89,6 +99,7 @@ func (s *EmulatorServer) startGrpcServer() {
 	grpcServer.Serve(lis)
 }
 
+// StartServer sets up an instance of the Bamboo Emulator server and starts it.
 func StartServer(logger *log.Logger, config *Config) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
