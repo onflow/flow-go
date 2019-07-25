@@ -243,14 +243,14 @@ func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature)
 
 	for _, publicKey := range account.PublicKeys {
 		// TODO: perform real signature verification
-		if reflect.DeepEqual(publicKey, signature.Signature) {
+		if reflect.DeepEqual(publicKey, signature.PublicKey) {
 			return nil
 		}
 	}
 
 	return &ErrInvalidSignaturePublicKey{
 		Account:   signature.Account,
-		PublicKey: signature.Signature,
+		PublicKey: signature.PublicKey,
 	}
 }
 
