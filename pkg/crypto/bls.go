@@ -7,7 +7,7 @@ import (
 
 // Signature48 implements Signature
 
-func (s *Signature48) ToBytes() []byte {
+func (s *Signature48) Bytes() []byte {
 	return s[:]
 }
 

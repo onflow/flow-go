@@ -24,17 +24,17 @@ func TestSha3_256(t *testing.T) {
 	expected, _ := hex.DecodeString("36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80")
 
 	alg := NewHashAlgo(SHA3_256)
-	hash := alg.ComputeBytesHash(input).ToBytes()
+	hash := alg.ComputeBytesHash(input).Bytes()
 	checkBytes(t, input, expected, hash)
 
-	hash = alg.ComputeStructHash(&testStruct{"te", "st"}).ToBytes()
+	hash = alg.ComputeStructHash(&testStruct{"te", "st"}).Bytes()
 	checkBytes(t, input, expected, hash)
 
 	alg.Reset()
 	alg.AddBytes([]byte("te"))
 	alg.AddBytes([]byte("s"))
 	alg.AddBytes([]byte("t"))
-	hash = alg.SumHash().ToBytes()
+	hash = alg.SumHash().Bytes()
 	checkBytes(t, input, expected, hash)
 }
 

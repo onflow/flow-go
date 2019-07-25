@@ -3,8 +3,8 @@ package core
 import (
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	eruntime "github.com/dapperlabs/bamboo-node/internal/emulator/runtime"
@@ -25,17 +25,29 @@ type EmulatedBlockchain struct {
 	// current world state
 	pendingWorldState *state.WorldState
 	// pool of pending transactions waiting to be commmitted (already executed)
-	txPool   map[crypto.Hash]*types.SignedTransaction
-	computer *Computer
+	txPool             map[crypto.Hash]*types.SignedTransaction
+	computer           *Computer
+	rootAccountAddress types.Address
+	rootAccountKeyPair *crypto.KeyPair
 }
 
+// EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
+type EmulatedBlockchainOptions struct {
+	RootAccountKeyPair *crypto.KeyPair
+}
+
+// DefaultOptions is the default configuration for an emulated blockchain.
+var DefaultOptions = &EmulatedBlockchainOptions{}
+
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
-func NewEmulatedBlockchain() *EmulatedBlockchain {
+func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	worldStates := make(map[crypto.Hash][]byte)
 	intermediateWorldStates := make(map[crypto.Hash][]byte)
 	txPool := make(map[crypto.Hash]*types.SignedTransaction)
 	computer := NewComputer(runtime.NewInterpreterRuntime())
 	ws := state.NewWorldState()
+
+	rootAccountAddress, rootAccountKeyPair := createRootAccount(ws, opt.RootAccountKeyPair)
 
 	bytes := ws.Encode()
 	worldStates[ws.Hash()] = bytes
@@ -46,19 +58,17 @@ func NewEmulatedBlockchain() *EmulatedBlockchain {
 		pendingWorldState:       ws,
 		txPool:                  txPool,
 		computer:                computer,
+		rootAccountAddress:      rootAccountAddress,
+		rootAccountKeyPair:      rootAccountKeyPair,
 	}
 }
 
-func (b *EmulatedBlockchain) getWorldStateAtVersion(wsHash crypto.Hash) (*state.WorldState, error) {
-	if wsBytes, ok := b.worldStates[wsHash]; ok {
-		return state.Decode(wsBytes), nil
-	}
+func (b *EmulatedBlockchain) RootAccount() types.Address {
+	return b.rootAccountAddress
+}
 
-	if wsBytes, ok := b.intermediateWorldStates[wsHash]; ok {
-		return state.Decode(wsBytes), nil
-	}
-
-	return nil, &ErrInvalidStateVersion{Version: wsHash}
+func (b *EmulatedBlockchain) RootKeyPair() *crypto.KeyPair {
+	return b.rootAccountKeyPair
 }
 
 // GetTransaction gets an existing transaction by hash.
@@ -83,14 +93,14 @@ func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash
 }
 
 // GetAccount gets account information associated with an address identifier.
-func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account {
+func (b *EmulatedBlockchain) GetAccount(address types.Address) *types.Account {
 	registers := b.pendingWorldState.Registers.NewView()
 	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
 	return runtimeAPI.GetAccount(address)
 }
 
 // GetAccountAtVersion gets account information associated with an address identifier at a specified state.
-func (b *EmulatedBlockchain) GetAccountAtVersion(address crypto.Address, version crypto.Hash) (*crypto.Account, error) {
+func (b *EmulatedBlockchain) GetAccountAtVersion(address types.Address, version crypto.Hash) (*types.Account, error) {
 	ws, err := b.getWorldStateAtVersion(version)
 	if err != nil {
 		return nil, err
@@ -191,15 +201,6 @@ func (b *EmulatedBlockchain) CommitBlock() {
 	b.commitWorldState(block.Hash())
 }
 
-func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
-	if _, exists := b.worldStates[blockHash]; exists {
-		return
-	}
-
-	bytes := b.pendingWorldState.Encode()
-	b.worldStates[blockHash] = bytes
-}
-
 // SeekToState rewinds the blockchain state to a previously committed history.
 //
 // Note that this only seeks to a committed world state (not intermediate world state)
@@ -212,7 +213,44 @@ func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
 	}
 }
 
-func (b *EmulatedBlockchain) validateSignature(sig crypto.Signature) error {
+func (b *EmulatedBlockchain) getWorldStateAtVersion(wsHash crypto.Hash) (*state.WorldState, error) {
+	if wsBytes, ok := b.worldStates[wsHash]; ok {
+		return state.Decode(wsBytes), nil
+	}
+
+	if wsBytes, ok := b.intermediateWorldStates[wsHash]; ok {
+		return state.Decode(wsBytes), nil
+	}
+
+	return nil, &ErrInvalidStateVersion{Version: wsHash}
+}
+
+func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
+	if _, exists := b.worldStates[blockHash]; exists {
+		return
+	}
+
+	bytes := b.pendingWorldState.Encode()
+	b.worldStates[blockHash] = bytes
+}
+
+func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature) error {
 	// TODO: validate signatures
 	return nil
+}
+
+// createRootAccount creates a new root account and commits it to the world state.
+func createRootAccount(ws *state.WorldState, keyPair *crypto.KeyPair) (types.Address, *crypto.KeyPair) {
+	registers := ws.Registers.NewView()
+
+	if keyPair == nil {
+		keyPair, _ = crypto.GenKeyPair("root")
+	}
+
+	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
+	accountID, _ := runtimeAPI.CreateAccount(keyPair.PublicKey, []byte{})
+
+	ws.SetRegisters(registers.UpdatedRegisters())
+
+	return types.BytesToAddress(accountID), keyPair
 }
