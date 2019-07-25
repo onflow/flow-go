@@ -57,8 +57,8 @@ func (a *SignAlgo) SignatureSize() int {
 
 // Signature is unspecified signature scheme signature
 type Signature interface {
-	// ToBytes returns the bytes representation of a signature
-	ToBytes() []byte
+	// Bytes returns the bytes representation of a signature
+	Bytes() []byte
 	// String returns a hex string representation of signature bytes
 	String() string
 }

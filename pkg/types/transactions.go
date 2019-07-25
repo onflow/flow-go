@@ -55,7 +55,7 @@ func (tx *RawTransaction) Sign(account Address, keyPair *crypto.KeyPair) *Signed
 
 	accountSig := AccountSignature{
 		Account:   account,
-		Signature: sig.ToBytes(),
+		Signature: sig.Bytes(),
 	}
 
 	return &SignedTransaction{
