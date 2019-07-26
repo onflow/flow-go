@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
@@ -81,7 +81,12 @@ func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlo
 	hash := crypto.BytesToHash(req.GetHash())
 	block, err := s.blockchain.GetBlockByHash(hash)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, err.Error())
+		switch err.(type) {
+		case *core.ErrBlockNotFound:
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 
 	s.logger.WithFields(log.Fields{
@@ -102,7 +107,12 @@ func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetB
 	number := req.GetNumber()
 	block, err := s.blockchain.GetBlockByNumber(number)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, err.Error())
+		switch err.(type) {
+		case *core.ErrBlockNotFound:
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 
 	s.logger.WithFields(log.Fields{
@@ -141,7 +151,12 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 	hash := crypto.BytesToHash(req.GetHash())
 	tx, err := s.blockchain.GetTransaction(hash)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, err.Error())
+		switch err.(type) {
+		case *core.ErrTransactionNotFound:
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 
 	s.logger.
@@ -173,7 +188,12 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 	address := crypto.BytesToAddress(req.GetAddress())
 	account, err := s.blockchain.GetAccount(address)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, err.Error())
+		switch err.(type) {
+		case *core.ErrAccountNotFound:
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 
 	s.logger.

@@ -18,9 +18,9 @@ import (
 //
 // Wraps the Emulator Core Library with the Observation gRPC interface.
 type EmulatorServer struct {
-	blockchain     *core.EmulatedBlockchain
-	config         *Config
-	logger         *log.Logger
+	blockchain *core.EmulatedBlockchain
+	config     *Config
+	logger     *log.Logger
 }
 
 // Config is EmulatorServer configuration settings.
@@ -32,9 +32,9 @@ type Config struct {
 // NewEmulatorServer creates a new instance of a Bamboo Emulator server.
 func NewEmulatorServer(logger *log.Logger, config *Config) *EmulatorServer {
 	return &EmulatorServer{
-		blockchain:     core.NewEmulatedBlockchain(),
-		config:         config,
-		logger:         logger,
+		blockchain: core.NewEmulatedBlockchain(),
+		config:     config,
+		logger:     logger,
 	}
 }
 
