@@ -9,10 +9,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 )
 
 // Ping pings the Observation API server for a response.
@@ -38,7 +39,36 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 		Status: types.TransactionPending,
 	}
 
-	s.transactionsIn <- tx
+	err := s.blockchain.SubmitTransaction(tx)
+	if err != nil {
+		switch err.(type) {
+		case *core.ErrTransactionReverted:
+			s.logger.
+				WithField("txHash", tx.Hash()).
+				Infof("💸  Transaction #%d submitted to network", tx.Nonce)
+			s.logger.WithError(err).Warnf("⚠️  Transaction #%d reverted", tx.Nonce)
+		case *core.ErrDuplicateTransaction:
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case *core.ErrInvalidTransactionSignature:
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	} else {
+		s.logger.
+			WithField("txHash", tx.Hash()).
+			Infof("💸  Transaction #%d submitted to network", tx.Nonce)
+	}
+
+	hash := s.blockchain.CommitBlock()
+	block, _ := s.blockchain.GetBlockByHash(hash)
+
+	s.logger.WithFields(log.Fields{
+		"blockNum":  block.Number,
+		"blockHash": block.Hash(),
+		"blockSize": len(block.TransactionHashes),
+	}).Infof("️⛏  Block #%d mined", block.Number)
+
 	response := &observe.SendTransactionResponse{
 		Hash: tx.Hash().Bytes(),
 	}

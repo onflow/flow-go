@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 )
@@ -20,7 +19,6 @@ import (
 // Wraps the Emulator Core Library with the Observation gRPC interface.
 type EmulatorServer struct {
 	blockchain     *core.EmulatedBlockchain
-	transactionsIn chan *types.SignedTransaction
 	config         *Config
 	logger         *log.Logger
 }
@@ -35,7 +33,6 @@ type Config struct {
 func NewEmulatorServer(logger *log.Logger, config *Config) *EmulatorServer {
 	return &EmulatorServer{
 		blockchain:     core.NewEmulatedBlockchain(),
-		transactionsIn: make(chan *types.SignedTransaction, 16),
 		config:         config,
 		logger:         logger,
 	}
@@ -56,22 +53,6 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 	tick := time.Tick(s.config.BlockInterval)
 	for {
 		select {
-		case tx := <-s.transactionsIn:
-			s.blockchain.SubmitTransaction(tx)
-
-			s.logger.
-				WithField("txHash", tx.Hash()).
-				Infof("💸  Transaction #%d submitted to network", tx.Nonce)
-
-			hash := s.blockchain.CommitBlock()
-			block, _ := s.blockchain.GetBlockByHash(hash)
-
-			s.logger.WithFields(log.Fields{
-				"blockNum":  block.Number,
-				"blockHash": block.Hash(),
-				"blockSize": len(block.TransactionHashes),
-			}).Infof("️⛏  Block #%d mined", block.Number)
-
 		case <-tick:
 			hash := s.blockchain.CommitBlock()
 			block, _ := s.blockchain.GetBlockByHash(hash)
