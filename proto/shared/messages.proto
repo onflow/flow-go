@@ -68,19 +68,6 @@ message ResultApproval {
   bytes signature = 5; // The final signature over all the above fields to prevent external manipulation.
 }
 
-message Transaction {
-  bytes script = 1;
-  uint64 nonce = 2;
-  repeated TransactionRegister registers = 3;
-  repeated bytes chunks = 4;
-}
-
-message SignedTransaction {
-  Transaction transaction = 1;
-  repeated bytes scriptSignatures = 2;
-  bytes payerSignature = 3;
-}
-
 message Register {
   bytes id = 1;
   bytes value = 2;
@@ -119,6 +106,28 @@ message TransactionRegister {
   bytes id = 3;
   repeated KeyWeight keys = 4;
 }
+
+message AccountSignature {
+  bytes account = 1;
+  bytes signature = 2;
+}
+
+enum TransactionStatus {
+  STATUS_PENDING = 0;
+  STATUS_FINALIZED = 1;
+  STATUS_REVERTED = 2;
+  STATUS_SEALED = 3;
+}
+
+message SignedTransaction {
+  bytes script = 1;
+  uint64 nonce = 2;
+  uint64 compute_limit = 3;
+  uint64 compute_used = 4;
+  AccountSignature payer_signature = 5;
+  TransactionStatus status = 7;
+}
+
 
 message Inventory {
   message Item {
