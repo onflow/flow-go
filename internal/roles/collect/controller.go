@@ -23,7 +23,35 @@ func (c *Controller) Ping(context.Context, *collectSvc.PingRequest) (*collectSvc
 	}, nil
 }
 
-func (c *Controller) SubmitTransaction(context.Context, *collectSvc.SubmitTransactionRequest) (*collectSvc.SubmitTransactionResponse, error) {
+// SubmitTransaction accepts an incoming transaction from a user agent or peer node.
+//
+// This function will return an error in the follow cases:
+//
+// The request is malformed or incomplete.
+// The transaction has an invalid or missing signature.
+//
+// The submitted transaction will be stored for future inclusion in a collection
+// if it belongs to this node's cluster, but otherwise it will be forwarded to the
+// correct cluster.
+func (c *Controller) SubmitTransaction(
+	ctx context.Context,
+	req *collectSvc.SubmitTransactionRequest,
+) (*collectSvc.SubmitTransactionResponse, error) {
+	tx := req.GetTransaction()
+
+	if tx == nil {
+		return nil, status.Error(codes.InvalidArgument, "")
+	}
+
+	// TODO: validate transaction contents
+	// https://github.com/dapperlabs/bamboo-node/issues/170
+
+	// TODO: validate transaction signature
+	// https://github.com/dapperlabs/bamboo-node/issues/171
+
+	// TODO: store transaction
+	// https://github.com/dapperlabs/bamboo-node/issues/169
+
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
