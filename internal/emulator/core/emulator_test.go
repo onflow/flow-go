@@ -155,7 +155,9 @@ func TestSubmitTransaction(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	// tx1 status becomes TransactionFinalized
-	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionFinalized))
+	tx, err := b.GetTransaction(tx1.Hash())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(tx.Status).To(Equal(types.TransactionFinalized))
 }
 
 func TestSubmitDuplicateTransaction(t *testing.T) {
@@ -198,7 +200,9 @@ func TestSubmitTransactionReverted(t *testing.T) {
 	Expect(err).To(HaveOccurred())
 
 	// tx1 status becomes TransactionReverted
-	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionReverted))
+	tx, err := b.GetTransaction(tx1.Hash())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(tx.Status).To(Equal(types.TransactionReverted))
 }
 
 func TestCommitBlock(t *testing.T) {
@@ -216,8 +220,9 @@ func TestCommitBlock(t *testing.T) {
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
+	tx, _ := b.GetTransaction(tx1.Hash())
 	Expect(err).ToNot(HaveOccurred())
-	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionFinalized))
+	Expect(tx.Status).To(Equal(types.TransactionFinalized))
 
 	tx2 := &types.SignedTransaction{
 		Script:         []byte("invalid script"),
@@ -229,16 +234,19 @@ func TestCommitBlock(t *testing.T) {
 
 	// Submit invalid tx2
 	err = b.SubmitTransaction(tx2)
+	tx, _ = b.GetTransaction(tx2.Hash())
 	Expect(err).To(HaveOccurred())
-	Expect(b.GetTransaction(tx2.Hash()).Status).To(Equal(types.TransactionReverted))
+	Expect(tx.Status).To(Equal(types.TransactionReverted))
 
 	// Commit tx1 and tx2 into new block
 	b.CommitBlock()
 
 	// tx1 status becomes TransactionSealed
-	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionSealed))
+	tx, _ = b.GetTransaction(tx1.Hash())
+	Expect(tx.Status).To(Equal(types.TransactionSealed))
 	// tx2 status stays TransactionReverted
-	Expect(b.GetTransaction(tx2.Hash()).Status).To(Equal(types.TransactionReverted))
+	tx, _ = b.GetTransaction(tx2.Hash())
+	Expect(tx.Status).To(Equal(types.TransactionReverted))
 }
 
 func TestCallScript(t *testing.T) {
@@ -306,7 +314,7 @@ func TestQueryByVersion(t *testing.T) {
 
 	// tx1 does not exist at ws1
 	tx, err = b.GetTransactionAtVersion(tx1.Hash(), ws1)
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).To(MatchError(&ErrTransactionNotFound{TxHash: tx1.Hash()}))
 	Expect(tx).To(BeNil())
 
 	// tx1 does exist at ws2
@@ -316,7 +324,7 @@ func TestQueryByVersion(t *testing.T) {
 
 	// tx2 does not exist at ws2
 	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws2)
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).To(MatchError(&ErrTransactionNotFound{TxHash: tx2.Hash()}))
 	Expect(tx).To(BeNil())
 
 	// tx2 does exist at ws3
