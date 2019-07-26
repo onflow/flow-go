@@ -7,6 +7,7 @@ package collect
 
 import (
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/config"
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,8 +16,8 @@ import (
 func InitializeServer() (*Server, error) {
 	configConfig := config.New()
 	logger := logrus.New()
-	controller := NewController(logger)
-	server, err := NewServer(configConfig, logger, controller)
+	controllerController := controller.New(logger)
+	server, err := NewServer(configConfig, logger, controllerController)
 	if err != nil {
 		return nil, err
 	}

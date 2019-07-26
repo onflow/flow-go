@@ -1,4 +1,4 @@
-package collect
+package controller
 
 import (
 	"context"
@@ -20,7 +20,7 @@ type Controller struct {
 	log *logrus.Entry
 }
 
-func NewController(log *logrus.Logger) *Controller {
+func New(log *logrus.Logger) *Controller {
 	return &Controller{
 		log: logrus.NewEntry(log),
 	}

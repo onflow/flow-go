@@ -8,8 +8,10 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/config"
 	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
+
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/config"
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
 )
 
 type Server struct {
@@ -21,7 +23,7 @@ type Server struct {
 func NewServer(
 	conf *config.Config,
 	log *logrus.Logger,
-	ctrl *Controller,
+	ctrl *controller.Controller,
 ) (*Server, error) {
 	gsrv := grpc.NewServer()
 
