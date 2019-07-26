@@ -49,7 +49,10 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 // GetBlockByHash gets a block by hash.
 func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlockByHashRequest) (*observe.GetBlockByHashResponse, error) {
 	hash := crypto.BytesToHash(req.GetHash())
-	block := s.blockchain.GetBlockByHash(hash)
+	block, err := s.blockchain.GetBlockByHash(hash)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
 
 	s.logger.WithFields(log.Fields{
 		"blockNum":  block.Number,
@@ -67,7 +70,10 @@ func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlo
 // GetBlockByNumber gets a block by number.
 func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetBlockByNumberRequest) (*observe.GetBlockByNumberResponse, error) {
 	number := req.GetNumber()
-	block := s.blockchain.GetBlockByNumber(number)
+	block, err := s.blockchain.GetBlockByNumber(number)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
 
 	s.logger.WithFields(log.Fields{
 		"blockNum":  number,
@@ -103,7 +109,10 @@ func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLat
 // GetTransaction gets a transaction by hash.
 func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTransactionRequest) (*observe.GetTransactionResponse, error) {
 	hash := crypto.BytesToHash(req.GetHash())
-	tx := s.blockchain.GetTransaction(hash)
+	tx, err := s.blockchain.GetTransaction(hash)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
 
 	s.logger.
 		WithField("txHash", hash).
@@ -132,7 +141,10 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 // GetAccount returns the info associated with an address.
 func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccountRequest) (*observe.GetAccountResponse, error) {
 	address := crypto.BytesToAddress(req.GetAddress())
-	account := s.blockchain.GetAccount(address)
+	account, err := s.blockchain.GetAccount(address)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
 
 	s.logger.
 		WithField("address", address).

@@ -64,7 +64,7 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 				Infof("💸  Transaction #%d submitted to network", tx.Nonce)
 
 			hash := s.blockchain.CommitBlock()
-			block := s.blockchain.GetBlockByHash(hash)
+			block, _ := s.blockchain.GetBlockByHash(hash)
 
 			s.logger.WithFields(log.Fields{
 				"blockNum":  block.Number,
@@ -74,7 +74,7 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 
 		case <-tick:
 			hash := s.blockchain.CommitBlock()
-			block := s.blockchain.GetBlockByHash(hash)
+			block, _ := s.blockchain.GetBlockByHash(hash)
 
 			s.logger.WithFields(log.Fields{
 				"blockNum":  block.Number,

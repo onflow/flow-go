@@ -17,7 +17,7 @@ func (e *ErrBlockNotFound) Error() string {
 		return fmt.Sprintf("Block with hash %s cannot be found", e.BlockHash)
 	}
 
-	return fmt.Sprintf("Block with number %d cannot be found", e.BlockNum)
+	return fmt.Sprintf("Block number %d cannot be found", e.BlockNum)
 }
 
 // ErrTransactionNotFound indicates that a transaction specified by hash cannot be found.
