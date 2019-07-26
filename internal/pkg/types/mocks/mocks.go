@@ -5,8 +5,9 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 
+	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	bambooProto "github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
+	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 )
 
 var mockedCurrentTime = time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC)
@@ -19,95 +20,95 @@ func MockSignature() crypto.Signature {
 	return crypto.Signature{}
 }
 
-func MockKeyWeight() KeyWeight {
-	return KeyWeight{
+func MockKeyWeight() types.KeyWeight {
+	return types.KeyWeight{
 		Key:    []byte("MOCK"),
 		Weight: 0,
 	}
 }
 
-func MockKeyWeightMessage() *bambooProto.TransactionRegister_KeyWeight {
-	return &bambooProto.TransactionRegister_KeyWeight{
+func MockKeyWeightMessage() *shared.TransactionRegister_KeyWeight {
+	return &shared.TransactionRegister_KeyWeight{
 		Key:    []byte("MOCK"),
 		Weight: 0,
 	}
 }
 
-func MockRegister() *Register {
-	return &Register{
+func MockRegister() *types.Register {
+	return &types.Register{
 		ID:    []byte("TEST"),
 		Value: []byte("MOCK"),
 	}
 }
 
-func MockRegisterMessage() *bambooProto.Register {
-	return &bambooProto.Register{
+func MockRegisterMessage() *shared.Register {
+	return &shared.Register{
 		Id:    []byte("TEST"),
 		Value: []byte("MOCK"),
 	}
 }
 
-func MockIntermediateRegisters() *IntermediateRegisters {
-	registers := make([]Register, 0)
+func MockIntermediateRegisters() *types.IntermediateRegisters {
+	registers := make([]types.Register, 0)
 	for i := 0; i < 5; i++ {
 		registers = append(registers, *MockRegister())
 	}
 
-	return &IntermediateRegisters{
+	return &types.IntermediateRegisters{
 		TransactionHash: MockHash(),
 		Registers:       registers,
 		ComputeUsed:     0,
 	}
 }
 
-func MockIntermediateRegistersMessage() *bambooProto.IntermediateRegisters {
-	registers := make([]*bambooProto.Register, 0)
+func MockIntermediateRegistersMessage() *shared.IntermediateRegisters {
+	registers := make([]*shared.Register, 0)
 	for i := 0; i < 5; i++ {
 		registers = append(registers, MockRegisterMessage())
 	}
 
-	return &bambooProto.IntermediateRegisters{
+	return &shared.IntermediateRegisters{
 		TransactionHash: MockHash().Bytes(),
 		Registers:       registers,
 		ComputeUsed:     0,
 	}
 }
 
-func MockTransactionRegister() *TransactionRegister {
-	keys := make([]KeyWeight, 0)
+func MockTransactionRegister() *types.TransactionRegister {
+	keys := make([]types.KeyWeight, 0)
 	for i := 0; i < 5; i++ {
 		keys = append(keys, MockKeyWeight())
 	}
 
-	return &TransactionRegister{
-		Type:       SIMPLE,
-		AccessMode: CREATE,
+	return &types.TransactionRegister{
+		Type:       types.SIMPLE,
+		AccessMode: types.CREATE,
 		ID:         []byte("TEST"),
 		Keys:       keys,
 	}
 }
 
-func MockTransactionRegisterMessage() *bambooProto.TransactionRegister {
-	keys := make([]*bambooProto.TransactionRegister_KeyWeight, 0)
+func MockTransactionRegisterMessage() *shared.TransactionRegister {
+	keys := make([]*shared.TransactionRegister_KeyWeight, 0)
 	for i := 0; i < 5; i++ {
 		keys = append(keys, MockKeyWeightMessage())
 	}
 
-	return &bambooProto.TransactionRegister{
-		Type:       bambooProto.TransactionRegister_SIMPLE,
-		AccessMode: bambooProto.TransactionRegister_CREATE,
+	return &shared.TransactionRegister{
+		Type:       shared.TransactionRegister_SIMPLE,
+		AccessMode: shared.TransactionRegister_CREATE,
 		Id:         []byte("TEST"),
 		Keys:       keys,
 	}
 }
 
-func MockTransaction() *Transaction {
-	registers := make([]TransactionRegister, 0)
+func MockTransaction() *types.Transaction {
+	registers := make([]types.TransactionRegister, 0)
 	for i := 0; i < 5; i++ {
 		registers = append(registers, *MockTransactionRegister())
 	}
 
-	return &Transaction{
+	return &types.Transaction{
 		Script:    []byte("TEST"),
 		Nonce:     0,
 		Registers: registers,
@@ -115,13 +116,13 @@ func MockTransaction() *Transaction {
 	}
 }
 
-func MockTransactionMessage() *bambooProto.Transaction {
-	registers := make([]*bambooProto.TransactionRegister, 0)
+func MockTransactionMessage() *shared.Transaction {
+	registers := make([]*shared.TransactionRegister, 0)
 	for i := 0; i < 5; i++ {
 		registers = append(registers, MockTransactionRegisterMessage())
 	}
 
-	return &bambooProto.Transaction{
+	return &shared.Transaction{
 		Script:    []byte("TEST"),
 		Nonce:     0,
 		Registers: registers,
@@ -129,83 +130,83 @@ func MockTransactionMessage() *bambooProto.Transaction {
 	}
 }
 
-func MockSignedTransaction() *SignedTransaction {
+func MockSignedTransaction() *types.SignedTransaction {
 	sigs := make([]crypto.Signature, 0)
 	for i := 0; i < 5; i++ {
 		sigs = append(sigs, MockSignature())
 	}
 
-	return &SignedTransaction{
+	return &types.SignedTransaction{
 		Transaction:      *MockTransaction(),
 		ScriptSignatures: sigs,
 		PayerSignature:   MockSignature(),
 	}
 }
 
-func MockSignedTransactionMessage() *bambooProto.SignedTransaction {
+func MockSignedTransactionMessage() *shared.SignedTransaction {
 	sigs := make([][]byte, 0)
 	for i := 0; i < 5; i++ {
 		sigs = append(sigs, MockSignature().Bytes())
 	}
 
-	return &bambooProto.SignedTransaction{
+	return &shared.SignedTransaction{
 		Transaction:      MockTransactionMessage(),
 		ScriptSignatures: sigs,
 		PayerSignature:   MockSignature().Bytes(),
 	}
 }
 
-func MockCollection() *Collection {
+func MockCollection() *types.Collection {
 	transactions := make([]SignedTransaction, 0)
 	for i := 0; i < 5; i++ {
 		transactions = append(transactions, *MockSignedTransaction())
 	}
 
-	return &Collection{
+	return &types.Collection{
 		Transactions:        transactions,
 		FoundationBlockHash: MockHash(),
 	}
 }
 
-func MockCollectionMessage() *bambooProto.Collection {
-	transactions := make([]*bambooProto.SignedTransaction, 0)
+func MockCollectionMessage() *shared.Collection {
+	transactions := make([]*shared.SignedTransaction, 0)
 	for i := 0; i < 5; i++ {
 		transactions = append(transactions, MockSignedTransactionMessage())
 	}
 
-	return &bambooProto.Collection{
+	return &shared.Collection{
 		Transactions:        transactions,
 		FoundationBlockHash: MockHash().Bytes(),
 	}
 }
 
-func MockSignedCollectionHash() *SignedCollectionHash {
+func MockSignedCollectionHash() *types.SignedCollectionHash {
 	sigs := make([]crypto.Signature, 0)
 	for i := 0; i < 5; i++ {
 		sigs = append(sigs, MockSignature())
 	}
 
-	return &SignedCollectionHash{
+	return &types.SignedCollectionHash{
 		CollectionHash: MockHash(),
 		Signatures:     sigs,
 	}
 }
 
-func MockSignedCollectionHashMessage() *bambooProto.SignedCollectionHash {
+func MockSignedCollectionHashMessage() *shared.SignedCollectionHash {
 	sigs := make([][]byte, 0)
 	for i := 0; i < 5; i++ {
 		sigs = append(sigs, MockSignature().Bytes())
 	}
 
-	return &bambooProto.SignedCollectionHash{
+	return &shared.SignedCollectionHash{
 		CollectionHash: MockHash().Bytes(),
 		Signatures:     sigs,
 	}
 }
 
-func MockExecutionReceipt() *ExecutionReceipt {
-	registers := make([]Register, 0)
-	irList := make([]IntermediateRegisters, 0)
+func MockExecutionReceipt() *types.ExecutionReceipt {
+	registers := make([]types.Register, 0)
+	irList := make([]types.IntermediateRegisters, 0)
 	sigs := make([]crypto.Signature, 0)
 	for i := 0; i < 5; i++ {
 		registers = append(registers, *MockRegister())
@@ -213,7 +214,7 @@ func MockExecutionReceipt() *ExecutionReceipt {
 		sigs = append(sigs, MockSignature())
 	}
 
-	return &ExecutionReceipt{
+	return &types.ExecutionReceipt{
 		PreviousReceiptHash:       MockHash(),
 		BlockHash:                 MockHash(),
 		InitialRegisters:          registers,
@@ -222,9 +223,9 @@ func MockExecutionReceipt() *ExecutionReceipt {
 	}
 }
 
-func MockExecutionReceiptMessage() *bambooProto.ExecutionReceipt {
-	registers := make([]*bambooProto.Register, 0)
-	irList := make([]*bambooProto.IntermediateRegisters, 0)
+func MockExecutionReceiptMessage() *shared.ExecutionReceipt {
+	registers := make([]*shared.Register, 0)
+	irList := make([]*shared.IntermediateRegisters, 0)
 	sigs := make([][]byte, 0)
 	for i := 0; i < 5; i++ {
 		registers = append(registers, MockRegisterMessage())
@@ -232,7 +233,7 @@ func MockExecutionReceiptMessage() *bambooProto.ExecutionReceipt {
 		sigs = append(sigs, MockSignature().Bytes())
 	}
 
-	return &bambooProto.ExecutionReceipt{
+	return &shared.ExecutionReceipt{
 		PreviousReceiptHash:       MockHash().Bytes(),
 		BlockHash:                 MockHash().Bytes(),
 		InitialRegisters:          registers,
@@ -241,13 +242,13 @@ func MockExecutionReceiptMessage() *bambooProto.ExecutionReceipt {
 	}
 }
 
-func MockInvalidExecutionReceiptChallenge() *InvalidExecutionReceiptChallenge {
-	partTransactions := make([]IntermediateRegisters, 0)
+func MockInvalidExecutionReceiptChallenge() *types.InvalidExecutionReceiptChallenge {
+	partTransactions := make([]types.IntermediateRegisters, 0)
 	for i := 0; i < 5; i++ {
 		partTransactions = append(partTransactions, *MockIntermediateRegisters())
 	}
 
-	return &InvalidExecutionReceiptChallenge{
+	return &types.InvalidExecutionReceiptChallenge{
 		ExecutionReceiptHash:      MockHash(),
 		ExecutionReceiptSignature: MockSignature(),
 		PartIndex:                 0,
@@ -256,13 +257,13 @@ func MockInvalidExecutionReceiptChallenge() *InvalidExecutionReceiptChallenge {
 	}
 }
 
-func MockInvalidExecutionReceiptChallengeMessage() *bambooProto.InvalidExecutionReceiptChallenge {
-	partTransactions := make([]*bambooProto.IntermediateRegisters, 0)
+func MockInvalidExecutionReceiptChallengeMessage() *shared.InvalidExecutionReceiptChallenge {
+	partTransactions := make([]*shared.IntermediateRegisters, 0)
 	for i := 0; i < 5; i++ {
 		partTransactions = append(partTransactions, MockIntermediateRegistersMessage())
 	}
 
-	return &bambooProto.InvalidExecutionReceiptChallenge{
+	return &shared.InvalidExecutionReceiptChallenge{
 		ExecutionReceiptHash:      MockHash().Bytes(),
 		ExecutionReceiptSignature: MockSignature().Bytes(),
 		PartIndex:                 0,
@@ -271,8 +272,8 @@ func MockInvalidExecutionReceiptChallengeMessage() *bambooProto.InvalidExecution
 	}
 }
 
-func MockResultApproval() *ResultApproval {
-	return &ResultApproval{
+func MockResultApproval() *types.ResultApproval {
+	return &types.ResultApproval{
 		BlockHeight:             0,
 		ExecutionReceiptHash:    MockHash(),
 		ResultApprovalSignature: MockSignature(),
@@ -281,8 +282,8 @@ func MockResultApproval() *ResultApproval {
 	}
 }
 
-func MockResultApprovalMessage() *bambooProto.ResultApproval {
-	return &bambooProto.ResultApproval{
+func MockResultApprovalMessage() *shared.ResultApproval {
+	return &shared.ResultApproval{
 		BlockHeight:             0,
 		ExecutionReceiptHash:    MockHash().Bytes(),
 		ResultApprovalSignature: MockSignature().Bytes(),
@@ -291,7 +292,7 @@ func MockResultApprovalMessage() *bambooProto.ResultApproval {
 	}
 }
 
-func MockBlockSeal() *BlockSeal {
+func MockBlockSeal() *types.BlockSeal {
 	erSigs := make([]crypto.Signature, 0)
 	raSigs := make([]crypto.Signature, 0)
 	for i := 0; i < 5; i++ {
@@ -299,7 +300,7 @@ func MockBlockSeal() *BlockSeal {
 		raSigs = append(raSigs, MockSignature())
 	}
 
-	return &BlockSeal{
+	return &types.BlockSeal{
 		BlockHash:                  MockHash(),
 		ExecutionReceiptHash:       MockHash(),
 		ExecutionReceiptSignatures: erSigs,
@@ -307,7 +308,7 @@ func MockBlockSeal() *BlockSeal {
 	}
 }
 
-func MockBlockSealMessage() *bambooProto.BlockSeal {
+func MockBlockSealMessage() *shared.BlockSeal {
 	erSigs := make([][]byte, 0)
 	raSigs := make([][]byte, 0)
 	for i := 0; i < 5; i++ {
@@ -315,7 +316,7 @@ func MockBlockSealMessage() *bambooProto.BlockSeal {
 		raSigs = append(raSigs, MockSignature().Bytes())
 	}
 
-	return &bambooProto.BlockSeal{
+	return &shared.BlockSeal{
 		BlockHash:                  MockHash().Bytes(),
 		ExecutionReceiptHash:       MockHash().Bytes(),
 		ExecutionReceiptSignatures: erSigs,
@@ -323,9 +324,9 @@ func MockBlockSealMessage() *bambooProto.BlockSeal {
 	}
 }
 
-func MockBlock() *Block {
-	signedCollectionHashes := make([]SignedCollectionHash, 0)
-	blockSeals := make([]BlockSeal, 0)
+func MockBlock() *types.Block {
+	signedCollectionHashes := make([]types.SignedCollectionHash, 0)
+	blockSeals := make([]types.BlockSeal, 0)
 	sigs := make([]crypto.Signature, 0)
 	for i := 0; i < 5; i++ {
 		signedCollectionHashes = append(signedCollectionHashes, *MockSignedCollectionHash())
@@ -333,7 +334,7 @@ func MockBlock() *Block {
 		sigs = append(sigs, MockSignature())
 	}
 
-	return &Block{
+	return &types.Block{
 		ChainID:                "BAMBOO",
 		Height:                 0,
 		PreviousBlockHash:      MockHash(),
@@ -344,10 +345,10 @@ func MockBlock() *Block {
 	}
 }
 
-func MockBlockMessage() *bambooProto.Block {
+func MockBlockMessage() *shared.Block {
 	timestamp, _ := ptypes.TimestampProto(mockedCurrentTime)
-	signedCollectionHashes := make([]*bambooProto.SignedCollectionHash, 0)
-	blockSeals := make([]*bambooProto.BlockSeal, 0)
+	signedCollectionHashes := make([]*shared.SignedCollectionHash, 0)
+	blockSeals := make([]*shared.BlockSeal, 0)
 	sigs := make([][]byte, 0)
 	for i := 0; i < 5; i++ {
 		signedCollectionHashes = append(signedCollectionHashes, MockSignedCollectionHashMessage())
@@ -355,7 +356,7 @@ func MockBlockMessage() *bambooProto.Block {
 		sigs = append(sigs, MockSignature().Bytes())
 	}
 
-	return &bambooProto.Block{
+	return &shared.Block{
 		ChainID:                "BAMBOO",
 		Height:                 0,
 		PreviousBlockHash:      MockHash().Bytes(),
@@ -366,13 +367,13 @@ func MockBlockMessage() *bambooProto.Block {
 	}
 }
 
-func MockStateTransition() *StateTransition {
+func MockStateTransition() *types.StateTransition {
 	sigs := make([]crypto.Signature, 0)
 	for i := 0; i < 5; i++ {
 		sigs = append(sigs, MockSignature())
 	}
 
-	return &StateTransition{
+	return &types.StateTransition{
 		PreviousStateTransitionHash:      MockHash(),
 		PreviousCommitApprovalSignatures: sigs,
 		Height:                           0,
@@ -380,13 +381,13 @@ func MockStateTransition() *StateTransition {
 	}
 }
 
-func MockStateTransitionMessage() *bambooProto.StateTransition {
+func MockStateTransitionMessage() *shared.StateTransition {
 	sigs := make([][]byte, 0)
 	for i := 0; i < 5; i++ {
 		sigs = append(sigs, MockSignature().Bytes())
 	}
 
-	return &bambooProto.StateTransition{
+	return &shared.StateTransition{
 		PreviousStateTransitionHash:      MockHash().Bytes(),
 		PreviousCommitApprovalSignatures: sigs,
 		Height:                           0,
@@ -394,56 +395,56 @@ func MockStateTransitionMessage() *bambooProto.StateTransition {
 	}
 }
 
-func MockSignedStateTransition() *SignedStateTransition {
-	return &SignedStateTransition{
+func MockSignedStateTransition() *types.SignedStateTransition {
+	return &types.SignedStateTransition{
 		StateTransition: *MockStateTransition(),
 		Signature:       MockSignature(),
 	}
 }
 
-func MockSignedStateTransitionMessage() *bambooProto.SignedStateTransition {
-	return &bambooProto.SignedStateTransition{
+func MockSignedStateTransitionMessage() *shared.SignedStateTransition {
+	return &shared.SignedStateTransition{
 		StateTransition: MockStateTransitionMessage(),
 		Signature:       MockSignature().Bytes(),
 	}
 }
 
-func MockFinalizedStateTransition() *FinalizedStateTransition {
+func MockFinalizedStateTransition() *types.FinalizedStateTransition {
 	sigs := make([]crypto.Signature, 0)
 	for i := 0; i < 5; i++ {
 		sigs = append(sigs, MockSignature())
 	}
 
-	return &FinalizedStateTransition{
+	return &types.FinalizedStateTransition{
 		SignedStateTransition: *MockSignedStateTransition(),
 		Signatures:            sigs,
 	}
 }
 
-func MockFinalizedStateTransitionMessage() *bambooProto.FinalizedStateTransition {
+func MockFinalizedStateTransitionMessage() *shared.FinalizedStateTransition {
 	sigs := make([][]byte, 0)
 	for i := 0; i < 5; i++ {
 		sigs = append(sigs, MockSignature().Bytes())
 	}
 
-	return &bambooProto.FinalizedStateTransition{
+	return &shared.FinalizedStateTransition{
 		SignedStateTransition: MockSignedStateTransitionMessage(),
 		Signatures:            sigs,
 	}
 }
 
-func MockStateTransitionVote() *StateTransitionVote {
-	return &StateTransitionVote{
+func MockStateTransitionVote() *types.StateTransitionVote {
+	return &types.StateTransitionVote{
 		StateTransitionHash: MockHash(),
 		Vote:                APPROVE,
 		Height:              0,
 	}
 }
 
-func MockStateTransitionVoteMessage() *bambooProto.StateTransitionVote {
-	return &bambooProto.StateTransitionVote{
+func MockStateTransitionVoteMessage() *shared.StateTransitionVote {
+	return &shared.StateTransitionVote{
 		StateTransitionHash: MockHash().Bytes(),
-		Vote:                bambooProto.Vote_APPROVE,
+		Vote:                shared.Vote_APPROVE,
 		Height:              0,
 	}
 }

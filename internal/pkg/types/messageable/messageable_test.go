@@ -4,15 +4,13 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
-
-	"github.com/dapperlabs/bamboo-node/internal/types"
 )
 
 func TestRegister(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockRegisterMessage()
-	register := types.MockRegister()
+	message := mocks.MockRegisterMessage()
+	register := mocks.MockRegister()
 
 	actualMessage := RegisterToMessage(register)
 	actualRegister := MessageToRegister(message)
@@ -24,8 +22,8 @@ func TestRegister(t *testing.T) {
 func TestIntermediateRegisters(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockIntermediateRegistersMessage()
-	intermediateRegisters := types.MockIntermediateRegisters()
+	message := mocks.MockIntermediateRegistersMessage()
+	intermediateRegisters := mocks.MockIntermediateRegisters()
 
 	actualMessage := IntermediateRegistersToMessage(intermediateRegisters)
 	actualIntermediateRegisters := MessageToIntermediateRegisters(message)
@@ -37,8 +35,8 @@ func TestIntermediateRegisters(t *testing.T) {
 func TestTransactionRegister(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockTransactionRegisterMessage()
-	transactionRegister := types.MockTransactionRegister()
+	message := mocks.MockTransactionRegisterMessage()
+	transactionRegister := mocks.MockTransactionRegister()
 
 	actualMessage := TransactionRegisterToMessage(transactionRegister)
 	actualTransactionRegister := MessageToTransactionRegister(message)
@@ -50,8 +48,8 @@ func TestTransactionRegister(t *testing.T) {
 func TestTransaction(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockTransactionMessage()
-	txn := types.MockTransaction()
+	message := mocks.MockTransactionMessage()
+	txn := mocks.MockTransaction()
 
 	actualMessage := TransactionToMessage(txn)
 	actualTxn := MessageToTransaction(message)
@@ -63,8 +61,8 @@ func TestTransaction(t *testing.T) {
 func TestSignedTransaction(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockSignedTransactionMessage()
-	signedTxn := types.MockSignedTransaction()
+	message := mocks.MockSignedTransactionMessage()
+	signedTxn := mocks.MockSignedTransaction()
 
 	actualMessage := SignedTransactionToMessage(signedTxn)
 	actualSignedTxn := MessageToSignedTransaction(message)
@@ -76,8 +74,8 @@ func TestSignedTransaction(t *testing.T) {
 func TestCollection(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockCollectionMessage()
-	collection := types.MockCollection()
+	message := mocks.MockCollectionMessage()
+	collection := mocks.MockCollection()
 
 	actualMessage := CollectionToMessage(collection)
 	actualCollection := MessageToCollection(message)
@@ -89,8 +87,8 @@ func TestCollection(t *testing.T) {
 func TestSignedCollectionHash(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockSignedCollectionHashMessage()
-	signedCollectionHash := types.MockSignedCollectionHash()
+	message := mocks.MockSignedCollectionHashMessage()
+	signedCollectionHash := mocks.MockSignedCollectionHash()
 
 	actualMessage := SignedCollectionHashToMessage(signedCollectionHash)
 	actualSignedCollectionHash := MessageToSignedCollectionHash(message)
@@ -102,8 +100,8 @@ func TestSignedCollectionHash(t *testing.T) {
 func TestExecutionReceipt(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockExecutionReceiptMessage()
-	executionReceipt := types.MockExecutionReceipt()
+	message := mocks.MockExecutionReceiptMessage()
+	executionReceipt := mocks.MockExecutionReceipt()
 
 	actualMessage := ExecutionReceiptToMessage(executionReceipt)
 	actualExecutionReceipt := MessageToExecutionReceipt(message)
@@ -115,8 +113,8 @@ func TestExecutionReceipt(t *testing.T) {
 func TestInvalidExecutionReceiptChallenge(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockInvalidExecutionReceiptChallengeMessage()
-	invalidExecutionReceiptChallenge := types.MockInvalidExecutionReceiptChallenge()
+	message := mocks.MockInvalidExecutionReceiptChallengeMessage()
+	invalidExecutionReceiptChallenge := mocks.MockInvalidExecutionReceiptChallenge()
 
 	actualMessage := InvalidExecutionReceiptChallengeToMessage(invalidExecutionReceiptChallenge)
 	actualIERC := MessageToInvalidExecutionReceiptChallenge(message)
@@ -128,8 +126,8 @@ func TestInvalidExecutionReceiptChallenge(t *testing.T) {
 func TestResultApproval(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockResultApprovalMessage()
-	resultApproval := types.MockResultApproval()
+	message := mocks.MockResultApprovalMessage()
+	resultApproval := mocks.MockResultApproval()
 
 	actualMessage := ResultApprovalToMessage(resultApproval)
 	actualResultApproval := MessageToResultApproval(message)
@@ -141,8 +139,8 @@ func TestResultApproval(t *testing.T) {
 func TestBlockSeal(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockBlockSealMessage()
-	blockSeal := types.MockBlockSeal()
+	message := mocks.MockBlockSealMessage()
+	blockSeal := mocks.MockBlockSeal()
 
 	actualMessage := BlockSealToMessage(blockSeal)
 	actualBlockSeal := MessageToBlockSeal(message)
@@ -154,8 +152,8 @@ func TestBlockSeal(t *testing.T) {
 func TestBlock(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockBlockMessage()
-	block := types.MockBlock()
+	message := mocks.MockBlockMessage()
+	block := mocks.MockBlock()
 
 	actualMessage := BlockToMessage(block)
 	actualBlock := MessageToBlock(message)
@@ -167,8 +165,8 @@ func TestBlock(t *testing.T) {
 func TestStateTransition(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockStateTransitionMessage()
-	stateTransition := types.MockStateTransition()
+	message := mocks.MockStateTransitionMessage()
+	stateTransition := mocks.MockStateTransition()
 
 	actualMessage := StateTransitionToMessage(stateTransition)
 	actualStateTransition := MessageToStateTransition(message)
@@ -180,8 +178,8 @@ func TestStateTransition(t *testing.T) {
 func TestSignedStateTransition(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockSignedStateTransitionMessage()
-	signedStateTransition := types.MockSignedStateTransition()
+	message := mocks.MockSignedStateTransitionMessage()
+	signedStateTransition := mocks.MockSignedStateTransition()
 
 	actualMessage := SignedStateTransitionToMessage(signedStateTransition)
 	actualSignedStateTransition := MessageToSignedStateTransition(message)
@@ -193,8 +191,8 @@ func TestSignedStateTransition(t *testing.T) {
 func TestFinalizedStateTransition(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockFinalizedStateTransitionMessage()
-	finalizedStateTransition := types.MockFinalizedStateTransition()
+	message := mocks.MockFinalizedStateTransitionMessage()
+	finalizedStateTransition := mocks.MockFinalizedStateTransition()
 
 	actualMessage := FinalizedStateTransitionToMessage(finalizedStateTransition)
 	actualFinalizedStateTransition := MessageToFinalizedStateTransition(message)
@@ -206,8 +204,8 @@ func TestFinalizedStateTransition(t *testing.T) {
 func TestStateTransitionVote(t *testing.T) {
 	RegisterTestingT(t)
 
-	message := types.MockStateTransitionVoteMessage()
-	stateTransitionVote := types.MockStateTransitionVote()
+	message := mocks.MockStateTransitionVoteMessage()
+	stateTransitionVote := mocks.MockStateTransitionVote()
 
 	actualMessage := StateTransitionVoteToMessage(stateTransitionVote)
 	actualStateTransitionVote := MessageToStateTransitionVote(message)
