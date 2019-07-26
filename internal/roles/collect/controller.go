@@ -3,6 +3,8 @@ package collect
 import (
 	"context"
 
+	"github.com/sirupsen/logrus"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -15,10 +17,13 @@ const (
 
 type Controller struct {
 	dal *DAL
+	log *logrus.Entry
 }
 
-func NewController() *Controller {
-	return &Controller{}
+func NewController(log *logrus.Logger) *Controller {
+	return &Controller{
+		log: logrus.NewEntry(log),
+	}
 }
 
 func (c *Controller) Ping(context.Context, *collectSvc.PingRequest) (*collectSvc.PingResponse, error) {

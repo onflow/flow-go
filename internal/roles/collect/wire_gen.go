@@ -7,14 +7,16 @@ package collect
 
 import (
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/config"
+	"github.com/sirupsen/logrus"
 )
 
 // Injectors from wire.go:
 
 func InitializeServer() (*Server, error) {
 	configConfig := config.New()
-	controller := NewController()
-	server, err := NewServer(configConfig, controller)
+	logger := logrus.New()
+	controller := NewController(logger)
+	server, err := NewServer(configConfig, logger, controller)
 	if err != nil {
 		return nil, err
 	}

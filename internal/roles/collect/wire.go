@@ -4,6 +4,7 @@ package collect
 
 import (
 	"github.com/google/wire"
+	"github.com/sirupsen/logrus"
 
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/config"
 )
@@ -13,6 +14,7 @@ func InitializeServer() (*Server, error) {
 	wire.Build(
 		NewServer,
 		config.New,
+		logrus.New,
 		NewController,
 	)
 	return &Server{}, nil
