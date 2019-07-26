@@ -2,7 +2,7 @@ package config
 
 import "github.com/psiemens/sconfig"
 
-// Config holds the application configuration for an security node.
+// Config holds the application configuration for a collection node.
 type Config struct {
 	Port int `default:"5000"`
 }
