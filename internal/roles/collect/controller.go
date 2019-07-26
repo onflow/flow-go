@@ -9,6 +9,10 @@ import (
 	collectSvc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 )
 
+const (
+	errNoTransaction = "request must include a transaction"
+)
+
 type Controller struct {
 	dal *DAL
 }
@@ -39,7 +43,7 @@ func (c *Controller) SubmitTransaction(
 ) (*collectSvc.SubmitTransactionResponse, error) {
 	tx := req.GetTransaction()
 	if tx == nil {
-		return nil, status.Error(codes.InvalidArgument, "")
+		return nil, status.Error(codes.InvalidArgument, errNoTransaction)
 	}
 
 	// TODO: validate transaction contents
@@ -51,7 +55,9 @@ func (c *Controller) SubmitTransaction(
 	// TODO: store transaction
 	// https://github.com/dapperlabs/bamboo-node/issues/169
 
-	return nil, status.Error(codes.Unimplemented, "")
+	// TODO: route transaction to cluster
+
+	return &collectSvc.SubmitTransactionResponse{}, nil
 }
 
 func (c *Controller) SubmitCollection(context.Context, *collectSvc.SubmitCollectionRequest) (*collectSvc.SubmitCollectionResponse, error) {
