@@ -38,7 +38,6 @@ func (c *Controller) SubmitTransaction(
 	req *collectSvc.SubmitTransactionRequest,
 ) (*collectSvc.SubmitTransactionResponse, error) {
 	tx := req.GetTransaction()
-
 	if tx == nil {
 		return nil, status.Error(codes.InvalidArgument, "")
 	}
