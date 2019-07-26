@@ -80,4 +80,4 @@ adds entropy for seeding pseudo-random-number generators to the block
 broadcasting the resulting finalized block to the entire network 
 
 ## Interaction Graph 
-![interaction-flow](docs/images/Consensus_interaction_flow.png?raw=true)
+![interaction-flow](../../../docs/images/Consensus_interaction_flow.png?raw=true)
