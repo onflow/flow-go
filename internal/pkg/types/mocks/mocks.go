@@ -5,8 +5,8 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 
-	bambooProto "github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	bambooProto "github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 )
 
 var mockedCurrentTime = time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC)
