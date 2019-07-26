@@ -66,24 +66,39 @@ func (b *EmulatedBlockchain) GetLatestBlock() *etypes.Block {
 }
 
 // GetBlockByHash gets a block by hash.
-func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) *etypes.Block {
-	return b.pendingWorldState.GetBlockByHash(hash)
+func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*etypes.Block, error) {
+	block := b.pendingWorldState.GetBlockByHash(hash)
+	if block == nil {
+		return nil, &ErrBlockNotFound{BlockHash: hash}
+	}
+
+	return block, nil
 }
 
 // GetBlockByNumber gets a block by number.
-func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) *etypes.Block {
-	return b.pendingWorldState.GetBlockByNumber(number)
+func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*etypes.Block, error) {
+	block := b.pendingWorldState.GetBlockByNumber(number)
+	if block == nil {
+		return nil, &ErrBlockNotFound{BlockNum: number}
+	}
+
+	return block, nil
 }
 
 // GetTransaction gets an existing transaction by hash.
 //
 // First looks in pending txPool, then looks in current blockchain state.
-func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTransaction {
-	if tx, ok := b.txPool[hash]; ok {
-		return tx
+func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*types.SignedTransaction, error) {
+	if tx, ok := b.txPool[txHash]; ok {
+		return tx, nil
 	}
 
-	return b.pendingWorldState.GetTransaction(hash)
+	tx := b.pendingWorldState.GetTransaction(txHash)
+	if tx == nil {
+		return nil, &ErrTransactionNotFound{TxHash: txHash}
+	}
+
+	return tx, nil
 }
 
 // GetTransactionAtVersion gets an existing transaction by hash at a specified state.
@@ -93,12 +108,22 @@ func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash
 		return nil, err
 	}
 
-	return ws.GetTransaction(txHash), nil
+	tx := ws.GetTransaction(txHash)
+	if tx == nil {
+		return nil, &ErrTransactionNotFound{TxHash: txHash}
+	}
+
+	return tx, nil
 }
 
 // GetAccount gets account information associated with an address identifier.
-func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account {
-	return b.pendingWorldState.GetAccount(address)
+func (b *EmulatedBlockchain) GetAccount(address crypto.Address) (*crypto.Account, error) {
+	account := b.pendingWorldState.GetAccount(address)
+	if account == nil {
+		return nil, &ErrAccountNotFound{Address: address}
+	}
+
+	return account, nil
 }
 
 // GetAccountAtVersion gets account information associated with an address identifier at a specified state.
@@ -108,7 +133,12 @@ func (b *EmulatedBlockchain) GetAccountAtVersion(address crypto.Address, version
 		return nil, err
 	}
 
-	return ws.GetAccount(address), nil
+	account := ws.GetAccount(address)
+	if account == nil {
+		return nil, &ErrAccountNotFound{Address: address}
+	}
+
+	return account, nil
 }
 
 // SubmitTransaction sends a transaction to the network that is immediately executed (updates blockchain state).
