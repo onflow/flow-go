@@ -1,4 +1,4 @@
-package collect
+package data
 
 type DAL struct{}
 

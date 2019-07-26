@@ -9,6 +9,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	collectSvc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
+
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/data"
 )
 
 const (
@@ -16,7 +18,7 @@ const (
 )
 
 type Controller struct {
-	dal *DAL
+	dal *data.DAL
 	log *logrus.Entry
 }
 
