@@ -216,14 +216,17 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 
 // CallContract performs a contract call.
 func (s *EmulatorServer) CallContract(ctx context.Context, req *observe.CallContractRequest) (*observe.CallContractResponse, error) {
-	s.logger.Debugf("📞  Contract script called")
-
 	script := req.GetScript()
-	value, _ := s.blockchain.CallScript(script)
-	// TODO: add error handling besides just this
+	value, err := s.blockchain.CallScript(script)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	if value == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid script")
 	}
+
+	s.logger.Debugf("📞  Contract script called")
 
 	// TODO: change this to whatever interface -> byte encoding decided on
 	valueMsg := []byte(fmt.Sprintf("%v", value.(interface{})))
