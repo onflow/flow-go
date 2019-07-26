@@ -43,8 +43,7 @@ func (c *Controller) Ping(context.Context, *collectSvc.PingRequest) (*collectSvc
 // if it belongs to this node's cluster, but otherwise it will be forwarded to the
 // correct cluster.
 func (c *Controller) SubmitTransaction(
-	ctx context.Context,
-	req *collectSvc.SubmitTransactionRequest,
+	ctx context.Context, req *collectSvc.SubmitTransactionRequest,
 ) (*collectSvc.SubmitTransactionResponse, error) {
 	tx := req.GetTransaction()
 	if tx == nil {
