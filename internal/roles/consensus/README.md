@@ -16,7 +16,7 @@ to be determined whether it will live in this stream of in a separate stream
 
 ## Terminology
 
-* **Collection** - A set of transactions bundled together by a [Collection Node Cluster](internal/roles/collect)
+* **Collection** - A set of transactions bundled together by a [Collection Node Cluster](../../../internal/roles/collect)
 * **Consensus Nodes (CNs)** - collectively produce finalized blocks (including running the random beacon) 
 * **Proto Block** - _Candidate_ blocks (potentially unfinalized) that are produced by the BFT consensus algorithm.
   Proto Blocks are full blocks _except_ that they don't contain any entropy (which is subsequently added by the Random Beacon)   
@@ -33,7 +33,7 @@ Collection are submitted to (one or more) CN(s) via the `SubmitCollection` gRPC 
   - During normal operations, Consensus nodes only receive the  _hashes_ 
     and (aggregated) signatures from the collectors that guarantee the collection.  
     The collection's content is _not_ resolved or inspected.  
-  - CNs will only consider _guaranteed collection_ (see [Collection](internal/roles/collect) for details)
+  - CNs will only consider _guaranteed collection_ (see [Collection](../../../internal/roles/collect) for details)
 Consensus nodes will gossip received collections to other consensus nodes.  
 
 <!--
