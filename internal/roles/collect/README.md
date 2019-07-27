@@ -34,7 +34,8 @@ The algorithm uses the block hash of the last block in the previous epoch as a s
 
 Details about the algorithm can be found in the package below:
 
-**Relevant packages:** [/internal/protocol/collect/clusters](../../../internal/protocol/collect/clusters)
+**Relevant packages:** [/internal/protocol/collect/clusters](/internal/protocol/collect/clusters)
+
 
 ## Transaction Submission
 
@@ -47,7 +48,9 @@ The access node validates the transaction and will return an error to the user i
 - Transaction has a missing/invalid signature
 - Transaction is signed by an account that does not exist
 
-**Relevant packages:** [/internal/nodes/access/controllers](../../../internal/nodes/access/controllers)
+**Relevant packages:** [/internal/nodes/access/controllers](/internal/nodes/access/controllers)
+
+
 
 ## Transaction Routing
 
@@ -57,7 +60,7 @@ After a transaction is validated, it is forwarded to a node in the correct clust
 
 Once a transaction reaches a node in the correct cluster, that node will store the transaction and begin sharing it with other cluster peers.
 
-**Relevant packages:** [/internal/protocol/collect/routing](../../../internal/protocol/collect/routing)
+**Relevant packages:** [/internal/roles/collect/routing](../../../internal/roles/collect/routing)
 
 ## Collection Building
 
@@ -70,19 +73,20 @@ Specifically, we require that the accumulated stake of all guarantors is _more_ 
 
 Details about the collection building algorithm can be found in the package below:
 
-**Relevant packages:** [/internal/protocol/collect/collections](../../../internal/protocol/collect/collections)
+**Relevant packages:** [/internal/roles/collect/collections](../../../internal/roles/collect/collections)
 
 ## Collection Publishing
 
 After a collection is formed, the collection owner will send the collection to one or more security nodes to be included in a block.
 Consensus nodes will only accept guaranteed collections.
 
-**Dependency: this part of the flow interacts with the [Consensus](../collections/consensus.md) stream.**
+**Dependency: this part of the flow interacts with the [Consensus](../../../internal/roles/consensus/) stream.**
 
-**Relevant packages:** [/internal/protocol/collect/collections](../../../internal/protocol/collect/collections), [/internal/nodes/security/controllers](/internal/nodes/security/controllers)
+
+**Relevant packages:** [/internal/roles/collect/collections](../../../internal/roles/collect/collections), [/internal/nodes/security/controllers](/internal/nodes/security/controllers)
 
 ## Transaction and Collection Storage
 
 ANs are responsible for saving all transactions and collections that they commit to storing.
 
-**Relevant packages:** [/internal/nodes/access/data](../../..//internal/nodes/access/data)
+**Relevant packages:** [/internal/nodes/access/data](/internal/nodes/access/data)
