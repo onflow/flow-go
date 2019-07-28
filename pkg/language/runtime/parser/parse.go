@@ -64,13 +64,15 @@ func Parse(code string) (program *ast.Program, errors []error) {
 		}
 	}()
 
-	result := parser.Program().Accept(&ProgramVisitor{})
+	parsed := parser.Program()
 
 	appendSyntaxErrors()
 
 	if len(errors) > 0 {
 		return nil, errors
 	}
+
+	result := parsed.Accept(&ProgramVisitor{})
 
 	program, ok := result.(*ast.Program)
 	if !ok {
