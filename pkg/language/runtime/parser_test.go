@@ -674,6 +674,92 @@ func TestParseFunctionAndBlock(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
+func TestParseFunctionParameterWithoutLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+	    fun test(x: Int) { }
+	`)
+
+	Expect(errors).Should(BeEmpty())
+
+	test := &FunctionDeclaration{
+		IsPublic:   false,
+		Identifier: "test",
+		Parameters: []*Parameter{
+			{
+				Label:      "",
+				Identifier: "x",
+				Type: &BaseType{
+					Identifier: "Int",
+					Pos:        &Position{Offset: 18, Line: 2, Column: 17},
+				},
+				StartPos: &Position{Offset: 15, Line: 2, Column: 14},
+				EndPos:   &Position{Offset: 18, Line: 2, Column: 17},
+			},
+		},
+		ReturnType: &BaseType{
+			Pos: &Position{Offset: 21, Line: 2, Column: 20},
+		},
+		Block: &Block{
+			StartPos: &Position{Offset: 23, Line: 2, Column: 22},
+			EndPos:   &Position{Offset: 25, Line: 2, Column: 24},
+		},
+		StartPos:      &Position{Offset: 6, Line: 2, Column: 5},
+		EndPos:        &Position{Offset: 25, Line: 2, Column: 24},
+		IdentifierPos: &Position{Offset: 10, Line: 2, Column: 9},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseFunctionParameterWithLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+	    fun test(x y: Int) { }
+	`)
+
+	Expect(errors).Should(BeEmpty())
+
+	test := &FunctionDeclaration{
+		IsPublic:   false,
+		Identifier: "test",
+		Parameters: []*Parameter{
+			{
+				Label:      "x",
+				Identifier: "y",
+				Type: &BaseType{
+					Identifier: "Int",
+					Pos:        &Position{Offset: 20, Line: 2, Column: 19},
+				},
+				StartPos: &Position{Offset: 15, Line: 2, Column: 14},
+				EndPos:   &Position{Offset: 20, Line: 2, Column: 19},
+			},
+		},
+		ReturnType: &BaseType{
+			Pos: &Position{Offset: 23, Line: 2, Column: 22},
+		},
+		Block: &Block{
+			StartPos: &Position{Offset: 25, Line: 2, Column: 24},
+			EndPos:   &Position{Offset: 27, Line: 2, Column: 26},
+		},
+		StartPos:      &Position{Offset: 6, Line: 2, Column: 5},
+		EndPos:        &Position{Offset: 27, Line: 2, Column: 26},
+		IdentifierPos: &Position{Offset: 10, Line: 2, Column: 9},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
 func TestParseIfStatement(t *testing.T) {
 	RegisterTestingT(t)
 

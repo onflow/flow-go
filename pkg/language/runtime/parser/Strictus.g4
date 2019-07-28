@@ -63,7 +63,7 @@ parameterList
     ;
 
 parameter
-    : Identifier ':' fullType
+    : (argumentLabel=Identifier)? parameterName=Identifier ':' fullType
     ;
 
 fullType
