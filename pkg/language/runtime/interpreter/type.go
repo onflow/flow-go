@@ -186,10 +186,6 @@ func ArrayTypeToString(arrayType ArrayType) string {
 	}
 
 	baseType := currentType.String()
-	if _, isFunctionType := currentType.(*FunctionType); isFunctionType {
-		baseType = fmt.Sprintf("(%s)", baseType)
-	}
-
 	return baseType + arraySuffixes.String()
 }
 
