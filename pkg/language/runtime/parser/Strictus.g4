@@ -55,11 +55,11 @@ declaration
     ;
 
 functionDeclaration
-    : Pub? Fun Identifier '(' parameterList? ')' (':' returnType=fullType)? block
+    : Pub? Fun Identifier parameterList (':' returnType=fullType)? block
     ;
 
 parameterList
-    : parameter (',' parameter)*
+    : '(' (parameter (',' parameter)*)? ')'
     ;
 
 parameter
@@ -220,10 +220,10 @@ Negate : '!' ;
 
 
 primaryExpressionStart
-    : Identifier                                                           # IdentifierExpression
-    | literal                                                              # LiteralExpression
-    | Fun '(' parameterList? ')' (':' returnType=fullType)? block          # FunctionExpression
-    | '(' expression ')'                                                   # NestedExpression
+    : Identifier                                          # IdentifierExpression
+    | literal                                             # LiteralExpression
+    | Fun parameterList (':' returnType=fullType)? block  # FunctionExpression
+    | '(' expression ')'                                  # NestedExpression
     ;
 
 expressionAccess

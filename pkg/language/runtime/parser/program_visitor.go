@@ -38,8 +38,8 @@ func (v *ProgramVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
 func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
 	isPublic := ctx.Pub() != nil
 	identifier := ctx.Identifier().GetText()
-	closeParen := ctx.CloseParen().GetSymbol()
-	returnType := v.visitReturnType(ctx.returnType, closeParen)
+	parameterListEnd := ctx.ParameterList().GetStop()
+	returnType := v.visitReturnType(ctx.returnType, parameterListEnd)
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
@@ -79,8 +79,8 @@ func (v *ProgramVisitor) visitReturnType(ctx IFullTypeContext, tokenBefore antlr
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
-	closeParen := ctx.CloseParen().GetSymbol()
-	returnType := v.visitReturnType(ctx.returnType, closeParen)
+	parameterListEnd := ctx.ParameterList().GetStop()
+	returnType := v.visitReturnType(ctx.returnType, parameterListEnd)
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
