@@ -134,6 +134,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#invocation.
 	VisitInvocation(ctx *InvocationContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#argument.
+	VisitArgument(ctx *ArgumentContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#literal.
 	VisitLiteral(ctx *LiteralContext) interface{}
 

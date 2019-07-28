@@ -160,7 +160,7 @@ func TestParseArrayExpression(t *testing.T) {
 	Expect(actual).Should(Equal(expected))
 }
 
-func TestParseInvocationExpression(t *testing.T) {
+func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, errors := parser.Parse(`
@@ -178,14 +178,20 @@ func TestParseInvocationExpression(t *testing.T) {
 				StartPos:   &Position{Offset: 14, Line: 2, Column: 13},
 				EndPos:     &Position{Offset: 14, Line: 2, Column: 13},
 			},
-			Arguments: []Expression{
-				&IntExpression{
-					Value: big.NewInt(1),
-					Pos:   &Position{Offset: 16, Line: 2, Column: 15},
+			Arguments: []*Argument{
+				{
+					Label: "",
+					Expression: &IntExpression{
+						Value: big.NewInt(1),
+						Pos:   &Position{Offset: 16, Line: 2, Column: 15},
+					},
 				},
-				&IntExpression{
-					Value: big.NewInt(2),
-					Pos:   &Position{Offset: 19, Line: 2, Column: 18},
+				{
+					Label: "",
+					Expression: &IntExpression{
+						Value: big.NewInt(2),
+						Pos:   &Position{Offset: 19, Line: 2, Column: 18},
+					},
 				},
 			},
 			StartPos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -193,6 +199,55 @@ func TestParseInvocationExpression(t *testing.T) {
 		},
 		StartPos:      &Position{Offset: 6, Line: 2, Column: 5},
 		EndPos:        &Position{Offset: 20, Line: 2, Column: 19},
+		IdentifierPos: &Position{Offset: 10, Line: 2, Column: 9},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{a},
+	}
+
+	Expect(actual).Should(Equal(expected))
+}
+
+func TestParseInvocationExpressionWithLabels(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+	    let a = b(x: 1, y: 2)
+	`)
+
+	Expect(errors).Should(BeEmpty())
+
+	a := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: "a",
+		Value: &InvocationExpression{
+			Expression: &IdentifierExpression{
+				Identifier: "b",
+				StartPos:   &Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:     &Position{Offset: 14, Line: 2, Column: 13},
+			},
+			Arguments: []*Argument{
+				{
+					Label: "x",
+					Expression: &IntExpression{
+						Value: big.NewInt(1),
+						Pos:   &Position{Offset: 19, Line: 2, Column: 18},
+					},
+				},
+				{
+					Label: "y",
+					Expression: &IntExpression{
+						Value: big.NewInt(2),
+						Pos:   &Position{Offset: 25, Line: 2, Column: 24},
+					},
+				},
+			},
+			StartPos: &Position{Offset: 15, Line: 2, Column: 14},
+			EndPos:   &Position{Offset: 26, Line: 2, Column: 25},
+		},
+		StartPos:      &Position{Offset: 6, Line: 2, Column: 5},
+		EndPos:        &Position{Offset: 26, Line: 2, Column: 25},
 		IdentifierPos: &Position{Offset: 10, Line: 2, Column: 9},
 	}
 

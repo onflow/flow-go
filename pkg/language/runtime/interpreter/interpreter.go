@@ -860,7 +860,12 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 			}
 
 			// NOTE: evaluate all argument expressions in call-site scope, not in function body
-			return interpreter.visitExpressions(invocationExpression.Arguments, nil).
+			argumentExpressions := make([]ast.Expression, len(invocationExpression.Arguments))
+			for i, argument := range invocationExpression.Arguments {
+				argumentExpressions[i] = argument.Expression
+			}
+
+			return interpreter.visitExpressions(argumentExpressions, nil).
 				FlatMap(func(result interface{}) Trampoline {
 
 					arguments := result.(ArrayValue)

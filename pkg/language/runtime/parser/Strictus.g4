@@ -240,8 +240,12 @@ bracketExpression
 	;
 
 invocation
-	: '(' (expression (',' expression)*)? ')'
+	: '(' (argument (',' argument)*)? ')'
 	;
+
+argument
+    : (Identifier ':')? expression
+    ;
 
 literal
     : integerLiteral
