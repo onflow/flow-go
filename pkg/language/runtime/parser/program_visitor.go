@@ -148,14 +148,6 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 
 func (v *ProgramVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{} {
 
-	// nested?
-	nestedFunctionTypeContext := ctx.FunctionType()
-	if nestedFunctionTypeContext != nil {
-		return nestedFunctionTypeContext.Accept(v)
-	}
-
-	//
-
 	var parameterTypes []ast.Type
 	for _, fullType := range ctx.parameterTypes {
 		parameterTypes = append(
@@ -169,7 +161,7 @@ func (v *ProgramVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{}
 	}
 	returnType := ctx.returnType.Accept(v).(ast.Type)
 
-	startPosition := ast.PositionFromToken(ctx.OpenParen().GetSymbol())
+	startPosition := ast.PositionFromToken(ctx.OpenParen(0).GetSymbol())
 	endPosition := returnType.EndPosition()
 
 	return &ast.FunctionType{
@@ -299,8 +291,9 @@ func (v *ProgramVisitor) VisitReturnStatement(ctx *ReturnStatementContext) inter
 }
 
 func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{} {
-	isConst := ctx.Const() != nil
-	identifier := ctx.Identifier().GetText()
+	isConstant := ctx.Let() != nil
+	identifierNode := ctx.Identifier()
+	identifier := identifierNode.GetText()
 	expressionResult := ctx.Expression().Accept(v)
 	if expressionResult == nil {
 		return nil
@@ -317,10 +310,10 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 
 	// TODO: get end position from expression
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
-	identifierPosition := ast.PositionFromToken(ctx.Identifier().GetSymbol())
+	identifierPosition := ast.PositionFromToken(identifierNode.GetSymbol())
 
 	return &ast.VariableDeclaration{
-		IsConst:       isConst,
+		IsConstant:    isConstant,
 		Identifier:    identifier,
 		Value:         expression,
 		Type:          fullType,

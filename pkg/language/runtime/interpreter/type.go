@@ -211,7 +211,7 @@ func (t FunctionType) String() string {
 		parameters.WriteString(parameter.String())
 	}
 
-	return fmt.Sprintf("(%s) -> %s", parameters.String(), t.ReturnType.String())
+	return fmt.Sprintf("((%s): %s)", parameters.String(), t.ReturnType.String())
 }
 
 // mustConvertType converts an AST type representation to an interpreter type representation

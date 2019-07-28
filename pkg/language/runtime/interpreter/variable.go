@@ -26,7 +26,7 @@ func newVariable(declaration *ast.VariableDeclaration, depth int, value Value) *
 }
 
 func (v *Variable) Set(newValue Value) bool {
-	if v.Declaration.IsConst {
+	if v.Declaration.IsConstant {
 		return false
 	}
 

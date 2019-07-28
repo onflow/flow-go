@@ -190,7 +190,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	variableDeclaration := &ast.VariableDeclaration{
 		Value:         expression,
 		Identifier:    declaration.Identifier,
-		IsConst:       true,
+		IsConstant:    true,
 		Type:          functionType,
 		StartPos:      declaration.StartPos,
 		EndPos:        declaration.EndPos,
@@ -213,7 +213,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 func (interpreter *Interpreter) ImportFunction(name string, function *HostFunctionValue) {
 	variableDeclaration := &ast.VariableDeclaration{
 		Identifier: name,
-		IsConst:    true,
+		IsConstant: true,
 		// TODO: Type
 	}
 
@@ -909,7 +909,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 			parameter.Identifier,
 			&Variable{
 				Declaration: &ast.VariableDeclaration{
-					IsConst:    true,
+					IsConstant: true,
 					Identifier: parameter.Identifier,
 					Type:       parameter.Type,
 					StartPos:   parameter.StartPos,
