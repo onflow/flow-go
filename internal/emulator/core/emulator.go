@@ -1,6 +1,7 @@
 package core
 
 import (
+	"sync"
 	"time"
 
 	"github.com/dapperlabs/bamboo-node/language/runtime"
@@ -18,14 +19,15 @@ import (
 // but only "committed" world states are enabled for the SeekToState feature.
 type EmulatedBlockchain struct {
 	// mapping of committed world states (updated after CommitBlock)
-	worldStates map[crypto.Hash][]byte
+	worldStates             map[crypto.Hash][]byte
 	// mapping of intermediate world states (updated after SubmitTransaction)
 	intermediateWorldStates map[crypto.Hash][]byte
 	// current world state
-	pendingWorldState *state.WorldState
+	pendingWorldState       *state.WorldState
 	// pool of pending transactions waiting to be commmitted (already executed)
-	txPool   map[crypto.Hash]*types.SignedTransaction
-	computer *Computer
+	txPool                  map[crypto.Hash]*types.SignedTransaction
+	emulatorMutex           sync.RWMutex
+	computer                *Computer
 }
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
@@ -89,6 +91,9 @@ func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*etypes.Block, err
 //
 // First looks in pending txPool, then looks in current blockchain state.
 func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*types.SignedTransaction, error) {
+	b.emulatorMutex.RLock()
+	defer b.emulatorMutex.RUnlock()
+
 	if tx, ok := b.txPool[txHash]; ok {
 		return tx, nil
 	}
@@ -146,6 +151,9 @@ func (b *EmulatedBlockchain) GetAccountAtVersion(address crypto.Address, version
 // Note that the resulting state is not finalized until CommitBlock() is called.
 // However, the pending blockchain state is indexed for testing purposes.
 func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) error {
+	b.emulatorMutex.Lock()
+	defer b.emulatorMutex.Unlock()
+
 	if _, exists := b.txPool[tx.Hash()]; exists {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
@@ -207,6 +215,9 @@ func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.H
 // Note that this clears the pending transaction pool and indexes the committed
 // blockchain state for testing purposes.
 func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
+	b.emulatorMutex.Lock()
+	defer b.emulatorMutex.Unlock()
+
 	txHashes := make([]crypto.Hash, 0)
 	for hash := range b.txPool {
 		txHashes = append(txHashes, hash)
@@ -243,6 +254,9 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 // Note that this only seeks to a committed world state (not intermediate world state)
 // and this clears all pending transactions in txPool.
 func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
+	b.emulatorMutex.Lock()
+	defer b.emulatorMutex.Unlock()
+
 	if bytes, ok := b.worldStates[hash]; ok {
 		ws := state.Decode(bytes)
 		b.pendingWorldState = ws
