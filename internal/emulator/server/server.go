@@ -40,7 +40,7 @@ func NewEmulatorServer(logger *log.Logger, config *Config) *EmulatorServer {
 
 // Start spins up the Bamboo Emulator server instance.
 //
-// Starts a gRPC server to listen for incoming requests and process incoming transactions.
+// This function starts a gRPC server to listen for requests and process incoming transactions.
 // By defualt, the Bamboo Emulator server automatically mines a block every BlockInteval.
 func (s *EmulatorServer) Start(ctx context.Context) {
 	s.logger.WithFields(log.Fields{
