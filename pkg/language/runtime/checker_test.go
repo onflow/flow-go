@@ -48,3 +48,23 @@ func TestCheckBoolean(t *testing.T) {
 	Expect(checker.Globals["x"].Type).
 		To(Equal(&sema.BoolType{}))
 }
+
+func TestCheckInvalidVariableRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+        fun test() {
+            let x = true
+            let x = false
+        }
+    `)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}

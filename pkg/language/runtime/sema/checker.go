@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	goRuntime "runtime"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
@@ -9,17 +10,61 @@ import (
 )
 
 type Checker struct {
-	Program     *ast.Program
-	activations *activations.Activations
-	Globals     map[string]*Variable
+	Program          *ast.Program
+	valueActivations *activations.Activations
+	typeActivations  *activations.Activations
+	Globals          map[string]*Variable
 }
 
 func NewChecker(program *ast.Program) *Checker {
 	return &Checker{
-		Program:     program,
-		activations: &activations.Activations{},
-		Globals:     map[string]*Variable{},
+		Program:          program,
+		valueActivations: &activations.Activations{},
+		typeActivations:  &activations.Activations{},
+		Globals:          map[string]*Variable{},
 	}
+}
+
+func (checker *Checker) setVariable(name string, variable *Variable) {
+	checker.valueActivations.Set(name, variable)
+}
+
+func (checker *Checker) setType(name string, ty Type) {
+	checker.typeActivations.Set(name, ty)
+}
+
+func (checker *Checker) findVariable(name string) *Variable {
+	value := checker.valueActivations.Find(name)
+	if value == nil {
+		return nil
+	}
+	variable, ok := value.(*Variable)
+	if !ok {
+		return nil
+	}
+	return variable
+}
+
+func (checker *Checker) findType(name string) Type {
+	value := checker.typeActivations.Find(name)
+	if value == nil {
+		return nil
+	}
+	ty, ok := value.(Type)
+	if !ok {
+		return nil
+	}
+	return ty
+}
+
+func (checker *Checker) pushActivations() {
+	checker.valueActivations.PushCurrent()
+	checker.typeActivations.PushCurrent()
+}
+
+func (checker *Checker) popActivations() {
+	checker.valueActivations.Pop()
+	checker.typeActivations.Pop()
 }
 
 func (checker *Checker) Check() (err error) {
@@ -53,7 +98,10 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
-	// TODO:
+	checker.pushActivations()
+	defer checker.popActivations()
+	declaration.Block.Accept(checker)
+
 	return nil
 }
 
@@ -73,7 +121,7 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty Type) {
 	// check if variable with this name is already declared in the current scope
 	variable := checker.findVariable(declaration.Identifier)
-	depth := checker.activations.Depth()
+	depth := checker.valueActivations.Depth()
 	if variable != nil && variable.Depth == depth {
 		panic(&RedeclarationError{
 			Name: declaration.Identifier,
@@ -90,22 +138,6 @@ func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty
 	checker.setVariable(declaration.Identifier, variable)
 }
 
-func (checker *Checker) setVariable(name string, variable *Variable) {
-	checker.activations.Set(name, variable)
-}
-
-func (checker *Checker) findVariable(name string) *Variable {
-	value := checker.activations.Find(name)
-	if value == nil {
-		return nil
-	}
-	variable, ok := value.(*Variable)
-	if !ok {
-		return nil
-	}
-	return variable
-}
-
 func (checker *Checker) declareGlobal(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
 	if _, exists := checker.Globals[name]; exists {
@@ -118,7 +150,13 @@ func (checker *Checker) declareGlobal(declaration ast.Declaration) {
 }
 
 func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
-	// TODO:
+	checker.pushActivations()
+	defer checker.popActivations()
+
+	for _, statement := range block.Statements {
+		statement.Accept(checker)
+	}
+
 	return nil
 }
 
@@ -198,4 +236,50 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
 	// TODO:
 	return nil
+}
+
+// ConvertType converts an AST type representation to a sema type
+func (checker *Checker) ConvertType(t ast.Type) Type {
+	switch t := t.(type) {
+	case *ast.BaseType:
+		result := checker.findType(t.Identifier)
+		if result == nil {
+			panic(&NotDeclaredError{
+				ExpectedKind: common.DeclarationKindType,
+				Name:         t.Identifier,
+				// TODO: add start and end position to ast.Type
+				StartPos: t.Pos,
+				EndPos:   t.Pos,
+			})
+		}
+		return result
+
+	case *ast.VariableSizedType:
+		return &VariableSizedType{
+			Type: checker.ConvertType(t.Type),
+		}
+
+	case *ast.ConstantSizedType:
+		return &ConstantSizedType{
+			Type: checker.ConvertType(t.Type),
+			Size: t.Size,
+		}
+
+	case *ast.FunctionType:
+		var parameterTypes []Type
+		for _, parameterType := range t.ParameterTypes {
+			parameterTypes = append(parameterTypes,
+				checker.ConvertType(parameterType),
+			)
+		}
+
+		returnType := checker.ConvertType(t.ReturnType)
+
+		return FunctionType{
+			ParameterTypes: parameterTypes,
+			ReturnType:     returnType,
+		}
+	}
+
+	panic(&astTypeConversionError{invalidASTType: t})
 }
