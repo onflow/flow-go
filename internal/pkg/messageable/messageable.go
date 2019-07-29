@@ -1,6 +1,8 @@
 package messageable
 
 import (
+	"github.com/golang/protobuf/ptypes"
+
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
@@ -20,21 +22,27 @@ func AccountSignatureToMessage(t types.AccountSignature) *shared.AccountSignatur
 }
 
 func MessageToSignedTransaction(m *shared.SignedTransaction) *types.SignedTransaction {
+	timestamp, _ := ptypes.Timestamp(m.GetTimestamp())
+
 	return &types.SignedTransaction{
 		Script:         m.GetScript(),
 		Nonce:          m.GetNonce(),
 		ComputeLimit:   m.GetComputeLimit(),
 		ComputeUsed:    m.GetComputeUsed(),
+		Timestamp:      timestamp,
 		PayerSignature: MessageToAccountSignature(m.GetPayerSignature()),
 	}
 }
 
 func SignedTransactionToMessage(t *types.SignedTransaction) *shared.SignedTransaction {
+	timestamp, _ := ptypes.TimestampProto(t.Timestamp)
+
 	return &shared.SignedTransaction{
 		Script:         t.Script,
 		Nonce:          t.Nonce,
 		ComputeLimit:   t.ComputeLimit,
 		ComputeUsed:    t.ComputeUsed,
+		Timestamp:      timestamp,
 		PayerSignature: AccountSignatureToMessage(t.PayerSignature),
 	}
 }

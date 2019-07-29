@@ -23,7 +23,7 @@ func MockSignedTransaction() *types.SignedTransaction {
 		Nonce:          1,
 		ComputeLimit:   10,
 		ComputeUsed:    0,
-		Timestamp:      time.Now(),
+		Timestamp:      time.Now().In(time.UTC),
 		PayerSignature: MockAccountSignature(),
 	}
 }

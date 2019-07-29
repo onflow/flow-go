@@ -124,7 +124,8 @@ message SignedTransaction {
   uint64 nonce = 2;
   uint64 compute_limit = 3;
   uint64 compute_used = 4;
-  AccountSignature payer_signature = 5;
+  google.protobuf.Timestamp timestamp = 5;
+  AccountSignature payer_signature = 6;
   TransactionStatus status = 7;
 }
 
