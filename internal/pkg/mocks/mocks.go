@@ -1,3 +1,4 @@
+// Package mocks provides mocked values of common types for use in unit tests.
 package mocks
 
 import (
