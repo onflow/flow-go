@@ -1,8 +1,8 @@
 package core
 
 import (
-	"sync"
 	"reflect"
+	"sync"
 	"time"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
@@ -21,14 +21,14 @@ import (
 // but only "committed" world states are enabled for the SeekToState feature.
 type EmulatedBlockchain struct {
 	// mapping of committed world states (updated after CommitBlock)
-	worldStates             map[crypto.Hash][]byte
+	worldStates map[crypto.Hash][]byte
 	// mapping of intermediate world states (updated after SubmitTransaction)
 	intermediateWorldStates map[crypto.Hash][]byte
 	// current world state
-	pendingWorldState       *state.WorldState
+	pendingWorldState *state.WorldState
 	// pool of pending transactions waiting to be commmitted (already executed)
 	txPool             map[crypto.Hash]*types.SignedTransaction
-	emulatorMutex           sync.RWMutex
+	emulatorMutex      sync.RWMutex
 	computer           *Computer
 	rootAccountAddress types.Address
 	rootAccountKeyPair *crypto.KeyPair
@@ -134,7 +134,7 @@ func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash
 }
 
 // GetAccount gets account information associated with an address identifier.
-func (b *EmulatedBlockchain) GetAccount(address types.Address) *types.Account {
+func (b *EmulatedBlockchain) GetAccount(address types.Address) (*types.Account, error) {
 	registers := b.pendingWorldState.Registers.NewView()
 	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
 	account := runtimeAPI.GetAccount(address)
@@ -296,8 +296,8 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 }
 
 func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature) error {
-	account := b.GetAccount(signature.Account)
-	if account == nil {
+	account, err := b.GetAccount(signature.Account)
+	if err != nil {
 		return &ErrInvalidSignatureAccount{Account: signature.Account}
 	}
 

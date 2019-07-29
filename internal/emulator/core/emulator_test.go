@@ -309,8 +309,9 @@ func TestCreateAccount(t *testing.T) {
 	// root account has ID 1, so expect this account to have ID 2
 	address := types.HexToAddress("0000000000000000000000000000000000000002")
 
-	account := b.GetAccount(address)
+	account, err := b.GetAccount(address)
 
+	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
 	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
@@ -333,8 +334,9 @@ func TestCreateAccount(t *testing.T) {
 
 	address = types.HexToAddress("0000000000000000000000000000000000000003")
 
-	account = b.GetAccount(address)
+	account, err = b.GetAccount(address)
 
+	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
 	Expect(account.PublicKeys).To(ContainElement([]byte{7, 8, 9}))
 	Expect(account.Code).To(Equal([]byte{10, 11, 12}))

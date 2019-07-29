@@ -9,7 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
+	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 )
@@ -32,7 +32,7 @@ type Config struct {
 // NewEmulatorServer creates a new instance of a Bamboo Emulator server.
 func NewEmulatorServer(logger *log.Logger, config *Config) *EmulatorServer {
 	return &EmulatorServer{
-		blockchain: core.NewEmulatedBlockchain(),
+		blockchain: core.NewEmulatedBlockchain(core.DefaultOptions),
 		config:     config,
 		logger:     logger,
 	}

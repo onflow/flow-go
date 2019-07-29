@@ -32,7 +32,7 @@ func (e *ErrTransactionNotFound) Error() string {
 
 // ErrAccountNotFound indicates that an account specified by address cannot be found.
 type ErrAccountNotFound struct {
-	Address crypto.Address
+	Address types.Address
 }
 
 func (e *ErrAccountNotFound) Error() string {

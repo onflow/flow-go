@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
@@ -31,10 +31,11 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 		Nonce:        txMsg.GetNonce(),
 		ComputeLimit: txMsg.GetComputeLimit(),
 		Timestamp:    time.Now(),
-		PayerSignature: crypto.Signature{
-			Account: crypto.BytesToAddress(payerSig.GetAccountAddress()),
+		PayerSignature: types.AccountSignature{
+			Account: types.BytesToAddress(payerSig.GetAccountAddress()),
 			// TODO: update this (default signature for now)
-			Sig: crypto.Sig{},
+			PublicKey: []byte{},
+			Signature: []byte{},
 		},
 		Status: types.TransactionPending,
 	}
@@ -49,7 +50,9 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 			s.logger.WithError(err).Warnf("⚠️  Transaction #%d reverted", tx.Nonce)
 		case *core.ErrDuplicateTransaction:
 			return nil, status.Error(codes.InvalidArgument, err.Error())
-		case *core.ErrInvalidTransactionSignature:
+		case *core.ErrInvalidSignaturePublicKey:
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case *core.ErrInvalidSignatureAccount:
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
@@ -170,7 +173,7 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 		PayerSignature: &observe.Signature{
 			AccountAddress: tx.PayerSignature.Account.Bytes(),
 			// TODO: update this (default signature bytes for now)
-			Signature: tx.PayerSignature.Sig[:],
+			Signature: tx.PayerSignature.Signature,
 		},
 		Status: observe.GetTransactionResponse_Transaction_Status(tx.Status),
 	}
@@ -184,7 +187,7 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 
 // GetAccount returns the info associated with an address.
 func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccountRequest) (*observe.GetAccountResponse, error) {
-	address := crypto.BytesToAddress(req.GetAddress())
+	address := types.BytesToAddress(req.GetAddress())
 	account, err := s.blockchain.GetAccount(address)
 	if err != nil {
 		switch err.(type) {

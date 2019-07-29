@@ -5,8 +5,8 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 
-	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 )
 
 type Block struct {
