@@ -6,6 +6,38 @@ import (
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 )
 
+// ErrBlockNotFound indicates that a block specified by hash or number cannot be found.
+type ErrBlockNotFound struct {
+	BlockHash crypto.Hash
+	BlockNum  uint64
+}
+
+func (e *ErrBlockNotFound) Error() string {
+	if e.BlockNum == 0 {
+		return fmt.Sprintf("Block with hash %s cannot be found", e.BlockHash)
+	}
+
+	return fmt.Sprintf("Block number %d cannot be found", e.BlockNum)
+}
+
+// ErrTransactionNotFound indicates that a transaction specified by hash cannot be found.
+type ErrTransactionNotFound struct {
+	TxHash crypto.Hash
+}
+
+func (e *ErrTransactionNotFound) Error() string {
+	return fmt.Sprintf("Transaction with hash %s cannot be found", e.TxHash)
+}
+
+// ErrAccountNotFound indicates that an account specified by address cannot be found.
+type ErrAccountNotFound struct {
+	Address crypto.Address
+}
+
+func (e *ErrAccountNotFound) Error() string {
+	return fmt.Sprintf("Account with address %s cannot be found", e.Address)
+}
+
 // ErrDuplicateTransaction indicates that a transaction has already been submitted.
 type ErrDuplicateTransaction struct {
 	TxHash crypto.Hash

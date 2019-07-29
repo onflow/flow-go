@@ -1,6 +1,7 @@
 package core
 
 import (
+	"sync"
 	"time"
 
 	"github.com/dapperlabs/bamboo-node/language/runtime"
@@ -18,14 +19,15 @@ import (
 // but only "committed" world states are enabled for the SeekToState feature.
 type EmulatedBlockchain struct {
 	// mapping of committed world states (updated after CommitBlock)
-	worldStates map[crypto.Hash][]byte
+	worldStates             map[crypto.Hash][]byte
 	// mapping of intermediate world states (updated after SubmitTransaction)
 	intermediateWorldStates map[crypto.Hash][]byte
 	// current world state
-	pendingWorldState *state.WorldState
+	pendingWorldState       *state.WorldState
 	// pool of pending transactions waiting to be commmitted (already executed)
-	txPool   map[crypto.Hash]*types.SignedTransaction
-	computer *Computer
+	txPool                  map[crypto.Hash]*types.SignedTransaction
+	emulatorMutex           sync.RWMutex
+	computer                *Computer
 }
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
@@ -66,24 +68,42 @@ func (b *EmulatedBlockchain) GetLatestBlock() *etypes.Block {
 }
 
 // GetBlockByHash gets a block by hash.
-func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) *etypes.Block {
-	return b.pendingWorldState.GetBlockByHash(hash)
+func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*etypes.Block, error) {
+	block := b.pendingWorldState.GetBlockByHash(hash)
+	if block == nil {
+		return nil, &ErrBlockNotFound{BlockHash: hash}
+	}
+
+	return block, nil
 }
 
 // GetBlockByNumber gets a block by number.
-func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) *etypes.Block {
-	return b.pendingWorldState.GetBlockByNumber(number)
+func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*etypes.Block, error) {
+	block := b.pendingWorldState.GetBlockByNumber(number)
+	if block == nil {
+		return nil, &ErrBlockNotFound{BlockNum: number}
+	}
+
+	return block, nil
 }
 
 // GetTransaction gets an existing transaction by hash.
 //
 // First looks in pending txPool, then looks in current blockchain state.
-func (b *EmulatedBlockchain) GetTransaction(hash crypto.Hash) *types.SignedTransaction {
-	if tx, ok := b.txPool[hash]; ok {
-		return tx
+func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*types.SignedTransaction, error) {
+	b.emulatorMutex.RLock()
+	defer b.emulatorMutex.RUnlock()
+
+	if tx, ok := b.txPool[txHash]; ok {
+		return tx, nil
 	}
 
-	return b.pendingWorldState.GetTransaction(hash)
+	tx := b.pendingWorldState.GetTransaction(txHash)
+	if tx == nil {
+		return nil, &ErrTransactionNotFound{TxHash: txHash}
+	}
+
+	return tx, nil
 }
 
 // GetTransactionAtVersion gets an existing transaction by hash at a specified state.
@@ -93,12 +113,22 @@ func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash
 		return nil, err
 	}
 
-	return ws.GetTransaction(txHash), nil
+	tx := ws.GetTransaction(txHash)
+	if tx == nil {
+		return nil, &ErrTransactionNotFound{TxHash: txHash}
+	}
+
+	return tx, nil
 }
 
 // GetAccount gets account information associated with an address identifier.
-func (b *EmulatedBlockchain) GetAccount(address crypto.Address) *crypto.Account {
-	return b.pendingWorldState.GetAccount(address)
+func (b *EmulatedBlockchain) GetAccount(address crypto.Address) (*crypto.Account, error) {
+	account := b.pendingWorldState.GetAccount(address)
+	if account == nil {
+		return nil, &ErrAccountNotFound{Address: address}
+	}
+
+	return account, nil
 }
 
 // GetAccountAtVersion gets account information associated with an address identifier at a specified state.
@@ -108,7 +138,12 @@ func (b *EmulatedBlockchain) GetAccountAtVersion(address crypto.Address, version
 		return nil, err
 	}
 
-	return ws.GetAccount(address), nil
+	account := ws.GetAccount(address)
+	if account == nil {
+		return nil, &ErrAccountNotFound{Address: address}
+	}
+
+	return account, nil
 }
 
 // SubmitTransaction sends a transaction to the network that is immediately executed (updates blockchain state).
@@ -116,6 +151,9 @@ func (b *EmulatedBlockchain) GetAccountAtVersion(address crypto.Address, version
 // Note that the resulting state is not finalized until CommitBlock() is called.
 // However, the pending blockchain state is indexed for testing purposes.
 func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) error {
+	b.emulatorMutex.Lock()
+	defer b.emulatorMutex.Unlock()
+
 	if _, exists := b.txPool[tx.Hash()]; exists {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
@@ -176,7 +214,10 @@ func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.H
 //
 // Note that this clears the pending transaction pool and indexes the committed
 // blockchain state for testing purposes.
-func (b *EmulatedBlockchain) CommitBlock() crypto.Hash {
+func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
+	b.emulatorMutex.Lock()
+	defer b.emulatorMutex.Unlock()
+
 	txHashes := make([]crypto.Hash, 0)
 	for hash := range b.txPool {
 		txHashes = append(txHashes, hash)
@@ -196,7 +237,7 @@ func (b *EmulatedBlockchain) CommitBlock() crypto.Hash {
 
 	b.pendingWorldState.InsertBlock(block)
 	b.commitWorldState(block.Hash())
-	return b.pendingWorldState.Hash()
+	return block
 }
 
 func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
@@ -213,6 +254,9 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 // Note that this only seeks to a committed world state (not intermediate world state)
 // and this clears all pending transactions in txPool.
 func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
+	b.emulatorMutex.Lock()
+	defer b.emulatorMutex.Unlock()
+
 	if bytes, ok := b.worldStates[hash]; ok {
 		ws := state.Decode(bytes)
 		b.pendingWorldState = ws

@@ -10,9 +10,10 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dapperlabs/bamboo-node/grpc/services/observe"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 )
 
 // Ping pings the Observation API server for a response.
@@ -38,7 +39,35 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 		Status: types.TransactionPending,
 	}
 
-	s.transactionsIn <- tx
+	err := s.blockchain.SubmitTransaction(tx)
+	if err != nil {
+		switch err.(type) {
+		case *core.ErrTransactionReverted:
+			s.logger.
+				WithField("txHash", tx.Hash()).
+				Infof("💸  Transaction #%d submitted to network", tx.Nonce)
+			s.logger.WithError(err).Warnf("⚠️  Transaction #%d reverted", tx.Nonce)
+		case *core.ErrDuplicateTransaction:
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case *core.ErrInvalidTransactionSignature:
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	} else {
+		s.logger.
+			WithField("txHash", tx.Hash()).
+			Infof("💸  Transaction #%d submitted to network", tx.Nonce)
+	}
+
+	block := s.blockchain.CommitBlock()
+
+	s.logger.WithFields(log.Fields{
+		"blockNum":  block.Number,
+		"blockHash": block.Hash(),
+		"blockSize": len(block.TransactionHashes),
+	}).Infof("️⛏  Block #%d mined", block.Number)
+
 	response := &observe.SendTransactionResponse{
 		Hash: tx.Hash().Bytes(),
 	}
@@ -49,7 +78,15 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 // GetBlockByHash gets a block by hash.
 func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlockByHashRequest) (*observe.GetBlockByHashResponse, error) {
 	hash := crypto.BytesToHash(req.GetHash())
-	block := s.blockchain.GetBlockByHash(hash)
+	block, err := s.blockchain.GetBlockByHash(hash)
+	if err != nil {
+		switch err.(type) {
+		case *core.ErrBlockNotFound:
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 
 	s.logger.WithFields(log.Fields{
 		"blockNum":  block.Number,
@@ -67,7 +104,15 @@ func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlo
 // GetBlockByNumber gets a block by number.
 func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetBlockByNumberRequest) (*observe.GetBlockByNumberResponse, error) {
 	number := req.GetNumber()
-	block := s.blockchain.GetBlockByNumber(number)
+	block, err := s.blockchain.GetBlockByNumber(number)
+	if err != nil {
+		switch err.(type) {
+		case *core.ErrBlockNotFound:
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 
 	s.logger.WithFields(log.Fields{
 		"blockNum":  number,
@@ -103,7 +148,15 @@ func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLat
 // GetTransaction gets a transaction by hash.
 func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTransactionRequest) (*observe.GetTransactionResponse, error) {
 	hash := crypto.BytesToHash(req.GetHash())
-	tx := s.blockchain.GetTransaction(hash)
+	tx, err := s.blockchain.GetTransaction(hash)
+	if err != nil {
+		switch err.(type) {
+		case *core.ErrTransactionNotFound:
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 
 	s.logger.
 		WithField("txHash", hash).
@@ -132,7 +185,15 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 // GetAccount returns the info associated with an address.
 func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccountRequest) (*observe.GetAccountResponse, error) {
 	address := crypto.BytesToAddress(req.GetAddress())
-	account := s.blockchain.GetAccount(address)
+	account, err := s.blockchain.GetAccount(address)
+	if err != nil {
+		switch err.(type) {
+		case *core.ErrAccountNotFound:
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 
 	s.logger.
 		WithField("address", address).
@@ -154,20 +215,23 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 
 // CallContract performs a contract call.
 func (s *EmulatorServer) CallContract(ctx context.Context, req *observe.CallContractRequest) (*observe.CallContractResponse, error) {
-	s.logger.Debugf("📞  Contract script called")
-
 	script := req.GetScript()
-	value, _ := s.blockchain.CallScript(script)
-	// TODO: add error handling besides just this
+	value, err := s.blockchain.CallScript(script)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	if value == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid script")
 	}
+
+	s.logger.Debugf("📞  Contract script called")
 
 	// TODO: change this to whatever interface -> byte encoding decided on
 	valueMsg := []byte(fmt.Sprintf("%v", value.(interface{})))
 
 	response := &observe.CallContractResponse{
-		Script: valueMsg,
+		Value: valueMsg,
 	}
 
 	return response, nil
