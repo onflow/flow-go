@@ -18,8 +18,8 @@ func MockAccountSignature() types.AccountSignature {
 	}
 }
 
-func MockSignedTransaction() *types.SignedTransaction {
-	return &types.SignedTransaction{
+func MockSignedTransaction() types.SignedTransaction {
+	return types.SignedTransaction{
 		Script:         []byte(""),
 		Nonce:          1,
 		ComputeLimit:   10,

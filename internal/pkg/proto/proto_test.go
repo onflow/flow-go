@@ -25,8 +25,11 @@ func TestSignedTransaction(t *testing.T) {
 
 	txA := mocks.MockSignedTransaction()
 
-	message := proto.SignedTransactionToMessage(txA)
-	txB := proto.MessageToSignedTransaction(message)
+	message, err := proto.SignedTransactionToMessage(txA)
+	Expect(err).ToNot(HaveOccurred())
+
+	txB, err := proto.MessageToSignedTransaction(message)
+	Expect(err).ToNot(HaveOccurred())
 
 	Expect(txA).To(Equal(txB))
 }
