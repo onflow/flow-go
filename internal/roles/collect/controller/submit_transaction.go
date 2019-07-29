@@ -9,9 +9,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	"github.com/dapperlabs/bamboo-node/internal/pkg/proto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 const (
