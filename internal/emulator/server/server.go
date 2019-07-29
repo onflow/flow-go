@@ -23,7 +23,7 @@ type EmulatorServer struct {
 	logger     *log.Logger
 }
 
-// Config is EmulatorServer configuration settings.
+// Config for the EmulatorServer configuration settings.
 type Config struct {
 	Port          int           `default:"5000"`
 	BlockInterval time.Duration `default:"5s"`
