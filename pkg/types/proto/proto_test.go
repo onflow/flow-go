@@ -5,8 +5,8 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/internal/pkg/mocks"
-	"github.com/dapperlabs/bamboo-node/internal/pkg/proto"
+	"github.com/dapperlabs/bamboo-node/pkg/types/mocks"
+	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
 )
 
 func TestAccountSignature(t *testing.T) {
