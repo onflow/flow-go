@@ -16,7 +16,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 )
 
-// Ping pings the Observation API server for a response.
+// Ping the Observation API server for a response.
 func (s *EmulatorServer) Ping(ctx context.Context, req *observe.PingRequest) (*observe.PingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
