@@ -20,7 +20,7 @@ func MockAccountSignature() types.AccountSignature {
 
 func MockSignedTransaction() types.SignedTransaction {
 	return types.SignedTransaction{
-		Script:         []byte(""),
+		Script:         []byte("fun main() {}"),
 		Nonce:          1,
 		ComputeLimit:   10,
 		ComputeUsed:    0,
