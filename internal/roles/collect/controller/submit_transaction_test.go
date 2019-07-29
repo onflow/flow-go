@@ -9,10 +9,10 @@ import (
 
 	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 
-	"github.com/dapperlabs/bamboo-node/internal/pkg/mocks"
-	"github.com/dapperlabs/bamboo-node/internal/pkg/proto"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/bamboo-node/pkg/types/mocks"
+	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
 )
 
 func TestSubmitTransaction(t *testing.T) {
