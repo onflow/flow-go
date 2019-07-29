@@ -50,6 +50,7 @@ func Parse(code string) (program *ast.Program, errors []error) {
 		if r := recover(); r != nil {
 			var ok bool
 			var err error
+			// don't recover Go errors
 			err, ok = r.(goRuntime.Error)
 			if ok {
 				panic(err)
