@@ -41,7 +41,7 @@ func NewEmulatorServer(logger *log.Logger, config *Config) *EmulatorServer {
 // Start spins up the Bamboo Emulator server instance.
 //
 // This function starts a gRPC server to listen for requests and process incoming transactions.
-// By defualt, the Bamboo Emulator server automatically mines a block every BlockInteval.
+// By default, the Bamboo Emulator server automatically mines a block every BlockInterval.
 func (s *EmulatorServer) Start(ctx context.Context) {
 	s.logger.WithFields(log.Fields{
 		"port": s.config.Port,
