@@ -3,8 +3,8 @@ package testmocks
 import (
 	"errors"
 
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
+	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
 )
 
 func NewMockEffectsErrorReceiptValidation(m *MockEffectsHappyPath) *MockEffectsErrorReceiptValidation {
@@ -17,7 +17,7 @@ type MockEffectsErrorReceiptValidation struct {
 	_callCount int
 }
 
-func (m *MockEffectsErrorReceiptValidation) IsValidExecutionReceipt(*types.ExecutionReceipt) (compute.ValidationResult, error) {
+func (m *MockEffectsErrorReceiptValidation) IsValidExecutionReceipt(*processor.ExecutionReceipt) (compute.ValidationResult, error) {
 	m._callCount++
 	return nil, errors.New("Validation Error")
 }

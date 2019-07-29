@@ -4,8 +4,23 @@
 package compute
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
+	"crypto"
 )
+
+type Registers map[crypto.Hash][]byte
+
+type IntermediateRegisters struct {
+	TransactionHash crypto.Hash
+	Registers       Registers
+	ComputeUsed     uint64
+}
+
+// TODO: this type should be defined inside the compute library.
+// It is given here in the meanwhile.
+type BlockPartExecutionResult struct {
+	PartIndex        uint64
+	PartTransactions []IntermediateRegisters
+}
 
 type ValidationResult interface {
 	isValidationResult()
@@ -17,6 +32,6 @@ type ValidationResultSuccess struct {
 }
 
 type ValidationResultFail struct {
-	BlockPartResult *types.BlockPartExecutionResult
+	BlockPartResult *BlockPartExecutionResult
 	ValidationResult
 }

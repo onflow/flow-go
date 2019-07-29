@@ -5,14 +5,33 @@
 package processor
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 
 	"github.com/bluele/gcache"
 
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
+
+type ExecutionReceipt struct {
+	PreviousReceiptHash       crypto.Hash
+	BlockHash                 crypto.Hash
+	Signatures                []crypto.Signature
+	InitialRegisters          compute.Registers
+	IntermediateRegistersList []compute.IntermediateRegisters
+}
+
+// Encode implements the crypto.Encoder interface.
+func (m *ExecutionReceipt) Encode() []byte {
+	var b bytes.Buffer
+	e := gob.NewEncoder(&b)
+	if err := e.Encode(m); err != nil {
+		panic(err)
+	}
+	return b.Bytes()
+}
 
 type ReceiptProcessor struct {
 	q       chan *receiptAndDoneChan
@@ -22,7 +41,7 @@ type ReceiptProcessor struct {
 }
 
 type receiptAndDoneChan struct {
-	receipt *types.ExecutionReceipt
+	receipt *ExecutionReceipt
 	done    chan bool
 }
 
@@ -42,7 +61,7 @@ func NewReceiptProcessor(effects Effects, rc *ReceiptProcessorConfig, hasher cry
 
 // Submit takes in an ExecutionReceipt to be process async.
 // The done chan is optional. If caller is not interested to be notified when processing has been completed, nil value should be used for it.
-func (p *ReceiptProcessor) Submit(receipt *types.ExecutionReceipt, done chan bool) {
+func (p *ReceiptProcessor) Submit(receipt *ExecutionReceipt, done chan bool) {
 	// TODO: if ER does not have a valid signature, then this needs to be discard. Deal with it here are at upper layer before submit?
 
 	if ok, err := p.effects.HasMinStake(receipt); err != nil {
@@ -108,7 +127,7 @@ func (p *ReceiptProcessor) run() {
 	}
 }
 
-func (p *ReceiptProcessor) sendApprovalOrSlash(receipt *types.ExecutionReceipt, validationResult compute.ValidationResult) {
+func (p *ReceiptProcessor) sendApprovalOrSlash(receipt *ExecutionReceipt, validationResult compute.ValidationResult) {
 	switch vr := validationResult.(type) {
 	case *compute.ValidationResultSuccess:
 		p.effects.Send(receipt, vr.Proof)

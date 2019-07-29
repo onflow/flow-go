@@ -1,8 +1,8 @@
 package testmocks
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
+	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
 )
 
 // MockEffectsHappyPath implements the processor.Effects & Mock interfaces
@@ -16,32 +16,32 @@ type MockEffectsHappyPath struct {
 	_callCountHandleError                  int
 }
 
-func (m *MockEffectsHappyPath) IsValidExecutionReceipt(*types.ExecutionReceipt) (compute.ValidationResult, error) {
+func (m *MockEffectsHappyPath) IsValidExecutionReceipt(*processor.ExecutionReceipt) (compute.ValidationResult, error) {
 	m._callCountIsValidExecutionReceipt++
 	return &compute.ValidationResultSuccess{}, nil
 }
 
-func (m *MockEffectsHappyPath) HasMinStake(*types.ExecutionReceipt) (bool, error) {
+func (m *MockEffectsHappyPath) HasMinStake(*processor.ExecutionReceipt) (bool, error) {
 	m._callCountHasMinStake++
 	return true, nil
 }
 
-func (m *MockEffectsHappyPath) IsSealedWithDifferentReceipt(*types.ExecutionReceipt) (bool, error) {
+func (m *MockEffectsHappyPath) IsSealedWithDifferentReceipt(*processor.ExecutionReceipt) (bool, error) {
 	m._callCountIsSealedWithDifferentReceipt++
 	return false, nil
 }
 
-func (m *MockEffectsHappyPath) Send(*types.ExecutionReceipt, []byte) error {
+func (m *MockEffectsHappyPath) Send(*processor.ExecutionReceipt, []byte) error {
 	m._callCountSend++
 	return nil
 }
 
-func (m *MockEffectsHappyPath) SlashExpiredReceipt(*types.ExecutionReceipt) error {
+func (m *MockEffectsHappyPath) SlashExpiredReceipt(*processor.ExecutionReceipt) error {
 	m._callCountSlashExpiredReceipt++
 	return nil
 }
 
-func (m *MockEffectsHappyPath) SlashInvalidReceipt(*types.ExecutionReceipt, *types.BlockPartExecutionResult) error {
+func (m *MockEffectsHappyPath) SlashInvalidReceipt(*processor.ExecutionReceipt, *compute.BlockPartExecutionResult) error {
 	m._callCountSlashInvalidReceipt++
 	return nil
 }

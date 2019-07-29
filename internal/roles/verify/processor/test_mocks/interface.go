@@ -1,8 +1,8 @@
 package testmocks
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
+	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
 )
 
 // Mock interface provides a set of common methods to introspect the mock instance
@@ -24,11 +24,11 @@ type MockCounters interface {
 // ProcessorEffects matches processor.Effects interface.
 // The latter cannot be reused here due to circular import.
 type ProcessorEffects interface {
-	IsValidExecutionReceipt(*types.ExecutionReceipt) (compute.ValidationResult, error)
-	HasMinStake(*types.ExecutionReceipt) (bool, error)
-	IsSealedWithDifferentReceipt(*types.ExecutionReceipt) (bool, error)
-	Send(*types.ExecutionReceipt, []byte) error
-	SlashExpiredReceipt(*types.ExecutionReceipt) error
-	SlashInvalidReceipt(*types.ExecutionReceipt, *types.BlockPartExecutionResult) error
+	IsValidExecutionReceipt(*processor.ExecutionReceipt) (compute.ValidationResult, error)
+	HasMinStake(*processor.ExecutionReceipt) (bool, error)
+	IsSealedWithDifferentReceipt(*processor.ExecutionReceipt) (bool, error)
+	Send(*processor.ExecutionReceipt, []byte) error
+	SlashExpiredReceipt(*processor.ExecutionReceipt) error
+	SlashInvalidReceipt(*processor.ExecutionReceipt, *compute.BlockPartExecutionResult) error
 	HandleError(error)
 }

@@ -1,8 +1,6 @@
 package testmocks
 
-import (
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
-)
+import "github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
 
 func NewMockEffectsSealWithDifferentReceipt(m *MockEffectsHappyPath) *MockEffectsSealWithDifferentReceipt {
 	return &MockEffectsSealWithDifferentReceipt{m, 0}
@@ -14,7 +12,7 @@ type MockEffectsSealWithDifferentReceipt struct {
 	_callCount int
 }
 
-func (m *MockEffectsSealWithDifferentReceipt) IsSealedWithDifferentReceipt(*types.ExecutionReceipt) (bool, error) {
+func (m *MockEffectsSealWithDifferentReceipt) IsSealedWithDifferentReceipt(*processor.ExecutionReceipt) (bool, error) {
 	m._callCount++
 	return true, nil
 }
