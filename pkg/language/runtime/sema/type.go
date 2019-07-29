@@ -1,11 +1,9 @@
-package interpreter
+package sema
 
 import (
 	"fmt"
-	"strings"
-
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"strings"
 )
 
 type Type interface {
@@ -210,53 +208,9 @@ func (t FunctionType) String() string {
 	return fmt.Sprintf("((%s): %s)", parameters.String(), t.ReturnType.String())
 }
 
-// mustConvertType converts an AST type representation to an interpreter type representation
-func mustConvertType(t ast.Type) Type {
-	switch t := t.(type) {
-	case *ast.BaseType:
-		result := ParseBaseType(t.Identifier)
-		if result == nil {
-			panic(&NotDeclaredError{
-				ExpectedKind: DeclarationKindType,
-				Name:         t.Identifier,
-				// TODO: add start and end position to ast.Type
-				StartPos: t.Pos,
-				EndPos:   t.Pos,
-			})
-		}
-		return result
+// BaseTypes
 
-	case *ast.VariableSizedType:
-		return &VariableSizedType{
-			Type: mustConvertType(t.Type),
-		}
-
-	case *ast.ConstantSizedType:
-		return &ConstantSizedType{
-			Type: mustConvertType(t.Type),
-			Size: t.Size,
-		}
-
-	case *ast.FunctionType:
-		var parameterTypes []Type
-		for _, parameterType := range t.ParameterTypes {
-			parameterTypes = append(parameterTypes,
-				mustConvertType(parameterType),
-			)
-		}
-
-		returnType := mustConvertType(t.ReturnType)
-
-		return FunctionType{
-			ParameterTypes: parameterTypes,
-			ReturnType:     returnType,
-		}
-	}
-
-	panic(&astTypeConversionError{invalidASTType: t})
-}
-
-var baseTypes = map[string]Type{
+var BaseTypes = map[string]Type{
 	"":       &VoidType{},
 	"Void":   &VoidType{},
 	"Bool":   &BoolType{},
@@ -269,13 +223,4 @@ var baseTypes = map[string]Type{
 	"UInt16": &UInt16Type{},
 	"UInt32": &UInt32Type{},
 	"UInt64": &UInt64Type{},
-}
-
-func ParseBaseType(name string) Type {
-	baseType, ok := baseTypes[name]
-	if !ok {
-		return nil
-	}
-
-	return baseType
 }

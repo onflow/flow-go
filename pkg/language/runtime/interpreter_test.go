@@ -3,6 +3,7 @@ package runtime
 import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	. "github.com/onsi/gomega"
 	"math/big"
 	"testing"
@@ -1711,12 +1712,12 @@ func TestInterpretHostFunction(t *testing.T) {
 	inter := interpreter.NewInterpreter(program)
 
 	testFunction := interpreter.NewHostFunction(
-		&interpreter.FunctionType{
-			ParameterTypes: []interpreter.Type{
-				&interpreter.IntType{},
-				&interpreter.IntType{},
+		&sema.FunctionType{
+			ParameterTypes: []sema.Type{
+				&sema.IntType{},
+				&sema.IntType{},
 			},
-			ReturnType: &interpreter.IntType{},
+			ReturnType: &sema.IntType{},
 		},
 		func(inter *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
 			a := arguments[0].(interpreter.IntValue).Int
