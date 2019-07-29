@@ -128,7 +128,6 @@ func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetB
 	}
 
 	return response, nil
-
 }
 
 // GetLatestBlock gets the latest sealed block.
