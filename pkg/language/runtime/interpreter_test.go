@@ -82,7 +82,7 @@ func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
 }
 
 func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
@@ -102,7 +102,7 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
 }
 
 func TestInterpretInvalidUnknownDeclaration(t *testing.T) {
@@ -124,7 +124,7 @@ func TestInterpretInvalidUnknownDeclaration(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
 }
 
 func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
@@ -146,7 +146,7 @@ func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
 }
 
 func TestInterpretInvalidUnknownDeclarationIndexing(t *testing.T) {
@@ -168,7 +168,7 @@ func TestInterpretInvalidUnknownDeclarationIndexing(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
 }
 
 func TestInterpretInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
@@ -190,7 +190,7 @@ func TestInterpretInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
 }
 
 func TestInterpretLexicalScope(t *testing.T) {
@@ -307,7 +307,7 @@ func TestInterpretInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.ArgumentCountError{}))
 }
 
 func TestInterpretInvalidFunctionCallWithTooManyArguments(t *testing.T) {
@@ -333,7 +333,7 @@ func TestInterpretInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.ArgumentCountError{}))
 }
 
 func TestInterpretInvalidFunctionCallOfBool(t *testing.T) {
@@ -355,7 +355,7 @@ func TestInterpretInvalidFunctionCallOfBool(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
 }
 
 func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
@@ -377,7 +377,7 @@ func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
 }
 
 func TestInterpretInvalidConstantAssignment(t *testing.T) {
@@ -400,7 +400,7 @@ func TestInterpretInvalidConstantAssignment(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.AssignmentToConstantError{}))
 }
 
 func TestInterpretVariableAssignment(t *testing.T) {
@@ -447,7 +447,7 @@ func TestInterpretInvalidGlobalConstantAssignment(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.AssignmentToConstantError{}))
 }
 
 func TestInterpretGlobalVariableAssignment(t *testing.T) {
@@ -577,7 +577,7 @@ func TestInterpretInvalidArrayIndexingWithBool(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidIndexValueError{}))
 }
 
 func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
@@ -599,7 +599,7 @@ func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.NotIndexableError{}))
 }
 
 func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
@@ -621,7 +621,7 @@ func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.NotIndexableError{}))
 }
 
 func TestInterpretArrayIndexingAssignment(t *testing.T) {
@@ -668,7 +668,7 @@ func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidIndexValueError{}))
 }
 
 func TestInterpretReturnWithoutExpression(t *testing.T) {
@@ -729,15 +729,15 @@ func TestInterpretPlusOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBools")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretMinusOperator(t *testing.T) {
@@ -774,15 +774,15 @@ func TestInterpretMinusOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBools")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretMulOperator(t *testing.T) {
@@ -819,15 +819,15 @@ func TestInterpretMulOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBools")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretDivOperator(t *testing.T) {
@@ -864,15 +864,15 @@ func TestInterpretDivOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBools")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretModOperator(t *testing.T) {
@@ -909,15 +909,15 @@ func TestInterpretModOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBools")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretEqualOperator(t *testing.T) {
@@ -973,11 +973,11 @@ func TestInterpretEqualOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	Expect(inter.Invoke("testTrueAndTrue")).
 		To(Equal(interpreter.BoolValue(true)))
@@ -1045,11 +1045,11 @@ func TestInterpretUnequalOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	Expect(inter.Invoke("testTrueAndTrue")).
 		To(Equal(interpreter.BoolValue(false)))
@@ -1124,27 +1124,27 @@ func TestInterpretLessOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testTrueAndTrue")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testTrueAndFalse")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndTrue")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndFalse")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretLessEqualOperator(t *testing.T) {
@@ -1207,27 +1207,27 @@ func TestInterpretLessEqualOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testTrueAndTrue")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testTrueAndFalse")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndTrue")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndFalse")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretGreaterOperator(t *testing.T) {
@@ -1290,27 +1290,27 @@ func TestInterpretGreaterOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testTrueAndTrue")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testTrueAndFalse")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndTrue")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndFalse")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretGreaterEqualOperator(t *testing.T) {
@@ -1373,27 +1373,27 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testTrueAndTrue")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testTrueAndFalse")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndTrue")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndFalse")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretOrOperator(t *testing.T) {
@@ -1451,15 +1451,15 @@ func TestInterpretOrOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testIntegers")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretAndOperator(t *testing.T) {
@@ -1517,15 +1517,15 @@ func TestInterpretAndOperator(t *testing.T) {
 
 	_, err = inter.Invoke("testBoolAndInteger")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testIntegerAndBool")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testIntegers")
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretIfStatement(t *testing.T) {
@@ -1722,9 +1722,9 @@ func TestInterpretInvalidAssignmentToParameter(t *testing.T) {
 	Expect(err).
 		ToNot(HaveOccurred())
 
-	_, err = inter.Invoke("test")
+	_, err = inter.Invoke("test", int8(1))
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.AssignmentToConstantError{}))
 }
 
 func TestInterpretFunctionBindingInFunction(t *testing.T) {
@@ -1844,7 +1844,7 @@ func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidUnaryOperandError{}))
 }
 
 func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
@@ -1860,7 +1860,7 @@ func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
 	Expect(err).
-		To(HaveOccurred())
+		To(BeAssignableToTypeOf(&interpreter.InvalidUnaryOperandError{}))
 }
 
 func TestInterpretHostFunction(t *testing.T) {
