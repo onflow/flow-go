@@ -63,7 +63,7 @@ parameterList
     ;
 
 parameter
-    : Identifier ':' fullType
+    : (argumentLabel=Identifier)? parameterName=Identifier ':' fullType
     ;
 
 fullType
@@ -240,8 +240,12 @@ bracketExpression
 	;
 
 invocation
-	: '(' (expression (',' expression)*)? ')'
+	: '(' (argument (',' argument)*)? ')'
 	;
+
+argument
+    : (Identifier ':')? expression
+    ;
 
 literal
     : integerLiteral
