@@ -105,28 +105,6 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
 }
 
-func TestInterpretInvalidUnknownDeclaration(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test() {
-           return x
-       }
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		ToNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
-}
-
 func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
 	RegisterTestingT(t)
 

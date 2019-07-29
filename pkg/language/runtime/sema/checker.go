@@ -161,7 +161,8 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 }
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
-	// TODO:
+	statement.Expression.Accept(checker)
+
 	return nil
 }
 
@@ -181,7 +182,16 @@ func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast
 }
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
-	// TODO:
+	variable := checker.findVariable(expression.Identifier)
+	if variable == nil {
+		panic(&NotDeclaredError{
+			ExpectedKind: common.DeclarationKindValue,
+			Name:         expression.Identifier,
+			StartPos:     expression.StartPosition(),
+			EndPos:       expression.EndPosition(),
+		})
+	}
+
 	return nil
 }
 

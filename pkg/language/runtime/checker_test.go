@@ -68,3 +68,22 @@ func TestCheckInvalidVariableRedeclaration(t *testing.T) {
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
+
+func TestCheckInvalidUnknownDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+       fun test() {
+           return x
+       }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}

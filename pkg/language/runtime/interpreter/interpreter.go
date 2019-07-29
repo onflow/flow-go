@@ -446,14 +446,6 @@ func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
 	variable := interpreter.findVariable(expression.Identifier)
-	if variable == nil {
-		panic(&NotDeclaredError{
-			ExpectedKind: common.DeclarationKindValue,
-			Name:         expression.Identifier,
-			StartPos:     expression.StartPosition(),
-			EndPos:       expression.EndPosition(),
-		})
-	}
 	return Done{Result: variable.Value}
 }
 
