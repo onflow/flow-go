@@ -1,31 +1,12 @@
 syntax = "proto3";
 
-import "shared/messages.proto";
-
 package bamboo.shared.gossip;
 
 option go_package = "shared";
 
 // Message models a single message that is supposed to get exchanged by the gossip network
 message GossipMessage {
-  oneof Payload {                   // The payload of the message, i.e., the data to be exchanged
-    bamboo.shared.messages.SignedCollectionHash signedCollectionHash = 1;
-    bamboo.shared.messages.Collection collection = 2;
-    bamboo.shared.messages.Block block = 3;
-    bamboo.shared.messages.BlockSeal blockSeal = 4;
-    bamboo.shared.messages.IntermediateRegisters intermediateRegisters = 5;
-    bamboo.shared.messages.ExecutionReceipt executionReceipt = 6;
-    bamboo.shared.messages.ResultApproval resultApproval = 7;
-    bamboo.shared.messages.SignedTransaction signedTransaction = 8;
-    bamboo.shared.messages.Register register = 9;
-    bamboo.shared.messages.TransactionRegister transactionRegister = 10;
-    bamboo.shared.messages.Inventory inventory = 11;
-    bamboo.shared.messages.InvalidExecutionReceiptChallenge invalidExecutionReceiptChallenge = 12;
-    bamboo.shared.messages.StateTransition stateTransition = 13;
-    bamboo.shared.messages.SignedStateTransition signedStateTransition = 14;
-    bamboo.shared.messages.FinalizedStateTransition finalizedStateTransition = 15;
-    bamboo.shared.messages.Vote vote = 16;
-    bamboo.shared.messages.StateTransitionVote stateTransitionVote = 17;
+  oneof Payload {
     MessageRequest messageRequest = 18;
     MessageReply messageReply = 19;
   }

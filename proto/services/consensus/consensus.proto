@@ -30,7 +30,7 @@ service ConsensusService {
   rpc GetFinalizedStateTransitions(GetFinalizedStateTransitionsRequest) returns (GetFinalizedStateTransitionsResponse);
 
   // Process state transition proposal from other security node.
-  rpc ProcessStateTransitionProposal(bamboo.shared.messages.SignedStateTransition) returns (google.protobuf.Empty);
+  rpc ProcessStateTransitionProposal(ProcessStateTransitionProposalRequest) returns (google.protobuf.Empty);
 
   // Process state transition prepare vote from other security node.
   rpc ProcessStateTransitionPrepareVote(ProcessSignedStateTransitionPrepareVoteRequest) returns (google.protobuf.Empty);
@@ -76,15 +76,47 @@ message GetFinalizedStateTransitionsRequest {
 }
 
 message GetFinalizedStateTransitionsResponse {
-  repeated bamboo.shared.messages.FinalizedStateTransition finalizedStateTransitions = 1;
+  repeated FinalizedStateTransition finalizedStateTransitions = 1;
+}
+
+message ProcessStateTransitionProposalRequest {
+  SignedStateTransition transition = 1;
 }
 
 message ProcessSignedStateTransitionPrepareVoteRequest {
-  bamboo.shared.messages.StateTransitionVote stateTransitionVote = 1;
+  StateTransitionVote stateTransitionVote = 1;
   bytes signature = 2;
 }
 
 message ProcessSignedStateTransitionCommitVoteRequest {
-  bamboo.shared.messages.StateTransitionVote stateTransitionVote = 1;
+  StateTransitionVote stateTransitionVote = 1;
   bytes signature = 2;
+}
+
+message StateTransition {
+  bytes previousStateTransitionHash = 1;
+  repeated bytes previousCommitApprovalSignatures = 2;
+  uint64 height = 3;
+  bytes value = 4;
+}
+
+message SignedStateTransition {
+  StateTransition stateTransition = 1;
+  bytes signature = 2;
+}
+
+message FinalizedStateTransition {
+  SignedStateTransition signedStateTransition = 1;
+  repeated bytes signatures = 2;
+}
+
+enum Vote {
+  REJECT = 0;
+  APPROVE = 1;
+}
+
+message StateTransitionVote {
+  bytes stateTransitionHash = 1;
+  Vote vote = 2;
+  uint64 height = 3;
 }
