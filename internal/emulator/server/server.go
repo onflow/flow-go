@@ -16,7 +16,7 @@ import (
 
 // EmulatorServer is a local server that runs a Bamboo Emulator instance.
 //
-// Wraps the Emulator Core Library with the Observation gRPC interface.
+// The server wraps the Emulator Core Library with the Observation gRPC interface.
 type EmulatorServer struct {
 	blockchain *core.EmulatedBlockchain
 	config     *Config
