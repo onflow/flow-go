@@ -13,7 +13,6 @@ test-setup:
 	docker-compose up --build start_consensus_dependencies
 	docker-compose up --build start_execute_dependencies
 	docker-compose up --build start_verify_dependencies
-	docker-compose up --build start_seal_dependencies
 	docker-compose up --build start_test_dependencies
 
 .PHONY: test-run
@@ -32,6 +31,8 @@ generate-godoc:
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/clusters > internal/roles/collect/clusters/README.md
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/routing > internal/roles/collect/routing/README.md
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/collections > internal/roles/collect/collections/README.md
+	godoc2md github.com/dapperlabs/bamboo-node/pkg/data/keyvalue > pkg/data/keyvalue/README.md
+	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/verify/processor > internal/roles/verify/processor/README.md
 
 .PHONY: generate-proto
 generate-proto:
@@ -43,7 +44,6 @@ generate-wire:
 	wire ./internal/roles/consensus/
 	wire ./internal/roles/execute/
 	wire ./internal/roles/verify/
-	wire ./internal/roles/seal/
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-wire

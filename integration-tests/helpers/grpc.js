@@ -6,7 +6,7 @@ const COLLECT_PROTO_PATH = 'services/collect/collect.proto';
 const CONSENSUS_PROTO_PATH = 'services/consensus/consensus.proto';
 const EXECUTE_PROTO_PATH = 'services/execute/execute.proto';
 const VERIFY_PROTO_PATH = 'services/verify/verify.proto';
-const SEAL_PROTO_PATH = 'services/seal/seal.proto';
+const OBSERVE_PROTO_PATH = 'services/observe/observe.proto';
 
 const options = {
   keepCase: true,
@@ -21,7 +21,7 @@ const collectProtoDescriptor = grpc.loadPackageDefinition(protoLoader.loadSync(C
 const consensusProtoDescriptor = grpc.loadPackageDefinition(protoLoader.loadSync(CONSENSUS_PROTO_PATH, options));
 const executeProtoDescriptor = grpc.loadPackageDefinition(protoLoader.loadSync(EXECUTE_PROTO_PATH, options));
 const verifyProtoDescriptor = grpc.loadPackageDefinition(protoLoader.loadSync(VERIFY_PROTO_PATH, options));
-const sealProtoDescriptor = grpc.loadPackageDefinition(protoLoader.loadSync(SEAL_PROTO_PATH, options));
+const observeProtoDescriptor = grpc.loadPackageDefinition(protoLoader.loadSync(OBSERVE_PROTO_PATH, options));
 
 function createNewCollectStub(address) {
   const stub = new collectProtoDescriptor.bamboo.services.collect.CollectService(address, grpc.credentials.createInsecure());
@@ -43,8 +43,8 @@ function createNewVerifyStub(address) {
   return promisifyStub(stub);
 }
 
-function createNewSealStub(address) {
-  const stub = new sealProtoDescriptor.bamboo.services.seal.SealService(address, grpc.credentials.createInsecure());
+function createNewObserveStub(address) {
+  const stub = new observeProtoDescriptor.bamboo.services.observe.ObserveService(address, grpc.credentials.createInsecure());
   return promisifyStub(stub);
 }
 
@@ -60,5 +60,5 @@ module.exports = {
   createNewConsensusStub,
   createNewExecuteStub,
   createNewVerifyStub,
-  createNewSealStub,
+  createNewObserveStub,
 }

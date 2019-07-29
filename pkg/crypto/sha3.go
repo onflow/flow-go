@@ -37,7 +37,7 @@ func (s *sha3_256Algo) SumHash() Hash {
 }
 
 // Hash32 implements Hash
-func (h *Hash32) ToBytes() []byte {
+func (h *Hash32) Bytes() []byte {
 	return h[:]
 }
 
@@ -51,7 +51,7 @@ func (h *Hash32) String() string {
 }
 
 func (h *Hash32) IsEqual(input Hash) bool {
-	inputBytes := input.ToBytes()
+	inputBytes := input.Bytes()
 	if len(h) != len(inputBytes) {
 		return false
 	}

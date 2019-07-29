@@ -12,8 +12,7 @@ func EncodeAsBytes(data ...interface{}) []byte {
 	gob.Register(time.Time{})
 	gob.Register(Hash{})
 	gob.Register([]Hash{})
-	gob.Register(Address{})
-	gob.Register(Signature{})
+	gob.Register(MockSignature{})
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)

@@ -47,16 +47,24 @@ func (tx *RawTransaction) Hash() crypto.Hash {
 // Sign signs a transaction with the given account and keypair.
 //
 // The function returns a new SignedTransaction that includes the generated signature.
-func (tx *RawTransaction) Sign(account crypto.Address, keyPair *crypto.KeyPair) *SignedTransaction {
+func (tx *RawTransaction) Sign(account Address, keyPair *crypto.KeyPair) *SignedTransaction {
 	hash := tx.Hash()
-	sig := crypto.Sign(hash, account, keyPair)
+
+	// TODO: include account in signature
+	sig := crypto.Sign(hash, keyPair)
+
+	accountSig := AccountSignature{
+		Account:   account,
+		PublicKey: keyPair.PublicKey,
+		Signature: sig.Bytes(),
+	}
 
 	return &SignedTransaction{
 		Script:         tx.Script,
 		Nonce:          tx.Nonce,
 		ComputeLimit:   tx.ComputeLimit,
 		Timestamp:      tx.Timestamp,
-		PayerSignature: *sig,
+		PayerSignature: accountSig,
 	}
 }
 
@@ -67,7 +75,7 @@ type SignedTransaction struct {
 	ComputeLimit   uint64
 	ComputeUsed    uint64
 	Timestamp      time.Time
-	PayerSignature crypto.Signature
+	PayerSignature AccountSignature
 	Status         TransactionStatus
 }
 
@@ -78,7 +86,7 @@ func (tx *SignedTransaction) Hash() crypto.Hash {
 		tx.Nonce,
 		tx.ComputeLimit,
 		tx.Timestamp,
-		tx.PayerSignature,
+		tx.PayerSignature.Bytes(),
 	)
 	return crypto.NewHash(bytes)
 }

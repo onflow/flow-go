@@ -27,12 +27,6 @@
 /grpc/services/verify @pazams
 /cmd/verify @pazams
 
-# Sealing Stream
-/internal/roles/seal @pazams
-/proto/services/seal @pazams
-/grpc/services/seal @pazams
-/cmd/seal @pazams
-
 # Observation Stream
 /internal/roles/observe @psiemens
 /proto/services/observe @psiemens
