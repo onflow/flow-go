@@ -4,18 +4,15 @@ import (
 	"context"
 
 	"github.com/sirupsen/logrus"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	collectSvc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
+	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/data"
 )
 
-const (
-	errNoTransaction = "request must include a transaction"
-)
+const errNoTransaction = "request must include a transaction"
 
 type Controller struct {
 	dal *data.DAL
@@ -28,8 +25,8 @@ func New(log *logrus.Logger) *Controller {
 	}
 }
 
-func (c *Controller) Ping(context.Context, *collectSvc.PingRequest) (*collectSvc.PingResponse, error) {
-	return &collectSvc.PingResponse{
+func (c *Controller) Ping(context.Context, *svc.PingRequest) (*svc.PingResponse, error) {
+	return &svc.PingResponse{
 		Address: []byte("pong!"),
 	}, nil
 }
@@ -45,8 +42,8 @@ func (c *Controller) Ping(context.Context, *collectSvc.PingRequest) (*collectSvc
 // if it belongs to this node's cluster, but otherwise it will be forwarded to the
 // correct cluster.
 func (c *Controller) SubmitTransaction(
-	ctx context.Context, req *collectSvc.SubmitTransactionRequest,
-) (*collectSvc.SubmitTransactionResponse, error) {
+	ctx context.Context, req *svc.SubmitTransactionRequest,
+) (*svc.SubmitTransactionResponse, error) {
 	tx := req.GetTransaction()
 	if tx == nil {
 		return nil, status.Error(codes.InvalidArgument, errNoTransaction)
@@ -63,17 +60,17 @@ func (c *Controller) SubmitTransaction(
 
 	// TODO: route transaction to cluster
 
-	return &collectSvc.SubmitTransactionResponse{}, nil
+	return &svc.SubmitTransactionResponse{}, nil
 }
 
-func (c *Controller) SubmitCollection(context.Context, *collectSvc.SubmitCollectionRequest) (*collectSvc.SubmitCollectionResponse, error) {
+func (c *Controller) SubmitCollection(context.Context, *svc.SubmitCollectionRequest) (*svc.SubmitCollectionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (c *Controller) GetTransaction(context.Context, *collectSvc.GetTransactionRequest) (*collectSvc.GetTransactionResponse, error) {
+func (c *Controller) GetTransaction(context.Context, *svc.GetTransactionRequest) (*svc.GetTransactionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (c *Controller) GetCollection(context.Context, *collectSvc.GetCollectionRequest) (*collectSvc.GetCollectionResponse, error) {
+func (c *Controller) GetCollection(context.Context, *svc.GetCollectionRequest) (*svc.GetCollectionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
