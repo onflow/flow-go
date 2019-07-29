@@ -175,6 +175,50 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	Expect(err).To(MatchError(&ErrDuplicateTransaction{TxHash: tx1.Hash()}))
 }
 
+func TestSubmitTransactionInvalidAccount(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain(DefaultOptions)
+
+	invalidAddress := types.HexToAddress("0000000000000000000000000000000000000002")
+
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(sampleScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(invalidAddress, b.RootKeyPair())
+
+	// Submit invalid tx1 (errors)
+	err := b.SubmitTransaction(tx1)
+	Expect(err).To(MatchError(&ErrInvalidSignatureAccount{Account: invalidAddress}))
+}
+
+func TestSubmitTransactionInvalidKeyPair(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain(DefaultOptions)
+
+	// use key pair that does not exist on root account
+	invalidKeyPair, _ := crypto.GenKeyPair("elephant-ears")
+
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(sampleScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), invalidKeyPair)
+
+	// Submit invalid tx1 (errors)
+	err := b.SubmitTransaction(tx1)
+	Expect(err).To(MatchError(
+		&ErrInvalidSignaturePublicKey{
+			Account:   b.RootAccount(),
+			PublicKey: invalidKeyPair.PublicKey,
+		}),
+	)
+}
+
 func TestSubmitTransactionReverted(t *testing.T) {
 	RegisterTestingT(t)
 
