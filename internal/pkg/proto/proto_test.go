@@ -1,12 +1,12 @@
-package messageable_test
+package proto_test
 
 import (
 	"testing"
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/internal/pkg/messageable"
 	"github.com/dapperlabs/bamboo-node/internal/pkg/mocks"
+	"github.com/dapperlabs/bamboo-node/internal/pkg/proto"
 )
 
 func TestAccountSignature(t *testing.T) {
@@ -14,8 +14,8 @@ func TestAccountSignature(t *testing.T) {
 
 	sigA := mocks.MockAccountSignature()
 
-	message := messageable.AccountSignatureToMessage(sigA)
-	sigB := messageable.MessageToAccountSignature(message)
+	message := proto.AccountSignatureToMessage(sigA)
+	sigB := proto.MessageToAccountSignature(message)
 
 	Expect(sigA).To(Equal(sigB))
 }
@@ -25,8 +25,8 @@ func TestSignedTransaction(t *testing.T) {
 
 	txA := mocks.MockSignedTransaction()
 
-	message := messageable.SignedTransactionToMessage(txA)
-	txB := messageable.MessageToSignedTransaction(message)
+	message := proto.SignedTransactionToMessage(txA)
+	txB := proto.MessageToSignedTransaction(message)
 
 	Expect(txA).To(Equal(txB))
 }

@@ -1,4 +1,4 @@
-package messageable
+package proto
 
 import (
 	"github.com/golang/protobuf/ptypes"
