@@ -10,19 +10,37 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
-// sampleScript runs a script that adds 2 to a value.
-const sampleScript = `
+// addTwoScript runs a script that adds 2 to a value.
+const addTwoScript = `
 	fun main() {
-		const controller = [1]
-		const owner = [2]
-		const key = [3]
-		const value = getValue(controller, owner, key)
+		let controller = [1]
+		let owner = [2]
+		let key = [3]
+		let value = getValue(controller, owner, key)
 		setValue(controller, owner, key, value + 2)
 	}
 `
 
+// createAccountScriptA runs a script that creates an account.
+const createAccountScriptA = `
+	fun main() {
+		let publicKey = [1,2,3]
+		let code = [4,5,6]
+		createAccount(publicKey, code)
+	}
+`
+
+// createAccountScriptB runs a script that creates an account.
+const createAccountScriptB = `
+	fun main() {
+		let publicKey = [7,8,9]
+		let code = [10,11,12]
+		createAccount(publicKey, code)
+	}
+`
+
 const sampleCall = `
-	fun main() -> Int {
+	fun main(): Int {
 		return getValue([1], [2], [3])
 	}
 `
@@ -35,21 +53,21 @@ func TestWorldStates(t *testing.T) {
 
 	// Create 3 signed transactions (tx1, tx2. tx3)
 	tx1 := (&types.RawTransaction{
-		Script:       []byte(sampleScript),
+		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
 	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	tx2 := (&types.RawTransaction{
-		Script:       []byte(sampleScript),
+		Script:       []byte(addTwoScript),
 		Nonce:        2,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
 	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	tx3 := (&types.RawTransaction{
-		Script:       []byte(sampleScript),
+		Script:       []byte(addTwoScript),
 		Nonce:        3,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -140,7 +158,7 @@ func TestSubmitTransaction(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
-		Script:       []byte(sampleScript),
+		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -162,7 +180,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
-		Script:       []byte(sampleScript),
+		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -185,7 +203,7 @@ func TestSubmitTransactionInvalidAccount(t *testing.T) {
 	invalidAddress := types.HexToAddress("0000000000000000000000000000000000000002")
 
 	tx1 := (&types.RawTransaction{
-		Script:       []byte(sampleScript),
+		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -205,7 +223,7 @@ func TestSubmitTransactionInvalidKeyPair(t *testing.T) {
 	invalidKeyPair, _ := crypto.GenKeyPair("elephant-ears")
 
 	tx1 := (&types.RawTransaction{
-		Script:       []byte(sampleScript),
+		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -249,7 +267,7 @@ func TestCommitBlock(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
-		Script:       []byte(sampleScript),
+		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -291,13 +309,7 @@ func TestCreateAccount(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
-		Script: []byte(`
-			fun main() {
-				const publicKey = [1,2,3]
-				const code = [4,5,6]
-				createAccount(publicKey, code)
-			}
-		`),
+		Script:       []byte(createAccountScriptA),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -317,13 +329,7 @@ func TestCreateAccount(t *testing.T) {
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
 	tx2 := (&types.RawTransaction{
-		Script: []byte(`
-			fun main() {
-				const publicKey = [7,8,9]
-				const code = [10,11,12]
-				createAccount(publicKey, code)
-			}
-		`),
+		Script:       []byte(createAccountScriptB),
 		Nonce:        2,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -348,7 +354,7 @@ func TestCallScript(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
-		Script:       []byte(sampleScript),
+		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -375,14 +381,14 @@ func TestQueryByVersion(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := (&types.RawTransaction{
-		Script:       []byte(sampleScript),
+		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
 	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	tx2 := (&types.RawTransaction{
-		Script:       []byte(sampleScript),
+		Script:       []byte(addTwoScript),
 		Nonce:        2,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
