@@ -3,6 +3,7 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"math/big"
 	"strings"
 
@@ -93,64 +94,64 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 }
 
 // TODO: improve types
-var setValueFunctionType = interpreter.FunctionType{
-	ParameterTypes: []interpreter.Type{
+var setValueFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{
 		// owner
-		&interpreter.VariableSizedType{
-			Type: &interpreter.UInt8Type{},
+		&sema.VariableSizedType{
+			Type: &sema.UInt8Type{},
 		},
 		// controller
-		&interpreter.VariableSizedType{
-			Type: &interpreter.UInt8Type{},
+		&sema.VariableSizedType{
+			Type: &sema.UInt8Type{},
 		},
 		// key
-		&interpreter.VariableSizedType{
-			Type: &interpreter.UInt8Type{},
+		&sema.VariableSizedType{
+			Type: &sema.UInt8Type{},
 		},
 		// value
 		// TODO: add proper type
-		&interpreter.IntType{},
+		&sema.IntType{},
 	},
 	// nothing
-	ReturnType: &interpreter.VoidType{},
+	ReturnType: &sema.VoidType{},
 }
 
 // TODO: improve types
-var getValueFunctionType = interpreter.FunctionType{
-	ParameterTypes: []interpreter.Type{
+var getValueFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{
 		// owner
-		&interpreter.VariableSizedType{
-			Type: &interpreter.UInt8Type{},
+		&sema.VariableSizedType{
+			Type: &sema.UInt8Type{},
 		},
 		// controller
-		&interpreter.VariableSizedType{
-			Type: &interpreter.UInt8Type{},
+		&sema.VariableSizedType{
+			Type: &sema.UInt8Type{},
 		},
 		// key
-		&interpreter.VariableSizedType{
-			Type: &interpreter.UInt8Type{},
+		&sema.VariableSizedType{
+			Type: &sema.UInt8Type{},
 		},
 	},
 	// value
 	// TODO: add proper type
-	ReturnType: &interpreter.IntType{},
+	ReturnType: &sema.IntType{},
 }
 
 // TODO: improve types
-var createAccountFunctionType = interpreter.FunctionType{
-	ParameterTypes: []interpreter.Type{
+var createAccountFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{
 		// key
-		&interpreter.VariableSizedType{
-			Type: &interpreter.UInt8Type{},
+		&sema.VariableSizedType{
+			Type: &sema.UInt8Type{},
 		},
 		// code
-		&interpreter.VariableSizedType{
-			Type: &interpreter.UInt8Type{},
+		&sema.VariableSizedType{
+			Type: &sema.UInt8Type{},
 		},
 	},
 	// value
 	// TODO: add proper type
-	ReturnType: &interpreter.IntType{},
+	ReturnType: &sema.IntType{},
 }
 
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {

@@ -1,4 +1,4 @@
-package interpreter
+package common
 
 import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 

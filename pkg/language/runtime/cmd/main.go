@@ -5,6 +5,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"io/ioutil"
 	"os"
 )
@@ -39,9 +40,9 @@ func main() {
 	inter.ImportFunction(
 		"log",
 		NewHostFunction(
-			&FunctionType{
-				ParameterTypes: []Type{&AnyType{}},
-				ReturnType:     &VoidType{},
+			&sema.FunctionType{
+				ParameterTypes: []sema.Type{&sema.AnyType{}},
+				ReturnType:     &sema.VoidType{},
 			},
 			func(_ *Interpreter, arguments []Value) Value {
 				fmt.Printf("%v\n", arguments[0])

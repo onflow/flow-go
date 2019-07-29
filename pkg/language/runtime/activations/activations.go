@@ -1,26 +1,25 @@
-package interpreter
+package activations
 
 import (
 	"github.com/raviqqe/hamt"
 	"github.com/segmentio/fasthash/fnv1a"
 )
 
-/// ActivationKey
+/// StringKey
 
-type ActivationKey string
+type StringKey string
 
-func (key ActivationKey) Hash() uint32 {
+func (key StringKey) Hash() uint32 {
 	return fnv1a.HashString32(string(key))
 }
 
-func (key ActivationKey) Equal(other hamt.Entry) bool {
-	otherKey, isActivationKey := other.(ActivationKey)
-	return isActivationKey && string(otherKey) == string(key)
+func (key StringKey) Equal(other hamt.Entry) bool {
+	otherKey, isPointerKey := other.(StringKey)
+	return isPointerKey && string(otherKey) == string(key)
 }
 
 // Activations is a stack of activation records.
 // Each entry represents a new scope.
-// Variable declarations are performed in the map of the current scope.
 //
 type Activations struct {
 	activations []hamt.Map
@@ -35,22 +34,15 @@ func (a *Activations) current() *hamt.Map {
 	return &current
 }
 
-// Find finds the variable with the given name, in all scopes (current and parent scopes)
-
-func (a *Activations) Find(name string) *Variable {
+func (a *Activations) Find(key string) interface{} {
 	current := a.current()
 	if current == nil {
 		return nil
 	}
-	value, ok := current.Find(ActivationKey(name)).(*Variable)
-	if !ok {
-		return nil
-	}
-
-	return value
+	return current.Find(StringKey(key))
 }
 
-func (a *Activations) Set(name string, variable *Variable) {
+func (a *Activations) Set(name string, value interface{}) {
 	current := a.current()
 	if current == nil {
 		a.PushCurrent()
@@ -58,7 +50,7 @@ func (a *Activations) Set(name string, variable *Variable) {
 	}
 
 	count := len(a.activations)
-	a.activations[count-1] = current.Insert(ActivationKey(name), variable)
+	a.activations[count-1] = current.Insert(StringKey(name), value)
 }
 
 func (a *Activations) PushCurrent() {

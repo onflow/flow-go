@@ -3,6 +3,8 @@ package interpreter
 import (
 	"fmt"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 )
 
 // SecondaryError
@@ -36,7 +38,7 @@ func (e *unsupportedAssignmentTargetExpression) Error() string {
 // unsupportedOperation
 
 type unsupportedOperation struct {
-	kind      OperationKind
+	kind      common.OperationKind
 	operation ast.Operation
 	pos       *ast.Position
 }
@@ -45,18 +47,10 @@ func (e *unsupportedOperation) Error() string {
 	return fmt.Sprintf("cannot evaluate unsupported %s operation: %s", e.kind.Name(), e.operation.Symbol())
 }
 
-// ProgramError
-
-type ProgramError interface {
-	error
-	ast.HasPosition
-	isProgramError()
-}
-
 // NotDeclaredError
 
 type NotDeclaredError struct {
-	ExpectedKind DeclarationKind
+	ExpectedKind common.DeclarationKind
 	Name         string
 	StartPos     *ast.Position
 	EndPos       *ast.Position
@@ -122,7 +116,7 @@ func (e *NotIndexableError) EndPosition() *ast.Position {
 
 type InvalidUnaryOperandError struct {
 	Operation    ast.Operation
-	ExpectedType Type
+	ExpectedType sema.Type
 	Value        Value
 	StartPos     *ast.Position
 	EndPos       *ast.Position
@@ -149,8 +143,8 @@ func (e *InvalidUnaryOperandError) EndPosition() *ast.Position {
 
 type InvalidBinaryOperandError struct {
 	Operation    ast.Operation
-	Side         OperandSide
-	ExpectedType Type
+	Side         common.OperandSide
+	ExpectedType sema.Type
 	Value        Value
 	StartPos     *ast.Position
 	EndPos       *ast.Position
@@ -178,7 +172,7 @@ func (e *InvalidBinaryOperandError) EndPosition() *ast.Position {
 
 type InvalidBinaryOperandTypesError struct {
 	Operation    ast.Operation
-	ExpectedType Type
+	ExpectedType sema.Type
 	LeftValue    Value
 	RightValue   Value
 	StartPos     *ast.Position
