@@ -60,8 +60,7 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 			Infof("💸  Transaction #%d submitted to network", tx.Nonce)
 	}
 
-	hash := s.blockchain.CommitBlock()
-	block, _ := s.blockchain.GetBlockByHash(hash)
+	block := s.blockchain.CommitBlock()
 
 	s.logger.WithFields(log.Fields{
 		"blockNum":  block.Number,
@@ -232,7 +231,7 @@ func (s *EmulatorServer) CallContract(ctx context.Context, req *observe.CallCont
 	valueMsg := []byte(fmt.Sprintf("%v", value.(interface{})))
 
 	response := &observe.CallContractResponse{
-		Script: valueMsg,
+		Value: valueMsg,
 	}
 
 	return response, nil

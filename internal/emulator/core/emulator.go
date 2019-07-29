@@ -206,7 +206,7 @@ func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.H
 //
 // Note that this clears the pending transaction pool and indexes the committed
 // blockchain state for testing purposes.
-func (b *EmulatedBlockchain) CommitBlock() crypto.Hash {
+func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
 	txHashes := make([]crypto.Hash, 0)
 	for hash := range b.txPool {
 		txHashes = append(txHashes, hash)
@@ -226,7 +226,7 @@ func (b *EmulatedBlockchain) CommitBlock() crypto.Hash {
 
 	b.pendingWorldState.InsertBlock(block)
 	b.commitWorldState(block.Hash())
-	return b.pendingWorldState.Hash()
+	return block
 }
 
 func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {

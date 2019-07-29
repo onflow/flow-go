@@ -54,8 +54,7 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 	for {
 		select {
 		case <-tick:
-			hash := s.blockchain.CommitBlock()
-			block, _ := s.blockchain.GetBlockByHash(hash)
+			block := s.blockchain.CommitBlock()
 
 			s.logger.WithFields(log.Fields{
 				"blockNum":  block.Number,

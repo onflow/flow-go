@@ -40,11 +40,10 @@ message Signature {
 
 message SendTransactionRequest {
   message Transaction {
-    bytes to_address = 1;
-    bytes script = 2;
-    uint64 nonce = 3;
-    uint64 compute_limit = 4;
-    Signature payer_signature = 5;
+    bytes script = 1;
+    uint64 nonce = 2;
+    uint64 compute_limit = 3;
+    Signature payer_signature = 4;
   }
   Transaction transaction = 1;
 }
@@ -102,13 +101,12 @@ message GetTransactionResponse {
       STATUS_REVERTED = 2;
       STATUS_SEALED = 3;
     }
-    bytes to_address = 1;
-    bytes script = 2;
-    uint64 nonce = 3;
-    uint64 compute_limit = 4;
-    uint64 compute_used = 5;
-    Signature payer_signature = 6;
-    Status status = 7;
+    bytes script = 1;
+    uint64 nonce = 2;
+    uint64 compute_limit = 3;
+    uint64 compute_used = 4;
+    Signature payer_signature = 5;
+    Status status = 6;
   }
   Transaction transaction = 1;
 }
@@ -132,5 +130,5 @@ message CallContractRequest {
 }
 
 message CallContractResponse {
-  bytes script = 1;
+  bytes value = 1;
 }
