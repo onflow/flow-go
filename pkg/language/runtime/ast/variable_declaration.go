@@ -1,7 +1,7 @@
 package ast
 
 type VariableDeclaration struct {
-	IsConst       bool
+	IsConstant    bool
 	Identifier    string
 	Type          Type
 	Value         Expression
