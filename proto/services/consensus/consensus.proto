@@ -80,7 +80,7 @@ message GetFinalizedStateTransitionsResponse {
 }
 
 message ProcessStateTransitionProposalRequest {
-  SignedStateTransition transition = 1;
+  SignedStateTransition signedStateTransition = 1;
 }
 
 message ProcessSignedStateTransitionPrepareVoteRequest {
