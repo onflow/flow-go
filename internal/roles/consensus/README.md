@@ -28,7 +28,8 @@ to be determined whether it will live in this stream of in a separate stream
   - has been finalized (committed) by the BFT consensus protocol
   - with added entropy by the Random Beacon       
 
-## Details 
+## Details
+
 ### Collection Submission
 
 Collection are submitted to (one or more) CN(s) via the `SubmitCollection` gRPC method.
