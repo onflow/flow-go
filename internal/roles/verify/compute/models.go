@@ -4,7 +4,7 @@
 package compute
 
 import (
-	"crypto"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
 type Registers map[crypto.Hash][]byte
