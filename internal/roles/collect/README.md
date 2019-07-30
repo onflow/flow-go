@@ -21,7 +21,7 @@ All collection duties are performed by access nodes.
 * **Epoch** - A fixed period of time (measured in blocks) during which node stakes are fixed
 * **AN Cluster** - A grouping of ANs that work together to form collections
 * **Collection** - A set of transactions bundled together for execution
-* **Collection Guarantor**: an AN that has signed the collection, thereby guaranteeing to store the collection and all contained transactions until execution (or until all transactions in the collection have expired).
+* **Collection Guarantor**: An AN that has signed a collection, thereby guaranteeing to store the collection and all contained transactions until execution (or until all transactions in the collection have expired).
 * **Guaranteed Collection**: a collection where the accumulated stake of all guarantors is _more_ than 2/3 of the clusters total stake
 
 ## Cluster Formation
