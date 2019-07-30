@@ -418,3 +418,20 @@ func TestCheckInvalidArgumentLabelRedeclaration(t *testing.T) {
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
+
+func TestCheckInvalidConstantValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let x: Bool = 1
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}

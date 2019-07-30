@@ -208,8 +208,17 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 	declarationType := valueType
 	// does the declaration have an explicit type annotation?
 	if declaration.Type != nil {
-		// TODO: check value type is subtype of declaration type
-		// TODO: use explicit declaration type
+		declarationType = checker.ConvertType(declaration.Type)
+
+		// check the value type is a subtype of the declaration type
+		if !checker.IsSubType(valueType, declarationType) {
+			panic(&TypeMismatchError{
+				ExpectedType: declarationType,
+				ActualType:   valueType,
+				StartPos:     declaration.Value.StartPosition(),
+				EndPos:       declaration.Value.EndPosition(),
+			})
+		}
 	}
 	checker.declareVariable(declaration, declarationType)
 
