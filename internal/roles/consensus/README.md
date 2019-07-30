@@ -32,11 +32,11 @@ More specifically, collection covers the following:
 
 ### Collection Submission
 
-Collection are submitted to (one or more) CN(s) via the `SubmitCollection` gRPC method.
-  - During normal operations, Consensus nodes only receive the  _hashes_ 
+Collection are submitted to one or more CN(s) via the `SubmitCollection` gRPC method.
+  - During normal operation, CNs only receive the collection _hashes_
     and (aggregated) signatures from the collectors that guarantee the collection.  
     The collection's content is _not_ resolved or inspected.  
-  - CNs will only consider _guaranteed collection_ (see [Collection](../../../internal/roles/collect) for details)
+  - CNs will only consider _guaranteed collections_ (see [Collection](../collect) for details).
 Consensus nodes will gossip received collections to other consensus nodes.  
 
 <!--
@@ -45,18 +45,18 @@ Consensus nodes will gossip received collections to other consensus nodes.
 
 ### Block Formation (and Mempool)
 
-Consensus nodes store and track the status of all collection they receive. Each node maintains this sort of Mempool for itself.
-The mempool only operates on the level of collections and provides the following functionality.
-- Get list of all pending collections that are _not_ included in a finalized block (yet)
-- Get the list of pending collections that are included in non-finalized blocks.
-- Order collections by submission time. 
-- For a given fork: get all pending collections that are not included in this specific fork 
-- Collections that are included in a finalized block may be pruned from the mempool
+Consensus nodes store and track the status of all collections they receive. Each node maintains this sort of mempool for itself.
+The mempool only operates on the level of collections and provides the following functionality:
+- Provides a list of all pending collections that are _not yet_ included in a finalized block.
+- Provides a list of pending collections that are included in non-finalized blocks.
+- Orders collections by submission time. 
+- For a given fork: provides all pending collections that are not included in this specific fork.
+- Collections that are included in a finalized block may be pruned from the mempool.
 
 When a CN generates a proto block, it includes all pending collections that are not in the current fork. 
 
-When a CN generates sees a proto block from a different CN, it
-* requests and verifies all collections it hoesn't have in its mempool (hashes and signatures only)
+When a CN sees a proto block from a different CN, it does the following:
+* requests and verifies all collections it does not have in its mempool (hashes and signatures only)
 * updates the status of all collections in the block 
  
 <!--
