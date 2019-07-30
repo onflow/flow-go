@@ -22,7 +22,7 @@ All collection duties are performed by access nodes.
 * **AN Cluster** - A grouping of ANs that work together to form collections
 * **Collection** - A set of transactions bundled together for execution
 * **Collection Guarantor**: An AN that has signed a collection, thereby guaranteeing to store the collection and all contained transactions until execution (or until all transactions in the collection have expired).
-* **Guaranteed Collection**: a collection where the accumulated stake of all guarantors is _more_ than 2/3 of the clusters total stake
+* **Guaranteed Collection**: A collection of which the accumulated stake of all guarantors is _more_ than 2/3 of the cluster's total stake.
 
 ## Cluster Formation
 
