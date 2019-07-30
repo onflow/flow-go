@@ -133,6 +133,8 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 	checker.checkFunction(
+		declaration.Identifier,
+		declaration.IdentifierPos,
 		declaration.Parameters,
 		declaration.ReturnType,
 		declaration.Block,
@@ -141,7 +143,13 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	return nil
 }
 
-func (checker *Checker) checkFunction(parameters []*ast.Parameter, returnType ast.Type, block *ast.Block) {
+func (checker *Checker) checkFunction(
+	identifier string,
+	identifierPos *ast.Position,
+	parameters []*ast.Parameter,
+	returnType ast.Type,
+	block *ast.Block,
+) {
 	checker.pushActivations()
 	defer checker.popActivations()
 
@@ -149,7 +157,7 @@ func (checker *Checker) checkFunction(parameters []*ast.Parameter, returnType as
 	checker.checkArgumentLabels(parameters)
 	checker.bindParameters(parameters)
 
-	checker.enterFunction(checker.ConvertType(returnType))
+	checker.enterFunction(identifier, identifierPos, checker.functionType(parameters, returnType))
 	defer checker.leaveFunction()
 
 	block.Accept(checker)
@@ -201,19 +209,16 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) {
 func (checker *Checker) bindParameters(parameters []*ast.Parameter) {
 	// declare a constant variable for each parameter
 
+	depth := checker.valueActivations.Depth()
+
 	for _, parameter := range parameters {
 		ty := checker.ConvertType(parameter.Type)
 		checker.setVariable(
 			parameter.Identifier,
 			&Variable{
-				Declaration: &ast.VariableDeclaration{
-					IsConstant: true,
-					Identifier: parameter.Identifier,
-					Type:       parameter.Type,
-					StartPos:   parameter.StartPos,
-					EndPos:     parameter.EndPos,
-				},
-				Type: ty,
+				IsConstant: true,
+				Type:       ty,
+				Depth:      depth,
 			},
 		)
 	}
@@ -255,9 +260,9 @@ func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty
 
 	// variable with this name is not declared in current scope, declare it
 	variable = &Variable{
-		Declaration: declaration,
-		Depth:       depth,
-		Type:        ty,
+		IsConstant: declaration.IsConstant,
+		Depth:      depth,
+		Type:       ty,
 	}
 	checker.setVariable(declaration.Identifier, variable)
 }
@@ -374,7 +379,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	}
 
 	// check identifier is not a constant
-	if variable.Declaration.IsConstant {
+	if variable.IsConstant {
 		panic(&AssignmentToConstantError{
 			Name:     identifier,
 			StartPos: target.StartPosition(),
@@ -522,6 +527,8 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
 	checker.checkFunction(
+		"",
+		nil,
 		expression.Parameters,
 		expression.ReturnType,
 		expression.Block,
@@ -576,11 +583,40 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	panic(&astTypeConversionError{invalidASTType: t})
 }
 
-func (checker *Checker) enterFunction(returnType Type) {
+func (checker *Checker) enterFunction(identifier string, identifierPosition *ast.Position, functionType *FunctionType) {
+	if identifier != "" {
+		checker.declareFunction(identifier, identifierPosition, functionType)
+	}
+
 	checker.functionContexts = append(checker.functionContexts,
 		&functionContext{
-			returnType: returnType,
+			returnType: functionType.ReturnType,
 		})
+}
+
+func (checker *Checker) declareFunction(
+	identifier string,
+	identifierPosition *ast.Position,
+	functionType *FunctionType,
+) {
+	// check if variable with this identifier is already declared in the current scope
+	variable := checker.findVariable(identifier)
+	depth := checker.valueActivations.Depth()
+	if variable != nil && variable.Depth == depth {
+		panic(&RedeclarationError{
+			Kind: common.DeclarationKindFunction,
+			Name: identifier,
+			Pos:  identifierPosition,
+		})
+	}
+
+	// variable with this identifier is not declared in current scope, declare it
+	variable = &Variable{
+		IsConstant: true,
+		Depth:      depth,
+		Type:       functionType,
+	}
+	checker.setVariable(identifier, variable)
 }
 
 func (checker *Checker) leaveFunction() {
@@ -594,4 +630,16 @@ func (checker *Checker) currentFunction() *functionContext {
 		return nil
 	}
 	return checker.functionContexts[lastIndex]
+}
+
+func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast.Type) *FunctionType {
+	parameterTypes := make([]Type, len(parameters))
+	for i, parameter := range parameters {
+		parameterTypes[i] = checker.ConvertType(parameter.Type)
+	}
+
+	return &FunctionType{
+		ParameterTypes: parameterTypes,
+		ReturnType:     checker.ConvertType(returnType),
+	}
 }
