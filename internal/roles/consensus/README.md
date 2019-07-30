@@ -22,7 +22,7 @@ More specifically, collection covers the following:
 * **Consensus Node (CN)** - A node that participates in consensus, produces finalized blocks and runs the random beacon.
 * **Proto Block** - _Candidate_ blocks (potentially unfinalized) that are produced by the BFT consensus algorithm.
   Proto blocks are full blocks _except_ that they don't contain any entropy (which is subsequently added by the random beacon).
-* **Random Beacon** - A _sub_-set of consensus nodes that generate entropy through byzantine-resilient protocol.
+* **Random Beacon** - A _subset_ of consensus nodes that generate entropy through a byzantine-resilient protocol.
   The random beacon adds the entropy (byte-string) to the Proto Blocks.
 * (Full) **Block** - a proto block which
   - has been finalized (committed) by the BFT consensus protocol
