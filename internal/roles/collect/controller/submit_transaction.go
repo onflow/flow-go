@@ -33,6 +33,9 @@ const (
 func (c *Controller) SubmitTransaction(
 	ctx context.Context, req *svc.SubmitTransactionRequest,
 ) (*svc.SubmitTransactionResponse, error) {
+
+	c.log.Info("Transaction submitted")
+
 	tx, err := proto.MessageToSignedTransaction(req.GetTransaction())
 	if err != nil {
 		if err == proto.ErrEmptyMessage {
@@ -42,7 +45,7 @@ func (c *Controller) SubmitTransaction(
 		return nil, status.Error(codes.InvalidArgument, msgFailedTransactionDecode)
 	}
 
-	if c.dal.ContainsTransaction(tx.Hash()) {
+	if c.storage.ContainsTransaction(tx.Hash()) {
 		return &svc.SubmitTransactionResponse{}, nil
 	}
 
@@ -55,7 +58,7 @@ func (c *Controller) SubmitTransaction(
 
 	c.txPool.Insert(tx)
 
-	err = c.dal.InsertTransaction(tx)
+	err = c.storage.InsertTransaction(tx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, msgInternalError)
 	}

@@ -12,7 +12,7 @@
 
 ## <a name="pkg-index">Index</a>
 * [type Controller](#Controller)
-  * [func New(log *logrus.Logger) *Controller](#New)
+  * [func New(storage storage.Storage, txPool *txpool.TxPool, log *logrus.Logger) *Controller](#New)
   * [func (c *Controller) GetCollection(context.Context, *svc.GetCollectionRequest) (*svc.GetCollectionResponse, error)](#Controller.GetCollection)
   * [func (c *Controller) GetTransaction(context.Context, *svc.GetTransactionRequest) (*svc.GetTransactionResponse, error)](#Controller.GetTransaction)
   * [func (c *Controller) Ping(context.Context, *svc.PingRequest) (*svc.PingResponse, error)](#Controller.Ping)
@@ -28,7 +28,7 @@
 
 
 
-## <a name="Controller">type</a> [Controller](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=273:333#L15)
+## <a name="Controller">type</a> [Controller](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=343:441#L16)
 ``` go
 type Controller struct {
     // contains filtered or unexported fields
@@ -41,43 +41,43 @@ type Controller struct {
 
 
 
-### <a name="New">func</a> [New](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=335:375#L20)
+### <a name="New">func</a> [New](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=486:574#L24)
 ``` go
-func New(log *logrus.Logger) *Controller
+func New(storage storage.Storage, txPool *txpool.TxPool, log *logrus.Logger) *Controller
 ```
 
 
 
 
-### <a name="Controller.GetCollection">func</a> (\*Controller) [GetCollection](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=944:1058#L40)
+### <a name="Controller.GetCollection">func</a> (\*Controller) [GetCollection](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=1186:1300#L46)
 ``` go
 func (c *Controller) GetCollection(context.Context, *svc.GetCollectionRequest) (*svc.GetCollectionResponse, error)
 ```
 
 
 
-### <a name="Controller.GetTransaction">func</a> (\*Controller) [GetTransaction](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=770:887#L36)
+### <a name="Controller.GetTransaction">func</a> (\*Controller) [GetTransaction](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=1012:1129#L42)
 ``` go
 func (c *Controller) GetTransaction(context.Context, *svc.GetTransactionRequest) (*svc.GetTransactionResponse, error)
 ```
 
 
 
-### <a name="Controller.Ping">func</a> (\*Controller) [Ping](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=434:521#L26)
+### <a name="Controller.Ping">func</a> (\*Controller) [Ping](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=676:763#L32)
 ``` go
 func (c *Controller) Ping(context.Context, *svc.PingRequest) (*svc.PingResponse, error)
 ```
 
 
 
-### <a name="Controller.SubmitCollection">func</a> (\*Controller) [SubmitCollection](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=590:713#L32)
+### <a name="Controller.SubmitCollection">func</a> (\*Controller) [SubmitCollection](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=832:955#L38)
 ``` go
 func (c *Controller) SubmitCollection(context.Context, *svc.SubmitCollectionRequest) (*svc.SubmitCollectionResponse, error)
 ```
 
 
 
-### <a name="Controller.SubmitTransaction">func</a> (\*Controller) [SubmitTransaction](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/submit_transaction.go?s=863:1001#L32)
+### <a name="Controller.SubmitTransaction">func</a> (\*Controller) [SubmitTransaction](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/submit_transaction.go?s=934:1072#L33)
 ``` go
 func (c *Controller) SubmitTransaction(
     ctx context.Context, req *svc.SubmitTransactionRequest,
