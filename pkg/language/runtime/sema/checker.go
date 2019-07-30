@@ -556,6 +556,9 @@ func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalEx
 }
 
 func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
+
+	// check the invoked expression can be invoked
+
 	invokedExpression := invocationExpression.Expression
 	expressionType := invokedExpression.Accept(checker).(Type)
 
@@ -568,7 +571,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		})
 	}
 
-	// ensures the invocation's argument count matches the function's parameter count
+	// check the invocation's argument count matches the function's parameter count
 
 	parameterCount := len(functionType.ParameterTypes)
 	argumentCount := len(invocationExpression.Arguments)
@@ -582,7 +585,23 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		})
 	}
 
-	// TODO: ensure types of arguments match types of parameters
+	for i := 0; i < parameterCount; i++ {
+		// ensure the type of the argument matches the type of the parameter
+
+		parameterType := functionType.ParameterTypes[i]
+		argument := invocationExpression.Arguments[i]
+		argumentType := argument.Expression.Accept(checker).(Type)
+
+		if !checker.IsSubType(argumentType, parameterType) {
+			panic(&TypeMismatchError{
+				ExpectedType: parameterType,
+				ActualType:   argumentType,
+				StartPos:     argument.Expression.StartPosition(),
+				EndPos:       argument.Expression.EndPosition(),
+			})
+		}
+	}
+
 	// TODO: ensure argument labels of arguments match argument labels of parameters
 
 	return functionType.ReturnType

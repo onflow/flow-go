@@ -746,6 +746,29 @@ func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
 }
 
+func TestCheckFunctionCallWithCorrectArgumentCount(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+     fun f(x: Int): Int {
+         return x
+     }
+
+     fun test(): Int {
+         return f(1)
+     }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -805,4 +828,27 @@ func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+}
+
+func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+     fun f(x: Int): Int {
+         return x
+     }
+
+     fun test(): Int {
+         return f(true)
+     }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
