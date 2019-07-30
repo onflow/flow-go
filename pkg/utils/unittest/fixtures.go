@@ -1,5 +1,4 @@
-// Package mocks provides mocked values of common types for use in unit tests.
-package mocks
+package unittest
 
 import (
 	"time"
@@ -7,18 +6,18 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
-func MockAddress() types.Address {
+func AddressFixture() types.Address {
 	return types.ZeroAddress()
 }
 
-func MockAccountSignature() types.AccountSignature {
+func AccountSignatureFixture() types.AccountSignature {
 	return types.AccountSignature{
 		Account:   MockAddress(),
 		Signature: []byte{},
 	}
 }
 
-func MockSignedTransaction() types.SignedTransaction {
+func SignedTransactionFixture() types.SignedTransaction {
 	return types.SignedTransaction{
 		Script:         []byte("fun main() {}"),
 		Nonce:          1,
