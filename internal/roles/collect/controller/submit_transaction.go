@@ -41,9 +41,14 @@ func (c *Controller) SubmitTransaction(
 		return nil, status.Error(codes.InvalidArgument, msgFailedTransactionDecode)
 	}
 
-	if err := c.validateSignedTransaction(tx); err != nil {
+	// TODO: check if transaction exists in storage
+
+	if err := c.validateTransactionBody(tx); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+
+	// TODO: validate transaction signature
+	// https://github.com/dapperlabs/bamboo-node/issues/171
 
 	// TODO: store transaction
 	// https://github.com/dapperlabs/bamboo-node/issues/169
@@ -64,7 +69,7 @@ func (e errIncompleteTransaction) Error() string {
 	)
 }
 
-func (c *Controller) validateSignedTransaction(tx types.SignedTransaction) error {
+func (c *Controller) validateTransactionBody(tx types.SignedTransaction) error {
 	missingFields := make([]string, 0)
 
 	if len(tx.Script) == 0 {
@@ -78,9 +83,6 @@ func (c *Controller) validateSignedTransaction(tx types.SignedTransaction) error
 	if len(missingFields) > 0 {
 		return errIncompleteTransaction{missingFields}
 	}
-
-	// TODO: validate transaction signature
-	// https://github.com/dapperlabs/bamboo-node/issues/171
 
 	return nil
 }

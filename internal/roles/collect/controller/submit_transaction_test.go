@@ -15,42 +15,60 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/utils/unittest"
 )
 
-func TestSubmitTransaction(t *testing.T) {
-	RegisterTestingT(t)
-
-	c := controller.New(logrus.New())
-
-	ctx := context.Background()
-
-	tx := unittest.SignedTransactionFixture()
-
-	txMsg, err := proto.SignedTransactionToMessage(tx)
-	Expect(err).ToNot(HaveOccurred())
-
-	_, err = c.SubmitTransaction(ctx, &svc.SubmitTransactionRequest{
-		Transaction: txMsg,
-	})
-	Expect(err).ToNot(HaveOccurred())
+type transactionTestCase struct {
+	title         string
+	tx            types.SignedTransaction
+	shouldSucceed bool
 }
 
-func TestSubmitInvalidTransaction(t *testing.T) {
-	RegisterTestingT(t)
+var transactionTests = []transactionTestCase{
+	{
+		title:         "valid transaction",
+		tx:            unittest.SignedTransactionFixture(),
+		shouldSucceed: true,
+	},
+	{
+		title: "transaction with no script should be rejected",
+		tx: types.SignedTransaction{
+			Nonce:          10,
+			ComputeLimit:   5,
+			PayerSignature: unittest.AccountSignatureFixture(),
+		},
+		shouldSucceed: false,
+	},
+	{
+		title: "transaction with no compute limit should be rejecte",
+		tx: types.SignedTransaction{
+			Nonce:          10,
+			Script:         []byte("fun main() {}"),
+			PayerSignature: unittest.AccountSignatureFixture(),
+		},
+		shouldSucceed: false,
+	},
+}
 
-	c := controller.New(logrus.New())
+func TestSubmitTransaction(t *testing.T) {
+	for _, tt := range transactionTests {
+		t.Run(tt.title, func(t *testing.T) {
+			RegisterTestingT(t)
 
-	ctx := context.Background()
+			c := controller.New(logrus.New())
 
-	// transaction missing script and compute_limit fields
-	tx := types.SignedTransaction{
-		Nonce:          10,
-		PayerSignature: unittest.AccountSignatureFixture(),
+			txMsg, err := proto.SignedTransactionToMessage(tt.tx)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = c.SubmitTransaction(
+				context.Background(),
+				&svc.SubmitTransactionRequest{
+					Transaction: txMsg,
+				},
+			)
+
+			if tt.shouldSucceed {
+				Expect(err).ToNot(HaveOccurred())
+			} else {
+				Expect(err).To(HaveOccurred())
+			}
+		})
 	}
-
-	txMsg, err := proto.SignedTransactionToMessage(tx)
-	Expect(err).ToNot(HaveOccurred())
-
-	_, err = c.SubmitTransaction(ctx, &svc.SubmitTransactionRequest{
-		Transaction: txMsg,
-	})
-	Expect(err).To(HaveOccurred())
 }
