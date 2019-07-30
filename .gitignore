@@ -11,7 +11,11 @@ node_modules
 
 bamboo
 bamboo.mnemonic
+ 
+.idea
 
 # IDE related files
 .vscode
-.idea
+
+#relic submodule
+./pkg/crypto/relic
