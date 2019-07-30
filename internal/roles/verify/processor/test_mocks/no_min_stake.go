@@ -1,6 +1,6 @@
 package testmocks
 
-import "github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
+import "github.com/dapperlabs/bamboo-node/pkg/types"
 
 func NewMockEffectsNoMinStake(m *MockEffectsHappyPath) *MockEffectsNoMinStake {
 	return &MockEffectsNoMinStake{m, 0}
@@ -12,7 +12,7 @@ type MockEffectsNoMinStake struct {
 	_callCount int
 }
 
-func (m *MockEffectsNoMinStake) HasMinStake(*processor.ExecutionReceipt) (bool, error) {
+func (m *MockEffectsNoMinStake) HasMinStake(*types.ExecutionReceipt) (bool, error) {
 	m._callCount++
 	return false, nil
 }
