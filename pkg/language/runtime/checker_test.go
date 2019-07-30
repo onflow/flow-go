@@ -744,13 +744,13 @@ func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-     fun f(x: Int): Int {
-         return x
-     }
+      fun f(x: Int): Int {
+          return x
+      }
 
-     fun test(): Int {
-         return f()
-     }
+      fun test(): Int {
+          return f()
+      }
 	`)
 
 	Expect(errors).
@@ -763,17 +763,17 @@ func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
 }
 
-func TestCheckFunctionCallWithCorrectArgumentCount(t *testing.T) {
+func TestCheckFunctionCallWithArgumentLabel(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-     fun f(x: Int): Int {
-         return x
-     }
+      fun f(x: Int): Int {
+          return x
+      }
 
-     fun test(): Int {
-         return f(1)
-     }
+      fun test(): Int {
+          return f(x: 1)
+      }
 	`)
 
 	Expect(errors).
@@ -785,6 +785,76 @@ func TestCheckFunctionCallWithCorrectArgumentCount(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
+
+func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun f(_ x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
+          return f(1)
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+// TODO:
+//func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
+//	RegisterTestingT(t)
+//
+//	program, errors := parser.Parse(`
+//      fun f(x: Int): Int {
+//          return x
+//      }
+//
+//      fun test(): Int {
+//          return f(1)
+//      }
+//	`)
+//
+//	Expect(errors).
+//		To(BeEmpty())
+//
+//	checker := sema.NewChecker(program)
+//	err := checker.Check()
+//
+//	Expect(err).
+//		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+//}
+//
+//func TestCheckFunctionCallIncorrectArgumentLabel(t *testing.T) {
+//	RegisterTestingT(t)
+//
+//	program, errors := parser.Parse(`
+//      fun f(x: Int): Int {
+//          return x
+//      }
+//
+//      fun test(): Int {
+//          return f(y: 1)
+//      }
+//	`)
+//
+//	Expect(errors).
+//		To(BeEmpty())
+//
+//	checker := sema.NewChecker(program)
+//	err := checker.Check()
+//
+//	Expect(err).
+//		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
+//}
 
 func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 	RegisterTestingT(t)
@@ -851,13 +921,13 @@ func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-     fun f(x: Int): Int {
-         return x
-     }
+      fun f(x: Int): Int {
+          return x
+      }
 
-     fun test(): Int {
-         return f(true)
-     }
+      fun test(): Int {
+          return f(true)
+      }
 	`)
 
 	Expect(errors).
