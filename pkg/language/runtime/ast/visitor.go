@@ -7,6 +7,21 @@ type Element interface {
 	Accept(Visitor) Repr
 }
 
+type NotAnElement struct{}
+
+func (NotAnElement) Accept(Visitor) Repr {
+	// NO-OP
+	return nil
+}
+
+func (NotAnElement) StartPosition() *Position {
+	return nil
+}
+
+func (NotAnElement) EndPosition() *Position {
+	return nil
+}
+
 type Visitor interface {
 	VisitProgram(*Program) Repr
 	VisitFunctionDeclaration(*FunctionDeclaration) Repr
