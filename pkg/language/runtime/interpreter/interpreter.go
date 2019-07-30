@@ -132,6 +132,11 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 	defer func() {
 		if r := recover(); r != nil {
 			var ok bool
+			// don't recover Go errors
+			err, ok = r.(goRuntime.Error)
+			if ok {
+				panic(err)
+			}
 			err, ok = r.(error)
 			if !ok {
 				err = fmt.Errorf("%v", r)
