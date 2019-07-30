@@ -11,8 +11,8 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
-	"github.com/dapperlabs/bamboo-node/pkg/types/mocks"
 	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
+	"github.com/dapperlabs/bamboo-node/pkg/utils/unittest"
 )
 
 func TestSubmitTransaction(t *testing.T) {
@@ -22,7 +22,7 @@ func TestSubmitTransaction(t *testing.T) {
 
 	ctx := context.Background()
 
-	tx := mocks.MockSignedTransaction()
+	tx := unittest.SignedTransactionFixture()
 
 	txMsg, err := proto.SignedTransactionToMessage(tx)
 	Expect(err).ToNot(HaveOccurred())
@@ -43,7 +43,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 	// transaction missing script and compute_limit fields
 	tx := types.SignedTransaction{
 		Nonce:          10,
-		PayerSignature: mocks.MockAccountSignature(),
+		PayerSignature: unittest.AccountSignatureFixture(),
 	}
 
 	txMsg, err := proto.SignedTransactionToMessage(tx)
