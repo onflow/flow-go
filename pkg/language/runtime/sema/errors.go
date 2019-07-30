@@ -207,3 +207,53 @@ func (e *ArgumentCountError) StartPosition() *ast.Position {
 func (e *ArgumentCountError) EndPosition() *ast.Position {
 	return e.EndPos
 }
+
+// MissingArgumentLabelError
+
+// TODO: suggest adding argument label
+
+type MissingArgumentLabelError struct {
+	ExpectedArgumentLabel string
+	StartPos              *ast.Position
+	EndPos                *ast.Position
+}
+
+func (e *MissingArgumentLabelError) Error() string {
+	return fmt.Sprintf(
+		"missing argument label: %s",
+		e.ExpectedArgumentLabel,
+	)
+}
+
+func (e *MissingArgumentLabelError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *MissingArgumentLabelError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
+// IncorrectArgumentLabelError
+
+type IncorrectArgumentLabelError struct {
+	ExpectedArgumentLabel string
+	ActualArgumentLabel   string
+	StartPos              *ast.Position
+	EndPos                *ast.Position
+}
+
+func (e *IncorrectArgumentLabelError) Error() string {
+	return fmt.Sprintf(
+		"incorrect argument label: got `%s`, need `%s`",
+		e.ActualArgumentLabel,
+		e.ExpectedArgumentLabel,
+	)
+}
+
+func (e *IncorrectArgumentLabelError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *IncorrectArgumentLabelError) EndPosition() *ast.Position {
+	return e.EndPos
+}
