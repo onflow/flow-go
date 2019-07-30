@@ -6,7 +6,7 @@ network's computation state.
 More specifically, collection covers the following:
 
 **Block Production** 
-- Receiving collections from Collector Nodes. 
+- Receiving collections from Collector Nodes
 - Block formation (generating a candidate block and proposing it to the network)
 - BFT consensus to agree on the collections included in a block
 - Random Beacon which adds entropy for seeding pseudo-random-number generators to the block
