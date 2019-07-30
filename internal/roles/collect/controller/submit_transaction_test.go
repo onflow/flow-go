@@ -10,6 +10,7 @@ import (
 	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/txpool"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
 	"github.com/dapperlabs/bamboo-node/pkg/utils/unittest"
@@ -52,7 +53,7 @@ func TestSubmitTransaction(t *testing.T) {
 		t.Run(tt.title, func(t *testing.T) {
 			RegisterTestingT(t)
 
-			c := controller.New(logrus.New())
+			c := controller.New(txpool.New(), logrus.New())
 
 			txMsg, err := proto.SignedTransactionToMessage(tt.tx)
 			Expect(err).ToNot(HaveOccurred())

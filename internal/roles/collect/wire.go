@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/config"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/txpool"
 )
 
 // InitializeServer resolves all dependencies for dependency injection and returns the server object
@@ -15,6 +16,7 @@ func InitializeServer() (*Server, error) {
 	wire.Build(
 		NewServer,
 		config.New,
+		txpool.New,
 		logrus.New,
 		controller.New,
 	)

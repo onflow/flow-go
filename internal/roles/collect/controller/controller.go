@@ -10,16 +10,19 @@ import (
 	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/data"
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/txpool"
 )
 
 type Controller struct {
-	dal *data.DAL
-	log *logrus.Entry
+	dal    *data.DAL
+	txPool *txpool.TxPool
+	log    *logrus.Entry
 }
 
-func New(log *logrus.Logger) *Controller {
+func New(txPool *txpool.TxPool, log *logrus.Logger) *Controller {
 	return &Controller{
-		log: logrus.NewEntry(log),
+		txPool: txPool,
+		log:    logrus.NewEntry(log),
 	}
 }
 
