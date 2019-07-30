@@ -64,7 +64,7 @@ When a CN generates sees a proto block from a different CN, it
 -->
  
 
-### BFT consensus
+### BFT Consensus
 
 The BFT consensus algorithm is abstracted behind a generic API.
 The only fixed API-level requirement for the consensus algorithm is deterministic finality.    
