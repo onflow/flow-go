@@ -130,6 +130,8 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	checker.pushActivations()
 	defer checker.popActivations()
 
+	checker.checkParameterNames(declaration.Parameters)
+	checker.checkArgumentLabels(declaration.Parameters)
 	checker.bindParameters(declaration.Parameters)
 
 	declaration.Block.Accept(checker)
@@ -137,10 +139,50 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	return nil
 }
 
+// checkParameterNames checks that all parameter names are unique
+//
+func (checker *Checker) checkParameterNames(parameters []*ast.Parameter) {
+	identifierPositions := map[string]*ast.Position{}
+
+	for _, parameter := range parameters {
+		identifier := parameter.Identifier
+		if previousPos, ok := identifierPositions[identifier]; ok {
+			panic(&RedeclarationError{
+				Kind:        common.DeclarationKindParameter,
+				Name:        identifier,
+				Pos:         parameter.IdentifierPos,
+				PreviousPos: previousPos,
+			})
+		}
+		identifierPositions[identifier] = parameter.IdentifierPos
+	}
+}
+
+// checkArgumentLabels checks that all argument labels (if any) are unique
+//
+func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) {
+	argumentLabelPositions := map[string]*ast.Position{}
+
+	for _, parameter := range parameters {
+		label := parameter.Label
+		if label == "" {
+			continue
+		}
+
+		if previousPos, ok := argumentLabelPositions[label]; ok {
+			panic(&RedeclarationError{
+				Kind:        common.DeclarationKindArgumentLabel,
+				Name:        label,
+				Pos:         parameter.LabelPos,
+				PreviousPos: previousPos,
+			})
+		}
+
+		argumentLabelPositions[label] = parameter.LabelPos
+	}
+}
+
 func (checker *Checker) bindParameters(parameters []*ast.Parameter) {
-
-	// TODO: check all parameter names are unique
-
 	// declare a constant variable for each parameter
 
 	for _, parameter := range parameters {
@@ -180,8 +222,9 @@ func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty
 	depth := checker.valueActivations.Depth()
 	if variable != nil && variable.Depth == depth {
 		panic(&RedeclarationError{
+			Kind: declaration.DeclarationKind(),
 			Name: declaration.Identifier,
-			Pos:  declaration.GetIdentifierPosition(),
+			Pos:  declaration.IdentifierPosition(),
 		})
 	}
 
@@ -198,8 +241,9 @@ func (checker *Checker) declareGlobal(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
 	if _, exists := checker.Globals[name]; exists {
 		panic(&RedeclarationError{
+			Kind: declaration.DeclarationKind(),
 			Name: name,
-			Pos:  declaration.GetIdentifierPosition(),
+			Pos:  declaration.IdentifierPosition(),
 		})
 	}
 	checker.Globals[name] = checker.findVariable(name)

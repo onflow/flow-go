@@ -112,21 +112,30 @@ func (v *ProgramVisitor) VisitParameterList(ctx *ParameterListContext) interface
 }
 
 func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
+	// label
 	label := ""
+	var labelPos *ast.Position
 	if ctx.argumentLabel != nil {
 		label = ctx.argumentLabel.GetText()
+		labelPos = ast.PositionFromToken(ctx.argumentLabel)
 	}
-	name := ctx.parameterName.GetText()
+
+	// identifier
+	identifier := ctx.parameterName.GetText()
+	identifierPos := ast.PositionFromToken(ctx.parameterName)
+
 	fullType := ctx.FullType().Accept(v).(ast.Type)
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
 
 	return &ast.Parameter{
-		Label:      label,
-		Identifier: name,
-		Type:       fullType,
-		StartPos:   startPosition,
-		EndPos:     endPosition,
+		Label:         label,
+		Identifier:    identifier,
+		Type:          fullType,
+		LabelPos:      labelPos,
+		IdentifierPos: identifierPos,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
 }
 

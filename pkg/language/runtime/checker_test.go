@@ -384,3 +384,37 @@ func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 }
+
+func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test(a: Int, a: Int) {}
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckInvalidArgumentLabelRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test(x a: Int, x b: Int) {}
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}

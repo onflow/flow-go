@@ -7,7 +7,8 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 type Operation int
 
 const (
-	OperationOr Operation = iota
+	OperationUnknown Operation = iota
+	OperationOr
 	OperationAnd
 	OperationEqual
 	OperationUnequal

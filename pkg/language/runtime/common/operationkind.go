@@ -7,7 +7,8 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 type OperationKind int
 
 const (
-	OperationKindUnary OperationKind = iota
+	OperationKindUnknown OperationKind = iota
+	OperationKindUnary
 	OperationKindBinary
 	OperationKindTernary
 )
