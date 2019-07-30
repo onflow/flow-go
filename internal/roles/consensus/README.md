@@ -19,7 +19,7 @@ More specifically, collection covers the following:
 ## Terminology
 
 * **Collection** - A set of transactions bundled together by a [Collection Node Cluster](../../../internal/roles/collect)
-* **Consensus Nodes (CNs)** - collectively produce finalized blocks (including running the random beacon) 
+* **Consensus Node (CN)** - A node that participates in consensus, produces finalized blocks and runs the random beacon.
 * **Proto Block** - _Candidate_ blocks (potentially unfinalized) that are produced by the BFT consensus algorithm.
   Proto Blocks are full blocks _except_ that they don't contain any entropy (which is subsequently added by the Random Beacon)   
 * **Random Beacon** - A _sub_-set of consensus nodes that generate entropy through byzantine-resilient protocol.
