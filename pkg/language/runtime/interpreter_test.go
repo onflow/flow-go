@@ -20,11 +20,12 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
         var b = [1, 2]
     `)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
@@ -54,11 +55,13 @@ func TestInterpretDeclarations(t *testing.T) {
         }
     `)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
@@ -69,14 +72,17 @@ func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
 
 	program, errors := parser.Parse(``)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
 }
 
 func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
@@ -86,33 +92,17 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
        let test = 1
    `)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
-}
-
-func TestInterpretInvalidUnknownDeclaration(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test() {
-           return x
-       }
-	`)
-
-	Expect(errors).Should(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
 }
 
 func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
@@ -124,14 +114,17 @@ func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
 }
 
 func TestInterpretInvalidUnknownDeclarationIndexing(t *testing.T) {
@@ -143,14 +136,17 @@ func TestInterpretInvalidUnknownDeclarationIndexing(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
 }
 
 func TestInterpretInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
@@ -162,14 +158,17 @@ func TestInterpretInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
 }
 
 func TestInterpretLexicalScope(t *testing.T) {
@@ -190,11 +189,13 @@ func TestInterpretLexicalScope(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(10)}))
@@ -221,11 +222,13 @@ func TestInterpretNoHoisting(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -244,11 +247,13 @@ func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
        let y = (fun (x: Int32): Int32 { return x })(42)
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(10)}))
@@ -270,14 +275,17 @@ func TestInterpretInvalidFunctionCallWithTooFewArguments(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ArgumentCountError{}))
 }
 
 func TestInterpretInvalidFunctionCallWithTooManyArguments(t *testing.T) {
@@ -293,14 +301,17 @@ func TestInterpretInvalidFunctionCallWithTooManyArguments(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ArgumentCountError{}))
 }
 
 func TestInterpretInvalidFunctionCallOfBool(t *testing.T) {
@@ -312,14 +323,17 @@ func TestInterpretInvalidFunctionCallOfBool(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
 }
 
 func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
@@ -331,14 +345,17 @@ func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
 }
 
 func TestInterpretInvalidConstantAssignment(t *testing.T) {
@@ -351,14 +368,17 @@ func TestInterpretInvalidConstantAssignment(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.AssignmentToConstantError{}))
 }
 
 func TestInterpretVariableAssignment(t *testing.T) {
@@ -372,11 +392,13 @@ func TestInterpretVariableAssignment(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
@@ -393,14 +415,17 @@ func TestInterpretInvalidGlobalConstantAssignment(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.AssignmentToConstantError{}))
 }
 
 func TestInterpretGlobalVariableAssignment(t *testing.T) {
@@ -415,11 +440,13 @@ func TestInterpretGlobalVariableAssignment(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -429,42 +456,6 @@ func TestInterpretGlobalVariableAssignment(t *testing.T) {
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
-}
-
-func TestInterpretInvalidConstantRedeclaration(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test() {
-           let x = 2
-           let x = 3
-       }
-	`)
-
-	Expect(errors).Should(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
-}
-
-func TestInterpretInvalidGlobalConstantRedeclaration(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-		let x = 2
-		let x = 3
-	`)
-
-	Expect(errors).Should(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-
-	Expect(err).Should(HaveOccurred())
 }
 
 func TestInterpretConstantRedeclaration(t *testing.T) {
@@ -479,11 +470,13 @@ func TestInterpretConstantRedeclaration(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -505,11 +498,13 @@ func TestInterpretParameters(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("returnA", int64(24), int64(42))).
 		To(Equal(interpreter.Int64Value(24)))
@@ -528,11 +523,13 @@ func TestInterpretArrayIndexing(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
@@ -548,14 +545,17 @@ func TestInterpretInvalidArrayIndexingWithBool(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidIndexValueError{}))
 }
 
 func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
@@ -567,14 +567,17 @@ func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.NotIndexableError{}))
 }
 
 func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
@@ -586,14 +589,17 @@ func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.NotIndexableError{}))
 }
 
 func TestInterpretArrayIndexingAssignment(t *testing.T) {
@@ -607,11 +613,13 @@ func TestInterpretArrayIndexingAssignment(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -628,14 +636,17 @@ func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidIndexValueError{}))
 }
 
 func TestInterpretReturnWithoutExpression(t *testing.T) {
@@ -648,11 +659,13 @@ func TestInterpretReturnWithoutExpression(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("returnEarly")).
 		To(Equal(interpreter.VoidValue{}))
@@ -681,23 +694,28 @@ func TestInterpretPlusOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testIntegers")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBools")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretMinusOperator(t *testing.T) {
@@ -721,23 +739,28 @@ func TestInterpretMinusOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testIntegers")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(-2)}))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBools")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretMulOperator(t *testing.T) {
@@ -761,23 +784,28 @@ func TestInterpretMulOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testIntegers")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(8)}))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBools")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretDivOperator(t *testing.T) {
@@ -801,23 +829,28 @@ func TestInterpretDivOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testIntegers")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBools")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretModOperator(t *testing.T) {
@@ -841,23 +874,28 @@ func TestInterpretModOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testIntegers")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBools")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretEqualOperator(t *testing.T) {
@@ -897,11 +935,13 @@ func TestInterpretEqualOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testIntegersUnequal")).
 		To(Equal(interpreter.BoolValue(false)))
@@ -910,10 +950,12 @@ func TestInterpretEqualOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(true)))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	Expect(inter.Invoke("testTrueAndTrue")).
 		To(Equal(interpreter.BoolValue(true)))
@@ -965,11 +1007,13 @@ func TestInterpretUnequalOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testIntegersUnequal")).
 		To(Equal(interpreter.BoolValue(true)))
@@ -978,10 +1022,12 @@ func TestInterpretUnequalOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	Expect(inter.Invoke("testTrueAndTrue")).
 		To(Equal(interpreter.BoolValue(false)))
@@ -1037,11 +1083,13 @@ func TestInterpretLessOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testIntegersGreater")).
 		To(Equal(interpreter.BoolValue(false)))
@@ -1053,22 +1101,28 @@ func TestInterpretLessOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(true)))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testTrueAndTrue")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testTrueAndFalse")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndTrue")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndFalse")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretLessEqualOperator(t *testing.T) {
@@ -1112,11 +1166,13 @@ func TestInterpretLessEqualOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testIntegersGreater")).
 		To(Equal(interpreter.BoolValue(false)))
@@ -1128,22 +1184,28 @@ func TestInterpretLessEqualOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(true)))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testTrueAndTrue")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testTrueAndFalse")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndTrue")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndFalse")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretGreaterOperator(t *testing.T) {
@@ -1187,11 +1249,13 @@ func TestInterpretGreaterOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testIntegersGreater")).
 		To(Equal(interpreter.BoolValue(true)))
@@ -1203,22 +1267,28 @@ func TestInterpretGreaterOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testTrueAndTrue")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testTrueAndFalse")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndTrue")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndFalse")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretGreaterEqualOperator(t *testing.T) {
@@ -1262,11 +1332,13 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testIntegersGreater")).
 		To(Equal(interpreter.BoolValue(true)))
@@ -1278,22 +1350,28 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testTrueAndTrue")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testTrueAndFalse")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndTrue")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 
 	_, err = inter.Invoke("testFalseAndFalse")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretOrOperator(t *testing.T) {
@@ -1329,11 +1407,13 @@ func TestInterpretOrOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testTrueTrue")).
 		To(Equal(interpreter.BoolValue(true)))
@@ -1348,13 +1428,16 @@ func TestInterpretOrOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testIntegers")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretAndOperator(t *testing.T) {
@@ -1390,11 +1473,13 @@ func TestInterpretAndOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("testTrueTrue")).
 		To(Equal(interpreter.BoolValue(true)))
@@ -1409,13 +1494,16 @@ func TestInterpretAndOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 
 	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	_, err = inter.Invoke("testIntegers")
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretIfStatement(t *testing.T) {
@@ -1457,16 +1545,25 @@ func TestInterpretIfStatement(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
-	Expect(inter.Invoke("testTrue")).To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
-	Expect(inter.Invoke("testFalse")).To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
-	Expect(inter.Invoke("testNoElse")).To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
-	Expect(inter.Invoke("testElseIf")).To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+	Expect(inter.Invoke("testTrue")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Invoke("testFalse")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+
+	Expect(inter.Invoke("testNoElse")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Invoke("testElseIf")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
 
 func TestInterpretWhileStatement(t *testing.T) {
@@ -1483,13 +1580,16 @@ func TestInterpretWhileStatement(t *testing.T) {
 
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
-	Expect(inter.Invoke("test")).To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
 }
 
 func TestInterpretWhileStatementWithReturn(t *testing.T) {
@@ -1509,13 +1609,16 @@ func TestInterpretWhileStatementWithReturn(t *testing.T) {
 
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
-	Expect(inter.Invoke("test")).To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
 }
 
 func TestInterpretExpressionStatement(t *testing.T) {
@@ -1534,15 +1637,22 @@ func TestInterpretExpressionStatement(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
-	Expect(inter.Globals["x"].Value).To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
-	Expect(inter.Invoke("test")).To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
-	Expect(inter.Globals["x"].Value).To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
 }
 
 func TestInterpretConditionalOperator(t *testing.T) {
@@ -1558,14 +1668,19 @@ func TestInterpretConditionalOperator(t *testing.T) {
        }
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
-	Expect(inter.Invoke("testTrue")).To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
-	Expect(inter.Invoke("testFalse")).To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+	Expect(inter.Invoke("testTrue")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Invoke("testFalse")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
 
 func TestInterpretInvalidAssignmentToParameter(t *testing.T) {
@@ -1577,14 +1692,17 @@ func TestInterpretInvalidAssignmentToParameter(t *testing.T) {
        }
    `)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
-	_, err = inter.Invoke("test")
-	Expect(err).Should(HaveOccurred())
+	_, err = inter.Invoke("test", int8(1))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.AssignmentToConstantError{}))
 }
 
 func TestInterpretFunctionBindingInFunction(t *testing.T) {
@@ -1596,14 +1714,17 @@ func TestInterpretFunctionBindingInFunction(t *testing.T) {
        }
    `)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	_, err = inter.Invoke("foo")
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 }
 
 func TestInterpretRecursion(t *testing.T) {
@@ -1622,11 +1743,13 @@ func TestInterpretRecursion(t *testing.T) {
        }
    `)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
 	Expect(inter.Invoke("fib", big.NewInt(14))).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(377)}))
@@ -1640,14 +1763,19 @@ func TestInterpretUnaryIntegerNegation(t *testing.T) {
       let y = -(-2)
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
-	Expect(inter.Globals["x"].Value).To(Equal(interpreter.IntValue{Int: big.NewInt(-2)}))
-	Expect(inter.Globals["y"].Value).To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(-2)}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
 }
 
 func TestInterpretUnaryBooleanNegation(t *testing.T) {
@@ -1660,16 +1788,25 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
       let d = !(!false)
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
-	Expect(inter.Globals["a"].Value).To(Equal(interpreter.BoolValue(false)))
-	Expect(inter.Globals["b"].Value).To(Equal(interpreter.BoolValue(true)))
-	Expect(inter.Globals["c"].Value).To(Equal(interpreter.BoolValue(true)))
-	Expect(inter.Globals["d"].Value).To(Equal(interpreter.BoolValue(false)))
+	Expect(inter.Globals["a"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+
+	Expect(inter.Globals["b"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["c"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["d"].Value).
+		To(Equal(interpreter.BoolValue(false)))
 }
 
 func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
@@ -1679,11 +1816,13 @@ func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
       let a = !1
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidUnaryOperandError{}))
 }
 
 func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
@@ -1693,11 +1832,13 @@ func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
       let a = -true
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 	err := inter.Interpret()
-	Expect(err).Should(HaveOccurred())
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.InvalidUnaryOperandError{}))
 }
 
 func TestInterpretHostFunction(t *testing.T) {
@@ -1707,7 +1848,8 @@ func TestInterpretHostFunction(t *testing.T) {
       let a = test(1, 2)
 	`)
 
-	Expect(errors).Should(BeEmpty())
+	Expect(errors).
+		To(BeEmpty())
 
 	inter := interpreter.NewInterpreter(program)
 
@@ -1729,7 +1871,9 @@ func TestInterpretHostFunction(t *testing.T) {
 
 	inter.ImportFunction("test", testFunction)
 	err := inter.Interpret()
-	Expect(err).ShouldNot(HaveOccurred())
+	Expect(err).
+		ToNot(HaveOccurred())
 
-	Expect(inter.Globals["a"].Value).To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+	Expect(inter.Globals["a"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
