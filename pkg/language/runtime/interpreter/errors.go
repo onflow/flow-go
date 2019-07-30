@@ -72,33 +72,6 @@ func (e *NotCallableError) EndPosition() *ast.Position {
 	return e.EndPos
 }
 
-// InvalidUnaryOperandError
-
-type InvalidUnaryOperandError struct {
-	Operation    ast.Operation
-	ExpectedType sema.Type
-	Value        Value
-	StartPos     *ast.Position
-	EndPos       *ast.Position
-}
-
-func (e *InvalidUnaryOperandError) Error() string {
-	return fmt.Sprintf(
-		"cannot apply unary operation %s to value: %#+v. Expected type %s",
-		e.Operation.Symbol(),
-		e.Value,
-		e.ExpectedType.String(),
-	)
-}
-
-func (e *InvalidUnaryOperandError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidUnaryOperandError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
 // InvalidBinaryOperandError
 
 type InvalidBinaryOperandError struct {

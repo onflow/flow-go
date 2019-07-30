@@ -450,44 +450,6 @@ func (interpreter *Interpreter) visitBinaryBoolOperand(
 	return boolValue
 }
 
-func (interpreter *Interpreter) visitUnaryBoolOperand(
-	value Value,
-	operation ast.Operation,
-	startPos *ast.Position,
-	endPos *ast.Position,
-) BoolValue {
-	boolValue, isBool := value.(BoolValue)
-	if !isBool {
-		panic(&InvalidUnaryOperandError{
-			Operation:    operation,
-			ExpectedType: &sema.BoolType{},
-			Value:        value,
-			StartPos:     startPos,
-			EndPos:       endPos,
-		})
-	}
-	return boolValue
-}
-
-func (interpreter *Interpreter) visitUnaryIntegerOperand(
-	value Value,
-	operation ast.Operation,
-	startPos *ast.Position,
-	endPos *ast.Position,
-) IntegerValue {
-	integerValue, isInteger := value.(IntegerValue)
-	if !isInteger {
-		panic(&InvalidUnaryOperandError{
-			Operation:    operation,
-			ExpectedType: &sema.IntegerType{},
-			Value:        value,
-			StartPos:     startPos,
-			EndPos:       endPos,
-		})
-	}
-	return integerValue
-}
-
 // visitBinaryOperation interprets the left-hand side and the right-hand side and returns
 // the result in a integerTuple or booleanTuple
 func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression) Trampoline {
@@ -721,21 +683,11 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 
 			switch expression.Operation {
 			case ast.OperationNegate:
-				boolValue := interpreter.visitUnaryBoolOperand(
-					value,
-					expression.Operation,
-					expression.StartPosition(),
-					expression.EndPosition(),
-				)
+				boolValue := value.(BoolValue)
 				return boolValue.Negate()
 
 			case ast.OperationMinus:
-				integerValue := interpreter.visitUnaryIntegerOperand(
-					value,
-					expression.Operation,
-					expression.StartPosition(),
-					expression.EndPosition(),
-				)
+				integerValue := value.(IntegerValue)
 				return integerValue.Negate()
 			}
 

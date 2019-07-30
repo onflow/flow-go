@@ -1487,38 +1487,6 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 }
 
-func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-      let a = !1
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidUnaryOperandError{}))
-}
-
-func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-      let a = -true
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidUnaryOperandError{}))
-}
-
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 

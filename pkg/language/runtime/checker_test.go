@@ -939,3 +939,71 @@ func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
+
+func TestCheckInvalidUnaryBooleanNegationOfInteger(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let a = !1
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
+}
+
+func TestCheckUnaryBooleanNegation(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let a = !true
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidUnaryIntegerNegationOfBoolean(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let a = -true
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
+}
+
+func TestCheckUnaryIntegerNegation(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let a = -1
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}

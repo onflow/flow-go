@@ -37,8 +37,24 @@ func NewChecker(program *ast.Program) *Checker {
 }
 
 func (checker *Checker) IsSubType(subType Type, superType Type) bool {
-	// TODO: improve
-	return subType.Equal(superType)
+	if subType.Equal(superType) {
+		return true
+	}
+
+	if _, ok := superType.(*IntegerType); ok {
+		switch subType.(type) {
+		case *IntType,
+			*Int8Type, *Int16Type, *Int32Type, *Int64Type,
+			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type:
+
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	return false
 }
 
 func (checker *Checker) IndexableElementType(ty Type) Type {
@@ -54,8 +70,7 @@ func (checker *Checker) IsIndexingType(indexingType Type, indexedType Type) bool
 	switch indexedType.(type) {
 	// arrays can be index with integers
 	case ArrayType:
-		_, ok := indexingType.(integerType)
-		return ok
+		return checker.IsSubType(indexingType, &IntegerType{})
 	}
 
 	return false
@@ -473,7 +488,39 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 }
 
 func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {
-	// TODO:
+	valueType := expression.Expression.Accept(checker).(Type)
+
+	switch expression.Operation {
+	case ast.OperationNegate:
+		if !checker.IsSubType(valueType, &BoolType{}) {
+			panic(&InvalidUnaryOperandError{
+				Operation:    expression.Operation,
+				ExpectedType: &BoolType{},
+				ActualType:   valueType,
+				StartPos:     expression.Expression.StartPosition(),
+				EndPos:       expression.Expression.EndPosition(),
+			})
+		}
+		return valueType
+
+	case ast.OperationMinus:
+		if !checker.IsSubType(valueType, &IntegerType{}) {
+			panic(&InvalidUnaryOperandError{
+				Operation:    expression.Operation,
+				ExpectedType: &IntegerType{},
+				ActualType:   valueType,
+				StartPos:     expression.Expression.StartPosition(),
+				EndPos:       expression.Expression.EndPosition(),
+			})
+		}
+		return valueType
+	}
+
+	panic(&unsupportedOperation{
+		kind:      common.OperationKindUnary,
+		operation: expression.Operation,
+	})
+
 	return nil
 }
 

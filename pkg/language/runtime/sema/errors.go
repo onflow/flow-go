@@ -26,6 +26,22 @@ func (e *unsupportedAssignmentTargetExpression) Error() string {
 	return fmt.Sprintf("cannot assign to unsupported target expression: %#+v", e.target)
 }
 
+// unsupportedOperation
+
+type unsupportedOperation struct {
+	kind      common.OperationKind
+	operation ast.Operation
+	pos       *ast.Position
+}
+
+func (e *unsupportedOperation) Error() string {
+	return fmt.Sprintf(
+		"cannot check unsupported %s operation: %s",
+		e.kind.Name(),
+		e.operation.Symbol(),
+	)
+}
+
 // RedeclarationError
 
 // TODO: show previous declaration
@@ -255,5 +271,32 @@ func (e *IncorrectArgumentLabelError) StartPosition() *ast.Position {
 }
 
 func (e *IncorrectArgumentLabelError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
+// InvalidUnaryOperandError
+
+type InvalidUnaryOperandError struct {
+	Operation    ast.Operation
+	ExpectedType Type
+	ActualType   Type
+	StartPos     *ast.Position
+	EndPos       *ast.Position
+}
+
+func (e *InvalidUnaryOperandError) Error() string {
+	return fmt.Sprintf(
+		"cannot apply unary operation %s to type: got `%s`, need `%s`",
+		e.Operation.Symbol(),
+		e.ActualType.String(),
+		e.ExpectedType.String(),
+	)
+}
+
+func (e *InvalidUnaryOperandError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidUnaryOperandError) EndPosition() *ast.Position {
 	return e.EndPos
 }
