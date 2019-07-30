@@ -322,8 +322,20 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 }
 
 func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.Repr {
-	// TODO: ensure text expression's type is boolean
-	// TODO: check block
+	test := statement.Test
+	testType := test.Accept(checker).(Type)
+
+	if !testType.Equal(&BoolType{}) {
+		panic(&TypeMismatchError{
+			ExpectedType: &BoolType{},
+			ActualType:   testType,
+			StartPos:     test.StartPosition(),
+			EndPos:       test.EndPosition(),
+		})
+	}
+
+	statement.Block.Accept(checker)
+
 	return nil
 }
 
