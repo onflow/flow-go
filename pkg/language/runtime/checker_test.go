@@ -174,7 +174,7 @@ func TestCheckGlobalVariableAssignment(t *testing.T) {
 	program, errors := parser.Parse(`
       var x = 2
 
-      fun test(): Int64 {
+      fun test(): Int {
           x = 3
           return x
       }
@@ -424,6 +424,25 @@ func TestCheckInvalidConstantValue(t *testing.T) {
 
 	program, errors := parser.Parse(`
       let x: Bool = 1
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidReturnValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test(): Int {
+          return true
+      }
 	`)
 
 	Expect(errors).

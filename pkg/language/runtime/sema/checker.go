@@ -10,10 +10,15 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
+type functionContext struct {
+	returnType Type
+}
+
 type Checker struct {
 	Program          *ast.Program
 	valueActivations *activations.Activations
 	typeActivations  *activations.Activations
+	functionContexts []*functionContext
 	Globals          map[string]*Variable
 }
 
@@ -133,6 +138,9 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	checker.checkParameterNames(declaration.Parameters)
 	checker.checkArgumentLabels(declaration.Parameters)
 	checker.bindParameters(declaration.Parameters)
+
+	checker.enterFunction(checker.ConvertType(declaration.ReturnType))
+	defer checker.leaveFunction()
 
 	declaration.Block.Accept(checker)
 
@@ -270,9 +278,20 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 }
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
-	// TODO: check value type matches enclosing function's return type
 
-	statement.Expression.Accept(checker)
+	// check value type matches enclosing function's return type
+
+	valueType := statement.Expression.Accept(checker).(Type)
+	returnType := checker.currentFunction().returnType
+
+	if !checker.IsSubType(valueType, returnType) {
+		panic(&TypeMismatchError{
+			ExpectedType: returnType,
+			ActualType:   valueType,
+			StartPos:     statement.Expression.StartPosition(),
+			EndPos:       statement.Expression.EndPosition(),
+		})
+	}
 
 	return nil
 }
@@ -542,4 +561,24 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	}
 
 	panic(&astTypeConversionError{invalidASTType: t})
+}
+
+func (checker *Checker) enterFunction(returnType Type) {
+	checker.functionContexts = append(checker.functionContexts,
+		&functionContext{
+			returnType: returnType,
+		})
+}
+
+func (checker *Checker) leaveFunction() {
+	lastIndex := len(checker.functionContexts) - 1
+	checker.functionContexts = checker.functionContexts[:lastIndex]
+}
+
+func (checker *Checker) currentFunction() *functionContext {
+	lastIndex := len(checker.functionContexts) - 1
+	if lastIndex < 0 {
+		return nil
+	}
+	return checker.functionContexts[lastIndex]
 }
