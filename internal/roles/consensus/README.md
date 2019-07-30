@@ -39,9 +39,6 @@ Collection are submitted to one or more CN(s) via the `SubmitCollection` gRPC me
   - CNs will only consider _guaranteed collections_ (see [Collection](../collect) for details).
 Consensus nodes will gossip received collections to other consensus nodes.  
 
-<!--
-**Relevant packages:** [/internal/nodes/access/controllers](/internal/nodes/access/controllers)
--->
 
 ### Block Formation (and Mempool)
 
@@ -58,20 +55,13 @@ When a CN generates a proto block, it includes all pending collections that are 
 When a CN sees a proto block from a different CN, it does the following:
 * requests and verifies all collections it does not have in its mempool (hashes and signatures only)
 * updates the status of all collections in the block 
- 
-<!--
-**Relevant packages:** [/internal/nodes/access/controllers](/internal/nodes/access/controllers)
--->
- 
+
 
 ### BFT Consensus
 
 The BFT consensus algorithm is abstracted behind a generic API.
 The only fixed API-level requirement for the consensus algorithm is deterministic finality.    
 
-<!--
-**Relevant packages:** [/internal/nodes/access/controllers](/internal/nodes/access/controllers)
--->
 
 ### Random Beacon
 
