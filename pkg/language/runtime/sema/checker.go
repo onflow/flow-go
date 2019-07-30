@@ -10,6 +10,8 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
+const ArgumentLabelNotRequired = "_"
+
 type functionContext struct {
 	returnType Type
 }
@@ -188,7 +190,7 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) {
 
 	for _, parameter := range parameters {
 		label := parameter.Label
-		if label == "" {
+		if label == "" || label == ArgumentLabelNotRequired {
 			continue
 		}
 
