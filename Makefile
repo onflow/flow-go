@@ -60,3 +60,7 @@ build-bamboo:
 
 .PHONY: ci
 ci: install-tools generate check-generated-code test
+
+.PHONY: build-relic
+build-relic:
+	sh ./pkg/crypto/relic_build.sh
