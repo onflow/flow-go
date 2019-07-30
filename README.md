@@ -157,7 +157,7 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 
 | Stream         | Owner(s)                    | Home directory  |
 | -------------- | --------------------------- | --------- |
-| Collection  | [Peter Siemens](https://github.com/psiemens]) | [/internal/roles/collect](/internal/roles/collect) |
+| Collection  | [Peter Siemens](https://github.com/psiemens) | [/internal/roles/collect](/internal/roles/collect) |
 | Consensus | [Alexander Hentschel](https://github.com/AlexHentschel) | [/internal/roles/consensus](/internal/roles/consensus) |
 | Execution      | [Bastian Müller](https://github.com/turbolent) | [/internal/roles/execute](/internal/roles/execute) |
 | Verifcation | [Moar Zamski](https://github.com/pazams) | [/internal/roles/verify](/internal/roles/verify) |
