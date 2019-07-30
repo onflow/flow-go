@@ -125,7 +125,7 @@ message SignedTransaction {
   uint64 compute_limit = 3;
   uint64 compute_used = 4;
   AccountSignature payer_signature = 5;
-  TransactionStatus status = 7;
+  TransactionStatus status = 6;
 }
 
 
