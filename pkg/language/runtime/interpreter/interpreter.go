@@ -673,6 +673,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	panic(&unsupportedOperation{
 		kind:      common.OperationKindBinary,
 		operation: expression.Operation,
+		startPos:  expression.StartPos,
+		endPos:    expression.EndPos,
 	})
 }
 
@@ -694,6 +696,8 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 			panic(&unsupportedOperation{
 				kind:      common.OperationKindUnary,
 				operation: expression.Operation,
+				startPos:  expression.StartPos,
+				endPos:    expression.EndPos,
 			})
 		})
 }

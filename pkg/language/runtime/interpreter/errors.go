@@ -20,11 +20,24 @@ type SecondaryError interface {
 type unsupportedOperation struct {
 	kind      common.OperationKind
 	operation ast.Operation
-	pos       *ast.Position
+	startPos  *ast.Position
+	endPos    *ast.Position
 }
 
 func (e *unsupportedOperation) Error() string {
-	return fmt.Sprintf("cannot evaluate unsupported %s operation: %s", e.kind.Name(), e.operation.Symbol())
+	return fmt.Sprintf(
+		"cannot evaluate unsupported %s operation: %s",
+		e.kind.Name(),
+		e.operation.Symbol(),
+	)
+}
+
+func (e *unsupportedOperation) StartPosition() *ast.Position {
+	return e.startPos
+}
+
+func (e *unsupportedOperation) EndPosition() *ast.Position {
+	return e.endPos
 }
 
 // NotDeclaredError

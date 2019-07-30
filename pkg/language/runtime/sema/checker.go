@@ -519,6 +519,8 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 	panic(&unsupportedOperation{
 		kind:      common.OperationKindUnary,
 		operation: expression.Operation,
+		startPos:  expression.StartPos,
+		endPos:    expression.EndPos,
 	})
 
 	return nil
