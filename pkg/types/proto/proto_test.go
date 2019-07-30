@@ -5,14 +5,14 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/pkg/types/mocks"
 	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
+	"github.com/dapperlabs/bamboo-node/pkg/unittest"
 )
 
 func TestAccountSignature(t *testing.T) {
 	RegisterTestingT(t)
 
-	sigA := mocks.MockAccountSignature()
+	sigA := unittest.AccountSignatureFixture()
 
 	message := proto.AccountSignatureToMessage(sigA)
 	sigB := proto.MessageToAccountSignature(message)
@@ -23,7 +23,7 @@ func TestAccountSignature(t *testing.T) {
 func TestSignedTransaction(t *testing.T) {
 	RegisterTestingT(t)
 
-	txA := mocks.MockSignedTransaction()
+	txA := unittest.SignedTransactionFixture()
 
 	message := proto.SignedTransactionToMessage(txA)
 	txB := proto.MessageToSignedTransaction(message)
