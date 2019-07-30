@@ -22,5 +22,5 @@ message PingResponse {
 }
 
 message SubmitExecutionReceiptRequest {
-  bamboo.shared.ExecutionReceipt executionReceipt = 1;
+  bamboo.shared.messages.ExecutionReceipt executionReceipt = 1;
 }
