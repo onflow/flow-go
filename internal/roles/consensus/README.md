@@ -13,7 +13,7 @@ More specifically, collection covers the following:
 - Block publishing: broadcasting the resulting finalized block to the entire network 
 
 **Block Sealing**  
-to be determined whether it will live in this stream of in a separate stream
+ - Details TBD (may belong to another stream)
 
 
 ## Terminology
