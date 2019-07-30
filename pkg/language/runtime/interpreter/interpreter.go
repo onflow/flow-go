@@ -190,7 +190,7 @@ func (interpreter *Interpreter) invokeFunction(
 }
 
 func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
-	panic(errors.UnreachableError{})
+	panic(&errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
