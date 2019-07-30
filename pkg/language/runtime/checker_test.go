@@ -436,11 +436,30 @@ func TestCheckInvalidConstantValue(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
-func TestCheckInvalidReturnValue(t *testing.T) {
+func TestCheckInvalidFunctionDeclarationReturnValue(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
       fun test(): Int {
+          return true
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidFunctionExpressionReturnValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let test = fun (): Int {
           return true
       }
 	`)

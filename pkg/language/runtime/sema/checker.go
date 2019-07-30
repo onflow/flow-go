@@ -132,19 +132,27 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
+	checker.checkFunction(
+		declaration.Parameters,
+		declaration.ReturnType,
+		declaration.Block,
+	)
+
+	return nil
+}
+
+func (checker *Checker) checkFunction(parameters []*ast.Parameter, returnType ast.Type, block *ast.Block) {
 	checker.pushActivations()
 	defer checker.popActivations()
 
-	checker.checkParameterNames(declaration.Parameters)
-	checker.checkArgumentLabels(declaration.Parameters)
-	checker.bindParameters(declaration.Parameters)
+	checker.checkParameterNames(parameters)
+	checker.checkArgumentLabels(parameters)
+	checker.bindParameters(parameters)
 
-	checker.enterFunction(checker.ConvertType(declaration.ReturnType))
+	checker.enterFunction(checker.ConvertType(returnType))
 	defer checker.leaveFunction()
 
-	declaration.Block.Accept(checker)
-
-	return nil
+	block.Accept(checker)
 }
 
 // checkParameterNames checks that all parameter names are unique
@@ -513,7 +521,12 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 }
 
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
-	// TODO:
+	checker.checkFunction(
+		expression.Parameters,
+		expression.ReturnType,
+		expression.Block,
+	)
+
 	return nil
 }
 
