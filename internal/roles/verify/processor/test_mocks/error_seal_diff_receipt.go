@@ -3,7 +3,7 @@ package testmocks
 import (
 	"errors"
 
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 func NewMockEffectsErrorSealWithDifferentReceipt(m *MockEffectsHappyPath) *MockEffectsErrorSealWithDifferentReceipt {
@@ -16,7 +16,7 @@ type MockEffectsErrorSealWithDifferentReceipt struct {
 	_callCount int
 }
 
-func (m *MockEffectsErrorSealWithDifferentReceipt) IsSealedWithDifferentReceipt(*processor.ExecutionReceipt) (bool, error) {
+func (m *MockEffectsErrorSealWithDifferentReceipt) IsSealedWithDifferentReceipt(*types.ExecutionReceipt) (bool, error) {
 	m._callCount++
 	return true, errors.New("IsSealedWithDifferentReceipt error")
 }

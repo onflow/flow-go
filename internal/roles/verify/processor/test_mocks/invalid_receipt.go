@@ -2,7 +2,7 @@ package testmocks
 
 import (
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 func NewMockEffectsInvalidReceipt(m *MockEffectsHappyPath) *MockEffectsInvalidReceipt {
@@ -15,7 +15,7 @@ type MockEffectsInvalidReceipt struct {
 	_callCount int
 }
 
-func (m *MockEffectsInvalidReceipt) IsValidExecutionReceipt(*processor.ExecutionReceipt) (compute.ValidationResult, error) {
+func (m *MockEffectsInvalidReceipt) IsValidExecutionReceipt(*types.ExecutionReceipt) (compute.ValidationResult, error) {
 	m._callCount++
 	return &compute.ValidationResultFail{}, nil
 }

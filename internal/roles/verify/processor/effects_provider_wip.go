@@ -4,6 +4,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 // EffectsProvider implements the Effects interface.
@@ -15,27 +16,27 @@ func NewEffectsProvider() Effects {
 	return &EffectsProvider{}
 }
 
-func (e *EffectsProvider) IsValidExecutionReceipt(*ExecutionReceipt) (compute.ValidationResult, error) {
+func (e *EffectsProvider) IsValidExecutionReceipt(*types.ExecutionReceipt) (compute.ValidationResult, error) {
 	return &compute.ValidationResultSuccess{}, nil
 }
 
-func (e *EffectsProvider) HasMinStake(*ExecutionReceipt) (bool, error) {
+func (e *EffectsProvider) HasMinStake(*types.ExecutionReceipt) (bool, error) {
 	return true, nil
 }
 
-func (e *EffectsProvider) IsSealedWithDifferentReceipt(*ExecutionReceipt) (bool, error) {
+func (e *EffectsProvider) IsSealedWithDifferentReceipt(*types.ExecutionReceipt) (bool, error) {
 	return false, nil
 }
 
-func (e *EffectsProvider) Send(*ExecutionReceipt, []byte) error {
+func (e *EffectsProvider) Send(*types.ExecutionReceipt, []byte) error {
 	return nil
 }
 
-func (e *EffectsProvider) SlashExpiredReceipt(*ExecutionReceipt) error {
+func (e *EffectsProvider) SlashExpiredReceipt(*types.ExecutionReceipt) error {
 	return nil
 }
 
-func (e *EffectsProvider) SlashInvalidReceipt(*ExecutionReceipt, *compute.BlockPartExecutionResult) error {
+func (e *EffectsProvider) SlashInvalidReceipt(*types.ExecutionReceipt, *compute.BlockPartExecutionResult) error {
 	return nil
 }
 

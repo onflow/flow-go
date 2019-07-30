@@ -3,23 +3,11 @@
 // Once the validation flow is hooked up with the actual compute module, this package will likely be removed or changed.
 package compute
 
-import (
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-)
+import "github.com/dapperlabs/bamboo-node/pkg/types"
 
-type Registers map[crypto.Hash][]byte
-
-type IntermediateRegisters struct {
-	TransactionHash crypto.Hash
-	Registers       Registers
-	ComputeUsed     uint64
-}
-
-// TODO: this type should be defined inside the compute library.
-// It is given here in the meanwhile.
 type BlockPartExecutionResult struct {
 	PartIndex        uint64
-	PartTransactions []IntermediateRegisters
+	PartTransactions []types.IntermediateRegisters
 }
 
 type ValidationResult interface {
