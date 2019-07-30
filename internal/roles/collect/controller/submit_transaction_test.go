@@ -10,6 +10,7 @@ import (
 	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/data"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/txpool"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
@@ -38,7 +39,7 @@ var transactionTests = []transactionTestCase{
 		shouldSucceed: false,
 	},
 	{
-		title: "transaction with no compute limit should be rejecte",
+		title: "transaction with no compute limit should be rejected",
 		tx: types.SignedTransaction{
 			Nonce:          10,
 			Script:         []byte("fun main() {}"),
@@ -53,7 +54,7 @@ func TestSubmitTransaction(t *testing.T) {
 		t.Run(tt.title, func(t *testing.T) {
 			RegisterTestingT(t)
 
-			c := controller.New(txpool.New(), logrus.New())
+			c := controller.New(data.NewMock(), txpool.New(), logrus.New())
 
 			txMsg, err := proto.SignedTransactionToMessage(tt.tx)
 			Expect(err).ToNot(HaveOccurred())

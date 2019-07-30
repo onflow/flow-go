@@ -1,7 +1,17 @@
 package data
 
-type DAL struct{}
+import (
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
+)
 
-func New() *DAL {
-	return &DAL{}
+type DAL interface {
+	InsertTransaction(types.SignedTransaction) error
+	ContainsTransaction(hash crypto.Hash) bool
+}
+
+type DatabaseDAL struct{}
+
+func New() *DatabaseDAL {
+	return &DatabaseDAL{}
 }

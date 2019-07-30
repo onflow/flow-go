@@ -17,6 +17,7 @@ import (
 const (
 	msgEmptyTransaction        = "transaction field is empty"
 	msgFailedTransactionDecode = "failed to decode transaction"
+	msgDuplicateTransaction    = "transaction has already been submitted"
 )
 
 // SubmitTransaction accepts an incoming transaction from a user agent or peer node.
@@ -41,7 +42,9 @@ func (c *Controller) SubmitTransaction(
 		return nil, status.Error(codes.InvalidArgument, msgFailedTransactionDecode)
 	}
 
-	// TODO: check if transaction exists in storage
+	if c.dal.ContainsTransaction(tx.Hash()) {
+		return &svc.SubmitTransactionResponse{}, nil
+	}
 
 	if err := c.validateTransactionBody(tx); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -50,8 +53,12 @@ func (c *Controller) SubmitTransaction(
 	// TODO: validate transaction signature
 	// https://github.com/dapperlabs/bamboo-node/issues/171
 
-	// TODO: store transaction
-	// https://github.com/dapperlabs/bamboo-node/issues/169
+	c.txPool.Insert(tx)
+
+	err = c.dal.InsertTransaction(tx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, msgInternalError)
+	}
 
 	// TODO: route transaction to cluster
 

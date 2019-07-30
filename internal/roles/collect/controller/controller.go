@@ -14,13 +14,16 @@ import (
 )
 
 type Controller struct {
-	dal    *data.DAL
+	dal    data.DAL
 	txPool *txpool.TxPool
 	log    *logrus.Entry
 }
 
-func New(txPool *txpool.TxPool, log *logrus.Logger) *Controller {
+const msgInternalError = "internal error"
+
+func New(dal data.DAL, txPool *txpool.TxPool, log *logrus.Logger) *Controller {
 	return &Controller{
+		dal:    dal,
 		txPool: txPool,
 		log:    logrus.NewEntry(log),
 	}
