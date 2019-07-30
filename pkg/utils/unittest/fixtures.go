@@ -12,7 +12,7 @@ func AddressFixture() types.Address {
 
 func AccountSignatureFixture() types.AccountSignature {
 	return types.AccountSignature{
-		Account:   MockAddress(),
+		Account:   AddressFixture(),
 		Signature: []byte{},
 	}
 }
@@ -24,6 +24,6 @@ func SignedTransactionFixture() types.SignedTransaction {
 		ComputeLimit:   10,
 		ComputeUsed:    0,
 		Timestamp:      time.Now().In(time.UTC),
-		PayerSignature: MockAccountSignature(),
+		PayerSignature: AccountSignatureFixture(),
 	}
 }
