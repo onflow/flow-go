@@ -162,3 +162,48 @@ func (e *NotIndexingTypeError) StartPosition() *ast.Position {
 func (e *NotIndexingTypeError) EndPosition() *ast.Position {
 	return e.EndPos
 }
+
+// NotCallableError
+
+type NotCallableError struct {
+	Type     Type
+	StartPos *ast.Position
+	EndPos   *ast.Position
+}
+
+func (e *NotCallableError) Error() string {
+	return fmt.Sprintf("cannot call type: %s", e.Type.String())
+}
+
+func (e *NotCallableError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *NotCallableError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
+// ArgumentCountError
+
+type ArgumentCountError struct {
+	ParameterCount int
+	ArgumentCount  int
+	StartPos       *ast.Position
+	EndPos         *ast.Position
+}
+
+func (e *ArgumentCountError) Error() string {
+	return fmt.Sprintf(
+		"incorrect number of arguments: got %d, need %d",
+		e.ArgumentCount,
+		e.ParameterCount,
+	)
+}
+
+func (e *ArgumentCountError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *ArgumentCountError) EndPosition() *ast.Position {
+	return e.EndPos
+}

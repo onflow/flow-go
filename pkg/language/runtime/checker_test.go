@@ -512,7 +512,7 @@ func TestCheckReferenceInFunction(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
-func TestCheckInvalidParameterNameWithFunctionName(t *testing.T) {
+func TestCheckParameterNameWithFunctionName(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
@@ -528,7 +528,7 @@ func TestCheckInvalidParameterNameWithFunctionName(t *testing.T) {
 	err := checker.Check()
 
 	Expect(err).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+		To(Not(HaveOccurred()))
 }
 
 func TestCheckIfStatementTest(t *testing.T) {
@@ -721,4 +721,88 @@ func TestCheckInvalidWhileBlock(t *testing.T) {
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+     fun f(x: Int): Int {
+         return x
+     }
+
+     fun test(): Int {
+         return f()
+     }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+}
+
+func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun f(x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
+          return f(2, 3)
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+}
+
+func TestCheckInvalidFunctionCallOfBool(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test(): Int {
+          return true()
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+}
+
+func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test(): Int32 {
+          return 2()
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }

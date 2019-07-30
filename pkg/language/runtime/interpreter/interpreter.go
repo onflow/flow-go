@@ -144,7 +144,19 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 		}
 	}()
 
-	result := Run(interpreter.invokeFunction(function, arguments, nil, nil))
+	// ensures the invocation's argument count matches the function's parameter count
+
+	parameterCount := function.parameterCount()
+	argumentCount := len(arguments)
+
+	if argumentCount != parameterCount {
+		return nil, &ArgumentCountError{
+			ParameterCount: parameterCount,
+			ArgumentCount:  argumentCount,
+		}
+	}
+
+	result := Run(function.invoke(interpreter, arguments))
 	if result == nil {
 		return nil, nil
 	}
@@ -168,30 +180,6 @@ func (interpreter *Interpreter) InvokeExportable(
 	}
 
 	return result.(ExportableValue), nil
-}
-
-func (interpreter *Interpreter) invokeFunction(
-	function FunctionValue,
-	arguments []Value,
-	startPosition *ast.Position,
-	endPosition *ast.Position,
-) Trampoline {
-
-	// ensures the invocation's argument count matches the function's parameter count
-
-	parameterCount := function.parameterCount()
-	argumentCount := len(arguments)
-
-	if argumentCount != parameterCount {
-		panic(&ArgumentCountError{
-			ParameterCount: parameterCount,
-			ArgumentCount:  argumentCount,
-			StartPos:       startPosition,
-			EndPos:         endPosition,
-		})
-	}
-
-	return function.invoke(interpreter, arguments)
 }
 
 func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
@@ -820,14 +808,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 	return invocationExpression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(Value)
-			function, ok := value.(FunctionValue)
-			if !ok {
-				panic(&NotCallableError{
-					Value:    value,
-					StartPos: invocationExpression.Expression.StartPosition(),
-					EndPos:   invocationExpression.Expression.EndPosition(),
-				})
-			}
+			function := value.(FunctionValue)
 
 			// NOTE: evaluate all argument expressions in call-site scope, not in function body
 			argumentExpressions := make([]ast.Expression, len(invocationExpression.Arguments))
@@ -837,15 +818,8 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 
 			return interpreter.visitExpressions(argumentExpressions, nil).
 				FlatMap(func(result interface{}) Trampoline {
-
 					arguments := result.(ArrayValue)
-
-					return interpreter.invokeFunction(
-						function,
-						arguments,
-						invocationExpression.StartPosition(),
-						invocationExpression.EndPosition(),
-					)
+					return function.invoke(interpreter, arguments)
 				})
 		})
 }
