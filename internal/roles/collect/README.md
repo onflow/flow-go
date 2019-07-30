@@ -69,7 +69,7 @@ The primary function of a cluster is to produce collections. Collections are for
 Each AN shares transactions within their cluster to create a shared pool of pending transactions. Eventually this pool is used to create a collection, which is organized by a collection owner.
 
 The collection building process requires a sufficient number of ANs to sign each collection. We refer to the ANs that sign the collection as the collection guarantors. Only ANs that are part of the cluster that generates the collection can guarantee the collection.  
-Specifically, we require that the accumulated stake of all guarantors is _more_ than 2/3 of the clusters total stake. A collection with this property is a _guaranteed collection_.
+Specifically, we require that the accumulated stake of all guarantors is _more_ than 2/3 of the cluster's total stake. A collection with this property is a _guaranteed collection_.
 
 Details about the collection building algorithm can be found in the package below:
 
