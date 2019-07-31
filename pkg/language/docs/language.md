@@ -1669,208 +1669,33 @@ and when the value is returned from a function:
 
     We think resources are a great way to represent such assets.
 
+## Composite Data Type Declaration and Creation
 
-### Structures
+Structures are declared using the `struct` keyword and resources are declared using the `resource` keyword. The keyword is followed by the name.
 
-Structures are declared using the `struct` keyword, followed by the name of the type.
-
-```bamboo,file=structure-declaration.bpl
+```bamboo,file=composite-data-type-declaration.bpl
 struct SomeStruct {
+    // ...
+}
+
+resource SomeResource {
     // ...
 }
 ```
 
-Structures are types. Structures are created (instantiated) by calling the type like a function.
+Structures and resources are types.
+
+Structures are created (instantiated) by calling the type like a function.
 
 ```bamboo,file=structure-instantiation.bpl
 SomeStruct()
 ```
 
-Structures are **copied** when used as an initial value for constant or variable,
-when assigned to a different variable,
-when passed as an argument to a function,
-and when returned from a function:
-
-```bamboo,file=struct-behavior.bpl
-// Declare a structure named `SomeStruct`, with a variable integer field
-//
-struct SomeStruct {
-    var value: Int
-
-    init(value: Int) {
-        self.value = value
-    }
-}
-
-// Declare a constant with value of structure type `SomeStruct`
-//
-let a = SomeStruct(value: 0)
-
-// *Copy* the structure value into a new constant
-//
-let b = a
-
-b.value = 1
-
-a.value // is *0*
-```
-
-### Resources
-
-#### Resource Declaration
-
-Resources are declared using the `resource` keyword, followed by the name of the resource.
-
-```bamboo,file=resource-declaration.bpl
-resource SomeResource {
-    // ...
-}
-```
-
-Resources are types. Resource values are created (instantiated) by using the `create` keyword and calling the type like a function.
+Resource are created (instantiated) by using the `create` keyword and calling the type like a function.
 
 ```bamboo,file=resource-instantiation.bpl
 create SomeResource()
 ```
-
-#### Resource Behaviour
-
-Resources are **moved** when used as an initial value for a constant or variable,
-when assigned to a different variable,
-when passed as an argument to a function,
-and when returned from a function.
-
-When the resource was moved, the constant or variable that referred to the resource before the move becomes **invalid**.
-
-To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it moved to a different variable, or when it moved to a function.
-
-```bamboo,file=resource-behavior.bpl
-// Declare a resource named `SomeResource`, with a variable integer field
-//
-resource SomeResource {
-    var value: Int
-
-    init(value: Int) {
-        self.value = value
-    }
-}
-
-// Declare a constant with value of resource type `SomeResource`
-//
-let a <- SomeResource(value: 0)
-
-// *Move* the resource value to a new constant
-//
-let b <- a
-
-// Invalid: Cannot use constant `a` anymore as the resource
-// it referred to was moved to constant `b`
-//
-a.value
-
-// Constant `b` owns the resource
-//
-b.value = 1
-
-// Declare a function which accepts a resource.
-//
-// The parameter has a resource type, so the type name must be prefixed with `<-`
-//
-fun use(resource: <-SomeResource) {
-    // ...
-}
-
-// Call function `use` and move the resource into it
-//
-use(<-b)
-
-// Invalid: Cannot use constant `b` anymore as the resource
-// it referred to was moved into function `foo`
-//
-b.value
-```
-
-Resources **must** be used **exactly once**. To destroy a resource, the `destroy` keyword must be used.
-
-```bamboo,file=resource-loss.bpl
-// Declare another, unrelated value of resource type `SomeResource`
-//
-let c = SomeResource(value: 10)
-
-// Invalid: `c` is not used, but must be! `c` cannot be lost
-```
-
-```bamboo,file=resource-destruction.bpl
-// Declare another, unrelated value of resource type `SomeResource`
-//
-let d = SomeResource(value: 20)
-
-// Destroy the resource referred to by constant `d`
-//
-destroy d
-
-// Invalid: Cannot use constant `d` anymore as the resource
-// it referred to was destroyed
-//
-d.value
-```
-
-To make it explicit that the type is moved, it must be prefixed with `<-` in type annotations.
-
-```bamboo,file=resource-type-annotation.bpl
-// Declare a constant with an explicit type annotation.
-//
-// The constant has a resource type, so the type name must be prefixed with `<-`
-//
-let someResource: <-SomeResource <- create SomeResource()
-
-// Declare a function which consumes a resource.
-//
-// The parameter has a resource type, so the type name must be prefixed with `<-`
-//
-fun use(resource: <-SomeResource) {
-    destroy resource
-}
-
-// Declare a function which returns a resource.
-//
-// The return type is a resource type, so the type name must be prefixed with `<-`
-//
-fun get(): <-SomeResource {
-    return create SomeResource()
-}
-```
-
-#### Resources in Arrays and Dictionaries
-
-Arrays and dictionaries behave differently when they contain resources: When a resource is **read** from the array at a certain index, or it is **read** from a dictionary by accessing a certain key, the resource is **moved** out of the array or dictionary.
-
-```bamboo,file=resource-in-array.bpl
-let resources = [
-    SomeResource(value: 1),
-    SomeResource(value: 2),
-    SomeResource(value: 3)
-]
-
-// **Move** the first resource into a new constant
-//
-let firstResource <- resources[0]
-
-// **Move** the second resource into a new constant
-//
-let secondResource <- resources[1]
-
-// `resources` only contains one element,
-// the initial third resource!
-//
-// The first two resources were moved out of the array when
-// they were read, i.e., the were removed from the array
-//
-// Accessing a field of a resource does not move the resource
-//
-resource[0].value // is 3
-```
-
 
 ### Composite Data Type Fields
 
@@ -2109,6 +1934,178 @@ let rectangle = Rectangle(width: 2, height: 3)
 rectangle.scale(factor: 4)
 // `rectangle.width` is 8
 // `rectangle.height` is 12
+```
+
+
+### Composite Data Type Behaviour
+
+#### Structures
+
+Structures are **copied** when used as an initial value for constant or variable,
+when assigned to a different variable,
+when passed as an argument to a function,
+and when returned from a function:
+
+```bamboo,file=struct-behavior.bpl
+// Declare a structure named `SomeStruct`, with a variable integer field
+//
+struct SomeStruct {
+    var value: Int
+
+    init(value: Int) {
+        self.value = value
+    }
+}
+
+// Declare a constant with value of structure type `SomeStruct`
+//
+let a = SomeStruct(value: 0)
+
+// *Copy* the structure value into a new constant
+//
+let b = a
+
+b.value = 1
+
+a.value // is *0*
+```
+
+#### Resources
+
+Resources are **moved** when used as an initial value for a constant or variable,
+when assigned to a different variable,
+when passed as an argument to a function,
+and when returned from a function.
+
+When the resource was moved, the constant or variable that referred to the resource before the move becomes **invalid**.
+
+To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it moved to a different variable, or when it moved to a function.
+
+```bamboo,file=resource-behavior.bpl
+// Declare a resource named `SomeResource`, with a variable integer field
+//
+resource SomeResource {
+    var value: Int
+
+    init(value: Int) {
+        self.value = value
+    }
+}
+
+// Declare a constant with value of resource type `SomeResource`
+//
+let a <- SomeResource(value: 0)
+
+// *Move* the resource value to a new constant
+//
+let b <- a
+
+// Invalid: Cannot use constant `a` anymore as the resource
+// it referred to was moved to constant `b`
+//
+a.value
+
+// Constant `b` owns the resource
+//
+b.value = 1
+
+// Declare a function which accepts a resource.
+//
+// The parameter has a resource type, so the type name must be prefixed with `<-`
+//
+fun use(resource: <-SomeResource) {
+    // ...
+}
+
+// Call function `use` and move the resource into it
+//
+use(<-b)
+
+// Invalid: Cannot use constant `b` anymore as the resource
+// it referred to was moved into function `foo`
+//
+b.value
+```
+
+Resources **must** be used **exactly once**. To destroy a resource, the `destroy` keyword must be used.
+
+```bamboo,file=resource-loss.bpl
+// Declare another, unrelated value of resource type `SomeResource`
+//
+let c = SomeResource(value: 10)
+
+// Invalid: `c` is not used, but must be! `c` cannot be lost
+```
+
+```bamboo,file=resource-destruction.bpl
+// Declare another, unrelated value of resource type `SomeResource`
+//
+let d = SomeResource(value: 20)
+
+// Destroy the resource referred to by constant `d`
+//
+destroy d
+
+// Invalid: Cannot use constant `d` anymore as the resource
+// it referred to was destroyed
+//
+d.value
+```
+
+To make it explicit that the type is moved, it must be prefixed with `<-` in type annotations.
+
+```bamboo,file=resource-type-annotation.bpl
+// Declare a constant with an explicit type annotation.
+//
+// The constant has a resource type, so the type name must be prefixed with `<-`
+//
+let someResource: <-SomeResource <- create SomeResource()
+
+// Declare a function which consumes a resource.
+//
+// The parameter has a resource type, so the type name must be prefixed with `<-`
+//
+fun use(resource: <-SomeResource) {
+    destroy resource
+}
+
+// Declare a function which returns a resource.
+//
+// The return type is a resource type, so the type name must be prefixed with `<-`
+//
+fun get(): <-SomeResource {
+    return create SomeResource()
+}
+```
+
+#### Resources in Arrays and Dictionaries
+
+Arrays and dictionaries behave differently when they contain resources: When a resource is **read** from the array at a certain index, or it is **read** from a dictionary by accessing a certain key, the resource is **moved** out of the array or dictionary.
+
+```bamboo,file=resource-in-array.bpl
+let resources = [
+    SomeResource(value: 1),
+    SomeResource(value: 2),
+    SomeResource(value: 3)
+]
+
+// **Move** the first resource into a new constant
+//
+let firstResource <- resources[0]
+
+// **Move** the second resource into a new constant
+//
+let secondResource <- resources[1]
+
+// `resources` only contains one element,
+// the initial third resource!
+//
+// The first two resources were moved out of the array when
+// they were read, i.e., the were removed from the array
+//
+// Accessing a field of a resource does not move the resource
+//
+resource[0].value // is 3
 ```
 
 ### Unbound References / Nulls
