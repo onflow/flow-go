@@ -16,7 +16,8 @@ func TestFlatMap(t *testing.T) {
 				return Done{number * 42}
 			})
 
-	Expect(Run(trampoline)).To(Equal(23 * 42))
+	Expect(Run(trampoline)).
+		To(Equal(23 * 42))
 }
 
 func TestFlatMap2(t *testing.T) {
@@ -35,7 +36,8 @@ func TestFlatMap2(t *testing.T) {
 				return Done{str + "42"}
 			})
 
-	Expect(Run(trampoline)).To(Equal("2342"))
+	Expect(Run(trampoline)).
+		To(Equal("2342"))
 }
 
 func TestFlatMap3(t *testing.T) {
@@ -54,7 +56,8 @@ func TestFlatMap3(t *testing.T) {
 				return Done{strconv.Itoa(n)}
 			})
 
-	Expect(Run(trampoline)).To(Equal(strconv.Itoa(23 * 42)))
+	Expect(Run(trampoline)).
+		To(Equal(strconv.Itoa(23 * 42)))
 }
 
 func TestMap(t *testing.T) {
@@ -67,7 +70,8 @@ func TestMap(t *testing.T) {
 				return n * 42
 			})
 
-	Expect(Run(trampoline)).To(Equal(23 * 42))
+	Expect(Run(trampoline)).
+		To(Equal(23 * 42))
 }
 
 func TestMap2(t *testing.T) {
@@ -80,7 +84,8 @@ func TestMap2(t *testing.T) {
 				return n * 42
 			})
 
-	Expect(Run(trampoline)).To(Equal(23 * 42))
+	Expect(Run(trampoline)).
+		To(Equal(23 * 42))
 }
 
 func TestEvenOdd(t *testing.T) {
@@ -110,10 +115,17 @@ func TestEvenOdd(t *testing.T) {
 		})
 	}
 
-	Expect(Run(odd(99999))).To(BeTrue())
-	Expect(Run(even(100000))).To(BeTrue())
-	Expect(Run(odd(100000))).To(BeFalse())
-	Expect(Run(even(99999))).To(BeFalse())
+	Expect(Run(odd(99999))).
+		To(BeTrue())
+
+	Expect(Run(even(100000))).
+		To(BeTrue())
+
+	Expect(Run(odd(100000))).
+		To(BeFalse())
+
+	Expect(Run(even(99999))).
+		To(BeFalse())
 }
 
 func TestAckermann(t *testing.T) {
@@ -161,8 +173,15 @@ func TestAckermann(t *testing.T) {
 		return first.FlatMap(second)
 	}
 
-	Expect(Run(ackermann(1, 2))).To(Equal(4))
-	Expect(Run(ackermann(3, 2))).To(Equal(29))
-	Expect(Run(ackermann(3, 4))).To(Equal(125))
-	Expect(Run(ackermann(3, 7))).To(Equal(1021))
+	Expect(Run(ackermann(1, 2))).
+		To(Equal(4))
+
+	Expect(Run(ackermann(3, 2))).
+		To(Equal(29))
+
+	Expect(Run(ackermann(3, 4))).
+		To(Equal(125))
+
+	Expect(Run(ackermann(3, 7))).
+		To(Equal(1021))
 }

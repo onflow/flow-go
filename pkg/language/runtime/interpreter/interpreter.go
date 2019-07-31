@@ -2,6 +2,11 @@ package interpreter
 
 import (
 	"fmt"
+	goRuntime "runtime"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
@@ -13,16 +18,32 @@ import (
 
 type Interpreter struct {
 	Program     *ast.Program
-	activations *Activations
+	activations *activations.Activations
 	Globals     map[string]*Variable
 }
 
 func NewInterpreter(program *ast.Program) *Interpreter {
 	return &Interpreter{
 		Program:     program,
-		activations: &Activations{},
+		activations: &activations.Activations{},
 		Globals:     map[string]*Variable{},
 	}
+}
+
+func (interpreter *Interpreter) findVariable(name string) *Variable {
+	value := interpreter.activations.Find(name)
+	if value == nil {
+		return nil
+	}
+	variable, ok := value.(*Variable)
+	if !ok {
+		return nil
+	}
+	return variable
+}
+
+func (interpreter *Interpreter) setVariable(name string, variable *Variable) {
+	interpreter.activations.Set(name, variable)
 }
 
 func (interpreter *Interpreter) Interpret() (err error) {
@@ -30,6 +51,11 @@ func (interpreter *Interpreter) Interpret() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			var ok bool
+			// don't recover Go errors
+			err, ok = r.(goRuntime.Error)
+			if ok {
+				panic(err)
+			}
 			err, ok = r.(error)
 			if !ok {
 				err = fmt.Errorf("%v", r)
@@ -45,10 +71,10 @@ func (interpreter *Interpreter) Interpret() (err error) {
 }
 
 func (interpreter *Interpreter) visitProgramDeclarations() Trampoline {
-	return interpreter.visitDeclarations(interpreter.Program.Declarations)
+	return interpreter.visitGlobalDeclarations(interpreter.Program.Declarations)
 }
 
-func (interpreter *Interpreter) visitDeclarations(declarations []ast.Declaration) Trampoline {
+func (interpreter *Interpreter) visitGlobalDeclarations(declarations []ast.Declaration) Trampoline {
 	count := len(declarations)
 
 	// no declarations? stop
@@ -58,37 +84,32 @@ func (interpreter *Interpreter) visitDeclarations(declarations []ast.Declaration
 	}
 
 	// interpret the first declaration, then the remaining ones
-	return interpreter.visitDeclaration(declarations[0]).
+	return interpreter.visitGlobalDeclaration(declarations[0]).
 		FlatMap(func(_ interface{}) Trampoline {
-			return interpreter.visitDeclarations(declarations[1:])
+			return interpreter.visitGlobalDeclarations(declarations[1:])
 		})
 }
 
-// visitDeclaration firsts interprets the declaration,
+// visitGlobalDeclaration firsts interprets the global declaration,
 // then finds the declaration and adds it to the globals
-func (interpreter *Interpreter) visitDeclaration(declaration ast.Declaration) Trampoline {
+func (interpreter *Interpreter) visitGlobalDeclaration(declaration ast.Declaration) Trampoline {
 	return declaration.Accept(interpreter).(Trampoline).
 		Then(func(_ interface{}) {
-			interpreter.defineGlobal(declaration)
+			interpreter.declareGlobal(declaration)
 		})
 }
 
-func (interpreter *Interpreter) defineGlobal(declaration ast.Declaration) {
+func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
-	if _, exists := interpreter.Globals[name]; exists {
-		panic(&RedeclarationError{
-			Name: name,
-			Pos:  declaration.GetIdentifierPosition(),
-		})
-	}
-	interpreter.Globals[name] = interpreter.activations.Find(name)
+	// NOTE: semantic analysis already checked possible invalid redeclaration
+	interpreter.Globals[name] = interpreter.findVariable(name)
 }
 
 func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value Value, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
 		return nil, &NotDeclaredError{
-			ExpectedKind: DeclarationKindFunction,
+			ExpectedKind: common.DeclarationKindFunction,
 			Name:         functionName,
 		}
 	}
@@ -125,7 +146,13 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 	return result.(Value), nil
 }
 
-func (interpreter *Interpreter) InvokeExportable(functionName string, inputs ...interface{}) (value ExportableValue, err error) {
+func (interpreter *Interpreter) InvokeExportable(
+	functionName string,
+	inputs ...interface{},
+) (
+	value ExportableValue,
+	err error,
+) {
 	result, err := interpreter.Invoke(functionName, inputs...)
 	if err != nil {
 		return nil, err
@@ -190,7 +217,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	variableDeclaration := &ast.VariableDeclaration{
 		Value:         expression,
 		Identifier:    declaration.Identifier,
-		IsConst:       true,
+		IsConstant:    true,
 		Type:          functionType,
 		StartPos:      declaration.StartPos,
 		EndPos:        declaration.EndPos,
@@ -198,10 +225,12 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	}
 
 	// make the function itself available inside the function
-	depth := interpreter.activations.Depth()
-	variable := newVariable(variableDeclaration, depth, function)
+	variable := &Variable{
+		Declaration: variableDeclaration,
+		Value:       function,
+	}
 	function.Activation = function.Activation.
-		Insert(ActivationKey(declaration.Identifier), variable)
+		Insert(activations.StringKey(declaration.Identifier), variable)
 
 	// function declarations are de-sugared to constants
 	interpreter.declareVariable(variableDeclaration, function)
@@ -213,7 +242,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 func (interpreter *Interpreter) ImportFunction(name string, function *HostFunctionValue) {
 	variableDeclaration := &ast.VariableDeclaration{
 		Identifier: name,
-		IsConst:    true,
+		IsConstant: true,
 		// TODO: Type
 	}
 
@@ -322,18 +351,13 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 }
 
 func (interpreter *Interpreter) declareVariable(declaration *ast.VariableDeclaration, value Value) {
-	variable := interpreter.activations.Find(declaration.Identifier)
-	depth := interpreter.activations.Depth()
-	if variable != nil && variable.Depth == depth {
-		panic(&RedeclarationError{
-			Name: declaration.Identifier,
-			Pos:  declaration.GetIdentifierPosition(),
-		})
+	variable := interpreter.findVariable(declaration.Identifier)
+	// NOTE: semantic analysis already checked possible invalid redeclaration
+	variable = &Variable{
+		Declaration: declaration,
+		Value:       value,
 	}
-
-	variable = newVariable(declaration, depth, value)
-
-	interpreter.activations.Set(declaration.Identifier, variable)
+	interpreter.setVariable(declaration.Identifier, variable)
 }
 
 func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
@@ -401,10 +425,10 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 
 func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
 	identifier := target.Identifier
-	variable := interpreter.activations.Find(identifier)
+	variable := interpreter.findVariable(identifier)
 	if variable == nil {
 		panic(&NotDeclaredError{
-			ExpectedKind: DeclarationKindVariable,
+			ExpectedKind: common.DeclarationKindVariable,
 			Name:         identifier,
 			StartPos:     target.StartPosition(),
 			EndPos:       target.EndPosition(),
@@ -417,26 +441,18 @@ func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.
 			EndPos:   target.EndPosition(),
 		})
 	}
-	interpreter.activations.Set(identifier, variable)
+	interpreter.setVariable(identifier, variable)
 }
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
-	variable := interpreter.activations.Find(expression.Identifier)
-	if variable == nil {
-		panic(&NotDeclaredError{
-			ExpectedKind: DeclarationKindValue,
-			Name:         expression.Identifier,
-			StartPos:     expression.StartPosition(),
-			EndPos:       expression.EndPosition(),
-		})
-	}
+	variable := interpreter.findVariable(expression.Identifier)
 	return Done{Result: variable.Value}
 }
 
 func (interpreter *Interpreter) visitBinaryIntegerOperand(
 	value Value,
 	operation ast.Operation,
-	side OperandSide,
+	side common.OperandSide,
 	startPos *ast.Position,
 	endPos *ast.Position,
 ) IntegerValue {
@@ -445,7 +461,7 @@ func (interpreter *Interpreter) visitBinaryIntegerOperand(
 		panic(&InvalidBinaryOperandError{
 			Operation:    operation,
 			Side:         side,
-			ExpectedType: &IntegerType{},
+			ExpectedType: &sema.IntegerType{},
 			Value:        value,
 			StartPos:     startPos,
 			EndPos:       endPos,
@@ -457,7 +473,7 @@ func (interpreter *Interpreter) visitBinaryIntegerOperand(
 func (interpreter *Interpreter) visitBinaryBoolOperand(
 	value Value,
 	operation ast.Operation,
-	side OperandSide,
+	side common.OperandSide,
 	startPos *ast.Position,
 	endPos *ast.Position,
 ) BoolValue {
@@ -466,7 +482,7 @@ func (interpreter *Interpreter) visitBinaryBoolOperand(
 		panic(&InvalidBinaryOperandError{
 			Operation:    operation,
 			Side:         side,
-			ExpectedType: &BoolType{},
+			ExpectedType: &sema.BoolType{},
 			Value:        value,
 			StartPos:     startPos,
 			EndPos:       endPos,
@@ -485,7 +501,7 @@ func (interpreter *Interpreter) visitUnaryBoolOperand(
 	if !isBool {
 		panic(&InvalidUnaryOperandError{
 			Operation:    operation,
-			ExpectedType: &BoolType{},
+			ExpectedType: &sema.BoolType{},
 			Value:        value,
 			StartPos:     startPos,
 			EndPos:       endPos,
@@ -504,7 +520,7 @@ func (interpreter *Interpreter) visitUnaryIntegerOperand(
 	if !isInteger {
 		panic(&InvalidUnaryOperandError{
 			Operation:    operation,
-			ExpectedType: &IntegerType{},
+			ExpectedType: &sema.IntegerType{},
 			Value:        value,
 			StartPos:     startPos,
 			EndPos:       endPos,
@@ -532,14 +548,14 @@ func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression)
 						left := interpreter.visitBinaryIntegerOperand(
 							leftValue,
 							expr.Operation,
-							OperandSideLeft,
+							common.OperandSideLeft,
 							expr.Left.StartPosition(),
 							expr.Left.EndPosition(),
 						)
 						right := interpreter.visitBinaryIntegerOperand(
 							rightValue,
 							expr.Operation,
-							OperandSideRight,
+							common.OperandSideRight,
 							expr.Right.StartPosition(),
 							expr.Right.EndPosition(),
 						)
@@ -549,14 +565,14 @@ func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression)
 						left := interpreter.visitBinaryBoolOperand(
 							leftValue,
 							expr.Operation,
-							OperandSideLeft,
+							common.OperandSideLeft,
 							expr.Left.StartPosition(),
 							expr.Left.EndPosition(),
 						)
 						right := interpreter.visitBinaryBoolOperand(
 							rightValue,
 							expr.Operation,
-							OperandSideRight,
+							common.OperandSideRight,
 							expr.Right.StartPosition(),
 							expr.Right.EndPosition(),
 						)
@@ -582,7 +598,7 @@ func (interpreter *Interpreter) visitBinaryIntegerOperation(
 				leftValue, rightValue := result.(valueTuple).values()
 				panic(&InvalidBinaryOperandTypesError{
 					Operation:    expression.Operation,
-					ExpectedType: &IntegerType{},
+					ExpectedType: &sema.IntegerType{},
 					LeftValue:    leftValue,
 					RightValue:   rightValue,
 					StartPos:     expression.StartPosition(),
@@ -608,7 +624,7 @@ func (interpreter *Interpreter) visitBinaryBoolOperation(
 				leftValue, rightValue := result.(valueTuple).values()
 				panic(&InvalidBinaryOperandTypesError{
 					Operation:    expression.Operation,
-					ExpectedType: &BoolType{},
+					ExpectedType: &sema.BoolType{},
 					LeftValue:    leftValue,
 					RightValue:   rightValue,
 					StartPos:     expression.StartPosition(),
@@ -734,7 +750,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	}
 
 	panic(&unsupportedOperation{
-		kind:      OperationKindBinary,
+		kind:      common.OperationKindBinary,
 		operation: expression.Operation,
 	})
 }
@@ -765,7 +781,7 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 			}
 
 			panic(&unsupportedOperation{
-				kind:      OperationKindUnary,
+				kind:      common.OperationKindUnary,
 				operation: expression.Operation,
 			})
 		})
@@ -860,7 +876,12 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 			}
 
 			// NOTE: evaluate all argument expressions in call-site scope, not in function body
-			return interpreter.visitExpressions(invocationExpression.Arguments, nil).
+			argumentExpressions := make([]ast.Expression, len(invocationExpression.Arguments))
+			for i, argument := range invocationExpression.Arguments {
+				argumentExpressions[i] = argument.Expression
+			}
+
+			return interpreter.visitExpressions(argumentExpressions, nil).
 				FlatMap(func(result interface{}) Trampoline {
 
 					arguments := result.(ArrayValue)
@@ -905,11 +926,11 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 	for parameterIndex, parameter := range function.Expression.Parameters {
 		argument := arguments[parameterIndex]
 
-		interpreter.activations.Set(
+		interpreter.setVariable(
 			parameter.Identifier,
 			&Variable{
 				Declaration: &ast.VariableDeclaration{
-					IsConst:    true,
+					IsConstant: true,
 					Identifier: parameter.Identifier,
 					Type:       parameter.Type,
 					StartPos:   parameter.StartPos,

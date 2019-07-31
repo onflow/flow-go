@@ -1,6 +1,7 @@
 package ast
 
 type Parameter struct {
+	Label      string
 	Identifier string
 	Type       Type
 	StartPos   *Position
