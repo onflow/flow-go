@@ -322,7 +322,79 @@ let aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 // `aNumber` has type `Int`
 ```
 
+### Optionals
+
+> 🚧 Status: Optionals are not implemented yet.
+
+Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.
+
+An optional type is declared using the `?` suffix for another type. For example, `Int` is a non-optional integer, and `Int?` is an optional integer, i.e. either nothing, or an integer.
+
+The value representing nothing is `nil`.
+
+```bamboo
+// declare a constant which has an optional integer type,
+// with nil as its initial value
+//
+let a: Int? = nil
+
+// declare a constant which has an optional integer type,
+// with 42 as its initial value
+//
+let b: Int? = 42
+```
+
+#### Nil-Coalescing Operator
+
+The nil-coalescing operator `??` returns the value inside an optional if it contains a value, or returns an alternative value if the optional has no value, i.e., the optional value is `nil`.
+
+```bamboo
+// declare a constant which has an optional integer type
+//
+let a: Int? = nil
+
+// declare a constant with a non-optional integer type,
+// which is initialized to b if it is non-nil, or 42 otherwise
+//
+let b: Int = a ?? 42
+// integer is 42, as a is nil
+```
+
+The nil-coalescing operator can only be applied to values which have an optional type.
+
+```bamboo
+// declare a constant with a non-optional integer type
+//
+let a = 1
+
+// invalid: nil-coalescing operator is applied to a value which has a non-optional type
+// (a has the non-optional type Int)
+//
+let b = a ?? 2
+```
+
+```bamboo
+// invalid: nil-coalescing operator is applied to a value which has a non-optional type
+// (the integer literal is of type Int)
+//
+let c = 1 ?? 2
+```
+
+The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.
+
+```bamboo
+// declare a constant with a non-optional integer type
+let a = 1
+
+// invalid: nil-coalescing operator is applied to a value of type Int,
+// but alternative is of type Bool
+//
+let b = a ?? false
+```
+
 ### Strings and Characters
+
+> 🚧 Status: Strings are not implemented yet.
 
 Strings are collections of characters. Strings have the type `String`, and characters have the type `Character`. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.
 
@@ -407,11 +479,31 @@ Arrays are mutable, ordered collections of values. All values in an array must h
 [1, true, 2, false]
 ```
 
+#### Array Types
+
+Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.
+
+Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array. For example, a fixed-size array of 3 `Int8` elements has the type `Int8[3]`.
+
+Variable-size arrays have the type suffix `[]`. For example, the type `Int16[]` specifies a variable-size array of elements that have type `Int16`.
+
+```bamboo,file=array-types.bpl
+let array: Int8[2] = [1, 2]
+
+let arrays: Int16[2][3] = [
+    [1, 2, 3],
+    [4, 5, 6]
+]
+```
+
 #### Array Indexing
 
 To get the element of an array at a specific index, the indexing syntax can be used: The array is followed by an opening square bracket `[`, the indexing value, and ends with a closing square bracket `]`.
 
+Accessing an element which is out of bounds results in a fatal error.
+
 ```bamboo,file=arrays-indexing.bpl
+// Declare an array
 let numbers = [42, 23]
 
 // Get the first number
@@ -421,6 +513,10 @@ numbers[0] // is 42
 // Get the second number
 //
 numbers[1] // is 23
+
+// Error: Index 2 is out of bounds
+//
+numbers[2]
 ```
 
 ```bamboo,file=arrays-nested-indexing.bpl
@@ -445,23 +541,6 @@ let numbers = [42, 23]
 numbers[1] = 2
 
 // `numbers` is [42, 2]
-```
-
-#### Array Types
-
-Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.
-
-Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array. For example, a fixed-size array of 3 `Int8` elements has the type `Int8[3]`.
-
-Variable-size arrays have the type suffix `[]`. For example, the type `Int16[]` specifies a variable-size array of elements that have type `Int16`.
-
-```bamboo,file=array-types.bpl
-let array: Int8[2] = [1, 2]
-
-let arrays: Int16[2][3] = [
-    [1, 2, 3],
-    [4, 5, 6]
-]
 ```
 
 <!--
@@ -505,22 +584,65 @@ Dictionary literals start with an opening brace `{` and end with a closing brace
 }
 ```
 
-#### Dictionary Access
+#### Dictionary Types
 
-To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
+Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
 
-```bamboo,file=dictionary-access.bpl
+```bamboo,file=dictionary-types.bpl
+// Declare a constant that has type `Bool[Int]`,
+// a dictionary mapping integers to booleans
+//
 let booleans = {
     1: true,
     0: false
 }
-booleans[1] // is true
-booleans[0] // is false
 
+// Declare a constant that has type `Int[Bool]`,
+// a dictionary mapping booleans to integers
+//
 let integers = {
     true: 1,
     false: 0
 }
+```
+
+#### Dictionary Access
+
+To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
+
+Accessing a key returns an [optional](#optionals): If the key is found in the dictionary, the value for the given key is returned, and if the key is not found, `nil` is returned.
+
+```bamboo,file=dictionary-access-integer-keys.bpl
+// Declare a constant that has type `Bool[Int]`,
+// a dictionary mapping integers to booleans
+//
+let booleans = {
+    1: true,
+    0: false
+}
+
+// The result of accessing a key has type `Bool?`
+//
+booleans[1] // is true
+booleans[0] // is false
+booleans[2] // is nil
+
+// Invalid: Accessing a key which does not have type `Int`
+//
+booleans["1"]
+```
+
+```bamboo,file=dictionary-access-boolean-keys.bpl
+// Declare a constant that has type `Int[Bool]`,
+// a dictionary mapping booleans to integers
+//
+let integers = {
+    true: 1,
+    false: 0
+}
+
+// The result of accessing a key has type `Int?`
+//
 integers[true] // is 1
 integers[false] // is 0
 ```
@@ -534,26 +656,7 @@ let booleans = {
 }
 booleans[1] = false
 booleans[0] = true
-// `booleans` is {1: false, 0: true}
-```
-
-
-#### Dictionary Types
-
-Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
-
-```bamboo,file=dictionary-types.bpl
-let booleans = {
-    1: true,
-    0: false
-}
-// `booleans` has type `Bool[Int]`
-
-let integers = {
-    true: 1,
-    false: 0
-}
-// `integers` has type `Int[Bool]`
+// `booleans` is `{1: false, 0: true}`
 ```
 
 <!--
@@ -1377,76 +1480,6 @@ fun f(): Int {
     return x
 }
 f() // returns 2
-```
-
-## Optionals
-
-> Status: Optionals are not implemented yet.
-
-Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.
-
-An optional type is declared using the `?` suffix for another type. For example, `Int` is a non-optional integer, and `Int?` is an optional integer, i.e. either nothing, or an integer.
-
-The value representing nothing is `nil`.
-
-```bamboo
-// declare a constant which has an optional integer type,
-// with nil as its initial value
-//
-let a: Int? = nil
-
-// declare a constant which has an optional integer type,
-// with 42 as its initial value
-//
-let b: Int? = 42
-```
-
-### Nil-Coalescing Operator
-
-The nil-coalescing operator `??` returns the value inside an optional if it contains a value, or returns an alternative value if the optional has no value, i.e., the optional value is `nil`.
-
-```bamboo
-// declare a constant which has an optional integer type
-//
-let a: Int? = nil
-
-// declare a constant with a non-optional integer type,
-// which is initialized to b if it is non-nil, or 42 otherwise
-//
-let b: Int = a ?? 42
-// integer is 42, as a is nil
-```
-
-The nil-coalescing operator can only be applied to values which have an optional type.
-
-```bamboo
-// declare a constant with a non-optional integer type
-//
-let a = 1
-
-// invalid: nil-coalescing operator is applied to a value which has a non-optional type
-// (a has the non-optional type Int)
-//
-let b = a ?? 2
-```
-
-```bamboo
-// invalid: nil-coalescing operator is applied to a value which has a non-optional type
-// (the integer literal is of type Int)
-//
-let c = 1 ?? 2
-```
-
-The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.
-
-```bamboo
-// declare a constant with a non-optional integer type
-let a = 1
-
-// invalid: nil-coalescing operator is applied to a value of type Int,
-// but alternative is of type Bool
-//
-let b = a ?? false
 ```
 
 
