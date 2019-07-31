@@ -838,7 +838,7 @@ let a = 1 + 2
 
 The arguments for the operators need to be of the same type.
 
-Arithmetic operators don't cause values to overflow.
+Arithmetic operators do not cause values to overflow.
 
 ```bamboo,file=operator-times.bpl
 let a: Int8 = 100
@@ -2883,6 +2883,14 @@ Attestations are values that proof ownership.
 Attestations can be created for resources and reflect their current state, which is read-only.
 They cannot be stored.
 
+Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.
+
+As an analogy, a bank statement is a proof of ownership of money.
+However, unlike a bank statement, an attestation is "live", i.e. it is not just a snapshot at the time it was created,
+but it reflects the current state of the underlying resource.
+
+Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource, and can be safely handed to untrusted parties.
+
 Attestations of resources are created using the `@` operator.
 Attestation types have the name of the resource type, prefixed with the `@` symbol.
 
@@ -3319,7 +3327,7 @@ How do we store programs on-chain?
 
 > ➡️ <https://github.com/dapperlabs/bamboo-node/issues/67>
 
-We don't allow floating-point numbers.
+We do not allow floating-point numbers.
 Should we add fixed-point arithmetic to support fractional numbers?
 
 ### Enums with Exhaustiveness Check
@@ -3365,7 +3373,7 @@ How do we ensure preconditions and postconditions are side-effect free?
 
 > ➡️ <https://github.com/dapperlabs/bamboo-node/issues/71>
 
-Currently we don't allow variables and constants to be initialized after they are declared. This improves readability, as the reader of the code can always be sure the initial value can be found where the variable or constant was declared, not somewhere else in the code following the declaration.
+Currently we do not allow variables and constants to be initialized after they are declared. This improves readability, as the reader of the code can always be sure the initial value can be found where the variable or constant was declared, not somewhere else in the code following the declaration.
 
 Should we allow the late initialization of variables and constants?
 
