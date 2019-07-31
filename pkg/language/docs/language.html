@@ -56,28 +56,35 @@
                 <p><a href="#addresses">Addresses</a></p>
               </li>
               <li>
+                <p><a href="#any">Any</a></p>
+              </li>
+              <li>
+                <p><a href="#never">Never</a></p>
+              </li>
+              <li>
+                <p><a href="#optionals">Optionals</a></p>
+                <ul>
+                  <li><a href="#nil-coalescing-operator">Nil-Coalescing Operator</a></li>
+                  <li><a href="#conditional-downcasting-operator">Conditional Downcasting Operator</a></li>
+                </ul>
+              </li>
+              <li>
                 <p><a href="#strings-and-characters">Strings and Characters</a></p>
               </li>
               <li>
                 <p><a href="#arrays">Arrays</a></p>
                 <ul>
-                  <li><a href="#array-indexing">Array Indexing</a></li>
                   <li><a href="#array-types">Array Types</a></li>
+                  <li><a href="#array-indexing">Array Indexing</a></li>
                 </ul>
               </li>
               <li>
                 <p><a href="#dictionaries">Dictionaries</a></p>
                 <ul>
-                  <li><a href="#dictionary-access">Dictionary Access</a></li>
                   <li><a href="#dictionary-types">Dictionary Types</a></li>
+                  <li><a href="#dictionary-access">Dictionary Access</a></li>
                   <li><a href="#dictionary-keys">Dictionary Keys</a></li>
                 </ul>
-              </li>
-              <li>
-                <p><a href="#any">Any</a></p>
-              </li>
-              <li>
-                <p><a href="#never">Never</a></p>
               </li>
             </ul>
           </li>
@@ -128,12 +135,6 @@
             <p><a href="#scope">Scope</a></p>
           </li>
           <li>
-            <p><a href="#optionals">Optionals</a></p>
-            <ul>
-              <li><a href="#nil-coalescing-operator">Nil-Coalescing Operator</a></li>
-            </ul>
-          </li>
-          <li>
             <p><a href="#type-safety">Type Safety</a></p>
           </li>
           <li>
@@ -141,18 +142,10 @@
           </li>
           <li>
             <p><a href="#composite-data-types">Composite Data Types</a></p>
+          </li>
+          <li>
+            <p><a href="#composite-data-type-declaration-and-creation">Composite Data Type Declaration and Creation</a></p>
             <ul>
-              <li>
-                <p><a href="#structures">Structures</a></p>
-              </li>
-              <li>
-                <p><a href="#resources">Resources</a></p>
-                <ul>
-                  <li><a href="#resource-declaration">Resource Declaration</a></li>
-                  <li><a href="#resource-behaviour">Resource Behaviour</a></li>
-                  <li><a href="#resources-in-arrays-and-dictionaries">Resources in Arrays and Dictionaries</a></li>
-                </ul>
-              </li>
               <li>
                 <p><a href="#composite-data-type-fields">Composite Data Type Fields</a></p>
               </li>
@@ -164,6 +157,14 @@
               </li>
               <li>
                 <p><a href="#composite-data-type-functions">Composite Data Type Functions</a></p>
+              </li>
+              <li>
+                <p><a href="#composite-data-type-behaviour">Composite Data Type Behaviour</a></p>
+                <ul>
+                  <li><a href="#structures">Structures</a></li>
+                  <li><a href="#resources">Resources</a></li>
+                  <li><a href="#resources-in-arrays-and-dictionaries">Resources in Arrays and Dictionaries</a></li>
+                </ul>
               </li>
               <li>
                 <p><a href="#unbound-references--nulls">Unbound References / Nulls</a></p>
@@ -358,7 +359,7 @@
       <section>
         <h2 id="naming"><a href="#naming" aria-hidden="true"><span class="icon icon-link"></span></a>Naming</h2>
         <p>
-          Names may start with any upper and lowercase letter or an underscore. This may be followed by zero or more upper and lower case letters, underscores, and numbers.
+          Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (<code>_</code>). This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
           Names may not begin with a number.
         </p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Valid, title-case</span><span>
@@ -392,7 +393,11 @@
       </section>
       <section>
         <h2 id="semicolons"><a href="#semicolons" aria-hidden="true"><span class="icon icon-link"></span></a>Semicolons</h2>
-        <p>Semicolons may be used to separate statements, but are optional. They can be used to separate multiple statements on a single line.</p>
+        <p>
+          Semicolons (;) are used as statement separators.
+          Semicolons can be placed after any statement, but can be omitted if only one statement appears on the line.
+          Semicolons must be used to separate multiple statements if they appear on the same line.
+        </p>
         <pre><code class="language-bamboo,file=semicolons.bpl"><span style="color: #008000">// Declare a constant, without a semicolon</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
@@ -497,6 +502,7 @@
           <p>In addition, the arbitrary precision integer type <code>Int</code> is provided.</p>
           <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> veryLargeNumber: Int = </span><span style="color: #09885A">10000000000000000000000000000000</span><span>
 </span></code></pre>
+          <p>Negative integers are encoded in two's complement representation.</p>
         </section>
         <section>
           <h3 id="floating-point-numbers"><a href="#floating-point-numbers" aria-hidden="true"><span class="icon icon-link"></span></a>Floating-Point Numbers</h3>
@@ -529,7 +535,133 @@
 </span></code></pre>
         </section>
         <section>
+          <h3 id="any"><a href="#any" aria-hidden="true"><span class="icon icon-link"></span></a>Any</h3>
+          <p><code>Any</code> is the top type, i.e., all types are a subtype of it.</p>
+          <pre><code class="language-bamboo"><span style="color: #008000">// Declare a variable that has the type `Any`.</span><span>
+</span><span style="color: #008000">// Any value can be assigned to it, for example an integer.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> someValue: Any = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Assign a value with a different type, `Bool`</span><span>
+</span><span style="color: #000000">someValue = </span><span style="color: #0000FF">true</span><span>
+</span></code></pre>
+          <p>However, using <code>Any</code> does not opt-out of type checking. It is invalid to access fields and call functions on <code>Any</code> typed values, as it has no fields and functions.</p>
+          <pre><code class="language-bamboo"><span style="color: #008000">// Declare a variable that has the type `Any`. The initial value is an integer,</span><span>
+</span><span style="color: #008000">// but the variable  still has the explicit type `Any`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Any = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)</span><span>
+</span><span style="color: #008000">// and an `Int` value (`2`, right-hand side)</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">a + </span><span style="color: #09885A">2</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="never"><a href="#never" aria-hidden="true"><span class="icon icon-link"></span></a>Never</h3>
+          <p><code>Never</code> is the bottom type, i.e., it is a subtype of all types. There is no value that has type <code>Never</code>. <code>Never</code> can be used as the return type for functions that never return normally. For example, it is the return type of the function <a href="#fatalError"><code>fatalError</code></a>.</p>
+          <pre><code class="language-bamboo"><span style="color: #008000">// Declare a function named `crashAndBurn` which will never return,</span><span>
+</span><span style="color: #008000">// because it calls the function named `fatalError`, which never returns</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> crashAndBurn(): Never {</span><span>
+</span><span style="color: #000000">    fatalError(</span><span style="color: #A31515">"An unrecoverable error occurred"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="optionals"><a href="#optionals" aria-hidden="true"><span class="icon icon-link"></span></a>Optionals</h3>
+          <blockquote>
+            <p>🚧 Status: Optionals are not implemented yet.</p>
+          </blockquote>
+          <p>Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.</p>
+          <p>An optional type is declared using the <code>?</code> suffix for another type. For example, <code>Int</code> is a non-optional integer, and <code>Int?</code> is an optional integer, i.e. either nothing, or an integer.</p>
+          <p>The value representing nothing is <code>nil</code>.</p>
+          <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
+</span><span style="color: #008000">// with nil as its initial value</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
+</span><span style="color: #008000">// with 42 as its initial value</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int? = </span><span style="color: #09885A">42</span><span>
+</span></code></pre>
+          <section>
+            <h4 id="nil-coalescing-operator"><a href="#nil-coalescing-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Nil-Coalescing Operator</h4>
+            <p>
+              The nil-coalescing operator <code>??</code> returns the value inside an optional if it contains a value,
+              or returns an alternative value if the optional has no value, i.e., the optional value is <code>nil</code>.
+            </p>
+            <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant which has an optional integer type</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant with a non-optional integer type,</span><span>
+</span><span style="color: #008000">// which is initialized to b if it is non-nil, or 42 otherwise</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int = a ?? </span><span style="color: #09885A">42</span><span>
+</span><span style="color: #008000">// `b` is 42, as `a` is nil</span><span>
+</span></code></pre>
+            <p>The nil-coalescing operator can only be applied to values which have an optional type.</p>
+            <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant with a non-optional integer type</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: nil-coalescing operator is applied to a value which has a non-optional type</span><span>
+</span><span style="color: #008000">// (a has the non-optional type Int)</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a ?? </span><span style="color: #09885A">2</span><span>
+</span></code></pre>
+            <pre><code class="language-bamboo"><span style="color: #008000">// Invalid: nil-coalescing operator is applied to a value which has a non-optional type</span><span>
+</span><span style="color: #008000">// (the integer literal is of type Int)</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> c = </span><span style="color: #09885A">1</span><span style="color: #000000"> ?? </span><span style="color: #09885A">2</span><span>
+</span></code></pre>
+            <p>The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.</p>
+            <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant with a non-optional integer type</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: nil-coalescing operator is applied to a value of type Int,</span><span>
+</span><span style="color: #008000">// but alternative is of type Bool</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a ?? </span><span style="color: #0000FF">false</span><span>
+</span></code></pre>
+          </section>
+          <section>
+            <h4 id="conditional-downcasting-operator"><a href="#conditional-downcasting-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Conditional Downcasting Operator</h4>
+            <p>
+              The conditional downcasting operator <code>as?</code> can be used to type cast a value to a type.
+              The operator returns an optional.
+              If the value has a type that is a subtype of the given type that should be casted to,
+              the operator returns the value as the given type,
+              otherwise the result is <code>nil</code>.
+            </p>
+            <pre><code class="language-bamboo,file=conditional-downcasting.bpl"><span style="color: #008000">// Declare a constant named `something` which has type `Any`,</span><span>
+</span><span style="color: #008000">// with an initial value which has type `Int`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> something: Any = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Conditionally downcast the value of `something` to `Int`.</span><span>
+</span><span style="color: #008000">// The cast succeeds, because the value has type `Int`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> number = something as? Int</span><span>
+</span><span style="color: #008000">// `number` is 1 and has type `Int?`</span><span>
+</span><span>
+</span><span style="color: #008000">// Conditionally downcast the value of `something` to `Bool`.</span><span>
+</span><span style="color: #008000">// The cast fails, because the value has type `Int`,</span><span>
+</span><span style="color: #008000">// and `Bool` is not a subtype of `Int`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> boolean = something as? Bool</span><span>
+</span><span style="color: #008000">// `boolean` is nil and has type `Bool?`</span><span>
+</span></code></pre>
+          </section>
+        </section>
+        <section>
           <h3 id="strings-and-characters"><a href="#strings-and-characters" aria-hidden="true"><span class="icon icon-link"></span></a>Strings and Characters</h3>
+          <blockquote>
+            <p>🚧 Status: Strings are not implemented yet.</p>
+          </blockquote>
           <p>Strings are collections of characters. Strings have the type <code>String</code>, and characters have the type <code>Character</code>. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.</p>
           <p>String and character literals are enclosed in double quotation marks (<code>"</code>).</p>
           <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> someString = </span><span style="color: #A31515">"Hello, world!"</span><span>
@@ -586,9 +718,24 @@
 </span><span style="color: #000000">[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #0000FF">false</span><span style="color: #000000">]</span><span>
 </span></code></pre>
           <section>
+            <h4 id="array-types"><a href="#array-types" aria-hidden="true"><span class="icon icon-link"></span></a>Array Types</h4>
+            <p>Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.</p>
+            <p>Fixed-size arrays have the type suffix <code>[N]</code>, where <code>N</code> is the size of the array. For example, a fixed-size array of 3 <code>Int8</code> elements has the type <code>Int8[3]</code>.</p>
+            <p>Variable-size arrays have the type suffix <code>[]</code>. For example, the type <code>Int16[]</code> specifies a variable-size array of elements that have type <code>Int16</code>.</p>
+            <pre><code class="language-bamboo,file=array-types.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> array: Int8[2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays: Int16[2][3] = [</span><span>
+</span><span style="color: #000000">    [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #09885A">3</span><span style="color: #000000">],</span><span>
+</span><span style="color: #000000">    [</span><span style="color: #09885A">4</span><span style="color: #000000">, </span><span style="color: #09885A">5</span><span style="color: #000000">, </span><span style="color: #09885A">6</span><span style="color: #000000">]</span><span>
+</span><span style="color: #000000">]</span><span>
+</span></code></pre>
+          </section>
+          <section>
             <h4 id="array-indexing"><a href="#array-indexing" aria-hidden="true"><span class="icon icon-link"></span></a>Array Indexing</h4>
             <p>To get the element of an array at a specific index, the indexing syntax can be used: The array is followed by an opening square bracket <code>[</code>, the indexing value, and ends with a closing square bracket <code>]</code>.</p>
-            <pre><code class="language-bamboo,file=arrays-indexing.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
+            <p>Accessing an element which is out of bounds results in a fatal error.</p>
+            <pre><code class="language-bamboo,file=arrays-indexing.bpl"><span style="color: #008000">// Declare an array</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Get the first number</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -597,6 +744,10 @@
 </span><span style="color: #008000">// Get the second number</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">numbers[</span><span style="color: #09885A">1</span><span style="color: #000000">] </span><span style="color: #008000">// is 23</span><span>
+</span><span>
+</span><span style="color: #008000">// Error: Index 2 is out of bounds</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">numbers[</span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
 </span></code></pre>
             <pre><code class="language-bamboo,file=arrays-nested-indexing.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> arrays = [[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">], [</span><span style="color: #09885A">3</span><span style="color: #000000">, </span><span style="color: #09885A">4</span><span style="color: #000000">]]</span><span>
 </span><span>
@@ -616,19 +767,6 @@
 </span><span style="color: #000000">numbers[</span><span style="color: #09885A">1</span><span style="color: #000000">] = </span><span style="color: #09885A">2</span><span>
 </span><span>
 </span><span style="color: #008000">// `numbers` is [42, 2]</span><span>
-</span></code></pre>
-          </section>
-          <section>
-            <h4 id="array-types"><a href="#array-types" aria-hidden="true"><span class="icon icon-link"></span></a>Array Types</h4>
-            <p>Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.</p>
-            <p>Fixed-size arrays have the type suffix <code>[N]</code>, where <code>N</code> is the size of the array. For example, a fixed-size array of 3 <code>Int8</code> elements has the type <code>Int8[3]</code>.</p>
-            <p>Variable-size arrays have the type suffix <code>[]</code>. For example, the type <code>Int16[]</code> specifies a variable-size array of elements that have type <code>Int16</code>.</p>
-            <pre><code class="language-bamboo,file=array-types.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> array: Int8[2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
-</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays: Int16[2][3] = [</span><span>
-</span><span style="color: #000000">    [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #09885A">3</span><span style="color: #000000">],</span><span>
-</span><span style="color: #000000">    [</span><span style="color: #09885A">4</span><span style="color: #000000">, </span><span style="color: #09885A">5</span><span style="color: #000000">, </span><span style="color: #09885A">6</span><span style="color: #000000">]</span><span>
-</span><span style="color: #000000">]</span><span>
 </span></code></pre>
           </section>
         </section>
@@ -658,19 +796,57 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <section>
-            <h4 id="dictionary-access"><a href="#dictionary-access" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Access</h4>
-            <p>To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket <code>[</code>, the key, and ends with a closing square bracket <code>]</code>.</p>
-            <pre><code class="language-bamboo,file=dictionary-access.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
+            <h4 id="dictionary-types"><a href="#dictionary-types" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Types</h4>
+            <p>Dictionaries have the type suffix <code>[T]</code>, where <code>T</code> is the type of the key. For example, a dictionary with <code>Int</code> keys and <code>Bool</code> values has type <code>Bool[Int]</code>.</p>
+            <pre><code class="language-bamboo,file=dictionary-types.bpl"><span style="color: #008000">// Declare a constant that has type `Bool[Int]`,</span><span>
+</span><span style="color: #008000">// a dictionary mapping integers to booleans</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">0</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
 </span><span style="color: #000000">}</span><span>
-</span><span style="color: #000000">booleans[</span><span style="color: #09885A">1</span><span style="color: #000000">] </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #000000">booleans[</span><span style="color: #09885A">0</span><span style="color: #000000">] </span><span style="color: #008000">// is false</span><span>
 </span><span>
+</span><span style="color: #008000">// Declare a constant that has type `Int[Bool]`,</span><span>
+</span><span style="color: #008000">// a dictionary mapping booleans to integers</span><span>
+</span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> integers = {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">true</span><span style="color: #000000">: </span><span style="color: #09885A">1</span><span style="color: #000000">,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">false</span><span style="color: #000000">: </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          </section>
+          <section>
+            <h4 id="dictionary-access"><a href="#dictionary-access" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Access</h4>
+            <p>To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket <code>[</code>, the key, and ends with a closing square bracket <code>]</code>.</p>
+            <p>Accessing a key returns an <a href="#optionals">optional</a>: If the key is found in the dictionary, the value for the given key is returned, and if the key is not found, <code>nil</code> is returned.</p>
+            <pre><code class="language-bamboo,file=dictionary-access-integer-keys.bpl"><span style="color: #008000">// Declare a constant that has type `Bool[Int]`,</span><span>
+</span><span style="color: #008000">// a dictionary mapping integers to booleans</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">0</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// The result of accessing a key has type `Bool?`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">booleans[</span><span style="color: #09885A">1</span><span style="color: #000000">] </span><span style="color: #008000">// is true</span><span>
+</span><span style="color: #000000">booleans[</span><span style="color: #09885A">0</span><span style="color: #000000">] </span><span style="color: #008000">// is false</span><span>
+</span><span style="color: #000000">booleans[</span><span style="color: #09885A">2</span><span style="color: #000000">] </span><span style="color: #008000">// is nil</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Accessing a key which does not have type `Int`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">booleans[</span><span style="color: #A31515">"1"</span><span style="color: #000000">]</span><span>
+</span></code></pre>
+            <pre><code class="language-bamboo,file=dictionary-access-boolean-keys.bpl"><span style="color: #008000">// Declare a constant that has type `Int[Bool]`,</span><span>
+</span><span style="color: #008000">// a dictionary mapping booleans to integers</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> integers = {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">true</span><span style="color: #000000">: </span><span style="color: #09885A">1</span><span style="color: #000000">,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">false</span><span style="color: #000000">: </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// The result of accessing a key has type `Int?`</span><span>
+</span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">integers[</span><span style="color: #0000FF">true</span><span style="color: #000000">] </span><span style="color: #008000">// is 1</span><span>
 </span><span style="color: #000000">integers[</span><span style="color: #0000FF">false</span><span style="color: #000000">] </span><span style="color: #008000">// is 0</span><span>
 </span></code></pre>
@@ -681,23 +857,7 @@
 </span><span style="color: #000000">}</span><span>
 </span><span style="color: #000000">booleans[</span><span style="color: #09885A">1</span><span style="color: #000000">] = </span><span style="color: #0000FF">false</span><span>
 </span><span style="color: #000000">booleans[</span><span style="color: #09885A">0</span><span style="color: #000000">] = </span><span style="color: #0000FF">true</span><span>
-</span><span style="color: #008000">// `booleans` is {1: false, 0: true}</span><span>
-</span></code></pre>
-          </section>
-          <section>
-            <h4 id="dictionary-types"><a href="#dictionary-types" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Types</h4>
-            <p>Dictionaries have the type suffix <code>[T]</code>, where <code>T</code> is the type of the key. For example, a dictionary with <code>Int</code> keys and <code>Bool</code> values has type <code>Bool[Int]</code>.</p>
-            <pre><code class="language-bamboo,file=dictionary-types.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #09885A">0</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span style="color: #008000">// `booleans` has type `Bool[Int]`</span><span>
-</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> integers = {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">true</span><span style="color: #000000">: </span><span style="color: #09885A">1</span><span style="color: #000000">,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">false</span><span style="color: #000000">: </span><span style="color: #09885A">0</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span style="color: #008000">// `integers` has type `Int[Bool]`</span><span>
+</span><span style="color: #008000">// `booleans` is `{1: false, 0: true}`</span><span>
 </span></code></pre>
           </section>
           <section>
@@ -705,40 +865,6 @@
             <p>Dictionary keys must be hashable and equatable, i.e., must implement the <a href="#hashable-interface"><code>Hashable</code></a> and <a href="#equatable-interface"><code>Equatable</code></a> <a href="#interfaces">interfaces</a>.</p>
             <p>Most of the built-in types, like booleans, integers, are hashable and equatable, so can be used as keys in dictionaries.</p>
           </section>
-        </section>
-        <section>
-          <h3 id="any"><a href="#any" aria-hidden="true"><span class="icon icon-link"></span></a>Any</h3>
-          <p><code>Any</code> is the top type, i.e., all types are a subtype of it.</p>
-          <pre><code class="language-bamboo"><span style="color: #008000">// Declare a variable that has the type `Any`.</span><span>
-</span><span style="color: #008000">// Any value can be assigned to it, for example an integer.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">var</span><span style="color: #000000"> someValue: Any = </span><span style="color: #09885A">1</span><span>
-</span><span>
-</span><span style="color: #008000">// Assign a value with a different type, `Bool`</span><span>
-</span><span style="color: #000000">someValue = </span><span style="color: #0000FF">true</span><span>
-</span></code></pre>
-          <p>However, using <code>Any</code> does not opt-out of type checking. It is invalid to access fields and call functions on <code>Any</code> typed values, as it has no fields and functions.</p>
-          <pre><code class="language-bamboo"><span style="color: #008000">// Declare a variable that has the type `Any`. The initial value is an integer,</span><span>
-</span><span style="color: #008000">// but the variable  still has the explicit type `Any`.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Any = </span><span style="color: #09885A">1</span><span>
-</span><span>
-</span><span style="color: #008000">// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)</span><span>
-</span><span style="color: #008000">// and an `Int` value (`2`, right-hand side)</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">a + </span><span style="color: #09885A">2</span><span>
-</span></code></pre>
-        </section>
-        <section>
-          <h3 id="never"><a href="#never" aria-hidden="true"><span class="icon icon-link"></span></a>Never</h3>
-          <p><code>Never</code> is the bottom type, i.e., it is a subtype of all types. There is no value that has type <code>Never</code>. <code>Never</code> can be used as the return type for functions that never return normally. For example, it is the return type of the function <a href="#fatalError"><code>fatalError</code></a>.</p>
-          <pre><code class="language-bamboo"><span style="color: #008000">// Declare a function named `crashAndBurn` which will never return,</span><span>
-</span><span style="color: #008000">// because it calls the function named `fatalError`, which never returns</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> crashAndBurn(): Never {</span><span>
-</span><span style="color: #000000">    fatalError(</span><span style="color: #A31515">"An unrecoverable error occurred"</span><span style="color: #000000">)</span><span>
-</span><span style="color: #000000">}</span><span>
-</span></code></pre>
         </section>
       </section>
       <section>
@@ -771,7 +897,7 @@
           <p>The binary assignment operator <code>=</code> can be used to assign a new value to a variable. It is only allowed in a statement and is not allowed in expressions.</p>
           <pre><code class="language-bamboo,file=assignment.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">a = </span><span style="color: #09885A">2</span><span>
-</span><span style="color: #008000">// a is 2</span><span>
+</span><span style="color: #008000">// `a` is 2</span><span>
 </span></code></pre>
           <p>The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.</p>
           <pre><code class="language-bamboo,file=assignment-numbers.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
@@ -811,11 +937,13 @@
             <li>Subtraction: <code>-</code></li>
             <li>Multiplication: <code>*</code></li>
             <li>Division: <code>/</code></li>
+            <li>Remainder: <code>%</code></li>
           </ul>
           <pre><code class="language-bamboo,file=operator-plus.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span style="color: #000000"> + </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #008000">// `a` is 3</span><span>
 </span></code></pre>
-          <p>Arithmetic operators don't cause values to overflow.</p>
+          <p>The arguments for the operators need to be of the same type.</p>
+          <p>Arithmetic operators do not cause values to overflow.</p>
           <pre><code class="language-bamboo,file=operator-times.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">100</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int8 = </span><span style="color: #09885A">100</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> c = a * b</span><span>
@@ -1022,7 +1150,7 @@
 </span><span style="color: #008000">// for these parameters, the parameter names must be used as argument labels.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> clamped = clamp(</span><span style="color: #09885A">123</span><span style="color: #000000">, min: </span><span style="color: #09885A">0</span><span style="color: #000000">, max: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
-</span><span style="color: #008000">// clamped is 100</span><span>
+</span><span style="color: #008000">// `clamped` is 100</span><span>
 </span></code></pre>
           <p>Argument labels make code more explicit and readable. For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.</p>
           <p>Argument labels should be named so they make sense from the perspective of the function call.</p>
@@ -1123,7 +1251,7 @@
           <h3 id="function-calls"><a href="#function-calls" aria-hidden="true"><span class="icon icon-link"></span></a>Function Calls</h3>
           <p>Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.</p>
           <pre><code class="language-bamboo,file=function-call.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
-</span><span style="color: #000000">     </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Valid: the correct amount of arguments is provided</span><span>
@@ -1174,22 +1302,33 @@
           <p>The type <code>((Int): Int)[2]</code> specifies an array type of two functions, which accept one integer and return one integer.</p>
           <section>
             <h4 id="argument-passing-behavior"><a href="#argument-passing-behavior" aria-hidden="true"><span class="icon icon-link"></span></a>Argument Passing Behavior</h4>
-            <p>When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as <a href="https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&#x26;oldid=896280571#Call_by_sharing">call-by-sharing</a>.</p>
-            <pre><code class="language-bamboo,file=function-change.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> change(_ numbers: Int[]) {</span><span>
-</span><span style="color: #000000">     numbers[</span><span style="color: #09885A">0</span><span style="color: #000000">] = </span><span style="color: #09885A">1</span><span>
-</span><span style="color: #000000">     numbers[</span><span style="color: #09885A">1</span><span style="color: #000000">] = </span><span style="color: #09885A">2</span><span>
+            <p>
+              When arguments are passed to a function, they are copied.
+              Therefore, values that are passed into a function are unchanged in the caller's scope when the function returns.
+              This behavior is known as <a href="https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&#x26;oldid=896280571#Call_by_value">call-by-value</a>.
+            </p>
+            <pre><code class="language-bamboo,file=function-change.bpl"><span style="color: #008000">// Declare a function that changes the first two elements</span><span>
+</span><span style="color: #008000">// of an array of integers</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> change(_ numbers: Int[]) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Change the elements of the passed in array.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The changes are only local, as the array was copied</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    numbers[</span><span style="color: #09885A">0</span><span style="color: #000000">] = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    numbers[</span><span style="color: #09885A">1</span><span style="color: #000000">] = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// `numbers` is [1, 2]</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">0</span><span style="color: #000000">, </span><span style="color: #09885A">1</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #000000">change(numbers)</span><span>
-</span><span style="color: #008000">// numbers is [1, 2]</span><span>
+</span><span style="color: #008000">// `numbers` is still [0, 1]</span><span>
 </span></code></pre>
             <p>Parameters are constant, i.e., it is not allowed to assign to them.</p>
             <pre><code class="language-bamboo,file=function-parameter-assignment.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> test(x: Int) {</span><span>
-</span><span style="color: #000000">     </span><span style="color: #008000">// Invalid: cannot assign to a parameter (constant)</span><span>
-</span><span style="color: #000000">     </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">     x = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: cannot assign to a parameter (constant)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    x = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           </section>
@@ -1271,7 +1410,7 @@
 </span><span style="color: #000000">   b = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// b is 1</span><span>
+</span><span style="color: #008000">// `b` is 1</span><span>
 </span></code></pre>
           <p>
             An additional else-clause can be added to execute another piece of code when the condition is false.
@@ -1286,7 +1425,7 @@
 </span><span style="color: #000000">   b = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// b is 2</span><span>
+</span><span style="color: #008000">// `b` is 2</span><span>
 </span></code></pre>
           <p>The else-clause can contain another if-statement, i.e., if-statements can be chained together.</p>
           <pre><code class="language-bamboo,file=control-flow-if-else-if.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
@@ -1300,7 +1439,7 @@
 </span><span style="color: #000000">   b = </span><span style="color: #09885A">3</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// b is 3</span><span>
+</span><span style="color: #008000">// `b` is 3</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -1316,7 +1455,7 @@
 </span><span style="color: #000000">    a = a + </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// a is 5</span><span>
+</span><span style="color: #008000">// `a` is 5</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -1387,63 +1526,6 @@
 </span><span style="color: #000000">}</span><span>
 </span><span style="color: #000000">f() </span><span style="color: #008000">// returns 2</span><span>
 </span></code></pre>
-      </section>
-      <section>
-        <h2 id="optionals"><a href="#optionals" aria-hidden="true"><span class="icon icon-link"></span></a>Optionals</h2>
-        <blockquote>
-          <p>Status: Optionals are not implemented yet.</p>
-        </blockquote>
-        <p>Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.</p>
-        <p>An optional type is declared using the <code>?</code> suffix for another type. For example, <code>Int</code> is a non-optional integer, and <code>Int?</code> is an optional integer, i.e. either nothing, or an integer.</p>
-        <p>The value representing nothing is <code>nil</code>.</p>
-        <pre><code class="language-bamboo"><span style="color: #008000">// declare a constant which has an optional integer type,</span><span>
-</span><span style="color: #008000">// with nil as its initial value</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
-</span><span>
-</span><span style="color: #008000">// declare a constant which has an optional integer type,</span><span>
-</span><span style="color: #008000">// with 42 as its initial value</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int? = </span><span style="color: #09885A">42</span><span>
-</span></code></pre>
-        <section>
-          <h3 id="nil-coalescing-operator"><a href="#nil-coalescing-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Nil-Coalescing Operator</h3>
-          <p>The nil-coalescing operator <code>??</code> returns the value inside an optional if it contains a value, or returns an alternative value if the optional has no value, i.e., the optional value is <code>nil</code>.</p>
-          <pre><code class="language-bamboo"><span style="color: #008000">// declare a constant which has an optional integer type</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
-</span><span>
-</span><span style="color: #008000">// declare a constant with a non-optional integer type,</span><span>
-</span><span style="color: #008000">// which is initialized to b if it is non-nil, or 42 otherwise</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int = a ?? </span><span style="color: #09885A">42</span><span>
-</span><span style="color: #008000">// integer is 42, as a is nil</span><span>
-</span></code></pre>
-          <p>The nil-coalescing operator can only be applied to values which have an optional type.</p>
-          <pre><code class="language-bamboo"><span style="color: #008000">// declare a constant with a non-optional integer type</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
-</span><span>
-</span><span style="color: #008000">// invalid: nil-coalescing operator is applied to a value which has a non-optional type</span><span>
-</span><span style="color: #008000">// (a has the non-optional type Int)</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a ?? </span><span style="color: #09885A">2</span><span>
-</span></code></pre>
-          <pre><code class="language-bamboo"><span style="color: #008000">// invalid: nil-coalescing operator is applied to a value which has a non-optional type</span><span>
-</span><span style="color: #008000">// (the integer literal is of type Int)</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> c = </span><span style="color: #09885A">1</span><span style="color: #000000"> ?? </span><span style="color: #09885A">2</span><span>
-</span></code></pre>
-          <p>The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.</p>
-          <pre><code class="language-bamboo"><span style="color: #008000">// declare a constant with a non-optional integer type</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
-</span><span>
-</span><span style="color: #008000">// invalid: nil-coalescing operator is applied to a value of type Int,</span><span>
-</span><span style="color: #008000">// but alternative is of type Bool</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a ?? </span><span style="color: #0000FF">false</span><span>
-</span></code></pre>
-        </section>
       </section>
       <section>
         <h2 id="type-safety"><a href="#type-safety" aria-hidden="true"><span class="icon icon-link"></span></a>Type Safety</h2>
@@ -1527,6 +1609,19 @@
 </span><span>
 </span><span style="color: #008000">// `add` has type `((Int8, Int8): Int)`</span><span>
 </span></code></pre>
+        <p>Type inference is performed for eacg expression / statement, and not across statements.</p>
+        <p>
+          There are cases where types cannot be inferred.
+          In these cases explicit type annotations are required.
+        </p>
+        <pre><code class="language-bamboo,file=type-inference-impossible.bpl"><span style="color: #008000">// Invalid: not possible to infer type based on array literal's elements</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> array = []</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: not possible to infer type based on dictionary literal's keys and values</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> dictionary = {}</span><span>
+</span></code></pre>
       </section>
       <section>
         <h2 id="composite-data-types"><a href="#composite-data-types" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Types</h2>
@@ -1558,23 +1653,272 @@
             <p>We think resources are a great way to represent such assets.</p>
           </li>
         </ul>
-        <section>
-          <h3 id="structures"><a href="#structures" aria-hidden="true"><span class="icon icon-link"></span></a>Structures</h3>
-          <p>Structures are declared using the <code>struct</code> keyword, followed by the name of the type.</p>
-          <pre><code class="language-bamboo,file=structure-declaration.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
+      </section>
+      <section>
+        <h2 id="composite-data-type-declaration-and-creation"><a href="#composite-data-type-declaration-and-creation" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Declaration and Creation</h2>
+        <p>Structures are declared using the <code>struct</code> keyword and resources are declared using the <code>resource</code> keyword. The keyword is followed by the name.</p>
+        <pre><code class="language-bamboo,file=composite-data-type-declaration.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> SomeResource {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <p>Structures are types. Structures are created (instantiated) by calling the type like a function.</p>
-          <pre><code class="language-bamboo,file=structure-instantiation.bpl"><span style="color: #000000">SomeStruct()</span><span>
+        <p>Structures and resources are types.</p>
+        <p>Structures are created (instantiated) by calling the type like a function.</p>
+        <pre><code class="language-bamboo,file=structure-instantiation.bpl"><span style="color: #000000">SomeStruct()</span><span>
 </span></code></pre>
+        <p>Resource are created (instantiated) by using the <code>create</code> keyword and calling the type like a function.</p>
+        <pre><code class="language-bamboo,file=resource-instantiation.bpl"><span style="color: #000000">create SomeResource()</span><span>
+</span></code></pre>
+        <section>
+          <h3 id="composite-data-type-fields"><a href="#composite-data-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Fields</h3>
+          <p>Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields <strong>must</strong> be initialized in the initializer. The initializer is declared using the <code>init</code> keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always <code>Void</code>. The initializer always follows any fields.</p>
+          <p>There are three kinds of fields.</p>
+          <p>Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the <code>var</code> keyword.</p>
+          <p>Constant fields are also stored in the composite value, but they can <strong>not</strong> have new values assigned to them. They are declared using the <code>let</code> keyword.</p>
+          <p>Synthetic fields are <strong>not</strong> stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the <code>synthetic</code> keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the <a href="#composite-data-type-field-getters-and-setters">next section</a>. Synthetic fields are explained in a <a href="#synthetic-composite-data-type-fields">separate section</a>.</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Field Kind</th>
+                <th>Stored in memory</th>
+                <th>Assignable</th>
+                <th>Keyword</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Variable field</strong></td>
+                <td>Yes</td>
+                <td>Yes</td>
+                <td><code>var</code></td>
+              </tr>
+              <tr>
+                <td><strong>Constant field</strong></td>
+                <td>Yes</td>
+                <td><strong>No</strong></td>
+                <td><code>let</code></td>
+              </tr>
+              <tr>
+                <td><strong>Synthetic field</strong></td>
+                <td><strong>No</strong></td>
+                <td>Yes</td>
+                <td><code>synthetic</code></td>
+              </tr>
+            </tbody>
+          </table>
+          <pre><code class="language-bamboo,file=composite-data-type-fields-and-init.bpl"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
+</span><span style="color: #008000">// named `id` and a variable field named `balance`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Both fields are initialized through the initializer</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int, balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          <p>In initializers, the special constant <code>self</code> refers to the composite value that is to be initialized.</p>
+          <p>Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (<code>.</code>) and the name of the field.</p>
+          <pre><code class="language-bamboo,file=composite-data-type-fields-assignment.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">42</span><span style="color: #000000">, balance: </span><span style="color: #09885A">1_000_00</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #000000">token.id </span><span style="color: #008000">// is 42</span><span>
+</span><span style="color: #000000">token.balance </span><span style="color: #008000">// is 1_000_000</span><span>
+</span><span>
+</span><span style="color: #000000">token.balance = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// `token.balance` is 1</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: assignment to constant field</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">token.id = </span><span style="color: #09885A">23</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="composite-data-type-field-getters-and-setters"><a href="#composite-data-type-field-getters-and-setters" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Field Getters and Setters</h3>
+          <p>Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.</p>
+          <p>Getters and setters are enclosed in opening and closing braces, after the field's type.</p>
+          <p>Getters are declared using the <code>get</code> keyword. Getters have no parameters and their return type is implicitly the type of the field.</p>
+          <pre><code class="language-bamboo,file=composite-data-type-field-getter.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> GetterExample {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a variable field named `balance` with a getter</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// which ensures the read value is always positive</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">           </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">               result >= </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">           }</span><span>
+</span><span>
+</span><span style="color: #000000">           </span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance &#x3C; </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">               </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">           }</span><span>
+</span><span>
+</span><span style="color: #000000">           </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> example = GetterExample(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `example.balance` is 10</span><span>
+</span><span>
+</span><span style="color: #000000">example.balance = </span><span style="color: #09885A">-50</span><span>
+</span><span style="color: #008000">// `example.balance` is 0. without the getter it would be -50</span><span>
+</span></code></pre>
+          <p>Setters are declared using the <code>set</code> keyword, followed by the name for the new value enclosed in parentheses. The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.</p>
+          <p>The types of values assigned to setters must always match the field's type.</p>
+          <pre><code class="language-bamboo,file=composite-data-type-field-setter.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> SetterExample {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a variable field named `balance` with a setter</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// which requires written values to be positive</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
+</span><span style="color: #000000">       </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
+</span><span style="color: #000000">           </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">               newBalance >= </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">           }</span><span>
+</span><span style="color: #000000">           </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = newBalance</span><span>
+</span><span style="color: #000000">       }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> example = SetterExample(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `example.balance` is 10</span><span>
+</span><span>
+</span><span style="color: #008000">// error: precondition of setter for field balance failed</span><span>
+</span><span style="color: #000000">example.balance = </span><span style="color: #09885A">-50</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="synthetic-composite-data-type-fields"><a href="#synthetic-composite-data-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Synthetic Composite Data Type Fields</h3>
+          <p>Fields which are not stored in the composite value are <em>synthetic</em>, i.e., the field value is computed. Synthetic can be either read-only, or readable and writable.</p>
+          <p>Synthetic fields are declared using the <code>synthetic</code> keyword.</p>
+          <p>Synthetic fields are read-only when only a getter is provided.</p>
+          <pre><code class="language-bamboo,file=composite-type-synthetic-field-getter-only.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a synthetic field named `area`,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// which computes the area based on the width and height</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    synthetic area: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> width * height</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          <p>Synthetic fields are readable and writable when both a getter and a setter is declared.</p>
+          <pre><code class="language-bamboo,file=composite-type-synthetic-field-setter-getter.bpl"><span style="color: #008000">// Declare a struct named `GoalTracker` which stores a number</span><span>
+</span><span style="color: #008000">// of target goals, a number of completed goals,</span><span>
+</span><span style="color: #008000">// and has a synthetic field to provide the left number of goals</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// NOTE: the tracker only implements some functionality to demonstrate</span><span>
+</span><span style="color: #008000">// synthetic fields, it is incomplete (e.g. assignments to `goal` are not handled properly)</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> GoalTracker {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> goal: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> completed: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a synthetic field which is both readable</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// and writable.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// When the field is read from (in the getter),</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the number of left goals is computed from</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the target number of goals and</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the completed number of goals.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// When the field is written to (in the setter),</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the number of completed goals is updated,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// based on the number of target goals</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// and the new remaining number of goals</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    synthetic left: Double {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.goal - </span><span style="color: #0000FF">self</span><span style="color: #000000">.completed</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newLeft) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.completed = </span><span style="color: #0000FF">self</span><span style="color: #000000">.goal - newLeft</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(goal: Int, completed: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.goal = goal</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.completed = completed</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> tracker = GoalTracker(goal: </span><span style="color: #09885A">10</span><span style="color: #000000">, completed: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `tracker.goal` is 10</span><span>
+</span><span style="color: #008000">// `tracker.completed` is 0</span><span>
+</span><span style="color: #008000">// `tracker.left` is 10</span><span>
+</span><span>
+</span><span style="color: #000000">tracker.completed = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// `tracker.left` is 9</span><span>
+</span><span>
+</span><span style="color: #000000">tracker.left = </span><span style="color: #09885A">8</span><span>
+</span><span style="color: #008000">// `tracker.completed` is 2</span><span>
+</span></code></pre>
+          <p>It is invalid to declare a synthetic field with only a setter.</p>
+        </section>
+        <section>
+          <h3 id="composite-data-type-functions"><a href="#composite-data-type-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Functions</h3>
           <p>
-            Structures are <strong>copied</strong> when used as an initial value for constant or variable,
-            when assigned to a different variable,
-            when passed as an argument to a function,
-            and when returned from a function:
+            Composite data types may contain functions.
+            Just like in the initializer, the special constant <code>self</code> refers to the composite value that the function is called on.
           </p>
-          <pre><code class="language-bamboo,file=struct-behavior.bpl"><span style="color: #008000">// Declare a structure named `SomeStruct`, with a variable integer field</span><span>
+          <pre><code class="language-bamboo,file=composite-data-type-function.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * factor</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * factor</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> rectangle = Rectangle(width: </span><span style="color: #09885A">2</span><span style="color: #000000">, height: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">rectangle.scale(factor: </span><span style="color: #09885A">4</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `rectangle.width` is 8</span><span>
+</span><span style="color: #008000">// `rectangle.height` is 12</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="composite-data-type-behaviour"><a href="#composite-data-type-behaviour" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Behaviour</h3>
+          <section>
+            <h4 id="structures"><a href="#structures" aria-hidden="true"><span class="icon icon-link"></span></a>Structures</h4>
+            <p>
+              Structures are <strong>copied</strong> when used as an initial value for constant or variable,
+              when assigned to a different variable,
+              when passed as an argument to a function,
+              and when returned from a function:
+            </p>
+            <pre><code class="language-bamboo,file=struct-behavior.bpl"><span style="color: #008000">// Declare a structure named `SomeStruct`, with a variable integer field</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: Int</span><span>
@@ -1596,22 +1940,9 @@
 </span><span>
 </span><span style="color: #000000">a.value </span><span style="color: #008000">// is *0*</span><span>
 </span></code></pre>
-        </section>
-        <section>
-          <h3 id="resources"><a href="#resources" aria-hidden="true"><span class="icon icon-link"></span></a>Resources</h3>
-          <section>
-            <h4 id="resource-declaration"><a href="#resource-declaration" aria-hidden="true"><span class="icon icon-link"></span></a>Resource Declaration</h4>
-            <p>Resources are declared using the <code>resource</code> keyword, followed by the name of the resource.</p>
-            <pre><code class="language-bamboo,file=resource-declaration.bpl"><span style="color: #0000FF">resource</span><span style="color: #000000"> SomeResource {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
-</span><span style="color: #000000">}</span><span>
-</span></code></pre>
-            <p>Resources are types. Resource values are created (instantiated) by using the <code>create</code> keyword and calling the type like a function.</p>
-            <pre><code class="language-bamboo,file=resource-instantiation.bpl"><span style="color: #000000">create SomeResource()</span><span>
-</span></code></pre>
           </section>
           <section>
-            <h4 id="resource-behaviour"><a href="#resource-behaviour" aria-hidden="true"><span class="icon icon-link"></span></a>Resource Behaviour</h4>
+            <h4 id="resources"><a href="#resources" aria-hidden="true"><span class="icon icon-link"></span></a>Resources</h4>
             <p>
               Resources are <strong>moved</strong> when used as an initial value for a constant or variable,
               when assigned to a different variable,
@@ -1710,7 +2041,12 @@
           </section>
           <section>
             <h4 id="resources-in-arrays-and-dictionaries"><a href="#resources-in-arrays-and-dictionaries" aria-hidden="true"><span class="icon icon-link"></span></a>Resources in Arrays and Dictionaries</h4>
-            <p>Arrays and dictionaries behave differently when they contain resources: When a resource is <strong>read</strong> from the array at a certain index, or it is <strong>read</strong> from a dictionary by accessing a certain key, the resource is <strong>moved</strong> out of the array or dictionary.</p>
+            <p>
+              Arrays and dictionaries behave differently when they contain resources:
+              When a resource is <strong>read</strong> from the array at a certain index,
+              or it is <strong>read</strong> from a dictionary by accessing a certain key,
+              the resource is <strong>moved</strong> out of the array or dictionary.
+            </p>
             <pre><code class="language-bamboo,file=resource-in-array.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resources = [</span><span>
 </span><span style="color: #000000">    SomeResource(value: </span><span style="color: #09885A">1</span><span style="color: #000000">),</span><span>
 </span><span style="color: #000000">    SomeResource(value: </span><span style="color: #09885A">2</span><span style="color: #000000">),</span><span>
@@ -1734,244 +2070,14 @@
 </span><span style="color: #008000">// Accessing a field of a resource does not move the resource</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">resource[</span><span style="color: #09885A">0</span><span style="color: #000000">].value </span><span style="color: #008000">// is 3</span><span>
+</span><span>
+</span><span style="color: #008000">// Error: cannot access second element of `resources`,</span><span>
+</span><span style="color: #008000">// as it only has one element left after the first two elements</span><span>
+</span><span style="color: #008000">// were accessed above</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">resource[</span><span style="color: #09885A">1</span><span style="color: #000000">]</span><span>
 </span></code></pre>
           </section>
-        </section>
-        <section>
-          <h3 id="composite-data-type-fields"><a href="#composite-data-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Fields</h3>
-          <p>Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields <strong>must</strong> be initialized in the initializer. The initializer is declared using the <code>init</code> keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always <code>Void</code>. The initializer always follows any fields.</p>
-          <p>There are three kinds of fields.</p>
-          <p>Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the <code>var</code> keyword.</p>
-          <p>Constant fields are also stored in the composite value, but they can <strong>not</strong> have new values assigned to them. They are declared using the <code>let</code> keyword.</p>
-          <p>Synthetic fields are <strong>not</strong> stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the <code>synthetic</code> keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the <a href="#composite-data-type-field-getters-and-setters">next section</a>. Synthetic fields are explained in a <a href="#synthetic-composite-data-type-fields">separate section</a>.</p>
-          <table>
-            <thead>
-              <tr>
-                <th>Field Kind</th>
-                <th>Stored in memory</th>
-                <th>Assignable</th>
-                <th>Keyword</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Variable field</strong></td>
-                <td>Yes</td>
-                <td>Yes</td>
-                <td><code>var</code></td>
-              </tr>
-              <tr>
-                <td><strong>Constant field</strong></td>
-                <td>Yes</td>
-                <td><strong>No</strong></td>
-                <td><code>let</code></td>
-              </tr>
-              <tr>
-                <td><strong>Synthetic field</strong></td>
-                <td><strong>No</strong></td>
-                <td>Yes</td>
-                <td><code>synthetic</code></td>
-              </tr>
-            </tbody>
-          </table>
-          <pre><code class="language-bamboo,file=composite-data-type-fields-and-init.bpl"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
-</span><span style="color: #008000">// named `id` and a variable field named `balance`.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// Both fields are initialized through the initializer</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int, balance: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
-</span></code></pre>
-          <p>In initializers, the special constant <code>self</code> refers to the composite value that is to be initialized.</p>
-          <p>Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (<code>.</code>) and the name of the field.</p>
-          <pre><code class="language-bamboo,file=composite-data-type-fields-assignment.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">42</span><span style="color: #000000">, balance: </span><span style="color: #09885A">1_000_00</span><span style="color: #000000">)</span><span>
-</span><span>
-</span><span style="color: #000000">token.id </span><span style="color: #008000">// is 42</span><span>
-</span><span style="color: #000000">token.balance </span><span style="color: #008000">// is 1_000_000</span><span>
-</span><span>
-</span><span style="color: #000000">token.balance = </span><span style="color: #09885A">1</span><span>
-</span><span style="color: #008000">// token.balance is 1</span><span>
-</span><span>
-</span><span style="color: #008000">// Invalid: assignment to constant field</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">token.id = </span><span style="color: #09885A">23</span><span>
-</span></code></pre>
-        </section>
-        <section>
-          <h3 id="composite-data-type-field-getters-and-setters"><a href="#composite-data-type-field-getters-and-setters" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Field Getters and Setters</h3>
-          <p>Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.</p>
-          <p>Getters and setters are enclosed in opening and closing braces, after the field's type.</p>
-          <p>Getters are declared using the <code>get</code> keyword. Getters have no parameters and their return type is implicitly the type of the field.</p>
-          <pre><code class="language-bamboo,file=composite-data-type-field-getter.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> GetterExample {</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a variable field named `balance` with a getter</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// which ensures the read value is always positive</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">               result >= </span><span style="color: #09885A">0</span><span>
-</span><span style="color: #000000">           }</span><span>
-</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance &#x3C; </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">               </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #09885A">0</span><span>
-</span><span style="color: #000000">           }</span><span>
-</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance</span><span>
-</span><span style="color: #000000">        }</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> example = GetterExample(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
-</span><span style="color: #008000">// example.balance is 10</span><span>
-</span><span>
-</span><span style="color: #000000">example.balance = </span><span style="color: #09885A">-50</span><span>
-</span><span style="color: #008000">// example.balance is 0. without the getter it would be -50</span><span>
-</span></code></pre>
-          <p>Setters are declared using the <code>set</code> keyword, followed by the name for the new value enclosed in parentheses. The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.</p>
-          <p>The types of values assigned to setters must always match the field's type.</p>
-          <pre><code class="language-bamboo,file=composite-data-type-field-setter.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> SetterExample {</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a variable field named `balance` with a setter</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// which requires written values to be positive</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
-</span><span style="color: #000000">       </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">               newBalance >= </span><span style="color: #09885A">0</span><span>
-</span><span style="color: #000000">           }</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = newBalance</span><span>
-</span><span style="color: #000000">       }</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> example = SetterExample(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
-</span><span style="color: #008000">// example.balance is 10</span><span>
-</span><span>
-</span><span style="color: #008000">// error: precondition of setter for field balance failed</span><span>
-</span><span style="color: #000000">example.balance = </span><span style="color: #09885A">-50</span><span>
-</span></code></pre>
-        </section>
-        <section>
-          <h3 id="synthetic-composite-data-type-fields"><a href="#synthetic-composite-data-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Synthetic Composite Data Type Fields</h3>
-          <p>Fields which are not stored in the composite value are <em>synthetic</em>, i.e., the field value is computed. Synthetic can be either read-only, or readable and writable.</p>
-          <p>Synthetic fields are declared using the <code>synthetic</code> keyword.</p>
-          <p>Synthetic fields are read-only when only a getter is provided.</p>
-          <pre><code class="language-bamboo,file=composite-type-synthetic-field-getter-only.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a synthetic field named `area`,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// which computes the area based on the width and height</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    synthetic area: Int {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> width * height</span><span>
-</span><span style="color: #000000">        }</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
-</span></code></pre>
-          <p>Synthetic fields are readable and writable when both a getter and a setter is declared.</p>
-          <pre><code class="language-bamboo,file=composite-type-synthetic-field-setter-getter.bpl"><span style="color: #008000">// Declare a struct named `GoalTracker` which stores a number</span><span>
-</span><span style="color: #008000">// of target goals, a number of completed goals,</span><span>
-</span><span style="color: #008000">// and has a synthetic field to provide the left number of goals</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// NOTE: the tracker only implements some functionality to demonstrate</span><span>
-</span><span style="color: #008000">// synthetic fields, it is incomplete (e.g. assignments to `goal` are not handled properly)</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">struct</span><span style="color: #000000"> GoalTracker {</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> goal: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> completed: Int</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a synthetic field which is both readable</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// and writable.</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// When the field is read from (in the getter),</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// the number of left goals is computed from</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// the target number of goals and</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// the completed number of goals.</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// When the field is written to (in the setter),</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// the number of completed goals is updated,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// based on the number of target goals</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// and the new remaining number of goals</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    synthetic left: Double {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.goal - </span><span style="color: #0000FF">self</span><span style="color: #000000">.completed</span><span>
-</span><span style="color: #000000">        }</span><span>
-</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newLeft) {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.completed = </span><span style="color: #0000FF">self</span><span style="color: #000000">.goal - newLeft</span><span>
-</span><span style="color: #000000">        }</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(goal: Int, completed: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.goal = goal</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.completed = completed</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> tracker = GoalTracker(goal: </span><span style="color: #09885A">10</span><span style="color: #000000">, completed: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
-</span><span style="color: #008000">// tracker.goal is 10</span><span>
-</span><span style="color: #008000">// tracker.completed is 0</span><span>
-</span><span style="color: #008000">// tracker.left is 10</span><span>
-</span><span>
-</span><span style="color: #000000">tracker.completed = </span><span style="color: #09885A">1</span><span>
-</span><span style="color: #008000">// tracker.left is 9</span><span>
-</span><span>
-</span><span style="color: #000000">tracker.left = </span><span style="color: #09885A">8</span><span>
-</span><span style="color: #008000">// tracker.completed is 2</span><span>
-</span></code></pre>
-          <p>It is invalid to declare a synthetic field with only a setter.</p>
-        </section>
-        <section>
-          <h3 id="composite-data-type-functions"><a href="#composite-data-type-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Functions</h3>
-          <p>
-            Composite data types may contain functions.
-            Just like in the initializer, the special constant <code>self</code> refers to the composite value that the function is called on.
-          </p>
-          <pre><code class="language-bamboo,file=composite-data-type-function.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * factor</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * factor</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> rectangle = Rectangle(width: </span><span style="color: #09885A">2</span><span style="color: #000000">, height: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
-</span><span style="color: #000000">rectangle.scale(factor: </span><span style="color: #09885A">4</span><span style="color: #000000">)</span><span>
-</span><span style="color: #008000">// rectangle.width is 8</span><span>
-</span><span style="color: #008000">// rectangle.height is 12</span><span>
-</span></code></pre>
         </section>
         <section>
           <h3 id="unbound-references--nulls"><a href="#unbound-references--nulls" aria-hidden="true"><span class="icon icon-link"></span></a>Unbound References / Nulls</h3>
@@ -2060,15 +2166,15 @@
             </tr>
           </tbody>
         </table>
-        <pre><code class="language-bamboo,file=access-control.bpl"><span style="color: #008000">// Declare a private constant, inaccessible/invisible in outer scope</span><span>
+        <pre><code class="language-bamboo,file=access-control-globals.bpl"><span style="color: #008000">// Declare a private constant, inaccessible/invisible in outer scope</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a public constant, accessible/visible in all scopes</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
-</span><span>
-</span><span style="color: #008000">// Declare a public struct, accessible/visible in all scopes</span><span>
+</span></code></pre>
+        <pre><code class="language-bamboo,file=acess-control-struct.bpl"><span style="color: #008000">// Declare a public struct, accessible/visible in all scopes</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span>
@@ -2112,7 +2218,52 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> privateTest() {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The initializer is omitted for brevity.</span><span>
+</span><span>
 </span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> some = SomeStruct()</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot read private constant field in outer scope</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.a</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot set private constant field in outer scope</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.a = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: can read public constant field in outer scope</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.b</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot set public constant field in outer scope</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.b = </span><span style="color: #09885A">2</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot read private variable field in outer scope</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.c</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot set private variable field in outer scope</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.c = </span><span style="color: #09885A">3</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: can read public variable field in outer scope</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.d</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot set public variable field in outer scope</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.d = </span><span style="color: #09885A">4</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: can read publicly settable variable field in outer scope</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.e</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: can set publicly settable variable field in outer scope</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.e = </span><span style="color: #09885A">5</span><span>
 </span></code></pre>
       </section>
       <section>
@@ -2347,8 +2498,8 @@
 </span><span style="color: #008000">// The postcondition of the `withdraw` function in the `FungibleToken`</span><span>
 </span><span style="color: #008000">// interface ensured the balance field of the token was updated properly</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// token.balance is 90</span><span>
-</span><span style="color: #008000">// withdrawn.balance is 10</span><span>
+</span><span style="color: #008000">// `token.balance` is 90</span><span>
+</span><span style="color: #008000">// `withdrawn.balance` is 10</span><span>
 </span><span>
 </span><span style="color: #008000">// Deposit the withdrawn token into another one.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> receiver: </span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> &#x3C;- </span><span style="color: #008000">// ...</span><span>
@@ -2713,6 +2864,13 @@
           Attestations can be created for resources and reflect their current state, which is read-only.
           They cannot be stored.
         </p>
+        <p>Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.</p>
+        <p>
+          As an analogy, a bank statement is a proof of ownership of money.
+          However, unlike a bank statement, an attestation is "live", i.e. it is not just a snapshot at the time it was created,
+          but it reflects the current state of the underlying resource.
+        </p>
+        <p>Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource, and can be safely handed to untrusted parties.</p>
         <p>
           Attestations of resources are created using the <code>@</code> operator.
           Attestation types have the name of the resource type, prefixed with the <code>@</code> symbol.
@@ -3126,7 +3284,7 @@
             <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/67">https://github.com/dapperlabs/bamboo-node/issues/67</a></p>
           </blockquote>
           <p>
-            We don't allow floating-point numbers.
+            We do not allow floating-point numbers.
             Should we add fixed-point arithmetic to support fractional numbers?
           </p>
         </section>
@@ -3186,7 +3344,7 @@
           <blockquote>
             <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/71">https://github.com/dapperlabs/bamboo-node/issues/71</a></p>
           </blockquote>
-          <p>Currently we don't allow variables and constants to be initialized after they are declared. This improves readability, as the reader of the code can always be sure the initial value can be found where the variable or constant was declared, not somewhere else in the code following the declaration.</p>
+          <p>Currently we do not allow variables and constants to be initialized after they are declared. This improves readability, as the reader of the code can always be sure the initial value can be found where the variable or constant was declared, not somewhere else in the code following the declaration.</p>
           <p>Should we allow the late initialization of variables and constants?</p>
           <p>Are there good examples for cases where late initialization would be useful or even essential?</p>
         </section>
