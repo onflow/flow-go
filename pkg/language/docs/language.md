@@ -148,7 +148,7 @@ booleanVariable = 1
 
 ## Naming
 
-Names may start with any upper and lowercase letter or an underscore. This may be followed by zero or more upper and lower case letters, underscores, and numbers.
+Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (`_`). This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
 Names may not begin with a number.
 
 ```bamboo
