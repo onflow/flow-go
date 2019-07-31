@@ -322,6 +322,48 @@ let aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 // `aNumber` has type `Int`
 ```
 
+
+### Any
+
+`Any` is the top type, i.e., all types are a subtype of it.
+
+```bamboo
+// Declare a variable that has the type `Any`.
+// Any value can be assigned to it, for example an integer.
+//
+var someValue: Any = 1
+
+// Assign a value with a different type, `Bool`
+someValue = true
+```
+
+However, using `Any` does not opt-out of type checking. It is invalid to access fields and call functions on `Any` typed values, as it has no fields and functions.
+
+```bamboo
+// Declare a variable that has the type `Any`. The initial value is an integer,
+// but the variable  still has the explicit type `Any`.
+//
+let a: Any = 1
+
+// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)
+// and an `Int` value (`2`, right-hand side)
+//
+a + 2
+```
+
+### Never
+
+`Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
+
+```bamboo
+// Declare a function named `crashAndBurn` which will never return,
+// because it calls the function named `fatalError`, which never returns
+//
+fun crashAndBurn(): Never {
+    fatalError("An unrecoverable error occurred")
+}
+```
+
 ### Optionals
 
 > 🚧 Status: Optionals are not implemented yet.
@@ -674,48 +716,6 @@ TODO
 Dictionary keys must be hashable and equatable, i.e., must implement the [`Hashable`](#hashable-interface) and [`Equatable`](#equatable-interface) [interfaces](#interfaces).
 
 Most of the built-in types, like booleans, integers, are hashable and equatable, so can be used as keys in dictionaries.
-
-
-### Any
-
-`Any` is the top type, i.e., all types are a subtype of it.
-
-```bamboo
-// Declare a variable that has the type `Any`.
-// Any value can be assigned to it, for example an integer.
-//
-var someValue: Any = 1
-
-// Assign a value with a different type, `Bool`
-someValue = true
-```
-
-However, using `Any` does not opt-out of type checking. It is invalid to access fields and call functions on `Any` typed values, as it has no fields and functions.
-
-```bamboo
-// Declare a variable that has the type `Any`. The initial value is an integer,
-// but the variable  still has the explicit type `Any`.
-//
-let a: Any = 1
-
-// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)
-// and an `Int` value (`2`, right-hand side)
-//
-a + 2
-```
-
-### Never
-
-`Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
-
-```bamboo
-// Declare a function named `crashAndBurn` which will never return,
-// because it calls the function named `fatalError`, which never returns
-//
-fun crashAndBurn(): Never {
-    fatalError("An unrecoverable error occurred")
-}
-```
 
 ## Operators
 
