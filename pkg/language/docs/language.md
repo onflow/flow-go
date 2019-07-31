@@ -2080,7 +2080,10 @@ fun get(): <-SomeResource {
 
 #### Resources in Arrays and Dictionaries
 
-Arrays and dictionaries behave differently when they contain resources: When a resource is **read** from the array at a certain index, or it is **read** from a dictionary by accessing a certain key, the resource is **moved** out of the array or dictionary.
+Arrays and dictionaries behave differently when they contain resources:
+When a resource is **read** from the array at a certain index,
+or it is **read** from a dictionary by accessing a certain key,
+the resource is **moved** out of the array or dictionary.
 
 ```bamboo,file=resource-in-array.bpl
 let resources = [
@@ -2106,6 +2109,12 @@ let secondResource <- resources[1]
 // Accessing a field of a resource does not move the resource
 //
 resource[0].value // is 3
+
+// Error: cannot access second element of `resources`,
+// as it only has one element left after the first two elements
+// were accessed above
+//
+resource[1]
 ```
 
 ### Unbound References / Nulls
