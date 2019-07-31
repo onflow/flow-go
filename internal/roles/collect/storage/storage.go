@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/data/keyvalue"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
@@ -18,9 +16,5 @@ type DatabaseStorage struct {
 }
 
 func NewDatabaseStorage(db keyvalue.DBConnector) Storage {
-	fmt.Println("migrating up")
-	err := db.MigrateUp()
-	fmt.Println(err)
-
 	return &DatabaseStorage{db}
 }
