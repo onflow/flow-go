@@ -184,7 +184,9 @@ By convention, variables, constants, and functions have lowercase names; and typ
 
 ## Semicolons
 
-Semicolons may be used to separate statements, but are optional. They can be used to separate multiple statements on a single line.
+Semicolons (;) are used as statement separators.
+Semicolons can be placed after any statement, but can be omitted if only one statement appears on the line.
+Semicolons must be used to separate multiple statements if they appear on the same line.
 
 ```bamboo,file=semicolons.bpl
 // Declare a constant, without a semicolon
