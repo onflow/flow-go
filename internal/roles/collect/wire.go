@@ -17,6 +17,7 @@ func InitializeServer() (*Server, error) {
 	wire.Build(
 		NewServer,
 		config.New,
+		NewDatabaseConnector,
 		storage.NewDatabaseStorage,
 		txpool.New,
 		logrus.New,

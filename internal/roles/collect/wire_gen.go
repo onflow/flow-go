@@ -18,7 +18,8 @@ import (
 func InitializeServer() (*Server, error) {
 	configConfig := config.New()
 	logger := logrus.New()
-	storageStorage := storage.NewDatabaseStorage()
+	dbConnector := NewDatabaseConnector(configConfig)
+	storageStorage := storage.NewDatabaseStorage(dbConnector)
 	txPool := txpool.New()
 	controllerController := controller.New(storageStorage, txPool, logger)
 	server, err := NewServer(configConfig, logger, controllerController)
