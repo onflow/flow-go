@@ -18,4 +18,4 @@ bamboo.mnemonic
 .vscode
 
 #relic submodule
-./pkg/crypto/relic
+pkg/crypto/relic/*

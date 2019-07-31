@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"testing"
 )
 
@@ -64,7 +65,8 @@ func TestBLS_BLS12381(t *testing.T) {
 	h := halg.ComputeBytesHash(input)
 
 	salg := NewSignatureAlgo(BLS_BLS12381)
-	sk := salg.GeneratePrKey()
+	seed := []byte{1, 2, 3}
+	sk := salg.GeneratePrKey(seed)
 	pk := sk.Pubkey()
 
 	s := salg.SignHash(sk, h)
@@ -85,4 +87,15 @@ func TestBLS_BLS12381(t *testing.T) {
 	} else {
 		t.Logf("Verification passed: signature is %x", s)
 	}
+}
+
+// Testg1 contains tests of operations in G1
+func TestG1(t *testing.T) {
+	fmt.Println("testing G1")
+
+	_ = NewSignatureAlgo(BLS_BLS12381)
+
+	var scalar big.Int
+	scalar.SetUint64(1)
+	_G1scalarGenMult(scalar)
 }

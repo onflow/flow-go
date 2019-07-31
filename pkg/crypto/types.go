@@ -33,5 +33,5 @@ type Hash32 [32]byte
 // Hash64 is 512-bits digest
 type Hash64 [64]byte
 
-// Signature48 is 384-bits signature
-type Signature48 [48]byte
+// Signature is a generic type, regardless of the signature scheme
+type Signature []byte

@@ -1,50 +1,37 @@
 package crypto
 
-import (
-	"strconv"
-	"strings"
-)
-
-// Signature48 implements Signature
-
-func (s *Signature48) ToBytes() []byte {
-	return s[:]
-}
-
-func (s *Signature48) String() string {
-	var sb strings.Builder
-	sb.WriteString("0x")
-	for _, i := range s {
-		sb.WriteString(strconv.FormatUint(uint64(i), 16))
-	}
-	return sb.String()
-}
-
 // BLS_BLS12381Algo, embeds SignAlgo
 type BLS_BLS12381Algo struct {
-	// G1 and G2 curves will be added here
-	//...
-	//...
+	// points to Relic context of BLS12-381 with all the parameters
+	context ctx
+	// embeds SignAlgo
 	*SignAlgo
 }
 
 // SignHash implements BLS signature on BLS12381 curve
 func (a *BLS_BLS12381Algo) SignHash(k PrKey, h Hash) Signature {
 	var s Signature
+	s = make([]byte, a.SignatureLength)
+	// signature computation here
 	return s
 }
 
 // VerifyHash implements BLS signature verification on BLS12381 curve
 func (a *BLS_BLS12381Algo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
+	// signature verification here
 	return true
 }
 
 // GeneratePrKey generates a private key for BLS on BLS12381 curve
-func (a *BLS_BLS12381Algo) GeneratePrKey() PrKey {
-	var sk PrKeyBLS_BLS12381
+func (a *BLS_BLS12381Algo) GeneratePrKey(seed []byte) PrKey {
+	var prKey PrKeyBLS_BLS12381
+	// Generate private key here
+	prKey.sk = randZr(seed)
+	// public key is not computed (but this could be changed)
+	prKey.pk = nil
 	// links the private key to the algo
-	sk.alg = a
-	return &sk
+	prKey.alg = a
+	return &prKey
 }
 
 // SignBytes signs an array of bytes
@@ -77,8 +64,8 @@ type PrKeyBLS_BLS12381 struct {
 	alg *BLS_BLS12381Algo
 	// public key
 	pk *PubKey_BLS_BLS12381
-	// private key data will be entered here
-	//...
+	// private key data
+	sk *scalar
 }
 
 func (sk *PrKeyBLS_BLS12381) AlgoName() AlgoName {
@@ -105,7 +92,7 @@ func (sk *PrKeyBLS_BLS12381) Pubkey() PubKey {
 // PubKey_BLS_BLS12381 is the public key of BLS using BLS12_381, it implements PubKey
 type PubKey_BLS_BLS12381 struct {
 	// public key data  will be entered here
-	dummy int
+	pk pointG1
 }
 
 func (pk *PubKey_BLS_BLS12381) KeySize() int {

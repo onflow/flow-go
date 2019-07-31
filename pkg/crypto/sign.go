@@ -1,17 +1,21 @@
 package crypto
 
 import (
+	"strconv"
+	"strings"
+
 	log "github.com/sirupsen/logrus"
 )
 
 // NewSignatureAlgo initializes and chooses a signature scheme
 func NewSignatureAlgo(name AlgoName) Signer {
 	if name == BLS_BLS12381 {
-		a := &(BLS_BLS12381Algo{&SignAlgo{
+		a := &(BLS_BLS12381Algo{nil, &SignAlgo{
 			name,
 			PrKeyLengthBLS_BLS12381,
 			PubKeyLengthBLS_BLS12381,
 			SignatureLengthBLS_BLS12381}})
+		a.init()
 		return a
 	}
 	log.Errorf("the signature scheme %s is not supported.", name)
@@ -32,7 +36,7 @@ type Signer interface {
 	VerifyBytes(PubKey, Signature, []byte, Hasher) bool
 	VerifyStruct(PubKey, Signature, Encoder, Hasher) bool
 	// Private key functions
-	GeneratePrKey() PrKey // to be changed to accept a randomness source as an input
+	GeneratePrKey([]byte) PrKey
 }
 
 // SignAlgo
@@ -55,12 +59,19 @@ func (a *SignAlgo) SignatureSize() int {
 
 // Signature type tools
 
-// Signature is unspecified signature scheme signature
-type Signature interface {
-	// ToBytes returns the bytes representation of a signature
-	ToBytes() []byte
-	// String returns a hex string representation of signature bytes
-	String() string
+// ToBytes returns a byte array of the signature data
+func (s Signature) ToBytes() []byte {
+	return s
+}
+
+// String returns a String representation of the signature data
+func (s Signature) String() string {
+	var sb strings.Builder
+	sb.WriteString("0x")
+	for _, i := range s {
+		sb.WriteString(strconv.FormatUint(uint64(i), 16))
+	}
+	return sb.String()
 }
 
 // Key Pair

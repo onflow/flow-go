@@ -5,6 +5,7 @@
 #include "relic_bn.h"
 #include "relic_fp.h"
 #include "relic_core.h"
+#include "relic_pc.h"
 
 // Most of the functions are written for ALLOC=AUTO not ALLOC=DYNAMIC
 
@@ -17,8 +18,10 @@ void _ep_free(ep_t);
 // Debug related functions
 void _fp_print(fp_st*);
 void _bn_print(bn_st*);
+bn_st* bn_randZr(char*);
 
-// G1 
+// bls core
+ 
 
 
 
