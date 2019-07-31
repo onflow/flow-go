@@ -829,6 +829,7 @@ There are four arithmetic operators:
 - Subtraction: `-`
 - Multiplication: `*`
 - Division: `/`
+- Remainder: `%`
 
 ```bamboo,file=operator-plus.bpl
 let a = 1 + 2
