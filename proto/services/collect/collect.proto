@@ -27,13 +27,13 @@ message PingResponse {
 }
 
 message SubmitTransactionRequest {
-  bamboo.shared.SignedTransaction transaction = 1;
+  bamboo.shared.messages.SignedTransaction transaction = 1;
 }
   
 message SubmitTransactionResponse {}
 
 message SubmitCollectionRequest {
-  bamboo.shared.Collection collection = 1;
+  bamboo.shared.messages.Collection collection = 1;
   bytes accessSignature = 2;
 }
   
@@ -46,7 +46,7 @@ message GetTransactionRequest {
 }
 
 message GetTransactionResponse {
-  bamboo.shared.SignedTransaction transaction = 1;
+  bamboo.shared.messages.SignedTransaction transaction = 1;
 }
 
 message GetCollectionRequest {
@@ -54,5 +54,5 @@ message GetCollectionRequest {
 }
 
 message GetCollectionResponse {
-  bamboo.shared.Collection collection = 1;
+  bamboo.shared.messages.Collection collection = 1;
 }

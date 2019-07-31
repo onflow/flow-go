@@ -6,19 +6,11 @@ import (
 
 type Variable struct {
 	Declaration *ast.VariableDeclaration
-	Depth       int
 	Value       Value
 }
 
-func newVariable(declaration *ast.VariableDeclaration, depth int, value Value) *Variable {
-	return &Variable{
-		Declaration: declaration,
-		Depth:       depth,
-		Value:       value,
-	}
-}
-
 func (v *Variable) Set(newValue Value) bool {
+	// TODO: move to sema/checker
 	if v.Declaration.IsConstant {
 		return false
 	}

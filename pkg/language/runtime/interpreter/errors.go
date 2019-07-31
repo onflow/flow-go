@@ -15,16 +15,6 @@ type SecondaryError interface {
 	SecondaryError() string
 }
 
-// astTypeConversionError
-
-type astTypeConversionError struct {
-	invalidASTType ast.Type
-}
-
-func (e *astTypeConversionError) Error() string {
-	return fmt.Sprintf("cannot convert unsupported AST type: %#+v", e.invalidASTType)
-}
-
 // unsupportedAssignmentTargetExpression
 
 type unsupportedAssignmentTargetExpression struct {
@@ -219,25 +209,6 @@ func (e *ArgumentCountError) StartPosition() *ast.Position {
 
 func (e *ArgumentCountError) EndPosition() *ast.Position {
 	return e.EndPos
-}
-
-// RedeclarationError
-
-type RedeclarationError struct {
-	Name string
-	Pos  *ast.Position
-}
-
-func (e *RedeclarationError) Error() string {
-	return fmt.Sprintf("cannot redeclare already declared identifier: %s", e.Name)
-}
-
-func (e *RedeclarationError) StartPosition() *ast.Position {
-	return e.Pos
-}
-
-func (e *RedeclarationError) EndPosition() *ast.Position {
-	return e.Pos
 }
 
 // AssignmentToConstantError

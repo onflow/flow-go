@@ -5,6 +5,7 @@ package bamboo.services.observe;
 option go_package = "observe";
 
 import "google/protobuf/timestamp.proto";
+import "shared/messages.proto";
 
 // ObserveService is the user-facing API provided by access nodes.
 service ObserveService {
@@ -33,20 +34,8 @@ message PingResponse {
   bytes address = 1;
 }
 
-message Signature {
-  bytes account_address = 1;
-  bytes signature = 2;
-}
-
 message SendTransactionRequest {
-  message Transaction {
-    bytes to_address = 1;
-    bytes script = 2;
-    uint64 nonce = 3;
-    uint64 compute_limit = 4;
-    Signature payer_signature = 5;
-  }
-  Transaction transaction = 1;
+  bamboo.shared.messages.SignedTransaction transaction = 1;
 }
 
 message SendTransactionResponse {
@@ -95,22 +84,7 @@ message GetTransactionRequest {
 }
 
 message GetTransactionResponse {
-  message Transaction {
-    enum Status {
-      STATUS_PENDING = 0;
-      STATUS_FINALIZED = 1;
-      STATUS_REVERTED = 2;
-      STATUS_SEALED = 3;
-    }
-    bytes to_address = 1;
-    bytes script = 2;
-    uint64 nonce = 3;
-    uint64 compute_limit = 4;
-    uint64 compute_used = 5;
-    Signature payer_signature = 6;
-    Status status = 7;
-  }
-  Transaction transaction = 1;
+  bamboo.shared.messages.SignedTransaction transaction = 1;
 }
 
 message GetAccountRequest {

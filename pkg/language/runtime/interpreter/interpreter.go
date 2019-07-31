@@ -2,6 +2,8 @@ package interpreter
 
 import (
 	"fmt"
+	goRuntime "runtime"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
@@ -28,11 +30,32 @@ func NewInterpreter(program *ast.Program) *Interpreter {
 	}
 }
 
+func (interpreter *Interpreter) findVariable(name string) *Variable {
+	value := interpreter.activations.Find(name)
+	if value == nil {
+		return nil
+	}
+	variable, ok := value.(*Variable)
+	if !ok {
+		return nil
+	}
+	return variable
+}
+
+func (interpreter *Interpreter) setVariable(name string, variable *Variable) {
+	interpreter.activations.Set(name, variable)
+}
+
 func (interpreter *Interpreter) Interpret() (err error) {
 	// recover internal panics and return them as an error
 	defer func() {
 		if r := recover(); r != nil {
 			var ok bool
+			// don't recover Go errors
+			err, ok = r.(goRuntime.Error)
+			if ok {
+				panic(err)
+			}
 			err, ok = r.(error)
 			if !ok {
 				err = fmt.Errorf("%v", r)
@@ -48,10 +71,10 @@ func (interpreter *Interpreter) Interpret() (err error) {
 }
 
 func (interpreter *Interpreter) visitProgramDeclarations() Trampoline {
-	return interpreter.visitDeclarations(interpreter.Program.Declarations)
+	return interpreter.visitGlobalDeclarations(interpreter.Program.Declarations)
 }
 
-func (interpreter *Interpreter) visitDeclarations(declarations []ast.Declaration) Trampoline {
+func (interpreter *Interpreter) visitGlobalDeclarations(declarations []ast.Declaration) Trampoline {
 	count := len(declarations)
 
 	// no declarations? stop
@@ -61,42 +84,25 @@ func (interpreter *Interpreter) visitDeclarations(declarations []ast.Declaration
 	}
 
 	// interpret the first declaration, then the remaining ones
-	return interpreter.visitDeclaration(declarations[0]).
+	return interpreter.visitGlobalDeclaration(declarations[0]).
 		FlatMap(func(_ interface{}) Trampoline {
-			return interpreter.visitDeclarations(declarations[1:])
+			return interpreter.visitGlobalDeclarations(declarations[1:])
 		})
 }
 
-// visitDeclaration firsts interprets the declaration,
+// visitGlobalDeclaration firsts interprets the global declaration,
 // then finds the declaration and adds it to the globals
-func (interpreter *Interpreter) visitDeclaration(declaration ast.Declaration) Trampoline {
+func (interpreter *Interpreter) visitGlobalDeclaration(declaration ast.Declaration) Trampoline {
 	return declaration.Accept(interpreter).(Trampoline).
 		Then(func(_ interface{}) {
-			interpreter.defineGlobal(declaration)
+			interpreter.declareGlobal(declaration)
 		})
 }
 
-func (interpreter *Interpreter) defineGlobal(declaration ast.Declaration) {
+func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
-	if _, exists := interpreter.Globals[name]; exists {
-		panic(&RedeclarationError{
-			Name: name,
-			Pos:  declaration.GetIdentifierPosition(),
-		})
-	}
+	// NOTE: semantic analysis already checked possible invalid redeclaration
 	interpreter.Globals[name] = interpreter.findVariable(name)
-}
-
-func (interpreter *Interpreter) findVariable(name string) *Variable {
-	value := interpreter.activations.Find(name)
-	if value == nil {
-		return nil
-	}
-	variable, ok := value.(*Variable)
-	if !ok {
-		return nil
-	}
-	return variable
 }
 
 func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value Value, err error) {
@@ -140,7 +146,13 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 	return result.(Value), nil
 }
 
-func (interpreter *Interpreter) InvokeExportable(functionName string, inputs ...interface{}) (value ExportableValue, err error) {
+func (interpreter *Interpreter) InvokeExportable(
+	functionName string,
+	inputs ...interface{},
+) (
+	value ExportableValue,
+	err error,
+) {
 	result, err := interpreter.Invoke(functionName, inputs...)
 	if err != nil {
 		return nil, err
@@ -213,8 +225,10 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	}
 
 	// make the function itself available inside the function
-	depth := interpreter.activations.Depth()
-	variable := newVariable(variableDeclaration, depth, function)
+	variable := &Variable{
+		Declaration: variableDeclaration,
+		Value:       function,
+	}
 	function.Activation = function.Activation.
 		Insert(activations.StringKey(declaration.Identifier), variable)
 
@@ -338,21 +352,12 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 
 func (interpreter *Interpreter) declareVariable(declaration *ast.VariableDeclaration, value Value) {
 	variable := interpreter.findVariable(declaration.Identifier)
-	depth := interpreter.activations.Depth()
-	if variable != nil && variable.Depth == depth {
-		panic(&RedeclarationError{
-			Name: declaration.Identifier,
-			Pos:  declaration.GetIdentifierPosition(),
-		})
+	// NOTE: semantic analysis already checked possible invalid redeclaration
+	variable = &Variable{
+		Declaration: declaration,
+		Value:       value,
 	}
-
-	variable = newVariable(declaration, depth, value)
-
 	interpreter.setVariable(declaration.Identifier, variable)
-}
-
-func (interpreter *Interpreter) setVariable(name string, variable *Variable) {
-	interpreter.activations.Set(name, variable)
 }
 
 func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
@@ -441,14 +446,6 @@ func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
 	variable := interpreter.findVariable(expression.Identifier)
-	if variable == nil {
-		panic(&NotDeclaredError{
-			ExpectedKind: common.DeclarationKindValue,
-			Name:         expression.Identifier,
-			StartPos:     expression.StartPosition(),
-			EndPos:       expression.EndPosition(),
-		})
-	}
 	return Done{Result: variable.Value}
 }
 
