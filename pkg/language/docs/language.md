@@ -1622,6 +1622,21 @@ let add = (a: Int8, b: Int8): Int {
 // `add` has type `((Int8, Int8): Int)`
 ```
 
+Type inference is performed for eacg expression / statement, and not across statements.
+
+There are cases where types cannot be inferred.
+In these cases explicit type annotations are required.
+
+```bamboo,file=type-inference-impossible.bpl
+// Invalid: not possible to infer type based on array literal's elements
+//
+let array = []
+
+// Invalid: not possible to infer type based on dictionary literal's keys and values
+//
+let dictionary = {}
+```
+
 ## Composite Data Types
 
 > 🚧 Status: Composite data types are not implemented yet.
