@@ -286,6 +286,8 @@ In addition, the arbitrary precision integer type `Int` is provided.
 let veryLargeNumber: Int = 10000000000000000000000000000000
 ```
 
+Negative integers are encoded in two's complement representation.
+
 ### Floating-Point Numbers
 
 There is no support for floating point numbers.
