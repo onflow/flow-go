@@ -2163,7 +2163,7 @@ To summarize the behavior for functions, structures, resources, and interfaces:
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   | `pub`                 | **All**           |
 
 
-```bamboo,file=access-control.bpl
+```bamboo,file=access-control-globals.bpl
 // Declare a private constant, inaccessible/invisible in outer scope
 //
 let a = 1
@@ -2171,7 +2171,9 @@ let a = 1
 // Declare a public constant, accessible/visible in all scopes
 //
 pub let b = 2
+```
 
+```bamboo,file=acess-control-struct.bpl
 // Declare a public struct, accessible/visible in all scopes
 //
 pub struct SomeStruct {
@@ -2216,7 +2218,52 @@ pub struct SomeStruct {
     pub fun privateTest() {
         // ...
     }
+
+    // The initializer is omitted for brevity.
+
 }
+
+let some = SomeStruct()
+
+// Invalid: cannot read private constant field in outer scope
+//
+some.a
+
+// Invalid: cannot set private constant field in outer scope
+//
+some.a = 1
+
+// Valid: can read public constant field in outer scope
+//
+some.b
+
+// Invalid: cannot set public constant field in outer scope
+//
+some.b = 2
+
+// Invalid: cannot read private variable field in outer scope
+//
+some.c
+
+// Invalid: cannot set private variable field in outer scope
+//
+some.c = 3
+
+// Valid: can read public variable field in outer scope
+//
+some.d
+
+// Invalid: cannot set public variable field in outer scope
+//
+some.d = 4
+
+// Valid: can read publicly settable variable field in outer scope
+//
+some.e
+
+// Valid: can set publicly settable variable field in outer scope
+//
+some.e = 5
 ```
 
 ## Interfaces
