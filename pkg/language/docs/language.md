@@ -388,7 +388,8 @@ let b: Int? = 42
 
 #### Nil-Coalescing Operator
 
-The nil-coalescing operator `??` returns the value inside an optional if it contains a value, or returns an alternative value if the optional has no value, i.e., the optional value is `nil`.
+The nil-coalescing operator `??` returns the value inside an optional if it contains a value,
+or returns an alternative value if the optional has no value, i.e., the optional value is `nil`.
 
 ```bamboo
 // Declare a constant which has an optional integer type
@@ -433,6 +434,34 @@ let a = 1
 // but alternative is of type Bool
 //
 let b = a ?? false
+```
+
+#### Conditional Downcasting Operator
+
+The conditional downcasting operator `as?` can be used to type cast a value to a type.
+The operator returns an optional.
+If the value has a type that is a subtype of the given type that should be casted to,
+the operator returns the value as the given type,
+otherwise the result is `nil`.
+
+```bamboo,file=conditional-downcasting.bpl
+// Declare a constant named `something` which has type `Any`,
+// with an initial value which has type `Int`
+//
+let something: Any = 1
+
+// Conditionally downcast the value of `something` to `Int`.
+// The cast succeeds, because the value has type `Int`
+//
+let number = something as? Int
+// `number` is 1 and has type `Int?`
+
+// Conditionally downcast the value of `something` to `Bool`.
+// The cast fails, because the value has type `Int`,
+// and `Bool` is not a subtype of `Int`
+//
+let boolean = something as? Bool
+// `boolean` is nil and has type `Bool?`
 ```
 
 ### Strings and Characters
