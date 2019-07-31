@@ -1,8 +1,8 @@
 package testmocks
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 func NewMockEffectsInvalidReceipt(m *MockEffectsHappyPath) *MockEffectsInvalidReceipt {

@@ -3,8 +3,8 @@ package processor
 import (
 	log "github.com/sirupsen/logrus"
 
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 // EffectsProvider implements the Effects interface.
@@ -36,7 +36,7 @@ func (e *EffectsProvider) SlashExpiredReceipt(*types.ExecutionReceipt) error {
 	return nil
 }
 
-func (e *EffectsProvider) SlashInvalidReceipt(*types.ExecutionReceipt, *types.BlockPartExecutionResult) error {
+func (e *EffectsProvider) SlashInvalidReceipt(*types.ExecutionReceipt, *compute.BlockPartExecutionResult) error {
 	return nil
 }
 

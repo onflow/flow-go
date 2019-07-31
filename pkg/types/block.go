@@ -16,6 +16,11 @@ type Block struct {
 	Signatures             []crypto.Signature
 }
 
+type SignedCollectionHash struct {
+	CollectionHash crypto.Hash
+	Signatures     []crypto.Signature
+}
+
 type BlockSeal struct {
 	BlockHash                  crypto.Hash
 	ExecutionReceiptHash       crypto.Hash
