@@ -1192,7 +1192,7 @@ Functions can be called (invoked). Function calls need to provide exactly as man
 
 ```bamboo,file=function-call.bpl
 fun double(_ x: Int): Int {
-     return x * 2
+    return x * 2
 }
 
 // Valid: the correct amount of arguments is provided
@@ -1250,27 +1250,36 @@ The type `((Int): Int)[2]` specifies an array type of two functions, which accep
 
 #### Argument Passing Behavior
 
-When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as [call-by-sharing](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_sharing).
+When arguments are passed to a function, they are copied.
+Therefore, values that are passed into a function are unchanged in the caller's scope when the function returns.
+This behavior is known as [call-by-value](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_value).
 
 ```bamboo,file=function-change.bpl
+// Declare a function that changes the first two elements
+// of an array of integers
+//
 fun change(_ numbers: Int[]) {
-     numbers[0] = 1
-     numbers[1] = 2
+    // Change the elements of the passed in array.
+    // The changes are only local, as the array was copied
+    //
+    numbers[0] = 1
+    numbers[1] = 2
+    // `numbers` is [1, 2]
 }
 
 let numbers = [0, 1]
 
 change(numbers)
-// `numbers` is [1, 2]
+// `numbers` is still [0, 1]
 ```
 
 Parameters are constant, i.e., it is not allowed to assign to them.
 
 ```bamboo,file=function-parameter-assignment.bpl
 fun test(x: Int) {
-     // Invalid: cannot assign to a parameter (constant)
-     //
-     x = 2
+    // Invalid: cannot assign to a parameter (constant)
+    //
+    x = 2
 }
 ```
 
