@@ -333,12 +333,12 @@ An optional type is declared using the `?` suffix for another type. For example,
 The value representing nothing is `nil`.
 
 ```bamboo
-// declare a constant which has an optional integer type,
+// Declare a constant which has an optional integer type,
 // with nil as its initial value
 //
 let a: Int? = nil
 
-// declare a constant which has an optional integer type,
+// Declare a constant which has an optional integer type,
 // with 42 as its initial value
 //
 let b: Int? = 42
@@ -349,32 +349,32 @@ let b: Int? = 42
 The nil-coalescing operator `??` returns the value inside an optional if it contains a value, or returns an alternative value if the optional has no value, i.e., the optional value is `nil`.
 
 ```bamboo
-// declare a constant which has an optional integer type
+// Declare a constant which has an optional integer type
 //
 let a: Int? = nil
 
-// declare a constant with a non-optional integer type,
+// Declare a constant with a non-optional integer type,
 // which is initialized to b if it is non-nil, or 42 otherwise
 //
 let b: Int = a ?? 42
-// integer is 42, as a is nil
+// `b` is 42, as `a` is nil
 ```
 
 The nil-coalescing operator can only be applied to values which have an optional type.
 
 ```bamboo
-// declare a constant with a non-optional integer type
+// Declare a constant with a non-optional integer type
 //
 let a = 1
 
-// invalid: nil-coalescing operator is applied to a value which has a non-optional type
+// Invalid: nil-coalescing operator is applied to a value which has a non-optional type
 // (a has the non-optional type Int)
 //
 let b = a ?? 2
 ```
 
 ```bamboo
-// invalid: nil-coalescing operator is applied to a value which has a non-optional type
+// Invalid: nil-coalescing operator is applied to a value which has a non-optional type
 // (the integer literal is of type Int)
 //
 let c = 1 ?? 2
@@ -383,10 +383,11 @@ let c = 1 ?? 2
 The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.
 
 ```bamboo
-// declare a constant with a non-optional integer type
+// Declare a constant with a non-optional integer type
+//
 let a = 1
 
-// invalid: nil-coalescing operator is applied to a value of type Int,
+// Invalid: nil-coalescing operator is applied to a value of type Int,
 // but alternative is of type Bool
 //
 let b = a ?? false
@@ -750,7 +751,7 @@ The binary assignment operator `=` can be used to assign a new value to a variab
 ```bamboo,file=assignment.bpl
 var a = 1
 a = 2
-// a is 2
+// `a` is 2
 ```
 
 The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.
@@ -1042,7 +1043,7 @@ fun clamp(_ value: Int, min: Int, max: Int): Int {
 // for these parameters, the parameter names must be used as argument labels.
 //
 let clamped = clamp(123, min: 0, max: 100)
-// clamped is 100
+// `clamped` is 100
 ```
 
 Argument labels make code more explicit and readable. For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
@@ -1226,7 +1227,7 @@ fun change(_ numbers: Int[]) {
 let numbers = [0, 1]
 
 change(numbers)
-// numbers is [1, 2]
+// `numbers` is [1, 2]
 ```
 
 Parameters are constant, i.e., it is not allowed to assign to them.
@@ -1339,7 +1340,7 @@ if a != 0 {
    b = 2
 }
 
-// b is 1
+// `b` is 1
 ```
 
 An additional else-clause can be added to execute another piece of code when the condition is false.
@@ -1355,7 +1356,7 @@ if a == 1 {
    b = 2
 }
 
-// b is 2
+// `b` is 2
 ```
 
 The else-clause can contain another if-statement, i.e., if-statements can be chained together.
@@ -1372,7 +1373,7 @@ if a == 1 {
    b = 3
 }
 
-// b is 3
+// `b` is 3
 ```
 
 ### Looping: while-statement
@@ -1390,7 +1391,7 @@ while a < 5 {
     a = a + 1
 }
 
-// a is 5
+// `a` is 5
 ```
 
 ### Immediate function return: return-statement
@@ -1859,7 +1860,7 @@ token.id // is 42
 token.balance // is 1_000_000
 
 token.balance = 1
-// token.balance is 1
+// `token.balance` is 1
 
 // Invalid: assignment to constant field
 //
@@ -1900,10 +1901,10 @@ struct GetterExample {
 }
 
 let example = GetterExample(balance: 10)
-// example.balance is 10
+// `example.balance` is 10
 
 example.balance = -50
-// example.balance is 0. without the getter it would be -50
+// `example.balance` is 0. without the getter it would be -50
 ```
 
 Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses. The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.
@@ -1931,7 +1932,7 @@ struct SetterExample {
 }
 
 let example = SetterExample(balance: 10)
-// example.balance is 10
+// `example.balance` is 10
 
 // error: precondition of setter for field balance failed
 example.balance = -50
@@ -2011,15 +2012,15 @@ struct GoalTracker {
 }
 
 let tracker = GoalTracker(goal: 10, completed: 0)
-// tracker.goal is 10
-// tracker.completed is 0
-// tracker.left is 10
+// `tracker.goal` is 10
+// `tracker.completed` is 0
+// `tracker.left` is 10
 
 tracker.completed = 1
-// tracker.left is 9
+// `tracker.left` is 9
 
 tracker.left = 8
-// tracker.completed is 2
+// `tracker.completed` is 2
 ```
 
 It is invalid to declare a synthetic field with only a setter.
@@ -2048,8 +2049,8 @@ struct Rectangle {
 
 let rectangle = Rectangle(width: 2, height: 3)
 rectangle.scale(factor: 4)
-// rectangle.width is 8
-// rectangle.height is 12
+// `rectangle.width` is 8
+// `rectangle.height` is 12
 ```
 
 ### Unbound References / Nulls
@@ -2381,8 +2382,8 @@ let withdrawn <- token.withdraw(amount: 10)
 // The postcondition of the `withdraw` function in the `FungibleToken`
 // interface ensured the balance field of the token was updated properly
 //
-// token.balance is 90
-// withdrawn.balance is 10
+// `token.balance` is 90
+// `withdrawn.balance` is 10
 
 // Deposit the withdrawn token into another one.
 let receiver: ExampleToken <- // ...
