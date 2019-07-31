@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 )
 
 // SecondaryError
@@ -82,63 +81,6 @@ func (e *NotCallableError) StartPosition() *ast.Position {
 }
 
 func (e *NotCallableError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// InvalidBinaryOperandError
-
-type InvalidBinaryOperandError struct {
-	Operation    ast.Operation
-	Side         common.OperandSide
-	ExpectedType sema.Type
-	Value        Value
-	StartPos     *ast.Position
-	EndPos       *ast.Position
-}
-
-func (e *InvalidBinaryOperandError) Error() string {
-	return fmt.Sprintf(
-		"cannot apply binary operation %s to %s-hand value: %s. Expected type %s",
-		e.Operation.Symbol(),
-		e.Side.Name(),
-		e.Value,
-		e.ExpectedType.String(),
-	)
-}
-
-func (e *InvalidBinaryOperandError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidBinaryOperandError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// InvalidBinaryOperandTypesError
-
-type InvalidBinaryOperandTypesError struct {
-	Operation    ast.Operation
-	ExpectedType sema.Type
-	LeftValue    Value
-	RightValue   Value
-	StartPos     *ast.Position
-	EndPos       *ast.Position
-}
-
-func (e *InvalidBinaryOperandTypesError) Error() string {
-	return fmt.Sprintf(
-		"can't apply binary operation %s to values: %s, %s. Expected type %s",
-		e.Operation.Symbol(),
-		e.LeftValue, e.RightValue,
-		e.ExpectedType.String(),
-	)
-}
-
-func (e *InvalidBinaryOperandTypesError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidBinaryOperandTypesError) EndPosition() *ast.Position {
 	return e.EndPos
 }
 

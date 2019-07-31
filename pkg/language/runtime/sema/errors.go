@@ -134,7 +134,7 @@ func (e *TypeMismatchError) Error() string {
 
 func (e *TypeMismatchError) SecondaryError() string {
 	return fmt.Sprintf(
-		"expected `%s`, found `%s`",
+		"expected `%s`, got `%s`",
 		e.ExpectedType.String(),
 		e.ActualType.String(),
 	)
@@ -219,9 +219,9 @@ type ArgumentCountError struct {
 
 func (e *ArgumentCountError) Error() string {
 	return fmt.Sprintf(
-		"incorrect number of arguments: got %d, need %d",
-		e.ArgumentCount,
+		"incorrect number of arguments: expected %d, got %d",
 		e.ParameterCount,
+		e.ArgumentCount,
 	)
 }
 
@@ -269,9 +269,9 @@ type IncorrectArgumentLabelError struct {
 
 func (e *IncorrectArgumentLabelError) Error() string {
 	return fmt.Sprintf(
-		"incorrect argument label: got `%s`, need `%s`",
-		e.ActualArgumentLabel,
+		"incorrect argument label: expected `%s`, got `%s`",
 		e.ExpectedArgumentLabel,
+		e.ActualArgumentLabel,
 	)
 }
 
@@ -295,10 +295,10 @@ type InvalidUnaryOperandError struct {
 
 func (e *InvalidUnaryOperandError) Error() string {
 	return fmt.Sprintf(
-		"cannot apply unary operation %s to type: got `%s`, need `%s`",
+		"cannot apply unary operation %s to type: expected `%s`, got `%s`",
 		e.Operation.Symbol(),
-		e.ActualType.String(),
 		e.ExpectedType.String(),
+		e.ActualType.String(),
 	)
 }
 
@@ -307,5 +307,61 @@ func (e *InvalidUnaryOperandError) StartPosition() *ast.Position {
 }
 
 func (e *InvalidUnaryOperandError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
+// InvalidBinaryOperandError
+
+type InvalidBinaryOperandError struct {
+	Operation    ast.Operation
+	Side         common.OperandSide
+	ExpectedType Type
+	ActualType   Type
+	StartPos     *ast.Position
+	EndPos       *ast.Position
+}
+
+func (e *InvalidBinaryOperandError) Error() string {
+	return fmt.Sprintf(
+		"cannot apply binary operation %s to %s-hand type: expected `%s`, got `%s`",
+		e.Operation.Symbol(),
+		e.Side.Name(),
+		e.ExpectedType.String(),
+		e.ActualType.String(),
+	)
+}
+
+func (e *InvalidBinaryOperandError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidBinaryOperandError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
+// InvalidBinaryOperandsError
+
+type InvalidBinaryOperandsError struct {
+	Operation ast.Operation
+	LeftType  Type
+	RightType Type
+	StartPos  *ast.Position
+	EndPos    *ast.Position
+}
+
+func (e *InvalidBinaryOperandsError) Error() string {
+	return fmt.Sprintf(
+		"can't apply binary operation %s to different types: `%s`, `%s`",
+		e.Operation.Symbol(),
+		e.LeftType.String(),
+		e.RightType.String(),
+	)
+}
+
+func (e *InvalidBinaryOperandsError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidBinaryOperandsError) EndPosition() *ast.Position {
 	return e.EndPos
 }
