@@ -836,6 +836,8 @@ let a = 1 + 2
 // `a` is 3
 ```
 
+The arguments for the operators need to be of the same type.
+
 Arithmetic operators don't cause values to overflow.
 
 ```bamboo,file=operator-times.bpl
