@@ -24,7 +24,7 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 	checker := sema.NewChecker(program)
 	err := checker.Check()
 	Expect(err).
-		ToNot(HaveOccurred())
+		To(Not(HaveOccurred()))
 
 	Expect(checker.Globals["x"].Type).
 		To(Equal(&sema.IntType{}))
@@ -46,7 +46,7 @@ func TestCheckBoolean(t *testing.T) {
 	checker := sema.NewChecker(program)
 	err := checker.Check()
 	Expect(err).
-		ToNot(HaveOccurred())
+		To(Not(HaveOccurred()))
 
 	Expect(checker.Globals["x"].Type).
 		To(Equal(&sema.BoolType{}))
@@ -165,7 +165,7 @@ func TestCheckAssignment(t *testing.T) {
 	err := checker.Check()
 
 	Expect(err).
-		ToNot(HaveOccurred())
+		To(Not(HaveOccurred()))
 }
 
 func TestCheckInvalidGlobalConstantAssignment(t *testing.T) {
@@ -208,7 +208,7 @@ func TestCheckGlobalVariableAssignment(t *testing.T) {
 	err := checker.Check()
 
 	Expect(err).
-		ToNot(HaveOccurred())
+		To(Not(HaveOccurred()))
 }
 
 func TestCheckInvalidAssignmentToParameter(t *testing.T) {
