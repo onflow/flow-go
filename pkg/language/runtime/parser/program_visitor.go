@@ -67,7 +67,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 func (v *ProgramVisitor) visitReturnType(ctx IFullTypeContext, tokenBefore antlr.Token) ast.Type {
 	if ctx == nil {
 		positionBeforeMissingReturnType := ast.PositionFromToken(tokenBefore)
-		return &ast.BaseType{
+		return &ast.NominalType{
 			Pos: positionBeforeMissingReturnType,
 		}
 	}
@@ -145,7 +145,7 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	if identifierNode != nil {
 		identifier := identifierNode.GetText()
 		position := ast.PositionFromToken(identifierNode.GetSymbol())
-		return &ast.BaseType{
+		return &ast.NominalType{
 			Identifier: identifier,
 			Pos:        position,
 		}

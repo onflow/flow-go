@@ -873,7 +873,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 // ConvertType converts an AST type representation to a sema type
 func (checker *Checker) ConvertType(t ast.Type) Type {
 	switch t := t.(type) {
-	case *ast.BaseType:
+	case *ast.NominalType:
 		result := checker.findType(t.Identifier)
 		if result == nil {
 			panic(&NotDeclaredError{
