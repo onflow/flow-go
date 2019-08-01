@@ -7,11 +7,10 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
-	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
-
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/storage"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/txpool"
+	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
 	"github.com/dapperlabs/bamboo-node/pkg/utils/unittest"

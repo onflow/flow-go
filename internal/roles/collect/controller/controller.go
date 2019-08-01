@@ -7,10 +7,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
-
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/storage"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/txpool"
+	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 )
 
 type Controller struct {
