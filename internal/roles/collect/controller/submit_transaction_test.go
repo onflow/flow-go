@@ -60,9 +60,7 @@ func TestSubmitTransaction(t *testing.T) {
 
 			_, err = c.SubmitTransaction(
 				context.Background(),
-				&svc.SubmitTransactionRequest{
-					Transaction: txMsg,
-				},
+				&svc.SubmitTransactionRequest{Transaction: txMsg},
 			)
 
 			if tt.shouldSucceed {
@@ -72,4 +70,67 @@ func TestSubmitTransaction(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSubmitTransactionStorage(t *testing.T) {
+	RegisterTestingT(t)
+
+	// expose transaction pool and storage for use in tests
+	txPool := txpool.New()
+	store := storage.NewMockStorage()
+
+	c := controller.New(store, txPool, logrus.New())
+
+	txA := unittest.SignedTransactionFixture()
+	txMsg, err := proto.SignedTransactionToMessage(txA)
+	Expect(err).ToNot(HaveOccurred())
+
+	_, err = c.SubmitTransaction(
+		context.Background(),
+		&svc.SubmitTransactionRequest{Transaction: txMsg},
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	// stored transaction should be identical to submitted transaction
+	txB, err := store.GetTransaction(txA.Hash())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(txA).To(Equal(txB))
+
+	// pending transaction should be identical to submitted transaction
+	txC := txPool.Get(txA.Hash())
+	Expect(txA).To(Equal(txC))
+}
+
+func TestSubmitDuplicateTransaction(t *testing.T) {
+	RegisterTestingT(t)
+
+	// expose transaction pool for use in tests
+	txPool := txpool.New()
+
+	c := controller.New(storage.NewMockStorage(), txPool, logrus.New())
+
+	txA := unittest.SignedTransactionFixture()
+	txMsg, err := proto.SignedTransactionToMessage(txA)
+	Expect(err).ToNot(HaveOccurred())
+
+	// submit transaction
+	_, err = c.SubmitTransaction(
+		context.Background(),
+		&svc.SubmitTransactionRequest{Transaction: txMsg},
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	// manually remove the transaction from the pending pool
+	txPool.Remove(txA.Hash())
+
+	// resubmit transaction
+	_, err = c.SubmitTransaction(
+		context.Background(),
+		&svc.SubmitTransactionRequest{Transaction: txMsg},
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	// transaction should not be added back to pool on 2nd submission
+	containsTx := txPool.Contains(txA.Hash())
+	Expect(containsTx).To(BeFalse())
 }

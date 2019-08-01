@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"errors"
+
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
@@ -21,6 +23,18 @@ func NewMockStorage() Storage {
 func (d *MockStorage) InsertTransaction(tx types.SignedTransaction) error {
 	d.transactions[tx.Hash()] = tx
 	return nil
+}
+
+// GetTransaction returns the transaction with the provided hash.
+//
+// This function returns error if the hash does not exist in storage.
+func (d *MockStorage) GetTransaction(hash crypto.Hash) (types.SignedTransaction, error) {
+	tx, exists := d.transactions[hash]
+	if !exists {
+		return types.SignedTransaction{}, errors.New("transaction does not exist")
+	}
+
+	return tx, nil
 }
 
 // ContainsTransaction returns true if a transaction with the given hash exists

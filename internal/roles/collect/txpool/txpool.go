@@ -30,6 +30,12 @@ func (tp *TxPool) Insert(tx types.SignedTransaction) {
 	tp.transactions[tx.Hash()] = tx
 }
 
+// Get returns the transaction with the provided hash or nil if it does not exist
+// in the pool.
+func (tp *TxPool) Get(hash crypto.Hash) types.SignedTransaction {
+	return tp.transactions[hash]
+}
+
 // Contains returns true if the pool contains a transaction with the provided
 // hash, and false otherwise.
 func (tp *TxPool) Contains(hash crypto.Hash) bool {
