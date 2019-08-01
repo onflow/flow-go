@@ -112,16 +112,30 @@ func (v *ProgramVisitor) VisitParameterList(ctx *ParameterListContext) interface
 }
 
 func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
-	identifier := ctx.Identifier().GetText()
+	// label
+	label := ""
+	var labelPos *ast.Position
+	if ctx.argumentLabel != nil {
+		label = ctx.argumentLabel.GetText()
+		labelPos = ast.PositionFromToken(ctx.argumentLabel)
+	}
+
+	// identifier
+	identifier := ctx.parameterName.GetText()
+	identifierPos := ast.PositionFromToken(ctx.parameterName)
+
 	fullType := ctx.FullType().Accept(v).(ast.Type)
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
 
 	return &ast.Parameter{
-		Identifier: identifier,
-		Type:       fullType,
-		StartPos:   startPosition,
-		EndPos:     endPosition,
+		Label:         label,
+		Identifier:    identifier,
+		Type:          fullType,
+		LabelPos:      labelPos,
+		IdentifierPos: identifierPos,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
 }
 
@@ -143,7 +157,7 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 		return functionTypeContext.Accept(v)
 	}
 
-	panic(errors.UnreachableError{})
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{} {
@@ -852,21 +866,34 @@ func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionCont
 }
 
 func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
-	var expressions []ast.Expression
-	for _, expression := range ctx.AllExpression() {
-		expressions = append(
-			expressions,
-			expression.Accept(v).(ast.Expression),
+	var arguments []*ast.Argument
+	for _, argument := range ctx.AllArgument() {
+		arguments = append(
+			arguments,
+			argument.Accept(v).(*ast.Argument),
 		)
 	}
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
 
-	// NOTE: partial, expression is filled later
+	// NOTE: partial, argument is filled later
 	return &ast.InvocationExpression{
-		Arguments: expressions,
+		Arguments: arguments,
 		StartPos:  startPosition,
 		EndPos:    endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitArgument(ctx *ArgumentContext) interface{} {
+	identifierNode := ctx.Identifier()
+	label := ""
+	if identifierNode != nil {
+		label = identifierNode.GetText()
+	}
+	expression := ctx.Expression().Accept(v).(ast.Expression)
+	return &ast.Argument{
+		Label:      label,
+		Expression: expression,
 	}
 }
 

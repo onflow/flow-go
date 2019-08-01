@@ -26,7 +26,7 @@ func (k IntegerLiteralKind) Base() int {
 		return 16
 	}
 
-	panic(errors.UnreachableError{})
+	panic(&errors.UnreachableError{})
 }
 
 func (k IntegerLiteralKind) Name() string {
@@ -43,5 +43,5 @@ func (k IntegerLiteralKind) Name() string {
 		return "hexadecimal"
 	}
 
-	panic(errors.UnreachableError{})
+	panic(&errors.UnreachableError{})
 }

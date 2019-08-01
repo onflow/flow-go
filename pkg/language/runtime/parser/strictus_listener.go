@@ -130,6 +130,9 @@ type StrictusListener interface {
 	// EnterInvocation is called when entering the invocation production.
 	EnterInvocation(c *InvocationContext)
 
+	// EnterArgument is called when entering the argument production.
+	EnterArgument(c *ArgumentContext)
+
 	// EnterLiteral is called when entering the literal production.
 	EnterLiteral(c *LiteralContext)
 
@@ -279,6 +282,9 @@ type StrictusListener interface {
 
 	// ExitInvocation is called when exiting the invocation production.
 	ExitInvocation(c *InvocationContext)
+
+	// ExitArgument is called when exiting the argument production.
+	ExitArgument(c *ArgumentContext)
 
 	// ExitLiteral is called when exiting the literal production.
 	ExitLiteral(c *LiteralContext)

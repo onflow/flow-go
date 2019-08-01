@@ -97,7 +97,7 @@ func (e *IdentifierExpression) Accept(v Visitor) Repr {
 
 type InvocationExpression struct {
 	Expression Expression
-	Arguments  []Expression
+	Arguments  []*Argument
 	StartPos   *Position
 	EndPos     *Position
 }

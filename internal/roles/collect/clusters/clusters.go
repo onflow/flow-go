@@ -1,17 +1,20 @@
 // Package clusters implements the logic required to compute and validate access node clusters.
 package clusters
 
-import "github.com/dapperlabs/bamboo-node/pkg/crypto"
+import (
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
+)
 
 // Cluster is a grouping of access nodes.
 type Cluster struct {
 	Index uint64
-	Nodes []crypto.Address
+	Nodes []types.Address
 }
 
 // Hash returns the unique hash of a cluster.
 func (c *Cluster) Hash() crypto.Hash {
-	return crypto.ZeroHash()
+	return nil
 }
 
 // ClusterManager is a utility to compute cluster arrangements.
@@ -23,7 +26,7 @@ func (c *Cluster) Hash() crypto.Hash {
 type ClusterManager struct{}
 
 // GetCluster returns the cluster that the given node belongs to.
-func (c *ClusterManager) GetCluster(address crypto.Address, epoch uint64) (*Cluster, error) {
+func (c *ClusterManager) GetCluster(address types.Address, epoch uint64) (*Cluster, error) {
 	return nil, nil
 }
 

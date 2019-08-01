@@ -9,7 +9,8 @@ import (
 type InvalidIntegerLiteralKind int
 
 const (
-	InvalidIntegerLiteralKindLeadingUnderscore InvalidIntegerLiteralKind = iota
+	InvalidIntegerLiteralKindUnknown InvalidIntegerLiteralKind = iota
+	InvalidIntegerLiteralKindLeadingUnderscore
 	InvalidIntegerLiteralKindTrailingUnderscore
 	InvalidIntegerLiteralKindUnknownPrefix
 )
