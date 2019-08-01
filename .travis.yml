@@ -19,6 +19,8 @@ cache:
   bundler: true
   directories:
     - $HOME/docker
+    - $HOME/.cache/go-build
+    - $HOME/gopath/pkg/mod
 
 script:
   - make ci
