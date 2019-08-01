@@ -850,7 +850,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 		expression.Block,
 	)
 
-	return nil
+	return functionType
 }
 
 // ConvertType converts an AST type representation to a sema type

@@ -857,3 +857,18 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckFunctionExpressionsAndScope(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       let x = 10
+
+       // check first-class functions and scope inside them
+       let y = (fun (x: Int): Int { return x })(42)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
