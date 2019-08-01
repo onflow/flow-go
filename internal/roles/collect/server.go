@@ -5,7 +5,6 @@ import (
 	"net"
 
 	"github.com/sirupsen/logrus"
-
 	"google.golang.org/grpc"
 
 	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
