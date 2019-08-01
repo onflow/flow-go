@@ -6,7 +6,6 @@ import (
 	"github.com/google/wire"
 	"github.com/sirupsen/logrus"
 
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/config"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/storage"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/txpool"
@@ -16,7 +15,7 @@ import (
 func InitializeServer() (*Server, error) {
 	wire.Build(
 		NewServer,
-		config.New,
+		NewConfig,
 		NewDatabaseConnector,
 		storage.NewDatabaseStorage,
 		txpool.New,

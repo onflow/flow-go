@@ -1,4 +1,4 @@
-package config
+package collect
 
 import "github.com/psiemens/sconfig"
 
@@ -11,8 +11,9 @@ type Config struct {
 	PostgresDatabase string `default:"bam_collection"`
 }
 
-// New returns a new Config object.
-func New() *Config {
+// NewConfig parses the application configuration from environment variables and
+// returns a new Config struct.
+func NewConfig() *Config {
 	var conf Config
 
 	err := sconfig.New(&conf).
