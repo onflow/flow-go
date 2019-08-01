@@ -77,7 +77,7 @@ func (c *Controller) SubmitCollection(context.Context, *svc.SubmitCollectionRequ
 
 
 
-### <a name="Controller.SubmitTransaction">func</a> (\*Controller) [SubmitTransaction](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/submit_transaction.go?s=863:1001#L32)
+### <a name="Controller.SubmitTransaction">func</a> (\*Controller) [SubmitTransaction](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/submit_transaction.go?s=798:936#L29)
 ``` go
 func (c *Controller) SubmitTransaction(
     ctx context.Context, req *svc.SubmitTransactionRequest,
