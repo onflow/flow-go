@@ -85,6 +85,7 @@ func TestSubmitTransactionStorage(t *testing.T) {
 	txMsg, err := proto.SignedTransactionToMessage(txA)
 	Expect(err).ToNot(HaveOccurred())
 
+	// submit transaction
 	_, err = c.SubmitTransaction(
 		context.Background(),
 		&svc.SubmitTransactionRequest{Transaction: txMsg},
