@@ -872,3 +872,15 @@ func TestCheckFunctionExpressionsAndScope(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckReturnWithoutExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       fun returnNothing() {
+           return
+       }
+	`)
+
+	Expect(inter.Invoke("returnNothing")).
+		To(Equal(interpreter.VoidValue{}))
+}

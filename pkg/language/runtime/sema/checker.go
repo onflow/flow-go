@@ -328,6 +328,10 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 
 	// check value type matches enclosing function's return type
 
+	if statement.Expression == nil {
+		return nil
+	}
+
 	valueType := statement.Expression.Accept(checker).(Type)
 	returnType := checker.currentFunction().returnType
 
