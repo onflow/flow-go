@@ -24,14 +24,15 @@ func (a *BLS_BLS12381Algo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
 
 // GeneratePrKey generates a private key for BLS on BLS12381 curve
 func (a *BLS_BLS12381Algo) GeneratePrKey(seed []byte) PrKey {
-	var prKey PrKeyBLS_BLS12381
+	var sk PrKeyBLS_BLS12381
 	// Generate private key here
-	prKey.sk = randZr(seed)
+	randZr(&(sk.sk), seed)
+	//(&(sk.sk)).setInt(1)
 	// public key is not computed (but this could be changed)
-	prKey.pk = nil
+	sk.pk = nil
 	// links the private key to the algo
-	prKey.alg = a
-	return &prKey
+	sk.alg = a
+	return &sk
 }
 
 // SignBytes signs an array of bytes
@@ -65,7 +66,7 @@ type PrKeyBLS_BLS12381 struct {
 	// public key
 	pk *PubKey_BLS_BLS12381
 	// private key data
-	sk *scalar
+	sk scalar
 }
 
 func (sk *PrKeyBLS_BLS12381) AlgoName() AlgoName {
@@ -77,8 +78,10 @@ func (sk *PrKeyBLS_BLS12381) KeySize() int {
 }
 
 func (sk *PrKeyBLS_BLS12381) ComputePubKey() {
-	// compute sk.pk here
-	sk.pk = nil
+	var newPk PubKey_BLS_BLS12381
+	// compute public key pk = g2^sk
+	_G2scalarGenMult(&(newPk.pk), &(sk.sk))
+	sk.pk = &newPk
 }
 
 func (sk *PrKeyBLS_BLS12381) Pubkey() PubKey {
@@ -91,8 +94,8 @@ func (sk *PrKeyBLS_BLS12381) Pubkey() PubKey {
 
 // PubKey_BLS_BLS12381 is the public key of BLS using BLS12_381, it implements PubKey
 type PubKey_BLS_BLS12381 struct {
-	// public key data  will be entered here
-	pk pointG1
+	// public key data will be entered here
+	pk pointG2
 }
 
 func (pk *PubKey_BLS_BLS12381) KeySize() int {

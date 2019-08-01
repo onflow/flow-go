@@ -16,11 +16,17 @@ void _ep_new(ep_t);
 void _ep_free(ep_t);
 
 // Debug related functions
-void _fp_print(fp_st*);
-void _bn_print(bn_st*);
-bn_st* bn_randZr(char*);
+void _fp_print(char*, fp_st*);
+void _bn_print(char*, bn_st*);
+void _ep_print(char*, ep_st*);
+void _ep2_print(char*, ep2_st*);
+void bn_randZr(bn_st*, char*);
 
 // bls core
+void _G1scalarPointMult(ep_st*, ep_st*, bn_st*);
+void _G1scalarGenMult(ep_st*, bn_st*);
+void _G2scalarGenMult(ep2_st*, bn_st*);
+
  
 
 

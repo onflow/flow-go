@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"testing"
 )
 
@@ -95,7 +94,8 @@ func TestG1(t *testing.T) {
 
 	_ = NewSignatureAlgo(BLS_BLS12381)
 
-	var scalar big.Int
-	scalar.SetUint64(1)
-	_G1scalarGenMult(scalar)
+	var expo scalar
+	(&expo).setInt(1)
+	var res pointG1
+	_G1scalarGenMult(&res, &expo)
 }

@@ -9,14 +9,14 @@ import "C"
 // BN_KARAT: try 2, if karatsuba is used
 // try sliding window expo with 4-5-6
 import (
-	"errors"
-	"math/big"
+	_ "errors"
+	_ "fmt"
 	"unsafe"
-	//"fmt"
 )
 
 // Go wrappers to C types
 type pointG1 C.ep_st
+type pointG2 C.ep2_st
 type scalar C.bn_st
 type ctx *C.ctx_t
 
@@ -24,7 +24,7 @@ type ctx *C.ctx_t
 func (a *BLS_BLS12381Algo) init() {
 	C.core_init()
 	//C.ep_param_set(B12_P381)
-	C.ep_param_set_any_pairf() // sets B12_P381 if FP_PRIME = 381 !
+	C.ep_param_set_any_pairf() // sets B12_P381 if FP_PRIME = 381 in relic config
 	a.context = ctx(C.core_get())
 }
 
@@ -36,45 +36,31 @@ func (a *BLS_BLS12381Algo) reinit() {
 	}
 }
 
-func (p *pointG1) _G1scalarPointMult(b big.Int) *pointG1 {
-	var expo scalar
-	C._bn_new((*C.bn_st)(&expo))
-	defer C._bn_free((*C.bn_st)(&expo))
-
-	byteScalar := b.Bytes()
-	if len(byteScalar) == 0 {
-		byteScalar = []byte{0}
-	}
-	C.bn_read_bin((*C.bn_st)(&expo), (*C.uint8_t)((unsafe.Pointer)(&byteScalar[0])), C.int(len(byteScalar)))
-
-	var res pointG1
-	C.ep_mul_basic((*C.ep_st)(&res), (*C.ep_st)(p), (*C.bn_st)(&expo))
-	return &res
+// Exponentiation in G1 (scalar point multiplication)
+func (p *pointG1) _G1scalarPointMult(res *pointG1, expo *scalar) {
+	C._bn_print(C.CString("k"), (*C.bn_st)(expo))
+	C._G1scalarPointMult((*C.ep_st)(res), (*C.ep_st)(p), (*C.bn_st)(expo))
+	C._ep_print(C.CString("kG1"), (*C.ep_st)(res))
 }
 
-// _G1scalarGenMult is a test function
-func _G1scalarGenMult(scalar big.Int) *pointG1 {
-
-	var p pointG1
-	C._ep_new((*C.ep_st)(&p))
-	defer C._ep_free((*C.ep_st)(&p))
-	C.ep_curve_get_gen((*C.ep_st)(&p))
-	C._fp_print(&(*C.ep_st)(&p).x)
-	res := (&p)._G1scalarPointMult(scalar)
-	C._fp_print(&res.x)
-
-	return res
+// Exponentiation of g1 in G1
+func _G1scalarGenMult(res *pointG1, expo *scalar) {
+	C._G1scalarGenMult((*C.ep_st)(res), (*C.bn_st)(expo))
+	C._ep_print(C.CString("kG1"), (*C.ep_st)(res))
 }
 
+// Exponentiation of g2 in G2
+func _G2scalarGenMult(res *pointG2, expo *scalar) {
+	C._G2scalarGenMult((*C.ep2_st)(res), (*C.bn_st)(expo))
+	C._ep2_print(C.CString("kG2"), (*C.ep2_st)(res))
+}
 
-func randZr(seed []byte) *scalar {
-	var x *C.bn_st
-	x = C.bn_randZr((*C.char)((unsafe.Pointer)(&seed[0]))) // to define the length of seed
-	defer C.free((unsafe.Pointer)(x))
-	
-	if x == nil {
-		panic(errors.New("randZr output is not allocated"))
-	}
+// TEST/DEBUG
+// returnd a random number on Z/Z.r
+func randZr(x *scalar, seed []byte) {
+	C.bn_randZr((*C.bn_st)(x), (*C.char)((unsafe.Pointer)(&seed[0]))) // to define the length of seed
+}
 
-	return (*scalar)(x)
+func (x *scalar) setInt(a int) {
+	C.bn_set_dig((*C.bn_st)(x), (C.uint64_t)(a))
 }
