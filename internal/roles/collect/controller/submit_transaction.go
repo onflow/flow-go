@@ -2,15 +2,12 @@ package controller
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 
-	"github.com/dapperlabs/bamboo-node/pkg/types"
 	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
 )
 
@@ -43,7 +40,7 @@ func (c *Controller) SubmitTransaction(
 
 	// TODO: check if transaction exists in storage
 
-	if err := c.validateTransactionBody(tx); err != nil {
+	if err := tx.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
@@ -56,33 +53,4 @@ func (c *Controller) SubmitTransaction(
 	// TODO: route transaction to cluster
 
 	return &svc.SubmitTransactionResponse{}, nil
-}
-
-type errIncompleteTransaction struct {
-	missingFields []string
-}
-
-func (e errIncompleteTransaction) Error() string {
-	return fmt.Sprintf(
-		"required fields are not set: %s",
-		strings.Join(e.missingFields[:], ", "),
-	)
-}
-
-func (c *Controller) validateTransactionBody(tx types.SignedTransaction) error {
-	missingFields := make([]string, 0)
-
-	if len(tx.Script) == 0 {
-		missingFields = append(missingFields, "script")
-	}
-
-	if tx.ComputeLimit == 0 {
-		missingFields = append(missingFields, "compute_limit")
-	}
-
-	if len(missingFields) > 0 {
-		return errIncompleteTransaction{missingFields}
-	}
-
-	return nil
 }
