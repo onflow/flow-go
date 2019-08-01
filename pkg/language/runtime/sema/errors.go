@@ -162,3 +162,98 @@ func (e *NotIndexingTypeError) StartPosition() *ast.Position {
 func (e *NotIndexingTypeError) EndPosition() *ast.Position {
 	return e.EndPos
 }
+
+// NotCallableError
+
+type NotCallableError struct {
+	Type     Type
+	StartPos *ast.Position
+	EndPos   *ast.Position
+}
+
+func (e *NotCallableError) Error() string {
+	return fmt.Sprintf("cannot call type: %s", e.Type.String())
+}
+
+func (e *NotCallableError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *NotCallableError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
+// ArgumentCountError
+
+type ArgumentCountError struct {
+	ParameterCount int
+	ArgumentCount  int
+	StartPos       *ast.Position
+	EndPos         *ast.Position
+}
+
+func (e *ArgumentCountError) Error() string {
+	return fmt.Sprintf(
+		"incorrect number of arguments: got %d, need %d",
+		e.ArgumentCount,
+		e.ParameterCount,
+	)
+}
+
+func (e *ArgumentCountError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *ArgumentCountError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
+// MissingArgumentLabelError
+
+// TODO: suggest adding argument label
+
+type MissingArgumentLabelError struct {
+	ExpectedArgumentLabel string
+	StartPos              *ast.Position
+	EndPos                *ast.Position
+}
+
+func (e *MissingArgumentLabelError) Error() string {
+	return fmt.Sprintf(
+		"missing argument label: %s",
+		e.ExpectedArgumentLabel,
+	)
+}
+
+func (e *MissingArgumentLabelError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *MissingArgumentLabelError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
+// IncorrectArgumentLabelError
+
+type IncorrectArgumentLabelError struct {
+	ExpectedArgumentLabel string
+	ActualArgumentLabel   string
+	StartPos              *ast.Position
+	EndPos                *ast.Position
+}
+
+func (e *IncorrectArgumentLabelError) Error() string {
+	return fmt.Sprintf(
+		"incorrect argument label: got `%s`, need `%s`",
+		e.ActualArgumentLabel,
+		e.ExpectedArgumentLabel,
+	)
+}
+
+func (e *IncorrectArgumentLabelError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *IncorrectArgumentLabelError) EndPosition() *ast.Position {
+	return e.EndPos
+}

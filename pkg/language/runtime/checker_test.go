@@ -419,6 +419,23 @@ func TestCheckInvalidArgumentLabelRedeclaration(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
+func TestCheckArgumentLabelRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test(_ a: Int, _ b: Int) {}
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckInvalidConstantValue(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -512,7 +529,7 @@ func TestCheckReferenceInFunction(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
-func TestCheckInvalidParameterNameWithFunctionName(t *testing.T) {
+func TestCheckParameterNameWithFunctionName(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
@@ -528,7 +545,7 @@ func TestCheckInvalidParameterNameWithFunctionName(t *testing.T) {
 	err := checker.Check()
 
 	Expect(err).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+		To(Not(HaveOccurred()))
 }
 
 func TestCheckIfStatementTest(t *testing.T) {
@@ -721,4 +738,204 @@ func TestCheckInvalidWhileBlock(t *testing.T) {
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun f(x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
+          return f()
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+}
+
+func TestCheckFunctionCallWithArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun f(x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
+          return f(x: 1)
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun f(_ x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
+          return f(1)
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+// TODO:
+//func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
+//	RegisterTestingT(t)
+//
+//	program, errors := parser.Parse(`
+//      fun f(x: Int): Int {
+//          return x
+//      }
+//
+//      fun test(): Int {
+//          return f(1)
+//      }
+//	`)
+//
+//	Expect(errors).
+//		To(BeEmpty())
+//
+//	checker := sema.NewChecker(program)
+//	err := checker.Check()
+//
+//	Expect(err).
+//		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+//}
+//
+//func TestCheckFunctionCallIncorrectArgumentLabel(t *testing.T) {
+//	RegisterTestingT(t)
+//
+//	program, errors := parser.Parse(`
+//      fun f(x: Int): Int {
+//          return x
+//      }
+//
+//      fun test(): Int {
+//          return f(y: 1)
+//      }
+//	`)
+//
+//	Expect(errors).
+//		To(BeEmpty())
+//
+//	checker := sema.NewChecker(program)
+//	err := checker.Check()
+//
+//	Expect(err).
+//		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
+//}
+
+func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun f(x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
+          return f(2, 3)
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+}
+
+func TestCheckInvalidFunctionCallOfBool(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test(): Int {
+          return true()
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+}
+
+func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test(): Int32 {
+          return 2()
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+}
+
+func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun f(x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
+          return f(true)
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }

@@ -10,6 +10,8 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
+const ArgumentLabelNotRequired = "_"
+
 type functionContext struct {
 	returnType Type
 }
@@ -132,11 +134,12 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
+	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
+	checker.declareFunction(declaration.Identifier, declaration.IdentifierPos, functionType)
+
 	checker.checkFunction(
-		declaration.Identifier,
-		declaration.IdentifierPos,
 		declaration.Parameters,
-		declaration.ReturnType,
+		functionType,
 		declaration.Block,
 	)
 
@@ -144,10 +147,8 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 }
 
 func (checker *Checker) checkFunction(
-	identifier string,
-	identifierPos *ast.Position,
 	parameters []*ast.Parameter,
-	returnType ast.Type,
+	functionType *FunctionType,
 	block *ast.Block,
 ) {
 	checker.pushActivations()
@@ -157,7 +158,7 @@ func (checker *Checker) checkFunction(
 	checker.checkArgumentLabels(parameters)
 	checker.bindParameters(parameters)
 
-	checker.enterFunction(identifier, identifierPos, checker.functionType(parameters, returnType))
+	checker.enterFunction(functionType)
 	defer checker.leaveFunction()
 
 	block.Accept(checker)
@@ -189,7 +190,7 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) {
 
 	for _, parameter := range parameters {
 		label := parameter.Label
-		if label == "" {
+		if label == "" || label == ArgumentLabelNotRequired {
 			continue
 		}
 
@@ -557,16 +558,63 @@ func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalEx
 }
 
 func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
-	// TODO:
-	return nil
+
+	// check the invoked expression can be invoked
+
+	invokedExpression := invocationExpression.Expression
+	expressionType := invokedExpression.Accept(checker).(Type)
+
+	functionType, ok := expressionType.(*FunctionType)
+	if !ok {
+		panic(&NotCallableError{
+			Type:     expressionType,
+			StartPos: invokedExpression.StartPosition(),
+			EndPos:   invokedExpression.EndPosition(),
+		})
+	}
+
+	// check the invocation's argument count matches the function's parameter count
+
+	parameterCount := len(functionType.ParameterTypes)
+	argumentCount := len(invocationExpression.Arguments)
+
+	if argumentCount != parameterCount {
+		panic(&ArgumentCountError{
+			ParameterCount: parameterCount,
+			ArgumentCount:  argumentCount,
+			StartPos:       invocationExpression.StartPos,
+			EndPos:         invocationExpression.EndPos,
+		})
+	}
+
+	for i := 0; i < parameterCount; i++ {
+		// ensure the type of the argument matches the type of the parameter
+
+		parameterType := functionType.ParameterTypes[i]
+		argument := invocationExpression.Arguments[i]
+		argumentType := argument.Expression.Accept(checker).(Type)
+
+		if !checker.IsSubType(argumentType, parameterType) {
+			panic(&TypeMismatchError{
+				ExpectedType: parameterType,
+				ActualType:   argumentType,
+				StartPos:     argument.Expression.StartPosition(),
+				EndPos:       argument.Expression.EndPosition(),
+			})
+		}
+	}
+
+	// TODO: ensure argument labels of arguments match argument labels of parameters
+
+	return functionType.ReturnType
 }
 
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
+	// TODO: infer
+	functionType := checker.functionType(expression.Parameters, expression.ReturnType)
 	checker.checkFunction(
-		"",
-		nil,
 		expression.Parameters,
-		expression.ReturnType,
+		functionType,
 		expression.Block,
 	)
 
@@ -619,11 +667,7 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	panic(&astTypeConversionError{invalidASTType: t})
 }
 
-func (checker *Checker) enterFunction(identifier string, identifierPosition *ast.Position, functionType *FunctionType) {
-	if identifier != "" {
-		checker.declareFunction(identifier, identifierPosition, functionType)
-	}
-
+func (checker *Checker) enterFunction(functionType *FunctionType) {
 	checker.functionContexts = append(checker.functionContexts,
 		&functionContext{
 			returnType: functionType.ReturnType,
