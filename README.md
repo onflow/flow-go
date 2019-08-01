@@ -14,11 +14,14 @@ Bamboo is a highly-performant blockchain designed to power the next generation o
   - [Setting up your environment](#setting-up-your-environment)
     - [Install Go](#install-go)
     - [Install Docker](#install-docker)
+    - [Install tooling dependencies](#install-tooling-dependencies)
   - [Generating code](#generating-code)
     - [Dependency injection using Wire](#dependency-injection-using-wire)
     - [Generate gRPC stubs from protobuf files](#generate-grpc-stubs-from-protobuf-files)
     - [Generate all code](#generate-all-code)
 - [Testing](#testing)
+  - [Unit tests](#unit-tests)
+  - [Integration tests](#integration-tests)
 - [Contributing](#contributing)
   - [Work streams](#work-streams)
   - [Workflow](#workflow)
@@ -119,28 +122,36 @@ make generate
 
 ## Testing
 
+### Unit tests
+
+```bash
+make test-unit
+```
+
+### Integration tests
+
 Initialize all containers:
 
 ```bash
-make test-setup
+make test-integrate-setup
 ```
 
 Run the test suite:
 
 ```bash
-make test-run
+make test-integrate-run
 ```
 
 Cleanup:
 
 ```bash
-make test-teardown
+make test-integrate-teardown
 ```
 
 The following command will run the three steps above:
 
 ```bash
-make test
+make test-integrate
 ```
 
 ## Contributing
