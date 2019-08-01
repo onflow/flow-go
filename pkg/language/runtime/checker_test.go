@@ -3,6 +3,7 @@ package runtime
 import (
 	"fmt"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	. "github.com/onsi/gomega"
@@ -792,6 +793,7 @@ func TestCheckUnaryIntegerNegation(t *testing.T) {
 }
 
 type operationTest struct {
+	ty          sema.Type
 	left, right string
 	matcher     types.GomegaMatcher
 }
@@ -808,13 +810,23 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 		{
 			operations: []ast.Operation{
 				ast.OperationPlus, ast.OperationMinus, ast.OperationMod, ast.OperationMul, ast.OperationDiv,
+			},
+			tests: []operationTest{
+				{&sema.IntType{}, "1", "2", Not(HaveOccurred())},
+				{&sema.IntType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.IntType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.IntType{}, "true", "false", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+			},
+		},
+		{
+			operations: []ast.Operation{
 				ast.OperationLess, ast.OperationLessEqual, ast.OperationGreater, ast.OperationGreaterEqual,
 			},
 			tests: []operationTest{
-				{"1", "2", Not(HaveOccurred())},
-				{"true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{"1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{"true", "false", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.BoolType{}, "1", "2", Not(HaveOccurred())},
+				{&sema.BoolType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.BoolType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.BoolType{}, "true", "false", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
 			},
 		},
 		{
@@ -822,10 +834,10 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				ast.OperationOr, ast.OperationAnd,
 			},
 			tests: []operationTest{
-				{"true", "false", Not(HaveOccurred())},
-				{"true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{"1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{"1", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.BoolType{}, "true", "false", Not(HaveOccurred())},
+				{&sema.BoolType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.BoolType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.BoolType{}, "1", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
 			},
 		},
 		{
@@ -833,10 +845,10 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				ast.OperationEqual, ast.OperationUnequal,
 			},
 			tests: []operationTest{
-				{"true", "false", Not(HaveOccurred())},
-				{"1", "2", Not(HaveOccurred())},
-				{"true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
-				{"1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.BoolType{}, "true", "false", Not(HaveOccurred())},
+				{&sema.BoolType{}, "1", "2", Not(HaveOccurred())},
+				{&sema.BoolType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.BoolType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
 			},
 		},
 	}
@@ -846,8 +858,8 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 			for _, test := range operationTests.tests {
 				_, err := parseAndCheck(
 					fmt.Sprintf(
-						`let a = %s %s %s`,
-						test.left, operation.Symbol(), test.right,
+						`fun test(): %s { return %s %s %s }`,
+						test.ty, test.left, operation.Symbol(), test.right,
 					),
 				)
 
