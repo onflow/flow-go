@@ -2,6 +2,10 @@
 language: go
 go_import_path: github.com/dapperlabs/bamboo-node
 
+branches:
+  only:
+  - master
+  
 services:
   - docker
 
