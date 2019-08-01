@@ -13,16 +13,16 @@ import (
 // sampleScript runs a script that adds 2 to a value.
 const sampleScript = `
 	fun main() {
-		const controller = [1]
-		const owner = [2]
-		const key = [3]
-		const value = getValue(controller, owner, key)
+		let controller = [1]
+		let owner = [2]
+		let key = [3]
+		let value = getValue(controller, owner, key)
 		setValue(controller, owner, key, value + 2)
 	}
 `
 
 const sampleCall = `
-	fun main() -> Int {
+	fun main(): Int {
 		return getValue([1], [2], [3])
 	}
 `
@@ -285,8 +285,8 @@ func TestCreateAccount(t *testing.T) {
 	tx1 := (&types.RawTransaction{
 		Script: []byte(`
 			fun main() {
-				const publicKey = [1,2,3]
-				const code = [4,5,6]
+				let publicKey = [1,2,3]
+				let code = [4,5,6]
 				createAccount(publicKey, code)
 			}
 		`),
@@ -310,8 +310,8 @@ func TestCreateAccount(t *testing.T) {
 	tx2 := (&types.RawTransaction{
 		Script: []byte(`
 			fun main() {
-				const publicKey = [7,8,9]
-				const code = [10,11,12]
+				let publicKey = [7,8,9]
+				let code = [10,11,12]
 				createAccount(publicKey, code)
 			}
 		`),
