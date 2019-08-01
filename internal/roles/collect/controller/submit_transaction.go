@@ -50,14 +50,14 @@ func (c *Controller) SubmitTransaction(
 	// TODO: validate transaction signature
 	// https://github.com/dapperlabs/bamboo-node/issues/171
 
+	// TODO: route transaction to cluster if required and return
+
 	c.txPool.Insert(tx)
 
 	err = c.storage.InsertTransaction(tx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, msgInternalError)
 	}
-
-	// TODO: route transaction to cluster
 
 	return &svc.SubmitTransactionResponse{}, nil
 }
