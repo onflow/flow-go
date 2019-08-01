@@ -30,9 +30,6 @@ const (
 func (c *Controller) SubmitTransaction(
 	ctx context.Context, req *svc.SubmitTransactionRequest,
 ) (*svc.SubmitTransactionResponse, error) {
-
-	c.log.Info("Transaction submitted")
-
 	tx, err := proto.MessageToSignedTransaction(req.GetTransaction())
 	if err != nil {
 		if err == proto.ErrEmptyMessage {
