@@ -310,14 +310,32 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 }
 
 func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
-	// TODO: ensure text expression's type is boolean
-	// TODO: check block
+
+	var elseElement ast.Element = ast.NotAnElement{}
+	if statement.Else != nil {
+		elseElement = statement.Else
+	}
+
+	checker.visitConditional(statement.Test, statement.Then, elseElement)
+
 	return nil
 }
 
 func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.Repr {
-	// TODO: ensure text expression's type is boolean
-	// TODO: check block
+	test := statement.Test
+	testType := test.Accept(checker).(Type)
+
+	if !testType.Equal(&BoolType{}) {
+		panic(&TypeMismatchError{
+			ExpectedType: &BoolType{},
+			ActualType:   testType,
+			StartPos:     test.StartPosition(),
+			EndPos:       test.EndPosition(),
+		})
+	}
+
+	statement.Block.Accept(checker)
+
 	return nil
 }
 
@@ -516,8 +534,26 @@ func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) as
 }
 
 func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalExpression) ast.Repr {
-	// TODO:
-	return nil
+
+	thenType, elseType := checker.visitConditional(expression.Test, expression.Then, expression.Else)
+
+	if thenType == nil || elseType == nil {
+		panic(&errors.UnreachableError{})
+	}
+
+	// TODO: improve
+	resultType := thenType
+
+	if !checker.IsSubType(elseType, resultType) {
+		panic(&TypeMismatchError{
+			ExpectedType: resultType,
+			ActualType:   elseType,
+			StartPos:     expression.Else.StartPosition(),
+			EndPos:       expression.Else.EndPosition(),
+		})
+	}
+
+	return resultType
 }
 
 func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
@@ -642,4 +678,30 @@ func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast
 		ParameterTypes: parameterTypes,
 		ReturnType:     checker.ConvertType(returnType),
 	}
+}
+
+// visitConditional checks a conditional. the test expression must be a boolean.
+// the then and else elements may be expressions, in which case the types are returned.
+func (checker *Checker) visitConditional(
+	test ast.Expression,
+	thenElement ast.Element,
+	elseElement ast.Element,
+) (
+	thenType, elseType Type,
+) {
+	testType := test.Accept(checker).(Type)
+
+	if !testType.Equal(&BoolType{}) {
+		panic(&TypeMismatchError{
+			ExpectedType: &BoolType{},
+			ActualType:   testType,
+			StartPos:     test.StartPosition(),
+			EndPos:       test.EndPosition(),
+		})
+	}
+
+	thenType, _ = thenElement.Accept(checker).(Type)
+	elseType, _ = elseElement.Accept(checker).(Type)
+
+	return
 }
