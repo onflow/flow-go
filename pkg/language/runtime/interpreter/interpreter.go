@@ -132,6 +132,11 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 	defer func() {
 		if r := recover(); r != nil {
 			var ok bool
+			// don't recover Go errors
+			err, ok = r.(goRuntime.Error)
+			if ok {
+				panic(err)
+			}
 			err, ok = r.(error)
 			if !ok {
 				err = fmt.Errorf("%v", r)
@@ -190,7 +195,7 @@ func (interpreter *Interpreter) invokeFunction(
 }
 
 func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
-	panic(errors.UnreachableError{})
+	panic(&errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
@@ -379,15 +384,11 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 		return interpreter.visitIndexExpressionAssignment(target, value)
 
 	case *ast.MemberExpression:
-	// TODO:
-
-	default:
-		panic(&unsupportedAssignmentTargetExpression{
-			target: target,
-		})
+		// TODO:
+		panic(&errors.UnreachableError{})
 	}
 
-	panic(errors.UnreachableError{})
+	panic(&errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
@@ -395,26 +396,11 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 		FlatMap(func(result interface{}) Trampoline {
 			indexedValue := result.(Value)
 
-			array, ok := indexedValue.(ArrayValue)
-			if !ok {
-				panic(&NotIndexableError{
-					Value:    indexedValue,
-					StartPos: target.Expression.StartPosition(),
-					EndPos:   target.Expression.EndPosition(),
-				})
-			}
-
+			array := indexedValue.(ArrayValue)
 			return target.Index.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
 					indexValue := result.(Value)
-					index, ok := indexValue.(IntegerValue)
-					if !ok {
-						panic(&InvalidIndexValueError{
-							Value:    indexValue,
-							StartPos: target.Index.StartPosition(),
-							EndPos:   target.Index.EndPosition(),
-						})
-					}
+					index := indexValue.(IntegerValue)
 					array[index.IntValue()] = value
 
 					// NOTE: no result, so it does *not* act like a return-statement
@@ -426,22 +412,7 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
 	identifier := target.Identifier
 	variable := interpreter.findVariable(identifier)
-	if variable == nil {
-		panic(&NotDeclaredError{
-			ExpectedKind: common.DeclarationKindVariable,
-			Name:         identifier,
-			StartPos:     target.StartPosition(),
-			EndPos:       target.EndPosition(),
-		})
-	}
-	if !variable.Set(value) {
-		panic(&AssignmentToConstantError{
-			Name:     identifier,
-			StartPos: target.StartPosition(),
-			EndPos:   target.EndPosition(),
-		})
-	}
-	interpreter.setVariable(identifier, variable)
+	variable.Value = value
 }
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
@@ -819,28 +790,11 @@ func (interpreter *Interpreter) VisitMemberExpression(*ast.MemberExpression) ast
 func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			indexedValue := result.(Value)
-			array, ok := indexedValue.(ArrayValue)
-			if !ok {
-				panic(&NotIndexableError{
-					Value:    indexedValue,
-					StartPos: expression.Expression.StartPosition(),
-					EndPos:   expression.Expression.EndPosition(),
-				})
-			}
+			array := result.(ArrayValue)
 
 			return expression.Index.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
-					indexValue := result.(Value)
-					index, ok := indexValue.(IntegerValue)
-					if !ok {
-						panic(&InvalidIndexValueError{
-							Value:    indexValue,
-							StartPos: expression.Index.StartPosition(),
-							EndPos:   expression.Index.EndPosition(),
-						})
-					}
-
+					index := result.(IntegerValue)
 					value := array[index.IntValue()]
 
 					return Done{Result: value}

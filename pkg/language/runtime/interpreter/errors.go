@@ -15,16 +15,6 @@ type SecondaryError interface {
 	SecondaryError() string
 }
 
-// unsupportedAssignmentTargetExpression
-
-type unsupportedAssignmentTargetExpression struct {
-	target ast.Expression
-}
-
-func (e *unsupportedAssignmentTargetExpression) Error() string {
-	return fmt.Sprintf("cannot assign to unsupported target expression: %#+v", e.target)
-}
-
 // unsupportedOperation
 
 type unsupportedOperation struct {
@@ -79,26 +69,6 @@ func (e *NotCallableError) StartPosition() *ast.Position {
 }
 
 func (e *NotCallableError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// NotIndexableError
-
-type NotIndexableError struct {
-	Value    Value
-	StartPos *ast.Position
-	EndPos   *ast.Position
-}
-
-func (e *NotIndexableError) Error() string {
-	return fmt.Sprintf("cannot index into value: %#+v", e.Value)
-}
-
-func (e *NotIndexableError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *NotIndexableError) EndPosition() *ast.Position {
 	return e.EndPos
 }
 
@@ -208,45 +178,5 @@ func (e *ArgumentCountError) StartPosition() *ast.Position {
 }
 
 func (e *ArgumentCountError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// AssignmentToConstantError
-
-type AssignmentToConstantError struct {
-	Name     string
-	StartPos *ast.Position
-	EndPos   *ast.Position
-}
-
-func (e *AssignmentToConstantError) Error() string {
-	return fmt.Sprintf("cannot assign to constant: %s", e.Name)
-}
-
-func (e *AssignmentToConstantError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *AssignmentToConstantError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// InvalidIndexValueError
-
-type InvalidIndexValueError struct {
-	Value    Value
-	StartPos *ast.Position
-	EndPos   *ast.Position
-}
-
-func (e *InvalidIndexValueError) Error() string {
-	return fmt.Sprintf("cannot index with value: %#+v", e.Value)
-}
-
-func (e *InvalidIndexValueError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidIndexValueError) EndPosition() *ast.Position {
 	return e.EndPos
 }

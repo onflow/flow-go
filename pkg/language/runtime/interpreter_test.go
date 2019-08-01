@@ -105,72 +105,6 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
 }
 
-func TestInterpretInvalidUnknownDeclarationAssignment(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test() {
-           x = 2
-       }
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		ToNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
-}
-
-func TestInterpretInvalidUnknownDeclarationIndexing(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test() {
-           x[0]
-       }
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		ToNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
-}
-
-func TestInterpretInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test() {
-           x[0] = 2
-       }
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		ToNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
-}
-
 func TestInterpretLexicalScope(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -358,29 +292,6 @@ func TestInterpretInvalidFunctionCallOfInteger(t *testing.T) {
 		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
 }
 
-func TestInterpretInvalidConstantAssignment(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test() {
-           let x = 2
-           x = 3
-       }
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		ToNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.AssignmentToConstantError{}))
-}
-
 func TestInterpretVariableAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -402,30 +313,6 @@ func TestInterpretVariableAssignment(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
-}
-
-func TestInterpretInvalidGlobalConstantAssignment(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       let x = 2
-
-       fun test() {
-           x = 3
-       }
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		ToNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.AssignmentToConstantError{}))
 }
 
 func TestInterpretGlobalVariableAssignment(t *testing.T) {
@@ -535,73 +422,6 @@ func TestInterpretArrayIndexing(t *testing.T) {
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
 
-func TestInterpretInvalidArrayIndexingWithBool(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test(): Int64 {
-           let z = [0, 3]
-           return z[true]
-       }
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		ToNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidIndexValueError{}))
-}
-
-func TestInterpretInvalidArrayIndexingIntoBool(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test(): Int64 {
-           return true[0]
-       }
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		ToNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.NotIndexableError{}))
-}
-
-func TestInterpretInvalidArrayIndexingIntoInteger(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test(): Int64 {
-           return 2[0]
-       }
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		ToNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.NotIndexableError{}))
-}
-
 func TestInterpretArrayIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -623,30 +443,6 @@ func TestInterpretArrayIndexingAssignment(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
-}
-
-func TestInterpretInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test(): Int64 {
-           let z = [0, 3]
-           z[true] = 2
-           return z[1]
-       }
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		ToNot(HaveOccurred())
-
-	_, err = inter.Invoke("test")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidIndexValueError{}))
 }
 
 func TestInterpretReturnWithoutExpression(t *testing.T) {
@@ -1681,28 +1477,6 @@ func TestInterpretConditionalOperator(t *testing.T) {
 
 	Expect(inter.Invoke("testFalse")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
-}
-
-func TestInterpretInvalidAssignmentToParameter(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun test(x: Int8) {
-            x = 2
-       }
-   `)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		ToNot(HaveOccurred())
-
-	_, err = inter.Invoke("test", int8(1))
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.AssignmentToConstantError{}))
 }
 
 func TestInterpretFunctionBindingInFunction(t *testing.T) {

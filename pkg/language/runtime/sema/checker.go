@@ -2,11 +2,12 @@ package sema
 
 import (
 	"fmt"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	goRuntime "runtime"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
 type Checker struct {
@@ -17,12 +18,40 @@ type Checker struct {
 }
 
 func NewChecker(program *ast.Program) *Checker {
+	typeActivations := &activations.Activations{}
+	typeActivations.Push(baseTypes)
+
 	return &Checker{
 		Program:          program,
 		valueActivations: &activations.Activations{},
-		typeActivations:  &activations.Activations{},
+		typeActivations:  typeActivations,
 		Globals:          map[string]*Variable{},
 	}
+}
+
+func (checker *Checker) IsSubType(subType Type, superType Type) bool {
+	// TODO: improve
+	return subType.Equal(superType)
+}
+
+func (checker *Checker) IndexableElementType(ty Type) Type {
+	switch ty := ty.(type) {
+	case ArrayType:
+		return ty.elementType()
+	}
+
+	return nil
+}
+
+func (checker *Checker) IsIndexingType(indexingType Type, indexedType Type) bool {
+	switch indexedType.(type) {
+	// arrays can be index with integers
+	case ArrayType:
+		_, ok := indexingType.(integerType)
+		return ok
+	}
+
+	return false
 }
 
 func (checker *Checker) setVariable(name string, variable *Variable) {
@@ -100,9 +129,36 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 	checker.pushActivations()
 	defer checker.popActivations()
+
+	checker.bindParameters(declaration.Parameters)
+
 	declaration.Block.Accept(checker)
 
 	return nil
+}
+
+func (checker *Checker) bindParameters(parameters []*ast.Parameter) {
+
+	// TODO: check all parameter names are unique
+
+	// declare a constant variable for each parameter
+
+	for _, parameter := range parameters {
+		ty := checker.ConvertType(parameter.Type)
+		checker.setVariable(
+			parameter.Identifier,
+			&Variable{
+				Declaration: &ast.VariableDeclaration{
+					IsConstant: true,
+					Identifier: parameter.Identifier,
+					Type:       parameter.Type,
+					StartPos:   parameter.StartPos,
+					EndPos:     parameter.EndPos,
+				},
+				Type: ty,
+			},
+		)
+	}
 }
 
 func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclaration) ast.Repr {
@@ -161,24 +217,136 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 }
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
+	// TODO: check value type matches enclosing function's return type
+
 	statement.Expression.Accept(checker)
 
 	return nil
 }
 
 func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
-	// TODO:
+	// TODO: ensure text expression's type is boolean
+	// TODO: check block
 	return nil
 }
 
 func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.Repr {
-	// TODO:
+	// TODO: ensure text expression's type is boolean
+	// TODO: check block
 	return nil
 }
 
 func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
-	// TODO:
+	ty := assignment.Value.Accept(checker).(Type)
+	checker.visitAssignmentValueType(assignment, ty)
+
 	return nil
+}
+
+func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentStatement, valueType Type) {
+	switch target := assignment.Target.(type) {
+	case *ast.IdentifierExpression:
+		checker.visitIdentifierExpressionAssignment(assignment, target, valueType)
+		return
+
+	case *ast.IndexExpression:
+		elementType := checker.visitIndexingExpression(target.Expression, target.Index)
+		if !checker.IsSubType(valueType, elementType) {
+			panic(&TypeMismatchError{
+				ExpectedType: elementType,
+				ActualType:   valueType,
+				StartPos:     assignment.Value.StartPosition(),
+				EndPos:       assignment.Value.EndPosition(),
+			})
+		}
+
+		return
+
+	case *ast.MemberExpression:
+		// TODO:
+		panic(&errors.UnreachableError{})
+
+	default:
+		panic(&unsupportedAssignmentTargetExpression{
+			target: target,
+		})
+	}
+
+	panic(&errors.UnreachableError{})
+}
+
+func (checker *Checker) visitIdentifierExpressionAssignment(
+	assignment *ast.AssignmentStatement,
+	target *ast.IdentifierExpression,
+	valueType Type,
+) {
+	identifier := target.Identifier
+
+	// check identifier was declared before
+	variable := checker.findVariable(identifier)
+	if variable == nil {
+		panic(&NotDeclaredError{
+			ExpectedKind: common.DeclarationKindVariable,
+			Name:         identifier,
+			StartPos:     target.StartPosition(),
+			EndPos:       target.EndPosition(),
+		})
+	}
+
+	// check identifier is not a constant
+	if variable.Declaration.IsConstant {
+		panic(&AssignmentToConstantError{
+			Name:     identifier,
+			StartPos: target.StartPosition(),
+			EndPos:   target.EndPosition(),
+		})
+	}
+
+	// check value type is subtype of variable type
+	if !checker.IsSubType(valueType, variable.Type) {
+		panic(&TypeMismatchError{
+			ExpectedType: variable.Type,
+			ActualType:   valueType,
+			StartPos:     assignment.Value.StartPosition(),
+			EndPos:       assignment.Value.EndPosition(),
+		})
+	}
+}
+
+// visitIndexingExpression checks if the indexed expression is indexable,
+// checks if the indexing expression can be used to index into the indexed expression,
+// and returns the expected element type
+//
+func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpression ast.Expression) Type {
+	indexedType := indexedExpression.Accept(checker).(Type)
+	indexingType := indexingExpression.Accept(checker).(Type)
+
+	// NOTE: check indexed type first for UX reasons
+
+	// check indexed expression's type is indexable
+	// by getting the expected element
+
+	elementType := checker.IndexableElementType(indexedType)
+	if elementType == nil {
+		panic(&NotIndexableTypeError{
+			Type:     indexedType,
+			StartPos: indexedExpression.StartPosition(),
+			EndPos:   indexedExpression.EndPosition(),
+		})
+	}
+
+	// check indexing expression's type can be used to index
+	// into indexed expression's type
+
+	if !checker.IsIndexingType(indexingType, indexedType) {
+		panic(&NotIndexingTypeError{
+			Type:     indexingType,
+			StartPos: indexingExpression.StartPosition(),
+			EndPos:   indexingExpression.EndPosition(),
+		})
+	}
+
+	return elementType
 }
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
@@ -192,7 +360,7 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 		})
 	}
 
-	return nil
+	return variable.Type
 }
 
 func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) ast.Repr {
@@ -206,7 +374,8 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 }
 
 func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatement) ast.Repr {
-	// TODO:
+	statement.Expression.Accept(checker)
+
 	return nil
 }
 
@@ -219,18 +388,46 @@ func (checker *Checker) VisitIntExpression(expression *ast.IntExpression) ast.Re
 }
 
 func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) ast.Repr {
-	// TODO:
-	return nil
+	// visit all elements, ensure they are all the same type
+
+	var elementType Type
+
+	for _, value := range expression.Values {
+		valueType := value.Accept(checker).(Type)
+
+		// infer element type from first element
+		// TODO: find common super type?
+		if elementType == nil {
+			elementType = valueType
+		} else if !checker.IsSubType(valueType, elementType) {
+			panic(&TypeMismatchError{
+				ExpectedType: elementType,
+				ActualType:   valueType,
+				StartPos:     value.StartPosition(),
+				EndPos:       value.EndPosition(),
+			})
+		}
+	}
+
+	// TODO: use bottom type
+	//if elementType == nil {
+	//
+	//}
+
+	return &ConstantSizedType{
+		Size: len(expression.Values),
+		Type: elementType,
+	}
 }
 
 func (checker *Checker) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
 	// TODO:
+	panic(&errors.UnreachableError{})
 	return nil
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
-	// TODO:
-	return nil
+	return checker.visitIndexingExpression(expression.Expression, expression.Index)
 }
 
 func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalExpression) ast.Repr {
@@ -285,7 +482,7 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 
 		returnType := checker.ConvertType(t.ReturnType)
 
-		return FunctionType{
+		return &FunctionType{
 			ParameterTypes: parameterTypes,
 			ReturnType:     returnType,
 		}
