@@ -10,10 +10,15 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
+type functionContext struct {
+	returnType Type
+}
+
 type Checker struct {
 	Program          *ast.Program
 	valueActivations *activations.Activations
 	typeActivations  *activations.Activations
+	functionContexts []*functionContext
 	Globals          map[string]*Variable
 }
 
@@ -127,35 +132,93 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
-	checker.pushActivations()
-	defer checker.popActivations()
-
-	checker.bindParameters(declaration.Parameters)
-
-	declaration.Block.Accept(checker)
+	checker.checkFunction(
+		declaration.Identifier,
+		declaration.IdentifierPos,
+		declaration.Parameters,
+		declaration.ReturnType,
+		declaration.Block,
+	)
 
 	return nil
 }
 
+func (checker *Checker) checkFunction(
+	identifier string,
+	identifierPos *ast.Position,
+	parameters []*ast.Parameter,
+	returnType ast.Type,
+	block *ast.Block,
+) {
+	checker.pushActivations()
+	defer checker.popActivations()
+
+	checker.checkParameterNames(parameters)
+	checker.checkArgumentLabels(parameters)
+	checker.bindParameters(parameters)
+
+	checker.enterFunction(identifier, identifierPos, checker.functionType(parameters, returnType))
+	defer checker.leaveFunction()
+
+	block.Accept(checker)
+}
+
+// checkParameterNames checks that all parameter names are unique
+//
+func (checker *Checker) checkParameterNames(parameters []*ast.Parameter) {
+	identifierPositions := map[string]*ast.Position{}
+
+	for _, parameter := range parameters {
+		identifier := parameter.Identifier
+		if previousPos, ok := identifierPositions[identifier]; ok {
+			panic(&RedeclarationError{
+				Kind:        common.DeclarationKindParameter,
+				Name:        identifier,
+				Pos:         parameter.IdentifierPos,
+				PreviousPos: previousPos,
+			})
+		}
+		identifierPositions[identifier] = parameter.IdentifierPos
+	}
+}
+
+// checkArgumentLabels checks that all argument labels (if any) are unique
+//
+func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) {
+	argumentLabelPositions := map[string]*ast.Position{}
+
+	for _, parameter := range parameters {
+		label := parameter.Label
+		if label == "" {
+			continue
+		}
+
+		if previousPos, ok := argumentLabelPositions[label]; ok {
+			panic(&RedeclarationError{
+				Kind:        common.DeclarationKindArgumentLabel,
+				Name:        label,
+				Pos:         parameter.LabelPos,
+				PreviousPos: previousPos,
+			})
+		}
+
+		argumentLabelPositions[label] = parameter.LabelPos
+	}
+}
+
 func (checker *Checker) bindParameters(parameters []*ast.Parameter) {
-
-	// TODO: check all parameter names are unique
-
 	// declare a constant variable for each parameter
+
+	depth := checker.valueActivations.Depth()
 
 	for _, parameter := range parameters {
 		ty := checker.ConvertType(parameter.Type)
 		checker.setVariable(
 			parameter.Identifier,
 			&Variable{
-				Declaration: &ast.VariableDeclaration{
-					IsConstant: true,
-					Identifier: parameter.Identifier,
-					Type:       parameter.Type,
-					StartPos:   parameter.StartPos,
-					EndPos:     parameter.EndPos,
-				},
-				Type: ty,
+				IsConstant: true,
+				Type:       ty,
+				Depth:      depth,
 			},
 		)
 	}
@@ -166,8 +229,17 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 	declarationType := valueType
 	// does the declaration have an explicit type annotation?
 	if declaration.Type != nil {
-		// TODO: check value type is subtype of declaration type
-		// TODO: use explicit declaration type
+		declarationType = checker.ConvertType(declaration.Type)
+
+		// check the value type is a subtype of the declaration type
+		if !checker.IsSubType(valueType, declarationType) {
+			panic(&TypeMismatchError{
+				ExpectedType: declarationType,
+				ActualType:   valueType,
+				StartPos:     declaration.Value.StartPosition(),
+				EndPos:       declaration.Value.EndPosition(),
+			})
+		}
 	}
 	checker.declareVariable(declaration, declarationType)
 
@@ -180,16 +252,17 @@ func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty
 	depth := checker.valueActivations.Depth()
 	if variable != nil && variable.Depth == depth {
 		panic(&RedeclarationError{
+			Kind: declaration.DeclarationKind(),
 			Name: declaration.Identifier,
-			Pos:  declaration.GetIdentifierPosition(),
+			Pos:  declaration.IdentifierPosition(),
 		})
 	}
 
 	// variable with this name is not declared in current scope, declare it
 	variable = &Variable{
-		Declaration: declaration,
-		Depth:       depth,
-		Type:        ty,
+		IsConstant: declaration.IsConstant,
+		Depth:      depth,
+		Type:       ty,
 	}
 	checker.setVariable(declaration.Identifier, variable)
 }
@@ -198,8 +271,9 @@ func (checker *Checker) declareGlobal(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
 	if _, exists := checker.Globals[name]; exists {
 		panic(&RedeclarationError{
+			Kind: declaration.DeclarationKind(),
 			Name: name,
-			Pos:  declaration.GetIdentifierPosition(),
+			Pos:  declaration.IdentifierPosition(),
 		})
 	}
 	checker.Globals[name] = checker.findVariable(name)
@@ -217,9 +291,20 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 }
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
-	// TODO: check value type matches enclosing function's return type
 
-	statement.Expression.Accept(checker)
+	// check value type matches enclosing function's return type
+
+	valueType := statement.Expression.Accept(checker).(Type)
+	returnType := checker.currentFunction().returnType
+
+	if !checker.IsSubType(valueType, returnType) {
+		panic(&TypeMismatchError{
+			ExpectedType: returnType,
+			ActualType:   valueType,
+			StartPos:     statement.Expression.StartPosition(),
+			EndPos:       statement.Expression.EndPosition(),
+		})
+	}
 
 	return nil
 }
@@ -294,7 +379,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	}
 
 	// check identifier is not a constant
-	if variable.Declaration.IsConstant {
+	if variable.IsConstant {
 		panic(&AssignmentToConstantError{
 			Name:     identifier,
 			StartPos: target.StartPosition(),
@@ -441,7 +526,14 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 }
 
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
-	// TODO:
+	checker.checkFunction(
+		"",
+		nil,
+		expression.Parameters,
+		expression.ReturnType,
+		expression.Block,
+	)
+
 	return nil
 }
 
@@ -489,4 +581,65 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	}
 
 	panic(&astTypeConversionError{invalidASTType: t})
+}
+
+func (checker *Checker) enterFunction(identifier string, identifierPosition *ast.Position, functionType *FunctionType) {
+	if identifier != "" {
+		checker.declareFunction(identifier, identifierPosition, functionType)
+	}
+
+	checker.functionContexts = append(checker.functionContexts,
+		&functionContext{
+			returnType: functionType.ReturnType,
+		})
+}
+
+func (checker *Checker) declareFunction(
+	identifier string,
+	identifierPosition *ast.Position,
+	functionType *FunctionType,
+) {
+	// check if variable with this identifier is already declared in the current scope
+	variable := checker.findVariable(identifier)
+	depth := checker.valueActivations.Depth()
+	if variable != nil && variable.Depth == depth {
+		panic(&RedeclarationError{
+			Kind: common.DeclarationKindFunction,
+			Name: identifier,
+			Pos:  identifierPosition,
+		})
+	}
+
+	// variable with this identifier is not declared in current scope, declare it
+	variable = &Variable{
+		IsConstant: true,
+		Depth:      depth,
+		Type:       functionType,
+	}
+	checker.setVariable(identifier, variable)
+}
+
+func (checker *Checker) leaveFunction() {
+	lastIndex := len(checker.functionContexts) - 1
+	checker.functionContexts = checker.functionContexts[:lastIndex]
+}
+
+func (checker *Checker) currentFunction() *functionContext {
+	lastIndex := len(checker.functionContexts) - 1
+	if lastIndex < 0 {
+		return nil
+	}
+	return checker.functionContexts[lastIndex]
+}
+
+func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast.Type) *FunctionType {
+	parameterTypes := make([]Type, len(parameters))
+	for i, parameter := range parameters {
+		parameterTypes[i] = checker.ConvertType(parameter.Type)
+	}
+
+	return &FunctionType{
+		ParameterTypes: parameterTypes,
+		ReturnType:     checker.ConvertType(returnType),
+	}
 }

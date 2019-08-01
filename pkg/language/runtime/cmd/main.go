@@ -36,6 +36,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	checker := sema.NewChecker(program)
+	err = checker.Check()
+	if err != nil {
+		prettyPrintError(err, filename, code)
+		os.Exit(1)
+	}
+
 	inter := NewInterpreter(program)
 	inter.ImportFunction(
 		"log",

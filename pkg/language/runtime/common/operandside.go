@@ -7,7 +7,8 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 type OperandSide int
 
 const (
-	OperandSideLeft OperandSide = iota
+	OperandSideUnknown OperandSide = iota
+	OperandSideLeft
 	OperandSideRight
 )
 

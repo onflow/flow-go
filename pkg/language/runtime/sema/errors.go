@@ -31,12 +31,14 @@ func (e *unsupportedAssignmentTargetExpression) Error() string {
 // TODO: show previous declaration
 
 type RedeclarationError struct {
-	Name string
-	Pos  *ast.Position
+	Kind        common.DeclarationKind
+	Name        string
+	Pos         *ast.Position
+	PreviousPos *ast.Position
 }
 
 func (e *RedeclarationError) Error() string {
-	return fmt.Sprintf("cannot redeclare already declared identifier: %s", e.Name)
+	return fmt.Sprintf("cannot redeclare already declared %s: %s", e.Kind.Name(), e.Name)
 }
 
 func (e *RedeclarationError) StartPosition() *ast.Position {
@@ -57,7 +59,7 @@ type NotDeclaredError struct {
 }
 
 func (e *NotDeclaredError) Error() string {
-	return fmt.Sprintf("cannot find %s `%s` in this scope", e.ExpectedKind.Name(), e.Name)
+	return fmt.Sprintf("cannot find %s in this scope: %s", e.ExpectedKind.Name(), e.Name)
 }
 
 func (e *NotDeclaredError) SecondaryError() string {

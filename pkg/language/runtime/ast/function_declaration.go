@@ -1,5 +1,7 @@
 package ast
 
+import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+
 type FunctionDeclaration struct {
 	IsPublic      bool
 	Identifier    string
@@ -19,7 +21,7 @@ func (f *FunctionDeclaration) EndPosition() *Position {
 	return f.EndPos
 }
 
-func (f *FunctionDeclaration) GetIdentifierPosition() *Position {
+func (f *FunctionDeclaration) IdentifierPosition() *Position {
 	return f.IdentifierPos
 }
 
@@ -32,4 +34,8 @@ func (*FunctionDeclaration) isStatement()   {}
 
 func (f *FunctionDeclaration) DeclarationName() string {
 	return f.Identifier
+}
+
+func (f *FunctionDeclaration) DeclarationKind() common.DeclarationKind {
+	return common.DeclarationKindFunction
 }

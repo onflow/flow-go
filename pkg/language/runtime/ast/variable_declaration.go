@@ -1,5 +1,7 @@
 package ast
 
+import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+
 type VariableDeclaration struct {
 	IsConstant    bool
 	Identifier    string
@@ -18,7 +20,7 @@ func (v *VariableDeclaration) EndPosition() *Position {
 	return v.EndPos
 }
 
-func (v *VariableDeclaration) GetIdentifierPosition() *Position {
+func (v *VariableDeclaration) IdentifierPosition() *Position {
 	return v.IdentifierPos
 }
 
@@ -31,4 +33,12 @@ func (v *VariableDeclaration) Accept(visitor Visitor) Repr {
 
 func (v *VariableDeclaration) DeclarationName() string {
 	return v.Identifier
+}
+
+func (v *VariableDeclaration) DeclarationKind() common.DeclarationKind {
+	if v.IsConstant {
+		return common.DeclarationKindConstant
+	} else {
+		return common.DeclarationKindVariable
+	}
 }

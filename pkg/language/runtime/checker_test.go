@@ -174,7 +174,7 @@ func TestCheckGlobalVariableAssignment(t *testing.T) {
 	program, errors := parser.Parse(`
       var x = 2
 
-      fun test(): Int64 {
+      fun test(): Int {
           x = 3
           return x
       }
@@ -383,4 +383,131 @@ func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test(a: Int, a: Int) {}
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckInvalidArgumentLabelRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test(x a: Int, x b: Int) {}
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckInvalidConstantValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let x: Bool = 1
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidFunctionDeclarationReturnValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test(): Int {
+          return true
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidFunctionExpressionReturnValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let test = fun (): Int {
+          return true
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidReference(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test() {
+          testX
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckReferenceInFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test() {
+          test
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 }
