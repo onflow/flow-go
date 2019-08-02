@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package bamboo.shared.gossip;
+
+option go_package = "shared";
+
+// Message models a single message that is supposed to get exchanged by the gossip network
+message GossipMessage {
+  oneof Payload {
+    MessageRequest messageRequest = 18;
+    MessageReply messageReply = 19;
+  }
+  string Method = 20;                // Name of RPC method to be invoked on the message
+  repeated string Recipients = 21;   // Address of the recipients to which the message should be delivered
+  string Sender = 22;                // Address of the sender of this message
+  repeated string Path = 23;         // Address of the nodes that this message visited so far
+  uint64 TTL = 24;                   // The time to live of the message, i.e., maximum number of hops it should be gossiped
+}
+
+////////////////////////////////////////////////////////////////////////////
+// 2 testing messages + rpc service to be deleted later
+
+service Messages {
+  rpc SendMessage (GossipMessage) returns (MessageReply) {}
+}
+
+message MessageRequest {
+  string Text = 1;
+}
+
+message MessageReply {
+  string TextResponse = 1;
+}
+
+////////////////////////////////////////////////////////////////////////////

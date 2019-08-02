@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 // ErrDuplicateTransaction indicates that a transaction has already been submitted.
@@ -15,13 +16,23 @@ func (e *ErrDuplicateTransaction) Error() string {
 	return fmt.Sprintf("Transaction with hash %s has already been submitted", e.TxHash)
 }
 
-// ErrInvalidTransactionSignature indicates that a transaction has an invalid signature.
-type ErrInvalidTransactionSignature struct {
-	TxHash crypto.Hash
+// ErrInvalidSignaturePublicKey indicates that signature uses an invalid public key.
+type ErrInvalidSignaturePublicKey struct {
+	Account   types.Address
+	PublicKey []byte
 }
 
-func (e *ErrInvalidTransactionSignature) Error() string {
-	return fmt.Sprintf("Transaction with hash %s has an invalid signature", e.TxHash)
+func (e *ErrInvalidSignaturePublicKey) Error() string {
+	return fmt.Sprintf("Public key %s does not exist on account %s", e.PublicKey, e.Account)
+}
+
+// ErrInvalidSignatureAccount indicates that a signature references a nonexistent account.
+type ErrInvalidSignatureAccount struct {
+	Account types.Address
+}
+
+func (e *ErrInvalidSignatureAccount) Error() string {
+	return fmt.Sprintf("Account with address %s does not exist", e.Account)
 }
 
 // ErrTransactionReverted indicates that a transaction reverted.

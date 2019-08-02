@@ -1,6 +1,8 @@
 package types
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
@@ -55,6 +57,7 @@ func (tx *RawTransaction) Sign(account Address, keyPair *crypto.KeyPair) *Signed
 
 	accountSig := AccountSignature{
 		Account:   account,
+		PublicKey: keyPair.PublicKey,
 		Signature: sig.Bytes(),
 	}
 
@@ -88,4 +91,37 @@ func (tx *SignedTransaction) Hash() crypto.Hash {
 		tx.PayerSignature.Bytes(),
 	)
 	return crypto.NewHash(bytes)
+}
+
+// InvalidTransactionError indicates that a transaction does not contain all
+// required information.
+type InvalidTransactionError struct {
+	missingFields []string
+}
+
+func (e InvalidTransactionError) Error() string {
+	return fmt.Sprintf(
+		"required fields are not set: %s",
+		strings.Join(e.missingFields[:], ", "),
+	)
+}
+
+// Validate returns and error if the transaction does not contain all required
+// fields.
+func (tx *SignedTransaction) Validate() error {
+	missingFields := make([]string, 0)
+
+	if len(tx.Script) == 0 {
+		missingFields = append(missingFields, "script")
+	}
+
+	if tx.ComputeLimit == 0 {
+		missingFields = append(missingFields, "compute_limit")
+	}
+
+	if len(missingFields) > 0 {
+		return InvalidTransactionError{missingFields}
+	}
+
+	return nil
 }
