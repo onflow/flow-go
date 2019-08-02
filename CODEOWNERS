@@ -21,12 +21,6 @@
 /grpc/services/execute @turbolent
 /cmd/execute @turbolent
 
-# Verification Stream
-/internal/roles/verify @pazams
-/proto/services/verify @pazams
-/grpc/services/verify @pazams
-/cmd/verify @pazams
-
 # Observation Stream
 /internal/roles/observe @psiemens
 /proto/services/observe @psiemens

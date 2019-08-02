@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	consensusSvc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/consensus"
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 )
 
 type Controller struct {
@@ -49,7 +48,7 @@ func (c *Controller) GetFinalizedStateTransitions(context.Context, *consensusSvc
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (c *Controller) ProcessStateTransitionProposal(context.Context, *shared.SignedStateTransition) (*empty.Empty, error) {
+func (c *Controller) ProcessStateTransitionProposal(context.Context, *consensusSvc.ProcessStateTransitionProposalRequest) (*empty.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 

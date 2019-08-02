@@ -1,8 +1,8 @@
 package testmocks
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 // MockEffectsHappyPath implements the processor.Effects & Mock interfaces
@@ -41,7 +41,7 @@ func (m *MockEffectsHappyPath) SlashExpiredReceipt(*types.ExecutionReceipt) erro
 	return nil
 }
 
-func (m *MockEffectsHappyPath) SlashInvalidReceipt(*types.ExecutionReceipt, *types.BlockPartExecutionResult) error {
+func (m *MockEffectsHappyPath) SlashInvalidReceipt(*types.ExecutionReceipt, *compute.BlockPartExecutionResult) error {
 	m._callCountSlashInvalidReceipt++
 	return nil
 }
