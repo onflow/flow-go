@@ -40,19 +40,19 @@ func (a *BLS_BLS12381Algo) reinit() {
 func (p *pointG1) _G1scalarPointMult(res *pointG1, expo *scalar) {
 	C._bn_print(C.CString("k"), (*C.bn_st)(expo))
 	C._G1scalarPointMult((*C.ep_st)(res), (*C.ep_st)(p), (*C.bn_st)(expo))
-	C._ep_print(C.CString("kG1"), (*C.ep_st)(res))
+	//C._ep_print(C.CString("kG1"), (*C.ep_st)(res))
 }
 
 // Exponentiation of g1 in G1
 func _G1scalarGenMult(res *pointG1, expo *scalar) {
 	C._G1scalarGenMult((*C.ep_st)(res), (*C.bn_st)(expo))
-	C._ep_print(C.CString("kG1"), (*C.ep_st)(res))
+	//C._ep_print(C.CString("kG1"), (*C.ep_st)(res))
 }
 
 // Exponentiation of g2 in G2
 func _G2scalarGenMult(res *pointG2, expo *scalar) {
 	C._G2scalarGenMult((*C.ep2_st)(res), (*C.bn_st)(expo))
-	C._ep2_print(C.CString("kG2"), (*C.ep2_st)(res))
+	//C._ep2_print(C.CString("kG2"), (*C.ep2_st)(res))
 }
 
 // TEST/DEBUG

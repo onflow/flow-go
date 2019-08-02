@@ -13,12 +13,15 @@ func (a *BLS_BLS12381Algo) SignHash(k PrKey, h Hash) Signature {
 	var s Signature
 	s = make([]byte, a.SignatureLength)
 	// signature computation here
+	// TODO : hash to G1
+	// TODO : exponentiation in G1
 	return s
 }
 
 // VerifyHash implements BLS signature verification on BLS12381 curve
 func (a *BLS_BLS12381Algo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
-	// signature verification here
+	// TODO: signature verification here
+	// TODO : double pairing == 1 or double thread
 	return true
 }
 
@@ -47,6 +50,7 @@ func (a *BLS_BLS12381Algo) SignStruct(sk PrKey, data Encoder, alg Hasher) Signat
 	return a.SignHash(sk, h)
 }
 
+//TODO: move to sign ?
 // VerifyBytes verifies a signature of a byte array
 func (a *BLS_BLS12381Algo) VerifyBytes(pk PubKey, s Signature, data []byte, alg Hasher) bool {
 	h := alg.ComputeBytesHash(data)

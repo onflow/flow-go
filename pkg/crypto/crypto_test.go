@@ -98,4 +98,48 @@ func TestG1(t *testing.T) {
 	(&expo).setInt(1)
 	var res pointG1
 	_G1scalarGenMult(&res, &expo)
+
+}
+
+// G1 bench
+func BenchmarkG1(b *testing.B) {
+	_ = NewSignatureAlgo(BLS_BLS12381)
+	var expo scalar
+	randZr(&expo, []byte{0})
+	var res pointG1
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_G1scalarGenMult(&res, &expo)
+	}
+	b.StopTimer()
+	return
+}
+
+// Testg2 contains tests of operations in G2
+func TestG2(t *testing.T) {
+	fmt.Println("testing G2")
+
+	_ = NewSignatureAlgo(BLS_BLS12381)
+
+	var expo scalar
+	(&expo).setInt(1)
+	var res pointG2
+	_G2scalarGenMult(&res, &expo)
+
+}
+
+// G2 bench
+func BenchmarkG2(b *testing.B) {
+	_ = NewSignatureAlgo(BLS_BLS12381)
+	var expo scalar
+	randZr(&expo, []byte{0})
+	var res pointG2
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_G2scalarGenMult(&res, &expo)
+	}
+	b.StopTimer()
+	return
 }
