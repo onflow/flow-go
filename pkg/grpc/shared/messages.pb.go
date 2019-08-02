@@ -4,13 +4,9 @@
 package shared
 
 import (
-	context "context"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
-	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -25,687 +21,35 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
-type Vote int32
+type TransactionStatus int32
 
 const (
-	Vote_REJECT  Vote = 0
-	Vote_APPROVE Vote = 1
+	TransactionStatus_STATUS_PENDING   TransactionStatus = 0
+	TransactionStatus_STATUS_FINALIZED TransactionStatus = 1
+	TransactionStatus_STATUS_REVERTED  TransactionStatus = 2
+	TransactionStatus_STATUS_SEALED    TransactionStatus = 3
 )
 
-var Vote_name = map[int32]string{
-	0: "REJECT",
-	1: "APPROVE",
+var TransactionStatus_name = map[int32]string{
+	0: "STATUS_PENDING",
+	1: "STATUS_FINALIZED",
+	2: "STATUS_REVERTED",
+	3: "STATUS_SEALED",
 }
 
-var Vote_value = map[string]int32{
-	"REJECT":  0,
-	"APPROVE": 1,
+var TransactionStatus_value = map[string]int32{
+	"STATUS_PENDING":   0,
+	"STATUS_FINALIZED": 1,
+	"STATUS_REVERTED":  2,
+	"STATUS_SEALED":    3,
 }
 
-func (x Vote) String() string {
-	return proto.EnumName(Vote_name, int32(x))
+func (x TransactionStatus) String() string {
+	return proto.EnumName(TransactionStatus_name, int32(x))
 }
 
-func (Vote) EnumDescriptor() ([]byte, []int) {
+func (TransactionStatus) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_e57dabda91f43ef4, []int{0}
-}
-
-type TransactionRegister_AccessMode int32
-
-const (
-	TransactionRegister_CREATE TransactionRegister_AccessMode = 0
-	// Allows read-only access to the contents of the register as they were at the end of the previous block.
-	TransactionRegister_SNAPSHOT_READ TransactionRegister_AccessMode = 1
-	// Allows read-only access to the contents of the register as they were after all previous transactions
-	// have been processed (including those in the same block).
-	TransactionRegister_CONFIRMED_READ TransactionRegister_AccessMode = 2
-	// Only valid for Balance Registers. Allows Snapshot Read access to the Register, plus the ability to
-	// issue deferred additions on that register.
-	TransactionRegister_DEFERRED_WRITE TransactionRegister_AccessMode = 3
-	// Allows exclusive read/write access to the contents of the register; all writes from previous transactions
-	// will be visible, and all writes made by this transaction will be visible to all subsequent transactions
-	// (formally: Serializability).
-	TransactionRegister_READ_WRITE TransactionRegister_AccessMode = 4
-)
-
-var TransactionRegister_AccessMode_name = map[int32]string{
-	0: "CREATE",
-	1: "SNAPSHOT_READ",
-	2: "CONFIRMED_READ",
-	3: "DEFERRED_WRITE",
-	4: "READ_WRITE",
-}
-
-var TransactionRegister_AccessMode_value = map[string]int32{
-	"CREATE":         0,
-	"SNAPSHOT_READ":  1,
-	"CONFIRMED_READ": 2,
-	"DEFERRED_WRITE": 3,
-	"READ_WRITE":     4,
-}
-
-func (x TransactionRegister_AccessMode) String() string {
-	return proto.EnumName(TransactionRegister_AccessMode_name, int32(x))
-}
-
-func (TransactionRegister_AccessMode) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{13, 0}
-}
-
-type TransactionRegister_Type int32
-
-const (
-	TransactionRegister_SIMPLE  TransactionRegister_Type = 0
-	TransactionRegister_CHUNK   TransactionRegister_Type = 1
-	TransactionRegister_BALANCE TransactionRegister_Type = 2
-)
-
-var TransactionRegister_Type_name = map[int32]string{
-	0: "SIMPLE",
-	1: "CHUNK",
-	2: "BALANCE",
-}
-
-var TransactionRegister_Type_value = map[string]int32{
-	"SIMPLE":  0,
-	"CHUNK":   1,
-	"BALANCE": 2,
-}
-
-func (x TransactionRegister_Type) String() string {
-	return proto.EnumName(TransactionRegister_Type_name, int32(x))
-}
-
-func (TransactionRegister_Type) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{13, 1}
-}
-
-type Inventory_Item_Type int32
-
-const (
-	Inventory_Item_TRANSACTION Inventory_Item_Type = 0
-	Inventory_Item_BLOCK       Inventory_Item_Type = 1
-)
-
-var Inventory_Item_Type_name = map[int32]string{
-	0: "TRANSACTION",
-	1: "BLOCK",
-}
-
-var Inventory_Item_Type_value = map[string]int32{
-	"TRANSACTION": 0,
-	"BLOCK":       1,
-}
-
-func (x Inventory_Item_Type) String() string {
-	return proto.EnumName(Inventory_Item_Type_name, int32(x))
-}
-
-func (Inventory_Item_Type) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{14, 0, 0}
-}
-
-// Message models a single message that is supposed to get exchanged by the gossip network
-type GossipMessage struct {
-	// Types that are valid to be assigned to Payload:
-	//	*GossipMessage_SignedCollectionHash
-	//	*GossipMessage_Collection
-	//	*GossipMessage_Block
-	//	*GossipMessage_BlockSeal
-	//	*GossipMessage_IntermediateRegisters
-	//	*GossipMessage_ExecutionReceipt
-	//	*GossipMessage_ResultApproval
-	//	*GossipMessage_Transaction
-	//	*GossipMessage_SignedTransaction
-	//	*GossipMessage_Register
-	//	*GossipMessage_TransactionRegister
-	//	*GossipMessage_Inventory
-	//	*GossipMessage_InvalidExecutionReceiptChallenge
-	//	*GossipMessage_StateTransition
-	//	*GossipMessage_SignedStateTransition
-	//	*GossipMessage_FinalizedStateTransition
-	//	*GossipMessage_Vote
-	//	*GossipMessage_StateTransitionVote
-	//	*GossipMessage_MessageRequest
-	//	*GossipMessage_MessageReply
-	Payload              isGossipMessage_Payload `protobuf_oneof:"Payload"`
-	Method               string                  `protobuf:"bytes,21,opt,name=Method,proto3" json:"Method,omitempty"`
-	Recipients           []string                `protobuf:"bytes,22,rep,name=Recipients,proto3" json:"Recipients,omitempty"`
-	Sender               string                  `protobuf:"bytes,23,opt,name=Sender,proto3" json:"Sender,omitempty"`
-	Path                 []string                `protobuf:"bytes,24,rep,name=Path,proto3" json:"Path,omitempty"`
-	TTL                  uint64                  `protobuf:"varint,25,opt,name=TTL,proto3" json:"TTL,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
-	XXX_unrecognized     []byte                  `json:"-"`
-	XXX_sizecache        int32                   `json:"-"`
-}
-
-func (m *GossipMessage) Reset()         { *m = GossipMessage{} }
-func (m *GossipMessage) String() string { return proto.CompactTextString(m) }
-func (*GossipMessage) ProtoMessage()    {}
-func (*GossipMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{0}
-}
-
-func (m *GossipMessage) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GossipMessage.Unmarshal(m, b)
-}
-func (m *GossipMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GossipMessage.Marshal(b, m, deterministic)
-}
-func (m *GossipMessage) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GossipMessage.Merge(m, src)
-}
-func (m *GossipMessage) XXX_Size() int {
-	return xxx_messageInfo_GossipMessage.Size(m)
-}
-func (m *GossipMessage) XXX_DiscardUnknown() {
-	xxx_messageInfo_GossipMessage.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GossipMessage proto.InternalMessageInfo
-
-type isGossipMessage_Payload interface {
-	isGossipMessage_Payload()
-}
-
-type GossipMessage_SignedCollectionHash struct {
-	SignedCollectionHash *SignedCollectionHash `protobuf:"bytes,1,opt,name=signedCollectionHash,proto3,oneof"`
-}
-
-type GossipMessage_Collection struct {
-	Collection *Collection `protobuf:"bytes,2,opt,name=collection,proto3,oneof"`
-}
-
-type GossipMessage_Block struct {
-	Block *Block `protobuf:"bytes,3,opt,name=block,proto3,oneof"`
-}
-
-type GossipMessage_BlockSeal struct {
-	BlockSeal *BlockSeal `protobuf:"bytes,4,opt,name=blockSeal,proto3,oneof"`
-}
-
-type GossipMessage_IntermediateRegisters struct {
-	IntermediateRegisters *IntermediateRegisters `protobuf:"bytes,5,opt,name=intermediateRegisters,proto3,oneof"`
-}
-
-type GossipMessage_ExecutionReceipt struct {
-	ExecutionReceipt *ExecutionReceipt `protobuf:"bytes,6,opt,name=executionReceipt,proto3,oneof"`
-}
-
-type GossipMessage_ResultApproval struct {
-	ResultApproval *ResultApproval `protobuf:"bytes,7,opt,name=resultApproval,proto3,oneof"`
-}
-
-type GossipMessage_Transaction struct {
-	Transaction *Transaction `protobuf:"bytes,8,opt,name=transaction,proto3,oneof"`
-}
-
-type GossipMessage_SignedTransaction struct {
-	SignedTransaction *SignedTransaction `protobuf:"bytes,9,opt,name=signedTransaction,proto3,oneof"`
-}
-
-type GossipMessage_Register struct {
-	Register *Register `protobuf:"bytes,10,opt,name=register,proto3,oneof"`
-}
-
-type GossipMessage_TransactionRegister struct {
-	TransactionRegister *TransactionRegister `protobuf:"bytes,11,opt,name=transactionRegister,proto3,oneof"`
-}
-
-type GossipMessage_Inventory struct {
-	Inventory *Inventory `protobuf:"bytes,12,opt,name=inventory,proto3,oneof"`
-}
-
-type GossipMessage_InvalidExecutionReceiptChallenge struct {
-	InvalidExecutionReceiptChallenge *InvalidExecutionReceiptChallenge `protobuf:"bytes,13,opt,name=invalidExecutionReceiptChallenge,proto3,oneof"`
-}
-
-type GossipMessage_StateTransition struct {
-	StateTransition *StateTransition `protobuf:"bytes,14,opt,name=stateTransition,proto3,oneof"`
-}
-
-type GossipMessage_SignedStateTransition struct {
-	SignedStateTransition *SignedStateTransition `protobuf:"bytes,15,opt,name=signedStateTransition,proto3,oneof"`
-}
-
-type GossipMessage_FinalizedStateTransition struct {
-	FinalizedStateTransition *FinalizedStateTransition `protobuf:"bytes,16,opt,name=finalizedStateTransition,proto3,oneof"`
-}
-
-type GossipMessage_Vote struct {
-	Vote Vote `protobuf:"varint,17,opt,name=vote,proto3,enum=bamboo.shared.Vote,oneof"`
-}
-
-type GossipMessage_StateTransitionVote struct {
-	StateTransitionVote *StateTransitionVote `protobuf:"bytes,18,opt,name=stateTransitionVote,proto3,oneof"`
-}
-
-type GossipMessage_MessageRequest struct {
-	MessageRequest *MessageRequest `protobuf:"bytes,19,opt,name=messageRequest,proto3,oneof"`
-}
-
-type GossipMessage_MessageReply struct {
-	MessageReply *MessageReply `protobuf:"bytes,20,opt,name=messageReply,proto3,oneof"`
-}
-
-func (*GossipMessage_SignedCollectionHash) isGossipMessage_Payload() {}
-
-func (*GossipMessage_Collection) isGossipMessage_Payload() {}
-
-func (*GossipMessage_Block) isGossipMessage_Payload() {}
-
-func (*GossipMessage_BlockSeal) isGossipMessage_Payload() {}
-
-func (*GossipMessage_IntermediateRegisters) isGossipMessage_Payload() {}
-
-func (*GossipMessage_ExecutionReceipt) isGossipMessage_Payload() {}
-
-func (*GossipMessage_ResultApproval) isGossipMessage_Payload() {}
-
-func (*GossipMessage_Transaction) isGossipMessage_Payload() {}
-
-func (*GossipMessage_SignedTransaction) isGossipMessage_Payload() {}
-
-func (*GossipMessage_Register) isGossipMessage_Payload() {}
-
-func (*GossipMessage_TransactionRegister) isGossipMessage_Payload() {}
-
-func (*GossipMessage_Inventory) isGossipMessage_Payload() {}
-
-func (*GossipMessage_InvalidExecutionReceiptChallenge) isGossipMessage_Payload() {}
-
-func (*GossipMessage_StateTransition) isGossipMessage_Payload() {}
-
-func (*GossipMessage_SignedStateTransition) isGossipMessage_Payload() {}
-
-func (*GossipMessage_FinalizedStateTransition) isGossipMessage_Payload() {}
-
-func (*GossipMessage_Vote) isGossipMessage_Payload() {}
-
-func (*GossipMessage_StateTransitionVote) isGossipMessage_Payload() {}
-
-func (*GossipMessage_MessageRequest) isGossipMessage_Payload() {}
-
-func (*GossipMessage_MessageReply) isGossipMessage_Payload() {}
-
-func (m *GossipMessage) GetPayload() isGossipMessage_Payload {
-	if m != nil {
-		return m.Payload
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetSignedCollectionHash() *SignedCollectionHash {
-	if x, ok := m.GetPayload().(*GossipMessage_SignedCollectionHash); ok {
-		return x.SignedCollectionHash
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetCollection() *Collection {
-	if x, ok := m.GetPayload().(*GossipMessage_Collection); ok {
-		return x.Collection
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetBlock() *Block {
-	if x, ok := m.GetPayload().(*GossipMessage_Block); ok {
-		return x.Block
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetBlockSeal() *BlockSeal {
-	if x, ok := m.GetPayload().(*GossipMessage_BlockSeal); ok {
-		return x.BlockSeal
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetIntermediateRegisters() *IntermediateRegisters {
-	if x, ok := m.GetPayload().(*GossipMessage_IntermediateRegisters); ok {
-		return x.IntermediateRegisters
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetExecutionReceipt() *ExecutionReceipt {
-	if x, ok := m.GetPayload().(*GossipMessage_ExecutionReceipt); ok {
-		return x.ExecutionReceipt
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetResultApproval() *ResultApproval {
-	if x, ok := m.GetPayload().(*GossipMessage_ResultApproval); ok {
-		return x.ResultApproval
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetTransaction() *Transaction {
-	if x, ok := m.GetPayload().(*GossipMessage_Transaction); ok {
-		return x.Transaction
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetSignedTransaction() *SignedTransaction {
-	if x, ok := m.GetPayload().(*GossipMessage_SignedTransaction); ok {
-		return x.SignedTransaction
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetRegister() *Register {
-	if x, ok := m.GetPayload().(*GossipMessage_Register); ok {
-		return x.Register
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetTransactionRegister() *TransactionRegister {
-	if x, ok := m.GetPayload().(*GossipMessage_TransactionRegister); ok {
-		return x.TransactionRegister
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetInventory() *Inventory {
-	if x, ok := m.GetPayload().(*GossipMessage_Inventory); ok {
-		return x.Inventory
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetInvalidExecutionReceiptChallenge() *InvalidExecutionReceiptChallenge {
-	if x, ok := m.GetPayload().(*GossipMessage_InvalidExecutionReceiptChallenge); ok {
-		return x.InvalidExecutionReceiptChallenge
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetStateTransition() *StateTransition {
-	if x, ok := m.GetPayload().(*GossipMessage_StateTransition); ok {
-		return x.StateTransition
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetSignedStateTransition() *SignedStateTransition {
-	if x, ok := m.GetPayload().(*GossipMessage_SignedStateTransition); ok {
-		return x.SignedStateTransition
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetFinalizedStateTransition() *FinalizedStateTransition {
-	if x, ok := m.GetPayload().(*GossipMessage_FinalizedStateTransition); ok {
-		return x.FinalizedStateTransition
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetVote() Vote {
-	if x, ok := m.GetPayload().(*GossipMessage_Vote); ok {
-		return x.Vote
-	}
-	return Vote_REJECT
-}
-
-func (m *GossipMessage) GetStateTransitionVote() *StateTransitionVote {
-	if x, ok := m.GetPayload().(*GossipMessage_StateTransitionVote); ok {
-		return x.StateTransitionVote
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetMessageRequest() *MessageRequest {
-	if x, ok := m.GetPayload().(*GossipMessage_MessageRequest); ok {
-		return x.MessageRequest
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetMessageReply() *MessageReply {
-	if x, ok := m.GetPayload().(*GossipMessage_MessageReply); ok {
-		return x.MessageReply
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetMethod() string {
-	if m != nil {
-		return m.Method
-	}
-	return ""
-}
-
-func (m *GossipMessage) GetRecipients() []string {
-	if m != nil {
-		return m.Recipients
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetSender() string {
-	if m != nil {
-		return m.Sender
-	}
-	return ""
-}
-
-func (m *GossipMessage) GetPath() []string {
-	if m != nil {
-		return m.Path
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetTTL() uint64 {
-	if m != nil {
-		return m.TTL
-	}
-	return 0
-}
-
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*GossipMessage) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
-		(*GossipMessage_SignedCollectionHash)(nil),
-		(*GossipMessage_Collection)(nil),
-		(*GossipMessage_Block)(nil),
-		(*GossipMessage_BlockSeal)(nil),
-		(*GossipMessage_IntermediateRegisters)(nil),
-		(*GossipMessage_ExecutionReceipt)(nil),
-		(*GossipMessage_ResultApproval)(nil),
-		(*GossipMessage_Transaction)(nil),
-		(*GossipMessage_SignedTransaction)(nil),
-		(*GossipMessage_Register)(nil),
-		(*GossipMessage_TransactionRegister)(nil),
-		(*GossipMessage_Inventory)(nil),
-		(*GossipMessage_InvalidExecutionReceiptChallenge)(nil),
-		(*GossipMessage_StateTransition)(nil),
-		(*GossipMessage_SignedStateTransition)(nil),
-		(*GossipMessage_FinalizedStateTransition)(nil),
-		(*GossipMessage_Vote)(nil),
-		(*GossipMessage_StateTransitionVote)(nil),
-		(*GossipMessage_MessageRequest)(nil),
-		(*GossipMessage_MessageReply)(nil),
-	}
-}
-
-type MessageRequest struct {
-	Text                 string   `protobuf:"bytes,1,opt,name=Text,proto3" json:"Text,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *MessageRequest) Reset()         { *m = MessageRequest{} }
-func (m *MessageRequest) String() string { return proto.CompactTextString(m) }
-func (*MessageRequest) ProtoMessage()    {}
-func (*MessageRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{1}
-}
-
-func (m *MessageRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_MessageRequest.Unmarshal(m, b)
-}
-func (m *MessageRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_MessageRequest.Marshal(b, m, deterministic)
-}
-func (m *MessageRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MessageRequest.Merge(m, src)
-}
-func (m *MessageRequest) XXX_Size() int {
-	return xxx_messageInfo_MessageRequest.Size(m)
-}
-func (m *MessageRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_MessageRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_MessageRequest proto.InternalMessageInfo
-
-func (m *MessageRequest) GetText() string {
-	if m != nil {
-		return m.Text
-	}
-	return ""
-}
-
-type MessageReply struct {
-	TextResponse         string   `protobuf:"bytes,1,opt,name=TextResponse,proto3" json:"TextResponse,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *MessageReply) Reset()         { *m = MessageReply{} }
-func (m *MessageReply) String() string { return proto.CompactTextString(m) }
-func (*MessageReply) ProtoMessage()    {}
-func (*MessageReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{2}
-}
-
-func (m *MessageReply) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_MessageReply.Unmarshal(m, b)
-}
-func (m *MessageReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_MessageReply.Marshal(b, m, deterministic)
-}
-func (m *MessageReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MessageReply.Merge(m, src)
-}
-func (m *MessageReply) XXX_Size() int {
-	return xxx_messageInfo_MessageReply.Size(m)
-}
-func (m *MessageReply) XXX_DiscardUnknown() {
-	xxx_messageInfo_MessageReply.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_MessageReply proto.InternalMessageInfo
-
-func (m *MessageReply) GetTextResponse() string {
-	if m != nil {
-		return m.TextResponse
-	}
-	return ""
-}
-
-type SignedCollectionHash struct {
-	CollectionHash       []byte   `protobuf:"bytes,1,opt,name=collectionHash,proto3" json:"collectionHash,omitempty"`
-	Signatures           [][]byte `protobuf:"bytes,2,rep,name=signatures,proto3" json:"signatures,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SignedCollectionHash) Reset()         { *m = SignedCollectionHash{} }
-func (m *SignedCollectionHash) String() string { return proto.CompactTextString(m) }
-func (*SignedCollectionHash) ProtoMessage()    {}
-func (*SignedCollectionHash) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{3}
-}
-
-func (m *SignedCollectionHash) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SignedCollectionHash.Unmarshal(m, b)
-}
-func (m *SignedCollectionHash) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SignedCollectionHash.Marshal(b, m, deterministic)
-}
-func (m *SignedCollectionHash) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SignedCollectionHash.Merge(m, src)
-}
-func (m *SignedCollectionHash) XXX_Size() int {
-	return xxx_messageInfo_SignedCollectionHash.Size(m)
-}
-func (m *SignedCollectionHash) XXX_DiscardUnknown() {
-	xxx_messageInfo_SignedCollectionHash.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SignedCollectionHash proto.InternalMessageInfo
-
-func (m *SignedCollectionHash) GetCollectionHash() []byte {
-	if m != nil {
-		return m.CollectionHash
-	}
-	return nil
-}
-
-func (m *SignedCollectionHash) GetSignatures() [][]byte {
-	if m != nil {
-		return m.Signatures
-	}
-	return nil
-}
-
-type Collection struct {
-	Transactions         []*SignedTransaction `protobuf:"bytes,1,rep,name=transactions,proto3" json:"transactions,omitempty"`
-	FoundationBlockHash  []byte               `protobuf:"bytes,2,opt,name=foundationBlockHash,proto3" json:"foundationBlockHash,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
-	XXX_unrecognized     []byte               `json:"-"`
-	XXX_sizecache        int32                `json:"-"`
-}
-
-func (m *Collection) Reset()         { *m = Collection{} }
-func (m *Collection) String() string { return proto.CompactTextString(m) }
-func (*Collection) ProtoMessage()    {}
-func (*Collection) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{4}
-}
-
-func (m *Collection) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Collection.Unmarshal(m, b)
-}
-func (m *Collection) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Collection.Marshal(b, m, deterministic)
-}
-func (m *Collection) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Collection.Merge(m, src)
-}
-func (m *Collection) XXX_Size() int {
-	return xxx_messageInfo_Collection.Size(m)
-}
-func (m *Collection) XXX_DiscardUnknown() {
-	xxx_messageInfo_Collection.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Collection proto.InternalMessageInfo
-
-func (m *Collection) GetTransactions() []*SignedTransaction {
-	if m != nil {
-		return m.Transactions
-	}
-	return nil
-}
-
-func (m *Collection) GetFoundationBlockHash() []byte {
-	if m != nil {
-		return m.FoundationBlockHash
-	}
-	return nil
 }
 
 type Block struct {
@@ -725,7 +69,7 @@ func (m *Block) Reset()         { *m = Block{} }
 func (m *Block) String() string { return proto.CompactTextString(m) }
 func (*Block) ProtoMessage()    {}
 func (*Block) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{5}
+	return fileDescriptor_e57dabda91f43ef4, []int{0}
 }
 
 func (m *Block) XXX_Unmarshal(b []byte) error {
@@ -818,7 +162,7 @@ func (m *BlockSeal) Reset()         { *m = BlockSeal{} }
 func (m *BlockSeal) String() string { return proto.CompactTextString(m) }
 func (*BlockSeal) ProtoMessage()    {}
 func (*BlockSeal) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{6}
+	return fileDescriptor_e57dabda91f43ef4, []int{1}
 }
 
 func (m *BlockSeal) XXX_Unmarshal(b []byte) error {
@@ -881,7 +225,7 @@ func (m *IntermediateRegisters) Reset()         { *m = IntermediateRegisters{} }
 func (m *IntermediateRegisters) String() string { return proto.CompactTextString(m) }
 func (*IntermediateRegisters) ProtoMessage()    {}
 func (*IntermediateRegisters) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{7}
+	return fileDescriptor_e57dabda91f43ef4, []int{2}
 }
 
 func (m *IntermediateRegisters) XXX_Unmarshal(b []byte) error {
@@ -939,7 +283,7 @@ func (m *ExecutionReceipt) Reset()         { *m = ExecutionReceipt{} }
 func (m *ExecutionReceipt) String() string { return proto.CompactTextString(m) }
 func (*ExecutionReceipt) ProtoMessage()    {}
 func (*ExecutionReceipt) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{8}
+	return fileDescriptor_e57dabda91f43ef4, []int{3}
 }
 
 func (m *ExecutionReceipt) XXX_Unmarshal(b []byte) error {
@@ -1012,7 +356,7 @@ func (m *ResultApproval) Reset()         { *m = ResultApproval{} }
 func (m *ResultApproval) String() string { return proto.CompactTextString(m) }
 func (*ResultApproval) ProtoMessage()    {}
 func (*ResultApproval) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{9}
+	return fileDescriptor_e57dabda91f43ef4, []int{4}
 }
 
 func (m *ResultApproval) XXX_Unmarshal(b []byte) error {
@@ -1068,124 +412,6 @@ func (m *ResultApproval) GetSignature() []byte {
 	return nil
 }
 
-type Transaction struct {
-	Script               []byte                 `protobuf:"bytes,1,opt,name=script,proto3" json:"script,omitempty"`
-	Nonce                uint64                 `protobuf:"varint,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
-	Registers            []*TransactionRegister `protobuf:"bytes,3,rep,name=registers,proto3" json:"registers,omitempty"`
-	Chunks               [][]byte               `protobuf:"bytes,4,rep,name=chunks,proto3" json:"chunks,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
-	XXX_unrecognized     []byte                 `json:"-"`
-	XXX_sizecache        int32                  `json:"-"`
-}
-
-func (m *Transaction) Reset()         { *m = Transaction{} }
-func (m *Transaction) String() string { return proto.CompactTextString(m) }
-func (*Transaction) ProtoMessage()    {}
-func (*Transaction) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{10}
-}
-
-func (m *Transaction) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Transaction.Unmarshal(m, b)
-}
-func (m *Transaction) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Transaction.Marshal(b, m, deterministic)
-}
-func (m *Transaction) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Transaction.Merge(m, src)
-}
-func (m *Transaction) XXX_Size() int {
-	return xxx_messageInfo_Transaction.Size(m)
-}
-func (m *Transaction) XXX_DiscardUnknown() {
-	xxx_messageInfo_Transaction.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Transaction proto.InternalMessageInfo
-
-func (m *Transaction) GetScript() []byte {
-	if m != nil {
-		return m.Script
-	}
-	return nil
-}
-
-func (m *Transaction) GetNonce() uint64 {
-	if m != nil {
-		return m.Nonce
-	}
-	return 0
-}
-
-func (m *Transaction) GetRegisters() []*TransactionRegister {
-	if m != nil {
-		return m.Registers
-	}
-	return nil
-}
-
-func (m *Transaction) GetChunks() [][]byte {
-	if m != nil {
-		return m.Chunks
-	}
-	return nil
-}
-
-type SignedTransaction struct {
-	Transaction          *Transaction `protobuf:"bytes,1,opt,name=transaction,proto3" json:"transaction,omitempty"`
-	ScriptSignatures     [][]byte     `protobuf:"bytes,2,rep,name=scriptSignatures,proto3" json:"scriptSignatures,omitempty"`
-	PayerSignature       []byte       `protobuf:"bytes,3,opt,name=payerSignature,proto3" json:"payerSignature,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
-	XXX_unrecognized     []byte       `json:"-"`
-	XXX_sizecache        int32        `json:"-"`
-}
-
-func (m *SignedTransaction) Reset()         { *m = SignedTransaction{} }
-func (m *SignedTransaction) String() string { return proto.CompactTextString(m) }
-func (*SignedTransaction) ProtoMessage()    {}
-func (*SignedTransaction) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{11}
-}
-
-func (m *SignedTransaction) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SignedTransaction.Unmarshal(m, b)
-}
-func (m *SignedTransaction) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SignedTransaction.Marshal(b, m, deterministic)
-}
-func (m *SignedTransaction) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SignedTransaction.Merge(m, src)
-}
-func (m *SignedTransaction) XXX_Size() int {
-	return xxx_messageInfo_SignedTransaction.Size(m)
-}
-func (m *SignedTransaction) XXX_DiscardUnknown() {
-	xxx_messageInfo_SignedTransaction.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SignedTransaction proto.InternalMessageInfo
-
-func (m *SignedTransaction) GetTransaction() *Transaction {
-	if m != nil {
-		return m.Transaction
-	}
-	return nil
-}
-
-func (m *SignedTransaction) GetScriptSignatures() [][]byte {
-	if m != nil {
-		return m.ScriptSignatures
-	}
-	return nil
-}
-
-func (m *SignedTransaction) GetPayerSignature() []byte {
-	if m != nil {
-		return m.PayerSignature
-	}
-	return nil
-}
-
 type Register struct {
 	Id                   []byte   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Value                []byte   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
@@ -1198,7 +424,7 @@ func (m *Register) Reset()         { *m = Register{} }
 func (m *Register) String() string { return proto.CompactTextString(m) }
 func (*Register) ProtoMessage()    {}
 func (*Register) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{12}
+	return fileDescriptor_e57dabda91f43ef4, []int{5}
 }
 
 func (m *Register) XXX_Unmarshal(b []byte) error {
@@ -1233,704 +459,303 @@ func (m *Register) GetValue() []byte {
 	return nil
 }
 
-type TransactionRegister struct {
-	Type                 TransactionRegister_Type         `protobuf:"varint,1,opt,name=type,proto3,enum=bamboo.shared.TransactionRegister_Type" json:"type,omitempty"`
-	AccessMode           TransactionRegister_AccessMode   `protobuf:"varint,2,opt,name=accessMode,proto3,enum=bamboo.shared.TransactionRegister_AccessMode" json:"accessMode,omitempty"`
-	Id                   []byte                           `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
-	Keys                 []*TransactionRegister_KeyWeight `protobuf:"bytes,4,rep,name=keys,proto3" json:"keys,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                         `json:"-"`
-	XXX_unrecognized     []byte                           `json:"-"`
-	XXX_sizecache        int32                            `json:"-"`
-}
-
-func (m *TransactionRegister) Reset()         { *m = TransactionRegister{} }
-func (m *TransactionRegister) String() string { return proto.CompactTextString(m) }
-func (*TransactionRegister) ProtoMessage()    {}
-func (*TransactionRegister) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{13}
-}
-
-func (m *TransactionRegister) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_TransactionRegister.Unmarshal(m, b)
-}
-func (m *TransactionRegister) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_TransactionRegister.Marshal(b, m, deterministic)
-}
-func (m *TransactionRegister) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TransactionRegister.Merge(m, src)
-}
-func (m *TransactionRegister) XXX_Size() int {
-	return xxx_messageInfo_TransactionRegister.Size(m)
-}
-func (m *TransactionRegister) XXX_DiscardUnknown() {
-	xxx_messageInfo_TransactionRegister.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_TransactionRegister proto.InternalMessageInfo
-
-func (m *TransactionRegister) GetType() TransactionRegister_Type {
-	if m != nil {
-		return m.Type
-	}
-	return TransactionRegister_SIMPLE
-}
-
-func (m *TransactionRegister) GetAccessMode() TransactionRegister_AccessMode {
-	if m != nil {
-		return m.AccessMode
-	}
-	return TransactionRegister_CREATE
-}
-
-func (m *TransactionRegister) GetId() []byte {
-	if m != nil {
-		return m.Id
-	}
-	return nil
-}
-
-func (m *TransactionRegister) GetKeys() []*TransactionRegister_KeyWeight {
-	if m != nil {
-		return m.Keys
-	}
-	return nil
-}
-
-type TransactionRegister_KeyWeight struct {
-	Key                  []byte   `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Weight               float64  `protobuf:"fixed64,2,opt,name=weight,proto3" json:"weight,omitempty"`
+type AccountSignature struct {
+	Account              []byte   `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	Signature            []byte   `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *TransactionRegister_KeyWeight) Reset()         { *m = TransactionRegister_KeyWeight{} }
-func (m *TransactionRegister_KeyWeight) String() string { return proto.CompactTextString(m) }
-func (*TransactionRegister_KeyWeight) ProtoMessage()    {}
-func (*TransactionRegister_KeyWeight) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{13, 0}
+func (m *AccountSignature) Reset()         { *m = AccountSignature{} }
+func (m *AccountSignature) String() string { return proto.CompactTextString(m) }
+func (*AccountSignature) ProtoMessage()    {}
+func (*AccountSignature) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e57dabda91f43ef4, []int{6}
 }
 
-func (m *TransactionRegister_KeyWeight) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_TransactionRegister_KeyWeight.Unmarshal(m, b)
+func (m *AccountSignature) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_AccountSignature.Unmarshal(m, b)
 }
-func (m *TransactionRegister_KeyWeight) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_TransactionRegister_KeyWeight.Marshal(b, m, deterministic)
+func (m *AccountSignature) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_AccountSignature.Marshal(b, m, deterministic)
 }
-func (m *TransactionRegister_KeyWeight) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TransactionRegister_KeyWeight.Merge(m, src)
+func (m *AccountSignature) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AccountSignature.Merge(m, src)
 }
-func (m *TransactionRegister_KeyWeight) XXX_Size() int {
-	return xxx_messageInfo_TransactionRegister_KeyWeight.Size(m)
+func (m *AccountSignature) XXX_Size() int {
+	return xxx_messageInfo_AccountSignature.Size(m)
 }
-func (m *TransactionRegister_KeyWeight) XXX_DiscardUnknown() {
-	xxx_messageInfo_TransactionRegister_KeyWeight.DiscardUnknown(m)
+func (m *AccountSignature) XXX_DiscardUnknown() {
+	xxx_messageInfo_AccountSignature.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_TransactionRegister_KeyWeight proto.InternalMessageInfo
+var xxx_messageInfo_AccountSignature proto.InternalMessageInfo
 
-func (m *TransactionRegister_KeyWeight) GetKey() []byte {
+func (m *AccountSignature) GetAccount() []byte {
 	if m != nil {
-		return m.Key
+		return m.Account
 	}
 	return nil
 }
 
-func (m *TransactionRegister_KeyWeight) GetWeight() float64 {
-	if m != nil {
-		return m.Weight
-	}
-	return 0
-}
-
-type Inventory struct {
-	Items                []*Inventory_Item `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
-	XXX_unrecognized     []byte            `json:"-"`
-	XXX_sizecache        int32             `json:"-"`
-}
-
-func (m *Inventory) Reset()         { *m = Inventory{} }
-func (m *Inventory) String() string { return proto.CompactTextString(m) }
-func (*Inventory) ProtoMessage()    {}
-func (*Inventory) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{14}
-}
-
-func (m *Inventory) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Inventory.Unmarshal(m, b)
-}
-func (m *Inventory) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Inventory.Marshal(b, m, deterministic)
-}
-func (m *Inventory) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Inventory.Merge(m, src)
-}
-func (m *Inventory) XXX_Size() int {
-	return xxx_messageInfo_Inventory.Size(m)
-}
-func (m *Inventory) XXX_DiscardUnknown() {
-	xxx_messageInfo_Inventory.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Inventory proto.InternalMessageInfo
-
-func (m *Inventory) GetItems() []*Inventory_Item {
-	if m != nil {
-		return m.Items
-	}
-	return nil
-}
-
-type Inventory_Item struct {
-	Type                 Inventory_Item_Type `protobuf:"varint,1,opt,name=type,proto3,enum=bamboo.shared.Inventory_Item_Type" json:"type,omitempty"`
-	Hash                 []byte              `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
-	XXX_unrecognized     []byte              `json:"-"`
-	XXX_sizecache        int32               `json:"-"`
-}
-
-func (m *Inventory_Item) Reset()         { *m = Inventory_Item{} }
-func (m *Inventory_Item) String() string { return proto.CompactTextString(m) }
-func (*Inventory_Item) ProtoMessage()    {}
-func (*Inventory_Item) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{14, 0}
-}
-
-func (m *Inventory_Item) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Inventory_Item.Unmarshal(m, b)
-}
-func (m *Inventory_Item) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Inventory_Item.Marshal(b, m, deterministic)
-}
-func (m *Inventory_Item) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Inventory_Item.Merge(m, src)
-}
-func (m *Inventory_Item) XXX_Size() int {
-	return xxx_messageInfo_Inventory_Item.Size(m)
-}
-func (m *Inventory_Item) XXX_DiscardUnknown() {
-	xxx_messageInfo_Inventory_Item.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Inventory_Item proto.InternalMessageInfo
-
-func (m *Inventory_Item) GetType() Inventory_Item_Type {
-	if m != nil {
-		return m.Type
-	}
-	return Inventory_Item_TRANSACTION
-}
-
-func (m *Inventory_Item) GetHash() []byte {
-	if m != nil {
-		return m.Hash
-	}
-	return nil
-}
-
-type InvalidExecutionReceiptChallenge struct {
-	ExecutionReceiptHash      []byte                   `protobuf:"bytes,1,opt,name=executionReceiptHash,proto3" json:"executionReceiptHash,omitempty"`
-	ExecutionReceiptSignature []byte                   `protobuf:"bytes,2,opt,name=executionReceiptSignature,proto3" json:"executionReceiptSignature,omitempty"`
-	PartIndex                 uint64                   `protobuf:"varint,3,opt,name=partIndex,proto3" json:"partIndex,omitempty"`
-	PartTransactions          []*IntermediateRegisters `protobuf:"bytes,4,rep,name=partTransactions,proto3" json:"partTransactions,omitempty"`
-	Signature                 []byte                   `protobuf:"bytes,5,opt,name=signature,proto3" json:"signature,omitempty"`
-	XXX_NoUnkeyedLiteral      struct{}                 `json:"-"`
-	XXX_unrecognized          []byte                   `json:"-"`
-	XXX_sizecache             int32                    `json:"-"`
-}
-
-func (m *InvalidExecutionReceiptChallenge) Reset()         { *m = InvalidExecutionReceiptChallenge{} }
-func (m *InvalidExecutionReceiptChallenge) String() string { return proto.CompactTextString(m) }
-func (*InvalidExecutionReceiptChallenge) ProtoMessage()    {}
-func (*InvalidExecutionReceiptChallenge) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{15}
-}
-
-func (m *InvalidExecutionReceiptChallenge) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_InvalidExecutionReceiptChallenge.Unmarshal(m, b)
-}
-func (m *InvalidExecutionReceiptChallenge) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_InvalidExecutionReceiptChallenge.Marshal(b, m, deterministic)
-}
-func (m *InvalidExecutionReceiptChallenge) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_InvalidExecutionReceiptChallenge.Merge(m, src)
-}
-func (m *InvalidExecutionReceiptChallenge) XXX_Size() int {
-	return xxx_messageInfo_InvalidExecutionReceiptChallenge.Size(m)
-}
-func (m *InvalidExecutionReceiptChallenge) XXX_DiscardUnknown() {
-	xxx_messageInfo_InvalidExecutionReceiptChallenge.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_InvalidExecutionReceiptChallenge proto.InternalMessageInfo
-
-func (m *InvalidExecutionReceiptChallenge) GetExecutionReceiptHash() []byte {
-	if m != nil {
-		return m.ExecutionReceiptHash
-	}
-	return nil
-}
-
-func (m *InvalidExecutionReceiptChallenge) GetExecutionReceiptSignature() []byte {
-	if m != nil {
-		return m.ExecutionReceiptSignature
-	}
-	return nil
-}
-
-func (m *InvalidExecutionReceiptChallenge) GetPartIndex() uint64 {
-	if m != nil {
-		return m.PartIndex
-	}
-	return 0
-}
-
-func (m *InvalidExecutionReceiptChallenge) GetPartTransactions() []*IntermediateRegisters {
-	if m != nil {
-		return m.PartTransactions
-	}
-	return nil
-}
-
-func (m *InvalidExecutionReceiptChallenge) GetSignature() []byte {
+func (m *AccountSignature) GetSignature() []byte {
 	if m != nil {
 		return m.Signature
 	}
 	return nil
 }
 
-type StateTransition struct {
-	PreviousStateTransitionHash      []byte   `protobuf:"bytes,1,opt,name=previousStateTransitionHash,proto3" json:"previousStateTransitionHash,omitempty"`
-	PreviousCommitApprovalSignatures [][]byte `protobuf:"bytes,2,rep,name=previousCommitApprovalSignatures,proto3" json:"previousCommitApprovalSignatures,omitempty"`
-	Height                           uint64   `protobuf:"varint,3,opt,name=height,proto3" json:"height,omitempty"`
-	Value                            []byte   `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral             struct{} `json:"-"`
-	XXX_unrecognized                 []byte   `json:"-"`
-	XXX_sizecache                    int32    `json:"-"`
+type SignedTransaction struct {
+	Script               []byte               `protobuf:"bytes,1,opt,name=script,proto3" json:"script,omitempty"`
+	Nonce                uint64               `protobuf:"varint,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	ComputeLimit         uint64               `protobuf:"varint,3,opt,name=compute_limit,json=computeLimit,proto3" json:"compute_limit,omitempty"`
+	ComputeUsed          uint64               `protobuf:"varint,4,opt,name=compute_used,json=computeUsed,proto3" json:"compute_used,omitempty"`
+	Timestamp            *timestamp.Timestamp `protobuf:"bytes,5,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	PayerSignature       *AccountSignature    `protobuf:"bytes,6,opt,name=payer_signature,json=payerSignature,proto3" json:"payer_signature,omitempty"`
+	Status               TransactionStatus    `protobuf:"varint,7,opt,name=status,proto3,enum=bamboo.shared.messages.TransactionStatus" json:"status,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
+	XXX_unrecognized     []byte               `json:"-"`
+	XXX_sizecache        int32                `json:"-"`
 }
 
-func (m *StateTransition) Reset()         { *m = StateTransition{} }
-func (m *StateTransition) String() string { return proto.CompactTextString(m) }
-func (*StateTransition) ProtoMessage()    {}
-func (*StateTransition) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{16}
+func (m *SignedTransaction) Reset()         { *m = SignedTransaction{} }
+func (m *SignedTransaction) String() string { return proto.CompactTextString(m) }
+func (*SignedTransaction) ProtoMessage()    {}
+func (*SignedTransaction) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e57dabda91f43ef4, []int{7}
 }
 
-func (m *StateTransition) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_StateTransition.Unmarshal(m, b)
+func (m *SignedTransaction) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SignedTransaction.Unmarshal(m, b)
 }
-func (m *StateTransition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_StateTransition.Marshal(b, m, deterministic)
+func (m *SignedTransaction) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SignedTransaction.Marshal(b, m, deterministic)
 }
-func (m *StateTransition) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StateTransition.Merge(m, src)
+func (m *SignedTransaction) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SignedTransaction.Merge(m, src)
 }
-func (m *StateTransition) XXX_Size() int {
-	return xxx_messageInfo_StateTransition.Size(m)
+func (m *SignedTransaction) XXX_Size() int {
+	return xxx_messageInfo_SignedTransaction.Size(m)
 }
-func (m *StateTransition) XXX_DiscardUnknown() {
-	xxx_messageInfo_StateTransition.DiscardUnknown(m)
+func (m *SignedTransaction) XXX_DiscardUnknown() {
+	xxx_messageInfo_SignedTransaction.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_StateTransition proto.InternalMessageInfo
+var xxx_messageInfo_SignedTransaction proto.InternalMessageInfo
 
-func (m *StateTransition) GetPreviousStateTransitionHash() []byte {
+func (m *SignedTransaction) GetScript() []byte {
 	if m != nil {
-		return m.PreviousStateTransitionHash
+		return m.Script
 	}
 	return nil
 }
 
-func (m *StateTransition) GetPreviousCommitApprovalSignatures() [][]byte {
+func (m *SignedTransaction) GetNonce() uint64 {
 	if m != nil {
-		return m.PreviousCommitApprovalSignatures
-	}
-	return nil
-}
-
-func (m *StateTransition) GetHeight() uint64 {
-	if m != nil {
-		return m.Height
+		return m.Nonce
 	}
 	return 0
 }
 
-func (m *StateTransition) GetValue() []byte {
+func (m *SignedTransaction) GetComputeLimit() uint64 {
 	if m != nil {
-		return m.Value
+		return m.ComputeLimit
+	}
+	return 0
+}
+
+func (m *SignedTransaction) GetComputeUsed() uint64 {
+	if m != nil {
+		return m.ComputeUsed
+	}
+	return 0
+}
+
+func (m *SignedTransaction) GetTimestamp() *timestamp.Timestamp {
+	if m != nil {
+		return m.Timestamp
 	}
 	return nil
 }
 
-type SignedStateTransition struct {
-	StateTransition      *StateTransition `protobuf:"bytes,1,opt,name=stateTransition,proto3" json:"stateTransition,omitempty"`
-	Signature            []byte           `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}         `json:"-"`
-	XXX_unrecognized     []byte           `json:"-"`
-	XXX_sizecache        int32            `json:"-"`
-}
-
-func (m *SignedStateTransition) Reset()         { *m = SignedStateTransition{} }
-func (m *SignedStateTransition) String() string { return proto.CompactTextString(m) }
-func (*SignedStateTransition) ProtoMessage()    {}
-func (*SignedStateTransition) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{17}
-}
-
-func (m *SignedStateTransition) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SignedStateTransition.Unmarshal(m, b)
-}
-func (m *SignedStateTransition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SignedStateTransition.Marshal(b, m, deterministic)
-}
-func (m *SignedStateTransition) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SignedStateTransition.Merge(m, src)
-}
-func (m *SignedStateTransition) XXX_Size() int {
-	return xxx_messageInfo_SignedStateTransition.Size(m)
-}
-func (m *SignedStateTransition) XXX_DiscardUnknown() {
-	xxx_messageInfo_SignedStateTransition.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SignedStateTransition proto.InternalMessageInfo
-
-func (m *SignedStateTransition) GetStateTransition() *StateTransition {
+func (m *SignedTransaction) GetPayerSignature() *AccountSignature {
 	if m != nil {
-		return m.StateTransition
+		return m.PayerSignature
 	}
 	return nil
 }
 
-func (m *SignedStateTransition) GetSignature() []byte {
+func (m *SignedTransaction) GetStatus() TransactionStatus {
 	if m != nil {
-		return m.Signature
+		return m.Status
+	}
+	return TransactionStatus_STATUS_PENDING
+}
+
+type Collection struct {
+	Transactions         []*SignedTransaction `protobuf:"bytes,1,rep,name=transactions,proto3" json:"transactions,omitempty"`
+	FoundationBlockHash  []byte               `protobuf:"bytes,2,opt,name=foundationBlockHash,proto3" json:"foundationBlockHash,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
+	XXX_unrecognized     []byte               `json:"-"`
+	XXX_sizecache        int32                `json:"-"`
+}
+
+func (m *Collection) Reset()         { *m = Collection{} }
+func (m *Collection) String() string { return proto.CompactTextString(m) }
+func (*Collection) ProtoMessage()    {}
+func (*Collection) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e57dabda91f43ef4, []int{8}
+}
+
+func (m *Collection) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Collection.Unmarshal(m, b)
+}
+func (m *Collection) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Collection.Marshal(b, m, deterministic)
+}
+func (m *Collection) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Collection.Merge(m, src)
+}
+func (m *Collection) XXX_Size() int {
+	return xxx_messageInfo_Collection.Size(m)
+}
+func (m *Collection) XXX_DiscardUnknown() {
+	xxx_messageInfo_Collection.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Collection proto.InternalMessageInfo
+
+func (m *Collection) GetTransactions() []*SignedTransaction {
+	if m != nil {
+		return m.Transactions
 	}
 	return nil
 }
 
-type FinalizedStateTransition struct {
-	SignedStateTransition *SignedStateTransition `protobuf:"bytes,1,opt,name=signedStateTransition,proto3" json:"signedStateTransition,omitempty"`
-	Signatures            [][]byte               `protobuf:"bytes,2,rep,name=signatures,proto3" json:"signatures,omitempty"`
-	XXX_NoUnkeyedLiteral  struct{}               `json:"-"`
-	XXX_unrecognized      []byte                 `json:"-"`
-	XXX_sizecache         int32                  `json:"-"`
-}
-
-func (m *FinalizedStateTransition) Reset()         { *m = FinalizedStateTransition{} }
-func (m *FinalizedStateTransition) String() string { return proto.CompactTextString(m) }
-func (*FinalizedStateTransition) ProtoMessage()    {}
-func (*FinalizedStateTransition) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{18}
-}
-
-func (m *FinalizedStateTransition) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_FinalizedStateTransition.Unmarshal(m, b)
-}
-func (m *FinalizedStateTransition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_FinalizedStateTransition.Marshal(b, m, deterministic)
-}
-func (m *FinalizedStateTransition) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_FinalizedStateTransition.Merge(m, src)
-}
-func (m *FinalizedStateTransition) XXX_Size() int {
-	return xxx_messageInfo_FinalizedStateTransition.Size(m)
-}
-func (m *FinalizedStateTransition) XXX_DiscardUnknown() {
-	xxx_messageInfo_FinalizedStateTransition.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_FinalizedStateTransition proto.InternalMessageInfo
-
-func (m *FinalizedStateTransition) GetSignedStateTransition() *SignedStateTransition {
+func (m *Collection) GetFoundationBlockHash() []byte {
 	if m != nil {
-		return m.SignedStateTransition
+		return m.FoundationBlockHash
 	}
 	return nil
 }
 
-func (m *FinalizedStateTransition) GetSignatures() [][]byte {
+type SignedCollectionHash struct {
+	CollectionHash       []byte   `protobuf:"bytes,1,opt,name=collectionHash,proto3" json:"collectionHash,omitempty"`
+	Signatures           [][]byte `protobuf:"bytes,2,rep,name=signatures,proto3" json:"signatures,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *SignedCollectionHash) Reset()         { *m = SignedCollectionHash{} }
+func (m *SignedCollectionHash) String() string { return proto.CompactTextString(m) }
+func (*SignedCollectionHash) ProtoMessage()    {}
+func (*SignedCollectionHash) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e57dabda91f43ef4, []int{9}
+}
+
+func (m *SignedCollectionHash) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SignedCollectionHash.Unmarshal(m, b)
+}
+func (m *SignedCollectionHash) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SignedCollectionHash.Marshal(b, m, deterministic)
+}
+func (m *SignedCollectionHash) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SignedCollectionHash.Merge(m, src)
+}
+func (m *SignedCollectionHash) XXX_Size() int {
+	return xxx_messageInfo_SignedCollectionHash.Size(m)
+}
+func (m *SignedCollectionHash) XXX_DiscardUnknown() {
+	xxx_messageInfo_SignedCollectionHash.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SignedCollectionHash proto.InternalMessageInfo
+
+func (m *SignedCollectionHash) GetCollectionHash() []byte {
+	if m != nil {
+		return m.CollectionHash
+	}
+	return nil
+}
+
+func (m *SignedCollectionHash) GetSignatures() [][]byte {
 	if m != nil {
 		return m.Signatures
 	}
 	return nil
 }
 
-type StateTransitionVote struct {
-	StateTransitionHash  []byte   `protobuf:"bytes,1,opt,name=stateTransitionHash,proto3" json:"stateTransitionHash,omitempty"`
-	Vote                 Vote     `protobuf:"varint,2,opt,name=vote,proto3,enum=bamboo.shared.Vote" json:"vote,omitempty"`
-	Height               uint64   `protobuf:"varint,3,opt,name=height,proto3" json:"height,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *StateTransitionVote) Reset()         { *m = StateTransitionVote{} }
-func (m *StateTransitionVote) String() string { return proto.CompactTextString(m) }
-func (*StateTransitionVote) ProtoMessage()    {}
-func (*StateTransitionVote) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e57dabda91f43ef4, []int{19}
-}
-
-func (m *StateTransitionVote) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_StateTransitionVote.Unmarshal(m, b)
-}
-func (m *StateTransitionVote) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_StateTransitionVote.Marshal(b, m, deterministic)
-}
-func (m *StateTransitionVote) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StateTransitionVote.Merge(m, src)
-}
-func (m *StateTransitionVote) XXX_Size() int {
-	return xxx_messageInfo_StateTransitionVote.Size(m)
-}
-func (m *StateTransitionVote) XXX_DiscardUnknown() {
-	xxx_messageInfo_StateTransitionVote.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StateTransitionVote proto.InternalMessageInfo
-
-func (m *StateTransitionVote) GetStateTransitionHash() []byte {
-	if m != nil {
-		return m.StateTransitionHash
-	}
-	return nil
-}
-
-func (m *StateTransitionVote) GetVote() Vote {
-	if m != nil {
-		return m.Vote
-	}
-	return Vote_REJECT
-}
-
-func (m *StateTransitionVote) GetHeight() uint64 {
-	if m != nil {
-		return m.Height
-	}
-	return 0
-}
-
 func init() {
-	proto.RegisterEnum("bamboo.shared.Vote", Vote_name, Vote_value)
-	proto.RegisterEnum("bamboo.shared.TransactionRegister_AccessMode", TransactionRegister_AccessMode_name, TransactionRegister_AccessMode_value)
-	proto.RegisterEnum("bamboo.shared.TransactionRegister_Type", TransactionRegister_Type_name, TransactionRegister_Type_value)
-	proto.RegisterEnum("bamboo.shared.Inventory_Item_Type", Inventory_Item_Type_name, Inventory_Item_Type_value)
-	proto.RegisterType((*GossipMessage)(nil), "bamboo.shared.GossipMessage")
-	proto.RegisterType((*MessageRequest)(nil), "bamboo.shared.MessageRequest")
-	proto.RegisterType((*MessageReply)(nil), "bamboo.shared.MessageReply")
-	proto.RegisterType((*SignedCollectionHash)(nil), "bamboo.shared.SignedCollectionHash")
-	proto.RegisterType((*Collection)(nil), "bamboo.shared.Collection")
-	proto.RegisterType((*Block)(nil), "bamboo.shared.Block")
-	proto.RegisterType((*BlockSeal)(nil), "bamboo.shared.BlockSeal")
-	proto.RegisterType((*IntermediateRegisters)(nil), "bamboo.shared.IntermediateRegisters")
-	proto.RegisterType((*ExecutionReceipt)(nil), "bamboo.shared.ExecutionReceipt")
-	proto.RegisterType((*ResultApproval)(nil), "bamboo.shared.ResultApproval")
-	proto.RegisterType((*Transaction)(nil), "bamboo.shared.Transaction")
-	proto.RegisterType((*SignedTransaction)(nil), "bamboo.shared.SignedTransaction")
-	proto.RegisterType((*Register)(nil), "bamboo.shared.Register")
-	proto.RegisterType((*TransactionRegister)(nil), "bamboo.shared.TransactionRegister")
-	proto.RegisterType((*TransactionRegister_KeyWeight)(nil), "bamboo.shared.TransactionRegister.KeyWeight")
-	proto.RegisterType((*Inventory)(nil), "bamboo.shared.Inventory")
-	proto.RegisterType((*Inventory_Item)(nil), "bamboo.shared.Inventory.Item")
-	proto.RegisterType((*InvalidExecutionReceiptChallenge)(nil), "bamboo.shared.InvalidExecutionReceiptChallenge")
-	proto.RegisterType((*StateTransition)(nil), "bamboo.shared.StateTransition")
-	proto.RegisterType((*SignedStateTransition)(nil), "bamboo.shared.SignedStateTransition")
-	proto.RegisterType((*FinalizedStateTransition)(nil), "bamboo.shared.FinalizedStateTransition")
-	proto.RegisterType((*StateTransitionVote)(nil), "bamboo.shared.StateTransitionVote")
+	proto.RegisterEnum("bamboo.shared.messages.TransactionStatus", TransactionStatus_name, TransactionStatus_value)
+	proto.RegisterType((*Block)(nil), "bamboo.shared.messages.Block")
+	proto.RegisterType((*BlockSeal)(nil), "bamboo.shared.messages.BlockSeal")
+	proto.RegisterType((*IntermediateRegisters)(nil), "bamboo.shared.messages.IntermediateRegisters")
+	proto.RegisterType((*ExecutionReceipt)(nil), "bamboo.shared.messages.ExecutionReceipt")
+	proto.RegisterType((*ResultApproval)(nil), "bamboo.shared.messages.ResultApproval")
+	proto.RegisterType((*Register)(nil), "bamboo.shared.messages.Register")
+	proto.RegisterType((*AccountSignature)(nil), "bamboo.shared.messages.AccountSignature")
+	proto.RegisterType((*SignedTransaction)(nil), "bamboo.shared.messages.SignedTransaction")
+	proto.RegisterType((*Collection)(nil), "bamboo.shared.messages.Collection")
+	proto.RegisterType((*SignedCollectionHash)(nil), "bamboo.shared.messages.SignedCollectionHash")
 }
 
 func init() { proto.RegisterFile("shared/messages.proto", fileDescriptor_e57dabda91f43ef4) }
 
 var fileDescriptor_e57dabda91f43ef4 = []byte{
-	// 1724 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x58, 0xcb, 0x6e, 0xdb, 0x46,
-	0x17, 0x16, 0x25, 0x5a, 0xb6, 0x8e, 0x64, 0x59, 0x1e, 0x5f, 0x32, 0x76, 0x6e, 0x02, 0xff, 0xe0,
-	0x8f, 0x1b, 0xa4, 0x72, 0xe0, 0x20, 0x45, 0xd0, 0x04, 0x41, 0x64, 0x59, 0x89, 0xe4, 0x58, 0xb6,
-	0x30, 0x52, 0x1c, 0x34, 0x2d, 0x1a, 0xd0, 0xd2, 0xd8, 0x22, 0x4c, 0x91, 0x2c, 0x49, 0xb9, 0x51,
-	0x81, 0xa2, 0x5d, 0x74, 0xd1, 0x17, 0x68, 0x17, 0x5d, 0x16, 0xe8, 0xaa, 0x2f, 0x50, 0xa0, 0xcf,
-	0xd0, 0x5d, 0x17, 0xed, 0xdb, 0x14, 0x33, 0xa4, 0xc4, 0xbb, 0xad, 0x76, 0xc7, 0x39, 0x97, 0x6f,
-	0x66, 0xce, 0x39, 0x73, 0x2e, 0x84, 0x35, 0x6b, 0x20, 0x9b, 0xb4, 0xbf, 0x3d, 0xa4, 0x96, 0x25,
-	0x9f, 0x51, 0xab, 0x62, 0x98, 0xba, 0xad, 0xa3, 0xc5, 0x13, 0x79, 0x78, 0xa2, 0xeb, 0x15, 0x87,
-	0xbb, 0x79, 0xfb, 0x4c, 0xd7, 0xcf, 0x54, 0xba, 0xcd, 0x99, 0x27, 0xa3, 0xd3, 0x6d, 0x5b, 0x19,
-	0x52, 0xcb, 0x96, 0x87, 0x86, 0x23, 0x2f, 0x7d, 0xbb, 0x08, 0x8b, 0x2f, 0x75, 0xcb, 0x52, 0x8c,
-	0x96, 0x03, 0x84, 0x3e, 0x81, 0x55, 0x4b, 0x39, 0xd3, 0x68, 0xbf, 0xa6, 0xab, 0x2a, 0xed, 0xd9,
-	0x8a, 0xae, 0x35, 0x64, 0x6b, 0x80, 0x85, 0xb2, 0xb0, 0x95, 0xdf, 0xf9, 0x5f, 0x25, 0xb0, 0x41,
-	0xa5, 0x13, 0x23, 0xda, 0x48, 0x91, 0x58, 0x08, 0xf4, 0x04, 0xa0, 0x37, 0xa5, 0xe0, 0x34, 0x07,
-	0xdc, 0x08, 0x01, 0xfa, 0x54, 0x52, 0xc4, 0x27, 0x8e, 0xee, 0xc3, 0xdc, 0x89, 0xaa, 0xf7, 0xce,
-	0x71, 0x86, 0xeb, 0xad, 0x86, 0xf4, 0x76, 0x19, 0xaf, 0x91, 0x22, 0x8e, 0x10, 0x7a, 0x0c, 0x39,
-	0xfe, 0xd1, 0xa1, 0xb2, 0x8a, 0x45, 0xae, 0x81, 0xe3, 0x34, 0x18, 0xbf, 0x91, 0x22, 0x9e, 0x30,
-	0xfa, 0x0c, 0xd6, 0x14, 0xcd, 0xa6, 0xe6, 0x90, 0xf6, 0x15, 0xd9, 0xa6, 0x84, 0x9e, 0x29, 0x96,
-	0x4d, 0x4d, 0x0b, 0xcf, 0x71, 0x94, 0x3b, 0x21, 0x94, 0x66, 0x9c, 0x6c, 0x23, 0x45, 0xe2, 0x41,
-	0x50, 0x0b, 0x4a, 0xf4, 0x3d, 0xed, 0x8d, 0xd8, 0x95, 0x08, 0xed, 0x51, 0xc5, 0xb0, 0x71, 0x96,
-	0x03, 0xdf, 0x0e, 0x01, 0xd7, 0x43, 0x62, 0x8d, 0x14, 0x89, 0xa8, 0xa2, 0x97, 0x50, 0x34, 0xa9,
-	0x35, 0x52, 0xed, 0xaa, 0x61, 0x98, 0xfa, 0x85, 0xac, 0xe2, 0x79, 0x0e, 0x76, 0x33, 0x04, 0x46,
-	0x02, 0x42, 0x8d, 0x14, 0x09, 0xa9, 0xa1, 0x67, 0x90, 0xb7, 0x4d, 0x59, 0xb3, 0x64, 0xc7, 0x37,
-	0x0b, 0x1c, 0x65, 0x33, 0x84, 0xd2, 0xf5, 0x24, 0x1a, 0x29, 0xe2, 0x57, 0x40, 0x6d, 0x58, 0x76,
-	0x5c, 0xee, 0x93, 0xc1, 0x39, 0x8e, 0x52, 0x8e, 0x0d, 0x99, 0x20, 0x56, 0x54, 0x19, 0x3d, 0x82,
-	0x05, 0xd3, 0x35, 0x1b, 0x06, 0x0e, 0x74, 0x2d, 0x72, 0x29, 0x87, 0xdd, 0x48, 0x91, 0xa9, 0x28,
-	0x3a, 0x86, 0x15, 0xdf, 0xb9, 0x26, 0x22, 0x38, 0xcf, 0x11, 0xa4, 0xe4, 0x0b, 0xf9, 0xc0, 0xe2,
-	0x00, 0x58, 0x40, 0x29, 0xda, 0x05, 0xd5, 0x6c, 0xdd, 0x1c, 0xe3, 0x42, 0x6c, 0x40, 0x35, 0x27,
-	0x7c, 0x16, 0x50, 0x53, 0x61, 0xf4, 0x35, 0x94, 0x15, 0xed, 0x42, 0x56, 0x95, 0x7e, 0xd8, 0xa5,
-	0xb5, 0x81, 0xac, 0xaa, 0x54, 0x3b, 0xa3, 0x78, 0x91, 0x03, 0x6e, 0x47, 0x01, 0x2f, 0x55, 0x6b,
-	0xa4, 0xc8, 0x95, 0xd0, 0x68, 0x1f, 0x96, 0x2c, 0x5b, 0xb6, 0x29, 0xbf, 0xab, 0xc2, 0xfd, 0x52,
-	0xe4, 0xbb, 0xdd, 0x0a, 0xfb, 0x25, 0x28, 0xd5, 0x48, 0x91, 0xb0, 0x22, 0x7b, 0x1b, 0x8e, 0xa3,
-	0x42, 0xb2, 0x78, 0x29, 0xf6, 0x6d, 0x74, 0xe2, 0x64, 0xd9, 0xdb, 0x88, 0x05, 0x41, 0x14, 0xf0,
-	0xa9, 0xa2, 0xc9, 0xaa, 0xf2, 0x55, 0x74, 0x83, 0x12, 0xdf, 0xe0, 0x6e, 0x68, 0x83, 0x17, 0x09,
-	0xe2, 0x8d, 0x14, 0x49, 0x84, 0x42, 0x1f, 0x80, 0x78, 0xa1, 0xdb, 0x14, 0x2f, 0x97, 0x85, 0xad,
-	0xe2, 0xce, 0x4a, 0x08, 0xf2, 0x58, 0xb7, 0x99, 0x5d, 0xb9, 0x08, 0x0b, 0xa6, 0x90, 0x09, 0x18,
-	0x1b, 0xa3, 0xd8, 0x60, 0xea, 0x44, 0x25, 0x59, 0x30, 0xc5, 0x00, 0xb0, 0x67, 0xeb, 0xe6, 0x6d,
-	0x42, 0xbf, 0x18, 0x51, 0xcb, 0xc6, 0x2b, 0xb1, 0xcf, 0xb6, 0x15, 0x10, 0x62, 0xcf, 0x36, 0xa8,
-	0x86, 0xaa, 0x50, 0x98, 0x52, 0x0c, 0x75, 0x8c, 0x57, 0x39, 0xcc, 0xf5, 0x24, 0x18, 0x43, 0x65,
-	0xb1, 0x19, 0x50, 0x41, 0xeb, 0x90, 0x6d, 0x51, 0x7b, 0xa0, 0xf7, 0xf1, 0x5a, 0x59, 0xd8, 0xca,
-	0x11, 0x77, 0x85, 0x6e, 0x01, 0x10, 0xda, 0x53, 0x0c, 0x85, 0x6a, 0xb6, 0x85, 0xd7, 0xcb, 0x99,
-	0xad, 0x1c, 0xf1, 0x51, 0x98, 0x5e, 0x87, 0x6a, 0x7d, 0x6a, 0xe2, 0x6b, 0x8e, 0x9e, 0xb3, 0x42,
-	0x08, 0xc4, 0xb6, 0x6c, 0x0f, 0x30, 0xe6, 0x1a, 0xfc, 0x1b, 0x95, 0x20, 0xd3, 0xed, 0x1e, 0xe0,
-	0x8d, 0xb2, 0xb0, 0x25, 0x12, 0xf6, 0xb9, 0x9b, 0x83, 0xf9, 0xb6, 0x3c, 0x56, 0x75, 0xb9, 0x2f,
-	0xdd, 0x81, 0x62, 0xf0, 0x9e, 0x0c, 0xa2, 0x4b, 0xdf, 0xdb, 0xbc, 0xe4, 0xe4, 0x08, 0xff, 0x96,
-	0x76, 0xa0, 0xe0, 0xbf, 0x06, 0x92, 0xa0, 0xc0, 0xe8, 0x84, 0x5a, 0x86, 0xae, 0x59, 0xd4, 0x95,
-	0x0d, 0xd0, 0xa4, 0xcf, 0x61, 0x35, 0xae, 0x3e, 0xa1, 0xff, 0x43, 0xb1, 0x17, 0x2d, 0x6e, 0x05,
-	0x12, 0xa2, 0x32, 0x13, 0xb0, 0x48, 0x95, 0xed, 0x91, 0x49, 0x2d, 0x9c, 0x2e, 0x67, 0xb6, 0x0a,
-	0xc4, 0x47, 0x91, 0xbe, 0x13, 0x00, 0x3c, 0x68, 0xb4, 0x07, 0x05, 0x5f, 0xe6, 0xb0, 0xb0, 0x50,
-	0xce, 0xcc, 0x92, 0xfe, 0x48, 0x40, 0x0b, 0x3d, 0x80, 0x95, 0x53, 0x7d, 0xa4, 0xf5, 0x65, 0xb6,
-	0x74, 0xaa, 0x1a, 0x3b, 0x61, 0x9a, 0x9f, 0x30, 0x8e, 0x25, 0xfd, 0x95, 0x86, 0x39, 0xbe, 0x42,
-	0x18, 0xe6, 0x7b, 0x03, 0x59, 0xd1, 0x9a, 0x7b, 0xae, 0x3d, 0x26, 0x4b, 0xe6, 0xad, 0x01, 0x55,
-	0xce, 0x06, 0x36, 0x07, 0x12, 0x89, 0xbb, 0x42, 0xf7, 0x61, 0xd9, 0x30, 0xe9, 0x85, 0xa2, 0x8f,
-	0x2c, 0x6f, 0xaf, 0x0c, 0xdf, 0x2b, 0xca, 0x60, 0x49, 0x70, 0xda, 0x40, 0xb8, 0x55, 0x75, 0xb3,
-	0xe2, 0xb4, 0x18, 0x95, 0x49, 0x8b, 0x51, 0xe9, 0x4e, 0x24, 0x88, 0x27, 0x8c, 0x3e, 0x85, 0xf5,
-	0xb8, 0x96, 0x80, 0xb2, 0xb2, 0x9a, 0x99, 0xb1, 0xaf, 0x20, 0x09, 0x10, 0xe8, 0x31, 0xc0, 0xb4,
-	0x7e, 0x5b, 0x38, 0xcb, 0x01, 0x13, 0xab, 0x3d, 0xf1, 0xc9, 0x86, 0x3c, 0x3c, 0x1f, 0xf1, 0xf0,
-	0xdf, 0x02, 0xe4, 0xa6, 0x9a, 0xe8, 0x86, 0xdb, 0x54, 0xf8, 0x42, 0xc6, 0x23, 0xa0, 0x1d, 0x58,
-	0x0d, 0xd7, 0x67, 0x9f, 0xe7, 0x62, 0x79, 0xe8, 0x19, 0x6c, 0x86, 0xe9, 0x1d, 0xef, 0x3c, 0x19,
-	0x7e, 0x9e, 0x4b, 0x24, 0xd0, 0xc7, 0x80, 0x83, 0x85, 0xdc, 0xa7, 0x2d, 0x72, 0xed, 0x44, 0xbe,
-	0xf4, 0x93, 0x00, 0x6b, 0xb1, 0xdd, 0x0b, 0xda, 0x82, 0x25, 0x5f, 0x48, 0xfa, 0x6e, 0x1b, 0x26,
-	0xa3, 0x47, 0x90, 0x33, 0xa7, 0x0d, 0x52, 0x9a, 0x1b, 0x3e, 0xa9, 0x4a, 0x13, 0x4f, 0x12, 0x95,
-	0x21, 0xdf, 0xd3, 0x87, 0xc6, 0xc8, 0xa6, 0xaf, 0x2d, 0xda, 0xe7, 0xf1, 0x26, 0x12, 0x3f, 0x49,
-	0xfa, 0x35, 0x0d, 0xa5, 0x70, 0x4d, 0x63, 0x4f, 0x63, 0x12, 0x93, 0x7e, 0x03, 0x3b, 0x67, 0x8b,
-	0x63, 0x05, 0x3d, 0x96, 0x0e, 0x7b, 0xac, 0x06, 0x25, 0x45, 0x53, 0x6c, 0x45, 0x56, 0xbd, 0x2e,
-	0x2f, 0x73, 0xf9, 0x25, 0x22, 0x0a, 0xe8, 0x04, 0x36, 0x62, 0x5b, 0xbd, 0x03, 0xc5, 0xb2, 0xb9,
-	0x0f, 0x66, 0xec, 0x19, 0x49, 0x32, 0x4c, 0x28, 0x4c, 0xe7, 0x22, 0x61, 0xfa, 0xa7, 0x00, 0xc5,
-	0x60, 0x8b, 0xc7, 0x4c, 0xec, 0x5c, 0xd4, 0x79, 0xf5, 0x82, 0x63, 0x62, 0x1f, 0xe9, 0x3f, 0xc5,
-	0xeb, 0x63, 0xb8, 0x96, 0x10, 0x4f, 0x6e, 0xd2, 0x48, 0x62, 0xa3, 0x55, 0x98, 0x33, 0x4c, 0x5d,
-	0x3f, 0xe5, 0x69, 0x43, 0x24, 0xce, 0x82, 0xf9, 0x67, 0x7a, 0x0d, 0xde, 0x60, 0x17, 0x88, 0x47,
-	0x90, 0x7e, 0x10, 0x20, 0xef, 0x6f, 0x09, 0xd7, 0x21, 0x6b, 0xf5, 0x4c, 0xd6, 0x32, 0x3b, 0x2e,
-	0x77, 0x57, 0x0c, 0x5b, 0xd3, 0xb5, 0x1e, 0x75, 0x73, 0x9b, 0xb3, 0x40, 0xcf, 0xfd, 0xb1, 0xe9,
-	0xb8, 0x75, 0x86, 0xfe, 0xcf, 0x1f, 0xa6, 0xeb, 0x90, 0xed, 0x0d, 0x46, 0xda, 0xf9, 0xe4, 0x2d,
-	0xb9, 0x2b, 0xe9, 0x17, 0x01, 0x96, 0x23, 0x69, 0x1c, 0x3d, 0x0d, 0xb6, 0xd0, 0xc2, 0x55, 0x2d,
-	0x74, 0xb0, 0x81, 0xbe, 0x07, 0x25, 0xe7, 0x36, 0x9d, 0x70, 0xc5, 0x89, 0xd0, 0x59, 0xfd, 0x32,
-	0xe4, 0x31, 0x35, 0xc3, 0xc6, 0x0f, 0x51, 0xa5, 0x07, 0xb0, 0x30, 0xed, 0x5f, 0x8b, 0x90, 0x56,
-	0xfa, 0xae, 0xdd, 0xd2, 0x4a, 0x9f, 0xd9, 0xec, 0x42, 0x56, 0x47, 0xd4, 0x75, 0xb7, 0xb3, 0x90,
-	0x7e, 0xcf, 0xc0, 0x4a, 0x8c, 0x51, 0xd0, 0x13, 0x10, 0xed, 0xb1, 0xe1, 0x54, 0xd9, 0x62, 0xa4,
-	0x0d, 0x8b, 0xd1, 0xa8, 0x74, 0xc7, 0x06, 0x25, 0x5c, 0x09, 0xb5, 0x00, 0xe4, 0x5e, 0x8f, 0x5a,
-	0x56, 0x4b, 0xef, 0x3b, 0xfb, 0x15, 0x77, 0x3e, 0x9c, 0x01, 0xa2, 0x3a, 0x55, 0x22, 0x3e, 0x00,
-	0xf7, 0x26, 0x99, 0xe9, 0x4d, 0x9e, 0x83, 0x78, 0x4e, 0xc7, 0x96, 0xfb, 0xd6, 0xee, 0xcf, 0x00,
-	0xfc, 0x8a, 0x8e, 0xdf, 0xf0, 0x37, 0x40, 0xb8, 0xe6, 0xe6, 0x23, 0xc8, 0x4d, 0x49, 0xac, 0x57,
-	0x39, 0xa7, 0x63, 0xd7, 0x52, 0xec, 0x93, 0x85, 0xc1, 0x97, 0x5e, 0xed, 0x14, 0x88, 0xbb, 0x92,
-	0x7a, 0x00, 0xde, 0x11, 0x11, 0x40, 0xb6, 0x46, 0xea, 0xd5, 0x6e, 0xbd, 0x94, 0x42, 0xcb, 0xb0,
-	0xd8, 0x39, 0xac, 0xb6, 0x3b, 0x8d, 0xa3, 0xee, 0x3b, 0x52, 0xaf, 0xee, 0x95, 0x04, 0x84, 0xa0,
-	0x58, 0x3b, 0x3a, 0x7c, 0xd1, 0x24, 0xad, 0xfa, 0x9e, 0x43, 0x4b, 0x33, 0xda, 0x5e, 0xfd, 0x45,
-	0x9d, 0x90, 0xfa, 0xde, 0xbb, 0x37, 0xa4, 0xd9, 0xad, 0x97, 0x32, 0xa8, 0x08, 0xc0, 0xb8, 0xee,
-	0x5a, 0x94, 0xee, 0x81, 0xc8, 0x4c, 0xc9, 0xe0, 0x3b, 0xcd, 0x56, 0xfb, 0x80, 0xc1, 0xe7, 0x60,
-	0xae, 0xd6, 0x78, 0x7d, 0xf8, 0xaa, 0x24, 0xa0, 0x3c, 0xcc, 0xef, 0x56, 0x0f, 0xaa, 0x87, 0xb5,
-	0x7a, 0x29, 0x2d, 0xfd, 0x26, 0x40, 0x6e, 0x3a, 0x84, 0xa0, 0x87, 0x30, 0xa7, 0xd8, 0x74, 0x38,
-	0xe9, 0x43, 0x6e, 0x26, 0x4d, 0x2b, 0x95, 0xa6, 0x4d, 0x87, 0xc4, 0x91, 0xdd, 0xbc, 0x00, 0x91,
-	0x2d, 0xd1, 0x47, 0x01, 0x87, 0x4b, 0x97, 0xea, 0xfa, 0x7d, 0x8d, 0x40, 0x1c, 0x78, 0x49, 0x84,
-	0x7f, 0x4b, 0x92, 0x7b, 0x85, 0x25, 0xc8, 0x77, 0x49, 0xf5, 0xb0, 0x53, 0xad, 0x75, 0x9b, 0x47,
-	0x87, 0xce, 0x3d, 0x76, 0x0f, 0x8e, 0x6a, 0xaf, 0x4a, 0x82, 0xf4, 0x73, 0x1a, 0xca, 0x57, 0x8d,
-	0x3b, 0x89, 0x19, 0x4b, 0xb8, 0x24, 0x63, 0x3d, 0x85, 0x8d, 0xc4, 0xfa, 0xe9, 0x9e, 0x32, 0x59,
-	0x80, 0xe5, 0x27, 0x43, 0x36, 0xed, 0xa6, 0xd6, 0xa7, 0xef, 0xdd, 0x32, 0xe5, 0x11, 0x50, 0x1b,
-	0x4a, 0x6c, 0xd1, 0xf5, 0x37, 0x7d, 0xff, 0x26, 0xe3, 0x47, 0xb4, 0xaf, 0xc8, 0x87, 0x7f, 0x08,
-	0xb0, 0x14, 0x9e, 0x66, 0x9e, 0xc3, 0xf5, 0x49, 0xe1, 0x0b, 0x0f, 0x41, 0x9e, 0x69, 0x2e, 0x13,
-	0x41, 0xfb, 0x50, 0x9e, 0xb0, 0x6b, 0xfa, 0x70, 0xa8, 0xc4, 0xf5, 0x12, 0x4e, 0x26, 0xba, 0x52,
-	0xce, 0xd7, 0x66, 0x66, 0x02, 0x6d, 0xe6, 0x34, 0xdb, 0x88, 0xfe, 0x6c, 0xf3, 0x0d, 0xac, 0xc5,
-	0x8e, 0x88, 0xa8, 0x11, 0x9d, 0x59, 0x85, 0x59, 0x66, 0xd6, 0xe8, 0xc4, 0x1a, 0x30, 0x68, 0x3a,
-	0x6c, 0xd0, 0x1f, 0x05, 0xc0, 0x49, 0x33, 0x24, 0x7a, 0x9b, 0x34, 0xec, 0x0a, 0xb3, 0x0f, 0xbb,
-	0x49, 0xa3, 0xee, 0x55, 0x93, 0xc5, 0xf7, 0x02, 0xac, 0xc4, 0xcc, 0x93, 0xac, 0x03, 0xb2, 0x12,
-	0xbd, 0x1c, 0xc7, 0x42, 0x77, 0xdd, 0x69, 0x37, 0x9d, 0x38, 0xed, 0xba, 0xb3, 0x6e, 0x82, 0xeb,
-	0xee, 0xdd, 0x06, 0x91, 0x6f, 0x0d, 0x90, 0x25, 0xf5, 0xfd, 0x7a, 0xad, 0x5b, 0x4a, 0xb1, 0xac,
-	0x53, 0x6d, 0xb7, 0xc9, 0xd1, 0x71, 0xbd, 0x24, 0xec, 0x1c, 0xc3, 0x82, 0x3b, 0x99, 0x59, 0x68,
-	0x1f, 0xf2, 0x6c, 0x0c, 0x9c, 0xfc, 0x4b, 0xbc, 0x11, 0xda, 0x2e, 0xf0, 0xa7, 0x71, 0xf3, 0xb2,
-	0x31, 0x55, 0x4a, 0xed, 0x2e, 0xbc, 0xcd, 0x3a, 0x8c, 0x93, 0x2c, 0x9f, 0x2d, 0x1e, 0xfe, 0x13,
-	0x00, 0x00, 0xff, 0xff, 0xb0, 0x29, 0x35, 0x8b, 0xf4, 0x14, 0x00, 0x00,
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConn
-
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion4
-
-// MessagesClient is the client API for Messages service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type MessagesClient interface {
-	SendMessage(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*MessageReply, error)
-}
-
-type messagesClient struct {
-	cc *grpc.ClientConn
-}
-
-func NewMessagesClient(cc *grpc.ClientConn) MessagesClient {
-	return &messagesClient{cc}
-}
-
-func (c *messagesClient) SendMessage(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*MessageReply, error) {
-	out := new(MessageReply)
-	err := c.cc.Invoke(ctx, "/bamboo.shared.Messages/SendMessage", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// MessagesServer is the server API for Messages service.
-type MessagesServer interface {
-	SendMessage(context.Context, *GossipMessage) (*MessageReply, error)
-}
-
-// UnimplementedMessagesServer can be embedded to have forward compatible implementations.
-type UnimplementedMessagesServer struct {
-}
-
-func (*UnimplementedMessagesServer) SendMessage(ctx context.Context, req *GossipMessage) (*MessageReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendMessage not implemented")
-}
-
-func RegisterMessagesServer(s *grpc.Server, srv MessagesServer) {
-	s.RegisterService(&_Messages_serviceDesc, srv)
-}
-
-func _Messages_SendMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GossipMessage)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MessagesServer).SendMessage(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/bamboo.shared.Messages/SendMessage",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MessagesServer).SendMessage(ctx, req.(*GossipMessage))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-var _Messages_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "bamboo.shared.Messages",
-	HandlerType: (*MessagesServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "SendMessage",
-			Handler:    _Messages_SendMessage_Handler,
-		},
-	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "shared/messages.proto",
+	// 844 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x55, 0xdd, 0x8e, 0xdb, 0x44,
+	0x14, 0xc6, 0xce, 0x4f, 0x9b, 0xb3, 0xdb, 0x6c, 0x76, 0xba, 0x5d, 0xcc, 0x0a, 0x41, 0x1a, 0x24,
+	0xe4, 0xa2, 0xe2, 0xad, 0xc2, 0x4d, 0xc5, 0x45, 0xa5, 0x2c, 0x31, 0x10, 0x14, 0x56, 0x30, 0x49,
+	0xb9, 0xe8, 0x05, 0xab, 0x89, 0x3d, 0x9b, 0x8c, 0xea, 0x78, 0x2c, 0xcf, 0x78, 0x05, 0x0f, 0xc1,
+	0x53, 0xf0, 0x1c, 0xbc, 0x05, 0x37, 0x7d, 0x05, 0x9e, 0x02, 0x79, 0x3c, 0x8e, 0x1d, 0xc7, 0x5e,
+	0x41, 0x2f, 0xcf, 0x77, 0xe6, 0x7c, 0x3e, 0xf3, 0x9d, 0x33, 0x9f, 0xe1, 0x89, 0xd8, 0x90, 0x98,
+	0xfa, 0x97, 0x5b, 0x2a, 0x04, 0x59, 0x53, 0xe1, 0x44, 0x31, 0x97, 0x1c, 0x9d, 0xaf, 0xc8, 0x76,
+	0xc5, 0xb9, 0x93, 0x65, 0x9d, 0x3c, 0x7b, 0xf1, 0xe9, 0x9a, 0xf3, 0x75, 0x40, 0x2f, 0xd5, 0xa9,
+	0x55, 0x72, 0x7b, 0x29, 0xd9, 0x96, 0x0a, 0x49, 0xb6, 0x51, 0x56, 0x38, 0xfa, 0xc7, 0x84, 0xce,
+	0x55, 0xc0, 0xbd, 0xb7, 0xc8, 0x82, 0x07, 0xde, 0x86, 0xb0, 0x70, 0x36, 0xb5, 0x8c, 0xa1, 0x61,
+	0xf7, 0x70, 0x1e, 0xa2, 0x73, 0xe8, 0x6e, 0x28, 0x5b, 0x6f, 0xa4, 0x65, 0x0e, 0x0d, 0xbb, 0x8d,
+	0x75, 0x84, 0x9e, 0xc3, 0x69, 0x14, 0xd3, 0x3b, 0xc6, 0x13, 0xa1, 0x28, 0xbe, 0x27, 0x62, 0x63,
+	0xb5, 0x86, 0x86, 0x7d, 0x8c, 0x0f, 0x13, 0xe8, 0x25, 0xf4, 0x76, 0x1f, 0xb7, 0xda, 0x43, 0xc3,
+	0x3e, 0x1a, 0x5f, 0x38, 0x59, 0x7b, 0x4e, 0xde, 0x9e, 0xb3, 0xcc, 0x4f, 0xe0, 0xe2, 0x30, 0xf2,
+	0xe1, 0x5c, 0xb0, 0x75, 0x48, 0xfd, 0x6f, 0x78, 0x10, 0x50, 0x4f, 0x32, 0x1e, 0xa6, 0x8c, 0x54,
+	0x58, 0x9d, 0x61, 0xcb, 0x3e, 0x1a, 0x3f, 0x77, 0xea, 0x6f, 0xef, 0x2c, 0x6a, 0xaa, 0x70, 0x03,
+	0x17, 0x9a, 0x00, 0xac, 0xd2, 0x66, 0x17, 0x94, 0x04, 0xc2, 0xea, 0x2a, 0xe6, 0xa7, 0x4d, 0xcc,
+	0x57, 0xf9, 0x49, 0x5c, 0x2a, 0x42, 0x9f, 0x00, 0xa4, 0xe4, 0x44, 0x26, 0x31, 0x15, 0xd6, 0x83,
+	0x61, 0xcb, 0x3e, 0xc6, 0x25, 0x64, 0xf4, 0xce, 0x80, 0xde, 0xae, 0x12, 0x7d, 0x0c, 0xbd, 0xd5,
+	0x4e, 0x36, 0x43, 0xc9, 0x56, 0x00, 0x68, 0x0c, 0x67, 0xf4, 0x37, 0xea, 0x25, 0x69, 0x87, 0x98,
+	0x7a, 0x94, 0x45, 0x52, 0x1d, 0x34, 0xd5, 0xc1, 0xda, 0x1c, 0x7a, 0x05, 0x17, 0x55, 0x7c, 0x51,
+	0xf4, 0xd3, 0x52, 0xfd, 0xdc, 0x73, 0x02, 0x7d, 0x0d, 0x56, 0x4c, 0x45, 0x12, 0xc8, 0x49, 0x14,
+	0xc5, 0xfc, 0x8e, 0x04, 0xa5, 0xea, 0xb6, 0xaa, 0x6e, 0xcc, 0x8f, 0xfe, 0x34, 0xe0, 0xc9, 0x2c,
+	0x94, 0x34, 0xde, 0x52, 0x9f, 0x11, 0x49, 0x31, 0x5d, 0x33, 0x21, 0x69, 0x2c, 0x90, 0x0d, 0x27,
+	0x32, 0x26, 0xa1, 0x20, 0x3b, 0xb5, 0xf5, 0x6d, 0xab, 0x30, 0x7a, 0x05, 0xbd, 0x38, 0x2f, 0xb3,
+	0x4c, 0x35, 0x81, 0x61, 0xd3, 0x04, 0x72, 0x7e, 0x5c, 0x94, 0xa0, 0x21, 0x1c, 0x79, 0x7c, 0x1b,
+	0x25, 0x92, 0xbe, 0x16, 0xd4, 0x57, 0xab, 0xd8, 0xc6, 0x65, 0x68, 0xf4, 0x97, 0x09, 0x03, 0xb7,
+	0x22, 0x00, 0x7a, 0x01, 0x8f, 0xf3, 0x75, 0x2d, 0x2b, 0x9d, 0x35, 0x59, 0x97, 0xda, 0x1f, 0x9d,
+	0x59, 0x1d, 0xdd, 0x1c, 0x06, 0x2c, 0x64, 0x92, 0x91, 0x60, 0x27, 0x82, 0x12, 0xff, 0xbf, 0xdc,
+	0xe6, 0xa0, 0x12, 0xbd, 0x85, 0x8f, 0x58, 0x9d, 0xae, 0x73, 0x26, 0xa4, 0x9a, 0xca, 0xd1, 0xf8,
+	0xcb, 0x26, 0xda, 0xda, 0x81, 0xe0, 0x66, 0xbe, 0xca, 0x06, 0x77, 0x0e, 0x36, 0xf8, 0x6f, 0x03,
+	0xfa, 0x78, 0x6f, 0x05, 0x52, 0xd1, 0xb3, 0xab, 0x67, 0x16, 0x61, 0x64, 0xa2, 0x97, 0xa0, 0xf7,
+	0x5a, 0xe5, 0x97, 0xf0, 0x61, 0xc3, 0xaa, 0x69, 0x87, 0x69, 0x4a, 0xa3, 0x33, 0xe8, 0x44, 0x31,
+	0xe7, 0xb7, 0xca, 0x63, 0xda, 0x38, 0x0b, 0xd2, 0x89, 0xed, 0xae, 0x61, 0x75, 0xb2, 0x89, 0xed,
+	0x80, 0xd1, 0x0b, 0x78, 0x98, 0xeb, 0x80, 0xfa, 0x60, 0x32, 0x5f, 0x0f, 0xdf, 0x64, 0x7e, 0xca,
+	0x77, 0x47, 0x82, 0x84, 0xea, 0x76, 0xb3, 0x60, 0xf4, 0x03, 0x0c, 0x26, 0x9e, 0xc7, 0x93, 0xb0,
+	0x78, 0x3f, 0xa9, 0x83, 0x92, 0x0c, 0xd3, 0xe5, 0x79, 0xb8, 0xff, 0x75, 0xb3, 0xfa, 0xf5, 0x77,
+	0x26, 0x9c, 0x66, 0x56, 0xb5, 0x2c, 0x1e, 0x44, 0xea, 0xba, 0xc2, 0x8b, 0x59, 0x94, 0x93, 0xe9,
+	0x28, 0xed, 0x27, 0xe4, 0xa1, 0x47, 0xb5, 0x19, 0x67, 0x01, 0xfa, 0x0c, 0x1e, 0xe9, 0x3d, 0xbf,
+	0x09, 0xd8, 0x96, 0x49, 0xbd, 0xfc, 0xc7, 0x1a, 0x9c, 0xa7, 0x18, 0x7a, 0x0a, 0x79, 0x7c, 0x93,
+	0xa4, 0x0f, 0xa4, 0x7d, 0xf0, 0x40, 0xf6, 0x5d, 0xba, 0xf3, 0x7f, 0x5c, 0xfa, 0x67, 0x38, 0x89,
+	0xc8, 0xef, 0x34, 0xbe, 0x29, 0x6e, 0xda, 0x55, 0xf5, 0x76, 0xd3, 0x76, 0x56, 0x05, 0xc4, 0x7d,
+	0x45, 0x50, 0x08, 0x3a, 0x81, 0xae, 0x90, 0x44, 0x26, 0xa9, 0x97, 0x1a, 0x76, 0x7f, 0xfc, 0xac,
+	0x89, 0xa9, 0xa4, 0xdb, 0x42, 0x15, 0x60, 0x5d, 0x38, 0xfa, 0xc3, 0x00, 0x28, 0xac, 0x1e, 0xfd,
+	0x08, 0xc7, 0x25, 0xd3, 0x11, 0x96, 0xa1, 0xde, 0xcf, 0xb3, 0xfb, 0x7f, 0x20, 0x25, 0x76, 0xbc,
+	0x57, 0x9e, 0x3a, 0xc7, 0x2d, 0x4f, 0x42, 0x9f, 0xa4, 0xe1, 0x55, 0xc5, 0x11, 0xea, 0x52, 0xa3,
+	0x5f, 0xe1, 0xac, 0xee, 0xaf, 0x84, 0x3e, 0x87, 0xbe, 0xb7, 0x87, 0xe8, 0xa9, 0x57, 0xd0, 0xca,
+	0x03, 0x35, 0xab, 0x0f, 0xf4, 0x0b, 0x0a, 0xa7, 0x07, 0x62, 0x20, 0x04, 0xfd, 0xc5, 0x72, 0xb2,
+	0x7c, 0xbd, 0xb8, 0xf9, 0xc9, 0xbd, 0x9e, 0xce, 0xae, 0xbf, 0x1b, 0x7c, 0x80, 0xce, 0x60, 0xa0,
+	0xb1, 0x6f, 0x67, 0xd7, 0x93, 0xf9, 0xec, 0x8d, 0x3b, 0x1d, 0x18, 0xe8, 0x31, 0x9c, 0x68, 0x14,
+	0xbb, 0xbf, 0xb8, 0x78, 0xe9, 0x4e, 0x07, 0x26, 0x3a, 0x85, 0x47, 0x1a, 0x5c, 0xb8, 0x93, 0xb9,
+	0x3b, 0x1d, 0xb4, 0xae, 0x1e, 0xbe, 0xe9, 0x66, 0x5a, 0xad, 0xba, 0x6a, 0x2b, 0xbe, 0xfa, 0x37,
+	0x00, 0x00, 0xff, 0xff, 0x98, 0x7a, 0x69, 0xd1, 0x99, 0x08, 0x00, 0x00,
 }

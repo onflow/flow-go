@@ -3,9 +3,12 @@
 // Once the validation flow is hooked up with the actual compute module, this package will likely be removed or changed.
 package compute
 
-import (
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
-)
+import "github.com/dapperlabs/bamboo-node/pkg/types"
+
+type BlockPartExecutionResult struct {
+	PartIndex        uint64
+	PartTransactions []types.IntermediateRegisters
+}
 
 type ValidationResult interface {
 	isValidationResult()
@@ -17,6 +20,6 @@ type ValidationResultSuccess struct {
 }
 
 type ValidationResultFail struct {
-	BlockPartResult *types.BlockPartExecutionResult
+	BlockPartResult *BlockPartExecutionResult
 	ValidationResult
 }
