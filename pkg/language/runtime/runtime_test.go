@@ -59,7 +59,7 @@ func TestNewInterpreterRuntime(t *testing.T) {
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
 
 	Expect(err).
-		ToNot(HaveOccurred())
+		To(Not(HaveOccurred()))
 
 	Expect(state.Int64()).
 		To(Equal(int64(5)))

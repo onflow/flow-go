@@ -37,8 +37,28 @@ func NewChecker(program *ast.Program) *Checker {
 }
 
 func (checker *Checker) IsSubType(subType Type, superType Type) bool {
-	// TODO: improve
-	return subType.Equal(superType)
+	if subType.Equal(superType) {
+		return true
+	}
+
+	if superType.Equal(&AnyType{}) {
+		return true
+	}
+
+	if _, ok := superType.(*IntegerType); ok {
+		switch subType.(type) {
+		case *IntType,
+			*Int8Type, *Int16Type, *Int32Type, *Int64Type,
+			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type:
+
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	return false
 }
 
 func (checker *Checker) IndexableElementType(ty Type) Type {
@@ -54,8 +74,7 @@ func (checker *Checker) IsIndexingType(indexingType Type, indexedType Type) bool
 	switch indexedType.(type) {
 	// arrays can be index with integers
 	case ArrayType:
-		_, ok := indexingType.(integerType)
-		return ok
+		return checker.IsSubType(indexingType, &IntegerType{})
 	}
 
 	return false
@@ -135,7 +154,25 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
-	checker.declareFunction(declaration.Identifier, declaration.IdentifierPos, functionType)
+
+	argumentLabels := make([]string, len(declaration.Parameters))
+
+	for i, parameter := range declaration.Parameters {
+		argumentLabel := parameter.Label
+		// if no argument label is given, the parameter name
+		// is used as the argument labels and is required
+		if argumentLabel == "" {
+			argumentLabel = parameter.Identifier
+		}
+		argumentLabels[i] = argumentLabel
+	}
+
+	checker.declareFunction(
+		declaration.Identifier,
+		declaration.IdentifierPos,
+		functionType,
+		argumentLabels,
+	)
 
 	checker.checkFunction(
 		declaration.Parameters,
@@ -295,6 +332,10 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 
 	// check value type matches enclosing function's return type
 
+	if statement.Expression == nil {
+		return nil
+	}
+
 	valueType := statement.Expression.Accept(checker).(Type)
 	returnType := checker.currentFunction().returnType
 
@@ -326,7 +367,7 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 	test := statement.Test
 	testType := test.Accept(checker).(Type)
 
-	if !testType.Equal(&BoolType{}) {
+	if !checker.IsSubType(testType, &BoolType{}) {
 		panic(&TypeMismatchError{
 			ExpectedType: &BoolType{},
 			ActualType:   testType,
@@ -367,7 +408,7 @@ func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentState
 		return
 
 	case *ast.MemberExpression:
-		// TODO:
+		// TODO: no structures/dictionaries yet
 		panic(&errors.UnreachableError{})
 
 	default:
@@ -454,6 +495,11 @@ func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpre
 }
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
+	variable := checker.findAndCheckVariable(expression)
+	return variable.Type
+}
+
+func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpression) *Variable {
 	variable := checker.findVariable(expression.Identifier)
 	if variable == nil {
 		panic(&NotDeclaredError{
@@ -463,17 +509,178 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 			EndPos:       expression.EndPosition(),
 		})
 	}
+	return variable
+}
 
-	return variable.Type
+func (checker *Checker) visitBinaryOperation(expr *ast.BinaryExpression) (left, right Type) {
+	left = expr.Left.Accept(checker).(Type)
+	right = expr.Right.Accept(checker).(Type)
+	return
 }
 
 func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) ast.Repr {
-	// TODO:
-	return nil
+	left, right := checker.visitBinaryOperation(expression)
+
+	operation := expression.Operation
+	operationKind := binaryOperationKind(operation)
+
+	switch operationKind {
+	case BinaryOperationKindIntegerArithmetic,
+		BinaryOperationKindIntegerComparison:
+
+		// check both types are integer subtypes
+
+		leftIsInteger := checker.IsSubType(left, &IntegerType{})
+		rightIsInteger := checker.IsSubType(right, &IntegerType{})
+
+		if !leftIsInteger && !rightIsInteger {
+			panic(&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  left,
+				RightType: right,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			})
+		} else if !leftIsInteger {
+			panic(&InvalidBinaryOperandError{
+				Operation:    operation,
+				Side:         common.OperandSideLeft,
+				ExpectedType: &IntegerType{},
+				ActualType:   left,
+				StartPos:     expression.Left.StartPosition(),
+				EndPos:       expression.Left.EndPosition(),
+			})
+		} else if !rightIsInteger {
+			panic(&InvalidBinaryOperandError{
+				Operation:    operation,
+				Side:         common.OperandSideRight,
+				ExpectedType: &IntegerType{},
+				ActualType:   right,
+				StartPos:     expression.Right.StartPosition(),
+				EndPos:       expression.Right.EndPosition(),
+			})
+		}
+
+		// check both types are equal
+
+		if !left.Equal(right) {
+			panic(&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  left,
+				RightType: right,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			})
+		}
+
+		switch operationKind {
+		case BinaryOperationKindIntegerArithmetic:
+			return left
+		case BinaryOperationKindIntegerComparison:
+			return &BoolType{}
+		}
+
+		panic(&errors.UnreachableError{})
+
+	case BinaryOperationKindEquality:
+		// check both types are equal, and boolean subtypes or integer subtypes
+
+		if !(left.Equal(right) &&
+			(checker.IsSubType(left, &BoolType{}) || checker.IsSubType(left, &IntegerType{}))) {
+
+			panic(&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  left,
+				RightType: right,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			})
+		}
+
+		return &BoolType{}
+
+	case BinaryOperationKindBooleanLogic:
+
+		// check both types are integer subtypes
+
+		leftIsBool := checker.IsSubType(left, &BoolType{})
+		rightIsBool := checker.IsSubType(right, &BoolType{})
+
+		if !leftIsBool && !rightIsBool {
+			panic(&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  left,
+				RightType: right,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			})
+		} else if !leftIsBool {
+			panic(&InvalidBinaryOperandError{
+				Operation:    operation,
+				Side:         common.OperandSideLeft,
+				ExpectedType: &BoolType{},
+				ActualType:   left,
+				StartPos:     expression.Left.StartPosition(),
+				EndPos:       expression.Left.EndPosition(),
+			})
+		} else if !rightIsBool {
+			panic(&InvalidBinaryOperandError{
+				Operation:    operation,
+				Side:         common.OperandSideRight,
+				ExpectedType: &BoolType{},
+				ActualType:   right,
+				StartPos:     expression.Right.StartPosition(),
+				EndPos:       expression.Right.EndPosition(),
+			})
+		}
+
+		return &BoolType{}
+	}
+
+	panic(&unsupportedOperation{
+		kind:      common.OperationKindBinary,
+		operation: operation,
+		startPos:  expression.StartPos,
+		endPos:    expression.EndPos,
+	})
 }
 
 func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {
-	// TODO:
+	valueType := expression.Expression.Accept(checker).(Type)
+
+	switch expression.Operation {
+	case ast.OperationNegate:
+		if !checker.IsSubType(valueType, &BoolType{}) {
+			panic(&InvalidUnaryOperandError{
+				Operation:    expression.Operation,
+				ExpectedType: &BoolType{},
+				ActualType:   valueType,
+				StartPos:     expression.Expression.StartPosition(),
+				EndPos:       expression.Expression.EndPosition(),
+			})
+		}
+		return valueType
+
+	case ast.OperationMinus:
+		if !checker.IsSubType(valueType, &IntegerType{}) {
+			panic(&InvalidUnaryOperandError{
+				Operation:    expression.Operation,
+				ExpectedType: &IntegerType{},
+				ActualType:   valueType,
+				StartPos:     expression.Expression.StartPosition(),
+				EndPos:       expression.Expression.EndPosition(),
+			})
+		}
+		return valueType
+	}
+
+	panic(&unsupportedOperation{
+		kind:      common.OperationKindUnary,
+		operation: expression.Operation,
+		startPos:  expression.StartPos,
+		endPos:    expression.EndPos,
+	})
+
 	return nil
 }
 
@@ -525,9 +732,8 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 }
 
 func (checker *Checker) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO:
+	// TODO: no structures/dictionaries yet
 	panic(&errors.UnreachableError{})
-	return nil
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
@@ -604,7 +810,50 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		}
 	}
 
-	// TODO: ensure argument labels of arguments match argument labels of parameters
+	// if the invocation refers directly to the name of the function as stated in the declaration,
+	// the argument labels need to be supplied
+
+	if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
+
+		variable := checker.findAndCheckVariable(identifierExpression)
+		if variable.ArgumentLabels != nil {
+
+			for i, argumentLabel := range variable.ArgumentLabels {
+				argument := invocationExpression.Arguments[i]
+				providedLabel := argument.Label
+				if argumentLabel == ArgumentLabelNotRequired {
+					// argument label is not required,
+					// check it is not provided
+
+					if providedLabel != "" {
+						panic(&IncorrectArgumentLabelError{
+							ActualArgumentLabel:   providedLabel,
+							ExpectedArgumentLabel: "",
+							StartPos:              argument.Expression.StartPosition(),
+							EndPos:                argument.Expression.EndPosition(),
+						})
+					}
+				} else {
+					// argument label is required,
+					// check it is provided and correct
+					if providedLabel == "" {
+						panic(&MissingArgumentLabelError{
+							ExpectedArgumentLabel: argumentLabel,
+							StartPos:              argument.Expression.StartPosition(),
+							EndPos:                argument.Expression.EndPosition(),
+						})
+					} else if providedLabel != argumentLabel {
+						panic(&IncorrectArgumentLabelError{
+							ActualArgumentLabel:   providedLabel,
+							ExpectedArgumentLabel: argumentLabel,
+							StartPos:              argument.Expression.StartPosition(),
+							EndPos:                argument.Expression.EndPosition(),
+						})
+					}
+				}
+			}
+		}
+	}
 
 	return functionType.ReturnType
 }
@@ -618,13 +867,13 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 		expression.Block,
 	)
 
-	return nil
+	return functionType
 }
 
 // ConvertType converts an AST type representation to a sema type
 func (checker *Checker) ConvertType(t ast.Type) Type {
 	switch t := t.(type) {
-	case *ast.BaseType:
+	case *ast.NominalType:
 		result := checker.findType(t.Identifier)
 		if result == nil {
 			panic(&NotDeclaredError{
@@ -678,6 +927,7 @@ func (checker *Checker) declareFunction(
 	identifier string,
 	identifierPosition *ast.Position,
 	functionType *FunctionType,
+	argumentLabels []string,
 ) {
 	// check if variable with this identifier is already declared in the current scope
 	variable := checker.findVariable(identifier)
@@ -692,9 +942,10 @@ func (checker *Checker) declareFunction(
 
 	// variable with this identifier is not declared in current scope, declare it
 	variable = &Variable{
-		IsConstant: true,
-		Depth:      depth,
-		Type:       functionType,
+		IsConstant:     true,
+		Depth:          depth,
+		Type:           functionType,
+		ArgumentLabels: argumentLabels,
 	}
 	checker.setVariable(identifier, variable)
 }
@@ -735,7 +986,7 @@ func (checker *Checker) visitConditional(
 ) {
 	testType := test.Accept(checker).(Type)
 
-	if !testType.Equal(&BoolType{}) {
+	if !checker.IsSubType(testType, &BoolType{}) {
 		panic(&TypeMismatchError{
 			ExpectedType: &BoolType{},
 			ActualType:   testType,

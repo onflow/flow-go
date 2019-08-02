@@ -5,10 +5,8 @@ import (
 	goRuntime "runtime"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 )
@@ -372,7 +370,7 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 		return interpreter.visitIndexExpressionAssignment(target, value)
 
 	case *ast.MemberExpression:
-		// TODO:
+		// TODO: no structures/dictionaries yet
 		panic(&errors.UnreachableError{})
 	}
 
@@ -408,88 +406,8 @@ func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.Identi
 	return Done{Result: variable.Value}
 }
 
-func (interpreter *Interpreter) visitBinaryIntegerOperand(
-	value Value,
-	operation ast.Operation,
-	side common.OperandSide,
-	startPos *ast.Position,
-	endPos *ast.Position,
-) IntegerValue {
-	integerValue, isInteger := value.(IntegerValue)
-	if !isInteger {
-		panic(&InvalidBinaryOperandError{
-			Operation:    operation,
-			Side:         side,
-			ExpectedType: &sema.IntegerType{},
-			Value:        value,
-			StartPos:     startPos,
-			EndPos:       endPos,
-		})
-	}
-	return integerValue
-}
-
-func (interpreter *Interpreter) visitBinaryBoolOperand(
-	value Value,
-	operation ast.Operation,
-	side common.OperandSide,
-	startPos *ast.Position,
-	endPos *ast.Position,
-) BoolValue {
-	boolValue, isBool := value.(BoolValue)
-	if !isBool {
-		panic(&InvalidBinaryOperandError{
-			Operation:    operation,
-			Side:         side,
-			ExpectedType: &sema.BoolType{},
-			Value:        value,
-			StartPos:     startPos,
-			EndPos:       endPos,
-		})
-	}
-	return boolValue
-}
-
-func (interpreter *Interpreter) visitUnaryBoolOperand(
-	value Value,
-	operation ast.Operation,
-	startPos *ast.Position,
-	endPos *ast.Position,
-) BoolValue {
-	boolValue, isBool := value.(BoolValue)
-	if !isBool {
-		panic(&InvalidUnaryOperandError{
-			Operation:    operation,
-			ExpectedType: &sema.BoolType{},
-			Value:        value,
-			StartPos:     startPos,
-			EndPos:       endPos,
-		})
-	}
-	return boolValue
-}
-
-func (interpreter *Interpreter) visitUnaryIntegerOperand(
-	value Value,
-	operation ast.Operation,
-	startPos *ast.Position,
-	endPos *ast.Position,
-) IntegerValue {
-	integerValue, isInteger := value.(IntegerValue)
-	if !isInteger {
-		panic(&InvalidUnaryOperandError{
-			Operation:    operation,
-			ExpectedType: &sema.IntegerType{},
-			Value:        value,
-			StartPos:     startPos,
-			EndPos:       endPos,
-		})
-	}
-	return integerValue
-}
-
 // visitBinaryOperation interprets the left-hand side and the right-hand side and returns
-// the result in a integerTuple or booleanTuple
+// the result in a Tuple
 func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression) Trampoline {
 	// interpret the left-hand side
 	return expr.Left.Accept(interpreter).(Trampoline).
@@ -498,180 +416,106 @@ func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression)
 			// interpret the right-hand side
 			return expr.Right.Accept(interpreter).(Trampoline).
 				FlatMap(func(right interface{}) Trampoline {
-
-					leftValue := left.(Value)
-					rightValue := right.(Value)
-
-					switch leftValue.(type) {
-					case IntegerValue:
-						left := interpreter.visitBinaryIntegerOperand(
-							leftValue,
-							expr.Operation,
-							common.OperandSideLeft,
-							expr.Left.StartPosition(),
-							expr.Left.EndPosition(),
-						)
-						right := interpreter.visitBinaryIntegerOperand(
-							rightValue,
-							expr.Operation,
-							common.OperandSideRight,
-							expr.Right.StartPosition(),
-							expr.Right.EndPosition(),
-						)
-						return Done{Result: integerTuple{left, right}}
-
-					case BoolValue:
-						left := interpreter.visitBinaryBoolOperand(
-							leftValue,
-							expr.Operation,
-							common.OperandSideLeft,
-							expr.Left.StartPosition(),
-							expr.Left.EndPosition(),
-						)
-						right := interpreter.visitBinaryBoolOperand(
-							rightValue,
-							expr.Operation,
-							common.OperandSideRight,
-							expr.Right.StartPosition(),
-							expr.Right.EndPosition(),
-						)
-
-						return Done{Result: boolTuple{left, right}}
-					}
-
-					panic(&errors.UnreachableError{})
+					return Done{Result: Tuple{left.(Value), right.(Value)}}
 				})
-		})
-}
-
-// visitBinaryIntegerOperation interprets the left-hand side and right-hand side
-// of the binary expression, and applies both integer values to the given binary function
-func (interpreter *Interpreter) visitBinaryIntegerOperation(
-	expression *ast.BinaryExpression,
-	binaryFunction func(IntegerValue, IntegerValue) Value,
-) Trampoline {
-	return interpreter.visitBinaryOperation(expression).
-		Map(func(result interface{}) interface{} {
-			tuple, ok := result.(integerTuple)
-			if !ok {
-				leftValue, rightValue := result.(valueTuple).values()
-				panic(&InvalidBinaryOperandTypesError{
-					Operation:    expression.Operation,
-					ExpectedType: &sema.IntegerType{},
-					LeftValue:    leftValue,
-					RightValue:   rightValue,
-					StartPos:     expression.StartPosition(),
-					EndPos:       expression.EndPosition(),
-				})
-			}
-
-			left, right := tuple.destructure()
-			return binaryFunction(left, right)
-		})
-}
-
-// visitBinaryBoolOperation interprets the left-hand side and right-hand side
-// of the binary expression, and applies both boolean values to the given binary function
-func (interpreter *Interpreter) visitBinaryBoolOperation(
-	expression *ast.BinaryExpression,
-	binaryFunction func(BoolValue, BoolValue) Value,
-) Trampoline {
-	return interpreter.visitBinaryOperation(expression).
-		Map(func(result interface{}) interface{} {
-			tuple, ok := result.(boolTuple)
-			if !ok {
-				leftValue, rightValue := result.(valueTuple).values()
-				panic(&InvalidBinaryOperandTypesError{
-					Operation:    expression.Operation,
-					ExpectedType: &sema.BoolType{},
-					LeftValue:    leftValue,
-					RightValue:   rightValue,
-					StartPos:     expression.StartPosition(),
-					EndPos:       expression.EndPosition(),
-				})
-			}
-
-			left, right := tuple.destructure()
-			return binaryFunction(left, right)
 		})
 }
 
 func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpression) ast.Repr {
 	switch expression.Operation {
 	case ast.OperationPlus:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Plus(right)
 			})
 
 	case ast.OperationMinus:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Minus(right)
 			})
 
 	case ast.OperationMod:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Mod(right)
 			})
 
 	case ast.OperationMul:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Mul(right)
 			})
 
 	case ast.OperationDiv:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Div(right)
 			})
 
 	case ast.OperationLess:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Less(right)
 			})
 
 	case ast.OperationLessEqual:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.LessEqual(right)
 			})
 
 	case ast.OperationGreater:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Greater(right)
 			})
 
 	case ast.OperationGreaterEqual:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.GreaterEqual(right)
 			})
 
 	case ast.OperationEqual:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				switch tuple := result.(type) {
-				case integerTuple:
-					left, right := tuple.destructure()
+				tuple := result.(Tuple)
+
+				switch left := tuple.left.(type) {
+				case IntegerValue:
+					right := tuple.right.(IntegerValue)
 					return BoolValue(left.Equal(right))
 
-				case boolTuple:
-					left, right := tuple.destructure()
-					return BoolValue(left == right)
+				case BoolValue:
+					return BoolValue(tuple.left == tuple.right)
 				}
 
 				panic(&errors.UnreachableError{})
@@ -679,31 +523,36 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 
 	case ast.OperationUnequal:
 		return interpreter.visitBinaryOperation(expression).
-			Map(func(tuple interface{}) interface{} {
-				switch typedTuple := tuple.(type) {
-				case integerTuple:
-					left, right := typedTuple.destructure()
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+
+				switch left := tuple.left.(type) {
+				case IntegerValue:
+					right := tuple.right.(IntegerValue)
 					return BoolValue(!left.Equal(right))
 
-				case boolTuple:
-					left, right := typedTuple.destructure()
-					return BoolValue(left != right)
+				case BoolValue:
+					return BoolValue(tuple.left != tuple.right)
 				}
 
 				panic(&errors.UnreachableError{})
 			})
 
 	case ast.OperationOr:
-		return interpreter.visitBinaryBoolOperation(
-			expression,
-			func(left BoolValue, right BoolValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(BoolValue)
+				right := tuple.right.(BoolValue)
 				return BoolValue(left || right)
 			})
 
 	case ast.OperationAnd:
-		return interpreter.visitBinaryBoolOperation(
-			expression,
-			func(left BoolValue, right BoolValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(BoolValue)
+				right := tuple.right.(BoolValue)
 				return BoolValue(left && right)
 			})
 	}
@@ -711,6 +560,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	panic(&unsupportedOperation{
 		kind:      common.OperationKindBinary,
 		operation: expression.Operation,
+		startPos:  expression.StartPos,
+		endPos:    expression.EndPos,
 	})
 }
 
@@ -721,27 +572,19 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 
 			switch expression.Operation {
 			case ast.OperationNegate:
-				boolValue := interpreter.visitUnaryBoolOperand(
-					value,
-					expression.Operation,
-					expression.StartPosition(),
-					expression.EndPosition(),
-				)
+				boolValue := value.(BoolValue)
 				return boolValue.Negate()
 
 			case ast.OperationMinus:
-				integerValue := interpreter.visitUnaryIntegerOperand(
-					value,
-					expression.Operation,
-					expression.StartPosition(),
-					expression.EndPosition(),
-				)
+				integerValue := value.(IntegerValue)
 				return integerValue.Negate()
 			}
 
 			panic(&unsupportedOperation{
 				kind:      common.OperationKindUnary,
 				operation: expression.Operation,
+				startPos:  expression.StartPos,
+				endPos:    expression.EndPos,
 			})
 		})
 }
@@ -771,7 +614,7 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 }
 
 func (interpreter *Interpreter) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO: no dictionaries yet
+	// TODO: no structures/dictionaries yet
 	panic(&errors.UnreachableError{})
 }
 

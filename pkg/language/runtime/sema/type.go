@@ -70,15 +70,10 @@ func (*IntegerType) Equal(other Type) bool {
 	return ok
 }
 
-type integerType interface {
-	isIntegerType()
-}
-
 // IntType represents the arbitrary-precision integer type `Int`
 type IntType struct{}
 
-func (*IntType) isType()        {}
-func (*IntType) isIntegerType() {}
+func (*IntType) isType() {}
 
 func (*IntType) String() string {
 	return "Int"
@@ -93,8 +88,7 @@ func (*IntType) Equal(other Type) bool {
 
 type Int8Type struct{}
 
-func (*Int8Type) isType()        {}
-func (*Int8Type) isIntegerType() {}
+func (*Int8Type) isType() {}
 
 func (*Int8Type) String() string {
 	return "Int8"
@@ -108,8 +102,7 @@ func (*Int8Type) Equal(other Type) bool {
 // Int16Type represents the 16-bit signed integer type `Int16`
 type Int16Type struct{}
 
-func (*Int16Type) isType()        {}
-func (*Int16Type) isIntegerType() {}
+func (*Int16Type) isType() {}
 
 func (*Int16Type) String() string {
 	return "Int16"
@@ -123,8 +116,7 @@ func (*Int16Type) Equal(other Type) bool {
 // Int32Type represents the 32-bit signed integer type `Int32`
 type Int32Type struct{}
 
-func (*Int32Type) isType()        {}
-func (*Int32Type) isIntegerType() {}
+func (*Int32Type) isType() {}
 
 func (*Int32Type) String() string {
 	return "Int32"
@@ -138,8 +130,7 @@ func (*Int32Type) Equal(other Type) bool {
 // Int64Type represents the 64-bit signed integer type `Int64`
 type Int64Type struct{}
 
-func (*Int64Type) isType()        {}
-func (*Int64Type) isIntegerType() {}
+func (*Int64Type) isType() {}
 
 func (*Int64Type) String() string {
 	return "Int64"
@@ -153,8 +144,7 @@ func (*Int64Type) Equal(other Type) bool {
 // UInt8Type represents the 8-bit unsigned integer type `UInt8`
 type UInt8Type struct{}
 
-func (*UInt8Type) isType()        {}
-func (*UInt8Type) isIntegerType() {}
+func (*UInt8Type) isType() {}
 
 func (*UInt8Type) String() string {
 	return "UInt8"
@@ -168,8 +158,7 @@ func (*UInt8Type) Equal(other Type) bool {
 // UInt16Type represents the 16-bit unsigned integer type `UInt16`
 type UInt16Type struct{}
 
-func (*UInt16Type) isType()        {}
-func (*UInt16Type) isIntegerType() {}
+func (*UInt16Type) isType() {}
 
 func (*UInt16Type) String() string {
 	return "UInt16"
@@ -183,8 +172,7 @@ func (*UInt16Type) Equal(other Type) bool {
 // UInt32Type represents the 32-bit unsigned integer type `UInt32`
 type UInt32Type struct{}
 
-func (*UInt32Type) isType()        {}
-func (*UInt32Type) isIntegerType() {}
+func (*UInt32Type) isType() {}
 
 func (*UInt32Type) String() string {
 	return "UInt32"
@@ -198,8 +186,7 @@ func (*UInt32Type) Equal(other Type) bool {
 // UInt64Type represents the 64-bit unsigned integer type `UInt64`
 type UInt64Type struct{}
 
-func (*UInt64Type) isType()        {}
-func (*UInt64Type) isIntegerType() {}
+func (*UInt64Type) isType() {}
 
 func (*UInt64Type) String() string {
 	return "UInt64"
@@ -342,20 +329,31 @@ func (t *FunctionType) Equal(other Type) bool {
 var baseTypes hamt.Map
 
 func init() {
-	for name, baseType := range map[string]Type{
-		"":       &VoidType{},
-		"Void":   &VoidType{},
-		"Bool":   &BoolType{},
-		"Int":    &IntType{},
-		"Int8":   &Int8Type{},
-		"Int16":  &Int16Type{},
-		"Int32":  &Int32Type{},
-		"Int64":  &Int64Type{},
-		"UInt8":  &UInt8Type{},
-		"UInt16": &UInt16Type{},
-		"UInt32": &UInt32Type{},
-		"UInt64": &UInt64Type{},
-	} {
+
+	typeNames := map[string]Type{
+		"": &VoidType{},
+	}
+
+	types := []Type{
+		&VoidType{},
+		&AnyType{},
+		&BoolType{},
+		&IntType{},
+		&Int8Type{},
+		&Int16Type{},
+		&Int32Type{},
+		&Int64Type{},
+		&UInt8Type{},
+		&UInt16Type{},
+		&UInt32Type{},
+		&UInt64Type{},
+	}
+
+	for _, ty := range types {
+		typeNames[ty.String()] = ty
+	}
+
+	for name, baseType := range typeNames {
 		baseTypes = baseTypes.Insert(activations.StringKey(name), baseType)
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 )
 
 // SecondaryError
@@ -20,11 +19,24 @@ type SecondaryError interface {
 type unsupportedOperation struct {
 	kind      common.OperationKind
 	operation ast.Operation
-	pos       *ast.Position
+	startPos  *ast.Position
+	endPos    *ast.Position
 }
 
 func (e *unsupportedOperation) Error() string {
-	return fmt.Sprintf("cannot evaluate unsupported %s operation: %s", e.kind.Name(), e.operation.Symbol())
+	return fmt.Sprintf(
+		"cannot evaluate unsupported %s operation: %s",
+		e.kind.Name(),
+		e.operation.Symbol(),
+	)
+}
+
+func (e *unsupportedOperation) StartPosition() *ast.Position {
+	return e.startPos
+}
+
+func (e *unsupportedOperation) EndPosition() *ast.Position {
+	return e.endPos
 }
 
 // NotDeclaredError
@@ -69,90 +81,6 @@ func (e *NotCallableError) StartPosition() *ast.Position {
 }
 
 func (e *NotCallableError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// InvalidUnaryOperandError
-
-type InvalidUnaryOperandError struct {
-	Operation    ast.Operation
-	ExpectedType sema.Type
-	Value        Value
-	StartPos     *ast.Position
-	EndPos       *ast.Position
-}
-
-func (e *InvalidUnaryOperandError) Error() string {
-	return fmt.Sprintf(
-		"cannot apply unary operation %s to value: %#+v. Expected type %s",
-		e.Operation.Symbol(),
-		e.Value,
-		e.ExpectedType.String(),
-	)
-}
-
-func (e *InvalidUnaryOperandError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidUnaryOperandError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// InvalidBinaryOperandError
-
-type InvalidBinaryOperandError struct {
-	Operation    ast.Operation
-	Side         common.OperandSide
-	ExpectedType sema.Type
-	Value        Value
-	StartPos     *ast.Position
-	EndPos       *ast.Position
-}
-
-func (e *InvalidBinaryOperandError) Error() string {
-	return fmt.Sprintf(
-		"cannot apply binary operation %s to %s-hand value: %s. Expected type %s",
-		e.Operation.Symbol(),
-		e.Side.Name(),
-		e.Value,
-		e.ExpectedType.String(),
-	)
-}
-
-func (e *InvalidBinaryOperandError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidBinaryOperandError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// InvalidBinaryOperandTypesError
-
-type InvalidBinaryOperandTypesError struct {
-	Operation    ast.Operation
-	ExpectedType sema.Type
-	LeftValue    Value
-	RightValue   Value
-	StartPos     *ast.Position
-	EndPos       *ast.Position
-}
-
-func (e *InvalidBinaryOperandTypesError) Error() string {
-	return fmt.Sprintf(
-		"can't apply binary operation %s to values: %s, %s. Expected type %s",
-		e.Operation.Symbol(),
-		e.LeftValue, e.RightValue,
-		e.ExpectedType.String(),
-	)
-}
-
-func (e *InvalidBinaryOperandTypesError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidBinaryOperandTypesError) EndPosition() *ast.Position {
 	return e.EndPos
 }
 
