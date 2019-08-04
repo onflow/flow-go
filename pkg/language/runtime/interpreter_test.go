@@ -377,21 +377,7 @@ func TestInterpretPlusOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testIntegers(): Int64 {
-           return 2 + 4
-       }
-
-       fun testIntegerAndBool(): Int64 {
-           return 2 + true
-       }
-
-       fun testBoolAndInteger(): Int64 {
-           return true + 2
-       }
-
-       fun testBools(): Int64 {
-           return true + true
-       }
+       let x = 2 + 4
 	`)
 
 	Expect(errors).
@@ -402,41 +388,15 @@ func TestInterpretPlusOperator(t *testing.T) {
 	Expect(err).
 		ToNot(HaveOccurred())
 
-	Expect(inter.Invoke("testIntegers")).
+	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBools")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretMinusOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testIntegers(): Int64 {
-           return 2 - 4
-       }
-
-       fun testIntegerAndBool(): Int64 {
-           return 2 - true
-       }
-
-       fun testBoolAndInteger(): Int64 {
-           return true - 2
-       }
-
-       fun testBools(): Int64 {
-           return true - true
-       }
+       let x = 2 - 4
 	`)
 
 	Expect(errors).
@@ -447,41 +407,15 @@ func TestInterpretMinusOperator(t *testing.T) {
 	Expect(err).
 		ToNot(HaveOccurred())
 
-	Expect(inter.Invoke("testIntegers")).
+	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(-2)}))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBools")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretMulOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testIntegers(): Int64 {
-           return 2 * 4
-       }
-
-       fun testIntegerAndBool(): Int64 {
-           return 2 * true
-       }
-
-       fun testBoolAndInteger(): Int64 {
-           return true * 2
-       }
-
-       fun testBools(): Int64 {
-           return true * true
-       }
+       let x = 2 * 4
 	`)
 
 	Expect(errors).
@@ -492,41 +426,15 @@ func TestInterpretMulOperator(t *testing.T) {
 	Expect(err).
 		ToNot(HaveOccurred())
 
-	Expect(inter.Invoke("testIntegers")).
+	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(8)}))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBools")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretDivOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testIntegers(): Int64 {
-           return 7 / 3
-       }
-
-       fun testIntegerAndBool(): Int64 {
-           return 7 / true
-       }
-
-       fun testBoolAndInteger(): Int64 {
-           return true / 2
-       }
-
-       fun testBools(): Int64 {
-           return true / true
-       }
+       let x = 7 / 3
 	`)
 
 	Expect(errors).
@@ -537,41 +445,15 @@ func TestInterpretDivOperator(t *testing.T) {
 	Expect(err).
 		ToNot(HaveOccurred())
 
-	Expect(inter.Invoke("testIntegers")).
+	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBools")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretModOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testIntegers(): Int64 {
-           return 5 % 3
-       }
-
-       fun testIntegerAndBool(): Int64 {
-           return 5 % true
-       }
-
-       fun testBoolAndInteger(): Int64 {
-           return true % 2
-       }
-
-       fun testBools(): Int64 {
-           return true % true
-       }
+       let x = 5 % 3
 	`)
 
 	Expect(errors).
@@ -582,57 +464,37 @@ func TestInterpretModOperator(t *testing.T) {
 	Expect(err).
 		ToNot(HaveOccurred())
 
-	Expect(inter.Invoke("testIntegers")).
+	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBools")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testIntegersUnequal(): Bool {
-           return 5 == 3
-       }
+      fun testIntegersUnequal(): Bool {
+          return 5 == 3
+      }
 
-       fun testIntegersEqual(): Bool {
-           return 3 == 3
-       }
+      fun testIntegersEqual(): Bool {
+          return 3 == 3
+      }
 
-       fun testIntegerAndBool(): Bool {
-           return 5 == true
-       }
+      fun testTrueAndTrue(): Bool {
+          return true == true
+      }
 
-       fun testBoolAndInteger(): Bool {
-           return true == 5
-       }
+      fun testTrueAndFalse(): Bool {
+          return true == false
+      }
 
-       fun testTrueAndTrue(): Bool {
-           return true == true
-       }
+      fun testFalseAndTrue(): Bool {
+          return false == true
+      }
 
-       fun testTrueAndFalse(): Bool {
-           return true == false
-       }
-
-       fun testFalseAndTrue(): Bool {
-           return false == true
-       }
-
-       fun testFalseAndFalse(): Bool {
-           return false == false
-       }
+      fun testFalseAndFalse(): Bool {
+          return false == false
+      }
 	`)
 
 	Expect(errors).
@@ -648,14 +510,6 @@ func TestInterpretEqualOperator(t *testing.T) {
 
 	Expect(inter.Invoke("testIntegersEqual")).
 		To(Equal(interpreter.BoolValue(true)))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	Expect(inter.Invoke("testTrueAndTrue")).
 		To(Equal(interpreter.BoolValue(true)))
@@ -674,37 +528,29 @@ func TestInterpretUnequalOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testIntegersUnequal(): Bool {
-           return 5 != 3
-       }
+      fun testIntegersUnequal(): Bool {
+          return 5 != 3
+      }
 
-       fun testIntegersEqual(): Bool {
-           return 3 != 3
-       }
+      fun testIntegersEqual(): Bool {
+          return 3 != 3
+      }
 
-       fun testIntegerAndBool(): Bool {
-           return 5 != true
-       }
+      fun testTrueAndTrue(): Bool {
+          return true != true
+      }
 
-       fun testBoolAndInteger(): Bool {
-           return true != 5
-       }
+      fun testTrueAndFalse(): Bool {
+          return true != false
+      }
 
-       fun testTrueAndTrue(): Bool {
-           return true != true
-       }
+      fun testFalseAndTrue(): Bool {
+          return false != true
+      }
 
-       fun testTrueAndFalse(): Bool {
-           return true != false
-       }
-
-       fun testFalseAndTrue(): Bool {
-           return false != true
-       }
-
-       fun testFalseAndFalse(): Bool {
-           return false != false
-       }
+      fun testFalseAndFalse(): Bool {
+          return false != false
+      }
 	`)
 
 	Expect(errors).
@@ -720,14 +566,6 @@ func TestInterpretUnequalOperator(t *testing.T) {
 
 	Expect(inter.Invoke("testIntegersEqual")).
 		To(Equal(interpreter.BoolValue(false)))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
 
 	Expect(inter.Invoke("testTrueAndTrue")).
 		To(Equal(interpreter.BoolValue(false)))
@@ -746,42 +584,18 @@ func TestInterpretLessOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testIntegersGreater(): Bool {
-           return 5 < 3
-       }
+      fun testIntegersGreater(): Bool {
+          return 5 < 3
+      }
 
-       fun testIntegersEqual(): Bool {
-           return 3 < 3
-       }
+      fun testIntegersEqual(): Bool {
+          return 3 < 3
+      }
 
-       fun testIntegersLess(): Bool {
-           return 3 < 5
-       }
-
-       fun testIntegerAndBool(): Bool {
-           return 5 < true
-       }
-
-       fun testBoolAndInteger(): Bool {
-           return true < 5
-       }
-
-       fun testTrueAndTrue(): Bool {
-           return true < true
-       }
-
-       fun testTrueAndFalse(): Bool {
-           return true < false
-       }
-
-       fun testFalseAndTrue(): Bool {
-           return false < true
-       }
-
-       fun testFalseAndFalse(): Bool {
-           return false < false
-       }
-	`)
+      fun testIntegersLess(): Bool {
+          return 3 < 5
+      }
+    `)
 
 	Expect(errors).
 		To(BeEmpty())
@@ -799,71 +613,23 @@ func TestInterpretLessOperator(t *testing.T) {
 
 	Expect(inter.Invoke("testIntegersLess")).
 		To(Equal(interpreter.BoolValue(true)))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testTrueAndTrue")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testTrueAndFalse")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testFalseAndTrue")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testFalseAndFalse")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretLessEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testIntegersGreater(): Bool {
-           return 5 <= 3
-       }
+      fun testIntegersGreater(): Bool {
+          return 5 <= 3
+      }
 
-       fun testIntegersEqual(): Bool {
-           return 3 <= 3
-       }
+      fun testIntegersEqual(): Bool {
+          return 3 <= 3
+      }
 
-       fun testIntegersLess(): Bool {
-           return 3 <= 5
-       }
-
-       fun testIntegerAndBool(): Bool {
-           return 5 <= true
-       }
-
-       fun testBoolAndInteger(): Bool {
-           return true <= 5
-       }
-
-       fun testTrueAndTrue(): Bool {
-           return true <= true
-       }
-
-       fun testTrueAndFalse(): Bool {
-           return true <= false
-       }
-
-       fun testFalseAndTrue(): Bool {
-           return false <= true
-       }
-
-       fun testFalseAndFalse(): Bool {
-           return false <= false
-       }
+      fun testIntegersLess(): Bool {
+          return 3 <= 5
+      }
 	`)
 
 	Expect(errors).
@@ -882,71 +648,23 @@ func TestInterpretLessEqualOperator(t *testing.T) {
 
 	Expect(inter.Invoke("testIntegersLess")).
 		To(Equal(interpreter.BoolValue(true)))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testTrueAndTrue")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testTrueAndFalse")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testFalseAndTrue")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testFalseAndFalse")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretGreaterOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testIntegersGreater(): Bool {
-           return 5 > 3
-       }
+      fun testIntegersGreater(): Bool {
+          return 5 > 3
+      }
 
-       fun testIntegersEqual(): Bool {
-           return 3 > 3
-       }
+      fun testIntegersEqual(): Bool {
+          return 3 > 3
+      }
 
-       fun testIntegersLess(): Bool {
-           return 3 > 5
-       }
-
-       fun testIntegerAndBool(): Bool {
-           return 5 > true
-       }
-
-       fun testBoolAndInteger(): Bool {
-           return true > 5
-       }
-
-       fun testTrueAndTrue(): Bool {
-           return true > true
-       }
-
-       fun testTrueAndFalse(): Bool {
-           return true > false
-       }
-
-       fun testFalseAndTrue(): Bool {
-           return false > true
-       }
-
-       fun testFalseAndFalse(): Bool {
-           return false > false
-       }
+      fun testIntegersLess(): Bool {
+          return 3 > 5
+      }
 	`)
 
 	Expect(errors).
@@ -965,71 +683,23 @@ func TestInterpretGreaterOperator(t *testing.T) {
 
 	Expect(inter.Invoke("testIntegersLess")).
 		To(Equal(interpreter.BoolValue(false)))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testTrueAndTrue")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testTrueAndFalse")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testFalseAndTrue")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testFalseAndFalse")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretGreaterEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testIntegersGreater(): Bool {
-           return 5 >= 3
-       }
+      fun testIntegersGreater(): Bool {
+          return 5 >= 3
+      }
 
-       fun testIntegersEqual(): Bool {
-           return 3 >= 3
-       }
+      fun testIntegersEqual(): Bool {
+          return 3 >= 3
+      }
 
-       fun testIntegersLess(): Bool {
-           return 3 >= 5
-       }
-
-       fun testIntegerAndBool(): Bool {
-           return 5 >= true
-       }
-
-       fun testBoolAndInteger(): Bool {
-           return true >= 5
-       }
-
-       fun testTrueAndTrue(): Bool {
-           return true >= true
-       }
-
-       fun testTrueAndFalse(): Bool {
-           return true >= false
-       }
-
-       fun testFalseAndTrue(): Bool {
-           return false >= true
-       }
-
-       fun testFalseAndFalse(): Bool {
-           return false >= false
-       }
+      fun testIntegersLess(): Bool {
+          return 3 >= 5
+      }
 	`)
 
 	Expect(errors).
@@ -1048,63 +718,27 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
 
 	Expect(inter.Invoke("testIntegersLess")).
 		To(Equal(interpreter.BoolValue(false)))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testTrueAndTrue")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testTrueAndFalse")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testFalseAndTrue")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
-
-	_, err = inter.Invoke("testFalseAndFalse")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretOrOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testTrueTrue(): Bool {
-           return true || true
-       }
+      fun testTrueTrue(): Bool {
+          return true || true
+      }
 
-       fun testTrueFalse(): Bool {
-           return true || false
-       }
+      fun testTrueFalse(): Bool {
+          return true || false
+      }
 
-       fun testFalseTrue(): Bool {
-           return false || true
-       }
+      fun testFalseTrue(): Bool {
+          return false || true
+      }
 
-       fun testFalseFalse(): Bool {
-           return false || false
-       }
-
-       fun testBoolAndInteger(): Bool {
-           return false || 2
-       }
-
-       fun testIntegerAndBool(): Bool {
-           return 2 || false
-       }
-
-       fun testIntegers(): Bool {
-           return 2 || 3
-       }
+      fun testFalseFalse(): Bool {
+          return false || false
+      }
 	`)
 
 	Expect(errors).
@@ -1126,51 +760,27 @@ func TestInterpretOrOperator(t *testing.T) {
 
 	Expect(inter.Invoke("testFalseFalse")).
 		To(Equal(interpreter.BoolValue(false)))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testIntegers")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretAndOperator(t *testing.T) {
 	RegisterTestingT(t)
 
 	program, errors := parser.Parse(`
-       fun testTrueTrue(): Bool {
-           return true && true
-       }
+      fun testTrueTrue(): Bool {
+          return true && true
+      }
 
-       fun testTrueFalse(): Bool {
-           return true && false
-       }
+      fun testTrueFalse(): Bool {
+          return true && false
+      }
 
-       fun testFalseTrue(): Bool {
-           return false && true
-       }
+      fun testFalseTrue(): Bool {
+          return false && true
+      }
 
-       fun testFalseFalse(): Bool {
-           return false && false
-       }
-
-       fun testBoolAndInteger(): Bool {
-           return false && 2
-       }
-
-       fun testIntegerAndBool(): Bool {
-           return 2 && false
-       }
-
-       fun testIntegers(): Bool {
-           return 2 && 3
-       }
+      fun testFalseFalse(): Bool {
+          return false && false
+      }
 	`)
 
 	Expect(errors).
@@ -1192,18 +802,6 @@ func TestInterpretAndOperator(t *testing.T) {
 
 	Expect(inter.Invoke("testFalseFalse")).
 		To(Equal(interpreter.BoolValue(false)))
-
-	_, err = inter.Invoke("testBoolAndInteger")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testIntegerAndBool")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandError{}))
-
-	_, err = inter.Invoke("testIntegers")
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidBinaryOperandTypesError{}))
 }
 
 func TestInterpretIfStatement(t *testing.T) {
@@ -1485,38 +1083,6 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 
 	Expect(inter.Globals["d"].Value).
 		To(Equal(interpreter.BoolValue(false)))
-}
-
-func TestInterpretInvalidUnaryIntegerNegation(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-      let a = !1
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidUnaryOperandError{}))
-}
-
-func TestInterpretInvalidUnaryBooleanNegation(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-      let a = -true
-	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.InvalidUnaryOperandError{}))
 }
 
 func TestInterpretHostFunction(t *testing.T) {

@@ -1,9 +1,12 @@
 package runtime
 
 import (
+	"fmt"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 	"testing"
 )
 
@@ -47,6 +50,24 @@ func TestCheckBoolean(t *testing.T) {
 
 	Expect(checker.Globals["x"].Type).
 		To(Equal(&sema.BoolType{}))
+}
+
+func TestCheckInvalidGlobalRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+        let x = true
+        let x = false
+    `)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
 func TestCheckInvalidVariableRedeclaration(t *testing.T) {
@@ -345,6 +366,26 @@ func TestCheckArrayIndexingAssignmentWithInteger(t *testing.T) {
 
 	Expect(err).
 		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test() {
+          let z = [0, 3]
+          z[0] = true
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
@@ -938,4 +979,141 @@ func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidUnaryBooleanNegationOfInteger(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let a = !1
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
+}
+
+func TestCheckUnaryBooleanNegation(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let a = !true
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidUnaryIntegerNegationOfBoolean(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let a = -true
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
+}
+
+func TestCheckUnaryIntegerNegation(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      let a = -1
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+type operationTest struct {
+	left, right string
+	matcher     types.GomegaMatcher
+}
+
+type operationTests struct {
+	operations []ast.Operation
+	tests      []operationTest
+}
+
+func TestCheckIntegerBinaryOperations(t *testing.T) {
+	RegisterTestingT(t)
+
+	allOperationTests := []operationTests{
+		{
+			operations: []ast.Operation{
+				ast.OperationPlus, ast.OperationMinus, ast.OperationMod, ast.OperationMul, ast.OperationDiv,
+				ast.OperationLess, ast.OperationLessEqual, ast.OperationGreater, ast.OperationGreaterEqual,
+			},
+			tests: []operationTest{
+				{"1", "2", Not(HaveOccurred())},
+				{"true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{"1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{"true", "false", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+			},
+		},
+		{
+			operations: []ast.Operation{
+				ast.OperationOr, ast.OperationAnd,
+			},
+			tests: []operationTest{
+				{"true", "false", Not(HaveOccurred())},
+				{"true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{"1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{"1", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+			},
+		},
+		{
+			operations: []ast.Operation{
+				ast.OperationEqual, ast.OperationUnequal,
+			},
+			tests: []operationTest{
+				{"true", "false", Not(HaveOccurred())},
+				{"1", "2", Not(HaveOccurred())},
+				{"true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{"1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+			},
+		},
+	}
+
+	for _, operationTests := range allOperationTests {
+		for _, operation := range operationTests.operations {
+			for _, test := range operationTests.tests {
+				code := fmt.Sprintf(`let a = %s %s %s`, test.left, operation.Symbol(), test.right)
+				program, errors := parser.Parse(code)
+
+				Expect(errors).
+					To(BeEmpty())
+
+				checker := sema.NewChecker(program)
+				err := checker.Check()
+
+				Expect(err).
+					To(test.matcher)
+			}
+		}
+	}
 }

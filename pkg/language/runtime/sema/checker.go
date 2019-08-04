@@ -37,8 +37,24 @@ func NewChecker(program *ast.Program) *Checker {
 }
 
 func (checker *Checker) IsSubType(subType Type, superType Type) bool {
-	// TODO: improve
-	return subType.Equal(superType)
+	if subType.Equal(superType) {
+		return true
+	}
+
+	if _, ok := superType.(*IntegerType); ok {
+		switch subType.(type) {
+		case *IntType,
+			*Int8Type, *Int16Type, *Int32Type, *Int64Type,
+			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type:
+
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	return false
 }
 
 func (checker *Checker) IndexableElementType(ty Type) Type {
@@ -54,8 +70,7 @@ func (checker *Checker) IsIndexingType(indexingType Type, indexedType Type) bool
 	switch indexedType.(type) {
 	// arrays can be index with integers
 	case ArrayType:
-		_, ok := indexingType.(integerType)
-		return ok
+		return checker.IsSubType(indexingType, &IntegerType{})
 	}
 
 	return false
@@ -326,7 +341,7 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 	test := statement.Test
 	testType := test.Accept(checker).(Type)
 
-	if !testType.Equal(&BoolType{}) {
+	if !checker.IsSubType(testType, &BoolType{}) {
 		panic(&TypeMismatchError{
 			ExpectedType: &BoolType{},
 			ActualType:   testType,
@@ -367,7 +382,7 @@ func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentState
 		return
 
 	case *ast.MemberExpression:
-		// TODO:
+		// TODO: no structures/dictionaries yet
 		panic(&errors.UnreachableError{})
 
 	default:
@@ -467,13 +482,166 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	return variable.Type
 }
 
+func (checker *Checker) visitBinaryOperation(expr *ast.BinaryExpression) (left, right Type) {
+	left = expr.Left.Accept(checker).(Type)
+	right = expr.Right.Accept(checker).(Type)
+	return
+}
+
 func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) ast.Repr {
-	// TODO:
-	return nil
+	left, right := checker.visitBinaryOperation(expression)
+
+	operation := expression.Operation
+	switch operation {
+	case ast.OperationPlus, ast.OperationMinus, ast.OperationMod, ast.OperationMul, ast.OperationDiv,
+		ast.OperationLess, ast.OperationLessEqual, ast.OperationGreater, ast.OperationGreaterEqual:
+
+		// check both types are integer subtypes
+
+		leftIsInteger := checker.IsSubType(left, &IntegerType{})
+		rightIsInteger := checker.IsSubType(right, &IntegerType{})
+
+		if !leftIsInteger && !rightIsInteger {
+			panic(&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  left,
+				RightType: right,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			})
+		} else if !leftIsInteger {
+			panic(&InvalidBinaryOperandError{
+				Operation:    operation,
+				Side:         common.OperandSideLeft,
+				ExpectedType: &IntegerType{},
+				ActualType:   left,
+				StartPos:     expression.Left.StartPosition(),
+				EndPos:       expression.Left.EndPosition(),
+			})
+		} else if !rightIsInteger {
+			panic(&InvalidBinaryOperandError{
+				Operation:    operation,
+				Side:         common.OperandSideRight,
+				ExpectedType: &IntegerType{},
+				ActualType:   right,
+				StartPos:     expression.Right.StartPosition(),
+				EndPos:       expression.Right.EndPosition(),
+			})
+		}
+
+		// check both types are equal
+
+		if !left.Equal(right) {
+			panic(&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  left,
+				RightType: right,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			})
+		}
+
+		return left
+
+	case ast.OperationEqual, ast.OperationUnequal:
+		// check both types are equal, and boolean subtypes or integer subtypes
+
+		if !(left.Equal(right) &&
+			(checker.IsSubType(left, &BoolType{}) || checker.IsSubType(left, &IntegerType{}))) {
+
+			panic(&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  left,
+				RightType: right,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			})
+		}
+
+		return left
+
+	case ast.OperationOr, ast.OperationAnd:
+
+		// check both types are integer subtypes
+
+		leftIsBool := checker.IsSubType(left, &BoolType{})
+		rightIsBool := checker.IsSubType(right, &BoolType{})
+
+		if !leftIsBool && !rightIsBool {
+			panic(&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  left,
+				RightType: right,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			})
+		} else if !leftIsBool {
+			panic(&InvalidBinaryOperandError{
+				Operation:    operation,
+				Side:         common.OperandSideLeft,
+				ExpectedType: &BoolType{},
+				ActualType:   left,
+				StartPos:     expression.Left.StartPosition(),
+				EndPos:       expression.Left.EndPosition(),
+			})
+		} else if !rightIsBool {
+			panic(&InvalidBinaryOperandError{
+				Operation:    operation,
+				Side:         common.OperandSideRight,
+				ExpectedType: &BoolType{},
+				ActualType:   right,
+				StartPos:     expression.Right.StartPosition(),
+				EndPos:       expression.Right.EndPosition(),
+			})
+		}
+
+		return &BoolType{}
+	}
+
+	panic(&unsupportedOperation{
+		kind:      common.OperationKindBinary,
+		operation: operation,
+		startPos:  expression.StartPos,
+		endPos:    expression.EndPos,
+	})
 }
 
 func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {
-	// TODO:
+	valueType := expression.Expression.Accept(checker).(Type)
+
+	switch expression.Operation {
+	case ast.OperationNegate:
+		if !checker.IsSubType(valueType, &BoolType{}) {
+			panic(&InvalidUnaryOperandError{
+				Operation:    expression.Operation,
+				ExpectedType: &BoolType{},
+				ActualType:   valueType,
+				StartPos:     expression.Expression.StartPosition(),
+				EndPos:       expression.Expression.EndPosition(),
+			})
+		}
+		return valueType
+
+	case ast.OperationMinus:
+		if !checker.IsSubType(valueType, &IntegerType{}) {
+			panic(&InvalidUnaryOperandError{
+				Operation:    expression.Operation,
+				ExpectedType: &IntegerType{},
+				ActualType:   valueType,
+				StartPos:     expression.Expression.StartPosition(),
+				EndPos:       expression.Expression.EndPosition(),
+			})
+		}
+		return valueType
+	}
+
+	panic(&unsupportedOperation{
+		kind:      common.OperationKindUnary,
+		operation: expression.Operation,
+		startPos:  expression.StartPos,
+		endPos:    expression.EndPos,
+	})
+
 	return nil
 }
 
@@ -525,9 +693,8 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 }
 
 func (checker *Checker) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO:
+	// TODO: no structures/dictionaries yet
 	panic(&errors.UnreachableError{})
-	return nil
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
@@ -735,7 +902,7 @@ func (checker *Checker) visitConditional(
 ) {
 	testType := test.Accept(checker).(Type)
 
-	if !testType.Equal(&BoolType{}) {
+	if !checker.IsSubType(testType, &BoolType{}) {
 		panic(&TypeMismatchError{
 			ExpectedType: &BoolType{},
 			ActualType:   testType,
