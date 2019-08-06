@@ -10,6 +10,12 @@ import (
 	"testing"
 )
 
+func checkProgram(program *ast.Program) (*sema.Checker, error) {
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+	return checker, err
+}
+
 func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -21,10 +27,10 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	checker, err := checkProgram(program)
+
 	Expect(err).
-		ToNot(HaveOccurred())
+		To(Not(HaveOccurred()))
 
 	Expect(checker.Globals["x"].Type).
 		To(Equal(&sema.IntType{}))
@@ -43,10 +49,10 @@ func TestCheckBoolean(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	checker, err := checkProgram(program)
+
 	Expect(err).
-		ToNot(HaveOccurred())
+		To(Not(HaveOccurred()))
 
 	Expect(checker.Globals["x"].Type).
 		To(Equal(&sema.BoolType{}))
@@ -63,8 +69,7 @@ func TestCheckInvalidGlobalRedeclaration(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
@@ -83,8 +88,7 @@ func TestCheckInvalidVariableRedeclaration(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
@@ -102,8 +106,7 @@ func TestCheckInvalidUnknownDeclaration(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -121,8 +124,7 @@ func TestCheckInvalidUnknownDeclarationAssignment(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -141,8 +143,7 @@ func TestCheckInvalidConstantAssignment(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
@@ -161,11 +162,10 @@ func TestCheckAssignment(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
-		ToNot(HaveOccurred())
+		To(Not(HaveOccurred()))
 }
 
 func TestCheckInvalidGlobalConstantAssignment(t *testing.T) {
@@ -182,8 +182,7 @@ func TestCheckInvalidGlobalConstantAssignment(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
@@ -204,11 +203,10 @@ func TestCheckGlobalVariableAssignment(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
-		ToNot(HaveOccurred())
+		To(Not(HaveOccurred()))
 }
 
 func TestCheckInvalidAssignmentToParameter(t *testing.T) {
@@ -223,8 +221,7 @@ func TestCheckInvalidAssignmentToParameter(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
@@ -243,11 +240,28 @@ func TestCheckArrayIndexingWithInteger(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayElements(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun test() {
+          let z = [0, true]
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	_, err := checkProgram(program)
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckNestedArrayIndexingWithInteger(t *testing.T) {
@@ -263,8 +277,7 @@ func TestCheckNestedArrayIndexingWithInteger(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -283,8 +296,7 @@ func TestCheckInvalidArrayIndexingWithBool(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
@@ -302,8 +314,7 @@ func TestCheckInvalidArrayIndexingIntoBool(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
@@ -321,8 +332,7 @@ func TestCheckInvalidArrayIndexingIntoInteger(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
@@ -341,8 +351,7 @@ func TestCheckInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
@@ -361,8 +370,7 @@ func TestCheckArrayIndexingAssignmentWithInteger(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -381,8 +389,7 @@ func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -400,8 +407,7 @@ func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -419,8 +425,7 @@ func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -436,8 +441,7 @@ func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
@@ -453,8 +457,7 @@ func TestCheckInvalidArgumentLabelRedeclaration(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
@@ -470,8 +473,7 @@ func TestCheckArgumentLabelRedeclaration(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -487,8 +489,7 @@ func TestCheckInvalidConstantValue(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -506,8 +507,7 @@ func TestCheckInvalidFunctionDeclarationReturnValue(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -525,8 +525,7 @@ func TestCheckInvalidFunctionExpressionReturnValue(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -544,8 +543,7 @@ func TestCheckInvalidReference(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -563,8 +561,7 @@ func TestCheckReferenceInFunction(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -582,8 +579,7 @@ func TestCheckParameterNameWithFunctionName(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -601,8 +597,7 @@ func TestCheckIfStatementTest(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -620,8 +615,7 @@ func TestCheckInvalidIfStatementTest(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -641,8 +635,7 @@ func TestCheckInvalidIfStatementElse(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -660,8 +653,7 @@ func TestCheckConditionalExpressionTest(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -679,8 +671,7 @@ func TestCheckInvalidConditionalExpressionTest(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -698,8 +689,7 @@ func TestCheckInvalidConditionalExpressionElse(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -717,8 +707,7 @@ func TestCheckInvalidConditionalExpressionTypes(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -736,8 +725,7 @@ func TestCheckInvalidWhileTest(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -755,8 +743,7 @@ func TestCheckWhileTest(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -774,8 +761,7 @@ func TestCheckInvalidWhileBlock(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -797,8 +783,7 @@ func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
@@ -820,8 +805,7 @@ func TestCheckFunctionCallWithArgumentLabel(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -843,59 +827,100 @@ func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
 
-// TODO:
-//func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
-//	RegisterTestingT(t)
-//
-//	program, errors := parser.Parse(`
-//      fun f(x: Int): Int {
-//          return x
-//      }
-//
-//      fun test(): Int {
-//          return f(1)
-//      }
-//	`)
-//
-//	Expect(errors).
-//		To(BeEmpty())
-//
-//	checker := sema.NewChecker(program)
-//	err := checker.Check()
-//
-//	Expect(err).
-//		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
-//}
-//
-//func TestCheckFunctionCallIncorrectArgumentLabel(t *testing.T) {
-//	RegisterTestingT(t)
-//
-//	program, errors := parser.Parse(`
-//      fun f(x: Int): Int {
-//          return x
-//      }
-//
-//      fun test(): Int {
-//          return f(y: 1)
-//      }
-//	`)
-//
-//	Expect(errors).
-//		To(BeEmpty())
-//
-//	checker := sema.NewChecker(program)
-//	err := checker.Check()
-//
-//	Expect(err).
-//		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
-//}
+func TestCheckInvalidFunctionCallWithNotRequiredArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun f(_ x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
+          return f(x: 1)
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	_, err := checkProgram(program)
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
+}
+
+func TestCheckIndirectFunctionCallWithoutArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun f(x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
+          let g = f
+          return g(1)
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	_, err := checkProgram(program)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun f(x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
+          return f(1)
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	_, err := checkProgram(program)
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+}
+
+func TestCheckFunctionCallIncorrectArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	program, errors := parser.Parse(`
+      fun f(x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
+          return f(y: 1)
+      }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	_, err := checkProgram(program)
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
+}
 
 func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 	RegisterTestingT(t)
@@ -913,8 +938,7 @@ func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
@@ -932,8 +956,7 @@ func TestCheckInvalidFunctionCallOfBool(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
@@ -951,8 +974,7 @@ func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
@@ -974,8 +996,7 @@ func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -991,8 +1012,7 @@ func TestCheckInvalidUnaryBooleanNegationOfInteger(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
@@ -1008,8 +1028,7 @@ func TestCheckUnaryBooleanNegation(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -1025,8 +1044,7 @@ func TestCheckInvalidUnaryIntegerNegationOfBoolean(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
@@ -1042,8 +1060,7 @@ func TestCheckUnaryIntegerNegation(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -1108,8 +1125,7 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				Expect(errors).
 					To(BeEmpty())
 
-				checker := sema.NewChecker(program)
-				err := checker.Check()
+				_, err := checkProgram(program)
 
 				Expect(err).
 					To(test.matcher)

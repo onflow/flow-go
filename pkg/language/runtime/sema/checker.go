@@ -150,7 +150,25 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
-	checker.declareFunction(declaration.Identifier, declaration.IdentifierPos, functionType)
+
+	argumentLabels := make([]string, len(declaration.Parameters))
+
+	for i, parameter := range declaration.Parameters {
+		argumentLabel := parameter.Label
+		// if no argument label is given, the parameter name
+		// is used as the argument labels and is required
+		if argumentLabel == "" {
+			argumentLabel = parameter.Identifier
+		}
+		argumentLabels[i] = argumentLabel
+	}
+
+	checker.declareFunction(
+		declaration.Identifier,
+		declaration.IdentifierPos,
+		functionType,
+		argumentLabels,
+	)
 
 	checker.checkFunction(
 		declaration.Parameters,
@@ -469,6 +487,11 @@ func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpre
 }
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
+	variable := checker.findAndCheckVariable(expression)
+	return variable.Type
+}
+
+func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpression) *Variable {
 	variable := checker.findVariable(expression.Identifier)
 	if variable == nil {
 		panic(&NotDeclaredError{
@@ -478,8 +501,7 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 			EndPos:       expression.EndPosition(),
 		})
 	}
-
-	return variable.Type
+	return variable
 }
 
 func (checker *Checker) visitBinaryOperation(expr *ast.BinaryExpression) (left, right Type) {
@@ -771,7 +793,50 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		}
 	}
 
-	// TODO: ensure argument labels of arguments match argument labels of parameters
+	// if the invocation refers directly to the name of the function as stated in the declaration,
+	// the argument labels need to be supplied
+
+	if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
+
+		variable := checker.findAndCheckVariable(identifierExpression)
+		if variable.ArgumentLabels != nil {
+
+			for i, argumentLabel := range variable.ArgumentLabels {
+				argument := invocationExpression.Arguments[i]
+				providedLabel := argument.Label
+				if argumentLabel == ArgumentLabelNotRequired {
+					// argument label is not required,
+					// check it is not provided
+
+					if providedLabel != "" {
+						panic(&IncorrectArgumentLabelError{
+							ActualArgumentLabel:   providedLabel,
+							ExpectedArgumentLabel: "",
+							StartPos:              argument.Expression.StartPosition(),
+							EndPos:                argument.Expression.EndPosition(),
+						})
+					}
+				} else {
+					// argument label is required,
+					// check it is provided and correct
+					if providedLabel == "" {
+						panic(&MissingArgumentLabelError{
+							ExpectedArgumentLabel: argumentLabel,
+							StartPos:              argument.Expression.StartPosition(),
+							EndPos:                argument.Expression.EndPosition(),
+						})
+					} else if providedLabel != argumentLabel {
+						panic(&IncorrectArgumentLabelError{
+							ActualArgumentLabel:   providedLabel,
+							ExpectedArgumentLabel: argumentLabel,
+							StartPos:              argument.Expression.StartPosition(),
+							EndPos:                argument.Expression.EndPosition(),
+						})
+					}
+				}
+			}
+		}
+	}
 
 	return functionType.ReturnType
 }
@@ -845,6 +910,7 @@ func (checker *Checker) declareFunction(
 	identifier string,
 	identifierPosition *ast.Position,
 	functionType *FunctionType,
+	argumentLabels []string,
 ) {
 	// check if variable with this identifier is already declared in the current scope
 	variable := checker.findVariable(identifier)
@@ -859,9 +925,10 @@ func (checker *Checker) declareFunction(
 
 	// variable with this identifier is not declared in current scope, declare it
 	variable = &Variable{
-		IsConstant: true,
-		Depth:      depth,
-		Type:       functionType,
+		IsConstant:     true,
+		Depth:          depth,
+		Type:           functionType,
+		ArgumentLabels: argumentLabels,
 	}
 	checker.setVariable(identifier, variable)
 }

@@ -268,9 +268,13 @@ type IncorrectArgumentLabelError struct {
 }
 
 func (e *IncorrectArgumentLabelError) Error() string {
+	expected := "none"
+	if e.ExpectedArgumentLabel != "" {
+		expected = fmt.Sprintf(`%s`, e.ExpectedArgumentLabel)
+	}
 	return fmt.Sprintf(
-		"incorrect argument label: expected `%s`, got `%s`",
-		e.ExpectedArgumentLabel,
+		"incorrect argument label: expected %s, got `%s`",
+		expected,
 		e.ActualArgumentLabel,
 	)
 }
