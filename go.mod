@@ -14,6 +14,7 @@ require (
 	github.com/ethereum/go-ethereum v1.8.27 // indirect
 	github.com/go-pg/migrations v6.7.3+incompatible
 	github.com/go-pg/pg v8.0.4+incompatible
+	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
 	github.com/google/wire v0.3.0
 	github.com/jinzhu/inflection v1.0.0 // indirect
