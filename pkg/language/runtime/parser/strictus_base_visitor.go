@@ -171,6 +171,10 @@ func (v *BaseStrictusVisitor) VisitInvocation(ctx *InvocationContext) interface{
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitArgument(ctx *ArgumentContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }

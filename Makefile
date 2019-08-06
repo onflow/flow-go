@@ -7,24 +7,28 @@ install-tools:
 	go get github.com/golang/protobuf/protoc-gen-go@v1.3.2
 	go get github.com/uber/prototool/cmd/prototool@v1.8.0
 
-.PHONY: test-setup
-test-setup:
+.PHONY: test-integrate-setup
+test-integrate-setup:
 	docker-compose up --build start_collect_dependencies
 	docker-compose up --build start_consensus_dependencies
 	docker-compose up --build start_execute_dependencies
 	docker-compose up --build start_verify_dependencies
 	docker-compose up --build start_test_dependencies
 
-.PHONY: test-run
-test-run:
+.PHONY: test-integrate-run
+test-integrate-run:
 	docker-compose up --build --exit-code-from test test
 
-.PHONY: test-teardown
-test-teardown:
+.PHONY: test-integrate-teardown
+test-integrate-teardown:
 	docker-compose down
 
-.PHONY: test
-test: test-setup test-run test-teardown
+.PHONY: test-integrate
+test-integrate: test-integrate-setup test-integrate-run test-integrate-teardown
+
+.PHONY: test-unit
+test-unit:
+	go test ./...
 
 .PHONY: generate-godoc
 generate-godoc:
@@ -58,4 +62,4 @@ build-bamboo:
 	go build -o bamboo ./cmd/bamboo/
 
 .PHONY: ci
-ci: install-tools generate check-generated-code test
+ci: install-tools generate check-generated-code test-unit test-integrate

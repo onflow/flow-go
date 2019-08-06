@@ -8,14 +8,15 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[InvalidIntegerLiteralKindLeadingUnderscore-0]
-	_ = x[InvalidIntegerLiteralKindTrailingUnderscore-1]
-	_ = x[InvalidIntegerLiteralKindUnknownPrefix-2]
+	_ = x[InvalidIntegerLiteralKindUnknown-0]
+	_ = x[InvalidIntegerLiteralKindLeadingUnderscore-1]
+	_ = x[InvalidIntegerLiteralKindTrailingUnderscore-2]
+	_ = x[InvalidIntegerLiteralKindUnknownPrefix-3]
 }
 
-const _InvalidIntegerLiteralKind_name = "InvalidIntegerLiteralKindLeadingUnderscoreInvalidIntegerLiteralKindTrailingUnderscoreInvalidIntegerLiteralKindUnknownPrefix"
+const _InvalidIntegerLiteralKind_name = "InvalidIntegerLiteralKindUnknownInvalidIntegerLiteralKindLeadingUnderscoreInvalidIntegerLiteralKindTrailingUnderscoreInvalidIntegerLiteralKindUnknownPrefix"
 
-var _InvalidIntegerLiteralKind_index = [...]uint8{0, 42, 85, 123}
+var _InvalidIntegerLiteralKind_index = [...]uint8{0, 32, 74, 117, 155}
 
 func (i InvalidIntegerLiteralKind) String() string {
 	if i < 0 || i >= InvalidIntegerLiteralKind(len(_InvalidIntegerLiteralKind_index)-1) {

@@ -266,6 +266,12 @@ func (s *BaseStrictusListener) EnterInvocation(ctx *InvocationContext) {}
 // ExitInvocation is called when production invocation is exited.
 func (s *BaseStrictusListener) ExitInvocation(ctx *InvocationContext) {}
 
+// EnterArgument is called when production argument is entered.
+func (s *BaseStrictusListener) EnterArgument(ctx *ArgumentContext) {}
+
+// ExitArgument is called when production argument is exited.
+func (s *BaseStrictusListener) ExitArgument(ctx *ArgumentContext) {}
+
 // EnterLiteral is called when production literal is entered.
 func (s *BaseStrictusListener) EnterLiteral(ctx *LiteralContext) {}
 

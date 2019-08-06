@@ -2,8 +2,11 @@ package interpreter
 
 import (
 	"fmt"
+	goRuntime "runtime"
 
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 )
@@ -13,16 +16,32 @@ import (
 
 type Interpreter struct {
 	Program     *ast.Program
-	activations *Activations
+	activations *activations.Activations
 	Globals     map[string]*Variable
 }
 
 func NewInterpreter(program *ast.Program) *Interpreter {
 	return &Interpreter{
 		Program:     program,
-		activations: &Activations{},
+		activations: &activations.Activations{},
 		Globals:     map[string]*Variable{},
 	}
+}
+
+func (interpreter *Interpreter) findVariable(name string) *Variable {
+	value := interpreter.activations.Find(name)
+	if value == nil {
+		return nil
+	}
+	variable, ok := value.(*Variable)
+	if !ok {
+		return nil
+	}
+	return variable
+}
+
+func (interpreter *Interpreter) setVariable(name string, variable *Variable) {
+	interpreter.activations.Set(name, variable)
 }
 
 func (interpreter *Interpreter) Interpret() (err error) {
@@ -30,6 +49,11 @@ func (interpreter *Interpreter) Interpret() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			var ok bool
+			// don't recover Go errors
+			err, ok = r.(goRuntime.Error)
+			if ok {
+				panic(err)
+			}
 			err, ok = r.(error)
 			if !ok {
 				err = fmt.Errorf("%v", r)
@@ -45,10 +69,10 @@ func (interpreter *Interpreter) Interpret() (err error) {
 }
 
 func (interpreter *Interpreter) visitProgramDeclarations() Trampoline {
-	return interpreter.visitDeclarations(interpreter.Program.Declarations)
+	return interpreter.visitGlobalDeclarations(interpreter.Program.Declarations)
 }
 
-func (interpreter *Interpreter) visitDeclarations(declarations []ast.Declaration) Trampoline {
+func (interpreter *Interpreter) visitGlobalDeclarations(declarations []ast.Declaration) Trampoline {
 	count := len(declarations)
 
 	// no declarations? stop
@@ -58,37 +82,32 @@ func (interpreter *Interpreter) visitDeclarations(declarations []ast.Declaration
 	}
 
 	// interpret the first declaration, then the remaining ones
-	return interpreter.visitDeclaration(declarations[0]).
+	return interpreter.visitGlobalDeclaration(declarations[0]).
 		FlatMap(func(_ interface{}) Trampoline {
-			return interpreter.visitDeclarations(declarations[1:])
+			return interpreter.visitGlobalDeclarations(declarations[1:])
 		})
 }
 
-// visitDeclaration firsts interprets the declaration,
+// visitGlobalDeclaration firsts interprets the global declaration,
 // then finds the declaration and adds it to the globals
-func (interpreter *Interpreter) visitDeclaration(declaration ast.Declaration) Trampoline {
+func (interpreter *Interpreter) visitGlobalDeclaration(declaration ast.Declaration) Trampoline {
 	return declaration.Accept(interpreter).(Trampoline).
 		Then(func(_ interface{}) {
-			interpreter.defineGlobal(declaration)
+			interpreter.declareGlobal(declaration)
 		})
 }
 
-func (interpreter *Interpreter) defineGlobal(declaration ast.Declaration) {
+func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
-	if _, exists := interpreter.Globals[name]; exists {
-		panic(&RedeclarationError{
-			Name: name,
-			Pos:  declaration.GetIdentifierPosition(),
-		})
-	}
-	interpreter.Globals[name] = interpreter.activations.Find(name)
+	// NOTE: semantic analysis already checked possible invalid redeclaration
+	interpreter.Globals[name] = interpreter.findVariable(name)
 }
 
 func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value Value, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
 		return nil, &NotDeclaredError{
-			ExpectedKind: DeclarationKindFunction,
+			ExpectedKind: common.DeclarationKindFunction,
 			Name:         functionName,
 		}
 	}
@@ -111,6 +130,11 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 	defer func() {
 		if r := recover(); r != nil {
 			var ok bool
+			// don't recover Go errors
+			err, ok = r.(goRuntime.Error)
+			if ok {
+				panic(err)
+			}
 			err, ok = r.(error)
 			if !ok {
 				err = fmt.Errorf("%v", r)
@@ -118,14 +142,32 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 		}
 	}()
 
-	result := Run(interpreter.invokeFunction(function, arguments, nil, nil))
+	// ensures the invocation's argument count matches the function's parameter count
+
+	parameterCount := function.parameterCount()
+	argumentCount := len(arguments)
+
+	if argumentCount != parameterCount {
+		return nil, &ArgumentCountError{
+			ParameterCount: parameterCount,
+			ArgumentCount:  argumentCount,
+		}
+	}
+
+	result := Run(function.invoke(interpreter, arguments))
 	if result == nil {
 		return nil, nil
 	}
 	return result.(Value), nil
 }
 
-func (interpreter *Interpreter) InvokeExportable(functionName string, inputs ...interface{}) (value ExportableValue, err error) {
+func (interpreter *Interpreter) InvokeExportable(
+	functionName string,
+	inputs ...interface{},
+) (
+	value ExportableValue,
+	err error,
+) {
 	result, err := interpreter.Invoke(functionName, inputs...)
 	if err != nil {
 		return nil, err
@@ -138,32 +180,8 @@ func (interpreter *Interpreter) InvokeExportable(functionName string, inputs ...
 	return result.(ExportableValue), nil
 }
 
-func (interpreter *Interpreter) invokeFunction(
-	function FunctionValue,
-	arguments []Value,
-	startPosition *ast.Position,
-	endPosition *ast.Position,
-) Trampoline {
-
-	// ensures the invocation's argument count matches the function's parameter count
-
-	parameterCount := function.parameterCount()
-	argumentCount := len(arguments)
-
-	if argumentCount != parameterCount {
-		panic(&ArgumentCountError{
-			ParameterCount: parameterCount,
-			ArgumentCount:  argumentCount,
-			StartPos:       startPosition,
-			EndPos:         endPosition,
-		})
-	}
-
-	return function.invoke(interpreter, arguments)
-}
-
 func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
-	panic(errors.UnreachableError{})
+	panic(&errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
@@ -190,7 +208,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	variableDeclaration := &ast.VariableDeclaration{
 		Value:         expression,
 		Identifier:    declaration.Identifier,
-		IsConst:       true,
+		IsConstant:    true,
 		Type:          functionType,
 		StartPos:      declaration.StartPos,
 		EndPos:        declaration.EndPos,
@@ -198,10 +216,12 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	}
 
 	// make the function itself available inside the function
-	depth := interpreter.activations.Depth()
-	variable := newVariable(variableDeclaration, depth, function)
+	variable := &Variable{
+		Declaration: variableDeclaration,
+		Value:       function,
+	}
 	function.Activation = function.Activation.
-		Insert(ActivationKey(declaration.Identifier), variable)
+		Insert(activations.StringKey(declaration.Identifier), variable)
 
 	// function declarations are de-sugared to constants
 	interpreter.declareVariable(variableDeclaration, function)
@@ -213,7 +233,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 func (interpreter *Interpreter) ImportFunction(name string, function *HostFunctionValue) {
 	variableDeclaration := &ast.VariableDeclaration{
 		Identifier: name,
-		IsConst:    true,
+		IsConstant: true,
 		// TODO: Type
 	}
 
@@ -322,18 +342,13 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 }
 
 func (interpreter *Interpreter) declareVariable(declaration *ast.VariableDeclaration, value Value) {
-	variable := interpreter.activations.Find(declaration.Identifier)
-	depth := interpreter.activations.Depth()
-	if variable != nil && variable.Depth == depth {
-		panic(&RedeclarationError{
-			Name: declaration.Identifier,
-			Pos:  declaration.GetIdentifierPosition(),
-		})
+	variable := interpreter.findVariable(declaration.Identifier)
+	// NOTE: semantic analysis already checked possible invalid redeclaration
+	variable = &Variable{
+		Declaration: declaration,
+		Value:       value,
 	}
-
-	variable = newVariable(declaration, depth, value)
-
-	interpreter.activations.Set(declaration.Identifier, variable)
+	interpreter.setVariable(declaration.Identifier, variable)
 }
 
 func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
@@ -355,15 +370,11 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 		return interpreter.visitIndexExpressionAssignment(target, value)
 
 	case *ast.MemberExpression:
-	// TODO:
-
-	default:
-		panic(&unsupportedAssignmentTargetExpression{
-			target: target,
-		})
+		// TODO: no structures/dictionaries yet
+		panic(&errors.UnreachableError{})
 	}
 
-	panic(errors.UnreachableError{})
+	panic(&errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
@@ -371,26 +382,11 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 		FlatMap(func(result interface{}) Trampoline {
 			indexedValue := result.(Value)
 
-			array, ok := indexedValue.(ArrayValue)
-			if !ok {
-				panic(&NotIndexableError{
-					Value:    indexedValue,
-					StartPos: target.Expression.StartPosition(),
-					EndPos:   target.Expression.EndPosition(),
-				})
-			}
-
+			array := indexedValue.(ArrayValue)
 			return target.Index.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
 					indexValue := result.(Value)
-					index, ok := indexValue.(IntegerValue)
-					if !ok {
-						panic(&InvalidIndexValueError{
-							Value:    indexValue,
-							StartPos: target.Index.StartPosition(),
-							EndPos:   target.Index.EndPosition(),
-						})
-					}
+					index := indexValue.(IntegerValue)
 					array[index.IntValue()] = value
 
 					// NOTE: no result, so it does *not* act like a return-statement
@@ -401,120 +397,17 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 
 func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
 	identifier := target.Identifier
-	variable := interpreter.activations.Find(identifier)
-	if variable == nil {
-		panic(&NotDeclaredError{
-			ExpectedKind: DeclarationKindVariable,
-			Name:         identifier,
-			StartPos:     target.StartPosition(),
-			EndPos:       target.EndPosition(),
-		})
-	}
-	if !variable.Set(value) {
-		panic(&AssignmentToConstantError{
-			Name:     identifier,
-			StartPos: target.StartPosition(),
-			EndPos:   target.EndPosition(),
-		})
-	}
-	interpreter.activations.Set(identifier, variable)
+	variable := interpreter.findVariable(identifier)
+	variable.Value = value
 }
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
-	variable := interpreter.activations.Find(expression.Identifier)
-	if variable == nil {
-		panic(&NotDeclaredError{
-			ExpectedKind: DeclarationKindValue,
-			Name:         expression.Identifier,
-			StartPos:     expression.StartPosition(),
-			EndPos:       expression.EndPosition(),
-		})
-	}
+	variable := interpreter.findVariable(expression.Identifier)
 	return Done{Result: variable.Value}
 }
 
-func (interpreter *Interpreter) visitBinaryIntegerOperand(
-	value Value,
-	operation ast.Operation,
-	side OperandSide,
-	startPos *ast.Position,
-	endPos *ast.Position,
-) IntegerValue {
-	integerValue, isInteger := value.(IntegerValue)
-	if !isInteger {
-		panic(&InvalidBinaryOperandError{
-			Operation:    operation,
-			Side:         side,
-			ExpectedType: &IntegerType{},
-			Value:        value,
-			StartPos:     startPos,
-			EndPos:       endPos,
-		})
-	}
-	return integerValue
-}
-
-func (interpreter *Interpreter) visitBinaryBoolOperand(
-	value Value,
-	operation ast.Operation,
-	side OperandSide,
-	startPos *ast.Position,
-	endPos *ast.Position,
-) BoolValue {
-	boolValue, isBool := value.(BoolValue)
-	if !isBool {
-		panic(&InvalidBinaryOperandError{
-			Operation:    operation,
-			Side:         side,
-			ExpectedType: &BoolType{},
-			Value:        value,
-			StartPos:     startPos,
-			EndPos:       endPos,
-		})
-	}
-	return boolValue
-}
-
-func (interpreter *Interpreter) visitUnaryBoolOperand(
-	value Value,
-	operation ast.Operation,
-	startPos *ast.Position,
-	endPos *ast.Position,
-) BoolValue {
-	boolValue, isBool := value.(BoolValue)
-	if !isBool {
-		panic(&InvalidUnaryOperandError{
-			Operation:    operation,
-			ExpectedType: &BoolType{},
-			Value:        value,
-			StartPos:     startPos,
-			EndPos:       endPos,
-		})
-	}
-	return boolValue
-}
-
-func (interpreter *Interpreter) visitUnaryIntegerOperand(
-	value Value,
-	operation ast.Operation,
-	startPos *ast.Position,
-	endPos *ast.Position,
-) IntegerValue {
-	integerValue, isInteger := value.(IntegerValue)
-	if !isInteger {
-		panic(&InvalidUnaryOperandError{
-			Operation:    operation,
-			ExpectedType: &IntegerType{},
-			Value:        value,
-			StartPos:     startPos,
-			EndPos:       endPos,
-		})
-	}
-	return integerValue
-}
-
 // visitBinaryOperation interprets the left-hand side and the right-hand side and returns
-// the result in a integerTuple or booleanTuple
+// the result in a Tuple
 func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression) Trampoline {
 	// interpret the left-hand side
 	return expr.Left.Accept(interpreter).(Trampoline).
@@ -523,180 +416,106 @@ func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression)
 			// interpret the right-hand side
 			return expr.Right.Accept(interpreter).(Trampoline).
 				FlatMap(func(right interface{}) Trampoline {
-
-					leftValue := left.(Value)
-					rightValue := right.(Value)
-
-					switch leftValue.(type) {
-					case IntegerValue:
-						left := interpreter.visitBinaryIntegerOperand(
-							leftValue,
-							expr.Operation,
-							OperandSideLeft,
-							expr.Left.StartPosition(),
-							expr.Left.EndPosition(),
-						)
-						right := interpreter.visitBinaryIntegerOperand(
-							rightValue,
-							expr.Operation,
-							OperandSideRight,
-							expr.Right.StartPosition(),
-							expr.Right.EndPosition(),
-						)
-						return Done{Result: integerTuple{left, right}}
-
-					case BoolValue:
-						left := interpreter.visitBinaryBoolOperand(
-							leftValue,
-							expr.Operation,
-							OperandSideLeft,
-							expr.Left.StartPosition(),
-							expr.Left.EndPosition(),
-						)
-						right := interpreter.visitBinaryBoolOperand(
-							rightValue,
-							expr.Operation,
-							OperandSideRight,
-							expr.Right.StartPosition(),
-							expr.Right.EndPosition(),
-						)
-
-						return Done{Result: boolTuple{left, right}}
-					}
-
-					panic(&errors.UnreachableError{})
+					return Done{Result: Tuple{left.(Value), right.(Value)}}
 				})
-		})
-}
-
-// visitBinaryIntegerOperation interprets the left-hand side and right-hand side
-// of the binary expression, and applies both integer values to the given binary function
-func (interpreter *Interpreter) visitBinaryIntegerOperation(
-	expression *ast.BinaryExpression,
-	binaryFunction func(IntegerValue, IntegerValue) Value,
-) Trampoline {
-	return interpreter.visitBinaryOperation(expression).
-		Map(func(result interface{}) interface{} {
-			tuple, ok := result.(integerTuple)
-			if !ok {
-				leftValue, rightValue := result.(valueTuple).values()
-				panic(&InvalidBinaryOperandTypesError{
-					Operation:    expression.Operation,
-					ExpectedType: &IntegerType{},
-					LeftValue:    leftValue,
-					RightValue:   rightValue,
-					StartPos:     expression.StartPosition(),
-					EndPos:       expression.EndPosition(),
-				})
-			}
-
-			left, right := tuple.destructure()
-			return binaryFunction(left, right)
-		})
-}
-
-// visitBinaryBoolOperation interprets the left-hand side and right-hand side
-// of the binary expression, and applies both boolean values to the given binary function
-func (interpreter *Interpreter) visitBinaryBoolOperation(
-	expression *ast.BinaryExpression,
-	binaryFunction func(BoolValue, BoolValue) Value,
-) Trampoline {
-	return interpreter.visitBinaryOperation(expression).
-		Map(func(result interface{}) interface{} {
-			tuple, ok := result.(boolTuple)
-			if !ok {
-				leftValue, rightValue := result.(valueTuple).values()
-				panic(&InvalidBinaryOperandTypesError{
-					Operation:    expression.Operation,
-					ExpectedType: &BoolType{},
-					LeftValue:    leftValue,
-					RightValue:   rightValue,
-					StartPos:     expression.StartPosition(),
-					EndPos:       expression.EndPosition(),
-				})
-			}
-
-			left, right := tuple.destructure()
-			return binaryFunction(left, right)
 		})
 }
 
 func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpression) ast.Repr {
 	switch expression.Operation {
 	case ast.OperationPlus:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Plus(right)
 			})
 
 	case ast.OperationMinus:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Minus(right)
 			})
 
 	case ast.OperationMod:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Mod(right)
 			})
 
 	case ast.OperationMul:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Mul(right)
 			})
 
 	case ast.OperationDiv:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Div(right)
 			})
 
 	case ast.OperationLess:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Less(right)
 			})
 
 	case ast.OperationLessEqual:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.LessEqual(right)
 			})
 
 	case ast.OperationGreater:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Greater(right)
 			})
 
 	case ast.OperationGreaterEqual:
-		return interpreter.visitBinaryIntegerOperation(
-			expression,
-			func(left IntegerValue, right IntegerValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.GreaterEqual(right)
 			})
 
 	case ast.OperationEqual:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				switch tuple := result.(type) {
-				case integerTuple:
-					left, right := tuple.destructure()
+				tuple := result.(Tuple)
+
+				switch left := tuple.left.(type) {
+				case IntegerValue:
+					right := tuple.right.(IntegerValue)
 					return BoolValue(left.Equal(right))
 
-				case boolTuple:
-					left, right := tuple.destructure()
-					return BoolValue(left == right)
+				case BoolValue:
+					return BoolValue(tuple.left == tuple.right)
 				}
 
 				panic(&errors.UnreachableError{})
@@ -704,38 +523,45 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 
 	case ast.OperationUnequal:
 		return interpreter.visitBinaryOperation(expression).
-			Map(func(tuple interface{}) interface{} {
-				switch typedTuple := tuple.(type) {
-				case integerTuple:
-					left, right := typedTuple.destructure()
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+
+				switch left := tuple.left.(type) {
+				case IntegerValue:
+					right := tuple.right.(IntegerValue)
 					return BoolValue(!left.Equal(right))
 
-				case boolTuple:
-					left, right := typedTuple.destructure()
-					return BoolValue(left != right)
+				case BoolValue:
+					return BoolValue(tuple.left != tuple.right)
 				}
 
 				panic(&errors.UnreachableError{})
 			})
 
 	case ast.OperationOr:
-		return interpreter.visitBinaryBoolOperation(
-			expression,
-			func(left BoolValue, right BoolValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(BoolValue)
+				right := tuple.right.(BoolValue)
 				return BoolValue(left || right)
 			})
 
 	case ast.OperationAnd:
-		return interpreter.visitBinaryBoolOperation(
-			expression,
-			func(left BoolValue, right BoolValue) Value {
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(Tuple)
+				left := tuple.left.(BoolValue)
+				right := tuple.right.(BoolValue)
 				return BoolValue(left && right)
 			})
 	}
 
 	panic(&unsupportedOperation{
-		kind:      OperationKindBinary,
+		kind:      common.OperationKindBinary,
 		operation: expression.Operation,
+		startPos:  expression.StartPos,
+		endPos:    expression.EndPos,
 	})
 }
 
@@ -746,27 +572,19 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 
 			switch expression.Operation {
 			case ast.OperationNegate:
-				boolValue := interpreter.visitUnaryBoolOperand(
-					value,
-					expression.Operation,
-					expression.StartPosition(),
-					expression.EndPosition(),
-				)
+				boolValue := value.(BoolValue)
 				return boolValue.Negate()
 
 			case ast.OperationMinus:
-				integerValue := interpreter.visitUnaryIntegerOperand(
-					value,
-					expression.Operation,
-					expression.StartPosition(),
-					expression.EndPosition(),
-				)
+				integerValue := value.(IntegerValue)
 				return integerValue.Negate()
 			}
 
 			panic(&unsupportedOperation{
-				kind:      OperationKindUnary,
+				kind:      common.OperationKindUnary,
 				operation: expression.Operation,
+				startPos:  expression.StartPos,
+				endPos:    expression.EndPos,
 			})
 		})
 }
@@ -796,35 +614,18 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 }
 
 func (interpreter *Interpreter) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO: no dictionaries yet
+	// TODO: no structures/dictionaries yet
 	panic(&errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			indexedValue := result.(Value)
-			array, ok := indexedValue.(ArrayValue)
-			if !ok {
-				panic(&NotIndexableError{
-					Value:    indexedValue,
-					StartPos: expression.Expression.StartPosition(),
-					EndPos:   expression.Expression.EndPosition(),
-				})
-			}
+			array := result.(ArrayValue)
 
 			return expression.Index.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
-					indexValue := result.(Value)
-					index, ok := indexValue.(IntegerValue)
-					if !ok {
-						panic(&InvalidIndexValueError{
-							Value:    indexValue,
-							StartPos: expression.Index.StartPosition(),
-							EndPos:   expression.Index.EndPosition(),
-						})
-					}
-
+					index := result.(IntegerValue)
 					value := array[index.IntValue()]
 
 					return Done{Result: value}
@@ -850,27 +651,18 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 	return invocationExpression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(Value)
-			function, ok := value.(FunctionValue)
-			if !ok {
-				panic(&NotCallableError{
-					Value:    value,
-					StartPos: invocationExpression.Expression.StartPosition(),
-					EndPos:   invocationExpression.Expression.EndPosition(),
-				})
-			}
+			function := value.(FunctionValue)
 
 			// NOTE: evaluate all argument expressions in call-site scope, not in function body
-			return interpreter.visitExpressions(invocationExpression.Arguments, nil).
+			argumentExpressions := make([]ast.Expression, len(invocationExpression.Arguments))
+			for i, argument := range invocationExpression.Arguments {
+				argumentExpressions[i] = argument.Expression
+			}
+
+			return interpreter.visitExpressions(argumentExpressions, nil).
 				FlatMap(func(result interface{}) Trampoline {
-
 					arguments := result.(ArrayValue)
-
-					return interpreter.invokeFunction(
-						function,
-						arguments,
-						invocationExpression.StartPosition(),
-						invocationExpression.EndPosition(),
-					)
+					return function.invoke(interpreter, arguments)
 				})
 		})
 }
@@ -905,11 +697,11 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 	for parameterIndex, parameter := range function.Expression.Parameters {
 		argument := arguments[parameterIndex]
 
-		interpreter.activations.Set(
+		interpreter.setVariable(
 			parameter.Identifier,
 			&Variable{
 				Declaration: &ast.VariableDeclaration{
-					IsConst:    true,
+					IsConstant: true,
 					Identifier: parameter.Identifier,
 					Type:       parameter.Type,
 					StartPos:   parameter.StartPos,

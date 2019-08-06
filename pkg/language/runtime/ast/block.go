@@ -9,3 +9,11 @@ type Block struct {
 func (b *Block) Accept(visitor Visitor) Repr {
 	return visitor.VisitBlock(b)
 }
+
+func (b *Block) StartPosition() *Position {
+	return b.StartPos
+}
+
+func (b *Block) EndPosition() *Position {
+	return b.EndPos
+}

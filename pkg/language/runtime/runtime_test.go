@@ -31,10 +31,10 @@ func TestNewInterpreterRuntime(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 	script := []byte(`
         fun main() {
-            const controller = [1]
-            const owner = [2]
-            const key = [3]
-            const value = getValue(controller, owner, key)
+            let controller = [1]
+            let owner = [2]
+            let key = [3]
+            let value = getValue(controller, owner, key)
             setValue(controller, owner, key, value + 2)
 		}
 	`)
@@ -57,6 +57,10 @@ func TestNewInterpreterRuntime(t *testing.T) {
 	}
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
-	Expect(err).ToNot(HaveOccurred())
-	Expect(state.Int64()).To(Equal(int64(5)))
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(state.Int64()).
+		To(Equal(int64(5)))
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	goRuntime "runtime"
 )
 
 type errorListener struct {
@@ -48,7 +49,13 @@ func Parse(code string) (program *ast.Program, errors []error) {
 	defer func() {
 		if r := recover(); r != nil {
 			var ok bool
-			err, ok := r.(error)
+			var err error
+			// don't recover Go errors
+			err, ok = r.(goRuntime.Error)
+			if ok {
+				panic(err)
+			}
+			err, ok = r.(error)
 			if !ok {
 				err = fmt.Errorf("%v", r)
 			}
@@ -58,13 +65,15 @@ func Parse(code string) (program *ast.Program, errors []error) {
 		}
 	}()
 
-	result := parser.Program().Accept(&ProgramVisitor{})
+	parsed := parser.Program()
 
 	appendSyntaxErrors()
 
 	if len(errors) > 0 {
 		return nil, errors
 	}
+
+	result := parsed.Accept(&ProgramVisitor{})
 
 	program, ok := result.(*ast.Program)
 	if !ok {

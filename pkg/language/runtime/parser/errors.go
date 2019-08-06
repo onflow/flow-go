@@ -104,3 +104,23 @@ func (e *InvalidIntegerLiteralError) SecondaryError() string {
 
 	panic(&errors.UnreachableError{})
 }
+
+// MissingIdentifierError
+
+type MissingIdentifierError struct {
+	Pos *ast.Position
+}
+
+func (*MissingIdentifierError) isParseError() {}
+
+func (e *MissingIdentifierError) StartPosition() *ast.Position {
+	return e.Pos
+}
+
+func (e *MissingIdentifierError) EndPosition() *ast.Position {
+	return e.Pos
+}
+
+func (e *MissingIdentifierError) Error() string {
+	return "missing name"
+}

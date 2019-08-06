@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 	"github.com/raviqqe/hamt"
 )
@@ -43,7 +44,7 @@ func (f *InterpretedFunctionValue) parameterCount() int {
 // HostFunctionValue
 
 type HostFunctionValue struct {
-	functionType *FunctionType
+	functionType *sema.FunctionType
 	function     func(*Interpreter, []Value) Value
 }
 
@@ -60,7 +61,7 @@ func (f *HostFunctionValue) parameterCount() int {
 }
 
 func NewHostFunction(
-	functionType *FunctionType,
+	functionType *sema.FunctionType,
 	function func(*Interpreter, []Value) Value,
 ) *HostFunctionValue {
 	return &HostFunctionValue{

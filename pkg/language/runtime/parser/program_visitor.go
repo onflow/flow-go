@@ -38,8 +38,8 @@ func (v *ProgramVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
 func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
 	isPublic := ctx.Pub() != nil
 	identifier := ctx.Identifier().GetText()
-	closeParen := ctx.CloseParen().GetSymbol()
-	returnType := v.visitReturnType(ctx.returnType, closeParen)
+	parameterListEnd := ctx.ParameterList().GetStop()
+	returnType := v.visitReturnType(ctx.returnType, parameterListEnd)
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
@@ -79,8 +79,8 @@ func (v *ProgramVisitor) visitReturnType(ctx IFullTypeContext, tokenBefore antlr
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
-	closeParen := ctx.CloseParen().GetSymbol()
-	returnType := v.visitReturnType(ctx.returnType, closeParen)
+	parameterListEnd := ctx.ParameterList().GetStop()
+	returnType := v.visitReturnType(ctx.returnType, parameterListEnd)
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
@@ -112,16 +112,30 @@ func (v *ProgramVisitor) VisitParameterList(ctx *ParameterListContext) interface
 }
 
 func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
-	identifier := ctx.Identifier().GetText()
+	// label
+	label := ""
+	var labelPos *ast.Position
+	if ctx.argumentLabel != nil {
+		label = ctx.argumentLabel.GetText()
+		labelPos = ast.PositionFromToken(ctx.argumentLabel)
+	}
+
+	// identifier
+	identifier := ctx.parameterName.GetText()
+	identifierPos := ast.PositionFromToken(ctx.parameterName)
+
 	fullType := ctx.FullType().Accept(v).(ast.Type)
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
 
 	return &ast.Parameter{
-		Identifier: identifier,
-		Type:       fullType,
-		StartPos:   startPosition,
-		EndPos:     endPosition,
+		Label:         label,
+		Identifier:    identifier,
+		Type:          fullType,
+		LabelPos:      labelPos,
+		IdentifierPos: identifierPos,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
 }
 
@@ -143,18 +157,10 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 		return functionTypeContext.Accept(v)
 	}
 
-	panic(errors.UnreachableError{})
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{} {
-
-	// nested?
-	nestedFunctionTypeContext := ctx.FunctionType()
-	if nestedFunctionTypeContext != nil {
-		return nestedFunctionTypeContext.Accept(v)
-	}
-
-	//
 
 	var parameterTypes []ast.Type
 	for _, fullType := range ctx.parameterTypes {
@@ -169,7 +175,7 @@ func (v *ProgramVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{}
 	}
 	returnType := ctx.returnType.Accept(v).(ast.Type)
 
-	startPosition := ast.PositionFromToken(ctx.OpenParen().GetSymbol())
+	startPosition := ast.PositionFromToken(ctx.OpenParen(0).GetSymbol())
 	endPosition := returnType.EndPosition()
 
 	return &ast.FunctionType{
@@ -299,8 +305,9 @@ func (v *ProgramVisitor) VisitReturnStatement(ctx *ReturnStatementContext) inter
 }
 
 func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{} {
-	isConst := ctx.Const() != nil
-	identifier := ctx.Identifier().GetText()
+	isConstant := ctx.Let() != nil
+	identifierNode := ctx.Identifier()
+	identifier := identifierNode.GetText()
 	expressionResult := ctx.Expression().Accept(v)
 	if expressionResult == nil {
 		return nil
@@ -317,10 +324,10 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 
 	// TODO: get end position from expression
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
-	identifierPosition := ast.PositionFromToken(ctx.Identifier().GetSymbol())
+	identifierPosition := ast.PositionFromToken(identifierNode.GetSymbol())
 
 	return &ast.VariableDeclaration{
-		IsConst:       isConst,
+		IsConstant:    isConstant,
 		Identifier:    identifier,
 		Value:         expression,
 		Type:          fullType,
@@ -859,21 +866,34 @@ func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionCont
 }
 
 func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
-	var expressions []ast.Expression
-	for _, expression := range ctx.AllExpression() {
-		expressions = append(
-			expressions,
-			expression.Accept(v).(ast.Expression),
+	var arguments []*ast.Argument
+	for _, argument := range ctx.AllArgument() {
+		arguments = append(
+			arguments,
+			argument.Accept(v).(*ast.Argument),
 		)
 	}
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
 
-	// NOTE: partial, expression is filled later
+	// NOTE: partial, argument is filled later
 	return &ast.InvocationExpression{
-		Arguments: expressions,
+		Arguments: arguments,
 		StartPos:  startPosition,
 		EndPos:    endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitArgument(ctx *ArgumentContext) interface{} {
+	identifierNode := ctx.Identifier()
+	label := ""
+	if identifierNode != nil {
+		label = identifierNode.GetText()
+	}
+	expression := ctx.Expression().Accept(v).(ast.Expression)
+	return &ast.Argument{
+		Label:      label,
+		Expression: expression,
 	}
 }
 

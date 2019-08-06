@@ -148,7 +148,7 @@ booleanVariable = 1
 
 ## Naming
 
-Names may start with any upper and lowercase letter or an underscore. This may be followed by zero or more upper and lower case letters, underscores, and numbers.
+Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (`_`). This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
 Names may not begin with a number.
 
 ```bamboo
@@ -184,7 +184,9 @@ By convention, variables, constants, and functions have lowercase names; and typ
 
 ## Semicolons
 
-Semicolons may be used to separate statements, but are optional. They can be used to separate multiple statements on a single line.
+Semicolons (;) are used as statement separators.
+Semicolons can be placed after any statement, but can be omitted if only one statement appears on the line.
+Semicolons must be used to separate multiple statements if they appear on the same line.
 
 ```bamboo,file=semicolons.bpl
 // Declare a constant, without a semicolon
@@ -284,6 +286,8 @@ In addition, the arbitrary precision integer type `Int` is provided.
 let veryLargeNumber: Int = 10000000000000000000000000000000
 ```
 
+Negative integers are encoded in two's complement representation.
+
 ### Floating-Point Numbers
 
 There is no support for floating point numbers.
@@ -320,7 +324,151 @@ let aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 // `aNumber` has type `Int`
 ```
 
+
+### Any
+
+`Any` is the top type, i.e., all types are a subtype of it.
+
+```bamboo
+// Declare a variable that has the type `Any`.
+// Any value can be assigned to it, for example an integer.
+//
+var someValue: Any = 1
+
+// Assign a value with a different type, `Bool`
+someValue = true
+```
+
+However, using `Any` does not opt-out of type checking. It is invalid to access fields and call functions on `Any` typed values, as it has no fields and functions.
+
+```bamboo
+// Declare a variable that has the type `Any`. The initial value is an integer,
+// but the variable  still has the explicit type `Any`.
+//
+let a: Any = 1
+
+// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)
+// and an `Int` value (`2`, right-hand side)
+//
+a + 2
+```
+
+### Never
+
+`Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
+
+```bamboo
+// Declare a function named `crashAndBurn` which will never return,
+// because it calls the function named `fatalError`, which never returns
+//
+fun crashAndBurn(): Never {
+    fatalError("An unrecoverable error occurred")
+}
+```
+
+### Optionals
+
+> 🚧 Status: Optionals are not implemented yet.
+
+Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.
+
+An optional type is declared using the `?` suffix for another type. For example, `Int` is a non-optional integer, and `Int?` is an optional integer, i.e. either nothing, or an integer.
+
+The value representing nothing is `nil`.
+
+```bamboo
+// Declare a constant which has an optional integer type,
+// with nil as its initial value
+//
+let a: Int? = nil
+
+// Declare a constant which has an optional integer type,
+// with 42 as its initial value
+//
+let b: Int? = 42
+```
+
+#### Nil-Coalescing Operator
+
+The nil-coalescing operator `??` returns the value inside an optional if it contains a value,
+or returns an alternative value if the optional has no value, i.e., the optional value is `nil`.
+
+```bamboo
+// Declare a constant which has an optional integer type
+//
+let a: Int? = nil
+
+// Declare a constant with a non-optional integer type,
+// which is initialized to b if it is non-nil, or 42 otherwise
+//
+let b: Int = a ?? 42
+// `b` is 42, as `a` is nil
+```
+
+The nil-coalescing operator can only be applied to values which have an optional type.
+
+```bamboo
+// Declare a constant with a non-optional integer type
+//
+let a = 1
+
+// Invalid: nil-coalescing operator is applied to a value which has a non-optional type
+// (a has the non-optional type Int)
+//
+let b = a ?? 2
+```
+
+```bamboo
+// Invalid: nil-coalescing operator is applied to a value which has a non-optional type
+// (the integer literal is of type Int)
+//
+let c = 1 ?? 2
+```
+
+The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.
+
+```bamboo
+// Declare a constant with a non-optional integer type
+//
+let a = 1
+
+// Invalid: nil-coalescing operator is applied to a value of type Int,
+// but alternative is of type Bool
+//
+let b = a ?? false
+```
+
+#### Conditional Downcasting Operator
+
+The conditional downcasting operator `as?` can be used to type cast a value to a type.
+The operator returns an optional.
+If the value has a type that is a subtype of the given type that should be casted to,
+the operator returns the value as the given type,
+otherwise the result is `nil`.
+
+```bamboo,file=conditional-downcasting.bpl
+// Declare a constant named `something` which has type `Any`,
+// with an initial value which has type `Int`
+//
+let something: Any = 1
+
+// Conditionally downcast the value of `something` to `Int`.
+// The cast succeeds, because the value has type `Int`
+//
+let number = something as? Int
+// `number` is 1 and has type `Int?`
+
+// Conditionally downcast the value of `something` to `Bool`.
+// The cast fails, because the value has type `Int`,
+// and `Bool` is not a subtype of `Int`
+//
+let boolean = something as? Bool
+// `boolean` is nil and has type `Bool?`
+```
+
 ### Strings and Characters
+
+> 🚧 Status: Strings are not implemented yet.
 
 Strings are collections of characters. Strings have the type `String`, and characters have the type `Character`. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.
 
@@ -405,11 +553,31 @@ Arrays are mutable, ordered collections of values. All values in an array must h
 [1, true, 2, false]
 ```
 
+#### Array Types
+
+Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.
+
+Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array. For example, a fixed-size array of 3 `Int8` elements has the type `Int8[3]`.
+
+Variable-size arrays have the type suffix `[]`. For example, the type `Int16[]` specifies a variable-size array of elements that have type `Int16`.
+
+```bamboo,file=array-types.bpl
+let array: Int8[2] = [1, 2]
+
+let arrays: Int16[2][3] = [
+    [1, 2, 3],
+    [4, 5, 6]
+]
+```
+
 #### Array Indexing
 
 To get the element of an array at a specific index, the indexing syntax can be used: The array is followed by an opening square bracket `[`, the indexing value, and ends with a closing square bracket `]`.
 
+Accessing an element which is out of bounds results in a fatal error.
+
 ```bamboo,file=arrays-indexing.bpl
+// Declare an array
 let numbers = [42, 23]
 
 // Get the first number
@@ -419,6 +587,10 @@ numbers[0] // is 42
 // Get the second number
 //
 numbers[1] // is 23
+
+// Error: Index 2 is out of bounds
+//
+numbers[2]
 ```
 
 ```bamboo,file=arrays-nested-indexing.bpl
@@ -443,23 +615,6 @@ let numbers = [42, 23]
 numbers[1] = 2
 
 // `numbers` is [42, 2]
-```
-
-#### Array Types
-
-Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.
-
-Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array. For example, a fixed-size array of 3 `Int8` elements has the type `Int8[3]`.
-
-Variable-size arrays have the type suffix `[]`. For example, the type `Int16[]` specifies a variable-size array of elements that have type `Int16`.
-
-```bamboo,file=array-types.bpl
-let array: Int8[2] = [1, 2]
-
-let arrays: Int16[2][3] = [
-    [1, 2, 3],
-    [4, 5, 6]
-]
 ```
 
 <!--
@@ -503,22 +658,65 @@ Dictionary literals start with an opening brace `{` and end with a closing brace
 }
 ```
 
-#### Dictionary Access
+#### Dictionary Types
 
-To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
+Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
 
-```bamboo,file=dictionary-access.bpl
+```bamboo,file=dictionary-types.bpl
+// Declare a constant that has type `Bool[Int]`,
+// a dictionary mapping integers to booleans
+//
 let booleans = {
     1: true,
     0: false
 }
-booleans[1] // is true
-booleans[0] // is false
 
+// Declare a constant that has type `Int[Bool]`,
+// a dictionary mapping booleans to integers
+//
 let integers = {
     true: 1,
     false: 0
 }
+```
+
+#### Dictionary Access
+
+To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
+
+Accessing a key returns an [optional](#optionals): If the key is found in the dictionary, the value for the given key is returned, and if the key is not found, `nil` is returned.
+
+```bamboo,file=dictionary-access-integer-keys.bpl
+// Declare a constant that has type `Bool[Int]`,
+// a dictionary mapping integers to booleans
+//
+let booleans = {
+    1: true,
+    0: false
+}
+
+// The result of accessing a key has type `Bool?`
+//
+booleans[1] // is true
+booleans[0] // is false
+booleans[2] // is nil
+
+// Invalid: Accessing a key which does not have type `Int`
+//
+booleans["1"]
+```
+
+```bamboo,file=dictionary-access-boolean-keys.bpl
+// Declare a constant that has type `Int[Bool]`,
+// a dictionary mapping booleans to integers
+//
+let integers = {
+    true: 1,
+    false: 0
+}
+
+// The result of accessing a key has type `Int?`
+//
 integers[true] // is 1
 integers[false] // is 0
 ```
@@ -532,26 +730,7 @@ let booleans = {
 }
 booleans[1] = false
 booleans[0] = true
-// `booleans` is {1: false, 0: true}
-```
-
-
-#### Dictionary Types
-
-Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
-
-```bamboo,file=dictionary-types.bpl
-let booleans = {
-    1: true,
-    0: false
-}
-// `booleans` has type `Bool[Int]`
-
-let integers = {
-    true: 1,
-    false: 0
-}
-// `integers` has type `Int[Bool]`
+// `booleans` is `{1: false, 0: true}`
 ```
 
 <!--
@@ -568,48 +747,6 @@ TODO
 Dictionary keys must be hashable and equatable, i.e., must implement the [`Hashable`](#hashable-interface) and [`Equatable`](#equatable-interface) [interfaces](#interfaces).
 
 Most of the built-in types, like booleans, integers, are hashable and equatable, so can be used as keys in dictionaries.
-
-
-### Any
-
-`Any` is the top type, i.e., all types are a subtype of it.
-
-```bamboo
-// Declare a variable that has the type `Any`.
-// Any value can be assigned to it, for example an integer.
-//
-var someValue: Any = 1
-
-// Assign a value with a different type, `Bool`
-someValue = true
-```
-
-However, using `Any` does not opt-out of type checking. It is invalid to access fields and call functions on `Any` typed values, as it has no fields and functions.
-
-```bamboo
-// Declare a variable that has the type `Any`. The initial value is an integer,
-// but the variable  still has the explicit type `Any`.
-//
-let a: Any = 1
-
-// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)
-// and an `Int` value (`2`, right-hand side)
-//
-a + 2
-```
-
-### Never
-
-`Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
-
-```bamboo
-// Declare a function named `crashAndBurn` which will never return,
-// because it calls the function named `fatalError`, which never returns
-//
-fun crashAndBurn(): Never {
-    fatalError("An unrecoverable error occurred")
-}
-```
 
 ## Operators
 
@@ -645,7 +782,7 @@ The binary assignment operator `=` can be used to assign a new value to a variab
 ```bamboo,file=assignment.bpl
 var a = 1
 a = 2
-// a is 2
+// `a` is 2
 ```
 
 The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.
@@ -692,13 +829,16 @@ There are four arithmetic operators:
 - Subtraction: `-`
 - Multiplication: `*`
 - Division: `/`
+- Remainder: `%`
 
 ```bamboo,file=operator-plus.bpl
 let a = 1 + 2
 // `a` is 3
 ```
 
-Arithmetic operators don't cause values to overflow.
+The arguments for the operators need to be of the same type.
+
+Arithmetic operators do not cause values to overflow.
 
 ```bamboo,file=operator-times.bpl
 let a: Int8 = 100
@@ -937,7 +1077,7 @@ fun clamp(_ value: Int, min: Int, max: Int): Int {
 // for these parameters, the parameter names must be used as argument labels.
 //
 let clamped = clamp(123, min: 0, max: 100)
-// clamped is 100
+// `clamped` is 100
 ```
 
 Argument labels make code more explicit and readable. For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
@@ -1052,7 +1192,7 @@ Functions can be called (invoked). Function calls need to provide exactly as man
 
 ```bamboo,file=function-call.bpl
 fun double(_ x: Int): Int {
-     return x * 2
+    return x * 2
 }
 
 // Valid: the correct amount of arguments is provided
@@ -1110,27 +1250,36 @@ The type `((Int): Int)[2]` specifies an array type of two functions, which accep
 
 #### Argument Passing Behavior
 
-When arguments are passed to a function, they are not copied. Instead, parameters act as new variable bindings and the values they refer to are identical to the passed values. Modifications to mutable values made within a function will be visible to the caller. This behavior is known as [call-by-sharing](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_sharing).
+When arguments are passed to a function, they are copied.
+Therefore, values that are passed into a function are unchanged in the caller's scope when the function returns.
+This behavior is known as [call-by-value](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_value).
 
 ```bamboo,file=function-change.bpl
+// Declare a function that changes the first two elements
+// of an array of integers
+//
 fun change(_ numbers: Int[]) {
-     numbers[0] = 1
-     numbers[1] = 2
+    // Change the elements of the passed in array.
+    // The changes are only local, as the array was copied
+    //
+    numbers[0] = 1
+    numbers[1] = 2
+    // `numbers` is [1, 2]
 }
 
 let numbers = [0, 1]
 
 change(numbers)
-// numbers is [1, 2]
+// `numbers` is still [0, 1]
 ```
 
 Parameters are constant, i.e., it is not allowed to assign to them.
 
 ```bamboo,file=function-parameter-assignment.bpl
 fun test(x: Int) {
-     // Invalid: cannot assign to a parameter (constant)
-     //
-     x = 2
+    // Invalid: cannot assign to a parameter (constant)
+    //
+    x = 2
 }
 ```
 
@@ -1234,7 +1383,7 @@ if a != 0 {
    b = 2
 }
 
-// b is 1
+// `b` is 1
 ```
 
 An additional else-clause can be added to execute another piece of code when the condition is false.
@@ -1250,7 +1399,7 @@ if a == 1 {
    b = 2
 }
 
-// b is 2
+// `b` is 2
 ```
 
 The else-clause can contain another if-statement, i.e., if-statements can be chained together.
@@ -1267,7 +1416,7 @@ if a == 1 {
    b = 3
 }
 
-// b is 3
+// `b` is 3
 ```
 
 ### Looping: while-statement
@@ -1285,7 +1434,7 @@ while a < 5 {
     a = a + 1
 }
 
-// a is 5
+// `a` is 5
 ```
 
 ### Immediate function return: return-statement
@@ -1375,76 +1524,6 @@ fun f(): Int {
     return x
 }
 f() // returns 2
-```
-
-## Optionals
-
-> Status: Optionals are not implemented yet.
-
-Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.
-
-An optional type is declared using the `?` suffix for another type. For example, `Int` is a non-optional integer, and `Int?` is an optional integer, i.e. either nothing, or an integer.
-
-The value representing nothing is `nil`.
-
-```bamboo
-// declare a constant which has an optional integer type,
-// with nil as its initial value
-//
-let a: Int? = nil
-
-// declare a constant which has an optional integer type,
-// with 42 as its initial value
-//
-let b: Int? = 42
-```
-
-### Nil-Coalescing Operator
-
-The nil-coalescing operator `??` returns the value inside an optional if it contains a value, or returns an alternative value if the optional has no value, i.e., the optional value is `nil`.
-
-```bamboo
-// declare a constant which has an optional integer type
-//
-let a: Int? = nil
-
-// declare a constant with a non-optional integer type,
-// which is initialized to b if it is non-nil, or 42 otherwise
-//
-let b: Int = a ?? 42
-// integer is 42, as a is nil
-```
-
-The nil-coalescing operator can only be applied to values which have an optional type.
-
-```bamboo
-// declare a constant with a non-optional integer type
-//
-let a = 1
-
-// invalid: nil-coalescing operator is applied to a value which has a non-optional type
-// (a has the non-optional type Int)
-//
-let b = a ?? 2
-```
-
-```bamboo
-// invalid: nil-coalescing operator is applied to a value which has a non-optional type
-// (the integer literal is of type Int)
-//
-let c = 1 ?? 2
-```
-
-The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.
-
-```bamboo
-// declare a constant with a non-optional integer type
-let a = 1
-
-// invalid: nil-coalescing operator is applied to a value of type Int,
-// but alternative is of type Bool
-//
-let b = a ?? false
 ```
 
 
@@ -1552,6 +1631,21 @@ let add = (a: Int8, b: Int8): Int {
 // `add` has type `((Int8, Int8): Int)`
 ```
 
+Type inference is performed for eacg expression / statement, and not across statements.
+
+There are cases where types cannot be inferred.
+In these cases explicit type annotations are required.
+
+```bamboo,file=type-inference-impossible.bpl
+// Invalid: not possible to infer type based on array literal's elements
+//
+let array = []
+
+// Invalid: not possible to infer type based on dictionary literal's keys and values
+//
+let dictionary = {}
+```
+
 ## Composite Data Types
 
 > 🚧 Status: Composite data types are not implemented yet.
@@ -1567,23 +1661,285 @@ and when the value is returned from a function:
   - [**Structures**](#structures) are **copied**, i.e. they are value types.
     Structures are useful when copies with independent state are desired.
   - [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
+
     Resources are useful when it is desired to model ownership (a value exists exactly in one location and it should not be lost).
 
-### Structures
+    Certain constructs in a blockchain represent assets of real, tangible value, as much as a house or car or bank account.
+    We have to worry about literal loss and theft, perhaps even on the scale of millions of dollars.
 
-Structures are declared using the `struct` keyword, followed by the name of the type.
+    We think resources are a great way to represent such assets.
 
-```bamboo,file=structure-declaration.bpl
+## Composite Data Type Declaration and Creation
+
+Structures are declared using the `struct` keyword and resources are declared using the `resource` keyword. The keyword is followed by the name.
+
+```bamboo,file=composite-data-type-declaration.bpl
 struct SomeStruct {
+    // ...
+}
+
+resource SomeResource {
     // ...
 }
 ```
 
-Structures are types. Structures are created (instantiated) by calling the type like a function.
+Structures and resources are types.
+
+Structures are created (instantiated) by calling the type like a function.
 
 ```bamboo,file=structure-instantiation.bpl
 SomeStruct()
 ```
+
+Resource are created (instantiated) by using the `create` keyword and calling the type like a function.
+
+```bamboo,file=resource-instantiation.bpl
+create SomeResource()
+```
+
+### Composite Data Type Fields
+
+Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initializer is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
+
+There are three kinds of fields.
+
+Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the `var` keyword.
+
+Constant fields are also stored in the composite value, but they can **not** have new values assigned to them. They are declared using the `let` keyword.
+
+Synthetic fields are **not** stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#composite-data-type-field-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
+
+| Field Kind           | Stored in memory | Assignable         | Keyword     |
+|----------------------|------------------|--------------------|-------------|
+| **Variable field**   | Yes              | Yes                | `var`       |
+| **Constant field**   | Yes              | **No**             | `let`       |
+| **Synthetic field**  | **No**           | Yes                | `synthetic` |
+
+```bamboo,file=composite-data-type-fields-and-init.bpl
+// Declare a structure named `Token`, which has a constant field
+// named `id` and a variable field named `balance`.
+//
+// Both fields are initialized through the initializer
+//
+struct Token {
+    let id: Int
+    var balance: Int
+
+    init(id: Int, balance: Int) {
+        self.id = id
+        self.balance = balance
+    }
+}
+```
+
+In initializers, the special constant `self` refers to the composite value that is to be initialized.
+
+Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (`.`) and the name of the field.
+
+```bamboo,file=composite-data-type-fields-assignment.bpl
+let token = Token(id: 42, balance: 1_000_00)
+
+token.id // is 42
+token.balance // is 1_000_000
+
+token.balance = 1
+// `token.balance` is 1
+
+// Invalid: assignment to constant field
+//
+token.id = 23
+```
+
+### Composite Data Type Field Getters and Setters
+
+Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.
+
+Getters and setters are enclosed in opening and closing braces, after the field's type.
+
+Getters are declared using the `get` keyword. Getters have no parameters and their return type is implicitly the type of the field.
+
+```bamboo,file=composite-data-type-field-getter.bpl
+struct GetterExample {
+
+    // Declare a variable field named `balance` with a getter
+    // which ensures the read value is always positive
+    //
+    var balance: Int {
+        get {
+           ensure {
+               result >= 0
+           }
+
+           if self.balance < 0 {
+               return 0
+           }
+
+           return self.balance
+        }
+    }
+
+    init(balance: Int) {
+        self.balance = balance
+    }
+}
+
+let example = GetterExample(balance: 10)
+// `example.balance` is 10
+
+example.balance = -50
+// `example.balance` is 0. without the getter it would be -50
+```
+
+Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses. The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.
+
+The types of values assigned to setters must always match the field's type.
+
+```bamboo,file=composite-data-type-field-setter.bpl
+struct SetterExample {
+
+    // Declare a variable field named `balance` with a setter
+    // which requires written values to be positive
+    //
+    var balance: Int {
+       set(newBalance) {
+           require {
+               newBalance >= 0
+           }
+           self.balance = newBalance
+       }
+    }
+
+    init(balance: Int) {
+        self.balance = balance
+    }
+}
+
+let example = SetterExample(balance: 10)
+// `example.balance` is 10
+
+// error: precondition of setter for field balance failed
+example.balance = -50
+```
+
+### Synthetic Composite Data Type Fields
+
+Fields which are not stored in the composite value are *synthetic*, i.e., the field value is computed. Synthetic can be either read-only, or readable and writable.
+
+Synthetic fields are declared using the `synthetic` keyword.
+
+Synthetic fields are read-only when only a getter is provided.
+
+```bamboo,file=composite-type-synthetic-field-getter-only.bpl
+struct Rectangle {
+    var width: Int
+    var height: Int
+
+    // Declare a synthetic field named `area`,
+    // which computes the area based on the width and height
+    //
+    synthetic area: Int {
+        get {
+            return width * height
+        }
+    }
+
+    init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
+    }
+}
+```
+
+Synthetic fields are readable and writable when both a getter and a setter is declared.
+
+```bamboo,file=composite-type-synthetic-field-setter-getter.bpl
+// Declare a struct named `GoalTracker` which stores a number
+// of target goals, a number of completed goals,
+// and has a synthetic field to provide the left number of goals
+//
+// NOTE: the tracker only implements some functionality to demonstrate
+// synthetic fields, it is incomplete (e.g. assignments to `goal` are not handled properly)
+//
+struct GoalTracker {
+
+    var goal: Int
+    var completed: Int
+
+    // Declare a synthetic field which is both readable
+    // and writable.
+    //
+    // When the field is read from (in the getter),
+    // the number of left goals is computed from
+    // the target number of goals and
+    // the completed number of goals.
+    //
+    // When the field is written to (in the setter),
+    // the number of completed goals is updated,
+    // based on the number of target goals
+    // and the new remaining number of goals
+    //
+    synthetic left: Double {
+        get {
+            return self.goal - self.completed
+        }
+
+        set(newLeft) {
+            self.completed = self.goal - newLeft
+        }
+    }
+
+    init(goal: Int, completed: Int) {
+        self.goal = goal
+        self.completed = completed
+    }
+}
+
+let tracker = GoalTracker(goal: 10, completed: 0)
+// `tracker.goal` is 10
+// `tracker.completed` is 0
+// `tracker.left` is 10
+
+tracker.completed = 1
+// `tracker.left` is 9
+
+tracker.left = 8
+// `tracker.completed` is 2
+```
+
+It is invalid to declare a synthetic field with only a setter.
+
+
+### Composite Data Type Functions
+
+Composite data types may contain functions.
+Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
+
+```bamboo,file=composite-data-type-function.bpl
+struct Rectangle {
+    var width: Int
+    var height: Int
+
+    init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
+    }
+
+    fun scale(factor: Int) {
+        self.width = self.width * factor
+        self.height = self.height * factor
+    }
+}
+
+let rectangle = Rectangle(width: 2, height: 3)
+rectangle.scale(factor: 4)
+// `rectangle.width` is 8
+// `rectangle.height` is 12
+```
+
+
+### Composite Data Type Behaviour
+
+#### Structures
 
 Structures are **copied** when used as an initial value for constant or variable,
 when assigned to a different variable,
@@ -1614,25 +1970,7 @@ b.value = 1
 a.value // is *0*
 ```
 
-### Resources
-
-#### Resource Declaration
-
-Resources are declared using the `resource` keyword, followed by the name of the resource.
-
-```bamboo,file=resource-declaration.bpl
-resource SomeResource {
-    // ...
-}
-```
-
-Resources are types. Resource values are created (instantiated) by using the `create` keyword and calling the type like a function.
-
-```bamboo,file=resource-instantiation.bpl
-create SomeResource()
-```
-
-#### Resource Behaviour
+#### Resources
 
 Resources are **moved** when used as an initial value for a constant or variable,
 when assigned to a different variable,
@@ -1742,7 +2080,10 @@ fun get(): <-SomeResource {
 
 #### Resources in Arrays and Dictionaries
 
-Arrays and dictionaries behave differently when they contain resources: When a resource is **read** from the array at a certain index, or it is **read** from a dictionary by accessing a certain key, the resource is **moved** out of the array or dictionary.
+Arrays and dictionaries behave differently when they contain resources:
+When a resource is **read** from the array at a certain index,
+or it is **read** from a dictionary by accessing a certain key,
+the resource is **moved** out of the array or dictionary.
 
 ```bamboo,file=resource-in-array.bpl
 let resources = [
@@ -1768,246 +2109,12 @@ let secondResource <- resources[1]
 // Accessing a field of a resource does not move the resource
 //
 resource[0].value // is 3
-```
 
-
-### Composite Data Type Fields
-
-Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields **must** be initialized in the initializer. The initializer is declared using the `init` keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always `Void`. The initializer always follows any fields.
-
-There are three kinds of fields.
-
-Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the `var` keyword.
-
-Constant fields are also stored in the composite value, but they can **not** have new values assigned to them. They are declared using the `let` keyword.
-
-Synthetic fields are **not** stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#composite-data-type-field-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
-
-| Field Kind           | Stored in memory | Assignable         | Keyword     |
-|----------------------|------------------|--------------------|-------------|
-| **Variable field**   | Yes              | Yes                | `var`       |
-| **Constant field**   | Yes              | **No**             | `let`       |
-| **Synthetic field**  | **No**           | Yes                | `synthetic` |
-
-```bamboo,file=composite-data-type-fields-and-init.bpl
-// Declare a structure named `Token`, which has a constant field
-// named `id` and a variable field named `balance`.
+// Error: cannot access second element of `resources`,
+// as it only has one element left after the first two elements
+// were accessed above
 //
-// Both fields are initialized through the initializer
-//
-struct Token {
-    let id: Int
-    var balance: Int
-
-    init(id: Int, balance: Int) {
-        self.id = id
-        self.balance = balance
-    }
-}
-```
-
-In initializers, the special constant `self` refers to the composite value that is to be initialized.
-
-Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (`.`) and the name of the field.
-
-```bamboo,file=composite-data-type-fields-assignment.bpl
-let token = Token(id: 42, balance: 1_000_00)
-
-token.id // is 42
-token.balance // is 1_000_000
-
-token.balance = 1
-// token.balance is 1
-
-// Invalid: assignment to constant field
-//
-token.id = 23
-```
-
-### Composite Data Type Field Getters and Setters
-
-Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.
-
-Getters and setters are enclosed in opening and closing braces, after the field's type.
-
-Getters are declared using the `get` keyword. Getters have no parameters and their return type is implicitly the type of the field.
-
-```bamboo,file=composite-data-type-field-getter.bpl
-struct GetterExample {
-
-    // Declare a variable field named `balance` with a getter
-    // which ensures the read value is always positive
-    //
-    var balance: Int {
-        get {
-           ensure {
-               result >= 0
-           }
-
-           if self.balance < 0 {
-               return 0
-           }
-
-           return self.balance
-        }
-    }
-
-    init(balance: Int) {
-        self.balance = balance
-    }
-}
-
-let example = GetterExample(balance: 10)
-// example.balance is 10
-
-example.balance = -50
-// example.balance is 0. without the getter it would be -50
-```
-
-Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses. The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.
-
-The types of values assigned to setters must always match the field's type.
-
-```bamboo,file=composite-data-type-field-setter.bpl
-struct SetterExample {
-
-    // Declare a variable field named `balance` with a setter
-    // which requires written values to be positive
-    //
-    var balance: Int {
-       set(newBalance) {
-           require {
-               newBalance >= 0
-           }
-           self.balance = newBalance
-       }
-    }
-
-    init(balance: Int) {
-        self.balance = balance
-    }
-}
-
-let example = SetterExample(balance: 10)
-// example.balance is 10
-
-// error: precondition of setter for field balance failed
-example.balance = -50
-```
-
-### Synthetic Composite Data Type Fields
-
-Fields which are not stored in the composite value are *synthetic*, i.e., the field value is computed. Synthetic can be either read-only, or readable and writable.
-
-Synthetic fields are declared using the `synthetic` keyword.
-
-Synthetic fields are read-only when only a getter is provided.
-
-```bamboo,file=composite-type-synthetic-field-getter-only.bpl
-struct Rectangle {
-    var width: Int
-    var height: Int
-
-    // Declare a synthetic field named `area`,
-    // which computes the area based on the width and height
-    //
-    synthetic area: Int {
-        get {
-            return width * height
-        }
-    }
-
-    init(width: Int, height: Int) {
-        self.width = width
-        self.height = height
-    }
-}
-```
-
-Synthetic fields are readable and writable when both a getter and a setter is declared.
-
-```bamboo,file=composite-type-synthetic-field-setter-getter.bpl
-// Declare a struct named `GoalTracker` which stores a number
-// of target goals, a number of completed goals,
-// and has a synthetic field to provide the left number of goals
-//
-// NOTE: the tracker only implements some functionality to demonstrate
-// synthetic fields, it is incomplete (e.g. assignments to `goal` are not handled properly)
-//
-struct GoalTracker {
-
-    var goal: Int
-    var completed: Int
-
-    // Declare a synthetic field which is both readable
-    // and writable.
-    //
-    // When the field is read from (in the getter),
-    // the number of left goals is computed from
-    // the target number of goals and
-    // the completed number of goals.
-    //
-    // When the field is written to (in the setter),
-    // the number of completed goals is updated,
-    // based on the number of target goals
-    // and the new remaining number of goals
-    //
-    synthetic left: Double {
-        get {
-            return self.goal - self.completed
-        }
-
-        set(newLeft) {
-            self.completed = self.goal - newLeft
-        }
-    }
-
-    init(goal: Int, completed: Int) {
-        self.goal = goal
-        self.completed = completed
-    }
-}
-
-let tracker = GoalTracker(goal: 10, completed: 0)
-// tracker.goal is 10
-// tracker.completed is 0
-// tracker.left is 10
-
-tracker.completed = 1
-// tracker.left is 9
-
-tracker.left = 8
-// tracker.completed is 2
-```
-
-It is invalid to declare a synthetic field with only a setter.
-
-
-### Composite Data Type Functions
-
-Composite data types may contain functions.
-Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
-
-```bamboo,file=composite-data-type-function.bpl
-struct Rectangle {
-    var width: Int
-    var height: Int
-
-    init(width: Int, height: Int) {
-        self.width = width
-        self.height = height
-    }
-
-    fun scale(factor: Int) {
-        self.width = self.width * factor
-        self.height = self.height * factor
-    }
-}
-
-let rectangle = Rectangle(width: 2, height: 3)
-rectangle.scale(factor: 4)
-// rectangle.width is 8
-// rectangle.height is 12
+resource[1]
 ```
 
 ### Unbound References / Nulls
@@ -2056,7 +2163,7 @@ To summarize the behavior for functions, structures, resources, and interfaces:
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   | `pub`                 | **All**           |
 
 
-```bamboo,file=access-control.bpl
+```bamboo,file=access-control-globals.bpl
 // Declare a private constant, inaccessible/invisible in outer scope
 //
 let a = 1
@@ -2064,7 +2171,9 @@ let a = 1
 // Declare a public constant, accessible/visible in all scopes
 //
 pub let b = 2
+```
 
+```bamboo,file=acess-control-struct.bpl
 // Declare a public struct, accessible/visible in all scopes
 //
 pub struct SomeStruct {
@@ -2109,7 +2218,52 @@ pub struct SomeStruct {
     pub fun privateTest() {
         // ...
     }
+
+    // The initializer is omitted for brevity.
+
 }
+
+let some = SomeStruct()
+
+// Invalid: cannot read private constant field in outer scope
+//
+some.a
+
+// Invalid: cannot set private constant field in outer scope
+//
+some.a = 1
+
+// Valid: can read public constant field in outer scope
+//
+some.b
+
+// Invalid: cannot set public constant field in outer scope
+//
+some.b = 2
+
+// Invalid: cannot read private variable field in outer scope
+//
+some.c
+
+// Invalid: cannot set private variable field in outer scope
+//
+some.c = 3
+
+// Valid: can read public variable field in outer scope
+//
+some.d
+
+// Invalid: cannot set public variable field in outer scope
+//
+some.d = 4
+
+// Valid: can read publicly settable variable field in outer scope
+//
+some.e
+
+// Valid: can set publicly settable variable field in outer scope
+//
+some.e = 5
 ```
 
 ## Interfaces
@@ -2339,8 +2493,8 @@ let withdrawn <- token.withdraw(amount: 10)
 // The postcondition of the `withdraw` function in the `FungibleToken`
 // interface ensured the balance field of the token was updated properly
 //
-// token.balance is 90
-// withdrawn.balance is 10
+// `token.balance` is 90
+// `withdrawn.balance` is 10
 
 // Deposit the withdrawn token into another one.
 let receiver: ExampleToken <- // ...
@@ -2728,6 +2882,14 @@ impl Hashable for Point {
 Attestations are values that proof ownership.
 Attestations can be created for resources and reflect their current state, which is read-only.
 They cannot be stored.
+
+Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.
+
+As an analogy, a bank statement is a proof of ownership of money.
+However, unlike a bank statement, an attestation is "live", i.e. it is not just a snapshot at the time it was created,
+but it reflects the current state of the underlying resource.
+
+Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource, and can be safely handed to untrusted parties.
 
 Attestations of resources are created using the `@` operator.
 Attestation types have the name of the resource type, prefixed with the `@` symbol.
@@ -3165,7 +3327,7 @@ How do we store programs on-chain?
 
 > ➡️ <https://github.com/dapperlabs/bamboo-node/issues/67>
 
-We don't allow floating-point numbers.
+We do not allow floating-point numbers.
 Should we add fixed-point arithmetic to support fractional numbers?
 
 ### Enums with Exhaustiveness Check
@@ -3211,7 +3373,7 @@ How do we ensure preconditions and postconditions are side-effect free?
 
 > ➡️ <https://github.com/dapperlabs/bamboo-node/issues/71>
 
-Currently we don't allow variables and constants to be initialized after they are declared. This improves readability, as the reader of the code can always be sure the initial value can be found where the variable or constant was declared, not somewhere else in the code following the declaration.
+Currently we do not allow variables and constants to be initialized after they are declared. This improves readability, as the reader of the code can always be sure the initial value can be found where the variable or constant was declared, not somewhere else in the code following the declaration.
 
 Should we allow the late initialization of variables and constants?
 

@@ -1,8 +1,11 @@
 package ast
 
+import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+
 type Declaration interface {
 	Element
 	isDeclaration()
 	DeclarationName() string
-	GetIdentifierPosition() *Position
+	IdentifierPosition() *Position
+	DeclarationKind() common.DeclarationKind
 }
