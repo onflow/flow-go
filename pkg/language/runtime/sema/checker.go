@@ -328,6 +328,10 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 
 	// check value type matches enclosing function's return type
 
+	if statement.Expression == nil {
+		return nil
+	}
+
 	valueType := statement.Expression.Accept(checker).(Type)
 	returnType := checker.currentFunction().returnType
 
@@ -514,9 +518,11 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 	left, right := checker.visitBinaryOperation(expression)
 
 	operation := expression.Operation
-	switch operation {
-	case ast.OperationPlus, ast.OperationMinus, ast.OperationMod, ast.OperationMul, ast.OperationDiv,
-		ast.OperationLess, ast.OperationLessEqual, ast.OperationGreater, ast.OperationGreaterEqual:
+	operationKind := binaryOperationKind(operation)
+
+	switch operationKind {
+	case BinaryOperationKindIntegerArithmetic,
+		BinaryOperationKindIntegerComparison:
 
 		// check both types are integer subtypes
 
@@ -563,9 +569,16 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 			})
 		}
 
-		return left
+		switch operationKind {
+		case BinaryOperationKindIntegerArithmetic:
+			return left
+		case BinaryOperationKindIntegerComparison:
+			return &BoolType{}
+		}
 
-	case ast.OperationEqual, ast.OperationUnequal:
+		panic(&errors.UnreachableError{})
+
+	case BinaryOperationKindEquality:
 		// check both types are equal, and boolean subtypes or integer subtypes
 
 		if !(left.Equal(right) &&
@@ -580,9 +593,9 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 			})
 		}
 
-		return left
+		return &BoolType{}
 
-	case ast.OperationOr, ast.OperationAnd:
+	case BinaryOperationKindBooleanLogic:
 
 		// check both types are integer subtypes
 
@@ -850,7 +863,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 		expression.Block,
 	)
 
-	return nil
+	return functionType
 }
 
 // ConvertType converts an AST type representation to a sema type

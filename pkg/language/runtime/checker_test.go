@@ -3,6 +3,7 @@ package runtime
 import (
 	"fmt"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	. "github.com/onsi/gomega"
@@ -10,7 +11,12 @@ import (
 	"testing"
 )
 
-func checkProgram(program *ast.Program) (*sema.Checker, error) {
+func parseAndCheck(code string) (*sema.Checker, error) {
+	program, errors := parser.Parse(code)
+
+	Expect(errors).
+		To(BeEmpty())
+
 	checker := sema.NewChecker(program)
 	err := checker.Check()
 	return checker, err
@@ -19,15 +25,10 @@ func checkProgram(program *ast.Program) (*sema.Checker, error) {
 func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	checker, err := parseAndCheck(`
         let x = 1
         var y = 1
     `)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	checker, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -42,14 +43,9 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 func TestCheckBoolean(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	checker, err := parseAndCheck(`
         let x = true
     `)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	checker, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -61,15 +57,10 @@ func TestCheckBoolean(t *testing.T) {
 func TestCheckInvalidGlobalRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
         let x = true
         let x = false
     `)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
@@ -78,17 +69,12 @@ func TestCheckInvalidGlobalRedeclaration(t *testing.T) {
 func TestCheckInvalidVariableRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
         fun test() {
             let x = true
             let x = false
         }
     `)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
@@ -97,16 +83,11 @@ func TestCheckInvalidVariableRedeclaration(t *testing.T) {
 func TestCheckInvalidUnknownDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
        fun test() {
            return x
        }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -115,16 +96,11 @@ func TestCheckInvalidUnknownDeclaration(t *testing.T) {
 func TestCheckInvalidUnknownDeclarationAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           x = 2
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -133,17 +109,12 @@ func TestCheckInvalidUnknownDeclarationAssignment(t *testing.T) {
 func TestCheckInvalidConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let x = 2
           x = 3
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
@@ -152,17 +123,12 @@ func TestCheckInvalidConstantAssignment(t *testing.T) {
 func TestCheckAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           var x = 2
           x = 3
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -171,18 +137,13 @@ func TestCheckAssignment(t *testing.T) {
 func TestCheckInvalidGlobalConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       let x = 2
 
       fun test() {
           x = 3
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
@@ -191,7 +152,7 @@ func TestCheckInvalidGlobalConstantAssignment(t *testing.T) {
 func TestCheckGlobalVariableAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       var x = 2
 
       fun test(): Int {
@@ -200,11 +161,6 @@ func TestCheckGlobalVariableAssignment(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
-
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
@@ -212,16 +168,11 @@ func TestCheckGlobalVariableAssignment(t *testing.T) {
 func TestCheckInvalidAssignmentToParameter(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test(x: Int8) {
            x = 2
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
@@ -230,17 +181,12 @@ func TestCheckInvalidAssignmentToParameter(t *testing.T) {
 func TestCheckArrayIndexingWithInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let z = [0, 3]
           z[0]
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -249,16 +195,11 @@ func TestCheckArrayIndexingWithInteger(t *testing.T) {
 func TestCheckInvalidArrayElements(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let z = [0, true]
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -267,17 +208,12 @@ func TestCheckInvalidArrayElements(t *testing.T) {
 func TestCheckNestedArrayIndexingWithInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let z = [[0, 1], [2, 3]]
           z[0][1]
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -286,17 +222,12 @@ func TestCheckNestedArrayIndexingWithInteger(t *testing.T) {
 func TestCheckInvalidArrayIndexingWithBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let z = [0, 3]
           z[true]
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
@@ -305,16 +236,11 @@ func TestCheckInvalidArrayIndexingWithBool(t *testing.T) {
 func TestCheckInvalidArrayIndexingIntoBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test(): Int64 {
           return true[0]
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
@@ -323,16 +249,11 @@ func TestCheckInvalidArrayIndexingIntoBool(t *testing.T) {
 func TestCheckInvalidArrayIndexingIntoInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test(): Int64 {
           return 2[0]
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
@@ -341,17 +262,12 @@ func TestCheckInvalidArrayIndexingIntoInteger(t *testing.T) {
 func TestCheckInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let z = [0, 3]
           z[true] = 2
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
@@ -360,17 +276,12 @@ func TestCheckInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
 func TestCheckArrayIndexingAssignmentWithInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let z = [0, 3]
           z[0] = 2
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -379,17 +290,12 @@ func TestCheckArrayIndexingAssignmentWithInteger(t *testing.T) {
 func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let z = [0, 3]
           z[0] = true
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -398,16 +304,11 @@ func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {
 func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           x[0]
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -416,16 +317,11 @@ func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
 func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           x[0] = 2
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -434,14 +330,9 @@ func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test(a: Int, a: Int) {}
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
@@ -450,14 +341,9 @@ func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
 func TestCheckInvalidArgumentLabelRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test(x a: Int, x b: Int) {}
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
@@ -466,14 +352,9 @@ func TestCheckInvalidArgumentLabelRedeclaration(t *testing.T) {
 func TestCheckArgumentLabelRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test(_ a: Int, _ b: Int) {}
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -482,14 +363,9 @@ func TestCheckArgumentLabelRedeclaration(t *testing.T) {
 func TestCheckInvalidConstantValue(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       let x: Bool = 1
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -498,16 +374,11 @@ func TestCheckInvalidConstantValue(t *testing.T) {
 func TestCheckInvalidFunctionDeclarationReturnValue(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test(): Int {
           return true
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -516,16 +387,11 @@ func TestCheckInvalidFunctionDeclarationReturnValue(t *testing.T) {
 func TestCheckInvalidFunctionExpressionReturnValue(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       let test = fun (): Int {
           return true
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -534,16 +400,11 @@ func TestCheckInvalidFunctionExpressionReturnValue(t *testing.T) {
 func TestCheckInvalidReference(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           testX
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -552,16 +413,11 @@ func TestCheckInvalidReference(t *testing.T) {
 func TestCheckReferenceInFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           test
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -570,16 +426,11 @@ func TestCheckReferenceInFunction(t *testing.T) {
 func TestCheckParameterNameWithFunctionName(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test(test: Int) {
           test
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -588,16 +439,11 @@ func TestCheckParameterNameWithFunctionName(t *testing.T) {
 func TestCheckIfStatementTest(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           if true {}
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -606,16 +452,11 @@ func TestCheckIfStatementTest(t *testing.T) {
 func TestCheckInvalidIfStatementTest(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           if 1 {}
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -624,18 +465,13 @@ func TestCheckInvalidIfStatementTest(t *testing.T) {
 func TestCheckInvalidIfStatementElse(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           if true {} else {
               x
           }
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -644,16 +480,11 @@ func TestCheckInvalidIfStatementElse(t *testing.T) {
 func TestCheckConditionalExpressionTest(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let x = true ? 1 : 2
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -662,16 +493,11 @@ func TestCheckConditionalExpressionTest(t *testing.T) {
 func TestCheckInvalidConditionalExpressionTest(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let x = 1 ? 2 : 3
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -680,16 +506,11 @@ func TestCheckInvalidConditionalExpressionTest(t *testing.T) {
 func TestCheckInvalidConditionalExpressionElse(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let x = true ? 2 : y
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -698,16 +519,11 @@ func TestCheckInvalidConditionalExpressionElse(t *testing.T) {
 func TestCheckInvalidConditionalExpressionTypes(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           let x = true ? 2 : false
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -716,16 +532,11 @@ func TestCheckInvalidConditionalExpressionTypes(t *testing.T) {
 func TestCheckInvalidWhileTest(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           while 1 {}
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
@@ -734,16 +545,11 @@ func TestCheckInvalidWhileTest(t *testing.T) {
 func TestCheckWhileTest(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           while true {}
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -752,16 +558,11 @@ func TestCheckWhileTest(t *testing.T) {
 func TestCheckInvalidWhileBlock(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test() {
           while true { x }
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -770,7 +571,7 @@ func TestCheckInvalidWhileBlock(t *testing.T) {
 func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun f(x: Int): Int {
           return x
       }
@@ -780,11 +581,6 @@ func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
-
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
 }
@@ -792,7 +588,7 @@ func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
 func TestCheckFunctionCallWithArgumentLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun f(x: Int): Int {
           return x
       }
@@ -802,11 +598,6 @@ func TestCheckFunctionCallWithArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
-
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
@@ -814,7 +605,7 @@ func TestCheckFunctionCallWithArgumentLabel(t *testing.T) {
 func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun f(_ x: Int): Int {
           return x
       }
@@ -824,11 +615,6 @@ func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
-
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
@@ -836,7 +622,7 @@ func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
 func TestCheckInvalidFunctionCallWithNotRequiredArgumentLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun f(_ x: Int): Int {
           return x
       }
@@ -846,11 +632,6 @@ func TestCheckInvalidFunctionCallWithNotRequiredArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
-
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
 }
@@ -858,7 +639,7 @@ func TestCheckInvalidFunctionCallWithNotRequiredArgumentLabel(t *testing.T) {
 func TestCheckIndirectFunctionCallWithoutArgumentLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun f(x: Int): Int {
           return x
       }
@@ -869,11 +650,6 @@ func TestCheckIndirectFunctionCallWithoutArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
-
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
@@ -881,7 +657,7 @@ func TestCheckIndirectFunctionCallWithoutArgumentLabel(t *testing.T) {
 func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun f(x: Int): Int {
           return x
       }
@@ -891,11 +667,6 @@ func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
-
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
 }
@@ -903,7 +674,7 @@ func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
 func TestCheckFunctionCallIncorrectArgumentLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun f(x: Int): Int {
           return x
       }
@@ -913,11 +684,6 @@ func TestCheckFunctionCallIncorrectArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
-
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
 }
@@ -925,7 +691,7 @@ func TestCheckFunctionCallIncorrectArgumentLabel(t *testing.T) {
 func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun f(x: Int): Int {
           return x
       }
@@ -935,11 +701,6 @@ func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
-
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
 }
@@ -947,16 +708,11 @@ func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
 func TestCheckInvalidFunctionCallOfBool(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test(): Int {
           return true()
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
@@ -965,16 +721,11 @@ func TestCheckInvalidFunctionCallOfBool(t *testing.T) {
 func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun test(): Int32 {
           return 2()
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
@@ -983,7 +734,7 @@ func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
 func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       fun f(x: Int): Int {
           return x
       }
@@ -993,11 +744,6 @@ func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
-
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
@@ -1005,14 +751,9 @@ func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
 func TestCheckInvalidUnaryBooleanNegationOfInteger(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       let a = !1
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
@@ -1021,14 +762,9 @@ func TestCheckInvalidUnaryBooleanNegationOfInteger(t *testing.T) {
 func TestCheckUnaryBooleanNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       let a = !true
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -1037,14 +773,9 @@ func TestCheckUnaryBooleanNegation(t *testing.T) {
 func TestCheckInvalidUnaryIntegerNegationOfBoolean(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       let a = -true
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
@@ -1053,20 +784,16 @@ func TestCheckInvalidUnaryIntegerNegationOfBoolean(t *testing.T) {
 func TestCheckUnaryIntegerNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	_, err := parseAndCheck(`
       let a = -1
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	_, err := checkProgram(program)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
 
 type operationTest struct {
+	ty          sema.Type
 	left, right string
 	matcher     types.GomegaMatcher
 }
@@ -1083,13 +810,23 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 		{
 			operations: []ast.Operation{
 				ast.OperationPlus, ast.OperationMinus, ast.OperationMod, ast.OperationMul, ast.OperationDiv,
+			},
+			tests: []operationTest{
+				{&sema.IntType{}, "1", "2", Not(HaveOccurred())},
+				{&sema.IntType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.IntType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.IntType{}, "true", "false", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+			},
+		},
+		{
+			operations: []ast.Operation{
 				ast.OperationLess, ast.OperationLessEqual, ast.OperationGreater, ast.OperationGreaterEqual,
 			},
 			tests: []operationTest{
-				{"1", "2", Not(HaveOccurred())},
-				{"true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{"1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{"true", "false", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.BoolType{}, "1", "2", Not(HaveOccurred())},
+				{&sema.BoolType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.BoolType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.BoolType{}, "true", "false", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
 			},
 		},
 		{
@@ -1097,10 +834,10 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				ast.OperationOr, ast.OperationAnd,
 			},
 			tests: []operationTest{
-				{"true", "false", Not(HaveOccurred())},
-				{"true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{"1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{"1", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.BoolType{}, "true", "false", Not(HaveOccurred())},
+				{&sema.BoolType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.BoolType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
+				{&sema.BoolType{}, "1", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
 			},
 		},
 		{
@@ -1108,10 +845,10 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				ast.OperationEqual, ast.OperationUnequal,
 			},
 			tests: []operationTest{
-				{"true", "false", Not(HaveOccurred())},
-				{"1", "2", Not(HaveOccurred())},
-				{"true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
-				{"1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.BoolType{}, "true", "false", Not(HaveOccurred())},
+				{&sema.BoolType{}, "1", "2", Not(HaveOccurred())},
+				{&sema.BoolType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.BoolType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
 			},
 		},
 	}
@@ -1119,17 +856,43 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 	for _, operationTests := range allOperationTests {
 		for _, operation := range operationTests.operations {
 			for _, test := range operationTests.tests {
-				code := fmt.Sprintf(`let a = %s %s %s`, test.left, operation.Symbol(), test.right)
-				program, errors := parser.Parse(code)
-
-				Expect(errors).
-					To(BeEmpty())
-
-				_, err := checkProgram(program)
+				_, err := parseAndCheck(
+					fmt.Sprintf(
+						`fun test(): %s { return %s %s %s }`,
+						test.ty, test.left, operation.Symbol(), test.right,
+					),
+				)
 
 				Expect(err).
 					To(test.matcher)
 			}
 		}
 	}
+}
+
+func TestCheckFunctionExpressionsAndScope(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       let x = 10
+
+       // check first-class functions and scope inside them
+       let y = (fun (x: Int): Int { return x })(42)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckReturnWithoutExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       fun returnNothing() {
+           return
+       }
+	`)
+
+	Expect(inter.Invoke("returnNothing")).
+		To(Equal(interpreter.VoidValue{}))
 }

@@ -5,27 +5,46 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	"math/big"
 	"testing"
 )
 
+func init() {
+	format.UseStringerRepresentation = true
+}
+
+func parseCheckAndInterpret(code string) *interpreter.Interpreter {
+	program, errors := parser.Parse(code)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	checker := sema.NewChecker(program)
+	err := checker.Check()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	inter := interpreter.NewInterpreter(program)
+	err = inter.Interpret()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	return inter
+}
+
 func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
         let x = 1
         let y = true
         let z = 1 + 2
         var a = 3 == 3
         var b = [1, 2]
     `)
-
-	Expect(errors).To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
@@ -49,19 +68,11 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 func TestInterpretDeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
         fun test(): Int {
             return 42
         }
     `)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
@@ -70,17 +81,9 @@ func TestInterpretDeclarations(t *testing.T) {
 func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(``)
+	inter := parseCheckAndInterpret(``)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
-
-	_, err = inter.Invoke("test")
+	_, err := inter.Invoke("test")
 	Expect(err).
 		To(BeAssignableToTypeOf(&interpreter.NotDeclaredError{}))
 }
@@ -88,19 +91,11 @@ func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
 func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        let test = 1
    `)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
-
-	_, err = inter.Invoke("test")
+	_, err := inter.Invoke("test")
 	Expect(err).
 		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
 }
@@ -108,28 +103,20 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 func TestInterpretLexicalScope(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        let x = 10
 
-       fun f(): Int32 {
+       fun f(): Int {
           // check resolution
           return x
        }
 
-       fun g(): Int32 {
+       fun g(): Int {
           // check scope is lexical, not dynamic
           let x = 20
           return f()
        }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(10)}))
@@ -144,10 +131,10 @@ func TestInterpretLexicalScope(t *testing.T) {
 func TestInterpretNoHoisting(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        let x = 2
 
-       fun test(): Int64 {
+       fun test(): Int {
           if x == 0 {
               let x = 3
               return x
@@ -155,14 +142,6 @@ func TestInterpretNoHoisting(t *testing.T) {
           return x
        }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -174,20 +153,12 @@ func TestInterpretNoHoisting(t *testing.T) {
 func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        let x = 10
 
        // check first-class functions and scope inside them
-       let y = (fun (x: Int32): Int32 { return x })(42)
+       let y = (fun (x: Int): Int { return x })(42)
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(10)}))
@@ -199,21 +170,13 @@ func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 func TestInterpretVariableAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
-       fun test(): Int64 {
+	inter := parseCheckAndInterpret(`
+       fun test(): Int {
            var x = 2
            x = 3
            return x
        }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
@@ -222,22 +185,14 @@ func TestInterpretVariableAssignment(t *testing.T) {
 func TestInterpretGlobalVariableAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        var x = 2
 
-       fun test(): Int64 {
+       fun test(): Int {
            x = 3
            return x
        }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -252,22 +207,14 @@ func TestInterpretGlobalVariableAssignment(t *testing.T) {
 func TestInterpretConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        let x = 2
 
-       fun test(): Int64 {
+       fun test(): Int {
            let x = 3
            return x
        }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -279,48 +226,32 @@ func TestInterpretConstantRedeclaration(t *testing.T) {
 func TestInterpretParameters(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
-       fun returnA(a: Int32, b: Int32): Int64 {
+	inter := parseCheckAndInterpret(`
+       fun returnA(a: Int, b: Int): Int {
            return a
        }
 
-       fun returnB(a: Int32, b: Int32): Int64 {
+       fun returnB(a: Int, b: Int): Int {
            return b
        }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
+	Expect(inter.Invoke("returnA", big.NewInt(24), big.NewInt(42))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(24)}))
 
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
-
-	Expect(inter.Invoke("returnA", int64(24), int64(42))).
-		To(Equal(interpreter.Int64Value(24)))
-
-	Expect(inter.Invoke("returnB", int64(24), int64(42))).
-		To(Equal(interpreter.Int64Value(42)))
+	Expect(inter.Invoke("returnB", big.NewInt(24), big.NewInt(42))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
 }
 
 func TestInterpretArrayIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
-       fun test(): Int64 {
+	inter := parseCheckAndInterpret(`
+       fun test(): Int {
            let z = [0, 3]
            return z[1]
        }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
@@ -329,21 +260,13 @@ func TestInterpretArrayIndexing(t *testing.T) {
 func TestInterpretArrayIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
-       fun test(): Int64 {
+	inter := parseCheckAndInterpret(`
+       fun test(): Int {
            let z = [0, 3]
            z[1] = 2
            return z[1]
        }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -352,23 +275,28 @@ func TestInterpretArrayIndexingAssignment(t *testing.T) {
 func TestInterpretReturnWithoutExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
-       fun returnEarly() {
+	inter := parseCheckAndInterpret(`
+       fun returnNothing() {
            return
+       }
+	`)
+
+	Expect(inter.Invoke("returnNothing")).
+		To(Equal(interpreter.VoidValue{}))
+}
+
+func TestInterpretReturns(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       fun returnEarly(): Int {
+           return 2
            return 1
        }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
-
 	Expect(inter.Invoke("returnEarly")).
-		To(Equal(interpreter.VoidValue{}))
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
 }
 
 // TODO: perform each operator test for each integer type
@@ -376,17 +304,9 @@ func TestInterpretReturnWithoutExpression(t *testing.T) {
 func TestInterpretPlusOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        let x = 2 + 4
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
@@ -395,17 +315,9 @@ func TestInterpretPlusOperator(t *testing.T) {
 func TestInterpretMinusOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        let x = 2 - 4
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(-2)}))
@@ -414,17 +326,9 @@ func TestInterpretMinusOperator(t *testing.T) {
 func TestInterpretMulOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        let x = 2 * 4
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(8)}))
@@ -433,17 +337,9 @@ func TestInterpretMulOperator(t *testing.T) {
 func TestInterpretDivOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        let x = 7 / 3
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -452,17 +348,9 @@ func TestInterpretDivOperator(t *testing.T) {
 func TestInterpretModOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        let x = 5 % 3
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -471,7 +359,7 @@ func TestInterpretModOperator(t *testing.T) {
 func TestInterpretEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
       fun testIntegersUnequal(): Bool {
           return 5 == 3
       }
@@ -497,14 +385,6 @@ func TestInterpretEqualOperator(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
-
 	Expect(inter.Invoke("testIntegersUnequal")).
 		To(Equal(interpreter.BoolValue(false)))
 
@@ -527,7 +407,7 @@ func TestInterpretEqualOperator(t *testing.T) {
 func TestInterpretUnequalOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
       fun testIntegersUnequal(): Bool {
           return 5 != 3
       }
@@ -553,14 +433,6 @@ func TestInterpretUnequalOperator(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
-
 	Expect(inter.Invoke("testIntegersUnequal")).
 		To(Equal(interpreter.BoolValue(true)))
 
@@ -583,7 +455,7 @@ func TestInterpretUnequalOperator(t *testing.T) {
 func TestInterpretLessOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
       fun testIntegersGreater(): Bool {
           return 5 < 3
       }
@@ -596,14 +468,6 @@ func TestInterpretLessOperator(t *testing.T) {
           return 3 < 5
       }
     `)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("testIntegersGreater")).
 		To(Equal(interpreter.BoolValue(false)))
@@ -618,7 +482,7 @@ func TestInterpretLessOperator(t *testing.T) {
 func TestInterpretLessEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
       fun testIntegersGreater(): Bool {
           return 5 <= 3
       }
@@ -631,14 +495,6 @@ func TestInterpretLessEqualOperator(t *testing.T) {
           return 3 <= 5
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("testIntegersGreater")).
 		To(Equal(interpreter.BoolValue(false)))
@@ -653,7 +509,7 @@ func TestInterpretLessEqualOperator(t *testing.T) {
 func TestInterpretGreaterOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
       fun testIntegersGreater(): Bool {
           return 5 > 3
       }
@@ -666,14 +522,6 @@ func TestInterpretGreaterOperator(t *testing.T) {
           return 3 > 5
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("testIntegersGreater")).
 		To(Equal(interpreter.BoolValue(true)))
@@ -688,7 +536,7 @@ func TestInterpretGreaterOperator(t *testing.T) {
 func TestInterpretGreaterEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
       fun testIntegersGreater(): Bool {
           return 5 >= 3
       }
@@ -701,14 +549,6 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
           return 3 >= 5
       }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("testIntegersGreater")).
 		To(Equal(interpreter.BoolValue(true)))
@@ -723,7 +563,7 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
 func TestInterpretOrOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
       fun testTrueTrue(): Bool {
           return true || true
       }
@@ -741,14 +581,6 @@ func TestInterpretOrOperator(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
-
 	Expect(inter.Invoke("testTrueTrue")).
 		To(Equal(interpreter.BoolValue(true)))
 
@@ -765,7 +597,7 @@ func TestInterpretOrOperator(t *testing.T) {
 func TestInterpretAndOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
       fun testTrueTrue(): Bool {
           return true && true
       }
@@ -783,14 +615,6 @@ func TestInterpretAndOperator(t *testing.T) {
       }
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
-
 	Expect(inter.Invoke("testTrueTrue")).
 		To(Equal(interpreter.BoolValue(true)))
 
@@ -807,8 +631,8 @@ func TestInterpretAndOperator(t *testing.T) {
 func TestInterpretIfStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
-       fun testTrue(): Int64 {
+	inter := parseCheckAndInterpret(`
+       fun testTrue(): Int {
            if true {
                return 2
            } else {
@@ -817,7 +641,7 @@ func TestInterpretIfStatement(t *testing.T) {
            return 4
        }
 
-       fun testFalse(): Int64 {
+       fun testFalse(): Int {
            if false {
                return 2
            } else {
@@ -826,14 +650,14 @@ func TestInterpretIfStatement(t *testing.T) {
            return 4
        }
 
-       fun testNoElse(): Int64 {
+       fun testNoElse(): Int {
            if true {
                return 2
            }
            return 3
        }
 
-       fun testElseIf(): Int64 {
+       fun testElseIf(): Int {
            if false {
                return 2
            } else if true {
@@ -842,14 +666,6 @@ func TestInterpretIfStatement(t *testing.T) {
            return 4
        }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("testTrue")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -867,8 +683,8 @@ func TestInterpretIfStatement(t *testing.T) {
 func TestInterpretWhileStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
-       fun test(): Int64 {
+	inter := parseCheckAndInterpret(`
+       fun test(): Int {
            var x = 0
            while x < 5 {
                x = x + 2
@@ -878,14 +694,6 @@ func TestInterpretWhileStatement(t *testing.T) {
 
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
-
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
 }
@@ -893,8 +701,8 @@ func TestInterpretWhileStatement(t *testing.T) {
 func TestInterpretWhileStatementWithReturn(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
-       fun test(): Int64 {
+	inter := parseCheckAndInterpret(`
+       fun test(): Int {
            var x = 0
            while x < 10 {
                x = x + 2
@@ -907,14 +715,6 @@ func TestInterpretWhileStatementWithReturn(t *testing.T) {
 
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
-
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
 }
@@ -922,26 +722,18 @@ func TestInterpretWhileStatementWithReturn(t *testing.T) {
 func TestInterpretExpressionStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
        var x = 0
 
        fun incX() {
            x = x + 2
        }
 
-       fun test(): Int64 {
+       fun test(): Int {
            incX()
            return x
        }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
@@ -956,23 +748,15 @@ func TestInterpretExpressionStatement(t *testing.T) {
 func TestInterpretConditionalOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
-       fun testTrue(): Int64 {
+	inter := parseCheckAndInterpret(`
+       fun testTrue(): Int {
            return true ? 2 : 3
        }
 
-       fun testFalse(): Int64 {
+       fun testFalse(): Int {
 			return false ? 2 : 3
        }
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("testTrue")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -981,27 +765,21 @@ func TestInterpretConditionalOperator(t *testing.T) {
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
 
-func TestInterpretFunctionBindingInFunction(t *testing.T) {
-	RegisterTestingT(t)
-
-	program, errors := parser.Parse(`
-       fun foo() {
-           return foo
-       }
-   `)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
-
-	_, err = inter.Invoke("foo")
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
+// TODO: requires Any type
+//
+//func TestInterpretFunctionBindingInFunction(t *testing.T) {
+//	RegisterTestingT(t)
+//
+//	inter := parseCheckAndInterpret(`
+//       fun foo(): Any {
+//           return foo
+//       }
+//   `)
+//
+//	_, err := inter.Invoke("foo")
+//	Expect(err).
+//		To(Not(HaveOccurred()))
+//}
 
 func TestInterpretRecursion(t *testing.T) {
 	// mainly tests that the function declaration identifier is bound
@@ -1010,22 +788,14 @@ func TestInterpretRecursion(t *testing.T) {
 
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
-       fun fib(n: Int): Int {
+	inter := parseCheckAndInterpret(`
+       fun fib(_ n: Int): Int {
            if n < 2 {
               return n
            }
            return fib(n - 1) + fib(n - 2)
        }
    `)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("fib", big.NewInt(14))).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(377)}))
@@ -1034,18 +804,10 @@ func TestInterpretRecursion(t *testing.T) {
 func TestInterpretUnaryIntegerNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
       let x = -2
       let y = -(-2)
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(-2)}))
@@ -1057,20 +819,12 @@ func TestInterpretUnaryIntegerNegation(t *testing.T) {
 func TestInterpretUnaryBooleanNegation(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	inter := parseCheckAndInterpret(`
       let a = !true
       let b = !(!true)
       let c = !false
       let d = !(!false)
 	`)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	inter := interpreter.NewInterpreter(program)
-	err := inter.Interpret()
-	Expect(err).
-		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["a"].Value).
 		To(Equal(interpreter.BoolValue(false)))
