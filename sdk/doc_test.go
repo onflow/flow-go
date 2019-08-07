@@ -23,7 +23,6 @@ func ExampleCreateAccount_complete() {
 
 	// generate an account creation transaction
 	tx := sdk.CreateAccount(keyPair.PublicKey, nil)
-	tx.SetComputeLimit(100)
 
 	signedTx := tx.SignPayer(myAccount.Account, myAccount.KeyPair)
 
