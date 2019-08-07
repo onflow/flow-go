@@ -1176,15 +1176,11 @@ fun factorial(_ n: Int): Int {
             "the result must be greater than or equal to 1"
     }
 
-    var i = n
-    var result = 1
-
-    while i > 1 {
-        result = result * i
-        i = i - 1
+    if n < 1 {
+       return 1
     }
 
-    return result
+    return n * factorial(n - 1)
 }
 
 factorial(5) // returns 120
