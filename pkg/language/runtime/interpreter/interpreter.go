@@ -11,6 +11,9 @@ import (
 	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 )
 
+type loopBreak struct{}
+type loopContinue struct{}
+
 // Visit-methods for statement which return a non-nil value
 // are treated like they are returning a value.
 
@@ -292,6 +295,14 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 	return statement.Expression.Accept(interpreter).(Trampoline)
 }
 
+func (interpreter *Interpreter) VisitBreakStatement(statement *ast.BreakStatement) ast.Repr {
+	return Done{Result: loopBreak{}}
+}
+
+func (interpreter *Interpreter) VisitContinueStatement(statement *ast.ContinueStatement) ast.Repr {
+	return Done{Result: loopContinue{}}
+}
+
 func (interpreter *Interpreter) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 	return statement.Test.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
@@ -317,7 +328,11 @@ func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatemen
 
 			return statement.Block.Accept(interpreter).(Trampoline).
 				FlatMap(func(returnValue interface{}) Trampoline {
-					if returnValue != nil {
+					if _, ok := returnValue.(loopBreak); ok {
+						return Done{}
+					} else if _, ok := returnValue.(loopContinue); ok {
+						// NO-OP
+					} else if returnValue != nil {
 						return Done{Result: returnValue}
 					}
 
@@ -560,8 +575,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	panic(&unsupportedOperation{
 		kind:      common.OperationKindBinary,
 		operation: expression.Operation,
-		startPos:  expression.StartPos,
-		endPos:    expression.EndPos,
+		startPos:  expression.StartPosition(),
+		endPos:    expression.EndPosition(),
 	})
 }
 
