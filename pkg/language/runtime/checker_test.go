@@ -53,6 +53,21 @@ func TestCheckBoolean(t *testing.T) {
 		To(Equal(&sema.BoolType{}))
 }
 
+func expectCheckerErrors(err error, len int) []error {
+	if len <= 0 {
+		return nil
+	}
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&sema.CheckerError{}))
+
+	errs := err.(*sema.CheckerError).Errors
+
+	Expect(errs).To(HaveLen(len))
+
+	return errs
+}
+
 func TestCheckInvalidGlobalRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -61,7 +76,9 @@ func TestCheckInvalidGlobalRedeclaration(t *testing.T) {
         let x = false
     `)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
@@ -75,7 +92,9 @@ func TestCheckInvalidVariableRedeclaration(t *testing.T) {
         }
     `)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
@@ -88,8 +107,12 @@ func TestCheckInvalidUnknownDeclaration(t *testing.T) {
        }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckInvalidUnknownDeclarationAssignment(t *testing.T) {
@@ -101,7 +124,9 @@ func TestCheckInvalidUnknownDeclarationAssignment(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 }
 
@@ -115,7 +140,9 @@ func TestCheckInvalidConstantAssignment(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
 }
 
@@ -144,7 +171,9 @@ func TestCheckInvalidGlobalConstantAssignment(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
 }
 
@@ -173,8 +202,13 @@ func TestCheckInvalidAssignmentToParameter(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckArrayIndexingWithInteger(t *testing.T) {
@@ -200,7 +234,9 @@ func TestCheckInvalidArrayElements(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
@@ -228,7 +264,9 @@ func TestCheckInvalidArrayIndexingWithBool(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
 }
 
@@ -241,7 +279,9 @@ func TestCheckInvalidArrayIndexingIntoBool(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
 }
 
@@ -254,7 +294,9 @@ func TestCheckInvalidArrayIndexingIntoInteger(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
 }
 
@@ -268,7 +310,9 @@ func TestCheckInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
 }
 
@@ -296,7 +340,9 @@ func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
@@ -309,8 +355,13 @@ func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
 }
 
 func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
@@ -322,8 +373,13 @@ func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
 }
 
 func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
@@ -333,7 +389,28 @@ func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
       fun test(a: Int, a: Int) {}
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckInvalidRedeclarations(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(a: Int, a: Int) {
+        let x = 1
+        let x = 2
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
@@ -344,7 +421,9 @@ func TestCheckInvalidArgumentLabelRedeclaration(t *testing.T) {
       fun test(x a: Int, x b: Int) {}
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
@@ -366,7 +445,9 @@ func TestCheckInvalidConstantValue(t *testing.T) {
       let x: Bool = 1
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
@@ -379,7 +460,9 @@ func TestCheckInvalidFunctionDeclarationReturnValue(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
@@ -392,7 +475,9 @@ func TestCheckInvalidFunctionExpressionReturnValue(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
@@ -405,7 +490,9 @@ func TestCheckInvalidReference(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 }
 
@@ -457,7 +544,9 @@ func TestCheckInvalidIfStatementTest(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
@@ -472,7 +561,9 @@ func TestCheckInvalidIfStatementElse(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 }
 
@@ -498,7 +589,9 @@ func TestCheckInvalidConditionalExpressionTest(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
@@ -511,8 +604,13 @@ func TestCheckInvalidConditionalExpressionElse(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckInvalidConditionalExpressionTypes(t *testing.T) {
@@ -524,7 +622,9 @@ func TestCheckInvalidConditionalExpressionTypes(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
@@ -537,7 +637,9 @@ func TestCheckInvalidWhileTest(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
@@ -563,7 +665,9 @@ func TestCheckInvalidWhileBlock(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 }
 
@@ -580,7 +684,9 @@ func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
 }
 
@@ -631,7 +737,9 @@ func TestCheckInvalidFunctionCallWithNotRequiredArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
 }
 
@@ -666,7 +774,9 @@ func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
 }
 
@@ -683,7 +793,9 @@ func TestCheckFunctionCallIncorrectArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
 }
 
@@ -700,8 +812,13 @@ func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
 }
 
 func TestCheckInvalidFunctionCallOfBool(t *testing.T) {
@@ -713,7 +830,9 @@ func TestCheckInvalidFunctionCallOfBool(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }
 
@@ -726,7 +845,9 @@ func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }
 
@@ -739,12 +860,36 @@ func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
       }
 
       fun test(): Int {
+          return f(x: true)
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidFunctionCallWithWrongTypeAndMissingArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun f(x: Int): Int {
+          return x
+      }
+
+      fun test(): Int {
           return f(true)
       }
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
 }
 
 func TestCheckInvalidUnaryBooleanNegationOfInteger(t *testing.T) {
@@ -754,7 +899,9 @@ func TestCheckInvalidUnaryBooleanNegationOfInteger(t *testing.T) {
       let a = !1
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
 }
 
@@ -776,7 +923,9 @@ func TestCheckInvalidUnaryIntegerNegationOfBoolean(t *testing.T) {
       let a = -true
 	`)
 
-	Expect(err).
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
 }
 
@@ -794,7 +943,7 @@ func TestCheckUnaryIntegerNegation(t *testing.T) {
 type operationTest struct {
 	ty          sema.Type
 	left, right string
-	matcher     types.GomegaMatcher
+	matchers    []types.GomegaMatcher
 }
 
 type operationTests struct {
@@ -811,10 +960,20 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				ast.OperationPlus, ast.OperationMinus, ast.OperationMod, ast.OperationMul, ast.OperationDiv,
 			},
 			tests: []operationTest{
-				{&sema.IntType{}, "1", "2", Not(HaveOccurred())},
-				{&sema.IntType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{&sema.IntType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{&sema.IntType{}, "true", "false", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.IntType{}, "1", "2", nil},
+				{&sema.IntType{}, "true", "2", []types.GomegaMatcher{
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+					BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+				}},
+				{&sema.IntType{}, "1", "true", []types.GomegaMatcher{
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				}},
+				{&sema.IntType{}, "true", "false", []types.GomegaMatcher{
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+					BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+				}},
 			},
 		},
 		{
@@ -822,10 +981,18 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				ast.OperationLess, ast.OperationLessEqual, ast.OperationGreater, ast.OperationGreaterEqual,
 			},
 			tests: []operationTest{
-				{&sema.BoolType{}, "1", "2", Not(HaveOccurred())},
-				{&sema.BoolType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{&sema.BoolType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{&sema.BoolType{}, "true", "false", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.BoolType{}, "1", "2", nil},
+				{&sema.BoolType{}, "true", "2", []types.GomegaMatcher{
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				}},
+				{&sema.BoolType{}, "1", "true", []types.GomegaMatcher{
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				}},
+				{&sema.BoolType{}, "true", "false", []types.GomegaMatcher{
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				}},
 			},
 		},
 		{
@@ -833,10 +1000,16 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				ast.OperationOr, ast.OperationAnd,
 			},
 			tests: []operationTest{
-				{&sema.BoolType{}, "true", "false", Not(HaveOccurred())},
-				{&sema.BoolType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{&sema.BoolType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{})},
-				{&sema.BoolType{}, "1", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.BoolType{}, "true", "false", nil},
+				{&sema.BoolType{}, "true", "2", []types.GomegaMatcher{
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+				}},
+				{&sema.BoolType{}, "1", "true", []types.GomegaMatcher{
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+				}},
+				{&sema.BoolType{}, "1", "2", []types.GomegaMatcher{
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				}},
 			},
 		},
 		{
@@ -844,10 +1017,14 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				ast.OperationEqual, ast.OperationUnequal,
 			},
 			tests: []operationTest{
-				{&sema.BoolType{}, "true", "false", Not(HaveOccurred())},
-				{&sema.BoolType{}, "1", "2", Not(HaveOccurred())},
-				{&sema.BoolType{}, "true", "2", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
-				{&sema.BoolType{}, "1", "true", BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{})},
+				{&sema.BoolType{}, "true", "false", nil},
+				{&sema.BoolType{}, "1", "2", nil},
+				{&sema.BoolType{}, "true", "2", []types.GomegaMatcher{
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				}},
+				{&sema.BoolType{}, "1", "true", []types.GomegaMatcher{
+					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				}},
 			},
 		},
 	}
@@ -862,8 +1039,12 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 					),
 				)
 
-				Expect(err).
-					To(test.matcher)
+				errs := expectCheckerErrors(err, len(test.matchers))
+
+				for i, matcher := range test.matchers {
+					Expect(errs[i]).
+						To(matcher)
+				}
 			}
 		}
 	}
