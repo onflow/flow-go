@@ -46,16 +46,6 @@ func (tx *RawTransaction) Hash() crypto.Hash {
 	return crypto.NewHash(bytes)
 }
 
-// SetNonce sets the nonce for the transaction.
-func (tx *RawTransaction) SetNonce(nonce uint64) {
-	tx.Nonce = nonce
-}
-
-// SetComputeLimit sets the compute limit for the transaction.
-func (tx *RawTransaction) SetComputeLimit(computeLimit uint64) {
-	tx.ComputeLimit = computeLimit
-}
-
 // SignPayer signs the transaction with the given account and keypair.
 //
 // The function returns a new SignedTransaction that includes the generated signature.
