@@ -46,18 +46,28 @@ func (tx *RawTransaction) Hash() crypto.Hash {
 	return crypto.NewHash(bytes)
 }
 
-// Sign signs a transaction with the given account and keypair.
+// SetNonce sets the nonce for the transaction.
+func (tx *RawTransaction) SetNonce(nonce uint64) {
+	tx.Nonce = nonce
+}
+
+// SetComputeLimit sets the compute limit for the transaction.
+func (tx *RawTransaction) SetComputeLimit(computeLimit uint64) {
+	tx.ComputeLimit = computeLimit
+}
+
+// SignPayer signs the transaction with the given account and keypair.
 //
 // The function returns a new SignedTransaction that includes the generated signature.
-func (tx *RawTransaction) Sign(account Address, keyPair *crypto.KeyPair) *SignedTransaction {
+func (tx *RawTransaction) SignPayer(key *AccountKey) *SignedTransaction {
 	hash := tx.Hash()
 
 	// TODO: include account in signature
-	sig := crypto.Sign(hash, keyPair)
+	sig := crypto.Sign(hash, key.KeyPair)
 
 	accountSig := AccountSignature{
-		Account:   account,
-		PublicKey: keyPair.PublicKey,
+		Account:   key.Account,
+		PublicKey: key.KeyPair.PublicKey,
 		Signature: sig.Bytes(),
 	}
 

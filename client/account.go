@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"time"
 
-	bip32 "github.com/tyler-smith/go-bip32"
-	bip39 "github.com/tyler-smith/go-bip39"
-
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
@@ -17,18 +17,7 @@ type AccountConfig struct {
 	Seed    string `json:"seed"`
 }
 
-type AccountKey struct {
-	Account    types.Address
-	PublicKey  []byte
-	PrivateKey []byte
-}
-
-type KeyPair struct {
-	PublicKey  []byte
-	PrivateKey []byte
-}
-
-func LoadAccountFromFile(filename string) (*AccountKey, error) {
+func LoadAccountFromFile(filename string) (*types.AccountKey, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -37,7 +26,7 @@ func LoadAccountFromFile(filename string) (*AccountKey, error) {
 	return LoadAccount(f)
 }
 
-func LoadAccount(r io.Reader) (*AccountKey, error) {
+func LoadAccount(r io.Reader) (*types.AccountKey, error) {
 	d := json.NewDecoder(r)
 
 	var conf AccountConfig
@@ -46,39 +35,35 @@ func LoadAccount(r io.Reader) (*AccountKey, error) {
 		return nil, err
 	}
 
-	keyPair, err := GenerateKeyPair(conf.Seed)
+	keyPair, err := crypto.GenerateKeyPair(conf.Seed)
 	if err != nil {
 		return nil, err
 	}
 
-	return &AccountKey{
-		Account:    types.HexToAddress(conf.Address),
-		PublicKey:  keyPair.PublicKey,
-		PrivateKey: keyPair.PrivateKey,
+	return &types.AccountKey{
+		Account: types.HexToAddress(conf.Address),
+		KeyPair: keyPair,
 	}, nil
 }
 
-// GenerateKeyPair generates a new key-pair from a passphrase.
-func GenerateKeyPair(passphrase string) (*KeyPair, error) {
-	// generate a mnemonic for memorization or user-friendly seeds
-	entropy, _ := bip39.NewEntropy(256)
-	mnemonic, _ := bip39.NewMnemonic(entropy)
+func CreateAccount(publicKey, code []byte) *types.RawTransaction {
+	publicKeyStr := bytesToString(publicKey)
+	codeStr := bytesToString(code)
 
-	// generate a Bip32 HD wallet for the mnemonic and a user supplied password
-	seed := bip39.NewSeed(mnemonic, passphrase)
+	script := fmt.Sprintf(`
+		fun main() {
+			let publicKey = %s
+			let code = %s
+			createAccount(publicKey, code)
+		}
+	`, publicKeyStr, codeStr)
 
-	masterKey, err := bip32.NewMasterKey(seed)
-	if err != nil {
-		return nil, fmt.Errorf("invalid seed phrase")
+	return &types.RawTransaction{
+		Script:    []byte(script),
+		Timestamp: time.Now(),
 	}
+}
 
-	publicKey := masterKey.PublicKey()
-
-	publicKeyBytes, _ := publicKey.Serialize()
-	privateKeyBytes, _ := masterKey.Serialize()
-
-	return &KeyPair{
-		PublicKey:  publicKeyBytes,
-		PrivateKey: privateKeyBytes,
-	}, nil
+func bytesToString(b []byte) string {
+	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }

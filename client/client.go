@@ -44,6 +44,7 @@ func New(host string, port int) (*Client, error) {
 func NewFromRPCClient(rpcClient RPCClient) *Client {
 	return &Client{
 		rpcClient: rpcClient,
+		close:     func() error { return nil },
 	}
 }
 

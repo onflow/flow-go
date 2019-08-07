@@ -23,8 +23,7 @@ func TestLoadAccount(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	Expect(a.Account).ToNot(BeNil())
-	Expect(a.PublicKey).ToNot(BeNil())
-	Expect(a.PrivateKey).ToNot(BeNil())
+	Expect(a.KeyPair).ToNot(BeNil())
 
 	// invalid json should fail
 	r = strings.NewReader(`
