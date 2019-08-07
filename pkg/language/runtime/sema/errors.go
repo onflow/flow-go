@@ -369,3 +369,26 @@ func (e *InvalidBinaryOperandsError) StartPosition() *ast.Position {
 func (e *InvalidBinaryOperandsError) EndPosition() *ast.Position {
 	return e.EndPos
 }
+
+// ControlStatementError
+
+type ControlStatementError struct {
+	ControlStatement common.ControlStatement
+	StartPos         *ast.Position
+	EndPos           *ast.Position
+}
+
+func (e *ControlStatementError) Error() string {
+	return fmt.Sprintf(
+		"control statement outside of loop: %s",
+		e.ControlStatement.Symbol(),
+	)
+}
+
+func (e *ControlStatementError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *ControlStatementError) EndPosition() *ast.Position {
+	return e.EndPos
+}

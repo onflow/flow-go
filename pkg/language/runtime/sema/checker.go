@@ -12,6 +12,7 @@ const ArgumentLabelNotRequired = "_"
 
 type functionContext struct {
 	returnType Type
+	loops      int
 }
 
 type checkerResult struct {
@@ -457,6 +458,46 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	}
 }
 
+func (checker *Checker) VisitBreakStatement(statement *ast.BreakStatement) ast.Repr {
+	var errs []error
+
+	// check statement is inside loop
+	if checker.currentFunction().loops == 0 {
+		errs = append(errs,
+			&ControlStatementError{
+				ControlStatement: common.ControlStatementBreak,
+				StartPos:         statement.StartPos,
+				EndPos:           statement.EndPos,
+			},
+		)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
+}
+
+func (checker *Checker) VisitContinueStatement(statement *ast.ContinueStatement) ast.Repr {
+	var errs []error
+
+	// check statement is inside loop
+	if checker.currentFunction().loops == 0 {
+		errs = append(errs,
+			&ControlStatementError{
+				ControlStatement: common.ControlStatementContinue,
+				StartPos:         statement.StartPos,
+				EndPos:           statement.EndPos,
+			},
+		)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
+}
+
 func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 	var errs []error
 
@@ -495,6 +536,11 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 			},
 		)
 	}
+
+	checker.currentFunction().loops += 1
+	defer func() {
+		checker.currentFunction().loops -= 1
+	}()
 
 	blockResult := statement.Block.Accept(checker).(checkerResult)
 	errs = append(errs, blockResult.Errors...)
@@ -855,8 +901,8 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 	panic(&unsupportedOperation{
 		kind:      common.OperationKindBinary,
 		operation: operation,
-		startPos:  expression.StartPos,
-		endPos:    expression.EndPos,
+		startPos:  expression.StartPosition(),
+		endPos:    expression.EndPosition(),
 	})
 }
 
