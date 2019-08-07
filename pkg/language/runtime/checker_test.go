@@ -3,7 +3,6 @@ package runtime
 import (
 	"fmt"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	. "github.com/onsi/gomega"
@@ -887,12 +886,37 @@ func TestCheckFunctionExpressionsAndScope(t *testing.T) {
 func TestCheckReturnWithoutExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := parseCheckAndInterpret(`
+	_, err := parseAndCheck(`
        fun returnNothing() {
            return
        }
 	`)
 
-	Expect(inter.Invoke("returnNothing")).
-		To(Equal(interpreter.VoidValue{}))
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckAnyReturnType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun foo(): Any {
+          return foo
+      }
+  `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckAny(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let a: Any = 1
+      let b: Any = true
+  `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 }

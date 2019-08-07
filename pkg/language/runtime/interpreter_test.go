@@ -765,21 +765,19 @@ func TestInterpretConditionalOperator(t *testing.T) {
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
 
-// TODO: requires Any type
-//
-//func TestInterpretFunctionBindingInFunction(t *testing.T) {
-//	RegisterTestingT(t)
-//
-//	inter := parseCheckAndInterpret(`
-//       fun foo(): Any {
-//           return foo
-//       }
-//   `)
-//
-//	_, err := inter.Invoke("foo")
-//	Expect(err).
-//		To(Not(HaveOccurred()))
-//}
+func TestInterpretFunctionBindingInFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun foo(): Any {
+          return foo
+      }
+  `)
+
+	_, err := inter.Invoke("foo")
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
 
 func TestInterpretRecursion(t *testing.T) {
 	// mainly tests that the function declaration identifier is bound
