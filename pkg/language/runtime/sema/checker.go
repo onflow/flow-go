@@ -1447,7 +1447,27 @@ func (checker *Checker) visitConditional(
 
 func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
 	// TODO:
-	return nil
+	var errs []error
+
+	identifier := structure.Identifier
+
+	// check type is not already defined
+
+	existingType := checker.findType(identifier)
+	if existingType != nil {
+		errs = append(errs,
+			&RedeclarationError{
+				Kind: common.DeclarationKindType,
+				Name: identifier,
+				Pos:  structure.IdentifierPos,
+			},
+		)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {

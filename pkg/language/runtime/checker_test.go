@@ -1212,3 +1212,37 @@ func TestCheckInvalidFunctionAccess(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.InvalidAccessError{}))
 }
+
+func TestCheckInvalidStructureRedeclaringType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct Int {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckStructure(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct Test {
+            pub(set) var foo: Int
+
+            init(foo: Int) {
+                self.foo = foo
+            }
+
+            pub fun getFoo(): Int {
+                return self.foo
+            }
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
