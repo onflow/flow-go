@@ -93,6 +93,8 @@ statements
 
 statement
     : returnStatement
+    | breakStatement
+    | continueStatement
     | ifStatement
     | whileStatement
     | declaration
@@ -102,6 +104,14 @@ statement
 
 returnStatement
     : Return expression?
+    ;
+
+breakStatement
+    : Break
+    ;
+
+continueStatement
+    : Continue
     ;
 
 ifStatement
@@ -278,6 +288,10 @@ Fun : 'fun' ;
 Pub : 'pub' ;
 
 Return : 'return' ;
+
+Break : 'break' ;
+Continue : 'continue' ;
+
 Let : 'let' ;
 Var : 'var' ;
 

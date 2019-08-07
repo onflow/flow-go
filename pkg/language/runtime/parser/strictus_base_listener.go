@@ -98,6 +98,18 @@ func (s *BaseStrictusListener) EnterReturnStatement(ctx *ReturnStatementContext)
 // ExitReturnStatement is called when production returnStatement is exited.
 func (s *BaseStrictusListener) ExitReturnStatement(ctx *ReturnStatementContext) {}
 
+// EnterBreakStatement is called when production breakStatement is entered.
+func (s *BaseStrictusListener) EnterBreakStatement(ctx *BreakStatementContext) {}
+
+// ExitBreakStatement is called when production breakStatement is exited.
+func (s *BaseStrictusListener) ExitBreakStatement(ctx *BreakStatementContext) {}
+
+// EnterContinueStatement is called when production continueStatement is entered.
+func (s *BaseStrictusListener) EnterContinueStatement(ctx *ContinueStatementContext) {}
+
+// ExitContinueStatement is called when production continueStatement is exited.
+func (s *BaseStrictusListener) ExitContinueStatement(ctx *ContinueStatementContext) {}
+
 // EnterIfStatement is called when production ifStatement is entered.
 func (s *BaseStrictusListener) EnterIfStatement(ctx *IfStatementContext) {}
 
