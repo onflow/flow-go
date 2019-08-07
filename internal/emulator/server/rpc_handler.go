@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
-	"fmt"
+	"encoding/gob"
+	"reflect"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -218,8 +220,8 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 	return response, nil
 }
 
-// CallContract performs a contract call.
-func (s *EmulatorServer) CallContract(ctx context.Context, req *observe.CallContractRequest) (*observe.CallContractResponse, error) {
+// Call performs a call.
+func (s *EmulatorServer) Call(ctx context.Context, req *observe.CallRequest) (*observe.CallResponse, error) {
 	script := req.GetScript()
 	value, err := s.blockchain.CallScript(script)
 	if err != nil {
@@ -233,10 +235,14 @@ func (s *EmulatorServer) CallContract(ctx context.Context, req *observe.CallCont
 	s.logger.Debugf("📞  Contract script called")
 
 	// TODO: change this to whatever interface -> byte encoding decided on
-	valueMsg := []byte(fmt.Sprintf("%v", value.(interface{})))
+	var valueBuf bytes.Buffer
+	enc := gob.NewEncoder(&valueBuf)
+	enc.Encode(value)
 
-	response := &observe.CallContractResponse{
-		Value: valueMsg,
+	response := &observe.CallResponse{
+		// TODO: standardize types to be language-agnostic
+		Type:  reflect.TypeOf(value),
+		Value: valueBuf.Bytes(),
 	}
 
 	return response, nil
