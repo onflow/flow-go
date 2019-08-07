@@ -1281,7 +1281,37 @@ while a < 5 {
     a = a + 1
 }
 
-// a is 5
+// `a` is 5
+```
+
+The `continue` statement can be used to stop the current iteration of the loop and start the next iteration.
+
+```bamboo,file=control-flow-continue.bpl
+var i = 0
+var x = 0
+while i < 10 {
+    i = i + 1
+    if i < 5 {
+        continue
+    }
+    x = x + 1
+}
+
+// `x` is 6
+```
+
+The `break` statement can be used to stop the loop.
+
+```bamboo,file=control-flow-break.bpl
+var x = 0
+while x < 10 {
+    x = x + 1
+    if x == 5 {
+        break
+    }
+}
+
+// `x` is 5
 ```
 
 ### Immediate function return: return-statement
