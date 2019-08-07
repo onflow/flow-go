@@ -173,19 +173,17 @@ func (e *IndexExpression) Accept(v Visitor) Repr {
 // ConditionalExpression
 
 type ConditionalExpression struct {
-	Test     Expression
-	Then     Expression
-	Else     Expression
-	StartPos *Position
-	EndPos   *Position
+	Test Expression
+	Then Expression
+	Else Expression
 }
 
 func (e *ConditionalExpression) StartPosition() *Position {
-	return e.StartPos
+	return e.Test.StartPosition()
 }
 
 func (e *ConditionalExpression) EndPosition() *Position {
-	return e.EndPos
+	return e.Else.EndPosition()
 }
 
 func (*ConditionalExpression) isExpression() {}
@@ -223,16 +221,14 @@ type BinaryExpression struct {
 	Operation Operation
 	Left      Expression
 	Right     Expression
-	StartPos  *Position
-	EndPos    *Position
 }
 
 func (e *BinaryExpression) StartPosition() *Position {
-	return e.StartPos
+	return e.Left.StartPosition()
 }
 
 func (e *BinaryExpression) EndPosition() *Position {
-	return e.EndPos
+	return e.Right.EndPosition()
 }
 
 func (*BinaryExpression) isExpression() {}

@@ -119,18 +119,16 @@ func (s *WhileStatement) Accept(visitor Visitor) Repr {
 // AssignmentStatement
 
 type AssignmentStatement struct {
-	Target   Expression
-	Value    Expression
-	StartPos *Position
-	EndPos   *Position
+	Target Expression
+	Value  Expression
 }
 
 func (s *AssignmentStatement) StartPosition() *Position {
-	return s.StartPos
+	return s.Target.StartPosition()
 }
 
 func (s *AssignmentStatement) EndPosition() *Position {
-	return s.EndPos
+	return s.Value.EndPosition()
 }
 
 func (*AssignmentStatement) isStatement() {}
