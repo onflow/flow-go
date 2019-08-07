@@ -26,7 +26,6 @@ require (
 	github.com/raviqqe/hamt v0.0.0-20190615202029-864fb7caef85
 	github.com/segmentio/fasthash v1.0.0
 	github.com/sirupsen/logrus v1.4.2
-	github.com/spf13/cobra v0.0.5
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/tyler-smith/go-bip32 v0.0.0-20170922074101-2c9cfd177564
 	github.com/tyler-smith/go-bip39 v1.0.0
@@ -38,3 +37,5 @@ require (
 	google.golang.org/grpc v1.21.1
 	mellium.im/sasl v0.2.1 // indirect
 )
+
+replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
