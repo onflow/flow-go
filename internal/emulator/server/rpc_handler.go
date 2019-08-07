@@ -220,8 +220,8 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 	return response, nil
 }
 
-// Call performs a call.
-func (s *EmulatorServer) Call(ctx context.Context, req *observe.CallRequest) (*observe.CallResponse, error) {
+// CallScript performs a call.
+func (s *EmulatorServer) CallScript(ctx context.Context, req *observe.CallScriptRequest) (*observe.CallScriptResponse, error) {
 	script := req.GetScript()
 	value, err := s.blockchain.CallScript(script)
 	if err != nil {
@@ -239,9 +239,9 @@ func (s *EmulatorServer) Call(ctx context.Context, req *observe.CallRequest) (*o
 	enc := gob.NewEncoder(&valueBuf)
 	enc.Encode(value)
 
-	response := &observe.CallResponse{
+	response := &observe.CallScriptResponse{
 		// TODO: standardize types to be language-agnostic
-		Type:  reflect.TypeOf(value),
+		Type:  reflect.TypeOf(value).String(),
 		Value: valueBuf.Bytes(),
 	}
 

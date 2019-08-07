@@ -1,7 +1,8 @@
-package sdk
+package sdk_test
 
 import (
 	"context"
+	"fmt"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/sdk"
@@ -27,9 +28,12 @@ func ExampleCreateAccount_complete() {
 	signedTx := tx.SignPayer(myAccount.Account, myAccount.KeyPair)
 
 	// connect to node and submit transaction
-	c := client.New("localhost:5000")
+	c, err := client.New("localhost:5000")
+	if err != nil {
+		panic("failed to connect to node!")
+	}
 
-	err := c.SendTransaction(context.Background(), signedTx)
+	err = c.SendTransaction(context.Background(), *signedTx)
 	if err != nil {
 		panic("failed to submit transaction!")
 	}
@@ -38,4 +42,9 @@ func ExampleCreateAccount_complete() {
 // Load a user account from a JSON file.
 func ExampleLoadAccountFromFile() {
 	account, err := sdk.LoadAccountFromFile("./bamboo.json")
+	if err != nil {
+		panic("failed to load account!")
+	}
+
+	fmt.Printf("Loaded account with address %s", account.Account.String())
 }
