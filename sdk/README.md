@@ -19,7 +19,6 @@ applications in Go.
 * [func LoadAccount(r io.Reader) (*types.AccountKey, error)](#LoadAccount)
 * [func LoadAccountFromFile(filename string) (*types.AccountKey, error)](#LoadAccountFromFile)
 * [func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction](#UpdateAccountCode)
-* [type AccountConfig](#AccountConfig)
 
 
 #### <a name="pkg-files">Package files</a>
@@ -62,27 +61,6 @@ An error will be returned if the file cannot be read or if it contains invalid J
 func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 ```
 UpdateAccountCode generates a transaction that updates the code associated with an account.
-
-
-
-
-## <a name="AccountConfig">type</a> [AccountConfig](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/account.go?s=328:420#L18)
-``` go
-type AccountConfig struct {
-    Address string `json:"account"`
-    Seed    string `json:"seed"`
-}
-
-```
-AccountConfig is the configuration format for a user account.
-
-This structure is used to load account configuration from JSON.
-
-
-
-
-
-
 
 
 
