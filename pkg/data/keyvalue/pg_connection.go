@@ -24,13 +24,12 @@ func NewpostgresDB(addr, user, password, dbname string) DBConnector {
 	}
 
 	db := pg.Connect(options)
-	qBuilder := &pgQueryBuilder{db: db}
 
 	return &postgresDB{
 		db:          db,
-		getQuery:    qBuilder.AddGet().MustBuild(),
-		setQuery:    qBuilder.AddSet().MustBuild(),
-		deleteQuery: qBuilder.AddDelete().MustBuild(),
+		getQuery:    (&pgQueryBuilder{db: db}).AddGet().MustBuild(),
+		setQuery:    (&pgQueryBuilder{db: db}).AddSet().MustBuild(),
+		deleteQuery: (&pgQueryBuilder{db: db}).AddDelete().MustBuild(),
 	}
 }
 
@@ -65,7 +64,6 @@ func (d *postgresDB) MigrateDown() error {
 }
 
 func (d *postgresDB) migrate(cmd string) error {
-	// Migrations
 	migrations.DefaultCollection.DiscoverSQLMigrations("migrations/")
 	_, _, _ = migrations.Run(d.db, "init")
 	oldVersion, newVersion, err := migrations.Run(d.db, cmd)

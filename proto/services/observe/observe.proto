@@ -106,5 +106,5 @@ message CallContractRequest {
 }
 
 message CallContractResponse {
-  bytes script = 1;
+  bytes value = 1;
 }
