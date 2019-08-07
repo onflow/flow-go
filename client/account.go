@@ -67,7 +67,7 @@ func CreateAccount(publicKey, code []byte) *types.RawTransaction {
 
 // UpdateAccountCode generates a transaction that updates the code associated with an account.
 func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction {
-	accountStr := bytesToString(account)
+	accountStr := bytesToString(account.Bytes())
 	codeStr := bytesToString(code)
 
 	script := fmt.Sprintf(`

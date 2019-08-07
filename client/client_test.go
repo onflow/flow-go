@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/client/mocks"
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 	"github.com/dapperlabs/bamboo-node/pkg/utils/unittest"
 )
 
@@ -74,7 +75,9 @@ func TestCreateAccount(t *testing.T) {
 	tx.SetNonce(client.RandomNonce())
 	tx.SetComputeLimit(100)
 
-	signedTx := tx.SignPayer(defaultAccount)
+	signedTx := tx.SignPayer(defaultAccount.Account, defaultAccount.KeyPair)
+
+	client.UpdateAccountCode(types.HexToAddress("0000000000000000000000000000000000000002"), []byte("fun main() {}"))
 
 	// client should return non-error if RPC call succeeds
 	mockRPC.EXPECT().
