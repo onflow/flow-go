@@ -36,29 +36,34 @@ func (v *ProgramVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
-	isPublic := ctx.Pub() != nil
-	identifier := ctx.Identifier().GetText()
+	access := ctx.Access().Accept(v).(ast.Access)
+
+	identifierNode := ctx.Identifier()
+	identifier := identifierNode.GetText()
+
 	parameterListEnd := ctx.ParameterList().GetStop()
 	returnType := v.visitReturnType(ctx.returnType, parameterListEnd)
+
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
+
 	block := ctx.Block().Accept(v).(*ast.Block)
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
-	identifierPosition := ast.PositionFromToken(ctx.Identifier().GetSymbol())
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
 
 	return &ast.FunctionDeclaration{
-		IsPublic:      isPublic,
+		Access:        access,
 		Identifier:    identifier,
 		Parameters:    parameters,
 		ReturnType:    returnType,
 		Block:         block,
 		StartPos:      startPosition,
 		EndPos:        endPosition,
-		IdentifierPos: identifierPosition,
+		IdentifierPos: identifierPos,
 	}
 }
 
@@ -76,6 +81,18 @@ func (v *ProgramVisitor) visitReturnType(ctx IFullTypeContext, tokenBefore antlr
 		return nil
 	}
 	return result.(ast.Type)
+}
+
+func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
+	if ctx.Pub() != nil {
+		return ast.AccessPublic
+	}
+
+	if ctx.PubSet() != nil {
+		return ast.AccessPublicSettable
+	}
+
+	return ast.AccessNotSpecified
 }
 
 func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{} {

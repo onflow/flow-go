@@ -3,7 +3,7 @@ package ast
 import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 
 type FunctionDeclaration struct {
-	IsPublic      bool
+	Access        Access
 	Identifier    string
 	Parameters    []*Parameter
 	ReturnType    Type

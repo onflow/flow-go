@@ -1171,3 +1171,27 @@ func TestCheckInvalidContinueStatement(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.ControlStatementError{}))
 }
+
+func TestCheckFunctionAccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       pub fun test() {}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidFunctionAccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       pub(set) fun test() {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidAccessError{}))
+}

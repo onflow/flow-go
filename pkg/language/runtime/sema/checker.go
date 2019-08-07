@@ -177,6 +177,19 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 	var errs []error
 
+	switch declaration.Access {
+	case ast.AccessNotSpecified, ast.AccessPublic:
+		break
+	default:
+		errs = append(errs,
+			&InvalidAccessError{
+				DeclarationKind: common.DeclarationKindFunction,
+				Access:          declaration.Access,
+				Pos:             declaration.StartPos,
+			},
+		)
+	}
+
 	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
 
 	argumentLabels := make([]string, len(declaration.Parameters))

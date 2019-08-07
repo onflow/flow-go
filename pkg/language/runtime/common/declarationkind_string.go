@@ -16,11 +16,12 @@ func _() {
 	_ = x[DeclarationKindType-5]
 	_ = x[DeclarationKindParameter-6]
 	_ = x[DeclarationKindArgumentLabel-7]
+	_ = x[DeclarationKindStructure-8]
 }
 
-const _DeclarationKind_name = "DeclarationKindUnknownDeclarationKindValueDeclarationKindFunctionDeclarationKindVariableDeclarationKindConstantDeclarationKindTypeDeclarationKindParameterDeclarationKindArgumentLabel"
+const _DeclarationKind_name = "DeclarationKindUnknownDeclarationKindValueDeclarationKindFunctionDeclarationKindVariableDeclarationKindConstantDeclarationKindTypeDeclarationKindParameterDeclarationKindArgumentLabelDeclarationKindStructure"
 
-var _DeclarationKind_index = [...]uint8{0, 22, 42, 65, 88, 111, 130, 154, 182}
+var _DeclarationKind_index = [...]uint8{0, 22, 42, 65, 88, 111, 130, 154, 182, 206}
 
 func (i DeclarationKind) String() string {
 	if i < 0 || i >= DeclarationKind(len(_DeclarationKind_index)-1) {

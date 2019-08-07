@@ -689,7 +689,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -728,7 +728,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		Parameters: []*Parameter{
 			{
@@ -775,7 +775,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		Parameters: []*Parameter{
 			{
@@ -831,7 +831,7 @@ func TestParseIfStatement(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -933,7 +933,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -993,7 +993,7 @@ func TestParseWhileStatement(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -1057,7 +1057,7 @@ func TestParseAssignment(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -1105,7 +1105,7 @@ func TestParseAccessAssignment(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -1182,7 +1182,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -1255,7 +1255,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   true,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		Parameters: []*Parameter{
 			{
