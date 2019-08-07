@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -24,9 +23,7 @@ type Client struct {
 // New initializes a Bamboo client with the default gRPC provider.
 //
 // An error will be returned if the host is unreachable.
-func New(host string, port int) (*Client, error) {
-	addr := fmt.Sprintf("%s:%d", host, port)
-
+func New(addr string) (*Client, error) {
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
