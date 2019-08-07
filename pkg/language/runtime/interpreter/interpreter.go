@@ -13,6 +13,9 @@ import (
 
 type loopBreak struct{}
 type loopContinue struct{}
+type functionReturn struct {
+	Value
+}
 
 // Visit-methods for statement which return a non-nil value
 // are treated like they are returning a value.
@@ -289,10 +292,13 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 	// NOTE: returning result
 
 	if statement.Expression == nil {
-		return Done{Result: VoidValue{}}
+		return Done{Result: functionReturn{VoidValue{}}}
 	}
 
-	return statement.Expression.Accept(interpreter).(Trampoline)
+	return statement.Expression.Accept(interpreter).(Trampoline).
+		Map(func(value interface{}) interface{} {
+			return functionReturn{value.(Value)}
+		})
 }
 
 func (interpreter *Interpreter) VisitBreakStatement(statement *ast.BreakStatement) ast.Repr {
@@ -327,13 +333,13 @@ func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatemen
 			}
 
 			return statement.Block.Accept(interpreter).(Trampoline).
-				FlatMap(func(returnValue interface{}) Trampoline {
-					if _, ok := returnValue.(loopBreak); ok {
+				FlatMap(func(value interface{}) Trampoline {
+					if _, ok := value.(loopBreak); ok {
 						return Done{}
-					} else if _, ok := returnValue.(loopContinue); ok {
+					} else if _, ok := value.(loopContinue); ok {
 						// NO-OP
-					} else if returnValue != nil {
-						return Done{Result: returnValue}
+					} else if functionReturn, ok := value.(functionReturn); ok {
+						return Done{Result: functionReturn}
 					}
 
 					// recurse
@@ -700,7 +706,7 @@ func (interpreter *Interpreter) invokeInterpretedFunction(
 			if blockResult == nil {
 				return VoidValue{}
 			}
-			return blockResult.(Value)
+			return blockResult.(functionReturn).Value
 		})
 }
 
