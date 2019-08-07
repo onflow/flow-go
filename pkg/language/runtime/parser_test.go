@@ -983,6 +983,8 @@ func TestParseWhileStatement(t *testing.T) {
 	    fun test() {
             while true {
               return
+              break
+              continue
             }
         }
 	`)
@@ -1008,21 +1010,29 @@ func TestParseWhileStatement(t *testing.T) {
 							&ReturnStatement{
 								Expression: nil,
 								StartPos:   &Position{Offset: 58, Line: 4, Column: 14},
-								EndPos:     &Position{Offset: 58, Line: 4, Column: 14},
+								EndPos:     &Position{Offset: 63, Line: 4, Column: 19},
+							},
+							&BreakStatement{
+								StartPos: &Position{Offset: 79, Line: 5, Column: 14},
+								EndPos:   &Position{Offset: 83, Line: 5, Column: 18},
+							},
+							&ContinueStatement{
+								StartPos: &Position{Offset: 99, Line: 6, Column: 14},
+								EndPos:   &Position{Offset: 106, Line: 6, Column: 21},
 							},
 						},
 						StartPos: &Position{Offset: 42, Line: 3, Column: 23},
-						EndPos:   &Position{Offset: 77, Line: 5, Column: 12},
+						EndPos:   &Position{Offset: 120, Line: 7, Column: 12},
 					},
 					StartPos: &Position{Offset: 31, Line: 3, Column: 12},
-					EndPos:   &Position{Offset: 77, Line: 5, Column: 12},
+					EndPos:   &Position{Offset: 120, Line: 7, Column: 12},
 				},
 			},
 			StartPos: &Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   &Position{Offset: 87, Line: 6, Column: 8},
+			EndPos:   &Position{Offset: 130, Line: 8, Column: 8},
 		},
 		StartPos:      &Position{Offset: 6, Line: 2, Column: 5},
-		EndPos:        &Position{Offset: 87, Line: 6, Column: 8},
+		EndPos:        &Position{Offset: 130, Line: 8, Column: 8},
 		IdentifierPos: &Position{Offset: 10, Line: 2, Column: 9},
 	}
 

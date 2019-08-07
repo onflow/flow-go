@@ -310,6 +310,26 @@ func (v *ProgramVisitor) VisitReturnStatement(ctx *ReturnStatementContext) inter
 	}
 }
 
+func (v *ProgramVisitor) VisitBreakStatement(ctx *BreakStatementContext) interface{} {
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.EndPosition(startPosition, ctx.Break().GetSymbol().GetStop())
+
+	return &ast.BreakStatement{
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitContinueStatement(ctx *ContinueStatementContext) interface{} {
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.EndPosition(startPosition, ctx.Continue().GetSymbol().GetStop())
+
+	return &ast.ContinueStatement{
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
+}
+
 func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{} {
 	isConstant := ctx.Let() != nil
 	identifierNode := ctx.Identifier()
