@@ -7,19 +7,24 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/storage"
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/txpool"
 	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
-
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/data"
 )
 
 type Controller struct {
-	dal *data.DAL
-	log *logrus.Entry
+	storage storage.Storage
+	txPool  *txpool.TxPool
+	log     *logrus.Entry
 }
 
-func New(log *logrus.Logger) *Controller {
+const msgInternalError = "internal error"
+
+func New(storage storage.Storage, txPool *txpool.TxPool, log *logrus.Logger) *Controller {
 	return &Controller{
-		log: logrus.NewEntry(log),
+		storage: storage,
+		txPool:  txPool,
+		log:     logrus.NewEntry(log),
 	}
 }
 

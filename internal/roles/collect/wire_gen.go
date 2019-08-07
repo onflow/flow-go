@@ -6,18 +6,22 @@
 package collect
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/config"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/storage"
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/txpool"
 	"github.com/sirupsen/logrus"
 )
 
 // Injectors from wire.go:
 
 func InitializeServer() (*Server, error) {
-	configConfig := config.New()
+	config := NewConfig()
 	logger := logrus.New()
-	controllerController := controller.New(logger)
-	server, err := NewServer(configConfig, logger, controllerController)
+	dbConnector := NewDatabaseConnector(config)
+	storageStorage := storage.NewDatabaseStorage(dbConnector)
+	txPool := txpool.New()
+	controllerController := controller.New(storageStorage, txPool, logger)
+	server, err := NewServer(config, logger, controllerController)
 	if err != nil {
 		return nil, err
 	}
