@@ -46,6 +46,7 @@ func LoadAccount(r io.Reader) (*types.AccountKey, error) {
 	}, nil
 }
 
+// CreateAccount generates a transaction that creates a new account.
 func CreateAccount(publicKey, code []byte) *types.RawTransaction {
 	publicKeyStr := bytesToString(publicKey)
 	codeStr := bytesToString(code)
@@ -57,6 +58,25 @@ func CreateAccount(publicKey, code []byte) *types.RawTransaction {
 			createAccount(publicKey, code)
 		}
 	`, publicKeyStr, codeStr)
+
+	return &types.RawTransaction{
+		Script:    []byte(script),
+		Timestamp: time.Now(),
+	}
+}
+
+// UpdateAccountCode generates a transaction that updates the code associated with an account.
+func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction {
+	accountStr := bytesToString(account)
+	codeStr := bytesToString(code)
+
+	script := fmt.Sprintf(`
+		fun main() {
+			let account = %s
+			let code = %s
+			updateAccountCode(account, code)
+		}
+	`, accountStr, codeStr)
 
 	return &types.RawTransaction{
 		Script:    []byte(script),
