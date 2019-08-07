@@ -6,14 +6,6 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 )
 
-// SecondaryError
-
-// SecondaryError is an interface for errors that provide a secondary error message
-//
-type SecondaryError interface {
-	SecondaryError() string
-}
-
 // unsupportedOperation
 
 type unsupportedOperation struct {

@@ -26,6 +26,8 @@ require (
 	github.com/raviqqe/hamt v0.0.0-20190615202029-864fb7caef85
 	github.com/segmentio/fasthash v1.0.0
 	github.com/sirupsen/logrus v1.4.2
+	github.com/sourcegraph/jsonrpc2 v0.0.0-20190106185902-35a74f039c6a
+	github.com/spf13/cobra v0.0.5
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/tyler-smith/go-bip32 v0.0.0-20170922074101-2c9cfd177564
 	github.com/tyler-smith/go-bip39 v1.0.0
@@ -34,6 +36,7 @@ require (
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
 	golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb // indirect
 	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/tools v0.0.0-20190422233926-fe54fb35175b
 	google.golang.org/grpc v1.21.1
 	mellium.im/sasl v0.2.1 // indirect
 )
