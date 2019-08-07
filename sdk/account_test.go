@@ -1,4 +1,4 @@
-package client_test
+package sdk_test
 
 import (
 	"strings"
@@ -6,8 +6,8 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/client"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/bamboo-node/sdk"
 )
 
 func TestLoadAccount(t *testing.T) {
@@ -20,7 +20,7 @@ func TestLoadAccount(t *testing.T) {
 		}
 	`)
 
-	a, err := client.LoadAccount(r)
+	a, err := sdk.LoadAccount(r)
 	Expect(err).ToNot(HaveOccurred())
 
 	Expect(a.Account).ToNot(BeNil())
@@ -33,7 +33,7 @@ func TestLoadAccount(t *testing.T) {
 		}
 	`)
 
-	a, err = client.LoadAccount(r)
+	a, err = sdk.LoadAccount(r)
 	Expect(err).To(HaveOccurred())
 }
 
@@ -43,7 +43,7 @@ func TestCreateAccount(t *testing.T) {
 	publicKey := []byte{4, 136, 178, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 111, 117, 56, 107, 245, 122, 184, 40, 127, 172, 19, 175, 225, 131, 184, 22, 122, 23, 90, 172, 214, 144, 150, 92, 69, 119, 218, 11, 191, 120, 226, 74, 2, 217, 156, 75, 44, 44, 121, 152, 143, 47, 180, 169, 205, 18, 77, 47, 135, 146, 34, 34, 157, 69, 149, 177, 141, 80, 99, 66, 186, 33, 25, 73, 179, 224, 166, 205, 172}
 
 	// create account with no code
-	txA := client.CreateAccount(publicKey, []byte{})
+	txA := sdk.CreateAccount(publicKey, []byte{})
 
 	Expect(txA.Script).To(Equal([]byte(`
 		fun main() {
@@ -54,7 +54,7 @@ func TestCreateAccount(t *testing.T) {
 	`)))
 
 	// create account with code
-	txB := client.CreateAccount(publicKey, []byte("fun main() {}"))
+	txB := sdk.CreateAccount(publicKey, []byte("fun main() {}"))
 
 	Expect(txB.Script).To(Equal([]byte(`
 		fun main() {
@@ -69,7 +69,7 @@ func TestUpdateAccountCode(t *testing.T) {
 	RegisterTestingT(t)
 
 	address := types.HexToAddress("0000000000000000000000000000000000000001")
-	tx := client.UpdateAccountCode(address, []byte("fun main() {}"))
+	tx := sdk.UpdateAccountCode(address, []byte("fun main() {}"))
 
 	Expect(tx.Script).To(Equal([]byte(`
 		fun main() {

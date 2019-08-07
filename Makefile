@@ -53,7 +53,7 @@ generate-wire:
 
 .PHONY: generate-mocks
 generate-mocks:
-	mockgen -destination=client/mocks/mock_client.go -package=mocks github.com/dapperlabs/bamboo-node/client RPCClient
+	mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/bamboo-node/sdk/client RPCClient
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-wire generate-mocks

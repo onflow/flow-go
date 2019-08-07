@@ -9,13 +9,14 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/client"
-	"github.com/dapperlabs/bamboo-node/client/mocks"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 	"github.com/dapperlabs/bamboo-node/pkg/utils/unittest"
+	"github.com/dapperlabs/bamboo-node/sdk"
+	"github.com/dapperlabs/bamboo-node/sdk/client"
+	"github.com/dapperlabs/bamboo-node/sdk/client/mocks"
 )
 
-var defaultAccount, _ = client.LoadAccount(strings.NewReader(`
+var defaultAccount, _ = sdk.LoadAccount(strings.NewReader(`
 	{	
 		"account": "0xdd2781f4c51bccdbe23e4d398b8a82261f585c278dbb4b84989fea70e76723a9",
 		"seed": "elephant ears"
