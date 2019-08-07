@@ -12,11 +12,17 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
+// AccountConfig is the configuration format for a user account.
+//
+// This structure is used to load account configuration from JSON.
 type AccountConfig struct {
 	Address string `json:"account"`
 	Seed    string `json:"seed"`
 }
 
+// LoadAccountFromFile loads an account key from a JSON file.
+//
+// An error will be returned if the file cannot be read or if it contains invalid JSON.
 func LoadAccountFromFile(filename string) (*types.AccountKey, error) {
 	f, err := os.Open(filename)
 	if err != nil {
@@ -26,6 +32,9 @@ func LoadAccountFromFile(filename string) (*types.AccountKey, error) {
 	return LoadAccount(f)
 }
 
+// LoadAccount parses an account key from a JSON reader.
+//
+// An error will be returned if the reader contains invalid JSON.
 func LoadAccount(r io.Reader) (*types.AccountKey, error) {
 	d := json.NewDecoder(r)
 
