@@ -97,26 +97,99 @@ func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{} {
-	return nil
+	identifierNode := ctx.Identifier()
+	identifier := identifierNode.GetText()
+
+	var fields []*ast.FieldDeclaration
+	for _, fieldCtx := range ctx.AllField() {
+		field := fieldCtx.Accept(v).(*ast.FieldDeclaration)
+		fields = append(fields, field)
+	}
+
+	var initializer *ast.InitializerDeclaration
+	initializerNode := ctx.Initializer()
+	if initializerNode != nil {
+		initializer = initializerNode.Accept(v).(*ast.InitializerDeclaration)
+	}
+
+	var functions []*ast.FunctionDeclaration
+	for _, functionDeclarationCtx := range ctx.AllFunctionDeclaration() {
+		functionDeclaration :=
+			functionDeclarationCtx.Accept(v).(*ast.FunctionDeclaration)
+		functions = append(functions, functionDeclaration)
+	}
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
+
+	return &ast.StructureDeclaration{
+		Identifier:    identifier,
+		Fields:        fields,
+		Initializer:   initializer,
+		Functions:     functions,
+		IdentifierPos: identifierPos,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
+	}
 }
 
 func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
-	return nil
+	access := ctx.Access().Accept(v).(ast.Access)
+
+	isConstant := ctx.Let() != nil
+
+	identifierNode := ctx.Identifier()
+	identifier := identifierNode.GetText()
+	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
+
+	typeContext := ctx.FullType()
+	fullType := typeContext.Accept(v).(ast.Type)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.EndPosition(startPosition, typeContext.GetStop().GetStop())
+
+	return &ast.FieldDeclaration{
+		Access:        access,
+		IsConstant:    isConstant,
+		Identifier:    identifier,
+		Type:          fullType,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
+		IdentifierPos: identifierPos,
+	}
 }
 
 func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
-	return nil
-}
-
-func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
-	parameterListEnd := ctx.ParameterList().GetStop()
-	returnType := v.visitReturnType(ctx.returnType, parameterListEnd)
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
+
 	block := ctx.Block().Accept(v).(*ast.Block)
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.InitializerDeclaration{
+		Parameters: parameters,
+		Block:      block,
+		StartPos:   startPosition,
+		EndPos:     endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
+	parameterListEnd := ctx.ParameterList().GetStop()
+	returnType := v.visitReturnType(ctx.returnType, parameterListEnd)
+
+	var parameters []*ast.Parameter
+	parameterList := ctx.ParameterList()
+	if parameterList != nil {
+		parameters = parameterList.Accept(v).([]*ast.Parameter)
+	}
+
+	block := ctx.Block().Accept(v).(*ast.Block)
+
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.FunctionExpression{

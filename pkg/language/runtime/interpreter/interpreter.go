@@ -758,3 +758,18 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 
 	return Done{Result: function}
 }
+
+func (interpreter *Interpreter) VisitStructureDeclaration(assignment *ast.StructureDeclaration) ast.Repr {
+	// TODO:
+	return nil
+}
+
+func (interpreter *Interpreter) VisitFieldDeclaration(assignment *ast.FieldDeclaration) ast.Repr {
+	// TODO:
+	return nil
+}
+
+func (interpreter *Interpreter) VisitInitializerDeclaration(assignment *ast.InitializerDeclaration) ast.Repr {
+	// TODO:
+	return nil
+}

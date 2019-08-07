@@ -1378,3 +1378,18 @@ func (checker *Checker) visitConditional(
 
 	return thenResult.Type, elseResult.Type, checkerError(errs)
 }
+
+func (checker *Checker) VisitStructureDeclaration(assignment *ast.StructureDeclaration) ast.Repr {
+	// TODO:
+	return nil
+}
+
+func (checker *Checker) VisitFieldDeclaration(assignment *ast.FieldDeclaration) ast.Repr {
+	// TODO:
+	return nil
+}
+
+func (checker *Checker) VisitInitializerDeclaration(assignment *ast.InitializerDeclaration) ast.Repr {
+	// TODO:
+	return nil
+}

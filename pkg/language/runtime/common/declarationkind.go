@@ -17,6 +17,7 @@ const (
 	DeclarationKindArgumentLabel
 	DeclarationKindStructure
 	DeclarationKindField
+	DeclarationKindInitializer
 )
 
 func (k DeclarationKind) Name() string {
@@ -39,6 +40,8 @@ func (k DeclarationKind) Name() string {
 		return "structure"
 	case DeclarationKindField:
 		return "field"
+	case DeclarationKindInitializer:
+		return "initializer"
 	}
 
 	panic(&errors.UnreachableError{})
