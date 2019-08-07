@@ -18,3 +18,7 @@
 - The language mode should be set to `Bamboo` automatically
 - A popup should appear "Bamboo language server started"
 - Happy coding!
+
+## Commands
+
+- "Bamboo: Restart language server"
