@@ -16,36 +16,81 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 )
 
+type GossipError []error
+
+func (g *GossipError) Collect(e error) {
+	if e != nil {
+		*g = append(*g, e)
+	}
+}
+
+func (g *GossipError) Error() string {
+	err := "gossip errors:\n"
+	for i, e := range *g {
+		err += fmt.Sprintf("\tgerror %d: %s\n", i, e.Error())
+	}
+
+	return err
+}
+
 type naiveGossip struct{}
 
 // Take in the protobuff messages and call the grpc of recipients
-func (n naiveGossip) Gossip(ctx context.Context, gossipMsg *shared.GossipMessage) (reply proto.Message, err error) {
-	reply = new(shared.MessageReply)
+func (n naiveGossip) Gossip(ctx context.Context, gossipMsg *shared.GossipMessage) ([]proto.Message, error) {
+	var (
+		gerrc    = make(chan error)
+		repliesc = make(chan proto.Message)
+
+		gerr    = &GossipError{}
+		replies = make([]proto.Message, len(gossipMsg.Recipients))
+	)
+
 	// Loop through recipients
 	for _, addr := range gossipMsg.Recipients {
-		// Set up a connection to the other node
-		conn, err := grpc.Dial(addr, grpc.WithInsecure())
-		if err != nil {
-			log.Fatalf("did not connect to %s: %v", addr, err)
-			return reply, err
-		}
-		defer conn.Close()
-		// Call the grpc manually so that the method can easily be switched out
-		err = conn.Invoke(ctx, gossipMsg.Method, gossipMsg, reply)
-		if err != nil {
-			log.Fatalf("could not greet: %v", err)
-			return reply, err
-		}
+		go func(addr string) {
+			reply, err := n.gossipHandler(ctx, addr, gossipMsg)
+			gerrc <- err
+			repliesc <- reply
+		}(addr)
 	}
-	return reply, err
+
+	for i, _ := range gossipMsg.Recipients {
+		gerr.Collect(<-gerrc)
+		replies[i] = <-repliesc
+	}
+
+	if len(*gerr) != 0 {
+		return replies, gerr
+	}
+
+	return replies, nil
+}
+
+// gossipHandler is used to send one gossip message to one recipient
+func (n naiveGossip) gossipHandler(ctx context.Context, addr string, gossipMsg *shared.GossipMessage) (proto.Message, error) {
+	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	if err != nil {
+		return nil, fmt.Errorf("did not connect to %s: %v", addr, err)
+	}
+
+	defer conn.Close()
+
+	// Call the grpc manually so that the method can easily be switched out
+	reply := new(shared.MessageReply)
+	err = conn.Invoke(ctx, gossipMsg.Method, gossipMsg, reply)
+	if err != nil {
+		return nil, fmt.Errorf("could not greet: %v", err)
+	}
+
+	return reply, nil
 }
 
 type server struct{}
 
 func (s *server) SendMessage(ctx context.Context, in *shared.GossipMessage) (*shared.MessageReply, error) {
 	txt := in.GetMessageRequest().GetText()
-	log.Printf("Received: %v", txt)
-	fmt.Println("Enter your text:")
+	log.Printf("\nReceived: %v", txt)
+	fmt.Print("Enter your text: ")
 	return &shared.MessageReply{TextResponse: "Hello " + txt}, nil
 }
 
@@ -86,14 +131,19 @@ func main() {
 
 	// Take in input from the cmd line to use as messages
 	scanner := bufio.NewScanner(os.Stdin)
-	var text string
-	// Quit/break the loop if text == "q"
-	for text != "q" {
-		fmt.Println("Enter your text:")
+
+	fmt.Print("Enter your text: ")
+	for {
 		scanner.Scan()
-		text = scanner.Text()
-		if text != "q" {
-			// Generate the protobuff messages needed to send through gossip
+		text := scanner.Text()
+
+		// exit condition
+		if text == "q" {
+			os.Exit(0)
+		}
+		// Generate the protobuff messages needed to send through gossip
+
+		go func(text string) {
 			msgRequest := shared.MessageRequest{Text: text}
 
 			gossipMsg := shared.GossipMessage{
@@ -101,20 +151,18 @@ func main() {
 				Method:     "/bamboo.shared.Messages/SendMessage",
 				Recipients: peers,
 			}
-
 			gossipInstance := naiveGossip{}
 			ctx := context.Background()
-			// Nothing is currently done with result, but this is how to retrieve it
-			result := new(shared.MessageReply)
+
 			// Send the message
 			msgReply, err := gossipInstance.Gossip(ctx, &gossipMsg)
-			result = msgReply.(*shared.MessageReply)
 
 			// Just to show the generality of receiving the return value,
 			// have to use the var somewhere, kind of annoying that it prints twice
-			log.Printf("Received: %v", result)
-			log.Printf("Received: %v", msgReply)
-			log.Printf("Received: %v", err)
-		}
+			log.Printf("Responses: %v\n", msgReply)
+			log.Printf("Errors: %v\n", err)
+			fmt.Print("Enter your text: ")
+		}(text)
+
 	}
 }
