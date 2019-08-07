@@ -11,21 +11,36 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:extension.helloWorld"
+        "onLanguage:bamboo"
     ],
     "main": "./out/extension.js",
     "contributes": {
         "commands": [
             {
-                "command": "extension.helloWorld",
-                "title": "Hello World"
+                "command": "bamboo.restartServer",
+                "category": "Bamboo",
+                "title": "Restart language server"
             }
         ],
+        "configuration": {
+            "type": "object",
+            "title": "Bamboo configuration",
+            "properties": {
+                "bamboo.languageServerPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "The path to the Bamboo language server",
+                    "scope": "resource"
+                }
+            }
+        },
         "languages": [
             {
-              "id": "bamboo",
-              "extensions": [".bpl"],
-              "configuration": "./language-configuration.json"
+                "id": "bamboo",
+                "extensions": [
+                    ".bpl"
+                ],
+                "configuration": "./language-configuration.json"
             }
         ],
         "grammars": [
@@ -38,12 +53,12 @@
                 "scopeName": "markdown.bamboo.codeblock",
                 "path": "./syntaxes/codeblock.json",
                 "injectTo": [
-                  "text.html.markdown"
+                    "text.html.markdown"
                 ],
                 "embeddedLanguages": {
-                  "meta.embedded.block.bamboo": "bamboo"
+                    "meta.embedded.block.bamboo": "bamboo"
                 }
-              }
+            }
         ]
     },
     "scripts": {
@@ -59,5 +74,8 @@
         "tslint": "^5.12.1",
         "@types/node": "^10.12.21",
         "@types/mocha": "^2.2.42"
+    },
+    "dependencies": {
+        "vscode-languageclient": "~4.4.0"
     }
 }
