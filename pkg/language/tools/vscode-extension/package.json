@@ -4,6 +4,10 @@
     "publisher": "dapperlabs",
     "description": "",
     "version": "0.0.1",
+    "repository": {
+        "type" : "git",
+        "url" : "https://github.com/dapperlabs/bamboo-node.git"
+    },
     "engines": {
         "vscode": "^1.36.0"
     },
