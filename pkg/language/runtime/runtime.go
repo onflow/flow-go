@@ -3,12 +3,12 @@ package runtime
 import (
 	"errors"
 	"fmt"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"math/big"
 	"strings"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 )
 
 type RuntimeInterface interface {
@@ -17,7 +17,9 @@ type RuntimeInterface interface {
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
 	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public key and code.
-	CreateAccount(publicKey []byte, code []byte) (accountID []byte, err error)
+	CreateAccount(publicKey, code []byte) (accountID []byte, err error)
+	// UpdateAccountCode updates the code associated with an account.
+	UpdateAccountCode(address, code []byte) (err error)
 }
 
 type RuntimeError struct {
@@ -75,6 +77,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 	inter.ImportFunction("getValue", r.newGetValueFunction(runtimeInterface))
 	inter.ImportFunction("setValue", r.newSetValueFunction(runtimeInterface))
 	inter.ImportFunction("createAccount", r.newCreateAccountFunction(runtimeInterface))
+	inter.ImportFunction("updateAccountCode", r.newUpdateAccountCodeFunction(runtimeInterface))
 
 	err := inter.Interpret()
 	if err != nil {
@@ -154,6 +157,22 @@ var createAccountFunctionType = sema.FunctionType{
 	ReturnType: &sema.IntType{},
 }
 
+// TODO: improve types
+var updateAccountCodeFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{
+		// address
+		&sema.VariableSizedType{
+			Type: &sema.UInt8Type{},
+		},
+		// code
+		&sema.VariableSizedType{
+			Type: &sema.UInt8Type{},
+		},
+	},
+	// nothing
+	ReturnType: &sema.VoidType{},
+}
+
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunction(
 		&setValueFunctionType,
@@ -224,6 +243,34 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeIn
 			}
 
 			return interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+		},
+	)
+}
+
+func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunction(
+		&createAccountFunctionType,
+		func(_ *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
+			if len(arguments) != 2 {
+				panic(fmt.Sprintf("updateAccountCode requires 2 parameters"))
+			}
+
+			address, err := toByteArray(arguments[0])
+			if err != nil {
+				panic(fmt.Sprintf("updateAccountCode requires the first parameter to be an array"))
+			}
+
+			code, err := toByteArray(arguments[1])
+			if err != nil {
+				panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
+			}
+
+			err = runtimeInterface.UpdateAccountCode(address, code)
+			if err != nil {
+				panic(err)
+			}
+
+			return &interpreter.VoidValue{}
 		},
 	)
 }
