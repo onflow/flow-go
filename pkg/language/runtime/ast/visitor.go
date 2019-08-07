@@ -28,6 +28,8 @@ type Visitor interface {
 	VisitBlock(*Block) Repr
 	// statements
 	VisitReturnStatement(*ReturnStatement) Repr
+	VisitBreakStatement(*BreakStatement) Repr
+	VisitContinueStatement(*ContinueStatement) Repr
 	VisitIfStatement(*IfStatement) Repr
 	VisitWhileStatement(*WhileStatement) Repr
 	VisitVariableDeclaration(*VariableDeclaration) Repr
