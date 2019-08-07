@@ -384,6 +384,23 @@ func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
 }
 
+func TestCheckInvalidParameterTypes(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: X, y: Y) {}
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+}
+
 func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
