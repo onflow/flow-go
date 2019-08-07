@@ -39,3 +39,5 @@ require (
 	google.golang.org/grpc v1.21.1
 	mellium.im/sasl v0.2.1 // indirect
 )
+
+replace mellium.im/sasl => github.com/mellium/sasl v0.2.1

@@ -26,5 +26,5 @@ func (gm GossipMode) String() string {
 // GossipService is the interface of the network package and hence the networking streams with all
 // other streams of the system. It defines the function call, the type of input arguments, and the output result
 type GossipService interface {
-	Gossip(ctx context.Context, request *shared.GossipMessage) (proto.Message, error)
+	Gossip(ctx context.Context, request *shared.GossipMessage) ([]proto.Message, error)
 }
