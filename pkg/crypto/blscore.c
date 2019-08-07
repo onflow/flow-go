@@ -1,5 +1,5 @@
 
-#include "relic_include.h"
+#include "include.h"
 
 #define DOUBADD 0 
 #define SLIDW   1 
@@ -12,49 +12,59 @@
 #define G1MULT RELIC
 #define G2MULT RELIC
 
-// Exponentiation of g1 in G1
-void _G1scalarPointMult(ep_st* res, ep_st* p, bn_st* expo) {
-    g1_mul(res, p, expo);
-}
+// Initializes Relic context with BLS12-381 parameters
+ctx_t* _relic_init_BLS12_381() { 
+    // check Relic was compiled with the right conf 
+    if (ALLOC != AUTO) return NULL;
 
-// Exponentiation of g1 in G1
-void _G1scalarGenMult(ep_st* res, bn_st* expo) {
-    ep_st g1;
-    ep_curve_get_gen(&g1);
+    // init relic core
+	if (core_init() != RLC_OK) return NULL;
+
+    // init BLS curve
+    int ret = RLC_OK;
+    #if (FP_PRIME == 381)
+    ret = ep_param_set_any_pairf(); // sets B12_P381 if FP_PRIME = 381 in relic config
+    #else
+    ep_param_set(B12_P381);
+    ep2_curve_set_twist(EP_MTYPE);  // Multiplicative twist 
+    #endif 
     
-    #if (G1MULT==DOUBADD)
-    ep_mul_basic(res, &g1, expo);
-    #elif (G1MULT==SLIDW)
-    ep_mul_slide(res, &g1, expo);
-    #elif (G1MULT==MONTG)
-    ep_mul_monty(res, &g1, expo);
-    #elif (G1MULT==PRECOM)
-    ep_mul_fix(res, &g1, expo);
-    #elif (G1MULT==WREG)
-    ep_mul_lwreg(res, &g1, expo);
-    #elif (G1MULT==WNAF)
-    ep_mul_lwnaf(res, &g1, expo);
-    #elif (G1MULT==RELIC)
-    ep_mul(res, &g1, expo);
+    if (ret != RLC_OK) return NULL;
+    return core_get();
+}
+
+// Exponentiation of random p in G1
+void _G1scalarPointMult(ep_st* res, ep_st* p, bn_st *expo) {
+    // Using window NAF of size 2
+    #if (EP_MUL	== LWNAF)
+        g1_mul(res, p, expo);
+    #else 
+        ep1_mul_lwnaf(res, p, expo);
     #endif
 }
 
-// Exponentiation of g2 in G2
-void _G2scalarGenMult(ep2_st* res, bn_st* expo) {
-    ep2_st g2;
-    ep2_curve_get_gen(&g2);
+// Exponentiation of fixed g1 in G1
+// This function is not called by BLS but is here for DEBUG/TESTs purposes
+void _G1scalarGenMult(ep_st* res, bn_st *expo) {
+    // Using precomputed table of size 4
+    g1_mul_gen(res, expo);
+}
 
-    #if (G2MULT==DOUBADD)
-    ep2_mul_basic(res, &g2, expo);
-    #elif (G2MULT==SLIDW)
-    ep2_mul_slide(res, &g2, expo);
-    #elif (G2MULT==MONTG)
-    ep2_mul_monty(res, &g2, expo);
-    #elif (G2MULT==WNAF)
-    ep2_mul_lwnaf(res, &g2, expo);
-    #elif (G2MULT==RELIC)
-    g2_mul_gen(res, expo);
+// Exponentiation of random p in G2
+void _G2scalarPointMult(ep2_st* res, ep2_st* p, bn_st *expo) {
+    // Using window NAF of size 2
+    #if (EP_MUL	== LWNAF)
+        g2_mul(res, p, expo);
+    #else 
+        ep2_mul_lwnaf(res, p, expo);
     #endif
+    
+}
+
+// Exponentiation of fixed g2 in G2
+void _G2scalarGenMult(ep2_st* res, bn_st *expo) {
+    // Using precomputed table of size 4
+    g2_mul_gen(res, expo);
 }
 
 

@@ -1,4 +1,4 @@
-#include "relic_include.h"
+#include "include.h"
 
 // RELIC library uses macros which are not visible to Go code.
 

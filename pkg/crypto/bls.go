@@ -21,6 +21,7 @@ func (a *BLS_BLS12381Algo) SignHash(k PrKey, h Hash) Signature {
 // VerifyHash implements BLS signature verification on BLS12381 curve
 func (a *BLS_BLS12381Algo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
 	// TODO: signature verification here
+	// TODO : hash to G1
 	// TODO : double pairing == 1 or double thread
 	return true
 }
@@ -30,7 +31,6 @@ func (a *BLS_BLS12381Algo) GeneratePrKey(seed []byte) PrKey {
 	var sk PrKeyBLS_BLS12381
 	// Generate private key here
 	randZr(&(sk.sk), seed)
-	//(&(sk.sk)).setInt(1)
 	// public key is not computed (but this could be changed)
 	sk.pk = nil
 	// links the private key to the algo
@@ -50,7 +50,6 @@ func (a *BLS_BLS12381Algo) SignStruct(sk PrKey, data Encoder, alg Hasher) Signat
 	return a.SignHash(sk, h)
 }
 
-//TODO: move to sign ?
 // VerifyBytes verifies a signature of a byte array
 func (a *BLS_BLS12381Algo) VerifyBytes(pk PubKey, s Signature, data []byte, alg Hasher) bool {
 	h := alg.ComputeBytesHash(data)
