@@ -19,7 +19,7 @@ type RuntimeInterface interface {
 	// CreateAccount creates a new account with the given public key and code.
 	CreateAccount(publicKey, code []byte) (accountID []byte, err error)
 	// UpdateAccountCode updates the code associated with an account.
-	UpdateAccountCode(address, code []byte) (err error)
+	UpdateAccountCode(accountID, code []byte) (err error)
 }
 
 type RuntimeError struct {
@@ -160,7 +160,7 @@ var createAccountFunctionType = sema.FunctionType{
 // TODO: improve types
 var updateAccountCodeFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
-		// address
+		// accountID
 		&sema.VariableSizedType{
 			Type: &sema.UInt8Type{},
 		},
@@ -255,7 +255,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Runti
 				panic(fmt.Sprintf("updateAccountCode requires 2 parameters"))
 			}
 
-			address, err := toByteArray(arguments[0])
+			accountID, err := toByteArray(arguments[0])
 			if err != nil {
 				panic(fmt.Sprintf("updateAccountCode requires the first parameter to be an array"))
 			}
@@ -265,7 +265,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Runti
 				panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
 			}
 
-			err = runtimeInterface.UpdateAccountCode(address, code)
+			err = runtimeInterface.UpdateAccountCode(accountID, code)
 			if err != nil {
 				panic(err)
 			}
