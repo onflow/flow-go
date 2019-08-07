@@ -1,13 +1,11 @@
 package sema
 
 import (
-	"fmt"
-	goRuntime "runtime"
-
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"strings"
 )
 
 const ArgumentLabelNotRequired = "_"
@@ -15,6 +13,34 @@ const ArgumentLabelNotRequired = "_"
 type functionContext struct {
 	returnType Type
 }
+
+type checkerResult struct {
+	Type   Type
+	Errors []error
+}
+
+type CheckerError struct {
+	Errors []error
+}
+
+func (e CheckerError) Error() string {
+	var sb strings.Builder
+	sb.WriteString("Checking failed:\n")
+	for _, err := range e.Errors {
+		sb.WriteString(err.Error())
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+func checkerError(errs []error) *CheckerError {
+	if errs != nil {
+		return &CheckerError{errs}
+	}
+	return nil
+}
+
+// Checker
 
 type Checker struct {
 	Program          *ast.Program
@@ -123,36 +149,33 @@ func (checker *Checker) popActivations() {
 }
 
 func (checker *Checker) Check() (err error) {
-	// recover internal panics and return them as an error
-	defer func() {
-		if r := recover(); r != nil {
-			var ok bool
-			// don't recover Go errors
-			err, ok = r.(goRuntime.Error)
-			if ok {
-				panic(err)
-			}
-			err, ok = r.(error)
-			if !ok {
-				err = fmt.Errorf("%v", r)
-			}
-		}
-	}()
-
-	checker.Program.Accept(checker)
-
-	return nil
+	result := checker.Program.Accept(checker).(checkerResult)
+	return checkerError(result.Errors)
 }
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
+	var errs []error
+
 	for _, declaration := range program.Declarations {
-		declaration.Accept(checker)
-		checker.declareGlobal(declaration)
+
+		result := declaration.Accept(checker).(checkerResult)
+		errs = append(errs, result.Errors...)
+
+		err := checker.declareGlobal(declaration)
+		if err != nil {
+			errs = append(errs, err.Errors...)
+		}
 	}
-	return nil
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
+	var errs []error
+
 	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
 
 	argumentLabels := make([]string, len(declaration.Parameters))
@@ -167,62 +190,98 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 		argumentLabels[i] = argumentLabel
 	}
 
-	checker.declareFunction(
+	// declare the function before checking it,
+	// so it can be referred to inside the function
+
+	err := checker.declareFunction(
 		declaration.Identifier,
 		declaration.IdentifierPos,
 		functionType,
 		argumentLabels,
 	)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
 
-	checker.checkFunction(
+	// check the function after declaring,
+	// so it can be referred to inside the function
+
+	err = checker.checkFunction(
 		declaration.Parameters,
 		functionType,
 		declaration.Block,
 	)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
 
-	return nil
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) checkFunction(
 	parameters []*ast.Parameter,
 	functionType *FunctionType,
 	block *ast.Block,
-) {
+) *CheckerError {
+	var errs []error
+
 	checker.pushActivations()
 	defer checker.popActivations()
 
-	checker.checkParameterNames(parameters)
-	checker.checkArgumentLabels(parameters)
+	// check parameter names
+	err := checker.checkParameterNames(parameters)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	// check argument labels
+	err = checker.checkArgumentLabels(parameters)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
 	checker.bindParameters(parameters)
 
 	checker.enterFunction(functionType)
 	defer checker.leaveFunction()
 
-	block.Accept(checker)
+	result := block.Accept(checker).(checkerResult)
+	errs = append(errs, result.Errors...)
+
+	return checkerError(errs)
 }
 
 // checkParameterNames checks that all parameter names are unique
 //
-func (checker *Checker) checkParameterNames(parameters []*ast.Parameter) {
+func (checker *Checker) checkParameterNames(parameters []*ast.Parameter) *CheckerError {
+	var errs []error
 	identifierPositions := map[string]*ast.Position{}
 
 	for _, parameter := range parameters {
 		identifier := parameter.Identifier
 		if previousPos, ok := identifierPositions[identifier]; ok {
-			panic(&RedeclarationError{
-				Kind:        common.DeclarationKindParameter,
-				Name:        identifier,
-				Pos:         parameter.IdentifierPos,
-				PreviousPos: previousPos,
-			})
+			errs = append(errs,
+				&RedeclarationError{
+					Kind:        common.DeclarationKindParameter,
+					Name:        identifier,
+					Pos:         parameter.IdentifierPos,
+					PreviousPos: previousPos,
+				},
+			)
 		}
 		identifierPositions[identifier] = parameter.IdentifierPos
 	}
+
+	return checkerError(errs)
 }
 
 // checkArgumentLabels checks that all argument labels (if any) are unique
 //
-func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) {
+func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) *CheckerError {
+	var errs []error
 	argumentLabelPositions := map[string]*ast.Position{}
 
 	for _, parameter := range parameters {
@@ -232,16 +291,20 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) {
 		}
 
 		if previousPos, ok := argumentLabelPositions[label]; ok {
-			panic(&RedeclarationError{
-				Kind:        common.DeclarationKindArgumentLabel,
-				Name:        label,
-				Pos:         parameter.LabelPos,
-				PreviousPos: previousPos,
-			})
+			errs = append(errs,
+				&RedeclarationError{
+					Kind:        common.DeclarationKindArgumentLabel,
+					Name:        label,
+					Pos:         parameter.LabelPos,
+					PreviousPos: previousPos,
+				},
+			)
 		}
 
 		argumentLabelPositions[label] = parameter.LabelPos
 	}
+
+	return checkerError(errs)
 }
 
 func (checker *Checker) bindParameters(parameters []*ast.Parameter) {
@@ -263,7 +326,10 @@ func (checker *Checker) bindParameters(parameters []*ast.Parameter) {
 }
 
 func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclaration) ast.Repr {
-	valueType := declaration.Value.Accept(checker).(Type)
+	valueResult := declaration.Value.Accept(checker).(checkerResult)
+	valueType := valueResult.Type
+	errs := valueResult.Errors
+
 	declarationType := valueType
 	// does the declaration have an explicit type annotation?
 	if declaration.Type != nil {
@@ -271,29 +337,42 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 
 		// check the value type is a subtype of the declaration type
 		if !checker.IsSubType(valueType, declarationType) {
-			panic(&TypeMismatchError{
-				ExpectedType: declarationType,
-				ActualType:   valueType,
-				StartPos:     declaration.Value.StartPosition(),
-				EndPos:       declaration.Value.EndPosition(),
-			})
+			errs = append(errs,
+				&TypeMismatchError{
+					ExpectedType: declarationType,
+					ActualType:   valueType,
+					StartPos:     declaration.Value.StartPosition(),
+					EndPos:       declaration.Value.EndPosition(),
+				},
+			)
 		}
 	}
-	checker.declareVariable(declaration, declarationType)
 
-	return nil
+	err := checker.declareVariable(declaration, declarationType)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
 
-func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty Type) {
+func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty Type) *CheckerError {
+	var errs []error
+
 	// check if variable with this name is already declared in the current scope
 	variable := checker.findVariable(declaration.Identifier)
 	depth := checker.valueActivations.Depth()
 	if variable != nil && variable.Depth == depth {
-		panic(&RedeclarationError{
-			Kind: declaration.DeclarationKind(),
-			Name: declaration.Identifier,
-			Pos:  declaration.IdentifierPosition(),
-		})
+		errs = append(errs,
+			&RedeclarationError{
+				Kind: declaration.DeclarationKind(),
+				Name: declaration.Identifier,
+				Pos:  declaration.IdentifierPosition(),
+			},
+		)
 	}
 
 	// variable with this name is not declared in current scope, declare it
@@ -303,109 +382,171 @@ func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty
 		Type:       ty,
 	}
 	checker.setVariable(declaration.Identifier, variable)
+
+	return checkerError(errs)
 }
 
-func (checker *Checker) declareGlobal(declaration ast.Declaration) {
+func (checker *Checker) declareGlobal(declaration ast.Declaration) *CheckerError {
+	var errs []error
+
 	name := declaration.DeclarationName()
 	if _, exists := checker.Globals[name]; exists {
-		panic(&RedeclarationError{
-			Kind: declaration.DeclarationKind(),
-			Name: name,
-			Pos:  declaration.IdentifierPosition(),
-		})
+		errs = append(errs,
+			&RedeclarationError{
+				Kind: declaration.DeclarationKind(),
+				Name: name,
+				Pos:  declaration.IdentifierPosition(),
+			},
+		)
 	}
+
 	checker.Globals[name] = checker.findVariable(name)
+
+	return checkerError(errs)
 }
 
 func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
+	var errs []error
+
 	checker.pushActivations()
 	defer checker.popActivations()
 
 	for _, statement := range block.Statements {
-		statement.Accept(checker)
+		result := statement.Accept(checker).(checkerResult)
+		errs = append(errs, result.Errors...)
 	}
 
-	return nil
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
+	var errs []error
 
 	// check value type matches enclosing function's return type
 
 	if statement.Expression == nil {
-		return nil
+		return checkerResult{
+			Type:   nil,
+			Errors: nil,
+		}
 	}
 
-	valueType := statement.Expression.Accept(checker).(Type)
+	valueResult := statement.Expression.Accept(checker).(checkerResult)
+	errs = append(errs, valueResult.Errors...)
+
+	valueType := valueResult.Type
 	returnType := checker.currentFunction().returnType
 
-	if !checker.IsSubType(valueType, returnType) {
-		panic(&TypeMismatchError{
-			ExpectedType: returnType,
-			ActualType:   valueType,
-			StartPos:     statement.Expression.StartPosition(),
-			EndPos:       statement.Expression.EndPosition(),
-		})
+	if valueType != nil && !checker.IsSubType(valueType, returnType) {
+		errs = append(errs,
+			&TypeMismatchError{
+				ExpectedType: returnType,
+				ActualType:   valueType,
+				StartPos:     statement.Expression.StartPosition(),
+				EndPos:       statement.Expression.EndPosition(),
+			},
+		)
 	}
 
-	return nil
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
+	var errs []error
 
 	var elseElement ast.Element = ast.NotAnElement{}
 	if statement.Else != nil {
 		elseElement = statement.Else
 	}
 
-	checker.visitConditional(statement.Test, statement.Then, elseElement)
+	_, _, err := checker.visitConditional(statement.Test, statement.Then, elseElement)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
 
-	return nil
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.Repr {
-	test := statement.Test
-	testType := test.Accept(checker).(Type)
+	var errs []error
+
+	testExpression := statement.Test
+	testResult := testExpression.Accept(checker).(checkerResult)
+	errs = append(errs, testResult.Errors...)
+
+	testType := testResult.Type
 
 	if !checker.IsSubType(testType, &BoolType{}) {
-		panic(&TypeMismatchError{
-			ExpectedType: &BoolType{},
-			ActualType:   testType,
-			StartPos:     test.StartPosition(),
-			EndPos:       test.EndPosition(),
-		})
+		errs = append(errs,
+			&TypeMismatchError{
+				ExpectedType: &BoolType{},
+				ActualType:   testType,
+				StartPos:     testExpression.StartPosition(),
+				EndPos:       testExpression.EndPosition(),
+			},
+		)
 	}
 
-	statement.Block.Accept(checker)
+	blockResult := statement.Block.Accept(checker).(checkerResult)
+	errs = append(errs, blockResult.Errors...)
 
-	return nil
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
-	ty := assignment.Value.Accept(checker).(Type)
-	checker.visitAssignmentValueType(assignment, ty)
+	var errs []error
 
-	return nil
+	valueResult := assignment.Value.Accept(checker).(checkerResult)
+	errs = append(errs, valueResult.Errors...)
+	valueType := valueResult.Type
+
+	err := checker.visitAssignmentValueType(assignment, valueType)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
 
-func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentStatement, valueType Type) {
+func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentStatement, valueType Type) *CheckerError {
 	switch target := assignment.Target.(type) {
 	case *ast.IdentifierExpression:
-		checker.visitIdentifierExpressionAssignment(assignment, target, valueType)
-		return
+		return checker.visitIdentifierExpressionAssignment(assignment, target, valueType)
 
 	case *ast.IndexExpression:
-		elementType := checker.visitIndexingExpression(target.Expression, target.Index)
-		if !checker.IsSubType(valueType, elementType) {
-			panic(&TypeMismatchError{
-				ExpectedType: elementType,
-				ActualType:   valueType,
-				StartPos:     assignment.Value.StartPosition(),
-				EndPos:       assignment.Value.EndPosition(),
-			})
+		var errs []error
+
+		elementResult := checker.visitIndexingExpression(target.Expression, target.Index)
+		errs = append(errs, elementResult.Errors...)
+		elementType := elementResult.Type
+
+		if elementType != nil && !checker.IsSubType(valueType, elementType) {
+			errs = append(errs,
+				&TypeMismatchError{
+					ExpectedType: elementType,
+					ActualType:   valueType,
+					StartPos:     assignment.Value.StartPosition(),
+					EndPos:       assignment.Value.EndPosition(),
+				},
+			)
 		}
 
-		return
+		return checkerError(errs)
 
 	case *ast.MemberExpression:
 		// TODO: no structures/dictionaries yet
@@ -424,47 +565,64 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	assignment *ast.AssignmentStatement,
 	target *ast.IdentifierExpression,
 	valueType Type,
-) {
+) *CheckerError {
+	var errs []error
+
 	identifier := target.Identifier
 
 	// check identifier was declared before
 	variable := checker.findVariable(identifier)
 	if variable == nil {
-		panic(&NotDeclaredError{
-			ExpectedKind: common.DeclarationKindVariable,
-			Name:         identifier,
-			StartPos:     target.StartPosition(),
-			EndPos:       target.EndPosition(),
-		})
+		errs = append(errs,
+			&NotDeclaredError{
+				ExpectedKind: common.DeclarationKindVariable,
+				Name:         identifier,
+				StartPos:     target.StartPosition(),
+				EndPos:       target.EndPosition(),
+			},
+		)
+	} else {
+		// check identifier is not a constant
+		if variable.IsConstant {
+			errs = append(errs,
+				&AssignmentToConstantError{
+					Name:     identifier,
+					StartPos: target.StartPosition(),
+					EndPos:   target.EndPosition(),
+				},
+			)
+		}
+
+		// check value type is subtype of variable type
+		if !checker.IsSubType(valueType, variable.Type) {
+			errs = append(errs,
+				&TypeMismatchError{
+					ExpectedType: variable.Type,
+					ActualType:   valueType,
+					StartPos:     assignment.Value.StartPosition(),
+					EndPos:       assignment.Value.EndPosition(),
+				},
+			)
+		}
 	}
 
-	// check identifier is not a constant
-	if variable.IsConstant {
-		panic(&AssignmentToConstantError{
-			Name:     identifier,
-			StartPos: target.StartPosition(),
-			EndPos:   target.EndPosition(),
-		})
-	}
-
-	// check value type is subtype of variable type
-	if !checker.IsSubType(valueType, variable.Type) {
-		panic(&TypeMismatchError{
-			ExpectedType: variable.Type,
-			ActualType:   valueType,
-			StartPos:     assignment.Value.StartPosition(),
-			EndPos:       assignment.Value.EndPosition(),
-		})
-	}
+	return checkerError(errs)
 }
 
 // visitIndexingExpression checks if the indexed expression is indexable,
 // checks if the indexing expression can be used to index into the indexed expression,
 // and returns the expected element type
 //
-func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpression ast.Expression) Type {
-	indexedType := indexedExpression.Accept(checker).(Type)
-	indexingType := indexingExpression.Accept(checker).(Type)
+func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpression ast.Expression) checkerResult {
+	var errs []error
+
+	indexedResult := indexedExpression.Accept(checker).(checkerResult)
+	errs = append(errs, indexedResult.Errors...)
+	indexedType := indexedResult.Type
+
+	indexingResult := indexingExpression.Accept(checker).(checkerResult)
+	errs = append(errs, indexingResult.Errors...)
+	indexingType := indexingResult.Type
 
 	// NOTE: check indexed type first for UX reasons
 
@@ -473,53 +631,82 @@ func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpre
 
 	elementType := checker.IndexableElementType(indexedType)
 	if elementType == nil {
-		panic(&NotIndexableTypeError{
-			Type:     indexedType,
-			StartPos: indexedExpression.StartPosition(),
-			EndPos:   indexedExpression.EndPosition(),
-		})
+		errs = append(errs,
+			&NotIndexableTypeError{
+				Type:     indexedType,
+				StartPos: indexedExpression.StartPosition(),
+				EndPos:   indexedExpression.EndPosition(),
+			},
+		)
+	} else {
+
+		// check indexing expression's type can be used to index
+		// into indexed expression's type
+
+		if !checker.IsIndexingType(indexingType, indexedType) {
+			errs = append(errs,
+				&NotIndexingTypeError{
+					Type:     indexingType,
+					StartPos: indexingExpression.StartPosition(),
+					EndPos:   indexingExpression.EndPosition(),
+				},
+			)
+		}
 	}
 
-	// check indexing expression's type can be used to index
-	// into indexed expression's type
-
-	if !checker.IsIndexingType(indexingType, indexedType) {
-		panic(&NotIndexingTypeError{
-			Type:     indexingType,
-			StartPos: indexingExpression.StartPosition(),
-			EndPos:   indexingExpression.EndPosition(),
-		})
+	return checkerResult{
+		Type:   elementType,
+		Errors: errs,
 	}
-
-	return elementType
 }
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
-	variable := checker.findAndCheckVariable(expression)
-	return variable.Type
+	variable, err := checker.findAndCheckVariable(expression)
+	if err != nil {
+		return checkerResult{
+			// TODO: verify this OK
+			Type:   &AnyType{},
+			Errors: []error{err},
+		}
+	}
+
+	return checkerResult{
+		Type:   variable.Type,
+		Errors: nil,
+	}
 }
 
-func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpression) *Variable {
+func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpression) (*Variable, error) {
 	variable := checker.findVariable(expression.Identifier)
 	if variable == nil {
-		panic(&NotDeclaredError{
+		return nil, &NotDeclaredError{
 			ExpectedKind: common.DeclarationKindValue,
 			Name:         expression.Identifier,
 			StartPos:     expression.StartPosition(),
 			EndPos:       expression.EndPosition(),
-		})
+		}
 	}
-	return variable
+
+	return variable, nil
 }
 
-func (checker *Checker) visitBinaryOperation(expr *ast.BinaryExpression) (left, right Type) {
-	left = expr.Left.Accept(checker).(Type)
-	right = expr.Right.Accept(checker).(Type)
+func (checker *Checker) visitBinaryOperation(expr *ast.BinaryExpression) (left, right checkerResult) {
+	left = expr.Left.Accept(checker).(checkerResult)
+	right = expr.Right.Accept(checker).(checkerResult)
 	return
 }
 
+// TODO: split up
+
 func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) ast.Repr {
-	left, right := checker.visitBinaryOperation(expression)
+	var errs []error
+
+	leftResult, rightResult := checker.visitBinaryOperation(expression)
+	errs = append(errs, leftResult.Errors...)
+	errs = append(errs, rightResult.Errors...)
+
+	leftType := leftResult.Type
+	rightType := rightResult.Type
 
 	operation := expression.Operation
 	operationKind := binaryOperationKind(operation)
@@ -530,54 +717,68 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 
 		// check both types are integer subtypes
 
-		leftIsInteger := checker.IsSubType(left, &IntegerType{})
-		rightIsInteger := checker.IsSubType(right, &IntegerType{})
+		leftIsInteger := checker.IsSubType(leftType, &IntegerType{})
+		rightIsInteger := checker.IsSubType(rightType, &IntegerType{})
 
 		if !leftIsInteger && !rightIsInteger {
-			panic(&InvalidBinaryOperandsError{
-				Operation: operation,
-				LeftType:  left,
-				RightType: right,
-				StartPos:  expression.StartPosition(),
-				EndPos:    expression.EndPosition(),
-			})
+			errs = append(errs,
+				&InvalidBinaryOperandsError{
+					Operation: operation,
+					LeftType:  leftType,
+					RightType: rightType,
+					StartPos:  expression.StartPosition(),
+					EndPos:    expression.EndPosition(),
+				},
+			)
 		} else if !leftIsInteger {
-			panic(&InvalidBinaryOperandError{
-				Operation:    operation,
-				Side:         common.OperandSideLeft,
-				ExpectedType: &IntegerType{},
-				ActualType:   left,
-				StartPos:     expression.Left.StartPosition(),
-				EndPos:       expression.Left.EndPosition(),
-			})
+			errs = append(errs,
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideLeft,
+					ExpectedType: &IntegerType{},
+					ActualType:   leftType,
+					StartPos:     expression.Left.StartPosition(),
+					EndPos:       expression.Left.EndPosition(),
+				},
+			)
 		} else if !rightIsInteger {
-			panic(&InvalidBinaryOperandError{
-				Operation:    operation,
-				Side:         common.OperandSideRight,
-				ExpectedType: &IntegerType{},
-				ActualType:   right,
-				StartPos:     expression.Right.StartPosition(),
-				EndPos:       expression.Right.EndPosition(),
-			})
+			errs = append(errs,
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideRight,
+					ExpectedType: &IntegerType{},
+					ActualType:   rightType,
+					StartPos:     expression.Right.StartPosition(),
+					EndPos:       expression.Right.EndPosition(),
+				},
+			)
 		}
 
 		// check both types are equal
 
-		if !left.Equal(right) {
-			panic(&InvalidBinaryOperandsError{
-				Operation: operation,
-				LeftType:  left,
-				RightType: right,
-				StartPos:  expression.StartPosition(),
-				EndPos:    expression.EndPosition(),
-			})
+		if !leftType.Equal(rightType) {
+			errs = append(errs,
+				&InvalidBinaryOperandsError{
+					Operation: operation,
+					LeftType:  leftType,
+					RightType: rightType,
+					StartPos:  expression.StartPosition(),
+					EndPos:    expression.EndPosition(),
+				},
+			)
 		}
 
 		switch operationKind {
 		case BinaryOperationKindIntegerArithmetic:
-			return left
+			return checkerResult{
+				Type:   leftType,
+				Errors: errs,
+			}
 		case BinaryOperationKindIntegerComparison:
-			return &BoolType{}
+			return checkerResult{
+				Type:   &BoolType{},
+				Errors: errs,
+			}
 		}
 
 		panic(&errors.UnreachableError{})
@@ -585,56 +786,70 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 	case BinaryOperationKindEquality:
 		// check both types are equal, and boolean subtypes or integer subtypes
 
-		if !(left.Equal(right) &&
-			(checker.IsSubType(left, &BoolType{}) || checker.IsSubType(left, &IntegerType{}))) {
+		if !(leftType.Equal(rightType) &&
+			(checker.IsSubType(leftType, &BoolType{}) || checker.IsSubType(leftType, &IntegerType{}))) {
 
-			panic(&InvalidBinaryOperandsError{
-				Operation: operation,
-				LeftType:  left,
-				RightType: right,
-				StartPos:  expression.StartPosition(),
-				EndPos:    expression.EndPosition(),
-			})
+			errs = append(errs,
+				&InvalidBinaryOperandsError{
+					Operation: operation,
+					LeftType:  leftType,
+					RightType: rightType,
+					StartPos:  expression.StartPosition(),
+					EndPos:    expression.EndPosition(),
+				},
+			)
 		}
 
-		return &BoolType{}
+		return checkerResult{
+			Type:   &BoolType{},
+			Errors: errs,
+		}
 
 	case BinaryOperationKindBooleanLogic:
 
 		// check both types are integer subtypes
 
-		leftIsBool := checker.IsSubType(left, &BoolType{})
-		rightIsBool := checker.IsSubType(right, &BoolType{})
+		leftIsBool := checker.IsSubType(leftType, &BoolType{})
+		rightIsBool := checker.IsSubType(rightType, &BoolType{})
 
 		if !leftIsBool && !rightIsBool {
-			panic(&InvalidBinaryOperandsError{
-				Operation: operation,
-				LeftType:  left,
-				RightType: right,
-				StartPos:  expression.StartPosition(),
-				EndPos:    expression.EndPosition(),
-			})
+			errs = append(errs,
+				&InvalidBinaryOperandsError{
+					Operation: operation,
+					LeftType:  leftType,
+					RightType: rightType,
+					StartPos:  expression.StartPosition(),
+					EndPos:    expression.EndPosition(),
+				},
+			)
 		} else if !leftIsBool {
-			panic(&InvalidBinaryOperandError{
-				Operation:    operation,
-				Side:         common.OperandSideLeft,
-				ExpectedType: &BoolType{},
-				ActualType:   left,
-				StartPos:     expression.Left.StartPosition(),
-				EndPos:       expression.Left.EndPosition(),
-			})
+			errs = append(errs,
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideLeft,
+					ExpectedType: &BoolType{},
+					ActualType:   leftType,
+					StartPos:     expression.Left.StartPosition(),
+					EndPos:       expression.Left.EndPosition(),
+				},
+			)
 		} else if !rightIsBool {
-			panic(&InvalidBinaryOperandError{
-				Operation:    operation,
-				Side:         common.OperandSideRight,
-				ExpectedType: &BoolType{},
-				ActualType:   right,
-				StartPos:     expression.Right.StartPosition(),
-				EndPos:       expression.Right.EndPosition(),
-			})
+			errs = append(errs,
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideRight,
+					ExpectedType: &BoolType{},
+					ActualType:   rightType,
+					StartPos:     expression.Right.StartPosition(),
+					EndPos:       expression.Right.EndPosition(),
+				},
+			)
 		}
 
-		return &BoolType{}
+		return checkerResult{
+			Type:   &BoolType{},
+			Errors: errs,
+		}
 	}
 
 	panic(&unsupportedOperation{
@@ -646,32 +861,46 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 }
 
 func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {
-	valueType := expression.Expression.Accept(checker).(Type)
+	var errs []error
+
+	valueResult := expression.Expression.Accept(checker).(checkerResult)
+	errs = append(errs, valueResult.Errors...)
+	valueType := valueResult.Type
 
 	switch expression.Operation {
 	case ast.OperationNegate:
 		if !checker.IsSubType(valueType, &BoolType{}) {
-			panic(&InvalidUnaryOperandError{
-				Operation:    expression.Operation,
-				ExpectedType: &BoolType{},
-				ActualType:   valueType,
-				StartPos:     expression.Expression.StartPosition(),
-				EndPos:       expression.Expression.EndPosition(),
-			})
+			errs = append(errs,
+				&InvalidUnaryOperandError{
+					Operation:    expression.Operation,
+					ExpectedType: &BoolType{},
+					ActualType:   valueType,
+					StartPos:     expression.Expression.StartPosition(),
+					EndPos:       expression.Expression.EndPosition(),
+				},
+			)
 		}
-		return valueType
+		return checkerResult{
+			Type:   valueType,
+			Errors: errs,
+		}
 
 	case ast.OperationMinus:
 		if !checker.IsSubType(valueType, &IntegerType{}) {
-			panic(&InvalidUnaryOperandError{
-				Operation:    expression.Operation,
-				ExpectedType: &IntegerType{},
-				ActualType:   valueType,
-				StartPos:     expression.Expression.StartPosition(),
-				EndPos:       expression.Expression.EndPosition(),
-			})
+			errs = append(errs,
+				&InvalidUnaryOperandError{
+					Operation:    expression.Operation,
+					ExpectedType: &IntegerType{},
+					ActualType:   valueType,
+					StartPos:     expression.Expression.StartPosition(),
+					EndPos:       expression.Expression.EndPosition(),
+				},
+			)
 		}
-		return valueType
+		return checkerResult{
+			Type:   valueType,
+			Errors: errs,
+		}
 	}
 
 	panic(&unsupportedOperation{
@@ -680,43 +909,51 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 		startPos:  expression.StartPos,
 		endPos:    expression.EndPos,
 	})
-
-	return nil
 }
 
 func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatement) ast.Repr {
-	statement.Expression.Accept(checker)
-
-	return nil
+	return statement.Expression.Accept(checker).(checkerResult)
 }
 
 func (checker *Checker) VisitBoolExpression(expression *ast.BoolExpression) ast.Repr {
-	return &BoolType{}
+	return checkerResult{
+		Type:   &BoolType{},
+		Errors: nil,
+	}
 }
 
 func (checker *Checker) VisitIntExpression(expression *ast.IntExpression) ast.Repr {
-	return &IntType{}
+	return checkerResult{
+		Type:   &IntType{},
+		Errors: nil,
+	}
 }
 
 func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) ast.Repr {
+	var errs []error
+
 	// visit all elements, ensure they are all the same type
 
 	var elementType Type
 
 	for _, value := range expression.Values {
-		valueType := value.Accept(checker).(Type)
+		valueResult := value.Accept(checker).(checkerResult)
+		errs = append(errs, valueResult.Errors...)
+		valueType := valueResult.Type
 
 		// infer element type from first element
 		// TODO: find common super type?
 		if elementType == nil {
 			elementType = valueType
 		} else if !checker.IsSubType(valueType, elementType) {
-			panic(&TypeMismatchError{
-				ExpectedType: elementType,
-				ActualType:   valueType,
-				StartPos:     value.StartPosition(),
-				EndPos:       value.EndPosition(),
-			})
+			errs = append(errs,
+				&TypeMismatchError{
+					ExpectedType: elementType,
+					ActualType:   valueType,
+					StartPos:     value.StartPosition(),
+					EndPos:       value.EndPosition(),
+				},
+			)
 		}
 	}
 
@@ -725,9 +962,14 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 	//
 	//}
 
-	return &ConstantSizedType{
+	arrayType := &ConstantSizedType{
 		Size: len(expression.Values),
 		Type: elementType,
+	}
+
+	return checkerResult{
+		Type:   arrayType,
+		Errors: errs,
 	}
 }
 
@@ -741,8 +983,12 @@ func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) as
 }
 
 func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalExpression) ast.Repr {
+	var errs []error
 
-	thenType, elseType := checker.visitConditional(expression.Test, expression.Then, expression.Else)
+	thenType, elseType, err := checker.visitConditional(expression.Test, expression.Then, expression.Else)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
 
 	if thenType == nil || elseType == nil {
 		panic(&errors.UnreachableError{})
@@ -752,61 +998,85 @@ func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalEx
 	resultType := thenType
 
 	if !checker.IsSubType(elseType, resultType) {
-		panic(&TypeMismatchError{
-			ExpectedType: resultType,
-			ActualType:   elseType,
-			StartPos:     expression.Else.StartPosition(),
-			EndPos:       expression.Else.EndPosition(),
-		})
+		errs = append(errs,
+			&TypeMismatchError{
+				ExpectedType: resultType,
+				ActualType:   elseType,
+				StartPos:     expression.Else.StartPosition(),
+				EndPos:       expression.Else.EndPosition(),
+			},
+		)
 	}
 
-	return resultType
+	return checkerResult{
+		Type:   resultType,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
+	var errs []error
 
 	// check the invoked expression can be invoked
 
 	invokedExpression := invocationExpression.Expression
-	expressionType := invokedExpression.Accept(checker).(Type)
+	expressionResult := invokedExpression.Accept(checker).(checkerResult)
+	errs = append(errs, expressionResult.Errors...)
+	expressionType := expressionResult.Type
+
+	argumentCount := len(invocationExpression.Arguments)
 
 	functionType, ok := expressionType.(*FunctionType)
 	if !ok {
-		panic(&NotCallableError{
-			Type:     expressionType,
-			StartPos: invokedExpression.StartPosition(),
-			EndPos:   invokedExpression.EndPosition(),
-		})
-	}
+		errs = append(errs,
+			&NotCallableError{
+				Type:     expressionType,
+				StartPos: invokedExpression.StartPosition(),
+				EndPos:   invokedExpression.EndPosition(),
+			},
+		)
+	} else {
+		// invoked expression has function type
 
-	// check the invocation's argument count matches the function's parameter count
+		// check the invocation's argument count matches the function's parameter count
+		parameterCount := len(functionType.ParameterTypes)
 
-	parameterCount := len(functionType.ParameterTypes)
-	argumentCount := len(invocationExpression.Arguments)
+		if argumentCount != parameterCount {
+			errs = append(errs,
+				&ArgumentCountError{
+					ParameterCount: parameterCount,
+					ArgumentCount:  argumentCount,
+					StartPos:       invocationExpression.StartPos,
+					EndPos:         invocationExpression.EndPos,
+				},
+			)
+		}
 
-	if argumentCount != parameterCount {
-		panic(&ArgumentCountError{
-			ParameterCount: parameterCount,
-			ArgumentCount:  argumentCount,
-			StartPos:       invocationExpression.StartPos,
-			EndPos:         invocationExpression.EndPos,
-		})
-	}
+		minCount := argumentCount
+		if parameterCount < argumentCount {
+			minCount = parameterCount
+		}
 
-	for i := 0; i < parameterCount; i++ {
-		// ensure the type of the argument matches the type of the parameter
+		for i := 0; i < minCount; i++ {
+			// ensure the type of the argument matches the type of the parameter
 
-		parameterType := functionType.ParameterTypes[i]
-		argument := invocationExpression.Arguments[i]
-		argumentType := argument.Expression.Accept(checker).(Type)
+			parameterType := functionType.ParameterTypes[i]
+			argument := invocationExpression.Arguments[i]
 
-		if !checker.IsSubType(argumentType, parameterType) {
-			panic(&TypeMismatchError{
-				ExpectedType: parameterType,
-				ActualType:   argumentType,
-				StartPos:     argument.Expression.StartPosition(),
-				EndPos:       argument.Expression.EndPosition(),
-			})
+			argumentResult := argument.Expression.Accept(checker).(checkerResult)
+			errs = append(errs, argumentResult.Errors...)
+			argumentType := argumentResult.Type
+
+			if argumentType != nil && !checker.IsSubType(argumentType, parameterType) {
+				errs = append(errs,
+					&TypeMismatchError{
+						ExpectedType: parameterType,
+						ActualType:   argumentType,
+						StartPos:     argument.Expression.StartPosition(),
+						EndPos:       argument.Expression.EndPosition(),
+					},
+				)
+			}
 		}
 	}
 
@@ -815,59 +1085,90 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 
 	if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
 
-		variable := checker.findAndCheckVariable(identifierExpression)
-		if variable.ArgumentLabels != nil {
+		variable, err := checker.findAndCheckVariable(identifierExpression)
+		if err != nil {
+			errs = append(errs, err)
+		} else if variable != nil {
+			if variable.ArgumentLabels != nil {
 
-			for i, argumentLabel := range variable.ArgumentLabels {
-				argument := invocationExpression.Arguments[i]
-				providedLabel := argument.Label
-				if argumentLabel == ArgumentLabelNotRequired {
-					// argument label is not required,
-					// check it is not provided
-
-					if providedLabel != "" {
-						panic(&IncorrectArgumentLabelError{
-							ActualArgumentLabel:   providedLabel,
-							ExpectedArgumentLabel: "",
-							StartPos:              argument.Expression.StartPosition(),
-							EndPos:                argument.Expression.EndPosition(),
-						})
+				for i, argumentLabel := range variable.ArgumentLabels {
+					if i >= argumentCount {
+						break
 					}
-				} else {
-					// argument label is required,
-					// check it is provided and correct
-					if providedLabel == "" {
-						panic(&MissingArgumentLabelError{
-							ExpectedArgumentLabel: argumentLabel,
-							StartPos:              argument.Expression.StartPosition(),
-							EndPos:                argument.Expression.EndPosition(),
-						})
-					} else if providedLabel != argumentLabel {
-						panic(&IncorrectArgumentLabelError{
-							ActualArgumentLabel:   providedLabel,
-							ExpectedArgumentLabel: argumentLabel,
-							StartPos:              argument.Expression.StartPosition(),
-							EndPos:                argument.Expression.EndPosition(),
-						})
+
+					argument := invocationExpression.Arguments[i]
+					providedLabel := argument.Label
+					if argumentLabel == ArgumentLabelNotRequired {
+						// argument label is not required,
+						// check it is not provided
+
+						if providedLabel != "" {
+							errs = append(errs,
+								&IncorrectArgumentLabelError{
+									ActualArgumentLabel:   providedLabel,
+									ExpectedArgumentLabel: "",
+									StartPos:              argument.Expression.StartPosition(),
+									EndPos:                argument.Expression.EndPosition(),
+								},
+							)
+						}
+					} else {
+						// argument label is required,
+						// check it is provided and correct
+						if providedLabel == "" {
+							errs = append(errs,
+								&MissingArgumentLabelError{
+									ExpectedArgumentLabel: argumentLabel,
+									StartPos:              argument.Expression.StartPosition(),
+									EndPos:                argument.Expression.EndPosition(),
+								},
+							)
+						} else if providedLabel != argumentLabel {
+							errs = append(errs,
+								&IncorrectArgumentLabelError{
+									ActualArgumentLabel:   providedLabel,
+									ExpectedArgumentLabel: argumentLabel,
+									StartPos:              argument.Expression.StartPosition(),
+									EndPos:                argument.Expression.EndPosition(),
+								},
+							)
+						}
 					}
 				}
 			}
 		}
 	}
 
-	return functionType.ReturnType
+	var returnType Type
+	if functionType != nil {
+		returnType = functionType.ReturnType
+	}
+
+	return checkerResult{
+		Type:   returnType,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
+	var errs []error
+
 	// TODO: infer
 	functionType := checker.functionType(expression.Parameters, expression.ReturnType)
-	checker.checkFunction(
+
+	err := checker.checkFunction(
 		expression.Parameters,
 		functionType,
 		expression.Block,
 	)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
 
-	return functionType
+	return checkerResult{
+		Type:   functionType,
+		Errors: errs,
+	}
 }
 
 // ConvertType converts an AST type representation to a sema type
@@ -928,16 +1229,20 @@ func (checker *Checker) declareFunction(
 	identifierPosition *ast.Position,
 	functionType *FunctionType,
 	argumentLabels []string,
-) {
+) *CheckerError {
+	var errs []error
+
 	// check if variable with this identifier is already declared in the current scope
 	variable := checker.findVariable(identifier)
 	depth := checker.valueActivations.Depth()
 	if variable != nil && variable.Depth == depth {
-		panic(&RedeclarationError{
-			Kind: common.DeclarationKindFunction,
-			Name: identifier,
-			Pos:  identifierPosition,
-		})
+		errs = append(errs,
+			&RedeclarationError{
+				Kind: common.DeclarationKindFunction,
+				Name: identifier,
+				Pos:  identifierPosition,
+			},
+		)
 	}
 
 	// variable with this identifier is not declared in current scope, declare it
@@ -948,6 +1253,8 @@ func (checker *Checker) declareFunction(
 		ArgumentLabels: argumentLabels,
 	}
 	checker.setVariable(identifier, variable)
+
+	return checkerError(errs)
 }
 
 func (checker *Checker) leaveFunction() {
@@ -982,21 +1289,33 @@ func (checker *Checker) visitConditional(
 	thenElement ast.Element,
 	elseElement ast.Element,
 ) (
-	thenType, elseType Type,
+	thenType, elseType Type, err *CheckerError,
 ) {
-	testType := test.Accept(checker).(Type)
+	var errs []error
+
+	testResult := test.Accept(checker).(checkerResult)
+	errs = append(errs, testResult.Errors...)
+
+	testType := testResult.Type
 
 	if !checker.IsSubType(testType, &BoolType{}) {
-		panic(&TypeMismatchError{
-			ExpectedType: &BoolType{},
-			ActualType:   testType,
-			StartPos:     test.StartPosition(),
-			EndPos:       test.EndPosition(),
-		})
+		errs = append(errs,
+			&TypeMismatchError{
+				ExpectedType: &BoolType{},
+				ActualType:   testType,
+				StartPos:     test.StartPosition(),
+				EndPos:       test.EndPosition(),
+			},
+		)
 	}
 
-	thenType, _ = thenElement.Accept(checker).(Type)
-	elseType, _ = elseElement.Accept(checker).(Type)
+	thenResult := thenElement.Accept(checker).(checkerResult)
+	errs = append(errs, thenResult.Errors...)
 
-	return
+	elseResult, ok := elseElement.Accept(checker).(checkerResult)
+	if ok {
+		errs = append(errs, elseResult.Errors...)
+	}
+
+	return thenResult.Type, elseResult.Type, checkerError(errs)
 }
