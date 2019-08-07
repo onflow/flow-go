@@ -1255,7 +1255,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		Access:     AccessNotSpecified,
+		Access:     AccessPublic,
 		Identifier: "test",
 		Parameters: []*Parameter{
 			{
