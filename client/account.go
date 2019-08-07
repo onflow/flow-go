@@ -84,6 +84,7 @@ func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 	}
 }
 
+// bytesToString converts a byte slice to a comma-separted list of uint8 integers.
 func bytesToString(b []byte) string {
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
