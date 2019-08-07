@@ -2299,3 +2299,24 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 	Expect(actual).
 		To(Equal(expected))
 }
+
+func TestParseStructure(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, errors := parser.Parse(`
+        struct Test {
+            pub(set) var foo: Int
+
+            init(foo: Int) {
+                self.foo = foo
+            }
+
+            fun getFoo(): Int {
+                return self.foo
+            }
+        }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+}

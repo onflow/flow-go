@@ -50,8 +50,21 @@ program
     ;
 
 declaration
-    : functionDeclaration
+    : structureDeclaration
+    | functionDeclaration
     | variableDeclaration
+    ;
+
+structureDeclaration
+    : Struct Identifier '{' field* initializer? functionDeclaration* '}'
+    ;
+
+field
+    : (Pub | PubSet)? (Let | Var) Identifier ':' fullType
+    ;
+
+initializer
+    : 'init' parameterList block
     ;
 
 functionDeclaration
@@ -283,9 +296,12 @@ arrayLiteral
 OpenParen: '(' ;
 CloseParen: ')' ;
 
+Struct : 'struct' ;
+
 Fun : 'fun' ;
 
 Pub : 'pub' ;
+PubSet : 'pub(set)' ;
 
 Return : 'return' ;
 
