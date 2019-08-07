@@ -37,8 +37,9 @@ generate-godoc:
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/routing > internal/roles/collect/routing/README.md
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/collections > internal/roles/collect/collections/README.md
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/controller > internal/roles/collect/controller/README.md
-	godoc2md github.com/dapperlabs/bamboo-node/pkg/data/keyvalue > pkg/data/keyvalue/README.md
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/verify/processor > internal/roles/verify/processor/README.md
+	godoc2md github.com/dapperlabs/bamboo-node/pkg/data/keyvalue > pkg/data/keyvalue/README.md
+	godoc2md github.com/dapperlabs/bamboo-node/sdk > sdk/README.md
 
 .PHONY: generate-proto
 generate-proto:
