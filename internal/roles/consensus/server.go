@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/consensus"
+	consensusSvc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/consensus"
 	"github.com/dapperlabs/bamboo-node/internal/roles/consensus/config"
 )
 
@@ -22,7 +22,7 @@ func NewServer(
 ) (*Server, error) {
 	gsrv := grpc.NewServer()
 
-	svc.RegisterConsensusServiceServer(gsrv, ctrl)
+	consensusSvc.RegisterConsensusServiceServer(gsrv, ctrl)
 
 	return &Server{
 		gsrv: gsrv,

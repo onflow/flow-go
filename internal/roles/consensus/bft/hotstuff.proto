@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package bamboo.services.collect;
+
+option go_package = "consensus";
+
+
+message BlockProposal {
+    uint32 ProposerID = 1; // potentially redundant with ViewNumber
+    uint64 Height = 2;
+    uint32 ViewNumber = 3; // potentially redundant with  ProposerID
+    bytes PreviousBlockHash = 4;
+    repeated bytes Collections = 5;
+}
+
+message IndividualSignature {
+    bytes SignatureBytes = 1;
+    bytes SignerIndex = 2;
+    uint32 round = 3;
+}
+
+message AggregatedSignature {
+    bytes SignatureBytes = 1;
+    bytes Signers = 2;
+}
+
+message QuorumCertificate {
+    AggregatedSignature AggregatedSignature = 1;
+    uint32 round = 3;
+}
+
+message Collections {
+    bytes Hash = 1;
+    bytes Signatures = 2;
+}
+
+message NextView {
+    QuorumCertificate QuorumCertificate = 1;
+}
+
