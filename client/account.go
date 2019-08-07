@@ -46,6 +46,7 @@ func LoadAccount(r io.Reader) (*types.AccountKey, error) {
 	}, nil
 }
 
+// CreateAccount generates a transaction that creates a new account.
 func CreateAccount(publicKey, code []byte) *types.RawTransaction {
 	publicKeyStr := bytesToString(publicKey)
 	codeStr := bytesToString(code)
@@ -64,6 +65,7 @@ func CreateAccount(publicKey, code []byte) *types.RawTransaction {
 	}
 }
 
+// bytesToString converts a byte slice to a comma-separted list of uint8 integers.
 func bytesToString(b []byte) string {
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }

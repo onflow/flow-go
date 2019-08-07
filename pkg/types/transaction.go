@@ -59,15 +59,15 @@ func (tx *RawTransaction) SetComputeLimit(computeLimit uint64) {
 // SignPayer signs the transaction with the given account and keypair.
 //
 // The function returns a new SignedTransaction that includes the generated signature.
-func (tx *RawTransaction) SignPayer(key *AccountKey) *SignedTransaction {
+func (tx *RawTransaction) SignPayer(account Address, keyPair *crypto.KeyPair) *SignedTransaction {
 	hash := tx.Hash()
 
 	// TODO: include account in signature
-	sig := crypto.Sign(hash, key.KeyPair)
+	sig := crypto.Sign(hash, keyPair)
 
 	accountSig := AccountSignature{
-		Account:   key.Account,
-		PublicKey: key.KeyPair.PublicKey,
+		Account:   account,
+		PublicKey: keyPair.PublicKey,
 		Signature: sig.Bytes(),
 	}
 
