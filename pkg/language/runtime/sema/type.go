@@ -362,10 +362,10 @@ func init() {
 
 type StructureType struct {
 	Identifier string
-	Components map[string]*StructureComponent
+	Members    map[string]*Member
 }
 
-type StructureComponent struct {
+type Member struct {
 	Type Type
 }
 

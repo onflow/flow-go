@@ -429,15 +429,15 @@ func (e *ControlStatementError) EndPosition() *ast.Position {
 	return e.EndPos
 }
 
-// InvalidAccessError
+// InvalidAccessModifierError
 
-type InvalidAccessError struct {
+type InvalidAccessModifierError struct {
 	DeclarationKind common.DeclarationKind
 	Access          ast.Access
 	Pos             *ast.Position
 }
 
-func (e *InvalidAccessError) Error() string {
+func (e *InvalidAccessModifierError) Error() string {
 	return fmt.Sprintf(
 		"invalid access modifier for %s: %s",
 		e.DeclarationKind.Name(),
@@ -445,13 +445,13 @@ func (e *InvalidAccessError) Error() string {
 	)
 }
 
-func (*InvalidAccessError) isSemanticError() {}
+func (*InvalidAccessModifierError) isSemanticError() {}
 
-func (e *InvalidAccessError) StartPosition() *ast.Position {
+func (e *InvalidAccessModifierError) StartPosition() *ast.Position {
 	return e.Pos
 }
 
-func (e *InvalidAccessError) EndPosition() *ast.Position {
+func (e *InvalidAccessModifierError) EndPosition() *ast.Position {
 	return e.Pos
 }
 
@@ -542,4 +542,31 @@ func (e *MissingInitializerError) StartPosition() *ast.Position {
 
 func (e *MissingInitializerError) EndPosition() *ast.Position {
 	return e.FirstFieldEndPos
+}
+
+// NotDeclaredMemberError
+
+type NotDeclaredMemberError struct {
+	Name     string
+	Type     Type
+	StartPos *ast.Position
+	EndPos   *ast.Position
+}
+
+func (e *NotDeclaredMemberError) Error() string {
+	return fmt.Sprintf("value of type `%s` has no member `%s`", e.Type.String(), e.Name)
+}
+
+func (e *NotDeclaredMemberError) SecondaryError() string {
+	return "unknown member"
+}
+
+func (*NotDeclaredMemberError) isSemanticError() {}
+
+func (e *NotDeclaredMemberError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *NotDeclaredMemberError) EndPosition() *ast.Position {
+	return e.EndPos
 }

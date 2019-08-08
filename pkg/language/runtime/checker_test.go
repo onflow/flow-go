@@ -1239,7 +1239,7 @@ func TestCheckInvalidFunctionAccess(t *testing.T) {
 	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidAccessError{}))
+		To(BeAssignableToTypeOf(&sema.InvalidAccessModifierError{}))
 }
 
 func TestCheckInvalidStructureRedeclaringType(t *testing.T) {
@@ -1255,7 +1255,6 @@ func TestCheckInvalidStructureRedeclaringType(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
-// TODO:
 func TestCheckStructure(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1264,11 +1263,11 @@ func TestCheckStructure(t *testing.T) {
             pub(set) var foo: Int
 
             init(foo: Int) {
-                // self.foo = foo
+                self.foo = foo
             }
 
             pub fun getFoo(): Int {
-                // return self.foo
+                return self.foo
             }
         }
 	`)
@@ -1517,9 +1516,9 @@ func TestCheckInvalidLocalStructure(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-	   fun test() {
-           struct Test {}
-       }
+	  fun test() {
+          struct Test {}
+      }
 	`)
 
 	errs := expectCheckerErrors(err, 1)
@@ -1532,13 +1531,64 @@ func TestCheckInvalidStructureMissingInitializer(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-        struct Test {
-            let foo: Int
-        }
+      struct Test {
+          let foo: Int
+      }
 	`)
 
 	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+}
+
+func TestCheckStructureSelfFieldAccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+          let foo: Int
+
+          init() {
+              self.foo
+          }
+
+          fun test() {
+              self.foo
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStructureSelfFieldAccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+          let foo: Int
+
+          init() {
+              self.bar
+          }
+
+          fun test() {
+              self.baz
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+	Expect(errs[0].(*sema.NotDeclaredMemberError).Name).
+		To(Equal("bar"))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+	Expect(errs[1].(*sema.NotDeclaredMemberError).Name).
+		To(Equal("baz"))
 }

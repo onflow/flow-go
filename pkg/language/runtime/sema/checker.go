@@ -188,7 +188,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 		break
 	default:
 		errs = append(errs,
-			&InvalidAccessError{
+			&InvalidAccessModifierError{
 				DeclarationKind: common.DeclarationKindFunction,
 				Access:          declaration.Access,
 				Pos:             declaration.StartPos,
@@ -630,8 +630,7 @@ func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentState
 		return checker.visitIndexExpressionAssignment(assignment, target, valueType)
 
 	case *ast.MemberExpression:
-		// TODO: no structures yet
-		panic(&errors.UnreachableError{})
+		return checker.visitMemberExpressionAssignment(assignment, target, valueType)
 
 	default:
 		panic(&unsupportedAssignmentTargetExpression{
@@ -712,6 +711,18 @@ func (checker *Checker) visitIndexExpressionAssignment(
 			},
 		)
 	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) visitMemberExpressionAssignment(
+	assignment *ast.AssignmentStatement,
+	target *ast.MemberExpression,
+	valueType Type,
+) *CheckerError {
+	var errs []error
+
+	// TODO:
 
 	return checkerError(errs)
 }
@@ -1080,9 +1091,38 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 	}
 }
 
-func (checker *Checker) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO: no structures yet
-	panic(&errors.UnreachableError{})
+func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
+	var errs []error
+
+	result := expression.Expression.Accept(checker).(checkerResult)
+	errs = append(errs, result.Errors...)
+
+	identifier := expression.Identifier
+
+	var member *Member
+	var memberType Type = &AnyType{}
+	structureType, ok := result.Type.(*StructureType)
+	if ok {
+		member, ok = structureType.Members[identifier]
+	}
+
+	if !ok {
+		errs = append(errs,
+			&NotDeclaredMemberError{
+				Type:     result.Type,
+				Name:     identifier,
+				StartPos: expression.StartPos,
+				EndPos:   expression.EndPos,
+			},
+		)
+	} else if member != nil {
+		memberType = member.Type
+	}
+
+	return checkerResult{
+		Type:   memberType,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
@@ -1496,12 +1536,14 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		errs = append(errs, err.Errors...)
 	}
 
-	// TODO: self type
-	selfType := &StructureType{}
+	structureType, err := checker.structureType(structure)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
 
 	initializer := structure.Initializer
 	if initializer != nil {
-		if err := checker.checkStructureInitializer(initializer, selfType); err != nil {
+		if err := checker.checkStructureInitializer(initializer, structureType); err != nil {
 			errs = append(errs, err.Errors...)
 		}
 	} else if len(structure.Fields) > 0 {
@@ -1511,7 +1553,7 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		)
 	}
 
-	if err := checker.checkStructureFunctions(structure.Functions, selfType); err != nil {
+	if err := checker.checkStructureFunctions(structure.Functions, structureType); err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
@@ -1519,6 +1561,48 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		Type:   nil,
 		Errors: errs,
 	}
+}
+
+func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*StructureType, *CheckerError) {
+	var errs []error
+
+	fieldCount := len(structure.Fields)
+	functionCount := len(structure.Functions)
+
+	members := make(map[string]*Member, fieldCount+functionCount)
+
+	// declare a member for each field
+	for _, field := range structure.Fields {
+		fieldType, err := checker.ConvertType(field.Type)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
+		}
+
+		// NOTE: still declare member
+		members[field.Identifier] = &Member{
+			Type: fieldType,
+		}
+	}
+
+	// declare a member for each function
+	for _, function := range structure.Functions {
+		functionType, err := checker.functionType(function.Parameters, function.ReturnType)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
+		}
+
+		// NOTE: still declare member
+		members[function.Identifier] = &Member{
+			Type: functionType,
+		}
+	}
+
+	return &StructureType{
+		Identifier: structure.Identifier,
+		Members:    members,
+	}, checkerError(errs)
 }
 
 func (checker *Checker) checkStructureFields(fields []*ast.FieldDeclaration) *CheckerError {
@@ -1671,15 +1755,12 @@ func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclara
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
-	var errs []error
 
-	if _, err := checker.ConvertType(field.Type); err != nil {
-		errs = append(errs, err.Errors...)
-	}
+	// NOTE: field type is already checked when determining structure function in `structureType`
 
 	return checkerResult{
 		Type:   nil,
-		Errors: errs,
+		Errors: nil,
 	}
 }
 
