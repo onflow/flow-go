@@ -31,6 +31,10 @@ func (e CheckerError) Error() string {
 	sb.WriteString("Checking failed:\n")
 	for _, err := range e.Errors {
 		sb.WriteString(err.Error())
+		if err, ok := err.(errors.SecondaryError); ok {
+			sb.WriteString(". ")
+			sb.WriteString(err.SecondaryError())
+		}
 		sb.WriteString("\n")
 	}
 	return sb.String()
