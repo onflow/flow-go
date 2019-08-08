@@ -635,7 +635,7 @@ func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentState
 		return checker.visitIdentifierExpressionAssignment(assignment, target, valueType)
 
 	case *ast.IndexExpression:
-		return checker.checkIndexExpressionAssignment(target, valueType, assignment)
+		return checker.visitIndexExpressionAssignment(assignment, target, valueType)
 
 	case *ast.MemberExpression:
 		// TODO: no structures yet
@@ -698,10 +698,10 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	return checkerError(errs)
 }
 
-func (checker *Checker) checkIndexExpressionAssignment(
+func (checker *Checker) visitIndexExpressionAssignment(
+	assignment *ast.AssignmentStatement,
 	target *ast.IndexExpression,
 	valueType Type,
-	assignment *ast.AssignmentStatement,
 ) *CheckerError {
 	var errs []error
 
