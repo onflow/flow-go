@@ -168,8 +168,7 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 		result := declaration.Accept(checker).(checkerResult)
 		errs = append(errs, result.Errors...)
 
-		err := checker.declareGlobal(declaration)
-		if err != nil {
+		if err := checker.declareGlobal(declaration); err != nil {
 			// NOTE: append, don't return
 			errs = append(errs, err.Errors...)
 		}
@@ -218,13 +217,12 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	// declare the function before checking it,
 	// so it can be referred to inside the function
 
-	err = checker.declareFunction(
+	if err := checker.declareFunction(
 		declaration.Identifier,
 		declaration.IdentifierPos,
 		functionType,
 		argumentLabels,
-	)
-	if err != nil {
+	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -232,12 +230,11 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	// check the function after declaring,
 	// so it can be referred to inside the function
 
-	err = checker.checkFunction(
+	if err := checker.checkFunction(
 		declaration.Parameters,
 		functionType,
 		declaration.Block,
-	)
-	if err != nil {
+	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -259,14 +256,12 @@ func (checker *Checker) checkFunction(
 	defer checker.popActivations()
 
 	// check argument labels
-	err := checker.checkArgumentLabels(parameters)
-	if err != nil {
+	if err := checker.checkArgumentLabels(parameters); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
-	err = checker.declareParameters(parameters, functionType.ParameterTypes)
-	if err != nil {
+	if err := checker.declareParameters(parameters, functionType.ParameterTypes); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -382,8 +377,7 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		}
 	}
 
-	err := checker.declareVariable(declaration, declarationType)
-	if err != nil {
+	if err := checker.declareVariable(declaration, declarationType); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -564,8 +558,7 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 		elseElement = statement.Else
 	}
 
-	_, _, err := checker.visitConditional(statement.Test, statement.Then, elseElement)
-	if err != nil {
+	if _, _, err := checker.visitConditional(statement.Test, statement.Then, elseElement); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -617,8 +610,7 @@ func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast
 	errs = append(errs, valueResult.Errors...)
 	valueType := valueResult.Type
 
-	err := checker.visitAssignmentValueType(assignment, valueType)
-	if err != nil {
+	if err := checker.visitAssignmentValueType(assignment, valueType); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -1276,12 +1268,11 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 		errs = append(errs, err.Errors...)
 	}
 
-	err = checker.checkFunction(
+	if err := checker.checkFunction(
 		expression.Parameters,
 		functionType,
 		expression.Block,
-	)
-	if err != nil {
+	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -1682,8 +1673,7 @@ func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclara
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
 	var errs []error
 
-	_, err := checker.ConvertType(field.Type)
-	if err != nil {
+	if _, err := checker.ConvertType(field.Type); err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
@@ -1713,12 +1703,11 @@ func (checker *Checker) VisitInitializerDeclaration(initializer *ast.Initializer
 		errs = append(errs, err.Errors...)
 	}
 
-	err = checker.checkFunction(
+	if err := checker.checkFunction(
 		initializer.Parameters,
 		functionType,
 		initializer.Block,
-	)
-	if err != nil {
+	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
