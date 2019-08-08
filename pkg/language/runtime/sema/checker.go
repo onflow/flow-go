@@ -9,6 +9,7 @@ import (
 )
 
 const ArgumentLabelNotRequired = "_"
+const InitializerIdentifier = "init"
 
 type functionContext struct {
 	returnType Type
@@ -1446,12 +1447,87 @@ func (checker *Checker) visitConditional(
 }
 
 func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
-	// TODO:
+	var errs []error
+
+	err := checker.checkStructureIdentifier(structure)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	err = checker.checkStructureFieldAndFunctionIdentifiers(structure)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	initializer := structure.Initializer
+	if initializer != nil {
+		result := initializer.Accept(checker).(checkerResult)
+		errs = append(errs, result.Errors...)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
+}
+
+// checkStructureFieldAndFunctionIdentifiers checks the structure's fields and functions
+// are unique and aren't named `init`
+//
+func (checker *Checker) checkStructureFieldAndFunctionIdentifiers(structure *ast.StructureDeclaration) *CheckerError {
+	var errs []error
+
+	positions := map[string]*ast.Position{}
+
+	checkName := func(name string, pos *ast.Position, kind common.DeclarationKind) {
+		if name == InitializerIdentifier {
+			errs = append(errs,
+				&InvalidNameError{
+					Name: name,
+					Pos:  structure.IdentifierPos,
+				},
+			)
+		}
+
+		if previousPos, ok := positions[name]; ok {
+			errs = append(errs,
+				&RedeclarationError{
+					Name:        name,
+					Pos:         pos,
+					Kind:        kind,
+					PreviousPos: previousPos,
+				},
+			)
+		} else {
+			positions[name] = pos
+		}
+	}
+
+	for _, field := range structure.Fields {
+		checkName(
+			field.Identifier,
+			field.IdentifierPos,
+			common.DeclarationKindField,
+		)
+	}
+
+	for _, function := range structure.Functions {
+		checkName(
+			function.Identifier,
+			function.IdentifierPos,
+			common.DeclarationKindFunction,
+		)
+	}
+
+	return checkerError(errs)
+}
+
+// checkStructureIdentifier checks a type with the structure's name is not already defined
+//
+func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclaration) *CheckerError {
 	var errs []error
 
 	identifier := structure.Identifier
-
-	// check type is not already defined
 
 	existingType := checker.findType(identifier)
 	if existingType != nil {
@@ -1464,10 +1540,7 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		)
 	}
 
-	return checkerResult{
-		Type:   nil,
-		Errors: errs,
-	}
+	return checkerError(errs)
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
@@ -1476,6 +1549,21 @@ func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.R
 }
 
 func (checker *Checker) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
-	// TODO:
-	return nil
+	var errs []error
+
+	// check the initializer is named properly
+	identifier := initializer.Identifier
+	if identifier != InitializerIdentifier {
+		errs = append(errs,
+			&InvalidInitializerNameError{
+				Name: identifier,
+				Pos:  initializer.StartPos,
+			},
+		)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }

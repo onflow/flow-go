@@ -450,3 +450,45 @@ func (e *InvalidAccessError) StartPosition() *ast.Position {
 func (e *InvalidAccessError) EndPosition() *ast.Position {
 	return e.Pos
 }
+
+// InvalidNameError
+
+type InvalidNameError struct {
+	Name string
+	Pos  *ast.Position
+}
+
+func (e *InvalidNameError) Error() string {
+	return fmt.Sprintf("invalid name: %s", e.Name)
+}
+
+func (e *InvalidNameError) StartPosition() *ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidNameError) EndPosition() *ast.Position {
+	return e.Pos
+}
+
+// InvalidInitializerNameError
+
+type InvalidInitializerNameError struct {
+	Name string
+	Pos  *ast.Position
+}
+
+func (e *InvalidInitializerNameError) Error() string {
+	return fmt.Sprintf("invalid initializer name: %s", e.Name)
+}
+
+func (e *InvalidInitializerNameError) SecondaryError() string {
+	return fmt.Sprintf("initializer must be named `%s`", InitializerIdentifier)
+}
+
+func (e *InvalidInitializerNameError) StartPosition() *ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidInitializerNameError) EndPosition() *ast.Position {
+	return e.Pos
+}
