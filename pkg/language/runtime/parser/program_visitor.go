@@ -457,7 +457,9 @@ func (v *ProgramVisitor) VisitOrExpression(ctx *OrExpressionContext) interface{}
 	}
 
 	leftExpression := leftContext.Accept(v).(ast.Expression)
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
+	startPosition := leftExpression.StartPosition()
+	endPosition := rightExpression.EndPosition()
 
 	return &ast.BinaryExpression{
 		Operation: ast.OperationOr,
@@ -481,7 +483,9 @@ func (v *ProgramVisitor) VisitAndExpression(ctx *AndExpressionContext) interface
 	}
 
 	leftExpression := leftContext.Accept(v).(ast.Expression)
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
+	startPosition := leftExpression.StartPosition()
+	endPosition := rightExpression.EndPosition()
 
 	return &ast.BinaryExpression{
 		Operation: ast.OperationAnd,
@@ -506,7 +510,9 @@ func (v *ProgramVisitor) VisitEqualityExpression(ctx *EqualityExpressionContext)
 
 	leftExpression := leftContext.Accept(v).(ast.Expression)
 	operation := ctx.EqualityOp().Accept(v).(ast.Operation)
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
+	startPosition := leftExpression.StartPosition()
+	endPosition := rightExpression.EndPosition()
 
 	return &ast.BinaryExpression{
 		Operation: operation,
@@ -531,7 +537,9 @@ func (v *ProgramVisitor) VisitRelationalExpression(ctx *RelationalExpressionCont
 
 	leftExpression := leftContext.Accept(v).(ast.Expression)
 	operation := ctx.RelationalOp().Accept(v).(ast.Operation)
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
+	startPosition := leftExpression.StartPosition()
+	endPosition := rightExpression.EndPosition()
 
 	return &ast.BinaryExpression{
 		Operation: operation,
@@ -556,7 +564,9 @@ func (v *ProgramVisitor) VisitAdditiveExpression(ctx *AdditiveExpressionContext)
 
 	leftExpression := leftContext.Accept(v).(ast.Expression)
 	operation := ctx.AdditiveOp().Accept(v).(ast.Operation)
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
+	startPosition := leftExpression.StartPosition()
+	endPosition := rightExpression.EndPosition()
 
 	return &ast.BinaryExpression{
 		Operation: operation,
@@ -581,7 +591,9 @@ func (v *ProgramVisitor) VisitMultiplicativeExpression(ctx *MultiplicativeExpres
 
 	leftExpression := leftContext.Accept(v).(ast.Expression)
 	operation := ctx.MultiplicativeOp().Accept(v).(ast.Operation)
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
+	startPosition := leftExpression.StartPosition()
+	endPosition := rightExpression.EndPosition()
 
 	return &ast.BinaryExpression{
 		Operation: operation,
