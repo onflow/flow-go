@@ -820,7 +820,7 @@ func TestInterpretFunctionBindingInFunction(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
-func TestInterpretRecursion(t *testing.T) {
+func TestInterpretRecursionFib(t *testing.T) {
 	// mainly tests that the function declaration identifier is bound
 	// to the function inside the function and that the arguments
 	// of the function calls are evaluated in the call-site scope
@@ -838,6 +838,23 @@ func TestInterpretRecursion(t *testing.T) {
 
 	Expect(inter.Invoke("fib", big.NewInt(14))).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(377)}))
+}
+
+func TestInterpretRecursionFactorial(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        fun factorial(_ n: Int): Int {
+            if n < 1 {
+               return 1
+            }
+
+            return n * factorial(n - 1)
+        }
+   `)
+
+	Expect(inter.Invoke("factorial", big.NewInt(5))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(120)}))
 }
 
 func TestInterpretUnaryIntegerNegation(t *testing.T) {

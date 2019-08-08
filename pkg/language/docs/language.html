@@ -1359,15 +1359,11 @@
 </span><span style="color: #000000">            </span><span style="color: #A31515">"the result must be greater than or equal to 1"</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> i = n</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> result = </span><span style="color: #09885A">1</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">while</span><span style="color: #000000"> i > </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">        result = result * i</span><span>
-</span><span style="color: #000000">        i = i - </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> n &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">       </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> result</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> n * factorial(n - </span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #000000">factorial(</span><span style="color: #09885A">5</span><span style="color: #000000">) </span><span style="color: #008000">// returns 120</span><span>
@@ -1456,6 +1452,30 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// `a` is 5</span><span>
+</span></code></pre>
+          <p>The <code>continue</code> statement can be used to stop the current iteration of the loop and start the next iteration.</p>
+          <pre><code class="language-bamboo,file=control-flow-continue.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> i = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> x = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">while</span><span style="color: #000000"> i &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    i = i + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> i &#x3C; </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        continue</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    x = x + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `x` is 6</span><span>
+</span></code></pre>
+          <p>The <code>break</code> statement can be used to stop the loop.</p>
+          <pre><code class="language-bamboo,file=control-flow-break.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> x = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">while</span><span style="color: #000000"> x &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    x = x + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> x == </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        break</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `x` is 5</span><span>
 </span></code></pre>
         </section>
         <section>
