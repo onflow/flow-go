@@ -71,7 +71,7 @@ type RedeclarationError struct {
 }
 
 func (e *RedeclarationError) Error() string {
-	return fmt.Sprintf("cannot redeclare already declared %s: %s", e.Kind.Name(), e.Name)
+	return fmt.Sprintf("cannot redeclare %s: `%s` is already declared", e.Kind.Name(), e.Name)
 }
 
 func (*RedeclarationError) isSemanticError() {}
