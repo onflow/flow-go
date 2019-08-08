@@ -357,3 +357,29 @@ func init() {
 		baseTypes = baseTypes.Insert(activations.StringKey(name), baseType)
 	}
 }
+
+// StructureType
+
+type StructureType struct {
+	Identifier string
+	Components map[string]*StructureComponent
+}
+
+type StructureComponent struct {
+	Type Type
+}
+
+func (*StructureType) isType() {}
+
+func (t *StructureType) String() string {
+	return t.Identifier
+}
+
+func (t *StructureType) Equal(other Type) bool {
+	otherStructure, ok := other.(*StructureType)
+	if !ok {
+		return false
+	}
+
+	return otherStructure.Identifier == t.Identifier
+}
