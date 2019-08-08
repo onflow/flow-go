@@ -1474,6 +1474,11 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		errs = append(errs, result.Errors...)
 	}
 
+	for _, function := range structure.Functions {
+		result := function.Accept(checker).(checkerResult)
+		errs = append(errs, result.Errors...)
+	}
+
 	return checkerResult{
 		Type:   nil,
 		Errors: errs,
