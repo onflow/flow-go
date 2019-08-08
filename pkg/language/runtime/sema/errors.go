@@ -51,6 +51,14 @@ func (e *unsupportedOperation) EndPosition() *ast.Position {
 	return e.endPos
 }
 
+// SemanticError
+
+type SemanticError interface {
+	error
+	ast.HasPosition
+	isSemanticError()
+}
+
 // RedeclarationError
 
 // TODO: show previous declaration
@@ -65,6 +73,8 @@ type RedeclarationError struct {
 func (e *RedeclarationError) Error() string {
 	return fmt.Sprintf("cannot redeclare already declared %s: %s", e.Kind.Name(), e.Name)
 }
+
+func (*RedeclarationError) isSemanticError() {}
 
 func (e *RedeclarationError) StartPosition() *ast.Position {
 	return e.Pos
@@ -86,6 +96,8 @@ type NotDeclaredError struct {
 func (e *NotDeclaredError) Error() string {
 	return fmt.Sprintf("cannot find %s in this scope: %s", e.ExpectedKind.Name(), e.Name)
 }
+
+func (*NotDeclaredError) isSemanticError() {}
 
 func (e *NotDeclaredError) SecondaryError() string {
 	return "not found in this scope"
@@ -111,6 +123,8 @@ func (e *AssignmentToConstantError) Error() string {
 	return fmt.Sprintf("cannot assign to constant: %s", e.Name)
 }
 
+func (*AssignmentToConstantError) isSemanticError() {}
+
 func (e *AssignmentToConstantError) StartPosition() *ast.Position {
 	return e.StartPos
 }
@@ -131,6 +145,8 @@ type TypeMismatchError struct {
 func (e *TypeMismatchError) Error() string {
 	return "mismatched types"
 }
+
+func (*TypeMismatchError) isSemanticError() {}
 
 func (e *TypeMismatchError) SecondaryError() string {
 	return fmt.Sprintf(
@@ -160,6 +176,8 @@ func (e *NotIndexableTypeError) Error() string {
 	return fmt.Sprintf("cannot index into value which has type: %s", e.Type.String())
 }
 
+func (*NotIndexableTypeError) isSemanticError() {}
+
 func (e *NotIndexableTypeError) StartPosition() *ast.Position {
 	return e.StartPos
 }
@@ -180,6 +198,8 @@ func (e *NotIndexingTypeError) Error() string {
 	return fmt.Sprintf("cannot index with value which has type: %s", e.Type.String())
 }
 
+func (*NotIndexingTypeError) isSemanticError() {}
+
 func (e *NotIndexingTypeError) StartPosition() *ast.Position {
 	return e.StartPos
 }
@@ -199,6 +219,8 @@ type NotCallableError struct {
 func (e *NotCallableError) Error() string {
 	return fmt.Sprintf("cannot call type: %s", e.Type.String())
 }
+
+func (*NotCallableError) isSemanticError() {}
 
 func (e *NotCallableError) StartPosition() *ast.Position {
 	return e.StartPos
@@ -225,6 +247,8 @@ func (e *ArgumentCountError) Error() string {
 	)
 }
 
+func (*ArgumentCountError) isSemanticError() {}
+
 func (e *ArgumentCountError) StartPosition() *ast.Position {
 	return e.StartPos
 }
@@ -249,6 +273,8 @@ func (e *MissingArgumentLabelError) Error() string {
 		e.ExpectedArgumentLabel,
 	)
 }
+
+func (*MissingArgumentLabelError) isSemanticError() {}
 
 func (e *MissingArgumentLabelError) StartPosition() *ast.Position {
 	return e.StartPos
@@ -279,6 +305,8 @@ func (e *IncorrectArgumentLabelError) Error() string {
 	)
 }
 
+func (*IncorrectArgumentLabelError) isSemanticError() {}
+
 func (e *IncorrectArgumentLabelError) StartPosition() *ast.Position {
 	return e.StartPos
 }
@@ -305,6 +333,8 @@ func (e *InvalidUnaryOperandError) Error() string {
 		e.ActualType.String(),
 	)
 }
+
+func (*InvalidUnaryOperandError) isSemanticError() {}
 
 func (e *InvalidUnaryOperandError) StartPosition() *ast.Position {
 	return e.StartPos
@@ -335,6 +365,8 @@ func (e *InvalidBinaryOperandError) Error() string {
 	)
 }
 
+func (*InvalidBinaryOperandError) isSemanticError() {}
+
 func (e *InvalidBinaryOperandError) StartPosition() *ast.Position {
 	return e.StartPos
 }
@@ -361,6 +393,8 @@ func (e *InvalidBinaryOperandsError) Error() string {
 		e.RightType.String(),
 	)
 }
+
+func (*InvalidBinaryOperandsError) isSemanticError() {}
 
 func (e *InvalidBinaryOperandsError) StartPosition() *ast.Position {
 	return e.StartPos
