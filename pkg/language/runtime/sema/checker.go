@@ -635,24 +635,7 @@ func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentState
 		return checker.visitIdentifierExpressionAssignment(assignment, target, valueType)
 
 	case *ast.IndexExpression:
-		var errs []error
-
-		elementResult := checker.visitIndexingExpression(target.Expression, target.Index)
-		errs = append(errs, elementResult.Errors...)
-		elementType := elementResult.Type
-
-		if elementType != nil && !checker.IsSubType(valueType, elementType) {
-			errs = append(errs,
-				&TypeMismatchError{
-					ExpectedType: elementType,
-					ActualType:   valueType,
-					StartPos:     assignment.Value.StartPosition(),
-					EndPos:       assignment.Value.EndPosition(),
-				},
-			)
-		}
-
-		return checkerError(errs)
+		return checker.checkIndexExpressionAssignment(target, valueType, assignment)
 
 	case *ast.MemberExpression:
 		// TODO: no structures yet
@@ -710,6 +693,32 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 				},
 			)
 		}
+	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) checkIndexExpressionAssignment(
+	target *ast.IndexExpression,
+	valueType Type,
+	assignment *ast.AssignmentStatement,
+) *CheckerError {
+	var errs []error
+
+	elementResult := checker.visitIndexingExpression(target.Expression, target.Index)
+	errs = append(errs, elementResult.Errors...)
+
+	elementType := elementResult.Type
+
+	if elementType != nil && !checker.IsSubType(valueType, elementType) {
+		errs = append(errs,
+			&TypeMismatchError{
+				ExpectedType: elementType,
+				ActualType:   valueType,
+				StartPos:     assignment.Value.StartPosition(),
+				EndPos:       assignment.Value.EndPosition(),
+			},
+		)
 	}
 
 	return checkerError(errs)
