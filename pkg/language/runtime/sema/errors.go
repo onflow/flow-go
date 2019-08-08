@@ -419,6 +419,8 @@ func (e *ControlStatementError) Error() string {
 	)
 }
 
+func (*ControlStatementError) isSemanticError() {}
+
 func (e *ControlStatementError) StartPosition() *ast.Position {
 	return e.StartPos
 }
@@ -443,6 +445,8 @@ func (e *InvalidAccessError) Error() string {
 	)
 }
 
+func (*InvalidAccessError) isSemanticError() {}
+
 func (e *InvalidAccessError) StartPosition() *ast.Position {
 	return e.Pos
 }
@@ -462,6 +466,8 @@ func (e *InvalidNameError) Error() string {
 	return fmt.Sprintf("invalid name: %s", e.Name)
 }
 
+func (*InvalidNameError) isSemanticError() {}
+
 func (e *InvalidNameError) StartPosition() *ast.Position {
 	return e.Pos
 }
@@ -480,6 +486,8 @@ type InvalidInitializerNameError struct {
 func (e *InvalidInitializerNameError) Error() string {
 	return fmt.Sprintf("invalid initializer name: %s", e.Name)
 }
+
+func (*InvalidInitializerNameError) isSemanticError() {}
 
 func (e *InvalidInitializerNameError) SecondaryError() string {
 	return fmt.Sprintf("initializer must be named `%s`", InitializerIdentifier)
