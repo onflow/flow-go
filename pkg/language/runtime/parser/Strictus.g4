@@ -69,8 +69,11 @@ field
     : access (Let | Var) Identifier ':' fullType
     ;
 
+// NOTE: allow any identifier in parser, then check identifier
+// is `init` in semantic analysis to provide better error
+//
 initializer
-    : 'init' parameterList block
+    : Identifier parameterList block
     ;
 
 functionDeclaration

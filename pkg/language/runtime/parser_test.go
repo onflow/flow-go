@@ -2337,6 +2337,7 @@ func TestParseStructure(t *testing.T) {
 			},
 		},
 		Initializer: &InitializerDeclaration{
+			Identifier: "init",
 			Parameters: []*Parameter{
 				{
 					Label:      "",
