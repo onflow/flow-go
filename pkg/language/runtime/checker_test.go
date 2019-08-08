@@ -1476,9 +1476,9 @@ func TestCheckStructureInitializerSelfReference(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-     struct Test {
-         init() { self }
-     }
+      struct Test {
+          init() { self }
+      }
 	`)
 
 	Expect(err).
@@ -1489,9 +1489,9 @@ func TestCheckStructureFunctionSelfReference(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-     struct Test {
-         fun test() { self }
-     }
+      struct Test {
+          fun test() { self }
+      }
 	`)
 
 	Expect(err).
