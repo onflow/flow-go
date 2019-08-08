@@ -1649,15 +1649,15 @@ func TestCheckInvalidStructureFieldAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-     struct Test {
-         init() {
-             self.foo = 1
-         }
+      struct Test {
+          init() {
+              self.foo = 1
+          }
 
-         fun test() {
-             self.bar = 2
-         }
-     }
+          fun test() {
+              self.bar = 2
+          }
+      }
 	`)
 
 	errs := expectCheckerErrors(err, 2)
@@ -1703,18 +1703,18 @@ func TestCheckInvalidStructureFieldConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-    struct Test {
-        let foo: Int
-        let bar: Int
+      struct Test {
+          let foo: Int
+          let bar: Int
 
-        init() {
-            self.foo = 1
-        }
+          init() {
+              self.foo = 1
+          }
 
-        fun test() {
-            self.bar = 2
-        }
-    }
+          fun test() {
+              self.bar = 2
+          }
+      }
 	`)
 
 	errs := expectCheckerErrors(err, 2)
@@ -1734,13 +1734,13 @@ func TestCheckStructureFunctionCall(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-    struct Test {
-        fun foo() {}
+      struct Test {
+          fun foo() {}
 
-        fun bar() {
-            self.foo()
-        }
-    }
+          fun bar() {
+              self.foo()
+          }
+      }
 	`)
 
 	Expect(err).
@@ -1751,13 +1751,13 @@ func TestCheckInvalidStructureFunctionCall(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-    struct Test {
-        fun foo() {}
+      struct Test {
+          fun foo() {}
 
-        fun bar() {
-            self.baz()
-        }
-    }
+          fun bar() {
+              self.baz()
+          }
+      }
 	`)
 
 	errs := expectCheckerErrors(err, 2)
@@ -1773,13 +1773,13 @@ func TestCheckInvalidStructureFunctionAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-   struct Test {
-       fun foo() {}
+      struct Test {
+          fun foo() {}
 
-       fun bar() {
-           self.foo = 2
-       }
-   }
+          fun bar() {
+              self.foo = 2
+          }
+      }
 	`)
 
 	errs := expectCheckerErrors(err, 2)
