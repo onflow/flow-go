@@ -59,6 +59,14 @@ func (v *BaseStrictusVisitor) VisitReturnStatement(ctx *ReturnStatementContext) 
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitBreakStatement(ctx *BreakStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitContinueStatement(ctx *ContinueStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }

@@ -50,6 +50,12 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#returnStatement.
 	VisitReturnStatement(ctx *ReturnStatementContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#breakStatement.
+	VisitBreakStatement(ctx *BreakStatementContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#continueStatement.
+	VisitContinueStatement(ctx *ContinueStatementContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#ifStatement.
 	VisitIfStatement(ctx *IfStatementContext) interface{}
 

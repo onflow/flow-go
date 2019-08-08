@@ -294,13 +294,39 @@ func (v *ProgramVisitor) VisitReturnStatement(ctx *ReturnStatementContext) inter
 		expression = expressionNode.Accept(v).(ast.Expression)
 	}
 
-	// TODO: get end position from expression
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	var endPosition *ast.Position
+	if expression != nil {
+		endPosition = expression.EndPosition()
+	} else {
+		endPosition = ast.EndPosition(startPosition, ctx.Return().GetSymbol().GetStop())
+	}
 
 	return &ast.ReturnStatement{
 		Expression: expression,
 		StartPos:   startPosition,
 		EndPos:     endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitBreakStatement(ctx *BreakStatementContext) interface{} {
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.EndPosition(startPosition, ctx.Break().GetSymbol().GetStop())
+
+	return &ast.BreakStatement{
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitContinueStatement(ctx *ContinueStatementContext) interface{} {
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.EndPosition(startPosition, ctx.Continue().GetSymbol().GetStop())
+
+	return &ast.ContinueStatement{
+		StartPos: startPosition,
+		EndPos:   endPosition,
 	}
 }
 
@@ -322,8 +348,8 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		}
 	}
 
-	// TODO: get end position from expression
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := expression.EndPosition()
 	identifierPosition := ast.PositionFromToken(identifierNode.GetSymbol())
 
 	return &ast.VariableDeclaration{
@@ -404,14 +430,9 @@ func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
 		target = v.wrapPartialAccessExpression(target, accessExpression)
 	}
 
-	// TODO: get end position from expression
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
-
 	return &ast.AssignmentStatement{
-		Target:   target,
-		Value:    value,
-		StartPos: startPosition,
-		EndPos:   endPosition,
+		Target: target,
+		Value:  value,
 	}
 }
 
@@ -430,14 +451,11 @@ func (v *ProgramVisitor) VisitConditionalExpression(ctx *ConditionalExpressionCo
 	if ctx.then != nil && ctx.alt != nil {
 		then := ctx.then.Accept(v).(ast.Expression)
 		alt := ctx.alt.Accept(v).(ast.Expression)
-		startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
 
 		return &ast.ConditionalExpression{
-			Test:     expression,
-			Then:     then,
-			Else:     alt,
-			StartPos: startPosition,
-			EndPos:   endPosition,
+			Test: expression,
+			Then: then,
+			Else: alt,
 		}
 	}
 
@@ -458,15 +476,10 @@ func (v *ProgramVisitor) VisitOrExpression(ctx *OrExpressionContext) interface{}
 
 	leftExpression := leftContext.Accept(v).(ast.Expression)
 
-	startPosition := leftExpression.StartPosition()
-	endPosition := rightExpression.EndPosition()
-
 	return &ast.BinaryExpression{
 		Operation: ast.OperationOr,
 		Left:      leftExpression,
 		Right:     rightExpression,
-		StartPos:  startPosition,
-		EndPos:    endPosition,
 	}
 }
 
@@ -484,15 +497,10 @@ func (v *ProgramVisitor) VisitAndExpression(ctx *AndExpressionContext) interface
 
 	leftExpression := leftContext.Accept(v).(ast.Expression)
 
-	startPosition := leftExpression.StartPosition()
-	endPosition := rightExpression.EndPosition()
-
 	return &ast.BinaryExpression{
 		Operation: ast.OperationAnd,
 		Left:      leftExpression,
 		Right:     rightExpression,
-		StartPos:  startPosition,
-		EndPos:    endPosition,
 	}
 }
 
@@ -511,15 +519,10 @@ func (v *ProgramVisitor) VisitEqualityExpression(ctx *EqualityExpressionContext)
 	leftExpression := leftContext.Accept(v).(ast.Expression)
 	operation := ctx.EqualityOp().Accept(v).(ast.Operation)
 
-	startPosition := leftExpression.StartPosition()
-	endPosition := rightExpression.EndPosition()
-
 	return &ast.BinaryExpression{
 		Operation: operation,
 		Left:      leftExpression,
 		Right:     rightExpression,
-		StartPos:  startPosition,
-		EndPos:    endPosition,
 	}
 }
 
@@ -538,15 +541,10 @@ func (v *ProgramVisitor) VisitRelationalExpression(ctx *RelationalExpressionCont
 	leftExpression := leftContext.Accept(v).(ast.Expression)
 	operation := ctx.RelationalOp().Accept(v).(ast.Operation)
 
-	startPosition := leftExpression.StartPosition()
-	endPosition := rightExpression.EndPosition()
-
 	return &ast.BinaryExpression{
 		Operation: operation,
 		Left:      leftExpression,
 		Right:     rightExpression,
-		StartPos:  startPosition,
-		EndPos:    endPosition,
 	}
 }
 
@@ -565,15 +563,10 @@ func (v *ProgramVisitor) VisitAdditiveExpression(ctx *AdditiveExpressionContext)
 	leftExpression := leftContext.Accept(v).(ast.Expression)
 	operation := ctx.AdditiveOp().Accept(v).(ast.Operation)
 
-	startPosition := leftExpression.StartPosition()
-	endPosition := rightExpression.EndPosition()
-
 	return &ast.BinaryExpression{
 		Operation: operation,
 		Left:      leftExpression,
 		Right:     rightExpression,
-		StartPos:  startPosition,
-		EndPos:    endPosition,
 	}
 }
 
@@ -592,15 +585,10 @@ func (v *ProgramVisitor) VisitMultiplicativeExpression(ctx *MultiplicativeExpres
 	leftExpression := leftContext.Accept(v).(ast.Expression)
 	operation := ctx.MultiplicativeOp().Accept(v).(ast.Operation)
 
-	startPosition := leftExpression.StartPosition()
-	endPosition := rightExpression.EndPosition()
-
 	return &ast.BinaryExpression{
 		Operation: operation,
 		Left:      leftExpression,
 		Right:     rightExpression,
-		StartPos:  startPosition,
-		EndPos:    endPosition,
 	}
 }
 
@@ -624,7 +612,9 @@ func (v *ProgramVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) inter
 
 	expression := unaryContext.Accept(v).(ast.Expression)
 	operation := ctx.UnaryOp(0).Accept(v).(ast.Operation)
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx.BaseParserRuleContext)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := expression.EndPosition()
 
 	return &ast.UnaryExpression{
 		Operation:  operation,

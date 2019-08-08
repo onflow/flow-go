@@ -712,11 +712,52 @@ func TestInterpretWhileStatementWithReturn(t *testing.T) {
            }
            return x
        }
-
 	`)
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
+}
+
+func TestInterpretWhileStatementWithContinue(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       fun test(): Int {
+           var i = 0
+           var x = 0
+           while i < 10 {
+               i = i + 1
+               if i < 5 {
+                   continue
+               }
+               x = x + 1
+           }
+           return x
+       }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
+}
+
+func TestInterpretWhileStatementWithBreak(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       fun test(): Int {
+           var x = 0
+           while x < 10 {
+               x = x + 1
+               if x == 5 {
+                   break
+               }
+           }
+           return x
+       }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(5)}))
 }
 
 func TestInterpretExpressionStatement(t *testing.T) {
@@ -779,7 +820,7 @@ func TestInterpretFunctionBindingInFunction(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
-func TestInterpretRecursion(t *testing.T) {
+func TestInterpretRecursionFib(t *testing.T) {
 	// mainly tests that the function declaration identifier is bound
 	// to the function inside the function and that the arguments
 	// of the function calls are evaluated in the call-site scope
@@ -797,6 +838,23 @@ func TestInterpretRecursion(t *testing.T) {
 
 	Expect(inter.Invoke("fib", big.NewInt(14))).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(377)}))
+}
+
+func TestInterpretRecursionFactorial(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        fun factorial(_ n: Int): Int {
+            if n < 1 {
+               return 1
+            }
+
+            return n * factorial(n - 1)
+        }
+   `)
+
+	Expect(inter.Invoke("factorial", big.NewInt(5))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(120)}))
 }
 
 func TestInterpretUnaryIntegerNegation(t *testing.T) {

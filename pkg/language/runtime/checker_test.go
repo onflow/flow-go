@@ -27,7 +27,7 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 	checker, err := parseAndCheck(`
         let x = 1
         var y = 1
-    `)
+	`)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -44,7 +44,7 @@ func TestCheckBoolean(t *testing.T) {
 
 	checker, err := parseAndCheck(`
         let x = true
-    `)
+	`)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -57,6 +57,8 @@ func expectCheckerErrors(err error, len int) []error {
 	if len <= 0 {
 		return nil
 	}
+
+	Expect(err).To(HaveOccurred())
 
 	Expect(err).
 		To(BeAssignableToTypeOf(&sema.CheckerError{}))
@@ -74,7 +76,7 @@ func TestCheckInvalidGlobalRedeclaration(t *testing.T) {
 	_, err := parseAndCheck(`
         let x = true
         let x = false
-    `)
+	`)
 
 	errs := expectCheckerErrors(err, 1)
 
@@ -90,7 +92,7 @@ func TestCheckInvalidVariableRedeclaration(t *testing.T) {
             let x = true
             let x = false
         }
-    `)
+	`)
 
 	errs := expectCheckerErrors(err, 1)
 
@@ -1084,7 +1086,7 @@ func TestCheckAnyReturnType(t *testing.T) {
       fun foo(): Any {
           return foo
       }
-  `)
+	`)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -1096,8 +1098,76 @@ func TestCheckAny(t *testing.T) {
 	_, err := parseAndCheck(`
       let a: Any = 1
       let b: Any = true
-  `)
+	`)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
+}
+
+func TestCheckBreakStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       fun test() {
+           while true {
+               break
+           }
+       }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidBreakStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       fun test() {
+           while true {
+               fun () {
+                   break
+               }
+           }
+       }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ControlStatementError{}))
+}
+
+func TestCheckContinueStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       fun test() {
+           while true {
+               continue
+           }
+       }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidContinueStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       fun test() {
+           while true {
+               fun () {
+                   continue
+               }
+           }
+       }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ControlStatementError{}))
 }

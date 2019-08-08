@@ -46,6 +46,12 @@ type StrictusListener interface {
 	// EnterReturnStatement is called when entering the returnStatement production.
 	EnterReturnStatement(c *ReturnStatementContext)
 
+	// EnterBreakStatement is called when entering the breakStatement production.
+	EnterBreakStatement(c *BreakStatementContext)
+
+	// EnterContinueStatement is called when entering the continueStatement production.
+	EnterContinueStatement(c *ContinueStatementContext)
+
 	// EnterIfStatement is called when entering the ifStatement production.
 	EnterIfStatement(c *IfStatementContext)
 
@@ -198,6 +204,12 @@ type StrictusListener interface {
 
 	// ExitReturnStatement is called when exiting the returnStatement production.
 	ExitReturnStatement(c *ReturnStatementContext)
+
+	// ExitBreakStatement is called when exiting the breakStatement production.
+	ExitBreakStatement(c *BreakStatementContext)
+
+	// ExitContinueStatement is called when exiting the continueStatement production.
+	ExitContinueStatement(c *ContinueStatementContext)
 
 	// ExitIfStatement is called when exiting the ifStatement production.
 	ExitIfStatement(c *IfStatementContext)
