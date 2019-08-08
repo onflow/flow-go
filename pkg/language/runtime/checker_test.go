@@ -1226,6 +1226,7 @@ func TestCheckInvalidStructureRedeclaringType(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
+// TODO:
 func TestCheckStructure(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1234,11 +1235,11 @@ func TestCheckStructure(t *testing.T) {
             pub(set) var foo: Int
 
             init(foo: Int) {
-                self.foo = foo
+                // self.foo = foo
             }
 
             pub fun getFoo(): Int {
-                return self.foo
+                // return self.foo
             }
         }
 	`)
@@ -1440,4 +1441,30 @@ func TestCheckInvalidStructureFunction(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckStructureInitializerSelfReference(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     struct Test {
+         init() { self }
+     }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckStructureFunctionSelfReference(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     struct Test {
+         fun test() { self }
+     }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 }

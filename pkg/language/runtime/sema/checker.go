@@ -10,6 +10,7 @@ import (
 
 const ArgumentLabelNotRequired = "_"
 const InitializerIdentifier = "init"
+const SelfIdentifier = "self"
 
 type functionContext struct {
 	returnType Type
@@ -1468,15 +1469,59 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		errs = append(errs, result.Errors...)
 	}
 
+	// TODO: self type
+	selfType := &VoidType{}
+
 	initializer := structure.Initializer
 	if initializer != nil {
-		result := initializer.Accept(checker).(checkerResult)
-		errs = append(errs, result.Errors...)
+		func() {
+			// NOTE: new activation, so `self`
+			// is only visible inside initializer
+
+			checker.valueActivations.PushCurrent()
+			defer checker.valueActivations.Pop()
+
+			depth := checker.valueActivations.Depth()
+
+			self := &Variable{
+				Type:       selfType,
+				IsConstant: true,
+				Depth:      depth,
+			}
+			checker.setVariable(
+				SelfIdentifier,
+				self,
+			)
+
+			result := initializer.Accept(checker).(checkerResult)
+			errs = append(errs, result.Errors...)
+		}()
 	}
 
 	for _, function := range structure.Functions {
-		result := function.Accept(checker).(checkerResult)
-		errs = append(errs, result.Errors...)
+		func() {
+			// NOTE: new activation, as function declarations
+			// shouldn't be visible in other function declarations,
+			// and `self` is is only visible inside function
+
+			checker.valueActivations.PushCurrent()
+			defer checker.valueActivations.Pop()
+
+			depth := checker.valueActivations.Depth()
+
+			self := &Variable{
+				Type:       selfType,
+				IsConstant: true,
+				Depth:      depth,
+			}
+			checker.setVariable(
+				SelfIdentifier,
+				self,
+			)
+
+			result := function.Accept(checker).(checkerResult)
+			errs = append(errs, result.Errors...)
+		}()
 	}
 
 	return checkerResult{
