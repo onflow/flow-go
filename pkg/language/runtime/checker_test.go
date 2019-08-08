@@ -1497,3 +1497,18 @@ func TestCheckStructureFunctionSelfReference(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
+
+func TestCheckInvalidLocalStructure(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+	   fun test() {
+           struct Test {}
+       }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+}

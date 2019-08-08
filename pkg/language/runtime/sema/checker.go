@@ -453,7 +453,24 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 	checker.pushActivations()
 	defer checker.popActivations()
 
+	// check all statements
+
 	for _, statement := range block.Statements {
+
+		// check statement is not a local structure declaration
+
+		if _, ok := statement.(*ast.StructureDeclaration); ok {
+			errs = append(errs, &InvalidDeclarationError{
+				Kind:     common.DeclarationKindStructure,
+				StartPos: statement.StartPosition(),
+				EndPos:   statement.EndPosition(),
+			})
+
+			continue
+		}
+
+		// check statement
+
 		result := statement.Accept(checker).(checkerResult)
 		errs = append(errs, result.Errors...)
 	}

@@ -492,3 +492,25 @@ func (e *InvalidInitializerNameError) StartPosition() *ast.Position {
 func (e *InvalidInitializerNameError) EndPosition() *ast.Position {
 	return e.Pos
 }
+
+// InvalidDeclarationError
+
+type InvalidDeclarationError struct {
+	Kind     common.DeclarationKind
+	StartPos *ast.Position
+	EndPos   *ast.Position
+}
+
+func (e *InvalidDeclarationError) Error() string {
+	return fmt.Sprintf("cannot declare %s here", e.Kind.Name())
+}
+
+func (*InvalidDeclarationError) isSemanticError() {}
+
+func (e *InvalidDeclarationError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidDeclarationError) EndPosition() *ast.Position {
+	return e.EndPos
+}

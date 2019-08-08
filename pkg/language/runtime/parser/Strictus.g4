@@ -119,6 +119,9 @@ statement
     | continueStatement
     | ifStatement
     | whileStatement
+    // NOTE: allow all declarations, even structures, in parser,
+    // then check identifier declaration is variable/constant or function
+    // in semantic analysis to provide better error
     | declaration
     | assignment
     | expression
