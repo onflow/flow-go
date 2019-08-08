@@ -1214,10 +1214,10 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	invokedExpression := invocationExpression.Expression
 	expressionResult := invokedExpression.Accept(checker).(checkerResult)
 	errs = append(errs, expressionResult.Errors...)
+
 	expressionType := expressionResult.Type
 
-	argumentCount := len(invocationExpression.Arguments)
-
+	var returnType Type
 	functionType, ok := expressionType.(*FunctionType)
 	if !ok {
 		errs = append(errs,
@@ -1230,109 +1230,22 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	} else {
 		// invoked expression has function type
 
-		// check the invocation's argument count matches the function's parameter count
-		parameterCount := len(functionType.ParameterTypes)
-
-		if argumentCount != parameterCount {
-			errs = append(errs,
-				&ArgumentCountError{
-					ParameterCount: parameterCount,
-					ArgumentCount:  argumentCount,
-					StartPos:       invocationExpression.StartPos,
-					EndPos:         invocationExpression.EndPos,
-				},
-			)
-		}
-
-		minCount := argumentCount
-		if parameterCount < argumentCount {
-			minCount = parameterCount
-		}
-
-		for i := 0; i < minCount; i++ {
-			// ensure the type of the argument matches the type of the parameter
-
-			parameterType := functionType.ParameterTypes[i]
-			argument := invocationExpression.Arguments[i]
-
-			argumentResult := argument.Expression.Accept(checker).(checkerResult)
-			errs = append(errs, argumentResult.Errors...)
-			argumentType := argumentResult.Type
-
-			if argumentType != nil && !checker.IsSubType(argumentType, parameterType) {
-				errs = append(errs,
-					&TypeMismatchError{
-						ExpectedType: parameterType,
-						ActualType:   argumentType,
-						StartPos:     argument.Expression.StartPosition(),
-						EndPos:       argument.Expression.EndPosition(),
-					},
-				)
-			}
+		if err := checker.checkInvocationArguments(invocationExpression, functionType); err != nil {
+			errs = append(errs, err.Errors...)
 		}
 
 		// if the invocation refers directly to the name of the function as stated in the declaration,
 		// the argument labels need to be supplied
 
 		if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
-
-			variable, err := checker.findAndCheckVariable(identifierExpression)
-			if err != nil {
-				errs = append(errs, err)
-			} else if variable != nil {
-				if variable.ArgumentLabels != nil {
-
-					for i, argumentLabel := range variable.ArgumentLabels {
-						if i >= argumentCount {
-							break
-						}
-
-						argument := invocationExpression.Arguments[i]
-						providedLabel := argument.Label
-						if argumentLabel == ArgumentLabelNotRequired {
-							// argument label is not required,
-							// check it is not provided
-
-							if providedLabel != "" {
-								errs = append(errs,
-									&IncorrectArgumentLabelError{
-										ActualArgumentLabel:   providedLabel,
-										ExpectedArgumentLabel: "",
-										StartPos:              argument.Expression.StartPosition(),
-										EndPos:                argument.Expression.EndPosition(),
-									},
-								)
-							}
-						} else {
-							// argument label is required,
-							// check it is provided and correct
-							if providedLabel == "" {
-								errs = append(errs,
-									&MissingArgumentLabelError{
-										ExpectedArgumentLabel: argumentLabel,
-										StartPos:              argument.Expression.StartPosition(),
-										EndPos:                argument.Expression.EndPosition(),
-									},
-								)
-							} else if providedLabel != argumentLabel {
-								errs = append(errs,
-									&IncorrectArgumentLabelError{
-										ActualArgumentLabel:   providedLabel,
-										ExpectedArgumentLabel: argumentLabel,
-										StartPos:              argument.Expression.StartPosition(),
-										EndPos:                argument.Expression.EndPosition(),
-									},
-								)
-							}
-						}
-					}
-				}
+			if err := checker.checkInvocationArgumentLabels(
+				invocationExpression,
+				identifierExpression,
+			); err != nil {
+				errs = append(errs, err.Errors...)
 			}
 		}
-	}
 
-	var returnType Type
-	if functionType != nil {
 		returnType = functionType.ReturnType
 	}
 
@@ -1340,6 +1253,120 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		Type:   returnType,
 		Errors: errs,
 	}
+}
+
+func (checker *Checker) checkInvocationArgumentLabels(
+	invocationExpression *ast.InvocationExpression,
+	identifierExpression *ast.IdentifierExpression,
+) *CheckerError {
+	var errs []error
+
+	variable, err := checker.findAndCheckVariable(identifierExpression)
+	if err != nil {
+		errs = append(errs, err)
+	} else if variable != nil {
+		if variable.ArgumentLabels != nil {
+			argumentCount := len(invocationExpression.Arguments)
+
+			for i, argumentLabel := range variable.ArgumentLabels {
+				if i >= argumentCount {
+					break
+				}
+
+				argument := invocationExpression.Arguments[i]
+				providedLabel := argument.Label
+				if argumentLabel == ArgumentLabelNotRequired {
+					// argument label is not required,
+					// check it is not provided
+
+					if providedLabel != "" {
+						errs = append(errs,
+							&IncorrectArgumentLabelError{
+								ActualArgumentLabel:   providedLabel,
+								ExpectedArgumentLabel: "",
+								StartPos:              argument.Expression.StartPosition(),
+								EndPos:                argument.Expression.EndPosition(),
+							},
+						)
+					}
+				} else {
+					// argument label is required,
+					// check it is provided and correct
+					if providedLabel == "" {
+						errs = append(errs,
+							&MissingArgumentLabelError{
+								ExpectedArgumentLabel: argumentLabel,
+								StartPos:              argument.Expression.StartPosition(),
+								EndPos:                argument.Expression.EndPosition(),
+							},
+						)
+					} else if providedLabel != argumentLabel {
+						errs = append(errs,
+							&IncorrectArgumentLabelError{
+								ActualArgumentLabel:   providedLabel,
+								ExpectedArgumentLabel: argumentLabel,
+								StartPos:              argument.Expression.StartPosition(),
+								EndPos:                argument.Expression.EndPosition(),
+							},
+						)
+					}
+				}
+			}
+		}
+	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) checkInvocationArguments(
+	invocationExpression *ast.InvocationExpression,
+	functionType *FunctionType,
+) *CheckerError {
+	var errs []error
+
+	argumentCount := len(invocationExpression.Arguments)
+
+	// check the invocation's argument count matches the function's parameter count
+	parameterCount := len(functionType.ParameterTypes)
+	if argumentCount != parameterCount {
+		errs = append(errs,
+			&ArgumentCountError{
+				ParameterCount: parameterCount,
+				ArgumentCount:  argumentCount,
+				StartPos:       invocationExpression.StartPos,
+				EndPos:         invocationExpression.EndPos,
+			},
+		)
+	}
+
+	minCount := argumentCount
+	if parameterCount < argumentCount {
+		minCount = parameterCount
+	}
+
+	for i := 0; i < minCount; i++ {
+		// ensure the type of the argument matches the type of the parameter
+
+		parameterType := functionType.ParameterTypes[i]
+		argument := invocationExpression.Arguments[i]
+
+		argumentResult := argument.Expression.Accept(checker).(checkerResult)
+		errs = append(errs, argumentResult.Errors...)
+		argumentType := argumentResult.Type
+
+		if argumentType != nil && !checker.IsSubType(argumentType, parameterType) {
+			errs = append(errs,
+				&TypeMismatchError{
+					ExpectedType: parameterType,
+					ActualType:   argumentType,
+					StartPos:     argument.Expression.StartPosition(),
+					EndPos:       argument.Expression.EndPosition(),
+				},
+			)
+		}
+	}
+
+	return checkerError(errs)
 }
 
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
