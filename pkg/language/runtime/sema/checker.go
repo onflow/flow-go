@@ -1396,10 +1396,14 @@ func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast
 		parameterTypes[i] = parameterType
 	}
 
-	convertedReturnType, err := checker.ConvertType(returnType)
-	if err != nil {
-		// NOTE: append, don't return
-		errs = append(errs, err.Errors...)
+	var convertedReturnType Type = &VoidType{}
+	if returnType != nil {
+		var err *CheckerError
+		convertedReturnType, err = checker.ConvertType(returnType)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
+		}
 	}
 
 	return &FunctionType{
@@ -1574,6 +1578,22 @@ func (checker *Checker) VisitInitializerDeclaration(initializer *ast.Initializer
 				Pos:  initializer.StartPos,
 			},
 		)
+	}
+
+	functionType, err := checker.functionType(initializer.Parameters, nil)
+	if err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
+	}
+
+	err = checker.checkFunction(
+		initializer.Parameters,
+		functionType,
+		initializer.Block,
+	)
+	if err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
 	}
 
 	return checkerResult{

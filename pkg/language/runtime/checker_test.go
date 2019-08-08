@@ -1381,3 +1381,48 @@ func TestCheckInvalidStructureFieldType(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 }
+
+func TestCheckInvalidStructureInitializerParameterType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       struct Test {
+           init(x: X) {}
+       }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckInvalidStructureInitializerParameters(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       struct Test {
+           init(x: Int, x: Int) {}
+       }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckInvalidStructureInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       struct Test {
+           init() { X }
+       }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
