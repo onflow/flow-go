@@ -204,17 +204,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 		errs = append(errs, err.Errors...)
 	}
 
-	argumentLabels := make([]string, len(declaration.Parameters))
-
-	for i, parameter := range declaration.Parameters {
-		argumentLabel := parameter.Label
-		// if no argument label is given, the parameter name
-		// is used as the argument labels and is required
-		if argumentLabel == "" {
-			argumentLabel = parameter.Identifier
-		}
-		argumentLabels[i] = argumentLabel
-	}
+	argumentLabels := checker.argumentLabels(declaration.Parameters)
 
 	// declare the function before checking it,
 	// so it can be referred to inside the function
@@ -245,6 +235,22 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 		Type:   nil,
 		Errors: errs,
 	}
+}
+
+func (checker *Checker) argumentLabels(parameters []*ast.Parameter) []string {
+	argumentLabels := make([]string, len(parameters))
+
+	for i, parameter := range parameters {
+		argumentLabel := parameter.Label
+		// if no argument label is given, the parameter name
+		// is used as the argument labels and is required
+		if argumentLabel == "" {
+			argumentLabel = parameter.Identifier
+		}
+		argumentLabels[i] = argumentLabel
+	}
+
+	return argumentLabels
 }
 
 func (checker *Checker) checkFunction(
