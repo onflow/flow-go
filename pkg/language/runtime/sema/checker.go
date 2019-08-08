@@ -1270,60 +1270,60 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 				)
 			}
 		}
-	}
 
-	// if the invocation refers directly to the name of the function as stated in the declaration,
-	// the argument labels need to be supplied
+		// if the invocation refers directly to the name of the function as stated in the declaration,
+		// the argument labels need to be supplied
 
-	if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
+		if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
 
-		variable, err := checker.findAndCheckVariable(identifierExpression)
-		if err != nil {
-			errs = append(errs, err)
-		} else if variable != nil {
-			if variable.ArgumentLabels != nil {
+			variable, err := checker.findAndCheckVariable(identifierExpression)
+			if err != nil {
+				errs = append(errs, err)
+			} else if variable != nil {
+				if variable.ArgumentLabels != nil {
 
-				for i, argumentLabel := range variable.ArgumentLabels {
-					if i >= argumentCount {
-						break
-					}
-
-					argument := invocationExpression.Arguments[i]
-					providedLabel := argument.Label
-					if argumentLabel == ArgumentLabelNotRequired {
-						// argument label is not required,
-						// check it is not provided
-
-						if providedLabel != "" {
-							errs = append(errs,
-								&IncorrectArgumentLabelError{
-									ActualArgumentLabel:   providedLabel,
-									ExpectedArgumentLabel: "",
-									StartPos:              argument.Expression.StartPosition(),
-									EndPos:                argument.Expression.EndPosition(),
-								},
-							)
+					for i, argumentLabel := range variable.ArgumentLabels {
+						if i >= argumentCount {
+							break
 						}
-					} else {
-						// argument label is required,
-						// check it is provided and correct
-						if providedLabel == "" {
-							errs = append(errs,
-								&MissingArgumentLabelError{
-									ExpectedArgumentLabel: argumentLabel,
-									StartPos:              argument.Expression.StartPosition(),
-									EndPos:                argument.Expression.EndPosition(),
-								},
-							)
-						} else if providedLabel != argumentLabel {
-							errs = append(errs,
-								&IncorrectArgumentLabelError{
-									ActualArgumentLabel:   providedLabel,
-									ExpectedArgumentLabel: argumentLabel,
-									StartPos:              argument.Expression.StartPosition(),
-									EndPos:                argument.Expression.EndPosition(),
-								},
-							)
+
+						argument := invocationExpression.Arguments[i]
+						providedLabel := argument.Label
+						if argumentLabel == ArgumentLabelNotRequired {
+							// argument label is not required,
+							// check it is not provided
+
+							if providedLabel != "" {
+								errs = append(errs,
+									&IncorrectArgumentLabelError{
+										ActualArgumentLabel:   providedLabel,
+										ExpectedArgumentLabel: "",
+										StartPos:              argument.Expression.StartPosition(),
+										EndPos:                argument.Expression.EndPosition(),
+									},
+								)
+							}
+						} else {
+							// argument label is required,
+							// check it is provided and correct
+							if providedLabel == "" {
+								errs = append(errs,
+									&MissingArgumentLabelError{
+										ExpectedArgumentLabel: argumentLabel,
+										StartPos:              argument.Expression.StartPosition(),
+										EndPos:                argument.Expression.EndPosition(),
+									},
+								)
+							} else if providedLabel != argumentLabel {
+								errs = append(errs,
+									&IncorrectArgumentLabelError{
+										ActualArgumentLabel:   providedLabel,
+										ExpectedArgumentLabel: argumentLabel,
+										StartPos:              argument.Expression.StartPosition(),
+										EndPos:                argument.Expression.EndPosition(),
+									},
+								)
+							}
 						}
 					}
 				}
