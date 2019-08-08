@@ -391,7 +391,7 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 		return interpreter.visitIndexExpressionAssignment(target, value)
 
 	case *ast.MemberExpression:
-		// TODO: no structures/dictionaries yet
+		// TODO: no structures yet
 		panic(&errors.UnreachableError{})
 	}
 
@@ -635,7 +635,7 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 }
 
 func (interpreter *Interpreter) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO: no structures/dictionaries yet
+	// TODO: no structures yet
 	panic(&errors.UnreachableError{})
 }
 

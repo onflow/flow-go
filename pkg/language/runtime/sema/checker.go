@@ -629,7 +629,7 @@ func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentState
 		return checkerError(errs)
 
 	case *ast.MemberExpression:
-		// TODO: no structures/dictionaries yet
+		// TODO: no structures yet
 		panic(&errors.UnreachableError{})
 
 	default:
@@ -1054,7 +1054,7 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 }
 
 func (checker *Checker) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO: no structures/dictionaries yet
+	// TODO: no structures yet
 	panic(&errors.UnreachableError{})
 }
 
