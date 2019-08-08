@@ -1600,10 +1600,14 @@ func TestCheckStructureFieldAssignment(t *testing.T) {
 
           init() {
               self.foo = 1
+              let alsoSelf = self
+              alsoSelf.foo = 2
           }
 
           fun test() {
-              self.foo = 2
+              self.foo = 3
+              let alsoSelf = self
+              alsoSelf.foo = 4
           }
       }
 	`)
