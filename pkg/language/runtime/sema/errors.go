@@ -522,3 +522,24 @@ func (e *InvalidDeclarationError) StartPosition() *ast.Position {
 func (e *InvalidDeclarationError) EndPosition() *ast.Position {
 	return e.EndPos
 }
+
+// MissingInitializerError
+
+type MissingInitializerError struct {
+	FirstFieldStartPos *ast.Position
+	FirstFieldEndPos   *ast.Position
+}
+
+func (e *MissingInitializerError) Error() string {
+	return "missing initializer for field"
+}
+
+func (*MissingInitializerError) isSemanticError() {}
+
+func (e *MissingInitializerError) StartPosition() *ast.Position {
+	return e.FirstFieldStartPos
+}
+
+func (e *MissingInitializerError) EndPosition() *ast.Position {
+	return e.FirstFieldEndPos
+}

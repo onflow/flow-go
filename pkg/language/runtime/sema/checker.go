@@ -1493,51 +1493,91 @@ func (checker *Checker) visitConditional(
 func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
 	var errs []error
 
-	err := checker.checkStructureIdentifier(structure)
-	if err != nil {
+	if err := checker.checkStructureIdentifier(structure); err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
-	err = checker.checkStructureFieldAndFunctionIdentifiers(structure)
-	if err != nil {
+	if err := checker.checkStructureFieldAndFunctionIdentifiers(structure); err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
-	for _, field := range structure.Fields {
+	if err := checker.checkStructureFields(structure.Fields); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	// TODO: self type
+	selfType := &StructureType{}
+
+	initializer := structure.Initializer
+	if initializer != nil {
+		if err := checker.checkStructureInitializer(initializer, selfType); err != nil {
+			errs = append(errs, err.Errors...)
+		}
+	} else if len(structure.Fields) > 0 {
+		// structure has fields, but no initializer
+		errs = append(errs,
+			&MissingInitializerError{},
+		)
+	}
+
+	if err := checker.checkStructureFunctions(structure.Functions, selfType); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
+}
+
+func (checker *Checker) checkStructureFields(fields []*ast.FieldDeclaration) *CheckerError {
+	var errs []error
+
+	for _, field := range fields {
 		result := field.Accept(checker).(checkerResult)
 		errs = append(errs, result.Errors...)
 	}
 
-	// TODO: self type
-	selfType := &VoidType{}
+	return checkerError(errs)
+}
 
-	initializer := structure.Initializer
-	if initializer != nil {
-		func() {
-			// NOTE: new activation, so `self`
-			// is only visible inside initializer
+func (checker *Checker) checkStructureInitializer(
+	initializer *ast.InitializerDeclaration,
+	selfType *StructureType,
+) *CheckerError {
+	var errs []error
 
-			checker.valueActivations.PushCurrent()
-			defer checker.valueActivations.Pop()
+	// NOTE: new activation, so `self`
+	// is only visible inside initializer
 
-			depth := checker.valueActivations.Depth()
+	checker.valueActivations.PushCurrent()
+	defer checker.valueActivations.Pop()
 
-			self := &Variable{
-				Type:       selfType,
-				IsConstant: true,
-				Depth:      depth,
-			}
-			checker.setVariable(
-				SelfIdentifier,
-				self,
-			)
+	depth := checker.valueActivations.Depth()
 
-			result := initializer.Accept(checker).(checkerResult)
-			errs = append(errs, result.Errors...)
-		}()
+	self := &Variable{
+		Type:       selfType,
+		IsConstant: true,
+		Depth:      depth,
 	}
+	checker.setVariable(
+		SelfIdentifier,
+		self,
+	)
 
-	for _, function := range structure.Functions {
+	result := initializer.Accept(checker).(checkerResult)
+	errs = append(errs, result.Errors...)
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) checkStructureFunctions(
+	functions []*ast.FunctionDeclaration,
+	selfType *StructureType,
+) *CheckerError {
+	var errs []error
+
+	for _, function := range functions {
 		func() {
 			// NOTE: new activation, as function declarations
 			// shouldn't be visible in other function declarations,
@@ -1563,10 +1603,7 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		}()
 	}
 
-	return checkerResult{
-		Type:   nil,
-		Errors: errs,
-	}
+	return checkerError(errs)
 }
 
 // checkStructureFieldAndFunctionIdentifiers checks the structure's fields and functions

@@ -1314,10 +1314,13 @@ func TestCheckInvalidStructureFieldName(t *testing.T) {
         }
 	`)
 
-	errs := expectCheckerErrors(err, 1)
+	errs := expectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 }
 
 func TestCheckInvalidStructureFunctionName(t *testing.T) {
@@ -1345,10 +1348,13 @@ func TestCheckInvalidStructureRedeclaringFields(t *testing.T) {
        }
 	`)
 
-	errs := expectCheckerErrors(err, 1)
+	errs := expectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 }
 
 func TestCheckInvalidStructureRedeclaringFunctions(t *testing.T) {
@@ -1377,10 +1383,13 @@ func TestCheckInvalidStructureRedeclaringFieldsAndFunctions(t *testing.T) {
        }
 	`)
 
-	errs := expectCheckerErrors(err, 1)
+	errs := expectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 }
 
 func TestCheckStructureFieldsAndFunctions(t *testing.T) {
@@ -1389,6 +1398,9 @@ func TestCheckStructureFieldsAndFunctions(t *testing.T) {
 	_, err := parseAndCheck(`
        struct Test {
            let x: Int
+
+           init() {}
+
            fun y() {}
        }
 	`)
@@ -1406,10 +1418,13 @@ func TestCheckInvalidStructureFieldType(t *testing.T) {
        }
 	`)
 
-	errs := expectCheckerErrors(err, 1)
+	errs := expectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 }
 
 func TestCheckInvalidStructureInitializerParameterType(t *testing.T) {
@@ -1511,4 +1526,19 @@ func TestCheckInvalidLocalStructure(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+}
+
+func TestCheckInvalidStructureMissingInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct Test {
+            let foo: Int
+        }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 }
