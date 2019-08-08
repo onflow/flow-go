@@ -1542,7 +1542,7 @@ func TestCheckInvalidStructureMissingInitializer(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 }
 
-func TestCheckStructureSelfFieldAccess(t *testing.T) {
+func TestCheckStructureFieldAccess(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
@@ -1563,19 +1563,17 @@ func TestCheckStructureSelfFieldAccess(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
-func TestCheckInvalidStructureSelfFieldAccess(t *testing.T) {
+func TestCheckInvalidStructureFieldAccess(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
       struct Test {
-          let foo: Int
-
           init() {
-              self.bar
+              self.foo
           }
 
           fun test() {
-              self.baz
+              self.bar
           }
       }
 	`)
@@ -1585,10 +1583,179 @@ func TestCheckInvalidStructureSelfFieldAccess(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
 	Expect(errs[0].(*sema.NotDeclaredMemberError).Name).
-		To(Equal("bar"))
+		To(Equal("foo"))
 
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
 	Expect(errs[1].(*sema.NotDeclaredMemberError).Name).
-		To(Equal("baz"))
+		To(Equal("bar"))
+}
+
+func TestCheckStructureFieldAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+          var foo: Int
+
+          init() {
+              self.foo = 1
+          }
+
+          fun test() {
+              self.foo = 2
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStructureFieldAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     struct Test {
+         init() {
+             self.foo = 1
+         }
+
+         fun test() {
+             self.bar = 2
+         }
+     }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+	Expect(errs[0].(*sema.NotDeclaredMemberError).Name).
+		To(Equal("foo"))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+	Expect(errs[1].(*sema.NotDeclaredMemberError).Name).
+		To(Equal("bar"))
+}
+
+func TestCheckInvalidStructureFieldAssignmentWrongType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+          var foo: Int
+
+          init() {
+              self.foo = true
+          }
+
+          fun test() {
+              self.foo = false
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidStructureFieldConstantAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+    struct Test {
+        let foo: Int
+        let bar: Int
+
+        init() {
+            self.foo = 1
+        }
+
+        fun test() {
+            self.bar = 2
+        }
+    }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
+	Expect(errs[0].(*sema.AssignmentToConstantMemberError).Name).
+		To(Equal("foo"))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
+	Expect(errs[1].(*sema.AssignmentToConstantMemberError).Name).
+		To(Equal("bar"))
+}
+
+func TestCheckStructureFunctionCall(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+    struct Test {
+        fun foo() {}
+
+        fun bar() {
+            self.foo()
+        }
+    }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStructureFunctionCall(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+    struct Test {
+        fun foo() {}
+
+        fun bar() {
+            self.baz()
+        }
+    }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+}
+
+func TestCheckInvalidStructureFunctionAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+   struct Test {
+       fun foo() {}
+
+       fun bar() {
+           self.foo = 2
+       }
+   }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
+	Expect(errs[0].(*sema.AssignmentToConstantMemberError).Name).
+		To(Equal("foo"))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }

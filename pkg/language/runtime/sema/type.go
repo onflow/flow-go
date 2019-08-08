@@ -366,7 +366,8 @@ type StructureType struct {
 }
 
 type Member struct {
-	Type Type
+	Type       Type
+	IsConstant bool
 }
 
 func (*StructureType) isType() {}

@@ -570,3 +570,29 @@ func (e *NotDeclaredMemberError) StartPosition() *ast.Position {
 func (e *NotDeclaredMemberError) EndPosition() *ast.Position {
 	return e.EndPos
 }
+
+// AssignmentToConstantMemberError
+
+// TODO: maybe split up into two errors:
+//  - assignment to constant field
+//  - assignment to function
+
+type AssignmentToConstantMemberError struct {
+	Name     string
+	StartPos *ast.Position
+	EndPos   *ast.Position
+}
+
+func (e *AssignmentToConstantMemberError) Error() string {
+	return fmt.Sprintf("cannot assign to constant member: %s", e.Name)
+}
+
+func (*AssignmentToConstantMemberError) isSemanticError() {}
+
+func (e *AssignmentToConstantMemberError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *AssignmentToConstantMemberError) EndPosition() *ast.Position {
+	return e.EndPos
+}

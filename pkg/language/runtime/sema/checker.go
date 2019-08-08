@@ -91,6 +91,8 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		}
 	}
 
+	// TODO: functions
+
 	return false
 }
 
@@ -722,7 +724,36 @@ func (checker *Checker) visitMemberExpressionAssignment(
 ) *CheckerError {
 	var errs []error
 
-	// TODO:
+	member, err := checker.visitMember(target)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	if member != nil {
+		// check member is not constant
+
+		if member.IsConstant {
+			errs = append(errs,
+				&AssignmentToConstantMemberError{
+					Name:     target.Identifier,
+					StartPos: assignment.Value.StartPosition(),
+					EndPos:   assignment.Value.EndPosition(),
+				},
+			)
+		}
+
+		// check value can be assigned to member
+		if !checker.IsSubType(valueType, member.Type) {
+			errs = append(errs,
+				&TypeMismatchError{
+					ExpectedType: member.Type,
+					ActualType:   valueType,
+					StartPos:     assignment.Value.StartPosition(),
+					EndPos:       assignment.Value.EndPosition(),
+				},
+			)
+		}
+	}
 
 	return checkerError(errs)
 }
@@ -1094,13 +1125,31 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	var errs []error
 
+	member, err := checker.visitMember(expression)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	var memberType Type = &AnyType{}
+	if member != nil {
+		memberType = member.Type
+	}
+
+	return checkerResult{
+		Type:   memberType,
+		Errors: errs,
+	}
+}
+
+func (checker *Checker) visitMember(expression *ast.MemberExpression) (*Member, *CheckerError) {
+	var errs []error
+
 	result := expression.Expression.Accept(checker).(checkerResult)
 	errs = append(errs, result.Errors...)
 
 	identifier := expression.Identifier
 
 	var member *Member
-	var memberType Type = &AnyType{}
 	structureType, ok := result.Type.(*StructureType)
 	if ok {
 		member, ok = structureType.Members[identifier]
@@ -1115,14 +1164,9 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 				EndPos:   expression.EndPos,
 			},
 		)
-	} else if member != nil {
-		memberType = member.Type
 	}
 
-	return checkerResult{
-		Type:   memberType,
-		Errors: errs,
-	}
+	return member, checkerError(errs)
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
@@ -1581,7 +1625,8 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*Str
 
 		// NOTE: still declare member
 		members[field.Identifier] = &Member{
-			Type: fieldType,
+			Type:       fieldType,
+			IsConstant: field.IsConstant,
 		}
 	}
 
@@ -1595,7 +1640,8 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*Str
 
 		// NOTE: still declare member
 		members[function.Identifier] = &Member{
-			Type: functionType,
+			Type:       functionType,
+			IsConstant: true,
 		}
 	}
 
