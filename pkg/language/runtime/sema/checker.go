@@ -1459,6 +1459,11 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		errs = append(errs, err.Errors...)
 	}
 
+	for _, field := range structure.Fields {
+		result := field.Accept(checker).(checkerResult)
+		errs = append(errs, result.Errors...)
+	}
+
 	initializer := structure.Initializer
 	if initializer != nil {
 		result := initializer.Accept(checker).(checkerResult)
@@ -1544,8 +1549,17 @@ func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclara
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
-	// TODO:
-	return nil
+	var errs []error
+
+	_, err := checker.ConvertType(field.Type)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
