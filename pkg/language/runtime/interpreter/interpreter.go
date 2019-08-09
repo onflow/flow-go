@@ -359,13 +359,11 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			indexedValue := result.(Value)
+			array := result.(ArrayValue)
 
-			array := indexedValue.(ArrayValue)
 			return target.Index.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
-					indexValue := result.(Value)
-					index := indexValue.(IntegerValue)
+					index := result.(IntegerValue)
 					array[index.IntValue()] = value
 
 					// NOTE: no result, so it does *not* act like a return-statement
@@ -629,8 +627,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 	// interpret the invoked expression
 	return invocationExpression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			value := result.(Value)
-			function := value.(FunctionValue)
+			function := result.(FunctionValue)
 
 			// NOTE: evaluate all argument expressions in call-site scope, not in function body
 			argumentExpressions := make([]ast.Expression, len(invocationExpression.Arguments))
