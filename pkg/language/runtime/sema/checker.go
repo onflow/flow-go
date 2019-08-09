@@ -69,6 +69,11 @@ func NewChecker(program *ast.Program) *Checker {
 	}
 }
 
+func (checker *Checker) Check() (err error) {
+	result := checker.Program.Accept(checker).(checkerResult)
+	return checkerError(result.Errors)
+}
+
 func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 	if subType.Equal(superType) {
 		return true
@@ -155,11 +160,6 @@ func (checker *Checker) pushActivations() {
 func (checker *Checker) popActivations() {
 	checker.valueActivations.Pop()
 	checker.typeActivations.Pop()
-}
-
-func (checker *Checker) Check() (err error) {
-	result := checker.Program.Accept(checker).(checkerResult)
-	return checkerError(result.Errors)
 }
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
@@ -1476,13 +1476,6 @@ func (checker *Checker) ConvertType(t ast.Type) (Type, *CheckerError) {
 	panic(&astTypeConversionError{invalidASTType: t})
 }
 
-func (checker *Checker) enterFunction(functionType *FunctionType) {
-	checker.functionContexts = append(checker.functionContexts,
-		&functionContext{
-			returnType: functionType.ReturnType,
-		})
-}
-
 func (checker *Checker) declareFunction(
 	identifier string,
 	identifierPosition *ast.Position,
@@ -1518,6 +1511,13 @@ func (checker *Checker) declareFunction(
 	)
 
 	return checkerError(errs)
+}
+
+func (checker *Checker) enterFunction(functionType *FunctionType) {
+	checker.functionContexts = append(checker.functionContexts,
+		&functionContext{
+			returnType: functionType.ReturnType,
+		})
 }
 
 func (checker *Checker) leaveFunction() {
