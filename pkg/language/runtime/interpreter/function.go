@@ -55,15 +55,15 @@ func (f HostFunctionValue) invoke(interpreter *Interpreter, arguments []Value) T
 	return f.function(interpreter, arguments)
 }
 
-func (f *HostFunctionValue) parameterCount() int {
+func (f HostFunctionValue) parameterCount() int {
 	return len(f.functionType.ParameterTypes)
 }
 
 func NewHostFunction(
 	functionType *sema.FunctionType,
 	function func(*Interpreter, []Value) Trampoline,
-) *HostFunctionValue {
-	return &HostFunctionValue{
+) HostFunctionValue {
+	return HostFunctionValue{
 		functionType: functionType,
 		function:     function,
 	}

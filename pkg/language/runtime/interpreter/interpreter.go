@@ -204,7 +204,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	return Done{}
 }
 
-func (interpreter *Interpreter) ImportFunction(name string, function *HostFunctionValue) {
+func (interpreter *Interpreter) ImportFunction(name string, function HostFunctionValue) {
 	interpreter.declareVariable(name, function)
 }
 
