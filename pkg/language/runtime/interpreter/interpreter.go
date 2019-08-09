@@ -774,6 +774,9 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 			structure := newStructure()
 
 			for name, function := range functions {
+				// NOTE: rebind, as function is captured in closure
+				function := function
+
 				// TODO: function type
 				structure.Members[name] =
 					NewHostFunction(

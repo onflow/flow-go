@@ -1130,3 +1130,24 @@ func TestInterpretStructureDeclarationWithFunction(t *testing.T) {
 	Expect(inter.Globals["value"].Value).
 		To(Equal(interpreter.IntValue{Int: newValue}))
 }
+
+func TestInterpretStructureFunctionCall(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     struct Test {
+         fun foo(): Int {
+             return 42
+         }
+
+         fun bar(): Int {
+             return self.foo()
+         }
+     }
+
+     let value = Test().bar()
+	`)
+
+	Expect(inter.Globals["value"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+}
