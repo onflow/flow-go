@@ -605,6 +605,19 @@ func (v UInt64Value) Equal(other IntegerValue) BoolValue {
 	return v == other.(UInt64Value)
 }
 
+// StructureValue
+
+type StructureValue struct {
+	Members map[string]Value
+}
+
+func (*StructureValue) isValue() {}
+
+func (v *StructureValue) ToGoValue() interface{} {
+	// TODO: convert values to Go values?
+	return v.Members
+}
+
 // ToValue
 
 // ToValue converts a Go value into an interpreter value
