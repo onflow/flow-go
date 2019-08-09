@@ -657,8 +657,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 			&NotDeclaredError{
 				ExpectedKind: common.DeclarationKindVariable,
 				Name:         identifier,
-				StartPos:     target.StartPosition(),
-				EndPos:       target.EndPosition(),
+				Pos:          target.StartPosition(),
 			},
 		)
 	} else {
@@ -731,14 +730,18 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		// check member is not constant
 
 		if member.IsConstant {
-			errs = append(errs,
-				&AssignmentToConstantMemberError{
-					Name:     target.Identifier,
-					StartPos: assignment.Value.StartPosition(),
-					EndPos:   assignment.Value.EndPosition(),
-				},
-			)
+			if member.IsInitialized {
+				errs = append(errs,
+					&AssignmentToConstantMemberError{
+						Name:     target.Identifier,
+						StartPos: assignment.Value.StartPosition(),
+						EndPos:   assignment.Value.EndPosition(),
+					},
+				)
+			}
 		}
+
+		member.IsInitialized = true
 
 		// check value can be assigned to member
 		if !checker.IsSubType(valueType, member.Type) {
@@ -829,8 +832,7 @@ func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpressio
 		return nil, &NotDeclaredError{
 			ExpectedKind: common.DeclarationKindValue,
 			Name:         expression.Identifier,
-			StartPos:     expression.StartPosition(),
-			EndPos:       expression.EndPosition(),
+			Pos:          expression.StartPosition(),
 		}
 	}
 
@@ -1405,9 +1407,7 @@ func (checker *Checker) ConvertType(t ast.Type) (Type, *CheckerError) {
 					&NotDeclaredError{
 						ExpectedKind: common.DeclarationKindType,
 						Name:         t.Identifier,
-						// TODO: add start and end position to ast.Type
-						StartPos: t.Pos,
-						EndPos:   t.Pos,
+						Pos:          t.Pos,
 					},
 				},
 			}
@@ -1637,10 +1637,36 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 			errs = append(errs, err.Errors...)
 		}
 	} else if len(structure.Fields) > 0 {
+		firstField := structure.Fields[0]
+
 		// structure has fields, but no initializer
 		errs = append(errs,
-			&MissingInitializerError{},
+			&MissingInitializerError{
+				StructureType:  structureType,
+				FirstFieldName: firstField.Identifier,
+				FirstFieldPos:  firstField.IdentifierPos,
+			},
 		)
+	}
+
+	// TODO: very simple field initialization check for now.
+	//  perform proper definite assignment analysis
+
+	if structureType != nil {
+		for _, field := range structure.Fields {
+			name := field.Identifier
+			member := structureType.Members[name]
+
+			if !member.IsInitialized {
+				errs = append(errs,
+					&FieldUninitializedError{
+						Name:          name,
+						Pos:           field.IdentifierPos,
+						StructureType: structureType,
+					},
+				)
+			}
+		}
 	}
 
 	if err := checker.checkStructureFunctions(structure.Functions, structureType); err != nil {
@@ -1708,8 +1734,9 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*Str
 
 		// NOTE: still declare member
 		members[field.Identifier] = &Member{
-			Type:       fieldType,
-			IsConstant: field.IsConstant,
+			Type:          fieldType,
+			IsConstant:    field.IsConstant,
+			IsInitialized: false,
 		}
 	}
 
@@ -1723,8 +1750,9 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*Str
 
 		// NOTE: still declare member
 		members[function.Identifier] = &Member{
-			Type:       functionType,
-			IsConstant: true,
+			Type:          functionType,
+			IsConstant:    true,
+			IsInitialized: true,
 		}
 	}
 

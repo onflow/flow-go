@@ -89,8 +89,7 @@ func (e *RedeclarationError) EndPosition() *ast.Position {
 type NotDeclaredError struct {
 	ExpectedKind common.DeclarationKind
 	Name         string
-	StartPos     *ast.Position
-	EndPos       *ast.Position
+	Pos          *ast.Position
 }
 
 func (e *NotDeclaredError) Error() string {
@@ -104,11 +103,11 @@ func (e *NotDeclaredError) SecondaryError() string {
 }
 
 func (e *NotDeclaredError) StartPosition() *ast.Position {
-	return e.StartPos
+	return e.Pos
 }
 
 func (e *NotDeclaredError) EndPosition() *ast.Position {
-	return e.EndPos
+	return e.Pos
 }
 
 // AssignmentToConstantError
@@ -195,7 +194,10 @@ type NotIndexingTypeError struct {
 }
 
 func (e *NotIndexingTypeError) Error() string {
-	return fmt.Sprintf("cannot index with value which has type: %s", e.Type.String())
+	return fmt.Sprintf(
+		"cannot index with value which has type: %s",
+		e.Type.String(),
+	)
 }
 
 func (*NotIndexingTypeError) isSemanticError() {}
@@ -526,22 +528,27 @@ func (e *InvalidDeclarationError) EndPosition() *ast.Position {
 // MissingInitializerError
 
 type MissingInitializerError struct {
-	FirstFieldStartPos *ast.Position
-	FirstFieldEndPos   *ast.Position
+	StructureType  *StructureType
+	FirstFieldName string
+	FirstFieldPos  *ast.Position
 }
 
 func (e *MissingInitializerError) Error() string {
-	return "missing initializer for field"
+	return fmt.Sprintf(
+		"missing initializer for field `%s` of type `%s`",
+		e.FirstFieldName,
+		e.StructureType.Identifier,
+	)
 }
 
 func (*MissingInitializerError) isSemanticError() {}
 
 func (e *MissingInitializerError) StartPosition() *ast.Position {
-	return e.FirstFieldStartPos
+	return e.FirstFieldPos
 }
 
 func (e *MissingInitializerError) EndPosition() *ast.Position {
-	return e.FirstFieldEndPos
+	return e.FirstFieldPos
 }
 
 // NotDeclaredMemberError
@@ -554,7 +561,11 @@ type NotDeclaredMemberError struct {
 }
 
 func (e *NotDeclaredMemberError) Error() string {
-	return fmt.Sprintf("value of type `%s` has no member `%s`", e.Type.String(), e.Name)
+	return fmt.Sprintf(
+		"value of type `%s` has no member `%s`",
+		e.Type.String(),
+		e.Name,
+	)
 }
 
 func (e *NotDeclaredMemberError) SecondaryError() string {
@@ -595,4 +606,34 @@ func (e *AssignmentToConstantMemberError) StartPosition() *ast.Position {
 
 func (e *AssignmentToConstantMemberError) EndPosition() *ast.Position {
 	return e.EndPos
+}
+
+// FieldUninitializedError
+
+type FieldUninitializedError struct {
+	Name          string
+	StructureType *StructureType
+	Pos           *ast.Position
+}
+
+func (e *FieldUninitializedError) Error() string {
+	return fmt.Sprintf(
+		"field `%s` of type `%s` is not initialized",
+		e.Name,
+		e.StructureType.Identifier,
+	)
+}
+
+func (e *FieldUninitializedError) SecondaryError() string {
+	return "not initialized"
+}
+
+func (*FieldUninitializedError) isSemanticError() {}
+
+func (e *FieldUninitializedError) StartPosition() *ast.Position {
+	return e.Pos
+}
+
+func (e *FieldUninitializedError) EndPosition() *ast.Position {
+	return e.Pos
 }
