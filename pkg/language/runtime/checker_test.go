@@ -486,6 +486,19 @@ func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
+func TestCheckParameterRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(a: Int) {
+          let a = 1
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckInvalidRedeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
