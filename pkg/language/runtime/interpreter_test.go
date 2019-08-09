@@ -1135,19 +1135,57 @@ func TestInterpretStructureFunctionCall(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-     struct Test {
-         fun foo(): Int {
-             return 42
-         }
+      struct Test {
+          fun foo(): Int {
+              return 42
+          }
 
-         fun bar(): Int {
-             return self.foo()
-         }
-     }
+          fun bar(): Int {
+              return self.foo()
+          }
+      }
 
-     let value = Test().bar()
+      let value = Test().bar()
 	`)
 
 	Expect(inter.Globals["value"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
 }
+
+func TestInterpretStructureFieldAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Test {
+          var foo: Int
+
+          init() {
+              self.foo = 1
+              let alsoSelf = self
+              alsoSelf.foo = 2
+          }
+
+          fun test() {
+              self.foo = 3
+              let alsoSelf = self
+              alsoSelf.foo = 4
+          }
+      }
+
+	  let test = Test()
+
+      fun callTest() {
+          test.test()
+      }
+	`)
+
+	Expect(inter.Globals["test"].Value.(*interpreter.StructureValue).Members["foo"]).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Invoke("callTest")).
+		To(Equal(interpreter.VoidValue{}))
+
+	Expect(inter.Globals["test"].Value.(*interpreter.StructureValue).Members["foo"]).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(4)}))
+}
+
