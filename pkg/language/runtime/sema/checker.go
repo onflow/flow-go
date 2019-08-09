@@ -1536,15 +1536,10 @@ func (checker *Checker) currentFunction() *functionContext {
 func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast.Type) (*FunctionType, *CheckerError) {
 	var errs []error
 
-	parameterTypes := make([]Type, len(parameters))
-	for i, parameter := range parameters {
-		parameterType, err := checker.ConvertType(parameter.Type)
-		if err != nil {
-			// NOTE: append, don't return
-			errs = append(errs, err.Errors...)
-		}
-		// NOTE: still assigning parameter type
-		parameterTypes[i] = parameterType
+	parameterTypes, err := checker.parameterTypes(parameters)
+	if err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
 	}
 
 	var convertedReturnType Type = &VoidType{}
@@ -1561,6 +1556,23 @@ func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast
 		ParameterTypes: parameterTypes,
 		ReturnType:     convertedReturnType,
 	}, checkerError(errs)
+}
+
+func (checker *Checker) parameterTypes(parameters []*ast.Parameter) ([]Type, *CheckerError) {
+	var errs []error
+
+	parameterTypes := make([]Type, len(parameters))
+	for i, parameter := range parameters {
+		parameterType, err := checker.ConvertType(parameter.Type)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
+		}
+		// NOTE: still assigning parameter type
+		parameterTypes[i] = parameterType
+	}
+
+	return parameterTypes, checkerError(errs)
 }
 
 // visitConditional checks a conditional. the test expression must be a boolean.
