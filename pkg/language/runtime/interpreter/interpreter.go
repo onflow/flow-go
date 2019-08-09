@@ -185,11 +185,10 @@ func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
+	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	function := newInterpretedFunction(
-		declaration.ToExpression(),
-		interpreter.activations.CurrentOrNew(),
-	)
+	functionExpression := declaration.ToExpression()
+	function := newInterpretedFunction(functionExpression, lexicalScope)
 
 	// make the function itself available inside the function
 	variable := &Variable{Value: function}
@@ -699,8 +698,11 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression, v
 }
 
 func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
+
 	// lexical scope: variables in functions are bound to what is visible at declaration time
-	function := newInterpretedFunction(expression, interpreter.activations.CurrentOrNew())
+	lexicalScope := interpreter.activations.CurrentOrNew()
+
+	function := newInterpretedFunction(expression, lexicalScope)
 
 	return Done{Result: function}
 }
