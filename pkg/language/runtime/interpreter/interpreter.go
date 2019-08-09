@@ -765,11 +765,30 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 
 	constructorVariable := &Variable{}
 
+	functions := interpreter.structureFunctions(declaration, lexicalScope)
+
 	// TODO: function type
 	constructorVariable.Value = NewHostFunction(
 		nil,
 		func(interpreter *Interpreter, values []Value) Trampoline {
 			structure := newStructure()
+
+			for name, function := range functions {
+				// TODO: function type
+				structure.Members[name] =
+					NewHostFunction(
+						nil,
+						func(interpreter *Interpreter, values []Value) Trampoline {
+							return interpreter.invokeStructureFunction(
+								function,
+								values,
+								structure,
+								declaration.Identifier,
+								constructorVariable,
+							)
+						},
+					)
+			}
 
 			var initializationTrampoline Trampoline = Done{}
 
@@ -777,7 +796,6 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 				initializationTrampoline = interpreter.invokeStructureFunction(
 					*initializerFunction,
 					values,
-					initializerFunction.Activation,
 					structure,
 					declaration.Identifier,
 					constructorVariable,
@@ -802,7 +820,6 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 func (interpreter *Interpreter) invokeStructureFunction(
 	function InterpretedFunctionValue,
 	values []Value,
-	lexicalScope hamt.Map,
 	structure *StructureValue,
 	identifier string,
 	constructorVariable *Variable,
@@ -810,7 +827,7 @@ func (interpreter *Interpreter) invokeStructureFunction(
 	// start a new activation record
 	// lexical scope: use the function declaration's activation record,
 	// not the current one (which would be dynamic scope)
-	interpreter.activations.Push(lexicalScope)
+	interpreter.activations.Push(function.Activation)
 
 	// make `self` available in the initializer
 	interpreter.declareVariable(sema.SelfIdentifier, structure)
@@ -819,6 +836,22 @@ func (interpreter *Interpreter) invokeStructureFunction(
 	interpreter.setVariable(identifier, constructorVariable)
 
 	return interpreter.invokeInterpretedFunctionActivated(function, values)
+}
+
+func (interpreter *Interpreter) structureFunctions(
+	declaration *ast.StructureDeclaration,
+	lexicalScope hamt.Map,
+) map[string]InterpretedFunctionValue {
+
+	functions := map[string]InterpretedFunctionValue{}
+
+	for _, functionDeclaration := range declaration.Functions {
+		function := functionDeclaration.ToExpression()
+		functions[functionDeclaration.Identifier] =
+			newInterpretedFunction(function, lexicalScope)
+	}
+
+	return functions
 }
 
 func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {

@@ -1037,6 +1037,47 @@ func TestInterpretStructureConstructorReferenceInInitializer(t *testing.T) {
 		To(Equal(interpreter.VoidValue{}))
 }
 
+func TestInterpretStructureSelfReferenceInFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+
+    struct Test {
+
+        fun test() {
+            self
+        }
+    }
+
+    fun test() {
+        Test().test()
+    }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+}
+
+func TestInterpretStructureConstructorReferenceInFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+
+    struct Test {
+
+        fun test() {
+            Test
+        }
+    }
+
+    fun test() {
+        Test().test()
+    }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+}
 
 func TestInterpretStructureDeclarationWithField(t *testing.T) {
 	RegisterTestingT(t)
@@ -1060,5 +1101,32 @@ func TestInterpretStructureDeclarationWithField(t *testing.T) {
 	newValue := big.NewInt(42)
 
 	Expect(inter.Invoke("test", newValue)).
+		To(Equal(interpreter.IntValue{Int: newValue}))
+}
+
+func TestInterpretStructureDeclarationWithFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var value = 0
+
+      struct Test {
+          fun test(_ newValue: Int) {
+              value = newValue
+          }
+      }
+
+      fun test(newValue: Int) {
+          let test = Test()
+          test.test(newValue)
+      }
+	`)
+
+	newValue := big.NewInt(42)
+
+	Expect(inter.Invoke("test", newValue)).
+		To(Equal(interpreter.VoidValue{}))
+
+	Expect(inter.Globals["value"].Value).
 		To(Equal(interpreter.IntValue{Int: newValue}))
 }
