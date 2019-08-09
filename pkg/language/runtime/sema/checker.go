@@ -436,6 +436,7 @@ func (checker *Checker) declareGlobal(declaration ast.Declaration) *CheckerError
 	var errs []error
 
 	name := declaration.DeclarationName()
+
 	if existingGlobal, exists := checker.Globals[name]; exists {
 		errs = append(errs,
 			&RedeclarationError{

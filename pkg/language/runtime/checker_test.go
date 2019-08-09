@@ -1839,3 +1839,47 @@ func TestCheckStructureInstantiation(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
+
+func TestCheckInvalidStructureRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Foo {}
+      struct Foo {}
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	// NOTE: two errors: one because type is redeclared,
+	// the other because the global is redeclared
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+}
+
+func TestCheckInvalidIncompatibleStructureTypes(t *testing.T) {
+	// tests that structure typing is nominal, not structural
+
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Foo {
+          init() {}
+      }
+
+      struct Bar {
+          init() {}
+      }
+
+      let foo: Foo = Bar()
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
