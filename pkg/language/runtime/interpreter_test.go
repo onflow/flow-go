@@ -953,3 +953,44 @@ func TestInterpretHostFunction(t *testing.T) {
 	Expect(inter.Globals["a"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
+
+func TestInterpretStructureDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       struct Test {}
+
+       fun test(): Test {
+           return Test()
+       }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(BeAssignableToTypeOf(&interpreter.StructureValue{}))
+}
+
+func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       var value = 0
+
+       struct Test {
+           init(_ newValue: Int) {
+               value = newValue
+           }
+       }
+
+       fun test(newValue: Int): Test {
+           return Test(newValue)
+       }
+	`)
+
+	newValue := big.NewInt(42)
+
+	Expect(inter.Invoke("test", newValue)).
+		To(BeAssignableToTypeOf(&interpreter.StructureValue{}))
+
+	Expect(inter.Globals["value"].Value).
+		To(Equal(interpreter.IntValue{Int: newValue}))
+}

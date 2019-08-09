@@ -717,17 +717,58 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 	return Done{Result: function}
 }
 
-func (interpreter *Interpreter) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
-	// TODO:
-	return nil
+func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.StructureDeclaration) ast.Repr {
+
+	// lexical scope: variables in functions are bound to what is visible at declaration time
+	lexicalScope := interpreter.activations.CurrentOrNew()
+
+	initializer := declaration.Initializer
+
+	var initializerFunction *InterpretedFunctionValue
+	if initializer != nil {
+		functionExpression := initializer.ToFunctionExpression()
+		initializerFunction = newInterpretedFunction(functionExpression, lexicalScope)
+	}
+
+	// the constructor is a host function which creates a new StructureValue,
+	// calls the initializer (interpreted function), if any,
+	// where `self` is bound to the new structure value,
+	// and then returns the structure value
+
+	// TODO: function type
+	constructor := NewHostFunction(
+		nil,
+		func(interpreter *Interpreter, values []Value) Trampoline {
+			structure := &StructureValue{}
+
+			var initializationTrampoline Trampoline = Done{}
+
+			// TODO: bind `self` to structure
+			if initializerFunction != nil {
+				initializationTrampoline = initializerFunction.invoke(interpreter, values)
+			}
+
+			return initializationTrampoline.
+				Map(func(_ interface{}) interface{} {
+					return structure
+				})
+		},
+	)
+
+	// TODO: make the constructor itself available inside the structure's initializer and functions
+	variable := &Variable{Value: constructor}
+
+	// declare the constructor in the current scope
+	interpreter.setVariable(declaration.Identifier, variable)
+
+	// NOTE: no result, so it does *not* act like a return-statement
+	return Done{}
 }
 
 func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
-	// TODO:
-	return nil
+	panic(&errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
-	// TODO:
-	return nil
+	panic(&errors.UnreachableError{})
 }
