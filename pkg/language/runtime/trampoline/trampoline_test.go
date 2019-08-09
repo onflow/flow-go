@@ -6,7 +6,20 @@ import (
 	"testing"
 )
 
-func TestFlatMap(t *testing.T) {
+func TestFlatMapDone(t *testing.T) {
+	RegisterTestingT(t)
+
+	trampoline := Done{23}.
+		FlatMap(func(value interface{}) Trampoline {
+			number := value.(int)
+			return Done{number * 42}
+		})
+
+	Expect(Run(trampoline)).
+		To(Equal(23 * 42))
+}
+
+func TestFlatMapMore(t *testing.T) {
 	RegisterTestingT(t)
 
 	trampoline :=
