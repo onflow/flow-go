@@ -188,14 +188,14 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	functionExpression := declaration.ToExpression()
-	function := newInterpretedFunction(functionExpression, lexicalScope)
-
 	// make the function itself available inside the function
-	variable := &Variable{Value: function}
+	variable := &Variable{}
 
-	function.Activation = function.Activation.
+	lexicalScope = lexicalScope.
 		Insert(activations.StringKey(declaration.Identifier), variable)
+
+	functionExpression := declaration.ToExpression()
+	variable.Value = newInterpretedFunction(functionExpression, lexicalScope)
 
 	// declare the function in the current scope
 	interpreter.setVariable(declaration.Identifier, variable)
@@ -658,7 +658,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 }
 
 func (interpreter *Interpreter) invokeInterpretedFunction(
-	function *InterpretedFunctionValue,
+	function InterpretedFunctionValue,
 	arguments []Value,
 ) Trampoline {
 
@@ -673,7 +673,7 @@ func (interpreter *Interpreter) invokeInterpretedFunction(
 // NOTE: assumes the function's activation (or an extension of it) is pushed!
 //
 func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
-	function *InterpretedFunctionValue,
+	function InterpretedFunctionValue,
 	arguments []Value,
 ) Trampoline {
 	interpreter.bindFunctionInvocationParameters(function, arguments)
@@ -691,7 +691,7 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 
 // bindFunctionInvocationParameters binds the argument values to the parameters in the function
 func (interpreter *Interpreter) bindFunctionInvocationParameters(
-	function *InterpretedFunctionValue,
+	function InterpretedFunctionValue,
 	arguments []Value,
 ) {
 	for parameterIndex, parameter := range function.Expression.Parameters {
@@ -758,7 +758,8 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 	var initializerFunction *InterpretedFunctionValue
 	if initializer != nil {
 		functionExpression := initializer.ToFunctionExpression()
-		initializerFunction = newInterpretedFunction(functionExpression, lexicalScope)
+		function := newInterpretedFunction(functionExpression, lexicalScope)
+		initializerFunction = &function
 	}
 
 	constructorVariable := &Variable{}
@@ -785,7 +786,7 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 					// make the constructor available in the initializer
 					interpreter.setVariable(declaration.Identifier, constructorVariable)
 
-					return interpreter.invokeInterpretedFunctionActivated(initializerFunction, values)
+					return interpreter.invokeInterpretedFunctionActivated(*initializerFunction, values)
 				})
 			}
 

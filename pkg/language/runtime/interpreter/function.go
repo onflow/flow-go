@@ -26,18 +26,18 @@ type InterpretedFunctionValue struct {
 func (InterpretedFunctionValue) isValue()         {}
 func (InterpretedFunctionValue) isFunctionValue() {}
 
-func newInterpretedFunction(expression *ast.FunctionExpression, activation hamt.Map) *InterpretedFunctionValue {
-	return &InterpretedFunctionValue{
+func newInterpretedFunction(expression *ast.FunctionExpression, activation hamt.Map) InterpretedFunctionValue {
+	return InterpretedFunctionValue{
 		Expression: expression,
 		Activation: activation,
 	}
 }
 
-func (f *InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
+func (f InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
 	return interpreter.invokeInterpretedFunction(f, arguments)
 }
 
-func (f *InterpretedFunctionValue) parameterCount() int {
+func (f InterpretedFunctionValue) parameterCount() int {
 	return len(f.Expression.Parameters)
 }
 
