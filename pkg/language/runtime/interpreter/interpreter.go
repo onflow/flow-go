@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	goRuntime "runtime"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
@@ -666,6 +667,15 @@ func (interpreter *Interpreter) invokeInterpretedFunction(
 	// not the current one (which would be dynamic scope)
 	interpreter.activations.Push(function.Activation)
 
+	return interpreter.invokeInterpretedFunctionActivated(function, arguments)
+}
+
+// NOTE: assumes the function's activation (or an extension of it) is pushed!
+//
+func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
+	function *InterpretedFunctionValue,
+	arguments []Value,
+) Trampoline {
 	interpreter.bindFunctionInvocationParameters(function, arguments)
 
 	return function.Expression.Block.Accept(interpreter).(Trampoline).
@@ -740,13 +750,24 @@ func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.Struc
 	constructor := NewHostFunction(
 		nil,
 		func(interpreter *Interpreter, values []Value) Trampoline {
-			structure := &StructureValue{}
+			structure := &StructureValue{
+				Members: map[string]Value{},
+			}
 
 			var initializationTrampoline Trampoline = Done{}
 
 			// TODO: bind `self` to structure
 			if initializerFunction != nil {
-				initializationTrampoline = initializerFunction.invoke(interpreter, values)
+				initializationTrampoline = More(func() Trampoline {
+					// start a new activation record
+					// lexical scope: use the function declaration's activation record,
+					// not the current one (which would be dynamic scope)
+					interpreter.activations.Push(initializerFunction.Activation)
+
+					interpreter.declareVariable(sema.SelfIdentifier, structure)
+
+					return interpreter.invokeInterpretedFunctionActivated(initializerFunction, values)
+				})
 			}
 
 			return initializationTrampoline.

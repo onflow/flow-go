@@ -994,3 +994,50 @@ func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
 	Expect(inter.Globals["value"].Value).
 		To(Equal(interpreter.IntValue{Int: newValue}))
 }
+
+func TestInterpretStructureSelfReferenceInInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+
+      struct Test {
+
+          init() {
+              self
+          }
+      }
+
+      fun test() {
+          Test()
+      }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+}
+
+
+func TestInterpretStructureDeclarationWithField(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+
+      struct Test {
+          var test: Int
+
+          init(_ test: Int) {
+              self.test = test
+          }
+      }
+
+      fun test(test: Int): Int {
+          let test = Test(test)
+          return test.test
+      }
+	`)
+
+	newValue := big.NewInt(42)
+
+	Expect(inter.Invoke("test", newValue)).
+		To(Equal(interpreter.IntValue{Int: newValue}))
+}
