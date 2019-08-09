@@ -90,16 +90,17 @@ func (server) DidChangeTextDocument(
 	} else {
 		// no parsing parseErrors, check program
 
-		// TODO: publish all
-
 		checker := sema.NewChecker(program)
 		err := checker.Check()
 
-		if semanticError, ok := err.(sema.SemanticError); ok {
-
-			diagnostic := convertError(semanticError)
-			if diagnostic != nil {
-				diagnostics = append(diagnostics, *diagnostic)
+		if checkerError, ok := err.(*sema.CheckerError); ok && checkerError != nil {
+			for _, err := range checkerError.Errors {
+				if semanticError, ok := err.(sema.SemanticError); ok {
+					diagnostic := convertError(semanticError)
+					if diagnostic != nil {
+						diagnostics = append(diagnostics, *diagnostic)
+					}
+				}
 			}
 		}
 	}
