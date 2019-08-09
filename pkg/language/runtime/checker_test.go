@@ -1701,6 +1701,30 @@ func TestCheckStructureFieldAssignment(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckInvalidStructureSelfAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+          init() {
+              self = Test()
+          }
+
+          fun test() {
+              self = Test()
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+}
+
 func TestCheckInvalidStructureFieldAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
