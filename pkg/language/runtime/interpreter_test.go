@@ -128,6 +128,26 @@ func TestInterpretLexicalScope(t *testing.T) {
 		To(Equal(interpreter.IntValue{Int: big.NewInt(10)}))
 }
 
+func TestInterpretFunctionSideEffects(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       var value = 0
+
+       fun test(_ newValue: Int) {
+           value = newValue
+       }
+	`)
+
+	newValue := big.NewInt(42)
+
+	Expect(inter.Invoke("test", newValue)).
+		To(Equal(interpreter.VoidValue{}))
+
+	Expect(inter.Globals["value"].Value).
+		To(Equal(interpreter.IntValue{Int: newValue}))
+}
+
 func TestInterpretNoHoisting(t *testing.T) {
 	RegisterTestingT(t)
 
