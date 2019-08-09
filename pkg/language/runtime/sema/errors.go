@@ -81,7 +81,8 @@ func (e *RedeclarationError) StartPosition() ast.Position {
 }
 
 func (e *RedeclarationError) EndPosition() ast.Position {
-	return e.Pos
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
 }
 
 // NotDeclaredError
@@ -477,7 +478,8 @@ func (e *InvalidNameError) StartPosition() ast.Position {
 }
 
 func (e *InvalidNameError) EndPosition() ast.Position {
-	return e.Pos
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
 }
 
 // InvalidInitializerNameError
@@ -502,7 +504,8 @@ func (e *InvalidInitializerNameError) StartPosition() ast.Position {
 }
 
 func (e *InvalidInitializerNameError) EndPosition() ast.Position {
-	return e.Pos
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
 }
 
 // InvalidDeclarationError
@@ -637,5 +640,6 @@ func (e *FieldUninitializedError) StartPosition() ast.Position {
 }
 
 func (e *FieldUninitializedError) EndPosition() ast.Position {
-	return e.Pos
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
 }
