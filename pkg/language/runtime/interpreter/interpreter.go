@@ -665,12 +665,13 @@ func (interpreter *Interpreter) invokeInterpretedFunction(
 	// lexical scope: use the function declaration's activation record,
 	// not the current one (which would be dynamic scope)
 	interpreter.activations.Push(function.Activation)
-	defer interpreter.activations.Pop()
 
 	interpreter.bindFunctionInvocationParameters(function, arguments)
 
 	return function.Expression.Block.Accept(interpreter).(Trampoline).
 		Map(func(blockResult interface{}) interface{} {
+			interpreter.activations.Pop()
+
 			if blockResult == nil {
 				return VoidValue{}
 			}
