@@ -19,7 +19,12 @@ func (t *NominalType) StartPosition() *Position {
 }
 
 func (t *NominalType) EndPosition() *Position {
-	return t.Pos
+	length := len(t.Identifier)
+	return &Position{
+		Offset: t.Pos.Offset + length - 1,
+		Line:   t.Pos.Line,
+		Column: t.Pos.Column + length - 1,
+	}
 }
 
 // VariableSizedType is a variable sized array type
