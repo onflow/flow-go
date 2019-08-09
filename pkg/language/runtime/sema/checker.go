@@ -1616,10 +1616,6 @@ func (checker *Checker) visitConditional(
 func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
 	var errs []error
 
-	if err := checker.checkStructureIdentifier(structure); err != nil {
-		errs = append(errs, err.Errors...)
-	}
-
 	if err := checker.checkStructureFieldAndFunctionIdentifiers(structure); err != nil {
 		errs = append(errs, err.Errors...)
 	}
@@ -1630,6 +1626,10 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 
 	structureType, err := checker.structureType(structure)
 	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	if err := checker.declareType(structure.Identifier, structure.IdentifierPos, structureType); err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
@@ -1872,12 +1872,12 @@ func (checker *Checker) checkStructureFieldAndFunctionIdentifiers(structure *ast
 	return checkerError(errs)
 }
 
-// checkStructureIdentifier checks a type with the structure's name is not already defined
-//
-func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclaration) *CheckerError {
+func (checker *Checker) declareType(
+	identifier string,
+	identifierPos *ast.Position,
+	newType Type,
+) *CheckerError {
 	var errs []error
-
-	identifier := structure.Identifier
 
 	existingType := checker.findType(identifier)
 	if existingType != nil {
@@ -1885,11 +1885,14 @@ func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclara
 			&RedeclarationError{
 				Kind: common.DeclarationKindType,
 				Name: identifier,
-				Pos:  structure.IdentifierPos,
+				Pos:  identifierPos,
 				// TODO: previous pos
 			},
 		)
 	}
+
+	// type with this identifier is not declared in current scope, declare it
+	checker.setType(identifier, newType)
 
 	return checkerError(errs)
 }
