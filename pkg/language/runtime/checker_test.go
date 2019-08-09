@@ -71,12 +71,14 @@ func expectCheckerErrors(err error, len int) []error {
 	return errs
 }
 
-func TestCheckInvalidGlobalRedeclaration(t *testing.T) {
+func TestCheckInvalidGlobalConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-        let x = true
-        let x = false
+        fun x() {}
+
+        let y = true
+        let y = false
 	`)
 
 	errs := expectCheckerErrors(err, 1)
@@ -85,7 +87,23 @@ func TestCheckInvalidGlobalRedeclaration(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
-func TestCheckInvalidVariableRedeclaration(t *testing.T) {
+func TestCheckInvalidGlobalFunctionRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        let x = true
+
+        fun y() {}
+        fun y() {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckInvalidLocalRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
@@ -1844,6 +1862,7 @@ func TestCheckInvalidStructureRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
+      let x = 1
       struct Foo {}
       struct Foo {}
 	`)

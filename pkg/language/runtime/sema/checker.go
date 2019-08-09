@@ -436,18 +436,6 @@ func (checker *Checker) declareGlobal(declaration ast.Declaration) *CheckerError
 	var errs []error
 
 	name := declaration.DeclarationName()
-
-	if existingGlobal, exists := checker.Globals[name]; exists {
-		errs = append(errs,
-			&RedeclarationError{
-				Kind:        declaration.DeclarationKind(),
-				Name:        name,
-				Pos:         declaration.IdentifierPosition(),
-				PreviousPos: existingGlobal.Pos,
-			},
-		)
-	}
-
 	checker.Globals[name] = checker.findVariable(name)
 
 	return checkerError(errs)
