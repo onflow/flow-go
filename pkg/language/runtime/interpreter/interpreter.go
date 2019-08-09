@@ -35,15 +35,7 @@ func NewInterpreter(program *ast.Program) *Interpreter {
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
-	value := interpreter.activations.Find(name)
-	if value == nil {
-		return nil
-	}
-	variable, ok := value.(*Variable)
-	if !ok {
-		return nil
-	}
-	return variable
+	return interpreter.activations.Find(name).(*Variable)
 }
 
 func (interpreter *Interpreter) setVariable(name string, variable *Variable) {
