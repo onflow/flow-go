@@ -915,11 +915,12 @@ func TestInterpretHostFunction(t *testing.T) {
 			},
 			ReturnType: &sema.IntType{},
 		},
-		func(inter *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
+		func(inter *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int
 			b := arguments[1].(interpreter.IntValue).Int
-			result := big.NewInt(0).Add(a, b)
-			return interpreter.IntValue{Int: result}
+			value := big.NewInt(0).Add(a, b)
+			result := interpreter.IntValue{Int: value}
+			return trampoline.Done{Result: result}
 		},
 	)
 

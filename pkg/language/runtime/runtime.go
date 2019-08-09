@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 	"math/big"
 	"strings"
 
@@ -157,7 +158,7 @@ var createAccountFunctionType = sema.FunctionType{
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunction(
 		&setValueFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
+		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
 			if len(arguments) != 4 {
 				panic(fmt.Sprintf("setValue requires 4 parameters"))
 			}
@@ -175,7 +176,8 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterfa
 				panic(err)
 			}
 
-			return &interpreter.VoidValue{}
+			result := &interpreter.VoidValue{}
+			return trampoline.Done{Result: result}
 		},
 	)
 }
@@ -183,7 +185,7 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterfa
 func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunction(
 		&getValueFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
+		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
 			if len(arguments) != 3 {
 				panic(fmt.Sprintf("getValue requires 3 parameters"))
 			}
@@ -195,7 +197,8 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterfa
 				panic(err)
 			}
 
-			return interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+			result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+			return trampoline.Done{Result: result}
 		},
 	)
 }
@@ -203,7 +206,7 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterfa
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunction(
 		&createAccountFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
+		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
 			if len(arguments) != 2 {
 				panic(fmt.Sprintf("createAccount requires 2 parameters"))
 			}
@@ -223,7 +226,8 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeIn
 				panic(err)
 			}
 
-			return interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+			result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+			return trampoline.Done{Result: result}
 		},
 	)
 }
