@@ -1633,6 +1633,15 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		errs = append(errs, err.Errors...)
 	}
 
+	// declare the constructor function before checking initializer and functions,
+	// so the constructor function can be referred to inside them
+
+	if err := checker.declareStructureConstructor(structure, structureType); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	// check the initializer
+
 	initializer := structure.Initializer
 	if initializer != nil {
 		if err := checker.checkStructureInitializer(initializer, structureType); err != nil {
@@ -1653,6 +1662,43 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		Type:   nil,
 		Errors: errs,
 	}
+}
+
+func (checker *Checker) declareStructureConstructor(
+	structure *ast.StructureDeclaration,
+	structureType *StructureType,
+) *CheckerError {
+	var errs []error
+
+	functionType := &FunctionType{
+		ReturnType: structureType,
+	}
+	var argumentLabels []string
+
+	initializer := structure.Initializer
+	if initializer != nil {
+		// NOTE: IGNORING errors, because initializer will be checked separately
+		// in `VisitInitializerDeclaration`, otherwise we get error duplicates
+
+		parameterTypes, _ := checker.parameterTypes(initializer.Parameters)
+
+		functionType = &FunctionType{
+			ParameterTypes: parameterTypes,
+			ReturnType:     structureType,
+		}
+	}
+
+	if err := checker.declareFunction(
+		structure.Identifier,
+		structure.IdentifierPos,
+		functionType,
+		argumentLabels,
+	); err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
+	}
+
+	return checkerError(errs)
 }
 
 func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*StructureType, *CheckerError) {

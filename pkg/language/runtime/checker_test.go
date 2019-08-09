@@ -1817,3 +1817,25 @@ func TestCheckInvalidStructureFunctionAssignment(t *testing.T) {
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
+
+func TestCheckStructureInstantiation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+
+          init(x: Int) {
+              let test: Test = Test(x: 1)
+          }
+
+          fun test() {
+              let test: Test = Test(x: 2)
+          }
+      }
+
+      let test: Test = Test(x: 3)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
