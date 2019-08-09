@@ -19,7 +19,13 @@ func (e *BoolExpression) StartPosition() Position {
 }
 
 func (e *BoolExpression) EndPosition() Position {
-	return e.Pos
+	var length int
+	if e.Value {
+		length = len("true")
+	} else {
+		length = len("false")
+	}
+	return e.Pos.Shifted(length - 1)
 }
 
 func (*BoolExpression) isExpression() {}

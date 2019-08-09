@@ -106,7 +106,7 @@ func TestParseBoolExpression(t *testing.T) {
 			Pos:   Position{Offset: 14, Line: 2, Column: 13},
 		},
 		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
-		EndPos:        Position{Offset: 14, Line: 2, Column: 13},
+		EndPos:        Position{Offset: 17, Line: 2, Column: 16},
 		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
 	}
 
@@ -428,7 +428,7 @@ func TestParseOrExpression(t *testing.T) {
 			},
 		},
 		StartPos:      Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:        Position{Offset: 26, Line: 2, Column: 25},
+		EndPos:        Position{Offset: 29, Line: 2, Column: 28},
 		IdentifierPos: Position{Offset: 13, Line: 2, Column: 12},
 	}
 
@@ -466,7 +466,7 @@ func TestParseAndExpression(t *testing.T) {
 			},
 		},
 		StartPos:      Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:        Position{Offset: 26, Line: 2, Column: 25},
+		EndPos:        Position{Offset: 29, Line: 2, Column: 28},
 		IdentifierPos: Position{Offset: 13, Line: 2, Column: 12},
 	}
 
@@ -504,7 +504,7 @@ func TestParseEqualityExpression(t *testing.T) {
 			},
 		},
 		StartPos:      Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:        Position{Offset: 26, Line: 2, Column: 25},
+		EndPos:        Position{Offset: 29, Line: 2, Column: 28},
 		IdentifierPos: Position{Offset: 13, Line: 2, Column: 12},
 	}
 
