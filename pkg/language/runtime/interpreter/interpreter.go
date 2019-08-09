@@ -3,6 +3,7 @@ package interpreter
 import (
 	"fmt"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/raviqqe/hamt"
 	goRuntime "runtime"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
@@ -745,8 +746,8 @@ func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.Struc
 // calls the initializer (interpreted function), if any,
 // and then returns the structure.
 //
-// Inside the initializer, `self` is bound to the new structure value,
-// and the constructor itself is bound
+// Inside the initializer and all functions, `self` is bound to
+// the new structure value, and the constructor itself is bound
 //
 func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.StructureDeclaration) *Variable {
 
@@ -773,21 +774,14 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 			var initializationTrampoline Trampoline = Done{}
 
 			if initializerFunction != nil {
-				initializationTrampoline = More(func() Trampoline {
-
-					// start a new activation record
-					// lexical scope: use the function declaration's activation record,
-					// not the current one (which would be dynamic scope)
-					interpreter.activations.Push(initializerFunction.Activation)
-
-					// make `self` available in the initializer
-					interpreter.declareVariable(sema.SelfIdentifier, structure)
-
-					// make the constructor available in the initializer
-					interpreter.setVariable(declaration.Identifier, constructorVariable)
-
-					return interpreter.invokeInterpretedFunctionActivated(*initializerFunction, values)
-				})
+				initializationTrampoline = interpreter.invokeStructureFunction(
+					*initializerFunction,
+					values,
+					initializerFunction.Activation,
+					structure,
+					declaration.Identifier,
+					constructorVariable,
+				)
 			}
 
 			return initializationTrampoline.
@@ -798,6 +792,33 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 	)
 
 	return constructorVariable
+}
+
+// invokeStructureFunction calls the given function with the values.
+//
+// Inside the function, `self` is bound to the structure,
+// and the constructor for the structure is bound
+//
+func (interpreter *Interpreter) invokeStructureFunction(
+	function InterpretedFunctionValue,
+	values []Value,
+	lexicalScope hamt.Map,
+	structure *StructureValue,
+	identifier string,
+	constructorVariable *Variable,
+) Trampoline {
+	// start a new activation record
+	// lexical scope: use the function declaration's activation record,
+	// not the current one (which would be dynamic scope)
+	interpreter.activations.Push(lexicalScope)
+
+	// make `self` available in the initializer
+	interpreter.declareVariable(sema.SelfIdentifier, structure)
+
+	// make the constructor available in the initializer
+	interpreter.setVariable(identifier, constructorVariable)
+
+	return interpreter.invokeInterpretedFunctionActivated(function, values)
 }
 
 func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
