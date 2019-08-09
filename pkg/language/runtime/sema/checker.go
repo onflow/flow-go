@@ -373,7 +373,10 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		}
 
 		// check the value type is a subtype of the declaration type
-		if !checker.IsSubType(valueType, declarationType) {
+		if declarationType != nil &&
+			valueType != nil &&
+			!checker.IsSubType(valueType, declarationType) {
+
 			errs = append(errs,
 				&TypeMismatchError{
 					ExpectedType: declarationType,

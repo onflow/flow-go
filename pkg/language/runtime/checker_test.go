@@ -3,6 +3,7 @@ package runtime
 import (
 	"fmt"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	. "github.com/onsi/gomega"
@@ -128,6 +129,30 @@ func TestCheckInvalidUnknownDeclarationInGlobal(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckInvalidUnknownDeclarationInGlobalAndUnknownType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       let x: X = y
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	Expect(errs[0].(*sema.NotDeclaredError).Name).
+		To(Equal("y"))
+	Expect(errs[0].(*sema.NotDeclaredError).ExpectedKind).
+		To(Equal(common.DeclarationKindValue))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	Expect(errs[1].(*sema.NotDeclaredError).Name).
+		To(Equal("X"))
+	Expect(errs[1].(*sema.NotDeclaredError).ExpectedKind).
+		To(Equal(common.DeclarationKindType))
 }
 
 func TestCheckInvalidUnknownDeclarationCallInGlobal(t *testing.T) {
