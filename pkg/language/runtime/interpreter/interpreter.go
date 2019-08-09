@@ -349,11 +349,15 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 		return interpreter.visitIndexExpressionAssignment(target, value)
 
 	case *ast.MemberExpression:
-		// TODO: no structures yet
-		panic(&errors.UnreachableError{})
+		return interpreter.visitMemberExpressionAssignment(target, value)
 	}
 
 	panic(&errors.UnreachableError{})
+}
+
+func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
+	variable := interpreter.findVariable(target.Identifier)
+	variable.Value = value
 }
 
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
@@ -372,10 +376,16 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 		})
 }
 
-func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
-	identifier := target.Identifier
-	variable := interpreter.findVariable(identifier)
-	variable.Value = value
+func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.MemberExpression, value Value) Trampoline {
+	return target.Expression.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+			structure := result.(*StructureValue)
+
+			structure.Members[target.Identifier] = value
+
+			// NOTE: no result, so it does *not* act like a return-statement
+			return Done{}
+		})
 }
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
@@ -590,9 +600,12 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 	return interpreter.visitExpressions(expression.Values, nil)
 }
 
-func (interpreter *Interpreter) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO: no structures yet
-	panic(&errors.UnreachableError{})
+func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
+	return expression.Expression.Accept(interpreter).(Trampoline).
+		Map(func(result interface{}) interface{} {
+			structure := result.(*StructureValue)
+			return structure.Members[expression.Identifier]
+		})
 }
 
 func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
