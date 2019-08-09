@@ -729,6 +729,26 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 }
 
 func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.StructureDeclaration) ast.Repr {
+	constructorVariable := interpreter.structureConstructorVariable(declaration)
+
+	// declare the constructor in the current scope
+	interpreter.setVariable(declaration.Identifier, constructorVariable)
+
+	// NOTE: no result, so it does *not* act like a return-statement
+	return Done{}
+}
+
+// structureConstructorVariable creates a constructor function
+// for the given structure, bound in a variable.
+//
+// The constructor is a host function which creates a new structure,
+// calls the initializer (interpreted function), if any,
+// and then returns the structure.
+//
+// Inside the initializer, `self` is bound to the new structure value,
+// and the constructor itself is bound
+//
+func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.StructureDeclaration) *Variable {
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
@@ -740,11 +760,6 @@ func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.Struc
 		functionExpression := initializer.ToFunctionExpression()
 		initializerFunction = newInterpretedFunction(functionExpression, lexicalScope)
 	}
-
-	// the constructor is a host function which creates a new StructureValue,
-	// calls the initializer (interpreted function), if any,
-	// where `self` is bound to the new structure value,
-	// and then returns the structure value
 
 	constructorVariable := &Variable{}
 
@@ -781,11 +796,7 @@ func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.Struc
 		},
 	)
 
-	// declare the constructor in the current scope
-	interpreter.setVariable(declaration.Identifier, constructorVariable)
-
-	// NOTE: no result, so it does *not* act like a return-statement
-	return Done{}
+	return constructorVariable
 }
 
 func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
