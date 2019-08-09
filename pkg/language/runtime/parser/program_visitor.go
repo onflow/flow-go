@@ -223,7 +223,8 @@ func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
 	var labelPos *ast.Position
 	if ctx.argumentLabel != nil {
 		label = ctx.argumentLabel.GetText()
-		labelPos = ast.PositionFromToken(ctx.argumentLabel)
+		position := ast.PositionFromToken(ctx.argumentLabel)
+		labelPos = &position
 	}
 
 	// identifier
@@ -402,7 +403,7 @@ func (v *ProgramVisitor) VisitReturnStatement(ctx *ReturnStatementContext) inter
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
-	var endPosition *ast.Position
+	var endPosition ast.Position
 	if expression != nil {
 		endPosition = expression.EndPosition()
 	} else {

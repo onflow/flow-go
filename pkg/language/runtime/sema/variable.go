@@ -7,5 +7,5 @@ type Variable struct {
 	Depth          int
 	Type           Type
 	ArgumentLabels []string
-	Pos            *ast.Position
+	Pos            ast.Position
 }

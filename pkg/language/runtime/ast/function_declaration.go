@@ -8,20 +8,20 @@ type FunctionDeclaration struct {
 	Parameters    []*Parameter
 	ReturnType    Type
 	Block         *Block
-	StartPos      *Position
-	EndPos        *Position
-	IdentifierPos *Position
+	StartPos      Position
+	EndPos        Position
+	IdentifierPos Position
 }
 
-func (f *FunctionDeclaration) StartPosition() *Position {
+func (f *FunctionDeclaration) StartPosition() Position {
 	return f.StartPos
 }
 
-func (f *FunctionDeclaration) EndPosition() *Position {
+func (f *FunctionDeclaration) EndPosition() Position {
 	return f.EndPos
 }
 
-func (f *FunctionDeclaration) IdentifierPosition() *Position {
+func (f *FunctionDeclaration) IdentifierPosition() Position {
 	return f.IdentifierPos
 }
 

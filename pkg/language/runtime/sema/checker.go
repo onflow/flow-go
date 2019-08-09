@@ -290,7 +290,7 @@ func (checker *Checker) checkFunction(
 //
 func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) *CheckerError {
 	var errs []error
-	argumentLabelPositions := map[string]*ast.Position{}
+	argumentLabelPositions := map[string]ast.Position{}
 
 	for _, parameter := range parameters {
 		label := parameter.Label
@@ -298,18 +298,20 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) *Checke
 			continue
 		}
 
+		labelPos := *parameter.LabelPos
+
 		if previousPos, ok := argumentLabelPositions[label]; ok {
 			errs = append(errs,
 				&RedeclarationError{
 					Kind:        common.DeclarationKindArgumentLabel,
 					Name:        label,
-					Pos:         parameter.LabelPos,
+					Pos:         labelPos,
 					PreviousPos: previousPos,
 				},
 			)
 		}
 
-		argumentLabelPositions[label] = parameter.LabelPos
+		argumentLabelPositions[label] = labelPos
 	}
 
 	return checkerError(errs)
@@ -1467,7 +1469,7 @@ func (checker *Checker) ConvertType(t ast.Type) (Type, *CheckerError) {
 
 func (checker *Checker) declareFunction(
 	identifier string,
-	identifierPosition *ast.Position,
+	identifierPosition ast.Position,
 	functionType *FunctionType,
 	argumentLabels []string,
 ) *CheckerError {
@@ -1839,9 +1841,9 @@ func (checker *Checker) declareSelf(selfType *StructureType) {
 func (checker *Checker) checkStructureFieldAndFunctionIdentifiers(structure *ast.StructureDeclaration) *CheckerError {
 	var errs []error
 
-	positions := map[string]*ast.Position{}
+	positions := map[string]ast.Position{}
 
-	checkName := func(name string, pos *ast.Position, kind common.DeclarationKind) {
+	checkName := func(name string, pos ast.Position, kind common.DeclarationKind) {
 		if name == InitializerIdentifier {
 			errs = append(errs,
 				&InvalidNameError{
@@ -1886,7 +1888,7 @@ func (checker *Checker) checkStructureFieldAndFunctionIdentifiers(structure *ast
 
 func (checker *Checker) declareType(
 	identifier string,
-	identifierPos *ast.Position,
+	identifierPos ast.Position,
 	newType Type,
 ) *CheckerError {
 	var errs []error

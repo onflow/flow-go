@@ -11,14 +11,14 @@ type Expression interface {
 
 type BoolExpression struct {
 	Value bool
-	Pos   *Position
+	Pos   Position
 }
 
-func (e *BoolExpression) StartPosition() *Position {
+func (e *BoolExpression) StartPosition() Position {
 	return e.Pos
 }
 
-func (e *BoolExpression) EndPosition() *Position {
+func (e *BoolExpression) EndPosition() Position {
 	return e.Pos
 }
 
@@ -32,14 +32,14 @@ func (e *BoolExpression) Accept(v Visitor) Repr {
 
 type IntExpression struct {
 	Value *big.Int
-	Pos   *Position
+	Pos   Position
 }
 
-func (e *IntExpression) StartPosition() *Position {
+func (e *IntExpression) StartPosition() Position {
 	return e.Pos
 }
 
-func (e *IntExpression) EndPosition() *Position {
+func (e *IntExpression) EndPosition() Position {
 	return e.Pos
 }
 
@@ -53,15 +53,15 @@ func (e *IntExpression) Accept(v Visitor) Repr {
 
 type ArrayExpression struct {
 	Values   []Expression
-	StartPos *Position
-	EndPos   *Position
+	StartPos Position
+	EndPos   Position
 }
 
-func (e *ArrayExpression) StartPosition() *Position {
+func (e *ArrayExpression) StartPosition() Position {
 	return e.StartPos
 }
 
-func (e *ArrayExpression) EndPosition() *Position {
+func (e *ArrayExpression) EndPosition() Position {
 	return e.EndPos
 }
 
@@ -75,15 +75,15 @@ func (e *ArrayExpression) Accept(v Visitor) Repr {
 
 type IdentifierExpression struct {
 	Identifier string
-	StartPos   *Position
-	EndPos     *Position
+	StartPos   Position
+	EndPos     Position
 }
 
-func (e *IdentifierExpression) StartPosition() *Position {
+func (e *IdentifierExpression) StartPosition() Position {
 	return e.StartPos
 }
 
-func (e *IdentifierExpression) EndPosition() *Position {
+func (e *IdentifierExpression) EndPosition() Position {
 	return e.EndPos
 }
 
@@ -98,15 +98,15 @@ func (e *IdentifierExpression) Accept(v Visitor) Repr {
 type InvocationExpression struct {
 	Expression Expression
 	Arguments  []*Argument
-	StartPos   *Position
-	EndPos     *Position
+	StartPos   Position
+	EndPos     Position
 }
 
-func (e *InvocationExpression) StartPosition() *Position {
+func (e *InvocationExpression) StartPosition() Position {
 	return e.StartPos
 }
 
-func (e *InvocationExpression) EndPosition() *Position {
+func (e *InvocationExpression) EndPosition() Position {
 	return e.EndPos
 }
 
@@ -127,15 +127,15 @@ type AccessExpression interface {
 type MemberExpression struct {
 	Expression Expression
 	Identifier string
-	StartPos   *Position
-	EndPos     *Position
+	StartPos   Position
+	EndPos     Position
 }
 
-func (e *MemberExpression) StartPosition() *Position {
+func (e *MemberExpression) StartPosition() Position {
 	return e.StartPos
 }
 
-func (e *MemberExpression) EndPosition() *Position {
+func (e *MemberExpression) EndPosition() Position {
 	return e.EndPos
 }
 
@@ -151,15 +151,15 @@ func (e *MemberExpression) Accept(v Visitor) Repr {
 type IndexExpression struct {
 	Expression Expression
 	Index      Expression
-	StartPos   *Position
-	EndPos     *Position
+	StartPos   Position
+	EndPos     Position
 }
 
-func (e *IndexExpression) StartPosition() *Position {
+func (e *IndexExpression) StartPosition() Position {
 	return e.StartPos
 }
 
-func (e *IndexExpression) EndPosition() *Position {
+func (e *IndexExpression) EndPosition() Position {
 	return e.EndPos
 }
 
@@ -178,11 +178,11 @@ type ConditionalExpression struct {
 	Else Expression
 }
 
-func (e *ConditionalExpression) StartPosition() *Position {
+func (e *ConditionalExpression) StartPosition() Position {
 	return e.Test.StartPosition()
 }
 
-func (e *ConditionalExpression) EndPosition() *Position {
+func (e *ConditionalExpression) EndPosition() Position {
 	return e.Else.EndPosition()
 }
 
@@ -197,15 +197,15 @@ func (e *ConditionalExpression) Accept(v Visitor) Repr {
 type UnaryExpression struct {
 	Operation  Operation
 	Expression Expression
-	StartPos   *Position
-	EndPos     *Position
+	StartPos   Position
+	EndPos     Position
 }
 
-func (e *UnaryExpression) StartPosition() *Position {
+func (e *UnaryExpression) StartPosition() Position {
 	return e.StartPos
 }
 
-func (e *UnaryExpression) EndPosition() *Position {
+func (e *UnaryExpression) EndPosition() Position {
 	return e.EndPos
 }
 
@@ -223,11 +223,11 @@ type BinaryExpression struct {
 	Right     Expression
 }
 
-func (e *BinaryExpression) StartPosition() *Position {
+func (e *BinaryExpression) StartPosition() Position {
 	return e.Left.StartPosition()
 }
 
-func (e *BinaryExpression) EndPosition() *Position {
+func (e *BinaryExpression) EndPosition() Position {
 	return e.Right.EndPosition()
 }
 
@@ -243,15 +243,15 @@ type FunctionExpression struct {
 	Parameters []*Parameter
 	ReturnType Type
 	Block      *Block
-	StartPos   *Position
-	EndPos     *Position
+	StartPos   Position
+	EndPos     Position
 }
 
-func (e *FunctionExpression) StartPosition() *Position {
+func (e *FunctionExpression) StartPosition() Position {
 	return e.StartPos
 }
 
-func (e *FunctionExpression) EndPosition() *Position {
+func (e *FunctionExpression) EndPosition() Position {
 	return e.EndPos
 }
 
