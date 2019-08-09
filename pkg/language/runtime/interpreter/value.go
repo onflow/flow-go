@@ -618,6 +618,12 @@ func (v *StructureValue) ToGoValue() interface{} {
 	return v.Members
 }
 
+func newStructure() *StructureValue {
+	return &StructureValue{
+		Members: map[string]Value{},
+	}
+}
+
 // ToValue
 
 // ToValue converts a Go value into an interpreter value

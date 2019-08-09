@@ -746,25 +746,29 @@ func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.Struc
 	// where `self` is bound to the new structure value,
 	// and then returns the structure value
 
+	constructorVariable := &Variable{}
+
 	// TODO: function type
-	constructor := NewHostFunction(
+	constructorVariable.Value = NewHostFunction(
 		nil,
 		func(interpreter *Interpreter, values []Value) Trampoline {
-			structure := &StructureValue{
-				Members: map[string]Value{},
-			}
+			structure := newStructure()
 
 			var initializationTrampoline Trampoline = Done{}
 
-			// TODO: bind `self` to structure
 			if initializerFunction != nil {
 				initializationTrampoline = More(func() Trampoline {
+
 					// start a new activation record
 					// lexical scope: use the function declaration's activation record,
 					// not the current one (which would be dynamic scope)
 					interpreter.activations.Push(initializerFunction.Activation)
 
+					// make `self` available in the initializer
 					interpreter.declareVariable(sema.SelfIdentifier, structure)
+
+					// make the constructor available in the initializer
+					interpreter.setVariable(declaration.Identifier, constructorVariable)
 
 					return interpreter.invokeInterpretedFunctionActivated(initializerFunction, values)
 				})
@@ -777,11 +781,8 @@ func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.Struc
 		},
 	)
 
-	// TODO: make the constructor itself available inside the structure's initializer and functions
-	variable := &Variable{Value: constructor}
-
 	// declare the constructor in the current scope
-	interpreter.setVariable(declaration.Identifier, variable)
+	interpreter.setVariable(declaration.Identifier, constructorVariable)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
