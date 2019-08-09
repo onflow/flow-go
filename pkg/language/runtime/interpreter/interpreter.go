@@ -191,59 +191,29 @@ func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
-	expression := &ast.FunctionExpression{
-		Parameters: declaration.Parameters,
-		ReturnType: declaration.ReturnType,
-		Block:      declaration.Block,
-		StartPos:   declaration.StartPos,
-		EndPos:     declaration.EndPos,
-	}
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
-	function := newInterpretedFunction(expression, interpreter.activations.CurrentOrNew())
 
-	var parameterTypes []ast.Type
-	for _, parameter := range declaration.Parameters {
-		parameterTypes = append(parameterTypes, parameter.Type)
-	}
-
-	functionType := &ast.FunctionType{
-		ParameterTypes: parameterTypes,
-		ReturnType:     declaration.ReturnType,
-	}
-	variableDeclaration := &ast.VariableDeclaration{
-		Value:         expression,
-		Identifier:    declaration.Identifier,
-		IsConstant:    true,
-		Type:          functionType,
-		StartPos:      declaration.StartPos,
-		EndPos:        declaration.EndPos,
-		IdentifierPos: declaration.IdentifierPos,
-	}
+	function := newInterpretedFunction(
+		declaration.ToExpression(),
+		interpreter.activations.CurrentOrNew(),
+	)
 
 	// make the function itself available inside the function
-	variable := &Variable{
-		Declaration: variableDeclaration,
-		Value:       function,
-	}
+	variable := &Variable{Value: function}
+
 	function.Activation = function.Activation.
 		Insert(activations.StringKey(declaration.Identifier), variable)
 
-	// function declarations are de-sugared to constants
-	interpreter.declareVariable(variableDeclaration, function)
+	// declare the function in the current scope
+	interpreter.setVariable(declaration.Identifier, variable)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
 func (interpreter *Interpreter) ImportFunction(name string, function *HostFunctionValue) {
-	variableDeclaration := &ast.VariableDeclaration{
-		Identifier: name,
-		IsConstant: true,
-		// TODO: Type
-	}
-
-	interpreter.declareVariable(variableDeclaration, function)
+	interpreter.declareVariable(name, function)
 }
 
 func (interpreter *Interpreter) VisitBlock(block *ast.Block) ast.Repr {
@@ -355,21 +325,18 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(Value)
 
-			interpreter.declareVariable(declaration, value)
+			interpreter.declareVariable(declaration.Identifier, value)
 
 			// NOTE: ignore result, so it does *not* act like a return-statement
 			return Done{}
 		})
 }
 
-func (interpreter *Interpreter) declareVariable(declaration *ast.VariableDeclaration, value Value) {
-	variable := interpreter.findVariable(declaration.Identifier)
+func (interpreter *Interpreter) declareVariable(identifier string, value Value) {
 	// NOTE: semantic analysis already checked possible invalid redeclaration
-	variable = &Variable{
-		Declaration: declaration,
-		Value:       value,
-	}
-	interpreter.setVariable(declaration.Identifier, variable)
+	interpreter.setVariable(identifier, &Variable{
+		Value: value,
+	})
 }
 
 func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
@@ -717,20 +684,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 ) {
 	for parameterIndex, parameter := range function.Expression.Parameters {
 		argument := arguments[parameterIndex]
-
-		interpreter.setVariable(
-			parameter.Identifier,
-			&Variable{
-				Declaration: &ast.VariableDeclaration{
-					IsConstant: true,
-					Identifier: parameter.Identifier,
-					Type:       parameter.Type,
-					StartPos:   parameter.StartPos,
-					EndPos:     parameter.EndPos,
-				},
-				Value: argument,
-			},
-		)
+		interpreter.declareVariable(parameter.Identifier, argument)
 	}
 }
 

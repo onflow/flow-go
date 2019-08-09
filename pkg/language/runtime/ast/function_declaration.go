@@ -39,3 +39,13 @@ func (f *FunctionDeclaration) DeclarationName() string {
 func (f *FunctionDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindFunction
 }
+
+func (f *FunctionDeclaration) ToExpression() *FunctionExpression {
+	return &FunctionExpression{
+		Parameters: f.Parameters,
+		ReturnType: f.ReturnType,
+		Block:      f.Block,
+		StartPos:   f.StartPos,
+		EndPos:     f.EndPos,
+	}
+}
