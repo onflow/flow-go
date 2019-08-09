@@ -1757,17 +1757,7 @@ func (checker *Checker) checkStructureInitializer(
 	checker.valueActivations.PushCurrent()
 	defer checker.valueActivations.Pop()
 
-	depth := checker.valueActivations.Depth()
-
-	self := &Variable{
-		Type:       selfType,
-		IsConstant: true,
-		Depth:      depth,
-	}
-	checker.setVariable(
-		SelfIdentifier,
-		self,
-	)
+	checker.declareSelf(selfType)
 
 	result := initializer.Accept(checker).(checkerResult)
 	errs = append(errs, result.Errors...)
@@ -1786,21 +1776,10 @@ func (checker *Checker) checkStructureFunctions(
 			// NOTE: new activation, as function declarations
 			// shouldn't be visible in other function declarations,
 			// and `self` is is only visible inside function
-
 			checker.valueActivations.PushCurrent()
 			defer checker.valueActivations.Pop()
 
-			depth := checker.valueActivations.Depth()
-
-			self := &Variable{
-				Type:       selfType,
-				IsConstant: true,
-				Depth:      depth,
-			}
-			checker.setVariable(
-				SelfIdentifier,
-				self,
-			)
+			checker.declareSelf(selfType)
 
 			result := function.Accept(checker).(checkerResult)
 			errs = append(errs, result.Errors...)
@@ -1808,6 +1787,22 @@ func (checker *Checker) checkStructureFunctions(
 	}
 
 	return checkerError(errs)
+}
+
+func (checker *Checker) declareSelf(selfType *StructureType) {
+
+	// NOTE: declare `self` one depth lower ("inside" function),
+	// so it can't be re-declared by the function's parameters
+
+	depth := checker.valueActivations.Depth() + 1
+
+	self := &Variable{
+		Type:       selfType,
+		IsConstant: true,
+		Depth:      depth,
+	}
+
+	checker.setVariable(SelfIdentifier, self)
 }
 
 // checkStructureFieldAndFunctionIdentifiers checks the structure's fields and functions
