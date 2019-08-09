@@ -107,7 +107,8 @@ func (e *NotDeclaredError) StartPosition() ast.Position {
 }
 
 func (e *NotDeclaredError) EndPosition() ast.Position {
-	return e.Pos
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
 }
 
 // AssignmentToConstantError
@@ -454,7 +455,8 @@ func (e *InvalidAccessModifierError) StartPosition() ast.Position {
 }
 
 func (e *InvalidAccessModifierError) EndPosition() ast.Position {
-	return e.Pos
+	length := len(e.Access.Keyword())
+	return e.Pos.Shifted(length - 1)
 }
 
 // InvalidNameError

@@ -76,7 +76,6 @@ type IfStatement struct {
 	Then     *Block
 	Else     *Block
 	StartPos Position
-	EndPos   Position
 }
 
 func (s *IfStatement) StartPosition() Position {
@@ -84,7 +83,11 @@ func (s *IfStatement) StartPosition() Position {
 }
 
 func (s *IfStatement) EndPosition() Position {
-	return s.EndPos
+	if s.Else != nil {
+		return s.Else.EndPosition()
+	} else {
+		return s.Then.EndPosition()
+	}
 }
 
 func (*IfStatement) isStatement() {}

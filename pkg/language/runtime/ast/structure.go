@@ -90,7 +90,6 @@ type InitializerDeclaration struct {
 	Parameters []*Parameter
 	Block      *Block
 	StartPos   Position
-	EndPos     Position
 }
 
 func (i *InitializerDeclaration) Accept(visitor Visitor) Repr {
@@ -102,7 +101,7 @@ func (i *InitializerDeclaration) StartPosition() Position {
 }
 
 func (i *InitializerDeclaration) EndPosition() Position {
-	return i.EndPos
+	return i.Block.EndPos
 }
 
 func (i *InitializerDeclaration) IdentifierPosition() Position {
@@ -123,7 +122,6 @@ func (i *InitializerDeclaration) ToFunctionExpression() *FunctionExpression {
 	return &FunctionExpression{
 		Parameters: i.Parameters,
 		Block:      i.Block,
-		EndPos:     i.EndPos,
 		StartPos:   i.StartPos,
 	}
 }

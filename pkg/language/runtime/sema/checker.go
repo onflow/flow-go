@@ -193,7 +193,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 			&InvalidAccessModifierError{
 				DeclarationKind: common.DeclarationKindFunction,
 				Access:          declaration.Access,
-				Pos:             declaration.StartPos,
+				Pos:             declaration.StartPosition(),
 			},
 		)
 	}
@@ -1335,8 +1335,8 @@ func (checker *Checker) checkInvocationArguments(
 			&ArgumentCountError{
 				ParameterCount: parameterCount,
 				ArgumentCount:  argumentCount,
-				StartPos:       invocationExpression.StartPos,
-				EndPos:         invocationExpression.EndPos,
+				StartPos:       invocationExpression.StartPosition(),
+				EndPos:         invocationExpression.EndPosition(),
 			},
 		)
 	}
