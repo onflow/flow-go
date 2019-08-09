@@ -1673,6 +1673,10 @@
             <p>We think resources are a great way to represent such assets.</p>
           </li>
         </ul>
+        <p>
+          Two composite daya types are compatible if and only if they refer to the same declaration by name,
+          i.e., nominal typing applies instead of structural typing.
+        </p>
       </section>
       <section>
         <h2 id="composite-data-type-declaration-and-creation"><a href="#composite-data-type-declaration-and-creation" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Declaration and Creation</h2>
@@ -1692,6 +1696,10 @@
         <p>Resource are created (instantiated) by using the <code>create</code> keyword and calling the type like a function.</p>
         <pre><code class="language-bamboo,file=resource-instantiation.bpl"><span style="color: #000000">create SomeResource()</span><span>
 </span></code></pre>
+        <p>
+          Composite data types can only be be declared globally and not locally in functions.
+          They can also not be nested.
+        </p>
         <section>
           <h3 id="composite-data-type-fields"><a href="#composite-data-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Fields</h3>
           <p>Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields <strong>must</strong> be initialized in the initializer. The initializer is declared using the <code>init</code> keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always <code>Void</code>. The initializer always follows any fields.</p>
