@@ -2352,7 +2352,7 @@ func TestParseStructure(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	a := &StructureDeclaration{
+	test := &StructureDeclaration{
 		Identifier: "Test",
 		Fields: []*FieldDeclaration{
 			{
@@ -2452,7 +2452,109 @@ func TestParseStructure(t *testing.T) {
 	}
 
 	expected := &Program{
-		Declarations: []Declaration{a},
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParsePreAndPostConditions(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.Parse(`
+        fun test(n: Int) {
+            pre {
+              n != 0
+            }
+            post {
+              result == 0
+            }
+            return 0
+        }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&FunctionDeclaration{
+				Access:     AccessNotSpecified,
+				Identifier: "test",
+				Parameters: []*Parameter{
+					{
+						Label:      "",
+						Identifier: "n",
+						Type: &NominalType{
+							Identifier: "Int",
+							Pos:        Position{Offset: 21, Line: 2, Column: 20},
+						},
+						LabelPos:      nil,
+						IdentifierPos: Position{Offset: 18, Line: 2, Column: 17},
+						StartPos:      Position{Offset: 18, Line: 2, Column: 17},
+						EndPos:        Position{Offset: 21, Line: 2, Column: 20},
+					},
+				},
+				ReturnType: &NominalType{
+					Identifier: "",
+					Pos:        Position{Offset: 24, Line: 2, Column: 23},
+				},
+				FunctionBlock: &FunctionBlock{
+					Block: &Block{
+						Statements: []Statement{
+							&ReturnStatement{
+								Expression: &IntExpression{
+									Value:    big.NewInt(0),
+									StartPos: Position{Offset: 159, Line: 9, Column: 19},
+									EndPos:   Position{Offset: 159, Line: 9, Column: 19},
+								},
+								StartPos: Position{Offset: 152, Line: 9, Column: 12},
+								EndPos:   Position{Offset: 159, Line: 9, Column: 19},
+							},
+						},
+						StartPos: Position{Offset: 26, Line: 2, Column: 25},
+						EndPos:   Position{Offset: 169, Line: 10, Column: 8},
+					},
+					PreConditions: []*Condition{
+						{
+							Expression: &BinaryExpression{
+								Operation: OperationUnequal,
+								Left: &IdentifierExpression{
+									Identifier: "n",
+									StartPos:   Position{Offset: 60, Line: 4, Column: 14},
+									EndPos:     Position{Offset: 60, Line: 4, Column: 14},
+								},
+								Right: &IntExpression{
+									Value:    big.NewInt(0),
+									StartPos: Position{Offset: 65, Line: 4, Column: 19},
+									EndPos:   Position{Offset: 65, Line: 4, Column: 19},
+								},
+							},
+						},
+					},
+					PostConditions: []*Condition{
+						{
+							Expression: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier: "result",
+									StartPos:   Position{Offset: 114, Line: 7, Column: 14},
+									EndPos:     Position{Offset: 119, Line: 7, Column: 19},
+								},
+								Right: &IntExpression{
+									Value:    big.NewInt(0),
+									StartPos: Position{Offset: 124, Line: 7, Column: 24},
+									EndPos:   Position{Offset: 124, Line: 7, Column: 24},
+								},
+							},
+						},
+					},
+				},
+				StartPos:      Position{Offset: 9, Line: 2, Column: 8},
+				IdentifierPos: Position{Offset: 13, Line: 2, Column: 12},
+			},
+		},
 	}
 
 	Expect(actual).

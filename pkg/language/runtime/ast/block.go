@@ -22,16 +22,16 @@ func (b *Block) EndPosition() Position {
 
 type FunctionBlock struct {
 	*Block
+	PreConditions  []*Condition
+	PostConditions []*Condition
 }
 
 func (b *FunctionBlock) Accept(visitor Visitor) Repr {
 	return visitor.VisitFunctionBlock(b)
 }
 
-func (b *FunctionBlock) StartPosition() Position {
-	return b.StartPos
-}
+// Condition
 
-func (b *FunctionBlock) EndPosition() Position {
-	return b.EndPos
+type Condition struct {
+	Expression
 }
