@@ -11,6 +11,7 @@ import (
 const ArgumentLabelNotRequired = "_"
 const InitializerIdentifier = "init"
 const SelfIdentifier = "self"
+const BeforeIdentifier = "before"
 
 type functionContext struct {
 	returnType Type
@@ -509,12 +510,19 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
 	var errs []error
 
+	checker.pushActivations()
+	defer checker.popActivations()
+
 	if err := checker.visitConditions(functionBlock.PreConditions); err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
 	blockResult := checker.VisitBlock(functionBlock.Block).(checkerResult)
 	errs = append(errs, blockResult.Errors...)
+
+	if err := checker.declareBefore(); err != nil {
+		errs = append(errs, err.Errors...)
+	}
 
 	if err := checker.visitConditions(functionBlock.PostConditions); err != nil {
 		errs = append(errs, err.Errors...)
@@ -524,6 +532,30 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 		Type:   nil,
 		Errors: errs,
 	}
+}
+
+func (checker *Checker) declareBefore() *CheckerError {
+	var errs []error
+
+	if err := checker.declareVariable(
+		BeforeIdentifier,
+		&FunctionType{
+			ParameterTypes: []Type{&AnyType{}},
+			apply: func(types []Type) Type {
+				if len(types) < 1 {
+					return &AnyType{}
+				}
+				return types[0]
+			},
+		},
+		common.DeclarationKindFunction,
+		ast.Position{},
+		true,
+	); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	return checkerError(errs)
 }
 
 func (checker *Checker) visitConditions(conditions []*ast.Condition) *CheckerError {
@@ -1305,7 +1337,8 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	} else {
 		// invoked expression has function type
 
-		if err := checker.checkInvocationArguments(invocationExpression, functionType); err != nil {
+		argumentTypes, err := checker.checkInvocationArguments(invocationExpression, functionType)
+		if err != nil {
 			errs = append(errs, err.Errors...)
 		}
 
@@ -1329,7 +1362,11 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 			}
 		}
 
-		returnType = functionType.ReturnType
+		if functionType.apply != nil {
+			returnType = functionType.apply(argumentTypes)
+		} else {
+			returnType = functionType.ReturnType
+		}
 	}
 
 	return checkerResult{
@@ -1443,7 +1480,10 @@ func (checker *Checker) checkInvocationArgumentLabels(
 func (checker *Checker) checkInvocationArguments(
 	invocationExpression *ast.InvocationExpression,
 	functionType *FunctionType,
-) *CheckerError {
+) (
+	argumentTypes []Type,
+	err *CheckerError,
+) {
 	var errs []error
 
 	argumentCount := len(invocationExpression.Arguments)
@@ -1476,7 +1516,9 @@ func (checker *Checker) checkInvocationArguments(
 		errs = append(errs, argumentResult.Errors...)
 		argumentType := argumentResult.Type
 
-		if argumentType != nil && !checker.IsSubType(argumentType, parameterType) {
+		argumentTypes = append(argumentTypes, argumentType)
+
+		if !checker.IsSubType(argumentType, parameterType) {
 			errs = append(errs,
 				&TypeMismatchError{
 					ExpectedType: parameterType,
@@ -1488,7 +1530,7 @@ func (checker *Checker) checkInvocationArguments(
 		}
 	}
 
-	return checkerError(errs)
+	return argumentTypes, checkerError(errs)
 }
 
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {

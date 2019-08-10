@@ -2142,6 +2142,21 @@ func TestCheckInvalidFunctionNonBoolCondition(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
+func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+    fun test(x: Int) {
+        post {
+            before(x) != 0
+        }
+    }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
 	RegisterTestingT(t)
 
