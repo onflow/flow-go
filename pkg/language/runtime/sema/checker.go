@@ -306,7 +306,7 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) *Checke
 					Kind:        common.DeclarationKindArgumentLabel,
 					Name:        label,
 					Pos:         labelPos,
-					PreviousPos: previousPos,
+					PreviousPos: &previousPos,
 				},
 			)
 		}
@@ -351,7 +351,7 @@ func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameter
 				IsConstant: true,
 				Type:       parameterType,
 				Depth:      depth,
-				Pos:        parameter.IdentifierPos,
+				Pos:        &parameter.IdentifierPos,
 			},
 		)
 	}
@@ -427,7 +427,7 @@ func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty
 			IsConstant: declaration.IsConstant,
 			Depth:      depth,
 			Type:       ty,
-			Pos:        declaration.IdentifierPos,
+			Pos:        &declaration.IdentifierPos,
 		},
 	)
 
@@ -1109,12 +1109,11 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 	}
 
 	// TODO: use bottom type
-	//if elementType == nil {
-	//
-	//}
+	if elementType == nil {
+		elementType = &AnyType{}
+	}
 
-	arrayType := &ConstantSizedType{
-		Size: len(expression.Values),
+	arrayType := &VariableSizedType{
 		Type: elementType,
 	}
 
@@ -1237,12 +1236,20 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		}
 
 		// if the invocation refers directly to the name of the function as stated in the declaration,
-		// the argument labels need to be supplied
+		// or the invocation refers to a function of a structure (member),
+		// check that the correct argument labels are supplied in the invocation
 
 		if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
-			if err := checker.checkInvocationArgumentLabels(
+			if err := checker.checkIdentifierInvocationArgumentLabels(
 				invocationExpression,
 				identifierExpression,
+			); err != nil {
+				errs = append(errs, err.Errors...)
+			}
+		} else if memberExpression, ok := invokedExpression.(*ast.MemberExpression); ok {
+			if err := checker.checkMemberInvocationArgumentLabels(
+				invocationExpression,
+				memberExpression,
 			); err != nil {
 				errs = append(errs, err.Errors...)
 			}
@@ -1257,7 +1264,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	}
 }
 
-func (checker *Checker) checkInvocationArgumentLabels(
+func (checker *Checker) checkIdentifierInvocationArgumentLabels(
 	invocationExpression *ast.InvocationExpression,
 	identifierExpression *ast.IdentifierExpression,
 ) *CheckerError {
@@ -1268,51 +1275,90 @@ func (checker *Checker) checkInvocationArgumentLabels(
 		errs = append(errs, err)
 	} else if variable != nil {
 		if variable.ArgumentLabels != nil {
-			argumentCount := len(invocationExpression.Arguments)
+			if err := checker.checkInvocationArgumentLabels(
+				invocationExpression.Arguments,
+				variable.ArgumentLabels,
+			); err != nil {
+				errs = append(errs, err.Errors...)
+			}
+		}
+	}
 
-			for i, argumentLabel := range variable.ArgumentLabels {
-				if i >= argumentCount {
-					break
-				}
+	return checkerError(errs)
+}
 
-				argument := invocationExpression.Arguments[i]
-				providedLabel := argument.Label
-				if argumentLabel == ArgumentLabelNotRequired {
-					// argument label is not required,
-					// check it is not provided
+func (checker *Checker) checkMemberInvocationArgumentLabels(
+	invocationExpression *ast.InvocationExpression,
+	memberExpression *ast.MemberExpression,
+) *CheckerError {
+	var errs []error
 
-					if providedLabel != "" {
-						errs = append(errs,
-							&IncorrectArgumentLabelError{
-								ActualArgumentLabel:   providedLabel,
-								ExpectedArgumentLabel: "",
-								StartPos:              argument.Expression.StartPosition(),
-								EndPos:                argument.Expression.EndPosition(),
-							},
-						)
-					}
-				} else {
-					// argument label is required,
-					// check it is provided and correct
-					if providedLabel == "" {
-						errs = append(errs,
-							&MissingArgumentLabelError{
-								ExpectedArgumentLabel: argumentLabel,
-								StartPos:              argument.Expression.StartPosition(),
-								EndPos:                argument.Expression.EndPosition(),
-							},
-						)
-					} else if providedLabel != argumentLabel {
-						errs = append(errs,
-							&IncorrectArgumentLabelError{
-								ActualArgumentLabel:   providedLabel,
-								ExpectedArgumentLabel: argumentLabel,
-								StartPos:              argument.Expression.StartPosition(),
-								EndPos:                argument.Expression.EndPosition(),
-							},
-						)
-					}
-				}
+	member, err := checker.visitMember(memberExpression)
+	if err != nil {
+		errs = append(errs, err)
+	} else if member != nil {
+		if member.ArgumentLabels != nil {
+			if err := checker.checkInvocationArgumentLabels(
+				invocationExpression.Arguments,
+				member.ArgumentLabels,
+			); err != nil {
+				errs = append(errs, err.Errors...)
+			}
+		}
+	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) checkInvocationArgumentLabels(
+	arguments []*ast.Argument,
+	argumentLabels []string,
+) *CheckerError {
+	var errs []error
+
+	argumentCount := len(arguments)
+
+	for i, argumentLabel := range argumentLabels {
+		if i >= argumentCount {
+			break
+		}
+
+		argument := arguments[i]
+		providedLabel := argument.Label
+		if argumentLabel == ArgumentLabelNotRequired {
+			// argument label is not required,
+			// check it is not provided
+
+			if providedLabel != "" {
+				errs = append(errs,
+					&IncorrectArgumentLabelError{
+						ActualArgumentLabel:   providedLabel,
+						ExpectedArgumentLabel: "",
+						StartPos:              *argument.LabelStartPos,
+						EndPos:                *argument.LabelEndPos,
+					},
+				)
+			}
+		} else {
+			// argument label is required,
+			// check it is provided and correct
+			if providedLabel == "" {
+				errs = append(errs,
+					&MissingArgumentLabelError{
+						ExpectedArgumentLabel: argumentLabel,
+						StartPos:              argument.Expression.StartPosition(),
+						EndPos:                argument.Expression.EndPosition(),
+					},
+				)
+			} else if providedLabel != argumentLabel {
+				errs = append(errs,
+					&IncorrectArgumentLabelError{
+						ActualArgumentLabel:   providedLabel,
+						ExpectedArgumentLabel: argumentLabel,
+						StartPos:              *argument.LabelStartPos,
+						EndPos:                *argument.LabelEndPos,
+					},
+				)
 			}
 		}
 	}
@@ -1497,7 +1543,7 @@ func (checker *Checker) declareFunction(
 			Depth:          depth,
 			Type:           functionType,
 			ArgumentLabels: argumentLabels,
-			Pos:            identifierPosition,
+			Pos:            &identifierPosition,
 		},
 	)
 
@@ -1690,10 +1736,13 @@ func (checker *Checker) declareStructureConstructor(
 	functionType := &FunctionType{
 		ReturnType: structureType,
 	}
+
 	var argumentLabels []string
 
 	initializer := structure.Initializer
 	if initializer != nil {
+		argumentLabels = checker.argumentLabels(initializer.Parameters)
+
 		// NOTE: IGNORING errors, because initializer will be checked separately
 		// in `VisitInitializerDeclaration`, otherwise we get error duplicates
 
@@ -1750,11 +1799,14 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*Str
 			errs = append(errs, err.Errors...)
 		}
 
+		argumentLabels := checker.argumentLabels(function.Parameters)
+
 		// NOTE: still declare member
 		members[function.Identifier] = &Member{
-			Type:          functionType,
-			IsConstant:    true,
-			IsInitialized: true,
+			Type:           functionType,
+			IsConstant:     true,
+			IsInitialized:  true,
+			ArgumentLabels: argumentLabels,
 		}
 	}
 
@@ -1830,6 +1882,7 @@ func (checker *Checker) declareSelf(selfType *StructureType) {
 		Type:       selfType,
 		IsConstant: true,
 		Depth:      depth,
+		Pos:        nil,
 	}
 
 	checker.setVariable(SelfIdentifier, self)
@@ -1859,7 +1912,7 @@ func (checker *Checker) checkStructureFieldAndFunctionIdentifiers(structure *ast
 					Name:        name,
 					Pos:         pos,
 					Kind:        kind,
-					PreviousPos: previousPos,
+					PreviousPos: &previousPos,
 				},
 			)
 		} else {

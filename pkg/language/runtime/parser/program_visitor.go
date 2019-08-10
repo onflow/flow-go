@@ -794,8 +794,11 @@ func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) int
 }
 
 func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{} {
-	identifier := ctx.Identifier().GetText()
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	identifierNode := ctx.Identifier()
+	identifier := identifierNode.GetText()
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.EndPosition(startPosition, identifierNode.GetSymbol().GetStop())
 
 	// NOTE: partial, expression is filled later
 	return &ast.MemberExpression{
@@ -999,13 +1002,21 @@ func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
 func (v *ProgramVisitor) VisitArgument(ctx *ArgumentContext) interface{} {
 	identifierNode := ctx.Identifier()
 	label := ""
+	var labelStartPos, labelEndPos *ast.Position
 	if identifierNode != nil {
 		label = identifierNode.GetText()
+		symbol := identifierNode.GetSymbol()
+		startPos := ast.PositionFromToken(symbol)
+		endPos := ast.EndPosition(startPos, symbol.GetStop())
+		labelStartPos = &startPos
+		labelEndPos = &endPos
 	}
 	expression := ctx.Expression().Accept(v).(ast.Expression)
 	return &ast.Argument{
-		Label:      label,
-		Expression: expression,
+		Label:         label,
+		LabelStartPos: labelStartPos,
+		LabelEndPos:   labelEndPos,
+		Expression:    expression,
 	}
 }
 

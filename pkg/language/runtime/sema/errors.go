@@ -37,7 +37,7 @@ type unsupportedOperation struct {
 
 func (e *unsupportedOperation) Error() string {
 	return fmt.Sprintf(
-		"cannot check unsupported %s operation: %s",
+		"cannot check unsupported %s operation: `%s`",
 		e.kind.Name(),
 		e.operation.Symbol(),
 	)
@@ -67,7 +67,7 @@ type RedeclarationError struct {
 	Kind        common.DeclarationKind
 	Name        string
 	Pos         ast.Position
-	PreviousPos ast.Position
+	PreviousPos *ast.Position
 }
 
 func (e *RedeclarationError) Error() string {
@@ -94,7 +94,7 @@ type NotDeclaredError struct {
 }
 
 func (e *NotDeclaredError) Error() string {
-	return fmt.Sprintf("cannot find %s in this scope: %s", e.ExpectedKind.Name(), e.Name)
+	return fmt.Sprintf("cannot find %s in this scope: `%s`", e.ExpectedKind.Name(), e.Name)
 }
 
 func (*NotDeclaredError) isSemanticError() {}
@@ -121,7 +121,7 @@ type AssignmentToConstantError struct {
 }
 
 func (e *AssignmentToConstantError) Error() string {
-	return fmt.Sprintf("cannot assign to constant: %s", e.Name)
+	return fmt.Sprintf("cannot assign to constant: `%s`", e.Name)
 }
 
 func (*AssignmentToConstantError) isSemanticError() {}
@@ -174,7 +174,7 @@ type NotIndexableTypeError struct {
 }
 
 func (e *NotIndexableTypeError) Error() string {
-	return fmt.Sprintf("cannot index into value which has type: %s", e.Type.String())
+	return fmt.Sprintf("cannot index into value which has type: `%s`", e.Type.String())
 }
 
 func (*NotIndexableTypeError) isSemanticError() {}
@@ -197,7 +197,7 @@ type NotIndexingTypeError struct {
 
 func (e *NotIndexingTypeError) Error() string {
 	return fmt.Sprintf(
-		"cannot index with value which has type: %s",
+		"cannot index with value which has type: `%s`",
 		e.Type.String(),
 	)
 }
@@ -221,7 +221,7 @@ type NotCallableError struct {
 }
 
 func (e *NotCallableError) Error() string {
-	return fmt.Sprintf("cannot call type: %s", e.Type.String())
+	return fmt.Sprintf("cannot call type: `%s`", e.Type.String())
 }
 
 func (*NotCallableError) isSemanticError() {}
@@ -273,7 +273,7 @@ type MissingArgumentLabelError struct {
 
 func (e *MissingArgumentLabelError) Error() string {
 	return fmt.Sprintf(
-		"missing argument label: %s",
+		"missing argument label: `%s`",
 		e.ExpectedArgumentLabel,
 	)
 }
@@ -303,7 +303,7 @@ func (e *IncorrectArgumentLabelError) Error() string {
 		expected = fmt.Sprintf(`%s`, e.ExpectedArgumentLabel)
 	}
 	return fmt.Sprintf(
-		"incorrect argument label: expected %s, got `%s`",
+		"incorrect argument label: expected `%s`, got `%s`",
 		expected,
 		e.ActualArgumentLabel,
 	)
@@ -418,7 +418,7 @@ type ControlStatementError struct {
 
 func (e *ControlStatementError) Error() string {
 	return fmt.Sprintf(
-		"control statement outside of loop: %s",
+		"control statement outside of loop: `%s`",
 		e.ControlStatement.Symbol(),
 	)
 }
@@ -443,7 +443,7 @@ type InvalidAccessModifierError struct {
 
 func (e *InvalidAccessModifierError) Error() string {
 	return fmt.Sprintf(
-		"invalid access modifier for %s: %s",
+		"invalid access modifier for %s: `%s`",
 		e.DeclarationKind.Name(),
 		e.Access.Keyword(),
 	)
@@ -468,7 +468,7 @@ type InvalidNameError struct {
 }
 
 func (e *InvalidNameError) Error() string {
-	return fmt.Sprintf("invalid name: %s", e.Name)
+	return fmt.Sprintf("invalid name: `%s`", e.Name)
 }
 
 func (*InvalidNameError) isSemanticError() {}
@@ -490,7 +490,7 @@ type InvalidInitializerNameError struct {
 }
 
 func (e *InvalidInitializerNameError) Error() string {
-	return fmt.Sprintf("invalid initializer name: %s", e.Name)
+	return fmt.Sprintf("invalid initializer name: `%s`", e.Name)
 }
 
 func (*InvalidInitializerNameError) isSemanticError() {}
@@ -600,7 +600,7 @@ type AssignmentToConstantMemberError struct {
 }
 
 func (e *AssignmentToConstantMemberError) Error() string {
-	return fmt.Sprintf("cannot assign to constant member: %s", e.Name)
+	return fmt.Sprintf("cannot assign to constant member: `%s`", e.Name)
 }
 
 func (*AssignmentToConstantMemberError) isSemanticError() {}

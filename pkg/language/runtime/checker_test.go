@@ -1999,3 +1999,71 @@ func TestCheckStructureInitializesConstant(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
+
+func TestCheckStructureInitializerWithArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+
+          init(x: Int) {}
+      }
+
+	  let test = Test(x: 1)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStructureInitializerCallWithMissingArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+
+          init(x: Int) {}
+      }
+
+	  let test = Test(1)
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+}
+
+func TestCheckStructureFunctionWithArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+
+          fun test(x: Int) {}
+      }
+
+	  let test = Test().test(x: 1)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStructureFunctionCallWithMissingArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     struct Test {
+
+         fun test(x: Int) {}
+     }
+
+	  let test = Test().test(1)
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+}
