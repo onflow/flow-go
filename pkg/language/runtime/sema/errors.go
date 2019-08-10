@@ -419,6 +419,8 @@ func (e *ControlStatementError) Error() string {
 	)
 }
 
+func (*ControlStatementError) isSemanticError() {}
+
 func (e *ControlStatementError) StartPosition() *ast.Position {
 	return e.StartPos
 }
@@ -427,15 +429,15 @@ func (e *ControlStatementError) EndPosition() *ast.Position {
 	return e.EndPos
 }
 
-// InvalidAccessError
+// InvalidAccessModifierError
 
-type InvalidAccessError struct {
+type InvalidAccessModifierError struct {
 	DeclarationKind common.DeclarationKind
 	Access          ast.Access
 	Pos             *ast.Position
 }
 
-func (e *InvalidAccessError) Error() string {
+func (e *InvalidAccessModifierError) Error() string {
 	return fmt.Sprintf(
 		"invalid access modifier for %s: %s",
 		e.DeclarationKind.Name(),
@@ -443,11 +445,13 @@ func (e *InvalidAccessError) Error() string {
 	)
 }
 
-func (e *InvalidAccessError) StartPosition() *ast.Position {
+func (*InvalidAccessModifierError) isSemanticError() {}
+
+func (e *InvalidAccessModifierError) StartPosition() *ast.Position {
 	return e.Pos
 }
 
-func (e *InvalidAccessError) EndPosition() *ast.Position {
+func (e *InvalidAccessModifierError) EndPosition() *ast.Position {
 	return e.Pos
 }
 
@@ -461,6 +465,8 @@ type InvalidNameError struct {
 func (e *InvalidNameError) Error() string {
 	return fmt.Sprintf("invalid name: %s", e.Name)
 }
+
+func (*InvalidNameError) isSemanticError() {}
 
 func (e *InvalidNameError) StartPosition() *ast.Position {
 	return e.Pos
@@ -481,6 +487,8 @@ func (e *InvalidInitializerNameError) Error() string {
 	return fmt.Sprintf("invalid initializer name: %s", e.Name)
 }
 
+func (*InvalidInitializerNameError) isSemanticError() {}
+
 func (e *InvalidInitializerNameError) SecondaryError() string {
 	return fmt.Sprintf("initializer must be named `%s`", InitializerIdentifier)
 }
@@ -491,4 +499,100 @@ func (e *InvalidInitializerNameError) StartPosition() *ast.Position {
 
 func (e *InvalidInitializerNameError) EndPosition() *ast.Position {
 	return e.Pos
+}
+
+// InvalidDeclarationError
+
+type InvalidDeclarationError struct {
+	Kind     common.DeclarationKind
+	StartPos *ast.Position
+	EndPos   *ast.Position
+}
+
+func (e *InvalidDeclarationError) Error() string {
+	return fmt.Sprintf("cannot declare %s here", e.Kind.Name())
+}
+
+func (*InvalidDeclarationError) isSemanticError() {}
+
+func (e *InvalidDeclarationError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidDeclarationError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
+// MissingInitializerError
+
+type MissingInitializerError struct {
+	FirstFieldStartPos *ast.Position
+	FirstFieldEndPos   *ast.Position
+}
+
+func (e *MissingInitializerError) Error() string {
+	return "missing initializer for field"
+}
+
+func (*MissingInitializerError) isSemanticError() {}
+
+func (e *MissingInitializerError) StartPosition() *ast.Position {
+	return e.FirstFieldStartPos
+}
+
+func (e *MissingInitializerError) EndPosition() *ast.Position {
+	return e.FirstFieldEndPos
+}
+
+// NotDeclaredMemberError
+
+type NotDeclaredMemberError struct {
+	Name     string
+	Type     Type
+	StartPos *ast.Position
+	EndPos   *ast.Position
+}
+
+func (e *NotDeclaredMemberError) Error() string {
+	return fmt.Sprintf("value of type `%s` has no member `%s`", e.Type.String(), e.Name)
+}
+
+func (e *NotDeclaredMemberError) SecondaryError() string {
+	return "unknown member"
+}
+
+func (*NotDeclaredMemberError) isSemanticError() {}
+
+func (e *NotDeclaredMemberError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *NotDeclaredMemberError) EndPosition() *ast.Position {
+	return e.EndPos
+}
+
+// AssignmentToConstantMemberError
+
+// TODO: maybe split up into two errors:
+//  - assignment to constant field
+//  - assignment to function
+
+type AssignmentToConstantMemberError struct {
+	Name     string
+	StartPos *ast.Position
+	EndPos   *ast.Position
+}
+
+func (e *AssignmentToConstantMemberError) Error() string {
+	return fmt.Sprintf("cannot assign to constant member: %s", e.Name)
+}
+
+func (*AssignmentToConstantMemberError) isSemanticError() {}
+
+func (e *AssignmentToConstantMemberError) StartPosition() *ast.Position {
+	return e.StartPos
+}
+
+func (e *AssignmentToConstantMemberError) EndPosition() *ast.Position {
+	return e.EndPos
 }

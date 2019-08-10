@@ -31,7 +31,11 @@ func (s *StructureDeclaration) Accept(visitor Visitor) Repr {
 }
 
 func (*StructureDeclaration) isDeclaration() {}
-func (*StructureDeclaration) isStatement()   {}
+
+// NOTE: statement, so it can be represented in the AST,
+// but will be rejected in semantic analysis
+//
+func (*StructureDeclaration) isStatement() {}
 
 func (s *StructureDeclaration) DeclarationName() string {
 	return s.Identifier

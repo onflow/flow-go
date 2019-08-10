@@ -357,3 +357,30 @@ func init() {
 		baseTypes = baseTypes.Insert(activations.StringKey(name), baseType)
 	}
 }
+
+// StructureType
+
+type StructureType struct {
+	Identifier string
+	Members    map[string]*Member
+}
+
+type Member struct {
+	Type       Type
+	IsConstant bool
+}
+
+func (*StructureType) isType() {}
+
+func (t *StructureType) String() string {
+	return t.Identifier
+}
+
+func (t *StructureType) Equal(other Type) bool {
+	otherStructure, ok := other.(*StructureType)
+	if !ok {
+		return false
+	}
+
+	return otherStructure.Identifier == t.Identifier
+}

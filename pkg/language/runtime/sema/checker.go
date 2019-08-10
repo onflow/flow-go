@@ -91,6 +91,8 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		}
 	}
 
+	// TODO: functions
+
 	return false
 }
 
@@ -168,8 +170,7 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 		result := declaration.Accept(checker).(checkerResult)
 		errs = append(errs, result.Errors...)
 
-		err := checker.declareGlobal(declaration)
-		if err != nil {
+		if err := checker.declareGlobal(declaration); err != nil {
 			// NOTE: append, don't return
 			errs = append(errs, err.Errors...)
 		}
@@ -189,7 +190,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 		break
 	default:
 		errs = append(errs,
-			&InvalidAccessError{
+			&InvalidAccessModifierError{
 				DeclarationKind: common.DeclarationKindFunction,
 				Access:          declaration.Access,
 				Pos:             declaration.StartPos,
@@ -218,13 +219,12 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	// declare the function before checking it,
 	// so it can be referred to inside the function
 
-	err = checker.declareFunction(
+	if err := checker.declareFunction(
 		declaration.Identifier,
 		declaration.IdentifierPos,
 		functionType,
 		argumentLabels,
-	)
-	if err != nil {
+	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -232,12 +232,11 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	// check the function after declaring,
 	// so it can be referred to inside the function
 
-	err = checker.checkFunction(
+	if err := checker.checkFunction(
 		declaration.Parameters,
 		functionType,
 		declaration.Block,
-	)
-	if err != nil {
+	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -259,14 +258,12 @@ func (checker *Checker) checkFunction(
 	defer checker.popActivations()
 
 	// check argument labels
-	err := checker.checkArgumentLabels(parameters)
-	if err != nil {
+	if err := checker.checkArgumentLabels(parameters); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
-	err = checker.declareParameters(parameters, functionType.ParameterTypes)
-	if err != nil {
+	if err := checker.declareParameters(parameters, functionType.ParameterTypes); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -382,8 +379,7 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		}
 	}
 
-	err := checker.declareVariable(declaration, declarationType)
-	if err != nil {
+	if err := checker.declareVariable(declaration, declarationType); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -453,7 +449,24 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 	checker.pushActivations()
 	defer checker.popActivations()
 
+	// check all statements
+
 	for _, statement := range block.Statements {
+
+		// check statement is not a local structure declaration
+
+		if _, ok := statement.(*ast.StructureDeclaration); ok {
+			errs = append(errs, &InvalidDeclarationError{
+				Kind:     common.DeclarationKindStructure,
+				StartPos: statement.StartPosition(),
+				EndPos:   statement.EndPosition(),
+			})
+
+			continue
+		}
+
+		// check statement
+
 		result := statement.Accept(checker).(checkerResult)
 		errs = append(errs, result.Errors...)
 	}
@@ -547,8 +560,7 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 		elseElement = statement.Else
 	}
 
-	_, _, err := checker.visitConditional(statement.Test, statement.Then, elseElement)
-	if err != nil {
+	if _, _, err := checker.visitConditional(statement.Test, statement.Then, elseElement); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -600,8 +612,7 @@ func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast
 	errs = append(errs, valueResult.Errors...)
 	valueType := valueResult.Type
 
-	err := checker.visitAssignmentValueType(assignment, valueType)
-	if err != nil {
+	if err := checker.visitAssignmentValueType(assignment, valueType); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -618,28 +629,10 @@ func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentState
 		return checker.visitIdentifierExpressionAssignment(assignment, target, valueType)
 
 	case *ast.IndexExpression:
-		var errs []error
-
-		elementResult := checker.visitIndexingExpression(target.Expression, target.Index)
-		errs = append(errs, elementResult.Errors...)
-		elementType := elementResult.Type
-
-		if elementType != nil && !checker.IsSubType(valueType, elementType) {
-			errs = append(errs,
-				&TypeMismatchError{
-					ExpectedType: elementType,
-					ActualType:   valueType,
-					StartPos:     assignment.Value.StartPosition(),
-					EndPos:       assignment.Value.EndPosition(),
-				},
-			)
-		}
-
-		return checkerError(errs)
+		return checker.visitIndexExpressionAssignment(assignment, target, valueType)
 
 	case *ast.MemberExpression:
-		// TODO: no structures yet
-		panic(&errors.UnreachableError{})
+		return checker.visitMemberExpressionAssignment(assignment, target, valueType)
 
 	default:
 		panic(&unsupportedAssignmentTargetExpression{
@@ -687,6 +680,73 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 			errs = append(errs,
 				&TypeMismatchError{
 					ExpectedType: variable.Type,
+					ActualType:   valueType,
+					StartPos:     assignment.Value.StartPosition(),
+					EndPos:       assignment.Value.EndPosition(),
+				},
+			)
+		}
+	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) visitIndexExpressionAssignment(
+	assignment *ast.AssignmentStatement,
+	target *ast.IndexExpression,
+	valueType Type,
+) *CheckerError {
+	var errs []error
+
+	elementResult := checker.visitIndexingExpression(target.Expression, target.Index)
+	errs = append(errs, elementResult.Errors...)
+
+	elementType := elementResult.Type
+
+	if elementType != nil && !checker.IsSubType(valueType, elementType) {
+		errs = append(errs,
+			&TypeMismatchError{
+				ExpectedType: elementType,
+				ActualType:   valueType,
+				StartPos:     assignment.Value.StartPosition(),
+				EndPos:       assignment.Value.EndPosition(),
+			},
+		)
+	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) visitMemberExpressionAssignment(
+	assignment *ast.AssignmentStatement,
+	target *ast.MemberExpression,
+	valueType Type,
+) *CheckerError {
+	var errs []error
+
+	member, err := checker.visitMember(target)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	if member != nil {
+		// check member is not constant
+
+		if member.IsConstant {
+			errs = append(errs,
+				&AssignmentToConstantMemberError{
+					Name:     target.Identifier,
+					StartPos: assignment.Value.StartPosition(),
+					EndPos:   assignment.Value.EndPosition(),
+				},
+			)
+		}
+
+		// check value can be assigned to member
+		if !checker.IsSubType(valueType, member.Type) {
+			errs = append(errs,
+				&TypeMismatchError{
+					ExpectedType: member.Type,
 					ActualType:   valueType,
 					StartPos:     assignment.Value.StartPosition(),
 					EndPos:       assignment.Value.EndPosition(),
@@ -1062,9 +1122,51 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 	}
 }
 
-func (checker *Checker) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO: no structures yet
-	panic(&errors.UnreachableError{})
+func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
+	var errs []error
+
+	member, err := checker.visitMember(expression)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	var memberType Type = &AnyType{}
+	if member != nil {
+		memberType = member.Type
+	}
+
+	return checkerResult{
+		Type:   memberType,
+		Errors: errs,
+	}
+}
+
+func (checker *Checker) visitMember(expression *ast.MemberExpression) (*Member, *CheckerError) {
+	var errs []error
+
+	result := expression.Expression.Accept(checker).(checkerResult)
+	errs = append(errs, result.Errors...)
+
+	identifier := expression.Identifier
+
+	var member *Member
+	structureType, ok := result.Type.(*StructureType)
+	if ok {
+		member, ok = structureType.Members[identifier]
+	}
+
+	if !ok {
+		errs = append(errs,
+			&NotDeclaredMemberError{
+				Type:     result.Type,
+				Name:     identifier,
+				StartPos: expression.StartPos,
+				EndPos:   expression.EndPos,
+			},
+		)
+	}
+
+	return member, checkerError(errs)
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
@@ -1250,12 +1352,11 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 		errs = append(errs, err.Errors...)
 	}
 
-	err = checker.checkFunction(
+	if err := checker.checkFunction(
 		expression.Parameters,
 		functionType,
 		expression.Block,
-	)
-	if err != nil {
+	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -1467,51 +1568,137 @@ func (checker *Checker) visitConditional(
 func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
 	var errs []error
 
-	err := checker.checkStructureIdentifier(structure)
+	if err := checker.checkStructureIdentifier(structure); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	if err := checker.checkStructureFieldAndFunctionIdentifiers(structure); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	if err := checker.checkStructureFields(structure.Fields); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	structureType, err := checker.structureType(structure)
 	if err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
-	err = checker.checkStructureFieldAndFunctionIdentifiers(structure)
-	if err != nil {
+	initializer := structure.Initializer
+	if initializer != nil {
+		if err := checker.checkStructureInitializer(initializer, structureType); err != nil {
+			errs = append(errs, err.Errors...)
+		}
+	} else if len(structure.Fields) > 0 {
+		// structure has fields, but no initializer
+		errs = append(errs,
+			&MissingInitializerError{},
+		)
+	}
+
+	if err := checker.checkStructureFunctions(structure.Functions, structureType); err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
+}
+
+func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*StructureType, *CheckerError) {
+	var errs []error
+
+	fieldCount := len(structure.Fields)
+	functionCount := len(structure.Functions)
+
+	members := make(map[string]*Member, fieldCount+functionCount)
+
+	// declare a member for each field
 	for _, field := range structure.Fields {
+		fieldType, err := checker.ConvertType(field.Type)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
+		}
+
+		// NOTE: still declare member
+		members[field.Identifier] = &Member{
+			Type:       fieldType,
+			IsConstant: field.IsConstant,
+		}
+	}
+
+	// declare a member for each function
+	for _, function := range structure.Functions {
+		functionType, err := checker.functionType(function.Parameters, function.ReturnType)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
+		}
+
+		// NOTE: still declare member
+		members[function.Identifier] = &Member{
+			Type:       functionType,
+			IsConstant: true,
+		}
+	}
+
+	return &StructureType{
+		Identifier: structure.Identifier,
+		Members:    members,
+	}, checkerError(errs)
+}
+
+func (checker *Checker) checkStructureFields(fields []*ast.FieldDeclaration) *CheckerError {
+	var errs []error
+
+	for _, field := range fields {
 		result := field.Accept(checker).(checkerResult)
 		errs = append(errs, result.Errors...)
 	}
 
-	// TODO: self type
-	selfType := &VoidType{}
+	return checkerError(errs)
+}
 
-	initializer := structure.Initializer
-	if initializer != nil {
-		func() {
-			// NOTE: new activation, so `self`
-			// is only visible inside initializer
+func (checker *Checker) checkStructureInitializer(
+	initializer *ast.InitializerDeclaration,
+	selfType *StructureType,
+) *CheckerError {
+	var errs []error
 
-			checker.valueActivations.PushCurrent()
-			defer checker.valueActivations.Pop()
+	// NOTE: new activation, so `self`
+	// is only visible inside initializer
 
-			depth := checker.valueActivations.Depth()
+	checker.valueActivations.PushCurrent()
+	defer checker.valueActivations.Pop()
 
-			self := &Variable{
-				Type:       selfType,
-				IsConstant: true,
-				Depth:      depth,
-			}
-			checker.setVariable(
-				SelfIdentifier,
-				self,
-			)
+	depth := checker.valueActivations.Depth()
 
-			result := initializer.Accept(checker).(checkerResult)
-			errs = append(errs, result.Errors...)
-		}()
+	self := &Variable{
+		Type:       selfType,
+		IsConstant: true,
+		Depth:      depth,
 	}
+	checker.setVariable(
+		SelfIdentifier,
+		self,
+	)
 
-	for _, function := range structure.Functions {
+	result := initializer.Accept(checker).(checkerResult)
+	errs = append(errs, result.Errors...)
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) checkStructureFunctions(
+	functions []*ast.FunctionDeclaration,
+	selfType *StructureType,
+) *CheckerError {
+	var errs []error
+
+	for _, function := range functions {
 		func() {
 			// NOTE: new activation, as function declarations
 			// shouldn't be visible in other function declarations,
@@ -1537,10 +1724,7 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		}()
 	}
 
-	return checkerResult{
-		Type:   nil,
-		Errors: errs,
-	}
+	return checkerError(errs)
 }
 
 // checkStructureFieldAndFunctionIdentifiers checks the structure's fields and functions
@@ -1617,16 +1801,12 @@ func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclara
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
-	var errs []error
 
-	_, err := checker.ConvertType(field.Type)
-	if err != nil {
-		errs = append(errs, err.Errors...)
-	}
+	// NOTE: field type is already checked when determining structure function in `structureType`
 
 	return checkerResult{
 		Type:   nil,
-		Errors: errs,
+		Errors: nil,
 	}
 }
 
@@ -1650,12 +1830,11 @@ func (checker *Checker) VisitInitializerDeclaration(initializer *ast.Initializer
 		errs = append(errs, err.Errors...)
 	}
 
-	err = checker.checkFunction(
+	if err := checker.checkFunction(
 		initializer.Parameters,
 		functionType,
 		initializer.Block,
-	)
-	if err != nil {
+	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
