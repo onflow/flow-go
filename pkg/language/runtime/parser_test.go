@@ -2465,10 +2465,11 @@ func TestParsePreAndPostConditions(t *testing.T) {
 	actual, errors := parser.Parse(`
         fun test(n: Int) {
             pre {
-              n != 0
+                n != 0
+                n > 0
             }
             post {
-              result == 0
+                result == 0
             }
             return 0
         }
@@ -2506,15 +2507,15 @@ func TestParsePreAndPostConditions(t *testing.T) {
 							&ReturnStatement{
 								Expression: &IntExpression{
 									Value:    big.NewInt(0),
-									StartPos: Position{Offset: 159, Line: 9, Column: 19},
-									EndPos:   Position{Offset: 159, Line: 9, Column: 19},
+									StartPos: Position{Offset: 185, Line: 10, Column: 19},
+									EndPos:   Position{Offset: 185, Line: 10, Column: 19},
 								},
-								StartPos: Position{Offset: 152, Line: 9, Column: 12},
-								EndPos:   Position{Offset: 159, Line: 9, Column: 19},
+								StartPos: Position{Offset: 178, Line: 10, Column: 12},
+								EndPos:   Position{Offset: 185, Line: 10, Column: 19},
 							},
 						},
 						StartPos: Position{Offset: 26, Line: 2, Column: 25},
-						EndPos:   Position{Offset: 169, Line: 10, Column: 8},
+						EndPos:   Position{Offset: 195, Line: 11, Column: 8},
 					},
 					PreConditions: []*Condition{
 						{
@@ -2522,13 +2523,28 @@ func TestParsePreAndPostConditions(t *testing.T) {
 								Operation: OperationUnequal,
 								Left: &IdentifierExpression{
 									Identifier: "n",
-									StartPos:   Position{Offset: 60, Line: 4, Column: 14},
-									EndPos:     Position{Offset: 60, Line: 4, Column: 14},
+									StartPos:   Position{Offset: 62, Line: 4, Column: 16},
+									EndPos:     Position{Offset: 62, Line: 4, Column: 16},
 								},
 								Right: &IntExpression{
 									Value:    big.NewInt(0),
-									StartPos: Position{Offset: 65, Line: 4, Column: 19},
-									EndPos:   Position{Offset: 65, Line: 4, Column: 19},
+									StartPos: Position{Offset: 67, Line: 4, Column: 21},
+									EndPos:   Position{Offset: 67, Line: 4, Column: 21},
+								},
+							},
+						},
+						{
+							Expression: &BinaryExpression{
+								Operation: OperationGreater,
+								Left: &IdentifierExpression{
+									Identifier: "n",
+									StartPos:   Position{Offset: 85, Line: 5, Column: 16},
+									EndPos:     Position{Offset: 85, Line: 5, Column: 16},
+								},
+								Right: &IntExpression{
+									Value:    big.NewInt(0),
+									StartPos: Position{Offset: 89, Line: 5, Column: 20},
+									EndPos:   Position{Offset: 89, Line: 5, Column: 20},
 								},
 							},
 						},
@@ -2539,13 +2555,13 @@ func TestParsePreAndPostConditions(t *testing.T) {
 								Operation: OperationEqual,
 								Left: &IdentifierExpression{
 									Identifier: "result",
-									StartPos:   Position{Offset: 114, Line: 7, Column: 14},
-									EndPos:     Position{Offset: 119, Line: 7, Column: 19},
+									StartPos:   Position{Offset: 140, Line: 8, Column: 16},
+									EndPos:     Position{Offset: 145, Line: 8, Column: 21},
 								},
 								Right: &IntExpression{
 									Value:    big.NewInt(0),
-									StartPos: Position{Offset: 124, Line: 7, Column: 24},
-									EndPos:   Position{Offset: 124, Line: 7, Column: 24},
+									StartPos: Position{Offset: 150, Line: 8, Column: 26},
+									EndPos:   Position{Offset: 150, Line: 8, Column: 26},
 								},
 							},
 						},
