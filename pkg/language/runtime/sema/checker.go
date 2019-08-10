@@ -10,6 +10,7 @@ import (
 
 const ArgumentLabelNotRequired = "_"
 const InitializerIdentifier = "init"
+const SelfIdentifier = "self"
 
 type functionContext struct {
 	returnType Type
@@ -30,6 +31,10 @@ func (e CheckerError) Error() string {
 	sb.WriteString("Checking failed:\n")
 	for _, err := range e.Errors {
 		sb.WriteString(err.Error())
+		if err, ok := err.(errors.SecondaryError); ok {
+			sb.WriteString(". ")
+			sb.WriteString(err.SecondaryError())
+		}
 		sb.WriteString("\n")
 	}
 	return sb.String()
@@ -253,51 +258,27 @@ func (checker *Checker) checkFunction(
 	checker.pushActivations()
 	defer checker.popActivations()
 
-	// check parameter names
-	err := checker.checkParameterNames(parameters)
-	if err != nil {
-		// NOTE: append, don't return
-		errs = append(errs, err.Errors...)
-	}
-
 	// check argument labels
-	err = checker.checkArgumentLabels(parameters)
+	err := checker.checkArgumentLabels(parameters)
 	if err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
-	checker.bindParameters(parameters, functionType.ParameterTypes)
-
-	checker.enterFunction(functionType)
-	defer checker.leaveFunction()
-
-	result := block.Accept(checker).(checkerResult)
-	errs = append(errs, result.Errors...)
-
-	return checkerError(errs)
-}
-
-// checkParameterNames checks that all parameter names are unique
-//
-func (checker *Checker) checkParameterNames(parameters []*ast.Parameter) *CheckerError {
-	var errs []error
-	identifierPositions := map[string]*ast.Position{}
-
-	for _, parameter := range parameters {
-		identifier := parameter.Identifier
-		if previousPos, ok := identifierPositions[identifier]; ok {
-			errs = append(errs,
-				&RedeclarationError{
-					Kind:        common.DeclarationKindParameter,
-					Name:        identifier,
-					Pos:         parameter.IdentifierPos,
-					PreviousPos: previousPos,
-				},
-			)
-		}
-		identifierPositions[identifier] = parameter.IdentifierPos
+	err = checker.declareParameters(parameters, functionType.ParameterTypes)
+	if err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
 	}
+
+	func() {
+		// check the function's block
+		checker.enterFunction(functionType)
+		defer checker.leaveFunction()
+
+		result := block.Accept(checker).(checkerResult)
+		errs = append(errs, result.Errors...)
+	}()
 
 	return checkerError(errs)
 }
@@ -331,24 +312,46 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) *Checke
 	return checkerError(errs)
 }
 
-func (checker *Checker) bindParameters(parameters []*ast.Parameter, parameterTypes []Type) {
-	// declare a constant variable for each parameter
+// declareParameters declares a constant for each parameter,
+// ensuring names are unique and constants don't already exist
+//
+func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameterTypes []Type) *CheckerError {
+	var errs []error
 
 	depth := checker.valueActivations.Depth()
 
 	for i, parameter := range parameters {
+		identifier := parameter.Identifier
+
+		// check if variable with this identifier is already declared in the current scope
+		existingVariable := checker.findVariable(identifier)
+		if existingVariable != nil && existingVariable.Depth == depth {
+			errs = append(errs,
+				&RedeclarationError{
+					Kind:        common.DeclarationKindParameter,
+					Name:        identifier,
+					Pos:         parameter.IdentifierPos,
+					PreviousPos: existingVariable.Pos,
+				},
+			)
+
+			continue
+		}
+
 		parameterType := parameterTypes[i]
 
-		// NOTE: still set type
 		checker.setVariable(
-			parameter.Identifier,
+			identifier,
 			&Variable{
 				IsConstant: true,
 				Type:       parameterType,
 				Depth:      depth,
+				Pos:        parameter.IdentifierPos,
 			},
 		)
 	}
+
+	return checkerError(errs)
 }
 
 func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclaration) ast.Repr {
@@ -394,26 +397,32 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty Type) *CheckerError {
 	var errs []error
 
+	identifier := declaration.Identifier
+
 	// check if variable with this name is already declared in the current scope
-	variable := checker.findVariable(declaration.Identifier)
+	existingVariable := checker.findVariable(identifier)
 	depth := checker.valueActivations.Depth()
-	if variable != nil && variable.Depth == depth {
+	if existingVariable != nil && existingVariable.Depth == depth {
 		errs = append(errs,
 			&RedeclarationError{
-				Kind: declaration.DeclarationKind(),
-				Name: declaration.Identifier,
-				Pos:  declaration.IdentifierPosition(),
+				Kind:        declaration.DeclarationKind(),
+				Name:        identifier,
+				Pos:         declaration.IdentifierPosition(),
+				PreviousPos: existingVariable.Pos,
 			},
 		)
 	}
 
 	// variable with this name is not declared in current scope, declare it
-	variable = &Variable{
-		IsConstant: declaration.IsConstant,
-		Depth:      depth,
-		Type:       ty,
-	}
-	checker.setVariable(declaration.Identifier, variable)
+	checker.setVariable(
+		identifier,
+		&Variable{
+			IsConstant: declaration.IsConstant,
+			Depth:      depth,
+			Type:       ty,
+			Pos:        declaration.IdentifierPos,
+		},
+	)
 
 	return checkerError(errs)
 }
@@ -422,12 +431,13 @@ func (checker *Checker) declareGlobal(declaration ast.Declaration) *CheckerError
 	var errs []error
 
 	name := declaration.DeclarationName()
-	if _, exists := checker.Globals[name]; exists {
+	if existingGlobal, exists := checker.Globals[name]; exists {
 		errs = append(errs,
 			&RedeclarationError{
-				Kind: declaration.DeclarationKind(),
-				Name: name,
-				Pos:  declaration.IdentifierPosition(),
+				Kind:        declaration.DeclarationKind(),
+				Name:        name,
+				Pos:         declaration.IdentifierPosition(),
+				PreviousPos: existingGlobal.Pos,
 			},
 		)
 	}
@@ -628,7 +638,7 @@ func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentState
 		return checkerError(errs)
 
 	case *ast.MemberExpression:
-		// TODO: no structures/dictionaries yet
+		// TODO: no structures yet
 		panic(&errors.UnreachableError{})
 
 	default:
@@ -1053,7 +1063,7 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 }
 
 func (checker *Checker) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO: no structures/dictionaries yet
+	// TODO: no structures yet
 	panic(&errors.UnreachableError{})
 }
 
@@ -1345,26 +1355,30 @@ func (checker *Checker) declareFunction(
 	var errs []error
 
 	// check if variable with this identifier is already declared in the current scope
-	variable := checker.findVariable(identifier)
+	existingVariable := checker.findVariable(identifier)
 	depth := checker.valueActivations.Depth()
-	if variable != nil && variable.Depth == depth {
+	if existingVariable != nil && existingVariable.Depth == depth {
 		errs = append(errs,
 			&RedeclarationError{
-				Kind: common.DeclarationKindFunction,
-				Name: identifier,
-				Pos:  identifierPosition,
+				Kind:        common.DeclarationKindFunction,
+				Name:        identifier,
+				Pos:         identifierPosition,
+				PreviousPos: existingVariable.Pos,
 			},
 		)
 	}
 
 	// variable with this identifier is not declared in current scope, declare it
-	variable = &Variable{
-		IsConstant:     true,
-		Depth:          depth,
-		Type:           functionType,
-		ArgumentLabels: argumentLabels,
-	}
-	checker.setVariable(identifier, variable)
+	checker.setVariable(
+		identifier,
+		&Variable{
+			IsConstant:     true,
+			Depth:          depth,
+			Type:           functionType,
+			ArgumentLabels: argumentLabels,
+			Pos:            identifierPosition,
+		},
+	)
 
 	return checkerError(errs)
 }
@@ -1396,10 +1410,14 @@ func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast
 		parameterTypes[i] = parameterType
 	}
 
-	convertedReturnType, err := checker.ConvertType(returnType)
-	if err != nil {
-		// NOTE: append, don't return
-		errs = append(errs, err.Errors...)
+	var convertedReturnType Type = &VoidType{}
+	if returnType != nil {
+		var err *CheckerError
+		convertedReturnType, err = checker.ConvertType(returnType)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
+		}
 	}
 
 	return &FunctionType{
@@ -1459,10 +1477,64 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		errs = append(errs, err.Errors...)
 	}
 
+	for _, field := range structure.Fields {
+		result := field.Accept(checker).(checkerResult)
+		errs = append(errs, result.Errors...)
+	}
+
+	// TODO: self type
+	selfType := &VoidType{}
+
 	initializer := structure.Initializer
 	if initializer != nil {
-		result := initializer.Accept(checker).(checkerResult)
-		errs = append(errs, result.Errors...)
+		func() {
+			// NOTE: new activation, so `self`
+			// is only visible inside initializer
+
+			checker.valueActivations.PushCurrent()
+			defer checker.valueActivations.Pop()
+
+			depth := checker.valueActivations.Depth()
+
+			self := &Variable{
+				Type:       selfType,
+				IsConstant: true,
+				Depth:      depth,
+			}
+			checker.setVariable(
+				SelfIdentifier,
+				self,
+			)
+
+			result := initializer.Accept(checker).(checkerResult)
+			errs = append(errs, result.Errors...)
+		}()
+	}
+
+	for _, function := range structure.Functions {
+		func() {
+			// NOTE: new activation, as function declarations
+			// shouldn't be visible in other function declarations,
+			// and `self` is is only visible inside function
+
+			checker.valueActivations.PushCurrent()
+			defer checker.valueActivations.Pop()
+
+			depth := checker.valueActivations.Depth()
+
+			self := &Variable{
+				Type:       selfType,
+				IsConstant: true,
+				Depth:      depth,
+			}
+			checker.setVariable(
+				SelfIdentifier,
+				self,
+			)
+
+			result := function.Accept(checker).(checkerResult)
+			errs = append(errs, result.Errors...)
+		}()
 	}
 
 	return checkerResult{
@@ -1536,6 +1608,7 @@ func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclara
 				Kind: common.DeclarationKindType,
 				Name: identifier,
 				Pos:  structure.IdentifierPos,
+				// TODO: previous pos
 			},
 		)
 	}
@@ -1544,8 +1617,17 @@ func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclara
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
-	// TODO:
-	return nil
+	var errs []error
+
+	_, err := checker.ConvertType(field.Type)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
 
 func (checker *Checker) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
@@ -1560,6 +1642,22 @@ func (checker *Checker) VisitInitializerDeclaration(initializer *ast.Initializer
 				Pos:  initializer.StartPos,
 			},
 		)
+	}
+
+	functionType, err := checker.functionType(initializer.Parameters, nil)
+	if err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
+	}
+
+	err = checker.checkFunction(
+		initializer.Parameters,
+		functionType,
+		initializer.Block,
+	)
+	if err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
 	}
 
 	return checkerResult{
