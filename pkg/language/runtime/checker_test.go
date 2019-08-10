@@ -2141,3 +2141,25 @@ func TestCheckInvalidFunctionNonBoolCondition(t *testing.T) {
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
+
+func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int) {
+          pre {
+              before(x) != 0
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	Expect(errs[0].(*sema.NotDeclaredError).Name).
+		To(Equal("before"))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+}

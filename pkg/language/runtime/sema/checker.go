@@ -1010,8 +1010,9 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 	case BinaryOperationKindEquality:
 		// check both types are equal, and boolean subtypes or integer subtypes
 
-		if !(leftType.Equal(rightType) &&
-			(checker.IsSubType(leftType, &BoolType{}) || checker.IsSubType(leftType, &IntegerType{}))) {
+		if leftType != nil &&
+			!(leftType.Equal(rightType) &&
+				(checker.IsSubType(leftType, &BoolType{}) || checker.IsSubType(leftType, &IntegerType{}))) {
 
 			errs = append(errs,
 				&InvalidBinaryOperandsError{
