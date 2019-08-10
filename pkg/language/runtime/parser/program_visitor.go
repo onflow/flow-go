@@ -160,6 +160,8 @@ func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
+	identifier := ctx.Identifier().GetText()
+
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
@@ -171,6 +173,7 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.InitializerDeclaration{
+		Identifier: identifier,
 		Parameters: parameters,
 		Block:      block,
 		StartPos:   startPosition,

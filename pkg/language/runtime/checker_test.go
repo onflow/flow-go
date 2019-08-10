@@ -384,6 +384,23 @@ func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
 }
 
+func TestCheckInvalidParameterTypes(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: X, y: Y) {}
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+}
+
 func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1194,4 +1211,158 @@ func TestCheckInvalidFunctionAccess(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.InvalidAccessError{}))
+}
+
+func TestCheckInvalidStructureRedeclaringType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct Int {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckStructure(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct Test {
+            pub(set) var foo: Int
+
+            init(foo: Int) {
+                self.foo = foo
+            }
+
+            pub fun getFoo(): Int {
+                return self.foo
+            }
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInitializerName(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct Test {
+            init() {}
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInitializerName(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct Test {
+            initializer() {}
+        }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidInitializerNameError{}))
+}
+
+func TestCheckInvalidStructureFieldName(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct Test {
+            let init: Int
+        }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
+}
+
+func TestCheckInvalidStructureFunctionName(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct Test {
+            fun init() {}
+        }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
+}
+
+func TestCheckInvalidStructureRedeclaringFields(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       struct Test {
+           let x: Int
+           let x: Int
+       }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckInvalidStructureRedeclaringFunctions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       struct Test {
+           fun x() {}
+           fun x() {}
+       }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckInvalidStructureRedeclaringFieldsAndFunctions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       struct Test {
+           let x: Int
+           fun x() {}
+       }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckStructureFieldsAndFunctions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       struct Test {
+           let x: Int
+           fun y() {}
+       }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 }

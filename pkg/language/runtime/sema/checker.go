@@ -9,6 +9,7 @@ import (
 )
 
 const ArgumentLabelNotRequired = "_"
+const InitializerIdentifier = "init"
 
 type functionContext struct {
 	returnType Type
@@ -164,6 +165,7 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 		err := checker.declareGlobal(declaration)
 		if err != nil {
+			// NOTE: append, don't return
 			errs = append(errs, err.Errors...)
 		}
 	}
@@ -190,7 +192,11 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 		)
 	}
 
-	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
+	functionType, err := checker.functionType(declaration.Parameters, declaration.ReturnType)
+	if err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
+	}
 
 	argumentLabels := make([]string, len(declaration.Parameters))
 
@@ -207,13 +213,14 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	// declare the function before checking it,
 	// so it can be referred to inside the function
 
-	err := checker.declareFunction(
+	err = checker.declareFunction(
 		declaration.Identifier,
 		declaration.IdentifierPos,
 		functionType,
 		argumentLabels,
 	)
 	if err != nil {
+		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
@@ -226,6 +233,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 		declaration.Block,
 	)
 	if err != nil {
+		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
@@ -248,16 +256,18 @@ func (checker *Checker) checkFunction(
 	// check parameter names
 	err := checker.checkParameterNames(parameters)
 	if err != nil {
+		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
 	// check argument labels
 	err = checker.checkArgumentLabels(parameters)
 	if err != nil {
+		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
-	checker.bindParameters(parameters)
+	checker.bindParameters(parameters, functionType.ParameterTypes)
 
 	checker.enterFunction(functionType)
 	defer checker.leaveFunction()
@@ -321,18 +331,20 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) *Checke
 	return checkerError(errs)
 }
 
-func (checker *Checker) bindParameters(parameters []*ast.Parameter) {
+func (checker *Checker) bindParameters(parameters []*ast.Parameter, parameterTypes []Type) {
 	// declare a constant variable for each parameter
 
 	depth := checker.valueActivations.Depth()
 
-	for _, parameter := range parameters {
-		ty := checker.ConvertType(parameter.Type)
+	for i, parameter := range parameters {
+		parameterType := parameterTypes[i]
+
+		// NOTE: still set type
 		checker.setVariable(
 			parameter.Identifier,
 			&Variable{
 				IsConstant: true,
-				Type:       ty,
+				Type:       parameterType,
 				Depth:      depth,
 			},
 		)
@@ -347,7 +359,12 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 	declarationType := valueType
 	// does the declaration have an explicit type annotation?
 	if declaration.Type != nil {
-		declarationType = checker.ConvertType(declaration.Type)
+		var err *CheckerError
+		declarationType, err = checker.ConvertType(declaration.Type)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
+		}
 
 		// check the value type is a subtype of the declaration type
 		if !checker.IsSubType(valueType, declarationType) {
@@ -364,6 +381,7 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 
 	err := checker.declareVariable(declaration, declarationType)
 	if err != nil {
+		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
@@ -521,6 +539,7 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 
 	_, _, err := checker.visitConditional(statement.Test, statement.Then, elseElement)
 	if err != nil {
+		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
@@ -573,6 +592,7 @@ func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast
 
 	err := checker.visitAssignmentValueType(assignment, valueType)
 	if err != nil {
+		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
@@ -1046,6 +1066,7 @@ func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalEx
 
 	thenType, elseType, err := checker.visitConditional(expression.Test, expression.Then, expression.Else)
 	if err != nil {
+		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
@@ -1213,14 +1234,19 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	var errs []error
 
 	// TODO: infer
-	functionType := checker.functionType(expression.Parameters, expression.ReturnType)
+	functionType, err := checker.functionType(expression.Parameters, expression.ReturnType)
+	if err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
+	}
 
-	err := checker.checkFunction(
+	err = checker.checkFunction(
 		expression.Parameters,
 		functionType,
 		expression.Block,
 	)
 	if err != nil {
+		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
 
@@ -1231,46 +1257,73 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 }
 
 // ConvertType converts an AST type representation to a sema type
-func (checker *Checker) ConvertType(t ast.Type) Type {
+func (checker *Checker) ConvertType(t ast.Type) (Type, *CheckerError) {
+	var errs []error
+
 	switch t := t.(type) {
 	case *ast.NominalType:
 		result := checker.findType(t.Identifier)
 		if result == nil {
-			panic(&NotDeclaredError{
-				ExpectedKind: common.DeclarationKindType,
-				Name:         t.Identifier,
-				// TODO: add start and end position to ast.Type
-				StartPos: t.Pos,
-				EndPos:   t.Pos,
-			})
+			err := &CheckerError{
+				Errors: []error{
+					&NotDeclaredError{
+						ExpectedKind: common.DeclarationKindType,
+						Name:         t.Identifier,
+						// TODO: add start and end position to ast.Type
+						StartPos: t.Pos,
+						EndPos:   t.Pos,
+					},
+				},
+			}
+			return &AnyType{}, err
 		}
-		return result
+		return result, nil
 
 	case *ast.VariableSizedType:
-		return &VariableSizedType{
-			Type: checker.ConvertType(t.Type),
+		elementType, err := checker.ConvertType(t.Type)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
 		}
 
+		return &VariableSizedType{
+			Type: elementType,
+		}, checkerError(errs)
+
 	case *ast.ConstantSizedType:
-		return &ConstantSizedType{
-			Type: checker.ConvertType(t.Type),
-			Size: t.Size,
+		elementType, err := checker.ConvertType(t.Type)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
 		}
+
+		return &ConstantSizedType{
+			Type: elementType,
+			Size: t.Size,
+		}, checkerError(errs)
 
 	case *ast.FunctionType:
 		var parameterTypes []Type
 		for _, parameterType := range t.ParameterTypes {
-			parameterTypes = append(parameterTypes,
-				checker.ConvertType(parameterType),
-			)
+			parameterType, err := checker.ConvertType(parameterType)
+			if err != nil {
+				// NOTE: append, don't return
+				errs = append(errs, err.Errors...)
+			}
+			// NOTE: still append parameter type, even if there's an error
+			parameterTypes = append(parameterTypes, parameterType)
 		}
 
-		returnType := checker.ConvertType(t.ReturnType)
+		returnType, err := checker.ConvertType(t.ReturnType)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
+		}
 
 		return &FunctionType{
 			ParameterTypes: parameterTypes,
 			ReturnType:     returnType,
-		}
+		}, checkerError(errs)
 	}
 
 	panic(&astTypeConversionError{invalidASTType: t})
@@ -1329,16 +1382,30 @@ func (checker *Checker) currentFunction() *functionContext {
 	return checker.functionContexts[lastIndex]
 }
 
-func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast.Type) *FunctionType {
+func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast.Type) (*FunctionType, *CheckerError) {
+	var errs []error
+
 	parameterTypes := make([]Type, len(parameters))
 	for i, parameter := range parameters {
-		parameterTypes[i] = checker.ConvertType(parameter.Type)
+		parameterType, err := checker.ConvertType(parameter.Type)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
+		}
+		// NOTE: still assigning parameter type
+		parameterTypes[i] = parameterType
+	}
+
+	convertedReturnType, err := checker.ConvertType(returnType)
+	if err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
 	}
 
 	return &FunctionType{
 		ParameterTypes: parameterTypes,
-		ReturnType:     checker.ConvertType(returnType),
-	}
+		ReturnType:     convertedReturnType,
+	}, checkerError(errs)
 }
 
 // visitConditional checks a conditional. the test expression must be a boolean.
@@ -1379,17 +1446,124 @@ func (checker *Checker) visitConditional(
 	return thenResult.Type, elseResult.Type, checkerError(errs)
 }
 
-func (checker *Checker) VisitStructureDeclaration(assignment *ast.StructureDeclaration) ast.Repr {
+func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
+	var errs []error
+
+	err := checker.checkStructureIdentifier(structure)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	err = checker.checkStructureFieldAndFunctionIdentifiers(structure)
+	if err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	initializer := structure.Initializer
+	if initializer != nil {
+		result := initializer.Accept(checker).(checkerResult)
+		errs = append(errs, result.Errors...)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
+}
+
+// checkStructureFieldAndFunctionIdentifiers checks the structure's fields and functions
+// are unique and aren't named `init`
+//
+func (checker *Checker) checkStructureFieldAndFunctionIdentifiers(structure *ast.StructureDeclaration) *CheckerError {
+	var errs []error
+
+	positions := map[string]*ast.Position{}
+
+	checkName := func(name string, pos *ast.Position, kind common.DeclarationKind) {
+		if name == InitializerIdentifier {
+			errs = append(errs,
+				&InvalidNameError{
+					Name: name,
+					Pos:  structure.IdentifierPos,
+				},
+			)
+		}
+
+		if previousPos, ok := positions[name]; ok {
+			errs = append(errs,
+				&RedeclarationError{
+					Name:        name,
+					Pos:         pos,
+					Kind:        kind,
+					PreviousPos: previousPos,
+				},
+			)
+		} else {
+			positions[name] = pos
+		}
+	}
+
+	for _, field := range structure.Fields {
+		checkName(
+			field.Identifier,
+			field.IdentifierPos,
+			common.DeclarationKindField,
+		)
+	}
+
+	for _, function := range structure.Functions {
+		checkName(
+			function.Identifier,
+			function.IdentifierPos,
+			common.DeclarationKindFunction,
+		)
+	}
+
+	return checkerError(errs)
+}
+
+// checkStructureIdentifier checks a type with the structure's name is not already defined
+//
+func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclaration) *CheckerError {
+	var errs []error
+
+	identifier := structure.Identifier
+
+	existingType := checker.findType(identifier)
+	if existingType != nil {
+		errs = append(errs,
+			&RedeclarationError{
+				Kind: common.DeclarationKindType,
+				Name: identifier,
+				Pos:  structure.IdentifierPos,
+			},
+		)
+	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
 	// TODO:
 	return nil
 }
 
-func (checker *Checker) VisitFieldDeclaration(assignment *ast.FieldDeclaration) ast.Repr {
-	// TODO:
-	return nil
-}
+func (checker *Checker) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
+	var errs []error
 
-func (checker *Checker) VisitInitializerDeclaration(assignment *ast.InitializerDeclaration) ast.Repr {
-	// TODO:
-	return nil
+	// check the initializer is named properly
+	identifier := initializer.Identifier
+	if identifier != InitializerIdentifier {
+		errs = append(errs,
+			&InvalidInitializerNameError{
+				Name: identifier,
+				Pos:  initializer.StartPos,
+			},
+		)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
 }
