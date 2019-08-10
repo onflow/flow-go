@@ -8,7 +8,6 @@ type VariableDeclaration struct {
 	Type          Type
 	Value         Expression
 	StartPos      *Position
-	EndPos        *Position
 	IdentifierPos *Position
 }
 
@@ -17,7 +16,7 @@ func (v *VariableDeclaration) StartPosition() *Position {
 }
 
 func (v *VariableDeclaration) EndPosition() *Position {
-	return v.EndPos
+	return v.Value.EndPosition()
 }
 
 func (v *VariableDeclaration) IdentifierPosition() *Position {
