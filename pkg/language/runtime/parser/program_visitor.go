@@ -860,9 +860,11 @@ func parseIntExpression(token antlr.Token, text string, kind IntegerLiteralKind)
 	if !ok {
 		panic(fmt.Sprintf("invalid %s literal: %s", kind, text))
 	}
+
 	return &ast.IntExpression{
-		Value: value,
-		Pos:   startPosition,
+		Value:    value,
+		StartPos: startPosition,
+		EndPos:   endPosition,
 	}
 }
 
@@ -916,19 +918,27 @@ func (v *ProgramVisitor) VisitNestedExpression(ctx *NestedExpressionContext) int
 }
 
 func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interface{} {
-	position := ast.PositionFromToken(ctx.GetStart())
+	startPosition := ast.PositionFromToken(ctx.GetStart())
 
-	if ctx.True() != nil {
+	trueNode := ctx.True()
+	if trueNode != nil {
+		endPosition := ast.EndPosition(startPosition, trueNode.GetSymbol().GetStop())
+
 		return &ast.BoolExpression{
-			Value: true,
-			Pos:   position,
+			Value:    true,
+			StartPos: startPosition,
+			EndPos:   endPosition,
 		}
 	}
 
-	if ctx.False() != nil {
+	falseNode := ctx.False()
+	if falseNode != nil {
+		endPosition := ast.EndPosition(startPosition, falseNode.GetSymbol().GetStop())
+
 		return &ast.BoolExpression{
-			Value: false,
-			Pos:   position,
+			Value:    false,
+			StartPos: startPosition,
+			EndPos:   endPosition,
 		}
 	}
 

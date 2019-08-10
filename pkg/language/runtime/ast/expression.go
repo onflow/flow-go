@@ -10,22 +10,17 @@ type Expression interface {
 // BoolExpression
 
 type BoolExpression struct {
-	Value bool
-	Pos   Position
+	Value    bool
+	StartPos Position
+	EndPos   Position
 }
 
 func (e *BoolExpression) StartPosition() Position {
-	return e.Pos
+	return e.StartPos
 }
 
 func (e *BoolExpression) EndPosition() Position {
-	var length int
-	if e.Value {
-		length = len("true")
-	} else {
-		length = len("false")
-	}
-	return e.Pos.Shifted(length - 1)
+	return e.EndPos
 }
 
 func (*BoolExpression) isExpression() {}
@@ -37,16 +32,17 @@ func (e *BoolExpression) Accept(v Visitor) Repr {
 // IntExpression
 
 type IntExpression struct {
-	Value *big.Int
-	Pos   Position
+	Value    *big.Int
+	StartPos Position
+	EndPos   Position
 }
 
 func (e *IntExpression) StartPosition() Position {
-	return e.Pos
+	return e.StartPos
 }
 
 func (e *IntExpression) EndPosition() Position {
-	return e.Pos
+	return e.EndPos
 }
 
 func (*IntExpression) isExpression() {}
