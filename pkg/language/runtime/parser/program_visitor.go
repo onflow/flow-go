@@ -78,6 +78,18 @@ func (v *ProgramVisitor) visitReturnType(ctx IFullTypeContext, tokenBefore antlr
 	return result.(ast.Type)
 }
 
+func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{} {
+	return nil
+}
+
+func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
+	return nil
+}
+
+func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
+	return nil
+}
+
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
 	parameterListEnd := ctx.ParameterList().GetStop()
 	returnType := v.visitReturnType(ctx.returnType, parameterListEnd)

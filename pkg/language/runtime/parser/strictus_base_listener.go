@@ -32,6 +32,24 @@ func (s *BaseStrictusListener) EnterDeclaration(ctx *DeclarationContext) {}
 // ExitDeclaration is called when production declaration is exited.
 func (s *BaseStrictusListener) ExitDeclaration(ctx *DeclarationContext) {}
 
+// EnterStructureDeclaration is called when production structureDeclaration is entered.
+func (s *BaseStrictusListener) EnterStructureDeclaration(ctx *StructureDeclarationContext) {}
+
+// ExitStructureDeclaration is called when production structureDeclaration is exited.
+func (s *BaseStrictusListener) ExitStructureDeclaration(ctx *StructureDeclarationContext) {}
+
+// EnterField is called when production field is entered.
+func (s *BaseStrictusListener) EnterField(ctx *FieldContext) {}
+
+// ExitField is called when production field is exited.
+func (s *BaseStrictusListener) ExitField(ctx *FieldContext) {}
+
+// EnterInitializer is called when production initializer is entered.
+func (s *BaseStrictusListener) EnterInitializer(ctx *InitializerContext) {}
+
+// ExitInitializer is called when production initializer is exited.
+func (s *BaseStrictusListener) ExitInitializer(ctx *InitializerContext) {}
+
 // EnterFunctionDeclaration is called when production functionDeclaration is entered.
 func (s *BaseStrictusListener) EnterFunctionDeclaration(ctx *FunctionDeclarationContext) {}
 

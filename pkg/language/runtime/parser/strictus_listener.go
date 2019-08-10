@@ -13,6 +13,15 @@ type StrictusListener interface {
 	// EnterDeclaration is called when entering the declaration production.
 	EnterDeclaration(c *DeclarationContext)
 
+	// EnterStructureDeclaration is called when entering the structureDeclaration production.
+	EnterStructureDeclaration(c *StructureDeclarationContext)
+
+	// EnterField is called when entering the field production.
+	EnterField(c *FieldContext)
+
+	// EnterInitializer is called when entering the initializer production.
+	EnterInitializer(c *InitializerContext)
+
 	// EnterFunctionDeclaration is called when entering the functionDeclaration production.
 	EnterFunctionDeclaration(c *FunctionDeclarationContext)
 
@@ -171,6 +180,15 @@ type StrictusListener interface {
 
 	// ExitDeclaration is called when exiting the declaration production.
 	ExitDeclaration(c *DeclarationContext)
+
+	// ExitStructureDeclaration is called when exiting the structureDeclaration production.
+	ExitStructureDeclaration(c *StructureDeclarationContext)
+
+	// ExitField is called when exiting the field production.
+	ExitField(c *FieldContext)
+
+	// ExitInitializer is called when exiting the initializer production.
+	ExitInitializer(c *InitializerContext)
 
 	// ExitFunctionDeclaration is called when exiting the functionDeclaration production.
 	ExitFunctionDeclaration(c *FunctionDeclarationContext)

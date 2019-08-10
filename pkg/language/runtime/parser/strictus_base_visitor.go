@@ -15,6 +15,18 @@ func (v *BaseStrictusVisitor) VisitDeclaration(ctx *DeclarationContext) interfac
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitField(ctx *FieldContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
