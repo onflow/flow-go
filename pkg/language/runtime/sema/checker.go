@@ -532,6 +532,19 @@ func (checker *Checker) visitConditions(conditions []*ast.Condition) *CheckerErr
 	for _, condition := range conditions {
 		conditionResult := condition.Accept(checker).(checkerResult)
 		errs = append(errs, conditionResult.Errors...)
+
+		conditionType := conditionResult.Type
+
+		if !checker.IsSubType(conditionType, &BoolType{}) {
+			errs = append(errs,
+				&TypeMismatchError{
+					ExpectedType: &BoolType{},
+					ActualType:   conditionType,
+					StartPos:     condition.StartPosition(),
+					EndPos:       condition.EndPosition(),
+				},
+			)
+		}
 	}
 
 	return checkerError(errs)

@@ -2118,3 +2118,26 @@ func TestCheckInvalidFunctionPreConditionReference(t *testing.T) {
 	Expect(errs[3]).
 		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
 }
+
+func TestCheckInvalidFunctionNonBoolCondition(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int) {
+          pre {
+              1
+          }
+          post {
+              2
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
