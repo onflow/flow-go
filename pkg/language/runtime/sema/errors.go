@@ -426,3 +426,27 @@ func (e *ControlStatementError) StartPosition() *ast.Position {
 func (e *ControlStatementError) EndPosition() *ast.Position {
 	return e.EndPos
 }
+
+// InvalidAccessError
+
+type InvalidAccessError struct {
+	DeclarationKind common.DeclarationKind
+	Access          ast.Access
+	Pos             *ast.Position
+}
+
+func (e *InvalidAccessError) Error() string {
+	return fmt.Sprintf(
+		"invalid access modifier for %s: %s",
+		e.DeclarationKind.Name(),
+		e.Access.Keyword(),
+	)
+}
+
+func (e *InvalidAccessError) StartPosition() *ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidAccessError) EndPosition() *ast.Position {
+	return e.Pos
+}

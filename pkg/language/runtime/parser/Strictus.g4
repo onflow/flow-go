@@ -55,12 +55,18 @@ declaration
     | variableDeclaration
     ;
 
+access
+    : /* Not specified */
+    | Pub
+    | PubSet
+    ;
+
 structureDeclaration
     : Struct Identifier '{' field* initializer? functionDeclaration* '}'
     ;
 
 field
-    : (Pub | PubSet)? (Let | Var) Identifier ':' fullType
+    : access (Let | Var) Identifier ':' fullType
     ;
 
 initializer
@@ -68,7 +74,7 @@ initializer
     ;
 
 functionDeclaration
-    : Pub? Fun Identifier parameterList (':' returnType=fullType)? block
+    : access Fun Identifier parameterList (':' returnType=fullType)? block
     ;
 
 parameterList

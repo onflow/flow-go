@@ -17,6 +17,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#declaration.
 	VisitDeclaration(ctx *DeclarationContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#access.
+	VisitAccess(ctx *AccessContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#structureDeclaration.
 	VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{}
 

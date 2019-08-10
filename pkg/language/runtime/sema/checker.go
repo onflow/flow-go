@@ -177,6 +177,19 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 	var errs []error
 
+	switch declaration.Access {
+	case ast.AccessNotSpecified, ast.AccessPublic:
+		break
+	default:
+		errs = append(errs,
+			&InvalidAccessError{
+				DeclarationKind: common.DeclarationKindFunction,
+				Access:          declaration.Access,
+				Pos:             declaration.StartPos,
+			},
+		)
+	}
+
 	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
 
 	argumentLabels := make([]string, len(declaration.Parameters))
@@ -1364,4 +1377,19 @@ func (checker *Checker) visitConditional(
 	}
 
 	return thenResult.Type, elseResult.Type, checkerError(errs)
+}
+
+func (checker *Checker) VisitStructureDeclaration(assignment *ast.StructureDeclaration) ast.Repr {
+	// TODO:
+	return nil
+}
+
+func (checker *Checker) VisitFieldDeclaration(assignment *ast.FieldDeclaration) ast.Repr {
+	// TODO:
+	return nil
+}
+
+func (checker *Checker) VisitInitializerDeclaration(assignment *ast.InitializerDeclaration) ast.Repr {
+	// TODO:
+	return nil
 }

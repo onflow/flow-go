@@ -689,7 +689,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -728,7 +728,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		Parameters: []*Parameter{
 			{
@@ -775,7 +775,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		Parameters: []*Parameter{
 			{
@@ -831,7 +831,7 @@ func TestParseIfStatement(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -933,7 +933,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -993,7 +993,7 @@ func TestParseWhileStatement(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -1057,7 +1057,7 @@ func TestParseAssignment(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -1105,7 +1105,7 @@ func TestParseAccessAssignment(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -1182,7 +1182,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   false,
+		Access:     AccessNotSpecified,
 		Identifier: "test",
 		ReturnType: &NominalType{
 			Pos: &Position{Offset: 15, Line: 2, Column: 14},
@@ -1255,7 +1255,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		To(BeEmpty())
 
 	test := &FunctionDeclaration{
-		IsPublic:   true,
+		Access:     AccessPublic,
 		Identifier: "test",
 		Parameters: []*Parameter{
 			{
@@ -2303,7 +2303,7 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 func TestParseStructure(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, errors := parser.Parse(`
+	actual, errors := parser.Parse(`
         struct Test {
             pub(set) var foo: Int
 
@@ -2311,7 +2311,7 @@ func TestParseStructure(t *testing.T) {
                 self.foo = foo
             }
 
-            fun getFoo(): Int {
+            pub fun getFoo(): Int {
                 return self.foo
             }
         }
@@ -2319,4 +2319,107 @@ func TestParseStructure(t *testing.T) {
 
 	Expect(errors).
 		To(BeEmpty())
+
+	a := &StructureDeclaration{
+		Identifier: "Test",
+		Fields: []*FieldDeclaration{
+			{
+				Access:     AccessPublicSettable,
+				IsConstant: false,
+				Identifier: "foo",
+				Type: &NominalType{
+					Identifier: "Int",
+					Pos:        &Position{Offset: 53, Line: 3, Column: 30},
+				},
+				StartPos:      &Position{Offset: 35, Line: 3, Column: 12},
+				EndPos:        &Position{Offset: 55, Line: 3, Column: 32},
+				IdentifierPos: &Position{Offset: 48, Line: 3, Column: 25},
+			},
+		},
+		Initializer: &InitializerDeclaration{
+			Parameters: []*Parameter{
+				{
+					Label:      "",
+					Identifier: "foo",
+					Type: &NominalType{
+						Identifier: "Int",
+						Pos:        &Position{Offset: 80, Line: 5, Column: 22},
+					},
+					LabelPos:      nil,
+					IdentifierPos: &Position{Offset: 75, Line: 5, Column: 17},
+					StartPos:      &Position{Offset: 75, Line: 5, Column: 17},
+					EndPos:        &Position{Offset: 80, Line: 5, Column: 22},
+				},
+			},
+			Block: &Block{
+				Statements: []Statement{
+					&AssignmentStatement{
+						Target: &MemberExpression{
+							Expression: &IdentifierExpression{
+								Identifier: "self",
+								StartPos:   &Position{Offset: 103, Line: 6, Column: 16},
+								EndPos:     &Position{Offset: 106, Line: 6, Column: 19},
+							},
+							Identifier: "foo",
+							StartPos:   &Position{Offset: 107, Line: 6, Column: 20},
+							EndPos:     &Position{Offset: 108, Line: 6, Column: 21},
+						},
+						Value: &IdentifierExpression{
+							Identifier: "foo",
+							StartPos:   &Position{Offset: 114, Line: 6, Column: 27},
+							EndPos:     &Position{Offset: 116, Line: 6, Column: 29},
+						},
+					},
+				},
+				StartPos: &Position{Offset: 85, Line: 5, Column: 27},
+				EndPos:   &Position{Offset: 130, Line: 7, Column: 12},
+			},
+			StartPos: &Position{Offset: 70, Line: 5, Column: 12},
+			EndPos:   &Position{Offset: 130, Line: 7, Column: 12},
+		},
+		Functions: []*FunctionDeclaration{
+			{
+				Access:     AccessPublic,
+				Identifier: "getFoo",
+				Parameters: nil,
+				ReturnType: &NominalType{
+					Identifier: "Int",
+					Pos:        &Position{Offset: 163, Line: 9, Column: 30},
+				},
+				Block: &Block{
+					Statements: []Statement{
+						&ReturnStatement{
+							Expression: &MemberExpression{
+								Expression: &IdentifierExpression{
+									Identifier: "self",
+									StartPos:   &Position{Offset: 192, Line: 10, Column: 23},
+									EndPos:     &Position{Offset: 195, Line: 10, Column: 26},
+								},
+								Identifier: "foo",
+								StartPos:   &Position{Offset: 196, Line: 10, Column: 27},
+								EndPos:     &Position{Offset: 197, Line: 10, Column: 28},
+							},
+							StartPos: &Position{Offset: 185, Line: 10, Column: 16},
+							EndPos:   &Position{Offset: 197, Line: 10, Column: 28},
+						},
+					},
+					StartPos: &Position{Offset: 167, Line: 9, Column: 34},
+					EndPos:   &Position{Offset: 213, Line: 11, Column: 12},
+				},
+				StartPos:      &Position{Offset: 145, Line: 9, Column: 12},
+				EndPos:        &Position{Offset: 213, Line: 11, Column: 12},
+				IdentifierPos: &Position{Offset: 153, Line: 9, Column: 20},
+			},
+		},
+		IdentifierPos: &Position{Offset: 16, Line: 2, Column: 15},
+		StartPos:      &Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:        &Position{Offset: 223, Line: 12, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{a},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
 }

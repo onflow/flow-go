@@ -13,6 +13,9 @@ type StrictusListener interface {
 	// EnterDeclaration is called when entering the declaration production.
 	EnterDeclaration(c *DeclarationContext)
 
+	// EnterAccess is called when entering the access production.
+	EnterAccess(c *AccessContext)
+
 	// EnterStructureDeclaration is called when entering the structureDeclaration production.
 	EnterStructureDeclaration(c *StructureDeclarationContext)
 
@@ -180,6 +183,9 @@ type StrictusListener interface {
 
 	// ExitDeclaration is called when exiting the declaration production.
 	ExitDeclaration(c *DeclarationContext)
+
+	// ExitAccess is called when exiting the access production.
+	ExitAccess(c *AccessContext)
 
 	// ExitStructureDeclaration is called when exiting the structureDeclaration production.
 	ExitStructureDeclaration(c *StructureDeclarationContext)

@@ -26,6 +26,9 @@ type Visitor interface {
 	VisitProgram(*Program) Repr
 	VisitFunctionDeclaration(*FunctionDeclaration) Repr
 	VisitBlock(*Block) Repr
+	VisitStructureDeclaration(*StructureDeclaration) Repr
+	VisitFieldDeclaration(*FieldDeclaration) Repr
+	VisitInitializerDeclaration(*InitializerDeclaration) Repr
 	// statements
 	VisitReturnStatement(*ReturnStatement) Repr
 	VisitBreakStatement(*BreakStatement) Repr

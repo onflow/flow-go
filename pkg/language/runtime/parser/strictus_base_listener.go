@@ -32,6 +32,12 @@ func (s *BaseStrictusListener) EnterDeclaration(ctx *DeclarationContext) {}
 // ExitDeclaration is called when production declaration is exited.
 func (s *BaseStrictusListener) ExitDeclaration(ctx *DeclarationContext) {}
 
+// EnterAccess is called when production access is entered.
+func (s *BaseStrictusListener) EnterAccess(ctx *AccessContext) {}
+
+// ExitAccess is called when production access is exited.
+func (s *BaseStrictusListener) ExitAccess(ctx *AccessContext) {}
+
 // EnterStructureDeclaration is called when production structureDeclaration is entered.
 func (s *BaseStrictusListener) EnterStructureDeclaration(ctx *StructureDeclarationContext) {}
 
