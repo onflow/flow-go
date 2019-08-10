@@ -45,6 +45,5 @@ func (f *FunctionDeclaration) ToExpression() *FunctionExpression {
 		ReturnType: f.ReturnType,
 		Block:      f.Block,
 		StartPos:   f.StartPos,
-		EndPos:     f.EndPos,
 	}
 }

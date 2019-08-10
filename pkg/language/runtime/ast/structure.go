@@ -123,7 +123,6 @@ func (i *InitializerDeclaration) ToFunctionExpression() *FunctionExpression {
 	return &FunctionExpression{
 		Parameters: i.Parameters,
 		Block:      i.Block,
-		EndPos:     i.EndPos,
 		StartPos:   i.StartPos,
 	}
 }
