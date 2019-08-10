@@ -9,18 +9,21 @@ type BLS_BLS12381Algo struct {
 }
 
 // SignHash implements BLS signature on BLS12381 curve
-func (a *BLS_BLS12381Algo) SignHash(k PrKey, h Hash) Signature {
-	var s Signature
-	s = make([]byte, a.SignatureLength)
-	// signature computation here
-	// TODO : hash to G1
-	// TODO : exponentiation in G1
+func (a *BLS_BLS12381Algo) SignHash(sk PrKey, h Hash) Signature {
+	hashBytes := h.ToBytes()
+	//skScalar := sk.prKeyData().(*scalar)
+	skScalar := (sk.(*PrKeyBLS_BLS12381)).sk
+	s := blsSign(&skScalar, hashBytes)
 	return s
 }
 
 // VerifyHash implements BLS signature verification on BLS12381 curve
 func (a *BLS_BLS12381Algo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
 	// TODO: signature verification here
+	// TODO : check s is on curve
+	// TODO : check s is in G1
+	// TODO : check pk is on curve  (can be done offline)
+	// TODO : check pk is in G2 (can be done offline)
 	// TODO : hash to G1
 	// TODO : double pairing == 1 or double thread
 	return true
@@ -94,6 +97,10 @@ func (sk *PrKeyBLS_BLS12381) Pubkey() PubKey {
 	sk.ComputePubKey()
 	return sk.pk
 }
+
+/*func (sk *PrKeyBLS_BLS12381) prKeyData() data {
+	return &(sk.sk)
+}*/
 
 // PubKey_BLS_BLS12381 is the public key of BLS using BLS12_381, it implements PubKey
 type PubKey_BLS_BLS12381 struct {

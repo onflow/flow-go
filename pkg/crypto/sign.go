@@ -10,11 +10,13 @@ import (
 // NewSignatureAlgo initializes and chooses a signature scheme
 func NewSignatureAlgo(name AlgoName) Signer {
 	if name == BLS_BLS12381 {
-		a := &(BLS_BLS12381Algo{nil, &SignAlgo{
-			name,
-			PrKeyLengthBLS_BLS12381,
-			PubKeyLengthBLS_BLS12381,
-			SignatureLengthBLS_BLS12381}})
+		a := &(BLS_BLS12381Algo{
+			nil,
+			&SignAlgo{
+				name,
+				PrKeyLengthBLS_BLS12381,
+				PubKeyLengthBLS_BLS12381,
+				SignatureLengthBLS_BLS12381}})
 		a.init()
 		return a
 	}
@@ -66,10 +68,13 @@ func (s Signature) ToBytes() []byte {
 
 // String returns a String representation of the signature data
 func (s Signature) String() string {
+	const zero = "00"
 	var sb strings.Builder
 	sb.WriteString("0x")
 	for _, i := range s {
-		sb.WriteString(strconv.FormatUint(uint64(i), 16))
+		hex := strconv.FormatUint(uint64(i), 16)
+		sb.WriteString(zero[:2-len(hex)])
+		sb.WriteString(hex)
 	}
 	return sb.String()
 }
@@ -86,7 +91,11 @@ type PrKey interface {
 	ComputePubKey()
 	// returns the public key
 	Pubkey() PubKey
+	// returns the private key data
+	//prKeyData() data
 }
+
+//type data interface{}
 
 // PubKey is an unspecified signature scheme public key
 type PubKey interface {

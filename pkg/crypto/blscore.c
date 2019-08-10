@@ -68,3 +68,21 @@ void _G2scalarGenMult(ep2_st* res, bn_st *expo) {
 }
 
 
+// Computes BLS signature
+void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
+    ep_st p;
+    ep_new(&p);
+    // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
+    ep_map(&p, data, len);  // TODO : add another func for prehashed data?
+    // s = p^sk
+    
+    bn_set_dig(sk, 1);
+    _G1scalarGenMult(&p, sk);
+
+	//_G1scalarPointMult(&p, &p, sk);
+    ep_write_bin_compact(s, &p) // writing in bytes: should preserve the endianness when read
+
+    ep_free(&p);
+}
+
+
