@@ -98,12 +98,11 @@ func (e *IdentifierExpression) Accept(v Visitor) Repr {
 type InvocationExpression struct {
 	Expression Expression
 	Arguments  []*Argument
-	StartPos   *Position
 	EndPos     *Position
 }
 
 func (e *InvocationExpression) StartPosition() *Position {
-	return e.StartPos
+	return e.Expression.StartPosition()
 }
 
 func (e *InvocationExpression) EndPosition() *Position {
@@ -244,7 +243,6 @@ type FunctionExpression struct {
 	ReturnType Type
 	Block      *Block
 	StartPos   *Position
-	EndPos     *Position
 }
 
 func (e *FunctionExpression) StartPosition() *Position {
@@ -252,7 +250,7 @@ func (e *FunctionExpression) StartPosition() *Position {
 }
 
 func (e *FunctionExpression) EndPosition() *Position {
-	return e.EndPos
+	return e.Block.EndPosition()
 }
 
 func (*FunctionExpression) isExpression() {}

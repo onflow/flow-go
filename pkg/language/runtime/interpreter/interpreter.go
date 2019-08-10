@@ -196,7 +196,6 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 		ReturnType: declaration.ReturnType,
 		Block:      declaration.Block,
 		StartPos:   declaration.StartPos,
-		EndPos:     declaration.EndPos,
 	}
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
@@ -217,7 +216,6 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 		IsConstant:    true,
 		Type:          functionType,
 		StartPos:      declaration.StartPos,
-		EndPos:        declaration.EndPos,
 		IdentifierPos: declaration.IdentifierPos,
 	}
 
@@ -726,7 +724,6 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 					Identifier: parameter.Identifier,
 					Type:       parameter.Type,
 					StartPos:   parameter.StartPos,
-					EndPos:     parameter.EndPos,
 				},
 				Value: argument,
 			},

@@ -1331,8 +1331,8 @@ func (checker *Checker) checkInvocationArguments(
 			&ArgumentCountError{
 				ParameterCount: parameterCount,
 				ArgumentCount:  argumentCount,
-				StartPos:       invocationExpression.StartPos,
-				EndPos:         invocationExpression.EndPos,
+				StartPos:       invocationExpression.StartPosition(),
+				EndPos:         invocationExpression.EndPosition(),
 			},
 		)
 	}
@@ -1405,9 +1405,8 @@ func (checker *Checker) ConvertType(t ast.Type) (Type, *CheckerError) {
 					&NotDeclaredError{
 						ExpectedKind: common.DeclarationKindType,
 						Name:         t.Identifier,
-						// TODO: add start and end position to ast.Type
-						StartPos: t.Pos,
-						EndPos:   t.Pos,
+						StartPos:     t.StartPosition(),
+						EndPos:       t.EndPosition(),
 					},
 				},
 			}
