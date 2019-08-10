@@ -69,6 +69,11 @@ func NewChecker(program *ast.Program) *Checker {
 	}
 }
 
+func (checker *Checker) Check() (err error) {
+	result := checker.Program.Accept(checker).(checkerResult)
+	return checkerError(result.Errors)
+}
+
 func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 	if subType.Equal(superType) {
 		return true
@@ -157,11 +162,6 @@ func (checker *Checker) popActivations() {
 	checker.typeActivations.Pop()
 }
 
-func (checker *Checker) Check() (err error) {
-	result := checker.Program.Accept(checker).(checkerResult)
-	return checkerError(result.Errors)
-}
-
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 	var errs []error
 
@@ -204,17 +204,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 		errs = append(errs, err.Errors...)
 	}
 
-	argumentLabels := make([]string, len(declaration.Parameters))
-
-	for i, parameter := range declaration.Parameters {
-		argumentLabel := parameter.Label
-		// if no argument label is given, the parameter name
-		// is used as the argument labels and is required
-		if argumentLabel == "" {
-			argumentLabel = parameter.Identifier
-		}
-		argumentLabels[i] = argumentLabel
-	}
+	argumentLabels := checker.argumentLabels(declaration.Parameters)
 
 	// declare the function before checking it,
 	// so it can be referred to inside the function
@@ -245,6 +235,22 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 		Type:   nil,
 		Errors: errs,
 	}
+}
+
+func (checker *Checker) argumentLabels(parameters []*ast.Parameter) []string {
+	argumentLabels := make([]string, len(parameters))
+
+	for i, parameter := range parameters {
+		argumentLabel := parameter.Label
+		// if no argument label is given, the parameter name
+		// is used as the argument labels and is required
+		if argumentLabel == "" {
+			argumentLabel = parameter.Identifier
+		}
+		argumentLabels[i] = argumentLabel
+	}
+
+	return argumentLabels
 }
 
 func (checker *Checker) checkFunction(
@@ -367,7 +373,10 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		}
 
 		// check the value type is a subtype of the declaration type
-		if !checker.IsSubType(valueType, declarationType) {
+		if declarationType != nil &&
+			valueType != nil &&
+			!checker.IsSubType(valueType, declarationType) {
+
 			errs = append(errs,
 				&TypeMismatchError{
 					ExpectedType: declarationType,
@@ -427,17 +436,6 @@ func (checker *Checker) declareGlobal(declaration ast.Declaration) *CheckerError
 	var errs []error
 
 	name := declaration.DeclarationName()
-	if existingGlobal, exists := checker.Globals[name]; exists {
-		errs = append(errs,
-			&RedeclarationError{
-				Kind:        declaration.DeclarationKind(),
-				Name:        name,
-				Pos:         declaration.IdentifierPosition(),
-				PreviousPos: existingGlobal.Pos,
-			},
-		)
-	}
-
 	checker.Globals[name] = checker.findVariable(name)
 
 	return checkerError(errs)
@@ -1214,10 +1212,10 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	invokedExpression := invocationExpression.Expression
 	expressionResult := invokedExpression.Accept(checker).(checkerResult)
 	errs = append(errs, expressionResult.Errors...)
+
 	expressionType := expressionResult.Type
 
-	argumentCount := len(invocationExpression.Arguments)
-
+	var returnType Type
 	functionType, ok := expressionType.(*FunctionType)
 	if !ok {
 		errs = append(errs,
@@ -1230,109 +1228,22 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	} else {
 		// invoked expression has function type
 
-		// check the invocation's argument count matches the function's parameter count
-		parameterCount := len(functionType.ParameterTypes)
-
-		if argumentCount != parameterCount {
-			errs = append(errs,
-				&ArgumentCountError{
-					ParameterCount: parameterCount,
-					ArgumentCount:  argumentCount,
-					StartPos:       invocationExpression.StartPos,
-					EndPos:         invocationExpression.EndPos,
-				},
-			)
+		if err := checker.checkInvocationArguments(invocationExpression, functionType); err != nil {
+			errs = append(errs, err.Errors...)
 		}
 
-		minCount := argumentCount
-		if parameterCount < argumentCount {
-			minCount = parameterCount
-		}
+		// if the invocation refers directly to the name of the function as stated in the declaration,
+		// the argument labels need to be supplied
 
-		for i := 0; i < minCount; i++ {
-			// ensure the type of the argument matches the type of the parameter
-
-			parameterType := functionType.ParameterTypes[i]
-			argument := invocationExpression.Arguments[i]
-
-			argumentResult := argument.Expression.Accept(checker).(checkerResult)
-			errs = append(errs, argumentResult.Errors...)
-			argumentType := argumentResult.Type
-
-			if argumentType != nil && !checker.IsSubType(argumentType, parameterType) {
-				errs = append(errs,
-					&TypeMismatchError{
-						ExpectedType: parameterType,
-						ActualType:   argumentType,
-						StartPos:     argument.Expression.StartPosition(),
-						EndPos:       argument.Expression.EndPosition(),
-					},
-				)
+		if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
+			if err := checker.checkInvocationArgumentLabels(
+				invocationExpression,
+				identifierExpression,
+			); err != nil {
+				errs = append(errs, err.Errors...)
 			}
 		}
-	}
 
-	// if the invocation refers directly to the name of the function as stated in the declaration,
-	// the argument labels need to be supplied
-
-	if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
-
-		variable, err := checker.findAndCheckVariable(identifierExpression)
-		if err != nil {
-			errs = append(errs, err)
-		} else if variable != nil {
-			if variable.ArgumentLabels != nil {
-
-				for i, argumentLabel := range variable.ArgumentLabels {
-					if i >= argumentCount {
-						break
-					}
-
-					argument := invocationExpression.Arguments[i]
-					providedLabel := argument.Label
-					if argumentLabel == ArgumentLabelNotRequired {
-						// argument label is not required,
-						// check it is not provided
-
-						if providedLabel != "" {
-							errs = append(errs,
-								&IncorrectArgumentLabelError{
-									ActualArgumentLabel:   providedLabel,
-									ExpectedArgumentLabel: "",
-									StartPos:              argument.Expression.StartPosition(),
-									EndPos:                argument.Expression.EndPosition(),
-								},
-							)
-						}
-					} else {
-						// argument label is required,
-						// check it is provided and correct
-						if providedLabel == "" {
-							errs = append(errs,
-								&MissingArgumentLabelError{
-									ExpectedArgumentLabel: argumentLabel,
-									StartPos:              argument.Expression.StartPosition(),
-									EndPos:                argument.Expression.EndPosition(),
-								},
-							)
-						} else if providedLabel != argumentLabel {
-							errs = append(errs,
-								&IncorrectArgumentLabelError{
-									ActualArgumentLabel:   providedLabel,
-									ExpectedArgumentLabel: argumentLabel,
-									StartPos:              argument.Expression.StartPosition(),
-									EndPos:                argument.Expression.EndPosition(),
-								},
-							)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	var returnType Type
-	if functionType != nil {
 		returnType = functionType.ReturnType
 	}
 
@@ -1340,6 +1251,120 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		Type:   returnType,
 		Errors: errs,
 	}
+}
+
+func (checker *Checker) checkInvocationArgumentLabels(
+	invocationExpression *ast.InvocationExpression,
+	identifierExpression *ast.IdentifierExpression,
+) *CheckerError {
+	var errs []error
+
+	variable, err := checker.findAndCheckVariable(identifierExpression)
+	if err != nil {
+		errs = append(errs, err)
+	} else if variable != nil {
+		if variable.ArgumentLabels != nil {
+			argumentCount := len(invocationExpression.Arguments)
+
+			for i, argumentLabel := range variable.ArgumentLabels {
+				if i >= argumentCount {
+					break
+				}
+
+				argument := invocationExpression.Arguments[i]
+				providedLabel := argument.Label
+				if argumentLabel == ArgumentLabelNotRequired {
+					// argument label is not required,
+					// check it is not provided
+
+					if providedLabel != "" {
+						errs = append(errs,
+							&IncorrectArgumentLabelError{
+								ActualArgumentLabel:   providedLabel,
+								ExpectedArgumentLabel: "",
+								StartPos:              argument.Expression.StartPosition(),
+								EndPos:                argument.Expression.EndPosition(),
+							},
+						)
+					}
+				} else {
+					// argument label is required,
+					// check it is provided and correct
+					if providedLabel == "" {
+						errs = append(errs,
+							&MissingArgumentLabelError{
+								ExpectedArgumentLabel: argumentLabel,
+								StartPos:              argument.Expression.StartPosition(),
+								EndPos:                argument.Expression.EndPosition(),
+							},
+						)
+					} else if providedLabel != argumentLabel {
+						errs = append(errs,
+							&IncorrectArgumentLabelError{
+								ActualArgumentLabel:   providedLabel,
+								ExpectedArgumentLabel: argumentLabel,
+								StartPos:              argument.Expression.StartPosition(),
+								EndPos:                argument.Expression.EndPosition(),
+							},
+						)
+					}
+				}
+			}
+		}
+	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) checkInvocationArguments(
+	invocationExpression *ast.InvocationExpression,
+	functionType *FunctionType,
+) *CheckerError {
+	var errs []error
+
+	argumentCount := len(invocationExpression.Arguments)
+
+	// check the invocation's argument count matches the function's parameter count
+	parameterCount := len(functionType.ParameterTypes)
+	if argumentCount != parameterCount {
+		errs = append(errs,
+			&ArgumentCountError{
+				ParameterCount: parameterCount,
+				ArgumentCount:  argumentCount,
+				StartPos:       invocationExpression.StartPos,
+				EndPos:         invocationExpression.EndPos,
+			},
+		)
+	}
+
+	minCount := argumentCount
+	if parameterCount < argumentCount {
+		minCount = parameterCount
+	}
+
+	for i := 0; i < minCount; i++ {
+		// ensure the type of the argument matches the type of the parameter
+
+		parameterType := functionType.ParameterTypes[i]
+		argument := invocationExpression.Arguments[i]
+
+		argumentResult := argument.Expression.Accept(checker).(checkerResult)
+		errs = append(errs, argumentResult.Errors...)
+		argumentType := argumentResult.Type
+
+		if argumentType != nil && !checker.IsSubType(argumentType, parameterType) {
+			errs = append(errs,
+				&TypeMismatchError{
+					ExpectedType: parameterType,
+					ActualType:   argumentType,
+					StartPos:     argument.Expression.StartPosition(),
+					EndPos:       argument.Expression.EndPosition(),
+				},
+			)
+		}
+	}
+
+	return checkerError(errs)
 }
 
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
@@ -1440,13 +1465,6 @@ func (checker *Checker) ConvertType(t ast.Type) (Type, *CheckerError) {
 	panic(&astTypeConversionError{invalidASTType: t})
 }
 
-func (checker *Checker) enterFunction(functionType *FunctionType) {
-	checker.functionContexts = append(checker.functionContexts,
-		&functionContext{
-			returnType: functionType.ReturnType,
-		})
-}
-
 func (checker *Checker) declareFunction(
 	identifier string,
 	identifierPosition *ast.Position,
@@ -1484,6 +1502,13 @@ func (checker *Checker) declareFunction(
 	return checkerError(errs)
 }
 
+func (checker *Checker) enterFunction(functionType *FunctionType) {
+	checker.functionContexts = append(checker.functionContexts,
+		&functionContext{
+			returnType: functionType.ReturnType,
+		})
+}
+
 func (checker *Checker) leaveFunction() {
 	lastIndex := len(checker.functionContexts) - 1
 	checker.functionContexts = checker.functionContexts[:lastIndex]
@@ -1500,15 +1525,10 @@ func (checker *Checker) currentFunction() *functionContext {
 func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast.Type) (*FunctionType, *CheckerError) {
 	var errs []error
 
-	parameterTypes := make([]Type, len(parameters))
-	for i, parameter := range parameters {
-		parameterType, err := checker.ConvertType(parameter.Type)
-		if err != nil {
-			// NOTE: append, don't return
-			errs = append(errs, err.Errors...)
-		}
-		// NOTE: still assigning parameter type
-		parameterTypes[i] = parameterType
+	parameterTypes, err := checker.parameterTypes(parameters)
+	if err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
 	}
 
 	var convertedReturnType Type = &VoidType{}
@@ -1525,6 +1545,23 @@ func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast
 		ParameterTypes: parameterTypes,
 		ReturnType:     convertedReturnType,
 	}, checkerError(errs)
+}
+
+func (checker *Checker) parameterTypes(parameters []*ast.Parameter) ([]Type, *CheckerError) {
+	var errs []error
+
+	parameterTypes := make([]Type, len(parameters))
+	for i, parameter := range parameters {
+		parameterType, err := checker.ConvertType(parameter.Type)
+		if err != nil {
+			// NOTE: append, don't return
+			errs = append(errs, err.Errors...)
+		}
+		// NOTE: still assigning parameter type
+		parameterTypes[i] = parameterType
+	}
+
+	return parameterTypes, checkerError(errs)
 }
 
 // visitConditional checks a conditional. the test expression must be a boolean.
@@ -1568,10 +1605,6 @@ func (checker *Checker) visitConditional(
 func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
 	var errs []error
 
-	if err := checker.checkStructureIdentifier(structure); err != nil {
-		errs = append(errs, err.Errors...)
-	}
-
 	if err := checker.checkStructureFieldAndFunctionIdentifiers(structure); err != nil {
 		errs = append(errs, err.Errors...)
 	}
@@ -1584,6 +1617,19 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 	if err != nil {
 		errs = append(errs, err.Errors...)
 	}
+
+	if err := checker.declareType(structure.Identifier, structure.IdentifierPos, structureType); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	// declare the constructor function before checking initializer and functions,
+	// so the constructor function can be referred to inside them
+
+	if err := checker.declareStructureConstructor(structure, structureType); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	// check the initializer
 
 	initializer := structure.Initializer
 	if initializer != nil {
@@ -1605,6 +1651,43 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		Type:   nil,
 		Errors: errs,
 	}
+}
+
+func (checker *Checker) declareStructureConstructor(
+	structure *ast.StructureDeclaration,
+	structureType *StructureType,
+) *CheckerError {
+	var errs []error
+
+	functionType := &FunctionType{
+		ReturnType: structureType,
+	}
+	var argumentLabels []string
+
+	initializer := structure.Initializer
+	if initializer != nil {
+		// NOTE: IGNORING errors, because initializer will be checked separately
+		// in `VisitInitializerDeclaration`, otherwise we get error duplicates
+
+		parameterTypes, _ := checker.parameterTypes(initializer.Parameters)
+
+		functionType = &FunctionType{
+			ParameterTypes: parameterTypes,
+			ReturnType:     structureType,
+		}
+	}
+
+	if err := checker.declareFunction(
+		structure.Identifier,
+		structure.IdentifierPos,
+		functionType,
+		argumentLabels,
+	); err != nil {
+		// NOTE: append, don't return
+		errs = append(errs, err.Errors...)
+	}
+
+	return checkerError(errs)
 }
 
 func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*StructureType, *CheckerError) {
@@ -1778,12 +1861,12 @@ func (checker *Checker) checkStructureFieldAndFunctionIdentifiers(structure *ast
 	return checkerError(errs)
 }
 
-// checkStructureIdentifier checks a type with the structure's name is not already defined
-//
-func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclaration) *CheckerError {
+func (checker *Checker) declareType(
+	identifier string,
+	identifierPos *ast.Position,
+	newType Type,
+) *CheckerError {
 	var errs []error
-
-	identifier := structure.Identifier
 
 	existingType := checker.findType(identifier)
 	if existingType != nil {
@@ -1791,11 +1874,14 @@ func (checker *Checker) checkStructureIdentifier(structure *ast.StructureDeclara
 			&RedeclarationError{
 				Kind: common.DeclarationKindType,
 				Name: identifier,
-				Pos:  structure.IdentifierPos,
+				Pos:  identifierPos,
 				// TODO: previous pos
 			},
 		)
 	}
+
+	// type with this identifier is not declared in current scope, declare it
+	checker.setType(identifier, newType)
 
 	return checkerError(errs)
 }

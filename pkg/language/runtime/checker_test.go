@@ -3,6 +3,7 @@ package runtime
 import (
 	"fmt"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	. "github.com/onsi/gomega"
@@ -70,12 +71,14 @@ func expectCheckerErrors(err error, len int) []error {
 	return errs
 }
 
-func TestCheckInvalidGlobalRedeclaration(t *testing.T) {
+func TestCheckInvalidGlobalConstantRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-        let x = true
-        let x = false
+        fun x() {}
+
+        let y = true
+        let y = false
 	`)
 
 	errs := expectCheckerErrors(err, 1)
@@ -84,7 +87,23 @@ func TestCheckInvalidGlobalRedeclaration(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
-func TestCheckInvalidVariableRedeclaration(t *testing.T) {
+func TestCheckInvalidGlobalFunctionRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        let x = true
+
+        fun y() {}
+        fun y() {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckInvalidLocalRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
@@ -115,6 +134,59 @@ func TestCheckInvalidUnknownDeclaration(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidUnknownDeclarationInGlobal(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       let x = y
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckInvalidUnknownDeclarationInGlobalAndUnknownType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       let x: X = y
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	Expect(errs[0].(*sema.NotDeclaredError).Name).
+		To(Equal("y"))
+	Expect(errs[0].(*sema.NotDeclaredError).ExpectedKind).
+		To(Equal(common.DeclarationKindValue))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	Expect(errs[1].(*sema.NotDeclaredError).Name).
+		To(Equal("X"))
+	Expect(errs[1].(*sema.NotDeclaredError).ExpectedKind).
+		To(Equal(common.DeclarationKindType))
+}
+
+func TestCheckInvalidUnknownDeclarationCallInGlobal(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       let x = y()
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }
 
 func TestCheckInvalidUnknownDeclarationAssignment(t *testing.T) {
@@ -1620,15 +1692,15 @@ func TestCheckInvalidStructureFieldAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-     struct Test {
-         init() {
-             self.foo = 1
-         }
+      struct Test {
+          init() {
+              self.foo = 1
+          }
 
-         fun test() {
-             self.bar = 2
-         }
-     }
+          fun test() {
+              self.bar = 2
+          }
+      }
 	`)
 
 	errs := expectCheckerErrors(err, 2)
@@ -1674,18 +1746,18 @@ func TestCheckInvalidStructureFieldConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-    struct Test {
-        let foo: Int
-        let bar: Int
+      struct Test {
+          let foo: Int
+          let bar: Int
 
-        init() {
-            self.foo = 1
-        }
+          init() {
+              self.foo = 1
+          }
 
-        fun test() {
-            self.bar = 2
-        }
-    }
+          fun test() {
+              self.bar = 2
+          }
+      }
 	`)
 
 	errs := expectCheckerErrors(err, 2)
@@ -1705,13 +1777,13 @@ func TestCheckStructureFunctionCall(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-    struct Test {
-        fun foo() {}
+      struct Test {
+          fun foo() {}
 
-        fun bar() {
-            self.foo()
-        }
-    }
+          fun bar() {
+              self.foo()
+          }
+      }
 	`)
 
 	Expect(err).
@@ -1722,13 +1794,13 @@ func TestCheckInvalidStructureFunctionCall(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-    struct Test {
-        fun foo() {}
+      struct Test {
+          fun foo() {}
 
-        fun bar() {
-            self.baz()
-        }
-    }
+          fun bar() {
+              self.baz()
+          }
+      }
 	`)
 
 	errs := expectCheckerErrors(err, 2)
@@ -1744,13 +1816,13 @@ func TestCheckInvalidStructureFunctionAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-   struct Test {
-       fun foo() {}
+      struct Test {
+          fun foo() {}
 
-       fun bar() {
-           self.foo = 2
-       }
-   }
+          fun bar() {
+              self.foo = 2
+          }
+      }
 	`)
 
 	errs := expectCheckerErrors(err, 2)
@@ -1761,5 +1833,72 @@ func TestCheckInvalidStructureFunctionAssignment(t *testing.T) {
 		To(Equal("foo"))
 
 	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckStructureInstantiation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+
+          init(x: Int) {
+              let test: Test = Test(x: 1)
+          }
+
+          fun test() {
+              let test: Test = Test(x: 2)
+          }
+      }
+
+      let test: Test = Test(x: 3)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStructureRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x = 1
+      struct Foo {}
+      struct Foo {}
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	// NOTE: two errors: one because type is redeclared,
+	// the other because the global is redeclared
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+}
+
+func TestCheckInvalidIncompatibleStructureTypes(t *testing.T) {
+	// tests that structure typing is nominal, not structural
+
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Foo {
+          init() {}
+      }
+
+      struct Bar {
+          init() {}
+      }
+
+      let foo: Foo = Bar()
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }

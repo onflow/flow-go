@@ -1695,6 +1695,9 @@ and when the value is returned from a function:
 
     We think resources are a great way to represent such assets.
 
+Two composite daya types are compatible if and only if they refer to the same declaration by name,
+i.e., nominal typing applies instead of structural typing.
+
 ## Composite Data Type Declaration and Creation
 
 Structures are declared using the `struct` keyword and resources are declared using the `resource` keyword. The keyword is followed by the name.
@@ -1722,6 +1725,9 @@ Resource are created (instantiated) by using the `create` keyword and calling th
 ```bamboo,file=resource-instantiation.bpl
 create SomeResource()
 ```
+
+Composite data types can only be be declared globally and not locally in functions.
+They can also not be nested.
 
 ### Composite Data Type Fields
 
