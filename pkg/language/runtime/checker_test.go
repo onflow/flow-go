@@ -2195,3 +2195,82 @@ func TestCheckFunctionPostCondition(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
+
+func TestCheckInvalidFunctionPreConditionWithResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          pre {
+              result == 0
+          }
+          return 0
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	Expect(errs[0].(*sema.NotDeclaredError).Name).
+		To(Equal("result"))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+}
+
+func TestCheckInvalidFunctionPostConditionWithResultWrongType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          post {
+              result == true
+          }
+          return 0
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+}
+
+func TestCheckFunctionPostConditionWithResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          post {
+              result == 0
+          }
+          return 0
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidFunctionPostConditionWithResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          post {
+              result == 0
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	Expect(errs[0].(*sema.NotDeclaredError).Name).
+		To(Equal("result"))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+}

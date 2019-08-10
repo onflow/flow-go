@@ -12,6 +12,7 @@ const ArgumentLabelNotRequired = "_"
 const InitializerIdentifier = "init"
 const SelfIdentifier = "self"
 const BeforeIdentifier = "before"
+const ResultIdentifier = "result"
 
 type functionContext struct {
 	returnType Type
@@ -298,8 +299,9 @@ func (checker *Checker) checkFunction(
 		checker.enterFunction(functionType)
 		defer checker.leaveFunction()
 
-		result := functionBlock.Accept(checker).(checkerResult)
-		errs = append(errs, result.Errors...)
+		if err := checker.visitFunctionBlock(functionBlock, functionType.ReturnType); err != nil {
+			errs = append(errs, err.Errors...)
+		}
 	}()
 
 	return checkerError(errs)
@@ -517,6 +519,11 @@ func (checker *Checker) visitStatements(statements []ast.Statement) *CheckerErro
 }
 
 func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
+	// NOTE: see visitFunctionBlock
+	panic(&errors.UnreachableError{})
+}
+
+func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnType Type) *CheckerError {
 	var errs []error
 
 	checker.pushActivations()
@@ -537,14 +544,25 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 		errs = append(errs, err.Errors...)
 	}
 
+	// if there is a return type, declare the constant `result`
+	// which has the return type
+	if !returnType.Equal(&VoidType{}) {
+		if err := checker.declareVariable(
+			ResultIdentifier,
+			returnType,
+			common.DeclarationKindConstant,
+			ast.Position{},
+			true,
+		); err != nil {
+			errs = append(errs, err.Errors...)
+		}
+	}
+
 	if err := checker.visitConditions(functionBlock.PostConditions); err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
-	return checkerResult{
-		Type:   nil,
-		Errors: errs,
-	}
+	return checkerError(errs)
 }
 
 func (checker *Checker) declareBefore() *CheckerError {
