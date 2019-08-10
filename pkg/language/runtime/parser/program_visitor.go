@@ -50,7 +50,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
 
-	block := ctx.Block().Accept(v).(*ast.Block)
+	block := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
@@ -60,7 +60,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 		Identifier:    identifier,
 		Parameters:    parameters,
 		ReturnType:    returnType,
-		Block:         block,
+		FunctionBlock: block,
 		StartPos:      startPosition,
 		IdentifierPos: identifierPos,
 	}
@@ -167,15 +167,15 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
 
-	block := ctx.Block().Accept(v).(*ast.Block)
+	block := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.InitializerDeclaration{
-		Identifier: identifier,
-		Parameters: parameters,
-		Block:      block,
-		StartPos:   startPosition,
+		Identifier:    identifier,
+		Parameters:    parameters,
+		FunctionBlock: block,
+		StartPos:      startPosition,
 	}
 }
 
@@ -189,15 +189,15 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
 
-	block := ctx.Block().Accept(v).(*ast.Block)
+	block := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.FunctionExpression{
-		Parameters: parameters,
-		ReturnType: returnType,
-		Block:      block,
-		StartPos:   startPosition,
+		Parameters:    parameters,
+		ReturnType:    returnType,
+		FunctionBlock: block,
+		StartPos:      startPosition,
 	}
 }
 
@@ -350,6 +350,20 @@ func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {
 		Statements: statements,
 		StartPos:   startPosition,
 		EndPos:     endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitFunctionBlock(ctx *FunctionBlockContext) interface{} {
+	statements := ctx.Statements().Accept(v).([]ast.Statement)
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.FunctionBlock{
+		Block: &ast.Block{
+			Statements: statements,
+			StartPos:   startPosition,
+			EndPos:     endPosition,
+		},
 	}
 }
 

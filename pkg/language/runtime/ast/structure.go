@@ -86,10 +86,10 @@ func (f *FieldDeclaration) DeclarationKind() common.DeclarationKind {
 // InitializerDeclaration
 
 type InitializerDeclaration struct {
-	Identifier string
-	Parameters []*Parameter
-	Block      *Block
-	StartPos   Position
+	Identifier    string
+	Parameters    []*Parameter
+	FunctionBlock *FunctionBlock
+	StartPos      Position
 }
 
 func (i *InitializerDeclaration) Accept(visitor Visitor) Repr {
@@ -101,7 +101,7 @@ func (i *InitializerDeclaration) StartPosition() Position {
 }
 
 func (i *InitializerDeclaration) EndPosition() Position {
-	return i.Block.EndPos
+	return i.FunctionBlock.EndPos
 }
 
 func (i *InitializerDeclaration) IdentifierPosition() Position {
@@ -120,8 +120,8 @@ func (i *InitializerDeclaration) DeclarationKind() common.DeclarationKind {
 
 func (i *InitializerDeclaration) ToFunctionExpression() *FunctionExpression {
 	return &FunctionExpression{
-		Parameters: i.Parameters,
-		Block:      i.Block,
-		StartPos:   i.StartPos,
+		Parameters:    i.Parameters,
+		FunctionBlock: i.FunctionBlock,
+		StartPos:      i.StartPos,
 	}
 }

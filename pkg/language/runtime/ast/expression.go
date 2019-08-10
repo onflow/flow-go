@@ -241,10 +241,10 @@ func (e *BinaryExpression) Accept(v Visitor) Repr {
 // FunctionExpression
 
 type FunctionExpression struct {
-	Parameters []*Parameter
-	ReturnType Type
-	Block      *Block
-	StartPos   Position
+	Parameters    []*Parameter
+	ReturnType    Type
+	FunctionBlock *FunctionBlock
+	StartPos      Position
 }
 
 func (e *FunctionExpression) StartPosition() Position {
@@ -252,7 +252,7 @@ func (e *FunctionExpression) StartPosition() Position {
 }
 
 func (e *FunctionExpression) EndPosition() Position {
-	return e.Block.EndPosition()
+	return e.FunctionBlock.EndPosition()
 }
 
 func (*FunctionExpression) isExpression() {}

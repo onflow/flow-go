@@ -219,6 +219,10 @@ func (interpreter *Interpreter) VisitBlock(block *ast.Block) ast.Repr {
 		})
 }
 
+func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
+	return interpreter.VisitBlock(functionBlock.Block)
+}
+
 func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Trampoline {
 	count := len(statements)
 
@@ -679,7 +683,7 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 ) Trampoline {
 	interpreter.bindFunctionInvocationParameters(function, arguments)
 
-	return function.Expression.Block.Accept(interpreter).(Trampoline).
+	return function.Expression.FunctionBlock.Accept(interpreter).(Trampoline).
 		Map(func(blockResult interface{}) interface{} {
 			interpreter.activations.Pop()
 

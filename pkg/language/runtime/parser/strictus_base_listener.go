@@ -104,6 +104,36 @@ func (s *BaseStrictusListener) EnterBlock(ctx *BlockContext) {}
 // ExitBlock is called when production block is exited.
 func (s *BaseStrictusListener) ExitBlock(ctx *BlockContext) {}
 
+// EnterFunctionBlock is called when production functionBlock is entered.
+func (s *BaseStrictusListener) EnterFunctionBlock(ctx *FunctionBlockContext) {}
+
+// ExitFunctionBlock is called when production functionBlock is exited.
+func (s *BaseStrictusListener) ExitFunctionBlock(ctx *FunctionBlockContext) {}
+
+// EnterPreConditions is called when production preConditions is entered.
+func (s *BaseStrictusListener) EnterPreConditions(ctx *PreConditionsContext) {}
+
+// ExitPreConditions is called when production preConditions is exited.
+func (s *BaseStrictusListener) ExitPreConditions(ctx *PreConditionsContext) {}
+
+// EnterPostConditions is called when production postConditions is entered.
+func (s *BaseStrictusListener) EnterPostConditions(ctx *PostConditionsContext) {}
+
+// ExitPostConditions is called when production postConditions is exited.
+func (s *BaseStrictusListener) ExitPostConditions(ctx *PostConditionsContext) {}
+
+// EnterConditions is called when production conditions is entered.
+func (s *BaseStrictusListener) EnterConditions(ctx *ConditionsContext) {}
+
+// ExitConditions is called when production conditions is exited.
+func (s *BaseStrictusListener) ExitConditions(ctx *ConditionsContext) {}
+
+// EnterCondition is called when production condition is entered.
+func (s *BaseStrictusListener) EnterCondition(ctx *ConditionContext) {}
+
+// ExitCondition is called when production condition is exited.
+func (s *BaseStrictusListener) ExitCondition(ctx *ConditionContext) {}
+
 // EnterStatements is called when production statements is entered.
 func (s *BaseStrictusListener) EnterStatements(ctx *StatementsContext) {}
 

@@ -243,7 +243,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	if err := checker.checkFunction(
 		declaration.Parameters,
 		functionType,
-		declaration.Block,
+		declaration.FunctionBlock.Block,
 	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
@@ -504,6 +504,10 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 		Type:   nil,
 		Errors: errs,
 	}
+}
+
+func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
+	return checker.VisitBlock(functionBlock.Block)
 }
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
@@ -1459,7 +1463,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	if err := checker.checkFunction(
 		expression.Parameters,
 		functionType,
-		expression.Block,
+		expression.FunctionBlock.Block,
 	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
@@ -2026,7 +2030,7 @@ func (checker *Checker) VisitInitializerDeclaration(initializer *ast.Initializer
 	if err := checker.checkFunction(
 		initializer.Parameters,
 		functionType,
-		initializer.Block,
+		initializer.FunctionBlock.Block,
 	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
