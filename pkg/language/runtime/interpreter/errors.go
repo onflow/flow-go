@@ -100,3 +100,22 @@ func (e *ArgumentCountError) StartPosition() ast.Position {
 func (e *ArgumentCountError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// ConditionError
+
+type ConditionError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *ConditionError) Error() string {
+	return "condition failed"
+}
+
+func (e *ConditionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *ConditionError) EndPosition() ast.Position {
+	return e.EndPos
+}

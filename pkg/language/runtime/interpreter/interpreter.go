@@ -219,10 +219,6 @@ func (interpreter *Interpreter) VisitBlock(block *ast.Block) ast.Repr {
 		})
 }
 
-func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
-	return interpreter.VisitBlock(functionBlock.Block)
-}
-
 func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Trampoline {
 	count := len(statements)
 
@@ -233,7 +229,7 @@ func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Tram
 	}
 
 	// interpret the first statement, then the remaining ones
-	return interpreter.visitStatement(statements[0]).
+	return statements[0].Accept(interpreter).(Trampoline).
 		FlatMap(func(returnValue interface{}) Trampoline {
 			if returnValue != nil {
 				return Done{Result: returnValue}
@@ -242,17 +238,54 @@ func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Tram
 		})
 }
 
-func (interpreter *Interpreter) visitStatement(statement ast.Statement) Trampoline {
-	// the enclosing block pushed an activation, see VisitBlock.
-	// ensure it is popped properly even when a panic occurs
-	defer func() {
-		if e := recover(); e != nil {
-			interpreter.activations.Pop()
-			panic(e)
-		}
-	}()
+func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
+	// block scope: each function block gets an activation record
+	interpreter.activations.PushCurrent()
 
-	return statement.Accept(interpreter).(Trampoline)
+	return interpreter.visitConditions(functionBlock.PreConditions).
+		FlatMap(func(_ interface{}) Trampoline {
+			// NOTE: not interpreting block as it enters a new scope
+			// and post-conditions need to be able to refer to block's declarations
+			return interpreter.visitStatements(functionBlock.Block.Statements).
+				FlatMap(func(blockResult interface{}) Trampoline {
+					return interpreter.visitConditions(functionBlock.PostConditions).
+						Map(func(_ interface{}) interface{} {
+							return blockResult
+						})
+				})
+		}).
+		Then(func(_ interface{}) {
+			interpreter.activations.Pop()
+		})
+}
+
+func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Trampoline {
+	count := len(conditions)
+
+	// no conditions? stop
+	if count == 0 {
+		return Done{}
+	}
+
+	// interpret the first condition, then the remaining ones
+	condition := conditions[0]
+	return condition.Accept(interpreter).(Trampoline).
+		FlatMap(func(value interface{}) Trampoline {
+			result := value.(BoolValue)
+
+			if !result {
+				panic(&ConditionError{
+					StartPos: condition.StartPosition(),
+					EndPos:   condition.EndPosition(),
+				})
+			}
+
+			return interpreter.visitConditions(conditions[1:])
+		})
+}
+
+func (interpreter *Interpreter) VisitCondition(condition *ast.Condition) ast.Repr {
+	return condition.Expression.Accept(interpreter)
 }
 
 func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
@@ -310,7 +343,7 @@ func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatemen
 					}
 
 					// recurse
-					return interpreter.VisitWhileStatement(statement).(Trampoline)
+					return statement.Accept(interpreter).(Trampoline)
 				})
 		})
 }

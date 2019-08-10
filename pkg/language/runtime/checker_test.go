@@ -2178,3 +2178,20 @@ func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }
+
+func TestCheckFunctionPostCondition(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int): Int {
+          post {
+              y == 0
+          }
+          let y = x
+          return y
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}

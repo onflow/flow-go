@@ -35,3 +35,7 @@ func (b *FunctionBlock) Accept(visitor Visitor) Repr {
 type Condition struct {
 	Expression
 }
+
+func (c *Condition) Accept(visitor Visitor) Repr {
+	return visitor.VisitCondition(c)
+}

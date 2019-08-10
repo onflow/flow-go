@@ -479,9 +479,21 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 	checker.pushActivations()
 	defer checker.popActivations()
 
-	// check all statements
+	if err := checker.visitStatements(block.Statements); err != nil {
+		errs = append(errs, err.Errors...)
+	}
 
-	for _, statement := range block.Statements {
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
+}
+
+func (checker *Checker) visitStatements(statements []ast.Statement) *CheckerError {
+	var errs []error
+
+	// check all statements
+	for _, statement := range statements {
 
 		// check statement is not a local structure declaration
 
@@ -501,10 +513,7 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 		errs = append(errs, result.Errors...)
 	}
 
-	return checkerResult{
-		Type:   nil,
-		Errors: errs,
-	}
+	return checkerError(errs)
 }
 
 func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
@@ -517,8 +526,12 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 		errs = append(errs, err.Errors...)
 	}
 
-	blockResult := checker.VisitBlock(functionBlock.Block).(checkerResult)
-	errs = append(errs, blockResult.Errors...)
+	// NOTE: not checking block as it enters a new scope
+	// and post-conditions need to be able to refer to block's declarations
+
+	if err := checker.visitStatements(functionBlock.Block.Statements); err != nil {
+		errs = append(errs, err.Errors...)
+	}
 
 	if err := checker.declareBefore(); err != nil {
 		errs = append(errs, err.Errors...)
@@ -580,6 +593,10 @@ func (checker *Checker) visitConditions(conditions []*ast.Condition) *CheckerErr
 	}
 
 	return checkerError(errs)
+}
+
+func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
+	return condition.Expression.Accept(checker)
 }
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
