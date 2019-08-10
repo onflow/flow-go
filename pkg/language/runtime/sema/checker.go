@@ -243,7 +243,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	if err := checker.checkFunction(
 		declaration.Parameters,
 		functionType,
-		declaration.FunctionBlock.Block,
+		declaration.FunctionBlock,
 	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
@@ -274,7 +274,7 @@ func (checker *Checker) argumentLabels(parameters []*ast.Parameter) []string {
 func (checker *Checker) checkFunction(
 	parameters []*ast.Parameter,
 	functionType *FunctionType,
-	block *ast.Block,
+	functionBlock *ast.FunctionBlock,
 ) *CheckerError {
 	var errs []error
 
@@ -297,7 +297,7 @@ func (checker *Checker) checkFunction(
 		checker.enterFunction(functionType)
 		defer checker.leaveFunction()
 
-		result := block.Accept(checker).(checkerResult)
+		result := functionBlock.Accept(checker).(checkerResult)
 		errs = append(errs, result.Errors...)
 	}()
 
@@ -507,7 +507,34 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 }
 
 func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
-	return checker.VisitBlock(functionBlock.Block)
+	var errs []error
+
+	if err := checker.visitConditions(functionBlock.PreConditions); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	blockResult := checker.VisitBlock(functionBlock.Block).(checkerResult)
+	errs = append(errs, blockResult.Errors...)
+
+	if err := checker.visitConditions(functionBlock.PostConditions); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
+}
+
+func (checker *Checker) visitConditions(conditions []*ast.Condition) *CheckerError {
+	var errs []error
+
+	for _, condition := range conditions {
+		conditionResult := condition.Accept(checker).(checkerResult)
+		errs = append(errs, conditionResult.Errors...)
+	}
+
+	return checkerError(errs)
 }
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
@@ -1463,7 +1490,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	if err := checker.checkFunction(
 		expression.Parameters,
 		functionType,
-		expression.FunctionBlock.Block,
+		expression.FunctionBlock,
 	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
@@ -2030,7 +2057,7 @@ func (checker *Checker) VisitInitializerDeclaration(initializer *ast.Initializer
 	if err := checker.checkFunction(
 		initializer.Parameters,
 		functionType,
-		initializer.FunctionBlock.Block,
+		initializer.FunctionBlock,
 	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)

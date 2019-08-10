@@ -2067,3 +2067,54 @@ func TestCheckInvalidStructureFunctionCallWithMissingArgumentLabel(t *testing.T)
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
 }
+
+func TestCheckFunctionConditions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int) {
+          pre {
+              x != 0
+          }
+          post {
+              x == 0
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidFunctionPreConditionReference(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int) {
+          pre {
+              y == 0
+          }
+          post {
+              z == 0
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 4)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	Expect(errs[0].(*sema.NotDeclaredError).Name).
+		To(Equal("y"))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	Expect(errs[2].(*sema.NotDeclaredError).Name).
+		To(Equal("z"))
+
+	Expect(errs[3]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+}
