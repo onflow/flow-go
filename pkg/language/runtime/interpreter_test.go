@@ -1,14 +1,15 @@
 package runtime
 
 import (
+	"math/big"
+	"testing"
+
+	. "github.com/onsi/gomega"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
-	"math/big"
-	"testing"
 )
 
 func init() {

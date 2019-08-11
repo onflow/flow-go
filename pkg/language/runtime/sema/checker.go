@@ -1,11 +1,12 @@
 package sema
 
 import (
+	"strings"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"strings"
 )
 
 const ArgumentLabelNotRequired = "_"

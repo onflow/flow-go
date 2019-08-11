@@ -2,13 +2,15 @@ package runtime
 
 import (
 	"fmt"
+	"testing"
+
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/types"
-	"testing"
 )
 
 func parseAndCheck(code string) (*sema.Checker, error) {
