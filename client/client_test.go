@@ -17,7 +17,7 @@ import (
 
 var defaultAccount, _ = client.LoadAccount(strings.NewReader(`
 	{	
-		"account": "0xdd2781f4c51bccdbe23e4d398b8a82261f585c278dbb4b84989fea70e76723a9",
+		"account": "0000000000000000000000000000000000000002",
 		"seed": "elephant ears"
 	}
 `))

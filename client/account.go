@@ -44,7 +44,7 @@ func LoadAccount(r io.Reader) (*types.AccountKey, error) {
 		return nil, err
 	}
 
-	keyPair, err := crypto.GenerateKeyPair(conf.Seed)
+	keyPair, err := crypto.KeyPairFromSeed(conf.Seed)
 	if err != nil {
 		return nil, err
 	}
