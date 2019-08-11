@@ -10,6 +10,7 @@ type Expression interface {
 	Element
 	fmt.Stringer
 	isExpression()
+	AcceptExp(ExpressionVisitor) Repr
 }
 
 // BoolExpression
@@ -42,6 +43,10 @@ func (e *BoolExpression) Accept(v Visitor) Repr {
 	return v.VisitBoolExpression(e)
 }
 
+func (e *BoolExpression) AcceptExp(v ExpressionVisitor) Repr {
+	return v.VisitBoolExpression(e)
+}
+
 // IntExpression
 
 type IntExpression struct {
@@ -65,6 +70,10 @@ func (e *IntExpression) EndPosition() Position {
 func (*IntExpression) isExpression() {}
 
 func (e *IntExpression) Accept(v Visitor) Repr {
+	return v.VisitIntExpression(e)
+}
+
+func (e *IntExpression) AcceptExp(v ExpressionVisitor) Repr {
 	return v.VisitIntExpression(e)
 }
 
@@ -103,6 +112,10 @@ func (e *ArrayExpression) Accept(v Visitor) Repr {
 	return v.VisitArrayExpression(e)
 }
 
+func (e *ArrayExpression) AcceptExp(v ExpressionVisitor) Repr {
+	return v.VisitArrayExpression(e)
+}
+
 // IdentifierExpression
 
 type IdentifierExpression struct {
@@ -126,6 +139,10 @@ func (e *IdentifierExpression) EndPosition() Position {
 func (*IdentifierExpression) isExpression() {}
 
 func (e *IdentifierExpression) Accept(v Visitor) Repr {
+	return v.VisitIdentifierExpression(e)
+}
+
+func (e *IdentifierExpression) AcceptExp(v ExpressionVisitor) Repr {
 	return v.VisitIdentifierExpression(e)
 }
 
@@ -162,6 +179,10 @@ func (e *InvocationExpression) EndPosition() Position {
 func (*InvocationExpression) isExpression() {}
 
 func (e *InvocationExpression) Accept(v Visitor) Repr {
+	return v.VisitInvocationExpression(e)
+}
+
+func (e *InvocationExpression) AcceptExp(v ExpressionVisitor) Repr {
 	return v.VisitInvocationExpression(e)
 }
 
@@ -202,6 +223,10 @@ func (e *MemberExpression) Accept(v Visitor) Repr {
 	return v.VisitMemberExpression(e)
 }
 
+func (e *MemberExpression) AcceptExp(v ExpressionVisitor) Repr {
+	return v.VisitMemberExpression(e)
+}
+
 // IndexExpression
 
 type IndexExpression struct {
@@ -233,6 +258,10 @@ func (e *IndexExpression) Accept(v Visitor) Repr {
 	return v.VisitIndexExpression(e)
 }
 
+func (e *IndexExpression) AcceptExp(v ExpressionVisitor) Repr {
+	return v.VisitIndexExpression(e)
+}
+
 // ConditionalExpression
 
 type ConditionalExpression struct {
@@ -259,6 +288,10 @@ func (e *ConditionalExpression) EndPosition() Position {
 func (*ConditionalExpression) isExpression() {}
 
 func (e *ConditionalExpression) Accept(v Visitor) Repr {
+	return v.VisitConditionalExpression(e)
+}
+
+func (e *ConditionalExpression) AcceptExp(v ExpressionVisitor) Repr {
 	return v.VisitConditionalExpression(e)
 }
 
@@ -292,6 +325,10 @@ func (e *UnaryExpression) Accept(v Visitor) Repr {
 	return v.VisitUnaryExpression(e)
 }
 
+func (e *UnaryExpression) AcceptExp(v ExpressionVisitor) Repr {
+	return v.VisitUnaryExpression(e)
+}
+
 // BinaryExpression
 
 type BinaryExpression struct {
@@ -321,6 +358,10 @@ func (e *BinaryExpression) Accept(v Visitor) Repr {
 	return v.VisitBinaryExpression(e)
 }
 
+func (e *BinaryExpression) AcceptExp(v ExpressionVisitor) Repr {
+	return v.VisitBinaryExpression(e)
+}
+
 // FunctionExpression
 
 type FunctionExpression struct {
@@ -346,5 +387,9 @@ func (e *FunctionExpression) EndPosition() Position {
 func (*FunctionExpression) isExpression() {}
 
 func (e *FunctionExpression) Accept(visitor Visitor) Repr {
+	return visitor.VisitFunctionExpression(e)
+}
+
+func (e *FunctionExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 	return visitor.VisitFunctionExpression(e)
 }
