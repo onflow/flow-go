@@ -14,14 +14,20 @@ import (
 func TestLoadAccount(t *testing.T) {
 	RegisterTestingT(t)
 
-	r := strings.NewReader(`
+	const validAccountJSON = `
 		{	
 			"account": "0000000000000000000000000000000000000002",
 			"seed": "elephant ears"
 		}
-	`)
+	`
 
-	a, err := client.LoadAccount(r)
+	const invalidAccountJSON = `
+		{	
+			"account": "0xdd2781
+		}
+	`
+
+	a, err := client.LoadAccount(strings.NewReader(validAccountJSON))
 	Expect(err).ToNot(HaveOccurred())
 
 	address := types.HexToAddress("0000000000000000000000000000000000000002")
@@ -30,14 +36,13 @@ func TestLoadAccount(t *testing.T) {
 	Expect(a.Account).To(Equal(address))
 	Expect(a.KeyPair).To(Equal(keyPair))
 
-	// invalid json should fail
-	r = strings.NewReader(`
-		{	
-			"account": "0xdd2781
-		}
-	`)
+	// account loading should be deterministic
+	b, err := client.LoadAccount(strings.NewReader(validAccountJSON))
+	Expect(a).To(Equal(b))
 
-	a, err = client.LoadAccount(r)
+	// invalid json should fail
+	c, err := client.LoadAccount(strings.NewReader(invalidAccountJSON))
+	Expect(c).To(BeNil())
 	Expect(err).To(HaveOccurred())
 }
 
