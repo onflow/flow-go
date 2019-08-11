@@ -105,12 +105,13 @@ func (e *ArgumentCountError) EndPosition() ast.Position {
 // ConditionError
 
 type ConditionError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ConditionKind ast.ConditionKind
+	StartPos      ast.Position
+	EndPos        ast.Position
 }
 
 func (e *ConditionError) Error() string {
-	return "condition failed"
+	return fmt.Sprintf("%s failed", e.ConditionKind.Name())
 }
 
 func (e *ConditionError) StartPosition() ast.Position {

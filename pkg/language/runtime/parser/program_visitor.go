@@ -399,8 +399,23 @@ func (v *ProgramVisitor) VisitConditions(ctx *ConditionsContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitCondition(ctx *ConditionContext) interface{} {
+	parentParent := ctx.GetParent().GetParent()
+
+	_, isPreCondition := parentParent.(*PreConditionsContext)
+	_, isPostCondition := parentParent.(*PostConditionsContext)
+
+	var kind ast.ConditionKind
+	if isPreCondition {
+		kind = ast.ConditionKindPre
+	} else if isPostCondition {
+		kind = ast.ConditionKindPost
+	} else {
+		panic(errors.UnreachableError{})
+	}
+
 	expression := ctx.Expression().Accept(v).(ast.Expression)
 	return &ast.Condition{
+		Kind:       kind,
 		Expression: expression,
 	}
 }

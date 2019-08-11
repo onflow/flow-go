@@ -2521,6 +2521,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 					},
 					PreConditions: []*Condition{
 						{
+							Kind: ConditionKindPre,
 							Expression: &BinaryExpression{
 								Operation: OperationUnequal,
 								Left: &IdentifierExpression{
@@ -2536,6 +2537,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 							},
 						},
 						{
+							Kind: ConditionKindPre,
 							Expression: &BinaryExpression{
 								Operation: OperationGreater,
 								Left: &IdentifierExpression{
@@ -2553,6 +2555,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 					},
 					PostConditions: []*Condition{
 						{
+							Kind: ConditionKindPost,
 							Expression: &BinaryExpression{
 								Operation: OperationEqual,
 								Left: &IdentifierExpression{

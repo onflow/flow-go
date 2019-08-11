@@ -6,15 +6,12 @@ import (
 
 	. "github.com/onsi/gomega"
 
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 )
-
-func init() {
-	format.UseStringerRepresentation = true
-}
 
 func parseCheckAndInterpret(code string) *interpreter.Interpreter {
 	program, errors := parser.ParseProgram(code)
@@ -1329,8 +1326,12 @@ func TestInterpretFunctionPostConditionWithBeforeFailingPreCondition(t *testing.
 	`)
 
 	_, err := inter.Invoke("test")
+
 	Expect(err).
 		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).ConditionKind).
+		To(Equal(ast.ConditionKindPre))
 }
 
 func TestInterpretFunctionPostConditionWithBeforeFailingPostCondition(t *testing.T) {
@@ -1351,6 +1352,10 @@ func TestInterpretFunctionPostConditionWithBeforeFailingPostCondition(t *testing
 	`)
 
 	_, err := inter.Invoke("test")
+
 	Expect(err).
 		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).ConditionKind).
+		To(Equal(ast.ConditionKindPost))
 }

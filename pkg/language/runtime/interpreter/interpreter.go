@@ -335,8 +335,9 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 
 			if !result {
 				panic(&ConditionError{
-					StartPos: condition.StartPosition(),
-					EndPos:   condition.EndPosition(),
+					ConditionKind: condition.Kind,
+					StartPos:      condition.Expression.StartPosition(),
+					EndPos:        condition.Expression.EndPosition(),
 				})
 			}
 
