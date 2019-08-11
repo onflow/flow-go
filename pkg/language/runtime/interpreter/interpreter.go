@@ -249,31 +249,8 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 	// block scope: each function block gets an activation record
 	interpreter.activations.PushCurrent()
 
-	beforeExtractor := NewBeforeExtractor()
-
-	var beforeStatements []ast.Statement
-
-	rewrittenPostConditions := make([]*ast.Condition, len(functionBlock.PostConditions))
-
-	for i, postCondition := range functionBlock.PostConditions {
-		extraction := beforeExtractor.ExtractBefore(postCondition.Expression)
-
-		for _, extractedExpression := range extraction.ExtractedExpressions {
-
-			beforeStatements = append(beforeStatements,
-				&ast.VariableDeclaration{
-					Identifier: extractedExpression.Identifier,
-					Value:      extractedExpression.Expression,
-				},
-			)
-		}
-
-		// copy condition and set expression to rewritten one
-		newPostCondition := *postCondition
-		newPostCondition.Expression = extraction.RewrittenExpression
-
-		rewrittenPostConditions[i] = &newPostCondition
-	}
+	beforeStatements, rewrittenPostConditions :=
+		interpreter.rewritePostConditions(functionBlock)
 
 	return interpreter.visitStatements(beforeStatements).
 		FlatMap(func(_ interface{}) Trampoline {
@@ -309,6 +286,37 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 		Then(func(_ interface{}) {
 			interpreter.activations.Pop()
 		})
+}
+
+func (interpreter *Interpreter) rewritePostConditions(functionBlock *ast.FunctionBlock) (
+	beforeStatements []ast.Statement,
+	rewrittenPostConditions []*ast.Condition,
+) {
+	beforeExtractor := NewBeforeExtractor()
+
+	rewrittenPostConditions = make([]*ast.Condition, len(functionBlock.PostConditions))
+
+	for i, postCondition := range functionBlock.PostConditions {
+		extraction := beforeExtractor.ExtractBefore(postCondition.Expression)
+
+		for _, extractedExpression := range extraction.ExtractedExpressions {
+
+			beforeStatements = append(beforeStatements,
+				&ast.VariableDeclaration{
+					Identifier: extractedExpression.Identifier,
+					Value:      extractedExpression.Expression,
+				},
+			)
+		}
+
+		// copy condition and set expression to rewritten one
+		newPostCondition := *postCondition
+		newPostCondition.Expression = extraction.RewrittenExpression
+
+		rewrittenPostConditions[i] = &newPostCondition
+	}
+
+	return beforeStatements, rewrittenPostConditions
 }
 
 func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Trampoline {
