@@ -70,7 +70,7 @@ func NewInterpreterRuntime() Runtime {
 func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) (interface{}, error) {
 	code := string(script)
 
-	program, errs := parser.Parse(code)
+	program, errs := parser.ParseProgram(code)
 	if len(errs) > 0 {
 		return nil, RuntimeError{errs}
 	}

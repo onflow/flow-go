@@ -29,7 +29,7 @@ func main() {
 	}
 	code := string(data)
 
-	program, errors := parser.Parse(code)
+	program, errors := parser.ParseProgram(code)
 	if len(errors) > 0 {
 		for _, err := range errors {
 			prettyPrintError(err, filename, code)

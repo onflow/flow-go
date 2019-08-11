@@ -17,7 +17,7 @@ func init() {
 }
 
 func parseCheckAndInterpret(code string) *interpreter.Interpreter {
-	program, errors := parser.Parse(code)
+	program, errors := parser.ParseProgram(code)
 
 	Expect(errors).
 		To(BeEmpty())
@@ -920,7 +920,7 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	program, errors := parser.ParseProgram(`
       let a = test(1, 2)
 	`)
 

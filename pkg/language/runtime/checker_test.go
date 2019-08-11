@@ -14,7 +14,7 @@ import (
 )
 
 func parseAndCheck(code string) (*sema.Checker, error) {
-	program, errors := parser.Parse(code)
+	program, errors := parser.ParseProgram(code)
 
 	Expect(errors).
 		To(BeEmpty())
@@ -2148,11 +2148,11 @@ func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-    fun test(x: Int) {
-        post {
-            before(x) != 0
-        }
-    }
+      fun test(x: Int) {
+          post {
+              before(x) != 0
+          }
+      }
 	`)
 
 	Expect(err).
