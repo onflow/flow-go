@@ -798,9 +798,9 @@ func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) i
 		switch partialExpression := suffix.Accept(v).(type) {
 		case *ast.InvocationExpression:
 			result = &ast.InvocationExpression{
-				Expression: result,
-				Arguments:  partialExpression.Arguments,
-				EndPos:     partialExpression.EndPos,
+				InvokedExpression: result,
+				Arguments:         partialExpression.Arguments,
+				EndPos:            partialExpression.EndPos,
 			}
 		case ast.AccessExpression:
 			result = v.wrapPartialAccessExpression(result, partialExpression)
