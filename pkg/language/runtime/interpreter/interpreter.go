@@ -249,7 +249,36 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 	// block scope: each function block gets an activation record
 	interpreter.activations.PushCurrent()
 
-	return interpreter.visitConditions(functionBlock.PreConditions).
+	beforeExtractor := NewBeforeExtractor()
+
+	var beforeStatements []ast.Statement
+
+	rewrittenPostConditions := make([]*ast.Condition, len(functionBlock.PostConditions))
+
+	for i, postCondition := range functionBlock.PostConditions {
+		extraction := beforeExtractor.ExtractBefore(postCondition.Expression)
+
+		for _, extractedExpression := range extraction.ExtractedExpressions {
+
+			beforeStatements = append(beforeStatements,
+				&ast.VariableDeclaration{
+					Identifier: extractedExpression.Identifier,
+					Value:      extractedExpression.Expression,
+				},
+			)
+		}
+
+		// copy condition and set expression to rewritten one
+		newPostCondition := *postCondition
+		newPostCondition.Expression = extraction.RewrittenExpression
+
+		rewrittenPostConditions[i] = &newPostCondition
+	}
+
+	return interpreter.visitStatements(beforeStatements).
+		FlatMap(func(_ interface{}) Trampoline {
+			return interpreter.visitConditions(functionBlock.PreConditions)
+		}).
 		FlatMap(func(_ interface{}) Trampoline {
 			// NOTE: not interpreting block as it enters a new scope
 			// and post-conditions need to be able to refer to block's declarations
@@ -271,7 +300,7 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 						interpreter.declareVariable(sema.ResultIdentifier, resultValue)
 					}
 
-					return interpreter.visitConditions(functionBlock.PostConditions).
+					return interpreter.visitConditions(rewrittenPostConditions).
 						Map(func(_ interface{}) interface{} {
 							return resultValue
 						})
