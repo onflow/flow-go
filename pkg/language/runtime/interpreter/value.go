@@ -670,8 +670,8 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 	return values, nil
 }
 
-// Tuple
+// TupleValue
 
-type Tuple struct {
+type TupleValue struct {
 	left, right Value
 }

@@ -434,7 +434,7 @@ func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.Identi
 }
 
 // visitBinaryOperation interprets the left-hand side and the right-hand side and returns
-// the result in a Tuple
+// the result in a TupleValue
 func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression) Trampoline {
 	// interpret the left-hand side
 	return expr.Left.Accept(interpreter).(Trampoline).
@@ -443,7 +443,11 @@ func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression)
 			// interpret the right-hand side
 			return expr.Right.Accept(interpreter).(Trampoline).
 				FlatMap(func(right interface{}) Trampoline {
-					return Done{Result: Tuple{left.(Value), right.(Value)}}
+					tuple := TupleValue{
+						left.(Value),
+						right.(Value),
+					}
+					return Done{Result: tuple}
 				})
 		})
 }
@@ -453,7 +457,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationPlus:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 				left := tuple.left.(IntegerValue)
 				right := tuple.right.(IntegerValue)
 				return left.Plus(right)
@@ -462,7 +466,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationMinus:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 				left := tuple.left.(IntegerValue)
 				right := tuple.right.(IntegerValue)
 				return left.Minus(right)
@@ -471,7 +475,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationMod:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 				left := tuple.left.(IntegerValue)
 				right := tuple.right.(IntegerValue)
 				return left.Mod(right)
@@ -480,7 +484,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationMul:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 				left := tuple.left.(IntegerValue)
 				right := tuple.right.(IntegerValue)
 				return left.Mul(right)
@@ -489,7 +493,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationDiv:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 				left := tuple.left.(IntegerValue)
 				right := tuple.right.(IntegerValue)
 				return left.Div(right)
@@ -498,7 +502,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationLess:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 				left := tuple.left.(IntegerValue)
 				right := tuple.right.(IntegerValue)
 				return left.Less(right)
@@ -507,7 +511,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationLessEqual:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 				left := tuple.left.(IntegerValue)
 				right := tuple.right.(IntegerValue)
 				return left.LessEqual(right)
@@ -516,7 +520,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationGreater:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 				left := tuple.left.(IntegerValue)
 				right := tuple.right.(IntegerValue)
 				return left.Greater(right)
@@ -525,7 +529,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationGreaterEqual:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 				left := tuple.left.(IntegerValue)
 				right := tuple.right.(IntegerValue)
 				return left.GreaterEqual(right)
@@ -534,7 +538,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationEqual:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 
 				switch left := tuple.left.(type) {
 				case IntegerValue:
@@ -551,7 +555,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationUnequal:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 
 				switch left := tuple.left.(type) {
 				case IntegerValue:
@@ -568,7 +572,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationOr:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 				left := tuple.left.(BoolValue)
 				right := tuple.right.(BoolValue)
 				return BoolValue(left || right)
@@ -577,7 +581,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationAnd:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(Tuple)
+				tuple := result.(TupleValue)
 				left := tuple.left.(BoolValue)
 				right := tuple.right.(BoolValue)
 				return BoolValue(left && right)
@@ -715,6 +719,7 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 	function InterpretedFunctionValue,
 	arguments []Value,
 ) Trampoline {
+
 	interpreter.bindFunctionInvocationParameters(function, arguments)
 
 	return function.Expression.FunctionBlock.Accept(interpreter).(Trampoline).
