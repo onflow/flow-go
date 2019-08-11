@@ -11,6 +11,12 @@ import (
 	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 )
 
+type loopBreak struct{}
+type loopContinue struct{}
+type functionReturn struct {
+	Value
+}
+
 // Visit-methods for statement which return a non-nil value
 // are treated like they are returning a value.
 
@@ -190,7 +196,6 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 		ReturnType: declaration.ReturnType,
 		Block:      declaration.Block,
 		StartPos:   declaration.StartPos,
-		EndPos:     declaration.EndPos,
 	}
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
@@ -211,7 +216,6 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 		IsConstant:    true,
 		Type:          functionType,
 		StartPos:      declaration.StartPos,
-		EndPos:        declaration.EndPos,
 		IdentifierPos: declaration.IdentifierPos,
 	}
 
@@ -286,10 +290,21 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 	// NOTE: returning result
 
 	if statement.Expression == nil {
-		return Done{Result: VoidValue{}}
+		return Done{Result: functionReturn{VoidValue{}}}
 	}
 
-	return statement.Expression.Accept(interpreter).(Trampoline)
+	return statement.Expression.Accept(interpreter).(Trampoline).
+		Map(func(value interface{}) interface{} {
+			return functionReturn{value.(Value)}
+		})
+}
+
+func (interpreter *Interpreter) VisitBreakStatement(statement *ast.BreakStatement) ast.Repr {
+	return Done{Result: loopBreak{}}
+}
+
+func (interpreter *Interpreter) VisitContinueStatement(statement *ast.ContinueStatement) ast.Repr {
+	return Done{Result: loopContinue{}}
 }
 
 func (interpreter *Interpreter) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
@@ -316,9 +331,13 @@ func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatemen
 			}
 
 			return statement.Block.Accept(interpreter).(Trampoline).
-				FlatMap(func(returnValue interface{}) Trampoline {
-					if returnValue != nil {
-						return Done{Result: returnValue}
+				FlatMap(func(value interface{}) Trampoline {
+					if _, ok := value.(loopBreak); ok {
+						return Done{}
+					} else if _, ok := value.(loopContinue); ok {
+						// NO-OP
+					} else if functionReturn, ok := value.(functionReturn); ok {
+						return Done{Result: functionReturn}
 					}
 
 					// recurse
@@ -370,7 +389,7 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 		return interpreter.visitIndexExpressionAssignment(target, value)
 
 	case *ast.MemberExpression:
-		// TODO: no structures/dictionaries yet
+		// TODO: no structures yet
 		panic(&errors.UnreachableError{})
 	}
 
@@ -560,8 +579,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	panic(&unsupportedOperation{
 		kind:      common.OperationKindBinary,
 		operation: expression.Operation,
-		startPos:  expression.StartPos,
-		endPos:    expression.EndPos,
+		startPos:  expression.StartPosition(),
+		endPos:    expression.EndPosition(),
 	})
 }
 
@@ -614,7 +633,7 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 }
 
 func (interpreter *Interpreter) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO: no structures/dictionaries yet
+	// TODO: no structures yet
 	panic(&errors.UnreachableError{})
 }
 
@@ -685,7 +704,7 @@ func (interpreter *Interpreter) invokeInterpretedFunction(
 			if blockResult == nil {
 				return VoidValue{}
 			}
-			return blockResult.(Value)
+			return blockResult.(functionReturn).Value
 		})
 }
 
@@ -705,7 +724,6 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 					Identifier: parameter.Identifier,
 					Type:       parameter.Type,
 					StartPos:   parameter.StartPos,
-					EndPos:     parameter.EndPos,
 				},
 				Value: argument,
 			},
@@ -736,4 +754,19 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 	function := newInterpretedFunction(expression, interpreter.activations.CurrentOrNew())
 
 	return Done{Result: function}
+}
+
+func (interpreter *Interpreter) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
+	// TODO:
+	return nil
+}
+
+func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
+	// TODO:
+	return nil
+}
+
+func (interpreter *Interpreter) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
+	// TODO:
+	return nil
 }

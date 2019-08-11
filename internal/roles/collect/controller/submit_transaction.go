@@ -7,13 +7,13 @@ import (
 	"google.golang.org/grpc/status"
 
 	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
-
 	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
 )
 
 const (
 	msgEmptyTransaction        = "transaction field is empty"
 	msgFailedTransactionDecode = "failed to decode transaction"
+	msgDuplicateTransaction    = "transaction has already been submitted"
 )
 
 // SubmitTransaction accepts an incoming transaction from a user agent or peer node.
@@ -38,7 +38,9 @@ func (c *Controller) SubmitTransaction(
 		return nil, status.Error(codes.InvalidArgument, msgFailedTransactionDecode)
 	}
 
-	// TODO: check if transaction exists in storage
+	if c.storage.ContainsTransaction(tx.Hash()) {
+		return &svc.SubmitTransactionResponse{}, nil
+	}
 
 	if err := tx.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -47,10 +49,14 @@ func (c *Controller) SubmitTransaction(
 	// TODO: validate transaction signature
 	// https://github.com/dapperlabs/bamboo-node/issues/171
 
-	// TODO: store transaction
-	// https://github.com/dapperlabs/bamboo-node/issues/169
+	// TODO: route transaction to cluster if required and return
 
-	// TODO: route transaction to cluster
+	c.txPool.Insert(tx)
+
+	err = c.storage.InsertTransaction(tx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, msgInternalError)
+	}
 
 	return &svc.SubmitTransactionResponse{}, nil
 }

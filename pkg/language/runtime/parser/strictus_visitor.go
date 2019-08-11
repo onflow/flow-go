@@ -17,6 +17,18 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#declaration.
 	VisitDeclaration(ctx *DeclarationContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#access.
+	VisitAccess(ctx *AccessContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#structureDeclaration.
+	VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#field.
+	VisitField(ctx *FieldContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#initializer.
+	VisitInitializer(ctx *InitializerContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#functionDeclaration.
 	VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{}
 
@@ -49,6 +61,12 @@ type StrictusVisitor interface {
 
 	// Visit a parse tree produced by StrictusParser#returnStatement.
 	VisitReturnStatement(ctx *ReturnStatementContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#breakStatement.
+	VisitBreakStatement(ctx *BreakStatementContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#continueStatement.
+	VisitContinueStatement(ctx *ContinueStatementContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#ifStatement.
 	VisitIfStatement(ctx *IfStatementContext) interface{}

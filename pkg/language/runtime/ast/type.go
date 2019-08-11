@@ -5,21 +5,26 @@ type Type interface {
 	isType()
 }
 
-// BaseType represents a base type (e.g. boolean, integer, etc.)
+// NominalType represents a base type (e.g. boolean, integer, etc.)
 
-type BaseType struct {
+type NominalType struct {
 	Identifier string
 	Pos        *Position
 }
 
-func (*BaseType) isType() {}
+func (*NominalType) isType() {}
 
-func (t *BaseType) StartPosition() *Position {
+func (t *NominalType) StartPosition() *Position {
 	return t.Pos
 }
 
-func (t *BaseType) EndPosition() *Position {
-	return t.Pos
+func (t *NominalType) EndPosition() *Position {
+	length := len(t.Identifier)
+	return &Position{
+		Offset: t.Pos.Offset + length - 1,
+		Line:   t.Pos.Line,
+		Column: t.Pos.Column + length - 1,
+	}
 }
 
 // VariableSizedType is a variable sized array type

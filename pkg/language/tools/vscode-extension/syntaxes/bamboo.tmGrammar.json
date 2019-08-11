@@ -288,7 +288,7 @@
             "name": "keyword.control.branch.bamboo"
           },
           {
-            "match": "(?<!\\.)\\b(?:return)\\b",
+            "match": "(?<!\\.)\\b(?:return|continue|break)\\b",
             "name": "keyword.control.transfer.bamboo"
           },
           {

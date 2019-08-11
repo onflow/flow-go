@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 	"github.com/logrusorgru/aurora"
 	"strconv"
 	"strings"
@@ -104,7 +104,7 @@ func PrettyPrintError(err error, filename string, code string, useColor bool) st
 		}
 		builder.WriteString(carets)
 
-		if secondaryError, ok := err.(interpreter.SecondaryError); ok {
+		if secondaryError, ok := err.(errors.SecondaryError); ok {
 			builder.WriteString(" ")
 			secondaryError := secondaryError.SecondaryError()
 			if useColor {

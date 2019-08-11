@@ -15,6 +15,9 @@ const (
 	DeclarationKindType
 	DeclarationKindParameter
 	DeclarationKindArgumentLabel
+	DeclarationKindStructure
+	DeclarationKindField
+	DeclarationKindInitializer
 )
 
 func (k DeclarationKind) Name() string {
@@ -33,6 +36,12 @@ func (k DeclarationKind) Name() string {
 		return "parameter"
 	case DeclarationKindArgumentLabel:
 		return "argument label"
+	case DeclarationKindStructure:
+		return "structure"
+	case DeclarationKindField:
+		return "field"
+	case DeclarationKindInitializer:
+		return "initializer"
 	}
 
 	panic(&errors.UnreachableError{})

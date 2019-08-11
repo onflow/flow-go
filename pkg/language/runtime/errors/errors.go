@@ -13,3 +13,11 @@ type UnreachableError struct{}
 func (UnreachableError) Error() string {
 	return "unreachable"
 }
+
+// SecondaryError
+
+// SecondaryError is an interface for errors that provide a secondary error message
+//
+type SecondaryError interface {
+	SecondaryError() string
+}

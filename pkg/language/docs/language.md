@@ -1325,15 +1325,11 @@ fun factorial(_ n: Int): Int {
             "the result must be greater than or equal to 1"
     }
 
-    var i = n
-    var result = 1
-
-    while i > 1 {
-        result = result * i
-        i = i - 1
+    if n < 1 {
+       return 1
     }
 
-    return result
+    return n * factorial(n - 1)
 }
 
 factorial(5) // returns 120
@@ -1435,6 +1431,36 @@ while a < 5 {
 }
 
 // `a` is 5
+```
+
+The `continue` statement can be used to stop the current iteration of the loop and start the next iteration.
+
+```bamboo,file=control-flow-continue.bpl
+var i = 0
+var x = 0
+while i < 10 {
+    i = i + 1
+    if i < 5 {
+        continue
+    }
+    x = x + 1
+}
+
+// `x` is 6
+```
+
+The `break` statement can be used to stop the loop.
+
+```bamboo,file=control-flow-break.bpl
+var x = 0
+while x < 10 {
+    x = x + 1
+    if x == 5 {
+        break
+    }
+}
+
+// `x` is 5
 ```
 
 ### Immediate function return: return-statement
@@ -1669,6 +1695,9 @@ and when the value is returned from a function:
 
     We think resources are a great way to represent such assets.
 
+Two composite daya types are compatible if and only if they refer to the same declaration by name,
+i.e., nominal typing applies instead of structural typing.
+
 ## Composite Data Type Declaration and Creation
 
 Structures are declared using the `struct` keyword and resources are declared using the `resource` keyword. The keyword is followed by the name.
@@ -1696,6 +1725,9 @@ Resource are created (instantiated) by using the `create` keyword and calling th
 ```bamboo,file=resource-instantiation.bpl
 create SomeResource()
 ```
+
+Composite data types can only be be declared globally and not locally in functions.
+They can also not be nested.
 
 ### Composite Data Type Fields
 

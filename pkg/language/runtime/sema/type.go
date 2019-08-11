@@ -329,20 +329,58 @@ func (t *FunctionType) Equal(other Type) bool {
 var baseTypes hamt.Map
 
 func init() {
-	for name, baseType := range map[string]Type{
-		"":       &VoidType{},
-		"Void":   &VoidType{},
-		"Bool":   &BoolType{},
-		"Int":    &IntType{},
-		"Int8":   &Int8Type{},
-		"Int16":  &Int16Type{},
-		"Int32":  &Int32Type{},
-		"Int64":  &Int64Type{},
-		"UInt8":  &UInt8Type{},
-		"UInt16": &UInt16Type{},
-		"UInt32": &UInt32Type{},
-		"UInt64": &UInt64Type{},
-	} {
+
+	typeNames := map[string]Type{
+		"": &VoidType{},
+	}
+
+	types := []Type{
+		&VoidType{},
+		&AnyType{},
+		&BoolType{},
+		&IntType{},
+		&Int8Type{},
+		&Int16Type{},
+		&Int32Type{},
+		&Int64Type{},
+		&UInt8Type{},
+		&UInt16Type{},
+		&UInt32Type{},
+		&UInt64Type{},
+	}
+
+	for _, ty := range types {
+		typeNames[ty.String()] = ty
+	}
+
+	for name, baseType := range typeNames {
 		baseTypes = baseTypes.Insert(activations.StringKey(name), baseType)
 	}
+}
+
+// StructureType
+
+type StructureType struct {
+	Identifier string
+	Members    map[string]*Member
+}
+
+type Member struct {
+	Type       Type
+	IsConstant bool
+}
+
+func (*StructureType) isType() {}
+
+func (t *StructureType) String() string {
+	return t.Identifier
+}
+
+func (t *StructureType) Equal(other Type) bool {
+	otherStructure, ok := other.(*StructureType)
+	if !ok {
+		return false
+	}
+
+	return otherStructure.Identifier == t.Identifier
 }
