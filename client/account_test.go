@@ -7,6 +7,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/dapperlabs/bamboo-node/client"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 func TestLoadAccount(t *testing.T) {
@@ -14,7 +16,7 @@ func TestLoadAccount(t *testing.T) {
 
 	r := strings.NewReader(`
 		{	
-			"account": "0xdd2781f4c51bccdbe23e4d398b8a82261f585c278dbb4b84989fea70e76723a9",
+			"account": "0000000000000000000000000000000000000002",
 			"seed": "elephant ears"
 		}
 	`)
@@ -22,8 +24,11 @@ func TestLoadAccount(t *testing.T) {
 	a, err := client.LoadAccount(r)
 	Expect(err).ToNot(HaveOccurred())
 
-	Expect(a.Account).ToNot(BeNil())
-	Expect(a.KeyPair).ToNot(BeNil())
+	address := types.HexToAddress("0000000000000000000000000000000000000002")
+	keyPair, _ := crypto.KeyPairFromSeed("elephant ears")
+
+	Expect(a.Account).To(Equal(address))
+	Expect(a.KeyPair).To(Equal(keyPair))
 
 	// invalid json should fail
 	r = strings.NewReader(`

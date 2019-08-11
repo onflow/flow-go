@@ -2,28 +2,20 @@ package oldcrypto
 
 import (
 	bip32 "github.com/tyler-smith/go-bip32"
-	bip39 "github.com/tyler-smith/go-bip39"
 	"golang.org/x/crypto/sha3"
 )
 
-// KeyPair represents a BIP32 public key and private key pair (and the seed phrase used to derive it).
+// KeyPair represents a BIP32 public/private key-pair.
 type KeyPair struct {
 	PublicKey  []byte
 	PrivateKey []byte
 }
 
-// GenerateKeyPair generates a new key-pair from a passphrase.
-func GenerateKeyPair(passphrase string) (*KeyPair, error) {
-	// generate a mnemonic for memorization or user-friendly seeds
-	entropy, _ := bip39.NewEntropy(256)
-	mnemonic, _ := bip39.NewMnemonic(entropy)
-
-	// generate a Bip32 HD wallet for the mnemonic and a user supplied password
-	seed := bip39.NewSeed(mnemonic, passphrase)
-
-	masterKey, err := bip32.NewMasterKey(seed)
+// KeyPairFromSeed generates a BIP32 key-pair from a seed.
+func KeyPairFromSeed(seed string) (*KeyPair, error) {
+	masterKey, err := bip32.NewMasterKey([]byte(seed))
 	if err != nil {
-		return nil, &InvalidSeedError{seed: passphrase}
+		return nil, &InvalidSeedError{seed}
 	}
 
 	publicKey := masterKey.PublicKey()
