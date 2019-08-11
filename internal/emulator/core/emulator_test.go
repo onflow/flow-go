@@ -220,7 +220,7 @@ func TestSubmitTransactionInvalidKeyPair(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	// use key pair that does not exist on root account
-	invalidKeyPair, _ := crypto.GenerateKeyPair("elephant-ears")
+	invalidKeyPair, _ := crypto.KeyPairFromSeed("elephant-ears")
 
 	tx1 := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
