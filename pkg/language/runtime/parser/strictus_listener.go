@@ -13,6 +13,18 @@ type StrictusListener interface {
 	// EnterDeclaration is called when entering the declaration production.
 	EnterDeclaration(c *DeclarationContext)
 
+	// EnterAccess is called when entering the access production.
+	EnterAccess(c *AccessContext)
+
+	// EnterStructureDeclaration is called when entering the structureDeclaration production.
+	EnterStructureDeclaration(c *StructureDeclarationContext)
+
+	// EnterField is called when entering the field production.
+	EnterField(c *FieldContext)
+
+	// EnterInitializer is called when entering the initializer production.
+	EnterInitializer(c *InitializerContext)
+
 	// EnterFunctionDeclaration is called when entering the functionDeclaration production.
 	EnterFunctionDeclaration(c *FunctionDeclarationContext)
 
@@ -45,6 +57,12 @@ type StrictusListener interface {
 
 	// EnterReturnStatement is called when entering the returnStatement production.
 	EnterReturnStatement(c *ReturnStatementContext)
+
+	// EnterBreakStatement is called when entering the breakStatement production.
+	EnterBreakStatement(c *BreakStatementContext)
+
+	// EnterContinueStatement is called when entering the continueStatement production.
+	EnterContinueStatement(c *ContinueStatementContext)
 
 	// EnterIfStatement is called when entering the ifStatement production.
 	EnterIfStatement(c *IfStatementContext)
@@ -166,6 +184,18 @@ type StrictusListener interface {
 	// ExitDeclaration is called when exiting the declaration production.
 	ExitDeclaration(c *DeclarationContext)
 
+	// ExitAccess is called when exiting the access production.
+	ExitAccess(c *AccessContext)
+
+	// ExitStructureDeclaration is called when exiting the structureDeclaration production.
+	ExitStructureDeclaration(c *StructureDeclarationContext)
+
+	// ExitField is called when exiting the field production.
+	ExitField(c *FieldContext)
+
+	// ExitInitializer is called when exiting the initializer production.
+	ExitInitializer(c *InitializerContext)
+
 	// ExitFunctionDeclaration is called when exiting the functionDeclaration production.
 	ExitFunctionDeclaration(c *FunctionDeclarationContext)
 
@@ -198,6 +228,12 @@ type StrictusListener interface {
 
 	// ExitReturnStatement is called when exiting the returnStatement production.
 	ExitReturnStatement(c *ReturnStatementContext)
+
+	// ExitBreakStatement is called when exiting the breakStatement production.
+	ExitBreakStatement(c *BreakStatementContext)
+
+	// ExitContinueStatement is called when exiting the continueStatement production.
+	ExitContinueStatement(c *ContinueStatementContext)
 
 	// ExitIfStatement is called when exiting the ifStatement production.
 	ExitIfStatement(c *IfStatementContext)

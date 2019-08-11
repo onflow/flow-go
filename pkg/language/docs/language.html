@@ -1359,15 +1359,11 @@
 </span><span style="color: #000000">            </span><span style="color: #A31515">"the result must be greater than or equal to 1"</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> i = n</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> result = </span><span style="color: #09885A">1</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">while</span><span style="color: #000000"> i > </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">        result = result * i</span><span>
-</span><span style="color: #000000">        i = i - </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> n &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">       </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> result</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> n * factorial(n - </span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #000000">factorial(</span><span style="color: #09885A">5</span><span style="color: #000000">) </span><span style="color: #008000">// returns 120</span><span>
@@ -1456,6 +1452,30 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// `a` is 5</span><span>
+</span></code></pre>
+          <p>The <code>continue</code> statement can be used to stop the current iteration of the loop and start the next iteration.</p>
+          <pre><code class="language-bamboo,file=control-flow-continue.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> i = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> x = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">while</span><span style="color: #000000"> i &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    i = i + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> i &#x3C; </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        continue</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    x = x + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `x` is 6</span><span>
+</span></code></pre>
+          <p>The <code>break</code> statement can be used to stop the loop.</p>
+          <pre><code class="language-bamboo,file=control-flow-break.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> x = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">while</span><span style="color: #000000"> x &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    x = x + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> x == </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        break</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `x` is 5</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -1653,6 +1673,10 @@
             <p>We think resources are a great way to represent such assets.</p>
           </li>
         </ul>
+        <p>
+          Two composite daya types are compatible if and only if they refer to the same declaration by name,
+          i.e., nominal typing applies instead of structural typing.
+        </p>
       </section>
       <section>
         <h2 id="composite-data-type-declaration-and-creation"><a href="#composite-data-type-declaration-and-creation" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Declaration and Creation</h2>
@@ -1672,6 +1696,10 @@
         <p>Resource are created (instantiated) by using the <code>create</code> keyword and calling the type like a function.</p>
         <pre><code class="language-bamboo,file=resource-instantiation.bpl"><span style="color: #000000">create SomeResource()</span><span>
 </span></code></pre>
+        <p>
+          Composite data types can only be be declared globally and not locally in functions.
+          They can also not be nested.
+        </p>
         <section>
           <h3 id="composite-data-type-fields"><a href="#composite-data-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Fields</h3>
           <p>Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields <strong>must</strong> be initialized in the initializer. The initializer is declared using the <code>init</code> keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always <code>Void</code>. The initializer always follows any fields.</p>

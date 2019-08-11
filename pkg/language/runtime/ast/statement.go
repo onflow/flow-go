@@ -27,6 +27,48 @@ func (s *ReturnStatement) Accept(visitor Visitor) Repr {
 	return visitor.VisitReturnStatement(s)
 }
 
+// BreakStatement
+
+type BreakStatement struct {
+	StartPos *Position
+	EndPos   *Position
+}
+
+func (s *BreakStatement) StartPosition() *Position {
+	return s.StartPos
+}
+
+func (s *BreakStatement) EndPosition() *Position {
+	return s.EndPos
+}
+
+func (*BreakStatement) isStatement() {}
+
+func (s *BreakStatement) Accept(visitor Visitor) Repr {
+	return visitor.VisitBreakStatement(s)
+}
+
+// ContinueStatement
+
+type ContinueStatement struct {
+	StartPos *Position
+	EndPos   *Position
+}
+
+func (s *ContinueStatement) StartPosition() *Position {
+	return s.StartPos
+}
+
+func (s *ContinueStatement) EndPosition() *Position {
+	return s.EndPos
+}
+
+func (*ContinueStatement) isStatement() {}
+
+func (s *ContinueStatement) Accept(visitor Visitor) Repr {
+	return visitor.VisitContinueStatement(s)
+}
+
 // IfStatement
 
 type IfStatement struct {
@@ -34,7 +76,6 @@ type IfStatement struct {
 	Then     *Block
 	Else     *Block
 	StartPos *Position
-	EndPos   *Position
 }
 
 func (s *IfStatement) StartPosition() *Position {
@@ -42,7 +83,11 @@ func (s *IfStatement) StartPosition() *Position {
 }
 
 func (s *IfStatement) EndPosition() *Position {
-	return s.EndPos
+	if s.Else != nil {
+		return s.Else.EndPosition()
+	} else {
+		return s.Then.EndPosition()
+	}
 }
 
 func (*IfStatement) isStatement() {}
@@ -77,18 +122,16 @@ func (s *WhileStatement) Accept(visitor Visitor) Repr {
 // AssignmentStatement
 
 type AssignmentStatement struct {
-	Target   Expression
-	Value    Expression
-	StartPos *Position
-	EndPos   *Position
+	Target Expression
+	Value  Expression
 }
 
 func (s *AssignmentStatement) StartPosition() *Position {
-	return s.StartPos
+	return s.Target.StartPosition()
 }
 
 func (s *AssignmentStatement) EndPosition() *Position {
-	return s.EndPos
+	return s.Value.EndPosition()
 }
 
 func (*AssignmentStatement) isStatement() {}
