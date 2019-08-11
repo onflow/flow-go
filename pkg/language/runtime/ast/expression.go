@@ -1,9 +1,14 @@
 package ast
 
-import "math/big"
+import (
+	"fmt"
+	"math/big"
+	"strings"
+)
 
 type Expression interface {
 	Element
+	fmt.Stringer
 	isExpression()
 }
 
@@ -13,6 +18,14 @@ type BoolExpression struct {
 	Value    bool
 	StartPos Position
 	EndPos   Position
+}
+
+func (e *BoolExpression) String() string {
+	if e.Value {
+		return "true"
+	} else {
+		return "false"
+	}
 }
 
 func (e *BoolExpression) StartPosition() Position {
@@ -37,6 +50,10 @@ type IntExpression struct {
 	EndPos   Position
 }
 
+func (e *IntExpression) String() string {
+	return e.Value.String()
+}
+
 func (e *IntExpression) StartPosition() Position {
 	return e.StartPos
 }
@@ -57,6 +74,19 @@ type ArrayExpression struct {
 	Values   []Expression
 	StartPos Position
 	EndPos   Position
+}
+
+func (e *ArrayExpression) String() string {
+	var builder strings.Builder
+	builder.WriteString("[")
+	for i, value := range e.Values {
+		if i > 0 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(value.String())
+	}
+	builder.WriteString("]")
+	return builder.String()
 }
 
 func (e *ArrayExpression) StartPosition() Position {
@@ -81,6 +111,10 @@ type IdentifierExpression struct {
 	EndPos     Position
 }
 
+func (e *IdentifierExpression) String() string {
+	return e.Identifier
+}
+
 func (e *IdentifierExpression) StartPosition() Position {
 	return e.StartPos
 }
@@ -98,13 +132,27 @@ func (e *IdentifierExpression) Accept(v Visitor) Repr {
 // InvocationExpression
 
 type InvocationExpression struct {
-	Expression Expression
-	Arguments  []*Argument
-	EndPos     Position
+	InvokedExpression Expression
+	Arguments         []*Argument
+	EndPos            Position
+}
+
+func (e *InvocationExpression) String() string {
+	var builder strings.Builder
+	builder.WriteString(e.InvokedExpression.String())
+	builder.WriteString("(")
+	for i, argument := range e.Arguments {
+		if i > 0 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(argument.String())
+	}
+	builder.WriteString(")")
+	return builder.String()
 }
 
 func (e *InvocationExpression) StartPosition() Position {
-	return e.Expression.StartPosition()
+	return e.InvokedExpression.StartPosition()
 }
 
 func (e *InvocationExpression) EndPosition() Position {
@@ -132,6 +180,13 @@ type MemberExpression struct {
 	EndPos     Position
 }
 
+func (e *MemberExpression) String() string {
+	return fmt.Sprintf(
+		"%s.%s",
+		e.Expression, e.Identifier,
+	)
+}
+
 func (e *MemberExpression) StartPosition() Position {
 	return e.StartPos
 }
@@ -154,6 +209,13 @@ type IndexExpression struct {
 	Index      Expression
 	StartPos   Position
 	EndPos     Position
+}
+
+func (e *IndexExpression) String() string {
+	return fmt.Sprintf(
+		"%s[%s]",
+		e.Expression, e.Index,
+	)
 }
 
 func (e *IndexExpression) StartPosition() Position {
@@ -179,6 +241,13 @@ type ConditionalExpression struct {
 	Else Expression
 }
 
+func (e *ConditionalExpression) String() string {
+	return fmt.Sprintf(
+		"(%s ? %s : %s)",
+		e.Test, e.Then, e.Else,
+	)
+}
+
 func (e *ConditionalExpression) StartPosition() Position {
 	return e.Test.StartPosition()
 }
@@ -200,6 +269,13 @@ type UnaryExpression struct {
 	Expression Expression
 	StartPos   Position
 	EndPos     Position
+}
+
+func (e *UnaryExpression) String() string {
+	return fmt.Sprintf(
+		"%s%s",
+		e.Operation.Symbol(), e.Expression,
+	)
 }
 
 func (e *UnaryExpression) StartPosition() Position {
@@ -224,6 +300,13 @@ type BinaryExpression struct {
 	Right     Expression
 }
 
+func (e *BinaryExpression) String() string {
+	return fmt.Sprintf(
+		"(%s %s %s)",
+		e.Left, e.Operation.Symbol(), e.Right,
+	)
+}
+
 func (e *BinaryExpression) StartPosition() Position {
 	return e.Left.StartPosition()
 }
@@ -245,6 +328,11 @@ type FunctionExpression struct {
 	ReturnType    Type
 	FunctionBlock *FunctionBlock
 	StartPos      Position
+}
+
+func (e *FunctionExpression) String() string {
+	// TODO:
+	return "..."
 }
 
 func (e *FunctionExpression) StartPosition() Position {

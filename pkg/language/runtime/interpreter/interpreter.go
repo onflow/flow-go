@@ -678,7 +678,7 @@ func (interpreter *Interpreter) VisitConditionalExpression(expression *ast.Condi
 
 func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
 	// interpret the invoked expression
-	return invocationExpression.Expression.Accept(interpreter).(Trampoline).
+	return invocationExpression.InvokedExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			function := result.(FunctionValue)
 

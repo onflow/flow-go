@@ -1354,7 +1354,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 
 	// check the invoked expression can be invoked
 
-	invokedExpression := invocationExpression.Expression
+	invokedExpression := invocationExpression.InvokedExpression
 	expressionResult := invokedExpression.Accept(checker).(checkerResult)
 	errs = append(errs, expressionResult.Errors...)
 
