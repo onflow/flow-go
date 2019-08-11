@@ -2276,3 +2276,20 @@ func TestCheckInvalidFunctionPostConditionWithResult(t *testing.T) {
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
 }
+
+func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          post {
+              (fun (): Int { return 2 })() == 2
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.FunctionExpressionInConditionError{}))
+}

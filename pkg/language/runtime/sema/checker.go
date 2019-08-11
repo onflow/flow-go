@@ -58,6 +58,7 @@ type Checker struct {
 	typeActivations  *activations.Activations
 	functionContexts []*functionContext
 	Globals          map[string]*Variable
+	inCondition      bool
 }
 
 func NewChecker(program *ast.Program) *Checker {
@@ -592,6 +593,19 @@ func (checker *Checker) declareBefore() *CheckerError {
 
 func (checker *Checker) visitConditions(conditions []*ast.Condition) *CheckerError {
 	var errs []error
+
+	// flag the checker to be inside a condition.
+	// this flag is used to detect illegal expressions,
+	// see e.g. VisitFunctionExpression
+
+	wasInCondition := checker.inCondition
+	checker.inCondition = true
+	defer func() {
+		checker.inCondition = wasInCondition
+	}()
+
+	// check all conditions: check the expression
+	// and ensure the result is boolean
 
 	for _, condition := range conditions {
 		conditionResult := condition.Accept(checker).(checkerResult)
@@ -1586,6 +1600,17 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
+	}
+
+	// function expressions are not allowed in conditions
+
+	if checker.inCondition {
+		errs = append(errs,
+			&FunctionExpressionInConditionError{
+				StartPos: expression.StartPosition(),
+				EndPos:   expression.EndPosition(),
+			},
+		)
 	}
 
 	return checkerResult{

@@ -644,3 +644,24 @@ func (e *FieldUninitializedError) EndPosition() ast.Position {
 	length := len(e.Name)
 	return e.Pos.Shifted(length - 1)
 }
+
+// FunctionExpressionInConditionError
+
+type FunctionExpressionInConditionError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *FunctionExpressionInConditionError) Error() string {
+	return "condition contains function"
+}
+
+func (*FunctionExpressionInConditionError) isSemanticError() {}
+
+func (e *FunctionExpressionInConditionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *FunctionExpressionInConditionError) EndPosition() ast.Position {
+	return e.EndPos
+}
