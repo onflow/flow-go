@@ -542,13 +542,21 @@ func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, ret
 		errs = append(errs, err.Errors...)
 	}
 
-	if err := checker.declareBefore(); err != nil {
-		errs = append(errs, err.Errors...)
+	// if there is a post-condition, declare the function `before`
+
+	// TODO: improve: only declare when a condition actually refers to `before`?
+
+	if len(functionBlock.PostConditions) > 0 {
+		if err := checker.declareBefore(); err != nil {
+			errs = append(errs, err.Errors...)
+		}
 	}
 
 	// if there is a return type, declare the constant `result`
 	// which has the return type
+
 	if !returnType.Equal(&VoidType{}) {
+
 		if err := checker.declareVariable(
 			ResultIdentifier,
 			returnType,
