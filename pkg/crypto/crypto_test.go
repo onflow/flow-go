@@ -60,16 +60,14 @@ func BenchmarkSha3_256(b *testing.B) {
 func TestBLS_BLS12381(t *testing.T) {
 	fmt.Println("testing BLS on bls12_381:")
 	input := []byte("test")
-	halg := NewHashAlgo(SHA3_256)
-	h := halg.ComputeBytesHash(input)
 
 	salg := NewSignatureAlgo(BLS_BLS12381)
 	seed := []byte{1, 2, 3}
 	sk := salg.GeneratePrKey(seed)
 	pk := sk.Pubkey()
 
-	s := salg.SignHash(sk, h)
-	result := salg.VerifyHash(pk, s, h)
+	s := salg.SignBytes(sk, input, nil)
+	result := salg.VerifyBytes(pk, s, input, nil)
 
 	if result == false {
 		t.Errorf("Verification failed: signature is %s", s)
@@ -77,15 +75,15 @@ func TestBLS_BLS12381(t *testing.T) {
 		t.Logf("Verification passed: signature is %s", s)
 	}
 
-	message := &testStruct{"te", "st"}
-	s = salg.SignStruct(sk, message, halg)
-	result = salg.VerifyStruct(pk, s, message, halg)
+	/*message := &testStruct{"te", "st"}
+	s = salg.SignStruct(sk, message, nil)
+	result = salg.VerifyStruct(pk, s, message, nil)
 
 	if result == false {
 		t.Errorf("Verification failed: signature is %x", s)
 	} else {
 		t.Logf("Verification passed: signature is %x", s)
-	}
+	}*/
 }
 
 // Testg1 contains tests of operations in G1

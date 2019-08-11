@@ -33,6 +33,18 @@ ctx_t* _relic_init_BLS12_381() {
     return core_get();
 }
 
+int _getSignatureLengthBLS_BLS12381() {
+    return SIGNATURE_LEN;
+}
+
+int _getPubKeyLengthBLS_BLS12381() {
+    return PK_LEN;
+}
+
+int _getPrKeyLengthBLS_BLS12381() {
+    return SK_LEN;
+}
+
 // Exponentiation of random p in G1
 void _G1scalarPointMult(ep_st* res, ep_st* p, bn_st *expo) {
     // Using window NAF of size 2
@@ -70,19 +82,82 @@ void _G2scalarGenMult(ep2_st* res, bn_st *expo) {
 
 // Computes BLS signature
 void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
-    ep_st p;
-    ep_new(&p);
-    // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
-    ep_map(&p, data, len);  // TODO : add another func for prehashed data?
-    // s = p^sk
     
-    bn_set_dig(sk, 1);
-    _G1scalarGenMult(&p, sk);
-
-	//_G1scalarPointMult(&p, &p, sk);
-    ep_write_bin_compact(s, &p) // writing in bytes: should preserve the endianness when read
+    ep_st h;
+    ep_new(&h);
+    // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
+    ep_map(&h, data, len); 
+    // s = p^sk
+    //_G1scalarGenMult(&h, sk);
+	_G1scalarPointMult(&h, &h, sk);
+    ep_write_bin_compact(s, &h);
 
     ep_free(&p);
+}
+
+// Verifies the validity of a BLS signature
+int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
+
+    // TODO : check s is on curve
+	// TODO : check s is in G1
+	// TODO : check pk is on curve  (can be done offline)
+	// TODO : check pk is in G2 (can be done offline)
+    ep_st h;
+    ep_new(&h);
+    // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
+    ep_map(&h, data, len); 
+
+    ep_st s;
+    ep_new(s);
+    ep_read_bin_compact(&s, sig);
+
+    //_ep_print("H", &h);
+    _ep_print("S", &s);
+
+#if 0
+    ep2_st neg_g2;
+    ep2_new(&neg_g2);
+    ep2_neg(&neg_g2, &core_get()->ep2_g); // could be hardcoded
+
+    ep_st** elemsG1 = (ep_st**) malloc (2*sizeof(ep_st));
+    ep2_st** elemsG2 = (ep2_st**) malloc (2*sizeof(ep2_st));
+    if (!elemsG1 || !elemsG2) {
+        THROW(ERR_NO_MEMORY);
+        return SIG_ERROR;
+    }
+
+    elemsG1[0] = &s;   
+    elemsG2[0] = &neg_g2;  
+    elemsG1[1] = &h;
+    elemsG2[1] = pk;
+
+    fp12_t pair;
+    fp12_new(&pair);
+    // double pairing with Optimal Ate 
+    pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), 2);
+
+    // compare the result to 1
+    int res = fp12_cmp_dig(pair, 1);
+
+    free(elemsG1);
+    free(elemsG2);
+#else
+    fp12_t pair1, pair2;
+    fp12_new(&pair1); fp12_new(&pair2);
+    pp_map_oatep_k12(pair1, &s, &core_get()->ep2_g);
+    pp_map_oatep_k12(pair2, &h, pk);
+
+    int res = fp12_cmp(pair1, pair2);
+#endif
+
+    ep_free(&p);
+    ep_free(&s);
+    fp12_free(&one)
+    
+    if (res == RLC_EQ && core_get()->code == RLC_OK) 
+        return SIG_VALID;
+    else 
+        return SIG_INVALID;
 }
 
 

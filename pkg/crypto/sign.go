@@ -14,9 +14,9 @@ func NewSignatureAlgo(name AlgoName) Signer {
 			nil,
 			&SignAlgo{
 				name,
-				PrKeyLengthBLS_BLS12381,
-				PubKeyLengthBLS_BLS12381,
-				SignatureLengthBLS_BLS12381}})
+				prKeyLengthBLS_BLS12381(),
+				pubKeyLengthBLS_BLS12381(),
+				signatureLengthBLS_BLS12381()}})
 		a.init()
 		return a
 	}

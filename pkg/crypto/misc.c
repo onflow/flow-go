@@ -1,6 +1,13 @@
 #include "include.h"
 
 // DEBUG related functions
+void _bytes_print(char* s, byte* data, int len) {
+    printf("[%s]:\n", s);
+    for (int i=0; i<len; i++) 
+        printf("%02x,", data[i]);
+    printf("\n");
+}
+
 void _fp_print(char* s, fp_st* a) {
     char* str = malloc(sizeof(char) * fp_size_str(*a, 16));
     fp_write_str(str, 100, *a, 16);
@@ -58,13 +65,12 @@ void ep_write_bin_compact(byte *bin, const ep_st *a) {
     TRY {
         ep_new(t);
         ep_norm(t, a);
- 
+        fp_write_bin(bin, FP_BYTES, t->x);
+
         if (SERIALIZATION == COMPRESSED) {
-            fp_write_bin(bin, SIGNATURE_LEN, t->x);
             bin[0] |= (fp_get_bit(t->y, 0) << 5);
         } else {
-            fp_write_bin(bin, SIGNATURE_LEN, t->x);
-            fp_write_bin(bin + SIGNATURE_LEN, SIGNATURE_LEN, t->y);
+            fp_write_bin(bin + FP_BYTES, FP_BYTES, t->y);
         }
     } CATCH_ANY {
         THROW(ERR_CAUGHT);
@@ -78,8 +84,8 @@ void ep_write_bin_compact(byte *bin, const ep_st *a) {
 // ep_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
 // The coding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // The code is a modified version of Relic ep_write_bin
-void ep_read_bin_compact(ep_st* a, const byte *bin) {
-    if ((bin[0] & 0x40) == 0) {
+void ep_read_bin_compact(ep_st* a, byte *bin) {
+    if (bin[0] & 0x40) {
         if (bin[0] & 0x3F) {
             THROW(ERR_NO_VALID);
             return;
@@ -94,8 +100,9 @@ void ep_read_bin_compact(ep_st* a, const byte *bin) {
 		return;
 	} 
 
-    int compressed = bin[0] >> 7;
-    int y_is_odd = (bin[0] >> 6) & 1;
+    byte temp = bin[0];
+    int compressed = temp >> 7;
+    int y_is_odd = (temp >> 5) & 1;
 
     if (y_is_odd && (!compressed)) {
         THROW(ERR_NO_VALID);
@@ -104,15 +111,15 @@ void ep_read_bin_compact(ep_st* a, const byte *bin) {
 
 	a->norm = 1;
 	fp_set_dig(a->z, 1);
-	fp_read_bin(a->x, bin, SIGNATURE_LEN>>1);
-    for (int i=0; i<3; i++){
-        fp_set_bit(a->x, FP_PRIME+i, 0);
-    }
+    bin[0] &= 0x1F;
+	fp_read_bin(a->x, bin, FP_BYTES);
+    bin[0] = temp;
 
     if (SERIALIZATION == UNCOMPRESSED) {
-        fp_read_bin(a->y, bin + (SIGNATURE_LEN>>1), SIGNATURE_LEN>>1);
+        fp_read_bin(a->y, bin + FP_BYTES, FP_BYTES);
     }
     else {
+        fp_zero(a->y);
         fp_set_bit(a->y, 0, y_is_odd);
         ep_upk(a, a);
     }
