@@ -240,6 +240,12 @@ func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Tram
 }
 
 func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
+	// NOTE: see visitFunctionBlock
+	panic(&errors.UnreachableError{})
+}
+
+func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnType ast.Type) Trampoline {
+
 	// block scope: each function block gets an activation record
 	interpreter.activations.PushCurrent()
 
@@ -249,9 +255,25 @@ func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBl
 			// and post-conditions need to be able to refer to block's declarations
 			return interpreter.visitStatements(functionBlock.Block.Statements).
 				FlatMap(func(blockResult interface{}) Trampoline {
+
+					var resultValue Value
+					if blockResult == nil {
+						resultValue = VoidValue{}
+					} else {
+						resultValue = blockResult.(functionReturn).Value
+					}
+
+					// if there is a return type, declare the constant `result`
+					// which has the return value
+
+					// TODO: improve
+					if ty, ok := returnType.(*ast.NominalType); ok && ty.Identifier != "" {
+						interpreter.declareVariable(sema.ResultIdentifier, resultValue)
+					}
+
 					return interpreter.visitConditions(functionBlock.PostConditions).
 						Map(func(_ interface{}) interface{} {
-							return blockResult
+							return resultValue
 						})
 				})
 		}).
@@ -722,14 +744,14 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 
 	interpreter.bindFunctionInvocationParameters(function, arguments)
 
-	return function.Expression.FunctionBlock.Accept(interpreter).(Trampoline).
-		Map(func(blockResult interface{}) interface{} {
-			interpreter.activations.Pop()
+	functionBlockTrampoline := interpreter.visitFunctionBlock(
+		function.Expression.FunctionBlock,
+		function.Expression.ReturnType,
+	)
 
-			if blockResult == nil {
-				return VoidValue{}
-			}
-			return blockResult.(functionReturn).Value
+	return functionBlockTrampoline.
+		Then(func(_ interface{}) {
+			interpreter.activations.Pop()
 		})
 }
 

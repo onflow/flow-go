@@ -1252,3 +1252,41 @@ func TestInterpretFunctionPostCondition(t *testing.T) {
 	Expect(inter.Invoke("test", zero)).
 		To(Equal(interpreter.IntValue{Int: zero}))
 }
+
+func TestInterpretFunctionWithResultAndPostConditionWithResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int): Int {
+          post {
+              result == 0
+          }
+          return x
+      }
+	`)
+
+	_, err := inter.Invoke("test", big.NewInt(42))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	zero := big.NewInt(0)
+	Expect(inter.Invoke("test", zero)).
+		To(Equal(interpreter.IntValue{Int: zero}))
+}
+
+func TestInterpretFunctionWithoutResultAndPostConditionWithResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test() {
+          post {
+              result == 0
+          }
+          let result = 0
+      }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+}
+
