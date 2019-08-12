@@ -1882,23 +1882,9 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		)
 	}
 
-	// TODO: very simple field initialization check for now.
-	//  perform proper definite assignment analysis
-
 	if structureType != nil {
-		for _, field := range structure.Fields {
-			name := field.Identifier
-			member := structureType.Members[name]
-
-			if !member.IsInitialized {
-				errs = append(errs,
-					&FieldUninitializedError{
-						Name:          name,
-						Pos:           field.IdentifierPos,
-						StructureType: structureType,
-					},
-				)
-			}
+		if err := checker.checkFieldsInitialized(structure, structureType); err != nil {
+			errs = append(errs, err.Errors...)
 		}
 	}
 
@@ -1910,6 +1896,32 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		Type:   nil,
 		Errors: errs,
 	}
+}
+
+// TODO: very simple field initialization check for now.
+//  perform proper definite assignment analysis
+//
+func (checker *Checker) checkFieldsInitialized(
+	structure *ast.StructureDeclaration,
+	structureType *StructureType,
+) *CheckerError {
+	var errs []error
+
+	for _, field := range structure.Fields {
+		name := field.Identifier
+		member := structureType.Members[name]
+
+		if !member.IsInitialized {
+			errs = append(errs,
+				&FieldUninitializedError{
+					Name:          name,
+					Pos:           field.IdentifierPos,
+					StructureType: structureType,
+				},
+			)
+		}
+	}
+	return checkerError(errs)
 }
 
 func (checker *Checker) declareStructureConstructor(
