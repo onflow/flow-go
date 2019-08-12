@@ -864,6 +864,12 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
+	constructorVariable := &Variable{}
+
+	// make the constructor available in the initializer
+	lexicalScope = lexicalScope.
+		Insert(common.StringKey(declaration.Identifier), constructorVariable)
+
 	initializer := declaration.Initializer
 
 	var initializerFunction *InterpretedFunctionValue
@@ -872,8 +878,6 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 		function := newInterpretedFunction(functionExpression, lexicalScope)
 		initializerFunction = &function
 	}
-
-	constructorVariable := &Variable{}
 
 	functions := interpreter.structureFunctions(declaration, lexicalScope)
 
@@ -892,8 +896,6 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 					NewStructFunction(
 						function,
 						structure,
-						declaration.Identifier,
-						constructorVariable,
 					),
 				)
 			}
@@ -905,8 +907,6 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 					*initializerFunction,
 					values,
 					structure,
-					declaration.Identifier,
-					constructorVariable,
 				)
 			}
 
@@ -929,8 +929,6 @@ func (interpreter *Interpreter) invokeStructureFunction(
 	function InterpretedFunctionValue,
 	arguments []Value,
 	structure StructureValue,
-	structureIdentifier string,
-	constructorVariable *Variable,
 ) Trampoline {
 	// start a new activation record
 	// lexical scope: use the function declaration's activation record,
@@ -939,9 +937,6 @@ func (interpreter *Interpreter) invokeStructureFunction(
 
 	// make `self` available in the initializer
 	interpreter.declareVariable(sema.SelfIdentifier, structure)
-
-	// make the constructor available in the initializer
-	interpreter.setVariable(structureIdentifier, constructorVariable)
 
 	return interpreter.invokeInterpretedFunctionActivated(function, arguments)
 }

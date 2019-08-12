@@ -1014,7 +1014,7 @@ func TestInterpretStructureSelfReferenceInInitializer(t *testing.T) {
 		To(Equal(interpreter.VoidValue{}))
 }
 
-func TestInterpretStructureConstructorReferenceInInitializer(t *testing.T) {
+func TestInterpretStructureConstructorReferenceInInitializerAndFunction(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
@@ -1024,15 +1024,26 @@ func TestInterpretStructureConstructorReferenceInInitializer(t *testing.T) {
           init() {
               Test
           }
+
+          fun test(): Test {
+              return Test()
+          }
       }
 
-      fun test() {
-          Test()
+      fun test(): Test {
+          return Test()
+      }
+
+      fun test2(): Test {
+          return Test().test()
       }
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.VoidValue{}))
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+
+	Expect(inter.Invoke("test2")).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
 }
 
 func TestInterpretStructureSelfReferenceInFunction(t *testing.T) {

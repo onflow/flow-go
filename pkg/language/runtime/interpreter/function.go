@@ -83,10 +83,8 @@ func NewHostFunction(
 // StructFunctionValue
 
 type StructFunctionValue struct {
-	function            InterpretedFunctionValue
-	structure           StructureValue
-	structIdentifier    string
-	constructorVariable *Variable
+	function  InterpretedFunctionValue
+	structure StructureValue
 }
 
 func (*StructFunctionValue) isValue() {}
@@ -114,21 +112,15 @@ func (f *StructFunctionValue) invoke(interpreter *Interpreter, arguments []Value
 		f.function,
 		arguments,
 		f.structure,
-		f.structIdentifier,
-		f.constructorVariable,
 	)
 }
 
 func NewStructFunction(
 	function InterpretedFunctionValue,
 	structure StructureValue,
-	structIdentifier string,
-	constructorVariable *Variable,
 ) *StructFunctionValue {
 	return &StructFunctionValue{
 		function,
 		structure,
-		structIdentifier,
-		constructorVariable,
 	}
 }
