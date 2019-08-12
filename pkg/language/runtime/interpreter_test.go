@@ -1189,3 +1189,23 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
 		To(Equal(interpreter.IntValue{Int: big.NewInt(4)}))
 }
 
+func TestInterpretStructureInitializesConstant(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Test {
+          let foo: Int
+
+          init() {
+              self.foo = 42
+          }
+      }
+
+	  let test = Test()
+	`)
+
+	Expect(inter.Globals["test"].Value.(*interpreter.StructureValue).Members["foo"]).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+
+}
+
