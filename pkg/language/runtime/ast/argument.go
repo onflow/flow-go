@@ -1,6 +1,8 @@
 package ast
 
 type Argument struct {
-	Label      string
-	Expression Expression
+	Label         string
+	LabelStartPos *Position
+	LabelEndPos   *Position
+	Expression    Expression
 }

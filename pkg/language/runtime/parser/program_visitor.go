@@ -169,14 +169,13 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 
 	block := ctx.Block().Accept(v).(*ast.Block)
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.InitializerDeclaration{
 		Identifier: identifier,
 		Parameters: parameters,
 		Block:      block,
 		StartPos:   startPosition,
-		EndPos:     endPosition,
 	}
 }
 
@@ -221,7 +220,8 @@ func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
 	var labelPos *ast.Position
 	if ctx.argumentLabel != nil {
 		label = ctx.argumentLabel.GetText()
-		labelPos = ast.PositionFromToken(ctx.argumentLabel)
+		position := ast.PositionFromToken(ctx.argumentLabel)
+		labelPos = &position
 	}
 
 	// identifier
@@ -400,7 +400,7 @@ func (v *ProgramVisitor) VisitReturnStatement(ctx *ReturnStatementContext) inter
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
-	var endPosition *ast.Position
+	var endPosition ast.Position
 	if expression != nil {
 		endPosition = expression.EndPosition()
 	} else {
@@ -794,8 +794,11 @@ func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) int
 }
 
 func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{} {
-	identifier := ctx.Identifier().GetText()
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	identifierNode := ctx.Identifier()
+	identifier := identifierNode.GetText()
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.EndPosition(startPosition, identifierNode.GetSymbol().GetStop())
 
 	// NOTE: partial, expression is filled later
 	return &ast.MemberExpression{
@@ -860,9 +863,11 @@ func parseIntExpression(token antlr.Token, text string, kind IntegerLiteralKind)
 	if !ok {
 		panic(fmt.Sprintf("invalid %s literal: %s", kind, text))
 	}
+
 	return &ast.IntExpression{
-		Value: value,
-		Pos:   startPosition,
+		Value:    value,
+		StartPos: startPosition,
+		EndPos:   endPosition,
 	}
 }
 
@@ -916,19 +921,27 @@ func (v *ProgramVisitor) VisitNestedExpression(ctx *NestedExpressionContext) int
 }
 
 func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interface{} {
-	position := ast.PositionFromToken(ctx.GetStart())
+	startPosition := ast.PositionFromToken(ctx.GetStart())
 
-	if ctx.True() != nil {
+	trueNode := ctx.True()
+	if trueNode != nil {
+		endPosition := ast.EndPosition(startPosition, trueNode.GetSymbol().GetStop())
+
 		return &ast.BoolExpression{
-			Value: true,
-			Pos:   position,
+			Value:    true,
+			StartPos: startPosition,
+			EndPos:   endPosition,
 		}
 	}
 
-	if ctx.False() != nil {
+	falseNode := ctx.False()
+	if falseNode != nil {
+		endPosition := ast.EndPosition(startPosition, falseNode.GetSymbol().GetStop())
+
 		return &ast.BoolExpression{
-			Value: false,
-			Pos:   position,
+			Value:    false,
+			StartPos: startPosition,
+			EndPos:   endPosition,
 		}
 	}
 
@@ -989,13 +1002,21 @@ func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
 func (v *ProgramVisitor) VisitArgument(ctx *ArgumentContext) interface{} {
 	identifierNode := ctx.Identifier()
 	label := ""
+	var labelStartPos, labelEndPos *ast.Position
 	if identifierNode != nil {
 		label = identifierNode.GetText()
+		symbol := identifierNode.GetSymbol()
+		startPos := ast.PositionFromToken(symbol)
+		endPos := ast.EndPosition(startPos, symbol.GetStop())
+		labelStartPos = &startPos
+		labelEndPos = &endPos
 	}
 	expression := ctx.Expression().Accept(v).(ast.Expression)
 	return &ast.Argument{
-		Label:      label,
-		Expression: expression,
+		Label:         label,
+		LabelStartPos: labelStartPos,
+		LabelEndPos:   labelEndPos,
+		Expression:    expression,
 	}
 }
 

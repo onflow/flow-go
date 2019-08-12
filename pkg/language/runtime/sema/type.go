@@ -366,9 +366,10 @@ type StructureType struct {
 }
 
 type Member struct {
-	Type          Type
-	IsConstant    bool
-	IsInitialized bool
+	Type           Type
+	IsConstant     bool
+	IsInitialized  bool
+	ArgumentLabels []string
 }
 
 func (*StructureType) isType() {}

@@ -14,12 +14,12 @@ func (NotAnElement) Accept(Visitor) Repr {
 	return nil
 }
 
-func (NotAnElement) StartPosition() *Position {
-	return nil
+func (NotAnElement) StartPosition() Position {
+	return Position{}
 }
 
-func (NotAnElement) EndPosition() *Position {
-	return nil
+func (NotAnElement) EndPosition() Position {
+	return Position{}
 }
 
 type Visitor interface {
