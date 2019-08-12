@@ -1842,6 +1842,17 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		errs = append(errs, err.Errors...)
 	}
 
+	// NOTE: fields and functions might already refer to structure itself.
+	// insert a dummy type for now, so lookup succeeds during conversion,
+	// then fix up the type reference
+
+	temporaryStructureType := &StructureType{}
+
+	if err := checker.declareType(
+		structure.Identifier,
+		structure.IdentifierPos,
+		temporaryStructureType,
+	); err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
@@ -1850,8 +1861,8 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		errs = append(errs, err.Errors...)
 	}
 
-	if err := checker.declareType(structure.Identifier, structure.IdentifierPos, structureType); err != nil {
-		errs = append(errs, err.Errors...)
+	if structureType != nil {
+		*temporaryStructureType = *structureType
 	}
 
 	// declare the constructor function before checking initializer and functions,

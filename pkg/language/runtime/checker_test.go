@@ -2070,6 +2070,55 @@ func TestCheckInvalidStructureFunctionCallWithMissingArgumentLabel(t *testing.T)
 		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
 }
 
+func TestCheckStructureConstructorReferenceInInitializerAndFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+
+      struct Test {
+
+          init() {
+              Test
+          }
+
+          fun test(): Test {
+              return Test()
+          }
+      }
+
+      fun test(): Test {
+         return Test()
+      }
+
+      fun test2(): Test {
+         return Test().test()
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	testType := checker.FindType("Test")
+
+	Expect(testType).
+		To(BeAssignableToTypeOf(&sema.StructureType{}))
+
+	structureType := testType.(*sema.StructureType)
+
+	Expect(structureType.Identifier).
+		To(Equal("Test"))
+
+	testFunctionMember := structureType.Members["test"]
+
+	Expect(testFunctionMember.Type).
+		To(BeAssignableToTypeOf(&sema.FunctionType{}))
+
+	testFunctionType := testFunctionMember.Type.(*sema.FunctionType)
+
+	Expect(testFunctionType.ReturnType).
+		To(BeIdenticalTo(structureType))
+}
+
 func TestCheckFunctionConditions(t *testing.T) {
 	RegisterTestingT(t)
 
