@@ -162,7 +162,7 @@ func (checker *Checker) findVariable(name string) *Variable {
 	return variable
 }
 
-func (checker *Checker) findType(name string) Type {
+func (checker *Checker) FindType(name string) Type {
 	value := checker.typeActivations.Find(name)
 	if value == nil {
 		return nil
@@ -1633,7 +1633,7 @@ func (checker *Checker) ConvertType(t ast.Type) (Type, *CheckerError) {
 
 	switch t := t.(type) {
 	case *ast.NominalType:
-		result := checker.findType(t.Identifier)
+		result := checker.FindType(t.Identifier)
 		if result == nil {
 			err := &CheckerError{
 				Errors: []error{
@@ -2131,7 +2131,7 @@ func (checker *Checker) declareType(
 ) *CheckerError {
 	var errs []error
 
-	existingType := checker.findType(identifier)
+	existingType := checker.FindType(identifier)
 	if existingType != nil {
 		errs = append(errs,
 			&RedeclarationError{
