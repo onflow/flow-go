@@ -1208,3 +1208,4 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
 		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
 
 }
+

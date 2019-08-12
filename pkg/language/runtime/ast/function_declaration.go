@@ -9,7 +9,6 @@ type FunctionDeclaration struct {
 	ReturnType    Type
 	Block         *Block
 	StartPos      *Position
-	EndPos        *Position
 	IdentifierPos *Position
 }
 
@@ -18,7 +17,7 @@ func (f *FunctionDeclaration) StartPosition() *Position {
 }
 
 func (f *FunctionDeclaration) EndPosition() *Position {
-	return f.EndPos
+	return f.Block.EndPosition()
 }
 
 func (f *FunctionDeclaration) IdentifierPosition() *Position {
@@ -46,6 +45,5 @@ func (f *FunctionDeclaration) ToExpression() *FunctionExpression {
 		ReturnType: f.ReturnType,
 		Block:      f.Block,
 		StartPos:   f.StartPos,
-		EndPos:     f.EndPos,
 	}
 }
