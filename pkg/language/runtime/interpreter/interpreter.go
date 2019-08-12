@@ -193,8 +193,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	// make the function itself available inside the function
 	variable := &Variable{}
 
-	lexicalScope = lexicalScope.
-		Insert(activations.StringKey(declaration.Identifier), variable)
+	lexicalScope = lexicalScope.Insert(common.StringKey(declaration.Identifier), variable)
 
 	functionExpression := declaration.ToExpression()
 	variable.Value = newInterpretedFunction(functionExpression, lexicalScope)

@@ -6,7 +6,7 @@ import (
 
 	"github.com/raviqqe/hamt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
@@ -357,7 +357,7 @@ func init() {
 	}
 
 	for name, baseType := range typeNames {
-		baseTypes = baseTypes.Insert(activations.StringKey(name), baseType)
+		baseTypes = baseTypes.Insert(common.StringKey(name), baseType)
 	}
 }
 
