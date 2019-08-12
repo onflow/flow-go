@@ -58,6 +58,20 @@ func (*BoolType) Equal(other Type) bool {
 	return ok
 }
 
+// StringType represents the string type
+type StringType struct{}
+
+func (*StringType) isType() {}
+
+func (*StringType) String() string {
+	return "String"
+}
+
+func (*StringType) Equal(other Type) bool {
+	_, ok := other.(*StringType)
+	return ok
+}
+
 // IntegerType represents the super-type of all integer types
 type IntegerType struct{}
 
@@ -342,6 +356,7 @@ func init() {
 		&AnyType{},
 		&BoolType{},
 		&IntType{},
+		&StringType{},
 		&Int8Type{},
 		&Int16Type{},
 		&Int32Type{},
@@ -353,11 +368,19 @@ func init() {
 	}
 
 	for _, ty := range types {
-		typeNames[ty.String()] = ty
+		typeName := ty.String()
+
+		// check type is not accidentally redeclared
+		if _, ok := typeNames[typeName]; ok {
+			panic(&errors.UnreachableError{})
+		}
+
+		typeNames[typeName] = ty
 	}
 
 	for name, baseType := range typeNames {
-		baseTypes = baseTypes.Insert(common.StringKey(name), baseType)
+		key := common.StringKey(name)
+		baseTypes = baseTypes.Insert(key, baseType)
 	}
 }
 
