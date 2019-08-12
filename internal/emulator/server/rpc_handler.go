@@ -1,9 +1,8 @@
 package server
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
+	"encoding/json"
 	"reflect"
 	"time"
 
@@ -235,14 +234,12 @@ func (s *EmulatorServer) CallScript(ctx context.Context, req *observe.CallScript
 	s.logger.Debugf("📞  Contract script called")
 
 	// TODO: change this to whatever interface -> byte encoding decided on
-	var valueBuf bytes.Buffer
-	enc := gob.NewEncoder(&valueBuf)
-	enc.Encode(value)
+	valueBytes, _ := json.Marshal(value)
 
 	response := &observe.CallScriptResponse{
 		// TODO: standardize types to be language-agnostic
 		Type:  reflect.TypeOf(value).String(),
-		Value: valueBuf.Bytes(),
+		Value: valueBytes(),
 	}
 
 	return response, nil
