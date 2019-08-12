@@ -79,3 +79,56 @@ func NewHostFunction(
 		function:     function,
 	}
 }
+
+// StructFunctionValue
+
+type StructFunctionValue struct {
+	function            InterpretedFunctionValue
+	structure           StructureValue
+	structIdentifier    string
+	constructorVariable *Variable
+}
+
+func (*StructFunctionValue) isValue() {}
+
+func (*StructFunctionValue) isFunctionValue() {}
+
+func (f *StructFunctionValue) parameterCount() int {
+	// TODO:
+	return 0
+}
+
+func (f *StructFunctionValue) Copy() Value {
+	functionCopy := *f
+	return &functionCopy
+}
+
+func (f *StructFunctionValue) CopyWithStructure(structure StructureValue) *StructFunctionValue {
+	functionCopy := *f
+	functionCopy.structure = structure
+	return &functionCopy
+}
+
+func (f *StructFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
+	return interpreter.invokeStructureFunction(
+		f.function,
+		arguments,
+		f.structure,
+		f.structIdentifier,
+		f.constructorVariable,
+	)
+}
+
+func NewStructFunction(
+	function InterpretedFunctionValue,
+	structure StructureValue,
+	structIdentifier string,
+	constructorVariable *Variable,
+) *StructFunctionValue {
+	return &StructFunctionValue{
+		function,
+		structure,
+		structIdentifier,
+		constructorVariable,
+	}
+}

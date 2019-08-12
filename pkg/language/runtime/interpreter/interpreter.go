@@ -887,20 +887,15 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 				// NOTE: rebind, as function is captured in closure
 				function := function
 
-				// TODO: function type
-				structure.Members[name] =
-					NewHostFunction(
-						nil,
-						func(interpreter *Interpreter, values []Value) Trampoline {
-							return interpreter.invokeStructureFunction(
-								function,
-								values,
-								structure,
-								declaration.Identifier,
-								constructorVariable,
-							)
-						},
-					)
+				structure.Set(
+					name,
+					NewStructFunction(
+						function,
+						structure,
+						declaration.Identifier,
+						constructorVariable,
+					),
+				)
 			}
 
 			var initializationTrampoline Trampoline = Done{}
