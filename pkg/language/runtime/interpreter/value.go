@@ -673,5 +673,8 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 // TupleValue
 
 type TupleValue struct {
-	left, right Value
+	Left, Right Value
+}
+
+func (TupleValue) isValue() {}
 }

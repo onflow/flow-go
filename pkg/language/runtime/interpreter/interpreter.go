@@ -517,8 +517,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Plus(right)
 			})
 
@@ -526,8 +526,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Minus(right)
 			})
 
@@ -535,8 +535,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Mod(right)
 			})
 
@@ -544,8 +544,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Mul(right)
 			})
 
@@ -553,8 +553,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Div(right)
 			})
 
@@ -562,8 +562,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Less(right)
 			})
 
@@ -571,8 +571,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.LessEqual(right)
 			})
 
@@ -580,8 +580,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Greater(right)
 			})
 
@@ -589,8 +589,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.GreaterEqual(right)
 			})
 
@@ -599,13 +599,13 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
 
-				switch left := tuple.left.(type) {
+				switch left := tuple.Left.(type) {
 				case IntegerValue:
-					right := tuple.right.(IntegerValue)
+					right := tuple.Right.(IntegerValue)
 					return BoolValue(left.Equal(right))
 
 				case BoolValue:
-					return BoolValue(tuple.left == tuple.right)
+					return BoolValue(tuple.Left == tuple.Right)
 				}
 
 				panic(&errors.UnreachableError{})
@@ -616,13 +616,13 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
 
-				switch left := tuple.left.(type) {
+				switch left := tuple.Left.(type) {
 				case IntegerValue:
-					right := tuple.right.(IntegerValue)
+					right := tuple.Right.(IntegerValue)
 					return BoolValue(!left.Equal(right))
 
 				case BoolValue:
-					return BoolValue(tuple.left != tuple.right)
+					return BoolValue(tuple.Left != tuple.Right)
 				}
 
 				panic(&errors.UnreachableError{})
@@ -632,8 +632,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(BoolValue)
-				right := tuple.right.(BoolValue)
+				left := tuple.Left.(BoolValue)
+				right := tuple.Right.(BoolValue)
 				return BoolValue(left || right)
 			})
 
@@ -641,8 +641,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(BoolValue)
-				right := tuple.right.(BoolValue)
+				left := tuple.Left.(BoolValue)
+				right := tuple.Right.(BoolValue)
 				return BoolValue(left && right)
 			})
 	}
