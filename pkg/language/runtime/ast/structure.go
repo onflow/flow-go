@@ -93,28 +93,36 @@ type InitializerDeclaration struct {
 	EndPos     *Position
 }
 
-func (f *InitializerDeclaration) Accept(visitor Visitor) Repr {
-	return visitor.VisitInitializerDeclaration(f)
+func (i *InitializerDeclaration) Accept(visitor Visitor) Repr {
+	return visitor.VisitInitializerDeclaration(i)
 }
 
-func (f *InitializerDeclaration) StartPosition() *Position {
-	return f.StartPos
+func (i *InitializerDeclaration) StartPosition() *Position {
+	return i.StartPos
 }
 
-func (f *InitializerDeclaration) EndPosition() *Position {
-	return f.EndPos
+func (i *InitializerDeclaration) EndPosition() *Position {
+	return i.EndPos
 }
 
-func (f *InitializerDeclaration) IdentifierPosition() *Position {
+func (i *InitializerDeclaration) IdentifierPosition() *Position {
 	return nil
 }
 
 func (*InitializerDeclaration) isDeclaration() {}
 
-func (f *InitializerDeclaration) DeclarationName() string {
+func (i *InitializerDeclaration) DeclarationName() string {
 	return "init"
 }
 
-func (f *InitializerDeclaration) DeclarationKind() common.DeclarationKind {
+func (i *InitializerDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindInitializer
+}
+
+func (i *InitializerDeclaration) ToFunctionExpression() *FunctionExpression {
+	return &FunctionExpression{
+		Parameters: i.Parameters,
+		Block:      i.Block,
+		StartPos:   i.StartPos,
+	}
 }

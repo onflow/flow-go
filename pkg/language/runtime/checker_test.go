@@ -486,6 +486,19 @@ func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
+func TestCheckParameterRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(a: Int) {
+          let a = 1
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckInvalidRedeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1688,6 +1701,30 @@ func TestCheckStructureFieldAssignment(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckInvalidStructureSelfAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+          init() {
+              self = Test()
+          }
+
+          fun test() {
+              self = Test()
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+}
+
 func TestCheckInvalidStructureFieldAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1901,4 +1938,34 @@ func TestCheckInvalidIncompatibleStructureTypes(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidStructureFunctionWithSelfParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Foo {
+          fun test(self: Int) {}
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckInvalidStructureInitializerWithSelfParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Foo {
+          init(self: Int) {}
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }

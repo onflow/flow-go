@@ -6,6 +6,8 @@ import (
 	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
+
 	"io/ioutil"
 	"os"
 )
@@ -51,9 +53,9 @@ func main() {
 				ParameterTypes: []sema.Type{&sema.AnyType{}},
 				ReturnType:     &sema.VoidType{},
 			},
-			func(_ *Interpreter, arguments []Value) Value {
+			func(_ *Interpreter, arguments []Value) trampoline.Trampoline {
 				fmt.Printf("%v\n", arguments[0])
-				return &VoidValue{}
+				return trampoline.Done{Result: &VoidValue{}}
 			},
 		),
 	)
