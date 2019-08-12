@@ -58,8 +58,15 @@ void _G1scalarPointMult(ep_st* res, ep_st* p, bn_st *expo) {
 // Exponentiation of fixed g1 in G1
 // This function is not called by BLS but is here for DEBUG/TESTs purposes
 void _G1scalarGenMult(ep_st* res, bn_st *expo) {
+#define GENERIC_POINT 1
+#define FIXED_MULT    (1-GENERIC_POINT)
+
+#if GENERIC_POINT
+    _G1scalarPointMult(res, &core_get()->ep_g, expo);
+#elif FIXED_MULT
     // Using precomputed table of size 4
     g1_mul_gen(res, expo);
+#endif
 }
 
 // Exponentiation of random p in G2
@@ -88,15 +95,14 @@ void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
     // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
     ep_map(&h, data, len); 
     // s = p^sk
-    //_G1scalarGenMult(&h, sk);
-	_G1scalarPointMult(&h, &h, sk);
+	_G1scalarPointMult(&h, &h, sk);  // 0.68ms
     ep_write_bin_compact(s, &h);
 
     ep_free(&p);
 }
 
 // Verifies the validity of a BLS signature
-int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
+int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {  
 
     // TODO : check s is on curve
 	// TODO : check s is in G1
@@ -112,9 +118,9 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
     ep_read_bin_compact(&s, sig);
 
     //_ep_print("H", &h);
-    _ep_print("S", &s);
+    //_ep_print("S", &s);
 
-#if 0
+#if 1   // 1.5 ms
     ep2_st neg_g2;
     ep2_new(&neg_g2);
     ep2_neg(&neg_g2, &core_get()->ep2_g); // could be hardcoded
@@ -141,7 +147,7 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
 
     free(elemsG1);
     free(elemsG2);
-#else
+#else   // 7.5ms
     fp12_t pair1, pair2;
     fp12_new(&pair1); fp12_new(&pair2);
     pp_map_oatep_k12(pair1, &s, &core_get()->ep2_g);

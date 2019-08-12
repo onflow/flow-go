@@ -38,6 +38,8 @@ void _bn_print(char*, bn_st*);
 void _ep_print(char*, ep_st*);
 void _ep2_print(char*, ep2_st*);
 void _bn_randZr(bn_t, byte*);
+void _G1scalarGenMult(ep_st*, bn_st*);
+ep_st* _hashToG1(byte* data, int len);
 
 
 // bls core
@@ -46,7 +48,6 @@ int _getSignatureLengthBLS_BLS12381();
 int _getPubKeyLengthBLS_BLS12381();
 int _getPrKeyLengthBLS_BLS12381(); 
 void _G1scalarPointMult(ep_st*, ep_st*, bn_st*);
-void _G1scalarGenMult(ep_st*, bn_st*);
 void _G2scalarGenMult(ep2_st*, bn_st*);
 void _blsSign(byte*, bn_st*, byte*, int);
 int  _blsVerify(ep2_st *, byte*, byte*, int);

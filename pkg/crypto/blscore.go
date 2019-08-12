@@ -9,8 +9,9 @@ import "C"
 // TDOD: enable QUIET in relic
 import (
 	_ "errors"
-	"fmt"
+	_ "fmt"
 	"unsafe"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,24 +22,24 @@ type scalar C.bn_st
 type ctx *C.ctx_t
 
 func signatureLengthBLS_BLS12381() int {
-    return int(C._getSignatureLengthBLS_BLS12381());
+	return int(C._getSignatureLengthBLS_BLS12381())
 }
 
 func pubKeyLengthBLS_BLS12381() int {
-    return int(C._getPubKeyLengthBLS_BLS12381());
+	return int(C._getPubKeyLengthBLS_BLS12381())
 }
 
 func prKeyLengthBLS_BLS12381() int {
-	return int(C._getPrKeyLengthBLS_BLS12381());	
+	return int(C._getPrKeyLengthBLS_BLS12381())
 }
 
 // init sets the context of BLS12381 curve
 func (a *BLS_BLS12381Algo) init() {
 	// sanity checks of lengths
-	if (a.PrKeyLength != PrKeyLengthBLS_BLS12381 || 
-			a.PubKeyLength != PubKeyLengthBLS_BLS12381 ||
-			 a.SignatureLength != SignatureLengthBLS_BLS12381){
-				log.Warn("BLS Lengths in types.go are not matching include.h")
+	if a.PrKeyLength != PrKeyLengthBLS_BLS12381 ||
+		a.PubKeyLength != PubKeyLengthBLS_BLS12381 ||
+		a.SignatureLength != SignatureLengthBLS_BLS12381 {
+		log.Warn("BLS Lengths in types.go are not matching include.h")
 	}
 
 	// Inits relic context and sets the B12_381 context
@@ -82,6 +83,14 @@ func randZr(x *scalar, seed []byte) {
 	}
 }
 
+// TEST/DEBUG/BENCH
+// returns the hash to G1 point
+func hashToG1(data []byte) {
+	var l int
+	l = len(data)
+	_ = C._hashToG1((*C.uchar)((unsafe.Pointer)(&data[0])), (C.int)(l))
+}
+
 // sets a scalar to a small integer
 func (x *scalar) setInt(a int) {
 	C.bn_set_dig((*C.bn_st)(x), (C.uint64_t)(a))
@@ -90,27 +99,27 @@ func (x *scalar) setInt(a int) {
 // computes a bls signature
 func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 	var s Signature
-	s = make([]byte, a.SignatureLength)
+	s = make([]byte, a.SignatureLength) // 25ns
 
-	C._blsSign((*C.uchar)((unsafe.Pointer)(&s[0])),  
-			(*C.bn_st)(sk), 
-			(*C.uchar)((unsafe.Pointer)(&data[0])), 
-			(C.int)(len(data)))
-	fmt.Println("Signature: ",s)
+	C._blsSign((*C.uchar)((unsafe.Pointer)(&s[0])), // 2.1 ms
+		(*C.bn_st)(sk),
+		(*C.uchar)((unsafe.Pointer)(&data[0])),
+		(C.int)(len(data)))
+	//fmt.Println("Signature: ",s)
 	return s
 }
 
 // Checks the validity of a bls signature
 func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool {
-	verif := C._blsVerify( (*C.ep2_st)(pk),
-			(*C.uchar)((unsafe.Pointer)(&s[0])),   
-			(*C.uchar)((unsafe.Pointer)(&data[0])), 
-			(C.int)(len(data)))
-	
+	verif := C._blsVerify((*C.ep2_st)(pk),
+		(*C.uchar)((unsafe.Pointer)(&s[0])),
+		(*C.uchar)((unsafe.Pointer)(&data[0])),
+		(C.int)(len(data)))
+
 	const SIG_VALID = 1 // same value as in include.h
 	const SIG_ERR = 0xFF
 
-	if (verif == SIG_ERR) {
+	if verif == SIG_ERR {
 		panic("Relic memory allocation failed")
 	}
 	return (verif == SIG_VALID)

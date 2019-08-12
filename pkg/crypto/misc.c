@@ -124,3 +124,13 @@ void ep_read_bin_compact(ep_st* a, byte *bin) {
         ep_upk(a, a);
     }
 }
+
+// computes hashing to G1 
+// DEBUG/test function
+ep_st* _hashToG1(byte* data, int len) {
+    ep_st* h = (ep_st*) malloc(sizeof(ep_st));
+    ep_new(h);
+    // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
+    ep_map(h, data, len); 
+    return h;
+}

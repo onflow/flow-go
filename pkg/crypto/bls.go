@@ -51,7 +51,7 @@ func (a *BLS_BLS12381Algo) GeneratePrKey(seed []byte) PrKey {
 	var sk PrKeyBLS_BLS12381
 	// Generate private key here
 	randZr(&(sk.sk), seed)
-	(&(sk.sk)).setInt(7)
+	//(&(sk.sk)).setInt(7)
 	// public key is not computed (but this could be changed)
 	sk.pk = nil
 	// links the private key to the algo

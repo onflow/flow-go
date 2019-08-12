@@ -59,12 +59,13 @@ func BenchmarkSha3_256(b *testing.B) {
 // BLS tests
 func TestBLS_BLS12381(t *testing.T) {
 	fmt.Println("testing BLS on bls12_381:")
-	input := []byte("test")
 
 	salg := NewSignatureAlgo(BLS_BLS12381)
 	seed := []byte{1, 2, 3}
 	sk := salg.GeneratePrKey(seed)
 	pk := sk.Pubkey()
+
+	input := []byte("test")
 
 	s := salg.SignBytes(sk, input, nil)
 	result := salg.VerifyBytes(pk, s, input, nil)
@@ -75,7 +76,7 @@ func TestBLS_BLS12381(t *testing.T) {
 		t.Logf("Verification passed: signature is %s", s)
 	}
 
-	/*message := &testStruct{"te", "st"}
+	message := &testStruct{"te", "st"}
 	s = salg.SignStruct(sk, message, nil)
 	result = salg.VerifyStruct(pk, s, message, nil)
 
@@ -83,7 +84,7 @@ func TestBLS_BLS12381(t *testing.T) {
 		t.Errorf("Verification failed: signature is %x", s)
 	} else {
 		t.Logf("Verification passed: signature is %x", s)
-	}*/
+	}
 }
 
 // Testg1 contains tests of operations in G1
@@ -93,7 +94,7 @@ func TestG1(t *testing.T) {
 	_ = NewSignatureAlgo(BLS_BLS12381)
 
 	var expo scalar
-	(&expo).setInt(1)
+	randZr(&expo, []byte{0})
 	var res pointG1
 	_G1scalarGenMult(&res, &expo)
 
@@ -137,6 +138,53 @@ func BenchmarkG2(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		_G2scalarGenMult(&res, &expo)
+	}
+	b.StopTimer()
+	return
+}
+
+// Signing bench
+func BenchmarkBLS_BLS12381Sign(b *testing.B) {
+
+	salg := NewSignatureAlgo(BLS_BLS12381)
+	seed := []byte("keyseed")
+	sk := salg.GeneratePrKey(seed)
+
+	input := []byte("Bench input")
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_ = salg.SignBytes(sk, input, nil)
+	}
+	b.StopTimer()
+	return
+}
+
+// Verifying bench
+func BenchmarkBLS_BLS12381Verify(b *testing.B) {
+
+	salg := NewSignatureAlgo(BLS_BLS12381)
+	seed := []byte("keyseed")
+	sk := salg.GeneratePrKey(seed)
+	pk := sk.Pubkey()
+
+	input := []byte("Bench input")
+
+	s := salg.SignBytes(sk, input, nil)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_ = salg.VerifyBytes(pk, s, input, nil)
+	}
+	b.StopTimer()
+	return
+}
+
+func BenchmarkHashToG1(b *testing.B) {
+	input := []byte("Bench input")
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		hashToG1(input)
 	}
 	b.StopTimer()
 	return

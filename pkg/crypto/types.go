@@ -20,7 +20,7 @@ const (
 	// BLS signature scheme lengths
 
 	// BLS12-381
-	compression = 1
+	compression                 = 1
 	SignatureLengthBLS_BLS12381 = 48 * compression
 	PrKeyLengthBLS_BLS12381     = 32
 	PubKeyLengthBLS_BLS12381    = 96 * compression
