@@ -239,7 +239,7 @@ func (s *EmulatorServer) CallScript(ctx context.Context, req *observe.CallScript
 	response := &observe.CallScriptResponse{
 		// TODO: standardize types to be language-agnostic
 		Type:  reflect.TypeOf(value).String(),
-		Value: valueBytes(),
+		Value: valueBytes,
 	}
 
 	return response, nil
