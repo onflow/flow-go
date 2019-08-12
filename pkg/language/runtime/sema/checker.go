@@ -1407,8 +1407,7 @@ func (checker *Checker) ConvertType(t ast.Type) (Type, *CheckerError) {
 					&NotDeclaredError{
 						ExpectedKind: common.DeclarationKindType,
 						Name:         t.Identifier,
-						StartPos:     t.StartPosition(),
-						EndPos:       t.EndPosition(),
+						Pos:          t.Pos,
 					},
 				},
 			}
