@@ -43,6 +43,7 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
         let z = 1 + 2
         var a = 3 == 3
         var b = [1, 2]
+        let s = "\"123\""
     `)
 
 	Expect(inter.Globals["x"].Value).
@@ -62,6 +63,9 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 			interpreter.IntValue{Int: big.NewInt(1)},
 			interpreter.IntValue{Int: big.NewInt(2)},
 		})))
+
+	Expect(inter.Globals["s"].Value).
+		To(Equal(interpreter.StringValue("123")))
 }
 
 func TestInterpretDeclarations(t *testing.T) {
