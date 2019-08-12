@@ -1015,6 +1015,21 @@ func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interfa
 	panic(&errors.UnreachableError{})
 }
 
+func (v *ProgramVisitor) VisitStringLiteral(ctx *StringLiteralContext) interface{} {
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.EndPosition(startPosition, ctx.StringLiteral().GetSymbol().GetStop())
+
+	stringLiteral := ctx.StringLiteral().GetText()
+
+	// TODO: process stringLiteral
+
+	return &ast.StringExpression{
+		Value:    stringLiteral,
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
+}
+
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {
 	var expressions []ast.Expression
 	for _, expression := range ctx.AllExpression() {

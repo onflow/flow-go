@@ -176,6 +176,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#booleanLiteral.
 	VisitBooleanLiteral(ctx *BooleanLiteralContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#stringLiteral.
+	VisitStringLiteral(ctx *StringLiteralContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#DecimalLiteral.
 	VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{}
 
