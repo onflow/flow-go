@@ -50,12 +50,34 @@ program
     ;
 
 declaration
-    : functionDeclaration
+    : structureDeclaration
+    | functionDeclaration
     | variableDeclaration
     ;
 
+access
+    : /* Not specified */
+    | Pub
+    | PubSet
+    ;
+
+structureDeclaration
+    : Struct Identifier '{' field* initializer? functionDeclaration* '}'
+    ;
+
+field
+    : access (Let | Var) Identifier ':' fullType
+    ;
+
+// NOTE: allow any identifier in parser, then check identifier
+// is `init` in semantic analysis to provide better error
+//
+initializer
+    : Identifier parameterList block
+    ;
+
 functionDeclaration
-    : Pub? Fun Identifier parameterList (':' returnType=fullType)? block
+    : access Fun Identifier parameterList (':' returnType=fullType)? block
     ;
 
 parameterList
@@ -93,8 +115,13 @@ statements
 
 statement
     : returnStatement
+    | breakStatement
+    | continueStatement
     | ifStatement
     | whileStatement
+    // NOTE: allow all declarations, even structures, in parser,
+    // then check identifier declaration is variable/constant or function
+    // in semantic analysis to provide better error
     | declaration
     | assignment
     | expression
@@ -102,6 +129,14 @@ statement
 
 returnStatement
     : Return expression?
+    ;
+
+breakStatement
+    : Break
+    ;
+
+continueStatement
+    : Continue
     ;
 
 ifStatement
@@ -273,11 +308,18 @@ arrayLiteral
 OpenParen: '(' ;
 CloseParen: ')' ;
 
+Struct : 'struct' ;
+
 Fun : 'fun' ;
 
 Pub : 'pub' ;
+PubSet : 'pub(set)' ;
 
 Return : 'return' ;
+
+Break : 'break' ;
+Continue : 'continue' ;
+
 Let : 'let' ;
 Var : 'var' ;
 

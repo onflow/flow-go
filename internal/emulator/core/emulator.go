@@ -319,7 +319,7 @@ func createRootAccount(ws *state.WorldState, keyPair *crypto.KeyPair) (types.Add
 	registers := ws.Registers.NewView()
 
 	if keyPair == nil {
-		keyPair, _ = crypto.GenerateKeyPair("root")
+		keyPair, _ = crypto.KeyPairFromSeed("root")
 	}
 
 	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)

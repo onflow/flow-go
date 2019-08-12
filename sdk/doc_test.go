@@ -17,7 +17,7 @@ func ExampleCreateAccount_complete() {
 	}
 
 	// generate a fresh key-pair for the new account
-	keyPair, err := crypto.GenerateKeyPair("elephant ears")
+	keyPair, err := crypto.KeyPairFromSeed("elephant ears")
 	if err != nil {
 		panic("failed to generate key-pair!")
 	}

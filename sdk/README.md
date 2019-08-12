@@ -28,7 +28,7 @@ applications in Go.
 
 
 
-## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=1301:1365#L59)
+## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=1293:1357#L58)
 ``` go
 func CreateAccount(publicKey, code []byte) *types.RawTransaction
 ```
@@ -36,7 +36,7 @@ CreateAccount generates a transaction that creates a new account.
 
 
 
-## <a name="LoadAccount">func</a> [LoadAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=866:922#L38)
+## <a name="LoadAccount">func</a> [LoadAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=858:914#L37)
 ``` go
 func LoadAccount(r io.Reader) (*types.AccountKey, error)
 ```
@@ -46,7 +46,7 @@ An error will be returned if the reader contains invalid JSON.
 
 
 
-## <a name="LoadAccountFromFile">func</a> [LoadAccountFromFile](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=575:643#L26)
+## <a name="LoadAccountFromFile">func</a> [LoadAccountFromFile](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=567:635#L25)
 ``` go
 func LoadAccountFromFile(filename string) (*types.AccountKey, error)
 ```
@@ -56,7 +56,7 @@ An error will be returned if the file cannot be read or if it contains invalid J
 
 
 
-## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=1774:1854#L78)
+## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=1738:1818#L76)
 ``` go
 func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 ```

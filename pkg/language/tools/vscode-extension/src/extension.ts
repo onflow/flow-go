@@ -1,27 +1,85 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
+import { ExtensionContext, commands, workspace, window, ColorPresentation } from 'vscode';
+import { LanguageClient } from 'vscode-languageclient';
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+export function activate(ctx: ExtensionContext) {
+	detectLaunchConfigurationChanges();
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-		console.log('Congratulations, your extension "bamboo" is now active!');
+	function registerCommand(command: string, callback: (...args: any[]) => any) {
+		ctx.subscriptions.push(commands.registerCommand(command, callback));
+	}
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('extension.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
+	let client = startServer(ctx);
 
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World!');
+	registerCommand("bamboo.restartServer", async () => {
+		if (!client) {
+			return;
+		}
+		await client.stop();
+		client = startServer(ctx);
 	});
-
-	context.subscriptions.push(disposable);
 }
 
-// this method is called when your extension is deactivated
+function startServer(ctx: ExtensionContext): LanguageClient | undefined {
+	const serverPath: string | undefined =
+		workspace.getConfiguration('bamboo').get('languageServerPath');
+
+	if (!serverPath) {
+		window.showWarningMessage("Missing path to Bamboo language server");
+		return;
+	}
+
+	const client = new LanguageClient(
+		'bamboo',
+		"Bamboo",
+		{
+			command: "go",
+			args: ["run", "."],
+			options: {
+				cwd: serverPath
+			}
+		},
+		{
+			documentSelector: [{ scheme: "file", language: "bamboo" }],
+			synchronize: {
+		      configurationSection: "bamboo"
+		    },
+		}
+	);
+
+	client.onReady().then(() => {
+		return window.showInformationMessage('Bamboo language server started');
+	}).catch((error) => {
+		return window.showErrorMessage(`Bamboo language server failed to start: ${error}`);
+	});
+
+	let languageServerDisposable = client.start();
+	ctx.subscriptions.push(languageServerDisposable);
+
+	return client;
+}
+
+function detectLaunchConfigurationChanges() {
+	workspace.onDidChangeConfiguration(e => {
+	  const promptRestartKeys = [
+		"languageServerPath"
+	  ];
+	  const shouldPromptRestart = promptRestartKeys.some(key =>
+		e.affectsConfiguration(`bamboo.${key}`)
+	  );
+	  if (shouldPromptRestart) {
+		window
+		  .showInformationMessage(
+			"Server launch configuration change detected. Reload the window for changes to take effect",
+			"Reload Window",
+			"Not now"
+		  )
+		  .then(choice => {
+			if (choice === "Reload Window") {
+			  commands.executeCommand("workbench.action.reloadWindow");
+			}
+		  });
+	  }
+	});
+  }
+
 export function deactivate() {}
