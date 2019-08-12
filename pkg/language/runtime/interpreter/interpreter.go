@@ -415,7 +415,9 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(Value)
 
-			interpreter.declareVariable(declaration.Identifier, value)
+			valueCopy := value.Copy()
+
+			interpreter.declareVariable(declaration.Identifier, valueCopy)
 
 			// NOTE: ignore result, so it does *not* act like a return-statement
 			return Done{}
@@ -433,7 +435,10 @@ func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatem
 	return assignment.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(Value)
-			return interpreter.visitAssignmentValue(assignment, value)
+
+			valueCopy := value.Copy()
+
+			return interpreter.visitAssignmentValue(assignment, valueCopy)
 		})
 }
 
@@ -478,9 +483,9 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.MemberExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			structure := result.(*StructureValue)
+			structure := result.(StructureValue)
 
-			structure.Members[target.Identifier] = value
+			structure.Set(target.Identifier, value)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}
@@ -706,8 +711,8 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
-			structure := result.(*StructureValue)
-			return structure.Members[expression.Identifier]
+			structure := result.(StructureValue)
+			return structure.Get(expression.Identifier)
 		})
 }
 
@@ -754,7 +759,10 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 			return interpreter.visitExpressions(argumentExpressions, nil).
 				FlatMap(func(result interface{}) Trampoline {
 					arguments := result.(ArrayValue)
-					return function.invoke(interpreter, arguments)
+
+					argumentCopies := arguments.Copy().(ArrayValue)
+
+					return function.invoke(interpreter, argumentCopies)
 				})
 		})
 }
@@ -873,7 +881,7 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 	constructorVariable.Value = NewHostFunction(
 		nil,
 		func(interpreter *Interpreter, values []Value) Trampoline {
-			structure := newStructure()
+			structure := StructureValue{}
 
 			for name, function := range functions {
 				// NOTE: rebind, as function is captured in closure
@@ -924,9 +932,9 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 //
 func (interpreter *Interpreter) invokeStructureFunction(
 	function InterpretedFunctionValue,
-	values []Value,
-	structure *StructureValue,
-	identifier string,
+	arguments []Value,
+	structure StructureValue,
+	structureIdentifier string,
 	constructorVariable *Variable,
 ) Trampoline {
 	// start a new activation record
@@ -938,9 +946,9 @@ func (interpreter *Interpreter) invokeStructureFunction(
 	interpreter.declareVariable(sema.SelfIdentifier, structure)
 
 	// make the constructor available in the initializer
-	interpreter.setVariable(identifier, constructorVariable)
+	interpreter.setVariable(structureIdentifier, constructorVariable)
 
-	return interpreter.invokeInterpretedFunctionActivated(function, values)
+	return interpreter.invokeInterpretedFunctionActivated(function, arguments)
 }
 
 func (interpreter *Interpreter) structureFunctions(

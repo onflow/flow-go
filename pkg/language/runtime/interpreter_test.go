@@ -964,7 +964,7 @@ func TestInterpretStructureDeclaration(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(BeAssignableToTypeOf(&interpreter.StructureValue{}))
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
 }
 
 func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
@@ -987,7 +987,7 @@ func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
 	newValue := big.NewInt(42)
 
 	Expect(inter.Invoke("test", newValue)).
-		To(BeAssignableToTypeOf(&interpreter.StructureValue{}))
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
 
 	Expect(inter.Globals["value"].Value).
 		To(Equal(interpreter.IntValue{Int: newValue}))
@@ -1177,14 +1177,14 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
       }
 	`)
 
-	Expect(inter.Globals["test"].Value.(*interpreter.StructureValue).Members["foo"]).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).Get("foo")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
 
 	Expect(inter.Invoke("callTest")).
 		To(Equal(interpreter.VoidValue{}))
 
-	Expect(inter.Globals["test"].Value.(*interpreter.StructureValue).Members["foo"]).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(4)}))
+	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).Get("foo")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
 
 func TestInterpretStructureInitializesConstant(t *testing.T) {
@@ -1202,7 +1202,7 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
 	  let test = Test()
 	`)
 
-	Expect(inter.Globals["test"].Value.(*interpreter.StructureValue).Members["foo"]).
+	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).Get("foo")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
 
 }
