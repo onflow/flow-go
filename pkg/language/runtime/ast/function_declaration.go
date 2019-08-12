@@ -3,13 +3,12 @@ package ast
 import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 
 type FunctionDeclaration struct {
-	IsPublic      bool
+	Access        Access
 	Identifier    string
 	Parameters    []*Parameter
 	ReturnType    Type
 	Block         *Block
 	StartPos      *Position
-	EndPos        *Position
 	IdentifierPos *Position
 }
 
@@ -18,7 +17,7 @@ func (f *FunctionDeclaration) StartPosition() *Position {
 }
 
 func (f *FunctionDeclaration) EndPosition() *Position {
-	return f.EndPos
+	return f.Block.EndPosition()
 }
 
 func (f *FunctionDeclaration) IdentifierPosition() *Position {

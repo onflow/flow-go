@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 	"github.com/dapperlabs/bamboo-node/sdk"
 )
@@ -13,27 +14,35 @@ import (
 func TestLoadAccount(t *testing.T) {
 	RegisterTestingT(t)
 
-	r := strings.NewReader(`
+	const validAccountJSON = `
 		{	
-			"account": "0xdd2781f4c51bccdbe23e4d398b8a82261f585c278dbb4b84989fea70e76723a9",
+			"account": "0000000000000000000000000000000000000002",
 			"seed": "elephant ears"
 		}
-	`)
+	`
 
-	a, err := sdk.LoadAccount(r)
-	Expect(err).ToNot(HaveOccurred())
-
-	Expect(a.Account).ToNot(BeNil())
-	Expect(a.KeyPair).ToNot(BeNil())
-
-	// invalid json should fail
-	r = strings.NewReader(`
+	const invalidAccountJSON = `
 		{	
 			"account": "0xdd2781
 		}
-	`)
+	`
 
-	a, err = sdk.LoadAccount(r)
+	a, err := sdk.LoadAccount(strings.NewReader(validAccountJSON))
+	Expect(err).ToNot(HaveOccurred())
+
+	address := types.HexToAddress("0000000000000000000000000000000000000002")
+	keyPair, _ := crypto.KeyPairFromSeed("elephant ears")
+
+	Expect(a.Account).To(Equal(address))
+	Expect(a.KeyPair).To(Equal(keyPair))
+
+	// account loading should be deterministic
+	b, err := sdk.LoadAccount(strings.NewReader(validAccountJSON))
+	Expect(a).To(Equal(b))
+
+	// invalid json should fail
+	c, err := sdk.LoadAccount(strings.NewReader(invalidAccountJSON))
+	Expect(c).To(BeNil())
 	Expect(err).To(HaveOccurred())
 }
 

@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
@@ -44,7 +43,7 @@ func LoadAccount(r io.Reader) (*types.AccountKey, error) {
 		return nil, err
 	}
 
-	keyPair, err := crypto.GenerateKeyPair(conf.Seed)
+	keyPair, err := crypto.KeyPairFromSeed(conf.Seed)
 	if err != nil {
 		return nil, err
 	}
@@ -69,8 +68,7 @@ func CreateAccount(publicKey, code []byte) *types.RawTransaction {
 	`, publicKeyStr, codeStr)
 
 	return &types.RawTransaction{
-		Script:    []byte(script),
-		Timestamp: time.Now(),
+		Script: []byte(script),
 	}
 }
 
@@ -88,8 +86,7 @@ func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 	`, accountStr, codeStr)
 
 	return &types.RawTransaction{
-		Script:    []byte(script),
-		Timestamp: time.Now(),
+		Script: []byte(script),
 	}
 }
 
