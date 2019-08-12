@@ -1204,7 +1204,34 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
 
 	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).Get("foo")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+}
 
+func TestInterpretStructureFunctionMutatesSelf(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Test {
+          var foo: Int
+
+          init() {
+              self.foo = 0
+          }
+
+          fun inc() {
+              self.foo = self.foo + 1
+          }
+      }
+
+      fun test(): Int {
+          let test = Test()
+          test.inc()
+          test.inc()
+          return test.foo
+      }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
 }
 
 func TestInterpretFunctionPreCondition(t *testing.T) {
@@ -1358,4 +1385,180 @@ func TestInterpretFunctionPostConditionWithBeforeFailingPostCondition(t *testing
 
 	Expect(err.(*interpreter.ConditionError).ConditionKind).
 		To(Equal(ast.ConditionKindPost))
+}
+
+func TestInterpretStructCopyOnDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Cat {
+          var wasFed: Bool
+
+          init() {
+              self.wasFed = false
+          }
+      }
+
+      fun test(): Bool[] {
+          let cat = Cat()
+          let kitty = cat
+          kitty.wasFed = true
+          return [cat.wasFed, kitty.wasFed]
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.ArrayValue{
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		}))
+}
+
+func TestInterpretStructCopyOnDeclarationModifiedWithStructFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Cat {
+          var wasFed: Bool
+
+          init() {
+              self.wasFed = false
+          }
+
+          fun feed() {
+              self.wasFed = true
+          }
+      }
+
+      fun test(): Bool[] {
+          let cat = Cat()
+          let kitty = cat
+          kitty.feed()
+          return [cat.wasFed, kitty.wasFed]
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.ArrayValue{
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		}))
+}
+
+func TestInterpretStructCopyOnIdentifierAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Cat {
+          var wasFed: Bool
+
+          init() {
+              self.wasFed = false
+          }
+      }
+
+      fun test(): Bool[] {
+          var cat = Cat()
+          let kitty = Cat()
+          cat = kitty
+          kitty.wasFed = true
+          return [cat.wasFed, kitty.wasFed]
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.ArrayValue{
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		}))
+}
+
+func TestInterpretStructCopyOnIndexingAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Cat {
+          var wasFed: Bool
+
+          init() {
+              self.wasFed = false
+          }
+      }
+
+      fun test(): Bool[] {
+          let cats = [Cat()]
+          let kitty = Cat()
+          cats[0] = kitty
+          kitty.wasFed = true
+          return [cats[0].wasFed, kitty.wasFed]
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.ArrayValue{
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		}))
+}
+
+func TestInterpretStructCopyOnMemberAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Cat {
+          var wasFed: Bool
+
+          init() {
+              self.wasFed = false
+          }
+      }
+
+      struct Carrier {
+          var cat: Cat
+          init(cat: Cat) {
+              self.cat = cat
+          }
+      }
+
+      fun test(): Bool[] {
+          let carrier = Carrier(cat: Cat())
+          let kitty = Cat()
+          carrier.cat = kitty
+          kitty.wasFed = true
+          return [carrier.cat.wasFed, kitty.wasFed]
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.ArrayValue{
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		}))
+}
+
+func TestInterpretStructCopyOnPassing(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Cat {
+          var wasFed: Bool
+
+          init() {
+              self.wasFed = false
+          }
+      }
+
+      fun feed(cat: Cat) {
+          cat.wasFed = true
+      }
+
+      fun test(): Bool {
+          let kitty = Cat()
+          feed(cat: kitty)
+          return kitty.wasFed
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.BoolValue(false)))
 }
