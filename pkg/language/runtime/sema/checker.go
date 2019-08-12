@@ -1842,7 +1842,6 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		errs = append(errs, err.Errors...)
 	}
 
-	if err := checker.checkStructureFields(structure.Fields); err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
@@ -2013,17 +2012,6 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*Str
 	}, checkerError(errs)
 }
 
-func (checker *Checker) checkStructureFields(fields []*ast.FieldDeclaration) *CheckerError {
-	var errs []error
-
-	for _, field := range fields {
-		result := field.Accept(checker).(checkerResult)
-		errs = append(errs, result.Errors...)
-	}
-
-	return checkerError(errs)
-}
-
 func (checker *Checker) checkStructureInitializer(
 	initializer *ast.InitializerDeclaration,
 	selfType *StructureType,
@@ -2165,10 +2153,7 @@ func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.R
 
 	// NOTE: field type is already checked when determining structure function in `structureType`
 
-	return checkerResult{
-		Type:   nil,
-		Errors: nil,
-	}
+	panic(&errors.UnreachableError{})
 }
 
 func (checker *Checker) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
