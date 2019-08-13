@@ -534,18 +534,33 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	}
 
 	valueType := statement.Expression.Accept(checker).(Type)
+	valueIsInvalid := valueType.Equal(&InvalidType{})
 
 	returnType := checker.currentFunction().returnType
 
-	if valueType != nil && !checker.IsSubType(valueType, returnType) {
-		checker.report(
-			&TypeMismatchError{
-				ExpectedType: returnType,
-				ActualType:   valueType,
-				StartPos:     statement.Expression.StartPosition(),
-				EndPos:       statement.Expression.EndPosition(),
-			},
-		)
+	if valueType != nil {
+		if valueIsInvalid {
+			// return statement has expression, but function has Void return type?
+			if returnType.Equal(&VoidType{}) {
+				checker.report(
+					&InvalidReturnValueError{
+						StartPos: statement.Expression.StartPosition(),
+						EndPos:   statement.Expression.EndPosition(),
+					},
+				)
+			}
+		} else {
+			if !checker.IsSubType(valueType, returnType) {
+				checker.report(
+					&TypeMismatchError{
+						ExpectedType: returnType,
+						ActualType:   valueType,
+						StartPos:     statement.Expression.StartPosition(),
+						EndPos:       statement.Expression.EndPosition(),
+					},
+				)
+			}
+		}
 	}
 
 	return nil
@@ -685,7 +700,9 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 		}
 
 		// check value type is subtype of variable type
-		if !checker.IsSubType(valueType, variable.Type) {
+		if !valueType.Equal(&InvalidType{}) &&
+			!checker.IsSubType(valueType, variable.Type) {
+
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: variable.Type,
@@ -706,7 +723,10 @@ func (checker *Checker) visitIndexExpressionAssignment(
 
 	elementType := checker.visitIndexingExpression(target.Expression, target.Index)
 
-	if elementType != nil && !checker.IsSubType(valueType, elementType) {
+	if elementType != nil &&
+		!elementType.Equal(&InvalidType{}) &&
+		!checker.IsSubType(valueType, elementType) {
+
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: elementType,
@@ -773,9 +793,13 @@ func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpre
 	// check indexed expression's type is indexable
 	// by getting the expected element
 
+	if indexedType.Equal(&InvalidType{}) {
+		return &InvalidType{}
+	}
+
 	elementType := checker.IndexableElementType(indexedType)
 	if elementType == nil {
-		elementType = &AnyType{}
+		elementType = &InvalidType{}
 
 		checker.report(
 			&NotIndexableTypeError{
@@ -806,8 +830,7 @@ func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpre
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
 	variable := checker.findAndCheckVariable(expression)
 	if variable == nil {
-		// TODO: verify this OK
-		return &AnyType{}
+		return &InvalidType{}
 	}
 
 	return variable.Type
@@ -841,6 +864,10 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 
 	leftType, rightType := checker.visitBinaryOperation(expression)
 
+	leftIsInvalid := leftType.Equal(&InvalidType{})
+	rightIsInvalid := rightType.Equal(&InvalidType{})
+	anyInvalid := leftIsInvalid || rightIsInvalid
+
 	operation := expression.Operation
 	operationKind := binaryOperationKind(operation)
 
@@ -854,37 +881,43 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 		rightIsInteger := checker.IsSubType(rightType, &IntegerType{})
 
 		if !leftIsInteger && !rightIsInteger {
-			checker.report(
-				&InvalidBinaryOperandsError{
-					Operation: operation,
-					LeftType:  leftType,
-					RightType: rightType,
-					StartPos:  expression.StartPosition(),
-					EndPos:    expression.EndPosition(),
-				},
-			)
+			if !anyInvalid {
+				checker.report(
+					&InvalidBinaryOperandsError{
+						Operation: operation,
+						LeftType:  leftType,
+						RightType: rightType,
+						StartPos:  expression.StartPosition(),
+						EndPos:    expression.EndPosition(),
+					},
+				)
+			}
 		} else if !leftIsInteger {
-			checker.report(
-				&InvalidBinaryOperandError{
-					Operation:    operation,
-					Side:         common.OperandSideLeft,
-					ExpectedType: &IntegerType{},
-					ActualType:   leftType,
-					StartPos:     expression.Left.StartPosition(),
-					EndPos:       expression.Left.EndPosition(),
-				},
-			)
+			if !leftIsInvalid {
+				checker.report(
+					&InvalidBinaryOperandError{
+						Operation:    operation,
+						Side:         common.OperandSideLeft,
+						ExpectedType: &IntegerType{},
+						ActualType:   leftType,
+						StartPos:     expression.Left.StartPosition(),
+						EndPos:       expression.Left.EndPosition(),
+					},
+				)
+			}
 		} else if !rightIsInteger {
-			checker.report(
-				&InvalidBinaryOperandError{
-					Operation:    operation,
-					Side:         common.OperandSideRight,
-					ExpectedType: &IntegerType{},
-					ActualType:   rightType,
-					StartPos:     expression.Right.StartPosition(),
-					EndPos:       expression.Right.EndPosition(),
-				},
-			)
+			if !rightIsInvalid {
+				checker.report(
+					&InvalidBinaryOperandError{
+						Operation:    operation,
+						Side:         common.OperandSideRight,
+						ExpectedType: &IntegerType{},
+						ActualType:   rightType,
+						StartPos:     expression.Right.StartPosition(),
+						EndPos:       expression.Right.EndPosition(),
+					},
+				)
+			}
 		}
 
 		// check both types are equal
@@ -913,7 +946,8 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 	case BinaryOperationKindEquality:
 		// check both types are equal, and boolean subtypes or integer subtypes
 
-		if leftType != nil &&
+		if !anyInvalid &&
+			leftType != nil &&
 			!(leftType.Equal(rightType) &&
 				(checker.IsSubType(leftType, &BoolType{}) || checker.IsSubType(leftType, &IntegerType{}))) {
 
@@ -938,37 +972,43 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 		rightIsBool := checker.IsSubType(rightType, &BoolType{})
 
 		if !leftIsBool && !rightIsBool {
-			checker.report(
-				&InvalidBinaryOperandsError{
-					Operation: operation,
-					LeftType:  leftType,
-					RightType: rightType,
-					StartPos:  expression.StartPosition(),
-					EndPos:    expression.EndPosition(),
-				},
-			)
+			if !anyInvalid {
+				checker.report(
+					&InvalidBinaryOperandsError{
+						Operation: operation,
+						LeftType:  leftType,
+						RightType: rightType,
+						StartPos:  expression.StartPosition(),
+						EndPos:    expression.EndPosition(),
+					},
+				)
+			}
 		} else if !leftIsBool {
-			checker.report(
-				&InvalidBinaryOperandError{
-					Operation:    operation,
-					Side:         common.OperandSideLeft,
-					ExpectedType: &BoolType{},
-					ActualType:   leftType,
-					StartPos:     expression.Left.StartPosition(),
-					EndPos:       expression.Left.EndPosition(),
-				},
-			)
+			if !leftIsInvalid {
+				checker.report(
+					&InvalidBinaryOperandError{
+						Operation:    operation,
+						Side:         common.OperandSideLeft,
+						ExpectedType: &BoolType{},
+						ActualType:   leftType,
+						StartPos:     expression.Left.StartPosition(),
+						EndPos:       expression.Left.EndPosition(),
+					},
+				)
+			}
 		} else if !rightIsBool {
-			checker.report(
-				&InvalidBinaryOperandError{
-					Operation:    operation,
-					Side:         common.OperandSideRight,
-					ExpectedType: &BoolType{},
-					ActualType:   rightType,
-					StartPos:     expression.Right.StartPosition(),
-					EndPos:       expression.Right.EndPosition(),
-				},
-			)
+			if !rightIsInvalid {
+				checker.report(
+					&InvalidBinaryOperandError{
+						Operation:    operation,
+						Side:         common.OperandSideRight,
+						ExpectedType: &BoolType{},
+						ActualType:   rightType,
+						StartPos:     expression.Right.StartPosition(),
+						EndPos:       expression.Right.EndPosition(),
+					},
+				)
+			}
 		}
 
 		return &BoolType{}
@@ -1080,7 +1120,7 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 
 	member := checker.visitMember(expression)
 
-	var memberType Type = &AnyType{}
+	var memberType Type = &InvalidType{}
 	if member != nil {
 		memberType = member.Type
 	}
@@ -1150,16 +1190,19 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	invokedExpression := invocationExpression.InvokedExpression
 	expressionType := invokedExpression.Accept(checker).(Type)
 
-	var returnType Type = &VoidType{}
+	var returnType Type = &InvalidType{}
 	functionType, ok := expressionType.(*FunctionType)
 	if !ok {
-		checker.report(
-			&NotCallableError{
-				Type:     expressionType,
-				StartPos: invokedExpression.StartPosition(),
-				EndPos:   invokedExpression.EndPosition(),
-			},
-		)
+
+		if !expressionType.Equal(&InvalidType{}) {
+			checker.report(
+				&NotCallableError{
+					Type:     expressionType,
+					StartPos: invokedExpression.StartPosition(),
+					EndPos:   invokedExpression.EndPosition(),
+				},
+			)
+		}
 	} else {
 		// invoked expression has function type
 
@@ -1367,7 +1410,7 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 					Pos:          t.Pos,
 				},
 			)
-			return &AnyType{}
+			return &InvalidType{}
 		}
 		return result
 

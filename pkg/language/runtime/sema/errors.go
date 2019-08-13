@@ -687,3 +687,27 @@ func (e *FunctionExpressionInConditionError) StartPosition() ast.Position {
 func (e *FunctionExpressionInConditionError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// UnexpectedReturnValueError
+
+type InvalidReturnValueError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidReturnValueError) Error() string {
+	return fmt.Sprintf(
+		"invalid return with value from function without %s return type",
+		(&VoidType{}).String(),
+	)
+}
+
+func (*InvalidReturnValueError) isSemanticError() {}
+
+func (e *InvalidReturnValueError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidReturnValueError) EndPosition() ast.Position {
+	return e.EndPos
+}

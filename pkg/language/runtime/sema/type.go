@@ -44,6 +44,23 @@ func (*VoidType) Equal(other Type) bool {
 	return ok
 }
 
+// InvalidType represents a type that is invalid.
+// It is the result of type checking failing and
+// can't be expressed in programs.
+//
+type InvalidType struct{}
+
+func (*InvalidType) isType() {}
+
+func (*InvalidType) String() string {
+	return "<<invalid>>"
+}
+
+func (*InvalidType) Equal(other Type) bool {
+	_, ok := other.(*InvalidType)
+	return ok
+}
+
 // BoolType represents the boolean type
 type BoolType struct{}
 
