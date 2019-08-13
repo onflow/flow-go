@@ -20,8 +20,8 @@ message GossipMessage {
 ////////////////////////////////////////////////////////////////////////////
 // 2 testing messages + rpc service to be deleted later
 
-service Messages {
-  rpc SendMessage (GossipMessage) returns (MessageReply) {}
+service MessageReciever {
+  rpc AsyncQueue (GossipMessage) returns (VoidReply) {}
 }
 
 message MessageRequest {
@@ -29,7 +29,9 @@ message MessageRequest {
 }
 
 message MessageReply {
-  string TextResponse = 1;
+ string TextResponse = 1;
 }
+
+message VoidReply {}
 
 ////////////////////////////////////////////////////////////////////////////
