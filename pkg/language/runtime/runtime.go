@@ -3,6 +3,8 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 	"math/big"
@@ -72,13 +74,48 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 		return nil, RuntimeError{errs}
 	}
 
+	checker := sema.NewChecker(program)
+
+	if err := checker.DeclareValue(
+		"getValue",
+		&getValueFunctionType,
+		common.DeclarationKindFunction,
+		ast.Position{},
+		true,
+	); err != nil {
+		return nil, RuntimeError{[]error{err}}
+	}
+
+	if err := checker.DeclareValue(
+		"setValue",
+		&setValueFunctionType,
+		common.DeclarationKindFunction,
+		ast.Position{},
+		true,
+	); err != nil {
+		return nil, RuntimeError{[]error{err}}
+	}
+
+	if err := checker.DeclareValue(
+		"createAccount",
+		&createAccountFunctionType,
+		common.DeclarationKindFunction,
+		ast.Position{},
+		true,
+	); err != nil {
+		return nil, RuntimeError{[]error{err}}
+	}
+
+	if err := checker.Check(); err != nil {
+		return nil, RuntimeError{[]error{err}}
+	}
+
 	inter := interpreter.NewInterpreter(program)
 	inter.ImportFunction("getValue", r.newGetValueFunction(runtimeInterface))
 	inter.ImportFunction("setValue", r.newSetValueFunction(runtimeInterface))
 	inter.ImportFunction("createAccount", r.newCreateAccountFunction(runtimeInterface))
 
-	err := inter.Interpret()
-	if err != nil {
+	if err := inter.Interpret(); err != nil {
 		return nil, RuntimeError{[]error{err}}
 	}
 
@@ -99,15 +136,15 @@ var setValueFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
 		// owner
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// controller
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// key
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// value
 		// TODO: add proper type
@@ -122,15 +159,15 @@ var getValueFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
 		// owner
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// controller
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// key
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 	},
 	// value
@@ -143,11 +180,11 @@ var createAccountFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
 		// key
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// code
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 	},
 	// value

@@ -69,9 +69,27 @@ func NewChecker(program *ast.Program) *Checker {
 	}
 }
 
-func (checker *Checker) Check() (err error) {
+func (checker *Checker) DeclareValue(
+	name string,
+	ty Type,
+	kind common.DeclarationKind,
+	pos ast.Position,
+	isConstant bool,
+) error {
+	err := checker.declareVariable(name, ty, kind, pos, isConstant)
+	if err == nil {
+		return nil
+	}
+	return err
+}
+
+func (checker *Checker) Check() error {
 	result := checker.Program.Accept(checker).(checkerResult)
-	return checkerError(result.Errors)
+	err := checkerError(result.Errors)
+	if err == nil {
+		return nil
+	}
+	return err
 }
 
 func (checker *Checker) IsSubType(subType Type, superType Type) bool {
@@ -390,7 +408,13 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		}
 	}
 
-	if err := checker.declareVariable(declaration, declarationType); err != nil {
+	if err := checker.declareVariable(
+		declaration.Identifier,
+		declarationType,
+		declaration.DeclarationKind(),
+		declaration.IdentifierPosition(),
+		declaration.IsConstant,
+	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -401,20 +425,25 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 	}
 }
 
-func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty Type) *CheckerError {
+func (checker *Checker) declareVariable(
+	identifier string,
+	ty Type,
+	kind common.DeclarationKind,
+	pos ast.Position,
+	isConstant bool,
+) *CheckerError {
 	var errs []error
 
-	identifier := declaration.Identifier
+	depth := checker.valueActivations.Depth()
 
 	// check if variable with this name is already declared in the current scope
 	existingVariable := checker.findVariable(identifier)
-	depth := checker.valueActivations.Depth()
 	if existingVariable != nil && existingVariable.Depth == depth {
 		errs = append(errs,
 			&RedeclarationError{
-				Kind:        declaration.DeclarationKind(),
+				Kind:        kind,
 				Name:        identifier,
-				Pos:         declaration.IdentifierPosition(),
+				Pos:         pos,
 				PreviousPos: existingVariable.Pos,
 			},
 		)
@@ -424,10 +453,10 @@ func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty
 	checker.setVariable(
 		identifier,
 		&Variable{
-			IsConstant: declaration.IsConstant,
+			IsConstant: isConstant,
 			Depth:      depth,
 			Type:       ty,
-			Pos:        &declaration.IdentifierPos,
+			Pos:        &pos,
 		},
 	)
 
