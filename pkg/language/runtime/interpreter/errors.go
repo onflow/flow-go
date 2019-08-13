@@ -121,3 +121,13 @@ func (e *ConditionError) StartPosition() ast.Position {
 func (e *ConditionError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// RedeclarationError
+
+type RedeclarationError struct {
+	Name string
+}
+
+func (e *RedeclarationError) Error() string {
+	return fmt.Sprintf("cannot redeclare: `%s` is already declared", e.Name)
+}

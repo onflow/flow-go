@@ -49,9 +49,11 @@ func (f InterpretedFunctionValue) parameterCount() int {
 
 // HostFunctionValue
 
+type HostFunction func(interpreter *Interpreter, arguments []Value) Trampoline
+
 type HostFunctionValue struct {
-	functionType *sema.FunctionType
-	function     func(*Interpreter, []Value) Trampoline
+	Type     *sema.FunctionType
+	Function HostFunction
 }
 
 func (HostFunctionValue) isValue() {}
@@ -63,20 +65,20 @@ func (f HostFunctionValue) Copy() Value {
 func (HostFunctionValue) isFunctionValue() {}
 
 func (f HostFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
-	return f.function(interpreter, arguments)
+	return f.Function(interpreter, arguments)
 }
 
 func (f HostFunctionValue) parameterCount() int {
-	return len(f.functionType.ParameterTypes)
+	return len(f.Type.ParameterTypes)
 }
 
-func NewHostFunction(
+func NewHostFunctionValue(
 	functionType *sema.FunctionType,
-	function func(*Interpreter, []Value) Trampoline,
+	function HostFunction,
 ) HostFunctionValue {
 	return HostFunctionValue{
-		functionType: functionType,
-		function:     function,
+		Type:     functionType,
+		Function: function,
 	}
 }
 

@@ -930,7 +930,7 @@ func TestInterpretHostFunction(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 
-	testFunction := interpreter.NewHostFunction(
+	testFunction := interpreter.NewHostFunctionValue(
 		&sema.FunctionType{
 			ParameterTypes: []sema.Type{
 				&sema.IntType{},
@@ -947,8 +947,11 @@ func TestInterpretHostFunction(t *testing.T) {
 		},
 	)
 
-	inter.ImportFunction("test", testFunction)
-	err := inter.Interpret()
+	err := inter.ImportFunction("test", testFunction)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	err = inter.Interpret()
 	Expect(err).
 		To(Not(HaveOccurred()))
 
@@ -1577,4 +1580,3 @@ func TestInterpretStructCopyOnPassing(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.BoolValue(false)))
 }
-

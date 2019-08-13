@@ -194,7 +194,7 @@ var createAccountFunctionType = sema.FunctionType{
 }
 
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterface) interpreter.HostFunctionValue {
-	return interpreter.NewHostFunction(
+	return interpreter.NewHostFunctionValue(
 		&setValueFunctionType,
 		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
 			if len(arguments) != 4 {
@@ -221,7 +221,7 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterfa
 }
 
 func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterface) interpreter.HostFunctionValue {
-	return interpreter.NewHostFunction(
+	return interpreter.NewHostFunctionValue(
 		&getValueFunctionType,
 		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
 			if len(arguments) != 3 {
@@ -242,7 +242,7 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterfa
 }
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeInterface) interpreter.HostFunctionValue {
-	return interpreter.NewHostFunction(
+	return interpreter.NewHostFunctionValue(
 		&createAccountFunctionType,
 		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
 			if len(arguments) != 2 {

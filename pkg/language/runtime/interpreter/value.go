@@ -732,6 +732,8 @@ func ToValue(value interface{}) (Value, error) {
 		return UInt64Value(value), nil
 	case bool:
 		return BoolValue(value), nil
+	case string:
+		return StringValue(value), nil
 	}
 
 	return nil, fmt.Errorf("cannot convert Go value to value: %#+v", value)

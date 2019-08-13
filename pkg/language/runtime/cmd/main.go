@@ -11,7 +11,20 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
+)
+
+var log = stdlib.NewStandardLibraryFunction(
+	"log",
+	&sema.FunctionType{
+		ParameterTypes: []sema.Type{&sema.AnyType{}},
+		ReturnType:     &sema.VoidType{},
+	},
+	func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
+		fmt.Printf("%v\n", arguments[0])
+		return trampoline.Done{Result: &interpreter.VoidValue{}}
+	},
 )
 
 // main parses the given filename and prints any syntax errors.
@@ -20,6 +33,8 @@ import (
 // the program may call the function `log` to print a value.
 //
 func main() {
+
+	standardLibraryFunctions := append(stdlib.BuiltIns, log)
 
 	if len(os.Args) < 2 {
 		exitWithError("no input file")
@@ -40,22 +55,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	logType := &sema.FunctionType{
-		ParameterTypes: []sema.Type{&sema.AnyType{}},
-		ReturnType:     &sema.VoidType{},
-	}
-
 	checker := sema.NewChecker(program)
-	err = checker.DeclareValue(
-		"log",
-		logType,
-		common.DeclarationKindFunction,
-		ast.Position{},
-		true,
-	)
-	if err != nil {
-		prettyPrintError(err, filename, code)
-		os.Exit(1)
+	for _, function := range standardLibraryFunctions {
+		err = checker.DeclareValue(
+			function.Name,
+			function.Function.Type,
+			common.DeclarationKindFunction,
+			ast.Position{},
+			true,
+		)
+		if err != nil {
+			prettyPrintError(err, filename, code)
+			os.Exit(1)
+		}
 	}
 
 	err = checker.Check()
@@ -65,16 +77,9 @@ func main() {
 	}
 
 	inter := interpreter.NewInterpreter(program)
-	inter.ImportFunction(
-		"log",
-		interpreter.NewHostFunction(
-			logType,
-			func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
-				fmt.Printf("%v\n", arguments[0])
-				return trampoline.Done{Result: &interpreter.VoidValue{}}
-			},
-		),
-	)
+	for _, function := range standardLibraryFunctions {
+		inter.ImportFunction(function.Name, function.Function)
+	}
 
 	err = inter.Interpret()
 	if err != nil {
@@ -95,8 +100,8 @@ func main() {
 
 func prettyPrintError(err error, filename string, code string) {
 	var errs []error
-	if err, ok := err.(*sema.CheckerError); ok {
-		errs = err.Errors
+	if checkerError, ok := err.(*sema.CheckerError); ok {
+		errs = checkerError.Errors
 	} else {
 		errs = []error{err}
 	}
