@@ -20,10 +20,8 @@ type functionContext struct {
 
 var beforeType = &FunctionType{
 	ParameterTypes: []Type{&AnyType{}},
+	ReturnType:     &AnyType{},
 	apply: func(types []Type) Type {
-		if len(types) < 1 {
-			return &AnyType{}
-		}
 		return types[0]
 	},
 }
@@ -1183,7 +1181,9 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 			)
 		}
 
-		if functionType.apply != nil {
+		if len(argumentTypes) == len(functionType.ParameterTypes) &&
+			functionType.apply != nil {
+
 			returnType = functionType.apply(argumentTypes)
 		} else {
 			returnType = functionType.ReturnType

@@ -2234,6 +2234,26 @@ func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckInvalidFunctionPostConditionWithBeforeAndNoArgument(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int) {
+          post {
+              before() != 0
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+}
+
 func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
 	RegisterTestingT(t)
 
