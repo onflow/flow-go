@@ -1,8 +1,6 @@
 package sema
 
 import (
-	"strings"
-
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
@@ -18,26 +16,6 @@ const ResultIdentifier = "result"
 type functionContext struct {
 	returnType Type
 	loops      int
-}
-
-// CheckerError
-
-type CheckerError struct {
-	Errors []error
-}
-
-func (e CheckerError) Error() string {
-	var sb strings.Builder
-	sb.WriteString("Checking failed:\n")
-	for _, err := range e.Errors {
-		sb.WriteString(err.Error())
-		if err, ok := err.(errors.SecondaryError); ok {
-			sb.WriteString(". ")
-			sb.WriteString(err.SecondaryError())
-		}
-		sb.WriteString("\n")
-	}
-	return sb.String()
 }
 
 var beforeType = &FunctionType{

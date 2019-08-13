@@ -1577,3 +1577,4 @@ func TestInterpretStructCopyOnPassing(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.BoolValue(false)))
 }
+
