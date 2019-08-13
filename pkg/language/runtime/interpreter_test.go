@@ -43,7 +43,7 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
         let z = 1 + 2
         var a = 3 == 3
         var b = [1, 2]
-        let s = "\"123\""
+        let s = "123"
     `)
 
 	Expect(inter.Globals["x"].Value).

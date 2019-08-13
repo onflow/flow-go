@@ -1021,13 +1021,82 @@ func (v *ProgramVisitor) VisitStringLiteral(ctx *StringLiteralContext) interface
 
 	stringLiteral := ctx.StringLiteral().GetText()
 
-	// TODO: process stringLiteral
+	// slice off leading and trailing quotes
+	// and parse escape characters
+	parsedString := parseStringLiteral(
+		stringLiteral[1 : len(stringLiteral)-1],
+	)
 
 	return &ast.StringExpression{
-		Value:    stringLiteral,
+		Value:    parsedString,
 		StartPos: startPosition,
 		EndPos:   endPosition,
 	}
+}
+
+func parseStringLiteral(s string) string {
+	var builder strings.Builder
+
+	var c byte
+	for len(s) > 0 {
+		c, s = s[0], s[1:]
+
+		if c != '\\' {
+			builder.WriteByte(c)
+			continue
+		}
+
+		c, s = s[0], s[1:]
+
+		switch c {
+		case '0':
+			builder.WriteByte(0)
+		case 'n':
+			builder.WriteByte('\n')
+		case 'r':
+			builder.WriteByte('\r')
+		case 't':
+			builder.WriteByte('\t')
+		case '"':
+			builder.WriteByte('"')
+		case '\'':
+			builder.WriteByte('\'')
+		case '\\':
+			builder.WriteByte('\\')
+		case 'u':
+			// skip `{`
+			s = s[1:]
+
+			j := 0
+			var v rune
+			for ; s[j] != '}' && j < 8; j++ {
+				x := parseHex(s[j])
+				v = v<<4 | x
+			}
+
+			builder.WriteRune(v)
+
+			// skip hex characters and `}`
+
+			s = s[j+1:]
+		}
+	}
+
+	return builder.String()
+}
+
+func parseHex(b byte) rune {
+	c := rune(b)
+	switch {
+	case '0' <= c && c <= '9':
+		return c - '0'
+	case 'a' <= c && c <= 'f':
+		return c - 'a' + 10
+	case 'A' <= c && c <= 'F':
+		return c - 'A' + 10
+	}
+
+	panic(errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {

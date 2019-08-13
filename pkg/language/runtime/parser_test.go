@@ -2652,16 +2652,36 @@ func TestParseString(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, errors := parser.ParseExpression(`
-       "this is a test \t\\new line and race car:\n\u{1F3CE}\u{FE0F}"
+       "test \0\n\r\t\"\'\\ xyz"
 	`)
 
 	Expect(errors).
 		To(BeEmpty())
 
 	expected := &StringExpression{
-		Value:    "\"this is a test \\t\\\\new line and race car:\\n\\u{1F3CE}\\u{FE0F}\"",
+		Value:    "test \x00\n\r\t\"'\\ xyz",
 		StartPos: Position{Offset: 8, Line: 2, Column: 7},
-		EndPos:   Position{Offset: 69, Line: 2, Column: 68},
+		EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseStringWithUnicode(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseExpression(`
+      "this is a test \t\\new line and race car:\n\u{1F3CE}\u{FE0F}"
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	expected := &StringExpression{
+		Value:    "this is a test \t\\new line and race car:\n\U0001F3CE\uFE0F",
+		StartPos: Position{Offset: 7, Line: 2, Column: 6},
+		EndPos:   Position{Offset: 68, Line: 2, Column: 67},
 	}
 
 	Expect(actual).
