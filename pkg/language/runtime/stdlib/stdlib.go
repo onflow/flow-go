@@ -72,6 +72,45 @@ var Assert = NewStandardLibraryFunction(
 	},
 )
 
+// PanicError
+
+type PanicError struct {
+	Message  string
+	Position ast.Position
+}
+
+func (e PanicError) StartPosition() ast.Position {
+	return e.Position
+}
+
+func (e PanicError) EndPosition() ast.Position {
+	return e.Position
+}
+
+func (e PanicError) Error() string {
+	return fmt.Sprintf("panic: %s", e.Message)
+}
+
+// PanicFunction
+
+var PanicFunction = NewStandardLibraryFunction(
+	"panic",
+	&sema.FunctionType{
+		ParameterTypes: []sema.Type{
+			&sema.StringType{},
+		},
+		ReturnType: &sema.VoidType{},
+	},
+	func(inter *interpreter.Interpreter, arguments []interpreter.Value, position ast.Position) trampoline.Trampoline {
+		message := arguments[0].(interpreter.StringValue)
+		panic(PanicError{
+			Message:  string(message),
+			Position: position,
+		})
+		return trampoline.Done{}
+	},
+)
 var BuiltIns = []StandardLibraryFunction{
 	Assert,
+	PanicFunction,
 }
