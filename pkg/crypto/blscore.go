@@ -8,8 +8,6 @@ import "C"
 // TODO: remove -wall after reaching a stable version
 // TDOD: enable QUIET in relic
 import (
-	_ "errors"
-	_ "fmt"
 	"unsafe"
 
 	log "github.com/sirupsen/logrus"
@@ -105,7 +103,6 @@ func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 		(*C.bn_st)(sk),
 		(*C.uchar)((unsafe.Pointer)(&data[0])),
 		(C.int)(len(data)))
-	//fmt.Println("Signature: ",s)
 	return s
 }
 

@@ -51,7 +51,7 @@ void _G1scalarPointMult(ep_st* res, ep_st* p, bn_st *expo) {
     #if (EP_MUL	== LWNAF)
         g1_mul(res, p, expo);
     #else 
-        ep1_mul_lwnaf(res, p, expo);
+        ep_mul_lwnaf(res, p, expo);
     #endif
 }
 
@@ -59,7 +59,7 @@ void _G1scalarPointMult(ep_st* res, ep_st* p, bn_st *expo) {
 // This function is not called by BLS but is here for DEBUG/TESTs purposes
 void _G1scalarGenMult(ep_st* res, bn_st *expo) {
 #define GENERIC_POINT 1
-#define FIXED_MULT    (1-GENERIC_POINT)
+#define FIXED_MULT    (GENERIC_POINT^1)
 
 #if GENERIC_POINT
     _G1scalarPointMult(res, &core_get()->ep_g, expo);
@@ -95,47 +95,56 @@ void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
     // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
     ep_map(&h, data, len); 
     // s = p^sk
-	_G1scalarPointMult(&h, &h, sk);  // 0.68ms
+	_G1scalarPointMult(&h, &h, sk);  
     ep_write_bin_compact(s, &h);
 
     ep_free(&p);
 }
 
 // Verifies the validity of a BLS signature
-int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {  
+int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) { 
+    // TODO : check pk is on curve  (should be done offline)
+	// TODO : check pk is in G2 (should be done offline) 
 
     // TODO : check s is on curve
 	// TODO : check s is in G1
-	// TODO : check pk is on curve  (can be done offline)
-	// TODO : check pk is in G2 (can be done offline)
-    ep_st h;
-    ep_new(&h);
-    // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
-    ep_map(&h, data, len); 
 
-    ep_st s;
-    ep_new(s);
-    ep_read_bin_compact(&s, sig);
+    ep_t elemsG1[2];
+    ep2_t elemsG2[2];
 
-    //_ep_print("H", &h);
-    //_ep_print("S", &s);
+    // elemsG1[0] = s
+    ep_new(elemsG1[0]);
+    ep_read_bin_compact(elemsG1[0], sig);
 
-#if 1   // 1.5 ms
-    ep2_st neg_g2;
-    ep2_new(&neg_g2);
-    ep2_neg(&neg_g2, &core_get()->ep2_g); // could be hardcoded
-
-    ep_st** elemsG1 = (ep_st**) malloc (2*sizeof(ep_st));
-    ep2_st** elemsG2 = (ep2_st**) malloc (2*sizeof(ep2_st));
-    if (!elemsG1 || !elemsG2) {
-        THROW(ERR_NO_MEMORY);
-        return SIG_ERROR;
+ #if MEMBERSHIP_CHECK
+    if (!ep_is_valid(elemsG1[0]))
+        return SIG_INVALID;
+    ep_st inf;
+    ep_new(&inf);
+    // check s^order == infinity
+    // use basic double & add as lwnaf reduces the expo modulo r
+    // TODO : write a simple lwnaf without reduction
+    ep_mul_basic(&inf, elemsG1[0], &core_get()->ep_r);
+    if (!ep_is_infty(&inf)){
+        ep_free(&inf);
+        return SIG_INVALID;
     }
+    ep_free(&inf);
+ #endif
 
-    elemsG1[0] = &s;   
-    elemsG2[0] = &neg_g2;  
-    elemsG1[1] = &h;
-    elemsG2[1] = pk;
+    // elemsG1[1] = h
+    ep_new(elemsG1[1]);
+    // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
+    ep_map(elemsG1[1], data, len); 
+
+    // elemsG2[1] = pk
+    ep2_new(elemsG2[1]);
+    ep2_copy(elemsG2[1], pk);
+
+#if DOUBLE_PAIRING  
+    // elemsG2[0] = -g2
+    ep2_new(&elemsG2[0]);
+    ep2_neg(elemsG2[0], &core_get()->ep2_g); // could be hardcoded 
 
     fp12_t pair;
     fp12_new(&pair);
@@ -145,20 +154,19 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
     // compare the result to 1
     int res = fp12_cmp_dig(pair, 1);
 
-    free(elemsG1);
-    free(elemsG2);
-#else   // 7.5ms
+#elif SINGLE_PAIRING   
     fp12_t pair1, pair2;
     fp12_new(&pair1); fp12_new(&pair2);
-    pp_map_oatep_k12(pair1, &s, &core_get()->ep2_g);
-    pp_map_oatep_k12(pair2, &h, pk);
+    pp_map_oatep_k12(pair1, elemsG1[0], &core_get()->ep2_g);
+    pp_map_oatep_k12(pair2, elemsG1[1], elemsG2[1]);
 
     int res = fp12_cmp(pair1, pair2);
 #endif
-
-    ep_free(&p);
-    ep_free(&s);
-    fp12_free(&one)
+    fp12_free(&one);
+    ep_new(elemsG1[0]);
+    ep_new(elemsG1[1]);
+    ep2_new(elemsG2[0]);
+    ep2_new(elemsG2[1]);
     
     if (res == RLC_EQ && core_get()->code == RLC_OK) 
         return SIG_VALID;

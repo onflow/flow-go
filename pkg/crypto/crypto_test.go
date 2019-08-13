@@ -75,19 +75,19 @@ func TestBLS_BLS12381(t *testing.T) {
 	} else {
 		t.Logf("Verification passed: signature is %s", s)
 	}
+	/*
+		message := &testStruct{"te", "st"}
+		s = salg.SignStruct(sk, message, nil)
+		result = salg.VerifyStruct(pk, s, message, nil)
 
-	message := &testStruct{"te", "st"}
-	s = salg.SignStruct(sk, message, nil)
-	result = salg.VerifyStruct(pk, s, message, nil)
-
-	if result == false {
-		t.Errorf("Verification failed: signature is %x", s)
-	} else {
-		t.Logf("Verification passed: signature is %x", s)
-	}
+		if result == false {
+			t.Errorf("Verification failed: signature is %x", s)
+		} else {
+			t.Logf("Verification passed: signature is %x", s)
+		}*/
 }
 
-// Testg1 contains tests of operations in G1
+// TestG1 helps debugging but is not a unit test
 func TestG1(t *testing.T) {
 	fmt.Println("testing G1")
 
@@ -115,7 +115,7 @@ func BenchmarkG1(b *testing.B) {
 	return
 }
 
-// Testg2 contains tests of operations in G2
+// TestG2 helps debugging but is not a unit test
 func TestG2(t *testing.T) {
 	fmt.Println("testing G2")
 
@@ -162,7 +162,6 @@ func BenchmarkBLS_BLS12381Sign(b *testing.B) {
 
 // Verifying bench
 func BenchmarkBLS_BLS12381Verify(b *testing.B) {
-
 	salg := NewSignatureAlgo(BLS_BLS12381)
 	seed := []byte("keyseed")
 	sk := salg.GeneratePrKey(seed)
@@ -176,6 +175,7 @@ func BenchmarkBLS_BLS12381Verify(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = salg.VerifyBytes(pk, s, input, nil)
 	}
+
 	b.StopTimer()
 	return
 }

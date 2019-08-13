@@ -27,6 +27,11 @@
 #define SIG_INVALID 0
 #define SIG_ERROR   0xFF
 
+#define DOUBLE_PAIRING 1
+#define SINGLE_PAIRING (DOUBLE_PAIRING^1)
+
+#define MEMBERSHIP_CHECK 0
+
 typedef uint8_t byte;
 
 // Most of the functions are written for ALLOC=AUTO not ALLOC=DYNAMIC
