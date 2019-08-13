@@ -61,7 +61,7 @@ func TestBLS_BLS12381(t *testing.T) {
 	fmt.Println("testing BLS on bls12_381:")
 
 	salg := NewSignatureAlgo(BLS_BLS12381)
-	seed := []byte{1, 2, 3}
+	seed := []byte{1, 2, 3, 4}
 	sk := salg.GeneratePrKey(seed)
 	pk := sk.Pubkey()
 

@@ -32,8 +32,11 @@ void _ep2_print(char* s, ep2_st* p) {
     g2_print(p);
 }
 
-// Ignoring seed for now and relying on relic entropy
-void _bn_randZr(bn_t x, byte* seed) {
+// generates a random number less than the order r
+void _bn_randZr(bn_t x, byte* seed, int len) {
+    rand_seed(seed, len);
+    _bytes_print("seed", seed, len);
+
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
@@ -42,6 +45,7 @@ void _bn_randZr(bn_t x, byte* seed) {
     if (x)
         bn_rand_mod(x,r);
     bn_free(r);
+    _bn_print("sk", x);
 }
 
 // ep_write_bin_compact exports a point to a buffer in a compressed or uncompressed form.

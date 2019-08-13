@@ -1,11 +1,7 @@
 #ifndef _REL_INCLUDE_H
 #define _REL_INCLUDE_H
 
-#include "relic_ep.h"
-#include "relic_bn.h"
-#include "relic_fp.h"
-#include "relic_core.h"
-#include "relic_pc.h"
+#include "relic.h"
 
 // constants
 #define BITS_TO_BYTES(x) ((x+7)/8)
@@ -42,7 +38,7 @@ void _fp_print(char*, fp_st*);
 void _bn_print(char*, bn_st*);
 void _ep_print(char*, ep_st*);
 void _ep2_print(char*, ep2_st*);
-void _bn_randZr(bn_t, byte*);
+void _bn_randZr(bn_t, byte*, int);
 void _G1scalarGenMult(ep_st*, bn_st*);
 ep_st* _hashToG1(byte* data, int len);
 

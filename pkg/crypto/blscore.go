@@ -75,7 +75,7 @@ func _G2scalarGenMult(res *pointG2, expo *scalar) {
 // TEST/DEBUG
 // returns a random number on Z/Z.r
 func randZr(x *scalar, seed []byte) {
-	C._bn_randZr((*C.bn_st)(x), (*C.uchar)((unsafe.Pointer)(&seed[0]))) // to define the length of seed
+	C._bn_randZr((*C.bn_st)(x), (*C.uchar)((unsafe.Pointer)(&seed[0])), (C.int)(len(seed))) // to define the length of seed
 	if x == nil {
 		panic("the memory allocation of the random number has failed")
 	}
@@ -113,11 +113,11 @@ func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool
 		(*C.uchar)((unsafe.Pointer)(&data[0])),
 		(C.int)(len(data)))
 
-	const SIG_VALID = 1 // same value as in include.h
-	const SIG_ERR = 0xFF
+	const sigValid = 1 // same value as in include.h
+	const sigErr = 0xFF
 
-	if verif == SIG_ERR {
+	if verif == sigErr {
 		panic("Relic memory allocation failed")
 	}
-	return (verif == SIG_VALID)
+	return (verif == sigValid)
 }

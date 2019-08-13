@@ -9,7 +9,7 @@ cd $DIR/relic
 GENERAL="-DTIMER=CYCLE -DCHECK=OFF -DVERBS=OFF"
 LIBS="-DSHLIB=OFF -DSTLIB=ON"
 COMP="-DCOMP=\"-O3 -funroll-loops -fomit-frame-pointer -march=native -mtune=native\""
-RAND="-DRAND=UDEV"
+RAND="-DRAND=HASHD -DSEED="
 
 # 
 BN_REP="-DALLOC=AUTO -DALIGN=1 -DWSIZE=64 -DBN_PRECI=1024 -DBN_MAGNI=DOUBLE" #try larger (381*12 ?)
