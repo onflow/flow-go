@@ -96,7 +96,7 @@ void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
     ep_map(&h, data, len); 
     // s = p^sk
 	_G1scalarPointMult(&h, &h, sk);  
-    ep_write_bin_compact(s, &h);
+    _ep_write_bin_compact(s, &h);
 
     ep_free(&p);
 }
@@ -114,7 +114,7 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
 
     // elemsG1[0] = s
     ep_new(elemsG1[0]);
-    ep_read_bin_compact(elemsG1[0], sig);
+    _ep_read_bin_compact(elemsG1[0], sig);
 
  #if MEMBERSHIP_CHECK
     if (!ep_is_valid(elemsG1[0]))

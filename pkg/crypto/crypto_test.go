@@ -75,16 +75,16 @@ func TestBLS_BLS12381(t *testing.T) {
 	} else {
 		t.Logf("Verification passed: signature is %s", s)
 	}
-	/*
-		message := &testStruct{"te", "st"}
-		s = salg.SignStruct(sk, message, nil)
-		result = salg.VerifyStruct(pk, s, message, nil)
 
-		if result == false {
-			t.Errorf("Verification failed: signature is %x", s)
-		} else {
-			t.Logf("Verification passed: signature is %x", s)
-		}*/
+	message := &testStruct{"te", "st"}
+	s = salg.SignStruct(sk, message, nil)
+	result = salg.VerifyStruct(pk, s, message, nil)
+
+	if result == false {
+		t.Errorf("Verification failed: signature is %x", s)
+	} else {
+		t.Logf("Verification passed: signature is %x", s)
+	}
 }
 
 // TestG1 helps debugging but is not a unit test
@@ -180,6 +180,7 @@ func BenchmarkBLS_BLS12381Verify(b *testing.B) {
 	return
 }
 
+// Hashing to G1 bench
 func BenchmarkHashToG1(b *testing.B) {
 	input := []byte("Bench input")
 	b.StartTimer()

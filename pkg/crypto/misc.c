@@ -35,8 +35,6 @@ void _ep2_print(char* s, ep2_st* p) {
 // generates a random number less than the order r
 void _bn_randZr(bn_t x, byte* seed, int len) {
     rand_seed(seed, len);
-    _bytes_print("seed", seed, len);
-
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
@@ -45,7 +43,6 @@ void _bn_randZr(bn_t x, byte* seed, int len) {
     if (x)
         bn_rand_mod(x,r);
     bn_free(r);
-    _bn_print("sk", x);
 }
 
 // ep_write_bin_compact exports a point to a buffer in a compressed or uncompressed form.
@@ -56,7 +53,7 @@ void _bn_randZr(bn_t x, byte* seed, int len) {
 // The second-most significant bit indicates that the point is at infinity. 
 // If this bit is set, the remaining bits of the group element's encoding should be set to zero.
 // The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point at infinity and its y-coordinate is odd.
-void ep_write_bin_compact(byte *bin, const ep_st *a) {
+void _ep_write_bin_compact(byte *bin, const ep_st *a) {
     ep_t t;
     ep_null(t);
  
@@ -88,7 +85,7 @@ void ep_write_bin_compact(byte *bin, const ep_st *a) {
 // ep_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
 // The coding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // The code is a modified version of Relic ep_write_bin
-void ep_read_bin_compact(ep_st* a, byte *bin) {
+void _ep_read_bin_compact(ep_st* a, byte *bin) {
     if (bin[0] & 0x40) {
         if (bin[0] & 0x3F) {
             THROW(ERR_NO_VALID);
