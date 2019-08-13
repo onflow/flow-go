@@ -1561,13 +1561,18 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 	// declare the constructor function before checking initializer and functions,
 	// so the constructor function can be referred to inside them
 
-	checker.declareStructureConstructor(structure, structureType)
+	initializer := structure.Initializer
+	var parameterTypes []Type
+	if initializer != nil {
+		parameterTypes = checker.parameterTypes(initializer.Parameters)
+	}
+
+	checker.declareStructureConstructor(structure, structureType, parameterTypes)
 
 	// check the initializer
 
-	initializer := structure.Initializer
 	if initializer != nil {
-		checker.checkStructureInitializer(initializer, structureType)
+		checker.checkStructureInitializer(initializer, parameterTypes, structureType)
 	} else if len(structure.Fields) > 0 {
 		firstField := structure.Fields[0]
 
@@ -1617,6 +1622,7 @@ func (checker *Checker) checkFieldsInitialized(
 func (checker *Checker) declareStructureConstructor(
 	structure *ast.StructureDeclaration,
 	structureType *StructureType,
+	parameterTypes []Type,
 ) {
 	functionType := &FunctionType{
 		ReturnType: structureType,
@@ -1627,12 +1633,6 @@ func (checker *Checker) declareStructureConstructor(
 	initializer := structure.Initializer
 	if initializer != nil {
 		argumentLabels = checker.argumentLabels(initializer.Parameters)
-
-		// TODO:
-		// NOTE: IGNORING errors, because initializer will be checked separately
-		// in `VisitInitializerDeclaration`, otherwise we get error duplicates
-
-		parameterTypes := checker.parameterTypes(initializer.Parameters)
 
 		functionType = &FunctionType{
 			ParameterTypes: parameterTypes,
@@ -1688,6 +1688,7 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) *Stru
 
 func (checker *Checker) checkStructureInitializer(
 	initializer *ast.InitializerDeclaration,
+	parameterTypes []Type,
 	selfType *StructureType,
 ) {
 	// NOTE: new activation, so `self`
@@ -1698,7 +1699,27 @@ func (checker *Checker) checkStructureInitializer(
 
 	checker.declareSelf(selfType)
 
-	initializer.Accept(checker)
+	// check the initializer is named properly
+	identifier := initializer.Identifier
+	if identifier != InitializerIdentifier {
+		checker.report(
+			&InvalidInitializerNameError{
+				Name: identifier,
+				Pos:  initializer.StartPos,
+			},
+		)
+	}
+
+	functionType := &FunctionType{
+		ParameterTypes: parameterTypes,
+		ReturnType:     &VoidType{},
+	}
+
+	checker.checkFunction(
+		initializer.Parameters,
+		functionType,
+		initializer.FunctionBlock,
+	)
 }
 
 func (checker *Checker) checkStructureFunctions(
@@ -1815,24 +1836,7 @@ func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.R
 
 func (checker *Checker) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
 
-	// check the initializer is named properly
-	identifier := initializer.Identifier
-	if identifier != InitializerIdentifier {
-		checker.report(
-			&InvalidInitializerNameError{
-				Name: identifier,
-				Pos:  initializer.StartPos,
-			},
-		)
-	}
+	// NOTE: already checked in `checkStructureInitializer`
 
-	functionType := checker.functionType(initializer.Parameters, &ast.NominalType{})
-
-	checker.checkFunction(
-		initializer.Parameters,
-		functionType,
-		initializer.FunctionBlock,
-	)
-
-	return nil
+	panic(&errors.UnreachableError{})
 }
