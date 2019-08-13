@@ -196,7 +196,7 @@ var createAccountFunctionType = sema.FunctionType{
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterface) interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		&setValueFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
+		func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 			if len(arguments) != 4 {
 				panic(fmt.Sprintf("setValue requires 4 parameters"))
 			}
@@ -223,7 +223,7 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterfa
 func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterface) interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		&getValueFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
+		func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 			if len(arguments) != 3 {
 				panic(fmt.Sprintf("getValue requires 3 parameters"))
 			}
@@ -244,7 +244,7 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterfa
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeInterface) interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		&createAccountFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
+		func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 			if len(arguments) != 2 {
 				panic(fmt.Sprintf("createAccount requires 2 parameters"))
 			}

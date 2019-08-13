@@ -21,7 +21,7 @@ var log = stdlib.NewStandardLibraryFunction(
 		ParameterTypes: []sema.Type{&sema.AnyType{}},
 		ReturnType:     &sema.VoidType{},
 	},
-	func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
+	func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 		fmt.Printf("%v\n", arguments[0])
 		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	},

@@ -156,7 +156,7 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 		}
 	}
 
-	result := Run(function.invoke(interpreter, argumentValues))
+	result := Run(function.invoke(interpreter, argumentValues, ast.Position{}))
 	if result == nil {
 		return nil, nil
 	}
@@ -777,7 +777,11 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 
 					argumentCopies := arguments.Copy().(ArrayValue)
 
-					return function.invoke(interpreter, argumentCopies)
+					return function.invoke(
+						interpreter,
+						argumentCopies,
+						invocationExpression.StartPosition(),
+					)
 				})
 		})
 }
@@ -899,7 +903,7 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 	// TODO: function type
 	constructorVariable.Value = NewHostFunctionValue(
 		nil,
-		func(interpreter *Interpreter, values []Value) Trampoline {
+		func(interpreter *Interpreter, values []Value, position ast.Position) Trampoline {
 			structure := StructureValue{}
 
 			for name, function := range functions {

@@ -683,7 +683,7 @@ func (v StructureValue) Copy() Value {
 	newStructure := make(StructureValue, len(v))
 	for field, value := range v {
 		var copiedValue Value
-		if f, ok := value.(*StructFunctionValue); ok {
+		if f, ok := value.(*StructureFunctionValue); ok {
 			copiedValue = f.CopyWithStructure(newStructure)
 		} else {
 			copiedValue = value.Copy()
