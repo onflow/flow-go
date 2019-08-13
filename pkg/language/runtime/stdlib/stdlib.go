@@ -45,26 +45,36 @@ func (e AssertionError) EndPosition() ast.Position {
 }
 
 func (e AssertionError) Error() string {
-	return fmt.Sprintf("assertion failed: %s", e.Message)
+	const message = "assertion failed"
+	if e.Message == "" {
+		return message
+	}
+	return fmt.Sprintf("%s: %s", message, e.Message)
 }
 
 // Assertion
 
-var Assert = NewStandardLibraryFunction(
+var assertRequiredArgumentCount = 1
+
+var AssertFunction = NewStandardLibraryFunction(
 	"assert",
 	&sema.FunctionType{
 		ParameterTypes: []sema.Type{
 			&sema.BoolType{},
 			&sema.StringType{},
 		},
-		ReturnType: &sema.VoidType{},
+		ReturnType:            &sema.VoidType{},
+		RequiredArgumentCount: &assertRequiredArgumentCount,
 	},
 	func(inter *interpreter.Interpreter, arguments []interpreter.Value, position ast.Position) trampoline.Trampoline {
 		result := arguments[0].(interpreter.BoolValue)
 		if !result {
-			message := arguments[1].(interpreter.StringValue)
+			var message string
+			if len(arguments) > 1 {
+				message = string(arguments[1].(interpreter.StringValue))
+			}
 			panic(AssertionError{
-				Message:  string(message),
+				Message:  message,
 				Position: position,
 			})
 		}
@@ -110,7 +120,8 @@ var PanicFunction = NewStandardLibraryFunction(
 		return trampoline.Done{}
 	},
 )
+
 var BuiltIns = []StandardLibraryFunction{
-	Assert,
+	AssertFunction,
 	PanicFunction,
 }

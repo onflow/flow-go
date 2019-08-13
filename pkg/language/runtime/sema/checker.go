@@ -21,7 +21,7 @@ type functionContext struct {
 var beforeType = &FunctionType{
 	ParameterTypes: []Type{&AnyType{}},
 	ReturnType:     &AnyType{},
-	apply: func(types []Type) Type {
+	Apply: func(types []Type) Type {
 		return types[0]
 	},
 }
@@ -1225,9 +1225,9 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		}
 
 		if len(argumentTypes) == len(functionType.ParameterTypes) &&
-			functionType.apply != nil {
+			functionType.Apply != nil {
 
-			returnType = functionType.apply(argumentTypes)
+			returnType = functionType.Apply(argumentTypes)
 		} else {
 			returnType = functionType.ReturnType
 		}
@@ -1332,14 +1332,20 @@ func (checker *Checker) checkInvocationArguments(
 	// check the invocation's argument count matches the function's parameter count
 	parameterCount := len(functionType.ParameterTypes)
 	if argumentCount != parameterCount {
-		checker.report(
-			&ArgumentCountError{
-				ParameterCount: parameterCount,
-				ArgumentCount:  argumentCount,
-				StartPos:       invocationExpression.StartPosition(),
-				EndPos:         invocationExpression.EndPosition(),
-			},
-		)
+
+		// TODO: improve
+		if functionType.RequiredArgumentCount == nil ||
+			argumentCount < *functionType.RequiredArgumentCount {
+
+			checker.report(
+				&ArgumentCountError{
+					ParameterCount: parameterCount,
+					ArgumentCount:  argumentCount,
+					StartPos:       invocationExpression.StartPosition(),
+					EndPos:         invocationExpression.EndPosition(),
+				},
+			)
+		}
 	}
 
 	minCount := argumentCount

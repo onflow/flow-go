@@ -319,9 +319,10 @@ func ArrayTypeToString(arrayType ArrayType) string {
 // FunctionType
 
 type FunctionType struct {
-	ParameterTypes []Type
-	ReturnType     Type
-	apply          func([]Type) Type
+	ParameterTypes        []Type
+	ReturnType            Type
+	Apply                 func([]Type) Type
+	RequiredArgumentCount *int
 }
 
 func (*FunctionType) isType() {}
