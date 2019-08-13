@@ -10,19 +10,37 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
-// sampleScript runs a script that adds 2 to a value.
-const sampleScript = `
+// addTwoScript runs a script that adds 2 to a value.
+const addTwoScript = `
 	fun main() {
-		const controller = [1]
-		const owner = [2]
-		const key = [3]
-		const value = getValue(controller, owner, key)
+		let controller = [1]
+		let owner = [2]
+		let key = [3]
+		let value = getValue(controller, owner, key)
 		setValue(controller, owner, key, value + 2)
 	}
 `
 
+// createAccountScriptA runs a script that creates an account.
+const createAccountScriptA = `
+	fun main() {
+		let publicKey = [1,2,3]
+		let code = [4,5,6]
+		createAccount(publicKey, code)
+	}
+`
+
+// createAccountScriptB runs a script that creates an account.
+const createAccountScriptB = `
+	fun main() {
+		let publicKey = [7,8,9]
+		let code = [10,11,12]
+		createAccount(publicKey, code)
+	}
+`
+
 const sampleCall = `
-	fun main() -> Int {
+	fun main(): Int {
 		return getValue([1], [2], [3])
 	}
 `
@@ -31,32 +49,29 @@ func TestWorldStates(t *testing.T) {
 	RegisterTestingT(t)
 
 	// Create new emulated blockchain
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
 	// Create 3 signed transactions (tx1, tx2. tx3)
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(addTwoScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
-	tx2 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          2,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
-	}
+	tx2 := (&types.RawTransaction{
+		Script:       []byte(addTwoScript),
+		Nonce:        2,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
-	tx3 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          3,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
-	}
+	tx3 := (&types.RawTransaction{
+		Script:       []byte(addTwoScript),
+		Nonce:        3,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	ws1 := b.pendingWorldState.Hash()
 	t.Logf("initial world state: \t%s\n", ws1)
@@ -140,36 +155,36 @@ func TestWorldStates(t *testing.T) {
 func TestSubmitTransaction(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(addTwoScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
 	// tx1 status becomes TransactionFinalized
-	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionFinalized))
+	tx, err := b.GetTransaction(tx1.Hash())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(tx.Status).To(Equal(types.TransactionFinalized))
 }
 
 func TestSubmitDuplicateTransaction(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(addTwoScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
@@ -180,79 +195,170 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	Expect(err).To(MatchError(&ErrDuplicateTransaction{TxHash: tx1.Hash()}))
 }
 
+func TestSubmitTransactionInvalidAccount(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain(DefaultOptions)
+
+	invalidAddress := types.HexToAddress("0000000000000000000000000000000000000002")
+
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(addTwoScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(invalidAddress, b.RootKeyPair())
+
+	// Submit invalid tx1 (errors)
+	err := b.SubmitTransaction(tx1)
+	Expect(err).To(MatchError(&ErrInvalidSignatureAccount{Account: invalidAddress}))
+}
+
+func TestSubmitTransactionInvalidKeyPair(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain(DefaultOptions)
+
+	// use key pair that does not exist on root account
+	invalidKeyPair, _ := crypto.GenKeyPair("elephant-ears")
+
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(addTwoScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), invalidKeyPair)
+
+	// Submit invalid tx1 (errors)
+	err := b.SubmitTransaction(tx1)
+	Expect(err).To(MatchError(
+		&ErrInvalidSignaturePublicKey{
+			Account:   b.RootAccount(),
+			PublicKey: invalidKeyPair.PublicKey,
+		}),
+	)
+}
+
 func TestSubmitTransactionReverted(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte("invalid script"),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte("invalid script"),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Submit invalid tx1 (errors)
 	err := b.SubmitTransaction(tx1)
 	Expect(err).To(HaveOccurred())
 
 	// tx1 status becomes TransactionReverted
-	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionReverted))
+	tx, err := b.GetTransaction(tx1.Hash())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(tx.Status).To(Equal(types.TransactionReverted))
 }
 
 func TestCommitBlock(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(addTwoScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
+	tx, _ := b.GetTransaction(tx1.Hash())
 	Expect(err).ToNot(HaveOccurred())
-	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionFinalized))
+	Expect(tx.Status).To(Equal(types.TransactionFinalized))
 
-	tx2 := &types.SignedTransaction{
-		Script:         []byte("invalid script"),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
-	}
+	tx2 := (&types.RawTransaction{
+		Script:       []byte("invalid script"),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Submit invalid tx2
 	err = b.SubmitTransaction(tx2)
+	tx, _ = b.GetTransaction(tx2.Hash())
 	Expect(err).To(HaveOccurred())
-	Expect(b.GetTransaction(tx2.Hash()).Status).To(Equal(types.TransactionReverted))
+	Expect(tx.Status).To(Equal(types.TransactionReverted))
 
 	// Commit tx1 and tx2 into new block
 	b.CommitBlock()
 
 	// tx1 status becomes TransactionSealed
-	Expect(b.GetTransaction(tx1.Hash()).Status).To(Equal(types.TransactionSealed))
+	tx, _ = b.GetTransaction(tx1.Hash())
+	Expect(tx.Status).To(Equal(types.TransactionSealed))
 	// tx2 status stays TransactionReverted
-	Expect(b.GetTransaction(tx2.Hash()).Status).To(Equal(types.TransactionReverted))
+	tx, _ = b.GetTransaction(tx2.Hash())
+	Expect(tx.Status).To(Equal(types.TransactionReverted))
+}
+
+func TestCreateAccount(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain(DefaultOptions)
+
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(createAccountScriptA),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
+
+	err := b.SubmitTransaction(tx1)
+	Expect(err).ToNot(HaveOccurred())
+
+	// root account has ID 1, so expect this account to have ID 2
+	address := types.HexToAddress("0000000000000000000000000000000000000002")
+
+	account, err := b.GetAccount(address)
+
+	Expect(err).ToNot(HaveOccurred())
+	Expect(account.Balance).To(Equal(uint64(0)))
+	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
+	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
+
+	tx2 := (&types.RawTransaction{
+		Script:       []byte(createAccountScriptB),
+		Nonce:        2,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
+
+	err = b.SubmitTransaction(tx2)
+	Expect(err).ToNot(HaveOccurred())
+
+	address = types.HexToAddress("0000000000000000000000000000000000000003")
+
+	account, err = b.GetAccount(address)
+
+	Expect(err).ToNot(HaveOccurred())
+	Expect(account.Balance).To(Equal(uint64(0)))
+	Expect(account.PublicKeys).To(ContainElement([]byte{7, 8, 9}))
+	Expect(account.Code).To(Equal([]byte{10, 11, 12}))
 }
 
 func TestCallScript(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(addTwoScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	// Sample call (value is 0)
 	value, err := b.CallScript([]byte(sampleCall))
@@ -272,23 +378,21 @@ func TestCallScript(t *testing.T) {
 func TestQueryByVersion(t *testing.T) {
 	RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain()
+	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          1,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
-	}
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(addTwoScript),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
-	tx2 := &types.SignedTransaction{
-		Script:         []byte(sampleScript),
-		Nonce:          2,
-		ComputeLimit:   10,
-		Timestamp:      time.Now(),
-		PayerSignature: crypto.Signature{},
-	}
+	tx2 := (&types.RawTransaction{
+		Script:       []byte(addTwoScript),
+		Nonce:        2,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).Sign(b.RootAccount(), b.RootKeyPair())
 
 	invalidWorldState := crypto.NewHash([]byte("invalid state"))
 
@@ -306,7 +410,7 @@ func TestQueryByVersion(t *testing.T) {
 
 	// tx1 does not exist at ws1
 	tx, err = b.GetTransactionAtVersion(tx1.Hash(), ws1)
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).To(MatchError(&ErrTransactionNotFound{TxHash: tx1.Hash()}))
 	Expect(tx).To(BeNil())
 
 	// tx1 does exist at ws2
@@ -316,7 +420,7 @@ func TestQueryByVersion(t *testing.T) {
 
 	// tx2 does not exist at ws2
 	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws2)
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).To(MatchError(&ErrTransactionNotFound{TxHash: tx2.Hash()}))
 	Expect(tx).To(BeNil())
 
 	// tx2 does exist at ws3

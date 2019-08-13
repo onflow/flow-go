@@ -1,0 +1,85 @@
+{
+    "name": "bamboo",
+    "displayName": "Bamboo",
+    "publisher": "dapperlabs",
+    "description": "",
+    "version": "0.0.1",
+    "repository": {
+        "type" : "git",
+        "url" : "https://github.com/dapperlabs/bamboo-node.git"
+    },
+    "engines": {
+        "vscode": "^1.36.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onLanguage:bamboo"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "bamboo.restartServer",
+                "category": "Bamboo",
+                "title": "Restart language server"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Bamboo configuration",
+            "properties": {
+                "bamboo.languageServerPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "The path to the Bamboo language server",
+                    "scope": "resource"
+                }
+            }
+        },
+        "languages": [
+            {
+                "id": "bamboo",
+                "extensions": [
+                    ".bpl"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "bamboo",
+                "scopeName": "source.bamboo",
+                "path": "./syntaxes/bamboo.tmGrammar.json"
+            },
+            {
+                "scopeName": "markdown.bamboo.codeblock",
+                "path": "./syntaxes/codeblock.json",
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "embeddedLanguages": {
+                    "meta.embedded.block.bamboo": "bamboo"
+                }
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "postinstall": "node ./node_modules/vscode/bin/install",
+        "test": "npm run compile && node ./node_modules/vscode/bin/test"
+    },
+    "devDependencies": {
+        "typescript": "^3.3.1",
+        "vscode": "^1.1.28",
+        "tslint": "^5.12.1",
+        "@types/node": "^10.12.21",
+        "@types/mocha": "^2.2.42"
+    },
+    "dependencies": {
+        "vscode-languageclient": "~4.4.0"
+    }
+}

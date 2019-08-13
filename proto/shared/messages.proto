@@ -2,19 +2,10 @@ syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
 
-package bamboo.shared;
+package bamboo.shared.messages;
 
 option go_package = "shared";
 
-message SignedCollectionHash {
-  bytes collectionHash = 1;
-  repeated bytes signatures = 2;
-}
-
-message Collection {
-  repeated SignedTransaction transactions = 1;
-  bytes foundationBlockHash = 2;
-}
 
 message Block {
   string chainID = 1;
@@ -68,102 +59,39 @@ message ResultApproval {
   bytes signature = 5; // The final signature over all the above fields to prevent external manipulation.
 }
 
-message Transaction {
-  bytes script = 1;
-  uint64 nonce = 2;
-  repeated TransactionRegister registers = 3;
-  repeated bytes chunks = 4;
-}
-
-message SignedTransaction {
-  Transaction transaction = 1;
-  repeated bytes scriptSignatures = 2;
-  bytes payerSignature = 3;
-}
-
 message Register {
   bytes id = 1;
   bytes value = 2;
 }
 
-message TransactionRegister {
-  // Contains meta information of a register.
-  // It doesn't contain the register value as it's only meant to pass information about a register, not it's contents.
-
-  enum AccessMode {
-    CREATE = 0;
-    // Allows read-only access to the contents of the register as they were at the end of the previous block.
-    SNAPSHOT_READ = 1;
-    // Allows read-only access to the contents of the register as they were after all previous transactions
-    // have been processed (including those in the same block).
-    CONFIRMED_READ = 2;
-    // Only valid for Balance Registers. Allows Snapshot Read access to the Register, plus the ability to
-    // issue deferred additions on that register.
-    DEFERRED_WRITE = 3;
-    // Allows exclusive read/write access to the contents of the register; all writes from previous transactions
-    // will be visible, and all writes made by this transaction will be visible to all subsequent transactions
-    // (formally: Serializability).
-    READ_WRITE = 4;
-  }
-  enum Type {
-    SIMPLE = 0;
-    CHUNK = 1;
-    BALANCE = 2;
-  }
-  message KeyWeight {
-    bytes key = 1;
-    double weight = 2;
-  }
-  Type type = 1;
-  AccessMode accessMode = 2;
-  bytes id = 3;
-  repeated KeyWeight keys = 4;
-}
-
-message Inventory {
-  message Item {
-    enum Type {
-      TRANSACTION = 0;
-      BLOCK = 1;
-    }
-    Type type = 1;
-    bytes hash = 2;
-  }
-  repeated Item items = 1;
-}
-
-message InvalidExecutionReceiptChallenge {
-  bytes executionReceiptHash = 1;
-  bytes executionReceiptSignature = 2;
-  uint64 partIndex = 3;
-  repeated IntermediateRegisters partTransactions = 4;
-  bytes signature = 5;
-}
-
-message StateTransition {
-  bytes previousStateTransitionHash = 1;
-  repeated bytes previousCommitApprovalSignatures = 2;
-  uint64 height = 3;
-  bytes value = 4;
-}
-
-message SignedStateTransition {
-  StateTransition stateTransition = 1;
+message AccountSignature {
+  bytes account = 1;
   bytes signature = 2;
 }
 
-message FinalizedStateTransition {
-  SignedStateTransition signedStateTransition = 1;
+enum TransactionStatus {
+  STATUS_PENDING = 0;
+  STATUS_FINALIZED = 1;
+  STATUS_REVERTED = 2;
+  STATUS_SEALED = 3;
+}
+
+message SignedTransaction {
+  bytes script = 1;
+  uint64 nonce = 2;
+  uint64 compute_limit = 3;
+  uint64 compute_used = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  AccountSignature payer_signature = 6;
+  TransactionStatus status = 7;
+}
+
+message Collection {
+  repeated SignedTransaction transactions = 1;
+  bytes foundationBlockHash = 2;
+}
+
+message SignedCollectionHash {
+  bytes collectionHash = 1;
   repeated bytes signatures = 2;
-}
-
-enum Vote {
-  REJECT = 0;
-  APPROVE = 1;
-}
-
-message StateTransitionVote {
-  bytes stateTransitionHash = 1;
-  Vote vote = 2;
-  uint64 height = 3;
 }

@@ -3,7 +3,7 @@ package testmocks
 import (
 	"errors"
 
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 func NewMockEffectsErrorSealWithDifferentReceipt(m *MockEffectsHappyPath) *MockEffectsErrorSealWithDifferentReceipt {

@@ -1,8 +1,6 @@
 package testmocks
 
-import (
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
-)
+import "github.com/dapperlabs/bamboo-node/pkg/types"
 
 func NewMockEffectsNoMinStake(m *MockEffectsHappyPath) *MockEffectsNoMinStake {
 	return &MockEffectsNoMinStake{m, 0}

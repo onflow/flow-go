@@ -2,6 +2,8 @@ package oldcrypto
 
 import (
 	"encoding/hex"
+
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 
 const (
@@ -63,6 +65,11 @@ func NewHash(data []byte) Hash {
 // String encodes Hash as a readable string for logging purposes.
 func (h Hash) String() string {
 	return hex.EncodeToString(h.Bytes())
+}
+
+// NOTE: temporary function so that oldcrypto.Hash implements the crypto.Hash interface
+func (h Hash) IsEqual(hash crypto.Hash) bool {
+	return false
 }
 
 // ZeroBlockHash represents the parent hash of the genesis block.

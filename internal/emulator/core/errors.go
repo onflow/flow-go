@@ -4,7 +4,40 @@ import (
 	"fmt"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
+
+// ErrBlockNotFound indicates that a block specified by hash or number cannot be found.
+type ErrBlockNotFound struct {
+	BlockHash crypto.Hash
+	BlockNum  uint64
+}
+
+func (e *ErrBlockNotFound) Error() string {
+	if e.BlockNum == 0 {
+		return fmt.Sprintf("Block with hash %s cannot be found", e.BlockHash)
+	}
+
+	return fmt.Sprintf("Block number %d cannot be found", e.BlockNum)
+}
+
+// ErrTransactionNotFound indicates that a transaction specified by hash cannot be found.
+type ErrTransactionNotFound struct {
+	TxHash crypto.Hash
+}
+
+func (e *ErrTransactionNotFound) Error() string {
+	return fmt.Sprintf("Transaction with hash %s cannot be found", e.TxHash)
+}
+
+// ErrAccountNotFound indicates that an account specified by address cannot be found.
+type ErrAccountNotFound struct {
+	Address types.Address
+}
+
+func (e *ErrAccountNotFound) Error() string {
+	return fmt.Sprintf("Account with address %s cannot be found", e.Address)
+}
 
 // ErrDuplicateTransaction indicates that a transaction has already been submitted.
 type ErrDuplicateTransaction struct {
@@ -15,13 +48,23 @@ func (e *ErrDuplicateTransaction) Error() string {
 	return fmt.Sprintf("Transaction with hash %s has already been submitted", e.TxHash)
 }
 
-// ErrInvalidTransactionSignature indicates that a transaction has an invalid signature.
-type ErrInvalidTransactionSignature struct {
-	TxHash crypto.Hash
+// ErrInvalidSignaturePublicKey indicates that signature uses an invalid public key.
+type ErrInvalidSignaturePublicKey struct {
+	Account   types.Address
+	PublicKey []byte
 }
 
-func (e *ErrInvalidTransactionSignature) Error() string {
-	return fmt.Sprintf("Transaction with hash %s has an invalid signature", e.TxHash)
+func (e *ErrInvalidSignaturePublicKey) Error() string {
+	return fmt.Sprintf("Public key %s does not exist on account %s", e.PublicKey, e.Account)
+}
+
+// ErrInvalidSignatureAccount indicates that a signature references a nonexistent account.
+type ErrInvalidSignatureAccount struct {
+	Account types.Address
+}
+
+func (e *ErrInvalidSignatureAccount) Error() string {
+	return fmt.Sprintf("Account with address %s does not exist", e.Account)
 }
 
 // ErrTransactionReverted indicates that a transaction reverted.

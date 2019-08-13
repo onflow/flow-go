@@ -1,13 +1,14 @@
 
 
-# network
-`import "github.com/bamboo-node/internal/network"`
+# gossip
+`import "github.com/dapperlabs/bamboo-node/pkg/network/gossip"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
+* [Subdirectories](#pkg-subdirectories)
 
 ## <a name="pkg-overview">Overview</a>
-Package network implements the functionality to epidemically dessiminate a message (e.g., transaction, collection, or block) within the network.
+Package gossip implements the functionality to epidemically dessiminate a message (e.g., transaction, collection, or block) within the network.
 
 
 
@@ -16,18 +17,17 @@ Package network implements the functionality to epidemically dessiminate a messa
 * [type GossipMode](#GossipMode)
   * [func (gm GossipMode) String() string](#GossipMode.String)
 * [type GossipService](#GossipService)
-* [type Message](#Message)
 
 
 #### <a name="pkg-files">Package files</a>
-[Gossip.go](https://golang.org/src//target/Gossip.go)
+[gossip.go](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/gossip.go)
 
 
 
 
 
 
-## <a name="GossipMode">type</a> [GossipMode](https://golang.org/src//Users/yahyahassanzadeh/Documents/GitHub/bamboo-node/internal/network/Gossip.go?s=285:304#L10)
+## <a name="GossipMode">type</a> [GossipMode](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/gossip.go?s=333:352#L12)
 ``` go
 type GossipMode int
 ```
@@ -52,44 +52,21 @@ The legitimate values for the GossipMode
 
 
 
-### <a name="GossipMode.String">func</a> (GossipMode) [String](https://golang.org/src//Users/yahyahassanzadeh/Documents/GitHub/bamboo-node/internal/network/Gossip.go?s=416:452#L19)
+### <a name="GossipMode.String">func</a> (GossipMode) [String](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/gossip.go?s=464:500#L21)
 ``` go
 func (gm GossipMode) String() string
 ```
 
 
 
-## <a name="GossipService">type</a> [GossipService](https://golang.org/src//Users/yahyahassanzadeh/Documents/GitHub/bamboo-node/internal/network/Gossip.go?s=1383:1490#L35)
+## <a name="GossipService">type</a> [GossipService](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/gossip.go?s=785:900#L27)
 ``` go
 type GossipService interface {
-    Gossip(ctx context.Context, request *Message) (reply *Message, err error)
+    Gossip(ctx context.Context, request *shared.GossipMessage) (proto.Message, error)
 }
 ```
 GossipService is the interface of the network package and hence the networking streams with all
 other streams of the system. It defines the function call, the type of input arguments, and the output result
-
-
-
-
-
-
-
-
-
-
-## <a name="Message">type</a> [Message](https://golang.org/src//Users/yahyahassanzadeh/Documents/GitHub/bamboo-node/internal/network/Gossip.go?s=616:1169#L24)
-``` go
-type Message struct {
-    Payload    *proto.Message // The payload of the message, i.e., the data to be exchanged
-    Method     string         // Name of RPC method to be invoked on the message
-    Recipients []string       // Address of the recipients to which the message should be delivered
-    Sender     string         // Address of the sender of this message
-    Path       []string       // Address of the nodes that this message visited so far
-    TTL        int            // The time to live of the message, i.e., maximum number of hops it should be gossiped
-}
-
-```
-Message models a single message that is supposed to get exchanged by the gossip network
 
 
 

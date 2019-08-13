@@ -14,8 +14,8 @@ type KeyPair struct {
 	mnemonic  string
 }
 
-// genKeyPair generates a new HD wallet keypair to be used for account creation.
-func genKeyPair(passphrase string) (*KeyPair, error) {
+// GenKeyPair generates a new HD wallet keypair to be used for account creation.
+func GenKeyPair(passphrase string) (*KeyPair, error) {
 	// Generate a mnemonic for memorization or user-friendly seeds
 	entropy, _ := bip39.NewEntropy(256)
 	mnemonic, _ := bip39.NewMnemonic(entropy)

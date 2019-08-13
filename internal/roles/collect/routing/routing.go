@@ -2,7 +2,7 @@
 package routing
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/clusters"
+	"github.com/dapperlabs/bamboo-node/internal/roles/collect/clusters"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 

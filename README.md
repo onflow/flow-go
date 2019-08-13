@@ -14,11 +14,14 @@ Bamboo is a highly-performant blockchain designed to power the next generation o
   - [Setting up your environment](#setting-up-your-environment)
     - [Install Go](#install-go)
     - [Install Docker](#install-docker)
+    - [Install tooling dependencies](#install-tooling-dependencies)
   - [Generating code](#generating-code)
     - [Dependency injection using Wire](#dependency-injection-using-wire)
     - [Generate gRPC stubs from protobuf files](#generate-grpc-stubs-from-protobuf-files)
     - [Generate all code](#generate-all-code)
 - [Testing](#testing)
+  - [Unit tests](#unit-tests)
+  - [Integration tests](#integration-tests)
 - [Contributing](#contributing)
   - [Work streams](#work-streams)
   - [Workflow](#workflow)
@@ -119,28 +122,36 @@ make generate
 
 ## Testing
 
+### Unit tests
+
+```bash
+make test-unit
+```
+
+### Integration tests
+
 Initialize all containers:
 
 ```bash
-make test-setup
+make test-integrate-setup
 ```
 
 Run the test suite:
 
 ```bash
-make test-run
+make test-integrate-run
 ```
 
 Cleanup:
 
 ```bash
-make test-teardown
+make test-integrate-teardown
 ```
 
 The following command will run the three steps above:
 
 ```bash
-make test
+make test-integrate
 ```
 
 ## Contributing
@@ -157,11 +168,10 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 
 | Stream         | Owner(s)                    | Home directory  |
 | -------------- | --------------------------- | --------- |
-| Collection  | [Peter Siemens](https://github.com/psiemens]) | [/internal/roles/collect](/internal/roles/collect) |
+| Collection  | [Peter Siemens](https://github.com/psiemens) | [/internal/roles/collect](/internal/roles/collect) |
 | Consensus | [Alexander Hentschel](https://github.com/AlexHentschel) | [/internal/roles/consensus](/internal/roles/consensus) |
 | Execution      | [Bastian Müller](https://github.com/turbolent) | [/internal/roles/execute](/internal/roles/execute) |
-| Verifcation | [Moar Zamski](https://github.com/pazams) | [/internal/roles/verify](/internal/roles/verify) |
-| Sealing | [Moar Zamski](https://github.com/pazams) | [/internal/roles/seal](/internal/roles/seal) |
+| Verification | [Moar Zamski](https://github.com/pazams) | [/internal/roles/verify](/internal/roles/verify) |
 | Networking | [Yahya Hassanzadeh](https://github.com/yhassanzadeh)     | [/pkg/network](/pkg/network) |
 | Cryptography | [Tarak Ben Youssef](https://github.com/tarakby)     | [/pkg/crypto](/pkg/crypto) |
 | Emulator | [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens)     | [/internal/emulator](/internal/emulator) |

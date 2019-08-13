@@ -7,13 +7,18 @@ package verify
 
 import (
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/config"
+	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
 )
 
 // Injectors from wire.go:
 
 func InitializeServer() (*Server, error) {
 	configConfig := config.New()
-	controller := NewController()
+	effects := processor.NewEffectsProvider()
+	receiptProcessorConfig := NewReceiptProcessorConfig(configConfig)
+	hasher := NewHasher(configConfig)
+	receiptProcessor := processor.NewReceiptProcessor(effects, receiptProcessorConfig, hasher)
+	controller := NewController(receiptProcessor)
 	server, err := NewServer(configConfig, controller)
 	if err != nil {
 		return nil, err

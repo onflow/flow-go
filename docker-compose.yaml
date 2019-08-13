@@ -96,19 +96,19 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=foo    
 
-  seal_db:
+  observe_db:
     image: postgres:9.6-alpine
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
       - POSTGRES_PASSWORD=foo
 
-  seal:
+  observe:
     build:
       context: .
-      dockerfile: cmd/seal/Dockerfile
+      dockerfile: cmd/observe/Dockerfile
     depends_on:
-      - seal_db
+      - observe_db
     ports:
       - "3005:3001"
     restart: on-failure:5
@@ -119,7 +119,7 @@ services:
       - POSTGRES_DATABASE=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=foo    
-
+      
   testhelpers:
     build:
       context: .
@@ -129,18 +129,16 @@ services:
       - consensus_db
       - execute_db
       - verify_db
-      - seal_db    
     ports:
       - "3009:3009"
     restart: on-failure:5
     environment:
       - APP_ENV=LOCAL
       - PORT=3009
-      - POSTGRES_GCP_CONNECTION_NAME=foo
-      - POSTGRES_ADDR=db:5432 #TODO: this won't work because we need to setup configs to connect to 2 different dbs.
-      - POSTGRES_DATABASE=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=foo
+      - BAM_COLLECT_POSTGRESADDR=collect_db:5432
+      - BAM_COLLECT_POSTGRESUSER=postgres
+      - BAM_COLLECT_POSTGRESPASSWORD=foo
+      - BAM_COLLECT_POSTGRESDATABASE=postgres
 
   test:
     build:
@@ -151,14 +149,13 @@ services:
       - consensus
       - execute
       - verify
-      - seal
       - testhelpers
     environment:
       - COLLECT_ADDR=collect:3001
       - CONSENSUS_ADDR=consensus:3001
       - EXECUTE_ADDR=execute:3001
       - VERIFY_ADDR=verify:3001
-      - SEAL_ADDR=seal:3001
+      - OBSERVE_ADDR=observe:3001    
       - HELPERS_ADDR=testhelpers:3009
 
   # See https://github.com/dadarek/docker-wait-for-dependencies
@@ -195,11 +192,11 @@ services:
 
   # See https://github.com/dadarek/docker-wait-for-dependencies
   # Run this as a separate "docker-compose" up command
-  start_seal_dependencies:
+  start_observe_dependencies:
     image: dadarek/wait-for-dependencies
     depends_on:
-      - seal_db
-    command: seal_db:5432
+      - observe_db
+    command: observe_db:5432
 
   # See https://github.com/dadarek/docker-wait-for-dependencies
   # Run this as a separate "docker-compose" up command
@@ -210,6 +207,6 @@ services:
       - consensus
       - execute
       - verify
-      - seal
+      - observe
       - testhelpers
-    command: collect:3001 consensus:3001 execute:3001 verify:3001 seal:3001 testhelpers:3009
+    command: collect:3001 consensus:3001 execute:3001 verify:3001 observe:3001 testhelpers:3009
