@@ -10,22 +10,25 @@ import (
 )
 
 type StandardLibraryFunction struct {
-	Name     string
-	Function interpreter.HostFunctionValue
+	Name           string
+	Function       interpreter.HostFunctionValue
+	ArgumentLabels []string
 }
 
 func NewStandardLibraryFunction(
 	name string,
 	functionType *sema.FunctionType,
 	function interpreter.HostFunction,
+	argumentLabels []string,
 ) StandardLibraryFunction {
 	functionValue := interpreter.NewHostFunctionValue(
 		functionType,
 		function,
 	)
 	return StandardLibraryFunction{
-		Name:     name,
-		Function: functionValue,
+		Name:           name,
+		Function:       functionValue,
+		ArgumentLabels: argumentLabels,
 	}
 }
 
@@ -80,6 +83,7 @@ var AssertFunction = NewStandardLibraryFunction(
 		}
 		return trampoline.Done{}
 	},
+	[]string{"", "message"},
 )
 
 // PanicError
@@ -119,6 +123,7 @@ var PanicFunction = NewStandardLibraryFunction(
 		})
 		return trampoline.Done{}
 	},
+	nil,
 )
 
 var BuiltIns = []StandardLibraryFunction{

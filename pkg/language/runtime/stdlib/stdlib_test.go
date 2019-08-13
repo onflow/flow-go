@@ -39,7 +39,6 @@ func TestAssert(t *testing.T) {
 	_, err = inter.Invoke("assert", true)
 	Expect(err).
 		To(Not(HaveOccurred()))
-
 }
 
 func TestPanic(t *testing.T) {
