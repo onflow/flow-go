@@ -660,7 +660,7 @@
         <section>
           <h3 id="strings-and-characters"><a href="#strings-and-characters" aria-hidden="true"><span class="icon icon-link"></span></a>Strings and Characters</h3>
           <blockquote>
-            <p>🚧 Status: Strings are not implemented yet.</p>
+            <p>🚧 Status: Characters are not implemented yet.</p>
           </blockquote>
           <p>Strings are collections of characters. Strings have the type <code>String</code>, and characters have the type <code>Character</code>. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.</p>
           <p>String and character literals are enclosed in double quotation marks (<code>"</code>).</p>
@@ -1335,9 +1335,6 @@
         </section>
         <section>
           <h3 id="function-preconditions-and-postconditions"><a href="#function-preconditions-and-postconditions" aria-hidden="true"><span class="icon icon-link"></span></a>Function Preconditions and Postconditions</h3>
-          <blockquote>
-            <p>🚧 Status: Function Preconditions and Postconditions are not implemented yet.</p>
-          </blockquote>
           <p>Functions may have preconditions and may have postconditions. Preconditions and postconditions can be used to restrict the inputs (values for parameters) and output (return value) of a function.</p>
           <p>Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the <code>pre</code> keyword, followed by the condition block.</p>
           <p>Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the <code>post</code> keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.</p>
@@ -1549,9 +1546,6 @@
       </section>
       <section>
         <h2 id="type-safety"><a href="#type-safety" aria-hidden="true"><span class="icon icon-link"></span></a>Type Safety</h2>
-        <blockquote>
-          <p>🚧 Status: Type checking is not implemented yet.</p>
-        </blockquote>
         <p>The Bamboo programming language is a <em>type-safe</em> language.</p>
         <p>When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type <code>Bool</code>, it can <em>only</em> be assigned a value that has type <code>Bool</code>, and not for example a value that has type <code>Int</code>.</p>
         <pre><code class="language-bamboo,file=type-safety-assign-int-to-bool.bpl"><span style="color: #008000">// Declare a variable that has type `Bool`</span><span>
@@ -1592,7 +1586,7 @@
       <section>
         <h2 id="type-inference"><a href="#type-inference" aria-hidden="true"><span class="icon icon-link"></span></a>Type Inference</h2>
         <blockquote>
-          <p>🚧 Status: Type inference is not implemented yet.</p>
+          <p>🚧 Status: Only basic type inference is implemented.</p>
         </blockquote>
         <p>If a variable or constant is not annotated explicitly with a type, it is inferred from the value.</p>
         <p>Integer literals are inferred to type <code>Int</code>.</p>
@@ -1646,7 +1640,7 @@
       <section>
         <h2 id="composite-data-types"><a href="#composite-data-types" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Types</h2>
         <blockquote>
-          <p>🚧 Status: Composite data types are not implemented yet.</p>
+          <p>🚧 Status: Resources are not implemented yet.</p>
         </blockquote>
         <p>Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.</p>
         <p>

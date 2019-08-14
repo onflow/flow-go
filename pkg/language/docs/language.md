@@ -468,7 +468,7 @@ let boolean = something as? Bool
 
 ### Strings and Characters
 
-> 🚧 Status: Strings are not implemented yet.
+> 🚧 Status: Characters are not implemented yet.
 
 Strings are collections of characters. Strings have the type `String`, and characters have the type `Character`. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.
 
@@ -1285,8 +1285,6 @@ fun test(x: Int) {
 
 ### Function Preconditions and Postconditions
 
-> 🚧 Status: Function Preconditions and Postconditions are not implemented yet.
-
 Functions may have preconditions and may have postconditions. Preconditions and postconditions can be used to restrict the inputs (values for parameters) and output (return value) of a function.
 
 Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the `pre` keyword, followed by the condition block.
@@ -1555,8 +1553,6 @@ f() // returns 2
 
 ## Type Safety
 
-> 🚧 Status: Type checking is not implemented yet.
-
 The Bamboo programming language is a *type-safe* language.
 
 When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type `Bool`, it can *only* be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
@@ -1607,7 +1603,7 @@ add(a, b)
 
 ## Type Inference
 
-> 🚧 Status: Type inference is not implemented yet.
+> 🚧 Status: Only basic type inference is implemented.
 
 If a variable or constant is not annotated explicitly with a type, it is inferred from the value.
 
@@ -1674,7 +1670,7 @@ let dictionary = {}
 
 ## Composite Data Types
 
-> 🚧 Status: Composite data types are not implemented yet.
+> 🚧 Status: Resources are not implemented yet.
 
 Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.
 
