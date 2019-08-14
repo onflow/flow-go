@@ -6,15 +6,12 @@ import (
 
 	. "github.com/onsi/gomega"
 
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 )
-
-func init() {
-	format.UseStringerRepresentation = true
-}
 
 func parseCheckAndInterpret(code string) *interpreter.Interpreter {
 	program, errors := parser.ParseProgram(code)
@@ -1288,3 +1285,77 @@ func TestInterpretFunctionWithoutResultAndPostConditionWithResult(t *testing.T) 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.VoidValue{}))
 }
+
+func TestInterpretFunctionPostConditionWithBefore(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = 0
+
+      fun test() {
+          pre {
+              x == 0
+          }
+          post {
+              x == before(x) + 1
+          }
+          x = x + 1
+      }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+}
+
+func TestInterpretFunctionPostConditionWithBeforeFailingPreCondition(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = 0
+
+      fun test() {
+          pre {
+              x == 1
+          }
+          post {
+              x == before(x) + 1
+          }
+          x = x + 1
+      }
+	`)
+
+	_, err := inter.Invoke("test")
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).ConditionKind).
+		To(Equal(ast.ConditionKindPre))
+}
+
+func TestInterpretFunctionPostConditionWithBeforeFailingPostCondition(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = 0
+
+      fun test() {
+          pre {
+              x == 0
+          }
+          post {
+              x == before(x) + 2
+          }
+          x = x + 1
+      }
+	`)
+
+	_, err := inter.Invoke("test")
+
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).ConditionKind).
+		To(Equal(ast.ConditionKindPost))
+}
+

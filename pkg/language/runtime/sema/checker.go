@@ -626,8 +626,8 @@ func (checker *Checker) visitConditions(conditions []*ast.Condition) *CheckerErr
 				&TypeMismatchError{
 					ExpectedType: &BoolType{},
 					ActualType:   conditionType,
-					StartPos:     condition.StartPosition(),
-					EndPos:       condition.EndPosition(),
+					StartPos:     condition.Expression.StartPosition(),
+					EndPos:       condition.Expression.EndPosition(),
 				},
 			)
 		}
