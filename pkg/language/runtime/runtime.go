@@ -3,7 +3,10 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 	"math/big"
 	"strings"
 
@@ -71,13 +74,48 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 		return nil, RuntimeError{errs}
 	}
 
+	checker := sema.NewChecker(program)
+
+	if err := checker.DeclareValue(
+		"getValue",
+		&getValueFunctionType,
+		common.DeclarationKindFunction,
+		ast.Position{},
+		true,
+	); err != nil {
+		return nil, RuntimeError{[]error{err}}
+	}
+
+	if err := checker.DeclareValue(
+		"setValue",
+		&setValueFunctionType,
+		common.DeclarationKindFunction,
+		ast.Position{},
+		true,
+	); err != nil {
+		return nil, RuntimeError{[]error{err}}
+	}
+
+	if err := checker.DeclareValue(
+		"createAccount",
+		&createAccountFunctionType,
+		common.DeclarationKindFunction,
+		ast.Position{},
+		true,
+	); err != nil {
+		return nil, RuntimeError{[]error{err}}
+	}
+
+	if err := checker.Check(); err != nil {
+		return nil, RuntimeError{[]error{err}}
+	}
+
 	inter := interpreter.NewInterpreter(program)
 	inter.ImportFunction("getValue", r.newGetValueFunction(runtimeInterface))
 	inter.ImportFunction("setValue", r.newSetValueFunction(runtimeInterface))
 	inter.ImportFunction("createAccount", r.newCreateAccountFunction(runtimeInterface))
 
-	err := inter.Interpret()
-	if err != nil {
+	if err := inter.Interpret(); err != nil {
 		return nil, RuntimeError{[]error{err}}
 	}
 
@@ -98,15 +136,15 @@ var setValueFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
 		// owner
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// controller
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// key
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// value
 		// TODO: add proper type
@@ -121,15 +159,15 @@ var getValueFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
 		// owner
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// controller
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// key
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 	},
 	// value
@@ -142,11 +180,11 @@ var createAccountFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
 		// key
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 		// code
 		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
+			Type: &sema.IntType{},
 		},
 	},
 	// value
@@ -154,10 +192,10 @@ var createAccountFunctionType = sema.FunctionType{
 	ReturnType: &sema.IntType{},
 }
 
-func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
+func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterface) interpreter.HostFunctionValue {
 	return interpreter.NewHostFunction(
 		&setValueFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
+		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
 			if len(arguments) != 4 {
 				panic(fmt.Sprintf("setValue requires 4 parameters"))
 			}
@@ -175,15 +213,16 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterfa
 				panic(err)
 			}
 
-			return &interpreter.VoidValue{}
+			result := &interpreter.VoidValue{}
+			return trampoline.Done{Result: result}
 		},
 	)
 }
 
-func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
+func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterface) interpreter.HostFunctionValue {
 	return interpreter.NewHostFunction(
 		&getValueFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
+		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
 			if len(arguments) != 3 {
 				panic(fmt.Sprintf("getValue requires 3 parameters"))
 			}
@@ -195,15 +234,16 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterfa
 				panic(err)
 			}
 
-			return interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+			result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+			return trampoline.Done{Result: result}
 		},
 	)
 }
 
-func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
+func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeInterface) interpreter.HostFunctionValue {
 	return interpreter.NewHostFunction(
 		&createAccountFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
+		func(_ *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
 			if len(arguments) != 2 {
 				panic(fmt.Sprintf("createAccount requires 2 parameters"))
 			}
@@ -223,7 +263,8 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeIn
 				panic(err)
 			}
 
-			return interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+			result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+			return trampoline.Done{Result: result}
 		},
 	)
 }

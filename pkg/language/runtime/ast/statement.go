@@ -9,15 +9,15 @@ type Statement interface {
 
 type ReturnStatement struct {
 	Expression Expression
-	StartPos   *Position
-	EndPos     *Position
+	StartPos   Position
+	EndPos     Position
 }
 
-func (s *ReturnStatement) StartPosition() *Position {
+func (s *ReturnStatement) StartPosition() Position {
 	return s.StartPos
 }
 
-func (s *ReturnStatement) EndPosition() *Position {
+func (s *ReturnStatement) EndPosition() Position {
 	return s.EndPos
 }
 
@@ -30,15 +30,15 @@ func (s *ReturnStatement) Accept(visitor Visitor) Repr {
 // BreakStatement
 
 type BreakStatement struct {
-	StartPos *Position
-	EndPos   *Position
+	StartPos Position
+	EndPos   Position
 }
 
-func (s *BreakStatement) StartPosition() *Position {
+func (s *BreakStatement) StartPosition() Position {
 	return s.StartPos
 }
 
-func (s *BreakStatement) EndPosition() *Position {
+func (s *BreakStatement) EndPosition() Position {
 	return s.EndPos
 }
 
@@ -51,15 +51,15 @@ func (s *BreakStatement) Accept(visitor Visitor) Repr {
 // ContinueStatement
 
 type ContinueStatement struct {
-	StartPos *Position
-	EndPos   *Position
+	StartPos Position
+	EndPos   Position
 }
 
-func (s *ContinueStatement) StartPosition() *Position {
+func (s *ContinueStatement) StartPosition() Position {
 	return s.StartPos
 }
 
-func (s *ContinueStatement) EndPosition() *Position {
+func (s *ContinueStatement) EndPosition() Position {
 	return s.EndPos
 }
 
@@ -75,14 +75,14 @@ type IfStatement struct {
 	Test     Expression
 	Then     *Block
 	Else     *Block
-	StartPos *Position
+	StartPos Position
 }
 
-func (s *IfStatement) StartPosition() *Position {
+func (s *IfStatement) StartPosition() Position {
 	return s.StartPos
 }
 
-func (s *IfStatement) EndPosition() *Position {
+func (s *IfStatement) EndPosition() Position {
 	if s.Else != nil {
 		return s.Else.EndPosition()
 	} else {
@@ -101,15 +101,15 @@ func (s *IfStatement) Accept(visitor Visitor) Repr {
 type WhileStatement struct {
 	Test     Expression
 	Block    *Block
-	StartPos *Position
-	EndPos   *Position
+	StartPos Position
+	EndPos   Position
 }
 
-func (s *WhileStatement) StartPosition() *Position {
+func (s *WhileStatement) StartPosition() Position {
 	return s.StartPos
 }
 
-func (s *WhileStatement) EndPosition() *Position {
+func (s *WhileStatement) EndPosition() Position {
 	return s.EndPos
 }
 
@@ -126,11 +126,11 @@ type AssignmentStatement struct {
 	Value  Expression
 }
 
-func (s *AssignmentStatement) StartPosition() *Position {
+func (s *AssignmentStatement) StartPosition() Position {
 	return s.Target.StartPosition()
 }
 
-func (s *AssignmentStatement) EndPosition() *Position {
+func (s *AssignmentStatement) EndPosition() Position {
 	return s.Value.EndPosition()
 }
 
@@ -146,11 +146,11 @@ type ExpressionStatement struct {
 	Expression Expression
 }
 
-func (s *ExpressionStatement) StartPosition() *Position {
+func (s *ExpressionStatement) StartPosition() Position {
 	return s.Expression.StartPosition()
 }
 
-func (s *ExpressionStatement) EndPosition() *Position {
+func (s *ExpressionStatement) EndPosition() Position {
 	return s.Expression.EndPosition()
 }
 

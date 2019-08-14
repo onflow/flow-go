@@ -486,6 +486,19 @@ func TestCheckInvalidParameterNameRedeclaration(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
+func TestCheckParameterRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(a: Int) {
+          let a = 1
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckInvalidRedeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1385,13 +1398,16 @@ func TestCheckInvalidStructureFieldName(t *testing.T) {
         }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 3)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
 
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
 }
 
 func TestCheckInvalidStructureFunctionName(t *testing.T) {
@@ -1419,13 +1435,19 @@ func TestCheckInvalidStructureRedeclaringFields(t *testing.T) {
        }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 4)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+
+	Expect(errs[3]).
+		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
 }
 
 func TestCheckInvalidStructureRedeclaringFunctions(t *testing.T) {
@@ -1470,7 +1492,9 @@ func TestCheckStructureFieldsAndFunctions(t *testing.T) {
        struct Test {
            let x: Int
 
-           init() {}
+           init() {
+               self.x = 1
+           }
 
            fun y() {}
        }
@@ -1489,13 +1513,16 @@ func TestCheckInvalidStructureFieldType(t *testing.T) {
        }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 3)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
 }
 
 func TestCheckInvalidStructureInitializerParameterType(t *testing.T) {
@@ -1608,10 +1635,13 @@ func TestCheckInvalidStructureMissingInitializer(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 1)
+	errs := expectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
 }
 
 func TestCheckStructureFieldAccess(t *testing.T) {
@@ -1622,7 +1652,7 @@ func TestCheckStructureFieldAccess(t *testing.T) {
           let foo: Int
 
           init() {
-              self.foo
+              self.foo = 1
           }
 
           fun test() {
@@ -1688,6 +1718,30 @@ func TestCheckStructureFieldAssignment(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckInvalidStructureSelfAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+          init() {
+              self = Test()
+          }
+
+          fun test() {
+              self = Test()
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+}
+
 func TestCheckInvalidStructureFieldAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1748,29 +1802,23 @@ func TestCheckInvalidStructureFieldConstantAssignment(t *testing.T) {
 	_, err := parseAndCheck(`
       struct Test {
           let foo: Int
-          let bar: Int
 
           init() {
+              // initialization is fine
               self.foo = 1
           }
 
           fun test() {
-              self.bar = 2
+              // assignment is invalid
+              self.foo = 2
           }
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
-	Expect(errs[0].(*sema.AssignmentToConstantMemberError).Name).
-		To(Equal("foo"))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
-	Expect(errs[1].(*sema.AssignmentToConstantMemberError).Name).
-		To(Equal("bar"))
 }
 
 func TestCheckStructureFunctionCall(t *testing.T) {
@@ -1901,4 +1949,121 @@ func TestCheckInvalidIncompatibleStructureTypes(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidStructureFunctionWithSelfParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Foo {
+          fun test(self: Int) {}
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckInvalidStructureInitializerWithSelfParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Foo {
+          init(self: Int) {}
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckStructureInitializesConstant(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+          let foo: Int
+
+          init() {
+              self.foo = 42
+          }
+      }
+
+	  let test = Test()
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckStructureInitializerWithArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+
+          init(x: Int) {}
+      }
+
+	  let test = Test(x: 1)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStructureInitializerCallWithMissingArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+
+          init(x: Int) {}
+      }
+
+	  let test = Test(1)
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+}
+
+func TestCheckStructureFunctionWithArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct Test {
+
+          fun test(x: Int) {}
+      }
+
+	  let test = Test().test(x: 1)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStructureFunctionCallWithMissingArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     struct Test {
+
+         fun test(x: Int) {}
+     }
+
+	  let test = Test().test(1)
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
 }

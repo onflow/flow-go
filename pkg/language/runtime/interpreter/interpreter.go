@@ -2,6 +2,8 @@ package interpreter
 
 import (
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/raviqqe/hamt"
 	goRuntime "runtime"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
@@ -35,15 +37,7 @@ func NewInterpreter(program *ast.Program) *Interpreter {
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
-	value := interpreter.activations.Find(name)
-	if value == nil {
-		return nil
-	}
-	variable, ok := value.(*Variable)
-	if !ok {
-		return nil
-	}
-	return variable
+	return interpreter.activations.Find(name).(*Variable)
 }
 
 func (interpreter *Interpreter) setVariable(name string, variable *Variable) {
@@ -191,57 +185,28 @@ func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
-	expression := &ast.FunctionExpression{
-		Parameters: declaration.Parameters,
-		ReturnType: declaration.ReturnType,
-		Block:      declaration.Block,
-		StartPos:   declaration.StartPos,
-	}
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
-	function := newInterpretedFunction(expression, interpreter.activations.CurrentOrNew())
-
-	var parameterTypes []ast.Type
-	for _, parameter := range declaration.Parameters {
-		parameterTypes = append(parameterTypes, parameter.Type)
-	}
-
-	functionType := &ast.FunctionType{
-		ParameterTypes: parameterTypes,
-		ReturnType:     declaration.ReturnType,
-	}
-	variableDeclaration := &ast.VariableDeclaration{
-		Value:         expression,
-		Identifier:    declaration.Identifier,
-		IsConstant:    true,
-		Type:          functionType,
-		StartPos:      declaration.StartPos,
-		IdentifierPos: declaration.IdentifierPos,
-	}
+	lexicalScope := interpreter.activations.CurrentOrNew()
 
 	// make the function itself available inside the function
-	variable := &Variable{
-		Declaration: variableDeclaration,
-		Value:       function,
-	}
-	function.Activation = function.Activation.
+	variable := &Variable{}
+
+	lexicalScope = lexicalScope.
 		Insert(activations.StringKey(declaration.Identifier), variable)
 
-	// function declarations are de-sugared to constants
-	interpreter.declareVariable(variableDeclaration, function)
+	functionExpression := declaration.ToExpression()
+	variable.Value = newInterpretedFunction(functionExpression, lexicalScope)
+
+	// declare the function in the current scope
+	interpreter.setVariable(declaration.Identifier, variable)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-func (interpreter *Interpreter) ImportFunction(name string, function *HostFunctionValue) {
-	variableDeclaration := &ast.VariableDeclaration{
-		Identifier: name,
-		IsConstant: true,
-		// TODO: Type
-	}
-
-	interpreter.declareVariable(variableDeclaration, function)
+func (interpreter *Interpreter) ImportFunction(name string, function HostFunctionValue) {
+	interpreter.declareVariable(name, function)
 }
 
 func (interpreter *Interpreter) VisitBlock(block *ast.Block) ast.Repr {
@@ -353,21 +318,18 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(Value)
 
-			interpreter.declareVariable(declaration, value)
+			interpreter.declareVariable(declaration.Identifier, value)
 
 			// NOTE: ignore result, so it does *not* act like a return-statement
 			return Done{}
 		})
 }
 
-func (interpreter *Interpreter) declareVariable(declaration *ast.VariableDeclaration, value Value) {
-	variable := interpreter.findVariable(declaration.Identifier)
+func (interpreter *Interpreter) declareVariable(identifier string, value Value) {
 	// NOTE: semantic analysis already checked possible invalid redeclaration
-	variable = &Variable{
-		Declaration: declaration,
-		Value:       value,
-	}
-	interpreter.setVariable(declaration.Identifier, variable)
+	interpreter.setVariable(identifier, &Variable{
+		Value: value,
+	})
 }
 
 func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
@@ -389,23 +351,25 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 		return interpreter.visitIndexExpressionAssignment(target, value)
 
 	case *ast.MemberExpression:
-		// TODO: no structures yet
-		panic(&errors.UnreachableError{})
+		return interpreter.visitMemberExpressionAssignment(target, value)
 	}
 
 	panic(&errors.UnreachableError{})
 }
 
+func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
+	variable := interpreter.findVariable(target.Identifier)
+	variable.Value = value
+}
+
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			indexedValue := result.(Value)
+			array := result.(ArrayValue)
 
-			array := indexedValue.(ArrayValue)
 			return target.Index.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
-					indexValue := result.(Value)
-					index := indexValue.(IntegerValue)
+					index := result.(IntegerValue)
 					array[index.IntValue()] = value
 
 					// NOTE: no result, so it does *not* act like a return-statement
@@ -414,10 +378,16 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 		})
 }
 
-func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
-	identifier := target.Identifier
-	variable := interpreter.findVariable(identifier)
-	variable.Value = value
+func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.MemberExpression, value Value) Trampoline {
+	return target.Expression.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+			structure := result.(*StructureValue)
+
+			structure.Members[target.Identifier] = value
+
+			// NOTE: no result, so it does *not* act like a return-statement
+			return Done{}
+		})
 }
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
@@ -632,9 +602,12 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 	return interpreter.visitExpressions(expression.Values, nil)
 }
 
-func (interpreter *Interpreter) VisitMemberExpression(*ast.MemberExpression) ast.Repr {
-	// TODO: no structures yet
-	panic(&errors.UnreachableError{})
+func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
+	return expression.Expression.Accept(interpreter).(Trampoline).
+		Map(func(result interface{}) interface{} {
+			structure := result.(*StructureValue)
+			return structure.Members[expression.Identifier]
+		})
 }
 
 func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
@@ -669,8 +642,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 	// interpret the invoked expression
 	return invocationExpression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			value := result.(Value)
-			function := value.(FunctionValue)
+			function := result.(FunctionValue)
 
 			// NOTE: evaluate all argument expressions in call-site scope, not in function body
 			argumentExpressions := make([]ast.Expression, len(invocationExpression.Arguments))
@@ -687,7 +659,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 }
 
 func (interpreter *Interpreter) invokeInterpretedFunction(
-	function *InterpretedFunctionValue,
+	function InterpretedFunctionValue,
 	arguments []Value,
 ) Trampoline {
 
@@ -695,12 +667,22 @@ func (interpreter *Interpreter) invokeInterpretedFunction(
 	// lexical scope: use the function declaration's activation record,
 	// not the current one (which would be dynamic scope)
 	interpreter.activations.Push(function.Activation)
-	defer interpreter.activations.Pop()
 
+	return interpreter.invokeInterpretedFunctionActivated(function, arguments)
+}
+
+// NOTE: assumes the function's activation (or an extension of it) is pushed!
+//
+func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
+	function InterpretedFunctionValue,
+	arguments []Value,
+) Trampoline {
 	interpreter.bindFunctionInvocationParameters(function, arguments)
 
 	return function.Expression.Block.Accept(interpreter).(Trampoline).
 		Map(func(blockResult interface{}) interface{} {
+			interpreter.activations.Pop()
+
 			if blockResult == nil {
 				return VoidValue{}
 			}
@@ -710,24 +692,12 @@ func (interpreter *Interpreter) invokeInterpretedFunction(
 
 // bindFunctionInvocationParameters binds the argument values to the parameters in the function
 func (interpreter *Interpreter) bindFunctionInvocationParameters(
-	function *InterpretedFunctionValue,
+	function InterpretedFunctionValue,
 	arguments []Value,
 ) {
 	for parameterIndex, parameter := range function.Expression.Parameters {
 		argument := arguments[parameterIndex]
-
-		interpreter.setVariable(
-			parameter.Identifier,
-			&Variable{
-				Declaration: &ast.VariableDeclaration{
-					IsConstant: true,
-					Identifier: parameter.Identifier,
-					Type:       parameter.Type,
-					StartPos:   parameter.StartPos,
-				},
-				Value: argument,
-			},
-		)
+		interpreter.declareVariable(parameter.Identifier, argument)
 	}
 }
 
@@ -750,23 +720,147 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression, v
 }
 
 func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
+
 	// lexical scope: variables in functions are bound to what is visible at declaration time
-	function := newInterpretedFunction(expression, interpreter.activations.CurrentOrNew())
+	lexicalScope := interpreter.activations.CurrentOrNew()
+
+	function := newInterpretedFunction(expression, lexicalScope)
 
 	return Done{Result: function}
 }
 
-func (interpreter *Interpreter) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
-	// TODO:
-	return nil
+func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.StructureDeclaration) ast.Repr {
+	constructorVariable := interpreter.structureConstructorVariable(declaration)
+
+	// declare the constructor in the current scope
+	interpreter.setVariable(declaration.Identifier, constructorVariable)
+
+	// NOTE: no result, so it does *not* act like a return-statement
+	return Done{}
+}
+
+// structureConstructorVariable creates a constructor function
+// for the given structure, bound in a variable.
+//
+// The constructor is a host function which creates a new structure,
+// calls the initializer (interpreted function), if any,
+// and then returns the structure.
+//
+// Inside the initializer and all functions, `self` is bound to
+// the new structure value, and the constructor itself is bound
+//
+func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.StructureDeclaration) *Variable {
+
+	// lexical scope: variables in functions are bound to what is visible at declaration time
+	lexicalScope := interpreter.activations.CurrentOrNew()
+
+	initializer := declaration.Initializer
+
+	var initializerFunction *InterpretedFunctionValue
+	if initializer != nil {
+		functionExpression := initializer.ToFunctionExpression()
+		function := newInterpretedFunction(functionExpression, lexicalScope)
+		initializerFunction = &function
+	}
+
+	constructorVariable := &Variable{}
+
+	functions := interpreter.structureFunctions(declaration, lexicalScope)
+
+	// TODO: function type
+	constructorVariable.Value = NewHostFunction(
+		nil,
+		func(interpreter *Interpreter, values []Value) Trampoline {
+			structure := newStructure()
+
+			for name, function := range functions {
+				// NOTE: rebind, as function is captured in closure
+				function := function
+
+				// TODO: function type
+				structure.Members[name] =
+					NewHostFunction(
+						nil,
+						func(interpreter *Interpreter, values []Value) Trampoline {
+							return interpreter.invokeStructureFunction(
+								function,
+								values,
+								structure,
+								declaration.Identifier,
+								constructorVariable,
+							)
+						},
+					)
+			}
+
+			var initializationTrampoline Trampoline = Done{}
+
+			if initializerFunction != nil {
+				initializationTrampoline = interpreter.invokeStructureFunction(
+					*initializerFunction,
+					values,
+					structure,
+					declaration.Identifier,
+					constructorVariable,
+				)
+			}
+
+			return initializationTrampoline.
+				Map(func(_ interface{}) interface{} {
+					return structure
+				})
+		},
+	)
+
+	return constructorVariable
+}
+
+// invokeStructureFunction calls the given function with the values.
+//
+// Inside the function, `self` is bound to the structure,
+// and the constructor for the structure is bound
+//
+func (interpreter *Interpreter) invokeStructureFunction(
+	function InterpretedFunctionValue,
+	values []Value,
+	structure *StructureValue,
+	identifier string,
+	constructorVariable *Variable,
+) Trampoline {
+	// start a new activation record
+	// lexical scope: use the function declaration's activation record,
+	// not the current one (which would be dynamic scope)
+	interpreter.activations.Push(function.Activation)
+
+	// make `self` available in the initializer
+	interpreter.declareVariable(sema.SelfIdentifier, structure)
+
+	// make the constructor available in the initializer
+	interpreter.setVariable(identifier, constructorVariable)
+
+	return interpreter.invokeInterpretedFunctionActivated(function, values)
+}
+
+func (interpreter *Interpreter) structureFunctions(
+	declaration *ast.StructureDeclaration,
+	lexicalScope hamt.Map,
+) map[string]InterpretedFunctionValue {
+
+	functions := map[string]InterpretedFunctionValue{}
+
+	for _, functionDeclaration := range declaration.Functions {
+		function := functionDeclaration.ToExpression()
+		functions[functionDeclaration.Identifier] =
+			newInterpretedFunction(function, lexicalScope)
+	}
+
+	return functions
 }
 
 func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
-	// TODO:
-	return nil
+	panic(&errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
-	// TODO:
-	return nil
+	panic(&errors.UnreachableError{})
 }

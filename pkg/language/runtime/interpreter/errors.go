@@ -11,8 +11,8 @@ import (
 type unsupportedOperation struct {
 	kind      common.OperationKind
 	operation ast.Operation
-	startPos  *ast.Position
-	endPos    *ast.Position
+	startPos  ast.Position
+	endPos    ast.Position
 }
 
 func (e *unsupportedOperation) Error() string {
@@ -23,11 +23,11 @@ func (e *unsupportedOperation) Error() string {
 	)
 }
 
-func (e *unsupportedOperation) StartPosition() *ast.Position {
+func (e *unsupportedOperation) StartPosition() ast.Position {
 	return e.startPos
 }
 
-func (e *unsupportedOperation) EndPosition() *ast.Position {
+func (e *unsupportedOperation) EndPosition() ast.Position {
 	return e.endPos
 }
 
@@ -36,8 +36,8 @@ func (e *unsupportedOperation) EndPosition() *ast.Position {
 type NotDeclaredError struct {
 	ExpectedKind common.DeclarationKind
 	Name         string
-	StartPos     *ast.Position
-	EndPos       *ast.Position
+	StartPos     ast.Position
+	EndPos       ast.Position
 }
 
 func (e *NotDeclaredError) Error() string {
@@ -48,11 +48,11 @@ func (e *NotDeclaredError) SecondaryError() string {
 	return "not found in this scope"
 }
 
-func (e *NotDeclaredError) StartPosition() *ast.Position {
+func (e *NotDeclaredError) StartPosition() ast.Position {
 	return e.StartPos
 }
 
-func (e *NotDeclaredError) EndPosition() *ast.Position {
+func (e *NotDeclaredError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
@@ -60,19 +60,19 @@ func (e *NotDeclaredError) EndPosition() *ast.Position {
 
 type NotCallableError struct {
 	Value    Value
-	StartPos *ast.Position
-	EndPos   *ast.Position
+	StartPos ast.Position
+	EndPos   ast.Position
 }
 
 func (e *NotCallableError) Error() string {
 	return fmt.Sprintf("cannot call value: %#+v", e.Value)
 }
 
-func (e *NotCallableError) StartPosition() *ast.Position {
+func (e *NotCallableError) StartPosition() ast.Position {
 	return e.StartPos
 }
 
-func (e *NotCallableError) EndPosition() *ast.Position {
+func (e *NotCallableError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
@@ -81,8 +81,8 @@ func (e *NotCallableError) EndPosition() *ast.Position {
 type ArgumentCountError struct {
 	ParameterCount int
 	ArgumentCount  int
-	StartPos       *ast.Position
-	EndPos         *ast.Position
+	StartPos       ast.Position
+	EndPos         ast.Position
 }
 
 func (e *ArgumentCountError) Error() string {
@@ -93,10 +93,10 @@ func (e *ArgumentCountError) Error() string {
 	)
 }
 
-func (e *ArgumentCountError) StartPosition() *ast.Position {
+func (e *ArgumentCountError) StartPosition() ast.Position {
 	return e.StartPos
 }
 
-func (e *ArgumentCountError) EndPosition() *ast.Position {
+func (e *ArgumentCountError) EndPosition() ast.Position {
 	return e.EndPos
 }

@@ -17,17 +17,17 @@ type ParseError interface {
 // SyntaxError
 
 type SyntaxError struct {
-	Pos     *ast.Position
+	Pos     ast.Position
 	Message string
 }
 
 func (*SyntaxError) isParseError() {}
 
-func (e *SyntaxError) StartPosition() *ast.Position {
+func (e *SyntaxError) StartPosition() ast.Position {
 	return e.Pos
 }
 
-func (e *SyntaxError) EndPosition() *ast.Position {
+func (e *SyntaxError) EndPosition() ast.Position {
 	return e.Pos
 }
 
@@ -38,16 +38,16 @@ func (e *SyntaxError) Error() string {
 // JuxtaposedUnaryOperatorsError
 
 type JuxtaposedUnaryOperatorsError struct {
-	Pos *ast.Position
+	Pos ast.Position
 }
 
 func (*JuxtaposedUnaryOperatorsError) isParseError() {}
 
-func (e *JuxtaposedUnaryOperatorsError) StartPosition() *ast.Position {
+func (e *JuxtaposedUnaryOperatorsError) StartPosition() ast.Position {
 	return e.Pos
 }
 
-func (e *JuxtaposedUnaryOperatorsError) EndPosition() *ast.Position {
+func (e *JuxtaposedUnaryOperatorsError) EndPosition() ast.Position {
 	return e.Pos
 }
 
@@ -61,17 +61,17 @@ type InvalidIntegerLiteralError struct {
 	Literal                   string
 	IntegerLiteralKind        IntegerLiteralKind
 	InvalidIntegerLiteralKind InvalidIntegerLiteralKind
-	StartPos                  *ast.Position
-	EndPos                    *ast.Position
+	StartPos                  ast.Position
+	EndPos                    ast.Position
 }
 
 func (*InvalidIntegerLiteralError) isParseError() {}
 
-func (e *InvalidIntegerLiteralError) StartPosition() *ast.Position {
+func (e *InvalidIntegerLiteralError) StartPosition() ast.Position {
 	return e.StartPos
 }
 
-func (e *InvalidIntegerLiteralError) EndPosition() *ast.Position {
+func (e *InvalidIntegerLiteralError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
@@ -108,16 +108,16 @@ func (e *InvalidIntegerLiteralError) SecondaryError() string {
 // MissingIdentifierError
 
 type MissingIdentifierError struct {
-	Pos *ast.Position
+	Pos ast.Position
 }
 
 func (*MissingIdentifierError) isParseError() {}
 
-func (e *MissingIdentifierError) StartPosition() *ast.Position {
+func (e *MissingIdentifierError) StartPosition() ast.Position {
 	return e.Pos
 }
 
-func (e *MissingIdentifierError) EndPosition() *ast.Position {
+func (e *MissingIdentifierError) EndPosition() ast.Position {
 	return e.Pos
 }
 

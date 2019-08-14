@@ -9,39 +9,35 @@ type Type interface {
 
 type NominalType struct {
 	Identifier string
-	Pos        *Position
+	Pos        Position
 }
 
 func (*NominalType) isType() {}
 
-func (t *NominalType) StartPosition() *Position {
+func (t *NominalType) StartPosition() Position {
 	return t.Pos
 }
 
-func (t *NominalType) EndPosition() *Position {
+func (t *NominalType) EndPosition() Position {
 	length := len(t.Identifier)
-	return &Position{
-		Offset: t.Pos.Offset + length - 1,
-		Line:   t.Pos.Line,
-		Column: t.Pos.Column + length - 1,
-	}
+	return t.Pos.Shifted(length - 1)
 }
 
 // VariableSizedType is a variable sized array type
 
 type VariableSizedType struct {
 	Type
-	StartPos *Position
-	EndPos   *Position
+	StartPos Position
+	EndPos   Position
 }
 
 func (*VariableSizedType) isType() {}
 
-func (t *VariableSizedType) StartPosition() *Position {
+func (t *VariableSizedType) StartPosition() Position {
 	return t.StartPos
 }
 
-func (t *VariableSizedType) EndPosition() *Position {
+func (t *VariableSizedType) EndPosition() Position {
 	return t.EndPos
 }
 
@@ -50,17 +46,17 @@ func (t *VariableSizedType) EndPosition() *Position {
 type ConstantSizedType struct {
 	Type
 	Size     int
-	StartPos *Position
-	EndPos   *Position
+	StartPos Position
+	EndPos   Position
 }
 
 func (*ConstantSizedType) isType() {}
 
-func (t *ConstantSizedType) StartPosition() *Position {
+func (t *ConstantSizedType) StartPosition() Position {
 	return t.StartPos
 }
 
-func (t *ConstantSizedType) EndPosition() *Position {
+func (t *ConstantSizedType) EndPosition() Position {
 	return t.EndPos
 }
 
@@ -69,16 +65,16 @@ func (t *ConstantSizedType) EndPosition() *Position {
 type FunctionType struct {
 	ParameterTypes []Type
 	ReturnType     Type
-	StartPos       *Position
-	EndPos         *Position
+	StartPos       Position
+	EndPos         Position
 }
 
 func (*FunctionType) isType() {}
 
-func (t *FunctionType) StartPosition() *Position {
+func (t *FunctionType) StartPosition() Position {
 	return t.StartPos
 }
 
-func (t *FunctionType) EndPosition() *Position {
+func (t *FunctionType) EndPosition() Position {
 	return t.EndPos
 }

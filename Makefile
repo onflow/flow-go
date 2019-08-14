@@ -10,6 +10,7 @@ install-tools: build-relic
 	go get github.com/google/wire/cmd/wire@v0.3.0
 	go get github.com/golang/protobuf/protoc-gen-go@v1.3.2
 	go get github.com/uber/prototool/cmd/prototool@v1.8.0
+	go get github.com/golang/mock/mockgen
 
 .PHONY: test-integrate-setup
 test-integrate-setup:
@@ -54,8 +55,12 @@ generate-wire:
 	wire ./internal/roles/execute/
 	wire ./internal/roles/verify/
 
+.PHONY: generate-mocks
+generate-mocks:
+	mockgen -destination=client/mocks/mock_client.go -package=mocks github.com/dapperlabs/bamboo-node/client RPCClient
+
 .PHONY: generate
-generate: generate-godoc generate-proto generate-wire
+generate: generate-godoc generate-proto generate-wire generate-mocks
 
 .PHONY: check-generated-code
 check-generated-code:

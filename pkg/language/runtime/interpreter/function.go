@@ -26,18 +26,18 @@ type InterpretedFunctionValue struct {
 func (InterpretedFunctionValue) isValue()         {}
 func (InterpretedFunctionValue) isFunctionValue() {}
 
-func newInterpretedFunction(expression *ast.FunctionExpression, activation hamt.Map) *InterpretedFunctionValue {
-	return &InterpretedFunctionValue{
+func newInterpretedFunction(expression *ast.FunctionExpression, activation hamt.Map) InterpretedFunctionValue {
+	return InterpretedFunctionValue{
 		Expression: expression,
 		Activation: activation,
 	}
 }
 
-func (f *InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
+func (f InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
 	return interpreter.invokeInterpretedFunction(f, arguments)
 }
 
-func (f *InterpretedFunctionValue) parameterCount() int {
+func (f InterpretedFunctionValue) parameterCount() int {
 	return len(f.Expression.Parameters)
 }
 
@@ -45,26 +45,25 @@ func (f *InterpretedFunctionValue) parameterCount() int {
 
 type HostFunctionValue struct {
 	functionType *sema.FunctionType
-	function     func(*Interpreter, []Value) Value
+	function     func(*Interpreter, []Value) Trampoline
 }
 
 func (HostFunctionValue) isValue()           {}
 func (f HostFunctionValue) isFunctionValue() {}
 
 func (f HostFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
-	result := f.function(interpreter, arguments)
-	return Done{Result: result}
+	return f.function(interpreter, arguments)
 }
 
-func (f *HostFunctionValue) parameterCount() int {
+func (f HostFunctionValue) parameterCount() int {
 	return len(f.functionType.ParameterTypes)
 }
 
 func NewHostFunction(
 	functionType *sema.FunctionType,
-	function func(*Interpreter, []Value) Value,
-) *HostFunctionValue {
-	return &HostFunctionValue{
+	function func(*Interpreter, []Value) Trampoline,
+) HostFunctionValue {
+	return HostFunctionValue{
 		functionType: functionType,
 		function:     function,
 	}

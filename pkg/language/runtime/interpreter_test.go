@@ -4,6 +4,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	"math/big"
@@ -126,6 +127,26 @@ func TestInterpretLexicalScope(t *testing.T) {
 
 	Expect(inter.Invoke("g")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(10)}))
+}
+
+func TestInterpretFunctionSideEffects(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       var value = 0
+
+       fun test(_ newValue: Int) {
+           value = newValue
+       }
+	`)
+
+	newValue := big.NewInt(42)
+
+	Expect(inter.Invoke("test", newValue)).
+		To(Equal(interpreter.VoidValue{}))
+
+	Expect(inter.Globals["value"].Value).
+		To(Equal(interpreter.IntValue{Int: newValue}))
 }
 
 func TestInterpretNoHoisting(t *testing.T) {
@@ -915,11 +936,12 @@ func TestInterpretHostFunction(t *testing.T) {
 			},
 			ReturnType: &sema.IntType{},
 		},
-		func(inter *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
+		func(inter *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int
 			b := arguments[1].(interpreter.IntValue).Int
-			result := big.NewInt(0).Add(a, b)
-			return interpreter.IntValue{Int: result}
+			value := big.NewInt(0).Add(a, b)
+			result := interpreter.IntValue{Int: value}
+			return trampoline.Done{Result: result}
 		},
 	)
 
@@ -931,3 +953,259 @@ func TestInterpretHostFunction(t *testing.T) {
 	Expect(inter.Globals["a"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
+
+func TestInterpretStructureDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       struct Test {}
+
+       fun test(): Test {
+           return Test()
+       }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(BeAssignableToTypeOf(&interpreter.StructureValue{}))
+}
+
+func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       var value = 0
+
+       struct Test {
+           init(_ newValue: Int) {
+               value = newValue
+           }
+       }
+
+       fun test(newValue: Int): Test {
+           return Test(newValue)
+       }
+	`)
+
+	newValue := big.NewInt(42)
+
+	Expect(inter.Invoke("test", newValue)).
+		To(BeAssignableToTypeOf(&interpreter.StructureValue{}))
+
+	Expect(inter.Globals["value"].Value).
+		To(Equal(interpreter.IntValue{Int: newValue}))
+}
+
+func TestInterpretStructureSelfReferenceInInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+
+      struct Test {
+
+          init() {
+              self
+          }
+      }
+
+      fun test() {
+          Test()
+      }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+}
+
+func TestInterpretStructureConstructorReferenceInInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+
+      struct Test {
+
+          init() {
+              Test
+          }
+      }
+
+      fun test() {
+          Test()
+      }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+}
+
+func TestInterpretStructureSelfReferenceInFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+
+    struct Test {
+
+        fun test() {
+            self
+        }
+    }
+
+    fun test() {
+        Test().test()
+    }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+}
+
+func TestInterpretStructureConstructorReferenceInFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+
+    struct Test {
+
+        fun test() {
+            Test
+        }
+    }
+
+    fun test() {
+        Test().test()
+    }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+}
+
+func TestInterpretStructureDeclarationWithField(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+
+      struct Test {
+          var test: Int
+
+          init(_ test: Int) {
+              self.test = test
+          }
+      }
+
+      fun test(test: Int): Int {
+          let test = Test(test)
+          return test.test
+      }
+	`)
+
+	newValue := big.NewInt(42)
+
+	Expect(inter.Invoke("test", newValue)).
+		To(Equal(interpreter.IntValue{Int: newValue}))
+}
+
+func TestInterpretStructureDeclarationWithFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var value = 0
+
+      struct Test {
+          fun test(_ newValue: Int) {
+              value = newValue
+          }
+      }
+
+      fun test(newValue: Int) {
+          let test = Test()
+          test.test(newValue)
+      }
+	`)
+
+	newValue := big.NewInt(42)
+
+	Expect(inter.Invoke("test", newValue)).
+		To(Equal(interpreter.VoidValue{}))
+
+	Expect(inter.Globals["value"].Value).
+		To(Equal(interpreter.IntValue{Int: newValue}))
+}
+
+func TestInterpretStructureFunctionCall(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Test {
+          fun foo(): Int {
+              return 42
+          }
+
+          fun bar(): Int {
+              return self.foo()
+          }
+      }
+
+      let value = Test().bar()
+	`)
+
+	Expect(inter.Globals["value"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+}
+
+func TestInterpretStructureFieldAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Test {
+          var foo: Int
+
+          init() {
+              self.foo = 1
+              let alsoSelf = self
+              alsoSelf.foo = 2
+          }
+
+          fun test() {
+              self.foo = 3
+              let alsoSelf = self
+              alsoSelf.foo = 4
+          }
+      }
+
+	  let test = Test()
+
+      fun callTest() {
+          test.test()
+      }
+	`)
+
+	Expect(inter.Globals["test"].Value.(*interpreter.StructureValue).Members["foo"]).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Invoke("callTest")).
+		To(Equal(interpreter.VoidValue{}))
+
+	Expect(inter.Globals["test"].Value.(*interpreter.StructureValue).Members["foo"]).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(4)}))
+}
+
+func TestInterpretStructureInitializesConstant(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      struct Test {
+          let foo: Int
+
+          init() {
+              self.foo = 42
+          }
+      }
+
+	  let test = Test()
+	`)
+
+	Expect(inter.Globals["test"].Value.(*interpreter.StructureValue).Members["foo"]).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+
+}
+

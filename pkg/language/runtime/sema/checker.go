@@ -69,9 +69,27 @@ func NewChecker(program *ast.Program) *Checker {
 	}
 }
 
-func (checker *Checker) Check() (err error) {
+func (checker *Checker) DeclareValue(
+	name string,
+	ty Type,
+	kind common.DeclarationKind,
+	pos ast.Position,
+	isConstant bool,
+) error {
+	err := checker.declareVariable(name, ty, kind, pos, isConstant)
+	if err == nil {
+		return nil
+	}
+	return err
+}
+
+func (checker *Checker) Check() error {
 	result := checker.Program.Accept(checker).(checkerResult)
-	return checkerError(result.Errors)
+	err := checkerError(result.Errors)
+	if err == nil {
+		return nil
+	}
+	return err
 }
 
 func (checker *Checker) IsSubType(subType Type, superType Type) bool {
@@ -193,7 +211,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 			&InvalidAccessModifierError{
 				DeclarationKind: common.DeclarationKindFunction,
 				Access:          declaration.Access,
-				Pos:             declaration.StartPos,
+				Pos:             declaration.StartPosition(),
 			},
 		)
 	}
@@ -290,7 +308,7 @@ func (checker *Checker) checkFunction(
 //
 func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) *CheckerError {
 	var errs []error
-	argumentLabelPositions := map[string]*ast.Position{}
+	argumentLabelPositions := map[string]ast.Position{}
 
 	for _, parameter := range parameters {
 		label := parameter.Label
@@ -298,18 +316,20 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) *Checke
 			continue
 		}
 
+		labelPos := *parameter.LabelPos
+
 		if previousPos, ok := argumentLabelPositions[label]; ok {
 			errs = append(errs,
 				&RedeclarationError{
 					Kind:        common.DeclarationKindArgumentLabel,
 					Name:        label,
-					Pos:         parameter.LabelPos,
-					PreviousPos: previousPos,
+					Pos:         labelPos,
+					PreviousPos: &previousPos,
 				},
 			)
 		}
 
-		argumentLabelPositions[label] = parameter.LabelPos
+		argumentLabelPositions[label] = labelPos
 	}
 
 	return checkerError(errs)
@@ -349,7 +369,7 @@ func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameter
 				IsConstant: true,
 				Type:       parameterType,
 				Depth:      depth,
-				Pos:        parameter.IdentifierPos,
+				Pos:        &parameter.IdentifierPos,
 			},
 		)
 	}
@@ -388,7 +408,13 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		}
 	}
 
-	if err := checker.declareVariable(declaration, declarationType); err != nil {
+	if err := checker.declareVariable(
+		declaration.Identifier,
+		declarationType,
+		declaration.DeclarationKind(),
+		declaration.IdentifierPosition(),
+		declaration.IsConstant,
+	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
 	}
@@ -399,20 +425,25 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 	}
 }
 
-func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty Type) *CheckerError {
+func (checker *Checker) declareVariable(
+	identifier string,
+	ty Type,
+	kind common.DeclarationKind,
+	pos ast.Position,
+	isConstant bool,
+) *CheckerError {
 	var errs []error
 
-	identifier := declaration.Identifier
+	depth := checker.valueActivations.Depth()
 
 	// check if variable with this name is already declared in the current scope
 	existingVariable := checker.findVariable(identifier)
-	depth := checker.valueActivations.Depth()
 	if existingVariable != nil && existingVariable.Depth == depth {
 		errs = append(errs,
 			&RedeclarationError{
-				Kind:        declaration.DeclarationKind(),
+				Kind:        kind,
 				Name:        identifier,
-				Pos:         declaration.IdentifierPosition(),
+				Pos:         pos,
 				PreviousPos: existingVariable.Pos,
 			},
 		)
@@ -422,10 +453,10 @@ func (checker *Checker) declareVariable(declaration *ast.VariableDeclaration, ty
 	checker.setVariable(
 		identifier,
 		&Variable{
-			IsConstant: declaration.IsConstant,
+			IsConstant: isConstant,
 			Depth:      depth,
 			Type:       ty,
-			Pos:        declaration.IdentifierPos,
+			Pos:        &pos,
 		},
 	)
 
@@ -657,8 +688,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 			&NotDeclaredError{
 				ExpectedKind: common.DeclarationKindVariable,
 				Name:         identifier,
-				StartPos:     target.StartPosition(),
-				EndPos:       target.EndPosition(),
+				Pos:          target.StartPosition(),
 			},
 		)
 	} else {
@@ -731,14 +761,18 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		// check member is not constant
 
 		if member.IsConstant {
-			errs = append(errs,
-				&AssignmentToConstantMemberError{
-					Name:     target.Identifier,
-					StartPos: assignment.Value.StartPosition(),
-					EndPos:   assignment.Value.EndPosition(),
-				},
-			)
+			if member.IsInitialized {
+				errs = append(errs,
+					&AssignmentToConstantMemberError{
+						Name:     target.Identifier,
+						StartPos: assignment.Value.StartPosition(),
+						EndPos:   assignment.Value.EndPosition(),
+					},
+				)
+			}
 		}
+
+		member.IsInitialized = true
 
 		// check value can be assigned to member
 		if !checker.IsSubType(valueType, member.Type) {
@@ -829,8 +863,7 @@ func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpressio
 		return nil, &NotDeclaredError{
 			ExpectedKind: common.DeclarationKindValue,
 			Name:         expression.Identifier,
-			StartPos:     expression.StartPosition(),
-			EndPos:       expression.EndPosition(),
+			Pos:          expression.StartPosition(),
 		}
 	}
 
@@ -1105,12 +1138,11 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 	}
 
 	// TODO: use bottom type
-	//if elementType == nil {
-	//
-	//}
+	if elementType == nil {
+		elementType = &AnyType{}
+	}
 
-	arrayType := &ConstantSizedType{
-		Size: len(expression.Values),
+	arrayType := &VariableSizedType{
 		Type: elementType,
 	}
 
@@ -1233,12 +1265,20 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		}
 
 		// if the invocation refers directly to the name of the function as stated in the declaration,
-		// the argument labels need to be supplied
+		// or the invocation refers to a function of a structure (member),
+		// check that the correct argument labels are supplied in the invocation
 
 		if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
-			if err := checker.checkInvocationArgumentLabels(
+			if err := checker.checkIdentifierInvocationArgumentLabels(
 				invocationExpression,
 				identifierExpression,
+			); err != nil {
+				errs = append(errs, err.Errors...)
+			}
+		} else if memberExpression, ok := invokedExpression.(*ast.MemberExpression); ok {
+			if err := checker.checkMemberInvocationArgumentLabels(
+				invocationExpression,
+				memberExpression,
 			); err != nil {
 				errs = append(errs, err.Errors...)
 			}
@@ -1253,7 +1293,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	}
 }
 
-func (checker *Checker) checkInvocationArgumentLabels(
+func (checker *Checker) checkIdentifierInvocationArgumentLabels(
 	invocationExpression *ast.InvocationExpression,
 	identifierExpression *ast.IdentifierExpression,
 ) *CheckerError {
@@ -1264,51 +1304,90 @@ func (checker *Checker) checkInvocationArgumentLabels(
 		errs = append(errs, err)
 	} else if variable != nil {
 		if variable.ArgumentLabels != nil {
-			argumentCount := len(invocationExpression.Arguments)
+			if err := checker.checkInvocationArgumentLabels(
+				invocationExpression.Arguments,
+				variable.ArgumentLabels,
+			); err != nil {
+				errs = append(errs, err.Errors...)
+			}
+		}
+	}
 
-			for i, argumentLabel := range variable.ArgumentLabels {
-				if i >= argumentCount {
-					break
-				}
+	return checkerError(errs)
+}
 
-				argument := invocationExpression.Arguments[i]
-				providedLabel := argument.Label
-				if argumentLabel == ArgumentLabelNotRequired {
-					// argument label is not required,
-					// check it is not provided
+func (checker *Checker) checkMemberInvocationArgumentLabels(
+	invocationExpression *ast.InvocationExpression,
+	memberExpression *ast.MemberExpression,
+) *CheckerError {
+	var errs []error
 
-					if providedLabel != "" {
-						errs = append(errs,
-							&IncorrectArgumentLabelError{
-								ActualArgumentLabel:   providedLabel,
-								ExpectedArgumentLabel: "",
-								StartPos:              argument.Expression.StartPosition(),
-								EndPos:                argument.Expression.EndPosition(),
-							},
-						)
-					}
-				} else {
-					// argument label is required,
-					// check it is provided and correct
-					if providedLabel == "" {
-						errs = append(errs,
-							&MissingArgumentLabelError{
-								ExpectedArgumentLabel: argumentLabel,
-								StartPos:              argument.Expression.StartPosition(),
-								EndPos:                argument.Expression.EndPosition(),
-							},
-						)
-					} else if providedLabel != argumentLabel {
-						errs = append(errs,
-							&IncorrectArgumentLabelError{
-								ActualArgumentLabel:   providedLabel,
-								ExpectedArgumentLabel: argumentLabel,
-								StartPos:              argument.Expression.StartPosition(),
-								EndPos:                argument.Expression.EndPosition(),
-							},
-						)
-					}
-				}
+	member, err := checker.visitMember(memberExpression)
+	if err != nil {
+		errs = append(errs, err)
+	} else if member != nil {
+		if member.ArgumentLabels != nil {
+			if err := checker.checkInvocationArgumentLabels(
+				invocationExpression.Arguments,
+				member.ArgumentLabels,
+			); err != nil {
+				errs = append(errs, err.Errors...)
+			}
+		}
+	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) checkInvocationArgumentLabels(
+	arguments []*ast.Argument,
+	argumentLabels []string,
+) *CheckerError {
+	var errs []error
+
+	argumentCount := len(arguments)
+
+	for i, argumentLabel := range argumentLabels {
+		if i >= argumentCount {
+			break
+		}
+
+		argument := arguments[i]
+		providedLabel := argument.Label
+		if argumentLabel == ArgumentLabelNotRequired {
+			// argument label is not required,
+			// check it is not provided
+
+			if providedLabel != "" {
+				errs = append(errs,
+					&IncorrectArgumentLabelError{
+						ActualArgumentLabel:   providedLabel,
+						ExpectedArgumentLabel: "",
+						StartPos:              *argument.LabelStartPos,
+						EndPos:                *argument.LabelEndPos,
+					},
+				)
+			}
+		} else {
+			// argument label is required,
+			// check it is provided and correct
+			if providedLabel == "" {
+				errs = append(errs,
+					&MissingArgumentLabelError{
+						ExpectedArgumentLabel: argumentLabel,
+						StartPos:              argument.Expression.StartPosition(),
+						EndPos:                argument.Expression.EndPosition(),
+					},
+				)
+			} else if providedLabel != argumentLabel {
+				errs = append(errs,
+					&IncorrectArgumentLabelError{
+						ActualArgumentLabel:   providedLabel,
+						ExpectedArgumentLabel: argumentLabel,
+						StartPos:              *argument.LabelStartPos,
+						EndPos:                *argument.LabelEndPos,
+					},
+				)
 			}
 		}
 	}
@@ -1405,8 +1484,7 @@ func (checker *Checker) ConvertType(t ast.Type) (Type, *CheckerError) {
 					&NotDeclaredError{
 						ExpectedKind: common.DeclarationKindType,
 						Name:         t.Identifier,
-						StartPos:     t.StartPosition(),
-						EndPos:       t.EndPosition(),
+						Pos:          t.Pos,
 					},
 				},
 			}
@@ -1466,7 +1544,7 @@ func (checker *Checker) ConvertType(t ast.Type) (Type, *CheckerError) {
 
 func (checker *Checker) declareFunction(
 	identifier string,
-	identifierPosition *ast.Position,
+	identifierPosition ast.Position,
 	functionType *FunctionType,
 	argumentLabels []string,
 ) *CheckerError {
@@ -1494,7 +1572,7 @@ func (checker *Checker) declareFunction(
 			Depth:          depth,
 			Type:           functionType,
 			ArgumentLabels: argumentLabels,
-			Pos:            identifierPosition,
+			Pos:            &identifierPosition,
 		},
 	)
 
@@ -1636,10 +1714,36 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 			errs = append(errs, err.Errors...)
 		}
 	} else if len(structure.Fields) > 0 {
+		firstField := structure.Fields[0]
+
 		// structure has fields, but no initializer
 		errs = append(errs,
-			&MissingInitializerError{},
+			&MissingInitializerError{
+				StructureType:  structureType,
+				FirstFieldName: firstField.Identifier,
+				FirstFieldPos:  firstField.IdentifierPos,
+			},
 		)
+	}
+
+	// TODO: very simple field initialization check for now.
+	//  perform proper definite assignment analysis
+
+	if structureType != nil {
+		for _, field := range structure.Fields {
+			name := field.Identifier
+			member := structureType.Members[name]
+
+			if !member.IsInitialized {
+				errs = append(errs,
+					&FieldUninitializedError{
+						Name:          name,
+						Pos:           field.IdentifierPos,
+						StructureType: structureType,
+					},
+				)
+			}
+		}
 	}
 
 	if err := checker.checkStructureFunctions(structure.Functions, structureType); err != nil {
@@ -1661,10 +1765,13 @@ func (checker *Checker) declareStructureConstructor(
 	functionType := &FunctionType{
 		ReturnType: structureType,
 	}
+
 	var argumentLabels []string
 
 	initializer := structure.Initializer
 	if initializer != nil {
+		argumentLabels = checker.argumentLabels(initializer.Parameters)
+
 		// NOTE: IGNORING errors, because initializer will be checked separately
 		// in `VisitInitializerDeclaration`, otherwise we get error duplicates
 
@@ -1707,8 +1814,9 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*Str
 
 		// NOTE: still declare member
 		members[field.Identifier] = &Member{
-			Type:       fieldType,
-			IsConstant: field.IsConstant,
+			Type:          fieldType,
+			IsConstant:    field.IsConstant,
+			IsInitialized: false,
 		}
 	}
 
@@ -1720,10 +1828,14 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*Str
 			errs = append(errs, err.Errors...)
 		}
 
+		argumentLabels := checker.argumentLabels(function.Parameters)
+
 		// NOTE: still declare member
 		members[function.Identifier] = &Member{
-			Type:       functionType,
-			IsConstant: true,
+			Type:           functionType,
+			IsConstant:     true,
+			IsInitialized:  true,
+			ArgumentLabels: argumentLabels,
 		}
 	}
 
@@ -1756,17 +1868,7 @@ func (checker *Checker) checkStructureInitializer(
 	checker.valueActivations.PushCurrent()
 	defer checker.valueActivations.Pop()
 
-	depth := checker.valueActivations.Depth()
-
-	self := &Variable{
-		Type:       selfType,
-		IsConstant: true,
-		Depth:      depth,
-	}
-	checker.setVariable(
-		SelfIdentifier,
-		self,
-	)
+	checker.declareSelf(selfType)
 
 	result := initializer.Accept(checker).(checkerResult)
 	errs = append(errs, result.Errors...)
@@ -1785,21 +1887,10 @@ func (checker *Checker) checkStructureFunctions(
 			// NOTE: new activation, as function declarations
 			// shouldn't be visible in other function declarations,
 			// and `self` is is only visible inside function
-
 			checker.valueActivations.PushCurrent()
 			defer checker.valueActivations.Pop()
 
-			depth := checker.valueActivations.Depth()
-
-			self := &Variable{
-				Type:       selfType,
-				IsConstant: true,
-				Depth:      depth,
-			}
-			checker.setVariable(
-				SelfIdentifier,
-				self,
-			)
+			checker.declareSelf(selfType)
 
 			result := function.Accept(checker).(checkerResult)
 			errs = append(errs, result.Errors...)
@@ -1809,15 +1900,32 @@ func (checker *Checker) checkStructureFunctions(
 	return checkerError(errs)
 }
 
+func (checker *Checker) declareSelf(selfType *StructureType) {
+
+	// NOTE: declare `self` one depth lower ("inside" function),
+	// so it can't be re-declared by the function's parameters
+
+	depth := checker.valueActivations.Depth() + 1
+
+	self := &Variable{
+		Type:       selfType,
+		IsConstant: true,
+		Depth:      depth,
+		Pos:        nil,
+	}
+
+	checker.setVariable(SelfIdentifier, self)
+}
+
 // checkStructureFieldAndFunctionIdentifiers checks the structure's fields and functions
 // are unique and aren't named `init`
 //
 func (checker *Checker) checkStructureFieldAndFunctionIdentifiers(structure *ast.StructureDeclaration) *CheckerError {
 	var errs []error
 
-	positions := map[string]*ast.Position{}
+	positions := map[string]ast.Position{}
 
-	checkName := func(name string, pos *ast.Position, kind common.DeclarationKind) {
+	checkName := func(name string, pos ast.Position, kind common.DeclarationKind) {
 		if name == InitializerIdentifier {
 			errs = append(errs,
 				&InvalidNameError{
@@ -1833,7 +1941,7 @@ func (checker *Checker) checkStructureFieldAndFunctionIdentifiers(structure *ast
 					Name:        name,
 					Pos:         pos,
 					Kind:        kind,
-					PreviousPos: previousPos,
+					PreviousPos: &previousPos,
 				},
 			)
 		} else {
@@ -1862,7 +1970,7 @@ func (checker *Checker) checkStructureFieldAndFunctionIdentifiers(structure *ast
 
 func (checker *Checker) declareType(
 	identifier string,
-	identifierPos *ast.Position,
+	identifierPos ast.Position,
 	newType Type,
 ) *CheckerError {
 	var errs []error
