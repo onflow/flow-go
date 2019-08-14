@@ -7,7 +7,6 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
@@ -58,15 +57,7 @@ func main() {
 
 	checker := sema.NewChecker(program)
 	for _, function := range standardLibraryFunctions {
-		err = checker.DeclareValue(
-			function.Name,
-			function.Function.Type,
-			common.DeclarationKindFunction,
-			ast.Position{},
-			true,
-			nil,
-		)
-		if err != nil {
+		if err = checker.DeclareValue(function); err != nil {
 			prettyPrintError(err, filename, code)
 			os.Exit(1)
 		}
@@ -80,7 +71,11 @@ func main() {
 
 	inter := interpreter.NewInterpreter(program)
 	for _, function := range standardLibraryFunctions {
-		inter.ImportFunction(function.Name, function.Function)
+		err = inter.ImportFunction(function.Name, function.Function)
+		if err != nil {
+			prettyPrintError(err, filename, code)
+			os.Exit(1)
+		}
 	}
 
 	err = inter.Interpret()

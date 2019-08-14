@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
@@ -13,6 +14,30 @@ type StandardLibraryFunction struct {
 	Name           string
 	Function       interpreter.HostFunctionValue
 	ArgumentLabels []string
+}
+
+func (f StandardLibraryFunction) DeclarationName() string {
+	return f.Name
+}
+
+func (f StandardLibraryFunction) DeclarationType() sema.Type {
+	return f.Function.Type
+}
+
+func (StandardLibraryFunction) DeclarationKind() common.DeclarationKind {
+	return common.DeclarationKindFunction
+}
+
+func (StandardLibraryFunction) DeclarationPosition() ast.Position {
+	return ast.Position{}
+}
+
+func (StandardLibraryFunction) DeclarationIsConstant() bool {
+	return true
+}
+
+func (StandardLibraryFunction) DeclarationArgumentLabels() []string {
+	return nil
 }
 
 func NewStandardLibraryFunction(
