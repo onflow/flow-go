@@ -30,6 +30,20 @@ func (*AnyType) Equal(other Type) bool {
 	return ok
 }
 
+// NeverType represents the bottom type
+type NeverType struct{}
+
+func (*NeverType) isType() {}
+
+func (*NeverType) String() string {
+	return "Never"
+}
+
+func (*NeverType) Equal(other Type) bool {
+	_, ok := other.(*NeverType)
+	return ok
+}
+
 // VoidType represents the void type
 type VoidType struct{}
 
@@ -372,6 +386,7 @@ func init() {
 	types := []Type{
 		&VoidType{},
 		&AnyType{},
+		&NeverType{},
 		&BoolType{},
 		&IntType{},
 		&StringType{},

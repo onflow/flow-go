@@ -11,15 +11,23 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
 )
 
-func parseAndCheck(code string) (*sema.Checker, error) {
+func parseAndCheck(code string, declarations ...sema.ValueDeclaration) (*sema.Checker, error) {
 	program, errors := parser.ParseProgram(code)
 
 	Expect(errors).
 		To(BeEmpty())
 
 	checker := sema.NewChecker(program)
+
+	for _, declaration := range declarations {
+		if err := checker.DeclareValue(declaration); err != nil {
+			return checker, err
+		}
+	}
+
 	err := checker.Check()
 	return checker, err
 }
@@ -2599,6 +2607,22 @@ func TestCheckReferenceBeforeDeclaration(t *testing.T) {
          }
       }
     `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNever(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(
+		`
+            fun test(): Int {
+                return panic("XXX")
+            }
+        `,
+		stdlib.PanicFunction,
+	)
 
 	Expect(err).
 		To(Not(HaveOccurred()))

@@ -138,7 +138,7 @@ var PanicFunction = NewStandardLibraryFunction(
 		ParameterTypes: []sema.Type{
 			&sema.StringType{},
 		},
-		ReturnType: &sema.VoidType{},
+		ReturnType: &sema.NeverType{},
 	},
 	func(inter *interpreter.Interpreter, arguments []interpreter.Value, position ast.Position) trampoline.Trampoline {
 		message := arguments[0].(interpreter.StringValue)

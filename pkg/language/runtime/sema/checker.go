@@ -107,6 +107,10 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		return true
 	}
 
+	if subType.Equal(&NeverType{}) {
+		return true
+	}
+
 	if _, ok := superType.(*IntegerType); ok {
 		switch subType.(type) {
 		case *IntType,
