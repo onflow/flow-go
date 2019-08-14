@@ -413,10 +413,17 @@ func (v *ProgramVisitor) VisitCondition(ctx *ConditionContext) interface{} {
 		panic(errors.UnreachableError{})
 	}
 
-	expression := ctx.Expression().Accept(v).(ast.Expression)
+	test := ctx.test.Accept(v).(ast.Expression)
+
+	var message ast.Expression
+	if ctx.message != nil {
+		message = ctx.message.Accept(v).(ast.Expression)
+	}
+
 	return &ast.Condition{
-		Kind:       kind,
-		Expression: expression,
+		Kind:    kind,
+		Test:    test,
+		Message: message,
 	}
 }
 

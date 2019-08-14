@@ -125,9 +125,8 @@ conditions
     : (condition eos)*
     ;
 
-// TODO: description
 condition
-    : expression
+    : test=expression (':' message=expression)?
     ;
 
 statements
