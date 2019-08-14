@@ -512,23 +512,46 @@ func (checker *Checker) visitConditions(conditions []*ast.Condition) {
 	// and ensure the result is boolean
 
 	for _, condition := range conditions {
-		conditionType := condition.Accept(checker).(Type)
-
-		if !checker.IsSubType(conditionType, &BoolType{}) {
-			checker.report(
-				&TypeMismatchError{
-					ExpectedType: &BoolType{},
-					ActualType:   conditionType,
-					StartPos:     condition.Expression.StartPosition(),
-					EndPos:       condition.Expression.EndPosition(),
-				},
-			)
-		}
+		condition.Accept(checker)
 	}
 }
 
 func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
-	return condition.Expression.Accept(checker)
+
+	// check test expression is boolean
+
+	testType := condition.Test.Accept(checker).(Type)
+
+	if !testType.Equal(&InvalidType{}) && !checker.IsSubType(testType, &BoolType{}) {
+		checker.report(
+			&TypeMismatchError{
+				ExpectedType: &BoolType{},
+				ActualType:   testType,
+				StartPos:     condition.Test.StartPosition(),
+				EndPos:       condition.Test.EndPosition(),
+			},
+		)
+	}
+
+	// check message expression results in a string
+
+	if condition.Message != nil {
+
+		messageType := condition.Message.Accept(checker).(Type)
+
+		if !messageType.Equal(&InvalidType{}) && !checker.IsSubType(messageType, &StringType{}) {
+			checker.report(
+				&TypeMismatchError{
+					ExpectedType: &StringType{},
+					ActualType:   testType,
+					StartPos:     condition.Message.StartPosition(),
+					EndPos:       condition.Message.EndPosition(),
+				},
+			)
+		}
+	}
+
+	return nil
 }
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
