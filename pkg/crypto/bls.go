@@ -10,7 +10,7 @@ type BLS_BLS12381Algo struct {
 
 // SignHash implements BLS signature on BLS12381 curve
 func (a *BLS_BLS12381Algo) SignHash(sk PrKey, h Hash) Signature {
-	hashBytes := h.ToBytes()
+	hashBytes := h.Bytes()
 	return a.SignBytes(sk, hashBytes, nil)
 }
 
@@ -30,7 +30,7 @@ func (a *BLS_BLS12381Algo) SignStruct(sk PrKey, data Encoder, alg Hasher) Signat
 
 // VerifyHash implements BLS signature verification on BLS12381 curve
 func (a *BLS_BLS12381Algo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
-	hashBytes := h.ToBytes()
+	hashBytes := h.Bytes()
 	return a.VerifyBytes(pk, s, hashBytes, nil)
 }
 
