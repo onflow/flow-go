@@ -106,12 +106,16 @@ func (e *ArgumentCountError) EndPosition() ast.Position {
 
 type ConditionError struct {
 	ConditionKind ast.ConditionKind
+	Message       string
 	StartPos      ast.Position
 	EndPos        ast.Position
 }
 
 func (e *ConditionError) Error() string {
-	return fmt.Sprintf("%s failed", e.ConditionKind.Name())
+	if e.Message == "" {
+		return fmt.Sprintf("%s failed", e.ConditionKind.Name())
+	}
+	return fmt.Sprintf("%s failed: %s", e.ConditionKind.Name(), e.Message)
 }
 
 func (e *ConditionError) StartPosition() ast.Position {

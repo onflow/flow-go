@@ -2450,7 +2450,7 @@ func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.FunctionExpressionInConditionError{}))
 }
 
-func TestCheckFunctionPostConditionWithStringMessage(t *testing.T) {
+func TestCheckFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
@@ -2465,7 +2465,7 @@ func TestCheckFunctionPostConditionWithStringMessage(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
-func TestCheckInvalidFunctionPostConditionWithNonStringMessage(t *testing.T) {
+func TestCheckInvalidFunctionPostConditionWithMessageUsingBooleanLiteral(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
@@ -2482,7 +2482,7 @@ func TestCheckInvalidFunctionPostConditionWithNonStringMessage(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
-func TestCheckFunctionPostConditionWithMessageWithResult(t *testing.T) {
+func TestCheckFunctionPostConditionWithMessageUsingResult(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
@@ -2498,7 +2498,7 @@ func TestCheckFunctionPostConditionWithMessageWithResult(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
-func TestCheckFunctionPostConditionWithMessageWithBefore(t *testing.T) {
+func TestCheckFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`

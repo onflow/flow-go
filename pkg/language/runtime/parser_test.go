@@ -2732,15 +2732,15 @@ func TestParseConditionMessage(t *testing.T) {
 							&ReturnStatement{
 								Expression: &IdentifierExpression{
 									Identifier: "n",
-									StartPos:   Position{Offset: 125, Line: 6, Column: 19},
-									EndPos:     Position{Offset: 125, Line: 6, Column: 19},
+									StartPos:   Position{Offset: 124, Line: 6, Column: 19},
+									EndPos:     Position{Offset: 124, Line: 6, Column: 19},
 								},
-								StartPos: Position{Offset: 118, Line: 6, Column: 12},
-								EndPos:   Position{Offset: 125, Line: 6, Column: 19},
+								StartPos: Position{Offset: 117, Line: 6, Column: 12},
+								EndPos:   Position{Offset: 124, Line: 6, Column: 19},
 							},
 						},
 						StartPos: Position{Offset: 26, Line: 2, Column: 25},
-						EndPos:   Position{Offset: 135, Line: 7, Column: 8},
+						EndPos:   Position{Offset: 134, Line: 7, Column: 8},
 					},
 					PreConditions: []*Condition{
 						{
@@ -2749,19 +2749,19 @@ func TestParseConditionMessage(t *testing.T) {
 								Operation: OperationGreaterEqual,
 								Left: &IdentifierExpression{
 									Identifier: "n",
-									StartPos:   Position{Offset: 63, Line: 4, Column: 16},
-									EndPos:     Position{Offset: 63, Line: 4, Column: 16},
+									StartPos:   Position{Offset: 62, Line: 4, Column: 16},
+									EndPos:     Position{Offset: 62, Line: 4, Column: 16},
 								},
 								Right: &IntExpression{
 									Value:    big.NewInt(0),
-									StartPos: Position{Offset: 68, Line: 4, Column: 21},
-									EndPos:   Position{Offset: 68, Line: 4, Column: 21},
+									StartPos: Position{Offset: 67, Line: 4, Column: 21},
+									EndPos:   Position{Offset: 67, Line: 4, Column: 21},
 								},
 							},
 							Message: &StringExpression{
 								Value:    "n must be positive",
-								StartPos: Position{Offset: 71, Line: 4, Column: 24},
-								EndPos:   Position{Offset: 90, Line: 4, Column: 43},
+								StartPos: Position{Offset: 70, Line: 4, Column: 24},
+								EndPos:   Position{Offset: 89, Line: 4, Column: 43},
 							},
 						},
 					},

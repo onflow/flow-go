@@ -1405,6 +1405,96 @@ func TestInterpretFunctionPostConditionWithBeforeFailingPostCondition(t *testing
 		To(Equal(ast.ConditionKindPost))
 }
 
+func TestInterpretFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int): Int {
+          post {
+              y == 0: "y should be zero"
+          }
+          let y = x
+          return y
+      }
+	`)
+
+	_, err := inter.Invoke("test", big.NewInt(42))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("y should be zero"))
+
+	zero := big.NewInt(0)
+	Expect(inter.Invoke("test", zero)).
+		To(Equal(interpreter.IntValue{Int: zero}))
+}
+
+func TestInterpretFunctionPostConditionWithMessageUsingResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int): String {
+          post {
+              y == 0: result
+          }
+          let y = x
+          return "return value"
+      }
+	`)
+
+	_, err := inter.Invoke("test", big.NewInt(42))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("return value"))
+
+	zero := big.NewInt(0)
+	Expect(inter.Invoke("test", zero)).
+		To(Equal(interpreter.StringValue("return value")))
+}
+
+func TestInterpretFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: String): String {
+          post {
+              1 == 2: before(x)
+          }
+          return "return value"
+      }
+	`)
+
+	_, err := inter.Invoke("test", "parameter value")
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("parameter value"))
+}
+
+func TestInterpretFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: String): String {
+          post {
+              1 == 2: x
+          }
+          return "return value"
+      }
+	`)
+
+	_, err := inter.Invoke("test", "parameter value")
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("parameter value"))
+}
+
 func TestInterpretStructCopyOnDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
