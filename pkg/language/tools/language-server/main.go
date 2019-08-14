@@ -66,7 +66,7 @@ func (server) DidChangeTextDocument(
 ) error {
 	code := params.ContentChanges[0].Text
 
-	program, parseErrors := parser.Parse(code)
+	program, parseErrors := parser.ParseProgram(code)
 	errorCount := len(parseErrors)
 
 	diagnostics := []protocol.Diagnostic{}

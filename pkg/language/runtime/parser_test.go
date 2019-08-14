@@ -1,12 +1,14 @@
 package runtime
 
 import (
-	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
 	"math/big"
 	"testing"
+
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
+
+	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 )
 
 func init() {
@@ -17,7 +19,7 @@ func init() {
 func TestParseIncompleteConstKeyword(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    le
 	`)
 
@@ -39,7 +41,7 @@ func TestParseIncompleteConstKeyword(t *testing.T) {
 func TestParseIncompleteConstantDeclaration1(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let
 	`)
 
@@ -61,7 +63,7 @@ func TestParseIncompleteConstantDeclaration1(t *testing.T) {
 func TestParseIncompleteConstantDeclaration2(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let =
 	`)
 
@@ -91,7 +93,7 @@ func TestParseIncompleteConstantDeclaration2(t *testing.T) {
 func TestParseBoolExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = true
 	`)
 
@@ -121,7 +123,7 @@ func TestParseBoolExpression(t *testing.T) {
 func TestParseIdentifierExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let b = a
 	`)
 
@@ -151,7 +153,7 @@ func TestParseIdentifierExpression(t *testing.T) {
 func TestParseArrayExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = [1, 2]
 	`)
 
@@ -192,7 +194,7 @@ func TestParseArrayExpression(t *testing.T) {
 func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = b(1, 2)
 	`)
 
@@ -203,7 +205,7 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 		IsConstant: true,
 		Identifier: "a",
 		Value: &InvocationExpression{
-			Expression: &IdentifierExpression{
+			InvokedExpression: &IdentifierExpression{
 				Identifier: "b",
 				StartPos:   Position{Offset: 14, Line: 2, Column: 13},
 				EndPos:     Position{Offset: 14, Line: 2, Column: 13},
@@ -243,7 +245,7 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 func TestParseInvocationExpressionWithLabels(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = b(x: 1, y: 2)
 	`)
 
@@ -254,7 +256,7 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 		IsConstant: true,
 		Identifier: "a",
 		Value: &InvocationExpression{
-			Expression: &IdentifierExpression{
+			InvokedExpression: &IdentifierExpression{
 				Identifier: "b",
 				StartPos:   Position{Offset: 14, Line: 2, Column: 13},
 				EndPos:     Position{Offset: 14, Line: 2, Column: 13},
@@ -298,7 +300,7 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 func TestParseMemberExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = b.c
 	`)
 
@@ -333,7 +335,7 @@ func TestParseMemberExpression(t *testing.T) {
 func TestParseIndexExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = b[1]
 	`)
 
@@ -372,7 +374,7 @@ func TestParseIndexExpression(t *testing.T) {
 func TestParseUnaryExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let foo = -boo
 	`)
 
@@ -407,7 +409,7 @@ func TestParseUnaryExpression(t *testing.T) {
 func TestParseOrExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = false || true
 	`)
 
@@ -446,7 +448,7 @@ func TestParseOrExpression(t *testing.T) {
 func TestParseAndExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = false && true
 	`)
 
@@ -485,7 +487,7 @@ func TestParseAndExpression(t *testing.T) {
 func TestParseEqualityExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = false == true
 	`)
 
@@ -524,7 +526,7 @@ func TestParseEqualityExpression(t *testing.T) {
 func TestParseRelationalExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = 1 < 2
 	`)
 
@@ -563,7 +565,7 @@ func TestParseRelationalExpression(t *testing.T) {
 func TestParseAdditiveExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = 1 + 2
 	`)
 
@@ -602,7 +604,7 @@ func TestParseAdditiveExpression(t *testing.T) {
 func TestParseMultiplicativeExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = 1 * 2
 	`)
 
@@ -641,7 +643,7 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 func TestParseFunctionExpressionAndReturn(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let test = fun (): Int { return 1 }
 	`)
 
@@ -690,7 +692,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 func TestParseFunctionAndBlock(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() { return }
 	`)
 
@@ -730,7 +732,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test(x: Int) { }
 	`)
 
@@ -778,7 +780,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 func TestParseFunctionParameterWithLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test(x y: Int) { }
 	`)
 
@@ -826,7 +828,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 func TestParseIfStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() {
             if true {
                 return
@@ -937,7 +939,7 @@ func TestParseIfStatement(t *testing.T) {
 func TestParseIfStatementNoElse(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() {
             if true {
                 return
@@ -996,7 +998,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 func TestParseWhileStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() {
             while true {
               return
@@ -1066,7 +1068,7 @@ func TestParseWhileStatement(t *testing.T) {
 func TestParseAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() {
             a = 1
         }
@@ -1116,7 +1118,7 @@ func TestParseAssignment(t *testing.T) {
 func TestParseAccessAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() {
             x.foo.bar[0][1].baz = 1
         }
@@ -1199,7 +1201,7 @@ func TestParseAccessAssignment(t *testing.T) {
 func TestParseExpressionStatementWithAccess(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() { x.foo.bar[0][1].baz }
 	`)
 
@@ -1275,7 +1277,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 func TestParseParametersAndArrayTypes(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		pub fun test(a: Int32, b: Int32[2], c: Int32[][3]): Int64[][] {}
 	`)
 
@@ -1364,7 +1366,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 func TestParseIntegerLiterals(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let octal = 0o32
         let hex = 0xf2
         let binary = 0b101010
@@ -1433,7 +1435,7 @@ func TestParseIntegerLiterals(t *testing.T) {
 func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let octal = 0o32_45
         let hex = 0xf2_09
         let binary = 0b101010_101010
@@ -1502,7 +1504,7 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let octal = 0o_32_45
 	`)
 
@@ -1530,7 +1532,7 @@ func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let octal = 0o32_45_
 	`)
 
@@ -1558,7 +1560,7 @@ func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let binary = 0b_101010_101010
 	`)
 
@@ -1586,7 +1588,7 @@ func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let binary = 0b101010_101010_
 	`)
 
@@ -1614,7 +1616,7 @@ func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let decimal = 1_234_567_890_
 	`)
 
@@ -1642,7 +1644,7 @@ func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let hex = 0x_f2_09
 	`)
 
@@ -1670,7 +1672,7 @@ func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T
 func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let hex = 0xf2_09_
 	`)
 
@@ -1699,7 +1701,7 @@ func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.
 func TestParseInvalidIntegerLiteral(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let hex = 0z123
 	`)
 
@@ -1727,7 +1729,7 @@ func TestParseInvalidIntegerLiteral(t *testing.T) {
 func TestParseIntegerTypes(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let a: Int8 = 1
 		let b: Int16 = 2
 		let c: Int32 = 3
@@ -1873,7 +1875,7 @@ func TestParseIntegerTypes(t *testing.T) {
 func TestParseFunctionType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let add: ((Int8, Int16): Int32) = nothing
 	`)
 
@@ -1921,7 +1923,7 @@ func TestParseFunctionType(t *testing.T) {
 func TestParseFunctionArrayType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let test: ((Int8): Int16)[2] = []
 	`)
 
@@ -1969,7 +1971,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let test: ((Int8): Int16[2]) = nothing
 	`)
 
@@ -2018,7 +2020,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
@@ -2072,7 +2074,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
@@ -2126,7 +2128,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 func TestParseMissingReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let noop: ((): Void) =
             fun () { return }
 	`)
@@ -2178,7 +2180,7 @@ func TestParseMissingReturnType(t *testing.T) {
 func TestParseLeftAssociativity(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = 1 + 2 + 3
 	`)
 
@@ -2225,7 +2227,7 @@ func TestParseLeftAssociativity(t *testing.T) {
 func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	program, errors := parser.ParseProgram(`
 	   var a = 1
 	   let b = --a
 	`)
@@ -2244,7 +2246,7 @@ func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
 func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	program, errors := parser.ParseProgram(`
 	   let b = !!true
 	`)
 
@@ -2262,7 +2264,7 @@ func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
 func TestParseTernaryRightAssociativity(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = 2 > 1
           ? 0
           : 3 > 2 ? 1 : 2
@@ -2335,7 +2337,7 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 func TestParseStructure(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         struct Test {
             pub(set) var foo: Int
 
@@ -2462,7 +2464,7 @@ func TestParseStructure(t *testing.T) {
 func TestParsePreAndPostConditions(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         fun test(n: Int) {
             pre {
                 n != 0
@@ -2570,6 +2572,72 @@ func TestParsePreAndPostConditions(t *testing.T) {
 				StartPos:      Position{Offset: 9, Line: 2, Column: 8},
 				IdentifierPos: Position{Offset: 13, Line: 2, Column: 12},
 			},
+		},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseExpression(`
+        before(x + before(y)) + z
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	expected := &BinaryExpression{
+		Operation: OperationPlus,
+		Left: &InvocationExpression{
+			InvokedExpression: &IdentifierExpression{
+				Identifier: "before",
+				StartPos:   Position{Offset: 9, Line: 2, Column: 8},
+				EndPos:     Position{Offset: 14, Line: 2, Column: 13},
+			},
+			Arguments: []*Argument{
+				{
+					Label:         "",
+					LabelStartPos: nil,
+					LabelEndPos:   nil,
+					Expression: &BinaryExpression{
+						Operation: OperationPlus,
+						Left: &IdentifierExpression{
+							Identifier: "x",
+							StartPos:   Position{Offset: 16, Line: 2, Column: 15},
+							EndPos:     Position{Offset: 16, Line: 2, Column: 15},
+						},
+						Right: &InvocationExpression{
+							InvokedExpression: &IdentifierExpression{
+								Identifier: "before",
+								StartPos:   Position{Offset: 20, Line: 2, Column: 19},
+								EndPos:     Position{Offset: 25, Line: 2, Column: 24},
+							},
+							Arguments: []*Argument{
+								{
+									Label:         "",
+									LabelStartPos: nil,
+									LabelEndPos:   nil,
+									Expression: &IdentifierExpression{
+										Identifier: "y",
+										StartPos:   Position{Offset: 27, Line: 2, Column: 26},
+										EndPos:     Position{Offset: 27, Line: 2, Column: 26},
+									},
+								},
+							},
+							EndPos: Position{Offset: 28, Line: 2, Column: 27},
+						},
+					},
+				},
+			},
+			EndPos: Position{Offset: 29, Line: 2, Column: 28},
+		},
+		Right: &IdentifierExpression{
+			Identifier: "z",
+			StartPos:   Position{Offset: 33, Line: 2, Column: 32},
+			EndPos:     Position{Offset: 33, Line: 2, Column: 32},
 		},
 	}
 

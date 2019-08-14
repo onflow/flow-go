@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
-
-	"io/ioutil"
-	"os"
 )
 
 // main parses the given filename and prints any syntax errors.
@@ -30,7 +30,7 @@ func main() {
 	}
 	code := string(data)
 
-	program, errors := parser.Parse(code)
+	program, errors := parser.ParseProgram(code)
 	if len(errors) > 0 {
 		for _, err := range errors {
 			prettyPrintError(err, filename, code)

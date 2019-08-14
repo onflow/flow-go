@@ -1,14 +1,15 @@
 package runtime
 
 import (
+	"math/big"
+	"testing"
+
+	. "github.com/onsi/gomega"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
-	"math/big"
-	"testing"
 )
 
 func init() {
@@ -16,7 +17,7 @@ func init() {
 }
 
 func parseCheckAndInterpret(code string) *interpreter.Interpreter {
-	program, errors := parser.Parse(code)
+	program, errors := parser.ParseProgram(code)
 
 	Expect(errors).
 		To(BeEmpty())
@@ -919,7 +920,7 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	program, errors := parser.ParseProgram(`
       let a = test(1, 2)
 	`)
 
@@ -1251,3 +1252,39 @@ func TestInterpretFunctionPostCondition(t *testing.T) {
 		To(Equal(interpreter.IntValue{Int: zero}))
 }
 
+func TestInterpretFunctionWithResultAndPostConditionWithResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int): Int {
+          post {
+              result == 0
+          }
+          return x
+      }
+	`)
+
+	_, err := inter.Invoke("test", big.NewInt(42))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	zero := big.NewInt(0)
+	Expect(inter.Invoke("test", zero)).
+		To(Equal(interpreter.IntValue{Int: zero}))
+}
+
+func TestInterpretFunctionWithoutResultAndPostConditionWithResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test() {
+          post {
+              result == 0
+          }
+          let result = 0
+      }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+}

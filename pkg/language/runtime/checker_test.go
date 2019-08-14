@@ -2,17 +2,19 @@ package runtime
 
 import (
 	"fmt"
+	"testing"
+
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/types"
-	"testing"
 )
 
 func parseAndCheck(code string) (*sema.Checker, error) {
-	program, errors := parser.Parse(code)
+	program, errors := parser.ParseProgram(code)
 
 	Expect(errors).
 		To(BeEmpty())
@@ -2146,11 +2148,11 @@ func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-    fun test(x: Int) {
-        post {
-            before(x) != 0
-        }
-    }
+      fun test(x: Int) {
+          post {
+              before(x) != 0
+          }
+      }
 	`)
 
 	Expect(err).
@@ -2177,6 +2179,37 @@ func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
 
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+}
+
+func TestCheckInvalidFunctionWithBeforeVariableAndPostConditionWithBefore(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int) {
+          post {
+              before(x) == 0
+          }
+          let before = 0
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+func TestCheckFunctionWithBeforeVariable(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int) {
+          let before = 0
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 }
 
 func TestCheckFunctionPostCondition(t *testing.T) {
@@ -2273,4 +2306,88 @@ func TestCheckInvalidFunctionPostConditionWithResult(t *testing.T) {
 
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+}
+
+func TestCheckFunctionWithoutReturnTypeAndLocalResultAndPostConditionWithResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          post {
+              result == 0
+          }
+          let result = 0
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckFunctionWithoutReturnTypeAndResultParameterAndPostConditionWithResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(result: Int) {
+          post {
+              result == 0
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidFunctionWithReturnTypeAndLocalResultAndPostConditionWithResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          post {
+              result == 2
+          }
+          let result = 1
+          return result * 2
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
+// TODO: should this be invalid?
+func TestCheckFunctionWithReturnTypeAndResultParameterAndPostConditionWithResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(result: Int): Int {
+          post {
+              result == 2
+          }
+          return result * 2
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          post {
+              (fun (): Int { return 2 })() == 2
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.FunctionExpressionInConditionError{}))
 }

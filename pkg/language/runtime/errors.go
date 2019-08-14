@@ -2,11 +2,13 @@ package runtime
 
 import (
 	"fmt"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"github.com/logrusorgru/aurora"
 	"strconv"
 	"strings"
+
+	"github.com/logrusorgru/aurora"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
 func colorizeError(message string) string {

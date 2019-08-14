@@ -1,9 +1,10 @@
 package trampoline
 
 import (
-	. "github.com/onsi/gomega"
 	"strconv"
 	"testing"
+
+	. "github.com/onsi/gomega"
 )
 
 func TestFlatMapDone(t *testing.T) {

@@ -2,10 +2,12 @@ package sema
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/raviqqe/hamt"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"github.com/raviqqe/hamt"
-	"strings"
 )
 
 type Type interface {

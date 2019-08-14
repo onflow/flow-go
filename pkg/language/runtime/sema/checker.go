@@ -1,11 +1,12 @@
 package sema
 
 import (
+	"strings"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"strings"
 )
 
 const ArgumentLabelNotRequired = "_"
@@ -57,6 +58,7 @@ type Checker struct {
 	typeActivations  *activations.Activations
 	functionContexts []*functionContext
 	Globals          map[string]*Variable
+	inCondition      bool
 }
 
 func NewChecker(program *ast.Program) *Checker {
@@ -540,13 +542,21 @@ func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, ret
 		errs = append(errs, err.Errors...)
 	}
 
-	if err := checker.declareBefore(); err != nil {
-		errs = append(errs, err.Errors...)
+	// if there is a post-condition, declare the function `before`
+
+	// TODO: improve: only declare when a condition actually refers to `before`?
+
+	if len(functionBlock.PostConditions) > 0 {
+		if err := checker.declareBefore(); err != nil {
+			errs = append(errs, err.Errors...)
+		}
 	}
 
 	// if there is a return type, declare the constant `result`
 	// which has the return type
+
 	if !returnType.Equal(&VoidType{}) {
+
 		if err := checker.declareVariable(
 			ResultIdentifier,
 			returnType,
@@ -591,6 +601,19 @@ func (checker *Checker) declareBefore() *CheckerError {
 
 func (checker *Checker) visitConditions(conditions []*ast.Condition) *CheckerError {
 	var errs []error
+
+	// flag the checker to be inside a condition.
+	// this flag is used to detect illegal expressions,
+	// see e.g. VisitFunctionExpression
+
+	wasInCondition := checker.inCondition
+	checker.inCondition = true
+	defer func() {
+		checker.inCondition = wasInCondition
+	}()
+
+	// check all conditions: check the expression
+	// and ensure the result is boolean
 
 	for _, condition := range conditions {
 		conditionResult := condition.Accept(checker).(checkerResult)
@@ -1353,7 +1376,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 
 	// check the invoked expression can be invoked
 
-	invokedExpression := invocationExpression.Expression
+	invokedExpression := invocationExpression.InvokedExpression
 	expressionResult := invokedExpression.Accept(checker).(checkerResult)
 	errs = append(errs, expressionResult.Errors...)
 
@@ -1585,6 +1608,17 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
+	}
+
+	// function expressions are not allowed in conditions
+
+	if checker.inCondition {
+		errs = append(errs,
+			&FunctionExpressionInConditionError{
+				StartPos: expression.StartPosition(),
+				EndPos:   expression.EndPosition(),
+			},
+		)
 	}
 
 	return checkerResult{
