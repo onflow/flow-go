@@ -1670,3 +1670,64 @@ func TestInterpretStructCopyOnPassing(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.BoolValue(false)))
 }
+
+func TestInterpretMutuallyRecursiveFunctions(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun isEven(_ n: Int): Bool {
+          if n == 0 {
+              return true
+          }
+          return isOdd(n - 1)
+      }
+
+      fun isOdd(_ n: Int): Bool {
+          if n == 0 {
+              return false
+          }
+          return isEven(n - 1)
+      }
+    `)
+
+	four := big.NewInt(4)
+
+	Expect(inter.Invoke("isEven", four)).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Invoke("isOdd", four)).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var tests = 0
+
+      fun test(): Test {
+          return Test()
+      }
+
+      struct Test {
+         init() {
+             tests = tests + 1
+         }
+      }
+    `)
+
+	Expect(inter.Globals["tests"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+
+	Expect(inter.Invoke("test")).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+
+	Expect(inter.Globals["tests"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+
+	Expect(inter.Invoke("test")).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+
+	Expect(inter.Globals["tests"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+}
