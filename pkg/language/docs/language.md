@@ -2318,7 +2318,7 @@ and optional preconditions and postconditions.
 Field requirements consist of the name and the type of the field.
 Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
 
-Calling functions with pre-conditions and post-conditions on interfaces instead of concrete implementations can improve the security of a program,
+Calling functions with preconditions and postconditions on interfaces instead of concrete implementations can improve the security of a program,
 as it ensures that even if implementations change, some aspects of them will always hold.
 
 ### Interface Declaration
@@ -2412,7 +2412,7 @@ resource interface FungibleToken {
     // The given token must be of the same type – a deposit of another
     // type is not possible.
     //
-    // No pre-condition is required to check the given token's balance
+    // No precondition is required to check the given token's balance
     // is positive, as this condition is already ensured by
     // the field requirement.
     //
@@ -3005,14 +3005,14 @@ using Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
 
 Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.
 
-Transactions have three phases: Preparation, execution, and post-conditions.
+Transactions have three phases: Preparation, execution, and postconditions.
 
 The preparer acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
 The preparer has the permissions to read and write to storage of all signer accounts.
 
 Transactions are declared using the `transaction` keyword.
 The preparer is declared using the `prepare` keyword and the execution phase is declared using the `execute` keyword.
-The `post` section can be used to declare post-conditions.
+The `post` section can be used to declare postconditions.
 
 ```bamboo,file=transaction-declaration.bpl
 transaction {
@@ -3387,11 +3387,11 @@ Should the standard library provide a set data structure?
 
 Should we add generics? In what form? Is it OK to add them in a later version?
 
-### Calls of Pure Functions in Pre-Conditions and Post-Conditions
+### Calls of Pure Functions in Preconditions and Postconditions
 
 > ➡️ <https://github.com/dapperlabs/bamboo-node/issues/70>
 
-It might be useful to call pure functions pre-conditions and post-conditons.
+It might be useful to call pure functions preconditions and postconditons.
 How do we ensure preconditions and postconditions are side-effect free?
 
 ### Late Initialization of Variables and Constants
