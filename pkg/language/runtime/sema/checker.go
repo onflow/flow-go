@@ -38,7 +38,7 @@ type Checker struct {
 	functionContexts []*functionContext
 	Globals          map[string]*Variable
 	inCondition      bool
-	types            map[ast.Element]Type
+	Types            map[ast.Element]Type
 }
 
 func NewChecker(program *ast.Program) *Checker {
@@ -53,7 +53,7 @@ func NewChecker(program *ast.Program) *Checker {
 		valueActivations: valueActivations,
 		typeActivations:  typeActivations,
 		Globals:          map[string]*Variable{},
-		types:            map[ast.Element]Type{},
+		Types:            map[ast.Element]Type{},
 	}
 }
 
@@ -218,7 +218,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 
 	// global functions were previously declared, see `declareFunctionDeclaration`
 
-	functionType, ok := checker.types[declaration].(*FunctionType)
+	functionType, ok := checker.Types[declaration].(*FunctionType)
 	if !ok {
 		functionType = checker.declareFunctionDeclaration(declaration)
 	}
@@ -237,7 +237,7 @@ func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDecl
 	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
 	argumentLabels := checker.argumentLabels(declaration.Parameters)
 
-	checker.types[declaration] = functionType
+	checker.Types[declaration] = functionType
 
 	checker.declareFunction(
 		declaration.Identifier,
@@ -1455,6 +1455,8 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	// TODO: infer
 	functionType := checker.functionType(expression.Parameters, expression.ReturnType)
 
+	checker.Types[expression] = functionType
+
 	checker.checkFunction(
 		expression.Parameters,
 		functionType,
@@ -1637,7 +1639,7 @@ func (checker *Checker) visitConditional(
 
 func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
 
-	structureType := checker.types[structure].(*StructureType)
+	structureType := checker.Types[structure].(*StructureType)
 
 	checker.checkStructureFieldAndFunctionIdentifiers(structure)
 
@@ -1688,7 +1690,7 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 		*temporaryStructureType = *structureType
 	}
 
-	checker.types[structure] = structureType
+	checker.Types[structure] = structureType
 
 	// declare constructor
 
@@ -1749,6 +1751,8 @@ func (checker *Checker) declareStructureConstructor(
 			ReturnType:     structureType,
 		}
 	}
+
+	checker.Types[initializer] = functionType
 
 	checker.declareFunction(
 		structure.Identifier,

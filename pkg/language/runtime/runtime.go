@@ -171,7 +171,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 		return nil, RuntimeError{[]error{err}}
 	}
 
-	inter := interpreter.NewInterpreter(program)
+	inter := interpreter.NewInterpreter(checker)
 	for _, function := range functions {
 		if err := inter.ImportFunction(function.Name, function.Function); err != nil {
 			return nil, RuntimeError{[]error{err}}

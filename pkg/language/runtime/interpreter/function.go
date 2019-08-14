@@ -21,6 +21,7 @@ type FunctionValue interface {
 
 type InterpretedFunctionValue struct {
 	Expression *ast.FunctionExpression
+	ReturnType sema.Type
 	Activation hamt.Map
 }
 
@@ -32,9 +33,14 @@ func (f InterpretedFunctionValue) Copy() Value {
 
 func (InterpretedFunctionValue) isFunctionValue() {}
 
-func newInterpretedFunction(expression *ast.FunctionExpression, activation hamt.Map) InterpretedFunctionValue {
+func newInterpretedFunction(
+	expression *ast.FunctionExpression,
+	returnType sema.Type,
+	activation hamt.Map,
+) InterpretedFunctionValue {
 	return InterpretedFunctionValue{
 		Expression: expression,
+		ReturnType: returnType,
 		Activation: activation,
 	}
 }

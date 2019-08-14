@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 )
 
@@ -25,7 +26,7 @@ func parseCheckAndInterpret(code string) *interpreter.Interpreter {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	inter := interpreter.NewInterpreter(program)
+	inter := interpreter.NewInterpreter(checker)
 	err = inter.Interpret()
 
 	Expect(err).
@@ -928,9 +929,8 @@ func TestInterpretHostFunction(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	inter := interpreter.NewInterpreter(program)
-
-	testFunction := interpreter.NewHostFunctionValue(
+	testFunction := stdlib.NewStandardLibraryFunction(
+		"test",
 		&sema.FunctionType{
 			ParameterTypes: []sema.Type{
 				&sema.IntType{},
@@ -945,9 +945,22 @@ func TestInterpretHostFunction(t *testing.T) {
 			result := interpreter.IntValue{Int: value}
 			return trampoline.Done{Result: result}
 		},
+		nil,
 	)
 
-	err := inter.ImportFunction("test", testFunction)
+	checker := sema.NewChecker(program)
+
+	err := checker.DeclareValue(testFunction)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	err = checker.Check()
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	inter := interpreter.NewInterpreter(checker)
+
+	err = inter.ImportFunction(testFunction.Name, testFunction.Function)
 	Expect(err).
 		To(Not(HaveOccurred()))
 

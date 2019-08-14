@@ -24,14 +24,14 @@ type functionReturn struct {
 // are treated like they are returning a value.
 
 type Interpreter struct {
-	Program     *ast.Program
+	Checker     *sema.Checker
 	activations *activations.Activations
 	Globals     map[string]*Variable
 }
 
-func NewInterpreter(program *ast.Program) *Interpreter {
+func NewInterpreter(checker *sema.Checker) *Interpreter {
 	return &Interpreter{
-		Program:     program,
+		Checker:     checker,
 		activations: &activations.Activations{},
 		Globals:     map[string]*Variable{},
 	}
@@ -76,11 +76,11 @@ func (interpreter *Interpreter) Interpret() (err error) {
 	}()
 
 	// pre-declare empty variables for all structure and function declarations
-	for _, declaration := range interpreter.Program.StructureDeclarations() {
+	for _, declaration := range interpreter.Checker.Program.StructureDeclarations() {
 		interpreter.declareVariable(declaration.Identifier, nil)
 	}
 
-	for _, declaration := range interpreter.Program.FunctionDeclarations() {
+	for _, declaration := range interpreter.Checker.Program.FunctionDeclarations() {
 		interpreter.declareVariable(declaration.Identifier, nil)
 	}
 
@@ -92,7 +92,7 @@ func (interpreter *Interpreter) Interpret() (err error) {
 }
 
 func (interpreter *Interpreter) visitProgramDeclarations() Trampoline {
-	return interpreter.visitGlobalDeclarations(interpreter.Program.Declarations)
+	return interpreter.visitGlobalDeclarations(interpreter.Checker.Program.Declarations)
 }
 
 func (interpreter *Interpreter) visitGlobalDeclarations(declarations []ast.Declaration) Trampoline {
@@ -225,6 +225,8 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 
 	identifier := declaration.Identifier
 
+	functionType := interpreter.Checker.Types[declaration].(*sema.FunctionType)
+
 	variable := interpreter.findOrDeclareVariable(identifier)
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
@@ -234,7 +236,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	lexicalScope = lexicalScope.Insert(common.StringKey(identifier), variable)
 
 	functionExpression := declaration.ToExpression()
-	variable.Value = newInterpretedFunction(functionExpression, lexicalScope)
+	variable.Value = newInterpretedFunction(functionExpression, functionType.ReturnType, lexicalScope)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
@@ -286,7 +288,7 @@ func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBl
 	panic(&errors.UnreachableError{})
 }
 
-func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnType ast.Type) Trampoline {
+func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnType sema.Type) Trampoline {
 
 	// block scope: each function block gets an activation record
 	interpreter.activations.PushCurrent()
@@ -314,8 +316,7 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 					// if there is a return type, declare the constant `result`
 					// which has the return value
 
-					// TODO: improve
-					if ty, ok := returnType.(*ast.NominalType); ok && ty.Identifier != "" {
+					if !returnType.Equal(&sema.VoidType{}) {
 						interpreter.declareVariable(sema.ResultIdentifier, resultValue)
 					}
 
@@ -874,7 +875,7 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 
 	functionBlockTrampoline := interpreter.visitFunctionBlock(
 		function.Expression.FunctionBlock,
-		function.Expression.ReturnType,
+		function.ReturnType,
 	)
 
 	return functionBlockTrampoline.
@@ -917,7 +918,9 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	function := newInterpretedFunction(expression, lexicalScope)
+	functionType := interpreter.Checker.Types[expression].(*sema.FunctionType)
+
+	function := newInterpretedFunction(expression, functionType.ReturnType, lexicalScope)
 
 	return Done{Result: function}
 }
@@ -955,8 +958,11 @@ func (interpreter *Interpreter) declareStructureConstructor(declaration *ast.Str
 
 	var initializerFunction *InterpretedFunctionValue
 	if initializer != nil {
+
+		functionType := interpreter.Checker.Types[initializer].(*sema.FunctionType)
+
 		functionExpression := initializer.ToFunctionExpression()
-		function := newInterpretedFunction(functionExpression, lexicalScope)
+		function := newInterpretedFunction(functionExpression, functionType.ReturnType, lexicalScope)
 		initializerFunction = &function
 	}
 
@@ -1028,9 +1034,11 @@ func (interpreter *Interpreter) structureFunctions(
 	functions := map[string]InterpretedFunctionValue{}
 
 	for _, functionDeclaration := range declaration.Functions {
+		functionType := interpreter.Checker.Types[functionDeclaration].(*sema.FunctionType)
+
 		function := functionDeclaration.ToExpression()
 		functions[functionDeclaration.Identifier] =
-			newInterpretedFunction(function, lexicalScope)
+			newInterpretedFunction(function, functionType.ReturnType, lexicalScope)
 	}
 
 	return functions
