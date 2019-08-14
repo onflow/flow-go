@@ -1,6 +1,8 @@
 package sema
 
 import (
+	"github.com/raviqqe/hamt"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
@@ -36,17 +38,22 @@ type Checker struct {
 	functionContexts []*functionContext
 	Globals          map[string]*Variable
 	inCondition      bool
+	types            map[ast.Element]Type
 }
 
 func NewChecker(program *ast.Program) *Checker {
 	typeActivations := &activations.Activations{}
 	typeActivations.Push(baseTypes)
 
+	valueActivations := &activations.Activations{}
+	valueActivations.Push(hamt.NewMap())
+
 	return &Checker{
 		Program:          program,
-		valueActivations: &activations.Activations{},
+		valueActivations: valueActivations,
 		typeActivations:  typeActivations,
 		Globals:          map[string]*Variable{},
+		types:            map[ast.Element]Type{},
 	}
 }
 
@@ -171,10 +178,21 @@ func (checker *Checker) popActivations() {
 }
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
+
+	// pre-declare structures and functions (check afterwards)
+
+	for _, structureDeclaration := range program.StructureDeclarations() {
+		checker.declareStructureDeclaration(structureDeclaration)
+	}
+
+	for _, functionDeclaration := range program.FunctionDeclarations() {
+		checker.declareFunctionDeclaration(functionDeclaration)
+	}
+
+	// check all declarations
+
 	for _, declaration := range program.Declarations {
-
 		declaration.Accept(checker)
-
 		checker.declareGlobal(declaration)
 	}
 
@@ -182,9 +200,46 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
+
+	checker.checkFunctionAccessModifier(declaration)
+
+	// global functions were previously declared, see `declareFunctionDeclaration`
+
+	functionType, ok := checker.types[declaration].(*FunctionType)
+	if !ok {
+		functionType = checker.declareFunctionDeclaration(declaration)
+	}
+
+	checker.checkFunction(
+		declaration.Parameters,
+		functionType,
+		declaration.FunctionBlock,
+	)
+
+	return nil
+}
+
+func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDeclaration) *FunctionType {
+
+	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
+	argumentLabels := checker.argumentLabels(declaration.Parameters)
+
+	checker.types[declaration] = functionType
+
+	checker.declareFunction(
+		declaration.Identifier,
+		declaration.IdentifierPos,
+		functionType,
+		argumentLabels,
+	)
+
+	return functionType
+}
+
+func (checker *Checker) checkFunctionAccessModifier(declaration *ast.FunctionDeclaration) {
 	switch declaration.Access {
 	case ast.AccessNotSpecified, ast.AccessPublic:
-		break
+		return
 	default:
 		checker.report(
 			&InvalidAccessModifierError{
@@ -194,31 +249,6 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 			},
 		)
 	}
-
-	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
-
-	argumentLabels := checker.argumentLabels(declaration.Parameters)
-
-	// declare the function before checking it,
-	// so it can be referred to inside the function
-
-	checker.declareFunction(
-		declaration.Identifier,
-		declaration.IdentifierPos,
-		functionType,
-		argumentLabels,
-	)
-
-	// check the function after declaring,
-	// so it can be referred to inside the function
-
-	checker.checkFunction(
-		declaration.Parameters,
-		functionType,
-		declaration.FunctionBlock,
-	)
-
-	return nil
 }
 
 func (checker *Checker) argumentLabels(parameters []*ast.Parameter) []string {
@@ -1594,41 +1624,15 @@ func (checker *Checker) visitConditional(
 
 func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
 
+	structureType := checker.types[structure].(*StructureType)
+
 	checker.checkStructureFieldAndFunctionIdentifiers(structure)
-
-	// NOTE: fields and functions might already refer to structure itself.
-	// insert a dummy type for now, so lookup succeeds during conversion,
-	// then fix up the type reference
-
-	temporaryStructureType := &StructureType{}
-
-	checker.declareType(
-		structure.Identifier,
-		structure.IdentifierPos,
-		temporaryStructureType,
-	)
-
-	structureType := checker.structureType(structure)
-
-	if structureType != nil {
-		*temporaryStructureType = *structureType
-	}
-
-	// declare the constructor function before checking initializer and functions,
-	// so the constructor function can be referred to inside them
-
-	initializer := structure.Initializer
-	var parameterTypes []Type
-	if initializer != nil {
-		parameterTypes = checker.parameterTypes(initializer.Parameters)
-	}
-
-	checker.declareStructureConstructor(structure, structureType, parameterTypes)
 
 	// check the initializer
 
+	initializer := structure.Initializer
 	if initializer != nil {
-		checker.checkStructureInitializer(initializer, parameterTypes, structureType)
+		checker.checkStructureInitializer(initializer, structureType)
 	} else if len(structure.Fields) > 0 {
 		firstField := structure.Fields[0]
 
@@ -1649,6 +1653,43 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 	checker.checkStructureFunctions(structure.Functions, structureType)
 
 	return nil
+}
+
+func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDeclaration) {
+
+	// NOTE: fields and functions might already refer to structure itself.
+	// insert a dummy type for now, so lookup succeeds during conversion,
+	// then fix up the type reference
+
+	temporaryStructureType := &StructureType{}
+
+	checker.declareType(
+		structure.Identifier,
+		structure.IdentifierPos,
+		temporaryStructureType,
+	)
+
+	structureType := checker.structureType(structure)
+
+	if structureType != nil {
+		*temporaryStructureType = *structureType
+	}
+
+	checker.types[structure] = structureType
+
+	// declare constructor
+
+	initializer := structure.Initializer
+	var parameterTypes []Type
+	if initializer != nil {
+		parameterTypes = checker.parameterTypes(initializer.Parameters)
+	}
+
+	checker.declareStructureConstructor(structure, structureType, parameterTypes)
+
+	if structureType != nil {
+		structureType.ConstructorParameterTypes = parameterTypes
+	}
 }
 
 // TODO: very simple field initialization check for now.
@@ -1744,8 +1785,7 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) *Stru
 
 func (checker *Checker) checkStructureInitializer(
 	initializer *ast.InitializerDeclaration,
-	parameterTypes []Type,
-	selfType *StructureType,
+	structureType *StructureType,
 ) {
 	// NOTE: new activation, so `self`
 	// is only visible inside initializer
@@ -1753,7 +1793,7 @@ func (checker *Checker) checkStructureInitializer(
 	checker.valueActivations.PushCurrent()
 	defer checker.valueActivations.Pop()
 
-	checker.declareSelf(selfType)
+	checker.declareSelf(structureType)
 
 	// check the initializer is named properly
 	identifier := initializer.Identifier
@@ -1765,6 +1805,8 @@ func (checker *Checker) checkStructureInitializer(
 			},
 		)
 	}
+
+	parameterTypes := structureType.ConstructorParameterTypes
 
 	functionType := &FunctionType{
 		ParameterTypes: parameterTypes,

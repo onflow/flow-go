@@ -405,8 +405,9 @@ func init() {
 // StructureType
 
 type StructureType struct {
-	Identifier string
-	Members    map[string]*Member
+	Identifier                string
+	Members                   map[string]*Member
+	ConstructorParameterTypes []Type
 }
 
 type Member struct {

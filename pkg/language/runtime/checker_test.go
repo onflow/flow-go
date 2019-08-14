@@ -135,6 +135,24 @@ func TestCheckInvalidLocalRedeclaration(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
+func TestCheckInvalidLocalFunctionRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test() {
+            let x = true
+
+            fun y() {}
+            fun y() {}
+        }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
 func TestCheckInvalidUnknownDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1933,6 +1951,20 @@ func TestCheckInvalidStructureRedeclaration(t *testing.T) {
 
 }
 
+func TestCheckInvalidForwardReference(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x = y
+      let y = x
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
 func TestCheckInvalidIncompatibleStructureTypes(t *testing.T) {
 	// tests that structure typing is nominal, not structural
 
@@ -2523,6 +2555,50 @@ func TestCheckFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
           }
       }
 	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckMutuallyRecursiveFunctions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun isEven(_ n: Int): Bool {
+          if n == 0 {
+              return true
+          }
+          return isOdd(n - 1)
+      }
+
+      fun isOdd(_ n: Int): Bool {
+          if n == 0 {
+              return false
+          }
+          return isEven(n - 1)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckReferenceBeforeDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      var tests = 0
+
+      fun test(): Test {
+          return Test()
+      }
+
+      struct Test {
+         init() {
+             tests = tests + 1
+         }
+      }
+    `)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
