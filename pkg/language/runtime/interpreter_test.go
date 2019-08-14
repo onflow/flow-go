@@ -1207,7 +1207,6 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
 
 	Expect(inter.Globals["test"].Value.(*interpreter.StructureValue).Members["foo"]).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
-
 }
 
 func TestInterpretFunctionPreCondition(t *testing.T) {
@@ -1289,4 +1288,3 @@ func TestInterpretFunctionWithoutResultAndPostConditionWithResult(t *testing.T) 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.VoidValue{}))
 }
-
