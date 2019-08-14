@@ -288,6 +288,7 @@ func ArrayTypeToString(arrayType ArrayType) string {
 type FunctionType struct {
 	ParameterTypes []Type
 	ReturnType     Type
+	apply          func([]Type) Type
 }
 
 func (*FunctionType) isType() {}

@@ -1339,20 +1339,20 @@
             <p>🚧 Status: Function Preconditions and Postconditions are not implemented yet.</p>
           </blockquote>
           <p>Functions may have preconditions and may have postconditions. Preconditions and postconditions can be used to restrict the inputs (values for parameters) and output (return value) of a function.</p>
-          <p>Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the <code>require</code> keyword, followed by the condition block.</p>
-          <p>Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the <code>ensure</code> keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.</p>
+          <p>Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the <code>pre</code> keyword, followed by the condition block.</p>
+          <p>Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the <code>post</code> keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.</p>
           <p>A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions.</p>
           <p>Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for <a href="#semicolons">statements</a>.</p>
           <p>Following each condition, an optional description can be provided after a colon.</p>
           <p>In postconditions, the special constant <code>result</code> refers to the result of the function.</p>
           <pre><code class="language-bamboo,file=function-factorial.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: Int): Int {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Require the parameter `n` to be greater than or equal to zero</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        n >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">            </span><span style="color: #A31515">"factorial is only defined for integers greater than or equal to zero"</span><span>
 </span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Ensure the result will be greater than or equal to 1</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        result >= </span><span style="color: #09885A">1</span><span style="color: #000000">:</span><span>
@@ -1376,7 +1376,7 @@
           <pre><code class="language-bamboo,file=function-increment.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> n = </span><span style="color: #09885A">0</span><span>
 </span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> incrementN() {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Require the new value of `n` to be the old value of `n`, plus one</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        n == before(n) + </span><span style="color: #09885A">1</span><span style="color: #000000">:</span><span>
@@ -1459,7 +1459,7 @@
 </span><span style="color: #0000FF">while</span><span style="color: #000000"> i &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    i = i + </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> i &#x3C; </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">        continue</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">continue</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">    x = x + </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -1471,7 +1471,7 @@
 </span><span style="color: #0000FF">while</span><span style="color: #000000"> x &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    x = x + </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> x == </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">        break</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">break</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -1697,7 +1697,7 @@
         <pre><code class="language-bamboo,file=resource-instantiation.bpl"><span style="color: #000000">create SomeResource()</span><span>
 </span></code></pre>
         <p>
-          Composite data types can only be be declared globally and not locally in functions.
+          Composite data types can only be declared globally and not locally in functions.
           They can also not be nested.
         </p>
         <section>
@@ -1779,7 +1779,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">           </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">               result >= </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #000000">           }</span><span>
 </span><span>
@@ -1810,12 +1810,12 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// which requires written values to be positive</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
-</span><span style="color: #000000">       </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">               newBalance >= </span><span style="color: #09885A">0</span><span>
-</span><span style="color: #000000">           }</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = newBalance</span><span>
-</span><span style="color: #000000">       }</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                newBalance >= </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = newBalance</span><span>
+</span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
@@ -2365,7 +2365,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                result >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
 </span><span style="color: #000000">            }</span><span>
@@ -2376,7 +2376,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// given the initial balance, must initialize the balance field</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the balance must be initialized to the initial balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
@@ -2397,13 +2397,13 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: `&#x3C;-Self` is the resource type implementing this interface</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be positive"</span><span>
 </span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"insufficient funds: the amount must be smaller or equal to the balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) - amount:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be deducted from the balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
@@ -2426,7 +2426,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// i.e. the resource type implementing this interface</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-Self) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + token.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
@@ -2985,7 +2985,7 @@
         <p>
           Transactions are declared using the <code>transaction</code> keyword.
           The preparer is declared using the <code>prepare</code> keyword and the execution phase is declared using the <code>execute</code> keyword.
-          The <code>ensure</code> section can be used to declare post-conditions.
+          The <code>post</code> section can be used to declare post-conditions.
         </p>
         <pre><code class="language-bamboo,file=transaction-declaration.bpl"><span style="color: #000000">transaction {</span><span>
 </span><span>
@@ -3002,7 +3002,7 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -3020,11 +3020,11 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Provider {</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"withdrawal amount must be positive"</span><span>
 </span><span style="color: #000000">            }</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                result.balance == amount:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"incorrect amount returned"</span><span>
 </span><span style="color: #000000">            }</span><span>
@@ -3039,7 +3039,7 @@
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">                </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                    result >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                        </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
 </span><span style="color: #000000">                }</span><span>
@@ -3047,25 +3047,25 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == balance:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"the balance must be initialized to the initial balance"</span><span>
 </span><span style="color: #000000">            }</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"insufficient funds: the amount must be smaller or equal to the balance"</span><span>
 </span><span style="color: #000000">            }</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) - amount:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"Incorrect amount removed"</span><span>
 </span><span style="color: #000000">            }</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(vault: &#x3C;-Self) {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + vault.balance:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
 </span><span style="color: #000000">            }</span><span>

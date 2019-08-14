@@ -11,6 +11,8 @@ import (
 const ArgumentLabelNotRequired = "_"
 const InitializerIdentifier = "init"
 const SelfIdentifier = "self"
+const BeforeIdentifier = "before"
+const ResultIdentifier = "result"
 
 type functionContext struct {
 	returnType Type
@@ -243,7 +245,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	if err := checker.checkFunction(
 		declaration.Parameters,
 		functionType,
-		declaration.Block,
+		declaration.FunctionBlock,
 	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
@@ -274,7 +276,7 @@ func (checker *Checker) argumentLabels(parameters []*ast.Parameter) []string {
 func (checker *Checker) checkFunction(
 	parameters []*ast.Parameter,
 	functionType *FunctionType,
-	block *ast.Block,
+	functionBlock *ast.FunctionBlock,
 ) *CheckerError {
 	var errs []error
 
@@ -297,8 +299,9 @@ func (checker *Checker) checkFunction(
 		checker.enterFunction(functionType)
 		defer checker.leaveFunction()
 
-		result := block.Accept(checker).(checkerResult)
-		errs = append(errs, result.Errors...)
+		if err := checker.visitFunctionBlock(functionBlock, functionType.ReturnType); err != nil {
+			errs = append(errs, err.Errors...)
+		}
 	}()
 
 	return checkerError(errs)
@@ -478,9 +481,21 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 	checker.pushActivations()
 	defer checker.popActivations()
 
-	// check all statements
+	if err := checker.visitStatements(block.Statements); err != nil {
+		errs = append(errs, err.Errors...)
+	}
 
-	for _, statement := range block.Statements {
+	return checkerResult{
+		Type:   nil,
+		Errors: errs,
+	}
+}
+
+func (checker *Checker) visitStatements(statements []ast.Statement) *CheckerError {
+	var errs []error
+
+	// check all statements
+	for _, statement := range statements {
 
 		// check statement is not a local structure declaration
 
@@ -500,10 +515,106 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 		errs = append(errs, result.Errors...)
 	}
 
-	return checkerResult{
-		Type:   nil,
-		Errors: errs,
+	return checkerError(errs)
+}
+
+func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
+	// NOTE: see visitFunctionBlock
+	panic(&errors.UnreachableError{})
+}
+
+func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnType Type) *CheckerError {
+	var errs []error
+
+	checker.pushActivations()
+	defer checker.popActivations()
+
+	if err := checker.visitConditions(functionBlock.PreConditions); err != nil {
+		errs = append(errs, err.Errors...)
 	}
+
+	// NOTE: not checking block as it enters a new scope
+	// and post-conditions need to be able to refer to block's declarations
+
+	if err := checker.visitStatements(functionBlock.Block.Statements); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	if err := checker.declareBefore(); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	// if there is a return type, declare the constant `result`
+	// which has the return type
+	if !returnType.Equal(&VoidType{}) {
+		if err := checker.declareVariable(
+			ResultIdentifier,
+			returnType,
+			common.DeclarationKindConstant,
+			ast.Position{},
+			true,
+		); err != nil {
+			errs = append(errs, err.Errors...)
+		}
+	}
+
+	if err := checker.visitConditions(functionBlock.PostConditions); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) declareBefore() *CheckerError {
+	var errs []error
+
+	if err := checker.declareVariable(
+		BeforeIdentifier,
+		&FunctionType{
+			ParameterTypes: []Type{&AnyType{}},
+			apply: func(types []Type) Type {
+				if len(types) < 1 {
+					return &AnyType{}
+				}
+				return types[0]
+			},
+		},
+		common.DeclarationKindFunction,
+		ast.Position{},
+		true,
+	); err != nil {
+		errs = append(errs, err.Errors...)
+	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) visitConditions(conditions []*ast.Condition) *CheckerError {
+	var errs []error
+
+	for _, condition := range conditions {
+		conditionResult := condition.Accept(checker).(checkerResult)
+		errs = append(errs, conditionResult.Errors...)
+
+		conditionType := conditionResult.Type
+
+		if !checker.IsSubType(conditionType, &BoolType{}) {
+			errs = append(errs,
+				&TypeMismatchError{
+					ExpectedType: &BoolType{},
+					ActualType:   conditionType,
+					StartPos:     condition.StartPosition(),
+					EndPos:       condition.EndPosition(),
+				},
+			)
+		}
+	}
+
+	return checkerError(errs)
+}
+
+func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
+	return condition.Expression.Accept(checker)
 }
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
@@ -966,8 +1077,9 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 	case BinaryOperationKindEquality:
 		// check both types are equal, and boolean subtypes or integer subtypes
 
-		if !(leftType.Equal(rightType) &&
-			(checker.IsSubType(leftType, &BoolType{}) || checker.IsSubType(leftType, &IntegerType{}))) {
+		if leftType != nil &&
+			!(leftType.Equal(rightType) &&
+				(checker.IsSubType(leftType, &BoolType{}) || checker.IsSubType(leftType, &IntegerType{}))) {
 
 			errs = append(errs,
 				&InvalidBinaryOperandsError{
@@ -1260,7 +1372,8 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	} else {
 		// invoked expression has function type
 
-		if err := checker.checkInvocationArguments(invocationExpression, functionType); err != nil {
+		argumentTypes, err := checker.checkInvocationArguments(invocationExpression, functionType)
+		if err != nil {
 			errs = append(errs, err.Errors...)
 		}
 
@@ -1284,7 +1397,11 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 			}
 		}
 
-		returnType = functionType.ReturnType
+		if functionType.apply != nil {
+			returnType = functionType.apply(argumentTypes)
+		} else {
+			returnType = functionType.ReturnType
+		}
 	}
 
 	return checkerResult{
@@ -1398,7 +1515,10 @@ func (checker *Checker) checkInvocationArgumentLabels(
 func (checker *Checker) checkInvocationArguments(
 	invocationExpression *ast.InvocationExpression,
 	functionType *FunctionType,
-) *CheckerError {
+) (
+	argumentTypes []Type,
+	err *CheckerError,
+) {
 	var errs []error
 
 	argumentCount := len(invocationExpression.Arguments)
@@ -1431,7 +1551,9 @@ func (checker *Checker) checkInvocationArguments(
 		errs = append(errs, argumentResult.Errors...)
 		argumentType := argumentResult.Type
 
-		if argumentType != nil && !checker.IsSubType(argumentType, parameterType) {
+		argumentTypes = append(argumentTypes, argumentType)
+
+		if !checker.IsSubType(argumentType, parameterType) {
 			errs = append(errs,
 				&TypeMismatchError{
 					ExpectedType: parameterType,
@@ -1443,7 +1565,7 @@ func (checker *Checker) checkInvocationArguments(
 		}
 	}
 
-	return checkerError(errs)
+	return argumentTypes, checkerError(errs)
 }
 
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
@@ -1459,7 +1581,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	if err := checker.checkFunction(
 		expression.Parameters,
 		functionType,
-		expression.Block,
+		expression.FunctionBlock,
 	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)
@@ -2026,7 +2148,7 @@ func (checker *Checker) VisitInitializerDeclaration(initializer *ast.Initializer
 	if err := checker.checkFunction(
 		initializer.Parameters,
 		functionType,
-		initializer.Block,
+		initializer.FunctionBlock,
 	); err != nil {
 		// NOTE: append, don't return
 		errs = append(errs, err.Errors...)

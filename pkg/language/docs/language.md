@@ -1289,9 +1289,9 @@ fun test(x: Int) {
 
 Functions may have preconditions and may have postconditions. Preconditions and postconditions can be used to restrict the inputs (values for parameters) and output (return value) of a function.
 
-Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the `require` keyword, followed by the condition block.
+Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the `pre` keyword, followed by the condition block.
 
-Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `ensure` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
+Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `post` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
 
 A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions.
 
@@ -1312,13 +1312,13 @@ In postconditions, the special constant `result` refers to the result of the fun
 
 ```bamboo,file=function-factorial.bpl
 fun factorial(_ n: Int): Int {
-    require {
+    pre {
         // Require the parameter `n` to be greater than or equal to zero
         //
         n >= 0:
             "factorial is only defined for integers greater than or equal to zero"
     }
-    ensure {
+    post {
         // Ensure the result will be greater than or equal to 1
         //
         result >= 1:
@@ -1345,7 +1345,7 @@ In postconditions, the special function `before` can be used to get the value of
 var n = 0
 
 fun incrementN() {
-    ensure {
+    post {
         // Require the new value of `n` to be the old value of `n`, plus one
         //
         n == before(n) + 1:
@@ -1726,7 +1726,7 @@ Resource are created (instantiated) by using the `create` keyword and calling th
 create SomeResource()
 ```
 
-Composite data types can only be be declared globally and not locally in functions.
+Composite data types can only be declared globally and not locally in functions.
 They can also not be nested.
 
 ### Composite Data Type Fields
@@ -1798,7 +1798,7 @@ struct GetterExample {
     //
     var balance: Int {
         get {
-           ensure {
+           post {
                result >= 0
            }
 
@@ -1833,12 +1833,12 @@ struct SetterExample {
     // which requires written values to be positive
     //
     var balance: Int {
-       set(newBalance) {
-           require {
-               newBalance >= 0
-           }
-           self.balance = newBalance
-       }
+        set(newBalance) {
+            pre {
+                newBalance >= 0
+            }
+            self.balance = newBalance
+        }
     }
 
     init(balance: Int) {
@@ -2363,7 +2363,7 @@ resource interface FungibleToken {
     //
     pub balance: Int {
         get {
-            ensure {
+            post {
                 result >= 0:
                     "Balances are always non-negative"
             }
@@ -2374,7 +2374,7 @@ resource interface FungibleToken {
     // given the initial balance, must initialize the balance field
     //
     init(balance: Int) {
-        ensure {
+        post {
             self.balance == balance:
                 "the balance must be initialized to the initial balance"
         }
@@ -2395,13 +2395,13 @@ resource interface FungibleToken {
     // NOTE: `<-Self` is the resource type implementing this interface
     //
     pub fun withdraw(amount: Int): <-Self {
-        require {
+        pre {
             amount > 0:
                 "the amount must be positive"
             amount <= self.balance:
                 "insufficient funds: the amount must be smaller or equal to the balance"
         }
-        ensure {
+        post {
             self.balance == before(self.balance) - amount:
                 "the amount must be deducted from the balance"
         }
@@ -2424,7 +2424,7 @@ resource interface FungibleToken {
     // i.e. the resource type implementing this interface
     //
     pub fun deposit(_ token: <-Self) {
-        ensure {
+        post {
             self.balance == before(self.balance) + token.balance:
                 "the amount must be added to the balance"
         }
@@ -3016,7 +3016,7 @@ The preparer has the permissions to read and write to storage of all signer acco
 
 Transactions are declared using the `transaction` keyword.
 The preparer is declared using the `prepare` keyword and the execution phase is declared using the `execute` keyword.
-The `ensure` section can be used to declare post-conditions.
+The `post` section can be used to declare post-conditions.
 
 ```bamboo,file=transaction-declaration.bpl
 transaction {
@@ -3034,7 +3034,7 @@ transaction {
         // ...
     }
 
-    ensure {
+    post {
         // ...
     }
 }
@@ -3055,11 +3055,11 @@ resource interface FungibleToken {
     pub resource interface Provider {
 
         pub fun withdraw(amount: Int): <-Vault {
-            require {
+            pre {
                 amount > 0:
                     "withdrawal amount must be positive"
             }
-            ensure {
+            post {
                 result.balance == amount:
                     "incorrect amount returned"
             }
@@ -3074,7 +3074,7 @@ resource interface FungibleToken {
 
         pub balance: Int {
             get {
-                ensure {
+                post {
                     result >= 0:
                         "Balances are always non-negative"
                 }
@@ -3082,25 +3082,25 @@ resource interface FungibleToken {
         }
 
         init(balance: Int) {
-            ensure {
+            post {
                 self.balance == balance:
                     "the balance must be initialized to the initial balance"
             }
         }
 
         pub fun withdraw(amount: Int): <-Self {
-            require {
+            pre {
                 amount <= self.balance:
                     "insufficient funds: the amount must be smaller or equal to the balance"
             }
-            ensure {
+            post {
                 self.balance == before(self.balance) - amount:
                     "Incorrect amount removed"
             }
         }
 
         pub fun deposit(vault: <-Self) {
-            ensure {
+            post {
                 self.balance == before(self.balance) + vault.balance:
                     "the amount must be added to the balance"
             }

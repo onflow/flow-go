@@ -73,11 +73,11 @@ field
 // is `init` in semantic analysis to provide better error
 //
 initializer
-    : Identifier parameterList block
+    : Identifier parameterList functionBlock
     ;
 
 functionDeclaration
-    : access Fun Identifier parameterList (':' returnType=fullType)? block
+    : access Fun Identifier parameterList (':' returnType=fullType)? functionBlock
     ;
 
 parameterList
@@ -107,6 +107,27 @@ functionType
 
 block
     : '{' statements '}'
+    ;
+
+functionBlock
+    : '{' preConditions? postConditions? statements '}'
+    ;
+
+preConditions
+    : Pre '{' conditions '}'
+    ;
+
+postConditions
+    : Post '{' conditions '}'
+    ;
+
+conditions
+    : (condition eos)*
+    ;
+
+// TODO: description
+condition
+    : expression
     ;
 
 statements
@@ -255,10 +276,10 @@ Negate : '!' ;
 
 
 primaryExpressionStart
-    : Identifier                                          # IdentifierExpression
-    | literal                                             # LiteralExpression
-    | Fun parameterList (':' returnType=fullType)? block  # FunctionExpression
-    | '(' expression ')'                                  # NestedExpression
+    : Identifier                                                  # IdentifierExpression
+    | literal                                                     # LiteralExpression
+    | Fun parameterList (':' returnType=fullType)? functionBlock  # FunctionExpression
+    | '(' expression ')'                                          # NestedExpression
     ;
 
 expressionAccess
@@ -311,6 +332,9 @@ CloseParen: ')' ;
 Struct : 'struct' ;
 
 Fun : 'fun' ;
+
+Pre : 'pre' ;
+Post : 'post' ;
 
 Pub : 'pub' ;
 PubSet : 'pub(set)' ;

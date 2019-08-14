@@ -63,6 +63,26 @@ func (v *BaseStrictusVisitor) VisitBlock(ctx *BlockContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitFunctionBlock(ctx *FunctionBlockContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitPreConditions(ctx *PreConditionsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitPostConditions(ctx *PostConditionsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitConditions(ctx *ConditionsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitCondition(ctx *ConditionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitStatements(ctx *StatementsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
