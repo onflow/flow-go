@@ -364,30 +364,36 @@ func TestCheckInvalidArrayIndexingIntoBool(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int64 {
+      fun test(): Int {
           return true[0]
       }
 	`)
 
-	errs := expectCheckerErrors(err, 1)
+	errs := expectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckInvalidArrayIndexingIntoInteger(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int64 {
+      fun test(): Int {
           return 2[0]
       }
 	`)
 
-	errs := expectCheckerErrors(err, 1)
+	errs := expectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
@@ -950,25 +956,31 @@ func TestCheckInvalidFunctionCallOfBool(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 1)
+	errs := expectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int32 {
+      fun test(): Int {
           return 2()
       }
 	`)
 
-	errs := expectCheckerErrors(err, 1)
+	errs := expectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
@@ -2233,7 +2245,7 @@ func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 3)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -2242,6 +2254,9 @@ func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
 
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
 }
 
 func TestCheckInvalidFunctionWithBeforeVariableAndPostConditionWithBefore(t *testing.T) {
