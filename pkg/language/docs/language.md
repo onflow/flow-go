@@ -393,6 +393,8 @@ let b: Int? = 42
 The nil-coalescing operator `??` returns the value inside an optional if it contains a value,
 or returns an alternative value if the optional has no value, i.e., the optional value is `nil`.
 
+If the left-hand side is non-nil, the right-hand side is not evaluated.
+
 ```bamboo
 // Declare a constant which has an optional integer type
 //
@@ -413,27 +415,28 @@ The nil-coalescing operator can only be applied to values which have an optional
 let a = 1
 
 // Invalid: nil-coalescing operator is applied to a value which has a non-optional type
-// (a has the non-optional type Int)
+// (a has the non-optional type `Int`)
 //
 let b = a ?? 2
 ```
 
 ```bamboo
 // Invalid: nil-coalescing operator is applied to a value which has a non-optional type
-// (the integer literal is of type Int)
+// (the integer literal is of type `Int`)
 //
 let c = 1 ?? 2
 ```
 
-The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.
+The alternative value, i.e. the right-hand side of the operator,
+must be the non-optional or optional type matching the type of the left-hand side.
 
 ```bamboo
 // Declare a constant with a non-optional integer type
 //
 let a = 1
 
-// Invalid: nil-coalescing operator is applied to a value of type Int,
-// but alternative is of type Bool
+// Invalid: nil-coalescing operator is applied to a value of type `Int`,
+// but the alternative has type `Bool`
 //
 let b = a ?? false
 ```
