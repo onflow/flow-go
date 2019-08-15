@@ -56,6 +56,20 @@ func TestCheckBoolean(t *testing.T) {
 		To(Equal(&sema.BoolType{}))
 }
 
+func TestCheckString(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x = "x"
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.Globals["x"].Type).
+		To(Equal(&sema.StringType{}))
+}
+
 func expectCheckerErrors(err error, len int) []error {
 	if len <= 0 {
 		return nil

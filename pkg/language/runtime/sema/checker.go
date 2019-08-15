@@ -1244,6 +1244,13 @@ func (checker *Checker) VisitIntExpression(expression *ast.IntExpression) ast.Re
 	}
 }
 
+func (checker *Checker) VisitStringExpression(expression *ast.StringExpression) ast.Repr {
+	return checkerResult{
+		Type:   &StringType{},
+		Errors: nil,
+	}
+}
+
 func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) ast.Repr {
 	var errs []error
 

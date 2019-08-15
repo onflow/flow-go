@@ -47,6 +47,37 @@ func (e *BoolExpression) AcceptExp(v ExpressionVisitor) Repr {
 	return v.VisitBoolExpression(e)
 }
 
+// StringExpression
+
+type StringExpression struct {
+	Value    string
+	StartPos Position
+	EndPos   Position
+}
+
+func (e *StringExpression) String() string {
+	// TODO:
+	return ""
+}
+
+func (e *StringExpression) StartPosition() Position {
+	return e.StartPos
+}
+
+func (e *StringExpression) EndPosition() Position {
+	return e.EndPos
+}
+
+func (*StringExpression) isExpression() {}
+
+func (e *StringExpression) Accept(v Visitor) Repr {
+	return v.VisitStringExpression(e)
+}
+
+func (e *StringExpression) AcceptExp(v ExpressionVisitor) Repr {
+	return v.VisitStringExpression(e)
+}
+
 // IntExpression
 
 type IntExpression struct {

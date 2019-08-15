@@ -46,6 +46,20 @@ func (v BoolValue) Negate() BoolValue {
 	return !v
 }
 
+// StringValue
+
+type StringValue string
+
+func (StringValue) isValue() {}
+
+func (v StringValue) Copy() Value {
+	return v
+}
+
+func (v StringValue) ToGoValue() interface{} {
+	return string(v)
+}
+
 // ArrayValue
 
 type ArrayValue []Value

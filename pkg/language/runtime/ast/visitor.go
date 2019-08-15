@@ -45,6 +45,7 @@ type ExpressionVisitor interface {
 	VisitUnaryExpression(*UnaryExpression) Repr
 	VisitBinaryExpression(*BinaryExpression) Repr
 	VisitFunctionExpression(*FunctionExpression) Repr
+	VisitStringExpression(*StringExpression) Repr
 }
 
 type Visitor interface {

@@ -307,11 +307,16 @@ literal
     : integerLiteral
     | booleanLiteral
     | arrayLiteral
+    | stringLiteral
     ;
 
 booleanLiteral
     : True
     | False
+    ;
+
+stringLiteral
+    : StringLiteral
     ;
 
 integerLiteral
@@ -400,6 +405,24 @@ HexadecimalLiteral
 InvalidNumberLiteral
     : '0' [a-zA-Z] [0-9a-zA-Z_]*
     ;
+
+StringLiteral
+    : '"' QuotedText* '"'
+    ;
+
+fragment QuotedText
+    : EscapedCharacter
+    | ~["\n\r\\]
+    ;
+
+fragment EscapedCharacter
+    : '\\' [0\\tnr"']
+    // NOTE: allow arbitrary length in parser, but check length in semantic analysis
+    | '\\u' '{' HexadecimalDigit+ '}'
+    ;
+
+fragment HexadecimalDigit : [0-9a-fA-F] ;
+
 
 WS
     : [ \t\u000B\u000C\u0000]+ -> channel(HIDDEN)

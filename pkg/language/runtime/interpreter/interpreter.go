@@ -704,6 +704,12 @@ func (interpreter *Interpreter) VisitIntExpression(expression *ast.IntExpression
 	return Done{Result: value}
 }
 
+func (interpreter *Interpreter) VisitStringExpression(expression *ast.StringExpression) ast.Repr {
+	value := StringValue(expression.Value)
+
+	return Done{Result: value}
+}
+
 func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpression) ast.Repr {
 	return interpreter.visitExpressions(expression.Values, nil)
 }
