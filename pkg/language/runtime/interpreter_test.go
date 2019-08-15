@@ -1903,3 +1903,83 @@ func TestInterpretNilReturnValue(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.NilValue{}))
 }
+
+func TestInterpretNilCoalescingNilIntToOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let none: Int? = nil
+      let x: Int? = none ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretNilCoalescingNilIntToOptionals(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let none: Int?? = nil
+      let x: Int? = none ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretNilCoalescingNilIntToOptionalNilLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let x: Int? = nil ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretNilCoalescingRightSubtype(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = nil ?? nil
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NilValue{}))
+}
+
+func TestInterpretNilCoalescingNilInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let none: Int? = nil
+      let x: Int = none ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+}
+
+func TestInterpretNilCoalescingNilLiteralInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let x: Int = nil ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+}

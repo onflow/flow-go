@@ -731,6 +731,22 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 				right := tuple.Right.(BoolValue)
 				return BoolValue(left && right)
 			})
+
+	case ast.OperationNilCoalesce:
+		// interpret the left-hand side
+		return expression.Left.Accept(interpreter).(Trampoline).
+			FlatMap(func(left interface{}) Trampoline {
+				// only evaluate right-hand side if left-hand side
+				// is non-nil
+				if _, ok := left.(*NilValue); ok {
+					return Done{Result: left}
+				}
+
+				// after interpreting the left-hand side,
+				// interpret the right-hand side
+				return expression.Right.Accept(interpreter).(Trampoline)
+			})
+
 	}
 
 	panic(&unsupportedOperation{
