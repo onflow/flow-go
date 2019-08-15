@@ -57,21 +57,21 @@ func TestWorldStates(t *testing.T) {
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	tx2 := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        2,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	tx3 := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        3,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	ws1 := b.pendingWorldState.Hash()
 	t.Logf("initial world state: \t%s\n", ws1)
@@ -162,7 +162,7 @@ func TestSubmitTransaction(t *testing.T) {
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
@@ -184,7 +184,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
@@ -207,7 +207,7 @@ func TestSubmitTransactionInvalidAccount(t *testing.T) {
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(invalidAddress, b.RootKeyPair())
+	}).SignPayer(invalidAddress, b.RootKeyPair())
 
 	// Submit invalid tx1 (errors)
 	err := b.SubmitTransaction(tx1)
@@ -220,14 +220,14 @@ func TestSubmitTransactionInvalidKeyPair(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	// use key pair that does not exist on root account
-	invalidKeyPair, _ := crypto.GenKeyPair("elephant-ears")
+	invalidKeyPair, _ := crypto.KeyPairFromSeed("elephant-ears")
 
 	tx1 := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), invalidKeyPair)
+	}).SignPayer(b.RootAccount(), invalidKeyPair)
 
 	// Submit invalid tx1 (errors)
 	err := b.SubmitTransaction(tx1)
@@ -249,7 +249,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	// Submit invalid tx1 (errors)
 	err := b.SubmitTransaction(tx1)
@@ -271,7 +271,7 @@ func TestCommitBlock(t *testing.T) {
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
@@ -284,7 +284,7 @@ func TestCommitBlock(t *testing.T) {
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	// Submit invalid tx2
 	err = b.SubmitTransaction(tx2)
@@ -313,7 +313,7 @@ func TestCreateAccount(t *testing.T) {
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
@@ -333,7 +333,7 @@ func TestCreateAccount(t *testing.T) {
 		Nonce:        2,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	err = b.SubmitTransaction(tx2)
 	Expect(err).ToNot(HaveOccurred())
@@ -358,7 +358,7 @@ func TestCallScript(t *testing.T) {
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	// Sample call (value is 0)
 	value, err := b.CallScript([]byte(sampleCall))
@@ -385,14 +385,14 @@ func TestQueryByVersion(t *testing.T) {
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	tx2 := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        2,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
-	}).Sign(b.RootAccount(), b.RootKeyPair())
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
 
 	invalidWorldState := crypto.NewHash([]byte("invalid state"))
 
