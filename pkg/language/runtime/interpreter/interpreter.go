@@ -104,7 +104,7 @@ func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }
 
-func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value Value, err error) {
+func (interpreter *Interpreter) Invoke(functionName string, arguments ...interface{}) (value Value, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
 		return nil, &NotDeclaredError{
@@ -122,7 +122,8 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 		}
 	}
 
-	arguments, err := ToValues(inputs)
+	var argumentValues []Value
+	argumentValues, err = ToValues(arguments)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +147,7 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 	// ensures the invocation's argument count matches the function's parameter count
 
 	parameterCount := function.parameterCount()
-	argumentCount := len(arguments)
+	argumentCount := len(argumentValues)
 
 	if argumentCount != parameterCount {
 		return nil, &ArgumentCountError{
@@ -155,7 +156,7 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 		}
 	}
 
-	result := Run(function.invoke(interpreter, arguments))
+	result := Run(function.invoke(interpreter, argumentValues, ast.Position{}))
 	if result == nil {
 		return nil, nil
 	}
@@ -205,8 +206,16 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	return Done{}
 }
 
-func (interpreter *Interpreter) ImportFunction(name string, function HostFunctionValue) {
-	interpreter.declareVariable(name, function)
+func (interpreter *Interpreter) ImportFunction(name string, function HostFunctionValue) error {
+	if _, ok := interpreter.Globals[name]; ok {
+		return &RedeclarationError{
+			Name: name,
+		}
+	}
+
+	variable := interpreter.declareVariable(name, function)
+	interpreter.Globals[name] = variable
+	return nil
 }
 
 func (interpreter *Interpreter) VisitBlock(block *ast.Block) ast.Repr {
@@ -424,11 +433,11 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 		})
 }
 
-func (interpreter *Interpreter) declareVariable(identifier string, value Value) {
+func (interpreter *Interpreter) declareVariable(identifier string, value Value) *Variable {
 	// NOTE: semantic analysis already checked possible invalid redeclaration
-	interpreter.setVariable(identifier, &Variable{
-		Value: value,
-	})
+	variable := &Variable{Value: value}
+	interpreter.setVariable(identifier, variable)
+	return variable
 }
 
 func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
@@ -768,7 +777,11 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 
 					argumentCopies := arguments.Copy().(ArrayValue)
 
-					return function.invoke(interpreter, argumentCopies)
+					return function.invoke(
+						interpreter,
+						argumentCopies,
+						invocationExpression.StartPosition(),
+					)
 				})
 		})
 }
@@ -888,9 +901,9 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 	functions := interpreter.structureFunctions(declaration, lexicalScope)
 
 	// TODO: function type
-	constructorVariable.Value = NewHostFunction(
+	constructorVariable.Value = NewHostFunctionValue(
 		nil,
-		func(interpreter *Interpreter, values []Value) Trampoline {
+		func(interpreter *Interpreter, values []Value, position ast.Position) Trampoline {
 			structure := StructureValue{}
 
 			for name, function := range functions {

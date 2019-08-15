@@ -683,7 +683,7 @@ func (v StructureValue) Copy() Value {
 	newStructure := make(StructureValue, len(v))
 	for field, value := range v {
 		var copiedValue Value
-		if f, ok := value.(*StructFunctionValue); ok {
+		if f, ok := value.(*StructureFunctionValue); ok {
 			copiedValue = f.CopyWithStructure(newStructure)
 		} else {
 			copiedValue = value.Copy()
@@ -732,6 +732,8 @@ func ToValue(value interface{}) (Value, error) {
 		return UInt64Value(value), nil
 	case bool:
 		return BoolValue(value), nil
+	case string:
+		return StringValue(value), nil
 	}
 
 	return nil, fmt.Errorf("cannot convert Go value to value: %#+v", value)

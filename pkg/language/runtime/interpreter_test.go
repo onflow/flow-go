@@ -930,7 +930,7 @@ func TestInterpretHostFunction(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 
-	testFunction := interpreter.NewHostFunction(
+	testFunction := interpreter.NewHostFunctionValue(
 		&sema.FunctionType{
 			ParameterTypes: []sema.Type{
 				&sema.IntType{},
@@ -938,7 +938,7 @@ func TestInterpretHostFunction(t *testing.T) {
 			},
 			ReturnType: &sema.IntType{},
 		},
-		func(inter *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
+		func(inter *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int
 			b := arguments[1].(interpreter.IntValue).Int
 			value := big.NewInt(0).Add(a, b)
@@ -947,8 +947,11 @@ func TestInterpretHostFunction(t *testing.T) {
 		},
 	)
 
-	inter.ImportFunction("test", testFunction)
-	err := inter.Interpret()
+	err := inter.ImportFunction("test", testFunction)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	err = inter.Interpret()
 	Expect(err).
 		To(Not(HaveOccurred()))
 
@@ -1577,4 +1580,3 @@ func TestInterpretStructCopyOnPassing(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.BoolValue(false)))
 }
-
