@@ -89,7 +89,7 @@ parameter
     ;
 
 fullType
-    : baseType typeDimension* (optionals+='?')*
+    : baseType typeDimension* (optionals+=(Optional|NilCoalescing))*
     ;
 
 typeDimension
@@ -199,9 +199,14 @@ equalityExpression
 	;
 
 relationalExpression
-	: additiveExpression
-	| relationalExpression relationalOp additiveExpression
+	: nilCoalescingExpression
+	| relationalExpression relationalOp nilCoalescingExpression
 	;
+
+nilCoalescingExpression
+	// NOTE: right associative
+    : additiveExpression (NilCoalescing nilCoalescingExpression)?
+    ;
 
 additiveExpression
 	: multiplicativeExpression
@@ -273,6 +278,9 @@ unaryOp
 
 Negate : '!' ;
 
+Optional : '?' ;
+
+NilCoalescing : '??' ;
 
 primaryExpressionStart
     : Identifier                                                  # IdentifierExpression

@@ -109,6 +109,9 @@ type StrictusListener interface {
 	// EnterRelationalExpression is called when entering the relationalExpression production.
 	EnterRelationalExpression(c *RelationalExpressionContext)
 
+	// EnterNilCoalescingExpression is called when entering the nilCoalescingExpression production.
+	EnterNilCoalescingExpression(c *NilCoalescingExpressionContext)
+
 	// EnterAdditiveExpression is called when entering the additiveExpression production.
 	EnterAdditiveExpression(c *AdditiveExpressionContext)
 
@@ -300,6 +303,9 @@ type StrictusListener interface {
 
 	// ExitRelationalExpression is called when exiting the relationalExpression production.
 	ExitRelationalExpression(c *RelationalExpressionContext)
+
+	// ExitNilCoalescingExpression is called when exiting the nilCoalescingExpression production.
+	ExitNilCoalescingExpression(c *NilCoalescingExpressionContext)
 
 	// ExitAdditiveExpression is called when exiting the additiveExpression production.
 	ExitAdditiveExpression(c *AdditiveExpressionContext)

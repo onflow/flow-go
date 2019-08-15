@@ -323,12 +323,25 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	}
 
 	for _, optional := range ctx.optionals {
-		startPos := ast.PositionFromToken(optional)
-		endPos := ast.EndPosition(startPos, optional.GetStop())
-
-		result = &ast.OptionalType{
-			Type:   result,
-			EndPos: endPos,
+		switch optional.GetTokenType() {
+		case StrictusLexerOptional:
+			endPos := ast.PositionFromToken(optional)
+			result = &ast.OptionalType{
+				Type:   result,
+				EndPos: endPos,
+			}
+			continue
+		case StrictusLexerNilCoalescing:
+			endPosInner := ast.PositionFromToken(optional)
+			endPosOuter := endPosInner.Shifted(1)
+			result = &ast.OptionalType{
+				Type: &ast.OptionalType{
+					Type:   result,
+					EndPos: endPosInner,
+				},
+				EndPos: endPosOuter,
+			}
+			continue
 		}
 	}
 
@@ -713,7 +726,7 @@ func (v *ProgramVisitor) VisitEqualityExpression(ctx *EqualityExpressionContext)
 }
 
 func (v *ProgramVisitor) VisitRelationalExpression(ctx *RelationalExpressionContext) interface{} {
-	right := ctx.AdditiveExpression().Accept(v)
+	right := ctx.NilCoalescingExpression().Accept(v)
 	if right == nil {
 		return nil
 	}
@@ -729,6 +742,29 @@ func (v *ProgramVisitor) VisitRelationalExpression(ctx *RelationalExpressionCont
 
 	return &ast.BinaryExpression{
 		Operation: operation,
+		Left:      leftExpression,
+		Right:     rightExpression,
+	}
+}
+
+func (v *ProgramVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) interface{} {
+	// NOTE: right associative
+
+	left := ctx.AdditiveExpression().Accept(v)
+	if left == nil {
+		return nil
+	}
+
+	leftExpression := left.(ast.Expression)
+
+	rightContext := ctx.NilCoalescingExpression()
+	if rightContext == nil {
+		return leftExpression
+	}
+
+	rightExpression := rightContext.Accept(v).(ast.Expression)
+	return &ast.BinaryExpression{
+		Operation: ast.OperationNilCoalesce,
 		Left:      leftExpression,
 		Right:     rightExpression,
 	}

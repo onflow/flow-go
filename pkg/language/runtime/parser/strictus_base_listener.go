@@ -224,6 +224,12 @@ func (s *BaseStrictusListener) EnterRelationalExpression(ctx *RelationalExpressi
 // ExitRelationalExpression is called when production relationalExpression is exited.
 func (s *BaseStrictusListener) ExitRelationalExpression(ctx *RelationalExpressionContext) {}
 
+// EnterNilCoalescingExpression is called when production nilCoalescingExpression is entered.
+func (s *BaseStrictusListener) EnterNilCoalescingExpression(ctx *NilCoalescingExpressionContext) {}
+
+// ExitNilCoalescingExpression is called when production nilCoalescingExpression is exited.
+func (s *BaseStrictusListener) ExitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) {}
+
 // EnterAdditiveExpression is called when production additiveExpression is entered.
 func (s *BaseStrictusListener) EnterAdditiveExpression(ctx *AdditiveExpressionContext) {}
 
