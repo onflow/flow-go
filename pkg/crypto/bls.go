@@ -46,7 +46,7 @@ func (a *BLS_BLS12381Algo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
 // VerifyBytes verifies a signature of a byte array
 func (a *BLS_BLS12381Algo) VerifyBytes(pk PubKey, s Signature, data []byte, alg Hasher) bool {
 	blsPubKey, ok := pk.(*PubKey_BLS_BLS12381)
-	if ok == true {
+	if ok == false {
 		log.Error("BLS signature verification can only be called using a BLS public key")
 		return false
 	}
