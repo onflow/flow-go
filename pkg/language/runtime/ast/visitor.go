@@ -35,6 +35,7 @@ type StatementVisitor interface {
 
 type ExpressionVisitor interface {
 	VisitBoolExpression(*BoolExpression) Repr
+	VisitNilExpression(*NilExpression) Repr
 	VisitIntExpression(*IntExpression) Repr
 	VisitArrayExpression(*ArrayExpression) Repr
 	VisitIdentifierExpression(*IdentifierExpression) Repr

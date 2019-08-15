@@ -1032,6 +1032,13 @@ func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interfa
 	panic(&errors.UnreachableError{})
 }
 
+func (v *ProgramVisitor) VisitNilLiteral(ctx *NilLiteralContext) interface{} {
+	position := ast.PositionFromToken(ctx.GetStart())
+	return &ast.NilExpression{
+		Pos: position,
+	}
+}
+
 func (v *ProgramVisitor) VisitStringLiteral(ctx *StringLiteralContext) interface{} {
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 	endPosition := ast.EndPosition(startPosition, ctx.StringLiteral().GetSymbol().GetStop())

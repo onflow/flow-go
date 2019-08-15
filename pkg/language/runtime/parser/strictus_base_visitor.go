@@ -227,6 +227,10 @@ func (v *BaseStrictusVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) in
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitNilLiteral(ctx *NilLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitStringLiteral(ctx *StringLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }
