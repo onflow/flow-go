@@ -162,7 +162,7 @@ func (checker *Checker) findVariable(name string) *Variable {
 	return variable
 }
 
-func (checker *Checker) findType(name string) Type {
+func (checker *Checker) FindType(name string) Type {
 	value := checker.typeActivations.Find(name)
 	if value == nil {
 		return nil
@@ -1633,7 +1633,7 @@ func (checker *Checker) ConvertType(t ast.Type) (Type, *CheckerError) {
 
 	switch t := t.(type) {
 	case *ast.NominalType:
-		result := checker.findType(t.Identifier)
+		result := checker.FindType(t.Identifier)
 		if result == nil {
 			err := &CheckerError{
 				Errors: []error{
@@ -1842,7 +1842,17 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		errs = append(errs, err.Errors...)
 	}
 
-	if err := checker.checkStructureFields(structure.Fields); err != nil {
+	// NOTE: fields and functions might already refer to structure itself.
+	// insert a dummy type for now, so lookup succeeds during conversion,
+	// then fix up the type reference
+
+	temporaryStructureType := &StructureType{}
+
+	if err := checker.declareType(
+		structure.Identifier,
+		structure.IdentifierPos,
+		temporaryStructureType,
+	); err != nil {
 		errs = append(errs, err.Errors...)
 	}
 
@@ -1851,8 +1861,8 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		errs = append(errs, err.Errors...)
 	}
 
-	if err := checker.declareType(structure.Identifier, structure.IdentifierPos, structureType); err != nil {
-		errs = append(errs, err.Errors...)
+	if structureType != nil {
+		*temporaryStructureType = *structureType
 	}
 
 	// declare the constructor function before checking initializer and functions,
@@ -1882,23 +1892,9 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		)
 	}
 
-	// TODO: very simple field initialization check for now.
-	//  perform proper definite assignment analysis
-
 	if structureType != nil {
-		for _, field := range structure.Fields {
-			name := field.Identifier
-			member := structureType.Members[name]
-
-			if !member.IsInitialized {
-				errs = append(errs,
-					&FieldUninitializedError{
-						Name:          name,
-						Pos:           field.IdentifierPos,
-						StructureType: structureType,
-					},
-				)
-			}
+		if err := checker.checkFieldsInitialized(structure, structureType); err != nil {
+			errs = append(errs, err.Errors...)
 		}
 	}
 
@@ -1910,6 +1906,32 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		Type:   nil,
 		Errors: errs,
 	}
+}
+
+// TODO: very simple field initialization check for now.
+//  perform proper definite assignment analysis
+//
+func (checker *Checker) checkFieldsInitialized(
+	structure *ast.StructureDeclaration,
+	structureType *StructureType,
+) *CheckerError {
+	var errs []error
+
+	for _, field := range structure.Fields {
+		name := field.Identifier
+		member := structureType.Members[name]
+
+		if !member.IsInitialized {
+			errs = append(errs,
+				&FieldUninitializedError{
+					Name:          name,
+					Pos:           field.IdentifierPos,
+					StructureType: structureType,
+				},
+			)
+		}
+	}
+	return checkerError(errs)
 }
 
 func (checker *Checker) declareStructureConstructor(
@@ -1999,17 +2021,6 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) (*Str
 		Identifier: structure.Identifier,
 		Members:    members,
 	}, checkerError(errs)
-}
-
-func (checker *Checker) checkStructureFields(fields []*ast.FieldDeclaration) *CheckerError {
-	var errs []error
-
-	for _, field := range fields {
-		result := field.Accept(checker).(checkerResult)
-		errs = append(errs, result.Errors...)
-	}
-
-	return checkerError(errs)
 }
 
 func (checker *Checker) checkStructureInitializer(
@@ -2131,7 +2142,7 @@ func (checker *Checker) declareType(
 ) *CheckerError {
 	var errs []error
 
-	existingType := checker.findType(identifier)
+	existingType := checker.FindType(identifier)
 	if existingType != nil {
 		errs = append(errs,
 			&RedeclarationError{
@@ -2153,10 +2164,7 @@ func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.R
 
 	// NOTE: field type is already checked when determining structure function in `structureType`
 
-	return checkerResult{
-		Type:   nil,
-		Errors: nil,
-	}
+	panic(&errors.UnreachableError{})
 }
 
 func (checker *Checker) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {

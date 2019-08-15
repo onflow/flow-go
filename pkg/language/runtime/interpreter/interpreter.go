@@ -193,8 +193,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	// make the function itself available inside the function
 	variable := &Variable{}
 
-	lexicalScope = lexicalScope.
-		Insert(activations.StringKey(declaration.Identifier), variable)
+	lexicalScope = lexicalScope.Insert(common.StringKey(declaration.Identifier), variable)
 
 	functionExpression := declaration.ToExpression()
 	variable.Value = newInterpretedFunction(functionExpression, lexicalScope)
@@ -416,7 +415,9 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(Value)
 
-			interpreter.declareVariable(declaration.Identifier, value)
+			valueCopy := value.Copy()
+
+			interpreter.declareVariable(declaration.Identifier, valueCopy)
 
 			// NOTE: ignore result, so it does *not* act like a return-statement
 			return Done{}
@@ -434,7 +435,10 @@ func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatem
 	return assignment.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(Value)
-			return interpreter.visitAssignmentValue(assignment, value)
+
+			valueCopy := value.Copy()
+
+			return interpreter.visitAssignmentValue(assignment, valueCopy)
 		})
 }
 
@@ -479,9 +483,9 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.MemberExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			structure := result.(*StructureValue)
+			structure := result.(StructureValue)
 
-			structure.Members[target.Identifier] = value
+			structure.Set(target.Identifier, value)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}
@@ -518,8 +522,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Plus(right)
 			})
 
@@ -527,8 +531,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Minus(right)
 			})
 
@@ -536,8 +540,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Mod(right)
 			})
 
@@ -545,8 +549,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Mul(right)
 			})
 
@@ -554,8 +558,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Div(right)
 			})
 
@@ -563,8 +567,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Less(right)
 			})
 
@@ -572,8 +576,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.LessEqual(right)
 			})
 
@@ -581,8 +585,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.Greater(right)
 			})
 
@@ -590,8 +594,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.Left.(IntegerValue)
+				right := tuple.Right.(IntegerValue)
 				return left.GreaterEqual(right)
 			})
 
@@ -600,13 +604,13 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
 
-				switch left := tuple.left.(type) {
+				switch left := tuple.Left.(type) {
 				case IntegerValue:
-					right := tuple.right.(IntegerValue)
+					right := tuple.Right.(IntegerValue)
 					return BoolValue(left.Equal(right))
 
 				case BoolValue:
-					return BoolValue(tuple.left == tuple.right)
+					return BoolValue(tuple.Left == tuple.Right)
 				}
 
 				panic(&errors.UnreachableError{})
@@ -617,13 +621,13 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
 
-				switch left := tuple.left.(type) {
+				switch left := tuple.Left.(type) {
 				case IntegerValue:
-					right := tuple.right.(IntegerValue)
+					right := tuple.Right.(IntegerValue)
 					return BoolValue(!left.Equal(right))
 
 				case BoolValue:
-					return BoolValue(tuple.left != tuple.right)
+					return BoolValue(tuple.Left != tuple.Right)
 				}
 
 				panic(&errors.UnreachableError{})
@@ -633,8 +637,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(BoolValue)
-				right := tuple.right.(BoolValue)
+				left := tuple.Left.(BoolValue)
+				right := tuple.Right.(BoolValue)
 				return BoolValue(left || right)
 			})
 
@@ -642,8 +646,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-				left := tuple.left.(BoolValue)
-				right := tuple.right.(BoolValue)
+				left := tuple.Left.(BoolValue)
+				right := tuple.Right.(BoolValue)
 				return BoolValue(left && right)
 			})
 	}
@@ -707,8 +711,8 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
-			structure := result.(*StructureValue)
-			return structure.Members[expression.Identifier]
+			structure := result.(StructureValue)
+			return structure.Get(expression.Identifier)
 		})
 }
 
@@ -755,7 +759,10 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 			return interpreter.visitExpressions(argumentExpressions, nil).
 				FlatMap(func(result interface{}) Trampoline {
 					arguments := result.(ArrayValue)
-					return function.invoke(interpreter, arguments)
+
+					argumentCopies := arguments.Copy().(ArrayValue)
+
+					return function.invoke(interpreter, argumentCopies)
 				})
 		})
 }
@@ -857,6 +864,12 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
+	constructorVariable := &Variable{}
+
+	// make the constructor available in the initializer
+	lexicalScope = lexicalScope.
+		Insert(common.StringKey(declaration.Identifier), constructorVariable)
+
 	initializer := declaration.Initializer
 
 	var initializerFunction *InterpretedFunctionValue
@@ -866,34 +879,25 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 		initializerFunction = &function
 	}
 
-	constructorVariable := &Variable{}
-
 	functions := interpreter.structureFunctions(declaration, lexicalScope)
 
 	// TODO: function type
 	constructorVariable.Value = NewHostFunction(
 		nil,
 		func(interpreter *Interpreter, values []Value) Trampoline {
-			structure := newStructure()
+			structure := StructureValue{}
 
 			for name, function := range functions {
 				// NOTE: rebind, as function is captured in closure
 				function := function
 
-				// TODO: function type
-				structure.Members[name] =
-					NewHostFunction(
-						nil,
-						func(interpreter *Interpreter, values []Value) Trampoline {
-							return interpreter.invokeStructureFunction(
-								function,
-								values,
-								structure,
-								declaration.Identifier,
-								constructorVariable,
-							)
-						},
-					)
+				structure.Set(
+					name,
+					NewStructFunction(
+						function,
+						structure,
+					),
+				)
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -903,8 +907,6 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 					*initializerFunction,
 					values,
 					structure,
-					declaration.Identifier,
-					constructorVariable,
 				)
 			}
 
@@ -925,10 +927,8 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 //
 func (interpreter *Interpreter) invokeStructureFunction(
 	function InterpretedFunctionValue,
-	values []Value,
-	structure *StructureValue,
-	identifier string,
-	constructorVariable *Variable,
+	arguments []Value,
+	structure StructureValue,
 ) Trampoline {
 	// start a new activation record
 	// lexical scope: use the function declaration's activation record,
@@ -938,10 +938,7 @@ func (interpreter *Interpreter) invokeStructureFunction(
 	// make `self` available in the initializer
 	interpreter.declareVariable(sema.SelfIdentifier, structure)
 
-	// make the constructor available in the initializer
-	interpreter.setVariable(identifier, constructorVariable)
-
-	return interpreter.invokeInterpretedFunctionActivated(function, values)
+	return interpreter.invokeInterpretedFunctionActivated(function, arguments)
 }
 
 func (interpreter *Interpreter) structureFunctions(

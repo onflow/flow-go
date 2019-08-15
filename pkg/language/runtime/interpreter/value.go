@@ -7,6 +7,7 @@ import (
 
 type Value interface {
 	isValue()
+	Copy() Value
 }
 
 type ExportableValue interface {
@@ -19,6 +20,10 @@ type VoidValue struct{}
 
 func (VoidValue) isValue() {}
 
+func (v VoidValue) Copy() Value {
+	return v
+}
+
 func (v VoidValue) ToGoValue() interface{} {
 	return nil
 }
@@ -28,6 +33,10 @@ func (v VoidValue) ToGoValue() interface{} {
 type BoolValue bool
 
 func (BoolValue) isValue() {}
+
+func (v BoolValue) Copy() Value {
+	return v
+}
 
 func (v BoolValue) ToGoValue() interface{} {
 	return bool(v)
@@ -42,6 +51,15 @@ func (v BoolValue) Negate() BoolValue {
 type ArrayValue []Value
 
 func (ArrayValue) isValue() {}
+
+func (v ArrayValue) Copy() Value {
+	// TODO: optimize, use copy-on-write
+	copies := make(ArrayValue, len(v))
+	for i, value := range v {
+		copies[i] = value.Copy()
+	}
+	return copies
+}
 
 func (v ArrayValue) ToGoValue() interface{} {
 	values := make([]interface{}, len(v))
@@ -78,6 +96,10 @@ type IntValue struct {
 }
 
 func (v IntValue) isValue() {}
+
+func (v IntValue) Copy() Value {
+	return IntValue{big.NewInt(0).Set(v.Int)}
+}
 
 func (v IntValue) ToGoValue() interface{} {
 	return v.IntValue()
@@ -148,6 +170,10 @@ type Int8Value int8
 
 func (Int8Value) isValue() {}
 
+func (v Int8Value) Copy() Value {
+	return v
+}
+
 func (v Int8Value) ToGoValue() interface{} {
 	return int8(v)
 }
@@ -206,6 +232,10 @@ type Int16Value int16
 
 func (Int16Value) isValue() {}
 
+func (v Int16Value) Copy() Value {
+	return v
+}
+
 func (v Int16Value) ToGoValue() interface{} {
 	return int16(v)
 }
@@ -214,7 +244,7 @@ func (v Int16Value) IntValue() int {
 	return int(v)
 }
 
-func (v Int32Value) Negate() IntegerValue {
+func (v Int16Value) Negate() IntegerValue {
 	return -v
 }
 
@@ -264,6 +294,10 @@ type Int32Value int32
 
 func (Int32Value) isValue() {}
 
+func (v Int32Value) Copy() Value {
+	return v
+}
+
 func (v Int32Value) ToGoValue() interface{} {
 	return int32(v)
 }
@@ -272,7 +306,7 @@ func (v Int32Value) IntValue() int {
 	return int(v)
 }
 
-func (v Int16Value) Negate() IntegerValue {
+func (v Int32Value) Negate() IntegerValue {
 	return -v
 }
 
@@ -321,6 +355,10 @@ func (v Int32Value) Equal(other IntegerValue) BoolValue {
 type Int64Value int64
 
 func (Int64Value) isValue() {}
+
+func (v Int64Value) Copy() Value {
+	return v
+}
 
 func (v Int64Value) ToGoValue() interface{} {
 	return int64(v)
@@ -380,6 +418,10 @@ type UInt8Value uint8
 
 func (UInt8Value) isValue() {}
 
+func (v UInt8Value) Copy() Value {
+	return v
+}
+
 func (v UInt8Value) ToGoValue() interface{} {
 	return uint8(v)
 }
@@ -438,6 +480,10 @@ type UInt16Value uint16
 
 func (UInt16Value) isValue() {}
 
+func (v UInt16Value) Copy() Value {
+	return v
+}
+
 func (v UInt16Value) ToGoValue() interface{} {
 	return uint16(v)
 }
@@ -494,6 +540,10 @@ func (v UInt16Value) Equal(other IntegerValue) BoolValue {
 type UInt32Value uint32
 
 func (UInt32Value) isValue() {}
+
+func (v UInt32Value) Copy() Value {
+	return v
+}
 
 func (v UInt32Value) ToGoValue() interface{} {
 	return uint32(v)
@@ -553,6 +603,10 @@ type UInt64Value uint64
 
 func (UInt64Value) isValue() {}
 
+func (v UInt64Value) Copy() Value {
+	return v
+}
+
 func (v UInt64Value) ToGoValue() interface{} {
 	return uint64(v)
 }
@@ -607,21 +661,35 @@ func (v UInt64Value) Equal(other IntegerValue) BoolValue {
 
 // StructureValue
 
-type StructureValue struct {
-	Members map[string]Value
-}
+type StructureValue map[string]Value
 
-func (*StructureValue) isValue() {}
+func (StructureValue) isValue() {}
 
-func (v *StructureValue) ToGoValue() interface{} {
-	// TODO: convert values to Go values?
-	return v.Members
-}
-
-func newStructure() *StructureValue {
-	return &StructureValue{
-		Members: map[string]Value{},
+func (v StructureValue) Copy() Value {
+	newStructure := make(StructureValue, len(v))
+	for field, value := range v {
+		var copiedValue Value
+		if f, ok := value.(*StructFunctionValue); ok {
+			copiedValue = f.CopyWithStructure(newStructure)
+		} else {
+			copiedValue = value.Copy()
+		}
+		newStructure[field] = copiedValue
 	}
+	return newStructure
+}
+
+func (v StructureValue) ToGoValue() interface{} {
+	// TODO: convert values to Go values?
+	return v
+}
+
+func (v StructureValue) Get(field string) Value {
+	return v[field]
+}
+
+func (v StructureValue) Set(field string, value Value) {
+	v[field] = value
 }
 
 // ToValue
@@ -673,5 +741,14 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 // TupleValue
 
 type TupleValue struct {
-	left, right Value
+	Left, Right Value
+}
+
+func (TupleValue) isValue() {}
+
+func (v TupleValue) Copy() Value {
+	return TupleValue{
+		Left:  v.Left.Copy(),
+		Right: v.Right.Copy(),
+	}
 }
