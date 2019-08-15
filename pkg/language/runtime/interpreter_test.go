@@ -1781,8 +1781,8 @@ func TestInterpretOptionalVariableDeclaration(t *testing.T) {
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(
-			interpreter.OptionalValue{
-				Value: interpreter.OptionalValue{
+			interpreter.SomeValue{
+				Value: interpreter.SomeValue{
 					Value: interpreter.IntValue{Int: big.NewInt(2)},
 				},
 			}))
@@ -1799,8 +1799,8 @@ func TestInterpretOptionalParameterInvokedExternal(t *testing.T) {
 
 	Expect(inter.Invoke("test", big.NewInt(2))).
 		To(Equal(
-			interpreter.OptionalValue{
-				Value: interpreter.OptionalValue{
+			interpreter.SomeValue{
+				Value: interpreter.SomeValue{
 					Value: interpreter.IntValue{Int: big.NewInt(2)},
 				},
 			}))
@@ -1821,8 +1821,8 @@ func TestInterpretOptionalParameterInvokedInternal(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(
-			interpreter.OptionalValue{
-				Value: interpreter.OptionalValue{
+			interpreter.SomeValue{
+				Value: interpreter.SomeValue{
 					Value: interpreter.IntValue{Int: big.NewInt(2)},
 				},
 			}))
@@ -1839,8 +1839,8 @@ func TestInterpretOptionalReturn(t *testing.T) {
 
 	Expect(inter.Invoke("test", big.NewInt(2))).
 		To(Equal(
-			interpreter.OptionalValue{
-				Value: interpreter.OptionalValue{
+			interpreter.SomeValue{
+				Value: interpreter.SomeValue{
 					Value: interpreter.IntValue{Int: big.NewInt(2)},
 				},
 			}))
@@ -1862,9 +1862,44 @@ func TestInterpretOptionalAssignment(t *testing.T) {
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(
-			interpreter.OptionalValue{
-				Value: interpreter.OptionalValue{
+			interpreter.SomeValue{
+				Value: interpreter.SomeValue{
 					Value: interpreter.IntValue{Int: big.NewInt(2)},
 				},
 			}))
+}
+
+func TestInterpretNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     let x: Int? = nil
+   `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NilValue{}))
+}
+
+func TestInterpretOptionalNestingNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     let x: Int?? = nil
+   `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NilValue{}))
+}
+
+func TestInterpretNilReturnValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     fun test(): Int?? {
+         return nil
+     }
+   `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.NilValue{}))
 }
