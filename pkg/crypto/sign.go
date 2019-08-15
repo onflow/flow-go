@@ -63,7 +63,7 @@ func (a *SignAlgo) SignatureSize() int {
 
 // ToBytes returns a byte array of the signature data
 func (s Signature) ToBytes() []byte {
-	return s
+	return s[:]
 }
 
 // String returns a String representation of the signature data

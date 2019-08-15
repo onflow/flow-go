@@ -20,10 +20,12 @@ const (
 	// BLS signature scheme lengths
 
 	// BLS12-381
-	compression                 = 1 // 1 for compressed, 0 for uncompressed
+	compression = 1 // 1 for compressed, 0 for uncompressed
+	// the length is divided by 2 if compression is on
 	SignatureLengthBLS_BLS12381 = 48 * (2 - compression)
 	PrKeyLengthBLS_BLS12381     = 32
-	PubKeyLengthBLS_BLS12381    = 96 * (2 - compression)
+	// the length is divided by 2 if compression is on
+	PubKeyLengthBLS_BLS12381 = 96 * (2 - compression)
 )
 
 // These types should implement Hash
