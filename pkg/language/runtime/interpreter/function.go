@@ -14,14 +14,14 @@ type FunctionValue interface {
 	Value
 	isFunctionValue()
 	invoke(interpreter *Interpreter, arguments []Value, position ast.Position) Trampoline
-	parameterCount() int
+	functionType() *sema.FunctionType
 }
 
 // InterpretedFunctionValue
 
 type InterpretedFunctionValue struct {
 	Expression *ast.FunctionExpression
-	ReturnType sema.Type
+	Type       *sema.FunctionType
 	Activation hamt.Map
 }
 
@@ -35,12 +35,12 @@ func (InterpretedFunctionValue) isFunctionValue() {}
 
 func newInterpretedFunction(
 	expression *ast.FunctionExpression,
-	returnType sema.Type,
+	functionType *sema.FunctionType,
 	activation hamt.Map,
 ) InterpretedFunctionValue {
 	return InterpretedFunctionValue{
 		Expression: expression,
-		ReturnType: returnType,
+		Type:       functionType,
 		Activation: activation,
 	}
 }
@@ -49,8 +49,8 @@ func (f InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []V
 	return interpreter.invokeInterpretedFunction(f, arguments)
 }
 
-func (f InterpretedFunctionValue) parameterCount() int {
-	return len(f.Expression.Parameters)
+func (f InterpretedFunctionValue) functionType() *sema.FunctionType {
+	return f.Type
 }
 
 // HostFunctionValue
@@ -74,8 +74,8 @@ func (f HostFunctionValue) invoke(interpreter *Interpreter, arguments []Value, p
 	return f.Function(interpreter, arguments, position)
 }
 
-func (f HostFunctionValue) parameterCount() int {
-	return len(f.Type.ParameterTypes)
+func (f HostFunctionValue) functionType() *sema.FunctionType {
+	return f.Type
 }
 
 func NewHostFunctionValue(
@@ -99,9 +99,8 @@ func (*StructureFunctionValue) isValue() {}
 
 func (*StructureFunctionValue) isFunctionValue() {}
 
-func (f *StructureFunctionValue) parameterCount() int {
-	// TODO:
-	return 0
+func (f *StructureFunctionValue) functionType() *sema.FunctionType {
+	return f.function.Type
 }
 
 func (f *StructureFunctionValue) Copy() Value {
@@ -128,7 +127,7 @@ func NewStructFunction(
 	structure StructureValue,
 ) *StructureFunctionValue {
 	return &StructureFunctionValue{
-		function,
-		structure,
+		function:  function,
+		structure: structure,
 	}
 }

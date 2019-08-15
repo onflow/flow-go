@@ -1684,6 +1684,33 @@ func TestInterpretStructCopyOnPassing(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 }
 
+func TestInterpretArrayCopy(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+
+      fun change(_ numbers: Int[]): Int[] {
+          numbers[0] = 1
+          return numbers
+      }
+
+      fun test(): Int[] {
+          let numbers = [0]
+          let numbers2 = change(numbers)
+          return [
+              numbers[0],
+              numbers2[0]
+          ]
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.ArrayValue{
+			interpreter.IntValue{Int: big.NewInt(0)},
+			interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
 func TestInterpretMutuallyRecursiveFunctions(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1743,4 +1770,101 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
 
 	Expect(inter.Globals["tests"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+}
+
+func TestInterpretOptionalVariableDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int?? = 2
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(
+			interpreter.OptionalValue{
+				Value: interpreter.OptionalValue{
+					Value: interpreter.IntValue{Int: big.NewInt(2)},
+				},
+			}))
+}
+
+func TestInterpretOptionalParameterInvokedExternal(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int??): Int?? {
+          return x
+      }
+    `)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(
+			interpreter.OptionalValue{
+				Value: interpreter.OptionalValue{
+					Value: interpreter.IntValue{Int: big.NewInt(2)},
+				},
+			}))
+}
+
+func TestInterpretOptionalParameterInvokedInternal(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun testActual(x: Int??): Int?? {
+          return x
+      }
+
+      fun test(): Int?? {
+          return testActual(x: 2)
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(
+			interpreter.OptionalValue{
+				Value: interpreter.OptionalValue{
+					Value: interpreter.IntValue{Int: big.NewInt(2)},
+				},
+			}))
+}
+
+func TestInterpretOptionalReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int): Int?? {
+          return x
+      }
+    `)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(
+			interpreter.OptionalValue{
+				Value: interpreter.OptionalValue{
+					Value: interpreter.IntValue{Int: big.NewInt(2)},
+				},
+			}))
+}
+
+func TestInterpretOptionalAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x: Int?? = 1
+
+      fun test() {
+          x = 2
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(
+			interpreter.OptionalValue{
+				Value: interpreter.OptionalValue{
+					Value: interpreter.IntValue{Int: big.NewInt(2)},
+				},
+			}))
 }

@@ -38,7 +38,14 @@ type Checker struct {
 	functionContexts []*functionContext
 	Globals          map[string]*Variable
 	inCondition      bool
-	Types            map[ast.Element]Type
+	// TODO: refactor into fields on AST?
+	FunctionDeclarationFunctionTypes   map[*ast.FunctionDeclaration]*FunctionType
+	VariableDeclarationValueTypes      map[*ast.VariableDeclaration]Type
+	AssignmentStatementTargetTypes     map[*ast.AssignmentStatement]Type
+	StructureDeclarationTypes          map[*ast.StructureDeclaration]*StructureType
+	InitializerFunctionTypes           map[*ast.InitializerDeclaration]*FunctionType
+	FunctionExpressionFunctionType     map[*ast.FunctionExpression]*FunctionType
+	InvocationExpressionParameterTypes map[*ast.InvocationExpression][]Type
 }
 
 func NewChecker(program *ast.Program) *Checker {
@@ -49,11 +56,17 @@ func NewChecker(program *ast.Program) *Checker {
 	valueActivations.Push(hamt.NewMap())
 
 	return &Checker{
-		Program:          program,
-		valueActivations: valueActivations,
-		typeActivations:  typeActivations,
-		Globals:          map[string]*Variable{},
-		Types:            map[ast.Element]Type{},
+		Program:                            program,
+		valueActivations:                   valueActivations,
+		typeActivations:                    typeActivations,
+		Globals:                            map[string]*Variable{},
+		FunctionDeclarationFunctionTypes:   map[*ast.FunctionDeclaration]*FunctionType{},
+		VariableDeclarationValueTypes:      map[*ast.VariableDeclaration]Type{},
+		AssignmentStatementTargetTypes:     map[*ast.AssignmentStatement]Type{},
+		StructureDeclarationTypes:          map[*ast.StructureDeclaration]*StructureType{},
+		InitializerFunctionTypes:           map[*ast.InitializerDeclaration]*FunctionType{},
+		FunctionExpressionFunctionType:     map[*ast.FunctionExpression]*FunctionType{},
+		InvocationExpressionParameterTypes: map[*ast.InvocationExpression][]Type{},
 	}
 }
 
@@ -227,8 +240,8 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 
 	// global functions were previously declared, see `declareFunctionDeclaration`
 
-	functionType, ok := checker.Types[declaration].(*FunctionType)
-	if !ok {
+	functionType := checker.FunctionDeclarationFunctionTypes[declaration]
+	if functionType == nil {
 		functionType = checker.declareFunctionDeclaration(declaration)
 	}
 
@@ -246,7 +259,7 @@ func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDecl
 	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
 	argumentLabels := checker.argumentLabels(declaration.Parameters)
 
-	checker.Types[declaration] = functionType
+	checker.FunctionDeclarationFunctionTypes[declaration] = functionType
 
 	checker.declareFunction(
 		declaration.Identifier,
@@ -404,7 +417,7 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		}
 	}
 
-	checker.Types[declaration] = declarationType
+	checker.VariableDeclarationValueTypes[declaration] = declarationType
 
 	checker.declareVariable(
 		declaration.Identifier,
@@ -727,7 +740,7 @@ func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast
 
 	targetType := checker.visitAssignmentValueType(assignment, valueType)
 
-	checker.Types[assignment] = targetType
+	checker.AssignmentStatementTargetTypes[assignment] = targetType
 
 	return nil
 }
@@ -769,6 +782,8 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 				Pos:          target.StartPosition(),
 			},
 		)
+
+		return &InvalidType{}
 	} else {
 		// check identifier is not a constant
 		if variable.IsConstant {
@@ -794,9 +809,9 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 				},
 			)
 		}
-	}
 
-	return variable.Type
+		return variable.Type
+	}
 }
 
 func (checker *Checker) visitIndexExpressionAssignment(
@@ -807,8 +822,11 @@ func (checker *Checker) visitIndexExpressionAssignment(
 
 	elementType = checker.visitIndexingExpression(target.Expression, target.Index)
 
-	if elementType != nil &&
-		!elementType.Equal(&InvalidType{}) &&
+	if elementType == nil {
+		return &InvalidType{}
+	}
+
+	if !elementType.Equal(&InvalidType{}) &&
 		!checker.IsSubType(valueType, elementType) {
 
 		checker.report(
@@ -1312,13 +1330,16 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 			)
 		}
 
-		if len(argumentTypes) == len(functionType.ParameterTypes) &&
+		parameterTypes := functionType.ParameterTypes
+		if len(argumentTypes) == len(parameterTypes) &&
 			functionType.Apply != nil {
 
 			returnType = functionType.Apply(argumentTypes)
 		} else {
 			returnType = functionType.ReturnType
 		}
+
+		checker.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
 	}
 
 	return returnType
@@ -1471,7 +1492,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	// TODO: infer
 	functionType := checker.functionType(expression.Parameters, expression.ReturnType)
 
-	checker.Types[expression] = functionType
+	checker.FunctionExpressionFunctionType[expression] = functionType
 
 	checker.checkFunction(
 		expression.Parameters,
@@ -1659,7 +1680,7 @@ func (checker *Checker) visitConditional(
 
 func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
 
-	structureType := checker.Types[structure].(*StructureType)
+	structureType := checker.StructureDeclarationTypes[structure]
 
 	checker.checkStructureFieldAndFunctionIdentifiers(structure)
 
@@ -1710,7 +1731,7 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 		*temporaryStructureType = *structureType
 	}
 
-	checker.Types[structure] = structureType
+	checker.StructureDeclarationTypes[structure] = structureType
 
 	// declare constructor
 
@@ -1772,7 +1793,7 @@ func (checker *Checker) declareStructureConstructor(
 		}
 	}
 
-	checker.Types[initializer] = functionType
+	checker.InitializerFunctionTypes[initializer] = functionType
 
 	checker.declareFunction(
 		structure.Identifier,
