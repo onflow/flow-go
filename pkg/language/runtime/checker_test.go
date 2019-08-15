@@ -2862,6 +2862,30 @@ func TestCheckOptionalNilComparison(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckNonOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int = 1
+     let y = x == nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNonOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int = 1
+     let y = nil == x
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckNestedOptionalNilComparison(t *testing.T) {
 	RegisterTestingT(t)
 

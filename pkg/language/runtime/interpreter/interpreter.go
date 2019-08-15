@@ -684,34 +684,14 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-
-				switch left := tuple.Left.(type) {
-				case IntegerValue:
-					right := tuple.Right.(IntegerValue)
-					return BoolValue(left.Equal(right))
-
-				case BoolValue:
-					return BoolValue(tuple.Left == tuple.Right)
-				}
-
-				panic(&errors.UnreachableError{})
+				return interpreter.testEqual(tuple.Left, tuple.Right)
 			})
 
 	case ast.OperationUnequal:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-
-				switch left := tuple.Left.(type) {
-				case IntegerValue:
-					right := tuple.Right.(IntegerValue)
-					return BoolValue(!left.Equal(right))
-
-				case BoolValue:
-					return BoolValue(tuple.Left != tuple.Right)
-				}
-
-				panic(&errors.UnreachableError{})
+				return BoolValue(!interpreter.testEqual(tuple.Left, tuple.Right))
 			})
 
 	case ast.OperationOr:
@@ -770,6 +750,30 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		startPos:  expression.StartPosition(),
 		endPos:    expression.EndPosition(),
 	})
+}
+
+func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
+	left = interpreter.unbox(left)
+	right = interpreter.unbox(right)
+
+	switch left := left.(type) {
+	case IntegerValue:
+		// NOTE: might be NilValue
+		right, ok := right.(IntegerValue)
+		if !ok {
+			return false
+		}
+		return left.Equal(right)
+
+	case BoolValue:
+		return BoolValue(left == right)
+
+	case NilValue:
+		_, ok := right.(NilValue)
+		return BoolValue(ok)
+	}
+
+	panic(&errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {
@@ -1117,4 +1121,15 @@ func (interpreter *Interpreter) box(result Value, targetType sema.Type) Value {
 		targetType = optionalType.Type
 	}
 	return result
+}
+
+func (interpreter *Interpreter) unbox(value Value) Value {
+	for {
+		some, ok := value.(SomeValue)
+		if !ok {
+			return value
+		}
+
+		value = some.Value
+	}
 }

@@ -2163,3 +2163,126 @@ func TestInterpretNilCoalescingShortCircuitLeftFailure(t *testing.T) {
 	Expect(inter.Globals["y"].Value).
 		To(Equal(interpreter.BoolValue(true)))
 }
+
+func TestInterpretNilsComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x = nil == nil
+   `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretNonOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int = 1
+      let y = x == nil
+   `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNonOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int = 1
+      let y = nil == x
+   `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     let x: Int? = 1
+     let y = x == nil
+   `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNestedOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int?? = 1
+      let y = x == nil
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = 1
+      let y = nil == x
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNestedOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int?? = 1
+      let y = nil == x
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNestedOptionalComparisonNils(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = nil
+      let y: Int?? = nil
+      let z = x == y
+    `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretNestedOptionalComparisonValues(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = 2
+      let y: Int?? = 2
+      let z = x == y
+    `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = 2
+      let y: Int?? = nil
+      let z = x == y
+    `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+
+}
