@@ -2,7 +2,7 @@ export GO111MODULE := on
 
 .PHONY: build-relic
 build-relic:
-	sh ./pkg/crypto/relic_build.sh
+	./pkg/crypto/relic_build.sh
 
 .PHONY: install-tools
 install-tools: build-relic

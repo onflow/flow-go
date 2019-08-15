@@ -1,7 +1,10 @@
 #!/bin/bash
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )" 
-cd $DIR/relic
+
+mkdir $DIR/relic/build
+
+cd $DIR/relic/build
 
 # set RELIC config for Bamboo
 
@@ -32,7 +35,7 @@ cmake -DCOMP="-O3 -funroll-loops -fomit-frame-pointer -march=native -mtune=nativ
     -DBN_KARAT=0 -DBN_METHD="COMBA;COMBA;MONTY;SLIDE;STEIN;STRON" \
     -DFP_KARAT=0 -DFP_METHD="INTEG;INTEG;INTEG;MONTY;LOWER;SLIDE" \
     -DFPX_METHD="INTEG;INTEG;LAZYR" \
-    -DPP_METHD="LAZYR;OATEP" ./
+    -DPP_METHD="LAZYR;OATEP" ..
 
 # compile the static library
 make clean
