@@ -618,6 +618,66 @@ func TestInterpretOrOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 }
 
+func TestInterpretOrOperatorShortCircuitLeftSuccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return true
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() || changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretOrOperatorShortCircuitLeftFailure(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return false
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() || changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
 func TestInterpretAndOperator(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -649,6 +709,66 @@ func TestInterpretAndOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 
 	Expect(inter.Invoke("testFalseFalse")).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretAndOperatorShortCircuitLeftSuccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return true
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() && changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretAndOperatorShortCircuitLeftFailure(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return false
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() && changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
 		To(Equal(interpreter.BoolValue(false)))
 }
 
@@ -2043,4 +2163,3 @@ func TestInterpretNilCoalescingShortCircuitLeftFailure(t *testing.T) {
 	Expect(inter.Globals["y"].Value).
 		To(Equal(interpreter.BoolValue(true)))
 }
-
