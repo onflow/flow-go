@@ -1,5 +1,9 @@
 package crypto
 
+import (
+	log "github.com/sirupsen/logrus"
+)
+
 // BLS_BLS12381Algo, embeds SignAlgo
 type BLS_BLS12381Algo struct {
 	// points to Relic context of BLS12-381 with all the parameters
@@ -17,7 +21,12 @@ func (a *BLS_BLS12381Algo) SignHash(sk PrKey, h Hash) Signature {
 // SignBytes signs an array of bytes
 // Hasher is not used in the specific case of BLS
 func (a *BLS_BLS12381Algo) SignBytes(sk PrKey, data []byte, alg Hasher) Signature {
-	skScalar := (sk.(*PrKeyBLS_BLS12381)).sk
+	blsPrKey, ok := sk.(*PrKeyBLS_BLS12381)
+	if ok == false {
+		log.Error("BLS sigature can only be called using a BLS private key")
+		return nil
+	}
+	skScalar := blsPrKey.sk
 	return a.blsSign(&skScalar, data)
 }
 
@@ -36,7 +45,13 @@ func (a *BLS_BLS12381Algo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
 
 // VerifyBytes verifies a signature of a byte array
 func (a *BLS_BLS12381Algo) VerifyBytes(pk PubKey, s Signature, data []byte, alg Hasher) bool {
-	pkPoint := &((pk.(*PubKey_BLS_BLS12381)).pk)
+	blsPubKey, ok := pk.(*PubKey_BLS_BLS12381)
+	if ok == true {
+		log.Error("BLS signature verification can only be called using a BLS public key")
+		return false
+	}
+
+	pkPoint := &(blsPubKey.pk)
 	return a.blsVerify(pkPoint, s, data)
 }
 
@@ -73,7 +88,7 @@ func (sk *PrKeyBLS_BLS12381) AlgoName() AlgoName {
 }
 
 func (sk *PrKeyBLS_BLS12381) KeySize() int {
-	return prKeyLengthBLS_BLS12381()
+	return prKeyLengthBLS_BLS12381
 }
 
 func (sk *PrKeyBLS_BLS12381) ComputePubKey() {
@@ -98,5 +113,5 @@ type PubKey_BLS_BLS12381 struct {
 }
 
 func (pk *PubKey_BLS_BLS12381) KeySize() int {
-	return pubKeyLengthBLS_BLS12381()
+	return pubKeyLengthBLS_BLS12381
 }

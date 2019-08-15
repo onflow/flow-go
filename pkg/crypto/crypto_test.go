@@ -3,7 +3,6 @@ package crypto
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"testing"
 )
 
@@ -19,7 +18,6 @@ func (struc *testStruct) Encode() []byte {
 
 // Sanity checks of SHA3_256
 func TestSha3_256(t *testing.T) {
-	fmt.Println("testing Sha3_256:")
 	input := []byte("test")
 	expected, _ := hex.DecodeString("36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80")
 
@@ -58,8 +56,6 @@ func BenchmarkSha3_256(b *testing.B) {
 
 // BLS tests
 func TestBLS_BLS12381(t *testing.T) {
-	fmt.Println("testing BLS on bls12_381:")
-
 	salg := NewSignatureAlgo(BLS_BLS12381)
 	seed := []byte{1, 2, 3, 4}
 	sk := salg.GeneratePrKey(seed)
@@ -71,9 +67,9 @@ func TestBLS_BLS12381(t *testing.T) {
 	result := salg.VerifyBytes(pk, s, input, nil)
 
 	if result == false {
-		t.Errorf("Verification failed: signature is %s", s)
+		t.Errorf("BLS Verification failed: signature is %s", s)
 	} else {
-		t.Logf("Verification passed: signature is %s", s)
+		t.Logf("BLS Verification passed: signature is %s", s)
 	}
 
 	message := &testStruct{"te", "st"}
@@ -81,16 +77,14 @@ func TestBLS_BLS12381(t *testing.T) {
 	result = salg.VerifyStruct(pk, s, message, nil)
 
 	if result == false {
-		t.Errorf("Verification failed: signature is %x", s)
+		t.Errorf("BLS Verification failed: signature is %x", s)
 	} else {
-		t.Logf("Verification passed: signature is %x", s)
+		t.Logf("BLS Verification passed: signature is %x", s)
 	}
 }
 
 // TestG1 helps debugging but is not a unit test
 func TestG1(t *testing.T) {
-	fmt.Println("testing G1")
-
 	_ = NewSignatureAlgo(BLS_BLS12381)
 
 	var expo scalar
@@ -117,7 +111,6 @@ func BenchmarkG1(b *testing.B) {
 
 // TestG2 helps debugging but is not a unit test
 func TestG2(t *testing.T) {
-	fmt.Println("testing G2")
 
 	_ = NewSignatureAlgo(BLS_BLS12381)
 

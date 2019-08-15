@@ -19,17 +19,9 @@ type pointG2 C.ep2_st
 type scalar C.bn_st
 type ctx *C.ctx_t
 
-func signatureLengthBLS_BLS12381() int {
-	return int(C._getSignatureLengthBLS_BLS12381())
-}
-
-func pubKeyLengthBLS_BLS12381() int {
-	return int(C._getPubKeyLengthBLS_BLS12381())
-}
-
-func prKeyLengthBLS_BLS12381() int {
-	return int(C._getPrKeyLengthBLS_BLS12381())
-}
+var signatureLengthBLS_BLS12381 = int(C._getSignatureLengthBLS_BLS12381())
+var pubKeyLengthBLS_BLS12381 = int(C._getPubKeyLengthBLS_BLS12381())
+var prKeyLengthBLS_BLS12381 = int(C._getPrKeyLengthBLS_BLS12381())
 
 // init sets the context of BLS12381 curve
 func (a *BLS_BLS12381Algo) init() {
@@ -84,8 +76,7 @@ func randZr(x *scalar, seed []byte) {
 // TEST/DEBUG/BENCH
 // returns the hash to G1 point
 func hashToG1(data []byte) {
-	var l int
-	l = len(data)
+	l := len(data)
 	_ = C._hashToG1((*C.uchar)((unsafe.Pointer)(&data[0])), (C.int)(l))
 }
 
@@ -96,10 +87,9 @@ func (x *scalar) setInt(a int) {
 
 // computes a bls signature
 func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
-	var s Signature
-	s = make([]byte, a.SignatureLength) // 25ns
+	s := make([]byte, a.SignatureLength)
 
-	C._blsSign((*C.uchar)((unsafe.Pointer)(&s[0])), // 2.1 ms
+	C._blsSign((*C.uchar)((unsafe.Pointer)(&s[0])),
 		(*C.bn_st)(sk),
 		(*C.uchar)((unsafe.Pointer)(&data[0])),
 		(C.int)(len(data)))
