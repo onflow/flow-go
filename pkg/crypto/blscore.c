@@ -173,5 +173,3 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
     else 
         return SIG_INVALID;
 }
-
-

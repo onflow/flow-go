@@ -91,11 +91,7 @@ type PrKey interface {
 	ComputePubKey()
 	// returns the public key
 	Pubkey() PubKey
-	// returns the private key data
-	//prKeyData() data
 }
-
-//type data interface{}
 
 // PubKey is an unspecified signature scheme public key
 type PubKey interface {
