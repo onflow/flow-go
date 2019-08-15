@@ -1983,3 +1983,64 @@ func TestInterpretNilCoalescingNilLiteralInt(t *testing.T) {
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
 }
+
+func TestInterpretNilCoalescingShortCircuitLeftSuccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Int? {
+          x = true
+          return 1
+      }
+
+      fun changeY(): Int {
+          y = true
+          return 2
+      }
+
+      let test = changeX() ?? changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNilCoalescingShortCircuitLeftFailure(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Int? {
+          x = true
+          return nil
+      }
+
+      fun changeY(): Int {
+          y = true
+          return 2
+      }
+
+      let test = changeX() ?? changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
