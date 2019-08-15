@@ -1179,6 +1179,13 @@ func (checker *Checker) VisitBoolExpression(expression *ast.BoolExpression) ast.
 	return &BoolType{}
 }
 
+func (checker *Checker) VisitNilExpression(expression *ast.NilExpression) ast.Repr {
+	// TODO: verify
+	return &OptionalType{
+		Type: &NeverType{},
+	}
+}
+
 func (checker *Checker) VisitIntExpression(expression *ast.IntExpression) ast.Repr {
 	return &IntType{}
 }
