@@ -404,6 +404,8 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		}
 	}
 
+	checker.Types[declaration] = declarationType
+
 	checker.declareVariable(
 		declaration.Identifier,
 		declarationType,
@@ -723,24 +725,23 @@ func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast
 
 	valueType := assignment.Value.Accept(checker).(Type)
 
-	checker.visitAssignmentValueType(assignment, valueType)
+	targetType := checker.visitAssignmentValueType(assignment, valueType)
+
+	checker.Types[assignment] = targetType
 
 	return nil
 }
 
-func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentStatement, valueType Type) {
+func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentStatement, valueType Type) (targetType Type) {
 	switch target := assignment.Target.(type) {
 	case *ast.IdentifierExpression:
-		checker.visitIdentifierExpressionAssignment(assignment, target, valueType)
-		return
+		return checker.visitIdentifierExpressionAssignment(assignment, target, valueType)
 
 	case *ast.IndexExpression:
-		checker.visitIndexExpressionAssignment(assignment, target, valueType)
-		return
+		return checker.visitIndexExpressionAssignment(assignment, target, valueType)
 
 	case *ast.MemberExpression:
-		checker.visitMemberExpressionAssignment(assignment, target, valueType)
-		return
+		return checker.visitMemberExpressionAssignment(assignment, target, valueType)
 
 	default:
 		panic(&unsupportedAssignmentTargetExpression{
@@ -755,7 +756,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	assignment *ast.AssignmentStatement,
 	target *ast.IdentifierExpression,
 	valueType Type,
-) {
+) (targetType Type) {
 	identifier := target.Identifier
 
 	// check identifier was declared before
@@ -794,15 +795,17 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 			)
 		}
 	}
+
+	return variable.Type
 }
 
 func (checker *Checker) visitIndexExpressionAssignment(
 	assignment *ast.AssignmentStatement,
 	target *ast.IndexExpression,
 	valueType Type,
-) {
+) (elementType Type) {
 
-	elementType := checker.visitIndexingExpression(target.Expression, target.Index)
+	elementType = checker.visitIndexingExpression(target.Expression, target.Index)
 
 	if elementType != nil &&
 		!elementType.Equal(&InvalidType{}) &&
@@ -817,13 +820,15 @@ func (checker *Checker) visitIndexExpressionAssignment(
 			},
 		)
 	}
+
+	return elementType
 }
 
 func (checker *Checker) visitMemberExpressionAssignment(
 	assignment *ast.AssignmentStatement,
 	target *ast.MemberExpression,
 	valueType Type,
-) {
+) (memberType Type) {
 
 	member := checker.visitMember(target)
 
@@ -858,6 +863,8 @@ func (checker *Checker) visitMemberExpressionAssignment(
 			},
 		)
 	}
+
+	return member.Type
 }
 
 // visitIndexingExpression checks if the indexed expression is indexable,
