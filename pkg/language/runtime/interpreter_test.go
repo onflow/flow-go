@@ -15,14 +15,7 @@ import (
 )
 
 func parseCheckAndInterpret(code string) *interpreter.Interpreter {
-	program, errors := parser.ParseProgram(code)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	checker := sema.NewChecker(program)
-	err := checker.Check()
-
+	checker, err := parseAndCheck(code)
 	Expect(err).
 		To(Not(HaveOccurred()))
 
@@ -2284,5 +2277,4 @@ func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
 
 	Expect(inter.Globals["z"].Value).
 		To(Equal(interpreter.BoolValue(false)))
-
 }

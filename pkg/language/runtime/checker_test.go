@@ -2922,6 +2922,21 @@ func TestCheckNestedOptionalNilComparisonSwapped(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckNilCoalescingWithNever(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(
+		`
+          let x: Int? = nil
+          let y = x ?? panic("nope")
+        `,
+		stdlib.PanicFunction,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckNestedOptionalComparison(t *testing.T) {
 	RegisterTestingT(t)
 
