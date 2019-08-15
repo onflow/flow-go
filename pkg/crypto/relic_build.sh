@@ -2,8 +2,7 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )" 
 
-mkdir $DIR/relic/build
-
+mkdir -p $DIR/relic/build
 cd $DIR/relic/build
 
 # set RELIC config for Bamboo
@@ -40,4 +39,6 @@ cmake -DCOMP="-O3 -funroll-loops -fomit-frame-pointer -march=native -mtune=nativ
 # compile the static library
 make clean
 make relic_s
+mv ./include/relic_conf.h ../include/.
+rm -f CMakeCache.txt
 cd ..

@@ -16,7 +16,6 @@ RUN go mod download
 COPY . .
 
 RUN make build-relic
-
 RUN GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /go/bin/app ./cmd/collect/
 
 FROM alpine
