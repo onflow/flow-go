@@ -2772,3 +2772,69 @@ func TestCheckNilCoalescingRightSubtype(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
+
+func TestCheckNilCoalescingNilInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let one = 1
+      let none: Int? = nil
+      let x: Int = none ?? one
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidNilCoalescingOptionalsInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let one = 1
+      let none: Int?? = nil
+      let x: Int = none ?? one
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckNilCoalescingNilLiteralInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let one = 1
+     let x: Int = nil ?? one
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidNilCoalescingMismatchNonOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int = nil ?? false
+   `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidNilCoalescingRightSubtype(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int = nil ?? nil
+   `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
