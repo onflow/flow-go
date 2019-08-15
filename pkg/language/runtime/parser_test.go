@@ -2777,11 +2777,11 @@ func TestParseConditionMessage(t *testing.T) {
 		To(Equal(expected))
 }
 
-func TestParse(t *testing.T) {
+func TestParseOptionalType(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, errors := parser.ParseProgram(`
-       let x: Int? = 1
+       let x: Int?? = 1
 	`)
 
 	Expect(errors).
@@ -2793,16 +2793,19 @@ func TestParse(t *testing.T) {
 				IsConstant: true,
 				Identifier: "x",
 				Type: &OptionalType{
-					Type: &NominalType{
-						Identifier: "Int",
-						Pos:        Position{Offset: 15, Line: 2, Column: 14},
+					Type: &OptionalType{
+						Type: &NominalType{
+							Identifier: "Int",
+							Pos:        Position{Offset: 15, Line: 2, Column: 14},
+						},
+						EndPos: Position{Offset: 18, Line: 2, Column: 17},
 					},
-					EndPos: Position{Offset: 18, Line: 2, Column: 17},
+					EndPos: Position{Offset: 19, Line: 2, Column: 18},
 				},
 				Value: &IntExpression{
 					Value:    big.NewInt(1),
-					StartPos: Position{Offset: 22, Line: 2, Column: 21},
-					EndPos:   Position{Offset: 22, Line: 2, Column: 21},
+					StartPos: Position{Offset: 23, Line: 2, Column: 22},
+					EndPos:   Position{Offset: 23, Line: 2, Column: 22},
 				},
 				StartPos:      Position{Offset: 8, Line: 2, Column: 7},
 				IdentifierPos: Position{Offset: 12, Line: 2, Column: 11},

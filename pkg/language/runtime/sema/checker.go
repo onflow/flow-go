@@ -111,7 +111,8 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		return true
 	}
 
-	if _, ok := superType.(*IntegerType); ok {
+	switch typedSuperType := superType.(type) {
+	case *IntegerType:
 		switch subType.(type) {
 		case *IntType,
 			*Int8Type, *Int16Type, *Int32Type, *Int64Type,
@@ -122,6 +123,14 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		default:
 			return false
 		}
+	case *OptionalType:
+		optionalSubType, ok := subType.(*OptionalType)
+		if !ok {
+			// T <: U? if T <: U
+			return checker.IsSubType(subType, typedSuperType.Type)
+		}
+		// optionals are covariant: T? <: U? if T <: U
+		return checker.IsSubType(optionalSubType.Type, typedSuperType.Type)
 	}
 
 	// TODO: functions
@@ -1520,6 +1529,10 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 			ParameterTypes: parameterTypes,
 			ReturnType:     returnType,
 		}
+
+	case *ast.OptionalType:
+		result := checker.ConvertType(t.Type)
+		return &OptionalType{result}
 	}
 
 	panic(&astTypeConversionError{invalidASTType: t})
