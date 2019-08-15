@@ -83,6 +83,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 		common.DeclarationKindFunction,
 		ast.Position{},
 		true,
+		nil,
 	); err != nil {
 		return nil, RuntimeError{[]error{err}}
 	}
@@ -93,6 +94,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 		common.DeclarationKindFunction,
 		ast.Position{},
 		true,
+		nil,
 	); err != nil {
 		return nil, RuntimeError{[]error{err}}
 	}
@@ -103,6 +105,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 		common.DeclarationKindFunction,
 		ast.Position{},
 		true,
+		nil,
 	); err != nil {
 		return nil, RuntimeError{[]error{err}}
 	}

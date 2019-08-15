@@ -25,6 +25,7 @@ var log = stdlib.NewStandardLibraryFunction(
 		fmt.Printf("%v\n", arguments[0])
 		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	},
+	nil,
 )
 
 // main parses the given filename and prints any syntax errors.
@@ -63,6 +64,7 @@ func main() {
 			common.DeclarationKindFunction,
 			ast.Position{},
 			true,
+			nil,
 		)
 		if err != nil {
 			prettyPrintError(err, filename, code)

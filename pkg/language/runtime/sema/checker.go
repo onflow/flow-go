@@ -21,7 +21,7 @@ type functionContext struct {
 var beforeType = &FunctionType{
 	ParameterTypes: []Type{&AnyType{}},
 	ReturnType:     &AnyType{},
-	apply: func(types []Type) Type {
+	Apply: func(types []Type) Type {
 		return types[0]
 	},
 }
@@ -56,9 +56,10 @@ func (checker *Checker) DeclareValue(
 	kind common.DeclarationKind,
 	pos ast.Position,
 	isConstant bool,
+	argumentLabels []string,
 ) error {
 	checker.errors = nil
-	checker.declareVariable(name, ty, kind, pos, isConstant)
+	checker.declareVariable(name, ty, kind, pos, isConstant, argumentLabels)
 	return checker.checkerError()
 }
 
@@ -357,6 +358,7 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		declaration.DeclarationKind(),
 		declaration.IdentifierPosition(),
 		declaration.IsConstant,
+		nil,
 	)
 
 	return nil
@@ -368,6 +370,7 @@ func (checker *Checker) declareVariable(
 	kind common.DeclarationKind,
 	pos ast.Position,
 	isConstant bool,
+	argumentLabels []string,
 ) {
 
 	depth := checker.valueActivations.Depth()
@@ -389,10 +392,11 @@ func (checker *Checker) declareVariable(
 	checker.setVariable(
 		identifier,
 		&Variable{
-			IsConstant: isConstant,
-			Depth:      depth,
-			Type:       ty,
-			Pos:        &pos,
+			IsConstant:     isConstant,
+			Depth:          depth,
+			Type:           ty,
+			Pos:            &pos,
+			ArgumentLabels: argumentLabels,
 		},
 	)
 }
@@ -473,6 +477,7 @@ func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, ret
 			common.DeclarationKindConstant,
 			ast.Position{},
 			true,
+			nil,
 		)
 	}
 
@@ -487,6 +492,7 @@ func (checker *Checker) declareBefore() {
 		common.DeclarationKindFunction,
 		ast.Position{},
 		true,
+		nil,
 	)
 }
 
@@ -1225,9 +1231,9 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		}
 
 		if len(argumentTypes) == len(functionType.ParameterTypes) &&
-			functionType.apply != nil {
+			functionType.Apply != nil {
 
-			returnType = functionType.apply(argumentTypes)
+			returnType = functionType.Apply(argumentTypes)
 		} else {
 			returnType = functionType.ReturnType
 		}
@@ -1332,14 +1338,20 @@ func (checker *Checker) checkInvocationArguments(
 	// check the invocation's argument count matches the function's parameter count
 	parameterCount := len(functionType.ParameterTypes)
 	if argumentCount != parameterCount {
-		checker.report(
-			&ArgumentCountError{
-				ParameterCount: parameterCount,
-				ArgumentCount:  argumentCount,
-				StartPos:       invocationExpression.StartPosition(),
-				EndPos:         invocationExpression.EndPosition(),
-			},
-		)
+
+		// TODO: improve
+		if functionType.RequiredArgumentCount == nil ||
+			argumentCount < *functionType.RequiredArgumentCount {
+
+			checker.report(
+				&ArgumentCountError{
+					ParameterCount: parameterCount,
+					ArgumentCount:  argumentCount,
+					StartPos:       invocationExpression.StartPosition(),
+					EndPos:         invocationExpression.EndPosition(),
+				},
+			)
+		}
 	}
 
 	minCount := argumentCount

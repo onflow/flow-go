@@ -150,9 +150,22 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 	argumentCount := len(argumentValues)
 
 	if argumentCount != parameterCount {
-		return nil, &ArgumentCountError{
-			ParameterCount: parameterCount,
-			ArgumentCount:  argumentCount,
+
+		var functionType *sema.FunctionType
+
+		if hostFunction, ok := function.(HostFunctionValue); ok {
+			functionType = hostFunction.Type
+		}
+
+		// TODO: improve
+		if functionType == nil ||
+			(functionType.RequiredArgumentCount == nil ||
+				argumentCount < *functionType.RequiredArgumentCount) {
+
+			return nil, &ArgumentCountError{
+				ParameterCount: parameterCount,
+				ArgumentCount:  argumentCount,
+			}
 		}
 	}
 

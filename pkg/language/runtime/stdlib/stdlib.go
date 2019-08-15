@@ -10,22 +10,25 @@ import (
 )
 
 type StandardLibraryFunction struct {
-	Name     string
-	Function interpreter.HostFunctionValue
+	Name           string
+	Function       interpreter.HostFunctionValue
+	ArgumentLabels []string
 }
 
 func NewStandardLibraryFunction(
 	name string,
 	functionType *sema.FunctionType,
 	function interpreter.HostFunction,
+	argumentLabels []string,
 ) StandardLibraryFunction {
 	functionValue := interpreter.NewHostFunctionValue(
 		functionType,
 		function,
 	)
 	return StandardLibraryFunction{
-		Name:     name,
-		Function: functionValue,
+		Name:           name,
+		Function:       functionValue,
+		ArgumentLabels: argumentLabels,
 	}
 }
 
@@ -45,33 +48,85 @@ func (e AssertionError) EndPosition() ast.Position {
 }
 
 func (e AssertionError) Error() string {
-	return fmt.Sprintf("assertion failed: %s", e.Message)
+	const message = "assertion failed"
+	if e.Message == "" {
+		return message
+	}
+	return fmt.Sprintf("%s: %s", message, e.Message)
 }
 
 // Assertion
 
-var Assert = NewStandardLibraryFunction(
+var assertRequiredArgumentCount = 1
+
+var AssertFunction = NewStandardLibraryFunction(
 	"assert",
 	&sema.FunctionType{
 		ParameterTypes: []sema.Type{
 			&sema.BoolType{},
 			&sema.StringType{},
 		},
-		ReturnType: &sema.VoidType{},
+		ReturnType:            &sema.VoidType{},
+		RequiredArgumentCount: &assertRequiredArgumentCount,
 	},
 	func(inter *interpreter.Interpreter, arguments []interpreter.Value, position ast.Position) trampoline.Trampoline {
 		result := arguments[0].(interpreter.BoolValue)
 		if !result {
-			message := arguments[1].(interpreter.StringValue)
+			var message string
+			if len(arguments) > 1 {
+				message = string(arguments[1].(interpreter.StringValue))
+			}
 			panic(AssertionError{
-				Message:  string(message),
+				Message:  message,
 				Position: position,
 			})
 		}
 		return trampoline.Done{}
 	},
+	[]string{"", "message"},
+)
+
+// PanicError
+
+type PanicError struct {
+	Message  string
+	Position ast.Position
+}
+
+func (e PanicError) StartPosition() ast.Position {
+	return e.Position
+}
+
+func (e PanicError) EndPosition() ast.Position {
+	return e.Position
+}
+
+func (e PanicError) Error() string {
+	return fmt.Sprintf("panic: %s", e.Message)
+}
+
+// PanicFunction
+
+var PanicFunction = NewStandardLibraryFunction(
+	"panic",
+	&sema.FunctionType{
+		ParameterTypes: []sema.Type{
+			&sema.StringType{},
+		},
+		ReturnType: &sema.VoidType{},
+	},
+	func(inter *interpreter.Interpreter, arguments []interpreter.Value, position ast.Position) trampoline.Trampoline {
+		message := arguments[0].(interpreter.StringValue)
+		panic(PanicError{
+			Message:  string(message),
+			Position: position,
+		})
+		return trampoline.Done{}
+	},
+	nil,
 )
 
 var BuiltIns = []StandardLibraryFunction{
-	Assert,
+	AssertFunction,
+	PanicFunction,
 }

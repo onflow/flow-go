@@ -355,14 +355,14 @@ a + 2
 
 ### Never
 
-`Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
+`Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`panic`](#panic).
 
 ```bamboo
 // Declare a function named `crashAndBurn` which will never return,
-// because it calls the function named `fatalError`, which never returns
+// because it calls the function named `panic`, which never returns
 //
 fun crashAndBurn(): Never {
-    fatalError("An unrecoverable error occurred")
+    panic("An unrecoverable error occurred")
 }
 ```
 
@@ -3304,12 +3304,10 @@ transaction {
 
 ## Built-in Functions
 
-### `fatalError`
-
-> 🚧 Status: `fatalError` is not implemented yet.
+### `panic`
 
 ```bamboo
-fun fatalError(_ message: String): Never
+fun panic(_ message: String): Never
 ```
 
 Terminates the program unconditionally and reports a message which explains why the unrecoverable error occurred.
@@ -3318,12 +3316,10 @@ Terminates the program unconditionally and reports a message which explains why 
 
 ```bamboo
 let optionalAccount: Account? = // ...
-let account = optionalAccount ?? fatalError("missing account")
+let account = optionalAccount ?? panic("missing account")
 ```
 
 ### `assert`
-
-> 🚧 Status: `assert` is not implemented yet.
 
 ```bamboo
 fun assert(_ condition: Bool, message: String)
@@ -3331,6 +3327,7 @@ fun assert(_ condition: Bool, message: String)
 
 Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.
 
+The message argument is optional.
 
 ## Open questions
 
