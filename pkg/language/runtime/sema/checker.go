@@ -1099,14 +1099,15 @@ func (checker *Checker) checkBinaryExpressionEquality(
 	operationKind BinaryOperationKind,
 	leftType, rightType Type,
 	leftIsInvalid, rightIsInvalid, anyInvalid bool,
-) Type {
+) (resultType Type) {
 	// check both types are equal, and boolean subtypes or integer subtypes
+
+	resultType = &BoolType{}
 
 	if !anyInvalid &&
 		leftType != nil &&
-		!(leftType.Equal(rightType) &&
-			(checker.IsSubType(leftType, &BoolType{}) ||
-				checker.IsSubType(leftType, &IntegerType{}))) {
+		!(checker.isValidEqualityType(leftType) &&
+			checker.compatibleEqualityTypes(leftType, rightType)) {
 
 		checker.report(
 			&InvalidBinaryOperandsError{
@@ -1119,7 +1120,55 @@ func (checker *Checker) checkBinaryExpressionEquality(
 		)
 	}
 
-	return &BoolType{}
+	return
+}
+
+func (checker *Checker) isValidEqualityType(ty Type) bool {
+	if checker.IsSubType(ty, &BoolType{}) {
+		return true
+	}
+
+	if checker.IsSubType(ty, &IntegerType{}) {
+		return true
+	}
+
+	if _, ok := ty.(*OptionalType); ok {
+		return true
+	}
+
+	return false
+}
+
+func (checker *Checker) compatibleEqualityTypes(leftType, rightType Type) bool {
+	unwrappedLeft := checker.unwrapOptionalType(leftType)
+	unwrappedRight := checker.unwrapOptionalType(rightType)
+
+	if unwrappedLeft.Equal(unwrappedRight) {
+		return true
+	}
+
+	if _, ok := unwrappedLeft.(*NeverType); ok {
+		return true
+	}
+
+	if _, ok := unwrappedRight.(*NeverType); ok {
+		return true
+	}
+
+	return false
+}
+
+// unwrapOptionalType returns the type if it is not an optional type,
+// or the inner-most type if it is (optional types are repeatedly unwrapped)
+//
+func (checker *Checker) unwrapOptionalType(ty Type) Type {
+	for {
+		optionalType, ok := ty.(*OptionalType)
+		if !ok {
+			return ty
+		}
+		ty = optionalType.Type
+	}
 }
 
 func (checker *Checker) checkBinaryExpressionBooleanLogic(

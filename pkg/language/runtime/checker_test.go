@@ -2838,3 +2838,90 @@ func TestCheckInvalidNilCoalescingRightSubtype(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
+
+func TestCheckNilsComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x = nil == nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int? = 1
+     let y = x == nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNestedOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int?? = 1
+     let y = x == nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int? = 1
+     let y = nil == x
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNestedOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int?? = 1
+     let y = nil == x
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNestedOptionalComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int? = nil
+     let y: Int?? = nil
+     let z = x == y
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidNestedOptionalComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int? = nil
+     let y: Bool?? = nil
+     let z = x == y
+   `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+}
