@@ -990,19 +990,33 @@
           <ul>
             <li>
               <p>Logical AND: <code>a &#x26;&#x26; b</code></p>
-              <pre><code class="language-bamboo,file=operator-and.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">true</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #0000FF">false</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #0000FF">false</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
+              <pre><code class="language-bamboo,file=operator-and.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #0000FF">false</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #0000FF">false</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is false</span><span>
 </span></code></pre>
               <p>If the left-hand side is true, the right-hand side is not evaluated.</p>
             </li>
             <li>
               <p>Logical OR: <code>a || b</code></p>
-              <pre><code class="language-bamboo,file=operator-or.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">true</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">false</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">false</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
+              <pre><code class="language-bamboo,file=operator-or.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #0000FF">false</span><span style="color: #000000"> || </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #0000FF">false</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is false</span><span>
 </span></code></pre>
               <p>If the left-hand side is false, the right-hand side is not evaluated.</p>
             </li>
@@ -1013,49 +1027,117 @@
           <p>Comparison operators work with boolean and integer values.</p>
           <ul>
             <li>
-              <p>Equality: <code>==</code>, for booleans and integers</p>
-              <pre><code class="language-bamboo,file=operator-equal.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">true</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
+              <p>Equality: <code>==</code>, for booleans and integers (possibly optional)</p>
+              <pre><code class="language-bamboo,file=operator-equal-int.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-equal-bool.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-equal-optional-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">x == </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-equal-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">x == </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-equal-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #000000">x == y</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-equal-optional-int-optionals-int.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">x == y</span><span>
+</span><span style="color: #008000">// is true</span><span>
 </span></code></pre>
             </li>
             <li>
-              <p>Inequality: <code>!=</code>, for booleans and integers</p>
-              <pre><code class="language-bamboo,file=operator-not-equal.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">true</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
+              <p>Inequality: <code>!=</code>, for booleans and integers (possibly optional)</p>
+              <pre><code class="language-bamboo,file=operator-not-equal-int.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-not-equal-bool.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-not-equal-optional-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">x != </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-not-equal-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">x != </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-not-equal-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #000000">x != y</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-not-equal-optional-int-optionals-int.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">x != y</span><span>
+</span><span style="color: #008000">// is false</span><span>
 </span></code></pre>
             </li>
             <li>
               <p>Less than: <code>&#x3C;</code>, for integers</p>
-              <pre><code class="language-bamboo,file=operator-less.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #09885A">2</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
+              <pre><code class="language-bamboo,file=operator-less.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #09885A">2</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is false</span><span>
 </span></code></pre>
             </li>
             <li>
               <p>Less or equal than: <code>&#x3C;=</code>, for integers</p>
-              <pre><code class="language-bamboo,file=operator-less-equals.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #09885A">2</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
+              <pre><code class="language-bamboo,file=operator-less-equals.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #09885A">2</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is false</span><span>
 </span></code></pre>
             </li>
             <li>
               <p>Greater than: <code>></code>, for integers</p>
-              <pre><code class="language-bamboo,file=operator-greater.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #09885A">2</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
+              <pre><code class="language-bamboo,file=operator-greater.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #09885A">2</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is true</span><span>
 </span></code></pre>
             </li>
-          </ul>
-          <ul>
             <li>
               <p>Greater or equal than: <code>>=</code>, for integers</p>
-              <pre><code class="language-bamboo,file=operator-greater-equals.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #09885A">2</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
+              <pre><code class="language-bamboo,file=operator-greater-equals.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #09885A">2</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is true</span><span>
 </span></code></pre>
             </li>
           </ul>
