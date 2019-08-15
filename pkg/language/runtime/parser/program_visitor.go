@@ -2,12 +2,14 @@ package parser
 
 import (
 	"fmt"
-	"github.com/antlr/antlr4/runtime/Go/antlr"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 	"math/big"
 	"strconv"
 	"strings"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
 type ProgramVisitor struct {
@@ -50,7 +52,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
 
-	block := ctx.Block().Accept(v).(*ast.Block)
+	block := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
@@ -60,7 +62,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 		Identifier:    identifier,
 		Parameters:    parameters,
 		ReturnType:    returnType,
-		Block:         block,
+		FunctionBlock: block,
 		StartPos:      startPosition,
 		IdentifierPos: identifierPos,
 	}
@@ -167,15 +169,15 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
 
-	block := ctx.Block().Accept(v).(*ast.Block)
+	block := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.InitializerDeclaration{
-		Identifier: identifier,
-		Parameters: parameters,
-		Block:      block,
-		StartPos:   startPosition,
+		Identifier:    identifier,
+		Parameters:    parameters,
+		FunctionBlock: block,
+		StartPos:      startPosition,
 	}
 }
 
@@ -189,15 +191,15 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
 
-	block := ctx.Block().Accept(v).(*ast.Block)
+	block := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.FunctionExpression{
-		Parameters: parameters,
-		ReturnType: returnType,
-		Block:      block,
-		StartPos:   startPosition,
+		Parameters:    parameters,
+		ReturnType:    returnType,
+		FunctionBlock: block,
+		StartPos:      startPosition,
 	}
 }
 
@@ -342,14 +344,79 @@ func (v *ProgramVisitor) VisitTypeDimension(ctx *TypeDimensionContext) interface
 }
 
 func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {
-	statements := ctx.Statements().Accept(v).([]ast.Statement)
+	return v.visitBlock(ctx.BaseParserRuleContext, ctx.Statements())
+}
 
+func (v *ProgramVisitor) VisitFunctionBlock(ctx *FunctionBlockContext) interface{} {
+	block := v.visitBlock(ctx.BaseParserRuleContext, ctx.Statements())
+
+	var preConditions []*ast.Condition
+	preConditionsCtx := ctx.PreConditions()
+	if preConditionsCtx != nil {
+		preConditions = preConditionsCtx.Accept(v).([]*ast.Condition)
+	}
+
+	var postConditions []*ast.Condition
+	postConditionsCtx := ctx.PostConditions()
+	if postConditionsCtx != nil {
+		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
+	}
+
+	return &ast.FunctionBlock{
+		Block:          block,
+		PreConditions:  preConditions,
+		PostConditions: postConditions,
+	}
+}
+
+func (v *ProgramVisitor) visitBlock(ctx antlr.ParserRuleContext, statementsCtx IStatementsContext) *ast.Block {
+	statements := statementsCtx.Accept(v).([]ast.Statement)
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
-
 	return &ast.Block{
 		Statements: statements,
 		StartPos:   startPosition,
 		EndPos:     endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitPreConditions(ctx *PreConditionsContext) interface{} {
+	return ctx.Conditions().Accept(v)
+}
+
+func (v *ProgramVisitor) VisitPostConditions(ctx *PostConditionsContext) interface{} {
+	return ctx.Conditions().Accept(v)
+}
+
+func (v *ProgramVisitor) VisitConditions(ctx *ConditionsContext) interface{} {
+	var conditions []*ast.Condition
+	for _, statement := range ctx.AllCondition() {
+		conditions = append(
+			conditions,
+			statement.Accept(v).(*ast.Condition),
+		)
+	}
+	return conditions
+}
+
+func (v *ProgramVisitor) VisitCondition(ctx *ConditionContext) interface{} {
+	parentParent := ctx.GetParent().GetParent()
+
+	_, isPreCondition := parentParent.(*PreConditionsContext)
+	_, isPostCondition := parentParent.(*PostConditionsContext)
+
+	var kind ast.ConditionKind
+	if isPreCondition {
+		kind = ast.ConditionKindPre
+	} else if isPostCondition {
+		kind = ast.ConditionKindPost
+	} else {
+		panic(errors.UnreachableError{})
+	}
+
+	expression := ctx.Expression().Accept(v).(ast.Expression)
+	return &ast.Condition{
+		Kind:       kind,
+		Expression: expression,
 	}
 }
 
@@ -746,9 +813,9 @@ func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) i
 		switch partialExpression := suffix.Accept(v).(type) {
 		case *ast.InvocationExpression:
 			result = &ast.InvocationExpression{
-				Expression: result,
-				Arguments:  partialExpression.Arguments,
-				EndPos:     partialExpression.EndPos,
+				InvokedExpression: result,
+				Arguments:         partialExpression.Arguments,
+				EndPos:            partialExpression.EndPos,
 			}
 		case ast.AccessExpression:
 			result = v.wrapPartialAccessExpression(result, partialExpression)
@@ -946,6 +1013,90 @@ func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interfa
 	}
 
 	panic(&errors.UnreachableError{})
+}
+
+func (v *ProgramVisitor) VisitStringLiteral(ctx *StringLiteralContext) interface{} {
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := ast.EndPosition(startPosition, ctx.StringLiteral().GetSymbol().GetStop())
+
+	stringLiteral := ctx.StringLiteral().GetText()
+
+	// slice off leading and trailing quotes
+	// and parse escape characters
+	parsedString := parseStringLiteral(
+		stringLiteral[1 : len(stringLiteral)-1],
+	)
+
+	return &ast.StringExpression{
+		Value:    parsedString,
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
+}
+
+func parseStringLiteral(s string) string {
+	var builder strings.Builder
+
+	var c byte
+	for len(s) > 0 {
+		c, s = s[0], s[1:]
+
+		if c != '\\' {
+			builder.WriteByte(c)
+			continue
+		}
+
+		c, s = s[0], s[1:]
+
+		switch c {
+		case '0':
+			builder.WriteByte(0)
+		case 'n':
+			builder.WriteByte('\n')
+		case 'r':
+			builder.WriteByte('\r')
+		case 't':
+			builder.WriteByte('\t')
+		case '"':
+			builder.WriteByte('"')
+		case '\'':
+			builder.WriteByte('\'')
+		case '\\':
+			builder.WriteByte('\\')
+		case 'u':
+			// skip `{`
+			s = s[1:]
+
+			j := 0
+			var v rune
+			for ; s[j] != '}' && j < 8; j++ {
+				x := parseHex(s[j])
+				v = v<<4 | x
+			}
+
+			builder.WriteRune(v)
+
+			// skip hex characters and `}`
+
+			s = s[j+1:]
+		}
+	}
+
+	return builder.String()
+}
+
+func parseHex(b byte) rune {
+	c := rune(b)
+	switch {
+	case '0' <= c && c <= '9':
+		return c - '0'
+	case 'a' <= c && c <= 'f':
+		return c - 'a' + 10
+	case 'A' <= c && c <= 'F':
+		return c - 'A' + 10
+	}
+
+	panic(errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {

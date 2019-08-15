@@ -3,12 +3,13 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"math/big"
+	"strings"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
-	"math/big"
-	"strings"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
@@ -69,7 +70,7 @@ func NewInterpreterRuntime() Runtime {
 func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) (interface{}, error) {
 	code := string(script)
 
-	program, errs := parser.Parse(code)
+	program, errs := parser.ParseProgram(code)
 	if len(errs) > 0 {
 		return nil, RuntimeError{errs}
 	}

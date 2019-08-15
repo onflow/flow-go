@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )

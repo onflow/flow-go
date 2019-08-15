@@ -1,8 +1,9 @@
 package activations
 
 import (
-	. "github.com/onsi/gomega"
 	"testing"
+
+	. "github.com/onsi/gomega"
 )
 
 func TestActivations(t *testing.T) {

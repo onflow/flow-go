@@ -1,12 +1,14 @@
 package runtime
 
 import (
-	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
 	"math/big"
 	"testing"
+
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
+
+	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 )
 
 func init() {
@@ -17,7 +19,7 @@ func init() {
 func TestParseIncompleteConstKeyword(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    le
 	`)
 
@@ -39,7 +41,7 @@ func TestParseIncompleteConstKeyword(t *testing.T) {
 func TestParseIncompleteConstantDeclaration1(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let
 	`)
 
@@ -61,7 +63,7 @@ func TestParseIncompleteConstantDeclaration1(t *testing.T) {
 func TestParseIncompleteConstantDeclaration2(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let =
 	`)
 
@@ -91,7 +93,7 @@ func TestParseIncompleteConstantDeclaration2(t *testing.T) {
 func TestParseBoolExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = true
 	`)
 
@@ -121,7 +123,7 @@ func TestParseBoolExpression(t *testing.T) {
 func TestParseIdentifierExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let b = a
 	`)
 
@@ -151,7 +153,7 @@ func TestParseIdentifierExpression(t *testing.T) {
 func TestParseArrayExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = [1, 2]
 	`)
 
@@ -192,7 +194,7 @@ func TestParseArrayExpression(t *testing.T) {
 func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = b(1, 2)
 	`)
 
@@ -203,7 +205,7 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 		IsConstant: true,
 		Identifier: "a",
 		Value: &InvocationExpression{
-			Expression: &IdentifierExpression{
+			InvokedExpression: &IdentifierExpression{
 				Identifier: "b",
 				StartPos:   Position{Offset: 14, Line: 2, Column: 13},
 				EndPos:     Position{Offset: 14, Line: 2, Column: 13},
@@ -243,7 +245,7 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 func TestParseInvocationExpressionWithLabels(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = b(x: 1, y: 2)
 	`)
 
@@ -254,7 +256,7 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 		IsConstant: true,
 		Identifier: "a",
 		Value: &InvocationExpression{
-			Expression: &IdentifierExpression{
+			InvokedExpression: &IdentifierExpression{
 				Identifier: "b",
 				StartPos:   Position{Offset: 14, Line: 2, Column: 13},
 				EndPos:     Position{Offset: 14, Line: 2, Column: 13},
@@ -298,7 +300,7 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 func TestParseMemberExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = b.c
 	`)
 
@@ -333,7 +335,7 @@ func TestParseMemberExpression(t *testing.T) {
 func TestParseIndexExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let a = b[1]
 	`)
 
@@ -372,7 +374,7 @@ func TestParseIndexExpression(t *testing.T) {
 func TestParseUnaryExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let foo = -boo
 	`)
 
@@ -407,7 +409,7 @@ func TestParseUnaryExpression(t *testing.T) {
 func TestParseOrExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = false || true
 	`)
 
@@ -446,7 +448,7 @@ func TestParseOrExpression(t *testing.T) {
 func TestParseAndExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = false && true
 	`)
 
@@ -485,7 +487,7 @@ func TestParseAndExpression(t *testing.T) {
 func TestParseEqualityExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = false == true
 	`)
 
@@ -524,7 +526,7 @@ func TestParseEqualityExpression(t *testing.T) {
 func TestParseRelationalExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = 1 < 2
 	`)
 
@@ -563,7 +565,7 @@ func TestParseRelationalExpression(t *testing.T) {
 func TestParseAdditiveExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = 1 + 2
 	`)
 
@@ -602,7 +604,7 @@ func TestParseAdditiveExpression(t *testing.T) {
 func TestParseMultiplicativeExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = 1 * 2
 	`)
 
@@ -641,7 +643,7 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 func TestParseFunctionExpressionAndReturn(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    let test = fun (): Int { return 1 }
 	`)
 
@@ -656,20 +658,22 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 				Identifier: "Int",
 				Pos:        Position{Offset: 25, Line: 2, Column: 24},
 			},
-			Block: &Block{
-				Statements: []Statement{
-					&ReturnStatement{
-						Expression: &IntExpression{
-							Value:    big.NewInt(1),
-							StartPos: Position{Offset: 38, Line: 2, Column: 37},
+			FunctionBlock: &FunctionBlock{
+				Block: &Block{
+					Statements: []Statement{
+						&ReturnStatement{
+							Expression: &IntExpression{
+								Value:    big.NewInt(1),
+								StartPos: Position{Offset: 38, Line: 2, Column: 37},
+								EndPos:   Position{Offset: 38, Line: 2, Column: 37},
+							},
+							StartPos: Position{Offset: 31, Line: 2, Column: 30},
 							EndPos:   Position{Offset: 38, Line: 2, Column: 37},
 						},
-						StartPos: Position{Offset: 31, Line: 2, Column: 30},
-						EndPos:   Position{Offset: 38, Line: 2, Column: 37},
 					},
+					StartPos: Position{Offset: 29, Line: 2, Column: 28},
+					EndPos:   Position{Offset: 40, Line: 2, Column: 39},
 				},
-				StartPos: Position{Offset: 29, Line: 2, Column: 28},
-				EndPos:   Position{Offset: 40, Line: 2, Column: 39},
 			},
 			StartPos: Position{Offset: 17, Line: 2, Column: 16},
 		},
@@ -688,7 +692,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 func TestParseFunctionAndBlock(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() { return }
 	`)
 
@@ -701,15 +705,17 @@ func TestParseFunctionAndBlock(t *testing.T) {
 		ReturnType: &NominalType{
 			Pos: Position{Offset: 15, Line: 2, Column: 14},
 		},
-		Block: &Block{
-			Statements: []Statement{
-				&ReturnStatement{
-					StartPos: Position{Offset: 19, Line: 2, Column: 18},
-					EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&ReturnStatement{
+						StartPos: Position{Offset: 19, Line: 2, Column: 18},
+						EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+					},
 				},
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 26, Line: 2, Column: 25},
 			},
-			StartPos: Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   Position{Offset: 26, Line: 2, Column: 25},
 		},
 		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
 		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
@@ -726,7 +732,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test(x: Int) { }
 	`)
 
@@ -753,9 +759,11 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 		ReturnType: &NominalType{
 			Pos: Position{Offset: 21, Line: 2, Column: 20},
 		},
-		Block: &Block{
-			StartPos: Position{Offset: 23, Line: 2, Column: 22},
-			EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				StartPos: Position{Offset: 23, Line: 2, Column: 22},
+				EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+			},
 		},
 		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
 		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
@@ -772,7 +780,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 func TestParseFunctionParameterWithLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test(x y: Int) { }
 	`)
 
@@ -799,9 +807,11 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 		ReturnType: &NominalType{
 			Pos: Position{Offset: 23, Line: 2, Column: 22},
 		},
-		Block: &Block{
-			StartPos: Position{Offset: 25, Line: 2, Column: 24},
-			EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				StartPos: Position{Offset: 25, Line: 2, Column: 24},
+				EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+			},
 		},
 		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
 		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
@@ -818,7 +828,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 func TestParseIfStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() {
             if true {
                 return
@@ -840,77 +850,79 @@ func TestParseIfStatement(t *testing.T) {
 		ReturnType: &NominalType{
 			Pos: Position{Offset: 15, Line: 2, Column: 14},
 		},
-		Block: &Block{
-			Statements: []Statement{
-				&IfStatement{
-					Test: &BoolExpression{
-						Value:    true,
-						StartPos: Position{Offset: 34, Line: 3, Column: 15},
-						EndPos:   Position{Offset: 37, Line: 3, Column: 18},
-					},
-					Then: &Block{
-						Statements: []Statement{
-							&ReturnStatement{
-								Expression: nil,
-								StartPos:   Position{Offset: 57, Line: 4, Column: 16},
-								EndPos:     Position{Offset: 62, Line: 4, Column: 21},
-							},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&IfStatement{
+						Test: &BoolExpression{
+							Value:    true,
+							StartPos: Position{Offset: 34, Line: 3, Column: 15},
+							EndPos:   Position{Offset: 37, Line: 3, Column: 18},
 						},
-						StartPos: Position{Offset: 39, Line: 3, Column: 20},
-						EndPos:   Position{Offset: 76, Line: 5, Column: 12},
-					},
-					Else: &Block{
-						Statements: []Statement{
-							&IfStatement{
-								Test: &BoolExpression{
-									Value:    false,
-									StartPos: Position{Offset: 86, Line: 5, Column: 22},
-									EndPos:   Position{Offset: 90, Line: 5, Column: 26},
+						Then: &Block{
+							Statements: []Statement{
+								&ReturnStatement{
+									Expression: nil,
+									StartPos:   Position{Offset: 57, Line: 4, Column: 16},
+									EndPos:     Position{Offset: 62, Line: 4, Column: 21},
 								},
-								Then: &Block{
-									Statements: []Statement{
-										&ExpressionStatement{
-											Expression: &BoolExpression{
-												Value:    false,
-												StartPos: Position{Offset: 110, Line: 6, Column: 16},
-												EndPos:   Position{Offset: 114, Line: 6, Column: 20},
-											},
-										},
-										&ExpressionStatement{
-											Expression: &IntExpression{
-												Value:    big.NewInt(1),
-												StartPos: Position{Offset: 132, Line: 7, Column: 16},
-												EndPos:   Position{Offset: 132, Line: 7, Column: 16},
-											},
-										},
-									},
-									StartPos: Position{Offset: 92, Line: 5, Column: 28},
-									EndPos:   Position{Offset: 146, Line: 8, Column: 12},
-								},
-								Else: &Block{
-									Statements: []Statement{
-										&ExpressionStatement{
-											Expression: &IntExpression{
-												Value:    big.NewInt(2),
-												StartPos: Position{Offset: 171, Line: 9, Column: 16},
-												EndPos:   Position{Offset: 171, Line: 9, Column: 16},
-											},
-										},
-									},
-									StartPos: Position{Offset: 153, Line: 8, Column: 19},
-									EndPos:   Position{Offset: 185, Line: 10, Column: 12},
-								},
-								StartPos: Position{Offset: 83, Line: 5, Column: 19},
 							},
+							StartPos: Position{Offset: 39, Line: 3, Column: 20},
+							EndPos:   Position{Offset: 76, Line: 5, Column: 12},
 						},
-						StartPos: Position{Offset: 83, Line: 5, Column: 19},
-						EndPos:   Position{Offset: 185, Line: 10, Column: 12},
+						Else: &Block{
+							Statements: []Statement{
+								&IfStatement{
+									Test: &BoolExpression{
+										Value:    false,
+										StartPos: Position{Offset: 86, Line: 5, Column: 22},
+										EndPos:   Position{Offset: 90, Line: 5, Column: 26},
+									},
+									Then: &Block{
+										Statements: []Statement{
+											&ExpressionStatement{
+												Expression: &BoolExpression{
+													Value:    false,
+													StartPos: Position{Offset: 110, Line: 6, Column: 16},
+													EndPos:   Position{Offset: 114, Line: 6, Column: 20},
+												},
+											},
+											&ExpressionStatement{
+												Expression: &IntExpression{
+													Value:    big.NewInt(1),
+													StartPos: Position{Offset: 132, Line: 7, Column: 16},
+													EndPos:   Position{Offset: 132, Line: 7, Column: 16},
+												},
+											},
+										},
+										StartPos: Position{Offset: 92, Line: 5, Column: 28},
+										EndPos:   Position{Offset: 146, Line: 8, Column: 12},
+									},
+									Else: &Block{
+										Statements: []Statement{
+											&ExpressionStatement{
+												Expression: &IntExpression{
+													Value:    big.NewInt(2),
+													StartPos: Position{Offset: 171, Line: 9, Column: 16},
+													EndPos:   Position{Offset: 171, Line: 9, Column: 16},
+												},
+											},
+										},
+										StartPos: Position{Offset: 153, Line: 8, Column: 19},
+										EndPos:   Position{Offset: 185, Line: 10, Column: 12},
+									},
+									StartPos: Position{Offset: 83, Line: 5, Column: 19},
+								},
+							},
+							StartPos: Position{Offset: 83, Line: 5, Column: 19},
+							EndPos:   Position{Offset: 185, Line: 10, Column: 12},
+						},
+						StartPos: Position{Offset: 31, Line: 3, Column: 12},
 					},
-					StartPos: Position{Offset: 31, Line: 3, Column: 12},
 				},
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 195, Line: 11, Column: 8},
 			},
-			StartPos: Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   Position{Offset: 195, Line: 11, Column: 8},
 		},
 		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
 		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
@@ -927,7 +939,7 @@ func TestParseIfStatement(t *testing.T) {
 func TestParseIfStatementNoElse(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() {
             if true {
                 return
@@ -944,30 +956,32 @@ func TestParseIfStatementNoElse(t *testing.T) {
 		ReturnType: &NominalType{
 			Pos: Position{Offset: 15, Line: 2, Column: 14},
 		},
-		Block: &Block{
-			Statements: []Statement{
-				&IfStatement{
-					Test: &BoolExpression{
-						Value:    true,
-						StartPos: Position{Offset: 34, Line: 3, Column: 15},
-						EndPos:   Position{Offset: 37, Line: 3, Column: 18},
-					},
-					Then: &Block{
-						Statements: []Statement{
-							&ReturnStatement{
-								Expression: nil,
-								StartPos:   Position{Offset: 57, Line: 4, Column: 16},
-								EndPos:     Position{Offset: 62, Line: 4, Column: 21},
-							},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&IfStatement{
+						Test: &BoolExpression{
+							Value:    true,
+							StartPos: Position{Offset: 34, Line: 3, Column: 15},
+							EndPos:   Position{Offset: 37, Line: 3, Column: 18},
 						},
-						StartPos: Position{Offset: 39, Line: 3, Column: 20},
-						EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+						Then: &Block{
+							Statements: []Statement{
+								&ReturnStatement{
+									Expression: nil,
+									StartPos:   Position{Offset: 57, Line: 4, Column: 16},
+									EndPos:     Position{Offset: 62, Line: 4, Column: 21},
+								},
+							},
+							StartPos: Position{Offset: 39, Line: 3, Column: 20},
+							EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+						},
+						StartPos: Position{Offset: 31, Line: 3, Column: 12},
 					},
-					StartPos: Position{Offset: 31, Line: 3, Column: 12},
 				},
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 86, Line: 6, Column: 8},
 			},
-			StartPos: Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   Position{Offset: 86, Line: 6, Column: 8},
 		},
 		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
 		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
@@ -984,7 +998,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 func TestParseWhileStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() {
             while true {
               return
@@ -1003,39 +1017,41 @@ func TestParseWhileStatement(t *testing.T) {
 		ReturnType: &NominalType{
 			Pos: Position{Offset: 15, Line: 2, Column: 14},
 		},
-		Block: &Block{
-			Statements: []Statement{
-				&WhileStatement{
-					Test: &BoolExpression{
-						Value:    true,
-						StartPos: Position{Offset: 37, Line: 3, Column: 18},
-						EndPos:   Position{Offset: 40, Line: 3, Column: 21},
-					},
-					Block: &Block{
-						Statements: []Statement{
-							&ReturnStatement{
-								Expression: nil,
-								StartPos:   Position{Offset: 58, Line: 4, Column: 14},
-								EndPos:     Position{Offset: 63, Line: 4, Column: 19},
-							},
-							&BreakStatement{
-								StartPos: Position{Offset: 79, Line: 5, Column: 14},
-								EndPos:   Position{Offset: 83, Line: 5, Column: 18},
-							},
-							&ContinueStatement{
-								StartPos: Position{Offset: 99, Line: 6, Column: 14},
-								EndPos:   Position{Offset: 106, Line: 6, Column: 21},
-							},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&WhileStatement{
+						Test: &BoolExpression{
+							Value:    true,
+							StartPos: Position{Offset: 37, Line: 3, Column: 18},
+							EndPos:   Position{Offset: 40, Line: 3, Column: 21},
 						},
-						StartPos: Position{Offset: 42, Line: 3, Column: 23},
+						Block: &Block{
+							Statements: []Statement{
+								&ReturnStatement{
+									Expression: nil,
+									StartPos:   Position{Offset: 58, Line: 4, Column: 14},
+									EndPos:     Position{Offset: 63, Line: 4, Column: 19},
+								},
+								&BreakStatement{
+									StartPos: Position{Offset: 79, Line: 5, Column: 14},
+									EndPos:   Position{Offset: 83, Line: 5, Column: 18},
+								},
+								&ContinueStatement{
+									StartPos: Position{Offset: 99, Line: 6, Column: 14},
+									EndPos:   Position{Offset: 106, Line: 6, Column: 21},
+								},
+							},
+							StartPos: Position{Offset: 42, Line: 3, Column: 23},
+							EndPos:   Position{Offset: 120, Line: 7, Column: 12},
+						},
+						StartPos: Position{Offset: 31, Line: 3, Column: 12},
 						EndPos:   Position{Offset: 120, Line: 7, Column: 12},
 					},
-					StartPos: Position{Offset: 31, Line: 3, Column: 12},
-					EndPos:   Position{Offset: 120, Line: 7, Column: 12},
 				},
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 130, Line: 8, Column: 8},
 			},
-			StartPos: Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   Position{Offset: 130, Line: 8, Column: 8},
 		},
 		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
 		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
@@ -1052,7 +1068,7 @@ func TestParseWhileStatement(t *testing.T) {
 func TestParseAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() {
             a = 1
         }
@@ -1067,23 +1083,25 @@ func TestParseAssignment(t *testing.T) {
 		ReturnType: &NominalType{
 			Pos: Position{Offset: 15, Line: 2, Column: 14},
 		},
-		Block: &Block{
-			Statements: []Statement{
-				&AssignmentStatement{
-					Target: &IdentifierExpression{
-						Identifier: "a",
-						StartPos:   Position{Offset: 31, Line: 3, Column: 12},
-						EndPos:     Position{Offset: 31, Line: 3, Column: 12},
-					},
-					Value: &IntExpression{
-						Value:    big.NewInt(1),
-						StartPos: Position{Offset: 35, Line: 3, Column: 16},
-						EndPos:   Position{Offset: 35, Line: 3, Column: 16},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&AssignmentStatement{
+						Target: &IdentifierExpression{
+							Identifier: "a",
+							StartPos:   Position{Offset: 31, Line: 3, Column: 12},
+							EndPos:     Position{Offset: 31, Line: 3, Column: 12},
+						},
+						Value: &IntExpression{
+							Value:    big.NewInt(1),
+							StartPos: Position{Offset: 35, Line: 3, Column: 16},
+							EndPos:   Position{Offset: 35, Line: 3, Column: 16},
+						},
 					},
 				},
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 45, Line: 4, Column: 8},
 			},
-			StartPos: Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   Position{Offset: 45, Line: 4, Column: 8},
 		},
 		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
 		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
@@ -1100,7 +1118,7 @@ func TestParseAssignment(t *testing.T) {
 func TestParseAccessAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() {
             x.foo.bar[0][1].baz = 1
         }
@@ -1115,56 +1133,58 @@ func TestParseAccessAssignment(t *testing.T) {
 		ReturnType: &NominalType{
 			Pos: Position{Offset: 15, Line: 2, Column: 14},
 		},
-		Block: &Block{
-			Statements: []Statement{
-				&AssignmentStatement{
-					Target: &MemberExpression{
-						Expression: &IndexExpression{
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&AssignmentStatement{
+						Target: &MemberExpression{
 							Expression: &IndexExpression{
-								Expression: &MemberExpression{
+								Expression: &IndexExpression{
 									Expression: &MemberExpression{
-										Expression: &IdentifierExpression{
-											Identifier: "x",
-											StartPos:   Position{Offset: 31, Line: 3, Column: 12},
-											EndPos:     Position{Offset: 31, Line: 3, Column: 12},
+										Expression: &MemberExpression{
+											Expression: &IdentifierExpression{
+												Identifier: "x",
+												StartPos:   Position{Offset: 31, Line: 3, Column: 12},
+												EndPos:     Position{Offset: 31, Line: 3, Column: 12},
+											},
+											Identifier: "foo",
+											StartPos:   Position{Offset: 32, Line: 3, Column: 13},
+											EndPos:     Position{Offset: 35, Line: 3, Column: 16},
 										},
-										Identifier: "foo",
-										StartPos:   Position{Offset: 32, Line: 3, Column: 13},
-										EndPos:     Position{Offset: 35, Line: 3, Column: 16},
+										Identifier: "bar",
+										StartPos:   Position{Offset: 36, Line: 3, Column: 17},
+										EndPos:     Position{Offset: 39, Line: 3, Column: 20},
 									},
-									Identifier: "bar",
-									StartPos:   Position{Offset: 36, Line: 3, Column: 17},
-									EndPos:     Position{Offset: 39, Line: 3, Column: 20},
+									Index: &IntExpression{
+										Value:    big.NewInt(0),
+										StartPos: Position{Offset: 41, Line: 3, Column: 22},
+										EndPos:   Position{Offset: 41, Line: 3, Column: 22},
+									},
+									StartPos: Position{Offset: 40, Line: 3, Column: 21},
+									EndPos:   Position{Offset: 42, Line: 3, Column: 23},
 								},
 								Index: &IntExpression{
-									Value:    big.NewInt(0),
-									StartPos: Position{Offset: 41, Line: 3, Column: 22},
-									EndPos:   Position{Offset: 41, Line: 3, Column: 22},
+									Value:    big.NewInt(1),
+									StartPos: Position{Offset: 44, Line: 3, Column: 25},
+									EndPos:   Position{Offset: 44, Line: 3, Column: 25},
 								},
-								StartPos: Position{Offset: 40, Line: 3, Column: 21},
-								EndPos:   Position{Offset: 42, Line: 3, Column: 23},
+								StartPos: Position{Offset: 43, Line: 3, Column: 24},
+								EndPos:   Position{Offset: 45, Line: 3, Column: 26},
 							},
-							Index: &IntExpression{
-								Value:    big.NewInt(1),
-								StartPos: Position{Offset: 44, Line: 3, Column: 25},
-								EndPos:   Position{Offset: 44, Line: 3, Column: 25},
-							},
-							StartPos: Position{Offset: 43, Line: 3, Column: 24},
-							EndPos:   Position{Offset: 45, Line: 3, Column: 26},
+							Identifier: "baz",
+							StartPos:   Position{Offset: 46, Line: 3, Column: 27},
+							EndPos:     Position{Offset: 49, Line: 3, Column: 30},
 						},
-						Identifier: "baz",
-						StartPos:   Position{Offset: 46, Line: 3, Column: 27},
-						EndPos:     Position{Offset: 49, Line: 3, Column: 30},
-					},
-					Value: &IntExpression{
-						Value:    big.NewInt(1),
-						StartPos: Position{Offset: 53, Line: 3, Column: 34},
-						EndPos:   Position{Offset: 53, Line: 3, Column: 34},
+						Value: &IntExpression{
+							Value:    big.NewInt(1),
+							StartPos: Position{Offset: 53, Line: 3, Column: 34},
+							EndPos:   Position{Offset: 53, Line: 3, Column: 34},
+						},
 					},
 				},
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 63, Line: 4, Column: 8},
 			},
-			StartPos: Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   Position{Offset: 63, Line: 4, Column: 8},
 		},
 		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
 		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
@@ -1181,7 +1201,7 @@ func TestParseAccessAssignment(t *testing.T) {
 func TestParseExpressionStatementWithAccess(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 	    fun test() { x.foo.bar[0][1].baz }
 	`)
 
@@ -1194,51 +1214,53 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 		ReturnType: &NominalType{
 			Pos: Position{Offset: 15, Line: 2, Column: 14},
 		},
-		Block: &Block{
-			Statements: []Statement{
-				&ExpressionStatement{
-					Expression: &MemberExpression{
-						Expression: &IndexExpression{
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&ExpressionStatement{
+						Expression: &MemberExpression{
 							Expression: &IndexExpression{
-								Expression: &MemberExpression{
+								Expression: &IndexExpression{
 									Expression: &MemberExpression{
-										Expression: &IdentifierExpression{
-											Identifier: "x",
-											StartPos:   Position{Offset: 19, Line: 2, Column: 18},
-											EndPos:     Position{Offset: 19, Line: 2, Column: 18},
+										Expression: &MemberExpression{
+											Expression: &IdentifierExpression{
+												Identifier: "x",
+												StartPos:   Position{Offset: 19, Line: 2, Column: 18},
+												EndPos:     Position{Offset: 19, Line: 2, Column: 18},
+											},
+											Identifier: "foo",
+											StartPos:   Position{Offset: 20, Line: 2, Column: 19},
+											EndPos:     Position{Offset: 23, Line: 2, Column: 22},
 										},
-										Identifier: "foo",
-										StartPos:   Position{Offset: 20, Line: 2, Column: 19},
-										EndPos:     Position{Offset: 23, Line: 2, Column: 22},
+										Identifier: "bar",
+										StartPos:   Position{Offset: 24, Line: 2, Column: 23},
+										EndPos:     Position{Offset: 27, Line: 2, Column: 26},
 									},
-									Identifier: "bar",
-									StartPos:   Position{Offset: 24, Line: 2, Column: 23},
-									EndPos:     Position{Offset: 27, Line: 2, Column: 26},
+									Index: &IntExpression{
+										Value:    big.NewInt(0),
+										StartPos: Position{Offset: 29, Line: 2, Column: 28},
+										EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+									},
+									StartPos: Position{Offset: 28, Line: 2, Column: 27},
+									EndPos:   Position{Offset: 30, Line: 2, Column: 29},
 								},
 								Index: &IntExpression{
-									Value:    big.NewInt(0),
-									StartPos: Position{Offset: 29, Line: 2, Column: 28},
-									EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+									Value:    big.NewInt(1),
+									StartPos: Position{Offset: 32, Line: 2, Column: 31},
+									EndPos:   Position{Offset: 32, Line: 2, Column: 31},
 								},
-								StartPos: Position{Offset: 28, Line: 2, Column: 27},
-								EndPos:   Position{Offset: 30, Line: 2, Column: 29},
+								StartPos: Position{Offset: 31, Line: 2, Column: 30},
+								EndPos:   Position{Offset: 33, Line: 2, Column: 32},
 							},
-							Index: &IntExpression{
-								Value:    big.NewInt(1),
-								StartPos: Position{Offset: 32, Line: 2, Column: 31},
-								EndPos:   Position{Offset: 32, Line: 2, Column: 31},
-							},
-							StartPos: Position{Offset: 31, Line: 2, Column: 30},
-							EndPos:   Position{Offset: 33, Line: 2, Column: 32},
+							Identifier: "baz",
+							StartPos:   Position{Offset: 34, Line: 2, Column: 33},
+							EndPos:     Position{Offset: 37, Line: 2, Column: 36},
 						},
-						Identifier: "baz",
-						StartPos:   Position{Offset: 34, Line: 2, Column: 33},
-						EndPos:     Position{Offset: 37, Line: 2, Column: 36},
 					},
 				},
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 39, Line: 2, Column: 38},
 			},
-			StartPos: Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   Position{Offset: 39, Line: 2, Column: 38},
 		},
 		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
 		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
@@ -1255,7 +1277,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 func TestParseParametersAndArrayTypes(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		pub fun test(a: Int32, b: Int32[2], c: Int32[][3]): Int64[][] {}
 	`)
 
@@ -1323,9 +1345,11 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 			StartPos: Position{Offset: 60, Line: 2, Column: 59},
 			EndPos:   Position{Offset: 61, Line: 2, Column: 60},
 		},
-		Block: &Block{
-			StartPos: Position{Offset: 65, Line: 2, Column: 64},
-			EndPos:   Position{Offset: 66, Line: 2, Column: 65},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				StartPos: Position{Offset: 65, Line: 2, Column: 64},
+				EndPos:   Position{Offset: 66, Line: 2, Column: 65},
+			},
 		},
 		StartPos:      Position{Offset: 3, Line: 2, Column: 2},
 		IdentifierPos: Position{Offset: 11, Line: 2, Column: 10},
@@ -1342,7 +1366,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 func TestParseIntegerLiterals(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let octal = 0o32
         let hex = 0xf2
         let binary = 0b101010
@@ -1411,7 +1435,7 @@ func TestParseIntegerLiterals(t *testing.T) {
 func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let octal = 0o32_45
         let hex = 0xf2_09
         let binary = 0b101010_101010
@@ -1480,7 +1504,7 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let octal = 0o_32_45
 	`)
 
@@ -1508,7 +1532,7 @@ func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let octal = 0o32_45_
 	`)
 
@@ -1536,7 +1560,7 @@ func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let binary = 0b_101010_101010
 	`)
 
@@ -1564,7 +1588,7 @@ func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let binary = 0b101010_101010_
 	`)
 
@@ -1592,7 +1616,7 @@ func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let decimal = 1_234_567_890_
 	`)
 
@@ -1620,7 +1644,7 @@ func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let hex = 0x_f2_09
 	`)
 
@@ -1648,7 +1672,7 @@ func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T
 func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let hex = 0xf2_09_
 	`)
 
@@ -1677,7 +1701,7 @@ func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.
 func TestParseInvalidIntegerLiteral(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let hex = 0z123
 	`)
 
@@ -1705,7 +1729,7 @@ func TestParseInvalidIntegerLiteral(t *testing.T) {
 func TestParseIntegerTypes(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let a: Int8 = 1
 		let b: Int16 = 2
 		let c: Int32 = 3
@@ -1851,7 +1875,7 @@ func TestParseIntegerTypes(t *testing.T) {
 func TestParseFunctionType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let add: ((Int8, Int16): Int32) = nothing
 	`)
 
@@ -1899,7 +1923,7 @@ func TestParseFunctionType(t *testing.T) {
 func TestParseFunctionArrayType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let test: ((Int8): Int16)[2] = []
 	`)
 
@@ -1947,7 +1971,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let test: ((Int8): Int16[2]) = nothing
 	`)
 
@@ -1996,7 +2020,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
@@ -2050,7 +2074,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
@@ -2104,7 +2128,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 func TestParseMissingReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
 		let noop: ((): Void) =
             fun () { return }
 	`)
@@ -2127,15 +2151,17 @@ func TestParseMissingReturnType(t *testing.T) {
 			ReturnType: &NominalType{
 				Pos: Position{Offset: 43, Line: 3, Column: 17},
 			},
-			Block: &Block{
-				Statements: []Statement{
-					&ReturnStatement{
-						StartPos: Position{Offset: 47, Line: 3, Column: 21},
-						EndPos:   Position{Offset: 52, Line: 3, Column: 26},
+			FunctionBlock: &FunctionBlock{
+				Block: &Block{
+					Statements: []Statement{
+						&ReturnStatement{
+							StartPos: Position{Offset: 47, Line: 3, Column: 21},
+							EndPos:   Position{Offset: 52, Line: 3, Column: 26},
+						},
 					},
+					StartPos: Position{Offset: 45, Line: 3, Column: 19},
+					EndPos:   Position{Offset: 54, Line: 3, Column: 28},
 				},
-				StartPos: Position{Offset: 45, Line: 3, Column: 19},
-				EndPos:   Position{Offset: 54, Line: 3, Column: 28},
 			},
 			StartPos: Position{Offset: 38, Line: 3, Column: 12},
 		},
@@ -2154,7 +2180,7 @@ func TestParseMissingReturnType(t *testing.T) {
 func TestParseLeftAssociativity(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = 1 + 2 + 3
 	`)
 
@@ -2201,7 +2227,7 @@ func TestParseLeftAssociativity(t *testing.T) {
 func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	program, errors := parser.ParseProgram(`
 	   var a = 1
 	   let b = --a
 	`)
@@ -2220,7 +2246,7 @@ func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
 func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.Parse(`
+	program, errors := parser.ParseProgram(`
 	   let b = !!true
 	`)
 
@@ -2238,7 +2264,7 @@ func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
 func TestParseTernaryRightAssociativity(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         let a = 2 > 1
           ? 0
           : 3 > 2 ? 1 : 2
@@ -2311,7 +2337,7 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 func TestParseStructure(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, errors := parser.Parse(`
+	actual, errors := parser.ParseProgram(`
         struct Test {
             pub(set) var foo: Int
 
@@ -2328,7 +2354,7 @@ func TestParseStructure(t *testing.T) {
 	Expect(errors).
 		To(BeEmpty())
 
-	a := &StructureDeclaration{
+	test := &StructureDeclaration{
 		Identifier: "Test",
 		Fields: []*FieldDeclaration{
 			{
@@ -2360,28 +2386,30 @@ func TestParseStructure(t *testing.T) {
 					EndPos:        Position{Offset: 80, Line: 5, Column: 22},
 				},
 			},
-			Block: &Block{
-				Statements: []Statement{
-					&AssignmentStatement{
-						Target: &MemberExpression{
-							Expression: &IdentifierExpression{
-								Identifier: "self",
-								StartPos:   Position{Offset: 103, Line: 6, Column: 16},
-								EndPos:     Position{Offset: 106, Line: 6, Column: 19},
+			FunctionBlock: &FunctionBlock{
+				Block: &Block{
+					Statements: []Statement{
+						&AssignmentStatement{
+							Target: &MemberExpression{
+								Expression: &IdentifierExpression{
+									Identifier: "self",
+									StartPos:   Position{Offset: 103, Line: 6, Column: 16},
+									EndPos:     Position{Offset: 106, Line: 6, Column: 19},
+								},
+								Identifier: "foo",
+								StartPos:   Position{Offset: 107, Line: 6, Column: 20},
+								EndPos:     Position{Offset: 110, Line: 6, Column: 23},
 							},
-							Identifier: "foo",
-							StartPos:   Position{Offset: 107, Line: 6, Column: 20},
-							EndPos:     Position{Offset: 110, Line: 6, Column: 23},
-						},
-						Value: &IdentifierExpression{
-							Identifier: "foo",
-							StartPos:   Position{Offset: 114, Line: 6, Column: 27},
-							EndPos:     Position{Offset: 116, Line: 6, Column: 29},
+							Value: &IdentifierExpression{
+								Identifier: "foo",
+								StartPos:   Position{Offset: 114, Line: 6, Column: 27},
+								EndPos:     Position{Offset: 116, Line: 6, Column: 29},
+							},
 						},
 					},
+					StartPos: Position{Offset: 85, Line: 5, Column: 27},
+					EndPos:   Position{Offset: 130, Line: 7, Column: 12},
 				},
-				StartPos: Position{Offset: 85, Line: 5, Column: 27},
-				EndPos:   Position{Offset: 130, Line: 7, Column: 12},
 			},
 			StartPos: Position{Offset: 70, Line: 5, Column: 12},
 		},
@@ -2394,25 +2422,27 @@ func TestParseStructure(t *testing.T) {
 					Identifier: "Int",
 					Pos:        Position{Offset: 163, Line: 9, Column: 30},
 				},
-				Block: &Block{
-					Statements: []Statement{
-						&ReturnStatement{
-							Expression: &MemberExpression{
-								Expression: &IdentifierExpression{
-									Identifier: "self",
-									StartPos:   Position{Offset: 192, Line: 10, Column: 23},
-									EndPos:     Position{Offset: 195, Line: 10, Column: 26},
+				FunctionBlock: &FunctionBlock{
+					Block: &Block{
+						Statements: []Statement{
+							&ReturnStatement{
+								Expression: &MemberExpression{
+									Expression: &IdentifierExpression{
+										Identifier: "self",
+										StartPos:   Position{Offset: 192, Line: 10, Column: 23},
+										EndPos:     Position{Offset: 195, Line: 10, Column: 26},
+									},
+									Identifier: "foo",
+									StartPos:   Position{Offset: 196, Line: 10, Column: 27},
+									EndPos:     Position{Offset: 199, Line: 10, Column: 30},
 								},
-								Identifier: "foo",
-								StartPos:   Position{Offset: 196, Line: 10, Column: 27},
-								EndPos:     Position{Offset: 199, Line: 10, Column: 30},
+								StartPos: Position{Offset: 185, Line: 10, Column: 16},
+								EndPos:   Position{Offset: 199, Line: 10, Column: 30},
 							},
-							StartPos: Position{Offset: 185, Line: 10, Column: 16},
-							EndPos:   Position{Offset: 199, Line: 10, Column: 30},
 						},
+						StartPos: Position{Offset: 167, Line: 9, Column: 34},
+						EndPos:   Position{Offset: 213, Line: 11, Column: 12},
 					},
-					StartPos: Position{Offset: 167, Line: 9, Column: 34},
-					EndPos:   Position{Offset: 213, Line: 11, Column: 12},
 				},
 				StartPos:      Position{Offset: 145, Line: 9, Column: 12},
 				IdentifierPos: Position{Offset: 153, Line: 9, Column: 20},
@@ -2424,7 +2454,234 @@ func TestParseStructure(t *testing.T) {
 	}
 
 	expected := &Program{
-		Declarations: []Declaration{a},
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParsePreAndPostConditions(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseProgram(`
+        fun test(n: Int) {
+            pre {
+                n != 0
+                n > 0
+            }
+            post {
+                result == 0
+            }
+            return 0
+        }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&FunctionDeclaration{
+				Access:     AccessNotSpecified,
+				Identifier: "test",
+				Parameters: []*Parameter{
+					{
+						Label:      "",
+						Identifier: "n",
+						Type: &NominalType{
+							Identifier: "Int",
+							Pos:        Position{Offset: 21, Line: 2, Column: 20},
+						},
+						LabelPos:      nil,
+						IdentifierPos: Position{Offset: 18, Line: 2, Column: 17},
+						StartPos:      Position{Offset: 18, Line: 2, Column: 17},
+						EndPos:        Position{Offset: 21, Line: 2, Column: 20},
+					},
+				},
+				ReturnType: &NominalType{
+					Identifier: "",
+					Pos:        Position{Offset: 24, Line: 2, Column: 23},
+				},
+				FunctionBlock: &FunctionBlock{
+					Block: &Block{
+						Statements: []Statement{
+							&ReturnStatement{
+								Expression: &IntExpression{
+									Value:    big.NewInt(0),
+									StartPos: Position{Offset: 185, Line: 10, Column: 19},
+									EndPos:   Position{Offset: 185, Line: 10, Column: 19},
+								},
+								StartPos: Position{Offset: 178, Line: 10, Column: 12},
+								EndPos:   Position{Offset: 185, Line: 10, Column: 19},
+							},
+						},
+						StartPos: Position{Offset: 26, Line: 2, Column: 25},
+						EndPos:   Position{Offset: 195, Line: 11, Column: 8},
+					},
+					PreConditions: []*Condition{
+						{
+							Kind: ConditionKindPre,
+							Expression: &BinaryExpression{
+								Operation: OperationUnequal,
+								Left: &IdentifierExpression{
+									Identifier: "n",
+									StartPos:   Position{Offset: 62, Line: 4, Column: 16},
+									EndPos:     Position{Offset: 62, Line: 4, Column: 16},
+								},
+								Right: &IntExpression{
+									Value:    big.NewInt(0),
+									StartPos: Position{Offset: 67, Line: 4, Column: 21},
+									EndPos:   Position{Offset: 67, Line: 4, Column: 21},
+								},
+							},
+						},
+						{
+							Kind: ConditionKindPre,
+							Expression: &BinaryExpression{
+								Operation: OperationGreater,
+								Left: &IdentifierExpression{
+									Identifier: "n",
+									StartPos:   Position{Offset: 85, Line: 5, Column: 16},
+									EndPos:     Position{Offset: 85, Line: 5, Column: 16},
+								},
+								Right: &IntExpression{
+									Value:    big.NewInt(0),
+									StartPos: Position{Offset: 89, Line: 5, Column: 20},
+									EndPos:   Position{Offset: 89, Line: 5, Column: 20},
+								},
+							},
+						},
+					},
+					PostConditions: []*Condition{
+						{
+							Kind: ConditionKindPost,
+							Expression: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier: "result",
+									StartPos:   Position{Offset: 140, Line: 8, Column: 16},
+									EndPos:     Position{Offset: 145, Line: 8, Column: 21},
+								},
+								Right: &IntExpression{
+									Value:    big.NewInt(0),
+									StartPos: Position{Offset: 150, Line: 8, Column: 26},
+									EndPos:   Position{Offset: 150, Line: 8, Column: 26},
+								},
+							},
+						},
+					},
+				},
+				StartPos:      Position{Offset: 9, Line: 2, Column: 8},
+				IdentifierPos: Position{Offset: 13, Line: 2, Column: 12},
+			},
+		},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseExpression(`
+        before(x + before(y)) + z
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	expected := &BinaryExpression{
+		Operation: OperationPlus,
+		Left: &InvocationExpression{
+			InvokedExpression: &IdentifierExpression{
+				Identifier: "before",
+				StartPos:   Position{Offset: 9, Line: 2, Column: 8},
+				EndPos:     Position{Offset: 14, Line: 2, Column: 13},
+			},
+			Arguments: []*Argument{
+				{
+					Label:         "",
+					LabelStartPos: nil,
+					LabelEndPos:   nil,
+					Expression: &BinaryExpression{
+						Operation: OperationPlus,
+						Left: &IdentifierExpression{
+							Identifier: "x",
+							StartPos:   Position{Offset: 16, Line: 2, Column: 15},
+							EndPos:     Position{Offset: 16, Line: 2, Column: 15},
+						},
+						Right: &InvocationExpression{
+							InvokedExpression: &IdentifierExpression{
+								Identifier: "before",
+								StartPos:   Position{Offset: 20, Line: 2, Column: 19},
+								EndPos:     Position{Offset: 25, Line: 2, Column: 24},
+							},
+							Arguments: []*Argument{
+								{
+									Label:         "",
+									LabelStartPos: nil,
+									LabelEndPos:   nil,
+									Expression: &IdentifierExpression{
+										Identifier: "y",
+										StartPos:   Position{Offset: 27, Line: 2, Column: 26},
+										EndPos:     Position{Offset: 27, Line: 2, Column: 26},
+									},
+								},
+							},
+							EndPos: Position{Offset: 28, Line: 2, Column: 27},
+						},
+					},
+				},
+			},
+			EndPos: Position{Offset: 29, Line: 2, Column: 28},
+		},
+		Right: &IdentifierExpression{
+			Identifier: "z",
+			StartPos:   Position{Offset: 33, Line: 2, Column: 32},
+			EndPos:     Position{Offset: 33, Line: 2, Column: 32},
+		},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseString(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseExpression(`
+       "test \0\n\r\t\"\'\\ xyz"
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	expected := &StringExpression{
+		Value:    "test \x00\n\r\t\"'\\ xyz",
+		StartPos: Position{Offset: 8, Line: 2, Column: 7},
+		EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseStringWithUnicode(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseExpression(`
+      "this is a test \t\\new line and race car:\n\u{1F3CE}\u{FE0F}"
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	expected := &StringExpression{
+		Value:    "this is a test \t\\new line and race car:\n\U0001F3CE\uFE0F",
+		StartPos: Position{Offset: 7, Line: 2, Column: 6},
+		EndPos:   Position{Offset: 68, Line: 2, Column: 67},
 	}
 
 	Expect(actual).

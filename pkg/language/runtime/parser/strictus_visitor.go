@@ -53,6 +53,21 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#block.
 	VisitBlock(ctx *BlockContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#functionBlock.
+	VisitFunctionBlock(ctx *FunctionBlockContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#preConditions.
+	VisitPreConditions(ctx *PreConditionsContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#postConditions.
+	VisitPostConditions(ctx *PostConditionsContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#conditions.
+	VisitConditions(ctx *ConditionsContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#condition.
+	VisitCondition(ctx *ConditionContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#statements.
 	VisitStatements(ctx *StatementsContext) interface{}
 
@@ -160,6 +175,9 @@ type StrictusVisitor interface {
 
 	// Visit a parse tree produced by StrictusParser#booleanLiteral.
 	VisitBooleanLiteral(ctx *BooleanLiteralContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#stringLiteral.
+	VisitStringLiteral(ctx *StringLiteralContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#DecimalLiteral.
 	VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{}

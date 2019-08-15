@@ -22,14 +22,7 @@ func (NotAnElement) EndPosition() Position {
 	return Position{}
 }
 
-type Visitor interface {
-	VisitProgram(*Program) Repr
-	VisitFunctionDeclaration(*FunctionDeclaration) Repr
-	VisitBlock(*Block) Repr
-	VisitStructureDeclaration(*StructureDeclaration) Repr
-	VisitFieldDeclaration(*FieldDeclaration) Repr
-	VisitInitializerDeclaration(*InitializerDeclaration) Repr
-	// statements
+type StatementVisitor interface {
 	VisitReturnStatement(*ReturnStatement) Repr
 	VisitBreakStatement(*BreakStatement) Repr
 	VisitContinueStatement(*ContinueStatement) Repr
@@ -38,7 +31,9 @@ type Visitor interface {
 	VisitVariableDeclaration(*VariableDeclaration) Repr
 	VisitAssignment(*AssignmentStatement) Repr
 	VisitExpressionStatement(*ExpressionStatement) Repr
-	/// expressions
+}
+
+type ExpressionVisitor interface {
 	VisitBoolExpression(*BoolExpression) Repr
 	VisitIntExpression(*IntExpression) Repr
 	VisitArrayExpression(*ArrayExpression) Repr
@@ -50,4 +45,18 @@ type Visitor interface {
 	VisitUnaryExpression(*UnaryExpression) Repr
 	VisitBinaryExpression(*BinaryExpression) Repr
 	VisitFunctionExpression(*FunctionExpression) Repr
+	VisitStringExpression(*StringExpression) Repr
+}
+
+type Visitor interface {
+	StatementVisitor
+	ExpressionVisitor
+	VisitProgram(*Program) Repr
+	VisitFunctionDeclaration(*FunctionDeclaration) Repr
+	VisitBlock(*Block) Repr
+	VisitFunctionBlock(*FunctionBlock) Repr
+	VisitStructureDeclaration(*StructureDeclaration) Repr
+	VisitFieldDeclaration(*FieldDeclaration) Repr
+	VisitInitializerDeclaration(*InitializerDeclaration) Repr
+	VisitCondition(*Condition) Repr
 }

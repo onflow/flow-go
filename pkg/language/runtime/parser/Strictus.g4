@@ -73,11 +73,11 @@ field
 // is `init` in semantic analysis to provide better error
 //
 initializer
-    : Identifier parameterList block
+    : Identifier parameterList functionBlock
     ;
 
 functionDeclaration
-    : access Fun Identifier parameterList (':' returnType=fullType)? block
+    : access Fun Identifier parameterList (':' returnType=fullType)? functionBlock
     ;
 
 parameterList
@@ -107,6 +107,27 @@ functionType
 
 block
     : '{' statements '}'
+    ;
+
+functionBlock
+    : '{' preConditions? postConditions? statements '}'
+    ;
+
+preConditions
+    : Pre '{' conditions '}'
+    ;
+
+postConditions
+    : Post '{' conditions '}'
+    ;
+
+conditions
+    : (condition eos)*
+    ;
+
+// TODO: description
+condition
+    : expression
     ;
 
 statements
@@ -255,10 +276,10 @@ Negate : '!' ;
 
 
 primaryExpressionStart
-    : Identifier                                          # IdentifierExpression
-    | literal                                             # LiteralExpression
-    | Fun parameterList (':' returnType=fullType)? block  # FunctionExpression
-    | '(' expression ')'                                  # NestedExpression
+    : Identifier                                                  # IdentifierExpression
+    | literal                                                     # LiteralExpression
+    | Fun parameterList (':' returnType=fullType)? functionBlock  # FunctionExpression
+    | '(' expression ')'                                          # NestedExpression
     ;
 
 expressionAccess
@@ -286,11 +307,16 @@ literal
     : integerLiteral
     | booleanLiteral
     | arrayLiteral
+    | stringLiteral
     ;
 
 booleanLiteral
     : True
     | False
+    ;
+
+stringLiteral
+    : StringLiteral
     ;
 
 integerLiteral
@@ -311,6 +337,9 @@ CloseParen: ')' ;
 Struct : 'struct' ;
 
 Fun : 'fun' ;
+
+Pre : 'pre' ;
+Post : 'post' ;
 
 Pub : 'pub' ;
 PubSet : 'pub(set)' ;
@@ -376,6 +405,24 @@ HexadecimalLiteral
 InvalidNumberLiteral
     : '0' [a-zA-Z] [0-9a-zA-Z_]*
     ;
+
+StringLiteral
+    : '"' QuotedText* '"'
+    ;
+
+fragment QuotedText
+    : EscapedCharacter
+    | ~["\n\r\\]
+    ;
+
+fragment EscapedCharacter
+    : '\\' [0\\tnr"']
+    // NOTE: allow arbitrary length in parser, but check length in semantic analysis
+    | '\\u' '{' HexadecimalDigit+ '}'
+    ;
+
+fragment HexadecimalDigit : [0-9a-fA-F] ;
+
 
 WS
     : [ \t\u000B\u000C\u0000]+ -> channel(HIDDEN)

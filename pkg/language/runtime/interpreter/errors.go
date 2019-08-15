@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"fmt"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 )
@@ -98,5 +99,25 @@ func (e *ArgumentCountError) StartPosition() ast.Position {
 }
 
 func (e *ArgumentCountError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// ConditionError
+
+type ConditionError struct {
+	ConditionKind ast.ConditionKind
+	StartPos      ast.Position
+	EndPos        ast.Position
+}
+
+func (e *ConditionError) Error() string {
+	return fmt.Sprintf("%s failed", e.ConditionKind.Name())
+}
+
+func (e *ConditionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *ConditionError) EndPosition() ast.Position {
 	return e.EndPos
 }

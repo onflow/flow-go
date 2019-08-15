@@ -2,10 +2,12 @@ package sema
 
 import (
 	"fmt"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"github.com/raviqqe/hamt"
 	"strings"
+
+	"github.com/raviqqe/hamt"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
 type Type interface {
@@ -53,6 +55,20 @@ func (*BoolType) String() string {
 
 func (*BoolType) Equal(other Type) bool {
 	_, ok := other.(*BoolType)
+	return ok
+}
+
+// StringType represents the string type
+type StringType struct{}
+
+func (*StringType) isType() {}
+
+func (*StringType) String() string {
+	return "String"
+}
+
+func (*StringType) Equal(other Type) bool {
+	_, ok := other.(*StringType)
 	return ok
 }
 
@@ -288,6 +304,7 @@ func ArrayTypeToString(arrayType ArrayType) string {
 type FunctionType struct {
 	ParameterTypes []Type
 	ReturnType     Type
+	apply          func([]Type) Type
 }
 
 func (*FunctionType) isType() {}
@@ -339,6 +356,7 @@ func init() {
 		&AnyType{},
 		&BoolType{},
 		&IntType{},
+		&StringType{},
 		&Int8Type{},
 		&Int16Type{},
 		&Int32Type{},
@@ -350,11 +368,19 @@ func init() {
 	}
 
 	for _, ty := range types {
-		typeNames[ty.String()] = ty
+		typeName := ty.String()
+
+		// check type is not accidentally redeclared
+		if _, ok := typeNames[typeName]; ok {
+			panic(&errors.UnreachableError{})
+		}
+
+		typeNames[typeName] = ty
 	}
 
 	for name, baseType := range typeNames {
-		baseTypes = baseTypes.Insert(activations.StringKey(name), baseType)
+		key := common.StringKey(name)
+		baseTypes = baseTypes.Insert(key, baseType)
 	}
 }
 

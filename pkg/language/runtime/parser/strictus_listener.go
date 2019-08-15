@@ -49,6 +49,21 @@ type StrictusListener interface {
 	// EnterBlock is called when entering the block production.
 	EnterBlock(c *BlockContext)
 
+	// EnterFunctionBlock is called when entering the functionBlock production.
+	EnterFunctionBlock(c *FunctionBlockContext)
+
+	// EnterPreConditions is called when entering the preConditions production.
+	EnterPreConditions(c *PreConditionsContext)
+
+	// EnterPostConditions is called when entering the postConditions production.
+	EnterPostConditions(c *PostConditionsContext)
+
+	// EnterConditions is called when entering the conditions production.
+	EnterConditions(c *ConditionsContext)
+
+	// EnterCondition is called when entering the condition production.
+	EnterCondition(c *ConditionContext)
+
 	// EnterStatements is called when entering the statements production.
 	EnterStatements(c *StatementsContext)
 
@@ -157,6 +172,9 @@ type StrictusListener interface {
 	// EnterBooleanLiteral is called when entering the booleanLiteral production.
 	EnterBooleanLiteral(c *BooleanLiteralContext)
 
+	// EnterStringLiteral is called when entering the stringLiteral production.
+	EnterStringLiteral(c *StringLiteralContext)
+
 	// EnterDecimalLiteral is called when entering the DecimalLiteral production.
 	EnterDecimalLiteral(c *DecimalLiteralContext)
 
@@ -219,6 +237,21 @@ type StrictusListener interface {
 
 	// ExitBlock is called when exiting the block production.
 	ExitBlock(c *BlockContext)
+
+	// ExitFunctionBlock is called when exiting the functionBlock production.
+	ExitFunctionBlock(c *FunctionBlockContext)
+
+	// ExitPreConditions is called when exiting the preConditions production.
+	ExitPreConditions(c *PreConditionsContext)
+
+	// ExitPostConditions is called when exiting the postConditions production.
+	ExitPostConditions(c *PostConditionsContext)
+
+	// ExitConditions is called when exiting the conditions production.
+	ExitConditions(c *ConditionsContext)
+
+	// ExitCondition is called when exiting the condition production.
+	ExitCondition(c *ConditionContext)
 
 	// ExitStatements is called when exiting the statements production.
 	ExitStatements(c *StatementsContext)
@@ -327,6 +360,9 @@ type StrictusListener interface {
 
 	// ExitBooleanLiteral is called when exiting the booleanLiteral production.
 	ExitBooleanLiteral(c *BooleanLiteralContext)
+
+	// ExitStringLiteral is called when exiting the stringLiteral production.
+	ExitStringLiteral(c *StringLiteralContext)
 
 	// ExitDecimalLiteral is called when exiting the DecimalLiteral production.
 	ExitDecimalLiteral(c *DecimalLiteralContext)
