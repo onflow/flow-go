@@ -46,10 +46,10 @@ func (tx *RawTransaction) Hash() crypto.Hash {
 	return crypto.NewHash(bytes)
 }
 
-// Sign signs a transaction with the given account and keypair.
+// SignPayer signs the transaction with the given account and keypair.
 //
 // The function returns a new SignedTransaction that includes the generated signature.
-func (tx *RawTransaction) Sign(account Address, keyPair *crypto.KeyPair) *SignedTransaction {
+func (tx *RawTransaction) SignPayer(account Address, keyPair *crypto.KeyPair) *SignedTransaction {
 	hash := tx.Hash()
 
 	// TODO: include account in signature
