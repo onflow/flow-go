@@ -316,7 +316,7 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 					// if there is a return type, declare the constant `result`
 					// which has the return value
 
-					if !returnType.Equal(&sema.VoidType{}) {
+					if _, isVoid := returnType.(*sema.VoidType); !isVoid {
 						interpreter.declareVariable(sema.ResultIdentifier, resultValue)
 					}
 
