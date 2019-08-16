@@ -10,6 +10,7 @@ type Server struct {
 
 type Connection interface {
 	ShowMessage(params *ShowMessageParams)
+	LogMessage(params *LogMessageParams)
 	PublishDiagnostics(params *PublishDiagnosticsParams)
 }
 
@@ -19,6 +20,10 @@ type connection struct {
 
 func (conn *connection) ShowMessage(params *ShowMessageParams) {
 	conn.jsonrpc2Server.Notify("window/showMessage", params)
+}
+
+func (conn *connection) LogMessage(params *LogMessageParams) {
+	conn.jsonrpc2Server.Notify("window/logMessage", params)
 }
 
 func (conn *connection) PublishDiagnostics(params *PublishDiagnosticsParams) {
