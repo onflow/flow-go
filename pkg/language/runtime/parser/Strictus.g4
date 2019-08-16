@@ -63,7 +63,7 @@ access
     ;
 
 structureDeclaration
-    : Struct Identifier '{' field* initializer? functionDeclaration[true]* '}'
+    : Struct Identifier '{' field* initializer[true]? functionDeclaration[true]* '}'
     ;
 
 variableKind
@@ -76,14 +76,16 @@ field
     ;
 
 interfaceDeclaration
-    : Interface Identifier '{' field* functionDeclaration[false]* '}'
+    : Interface Identifier '{' field* initializer[false]? functionDeclaration[false]* '}'
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
 // is `init` in semantic analysis to provide better error
 //
-initializer
-    : Identifier parameterList functionBlock
+initializer[bool functionBlockRequired]
+    : Identifier parameterList
+      // only optional if parameter functionBlockRequired is false
+      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
 
 functionDeclaration[bool functionBlockRequired]

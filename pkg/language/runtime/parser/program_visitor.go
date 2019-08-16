@@ -179,7 +179,13 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
 
-	functionBlock := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
+	// NOTE: in e.g interface declarations, function blocks are optional
+
+	var functionBlock *ast.FunctionBlock
+	functionBlockContext := ctx.FunctionBlock()
+	if functionBlockContext != nil {
+		functionBlock = functionBlockContext.Accept(v).(*ast.FunctionBlock)
+	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
@@ -201,6 +207,12 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 		fields = append(fields, field)
 	}
 
+	var initializer *ast.InitializerDeclaration
+	initializerNode := ctx.Initializer()
+	if initializerNode != nil {
+		initializer = initializerNode.Accept(v).(*ast.InitializerDeclaration)
+	}
+
 	var functions []*ast.FunctionDeclaration
 	for _, functionDeclarationCtx := range ctx.AllFunctionDeclaration() {
 		functionDeclaration :=
@@ -214,6 +226,7 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 	return &ast.InterfaceDeclaration{
 		Identifier:    identifier,
 		Fields:        fields,
+		Initializer:   initializer,
 		Functions:     functions,
 		IdentifierPos: identifierPos,
 		StartPos:      startPosition,
