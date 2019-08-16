@@ -2449,3 +2449,81 @@ func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.FunctionExpressionInConditionError{}))
 }
+
+func TestCheckFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          post {
+             1 == 2: "nope"
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidFunctionPostConditionWithMessageUsingBooleanLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          post {
+             1 == 2: true
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckFunctionPostConditionWithMessageUsingResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): String {
+          post {
+             1 == 2: result
+          }
+          return ""
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: String) {
+          post {
+             1 == 2: before(x)
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: String) {
+          post {
+             1 == 2: x
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}

@@ -318,9 +318,28 @@ func (interpreter *Interpreter) rewritePostConditions(functionBlock *ast.Functio
 	rewrittenPostConditions = make([]*ast.Condition, len(functionBlock.PostConditions))
 
 	for i, postCondition := range functionBlock.PostConditions {
-		extraction := beforeExtractor.ExtractBefore(postCondition.Expression)
 
-		for _, extractedExpression := range extraction.ExtractedExpressions {
+		// copy condition and set expression to rewritten one
+		newPostCondition := *postCondition
+
+		testExtraction := beforeExtractor.ExtractBefore(postCondition.Test)
+
+		extractedExpressions := testExtraction.ExtractedExpressions
+
+		newPostCondition.Test = testExtraction.RewrittenExpression
+
+		if postCondition.Message != nil {
+			messageExtraction := beforeExtractor.ExtractBefore(postCondition.Message)
+
+			newPostCondition.Message = messageExtraction.RewrittenExpression
+
+			extractedExpressions = append(
+				extractedExpressions,
+				messageExtraction.ExtractedExpressions...,
+			)
+		}
+
+		for _, extractedExpression := range extractedExpressions {
 
 			beforeStatements = append(beforeStatements,
 				&ast.VariableDeclaration{
@@ -329,10 +348,6 @@ func (interpreter *Interpreter) rewritePostConditions(functionBlock *ast.Functio
 				},
 			)
 		}
-
-		// copy condition and set expression to rewritten one
-		newPostCondition := *postCondition
-		newPostCondition.Expression = extraction.RewrittenExpression
 
 		rewrittenPostConditions[i] = &newPostCondition
 	}
@@ -355,11 +370,26 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 			result := value.(BoolValue)
 
 			if !result {
-				panic(&ConditionError{
-					ConditionKind: condition.Kind,
-					StartPos:      condition.Expression.StartPosition(),
-					EndPos:        condition.Expression.EndPosition(),
-				})
+
+				var messageTrampoline Trampoline
+
+				if condition.Message == nil {
+					messageTrampoline = Done{Result: StringValue("")}
+				} else {
+					messageTrampoline = condition.Message.Accept(interpreter).(Trampoline)
+				}
+
+				return messageTrampoline.
+					Then(func(result interface{}) {
+						message := string(result.(StringValue))
+
+						panic(&ConditionError{
+							ConditionKind: condition.Kind,
+							Message:       message,
+							StartPos:      condition.Test.StartPosition(),
+							EndPos:        condition.Test.EndPosition(),
+						})
+					})
 			}
 
 			return interpreter.visitConditions(conditions[1:])
@@ -367,7 +397,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 }
 
 func (interpreter *Interpreter) VisitCondition(condition *ast.Condition) ast.Repr {
-	return condition.Expression.Accept(interpreter)
+	return condition.Test.Accept(interpreter)
 }
 
 func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
