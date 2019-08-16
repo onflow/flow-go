@@ -581,7 +581,7 @@ func (e *InvalidDeclarationError) EndPosition() ast.Position {
 // MissingInitializerError
 
 type MissingInitializerError struct {
-	StructureType  *StructureType
+	TypeIdentifier string
 	FirstFieldName string
 	FirstFieldPos  ast.Position
 }
@@ -590,7 +590,7 @@ func (e *MissingInitializerError) Error() string {
 	return fmt.Sprintf(
 		"missing initializer for field `%s` of type `%s`",
 		e.FirstFieldName,
-		e.StructureType.Identifier,
+		e.TypeIdentifier,
 	)
 }
 
@@ -735,4 +735,24 @@ func (e *InvalidReturnValueError) StartPosition() ast.Position {
 
 func (e *InvalidReturnValueError) EndPosition() ast.Position {
 	return e.EndPos
+}
+
+// InvalidFunctionImplementationError
+
+type InvalidFunctionImplementationError struct {
+	Pos ast.Position
+}
+
+func (e *InvalidFunctionImplementationError) Error() string {
+	return "cannot implement function here"
+}
+
+func (*InvalidFunctionImplementationError) isSemanticError() {}
+
+func (e *InvalidFunctionImplementationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidFunctionImplementationError) EndPosition() ast.Position {
+	return e.Pos
 }

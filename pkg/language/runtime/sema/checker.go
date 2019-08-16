@@ -1918,25 +1918,15 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 
 	structureType := checker.StructureDeclarationTypes[structure]
 
-	checker.checkStructureFieldAndFunctionIdentifiers(structure)
+	checker.checkMemberNames(structure.Fields, structure.Functions)
 
-	// check the initializer
-
-	initializer := structure.Initializer
-	if initializer != nil {
-		checker.checkStructureInitializer(initializer, structureType)
-	} else if len(structure.Fields) > 0 {
-		firstField := structure.Fields[0]
-
-		// structure has fields, but no initializer
-		checker.report(
-			&MissingInitializerError{
-				StructureType:  structureType,
-				FirstFieldName: firstField.Identifier,
-				FirstFieldPos:  firstField.IdentifierPos,
-			},
-		)
-	}
+	checker.checkInitializer(
+		structure.Initializer,
+		structure.Fields,
+		structureType,
+		structure.Identifier,
+		structureType.ConstructorParameterTypes,
+	)
 
 	if structureType != nil {
 		checker.checkFieldsInitialized(structure, structureType)
@@ -2087,17 +2077,37 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) *Stru
 	}
 }
 
-func (checker *Checker) checkStructureInitializer(
+func (checker *Checker) checkInitializer(
 	initializer *ast.InitializerDeclaration,
-	structureType *StructureType,
+	fields []*ast.FieldDeclaration,
+	ty Type,
+	typeIdentifier string,
+	constructorParameterTypes []Type,
 ) {
+	if initializer == nil {
+		// no initializer but fields?
+		if len(fields) > 0 {
+			firstField := fields[0]
+
+			// structure has fields, but no initializer
+			checker.report(
+				&MissingInitializerError{
+					TypeIdentifier: typeIdentifier,
+					FirstFieldName: firstField.Identifier,
+					FirstFieldPos:  firstField.IdentifierPos,
+				},
+			)
+		}
+		return
+	}
+
 	// NOTE: new activation, so `self`
 	// is only visible inside initializer
 
 	checker.valueActivations.PushCurrent()
 	defer checker.valueActivations.Pop()
 
-	checker.declareSelf(structureType)
+	checker.declareSelfValue(ty)
 
 	// check the initializer is named properly
 	identifier := initializer.Identifier
@@ -2110,10 +2120,8 @@ func (checker *Checker) checkStructureInitializer(
 		)
 	}
 
-	parameterTypes := structureType.ConstructorParameterTypes
-
 	functionType := &FunctionType{
-		ParameterTypes: parameterTypes,
+		ParameterTypes: constructorParameterTypes,
 		ReturnType:     &VoidType{},
 	}
 
@@ -2136,14 +2144,14 @@ func (checker *Checker) checkStructureFunctions(
 			checker.valueActivations.PushCurrent()
 			defer checker.valueActivations.Pop()
 
-			checker.declareSelf(selfType)
+			checker.declareSelfValue(selfType)
 
 			function.Accept(checker)
 		}()
 	}
 }
 
-func (checker *Checker) declareSelf(selfType *StructureType) {
+func (checker *Checker) declareSelfValue(selfType Type) {
 
 	// NOTE: declare `self` one depth lower ("inside" function),
 	// so it can't be re-declared by the function's parameters
@@ -2160,51 +2168,61 @@ func (checker *Checker) declareSelf(selfType *StructureType) {
 	checker.setVariable(SelfIdentifier, self)
 }
 
-// checkStructureFieldAndFunctionIdentifiers checks the structure's fields and functions
-// are unique and aren't named `init`
+// checkMemberNames checks the fields and functions are unique and aren't named `init`
 //
-func (checker *Checker) checkStructureFieldAndFunctionIdentifiers(structure *ast.StructureDeclaration) {
+func (checker *Checker) checkMemberNames(
+	fields []*ast.FieldDeclaration,
+	functions []*ast.FunctionDeclaration,
+) {
 
 	positions := map[string]ast.Position{}
 
-	checkName := func(name string, pos ast.Position, kind common.DeclarationKind) {
-		if name == InitializerIdentifier {
-			checker.report(
-				&InvalidNameError{
-					Name: name,
-					Pos:  structure.IdentifierPos,
-				},
-			)
-		}
-
-		if previousPos, ok := positions[name]; ok {
-			checker.report(
-				&RedeclarationError{
-					Name:        name,
-					Pos:         pos,
-					Kind:        kind,
-					PreviousPos: &previousPos,
-				},
-			)
-		} else {
-			positions[name] = pos
-		}
-	}
-
-	for _, field := range structure.Fields {
-		checkName(
+	for _, field := range fields {
+		checker.checkMemberName(
 			field.Identifier,
 			field.IdentifierPos,
 			common.DeclarationKindField,
+			positions,
 		)
 	}
 
-	for _, function := range structure.Functions {
-		checkName(
+	for _, function := range functions {
+		checker.checkMemberName(
 			function.Identifier,
 			function.IdentifierPos,
 			common.DeclarationKindFunction,
+			positions,
 		)
+	}
+}
+
+func (checker *Checker) checkMemberName(
+	name string,
+	pos ast.Position,
+	kind common.DeclarationKind,
+	positions map[string]ast.Position,
+) {
+
+	if name == InitializerIdentifier {
+		checker.report(
+			&InvalidNameError{
+				Name: name,
+				Pos:  pos,
+			},
+		)
+	}
+
+	if previousPos, ok := positions[name]; ok {
+		checker.report(
+			&RedeclarationError{
+				Name:        name,
+				Pos:         pos,
+				Kind:        kind,
+				PreviousPos: &previousPos,
+			},
+		)
+	} else {
+		positions[name] = pos
 	}
 }
 
@@ -2238,7 +2256,7 @@ func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.R
 
 func (checker *Checker) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
 
-	// NOTE: already checked in `checkStructureInitializer`
+	// NOTE: already checked in `checkInitializer`
 
 	panic(&errors.UnreachableError{})
 }

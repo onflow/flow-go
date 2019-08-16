@@ -448,13 +448,6 @@ type StructureType struct {
 	ConstructorParameterTypes []Type
 }
 
-type Member struct {
-	Type           Type
-	VariableKind   ast.VariableKind
-	IsInitialized  bool
-	ArgumentLabels []string
-}
-
 func (*StructureType) isType() {}
 
 func (t *StructureType) String() string {
@@ -469,3 +462,14 @@ func (t *StructureType) Equal(other Type) bool {
 
 	return otherStructure.Identifier == t.Identifier
 }
+
+// Member
+
+type Member struct {
+	Type           Type
+	VariableKind   ast.VariableKind
+	IsInitialized  bool
+	ArgumentLabels []string
+}
+
+//
