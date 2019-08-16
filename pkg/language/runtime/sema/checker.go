@@ -57,16 +57,25 @@ func NewChecker(program *ast.Program) *Checker {
 	}
 }
 
-func (checker *Checker) DeclareValue(
-	name string,
-	ty Type,
-	kind common.DeclarationKind,
-	pos ast.Position,
-	isConstant bool,
-	argumentLabels []string,
-) error {
+type ValueDeclaration interface {
+	DeclarationName() string
+	DeclarationType() Type
+	DeclarationKind() common.DeclarationKind
+	DeclarationPosition() ast.Position
+	DeclarationIsConstant() bool
+	DeclarationArgumentLabels() []string
+}
+
+func (checker *Checker) DeclareValue(declaration ValueDeclaration) error {
 	checker.errors = nil
-	checker.declareVariable(name, ty, kind, pos, isConstant, argumentLabels)
+	checker.declareVariable(
+		declaration.DeclarationName(),
+		declaration.DeclarationType(),
+		declaration.DeclarationKind(),
+		declaration.DeclarationPosition(),
+		declaration.DeclarationIsConstant(),
+		declaration.DeclarationArgumentLabels(),
+	)
 	return checker.checkerError()
 }
 
