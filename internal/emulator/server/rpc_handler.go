@@ -19,7 +19,7 @@ import (
 
 // Ping the Observation API server for a response.
 func (s *EmulatorServer) Ping(ctx context.Context, req *observe.PingRequest) (*observe.PingResponse, error) {
-	response := &observer.PingResponse{
+	response := &observe.PingResponse{
 		Address: []byte("pong!"),
 	}
 
