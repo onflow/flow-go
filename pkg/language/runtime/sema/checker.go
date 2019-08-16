@@ -529,12 +529,24 @@ func (checker *Checker) visitStatements(statements []ast.Statement) {
 	// check all statements
 	for _, statement := range statements {
 
-		// check statement is not a local structure declaration
+		// check statement is not a local structure or interface declaration
 
 		if _, ok := statement.(*ast.StructureDeclaration); ok {
 			checker.report(
 				&InvalidDeclarationError{
 					Kind:     common.DeclarationKindStructure,
+					StartPos: statement.StartPosition(),
+					EndPos:   statement.EndPosition(),
+				},
+			)
+
+			continue
+		}
+
+		if _, ok := statement.(*ast.InterfaceDeclaration); ok {
+			checker.report(
+				&InvalidDeclarationError{
+					Kind:     common.DeclarationKindInterface,
 					StartPos: statement.StartPosition(),
 					EndPos:   statement.EndPosition(),
 				},
