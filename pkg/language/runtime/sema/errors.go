@@ -737,22 +737,28 @@ func (e *InvalidReturnValueError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
-// InvalidFunctionImplementationError
+// InvalidImplementationError
 
-type InvalidFunctionImplementationError struct {
-	Pos ast.Position
+type InvalidImplementationError struct {
+	ImplementedKind common.DeclarationKind
+	ContainerKind   common.DeclarationKind
+	Pos             ast.Position
 }
 
-func (e *InvalidFunctionImplementationError) Error() string {
-	return "cannot implement function here"
+func (e *InvalidImplementationError) Error() string {
+	return fmt.Sprintf(
+		"cannot implement %s in %s",
+		e.ImplementedKind.Name(),
+		e.ContainerKind.Name(),
+	)
 }
 
-func (*InvalidFunctionImplementationError) isSemanticError() {}
+func (*InvalidImplementationError) isSemanticError() {}
 
-func (e *InvalidFunctionImplementationError) StartPosition() ast.Position {
+func (e *InvalidImplementationError) StartPosition() ast.Position {
 	return e.Pos
 }
 
-func (e *InvalidFunctionImplementationError) EndPosition() ast.Position {
+func (e *InvalidImplementationError) EndPosition() ast.Position {
 	return e.Pos
 }

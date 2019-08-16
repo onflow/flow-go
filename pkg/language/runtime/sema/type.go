@@ -472,4 +472,25 @@ type Member struct {
 	ArgumentLabels []string
 }
 
-//
+// InterfaceType
+
+type InterfaceType struct {
+	Identifier                string
+	Members                   map[string]*Member
+	ConstructorParameterTypes []Type
+}
+
+func (*InterfaceType) isType() {}
+
+func (t *InterfaceType) String() string {
+	return t.Identifier
+}
+
+func (t *InterfaceType) Equal(other Type) bool {
+	otherInterface, ok := other.(*InterfaceType)
+	if !ok {
+		return false
+	}
+
+	return otherInterface.Identifier == t.Identifier
+}

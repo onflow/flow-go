@@ -46,6 +46,7 @@ type Checker struct {
 	InitializerFunctionTypes           map[*ast.InitializerDeclaration]*FunctionType
 	FunctionExpressionFunctionType     map[*ast.FunctionExpression]*FunctionType
 	InvocationExpressionParameterTypes map[*ast.InvocationExpression][]Type
+	InterfaceDeclarationTypes          map[*ast.InterfaceDeclaration]*InterfaceType
 }
 
 func NewChecker(program *ast.Program) *Checker {
@@ -67,6 +68,7 @@ func NewChecker(program *ast.Program) *Checker {
 		InitializerFunctionTypes:           map[*ast.InitializerDeclaration]*FunctionType{},
 		FunctionExpressionFunctionType:     map[*ast.FunctionExpression]*FunctionType{},
 		InvocationExpressionParameterTypes: map[*ast.InvocationExpression][]Type{},
+		InterfaceDeclarationTypes:          map[*ast.InterfaceDeclaration]*InterfaceType{},
 	}
 }
 
@@ -214,7 +216,11 @@ func (checker *Checker) popActivations() {
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
-	// pre-declare structures and functions (check afterwards)
+	// pre-declare interfaces, structures, and functions (check afterwards)
+
+	for _, interfaceDeclaration := range program.InterfaceDeclarations() {
+		checker.declareInterfaceDeclaration(interfaceDeclaration)
+	}
 
 	for _, structureDeclaration := range program.StructureDeclarations() {
 		checker.declareStructureDeclaration(structureDeclaration)
@@ -315,13 +321,15 @@ func (checker *Checker) checkFunction(
 
 	checker.declareParameters(parameters, functionType.ParameterTypes)
 
-	func() {
-		// check the function's block
-		checker.enterFunction(functionType)
-		defer checker.leaveFunction()
+	if functionBlock != nil {
+		func() {
+			// check the function's block
+			checker.enterFunction(functionType)
+			defer checker.leaveFunction()
 
-		checker.visitFunctionBlock(functionBlock, functionType.ReturnType)
-	}()
+			checker.visitFunctionBlock(functionBlock, functionType.ReturnType)
+		}()
+	}
 }
 
 // checkArgumentLabels checks that all argument labels (if any) are unique
@@ -1944,22 +1952,20 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 	// insert a dummy type for now, so lookup succeeds during conversion,
 	// then fix up the type reference
 
-	temporaryStructureType := &StructureType{}
+	structureType := &StructureType{}
 
 	checker.declareType(
 		structure.Identifier,
 		structure.IdentifierPos,
-		temporaryStructureType,
+		structureType,
 	)
 
 	members := checker.members(structure.Fields, structure.Functions)
 
-	structureType := &StructureType{
+	*structureType = StructureType{
 		Identifier: structure.Identifier,
 		Members:    members,
 	}
-
-	*temporaryStructureType = *structureType
 
 	checker.StructureDeclarationTypes[structure] = structureType
 
@@ -2134,6 +2140,15 @@ func (checker *Checker) checkInitializer(
 		functionType,
 		initializer.FunctionBlock,
 	)
+
+	if kind == initializerKindInterface &&
+		initializer.FunctionBlock != nil {
+
+		checker.checkInterfaceFunctionBlock(
+			initializer.FunctionBlock,
+			common.DeclarationKindInitializer,
+		)
+	}
 }
 
 func (checker *Checker) checkStructureFunctions(
@@ -2265,7 +2280,103 @@ func (checker *Checker) VisitInitializerDeclaration(initializer *ast.Initializer
 	panic(&errors.UnreachableError{})
 }
 
-func (checker *Checker) VisitInterfaceDeclaration(structure *ast.InterfaceDeclaration) ast.Repr {
-	// TODO:
+func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
+
+	interfaceType := checker.InterfaceDeclarationTypes[declaration]
+
+	checker.checkMemberNames(declaration.Fields, declaration.Functions)
+
+	checker.checkInitializer(
+		declaration.Initializer,
+		declaration.Fields,
+		interfaceType,
+		declaration.Identifier,
+		interfaceType.ConstructorParameterTypes,
+		initializerKindInterface,
+	)
+
+	checker.checkInterfaceFunctions(declaration.Functions, interfaceType)
+
 	return nil
+}
+
+func (checker *Checker) checkInterfaceFunctions(functions []*ast.FunctionDeclaration, interfaceType Type) {
+	for _, function := range functions {
+		func() {
+			// NOTE: new activation, as function declarations
+			// shouldn't be visible in other function declarations,
+			// and `self` is is only visible inside function
+			checker.valueActivations.PushCurrent()
+			defer checker.valueActivations.Pop()
+
+			// NOTE: required for
+			checker.declareSelfValue(interfaceType)
+
+			function.Accept(checker)
+
+			if function.FunctionBlock != nil {
+				checker.checkInterfaceFunctionBlock(
+					function.FunctionBlock,
+					common.DeclarationKindFunction,
+				)
+			}
+		}()
+	}
+}
+
+func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDeclaration) {
+
+	// NOTE: fields and functions might already refer to structure itself.
+	// insert a dummy type for now, so lookup succeeds during conversion,
+	// then fix up the type reference
+
+	interfaceType := &InterfaceType{}
+
+	checker.declareType(
+		declaration.Identifier,
+		declaration.IdentifierPos,
+		interfaceType,
+	)
+
+	members := checker.members(declaration.Fields, declaration.Functions)
+
+	*interfaceType = InterfaceType{
+		Identifier: declaration.Identifier,
+		Members:    members,
+	}
+
+	checker.InterfaceDeclarationTypes[declaration] = interfaceType
+
+	// declare constructor
+
+	initializer := declaration.Initializer
+	var parameterTypes []Type
+	if initializer != nil {
+		parameterTypes = checker.parameterTypes(initializer.Parameters)
+	}
+
+	interfaceType.ConstructorParameterTypes = parameterTypes
+}
+
+func (checker *Checker) checkInterfaceFunctionBlock(block *ast.FunctionBlock, kind common.DeclarationKind) {
+
+	if len(block.Statements) > 0 {
+		checker.report(
+			&InvalidImplementationError{
+				Pos:             block.Statements[0].StartPosition(),
+				ContainerKind:   common.DeclarationKindInterface,
+				ImplementedKind: kind,
+			},
+		)
+	} else if len(block.PreConditions) == 0 &&
+		len(block.PostConditions) == 0 {
+
+		checker.report(
+			&InvalidImplementationError{
+				Pos:             block.StartPos,
+				ContainerKind:   common.DeclarationKindInterface,
+				ImplementedKind: kind,
+			},
+		)
+	}
 }

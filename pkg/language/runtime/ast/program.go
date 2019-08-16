@@ -3,12 +3,25 @@ package ast
 type Program struct {
 	// all declarations, in the order they are defined
 	Declarations          []Declaration
+	interfaceDeclarations []*InterfaceDeclaration
 	structureDeclarations []*StructureDeclaration
 	functionDeclarations  []*FunctionDeclaration
 }
 
 func (p *Program) Accept(visitor Visitor) Repr {
 	return visitor.VisitProgram(p)
+}
+
+func (p *Program) InterfaceDeclarations() []*InterfaceDeclaration {
+	if p.interfaceDeclarations == nil {
+		p.interfaceDeclarations = make([]*InterfaceDeclaration, 0)
+		for _, declaration := range p.Declarations {
+			if interfaceDeclaration, ok := declaration.(*InterfaceDeclaration); ok {
+				p.interfaceDeclarations = append(p.interfaceDeclarations, interfaceDeclaration)
+			}
+		}
+	}
+	return p.interfaceDeclarations
 }
 
 func (p *Program) StructureDeclarations() []*StructureDeclaration {
