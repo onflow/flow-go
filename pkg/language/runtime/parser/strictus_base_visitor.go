@@ -31,6 +31,10 @@ func (v *BaseStrictusVisitor) VisitField(ctx *FieldContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 	return v.VisitChildren(ctx)
 }

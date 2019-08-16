@@ -51,7 +51,8 @@ program
 
 declaration
     : structureDeclaration
-    | functionDeclaration
+    | interfaceDeclaration
+    | functionDeclaration[true]
     | variableDeclaration
     ;
 
@@ -62,7 +63,7 @@ access
     ;
 
 structureDeclaration
-    : Struct Identifier '{' field* initializer? functionDeclaration* '}'
+    : Struct Identifier '{' field* initializer? functionDeclaration[true]* '}'
     ;
 
 variableKind
@@ -74,6 +75,10 @@ field
     : access variableKind? Identifier ':' fullType
     ;
 
+interfaceDeclaration
+    : Interface Identifier '{' field* functionDeclaration[false]* '}'
+    ;
+
 // NOTE: allow any identifier in parser, then check identifier
 // is `init` in semantic analysis to provide better error
 //
@@ -81,8 +86,10 @@ initializer
     : Identifier parameterList functionBlock
     ;
 
-functionDeclaration
-    : access Fun Identifier parameterList (':' returnType=fullType)? functionBlock
+functionDeclaration[bool functionBlockRequired]
+    : access Fun Identifier parameterList (':' returnType=fullType)?
+      // only optional if parameter functionBlockRequired is false
+      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
 
 parameterList

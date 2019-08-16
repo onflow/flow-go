@@ -7,7 +7,7 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 type VariableKind int
 
 const (
-	VariableKindNone VariableKind = iota
+	VariableKindNotSpecified VariableKind = iota
 	VariableKindVariable
 	VariableKindConstant
 )

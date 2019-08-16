@@ -25,6 +25,9 @@ type StrictusListener interface {
 	// EnterField is called when entering the field production.
 	EnterField(c *FieldContext)
 
+	// EnterInterfaceDeclaration is called when entering the interfaceDeclaration production.
+	EnterInterfaceDeclaration(c *InterfaceDeclarationContext)
+
 	// EnterInitializer is called when entering the initializer production.
 	EnterInitializer(c *InitializerContext)
 
@@ -222,6 +225,9 @@ type StrictusListener interface {
 
 	// ExitField is called when exiting the field production.
 	ExitField(c *FieldContext)
+
+	// ExitInterfaceDeclaration is called when exiting the interfaceDeclaration production.
+	ExitInterfaceDeclaration(c *InterfaceDeclarationContext)
 
 	// ExitInitializer is called when exiting the initializer production.
 	ExitInitializer(c *InitializerContext)

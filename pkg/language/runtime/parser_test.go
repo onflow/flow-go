@@ -2544,6 +2544,19 @@ func TestParseStructure(t *testing.T) {
 		To(Equal(expected))
 }
 
+func TestParseInvalidStructureWithMissingFunctionBlock(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, errors := parser.ParseProgram(`
+        struct Test {
+            pub fun getFoo(): Int
+        }
+	`)
+
+	Expect(errors).
+		To(Not(BeEmpty()))
+}
+
 func TestParsePreAndPostConditions(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -2977,6 +2990,63 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 				IdentifierPos: Position{Offset: 12, Line: 2, Column: 11},
 			},
 		},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseInterface(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseProgram(`
+        interface Test {
+            foo: Int
+
+            fun getFoo(): Int
+        }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	test := &InterfaceDeclaration{
+		Identifier: "Test",
+		Fields: []*FieldDeclaration{
+			{
+				Access:       AccessNotSpecified,
+				VariableKind: VariableKindNotSpecified,
+				Identifier:   "foo",
+				Type: &NominalType{
+					Identifier: "Int",
+					Pos:        Position{Offset: 43, Line: 3, Column: 17},
+				},
+				StartPos:      Position{Offset: 38, Line: 3, Column: 12},
+				EndPos:        Position{Offset: 45, Line: 3, Column: 19},
+				IdentifierPos: Position{Offset: 38, Line: 3, Column: 12},
+			},
+		},
+		Functions: []*FunctionDeclaration{
+			{
+				Access:     AccessNotSpecified,
+				Identifier: "getFoo",
+				Parameters: nil,
+				ReturnType: &NominalType{
+					Identifier: "Int",
+					Pos:        Position{Offset: 74, Line: 5, Column: 26},
+				},
+				FunctionBlock: nil,
+				StartPos:      Position{Offset: 60, Line: 5, Column: 12},
+				IdentifierPos: Position{Offset: 64, Line: 5, Column: 16},
+			},
+		},
+		IdentifierPos: Position{Offset: 19, Line: 2, Column: 18},
+		StartPos:      Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:        Position{Offset: 86, Line: 6, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
 	}
 
 	Expect(actual).

@@ -56,6 +56,12 @@ func (s *BaseStrictusListener) EnterField(ctx *FieldContext) {}
 // ExitField is called when production field is exited.
 func (s *BaseStrictusListener) ExitField(ctx *FieldContext) {}
 
+// EnterInterfaceDeclaration is called when production interfaceDeclaration is entered.
+func (s *BaseStrictusListener) EnterInterfaceDeclaration(ctx *InterfaceDeclarationContext) {}
+
+// ExitInterfaceDeclaration is called when production interfaceDeclaration is exited.
+func (s *BaseStrictusListener) ExitInterfaceDeclaration(ctx *InterfaceDeclarationContext) {}
+
 // EnterInitializer is called when production initializer is entered.
 func (s *BaseStrictusListener) EnterInitializer(ctx *InitializerContext) {}
 
