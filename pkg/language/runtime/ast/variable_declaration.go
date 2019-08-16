@@ -7,20 +7,19 @@ type VariableDeclaration struct {
 	Identifier    string
 	Type          Type
 	Value         Expression
-	StartPos      *Position
-	EndPos        *Position
-	IdentifierPos *Position
+	StartPos      Position
+	IdentifierPos Position
 }
 
-func (v *VariableDeclaration) StartPosition() *Position {
+func (v *VariableDeclaration) StartPosition() Position {
 	return v.StartPos
 }
 
-func (v *VariableDeclaration) EndPosition() *Position {
-	return v.EndPos
+func (v *VariableDeclaration) EndPosition() Position {
+	return v.Value.EndPosition()
 }
 
-func (v *VariableDeclaration) IdentifierPosition() *Position {
+func (v *VariableDeclaration) IdentifierPosition() Position {
 	return v.IdentifierPos
 }
 

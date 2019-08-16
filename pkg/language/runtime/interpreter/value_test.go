@@ -1,8 +1,9 @@
 package interpreter
 
 import (
-	. "github.com/onsi/gomega"
 	"testing"
+
+	. "github.com/onsi/gomega"
 )
 
 func TestToExpression(t *testing.T) {

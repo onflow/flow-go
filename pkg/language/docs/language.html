@@ -213,7 +213,7 @@
             <p><a href="#built-in-functions">Built-in Functions</a></p>
             <ul>
               <li>
-                <p><a href="#fatalerror"><code>fatalError</code></a></p>
+                <p><a href="#panic"><code>panic</code></a></p>
                 <ul>
                   <li><a href="#example">Example</a></li>
                 </ul>
@@ -235,7 +235,7 @@
               <li><a href="#distinctnew-types">Distinct/New Types</a></li>
               <li><a href="#set-data-structure">Set Data Structure</a></li>
               <li><a href="#generics">Generics</a></li>
-              <li><a href="#calls-of-pure-functions-in-pre-conditions-and-post-conditions">Calls of Pure Functions in Pre-Conditions and Post-Conditions</a></li>
+              <li><a href="#calls-of-pure-functions-in-preconditions-and-postconditions">Calls of Pure Functions in Preconditions and Postconditions</a></li>
               <li><a href="#late-initialization-of-variables-and-constants">Late Initialization of Variables and Constants</a></li>
               <li><a href="#arbitrary-argument-order-based-on-argument-labels">Arbitrary Argument Order Based on Argument Labels</a></li>
             </ul>
@@ -559,12 +559,12 @@
         </section>
         <section>
           <h3 id="never"><a href="#never" aria-hidden="true"><span class="icon icon-link"></span></a>Never</h3>
-          <p><code>Never</code> is the bottom type, i.e., it is a subtype of all types. There is no value that has type <code>Never</code>. <code>Never</code> can be used as the return type for functions that never return normally. For example, it is the return type of the function <a href="#fatalError"><code>fatalError</code></a>.</p>
+          <p><code>Never</code> is the bottom type, i.e., it is a subtype of all types. There is no value that has type <code>Never</code>. <code>Never</code> can be used as the return type for functions that never return normally. For example, it is the return type of the function <a href="#panic"><code>panic</code></a>.</p>
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a function named `crashAndBurn` which will never return,</span><span>
-</span><span style="color: #008000">// because it calls the function named `fatalError`, which never returns</span><span>
+</span><span style="color: #008000">// because it calls the function named `panic`, which never returns</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> crashAndBurn(): Never {</span><span>
-</span><span style="color: #000000">    fatalError(</span><span style="color: #A31515">"An unrecoverable error occurred"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    panic(</span><span style="color: #A31515">"An unrecoverable error occurred"</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
         </section>
@@ -660,7 +660,7 @@
         <section>
           <h3 id="strings-and-characters"><a href="#strings-and-characters" aria-hidden="true"><span class="icon icon-link"></span></a>Strings and Characters</h3>
           <blockquote>
-            <p>🚧 Status: Strings are not implemented yet.</p>
+            <p>🚧 Status: Characters are not implemented yet.</p>
           </blockquote>
           <p>Strings are collections of characters. Strings have the type <code>String</code>, and characters have the type <code>Character</code>. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.</p>
           <p>String and character literals are enclosed in double quotation marks (<code>"</code>).</p>
@@ -1335,39 +1335,32 @@
         </section>
         <section>
           <h3 id="function-preconditions-and-postconditions"><a href="#function-preconditions-and-postconditions" aria-hidden="true"><span class="icon icon-link"></span></a>Function Preconditions and Postconditions</h3>
-          <blockquote>
-            <p>🚧 Status: Function Preconditions and Postconditions are not implemented yet.</p>
-          </blockquote>
           <p>Functions may have preconditions and may have postconditions. Preconditions and postconditions can be used to restrict the inputs (values for parameters) and output (return value) of a function.</p>
-          <p>Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the <code>require</code> keyword, followed by the condition block.</p>
-          <p>Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the <code>ensure</code> keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.</p>
-          <p>A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions.</p>
+          <p>Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the <code>pre</code> keyword, followed by the condition block.</p>
+          <p>Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the <code>post</code> keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.</p>
+          <p>A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions. Also, conditions may not contain function expressions.</p>
           <p>Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for <a href="#semicolons">statements</a>.</p>
           <p>Following each condition, an optional description can be provided after a colon.</p>
           <p>In postconditions, the special constant <code>result</code> refers to the result of the function.</p>
           <pre><code class="language-bamboo,file=function-factorial.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: Int): Int {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Require the parameter `n` to be greater than or equal to zero</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        n >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">            </span><span style="color: #A31515">"factorial is only defined for integers greater than or equal to zero"</span><span>
 </span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Ensure the result will be greater than or equal to 1</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        result >= </span><span style="color: #09885A">1</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">            </span><span style="color: #A31515">"the result must be greater than or equal to 1"</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> i = n</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> result = </span><span style="color: #09885A">1</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">while</span><span style="color: #000000"> i > </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">        result = result * i</span><span>
-</span><span style="color: #000000">        i = i - </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> n &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">       </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> result</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> n * factorial(n - </span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #000000">factorial(</span><span style="color: #09885A">5</span><span style="color: #000000">) </span><span style="color: #008000">// returns 120</span><span>
@@ -1380,7 +1373,7 @@
           <pre><code class="language-bamboo,file=function-increment.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> n = </span><span style="color: #09885A">0</span><span>
 </span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> incrementN() {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Require the new value of `n` to be the old value of `n`, plus one</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        n == before(n) + </span><span style="color: #09885A">1</span><span style="color: #000000">:</span><span>
@@ -1457,6 +1450,30 @@
 </span><span>
 </span><span style="color: #008000">// `a` is 5</span><span>
 </span></code></pre>
+          <p>The <code>continue</code> statement can be used to stop the current iteration of the loop and start the next iteration.</p>
+          <pre><code class="language-bamboo,file=control-flow-continue.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> i = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> x = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">while</span><span style="color: #000000"> i &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    i = i + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> i &#x3C; </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">continue</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    x = x + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `x` is 6</span><span>
+</span></code></pre>
+          <p>The <code>break</code> statement can be used to stop the loop.</p>
+          <pre><code class="language-bamboo,file=control-flow-break.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> x = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">while</span><span style="color: #000000"> x &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    x = x + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> x == </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">break</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `x` is 5</span><span>
+</span></code></pre>
         </section>
         <section>
           <h3 id="immediate-function-return-return-statement"><a href="#immediate-function-return-return-statement" aria-hidden="true"><span class="icon icon-link"></span></a>Immediate function return: return-statement</h3>
@@ -1529,9 +1546,6 @@
       </section>
       <section>
         <h2 id="type-safety"><a href="#type-safety" aria-hidden="true"><span class="icon icon-link"></span></a>Type Safety</h2>
-        <blockquote>
-          <p>🚧 Status: Type checking is not implemented yet.</p>
-        </blockquote>
         <p>The Bamboo programming language is a <em>type-safe</em> language.</p>
         <p>When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type <code>Bool</code>, it can <em>only</em> be assigned a value that has type <code>Bool</code>, and not for example a value that has type <code>Int</code>.</p>
         <pre><code class="language-bamboo,file=type-safety-assign-int-to-bool.bpl"><span style="color: #008000">// Declare a variable that has type `Bool`</span><span>
@@ -1572,7 +1586,7 @@
       <section>
         <h2 id="type-inference"><a href="#type-inference" aria-hidden="true"><span class="icon icon-link"></span></a>Type Inference</h2>
         <blockquote>
-          <p>🚧 Status: Type inference is not implemented yet.</p>
+          <p>🚧 Status: Only basic type inference is implemented.</p>
         </blockquote>
         <p>If a variable or constant is not annotated explicitly with a type, it is inferred from the value.</p>
         <p>Integer literals are inferred to type <code>Int</code>.</p>
@@ -1626,7 +1640,7 @@
       <section>
         <h2 id="composite-data-types"><a href="#composite-data-types" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Types</h2>
         <blockquote>
-          <p>🚧 Status: Composite data types are not implemented yet.</p>
+          <p>🚧 Status: Resources are not implemented yet.</p>
         </blockquote>
         <p>Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.</p>
         <p>
@@ -1653,6 +1667,10 @@
             <p>We think resources are a great way to represent such assets.</p>
           </li>
         </ul>
+        <p>
+          Two composite daya types are compatible if and only if they refer to the same declaration by name,
+          i.e., nominal typing applies instead of structural typing.
+        </p>
       </section>
       <section>
         <h2 id="composite-data-type-declaration-and-creation"><a href="#composite-data-type-declaration-and-creation" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Declaration and Creation</h2>
@@ -1672,6 +1690,10 @@
         <p>Resource are created (instantiated) by using the <code>create</code> keyword and calling the type like a function.</p>
         <pre><code class="language-bamboo,file=resource-instantiation.bpl"><span style="color: #000000">create SomeResource()</span><span>
 </span></code></pre>
+        <p>
+          Composite data types can only be declared globally and not locally in functions.
+          They can also not be nested.
+        </p>
         <section>
           <h3 id="composite-data-type-fields"><a href="#composite-data-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Fields</h3>
           <p>Fields are declared like variables and constants, however, they have no initial value. The initial values for fields are set in the initializer. All fields <strong>must</strong> be initialized in the initializer. The initializer is declared using the <code>init</code> keyword. Just like a function, it takes parameters. However, it has no return type, i.e., it is always <code>Void</code>. The initializer always follows any fields.</p>
@@ -1751,7 +1773,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">           </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">               result >= </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #000000">           }</span><span>
 </span><span>
@@ -1782,12 +1804,12 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// which requires written values to be positive</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
-</span><span style="color: #000000">       </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">               newBalance >= </span><span style="color: #09885A">0</span><span>
-</span><span style="color: #000000">           }</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = newBalance</span><span>
-</span><span style="color: #000000">       }</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                newBalance >= </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = newBalance</span><span>
+</span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
@@ -2295,7 +2317,7 @@
           Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
         </p>
         <p>
-          Calling functions with pre-conditions and post-conditions on interfaces instead of concrete implementations can improve the security of a program,
+          Calling functions with preconditions and postconditions on interfaces instead of concrete implementations can improve the security of a program,
           as it ensures that even if implementations change, some aspects of them will always hold.
         </p>
         <section>
@@ -2337,7 +2359,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                result >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
 </span><span style="color: #000000">            }</span><span>
@@ -2348,7 +2370,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// given the initial balance, must initialize the balance field</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the balance must be initialized to the initial balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
@@ -2369,13 +2391,13 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: `&#x3C;-Self` is the resource type implementing this interface</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be positive"</span><span>
 </span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"insufficient funds: the amount must be smaller or equal to the balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) - amount:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be deducted from the balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
@@ -2390,7 +2412,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// The given token must be of the same type – a deposit of another</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// type is not possible.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// No pre-condition is required to check the given token's balance</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// No precondition is required to check the given token's balance</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// is positive, as this condition is already ensured by</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// the field requirement.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
@@ -2398,7 +2420,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// i.e. the resource type implementing this interface</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-Self) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + token.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
@@ -2949,7 +2971,7 @@
       <section>
         <h2 id="transactions"><a href="#transactions" aria-hidden="true"><span class="icon icon-link"></span></a>Transactions</h2>
         <p>Transactions are objects that are signed by one or more <a href="#accounts">accounts</a> and are sent to the chain to interact with it.</p>
-        <p>Transactions have three phases: Preparation, execution, and post-conditions.</p>
+        <p>Transactions have three phases: Preparation, execution, and postconditions.</p>
         <p>
           The preparer acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
           The preparer has the permissions to read and write to storage of all signer accounts.
@@ -2957,7 +2979,7 @@
         <p>
           Transactions are declared using the <code>transaction</code> keyword.
           The preparer is declared using the <code>prepare</code> keyword and the execution phase is declared using the <code>execute</code> keyword.
-          The <code>ensure</code> section can be used to declare post-conditions.
+          The <code>post</code> section can be used to declare postconditions.
         </p>
         <pre><code class="language-bamboo,file=transaction-declaration.bpl"><span style="color: #000000">transaction {</span><span>
 </span><span>
@@ -2974,7 +2996,7 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -2992,11 +3014,11 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Provider {</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"withdrawal amount must be positive"</span><span>
 </span><span style="color: #000000">            }</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                result.balance == amount:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"incorrect amount returned"</span><span>
 </span><span style="color: #000000">            }</span><span>
@@ -3011,7 +3033,7 @@
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">                </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                    result >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                        </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
 </span><span style="color: #000000">                }</span><span>
@@ -3019,25 +3041,25 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == balance:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"the balance must be initialized to the initial balance"</span><span>
 </span><span style="color: #000000">            }</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">require</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"insufficient funds: the amount must be smaller or equal to the balance"</span><span>
 </span><span style="color: #000000">            }</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) - amount:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"Incorrect amount removed"</span><span>
 </span><span style="color: #000000">            }</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(vault: &#x3C;-Self) {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">ensure</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + vault.balance:</span><span>
 </span><span style="color: #000000">                    </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
 </span><span style="color: #000000">            }</span><span>
@@ -3226,28 +3248,23 @@
       <section>
         <h2 id="built-in-functions"><a href="#built-in-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Built-in Functions</h2>
         <section>
-          <h3 id="fatalerror"><a href="#fatalerror" aria-hidden="true"><span class="icon icon-link"></span></a><code>fatalError</code></h3>
-          <blockquote>
-            <p>🚧 Status: <code>fatalError</code> is not implemented yet.</p>
-          </blockquote>
-          <pre><code class="language-bamboo"><span style="color: #0000FF">fun</span><span style="color: #000000"> fatalError(_ message: </span><span style="color: #0000FF">String</span><span style="color: #000000">): Never</span><span>
+          <h3 id="panic"><a href="#panic" aria-hidden="true"><span class="icon icon-link"></span></a><code>panic</code></h3>
+          <pre><code class="language-bamboo"><span style="color: #0000FF">fun</span><span style="color: #000000"> panic(_ message: </span><span style="color: #0000FF">String</span><span style="color: #000000">): Never</span><span>
 </span></code></pre>
           <p>Terminates the program unconditionally and reports a message which explains why the unrecoverable error occurred.</p>
           <section>
             <h4 id="example"><a href="#example" aria-hidden="true"><span class="icon icon-link"></span></a>Example</h4>
             <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> optionalAccount: </span><span style="color: #0000FF">Account</span><span style="color: #000000">? = </span><span style="color: #008000">// ...</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> account = optionalAccount ?? fatalError(</span><span style="color: #A31515">"missing account"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> account = optionalAccount ?? panic(</span><span style="color: #A31515">"missing account"</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           </section>
         </section>
         <section>
           <h3 id="assert"><a href="#assert" aria-hidden="true"><span class="icon icon-link"></span></a><code>assert</code></h3>
-          <blockquote>
-            <p>🚧 Status: <code>assert</code> is not implemented yet.</p>
-          </blockquote>
           <pre><code class="language-bamboo"><span style="color: #0000FF">fun</span><span style="color: #000000"> assert(_ condition: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, message: </span><span style="color: #0000FF">String</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.</p>
+          <p>The message argument is optional.</p>
         </section>
       </section>
       <section>
@@ -3330,12 +3347,12 @@
           <p>Should we add generics? In what form? Is it OK to add them in a later version?</p>
         </section>
         <section>
-          <h3 id="calls-of-pure-functions-in-pre-conditions-and-post-conditions"><a href="#calls-of-pure-functions-in-pre-conditions-and-post-conditions" aria-hidden="true"><span class="icon icon-link"></span></a>Calls of Pure Functions in Pre-Conditions and Post-Conditions</h3>
+          <h3 id="calls-of-pure-functions-in-preconditions-and-postconditions"><a href="#calls-of-pure-functions-in-preconditions-and-postconditions" aria-hidden="true"><span class="icon icon-link"></span></a>Calls of Pure Functions in Preconditions and Postconditions</h3>
           <blockquote>
             <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/70">https://github.com/dapperlabs/bamboo-node/issues/70</a></p>
           </blockquote>
           <p>
-            It might be useful to call pure functions pre-conditions and post-conditons.
+            It might be useful to call pure functions preconditions and postconditons.
             How do we ensure preconditions and postconditions are side-effect free?
           </p>
         </section>
