@@ -2278,3 +2278,94 @@ func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
 	Expect(inter.Globals["z"].Value).
 		To(Equal(interpreter.BoolValue(false)))
 }
+
+func TestInterpretIfStatementTestWithDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int?): Int {
+          if var y = x {
+              return y
+          } else {
+              return 0
+          }
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+}
+
+func TestInterpretIfStatementTestWithDeclarationAndElse(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int?): Int {
+          if var y = x {
+              return y
+          }
+          return 0
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+}
+
+func TestInterpretIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int??): Int? {
+          if var y = x {
+              return y
+          } else {
+              return 0
+          }
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(2)},
+			}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(0)},
+			}))
+}
+
+func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int??): Int? {
+          if var y: Int? = x {
+              return y
+          } else {
+              return 0
+          }
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(2)},
+			}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(0)},
+			}))
+}

@@ -454,6 +454,8 @@ func (interpreter *Interpreter) VisitIfStatement(statement *ast.IfStatement) ast
 	switch test := statement.Test.(type) {
 	case ast.Expression:
 		return interpreter.visitIfStatementWithTestExpression(test, statement.Then, statement.Else)
+	case *ast.VariableDeclaration:
+		return interpreter.visitIfStatementWithVariableDeclaration(test, statement.Then, statement.Else)
 	default:
 		panic(&errors.UnreachableError{})
 	}
@@ -474,6 +476,32 @@ func (interpreter *Interpreter) visitIfStatementWithTestExpression(
 			}
 
 			// NOTE: no result, so it does *not* act like a return-statement
+			return Done{}
+		})
+}
+
+func (interpreter *Interpreter) visitIfStatementWithVariableDeclaration(
+	declaration *ast.VariableDeclaration,
+	thenBlock, elseBlock *ast.Block,
+) Trampoline {
+
+	return declaration.Value.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+
+			if someValue, ok := result.(SomeValue); ok {
+				unwrappedValueCopy := someValue.Value.Copy()
+				interpreter.activations.PushCurrent()
+				interpreter.declareVariable(declaration.Identifier, unwrappedValueCopy)
+
+				return thenBlock.Accept(interpreter).(Trampoline).
+					Then(func(_ interface{}) {
+						interpreter.activations.Pop()
+					})
+			} else if elseBlock != nil {
+				return elseBlock.Accept(interpreter).(Trampoline)
+			}
+
+			// NOTE: ignore result, so it does *not* act like a return-statement
 			return Done{}
 		})
 }
