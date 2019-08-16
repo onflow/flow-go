@@ -2044,7 +2044,7 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) *Stru
 			IsInitialized: false,
 		}
 
-		if field.VariableKind == ast.VariableKindNone {
+		if field.VariableKind == ast.VariableKindNotSpecified {
 			checker.report(
 				&InvalidVariableKindError{
 					Kind:     field.VariableKind,
@@ -2229,4 +2229,9 @@ func (checker *Checker) VisitInitializerDeclaration(initializer *ast.Initializer
 	// NOTE: already checked in `checkStructureInitializer`
 
 	panic(&errors.UnreachableError{})
+}
+
+func (checker *Checker) VisitInterfaceDeclaration(structure *ast.InterfaceDeclaration) ast.Repr {
+	// TODO:
+	return nil
 }
