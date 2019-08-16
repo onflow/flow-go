@@ -6,6 +6,7 @@ import (
 
 	"github.com/raviqqe/hamt"
 
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
@@ -449,7 +450,7 @@ type StructureType struct {
 
 type Member struct {
 	Type           Type
-	IsConstant     bool
+	VariableKind   ast.VariableKind
 	IsInitialized  bool
 	ArgumentLabels []string
 }

@@ -137,7 +137,11 @@ func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationCont
 func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 	access := ctx.Access().Accept(v).(ast.Access)
 
-	isConstant := ctx.Let() != nil
+	variableKindContext := ctx.VariableKind()
+	variableKind := ast.VariableKindNone
+	if variableKindContext != nil {
+		variableKind = variableKindContext.Accept(v).(ast.VariableKind)
+	}
 
 	identifierNode := ctx.Identifier()
 	identifier := identifierNode.GetText()
@@ -151,7 +155,7 @@ func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 
 	return &ast.FieldDeclaration{
 		Access:        access,
-		IsConstant:    isConstant,
+		VariableKind:  variableKind,
 		Identifier:    identifier,
 		Type:          fullType,
 		StartPos:      startPosition,
@@ -533,7 +537,9 @@ func (v *ProgramVisitor) VisitContinueStatement(ctx *ContinueStatementContext) i
 }
 
 func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{} {
-	isConstant := ctx.Let() != nil
+	variableKind := ctx.VariableKind().Accept(v).(ast.VariableKind)
+	isConstant := variableKind == ast.VariableKindConstant
+
 	identifierNode := ctx.Identifier()
 	identifier := identifierNode.GetText()
 	expressionResult := ctx.Expression().Accept(v)
@@ -561,6 +567,18 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		StartPos:      startPosition,
 		IdentifierPos: identifierPosition,
 	}
+}
+
+func (v *ProgramVisitor) VisitVariableKind(ctx *VariableKindContext) interface{} {
+	if ctx.Let() != nil {
+		return ast.VariableKindConstant
+	}
+
+	if ctx.Var() != nil {
+		return ast.VariableKindVariable
+	}
+
+	return ast.VariableKindNone
 }
 
 func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {

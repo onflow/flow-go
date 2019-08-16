@@ -65,8 +65,13 @@ structureDeclaration
     : Struct Identifier '{' field* initializer? functionDeclaration* '}'
     ;
 
+variableKind
+    : Let
+    | Var
+    ;
+
 field
-    : access (Let | Var) Identifier ':' fullType
+    : access variableKind? Identifier ':' fullType
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
@@ -171,7 +176,7 @@ whileStatement
     ;
 
 variableDeclaration
-    : (Let | Var) Identifier (':' fullType)? '=' expression
+    : variableKind Identifier (':' fullType)? '=' expression
     ;
 
 assignment
@@ -350,6 +355,8 @@ OpenParen: '(' ;
 CloseParen: ')' ;
 
 Struct : 'struct' ;
+
+Interface : 'interface' ;
 
 Fun : 'fun' ;
 

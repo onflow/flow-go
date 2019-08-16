@@ -917,7 +917,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 
 	// check member is not constant
 
-	if member.IsConstant {
+	if member.VariableKind == ast.VariableKindConstant {
 		if member.IsInitialized {
 			checker.report(
 				&AssignmentToConstantMemberError{
@@ -2040,8 +2040,18 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) *Stru
 
 		members[field.Identifier] = &Member{
 			Type:          fieldType,
-			IsConstant:    field.IsConstant,
+			VariableKind:  field.VariableKind,
 			IsInitialized: false,
+		}
+
+		if field.VariableKind == ast.VariableKindNone {
+			checker.report(
+				&InvalidVariableKindError{
+					Kind:     field.VariableKind,
+					StartPos: field.IdentifierPos,
+					EndPos:   field.IdentifierPos,
+				},
+			)
 		}
 	}
 
@@ -2053,7 +2063,7 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) *Stru
 
 		members[function.Identifier] = &Member{
 			Type:           functionType,
-			IsConstant:     true,
+			VariableKind:   ast.VariableKindConstant,
 			IsInitialized:  true,
 			ArgumentLabels: argumentLabels,
 		}

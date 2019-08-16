@@ -19,6 +19,9 @@ type StrictusListener interface {
 	// EnterStructureDeclaration is called when entering the structureDeclaration production.
 	EnterStructureDeclaration(c *StructureDeclarationContext)
 
+	// EnterVariableKind is called when entering the variableKind production.
+	EnterVariableKind(c *VariableKindContext)
+
 	// EnterField is called when entering the field production.
 	EnterField(c *FieldContext)
 
@@ -213,6 +216,9 @@ type StrictusListener interface {
 
 	// ExitStructureDeclaration is called when exiting the structureDeclaration production.
 	ExitStructureDeclaration(c *StructureDeclarationContext)
+
+	// ExitVariableKind is called when exiting the variableKind production.
+	ExitVariableKind(c *VariableKindContext)
 
 	// ExitField is called when exiting the field production.
 	ExitField(c *FieldContext)

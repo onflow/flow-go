@@ -2441,9 +2441,9 @@ func TestParseStructure(t *testing.T) {
 		Identifier: "Test",
 		Fields: []*FieldDeclaration{
 			{
-				Access:     AccessPublicSettable,
-				IsConstant: false,
-				Identifier: "foo",
+				Access:       AccessPublicSettable,
+				VariableKind: VariableKindVariable,
+				Identifier:   "foo",
 				Type: &NominalType{
 					Identifier: "Int",
 					Pos:        Position{Offset: 53, Line: 3, Column: 30},

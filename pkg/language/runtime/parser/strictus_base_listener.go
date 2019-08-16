@@ -44,6 +44,12 @@ func (s *BaseStrictusListener) EnterStructureDeclaration(ctx *StructureDeclarati
 // ExitStructureDeclaration is called when production structureDeclaration is exited.
 func (s *BaseStrictusListener) ExitStructureDeclaration(ctx *StructureDeclarationContext) {}
 
+// EnterVariableKind is called when production variableKind is entered.
+func (s *BaseStrictusListener) EnterVariableKind(ctx *VariableKindContext) {}
+
+// ExitVariableKind is called when production variableKind is exited.
+func (s *BaseStrictusListener) ExitVariableKind(ctx *VariableKindContext) {}
+
 // EnterField is called when production field is entered.
 func (s *BaseStrictusListener) EnterField(ctx *FieldContext) {}
 
