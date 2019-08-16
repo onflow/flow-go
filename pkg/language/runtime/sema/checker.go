@@ -704,7 +704,15 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 		elseElement = statement.Else
 	}
 
-	checker.visitConditional(statement.Test, statement.Then, elseElement)
+	switch test := statement.Test.(type) {
+	case ast.Expression:
+		checker.visitConditional(test, statement.Then, elseElement)
+	case *ast.VariableDeclaration:
+		// TODO:
+
+	default:
+		panic(&errors.UnreachableError{})
+	}
 
 	return nil
 }

@@ -564,7 +564,15 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 }
 
 func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
-	test := ctx.test.Accept(v).(ast.Expression)
+	var test ast.IfStatementTest
+	if ctx.testExpression != nil {
+		test = ctx.testExpression.Accept(v).(ast.Expression)
+	} else if ctx.testDeclaration != nil {
+		test = ctx.testDeclaration.Accept(v).(*ast.VariableDeclaration)
+	} else {
+		panic(&errors.UnreachableError{})
+	}
+
 	then := ctx.then.Accept(v).(*ast.Block)
 
 	var elseBlock *ast.Block
