@@ -1,14 +1,20 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
 	"github.com/dapperlabs/bamboo-node/pkg/language/tools/language-server/protocol"
-	"os"
-	"strings"
 )
+
+var standardLibraryFunctions = append(stdlib.BuiltIns, stdlib.Helpers...)
 
 type server struct{}
 
@@ -91,6 +97,12 @@ func (server) DidChangeTextDocument(
 		// no parsing parseErrors, check program
 
 		checker := sema.NewChecker(program)
+		for _, function := range standardLibraryFunctions {
+			if err := checker.DeclareValue(function); err != nil {
+				panic(err)
+			}
+		}
+
 		err := checker.Check()
 
 		if checkerError, ok := err.(*sema.CheckerError); ok && checkerError != nil {
