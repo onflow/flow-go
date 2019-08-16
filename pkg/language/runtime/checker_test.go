@@ -786,21 +786,21 @@ func TestCheckInvalidIfStatementTestWithDeclarationNonOptional(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
-// TODO: warn, useless
-//
-func TestCheckIfStatementTestWithDeclarationSameType(t *testing.T) {
+func TestCheckInvalidIfStatementTestWithDeclarationSameType(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(x: Int?) {
+      fun test(x: Int?): Int? {
           if var y: Int? = x {
-              // ...
+             return y
           }
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckConditionalExpressionTest(t *testing.T) {

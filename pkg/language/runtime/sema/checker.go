@@ -430,17 +430,19 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 			if isOptionalBinding {
 				if optionalValueType != nil &&
-					!checker.IsSubType(optionalValueType.Type, declarationType) {
+					(optionalValueType.Equal(declarationType) ||
+						!checker.IsSubType(optionalValueType.Type, declarationType)) {
 
 					checker.report(
 						&TypeMismatchError{
 							ExpectedType: declarationType,
-							ActualType:   valueType,
+							ActualType:   optionalValueType.Type,
 							StartPos:     declaration.Value.StartPosition(),
 							EndPos:       declaration.Value.EndPosition(),
 						},
 					)
 				}
+
 			} else {
 				if !checker.IsSubType(valueType, declarationType) {
 					checker.report(
