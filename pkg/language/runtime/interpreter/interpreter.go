@@ -38,7 +38,20 @@ func NewInterpreter(program *ast.Program) *Interpreter {
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
-	return interpreter.activations.Find(name).(*Variable)
+	result := interpreter.activations.Find(name)
+	if result == nil {
+		return nil
+	}
+	return result.(*Variable)
+}
+
+func (interpreter *Interpreter) findOrDeclareVariable(name string) *Variable {
+	variable := interpreter.findVariable(name)
+	if variable == nil {
+		variable = &Variable{}
+		interpreter.setVariable(name, variable)
+	}
+	return variable
 }
 
 func (interpreter *Interpreter) setVariable(name string, variable *Variable) {
@@ -61,6 +74,15 @@ func (interpreter *Interpreter) Interpret() (err error) {
 			}
 		}
 	}()
+
+	// pre-declare empty variables for all structure and function declarations
+	for _, declaration := range interpreter.Program.StructureDeclarations() {
+		interpreter.declareVariable(declaration.Identifier, nil)
+	}
+
+	for _, declaration := range interpreter.Program.FunctionDeclarations() {
+		interpreter.declareVariable(declaration.Identifier, nil)
+	}
 
 	Run(More(func() Trampoline {
 		return interpreter.visitProgramDeclarations()
@@ -201,19 +223,18 @@ func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 
+	identifier := declaration.Identifier
+
+	variable := interpreter.findOrDeclareVariable(identifier)
+
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
 	// make the function itself available inside the function
-	variable := &Variable{}
-
-	lexicalScope = lexicalScope.Insert(common.StringKey(declaration.Identifier), variable)
+	lexicalScope = lexicalScope.Insert(common.StringKey(identifier), variable)
 
 	functionExpression := declaration.ToExpression()
 	variable.Value = newInterpretedFunction(functionExpression, lexicalScope)
-
-	// declare the function in the current scope
-	interpreter.setVariable(declaration.Identifier, variable)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
@@ -902,16 +923,14 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 }
 
 func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.StructureDeclaration) ast.Repr {
-	constructorVariable := interpreter.structureConstructorVariable(declaration)
 
-	// declare the constructor in the current scope
-	interpreter.setVariable(declaration.Identifier, constructorVariable)
+	interpreter.declareStructureConstructor(declaration)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-// structureConstructorVariable creates a constructor function
+// declareStructureConstructor creates a constructor function
 // for the given structure, bound in a variable.
 //
 // The constructor is a host function which creates a new structure,
@@ -921,12 +940,12 @@ func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.Struc
 // Inside the initializer and all functions, `self` is bound to
 // the new structure value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.StructureDeclaration) *Variable {
+func (interpreter *Interpreter) declareStructureConstructor(declaration *ast.StructureDeclaration) {
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	constructorVariable := &Variable{}
+	constructorVariable := interpreter.findOrDeclareVariable(declaration.Identifier)
 
 	// make the constructor available in the initializer
 	lexicalScope = lexicalScope.
@@ -978,8 +997,6 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 				})
 		},
 	)
-
-	return constructorVariable
 }
 
 // invokeStructureFunction calls the given function with the values.
