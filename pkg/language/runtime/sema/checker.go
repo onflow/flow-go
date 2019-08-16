@@ -1926,6 +1926,7 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		structureType,
 		structure.Identifier,
 		structureType.ConstructorParameterTypes,
+		initializerKindStructure,
 	)
 
 	if structureType != nil {
@@ -1951,11 +1952,14 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 		temporaryStructureType,
 	)
 
-	structureType := checker.structureType(structure)
+	members := checker.members(structure.Fields, structure.Functions)
 
-	if structureType != nil {
-		*temporaryStructureType = *structureType
+	structureType := &StructureType{
+		Identifier: structure.Identifier,
+		Members:    members,
 	}
+
+	*temporaryStructureType = *structureType
 
 	checker.StructureDeclarationTypes[structure] = structureType
 
@@ -1969,9 +1973,7 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 
 	checker.declareStructureConstructor(structure, structureType, parameterTypes)
 
-	if structureType != nil {
-		structureType.ConstructorParameterTypes = parameterTypes
-	}
+	structureType.ConstructorParameterTypes = parameterTypes
 }
 
 // TODO: very simple field initialization check for now.
@@ -2029,15 +2031,18 @@ func (checker *Checker) declareStructureConstructor(
 	)
 }
 
-func (checker *Checker) structureType(structure *ast.StructureDeclaration) *StructureType {
+func (checker *Checker) members(
+	fields []*ast.FieldDeclaration,
+	functions []*ast.FunctionDeclaration,
+) map[string]*Member {
 
-	fieldCount := len(structure.Fields)
-	functionCount := len(structure.Functions)
+	fieldCount := len(fields)
+	functionCount := len(functions)
 
 	members := make(map[string]*Member, fieldCount+functionCount)
 
 	// declare a member for each field
-	for _, field := range structure.Fields {
+	for _, field := range fields {
 		fieldType := checker.ConvertType(field.Type)
 
 		members[field.Identifier] = &Member{
@@ -2046,6 +2051,7 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) *Stru
 			IsInitialized: false,
 		}
 
+		// TODO: don't report for interfaces
 		if field.VariableKind == ast.VariableKindNotSpecified {
 			checker.report(
 				&InvalidVariableKindError{
@@ -2058,7 +2064,7 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) *Stru
 	}
 
 	// declare a member for each function
-	for _, function := range structure.Functions {
+	for _, function := range functions {
 		functionType := checker.functionType(function.Parameters, function.ReturnType)
 
 		argumentLabels := checker.argumentLabels(function.Parameters)
@@ -2071,10 +2077,7 @@ func (checker *Checker) structureType(structure *ast.StructureDeclaration) *Stru
 		}
 	}
 
-	return &StructureType{
-		Identifier: structure.Identifier,
-		Members:    members,
-	}
+	return members
 }
 
 func (checker *Checker) checkInitializer(
@@ -2083,10 +2086,11 @@ func (checker *Checker) checkInitializer(
 	ty Type,
 	typeIdentifier string,
 	constructorParameterTypes []Type,
+	kind initializerKind,
 ) {
 	if initializer == nil {
-		// no initializer but fields?
-		if len(fields) > 0 {
+		// no initializer, inside a structure, but fields?
+		if kind != initializerKindInterface && len(fields) > 0 {
 			firstField := fields[0]
 
 			// structure has fields, but no initializer
