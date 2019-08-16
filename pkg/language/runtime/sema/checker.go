@@ -393,7 +393,31 @@ func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameter
 }
 
 func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclaration) ast.Repr {
+	checker.visitVariableDeclaration(declaration, false)
+	return nil
+}
+
+func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclaration, isOptionalBinding bool) {
 	valueType := declaration.Value.Accept(checker).(Type)
+
+	// if the variable declaration is a optional binding, the value must be optional
+
+	var valueIsOptional bool
+	var optionalValueType *OptionalType
+
+	if isOptionalBinding {
+		optionalValueType, valueIsOptional = valueType.(*OptionalType)
+		if !valueIsOptional {
+			checker.report(
+				&TypeMismatchError{
+					ExpectedType: &OptionalType{},
+					ActualType:   valueType,
+					StartPos:     declaration.Value.StartPosition(),
+					EndPos:       declaration.Value.EndPosition(),
+				},
+			)
+		}
+	}
 
 	declarationType := valueType
 
@@ -402,20 +426,36 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		declarationType = checker.ConvertType(declaration.Type)
 
 		// check the value type is a subtype of the declaration type
-		if declarationType != nil &&
-			valueType != nil &&
-			!valueType.Equal(&InvalidType{}) &&
-			!checker.IsSubType(valueType, declarationType) {
+		if declarationType != nil && valueType != nil && !valueType.Equal(&InvalidType{}) {
 
-			checker.report(
-				&TypeMismatchError{
-					ExpectedType: declarationType,
-					ActualType:   valueType,
-					StartPos:     declaration.Value.StartPosition(),
-					EndPos:       declaration.Value.EndPosition(),
-				},
-			)
+			if isOptionalBinding {
+				if optionalValueType != nil &&
+					!checker.IsSubType(optionalValueType.Type, declarationType) {
+
+					checker.report(
+						&TypeMismatchError{
+							ExpectedType: declarationType,
+							ActualType:   valueType,
+							StartPos:     declaration.Value.StartPosition(),
+							EndPos:       declaration.Value.EndPosition(),
+						},
+					)
+				}
+			} else {
+				if !checker.IsSubType(valueType, declarationType) {
+					checker.report(
+						&TypeMismatchError{
+							ExpectedType: declarationType,
+							ActualType:   valueType,
+							StartPos:     declaration.Value.StartPosition(),
+							EndPos:       declaration.Value.EndPosition(),
+						},
+					)
+				}
+			}
 		}
+	} else if isOptionalBinding && optionalValueType != nil {
+		declarationType = optionalValueType.Type
 	}
 
 	checker.VariableDeclarationValueTypes[declaration] = declarationType
@@ -428,8 +468,6 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		declaration.IsConstant,
 		nil,
 	)
-
-	return nil
 }
 
 func (checker *Checker) declareVariable(
@@ -699,6 +737,8 @@ func (checker *Checker) VisitContinueStatement(statement *ast.ContinueStatement)
 
 func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 
+	thenElement := statement.Then
+
 	var elseElement ast.Element = ast.NotAnElement{}
 	if statement.Else != nil {
 		elseElement = statement.Else
@@ -706,9 +746,19 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 
 	switch test := statement.Test.(type) {
 	case ast.Expression:
-		checker.visitConditional(test, statement.Then, elseElement)
+		checker.visitConditional(test, thenElement, elseElement)
+
 	case *ast.VariableDeclaration:
-		// TODO:
+		func() {
+			checker.pushActivations()
+			defer checker.popActivations()
+
+			checker.visitVariableDeclaration(test, true)
+
+			thenElement.Accept(checker)
+		}()
+
+		elseElement.Accept(checker)
 
 	default:
 		panic(&errors.UnreachableError{})
