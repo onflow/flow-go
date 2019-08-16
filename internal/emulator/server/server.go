@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"time"
 
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
@@ -19,6 +21,7 @@ import (
 // The server wraps the Emulator Core Library with the Observation gRPC interface.
 type EmulatorServer struct {
 	blockchain *core.EmulatedBlockchain
+	grpcServer *grpc.Server
 	config     *Config
 	logger     *log.Logger
 }
@@ -26,16 +29,21 @@ type EmulatorServer struct {
 // Config for the EmulatorServer configuration settings.
 type Config struct {
 	Port          int           `default:"5000"`
+	WrappedPort   int           `default:"9090"`
 	BlockInterval time.Duration `default:"5s"`
 }
 
 // NewEmulatorServer creates a new instance of a Bamboo Emulator server.
 func NewEmulatorServer(logger *log.Logger, config *Config) *EmulatorServer {
-	return &EmulatorServer{
+	server := &EmulatorServer{
 		blockchain: core.NewEmulatedBlockchain(core.DefaultOptions),
+		grpcServer: grpc.NewServer(),
 		config:     config,
 		logger:     logger,
 	}
+
+	observe.RegisterObserveServiceServer(server.grpcServer, server)
+	return server
 }
 
 // Start spins up the Bamboo Emulator server instance.
@@ -74,16 +82,30 @@ func (s *EmulatorServer) startGrpcServer() {
 		s.logger.WithError(err).Fatal("Failed to listen")
 	}
 
-	grpcServer := grpc.NewServer()
-	observe.RegisterObserveServiceServer(grpcServer, s)
-	grpcServer.Serve(lis)
+	s.grpcServer.Serve(lis)
 }
 
-// StartServer sets up an instance of the Bamboo Emulator server and starts it.
+// StartServer sets up a wrapped instance of the Bamboo Emulator server and starts it.
 func StartServer(logger *log.Logger, config *Config) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	emulatorServer := NewEmulatorServer(logger, config)
-	emulatorServer.Start(ctx)
+	go emulatorServer.Start(ctx)
+
+	wrappedServer := grpcweb.WrapServer(emulatorServer.grpcServer)
+	handler := func(resp http.ResponseWriter, req *http.Request) {
+		wrappedServer.ServeHTTP(resp, req)
+	}
+
+	httpServer := http.Server{
+		Addr:    fmt.Sprintf(":%d", config.WrappedPort),
+		Handler: http.HandlerFunc(handler),
+	}
+
+	logger.Debugf("Starting server. http port: %d", config.WrappedPort)
+
+	if err := httpServer.ListenAndServe(); err != nil {
+		logger.Fatalf("failed starting http server: %v", err)
+	}
 }
