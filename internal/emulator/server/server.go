@@ -79,7 +79,7 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 func (s *EmulatorServer) startGrpcServer() {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.Port))
 	if err != nil {
-		s.logger.WithError(err).Fatal("Failed to listen")
+		s.logger.WithError(err).Fatal("☠️  Failed to start Emulator Server")
 	}
 
 	s.grpcServer.Serve(lis)
@@ -103,9 +103,11 @@ func StartServer(logger *log.Logger, config *Config) {
 		Handler: http.HandlerFunc(handler),
 	}
 
-	logger.Debugf("Starting server. http port: %d", config.WrappedPort)
+	logger.
+		WithField("port", config.WrappedPort).
+		Debugf("🏁  Starting HTTP Server on port %d...", config.WrappedPort)
 
 	if err := httpServer.ListenAndServe(); err != nil {
-		logger.Fatalf("failed starting http server: %v", err)
+		logger.WithError(err).Fatal("☠️  Failed to start HTTP Server")
 	}
 }

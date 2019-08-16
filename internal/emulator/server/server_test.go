@@ -3,11 +3,12 @@ package server
 import (
 	"testing"
 	"time"
-	
+
 	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
 )
 
+// TODO: improve (currently a utility to run EmulatorServer)
 func TestWrappedServer(t *testing.T) {
 	RegisterTestingT(t)
 
