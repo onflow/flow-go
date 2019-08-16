@@ -135,6 +135,24 @@ func TestCheckInvalidLocalRedeclaration(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
+func TestCheckInvalidLocalFunctionRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test() {
+            let x = true
+
+            fun y() {}
+            fun y() {}
+        }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
 func TestCheckInvalidUnknownDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -148,8 +166,9 @@ func TestCheckInvalidUnknownDeclaration(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+		To(BeAssignableToTypeOf(&sema.InvalidReturnValueError{}))
 }
 
 func TestCheckInvalidUnknownDeclarationInGlobal(t *testing.T) {
@@ -196,13 +215,10 @@ func TestCheckInvalidUnknownDeclarationCallInGlobal(t *testing.T) {
        let x = y()
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }
 
 func TestCheckInvalidUnknownDeclarationAssignment(t *testing.T) {
@@ -364,7 +380,7 @@ func TestCheckInvalidArrayIndexingIntoBool(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int64 {
+      fun test(): Int {
           return true[0]
       }
 	`)
@@ -379,7 +395,7 @@ func TestCheckInvalidArrayIndexingIntoInteger(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int64 {
+      fun test(): Int {
           return 2[0]
       }
 	`)
@@ -445,13 +461,10 @@ func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
 }
 
 func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
@@ -463,13 +476,10 @@ func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
 }
 
 func TestCheckInvalidParameterTypes(t *testing.T) {
@@ -960,7 +970,7 @@ func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int32 {
+      fun test(): Int {
           return 2()
       }
 	`)
@@ -1867,13 +1877,10 @@ func TestCheckInvalidStructureFunctionCall(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }
 
 func TestCheckInvalidStructureFunctionAssignment(t *testing.T) {
@@ -1942,6 +1949,20 @@ func TestCheckInvalidStructureRedeclaration(t *testing.T) {
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 
+}
+
+func TestCheckInvalidForwardReference(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x = y
+      let y = x
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 }
 
 func TestCheckInvalidIncompatibleStructureTypes(t *testing.T) {
@@ -2165,7 +2186,7 @@ func TestCheckInvalidFunctionPreConditionReference(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 4)
+	errs := expectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -2173,15 +2194,9 @@ func TestCheckInvalidFunctionPreConditionReference(t *testing.T) {
 		To(Equal("y"))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
-
-	Expect(errs[2]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
-	Expect(errs[2].(*sema.NotDeclaredError).Name).
+	Expect(errs[1].(*sema.NotDeclaredError).Name).
 		To(Equal("z"))
-
-	Expect(errs[3]).
-		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
 }
 
 func TestCheckInvalidFunctionNonBoolCondition(t *testing.T) {
@@ -2222,6 +2237,27 @@ func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckInvalidFunctionPostConditionWithBeforeAndNoArgument(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int) {
+          post {
+              before() != 0
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+
+}
+
 func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -2233,15 +2269,12 @@ func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 	Expect(errs[0].(*sema.NotDeclaredError).Name).
 		To(Equal("before"))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }
 
 func TestCheckInvalidFunctionWithBeforeVariableAndPostConditionWithBefore(t *testing.T) {
@@ -2304,15 +2337,12 @@ func TestCheckInvalidFunctionPreConditionWithResult(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 	Expect(errs[0].(*sema.NotDeclaredError).Name).
 		To(Equal("result"))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
 }
 
 func TestCheckInvalidFunctionPostConditionWithResultWrongType(t *testing.T) {
@@ -2360,15 +2390,12 @@ func TestCheckInvalidFunctionPostConditionWithResult(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 	Expect(errs[0].(*sema.NotDeclaredError).Name).
 		To(Equal("result"))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
 }
 
 func TestCheckFunctionWithoutReturnTypeAndLocalResultAndPostConditionWithResult(t *testing.T) {
@@ -2453,4 +2480,126 @@ func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.FunctionExpressionInConditionError{}))
+}
+
+func TestCheckFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          post {
+             1 == 2: "nope"
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidFunctionPostConditionWithMessageUsingBooleanLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          post {
+             1 == 2: true
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckFunctionPostConditionWithMessageUsingResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): String {
+          post {
+             1 == 2: result
+          }
+          return ""
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: String) {
+          post {
+             1 == 2: before(x)
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: String) {
+          post {
+             1 == 2: x
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckMutuallyRecursiveFunctions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun isEven(_ n: Int): Bool {
+          if n == 0 {
+              return true
+          }
+          return isOdd(n - 1)
+      }
+
+      fun isOdd(_ n: Int): Bool {
+          if n == 0 {
+              return false
+          }
+          return isEven(n - 1)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckReferenceBeforeDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      var tests = 0
+
+      fun test(): Test {
+          return Test()
+      }
+
+      struct Test {
+         init() {
+             tests = tests + 1
+         }
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 }

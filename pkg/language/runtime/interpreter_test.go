@@ -930,7 +930,7 @@ func TestInterpretHostFunction(t *testing.T) {
 
 	inter := interpreter.NewInterpreter(program)
 
-	testFunction := interpreter.NewHostFunction(
+	testFunction := interpreter.NewHostFunctionValue(
 		&sema.FunctionType{
 			ParameterTypes: []sema.Type{
 				&sema.IntType{},
@@ -938,7 +938,7 @@ func TestInterpretHostFunction(t *testing.T) {
 			},
 			ReturnType: &sema.IntType{},
 		},
-		func(inter *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
+		func(inter *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int
 			b := arguments[1].(interpreter.IntValue).Int
 			value := big.NewInt(0).Add(a, b)
@@ -947,8 +947,11 @@ func TestInterpretHostFunction(t *testing.T) {
 		},
 	)
 
-	inter.ImportFunction("test", testFunction)
-	err := inter.Interpret()
+	err := inter.ImportFunction("test", testFunction)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	err = inter.Interpret()
 	Expect(err).
 		To(Not(HaveOccurred()))
 
@@ -1402,6 +1405,96 @@ func TestInterpretFunctionPostConditionWithBeforeFailingPostCondition(t *testing
 		To(Equal(ast.ConditionKindPost))
 }
 
+func TestInterpretFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int): Int {
+          post {
+              y == 0: "y should be zero"
+          }
+          let y = x
+          return y
+      }
+	`)
+
+	_, err := inter.Invoke("test", big.NewInt(42))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("y should be zero"))
+
+	zero := big.NewInt(0)
+	Expect(inter.Invoke("test", zero)).
+		To(Equal(interpreter.IntValue{Int: zero}))
+}
+
+func TestInterpretFunctionPostConditionWithMessageUsingResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int): String {
+          post {
+              y == 0: result
+          }
+          let y = x
+          return "return value"
+      }
+	`)
+
+	_, err := inter.Invoke("test", big.NewInt(42))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("return value"))
+
+	zero := big.NewInt(0)
+	Expect(inter.Invoke("test", zero)).
+		To(Equal(interpreter.StringValue("return value")))
+}
+
+func TestInterpretFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: String): String {
+          post {
+              1 == 2: before(x)
+          }
+          return "return value"
+      }
+	`)
+
+	_, err := inter.Invoke("test", "parameter value")
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("parameter value"))
+}
+
+func TestInterpretFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: String): String {
+          post {
+              1 == 2: x
+          }
+          return "return value"
+      }
+	`)
+
+	_, err := inter.Invoke("test", "parameter value")
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("parameter value"))
+}
+
 func TestInterpretStructCopyOnDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1576,4 +1669,65 @@ func TestInterpretStructCopyOnPassing(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretMutuallyRecursiveFunctions(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun isEven(_ n: Int): Bool {
+          if n == 0 {
+              return true
+          }
+          return isOdd(n - 1)
+      }
+
+      fun isOdd(_ n: Int): Bool {
+          if n == 0 {
+              return false
+          }
+          return isEven(n - 1)
+      }
+    `)
+
+	four := big.NewInt(4)
+
+	Expect(inter.Invoke("isEven", four)).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Invoke("isOdd", four)).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var tests = 0
+
+      fun test(): Test {
+          return Test()
+      }
+
+      struct Test {
+         init() {
+             tests = tests + 1
+         }
+      }
+    `)
+
+	Expect(inter.Globals["tests"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+
+	Expect(inter.Invoke("test")).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+
+	Expect(inter.Globals["tests"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+
+	Expect(inter.Invoke("test")).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+
+	Expect(inter.Globals["tests"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
 }

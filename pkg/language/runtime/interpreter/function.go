@@ -13,7 +13,7 @@ import (
 type FunctionValue interface {
 	Value
 	isFunctionValue()
-	invoke(interpreter *Interpreter, arguments []Value) Trampoline
+	invoke(interpreter *Interpreter, arguments []Value, position ast.Position) Trampoline
 	parameterCount() int
 }
 
@@ -39,7 +39,7 @@ func newInterpretedFunction(expression *ast.FunctionExpression, activation hamt.
 	}
 }
 
-func (f InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
+func (f InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []Value, _ ast.Position) Trampoline {
 	return interpreter.invokeInterpretedFunction(f, arguments)
 }
 
@@ -49,9 +49,11 @@ func (f InterpretedFunctionValue) parameterCount() int {
 
 // HostFunctionValue
 
+type HostFunction func(interpreter *Interpreter, arguments []Value, position ast.Position) Trampoline
+
 type HostFunctionValue struct {
-	functionType *sema.FunctionType
-	function     func(*Interpreter, []Value) Trampoline
+	Type     *sema.FunctionType
+	Function HostFunction
 }
 
 func (HostFunctionValue) isValue() {}
@@ -62,52 +64,52 @@ func (f HostFunctionValue) Copy() Value {
 
 func (HostFunctionValue) isFunctionValue() {}
 
-func (f HostFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
-	return f.function(interpreter, arguments)
+func (f HostFunctionValue) invoke(interpreter *Interpreter, arguments []Value, position ast.Position) Trampoline {
+	return f.Function(interpreter, arguments, position)
 }
 
 func (f HostFunctionValue) parameterCount() int {
-	return len(f.functionType.ParameterTypes)
+	return len(f.Type.ParameterTypes)
 }
 
-func NewHostFunction(
+func NewHostFunctionValue(
 	functionType *sema.FunctionType,
-	function func(*Interpreter, []Value) Trampoline,
+	function HostFunction,
 ) HostFunctionValue {
 	return HostFunctionValue{
-		functionType: functionType,
-		function:     function,
+		Type:     functionType,
+		Function: function,
 	}
 }
 
-// StructFunctionValue
+// StructureFunctionValue
 
-type StructFunctionValue struct {
+type StructureFunctionValue struct {
 	function  InterpretedFunctionValue
 	structure StructureValue
 }
 
-func (*StructFunctionValue) isValue() {}
+func (*StructureFunctionValue) isValue() {}
 
-func (*StructFunctionValue) isFunctionValue() {}
+func (*StructureFunctionValue) isFunctionValue() {}
 
-func (f *StructFunctionValue) parameterCount() int {
+func (f *StructureFunctionValue) parameterCount() int {
 	// TODO:
 	return 0
 }
 
-func (f *StructFunctionValue) Copy() Value {
+func (f *StructureFunctionValue) Copy() Value {
 	functionCopy := *f
 	return &functionCopy
 }
 
-func (f *StructFunctionValue) CopyWithStructure(structure StructureValue) *StructFunctionValue {
+func (f *StructureFunctionValue) CopyWithStructure(structure StructureValue) *StructureFunctionValue {
 	functionCopy := *f
 	functionCopy.structure = structure
 	return &functionCopy
 }
 
-func (f *StructFunctionValue) invoke(interpreter *Interpreter, arguments []Value) Trampoline {
+func (f *StructureFunctionValue) invoke(interpreter *Interpreter, arguments []Value, _ ast.Position) Trampoline {
 	return interpreter.invokeStructureFunction(
 		f.function,
 		arguments,
@@ -118,8 +120,8 @@ func (f *StructFunctionValue) invoke(interpreter *Interpreter, arguments []Value
 func NewStructFunction(
 	function InterpretedFunctionValue,
 	structure StructureValue,
-) *StructFunctionValue {
-	return &StructFunctionValue{
+) *StructureFunctionValue {
+	return &StructureFunctionValue{
 		function,
 		structure,
 	}

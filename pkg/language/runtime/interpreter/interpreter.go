@@ -38,7 +38,20 @@ func NewInterpreter(program *ast.Program) *Interpreter {
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
-	return interpreter.activations.Find(name).(*Variable)
+	result := interpreter.activations.Find(name)
+	if result == nil {
+		return nil
+	}
+	return result.(*Variable)
+}
+
+func (interpreter *Interpreter) findOrDeclareVariable(name string) *Variable {
+	variable := interpreter.findVariable(name)
+	if variable == nil {
+		variable = &Variable{}
+		interpreter.setVariable(name, variable)
+	}
+	return variable
 }
 
 func (interpreter *Interpreter) setVariable(name string, variable *Variable) {
@@ -61,6 +74,15 @@ func (interpreter *Interpreter) Interpret() (err error) {
 			}
 		}
 	}()
+
+	// pre-declare empty variables for all structure and function declarations
+	for _, declaration := range interpreter.Program.StructureDeclarations() {
+		interpreter.declareVariable(declaration.Identifier, nil)
+	}
+
+	for _, declaration := range interpreter.Program.FunctionDeclarations() {
+		interpreter.declareVariable(declaration.Identifier, nil)
+	}
 
 	Run(More(func() Trampoline {
 		return interpreter.visitProgramDeclarations()
@@ -104,7 +126,7 @@ func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }
 
-func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value Value, err error) {
+func (interpreter *Interpreter) Invoke(functionName string, arguments ...interface{}) (value Value, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
 		return nil, &NotDeclaredError{
@@ -122,7 +144,8 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 		}
 	}
 
-	arguments, err := ToValues(inputs)
+	var argumentValues []Value
+	argumentValues, err = ToValues(arguments)
 	if err != nil {
 		return nil, err
 	}
@@ -146,16 +169,29 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 	// ensures the invocation's argument count matches the function's parameter count
 
 	parameterCount := function.parameterCount()
-	argumentCount := len(arguments)
+	argumentCount := len(argumentValues)
 
 	if argumentCount != parameterCount {
-		return nil, &ArgumentCountError{
-			ParameterCount: parameterCount,
-			ArgumentCount:  argumentCount,
+
+		var functionType *sema.FunctionType
+
+		if hostFunction, ok := function.(HostFunctionValue); ok {
+			functionType = hostFunction.Type
+		}
+
+		// TODO: improve
+		if functionType == nil ||
+			(functionType.RequiredArgumentCount == nil ||
+				argumentCount < *functionType.RequiredArgumentCount) {
+
+			return nil, &ArgumentCountError{
+				ParameterCount: parameterCount,
+				ArgumentCount:  argumentCount,
+			}
 		}
 	}
 
-	result := Run(function.invoke(interpreter, arguments))
+	result := Run(function.invoke(interpreter, argumentValues, ast.Position{}))
 	if result == nil {
 		return nil, nil
 	}
@@ -187,26 +223,33 @@ func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 
+	identifier := declaration.Identifier
+
+	variable := interpreter.findOrDeclareVariable(identifier)
+
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
 	// make the function itself available inside the function
-	variable := &Variable{}
-
-	lexicalScope = lexicalScope.Insert(common.StringKey(declaration.Identifier), variable)
+	lexicalScope = lexicalScope.Insert(common.StringKey(identifier), variable)
 
 	functionExpression := declaration.ToExpression()
 	variable.Value = newInterpretedFunction(functionExpression, lexicalScope)
-
-	// declare the function in the current scope
-	interpreter.setVariable(declaration.Identifier, variable)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-func (interpreter *Interpreter) ImportFunction(name string, function HostFunctionValue) {
-	interpreter.declareVariable(name, function)
+func (interpreter *Interpreter) ImportFunction(name string, function HostFunctionValue) error {
+	if _, ok := interpreter.Globals[name]; ok {
+		return &RedeclarationError{
+			Name: name,
+		}
+	}
+
+	variable := interpreter.declareVariable(name, function)
+	interpreter.Globals[name] = variable
+	return nil
 }
 
 func (interpreter *Interpreter) VisitBlock(block *ast.Block) ast.Repr {
@@ -296,9 +339,28 @@ func (interpreter *Interpreter) rewritePostConditions(functionBlock *ast.Functio
 	rewrittenPostConditions = make([]*ast.Condition, len(functionBlock.PostConditions))
 
 	for i, postCondition := range functionBlock.PostConditions {
-		extraction := beforeExtractor.ExtractBefore(postCondition.Expression)
 
-		for _, extractedExpression := range extraction.ExtractedExpressions {
+		// copy condition and set expression to rewritten one
+		newPostCondition := *postCondition
+
+		testExtraction := beforeExtractor.ExtractBefore(postCondition.Test)
+
+		extractedExpressions := testExtraction.ExtractedExpressions
+
+		newPostCondition.Test = testExtraction.RewrittenExpression
+
+		if postCondition.Message != nil {
+			messageExtraction := beforeExtractor.ExtractBefore(postCondition.Message)
+
+			newPostCondition.Message = messageExtraction.RewrittenExpression
+
+			extractedExpressions = append(
+				extractedExpressions,
+				messageExtraction.ExtractedExpressions...,
+			)
+		}
+
+		for _, extractedExpression := range extractedExpressions {
 
 			beforeStatements = append(beforeStatements,
 				&ast.VariableDeclaration{
@@ -307,10 +369,6 @@ func (interpreter *Interpreter) rewritePostConditions(functionBlock *ast.Functio
 				},
 			)
 		}
-
-		// copy condition and set expression to rewritten one
-		newPostCondition := *postCondition
-		newPostCondition.Expression = extraction.RewrittenExpression
 
 		rewrittenPostConditions[i] = &newPostCondition
 	}
@@ -333,11 +391,26 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 			result := value.(BoolValue)
 
 			if !result {
-				panic(&ConditionError{
-					ConditionKind: condition.Kind,
-					StartPos:      condition.Expression.StartPosition(),
-					EndPos:        condition.Expression.EndPosition(),
-				})
+
+				var messageTrampoline Trampoline
+
+				if condition.Message == nil {
+					messageTrampoline = Done{Result: StringValue("")}
+				} else {
+					messageTrampoline = condition.Message.Accept(interpreter).(Trampoline)
+				}
+
+				return messageTrampoline.
+					Then(func(result interface{}) {
+						message := string(result.(StringValue))
+
+						panic(&ConditionError{
+							ConditionKind: condition.Kind,
+							Message:       message,
+							StartPos:      condition.Test.StartPosition(),
+							EndPos:        condition.Test.EndPosition(),
+						})
+					})
 			}
 
 			return interpreter.visitConditions(conditions[1:])
@@ -345,7 +418,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 }
 
 func (interpreter *Interpreter) VisitCondition(condition *ast.Condition) ast.Repr {
-	return condition.Expression.Accept(interpreter)
+	return condition.Test.Accept(interpreter)
 }
 
 func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
@@ -424,11 +497,11 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 		})
 }
 
-func (interpreter *Interpreter) declareVariable(identifier string, value Value) {
+func (interpreter *Interpreter) declareVariable(identifier string, value Value) *Variable {
 	// NOTE: semantic analysis already checked possible invalid redeclaration
-	interpreter.setVariable(identifier, &Variable{
-		Value: value,
-	})
+	variable := &Variable{Value: value}
+	interpreter.setVariable(identifier, variable)
+	return variable
 }
 
 func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
@@ -768,7 +841,11 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 
 					argumentCopies := arguments.Copy().(ArrayValue)
 
-					return function.invoke(interpreter, argumentCopies)
+					return function.invoke(
+						interpreter,
+						argumentCopies,
+						invocationExpression.StartPosition(),
+					)
 				})
 		})
 }
@@ -846,16 +923,14 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 }
 
 func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.StructureDeclaration) ast.Repr {
-	constructorVariable := interpreter.structureConstructorVariable(declaration)
 
-	// declare the constructor in the current scope
-	interpreter.setVariable(declaration.Identifier, constructorVariable)
+	interpreter.declareStructureConstructor(declaration)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-// structureConstructorVariable creates a constructor function
+// declareStructureConstructor creates a constructor function
 // for the given structure, bound in a variable.
 //
 // The constructor is a host function which creates a new structure,
@@ -865,12 +940,12 @@ func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.Struc
 // Inside the initializer and all functions, `self` is bound to
 // the new structure value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.StructureDeclaration) *Variable {
+func (interpreter *Interpreter) declareStructureConstructor(declaration *ast.StructureDeclaration) {
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	constructorVariable := &Variable{}
+	constructorVariable := interpreter.findOrDeclareVariable(declaration.Identifier)
 
 	// make the constructor available in the initializer
 	lexicalScope = lexicalScope.
@@ -888,9 +963,9 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 	functions := interpreter.structureFunctions(declaration, lexicalScope)
 
 	// TODO: function type
-	constructorVariable.Value = NewHostFunction(
+	constructorVariable.Value = NewHostFunctionValue(
 		nil,
-		func(interpreter *Interpreter, values []Value) Trampoline {
+		func(interpreter *Interpreter, values []Value, position ast.Position) Trampoline {
 			structure := StructureValue{}
 
 			for name, function := range functions {
@@ -922,8 +997,6 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 				})
 		},
 	)
-
-	return constructorVariable
 }
 
 // invokeStructureFunction calls the given function with the values.
