@@ -4,8 +4,7 @@ import (
 	goecdsa "crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-
-	//"crypto/rand"
+	"math/big"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -38,18 +37,18 @@ func (a *ECDSAalgo) SignHash(sk PrKey, h Hash) Signature {
 	for ; i < Nlen-len(rBytes); i++ {
 		signature[i] = 0
 	}
-	copy(signature[i:], rBytes)
+	i += copy(signature[i:], rBytes)
 	for ; i < 2*Nlen-len(sBytes); i++ {
 		signature[i] = 0
 	}
-	copy(signature[i:], rBytes)
+	copy(signature[i:], sBytes)
 	return signature
 }
 
 // SignBytes signs an array of bytes
 func (a *ECDSAalgo) SignBytes(sk PrKey, data []byte, alg Hasher) Signature {
 	if alg == nil {
-		log.Error("SignStruct requires a Hasher")
+		log.Error("SignBytes requires a Hasher")
 	}
 	h := alg.ComputeBytesHash(data)
 	return a.SignHash(sk, h)
@@ -65,18 +64,36 @@ func (a *ECDSAalgo) SignStruct(sk PrKey, data Encoder, alg Hasher) Signature {
 }
 
 // VerifyHash implements ECDSA signature verification
-func (a *ECDSAalgo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
-	return true
+func (a *ECDSAalgo) VerifyHash(pk PubKey, sig Signature, h Hash) bool {
+	ecdsaPk, ok := pk.(*PubKeyECDSA)
+	if ok == false {
+		log.Error("ECDSA signature verification can only be called using an ECDSA public key")
+		return false
+	}
+	var r big.Int
+	var s big.Int
+	Nlen := ((a.curve.Params().N).BitLen() + 7) / 8
+	r.SetBytes(sig[:Nlen])
+	s.SetBytes(sig[Nlen:])
+	return goecdsa.Verify((*goecdsa.PublicKey)(ecdsaPk), h.Bytes(), &r, &s)
 }
 
 // VerifyBytes verifies a signature of a byte array
-func (a *ECDSAalgo) VerifyBytes(pk PubKey, s Signature, data []byte, alg Hasher) bool {
-	return true
+func (a *ECDSAalgo) VerifyBytes(pk PubKey, sig Signature, data []byte, alg Hasher) bool {
+	if alg == nil {
+		log.Error("VerifyBytes requires a Hasher")
+	}
+	h := alg.ComputeBytesHash(data)
+	return a.VerifyHash(pk, sig, h)
 }
 
 // VerifyStruct verifies a signature of a structure
-func (a *ECDSAalgo) VerifyStruct(pk PubKey, s Signature, data Encoder, alg Hasher) bool {
-	return true
+func (a *ECDSAalgo) VerifyStruct(pk PubKey, sig Signature, data Encoder, alg Hasher) bool {
+	if alg == nil {
+		log.Error("VerifyStruct requires a Hasher")
+	}
+	h := alg.ComputeStructHash(data)
+	return a.VerifyHash(pk, sig, h)
 }
 
 // GeneratePrKey generates a private key for ECDSA
@@ -109,12 +126,8 @@ func (sk *PrKeyECDSA) KeySize() int {
 
 // Pubkey returns the public key associated to the private key
 func (sk *PrKeyECDSA) Pubkey() PubKey {
-	pk, ok := (sk.goPrKey.Public()).(*PubKeyECDSA)
-	if ok == false {
-		log.Error("Please check the definition of PubKeyECDSA")
-		return nil
-	}
-	return pk
+	pk := sk.goPrKey.PublicKey
+	return (*PubKeyECDSA)(&pk)
 }
 
 // PubKeyECDSA is the public key of ECDSA, it implements PubKey
