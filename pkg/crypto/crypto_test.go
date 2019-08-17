@@ -3,7 +3,6 @@ package crypto
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"testing"
 )
 
@@ -19,7 +18,6 @@ func (struc *testStruct) Encode() []byte {
 
 // Sanity checks of SHA3_256
 func TestSha3_256(t *testing.T) {
-	fmt.Println("testing Sha3_256:")
 	input := []byte("test")
 	expected, _ := hex.DecodeString("36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80")
 
@@ -58,31 +56,130 @@ func BenchmarkSha3_256(b *testing.B) {
 
 // BLS tests
 func TestBLS_BLS12381(t *testing.T) {
-	fmt.Println("testing BLS on bls12_381:")
-	input := []byte("test")
-	halg := NewHashAlgo(SHA3_256)
-	h := halg.ComputeBytesHash(input)
-
 	salg := NewSignatureAlgo(BLS_BLS12381)
-	sk := salg.GeneratePrKey()
+	seed := []byte{1, 2, 3, 4}
+	sk := salg.GeneratePrKey(seed)
 	pk := sk.Pubkey()
 
-	s := salg.SignHash(sk, h)
-	result := salg.VerifyHash(pk, s, h)
+	input := []byte("test")
+
+	s := salg.SignBytes(sk, input, nil)
+	result := salg.VerifyBytes(pk, s, input, nil)
 
 	if result == false {
-		t.Errorf("Verification failed: signature is %s", s)
+		t.Errorf("BLS Verification failed: signature is %s", s)
 	} else {
-		t.Logf("Verification passed: signature is %s", s)
+		t.Logf("BLS Verification passed: signature is %s", s)
 	}
 
 	message := &testStruct{"te", "st"}
-	s = salg.SignStruct(sk, message, halg)
-	result = salg.VerifyStruct(pk, s, message, halg)
+	s = salg.SignStruct(sk, message, nil)
+	result = salg.VerifyStruct(pk, s, message, nil)
 
 	if result == false {
-		t.Errorf("Verification failed: signature is %x", s)
+		t.Errorf("BLS Verification failed: signature is %x", s)
 	} else {
-		t.Logf("Verification passed: signature is %x", s)
+		t.Logf("BLS Verification passed: signature is %x", s)
 	}
+}
+
+// TestG1 helps debugging but is not a unit test
+func TestG1(t *testing.T) {
+	_ = NewSignatureAlgo(BLS_BLS12381)
+
+	var expo scalar
+	randZr(&expo, []byte{0})
+	var res pointG1
+	_G1scalarGenMult(&res, &expo)
+
+}
+
+// G1 bench
+func BenchmarkG1(b *testing.B) {
+	_ = NewSignatureAlgo(BLS_BLS12381)
+	var expo scalar
+	randZr(&expo, []byte{0})
+	var res pointG1
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_G1scalarGenMult(&res, &expo)
+	}
+	b.StopTimer()
+	return
+}
+
+// TestG2 helps debugging but is not a unit test
+func TestG2(t *testing.T) {
+
+	_ = NewSignatureAlgo(BLS_BLS12381)
+
+	var expo scalar
+	(&expo).setInt(1)
+	var res pointG2
+	_G2scalarGenMult(&res, &expo)
+
+}
+
+// G2 bench
+func BenchmarkG2(b *testing.B) {
+	_ = NewSignatureAlgo(BLS_BLS12381)
+	var expo scalar
+	randZr(&expo, []byte{0})
+	var res pointG2
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_G2scalarGenMult(&res, &expo)
+	}
+	b.StopTimer()
+	return
+}
+
+// Signing bench
+func BenchmarkBLS_BLS12381Sign(b *testing.B) {
+
+	salg := NewSignatureAlgo(BLS_BLS12381)
+	seed := []byte("keyseed")
+	sk := salg.GeneratePrKey(seed)
+
+	input := []byte("Bench input")
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_ = salg.SignBytes(sk, input, nil)
+	}
+	b.StopTimer()
+	return
+}
+
+// Verifying bench
+func BenchmarkBLS_BLS12381Verify(b *testing.B) {
+	salg := NewSignatureAlgo(BLS_BLS12381)
+	seed := []byte("keyseed")
+	sk := salg.GeneratePrKey(seed)
+	pk := sk.Pubkey()
+
+	input := []byte("Bench input")
+
+	s := salg.SignBytes(sk, input, nil)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_ = salg.VerifyBytes(pk, s, input, nil)
+	}
+
+	b.StopTimer()
+	return
+}
+
+// Hashing to G1 bench
+func BenchmarkHashToG1(b *testing.B) {
+	input := []byte("Bench input")
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		hashToG1(input)
+	}
+	b.StopTimer()
+	return
 }
