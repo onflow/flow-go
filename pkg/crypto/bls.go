@@ -91,7 +91,7 @@ func (sk *PrKeyBLS_BLS12381) KeySize() int {
 	return prKeyLengthBLS_BLS12381
 }
 
-func (sk *PrKeyBLS_BLS12381) ComputePubKey() {
+func (sk *PrKeyBLS_BLS12381) computePubKey() {
 	var newPk PubKey_BLS_BLS12381
 	// compute public key pk = g2^sk
 	_G2scalarGenMult(&(newPk.point), &(sk.scalar))
@@ -102,7 +102,7 @@ func (sk *PrKeyBLS_BLS12381) Pubkey() PubKey {
 	if sk.pk != nil {
 		return sk.pk
 	}
-	sk.ComputePubKey()
+	sk.computePubKey()
 	return sk.pk
 }
 

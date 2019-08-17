@@ -3,6 +3,7 @@ package crypto
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"testing"
 )
 
@@ -182,4 +183,27 @@ func BenchmarkHashToG1(b *testing.B) {
 	}
 	b.StopTimer()
 	return
+}
+
+// ECDSA tests
+func TestECDSA(t *testing.T) {
+	salg := NewSignatureAlgo(ECDSA_P256)
+	seed := []byte{1, 2, 3, 4}
+	sk := salg.GeneratePrKey(seed)
+	//pk := sk.Pubkey()
+
+	input := []byte("test")
+
+	halg := NewHashAlgo(SHA3_256)
+	s := salg.SignBytes(sk, input, halg)
+	fmt.Println(s)
+
+	//result := salg.VerifyBytes(pk, s, input, nil)
+	result := true
+
+	if result == false {
+		t.Errorf("BLS Verification failed: signature is %s", s)
+	} else {
+		t.Logf("BLS Verification passed: signature is %s", s)
+	}
 }

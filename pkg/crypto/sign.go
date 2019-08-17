@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"crypto/elliptic"
 	"strconv"
 	"strings"
 
@@ -20,6 +21,18 @@ func NewSignatureAlgo(name AlgoName) Signer {
 		a.init()
 		return a
 	}
+
+	if name == ECDSA_P256 {
+		a := &(ECDSAalgo{
+			elliptic.P256(),
+			&SignAlgo{
+				name,
+				PrKeyLengthECDSA_P256,
+				PubKeyLengthECDSA_P256,
+				SignatureLengthECDSA_P256}})
+		return a
+	}
+
 	log.Errorf("the signature scheme %s is not supported.", name)
 	return nil
 }
@@ -87,8 +100,6 @@ type PrKey interface {
 	AlgoName() AlgoName
 	// return the size in bytes
 	KeySize() int
-	// computes the pub key associated with the private key
-	ComputePubKey()
 	// returns the public key
 	Pubkey() PubKey
 }
