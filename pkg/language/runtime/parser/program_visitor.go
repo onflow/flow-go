@@ -322,6 +322,16 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 		}
 	}
 
+	for _, optional := range ctx.optionals {
+		startPos := ast.PositionFromToken(optional)
+		endPos := ast.EndPosition(startPos, optional.GetStop())
+
+		result = &ast.OptionalType{
+			Type:   result,
+			EndPos: endPos,
+		}
+	}
+
 	return result
 }
 

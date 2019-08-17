@@ -23,6 +23,23 @@ func (t *NominalType) EndPosition() Position {
 	return t.Pos.Shifted(length - 1)
 }
 
+// OptionalType represents am optional variant of another type
+
+type OptionalType struct {
+	Type   Type
+	EndPos Position
+}
+
+func (*OptionalType) isType() {}
+
+func (t *OptionalType) StartPosition() Position {
+	return t.Type.StartPosition()
+}
+
+func (t *OptionalType) EndPosition() Position {
+	return t.EndPos
+}
+
 // VariableSizedType is a variable sized array type
 
 type VariableSizedType struct {

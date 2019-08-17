@@ -75,6 +75,25 @@ func (*InvalidType) Equal(other Type) bool {
 	return ok
 }
 
+// OptionalType represents the optional variant of another type
+type OptionalType struct {
+	Type Type
+}
+
+func (*OptionalType) isType() {}
+
+func (t *OptionalType) String() string {
+	return fmt.Sprintf("%s?", t.Type.String())
+}
+
+func (t *OptionalType) Equal(other Type) bool {
+	otherOptional, ok := other.(*OptionalType)
+	if !ok {
+		return false
+	}
+	return t.Type.Equal(otherOptional.Type)
+}
+
 // BoolType represents the boolean type
 type BoolType struct{}
 

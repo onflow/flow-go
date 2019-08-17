@@ -7,12 +7,15 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 )
 
 func TestAssert(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := interpreter.NewInterpreter(&ast.Program{})
+	program := &ast.Program{}
+	checker := sema.NewChecker(program)
+	inter := interpreter.NewInterpreter(checker)
 	for _, function := range BuiltIns {
 		Expect(inter.ImportFunction(function.Name, function.Function)).
 			To(Not(HaveOccurred()))
@@ -44,7 +47,8 @@ func TestAssert(t *testing.T) {
 func TestPanic(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := interpreter.NewInterpreter(&ast.Program{})
+	checker := sema.NewChecker(&ast.Program{})
+	inter := interpreter.NewInterpreter(checker)
 	for _, function := range BuiltIns {
 		Expect(inter.ImportFunction(function.Name, function.Function)).
 			To(Not(HaveOccurred()))

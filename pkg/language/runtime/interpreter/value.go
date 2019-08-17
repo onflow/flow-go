@@ -768,3 +768,17 @@ func (v TupleValue) Copy() Value {
 		Right: v.Right.Copy(),
 	}
 }
+
+// OptionalValue
+
+type OptionalValue struct {
+	Value Value
+}
+
+func (OptionalValue) isValue() {}
+
+func (v OptionalValue) Copy() Value {
+	return OptionalValue{
+		Value: v.Value.Copy(),
+	}
+}

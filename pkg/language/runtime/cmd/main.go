@@ -69,7 +69,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	inter := interpreter.NewInterpreter(program)
+	inter := interpreter.NewInterpreter(checker)
 	for _, function := range standardLibraryFunctions {
 		err = inter.ImportFunction(function.Name, function.Function)
 		if err != nil {

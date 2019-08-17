@@ -89,7 +89,7 @@ parameter
     ;
 
 fullType
-    : baseType typeDimension*
+    : baseType typeDimension* (optionals+='?')*
     ;
 
 typeDimension
