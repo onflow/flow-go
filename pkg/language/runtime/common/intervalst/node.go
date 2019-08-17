@@ -1,7 +1,5 @@
 package intervalst
 
-import "math"
-
 type node struct {
 	interval    Interval
 	value       interface{}
@@ -9,7 +7,7 @@ type node struct {
 	// size of subtree rooted at this node
 	n int
 	// max endpoint in subtree rooted at this node
-	max int
+	max Position
 }
 
 func newNode(interval Interval, value interface{}) *node {
@@ -28,9 +26,21 @@ func (n *node) size() int {
 	return n.n
 }
 
-func (n *node) Max() int {
+type MaxPosition struct{}
+
+func (MaxPosition) CompareTo(other Position) int {
+	_, ok := other.(MaxPosition)
+	if ok {
+		return 0
+	}
+	return 1
+}
+
+var maxPosition = MaxPosition{}
+
+func (n *node) Max() Position {
 	if n == nil {
-		return math.MaxInt64
+		return maxPosition
 	}
 
 	return n.max
@@ -45,11 +55,11 @@ func (n *node) fix() {
 	n.max = max3(n.interval.Max, n.left.Max(), n.right.Max())
 }
 
-func max3(a, b, c int) int {
-	if c > a && c > b {
+func max3(a, b, c Position) Position {
+	if c.CompareTo(a) > 0 && c.CompareTo(b) > 0 {
 		return c
 	}
-	if b > a && b > c {
+	if b.CompareTo(a) > 0 && b.CompareTo(c) > 0 {
 		return b
 	}
 	return a
@@ -86,10 +96,14 @@ func (n *node) Values() []interface{} {
 
 func (n *node) checkCount() bool {
 	return n == nil ||
-		(n.left.checkCount() && n.right.checkCount() && (n.n == 1+n.left.size()+n.right.size()))
+		(n.left.checkCount() && n.right.checkCount() &&
+			(n.n == 1+n.left.size()+n.right.size()))
 }
 
 func (n *node) checkMax() bool {
-	return n == nil ||
-		(n.max == max3(n.interval.Max, n.left.Max(), n.right.Max()))
+	if n == nil {
+		return true
+	}
+	actual := max3(n.interval.Max, n.left.Max(), n.right.Max())
+	return n.max.CompareTo(actual) == 0
 }

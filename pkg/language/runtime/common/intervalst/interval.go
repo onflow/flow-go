@@ -2,39 +2,45 @@ package intervalst
 
 import "fmt"
 
-type Interval struct {
-	Min, Max int
+type Position interface {
+	CompareTo(other Position) int
 }
 
-func NewInterval(min, max int) Interval {
-	if min > max {
-		panic("illegal interval")
+type Interval struct {
+	Min, Max Position
+}
+
+func NewInterval(min, max Position) Interval {
+	if min.CompareTo(max) > 0 {
+		panic("illegal interval: min > max")
 	}
 	return Interval{min, max}
 }
 
 func (i Interval) Intersects(other Interval) bool {
-	return !(other.Max < i.Min || i.Max < other.Min)
+	return !(other.Max.CompareTo(i.Min) == -1 ||
+		i.Max.CompareTo(other.Min) == -1)
 }
 
-func (i Interval) Contains(x int) bool {
-	return i.Min <= x && x <= i.Max
+func (i Interval) Contains(x Position) bool {
+	return i.Min.CompareTo(x) <= 0 &&
+		x.CompareTo(i.Max) <= 0
 }
 
 func (i Interval) CompareTo(other Interval) int {
-	if i.Min < other.Min {
+	if i.Min.CompareTo(other.Min) < 0 {
 		return -1
-	} else if i.Min > other.Min {
-		return +1
-	} else if i.Max < other.Max {
+	} else if i.Min.CompareTo(other.Min) > 0 {
+		return 1
+	} else if i.Max.CompareTo(other.Max) < 0 {
 		return -1
-	} else if i.Max > other.Max {
-		return +1
+	} else if i.Max.CompareTo(other.Max) > 0 {
+		return 1
 	} else {
 		return 0
 	}
 }
 
 func (i Interval) String() string {
-	return fmt.Sprintf("[%d, %d]", i.Min, i.Max)
+	return fmt.Sprintf("[%s, %s]", i.Min, i.Max)
 }

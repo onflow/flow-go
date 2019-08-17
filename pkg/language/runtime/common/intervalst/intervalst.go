@@ -84,7 +84,7 @@ func (t *IntervalST) searchInterval(x *node, interval Interval) (*Interval, inte
 	for x != nil {
 		if x.interval.Intersects(interval) {
 			return &x.interval, x.value
-		} else if x.left == nil || x.left.max < interval.Min {
+		} else if x.left == nil || x.left.max.CompareTo(interval.Min) < 0 {
 			x = x.right
 		} else {
 			x = x.left
@@ -93,15 +93,15 @@ func (t *IntervalST) searchInterval(x *node, interval Interval) (*Interval, inte
 	return nil, nil
 }
 
-func (t *IntervalST) Search(p int) (*Interval, interface{}) {
+func (t *IntervalST) Search(p Position) (*Interval, interface{}) {
 	return t.search(t.root, p)
 }
 
-func (t *IntervalST) search(x *node, p int) (*Interval, interface{}) {
+func (t *IntervalST) search(x *node, p Position) (*Interval, interface{}) {
 	for x != nil {
 		if x.interval.Contains(p) {
 			return &x.interval, x.value
-		} else if x.left == nil || x.left.max < p {
+		} else if x.left == nil || x.left.max.CompareTo(p) < 0 {
 			x = x.right
 		} else {
 			x = x.left
