@@ -35,6 +35,7 @@ type Handler interface {
 	DidChangeTextDocument(connection Connection, params *DidChangeTextDocumentParams) error
 	Hover(connection Connection, params *TextDocumentPositionParams) (*Hover, error)
 	Definition(connection Connection, params *TextDocumentPositionParams) (*Location, error)
+	SignatureHelp(connection Connection, params *TextDocumentPositionParams) (*SignatureHelp, error)
 	Shutdown(connection Connection) error
 	Exit(connection Connection) error
 }
@@ -63,6 +64,9 @@ func NewServer(handler Handler) *Server {
 
 	jsonrpc2Server.Methods["textDocument/definition"] =
 		server.handleDefinition
+
+	jsonrpc2Server.Methods["textDocument/signatureHelp"] =
+		server.handleSignatureHelp
 
 	jsonrpc2Server.Methods["shutdown"] =
 		server.handleShutdown

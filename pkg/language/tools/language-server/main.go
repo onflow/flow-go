@@ -60,6 +60,10 @@ func (server) Initialize(
 			TextDocumentSync:   protocol.Full,
 			HoverProvider:      true,
 			DefinitionProvider: true,
+			// TODO:
+			//SignatureHelpProvider: &protocol.SignatureHelpOptions{
+			//	TriggerCharacters: []string{"("},
+			//},
 		},
 	}
 	return result, nil
@@ -223,6 +227,13 @@ func (s server) Definition(
 		URI:   uri,
 		Range: astToProtocolRange(*variable.Pos, *variable.Pos),
 	}, nil
+}
+
+func (s server) SignatureHelp(
+	connection protocol.Connection,
+	params *protocol.TextDocumentPositionParams,
+) (*protocol.SignatureHelp, error) {
+	return nil, nil
 }
 
 func (server) Shutdown(connection protocol.Connection) error {
