@@ -3300,6 +3300,103 @@ func TestCheckInvalidInterfaceConformanceNonInterface(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.InvalidConformanceError{}))
 }
 
+func TestCheckInterfaceFieldUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          x: Int
+      }
+
+      struct TestImpl: Test {
+          var x: Int
+
+          init(x: Int) {
+              self.x = x
+          }
+      }
+
+      let test: Test = TestImpl(x: 1)
+
+      let x = test.x
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {}
+
+      struct TestImpl: Test {
+          var x: Int
+
+          init(x: Int) {
+              self.x = x
+          }
+      }
+
+      let test: Test = TestImpl(x: 1)
+
+      let x = test.x
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+}
+
+func TestCheckInterfaceFunctionUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test(): Int
+      }
+
+      struct TestImpl: Test {
+          fun test(): Int {
+              return 2
+          }
+      }
+
+      let test: Test = TestImpl()
+
+      let val = test.test()
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+      }
+
+      struct TestImpl: Test {
+          fun test(): Int {
+              return 2
+          }
+      }
+
+      let test: Test = TestImpl()
+
+      let val = test.test()
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+}
+
 // TODO: field declaration, member access, type references
 //
 func TestCheckOrigins(t *testing.T) {

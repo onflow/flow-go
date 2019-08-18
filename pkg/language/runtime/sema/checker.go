@@ -1517,9 +1517,12 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	identifier := expression.Identifier
 
 	var member *Member
-	structureType, ok := expressionType.(*StructureType)
-	if ok {
-		member, ok = structureType.Members[identifier]
+	var ok bool
+	switch ty := expressionType.(type) {
+	case *StructureType:
+		member, ok = ty.Members[identifier]
+	case *InterfaceType:
+		member, ok = ty.Members[identifier]
 	}
 
 	if !ok {
@@ -1998,7 +2001,11 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 
 	conformances := checker.conformances(structure.Conformances)
 
-	members := checker.members(structure.Fields, structure.Functions)
+	members := checker.members(
+		structure.Fields,
+		structure.Functions,
+		common.DeclarationKindStructure,
+	)
 
 	*structureType = StructureType{
 		Identifier:   structure.Identifier,
@@ -2100,6 +2107,7 @@ func (checker *Checker) declareStructureConstructor(
 func (checker *Checker) members(
 	fields []*ast.FieldDeclaration,
 	functions []*ast.FunctionDeclaration,
+	declarationKind common.DeclarationKind,
 ) map[string]*Member {
 
 	fieldCount := len(fields)
@@ -2117,8 +2125,9 @@ func (checker *Checker) members(
 			IsInitialized: false,
 		}
 
-		// TODO: don'T report for interfaces
-		if field.VariableKind == ast.VariableKindNotSpecified {
+		if field.VariableKind == ast.VariableKindNotSpecified &&
+			declarationKind != common.DeclarationKindInterface {
+
 			checker.report(
 				&InvalidVariableKindError{
 					Kind:     field.VariableKind,
@@ -2410,7 +2419,11 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		common.DeclarationKindInterface,
 	)
 
-	members := checker.members(declaration.Fields, declaration.Functions)
+	members := checker.members(
+		declaration.Fields,
+		declaration.Functions,
+		common.DeclarationKindInterface,
+	)
 
 	*interfaceType = InterfaceType{
 		Identifier: declaration.Identifier,
