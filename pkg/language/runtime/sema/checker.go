@@ -2428,3 +2428,8 @@ func (checker *Checker) recordVariableOrigin(name string, variable *Variable) {
 	endPos := variable.Pos.Shifted(len(name) - 1)
 	checker.recordOrigin(startPos, endPos, variable)
 }
+
+func (checker *Checker) VisitConformance(conformance *ast.Conformance) ast.Repr {
+	// TODO:
+	return nil
+}

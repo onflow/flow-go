@@ -107,6 +107,8 @@ func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationCont
 	identifierNode := ctx.Identifier()
 	identifier := identifierNode.GetText()
 
+	conformances := ctx.Conformances().Accept(v).([]*ast.Conformance)
+
 	var fields []*ast.FieldDeclaration
 	for _, fieldCtx := range ctx.AllField() {
 		field := fieldCtx.Accept(v).(*ast.FieldDeclaration)
@@ -131,6 +133,7 @@ func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationCont
 
 	return &ast.StructureDeclaration{
 		Identifier:    identifier,
+		Conformances:  conformances,
 		Fields:        fields,
 		Initializer:   initializer,
 		Functions:     functions,
@@ -138,6 +141,20 @@ func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationCont
 		StartPos:      startPosition,
 		EndPos:        endPosition,
 	}
+}
+
+func (v *ProgramVisitor) VisitConformances(ctx *ConformancesContext) interface{} {
+	identifierNodes := ctx.AllIdentifier
+	conformances := make([]*ast.Conformance, len(identifierNodes()))
+	for i, identifierNode := range identifierNodes() {
+		identifier := identifierNode.GetText()
+		pos := ast.PositionFromToken(identifierNode.GetSymbol())
+		conformances[i] = &ast.Conformance{
+			Identifier: identifier,
+			Pos:        pos,
+		}
+	}
+	return conformances
 }
 
 func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {

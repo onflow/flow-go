@@ -63,7 +63,15 @@ access
     ;
 
 structureDeclaration
-    : Struct Identifier '{' field* initializer[true]? functionDeclaration[true]* '}'
+    : Struct Identifier conformances '{'
+        field*
+        initializer[true]?
+        functionDeclaration[true]*
+      '}'
+    ;
+
+conformances
+    : (':' Identifier (',' Identifier)*)?
     ;
 
 variableKind

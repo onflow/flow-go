@@ -57,6 +57,7 @@ type Visitor interface {
 	VisitBlock(*Block) Repr
 	VisitFunctionBlock(*FunctionBlock) Repr
 	VisitStructureDeclaration(*StructureDeclaration) Repr
+	VisitConformance(*Conformance) Repr
 	VisitInterfaceDeclaration(*InterfaceDeclaration) Repr
 	VisitFieldDeclaration(*FieldDeclaration) Repr
 	VisitInitializerDeclaration(*InitializerDeclaration) Repr

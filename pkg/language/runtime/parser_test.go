@@ -2438,7 +2438,8 @@ func TestParseStructure(t *testing.T) {
 		To(BeEmpty())
 
 	test := &StructureDeclaration{
-		Identifier: "Test",
+		Identifier:   "Test",
+		Conformances: []*Conformance{},
 		Fields: []*FieldDeclaration{
 			{
 				Access:       AccessPublicSettable,
@@ -2534,6 +2535,41 @@ func TestParseStructure(t *testing.T) {
 		IdentifierPos: Position{Offset: 16, Line: 2, Column: 15},
 		StartPos:      Position{Offset: 9, Line: 2, Column: 8},
 		EndPos:        Position{Offset: 223, Line: 12, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseStructureWithConformances(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseProgram(`
+        struct Test: Foo, Bar {}
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	test := &StructureDeclaration{
+		Identifier: "Test",
+		Conformances: []*Conformance{
+			{
+				Identifier: "Foo",
+				Pos:        Position{Offset: 22, Line: 2, Column: 21},
+			},
+			{
+				Identifier: "Bar",
+				Pos:        Position{Offset: 27, Line: 2, Column: 26},
+			},
+		},
+		IdentifierPos: Position{Offset: 16, Line: 2, Column: 15},
+		StartPos:      Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:        Position{Offset: 32, Line: 2, Column: 31},
 	}
 
 	expected := &Program{

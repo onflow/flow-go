@@ -6,6 +6,7 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 
 type StructureDeclaration struct {
 	Identifier    string
+	Conformances  []*Conformance
 	Fields        []*FieldDeclaration
 	Initializer   *InitializerDeclaration
 	Functions     []*FunctionDeclaration
@@ -43,6 +44,25 @@ func (s *StructureDeclaration) DeclarationName() string {
 
 func (s *StructureDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindStructure
+}
+
+// Conformance
+
+type Conformance struct {
+	Identifier string
+	Pos        Position
+}
+
+func (c *Conformance) Accept(visitor Visitor) Repr {
+	return visitor.VisitConformance(c)
+}
+
+func (c *Conformance) StartPosition() Position {
+	return c.Pos
+}
+
+func (c *Conformance) EndPosition() Position {
+	return c.Pos.Shifted(len(c.Identifier) - 1)
 }
 
 // FieldDeclaration
