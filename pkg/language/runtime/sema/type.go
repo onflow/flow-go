@@ -83,6 +83,9 @@ type OptionalType struct {
 func (*OptionalType) isType() {}
 
 func (t *OptionalType) String() string {
+	if t.Type == nil {
+		return "optional"
+	}
 	return fmt.Sprintf("%s?", t.Type.String())
 }
 

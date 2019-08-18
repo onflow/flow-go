@@ -2816,3 +2816,86 @@ func TestParseOptionalType(t *testing.T) {
 	Expect(actual).
 		To(Equal(expected))
 }
+
+func TestParseNilCoalescing(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseProgram(`
+       let x = nil ?? 1
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				IsConstant: true,
+				Identifier: "x",
+				Value: &BinaryExpression{
+					Operation: OperationNilCoalesce,
+					Left: &NilExpression{
+						Pos: Position{Offset: 16, Line: 2, Column: 15},
+					},
+					Right: &IntExpression{
+						Value:    big.NewInt(1),
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
+						EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+					},
+				},
+				StartPos:      Position{Offset: 8, Line: 2, Column: 7},
+				IdentifierPos: Position{Offset: 12, Line: 2, Column: 11},
+			},
+		},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseNilCoalescingRightAssociativity(t *testing.T) {
+	RegisterTestingT(t)
+
+	// NOTE: only syntactically, not semantically valid
+	actual, errors := parser.ParseProgram(`
+       let x = 1 ?? 2 ?? 3
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				IsConstant: true,
+				Identifier: "x",
+				Value: &BinaryExpression{
+					Operation: OperationNilCoalesce,
+					Left: &IntExpression{
+						Value:    big.NewInt(1),
+						StartPos: Position{Offset: 16, Line: 2, Column: 15},
+						EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+					},
+					Right: &BinaryExpression{
+						Operation: OperationNilCoalesce,
+						Left: &IntExpression{
+							Value:    big.NewInt(2),
+							StartPos: Position{Offset: 21, Line: 2, Column: 20},
+							EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+						},
+						Right: &IntExpression{
+							Value:    big.NewInt(3),
+							StartPos: Position{Offset: 26, Line: 2, Column: 25},
+							EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+						},
+					},
+				},
+				StartPos:      Position{Offset: 8, Line: 2, Column: 7},
+				IdentifierPos: Position{Offset: 12, Line: 2, Column: 11},
+			},
+		},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}

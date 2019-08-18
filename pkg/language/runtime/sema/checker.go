@@ -116,11 +116,11 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		return true
 	}
 
-	if superType.Equal(&AnyType{}) {
+	if _, ok := superType.(*AnyType); ok {
 		return true
 	}
 
-	if subType.Equal(&NeverType{}) {
+	if _, ok := subType.(*NeverType); ok {
 		return true
 	}
 
@@ -404,6 +404,7 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 		// check the value type is a subtype of the declaration type
 		if declarationType != nil &&
 			valueType != nil &&
+			!valueType.Equal(&InvalidType{}) &&
 			!checker.IsSubType(valueType, declarationType) {
 
 			checker.report(
@@ -536,7 +537,7 @@ func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, ret
 	// if there is a return type, declare the constant `result`
 	// which has the return type
 
-	if !returnType.Equal(&VoidType{}) {
+	if _, ok := returnType.(*VoidType); !ok {
 
 		checker.declareVariable(
 			ResultIdentifier,
@@ -630,14 +631,14 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	}
 
 	valueType := statement.Expression.Accept(checker).(Type)
-	valueIsInvalid := valueType.Equal(&InvalidType{})
+	_, valueIsInvalid := valueType.(*InvalidType)
 
 	returnType := checker.currentFunction().returnType
 
 	if valueType != nil {
 		if valueIsInvalid {
 			// return statement has expression, but function has Void return type?
-			if returnType.Equal(&VoidType{}) {
+			if _, ok := returnType.(*VoidType); ok {
 				checker.report(
 					&InvalidReturnValueError{
 						StartPos: statement.Expression.StartPosition(),
@@ -899,7 +900,7 @@ func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpre
 	// check indexed expression's type is indexable
 	// by getting the expected element
 
-	if indexedType.Equal(&InvalidType{}) {
+	if _, ok := indexedType.(*InvalidType); ok {
 		return &InvalidType{}
 	}
 
@@ -964,14 +965,12 @@ func (checker *Checker) visitBinaryOperation(expr *ast.BinaryExpression) (left, 
 	return
 }
 
-// TODO: split up
-
 func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) ast.Repr {
 
 	leftType, rightType := checker.visitBinaryOperation(expression)
 
-	leftIsInvalid := leftType.Equal(&InvalidType{})
-	rightIsInvalid := rightType.Equal(&InvalidType{})
+	_, leftIsInvalid := leftType.(*InvalidType)
+	_, rightIsInvalid := rightType.(*InvalidType)
 	anyInvalid := leftIsInvalid || rightIsInvalid
 
 	operation := expression.Operation
@@ -981,143 +980,35 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 	case BinaryOperationKindIntegerArithmetic,
 		BinaryOperationKindIntegerComparison:
 
-		// check both types are integer subtypes
-
-		leftIsInteger := checker.IsSubType(leftType, &IntegerType{})
-		rightIsInteger := checker.IsSubType(rightType, &IntegerType{})
-
-		if !leftIsInteger && !rightIsInteger {
-			if !anyInvalid {
-				checker.report(
-					&InvalidBinaryOperandsError{
-						Operation: operation,
-						LeftType:  leftType,
-						RightType: rightType,
-						StartPos:  expression.StartPosition(),
-						EndPos:    expression.EndPosition(),
-					},
-				)
-			}
-		} else if !leftIsInteger {
-			if !leftIsInvalid {
-				checker.report(
-					&InvalidBinaryOperandError{
-						Operation:    operation,
-						Side:         common.OperandSideLeft,
-						ExpectedType: &IntegerType{},
-						ActualType:   leftType,
-						StartPos:     expression.Left.StartPosition(),
-						EndPos:       expression.Left.EndPosition(),
-					},
-				)
-			}
-		} else if !rightIsInteger {
-			if !rightIsInvalid {
-				checker.report(
-					&InvalidBinaryOperandError{
-						Operation:    operation,
-						Side:         common.OperandSideRight,
-						ExpectedType: &IntegerType{},
-						ActualType:   rightType,
-						StartPos:     expression.Right.StartPosition(),
-						EndPos:       expression.Right.EndPosition(),
-					},
-				)
-			}
-		}
-
-		// check both types are equal
-
-		if !leftType.Equal(rightType) {
-			checker.report(
-				&InvalidBinaryOperandsError{
-					Operation: operation,
-					LeftType:  leftType,
-					RightType: rightType,
-					StartPos:  expression.StartPosition(),
-					EndPos:    expression.EndPosition(),
-				},
-			)
-		}
-
-		switch operationKind {
-		case BinaryOperationKindIntegerArithmetic:
-			return leftType
-		case BinaryOperationKindIntegerComparison:
-			return &BoolType{}
-		}
-
-		panic(&errors.UnreachableError{})
+		return checker.checkBinaryExpressionIntegerArithmeticOrComparison(
+			expression, operation, operationKind,
+			leftType, rightType,
+			leftIsInvalid, rightIsInvalid, anyInvalid,
+		)
 
 	case BinaryOperationKindEquality:
-		// check both types are equal, and boolean subtypes or integer subtypes
 
-		if !anyInvalid &&
-			leftType != nil &&
-			!(leftType.Equal(rightType) &&
-				(checker.IsSubType(leftType, &BoolType{}) || checker.IsSubType(leftType, &IntegerType{}))) {
-
-			checker.report(
-				&InvalidBinaryOperandsError{
-					Operation: operation,
-					LeftType:  leftType,
-					RightType: rightType,
-					StartPos:  expression.StartPosition(),
-					EndPos:    expression.EndPosition(),
-				},
-			)
-		}
-
-		return &BoolType{}
+		return checker.checkBinaryExpressionEquality(
+			expression, operation, operationKind,
+			leftType, rightType,
+			leftIsInvalid, rightIsInvalid, anyInvalid,
+		)
 
 	case BinaryOperationKindBooleanLogic:
 
-		// check both types are integer subtypes
+		return checker.checkBinaryExpressionBooleanLogic(
+			expression, operation, operationKind,
+			leftType, rightType,
+			leftIsInvalid, rightIsInvalid, anyInvalid,
+		)
 
-		leftIsBool := checker.IsSubType(leftType, &BoolType{})
-		rightIsBool := checker.IsSubType(rightType, &BoolType{})
+	case BinaryOperationKindNilCoalescing:
 
-		if !leftIsBool && !rightIsBool {
-			if !anyInvalid {
-				checker.report(
-					&InvalidBinaryOperandsError{
-						Operation: operation,
-						LeftType:  leftType,
-						RightType: rightType,
-						StartPos:  expression.StartPosition(),
-						EndPos:    expression.EndPosition(),
-					},
-				)
-			}
-		} else if !leftIsBool {
-			if !leftIsInvalid {
-				checker.report(
-					&InvalidBinaryOperandError{
-						Operation:    operation,
-						Side:         common.OperandSideLeft,
-						ExpectedType: &BoolType{},
-						ActualType:   leftType,
-						StartPos:     expression.Left.StartPosition(),
-						EndPos:       expression.Left.EndPosition(),
-					},
-				)
-			}
-		} else if !rightIsBool {
-			if !rightIsInvalid {
-				checker.report(
-					&InvalidBinaryOperandError{
-						Operation:    operation,
-						Side:         common.OperandSideRight,
-						ExpectedType: &BoolType{},
-						ActualType:   rightType,
-						StartPos:     expression.Right.StartPosition(),
-						EndPos:       expression.Right.EndPosition(),
-					},
-				)
-			}
-		}
-
-		return &BoolType{}
+		return checker.checkBinaryExpressionNilCoalescing(
+			expression, operation, operationKind,
+			leftType, rightType,
+			leftIsInvalid, rightIsInvalid, anyInvalid,
+		)
 	}
 
 	panic(&unsupportedOperation{
@@ -1126,6 +1017,223 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 		startPos:  expression.StartPosition(),
 		endPos:    expression.EndPosition(),
 	})
+}
+
+func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
+	expression *ast.BinaryExpression,
+	operation ast.Operation,
+	operationKind BinaryOperationKind,
+	leftType, rightType Type,
+	leftIsInvalid, rightIsInvalid, anyInvalid bool,
+) Type {
+	// check both types are integer subtypes
+
+	leftIsInteger := checker.IsSubType(leftType, &IntegerType{})
+	rightIsInteger := checker.IsSubType(rightType, &IntegerType{})
+
+	if !leftIsInteger && !rightIsInteger {
+		if !anyInvalid {
+			checker.report(
+				&InvalidBinaryOperandsError{
+					Operation: operation,
+					LeftType:  leftType,
+					RightType: rightType,
+					StartPos:  expression.StartPosition(),
+					EndPos:    expression.EndPosition(),
+				},
+			)
+		}
+	} else if !leftIsInteger {
+		if !leftIsInvalid {
+			checker.report(
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideLeft,
+					ExpectedType: &IntegerType{},
+					ActualType:   leftType,
+					StartPos:     expression.Left.StartPosition(),
+					EndPos:       expression.Left.EndPosition(),
+				},
+			)
+		}
+	} else if !rightIsInteger {
+		if !rightIsInvalid {
+			checker.report(
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideRight,
+					ExpectedType: &IntegerType{},
+					ActualType:   rightType,
+					StartPos:     expression.Right.StartPosition(),
+					EndPos:       expression.Right.EndPosition(),
+				},
+			)
+		}
+	}
+	// check both types are equal
+	if !leftType.Equal(rightType) {
+		checker.report(
+			&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  leftType,
+				RightType: rightType,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			},
+		)
+	}
+
+	switch operationKind {
+	case BinaryOperationKindIntegerArithmetic:
+		return leftType
+	case BinaryOperationKindIntegerComparison:
+		return &BoolType{}
+	}
+
+	panic(&errors.UnreachableError{})
+}
+
+func (checker *Checker) checkBinaryExpressionEquality(
+	expression *ast.BinaryExpression,
+	operation ast.Operation,
+	operationKind BinaryOperationKind,
+	leftType, rightType Type,
+	leftIsInvalid, rightIsInvalid, anyInvalid bool,
+) Type {
+	// check both types are equal, and boolean subtypes or integer subtypes
+
+	if !anyInvalid &&
+		leftType != nil &&
+		!(leftType.Equal(rightType) &&
+			(checker.IsSubType(leftType, &BoolType{}) ||
+				checker.IsSubType(leftType, &IntegerType{}))) {
+
+		checker.report(
+			&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  leftType,
+				RightType: rightType,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			},
+		)
+	}
+
+	return &BoolType{}
+}
+
+func (checker *Checker) checkBinaryExpressionBooleanLogic(
+	expression *ast.BinaryExpression,
+	operation ast.Operation,
+	operationKind BinaryOperationKind,
+	leftType, rightType Type,
+	leftIsInvalid, rightIsInvalid, anyInvalid bool,
+) Type {
+	// check both types are integer subtypes
+
+	leftIsBool := checker.IsSubType(leftType, &BoolType{})
+	rightIsBool := checker.IsSubType(rightType, &BoolType{})
+
+	if !leftIsBool && !rightIsBool {
+		if !anyInvalid {
+			checker.report(
+				&InvalidBinaryOperandsError{
+					Operation: operation,
+					LeftType:  leftType,
+					RightType: rightType,
+					StartPos:  expression.StartPosition(),
+					EndPos:    expression.EndPosition(),
+				},
+			)
+		}
+	} else if !leftIsBool {
+		if !leftIsInvalid {
+			checker.report(
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideLeft,
+					ExpectedType: &BoolType{},
+					ActualType:   leftType,
+					StartPos:     expression.Left.StartPosition(),
+					EndPos:       expression.Left.EndPosition(),
+				},
+			)
+		}
+	} else if !rightIsBool {
+		if !rightIsInvalid {
+			checker.report(
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideRight,
+					ExpectedType: &BoolType{},
+					ActualType:   rightType,
+					StartPos:     expression.Right.StartPosition(),
+					EndPos:       expression.Right.EndPosition(),
+				},
+			)
+		}
+	}
+
+	return &BoolType{}
+}
+
+func (checker *Checker) checkBinaryExpressionNilCoalescing(
+	expression *ast.BinaryExpression,
+	operation ast.Operation,
+	operationKind BinaryOperationKind,
+	leftType, rightType Type,
+	leftIsInvalid, rightIsInvalid, anyInvalid bool,
+) Type {
+	leftOptional, leftIsOptional := leftType.(*OptionalType)
+
+	if !leftIsInvalid {
+		if !leftIsOptional {
+			checker.report(
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideLeft,
+					ExpectedType: &OptionalType{},
+					ActualType:   leftType,
+					StartPos:     expression.Left.StartPosition(),
+					EndPos:       expression.Left.EndPosition(),
+				},
+			)
+		}
+	}
+
+	if leftIsInvalid || !leftIsOptional {
+		return &InvalidType{}
+	}
+
+	leftInner := leftOptional.Type
+
+	if _, ok := leftInner.(*NeverType); ok {
+		return rightType
+	} else {
+		canNarrow := false
+
+		if !rightIsInvalid {
+			if !checker.IsSubType(rightType, leftOptional) {
+				checker.report(
+					&InvalidBinaryOperandError{
+						Operation:    operation,
+						Side:         common.OperandSideRight,
+						ExpectedType: leftOptional,
+						ActualType:   rightType,
+						StartPos:     expression.Right.StartPosition(),
+						EndPos:       expression.Right.EndPosition(),
+					},
+				)
+			} else {
+				canNarrow = checker.IsSubType(rightType, leftInner)
+			}
+		}
+
+		if !canNarrow {
+			return leftOptional
+		}
+		return leftInner
+	}
 }
 
 func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {
@@ -1307,7 +1415,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	functionType, ok := expressionType.(*FunctionType)
 	if !ok {
 
-		if !expressionType.Equal(&InvalidType{}) {
+		if _, ok := expressionType.(*InvalidType); !ok {
 			checker.report(
 				&NotCallableError{
 					Type:     expressionType,

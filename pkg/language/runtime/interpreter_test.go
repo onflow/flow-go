@@ -1903,3 +1903,144 @@ func TestInterpretNilReturnValue(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.NilValue{}))
 }
+
+func TestInterpretNilCoalescingNilIntToOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let none: Int? = nil
+      let x: Int? = none ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretNilCoalescingNilIntToOptionals(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let none: Int?? = nil
+      let x: Int? = none ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretNilCoalescingNilIntToOptionalNilLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let x: Int? = nil ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretNilCoalescingRightSubtype(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = nil ?? nil
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NilValue{}))
+}
+
+func TestInterpretNilCoalescingNilInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let none: Int? = nil
+      let x: Int = none ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+}
+
+func TestInterpretNilCoalescingNilLiteralInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let x: Int = nil ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+}
+
+func TestInterpretNilCoalescingShortCircuitLeftSuccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Int? {
+          x = true
+          return 1
+      }
+
+      fun changeY(): Int {
+          y = true
+          return 2
+      }
+
+      let test = changeX() ?? changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNilCoalescingShortCircuitLeftFailure(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Int? {
+          x = true
+          return nil
+      }
+
+      fun changeY(): Int {
+          y = true
+          return 2
+      }
+
+      let test = changeX() ?? changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+

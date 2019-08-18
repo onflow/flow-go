@@ -143,6 +143,10 @@ func (v *BaseStrictusVisitor) VisitRelationalExpression(ctx *RelationalExpressio
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitAdditiveExpression(ctx *AdditiveExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
