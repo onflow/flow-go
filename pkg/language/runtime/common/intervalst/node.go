@@ -26,21 +26,21 @@ func (n *node) size() int {
 	return n.n
 }
 
-type MaxPosition struct{}
+type MinPosition struct{}
 
-func (MaxPosition) CompareTo(other Position) int {
-	_, ok := other.(MaxPosition)
+func (MinPosition) CompareTo(other Position) int {
+	_, ok := other.(MinPosition)
 	if ok {
 		return 0
 	}
-	return 1
+	return -1
 }
 
-var maxPosition = MaxPosition{}
+var minPosition = MinPosition{}
 
 func (n *node) Max() Position {
 	if n == nil {
-		return maxPosition
+		return minPosition
 	}
 
 	return n.max
@@ -56,11 +56,11 @@ func (n *node) fix() {
 }
 
 func max3(a, b, c Position) Position {
-	if c.CompareTo(a) > 0 && c.CompareTo(b) > 0 {
-		return c
-	}
-	if b.CompareTo(a) > 0 && b.CompareTo(c) > 0 {
+	if b.CompareTo(a) >= 0 && b.CompareTo(c) >= 0 {
 		return b
+	}
+	if c.CompareTo(a) >= 0 && c.CompareTo(b) >= 0 {
+		return c
 	}
 	return a
 }

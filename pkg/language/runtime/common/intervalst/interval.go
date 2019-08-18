@@ -28,13 +28,15 @@ func (i Interval) Contains(x Position) bool {
 }
 
 func (i Interval) CompareTo(other Interval) int {
-	if i.Min.CompareTo(other.Min) < 0 {
+	mins := i.Min.CompareTo(other.Min)
+	maxs := i.Max.CompareTo(other.Max)
+	if mins < 0 {
 		return -1
-	} else if i.Min.CompareTo(other.Min) > 0 {
+	} else if mins > 0 {
 		return 1
-	} else if i.Max.CompareTo(other.Max) < 0 {
+	} else if maxs < 0 {
 		return -1
-	} else if i.Max.CompareTo(other.Max) > 0 {
+	} else if maxs > 0 {
 		return 1
 	} else {
 		return 0
