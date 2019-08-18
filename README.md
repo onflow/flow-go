@@ -74,6 +74,10 @@ export PATH="$PATH:$GOPATH/bin"
 
 - Test that Go was installed correctly: https://golang.org/doc/install#testing
 - Clone this repository to `$GOPATH/src/github.com/dapperlabs/bamboo-node/`
+- Clone this repository submodules:
+```bash
+git submodule update --init --recursive
+```
 
 _Note: since we are using go modules and we prepend every `go` command with `GO111MODULE=on`, you can also clone this repo anywhere you want._
 
@@ -89,6 +93,8 @@ make test
 The first run will take a while because some base layers will be downloaded and built for the first time. See our [testing instructions](#testing) for more details.
 
 #### Install tooling dependencies
+
+First, install [CMake](https://cmake.org/install/) as it is used for code generation of some tools.
 
 Additional development tools required for code generation can be installed with this command:
 
