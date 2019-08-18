@@ -14,9 +14,39 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/tools/language-server/protocol"
 )
 
+func protocolToSemaPosition(pos protocol.Position) sema.Position {
+	return sema.Position{
+		Line:   int(pos.Line + 1),
+		Column: int(pos.Character),
+	}
+}
+
+func semaToProtocolPosition(pos sema.Position) protocol.Position {
+	return protocol.Position{
+		Line:      float64(pos.Line - 1),
+		Character: float64(pos.Column),
+	}
+}
+
+func astToProtocolPosition(pos ast.Position) protocol.Position {
+	return protocol.Position{
+		Line:      float64(pos.Line - 1),
+		Character: float64(pos.Column),
+	}
+}
+
+func astToProtocolRange(startPos, endPos ast.Position) protocol.Range {
+	return protocol.Range{
+		Start: astToProtocolPosition(startPos),
+		End:   astToProtocolPosition(endPos.Shifted(1)),
+	}
+}
+
 var standardLibraryFunctions = append(stdlib.BuiltIns, stdlib.Helpers...)
 
-type server struct{}
+type server struct {
+	checkers map[protocol.DocumentUri]*sema.Checker
+}
 
 func (server) Initialize(
 	connection protocol.Connection,
@@ -27,7 +57,9 @@ func (server) Initialize(
 ) {
 	result := &protocol.InitializeResult{
 		Capabilities: protocol.ServerCapabilities{
-			TextDocumentSync: protocol.Full,
+			TextDocumentSync:   protocol.Full,
+			HoverProvider:      true,
+			DefinitionProvider: true,
 		},
 	}
 	return result, nil
@@ -66,10 +98,11 @@ func convertError(err error) *protocol.Diagnostic {
 	}
 }
 
-func (server) DidChangeTextDocument(
+func (s server) DidChangeTextDocument(
 	connection protocol.Connection,
 	params *protocol.DidChangeTextDocumentParams,
 ) error {
+	uri := params.TextDocument.URI
 	code := params.ContentChanges[0].Text
 
 	start := time.Now()
@@ -99,7 +132,6 @@ func (server) DidChangeTextDocument(
 
 			diagnostics = append(diagnostics, *diagnostic)
 		}
-
 	} else {
 		// no parsing parseErrors, check program
 
@@ -118,6 +150,8 @@ func (server) DidChangeTextDocument(
 			Type:    protocol.Info,
 			Message: fmt.Sprintf("checking took %s", elapsed),
 		})
+
+		s.checkers[uri] = checker
 
 		if checkerError, ok := err.(*sema.CheckerError); ok && checkerError != nil {
 			for _, err := range checkerError.Errors {
@@ -139,6 +173,58 @@ func (server) DidChangeTextDocument(
 	return nil
 }
 
+func (s server) Hover(
+	connection protocol.Connection,
+	params *protocol.TextDocumentPositionParams,
+) (*protocol.Hover, error) {
+
+	uri := params.TextDocument.URI
+	checker, ok := s.checkers[uri]
+	if !ok {
+		return nil, nil
+	}
+
+	origin := checker.Origins.Find(protocolToSemaPosition(params.Position))
+
+	if origin == nil {
+		return nil, nil
+	}
+
+	contents := protocol.MarkupContent{
+		Kind:  protocol.Markdown,
+		Value: fmt.Sprintf("* Type: `%s`", origin.Variable.Type.String()),
+	}
+	return &protocol.Hover{Contents: contents}, nil
+}
+
+func (s server) Definition(
+	connection protocol.Connection,
+	params *protocol.TextDocumentPositionParams,
+) (*protocol.Location, error) {
+
+	uri := params.TextDocument.URI
+	checker, ok := s.checkers[uri]
+	if !ok {
+		return nil, nil
+	}
+
+	origin := checker.Origins.Find(protocolToSemaPosition(params.Position))
+
+	if origin == nil {
+		return nil, nil
+	}
+
+	variable := origin.Variable
+	if variable == nil {
+		return nil, nil
+	}
+
+	return &protocol.Location{
+		URI:   uri,
+		Range: astToProtocolRange(*variable.Pos, *variable.Pos),
+	}, nil
+}
+
 func (server) Shutdown(connection protocol.Connection) error {
 	connection.ShowMessage(&protocol.ShowMessageParams{
 		Type:    protocol.Warning,
@@ -153,6 +239,8 @@ func (server) Exit(connection protocol.Connection) error {
 }
 
 func main() {
-	server := &server{}
+	server := &server{
+		checkers: map[protocol.DocumentUri]*sema.Checker{},
+	}
 	<-protocol.NewServer(server).Start()
 }

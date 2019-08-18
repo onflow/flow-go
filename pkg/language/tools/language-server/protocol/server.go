@@ -33,6 +33,8 @@ func (conn *connection) PublishDiagnostics(params *PublishDiagnosticsParams) {
 type Handler interface {
 	Initialize(connection Connection, params *InitializeParams) (*InitializeResult, error)
 	DidChangeTextDocument(connection Connection, params *DidChangeTextDocumentParams) error
+	Hover(connection Connection, params *TextDocumentPositionParams) (*Hover, error)
+	Definition(connection Connection, params *TextDocumentPositionParams) (*Location, error)
 	Shutdown(connection Connection) error
 	Exit(connection Connection) error
 }
@@ -55,6 +57,12 @@ func NewServer(handler Handler) *Server {
 
 	jsonrpc2Server.Methods["textDocument/didChange"] =
 		server.handleDidChangeTextDocument
+
+	jsonrpc2Server.Methods["textDocument/hover"] =
+		server.handleHover
+
+	jsonrpc2Server.Methods["textDocument/definition"] =
+		server.handleDefinition
 
 	jsonrpc2Server.Methods["shutdown"] =
 		server.handleShutdown

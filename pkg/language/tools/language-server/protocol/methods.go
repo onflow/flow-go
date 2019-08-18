@@ -21,6 +21,24 @@ func (server *Server) handleDidChangeTextDocument(req *json.RawMessage) (interfa
 	return nil, err
 }
 
+func (server *Server) handleHover(req *json.RawMessage) (interface{}, error) {
+	var params TextDocumentPositionParams
+	if err := json.Unmarshal(*req, &params); err != nil {
+		return nil, err
+	}
+
+	return server.Handler.Hover(server.connection, &params)
+}
+
+func (server *Server) handleDefinition(req *json.RawMessage) (interface{}, error) {
+	var params TextDocumentPositionParams
+	if err := json.Unmarshal(*req, &params); err != nil {
+		return nil, err
+	}
+
+	return server.Handler.Definition(server.connection, &params)
+}
+
 func (server *Server) handleShutdown(req *json.RawMessage) (interface{}, error) {
 	err := server.Handler.Shutdown(server.connection)
 	return nil, err
