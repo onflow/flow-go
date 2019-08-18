@@ -3254,6 +3254,52 @@ func TestCheckInterfaceUse(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {}
+
+      struct TestImpl: Test {}
+
+      let test: Test = TestImpl()
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {}
+
+      // NOTE: not declaring conformance
+      struct TestImpl {}
+
+      let test: Test = TestImpl()
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceNonInterface(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct TestImpl: Int {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidConformanceError{}))
+}
+
 // TODO: field declaration, member access, type references
 //
 func TestCheckOrigins(t *testing.T) {

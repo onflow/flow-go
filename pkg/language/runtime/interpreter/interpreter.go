@@ -1179,8 +1179,3 @@ func (interpreter *Interpreter) VisitInterfaceDeclaration(structure *ast.Interfa
 	// TODO:
 	return nil
 }
-
-func (interpreter *Interpreter) VisitConformance(conformance *ast.Conformance) ast.Repr {
-	// TODO:
-	return nil
-}

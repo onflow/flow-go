@@ -762,3 +762,27 @@ func (e *InvalidImplementationError) StartPosition() ast.Position {
 func (e *InvalidImplementationError) EndPosition() ast.Position {
 	return e.Pos
 }
+
+// InvalidConformanceError
+
+type InvalidConformanceError struct {
+	Type Type
+	Pos  ast.Position
+}
+
+func (e *InvalidConformanceError) Error() string {
+	return fmt.Sprintf(
+		"cannot conform to non-interface type: `%s`",
+		e.Type.String(),
+	)
+}
+
+func (*InvalidConformanceError) isSemanticError() {}
+
+func (e *InvalidConformanceError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidConformanceError) EndPosition() ast.Position {
+	return e.Pos
+}

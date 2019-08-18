@@ -444,6 +444,7 @@ func init() {
 
 type StructureType struct {
 	Identifier                string
+	Conformances              []*InterfaceType
 	Members                   map[string]*Member
 	ConstructorParameterTypes []Type
 }

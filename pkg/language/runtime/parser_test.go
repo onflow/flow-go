@@ -2439,7 +2439,7 @@ func TestParseStructure(t *testing.T) {
 
 	test := &StructureDeclaration{
 		Identifier:   "Test",
-		Conformances: []*Conformance{},
+		Conformances: []*NominalType{},
 		Fields: []*FieldDeclaration{
 			{
 				Access:       AccessPublicSettable,
@@ -2557,7 +2557,7 @@ func TestParseStructureWithConformances(t *testing.T) {
 
 	test := &StructureDeclaration{
 		Identifier: "Test",
-		Conformances: []*Conformance{
+		Conformances: []*NominalType{
 			{
 				Identifier: "Foo",
 				Pos:        Position{Offset: 22, Line: 2, Column: 21},

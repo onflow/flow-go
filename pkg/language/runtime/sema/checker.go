@@ -142,6 +142,7 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		default:
 			return false
 		}
+
 	case *OptionalType:
 		optionalSubType, ok := subType.(*OptionalType)
 		if !ok {
@@ -150,6 +151,19 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		}
 		// optionals are covariant: T? <: U? if T <: U
 		return checker.IsSubType(optionalSubType.Type, typedSuperType.Type)
+
+	case *InterfaceType:
+		structureSubType, ok := subType.(*StructureType)
+		if !ok {
+			return false
+		}
+		// TODO: optimize, use set
+		for _, conformance := range structureSubType.Conformances {
+			if typedSuperType.Equal(conformance) {
+				return true
+			}
+		}
+		return false
 	}
 
 	// TODO: functions
@@ -1982,11 +1996,14 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 		common.DeclarationKindStructure,
 	)
 
+	conformances := checker.conformances(structure.Conformances)
+
 	members := checker.members(structure.Fields, structure.Functions)
 
 	*structureType = StructureType{
-		Identifier: structure.Identifier,
-		Members:    members,
+		Identifier:   structure.Identifier,
+		Members:      members,
+		Conformances: conformances,
 	}
 
 	checker.StructureDeclarationTypes[structure] = structureType
@@ -2002,6 +2019,26 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 	checker.declareStructureConstructor(structure, structureType, parameterTypes)
 
 	structureType.ConstructorParameterTypes = parameterTypes
+}
+
+func (checker *Checker) conformances(conformances []*ast.NominalType) []*InterfaceType {
+	var interfaceTypes []*InterfaceType
+	for _, conformance := range conformances {
+		convertedType := checker.ConvertType(conformance)
+
+		if interfaceType, ok := convertedType.(*InterfaceType); ok {
+			interfaceTypes = append(interfaceTypes, interfaceType)
+
+		} else if _, ok := convertedType.(*InvalidType); !ok {
+			checker.report(
+				&InvalidConformanceError{
+					Type: convertedType,
+					Pos:  conformance.Pos,
+				},
+			)
+		}
+	}
+	return interfaceTypes
 }
 
 // TODO: very simple field initialization check for now.
@@ -2427,9 +2464,4 @@ func (checker *Checker) recordVariableOrigin(name string, variable *Variable) {
 	startPos := *variable.Pos
 	endPos := variable.Pos.Shifted(len(name) - 1)
 	checker.recordOrigin(startPos, endPos, variable)
-}
-
-func (checker *Checker) VisitConformance(conformance *ast.Conformance) ast.Repr {
-	// TODO:
-	return nil
 }
