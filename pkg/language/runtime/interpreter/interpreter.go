@@ -1044,30 +1044,34 @@ func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.Struc
 // Inside the initializer and all functions, `self` is bound to
 // the new structure value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) declareStructureConstructor(declaration *ast.StructureDeclaration) {
+func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration *ast.StructureDeclaration) {
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	constructorVariable := interpreter.findOrDeclareVariable(declaration.Identifier)
+	constructorVariable := interpreter.findOrDeclareVariable(structureDeclaration.Identifier)
 
 	// make the constructor available in the initializer
 	lexicalScope = lexicalScope.
-		Insert(common.StringKey(declaration.Identifier), constructorVariable)
+		Insert(common.StringKey(structureDeclaration.Identifier), constructorVariable)
 
-	initializer := declaration.Initializer
+	initializer := structureDeclaration.Initializer
 
 	var initializerFunction *InterpretedFunctionValue
 	if initializer != nil {
 
 		functionType := interpreter.Checker.InitializerFunctionTypes[initializer]
 
-		functionExpression := initializer.ToFunctionExpression()
-		function := newInterpretedFunction(functionExpression, functionType, lexicalScope)
-		initializerFunction = &function
+		f := interpreter.initializerFunction(
+			structureDeclaration,
+			initializer,
+			functionType,
+			lexicalScope,
+		)
+		initializerFunction = &f
 	}
 
-	functions := interpreter.structureFunctions(declaration, lexicalScope)
+	functions := interpreter.structureFunctions(structureDeclaration, lexicalScope)
 
 	// TODO: function type
 	constructorVariable.Value = NewHostFunctionValue(
@@ -1096,6 +1100,40 @@ func (interpreter *Interpreter) declareStructureConstructor(declaration *ast.Str
 				})
 		},
 	)
+}
+
+func (interpreter *Interpreter) initializerFunction(
+	structureDeclaration *ast.StructureDeclaration,
+	initializer *ast.InitializerDeclaration,
+	functionType *sema.FunctionType,
+	lexicalScope hamt.Map,
+) InterpretedFunctionValue {
+
+	function := initializer.ToFunctionExpression()
+
+	// copy function block, append interfaces' pre-conditions and post-condition
+	functionBlockCopy := *function.FunctionBlock
+	function.FunctionBlock = &functionBlockCopy
+
+	for _, conformance := range structureDeclaration.Conformances {
+		interfaceDeclaration := interpreter.interfaces[conformance.Identifier]
+		initializer := interfaceDeclaration.Initializer
+		if initializer == nil || initializer.FunctionBlock == nil {
+			continue
+		}
+
+		functionBlockCopy.PreConditions = append(
+			functionBlockCopy.PreConditions,
+			initializer.FunctionBlock.PreConditions...,
+		)
+
+		functionBlockCopy.PostConditions = append(
+			functionBlockCopy.PostConditions,
+			initializer.FunctionBlock.PostConditions...,
+		)
+	}
+
+	return newInterpretedFunction(function, functionType, lexicalScope)
 }
 
 // invokeStructureFunction calls the given function with the values.
