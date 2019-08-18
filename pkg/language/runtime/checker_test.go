@@ -2652,7 +2652,7 @@ func TestCheckInvalidOptional(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
-func TestCheckInvalidOptionals(t *testing.T) {
+func TestCheckOptionalNesting(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
@@ -2661,4 +2661,52 @@ func TestCheckInvalidOptionals(t *testing.T) {
 
 	Expect(err).
 		To(Not(HaveOccurred()))
+}
+
+func TestCheckNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int? = nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckOptionalNestingNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int?? = nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNilReturnValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     fun test(): Int?? {
+         return nil
+     }
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidNonOptionalNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Int = nil
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }

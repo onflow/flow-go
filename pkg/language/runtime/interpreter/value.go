@@ -769,16 +769,30 @@ func (v TupleValue) Copy() Value {
 	}
 }
 
-// OptionalValue
+// NilValue
 
-type OptionalValue struct {
+type NilValue struct{}
+
+func (NilValue) isValue() {}
+
+func (v NilValue) Copy() Value {
+	return v
+}
+
+func (v NilValue) ToGoValue() interface{} {
+	return nil
+}
+
+// SomeValue
+
+type SomeValue struct {
 	Value Value
 }
 
-func (OptionalValue) isValue() {}
+func (SomeValue) isValue() {}
 
-func (v OptionalValue) Copy() Value {
-	return OptionalValue{
+func (v SomeValue) Copy() Value {
+	return SomeValue{
 		Value: v.Value.Copy(),
 	}
 }

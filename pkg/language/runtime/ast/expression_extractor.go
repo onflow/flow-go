@@ -10,6 +10,10 @@ type BoolExtractor interface {
 	ExtractBool(extractor *ExpressionExtractor, expression *BoolExpression) ExpressionExtraction
 }
 
+type NilExtractor interface {
+	ExtractNil(extractor *ExpressionExtractor, expression *NilExpression) ExpressionExtraction
+}
+
 type IntExtractor interface {
 	ExtractInt(extractor *ExpressionExtractor, expression *IntExpression) ExpressionExtraction
 }
@@ -57,6 +61,7 @@ type FunctionExtractor interface {
 type ExpressionExtractor struct {
 	nextIdentifier       int
 	BoolExtractor        BoolExtractor
+	NilExtractor         NilExtractor
 	IntExtractor         IntExtractor
 	StringExtractor      StringExtractor
 	ArrayExtractor       ArrayExtractor
@@ -113,6 +118,28 @@ func (extractor *ExpressionExtractor) VisitBoolExpression(expression *BoolExpres
 }
 
 func (extractor *ExpressionExtractor) ExtractBool(expression *BoolExpression) ExpressionExtraction {
+
+	// nothing to rewrite, return as-is
+
+	return ExpressionExtraction{
+		RewrittenExpression:  expression,
+		ExtractedExpressions: nil,
+	}
+}
+
+func (extractor *ExpressionExtractor) VisitNilExpression(expression *NilExpression) Repr {
+
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.NilExtractor != nil {
+		return extractor.NilExtractor.ExtractNil(extractor, expression)
+	} else {
+		return extractor.ExtractNil(expression)
+	}
+}
+
+func (extractor *ExpressionExtractor) ExtractNil(expression *NilExpression) ExpressionExtraction {
 
 	// nothing to rewrite, return as-is
 

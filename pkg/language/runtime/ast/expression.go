@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+const NilConstant = "nil"
+
 type Expression interface {
 	Element
 	fmt.Stringer
@@ -45,6 +47,34 @@ func (e *BoolExpression) Accept(v Visitor) Repr {
 
 func (e *BoolExpression) AcceptExp(v ExpressionVisitor) Repr {
 	return v.VisitBoolExpression(e)
+}
+
+// NilExpression
+
+type NilExpression struct {
+	Pos Position
+}
+
+func (e *NilExpression) String() string {
+	return NilConstant
+}
+
+func (e *NilExpression) StartPosition() Position {
+	return e.Pos
+}
+
+func (e *NilExpression) EndPosition() Position {
+	return e.Pos.Shifted(len(NilConstant) - 1)
+}
+
+func (*NilExpression) isExpression() {}
+
+func (e *NilExpression) Accept(v Visitor) Repr {
+	return v.VisitNilExpression(e)
+}
+
+func (e *NilExpression) AcceptExp(v ExpressionVisitor) Repr {
+	return v.VisitNilExpression(e)
 }
 
 // StringExpression

@@ -779,6 +779,11 @@ func (interpreter *Interpreter) VisitBoolExpression(expression *ast.BoolExpressi
 	return Done{Result: value}
 }
 
+func (interpreter *Interpreter) VisitNilExpression(expression *ast.NilExpression) ast.Repr {
+	value := NilValue{}
+	return Done{Result: value}
+}
+
 func (interpreter *Interpreter) VisitIntExpression(expression *ast.IntExpression) ast.Repr {
 	value := IntValue{expression.Value}
 
@@ -1070,10 +1075,12 @@ func (interpreter *Interpreter) box(result Value, targetType sema.Type) Value {
 			break
 		}
 
-		if optional, ok := inner.(OptionalValue); ok {
-			inner = optional.Value
+		if some, ok := inner.(SomeValue); ok {
+			inner = some.Value
+		} else if _, ok := inner.(NilValue); ok {
+			return inner
 		} else {
-			result = OptionalValue{Value: result}
+			result = SomeValue{Value: result}
 		}
 
 		targetType = optionalType.Type

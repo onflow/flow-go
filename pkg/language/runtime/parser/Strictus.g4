@@ -307,11 +307,16 @@ literal
     | booleanLiteral
     | arrayLiteral
     | stringLiteral
+    | nilLiteral
     ;
 
 booleanLiteral
     : True
     | False
+    ;
+
+nilLiteral
+    : Nil
     ;
 
 stringLiteral
@@ -358,6 +363,8 @@ While : 'while' ;
 
 True : 'true' ;
 False : 'false' ;
+
+Nil : 'nil' ;
 
 Identifier
     : IdentifierHead IdentifierCharacter*

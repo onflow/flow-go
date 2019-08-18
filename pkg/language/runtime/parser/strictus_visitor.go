@@ -176,6 +176,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#booleanLiteral.
 	VisitBooleanLiteral(ctx *BooleanLiteralContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#nilLiteral.
+	VisitNilLiteral(ctx *NilLiteralContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#stringLiteral.
 	VisitStringLiteral(ctx *StringLiteralContext) interface{}
 

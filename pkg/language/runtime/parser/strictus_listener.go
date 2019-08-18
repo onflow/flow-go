@@ -172,6 +172,9 @@ type StrictusListener interface {
 	// EnterBooleanLiteral is called when entering the booleanLiteral production.
 	EnterBooleanLiteral(c *BooleanLiteralContext)
 
+	// EnterNilLiteral is called when entering the nilLiteral production.
+	EnterNilLiteral(c *NilLiteralContext)
+
 	// EnterStringLiteral is called when entering the stringLiteral production.
 	EnterStringLiteral(c *StringLiteralContext)
 
@@ -360,6 +363,9 @@ type StrictusListener interface {
 
 	// ExitBooleanLiteral is called when exiting the booleanLiteral production.
 	ExitBooleanLiteral(c *BooleanLiteralContext)
+
+	// ExitNilLiteral is called when exiting the nilLiteral production.
+	ExitNilLiteral(c *NilLiteralContext)
 
 	// ExitStringLiteral is called when exiting the stringLiteral production.
 	ExitStringLiteral(c *StringLiteralContext)

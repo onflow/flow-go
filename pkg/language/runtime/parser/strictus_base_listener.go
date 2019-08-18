@@ -350,6 +350,12 @@ func (s *BaseStrictusListener) EnterBooleanLiteral(ctx *BooleanLiteralContext) {
 // ExitBooleanLiteral is called when production booleanLiteral is exited.
 func (s *BaseStrictusListener) ExitBooleanLiteral(ctx *BooleanLiteralContext) {}
 
+// EnterNilLiteral is called when production nilLiteral is entered.
+func (s *BaseStrictusListener) EnterNilLiteral(ctx *NilLiteralContext) {}
+
+// ExitNilLiteral is called when production nilLiteral is exited.
+func (s *BaseStrictusListener) ExitNilLiteral(ctx *NilLiteralContext) {}
+
 // EnterStringLiteral is called when production stringLiteral is entered.
 func (s *BaseStrictusListener) EnterStringLiteral(ctx *StringLiteralContext) {}
 
