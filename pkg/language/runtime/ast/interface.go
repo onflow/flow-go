@@ -5,13 +5,25 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 // InterfaceDeclaration
 
 type InterfaceDeclaration struct {
-	Identifier    string
-	Fields        []*FieldDeclaration
-	Initializer   *InitializerDeclaration
-	Functions     []*FunctionDeclaration
-	IdentifierPos Position
-	StartPos      Position
-	EndPos        Position
+	Identifier            string
+	Fields                []*FieldDeclaration
+	Initializer           *InitializerDeclaration
+	Functions             []*FunctionDeclaration
+	functionsByIdentifier map[string]*FunctionDeclaration
+	IdentifierPos         Position
+	StartPos              Position
+	EndPos                Position
+}
+
+func (s *InterfaceDeclaration) FunctionsByIdentifier() map[string]*FunctionDeclaration {
+	if s.functionsByIdentifier == nil {
+		functionsByIdentifier := make(map[string]*FunctionDeclaration, len(s.Functions))
+		for _, function := range s.Functions {
+			functionsByIdentifier[function.Identifier] = function
+		}
+		s.functionsByIdentifier = functionsByIdentifier
+	}
+	return s.functionsByIdentifier
 }
 
 func (s *InterfaceDeclaration) StartPosition() Position {

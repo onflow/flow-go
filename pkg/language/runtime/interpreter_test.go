@@ -2432,3 +2432,43 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 	Expect(inter.Globals["val"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
 }
+
+func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface Test {
+          fun test(x: Int): Int {
+              pre {
+                  x > 0: "x must be positive"
+              }
+          }
+      }
+
+      struct TestImpl: Test {
+          fun test(x: Int): Int {
+              pre {
+                  x < 2: "x must be smaller than 2"
+              }
+              return x
+          }
+      }
+
+      let test: Test = TestImpl()
+
+      fun callTest(x: Int): Int {
+          return test.test(x: x)
+      }
+	`)
+
+	_, err := inter.Invoke("callTest", big.NewInt(0))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(inter.Invoke("callTest", big.NewInt(1))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+
+	_, err = inter.Invoke("callTest", big.NewInt(2))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+}

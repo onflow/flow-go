@@ -27,6 +27,7 @@ type Interpreter struct {
 	Checker     *sema.Checker
 	activations *activations.Activations
 	Globals     map[string]*Variable
+	interfaces  map[string]*ast.InterfaceDeclaration
 }
 
 func NewInterpreter(checker *sema.Checker) *Interpreter {
@@ -34,6 +35,7 @@ func NewInterpreter(checker *sema.Checker) *Interpreter {
 		Checker:     checker,
 		activations: &activations.Activations{},
 		Globals:     map[string]*Variable{},
+		interfaces:  map[string]*ast.InterfaceDeclaration{},
 	}
 }
 
@@ -75,13 +77,19 @@ func (interpreter *Interpreter) Interpret() (err error) {
 		}
 	}()
 
+	program := interpreter.Checker.Program
+
 	// pre-declare empty variables for all structure and function declarations
-	for _, declaration := range interpreter.Checker.Program.StructureDeclarations() {
+	for _, declaration := range program.StructureDeclarations() {
 		interpreter.declareVariable(declaration.Identifier, nil)
 	}
 
-	for _, declaration := range interpreter.Checker.Program.FunctionDeclarations() {
+	for _, declaration := range program.FunctionDeclarations() {
 		interpreter.declareVariable(declaration.Identifier, nil)
+	}
+
+	for _, declaration := range program.InterfaceDeclarations() {
+		interpreter.declareInterface(declaration)
 	}
 
 	Run(More(func() Trampoline {
@@ -1112,21 +1120,56 @@ func (interpreter *Interpreter) invokeStructureFunction(
 }
 
 func (interpreter *Interpreter) structureFunctions(
-	declaration *ast.StructureDeclaration,
+	structureDeclaration *ast.StructureDeclaration,
 	lexicalScope hamt.Map,
 ) map[string]InterpretedFunctionValue {
 
 	functions := map[string]InterpretedFunctionValue{}
 
-	for _, functionDeclaration := range declaration.Functions {
+	for _, functionDeclaration := range structureDeclaration.Functions {
 		functionType := interpreter.Checker.FunctionDeclarationFunctionTypes[functionDeclaration]
 
-		function := functionDeclaration.ToExpression()
+		function := interpreter.structureFunction(structureDeclaration, functionDeclaration)
+
 		functions[functionDeclaration.Identifier] =
 			newInterpretedFunction(function, functionType, lexicalScope)
 	}
 
 	return functions
+}
+
+func (interpreter *Interpreter) structureFunction(
+	structureDeclaration *ast.StructureDeclaration,
+	functionDeclaration *ast.FunctionDeclaration,
+) *ast.FunctionExpression {
+
+	functionIdentifier := functionDeclaration.Identifier
+
+	function := functionDeclaration.ToExpression()
+
+	// copy function block, append interfaces' pre-conditions and post-condition
+	functionBlockCopy := *function.FunctionBlock
+	function.FunctionBlock = &functionBlockCopy
+
+	for _, conformance := range structureDeclaration.Conformances {
+		interfaceDeclaration := interpreter.interfaces[conformance.Identifier]
+		interfaceFunction, ok := interfaceDeclaration.FunctionsByIdentifier()[functionIdentifier]
+		if !ok || interfaceFunction.FunctionBlock == nil {
+			continue
+		}
+
+		functionBlockCopy.PreConditions = append(
+			functionBlockCopy.PreConditions,
+			interfaceFunction.FunctionBlock.PreConditions...,
+		)
+
+		functionBlockCopy.PostConditions = append(
+			functionBlockCopy.PostConditions,
+			interfaceFunction.FunctionBlock.PostConditions...,
+		)
+	}
+
+	return function
 }
 
 func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
@@ -1177,4 +1220,8 @@ func (interpreter *Interpreter) unbox(value Value) Value {
 
 func (interpreter *Interpreter) VisitInterfaceDeclaration(structure *ast.InterfaceDeclaration) ast.Repr {
 	return Done{}
+}
+
+func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDeclaration) {
+	interpreter.interfaces[declaration.Identifier] = declaration
 }

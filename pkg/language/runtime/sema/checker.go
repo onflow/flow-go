@@ -236,16 +236,16 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	// pre-declare interfaces, structures, and functions (check afterwards)
 
-	for _, interfaceDeclaration := range program.InterfaceDeclarations() {
-		checker.declareInterfaceDeclaration(interfaceDeclaration)
+	for _, declaration := range program.InterfaceDeclarations() {
+		checker.declareInterfaceDeclaration(declaration)
 	}
 
-	for _, structureDeclaration := range program.StructureDeclarations() {
-		checker.declareStructureDeclaration(structureDeclaration)
+	for _, declaration := range program.StructureDeclarations() {
+		checker.declareStructureDeclaration(declaration)
 	}
 
-	for _, functionDeclaration := range program.FunctionDeclarations() {
-		checker.declareFunctionDeclaration(functionDeclaration)
+	for _, declaration := range program.FunctionDeclarations() {
+		checker.declareFunctionDeclaration(declaration)
 	}
 
 	// check all declarations
