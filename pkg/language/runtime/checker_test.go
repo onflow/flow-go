@@ -3222,3 +3222,229 @@ func TestCheckInterfaceWithInitializerImplementationAndConditions(t *testing.T) 
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
+
+func TestCheckInvalidInterfaceConstructorCall(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {}
+
+      let test = Test()
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckInterfaceUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(
+		`
+          interface Test {}
+
+          let test: Test = panic("")
+        `,
+		stdlib.PanicFunction,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+// TODO: field declaration, member access, type references
+//
+func TestCheckOrigins(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x = 1
+        var y = 1
+
+        fun f1(paramX: Int, paramY: Bool) {
+            let x = 1
+            var y: Int? = y
+            fun f2() {
+                if let y = y {
+                }
+            }
+        }
+
+        struct S1 {
+            fun test() {}
+        }
+
+        interface I1 {}
+
+        fun f3(): S1 {
+            f1(paramX: 1, paramY: true)
+            return S1()
+        }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	origins := checker.Origins.All()
+
+	matchers := []*originMatcher{
+		{
+			sema.Position{Line: 2, Column: 12},
+			sema.Position{Line: 2, Column: 12},
+			common.DeclarationKindConstant,
+		},
+		{
+			sema.Position{Line: 3, Column: 12},
+			sema.Position{Line: 3, Column: 12},
+			common.DeclarationKindVariable,
+		},
+		{
+			sema.Position{Line: 5, Column: 12},
+			sema.Position{Line: 5, Column: 13},
+			common.DeclarationKindFunction,
+		},
+		{
+			sema.Position{Line: 5, Column: 15},
+			sema.Position{Line: 5, Column: 20},
+			common.DeclarationKindParameter,
+		},
+		{
+			sema.Position{Line: 5, Column: 28},
+			sema.Position{Line: 5, Column: 33},
+			common.DeclarationKindParameter,
+		},
+		{
+			sema.Position{Line: 6, Column: 16},
+			sema.Position{Line: 6, Column: 16},
+			common.DeclarationKindConstant,
+		},
+		{
+			sema.Position{Line: 7, Column: 16},
+			sema.Position{Line: 7, Column: 16},
+			common.DeclarationKindVariable,
+		},
+		{
+			sema.Position{Line: 7, Column: 26},
+			sema.Position{Line: 7, Column: 26},
+			common.DeclarationKindVariable,
+		},
+		{
+			sema.Position{Line: 8, Column: 16},
+			sema.Position{Line: 8, Column: 17},
+			common.DeclarationKindFunction,
+		},
+		{
+			sema.Position{Line: 9, Column: 23},
+			sema.Position{Line: 9, Column: 23},
+			common.DeclarationKindConstant,
+		},
+		{
+			sema.Position{Line: 9, Column: 27},
+			sema.Position{Line: 9, Column: 27},
+			common.DeclarationKindVariable,
+		},
+		{
+			sema.Position{Line: 14, Column: 15},
+			sema.Position{Line: 14, Column: 16},
+			common.DeclarationKindStructure,
+		},
+		{
+			sema.Position{Line: 15, Column: 16},
+			sema.Position{Line: 15, Column: 19},
+			common.DeclarationKindFunction,
+		},
+		{
+			sema.Position{Line: 18, Column: 18},
+			sema.Position{Line: 18, Column: 19},
+			common.DeclarationKindInterface,
+		},
+		{
+			sema.Position{Line: 20, Column: 12},
+			sema.Position{Line: 20, Column: 13},
+			common.DeclarationKindFunction,
+		},
+		{
+			sema.Position{Line: 21, Column: 12},
+			sema.Position{Line: 21, Column: 13},
+			common.DeclarationKindFunction,
+		},
+		{
+			sema.Position{Line: 22, Column: 19},
+			sema.Position{Line: 22, Column: 20},
+			// NOTE: function instead of structure: constructor
+			common.DeclarationKindFunction,
+		},
+	}
+
+	ms := make([]interface{}, len(matchers))
+	for i := range matchers {
+		ms[i] = matchers[i]
+	}
+
+	Expect(origins).
+		To(ConsistOf(ms...))
+
+	for _, matcher := range matchers {
+		Expect(checker.Origins.Find(matcher.startPos)).To(Not(BeNil()))
+		Expect(checker.Origins.Find(matcher.endPos)).To(Not(BeNil()))
+	}
+}
+
+// matchers
+
+type originMatcher struct {
+	startPos sema.Position
+	endPos   sema.Position
+	kind     common.DeclarationKind
+}
+
+func (matcher *originMatcher) Match(actual interface{}) (success bool, err error) {
+	origin, ok := actual.(sema.Origin)
+	if !ok {
+		return false, fmt.Errorf("originMatcher matcher expects a sema.Origin")
+	}
+
+	if origin.StartPos != matcher.startPos {
+		return false, fmt.Errorf(
+			"Expected\n\t%#v\nto have start position\n\t%#v",
+			actual,
+			matcher.startPos,
+		)
+	}
+
+	if origin.EndPos != matcher.endPos {
+		return false, fmt.Errorf(
+			"Expected\n\t%#v\nto have start position\n\t%#v",
+			actual,
+			matcher.endPos,
+		)
+	}
+
+	if origin.Variable.Kind != matcher.kind {
+		return false, fmt.Errorf(
+			"Expected\n\t%#v\nto have kind\n\t%s",
+			actual,
+			matcher.kind.Name(),
+		)
+	}
+
+	return true, nil
+}
+
+func (matcher *originMatcher) FailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf(
+		"Expected\n\t%#v\nto match origin with\n\t%s @ %#v",
+		actual,
+		matcher.kind.Name(), matcher.startPos,
+	)
+}
+
+func (matcher *originMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf(
+		"Expected\n\t%#v\nto not match origin with\n\t%s @ %#v",
+		actual,
+		matcher.kind.Name(), matcher.startPos,
+	)
+}

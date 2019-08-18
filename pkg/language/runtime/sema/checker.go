@@ -38,6 +38,7 @@ type Checker struct {
 	functionContexts []*functionContext
 	Globals          map[string]*Variable
 	inCondition      bool
+	Origins          *Origins
 	// TODO: refactor into fields on AST?
 	FunctionDeclarationFunctionTypes   map[*ast.FunctionDeclaration]*FunctionType
 	VariableDeclarationValueTypes      map[*ast.VariableDeclaration]Type
@@ -61,6 +62,7 @@ func NewChecker(program *ast.Program) *Checker {
 		valueActivations:                   valueActivations,
 		typeActivations:                    typeActivations,
 		Globals:                            map[string]*Variable{},
+		Origins:                            NewOrigins(),
 		FunctionDeclarationFunctionTypes:   map[*ast.FunctionDeclaration]*FunctionType{},
 		VariableDeclarationValueTypes:      map[*ast.VariableDeclaration]Type{},
 		AssignmentStatementTargetTypes:     map[*ast.AssignmentStatement]Type{},
@@ -83,14 +85,16 @@ type ValueDeclaration interface {
 
 func (checker *Checker) DeclareValue(declaration ValueDeclaration) error {
 	checker.errors = nil
-	checker.declareVariable(
-		declaration.DeclarationName(),
+	identifier := declaration.DeclarationName()
+	variable := checker.declareVariable(
+		identifier,
 		declaration.DeclarationType(),
 		declaration.DeclarationKind(),
 		declaration.DeclarationPosition(),
 		declaration.DeclarationIsConstant(),
 		declaration.DeclarationArgumentLabels(),
 	)
+	checker.recordVariableOrigin(identifier, variable)
 	return checker.checkerError()
 }
 
@@ -272,6 +276,7 @@ func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDecl
 		declaration.IdentifierPos,
 		functionType,
 		argumentLabels,
+		true,
 	)
 
 	return functionType
@@ -362,7 +367,7 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) {
 }
 
 // declareParameters declares a constant for each parameter,
-// ensuring names are unique and constants don't already exist
+// ensuring names are unique and constants don'T already exist
 //
 func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameterTypes []Type) {
 
@@ -388,15 +393,15 @@ func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameter
 
 		parameterType := parameterTypes[i]
 
-		checker.setVariable(
-			identifier,
-			&Variable{
-				IsConstant: true,
-				Type:       parameterType,
-				Depth:      depth,
-				Pos:        &parameter.IdentifierPos,
-			},
-		)
+		variable := &Variable{
+			Kind:       common.DeclarationKindParameter,
+			IsConstant: true,
+			Type:       parameterType,
+			Depth:      depth,
+			Pos:        &parameter.IdentifierPos,
+		}
+		checker.setVariable(identifier, variable)
+		checker.recordVariableOrigin(identifier, variable)
 	}
 }
 
@@ -470,7 +475,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 	checker.VariableDeclarationValueTypes[declaration] = declarationType
 
-	checker.declareVariable(
+	variable := checker.declareVariable(
 		declaration.Identifier,
 		declarationType,
 		declaration.DeclarationKind(),
@@ -478,6 +483,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declaration.IsConstant,
 		nil,
 	)
+	checker.recordVariableOrigin(declaration.Identifier, variable)
 }
 
 func (checker *Checker) declareVariable(
@@ -487,7 +493,7 @@ func (checker *Checker) declareVariable(
 	pos ast.Position,
 	isConstant bool,
 	argumentLabels []string,
-) {
+) *Variable {
 
 	depth := checker.valueActivations.Depth()
 
@@ -505,16 +511,16 @@ func (checker *Checker) declareVariable(
 	}
 
 	// variable with this name is not declared in current scope, declare it
-	checker.setVariable(
-		identifier,
-		&Variable{
-			IsConstant:     isConstant,
-			Depth:          depth,
-			Type:           ty,
-			Pos:            &pos,
-			ArgumentLabels: argumentLabels,
-		},
-	)
+	variable := &Variable{
+		Kind:           kind,
+		IsConstant:     isConstant,
+		Depth:          depth,
+		Type:           ty,
+		Pos:            &pos,
+		ArgumentLabels: argumentLabels,
+	}
+	checker.setVariable(identifier, variable)
+	return variable
 }
 
 func (checker *Checker) declareGlobal(declaration ast.Declaration) {
@@ -598,7 +604,6 @@ func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, ret
 	// which has the return type
 
 	if _, ok := returnType.(*VoidType); !ok {
-
 		checker.declareVariable(
 			ResultIdentifier,
 			returnType,
@@ -607,6 +612,7 @@ func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, ret
 			true,
 			nil,
 		)
+		// TODO: record origin - but what position?
 	}
 
 	checker.visitConditions(functionBlock.PostConditions)
@@ -622,6 +628,7 @@ func (checker *Checker) declareBefore() {
 		true,
 		nil,
 	)
+	// TODO: record origin – but what position?
 }
 
 func (checker *Checker) visitConditions(conditions []*ast.Condition) {
@@ -951,16 +958,18 @@ func (checker *Checker) visitMemberExpressionAssignment(
 
 	member.IsInitialized = true
 
-	// check value can be assigned to member
-	if !checker.IsSubType(valueType, member.Type) {
-		checker.report(
-			&TypeMismatchError{
-				ExpectedType: member.Type,
-				ActualType:   valueType,
-				StartPos:     assignment.Value.StartPosition(),
-				EndPos:       assignment.Value.EndPosition(),
-			},
-		)
+	// if value type is valid, check value can be assigned to member
+	if _, ok := valueType.(*InvalidType); !ok {
+		if !checker.IsSubType(valueType, member.Type) {
+			checker.report(
+				&TypeMismatchError{
+					ExpectedType: member.Type,
+					ActualType:   valueType,
+					StartPos:     assignment.Value.StartPosition(),
+					EndPos:       assignment.Value.EndPosition(),
+				},
+			)
+		}
 	}
 
 	return member.Type
@@ -1015,7 +1024,7 @@ func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpre
 }
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
-	variable := checker.findAndCheckVariable(expression)
+	variable := checker.findAndCheckVariable(expression, true)
 	if variable == nil {
 		return &InvalidType{}
 	}
@@ -1023,17 +1032,26 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	return variable.Type
 }
 
-func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpression) *Variable {
-	variable := checker.findVariable(expression.Identifier)
+func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpression, recordOrigin bool) *Variable {
+	identifier := expression.Identifier
+	variable := checker.findVariable(identifier)
 	if variable == nil {
 		checker.report(
 			&NotDeclaredError{
 				ExpectedKind: common.DeclarationKindValue,
-				Name:         expression.Identifier,
+				Name:         identifier,
 				Pos:          expression.StartPosition(),
 			},
 		)
 		return nil
+	}
+
+	if recordOrigin {
+		checker.recordOrigin(
+			expression.StartPosition(),
+			expression.EndPosition(),
+			variable,
+		)
 	}
 
 	return variable
@@ -1594,7 +1612,7 @@ func (checker *Checker) checkIdentifierInvocationArgumentLabels(
 	identifierExpression *ast.IdentifierExpression,
 ) {
 
-	variable := checker.findAndCheckVariable(identifierExpression)
+	variable := checker.findAndCheckVariable(identifierExpression, false)
 
 	if variable == nil || len(variable.ArgumentLabels) == 0 {
 		return
@@ -1815,6 +1833,7 @@ func (checker *Checker) declareFunction(
 	identifierPosition ast.Position,
 	functionType *FunctionType,
 	argumentLabels []string,
+	recordOrigin bool,
 ) {
 
 	// check if variable with this identifier is already declared in the current scope
@@ -1832,16 +1851,18 @@ func (checker *Checker) declareFunction(
 	}
 
 	// variable with this identifier is not declared in current scope, declare it
-	checker.setVariable(
-		identifier,
-		&Variable{
-			IsConstant:     true,
-			Depth:          depth,
-			Type:           functionType,
-			ArgumentLabels: argumentLabels,
-			Pos:            &identifierPosition,
-		},
-	)
+	variable := &Variable{
+		Kind:           common.DeclarationKindFunction,
+		IsConstant:     true,
+		Depth:          depth,
+		Type:           functionType,
+		ArgumentLabels: argumentLabels,
+		Pos:            &identifierPosition,
+	}
+	checker.setVariable(identifier, variable)
+	if recordOrigin {
+		checker.recordVariableOrigin(identifier, variable)
+	}
 }
 
 func (checker *Checker) enterFunction(functionType *FunctionType) {
@@ -1958,6 +1979,7 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 		structure.Identifier,
 		structure.IdentifierPos,
 		structureType,
+		common.DeclarationKindStructure,
 	)
 
 	members := checker.members(structure.Fields, structure.Functions)
@@ -2034,6 +2056,7 @@ func (checker *Checker) declareStructureConstructor(
 		structure.IdentifierPos,
 		functionType,
 		argumentLabels,
+		false,
 	)
 }
 
@@ -2057,7 +2080,7 @@ func (checker *Checker) members(
 			IsInitialized: false,
 		}
 
-		// TODO: don't report for interfaces
+		// TODO: don'T report for interfaces
 		if field.VariableKind == ast.VariableKindNotSpecified {
 			checker.report(
 				&InvalidVariableKindError{
@@ -2158,7 +2181,7 @@ func (checker *Checker) checkStructureFunctions(
 	for _, function := range functions {
 		func() {
 			// NOTE: new activation, as function declarations
-			// shouldn't be visible in other function declarations,
+			// shouldn'T be visible in other function declarations,
 			// and `self` is is only visible inside function
 			checker.valueActivations.PushCurrent()
 			defer checker.valueActivations.Pop()
@@ -2173,21 +2196,22 @@ func (checker *Checker) checkStructureFunctions(
 func (checker *Checker) declareSelfValue(selfType Type) {
 
 	// NOTE: declare `self` one depth lower ("inside" function),
-	// so it can't be re-declared by the function's parameters
+	// so it can'T be re-declared by the function's parameters
 
 	depth := checker.valueActivations.Depth() + 1
 
 	self := &Variable{
+		Kind:       common.DeclarationKindConstant,
 		Type:       selfType,
 		IsConstant: true,
 		Depth:      depth,
 		Pos:        nil,
 	}
-
 	checker.setVariable(SelfIdentifier, self)
+	checker.recordVariableOrigin(SelfIdentifier, self)
 }
 
-// checkMemberNames checks the fields and functions are unique and aren't named `init`
+// checkMemberNames checks the fields and functions are unique and aren'T named `init`
 //
 func (checker *Checker) checkMemberNames(
 	fields []*ast.FieldDeclaration,
@@ -2249,6 +2273,7 @@ func (checker *Checker) declareType(
 	identifier string,
 	identifierPos ast.Position,
 	newType Type,
+	kind common.DeclarationKind,
 ) {
 	existingType := checker.FindType(identifier)
 	if existingType != nil {
@@ -2264,6 +2289,15 @@ func (checker *Checker) declareType(
 
 	// type with this identifier is not declared in current scope, declare it
 	checker.setType(identifier, newType)
+	checker.recordVariableOrigin(
+		identifier,
+		&Variable{
+			Kind:       kind,
+			IsConstant: true,
+			Type:       newType,
+			Pos:        &identifierPos,
+		},
+	)
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
@@ -2304,7 +2338,7 @@ func (checker *Checker) checkInterfaceFunctions(functions []*ast.FunctionDeclara
 	for _, function := range functions {
 		func() {
 			// NOTE: new activation, as function declarations
-			// shouldn't be visible in other function declarations,
+			// shouldn'T be visible in other function declarations,
 			// and `self` is is only visible inside function
 			checker.valueActivations.PushCurrent()
 			defer checker.valueActivations.Pop()
@@ -2336,6 +2370,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		declaration.Identifier,
 		declaration.IdentifierPos,
 		interfaceType,
+		common.DeclarationKindInterface,
 	)
 
 	members := checker.members(declaration.Fields, declaration.Functions)
@@ -2379,4 +2414,17 @@ func (checker *Checker) checkInterfaceFunctionBlock(block *ast.FunctionBlock, ki
 			},
 		)
 	}
+}
+
+func (checker *Checker) recordOrigin(startPos, endPos ast.Position, variable *Variable) {
+	checker.Origins.Put(startPos, endPos, variable)
+}
+
+func (checker *Checker) recordVariableOrigin(name string, variable *Variable) {
+	if variable.Pos == nil {
+		return
+	}
+	startPos := *variable.Pos
+	endPos := variable.Pos.Shifted(len(name) - 1)
+	checker.recordOrigin(startPos, endPos, variable)
 }

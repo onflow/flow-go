@@ -7,7 +7,7 @@ type Position struct {
 	Offset int
 	// line number, starting at 1
 	Line int
-	// column number, starting at 1 (byte count)
+	// column number, starting at 0 (byte count)
 	Column int
 }
 
