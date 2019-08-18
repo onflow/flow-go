@@ -2369,3 +2369,66 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 				Value: interpreter.IntValue{Int: big.NewInt(0)},
 			}))
 }
+
+func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface Test {}
+
+      struct TestImpl: Test {}
+
+      let test: Test = TestImpl()
+	`)
+
+	Expect(inter.Globals["test"].Value).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+}
+
+func TestInterpretInterfaceFieldUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface Test {
+          x: Int
+      }
+
+      struct TestImpl: Test {
+          var x: Int
+
+          init(x: Int) {
+              self.x = x
+          }
+      }
+
+      let test: Test = TestImpl(x: 1)
+
+      let x = test.x
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+}
+
+func TestInterpretInterfaceFunctionUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface Test {
+          fun test(): Int
+      }
+
+      struct TestImpl: Test {
+          fun test(): Int {
+              return 2
+          }
+      }
+
+      let test: Test = TestImpl()
+
+      let val = test.test()
+	`)
+
+	Expect(inter.Globals["val"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+}

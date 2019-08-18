@@ -1176,6 +1176,5 @@ func (interpreter *Interpreter) unbox(value Value) Value {
 }
 
 func (interpreter *Interpreter) VisitInterfaceDeclaration(structure *ast.InterfaceDeclaration) ast.Repr {
-	// TODO:
-	return nil
+	return Done{}
 }
