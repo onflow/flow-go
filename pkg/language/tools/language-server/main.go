@@ -1,14 +1,20 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
 	"github.com/dapperlabs/bamboo-node/pkg/language/tools/language-server/protocol"
-	"os"
-	"strings"
 )
+
+var standardLibraryFunctions = append(stdlib.BuiltIns, stdlib.Helpers...)
 
 type server struct{}
 
@@ -66,8 +72,15 @@ func (server) DidChangeTextDocument(
 ) error {
 	code := params.ContentChanges[0].Text
 
+	start := time.Now()
 	program, parseErrors := parser.ParseProgram(code)
 	errorCount := len(parseErrors)
+	elapsed := time.Since(start)
+
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("parsing took %s", elapsed),
+	})
 
 	diagnostics := []protocol.Diagnostic{}
 
@@ -91,7 +104,20 @@ func (server) DidChangeTextDocument(
 		// no parsing parseErrors, check program
 
 		checker := sema.NewChecker(program)
+		for _, function := range standardLibraryFunctions {
+			if err := checker.DeclareValue(function); err != nil {
+				panic(err)
+			}
+		}
+
+		start := time.Now()
 		err := checker.Check()
+		elapsed := time.Since(start)
+
+		connection.LogMessage(&protocol.LogMessageParams{
+			Type:    protocol.Info,
+			Message: fmt.Sprintf("checking took %s", elapsed),
+		})
 
 		if checkerError, ok := err.(*sema.CheckerError); ok && checkerError != nil {
 			for _, err := range checkerError.Errors {
