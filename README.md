@@ -14,11 +14,14 @@ Bamboo is a highly-performant blockchain designed to power the next generation o
   - [Setting up your environment](#setting-up-your-environment)
     - [Install Go](#install-go)
     - [Install Docker](#install-docker)
+    - [Install tooling dependencies](#install-tooling-dependencies)
   - [Generating code](#generating-code)
     - [Dependency injection using Wire](#dependency-injection-using-wire)
     - [Generate gRPC stubs from protobuf files](#generate-grpc-stubs-from-protobuf-files)
     - [Generate all code](#generate-all-code)
 - [Testing](#testing)
+  - [Unit tests](#unit-tests)
+  - [Integration tests](#integration-tests)
 - [Contributing](#contributing)
   - [Work streams](#work-streams)
   - [Workflow](#workflow)
@@ -71,6 +74,10 @@ export PATH="$PATH:$GOPATH/bin"
 
 - Test that Go was installed correctly: https://golang.org/doc/install#testing
 - Clone this repository to `$GOPATH/src/github.com/dapperlabs/bamboo-node/`
+- Clone this repository submodules:
+```bash
+git submodule update --init --recursive
+```
 
 _Note: since we are using go modules and we prepend every `go` command with `GO111MODULE=on`, you can also clone this repo anywhere you want._
 
@@ -86,6 +93,8 @@ make test
 The first run will take a while because some base layers will be downloaded and built for the first time. See our [testing instructions](#testing) for more details.
 
 #### Install tooling dependencies
+
+First, install [CMake](https://cmake.org/install/) as it is used for code generation of some tools.
 
 Additional development tools required for code generation can be installed with this command:
 
@@ -119,28 +128,36 @@ make generate
 
 ## Testing
 
+### Unit tests
+
+```bash
+make test-unit
+```
+
+### Integration tests
+
 Initialize all containers:
 
 ```bash
-make test-setup
+make test-integrate-setup
 ```
 
 Run the test suite:
 
 ```bash
-make test-run
+make test-integrate-run
 ```
 
 Cleanup:
 
 ```bash
-make test-teardown
+make test-integrate-teardown
 ```
 
 The following command will run the three steps above:
 
 ```bash
-make test
+make test-integrate
 ```
 
 ## Contributing

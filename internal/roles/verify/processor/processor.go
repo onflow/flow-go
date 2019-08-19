@@ -9,9 +9,9 @@ import (
 
 	"github.com/bluele/gcache"
 
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
 	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 type ReceiptProcessor struct {

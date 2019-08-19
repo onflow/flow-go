@@ -27,23 +27,6 @@ const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 // Message models a single message that is supposed to get exchanged by the gossip network
 type GossipMessage struct {
 	// Types that are valid to be assigned to Payload:
-	//	*GossipMessage_SignedCollectionHash
-	//	*GossipMessage_Collection
-	//	*GossipMessage_Block
-	//	*GossipMessage_BlockSeal
-	//	*GossipMessage_IntermediateRegisters
-	//	*GossipMessage_ExecutionReceipt
-	//	*GossipMessage_ResultApproval
-	//	*GossipMessage_SignedTransaction
-	//	*GossipMessage_Register
-	//	*GossipMessage_TransactionRegister
-	//	*GossipMessage_Inventory
-	//	*GossipMessage_InvalidExecutionReceiptChallenge
-	//	*GossipMessage_StateTransition
-	//	*GossipMessage_SignedStateTransition
-	//	*GossipMessage_FinalizedStateTransition
-	//	*GossipMessage_Vote
-	//	*GossipMessage_StateTransitionVote
 	//	*GossipMessage_MessageRequest
 	//	*GossipMessage_MessageReply
 	Payload              isGossipMessage_Payload `protobuf_oneof:"Payload"`
@@ -86,74 +69,6 @@ type isGossipMessage_Payload interface {
 	isGossipMessage_Payload()
 }
 
-type GossipMessage_SignedCollectionHash struct {
-	SignedCollectionHash *SignedCollectionHash `protobuf:"bytes,1,opt,name=signedCollectionHash,proto3,oneof"`
-}
-
-type GossipMessage_Collection struct {
-	Collection *Collection `protobuf:"bytes,2,opt,name=collection,proto3,oneof"`
-}
-
-type GossipMessage_Block struct {
-	Block *Block `protobuf:"bytes,3,opt,name=block,proto3,oneof"`
-}
-
-type GossipMessage_BlockSeal struct {
-	BlockSeal *BlockSeal `protobuf:"bytes,4,opt,name=blockSeal,proto3,oneof"`
-}
-
-type GossipMessage_IntermediateRegisters struct {
-	IntermediateRegisters *IntermediateRegisters `protobuf:"bytes,5,opt,name=intermediateRegisters,proto3,oneof"`
-}
-
-type GossipMessage_ExecutionReceipt struct {
-	ExecutionReceipt *ExecutionReceipt `protobuf:"bytes,6,opt,name=executionReceipt,proto3,oneof"`
-}
-
-type GossipMessage_ResultApproval struct {
-	ResultApproval *ResultApproval `protobuf:"bytes,7,opt,name=resultApproval,proto3,oneof"`
-}
-
-type GossipMessage_SignedTransaction struct {
-	SignedTransaction *SignedTransaction `protobuf:"bytes,8,opt,name=signedTransaction,proto3,oneof"`
-}
-
-type GossipMessage_Register struct {
-	Register *Register `protobuf:"bytes,9,opt,name=register,proto3,oneof"`
-}
-
-type GossipMessage_TransactionRegister struct {
-	TransactionRegister *TransactionRegister `protobuf:"bytes,10,opt,name=transactionRegister,proto3,oneof"`
-}
-
-type GossipMessage_Inventory struct {
-	Inventory *Inventory `protobuf:"bytes,11,opt,name=inventory,proto3,oneof"`
-}
-
-type GossipMessage_InvalidExecutionReceiptChallenge struct {
-	InvalidExecutionReceiptChallenge *InvalidExecutionReceiptChallenge `protobuf:"bytes,12,opt,name=invalidExecutionReceiptChallenge,proto3,oneof"`
-}
-
-type GossipMessage_StateTransition struct {
-	StateTransition *StateTransition `protobuf:"bytes,13,opt,name=stateTransition,proto3,oneof"`
-}
-
-type GossipMessage_SignedStateTransition struct {
-	SignedStateTransition *SignedStateTransition `protobuf:"bytes,14,opt,name=signedStateTransition,proto3,oneof"`
-}
-
-type GossipMessage_FinalizedStateTransition struct {
-	FinalizedStateTransition *FinalizedStateTransition `protobuf:"bytes,15,opt,name=finalizedStateTransition,proto3,oneof"`
-}
-
-type GossipMessage_Vote struct {
-	Vote Vote `protobuf:"varint,16,opt,name=vote,proto3,enum=bamboo.shared.messages.Vote,oneof"`
-}
-
-type GossipMessage_StateTransitionVote struct {
-	StateTransitionVote *StateTransitionVote `protobuf:"bytes,17,opt,name=stateTransitionVote,proto3,oneof"`
-}
-
 type GossipMessage_MessageRequest struct {
 	MessageRequest *MessageRequest `protobuf:"bytes,18,opt,name=messageRequest,proto3,oneof"`
 }
@@ -162,40 +77,6 @@ type GossipMessage_MessageReply struct {
 	MessageReply *MessageReply `protobuf:"bytes,19,opt,name=messageReply,proto3,oneof"`
 }
 
-func (*GossipMessage_SignedCollectionHash) isGossipMessage_Payload() {}
-
-func (*GossipMessage_Collection) isGossipMessage_Payload() {}
-
-func (*GossipMessage_Block) isGossipMessage_Payload() {}
-
-func (*GossipMessage_BlockSeal) isGossipMessage_Payload() {}
-
-func (*GossipMessage_IntermediateRegisters) isGossipMessage_Payload() {}
-
-func (*GossipMessage_ExecutionReceipt) isGossipMessage_Payload() {}
-
-func (*GossipMessage_ResultApproval) isGossipMessage_Payload() {}
-
-func (*GossipMessage_SignedTransaction) isGossipMessage_Payload() {}
-
-func (*GossipMessage_Register) isGossipMessage_Payload() {}
-
-func (*GossipMessage_TransactionRegister) isGossipMessage_Payload() {}
-
-func (*GossipMessage_Inventory) isGossipMessage_Payload() {}
-
-func (*GossipMessage_InvalidExecutionReceiptChallenge) isGossipMessage_Payload() {}
-
-func (*GossipMessage_StateTransition) isGossipMessage_Payload() {}
-
-func (*GossipMessage_SignedStateTransition) isGossipMessage_Payload() {}
-
-func (*GossipMessage_FinalizedStateTransition) isGossipMessage_Payload() {}
-
-func (*GossipMessage_Vote) isGossipMessage_Payload() {}
-
-func (*GossipMessage_StateTransitionVote) isGossipMessage_Payload() {}
-
 func (*GossipMessage_MessageRequest) isGossipMessage_Payload() {}
 
 func (*GossipMessage_MessageReply) isGossipMessage_Payload() {}
@@ -203,125 +84,6 @@ func (*GossipMessage_MessageReply) isGossipMessage_Payload() {}
 func (m *GossipMessage) GetPayload() isGossipMessage_Payload {
 	if m != nil {
 		return m.Payload
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetSignedCollectionHash() *SignedCollectionHash {
-	if x, ok := m.GetPayload().(*GossipMessage_SignedCollectionHash); ok {
-		return x.SignedCollectionHash
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetCollection() *Collection {
-	if x, ok := m.GetPayload().(*GossipMessage_Collection); ok {
-		return x.Collection
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetBlock() *Block {
-	if x, ok := m.GetPayload().(*GossipMessage_Block); ok {
-		return x.Block
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetBlockSeal() *BlockSeal {
-	if x, ok := m.GetPayload().(*GossipMessage_BlockSeal); ok {
-		return x.BlockSeal
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetIntermediateRegisters() *IntermediateRegisters {
-	if x, ok := m.GetPayload().(*GossipMessage_IntermediateRegisters); ok {
-		return x.IntermediateRegisters
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetExecutionReceipt() *ExecutionReceipt {
-	if x, ok := m.GetPayload().(*GossipMessage_ExecutionReceipt); ok {
-		return x.ExecutionReceipt
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetResultApproval() *ResultApproval {
-	if x, ok := m.GetPayload().(*GossipMessage_ResultApproval); ok {
-		return x.ResultApproval
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetSignedTransaction() *SignedTransaction {
-	if x, ok := m.GetPayload().(*GossipMessage_SignedTransaction); ok {
-		return x.SignedTransaction
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetRegister() *Register {
-	if x, ok := m.GetPayload().(*GossipMessage_Register); ok {
-		return x.Register
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetTransactionRegister() *TransactionRegister {
-	if x, ok := m.GetPayload().(*GossipMessage_TransactionRegister); ok {
-		return x.TransactionRegister
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetInventory() *Inventory {
-	if x, ok := m.GetPayload().(*GossipMessage_Inventory); ok {
-		return x.Inventory
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetInvalidExecutionReceiptChallenge() *InvalidExecutionReceiptChallenge {
-	if x, ok := m.GetPayload().(*GossipMessage_InvalidExecutionReceiptChallenge); ok {
-		return x.InvalidExecutionReceiptChallenge
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetStateTransition() *StateTransition {
-	if x, ok := m.GetPayload().(*GossipMessage_StateTransition); ok {
-		return x.StateTransition
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetSignedStateTransition() *SignedStateTransition {
-	if x, ok := m.GetPayload().(*GossipMessage_SignedStateTransition); ok {
-		return x.SignedStateTransition
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetFinalizedStateTransition() *FinalizedStateTransition {
-	if x, ok := m.GetPayload().(*GossipMessage_FinalizedStateTransition); ok {
-		return x.FinalizedStateTransition
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetVote() Vote {
-	if x, ok := m.GetPayload().(*GossipMessage_Vote); ok {
-		return x.Vote
-	}
-	return Vote_REJECT
-}
-
-func (m *GossipMessage) GetStateTransitionVote() *StateTransitionVote {
-	if x, ok := m.GetPayload().(*GossipMessage_StateTransitionVote); ok {
-		return x.StateTransitionVote
 	}
 	return nil
 }
@@ -378,23 +140,6 @@ func (m *GossipMessage) GetTTL() uint64 {
 // XXX_OneofWrappers is for the internal use of the proto package.
 func (*GossipMessage) XXX_OneofWrappers() []interface{} {
 	return []interface{}{
-		(*GossipMessage_SignedCollectionHash)(nil),
-		(*GossipMessage_Collection)(nil),
-		(*GossipMessage_Block)(nil),
-		(*GossipMessage_BlockSeal)(nil),
-		(*GossipMessage_IntermediateRegisters)(nil),
-		(*GossipMessage_ExecutionReceipt)(nil),
-		(*GossipMessage_ResultApproval)(nil),
-		(*GossipMessage_SignedTransaction)(nil),
-		(*GossipMessage_Register)(nil),
-		(*GossipMessage_TransactionRegister)(nil),
-		(*GossipMessage_Inventory)(nil),
-		(*GossipMessage_InvalidExecutionReceiptChallenge)(nil),
-		(*GossipMessage_StateTransition)(nil),
-		(*GossipMessage_SignedStateTransition)(nil),
-		(*GossipMessage_FinalizedStateTransition)(nil),
-		(*GossipMessage_Vote)(nil),
-		(*GossipMessage_StateTransitionVote)(nil),
 		(*GossipMessage_MessageRequest)(nil),
 		(*GossipMessage_MessageReply)(nil),
 	}
@@ -478,61 +223,68 @@ func (m *MessageReply) GetTextResponse() string {
 	return ""
 }
 
+type VoidReply struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *VoidReply) Reset()         { *m = VoidReply{} }
+func (m *VoidReply) String() string { return proto.CompactTextString(m) }
+func (*VoidReply) ProtoMessage()    {}
+func (*VoidReply) Descriptor() ([]byte, []int) {
+	return fileDescriptor_b864370d9939db87, []int{3}
+}
+
+func (m *VoidReply) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_VoidReply.Unmarshal(m, b)
+}
+func (m *VoidReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_VoidReply.Marshal(b, m, deterministic)
+}
+func (m *VoidReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_VoidReply.Merge(m, src)
+}
+func (m *VoidReply) XXX_Size() int {
+	return xxx_messageInfo_VoidReply.Size(m)
+}
+func (m *VoidReply) XXX_DiscardUnknown() {
+	xxx_messageInfo_VoidReply.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_VoidReply proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*GossipMessage)(nil), "bamboo.shared.gossip.GossipMessage")
 	proto.RegisterType((*MessageRequest)(nil), "bamboo.shared.gossip.MessageRequest")
 	proto.RegisterType((*MessageReply)(nil), "bamboo.shared.gossip.MessageReply")
+	proto.RegisterType((*VoidReply)(nil), "bamboo.shared.gossip.VoidReply")
 }
 
 func init() { proto.RegisterFile("shared/gossip.proto", fileDescriptor_b864370d9939db87) }
 
 var fileDescriptor_b864370d9939db87 = []byte{
-	// 712 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x95, 0x6f, 0x6f, 0x12, 0x31,
-	0x1c, 0xc7, 0x0f, 0xc7, 0x18, 0xfc, 0xc6, 0xd8, 0xd6, 0xfd, 0xb1, 0x59, 0xd4, 0x20, 0x2e, 0x8a,
-	0x51, 0xd1, 0x60, 0x4c, 0x7c, 0x64, 0xb2, 0xcd, 0x3f, 0x5d, 0xe2, 0xcc, 0x52, 0xc8, 0xa2, 0x3e,
-	0x31, 0x85, 0xfb, 0x09, 0x8d, 0xb7, 0xeb, 0x79, 0xed, 0xc8, 0xe6, 0x0b, 0xf0, 0xb5, 0xfa, 0x32,
-	0x4c, 0x7b, 0x8c, 0x71, 0x70, 0x87, 0x3e, 0x2b, 0xed, 0xf7, 0xf3, 0xe9, 0xb5, 0xfd, 0x95, 0xc2,
-	0x96, 0x1e, 0x8a, 0x18, 0xfd, 0xe7, 0x03, 0xa5, 0xb5, 0x8c, 0x5a, 0x51, 0xac, 0x8c, 0x22, 0xdb,
-	0x3d, 0x71, 0xde, 0x53, 0xaa, 0x95, 0x8c, 0xb5, 0x92, 0xb1, 0xbd, 0x9d, 0x71, 0xf4, 0x1c, 0xb5,
-	0x16, 0x03, 0xd4, 0x49, 0xb8, 0xf1, 0x67, 0x0d, 0xd6, 0x3e, 0xb8, 0xc4, 0x49, 0x32, 0x40, 0x7a,
-	0xb0, 0xad, 0xe5, 0x20, 0x44, 0xff, 0x48, 0x05, 0x01, 0xf6, 0x8d, 0x54, 0x21, 0x13, 0x7a, 0x48,
-	0x0b, 0xf5, 0x42, 0x73, 0xb5, 0xfd, 0xb4, 0x95, 0xb6, 0x4f, 0x74, 0x9d, 0x0c, 0x86, 0x79, 0x3c,
-	0xd3, 0x45, 0xde, 0x02, 0xf4, 0x27, 0x3d, 0xf4, 0x96, 0x33, 0x37, 0xf2, 0xcc, 0x53, 0xac, 0xc7,
-	0xa7, 0x38, 0xf2, 0x0a, 0x96, 0x7b, 0x81, 0xea, 0xff, 0xa0, 0x4b, 0x4e, 0x70, 0x37, 0x4f, 0x70,
-	0x68, 0x43, 0xcc, 0xe3, 0x49, 0x9a, 0x1c, 0x40, 0xc5, 0x35, 0x3a, 0x28, 0x02, 0x5a, 0x74, 0xe8,
-	0xfd, 0x85, 0xa8, 0x0d, 0x32, 0x8f, 0xdf, 0x50, 0x04, 0x61, 0x47, 0x86, 0x06, 0xe3, 0x73, 0xf4,
-	0xa5, 0x30, 0xc8, 0x71, 0x20, 0xb5, 0xc1, 0x58, 0xd3, 0x65, 0xa7, 0x7b, 0x96, 0xa7, 0x3b, 0xce,
-	0x82, 0x98, 0xc7, 0xb3, 0x6d, 0xe4, 0x0c, 0x36, 0xf0, 0x12, 0xfb, 0x17, 0x76, 0xb5, 0x1c, 0xfb,
-	0x28, 0x23, 0x43, 0x4b, 0x6e, 0x86, 0x66, 0xde, 0x0c, 0xef, 0x66, 0xf2, 0xcc, 0xe3, 0x73, 0x0e,
-	0x72, 0x0a, 0xb5, 0x18, 0xf5, 0x45, 0x60, 0x0e, 0xa2, 0x28, 0x56, 0x23, 0x11, 0xd0, 0x15, 0x67,
-	0x7d, 0x98, 0x67, 0xe5, 0xa9, 0x34, 0xf3, 0xf8, 0x0c, 0x4f, 0xbe, 0xc0, 0x66, 0x72, 0xd0, 0xdd,
-	0x58, 0x84, 0x5a, 0x24, 0xe7, 0x5a, 0x76, 0xd2, 0xc7, 0x8b, 0x2b, 0x66, 0x0a, 0x60, 0x1e, 0x9f,
-	0xb7, 0x90, 0x37, 0x50, 0x8e, 0xc7, 0x3b, 0x42, 0x2b, 0xce, 0x58, 0xcf, 0xff, 0xcc, 0x24, 0xc7,
-	0x3c, 0x3e, 0x61, 0xc8, 0x37, 0xd8, 0x32, 0x37, 0xba, 0xeb, 0x08, 0x05, 0xa7, 0x7a, 0x92, 0xa7,
-	0xea, 0xce, 0x23, 0xcc, 0xe3, 0x59, 0x26, 0x5b, 0x4f, 0x32, 0x1c, 0x61, 0x68, 0x54, 0x7c, 0x45,
-	0x57, 0x17, 0xd7, 0xd3, 0xf1, 0x75, 0xd0, 0xd6, 0xd3, 0x84, 0x22, 0xbf, 0x0b, 0x50, 0x97, 0xe1,
-	0x48, 0x04, 0xd2, 0x9f, 0x3d, 0xc0, 0xa3, 0xa1, 0x08, 0x02, 0x0c, 0x07, 0x48, 0xab, 0x4e, 0xfd,
-	0x7a, 0x81, 0x7a, 0x21, 0xcf, 0x3c, 0xfe, 0xcf, 0x39, 0x48, 0x07, 0xd6, 0xb5, 0x11, 0x06, 0xdd,
-	0xf2, 0xa5, 0x3b, 0xc5, 0x35, 0x37, 0xed, 0xa3, 0xdc, 0x53, 0x4c, 0xc7, 0x99, 0xc7, 0x67, 0x0d,
-	0xf6, 0xb6, 0x24, 0xc7, 0x3a, 0x93, 0xa5, 0xb5, 0xc5, 0xb7, 0xa5, 0x93, 0x05, 0xd9, 0xdb, 0x92,
-	0x69, 0x23, 0x21, 0xd0, 0xef, 0x32, 0x14, 0x81, 0xfc, 0x35, 0x3f, 0xd3, 0xba, 0x9b, 0xe9, 0x45,
-	0xde, 0x4c, 0xef, 0x73, 0x38, 0xe6, 0xf1, 0x5c, 0x27, 0x69, 0x43, 0x71, 0xa4, 0x0c, 0xd2, 0x8d,
-	0x7a, 0xa1, 0x59, 0x6b, 0xdf, 0xc9, 0x73, 0x9f, 0x29, 0x63, 0xf7, 0xde, 0x65, 0x6d, 0x31, 0xce,
-	0xec, 0x8e, 0x1d, 0xa6, 0x9b, 0x8b, 0x8b, 0xb1, 0x33, 0x8f, 0xd8, 0x62, 0xcc, 0x30, 0x91, 0x4f,
-	0x50, 0x1b, 0x63, 0x1c, 0x7f, 0x5e, 0xa0, 0x36, 0x94, 0x38, 0xf7, 0x7e, 0x2b, 0xeb, 0x55, 0x68,
-	0x9d, 0xa4, 0xb2, 0xf6, 0x62, 0xa7, 0x69, 0xc2, 0xa0, 0x3a, 0xe9, 0x89, 0x82, 0x2b, 0xba, 0x95,
-	0xf9, 0x5f, 0x3d, 0x6b, 0x8b, 0x02, 0x5b, 0xe0, 0x29, 0x92, 0xec, 0x42, 0xe9, 0x04, 0xcd, 0x50,
-	0xf9, 0x74, 0xbb, 0x5e, 0x68, 0x56, 0xf8, 0xf8, 0x17, 0xb9, 0x07, 0xc0, 0xb1, 0x2f, 0x23, 0x89,
-	0xa1, 0xd1, 0x74, 0xa7, 0xbe, 0xd4, 0xac, 0xf0, 0xa9, 0x1e, 0xcb, 0x75, 0x30, 0xf4, 0x31, 0xa6,
-	0xbb, 0x09, 0x97, 0xfc, 0x22, 0x04, 0x8a, 0xa7, 0xc2, 0x0c, 0xe9, 0x6d, 0x47, 0xb8, 0x36, 0xd9,
-	0x80, 0xa5, 0x6e, 0xf7, 0x23, 0xa5, 0xf5, 0x42, 0xb3, 0xc8, 0x6d, 0xf3, 0xb0, 0x02, 0x2b, 0xa7,
-	0xe2, 0x2a, 0x50, 0xc2, 0x6f, 0xec, 0x43, 0x2d, 0xbd, 0x5c, 0xab, 0xe8, 0xe2, 0xa5, 0x71, 0x4f,
-	0x5b, 0x85, 0xbb, 0x76, 0xa3, 0x0d, 0xd5, 0xe9, 0x65, 0x90, 0x06, 0x54, 0x6d, 0x3f, 0x47, 0x1d,
-	0xa9, 0x50, 0xe3, 0x38, 0x9b, 0xea, 0x6b, 0xfb, 0x50, 0x1e, 0x33, 0x9a, 0x7c, 0x86, 0x55, 0xfb,
-	0x81, 0xd7, 0xaf, 0xe9, 0x83, 0xec, 0x9d, 0x4a, 0x3d, 0xb9, 0x7b, 0xff, 0xb1, 0x9d, 0x0d, 0xef,
-	0xb0, 0xfc, 0xb5, 0x94, 0x8c, 0xf7, 0x4a, 0xee, 0xed, 0x7e, 0xf9, 0x37, 0x00, 0x00, 0xff, 0xff,
-	0xe5, 0x66, 0x2d, 0xe7, 0xff, 0x07, 0x00, 0x00,
+	// 319 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x92, 0xc1, 0x4e, 0xfa, 0x40,
+	0x10, 0xc6, 0xe9, 0x1f, 0xc2, 0xdf, 0x0e, 0x88, 0x66, 0x40, 0xdc, 0x78, 0xd0, 0x66, 0xe5, 0xd0,
+	0x53, 0x4d, 0xf0, 0x09, 0xe4, 0x22, 0x07, 0x31, 0xb8, 0x36, 0x1e, 0xbc, 0x15, 0x3a, 0x81, 0x26,
+	0xd0, 0xad, 0xdd, 0xc5, 0xd8, 0x57, 0xf2, 0x29, 0x4d, 0x77, 0x09, 0xa1, 0xa6, 0x89, 0xb7, 0x6f,
+	0xbe, 0x99, 0xef, 0xb7, 0x99, 0xdd, 0x85, 0xbe, 0x5a, 0x47, 0x39, 0xc5, 0x77, 0x2b, 0xa9, 0x54,
+	0x92, 0x05, 0x59, 0x2e, 0xb5, 0xc4, 0xc1, 0x22, 0xda, 0x2e, 0xa4, 0x0c, 0x6c, 0x2f, 0xb0, 0x3d,
+	0xfe, 0xfd, 0x0f, 0x4e, 0x1f, 0x8d, 0x9c, 0x91, 0x52, 0xd1, 0x8a, 0xf0, 0x19, 0x7a, 0x5b, 0x2b,
+	0x05, 0x7d, 0xec, 0x48, 0x69, 0x86, 0x9e, 0xe3, 0x77, 0xc6, 0xa3, 0xa0, 0x0e, 0x10, 0xcc, 0x2a,
+	0xb3, 0xd3, 0x86, 0xf8, 0x95, 0xc6, 0x29, 0x74, 0x0f, 0x4e, 0xb6, 0x29, 0x58, 0xdf, 0xd0, 0xf8,
+	0x1f, 0xb4, 0x6c, 0x53, 0x4c, 0x1b, 0xa2, 0x92, 0xc4, 0x21, 0xb4, 0x67, 0xa4, 0xd7, 0x32, 0x66,
+	0x03, 0xcf, 0xf1, 0x5d, 0xb1, 0xaf, 0xf0, 0x1a, 0x40, 0xd0, 0x32, 0xc9, 0x12, 0x4a, 0xb5, 0x62,
+	0x17, 0x5e, 0xd3, 0x77, 0xc5, 0x91, 0x53, 0xe6, 0x5e, 0x29, 0x8d, 0x29, 0x67, 0x43, 0x9b, 0xb3,
+	0x15, 0x22, 0xb4, 0xe6, 0x91, 0x5e, 0xb3, 0x4b, 0x93, 0x30, 0x1a, 0xcf, 0xa1, 0x19, 0x86, 0x4f,
+	0x8c, 0x79, 0x8e, 0xdf, 0x12, 0xa5, 0x9c, 0xb8, 0xf0, 0x7f, 0x1e, 0x15, 0x1b, 0x19, 0xc5, 0x7c,
+	0x04, 0xbd, 0xea, 0xba, 0x25, 0x22, 0xa4, 0x2f, 0xcd, 0x1c, 0x03, 0x36, 0x9a, 0x8f, 0xa1, 0x7b,
+	0xbc, 0x06, 0x72, 0xe8, 0x96, 0xbe, 0x20, 0x95, 0xc9, 0x54, 0xd1, 0x7e, 0xb6, 0xe2, 0xf1, 0x0e,
+	0xb8, 0x6f, 0x32, 0x89, 0x4d, 0x60, 0xbc, 0x82, 0xb3, 0x03, 0x60, 0x99, 0xd0, 0x27, 0xe5, 0x18,
+	0x02, 0x3c, 0xa8, 0x22, 0x5d, 0xbe, 0xec, 0x68, 0x47, 0x78, 0x5b, 0x7f, 0x79, 0x95, 0x77, 0xbc,
+	0xba, 0xa9, 0x1f, 0x3a, 0x1c, 0xc3, 0x1b, 0x93, 0x93, 0xf7, 0xb6, 0x6d, 0x2e, 0xda, 0xe6, 0x8f,
+	0xdc, 0xff, 0x04, 0x00, 0x00, 0xff, 0xff, 0xba, 0xf0, 0x61, 0x12, 0x3a, 0x02, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -543,72 +295,72 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// MessagesClient is the client API for Messages service.
+// MessageRecieverClient is the client API for MessageReciever service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type MessagesClient interface {
-	SendMessage(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*MessageReply, error)
+type MessageRecieverClient interface {
+	AsyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*VoidReply, error)
 }
 
-type messagesClient struct {
+type messageRecieverClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewMessagesClient(cc *grpc.ClientConn) MessagesClient {
-	return &messagesClient{cc}
+func NewMessageRecieverClient(cc *grpc.ClientConn) MessageRecieverClient {
+	return &messageRecieverClient{cc}
 }
 
-func (c *messagesClient) SendMessage(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*MessageReply, error) {
-	out := new(MessageReply)
-	err := c.cc.Invoke(ctx, "/bamboo.shared.gossip.Messages/SendMessage", in, out, opts...)
+func (c *messageRecieverClient) AsyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*VoidReply, error) {
+	out := new(VoidReply)
+	err := c.cc.Invoke(ctx, "/bamboo.shared.gossip.MessageReciever/AsyncQueue", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// MessagesServer is the server API for Messages service.
-type MessagesServer interface {
-	SendMessage(context.Context, *GossipMessage) (*MessageReply, error)
+// MessageRecieverServer is the server API for MessageReciever service.
+type MessageRecieverServer interface {
+	AsyncQueue(context.Context, *GossipMessage) (*VoidReply, error)
 }
 
-// UnimplementedMessagesServer can be embedded to have forward compatible implementations.
-type UnimplementedMessagesServer struct {
+// UnimplementedMessageRecieverServer can be embedded to have forward compatible implementations.
+type UnimplementedMessageRecieverServer struct {
 }
 
-func (*UnimplementedMessagesServer) SendMessage(ctx context.Context, req *GossipMessage) (*MessageReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendMessage not implemented")
+func (*UnimplementedMessageRecieverServer) AsyncQueue(ctx context.Context, req *GossipMessage) (*VoidReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AsyncQueue not implemented")
 }
 
-func RegisterMessagesServer(s *grpc.Server, srv MessagesServer) {
-	s.RegisterService(&_Messages_serviceDesc, srv)
+func RegisterMessageRecieverServer(s *grpc.Server, srv MessageRecieverServer) {
+	s.RegisterService(&_MessageReciever_serviceDesc, srv)
 }
 
-func _Messages_SendMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MessageReciever_AsyncQueue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GossipMessage)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MessagesServer).SendMessage(ctx, in)
+		return srv.(MessageRecieverServer).AsyncQueue(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/bamboo.shared.gossip.Messages/SendMessage",
+		FullMethod: "/bamboo.shared.gossip.MessageReciever/AsyncQueue",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MessagesServer).SendMessage(ctx, req.(*GossipMessage))
+		return srv.(MessageRecieverServer).AsyncQueue(ctx, req.(*GossipMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-var _Messages_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "bamboo.shared.gossip.Messages",
-	HandlerType: (*MessagesServer)(nil),
+var _MessageReciever_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "bamboo.shared.gossip.MessageReciever",
+	HandlerType: (*MessageRecieverServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "SendMessage",
-			Handler:    _Messages_SendMessage_Handler,
+			MethodName: "AsyncQueue",
+			Handler:    _MessageReciever_AsyncQueue_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -2,9 +2,11 @@ package parser
 
 import (
 	"fmt"
-	"github.com/antlr/antlr4/runtime/Go/antlr"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	goRuntime "runtime"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 )
 
 type errorListener struct {
@@ -27,7 +29,45 @@ func (l *errorListener) SyntaxError(
 	})
 }
 
-func Parse(code string) (program *ast.Program, errors []error) {
+func ParseProgram(code string) (program *ast.Program, errors []error) {
+	result, errors := parse(
+		code,
+		func(parser *StrictusParser) antlr.ParserRuleContext {
+			return parser.Program()
+		},
+	)
+
+	program, ok := result.(*ast.Program)
+	if !ok {
+		return nil, errors
+	}
+
+	return program, errors
+}
+
+func ParseExpression(code string) (expression ast.Expression, errors []error) {
+	result, errors := parse(
+		code,
+		func(parser *StrictusParser) antlr.ParserRuleContext {
+			return parser.Expression()
+		},
+	)
+
+	program, ok := result.(ast.Expression)
+	if !ok {
+		return nil, errors
+	}
+
+	return program, errors
+}
+
+func parse(
+	code string,
+	parse func(*StrictusParser) antlr.ParserRuleContext,
+) (
+	result ast.Repr,
+	errors []error,
+) {
 	input := antlr.NewInputStream(code)
 	lexer := NewStrictusLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
@@ -61,11 +101,11 @@ func Parse(code string) (program *ast.Program, errors []error) {
 			}
 			appendSyntaxErrors()
 			errors = append(errors, err)
-			program = nil
+			result = nil
 		}
 	}()
 
-	parsed := parser.Program()
+	parsed := parse(parser)
 
 	appendSyntaxErrors()
 
@@ -73,12 +113,5 @@ func Parse(code string) (program *ast.Program, errors []error) {
 		return nil, errors
 	}
 
-	result := parsed.Accept(&ProgramVisitor{})
-
-	program, ok := result.(*ast.Program)
-	if !ok {
-		return nil, errors
-	}
-
-	return program, errors
+	return parsed.Accept(&ProgramVisitor{}), errors
 }

@@ -26,6 +26,31 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
+type Vote int32
+
+const (
+	Vote_REJECT  Vote = 0
+	Vote_APPROVE Vote = 1
+)
+
+var Vote_name = map[int32]string{
+	0: "REJECT",
+	1: "APPROVE",
+}
+
+var Vote_value = map[string]int32{
+	"REJECT":  0,
+	"APPROVE": 1,
+}
+
+func (x Vote) String() string {
+	return proto.EnumName(Vote_name, int32(x))
+}
+
+func (Vote) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_e74762047b656a23, []int{0}
+}
+
 type PingRequest struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -424,10 +449,10 @@ func (m *GetFinalizedStateTransitionsRequest) GetStateTransitionHeights() []uint
 }
 
 type GetFinalizedStateTransitionsResponse struct {
-	FinalizedStateTransitions []*shared.FinalizedStateTransition `protobuf:"bytes,1,rep,name=finalizedStateTransitions,proto3" json:"finalizedStateTransitions,omitempty"`
-	XXX_NoUnkeyedLiteral      struct{}                           `json:"-"`
-	XXX_unrecognized          []byte                             `json:"-"`
-	XXX_sizecache             int32                              `json:"-"`
+	FinalizedStateTransitions []*FinalizedStateTransition `protobuf:"bytes,1,rep,name=finalizedStateTransitions,proto3" json:"finalizedStateTransitions,omitempty"`
+	XXX_NoUnkeyedLiteral      struct{}                    `json:"-"`
+	XXX_unrecognized          []byte                      `json:"-"`
+	XXX_sizecache             int32                       `json:"-"`
 }
 
 func (m *GetFinalizedStateTransitionsResponse) Reset()         { *m = GetFinalizedStateTransitionsResponse{} }
@@ -455,19 +480,58 @@ func (m *GetFinalizedStateTransitionsResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_GetFinalizedStateTransitionsResponse proto.InternalMessageInfo
 
-func (m *GetFinalizedStateTransitionsResponse) GetFinalizedStateTransitions() []*shared.FinalizedStateTransition {
+func (m *GetFinalizedStateTransitionsResponse) GetFinalizedStateTransitions() []*FinalizedStateTransition {
 	if m != nil {
 		return m.FinalizedStateTransitions
 	}
 	return nil
 }
 
+type ProcessStateTransitionProposalRequest struct {
+	SignedStateTransition *SignedStateTransition `protobuf:"bytes,1,opt,name=signedStateTransition,proto3" json:"signedStateTransition,omitempty"`
+	XXX_NoUnkeyedLiteral  struct{}               `json:"-"`
+	XXX_unrecognized      []byte                 `json:"-"`
+	XXX_sizecache         int32                  `json:"-"`
+}
+
+func (m *ProcessStateTransitionProposalRequest) Reset()         { *m = ProcessStateTransitionProposalRequest{} }
+func (m *ProcessStateTransitionProposalRequest) String() string { return proto.CompactTextString(m) }
+func (*ProcessStateTransitionProposalRequest) ProtoMessage()    {}
+func (*ProcessStateTransitionProposalRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e74762047b656a23, []int{12}
+}
+
+func (m *ProcessStateTransitionProposalRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ProcessStateTransitionProposalRequest.Unmarshal(m, b)
+}
+func (m *ProcessStateTransitionProposalRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ProcessStateTransitionProposalRequest.Marshal(b, m, deterministic)
+}
+func (m *ProcessStateTransitionProposalRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProcessStateTransitionProposalRequest.Merge(m, src)
+}
+func (m *ProcessStateTransitionProposalRequest) XXX_Size() int {
+	return xxx_messageInfo_ProcessStateTransitionProposalRequest.Size(m)
+}
+func (m *ProcessStateTransitionProposalRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_ProcessStateTransitionProposalRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ProcessStateTransitionProposalRequest proto.InternalMessageInfo
+
+func (m *ProcessStateTransitionProposalRequest) GetSignedStateTransition() *SignedStateTransition {
+	if m != nil {
+		return m.SignedStateTransition
+	}
+	return nil
+}
+
 type ProcessSignedStateTransitionPrepareVoteRequest struct {
-	StateTransitionVote  *shared.StateTransitionVote `protobuf:"bytes,1,opt,name=stateTransitionVote,proto3" json:"stateTransitionVote,omitempty"`
-	Signature            []byte                      `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                    `json:"-"`
-	XXX_unrecognized     []byte                      `json:"-"`
-	XXX_sizecache        int32                       `json:"-"`
+	StateTransitionVote  *StateTransitionVote `protobuf:"bytes,1,opt,name=stateTransitionVote,proto3" json:"stateTransitionVote,omitempty"`
+	Signature            []byte               `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
+	XXX_unrecognized     []byte               `json:"-"`
+	XXX_sizecache        int32                `json:"-"`
 }
 
 func (m *ProcessSignedStateTransitionPrepareVoteRequest) Reset() {
@@ -478,7 +542,7 @@ func (m *ProcessSignedStateTransitionPrepareVoteRequest) String() string {
 }
 func (*ProcessSignedStateTransitionPrepareVoteRequest) ProtoMessage() {}
 func (*ProcessSignedStateTransitionPrepareVoteRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e74762047b656a23, []int{12}
+	return fileDescriptor_e74762047b656a23, []int{13}
 }
 
 func (m *ProcessSignedStateTransitionPrepareVoteRequest) XXX_Unmarshal(b []byte) error {
@@ -499,7 +563,7 @@ func (m *ProcessSignedStateTransitionPrepareVoteRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ProcessSignedStateTransitionPrepareVoteRequest proto.InternalMessageInfo
 
-func (m *ProcessSignedStateTransitionPrepareVoteRequest) GetStateTransitionVote() *shared.StateTransitionVote {
+func (m *ProcessSignedStateTransitionPrepareVoteRequest) GetStateTransitionVote() *StateTransitionVote {
 	if m != nil {
 		return m.StateTransitionVote
 	}
@@ -514,11 +578,11 @@ func (m *ProcessSignedStateTransitionPrepareVoteRequest) GetSignature() []byte {
 }
 
 type ProcessSignedStateTransitionCommitVoteRequest struct {
-	StateTransitionVote  *shared.StateTransitionVote `protobuf:"bytes,1,opt,name=stateTransitionVote,proto3" json:"stateTransitionVote,omitempty"`
-	Signature            []byte                      `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                    `json:"-"`
-	XXX_unrecognized     []byte                      `json:"-"`
-	XXX_sizecache        int32                       `json:"-"`
+	StateTransitionVote  *StateTransitionVote `protobuf:"bytes,1,opt,name=stateTransitionVote,proto3" json:"stateTransitionVote,omitempty"`
+	Signature            []byte               `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
+	XXX_unrecognized     []byte               `json:"-"`
+	XXX_sizecache        int32                `json:"-"`
 }
 
 func (m *ProcessSignedStateTransitionCommitVoteRequest) Reset() {
@@ -529,7 +593,7 @@ func (m *ProcessSignedStateTransitionCommitVoteRequest) String() string {
 }
 func (*ProcessSignedStateTransitionCommitVoteRequest) ProtoMessage() {}
 func (*ProcessSignedStateTransitionCommitVoteRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e74762047b656a23, []int{13}
+	return fileDescriptor_e74762047b656a23, []int{14}
 }
 
 func (m *ProcessSignedStateTransitionCommitVoteRequest) XXX_Unmarshal(b []byte) error {
@@ -550,7 +614,7 @@ func (m *ProcessSignedStateTransitionCommitVoteRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ProcessSignedStateTransitionCommitVoteRequest proto.InternalMessageInfo
 
-func (m *ProcessSignedStateTransitionCommitVoteRequest) GetStateTransitionVote() *shared.StateTransitionVote {
+func (m *ProcessSignedStateTransitionCommitVoteRequest) GetStateTransitionVote() *StateTransitionVote {
 	if m != nil {
 		return m.StateTransitionVote
 	}
@@ -564,7 +628,220 @@ func (m *ProcessSignedStateTransitionCommitVoteRequest) GetSignature() []byte {
 	return nil
 }
 
+type StateTransition struct {
+	PreviousStateTransitionHash      []byte   `protobuf:"bytes,1,opt,name=previousStateTransitionHash,proto3" json:"previousStateTransitionHash,omitempty"`
+	PreviousCommitApprovalSignatures [][]byte `protobuf:"bytes,2,rep,name=previousCommitApprovalSignatures,proto3" json:"previousCommitApprovalSignatures,omitempty"`
+	Height                           uint64   `protobuf:"varint,3,opt,name=height,proto3" json:"height,omitempty"`
+	Value                            []byte   `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"`
+	XXX_NoUnkeyedLiteral             struct{} `json:"-"`
+	XXX_unrecognized                 []byte   `json:"-"`
+	XXX_sizecache                    int32    `json:"-"`
+}
+
+func (m *StateTransition) Reset()         { *m = StateTransition{} }
+func (m *StateTransition) String() string { return proto.CompactTextString(m) }
+func (*StateTransition) ProtoMessage()    {}
+func (*StateTransition) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e74762047b656a23, []int{15}
+}
+
+func (m *StateTransition) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_StateTransition.Unmarshal(m, b)
+}
+func (m *StateTransition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_StateTransition.Marshal(b, m, deterministic)
+}
+func (m *StateTransition) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StateTransition.Merge(m, src)
+}
+func (m *StateTransition) XXX_Size() int {
+	return xxx_messageInfo_StateTransition.Size(m)
+}
+func (m *StateTransition) XXX_DiscardUnknown() {
+	xxx_messageInfo_StateTransition.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StateTransition proto.InternalMessageInfo
+
+func (m *StateTransition) GetPreviousStateTransitionHash() []byte {
+	if m != nil {
+		return m.PreviousStateTransitionHash
+	}
+	return nil
+}
+
+func (m *StateTransition) GetPreviousCommitApprovalSignatures() [][]byte {
+	if m != nil {
+		return m.PreviousCommitApprovalSignatures
+	}
+	return nil
+}
+
+func (m *StateTransition) GetHeight() uint64 {
+	if m != nil {
+		return m.Height
+	}
+	return 0
+}
+
+func (m *StateTransition) GetValue() []byte {
+	if m != nil {
+		return m.Value
+	}
+	return nil
+}
+
+type SignedStateTransition struct {
+	StateTransition      *StateTransition `protobuf:"bytes,1,opt,name=stateTransition,proto3" json:"stateTransition,omitempty"`
+	Signature            []byte           `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}         `json:"-"`
+	XXX_unrecognized     []byte           `json:"-"`
+	XXX_sizecache        int32            `json:"-"`
+}
+
+func (m *SignedStateTransition) Reset()         { *m = SignedStateTransition{} }
+func (m *SignedStateTransition) String() string { return proto.CompactTextString(m) }
+func (*SignedStateTransition) ProtoMessage()    {}
+func (*SignedStateTransition) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e74762047b656a23, []int{16}
+}
+
+func (m *SignedStateTransition) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SignedStateTransition.Unmarshal(m, b)
+}
+func (m *SignedStateTransition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SignedStateTransition.Marshal(b, m, deterministic)
+}
+func (m *SignedStateTransition) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SignedStateTransition.Merge(m, src)
+}
+func (m *SignedStateTransition) XXX_Size() int {
+	return xxx_messageInfo_SignedStateTransition.Size(m)
+}
+func (m *SignedStateTransition) XXX_DiscardUnknown() {
+	xxx_messageInfo_SignedStateTransition.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SignedStateTransition proto.InternalMessageInfo
+
+func (m *SignedStateTransition) GetStateTransition() *StateTransition {
+	if m != nil {
+		return m.StateTransition
+	}
+	return nil
+}
+
+func (m *SignedStateTransition) GetSignature() []byte {
+	if m != nil {
+		return m.Signature
+	}
+	return nil
+}
+
+type FinalizedStateTransition struct {
+	SignedStateTransition *SignedStateTransition `protobuf:"bytes,1,opt,name=signedStateTransition,proto3" json:"signedStateTransition,omitempty"`
+	Signatures            [][]byte               `protobuf:"bytes,2,rep,name=signatures,proto3" json:"signatures,omitempty"`
+	XXX_NoUnkeyedLiteral  struct{}               `json:"-"`
+	XXX_unrecognized      []byte                 `json:"-"`
+	XXX_sizecache         int32                  `json:"-"`
+}
+
+func (m *FinalizedStateTransition) Reset()         { *m = FinalizedStateTransition{} }
+func (m *FinalizedStateTransition) String() string { return proto.CompactTextString(m) }
+func (*FinalizedStateTransition) ProtoMessage()    {}
+func (*FinalizedStateTransition) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e74762047b656a23, []int{17}
+}
+
+func (m *FinalizedStateTransition) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_FinalizedStateTransition.Unmarshal(m, b)
+}
+func (m *FinalizedStateTransition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_FinalizedStateTransition.Marshal(b, m, deterministic)
+}
+func (m *FinalizedStateTransition) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_FinalizedStateTransition.Merge(m, src)
+}
+func (m *FinalizedStateTransition) XXX_Size() int {
+	return xxx_messageInfo_FinalizedStateTransition.Size(m)
+}
+func (m *FinalizedStateTransition) XXX_DiscardUnknown() {
+	xxx_messageInfo_FinalizedStateTransition.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_FinalizedStateTransition proto.InternalMessageInfo
+
+func (m *FinalizedStateTransition) GetSignedStateTransition() *SignedStateTransition {
+	if m != nil {
+		return m.SignedStateTransition
+	}
+	return nil
+}
+
+func (m *FinalizedStateTransition) GetSignatures() [][]byte {
+	if m != nil {
+		return m.Signatures
+	}
+	return nil
+}
+
+type StateTransitionVote struct {
+	StateTransitionHash  []byte   `protobuf:"bytes,1,opt,name=stateTransitionHash,proto3" json:"stateTransitionHash,omitempty"`
+	Vote                 Vote     `protobuf:"varint,2,opt,name=vote,proto3,enum=bamboo.services.consensus.Vote" json:"vote,omitempty"`
+	Height               uint64   `protobuf:"varint,3,opt,name=height,proto3" json:"height,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *StateTransitionVote) Reset()         { *m = StateTransitionVote{} }
+func (m *StateTransitionVote) String() string { return proto.CompactTextString(m) }
+func (*StateTransitionVote) ProtoMessage()    {}
+func (*StateTransitionVote) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e74762047b656a23, []int{18}
+}
+
+func (m *StateTransitionVote) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_StateTransitionVote.Unmarshal(m, b)
+}
+func (m *StateTransitionVote) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_StateTransitionVote.Marshal(b, m, deterministic)
+}
+func (m *StateTransitionVote) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StateTransitionVote.Merge(m, src)
+}
+func (m *StateTransitionVote) XXX_Size() int {
+	return xxx_messageInfo_StateTransitionVote.Size(m)
+}
+func (m *StateTransitionVote) XXX_DiscardUnknown() {
+	xxx_messageInfo_StateTransitionVote.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StateTransitionVote proto.InternalMessageInfo
+
+func (m *StateTransitionVote) GetStateTransitionHash() []byte {
+	if m != nil {
+		return m.StateTransitionHash
+	}
+	return nil
+}
+
+func (m *StateTransitionVote) GetVote() Vote {
+	if m != nil {
+		return m.Vote
+	}
+	return Vote_REJECT
+}
+
+func (m *StateTransitionVote) GetHeight() uint64 {
+	if m != nil {
+		return m.Height
+	}
+	return 0
+}
+
 func init() {
+	proto.RegisterEnum("bamboo.services.consensus.Vote", Vote_name, Vote_value)
 	proto.RegisterType((*PingRequest)(nil), "bamboo.services.consensus.PingRequest")
 	proto.RegisterType((*PingResponse)(nil), "bamboo.services.consensus.PingResponse")
 	proto.RegisterType((*SubmitCollectionRequest)(nil), "bamboo.services.consensus.SubmitCollectionRequest")
@@ -577,57 +854,75 @@ func init() {
 	proto.RegisterType((*GetBlockResponse)(nil), "bamboo.services.consensus.GetBlockResponse")
 	proto.RegisterType((*GetFinalizedStateTransitionsRequest)(nil), "bamboo.services.consensus.GetFinalizedStateTransitionsRequest")
 	proto.RegisterType((*GetFinalizedStateTransitionsResponse)(nil), "bamboo.services.consensus.GetFinalizedStateTransitionsResponse")
+	proto.RegisterType((*ProcessStateTransitionProposalRequest)(nil), "bamboo.services.consensus.ProcessStateTransitionProposalRequest")
 	proto.RegisterType((*ProcessSignedStateTransitionPrepareVoteRequest)(nil), "bamboo.services.consensus.ProcessSignedStateTransitionPrepareVoteRequest")
 	proto.RegisterType((*ProcessSignedStateTransitionCommitVoteRequest)(nil), "bamboo.services.consensus.ProcessSignedStateTransitionCommitVoteRequest")
+	proto.RegisterType((*StateTransition)(nil), "bamboo.services.consensus.StateTransition")
+	proto.RegisterType((*SignedStateTransition)(nil), "bamboo.services.consensus.SignedStateTransition")
+	proto.RegisterType((*FinalizedStateTransition)(nil), "bamboo.services.consensus.FinalizedStateTransition")
+	proto.RegisterType((*StateTransitionVote)(nil), "bamboo.services.consensus.StateTransitionVote")
 }
 
 func init() { proto.RegisterFile("services/consensus/consensus.proto", fileDescriptor_e74762047b656a23) }
 
 var fileDescriptor_e74762047b656a23 = []byte{
-	// 684 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x94, 0xdf, 0x4e, 0x13, 0x41,
-	0x14, 0xc6, 0xb3, 0x80, 0x1a, 0x4e, 0xab, 0x69, 0x06, 0x81, 0xb2, 0x80, 0xa9, 0xa3, 0xd1, 0x46,
-	0xc2, 0x96, 0x94, 0xc0, 0x8d, 0x89, 0x26, 0x25, 0x0a, 0xde, 0x35, 0x5b, 0xff, 0x24, 0x26, 0x98,
-	0x4c, 0xb7, 0x87, 0x65, 0x63, 0xbb, 0x53, 0x77, 0xa6, 0x26, 0x78, 0x4d, 0x4c, 0x7c, 0x01, 0x6f,
-	0x7d, 0x01, 0x7d, 0x0b, 0x1f, 0xcc, 0xec, 0xee, 0xcc, 0xb2, 0xa5, 0x9d, 0x85, 0x72, 0xe5, 0x5d,
-	0xf7, 0x9c, 0xf3, 0x9d, 0xf9, 0xe6, 0xcc, 0xe9, 0x0f, 0xa8, 0xc0, 0xe8, 0x6b, 0xe0, 0xa1, 0x68,
-	0x78, 0x3c, 0x14, 0x18, 0x8a, 0x51, 0xee, 0x97, 0x33, 0x8c, 0xb8, 0xe4, 0x64, 0xad, 0xcb, 0x06,
-	0x5d, 0xce, 0x1d, 0x5d, 0xea, 0x64, 0x05, 0xf6, 0xb2, 0x38, 0x65, 0x11, 0xf6, 0x1a, 0x03, 0x14,
-	0x82, 0xf9, 0xa8, 0x14, 0xf6, 0xba, 0xcf, 0xb9, 0xdf, 0xc7, 0x46, 0xf2, 0xd5, 0x1d, 0x9d, 0x34,
-	0x70, 0x30, 0x94, 0x67, 0x69, 0x92, 0xde, 0x85, 0x52, 0x3b, 0x08, 0x7d, 0x17, 0xbf, 0x8c, 0x50,
-	0x48, 0x5a, 0x87, 0x72, 0xfa, 0x29, 0x86, 0x71, 0x5b, 0x52, 0x85, 0x3b, 0xac, 0xd7, 0x8b, 0x50,
-	0x88, 0xaa, 0x55, 0xb3, 0xea, 0x65, 0x57, 0x7f, 0xd2, 0x1f, 0x16, 0xac, 0x76, 0x46, 0xdd, 0x41,
-	0x20, 0x0f, 0x78, 0xbf, 0x8f, 0x9e, 0x0c, 0x78, 0xa8, 0xba, 0x90, 0x16, 0x80, 0x97, 0x05, 0x13,
-	0x61, 0xa9, 0x49, 0x1d, 0x6d, 0x3c, 0x31, 0xe9, 0x64, 0x26, 0x73, 0xf2, 0x9c, 0x8a, 0x3c, 0x83,
-	0x0a, 0xf3, 0x3c, 0x14, 0xa2, 0x13, 0xf8, 0x21, 0x93, 0xa3, 0x08, 0x45, 0x75, 0xae, 0x36, 0x5f,
-	0x2f, 0xbb, 0x13, 0x71, 0xba, 0x0c, 0x4b, 0xed, 0x88, 0x0f, 0xb9, 0xc0, 0x56, 0x9f, 0x7b, 0x9f,
-	0xf5, 0x65, 0x56, 0xe0, 0xfe, 0x78, 0x38, 0xbd, 0x14, 0xdd, 0x00, 0xfb, 0xdd, 0xb0, 0xc7, 0x24,
-	0xaa, 0x6c, 0x6f, 0x4c, 0xb5, 0x09, 0xeb, 0x53, 0xb3, 0x4a, 0xbc, 0x07, 0xcb, 0x87, 0x28, 0x93,
-	0x58, 0xeb, 0xec, 0x88, 0x89, 0x53, 0x7d, 0xe9, 0x0d, 0x58, 0xec, 0xc6, 0xd1, 0x38, 0xa6, 0x86,
-	0x75, 0x11, 0xa0, 0xcf, 0x61, 0x35, 0x27, 0xc3, 0xc0, 0x3f, 0x95, 0x5a, 0x58, 0x83, 0x52, 0x5a,
-	0x97, 0x44, 0x13, 0xe9, 0x82, 0x9b, 0x0f, 0xd1, 0x43, 0xa8, 0x68, 0x71, 0xf6, 0x32, 0xbb, 0x70,
-	0x2b, 0x29, 0x51, 0xe3, 0xdd, 0x34, 0x8d, 0x37, 0x55, 0xa5, 0xb5, 0xf4, 0x18, 0x1e, 0x1d, 0xa2,
-	0x7c, 0x1d, 0x84, 0xac, 0x1f, 0x7c, 0xc3, 0x5e, 0x47, 0x32, 0x89, 0x6f, 0x23, 0x16, 0x8a, 0x20,
-	0x9e, 0xb9, 0xd0, 0x8e, 0xf6, 0x61, 0x45, 0x8c, 0xa7, 0x52, 0x23, 0xf1, 0x12, 0xcc, 0xd7, 0x17,
-	0x5c, 0x43, 0x96, 0xfe, 0xb4, 0xe0, 0x71, 0x71, 0x7f, 0x65, 0x3e, 0x84, 0xb5, 0x13, 0x53, 0x51,
-	0x72, 0x46, 0xa9, 0xb9, 0x63, 0xba, 0x90, 0xa9, 0xbb, 0x6b, 0x6e, 0x49, 0xff, 0x58, 0xe0, 0xb4,
-	0x23, 0xae, 0xd7, 0x66, 0xa2, 0xa2, 0x1d, 0xe1, 0x90, 0x45, 0xf8, 0x9e, 0x4b, 0xd4, 0x33, 0x38,
-	0x86, 0xa5, 0x4b, 0xb7, 0x8c, 0xb3, 0x6a, 0xda, 0x5b, 0x26, 0x73, 0x9d, 0x49, 0x89, 0x3b, 0xad,
-	0x4f, 0xbc, 0x2d, 0x42, 0x2f, 0x70, 0x75, 0x2e, 0xdd, 0x96, 0x2c, 0x40, 0x7f, 0x5b, 0xb0, 0x5d,
-	0xe4, 0xf7, 0x80, 0x0f, 0x06, 0x81, 0xfc, 0x5f, 0xec, 0x36, 0xff, 0x2e, 0x42, 0xe5, 0x40, 0x63,
-	0xa8, 0x93, 0x82, 0x89, 0x7c, 0x80, 0x85, 0x18, 0x25, 0xe4, 0x89, 0x63, 0x24, 0x96, 0x93, 0x43,
-	0x8f, 0xfd, 0xf4, 0xca, 0x3a, 0xb5, 0x3c, 0x9f, 0xa0, 0x72, 0x19, 0x3c, 0xa4, 0x59, 0x20, 0x36,
-	0x50, 0xca, 0x5e, 0x71, 0x52, 0x30, 0x3a, 0x1a, 0x8c, 0xce, 0xab, 0x18, 0x8c, 0x84, 0x43, 0x39,
-	0x8f, 0x0d, 0xe2, 0x14, 0x19, 0x9b, 0xc4, 0x8e, 0xdd, 0xb8, 0x76, 0xbd, 0xba, 0xd0, 0xb9, 0x05,
-	0x4b, 0x53, 0x90, 0x43, 0xf6, 0x0a, 0x1a, 0x99, 0x01, 0x66, 0xef, 0xcf, 0x2a, 0x53, 0x36, 0x38,
-	0xdc, 0x1b, 0x27, 0x1b, 0xd9, 0x29, 0xe8, 0x34, 0x15, 0x82, 0xf6, 0xd6, 0x35, 0x14, 0xd9, 0x81,
-	0xe2, 0x02, 0x6b, 0x9a, 0x89, 0x85, 0x0f, 0x69, 0x00, 0xe8, 0x6c, 0x87, 0xfe, 0xb2, 0x60, 0xa3,
-	0x88, 0x51, 0xe4, 0x45, 0x71, 0xb7, 0xab, 0xe0, 0x69, 0xbf, 0xbc, 0xb1, 0x5e, 0x39, 0xf4, 0xe1,
-	0x81, 0xfe, 0xef, 0x5f, 0xa6, 0x54, 0xfc, 0x6c, 0xac, 0x4f, 0xb6, 0x8d, 0xff, 0xe7, 0x69, 0xb0,
-	0x30, 0x2e, 0xfa, 0x77, 0x0b, 0x1e, 0x9a, 0x4e, 0xca, 0x78, 0x48, 0xde, 0x14, 0xaf, 0xf3, 0x0c,
-	0x4c, 0x35, 0x1a, 0x39, 0xb7, 0xa0, 0x36, 0xdd, 0xc8, 0x05, 0xe8, 0xc8, 0xd1, 0x0d, 0x7d, 0x4c,
-	0xb0, 0xd2, 0x64, 0xa3, 0x55, 0xfa, 0xb8, 0x98, 0xb5, 0xec, 0xde, 0x4e, 0x92, 0xbb, 0xff, 0x02,
-	0x00, 0x00, 0xff, 0xff, 0x17, 0x11, 0xe2, 0x81, 0x94, 0x09, 0x00, 0x00,
+	// 889 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x56, 0x4d, 0x6f, 0xf3, 0x44,
+	0x10, 0x66, 0xdf, 0xe6, 0xed, 0xab, 0x4e, 0xc2, 0xfb, 0x46, 0x9b, 0x26, 0x4d, 0xdd, 0xaf, 0xb0,
+	0x7c, 0x45, 0x45, 0x38, 0x55, 0xa2, 0xf6, 0x82, 0x04, 0x6d, 0xa2, 0xd0, 0xd2, 0x0b, 0x91, 0x53,
+	0x8a, 0x84, 0x04, 0xc2, 0x49, 0xb6, 0x89, 0x85, 0xe3, 0x75, 0xbd, 0x4e, 0xa4, 0xf6, 0x5c, 0x21,
+	0x21, 0x0e, 0x5c, 0xb8, 0x70, 0x42, 0xe2, 0x0f, 0xc0, 0x1f, 0xe1, 0xcc, 0xdf, 0x41, 0xfe, 0x58,
+	0xd7, 0x49, 0xec, 0x4d, 0xda, 0x03, 0xe2, 0xe6, 0x9d, 0x99, 0x67, 0xf6, 0xd9, 0xd9, 0x67, 0x3d,
+	0x03, 0x84, 0x53, 0x67, 0x6a, 0xf4, 0x29, 0xaf, 0xf5, 0x99, 0xc5, 0xa9, 0xc5, 0x27, 0xb1, 0x2f,
+	0xd5, 0x76, 0x98, 0xcb, 0xf0, 0x76, 0x4f, 0x1f, 0xf7, 0x18, 0x53, 0x45, 0xa8, 0x1a, 0x05, 0x28,
+	0x45, 0x3e, 0xd2, 0x1d, 0x3a, 0xa8, 0x8d, 0x29, 0xe7, 0xfa, 0x90, 0x86, 0x08, 0x65, 0x67, 0xc8,
+	0xd8, 0xd0, 0xa4, 0x35, 0x7f, 0xd5, 0x9b, 0xdc, 0xd4, 0xe8, 0xd8, 0x76, 0xef, 0x02, 0x27, 0x79,
+	0x1b, 0xb2, 0x1d, 0xc3, 0x1a, 0x6a, 0xf4, 0x76, 0x42, 0xb9, 0x4b, 0xaa, 0x90, 0x0b, 0x96, 0xdc,
+	0xf6, 0xd2, 0xe2, 0x32, 0xbc, 0xd2, 0x07, 0x03, 0x87, 0x72, 0x5e, 0x46, 0x15, 0x54, 0xcd, 0x69,
+	0x62, 0x49, 0x7e, 0x42, 0xb0, 0xd5, 0x9d, 0xf4, 0xc6, 0x86, 0xdb, 0x62, 0xa6, 0x49, 0xfb, 0xae,
+	0xc1, 0xac, 0x30, 0x0b, 0x6e, 0x02, 0xf4, 0x23, 0xa3, 0x0f, 0xcc, 0xd6, 0x89, 0x2a, 0x88, 0xfb,
+	0x24, 0xd5, 0x88, 0x64, 0x0c, 0x1e, 0x43, 0xe1, 0x43, 0xc8, 0xeb, 0xfd, 0x3e, 0xe5, 0xbc, 0x6b,
+	0x0c, 0x2d, 0xdd, 0x9d, 0x38, 0x94, 0x97, 0x5f, 0x54, 0xd6, 0xaa, 0x39, 0x6d, 0xc1, 0x4e, 0x8a,
+	0x50, 0xe8, 0x38, 0xcc, 0x66, 0x9c, 0x36, 0x4d, 0xd6, 0xff, 0x41, 0x1c, 0xa6, 0x04, 0x9b, 0xb3,
+	0xe6, 0xe0, 0x50, 0x64, 0x17, 0x94, 0xaf, 0xec, 0x81, 0xee, 0xd2, 0xd0, 0x3b, 0x98, 0x41, 0xed,
+	0xc1, 0x4e, 0xa2, 0x37, 0x04, 0x1f, 0x43, 0xf1, 0x9c, 0xba, 0xbe, 0xad, 0x79, 0x77, 0xa1, 0xf3,
+	0x91, 0x38, 0xf4, 0x2e, 0x6c, 0xf4, 0x3c, 0xab, 0x67, 0x0b, 0x8b, 0xf5, 0x68, 0x20, 0x9f, 0xc0,
+	0x56, 0x0c, 0x46, 0x8d, 0xe1, 0xc8, 0x15, 0xc0, 0x0a, 0x64, 0x83, 0x38, 0xdf, 0xea, 0x43, 0x33,
+	0x5a, 0xdc, 0x44, 0xce, 0x21, 0x2f, 0xc0, 0xd1, 0xcd, 0x34, 0xe0, 0xa5, 0x1f, 0x12, 0x96, 0x77,
+	0x2f, 0xad, 0xbc, 0x01, 0x2a, 0x88, 0x25, 0xdf, 0xc2, 0xbb, 0xe7, 0xd4, 0xfd, 0xdc, 0xb0, 0x74,
+	0xd3, 0xb8, 0xa7, 0x83, 0xae, 0xab, 0xbb, 0xf4, 0xca, 0xd1, 0x2d, 0x6e, 0x78, 0x35, 0xe7, 0x82,
+	0xd1, 0x09, 0x94, 0xf8, 0xac, 0x2b, 0x20, 0xe2, 0x89, 0x60, 0xad, 0x9a, 0xd1, 0x52, 0xbc, 0xe4,
+	0x37, 0x04, 0xef, 0xc9, 0xf3, 0x87, 0xe4, 0x6f, 0x61, 0xfb, 0x26, 0x2d, 0xc8, 0xdf, 0x23, 0x5b,
+	0x6f, 0xa8, 0xa9, 0x42, 0x57, 0xd3, 0x36, 0xd0, 0xd2, 0xb3, 0x92, 0x5f, 0x10, 0xbc, 0xdf, 0x71,
+	0x98, 0xaf, 0x9c, 0x59, 0x5f, 0x70, 0xcf, 0xba, 0x29, 0x4e, 0x7f, 0x03, 0x45, 0x6e, 0x0c, 0xad,
+	0x85, 0x1c, 0x61, 0xa5, 0x8f, 0x24, 0xc4, 0xba, 0x49, 0x38, 0x2d, 0x39, 0x1d, 0xf9, 0x0b, 0x81,
+	0x2a, 0x18, 0x25, 0x05, 0x74, 0x1c, 0x6a, 0xeb, 0x0e, 0xbd, 0x66, 0x2e, 0x15, 0xd4, 0xbe, 0x87,
+	0xc2, 0x5c, 0xe9, 0x3d, 0x6f, 0x48, 0x4c, 0x95, 0x11, 0x5b, 0x44, 0x69, 0x49, 0xa9, 0x3c, 0x15,
+	0x73, 0xf1, 0xb0, 0xca, 0x2f, 0x02, 0x15, 0x47, 0x06, 0xf2, 0x27, 0x82, 0x8f, 0x65, 0x94, 0x5b,
+	0x6c, 0x3c, 0x36, 0xdc, 0xff, 0x13, 0xe3, 0xbf, 0x11, 0xbc, 0x99, 0x4b, 0x85, 0x4f, 0x61, 0xc7,
+	0x76, 0xe8, 0xd4, 0x60, 0x93, 0x79, 0x29, 0xc4, 0xde, 0xae, 0x2c, 0x04, 0x5f, 0x42, 0x45, 0xb8,
+	0x83, 0x23, 0x9f, 0xd9, 0xb6, 0xc3, 0xa6, 0xba, 0xb9, 0xf0, 0xb3, 0x5a, 0x1a, 0x87, 0x4b, 0xb0,
+	0x3e, 0x0a, 0x5e, 0xfe, 0x9a, 0xff, 0xf2, 0xc3, 0x15, 0xde, 0x84, 0x97, 0x53, 0xdd, 0x9c, 0xd0,
+	0x72, 0xc6, 0xe7, 0x13, 0x2c, 0xc8, 0xcf, 0x08, 0x8a, 0x89, 0xa5, 0xc7, 0x57, 0xf0, 0x86, 0x27,
+	0x0a, 0xf6, 0x70, 0xf5, 0x2a, 0x6b, 0xf3, 0x29, 0x96, 0x54, 0xf7, 0x0f, 0x04, 0xe5, 0xb4, 0xc7,
+	0xf8, 0x5f, 0xbd, 0x23, 0xbc, 0x0f, 0xc0, 0xe7, 0xcb, 0x1e, 0xb3, 0x90, 0x5f, 0x11, 0x14, 0x12,
+	0xd4, 0x84, 0x8f, 0x16, 0xa4, 0x19, 0xbb, 0xfe, 0x24, 0x17, 0x6e, 0x40, 0x66, 0xea, 0xa9, 0xd7,
+	0xab, 0xc3, 0xeb, 0xfa, 0x81, 0xe4, 0x00, 0xbe, 0x5c, 0xfd, 0xe0, 0xb4, 0xfb, 0x3d, 0x3c, 0x80,
+	0x8c, 0x4f, 0x03, 0x60, 0x5d, 0x6b, 0x5f, 0xb6, 0x5b, 0x57, 0xf9, 0xb7, 0x70, 0x16, 0x5e, 0x9d,
+	0x75, 0x3a, 0xda, 0x97, 0xd7, 0xed, 0x3c, 0xaa, 0xff, 0xb3, 0x01, 0xf9, 0x96, 0xc8, 0xd8, 0x0d,
+	0xf6, 0xc0, 0x5f, 0x43, 0xc6, 0x6b, 0xd0, 0xf8, 0x03, 0xc9, 0xe6, 0xb1, 0x86, 0xae, 0x7c, 0xb8,
+	0x34, 0x2e, 0xfc, 0x25, 0x7f, 0x07, 0xf9, 0xf9, 0x76, 0x8e, 0xeb, 0xb2, 0x2b, 0x4a, 0xee, 0xfd,
+	0x4a, 0x49, 0x0d, 0xc6, 0x0d, 0x55, 0x8c, 0x1b, 0x6a, 0xdb, 0x1b, 0x37, 0x30, 0x83, 0x5c, 0xbc,
+	0x19, 0x63, 0xd9, 0xdb, 0x4f, 0x68, 0xe6, 0x4a, 0x6d, 0xe5, 0xf8, 0xf0, 0x40, 0x0f, 0x08, 0x0a,
+	0x09, 0x8d, 0x1c, 0x1f, 0x4b, 0x12, 0xa5, 0x8f, 0x05, 0xca, 0xc9, 0x53, 0x61, 0x21, 0x0d, 0x06,
+	0xaf, 0x67, 0xe7, 0x05, 0x2c, 0x13, 0x7e, 0xe2, 0x68, 0xa1, 0x7c, 0xb4, 0x02, 0x22, 0xda, 0x90,
+	0x3f, 0x0e, 0x0b, 0x62, 0xd2, 0x90, 0x5e, 0x64, 0xca, 0x58, 0xf2, 0xb4, 0x4d, 0x7f, 0x47, 0xb0,
+	0x2b, 0xeb, 0xfc, 0xf8, 0x53, 0x79, 0xb6, 0x65, 0x23, 0x89, 0xf2, 0xd9, 0xb3, 0xf1, 0x21, 0xc3,
+	0x7b, 0xd8, 0x97, 0xb7, 0x7f, 0x7c, 0x2a, 0x57, 0xd8, 0xf2, 0xc9, 0x21, 0x55, 0xfb, 0x3f, 0x22,
+	0x78, 0x27, 0x2d, 0x43, 0xd4, 0xe3, 0xf1, 0x17, 0x2b, 0xec, 0xbf, 0xda, 0x9c, 0x90, 0x4a, 0xe4,
+	0x01, 0x41, 0x25, 0x99, 0xc8, 0x63, 0xe7, 0xc6, 0x17, 0xcf, 0xe4, 0xb1, 0xd0, 0xfc, 0xd3, 0x68,
+	0x34, 0xb3, 0xdf, 0x6c, 0x44, 0x29, 0x7b, 0xeb, 0xbe, 0xb3, 0xf1, 0x6f, 0x00, 0x00, 0x00, 0xff,
+	0xff, 0xf1, 0xd1, 0xed, 0x38, 0xfd, 0x0c, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -656,7 +951,7 @@ type ConsensusServiceClient interface {
 	// Returns the finalized state transitions at the requested heights.
 	GetFinalizedStateTransitions(ctx context.Context, in *GetFinalizedStateTransitionsRequest, opts ...grpc.CallOption) (*GetFinalizedStateTransitionsResponse, error)
 	// Process state transition proposal from other security node.
-	ProcessStateTransitionProposal(ctx context.Context, in *shared.SignedStateTransition, opts ...grpc.CallOption) (*empty.Empty, error)
+	ProcessStateTransitionProposal(ctx context.Context, in *ProcessStateTransitionProposalRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	// Process state transition prepare vote from other security node.
 	ProcessStateTransitionPrepareVote(ctx context.Context, in *ProcessSignedStateTransitionPrepareVoteRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	// Process state transition commit vote from other security node.
@@ -734,7 +1029,7 @@ func (c *consensusServiceClient) GetFinalizedStateTransitions(ctx context.Contex
 	return out, nil
 }
 
-func (c *consensusServiceClient) ProcessStateTransitionProposal(ctx context.Context, in *shared.SignedStateTransition, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *consensusServiceClient) ProcessStateTransitionProposal(ctx context.Context, in *ProcessStateTransitionProposalRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/bamboo.services.consensus.ConsensusService/ProcessStateTransitionProposal", in, out, opts...)
 	if err != nil {
@@ -777,7 +1072,7 @@ type ConsensusServiceServer interface {
 	// Returns the finalized state transitions at the requested heights.
 	GetFinalizedStateTransitions(context.Context, *GetFinalizedStateTransitionsRequest) (*GetFinalizedStateTransitionsResponse, error)
 	// Process state transition proposal from other security node.
-	ProcessStateTransitionProposal(context.Context, *shared.SignedStateTransition) (*empty.Empty, error)
+	ProcessStateTransitionProposal(context.Context, *ProcessStateTransitionProposalRequest) (*empty.Empty, error)
 	// Process state transition prepare vote from other security node.
 	ProcessStateTransitionPrepareVote(context.Context, *ProcessSignedStateTransitionPrepareVoteRequest) (*empty.Empty, error)
 	// Process state transition commit vote from other security node.
@@ -809,7 +1104,7 @@ func (*UnimplementedConsensusServiceServer) GetBlockByHeight(ctx context.Context
 func (*UnimplementedConsensusServiceServer) GetFinalizedStateTransitions(ctx context.Context, req *GetFinalizedStateTransitionsRequest) (*GetFinalizedStateTransitionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetFinalizedStateTransitions not implemented")
 }
-func (*UnimplementedConsensusServiceServer) ProcessStateTransitionProposal(ctx context.Context, req *shared.SignedStateTransition) (*empty.Empty, error) {
+func (*UnimplementedConsensusServiceServer) ProcessStateTransitionProposal(ctx context.Context, req *ProcessStateTransitionProposalRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProcessStateTransitionProposal not implemented")
 }
 func (*UnimplementedConsensusServiceServer) ProcessStateTransitionPrepareVote(ctx context.Context, req *ProcessSignedStateTransitionPrepareVoteRequest) (*empty.Empty, error) {
@@ -950,7 +1245,7 @@ func _ConsensusService_GetFinalizedStateTransitions_Handler(srv interface{}, ctx
 }
 
 func _ConsensusService_ProcessStateTransitionProposal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(shared.SignedStateTransition)
+	in := new(ProcessStateTransitionProposalRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -962,7 +1257,7 @@ func _ConsensusService_ProcessStateTransitionProposal_Handler(srv interface{}, c
 		FullMethod: "/bamboo.services.consensus.ConsensusService/ProcessStateTransitionProposal",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConsensusServiceServer).ProcessStateTransitionProposal(ctx, req.(*shared.SignedStateTransition))
+		return srv.(ConsensusServiceServer).ProcessStateTransitionProposal(ctx, req.(*ProcessStateTransitionProposalRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

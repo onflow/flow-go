@@ -5,23 +5,21 @@ import (
 	"net"
 
 	"github.com/sirupsen/logrus"
-
 	"google.golang.org/grpc"
 
 	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
 
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/config"
 	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
 )
 
 type Server struct {
 	gsrv *grpc.Server
-	conf *config.Config
+	conf *Config
 	log  *logrus.Entry
 }
 
 func NewServer(
-	conf *config.Config,
+	conf *Config,
 	log *logrus.Logger,
 	ctrl *controller.Controller,
 ) (*Server, error) {

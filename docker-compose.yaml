@@ -135,11 +135,10 @@ services:
     environment:
       - APP_ENV=LOCAL
       - PORT=3009
-      - POSTGRES_GCP_CONNECTION_NAME=foo
-      - POSTGRES_ADDR=db:5432 #TODO: this won't work because we need to setup configs to connect to 2 different dbs.
-      - POSTGRES_DATABASE=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=foo
+      - BAM_COLLECT_POSTGRESADDR=collect_db:5432
+      - BAM_COLLECT_POSTGRESUSER=postgres
+      - BAM_COLLECT_POSTGRESPASSWORD=foo
+      - BAM_COLLECT_POSTGRESDATABASE=postgres
 
   test:
     build:

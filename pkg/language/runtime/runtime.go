@@ -3,9 +3,13 @@ package runtime
 import (
 	"errors"
 	"fmt"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"math/big"
 	"strings"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
@@ -18,6 +22,8 @@ type RuntimeInterface interface {
 	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public key and code.
 	CreateAccount(publicKey []byte, code []byte) (accountID []byte, err error)
+	// UpdateAccountCode updates the code associated with an account.
+	UpdateAccountCode(accountID, code []byte) (err error)
 }
 
 type RuntimeError struct {
@@ -63,21 +69,140 @@ func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }
 
+// TODO: improve types
+var setValueFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{
+		// owner
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+		// controller
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+		// key
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+		// value
+		// TODO: add proper type
+		&sema.IntType{},
+	},
+	// nothing
+	ReturnType: &sema.VoidType{},
+}
+
+// TODO: improve types
+var getValueFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{
+		// owner
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+		// controller
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+		// key
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+	},
+	// value
+	// TODO: add proper type
+	ReturnType: &sema.IntType{},
+}
+
+// TODO: improve types
+var createAccountFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{
+		// key
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+		// code
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+	},
+	// value
+	// TODO: add proper type
+	ReturnType: &sema.IntType{},
+}
+
+// TODO: improve types
+var updateAccountCodeFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{
+		// accountID
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+		// code
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+	},
+	// nothing
+	ReturnType: &sema.VoidType{},
+}
+
 func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) (interface{}, error) {
 	code := string(script)
 
-	program, errs := parser.Parse(code)
+	program, errs := parser.ParseProgram(code)
 	if len(errs) > 0 {
 		return nil, RuntimeError{errs}
 	}
 
-	inter := interpreter.NewInterpreter(program)
-	inter.ImportFunction("getValue", r.newGetValueFunction(runtimeInterface))
-	inter.ImportFunction("setValue", r.newSetValueFunction(runtimeInterface))
-	inter.ImportFunction("createAccount", r.newCreateAccountFunction(runtimeInterface))
+	// TODO: maybe consider adding argument labels
 
-	err := inter.Interpret()
-	if err != nil {
+	functions := append(
+		stdlib.BuiltIns,
+		stdlib.NewStandardLibraryFunction(
+			"getValue",
+			&getValueFunctionType,
+			r.newGetValueFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"setValue",
+			&setValueFunctionType,
+			r.newSetValueFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"createAccount",
+			&createAccountFunctionType,
+			r.newCreateAccountFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"updateAccountCode",
+			&updateAccountCodeFunctionType,
+			r.newUpdateAccountCodeFunction(runtimeInterface),
+			nil,
+		),
+	)
+
+	checker := sema.NewChecker(program)
+	for _, function := range functions {
+		if err := checker.DeclareValue(function); err != nil {
+			return nil, RuntimeError{[]error{err}}
+		}
+	}
+
+	if err := checker.Check(); err != nil {
+		return nil, RuntimeError{[]error{err}}
+	}
+
+	inter := interpreter.NewInterpreter(checker)
+	for _, function := range functions {
+		if err := inter.ImportFunction(function.Name, function.Function); err != nil {
+			return nil, RuntimeError{[]error{err}}
+		}
+	}
+
+	if err := inter.Interpret(); err != nil {
 		return nil, RuntimeError{[]error{err}}
 	}
 
@@ -93,139 +218,98 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 	return value.ToGoValue(), nil
 }
 
-// TODO: improve types
-var setValueFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
-		// owner
-		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
-		},
-		// controller
-		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
-		},
-		// key
-		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
-		},
-		// value
-		// TODO: add proper type
-		&sema.IntType{},
-	},
-	// nothing
-	ReturnType: &sema.VoidType{},
+func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterface) interpreter.HostFunction {
+	return func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
+		if len(arguments) != 4 {
+			panic(fmt.Sprintf("setValue requires 4 parameters"))
+		}
+
+		owner, controller, key := r.getOwnerControllerKey(arguments)
+
+		// TODO: only integer values supported for now. written in internal byte representation
+		intValue, ok := arguments[3].(interpreter.IntValue)
+		if !ok {
+			panic(fmt.Sprintf("setValue requires fourth parameter to be an Int"))
+		}
+		value := intValue.Bytes()
+
+		if err := runtimeInterface.SetValue(owner, controller, key, value); err != nil {
+			panic(err)
+		}
+
+		result := &interpreter.VoidValue{}
+		return trampoline.Done{Result: result}
+	}
 }
 
-// TODO: improve types
-var getValueFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
-		// owner
-		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
-		},
-		// controller
-		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
-		},
-		// key
-		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
-		},
-	},
-	// value
-	// TODO: add proper type
-	ReturnType: &sema.IntType{},
+func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterface) interpreter.HostFunction {
+	return func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
+		if len(arguments) != 3 {
+			panic(fmt.Sprintf("getValue requires 3 parameters"))
+		}
+
+		owner, controller, key := r.getOwnerControllerKey(arguments)
+
+		value, err := runtimeInterface.GetValue(owner, controller, key)
+		if err != nil {
+			panic(err)
+		}
+
+		result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+		return trampoline.Done{Result: result}
+	}
 }
 
-// TODO: improve types
-var createAccountFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
-		// key
-		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
-		},
-		// code
-		&sema.VariableSizedType{
-			Type: &sema.UInt8Type{},
-		},
-	},
-	// value
-	// TODO: add proper type
-	ReturnType: &sema.IntType{},
+func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeInterface) interpreter.HostFunction {
+	return func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
+		if len(arguments) != 2 {
+			panic(fmt.Sprintf("createAccount requires 2 parameters"))
+		}
+
+		publicKey, err := toByteArray(arguments[0])
+		if err != nil {
+			panic(fmt.Sprintf("createAccount requires the first parameter to be an array"))
+		}
+
+		code, err := toByteArray(arguments[1])
+		if err != nil {
+			panic(fmt.Sprintf("createAccount requires the second parameter to be an array"))
+		}
+
+		value, err := runtimeInterface.CreateAccount(publicKey, code)
+		if err != nil {
+			panic(err)
+		}
+
+		result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+		return trampoline.Done{Result: result}
+	}
 }
 
-func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunction(
-		&setValueFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
-			if len(arguments) != 4 {
-				panic(fmt.Sprintf("setValue requires 4 parameters"))
-			}
+func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface RuntimeInterface) interpreter.HostFunction {
+	return func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
+		if len(arguments) != 2 {
+			panic(fmt.Sprintf("updateAccountCode requires 2 parameters"))
+		}
 
-			owner, controller, key := r.getOwnerControllerKey(arguments)
+		accountID, err := toByteArray(arguments[0])
+		if err != nil {
+			panic(fmt.Sprintf("updateAccountCode requires the first parameter to be an array"))
+		}
 
-			// TODO: only integer values supported for now. written in internal byte representation
-			intValue, ok := arguments[3].(interpreter.IntValue)
-			if !ok {
-				panic(fmt.Sprintf("setValue requires fourth parameter to be an Int"))
-			}
-			value := intValue.Bytes()
+		code, err := toByteArray(arguments[1])
+		if err != nil {
+			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
+		}
 
-			if err := runtimeInterface.SetValue(owner, controller, key, value); err != nil {
-				panic(err)
-			}
+		err = runtimeInterface.UpdateAccountCode(accountID, code)
+		if err != nil {
+			panic(err)
+		}
 
-			return &interpreter.VoidValue{}
-		},
-	)
-}
-
-func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunction(
-		&getValueFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
-			if len(arguments) != 3 {
-				panic(fmt.Sprintf("getValue requires 3 parameters"))
-			}
-
-			owner, controller, key := r.getOwnerControllerKey(arguments)
-
-			value, err := runtimeInterface.GetValue(owner, controller, key)
-			if err != nil {
-				panic(err)
-			}
-
-			return interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
-		},
-	)
-}
-
-func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeInterface) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunction(
-		&createAccountFunctionType,
-		func(_ *interpreter.Interpreter, arguments []interpreter.Value) interpreter.Value {
-			if len(arguments) != 2 {
-				panic(fmt.Sprintf("createAccount requires 2 parameters"))
-			}
-
-			publicKey, err := toByteArray(arguments[0])
-			if err != nil {
-				panic(fmt.Sprintf("createAccount requires the first parameter to be an array"))
-			}
-
-			code, err := toByteArray(arguments[1])
-			if err != nil {
-				panic(fmt.Sprintf("createAccount requires the second parameter to be an array"))
-			}
-
-			value, err := runtimeInterface.CreateAccount(publicKey, code)
-			if err != nil {
-				panic(err)
-			}
-
-			return interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
-		},
-	)
+		result := &interpreter.VoidValue{}
+		return trampoline.Done{Result: result}
+	}
 }
 
 func (r *interpreterRuntime) getOwnerControllerKey(

@@ -2,11 +2,13 @@ package runtime
 
 import (
 	"fmt"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
-	"github.com/logrusorgru/aurora"
 	"strconv"
 	"strings"
+
+	"github.com/logrusorgru/aurora"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
 func colorizeError(message string) string {
@@ -50,8 +52,12 @@ func PrettyPrintError(err error, filename string, code string, useColor bool) st
 	lineNumberString := ""
 	lineNumberLength := 0
 	if positioned, hasPosition := err.(ast.HasPosition); hasPosition {
-		startPosition = positioned.StartPosition()
-		endPosition = positioned.EndPosition()
+		startPos := positioned.StartPosition()
+		startPosition = &startPos
+
+		endPos := positioned.EndPosition()
+		endPosition = &endPos
+
 		plainLineNumberString := strconv.Itoa(startPosition.Line)
 		lineNumberLength = len(plainLineNumberString)
 
@@ -104,7 +110,7 @@ func PrettyPrintError(err error, filename string, code string, useColor bool) st
 		}
 		builder.WriteString(carets)
 
-		if secondaryError, ok := err.(interpreter.SecondaryError); ok {
+		if secondaryError, ok := err.(errors.SecondaryError); ok {
 			builder.WriteString(" ")
 			secondaryError := secondaryError.SecondaryError()
 			if useColor {

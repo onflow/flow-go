@@ -16,7 +16,7 @@ Package clusters implements the logic required to compute and validate access no
 * [type Cluster](#Cluster)
   * [func (c *Cluster) Hash() crypto.Hash](#Cluster.Hash)
 * [type ClusterManager](#ClusterManager)
-  * [func (c *ClusterManager) GetCluster(address crypto.Address, epoch uint64) (*Cluster, error)](#ClusterManager.GetCluster)
+  * [func (c *ClusterManager) GetCluster(address types.Address, epoch uint64) (*Cluster, error)](#ClusterManager.GetCluster)
   * [func (c *ClusterManager) GetClusters(epoch uint64) ([]*Cluster, error)](#ClusterManager.GetClusters)
 
 
@@ -28,11 +28,11 @@ Package clusters implements the logic required to compute and validate access no
 
 
 
-## <a name="Cluster">type</a> [Cluster](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/clusters/clusters.go?s=211:272#L7)
+## <a name="Cluster">type</a> [Cluster](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/clusters/clusters.go?s=263:323#L10)
 ``` go
 type Cluster struct {
     Index uint64
-    Nodes []crypto.Address
+    Nodes []types.Address
 }
 
 ```
@@ -47,7 +47,7 @@ Cluster is a grouping of access nodes.
 
 
 
-### <a name="Cluster.Hash">func</a> (\*Cluster) [Hash](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/clusters/clusters.go?s=320:356#L13)
+### <a name="Cluster.Hash">func</a> (\*Cluster) [Hash](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/clusters/clusters.go?s=371:407#L16)
 ``` go
 func (c *Cluster) Hash() crypto.Hash
 ```
@@ -56,7 +56,7 @@ Hash returns the unique hash of a cluster.
 
 
 
-## <a name="ClusterManager">type</a> [ClusterManager](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/clusters/clusters.go?s=750:778#L23)
+## <a name="ClusterManager">type</a> [ClusterManager](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/clusters/clusters.go?s=787:815#L26)
 ``` go
 type ClusterManager struct{}
 
@@ -77,16 +77,16 @@ Clusters are computed using the following algorithm:
 
 
 
-### <a name="ClusterManager.GetCluster">func</a> (\*ClusterManager) [GetCluster](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/clusters/clusters.go?s=846:937#L26)
+### <a name="ClusterManager.GetCluster">func</a> (\*ClusterManager) [GetCluster](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/clusters/clusters.go?s=883:973#L29)
 ``` go
-func (c *ClusterManager) GetCluster(address crypto.Address, epoch uint64) (*Cluster, error)
+func (c *ClusterManager) GetCluster(address types.Address, epoch uint64) (*Cluster, error)
 ```
 GetCluster returns the cluster that the given node belongs to.
 
 
 
 
-### <a name="ClusterManager.GetClusters">func</a> (\*ClusterManager) [GetClusters](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/clusters/clusters.go?s=1015:1085#L31)
+### <a name="ClusterManager.GetClusters">func</a> (\*ClusterManager) [GetClusters](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/clusters/clusters.go?s=1051:1121#L34)
 ``` go
 func (c *ClusterManager) GetClusters(epoch uint64) ([]*Cluster, error)
 ```

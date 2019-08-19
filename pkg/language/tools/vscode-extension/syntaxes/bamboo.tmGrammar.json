@@ -288,7 +288,7 @@
             "name": "keyword.control.branch.bamboo"
           },
           {
-            "match": "(?<!\\.)\\b(?:return)\\b",
+            "match": "(?<!\\.)\\b(?:return|continue|break)\\b",
             "name": "keyword.control.transfer.bamboo"
           },
           {
@@ -296,7 +296,7 @@
             "name": "keyword.control.loop.bamboo"
           },
           {
-            "match": "(?<!\\.)\\b(?:require|ensure|prepare|execute)\\b",
+            "match": "(?<!\\.)\\b(?:pre|post|prepare|execute)\\b",
             "name": "keyword.other"
           },
           {

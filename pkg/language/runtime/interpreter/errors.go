@@ -2,39 +2,34 @@ package interpreter
 
 import (
 	"fmt"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 )
-
-// SecondaryError
-
-// SecondaryError is an interface for errors that provide a secondary error message
-//
-type SecondaryError interface {
-	SecondaryError() string
-}
-
-// unsupportedAssignmentTargetExpression
-
-type unsupportedAssignmentTargetExpression struct {
-	target ast.Expression
-}
-
-func (e *unsupportedAssignmentTargetExpression) Error() string {
-	return fmt.Sprintf("cannot assign to unsupported target expression: %#+v", e.target)
-}
 
 // unsupportedOperation
 
 type unsupportedOperation struct {
 	kind      common.OperationKind
 	operation ast.Operation
-	pos       *ast.Position
+	startPos  ast.Position
+	endPos    ast.Position
 }
 
 func (e *unsupportedOperation) Error() string {
-	return fmt.Sprintf("cannot evaluate unsupported %s operation: %s", e.kind.Name(), e.operation.Symbol())
+	return fmt.Sprintf(
+		"cannot evaluate unsupported %s operation: %s",
+		e.kind.Name(),
+		e.operation.Symbol(),
+	)
+}
+
+func (e *unsupportedOperation) StartPosition() ast.Position {
+	return e.startPos
+}
+
+func (e *unsupportedOperation) EndPosition() ast.Position {
+	return e.endPos
 }
 
 // NotDeclaredError
@@ -42,8 +37,8 @@ func (e *unsupportedOperation) Error() string {
 type NotDeclaredError struct {
 	ExpectedKind common.DeclarationKind
 	Name         string
-	StartPos     *ast.Position
-	EndPos       *ast.Position
+	StartPos     ast.Position
+	EndPos       ast.Position
 }
 
 func (e *NotDeclaredError) Error() string {
@@ -54,11 +49,11 @@ func (e *NotDeclaredError) SecondaryError() string {
 	return "not found in this scope"
 }
 
-func (e *NotDeclaredError) StartPosition() *ast.Position {
+func (e *NotDeclaredError) StartPosition() ast.Position {
 	return e.StartPos
 }
 
-func (e *NotDeclaredError) EndPosition() *ast.Position {
+func (e *NotDeclaredError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
@@ -66,123 +61,19 @@ func (e *NotDeclaredError) EndPosition() *ast.Position {
 
 type NotCallableError struct {
 	Value    Value
-	StartPos *ast.Position
-	EndPos   *ast.Position
+	StartPos ast.Position
+	EndPos   ast.Position
 }
 
 func (e *NotCallableError) Error() string {
 	return fmt.Sprintf("cannot call value: %#+v", e.Value)
 }
 
-func (e *NotCallableError) StartPosition() *ast.Position {
+func (e *NotCallableError) StartPosition() ast.Position {
 	return e.StartPos
 }
 
-func (e *NotCallableError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// NotIndexableError
-
-type NotIndexableError struct {
-	Value    Value
-	StartPos *ast.Position
-	EndPos   *ast.Position
-}
-
-func (e *NotIndexableError) Error() string {
-	return fmt.Sprintf("cannot index into value: %#+v", e.Value)
-}
-
-func (e *NotIndexableError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *NotIndexableError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// InvalidUnaryOperandError
-
-type InvalidUnaryOperandError struct {
-	Operation    ast.Operation
-	ExpectedType sema.Type
-	Value        Value
-	StartPos     *ast.Position
-	EndPos       *ast.Position
-}
-
-func (e *InvalidUnaryOperandError) Error() string {
-	return fmt.Sprintf(
-		"cannot apply unary operation %s to value: %#+v. Expected type %s",
-		e.Operation.Symbol(),
-		e.Value,
-		e.ExpectedType.String(),
-	)
-}
-
-func (e *InvalidUnaryOperandError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidUnaryOperandError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// InvalidBinaryOperandError
-
-type InvalidBinaryOperandError struct {
-	Operation    ast.Operation
-	Side         common.OperandSide
-	ExpectedType sema.Type
-	Value        Value
-	StartPos     *ast.Position
-	EndPos       *ast.Position
-}
-
-func (e *InvalidBinaryOperandError) Error() string {
-	return fmt.Sprintf(
-		"cannot apply binary operation %s to %s-hand value: %s. Expected type %s",
-		e.Operation.Symbol(),
-		e.Side.Name(),
-		e.Value,
-		e.ExpectedType.String(),
-	)
-}
-
-func (e *InvalidBinaryOperandError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidBinaryOperandError) EndPosition() *ast.Position {
-	return e.EndPos
-}
-
-// InvalidBinaryOperandTypesError
-
-type InvalidBinaryOperandTypesError struct {
-	Operation    ast.Operation
-	ExpectedType sema.Type
-	LeftValue    Value
-	RightValue   Value
-	StartPos     *ast.Position
-	EndPos       *ast.Position
-}
-
-func (e *InvalidBinaryOperandTypesError) Error() string {
-	return fmt.Sprintf(
-		"can't apply binary operation %s to values: %s, %s. Expected type %s",
-		e.Operation.Symbol(),
-		e.LeftValue, e.RightValue,
-		e.ExpectedType.String(),
-	)
-}
-
-func (e *InvalidBinaryOperandTypesError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidBinaryOperandTypesError) EndPosition() *ast.Position {
+func (e *NotCallableError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
@@ -191,8 +82,8 @@ func (e *InvalidBinaryOperandTypesError) EndPosition() *ast.Position {
 type ArgumentCountError struct {
 	ParameterCount int
 	ArgumentCount  int
-	StartPos       *ast.Position
-	EndPos         *ast.Position
+	StartPos       ast.Position
+	EndPos         ast.Position
 }
 
 func (e *ArgumentCountError) Error() string {
@@ -203,50 +94,44 @@ func (e *ArgumentCountError) Error() string {
 	)
 }
 
-func (e *ArgumentCountError) StartPosition() *ast.Position {
+func (e *ArgumentCountError) StartPosition() ast.Position {
 	return e.StartPos
 }
 
-func (e *ArgumentCountError) EndPosition() *ast.Position {
+func (e *ArgumentCountError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
-// AssignmentToConstantError
+// ConditionError
 
-type AssignmentToConstantError struct {
-	Name     string
-	StartPos *ast.Position
-	EndPos   *ast.Position
+type ConditionError struct {
+	ConditionKind ast.ConditionKind
+	Message       string
+	StartPos      ast.Position
+	EndPos        ast.Position
 }
 
-func (e *AssignmentToConstantError) Error() string {
-	return fmt.Sprintf("cannot assign to constant: %s", e.Name)
+func (e *ConditionError) Error() string {
+	if e.Message == "" {
+		return fmt.Sprintf("%s failed", e.ConditionKind.Name())
+	}
+	return fmt.Sprintf("%s failed: %s", e.ConditionKind.Name(), e.Message)
 }
 
-func (e *AssignmentToConstantError) StartPosition() *ast.Position {
+func (e *ConditionError) StartPosition() ast.Position {
 	return e.StartPos
 }
 
-func (e *AssignmentToConstantError) EndPosition() *ast.Position {
+func (e *ConditionError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
-// InvalidIndexValueError
+// RedeclarationError
 
-type InvalidIndexValueError struct {
-	Value    Value
-	StartPos *ast.Position
-	EndPos   *ast.Position
+type RedeclarationError struct {
+	Name string
 }
 
-func (e *InvalidIndexValueError) Error() string {
-	return fmt.Sprintf("cannot index with value: %#+v", e.Value)
-}
-
-func (e *InvalidIndexValueError) StartPosition() *ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidIndexValueError) EndPosition() *ast.Position {
-	return e.EndPos
+func (e *RedeclarationError) Error() string {
+	return fmt.Sprintf("cannot redeclare: `%s` is already declared", e.Name)
 }

@@ -1,4 +1,4 @@
-package processor
+package processor_test
 
 import (
 	"testing"
@@ -6,9 +6,10 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/internal/pkg/types"
+	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
 	. "github.com/dapperlabs/bamboo-node/internal/roles/verify/processor/test_mocks"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 type test struct {
@@ -124,12 +125,12 @@ func Test(t *testing.T) {
 		t.Run(test.title, func(t *testing.T) {
 			RegisterTestingT(t)
 
-			c := &ReceiptProcessorConfig{
+			c := &processor.ReceiptProcessorConfig{
 				QueueBuffer: 100,
 				CacheBuffer: 100,
 			}
 			hasher := crypto.NewHashAlgo(crypto.SHA3_256)
-			p := NewReceiptProcessor(test.m, c, hasher)
+			p := processor.NewReceiptProcessor(test.m, c, hasher)
 
 			receipt := &types.ExecutionReceipt{}
 			done := make(chan bool, 1)

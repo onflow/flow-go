@@ -50,12 +50,34 @@ program
     ;
 
 declaration
-    : functionDeclaration
+    : structureDeclaration
+    | functionDeclaration
     | variableDeclaration
     ;
 
+access
+    : /* Not specified */
+    | Pub
+    | PubSet
+    ;
+
+structureDeclaration
+    : Struct Identifier '{' field* initializer? functionDeclaration* '}'
+    ;
+
+field
+    : access (Let | Var) Identifier ':' fullType
+    ;
+
+// NOTE: allow any identifier in parser, then check identifier
+// is `init` in semantic analysis to provide better error
+//
+initializer
+    : Identifier parameterList functionBlock
+    ;
+
 functionDeclaration
-    : Pub? Fun Identifier parameterList (':' returnType=fullType)? block
+    : access Fun Identifier parameterList (':' returnType=fullType)? functionBlock
     ;
 
 parameterList
@@ -67,7 +89,7 @@ parameter
     ;
 
 fullType
-    : baseType typeDimension*
+    : baseType typeDimension* (optionals+=(Optional|NilCoalescing))*
     ;
 
 typeDimension
@@ -87,14 +109,39 @@ block
     : '{' statements '}'
     ;
 
+functionBlock
+    : '{' preConditions? postConditions? statements '}'
+    ;
+
+preConditions
+    : Pre '{' conditions '}'
+    ;
+
+postConditions
+    : Post '{' conditions '}'
+    ;
+
+conditions
+    : (condition eos)*
+    ;
+
+condition
+    : test=expression (':' message=expression)?
+    ;
+
 statements
     : (statement eos)*
     ;
 
 statement
     : returnStatement
+    | breakStatement
+    | continueStatement
     | ifStatement
     | whileStatement
+    // NOTE: allow all declarations, even structures, in parser,
+    // then check identifier declaration is variable/constant or function
+    // in semantic analysis to provide better error
     | declaration
     | assignment
     | expression
@@ -102,6 +149,14 @@ statement
 
 returnStatement
     : Return expression?
+    ;
+
+breakStatement
+    : Break
+    ;
+
+continueStatement
+    : Continue
     ;
 
 ifStatement
@@ -144,9 +199,14 @@ equalityExpression
 	;
 
 relationalExpression
-	: additiveExpression
-	| relationalExpression relationalOp additiveExpression
+	: nilCoalescingExpression
+	| relationalExpression relationalOp nilCoalescingExpression
 	;
+
+nilCoalescingExpression
+	// NOTE: right associative
+    : additiveExpression (NilCoalescing nilCoalescingExpression)?
+    ;
 
 additiveExpression
 	: multiplicativeExpression
@@ -218,12 +278,15 @@ unaryOp
 
 Negate : '!' ;
 
+Optional : '?' ;
+
+NilCoalescing : '??' ;
 
 primaryExpressionStart
-    : Identifier                                          # IdentifierExpression
-    | literal                                             # LiteralExpression
-    | Fun parameterList (':' returnType=fullType)? block  # FunctionExpression
-    | '(' expression ')'                                  # NestedExpression
+    : Identifier                                                  # IdentifierExpression
+    | literal                                                     # LiteralExpression
+    | Fun parameterList (':' returnType=fullType)? functionBlock  # FunctionExpression
+    | '(' expression ')'                                          # NestedExpression
     ;
 
 expressionAccess
@@ -251,11 +314,21 @@ literal
     : integerLiteral
     | booleanLiteral
     | arrayLiteral
+    | stringLiteral
+    | nilLiteral
     ;
 
 booleanLiteral
     : True
     | False
+    ;
+
+nilLiteral
+    : Nil
+    ;
+
+stringLiteral
+    : StringLiteral
     ;
 
 integerLiteral
@@ -273,11 +346,21 @@ arrayLiteral
 OpenParen: '(' ;
 CloseParen: ')' ;
 
+Struct : 'struct' ;
+
 Fun : 'fun' ;
 
+Pre : 'pre' ;
+Post : 'post' ;
+
 Pub : 'pub' ;
+PubSet : 'pub(set)' ;
 
 Return : 'return' ;
+
+Break : 'break' ;
+Continue : 'continue' ;
+
 Let : 'let' ;
 Var : 'var' ;
 
@@ -288,6 +371,8 @@ While : 'while' ;
 
 True : 'true' ;
 False : 'false' ;
+
+Nil : 'nil' ;
 
 Identifier
     : IdentifierHead IdentifierCharacter*
@@ -334,6 +419,24 @@ HexadecimalLiteral
 InvalidNumberLiteral
     : '0' [a-zA-Z] [0-9a-zA-Z_]*
     ;
+
+StringLiteral
+    : '"' QuotedText* '"'
+    ;
+
+fragment QuotedText
+    : EscapedCharacter
+    | ~["\n\r\\]
+    ;
+
+fragment EscapedCharacter
+    : '\\' [0\\tnr"']
+    // NOTE: allow arbitrary length in parser, but check length in semantic analysis
+    | '\\u' '{' HexadecimalDigit+ '}'
+    ;
+
+fragment HexadecimalDigit : [0-9a-fA-F] ;
+
 
 WS
     : [ \t\u000B\u000C\u0000]+ -> channel(HIDDEN)

@@ -7,7 +7,8 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 type Operation int
 
 const (
-	OperationOr Operation = iota
+	OperationUnknown Operation = iota
+	OperationOr
 	OperationAnd
 	OperationEqual
 	OperationUnequal
@@ -21,6 +22,7 @@ const (
 	OperationDiv
 	OperationMod
 	OperationNegate
+	OperationNilCoalesce
 )
 
 func (s Operation) Symbol() string {
@@ -53,6 +55,8 @@ func (s Operation) Symbol() string {
 		return "%"
 	case OperationNegate:
 		return "!"
+	case OperationNilCoalesce:
+		return "??"
 	}
 
 	panic(&errors.UnreachableError{})

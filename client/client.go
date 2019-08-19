@@ -4,21 +4,26 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/golang/protobuf/ptypes"
-
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
-	"github.com/dapperlabs/bamboo-node/internal/emulator/data"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
 )
 
+// RPCClient is an RPC client compatible with the Bamboo Observation API.
+type RPCClient observe.ObserveServiceClient
+
+// Client is a Bamboo user agent client.
 type Client struct {
-	conn       *grpc.ClientConn
-	grpcClient observe.ObserveServiceClient
+	rpcClient RPCClient
+	close     func() error
 }
 
+// New initializes a Bamboo client with the default gRPC provider.
+//
+// An error will be returned if the host is unreachable.
 func New(host string, port int) (*Client, error) {
 	addr := fmt.Sprintf("%s:%d", host, port)
 
@@ -30,90 +35,41 @@ func New(host string, port int) (*Client, error) {
 	grpcClient := observe.NewObserveServiceClient(conn)
 
 	return &Client{
-		conn:       conn,
-		grpcClient: grpcClient,
+		rpcClient: grpcClient,
+		close:     func() error { return conn.Close() },
 	}, nil
 }
 
-func (c *Client) Close() {
-	c.conn.Close()
+// NewFromRPCClient initializes a Bamboo client using a pre-configured gRPC provider.
+func NewFromRPCClient(rpcClient RPCClient) *Client {
+	return &Client{
+		rpcClient: rpcClient,
+		close:     func() error { return nil },
+	}
 }
 
-// SendTransaction submits a transaction to an access node.
-func (c *Client) SendTransaction(ctx context.Context, tx *types.SignedTransaction) error {
-	txMsg := &observe.SendTransactionRequest_Transaction{
-		ToAddress:    tx.ToAddress.Bytes(),
-		Script:       tx.Script,
-		Nonce:        tx.Nonce,
-		ComputeLimit: tx.ComputeLimit,
-		PayerSignature: &observe.Signature{
-			AccountAddress: tx.PayerSignature.Account.Bytes(),
-			Signature:      tx.PayerSignature.Sig,
-		},
+// Close closes the client connection.
+func (c *Client) Close() error {
+	return c.close()
+}
+
+// SendTransaction submits a transaction to the network.
+func (c *Client) SendTransaction(ctx context.Context, tx types.SignedTransaction) error {
+	txMsg, err := proto.SignedTransactionToMessage(tx)
+	if err != nil {
+		return err
 	}
 
-	_, err := c.grpcClient.SendTransaction(
+	_, err = c.rpcClient.SendTransaction(
 		ctx,
 		&observe.SendTransactionRequest{Transaction: txMsg},
 	)
 	return err
 }
 
-// GetBlockByHash fetches a block by hash.
-func (c *Client) GetBlockByHash(ctx context.Context, h crypto.Hash) (*data.Block, error) {
-	res, err := c.grpcClient.GetBlockByHash(
-		ctx,
-		&observe.GetBlockByHashRequest{Hash: h.Bytes()},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	block := res.GetBlock()
-
-	timestamp, err := ptypes.Timestamp(block.GetTimestamp())
-	if err != nil {
-		return nil, err
-	}
-
-	return &data.Block{
-		Number:            block.GetNumber(),
-		PrevBlockHash:     crypto.BytesToHash(block.GetPrevBlockHash()),
-		Timestamp:         timestamp,
-		Status:            data.BlockStatus(block.GetStatus()),
-		TransactionHashes: crypto.BytesToHashes(block.GetTransactionHashes()),
-	}, nil
-}
-
-// GetBlockByNumber fetches a block by number.
-func (c *Client) GetBlockByNumber(ctx context.Context, n uint64) (*data.Block, error) {
-	res, err := c.grpcClient.GetBlockByNumber(
-		ctx,
-		&observe.GetBlockByNumberRequest{Number: n},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	block := res.GetBlock()
-
-	timestamp, err := ptypes.Timestamp(block.GetTimestamp())
-	if err != nil {
-		return nil, err
-	}
-
-	return &data.Block{
-		Number:            block.GetNumber(),
-		PrevBlockHash:     crypto.BytesToHash(block.GetPrevBlockHash()),
-		Timestamp:         timestamp,
-		Status:            data.BlockStatus(block.GetStatus()),
-		TransactionHashes: crypto.BytesToHashes(block.GetTransactionHashes()),
-	}, nil
-}
-
 // GetTransaction fetches a transaction by hash.
 func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.SignedTransaction, error) {
-	res, err := c.grpcClient.GetTransaction(
+	res, err := c.rpcClient.GetTransaction(
 		ctx,
 		&observe.GetTransactionRequest{Hash: h.Bytes()},
 	)
@@ -125,24 +81,23 @@ func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.Sign
 	payerSig := tx.GetPayerSignature()
 
 	return &types.SignedTransaction{
-		ToAddress:    crypto.BytesToAddress(tx.GetToAddress()),
 		Script:       tx.GetScript(),
 		Nonce:        tx.GetNonce(),
 		ComputeLimit: tx.GetComputeLimit(),
 		ComputeUsed:  tx.GetComputeUsed(),
-		PayerSignature: &crypto.Signature{
-			Account: crypto.BytesToAddress(payerSig.GetAccountAddress()),
-			Sig:     payerSig.GetSignature(),
+		PayerSignature: types.AccountSignature{
+			Account:   types.BytesToAddress(payerSig.GetAccount()),
+			Signature: payerSig.GetSignature(),
 		},
-		Status: data.TxStatus(tx.GetStatus()),
+		Status: types.TransactionStatus(tx.GetStatus()),
 	}, nil
 }
 
 // GetAccount fetches an account by address.
-func (c *Client) GetAccount(ctx context.Context, a crypto.Address) (*crypto.Account, error) {
-	res, err := c.grpcClient.GetAccount(
+func (c *Client) GetAccount(ctx context.Context, address types.Address) (*types.Account, error) {
+	res, err := c.rpcClient.GetAccount(
 		ctx,
-		&observe.GetAccountRequest{Address: a.Bytes()},
+		&observe.GetAccountRequest{Address: address.Bytes()},
 	)
 	if err != nil {
 		return nil, err
@@ -150,8 +105,8 @@ func (c *Client) GetAccount(ctx context.Context, a crypto.Address) (*crypto.Acco
 
 	account := res.GetAccount()
 
-	return &crypto.Account{
-		Address:    crypto.BytesToAddress(account.GetAddress()),
+	return &types.Account{
+		Address:    types.BytesToAddress(account.GetAddress()),
 		Balance:    account.GetBalance(),
 		Code:       account.GetCode(),
 		PublicKeys: account.GetPublicKeys(),

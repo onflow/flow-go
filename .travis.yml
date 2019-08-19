@@ -2,6 +2,10 @@
 language: go
 go_import_path: github.com/dapperlabs/bamboo-node
 
+branches:
+  only:
+  - master
+  
 services:
   - docker
 
@@ -9,6 +13,7 @@ before_cache:
   # Save tagged docker images
   - >
     mkdir -p $HOME/docker && docker images -a --filter='dangling=false' --format '{{.Repository}}:{{.Tag}} {{.ID}}'
+    | grep -v bamboo-node_ | grep -v bamboonode_
     | xargs -n 2 -t sh -c 'test -e $HOME/docker/$1.tar.gz || docker save $0 | gzip -2 > $HOME/docker/$1.tar.gz'
 
 before_install:
@@ -19,6 +24,8 @@ cache:
   bundler: true
   directories:
     - $HOME/docker
+    - $HOME/.cache/go-build
+    - $HOME/gopath/pkg/mod
 
 script:
   - make ci
