@@ -3003,6 +3003,8 @@ func TestParseInterface(t *testing.T) {
         interface Test {
             foo: Int
 
+            init(foo: Int)
+
             fun getFoo(): Int
         }
 	`)
@@ -3026,6 +3028,25 @@ func TestParseInterface(t *testing.T) {
 				IdentifierPos: Position{Offset: 38, Line: 3, Column: 12},
 			},
 		},
+		Initializer: &InitializerDeclaration{
+			Identifier: "init",
+			Parameters: []*Parameter{
+				{
+					Label:      "",
+					Identifier: "foo",
+					Type: &NominalType{
+						Identifier: "Int",
+						Pos:        Position{Offset: 70, Line: 5, Column: 22},
+					},
+					LabelPos:      nil,
+					IdentifierPos: Position{Offset: 65, Line: 5, Column: 17},
+					StartPos:      Position{Offset: 65, Line: 5, Column: 17},
+					EndPos:        Position{Offset: 70, Line: 5, Column: 22},
+				},
+			},
+			FunctionBlock: nil,
+			StartPos:      Position{Offset: 60, Line: 5, Column: 12},
+		},
 		Functions: []*FunctionDeclaration{
 			{
 				Access:     AccessNotSpecified,
@@ -3033,16 +3054,16 @@ func TestParseInterface(t *testing.T) {
 				Parameters: nil,
 				ReturnType: &NominalType{
 					Identifier: "Int",
-					Pos:        Position{Offset: 74, Line: 5, Column: 26},
+					Pos:        Position{Offset: 102, Line: 7, Column: 26},
 				},
 				FunctionBlock: nil,
-				StartPos:      Position{Offset: 60, Line: 5, Column: 12},
-				IdentifierPos: Position{Offset: 64, Line: 5, Column: 16},
+				StartPos:      Position{Offset: 88, Line: 7, Column: 12},
+				IdentifierPos: Position{Offset: 92, Line: 7, Column: 16},
 			},
 		},
 		IdentifierPos: Position{Offset: 19, Line: 2, Column: 18},
 		StartPos:      Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:        Position{Offset: 86, Line: 6, Column: 8},
+		EndPos:        Position{Offset: 114, Line: 8, Column: 8},
 	}
 
 	expected := &Program{

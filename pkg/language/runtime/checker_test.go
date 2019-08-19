@@ -3096,3 +3096,129 @@ func TestCheckInvalidNonOptionalReturn(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
+
+func TestCheckInvalidLocalInterface(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+	  fun test() {
+          interface Test {}
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+}
+
+func TestCheckInterfaceWithFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test()
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInterfaceWithFunctionImplementationAndConditions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test(x: Int) {
+              pre {
+                x == 0
+              }
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInterfaceWithFunctionImplementation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test(): Int {
+             return 1
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+}
+
+func TestCheckInvalidInterfaceWithFunctionImplementationNoConditions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test() {
+            // ...
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+}
+
+func TestCheckInterfaceWithInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init()
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInterfaceWithInitializerImplementation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init() {
+            // ...
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+}
+
+func TestCheckInterfaceWithInitializerImplementationAndConditions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init(x: Int) {
+              pre {
+                x == 0
+              }
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
