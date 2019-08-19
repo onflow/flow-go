@@ -908,6 +908,8 @@ Logical operators work with the boolean values `true` and `false`.
     false && false // is false
     ```
 
+    If the left-hand side is true, the right-hand side is not evaluated.
+
   - Logical OR: `a || b`
 
     ```bamboo,file=operator-or.bpl
@@ -916,6 +918,8 @@ Logical operators work with the boolean values `true` and `false`.
     false || false // is true
     false || false // is false
     ```
+
+    If the left-hand side is false, the right-hand side is not evaluated.
 
 ### Comparison operators
 

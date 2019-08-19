@@ -715,21 +715,39 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 			})
 
 	case ast.OperationOr:
-		return interpreter.visitBinaryOperation(expression).
-			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(BoolValue)
-				right := tuple.Right.(BoolValue)
-				return BoolValue(left || right)
+		// interpret the left-hand side
+		return expression.Left.Accept(interpreter).(Trampoline).
+			FlatMap(func(left interface{}) Trampoline {
+				// only interpret right-hand side if left-hand side is false
+				leftBool := left.(BoolValue)
+				if leftBool {
+					return Done{Result: leftBool}
+				}
+
+				// after interpreting the left-hand side,
+				// interpret the right-hand side
+				return expression.Right.Accept(interpreter).(Trampoline).
+					FlatMap(func(right interface{}) Trampoline {
+						return Done{Result: right.(BoolValue)}
+					})
 			})
 
 	case ast.OperationAnd:
-		return interpreter.visitBinaryOperation(expression).
-			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(BoolValue)
-				right := tuple.Right.(BoolValue)
-				return BoolValue(left && right)
+		// interpret the left-hand side
+		return expression.Left.Accept(interpreter).(Trampoline).
+			FlatMap(func(left interface{}) Trampoline {
+				// only interpret right-hand side if left-hand side is true
+				leftBool := left.(BoolValue)
+				if !leftBool {
+					return Done{Result: leftBool}
+				}
+
+				// after interpreting the left-hand side,
+				// interpret the right-hand side
+				return expression.Right.Accept(interpreter).(Trampoline).
+					FlatMap(func(right interface{}) Trampoline {
+						return Done{Result: right.(BoolValue)}
+					})
 			})
 
 	case ast.OperationNilCoalesce:
