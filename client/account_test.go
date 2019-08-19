@@ -73,3 +73,18 @@ func TestCreateAccount(t *testing.T) {
 		}
 	`)))
 }
+
+func TestUpdateAccountCode(t *testing.T) {
+	RegisterTestingT(t)
+
+	address := types.HexToAddress("0000000000000000000000000000000000000001")
+	tx := client.UpdateAccountCode(address, []byte("fun main() {}"))
+
+	Expect(tx.Script).To(Equal([]byte(`
+		fun main() {
+			let account = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]
+			let code = [102,117,110,32,109,97,105,110,40,41,32,123,125]
+			updateAccountCode(account, code)
+		}
+	`)))
+}

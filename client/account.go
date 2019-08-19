@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
@@ -69,8 +68,25 @@ func CreateAccount(publicKey, code []byte) *types.RawTransaction {
 	`, publicKeyStr, codeStr)
 
 	return &types.RawTransaction{
-		Script:    []byte(script),
-		Timestamp: time.Now(),
+		Script: []byte(script),
+	}
+}
+
+// UpdateAccountCode generates a transaction that updates the code associated with an account.
+func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction {
+	accountStr := bytesToString(account.Bytes())
+	codeStr := bytesToString(code)
+
+	script := fmt.Sprintf(`
+		fun main() {
+			let account = %s
+			let code = %s
+			updateAccountCode(account, code)
+		}
+	`, accountStr, codeStr)
+
+	return &types.RawTransaction{
+		Script: []byte(script),
 	}
 }
 
