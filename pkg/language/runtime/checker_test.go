@@ -2260,6 +2260,25 @@ func TestCheckStructureConstructorReferenceInInitializerAndFunction(t *testing.T
 		To(BeIdenticalTo(structureType))
 }
 
+func TestCheckInvalidStructureFieldMissingVariableKind(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct X {
+            x: Int
+
+            init(x: Int) {
+                self.x = x
+            }
+        }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidVariableKindError{}))
+}
+
 func TestCheckFunctionConditions(t *testing.T) {
 	RegisterTestingT(t)
 

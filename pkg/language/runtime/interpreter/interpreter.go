@@ -1174,3 +1174,8 @@ func (interpreter *Interpreter) unbox(value Value) Value {
 		value = some.Value
 	}
 }
+
+func (interpreter *Interpreter) VisitInterfaceDeclaration(structure *ast.InterfaceDeclaration) ast.Repr {
+	// TODO:
+	return nil
+}

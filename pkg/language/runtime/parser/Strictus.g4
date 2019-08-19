@@ -51,7 +51,8 @@ program
 
 declaration
     : structureDeclaration
-    | functionDeclaration
+    | interfaceDeclaration
+    | functionDeclaration[true]
     | variableDeclaration
     ;
 
@@ -62,11 +63,20 @@ access
     ;
 
 structureDeclaration
-    : Struct Identifier '{' field* initializer? functionDeclaration* '}'
+    : Struct Identifier '{' field* initializer? functionDeclaration[true]* '}'
+    ;
+
+variableKind
+    : Let
+    | Var
     ;
 
 field
-    : access (Let | Var) Identifier ':' fullType
+    : access variableKind? Identifier ':' fullType
+    ;
+
+interfaceDeclaration
+    : Interface Identifier '{' field* functionDeclaration[false]* '}'
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
@@ -76,8 +86,10 @@ initializer
     : Identifier parameterList functionBlock
     ;
 
-functionDeclaration
-    : access Fun Identifier parameterList (':' returnType=fullType)? functionBlock
+functionDeclaration[bool functionBlockRequired]
+    : access Fun Identifier parameterList (':' returnType=fullType)?
+      // only optional if parameter functionBlockRequired is false
+      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
 
 parameterList
@@ -171,7 +183,7 @@ whileStatement
     ;
 
 variableDeclaration
-    : (Let | Var) Identifier (':' fullType)? '=' expression
+    : variableKind Identifier (':' fullType)? '=' expression
     ;
 
 assignment
@@ -350,6 +362,8 @@ OpenParen: '(' ;
 CloseParen: ')' ;
 
 Struct : 'struct' ;
+
+Interface : 'interface' ;
 
 Fun : 'fun' ;
 
