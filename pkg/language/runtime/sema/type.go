@@ -446,7 +446,7 @@ type StructureType struct {
 	Identifier                string
 	Conformances              []*InterfaceType
 	Members                   map[string]*Member
-	InitializerParameterTypes []Type
+	ConstructorParameterTypes []Type
 }
 
 func (*StructureType) isType() {}

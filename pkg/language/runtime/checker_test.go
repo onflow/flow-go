@@ -3397,6 +3397,43 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
 }
 
+func TestCheckInvalidInterfaceConformanceInitializerExplicitMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init(x: Int)
+      }
+
+      struct TestImpl: Test {
+          init(x: Bool) {}
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceInitializerImplicitMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init(x: Int)
+      }
+
+      struct TestImpl: Test {
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
 func TestCheckInvalidInterfaceConformanceMissingFunction(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -3563,8 +3600,6 @@ func TestCheckInvalidInterfaceConformanceFieldKindVarLetMismatch(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
 }
-
-// TODO: check initializer conformance
 
 // TODO: field declaration, member access, type references
 //

@@ -1971,7 +1971,7 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 		structure.Fields,
 		structureType,
 		structure.Identifier,
-		structureType.InitializerParameterTypes,
+		structureType.ConstructorParameterTypes,
 		initializerKindStructure,
 	)
 
@@ -2015,10 +2015,6 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 
 	checker.StructureDeclarationTypes[structure] = structureType
 
-	for _, interfaceType := range conformances {
-		checker.checkStructureConformance(structureType, interfaceType, structure.IdentifierPos)
-	}
-
 	// declare constructor
 
 	initializer := structure.Initializer
@@ -2029,7 +2025,15 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 
 	checker.declareStructureConstructor(structure, structureType, parameterTypes)
 
-	structureType.InitializerParameterTypes = parameterTypes
+	structureType.ConstructorParameterTypes = parameterTypes
+
+	// check conformances
+	// NOTE: perform after completing structure type (e.g. setting constructure parameter types)
+
+	for _, interfaceType := range conformances {
+		checker.checkStructureConformance(structureType, interfaceType, structure.IdentifierPos)
+	}
+
 }
 
 func (checker *Checker) conformances(conformances []*ast.NominalType) []*InterfaceType {
@@ -2059,8 +2063,27 @@ func (checker *Checker) checkStructureConformance(
 ) {
 	var missingMembers []*Member
 	var memberMismatches []MemberMismatch
+	var initializerMismatch *InitializerMismatch
 
-	// TODO: check initializer
+	if interfaceType.InitializerParameterTypes != nil {
+
+		structureInitializerType := &FunctionType{
+			ParameterTypes: structureType.ConstructorParameterTypes,
+			ReturnType:     &VoidType{},
+		}
+		interfaceInitializerType := &FunctionType{
+			ParameterTypes: interfaceType.InitializerParameterTypes,
+			ReturnType:     &VoidType{},
+		}
+
+		// TODO: subtype?
+		if !structureInitializerType.Equal(interfaceInitializerType) {
+			initializerMismatch = &InitializerMismatch{
+				StructureParameterTypes: structureType.ConstructorParameterTypes,
+				InterfaceParameterTypes: interfaceType.InitializerParameterTypes,
+			}
+		}
+	}
 
 	for name, interfaceMember := range interfaceType.Members {
 
@@ -2080,14 +2103,18 @@ func (checker *Checker) checkStructureConformance(
 		}
 	}
 
-	if len(missingMembers) > 0 || len(memberMismatches) > 0 {
+	if len(missingMembers) > 0 ||
+		len(memberMismatches) > 0 ||
+		initializerMismatch != nil {
+
 		checker.report(
 			&ConformanceError{
-				StructureType:    structureType,
-				InterfaceType:    interfaceType,
-				Pos:              pos,
-				MissingMembers:   missingMembers,
-				MemberMismatches: memberMismatches,
+				StructureType:       structureType,
+				InterfaceType:       interfaceType,
+				Pos:                 pos,
+				InitializerMismatch: initializerMismatch,
+				MissingMembers:      missingMembers,
+				MemberMismatches:    memberMismatches,
 			},
 		)
 	}

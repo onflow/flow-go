@@ -796,12 +796,18 @@ type MemberMismatch struct {
 	InterfaceMember *Member
 }
 
+type InitializerMismatch struct {
+	StructureParameterTypes []Type
+	InterfaceParameterTypes []Type
+}
+
 type ConformanceError struct {
-	StructureType    *StructureType
-	InterfaceType    *InterfaceType
-	MissingMembers   []*Member
-	MemberMismatches []MemberMismatch
-	Pos              ast.Position
+	StructureType       *StructureType
+	InterfaceType       *InterfaceType
+	InitializerMismatch *InitializerMismatch
+	MissingMembers      []*Member
+	MemberMismatches    []MemberMismatch
+	Pos                 ast.Position
 }
 
 func (e *ConformanceError) Error() string {
