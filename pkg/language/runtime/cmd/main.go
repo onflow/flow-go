@@ -1,30 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
-)
-
-var log = stdlib.NewStandardLibraryFunction(
-	"log",
-	&sema.FunctionType{
-		ParameterTypes: []sema.Type{&sema.AnyType{}},
-		ReturnType:     &sema.VoidType{},
-	},
-	func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
-		fmt.Printf("%v\n", arguments[0])
-		return trampoline.Done{Result: &interpreter.VoidValue{}}
-	},
-	nil,
 )
 
 // main parses the given filename and prints any syntax errors.
@@ -34,7 +18,7 @@ var log = stdlib.NewStandardLibraryFunction(
 //
 func main() {
 
-	standardLibraryFunctions := append(stdlib.BuiltIns, log)
+	standardLibraryFunctions := append(stdlib.BuiltIns, stdlib.Helpers...)
 
 	if len(os.Args) < 2 {
 		exitWithError("no input file")
