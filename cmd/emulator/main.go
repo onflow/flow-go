@@ -14,7 +14,7 @@ func main() {
 
 	config := &server.Config{
 		Port:          5000,
-		WrappedPort:   9090,
+		HTTPPort:      9090,
 		BlockInterval: time.Second * 5,
 	}
 

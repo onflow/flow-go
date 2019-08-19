@@ -29,7 +29,7 @@ type EmulatorServer struct {
 // Config for the EmulatorServer configuration settings.
 type Config struct {
 	Port          int           `default:"5000"`
-	WrappedPort   int           `default:"9090"`
+	HTTPPort      int           `default:"9090"`
 	BlockInterval time.Duration `default:"5s"`
 }
 
@@ -94,18 +94,15 @@ func StartServer(logger *log.Logger, config *Config) {
 	go emulatorServer.Start(ctx)
 
 	wrappedServer := grpcweb.WrapServer(emulatorServer.grpcServer)
-	handler := func(resp http.ResponseWriter, req *http.Request) {
-		wrappedServer.ServeHTTP(resp, req)
-	}
 
 	httpServer := http.Server{
-		Addr:    fmt.Sprintf(":%d", config.WrappedPort),
-		Handler: http.HandlerFunc(handler),
+		Addr:    fmt.Sprintf(":%d", config.HTTPPort),
+		Handler: http.HandlerFunc(wrappedServer.ServeHTTP),
 	}
 
 	logger.
-		WithField("port", config.WrappedPort).
-		Debugf("🏁  Starting HTTP Server on port %d...", config.WrappedPort)
+		WithField("port", config.HTTPPort).
+		Debugf("🏁  Starting HTTP Server on port %d...", config.HTTPPort)
 
 	if err := httpServer.ListenAndServe(); err != nil {
 		logger.WithError(err).Fatal("☠️  Failed to start HTTP Server")
