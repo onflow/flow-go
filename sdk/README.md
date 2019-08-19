@@ -15,52 +15,12 @@ applications in Go.
 
 
 ## <a name="pkg-index">Index</a>
-* [func CreateAccount(publicKey, code []byte) *types.RawTransaction](#CreateAccount)
-* [func LoadAccount(r io.Reader) (*types.AccountKey, error)](#LoadAccount)
-* [func LoadAccountFromFile(filename string) (*types.AccountKey, error)](#LoadAccountFromFile)
-* [func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction](#UpdateAccountCode)
 
 
 #### <a name="pkg-files">Package files</a>
-[accounts.go](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go) [doc.go](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/doc.go)
+[doc.go](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/doc.go)
 
 
-
-
-
-## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=1293:1357#L58)
-``` go
-func CreateAccount(publicKey, code []byte) *types.RawTransaction
-```
-CreateAccount generates a transaction that creates a new account.
-
-
-
-## <a name="LoadAccount">func</a> [LoadAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=858:914#L37)
-``` go
-func LoadAccount(r io.Reader) (*types.AccountKey, error)
-```
-LoadAccount parses an account key from a JSON reader.
-
-An error will be returned if the reader contains invalid JSON.
-
-
-
-## <a name="LoadAccountFromFile">func</a> [LoadAccountFromFile](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=567:635#L25)
-``` go
-func LoadAccountFromFile(filename string) (*types.AccountKey, error)
-```
-LoadAccountFromFile loads an account key from a JSON file.
-
-An error will be returned if the file cannot be read or if it contains invalid JSON.
-
-
-
-## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts.go?s=1738:1818#L76)
-``` go
-func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
-```
-UpdateAccountCode generates a transaction that updates the code associated with an account.
 
 
 

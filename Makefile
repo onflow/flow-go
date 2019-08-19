@@ -40,6 +40,7 @@ generate-godoc:
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/verify/processor > internal/roles/verify/processor/README.md
 	godoc2md github.com/dapperlabs/bamboo-node/pkg/data/keyvalue > pkg/data/keyvalue/README.md
 	godoc2md github.com/dapperlabs/bamboo-node/sdk > sdk/README.md
+	godoc2md github.com/dapperlabs/bamboo-node/sdk/accounts > sdk/accounts/README.md
 
 .PHONY: generate-proto
 generate-proto:

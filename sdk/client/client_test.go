@@ -12,12 +12,12 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 	"github.com/dapperlabs/bamboo-node/pkg/utils/unittest"
-	"github.com/dapperlabs/bamboo-node/sdk"
+	"github.com/dapperlabs/bamboo-node/sdk/accounts"
 	"github.com/dapperlabs/bamboo-node/sdk/client"
 	"github.com/dapperlabs/bamboo-node/sdk/client/mocks"
 )
 
-var defaultAccount, _ = sdk.LoadAccount(strings.NewReader(`
+var defaultAccount, _ = accounts.LoadAccount(strings.NewReader(`
 	{	
 		"account": "0000000000000000000000000000000000000002",
 		"seed": "elephant ears"
