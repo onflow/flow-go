@@ -414,7 +414,7 @@ type InvalidBinaryOperandsError struct {
 
 func (e *InvalidBinaryOperandsError) Error() string {
 	return fmt.Sprintf(
-		"can't apply binary operation %s to different types: `%s`, `%s`",
+		"cannot apply binary operation %s to different types: `%s`, `%s`",
 		e.Operation.Symbol(),
 		e.LeftType.String(),
 		e.RightType.String(),
