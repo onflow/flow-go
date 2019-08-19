@@ -1,4 +1,4 @@
-package sdk
+package accounts
 
 import (
 	"encoding/json"

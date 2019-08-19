@@ -5,13 +5,13 @@ import (
 	"fmt"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
-	"github.com/dapperlabs/bamboo-node/sdk"
+	"github.com/dapperlabs/bamboo-node/sdk/accounts"
 	"github.com/dapperlabs/bamboo-node/sdk/client"
 )
 
 func ExampleCreateAccount_complete() {
 	// load an existing account for signing
-	myAccount, err := sdk.LoadAccountFromFile("./bamboo.json")
+	myAccount, err := accounts.LoadAccountFromFile("./bamboo.json")
 	if err != nil {
 		panic("failed to load account!")
 	}
@@ -23,7 +23,7 @@ func ExampleCreateAccount_complete() {
 	}
 
 	// generate an account creation transaction
-	tx := sdk.CreateAccount(keyPair.PublicKey, nil)
+	tx := accounts.CreateAccount(keyPair.PublicKey, nil)
 
 	signedTx := tx.SignPayer(myAccount.Account, myAccount.KeyPair)
 
@@ -41,7 +41,7 @@ func ExampleCreateAccount_complete() {
 
 // Load a user account from a JSON file.
 func ExampleLoadAccountFromFile() {
-	account, err := sdk.LoadAccountFromFile("./bamboo.json")
+	account, err := accounts.LoadAccountFromFile("./bamboo.json")
 	if err != nil {
 		panic("failed to load account!")
 	}
