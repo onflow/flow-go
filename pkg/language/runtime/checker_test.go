@@ -3618,6 +3618,22 @@ func TestCheckInvalidInterfaceConformanceRepetition(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.DuplicateConformanceError{}))
 }
 
+func TestCheckInterfaceTypeAsValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+      interface X {}
+
+      let x = X
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.Globals["x"].Type).
+		To(BeAssignableToTypeOf(&sema.InterfaceMetaType{}))
+}
+
 // TODO: field declaration, member access, type references
 //
 func TestCheckOrigins(t *testing.T) {

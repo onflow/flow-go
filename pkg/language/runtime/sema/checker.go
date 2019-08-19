@@ -2013,19 +2013,19 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 		Conformances: conformances,
 	}
 
-	checker.StructureDeclarationTypes[structure] = structureType
-
-	// declare constructor
-
 	initializer := structure.Initializer
 	var parameterTypes []Type
 	if initializer != nil {
 		parameterTypes = checker.parameterTypes(initializer.Parameters)
 	}
 
-	checker.declareStructureConstructor(structure, structureType, parameterTypes)
-
 	structureType.ConstructorParameterTypes = parameterTypes
+
+	checker.StructureDeclarationTypes[structure] = structureType
+
+	// declare constructor
+
+	checker.declareStructureConstructor(structure, structureType, parameterTypes)
 
 	// check structure conforms to interfaces.
 	// NOTE: perform after completing structure type (e.g. setting constructor parameter types)
@@ -2532,10 +2532,6 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		Members:    members,
 	}
 
-	checker.InterfaceDeclarationTypes[declaration] = interfaceType
-
-	// declare constructor
-
 	initializer := declaration.Initializer
 	var parameterTypes []Type
 	if initializer != nil {
@@ -2543,6 +2539,12 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	}
 
 	interfaceType.InitializerParameterTypes = parameterTypes
+
+	checker.InterfaceDeclarationTypes[declaration] = interfaceType
+
+	// declare value
+
+	checker.declareInterfaceMetaType(declaration, interfaceType)
 }
 
 func (checker *Checker) checkInterfaceFunctionBlock(block *ast.FunctionBlock, kind common.DeclarationKind) {
@@ -2566,6 +2568,25 @@ func (checker *Checker) checkInterfaceFunctionBlock(block *ast.FunctionBlock, ki
 			},
 		)
 	}
+}
+
+func (checker *Checker) declareInterfaceMetaType(
+	declaration *ast.InterfaceDeclaration,
+	interfaceType *InterfaceType,
+) {
+	metaType := &InterfaceMetaType{
+		InterfaceType: interfaceType,
+	}
+
+	checker.declareVariable(
+		declaration.Identifier,
+		metaType,
+		// TODO: check
+		common.DeclarationKindInterface,
+		declaration.IdentifierPos,
+		true,
+		nil,
+	)
 }
 
 func (checker *Checker) recordOrigin(startPos, endPos ast.Position, variable *Variable) {
