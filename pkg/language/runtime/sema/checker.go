@@ -1999,7 +1999,7 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 		common.DeclarationKindStructure,
 	)
 
-	conformances := checker.conformances(structure.Conformances)
+	conformances := checker.conformances(structure)
 
 	members := checker.members(
 		structure.Fields,
@@ -2027,18 +2027,20 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 
 	structureType.ConstructorParameterTypes = parameterTypes
 
-	// check conformances
-	// NOTE: perform after completing structure type (e.g. setting constructure parameter types)
+	// check structure conforms to interfaces.
+	// NOTE: perform after completing structure type (e.g. setting constructor parameter types)
 
 	for _, interfaceType := range conformances {
 		checker.checkStructureConformance(structureType, interfaceType, structure.IdentifierPos)
 	}
-
 }
 
-func (checker *Checker) conformances(conformances []*ast.NominalType) []*InterfaceType {
+func (checker *Checker) conformances(structure *ast.StructureDeclaration) []*InterfaceType {
+
 	var interfaceTypes []*InterfaceType
-	for _, conformance := range conformances {
+	seenConformances := map[string]bool{}
+
+	for _, conformance := range structure.Conformances {
 		convertedType := checker.ConvertType(conformance)
 
 		if interfaceType, ok := convertedType.(*InterfaceType); ok {
@@ -2052,6 +2054,19 @@ func (checker *Checker) conformances(conformances []*ast.NominalType) []*Interfa
 				},
 			)
 		}
+
+		if seenConformances[conformance.Identifier] {
+
+			checker.report(
+				&DuplicateConformanceError{
+					StructureIdentifier: structure.Identifier,
+					Conformance:         conformance,
+				},
+			)
+
+		}
+
+		seenConformances[conformance.Identifier] = true
 	}
 	return interfaceTypes
 }

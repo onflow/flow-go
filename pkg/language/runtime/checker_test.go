@@ -3601,6 +3601,23 @@ func TestCheckInvalidInterfaceConformanceFieldKindVarLetMismatch(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
 }
 
+func TestCheckInvalidInterfaceConformanceRepetition(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface X {}
+
+      interface Y {}
+
+      struct TestImpl: X, Y, X {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.DuplicateConformanceError{}))
+}
+
 // TODO: field declaration, member access, type references
 //
 func TestCheckOrigins(t *testing.T) {

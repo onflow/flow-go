@@ -827,3 +827,30 @@ func (e *ConformanceError) StartPosition() ast.Position {
 func (e *ConformanceError) EndPosition() ast.Position {
 	return e.Pos
 }
+
+// DuplicateConformanceError
+
+// TODO: just make this a warning?
+
+type DuplicateConformanceError struct {
+	StructureIdentifier string
+	Conformance         *ast.NominalType
+}
+
+func (e *DuplicateConformanceError) Error() string {
+	return fmt.Sprintf(
+		"structure `%s` repeats conformance for interface `%s`",
+		e.StructureIdentifier,
+		e.Conformance.Identifier,
+	)
+}
+
+func (*DuplicateConformanceError) isSemanticError() {}
+
+func (e *DuplicateConformanceError) StartPosition() ast.Position {
+	return e.Conformance.StartPosition()
+}
+
+func (e *DuplicateConformanceError) EndPosition() ast.Position {
+	return e.Conformance.EndPosition()
+}
