@@ -22,7 +22,7 @@ func (a *BLS_BLS12381Algo) SignHash(sk PrKey, h Hash) Signature {
 // Hasher is not used in the specific case of BLS
 func (a *BLS_BLS12381Algo) SignBytes(sk PrKey, data []byte, alg Hasher) Signature {
 	blsPrKey, ok := sk.(*PrKeyBLS_BLS12381)
-	if ok == false {
+	if !ok {
 		log.Error("BLS sigature can only be called using a BLS private key")
 		return nil
 	}
@@ -46,7 +46,7 @@ func (a *BLS_BLS12381Algo) VerifyHash(pk PubKey, s Signature, h Hash) bool {
 // VerifyBytes verifies a signature of a byte array
 func (a *BLS_BLS12381Algo) VerifyBytes(pk PubKey, s Signature, data []byte, alg Hasher) bool {
 	blsPubKey, ok := pk.(*PubKey_BLS_BLS12381)
-	if ok == false {
+	if !ok {
 		log.Error("BLS signature verification can only be called using a BLS public key")
 		return false
 	}

@@ -17,22 +17,27 @@ type ECDSAalgo struct {
 	*SignAlgo
 }
 
+func bitToBytes(bits int) int {
+	return (bits + 7) >> 3
+}
+
 // SignHash implements ECDSA signature
 func (a *ECDSAalgo) SignHash(sk PrKey, h Hash) Signature {
 	skECDSA, ok := sk.(*PrKeyECDSA)
-	if ok == false {
+	if !ok {
 		log.Error("ECDSA sigature can only be called using an ECDSA private key")
 		return nil
 	}
 	r, s, err := goecdsa.Sign(rand.Reader, skECDSA.goPrKey, h.Bytes())
 	if err != nil {
 		log.Error("Signature has failed")
+		return nil
 	}
 	rBytes := r.Bytes()
 	sBytes := s.Bytes()
-	Nlen := ((a.curve.Params().N).BitLen() + 7) / 8
+	Nlen := bitToBytes((a.curve.Params().N).BitLen())
 	signature := make([]byte, 2*Nlen)
-	// padd the signature with zeroes
+	// pad the signature with zeroes
 	i := 0
 	for ; i < Nlen-len(rBytes); i++ {
 		signature[i] = 0
@@ -49,6 +54,7 @@ func (a *ECDSAalgo) SignHash(sk PrKey, h Hash) Signature {
 func (a *ECDSAalgo) SignBytes(sk PrKey, data []byte, alg Hasher) Signature {
 	if alg == nil {
 		log.Error("SignBytes requires a Hasher")
+		return nil
 	}
 	h := alg.ComputeBytesHash(data)
 	return a.SignHash(sk, h)
@@ -58,6 +64,7 @@ func (a *ECDSAalgo) SignBytes(sk PrKey, data []byte, alg Hasher) Signature {
 func (a *ECDSAalgo) SignStruct(sk PrKey, data Encoder, alg Hasher) Signature {
 	if alg == nil {
 		log.Error("SignStruct requires a Hasher")
+		return nil
 	}
 	h := alg.ComputeStructHash(data)
 	return a.SignHash(sk, h)
@@ -66,13 +73,13 @@ func (a *ECDSAalgo) SignStruct(sk PrKey, data Encoder, alg Hasher) Signature {
 // VerifyHash implements ECDSA signature verification
 func (a *ECDSAalgo) VerifyHash(pk PubKey, sig Signature, h Hash) bool {
 	ecdsaPk, ok := pk.(*PubKeyECDSA)
-	if ok == false {
+	if !ok {
 		log.Error("ECDSA signature verification can only be called using an ECDSA public key")
 		return false
 	}
 	var r big.Int
 	var s big.Int
-	Nlen := ((a.curve.Params().N).BitLen() + 7) / 8
+	Nlen := bitToBytes((a.curve.Params().N).BitLen())
 	r.SetBytes(sig[:Nlen])
 	s.SetBytes(sig[Nlen:])
 	return goecdsa.Verify((*goecdsa.PublicKey)(ecdsaPk), h.Bytes(), &r, &s)
@@ -82,6 +89,7 @@ func (a *ECDSAalgo) VerifyHash(pk PubKey, sig Signature, h Hash) bool {
 func (a *ECDSAalgo) VerifyBytes(pk PubKey, sig Signature, data []byte, alg Hasher) bool {
 	if alg == nil {
 		log.Error("VerifyBytes requires a Hasher")
+		return false
 	}
 	h := alg.ComputeBytesHash(data)
 	return a.VerifyHash(pk, sig, h)
@@ -91,6 +99,7 @@ func (a *ECDSAalgo) VerifyBytes(pk PubKey, sig Signature, data []byte, alg Hashe
 func (a *ECDSAalgo) VerifyStruct(pk PubKey, sig Signature, data Encoder, alg Hasher) bool {
 	if alg == nil {
 		log.Error("VerifyStruct requires a Hasher")
+		return false
 	}
 	h := alg.ComputeStructHash(data)
 	return a.VerifyHash(pk, sig, h)
@@ -102,6 +111,7 @@ func (a *ECDSAalgo) GeneratePrKey(seed []byte) PrKey {
 	sk, err := goecdsa.GenerateKey(a.curve, rand.Reader)
 	if err != nil {
 		log.Error("The ECDSA key generation has failed")
+		return nil
 	}
 	return &(PrKeyECDSA{a, sk})
 }
@@ -121,7 +131,7 @@ func (sk *PrKeyECDSA) AlgoName() AlgoName {
 
 // KeySize returns the length of the private key
 func (sk *PrKeyECDSA) KeySize() int {
-	return ((sk.alg.curve.Params().N).BitLen() + 7) / 8
+	return bitToBytes((sk.alg.curve.Params().N).BitLen())
 }
 
 // Pubkey returns the public key associated to the private key
@@ -135,5 +145,5 @@ type PubKeyECDSA goecdsa.PublicKey
 
 // KeySize returns the length of the public key
 func (pk *PubKeyECDSA) KeySize() int {
-	return 2 * (((pk.Params().P).BitLen() + 7) / 8)
+	return 2 * bitToBytes((pk.Params().P).BitLen())
 }
