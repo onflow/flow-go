@@ -160,7 +160,10 @@ continueStatement
     ;
 
 ifStatement
-    : If test=expression then=block (Else (ifStatement | alt=block))?
+    : If
+      (testExpression=expression | testDeclaration=variableDeclaration)
+      then=block
+      (Else (ifStatement | alt=block))?
     ;
 
 whileStatement

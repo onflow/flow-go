@@ -705,6 +705,104 @@ func TestCheckInvalidIfStatementElse(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 }
 
+func TestCheckIfStatementTestWithDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int?): Int {
+          if var y = x {
+              return y
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidIfStatementTestWithDeclarationReferenceInElse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int?) {
+          if var y = x {
+              // ...
+          } else {
+              y
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     fun test(x: Int??): Int? {
+         if var y = x {
+             return y
+         }
+     }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     fun test(x: Int??): Int? {
+         if var y: Int? = x {
+             return y
+         }
+     }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidIfStatementTestWithDeclarationNonOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     fun test(x: Int) {
+         if var y = x {
+             // ...
+         }
+     }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidIfStatementTestWithDeclarationSameType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int?): Int? {
+          if var y: Int? = x {
+             return y
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
 func TestCheckConditionalExpressionTest(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -2963,4 +3061,19 @@ func TestCheckInvalidNestedOptionalComparison(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+}
+
+func TestCheckInvalidNonOptionalReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int?): Int {
+          return x
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }

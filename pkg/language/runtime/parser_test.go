@@ -936,6 +936,89 @@ func TestParseIfStatement(t *testing.T) {
 		To(Equal(expected))
 }
 
+func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseProgram(`
+	    fun test() {
+            if var y = x {
+                1
+            } else {
+                2
+            }
+        }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	test := &FunctionDeclaration{
+		Access:     AccessNotSpecified,
+		Identifier: "test",
+		ReturnType: &NominalType{
+			Pos: Position{Offset: 15, Line: 2, Column: 14},
+		},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&IfStatement{
+						Test: &VariableDeclaration{
+							IsConstant: false,
+							Identifier: "y",
+							Type:       nil,
+							Value: &IdentifierExpression{
+								Identifier: "x",
+								StartPos:   Position{Offset: 42, Line: 3, Column: 23},
+								EndPos:     Position{Offset: 42, Line: 3, Column: 23},
+							},
+							StartPos:      Position{Offset: 34, Line: 3, Column: 15},
+							IdentifierPos: Position{Offset: 38, Line: 3, Column: 19},
+						},
+						Then: &Block{
+							Statements: []Statement{
+								&ExpressionStatement{
+									Expression: &IntExpression{
+										Value:    big.NewInt(1),
+										StartPos: Position{Offset: 62, Line: 4, Column: 16},
+										EndPos:   Position{Offset: 62, Line: 4, Column: 16},
+									},
+								},
+							},
+							StartPos: Position{Offset: 44, Line: 3, Column: 25},
+							EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+						},
+						Else: &Block{
+							Statements: []Statement{
+								&ExpressionStatement{
+									Expression: &IntExpression{
+										Value:    big.NewInt(2),
+										StartPos: Position{Offset: 101, Line: 6, Column: 16},
+										EndPos:   Position{Offset: 101, Line: 6, Column: 16},
+									},
+								},
+							},
+							StartPos: Position{Offset: 83, Line: 5, Column: 19},
+							EndPos:   Position{Offset: 115, Line: 7, Column: 12},
+						},
+						StartPos: Position{Offset: 31, Line: 3, Column: 12},
+					},
+				},
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 125, Line: 8, Column: 8},
+			},
+		},
+		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
+		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
 func TestParseIfStatementNoElse(t *testing.T) {
 	RegisterTestingT(t)
 
