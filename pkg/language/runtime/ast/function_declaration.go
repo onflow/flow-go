@@ -7,20 +7,20 @@ type FunctionDeclaration struct {
 	Identifier    string
 	Parameters    []*Parameter
 	ReturnType    Type
-	Block         *Block
-	StartPos      *Position
-	IdentifierPos *Position
+	FunctionBlock *FunctionBlock
+	StartPos      Position
+	IdentifierPos Position
 }
 
-func (f *FunctionDeclaration) StartPosition() *Position {
+func (f *FunctionDeclaration) StartPosition() Position {
 	return f.StartPos
 }
 
-func (f *FunctionDeclaration) EndPosition() *Position {
-	return f.Block.EndPosition()
+func (f *FunctionDeclaration) EndPosition() Position {
+	return f.FunctionBlock.EndPosition()
 }
 
-func (f *FunctionDeclaration) IdentifierPosition() *Position {
+func (f *FunctionDeclaration) IdentifierPosition() Position {
 	return f.IdentifierPos
 }
 
@@ -37,4 +37,13 @@ func (f *FunctionDeclaration) DeclarationName() string {
 
 func (f *FunctionDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindFunction
+}
+
+func (f *FunctionDeclaration) ToExpression() *FunctionExpression {
+	return &FunctionExpression{
+		Parameters:    f.Parameters,
+		ReturnType:    f.ReturnType,
+		FunctionBlock: f.FunctionBlock,
+		StartPos:      f.StartPos,
+	}
 }

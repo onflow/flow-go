@@ -2,21 +2,9 @@ package activations
 
 import (
 	"github.com/raviqqe/hamt"
-	"github.com/segmentio/fasthash/fnv1a"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 )
-
-/// StringKey
-
-type StringKey string
-
-func (key StringKey) Hash() uint32 {
-	return fnv1a.HashString32(string(key))
-}
-
-func (key StringKey) Equal(other hamt.Entry) bool {
-	otherKey, isPointerKey := other.(StringKey)
-	return isPointerKey && string(otherKey) == string(key)
-}
 
 // Activations is a stack of activation records.
 // Each entry represents a new scope.
@@ -39,7 +27,7 @@ func (a *Activations) Find(key string) interface{} {
 	if current == nil {
 		return nil
 	}
-	return current.Find(StringKey(key))
+	return current.Find(common.StringKey(key))
 }
 
 func (a *Activations) Set(name string, value interface{}) {
@@ -50,7 +38,8 @@ func (a *Activations) Set(name string, value interface{}) {
 	}
 
 	count := len(a.activations)
-	a.activations[count-1] = current.Insert(StringKey(name), value)
+	a.activations[count-1] = current.
+		Insert(common.StringKey(name), value)
 }
 
 func (a *Activations) PushCurrent() {

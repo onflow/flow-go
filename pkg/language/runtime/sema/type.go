@@ -2,10 +2,12 @@ package sema
 
 import (
 	"fmt"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"github.com/raviqqe/hamt"
 	"strings"
+
+	"github.com/raviqqe/hamt"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
 type Type interface {
@@ -28,6 +30,20 @@ func (*AnyType) Equal(other Type) bool {
 	return ok
 }
 
+// NeverType represents the bottom type
+type NeverType struct{}
+
+func (*NeverType) isType() {}
+
+func (*NeverType) String() string {
+	return "Never"
+}
+
+func (*NeverType) Equal(other Type) bool {
+	_, ok := other.(*NeverType)
+	return ok
+}
+
 // VoidType represents the void type
 type VoidType struct{}
 
@@ -42,6 +58,45 @@ func (*VoidType) Equal(other Type) bool {
 	return ok
 }
 
+// InvalidType represents a type that is invalid.
+// It is the result of type checking failing and
+// can't be expressed in programs.
+//
+type InvalidType struct{}
+
+func (*InvalidType) isType() {}
+
+func (*InvalidType) String() string {
+	return "<<invalid>>"
+}
+
+func (*InvalidType) Equal(other Type) bool {
+	_, ok := other.(*InvalidType)
+	return ok
+}
+
+// OptionalType represents the optional variant of another type
+type OptionalType struct {
+	Type Type
+}
+
+func (*OptionalType) isType() {}
+
+func (t *OptionalType) String() string {
+	if t.Type == nil {
+		return "optional"
+	}
+	return fmt.Sprintf("%s?", t.Type.String())
+}
+
+func (t *OptionalType) Equal(other Type) bool {
+	otherOptional, ok := other.(*OptionalType)
+	if !ok {
+		return false
+	}
+	return t.Type.Equal(otherOptional.Type)
+}
+
 // BoolType represents the boolean type
 type BoolType struct{}
 
@@ -53,6 +108,20 @@ func (*BoolType) String() string {
 
 func (*BoolType) Equal(other Type) bool {
 	_, ok := other.(*BoolType)
+	return ok
+}
+
+// StringType represents the string type
+type StringType struct{}
+
+func (*StringType) isType() {}
+
+func (*StringType) String() string {
+	return "String"
+}
+
+func (*StringType) Equal(other Type) bool {
+	_, ok := other.(*StringType)
 	return ok
 }
 
@@ -286,8 +355,10 @@ func ArrayTypeToString(arrayType ArrayType) string {
 // FunctionType
 
 type FunctionType struct {
-	ParameterTypes []Type
-	ReturnType     Type
+	ParameterTypes        []Type
+	ReturnType            Type
+	Apply                 func([]Type) Type
+	RequiredArgumentCount *int
 }
 
 func (*FunctionType) isType() {}
@@ -337,8 +408,10 @@ func init() {
 	types := []Type{
 		&VoidType{},
 		&AnyType{},
+		&NeverType{},
 		&BoolType{},
 		&IntType{},
+		&StringType{},
 		&Int8Type{},
 		&Int16Type{},
 		&Int32Type{},
@@ -350,24 +423,35 @@ func init() {
 	}
 
 	for _, ty := range types {
-		typeNames[ty.String()] = ty
+		typeName := ty.String()
+
+		// check type is not accidentally redeclared
+		if _, ok := typeNames[typeName]; ok {
+			panic(&errors.UnreachableError{})
+		}
+
+		typeNames[typeName] = ty
 	}
 
 	for name, baseType := range typeNames {
-		baseTypes = baseTypes.Insert(activations.StringKey(name), baseType)
+		key := common.StringKey(name)
+		baseTypes = baseTypes.Insert(key, baseType)
 	}
 }
 
 // StructureType
 
 type StructureType struct {
-	Identifier string
-	Members    map[string]*Member
+	Identifier                string
+	Members                   map[string]*Member
+	ConstructorParameterTypes []Type
 }
 
 type Member struct {
-	Type       Type
-	IsConstant bool
+	Type           Type
+	IsConstant     bool
+	IsInitialized  bool
+	ArgumentLabels []string
 }
 
 func (*StructureType) isType() {}

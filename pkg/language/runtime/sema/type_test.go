@@ -1,8 +1,9 @@
 package sema
 
 import (
-	. "github.com/onsi/gomega"
 	"testing"
+
+	. "github.com/onsi/gomega"
 )
 
 func TestConstantSizedType_String(t *testing.T) {

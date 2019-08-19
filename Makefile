@@ -1,7 +1,11 @@
 export GO111MODULE := on
 
+.PHONY: build-relic
+build-relic:
+	./pkg/crypto/relic_build.sh
+
 .PHONY: install-tools
-install-tools:
+install-tools: build-relic
 	go get github.com/psiemens/godoc2md@v1.0.1
 	go get github.com/google/wire/cmd/wire@v0.3.0
 	go get github.com/golang/protobuf/protoc-gen-go@v1.3.2
@@ -68,3 +72,4 @@ build-bamboo:
 
 .PHONY: ci
 ci: install-tools generate check-generated-code test-unit test-integrate
+

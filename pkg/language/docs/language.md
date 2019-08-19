@@ -355,14 +355,14 @@ a + 2
 
 ### Never
 
-`Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`fatalError`](#fatalError).
+`Never` is the bottom type, i.e., it is a subtype of all types. There is no value that has type `Never`. `Never` can be used as the return type for functions that never return normally. For example, it is the return type of the function [`panic`](#panic).
 
 ```bamboo
 // Declare a function named `crashAndBurn` which will never return,
-// because it calls the function named `fatalError`, which never returns
+// because it calls the function named `panic`, which never returns
 //
 fun crashAndBurn(): Never {
-    fatalError("An unrecoverable error occurred")
+    panic("An unrecoverable error occurred")
 }
 ```
 
@@ -393,6 +393,8 @@ let b: Int? = 42
 The nil-coalescing operator `??` returns the value inside an optional if it contains a value,
 or returns an alternative value if the optional has no value, i.e., the optional value is `nil`.
 
+If the left-hand side is non-nil, the right-hand side is not evaluated.
+
 ```bamboo
 // Declare a constant which has an optional integer type
 //
@@ -413,27 +415,28 @@ The nil-coalescing operator can only be applied to values which have an optional
 let a = 1
 
 // Invalid: nil-coalescing operator is applied to a value which has a non-optional type
-// (a has the non-optional type Int)
+// (a has the non-optional type `Int`)
 //
 let b = a ?? 2
 ```
 
 ```bamboo
 // Invalid: nil-coalescing operator is applied to a value which has a non-optional type
-// (the integer literal is of type Int)
+// (the integer literal is of type `Int`)
 //
 let c = 1 ?? 2
 ```
 
-The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.
+The alternative value, i.e. the right-hand side of the operator,
+must be the non-optional or optional type matching the type of the left-hand side.
 
 ```bamboo
 // Declare a constant with a non-optional integer type
 //
 let a = 1
 
-// Invalid: nil-coalescing operator is applied to a value of type Int,
-// but alternative is of type Bool
+// Invalid: nil-coalescing operator is applied to a value of type `Int`,
+// but the alternative has type `Bool`
 //
 let b = a ?? false
 ```
@@ -468,7 +471,7 @@ let boolean = something as? Bool
 
 ### Strings and Characters
 
-> 🚧 Status: Strings are not implemented yet.
+> 🚧 Status: Characters are not implemented yet.
 
 Strings are collections of characters. Strings have the type `String`, and characters have the type `Character`. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.
 
@@ -1285,15 +1288,13 @@ fun test(x: Int) {
 
 ### Function Preconditions and Postconditions
 
-> 🚧 Status: Function Preconditions and Postconditions are not implemented yet.
-
 Functions may have preconditions and may have postconditions. Preconditions and postconditions can be used to restrict the inputs (values for parameters) and output (return value) of a function.
 
-Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the `require` keyword, followed by the condition block.
+Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the `pre` keyword, followed by the condition block.
 
-Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `ensure` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
+Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `post` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
 
-A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions.
+A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions. Also, conditions may not contain function expressions.
 
 <!--
 
@@ -1312,13 +1313,13 @@ In postconditions, the special constant `result` refers to the result of the fun
 
 ```bamboo,file=function-factorial.bpl
 fun factorial(_ n: Int): Int {
-    require {
+    pre {
         // Require the parameter `n` to be greater than or equal to zero
         //
         n >= 0:
             "factorial is only defined for integers greater than or equal to zero"
     }
-    ensure {
+    post {
         // Ensure the result will be greater than or equal to 1
         //
         result >= 1:
@@ -1345,7 +1346,7 @@ In postconditions, the special function `before` can be used to get the value of
 var n = 0
 
 fun incrementN() {
-    ensure {
+    post {
         // Require the new value of `n` to be the old value of `n`, plus one
         //
         n == before(n) + 1:
@@ -1555,8 +1556,6 @@ f() // returns 2
 
 ## Type Safety
 
-> 🚧 Status: Type checking is not implemented yet.
-
 The Bamboo programming language is a *type-safe* language.
 
 When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type `Bool`, it can *only* be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
@@ -1607,7 +1606,7 @@ add(a, b)
 
 ## Type Inference
 
-> 🚧 Status: Type inference is not implemented yet.
+> 🚧 Status: Only basic type inference is implemented.
 
 If a variable or constant is not annotated explicitly with a type, it is inferred from the value.
 
@@ -1674,7 +1673,7 @@ let dictionary = {}
 
 ## Composite Data Types
 
-> 🚧 Status: Composite data types are not implemented yet.
+> 🚧 Status: Resources are not implemented yet.
 
 Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.
 
@@ -1726,7 +1725,7 @@ Resource are created (instantiated) by using the `create` keyword and calling th
 create SomeResource()
 ```
 
-Composite data types can only be be declared globally and not locally in functions.
+Composite data types can only be declared globally and not locally in functions.
 They can also not be nested.
 
 ### Composite Data Type Fields
@@ -1798,7 +1797,7 @@ struct GetterExample {
     //
     var balance: Int {
         get {
-           ensure {
+           post {
                result >= 0
            }
 
@@ -1833,12 +1832,12 @@ struct SetterExample {
     // which requires written values to be positive
     //
     var balance: Int {
-       set(newBalance) {
-           require {
-               newBalance >= 0
-           }
-           self.balance = newBalance
-       }
+        set(newBalance) {
+            pre {
+                newBalance >= 0
+            }
+            self.balance = newBalance
+        }
     }
 
     init(balance: Int) {
@@ -2322,7 +2321,7 @@ and optional preconditions and postconditions.
 Field requirements consist of the name and the type of the field.
 Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
 
-Calling functions with pre-conditions and post-conditions on interfaces instead of concrete implementations can improve the security of a program,
+Calling functions with preconditions and postconditions on interfaces instead of concrete implementations can improve the security of a program,
 as it ensures that even if implementations change, some aspects of them will always hold.
 
 ### Interface Declaration
@@ -2363,7 +2362,7 @@ resource interface FungibleToken {
     //
     pub balance: Int {
         get {
-            ensure {
+            post {
                 result >= 0:
                     "Balances are always non-negative"
             }
@@ -2374,7 +2373,7 @@ resource interface FungibleToken {
     // given the initial balance, must initialize the balance field
     //
     init(balance: Int) {
-        ensure {
+        post {
             self.balance == balance:
                 "the balance must be initialized to the initial balance"
         }
@@ -2395,13 +2394,13 @@ resource interface FungibleToken {
     // NOTE: `<-Self` is the resource type implementing this interface
     //
     pub fun withdraw(amount: Int): <-Self {
-        require {
+        pre {
             amount > 0:
                 "the amount must be positive"
             amount <= self.balance:
                 "insufficient funds: the amount must be smaller or equal to the balance"
         }
-        ensure {
+        post {
             self.balance == before(self.balance) - amount:
                 "the amount must be deducted from the balance"
         }
@@ -2416,7 +2415,7 @@ resource interface FungibleToken {
     // The given token must be of the same type – a deposit of another
     // type is not possible.
     //
-    // No pre-condition is required to check the given token's balance
+    // No precondition is required to check the given token's balance
     // is positive, as this condition is already ensured by
     // the field requirement.
     //
@@ -2424,7 +2423,7 @@ resource interface FungibleToken {
     // i.e. the resource type implementing this interface
     //
     pub fun deposit(_ token: <-Self) {
-        ensure {
+        post {
             self.balance == before(self.balance) + token.balance:
                 "the amount must be added to the balance"
         }
@@ -3009,14 +3008,14 @@ using Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
 
 Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.
 
-Transactions have three phases: Preparation, execution, and post-conditions.
+Transactions have three phases: Preparation, execution, and postconditions.
 
 The preparer acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
 The preparer has the permissions to read and write to storage of all signer accounts.
 
 Transactions are declared using the `transaction` keyword.
 The preparer is declared using the `prepare` keyword and the execution phase is declared using the `execute` keyword.
-The `ensure` section can be used to declare post-conditions.
+The `post` section can be used to declare postconditions.
 
 ```bamboo,file=transaction-declaration.bpl
 transaction {
@@ -3034,7 +3033,7 @@ transaction {
         // ...
     }
 
-    ensure {
+    post {
         // ...
     }
 }
@@ -3055,11 +3054,11 @@ resource interface FungibleToken {
     pub resource interface Provider {
 
         pub fun withdraw(amount: Int): <-Vault {
-            require {
+            pre {
                 amount > 0:
                     "withdrawal amount must be positive"
             }
-            ensure {
+            post {
                 result.balance == amount:
                     "incorrect amount returned"
             }
@@ -3074,7 +3073,7 @@ resource interface FungibleToken {
 
         pub balance: Int {
             get {
-                ensure {
+                post {
                     result >= 0:
                         "Balances are always non-negative"
                 }
@@ -3082,25 +3081,25 @@ resource interface FungibleToken {
         }
 
         init(balance: Int) {
-            ensure {
+            post {
                 self.balance == balance:
                     "the balance must be initialized to the initial balance"
             }
         }
 
         pub fun withdraw(amount: Int): <-Self {
-            require {
+            pre {
                 amount <= self.balance:
                     "insufficient funds: the amount must be smaller or equal to the balance"
             }
-            ensure {
+            post {
                 self.balance == before(self.balance) - amount:
                     "Incorrect amount removed"
             }
         }
 
         pub fun deposit(vault: <-Self) {
-            ensure {
+            post {
                 self.balance == before(self.balance) + vault.balance:
                     "the amount must be added to the balance"
             }
@@ -3304,12 +3303,10 @@ transaction {
 
 ## Built-in Functions
 
-### `fatalError`
-
-> 🚧 Status: `fatalError` is not implemented yet.
+### `panic`
 
 ```bamboo
-fun fatalError(_ message: String): Never
+fun panic(_ message: String): Never
 ```
 
 Terminates the program unconditionally and reports a message which explains why the unrecoverable error occurred.
@@ -3318,12 +3315,10 @@ Terminates the program unconditionally and reports a message which explains why 
 
 ```bamboo
 let optionalAccount: Account? = // ...
-let account = optionalAccount ?? fatalError("missing account")
+let account = optionalAccount ?? panic("missing account")
 ```
 
 ### `assert`
-
-> 🚧 Status: `assert` is not implemented yet.
 
 ```bamboo
 fun assert(_ condition: Bool, message: String)
@@ -3331,6 +3326,7 @@ fun assert(_ condition: Bool, message: String)
 
 Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.
 
+The message argument is optional.
 
 ## Open questions
 
@@ -3394,11 +3390,11 @@ Should the standard library provide a set data structure?
 
 Should we add generics? In what form? Is it OK to add them in a later version?
 
-### Calls of Pure Functions in Pre-Conditions and Post-Conditions
+### Calls of Pure Functions in Preconditions and Postconditions
 
 > ➡️ <https://github.com/dapperlabs/bamboo-node/issues/70>
 
-It might be useful to call pure functions pre-conditions and post-conditons.
+It might be useful to call pure functions preconditions and postconditons.
 How do we ensure preconditions and postconditions are side-effect free?
 
 ### Late Initialization of Variables and Constants
