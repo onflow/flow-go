@@ -786,3 +786,38 @@ func (e *InvalidConformanceError) StartPosition() ast.Position {
 func (e *InvalidConformanceError) EndPosition() ast.Position {
 	return e.Pos
 }
+
+// ConformanceError
+
+// TODO: report each missing member and mismatch as note
+
+type MemberMismatch struct {
+	StructureMember *Member
+	InterfaceMember *Member
+}
+
+type ConformanceError struct {
+	StructureType    *StructureType
+	InterfaceType    *InterfaceType
+	MissingMembers   []*Member
+	MemberMismatches []MemberMismatch
+	Pos              ast.Position
+}
+
+func (e *ConformanceError) Error() string {
+	return fmt.Sprintf(
+		"structure `%s` does not conform to interface `%s`",
+		e.StructureType.Identifier,
+		e.InterfaceType.Identifier,
+	)
+}
+
+func (*ConformanceError) isSemanticError() {}
+
+func (e *ConformanceError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *ConformanceError) EndPosition() ast.Position {
+	return e.Pos
+}
