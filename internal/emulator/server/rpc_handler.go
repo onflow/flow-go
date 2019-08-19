@@ -20,7 +20,11 @@ import (
 
 // Ping the Observation API server for a response.
 func (s *EmulatorServer) Ping(ctx context.Context, req *observe.PingRequest) (*observe.PingResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	response := &observe.PingResponse{
+		Address: []byte("pong!"),
+	}
+
+	return response, nil
 }
 
 // SendTransaction submits a transaction to the network.
