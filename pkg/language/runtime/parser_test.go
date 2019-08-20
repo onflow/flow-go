@@ -3109,3 +3109,51 @@ func TestParseInterface(t *testing.T) {
 	Expect(actual).
 		To(Equal(expected))
 }
+
+func TestParseImportWithString(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseProgram(`
+        import "test.bpl"
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	test := &ImportDeclaration{
+		Location: StringImportLocation("test.bpl"),
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseImportWithAddress(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseProgram(`
+        import 0x1234
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	test := &ImportDeclaration{
+		Location: AddressImportLocation{18, 52},
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}

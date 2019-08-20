@@ -54,6 +54,11 @@ declaration
     | interfaceDeclaration
     | functionDeclaration[true]
     | variableDeclaration
+    | importDeclaration
+    ;
+
+importDeclaration
+    : 'import' (stringLiteral | HexadecimalLiteral)
     ;
 
 access
@@ -371,6 +376,8 @@ arrayLiteral
 OpenParen: '(' ;
 CloseParen: ')' ;
 
+Transaction : 'transaction' ;
+
 Struct : 'struct' ;
 
 Interface : 'interface' ;
@@ -487,4 +494,3 @@ eos
     | {p.lineTerminatorAhead()}?
     | {p.GetTokenStream().LT(1).GetText() == "}"}?
     ;
-

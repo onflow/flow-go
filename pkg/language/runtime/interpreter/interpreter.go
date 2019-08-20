@@ -1278,3 +1278,7 @@ func (interpreter *Interpreter) declareInterfaceMetaType(declaration *ast.Interf
 	variable := interpreter.findOrDeclareVariable(declaration.Identifier)
 	variable.Value = MetaTypeValue{Type: interfaceType}
 }
+
+func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+	return nil
+}

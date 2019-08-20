@@ -539,6 +539,9 @@ func (checker *Checker) declareVariable(
 
 func (checker *Checker) declareGlobal(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
+	if name == "" {
+		return
+	}
 	checker.Globals[name] = checker.findVariable(name)
 }
 
@@ -2600,4 +2603,8 @@ func (checker *Checker) recordVariableOrigin(name string, variable *Variable) {
 	startPos := *variable.Pos
 	endPos := variable.Pos.Shifted(len(name) - 1)
 	checker.recordOrigin(startPos, endPos, variable)
+}
+
+func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+	return nil
 }

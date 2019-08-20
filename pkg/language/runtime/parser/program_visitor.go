@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -101,6 +102,40 @@ func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
 	}
 
 	return ast.AccessNotSpecified
+}
+
+func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) interface{} {
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	var location ast.ImportLocation
+	var endPos ast.Position
+
+	stringLiteralContext := ctx.StringLiteral()
+	if stringLiteralContext != nil {
+		stringExpression := stringLiteralContext.Accept(v).(*ast.StringExpression)
+		location = ast.StringImportLocation(stringExpression.Value)
+		endPos = stringExpression.EndPos
+	} else {
+		hexadecimalLiteralNode := ctx.HexadecimalLiteral()
+		text := hexadecimalLiteralNode.GetText()[2:]
+		bytes := []byte(strings.Replace(text, "_", "", -1))
+
+		address := make([]byte, hex.DecodedLen(len(bytes)))
+		_, err := hex.Decode(address, bytes)
+		if err != nil {
+			panic(err)
+		}
+		location = ast.AddressImportLocation(address)
+		symbol := hexadecimalLiteralNode.GetSymbol()
+		startPos := ast.PositionFromToken(symbol)
+		endPos = ast.EndPosition(startPos, symbol.GetStop())
+	}
+
+	return &ast.ImportDeclaration{
+		Location: location,
+		StartPos: startPosition,
+		EndPos:   endPos,
+	}
 }
 
 func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{} {
