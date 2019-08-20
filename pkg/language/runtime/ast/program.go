@@ -1,5 +1,7 @@
 package ast
 
+import "fmt"
+
 type Program struct {
 	// all declarations, in the order they are defined
 	Declarations          []Declaration
@@ -59,4 +61,47 @@ func (p *Program) Imports() map[ImportLocation]*Program {
 		}
 	}
 	return p.imports
+}
+
+type ImportResolver func(location ImportLocation) *Program
+
+func (p *Program) ResolveImports(resolver ImportResolver) error {
+	return p.resolveImports(
+		resolver,
+		map[*Program]bool{},
+		map[ImportLocation]*Program{},
+	)
+}
+
+type CyclicImportsError struct {
+	Location ImportLocation
+}
+
+func (e CyclicImportsError) Error() string {
+	return fmt.Sprintf("cyclic import of %s", e.Location)
+}
+
+func (p *Program) resolveImports(
+	resolver ImportResolver,
+	resolving map[*Program]bool,
+	resolved map[ImportLocation]*Program,
+) error {
+	resolving[p] = true
+	imports := p.Imports()
+	for location := range imports {
+		imported, ok := resolved[location]
+		if !ok {
+			imported = resolver(location)
+			resolved[location] = imported
+		}
+		imports[location] = imported
+		if resolving[imported] {
+			return CyclicImportsError{Location: location}
+		}
+		if err := imported.resolveImports(resolver, resolving, resolved); err != nil {
+			return err
+		}
+	}
+	delete(resolving, p)
+	return nil
 }
