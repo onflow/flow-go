@@ -19,10 +19,6 @@ func (v *VariableDeclaration) EndPosition() Position {
 	return v.Value.EndPosition()
 }
 
-func (v *VariableDeclaration) IdentifierPosition() Position {
-	return v.IdentifierPos
-}
-
 func (*VariableDeclaration) isIfStatementTest() {}
 
 func (*VariableDeclaration) isDeclaration() {}

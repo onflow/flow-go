@@ -23,10 +23,6 @@ func (s *StructureDeclaration) EndPosition() Position {
 	return s.EndPos
 }
 
-func (s *StructureDeclaration) IdentifierPosition() Position {
-	return s.IdentifierPos
-}
-
 func (s *StructureDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitStructureDeclaration(s)
 }
@@ -70,10 +66,6 @@ func (f *FieldDeclaration) EndPosition() Position {
 	return f.EndPos
 }
 
-func (f *FieldDeclaration) IdentifierPosition() Position {
-	return f.IdentifierPos
-}
-
 func (*FieldDeclaration) isDeclaration() {}
 
 func (f *FieldDeclaration) DeclarationName() string {
@@ -103,10 +95,6 @@ func (i *InitializerDeclaration) StartPosition() Position {
 
 func (i *InitializerDeclaration) EndPosition() Position {
 	return i.FunctionBlock.EndPos
-}
-
-func (i *InitializerDeclaration) IdentifierPosition() Position {
-	return i.StartPos
 }
 
 func (*InitializerDeclaration) isDeclaration() {}

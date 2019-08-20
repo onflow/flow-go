@@ -20,10 +20,6 @@ func (f *FunctionDeclaration) EndPosition() Position {
 	return f.FunctionBlock.EndPosition()
 }
 
-func (f *FunctionDeclaration) IdentifierPosition() Position {
-	return f.IdentifierPos
-}
-
 func (f *FunctionDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitFunctionDeclaration(f)
 }

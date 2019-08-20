@@ -34,10 +34,6 @@ func (s *InterfaceDeclaration) EndPosition() Position {
 	return s.EndPos
 }
 
-func (s *InterfaceDeclaration) IdentifierPosition() Position {
-	return s.IdentifierPos
-}
-
 func (s *InterfaceDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitInterfaceDeclaration(s)
 }

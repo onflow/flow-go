@@ -493,7 +493,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declaration.Identifier,
 		declarationType,
 		declaration.DeclarationKind(),
-		declaration.IdentifierPosition(),
+		declaration.IdentifierPos,
 		declaration.IsConstant,
 		nil,
 	)
