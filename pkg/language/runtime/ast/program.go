@@ -68,7 +68,7 @@ type ImportResolver func(location ImportLocation) *Program
 func (p *Program) ResolveImports(resolver ImportResolver) error {
 	return p.resolveImports(
 		resolver,
-		map[*Program]bool{},
+		map[ImportLocation]bool{},
 		map[ImportLocation]*Program{},
 	)
 }
@@ -83,11 +83,9 @@ func (e CyclicImportsError) Error() string {
 
 func (p *Program) resolveImports(
 	resolver ImportResolver,
-	resolving map[*Program]bool,
+	resolving map[ImportLocation]bool,
 	resolved map[ImportLocation]*Program,
 ) error {
-	resolving[p] = true
-	defer delete(resolving, p)
 
 	imports := p.Imports()
 	for location := range imports {
@@ -97,12 +95,15 @@ func (p *Program) resolveImports(
 			resolved[location] = imported
 		}
 		imports[location] = imported
-		if resolving[imported] {
+		if resolving[location] {
 			return CyclicImportsError{Location: location}
 		}
-		if err := imported.resolveImports(resolver, resolving, resolved); err != nil {
+		resolving[location] = true
+		err := imported.resolveImports(resolver, resolving, resolved)
+		if err != nil {
 			return err
 		}
+		delete(resolving, location)
 	}
 	return nil
 }

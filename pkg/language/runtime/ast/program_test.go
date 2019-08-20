@@ -77,6 +77,6 @@ func TestProgram_ResolveImportsCycle(t *testing.T) {
 
 	Expect(err).
 		To(Equal(CyclicImportsError{
-			Location: StringImportLocation("a"),
+			Location: StringImportLocation("b"),
 		}))
 }
