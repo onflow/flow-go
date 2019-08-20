@@ -3132,6 +3132,18 @@ func TestParseImportWithString(t *testing.T) {
 
 	Expect(actual).
 		To(Equal(expected))
+
+	Expect(actual.Imports()).
+		To(Equal(map[ImportLocation]*Program{
+			StringImportLocation("test.bpl"): nil,
+		}))
+
+	actual.Imports()[StringImportLocation("test.bpl")] = &Program{}
+
+	Expect(actual.Imports()).
+		To(Equal(map[ImportLocation]*Program{
+			StringImportLocation("test.bpl"): {},
+		}))
 }
 
 func TestParseImportWithAddress(t *testing.T) {
@@ -3145,7 +3157,7 @@ func TestParseImportWithAddress(t *testing.T) {
 		To(BeEmpty())
 
 	test := &ImportDeclaration{
-		Location: AddressImportLocation{18, 52},
+		Location: AddressImportLocation([]byte{18, 52}),
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
 		EndPos:   Position{Offset: 21, Line: 2, Column: 20},
 	}
@@ -3156,4 +3168,17 @@ func TestParseImportWithAddress(t *testing.T) {
 
 	Expect(actual).
 		To(Equal(expected))
+
+	Expect(actual.Imports()).
+		To(Equal(map[ImportLocation]*Program{
+			AddressImportLocation([]byte{18, 52}): nil,
+		}))
+
+	actual.Imports()[AddressImportLocation([]byte{18, 52})] = &Program{}
+
+	Expect(actual.Imports()).
+		To(Equal(map[ImportLocation]*Program{
+			AddressImportLocation([]byte{18, 52}): {},
+		}))
+
 }

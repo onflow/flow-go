@@ -6,6 +6,7 @@ type Program struct {
 	interfaceDeclarations []*InterfaceDeclaration
 	structureDeclarations []*StructureDeclaration
 	functionDeclarations  []*FunctionDeclaration
+	imports               map[ImportLocation]*Program
 }
 
 func (p *Program) Accept(visitor Visitor) Repr {
@@ -46,4 +47,16 @@ func (p *Program) FunctionDeclarations() []*FunctionDeclaration {
 		}
 	}
 	return p.functionDeclarations
+}
+
+func (p *Program) Imports() map[ImportLocation]*Program {
+	if p.imports == nil {
+		p.imports = make(map[ImportLocation]*Program)
+		for _, declaration := range p.Declarations {
+			if importDeclaration, ok := declaration.(*ImportDeclaration); ok {
+				p.imports[importDeclaration.Location] = nil
+			}
+		}
+	}
+	return p.imports
 }
