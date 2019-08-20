@@ -39,6 +39,15 @@ const createAccountScriptB = `
 	}
 `
 
+// updateAccountCodeScript runs a script that updates the code for an account.
+const updateAccountCodeScript = `
+	fun main() {
+		let account = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2]
+		let code = [102,117,110,32,109,97,105,110,40,41,32,123,125]
+		updateAccountCode(account, code)
+	}
+`
+
 const sampleCall = `
 	fun main(): Int {
 		return getValue([1], [2], [3])
@@ -346,6 +355,45 @@ func TestCreateAccount(t *testing.T) {
 	Expect(account.Balance).To(Equal(uint64(0)))
 	Expect(account.PublicKeys).To(ContainElement([]byte{7, 8, 9}))
 	Expect(account.Code).To(Equal([]byte{10, 11, 12}))
+}
+
+func TestUpdateAccountCode(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain(DefaultOptions)
+
+	tx1 := (&types.RawTransaction{
+		Script:       []byte(createAccountScriptA),
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
+
+	err := b.SubmitTransaction(tx1)
+	Expect(err).ToNot(HaveOccurred())
+
+	// root account has ID 1, so expect this account to have ID 2
+	address := types.HexToAddress("0000000000000000000000000000000000000002")
+
+	account, err := b.GetAccount(address)
+
+	Expect(err).ToNot(HaveOccurred())
+	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
+
+	tx2 := (&types.RawTransaction{
+		Script:       []byte(updateAccountCodeScript),
+		Nonce:        2,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).SignPayer(b.RootAccount(), b.RootKeyPair())
+
+	err = b.SubmitTransaction(tx2)
+	Expect(err).ToNot(HaveOccurred())
+
+	account, err = b.GetAccount(address)
+
+	Expect(err).ToNot(HaveOccurred())
+	Expect(account.Code).To(Equal([]byte{102, 117, 110, 32, 109, 97, 105, 110, 40, 41, 32, 123, 125}))
 }
 
 func TestCallScript(t *testing.T) {

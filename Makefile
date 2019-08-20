@@ -10,7 +10,7 @@ install-tools: build-relic
 	go get github.com/google/wire/cmd/wire@v0.3.0
 	go get github.com/golang/protobuf/protoc-gen-go@v1.3.2
 	go get github.com/uber/prototool/cmd/prototool@v1.8.0
-	go get github.com/golang/mock/mockgen
+	go get github.com/golang/mock/mockgen@v1.3.1
 
 .PHONY: test-integrate-setup
 test-integrate-setup:
@@ -41,8 +41,10 @@ generate-godoc:
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/routing > internal/roles/collect/routing/README.md
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/collections > internal/roles/collect/collections/README.md
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/collect/controller > internal/roles/collect/controller/README.md
-	godoc2md github.com/dapperlabs/bamboo-node/pkg/data/keyvalue > pkg/data/keyvalue/README.md
 	godoc2md github.com/dapperlabs/bamboo-node/internal/roles/verify/processor > internal/roles/verify/processor/README.md
+	godoc2md github.com/dapperlabs/bamboo-node/pkg/data/keyvalue > pkg/data/keyvalue/README.md
+	godoc2md github.com/dapperlabs/bamboo-node/sdk > sdk/README.md
+	godoc2md github.com/dapperlabs/bamboo-node/sdk/accounts > sdk/accounts/README.md
 
 .PHONY: generate-proto
 generate-proto:
@@ -57,7 +59,7 @@ generate-wire:
 
 .PHONY: generate-mocks
 generate-mocks:
-	mockgen -destination=client/mocks/mock_client.go -package=mocks github.com/dapperlabs/bamboo-node/client RPCClient
+	mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/bamboo-node/sdk/client RPCClient
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-wire generate-mocks

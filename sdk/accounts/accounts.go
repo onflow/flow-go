@@ -1,4 +1,4 @@
-package client
+package accounts
 
 import (
 	"encoding/json"
@@ -6,16 +6,15 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
-// AccountConfig is the configuration format for a user account.
+// accountConfig is the configuration format for a user account.
 //
 // This structure is used to load account configuration from JSON.
-type AccountConfig struct {
+type accountConfig struct {
 	Address string `json:"account"`
 	Seed    string `json:"seed"`
 }
@@ -38,7 +37,7 @@ func LoadAccountFromFile(filename string) (*types.AccountKey, error) {
 func LoadAccount(r io.Reader) (*types.AccountKey, error) {
 	d := json.NewDecoder(r)
 
-	var conf AccountConfig
+	var conf accountConfig
 
 	if err := d.Decode(&conf); err != nil {
 		return nil, err
@@ -69,8 +68,25 @@ func CreateAccount(publicKey, code []byte) *types.RawTransaction {
 	`, publicKeyStr, codeStr)
 
 	return &types.RawTransaction{
-		Script:    []byte(script),
-		Timestamp: time.Now(),
+		Script: []byte(script),
+	}
+}
+
+// UpdateAccountCode generates a transaction that updates the code associated with an account.
+func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction {
+	accountStr := bytesToString(account.Bytes())
+	codeStr := bytesToString(code)
+
+	script := fmt.Sprintf(`
+		fun main() {
+			let account = %s
+			let code = %s
+			updateAccountCode(account, code)
+		}
+	`, accountStr, codeStr)
+
+	return &types.RawTransaction{
+		Script: []byte(script),
 	}
 }
 
