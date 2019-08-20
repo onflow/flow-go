@@ -87,6 +87,8 @@ func (p *Program) resolveImports(
 	resolved map[ImportLocation]*Program,
 ) error {
 	resolving[p] = true
+	defer delete(resolving, p)
+
 	imports := p.Imports()
 	for location := range imports {
 		imported, ok := resolved[location]
@@ -102,6 +104,5 @@ func (p *Program) resolveImports(
 			return err
 		}
 	}
-	delete(resolving, p)
 	return nil
 }
