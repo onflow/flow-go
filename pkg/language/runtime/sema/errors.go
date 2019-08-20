@@ -414,7 +414,7 @@ type InvalidBinaryOperandsError struct {
 
 func (e *InvalidBinaryOperandsError) Error() string {
 	return fmt.Sprintf(
-		"can't apply binary operation %s to different types: `%s`, `%s`",
+		"cannot apply binary operation %s to different types: `%s`, `%s`",
 		e.Operation.Symbol(),
 		e.LeftType.String(),
 		e.RightType.String(),
@@ -531,6 +531,31 @@ func (e *InvalidInitializerNameError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
+// InvalidVariableKindError
+
+type InvalidVariableKindError struct {
+	Kind     ast.VariableKind
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidVariableKindError) Error() string {
+	if e.Kind == ast.VariableKindNotSpecified {
+		return fmt.Sprintf("missing variable kind")
+	}
+	return fmt.Sprintf("invalid variable kind: `%s`", e.Kind.Name())
+}
+
+func (*InvalidVariableKindError) isSemanticError() {}
+
+func (e *InvalidVariableKindError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidVariableKindError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
 // InvalidDeclarationError
 
 type InvalidDeclarationError struct {
@@ -556,7 +581,7 @@ func (e *InvalidDeclarationError) EndPosition() ast.Position {
 // MissingInitializerError
 
 type MissingInitializerError struct {
-	StructureType  *StructureType
+	TypeIdentifier string
 	FirstFieldName string
 	FirstFieldPos  ast.Position
 }
@@ -565,7 +590,7 @@ func (e *MissingInitializerError) Error() string {
 	return fmt.Sprintf(
 		"missing initializer for field `%s` of type `%s`",
 		e.FirstFieldName,
-		e.StructureType.Identifier,
+		e.TypeIdentifier,
 	)
 }
 
@@ -710,4 +735,30 @@ func (e *InvalidReturnValueError) StartPosition() ast.Position {
 
 func (e *InvalidReturnValueError) EndPosition() ast.Position {
 	return e.EndPos
+}
+
+// InvalidImplementationError
+
+type InvalidImplementationError struct {
+	ImplementedKind common.DeclarationKind
+	ContainerKind   common.DeclarationKind
+	Pos             ast.Position
+}
+
+func (e *InvalidImplementationError) Error() string {
+	return fmt.Sprintf(
+		"cannot implement %s in %s",
+		e.ImplementedKind.Name(),
+		e.ContainerKind.Name(),
+	)
+}
+
+func (*InvalidImplementationError) isSemanticError() {}
+
+func (e *InvalidImplementationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidImplementationError) EndPosition() ast.Position {
+	return e.Pos
 }

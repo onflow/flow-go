@@ -23,8 +23,11 @@ func (v *VariableDeclaration) IdentifierPosition() Position {
 	return v.IdentifierPos
 }
 
+func (*VariableDeclaration) isIfStatementTest() {}
+
 func (*VariableDeclaration) isDeclaration() {}
-func (*VariableDeclaration) isStatement()   {}
+
+func (*VariableDeclaration) isStatement() {}
 
 func (v *VariableDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitVariableDeclaration(v)

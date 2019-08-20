@@ -49,7 +49,7 @@ func (s *StructureDeclaration) DeclarationKind() common.DeclarationKind {
 
 type FieldDeclaration struct {
 	Access        Access
-	IsConstant    bool
+	VariableKind  VariableKind
 	Identifier    string
 	Type          Type
 	StartPos      Position

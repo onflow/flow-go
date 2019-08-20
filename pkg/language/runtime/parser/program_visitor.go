@@ -52,7 +52,13 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
 
-	block := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
+	// NOTE: in e.g interface declarations, function blocks are optional
+
+	var functionBlock *ast.FunctionBlock
+	functionBlockContext := ctx.FunctionBlock()
+	if functionBlockContext != nil {
+		functionBlock = functionBlockContext.Accept(v).(*ast.FunctionBlock)
+	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
@@ -62,7 +68,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 		Identifier:    identifier,
 		Parameters:    parameters,
 		ReturnType:    returnType,
-		FunctionBlock: block,
+		FunctionBlock: functionBlock,
 		StartPos:      startPosition,
 		IdentifierPos: identifierPos,
 	}
@@ -137,7 +143,11 @@ func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationCont
 func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 	access := ctx.Access().Accept(v).(ast.Access)
 
-	isConstant := ctx.Let() != nil
+	variableKindContext := ctx.VariableKind()
+	variableKind := ast.VariableKindNotSpecified
+	if variableKindContext != nil {
+		variableKind = variableKindContext.Accept(v).(ast.VariableKind)
+	}
 
 	identifierNode := ctx.Identifier()
 	identifier := identifierNode.GetText()
@@ -151,7 +161,7 @@ func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 
 	return &ast.FieldDeclaration{
 		Access:        access,
-		IsConstant:    isConstant,
+		VariableKind:  variableKind,
 		Identifier:    identifier,
 		Type:          fullType,
 		StartPos:      startPosition,
@@ -169,15 +179,58 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
 
-	block := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
+	// NOTE: in e.g interface declarations, function blocks are optional
+
+	var functionBlock *ast.FunctionBlock
+	functionBlockContext := ctx.FunctionBlock()
+	if functionBlockContext != nil {
+		functionBlock = functionBlockContext.Accept(v).(*ast.FunctionBlock)
+	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.InitializerDeclaration{
 		Identifier:    identifier,
 		Parameters:    parameters,
-		FunctionBlock: block,
+		FunctionBlock: functionBlock,
 		StartPos:      startPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{} {
+	identifierNode := ctx.Identifier()
+	identifier := identifierNode.GetText()
+
+	var fields []*ast.FieldDeclaration
+	for _, fieldCtx := range ctx.AllField() {
+		field := fieldCtx.Accept(v).(*ast.FieldDeclaration)
+		fields = append(fields, field)
+	}
+
+	var initializer *ast.InitializerDeclaration
+	initializerNode := ctx.Initializer()
+	if initializerNode != nil {
+		initializer = initializerNode.Accept(v).(*ast.InitializerDeclaration)
+	}
+
+	var functions []*ast.FunctionDeclaration
+	for _, functionDeclarationCtx := range ctx.AllFunctionDeclaration() {
+		functionDeclaration :=
+			functionDeclarationCtx.Accept(v).(*ast.FunctionDeclaration)
+		functions = append(functions, functionDeclaration)
+	}
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
+
+	return &ast.InterfaceDeclaration{
+		Identifier:    identifier,
+		Fields:        fields,
+		Initializer:   initializer,
+		Functions:     functions,
+		IdentifierPos: identifierPos,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
 }
 
@@ -191,14 +244,14 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 		parameters = parameterList.Accept(v).([]*ast.Parameter)
 	}
 
-	block := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
+	functionBlock := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.FunctionExpression{
 		Parameters:    parameters,
 		ReturnType:    returnType,
-		FunctionBlock: block,
+		FunctionBlock: functionBlock,
 		StartPos:      startPosition,
 	}
 }
@@ -533,7 +586,9 @@ func (v *ProgramVisitor) VisitContinueStatement(ctx *ContinueStatementContext) i
 }
 
 func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{} {
-	isConstant := ctx.Let() != nil
+	variableKind := ctx.VariableKind().Accept(v).(ast.VariableKind)
+	isConstant := variableKind == ast.VariableKindConstant
+
 	identifierNode := ctx.Identifier()
 	identifier := identifierNode.GetText()
 	expressionResult := ctx.Expression().Accept(v)
@@ -563,8 +618,28 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 	}
 }
 
+func (v *ProgramVisitor) VisitVariableKind(ctx *VariableKindContext) interface{} {
+	if ctx.Let() != nil {
+		return ast.VariableKindConstant
+	}
+
+	if ctx.Var() != nil {
+		return ast.VariableKindVariable
+	}
+
+	return ast.VariableKindNotSpecified
+}
+
 func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
-	test := ctx.test.Accept(v).(ast.Expression)
+	var test ast.IfStatementTest
+	if ctx.testExpression != nil {
+		test = ctx.testExpression.Accept(v).(ast.Expression)
+	} else if ctx.testDeclaration != nil {
+		test = ctx.testDeclaration.Accept(v).(*ast.VariableDeclaration)
+	} else {
+		panic(&errors.UnreachableError{})
+	}
+
 	then := ctx.then.Accept(v).(*ast.Block)
 
 	var elseBlock *ast.Block

@@ -14,6 +14,7 @@ require (
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
 	github.com/google/wire v0.3.0
+	github.com/improbable-eng/grpc-web v0.11.0
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/logrusorgru/aurora v0.0.0-20190428105938-cea283e61946
 	github.com/onsi/ginkgo v1.8.0 // indirect
@@ -21,6 +22,7 @@ require (
 	github.com/psiemens/godoc2md v1.0.1 // indirect
 	github.com/psiemens/sconfig v0.0.0-20190623041652-6e01eb1354fc
 	github.com/raviqqe/hamt v0.0.0-20190615202029-864fb7caef85
+	github.com/rs/cors v1.7.0 // indirect
 	github.com/segmentio/fasthash v1.0.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/sourcegraph/jsonrpc2 v0.0.0-20190106185902-35a74f039c6a
