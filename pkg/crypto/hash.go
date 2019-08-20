@@ -3,23 +3,20 @@ package crypto
 import (
 	"hash"
 
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/sha3"
 )
 
 // NewHashAlgo initializes and chooses a hashing algorithm
-func NewHashAlgo(name AlgoName) Hasher {
+func NewHashAlgo(name AlgoName) (Hasher, error) {
 	if name == SHA3_256 {
 		a := &(sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}})
 		// Output length sanity check
 		if a.outputLength != a.Size() {
-			log.Errorf("%s requires an output length %d", SHA3_256, a.Size())
-			return nil
+			return nil, cryptoError{string(SHA3_256) + " requires an output length " + string(a.Size())}
 		}
-		return a
+		return a, nil
 	}
-	log.Errorf("the hashing algorithm %s is not supported.", name)
-	return nil
+	return nil, cryptoError{"the hashing algorithm " + string(name) + " is not supported."}
 }
 
 // Hash is the hash algorithms output types
@@ -28,7 +25,7 @@ type Hash interface {
 	// Bytes returns the bytes representation of a hash
 	Bytes() []byte
 	// String returns a Hex string representation of the hash bytes in big endian
-	String() string
+	Hex() string
 	// IsEqual tests an equality with a given hash
 	IsEqual(Hash) bool
 }

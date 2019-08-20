@@ -5,8 +5,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"math/big"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // ECDSAalgo embeds SignAlgo
@@ -22,16 +20,14 @@ func bitToBytes(bits int) int {
 }
 
 // SignHash implements ECDSA signature
-func (a *ECDSAalgo) SignHash(sk PrKey, h Hash) Signature {
+func (a *ECDSAalgo) SignHash(sk PrKey, h Hash) (Signature, error) {
 	skECDSA, ok := sk.(*PrKeyECDSA)
 	if !ok {
-		log.Error("ECDSA sigature can only be called using an ECDSA private key")
-		return nil
+		return nil, cryptoError{"ECDSA sigature can only be called using an ECDSA private key"}
 	}
 	r, s, err := goecdsa.Sign(rand.Reader, skECDSA.goPrKey, h.Bytes())
 	if err != nil {
-		log.Error("Signature has failed")
-		return nil
+		return nil, cryptoError{"ECDSA Signature has failed"}
 	}
 	rBytes := r.Bytes()
 	sBytes := s.Bytes()
@@ -47,59 +43,54 @@ func (a *ECDSAalgo) SignHash(sk PrKey, h Hash) Signature {
 		signature[i] = 0
 	}
 	copy(signature[i:], sBytes)
-	return signature
+	return signature, nil
 }
 
 // SignBytes signs an array of bytes
-func (a *ECDSAalgo) SignBytes(sk PrKey, data []byte, alg Hasher) Signature {
+func (a *ECDSAalgo) SignBytes(sk PrKey, data []byte, alg Hasher) (Signature, error) {
 	if alg == nil {
-		log.Error("SignBytes requires a Hasher")
-		return nil
+		return nil, cryptoError{"ECDSA SignBytes requires a Hasher"}
 	}
 	h := alg.ComputeBytesHash(data)
 	return a.SignHash(sk, h)
 }
 
 // SignStruct signs a structure
-func (a *ECDSAalgo) SignStruct(sk PrKey, data Encoder, alg Hasher) Signature {
+func (a *ECDSAalgo) SignStruct(sk PrKey, data Encoder, alg Hasher) (Signature, error) {
 	if alg == nil {
-		log.Error("SignStruct requires a Hasher")
-		return nil
+		return nil, cryptoError{"ECDSA SignStruct requires a Hasher"}
 	}
 	h := alg.ComputeStructHash(data)
 	return a.SignHash(sk, h)
 }
 
 // VerifyHash implements ECDSA signature verification
-func (a *ECDSAalgo) VerifyHash(pk PubKey, sig Signature, h Hash) bool {
+func (a *ECDSAalgo) VerifyHash(pk PubKey, sig Signature, h Hash) (bool, error) {
 	ecdsaPk, ok := pk.(*PubKeyECDSA)
 	if !ok {
-		log.Error("ECDSA signature verification can only be called using an ECDSA public key")
-		return false
+		return false, cryptoError{"ECDSA signature verification can only be called using an ECDSA public key"}
 	}
 	var r big.Int
 	var s big.Int
 	Nlen := bitToBytes((a.curve.Params().N).BitLen())
 	r.SetBytes(sig[:Nlen])
 	s.SetBytes(sig[Nlen:])
-	return goecdsa.Verify((*goecdsa.PublicKey)(ecdsaPk), h.Bytes(), &r, &s)
+	return goecdsa.Verify((*goecdsa.PublicKey)(ecdsaPk), h.Bytes(), &r, &s), nil
 }
 
 // VerifyBytes verifies a signature of a byte array
-func (a *ECDSAalgo) VerifyBytes(pk PubKey, sig Signature, data []byte, alg Hasher) bool {
+func (a *ECDSAalgo) VerifyBytes(pk PubKey, sig Signature, data []byte, alg Hasher) (bool, error) {
 	if alg == nil {
-		log.Error("VerifyBytes requires a Hasher")
-		return false
+		return false, cryptoError{"VerifyBytes requires a Hasher"}
 	}
 	h := alg.ComputeBytesHash(data)
 	return a.VerifyHash(pk, sig, h)
 }
 
 // VerifyStruct verifies a signature of a structure
-func (a *ECDSAalgo) VerifyStruct(pk PubKey, sig Signature, data Encoder, alg Hasher) bool {
+func (a *ECDSAalgo) VerifyStruct(pk PubKey, sig Signature, data Encoder, alg Hasher) (bool, error) {
 	if alg == nil {
-		log.Error("VerifyStruct requires a Hasher")
-		return false
+		return false, cryptoError{"VerifyStruct requires a Hasher"}
 	}
 	h := alg.ComputeStructHash(data)
 	return a.VerifyHash(pk, sig, h)
@@ -107,13 +98,12 @@ func (a *ECDSAalgo) VerifyStruct(pk PubKey, sig Signature, data Encoder, alg Has
 
 // GeneratePrKey generates a private key for ECDSA
 // This is only a test function!
-func (a *ECDSAalgo) GeneratePrKey(seed []byte) PrKey {
+func (a *ECDSAalgo) GeneratePrKey(seed []byte) (PrKey, error) {
 	sk, err := goecdsa.GenerateKey(a.curve, rand.Reader)
 	if err != nil {
-		log.Error("The ECDSA key generation has failed")
-		return nil
+		return nil, cryptoError{"The ECDSA key generation has failed"}
 	}
-	return &(PrKeyECDSA{a, sk})
+	return &(PrKeyECDSA{a, sk}), nil
 }
 
 // PrKeyECDSA is the private key of ECDSA, it implements PrKey

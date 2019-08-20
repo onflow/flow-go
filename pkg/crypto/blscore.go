@@ -9,8 +9,6 @@ import "C"
 // TDOD: enable QUIET in relic
 import (
 	"unsafe"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // Go wrappers to C types
@@ -24,20 +22,21 @@ var pubKeyLengthBLS_BLS12381 = int(C._getPubKeyLengthBLS_BLS12381())
 var prKeyLengthBLS_BLS12381 = int(C._getPrKeyLengthBLS_BLS12381())
 
 // init sets the context of BLS12381 curve
-func (a *BLS_BLS12381Algo) init() {
+func (a *BLS_BLS12381Algo) init() error {
 	// sanity checks of lengths
 	if a.PrKeyLength != PrKeyLengthBLS_BLS12381 ||
 		a.PubKeyLength != PubKeyLengthBLS_BLS12381 ||
 		a.SignatureLength != SignatureLengthBLS_BLS12381 {
-		log.Warn("BLS Lengths in types.go are not matching include.h")
+		return cryptoError{"BLS Lengths in types.go are not matching include.h"}
 	}
 
 	// Inits relic context and sets the B12_381 context
 	c := C._relic_init_BLS12_381()
 	if c == nil {
-		panic("Relic core init failed")
+		return cryptoError{"Relic core init failed"}
 	}
 	a.context = c
+	return nil
 }
 
 // reinit the context of BLS12381 curve assuming there was a previous call to init()
@@ -66,11 +65,12 @@ func _G2scalarGenMult(res *pointG2, expo *scalar) {
 
 // TEST/DEBUG
 // returns a random number on Z/Z.r
-func randZr(x *scalar, seed []byte) {
+func randZr(x *scalar, seed []byte) error {
 	C._bn_randZr((*C.bn_st)(x), (*C.uchar)((unsafe.Pointer)(&seed[0])), (C.int)(len(seed))) // to define the length of seed
 	if x == nil {
-		panic("the memory allocation of the random number has failed")
+		return cryptoError{"the memory allocation of the random number has failed"}
 	}
+	return nil
 }
 
 // TEST/DEBUG/BENCH
