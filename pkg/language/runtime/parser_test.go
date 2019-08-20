@@ -936,6 +936,89 @@ func TestParseIfStatement(t *testing.T) {
 		To(Equal(expected))
 }
 
+func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseProgram(`
+	    fun test() {
+            if var y = x {
+                1
+            } else {
+                2
+            }
+        }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	test := &FunctionDeclaration{
+		Access:     AccessNotSpecified,
+		Identifier: "test",
+		ReturnType: &NominalType{
+			Pos: Position{Offset: 15, Line: 2, Column: 14},
+		},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&IfStatement{
+						Test: &VariableDeclaration{
+							IsConstant: false,
+							Identifier: "y",
+							Type:       nil,
+							Value: &IdentifierExpression{
+								Identifier: "x",
+								StartPos:   Position{Offset: 42, Line: 3, Column: 23},
+								EndPos:     Position{Offset: 42, Line: 3, Column: 23},
+							},
+							StartPos:      Position{Offset: 34, Line: 3, Column: 15},
+							IdentifierPos: Position{Offset: 38, Line: 3, Column: 19},
+						},
+						Then: &Block{
+							Statements: []Statement{
+								&ExpressionStatement{
+									Expression: &IntExpression{
+										Value:    big.NewInt(1),
+										StartPos: Position{Offset: 62, Line: 4, Column: 16},
+										EndPos:   Position{Offset: 62, Line: 4, Column: 16},
+									},
+								},
+							},
+							StartPos: Position{Offset: 44, Line: 3, Column: 25},
+							EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+						},
+						Else: &Block{
+							Statements: []Statement{
+								&ExpressionStatement{
+									Expression: &IntExpression{
+										Value:    big.NewInt(2),
+										StartPos: Position{Offset: 101, Line: 6, Column: 16},
+										EndPos:   Position{Offset: 101, Line: 6, Column: 16},
+									},
+								},
+							},
+							StartPos: Position{Offset: 83, Line: 5, Column: 19},
+							EndPos:   Position{Offset: 115, Line: 7, Column: 12},
+						},
+						StartPos: Position{Offset: 31, Line: 3, Column: 12},
+					},
+				},
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 125, Line: 8, Column: 8},
+			},
+		},
+		StartPos:      Position{Offset: 6, Line: 2, Column: 5},
+		IdentifierPos: Position{Offset: 10, Line: 2, Column: 9},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
 func TestParseIfStatementNoElse(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -2358,9 +2441,9 @@ func TestParseStructure(t *testing.T) {
 		Identifier: "Test",
 		Fields: []*FieldDeclaration{
 			{
-				Access:     AccessPublicSettable,
-				IsConstant: false,
-				Identifier: "foo",
+				Access:       AccessPublicSettable,
+				VariableKind: VariableKindVariable,
+				Identifier:   "foo",
 				Type: &NominalType{
 					Identifier: "Int",
 					Pos:        Position{Offset: 53, Line: 3, Column: 30},
@@ -2459,6 +2542,19 @@ func TestParseStructure(t *testing.T) {
 
 	Expect(actual).
 		To(Equal(expected))
+}
+
+func TestParseInvalidStructureWithMissingFunctionBlock(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, errors := parser.ParseProgram(`
+        struct Test {
+            pub fun getFoo(): Int
+        }
+	`)
+
+	Expect(errors).
+		To(Not(BeEmpty()))
 }
 
 func TestParsePreAndPostConditions(t *testing.T) {
@@ -2894,6 +2990,84 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 				IdentifierPos: Position{Offset: 12, Line: 2, Column: 11},
 			},
 		},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseInterface(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, errors := parser.ParseProgram(`
+        interface Test {
+            foo: Int
+
+            init(foo: Int)
+
+            fun getFoo(): Int
+        }
+	`)
+
+	Expect(errors).
+		To(BeEmpty())
+
+	test := &InterfaceDeclaration{
+		Identifier: "Test",
+		Fields: []*FieldDeclaration{
+			{
+				Access:       AccessNotSpecified,
+				VariableKind: VariableKindNotSpecified,
+				Identifier:   "foo",
+				Type: &NominalType{
+					Identifier: "Int",
+					Pos:        Position{Offset: 43, Line: 3, Column: 17},
+				},
+				StartPos:      Position{Offset: 38, Line: 3, Column: 12},
+				EndPos:        Position{Offset: 45, Line: 3, Column: 19},
+				IdentifierPos: Position{Offset: 38, Line: 3, Column: 12},
+			},
+		},
+		Initializer: &InitializerDeclaration{
+			Identifier: "init",
+			Parameters: []*Parameter{
+				{
+					Label:      "",
+					Identifier: "foo",
+					Type: &NominalType{
+						Identifier: "Int",
+						Pos:        Position{Offset: 70, Line: 5, Column: 22},
+					},
+					LabelPos:      nil,
+					IdentifierPos: Position{Offset: 65, Line: 5, Column: 17},
+					StartPos:      Position{Offset: 65, Line: 5, Column: 17},
+					EndPos:        Position{Offset: 70, Line: 5, Column: 22},
+				},
+			},
+			FunctionBlock: nil,
+			StartPos:      Position{Offset: 60, Line: 5, Column: 12},
+		},
+		Functions: []*FunctionDeclaration{
+			{
+				Access:     AccessNotSpecified,
+				Identifier: "getFoo",
+				Parameters: nil,
+				ReturnType: &NominalType{
+					Identifier: "Int",
+					Pos:        Position{Offset: 102, Line: 7, Column: 26},
+				},
+				FunctionBlock: nil,
+				StartPos:      Position{Offset: 88, Line: 7, Column: 12},
+				IdentifierPos: Position{Offset: 92, Line: 7, Column: 16},
+			},
+		},
+		IdentifierPos: Position{Offset: 19, Line: 2, Column: 18},
+		StartPos:      Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:        Position{Offset: 114, Line: 8, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
 	}
 
 	Expect(actual).

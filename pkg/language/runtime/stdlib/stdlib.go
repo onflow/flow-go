@@ -151,7 +151,30 @@ var PanicFunction = NewStandardLibraryFunction(
 	nil,
 )
 
+// BuiltIns
+
 var BuiltIns = []StandardLibraryFunction{
 	AssertFunction,
 	PanicFunction,
+}
+
+// Log
+
+var Log = NewStandardLibraryFunction(
+	"log",
+	&sema.FunctionType{
+		ParameterTypes: []sema.Type{&sema.AnyType{}},
+		ReturnType:     &sema.VoidType{},
+	},
+	func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
+		fmt.Printf("%v\n", arguments[0])
+		return trampoline.Done{Result: &interpreter.VoidValue{}}
+	},
+	nil,
+)
+
+// Helpers
+
+var Helpers = []StandardLibraryFunction{
+	Log,
 }

@@ -15,14 +15,7 @@ import (
 )
 
 func parseCheckAndInterpret(code string) *interpreter.Interpreter {
-	program, errors := parser.ParseProgram(code)
-
-	Expect(errors).
-		To(BeEmpty())
-
-	checker := sema.NewChecker(program)
-	err := checker.Check()
-
+	checker, err := parseAndCheck(code)
 	Expect(err).
 		To(Not(HaveOccurred()))
 
@@ -618,6 +611,66 @@ func TestInterpretOrOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 }
 
+func TestInterpretOrOperatorShortCircuitLeftSuccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return true
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() || changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretOrOperatorShortCircuitLeftFailure(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return false
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() || changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
 func TestInterpretAndOperator(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -649,6 +702,66 @@ func TestInterpretAndOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 
 	Expect(inter.Invoke("testFalseFalse")).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretAndOperatorShortCircuitLeftSuccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return true
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() && changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretAndOperatorShortCircuitLeftFailure(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return false
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() && changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
 		To(Equal(interpreter.BoolValue(false)))
 }
 
@@ -2044,3 +2157,215 @@ func TestInterpretNilCoalescingShortCircuitLeftFailure(t *testing.T) {
 		To(Equal(interpreter.BoolValue(true)))
 }
 
+func TestInterpretNilsComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x = nil == nil
+   `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretNonOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int = 1
+      let y = x == nil
+   `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNonOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int = 1
+      let y = nil == x
+   `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     let x: Int? = 1
+     let y = x == nil
+   `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNestedOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int?? = 1
+      let y = x == nil
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = 1
+      let y = nil == x
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNestedOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int?? = 1
+      let y = nil == x
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNestedOptionalComparisonNils(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = nil
+      let y: Int?? = nil
+      let z = x == y
+    `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretNestedOptionalComparisonValues(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = 2
+      let y: Int?? = 2
+      let z = x == y
+    `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = 2
+      let y: Int?? = nil
+      let z = x == y
+    `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretIfStatementTestWithDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int?): Int {
+          if var y = x {
+              return y
+          } else {
+              return 0
+          }
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+}
+
+func TestInterpretIfStatementTestWithDeclarationAndElse(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int?): Int {
+          if var y = x {
+              return y
+          }
+          return 0
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+}
+
+func TestInterpretIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int??): Int? {
+          if var y = x {
+              return y
+          } else {
+              return 0
+          }
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(2)},
+			}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(0)},
+			}))
+}
+
+func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int??): Int? {
+          if var y: Int? = x {
+              return y
+          } else {
+              return 0
+          }
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(2)},
+			}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(0)},
+			}))
+}

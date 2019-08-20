@@ -23,8 +23,14 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#structureDeclaration.
 	VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#variableKind.
+	VisitVariableKind(ctx *VariableKindContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#field.
 	VisitField(ctx *FieldContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#interfaceDeclaration.
+	VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#initializer.
 	VisitInitializer(ctx *InitializerContext) interface{}

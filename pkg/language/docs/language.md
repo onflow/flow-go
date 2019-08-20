@@ -902,75 +902,181 @@ Logical operators work with the boolean values `true` and `false`.
   - Logical AND: `a && b`
 
     ```bamboo,file=operator-and.bpl
-    true && true // is true
-    true && false // is false
-    false && false // is false
-    false && false // is false
+    true && true
+    // is true
+
+    true && false
+    // is false
+
+    false && true
+    // is false
+
+    false && false
+    // is false
     ```
+
+    If the left-hand side is true, the right-hand side is not evaluated.
 
   - Logical OR: `a || b`
 
     ```bamboo,file=operator-or.bpl
-    true || true // is true
-    true || false // is true
-    false || false // is true
-    false || false // is false
+    true || true
+    // is true
+
+    true || false
+    // is true
+
+    false || true
+    // is true
+
+    false || false
+    // is false
     ```
+
+    If the left-hand side is false, the right-hand side is not evaluated.
 
 ### Comparison operators
 
 Comparison operators work with boolean and integer values.
 
+  - Equality: `==`, for booleans and integers (possibly optional)
 
-  - Equality: `==`, for booleans and integers
+    ```bamboo,file=operator-equal-int.bpl
+    1 == 1
+    // is true
 
-    ```bamboo,file=operator-equal.bpl
-    1 == 1 // is true
-    1 == 2 // is false
-    true == true // is true
-    true == false // is false
+    1 == 2
+    // is false
     ```
 
-  - Inequality: `!=`, for booleans and integers
+    ```bamboo,file=operator-equal-bool.bpl
+    true == true
+    // is true
 
-    ```bamboo,file=operator-not-equal.bpl
-    1 != 1 // is false
-    1 != 2 // is true
-    true != true // is false
-    true != false // is true
+    true == false
+    // is false
+    ```
+
+    ```bamboo,file=operator-equal-optional-int-nil.bpl
+    let x: Int? = 1
+    x == nil
+    // is false
+    ```
+
+    ```bamboo,file=operator-equal-int-nil.bpl
+    let x: Int = 1
+    x == nil
+    // is false
+    ```
+
+    ```bamboo,file=operator-equal-int-nil.bpl
+    let x: Int? = 2
+    let y: Int?? = nil
+    x == y
+    // is false
+    ```
+
+    ```bamboo,file=operator-equal-optional-int-optionals-int.bpl
+    let x: Int? = 2
+    let y: Int?? = 2
+    x == y
+    // is true
+    ```
+
+  - Inequality: `!=`, for booleans and integers (possibly optional)
+
+    ```bamboo,file=operator-not-equal-int.bpl
+    1 != 1
+    // is false
+
+    1 != 2
+    // is true
+    ```
+
+    ```bamboo,file=operator-not-equal-bool.bpl
+    true != true
+    // is false
+
+    true != false
+    // is true
+    ```
+
+    ```bamboo,file=operator-not-equal-optional-int-nil.bpl
+    let x: Int? = 1
+    x != nil
+    // is true
+    ```
+
+    ```bamboo,file=operator-not-equal-int-nil.bpl
+    let x: Int = 1
+    x != nil
+    // is true
+    ```
+
+    ```bamboo,file=operator-not-equal-int-nil.bpl
+    let x: Int? = 2
+    let y: Int?? = nil
+    x != y
+    // is true
+    ```
+
+    ```bamboo,file=operator-not-equal-optional-int-optionals-int.bpl
+    let x: Int? = 2
+    let y: Int?? = 2
+    x != y
+    // is false
     ```
 
   - Less than: `<`, for integers
 
     ```bamboo,file=operator-less.bpl
-    1 < 1 // is false
-    1 < 2 // is true
-    2 < 1 // is false
+    1 < 1
+    // is false
+
+    1 < 2
+    // is true
+
+    2 < 1
+    // is false
     ```
 
   - Less or equal than: `<=`, for integers
 
     ```bamboo,file=operator-less-equals.bpl
-    1 <= 1 // is true
-    1 <= 2 // is true
-    2 <= 1 // is false
+    1 <= 1
+    // is true
+
+    1 <= 2
+    // is true
+
+    2 <= 1
+    // is false
     ```
 
   - Greater than: `>`, for integers
 
     ```bamboo,file=operator-greater.bpl
-    1 > 1 // is false
-    1 > 2 // is false
-    2 > 1 // is true
-    ```
+    1 > 1
+    // is false
 
+    1 > 2
+    // is false
+
+    2 > 1
+    // is true
+    ```
 
   - Greater or equal than: `>=`, for integers
 
     ```bamboo,file=operator-greater-equals.bpl
-    1 >= 1 // is true
-    1 >= 2 // is false
-    2 >= 1 // is true
+    1 >= 1
+    // is true
+
+    1 >= 2
+    // is false
+
+    2 >= 1
+    // is true
     ```
 
 

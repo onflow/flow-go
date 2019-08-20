@@ -51,7 +51,8 @@ program
 
 declaration
     : structureDeclaration
-    | functionDeclaration
+    | interfaceDeclaration
+    | functionDeclaration[true]
     | variableDeclaration
     ;
 
@@ -62,22 +63,35 @@ access
     ;
 
 structureDeclaration
-    : Struct Identifier '{' field* initializer? functionDeclaration* '}'
+    : Struct Identifier '{' field* initializer[true]? functionDeclaration[true]* '}'
+    ;
+
+variableKind
+    : Let
+    | Var
     ;
 
 field
-    : access (Let | Var) Identifier ':' fullType
+    : access variableKind? Identifier ':' fullType
+    ;
+
+interfaceDeclaration
+    : Interface Identifier '{' field* initializer[false]? functionDeclaration[false]* '}'
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
 // is `init` in semantic analysis to provide better error
 //
-initializer
-    : Identifier parameterList functionBlock
+initializer[bool functionBlockRequired]
+    : Identifier parameterList
+      // only optional if parameter functionBlockRequired is false
+      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
 
-functionDeclaration
-    : access Fun Identifier parameterList (':' returnType=fullType)? functionBlock
+functionDeclaration[bool functionBlockRequired]
+    : access Fun Identifier parameterList (':' returnType=fullType)?
+      // only optional if parameter functionBlockRequired is false
+      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
 
 parameterList
@@ -160,7 +174,10 @@ continueStatement
     ;
 
 ifStatement
-    : If test=expression then=block (Else (ifStatement | alt=block))?
+    : If
+      (testExpression=expression | testDeclaration=variableDeclaration)
+      then=block
+      (Else (ifStatement | alt=block))?
     ;
 
 whileStatement
@@ -168,7 +185,7 @@ whileStatement
     ;
 
 variableDeclaration
-    : (Let | Var) Identifier (':' fullType)? '=' expression
+    : variableKind Identifier (':' fullType)? '=' expression
     ;
 
 assignment
@@ -347,6 +364,8 @@ OpenParen: '(' ;
 CloseParen: ')' ;
 
 Struct : 'struct' ;
+
+Interface : 'interface' ;
 
 Fun : 'fun' ;
 

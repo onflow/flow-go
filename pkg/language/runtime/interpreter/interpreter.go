@@ -451,16 +451,57 @@ func (interpreter *Interpreter) VisitContinueStatement(statement *ast.ContinueSt
 }
 
 func (interpreter *Interpreter) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
-	return statement.Test.Accept(interpreter).(Trampoline).
+	switch test := statement.Test.(type) {
+	case ast.Expression:
+		return interpreter.visitIfStatementWithTestExpression(test, statement.Then, statement.Else)
+	case *ast.VariableDeclaration:
+		return interpreter.visitIfStatementWithVariableDeclaration(test, statement.Then, statement.Else)
+	default:
+		panic(&errors.UnreachableError{})
+	}
+}
+
+func (interpreter *Interpreter) visitIfStatementWithTestExpression(
+	test ast.Expression,
+	thenBlock, elseBlock *ast.Block,
+) Trampoline {
+
+	return test.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(BoolValue)
 			if value {
-				return statement.Then.Accept(interpreter).(Trampoline)
-			} else if statement.Else != nil {
-				return statement.Else.Accept(interpreter).(Trampoline)
+				return thenBlock.Accept(interpreter).(Trampoline)
+			} else if elseBlock != nil {
+				return elseBlock.Accept(interpreter).(Trampoline)
 			}
 
 			// NOTE: no result, so it does *not* act like a return-statement
+			return Done{}
+		})
+}
+
+func (interpreter *Interpreter) visitIfStatementWithVariableDeclaration(
+	declaration *ast.VariableDeclaration,
+	thenBlock, elseBlock *ast.Block,
+) Trampoline {
+
+	return declaration.Value.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+
+			if someValue, ok := result.(SomeValue); ok {
+				unwrappedValueCopy := someValue.Value.Copy()
+				interpreter.activations.PushCurrent()
+				interpreter.declareVariable(declaration.Identifier, unwrappedValueCopy)
+
+				return thenBlock.Accept(interpreter).(Trampoline).
+					Then(func(_ interface{}) {
+						interpreter.activations.Pop()
+					})
+			} else if elseBlock != nil {
+				return elseBlock.Accept(interpreter).(Trampoline)
+			}
+
+			// NOTE: ignore result, so it does *not* act like a return-statement
 			return Done{}
 		})
 }
@@ -684,52 +725,50 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-
-				switch left := tuple.Left.(type) {
-				case IntegerValue:
-					right := tuple.Right.(IntegerValue)
-					return BoolValue(left.Equal(right))
-
-				case BoolValue:
-					return BoolValue(tuple.Left == tuple.Right)
-				}
-
-				panic(&errors.UnreachableError{})
+				return interpreter.testEqual(tuple.Left, tuple.Right)
 			})
 
 	case ast.OperationUnequal:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-
-				switch left := tuple.Left.(type) {
-				case IntegerValue:
-					right := tuple.Right.(IntegerValue)
-					return BoolValue(!left.Equal(right))
-
-				case BoolValue:
-					return BoolValue(tuple.Left != tuple.Right)
-				}
-
-				panic(&errors.UnreachableError{})
+				return BoolValue(!interpreter.testEqual(tuple.Left, tuple.Right))
 			})
 
 	case ast.OperationOr:
-		return interpreter.visitBinaryOperation(expression).
-			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(BoolValue)
-				right := tuple.Right.(BoolValue)
-				return BoolValue(left || right)
+		// interpret the left-hand side
+		return expression.Left.Accept(interpreter).(Trampoline).
+			FlatMap(func(left interface{}) Trampoline {
+				// only interpret right-hand side if left-hand side is false
+				leftBool := left.(BoolValue)
+				if leftBool {
+					return Done{Result: leftBool}
+				}
+
+				// after interpreting the left-hand side,
+				// interpret the right-hand side
+				return expression.Right.Accept(interpreter).(Trampoline).
+					FlatMap(func(right interface{}) Trampoline {
+						return Done{Result: right.(BoolValue)}
+					})
 			})
 
 	case ast.OperationAnd:
-		return interpreter.visitBinaryOperation(expression).
-			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(BoolValue)
-				right := tuple.Right.(BoolValue)
-				return BoolValue(left && right)
+		// interpret the left-hand side
+		return expression.Left.Accept(interpreter).(Trampoline).
+			FlatMap(func(left interface{}) Trampoline {
+				// only interpret right-hand side if left-hand side is true
+				leftBool := left.(BoolValue)
+				if !leftBool {
+					return Done{Result: leftBool}
+				}
+
+				// after interpreting the left-hand side,
+				// interpret the right-hand side
+				return expression.Right.Accept(interpreter).(Trampoline).
+					FlatMap(func(right interface{}) Trampoline {
+						return Done{Result: right.(BoolValue)}
+					})
 			})
 
 	case ast.OperationNilCoalesce:
@@ -752,6 +791,30 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		startPos:  expression.StartPosition(),
 		endPos:    expression.EndPosition(),
 	})
+}
+
+func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
+	left = interpreter.unbox(left)
+	right = interpreter.unbox(right)
+
+	switch left := left.(type) {
+	case IntegerValue:
+		// NOTE: might be NilValue
+		right, ok := right.(IntegerValue)
+		if !ok {
+			return false
+		}
+		return left.Equal(right)
+
+	case BoolValue:
+		return BoolValue(left == right)
+
+	case NilValue:
+		_, ok := right.(NilValue)
+		return BoolValue(ok)
+	}
+
+	panic(&errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {
@@ -1099,4 +1162,20 @@ func (interpreter *Interpreter) box(result Value, targetType sema.Type) Value {
 		targetType = optionalType.Type
 	}
 	return result
+}
+
+func (interpreter *Interpreter) unbox(value Value) Value {
+	for {
+		some, ok := value.(SomeValue)
+		if !ok {
+			return value
+		}
+
+		value = some.Value
+	}
+}
+
+func (interpreter *Interpreter) VisitInterfaceDeclaration(structure *ast.InterfaceDeclaration) ast.Repr {
+	// TODO:
+	return nil
 }
