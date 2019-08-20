@@ -93,7 +93,10 @@ func StartServer(logger *log.Logger, config *Config) {
 	emulatorServer := NewEmulatorServer(logger, config)
 	go emulatorServer.Start(ctx)
 
-	wrappedServer := grpcweb.WrapServer(emulatorServer.grpcServer)
+	wrappedServer := grpcweb.WrapServer(
+		emulatorServer.grpcServer,
+		grpcweb.WithOriginFunc(func(origin string) bool { return true }),
+	)
 
 	httpServer := http.Server{
 		Addr:    fmt.Sprintf(":%d", config.HTTPPort),
