@@ -68,10 +68,9 @@ generate: generate-godoc generate-proto generate-wire generate-mocks
 check-generated-code:
 	./scripts/check-generated-code.sh
 
-.PHONY: build-bamboo
-build-bamboo:
+.PHONY: build-cli
+build-cli:
 	go build -o bamboo ./cmd/bamboo/
 
 .PHONY: ci
 ci: install-tools generate check-generated-code test-unit test-integrate
-

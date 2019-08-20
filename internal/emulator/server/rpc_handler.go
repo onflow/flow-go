@@ -10,12 +10,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
-
-	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 )
 
 // Ping the Observation API server for a response.
