@@ -41,7 +41,7 @@ func (h *Hash32) Bytes() []byte {
 	return h[:]
 }
 
-func (h *Hash32) Hex() string {
+func (h *Hash32) String() string {
 	var sb strings.Builder
 	sb.WriteString("0x")
 	for _, i := range h {

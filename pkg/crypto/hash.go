@@ -25,7 +25,7 @@ type Hash interface {
 	// Bytes returns the bytes representation of a hash
 	Bytes() []byte
 	// String returns a Hex string representation of the hash bytes in big endian
-	Hex() string
+	String() string
 	// IsEqual tests an equality with a given hash
 	IsEqual(Hash) bool
 }
