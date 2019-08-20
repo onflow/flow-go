@@ -12,9 +12,9 @@ import (
 )
 
 type Config struct {
-	Port          int           `default:"5000" flag:"port,p"`
-	HTTPPort      int           `default:"9090" flag:"http_port"`
-	BlockInterval time.Duration `default:"5s" flag:"interval,i"`
+	Port          int           `default:"5000" flag:"port,p" info:"port to run RPC server"`
+	HTTPPort      int           `default:"9090" flag:"http_port" info:"port to run HTTP server"`
+	BlockInterval time.Duration `default:"5s" flag:"interval,i" info:"time between minted blocks"`
 }
 
 var (
