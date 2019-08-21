@@ -478,7 +478,7 @@ type Member struct {
 type InterfaceType struct {
 	Identifier                string
 	Members                   map[string]*Member
-	ConstructorParameterTypes []Type
+	InitializerParameterTypes []Type
 }
 
 func (*InterfaceType) isType() {}

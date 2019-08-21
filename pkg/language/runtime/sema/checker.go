@@ -1999,7 +1999,7 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 		common.DeclarationKindStructure,
 	)
 
-	conformances := checker.conformances(structure.Conformances)
+	conformances := checker.conformances(structure)
 
 	members := checker.members(
 		structure.Fields,
@@ -2026,11 +2026,21 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 	checker.declareStructureConstructor(structure, structureType, parameterTypes)
 
 	structureType.ConstructorParameterTypes = parameterTypes
+
+	// check structure conforms to interfaces.
+	// NOTE: perform after completing structure type (e.g. setting constructor parameter types)
+
+	for _, interfaceType := range conformances {
+		checker.checkStructureConformance(structureType, interfaceType, structure.IdentifierPos)
+	}
 }
 
-func (checker *Checker) conformances(conformances []*ast.NominalType) []*InterfaceType {
+func (checker *Checker) conformances(structure *ast.StructureDeclaration) []*InterfaceType {
+
 	var interfaceTypes []*InterfaceType
-	for _, conformance := range conformances {
+	seenConformances := map[string]bool{}
+
+	for _, conformance := range structure.Conformances {
 		convertedType := checker.ConvertType(conformance)
 
 		if interfaceType, ok := convertedType.(*InterfaceType); ok {
@@ -2044,8 +2054,100 @@ func (checker *Checker) conformances(conformances []*ast.NominalType) []*Interfa
 				},
 			)
 		}
+
+		if seenConformances[conformance.Identifier] {
+
+			checker.report(
+				&DuplicateConformanceError{
+					StructureIdentifier: structure.Identifier,
+					Conformance:         conformance,
+				},
+			)
+
+		}
+
+		seenConformances[conformance.Identifier] = true
 	}
 	return interfaceTypes
+}
+
+func (checker *Checker) checkStructureConformance(
+	structureType *StructureType,
+	interfaceType *InterfaceType,
+	pos ast.Position,
+) {
+	var missingMembers []*Member
+	var memberMismatches []MemberMismatch
+	var initializerMismatch *InitializerMismatch
+
+	if interfaceType.InitializerParameterTypes != nil {
+
+		structureInitializerType := &FunctionType{
+			ParameterTypes: structureType.ConstructorParameterTypes,
+			ReturnType:     &VoidType{},
+		}
+		interfaceInitializerType := &FunctionType{
+			ParameterTypes: interfaceType.InitializerParameterTypes,
+			ReturnType:     &VoidType{},
+		}
+
+		// TODO: subtype?
+		if !structureInitializerType.Equal(interfaceInitializerType) {
+			initializerMismatch = &InitializerMismatch{
+				StructureParameterTypes: structureType.ConstructorParameterTypes,
+				InterfaceParameterTypes: interfaceType.InitializerParameterTypes,
+			}
+		}
+	}
+
+	for name, interfaceMember := range interfaceType.Members {
+
+		structureMember, ok := structureType.Members[name]
+		if !ok {
+			missingMembers = append(missingMembers, interfaceMember)
+			continue
+		}
+
+		if !checker.memberSatisfied(structureMember, interfaceMember) {
+			memberMismatches = append(memberMismatches,
+				MemberMismatch{
+					StructureMember: structureMember,
+					InterfaceMember: interfaceMember,
+				},
+			)
+		}
+	}
+
+	if len(missingMembers) > 0 ||
+		len(memberMismatches) > 0 ||
+		initializerMismatch != nil {
+
+		checker.report(
+			&ConformanceError{
+				StructureType:       structureType,
+				InterfaceType:       interfaceType,
+				Pos:                 pos,
+				InitializerMismatch: initializerMismatch,
+				MissingMembers:      missingMembers,
+				MemberMismatches:    memberMismatches,
+			},
+		)
+	}
+}
+
+func (checker *Checker) memberSatisfied(structureMember, interfaceMember *Member) bool {
+	// TODO: subtype?
+	if !structureMember.Type.Equal(interfaceMember.Type) {
+		return false
+	}
+
+	if interfaceMember.VariableKind != ast.VariableKindNotSpecified &&
+		structureMember.VariableKind != interfaceMember.VariableKind {
+
+		return false
+	}
+
+	return true
 }
 
 // TODO: very simple field initialization check for now.
@@ -2160,7 +2262,7 @@ func (checker *Checker) checkInitializer(
 	fields []*ast.FieldDeclaration,
 	ty Type,
 	typeIdentifier string,
-	constructorParameterTypes []Type,
+	initializerParameterTypes []Type,
 	kind initializerKind,
 ) {
 	if initializer == nil {
@@ -2200,7 +2302,7 @@ func (checker *Checker) checkInitializer(
 	}
 
 	functionType := &FunctionType{
-		ParameterTypes: constructorParameterTypes,
+		ParameterTypes: initializerParameterTypes,
 		ReturnType:     &VoidType{},
 	}
 
@@ -2371,7 +2473,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.Fields,
 		interfaceType,
 		declaration.Identifier,
-		interfaceType.ConstructorParameterTypes,
+		interfaceType.InitializerParameterTypes,
 		initializerKindInterface,
 	)
 
@@ -2440,7 +2542,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		parameterTypes = checker.parameterTypes(initializer.Parameters)
 	}
 
-	interfaceType.ConstructorParameterTypes = parameterTypes
+	interfaceType.InitializerParameterTypes = parameterTypes
 }
 
 func (checker *Checker) checkInterfaceFunctionBlock(block *ast.FunctionBlock, kind common.DeclarationKind) {

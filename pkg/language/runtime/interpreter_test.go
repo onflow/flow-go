@@ -2472,3 +2472,40 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 	Expect(err).
 		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
 }
+
+func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface Test {
+          init(x: Int) {
+              pre {
+                  x > 0: "x must be positive"
+              }
+          }
+      }
+
+      struct TestImpl: Test {
+          init(x: Int) {
+              pre {
+                  x < 2: "x must be smaller than 2"
+              }
+          }
+      }
+
+      fun test(x: Int): Test {
+          return TestImpl(x: x)
+      }
+	`)
+
+	_, err := inter.Invoke("test", big.NewInt(0))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(inter.Invoke("test", big.NewInt(1))).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+
+	_, err = inter.Invoke("test", big.NewInt(2))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+}

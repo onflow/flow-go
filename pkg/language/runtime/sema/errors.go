@@ -786,3 +786,71 @@ func (e *InvalidConformanceError) StartPosition() ast.Position {
 func (e *InvalidConformanceError) EndPosition() ast.Position {
 	return e.Pos
 }
+
+// ConformanceError
+
+// TODO: report each missing member and mismatch as note
+
+type MemberMismatch struct {
+	StructureMember *Member
+	InterfaceMember *Member
+}
+
+type InitializerMismatch struct {
+	StructureParameterTypes []Type
+	InterfaceParameterTypes []Type
+}
+
+type ConformanceError struct {
+	StructureType       *StructureType
+	InterfaceType       *InterfaceType
+	InitializerMismatch *InitializerMismatch
+	MissingMembers      []*Member
+	MemberMismatches    []MemberMismatch
+	Pos                 ast.Position
+}
+
+func (e *ConformanceError) Error() string {
+	return fmt.Sprintf(
+		"structure `%s` does not conform to interface `%s`",
+		e.StructureType.Identifier,
+		e.InterfaceType.Identifier,
+	)
+}
+
+func (*ConformanceError) isSemanticError() {}
+
+func (e *ConformanceError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *ConformanceError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// DuplicateConformanceError
+
+// TODO: just make this a warning?
+
+type DuplicateConformanceError struct {
+	StructureIdentifier string
+	Conformance         *ast.NominalType
+}
+
+func (e *DuplicateConformanceError) Error() string {
+	return fmt.Sprintf(
+		"structure `%s` repeats conformance for interface `%s`",
+		e.StructureIdentifier,
+		e.Conformance.Identifier,
+	)
+}
+
+func (*DuplicateConformanceError) isSemanticError() {}
+
+func (e *DuplicateConformanceError) StartPosition() ast.Position {
+	return e.Conformance.StartPosition()
+}
+
+func (e *DuplicateConformanceError) EndPosition() ast.Position {
+	return e.Conformance.EndPosition()
+}

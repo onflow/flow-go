@@ -3397,6 +3397,227 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
 }
 
+func TestCheckInvalidInterfaceConformanceInitializerExplicitMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init(x: Int)
+      }
+
+      struct TestImpl: Test {
+          init(x: Bool) {}
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceInitializerImplicitMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init(x: Int)
+      }
+
+      struct TestImpl: Test {
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceMissingFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test(): Int
+      }
+
+      struct TestImpl: Test {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceFunctionMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test(): Int
+      }
+
+      struct TestImpl: Test {
+          fun test(): Bool {
+              return true
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceMissingField(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+           x: Int
+      }
+
+      struct TestImpl: Test {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceFieldTypeMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          x: Int
+      }
+
+      struct TestImpl: Test {
+          var x: Bool
+          init(x: Bool) {
+             self.x = x
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceKindFieldFunctionMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          x: Bool
+      }
+
+      struct TestImpl: Test {
+          fun x(): Bool {
+              return true
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceKindFunctionFieldMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun x(): Bool
+      }
+
+      struct TestImpl: Test {
+          var x: Bool
+
+          init(x: Bool) {
+             self.x = x
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceFieldKindLetVarMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          let x: Bool
+      }
+
+      struct TestImpl: Test {
+          var x: Bool
+
+          init(x: Bool) {
+             self.x = x
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceFieldKindVarLetMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          var x: Bool
+      }
+
+      struct TestImpl: Test {
+          let x: Bool
+
+          init(x: Bool) {
+             self.x = x
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceRepetition(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface X {}
+
+      interface Y {}
+
+      struct TestImpl: X, Y, X {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.DuplicateConformanceError{}))
+}
+
 // TODO: field declaration, member access, type references
 //
 func TestCheckOrigins(t *testing.T) {
