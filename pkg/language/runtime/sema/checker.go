@@ -41,6 +41,8 @@ type Checker struct {
 	Globals                map[string]*Variable
 	inCondition            bool
 	Origins                *Origins
+	seenImports            map[ast.ImportLocation]bool
+	isChecked              bool
 	// TODO: refactor into fields on AST?
 	FunctionDeclarationFunctionTypes   map[*ast.FunctionDeclaration]*FunctionType
 	VariableDeclarationValueTypes      map[*ast.VariableDeclaration]Type
@@ -67,6 +69,7 @@ func NewChecker(program *ast.Program, predefinedDeclarations []ValueDeclaration)
 		typeActivations:                    typeActivations,
 		Globals:                            map[string]*Variable{},
 		Origins:                            NewOrigins(),
+		seenImports:                        map[ast.ImportLocation]bool{},
 		FunctionDeclarationFunctionTypes:   map[*ast.FunctionDeclaration]*FunctionType{},
 		VariableDeclarationValueTypes:      map[*ast.VariableDeclaration]Type{},
 		AssignmentStatementTargetTypes:     map[*ast.AssignmentStatement]Type{},
@@ -96,6 +99,8 @@ type ValueDeclaration interface {
 	DeclarationArgumentLabels() []string
 }
 
+// NOTE: consider declaring pre-defined values through NewChecker
+//
 func (checker *Checker) DeclareValue(declaration ValueDeclaration) error {
 	checker.errors = nil
 	identifier := declaration.DeclarationName()
@@ -108,16 +113,31 @@ func (checker *Checker) DeclareValue(declaration ValueDeclaration) error {
 		declaration.DeclarationArgumentLabels(),
 	)
 	checker.recordVariableOrigin(identifier, variable)
-	return checker.checkerError()
+	err := checker.checkerError()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (checker *Checker) IsChecked() bool {
+	return checker.isChecked
 }
 
 func (checker *Checker) Check() error {
-	checker.errors = nil
-	checker.Program.Accept(checker)
-	return checker.checkerError()
+	if !checker.IsChecked() {
+		checker.errors = nil
+		checker.Program.Accept(checker)
+		checker.isChecked = true
+	}
+	err := checker.checkerError()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (checker *Checker) checkerError() error {
+func (checker *Checker) checkerError() *CheckerError {
 	if len(checker.errors) > 0 {
 		return &CheckerError{
 			Errors: checker.errors,
@@ -2639,7 +2659,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		return nil
 	}
 
-	if checker.ImportCheckers[declaration.Location] != nil {
+	if checker.seenImports[declaration.Location] {
 		checker.report(
 			&RepeatedImportError{
 				ImportLocation: declaration.Location,
@@ -2649,17 +2669,26 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		)
 		return nil
 	}
+	checker.seenImports[declaration.Location] = true
 
-	importChecker, err := NewChecker(imported, checker.PredefinedDeclarations)
-	if err == nil {
-		checker.ImportCheckers[declaration.Location] = importChecker
-		err = importChecker.Check()
+	importChecker, ok := checker.ImportCheckers[declaration.Location]
+	var checkerErr *CheckerError
+	if !ok || importChecker == nil {
+		var err error
+		importChecker, err = NewChecker(imported, checker.PredefinedDeclarations)
+		if err == nil {
+			checker.ImportCheckers[declaration.Location] = importChecker
+		}
 	}
 
-	if err != nil {
+	// NOTE: ignore generic `error` result, get internal *CheckerError
+	_ = importChecker.Check()
+	checkerErr = importChecker.checkerError()
+
+	if checkerErr != nil {
 		checker.report(
 			&ImportedProgramError{
-				CheckerError:   err.(*CheckerError),
+				CheckerError:   checkerErr,
 				ImportLocation: declaration.Location,
 				Pos:            declaration.LocationPos,
 			},
