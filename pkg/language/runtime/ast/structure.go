@@ -6,6 +6,7 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 
 type StructureDeclaration struct {
 	Identifier    string
+	Conformances  []*NominalType
 	Fields        []*FieldDeclaration
 	Initializer   *InitializerDeclaration
 	Functions     []*FunctionDeclaration

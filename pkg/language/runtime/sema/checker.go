@@ -142,6 +142,7 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		default:
 			return false
 		}
+
 	case *OptionalType:
 		optionalSubType, ok := subType.(*OptionalType)
 		if !ok {
@@ -150,6 +151,19 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		}
 		// optionals are covariant: T? <: U? if T <: U
 		return checker.IsSubType(optionalSubType.Type, typedSuperType.Type)
+
+	case *InterfaceType:
+		structureSubType, ok := subType.(*StructureType)
+		if !ok {
+			return false
+		}
+		// TODO: optimize, use set
+		for _, conformance := range structureSubType.Conformances {
+			if typedSuperType.Equal(conformance) {
+				return true
+			}
+		}
+		return false
 	}
 
 	// TODO: functions
@@ -222,16 +236,16 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	// pre-declare interfaces, structures, and functions (check afterwards)
 
-	for _, interfaceDeclaration := range program.InterfaceDeclarations() {
-		checker.declareInterfaceDeclaration(interfaceDeclaration)
+	for _, declaration := range program.InterfaceDeclarations() {
+		checker.declareInterfaceDeclaration(declaration)
 	}
 
-	for _, structureDeclaration := range program.StructureDeclarations() {
-		checker.declareStructureDeclaration(structureDeclaration)
+	for _, declaration := range program.StructureDeclarations() {
+		checker.declareStructureDeclaration(declaration)
 	}
 
-	for _, functionDeclaration := range program.FunctionDeclarations() {
-		checker.declareFunctionDeclaration(functionDeclaration)
+	for _, declaration := range program.FunctionDeclarations() {
+		checker.declareFunctionDeclaration(declaration)
 	}
 
 	// check all declarations
@@ -1503,9 +1517,12 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	identifier := expression.Identifier
 
 	var member *Member
-	structureType, ok := expressionType.(*StructureType)
-	if ok {
-		member, ok = structureType.Members[identifier]
+	var ok bool
+	switch ty := expressionType.(type) {
+	case *StructureType:
+		member, ok = ty.Members[identifier]
+	case *InterfaceType:
+		member, ok = ty.Members[identifier]
 	}
 
 	if !ok {
@@ -1982,11 +1999,18 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 		common.DeclarationKindStructure,
 	)
 
-	members := checker.members(structure.Fields, structure.Functions)
+	conformances := checker.conformances(structure.Conformances)
+
+	members := checker.members(
+		structure.Fields,
+		structure.Functions,
+		common.DeclarationKindStructure,
+	)
 
 	*structureType = StructureType{
-		Identifier: structure.Identifier,
-		Members:    members,
+		Identifier:   structure.Identifier,
+		Members:      members,
+		Conformances: conformances,
 	}
 
 	checker.StructureDeclarationTypes[structure] = structureType
@@ -2002,6 +2026,26 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 	checker.declareStructureConstructor(structure, structureType, parameterTypes)
 
 	structureType.ConstructorParameterTypes = parameterTypes
+}
+
+func (checker *Checker) conformances(conformances []*ast.NominalType) []*InterfaceType {
+	var interfaceTypes []*InterfaceType
+	for _, conformance := range conformances {
+		convertedType := checker.ConvertType(conformance)
+
+		if interfaceType, ok := convertedType.(*InterfaceType); ok {
+			interfaceTypes = append(interfaceTypes, interfaceType)
+
+		} else if _, ok := convertedType.(*InvalidType); !ok {
+			checker.report(
+				&InvalidConformanceError{
+					Type: convertedType,
+					Pos:  conformance.Pos,
+				},
+			)
+		}
+	}
+	return interfaceTypes
 }
 
 // TODO: very simple field initialization check for now.
@@ -2063,6 +2107,7 @@ func (checker *Checker) declareStructureConstructor(
 func (checker *Checker) members(
 	fields []*ast.FieldDeclaration,
 	functions []*ast.FunctionDeclaration,
+	declarationKind common.DeclarationKind,
 ) map[string]*Member {
 
 	fieldCount := len(fields)
@@ -2080,8 +2125,9 @@ func (checker *Checker) members(
 			IsInitialized: false,
 		}
 
-		// TODO: don'T report for interfaces
-		if field.VariableKind == ast.VariableKindNotSpecified {
+		if field.VariableKind == ast.VariableKindNotSpecified &&
+			declarationKind != common.DeclarationKindInterface {
+
 			checker.report(
 				&InvalidVariableKindError{
 					Kind:     field.VariableKind,
@@ -2373,7 +2419,11 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		common.DeclarationKindInterface,
 	)
 
-	members := checker.members(declaration.Fields, declaration.Functions)
+	members := checker.members(
+		declaration.Fields,
+		declaration.Functions,
+		common.DeclarationKindInterface,
+	)
 
 	*interfaceType = InterfaceType{
 		Identifier: declaration.Identifier,

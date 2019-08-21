@@ -23,6 +23,10 @@ func (v *BaseStrictusVisitor) VisitStructureDeclaration(ctx *StructureDeclaratio
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitConformances(ctx *ConformancesContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitVariableKind(ctx *VariableKindContext) interface{} {
 	return v.VisitChildren(ctx)
 }
