@@ -226,7 +226,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 }
 
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
+	return func(arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 		if len(arguments) != 4 {
 			panic(fmt.Sprintf("setValue requires 4 parameters"))
 		}
@@ -250,7 +250,7 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) int
 }
 
 func (r *interpreterRuntime) newGetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
+	return func(arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 		if len(arguments) != 3 {
 			panic(fmt.Sprintf("getValue requires 3 parameters"))
 		}
@@ -268,7 +268,7 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface Interface) int
 }
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
+	return func(arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 		if len(arguments) != 2 {
 			panic(fmt.Sprintf("createAccount requires 2 parameters"))
 		}

@@ -94,7 +94,7 @@ var AssertFunction = NewStandardLibraryFunction(
 		ReturnType:            &sema.VoidType{},
 		RequiredArgumentCount: &assertRequiredArgumentCount,
 	},
-	func(inter *interpreter.Interpreter, arguments []interpreter.Value, position ast.Position) trampoline.Trampoline {
+	func(arguments []interpreter.Value, position ast.Position) trampoline.Trampoline {
 		result := arguments[0].(interpreter.BoolValue)
 		if !result {
 			var message string
@@ -140,7 +140,7 @@ var PanicFunction = NewStandardLibraryFunction(
 		},
 		ReturnType: &sema.NeverType{},
 	},
-	func(inter *interpreter.Interpreter, arguments []interpreter.Value, position ast.Position) trampoline.Trampoline {
+	func(arguments []interpreter.Value, position ast.Position) trampoline.Trampoline {
 		message := arguments[0].(interpreter.StringValue)
 		panic(PanicError{
 			Message:  string(message),
@@ -166,7 +166,7 @@ var Log = NewStandardLibraryFunction(
 		ParameterTypes: []sema.Type{&sema.AnyType{}},
 		ReturnType:     &sema.VoidType{},
 	},
-	func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
+	func(arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 		fmt.Printf("%v\n", arguments[0])
 		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	},

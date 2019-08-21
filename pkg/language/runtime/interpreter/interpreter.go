@@ -225,7 +225,7 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 		boxedArguments[i] = interpreter.box(argument, parameterTypes[i])
 	}
 
-	result := Run(function.invoke(interpreter, boxedArguments, ast.Position{}))
+	result := Run(function.invoke(boxedArguments, ast.Position{}))
 	if result == nil {
 		return nil, nil
 	}
@@ -270,7 +270,12 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	lexicalScope = lexicalScope.Insert(common.StringKey(identifier), variable)
 
 	functionExpression := declaration.ToExpression()
-	variable.Value = newInterpretedFunction(functionExpression, functionType, lexicalScope)
+	variable.Value = newInterpretedFunction(
+		interpreter,
+		functionExpression,
+		functionType,
+		lexicalScope,
+	)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
@@ -971,7 +976,6 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					}
 
 					return function.invoke(
-						interpreter,
 						argumentCopies,
 						invocationExpression.StartPosition(),
 					)
@@ -1048,7 +1052,7 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 
 	functionType := interpreter.Checker.FunctionExpressionFunctionType[expression]
 
-	function := newInterpretedFunction(expression, functionType, lexicalScope)
+	function := newInterpretedFunction(interpreter, expression, functionType, lexicalScope)
 
 	return Done{Result: function}
 }
@@ -1104,7 +1108,7 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 	// TODO: function type
 	variable.Value = NewHostFunctionValue(
 		nil,
-		func(interpreter *Interpreter, values []Value, position ast.Position) Trampoline {
+		func(values []Value, position ast.Position) Trampoline {
 			structure := StructureValue{}
 
 			for name, function := range functions {
@@ -1161,7 +1165,12 @@ func (interpreter *Interpreter) initializerFunction(
 		)
 	}
 
-	return newInterpretedFunction(function, functionType, lexicalScope)
+	return newInterpretedFunction(
+		interpreter,
+		function,
+		functionType,
+		lexicalScope,
+	)
 }
 
 // invokeStructureFunction calls the given function with the values.
@@ -1198,7 +1207,12 @@ func (interpreter *Interpreter) structureFunctions(
 		function := interpreter.structureFunction(structureDeclaration, functionDeclaration)
 
 		functions[functionDeclaration.Identifier.Identifier] =
-			newInterpretedFunction(function, functionType, lexicalScope)
+			newInterpretedFunction(
+				interpreter,
+				function,
+				functionType,
+				lexicalScope,
+			)
 	}
 
 	return functions
