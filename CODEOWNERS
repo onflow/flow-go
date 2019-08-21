@@ -37,9 +37,7 @@
 /internal/emulator @mrbrianhobo @psiemens
 
 # Client Library Stream
-/client @mrbrianhobo @psiemens
-/internal/cli @mrbrianhobo @psiemens
-/cmd/bamboo @mrbrianhobo @psiemens
+/sdk @mrbrianhobo @psiemens
 
 # Language Stream
-/language @turbolent
+/pkg/language @turbolent
