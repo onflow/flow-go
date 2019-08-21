@@ -160,8 +160,10 @@ var accountType = sema.StructureType{
 			Type: &sema.StringType{},
 		},
 		"storage": {
-			// TODO: storage type
-			Type: &sema.AnyType{},
+			Type: &sema.DictionaryType{
+				KeyType:   &sema.AnyType{},
+				ValueType: &sema.AnyType{},
+			},
 		},
 	},
 }
@@ -300,9 +302,10 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	signingAccounts := make([]interface{}, signingAccountsCount)
 
 	for i, address := range signingAccountAddresses {
-		// TODO:
 		signingAccounts[i] = interpreter.StructureValue{
 			"address": interpreter.StringValue(address.String()),
+			// TODO: initialize properly
+			"storage": interpreter.DictionaryValue{},
 		}
 	}
 

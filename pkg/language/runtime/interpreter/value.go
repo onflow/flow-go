@@ -3,6 +3,8 @@ package interpreter
 import (
 	"fmt"
 	"math/big"
+	"strconv"
+	"strings"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 )
@@ -28,6 +30,10 @@ func (v VoidValue) Copy() Value {
 
 func (v VoidValue) ToGoValue() interface{} {
 	return nil
+}
+
+func (v VoidValue) String() string {
+	return "()"
 }
 
 // BoolValue
@@ -60,6 +66,11 @@ func (v StringValue) Copy() Value {
 
 func (v StringValue) ToGoValue() interface{} {
 	return string(v)
+}
+
+func (v StringValue) String() string {
+	// TODO: quote like in string literal
+	return strconv.Quote(string(v))
 }
 
 // IndexableValue
@@ -103,6 +114,19 @@ func (v ArrayValue) Get(key Value) Value {
 
 func (v ArrayValue) Set(key Value, value Value) {
 	v[key.(IntegerValue).IntValue()] = value
+}
+
+func (v ArrayValue) String() string {
+	var builder strings.Builder
+	builder.WriteString("[")
+	for i, value := range v {
+		if i > 0 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(fmt.Sprint(value))
+	}
+	builder.WriteString("]")
+	return builder.String()
 }
 
 // IntegerValue
@@ -759,6 +783,23 @@ func (v DictionaryValue) Set(key Value, value Value) {
 	v[key] = value
 }
 
+func (v DictionaryValue) String() string {
+	var builder strings.Builder
+	builder.WriteString("{")
+	i := 0
+	for key, value := range v {
+		if i > 0 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(fmt.Sprint(key))
+		builder.WriteString(": ")
+		builder.WriteString(fmt.Sprint(value))
+		i += 1
+	}
+	builder.WriteString("}")
+	return builder.String()
+}
+
 // ToValue
 
 // ToValue converts a Go value into an interpreter value
@@ -828,6 +869,13 @@ func (v TupleValue) Copy() Value {
 	}
 }
 
+func (v TupleValue) String() string {
+	return fmt.Sprintf(
+		"Tuple(left: %s, right: %s)",
+		v.Left, v.Right,
+	)
+}
+
 // NilValue
 
 type NilValue struct{}
@@ -836,6 +884,10 @@ func (NilValue) isValue() {}
 
 func (v NilValue) Copy() Value {
 	return v
+}
+
+func (NilValue) String() string {
+	return "nil"
 }
 
 func (v NilValue) ToGoValue() interface{} {
@@ -854,6 +906,10 @@ func (v SomeValue) Copy() Value {
 	return SomeValue{
 		Value: v.Value.Copy(),
 	}
+}
+
+func (v SomeValue) String() string {
+	return fmt.Sprint(v.Value)
 }
 
 // MetaTypeValue

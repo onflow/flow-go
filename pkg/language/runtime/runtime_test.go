@@ -184,3 +184,43 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	Expect(loggedMessage).
 		To(Equal("0x2a00000000000000000000000000000000000000"))
 }
+
+func TestRuntimeStorage(t *testing.T) {
+	RegisterTestingT(t)
+
+	runtime := NewInterpreterRuntime()
+
+	script := []byte(`
+       fun main(account: Account) {
+           log(account.storage["nothing"])
+
+           account.storage["answer"] = 42
+           log(account.storage["answer"])
+
+           account.storage["123"] = [1, 2, 3]
+           log(account.storage["123"])
+
+           account.storage["xyz"] = "xyz"
+           log(account.storage["xyz"])
+		}
+	`)
+
+	var loggedMessages []string
+
+	runtimeInterface := &testRuntimeInterface{
+		getSigningAccounts: func() []types.Address {
+			return []types.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script, runtimeInterface)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(loggedMessages).
+		To(Equal([]string{"nil", "42", "[1, 2, 3]", `"xyz"`}))
+}
