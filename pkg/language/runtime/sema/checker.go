@@ -2622,5 +2622,94 @@ func (checker *Checker) recordVariableOrigin(name string, variable *Variable) {
 }
 
 func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+
+	imports := checker.Program.Imports()
+	imported := imports[declaration.Location]
+	if imported == nil {
+		checker.report(
+			&UnresolvedImportError{
+				ImportLocation: declaration.Location,
+				StartPos:       declaration.LocationPos,
+				EndPos:         declaration.LocationPos,
+			},
+		)
+		return nil
+	}
+
+	if checker.ImportCheckers[declaration.Location] != nil {
+		checker.report(
+			&RepeatedImportError{
+				ImportLocation: declaration.Location,
+				StartPos:       declaration.LocationPos,
+				EndPos:         declaration.LocationPos,
+			},
+		)
+		return nil
+	}
+
+	importChecker, err := NewChecker(imported, checker.PredefinedDeclarations)
+	if err == nil {
+		checker.ImportCheckers[declaration.Location] = importChecker
+		err = importChecker.Check()
+	}
+
+	if err != nil {
+		checker.report(
+			&ImportedProgramError{
+				CheckerError:   err.(*CheckerError),
+				ImportLocation: declaration.Location,
+				Pos:            declaration.LocationPos,
+			},
+		)
+	}
+
+	// TODO: consider access modifiers
+
+	// determine which identifiers are imported /
+	// which variables need to be declared
+	var variables map[string]*Variable
+	identifierLength := len(declaration.Identifiers)
+	if identifierLength > 0 {
+		variables = make(map[string]*Variable, identifierLength)
+		for _, identifier := range declaration.Identifiers {
+			variable := importChecker.Globals[identifier.Identifier]
+
+			if variable == nil {
+				checker.report(
+					&NotExportedError{
+						Name:           identifier.Identifier,
+						ImportLocation: declaration.Location,
+						Pos:            identifier.Pos,
+					},
+				)
+
+				// NOTE: creating variable to silence rest of program
+				variable = &Variable{
+					Type:       &InvalidType{},
+					IsConstant: true,
+				}
+			}
+
+			variables[identifier.Identifier] = variable
+		}
+	} else {
+		variables = importChecker.Globals
+	}
+
+	for name, variable := range variables {
+
+		// TODO: improve position
+		// TODO: allow cross-module variables?
+
+		checker.declareVariable(
+			name,
+			variable.Type,
+			variable.Kind,
+			declaration.LocationPos,
+			true,
+			variable.ArgumentLabels,
+		)
+	}
+
 	return nil
 }
