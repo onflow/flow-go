@@ -743,7 +743,10 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 				)
 			}
 		} else {
-			if !checker.IsSubType(valueType, returnType) {
+			if !valueType.Equal(&InvalidType{}) &&
+				!returnType.Equal(&InvalidType{}) &&
+				!checker.IsSubType(valueType, returnType) {
+
 				checker.report(
 					&TypeMismatchError{
 						ExpectedType: returnType,

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
@@ -37,7 +36,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	program, code, err := parseProgram(filename)
+	program, code, err := parser.ParseProgramFromFile(filename)
 	codes[filename] = code
 	must(err, filename)
 
@@ -45,7 +44,7 @@ func main() {
 		switch location := location.(type) {
 		case ast.StringImportLocation:
 			filename := string(location)
-			imported, code, err := parseProgram(filename)
+			imported, code, err := parser.ParseProgramFromFile(filename)
 			codes[filename] = code
 			must(err, filename)
 			return imported, nil
@@ -113,20 +112,4 @@ func prettyPrintError(err error, filename string, codes map[string]string) {
 func exitWithError(message string) {
 	print(runtime.FormatErrorMessage(message, true))
 	os.Exit(1)
-}
-
-func parseProgram(filename string) (program *ast.Program, code string, err error) {
-	var data []byte
-	data, err = ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, "", err
-	}
-
-	code = string(data)
-
-	program, err = parser.ParseProgram(code)
-	if err != nil {
-		return nil, code, err
-	}
-	return program, code, nil
 }

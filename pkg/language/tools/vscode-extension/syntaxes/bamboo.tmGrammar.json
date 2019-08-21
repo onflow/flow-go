@@ -296,6 +296,10 @@
             "name": "keyword.control.loop.bamboo"
           },
           {
+            "match": "(?<!\\.)\\b(?:import|from)\\b",
+            "name": "keyword.control.import"
+          },
+          {
             "match": "(?<!\\.)\\b(?:pre|post|prepare|execute)\\b",
             "name": "keyword.other"
           },
