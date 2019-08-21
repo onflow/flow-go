@@ -465,7 +465,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declarationType = checker.ConvertType(declaration.Type)
 
 		// check the value type is a subtype of the declaration type
-		if declarationType != nil && valueType != nil && !valueType.Equal(&InvalidType{}) {
+		if declarationType != nil && valueType != nil && !isInvalidType(valueType) {
 
 			if isOptionalBinding {
 				if optionalValueType != nil &&
@@ -686,7 +686,7 @@ func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
 
 	testType := condition.Test.Accept(checker).(Type)
 
-	if !testType.Equal(&InvalidType{}) && !checker.IsSubType(testType, &BoolType{}) {
+	if !isInvalidType(testType) && !checker.IsSubType(testType, &BoolType{}) {
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: &BoolType{},
@@ -703,7 +703,7 @@ func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
 
 		messageType := condition.Message.Accept(checker).(Type)
 
-		if !messageType.Equal(&InvalidType{}) && !checker.IsSubType(messageType, &StringType{}) {
+		if !isInvalidType(messageType) && !checker.IsSubType(messageType, &StringType{}) {
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: &StringType{},
@@ -727,7 +727,7 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	}
 
 	valueType := statement.Expression.Accept(checker).(Type)
-	_, valueIsInvalid := valueType.(*InvalidType)
+	valueIsInvalid := isInvalidType(valueType)
 
 	returnType := checker.currentFunction().returnType
 
@@ -743,8 +743,8 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 				)
 			}
 		} else {
-			if !valueType.Equal(&InvalidType{}) &&
-				!returnType.Equal(&InvalidType{}) &&
+			if !valueIsInvalid &&
+				!isInvalidType(returnType) &&
 				!checker.IsSubType(valueType, returnType) {
 
 				checker.report(
@@ -917,7 +917,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 		}
 
 		// check value type is subtype of variable type
-		if !valueType.Equal(&InvalidType{}) &&
+		if !isInvalidType(valueType) &&
 			!checker.IsSubType(valueType, variable.Type) {
 
 			checker.report(
@@ -946,7 +946,7 @@ func (checker *Checker) visitIndexExpressionAssignment(
 		return &InvalidType{}
 	}
 
-	if !elementType.Equal(&InvalidType{}) &&
+	if !isInvalidType(elementType) &&
 		!checker.IsSubType(valueType, elementType) {
 
 		checker.report(
@@ -991,17 +991,17 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	member.IsInitialized = true
 
 	// if value type is valid, check value can be assigned to member
-	if _, ok := valueType.(*InvalidType); !ok {
-		if !checker.IsSubType(valueType, member.Type) {
-			checker.report(
-				&TypeMismatchError{
-					ExpectedType: member.Type,
-					ActualType:   valueType,
-					StartPos:     assignment.Value.StartPosition(),
-					EndPos:       assignment.Value.EndPosition(),
-				},
-			)
-		}
+	if !isInvalidType(valueType) &&
+		!checker.IsSubType(valueType, member.Type) {
+
+		checker.report(
+			&TypeMismatchError{
+				ExpectedType: member.Type,
+				ActualType:   valueType,
+				StartPos:     assignment.Value.StartPosition(),
+				EndPos:       assignment.Value.EndPosition(),
+			},
+		)
 	}
 
 	return member.Type
@@ -1021,7 +1021,7 @@ func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpre
 	// check indexed expression's type is indexable
 	// by getting the expected element
 
-	if _, ok := indexedType.(*InvalidType); ok {
+	if isInvalidType(indexedType) {
 		return &InvalidType{}
 	}
 
@@ -1099,8 +1099,8 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 
 	leftType, rightType := checker.visitBinaryOperation(expression)
 
-	_, leftIsInvalid := leftType.(*InvalidType)
-	_, rightIsInvalid := rightType.(*InvalidType)
+	leftIsInvalid := isInvalidType(leftType)
+	rightIsInvalid := isInvalidType(rightType)
 	anyInvalid := leftIsInvalid || rightIsInvalid
 
 	operation := expression.Operation
@@ -1597,7 +1597,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	functionType, ok := expressionType.(*FunctionType)
 	if !ok {
 
-		if _, ok := expressionType.(*InvalidType); !ok {
+		if !isInvalidType(expressionType) {
 			checker.report(
 				&NotCallableError{
 					Type:     expressionType,
@@ -2068,7 +2068,7 @@ func (checker *Checker) conformances(structure *ast.StructureDeclaration) []*Int
 		if interfaceType, ok := convertedType.(*InterfaceType); ok {
 			interfaceTypes = append(interfaceTypes, interfaceType)
 
-		} else if _, ok := convertedType.(*InvalidType); !ok {
+		} else if !isInvalidType(convertedType) {
 			checker.report(
 				&InvalidConformanceError{
 					Type: convertedType,
