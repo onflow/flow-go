@@ -23,8 +23,8 @@ service ObserveService {
   rpc GetTransaction(GetTransactionRequest) returns (GetTransactionResponse);
   // GetAccount gets an account by address.
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
-  // CallContract performs a contract call.
-  rpc CallContract(CallContractRequest) returns (CallContractResponse);
+  // CallScript calls code deployed on the blockchain.
+  rpc CallScript(CallScriptRequest) returns (CallScriptResponse);
 }
 
 
@@ -101,10 +101,11 @@ message GetAccountResponse {
   Account account = 1;
 }
 
-message CallContractRequest {
+message CallScriptRequest {
   bytes script = 1;
 }
 
-message CallContractResponse {
-  bytes value = 1;
+message CallScriptResponse {
+  string type = 1;
+  bytes value = 2;
 }
