@@ -5,14 +5,13 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 // StructureDeclaration
 
 type StructureDeclaration struct {
-	Identifier    string
-	Conformances  []*NominalType
-	Fields        []*FieldDeclaration
-	Initializer   *InitializerDeclaration
-	Functions     []*FunctionDeclaration
-	IdentifierPos Position
-	StartPos      Position
-	EndPos        Position
+	Identifier   Identifier
+	Conformances []*NominalType
+	Fields       []*FieldDeclaration
+	Initializer  *InitializerDeclaration
+	Functions    []*FunctionDeclaration
+	StartPos     Position
+	EndPos       Position
 }
 
 func (s *StructureDeclaration) StartPosition() Position {
@@ -35,7 +34,7 @@ func (*StructureDeclaration) isDeclaration() {}
 func (*StructureDeclaration) isStatement() {}
 
 func (s *StructureDeclaration) DeclarationName() string {
-	return s.Identifier
+	return s.Identifier.Identifier
 }
 
 func (s *StructureDeclaration) DeclarationKind() common.DeclarationKind {
@@ -45,13 +44,12 @@ func (s *StructureDeclaration) DeclarationKind() common.DeclarationKind {
 // FieldDeclaration
 
 type FieldDeclaration struct {
-	Access        Access
-	VariableKind  VariableKind
-	Identifier    string
-	Type          Type
-	StartPos      Position
-	EndPos        Position
-	IdentifierPos Position
+	Access       Access
+	VariableKind VariableKind
+	Identifier   Identifier
+	Type         Type
+	StartPos     Position
+	EndPos       Position
 }
 
 func (f *FieldDeclaration) Accept(visitor Visitor) Repr {
@@ -69,7 +67,7 @@ func (f *FieldDeclaration) EndPosition() Position {
 func (*FieldDeclaration) isDeclaration() {}
 
 func (f *FieldDeclaration) DeclarationName() string {
-	return f.Identifier
+	return f.Identifier.Identifier
 }
 
 func (f *FieldDeclaration) DeclarationKind() common.DeclarationKind {
@@ -79,7 +77,7 @@ func (f *FieldDeclaration) DeclarationKind() common.DeclarationKind {
 // InitializerDeclaration
 
 type InitializerDeclaration struct {
-	Identifier    string
+	Identifier    Identifier
 	Parameters    []*Parameter
 	FunctionBlock *FunctionBlock
 	StartPos      Position

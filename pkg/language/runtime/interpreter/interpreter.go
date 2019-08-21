@@ -81,15 +81,15 @@ func (interpreter *Interpreter) Interpret() (err error) {
 
 	// pre-declare empty variables for all structures, interfaces, and function declarations
 	for _, declaration := range program.InterfaceDeclarations() {
-		interpreter.declareVariable(declaration.Identifier, nil)
+		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
 
 	for _, declaration := range program.StructureDeclarations() {
-		interpreter.declareVariable(declaration.Identifier, nil)
+		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
 
 	for _, declaration := range program.FunctionDeclarations() {
-		interpreter.declareVariable(declaration.Identifier, nil)
+		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
 
 	for _, declaration := range program.InterfaceDeclarations() {
@@ -241,7 +241,7 @@ func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 
-	identifier := declaration.Identifier
+	identifier := declaration.Identifier.Identifier
 
 	functionType := interpreter.Checker.FunctionDeclarationFunctionTypes[declaration]
 
@@ -503,7 +503,10 @@ func (interpreter *Interpreter) visitIfStatementWithVariableDeclaration(
 			if someValue, ok := result.(SomeValue); ok {
 				unwrappedValueCopy := someValue.Value.Copy()
 				interpreter.activations.PushCurrent()
-				interpreter.declareVariable(declaration.Identifier, unwrappedValueCopy)
+				interpreter.declareVariable(
+					declaration.Identifier.Identifier,
+					unwrappedValueCopy,
+				)
 
 				return thenBlock.Accept(interpreter).(Trampoline).
 					Then(func(_ interface{}) {
@@ -551,7 +554,10 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 			targetType := interpreter.Checker.VariableDeclarationValueTypes[declaration]
 			valueCopy := interpreter.copyAndBox(result.(Value), targetType)
 
-			interpreter.declareVariable(declaration.Identifier, valueCopy)
+			interpreter.declareVariable(
+				declaration.Identifier.Identifier,
+				valueCopy,
+			)
 
 			// NOTE: ignore result, so it does *not* act like a return-statement
 			return Done{}
@@ -594,7 +600,7 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 }
 
 func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
-	variable := interpreter.findVariable(target.Identifier)
+	variable := interpreter.findVariable(target.Identifier.Identifier)
 	variable.Value = value
 }
 
@@ -627,7 +633,7 @@ func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.Memb
 }
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
-	variable := interpreter.findVariable(expression.Identifier)
+	variable := interpreter.findVariable(expression.Identifier.Identifier)
 	return Done{Result: variable.Value}
 }
 
@@ -996,7 +1002,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 ) {
 	for parameterIndex, parameter := range function.Expression.Parameters {
 		argument := arguments[parameterIndex]
-		interpreter.declareVariable(parameter.Identifier, argument)
+		interpreter.declareVariable(parameter.Identifier.Identifier, argument)
 	}
 }
 
@@ -1053,11 +1059,12 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	variable := interpreter.findOrDeclareVariable(structureDeclaration.Identifier)
+	identifier := structureDeclaration.Identifier.Identifier
+	variable := interpreter.findOrDeclareVariable(identifier)
 
 	// make the constructor available in the initializer
 	lexicalScope = lexicalScope.
-		Insert(common.StringKey(structureDeclaration.Identifier), variable)
+		Insert(common.StringKey(identifier), variable)
 
 	initializer := structureDeclaration.Initializer
 
@@ -1120,7 +1127,7 @@ func (interpreter *Interpreter) initializerFunction(
 	function.FunctionBlock = &functionBlockCopy
 
 	for _, conformance := range structureDeclaration.Conformances {
-		interfaceDeclaration := interpreter.interfaces[conformance.Identifier]
+		interfaceDeclaration := interpreter.interfaces[conformance.Identifier.Identifier]
 		initializer := interfaceDeclaration.Initializer
 		if initializer == nil || initializer.FunctionBlock == nil {
 			continue
@@ -1173,7 +1180,7 @@ func (interpreter *Interpreter) structureFunctions(
 
 		function := interpreter.structureFunction(structureDeclaration, functionDeclaration)
 
-		functions[functionDeclaration.Identifier] =
+		functions[functionDeclaration.Identifier.Identifier] =
 			newInterpretedFunction(function, functionType, lexicalScope)
 	}
 
@@ -1185,7 +1192,7 @@ func (interpreter *Interpreter) structureFunction(
 	functionDeclaration *ast.FunctionDeclaration,
 ) *ast.FunctionExpression {
 
-	functionIdentifier := functionDeclaration.Identifier
+	functionIdentifier := functionDeclaration.Identifier.Identifier
 
 	function := functionDeclaration.ToExpression()
 
@@ -1194,7 +1201,8 @@ func (interpreter *Interpreter) structureFunction(
 	function.FunctionBlock = &functionBlockCopy
 
 	for _, conformance := range structureDeclaration.Conformances {
-		interfaceDeclaration := interpreter.interfaces[conformance.Identifier]
+		conformanceIdentifier := conformance.Identifier.Identifier
+		interfaceDeclaration := interpreter.interfaces[conformanceIdentifier]
 		interfaceFunction, ok := interfaceDeclaration.FunctionsByIdentifier()[functionIdentifier]
 		if !ok || interfaceFunction.FunctionBlock == nil {
 			continue
@@ -1268,14 +1276,14 @@ func (interpreter *Interpreter) VisitInterfaceDeclaration(declaration *ast.Inter
 }
 
 func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDeclaration) {
-	interpreter.interfaces[declaration.Identifier] = declaration
+	interpreter.interfaces[declaration.Identifier.Identifier] = declaration
 }
 
 func (interpreter *Interpreter) declareInterfaceMetaType(declaration *ast.InterfaceDeclaration) {
 
 	interfaceType := interpreter.Checker.InterfaceDeclarationTypes[declaration]
 
-	variable := interpreter.findOrDeclareVariable(declaration.Identifier)
+	variable := interpreter.findOrDeclareVariable(declaration.Identifier.Identifier)
 	variable.Value = MetaTypeValue{Type: interfaceType}
 }
 

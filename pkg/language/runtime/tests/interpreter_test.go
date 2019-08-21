@@ -1,4 +1,4 @@
-package runtime
+package tests
 
 import (
 	"math/big"
@@ -1035,12 +1035,12 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.ParseProgram(`
+	program, err := parser.ParseProgram(`
       let a = test(1, 2)
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
+	Expect(err).
+		To(Not(HaveOccurred()))
 
 	testFunction := stdlib.NewStandardLibraryFunction(
 		"test",
@@ -1061,9 +1061,9 @@ func TestInterpretHostFunction(t *testing.T) {
 		nil,
 	)
 
-	checker := sema.NewChecker(program)
-
-	err := checker.DeclareValue(testFunction)
+	checker, err := sema.NewChecker(program, []sema.ValueDeclaration{
+		testFunction,
+	})
 	Expect(err).
 		To(Not(HaveOccurred()))
 

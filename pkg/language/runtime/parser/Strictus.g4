@@ -58,7 +58,7 @@ declaration
     ;
 
 importDeclaration
-    : 'import' (stringLiteral | HexadecimalLiteral)
+    : 'import' (Identifier (',' Identifier)* 'from')? (stringLiteral | HexadecimalLiteral)
     ;
 
 access

@@ -8,9 +8,14 @@ import (
 )
 
 type testRuntimeInterface struct {
+	resolveImport func(ImportLocation) ([]byte, error)
 	getValue      func(controller, owner, key []byte) (value []byte, err error)
 	setValue      func(controller, owner, key, value []byte) (err error)
 	createAccount func(publicKey, code []byte) (accountID []byte, err error)
+}
+
+func (i *testRuntimeInterface) ResolveImport(location ImportLocation) ([]byte, error) {
+	return i.resolveImport(location)
 }
 
 func (i *testRuntimeInterface) GetValue(controller, owner, key []byte) (value []byte, err error) {
@@ -25,7 +30,7 @@ func (i *testRuntimeInterface) CreateAccount(publicKey, code []byte) (accountID 
 	return i.createAccount(publicKey, code)
 }
 
-func TestNewInterpreterRuntime(t *testing.T) {
+func TestRuntimeGetAndSetValue(t *testing.T) {
 	RegisterTestingT(t)
 
 	runtime := NewInterpreterRuntime()

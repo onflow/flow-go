@@ -15,7 +15,21 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 )
 
-type RuntimeInterface interface {
+type ImportLocation interface {
+	isImportLocation()
+}
+
+type StringImportLocation ast.StringImportLocation
+
+func (StringImportLocation) isImportLocation() {}
+
+type AddressImportLocation ast.AddressImportLocation
+
+func (AddressImportLocation) isImportLocation() {}
+
+type Interface interface {
+	// ResolveImport resolves an import of a program.
+	ResolveImport(ImportLocation) ([]byte, error)
 	// GetValue gets a value for the given key in the storage, controlled and owned by the given accounts.
 	GetValue(owner, controller, key []byte) (value []byte, err error)
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
@@ -24,11 +38,11 @@ type RuntimeInterface interface {
 	CreateAccount(publicKey []byte, code []byte) (accountID []byte, err error)
 }
 
-type RuntimeError struct {
+type Error struct {
 	Errors []error
 }
 
-func (e RuntimeError) Error() string {
+func (e Error) Error() string {
 	var sb strings.Builder
 	sb.WriteString("Execution failed:\n")
 	for _, err := range e.Errors {
@@ -43,7 +57,7 @@ type Runtime interface {
 	// ExecuteScript executes the given script.
 	// It returns errors if the program has errors (e.g syntax errors, type errors),
 	// and if the execution fails.
-	ExecuteScript(script []byte, runtimeInterface RuntimeInterface) (interface{}, error)
+	ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error)
 }
 
 // mockRuntime is a mocked version of the Bamboo runtime
@@ -54,7 +68,7 @@ func NewMockRuntime() Runtime {
 	return &mockRuntime{}
 }
 
-func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) (interface{}, error) {
+func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error) {
 	return nil, nil
 }
 
@@ -128,12 +142,33 @@ var createAccountFunctionType = sema.FunctionType{
 	ReturnType: &sema.IntType{},
 }
 
-func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface RuntimeInterface) (interface{}, error) {
-	code := string(script)
+func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (*ast.Program, error) {
+	return parser.ParseProgram(string(script))
+}
 
-	program, errs := parser.ParseProgram(code)
-	if len(errs) > 0 {
-		return nil, RuntimeError{errs}
+func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error) {
+
+	program, err := r.parse(script, runtimeInterface)
+	if err != nil {
+		return nil, err
+	}
+
+	err = program.ResolveImports(func(astLocation ast.ImportLocation) (program *ast.Program, e error) {
+		var location ImportLocation
+		switch astLocation := astLocation.(type) {
+		case ast.StringImportLocation:
+			location = StringImportLocation(astLocation)
+		case ast.AddressImportLocation:
+			location = AddressImportLocation(astLocation)
+		}
+		script, err := runtimeInterface.ResolveImport(location)
+		if err != nil {
+			return nil, err
+		}
+		return r.parse(script, runtimeInterface)
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// TODO: maybe consider adding argument labels
@@ -160,26 +195,24 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 		),
 	)
 
-	checker := sema.NewChecker(program)
-	for _, function := range functions {
-		if err := checker.DeclareValue(function); err != nil {
-			return nil, RuntimeError{[]error{err}}
-		}
+	checker, err := sema.NewChecker(program, stdlib.ToValueDeclarations(functions))
+	if err != nil {
+		return nil, Error{[]error{err}}
 	}
 
 	if err := checker.Check(); err != nil {
-		return nil, RuntimeError{[]error{err}}
+		return nil, Error{[]error{err}}
 	}
 
 	inter := interpreter.NewInterpreter(checker)
 	for _, function := range functions {
 		if err := inter.ImportFunction(function.Name, function.Function); err != nil {
-			return nil, RuntimeError{[]error{err}}
+			return nil, Error{[]error{err}}
 		}
 	}
 
 	if err := inter.Interpret(); err != nil {
-		return nil, RuntimeError{[]error{err}}
+		return nil, Error{[]error{err}}
 	}
 
 	if _, hasMain := inter.Globals["main"]; !hasMain {
@@ -188,13 +221,13 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Runti
 
 	value, err := inter.InvokeExportable("main")
 	if err != nil {
-		return nil, RuntimeError{[]error{err}}
+		return nil, Error{[]error{err}}
 	}
 
 	return value.ToGoValue(), nil
 }
 
-func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterface) interpreter.HostFunction {
+func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 		if len(arguments) != 4 {
 			panic(fmt.Sprintf("setValue requires 4 parameters"))
@@ -218,7 +251,7 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface RuntimeInterfa
 	}
 }
 
-func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterface) interpreter.HostFunction {
+func (r *interpreterRuntime) newGetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 		if len(arguments) != 3 {
 			panic(fmt.Sprintf("getValue requires 3 parameters"))
@@ -236,7 +269,7 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface RuntimeInterfa
 	}
 }
 
-func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface RuntimeInterface) interpreter.HostFunction {
+func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(_ *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
 		if len(arguments) != 2 {
 			panic(fmt.Sprintf("createAccount requires 2 parameters"))

@@ -11,7 +11,10 @@ import (
 func TestOptionalSubtyping(t *testing.T) {
 	RegisterTestingT(t)
 
-	checker := NewChecker(&ast.Program{})
+	checker, err := NewChecker(&ast.Program{}, nil)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 
 	Expect(checker.IsSubType(
 		&OptionalType{Type: &IntType{}},

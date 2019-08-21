@@ -178,3 +178,13 @@ var Log = NewStandardLibraryFunction(
 var Helpers = []StandardLibraryFunction{
 	Log,
 }
+
+// ToValueDeclarations
+
+func ToValueDeclarations(functions []StandardLibraryFunction) []sema.ValueDeclaration {
+	valueDeclarations := make([]sema.ValueDeclaration, len(functions))
+	for i, function := range functions {
+		valueDeclarations[i] = function
+	}
+	return valueDeclarations
+}

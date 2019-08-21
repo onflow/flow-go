@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -23,15 +24,14 @@ func TestProgram_ResolveImports(t *testing.T) {
 	b := makeImportingProgram("c")
 	c := &Program{}
 
-	err := a.ResolveImports(func(location ImportLocation) *Program {
+	err := a.ResolveImports(func(location ImportLocation) (*Program, error) {
 		switch location {
 		case StringImportLocation("b"):
-			return b
+			return b, nil
 		case StringImportLocation("c"):
-			return c
+			return c, nil
 		default:
-			t.Fatalf("Tried to resolve unknown import location: %s", location)
-			return nil
+			return nil, fmt.Errorf("tried to resolve unknown import location: %s", location)
 		}
 	})
 
@@ -61,17 +61,16 @@ func TestProgram_ResolveImportsCycle(t *testing.T) {
 	b := makeImportingProgram("c")
 	c := makeImportingProgram("a")
 
-	err := a.ResolveImports(func(location ImportLocation) *Program {
+	err := a.ResolveImports(func(location ImportLocation) (*Program, error) {
 		switch location {
 		case StringImportLocation("a"):
-			return a
+			return a, nil
 		case StringImportLocation("b"):
-			return b
+			return b, nil
 		case StringImportLocation("c"):
-			return c
+			return c, nil
 		default:
-			t.Fatalf("Tried to resolve unknown import location: %s", location)
-			return nil
+			return nil, fmt.Errorf("tried to resolve unknown import location: %s", location)
 		}
 	})
 

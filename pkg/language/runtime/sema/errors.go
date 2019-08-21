@@ -841,7 +841,7 @@ func (e *DuplicateConformanceError) Error() string {
 	return fmt.Sprintf(
 		"structure `%s` repeats conformance for interface `%s`",
 		e.StructureIdentifier,
-		e.Conformance.Identifier,
+		e.Conformance.Identifier.Identifier,
 	)
 }
 
@@ -853,4 +853,101 @@ func (e *DuplicateConformanceError) StartPosition() ast.Position {
 
 func (e *DuplicateConformanceError) EndPosition() ast.Position {
 	return e.Conformance.EndPosition()
+}
+
+// UnresolvedImportError
+
+type UnresolvedImportError struct {
+	ImportLocation ast.ImportLocation
+	StartPos       ast.Position
+	EndPos         ast.Position
+}
+
+func (e *UnresolvedImportError) Error() string {
+	return fmt.Sprintf(
+		"import of location `%s` could not be resolved",
+		e.ImportLocation,
+	)
+}
+
+func (*UnresolvedImportError) isSemanticError() {}
+
+func (e *UnresolvedImportError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *UnresolvedImportError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// RepeatedImportError
+
+// TODO: make warning?
+
+type RepeatedImportError struct {
+	ImportLocation ast.ImportLocation
+	StartPos       ast.Position
+	EndPos         ast.Position
+}
+
+func (e *RepeatedImportError) Error() string {
+	return fmt.Sprintf(
+		"repeated import of location `%s`",
+		e.ImportLocation,
+	)
+}
+
+func (*RepeatedImportError) isSemanticError() {}
+
+func (e *RepeatedImportError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *RepeatedImportError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// NotExportedError
+
+type NotExportedError struct {
+	Name           string
+	ImportLocation ast.ImportLocation
+	Pos            ast.Position
+}
+
+func (e *NotExportedError) Error() string {
+	return fmt.Sprintf("cannot find declaration `%s` in `%s`", e.Name, e.ImportLocation)
+}
+
+func (*NotExportedError) isSemanticError() {}
+
+func (e *NotExportedError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *NotExportedError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
+}
+
+// ImportedProgramError
+
+type ImportedProgramError struct {
+	CheckerError   *CheckerError
+	ImportLocation ast.ImportLocation
+	Pos            ast.Position
+}
+
+func (e *ImportedProgramError) Error() string {
+	return fmt.Sprintf("checking of imported program `%s` failed", e.ImportLocation)
+}
+
+func (*ImportedProgramError) isSemanticError() {}
+
+func (e *ImportedProgramError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *ImportedProgramError) EndPosition() ast.Position {
+	return e.Pos
 }

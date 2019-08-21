@@ -63,7 +63,7 @@ func (p *Program) Imports() map[ImportLocation]*Program {
 	return p.imports
 }
 
-type ImportResolver func(location ImportLocation) *Program
+type ImportResolver func(location ImportLocation) (*Program, error)
 
 func (p *Program) ResolveImports(resolver ImportResolver) error {
 	return p.resolveImports(
@@ -91,7 +91,11 @@ func (p *Program) resolveImports(
 	for location := range imports {
 		imported, ok := resolved[location]
 		if !ok {
-			imported = resolver(location)
+			var err error
+			imported, err = resolver(location)
+			if err != nil {
+				return err
+			}
 			resolved[location] = imported
 		}
 		imports[location] = imported

@@ -1,13 +1,35 @@
 package ast
 
-import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+import (
+	"fmt"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+)
+
+// Identifier
+
+type Identifier struct {
+	Identifier string
+	Pos        Position
+}
+
+func (i Identifier) StartPosition() Position {
+	return i.Pos
+}
+
+func (i Identifier) EndPosition() Position {
+	length := len(i.Identifier)
+	return i.Pos.Shifted(length - 1)
+}
 
 // ImportDeclaration
 
 type ImportDeclaration struct {
-	Location ImportLocation
-	StartPos Position
-	EndPos   Position
+	Identifiers []Identifier
+	Location    ImportLocation
+	StartPos    Position
+	EndPos      Position
+	LocationPos Position
 }
 
 func (v *ImportDeclaration) StartPosition() Position {
@@ -51,3 +73,7 @@ func (StringImportLocation) isImportLocation() {}
 type AddressImportLocation string
 
 func (AddressImportLocation) isImportLocation() {}
+
+func (l AddressImportLocation) String() string {
+	return fmt.Sprintf("%#x", []byte(l))
+}

@@ -191,21 +191,11 @@ func (e *ArrayExpression) AcceptExp(v ExpressionVisitor) Repr {
 // IdentifierExpression
 
 type IdentifierExpression struct {
-	Identifier string
-	StartPos   Position
-	EndPos     Position
+	Identifier
 }
 
 func (e *IdentifierExpression) String() string {
-	return e.Identifier
-}
-
-func (e *IdentifierExpression) StartPosition() Position {
-	return e.StartPos
-}
-
-func (e *IdentifierExpression) EndPosition() Position {
-	return e.EndPos
+	return e.Identifier.Identifier
 }
 
 func (*IdentifierExpression) isIfStatementTest() {}
