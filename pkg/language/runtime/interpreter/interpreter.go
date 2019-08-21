@@ -633,12 +633,12 @@ func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			array := result.(ArrayValue)
+			indexedValue := result.(IndexableValue)
 
 			return target.Index.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
-					index := result.(IntegerValue)
-					array[index.IntValue()] = value
+					indexingValue := result.(Value)
+					indexedValue.Set(indexingValue, value)
 
 					// NOTE: no result, so it does *not* act like a return-statement
 					return Done{}
@@ -931,13 +931,12 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			array := result.(ArrayValue)
+			indexedValue := result.(IndexableValue)
 
 			return expression.Index.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
-					index := result.(IntegerValue)
-					value := array[index.IntValue()]
-
+					indexingValue := result.(Value)
+					value := indexedValue.Get(indexingValue)
 					return Done{Result: value}
 				})
 		})

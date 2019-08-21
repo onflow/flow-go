@@ -62,6 +62,14 @@ func (v StringValue) ToGoValue() interface{} {
 	return string(v)
 }
 
+// IndexableValue
+
+type IndexableValue interface {
+	isIndexableValue()
+	Get(key Value) Value
+	Set(key Value, value Value)
+}
+
 // ArrayValue
 
 type ArrayValue []Value
@@ -85,6 +93,16 @@ func (v ArrayValue) ToGoValue() interface{} {
 	}
 
 	return values
+}
+
+func (v ArrayValue) isIndexableValue() {}
+
+func (v ArrayValue) Get(key Value) Value {
+	return v[key.(IntegerValue).IntValue()]
+}
+
+func (v ArrayValue) Set(key Value, value Value) {
+	v[key.(IntegerValue).IntValue()] = value
 }
 
 // IntegerValue
@@ -706,6 +724,35 @@ func (v StructureValue) Get(field string) Value {
 
 func (v StructureValue) Set(field string, value Value) {
 	v[field] = value
+}
+
+// DictionaryValue
+
+type DictionaryValue map[Value]Value
+
+func (DictionaryValue) isValue() {}
+
+func (v DictionaryValue) Copy() Value {
+	newDictionary := make(DictionaryValue, len(v))
+	for field, value := range v {
+		newDictionary[field] = value.Copy()
+	}
+	return newDictionary
+}
+
+func (v DictionaryValue) ToGoValue() interface{} {
+	// TODO: convert values to Go values?
+	return v
+}
+
+func (v DictionaryValue) isIndexableValue() {}
+
+func (v DictionaryValue) Get(key Value) Value {
+	return v[key]
+}
+
+func (v DictionaryValue) Set(key Value, value Value) {
+	v[key] = value
 }
 
 // ToValue

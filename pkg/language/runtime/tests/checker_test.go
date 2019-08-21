@@ -3955,7 +3955,7 @@ func TestCheckDictionaryIndexing(t *testing.T) {
 
 	checker, err := parseAndCheckWithExtra(
 		`
-         let x = dict["abc"]
+          let x = dict["abc"]
 	    `,
 		[]sema.ValueDeclaration{
 			stdlib.StandardLibraryValue{
@@ -3982,7 +3982,7 @@ func TestCheckInvalidDictionaryIndexing(t *testing.T) {
 
 	_, err := parseAndCheckWithExtra(
 		`
-        let x = dict[true]
+          let x = dict[true]
 	    `,
 		[]sema.ValueDeclaration{
 			stdlib.StandardLibraryValue{
