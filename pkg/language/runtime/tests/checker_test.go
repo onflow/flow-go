@@ -3974,7 +3974,7 @@ func TestCheckDictionaryIndexing(t *testing.T) {
 		To(Not(HaveOccurred()))
 
 	Expect(checker.Globals["x"].Type).
-		To(Equal(&sema.IntType{}))
+		To(Equal(&sema.OptionalType{Type: &sema.IntType{}}))
 }
 
 func TestCheckInvalidDictionaryIndexing(t *testing.T) {

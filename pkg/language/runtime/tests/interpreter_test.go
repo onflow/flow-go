@@ -2669,7 +2669,35 @@ func TestInterpretDictionaryIndexing(t *testing.T) {
 	)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(42)},
+			}))
+}
+
+func TestInterpretDictionaryIndexingNotFound(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpretWithExtra(
+		`
+          let x = dict["xyz"]
+        `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		map[string]interpreter.Value{
+			"dict": interpreter.DictionaryValue{},
+		},
+	)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NilValue{}))
 }
 
 func TestInterpretDictionaryIndexingAssignment(t *testing.T) {
@@ -2701,5 +2729,5 @@ func TestInterpretDictionaryIndexingAssignment(t *testing.T) {
 		To(Equal(interpreter.VoidValue{}))
 
 	Expect(inter.Globals["dict"].Value.(interpreter.DictionaryValue).Get(interpreter.StringValue("abc"))).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(23)}))
+		To(Equal(interpreter.SomeValue{Value: interpreter.IntValue{Int: big.NewInt(23)}}))
 }

@@ -227,12 +227,17 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 	return false
 }
 
-func (checker *Checker) IndexableElementType(indexedType Type) Type {
+func (checker *Checker) IndexableElementType(indexedType Type, isAssignment bool) Type {
 	switch indexedType := indexedType.(type) {
 	case ArrayType:
 		return indexedType.elementType()
 	case *DictionaryType:
-		return indexedType.ValueType
+		valueType := indexedType.ValueType
+		if isAssignment {
+			return valueType
+		} else {
+			return &OptionalType{Type: valueType}
+		}
 	}
 
 	return nil
@@ -988,7 +993,7 @@ func (checker *Checker) visitIndexExpressionAssignment(
 	valueType Type,
 ) (elementType Type) {
 
-	elementType = checker.visitIndexingExpression(target.Expression, target.Index)
+	elementType = checker.visitIndexingExpression(target.Expression, target.Index, true)
 
 	if elementType == nil {
 		return &InvalidType{}
@@ -1059,7 +1064,11 @@ func (checker *Checker) visitMemberExpressionAssignment(
 // checks if the indexing expression can be used to index into the indexed expression,
 // and returns the expected element type
 //
-func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpression ast.Expression) Type {
+func (checker *Checker) visitIndexingExpression(
+	indexedExpression ast.Expression,
+	indexingExpression ast.Expression,
+	isAssignment bool,
+) Type {
 
 	indexedType := indexedExpression.Accept(checker).(Type)
 	indexingType := indexingExpression.Accept(checker).(Type)
@@ -1073,7 +1082,7 @@ func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpre
 		return &InvalidType{}
 	}
 
-	elementType := checker.IndexableElementType(indexedType)
+	elementType := checker.IndexableElementType(indexedType, isAssignment)
 	if elementType == nil {
 		elementType = &InvalidType{}
 
@@ -1606,7 +1615,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
-	return checker.visitIndexingExpression(expression.Expression, expression.Index)
+	return checker.visitIndexingExpression(expression.Expression, expression.Index, false)
 }
 
 func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalExpression) ast.Repr {

@@ -748,7 +748,11 @@ func (v DictionaryValue) ToGoValue() interface{} {
 func (v DictionaryValue) isIndexableValue() {}
 
 func (v DictionaryValue) Get(key Value) Value {
-	return v[key]
+	value, ok := v[key]
+	if !ok {
+		return NilValue{}
+	}
+	return SomeValue{Value: value}
 }
 
 func (v DictionaryValue) Set(key Value, value Value) {
