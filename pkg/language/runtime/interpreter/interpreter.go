@@ -235,12 +235,12 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 
 func (interpreter *Interpreter) InvokeExportable(
 	functionName string,
-	inputs ...interface{},
+	arguments ...interface{},
 ) (
 	value ExportableValue,
 	err error,
 ) {
-	result, err := interpreter.Invoke(functionName, inputs...)
+	result, err := interpreter.Invoke(functionName, arguments...)
 	if err != nil {
 		return nil, err
 	}

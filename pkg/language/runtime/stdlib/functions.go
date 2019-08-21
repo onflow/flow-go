@@ -16,27 +16,27 @@ type StandardLibraryFunction struct {
 	ArgumentLabels []string
 }
 
-func (f StandardLibraryFunction) DeclarationName() string {
+func (f StandardLibraryFunction) ValueDeclarationName() string {
 	return f.Name
 }
 
-func (f StandardLibraryFunction) DeclarationType() sema.Type {
+func (f StandardLibraryFunction) ValueDeclarationType() sema.Type {
 	return f.Function.Type
 }
 
-func (StandardLibraryFunction) DeclarationKind() common.DeclarationKind {
+func (StandardLibraryFunction) ValueDeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindFunction
 }
 
-func (StandardLibraryFunction) DeclarationPosition() ast.Position {
+func (StandardLibraryFunction) ValueDeclarationPosition() ast.Position {
 	return ast.Position{}
 }
 
-func (StandardLibraryFunction) DeclarationIsConstant() bool {
+func (StandardLibraryFunction) ValueDeclarationIsConstant() bool {
 	return true
 }
 
-func (StandardLibraryFunction) DeclarationArgumentLabels() []string {
+func (StandardLibraryFunction) ValueDeclarationArgumentLabels() []string {
 	return nil
 }
 
@@ -84,7 +84,7 @@ func (e AssertionError) ImportLocation() ast.ImportLocation {
 	return e.Location.ImportLocation
 }
 
-// Assertion
+// AssertFunction
 
 var assertRequiredArgumentCount = 1
 
@@ -159,16 +159,16 @@ var PanicFunction = NewStandardLibraryFunction(
 	nil,
 )
 
-// BuiltIns
+// BuiltinFunctions
 
-var BuiltIns = []StandardLibraryFunction{
+var BuiltinFunctions = []StandardLibraryFunction{
 	AssertFunction,
 	PanicFunction,
 }
 
-// Log
+// LogFunction
 
-var Log = NewStandardLibraryFunction(
+var LogFunction = NewStandardLibraryFunction(
 	"log",
 	&sema.FunctionType{
 		ParameterTypes: []sema.Type{&sema.AnyType{}},
@@ -181,28 +181,8 @@ var Log = NewStandardLibraryFunction(
 	nil,
 )
 
-// Helpers
+// HelperFunctions
 
-var Helpers = []StandardLibraryFunction{
-	Log,
-}
-
-// ToValueDeclarations
-
-func ToValueDeclarations(functions []StandardLibraryFunction) []sema.ValueDeclaration {
-	valueDeclarations := make([]sema.ValueDeclaration, len(functions))
-	for i, function := range functions {
-		valueDeclarations[i] = function
-	}
-	return valueDeclarations
-}
-
-// ToValues
-
-func ToValues(functions []StandardLibraryFunction) map[string]interpreter.Value {
-	values := map[string]interpreter.Value{}
-	for _, function := range functions {
-		values[function.Name] = function.Function
-	}
-	return values
+var HelperFunctions = []StandardLibraryFunction{
+	LogFunction,
 }

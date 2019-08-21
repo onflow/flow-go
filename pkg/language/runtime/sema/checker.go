@@ -31,18 +31,19 @@ var beforeType = &FunctionType{
 // Checker
 
 type Checker struct {
-	Program                *ast.Program
-	PredefinedDeclarations []ValueDeclaration
-	ImportCheckers         map[ast.ImportLocation]*Checker
-	errors                 []error
-	valueActivations       *activations.Activations
-	typeActivations        *activations.Activations
-	functionContexts       []*functionContext
-	Globals                map[string]*Variable
-	inCondition            bool
-	Origins                *Origins
-	seenImports            map[ast.ImportLocation]bool
-	isChecked              bool
+	Program           *ast.Program
+	PredeclaredValues []ValueDeclaration
+	PredeclaredTypes  []TypeDeclaration
+	ImportCheckers    map[ast.ImportLocation]*Checker
+	errors            []error
+	valueActivations  *activations.Activations
+	typeActivations   *activations.Activations
+	functionContexts  []*functionContext
+	Globals           map[string]*Variable
+	inCondition       bool
+	Origins           *Origins
+	seenImports       map[ast.ImportLocation]bool
+	isChecked         bool
 	// TODO: refactor into fields on AST?
 	FunctionDeclarationFunctionTypes   map[*ast.FunctionDeclaration]*FunctionType
 	VariableDeclarationValueTypes      map[*ast.VariableDeclaration]Type
@@ -54,7 +55,11 @@ type Checker struct {
 	InterfaceDeclarationTypes          map[*ast.InterfaceDeclaration]*InterfaceType
 }
 
-func NewChecker(program *ast.Program, predefinedDeclarations []ValueDeclaration) (*Checker, error) {
+func NewChecker(
+	program *ast.Program,
+	predeclaredValues []ValueDeclaration,
+	predeclaredTypes []TypeDeclaration,
+) (*Checker, error) {
 	typeActivations := &activations.Activations{}
 	typeActivations.Push(baseTypes)
 
@@ -63,7 +68,8 @@ func NewChecker(program *ast.Program, predefinedDeclarations []ValueDeclaration)
 
 	checker := &Checker{
 		Program:                            program,
-		PredefinedDeclarations:             predefinedDeclarations,
+		PredeclaredValues:                  predeclaredValues,
+		PredeclaredTypes:                   predeclaredTypes,
 		ImportCheckers:                     map[ast.ImportLocation]*Checker{},
 		valueActivations:                   valueActivations,
 		typeActivations:                    typeActivations,
@@ -80,44 +86,61 @@ func NewChecker(program *ast.Program, predefinedDeclarations []ValueDeclaration)
 		InterfaceDeclarationTypes:          map[*ast.InterfaceDeclaration]*InterfaceType{},
 	}
 
-	for _, value := range predefinedDeclarations {
-		err := checker.DeclareValue(value)
-		if err != nil {
-			return nil, err
-		}
+	for _, declaration := range predeclaredValues {
+		checker.declareValue(declaration)
+	}
+
+	for _, declaration := range predeclaredTypes {
+		checker.declareTypeDeclaration(declaration)
+	}
+
+	err := checker.checkerError()
+	if err != nil {
+		return nil, err
 	}
 
 	return checker, nil
 }
 
 type ValueDeclaration interface {
-	DeclarationName() string
-	DeclarationType() Type
-	DeclarationKind() common.DeclarationKind
-	DeclarationPosition() ast.Position
-	DeclarationIsConstant() bool
-	DeclarationArgumentLabels() []string
+	ValueDeclarationName() string
+	ValueDeclarationType() Type
+	ValueDeclarationKind() common.DeclarationKind
+	ValueDeclarationPosition() ast.Position
+	ValueDeclarationIsConstant() bool
+	ValueDeclarationArgumentLabels() []string
 }
 
-// NOTE: consider declaring pre-defined values through NewChecker
-//
-func (checker *Checker) DeclareValue(declaration ValueDeclaration) error {
-	checker.errors = nil
-	identifier := declaration.DeclarationName()
+type TypeDeclaration interface {
+	TypeDeclarationName() string
+	TypeDeclarationType() Type
+	TypeDeclarationKind() common.DeclarationKind
+	TypeDeclarationPosition() ast.Position
+}
+
+func (checker *Checker) declareValue(declaration ValueDeclaration) {
+	identifier := declaration.ValueDeclarationName()
 	variable := checker.declareVariable(
 		identifier,
-		declaration.DeclarationType(),
-		declaration.DeclarationKind(),
-		declaration.DeclarationPosition(),
-		declaration.DeclarationIsConstant(),
-		declaration.DeclarationArgumentLabels(),
+		declaration.ValueDeclarationType(),
+		declaration.ValueDeclarationKind(),
+		declaration.ValueDeclarationPosition(),
+		declaration.ValueDeclarationIsConstant(),
+		declaration.ValueDeclarationArgumentLabels(),
 	)
 	checker.recordVariableOrigin(identifier, variable)
-	err := checker.checkerError()
-	if err != nil {
-		return err
+}
+
+func (checker *Checker) declareTypeDeclaration(declaration TypeDeclaration) {
+	identifier := ast.Identifier{
+		Identifier: declaration.TypeDeclarationName(),
+		Pos:        declaration.TypeDeclarationPosition(),
 	}
-	return nil
+	checker.declareType(
+		identifier,
+		declaration.TypeDeclarationType(),
+		declaration.TypeDeclarationKind(),
+	)
 }
 
 func (checker *Checker) IsChecked() bool {
@@ -2675,7 +2698,11 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 	var checkerErr *CheckerError
 	if !ok || importChecker == nil {
 		var err error
-		importChecker, err = NewChecker(imported, checker.PredefinedDeclarations)
+		importChecker, err = NewChecker(
+			imported,
+			checker.PredeclaredValues,
+			checker.PredeclaredTypes,
+		)
 		if err == nil {
 			checker.ImportCheckers[declaration.Location] = importChecker
 		}

@@ -15,12 +15,13 @@ import (
 )
 
 func parseAndCheck(code string) (*sema.Checker, error) {
-	return parseAndCheckWithExtra(code, nil, nil)
+	return parseAndCheckWithExtra(code, nil, nil, nil)
 }
 
 func parseAndCheckWithExtra(
 	code string,
-	declarations []sema.ValueDeclaration,
+	values []sema.ValueDeclaration,
+	types []sema.TypeDeclaration,
 	resolver ast.ImportResolver,
 ) (*sema.Checker, error) {
 	program, err := parser.ParseProgram(code)
@@ -35,7 +36,7 @@ func parseAndCheckWithExtra(
 		}
 	}
 
-	checker, err := sema.NewChecker(program, declarations)
+	checker, err := sema.NewChecker(program, values, types)
 	if err != nil {
 		return checker, err
 	}
@@ -2754,6 +2755,7 @@ func TestCheckNever(t *testing.T) {
 			stdlib.PanicFunction,
 		},
 		nil,
+		nil,
 	)
 
 	Expect(err).
@@ -3066,6 +3068,7 @@ func TestCheckNilCoalescingWithNever(t *testing.T) {
 			stdlib.PanicFunction,
 		},
 		nil,
+		nil,
 	)
 
 	Expect(err).
@@ -3268,6 +3271,7 @@ func TestCheckInterfaceUse(t *testing.T) {
 		[]sema.ValueDeclaration{
 			stdlib.PanicFunction,
 		},
+		nil,
 		nil,
 	)
 
@@ -3815,6 +3819,7 @@ func TestCheckInvalidRepeatedImport(t *testing.T) {
            import "unknown" 
         `,
 		nil,
+		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
 			return &ast.Program{}, nil
 		},
@@ -3845,6 +3850,7 @@ func TestCheckImportAll(t *testing.T) {
            let x = answer()
         `,
 		nil,
+		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
 			return checker.Program, nil
 		},
@@ -3870,6 +3876,7 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
 
            let x = answer()
         `,
+		nil,
 		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
 			return checker.Program, nil
@@ -3903,6 +3910,7 @@ func TestCheckImportSome(t *testing.T) {
            let x = answer()
         `,
 		nil,
+		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
 			return checker.Program, nil
 		},
@@ -3929,6 +3937,7 @@ func TestCheckInvalidImportedError(t *testing.T) {
 		`
            import x from "imported"
         `,
+		nil,
 		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
 			return imported, nil

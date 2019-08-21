@@ -1,9 +1,11 @@
 package runtime
 
 import (
+	"errors"
 	"math/big"
 
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
@@ -11,10 +13,11 @@ import (
 
 type EmulatorRuntimeAPI struct {
 	registers *etypes.RegistersView
+	Accounts  []types.Address
 }
 
 func NewEmulatorRuntimeAPI(registers *etypes.RegistersView) *EmulatorRuntimeAPI {
-	return &EmulatorRuntimeAPI{registers}
+	return &EmulatorRuntimeAPI{registers: registers}
 }
 
 func (i *EmulatorRuntimeAPI) GetValue(owner, controller, key []byte) ([]byte, error) {
@@ -67,6 +70,18 @@ func (i *EmulatorRuntimeAPI) GetAccount(address types.Address) *types.Account {
 		Code:       code,
 		PublicKeys: [][]byte{publicKey},
 	}
+}
+
+func (i *EmulatorRuntimeAPI) ResolveImport(location runtime.ImportLocation) ([]byte, error) {
+	// TODO:
+	return nil, errors.New("not supported")
+}
+func (i *EmulatorRuntimeAPI) GetSigningAccounts() []types.Address {
+	return i.Accounts
+}
+
+func (i *EmulatorRuntimeAPI) Log(message string) {
+	// TODO:
 }
 
 func keyLatestAccount() crypto.Hash {

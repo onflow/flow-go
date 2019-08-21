@@ -7,12 +7,14 @@ import (
 	"strings"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	runtimeErrors "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
-
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 type ImportLocation interface {
@@ -36,6 +38,10 @@ type Interface interface {
 	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public key and code.
 	CreateAccount(publicKey []byte, code []byte) (accountID []byte, err error)
+	// GetSigningAccounts returns the signing accounts.
+	GetSigningAccounts() []types.Address
+	// Log logs a string.
+	Log(string)
 }
 
 type Error struct {
@@ -142,6 +148,32 @@ var createAccountFunctionType = sema.FunctionType{
 	ReturnType: &sema.IntType{},
 }
 
+var logFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{&sema.AnyType{}},
+	ReturnType:     &sema.VoidType{},
+}
+
+var accountType = sema.StructureType{
+	Identifier: "Account",
+	Members: map[string]*sema.Member{
+		"address": {
+			Type: &sema.StringType{},
+		},
+		"storage": {
+			// TODO: storage type
+			Type: &sema.AnyType{},
+		},
+	},
+}
+
+var typeDeclarations = []sema.TypeDeclaration{
+	stdlib.StandardLibraryType{
+		Name: accountType.Identifier,
+		Type: &accountType,
+		Kind: common.DeclarationKindStructure,
+	},
+}
+
 func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (*ast.Program, error) {
 	return parser.ParseProgram(string(script))
 }
@@ -160,6 +192,8 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 			location = StringImportLocation(astLocation)
 		case ast.AddressImportLocation:
 			location = AddressImportLocation(astLocation)
+		default:
+			panic(runtimeErrors.UnreachableError{})
 		}
 		script, err := runtimeInterface.ResolveImport(location)
 		if err != nil {
@@ -174,7 +208,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	// TODO: maybe consider adding argument labels
 
 	functions := append(
-		stdlib.BuiltIns,
+		stdlib.BuiltinFunctions,
 		stdlib.NewStandardLibraryFunction(
 			"getValue",
 			&getValueFunctionType,
@@ -193,15 +227,63 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 			r.newCreateAccountFunction(runtimeInterface),
 			nil,
 		),
+		stdlib.NewStandardLibraryFunction(
+			"log",
+			&logFunctionType,
+			r.newLogFunction(runtimeInterface),
+			nil,
+		),
 	)
 
-	checker, err := sema.NewChecker(program, stdlib.ToValueDeclarations(functions))
+	valueDeclarations := stdlib.ToValueDeclarations(functions)
+
+	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations)
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
 
 	if err := checker.Check(); err != nil {
 		return nil, Error{[]error{err}}
+	}
+
+	main, ok := checker.Globals["main"]
+	if !ok {
+		// TODO: error because no main?
+		return nil, nil
+	}
+
+	mainFunctionType, ok := main.Type.(*sema.FunctionType)
+	if !ok {
+		err := errors.New("`main` is not a function")
+		return nil, Error{[]error{err}}
+	}
+
+	signingAccountAddresses := runtimeInterface.GetSigningAccounts()
+
+	// check parameter count
+
+	signingAccountsCount := len(signingAccountAddresses)
+	mainFunctionParameterCount := len(mainFunctionType.ParameterTypes)
+	if signingAccountsCount != mainFunctionParameterCount {
+		err := fmt.Errorf(
+			"parameter count mismatch for `main` function: expected %d, got %d",
+			signingAccountsCount,
+			mainFunctionParameterCount,
+		)
+		return nil, Error{[]error{err}}
+	}
+
+	// check parameter types
+
+	for _, parameterType := range mainFunctionType.ParameterTypes {
+		if !parameterType.Equal(&accountType) {
+			err := fmt.Errorf(
+				"parameter type mismatch for `main` function: expected `%s`, got `%s`",
+				&accountType,
+				parameterType,
+			)
+			return nil, Error{[]error{err}}
+		}
 	}
 
 	inter, err := interpreter.NewInterpreter(checker, stdlib.ToValues(functions))
@@ -213,11 +295,18 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		return nil, Error{[]error{err}}
 	}
 
-	if _, hasMain := inter.Globals["main"]; !hasMain {
-		return nil, nil
+	// TODO: invoke with account objects
+
+	signingAccounts := make([]interface{}, signingAccountsCount)
+
+	for i, address := range signingAccountAddresses {
+		// TODO:
+		signingAccounts[i] = interpreter.StructureValue{
+			"address": interpreter.StringValue(address.String()),
+		}
 	}
 
-	value, err := inter.InvokeExportable("main")
+	value, err := inter.InvokeExportable("main", signingAccounts...)
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
@@ -227,10 +316,6 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
-		if len(arguments) != 4 {
-			panic(fmt.Sprintf("setValue requires 4 parameters"))
-		}
-
 		owner, controller, key := r.getOwnerControllerKey(arguments)
 
 		// TODO: only integer values supported for now. written in internal byte representation
@@ -251,9 +336,6 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) int
 
 func (r *interpreterRuntime) newGetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
-		if len(arguments) != 3 {
-			panic(fmt.Sprintf("getValue requires 3 parameters"))
-		}
 
 		owner, controller, key := r.getOwnerControllerKey(arguments)
 
@@ -269,10 +351,6 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface Interface) int
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
-		if len(arguments) != 2 {
-			panic(fmt.Sprintf("createAccount requires 2 parameters"))
-		}
-
 		publicKey, err := toByteArray(arguments[0])
 		if err != nil {
 			panic(fmt.Sprintf("createAccount requires the first parameter to be an array"))
@@ -290,6 +368,13 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 
 		result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
 		return trampoline.Done{Result: result}
+	}
+}
+
+func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpreter.HostFunction {
+	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		runtimeInterface.Log(fmt.Sprint(arguments[0]))
+		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	}
 }
 

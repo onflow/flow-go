@@ -11,7 +11,7 @@ import (
 func TestOptionalSubtyping(t *testing.T) {
 	RegisterTestingT(t)
 
-	checker, err := NewChecker(&ast.Program{}, nil)
+	checker, err := NewChecker(&ast.Program{}, nil, nil)
 
 	Expect(err).
 		To(Not(HaveOccurred()))

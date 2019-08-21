@@ -43,7 +43,7 @@ func astToProtocolRange(startPos, endPos ast.Position) protocol.Range {
 	}
 }
 
-var standardLibraryFunctions = append(stdlib.BuiltIns, stdlib.Helpers...)
+var standardLibraryFunctions = append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
 
 type server struct {
 	checkers map[protocol.DocumentUri]*sema.Checker
