@@ -29,6 +29,7 @@ type Interpreter struct {
 	activations      *activations.Activations
 	Globals          map[string]*Variable
 	interfaces       map[string]*ast.InterfaceDeclaration
+	ImportLocation   ast.ImportLocation
 }
 
 func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
@@ -225,7 +226,7 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 		boxedArguments[i] = interpreter.box(argument, parameterTypes[i])
 	}
 
-	result := Run(function.invoke(boxedArguments, ast.Position{}))
+	result := Run(function.invoke(boxedArguments, Location{}))
 	if result == nil {
 		return nil, nil
 	}
@@ -449,8 +450,11 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 						panic(&ConditionError{
 							ConditionKind: condition.Kind,
 							Message:       message,
-							StartPos:      condition.Test.StartPosition(),
-							EndPos:        condition.Test.EndPosition(),
+							LocationRange: LocationRange{
+								ImportLocation: interpreter.ImportLocation,
+								StartPos:       condition.Test.StartPosition(),
+								EndPos:         condition.Test.EndPosition(),
+							},
 						})
 					})
 			}
@@ -975,10 +979,12 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 						argumentCopies[i] = interpreter.copyAndBox(argument, parameterTypes[i])
 					}
 
-					return function.invoke(
-						argumentCopies,
-						invocationExpression.StartPosition(),
-					)
+					// TODO: optimize: only potentially used by host-functions
+					location := Location{
+						Position:       invocationExpression.StartPosition(),
+						ImportLocation: interpreter.ImportLocation,
+					}
+					return function.invoke(argumentCopies, location)
 				})
 		})
 }
@@ -1108,7 +1114,7 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 	// TODO: function type
 	variable.Value = NewHostFunctionValue(
 		nil,
-		func(values []Value, position ast.Position) Trampoline {
+		func(values []Value, location Location) Trampoline {
 			structure := StructureValue{}
 
 			for name, function := range functions {
@@ -1325,6 +1331,8 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 	if err != nil {
 		panic(err)
 	}
+
+	subInterpreter.ImportLocation = declaration.Location
 
 	return subInterpreter.interpret().
 		Then(func(_ interface{}) {

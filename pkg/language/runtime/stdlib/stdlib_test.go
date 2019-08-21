@@ -28,14 +28,14 @@ func TestAssert(t *testing.T) {
 	Expect(err).
 		To(Equal(AssertionError{
 			Message:  "oops",
-			Position: ast.Position{},
+			Location: interpreter.Location{},
 		}))
 
 	_, err = inter.Invoke("assert", false)
 	Expect(err).
 		To(Equal(AssertionError{
 			Message:  "",
-			Position: ast.Position{},
+			Location: interpreter.Location{},
 		}))
 
 	_, err = inter.Invoke("assert", true, "oops")
@@ -63,6 +63,6 @@ func TestPanic(t *testing.T) {
 	Expect(err).
 		To(Equal(PanicError{
 			Message:  "oops",
-			Position: ast.Position{},
+			Location: interpreter.Location{},
 		}))
 }

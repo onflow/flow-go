@@ -61,15 +61,15 @@ func NewStandardLibraryFunction(
 
 type AssertionError struct {
 	Message  string
-	Position ast.Position
+	Location interpreter.Location
 }
 
 func (e AssertionError) StartPosition() ast.Position {
-	return e.Position
+	return e.Location.Position
 }
 
 func (e AssertionError) EndPosition() ast.Position {
-	return e.Position
+	return e.Location.Position
 }
 
 func (e AssertionError) Error() string {
@@ -78,6 +78,10 @@ func (e AssertionError) Error() string {
 		return message
 	}
 	return fmt.Sprintf("%s: %s", message, e.Message)
+}
+
+func (e AssertionError) ImportLocation() ast.ImportLocation {
+	return e.Location.ImportLocation
 }
 
 // Assertion
@@ -94,7 +98,7 @@ var AssertFunction = NewStandardLibraryFunction(
 		ReturnType:            &sema.VoidType{},
 		RequiredArgumentCount: &assertRequiredArgumentCount,
 	},
-	func(arguments []interpreter.Value, position ast.Position) trampoline.Trampoline {
+	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
 		result := arguments[0].(interpreter.BoolValue)
 		if !result {
 			var message string
@@ -103,7 +107,7 @@ var AssertFunction = NewStandardLibraryFunction(
 			}
 			panic(AssertionError{
 				Message:  message,
-				Position: position,
+				Location: location,
 			})
 		}
 		return trampoline.Done{}
@@ -115,19 +119,23 @@ var AssertFunction = NewStandardLibraryFunction(
 
 type PanicError struct {
 	Message  string
-	Position ast.Position
+	Location interpreter.Location
 }
 
 func (e PanicError) StartPosition() ast.Position {
-	return e.Position
+	return e.Location.Position
 }
 
 func (e PanicError) EndPosition() ast.Position {
-	return e.Position
+	return e.Location.Position
 }
 
 func (e PanicError) Error() string {
 	return fmt.Sprintf("panic: %s", e.Message)
+}
+
+func (e PanicError) ImportLocation() ast.ImportLocation {
+	return e.Location.ImportLocation
 }
 
 // PanicFunction
@@ -140,11 +148,11 @@ var PanicFunction = NewStandardLibraryFunction(
 		},
 		ReturnType: &sema.NeverType{},
 	},
-	func(arguments []interpreter.Value, position ast.Position) trampoline.Trampoline {
+	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
 		message := arguments[0].(interpreter.StringValue)
 		panic(PanicError{
 			Message:  string(message),
-			Position: position,
+			Location: location,
 		})
 		return trampoline.Done{}
 	},
@@ -166,7 +174,7 @@ var Log = NewStandardLibraryFunction(
 		ParameterTypes: []sema.Type{&sema.AnyType{}},
 		ReturnType:     &sema.VoidType{},
 	},
-	func(arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
+	func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 		fmt.Printf("%v\n", arguments[0])
 		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	},

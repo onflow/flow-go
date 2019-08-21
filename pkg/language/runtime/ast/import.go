@@ -77,3 +77,9 @@ func (AddressImportLocation) isImportLocation() {}
 func (l AddressImportLocation) String() string {
 	return fmt.Sprintf("%#x", []byte(l))
 }
+
+// HasImportLocation
+
+type HasImportLocation interface {
+	ImportLocation() ImportLocation
+}
