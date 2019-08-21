@@ -3949,3 +3949,110 @@ func TestCheckInvalidImportedError(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.ImportedProgramError{}))
 }
+
+func TestCheckDictionaryIndexing(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheckWithExtra(
+		`
+         let x = dict["abc"]
+	    `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.Globals["x"].Type).
+		To(Equal(&sema.IntType{}))
+}
+
+func TestCheckInvalidDictionaryIndexing(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+        let x = dict[true]
+	    `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
+}
+
+func TestCheckDictionaryIndexingAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+          fun test() {
+              dict["abc"] = 1
+          }
+	    `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidDictionaryIndexingAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+          fun test() {
+              dict["abc"] = true
+          }
+	    `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}

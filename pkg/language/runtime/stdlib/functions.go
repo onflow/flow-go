@@ -36,8 +36,8 @@ func (StandardLibraryFunction) ValueDeclarationIsConstant() bool {
 	return true
 }
 
-func (StandardLibraryFunction) ValueDeclarationArgumentLabels() []string {
-	return nil
+func (f StandardLibraryFunction) ValueDeclarationArgumentLabels() []string {
+	return f.ArgumentLabels
 }
 
 func NewStandardLibraryFunction(

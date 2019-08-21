@@ -227,20 +227,25 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 	return false
 }
 
-func (checker *Checker) IndexableElementType(ty Type) Type {
-	switch ty := ty.(type) {
+func (checker *Checker) IndexableElementType(indexedType Type) Type {
+	switch indexedType := indexedType.(type) {
 	case ArrayType:
-		return ty.elementType()
+		return indexedType.elementType()
+	case *DictionaryType:
+		return indexedType.ValueType
 	}
 
 	return nil
 }
 
 func (checker *Checker) IsIndexingType(indexingType Type, indexedType Type) bool {
-	switch indexedType.(type) {
-	// arrays can be index with integers
+	switch indexedType := indexedType.(type) {
+	// arrays can be indexed with integers
 	case ArrayType:
 		return checker.IsSubType(indexingType, &IntegerType{})
+	// dictionaries can be indexed with the dictionary type's key type
+	case *DictionaryType:
+		return checker.IsSubType(indexingType, indexedType.KeyType)
 	}
 
 	return false

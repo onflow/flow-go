@@ -521,3 +521,26 @@ func (t *InterfaceMetaType) Equal(other Type) bool {
 
 	return otherInterface.InterfaceType.Equal(t.InterfaceType)
 }
+
+// DictionaryType
+
+type DictionaryType struct {
+	KeyType   Type
+	ValueType Type
+}
+
+func (*DictionaryType) isType() {}
+
+func (t *DictionaryType) String() string {
+	return fmt.Sprintf("%s[%s]", t.ValueType, t.KeyType)
+}
+
+func (t *DictionaryType) Equal(other Type) bool {
+	otherDictionary, ok := other.(*DictionaryType)
+	if !ok {
+		return false
+	}
+
+	return otherDictionary.KeyType.Equal(t.KeyType) &&
+		otherDictionary.ValueType.Equal(t.ValueType)
+}
