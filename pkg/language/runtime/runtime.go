@@ -204,11 +204,9 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		return nil, Error{[]error{err}}
 	}
 
-	inter := interpreter.NewInterpreter(checker)
-	for _, function := range functions {
-		if err := inter.ImportFunction(function.Name, function.Function); err != nil {
-			return nil, Error{[]error{err}}
-		}
+	inter, err := interpreter.NewInterpreter(checker, stdlib.ToValues(functions))
+	if err != nil {
+		return nil, Error{[]error{err}}
 	}
 
 	if err := inter.Interpret(); err != nil {

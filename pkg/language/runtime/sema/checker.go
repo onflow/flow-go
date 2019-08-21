@@ -2661,6 +2661,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 				Pos:            declaration.LocationPos,
 			},
 		)
+		return nil
 	}
 
 	// TODO: consider access modifiers

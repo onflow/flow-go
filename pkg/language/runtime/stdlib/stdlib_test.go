@@ -19,11 +19,10 @@ func TestAssert(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	inter := interpreter.NewInterpreter(checker)
-	for _, function := range BuiltIns {
-		Expect(inter.ImportFunction(function.Name, function.Function)).
-			To(Not(HaveOccurred()))
-	}
+	inter, err := interpreter.NewInterpreter(checker, ToValues(BuiltIns))
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 
 	_, err = inter.Invoke("assert", false, "oops")
 	Expect(err).
@@ -55,11 +54,10 @@ func TestPanic(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	inter := interpreter.NewInterpreter(checker)
-	for _, function := range BuiltIns {
-		Expect(inter.ImportFunction(function.Name, function.Function)).
-			To(Not(HaveOccurred()))
-	}
+	inter, err := interpreter.NewInterpreter(checker, ToValues(BuiltIns))
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 
 	_, err = inter.Invoke("panic", "oops")
 	Expect(err).

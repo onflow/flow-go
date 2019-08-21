@@ -19,7 +19,11 @@ func parseCheckAndInterpret(code string) *interpreter.Interpreter {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	inter := interpreter.NewInterpreter(checker)
+	inter, err := interpreter.NewInterpreter(checker, nil)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
 	err = inter.Interpret()
 
 	Expect(err).
@@ -1071,9 +1075,13 @@ func TestInterpretHostFunction(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	inter := interpreter.NewInterpreter(checker)
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		map[string]interpreter.Value{
+			testFunction.Name: testFunction.Function,
+		},
+	)
 
-	err = inter.ImportFunction(testFunction.Name, testFunction.Function)
 	Expect(err).
 		To(Not(HaveOccurred()))
 

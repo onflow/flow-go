@@ -24,19 +24,30 @@ type functionReturn struct {
 // are treated like they are returning a value.
 
 type Interpreter struct {
-	Checker     *sema.Checker
-	activations *activations.Activations
-	Globals     map[string]*Variable
-	interfaces  map[string]*ast.InterfaceDeclaration
+	Checker          *sema.Checker
+	PredefinedValues map[string]Value
+	activations      *activations.Activations
+	Globals          map[string]*Variable
+	interfaces       map[string]*ast.InterfaceDeclaration
 }
 
-func NewInterpreter(checker *sema.Checker) *Interpreter {
-	return &Interpreter{
-		Checker:     checker,
-		activations: &activations.Activations{},
-		Globals:     map[string]*Variable{},
-		interfaces:  map[string]*ast.InterfaceDeclaration{},
+func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
+	interpreter := &Interpreter{
+		Checker:          checker,
+		PredefinedValues: predefinedValues,
+		activations:      &activations.Activations{},
+		Globals:          map[string]*Variable{},
+		interfaces:       map[string]*ast.InterfaceDeclaration{},
 	}
+
+	for name, value := range predefinedValues {
+		err := interpreter.ImportValue(name, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return interpreter, nil
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
@@ -77,30 +88,35 @@ func (interpreter *Interpreter) Interpret() (err error) {
 		}
 	}()
 
+	Run(interpreter.interpret())
+
+	return nil
+}
+
+func (interpreter *Interpreter) interpret() Trampoline {
+	return More(func() Trampoline {
+		interpreter.prepareInterpretation()
+
+		return interpreter.visitProgramDeclarations()
+	})
+}
+
+func (interpreter *Interpreter) prepareInterpretation() {
 	program := interpreter.Checker.Program
 
 	// pre-declare empty variables for all structures, interfaces, and function declarations
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
-
 	for _, declaration := range program.StructureDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
-
 	for _, declaration := range program.FunctionDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
-
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareInterface(declaration)
 	}
-
-	Run(More(func() Trampoline {
-		return interpreter.visitProgramDeclarations()
-	}))
-
-	return nil
 }
 
 func (interpreter *Interpreter) visitProgramDeclarations() Trampoline {
@@ -260,14 +276,15 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	return Done{}
 }
 
-func (interpreter *Interpreter) ImportFunction(name string, function HostFunctionValue) error {
+// NOTE: consider using NewInterpreter if the value should be predefined in all programs
+func (interpreter *Interpreter) ImportValue(name string, value Value) error {
 	if _, ok := interpreter.Globals[name]; ok {
 		return &RedeclarationError{
 			Name: name,
 		}
 	}
 
-	variable := interpreter.declareVariable(name, function)
+	variable := interpreter.declareVariable(name, value)
 	interpreter.Globals[name] = variable
 	return nil
 }
@@ -1288,5 +1305,33 @@ func (interpreter *Interpreter) declareInterfaceMetaType(declaration *ast.Interf
 }
 
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
-	return nil
+	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location]
+
+	subInterpreter, err := NewInterpreter(importedChecker, interpreter.PredefinedValues)
+	if err != nil {
+		panic(err)
+	}
+
+	return subInterpreter.interpret().
+		Then(func(_ interface{}) {
+			// determine which identifiers are imported /
+			// which variables need to be declared
+
+			var variables map[string]*Variable
+			identifierLength := len(declaration.Identifiers)
+			if identifierLength > 0 {
+				variables = make(map[string]*Variable, identifierLength)
+				for _, identifier := range declaration.Identifiers {
+					variables[identifier.Identifier] =
+						subInterpreter.Globals[identifier.Identifier]
+				}
+			} else {
+				variables = subInterpreter.Globals
+			}
+
+			// set variables for all imported values
+			for name, variable := range variables {
+				interpreter.setVariable(name, variable)
+			}
+		})
 }

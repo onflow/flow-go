@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -68,4 +69,46 @@ func TestRuntimeGetAndSetValue(t *testing.T) {
 
 	Expect(state.Int64()).
 		To(Equal(int64(5)))
+}
+
+func TestRuntimeImport(t *testing.T) {
+	RegisterTestingT(t)
+
+	runtime := NewInterpreterRuntime()
+
+	importedScript := []byte(`
+       fun answer(): Int {
+           return 42
+		}
+	`)
+
+	script := []byte(`
+       import "imported"
+
+       fun main(): Int {
+           let answer =  answer()
+           if answer != 42 {
+               panic("?!")
+           }
+           return answer
+		}
+	`)
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+			switch location {
+			case StringImportLocation("imported"):
+				return importedScript, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
+	}
+
+	value, err := runtime.ExecuteScript(script, runtimeInterface)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(value).To(Equal(42))
 }

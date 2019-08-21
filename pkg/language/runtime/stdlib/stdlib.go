@@ -188,3 +188,13 @@ func ToValueDeclarations(functions []StandardLibraryFunction) []sema.ValueDeclar
 	}
 	return valueDeclarations
 }
+
+// ToValues
+
+func ToValues(functions []StandardLibraryFunction) map[string]interpreter.Value {
+	values := map[string]interpreter.Value{}
+	for _, function := range functions {
+		values[function.Name] = function.Function
+	}
+	return values
+}
