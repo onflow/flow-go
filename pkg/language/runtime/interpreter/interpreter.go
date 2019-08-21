@@ -1323,6 +1323,15 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 	subInterpreter, err := NewInterpreter(importedChecker, interpreter.PredefinedValues)
 	if err != nil {
+		// if the sub-interpreter itself import another program and that one failed,
+		// report it as-is; otherwise, report the error wrapped with the location
+		if _, ok := err.(*ImportedProgramError); !ok {
+			err = &ImportedProgramError{
+				ProgramError:   err,
+				ImportLocation: declaration.Location,
+			}
+		}
+
 		panic(err)
 	}
 

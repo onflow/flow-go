@@ -135,3 +135,14 @@ type RedeclarationError struct {
 func (e *RedeclarationError) Error() string {
 	return fmt.Sprintf("cannot redeclare: `%s` is already declared", e.Name)
 }
+
+// ImportedProgramError
+
+type ImportedProgramError struct {
+	ProgramError   error
+	ImportLocation ast.ImportLocation
+}
+
+func (e *ImportedProgramError) Error() string {
+	return fmt.Sprintf("%s: %s", e.ImportLocation, e.ProgramError.Error())
+}
