@@ -4056,3 +4056,27 @@ func TestCheckInvalidDictionaryIndexingAssignment(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
+
+func TestCheckFailableDowncasting(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int? = 1 as? Int
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidFailableDowncasting(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Bool? = 1 as? Int
+   `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}

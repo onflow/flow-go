@@ -2789,6 +2789,6 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 }
 
 func (checker *Checker) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
-	// TODO:
-	return nil
+	convertedType := checker.ConvertType(expression.Type)
+	return &OptionalType{Type: convertedType}
 }
