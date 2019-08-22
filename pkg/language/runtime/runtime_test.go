@@ -15,6 +15,7 @@ type testRuntimeInterface struct {
 	getValue           func(controller, owner, key []byte) (value []byte, err error)
 	setValue           func(controller, owner, key, value []byte) (err error)
 	createAccount      func(publicKey, code []byte) (accountID []byte, err error)
+	updateAccountCode  func(accountID, code []byte) (err error)
 	getSigningAccounts func() []types.Address
 	log                func(string)
 }
@@ -33,6 +34,10 @@ func (i *testRuntimeInterface) SetValue(controller, owner, key, value []byte) (e
 
 func (i *testRuntimeInterface) CreateAccount(publicKey, code []byte) (accountID []byte, err error) {
 	return i.createAccount(publicKey, code)
+}
+
+func (i *testRuntimeInterface) UpdateAccountCode(accountID, code []byte) (err error) {
+	return i.updateAccountCode(accountID, code)
 }
 
 func (i *testRuntimeInterface) GetSigningAccounts() []types.Address {
@@ -74,6 +79,9 @@ func TestRuntimeGetAndSetValue(t *testing.T) {
 		},
 		createAccount: func(key, code []byte) (accountID []byte, err error) {
 			return nil, nil
+		},
+		updateAccountCode: func(accountID, code []byte) (err error) {
+			return nil
 		},
 	}
 
