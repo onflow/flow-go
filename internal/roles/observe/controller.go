@@ -47,6 +47,6 @@ func (c *Controller) GetAccount(context.Context, *observeSvc.GetAccountRequest) 
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (c *Controller) CallContract(context.Context, *observeSvc.CallContractRequest) (*observeSvc.CallContractResponse, error) {
+func (c *Controller) CallScript(context.Context, *observeSvc.CallScriptRequest) (*observeSvc.CallScriptResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
