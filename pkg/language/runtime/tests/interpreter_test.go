@@ -15,11 +15,20 @@ import (
 )
 
 func parseCheckAndInterpret(code string) *interpreter.Interpreter {
-	checker, err := parseAndCheck(code)
+	return parseCheckAndInterpretWithExtra(code, nil, nil)
+}
+
+func parseCheckAndInterpretWithExtra(
+	code string,
+	predefinedValueTypes []sema.ValueDeclaration,
+	predefinedValues map[string]interpreter.Value,
+) *interpreter.Interpreter {
+
+	checker, err := parseAndCheckWithExtra(code, predefinedValueTypes, nil, nil)
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	inter, err := interpreter.NewInterpreter(checker, nil)
+	inter, err := interpreter.NewInterpreter(checker, predefinedValues)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -2634,4 +2643,91 @@ func TestInterpretImportError(t *testing.T) {
 
 	Expect(err.(stdlib.PanicError).Message).
 		To(Equal("?!"))
+}
+
+func TestInterpretDictionaryIndexing(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpretWithExtra(
+		`
+          let x = dict["abc"]
+        `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		map[string]interpreter.Value{
+			"dict": interpreter.DictionaryValue{
+				interpreter.StringValue("abc"): interpreter.IntValue{Int: big.NewInt(42)},
+			},
+		},
+	)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(42)},
+			}))
+}
+
+func TestInterpretDictionaryIndexingNotFound(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpretWithExtra(
+		`
+          let x = dict["xyz"]
+        `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		map[string]interpreter.Value{
+			"dict": interpreter.DictionaryValue{},
+		},
+	)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NilValue{}))
+}
+
+func TestInterpretDictionaryIndexingAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpretWithExtra(
+		`
+           fun test() {
+               dict["abc"] = 23
+           }
+        `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		map[string]interpreter.Value{
+			"dict": interpreter.DictionaryValue{
+				interpreter.StringValue("abc"): interpreter.IntValue{Int: big.NewInt(42)},
+			},
+		},
+	)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+
+	Expect(inter.Globals["dict"].Value.(interpreter.DictionaryValue).Get(interpreter.StringValue("abc"))).
+		To(Equal(interpreter.SomeValue{Value: interpreter.IntValue{Int: big.NewInt(23)}}))
 }
