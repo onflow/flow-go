@@ -2,13 +2,13 @@ package runtime
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
+	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
-
-	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 )
 
 type EmulatorRuntimeAPI struct {
@@ -51,6 +51,17 @@ func (i *EmulatorRuntimeAPI) CreateAccount(publicKey, code []byte) (id []byte, e
 	return address.Bytes(), nil
 }
 
+func (i *EmulatorRuntimeAPI) UpdateAccountCode(accountID, code []byte) (err error) {
+	_, exists := i.registers.Get(fullKey(accountID, []byte{}, keyBalance()))
+	if !exists {
+		return fmt.Errorf("Account with ID %s does not exist", accountID)
+	}
+
+	i.registers.Set(fullKey(accountID, accountID, keyCode()), code)
+
+	return nil
+}
+
 func (i *EmulatorRuntimeAPI) GetAccount(address types.Address) *types.Account {
 	accountID := address.Bytes()
 
@@ -76,6 +87,7 @@ func (i *EmulatorRuntimeAPI) ResolveImport(location runtime.ImportLocation) ([]b
 	// TODO:
 	return nil, errors.New("not supported")
 }
+
 func (i *EmulatorRuntimeAPI) GetSigningAccounts() []types.Address {
 	return i.Accounts
 }

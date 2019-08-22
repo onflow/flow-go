@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"time"
 
@@ -16,58 +17,67 @@ import (
 // communicate with each other and place gossip messages.
 
 func main() {
-	portPool := []string{"50000", "50001", "50002"}
+	portPool := []string{"127.0.0.1:50000", "127.0.0.1:50001", "127.0.0.1:50002"}
 
-	servePort, err := pickPort(portPool)
+	ln, err := pickPort(portPool)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	node := async.NewNode(fmt.Sprintf("%s:%s", "127.0.0.1", servePort))
+	servePort := ln.Addr().String()
 
-	node.RegisterFunc("Time", func(msg *shared.GossipMessage) error {
+	fmt.Println(servePort)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	node := async.NewNode()
+
+	node.RegisterFunc("Time", func(msg *shared.GossipMessage) (*shared.MessageReply, error) {
 		time.Sleep(2 * time.Second)
 		fmt.Printf("The time is: %v\n", time.Now().Unix())
-		return nil
+		return &shared.MessageReply{TextResponse: "text response"}, nil
 	})
 
-	go node.Serve()
+	go node.Serve(ln)
 
 	peers := make([]string, 0)
 	for _, port := range portPool {
 		if port != servePort {
-			peers = append(peers, fmt.Sprintf("%s:%s", "127.0.0.1", port))
+			peers = append(peers, port)
 		}
 	}
 
 	t := time.Tick(5 * time.Second)
 
+	r := rand.New(rand.NewSource(99))
 	for {
 		select {
 		case <-t:
 			msgRequest := shared.MessageRequest{Text: "test"}
 			msg := &shared.GossipMessage{
+				Uuid:       &shared.UUID{Value: fmt.Sprintf("%d", r.Int())},
 				Payload:    &shared.GossipMessage_MessageRequest{MessageRequest: &msgRequest},
 				Method:     "Time",
 				Recipients: peers,
 			}
 			log.Println("Gossiping")
-			_, err := node.Gossip(context.Background(), msg)
+			rep, err := node.Gossip(context.Background(), msg)
 			if err != nil {
 				log.Println(err)
 			}
+			log.Println(rep[0])
 		}
 	}
 }
 
-func pickPort(portPool []string) (string, error) {
+func pickPort(portPool []string) (net.Listener, error) {
 	for _, port := range portPool {
-		ln, err := net.Listen("tcp", ":"+port)
+		ln, err := net.Listen("tcp4", port)
 		if err == nil {
-			defer ln.Close()
-			return port, nil
+			return ln, nil
 		}
 	}
 
-	return "", fmt.Errorf("could not find an empty port in the given pool")
+	return nil, fmt.Errorf("could not find an empty port in the given pool")
 }

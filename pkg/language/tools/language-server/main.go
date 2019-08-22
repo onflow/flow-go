@@ -158,7 +158,7 @@ func (s server) DidChangeTextDocument(
 		// check program
 
 		valueDeclarations := stdlib.ToValueDeclarations(standardLibraryFunctions)
-		checker, err := sema.NewChecker(program, valueDeclarations)
+		checker, err := sema.NewChecker(program, valueDeclarations, nil)
 		if err != nil {
 			panic(err)
 		}
