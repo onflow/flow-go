@@ -166,6 +166,12 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	var loggedMessage string
 
 	runtimeInterface := &testRuntimeInterface{
+		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+			return nil, nil
+		},
+		setValue: func(controller, owner, key, value []byte) (err error) {
+			return nil
+		},
 		getSigningAccounts: func() []types.Address {
 			return []types.Address{[20]byte{42}}
 		},
@@ -182,7 +188,7 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	Expect(value).To(Equal(42))
 
 	Expect(loggedMessage).
-		To(Equal("0x2a00000000000000000000000000000000000000"))
+		To(Equal(`"0x2a00000000000000000000000000000000000000"`))
 }
 
 func TestRuntimeStorage(t *testing.T) {
