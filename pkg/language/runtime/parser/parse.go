@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"io/ioutil"
 	goRuntime "runtime"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr"
@@ -124,4 +125,20 @@ func parse(
 	}
 
 	return parsed.Accept(&ProgramVisitor{}), errors
+}
+
+func ParseProgramFromFile(filename string) (program *ast.Program, code string, err error) {
+	var data []byte
+	data, err = ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, "", err
+	}
+
+	code = string(data)
+
+	program, err = ParseProgram(code)
+	if err != nil {
+		return nil, code, err
+	}
+	return program, code, nil
 }

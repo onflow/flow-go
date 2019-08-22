@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -102,6 +103,19 @@ func convertError(err error) *protocol.Diagnostic {
 	}
 }
 
+func (s server) parse(connection protocol.Connection, code, location string) (*ast.Program, error) {
+	start := time.Now()
+	program, err := parser.ParseProgram(code)
+	elapsed := time.Since(start)
+
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("parsing %s took %s", location, elapsed),
+	})
+
+	return program, err
+}
+
 func (s server) DidChangeTextDocument(
 	connection protocol.Connection,
 	params *protocol.DidChangeTextDocumentParams,
@@ -109,14 +123,7 @@ func (s server) DidChangeTextDocument(
 	uri := params.TextDocument.URI
 	code := params.ContentChanges[0].Text
 
-	start := time.Now()
-	program, err := parser.ParseProgram(code)
-	elapsed := time.Since(start)
-
-	connection.LogMessage(&protocol.LogMessageParams{
-		Type:    protocol.Info,
-		Message: fmt.Sprintf("parsing took %s", elapsed),
-	})
+	program, err := s.parse(connection, code, string(uri))
 
 	diagnostics := []protocol.Diagnostic{}
 
@@ -139,6 +146,14 @@ func (s server) DidChangeTextDocument(
 		}
 	} else {
 		// no parsing errors
+
+		// resolve imports
+
+		mainPath := strings.TrimPrefix(string(uri), "file://")
+
+		_ = program.ResolveImports(func(location ast.ImportLocation) (program *ast.Program, err error) {
+			return s.resolveImport(connection, mainPath, location)
+		})
 
 		// check program
 
@@ -249,6 +264,33 @@ func (server) Shutdown(connection protocol.Connection) error {
 func (server) Exit(connection protocol.Connection) error {
 	os.Exit(0)
 	return nil
+}
+
+func (s server) resolveImport(
+	connection protocol.Connection,
+	mainPath string,
+	location ast.ImportLocation,
+) (*ast.Program, error) {
+	stringLocation, ok := location.(ast.StringImportLocation)
+	// TODO: publish diagnostic type is not supported?
+	if !ok {
+		return nil, nil
+	}
+
+	filename := path.Join(path.Dir(mainPath), string(stringLocation))
+
+	// TODO: publish diagnostic import is self?
+	if filename == mainPath {
+		return nil, nil
+	}
+
+	program, _, err := parser.ParseProgramFromFile(filename)
+	// TODO: publish diagnostic file does not exist?
+	if err != nil {
+		return nil, nil
+	}
+
+	return program, nil
 }
 
 func main() {

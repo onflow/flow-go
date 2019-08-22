@@ -41,6 +41,8 @@ type Checker struct {
 	Globals                map[string]*Variable
 	inCondition            bool
 	Origins                *Origins
+	seenImports            map[ast.ImportLocation]bool
+	isChecked              bool
 	// TODO: refactor into fields on AST?
 	FunctionDeclarationFunctionTypes   map[*ast.FunctionDeclaration]*FunctionType
 	VariableDeclarationValueTypes      map[*ast.VariableDeclaration]Type
@@ -67,6 +69,7 @@ func NewChecker(program *ast.Program, predefinedDeclarations []ValueDeclaration)
 		typeActivations:                    typeActivations,
 		Globals:                            map[string]*Variable{},
 		Origins:                            NewOrigins(),
+		seenImports:                        map[ast.ImportLocation]bool{},
 		FunctionDeclarationFunctionTypes:   map[*ast.FunctionDeclaration]*FunctionType{},
 		VariableDeclarationValueTypes:      map[*ast.VariableDeclaration]Type{},
 		AssignmentStatementTargetTypes:     map[*ast.AssignmentStatement]Type{},
@@ -96,6 +99,8 @@ type ValueDeclaration interface {
 	DeclarationArgumentLabels() []string
 }
 
+// NOTE: consider declaring pre-defined values through NewChecker
+//
 func (checker *Checker) DeclareValue(declaration ValueDeclaration) error {
 	checker.errors = nil
 	identifier := declaration.DeclarationName()
@@ -108,16 +113,31 @@ func (checker *Checker) DeclareValue(declaration ValueDeclaration) error {
 		declaration.DeclarationArgumentLabels(),
 	)
 	checker.recordVariableOrigin(identifier, variable)
-	return checker.checkerError()
+	err := checker.checkerError()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (checker *Checker) IsChecked() bool {
+	return checker.isChecked
 }
 
 func (checker *Checker) Check() error {
-	checker.errors = nil
-	checker.Program.Accept(checker)
-	return checker.checkerError()
+	if !checker.IsChecked() {
+		checker.errors = nil
+		checker.Program.Accept(checker)
+		checker.isChecked = true
+	}
+	err := checker.checkerError()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (checker *Checker) checkerError() error {
+func (checker *Checker) checkerError() *CheckerError {
 	if len(checker.errors) > 0 {
 		return &CheckerError{
 			Errors: checker.errors,
@@ -465,7 +485,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declarationType = checker.ConvertType(declaration.Type)
 
 		// check the value type is a subtype of the declaration type
-		if declarationType != nil && valueType != nil && !valueType.Equal(&InvalidType{}) {
+		if declarationType != nil && valueType != nil && !isInvalidType(valueType) {
 
 			if isOptionalBinding {
 				if optionalValueType != nil &&
@@ -686,7 +706,7 @@ func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
 
 	testType := condition.Test.Accept(checker).(Type)
 
-	if !testType.Equal(&InvalidType{}) && !checker.IsSubType(testType, &BoolType{}) {
+	if !isInvalidType(testType) && !checker.IsSubType(testType, &BoolType{}) {
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: &BoolType{},
@@ -703,7 +723,7 @@ func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
 
 		messageType := condition.Message.Accept(checker).(Type)
 
-		if !messageType.Equal(&InvalidType{}) && !checker.IsSubType(messageType, &StringType{}) {
+		if !isInvalidType(messageType) && !checker.IsSubType(messageType, &StringType{}) {
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: &StringType{},
@@ -727,7 +747,7 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	}
 
 	valueType := statement.Expression.Accept(checker).(Type)
-	_, valueIsInvalid := valueType.(*InvalidType)
+	valueIsInvalid := isInvalidType(valueType)
 
 	returnType := checker.currentFunction().returnType
 
@@ -743,7 +763,10 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 				)
 			}
 		} else {
-			if !checker.IsSubType(valueType, returnType) {
+			if !valueIsInvalid &&
+				!isInvalidType(returnType) &&
+				!checker.IsSubType(valueType, returnType) {
+
 				checker.report(
 					&TypeMismatchError{
 						ExpectedType: returnType,
@@ -914,7 +937,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 		}
 
 		// check value type is subtype of variable type
-		if !valueType.Equal(&InvalidType{}) &&
+		if !isInvalidType(valueType) &&
 			!checker.IsSubType(valueType, variable.Type) {
 
 			checker.report(
@@ -943,7 +966,7 @@ func (checker *Checker) visitIndexExpressionAssignment(
 		return &InvalidType{}
 	}
 
-	if !elementType.Equal(&InvalidType{}) &&
+	if !isInvalidType(elementType) &&
 		!checker.IsSubType(valueType, elementType) {
 
 		checker.report(
@@ -988,17 +1011,17 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	member.IsInitialized = true
 
 	// if value type is valid, check value can be assigned to member
-	if _, ok := valueType.(*InvalidType); !ok {
-		if !checker.IsSubType(valueType, member.Type) {
-			checker.report(
-				&TypeMismatchError{
-					ExpectedType: member.Type,
-					ActualType:   valueType,
-					StartPos:     assignment.Value.StartPosition(),
-					EndPos:       assignment.Value.EndPosition(),
-				},
-			)
-		}
+	if !isInvalidType(valueType) &&
+		!checker.IsSubType(valueType, member.Type) {
+
+		checker.report(
+			&TypeMismatchError{
+				ExpectedType: member.Type,
+				ActualType:   valueType,
+				StartPos:     assignment.Value.StartPosition(),
+				EndPos:       assignment.Value.EndPosition(),
+			},
+		)
 	}
 
 	return member.Type
@@ -1018,7 +1041,7 @@ func (checker *Checker) visitIndexingExpression(indexedExpression, indexingExpre
 	// check indexed expression's type is indexable
 	// by getting the expected element
 
-	if _, ok := indexedType.(*InvalidType); ok {
+	if isInvalidType(indexedType) {
 		return &InvalidType{}
 	}
 
@@ -1096,8 +1119,8 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 
 	leftType, rightType := checker.visitBinaryOperation(expression)
 
-	_, leftIsInvalid := leftType.(*InvalidType)
-	_, rightIsInvalid := rightType.(*InvalidType)
+	leftIsInvalid := isInvalidType(leftType)
+	rightIsInvalid := isInvalidType(rightType)
 	anyInvalid := leftIsInvalid || rightIsInvalid
 
 	operation := expression.Operation
@@ -1594,7 +1617,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	functionType, ok := expressionType.(*FunctionType)
 	if !ok {
 
-		if _, ok := expressionType.(*InvalidType); !ok {
+		if !isInvalidType(expressionType) {
 			checker.report(
 				&NotCallableError{
 					Type:     expressionType,
@@ -2065,7 +2088,7 @@ func (checker *Checker) conformances(structure *ast.StructureDeclaration) []*Int
 		if interfaceType, ok := convertedType.(*InterfaceType); ok {
 			interfaceTypes = append(interfaceTypes, interfaceType)
 
-		} else if _, ok := convertedType.(*InvalidType); !ok {
+		} else if !isInvalidType(convertedType) {
 			checker.report(
 				&InvalidConformanceError{
 					Type: convertedType,
@@ -2636,7 +2659,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		return nil
 	}
 
-	if checker.ImportCheckers[declaration.Location] != nil {
+	if checker.seenImports[declaration.Location] {
 		checker.report(
 			&RepeatedImportError{
 				ImportLocation: declaration.Location,
@@ -2646,17 +2669,26 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		)
 		return nil
 	}
+	checker.seenImports[declaration.Location] = true
 
-	importChecker, err := NewChecker(imported, checker.PredefinedDeclarations)
-	if err == nil {
-		checker.ImportCheckers[declaration.Location] = importChecker
-		err = importChecker.Check()
+	importChecker, ok := checker.ImportCheckers[declaration.Location]
+	var checkerErr *CheckerError
+	if !ok || importChecker == nil {
+		var err error
+		importChecker, err = NewChecker(imported, checker.PredefinedDeclarations)
+		if err == nil {
+			checker.ImportCheckers[declaration.Location] = importChecker
+		}
 	}
 
-	if err != nil {
+	// NOTE: ignore generic `error` result, get internal *CheckerError
+	_ = importChecker.Check()
+	checkerErr = importChecker.checkerError()
+
+	if checkerErr != nil {
 		checker.report(
 			&ImportedProgramError{
-				CheckerError:   err.(*CheckerError),
+				CheckerError:   checkerErr,
 				ImportLocation: declaration.Location,
 				Pos:            declaration.LocationPos,
 			},

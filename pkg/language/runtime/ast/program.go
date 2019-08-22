@@ -96,7 +96,12 @@ func (p *Program) resolveImports(
 			if err != nil {
 				return err
 			}
-			resolved[location] = imported
+			if imported != nil {
+				resolved[location] = imported
+			}
+		}
+		if imported == nil {
+			continue
 		}
 		imports[location] = imported
 		if resolving[location] {

@@ -76,6 +76,11 @@ func (*InvalidType) Equal(other Type) bool {
 	return ok
 }
 
+func isInvalidType(ty Type) bool {
+	_, ok := ty.(*InvalidType)
+	return ok
+}
+
 // OptionalType represents the optional variant of another type
 type OptionalType struct {
 	Type Type
