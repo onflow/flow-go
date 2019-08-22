@@ -215,7 +215,8 @@ func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
 // CallScript executes a read-only script against the world state and returns the result.
 func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
 	registers := b.pendingWorldState.Registers.NewView()
-	return b.computer.ExecuteScript(script, registers)
+	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
+	return b.computer.ExecuteScript(script, runtimeAPI)
 }
 
 // CallScriptAtVersion executes a read-only script against a specified world state and returns the result.
@@ -226,7 +227,8 @@ func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.H
 	}
 
 	registers := ws.Registers.NewView()
-	return b.computer.ExecuteScript(script, registers)
+	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
+	return b.computer.ExecuteScript(script, runtimeAPI)
 }
 
 // CommitBlock takes all pending transactions and commits them into a block.

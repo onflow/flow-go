@@ -32,6 +32,12 @@ func (s *BaseStrictusListener) EnterDeclaration(ctx *DeclarationContext) {}
 // ExitDeclaration is called when production declaration is exited.
 func (s *BaseStrictusListener) ExitDeclaration(ctx *DeclarationContext) {}
 
+// EnterImportDeclaration is called when production importDeclaration is entered.
+func (s *BaseStrictusListener) EnterImportDeclaration(ctx *ImportDeclarationContext) {}
+
+// ExitImportDeclaration is called when production importDeclaration is exited.
+func (s *BaseStrictusListener) ExitImportDeclaration(ctx *ImportDeclarationContext) {}
+
 // EnterAccess is called when production access is entered.
 func (s *BaseStrictusListener) EnterAccess(ctx *AccessContext) {}
 
@@ -44,11 +50,29 @@ func (s *BaseStrictusListener) EnterStructureDeclaration(ctx *StructureDeclarati
 // ExitStructureDeclaration is called when production structureDeclaration is exited.
 func (s *BaseStrictusListener) ExitStructureDeclaration(ctx *StructureDeclarationContext) {}
 
+// EnterConformances is called when production conformances is entered.
+func (s *BaseStrictusListener) EnterConformances(ctx *ConformancesContext) {}
+
+// ExitConformances is called when production conformances is exited.
+func (s *BaseStrictusListener) ExitConformances(ctx *ConformancesContext) {}
+
+// EnterVariableKind is called when production variableKind is entered.
+func (s *BaseStrictusListener) EnterVariableKind(ctx *VariableKindContext) {}
+
+// ExitVariableKind is called when production variableKind is exited.
+func (s *BaseStrictusListener) ExitVariableKind(ctx *VariableKindContext) {}
+
 // EnterField is called when production field is entered.
 func (s *BaseStrictusListener) EnterField(ctx *FieldContext) {}
 
 // ExitField is called when production field is exited.
 func (s *BaseStrictusListener) ExitField(ctx *FieldContext) {}
+
+// EnterInterfaceDeclaration is called when production interfaceDeclaration is entered.
+func (s *BaseStrictusListener) EnterInterfaceDeclaration(ctx *InterfaceDeclarationContext) {}
+
+// ExitInterfaceDeclaration is called when production interfaceDeclaration is exited.
+func (s *BaseStrictusListener) ExitInterfaceDeclaration(ctx *InterfaceDeclarationContext) {}
 
 // EnterInitializer is called when production initializer is entered.
 func (s *BaseStrictusListener) EnterInitializer(ctx *InitializerContext) {}
@@ -224,6 +248,12 @@ func (s *BaseStrictusListener) EnterRelationalExpression(ctx *RelationalExpressi
 // ExitRelationalExpression is called when production relationalExpression is exited.
 func (s *BaseStrictusListener) ExitRelationalExpression(ctx *RelationalExpressionContext) {}
 
+// EnterNilCoalescingExpression is called when production nilCoalescingExpression is entered.
+func (s *BaseStrictusListener) EnterNilCoalescingExpression(ctx *NilCoalescingExpressionContext) {}
+
+// ExitNilCoalescingExpression is called when production nilCoalescingExpression is exited.
+func (s *BaseStrictusListener) ExitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) {}
+
 // EnterAdditiveExpression is called when production additiveExpression is entered.
 func (s *BaseStrictusListener) EnterAdditiveExpression(ctx *AdditiveExpressionContext) {}
 
@@ -349,6 +379,12 @@ func (s *BaseStrictusListener) EnterBooleanLiteral(ctx *BooleanLiteralContext) {
 
 // ExitBooleanLiteral is called when production booleanLiteral is exited.
 func (s *BaseStrictusListener) ExitBooleanLiteral(ctx *BooleanLiteralContext) {}
+
+// EnterNilLiteral is called when production nilLiteral is entered.
+func (s *BaseStrictusListener) EnterNilLiteral(ctx *NilLiteralContext) {}
+
+// ExitNilLiteral is called when production nilLiteral is exited.
+func (s *BaseStrictusListener) ExitNilLiteral(ctx *NilLiteralContext) {}
 
 // EnterStringLiteral is called when production stringLiteral is entered.
 func (s *BaseStrictusListener) EnterStringLiteral(ctx *StringLiteralContext) {}

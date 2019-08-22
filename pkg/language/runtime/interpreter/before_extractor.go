@@ -31,7 +31,7 @@ func (BeforeExtractor) ExtractInvocation(
 	invokedExpression := expression.InvokedExpression
 
 	if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
-		if identifierExpression.Identifier == sema.BeforeIdentifier {
+		if identifierExpression.Identifier.Identifier == sema.BeforeIdentifier {
 
 			// semantic analysis should have rejected calls
 			// which do not have exactly one argument
@@ -50,8 +50,12 @@ func (BeforeExtractor) ExtractInvocation(
 			// create a fresh identifier which has the rewritten argument
 			// as its initial value
 
-			newIdentifier := extractor.FreshIdentifier()
-			newExpression := &ast.IdentifierExpression{Identifier: newIdentifier}
+			newIdentifier := ast.Identifier{
+				Identifier: extractor.FreshIdentifier(),
+			}
+			newExpression := &ast.IdentifierExpression{
+				Identifier: newIdentifier,
+			}
 
 			extractedExpressions = append(extractedExpressions,
 				ast.ExtractedExpression{

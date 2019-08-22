@@ -52,11 +52,11 @@ func PrettyPrintError(err error, filename string, code string, useColor bool) st
 	lineNumberString := ""
 	lineNumberLength := 0
 	if positioned, hasPosition := err.(ast.HasPosition); hasPosition {
-		position := positioned.StartPosition()
-		startPosition = &position
+		startPos := positioned.StartPosition()
+		startPosition = &startPos
 
-		position = positioned.EndPosition()
-		endPosition = &position
+		endPos := positioned.EndPosition()
+		endPosition = &endPos
 
 		plainLineNumberString := strconv.Itoa(startPosition.Line)
 		lineNumberLength = len(plainLineNumberString)

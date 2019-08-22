@@ -13,14 +13,26 @@ type StrictusListener interface {
 	// EnterDeclaration is called when entering the declaration production.
 	EnterDeclaration(c *DeclarationContext)
 
+	// EnterImportDeclaration is called when entering the importDeclaration production.
+	EnterImportDeclaration(c *ImportDeclarationContext)
+
 	// EnterAccess is called when entering the access production.
 	EnterAccess(c *AccessContext)
 
 	// EnterStructureDeclaration is called when entering the structureDeclaration production.
 	EnterStructureDeclaration(c *StructureDeclarationContext)
 
+	// EnterConformances is called when entering the conformances production.
+	EnterConformances(c *ConformancesContext)
+
+	// EnterVariableKind is called when entering the variableKind production.
+	EnterVariableKind(c *VariableKindContext)
+
 	// EnterField is called when entering the field production.
 	EnterField(c *FieldContext)
+
+	// EnterInterfaceDeclaration is called when entering the interfaceDeclaration production.
+	EnterInterfaceDeclaration(c *InterfaceDeclarationContext)
 
 	// EnterInitializer is called when entering the initializer production.
 	EnterInitializer(c *InitializerContext)
@@ -109,6 +121,9 @@ type StrictusListener interface {
 	// EnterRelationalExpression is called when entering the relationalExpression production.
 	EnterRelationalExpression(c *RelationalExpressionContext)
 
+	// EnterNilCoalescingExpression is called when entering the nilCoalescingExpression production.
+	EnterNilCoalescingExpression(c *NilCoalescingExpressionContext)
+
 	// EnterAdditiveExpression is called when entering the additiveExpression production.
 	EnterAdditiveExpression(c *AdditiveExpressionContext)
 
@@ -172,6 +187,9 @@ type StrictusListener interface {
 	// EnterBooleanLiteral is called when entering the booleanLiteral production.
 	EnterBooleanLiteral(c *BooleanLiteralContext)
 
+	// EnterNilLiteral is called when entering the nilLiteral production.
+	EnterNilLiteral(c *NilLiteralContext)
+
 	// EnterStringLiteral is called when entering the stringLiteral production.
 	EnterStringLiteral(c *StringLiteralContext)
 
@@ -202,14 +220,26 @@ type StrictusListener interface {
 	// ExitDeclaration is called when exiting the declaration production.
 	ExitDeclaration(c *DeclarationContext)
 
+	// ExitImportDeclaration is called when exiting the importDeclaration production.
+	ExitImportDeclaration(c *ImportDeclarationContext)
+
 	// ExitAccess is called when exiting the access production.
 	ExitAccess(c *AccessContext)
 
 	// ExitStructureDeclaration is called when exiting the structureDeclaration production.
 	ExitStructureDeclaration(c *StructureDeclarationContext)
 
+	// ExitConformances is called when exiting the conformances production.
+	ExitConformances(c *ConformancesContext)
+
+	// ExitVariableKind is called when exiting the variableKind production.
+	ExitVariableKind(c *VariableKindContext)
+
 	// ExitField is called when exiting the field production.
 	ExitField(c *FieldContext)
+
+	// ExitInterfaceDeclaration is called when exiting the interfaceDeclaration production.
+	ExitInterfaceDeclaration(c *InterfaceDeclarationContext)
 
 	// ExitInitializer is called when exiting the initializer production.
 	ExitInitializer(c *InitializerContext)
@@ -298,6 +328,9 @@ type StrictusListener interface {
 	// ExitRelationalExpression is called when exiting the relationalExpression production.
 	ExitRelationalExpression(c *RelationalExpressionContext)
 
+	// ExitNilCoalescingExpression is called when exiting the nilCoalescingExpression production.
+	ExitNilCoalescingExpression(c *NilCoalescingExpressionContext)
+
 	// ExitAdditiveExpression is called when exiting the additiveExpression production.
 	ExitAdditiveExpression(c *AdditiveExpressionContext)
 
@@ -360,6 +393,9 @@ type StrictusListener interface {
 
 	// ExitBooleanLiteral is called when exiting the booleanLiteral production.
 	ExitBooleanLiteral(c *BooleanLiteralContext)
+
+	// ExitNilLiteral is called when exiting the nilLiteral production.
+	ExitNilLiteral(c *NilLiteralContext)
 
 	// ExitStringLiteral is called when exiting the stringLiteral production.
 	ExitStringLiteral(c *StringLiteralContext)

@@ -69,10 +69,16 @@ func (s *ContinueStatement) Accept(visitor Visitor) Repr {
 	return visitor.VisitContinueStatement(s)
 }
 
+// IfStatementTest
+
+type IfStatementTest interface {
+	isIfStatementTest()
+}
+
 // IfStatement
 
 type IfStatement struct {
-	Test     Expression
+	Test     IfStatementTest
 	Then     *Block
 	Else     *Block
 	StartPos Position
