@@ -12,7 +12,7 @@ import (
 
 // addTwoScript runs a script that adds 2 to a value.
 const addTwoScript = `
-	fun main() {
+	fun main(account: Account) {
 		let controller = [1]
 		let owner = [2]
 		let key = [3]
@@ -23,7 +23,7 @@ const addTwoScript = `
 
 // createAccountScriptA runs a script that creates an account.
 const createAccountScriptA = `
-	fun main() {
+	fun main(account: Account) {
 		let publicKey = [1,2,3]
 		let code = [4,5,6]
 		createAccount(publicKey, code)
@@ -32,7 +32,7 @@ const createAccountScriptA = `
 
 // createAccountScriptB runs a script that creates an account.
 const createAccountScriptB = `
-	fun main() {
+	fun main(account: Account) {
 		let publicKey = [7,8,9]
 		let code = [10,11,12]
 		createAccount(publicKey, code)
@@ -41,7 +41,7 @@ const createAccountScriptB = `
 
 // updateAccountCodeScript runs a script that updates the code for an account.
 const updateAccountCodeScript = `
-	fun main() {
+	fun main(account: Account) {
 		let account = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2]
 		let code = [102,117,110,32,109,97,105,110,40,41,32,123,125]
 		updateAccountCode(account, code)
