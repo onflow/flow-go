@@ -2,7 +2,7 @@ package client
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 
 	"google.golang.org/grpc"
 
@@ -24,9 +24,7 @@ type Client struct {
 // New initializes a Bamboo client with the default gRPC provider.
 //
 // An error will be returned if the host is unreachable.
-func New(host string, port int) (*Client, error) {
-	addr := fmt.Sprintf("%s:%d", host, port)
-
+func New(addr string) (*Client, error) {
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
@@ -65,6 +63,23 @@ func (c *Client) SendTransaction(ctx context.Context, tx types.SignedTransaction
 		&observe.SendTransactionRequest{Transaction: txMsg},
 	)
 	return err
+}
+
+// CallScript executes a script against the current world state.
+func (c *Client) CallScript(ctx context.Context, script []byte) (interface{}, error) {
+	res, err := c.rpcClient.CallScript(ctx, &observe.CallScriptRequest{Script: script})
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: change to production encoding format
+	var value interface{}
+	err = json.Unmarshal(res.GetValue(), &value)
+	if err != nil {
+		return nil, err
+	}
+
+	return value, nil
 }
 
 // GetTransaction fetches a transaction by hash.
