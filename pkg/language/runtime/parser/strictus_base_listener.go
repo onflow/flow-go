@@ -254,6 +254,14 @@ func (s *BaseStrictusListener) EnterNilCoalescingExpression(ctx *NilCoalescingEx
 // ExitNilCoalescingExpression is called when production nilCoalescingExpression is exited.
 func (s *BaseStrictusListener) ExitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) {}
 
+// EnterFailableDowncastingExpression is called when production failableDowncastingExpression is entered.
+func (s *BaseStrictusListener) EnterFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) {
+}
+
+// ExitFailableDowncastingExpression is called when production failableDowncastingExpression is exited.
+func (s *BaseStrictusListener) ExitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) {
+}
+
 // EnterAdditiveExpression is called when production additiveExpression is entered.
 func (s *BaseStrictusListener) EnterAdditiveExpression(ctx *AdditiveExpressionContext) {}
 

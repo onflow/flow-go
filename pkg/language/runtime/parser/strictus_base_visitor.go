@@ -163,6 +163,10 @@ func (v *BaseStrictusVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExp
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitAdditiveExpression(ctx *AdditiveExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
