@@ -102,9 +102,9 @@ func testSignBytes(t *testing.T, salg Signer, halg Hasher, sk PrKey, input []byt
 		return
 	}
 	if result == false {
-		t.Errorf("BLS Verification failed:\n signature is %s", s)
+		t.Errorf("Verification failed:\n signature is %s", s)
 	} else {
-		t.Logf("BLS Verification passed:\n signature is %s", s)
+		t.Logf("Verification passed:\n signature is %s", s)
 	}
 }
 
@@ -122,9 +122,9 @@ func testSignStruct(t *testing.T, salg Signer, halg Hasher, sk PrKey, input Enco
 	}
 
 	if result == false {
-		t.Errorf("BLS Verification failed:\n signature is %x", s)
+		t.Errorf("Verification failed:\n signature is %x", s)
 	} else {
-		t.Logf("BLS Verification passed:\n signature is %x", s)
+		t.Logf("Verification passed:\n signature is %x", s)
 	}
 }
 
@@ -235,39 +235,45 @@ func BenchmarkHashToG1(b *testing.B) {
 
 // ECDSA tests
 func TestECDSA(t *testing.T) {
-	salg, err := NewSignatureAlgo(ECDSA_P256)
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
-	halg, err := NewHashAlgo(SHA3_256)
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
-	seed := []byte{1, 2, 3, 4}
-	sk, err := salg.GeneratePrKey(seed)
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
-	input := []byte("test")
-	testSignBytes(t, salg, halg, sk, input)
+	ECDSAcurves := []AlgoName{ECDSA_P256, ECDSA_SECp256k1}
+	for _, curve := range ECDSAcurves {
+		t.Logf("Testing ECDSA for curve %s", curve)
+		salg, err := NewSignatureAlgo(curve)
+		if err != nil {
+			log.Error(err.Error())
+			return
+		}
+		halg, err := NewHashAlgo(SHA3_256)
+		if err != nil {
+			log.Error(err.Error())
+			return
+		}
+		seed := []byte{1, 2, 3, 4}
+		sk, err := salg.GeneratePrKey(seed)
+		if err != nil {
+			log.Error(err.Error())
+			return
+		}
+		input := []byte("test")
+		testSignBytes(t, salg, halg, sk, input)
 
-	inputStruct := &testStruct{"te", "st"}
-	testSignStruct(t, salg, halg, sk, inputStruct)
+		inputStruct := &testStruct{"te", "st"}
+		testSignStruct(t, salg, halg, sk, inputStruct)
+	}
 }
 
 // Signing bench
 func BenchmarkECDSASign(b *testing.B) {
-	salg, _ := NewSignatureAlgo(ECDSA_P256)
+	salg, _ := NewSignatureAlgo(ECDSA_SECp256k1)
+	//salg, _ := NewSignatureAlgo(ECDSA_P256)
 	halg, _ := NewHashAlgo(SHA3_256)
 	benchSign(b, salg, halg)
 }
 
 // Verifying bench
 func BenchmarkECDSAVerify(b *testing.B) {
-	salg, _ := NewSignatureAlgo(ECDSA_P256)
+	salg, _ := NewSignatureAlgo(ECDSA_SECp256k1)
+	//salg, _ := NewSignatureAlgo(ECDSA_P256)
 	halg, _ := NewHashAlgo(SHA3_256)
 	benchVerify(b, salg, halg)
 }

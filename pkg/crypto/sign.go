@@ -31,7 +31,18 @@ func NewSignatureAlgo(name AlgoName) (Signer, error) {
 		return a, nil
 	}
 
-	return nil, cryptoError{"the signature scheme %s is not supported."}
+	if name == ECDSA_SECp256k1 {
+		a := &(ECDSAalgo{
+			secp256k1(),
+			&SignAlgo{
+				name,
+				PrKeyLengthECDSA_SECp256k1,
+				PubKeyLengthECDSA_SECp256k1,
+				SignatureLengthECDSA_SECp256k1}})
+		return a, nil
+	}
+
+	return nil, cryptoError{"the signature scheme " + string(name) + " is not supported."}
 }
 
 // Signer interface
