@@ -11,9 +11,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
-
 	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
+	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 )
 
 // EmulatorServer is a local server that runs a Bamboo Emulator instance.
@@ -28,9 +27,9 @@ type EmulatorServer struct {
 
 // Config for the EmulatorServer configuration settings.
 type Config struct {
-	Port          int           `default:"5000"`
-	HTTPPort      int           `default:"9090"`
-	BlockInterval time.Duration `default:"5s"`
+	Port          int
+	HTTPPort      int
+	BlockInterval time.Duration
 }
 
 // NewEmulatorServer creates a new instance of a Bamboo Emulator server.
