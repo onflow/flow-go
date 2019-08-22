@@ -6,9 +6,12 @@ import (
 	"strings"
 )
 
+const NilConstant = "nil"
+
 type Expression interface {
 	Element
 	fmt.Stringer
+	IfStatementTest
 	isExpression()
 	AcceptExp(ExpressionVisitor) Repr
 }
@@ -37,6 +40,8 @@ func (e *BoolExpression) EndPosition() Position {
 	return e.EndPos
 }
 
+func (*BoolExpression) isIfStatementTest() {}
+
 func (*BoolExpression) isExpression() {}
 
 func (e *BoolExpression) Accept(v Visitor) Repr {
@@ -45,6 +50,36 @@ func (e *BoolExpression) Accept(v Visitor) Repr {
 
 func (e *BoolExpression) AcceptExp(v ExpressionVisitor) Repr {
 	return v.VisitBoolExpression(e)
+}
+
+// NilExpression
+
+type NilExpression struct {
+	Pos Position
+}
+
+func (e *NilExpression) String() string {
+	return NilConstant
+}
+
+func (e *NilExpression) StartPosition() Position {
+	return e.Pos
+}
+
+func (e *NilExpression) EndPosition() Position {
+	return e.Pos.Shifted(len(NilConstant) - 1)
+}
+
+func (*NilExpression) isIfStatementTest() {}
+
+func (*NilExpression) isExpression() {}
+
+func (e *NilExpression) Accept(v Visitor) Repr {
+	return v.VisitNilExpression(e)
+}
+
+func (e *NilExpression) AcceptExp(v ExpressionVisitor) Repr {
+	return v.VisitNilExpression(e)
 }
 
 // StringExpression
@@ -67,6 +102,8 @@ func (e *StringExpression) StartPosition() Position {
 func (e *StringExpression) EndPosition() Position {
 	return e.EndPos
 }
+
+func (*StringExpression) isIfStatementTest() {}
 
 func (*StringExpression) isExpression() {}
 
@@ -97,6 +134,8 @@ func (e *IntExpression) StartPosition() Position {
 func (e *IntExpression) EndPosition() Position {
 	return e.EndPos
 }
+
+func (*IntExpression) isIfStatementTest() {}
 
 func (*IntExpression) isExpression() {}
 
@@ -137,6 +176,8 @@ func (e *ArrayExpression) EndPosition() Position {
 	return e.EndPos
 }
 
+func (*ArrayExpression) isIfStatementTest() {}
+
 func (*ArrayExpression) isExpression() {}
 
 func (e *ArrayExpression) Accept(v Visitor) Repr {
@@ -150,22 +191,14 @@ func (e *ArrayExpression) AcceptExp(v ExpressionVisitor) Repr {
 // IdentifierExpression
 
 type IdentifierExpression struct {
-	Identifier string
-	StartPos   Position
-	EndPos     Position
+	Identifier
 }
 
 func (e *IdentifierExpression) String() string {
-	return e.Identifier
+	return e.Identifier.Identifier
 }
 
-func (e *IdentifierExpression) StartPosition() Position {
-	return e.StartPos
-}
-
-func (e *IdentifierExpression) EndPosition() Position {
-	return e.EndPos
-}
+func (*IdentifierExpression) isIfStatementTest() {}
 
 func (*IdentifierExpression) isExpression() {}
 
@@ -207,6 +240,8 @@ func (e *InvocationExpression) EndPosition() Position {
 	return e.EndPos
 }
 
+func (*InvocationExpression) isIfStatementTest() {}
+
 func (*InvocationExpression) isExpression() {}
 
 func (e *InvocationExpression) Accept(v Visitor) Repr {
@@ -247,7 +282,10 @@ func (e *MemberExpression) EndPosition() Position {
 	return e.EndPos
 }
 
-func (*MemberExpression) isExpression()       {}
+func (*MemberExpression) isIfStatementTest() {}
+
+func (*MemberExpression) isExpression() {}
+
 func (*MemberExpression) isAccessExpression() {}
 
 func (e *MemberExpression) Accept(v Visitor) Repr {
@@ -282,7 +320,10 @@ func (e *IndexExpression) EndPosition() Position {
 	return e.EndPos
 }
 
-func (*IndexExpression) isExpression()       {}
+func (*IndexExpression) isIfStatementTest() {}
+
+func (*IndexExpression) isExpression() {}
+
 func (*IndexExpression) isAccessExpression() {}
 
 func (e *IndexExpression) Accept(v Visitor) Repr {
@@ -315,6 +356,8 @@ func (e *ConditionalExpression) StartPosition() Position {
 func (e *ConditionalExpression) EndPosition() Position {
 	return e.Else.EndPosition()
 }
+
+func (*ConditionalExpression) isIfStatementTest() {}
 
 func (*ConditionalExpression) isExpression() {}
 
@@ -350,6 +393,8 @@ func (e *UnaryExpression) EndPosition() Position {
 	return e.EndPos
 }
 
+func (*UnaryExpression) isIfStatementTest() {}
+
 func (*UnaryExpression) isExpression() {}
 
 func (e *UnaryExpression) Accept(v Visitor) Repr {
@@ -383,6 +428,8 @@ func (e *BinaryExpression) EndPosition() Position {
 	return e.Right.EndPosition()
 }
 
+func (*BinaryExpression) isIfStatementTest() {}
+
 func (*BinaryExpression) isExpression() {}
 
 func (e *BinaryExpression) Accept(v Visitor) Repr {
@@ -414,6 +461,8 @@ func (e *FunctionExpression) StartPosition() Position {
 func (e *FunctionExpression) EndPosition() Position {
 	return e.FunctionBlock.EndPosition()
 }
+
+func (*FunctionExpression) isIfStatementTest() {}
 
 func (*FunctionExpression) isExpression() {}
 

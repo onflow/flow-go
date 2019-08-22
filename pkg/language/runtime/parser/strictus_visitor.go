@@ -17,14 +17,26 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#declaration.
 	VisitDeclaration(ctx *DeclarationContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#importDeclaration.
+	VisitImportDeclaration(ctx *ImportDeclarationContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#access.
 	VisitAccess(ctx *AccessContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#structureDeclaration.
 	VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#conformances.
+	VisitConformances(ctx *ConformancesContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#variableKind.
+	VisitVariableKind(ctx *VariableKindContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#field.
 	VisitField(ctx *FieldContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#interfaceDeclaration.
+	VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#initializer.
 	VisitInitializer(ctx *InitializerContext) interface{}
@@ -113,6 +125,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#relationalExpression.
 	VisitRelationalExpression(ctx *RelationalExpressionContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#nilCoalescingExpression.
+	VisitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#additiveExpression.
 	VisitAdditiveExpression(ctx *AdditiveExpressionContext) interface{}
 
@@ -175,6 +190,9 @@ type StrictusVisitor interface {
 
 	// Visit a parse tree produced by StrictusParser#booleanLiteral.
 	VisitBooleanLiteral(ctx *BooleanLiteralContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#nilLiteral.
+	VisitNilLiteral(ctx *NilLiteralContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#stringLiteral.
 	VisitStringLiteral(ctx *StringLiteralContext) interface{}

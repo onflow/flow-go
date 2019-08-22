@@ -24,21 +24,48 @@ type functionReturn struct {
 // are treated like they are returning a value.
 
 type Interpreter struct {
-	Program     *ast.Program
-	activations *activations.Activations
-	Globals     map[string]*Variable
+	Checker          *sema.Checker
+	PredefinedValues map[string]Value
+	activations      *activations.Activations
+	Globals          map[string]*Variable
+	interfaces       map[string]*ast.InterfaceDeclaration
+	ImportLocation   ast.ImportLocation
 }
 
-func NewInterpreter(program *ast.Program) *Interpreter {
-	return &Interpreter{
-		Program:     program,
-		activations: &activations.Activations{},
-		Globals:     map[string]*Variable{},
+func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
+	interpreter := &Interpreter{
+		Checker:          checker,
+		PredefinedValues: predefinedValues,
+		activations:      &activations.Activations{},
+		Globals:          map[string]*Variable{},
+		interfaces:       map[string]*ast.InterfaceDeclaration{},
 	}
+
+	for name, value := range predefinedValues {
+		err := interpreter.ImportValue(name, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return interpreter, nil
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
-	return interpreter.activations.Find(name).(*Variable)
+	result := interpreter.activations.Find(name)
+	if result == nil {
+		return nil
+	}
+	return result.(*Variable)
+}
+
+func (interpreter *Interpreter) findOrDeclareVariable(name string) *Variable {
+	variable := interpreter.findVariable(name)
+	if variable == nil {
+		variable = &Variable{}
+		interpreter.setVariable(name, variable)
+	}
+	return variable
 }
 
 func (interpreter *Interpreter) setVariable(name string, variable *Variable) {
@@ -62,15 +89,39 @@ func (interpreter *Interpreter) Interpret() (err error) {
 		}
 	}()
 
-	Run(More(func() Trampoline {
-		return interpreter.visitProgramDeclarations()
-	}))
+	Run(interpreter.interpret())
 
 	return nil
 }
 
+func (interpreter *Interpreter) interpret() Trampoline {
+	return More(func() Trampoline {
+		interpreter.prepareInterpretation()
+
+		return interpreter.visitProgramDeclarations()
+	})
+}
+
+func (interpreter *Interpreter) prepareInterpretation() {
+	program := interpreter.Checker.Program
+
+	// pre-declare empty variables for all structures, interfaces, and function declarations
+	for _, declaration := range program.InterfaceDeclarations() {
+		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
+	}
+	for _, declaration := range program.StructureDeclarations() {
+		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
+	}
+	for _, declaration := range program.FunctionDeclarations() {
+		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
+	}
+	for _, declaration := range program.InterfaceDeclarations() {
+		interpreter.declareInterface(declaration)
+	}
+}
+
 func (interpreter *Interpreter) visitProgramDeclarations() Trampoline {
-	return interpreter.visitGlobalDeclarations(interpreter.Program.Declarations)
+	return interpreter.visitGlobalDeclarations(interpreter.Checker.Program.Declarations)
 }
 
 func (interpreter *Interpreter) visitGlobalDeclarations(declarations []ast.Declaration) Trampoline {
@@ -104,7 +155,7 @@ func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }
 
-func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{}) (value Value, err error) {
+func (interpreter *Interpreter) Invoke(functionName string, arguments ...interface{}) (value Value, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
 		return nil, &NotDeclaredError{
@@ -122,7 +173,8 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 		}
 	}
 
-	arguments, err := ToValues(inputs)
+	var argumentValues []Value
+	argumentValues, err = ToValues(arguments)
 	if err != nil {
 		return nil, err
 	}
@@ -145,17 +197,36 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 
 	// ensures the invocation's argument count matches the function's parameter count
 
-	parameterCount := function.parameterCount()
-	argumentCount := len(arguments)
+	parameterTypes := function.functionType().ParameterTypes
+	parameterCount := len(parameterTypes)
+	argumentCount := len(argumentValues)
 
 	if argumentCount != parameterCount {
-		return nil, &ArgumentCountError{
-			ParameterCount: parameterCount,
-			ArgumentCount:  argumentCount,
+
+		var functionType *sema.FunctionType
+
+		if hostFunction, ok := function.(HostFunctionValue); ok {
+			functionType = hostFunction.Type
+		}
+
+		// TODO: improve
+		if functionType == nil ||
+			(functionType.RequiredArgumentCount == nil ||
+				argumentCount < *functionType.RequiredArgumentCount) {
+
+			return nil, &ArgumentCountError{
+				ParameterCount: parameterCount,
+				ArgumentCount:  argumentCount,
+			}
 		}
 	}
 
-	result := Run(function.invoke(interpreter, arguments))
+	boxedArguments := make(ArrayValue, len(arguments))
+	for i, argument := range argumentValues {
+		boxedArguments[i] = interpreter.box(argument, parameterTypes[i])
+	}
+
+	result := Run(function.invoke(boxedArguments, Location{}))
 	if result == nil {
 		return nil, nil
 	}
@@ -164,12 +235,12 @@ func (interpreter *Interpreter) Invoke(functionName string, inputs ...interface{
 
 func (interpreter *Interpreter) InvokeExportable(
 	functionName string,
-	inputs ...interface{},
+	arguments ...interface{},
 ) (
 	value ExportableValue,
 	err error,
 ) {
-	result, err := interpreter.Invoke(functionName, inputs...)
+	result, err := interpreter.Invoke(functionName, arguments...)
 	if err != nil {
 		return nil, err
 	}
@@ -187,26 +258,41 @@ func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 
+	identifier := declaration.Identifier.Identifier
+
+	functionType := interpreter.Checker.FunctionDeclarationFunctionTypes[declaration]
+
+	variable := interpreter.findOrDeclareVariable(identifier)
+
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
 	// make the function itself available inside the function
-	variable := &Variable{}
-
-	lexicalScope = lexicalScope.Insert(common.StringKey(declaration.Identifier), variable)
+	lexicalScope = lexicalScope.Insert(common.StringKey(identifier), variable)
 
 	functionExpression := declaration.ToExpression()
-	variable.Value = newInterpretedFunction(functionExpression, lexicalScope)
-
-	// declare the function in the current scope
-	interpreter.setVariable(declaration.Identifier, variable)
+	variable.Value = newInterpretedFunction(
+		interpreter,
+		functionExpression,
+		functionType,
+		lexicalScope,
+	)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-func (interpreter *Interpreter) ImportFunction(name string, function HostFunctionValue) {
-	interpreter.declareVariable(name, function)
+// NOTE: consider using NewInterpreter if the value should be predefined in all programs
+func (interpreter *Interpreter) ImportValue(name string, value Value) error {
+	if _, ok := interpreter.Globals[name]; ok {
+		return &RedeclarationError{
+			Name: name,
+		}
+	}
+
+	variable := interpreter.declareVariable(name, value)
+	interpreter.Globals[name] = variable
+	return nil
 }
 
 func (interpreter *Interpreter) VisitBlock(block *ast.Block) ast.Repr {
@@ -243,7 +329,7 @@ func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBl
 	panic(&errors.UnreachableError{})
 }
 
-func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnType ast.Type) Trampoline {
+func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnType sema.Type) Trampoline {
 
 	// block scope: each function block gets an activation record
 	interpreter.activations.PushCurrent()
@@ -266,13 +352,13 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 						resultValue = VoidValue{}
 					} else {
 						resultValue = blockResult.(functionReturn).Value
+						resultValue = interpreter.box(resultValue, returnType)
 					}
 
 					// if there is a return type, declare the constant `result`
 					// which has the return value
 
-					// TODO: improve
-					if ty, ok := returnType.(*ast.NominalType); ok && ty.Identifier != "" {
+					if _, isVoid := returnType.(*sema.VoidType); !isVoid {
 						interpreter.declareVariable(sema.ResultIdentifier, resultValue)
 					}
 
@@ -296,9 +382,28 @@ func (interpreter *Interpreter) rewritePostConditions(functionBlock *ast.Functio
 	rewrittenPostConditions = make([]*ast.Condition, len(functionBlock.PostConditions))
 
 	for i, postCondition := range functionBlock.PostConditions {
-		extraction := beforeExtractor.ExtractBefore(postCondition.Expression)
 
-		for _, extractedExpression := range extraction.ExtractedExpressions {
+		// copy condition and set expression to rewritten one
+		newPostCondition := *postCondition
+
+		testExtraction := beforeExtractor.ExtractBefore(postCondition.Test)
+
+		extractedExpressions := testExtraction.ExtractedExpressions
+
+		newPostCondition.Test = testExtraction.RewrittenExpression
+
+		if postCondition.Message != nil {
+			messageExtraction := beforeExtractor.ExtractBefore(postCondition.Message)
+
+			newPostCondition.Message = messageExtraction.RewrittenExpression
+
+			extractedExpressions = append(
+				extractedExpressions,
+				messageExtraction.ExtractedExpressions...,
+			)
+		}
+
+		for _, extractedExpression := range extractedExpressions {
 
 			beforeStatements = append(beforeStatements,
 				&ast.VariableDeclaration{
@@ -307,10 +412,6 @@ func (interpreter *Interpreter) rewritePostConditions(functionBlock *ast.Functio
 				},
 			)
 		}
-
-		// copy condition and set expression to rewritten one
-		newPostCondition := *postCondition
-		newPostCondition.Expression = extraction.RewrittenExpression
 
 		rewrittenPostConditions[i] = &newPostCondition
 	}
@@ -333,11 +434,29 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 			result := value.(BoolValue)
 
 			if !result {
-				panic(&ConditionError{
-					ConditionKind: condition.Kind,
-					StartPos:      condition.Expression.StartPosition(),
-					EndPos:        condition.Expression.EndPosition(),
-				})
+
+				var messageTrampoline Trampoline
+
+				if condition.Message == nil {
+					messageTrampoline = Done{Result: StringValue("")}
+				} else {
+					messageTrampoline = condition.Message.Accept(interpreter).(Trampoline)
+				}
+
+				return messageTrampoline.
+					Then(func(result interface{}) {
+						message := string(result.(StringValue))
+
+						panic(&ConditionError{
+							ConditionKind: condition.Kind,
+							Message:       message,
+							LocationRange: LocationRange{
+								ImportLocation: interpreter.ImportLocation,
+								StartPos:       condition.Test.StartPosition(),
+								EndPos:         condition.Test.EndPosition(),
+							},
+						})
+					})
 			}
 
 			return interpreter.visitConditions(conditions[1:])
@@ -345,7 +464,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 }
 
 func (interpreter *Interpreter) VisitCondition(condition *ast.Condition) ast.Repr {
-	return condition.Expression.Accept(interpreter)
+	return condition.Test.Accept(interpreter)
 }
 
 func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
@@ -370,16 +489,60 @@ func (interpreter *Interpreter) VisitContinueStatement(statement *ast.ContinueSt
 }
 
 func (interpreter *Interpreter) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
-	return statement.Test.Accept(interpreter).(Trampoline).
+	switch test := statement.Test.(type) {
+	case ast.Expression:
+		return interpreter.visitIfStatementWithTestExpression(test, statement.Then, statement.Else)
+	case *ast.VariableDeclaration:
+		return interpreter.visitIfStatementWithVariableDeclaration(test, statement.Then, statement.Else)
+	default:
+		panic(&errors.UnreachableError{})
+	}
+}
+
+func (interpreter *Interpreter) visitIfStatementWithTestExpression(
+	test ast.Expression,
+	thenBlock, elseBlock *ast.Block,
+) Trampoline {
+
+	return test.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(BoolValue)
 			if value {
-				return statement.Then.Accept(interpreter).(Trampoline)
-			} else if statement.Else != nil {
-				return statement.Else.Accept(interpreter).(Trampoline)
+				return thenBlock.Accept(interpreter).(Trampoline)
+			} else if elseBlock != nil {
+				return elseBlock.Accept(interpreter).(Trampoline)
 			}
 
 			// NOTE: no result, so it does *not* act like a return-statement
+			return Done{}
+		})
+}
+
+func (interpreter *Interpreter) visitIfStatementWithVariableDeclaration(
+	declaration *ast.VariableDeclaration,
+	thenBlock, elseBlock *ast.Block,
+) Trampoline {
+
+	return declaration.Value.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+
+			if someValue, ok := result.(SomeValue); ok {
+				unwrappedValueCopy := someValue.Value.Copy()
+				interpreter.activations.PushCurrent()
+				interpreter.declareVariable(
+					declaration.Identifier.Identifier,
+					unwrappedValueCopy,
+				)
+
+				return thenBlock.Accept(interpreter).(Trampoline).
+					Then(func(_ interface{}) {
+						interpreter.activations.Pop()
+					})
+			} else if elseBlock != nil {
+				return elseBlock.Accept(interpreter).(Trampoline)
+			}
+
+			// NOTE: ignore result, so it does *not* act like a return-statement
 			return Done{}
 		})
 }
@@ -413,30 +576,33 @@ func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatemen
 func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.VariableDeclaration) ast.Repr {
 	return declaration.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			value := result.(Value)
 
-			valueCopy := value.Copy()
+			targetType := interpreter.Checker.VariableDeclarationValueTypes[declaration]
+			valueCopy := interpreter.copyAndBox(result.(Value), targetType)
 
-			interpreter.declareVariable(declaration.Identifier, valueCopy)
+			interpreter.declareVariable(
+				declaration.Identifier.Identifier,
+				valueCopy,
+			)
 
 			// NOTE: ignore result, so it does *not* act like a return-statement
 			return Done{}
 		})
 }
 
-func (interpreter *Interpreter) declareVariable(identifier string, value Value) {
+func (interpreter *Interpreter) declareVariable(identifier string, value Value) *Variable {
 	// NOTE: semantic analysis already checked possible invalid redeclaration
-	interpreter.setVariable(identifier, &Variable{
-		Value: value,
-	})
+	variable := &Variable{Value: value}
+	interpreter.setVariable(identifier, variable)
+	return variable
 }
 
 func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
 	return assignment.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			value := result.(Value)
 
-			valueCopy := value.Copy()
+			targetType := interpreter.Checker.AssignmentStatementTargetTypes[assignment]
+			valueCopy := interpreter.copyAndBox(result.(Value), targetType)
 
 			return interpreter.visitAssignmentValue(assignment, valueCopy)
 		})
@@ -460,19 +626,19 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 }
 
 func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
-	variable := interpreter.findVariable(target.Identifier)
+	variable := interpreter.findVariable(target.Identifier.Identifier)
 	variable.Value = value
 }
 
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			array := result.(ArrayValue)
+			indexedValue := result.(IndexableValue)
 
 			return target.Index.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
-					index := result.(IntegerValue)
-					array[index.IntValue()] = value
+					indexingValue := result.(Value)
+					indexedValue.Set(indexingValue, value)
 
 					// NOTE: no result, so it does *not* act like a return-statement
 					return Done{}
@@ -493,7 +659,7 @@ func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.Memb
 }
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
-	variable := interpreter.findVariable(expression.Identifier)
+	variable := interpreter.findVariable(expression.Identifier.Identifier)
 	return Done{Result: variable.Value}
 }
 
@@ -603,52 +769,63 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-
-				switch left := tuple.Left.(type) {
-				case IntegerValue:
-					right := tuple.Right.(IntegerValue)
-					return BoolValue(left.Equal(right))
-
-				case BoolValue:
-					return BoolValue(tuple.Left == tuple.Right)
-				}
-
-				panic(&errors.UnreachableError{})
+				return interpreter.testEqual(tuple.Left, tuple.Right)
 			})
 
 	case ast.OperationUnequal:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(TupleValue)
-
-				switch left := tuple.Left.(type) {
-				case IntegerValue:
-					right := tuple.Right.(IntegerValue)
-					return BoolValue(!left.Equal(right))
-
-				case BoolValue:
-					return BoolValue(tuple.Left != tuple.Right)
-				}
-
-				panic(&errors.UnreachableError{})
+				return BoolValue(!interpreter.testEqual(tuple.Left, tuple.Right))
 			})
 
 	case ast.OperationOr:
-		return interpreter.visitBinaryOperation(expression).
-			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(BoolValue)
-				right := tuple.Right.(BoolValue)
-				return BoolValue(left || right)
+		// interpret the left-hand side
+		return expression.Left.Accept(interpreter).(Trampoline).
+			FlatMap(func(left interface{}) Trampoline {
+				// only interpret right-hand side if left-hand side is false
+				leftBool := left.(BoolValue)
+				if leftBool {
+					return Done{Result: leftBool}
+				}
+
+				// after interpreting the left-hand side,
+				// interpret the right-hand side
+				return expression.Right.Accept(interpreter).(Trampoline).
+					FlatMap(func(right interface{}) Trampoline {
+						return Done{Result: right.(BoolValue)}
+					})
 			})
 
 	case ast.OperationAnd:
-		return interpreter.visitBinaryOperation(expression).
-			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(BoolValue)
-				right := tuple.Right.(BoolValue)
-				return BoolValue(left && right)
+		// interpret the left-hand side
+		return expression.Left.Accept(interpreter).(Trampoline).
+			FlatMap(func(left interface{}) Trampoline {
+				// only interpret right-hand side if left-hand side is true
+				leftBool := left.(BoolValue)
+				if !leftBool {
+					return Done{Result: leftBool}
+				}
+
+				// after interpreting the left-hand side,
+				// interpret the right-hand side
+				return expression.Right.Accept(interpreter).(Trampoline).
+					FlatMap(func(right interface{}) Trampoline {
+						return Done{Result: right.(BoolValue)}
+					})
+			})
+
+	case ast.OperationNilCoalesce:
+		// interpret the left-hand side
+		return expression.Left.Accept(interpreter).(Trampoline).
+			FlatMap(func(left interface{}) Trampoline {
+				// only evaluate right-hand side if left-hand side is nil
+				if _, ok := left.(NilValue); ok {
+					return expression.Right.Accept(interpreter).(Trampoline)
+				}
+
+				value := left.(SomeValue).Value
+				return Done{Result: value}
 			})
 	}
 
@@ -658,6 +835,30 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		startPos:  expression.StartPosition(),
 		endPos:    expression.EndPosition(),
 	})
+}
+
+func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
+	left = interpreter.unbox(left)
+	right = interpreter.unbox(right)
+
+	switch left := left.(type) {
+	case IntegerValue:
+		// NOTE: might be NilValue
+		right, ok := right.(IntegerValue)
+		if !ok {
+			return false
+		}
+		return left.Equal(right)
+
+	case BoolValue:
+		return BoolValue(left == right)
+
+	case NilValue:
+		_, ok := right.(NilValue)
+		return BoolValue(ok)
+	}
+
+	panic(&errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {
@@ -698,6 +899,11 @@ func (interpreter *Interpreter) VisitBoolExpression(expression *ast.BoolExpressi
 	return Done{Result: value}
 }
 
+func (interpreter *Interpreter) VisitNilExpression(expression *ast.NilExpression) ast.Repr {
+	value := NilValue{}
+	return Done{Result: value}
+}
+
 func (interpreter *Interpreter) VisitIntExpression(expression *ast.IntExpression) ast.Repr {
 	value := IntValue{expression.Value}
 
@@ -725,13 +931,12 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			array := result.(ArrayValue)
+			indexedValue := result.(IndexableValue)
 
 			return expression.Index.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
-					index := result.(IntegerValue)
-					value := array[index.IntValue()]
-
+					indexingValue := result.(Value)
+					value := indexedValue.Get(indexingValue)
 					return Done{Result: value}
 				})
 		})
@@ -766,9 +971,19 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 				FlatMap(func(result interface{}) Trampoline {
 					arguments := result.(ArrayValue)
 
-					argumentCopies := arguments.Copy().(ArrayValue)
+					parameterTypes := interpreter.Checker.InvocationExpressionParameterTypes[invocationExpression]
 
-					return function.invoke(interpreter, argumentCopies)
+					argumentCopies := make(ArrayValue, len(arguments))
+					for i, argument := range arguments {
+						argumentCopies[i] = interpreter.copyAndBox(argument, parameterTypes[i])
+					}
+
+					// TODO: optimize: only potentially used by host-functions
+					location := Location{
+						Position:       invocationExpression.StartPosition(),
+						ImportLocation: interpreter.ImportLocation,
+					}
+					return function.invoke(argumentCopies, location)
 				})
 		})
 }
@@ -797,7 +1012,7 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 
 	functionBlockTrampoline := interpreter.visitFunctionBlock(
 		function.Expression.FunctionBlock,
-		function.Expression.ReturnType,
+		function.Type.ReturnType,
 	)
 
 	return functionBlockTrampoline.
@@ -813,7 +1028,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 ) {
 	for parameterIndex, parameter := range function.Expression.Parameters {
 		argument := arguments[parameterIndex]
-		interpreter.declareVariable(parameter.Identifier, argument)
+		interpreter.declareVariable(parameter.Identifier.Identifier, argument)
 	}
 }
 
@@ -840,22 +1055,22 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	function := newInterpretedFunction(expression, lexicalScope)
+	functionType := interpreter.Checker.FunctionExpressionFunctionType[expression]
+
+	function := newInterpretedFunction(interpreter, expression, functionType, lexicalScope)
 
 	return Done{Result: function}
 }
 
 func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.StructureDeclaration) ast.Repr {
-	constructorVariable := interpreter.structureConstructorVariable(declaration)
 
-	// declare the constructor in the current scope
-	interpreter.setVariable(declaration.Identifier, constructorVariable)
+	interpreter.declareStructureConstructor(declaration)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-// structureConstructorVariable creates a constructor function
+// declareStructureConstructor creates a constructor function
 // for the given structure, bound in a variable.
 //
 // The constructor is a host function which creates a new structure,
@@ -865,45 +1080,45 @@ func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.Struc
 // Inside the initializer and all functions, `self` is bound to
 // the new structure value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.StructureDeclaration) *Variable {
+func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration *ast.StructureDeclaration) {
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	constructorVariable := &Variable{}
+	identifier := structureDeclaration.Identifier.Identifier
+	variable := interpreter.findOrDeclareVariable(identifier)
 
 	// make the constructor available in the initializer
 	lexicalScope = lexicalScope.
-		Insert(common.StringKey(declaration.Identifier), constructorVariable)
+		Insert(common.StringKey(identifier), variable)
 
-	initializer := declaration.Initializer
+	initializer := structureDeclaration.Initializer
 
 	var initializerFunction *InterpretedFunctionValue
 	if initializer != nil {
-		functionExpression := initializer.ToFunctionExpression()
-		function := newInterpretedFunction(functionExpression, lexicalScope)
-		initializerFunction = &function
+
+		functionType := interpreter.Checker.InitializerFunctionTypes[initializer]
+
+		f := interpreter.initializerFunction(
+			structureDeclaration,
+			initializer,
+			functionType,
+			lexicalScope,
+		)
+		initializerFunction = &f
 	}
 
-	functions := interpreter.structureFunctions(declaration, lexicalScope)
+	functions := interpreter.structureFunctions(structureDeclaration, lexicalScope)
 
 	// TODO: function type
-	constructorVariable.Value = NewHostFunction(
+	variable.Value = NewHostFunctionValue(
 		nil,
-		func(interpreter *Interpreter, values []Value) Trampoline {
+		func(values []Value, location Location) Trampoline {
 			structure := StructureValue{}
 
 			for name, function := range functions {
-				// NOTE: rebind, as function is captured in closure
-				function := function
-
-				structure.Set(
-					name,
-					NewStructFunction(
-						function,
-						structure,
-					),
-				)
+				structFunction := NewStructFunction(function, structure)
+				structure.Set(name, structFunction)
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -922,8 +1137,45 @@ func (interpreter *Interpreter) structureConstructorVariable(declaration *ast.St
 				})
 		},
 	)
+}
 
-	return constructorVariable
+func (interpreter *Interpreter) initializerFunction(
+	structureDeclaration *ast.StructureDeclaration,
+	initializer *ast.InitializerDeclaration,
+	functionType *sema.FunctionType,
+	lexicalScope hamt.Map,
+) InterpretedFunctionValue {
+
+	function := initializer.ToFunctionExpression()
+
+	// copy function block, append interfaces' pre-conditions and post-condition
+	functionBlockCopy := *function.FunctionBlock
+	function.FunctionBlock = &functionBlockCopy
+
+	for _, conformance := range structureDeclaration.Conformances {
+		interfaceDeclaration := interpreter.interfaces[conformance.Identifier.Identifier]
+		initializer := interfaceDeclaration.Initializer
+		if initializer == nil || initializer.FunctionBlock == nil {
+			continue
+		}
+
+		functionBlockCopy.PreConditions = append(
+			functionBlockCopy.PreConditions,
+			initializer.FunctionBlock.PreConditions...,
+		)
+
+		functionBlockCopy.PostConditions = append(
+			functionBlockCopy.PostConditions,
+			initializer.FunctionBlock.PostConditions...,
+		)
+	}
+
+	return newInterpretedFunction(
+		interpreter,
+		function,
+		functionType,
+		lexicalScope,
+	)
 }
 
 // invokeStructureFunction calls the given function with the values.
@@ -948,19 +1200,62 @@ func (interpreter *Interpreter) invokeStructureFunction(
 }
 
 func (interpreter *Interpreter) structureFunctions(
-	declaration *ast.StructureDeclaration,
+	structureDeclaration *ast.StructureDeclaration,
 	lexicalScope hamt.Map,
 ) map[string]InterpretedFunctionValue {
 
 	functions := map[string]InterpretedFunctionValue{}
 
-	for _, functionDeclaration := range declaration.Functions {
-		function := functionDeclaration.ToExpression()
-		functions[functionDeclaration.Identifier] =
-			newInterpretedFunction(function, lexicalScope)
+	for _, functionDeclaration := range structureDeclaration.Functions {
+		functionType := interpreter.Checker.FunctionDeclarationFunctionTypes[functionDeclaration]
+
+		function := interpreter.structureFunction(structureDeclaration, functionDeclaration)
+
+		functions[functionDeclaration.Identifier.Identifier] =
+			newInterpretedFunction(
+				interpreter,
+				function,
+				functionType,
+				lexicalScope,
+			)
 	}
 
 	return functions
+}
+
+func (interpreter *Interpreter) structureFunction(
+	structureDeclaration *ast.StructureDeclaration,
+	functionDeclaration *ast.FunctionDeclaration,
+) *ast.FunctionExpression {
+
+	functionIdentifier := functionDeclaration.Identifier.Identifier
+
+	function := functionDeclaration.ToExpression()
+
+	// copy function block, append interfaces' pre-conditions and post-condition
+	functionBlockCopy := *function.FunctionBlock
+	function.FunctionBlock = &functionBlockCopy
+
+	for _, conformance := range structureDeclaration.Conformances {
+		conformanceIdentifier := conformance.Identifier.Identifier
+		interfaceDeclaration := interpreter.interfaces[conformanceIdentifier]
+		interfaceFunction, ok := interfaceDeclaration.FunctionsByIdentifier()[functionIdentifier]
+		if !ok || interfaceFunction.FunctionBlock == nil {
+			continue
+		}
+
+		functionBlockCopy.PreConditions = append(
+			functionBlockCopy.PreConditions,
+			interfaceFunction.FunctionBlock.PreConditions...,
+		)
+
+		functionBlockCopy.PostConditions = append(
+			functionBlockCopy.PostConditions,
+			interfaceFunction.FunctionBlock.PostConditions...,
+		)
+	}
+
+	return function
 }
 
 func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
@@ -969,4 +1264,95 @@ func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaratio
 
 func (interpreter *Interpreter) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
 	panic(&errors.UnreachableError{})
+}
+
+func (interpreter *Interpreter) copyAndBox(value Value, targetType sema.Type) Value {
+	result := value.Copy()
+	return interpreter.box(result, targetType)
+}
+
+// box boxes a value in optionals, if necessary
+func (interpreter *Interpreter) box(result Value, targetType sema.Type) Value {
+	inner := result
+	for {
+		optionalType, ok := targetType.(*sema.OptionalType)
+		if !ok {
+			break
+		}
+
+		if some, ok := inner.(SomeValue); ok {
+			inner = some.Value
+		} else if _, ok := inner.(NilValue); ok {
+			return inner
+		} else {
+			result = SomeValue{Value: result}
+		}
+
+		targetType = optionalType.Type
+	}
+	return result
+}
+
+func (interpreter *Interpreter) unbox(value Value) Value {
+	for {
+		some, ok := value.(SomeValue)
+		if !ok {
+			return value
+		}
+
+		value = some.Value
+	}
+}
+
+func (interpreter *Interpreter) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
+
+	interpreter.declareInterfaceMetaType(declaration)
+
+	return Done{}
+}
+
+func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDeclaration) {
+	interpreter.interfaces[declaration.Identifier.Identifier] = declaration
+}
+
+func (interpreter *Interpreter) declareInterfaceMetaType(declaration *ast.InterfaceDeclaration) {
+
+	interfaceType := interpreter.Checker.InterfaceDeclarationTypes[declaration]
+
+	variable := interpreter.findOrDeclareVariable(declaration.Identifier.Identifier)
+	variable.Value = MetaTypeValue{Type: interfaceType}
+}
+
+func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location]
+
+	subInterpreter, err := NewInterpreter(importedChecker, interpreter.PredefinedValues)
+	if err != nil {
+		panic(err)
+	}
+
+	subInterpreter.ImportLocation = declaration.Location
+
+	return subInterpreter.interpret().
+		Then(func(_ interface{}) {
+			// determine which identifiers are imported /
+			// which variables need to be declared
+
+			var variables map[string]*Variable
+			identifierLength := len(declaration.Identifiers)
+			if identifierLength > 0 {
+				variables = make(map[string]*Variable, identifierLength)
+				for _, identifier := range declaration.Identifiers {
+					variables[identifier.Identifier] =
+						subInterpreter.Globals[identifier.Identifier]
+				}
+			} else {
+				variables = subInterpreter.Globals
+			}
+
+			// set variables for all imported values
+			for name, variable := range variables {
+				interpreter.setVariable(name, variable)
+			}
+		})
 }

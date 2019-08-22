@@ -5,13 +5,13 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 // StructureDeclaration
 
 type StructureDeclaration struct {
-	Identifier    string
-	Fields        []*FieldDeclaration
-	Initializer   *InitializerDeclaration
-	Functions     []*FunctionDeclaration
-	IdentifierPos Position
-	StartPos      Position
-	EndPos        Position
+	Identifier   Identifier
+	Conformances []*NominalType
+	Fields       []*FieldDeclaration
+	Initializer  *InitializerDeclaration
+	Functions    []*FunctionDeclaration
+	StartPos     Position
+	EndPos       Position
 }
 
 func (s *StructureDeclaration) StartPosition() Position {
@@ -20,10 +20,6 @@ func (s *StructureDeclaration) StartPosition() Position {
 
 func (s *StructureDeclaration) EndPosition() Position {
 	return s.EndPos
-}
-
-func (s *StructureDeclaration) IdentifierPosition() Position {
-	return s.IdentifierPos
 }
 
 func (s *StructureDeclaration) Accept(visitor Visitor) Repr {
@@ -38,7 +34,7 @@ func (*StructureDeclaration) isDeclaration() {}
 func (*StructureDeclaration) isStatement() {}
 
 func (s *StructureDeclaration) DeclarationName() string {
-	return s.Identifier
+	return s.Identifier.Identifier
 }
 
 func (s *StructureDeclaration) DeclarationKind() common.DeclarationKind {
@@ -48,13 +44,12 @@ func (s *StructureDeclaration) DeclarationKind() common.DeclarationKind {
 // FieldDeclaration
 
 type FieldDeclaration struct {
-	Access        Access
-	IsConstant    bool
-	Identifier    string
-	Type          Type
-	StartPos      Position
-	EndPos        Position
-	IdentifierPos Position
+	Access       Access
+	VariableKind VariableKind
+	Identifier   Identifier
+	Type         Type
+	StartPos     Position
+	EndPos       Position
 }
 
 func (f *FieldDeclaration) Accept(visitor Visitor) Repr {
@@ -69,14 +64,10 @@ func (f *FieldDeclaration) EndPosition() Position {
 	return f.EndPos
 }
 
-func (f *FieldDeclaration) IdentifierPosition() Position {
-	return f.IdentifierPos
-}
-
 func (*FieldDeclaration) isDeclaration() {}
 
 func (f *FieldDeclaration) DeclarationName() string {
-	return f.Identifier
+	return f.Identifier.Identifier
 }
 
 func (f *FieldDeclaration) DeclarationKind() common.DeclarationKind {
@@ -86,7 +77,7 @@ func (f *FieldDeclaration) DeclarationKind() common.DeclarationKind {
 // InitializerDeclaration
 
 type InitializerDeclaration struct {
-	Identifier    string
+	Identifier    Identifier
 	Parameters    []*Parameter
 	FunctionBlock *FunctionBlock
 	StartPos      Position
@@ -102,10 +93,6 @@ func (i *InitializerDeclaration) StartPosition() Position {
 
 func (i *InitializerDeclaration) EndPosition() Position {
 	return i.FunctionBlock.EndPos
-}
-
-func (i *InitializerDeclaration) IdentifierPosition() Position {
-	return i.StartPos
 }
 
 func (*InitializerDeclaration) isDeclaration() {}

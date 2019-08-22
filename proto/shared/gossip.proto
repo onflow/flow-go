@@ -15,6 +15,7 @@ message GossipMessage {
   string Sender = 22;                // Address of the sender of this message
   repeated string Path = 23;         // Address of the nodes that this message visited so far
   uint64 TTL = 24;                   // The time to live of the message, i.e., maximum number of hops it should be gossiped
+  UUID uuid = 25;                    // The Uniqe identifier of the message. 
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -22,6 +23,7 @@ message GossipMessage {
 
 service MessageReciever {
   rpc AsyncQueue (GossipMessage) returns (VoidReply) {}
+  rpc SyncQueue (GossipMessage) returns (MessageReply) {}
 }
 
 message MessageRequest {
@@ -34,4 +36,7 @@ message MessageReply {
 
 message VoidReply {}
 
+message UUID {
+  string value = 1;
+}
 ////////////////////////////////////////////////////////////////////////////

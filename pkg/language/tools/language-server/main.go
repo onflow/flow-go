@@ -1,16 +1,53 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"path"
+	"strings"
+	"time"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
 	"github.com/dapperlabs/bamboo-node/pkg/language/tools/language-server/protocol"
-	"os"
-	"strings"
 )
 
-type server struct{}
+func protocolToSemaPosition(pos protocol.Position) sema.Position {
+	return sema.Position{
+		Line:   int(pos.Line + 1),
+		Column: int(pos.Character),
+	}
+}
+
+func semaToProtocolPosition(pos sema.Position) protocol.Position {
+	return protocol.Position{
+		Line:      float64(pos.Line - 1),
+		Character: float64(pos.Column),
+	}
+}
+
+func astToProtocolPosition(pos ast.Position) protocol.Position {
+	return protocol.Position{
+		Line:      float64(pos.Line - 1),
+		Character: float64(pos.Column),
+	}
+}
+
+func astToProtocolRange(startPos, endPos ast.Position) protocol.Range {
+	return protocol.Range{
+		Start: astToProtocolPosition(startPos),
+		End:   astToProtocolPosition(endPos.Shifted(1)),
+	}
+}
+
+var standardLibraryFunctions = append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
+
+type server struct {
+	checkers map[protocol.DocumentUri]*sema.Checker
+}
 
 func (server) Initialize(
 	connection protocol.Connection,
@@ -21,7 +58,13 @@ func (server) Initialize(
 ) {
 	result := &protocol.InitializeResult{
 		Capabilities: protocol.ServerCapabilities{
-			TextDocumentSync: protocol.Full,
+			TextDocumentSync:   protocol.Full,
+			HoverProvider:      true,
+			DefinitionProvider: true,
+			// TODO:
+			//SignatureHelpProvider: &protocol.SignatureHelpOptions{
+			//	TriggerCharacters: []string{"("},
+			//},
 		},
 	}
 	return result, nil
@@ -60,38 +103,76 @@ func convertError(err error) *protocol.Diagnostic {
 	}
 }
 
-func (server) DidChangeTextDocument(
+func (s server) parse(connection protocol.Connection, code, location string) (*ast.Program, error) {
+	start := time.Now()
+	program, err := parser.ParseProgram(code)
+	elapsed := time.Since(start)
+
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("parsing %s took %s", location, elapsed),
+	})
+
+	return program, err
+}
+
+func (s server) DidChangeTextDocument(
 	connection protocol.Connection,
 	params *protocol.DidChangeTextDocumentParams,
 ) error {
+	uri := params.TextDocument.URI
 	code := params.ContentChanges[0].Text
 
-	program, parseErrors := parser.ParseProgram(code)
-	errorCount := len(parseErrors)
+	program, err := s.parse(connection, code, string(uri))
 
 	diagnostics := []protocol.Diagnostic{}
 
-	if errorCount > 0 {
+	if err != nil {
 
-		for _, err := range parseErrors {
-			parseError, ok := err.(parser.ParseError)
-			if !ok {
-				continue
+		if parserError, ok := err.(parser.Error); ok {
+			for _, err := range parserError.Errors {
+				parseError, ok := err.(parser.ParseError)
+				if !ok {
+					continue
+				}
+
+				diagnostic := convertError(parseError)
+				if diagnostic == nil {
+					continue
+				}
+
+				diagnostics = append(diagnostics, *diagnostic)
 			}
+		}
+	} else {
+		// no parsing errors
 
-			diagnostic := convertError(parseError)
-			if diagnostic == nil {
-				continue
-			}
+		// resolve imports
 
-			diagnostics = append(diagnostics, *diagnostic)
+		mainPath := strings.TrimPrefix(string(uri), "file://")
+
+		_ = program.ResolveImports(func(location ast.ImportLocation) (program *ast.Program, err error) {
+			return s.resolveImport(connection, mainPath, location)
+		})
+
+		// check program
+
+		valueDeclarations := stdlib.ToValueDeclarations(standardLibraryFunctions)
+		checker, err := sema.NewChecker(program, valueDeclarations, nil)
+		if err != nil {
+			panic(err)
 		}
 
-	} else {
-		// no parsing parseErrors, check program
+		start := time.Now()
+		err = checker.Check()
+		elapsed := time.Since(start)
 
-		checker := sema.NewChecker(program)
-		err := checker.Check()
+		connection.LogMessage(&protocol.LogMessageParams{
+			Type:    protocol.Info,
+			Message: fmt.Sprintf("checking took %s", elapsed),
+		})
+
+		s.checkers[uri] = checker
 
 		if checkerError, ok := err.(*sema.CheckerError); ok && checkerError != nil {
 			for _, err := range checkerError.Errors {
@@ -113,6 +194,65 @@ func (server) DidChangeTextDocument(
 	return nil
 }
 
+func (s server) Hover(
+	connection protocol.Connection,
+	params *protocol.TextDocumentPositionParams,
+) (*protocol.Hover, error) {
+
+	uri := params.TextDocument.URI
+	checker, ok := s.checkers[uri]
+	if !ok {
+		return nil, nil
+	}
+
+	origin := checker.Origins.Find(protocolToSemaPosition(params.Position))
+
+	if origin == nil {
+		return nil, nil
+	}
+
+	contents := protocol.MarkupContent{
+		Kind:  protocol.Markdown,
+		Value: fmt.Sprintf("* Type: `%s`", origin.Variable.Type.String()),
+	}
+	return &protocol.Hover{Contents: contents}, nil
+}
+
+func (s server) Definition(
+	connection protocol.Connection,
+	params *protocol.TextDocumentPositionParams,
+) (*protocol.Location, error) {
+
+	uri := params.TextDocument.URI
+	checker, ok := s.checkers[uri]
+	if !ok {
+		return nil, nil
+	}
+
+	origin := checker.Origins.Find(protocolToSemaPosition(params.Position))
+
+	if origin == nil {
+		return nil, nil
+	}
+
+	variable := origin.Variable
+	if variable == nil {
+		return nil, nil
+	}
+
+	return &protocol.Location{
+		URI:   uri,
+		Range: astToProtocolRange(*variable.Pos, *variable.Pos),
+	}, nil
+}
+
+func (s server) SignatureHelp(
+	connection protocol.Connection,
+	params *protocol.TextDocumentPositionParams,
+) (*protocol.SignatureHelp, error) {
+	return nil, nil
+}
+
 func (server) Shutdown(connection protocol.Connection) error {
 	connection.ShowMessage(&protocol.ShowMessageParams{
 		Type:    protocol.Warning,
@@ -126,7 +266,36 @@ func (server) Exit(connection protocol.Connection) error {
 	return nil
 }
 
+func (s server) resolveImport(
+	connection protocol.Connection,
+	mainPath string,
+	location ast.ImportLocation,
+) (*ast.Program, error) {
+	stringLocation, ok := location.(ast.StringImportLocation)
+	// TODO: publish diagnostic type is not supported?
+	if !ok {
+		return nil, nil
+	}
+
+	filename := path.Join(path.Dir(mainPath), string(stringLocation))
+
+	// TODO: publish diagnostic import is self?
+	if filename == mainPath {
+		return nil, nil
+	}
+
+	program, _, err := parser.ParseProgramFromFile(filename)
+	// TODO: publish diagnostic file does not exist?
+	if err != nil {
+		return nil, nil
+	}
+
+	return program, nil
+}
+
 func main() {
-	server := &server{}
+	server := &server{
+		checkers: map[protocol.DocumentUri]*sema.Checker{},
+	}
 	<-protocol.NewServer(server).Start()
 }

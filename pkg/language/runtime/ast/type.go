@@ -8,19 +8,26 @@ type Type interface {
 // NominalType represents a base type (e.g. boolean, integer, etc.)
 
 type NominalType struct {
-	Identifier string
-	Pos        Position
+	Identifier
 }
 
 func (*NominalType) isType() {}
 
-func (t *NominalType) StartPosition() Position {
-	return t.Pos
+// OptionalType represents am optional variant of another type
+
+type OptionalType struct {
+	Type   Type
+	EndPos Position
 }
 
-func (t *NominalType) EndPosition() Position {
-	length := len(t.Identifier)
-	return t.Pos.Shifted(length - 1)
+func (*OptionalType) isType() {}
+
+func (t *OptionalType) StartPosition() Position {
+	return t.Type.StartPosition()
+}
+
+func (t *OptionalType) EndPosition() Position {
+	return t.EndPos
 }
 
 // VariableSizedType is a variable sized array type

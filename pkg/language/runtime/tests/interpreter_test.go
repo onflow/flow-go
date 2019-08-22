@@ -1,4 +1,4 @@
-package runtime
+package tests
 
 import (
 	"math/big"
@@ -10,22 +10,29 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 )
 
 func parseCheckAndInterpret(code string) *interpreter.Interpreter {
-	program, errors := parser.ParseProgram(code)
+	return parseCheckAndInterpretWithExtra(code, nil, nil)
+}
 
-	Expect(errors).
-		To(BeEmpty())
+func parseCheckAndInterpretWithExtra(
+	code string,
+	predefinedValueTypes []sema.ValueDeclaration,
+	predefinedValues map[string]interpreter.Value,
+) *interpreter.Interpreter {
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	checker, err := parseAndCheckWithExtra(code, predefinedValueTypes, nil, nil)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	inter, err := interpreter.NewInterpreter(checker, predefinedValues)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	inter := interpreter.NewInterpreter(program)
 	err = inter.Interpret()
 
 	Expect(err).
@@ -617,6 +624,66 @@ func TestInterpretOrOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 }
 
+func TestInterpretOrOperatorShortCircuitLeftSuccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return true
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() || changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretOrOperatorShortCircuitLeftFailure(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return false
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() || changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
 func TestInterpretAndOperator(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -648,6 +715,66 @@ func TestInterpretAndOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 
 	Expect(inter.Invoke("testFalseFalse")).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretAndOperatorShortCircuitLeftSuccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return true
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() && changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretAndOperatorShortCircuitLeftFailure(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Bool {
+          x = true
+          return false
+      }
+
+      fun changeY(): Bool {
+          y = true
+          return true
+      }
+
+      let test = changeX() && changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
 		To(Equal(interpreter.BoolValue(false)))
 }
 
@@ -921,16 +1048,15 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.ParseProgram(`
+	program, err := parser.ParseProgram(`
       let a = test(1, 2)
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
+	Expect(err).
+		To(Not(HaveOccurred()))
 
-	inter := interpreter.NewInterpreter(program)
-
-	testFunction := interpreter.NewHostFunction(
+	testFunction := stdlib.NewStandardLibraryFunction(
+		"test",
 		&sema.FunctionType{
 			ParameterTypes: []sema.Type{
 				&sema.IntType{},
@@ -938,17 +1064,39 @@ func TestInterpretHostFunction(t *testing.T) {
 			},
 			ReturnType: &sema.IntType{},
 		},
-		func(inter *interpreter.Interpreter, arguments []interpreter.Value) trampoline.Trampoline {
+		func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int
 			b := arguments[1].(interpreter.IntValue).Int
 			value := big.NewInt(0).Add(a, b)
 			result := interpreter.IntValue{Int: value}
 			return trampoline.Done{Result: result}
 		},
+		nil,
 	)
 
-	inter.ImportFunction("test", testFunction)
-	err := inter.Interpret()
+	checker, err := sema.NewChecker(
+		program,
+		[]sema.ValueDeclaration{testFunction},
+		nil,
+	)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	err = checker.Check()
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		map[string]interpreter.Value{
+			testFunction.Name: testFunction.Function,
+		},
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	err = inter.Interpret()
 	Expect(err).
 		To(Not(HaveOccurred()))
 
@@ -1402,6 +1550,96 @@ func TestInterpretFunctionPostConditionWithBeforeFailingPostCondition(t *testing
 		To(Equal(ast.ConditionKindPost))
 }
 
+func TestInterpretFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int): Int {
+          post {
+              y == 0: "y should be zero"
+          }
+          let y = x
+          return y
+      }
+	`)
+
+	_, err := inter.Invoke("test", big.NewInt(42))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("y should be zero"))
+
+	zero := big.NewInt(0)
+	Expect(inter.Invoke("test", zero)).
+		To(Equal(interpreter.IntValue{Int: zero}))
+}
+
+func TestInterpretFunctionPostConditionWithMessageUsingResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int): String {
+          post {
+              y == 0: result
+          }
+          let y = x
+          return "return value"
+      }
+	`)
+
+	_, err := inter.Invoke("test", big.NewInt(42))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("return value"))
+
+	zero := big.NewInt(0)
+	Expect(inter.Invoke("test", zero)).
+		To(Equal(interpreter.StringValue("return value")))
+}
+
+func TestInterpretFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: String): String {
+          post {
+              1 == 2: before(x)
+          }
+          return "return value"
+      }
+	`)
+
+	_, err := inter.Invoke("test", "parameter value")
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("parameter value"))
+}
+
+func TestInterpretFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: String): String {
+          post {
+              1 == 2: x
+          }
+          return "return value"
+      }
+	`)
+
+	_, err := inter.Invoke("test", "parameter value")
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(err.(*interpreter.ConditionError).Message).
+		To(Equal("parameter value"))
+}
+
 func TestInterpretStructCopyOnDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -1576,4 +1814,920 @@ func TestInterpretStructCopyOnPassing(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretArrayCopy(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+
+      fun change(_ numbers: Int[]): Int[] {
+          numbers[0] = 1
+          return numbers
+      }
+
+      fun test(): Int[] {
+          let numbers = [0]
+          let numbers2 = change(numbers)
+          return [
+              numbers[0],
+              numbers2[0]
+          ]
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.ArrayValue{
+			interpreter.IntValue{Int: big.NewInt(0)},
+			interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretMutuallyRecursiveFunctions(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun isEven(_ n: Int): Bool {
+          if n == 0 {
+              return true
+          }
+          return isOdd(n - 1)
+      }
+
+      fun isOdd(_ n: Int): Bool {
+          if n == 0 {
+              return false
+          }
+          return isEven(n - 1)
+      }
+    `)
+
+	four := big.NewInt(4)
+
+	Expect(inter.Invoke("isEven", four)).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Invoke("isOdd", four)).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var tests = 0
+
+      fun test(): Test {
+          return Test()
+      }
+
+      struct Test {
+         init() {
+             tests = tests + 1
+         }
+      }
+    `)
+
+	Expect(inter.Globals["tests"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+
+	Expect(inter.Invoke("test")).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+
+	Expect(inter.Globals["tests"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+
+	Expect(inter.Invoke("test")).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+
+	Expect(inter.Globals["tests"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+}
+
+func TestInterpretOptionalVariableDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int?? = 2
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.SomeValue{
+					Value: interpreter.IntValue{Int: big.NewInt(2)},
+				},
+			}))
+}
+
+func TestInterpretOptionalParameterInvokedExternal(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int??): Int?? {
+          return x
+      }
+    `)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.SomeValue{
+					Value: interpreter.IntValue{Int: big.NewInt(2)},
+				},
+			}))
+}
+
+func TestInterpretOptionalParameterInvokedInternal(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun testActual(x: Int??): Int?? {
+          return x
+      }
+
+      fun test(): Int?? {
+          return testActual(x: 2)
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.SomeValue{
+					Value: interpreter.IntValue{Int: big.NewInt(2)},
+				},
+			}))
+}
+
+func TestInterpretOptionalReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int): Int?? {
+          return x
+      }
+    `)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.SomeValue{
+					Value: interpreter.IntValue{Int: big.NewInt(2)},
+				},
+			}))
+}
+
+func TestInterpretOptionalAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x: Int?? = 1
+
+      fun test() {
+          x = 2
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.SomeValue{
+					Value: interpreter.IntValue{Int: big.NewInt(2)},
+				},
+			}))
+}
+
+func TestInterpretNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     let x: Int? = nil
+   `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NilValue{}))
+}
+
+func TestInterpretOptionalNestingNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     let x: Int?? = nil
+   `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NilValue{}))
+}
+
+func TestInterpretNilReturnValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     fun test(): Int?? {
+         return nil
+     }
+   `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.NilValue{}))
+}
+
+func TestInterpretNilCoalescingNilIntToOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let none: Int? = nil
+      let x: Int? = none ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretNilCoalescingNilIntToOptionals(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let none: Int?? = nil
+      let x: Int? = none ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretNilCoalescingNilIntToOptionalNilLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let x: Int? = nil ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretNilCoalescingRightSubtype(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = nil ?? nil
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NilValue{}))
+}
+
+func TestInterpretNilCoalescingNilInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let none: Int? = nil
+      let x: Int = none ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+}
+
+func TestInterpretNilCoalescingNilLiteralInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let one = 1
+      let x: Int = nil ?? one
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+}
+
+func TestInterpretNilCoalescingShortCircuitLeftSuccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Int? {
+          x = true
+          return 1
+      }
+
+      fun changeY(): Int {
+          y = true
+          return 2
+      }
+
+      let test = changeX() ?? changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNilCoalescingShortCircuitLeftFailure(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var x = false
+      var y = false
+
+      fun changeX(): Int? {
+          x = true
+          return nil
+      }
+
+      fun changeY(): Int {
+          y = true
+          return 2
+      }
+
+      let test = changeX() ?? changeY()
+    `)
+
+	Expect(inter.Globals["test"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretNilsComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x = nil == nil
+   `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretNonOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int = 1
+      let y = x == nil
+   `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNonOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int = 1
+      let y = nil == x
+   `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     let x: Int? = 1
+     let y = x == nil
+   `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNestedOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int?? = 1
+      let y = x == nil
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = 1
+      let y = nil == x
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNestedOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int?? = 1
+      let y = nil == x
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretNestedOptionalComparisonNils(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = nil
+      let y: Int?? = nil
+      let z = x == y
+    `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretNestedOptionalComparisonValues(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = 2
+      let y: Int?? = 2
+      let z = x == y
+    `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
+func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = 2
+      let y: Int?? = nil
+      let z = x == y
+    `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
+func TestInterpretIfStatementTestWithDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int?): Int {
+          if var y = x {
+              return y
+          } else {
+              return 0
+          }
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+}
+
+func TestInterpretIfStatementTestWithDeclarationAndElse(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int?): Int {
+          if var y = x {
+              return y
+          }
+          return 0
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+}
+
+func TestInterpretIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int??): Int? {
+          if var y = x {
+              return y
+          } else {
+              return 0
+          }
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(2)},
+			}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(0)},
+			}))
+}
+
+func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(x: Int??): Int? {
+          if var y: Int? = x {
+              return y
+          } else {
+              return 0
+          }
+      }
+	`)
+
+	Expect(inter.Invoke("test", big.NewInt(2))).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(2)},
+			}))
+
+	Expect(inter.Invoke("test", nil)).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(0)},
+			}))
+}
+
+func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface Test {}
+
+      struct TestImpl: Test {}
+
+      let test: Test = TestImpl()
+	`)
+
+	Expect(inter.Globals["test"].Value).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+}
+
+func TestInterpretInterfaceFieldUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface Test {
+          x: Int
+      }
+
+      struct TestImpl: Test {
+          var x: Int
+
+          init(x: Int) {
+              self.x = x
+          }
+      }
+
+      let test: Test = TestImpl(x: 1)
+
+      let x = test.x
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+}
+
+func TestInterpretInterfaceFunctionUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface Test {
+          fun test(): Int
+      }
+
+      struct TestImpl: Test {
+          fun test(): Int {
+              return 2
+          }
+      }
+
+      let test: Test = TestImpl()
+
+      let val = test.test()
+	`)
+
+	Expect(inter.Globals["val"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+}
+
+func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface Test {
+          fun test(x: Int): Int {
+              pre {
+                  x > 0: "x must be positive"
+              }
+          }
+      }
+
+      struct TestImpl: Test {
+          fun test(x: Int): Int {
+              pre {
+                  x < 2: "x must be smaller than 2"
+              }
+              return x
+          }
+      }
+
+      let test: Test = TestImpl()
+
+      fun callTest(x: Int): Int {
+          return test.test(x: x)
+      }
+	`)
+
+	_, err := inter.Invoke("callTest", big.NewInt(0))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(inter.Invoke("callTest", big.NewInt(1))).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+
+	_, err = inter.Invoke("callTest", big.NewInt(2))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+}
+
+func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface Test {
+          init(x: Int) {
+              pre {
+                  x > 0: "x must be positive"
+              }
+          }
+      }
+
+      struct TestImpl: Test {
+          init(x: Int) {
+              pre {
+                  x < 2: "x must be smaller than 2"
+              }
+          }
+      }
+
+      fun test(x: Int): Test {
+          return TestImpl(x: x)
+      }
+	`)
+
+	_, err := inter.Invoke("test", big.NewInt(0))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+
+	Expect(inter.Invoke("test", big.NewInt(1))).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+
+	_, err = inter.Invoke("test", big.NewInt(2))
+	Expect(err).
+		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+}
+
+func TestInterpretInterfaceTypeAsValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface X {}
+
+      let x = X
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(BeAssignableToTypeOf(interpreter.MetaTypeValue{}))
+}
+
+func TestInterpretImport(t *testing.T) {
+	RegisterTestingT(t)
+
+	checkerImported, err := parseAndCheck(`
+      fun answer(): Int {
+          return 42
+      }
+	`)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	checkerImporting, err := parseAndCheckWithExtra(
+		`
+          import answer from "imported"
+
+          fun test(): Int {
+              return answer()
+          }
+        `,
+		nil,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			Expect(location).To(Equal(ast.StringImportLocation("imported")))
+			return checkerImported.Program, nil
+		},
+	)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	inter, err := interpreter.NewInterpreter(checkerImporting, nil)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	err = inter.Interpret()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+}
+
+func TestInterpretImportError(t *testing.T) {
+	RegisterTestingT(t)
+
+	valueDeclarations := []sema.ValueDeclaration{
+		stdlib.PanicFunction,
+	}
+
+	checkerImported, err := parseAndCheckWithExtra(
+		`
+          fun answer(): Int {
+              return panic("?!")
+          }
+	    `,
+		valueDeclarations,
+		nil,
+		nil,
+	)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	checkerImporting, err := parseAndCheckWithExtra(
+		`
+          import answer from "imported"
+
+          fun test(): Int {
+              return answer()
+          }
+        `,
+		valueDeclarations,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			Expect(location).To(Equal(ast.StringImportLocation("imported")))
+			return checkerImported.Program, nil
+		},
+	)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	values := stdlib.ToValues([]stdlib.StandardLibraryFunction{
+		stdlib.PanicFunction,
+	})
+	inter, err := interpreter.NewInterpreter(checkerImporting, values)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	err = inter.Interpret()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = inter.Invoke("test")
+
+	Expect(err).
+		To(BeAssignableToTypeOf(stdlib.PanicError{}))
+
+	Expect(err.(stdlib.PanicError).Message).
+		To(Equal("?!"))
+}
+
+func TestInterpretDictionaryIndexing(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpretWithExtra(
+		`
+          let x = dict["abc"]
+        `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		map[string]interpreter.Value{
+			"dict": interpreter.DictionaryValue{
+				interpreter.StringValue("abc"): interpreter.IntValue{Int: big.NewInt(42)},
+			},
+		},
+	)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(42)},
+			}))
+}
+
+func TestInterpretDictionaryIndexingNotFound(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpretWithExtra(
+		`
+          let x = dict["xyz"]
+        `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		map[string]interpreter.Value{
+			"dict": interpreter.DictionaryValue{},
+		},
+	)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NilValue{}))
+}
+
+func TestInterpretDictionaryIndexingAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpretWithExtra(
+		`
+           fun test() {
+               dict["abc"] = 23
+           }
+        `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		map[string]interpreter.Value{
+			"dict": interpreter.DictionaryValue{
+				interpreter.StringValue("abc"): interpreter.IntValue{Int: big.NewInt(42)},
+			},
+		},
+	)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.VoidValue{}))
+
+	Expect(inter.Globals["dict"].Value.(interpreter.DictionaryValue).Get(interpreter.StringValue("abc"))).
+		To(Equal(interpreter.SomeValue{Value: interpreter.IntValue{Int: big.NewInt(23)}}))
 }

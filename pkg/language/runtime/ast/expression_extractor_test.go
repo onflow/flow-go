@@ -14,8 +14,12 @@ func (testIntExtractor) ExtractInt(
 	expression *IntExpression,
 ) ExpressionExtraction {
 
-	newIdentifier := extractor.FreshIdentifier()
-	newExpression := &IdentifierExpression{Identifier: newIdentifier}
+	newIdentifier := Identifier{
+		Identifier: extractor.FreshIdentifier(),
+	}
+	newExpression := &IdentifierExpression{
+		Identifier: newIdentifier,
+	}
 	return ExpressionExtraction{
 		RewrittenExpression: newExpression,
 		ExtractedExpressions: []ExtractedExpression{
@@ -32,8 +36,12 @@ func TestExpressionExtractorBinaryExpressionNothingExtracted(t *testing.T) {
 
 	expression := &BinaryExpression{
 		Operation: OperationEqual,
-		Left:      &IdentifierExpression{Identifier: "x"},
-		Right:     &IdentifierExpression{Identifier: "y"},
+		Left: &IdentifierExpression{
+			Identifier: Identifier{Identifier: "x"},
+		},
+		Right: &IdentifierExpression{
+			Identifier: Identifier{Identifier: "y"},
+		},
 	}
 
 	extractor := &ExpressionExtractor{
@@ -46,8 +54,12 @@ func TestExpressionExtractorBinaryExpressionNothingExtracted(t *testing.T) {
 		To(Equal(ExpressionExtraction{
 			RewrittenExpression: &BinaryExpression{
 				Operation: OperationEqual,
-				Left:      &IdentifierExpression{Identifier: "x"},
-				Right:     &IdentifierExpression{Identifier: "y"},
+				Left: &IdentifierExpression{
+					Identifier{Identifier: "x"},
+				},
+				Right: &IdentifierExpression{
+					Identifier{Identifier: "y"},
+				},
 			},
 			ExtractedExpressions: nil,
 		}))
@@ -58,8 +70,10 @@ func TestExpressionExtractorBinaryExpressionIntegerExtracted(t *testing.T) {
 
 	expression := &BinaryExpression{
 		Operation: OperationEqual,
-		Left:      &IdentifierExpression{Identifier: "x"},
-		Right:     &IntExpression{Value: big.NewInt(1)},
+		Left: &IdentifierExpression{
+			Identifier{Identifier: "x"},
+		},
+		Right: &IntExpression{Value: big.NewInt(1)},
 	}
 
 	extractor := &ExpressionExtractor{
@@ -74,12 +88,16 @@ func TestExpressionExtractorBinaryExpressionIntegerExtracted(t *testing.T) {
 		To(Equal(ExpressionExtraction{
 			RewrittenExpression: &BinaryExpression{
 				Operation: OperationEqual,
-				Left:      &IdentifierExpression{Identifier: "x"},
-				Right:     &IdentifierExpression{Identifier: newIdentifier},
+				Left: &IdentifierExpression{
+					Identifier{Identifier: "x"},
+				},
+				Right: &IdentifierExpression{
+					Identifier{Identifier: newIdentifier},
+				},
 			},
 			ExtractedExpressions: []ExtractedExpression{
 				{
-					Identifier: newIdentifier,
+					Identifier: Identifier{Identifier: newIdentifier},
 					Expression: &IntExpression{Value: big.NewInt(1)},
 				},
 			},

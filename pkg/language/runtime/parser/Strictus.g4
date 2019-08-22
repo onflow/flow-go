@@ -51,8 +51,14 @@ program
 
 declaration
     : structureDeclaration
-    | functionDeclaration
+    | interfaceDeclaration
+    | functionDeclaration[true]
     | variableDeclaration
+    | importDeclaration
+    ;
+
+importDeclaration
+    : 'import' (Identifier (',' Identifier)* 'from')? (stringLiteral | HexadecimalLiteral)
     ;
 
 access
@@ -62,22 +68,43 @@ access
     ;
 
 structureDeclaration
-    : Struct Identifier '{' field* initializer? functionDeclaration* '}'
+    : Struct Identifier conformances '{'
+        field*
+        initializer[true]?
+        functionDeclaration[true]*
+      '}'
+    ;
+
+conformances
+    : (':' Identifier (',' Identifier)*)?
+    ;
+
+variableKind
+    : Let
+    | Var
     ;
 
 field
-    : access (Let | Var) Identifier ':' fullType
+    : access variableKind? Identifier ':' fullType
+    ;
+
+interfaceDeclaration
+    : Interface Identifier '{' field* initializer[false]? functionDeclaration[false]* '}'
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
 // is `init` in semantic analysis to provide better error
 //
-initializer
-    : Identifier parameterList functionBlock
+initializer[bool functionBlockRequired]
+    : Identifier parameterList
+      // only optional if parameter functionBlockRequired is false
+      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
 
-functionDeclaration
-    : access Fun Identifier parameterList (':' returnType=fullType)? functionBlock
+functionDeclaration[bool functionBlockRequired]
+    : access Fun Identifier parameterList (':' returnType=fullType)?
+      // only optional if parameter functionBlockRequired is false
+      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
 
 parameterList
@@ -89,7 +116,7 @@ parameter
     ;
 
 fullType
-    : baseType typeDimension*
+    : baseType typeDimension* (optionals+=(Optional|NilCoalescing))*
     ;
 
 typeDimension
@@ -125,9 +152,8 @@ conditions
     : (condition eos)*
     ;
 
-// TODO: description
 condition
-    : expression
+    : test=expression (':' message=expression)?
     ;
 
 statements
@@ -161,7 +187,10 @@ continueStatement
     ;
 
 ifStatement
-    : If test=expression then=block (Else (ifStatement | alt=block))?
+    : If
+      (testExpression=expression | testDeclaration=variableDeclaration)
+      then=block
+      (Else (ifStatement | alt=block))?
     ;
 
 whileStatement
@@ -169,7 +198,7 @@ whileStatement
     ;
 
 variableDeclaration
-    : (Let | Var) Identifier (':' fullType)? '=' expression
+    : variableKind Identifier (':' fullType)? '=' expression
     ;
 
 assignment
@@ -200,9 +229,14 @@ equalityExpression
 	;
 
 relationalExpression
-	: additiveExpression
-	| relationalExpression relationalOp additiveExpression
+	: nilCoalescingExpression
+	| relationalExpression relationalOp nilCoalescingExpression
 	;
+
+nilCoalescingExpression
+	// NOTE: right associative
+    : additiveExpression (NilCoalescing nilCoalescingExpression)?
+    ;
 
 additiveExpression
 	: multiplicativeExpression
@@ -274,6 +308,9 @@ unaryOp
 
 Negate : '!' ;
 
+Optional : '?' ;
+
+NilCoalescing : '??' ;
 
 primaryExpressionStart
     : Identifier                                                  # IdentifierExpression
@@ -308,11 +345,16 @@ literal
     | booleanLiteral
     | arrayLiteral
     | stringLiteral
+    | nilLiteral
     ;
 
 booleanLiteral
     : True
     | False
+    ;
+
+nilLiteral
+    : Nil
     ;
 
 stringLiteral
@@ -334,7 +376,11 @@ arrayLiteral
 OpenParen: '(' ;
 CloseParen: ')' ;
 
+Transaction : 'transaction' ;
+
 Struct : 'struct' ;
+
+Interface : 'interface' ;
 
 Fun : 'fun' ;
 
@@ -359,6 +405,8 @@ While : 'while' ;
 
 True : 'true' ;
 False : 'false' ;
+
+Nil : 'nil' ;
 
 Identifier
     : IdentifierHead IdentifierCharacter*
@@ -446,4 +494,3 @@ eos
     | {p.lineTerminatorAhead()}?
     | {p.GetTokenStream().LT(1).GetText() == "}"}?
     ;
-

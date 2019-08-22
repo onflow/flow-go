@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
-	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
 )
 
 // main parses the given filename and prints any syntax errors.
@@ -19,66 +19,94 @@ import (
 //
 func main() {
 
+	standardLibraryFunctions := append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
+
 	if len(os.Args) < 2 {
 		exitWithError("no input file")
 	}
 	filename := os.Args[1]
 
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		exitWithError(err.Error())
-	}
-	code := string(data)
+	codes := map[string]string{}
 
-	program, errors := parser.ParseProgram(code)
-	if len(errors) > 0 {
-		for _, err := range errors {
-			prettyPrintError(err, filename, code)
+	must := func(err error, filename string) {
+		if err == nil {
+			return
 		}
+		prettyPrintError(err, filename, codes)
 		os.Exit(1)
 	}
 
-	checker := sema.NewChecker(program)
-	err = checker.Check()
-	if err != nil {
-		prettyPrintError(err, filename, code)
-		os.Exit(1)
-	}
+	program, code, err := parser.ParseProgramFromFile(filename)
+	codes[filename] = code
+	must(err, filename)
 
-	inter := NewInterpreter(program)
-	inter.ImportFunction(
-		"log",
-		NewHostFunction(
-			&sema.FunctionType{
-				ParameterTypes: []sema.Type{&sema.AnyType{}},
-				ReturnType:     &sema.VoidType{},
-			},
-			func(_ *Interpreter, arguments []Value) trampoline.Trampoline {
-				fmt.Printf("%v\n", arguments[0])
-				return trampoline.Done{Result: &VoidValue{}}
-			},
-		),
-	)
+	err = program.ResolveImports(func(location ast.ImportLocation) (program *ast.Program, err error) {
+		switch location := location.(type) {
+		case ast.StringImportLocation:
+			filename := string(location)
+			imported, code, err := parser.ParseProgramFromFile(filename)
+			codes[filename] = code
+			must(err, filename)
+			return imported, nil
 
-	err = inter.Interpret()
-	if err != nil {
-		prettyPrintError(err, filename, code)
-		os.Exit(1)
-	}
+		default:
+			return nil, fmt.Errorf("cannot import `%s`. only files are supported", location)
+		}
+	})
+	must(err, filename)
+
+	valueDeclarations := stdlib.ToValueDeclarations(standardLibraryFunctions)
+
+	checker, err := sema.NewChecker(program, valueDeclarations, nil)
+	must(err, filename)
+
+	must(checker.Check(), filename)
+
+	values := stdlib.ToValues(standardLibraryFunctions)
+
+	inter, err := interpreter.NewInterpreter(checker, values)
+	must(err, filename)
+
+	must(inter.Interpret(), filename)
 
 	if _, hasMain := inter.Globals["main"]; !hasMain {
 		return
 	}
 
 	_, err = inter.Invoke("main")
-	if err != nil {
-		prettyPrintError(err, filename, code)
-		os.Exit(1)
-	}
+	must(err, filename)
 }
 
-func prettyPrintError(err error, filename string, code string) {
-	print(runtime.PrettyPrintError(err, filename, code, true))
+func prettyPrintError(err error, filename string, codes map[string]string) {
+	i := 0
+	printErr := func(err error, filename string) {
+		if i > 0 {
+			println()
+		}
+		print(runtime.PrettyPrintError(err, filename, codes[filename], true))
+		i += 1
+	}
+
+	if parserError, ok := err.(parser.Error); ok {
+		for _, err := range parserError.Errors {
+			printErr(err, filename)
+		}
+	} else if checkerError, ok := err.(*sema.CheckerError); ok {
+		for _, err := range checkerError.Errors {
+			printErr(err, filename)
+			if err, ok := err.(*sema.ImportedProgramError); ok {
+				filename := string(err.ImportLocation.(ast.StringImportLocation))
+				for _, err := range err.CheckerError.Errors {
+					prettyPrintError(err, filename, codes)
+				}
+			}
+		}
+	} else if locatedErr, ok := err.(ast.HasImportLocation); ok {
+		filename := string(locatedErr.ImportLocation().(ast.StringImportLocation))
+		printErr(err, filename)
+	} else {
+		printErr(err, filename)
+	}
 }
 
 func exitWithError(message string) {

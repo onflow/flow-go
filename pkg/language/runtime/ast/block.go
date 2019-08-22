@@ -33,8 +33,9 @@ func (b *FunctionBlock) Accept(visitor Visitor) Repr {
 // Condition
 
 type Condition struct {
-	Kind       ConditionKind
-	Expression Expression
+	Kind    ConditionKind
+	Test    Expression
+	Message Expression
 }
 
 func (c *Condition) Accept(visitor Visitor) Repr {

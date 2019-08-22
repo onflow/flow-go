@@ -6,6 +6,7 @@ import (
 
 	"github.com/raviqqe/hamt"
 
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
@@ -30,6 +31,20 @@ func (*AnyType) Equal(other Type) bool {
 	return ok
 }
 
+// NeverType represents the bottom type
+type NeverType struct{}
+
+func (*NeverType) isType() {}
+
+func (*NeverType) String() string {
+	return "Never"
+}
+
+func (*NeverType) Equal(other Type) bool {
+	_, ok := other.(*NeverType)
+	return ok
+}
+
 // VoidType represents the void type
 type VoidType struct{}
 
@@ -42,6 +57,50 @@ func (*VoidType) String() string {
 func (*VoidType) Equal(other Type) bool {
 	_, ok := other.(*VoidType)
 	return ok
+}
+
+// InvalidType represents a type that is invalid.
+// It is the result of type checking failing and
+// can't be expressed in programs.
+//
+type InvalidType struct{}
+
+func (*InvalidType) isType() {}
+
+func (*InvalidType) String() string {
+	return "<<invalid>>"
+}
+
+func (*InvalidType) Equal(other Type) bool {
+	_, ok := other.(*InvalidType)
+	return ok
+}
+
+func isInvalidType(ty Type) bool {
+	_, ok := ty.(*InvalidType)
+	return ok
+}
+
+// OptionalType represents the optional variant of another type
+type OptionalType struct {
+	Type Type
+}
+
+func (*OptionalType) isType() {}
+
+func (t *OptionalType) String() string {
+	if t.Type == nil {
+		return "optional"
+	}
+	return fmt.Sprintf("%s?", t.Type.String())
+}
+
+func (t *OptionalType) Equal(other Type) bool {
+	otherOptional, ok := other.(*OptionalType)
+	if !ok {
+		return false
+	}
+	return t.Type.Equal(otherOptional.Type)
 }
 
 // BoolType represents the boolean type
@@ -302,9 +361,10 @@ func ArrayTypeToString(arrayType ArrayType) string {
 // FunctionType
 
 type FunctionType struct {
-	ParameterTypes []Type
-	ReturnType     Type
-	apply          func([]Type) Type
+	ParameterTypes        []Type
+	ReturnType            Type
+	Apply                 func([]Type) Type
+	RequiredArgumentCount *int
 }
 
 func (*FunctionType) isType() {}
@@ -354,6 +414,7 @@ func init() {
 	types := []Type{
 		&VoidType{},
 		&AnyType{},
+		&NeverType{},
 		&BoolType{},
 		&IntType{},
 		&StringType{},
@@ -387,15 +448,10 @@ func init() {
 // StructureType
 
 type StructureType struct {
-	Identifier string
-	Members    map[string]*Member
-}
-
-type Member struct {
-	Type           Type
-	IsConstant     bool
-	IsInitialized  bool
-	ArgumentLabels []string
+	Identifier                string
+	Conformances              []*InterfaceType
+	Members                   map[string]*Member
+	ConstructorParameterTypes []Type
 }
 
 func (*StructureType) isType() {}
@@ -411,4 +467,80 @@ func (t *StructureType) Equal(other Type) bool {
 	}
 
 	return otherStructure.Identifier == t.Identifier
+}
+
+// Member
+
+type Member struct {
+	Type           Type
+	VariableKind   ast.VariableKind
+	IsInitialized  bool
+	ArgumentLabels []string
+}
+
+// InterfaceType
+
+type InterfaceType struct {
+	Identifier                string
+	Members                   map[string]*Member
+	InitializerParameterTypes []Type
+}
+
+func (*InterfaceType) isType() {}
+
+func (t *InterfaceType) String() string {
+	return t.Identifier
+}
+
+func (t *InterfaceType) Equal(other Type) bool {
+	otherInterface, ok := other.(*InterfaceType)
+	if !ok {
+		return false
+	}
+
+	return otherInterface.Identifier == t.Identifier
+}
+
+// InterfaceMetaType
+
+type InterfaceMetaType struct {
+	InterfaceType *InterfaceType
+}
+
+func (*InterfaceMetaType) isType() {}
+
+func (t *InterfaceMetaType) String() string {
+	return fmt.Sprintf("%s.Type", t.InterfaceType.Identifier)
+}
+
+func (t *InterfaceMetaType) Equal(other Type) bool {
+	otherInterface, ok := other.(*InterfaceMetaType)
+	if !ok {
+		return false
+	}
+
+	return otherInterface.InterfaceType.Equal(t.InterfaceType)
+}
+
+// DictionaryType
+
+type DictionaryType struct {
+	KeyType   Type
+	ValueType Type
+}
+
+func (*DictionaryType) isType() {}
+
+func (t *DictionaryType) String() string {
+	return fmt.Sprintf("%s[%s]", t.ValueType, t.KeyType)
+}
+
+func (t *DictionaryType) Equal(other Type) bool {
+	otherDictionary, ok := other.(*DictionaryType)
+	if !ok {
+		return false
+	}
+
+	return otherDictionary.KeyType.Equal(t.KeyType) &&
+		otherDictionary.ValueType.Equal(t.ValueType)
 }

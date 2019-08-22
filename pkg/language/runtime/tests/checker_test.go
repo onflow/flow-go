@@ -1,4 +1,4 @@
-package runtime
+package tests
 
 import (
 	"fmt"
@@ -11,16 +11,37 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
 )
 
 func parseAndCheck(code string) (*sema.Checker, error) {
-	program, errors := parser.ParseProgram(code)
+	return parseAndCheckWithExtra(code, nil, nil, nil)
+}
 
-	Expect(errors).
-		To(BeEmpty())
+func parseAndCheckWithExtra(
+	code string,
+	values []sema.ValueDeclaration,
+	types []sema.TypeDeclaration,
+	resolver ast.ImportResolver,
+) (*sema.Checker, error) {
+	program, err := parser.ParseProgram(code)
 
-	checker := sema.NewChecker(program)
-	err := checker.Check()
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	if resolver != nil {
+		err := program.ResolveImports(resolver)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	checker, err := sema.NewChecker(program, values, types)
+	if err != nil {
+		return checker, err
+	}
+
+	err = checker.Check()
 	return checker, err
 }
 
@@ -135,6 +156,24 @@ func TestCheckInvalidLocalRedeclaration(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 }
 
+func TestCheckInvalidLocalFunctionRedeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test() {
+            let x = true
+
+            fun y() {}
+            fun y() {}
+        }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+}
+
 func TestCheckInvalidUnknownDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -148,8 +187,9 @@ func TestCheckInvalidUnknownDeclaration(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+		To(BeAssignableToTypeOf(&sema.InvalidReturnValueError{}))
 }
 
 func TestCheckInvalidUnknownDeclarationInGlobal(t *testing.T) {
@@ -196,13 +236,10 @@ func TestCheckInvalidUnknownDeclarationCallInGlobal(t *testing.T) {
        let x = y()
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }
 
 func TestCheckInvalidUnknownDeclarationAssignment(t *testing.T) {
@@ -364,7 +401,7 @@ func TestCheckInvalidArrayIndexingIntoBool(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int64 {
+      fun test(): Int {
           return true[0]
       }
 	`)
@@ -379,7 +416,7 @@ func TestCheckInvalidArrayIndexingIntoInteger(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int64 {
+      fun test(): Int {
           return 2[0]
       }
 	`)
@@ -445,13 +482,10 @@ func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
 }
 
 func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
@@ -463,13 +497,10 @@ func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
 }
 
 func TestCheckInvalidParameterTypes(t *testing.T) {
@@ -685,6 +716,104 @@ func TestCheckInvalidIfStatementElse(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckIfStatementTestWithDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int?): Int {
+          if var y = x {
+              return y
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidIfStatementTestWithDeclarationReferenceInElse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int?) {
+          if var y = x {
+              // ...
+          } else {
+              y
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
+func TestCheckIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     fun test(x: Int??): Int? {
+         if var y = x {
+             return y
+         }
+     }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     fun test(x: Int??): Int? {
+         if var y: Int? = x {
+             return y
+         }
+     }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidIfStatementTestWithDeclarationNonOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     fun test(x: Int) {
+         if var y = x {
+             // ...
+         }
+     }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidIfStatementTestWithDeclarationSameType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int?): Int? {
+          if var y: Int? = x {
+             return y
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckConditionalExpressionTest(t *testing.T) {
@@ -960,7 +1089,7 @@ func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int32 {
+      fun test(): Int {
           return 2()
       }
 	`)
@@ -1867,13 +1996,10 @@ func TestCheckInvalidStructureFunctionCall(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }
 
 func TestCheckInvalidStructureFunctionAssignment(t *testing.T) {
@@ -1942,6 +2068,20 @@ func TestCheckInvalidStructureRedeclaration(t *testing.T) {
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 
+}
+
+func TestCheckInvalidForwardReference(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x = y
+      let y = x
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 }
 
 func TestCheckInvalidIncompatibleStructureTypes(t *testing.T) {
@@ -2133,6 +2273,25 @@ func TestCheckStructureConstructorReferenceInInitializerAndFunction(t *testing.T
 		To(BeIdenticalTo(structureType))
 }
 
+func TestCheckInvalidStructureFieldMissingVariableKind(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct X {
+            x: Int
+
+            init(x: Int) {
+                self.x = x
+            }
+        }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidVariableKindError{}))
+}
+
 func TestCheckFunctionConditions(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -2165,7 +2324,7 @@ func TestCheckInvalidFunctionPreConditionReference(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 4)
+	errs := expectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
@@ -2173,15 +2332,9 @@ func TestCheckInvalidFunctionPreConditionReference(t *testing.T) {
 		To(Equal("y"))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
-
-	Expect(errs[2]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
-	Expect(errs[2].(*sema.NotDeclaredError).Name).
+	Expect(errs[1].(*sema.NotDeclaredError).Name).
 		To(Equal("z"))
-
-	Expect(errs[3]).
-		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
 }
 
 func TestCheckInvalidFunctionNonBoolCondition(t *testing.T) {
@@ -2222,6 +2375,27 @@ func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckInvalidFunctionPostConditionWithBeforeAndNoArgument(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int) {
+          post {
+              before() != 0
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+
+}
+
 func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -2233,15 +2407,12 @@ func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 	Expect(errs[0].(*sema.NotDeclaredError).Name).
 		To(Equal("before"))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }
 
 func TestCheckInvalidFunctionWithBeforeVariableAndPostConditionWithBefore(t *testing.T) {
@@ -2304,15 +2475,12 @@ func TestCheckInvalidFunctionPreConditionWithResult(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 	Expect(errs[0].(*sema.NotDeclaredError).Name).
 		To(Equal("result"))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
 }
 
 func TestCheckInvalidFunctionPostConditionWithResultWrongType(t *testing.T) {
@@ -2360,15 +2528,12 @@ func TestCheckInvalidFunctionPostConditionWithResult(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 	Expect(errs[0].(*sema.NotDeclaredError).Name).
 		To(Equal("result"))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
 }
 
 func TestCheckFunctionWithoutReturnTypeAndLocalResultAndPostConditionWithResult(t *testing.T) {
@@ -2453,4 +2618,1441 @@ func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.FunctionExpressionInConditionError{}))
+}
+
+func TestCheckFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          post {
+             1 == 2: "nope"
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidFunctionPostConditionWithMessageUsingBooleanLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {
+          post {
+             1 == 2: true
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckFunctionPostConditionWithMessageUsingResult(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): String {
+          post {
+             1 == 2: result
+          }
+          return ""
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: String) {
+          post {
+             1 == 2: before(x)
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: String) {
+          post {
+             1 == 2: x
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckMutuallyRecursiveFunctions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun isEven(_ n: Int): Bool {
+          if n == 0 {
+              return true
+          }
+          return isOdd(n - 1)
+      }
+
+      fun isOdd(_ n: Int): Bool {
+          if n == 0 {
+              return false
+          }
+          return isEven(n - 1)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckReferenceBeforeDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      var tests = 0
+
+      fun test(): Test {
+          return Test()
+      }
+
+      struct Test {
+         init() {
+             tests = tests + 1
+         }
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNever(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+            fun test(): Int {
+                return panic("XXX")
+            }
+        `,
+		[]sema.ValueDeclaration{
+			stdlib.PanicFunction,
+		},
+		nil,
+		nil,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Int? = 1
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Int? = false
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckOptionalNesting(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Int?? = 1
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int? = nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckOptionalNestingNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int?? = nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNilReturnValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     fun test(): Int?? {
+         return nil
+     }
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidNonOptionalNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Int = nil
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckNilCoalescingNilIntToOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let one = 1
+      let none: Int? = nil
+      let x: Int? = none ?? one
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNilCoalescingNilIntToOptionals(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let one = 1
+      let none: Int?? = nil
+      let x: Int? = none ?? one
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNilCoalescingNilIntToOptionalNilLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let one = 1
+      let x: Int? = nil ?? one
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidNilCoalescingMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Int? = nil ?? false
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckNilCoalescingRightSubtype(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Int? = nil ?? nil
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNilCoalescingNilInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let one = 1
+      let none: Int? = nil
+      let x: Int = none ?? one
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidNilCoalescingOptionalsInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let one = 1
+      let none: Int?? = nil
+      let x: Int = none ?? one
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckNilCoalescingNilLiteralInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let one = 1
+     let x: Int = nil ?? one
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidNilCoalescingMismatchNonOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int = nil ?? false
+   `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidNilCoalescingRightSubtype(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int = nil ?? nil
+   `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckNilsComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x = nil == nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int? = 1
+     let y = x == nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNonOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int = 1
+     let y = x == nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNonOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int = 1
+     let y = nil == x
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNestedOptionalNilComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int?? = 1
+     let y = x == nil
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int? = 1
+     let y = nil == x
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNestedOptionalNilComparisonSwapped(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int?? = 1
+     let y = nil == x
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNilCoalescingWithNever(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+          let x: Int? = nil
+          let y = x ?? panic("nope")
+        `,
+		[]sema.ValueDeclaration{
+			stdlib.PanicFunction,
+		},
+		nil,
+		nil,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNestedOptionalComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int? = nil
+     let y: Int?? = nil
+     let z = x == y
+   `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidNestedOptionalComparison(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Int? = nil
+     let y: Bool?? = nil
+     let z = x == y
+   `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}))
+}
+
+func TestCheckInvalidNonOptionalReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(x: Int?): Int {
+          return x
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidLocalInterface(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+	  fun test() {
+          interface Test {}
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+}
+
+func TestCheckInterfaceWithFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test()
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInterfaceWithFunctionImplementationAndConditions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test(x: Int) {
+              pre {
+                x == 0
+              }
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInterfaceWithFunctionImplementation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test(): Int {
+             return 1
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+}
+
+func TestCheckInvalidInterfaceWithFunctionImplementationNoConditions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test() {
+            // ...
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+}
+
+func TestCheckInterfaceWithInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init()
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInterfaceWithInitializerImplementation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init() {
+            // ...
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+}
+
+func TestCheckInterfaceWithInitializerImplementationAndConditions(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init(x: Int) {
+              pre {
+                x == 0
+              }
+          }
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInterfaceConstructorCall(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {}
+
+      let test = Test()
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+}
+
+func TestCheckInterfaceUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+          interface Test {}
+
+          let test: Test = panic("")
+        `,
+		[]sema.ValueDeclaration{
+			stdlib.PanicFunction,
+		},
+		nil,
+		nil,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {}
+
+      struct TestImpl: Test {}
+
+      let test: Test = TestImpl()
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {}
+
+      // NOTE: not declaring conformance
+      struct TestImpl {}
+
+      let test: Test = TestImpl()
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceNonInterface(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct TestImpl: Int {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidConformanceError{}))
+}
+
+func TestCheckInterfaceFieldUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          x: Int
+      }
+
+      struct TestImpl: Test {
+          var x: Int
+
+          init(x: Int) {
+              self.x = x
+          }
+      }
+
+      let test: Test = TestImpl(x: 1)
+
+      let x = test.x
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {}
+
+      struct TestImpl: Test {
+          var x: Int
+
+          init(x: Int) {
+              self.x = x
+          }
+      }
+
+      let test: Test = TestImpl(x: 1)
+
+      let x = test.x
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+}
+
+func TestCheckInterfaceFunctionUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test(): Int
+      }
+
+      struct TestImpl: Test {
+          fun test(): Int {
+              return 2
+          }
+      }
+
+      let test: Test = TestImpl()
+
+      let val = test.test()
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+      }
+
+      struct TestImpl: Test {
+          fun test(): Int {
+              return 2
+          }
+      }
+
+      let test: Test = TestImpl()
+
+      let val = test.test()
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceInitializerExplicitMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init(x: Int)
+      }
+
+      struct TestImpl: Test {
+          init(x: Bool) {}
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceInitializerImplicitMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          init(x: Int)
+      }
+
+      struct TestImpl: Test {
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceMissingFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test(): Int
+      }
+
+      struct TestImpl: Test {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceFunctionMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun test(): Int
+      }
+
+      struct TestImpl: Test {
+          fun test(): Bool {
+              return true
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceMissingField(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+           x: Int
+      }
+
+      struct TestImpl: Test {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceFieldTypeMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          x: Int
+      }
+
+      struct TestImpl: Test {
+          var x: Bool
+          init(x: Bool) {
+             self.x = x
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceKindFieldFunctionMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          x: Bool
+      }
+
+      struct TestImpl: Test {
+          fun x(): Bool {
+              return true
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceKindFunctionFieldMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          fun x(): Bool
+      }
+
+      struct TestImpl: Test {
+          var x: Bool
+
+          init(x: Bool) {
+             self.x = x
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceFieldKindLetVarMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          let x: Bool
+      }
+
+      struct TestImpl: Test {
+          var x: Bool
+
+          init(x: Bool) {
+             self.x = x
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceFieldKindVarLetMismatch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface Test {
+          var x: Bool
+      }
+
+      struct TestImpl: Test {
+          let x: Bool
+
+          init(x: Bool) {
+             self.x = x
+          }
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+}
+
+func TestCheckInvalidInterfaceConformanceRepetition(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface X {}
+
+      interface Y {}
+
+      struct TestImpl: X, Y, X {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.DuplicateConformanceError{}))
+}
+
+func TestCheckInterfaceTypeAsValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+      interface X {}
+
+      let x = X
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.Globals["x"].Type).
+		To(BeAssignableToTypeOf(&sema.InterfaceMetaType{}))
+}
+
+// TODO: field declaration, member access, type references
+//
+func TestCheckOrigins(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x = 1
+        var y = 1
+
+        fun f1(paramX: Int, paramY: Bool) {
+            let x = 1
+            var y: Int? = y
+            fun f2() {
+                if let y = y {
+                }
+            }
+        }
+
+        struct S1 {
+            fun test() {}
+        }
+
+        interface I1 {}
+
+        fun f3(): S1 {
+            f1(paramX: 1, paramY: true)
+            return S1()
+        }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	origins := checker.Origins.All()
+
+	matchers := []*originMatcher{
+		{
+			sema.Position{Line: 2, Column: 12},
+			sema.Position{Line: 2, Column: 12},
+			common.DeclarationKindConstant,
+		},
+		{
+			sema.Position{Line: 3, Column: 12},
+			sema.Position{Line: 3, Column: 12},
+			common.DeclarationKindVariable,
+		},
+		{
+			sema.Position{Line: 5, Column: 12},
+			sema.Position{Line: 5, Column: 13},
+			common.DeclarationKindFunction,
+		},
+		{
+			sema.Position{Line: 5, Column: 15},
+			sema.Position{Line: 5, Column: 20},
+			common.DeclarationKindParameter,
+		},
+		{
+			sema.Position{Line: 5, Column: 28},
+			sema.Position{Line: 5, Column: 33},
+			common.DeclarationKindParameter,
+		},
+		{
+			sema.Position{Line: 6, Column: 16},
+			sema.Position{Line: 6, Column: 16},
+			common.DeclarationKindConstant,
+		},
+		{
+			sema.Position{Line: 7, Column: 16},
+			sema.Position{Line: 7, Column: 16},
+			common.DeclarationKindVariable,
+		},
+		{
+			sema.Position{Line: 7, Column: 26},
+			sema.Position{Line: 7, Column: 26},
+			common.DeclarationKindVariable,
+		},
+		{
+			sema.Position{Line: 8, Column: 16},
+			sema.Position{Line: 8, Column: 17},
+			common.DeclarationKindFunction,
+		},
+		{
+			sema.Position{Line: 9, Column: 23},
+			sema.Position{Line: 9, Column: 23},
+			common.DeclarationKindConstant,
+		},
+		{
+			sema.Position{Line: 9, Column: 27},
+			sema.Position{Line: 9, Column: 27},
+			common.DeclarationKindVariable,
+		},
+		{
+			sema.Position{Line: 14, Column: 15},
+			sema.Position{Line: 14, Column: 16},
+			common.DeclarationKindStructure,
+		},
+		{
+			sema.Position{Line: 15, Column: 16},
+			sema.Position{Line: 15, Column: 19},
+			common.DeclarationKindFunction,
+		},
+		{
+			sema.Position{Line: 18, Column: 18},
+			sema.Position{Line: 18, Column: 19},
+			common.DeclarationKindInterface,
+		},
+		{
+			sema.Position{Line: 20, Column: 12},
+			sema.Position{Line: 20, Column: 13},
+			common.DeclarationKindFunction,
+		},
+		{
+			sema.Position{Line: 21, Column: 12},
+			sema.Position{Line: 21, Column: 13},
+			common.DeclarationKindFunction,
+		},
+		{
+			sema.Position{Line: 22, Column: 19},
+			sema.Position{Line: 22, Column: 20},
+			// NOTE: function instead of structure: constructor
+			common.DeclarationKindFunction,
+		},
+	}
+
+	ms := make([]interface{}, len(matchers))
+	for i := range matchers {
+		ms[i] = matchers[i]
+	}
+
+	Expect(origins).
+		To(ConsistOf(ms...))
+
+	for _, matcher := range matchers {
+		Expect(checker.Origins.Find(matcher.startPos)).To(Not(BeNil()))
+		Expect(checker.Origins.Find(matcher.endPos)).To(Not(BeNil()))
+	}
+}
+
+func TestCheckInvalidImport(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+       import "unknown"
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnresolvedImportError{}))
+}
+
+func TestCheckInvalidRepeatedImport(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+           import "unknown"
+           import "unknown" 
+        `,
+		nil,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			return &ast.Program{}, nil
+		},
+	)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RepeatedImportError{}))
+}
+
+func TestCheckImportAll(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+	   fun answer(): Int {
+	       return 42
+		}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = parseAndCheckWithExtra(
+		`
+           import "imported"
+
+           let x = answer()
+        `,
+		nil,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			return checker.Program, nil
+		},
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidImportUnexported(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`	
+       let x = 1
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = parseAndCheckWithExtra(
+		`
+           import answer from "imported"
+
+           let x = answer()
+        `,
+		nil,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			return checker.Program, nil
+		},
+	)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotExportedError{}))
+}
+
+func TestCheckImportSome(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+	   fun answer(): Int {
+	       return 42
+       }
+
+       let x = 1
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = parseAndCheckWithExtra(
+		`
+           import answer from "imported"
+
+           let x = answer()
+        `,
+		nil,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			return checker.Program, nil
+		},
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidImportedError(t *testing.T) {
+	RegisterTestingT(t)
+
+	// NOTE: only parse, don't check imported program.
+	// will be checked by checker checking importing program
+
+	imported, err := parser.ParseProgram(`	
+       let x: Bool = 1
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = parseAndCheckWithExtra(
+		`
+           import x from "imported"
+        `,
+		nil,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			return imported, nil
+		},
+	)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ImportedProgramError{}))
+}
+
+func TestCheckDictionaryIndexing(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheckWithExtra(
+		`
+          let x = dict["abc"]
+	    `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.Globals["x"].Type).
+		To(Equal(&sema.OptionalType{Type: &sema.IntType{}}))
+}
+
+func TestCheckInvalidDictionaryIndexing(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+          let x = dict[true]
+	    `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
+}
+
+func TestCheckDictionaryIndexingAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+          fun test() {
+              dict["abc"] = 1
+          }
+	    `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidDictionaryIndexingAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+          fun test() {
+              dict["abc"] = true
+          }
+	    `,
+		[]sema.ValueDeclaration{
+			stdlib.StandardLibraryValue{
+				Name: "dict",
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: &sema.IntType{},
+				},
+			},
+		},
+		nil,
+		nil,
+	)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }

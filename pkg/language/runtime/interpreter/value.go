@@ -1,8 +1,13 @@
 package interpreter
 
 import (
+	"encoding/gob"
 	"fmt"
 	"math/big"
+	"strconv"
+	"strings"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 )
 
 type Value interface {
@@ -26,6 +31,10 @@ func (v VoidValue) Copy() Value {
 
 func (v VoidValue) ToGoValue() interface{} {
 	return nil
+}
+
+func (v VoidValue) String() string {
+	return "()"
 }
 
 // BoolValue
@@ -60,6 +69,19 @@ func (v StringValue) ToGoValue() interface{} {
 	return string(v)
 }
 
+func (v StringValue) String() string {
+	// TODO: quote like in string literal
+	return strconv.Quote(string(v))
+}
+
+// IndexableValue
+
+type IndexableValue interface {
+	isIndexableValue()
+	Get(key Value) Value
+	Set(key Value, value Value)
+}
+
 // ArrayValue
 
 type ArrayValue []Value
@@ -83,6 +105,29 @@ func (v ArrayValue) ToGoValue() interface{} {
 	}
 
 	return values
+}
+
+func (v ArrayValue) isIndexableValue() {}
+
+func (v ArrayValue) Get(key Value) Value {
+	return v[key.(IntegerValue).IntValue()]
+}
+
+func (v ArrayValue) Set(key Value, value Value) {
+	v[key.(IntegerValue).IntValue()] = value
+}
+
+func (v ArrayValue) String() string {
+	var builder strings.Builder
+	builder.WriteString("[")
+	for i, value := range v {
+		if i > 0 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(fmt.Sprint(value))
+	}
+	builder.WriteString("]")
+	return builder.String()
 }
 
 // IntegerValue
@@ -683,7 +728,7 @@ func (v StructureValue) Copy() Value {
 	newStructure := make(StructureValue, len(v))
 	for field, value := range v {
 		var copiedValue Value
-		if f, ok := value.(*StructFunctionValue); ok {
+		if f, ok := value.(*StructureFunctionValue); ok {
 			copiedValue = f.CopyWithStructure(newStructure)
 		} else {
 			copiedValue = value.Copy()
@@ -704,6 +749,56 @@ func (v StructureValue) Get(field string) Value {
 
 func (v StructureValue) Set(field string, value Value) {
 	v[field] = value
+}
+
+// DictionaryValue
+
+type DictionaryValue map[Value]Value
+
+func (DictionaryValue) isValue() {}
+
+func (v DictionaryValue) Copy() Value {
+	newDictionary := make(DictionaryValue, len(v))
+	for field, value := range v {
+		newDictionary[field] = value.Copy()
+	}
+	return newDictionary
+}
+
+func (v DictionaryValue) ToGoValue() interface{} {
+	// TODO: convert values to Go values?
+	return v
+}
+
+func (v DictionaryValue) isIndexableValue() {}
+
+func (v DictionaryValue) Get(key Value) Value {
+	value, ok := v[key]
+	if !ok {
+		return NilValue{}
+	}
+	return SomeValue{Value: value}
+}
+
+func (v DictionaryValue) Set(key Value, value Value) {
+	v[key] = value
+}
+
+func (v DictionaryValue) String() string {
+	var builder strings.Builder
+	builder.WriteString("{")
+	i := 0
+	for key, value := range v {
+		if i > 0 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(fmt.Sprint(key))
+		builder.WriteString(": ")
+		builder.WriteString(fmt.Sprint(value))
+		i += 1
+	}
+	builder.WriteString("}")
+	return builder.String()
 }
 
 // ToValue
@@ -732,6 +827,10 @@ func ToValue(value interface{}) (Value, error) {
 		return UInt64Value(value), nil
 	case bool:
 		return BoolValue(value), nil
+	case string:
+		return StringValue(value), nil
+	case nil:
+		return NilValue{}, nil
 	}
 
 	return nil, fmt.Errorf("cannot convert Go value to value: %#+v", value)
@@ -740,9 +839,13 @@ func ToValue(value interface{}) (Value, error) {
 func ToValues(inputs []interface{}) ([]Value, error) {
 	var values []Value
 	for _, argument := range inputs {
-		value, err := ToValue(argument)
-		if err != nil {
-			return nil, err
+		value, ok := argument.(Value)
+		if !ok {
+			var err error
+			value, err = ToValue(argument)
+			if err != nil {
+				return nil, err
+			}
 		}
 		values = append(
 			values,
@@ -765,4 +868,81 @@ func (v TupleValue) Copy() Value {
 		Left:  v.Left.Copy(),
 		Right: v.Right.Copy(),
 	}
+}
+
+func (v TupleValue) String() string {
+	return fmt.Sprintf(
+		"Tuple(left: %s, right: %s)",
+		v.Left, v.Right,
+	)
+}
+
+// NilValue
+
+type NilValue struct{}
+
+func (NilValue) isValue() {}
+
+func (v NilValue) Copy() Value {
+	return v
+}
+
+func (NilValue) String() string {
+	return "nil"
+}
+
+func (v NilValue) ToGoValue() interface{} {
+	return nil
+}
+
+// SomeValue
+
+type SomeValue struct {
+	Value Value
+}
+
+func (SomeValue) isValue() {}
+
+func (v SomeValue) Copy() Value {
+	return SomeValue{
+		Value: v.Value.Copy(),
+	}
+}
+
+func (v SomeValue) String() string {
+	return fmt.Sprint(v.Value)
+}
+
+// MetaTypeValue
+
+type MetaTypeValue struct {
+	Type sema.Type
+}
+
+func (MetaTypeValue) isValue() {}
+
+func (v MetaTypeValue) Copy() Value {
+	return v
+}
+
+func init() {
+	gob.Register(VoidValue{})
+	gob.Register(BoolValue(true))
+	gob.Register(StringValue(""))
+	gob.Register(ArrayValue{})
+	gob.Register(IntValue{})
+	gob.Register(Int8Value(0))
+	gob.Register(Int16Value(0))
+	gob.Register(Int32Value(0))
+	gob.Register(Int64Value(0))
+	gob.Register(UInt8Value(0))
+	gob.Register(UInt16Value(0))
+	gob.Register(UInt32Value(0))
+	gob.Register(UInt64Value(0))
+	gob.Register(StructureValue{})
+	gob.Register(DictionaryValue{})
+	gob.Register(TupleValue{})
+	gob.Register(NilValue{})
+	gob.Register(SomeValue{})
+	gob.Register(MetaTypeValue{})
 }

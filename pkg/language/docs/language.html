@@ -213,7 +213,7 @@
             <p><a href="#built-in-functions">Built-in Functions</a></p>
             <ul>
               <li>
-                <p><a href="#fatalerror"><code>fatalError</code></a></p>
+                <p><a href="#panic"><code>panic</code></a></p>
                 <ul>
                   <li><a href="#example">Example</a></li>
                 </ul>
@@ -235,7 +235,7 @@
               <li><a href="#distinctnew-types">Distinct/New Types</a></li>
               <li><a href="#set-data-structure">Set Data Structure</a></li>
               <li><a href="#generics">Generics</a></li>
-              <li><a href="#calls-of-pure-functions-in-pre-conditions-and-post-conditions">Calls of Pure Functions in Pre-Conditions and Post-Conditions</a></li>
+              <li><a href="#calls-of-pure-functions-in-preconditions-and-postconditions">Calls of Pure Functions in Preconditions and Postconditions</a></li>
               <li><a href="#late-initialization-of-variables-and-constants">Late Initialization of Variables and Constants</a></li>
               <li><a href="#arbitrary-argument-order-based-on-argument-labels">Arbitrary Argument Order Based on Argument Labels</a></li>
             </ul>
@@ -559,12 +559,12 @@
         </section>
         <section>
           <h3 id="never"><a href="#never" aria-hidden="true"><span class="icon icon-link"></span></a>Never</h3>
-          <p><code>Never</code> is the bottom type, i.e., it is a subtype of all types. There is no value that has type <code>Never</code>. <code>Never</code> can be used as the return type for functions that never return normally. For example, it is the return type of the function <a href="#fatalError"><code>fatalError</code></a>.</p>
+          <p><code>Never</code> is the bottom type, i.e., it is a subtype of all types. There is no value that has type <code>Never</code>. <code>Never</code> can be used as the return type for functions that never return normally. For example, it is the return type of the function <a href="#panic"><code>panic</code></a>.</p>
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a function named `crashAndBurn` which will never return,</span><span>
-</span><span style="color: #008000">// because it calls the function named `fatalError`, which never returns</span><span>
+</span><span style="color: #008000">// because it calls the function named `panic`, which never returns</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> crashAndBurn(): Never {</span><span>
-</span><span style="color: #000000">    fatalError(</span><span style="color: #A31515">"An unrecoverable error occurred"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    panic(</span><span style="color: #A31515">"An unrecoverable error occurred"</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
         </section>
@@ -592,6 +592,7 @@
               The nil-coalescing operator <code>??</code> returns the value inside an optional if it contains a value,
               or returns an alternative value if the optional has no value, i.e., the optional value is <code>nil</code>.
             </p>
+            <p>If the left-hand side is non-nil, the right-hand side is not evaluated.</p>
             <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant which has an optional integer type</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
@@ -608,22 +609,25 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: nil-coalescing operator is applied to a value which has a non-optional type</span><span>
-</span><span style="color: #008000">// (a has the non-optional type Int)</span><span>
+</span><span style="color: #008000">// (a has the non-optional type `Int`)</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a ?? </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
             <pre><code class="language-bamboo"><span style="color: #008000">// Invalid: nil-coalescing operator is applied to a value which has a non-optional type</span><span>
-</span><span style="color: #008000">// (the integer literal is of type Int)</span><span>
+</span><span style="color: #008000">// (the integer literal is of type `Int`)</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> c = </span><span style="color: #09885A">1</span><span style="color: #000000"> ?? </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
-            <p>The alternative value, i.e. the right-hand side of the operator, must be the non-optional type matching the type of the left-hand side.</p>
+            <p>
+              The alternative value, i.e. the right-hand side of the operator,
+              must be the non-optional or optional type matching the type of the left-hand side.
+            </p>
             <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant with a non-optional integer type</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
-</span><span style="color: #008000">// Invalid: nil-coalescing operator is applied to a value of type Int,</span><span>
-</span><span style="color: #008000">// but alternative is of type Bool</span><span>
+</span><span style="color: #008000">// Invalid: nil-coalescing operator is applied to a value of type `Int`,</span><span>
+</span><span style="color: #008000">// but the alternative has type `Bool`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a ?? </span><span style="color: #0000FF">false</span><span>
 </span></code></pre>
@@ -660,7 +664,7 @@
         <section>
           <h3 id="strings-and-characters"><a href="#strings-and-characters" aria-hidden="true"><span class="icon icon-link"></span></a>Strings and Characters</h3>
           <blockquote>
-            <p>🚧 Status: Strings are not implemented yet.</p>
+            <p>🚧 Status: Characters are not implemented yet.</p>
           </blockquote>
           <p>Strings are collections of characters. Strings have the type <code>String</code>, and characters have the type <code>Character</code>. Strings can be used to work with text in a Unicode-compliant way. Strings are immutable.</p>
           <p>String and character literals are enclosed in double quotation marks (<code>"</code>).</p>
@@ -986,19 +990,35 @@
           <ul>
             <li>
               <p>Logical AND: <code>a &#x26;&#x26; b</code></p>
-              <pre><code class="language-bamboo,file=operator-and.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">true</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #0000FF">false</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #0000FF">false</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
+              <pre><code class="language-bamboo,file=operator-and.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #0000FF">false</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #0000FF">false</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is false</span><span>
 </span></code></pre>
+              <p>If the left-hand side is true, the right-hand side is not evaluated.</p>
             </li>
             <li>
               <p>Logical OR: <code>a || b</code></p>
-              <pre><code class="language-bamboo,file=operator-or.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">true</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">false</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">false</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
+              <pre><code class="language-bamboo,file=operator-or.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #0000FF">false</span><span style="color: #000000"> || </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #0000FF">false</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is false</span><span>
 </span></code></pre>
+              <p>If the left-hand side is false, the right-hand side is not evaluated.</p>
             </li>
           </ul>
         </section>
@@ -1007,49 +1027,117 @@
           <p>Comparison operators work with boolean and integer values.</p>
           <ul>
             <li>
-              <p>Equality: <code>==</code>, for booleans and integers</p>
-              <pre><code class="language-bamboo,file=operator-equal.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">true</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
+              <p>Equality: <code>==</code>, for booleans and integers (possibly optional)</p>
+              <pre><code class="language-bamboo,file=operator-equal-int.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-equal-bool.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-equal-optional-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">x == </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-equal-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">x == </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-equal-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #000000">x == y</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-equal-optional-int-optionals-int.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">x == y</span><span>
+</span><span style="color: #008000">// is true</span><span>
 </span></code></pre>
             </li>
             <li>
-              <p>Inequality: <code>!=</code>, for booleans and integers</p>
-              <pre><code class="language-bamboo,file=operator-not-equal.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">true</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
+              <p>Inequality: <code>!=</code>, for booleans and integers (possibly optional)</p>
+              <pre><code class="language-bamboo,file=operator-not-equal-int.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-not-equal-bool.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-not-equal-optional-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">x != </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-not-equal-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">x != </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-not-equal-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #000000">x != y</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span></code></pre>
+              <pre><code class="language-bamboo,file=operator-not-equal-optional-int-optionals-int.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">x != y</span><span>
+</span><span style="color: #008000">// is false</span><span>
 </span></code></pre>
             </li>
             <li>
               <p>Less than: <code>&#x3C;</code>, for integers</p>
-              <pre><code class="language-bamboo,file=operator-less.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #09885A">2</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
+              <pre><code class="language-bamboo,file=operator-less.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #09885A">2</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is false</span><span>
 </span></code></pre>
             </li>
             <li>
               <p>Less or equal than: <code>&#x3C;=</code>, for integers</p>
-              <pre><code class="language-bamboo,file=operator-less-equals.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #09885A">2</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
+              <pre><code class="language-bamboo,file=operator-less-equals.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #09885A">2</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is false</span><span>
 </span></code></pre>
             </li>
             <li>
               <p>Greater than: <code>></code>, for integers</p>
-              <pre><code class="language-bamboo,file=operator-greater.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #09885A">2</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
+              <pre><code class="language-bamboo,file=operator-greater.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #09885A">2</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is true</span><span>
 </span></code></pre>
             </li>
-          </ul>
-          <ul>
             <li>
               <p>Greater or equal than: <code>>=</code>, for integers</p>
-              <pre><code class="language-bamboo,file=operator-greater-equals.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
-</span><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">2</span><span style="color: #000000"> </span><span style="color: #008000">// is false</span><span>
-</span><span style="color: #09885A">2</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is true</span><span>
+              <pre><code class="language-bamboo,file=operator-greater-equals.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is true</span><span>
+</span><span>
+</span><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// is false</span><span>
+</span><span>
+</span><span style="color: #09885A">2</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// is true</span><span>
 </span></code></pre>
             </li>
           </ul>
@@ -1335,13 +1423,10 @@
         </section>
         <section>
           <h3 id="function-preconditions-and-postconditions"><a href="#function-preconditions-and-postconditions" aria-hidden="true"><span class="icon icon-link"></span></a>Function Preconditions and Postconditions</h3>
-          <blockquote>
-            <p>🚧 Status: Function Preconditions and Postconditions are not implemented yet.</p>
-          </blockquote>
           <p>Functions may have preconditions and may have postconditions. Preconditions and postconditions can be used to restrict the inputs (values for parameters) and output (return value) of a function.</p>
           <p>Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the <code>pre</code> keyword, followed by the condition block.</p>
           <p>Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the <code>post</code> keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.</p>
-          <p>A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions.</p>
+          <p>A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions. Also, conditions may not contain function expressions.</p>
           <p>Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for <a href="#semicolons">statements</a>.</p>
           <p>Following each condition, an optional description can be provided after a colon.</p>
           <p>In postconditions, the special constant <code>result</code> refers to the result of the function.</p>
@@ -1549,9 +1634,6 @@
       </section>
       <section>
         <h2 id="type-safety"><a href="#type-safety" aria-hidden="true"><span class="icon icon-link"></span></a>Type Safety</h2>
-        <blockquote>
-          <p>🚧 Status: Type checking is not implemented yet.</p>
-        </blockquote>
         <p>The Bamboo programming language is a <em>type-safe</em> language.</p>
         <p>When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type <code>Bool</code>, it can <em>only</em> be assigned a value that has type <code>Bool</code>, and not for example a value that has type <code>Int</code>.</p>
         <pre><code class="language-bamboo,file=type-safety-assign-int-to-bool.bpl"><span style="color: #008000">// Declare a variable that has type `Bool`</span><span>
@@ -1592,7 +1674,7 @@
       <section>
         <h2 id="type-inference"><a href="#type-inference" aria-hidden="true"><span class="icon icon-link"></span></a>Type Inference</h2>
         <blockquote>
-          <p>🚧 Status: Type inference is not implemented yet.</p>
+          <p>🚧 Status: Only basic type inference is implemented.</p>
         </blockquote>
         <p>If a variable or constant is not annotated explicitly with a type, it is inferred from the value.</p>
         <p>Integer literals are inferred to type <code>Int</code>.</p>
@@ -1646,7 +1728,7 @@
       <section>
         <h2 id="composite-data-types"><a href="#composite-data-types" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Types</h2>
         <blockquote>
-          <p>🚧 Status: Composite data types are not implemented yet.</p>
+          <p>🚧 Status: Resources are not implemented yet.</p>
         </blockquote>
         <p>Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.</p>
         <p>
@@ -2323,7 +2405,7 @@
           Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
         </p>
         <p>
-          Calling functions with pre-conditions and post-conditions on interfaces instead of concrete implementations can improve the security of a program,
+          Calling functions with preconditions and postconditions on interfaces instead of concrete implementations can improve the security of a program,
           as it ensures that even if implementations change, some aspects of them will always hold.
         </p>
         <section>
@@ -2418,7 +2500,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// The given token must be of the same type – a deposit of another</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// type is not possible.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// No pre-condition is required to check the given token's balance</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// No precondition is required to check the given token's balance</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// is positive, as this condition is already ensured by</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// the field requirement.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
@@ -2977,7 +3059,7 @@
       <section>
         <h2 id="transactions"><a href="#transactions" aria-hidden="true"><span class="icon icon-link"></span></a>Transactions</h2>
         <p>Transactions are objects that are signed by one or more <a href="#accounts">accounts</a> and are sent to the chain to interact with it.</p>
-        <p>Transactions have three phases: Preparation, execution, and post-conditions.</p>
+        <p>Transactions have three phases: Preparation, execution, and postconditions.</p>
         <p>
           The preparer acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
           The preparer has the permissions to read and write to storage of all signer accounts.
@@ -2985,7 +3067,7 @@
         <p>
           Transactions are declared using the <code>transaction</code> keyword.
           The preparer is declared using the <code>prepare</code> keyword and the execution phase is declared using the <code>execute</code> keyword.
-          The <code>post</code> section can be used to declare post-conditions.
+          The <code>post</code> section can be used to declare postconditions.
         </p>
         <pre><code class="language-bamboo,file=transaction-declaration.bpl"><span style="color: #000000">transaction {</span><span>
 </span><span>
@@ -3254,28 +3336,23 @@
       <section>
         <h2 id="built-in-functions"><a href="#built-in-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Built-in Functions</h2>
         <section>
-          <h3 id="fatalerror"><a href="#fatalerror" aria-hidden="true"><span class="icon icon-link"></span></a><code>fatalError</code></h3>
-          <blockquote>
-            <p>🚧 Status: <code>fatalError</code> is not implemented yet.</p>
-          </blockquote>
-          <pre><code class="language-bamboo"><span style="color: #0000FF">fun</span><span style="color: #000000"> fatalError(_ message: </span><span style="color: #0000FF">String</span><span style="color: #000000">): Never</span><span>
+          <h3 id="panic"><a href="#panic" aria-hidden="true"><span class="icon icon-link"></span></a><code>panic</code></h3>
+          <pre><code class="language-bamboo"><span style="color: #0000FF">fun</span><span style="color: #000000"> panic(_ message: </span><span style="color: #0000FF">String</span><span style="color: #000000">): Never</span><span>
 </span></code></pre>
           <p>Terminates the program unconditionally and reports a message which explains why the unrecoverable error occurred.</p>
           <section>
             <h4 id="example"><a href="#example" aria-hidden="true"><span class="icon icon-link"></span></a>Example</h4>
             <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> optionalAccount: </span><span style="color: #0000FF">Account</span><span style="color: #000000">? = </span><span style="color: #008000">// ...</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> account = optionalAccount ?? fatalError(</span><span style="color: #A31515">"missing account"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> account = optionalAccount ?? panic(</span><span style="color: #A31515">"missing account"</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           </section>
         </section>
         <section>
           <h3 id="assert"><a href="#assert" aria-hidden="true"><span class="icon icon-link"></span></a><code>assert</code></h3>
-          <blockquote>
-            <p>🚧 Status: <code>assert</code> is not implemented yet.</p>
-          </blockquote>
           <pre><code class="language-bamboo"><span style="color: #0000FF">fun</span><span style="color: #000000"> assert(_ condition: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, message: </span><span style="color: #0000FF">String</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.</p>
+          <p>The message argument is optional.</p>
         </section>
       </section>
       <section>
@@ -3358,12 +3435,12 @@
           <p>Should we add generics? In what form? Is it OK to add them in a later version?</p>
         </section>
         <section>
-          <h3 id="calls-of-pure-functions-in-pre-conditions-and-post-conditions"><a href="#calls-of-pure-functions-in-pre-conditions-and-post-conditions" aria-hidden="true"><span class="icon icon-link"></span></a>Calls of Pure Functions in Pre-Conditions and Post-Conditions</h3>
+          <h3 id="calls-of-pure-functions-in-preconditions-and-postconditions"><a href="#calls-of-pure-functions-in-preconditions-and-postconditions" aria-hidden="true"><span class="icon icon-link"></span></a>Calls of Pure Functions in Preconditions and Postconditions</h3>
           <blockquote>
             <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/70">https://github.com/dapperlabs/bamboo-node/issues/70</a></p>
           </blockquote>
           <p>
-            It might be useful to call pure functions pre-conditions and post-conditons.
+            It might be useful to call pure functions preconditions and postconditons.
             How do we ensure preconditions and postconditions are side-effect free?
           </p>
         </section>

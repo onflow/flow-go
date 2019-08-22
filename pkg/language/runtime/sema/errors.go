@@ -2,9 +2,11 @@ package sema
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
 // astTypeConversionError
@@ -50,6 +52,26 @@ func (e *unsupportedOperation) StartPosition() ast.Position {
 
 func (e *unsupportedOperation) EndPosition() ast.Position {
 	return e.endPos
+}
+
+// CheckerError
+
+type CheckerError struct {
+	Errors []error
+}
+
+func (e CheckerError) Error() string {
+	var sb strings.Builder
+	sb.WriteString("Checking failed:\n")
+	for _, err := range e.Errors {
+		sb.WriteString(err.Error())
+		if err, ok := err.(errors.SecondaryError); ok {
+			sb.WriteString(". ")
+			sb.WriteString(err.SecondaryError())
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 // SemanticError
@@ -392,7 +414,7 @@ type InvalidBinaryOperandsError struct {
 
 func (e *InvalidBinaryOperandsError) Error() string {
 	return fmt.Sprintf(
-		"can't apply binary operation %s to different types: `%s`, `%s`",
+		"cannot apply binary operation %s to different types: `%s`, `%s`",
 		e.Operation.Symbol(),
 		e.LeftType.String(),
 		e.RightType.String(),
@@ -509,6 +531,31 @@ func (e *InvalidInitializerNameError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
+// InvalidVariableKindError
+
+type InvalidVariableKindError struct {
+	Kind     ast.VariableKind
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidVariableKindError) Error() string {
+	if e.Kind == ast.VariableKindNotSpecified {
+		return fmt.Sprintf("missing variable kind")
+	}
+	return fmt.Sprintf("invalid variable kind: `%s`", e.Kind.Name())
+}
+
+func (*InvalidVariableKindError) isSemanticError() {}
+
+func (e *InvalidVariableKindError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidVariableKindError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
 // InvalidDeclarationError
 
 type InvalidDeclarationError struct {
@@ -534,7 +581,7 @@ func (e *InvalidDeclarationError) EndPosition() ast.Position {
 // MissingInitializerError
 
 type MissingInitializerError struct {
-	StructureType  *StructureType
+	TypeIdentifier string
 	FirstFieldName string
 	FirstFieldPos  ast.Position
 }
@@ -543,7 +590,7 @@ func (e *MissingInitializerError) Error() string {
 	return fmt.Sprintf(
 		"missing initializer for field `%s` of type `%s`",
 		e.FirstFieldName,
-		e.StructureType.Identifier,
+		e.TypeIdentifier,
 	)
 }
 
@@ -664,4 +711,243 @@ func (e *FunctionExpressionInConditionError) StartPosition() ast.Position {
 
 func (e *FunctionExpressionInConditionError) EndPosition() ast.Position {
 	return e.EndPos
+}
+
+// UnexpectedReturnValueError
+
+type InvalidReturnValueError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidReturnValueError) Error() string {
+	return fmt.Sprintf(
+		"invalid return with value from function without %s return type",
+		(&VoidType{}).String(),
+	)
+}
+
+func (*InvalidReturnValueError) isSemanticError() {}
+
+func (e *InvalidReturnValueError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidReturnValueError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidImplementationError
+
+type InvalidImplementationError struct {
+	ImplementedKind common.DeclarationKind
+	ContainerKind   common.DeclarationKind
+	Pos             ast.Position
+}
+
+func (e *InvalidImplementationError) Error() string {
+	return fmt.Sprintf(
+		"cannot implement %s in %s",
+		e.ImplementedKind.Name(),
+		e.ContainerKind.Name(),
+	)
+}
+
+func (*InvalidImplementationError) isSemanticError() {}
+
+func (e *InvalidImplementationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidImplementationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidConformanceError
+
+type InvalidConformanceError struct {
+	Type Type
+	Pos  ast.Position
+}
+
+func (e *InvalidConformanceError) Error() string {
+	return fmt.Sprintf(
+		"cannot conform to non-interface type: `%s`",
+		e.Type.String(),
+	)
+}
+
+func (*InvalidConformanceError) isSemanticError() {}
+
+func (e *InvalidConformanceError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidConformanceError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// ConformanceError
+
+// TODO: report each missing member and mismatch as note
+
+type MemberMismatch struct {
+	StructureMember *Member
+	InterfaceMember *Member
+}
+
+type InitializerMismatch struct {
+	StructureParameterTypes []Type
+	InterfaceParameterTypes []Type
+}
+
+type ConformanceError struct {
+	StructureType       *StructureType
+	InterfaceType       *InterfaceType
+	InitializerMismatch *InitializerMismatch
+	MissingMembers      []*Member
+	MemberMismatches    []MemberMismatch
+	Pos                 ast.Position
+}
+
+func (e *ConformanceError) Error() string {
+	return fmt.Sprintf(
+		"structure `%s` does not conform to interface `%s`",
+		e.StructureType.Identifier,
+		e.InterfaceType.Identifier,
+	)
+}
+
+func (*ConformanceError) isSemanticError() {}
+
+func (e *ConformanceError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *ConformanceError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// DuplicateConformanceError
+
+// TODO: just make this a warning?
+
+type DuplicateConformanceError struct {
+	StructureIdentifier string
+	Conformance         *ast.NominalType
+}
+
+func (e *DuplicateConformanceError) Error() string {
+	return fmt.Sprintf(
+		"structure `%s` repeats conformance for interface `%s`",
+		e.StructureIdentifier,
+		e.Conformance.Identifier.Identifier,
+	)
+}
+
+func (*DuplicateConformanceError) isSemanticError() {}
+
+func (e *DuplicateConformanceError) StartPosition() ast.Position {
+	return e.Conformance.StartPosition()
+}
+
+func (e *DuplicateConformanceError) EndPosition() ast.Position {
+	return e.Conformance.EndPosition()
+}
+
+// UnresolvedImportError
+
+type UnresolvedImportError struct {
+	ImportLocation ast.ImportLocation
+	StartPos       ast.Position
+	EndPos         ast.Position
+}
+
+func (e *UnresolvedImportError) Error() string {
+	return fmt.Sprintf(
+		"import of location `%s` could not be resolved",
+		e.ImportLocation,
+	)
+}
+
+func (*UnresolvedImportError) isSemanticError() {}
+
+func (e *UnresolvedImportError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *UnresolvedImportError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// RepeatedImportError
+
+// TODO: make warning?
+
+type RepeatedImportError struct {
+	ImportLocation ast.ImportLocation
+	StartPos       ast.Position
+	EndPos         ast.Position
+}
+
+func (e *RepeatedImportError) Error() string {
+	return fmt.Sprintf(
+		"repeated import of location `%s`",
+		e.ImportLocation,
+	)
+}
+
+func (*RepeatedImportError) isSemanticError() {}
+
+func (e *RepeatedImportError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *RepeatedImportError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// NotExportedError
+
+type NotExportedError struct {
+	Name           string
+	ImportLocation ast.ImportLocation
+	Pos            ast.Position
+}
+
+func (e *NotExportedError) Error() string {
+	return fmt.Sprintf("cannot find declaration `%s` in `%s`", e.Name, e.ImportLocation)
+}
+
+func (*NotExportedError) isSemanticError() {}
+
+func (e *NotExportedError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *NotExportedError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
+}
+
+// ImportedProgramError
+
+type ImportedProgramError struct {
+	CheckerError   *CheckerError
+	ImportLocation ast.ImportLocation
+	Pos            ast.Position
+}
+
+func (e *ImportedProgramError) Error() string {
+	return fmt.Sprintf("checking of imported program `%s` failed", e.ImportLocation)
+}
+
+func (*ImportedProgramError) isSemanticError() {}
+
+func (e *ImportedProgramError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *ImportedProgramError) EndPosition() ast.Position {
+	return e.Pos
 }

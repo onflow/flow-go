@@ -15,20 +15,29 @@ import (
 // QueueSize is the buffer size for holding incoming Gossip Messages
 const QueueSize int = 10
 
+// HandleFunc is the function type which can be registered to a Node
+type HandleFunc func(msg *shared.GossipMessage) (*shared.MessageReply, error)
+
 // Node is holding the required information for a functioning async gossip node
 type Node struct {
-	address  string
-	registry map[string]func(msg *shared.GossipMessage) error
+	registry map[string]HandleFunc
 	queue    chan *shared.GossipMessage
+
+	tracker messageTracker
 }
 
 // NewNode returns a new gossip async node that can be used as a grpc service
-func NewNode(address string) *Node {
-	return &Node{address: address, registry: make(map[string]func(msg *shared.GossipMessage) error, 0), queue: make(chan *shared.GossipMessage, QueueSize)}
+func NewNode() *Node {
+	return &Node{
+		registry: make(map[string]HandleFunc, 0),
+		queue:    make(chan *shared.GossipMessage, QueueSize),
+
+		tracker: make(messageTracker, 0),
+	}
 }
 
 // RegisterFunc adds a new method to be used by GossipMessages
-func (a *Node) RegisterFunc(name string, f func(msg *shared.GossipMessage) error) error {
+func (a *Node) RegisterFunc(name string, f HandleFunc) error {
 	if _, ok := a.registry[name]; ok {
 		return fmt.Errorf("function %v already registered", name)
 	}
@@ -71,19 +80,13 @@ func (a *Node) Gossip(ctx context.Context, gossipMsg *shared.GossipMessage) ([]p
 }
 
 // Serve starts the async node's grpc server, and its sweeper as well
-func (a *Node) Serve() {
-	// Listen on the designated port and wait for rpc methods to be called
-	lis, err := net.Listen("tcp", a.address)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
+func (a *Node) Serve(ln net.Listener) {
 	// Send of the sweeper to monitor the queue
 	go a.sweeper()
 
 	s := grpc.NewServer()
 	shared.RegisterMessageRecieverServer(s, a)
-	if err := s.Serve(lis); err != nil {
+	if err := s.Serve(ln); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
 }
@@ -96,6 +99,33 @@ func (a *Node) AsyncQueue(ctx context.Context, req *shared.GossipMessage) (*shar
 		return &shared.VoidReply{}, fmt.Errorf("request timed out")
 	case a.queue <- req:
 		return &shared.VoidReply{}, nil
+	}
+}
+
+// SyncQueue places a given gossip message to the node's queue and blocks waiting for a reply.
+func (a *Node) SyncQueue(ctx context.Context, req *shared.GossipMessage) (*shared.MessageReply, error) {
+	select {
+	case <-ctx.Done():
+		return &shared.MessageReply{}, fmt.Errorf("request timed out")
+	case a.queue <- req:
+	}
+
+	uuid := req.GetUuid().GetValue()
+
+	if err := a.tracker.TrackMessage(uuid); err != nil {
+		return &shared.MessageReply{}, fmt.Errorf("could not track message %v: %v", uuid, err)
+	}
+
+	select {
+	case <-ctx.Done():
+		return &shared.MessageReply{}, fmt.Errorf("request timed out")
+	case <-a.tracker.Done(uuid):
+		msgReply, msgErr, err := a.tracker.RetrieveReply(uuid)
+		if err != nil {
+			return &shared.MessageReply{}, err
+		}
+
+		return msgReply, msgErr
 	}
 }
 
@@ -133,7 +163,11 @@ func (a *Node) messageHandler(gossipMsg *shared.GossipMessage) error {
 		return fmt.Errorf("function %v is not registered", gossipMsg.Method)
 	}
 
-	return a.registry[gossipMsg.Method](gossipMsg)
+	uuid := gossipMsg.GetUuid().GetValue()
+
+	reply, err := a.registry[gossipMsg.Method](gossipMsg)
+
+	return a.tracker.FillMessageReply(uuid, reply, err)
 }
 
 // gossipError is the error type used when sending multiple requests and awaiting

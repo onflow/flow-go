@@ -22,6 +22,7 @@ const (
 	OperationDiv
 	OperationMod
 	OperationNegate
+	OperationNilCoalesce
 )
 
 func (s Operation) Symbol() string {
@@ -54,6 +55,8 @@ func (s Operation) Symbol() string {
 		return "%"
 	case OperationNegate:
 		return "!"
+	case OperationNilCoalesce:
+		return "??"
 	}
 
 	panic(&errors.UnreachableError{})

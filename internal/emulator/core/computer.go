@@ -26,17 +26,22 @@ func (c *Computer) ExecuteTransaction(
 	registers *etypes.RegistersView,
 ) (err error) {
 	// TODO: deduct gas cost from transaction signer's account
-	_, err = c.ExecuteScript(tx.Script, registers)
+
+	// TODO: more signatures
+	accounts := []types.Address{
+		tx.PayerSignature.Account,
+	}
+
+	inter := eruntime.NewEmulatorRuntimeAPI(registers)
+	inter.Accounts = accounts
+	_, err = c.ExecuteScript(tx.Script, inter)
 	return err
 }
 
 // ExecuteScript executes a script against the current world state.
 func (c *Computer) ExecuteScript(
 	script []byte,
-	registers *etypes.RegistersView,
+	inter runtime.Interface,
 ) (result interface{}, err error) {
-	return c.runtime.ExecuteScript(
-		script,
-		eruntime.NewEmulatorRuntimeAPI(registers),
-	)
+	return c.runtime.ExecuteScript(script, inter)
 }

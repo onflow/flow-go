@@ -106,18 +106,35 @@ func (e *ArgumentCountError) EndPosition() ast.Position {
 
 type ConditionError struct {
 	ConditionKind ast.ConditionKind
-	StartPos      ast.Position
-	EndPos        ast.Position
+	Message       string
+	LocationRange LocationRange
+}
+
+func (e *ConditionError) ImportLocation() ast.ImportLocation {
+	return e.LocationRange.ImportLocation
 }
 
 func (e *ConditionError) Error() string {
-	return fmt.Sprintf("%s failed", e.ConditionKind.Name())
+	if e.Message == "" {
+		return fmt.Sprintf("%s failed", e.ConditionKind.Name())
+	}
+	return fmt.Sprintf("%s failed: %s", e.ConditionKind.Name(), e.Message)
 }
 
 func (e *ConditionError) StartPosition() ast.Position {
-	return e.StartPos
+	return e.LocationRange.StartPos
 }
 
 func (e *ConditionError) EndPosition() ast.Position {
-	return e.EndPos
+	return e.LocationRange.EndPos
+}
+
+// RedeclarationError
+
+type RedeclarationError struct {
+	Name string
+}
+
+func (e *RedeclarationError) Error() string {
+	return fmt.Sprintf("cannot redeclare: `%s` is already declared", e.Name)
 }

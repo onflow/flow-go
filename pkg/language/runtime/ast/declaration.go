@@ -6,6 +6,5 @@ type Declaration interface {
 	Element
 	isDeclaration()
 	DeclarationName() string
-	IdentifierPosition() Position
 	DeclarationKind() common.DeclarationKind
 }
