@@ -53,6 +53,7 @@ type Checker struct {
 	FunctionExpressionFunctionType     map[*ast.FunctionExpression]*FunctionType
 	InvocationExpressionParameterTypes map[*ast.InvocationExpression][]Type
 	InterfaceDeclarationTypes          map[*ast.InterfaceDeclaration]*InterfaceType
+	FailableDowncastingTypes           map[*ast.FailableDowncastExpression]Type
 }
 
 func NewChecker(
@@ -84,6 +85,7 @@ func NewChecker(
 		FunctionExpressionFunctionType:     map[*ast.FunctionExpression]*FunctionType{},
 		InvocationExpressionParameterTypes: map[*ast.InvocationExpression][]Type{},
 		InterfaceDeclarationTypes:          map[*ast.InterfaceDeclaration]*InterfaceType{},
+		FailableDowncastingTypes:           map[*ast.FailableDowncastExpression]Type{},
 	}
 
 	for _, declaration := range predeclaredValues {
@@ -2790,5 +2792,6 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 
 func (checker *Checker) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
 	convertedType := checker.ConvertType(expression.Type)
+	checker.FailableDowncastingTypes[expression] = convertedType
 	return &OptionalType{Type: convertedType}
 }
