@@ -107,8 +107,11 @@ func (e *ArgumentCountError) EndPosition() ast.Position {
 type ConditionError struct {
 	ConditionKind ast.ConditionKind
 	Message       string
-	StartPos      ast.Position
-	EndPos        ast.Position
+	LocationRange LocationRange
+}
+
+func (e *ConditionError) ImportLocation() ast.ImportLocation {
+	return e.LocationRange.ImportLocation
 }
 
 func (e *ConditionError) Error() string {
@@ -119,11 +122,11 @@ func (e *ConditionError) Error() string {
 }
 
 func (e *ConditionError) StartPosition() ast.Position {
-	return e.StartPos
+	return e.LocationRange.StartPos
 }
 
 func (e *ConditionError) EndPosition() ast.Position {
-	return e.EndPos
+	return e.LocationRange.EndPos
 }
 
 // RedeclarationError

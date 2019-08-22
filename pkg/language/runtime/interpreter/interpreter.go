@@ -24,19 +24,31 @@ type functionReturn struct {
 // are treated like they are returning a value.
 
 type Interpreter struct {
-	Checker     *sema.Checker
-	activations *activations.Activations
-	Globals     map[string]*Variable
-	interfaces  map[string]*ast.InterfaceDeclaration
+	Checker          *sema.Checker
+	PredefinedValues map[string]Value
+	activations      *activations.Activations
+	Globals          map[string]*Variable
+	interfaces       map[string]*ast.InterfaceDeclaration
+	ImportLocation   ast.ImportLocation
 }
 
-func NewInterpreter(checker *sema.Checker) *Interpreter {
-	return &Interpreter{
-		Checker:     checker,
-		activations: &activations.Activations{},
-		Globals:     map[string]*Variable{},
-		interfaces:  map[string]*ast.InterfaceDeclaration{},
+func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
+	interpreter := &Interpreter{
+		Checker:          checker,
+		PredefinedValues: predefinedValues,
+		activations:      &activations.Activations{},
+		Globals:          map[string]*Variable{},
+		interfaces:       map[string]*ast.InterfaceDeclaration{},
 	}
+
+	for name, value := range predefinedValues {
+		err := interpreter.ImportValue(name, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return interpreter, nil
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
@@ -77,30 +89,35 @@ func (interpreter *Interpreter) Interpret() (err error) {
 		}
 	}()
 
+	Run(interpreter.interpret())
+
+	return nil
+}
+
+func (interpreter *Interpreter) interpret() Trampoline {
+	return More(func() Trampoline {
+		interpreter.prepareInterpretation()
+
+		return interpreter.visitProgramDeclarations()
+	})
+}
+
+func (interpreter *Interpreter) prepareInterpretation() {
 	program := interpreter.Checker.Program
 
 	// pre-declare empty variables for all structures, interfaces, and function declarations
 	for _, declaration := range program.InterfaceDeclarations() {
-		interpreter.declareVariable(declaration.Identifier, nil)
+		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
-
 	for _, declaration := range program.StructureDeclarations() {
-		interpreter.declareVariable(declaration.Identifier, nil)
+		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
-
 	for _, declaration := range program.FunctionDeclarations() {
-		interpreter.declareVariable(declaration.Identifier, nil)
+		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
-
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareInterface(declaration)
 	}
-
-	Run(More(func() Trampoline {
-		return interpreter.visitProgramDeclarations()
-	}))
-
-	return nil
 }
 
 func (interpreter *Interpreter) visitProgramDeclarations() Trampoline {
@@ -209,7 +226,7 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 		boxedArguments[i] = interpreter.box(argument, parameterTypes[i])
 	}
 
-	result := Run(function.invoke(interpreter, boxedArguments, ast.Position{}))
+	result := Run(function.invoke(boxedArguments, Location{}))
 	if result == nil {
 		return nil, nil
 	}
@@ -241,7 +258,7 @@ func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 
-	identifier := declaration.Identifier
+	identifier := declaration.Identifier.Identifier
 
 	functionType := interpreter.Checker.FunctionDeclarationFunctionTypes[declaration]
 
@@ -254,20 +271,26 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	lexicalScope = lexicalScope.Insert(common.StringKey(identifier), variable)
 
 	functionExpression := declaration.ToExpression()
-	variable.Value = newInterpretedFunction(functionExpression, functionType, lexicalScope)
+	variable.Value = newInterpretedFunction(
+		interpreter,
+		functionExpression,
+		functionType,
+		lexicalScope,
+	)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-func (interpreter *Interpreter) ImportFunction(name string, function HostFunctionValue) error {
+// NOTE: consider using NewInterpreter if the value should be predefined in all programs
+func (interpreter *Interpreter) ImportValue(name string, value Value) error {
 	if _, ok := interpreter.Globals[name]; ok {
 		return &RedeclarationError{
 			Name: name,
 		}
 	}
 
-	variable := interpreter.declareVariable(name, function)
+	variable := interpreter.declareVariable(name, value)
 	interpreter.Globals[name] = variable
 	return nil
 }
@@ -427,8 +450,11 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 						panic(&ConditionError{
 							ConditionKind: condition.Kind,
 							Message:       message,
-							StartPos:      condition.Test.StartPosition(),
-							EndPos:        condition.Test.EndPosition(),
+							LocationRange: LocationRange{
+								ImportLocation: interpreter.ImportLocation,
+								StartPos:       condition.Test.StartPosition(),
+								EndPos:         condition.Test.EndPosition(),
+							},
 						})
 					})
 			}
@@ -503,7 +529,10 @@ func (interpreter *Interpreter) visitIfStatementWithVariableDeclaration(
 			if someValue, ok := result.(SomeValue); ok {
 				unwrappedValueCopy := someValue.Value.Copy()
 				interpreter.activations.PushCurrent()
-				interpreter.declareVariable(declaration.Identifier, unwrappedValueCopy)
+				interpreter.declareVariable(
+					declaration.Identifier.Identifier,
+					unwrappedValueCopy,
+				)
 
 				return thenBlock.Accept(interpreter).(Trampoline).
 					Then(func(_ interface{}) {
@@ -551,7 +580,10 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 			targetType := interpreter.Checker.VariableDeclarationValueTypes[declaration]
 			valueCopy := interpreter.copyAndBox(result.(Value), targetType)
 
-			interpreter.declareVariable(declaration.Identifier, valueCopy)
+			interpreter.declareVariable(
+				declaration.Identifier.Identifier,
+				valueCopy,
+			)
 
 			// NOTE: ignore result, so it does *not* act like a return-statement
 			return Done{}
@@ -594,7 +626,7 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 }
 
 func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
-	variable := interpreter.findVariable(target.Identifier)
+	variable := interpreter.findVariable(target.Identifier.Identifier)
 	variable.Value = value
 }
 
@@ -627,7 +659,7 @@ func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.Memb
 }
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
-	variable := interpreter.findVariable(expression.Identifier)
+	variable := interpreter.findVariable(expression.Identifier.Identifier)
 	return Done{Result: variable.Value}
 }
 
@@ -947,11 +979,12 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 						argumentCopies[i] = interpreter.copyAndBox(argument, parameterTypes[i])
 					}
 
-					return function.invoke(
-						interpreter,
-						argumentCopies,
-						invocationExpression.StartPosition(),
-					)
+					// TODO: optimize: only potentially used by host-functions
+					location := Location{
+						Position:       invocationExpression.StartPosition(),
+						ImportLocation: interpreter.ImportLocation,
+					}
+					return function.invoke(argumentCopies, location)
 				})
 		})
 }
@@ -996,7 +1029,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 ) {
 	for parameterIndex, parameter := range function.Expression.Parameters {
 		argument := arguments[parameterIndex]
-		interpreter.declareVariable(parameter.Identifier, argument)
+		interpreter.declareVariable(parameter.Identifier.Identifier, argument)
 	}
 }
 
@@ -1025,7 +1058,7 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 
 	functionType := interpreter.Checker.FunctionExpressionFunctionType[expression]
 
-	function := newInterpretedFunction(expression, functionType, lexicalScope)
+	function := newInterpretedFunction(interpreter, expression, functionType, lexicalScope)
 
 	return Done{Result: function}
 }
@@ -1053,11 +1086,12 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	variable := interpreter.findOrDeclareVariable(structureDeclaration.Identifier)
+	identifier := structureDeclaration.Identifier.Identifier
+	variable := interpreter.findOrDeclareVariable(identifier)
 
 	// make the constructor available in the initializer
 	lexicalScope = lexicalScope.
-		Insert(common.StringKey(structureDeclaration.Identifier), variable)
+		Insert(common.StringKey(identifier), variable)
 
 	initializer := structureDeclaration.Initializer
 
@@ -1080,7 +1114,7 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 	// TODO: function type
 	variable.Value = NewHostFunctionValue(
 		nil,
-		func(interpreter *Interpreter, values []Value, position ast.Position) Trampoline {
+		func(values []Value, location Location) Trampoline {
 			structure := StructureValue{}
 
 			for name, function := range functions {
@@ -1120,7 +1154,7 @@ func (interpreter *Interpreter) initializerFunction(
 	function.FunctionBlock = &functionBlockCopy
 
 	for _, conformance := range structureDeclaration.Conformances {
-		interfaceDeclaration := interpreter.interfaces[conformance.Identifier]
+		interfaceDeclaration := interpreter.interfaces[conformance.Identifier.Identifier]
 		initializer := interfaceDeclaration.Initializer
 		if initializer == nil || initializer.FunctionBlock == nil {
 			continue
@@ -1137,7 +1171,12 @@ func (interpreter *Interpreter) initializerFunction(
 		)
 	}
 
-	return newInterpretedFunction(function, functionType, lexicalScope)
+	return newInterpretedFunction(
+		interpreter,
+		function,
+		functionType,
+		lexicalScope,
+	)
 }
 
 // invokeStructureFunction calls the given function with the values.
@@ -1173,8 +1212,13 @@ func (interpreter *Interpreter) structureFunctions(
 
 		function := interpreter.structureFunction(structureDeclaration, functionDeclaration)
 
-		functions[functionDeclaration.Identifier] =
-			newInterpretedFunction(function, functionType, lexicalScope)
+		functions[functionDeclaration.Identifier.Identifier] =
+			newInterpretedFunction(
+				interpreter,
+				function,
+				functionType,
+				lexicalScope,
+			)
 	}
 
 	return functions
@@ -1185,7 +1229,7 @@ func (interpreter *Interpreter) structureFunction(
 	functionDeclaration *ast.FunctionDeclaration,
 ) *ast.FunctionExpression {
 
-	functionIdentifier := functionDeclaration.Identifier
+	functionIdentifier := functionDeclaration.Identifier.Identifier
 
 	function := functionDeclaration.ToExpression()
 
@@ -1194,7 +1238,8 @@ func (interpreter *Interpreter) structureFunction(
 	function.FunctionBlock = &functionBlockCopy
 
 	for _, conformance := range structureDeclaration.Conformances {
-		interfaceDeclaration := interpreter.interfaces[conformance.Identifier]
+		conformanceIdentifier := conformance.Identifier.Identifier
+		interfaceDeclaration := interpreter.interfaces[conformanceIdentifier]
 		interfaceFunction, ok := interfaceDeclaration.FunctionsByIdentifier()[functionIdentifier]
 		if !ok || interfaceFunction.FunctionBlock == nil {
 			continue
@@ -1268,13 +1313,47 @@ func (interpreter *Interpreter) VisitInterfaceDeclaration(declaration *ast.Inter
 }
 
 func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDeclaration) {
-	interpreter.interfaces[declaration.Identifier] = declaration
+	interpreter.interfaces[declaration.Identifier.Identifier] = declaration
 }
 
 func (interpreter *Interpreter) declareInterfaceMetaType(declaration *ast.InterfaceDeclaration) {
 
 	interfaceType := interpreter.Checker.InterfaceDeclarationTypes[declaration]
 
-	variable := interpreter.findOrDeclareVariable(declaration.Identifier)
+	variable := interpreter.findOrDeclareVariable(declaration.Identifier.Identifier)
 	variable.Value = MetaTypeValue{Type: interfaceType}
+}
+
+func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location]
+
+	subInterpreter, err := NewInterpreter(importedChecker, interpreter.PredefinedValues)
+	if err != nil {
+		panic(err)
+	}
+
+	subInterpreter.ImportLocation = declaration.Location
+
+	return subInterpreter.interpret().
+		Then(func(_ interface{}) {
+			// determine which identifiers are imported /
+			// which variables need to be declared
+
+			var variables map[string]*Variable
+			identifierLength := len(declaration.Identifiers)
+			if identifierLength > 0 {
+				variables = make(map[string]*Variable, identifierLength)
+				for _, identifier := range declaration.Identifiers {
+					variables[identifier.Identifier] =
+						subInterpreter.Globals[identifier.Identifier]
+				}
+			} else {
+				variables = subInterpreter.Globals
+			}
+
+			// set variables for all imported values
+			for name, variable := range variables {
+				interpreter.setVariable(name, variable)
+			}
+		})
 }

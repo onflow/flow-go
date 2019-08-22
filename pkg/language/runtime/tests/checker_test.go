@@ -1,4 +1,4 @@
-package runtime
+package tests
 
 import (
 	"fmt"
@@ -14,21 +14,33 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
 )
 
-func parseAndCheck(code string, declarations ...sema.ValueDeclaration) (*sema.Checker, error) {
-	program, errors := parser.ParseProgram(code)
+func parseAndCheck(code string) (*sema.Checker, error) {
+	return parseAndCheckWithExtra(code, nil, nil)
+}
 
-	Expect(errors).
-		To(BeEmpty())
+func parseAndCheckWithExtra(
+	code string,
+	declarations []sema.ValueDeclaration,
+	resolver ast.ImportResolver,
+) (*sema.Checker, error) {
+	program, err := parser.ParseProgram(code)
 
-	checker := sema.NewChecker(program)
+	Expect(err).
+		To(Not(HaveOccurred()))
 
-	for _, declaration := range declarations {
-		if err := checker.DeclareValue(declaration); err != nil {
-			return checker, err
+	if resolver != nil {
+		err := program.ResolveImports(resolver)
+		if err != nil {
+			return nil, err
 		}
 	}
 
-	err := checker.Check()
+	checker, err := sema.NewChecker(program, declarations)
+	if err != nil {
+		return checker, err
+	}
+
+	err = checker.Check()
 	return checker, err
 }
 
@@ -2732,13 +2744,16 @@ func TestCheckReferenceBeforeDeclaration(t *testing.T) {
 func TestCheckNever(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(
+	_, err := parseAndCheckWithExtra(
 		`
             fun test(): Int {
                 return panic("XXX")
             }
         `,
-		stdlib.PanicFunction,
+		[]sema.ValueDeclaration{
+			stdlib.PanicFunction,
+		},
+		nil,
 	)
 
 	Expect(err).
@@ -3042,12 +3057,15 @@ func TestCheckNestedOptionalNilComparisonSwapped(t *testing.T) {
 func TestCheckNilCoalescingWithNever(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(
+	_, err := parseAndCheckWithExtra(
 		`
           let x: Int? = nil
           let y = x ?? panic("nope")
         `,
-		stdlib.PanicFunction,
+		[]sema.ValueDeclaration{
+			stdlib.PanicFunction,
+		},
+		nil,
 	)
 
 	Expect(err).
@@ -3241,13 +3259,16 @@ func TestCheckInvalidInterfaceConstructorCall(t *testing.T) {
 func TestCheckInterfaceUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(
+	_, err := parseAndCheckWithExtra(
 		`
           interface Test {}
 
           let test: Test = panic("")
         `,
-		stdlib.PanicFunction,
+		[]sema.ValueDeclaration{
+			stdlib.PanicFunction,
+		},
+		nil,
 	)
 
 	Expect(err).
@@ -3772,59 +3793,150 @@ func TestCheckOrigins(t *testing.T) {
 	}
 }
 
-// matchers
+func TestCheckInvalidImport(t *testing.T) {
+	RegisterTestingT(t)
 
-type originMatcher struct {
-	startPos sema.Position
-	endPos   sema.Position
-	kind     common.DeclarationKind
+	_, err := parseAndCheck(`
+       import "unknown"
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnresolvedImportError{}))
 }
 
-func (matcher *originMatcher) Match(actual interface{}) (success bool, err error) {
-	origin, ok := actual.(sema.Origin)
-	if !ok {
-		return false, fmt.Errorf("originMatcher matcher expects a sema.Origin")
-	}
+func TestCheckInvalidRepeatedImport(t *testing.T) {
+	RegisterTestingT(t)
 
-	if origin.StartPos != matcher.startPos {
-		return false, fmt.Errorf(
-			"Expected\n\t%#v\nto have start position\n\t%#v",
-			actual,
-			matcher.startPos,
-		)
-	}
-
-	if origin.EndPos != matcher.endPos {
-		return false, fmt.Errorf(
-			"Expected\n\t%#v\nto have start position\n\t%#v",
-			actual,
-			matcher.endPos,
-		)
-	}
-
-	if origin.Variable.Kind != matcher.kind {
-		return false, fmt.Errorf(
-			"Expected\n\t%#v\nto have kind\n\t%s",
-			actual,
-			matcher.kind.Name(),
-		)
-	}
-
-	return true, nil
-}
-
-func (matcher *originMatcher) FailureMessage(actual interface{}) (message string) {
-	return fmt.Sprintf(
-		"Expected\n\t%#v\nto match origin with\n\t%s @ %#v",
-		actual,
-		matcher.kind.Name(), matcher.startPos,
+	_, err := parseAndCheckWithExtra(
+		`
+           import "unknown"
+           import "unknown" 
+        `,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			return &ast.Program{}, nil
+		},
 	)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.RepeatedImportError{}))
 }
 
-func (matcher *originMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return fmt.Sprintf(
-		"Expected\n\t%#v\nto not match origin with\n\t%s @ %#v",
-		actual,
-		matcher.kind.Name(), matcher.startPos,
+func TestCheckImportAll(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+	   fun answer(): Int {
+	       return 42
+		}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = parseAndCheckWithExtra(
+		`
+           import "imported"
+
+           let x = answer()
+        `,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			return checker.Program, nil
+		},
 	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidImportUnexported(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`	
+       let x = 1
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = parseAndCheckWithExtra(
+		`
+           import answer from "imported"
+
+           let x = answer()
+        `,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			return checker.Program, nil
+		},
+	)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotExportedError{}))
+}
+
+func TestCheckImportSome(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+	   fun answer(): Int {
+	       return 42
+       }
+
+       let x = 1
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = parseAndCheckWithExtra(
+		`
+           import answer from "imported"
+
+           let x = answer()
+        `,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			return checker.Program, nil
+		},
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidImportedError(t *testing.T) {
+	RegisterTestingT(t)
+
+	// NOTE: only parse, don't check imported program.
+	// will be checked by checker checking importing program
+
+	imported, err := parser.ParseProgram(`	
+       let x: Bool = 1
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = parseAndCheckWithExtra(
+		`
+           import x from "imported"
+        `,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			return imported, nil
+		},
+	)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ImportedProgramError{}))
 }

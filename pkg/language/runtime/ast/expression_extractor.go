@@ -96,7 +96,7 @@ func (extractor *ExpressionExtractor) FormatIdentifier(identifier int) string {
 }
 
 type ExtractedExpression struct {
-	Identifier string
+	Identifier Identifier
 	Expression Expression
 }
 

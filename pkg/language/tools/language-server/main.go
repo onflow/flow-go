@@ -110,8 +110,7 @@ func (s server) DidChangeTextDocument(
 	code := params.ContentChanges[0].Text
 
 	start := time.Now()
-	program, parseErrors := parser.ParseProgram(code)
-	errorCount := len(parseErrors)
+	program, err := parser.ParseProgram(code)
 	elapsed := time.Since(start)
 
 	connection.LogMessage(&protocol.LogMessageParams{
@@ -121,33 +120,36 @@ func (s server) DidChangeTextDocument(
 
 	diagnostics := []protocol.Diagnostic{}
 
-	if errorCount > 0 {
+	if err != nil {
 
-		for _, err := range parseErrors {
-			parseError, ok := err.(parser.ParseError)
-			if !ok {
-				continue
+		if parserError, ok := err.(parser.Error); ok {
+			for _, err := range parserError.Errors {
+				parseError, ok := err.(parser.ParseError)
+				if !ok {
+					continue
+				}
+
+				diagnostic := convertError(parseError)
+				if diagnostic == nil {
+					continue
+				}
+
+				diagnostics = append(diagnostics, *diagnostic)
 			}
-
-			diagnostic := convertError(parseError)
-			if diagnostic == nil {
-				continue
-			}
-
-			diagnostics = append(diagnostics, *diagnostic)
 		}
 	} else {
-		// no parsing parseErrors, check program
+		// no parsing errors
 
-		checker := sema.NewChecker(program)
-		for _, function := range standardLibraryFunctions {
-			if err := checker.DeclareValue(function); err != nil {
-				panic(err)
-			}
+		// check program
+
+		valueDeclarations := stdlib.ToValueDeclarations(standardLibraryFunctions)
+		checker, err := sema.NewChecker(program, valueDeclarations)
+		if err != nil {
+			panic(err)
 		}
 
 		start := time.Now()
-		err := checker.Check()
+		err = checker.Check()
 		elapsed := time.Since(start)
 
 		connection.LogMessage(&protocol.LogMessageParams{

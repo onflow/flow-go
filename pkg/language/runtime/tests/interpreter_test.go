@@ -1,4 +1,4 @@
-package runtime
+package tests
 
 import (
 	"math/big"
@@ -19,7 +19,11 @@ func parseCheckAndInterpret(code string) *interpreter.Interpreter {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	inter := interpreter.NewInterpreter(checker)
+	inter, err := interpreter.NewInterpreter(checker, nil)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
 	err = inter.Interpret()
 
 	Expect(err).
@@ -1035,12 +1039,12 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, errors := parser.ParseProgram(`
+	program, err := parser.ParseProgram(`
       let a = test(1, 2)
 	`)
 
-	Expect(errors).
-		To(BeEmpty())
+	Expect(err).
+		To(Not(HaveOccurred()))
 
 	testFunction := stdlib.NewStandardLibraryFunction(
 		"test",
@@ -1051,7 +1055,7 @@ func TestInterpretHostFunction(t *testing.T) {
 			},
 			ReturnType: &sema.IntType{},
 		},
-		func(inter *interpreter.Interpreter, arguments []interpreter.Value, _ ast.Position) trampoline.Trampoline {
+		func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int
 			b := arguments[1].(interpreter.IntValue).Int
 			value := big.NewInt(0).Add(a, b)
@@ -1061,9 +1065,9 @@ func TestInterpretHostFunction(t *testing.T) {
 		nil,
 	)
 
-	checker := sema.NewChecker(program)
-
-	err := checker.DeclareValue(testFunction)
+	checker, err := sema.NewChecker(program, []sema.ValueDeclaration{
+		testFunction,
+	})
 	Expect(err).
 		To(Not(HaveOccurred()))
 
@@ -1071,9 +1075,13 @@ func TestInterpretHostFunction(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	inter := interpreter.NewInterpreter(checker)
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		map[string]interpreter.Value{
+			testFunction.Name: testFunction.Function,
+		},
+	)
 
-	err = inter.ImportFunction(testFunction.Name, testFunction.Function)
 	Expect(err).
 		To(Not(HaveOccurred()))
 
@@ -2521,4 +2529,104 @@ func TestInterpretInterfaceTypeAsValue(t *testing.T) {
 
 	Expect(inter.Globals["x"].Value).
 		To(BeAssignableToTypeOf(interpreter.MetaTypeValue{}))
+}
+
+func TestInterpretImport(t *testing.T) {
+	RegisterTestingT(t)
+
+	checkerImported, err := parseAndCheck(`
+      fun answer(): Int {
+          return 42
+      }
+	`)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	checkerImporting, err := parseAndCheckWithExtra(
+		`
+          import answer from "imported"
+
+          fun test(): Int {
+              return answer()
+          }
+        `,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			Expect(location).To(Equal(ast.StringImportLocation("imported")))
+			return checkerImported.Program, nil
+		},
+	)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	inter, err := interpreter.NewInterpreter(checkerImporting, nil)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	err = inter.Interpret()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+}
+
+func TestInterpretImportError(t *testing.T) {
+	RegisterTestingT(t)
+
+	valueDeclarations := []sema.ValueDeclaration{
+		stdlib.PanicFunction,
+	}
+
+	checkerImported, err := parseAndCheckWithExtra(
+		`
+          fun answer(): Int {
+              return panic("?!")
+          }
+	    `,
+		valueDeclarations,
+		nil,
+	)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	checkerImporting, err := parseAndCheckWithExtra(
+		`
+          import answer from "imported"
+
+          fun test(): Int {
+              return answer()
+          }
+        `,
+		valueDeclarations,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			Expect(location).To(Equal(ast.StringImportLocation("imported")))
+			return checkerImported.Program, nil
+		},
+	)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	values := stdlib.ToValues([]stdlib.StandardLibraryFunction{
+		stdlib.PanicFunction,
+	})
+	inter, err := interpreter.NewInterpreter(checkerImporting, values)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	err = inter.Interpret()
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = inter.Invoke("test")
+
+	Expect(err).
+		To(BeAssignableToTypeOf(stdlib.PanicError{}))
+
+	Expect(err.(stdlib.PanicError).Message).
+		To(Equal("?!"))
 }

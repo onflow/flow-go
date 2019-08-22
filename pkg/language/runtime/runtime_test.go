@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -8,10 +9,15 @@ import (
 )
 
 type testRuntimeInterface struct {
+	resolveImport     func(ImportLocation) ([]byte, error)
 	getValue          func(controller, owner, key []byte) (value []byte, err error)
 	setValue          func(controller, owner, key, value []byte) (err error)
 	createAccount     func(publicKey, code []byte) (accountID []byte, err error)
 	updateAccountCode func(accountID, code []byte) (err error)
+}
+
+func (i *testRuntimeInterface) ResolveImport(location ImportLocation) ([]byte, error) {
+	return i.resolveImport(location)
 }
 
 func (i *testRuntimeInterface) GetValue(controller, owner, key []byte) (value []byte, err error) {
@@ -30,7 +36,7 @@ func (i *testRuntimeInterface) UpdateAccountCode(accountID, code []byte) (err er
 	return i.updateAccountCode(accountID, code)
 }
 
-func TestNewInterpreterRuntime(t *testing.T) {
+func TestRuntimeGetAndSetValue(t *testing.T) {
 	RegisterTestingT(t)
 
 	runtime := NewInterpreterRuntime()
@@ -71,4 +77,46 @@ func TestNewInterpreterRuntime(t *testing.T) {
 
 	Expect(state.Int64()).
 		To(Equal(int64(5)))
+}
+
+func TestRuntimeImport(t *testing.T) {
+	RegisterTestingT(t)
+
+	runtime := NewInterpreterRuntime()
+
+	importedScript := []byte(`
+       fun answer(): Int {
+           return 42
+		}
+	`)
+
+	script := []byte(`
+       import "imported"
+
+       fun main(): Int {
+           let answer =  answer()
+           if answer != 42 {
+               panic("?!")
+           }
+           return answer
+		}
+	`)
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+			switch location {
+			case StringImportLocation("imported"):
+				return importedScript, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
+	}
+
+	value, err := runtime.ExecuteScript(script, runtimeInterface)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(value).To(Equal(42))
 }

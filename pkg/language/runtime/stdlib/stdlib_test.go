@@ -14,25 +14,28 @@ func TestAssert(t *testing.T) {
 	RegisterTestingT(t)
 
 	program := &ast.Program{}
-	checker := sema.NewChecker(program)
-	inter := interpreter.NewInterpreter(checker)
-	for _, function := range BuiltIns {
-		Expect(inter.ImportFunction(function.Name, function.Function)).
-			To(Not(HaveOccurred()))
-	}
 
-	_, err := inter.Invoke("assert", false, "oops")
+	checker, err := sema.NewChecker(program, nil)
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	inter, err := interpreter.NewInterpreter(checker, ToValues(BuiltIns))
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = inter.Invoke("assert", false, "oops")
 	Expect(err).
 		To(Equal(AssertionError{
 			Message:  "oops",
-			Position: ast.Position{},
+			Location: interpreter.Location{},
 		}))
 
 	_, err = inter.Invoke("assert", false)
 	Expect(err).
 		To(Equal(AssertionError{
 			Message:  "",
-			Position: ast.Position{},
+			Location: interpreter.Location{},
 		}))
 
 	_, err = inter.Invoke("assert", true, "oops")
@@ -47,17 +50,19 @@ func TestAssert(t *testing.T) {
 func TestPanic(t *testing.T) {
 	RegisterTestingT(t)
 
-	checker := sema.NewChecker(&ast.Program{})
-	inter := interpreter.NewInterpreter(checker)
-	for _, function := range BuiltIns {
-		Expect(inter.ImportFunction(function.Name, function.Function)).
-			To(Not(HaveOccurred()))
-	}
+	checker, err := sema.NewChecker(&ast.Program{}, nil)
+	Expect(err).
+		To(Not(HaveOccurred()))
 
-	_, err := inter.Invoke("panic", "oops")
+	inter, err := interpreter.NewInterpreter(checker, ToValues(BuiltIns))
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = inter.Invoke("panic", "oops")
 	Expect(err).
 		To(Equal(PanicError{
 			Message:  "oops",
-			Position: ast.Position{},
+			Location: interpreter.Location{},
 		}))
 }

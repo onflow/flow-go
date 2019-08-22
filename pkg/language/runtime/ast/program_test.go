@@ -1,0 +1,81 @@
+package ast
+
+import (
+	"fmt"
+	"testing"
+
+	. "github.com/onsi/gomega"
+)
+
+func TestProgram_ResolveImports(t *testing.T) {
+	RegisterTestingT(t)
+
+	makeImportingProgram := func(imported string) *Program {
+		return &Program{
+			Declarations: []Declaration{
+				&ImportDeclaration{
+					Location: StringImportLocation(imported),
+				},
+			},
+		}
+	}
+
+	a := makeImportingProgram("b")
+	b := makeImportingProgram("c")
+	c := &Program{}
+
+	err := a.ResolveImports(func(location ImportLocation) (*Program, error) {
+		switch location {
+		case StringImportLocation("b"):
+			return b, nil
+		case StringImportLocation("c"):
+			return c, nil
+		default:
+			return nil, fmt.Errorf("tried to resolve unknown import location: %s", location)
+		}
+	})
+
+	Expect(err).To(Not(HaveOccurred()))
+
+	Expect(a.Imports()[StringImportLocation("b")]).
+		To(BeIdenticalTo(b))
+
+	Expect(b.Imports()[StringImportLocation("c")]).
+		To(BeIdenticalTo(c))
+}
+
+func TestProgram_ResolveImportsCycle(t *testing.T) {
+	RegisterTestingT(t)
+
+	makeImportingProgram := func(imported string) *Program {
+		return &Program{
+			Declarations: []Declaration{
+				&ImportDeclaration{
+					Location: StringImportLocation(imported),
+				},
+			},
+		}
+	}
+
+	a := makeImportingProgram("b")
+	b := makeImportingProgram("c")
+	c := makeImportingProgram("a")
+
+	err := a.ResolveImports(func(location ImportLocation) (*Program, error) {
+		switch location {
+		case StringImportLocation("a"):
+			return a, nil
+		case StringImportLocation("b"):
+			return b, nil
+		case StringImportLocation("c"):
+			return c, nil
+		default:
+			return nil, fmt.Errorf("tried to resolve unknown import location: %s", location)
+		}
+	})
+
+	Expect(err).
+		To(Equal(CyclicImportsError{
+			Location: StringImportLocation("b"),
+		}))
+}

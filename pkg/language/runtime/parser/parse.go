@@ -29,7 +29,7 @@ func (l *errorListener) SyntaxError(
 	})
 }
 
-func ParseProgram(code string) (program *ast.Program, errors []error) {
+func ParseProgram(code string) (*ast.Program, error) {
 	result, errors := parse(
 		code,
 		func(parser *StrictusParser) antlr.ParserRuleContext {
@@ -37,15 +37,20 @@ func ParseProgram(code string) (program *ast.Program, errors []error) {
 		},
 	)
 
-	program, ok := result.(*ast.Program)
-	if !ok {
-		return nil, errors
+	var err error
+	if len(errors) > 0 {
+		err = Error{errors}
 	}
 
-	return program, errors
+	program, ok := result.(*ast.Program)
+	if !ok {
+		return nil, err
+	}
+
+	return program, err
 }
 
-func ParseExpression(code string) (expression ast.Expression, errors []error) {
+func ParseExpression(code string) (ast.Expression, error) {
 	result, errors := parse(
 		code,
 		func(parser *StrictusParser) antlr.ParserRuleContext {
@@ -53,12 +58,17 @@ func ParseExpression(code string) (expression ast.Expression, errors []error) {
 		},
 	)
 
-	program, ok := result.(ast.Expression)
-	if !ok {
-		return nil, errors
+	var err error
+	if len(errors) > 0 {
+		err = Error{errors}
 	}
 
-	return program, errors
+	program, ok := result.(ast.Expression)
+	if !ok {
+		return nil, err
+	}
+
+	return program, err
 }
 
 func parse(

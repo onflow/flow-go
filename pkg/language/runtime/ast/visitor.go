@@ -61,4 +61,5 @@ type Visitor interface {
 	VisitFieldDeclaration(*FieldDeclaration) Repr
 	VisitInitializerDeclaration(*InitializerDeclaration) Repr
 	VisitCondition(*Condition) Repr
+	VisitImportDeclaration(*ImportDeclaration) Repr
 }

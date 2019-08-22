@@ -8,20 +8,10 @@ type Type interface {
 // NominalType represents a base type (e.g. boolean, integer, etc.)
 
 type NominalType struct {
-	Identifier string
-	Pos        Position
+	Identifier
 }
 
 func (*NominalType) isType() {}
-
-func (t *NominalType) StartPosition() Position {
-	return t.Pos
-}
-
-func (t *NominalType) EndPosition() Position {
-	length := len(t.Identifier)
-	return t.Pos.Shifted(length - 1)
-}
 
 // OptionalType represents am optional variant of another type
 

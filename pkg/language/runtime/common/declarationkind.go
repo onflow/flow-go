@@ -19,6 +19,7 @@ const (
 	DeclarationKindField
 	DeclarationKindInitializer
 	DeclarationKindInterface
+	DeclarationKindImport
 )
 
 func (k DeclarationKind) Name() string {
@@ -45,6 +46,8 @@ func (k DeclarationKind) Name() string {
 		return "initializer"
 	case DeclarationKindInterface:
 		return "interface"
+	case DeclarationKindImport:
+		return "import"
 	}
 
 	panic(&errors.UnreachableError{})

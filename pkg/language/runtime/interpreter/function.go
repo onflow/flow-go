@@ -13,16 +13,17 @@ import (
 type FunctionValue interface {
 	Value
 	isFunctionValue()
-	invoke(interpreter *Interpreter, arguments []Value, position ast.Position) Trampoline
+	invoke(arguments []Value, location Location) Trampoline
 	functionType() *sema.FunctionType
 }
 
 // InterpretedFunctionValue
 
 type InterpretedFunctionValue struct {
-	Expression *ast.FunctionExpression
-	Type       *sema.FunctionType
-	Activation hamt.Map
+	Interpreter *Interpreter
+	Expression  *ast.FunctionExpression
+	Type        *sema.FunctionType
+	Activation  hamt.Map
 }
 
 func (InterpretedFunctionValue) isValue() {}
@@ -34,19 +35,21 @@ func (f InterpretedFunctionValue) Copy() Value {
 func (InterpretedFunctionValue) isFunctionValue() {}
 
 func newInterpretedFunction(
+	interpreter *Interpreter,
 	expression *ast.FunctionExpression,
 	functionType *sema.FunctionType,
 	activation hamt.Map,
 ) InterpretedFunctionValue {
 	return InterpretedFunctionValue{
-		Expression: expression,
-		Type:       functionType,
-		Activation: activation,
+		Interpreter: interpreter,
+		Expression:  expression,
+		Type:        functionType,
+		Activation:  activation,
 	}
 }
 
-func (f InterpretedFunctionValue) invoke(interpreter *Interpreter, arguments []Value, _ ast.Position) Trampoline {
-	return interpreter.invokeInterpretedFunction(f, arguments)
+func (f InterpretedFunctionValue) invoke(arguments []Value, _ Location) Trampoline {
+	return f.Interpreter.invokeInterpretedFunction(f, arguments)
 }
 
 func (f InterpretedFunctionValue) functionType() *sema.FunctionType {
@@ -55,7 +58,7 @@ func (f InterpretedFunctionValue) functionType() *sema.FunctionType {
 
 // HostFunctionValue
 
-type HostFunction func(interpreter *Interpreter, arguments []Value, position ast.Position) Trampoline
+type HostFunction func(arguments []Value, location Location) Trampoline
 
 type HostFunctionValue struct {
 	Type     *sema.FunctionType
@@ -70,8 +73,8 @@ func (f HostFunctionValue) Copy() Value {
 
 func (HostFunctionValue) isFunctionValue() {}
 
-func (f HostFunctionValue) invoke(interpreter *Interpreter, arguments []Value, position ast.Position) Trampoline {
-	return f.Function(interpreter, arguments, position)
+func (f HostFunctionValue) invoke(arguments []Value, location Location) Trampoline {
+	return f.Function(arguments, location)
 }
 
 func (f HostFunctionValue) functionType() *sema.FunctionType {
@@ -114,8 +117,8 @@ func (f *StructureFunctionValue) CopyWithStructure(structure StructureValue) *St
 	return &functionCopy
 }
 
-func (f *StructureFunctionValue) invoke(interpreter *Interpreter, arguments []Value, _ ast.Position) Trampoline {
-	return interpreter.invokeStructureFunction(
+func (f *StructureFunctionValue) invoke(arguments []Value, _ Location) Trampoline {
+	return f.function.Interpreter.invokeStructureFunction(
 		f.function,
 		arguments,
 		f.structure,
