@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -12,15 +13,11 @@ import (
 
 type EmulatorRuntimeAPI struct {
 	registers *etypes.RegistersView
+	Accounts  []types.Address
 }
 
 func NewEmulatorRuntimeAPI(registers *etypes.RegistersView) *EmulatorRuntimeAPI {
-	return &EmulatorRuntimeAPI{registers}
-}
-
-func (i *EmulatorRuntimeAPI) ResolveImport(location runtime.ImportLocation) ([]byte, error) {
-	// TODO:
-	return nil, nil
+	return &EmulatorRuntimeAPI{registers: registers}
 }
 
 func (i *EmulatorRuntimeAPI) GetValue(owner, controller, key []byte) ([]byte, error) {
@@ -84,6 +81,19 @@ func (i *EmulatorRuntimeAPI) GetAccount(address types.Address) *types.Account {
 		Code:       code,
 		PublicKeys: [][]byte{publicKey},
 	}
+}
+
+func (i *EmulatorRuntimeAPI) ResolveImport(location runtime.ImportLocation) ([]byte, error) {
+	// TODO:
+	return nil, errors.New("not supported")
+}
+
+func (i *EmulatorRuntimeAPI) GetSigningAccounts() []types.Address {
+	return i.Accounts
+}
+
+func (i *EmulatorRuntimeAPI) Log(message string) {
+	// TODO:
 }
 
 func keyLatestAccount() crypto.Hash {

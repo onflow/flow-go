@@ -19,7 +19,7 @@ import (
 //
 func main() {
 
-	standardLibraryFunctions := append(stdlib.BuiltIns, stdlib.Helpers...)
+	standardLibraryFunctions := append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
 
 	if len(os.Args) < 2 {
 		exitWithError("no input file")
@@ -57,7 +57,7 @@ func main() {
 
 	valueDeclarations := stdlib.ToValueDeclarations(standardLibraryFunctions)
 
-	checker, err := sema.NewChecker(program, valueDeclarations)
+	checker, err := sema.NewChecker(program, valueDeclarations, nil)
 	must(err, filename)
 
 	must(checker.Check(), filename)

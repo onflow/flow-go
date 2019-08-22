@@ -746,9 +746,13 @@ func ToValue(value interface{}) (Value, error) {
 func ToValues(inputs []interface{}) ([]Value, error) {
 	var values []Value
 	for _, argument := range inputs {
-		value, err := ToValue(argument)
-		if err != nil {
-			return nil, err
+		value, ok := argument.(Value)
+		if !ok {
+			var err error
+			value, err = ToValue(argument)
+			if err != nil {
+				return nil, err
+			}
 		}
 		values = append(
 			values,

@@ -1065,9 +1065,11 @@ func TestInterpretHostFunction(t *testing.T) {
 		nil,
 	)
 
-	checker, err := sema.NewChecker(program, []sema.ValueDeclaration{
-		testFunction,
-	})
+	checker, err := sema.NewChecker(
+		program,
+		[]sema.ValueDeclaration{testFunction},
+		nil,
+	)
 	Expect(err).
 		To(Not(HaveOccurred()))
 
@@ -2551,6 +2553,7 @@ func TestInterpretImport(t *testing.T) {
           }
         `,
 		nil,
+		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
 			Expect(location).To(Equal(ast.StringImportLocation("imported")))
 			return checkerImported.Program, nil
@@ -2588,6 +2591,7 @@ func TestInterpretImportError(t *testing.T) {
 	    `,
 		valueDeclarations,
 		nil,
+		nil,
 	)
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -2601,6 +2605,7 @@ func TestInterpretImportError(t *testing.T) {
           }
         `,
 		valueDeclarations,
+		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
 			Expect(location).To(Equal(ast.StringImportLocation("imported")))
 			return checkerImported.Program, nil

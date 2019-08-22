@@ -6,14 +6,18 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 type testRuntimeInterface struct {
-	resolveImport     func(ImportLocation) ([]byte, error)
-	getValue          func(controller, owner, key []byte) (value []byte, err error)
-	setValue          func(controller, owner, key, value []byte) (err error)
-	createAccount     func(publicKey, code []byte) (accountID []byte, err error)
-	updateAccountCode func(accountID, code []byte) (err error)
+	resolveImport      func(ImportLocation) ([]byte, error)
+	getValue           func(controller, owner, key []byte) (value []byte, err error)
+	setValue           func(controller, owner, key, value []byte) (err error)
+	createAccount      func(publicKey, code []byte) (accountID []byte, err error)
+	updateAccountCode  func(accountID, code []byte) (err error)
+	getSigningAccounts func() []types.Address
+	log                func(string)
 }
 
 func (i *testRuntimeInterface) ResolveImport(location ImportLocation) ([]byte, error) {
@@ -34,6 +38,17 @@ func (i *testRuntimeInterface) CreateAccount(publicKey, code []byte) (accountID 
 
 func (i *testRuntimeInterface) UpdateAccountCode(accountID, code []byte) (err error) {
 	return i.updateAccountCode(accountID, code)
+}
+
+func (i *testRuntimeInterface) GetSigningAccounts() []types.Address {
+	if i.getSigningAccounts == nil {
+		return nil
+	}
+	return i.getSigningAccounts()
+}
+
+func (i *testRuntimeInterface) Log(message string) {
+	i.log(message)
 }
 
 func TestRuntimeGetAndSetValue(t *testing.T) {
@@ -119,4 +134,61 @@ func TestRuntimeImport(t *testing.T) {
 		To(Not(HaveOccurred()))
 
 	Expect(value).To(Equal(42))
+}
+
+func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
+	RegisterTestingT(t)
+
+	runtime := NewInterpreterRuntime()
+
+	script := []byte(`
+       fun main(): Int {
+           return 42
+		}
+	`)
+
+	runtimeInterface := &testRuntimeInterface{
+		getSigningAccounts: func() []types.Address {
+			return []types.Address{[20]byte{42}}
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script, runtimeInterface)
+
+	Expect(err).
+		To(HaveOccurred())
+}
+
+func TestRuntimeMainWithAccount(t *testing.T) {
+	RegisterTestingT(t)
+
+	runtime := NewInterpreterRuntime()
+
+	script := []byte(`
+       fun main(account: Account): Int {
+           log(account.address)
+           return 42
+		}
+	`)
+
+	var loggedMessage string
+
+	runtimeInterface := &testRuntimeInterface{
+		getSigningAccounts: func() []types.Address {
+			return []types.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessage = message
+		},
+	}
+
+	value, err := runtime.ExecuteScript(script, runtimeInterface)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(value).To(Equal(42))
+
+	Expect(loggedMessage).
+		To(Equal("0x2a00000000000000000000000000000000000000"))
 }
