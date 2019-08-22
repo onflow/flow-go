@@ -3235,7 +3235,7 @@ func TestCheckInvalidInterfaceConstructorCall(t *testing.T) {
 	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
 }
 
 func TestCheckInterfaceUse(t *testing.T) {
@@ -3616,6 +3616,22 @@ func TestCheckInvalidInterfaceConformanceRepetition(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.DuplicateConformanceError{}))
+}
+
+func TestCheckInterfaceTypeAsValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+      interface X {}
+
+      let x = X
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.Globals["x"].Type).
+		To(BeAssignableToTypeOf(&sema.InterfaceMetaType{}))
 }
 
 // TODO: field declaration, member access, type references

@@ -3,6 +3,8 @@ package interpreter
 import (
 	"fmt"
 	"math/big"
+
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 )
 
 type Value interface {
@@ -797,4 +799,16 @@ func (v SomeValue) Copy() Value {
 	return SomeValue{
 		Value: v.Value.Copy(),
 	}
+}
+
+// MetaTypeValue
+
+type MetaTypeValue struct {
+	Type sema.Type
+}
+
+func (MetaTypeValue) isValue() {}
+
+func (v MetaTypeValue) Copy() Value {
+	return v
 }

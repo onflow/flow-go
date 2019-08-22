@@ -2509,3 +2509,16 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 	Expect(err).
 		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
 }
+
+func TestInterpretInterfaceTypeAsValue(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      interface X {}
+
+      let x = X
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(BeAssignableToTypeOf(interpreter.MetaTypeValue{}))
+}

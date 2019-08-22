@@ -495,3 +495,24 @@ func (t *InterfaceType) Equal(other Type) bool {
 
 	return otherInterface.Identifier == t.Identifier
 }
+
+// InterfaceMetaType
+
+type InterfaceMetaType struct {
+	InterfaceType *InterfaceType
+}
+
+func (*InterfaceMetaType) isType() {}
+
+func (t *InterfaceMetaType) String() string {
+	return fmt.Sprintf("%s.Type", t.InterfaceType.Identifier)
+}
+
+func (t *InterfaceMetaType) Equal(other Type) bool {
+	otherInterface, ok := other.(*InterfaceMetaType)
+	if !ok {
+		return false
+	}
+
+	return otherInterface.InterfaceType.Equal(t.InterfaceType)
+}
