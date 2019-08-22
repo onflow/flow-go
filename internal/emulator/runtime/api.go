@@ -6,6 +6,7 @@ import (
 
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
 	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
@@ -15,6 +16,11 @@ type EmulatorRuntimeAPI struct {
 
 func NewEmulatorRuntimeAPI(registers *etypes.RegistersView) *EmulatorRuntimeAPI {
 	return &EmulatorRuntimeAPI{registers}
+}
+
+func (i *EmulatorRuntimeAPI) ResolveImport(location runtime.ImportLocation) ([]byte, error) {
+	// TODO:
+	return nil, nil
 }
 
 func (i *EmulatorRuntimeAPI) GetValue(owner, controller, key []byte) ([]byte, error) {
