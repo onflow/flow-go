@@ -233,7 +233,7 @@ var parserATN = []uint16{
 	2, 2, 2, 461, 464, 5, 80, 41, 2, 462, 463, 7, 29, 2, 2, 463, 465, 5, 78,
 	40, 2, 464, 462, 3, 2, 2, 2, 464, 465, 3, 2, 2, 2, 465, 79, 3, 2, 2, 2,
 	466, 467, 8, 41, 1, 2, 467, 468, 5, 82, 42, 2, 468, 474, 3, 2, 2, 2, 469,
-	470, 12, 3, 2, 2, 470, 471, 7, 30, 2, 2, 471, 473, 5, 82, 42, 2, 472, 469,
+	470, 12, 3, 2, 2, 470, 471, 7, 30, 2, 2, 471, 473, 5, 28, 15, 2, 472, 469,
 	3, 2, 2, 2, 473, 476, 3, 2, 2, 2, 474, 472, 3, 2, 2, 2, 474, 475, 3, 2,
 	2, 2, 475, 81, 3, 2, 2, 2, 476, 474, 3, 2, 2, 2, 477, 478, 8, 42, 1, 2,
 	478, 479, 5, 84, 43, 2, 479, 486, 3, 2, 2, 2, 480, 481, 12, 3, 2, 2, 481,
@@ -6841,6 +6841,16 @@ func (s *FailableDowncastingExpressionContext) FailableDowncasting() antlr.Termi
 	return s.GetToken(StrictusParserFailableDowncasting, 0)
 }
 
+func (s *FailableDowncastingExpressionContext) FullType() IFullTypeContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*IFullTypeContext)(nil)).Elem(), 0)
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IFullTypeContext)
+}
+
 func (s *FailableDowncastingExpressionContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -6932,7 +6942,7 @@ func (p *StrictusParser) failableDowncastingExpression(_p int) (localctx IFailab
 			}
 			{
 				p.SetState(469)
-				p.additiveExpression(0)
+				p.FullType()
 			}
 
 		}

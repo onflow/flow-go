@@ -1356,3 +1356,8 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 			}
 		})
 }
+
+func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
+	// TODO
+	return nil
+}

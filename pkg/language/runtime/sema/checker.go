@@ -2787,3 +2787,8 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 
 	return nil
 }
+
+func (checker *Checker) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
+	// TODO:
+	return nil
+}

@@ -240,7 +240,7 @@ nilCoalescingExpression
 
 failableDowncastingExpression
     : additiveExpression
-    | failableDowncastingExpression FailableDowncasting additiveExpression
+    | failableDowncastingExpression FailableDowncasting fullType
     ;
 
 additiveExpression

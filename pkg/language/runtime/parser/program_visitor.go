@@ -942,23 +942,17 @@ func (v *ProgramVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpressi
 }
 
 func (v *ProgramVisitor) VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{} {
-	right := ctx.AdditiveExpression().Accept(v)
-	if right == nil {
-		return nil
-	}
-	rightExpression := right.(ast.Expression)
-
-	leftContext := ctx.FailableDowncastingExpression()
-	if leftContext == nil {
-		return rightExpression
+	typeContext := ctx.FullType()
+	if typeContext == nil {
+		return ctx.AdditiveExpression().Accept(v)
 	}
 
-	leftExpression := leftContext.Accept(v).(ast.Expression)
+	expression := ctx.FailableDowncastingExpression().Accept(v).(ast.Expression)
+	fullType := typeContext.Accept(v).(ast.Type)
 
-	return &ast.BinaryExpression{
-		Operation: ast.OperationFailableDowncast,
-		Left:      leftExpression,
-		Right:     rightExpression,
+	return &ast.FailableDowncastExpression{
+		Expression: expression,
+		Type:       fullType,
 	}
 }
 

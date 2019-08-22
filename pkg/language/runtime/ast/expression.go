@@ -473,3 +473,37 @@ func (e *FunctionExpression) Accept(visitor Visitor) Repr {
 func (e *FunctionExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 	return visitor.VisitFunctionExpression(e)
 }
+
+// FailableDowncastExpression
+
+type FailableDowncastExpression struct {
+	Expression Expression
+	Type       Type
+}
+
+func (e *FailableDowncastExpression) String() string {
+	return fmt.Sprintf(
+		"(%s as? %s)",
+		e.Expression, e.Type,
+	)
+}
+
+func (e *FailableDowncastExpression) StartPosition() Position {
+	return e.Expression.StartPosition()
+}
+
+func (e *FailableDowncastExpression) EndPosition() Position {
+	return e.Type.EndPosition()
+}
+
+func (*FailableDowncastExpression) isIfStatementTest() {}
+
+func (*FailableDowncastExpression) isExpression() {}
+
+func (e *FailableDowncastExpression) Accept(v Visitor) Repr {
+	return v.VisitFailableDowncastExpression(e)
+}
+
+func (e *FailableDowncastExpression) AcceptExp(v ExpressionVisitor) Repr {
+	return v.VisitFailableDowncastExpression(e)
+}

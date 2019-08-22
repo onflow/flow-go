@@ -3391,14 +3391,13 @@ func TestParseFailableDowncasting(t *testing.T) {
 					Identifier: "x",
 					Pos:        Position{Offset: 12, Line: 2, Column: 11},
 				},
-				Value: &BinaryExpression{
-					Operation: OperationFailableDowncast,
-					Left: &IntExpression{
+				Value: &FailableDowncastExpression{
+					Expression: &IntExpression{
 						Value:    big.NewInt(0),
 						StartPos: Position{Offset: 16, Line: 2, Column: 15},
 						EndPos:   Position{Offset: 16, Line: 2, Column: 15},
 					},
-					Right: &IdentifierExpression{
+					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "Int",
 							Pos:        Position{Offset: 22, Line: 2, Column: 21},
