@@ -36,6 +36,8 @@ type Interface interface {
 	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public key and code.
 	CreateAccount(publicKey []byte, code []byte) (accountID []byte, err error)
+	// UpdateAccountCode updates the code associated with an account.
+	UpdateAccountCode(accountID, code []byte) (err error)
 }
 
 type Error struct {
@@ -142,12 +144,27 @@ var createAccountFunctionType = sema.FunctionType{
 	ReturnType: &sema.IntType{},
 }
 
+// TODO: improve types
+var updateAccountCodeFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{
+		// accountID
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+		// code
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+	},
+	// nothing
+	ReturnType: &sema.VoidType{},
+}
+
 func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (*ast.Program, error) {
 	return parser.ParseProgram(string(script))
 }
 
 func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error) {
-
 	program, err := r.parse(script, runtimeInterface)
 	if err != nil {
 		return nil, err
@@ -191,6 +208,12 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 			"createAccount",
 			&createAccountFunctionType,
 			r.newCreateAccountFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"updateAccountCode",
+			&updateAccountCodeFunctionType,
+			r.newUpdateAccountCodeFunction(runtimeInterface),
 			nil,
 		),
 	)
@@ -289,6 +312,32 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 		}
 
 		result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+		return trampoline.Done{Result: result}
+	}
+}
+
+func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Interface) interpreter.HostFunction {
+	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		if len(arguments) != 2 {
+			panic(fmt.Sprintf("updateAccountCode requires 2 parameters"))
+		}
+
+		accountID, err := toByteArray(arguments[0])
+		if err != nil {
+			panic(fmt.Sprintf("updateAccountCode requires the first parameter to be an array"))
+		}
+
+		code, err := toByteArray(arguments[1])
+		if err != nil {
+			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
+		}
+
+		err = runtimeInterface.UpdateAccountCode(accountID, code)
+		if err != nil {
+			panic(err)
+		}
+
+		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
 	}
 }

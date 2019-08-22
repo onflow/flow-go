@@ -1,12 +1,13 @@
 package runtime
 
 import (
+	"fmt"
 	"math/big"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
-
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 type EmulatorRuntimeAPI struct {
@@ -15,6 +16,11 @@ type EmulatorRuntimeAPI struct {
 
 func NewEmulatorRuntimeAPI(registers *etypes.RegistersView) *EmulatorRuntimeAPI {
 	return &EmulatorRuntimeAPI{registers}
+}
+
+func (i *EmulatorRuntimeAPI) ResolveImport(location runtime.ImportLocation) ([]byte, error) {
+	// TODO:
+	return nil, nil
 }
 
 func (i *EmulatorRuntimeAPI) GetValue(owner, controller, key []byte) ([]byte, error) {
@@ -46,6 +52,17 @@ func (i *EmulatorRuntimeAPI) CreateAccount(publicKey, code []byte) (id []byte, e
 	address := types.BytesToAddress(accountID)
 
 	return address.Bytes(), nil
+}
+
+func (i *EmulatorRuntimeAPI) UpdateAccountCode(accountID, code []byte) (err error) {
+	_, exists := i.registers.Get(fullKey(accountID, []byte{}, keyBalance()))
+	if !exists {
+		return fmt.Errorf("Account with ID %s does not exist", accountID)
+	}
+
+	i.registers.Set(fullKey(accountID, accountID, keyCode()), code)
+
+	return nil
 }
 
 func (i *EmulatorRuntimeAPI) GetAccount(address types.Address) *types.Account {
