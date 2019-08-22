@@ -150,7 +150,7 @@ func TestBLS_BLS12381(t *testing.T) {
 
 // TestG1 helps debugging but is not a unit test
 func TestG1(t *testing.T) {
-	_, _ = NewSignatureAlgo(BLS_BLS12381)
+	NewSignatureAlgo(BLS_BLS12381)
 
 	var expo scalar
 	randZr(&expo, []byte{0})
@@ -161,7 +161,7 @@ func TestG1(t *testing.T) {
 
 // G1 bench
 func BenchmarkG1(b *testing.B) {
-	_, _ = NewSignatureAlgo(BLS_BLS12381)
+	NewSignatureAlgo(BLS_BLS12381)
 	var expo scalar
 	randZr(&expo, []byte{0})
 	var res pointG1
@@ -177,7 +177,7 @@ func BenchmarkG1(b *testing.B) {
 // TestG2 helps debugging but is not a unit test
 func TestG2(t *testing.T) {
 
-	_, _ = NewSignatureAlgo(BLS_BLS12381)
+	NewSignatureAlgo(BLS_BLS12381)
 
 	var expo scalar
 	(&expo).setInt(1)
@@ -188,7 +188,7 @@ func TestG2(t *testing.T) {
 
 // G2 bench
 func BenchmarkG2(b *testing.B) {
-	_, _ = NewSignatureAlgo(BLS_BLS12381)
+	NewSignatureAlgo(BLS_BLS12381)
 	var expo scalar
 	randZr(&expo, []byte{0})
 	var res pointG2
@@ -263,17 +263,29 @@ func TestECDSA(t *testing.T) {
 }
 
 // Signing bench
-func BenchmarkECDSASign(b *testing.B) {
-	salg, _ := NewSignatureAlgo(ECDSA_SECp256k1)
-	//salg, _ := NewSignatureAlgo(ECDSA_P256)
+func BenchmarkECDSA_P256Sign(b *testing.B) {
+	salg, _ := NewSignatureAlgo(ECDSA_P256)
 	halg, _ := NewHashAlgo(SHA3_256)
 	benchSign(b, salg, halg)
 }
 
 // Verifying bench
-func BenchmarkECDSAVerify(b *testing.B) {
+func BenchmarkECDSA_P256Verify(b *testing.B) {
+	salg, _ := NewSignatureAlgo(ECDSA_P256)
+	halg, _ := NewHashAlgo(SHA3_256)
+	benchVerify(b, salg, halg)
+}
+
+// Signing bench
+func BenchmarkECDSA_SECp256k1Sign(b *testing.B) {
 	salg, _ := NewSignatureAlgo(ECDSA_SECp256k1)
-	//salg, _ := NewSignatureAlgo(ECDSA_P256)
+	halg, _ := NewHashAlgo(SHA3_256)
+	benchSign(b, salg, halg)
+}
+
+// Verifying bench
+func BenchmarkECDSA_SECp256k1Verify(b *testing.B) {
+	salg, _ := NewSignatureAlgo(ECDSA_SECp256k1)
 	halg, _ := NewHashAlgo(SHA3_256)
 	benchVerify(b, salg, halg)
 }
