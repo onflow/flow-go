@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"math/big"
@@ -297,21 +299,56 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		return nil, Error{[]error{err}}
 	}
 
-	// TODO: invoke with account objects
-
 	signingAccounts := make([]interface{}, signingAccountsCount)
+	storedValues := make([]interpreter.DictionaryValue, signingAccountsCount)
+
+	storageKey := []byte("storage")
 
 	for i, address := range signingAccountAddresses {
+
+		// TODO: fix controller and key
+		storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, storageKey)
+		if err != nil {
+			return nil, Error{[]error{err}}
+		}
+
+		storedValue := interpreter.DictionaryValue{}
+		if len(storedData) > 0 {
+			decoder := gob.NewDecoder(bytes.NewReader(storedData))
+			err = decoder.Decode(&storedValue)
+			if err != nil {
+				return nil, Error{[]error{err}}
+			}
+		}
+
 		signingAccounts[i] = interpreter.StructureValue{
 			"address": interpreter.StringValue(address.String()),
-			// TODO: initialize properly
-			"storage": interpreter.DictionaryValue{},
+			"storage": storedValue,
 		}
+
+		storedValues[i] = storedValue
 	}
 
 	value, err := inter.InvokeExportable("main", signingAccounts...)
 	if err != nil {
 		return nil, Error{[]error{err}}
+	}
+
+	for i, storedValue := range storedValues {
+		address := signingAccountAddresses[i]
+
+		var newStoredData bytes.Buffer
+		encoder := gob.NewEncoder(&newStoredData)
+		err = encoder.Encode(&storedValue)
+		if err != nil {
+			return nil, Error{[]error{err}}
+		}
+
+		// TODO: fix controller and key
+		err := runtimeInterface.SetValue(address.Bytes(), []byte{}, storageKey, newStoredData.Bytes())
+		if err != nil {
+			return nil, Error{[]error{err}}
+		}
 	}
 
 	return value.ToGoValue(), nil

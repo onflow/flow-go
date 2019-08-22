@@ -202,12 +202,18 @@ func TestRuntimeStorage(t *testing.T) {
 
            account.storage["xyz"] = "xyz"
            log(account.storage["xyz"])
-		}
+       }
 	`)
 
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
+		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+			return nil, nil
+		},
+		setValue: func(controller, owner, key, value []byte) (err error) {
+			return nil
+		},
 		getSigningAccounts: func() []types.Address {
 			return []types.Address{[20]byte{42}}
 		},
@@ -223,4 +229,46 @@ func TestRuntimeStorage(t *testing.T) {
 
 	Expect(loggedMessages).
 		To(Equal([]string{"nil", "42", "[1, 2, 3]", `"xyz"`}))
+}
+
+func TestRuntimeStorageMultipleTransactions(t *testing.T) {
+	RegisterTestingT(t)
+
+	runtime := NewInterpreterRuntime()
+
+	script := []byte(`
+       fun main(account: Account) {
+           log(account.storage["x"])
+           account.storage["x"] = ["A", "B"]
+       }
+	`)
+
+	var loggedMessages []string
+	var storedValue []byte
+
+	runtimeInterface := &testRuntimeInterface{
+		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+			return storedValue, nil
+		},
+		setValue: func(controller, owner, key, value []byte) (err error) {
+			storedValue = value
+			return nil
+		},
+		getSigningAccounts: func() []types.Address {
+			return []types.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script, runtimeInterface)
+
+	_, err = runtime.ExecuteScript(script, runtimeInterface)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(loggedMessages).
+		To(Equal([]string{"nil", `["A", "B"]`}))
 }

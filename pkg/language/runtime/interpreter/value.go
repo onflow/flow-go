@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"encoding/gob"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -922,4 +923,26 @@ func (MetaTypeValue) isValue() {}
 
 func (v MetaTypeValue) Copy() Value {
 	return v
+}
+
+func init() {
+	gob.Register(VoidValue{})
+	gob.Register(BoolValue(true))
+	gob.Register(StringValue(""))
+	gob.Register(ArrayValue{})
+	gob.Register(IntValue{})
+	gob.Register(Int8Value(0))
+	gob.Register(Int16Value(0))
+	gob.Register(Int32Value(0))
+	gob.Register(Int64Value(0))
+	gob.Register(UInt8Value(0))
+	gob.Register(UInt16Value(0))
+	gob.Register(UInt32Value(0))
+	gob.Register(UInt64Value(0))
+	gob.Register(StructureValue{})
+	gob.Register(DictionaryValue{})
+	gob.Register(TupleValue{})
+	gob.Register(NilValue{})
+	gob.Register(SomeValue{})
+	gob.Register(MetaTypeValue{})
 }
