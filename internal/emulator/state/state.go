@@ -55,8 +55,8 @@ func (ws *WorldState) GetLatestBlock() *etypes.Block {
 
 	currHeight := len(ws.Blockchain)
 	blockHash := ws.Blockchain[currHeight-1]
-	block := ws.GetBlockByHash(blockHash)
-	return block
+
+	return ws.GetBlockByHash(blockHash)
 }
 
 // GetBlockByHash gets a block by hash.
@@ -113,17 +113,16 @@ func (ws *WorldState) SetRegisters(registers etypes.Registers) {
 
 // InsertBlock adds a new block to the blockchain.
 func (ws *WorldState) InsertBlock(block *etypes.Block) {
+	ws.blockchainMutex.Lock()
 	ws.blocksMutex.Lock()
 	defer ws.blocksMutex.Unlock()
+	defer ws.blockchainMutex.Unlock()
 
 	if _, exists := ws.Blocks[block.Hash()]; exists {
 		return
 	}
 
 	ws.Blocks[block.Hash()] = block
-
-	ws.blockchainMutex.Lock()
-	defer ws.blockchainMutex.Unlock()
 
 	ws.Blockchain = append(ws.Blockchain, block.Hash())
 
