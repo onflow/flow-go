@@ -17,5 +17,6 @@ func NewReceiptProcessorConfig(c *config.Config) *processor.ReceiptProcessorConf
 // NewHasher return a new crypto.Hasher
 // TODO: cast a config string to crypto.AlgoName
 func NewHasher(c *config.Config) crypto.Hasher {
-	return crypto.NewHashAlgo(crypto.SHA3_256)
+	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+	return hasher
 }
