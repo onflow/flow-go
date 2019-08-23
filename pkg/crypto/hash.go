@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"errors"
 	"hash"
 
 	"golang.org/x/crypto/sha3"
@@ -70,7 +71,20 @@ func (a *HashAlgo) AddStruct(struc Encoder) {
 	a.Write(struc.Encode())
 }
 
-// HashesToBytes converts a slice of hashes to a slice of bytes.
+// BytesToHash converts a byte slice to a hash instance.
+func BytesToHash(b []byte) (Hash, error) {
+	if len(b) == HashLengthSha3_256 {
+		var h Hash32
+		copy(h[:], b[:])
+		return &h, nil
+	}
+
+	// TODO: add support for Hash64
+
+	return nil, errors.New("invalid hash length")
+}
+
+// HashesToBytes converts a slice of hashes to a slice of byte slices.
 func HashesToBytes(hashes []Hash) [][]byte {
 	b := make([][]byte, len(hashes))
 
