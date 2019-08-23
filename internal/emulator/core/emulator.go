@@ -1,7 +1,6 @@
 package core
 
 import (
-	"reflect"
 	"sync"
 	"time"
 
@@ -178,7 +177,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
-	if err := b.validateSignature(tx.PayerSignature); err != nil {
+	if err := b.validateSignature(tx.PayerSignature, tx.Hash()); err != nil {
 		return err
 	}
 
@@ -297,15 +296,20 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 	b.worldStates[string(blockHash.Bytes())] = bytes
 }
 
-func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature) error {
+func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature, txHash crypto.Hash) error {
 	account, err := b.GetAccount(signature.Account)
 	if err != nil {
 		return &ErrInvalidSignatureAccount{Account: signature.Account}
 	}
 
-	for _, publicKey := range account.PublicKeys {
-		// TODO: perform real signature verification
-		if reflect.DeepEqual(publicKey, signature.PublicKey) {
+	// TODO: replace hard-coded signature algorithm
+	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+
+	for _, publicKeyBytes := range account.PublicKeys {
+		// TODO: handle errors in these functions
+		publicKey, _ := salg.ParsePubKey(publicKeyBytes)
+		valid, _ := salg.VerifyHash(publicKey, crypto.Signature(signature.Signature), txHash)
+		if valid {
 			return nil
 		}
 	}

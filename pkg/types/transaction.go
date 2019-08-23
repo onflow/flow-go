@@ -58,7 +58,7 @@ func (tx *RawTransaction) SignPayer(account Address, prKey crypto.PrKey) *Signed
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 	sig, _ := salg.SignHash(prKey, tx.Hash())
 
-	// TODO: create simpler functionf or encoding/decoding keys
+	// TODO: create simpler function for encoding/decoding keys
 	pubKeyBytes, _ := salg.EncodePubKey(prKey.Pubkey())
 
 	accountSig := AccountSignature{
