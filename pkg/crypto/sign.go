@@ -86,8 +86,8 @@ func (a *SignAlgo) SignatureSize() int {
 
 // Signature type tools
 
-// ToBytes returns a byte array of the signature data
-func (s Signature) ToBytes() []byte {
+// Bytes returns a byte array of the signature data
+func (s Signature) Bytes() []byte {
 	return s[:]
 }
 
