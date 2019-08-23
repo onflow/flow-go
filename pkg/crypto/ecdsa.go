@@ -1,7 +1,7 @@
 package crypto
 
 // Elliptic Curve Digital Signature Algorithm is implemented as
-// defined in FIPS 186-4, although The hash function implemented in this package is SHA3.
+// defined in FIPS 186-4, although the hash function implemented in this package is SHA3.
 // This is different from the ECDSA version implemented in some blockchains.
 
 import (
