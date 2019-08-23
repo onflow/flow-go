@@ -31,20 +31,20 @@ func TestNodeRecordsSort(t *testing.T) {
 	RegisterTestingT(t)
 
 	nodes := NodeRecords{
-		&NodeRecord{ID: 1},
-		&NodeRecord{ID: 3},
-		&NodeRecord{ID: 2},
-		&NodeRecord{ID: 5},
+		&NodeRecord{id: 1},
+		&NodeRecord{id: 3},
+		&NodeRecord{id: 2},
+		&NodeRecord{id: 5},
 	}
 
 	sort.Sort(nodes)
 
 	Expect(nodes).To(Equal(
 		NodeRecords{
-			&NodeRecord{ID: 1},
-			&NodeRecord{ID: 2},
-			&NodeRecord{ID: 3},
-			&NodeRecord{ID: 5},
+			&NodeRecord{id: 1},
+			&NodeRecord{id: 2},
+			&NodeRecord{id: 3},
+			&NodeRecord{id: 5},
 		},
 	))
 }
@@ -53,20 +53,20 @@ func TestNodeIdentitiesSort(t *testing.T) {
 	RegisterTestingT(t)
 
 	nodes := nodeIdentities{
-		&nodeIdentity{coreID: &NodeRecord{ID: 1}, index:11},
-		&nodeIdentity{coreID: &NodeRecord{ID: 3}, index:33},
-		&nodeIdentity{coreID: &NodeRecord{ID: 2}, index:22},
-		&nodeIdentity{coreID: &NodeRecord{ID: 5}, index:55},
+		&nodeIdentity{NodeRecord: &NodeRecord{id: 1}, index:11},
+		&nodeIdentity{NodeRecord: &NodeRecord{id: 3}, index:33},
+		&nodeIdentity{NodeRecord: &NodeRecord{id: 2}, index:22},
+		&nodeIdentity{NodeRecord: &NodeRecord{id: 5}, index:55},
 	}
 
 	sort.Sort(nodes)
 
 	Expect(nodes).To(Equal(
 		nodeIdentities{
-			&nodeIdentity{coreID: &NodeRecord{ID: 1}, index:11},
-			&nodeIdentity{coreID: &NodeRecord{ID: 2}, index:22},
-			&nodeIdentity{coreID: &NodeRecord{ID: 3}, index:33},
-			&nodeIdentity{coreID: &NodeRecord{ID: 5}, index:55},
+			&nodeIdentity{NodeRecord: &NodeRecord{id: 1}, index:11},
+			&nodeIdentity{NodeRecord: &NodeRecord{id: 2}, index:22},
+			&nodeIdentity{NodeRecord: &NodeRecord{id: 3}, index:33},
+			&nodeIdentity{NodeRecord: &NodeRecord{id: 5}, index:55},
 		},
 	))
 }
@@ -75,20 +75,20 @@ func TestNewInMemoryIdentityTable(t *testing.T) {
 	RegisterTestingT(t)
 
 	nodes := nodeIdentities{
-		&nodeIdentity{coreID: &NodeRecord{ID: 1}, index:11},
-		&nodeIdentity{coreID: &NodeRecord{ID: 3}, index:33},
-		&nodeIdentity{coreID: &NodeRecord{ID: 2}, index:22},
-		&nodeIdentity{coreID: &NodeRecord{ID: 5}, index:55},
+		&nodeIdentity{NodeRecord: &NodeRecord{id: 1}, index:11},
+		&nodeIdentity{NodeRecord: &NodeRecord{id: 3}, index:33},
+		&nodeIdentity{NodeRecord: &NodeRecord{id: 2}, index:22},
+		&nodeIdentity{NodeRecord: &NodeRecord{id: 5}, index:55},
 	}
 
 	sort.Sort(nodes)
 
 	Expect(nodes).To(Equal(
 		nodeIdentities{
-			&nodeIdentity{coreID: &NodeRecord{ID: 1}, index:11},
-			&nodeIdentity{coreID: &NodeRecord{ID: 2}, index:22},
-			&nodeIdentity{coreID: &NodeRecord{ID: 3}, index:33},
-			&nodeIdentity{coreID: &NodeRecord{ID: 5}, index:55},
+			&nodeIdentity{NodeRecord: &NodeRecord{id: 1}, index:11},
+			&nodeIdentity{NodeRecord: &NodeRecord{id: 2}, index:22},
+			&nodeIdentity{NodeRecord: &NodeRecord{id: 3}, index:33},
+			&nodeIdentity{NodeRecord: &NodeRecord{id: 5}, index:55},
 		},
 	))
 }
