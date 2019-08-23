@@ -1,8 +1,6 @@
 package types
 
-import (
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
-)
+import "github.com/dapperlabs/bamboo-node/pkg/crypto"
 
 // Account represents an account on the Bamboo network.
 //
@@ -16,5 +14,5 @@ type Account struct {
 
 type AccountKey struct {
 	Account Address
-	KeyPair *crypto.KeyPair
+	Key     crypto.PrKey
 }
