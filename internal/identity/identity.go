@@ -52,54 +52,39 @@ type Table interface {
 
 // NodeRecord provides information about one Node that (independent of potential other nodes)
 type NodeRecord struct {
-	ID      uint
-	Address string
-	Role    NodeRole
-	Stake   *big.Int
+	id      uint
+	address string
+	role    NodeRole
+	stake   *big.Int
 }
+
+func (i NodeRecord) ID() uint        { return i.id }
+func (i NodeRecord) Address() string { return i.address }
+func (i NodeRecord) Role() NodeRole  { return i.role }
+func (i NodeRecord) Stake() *big.Int { return i.stake }
 
 // NodeRecords is a slice of *NodeRecord which implements sort.Interface
 // Sorting is based solely on NodeRecord.ID
 type NodeRecords []*NodeRecord
 
 func (ns NodeRecords) Len() int           { return len(ns) }
-func (ns NodeRecords) Less(i, j int) bool { return ns[i].ID < ns[j].ID }
+func (ns NodeRecords) Less(i, j int) bool { return ns[i].id < ns[j].id }
 func (ns NodeRecords) Swap(i, j int)      { ns[i], ns[j] = ns[j], ns[i] }
-
-
 
 // Implementation of NodeIdentity interface
 type nodeIdentity struct {
-	coreID *NodeRecord
-	index  uint
+	*NodeRecord
+	index uint
 }
 
-func (i nodeIdentity) ID() uint {
-	return i.coreID.ID
-}
-
-func (i nodeIdentity) Address() string {
-	return i.coreID.Address
-}
-
-func (i nodeIdentity) Role() NodeRole {
-	return i.coreID.Role
-}
-
-func (i nodeIdentity) Stake() *big.Int {
-	return i.coreID.Stake
-}
-
-func (i nodeIdentity) Index() uint {
-	return i.index
-}
+func (i nodeIdentity) Index() uint { return i.index }
 
 // nodeIdentities is a slice of *nodeIdentity which implements sort.Interface
 // Sorting is based solely on nodeIdentity.ID
 type nodeIdentities []*nodeIdentity
 
 func (ns nodeIdentities) Len() int           { return len(ns) }
-func (ns nodeIdentities) Less(i, j int) bool { return ns[i].coreID.ID < ns[j].coreID.ID }
+func (ns nodeIdentities) Less(i, j int) bool { return ns[i].id < ns[j].id }
 func (ns nodeIdentities) Swap(i, j int)      { ns[i], ns[j] = ns[j], ns[i] }
 
 // InMemoryIdentityTable is an in-memory implementation of the interface identity.Table
@@ -115,7 +100,7 @@ func (t InMemoryIdentityTable) Count() uint {
 
 func (t InMemoryIdentityTable) Nodes() []NodeIdentity {
 	identities := make([]NodeIdentity, len(t.nodes))
-    // converting explicitly from nodeIdentity to interface NodeIdentity
+	// converting explicitly from nodeIdentity to interface NodeIdentity
 	for i, n := range t.nodes {
 		identities[i] = n
 	}
@@ -155,14 +140,14 @@ func (t InMemoryIdentityTable) TotalStake() *big.Int {
 
 func (t InMemoryIdentityTable) FilterByID(ids []uint) (Table, error) {
 	nodes := make([]*NodeRecord, len(ids))
-	missing := []uint{}
+	var missing []uint
 	var n *nodeIdentity
 	var found bool
 	var idx int = 0
 	for _, id := range ids {
 		n, found = t.idMap[id]
 		if found {
-			nodes[idx] = n.coreID
+			nodes[idx] = n.NodeRecord
 			idx++
 		} else {
 			missing = append(missing, id)
@@ -176,14 +161,14 @@ func (t InMemoryIdentityTable) FilterByID(ids []uint) (Table, error) {
 
 func (t InMemoryIdentityTable) FilterByAddress(addresses []string) (Table, error) {
 	nodes := make([]*NodeRecord, len(addresses))
-	missing := []string{}
+	var missing []string
 	var n *nodeIdentity
 	var found bool
 	var idx int = 0
 	for _, addr := range addresses {
 		n, found = t.addressMap[addr]
 		if found {
-			nodes[idx] = n.coreID
+			nodes[idx] = n.NodeRecord
 			idx++
 		} else {
 			missing = append(missing, addr)
@@ -200,7 +185,7 @@ func (t InMemoryIdentityTable) FilterByRole(role NodeRole) (Table, error) {
 	var idx int = 0
 	for _, n := range t.nodes {
 		if n.Role() == role {
-			nodes[idx] = n.coreID
+			nodes[idx] = n.NodeRecord
 			idx++
 		}
 	}
@@ -212,13 +197,13 @@ func (t InMemoryIdentityTable) FilterByRole(role NodeRole) (Table, error) {
 
 func (t InMemoryIdentityTable) FilterByIndex(indices []uint) (Table, error) {
 	nodes := make([]*NodeRecord, len(indices))
-	missing := []uint{}
+	var missing []uint
 	var idx int = 0
-	_nodeCount := uint(t.Count())
-	_allNodes := t.nodes
+	nodeCount := uint(t.Count())
+	allNodes := t.nodes
 	for _, i := range indices {
-		if i < _nodeCount {
-			nodes[idx] = _allNodes[i].coreID
+		if i < nodeCount {
+			nodes[idx] = allNodes[i].NodeRecord
 			idx++
 		} else {
 			missing = append(missing, i)
@@ -238,22 +223,21 @@ func (e *NodeNotFoundError) Error() string {
 	return fmt.Sprintf("node with '%s' not found", e.key)
 }
 
-
 // NewInMemoryIdentityTable generates an `identity.Table` which is maintained in-memory
 func NewInMemoryIdentityTable(nodes []*NodeRecord) *InMemoryIdentityTable {
 	nidentities := newSortedNodeIdentities(nodes)
 
 	addressMap := make(map[string]*nodeIdentity)
 	idMap := make(map[uint]*nodeIdentity)
-	var _last *NodeRecord = nil // reference to previous nodeIdentity to detect duplicates
+	var last *NodeRecord = nil // reference to previous nodeIdentity to detect duplicates
 	for i, n := range nidentities {
-		if _last == n.coreID {
+		if last == n.NodeRecord {
 			panic("Duplicate NodeRecord not supported")
 		}
-		_last = n.coreID
+		last = n.NodeRecord
 		n.index = uint(i)
-		addressMap[n.coreID.Address] = n
-		idMap[n.coreID.ID] = n
+		addressMap[n.Address()] = n
+		idMap[n.ID()] = n
 	}
 
 	return &InMemoryIdentityTable{nidentities, addressMap, idMap}
@@ -264,13 +248,13 @@ func NewInMemoryIdentityTable(nodes []*NodeRecord) *InMemoryIdentityTable {
 func newSortedNodeIdentities(nodes []*NodeRecord) []*nodeIdentity {
 	// While the slice `nodes` is copied, the data in the slice is not sufficient to sort the slice without mutating the underlying array
 	// For more details, see https://blog.golang.org/go-slices-usage-and-internals
-	nidentities := make([]*nodeIdentity, len(nodes))
+	var nidentities nodeIdentities = make([]*nodeIdentity, len(nodes))
 	for i, n := range nodes {
 		if n == nil {
 			panic("NodeRecord cannot be nil")
 		}
-		nidentities[i] = &nodeIdentity{coreID: n}
+		nidentities[i] = &nodeIdentity{NodeRecord: n}
 	}
-	sort.Sort(nodeIdentities(nidentities))
+	sort.Sort(nidentities)
 	return nidentities
 }
